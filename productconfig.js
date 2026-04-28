@@ -8,6 +8,7 @@ import {
   selectMinWidth,
   requiredRatedLoad,
 } from './analysis/productConfig.mjs';
+import { getApprovedProductCatalogRows } from './dataStore.mjs';
 
 document.addEventListener('DOMContentLoaded', () => {
   initSettings();
@@ -85,6 +86,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     renderResults(result);
+    renderApprovedCatalogMatches(result);
     document.getElementById('results-section').hidden = false;
   }
 
@@ -203,6 +205,35 @@ document.addEventListener('DOMContentLoaded', () => {
     } else {
       fallbackCopy(text);
     }
+  }
+
+  function renderApprovedCatalogMatches(result) {
+    const resultsEl = document.getElementById('results');
+    if (!resultsEl) return;
+    const widthIn = result.geometry?.widthIn;
+    const depthIn = result.geometry?.depthIn;
+    const candidates = getApprovedProductCatalogRows({ category: 'tray' })
+      .filter(row => {
+        if (widthIn > 0 && row.dimensions?.widthIn && Number(row.dimensions.widthIn) !== Number(widthIn)) return false;
+        if (depthIn > 0 && row.dimensions?.depthIn && Number(row.dimensions.depthIn) !== Number(depthIn)) return false;
+        return true;
+      })
+      .slice(0, 5);
+    const section = document.createElement('section');
+    section.className = 'result-card';
+    section.innerHTML = `
+      <h3>Approved Catalog Candidates</h3>
+      ${candidates.length ? `<table class="result-table">
+        <thead><tr><th>Catalog #</th><th>Manufacturer</th><th>Description</th><th>Verified</th></tr></thead>
+        <tbody>${candidates.map(row => `<tr>
+          <td>${esc(row.catalogNumber)}</td>
+          <td>${esc(row.manufacturer)}</td>
+          <td>${esc(row.description)}</td>
+          <td>${esc(row.lastVerified || 'not verified')}</td>
+        </tr>`).join('')}</tbody>
+      </table>` : '<p class="field-hint">No approved local catalog rows match this tray geometry. Open the Product Catalog to approve or import manufacturer rows.</p>'}
+      <p class="field-hint"><a href="productcatalog.html">Open Product Catalog</a></p>`;
+    resultsEl.appendChild(section);
   }
 
   function fallbackCopy(text) {

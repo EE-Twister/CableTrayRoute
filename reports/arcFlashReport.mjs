@@ -80,8 +80,16 @@ function resolveStudyDate(info) {
   return new Date().toISOString().split('T')[0];
 }
 
+function unwrapArcFlashResults(results = {}) {
+  if (!results || typeof results !== 'object' || Array.isArray(results)) return {};
+  if (results.results && typeof results.results === 'object' && !Array.isArray(results.results)) {
+    return results.results;
+  }
+  return results;
+}
+
 function safeEntries(results = {}) {
-  return Object.entries(results).filter(([key, value]) => {
+  return Object.entries(unwrapArcFlashResults(results)).filter(([key, value]) => {
     return key && typeof value === 'object' && value !== null && !key.startsWith('_');
   });
 }

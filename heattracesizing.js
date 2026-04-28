@@ -8,6 +8,14 @@ import {
   buildHeatTraceReport,
   renderHeatTraceReportHTML,
 } from './analysis/heatTraceReport.mjs';
+import {
+  buildHeatTraceInstallationPackage,
+  renderHeatTraceInstallationPackageHTML,
+} from './analysis/heatTraceInstallationPackage.mjs';
+import {
+  buildHeatTraceAdvancedPackage,
+  renderHeatTraceAdvancedHTML,
+} from './analysis/heatTraceAdvancedAssets.mjs';
 import { getStudies, getStudyApprovals, setStudies } from './dataStore.mjs';
 import { getProjectState } from './projectStorage.js';
 import { initStudyApprovalPanel } from './src/components/studyApproval.js';
@@ -50,7 +58,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const circuitCaseList = document.getElementById('circuit-case-list');
   const reportActionButton = document.getElementById('heattrace-report-action');
   const reportGenerateButton = document.getElementById('heattrace-generate-report');
+  const packageGenerateButton = document.getElementById('heattrace-generate-install-package');
+  const advancedPackageGenerateButton = document.getElementById('heattrace-generate-advanced-package');
   const reportExportJsonButton = document.getElementById('heattrace-export-report-json');
+  const packageExportJsonButton = document.getElementById('heattrace-export-package-json');
+  const advancedPackageExportJsonButton = document.getElementById('heattrace-export-advanced-json');
   const reportPrintButton = document.getElementById('heattrace-print-report');
   const reportPreview = document.getElementById('heattrace-report-preview');
   const reportStatus = document.getElementById('heattrace-report-status');
@@ -60,6 +72,35 @@ document.addEventListener('DOMContentLoaded', () => {
   const componentAllowanceRows = document.getElementById('component-allowance-rows');
   const addComponentAllowanceButton = document.getElementById('add-component-allowance');
   const componentAllowanceSummary = document.getElementById('component-allowance-summary');
+  const constructionFields = {
+    pipeTag: document.getElementById('construction-pipe-tag'),
+    service: document.getElementById('construction-service'),
+    area: document.getElementById('construction-area'),
+    sourcePanel: document.getElementById('construction-source-panel'),
+    controllerTag: document.getElementById('construction-controller-tag'),
+    circuitNumber: document.getElementById('construction-circuit-number'),
+    cableFamilyId: document.getElementById('construction-cable-family'),
+    accessoryOverrides: document.getElementById('construction-accessory-overrides'),
+    installationNotes: document.getElementById('construction-installation-notes'),
+  };
+  const advancedFields = {
+    assetType: document.getElementById('advanced-asset-type'),
+    assetTag: document.getElementById('advanced-asset-tag'),
+    panelPhase: document.getElementById('advanced-panel-phase'),
+    diversityGroup: document.getElementById('advanced-diversity-group'),
+    controllerType: document.getElementById('advanced-controller-type'),
+    controlMode: document.getElementById('advanced-control-mode'),
+    sensorCount: document.getElementById('advanced-sensor-count'),
+    sensorLocation: document.getElementById('advanced-sensor-location'),
+    highLimitSensor: document.getElementById('advanced-high-limit-sensor'),
+    hazardousEnabled: document.getElementById('advanced-hazardous-enabled'),
+    hazardousClassification: document.getElementById('advanced-hazardous-classification'),
+    tRatingTargetC: document.getElementById('advanced-t-rating-target-c'),
+    startupAmbientC: document.getElementById('advanced-startup-ambient-c'),
+    startupDiversity: document.getElementById('advanced-startup-diversity'),
+    segmentsJson: document.getElementById('advanced-segments-json'),
+    notes: document.getElementById('advanced-notes'),
+  };
   let activeUnitSystem = unitSystemSelect?.value || 'imperial';
   let sensitivityBaseline = null;
   let sensitivityRecommendations = [];
@@ -1799,6 +1840,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const inputs = readInputs();
+    const constructionMetadata = readConstructionMetadata();
+    if (!constructionMetadata) return;
     const name = circuitCaseNameInput?.value.trim() || `HT-${circuitCases.length + 1}`;
     const voltage = inputs.voltageV || 0;
     const loadAmps = result.installedLoadAmps ?? (voltage > 0 ? result.totalCircuitWatts / voltage : 0);
@@ -1812,6 +1855,7 @@ document.addEventListener('DOMContentLoaded', () => {
       inputs,
       result,
       loadAmps,
+      ...constructionMetadata,
       createdAt: existingIndex >= 0 ? circuitCases[existingIndex].createdAt : new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -1920,6 +1964,7 @@ document.addEventListener('DOMContentLoaded', () => {
     editingCircuitCaseId = caseId;
     updateCircuitCaseActionState();
     writeInputsToForm(circuitCase.inputs || {}, circuitCase.unitSystem || activeUnitSystem);
+    writeConstructionMetadataToForm(circuitCase);
     if (circuitCaseNameInput) {
       circuitCaseNameInput.value = circuitCase.name || '';
     }
@@ -2013,6 +2058,133 @@ document.addEventListener('DOMContentLoaded', () => {
     setStudies(studies);
   }
 
+  function readConstructionMetadata() {
+    const accessoryOverrides = parseAccessoryOverrides(constructionFields.accessoryOverrides?.value || '');
+    if (accessoryOverrides === null) return null;
+    const advancedMetadata = readAdvancedMetadata();
+    if (advancedMetadata === null) return null;
+    return {
+      pipeTag: constructionFields.pipeTag?.value?.trim() || '',
+      service: constructionFields.service?.value?.trim() || '',
+      area: constructionFields.area?.value?.trim() || '',
+      sourcePanel: constructionFields.sourcePanel?.value?.trim() || '',
+      controllerTag: constructionFields.controllerTag?.value?.trim() || '',
+      circuitNumber: constructionFields.circuitNumber?.value?.trim() || '',
+      cableFamilyId: constructionFields.cableFamilyId?.value || '',
+      accessoryOverrides,
+      installationNotes: constructionFields.installationNotes?.value?.trim() || '',
+      ...advancedMetadata,
+    };
+  }
+
+  function readAdvancedMetadata() {
+    const advancedSegments = parseAdvancedSegments(advancedFields.segmentsJson?.value || '');
+    if (advancedSegments === null) return null;
+    const startupAmbient = Number(advancedFields.startupAmbientC?.value);
+    const startupDiversity = Number(advancedFields.startupDiversity?.value);
+    const sensorCount = Number(advancedFields.sensorCount?.value);
+    const tRatingTargetC = Number(advancedFields.tRatingTargetC?.value);
+    return {
+      assetType: advancedFields.assetType?.value || 'pipe',
+      assetTag: advancedFields.assetTag?.value?.trim() || '',
+      panelPhase: advancedFields.panelPhase?.value || 'unassigned',
+      diversityGroup: advancedFields.diversityGroup?.value?.trim() || '',
+      advancedSegments,
+      controlMetadata: {
+        controllerType: advancedFields.controllerType?.value?.trim() || '',
+        controlMode: advancedFields.controlMode?.value?.trim() || '',
+        sensorCount: Number.isFinite(sensorCount) ? sensorCount : 0,
+        sensorLocation: advancedFields.sensorLocation?.value?.trim() || '',
+        highLimitSensor: Boolean(advancedFields.highLimitSensor?.checked),
+      },
+      hazardousArea: {
+        enabled: Boolean(advancedFields.hazardousEnabled?.checked),
+        classification: advancedFields.hazardousClassification?.value?.trim() || '',
+        tRatingTargetC: Number.isFinite(tRatingTargetC) ? tRatingTargetC : 0,
+      },
+      startupBasis: {
+        minimumAmbientC: Number.isFinite(startupAmbient) ? startupAmbient : undefined,
+        diversityFactor: Number.isFinite(startupDiversity) ? startupDiversity : undefined,
+      },
+      advancedNotes: advancedFields.notes?.value?.trim() || '',
+    };
+  }
+
+  function parseAdvancedSegments(raw) {
+    const text = String(raw || '').trim();
+    if (!text) return [];
+    try {
+      const parsed = JSON.parse(text);
+      if (!Array.isArray(parsed)) {
+        throw new Error('Advanced segment rows must be a JSON array.');
+      }
+      return parsed;
+    } catch (err) {
+      showModal('Advanced Segment Error', `<p>${escHtml(err.message || 'Advanced segment rows must be valid JSON.')}</p>`, 'error');
+      return null;
+    }
+  }
+
+  function parseAccessoryOverrides(raw) {
+    const text = String(raw || '').trim();
+    if (!text) return {};
+    try {
+      const parsed = JSON.parse(text);
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        throw new Error('Accessory overrides must be a JSON object.');
+      }
+      return Object.fromEntries(Object.entries(parsed)
+        .map(([key, value]) => [key, Number(value)])
+        .filter(([, value]) => Number.isFinite(value) && value > 0));
+    } catch (err) {
+      showModal('Accessory Override Error', `<p>${escHtml(err.message || 'Accessory overrides must be valid JSON.')}</p>`, 'error');
+      return null;
+    }
+  }
+
+  function writeConstructionMetadataToForm(caseItem = {}) {
+    const nested = caseItem.construction && typeof caseItem.construction === 'object' ? caseItem.construction : {};
+    setFieldValue(constructionFields.pipeTag, caseItem.pipeTag ?? nested.pipeTag ?? '');
+    setFieldValue(constructionFields.service, caseItem.service ?? nested.service ?? '');
+    setFieldValue(constructionFields.area, caseItem.area ?? nested.area ?? '');
+    setFieldValue(constructionFields.sourcePanel, caseItem.sourcePanel ?? nested.sourcePanel ?? '');
+    setFieldValue(constructionFields.controllerTag, caseItem.controllerTag ?? nested.controllerTag ?? '');
+    setFieldValue(constructionFields.circuitNumber, caseItem.circuitNumber ?? nested.circuitNumber ?? '');
+    setFieldValue(constructionFields.cableFamilyId, caseItem.cableFamilyId ?? nested.cableFamilyId ?? '');
+    const overrides = caseItem.accessoryOverrides ?? nested.accessoryOverrides ?? {};
+    setFieldValue(constructionFields.accessoryOverrides, Object.keys(overrides).length ? JSON.stringify(overrides) : '');
+    setFieldValue(constructionFields.installationNotes, caseItem.installationNotes ?? nested.installationNotes ?? '');
+    writeAdvancedMetadataToForm(caseItem);
+  }
+
+  function writeAdvancedMetadataToForm(caseItem = {}) {
+    const advanced = caseItem.advancedHeatTrace && typeof caseItem.advancedHeatTrace === 'object' ? caseItem.advancedHeatTrace : {};
+    setFieldValue(advancedFields.assetType, caseItem.assetType ?? advanced.assetType ?? 'pipe');
+    setFieldValue(advancedFields.assetTag, caseItem.assetTag ?? advanced.assetTag ?? '');
+    setFieldValue(advancedFields.panelPhase, caseItem.panelPhase ?? advanced.panelPhase ?? 'unassigned');
+    setFieldValue(advancedFields.diversityGroup, caseItem.diversityGroup ?? advanced.diversityGroup ?? '');
+    const control = caseItem.controlMetadata ?? advanced.controlMetadata ?? {};
+    setFieldValue(advancedFields.controllerType, control.controllerType ?? '');
+    setFieldValue(advancedFields.controlMode, control.controlMode ?? '');
+    setFieldValue(advancedFields.sensorCount, control.sensorCount ?? 0);
+    setFieldValue(advancedFields.sensorLocation, control.sensorLocation ?? '');
+    if (advancedFields.highLimitSensor) advancedFields.highLimitSensor.checked = Boolean(control.highLimitSensor);
+    const hazardous = caseItem.hazardousArea ?? advanced.hazardousArea ?? {};
+    if (advancedFields.hazardousEnabled) advancedFields.hazardousEnabled.checked = Boolean(hazardous.enabled);
+    setFieldValue(advancedFields.hazardousClassification, hazardous.classification ?? '');
+    setFieldValue(advancedFields.tRatingTargetC, hazardous.tRatingTargetC ?? '');
+    const startup = caseItem.startupBasis ?? advanced.startupBasis ?? {};
+    setFieldValue(advancedFields.startupAmbientC, startup.minimumAmbientC ?? '');
+    setFieldValue(advancedFields.startupDiversity, startup.diversityFactor ?? '');
+    const segments = caseItem.advancedSegments ?? advanced.advancedSegments ?? [];
+    setFieldValue(advancedFields.segmentsJson, Array.isArray(segments) && segments.length ? JSON.stringify(segments, null, 2) : '');
+    setFieldValue(advancedFields.notes, caseItem.advancedNotes ?? advanced.advancedNotes ?? '');
+  }
+
+  function setFieldValue(field, value) {
+    if (field) field.value = String(value ?? '');
+  }
+
   function updateCircuitCaseActionState() {
     if (!addCircuitCaseButton) return;
     addCircuitCaseButton.textContent = editingCircuitCaseId ? 'Update Branch' : 'Add Current Branch';
@@ -2050,6 +2222,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <th>Effective Length</th>
               <th>Selected</th>
               <th>Installed Load</th>
+              <th>Construction</th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -2062,6 +2235,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>${escHtml(formatLength(row.effectiveTraceLengthFt ?? row.lineLengthFt, row.unitSystem))} / ${escHtml(formatLength(row.maxCircuitLengthFt, row.unitSystem))}<br><span>${escHtml(formatLength(row.componentAllowanceLengthFt || 0, row.unitSystem))} allowance</span></td>
               <td>${escHtml(formatHeatTraceCableType(row.heatTraceCableType))}<br>${row.selectedWPerFt.toFixed(1)} W/ft x ${row.traceRunCount || 1}</td>
               <td>${row.totalWatts.toFixed(0)} W<br>${row.loadAmps.toFixed(1)} A @ ${escHtml(formatVoltage(row.voltageV))}<br><span>${row.requiredWatts.toFixed(0)} W required</span></td>
+              <td>${escHtml((circuitCases.find(item => item.id === row.id)?.pipeTag) || row.name)}<br><span>${escHtml((circuitCases.find(item => item.id === row.id)?.controllerTag) || 'No controller')}</span></td>
               <td>
                 <div class="heattrace-circuit-case-actions">
                   <button type="button" class="btn" data-circuit-case-edit="${escHtml(row.id)}">Edit</button>
@@ -2099,9 +2273,16 @@ document.addEventListener('DOMContentLoaded', () => {
       renderReportPreview();
     });
     reportGenerateButton?.addEventListener('click', renderReportPreview);
+    packageGenerateButton?.addEventListener('click', renderInstallationPackagePreview);
+    advancedPackageGenerateButton?.addEventListener('click', renderAdvancedPackagePreview);
     reportExportJsonButton?.addEventListener('click', exportReportJson);
+    packageExportJsonButton?.addEventListener('click', exportInstallationPackageJson);
+    advancedPackageExportJsonButton?.addEventListener('click', exportAdvancedPackageJson);
     reportPrintButton?.addEventListener('click', () => {
-      if (renderReportPreview()) {
+      if (!reportPreview || reportPreview.hidden) {
+        renderReportPreview();
+      }
+      if (reportPreview && !reportPreview.hidden) {
         setTimeout(() => window.print(), 100);
       }
     });
@@ -2122,6 +2303,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function buildCurrentHeatTraceReport(preferredResult = null) {
     return buildHeatTraceReport({
+      activeResult: getReportActiveResult(preferredResult),
+      activeInputs: readInputs(),
+      circuitCases,
+      approval: getStudyApprovals().heatTraceSizing || null,
+      projectName: getProjectName(),
+    });
+  }
+
+  function buildCurrentHeatTraceInstallationPackage(preferredResult = null) {
+    return buildHeatTraceInstallationPackage({
+      activeResult: getReportActiveResult(preferredResult),
+      activeInputs: readInputs(),
+      circuitCases,
+      approval: getStudyApprovals().heatTraceSizing || null,
+      projectName: getProjectName(),
+    });
+  }
+
+  function buildCurrentHeatTraceAdvancedPackage(preferredResult = null) {
+    return buildHeatTraceAdvancedPackage({
       activeResult: getReportActiveResult(preferredResult),
       activeInputs: readInputs(),
       circuitCases,
@@ -2157,6 +2358,46 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  function renderInstallationPackagePreview() {
+    const pkg = buildCurrentHeatTraceInstallationPackage();
+    if (!pkg.lineList.rows.length) {
+      if (reportStatus) reportStatus.textContent = 'Add at least one branch case before generating the installation package.';
+      if (reportPreview) {
+        reportPreview.hidden = true;
+        reportPreview.innerHTML = '';
+      }
+      return false;
+    }
+    if (reportPreview) {
+      reportPreview.innerHTML = renderHeatTraceInstallationPackageHTML(pkg);
+      reportPreview.hidden = false;
+    }
+    if (reportStatus) {
+      reportStatus.textContent = `Installation package generated: ${pkg.summary.lineCount} line list row${pkg.summary.lineCount === 1 ? '' : 's'}, ${pkg.summary.bomItemCount} BOM item type${pkg.summary.bomItemCount === 1 ? '' : 's'}, ${pkg.summary.warningCount} warning${pkg.summary.warningCount === 1 ? '' : 's'}.`;
+    }
+    return true;
+  }
+
+  function renderAdvancedPackagePreview() {
+    const pkg = buildCurrentHeatTraceAdvancedPackage();
+    if (!pkg.assetRows.length) {
+      if (reportStatus) reportStatus.textContent = 'Run a valid analysis or add at least one branch case before generating the advanced package.';
+      if (reportPreview) {
+        reportPreview.hidden = true;
+        reportPreview.innerHTML = '';
+      }
+      return false;
+    }
+    if (reportPreview) {
+      reportPreview.innerHTML = renderHeatTraceAdvancedHTML(pkg);
+      reportPreview.hidden = false;
+    }
+    if (reportStatus) {
+      reportStatus.textContent = `Advanced heat trace package generated: ${pkg.summary.assetCount} asset${pkg.summary.assetCount === 1 ? '' : 's'}, ${pkg.summary.segmentCount} segment${pkg.summary.segmentCount === 1 ? '' : 's'}, ${pkg.summary.warningCount} warning${pkg.summary.warningCount === 1 ? '' : 's'}.`;
+    }
+    return true;
+  }
+
   function exportReportJson() {
     const report = buildCurrentHeatTraceReport();
     const hasReportContent = Boolean(report.activeCase) || report.branchSchedule.summary.branchCount > 0;
@@ -2172,6 +2413,38 @@ document.addEventListener('DOMContentLoaded', () => {
     link.click();
     URL.revokeObjectURL(link.href);
     if (reportStatus) reportStatus.textContent = 'Heat trace report JSON exported.';
+  }
+
+  function exportInstallationPackageJson() {
+    const pkg = buildCurrentHeatTraceInstallationPackage();
+    if (!pkg.lineList.rows.length) {
+      if (reportStatus) reportStatus.textContent = 'Nothing to export yet. Add at least one branch case.';
+      showModal('No Installation Package', '<p>Add at least one branch case before exporting the heat trace installation package.</p>', 'info');
+      return;
+    }
+    const blob = new Blob([JSON.stringify(pkg, null, 2)], { type: 'application/json' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `heat-trace-installation-package-${new Date().toISOString().slice(0, 10)}.json`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+    if (reportStatus) reportStatus.textContent = 'Heat trace installation package JSON exported.';
+  }
+
+  function exportAdvancedPackageJson() {
+    const pkg = buildCurrentHeatTraceAdvancedPackage();
+    if (!pkg.assetRows.length) {
+      if (reportStatus) reportStatus.textContent = 'Nothing to export yet. Run analysis or add at least one branch case.';
+      showModal('No Advanced Package', '<p>Run analysis or add at least one branch case before exporting the advanced heat trace package.</p>', 'info');
+      return;
+    }
+    const blob = new Blob([JSON.stringify(pkg, null, 2)], { type: 'application/json' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `heat-trace-advanced-package-${new Date().toISOString().slice(0, 10)}.json`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+    if (reportStatus) reportStatus.textContent = 'Heat trace advanced package JSON exported.';
   }
 
   function formatLength(lengthFt, unitSystem = activeUnitSystem) {

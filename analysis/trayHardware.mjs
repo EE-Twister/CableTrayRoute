@@ -11,6 +11,10 @@
 
 import { calcMaxSpan, NEMA_LOAD_CLASSES } from './supportSpan.mjs';
 import { generateQRDataURL } from './pullCards.mjs';
+import {
+  buildRacewayAccessoryTakeoff,
+  normalizeRacewayDetailRows,
+} from './racewayConstructionDetailing.mjs';
 
 /** Distance threshold (ft) for treating two endpoints as coincident. */
 const COINCIDENCE_TOL = 0.5;
@@ -288,7 +292,7 @@ export function buildTrayHardwareBOM(trays, options = {}) {
   } = options;
 
   if (!trays || trays.length === 0) {
-    return { fittings: [], supports: [], sections: [], summary: [] };
+    return { fittings: [], supports: [], sections: [], constructionTakeoff: [], summary: [] };
   }
 
   // Filter to actual trays (exclude conduits/ductbanks if present)
@@ -354,16 +358,20 @@ export function buildTrayHardwareBOM(trays, options = {}) {
   });
 
   // 3. Build summary (aggregate by fitting type and tray size)
-  const summary = buildHardwareSummary(fittings, supports, sections, trayList);
+  const constructionDetailRows = normalizeRacewayDetailRows({ trays: trayList });
+  const constructionTakeoff = buildRacewayAccessoryTakeoff(constructionDetailRows, {
+    standardSectionLengthFt: standardSectionLength,
+  }).filter(row => row.source === 'constructionDetail' || row.source === 'manualAccessory');
+  const summary = buildHardwareSummary(fittings, supports, sections, trayList, constructionTakeoff);
 
-  return { fittings, supports, sections, summary };
+  return { fittings, supports, sections, constructionTakeoff, summary };
 }
 
 /**
  * Aggregate hardware into a procurement-oriented summary.
  * Groups items by type × width so a purchaser can place orders.
  */
-function buildHardwareSummary(fittings, supports, sections, trays) {
+function buildHardwareSummary(fittings, supports, sections, trays, constructionTakeoff = []) {
   const items = [];
 
   // Aggregate fittings by type × max width at junction
@@ -432,6 +440,18 @@ function buildHardwareSummary(fittings, supports, sections, trays) {
       width_in: v.width,
       qty: v.qty,
       unit: 'ea',
+    });
+  });
+
+  constructionTakeoff.forEach(row => {
+    items.push({
+      category: row.category || 'Construction Accessory',
+      item: row.item || 'Raceway accessory allowance',
+      width_in: row.widthIn || '',
+      qty: row.quantity,
+      unit: row.unit || 'ea',
+      basis: row.basis || 'construction detail metadata',
+      raceway_ids: (row.racewayIds || []).join(', '),
     });
   });
 

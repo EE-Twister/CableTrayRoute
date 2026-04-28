@@ -80,12 +80,66 @@
       </header>
       <section class="card">
         <form id="loadflow-form" novalidate>
-          <label>Base MVA <input type="number" name="baseMVA" value="100" min="0.1" step="any" aria-describedby="basemva-hint"></label>
-          <span id="basemva-hint" class="field-hint">System base power in MVA (typically 100).</span>
-          <label><input type="checkbox" name="balanced" checked> Balanced</label>
-          <button type="submit">Run Study</button>
+          <h2>Load Flow Study Case</h2>
+          <div class="form-grid">
+            <label>Base MVA <input type="number" name="baseMVA" value="100" min="0.001" step="any" aria-describedby="basemva-hint"></label>
+            <label>Mode
+              <select name="mode">
+                <option value="balanced">Balanced</option>
+                <option value="perPhase">Per-phase screening</option>
+              </select>
+            </label>
+            <label>Load model
+              <select name="loadModel">
+                <option value="constantPQ">Constant P/Q</option>
+                <option value="constantCurrent">Constant current</option>
+                <option value="constantImpedance">Constant impedance</option>
+                <option value="mixedZIP">Mixed ZIP</option>
+              </select>
+            </label>
+            <label>Report preset
+              <select name="reportPreset">
+                <option value="summary">Summary</option>
+                <option value="voltageProfile">Voltage profile</option>
+                <option value="fullStudy">Full study</option>
+              </select>
+            </label>
+            <label>Min voltage pu <input type="number" name="minVoltagePu" value="0.95" min="0" step="0.001"></label>
+            <label>Max voltage pu <input type="number" name="maxVoltagePu" value="1.05" min="0" step="0.001"></label>
+            <label>Warning margin pu <input type="number" name="warningMarginPu" value="0.02" min="0" step="0.001"></label>
+            <label><input type="checkbox" name="openPhaseEnabled"> Open-phase case</label>
+          </div>
+          <span id="basemva-hint" class="field-hint">Per-phase mode is screening-grade and solves phases separately.</span>
+          <fieldset>
+            <legend>Open phase(s)</legend>
+            <label><input type="checkbox" name="openPhasePhases" value="A"> A</label>
+            <label><input type="checkbox" name="openPhasePhases" value="B"> B</label>
+            <label><input type="checkbox" name="openPhasePhases" value="C"> C</label>
+          </fieldset>
+          <fieldset>
+            <legend>Include controls</legend>
+            <label><input type="checkbox" name="transformerTaps" checked> Transformer taps</label>
+            <label><input type="checkbox" name="regulators" checked> Regulators</label>
+            <label><input type="checkbox" name="capacitorSteps" checked> Capacitor steps</label>
+            <label><input type="checkbox" name="ibrVoltVar" checked> IBR Volt-VAR</label>
+          </fieldset>
+          <label>Study notes <textarea name="notes" rows="2" placeholder="Study basis, assumptions, or control settings"></textarea></label>
+          <h3>Bus, Load, and Source Rows</h3>
+          <div id="loadflow-row-editor" class="table-scroll"></div>
+          <h3>Branch and Control Rows</h3>
+          <div id="loadflow-branch-editor" class="table-scroll"></div>
+          <div class="button-row">
+            <button type="submit">Run Study Case</button>
+            <button type="button" id="loadflow-export-json">Export Package JSON</button>
+            <button type="button" id="loadflow-export-html">Export Printable HTML</button>
+            <a class="btn secondary-btn" href="optimalpowerflow.html">Open Optimal Power Flow</a>
+          </div>
         </form>
-        <pre id="loadflow-output"></pre>
+        <div id="loadflow-results"></div>
+        <details>
+          <summary>Raw package JSON</summary>
+          <pre id="loadflow-output"></pre>
+        </details>
       </section>
       <section class="card" aria-labelledby="study-review-panel-heading">
         <div id="study-review-panel"></div>

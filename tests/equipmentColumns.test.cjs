@@ -9,7 +9,11 @@ global.localStorage = {
 
 (async () => {
   const { getItem, setItem, STORAGE_KEYS } = await import('../dataStore.mjs');
-  const cols = [{ key: 'extra', label: 'Extra', type: 'text' }];
+  const cols = [
+    { key: 'extra', label: 'Extra', type: 'text' },
+    { key: 'interruptRatingKa', label: 'AIC (kA)', type: 'number' },
+    { key: 'oneLineRef', label: 'One-Line Ref', type: 'text' }
+  ];
   setItem(STORAGE_KEYS.equipmentColumns, cols);
   let saved = getItem(STORAGE_KEYS.equipmentColumns, []);
   assert.deepStrictEqual(saved, cols);

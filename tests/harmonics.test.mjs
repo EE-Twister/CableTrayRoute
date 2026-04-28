@@ -6,6 +6,7 @@
  * The formulas are extracted verbatim from the module implementation.
  */
 import assert from 'assert';
+import { parseHarmonicSpectrum } from '../analysis/harmonicStudyCase.mjs';
 
 function describe(name, fn) {
   console.log(name);
@@ -157,6 +158,16 @@ describe('parseSpectrum — string format', () => {
 
   it('empty string returns empty map', () => {
     assert.deepStrictEqual(parseSpectrum(''), {});
+  });
+});
+
+describe('harmonic study-case spectrum parser compatibility', () => {
+  it('accepts legacy text spectra for packaged study cases', () => {
+    assert.deepStrictEqual(parseHarmonicSpectrum('5:35,7:25'), { 5: 35, 7: 25 });
+  });
+
+  it('accepts JSON spectra for source-row imports', () => {
+    assert.deepStrictEqual(parseHarmonicSpectrum('{"5":35,"7":25}'), { 5: 35, 7: 25 });
   });
 });
 

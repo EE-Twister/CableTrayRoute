@@ -88,16 +88,95 @@
       </section>
       <section class="card">
         <form id="shortcircuit-form" novalidate>
-          <label for="method">Method
-            <select id="method" name="method" aria-describedby="method-hint">
-              <option value="ANSI">ANSI</option>
-              <option value="IEC">IEC</option>
-            </select>
+          <h2>Short-Circuit Study Case</h2>
+          <p class="field-hint">Define the calculation basis used for saved study results, equipment duty checks, reports, and Design Coach actions.</p>
+          <div class="form-grid">
+            <label for="method">Method
+              <select id="method" name="method" aria-describedby="method-hint">
+                <option value="Auto" selected>Auto by voltage</option>
+                <option value="ANSI">ANSI</option>
+                <option value="IEC">IEC</option>
+              </select>
+            </label>
+            <label for="duty-basis">Duty basis
+              <select id="duty-basis" name="dutyBasis">
+                <option value="equipmentEvaluation" selected>Equipment evaluation</option>
+                <option value="momentary">Momentary</option>
+                <option value="interrupting">Interrupting</option>
+                <option value="thirtyCycle">30-cycle / short-time</option>
+                <option value="relay">Relay current</option>
+              </select>
+            </label>
+            <label for="voltage-case">Voltage case
+              <select id="voltage-case" name="voltageCase">
+                <option value="nominal" selected>Nominal</option>
+                <option value="minimum">Minimum</option>
+                <option value="maximum">Maximum</option>
+                <option value="sensitivity">Sensitivity sweep</option>
+              </select>
+            </label>
+            <label for="voltage-sensitivity">Voltage sensitivity (%)
+              <input type="number" id="voltage-sensitivity" name="voltageSensitivityPct" min="0" max="20" step="0.5" value="5">
+            </label>
+            <label for="equipment-duty-side">Equipment duty side
+              <select id="equipment-duty-side" name="equipmentDutySide">
+                <option value="loadSide" selected>Load side</option>
+                <option value="lineSide">Line side planning flag</option>
+              </select>
+            </label>
+            <label for="report-preset">Report preset
+              <select id="report-preset" name="reportPreset">
+                <option value="summary" selected>Summary</option>
+                <option value="equipmentDuty">Equipment duty</option>
+                <option value="fullStudy">Full study</option>
+              </select>
+            </label>
+          </div>
+          <span id="method-hint" class="field-hint">Auto uses the existing ANSI/IEC selection behavior from the short-circuit engine.</span>
+
+          <fieldset>
+            <legend>Fault types</legend>
+            <label><input type="checkbox" name="faultTypes" value="threePhase" checked> Three-phase</label>
+            <label><input type="checkbox" name="faultTypes" value="lineToGround" checked> Line-to-ground</label>
+            <label><input type="checkbox" name="faultTypes" value="lineToLine" checked> Line-to-line</label>
+            <label><input type="checkbox" name="faultTypes" value="doubleLineGround" checked> Double-line-ground</label>
+          </fieldset>
+
+          <fieldset>
+            <legend>Bus / equipment scope</legend>
+            <div class="form-grid">
+              <label for="scope-area">Area
+                <input type="text" id="scope-area" name="scopeArea" placeholder="Optional area filter">
+              </label>
+              <label for="scope-zone">Zone
+                <input type="text" id="scope-zone" name="scopeZone" placeholder="Optional zone filter">
+              </label>
+              <label for="scope-min-kv">Min kV
+                <input type="number" id="scope-min-kv" name="scopeMinKv" min="0" step="0.01">
+              </label>
+              <label for="scope-max-kv">Max kV
+                <input type="number" id="scope-max-kv" name="scopeMaxKv" min="0" step="0.01">
+              </label>
+              <label for="scope-include">Include text
+                <input type="text" id="scope-include" name="scopeIncludeText" placeholder="Tag, name, sheet, etc.">
+              </label>
+              <label for="scope-exclude">Exclude text
+                <input type="text" id="scope-exclude" name="scopeExcludeText" placeholder="Tag, name, sheet, etc.">
+              </label>
+            </div>
+          </fieldset>
+
+          <label><input type="checkbox" id="include-dc-short-circuit" name="includeDcShortCircuit"> Include DC short-circuit note in report package</label>
+          <label for="study-notes">Study notes
+            <textarea id="study-notes" name="notes" rows="3" placeholder="Optional assumptions or reviewer notes"></textarea>
           </label>
-          <span id="method-hint" class="field-hint">Choose ANSI or IEC calculation standard.</span>
           <button type="submit">Run Study</button>
         </form>
-        <pre id="shortcircuit-output"></pre>
+        <div id="shortcircuit-results" role="region" aria-live="polite"></div>
+        <details>
+          <summary>Raw study package JSON</summary>
+          <pre id="shortcircuit-output"></pre>
+        </details>
       </section>
       <section class="card" aria-labelledby="study-review-panel-heading">
         <div id="study-review-panel"></div>

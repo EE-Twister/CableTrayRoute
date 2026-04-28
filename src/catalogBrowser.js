@@ -1,7 +1,15 @@
 import {
+  getProductCatalogRows,
   getTrayHardwareCatalogCustomProducts,
+  setProductCatalogRows,
   setTrayHardwareCatalogCustomProducts
 } from '../dataStore.mjs';
+import {
+  filterApprovedCatalogRows,
+  mergeProductCatalogRows,
+  normalizeProductCatalog,
+  normalizeProductCatalogRow,
+} from '../analysis/productCatalog.mjs';
 
 /**
  * Manufacturer Catalog Browser
@@ -21,18 +29,20 @@ let catalogCache = null;
 
 function getCustomProducts() {
   const stored = getTrayHardwareCatalogCustomProducts();
-  return Array.isArray(stored) ? stored : [];
+  const governed = getProductCatalogRows();
+  return [
+    ...(Array.isArray(stored) ? stored : []),
+    ...(Array.isArray(governed) ? governed : []),
+  ];
 }
 
 function setCustomProducts(products) {
   setTrayHardwareCatalogCustomProducts(Array.isArray(products) ? products : []);
+  setProductCatalogRows(Array.isArray(products) ? products : []);
 }
 
 function mergeCatalogProducts(base, custom) {
-  const byId = new Map();
-  for (const product of base) byId.set(product.id, product);
-  for (const product of custom) byId.set(product.id, product);
-  return [...byId.values()];
+  return mergeProductCatalogRows(base, custom).rows;
 }
 
 async function loadBaseCatalog() {
@@ -40,7 +50,7 @@ async function loadBaseCatalog() {
   const res = await fetch(CATALOG_URL);
   if (!res.ok) throw new Error(`Failed to load catalog: HTTP ${res.status}`);
   const data = await res.json();
-  catalogCache = Array.isArray(data.products) ? data.products : [];
+  catalogCache = normalizeProductCatalog(data).rows;
   return catalogCache;
 }
 
@@ -68,7 +78,10 @@ export async function loadCatalog() {
  */
 export async function filterProducts(filters = {}) {
   const all = await loadCatalog();
-  return all.filter(p => {
+  const base = (filters.approvedOnly || filters.standard || filters.staleOnly || filters.source)
+    ? filterApprovedCatalogRows(all, filters)
+    : all;
+  return base.filter(p => {
     if (filters.category && p.category !== filters.category) return false;
     if (filters.subcategory && p.subcategory !== filters.subcategory) return false;
     if (filters.manufacturer && !p.manufacturer?.toLowerCase().includes(filters.manufacturer.toLowerCase())) return false;
@@ -77,7 +90,7 @@ export async function filterProducts(filters = {}) {
     if (filters.material && p.material !== filters.material) return false;
     if (filters.search) {
       const q = filters.search.toLowerCase();
-      const searchable = `${p.id} ${p.description} ${p.series} ${p.manufacturer}`.toLowerCase();
+      const searchable = `${p.id} ${p.catalogNumber} ${p.description} ${p.series} ${p.manufacturer}`.toLowerCase();
       if (!searchable.includes(q)) return false;
     }
     return true;
@@ -91,7 +104,7 @@ export async function filterProducts(filters = {}) {
  */
 export async function getCatalogProduct(id) {
   const all = await loadCatalog();
-  return all.find(p => p.id === id) ?? null;
+  return all.find(p => p.id === id || p.catalogNumber === id) ?? null;
 }
 
 /**
@@ -139,12 +152,14 @@ export function renderCatalogTable(container, products, { onSelect } = {}) {
   const thead = document.createElement('thead');
   const headerRow = document.createElement('tr');
   const columns = [
-    { key: 'id', label: 'Part Number' },
+    { key: 'catalogNumber', label: 'Catalog #' },
     { key: 'manufacturer', label: 'Manufacturer' },
     { key: 'description', label: 'Description' },
     { key: 'width_in', label: 'Width (in)' },
     { key: 'depth_in', label: 'Depth (in)' },
     { key: 'material', label: 'Material' },
+    { key: 'approvalStatus', label: 'Approval' },
+    { key: 'lastVerified', label: 'Verified' },
     { key: 'unit', label: 'Unit' },
     { key: 'list_price_usd', label: 'List Price' },
   ];
@@ -167,7 +182,7 @@ export function renderCatalogTable(container, products, { onSelect } = {}) {
 
     for (const col of columns) {
       const td = document.createElement('td');
-      const val = product[col.key];
+      const val = product[col.key] ?? product.dimensions?.[col.key.replace('_in', 'In')];
       if (col.key === 'list_price_usd') {
         td.textContent = val != null ? `$${Number(val).toFixed(2)}` : '—';
       } else {
@@ -237,6 +252,12 @@ export async function mountCatalogBrowser(container, { onSelect } = {}) {
   const catFilter = makeSelect('Category', getDistinctOptions('category'));
   const mfrFilter = makeSelect('Manufacturer', getDistinctOptions('manufacturer'));
   const matFilter = makeSelect('Material', getDistinctOptions('material'));
+  const approvalLabel = document.createElement('label');
+  approvalLabel.className = 'catalog-filter-label';
+  const approvalInput = document.createElement('input');
+  approvalInput.type = 'checkbox';
+  approvalLabel.appendChild(approvalInput);
+  approvalLabel.appendChild(document.createTextNode(' Approved only'));
 
   const searchLabel = document.createElement('label');
   searchLabel.className = 'catalog-filter-label';
@@ -250,6 +271,7 @@ export async function mountCatalogBrowser(container, { onSelect } = {}) {
   filterBar.appendChild(catFilter.label);
   filterBar.appendChild(mfrFilter.label);
   filterBar.appendChild(matFilter.label);
+  filterBar.appendChild(approvalLabel);
   filterBar.appendChild(searchLabel);
 
   const resultsDiv = document.createElement('div');
@@ -270,6 +292,9 @@ export async function mountCatalogBrowser(container, { onSelect } = {}) {
         <option value="fitting">fitting</option>
         <option value="conduit">conduit</option>
         <option value="accessory">accessory</option>
+        <option value="heatTraceComponent">heatTraceComponent</option>
+        <option value="protectiveDevice">protectiveDevice</option>
+        <option value="cableType">cableType</option>
       </select>
     </label>
     <label class="catalog-filter-label">Description <input class="catalog-filter-input" name="description" required></label>
@@ -311,6 +336,7 @@ export async function mountCatalogBrowser(container, { onSelect } = {}) {
       category: catFilter.select.value || undefined,
       manufacturer: mfrFilter.select.value || undefined,
       material: matFilter.select.value || undefined,
+      approvedOnly: approvalInput.checked,
       search: searchInput.value.trim() || undefined,
     });
     renderCatalogTable(resultsDiv, filtered, { onSelect });
@@ -319,6 +345,7 @@ export async function mountCatalogBrowser(container, { onSelect } = {}) {
   catFilter.select.addEventListener('change', refresh);
   mfrFilter.select.addEventListener('change', refresh);
   matFilter.select.addEventListener('change', refresh);
+  approvalInput.addEventListener('change', refresh);
   searchInput.addEventListener('input', refresh);
   addForm.addEventListener('submit', async e => {
     e.preventDefault();
@@ -330,8 +357,9 @@ export async function mountCatalogBrowser(container, { onSelect } = {}) {
       addStatus.textContent = `Part number ${productId} already exists in the catalog.`;
       return;
     }
-    const nextProduct = {
+    const nextProduct = normalizeProductCatalogRow({
       id: productId,
+      catalogNumber: productId,
       manufacturer: String(formData.get('manufacturer') || '').trim(),
       series: 'Custom',
       category: String(formData.get('category') || 'accessory').trim(),
@@ -349,7 +377,9 @@ export async function mountCatalogBrowser(container, { onSelect } = {}) {
       nec_listed: false,
       ul_classified: false,
       url: null,
-    };
+      source: 'local-custom',
+      approvalStatus: 'unreviewed',
+    });
     const custom = getCustomProducts();
     custom.push(nextProduct);
     setCustomProducts(custom);

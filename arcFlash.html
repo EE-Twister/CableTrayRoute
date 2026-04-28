@@ -87,10 +87,48 @@
         <img src="icons/graphics/studies-visual.svg" alt="Illustration for arc flash evaluation" loading="lazy" decoding="async">
       </section>
       <section class="card">
-        <form id="arcflash-form">
-          <button type="submit">Run Study</button>
+        <form id="arcflash-form" class="stacked-form">
+          <h2>Arc Flash Study Case</h2>
+          <div class="form-grid">
+            <label for="arcflash-report-preset">Report preset
+              <select id="arcflash-report-preset" name="reportPreset">
+                <option value="summary">Summary</option>
+                <option value="labels">Labels</option>
+                <option value="mitigation">Mitigation comparison</option>
+                <option value="fullStudy">Full study</option>
+              </select>
+            </label>
+            <label for="arcflash-label-template">Label template
+              <select id="arcflash-label-template" name="labelTemplate">
+                <option value="nfpa70e">NFPA 70E style</option>
+                <option value="engineeringReview">Engineering review</option>
+              </select>
+            </label>
+            <label><input type="checkbox" id="arcflash-dc-note" name="includeDcArcFlashNote"> Include DC arc-flash note</label>
+            <label><input type="checkbox" id="arcflash-hv-note" name="includeHighVoltageNote"> Include high-voltage method note</label>
+          </div>
+          <label for="arcflash-notes">Study notes
+            <textarea id="arcflash-notes" name="notes" rows="2" placeholder="Study basis, known field assumptions, or label review notes"></textarea>
+          </label>
+
+          <h3>Equipment Data</h3>
+          <p class="muted">Rows are built from the one-line model. Defaulted values are visible and editable before saving the packaged result.</p>
+          <div id="arcflash-equipment-editor" class="table-scroll"></div>
+
+          <h3>Mitigation Scenarios</h3>
+          <div id="arcflash-scenario-editor" class="table-scroll"></div>
+
+          <div class="button-row">
+            <button type="submit">Run Study Case</button>
+            <button type="button" id="arcflash-export-json">Export Package JSON</button>
+            <button type="button" id="arcflash-export-html">Export Printable HTML</button>
+          </div>
         </form>
-        <pre id="arcflash-output"></pre>
+        <div id="arcflash-results"></div>
+        <details>
+          <summary>Raw package JSON</summary>
+          <pre id="arcflash-output"></pre>
+        </details>
       </section>
       <section class="card">
         <div id="study-basis-panel"></div>

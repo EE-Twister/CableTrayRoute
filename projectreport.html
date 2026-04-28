@@ -93,6 +93,22 @@
           <label for="rpt-project-name">Project Name Override</label>
           <input type="text" id="rpt-project-name" placeholder="Loaded from project data if blank" autocomplete="off">
         </div>
+        <div class="form-row">
+          <label for="rpt-package-revision">Package Revision</label>
+          <input type="text" id="rpt-package-revision" value="A" autocomplete="off">
+        </div>
+        <div class="form-row">
+          <label for="rpt-prepared-by">Prepared By</label>
+          <input type="text" id="rpt-prepared-by" autocomplete="off">
+        </div>
+        <div class="form-row">
+          <label for="rpt-checked-by">Checked By</label>
+          <input type="text" id="rpt-checked-by" autocomplete="off">
+        </div>
+        <div class="form-row">
+          <label for="rpt-approved-by">Approved By</label>
+          <input type="text" id="rpt-approved-by" autocomplete="off">
+        </div>
       </fieldset>
 
       <!-- Actions -->
@@ -100,6 +116,7 @@
         <button id="generate-report-btn" type="button" class="btn primary-btn">Generate Report</button>
         <button id="print-report-btn"    type="button" class="btn">Print / Save as PDF</button>
         <button id="export-json-btn"     type="button" class="btn secondary-btn">Export JSON</button>
+        <button id="export-package-btn"  type="button" class="btn secondary-btn">Export Package</button>
       </div>
 
       <!-- Status bar -->
@@ -109,6 +126,14 @@
       <nav id="report-toc" class="report-toc" aria-label="Report sections" hidden>
         <strong>Jump to:</strong>
         <a href="#rpt-summary">Summary</a>
+        <a href="#rpt-lifecycle">Lifecycle</a>
+        <a href="#rpt-design-coach">Design Coach</a>
+        <a href="#rpt-bim-coordination">BIM Coordination</a>
+        <a href="#rpt-bim-connector-readiness">Connector Readiness</a>
+        <a href="#rpt-equipment-evaluation">Equipment Evaluation</a>
+        <a href="#rpt-advanced-grounding">Advanced Grounding</a>
+        <a href="#rpt-cable-thermal-environment">Cable Thermal</a>
+        <a href="#rpt-optimal-power-flow">OPF</a>
         <a href="#rpt-cables">Cables</a>
         <a href="#rpt-fill">Fill</a>
         <a href="#rpt-clashes">Clashes</a>

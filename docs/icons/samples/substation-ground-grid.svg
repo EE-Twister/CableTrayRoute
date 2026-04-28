@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 180" role="img" aria-labelledby="title desc">
+  <title id="title">Substation ground grid sample preview</title>
+  <desc id="desc">Substation equipment over a grounding grid.</desc>
+  <rect width="360" height="180" rx="8" fill="#f8fafc"/>
+  <g stroke="#94a3b8" stroke-width="2">
+    <path d="M52 48v96M92 48v96M132 48v96M172 48v96M212 48v96M252 48v96M292 48v96"/>
+    <path d="M44 56h260M44 88h260M44 120h260M44 144h260"/>
+  </g>
+  <rect x="70" y="72" width="74" height="40" rx="4" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+  <text x="107" y="97" text-anchor="middle" font-family="Inter, Arial" font-size="12" fill="#1e3a8a">XFMR</text>
+  <rect x="196" y="70" width="82" height="44" rx="4" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
+  <text x="237" y="97" text-anchor="middle" font-family="Inter, Arial" font-size="12" fill="#166534">SWGR</text>
+  <path d="M144 92h52" stroke="#0f172a" stroke-width="3"/>
+</svg>
+

@@ -16,6 +16,29 @@
 
 import { calcPullTension } from '../src/pullCalc.js';
 
+const CONSTRUCTION_DETAIL_KEYS = [
+  'supportFamily',
+  'supportType',
+  'supportSpacingFt',
+  'dividerLane',
+  'constructionPhase',
+  'constructionStatus',
+  'drawingRef',
+  'detailRef',
+  'labelId',
+  'sectionRef',
+  'installArea',
+  'constructionNotes',
+];
+
+function constructionDetailFromSegment(seg = {}) {
+  const detail = {};
+  CONSTRUCTION_DETAIL_KEYS.forEach(key => {
+    if (seg[key] !== undefined && seg[key] !== null && seg[key] !== '') detail[key] = seg[key];
+  });
+  return detail;
+}
+
 // ---------------------------------------------------------------------------
 // QR code generation
 // ---------------------------------------------------------------------------
@@ -223,6 +246,16 @@ export function buildPullCard(pull) {
       length: Math.round(len * 100) / 100,
       start: seg.start || null,
       end: seg.end || null,
+      constructionDetail: constructionDetailFromSegment(seg),
+      drawingRef: seg.drawingRef || seg.drawing_ref || '',
+      detailRef: seg.detailRef || seg.detail_ref || '',
+      labelId: seg.labelId || seg.label_id || '',
+      sectionRef: seg.sectionRef || seg.section_ref || '',
+      constructionPhase: seg.constructionPhase || seg.construction_phase || '',
+      constructionStatus: seg.constructionStatus || seg.construction_status || '',
+      installArea: seg.installArea || seg.install_area || '',
+      notes: seg.constructionNotes || seg.construction_notes || seg.notes || '',
+      raw: seg,
     };
   });
 
@@ -258,6 +291,8 @@ export function buildPullCard(pull) {
     estimated_tension_lbs: Math.round(tensionResult.totalTension * 10) / 10,
     max_tension_lbs: Math.round(tensionResult.maxTension * 10) / 10,
     max_sidewall_pressure: Math.round((tensionResult.maxSidewallPressure || 0) * 10) / 10,
+    route_segments: Array.isArray(pull.route_segments) ? pull.route_segments : [],
+    breakdown: Array.isArray(pull.breakdown) ? pull.breakdown : [],
   };
 }
 

@@ -8,6 +8,11 @@ import {
   trayFillFactor,
   minimizeCostConductors,
 } from './analysis/autoSize.mjs';
+import {
+  buildTransformerFeederSizingPackage,
+  renderTransformerFeederSizingHTML,
+} from './analysis/transformerFeederSizingCase.mjs';
+import { getStudies, setStudies } from './dataStore.mjs';
 
 document.addEventListener('DOMContentLoaded', () => {
   initSettings();
@@ -18,6 +23,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const tabs = document.querySelectorAll('.tab-btn');
   const panels = document.querySelectorAll('.tab-panel');
+  let currentSizingPackage = null;
 
   tabs.forEach(tab => {
     tab.addEventListener('click', () => {
@@ -29,6 +35,58 @@ document.addEventListener('DOMContentLoaded', () => {
       const panel = document.getElementById(`panel-${target}`);
       if (panel) panel.hidden = false;
     });
+  });
+
+  const importDemandBtn = document.getElementById('import-governed-demand-btn');
+  if (importDemandBtn) {
+    importDemandBtn.addEventListener('click', () => {
+      const pkg = getStudies().loadDemandGovernance;
+      const summary = pkg?.summary;
+      if (!summary || !summary.governedDemandKw) {
+        renderError('feeder-results', 'No saved load demand-governance package was found. Save Demand Package from the Load List first.');
+        return;
+      }
+      const kwRadio = document.querySelector('input[name="feeder-mode"][value="kw"]');
+      if (kwRadio) kwRadio.checked = true;
+      const ampsRow = document.getElementById('row-amps');
+      const kwRow = document.getElementById('row-kw');
+      const pfRow = document.getElementById('row-pf');
+      const voltageRow = document.getElementById('row-voltage');
+      const phaseRow = document.getElementById('row-phase');
+      if (ampsRow) ampsRow.hidden = true;
+      [kwRow, pfRow, voltageRow, phaseRow].forEach(row => { if (row) row.hidden = false; });
+      const kwInput = document.getElementById('feeder-kw');
+      if (kwInput) kwInput.value = summary.governedDemandKw;
+      const sourceSelect = document.getElementById('sizing-load-source');
+      if (sourceSelect) sourceSelect.value = 'loadDemandGovernance';
+      const caseLoadKw = document.getElementById('sizing-load-kw');
+      if (caseLoadKw) caseLoadKw.value = summary.governedDemandKw || '';
+      const caseLoadKva = document.getElementById('sizing-load-kva');
+      if (caseLoadKva) caseLoadKva.value = summary.governedDemandKva || '';
+      const continuous = document.getElementById('feeder-continuous');
+      if (continuous) continuous.checked = (summary.continuousCount || 0) > 0;
+    });
+  }
+
+  const buildSizingBtn = document.getElementById('build-sizing-package-btn');
+  const saveSizingBtn = document.getElementById('save-sizing-package-btn');
+  const exportSizingJsonBtn = document.getElementById('export-sizing-json-btn');
+  const exportSizingHtmlBtn = document.getElementById('export-sizing-html-btn');
+  if (buildSizingBtn) buildSizingBtn.addEventListener('click', () => buildSizingPackage());
+  if (saveSizingBtn) saveSizingBtn.addEventListener('click', () => {
+    if (!currentSizingPackage) buildSizingPackage();
+    if (!currentSizingPackage) return;
+    const studies = getStudies();
+    setStudies({ ...studies, transformerFeederSizing: currentSizingPackage });
+    renderPackageNotice('Transformer/feeder sizing package saved to study results.');
+  });
+  if (exportSizingJsonBtn) exportSizingJsonBtn.addEventListener('click', () => {
+    if (!currentSizingPackage) buildSizingPackage();
+    if (currentSizingPackage) downloadText('transformer-feeder-sizing-package.json', JSON.stringify(currentSizingPackage, null, 2), 'application/json');
+  });
+  if (exportSizingHtmlBtn) exportSizingHtmlBtn.addEventListener('click', () => {
+    if (!currentSizingPackage) buildSizingPackage();
+    if (currentSizingPackage) downloadText('transformer-feeder-sizing-package.html', renderPrintableHtml(currentSizingPackage), 'text/html');
   });
 
   // -------------------------------------------------------------------------
@@ -140,6 +198,100 @@ document.addEventListener('DOMContentLoaded', () => {
   function renderError(containerId, message) {
     const div = document.getElementById(containerId);
     div.innerHTML = `<p class="alert-error" role="alert">Error: ${message}</p>`;
+  }
+
+  function buildSizingCaseInput() {
+    const feederMode = document.querySelector('input[name="feeder-mode"]:checked')?.value || 'amps';
+    const loadKw = parseFloat(document.getElementById('sizing-load-kw')?.value)
+      || (feederMode === 'kw' ? parseFloat(document.getElementById('feeder-kw')?.value) : null);
+    const loadKva = parseFloat(document.getElementById('sizing-load-kva')?.value)
+      || parseFloat(document.getElementById('xfmr-kva')?.value)
+      || null;
+    const pf = parseFloat(document.getElementById('sizing-pf')?.value)
+      || parseFloat(document.getElementById('feeder-pf')?.value)
+      || 0.9;
+    return {
+      caseName: document.getElementById('sizing-case-name')?.value || 'Transformer / Feeder Sizing Case',
+      loadSource: document.getElementById('sizing-load-source')?.value || 'manual',
+      panelId: document.getElementById('sizing-panel-id')?.value || '',
+      serviceGroup: document.getElementById('sizing-service-group')?.value || '',
+      loadKw,
+      loadKva,
+      powerFactor: pf,
+      voltage: parseFloat(document.getElementById('feeder-voltage')?.value) || parseFloat(document.getElementById('xfmr-secondary')?.value) || 480,
+      phase: document.getElementById('xfmr-phase')?.value || document.getElementById('feeder-phase')?.value || '3ph',
+      continuous: document.getElementById('feeder-continuous')?.checked ?? true,
+      futureGrowthPct: parseFloat(document.getElementById('sizing-growth-pct')?.value) || 0,
+      emergencyOverloadEnabled: document.getElementById('sizing-emergency-enabled')?.checked || false,
+      emergencyOverloadPct: parseFloat(document.getElementById('sizing-emergency-pct')?.value) || 0,
+      primaryVoltage: parseFloat(document.getElementById('xfmr-primary')?.value) || 480,
+      secondaryVoltage: parseFloat(document.getElementById('xfmr-secondary')?.value) || parseFloat(document.getElementById('feeder-voltage')?.value) || 208,
+      transformerPhase: document.getElementById('xfmr-phase')?.value || '3ph',
+      impedancePct: parseFloat(document.getElementById('sizing-impedance-pct')?.value) || null,
+      bilKv: parseFloat(document.getElementById('sizing-bil-kv')?.value) || null,
+      temperatureRiseC: parseFloat(document.getElementById('sizing-temp-rise-c')?.value) || null,
+      coolingClass: document.getElementById('sizing-cooling-class')?.value || '',
+      tapRangePct: parseFloat(document.getElementById('sizing-tap-range-pct')?.value) || null,
+      tapTargetVoltage: parseFloat(document.getElementById('sizing-tap-target-v')?.value) || null,
+      material: document.getElementById('feeder-material')?.value || 'copper',
+      tempRating: parseInt(document.getElementById('feeder-temp')?.value || '75', 10),
+      ambientTempC: parseFloat(document.getElementById('feeder-ambient')?.value) || 30,
+      bundledConductors: parseInt(document.getElementById('feeder-bundled')?.value || '3', 10),
+      installationType: document.getElementById('feeder-install')?.value || 'conduit',
+      maxParallel: parseInt(document.getElementById('sizing-max-parallel')?.value || '4', 10),
+      protectionBasisNote: document.getElementById('sizing-protection-note')?.value || '',
+      feederBasisNote: document.getElementById('sizing-feeder-note')?.value || '',
+      transformerBasisNote: document.getElementById('sizing-transformer-note')?.value || '',
+      notes: document.getElementById('sizing-notes')?.value || '',
+    };
+  }
+
+  function buildSizingPackage() {
+    try {
+      currentSizingPackage = buildTransformerFeederSizingPackage({
+        projectName: document.body?.dataset?.reportTitle || 'Auto-Size Equipment',
+        studyCase: buildSizingCaseInput(),
+        loadDemandGovernance: getStudies().loadDemandGovernance || null,
+      });
+      const container = document.getElementById('sizing-package-results');
+      if (container) {
+        container.innerHTML = `${renderTransformerFeederSizingHTML(currentSizingPackage)}
+          <details class="method-panel"><summary>Package JSON</summary><pre>${escapeHtml(JSON.stringify(currentSizingPackage, null, 2))}</pre></details>`;
+      }
+    } catch (err) {
+      currentSizingPackage = null;
+      renderError('sizing-package-results', err.message || String(err));
+    }
+  }
+
+  function renderPackageNotice(message) {
+    const status = document.getElementById('sizing-package-status');
+    if (status) status.textContent = message;
+  }
+
+  function downloadText(fileName, content, mimeType) {
+    const blob = new Blob([content], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }
+
+  function renderPrintableHtml(pkg) {
+    return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Transformer and Feeder Sizing Basis</title><link rel="stylesheet" href="style.css"></head><body>${renderTransformerFeederSizingHTML(pkg)}</body></html>`;
+  }
+
+  function escapeHtml(value = '') {
+    return String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
   }
 
   function row(label, value) {

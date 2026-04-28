@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 180" role="img" aria-labelledby="title desc">
+  <title id="title">Heat trace sample preview</title>
+  <desc id="desc">Heat trace panel feeding traced pipe circuits.</desc>
+  <rect width="360" height="180" rx="8" fill="#f8fafc"/>
+  <rect x="32" y="48" width="66" height="84" rx="5" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+  <text x="65" y="94" text-anchor="middle" font-family="Inter, Arial" font-size="12" fill="#1e3a8a">HTPNL</text>
+  <path d="M130 66h180M130 112h180" stroke="#64748b" stroke-width="12" stroke-linecap="round"/>
+  <path d="M130 66c24-22 48 22 72 0s48 22 72 0 48 22 72 0" stroke="#ef4444" stroke-width="4" fill="none"/>
+  <path d="M130 112c24-22 48 22 72 0s48 22 72 0 48 22 72 0" stroke="#ef4444" stroke-width="4" fill="none"/>
+  <path d="M98 72h32M98 108h32" stroke="#334155" stroke-width="3"/>
+  <rect x="280" y="42" width="44" height="28" rx="4" fill="#fee2e2" stroke="#dc2626"/>
+  <text x="302" y="60" text-anchor="middle" font-family="Inter, Arial" font-size="11" fill="#7f1d1d">RTD</text>
+</svg>
+

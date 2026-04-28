@@ -1,5 +1,9 @@
 import { buildPullTable } from './analysis/pullCards.mjs';
-import { getTrays, getCables } from './dataStore.mjs';
+import {
+  buildPullConstructabilityPackage,
+  renderPullConstructabilityHTML,
+} from './analysis/pullConstructability.mjs';
+import { getTrays, getCables, getStudies, setStudies } from './dataStore.mjs';
 
 document.addEventListener('DOMContentLoaded', () => {
   initSettings();
@@ -21,8 +25,20 @@ document.addEventListener('DOMContentLoaded', () => {
   const backToTableBtn = document.getElementById('backToTableBtn');
   const exportPullTableBtn = document.getElementById('exportPullTableBtn');
   const exportPullCardsBtn = document.getElementById('exportPullCardsBtn');
+  const constructabilitySection = document.getElementById('constructabilitySection');
+  const constructabilitySummary = document.getElementById('constructabilitySummary');
+  const constructabilityTableBody = document.querySelector('#constructabilityTable tbody');
+  const constructabilityWarningsBody = document.querySelector('#constructabilityWarningsTable tbody');
+  const pullConstructabilityDetail = document.getElementById('pullConstructabilityDetail');
+  const recalculateConstructabilityBtn = document.getElementById('recalculateConstructabilityBtn');
+  const exportConstructabilityJsonBtn = document.getElementById('exportConstructabilityJsonBtn');
+  const exportConstructabilityHtmlBtn = document.getElementById('exportConstructabilityHtmlBtn');
 
   let currentPulls = null;
+  let currentRouteResults = [];
+  let currentCableList = [];
+  let currentConstructabilityPackage = null;
+  const constructabilityOverrides = { sectionOverrides: {}, bendOverrides: {} };
 
   // ---- Import from XLSX ----
 
@@ -148,6 +164,8 @@ document.addEventListener('DOMContentLoaded', () => {
   function generatePullCards(routeResults, cableList) {
     const { pulls, summary } = buildPullTable(routeResults, cableList);
     currentPulls = pulls;
+    currentRouteResults = routeResults;
+    currentCableList = cableList;
 
     // Render summary
     summaryCards.innerHTML = `
@@ -197,6 +215,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     pullTableSection.hidden = false;
     pullCardDetail.hidden = true;
+    rebuildConstructabilityPackage();
 
     // Wire up view buttons
     pullTableBody.querySelectorAll('.view-pull-btn').forEach(btn => {
@@ -205,6 +224,80 @@ document.addEventListener('DOMContentLoaded', () => {
         showPullCard(num);
       });
     });
+  }
+
+  function getConstructabilityOptions() {
+    const value = id => document.getElementById(id)?.value;
+    const number = id => {
+      const parsed = Number(value(id));
+      return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+    };
+    return {
+      feedDirection: value('feedDirection') || 'forward',
+      frictionCoefficient: number('defaultFriction') || 0.35,
+      lubricantFactor: number('lubricantFactor') || 1,
+      ambientTempC: Number(value('ambientTempC')) || 30,
+      jacketMaterial: value('jacketMaterial') || 'XLPE',
+      pullingEquipmentLimitLbs: number('pullingEquipmentLimit'),
+      allowableSidewallPressureLbsPerFt: number('allowableSidewall'),
+      conduitInsideDiameterIn: number('defaultConduitId'),
+      compareReverse: document.getElementById('compareReverseToggle')?.checked !== false,
+      ...constructabilityOverrides,
+    };
+  }
+
+  function rebuildConstructabilityPackage() {
+    if (!currentPulls || !currentPulls.length) {
+      currentConstructabilityPackage = null;
+      if (constructabilitySection) constructabilitySection.hidden = true;
+      return;
+    }
+    currentConstructabilityPackage = buildPullConstructabilityPackage({
+      pullTable: { pulls: currentPulls },
+      routeResults: currentRouteResults,
+      cableList: currentCableList,
+      options: getConstructabilityOptions(),
+    });
+    saveConstructabilityPackage(currentConstructabilityPackage);
+    renderConstructabilityPackage(currentConstructabilityPackage);
+    const visiblePull = pullCardDetail && !pullCardDetail.hidden
+      ? Number(String(pullCardTitle.textContent || '').replace(/\D+/g, ''))
+      : null;
+    if (visiblePull) renderPullConstructabilityDetail(visiblePull);
+  }
+
+  function saveConstructabilityPackage(pkg) {
+    const studies = getStudies();
+    setStudies({ ...studies, pullConstructability: pkg });
+  }
+
+  function renderConstructabilityPackage(pkg) {
+    if (!pkg) return;
+    constructabilitySummary.innerHTML = `
+      <div class="summary-stat"><span class="stat-value">${pkg.summary.pullCount}</span><span class="stat-label">Pulls</span></div>
+      <div class="summary-stat"><span class="stat-value">${pkg.summary.pass}</span><span class="stat-label">Pass</span></div>
+      <div class="summary-stat"><span class="stat-value">${pkg.summary.warn}</span><span class="stat-label">Warn</span></div>
+      <div class="summary-stat"><span class="stat-value">${pkg.summary.fail}</span><span class="stat-label">Fail</span></div>
+      <div class="summary-stat"><span class="stat-value">${pkg.summary.missingData}</span><span class="stat-label">Missing Data</span></div>`;
+    constructabilityTableBody.innerHTML = pkg.pullRows.map(row => `<tr>
+      <td>${row.pullNumber}</td>
+      <td>${esc(row.recommendedDirection)}</td>
+      <td>${esc(row.status)}</td>
+      <td>${fmt(row.maxTensionLbs)}</td>
+      <td>${fmt(row.tensionLimitLbs)}</td>
+      <td>${fmt(row.maxSidewallPressureLbsPerFt)}</td>
+      <td>${fmt(row.sidewallMarginPct)}%</td>
+      <td>${row.warningCount}</td>
+    </tr>`).join('');
+    constructabilityWarningsBody.innerHTML = pkg.warningRows.length
+      ? pkg.warningRows.map(row => `<tr>
+        <td>${row.pullNumber}</td>
+        <td>${esc(row.severity)}</td>
+        <td>${esc(row.message)}</td>
+        <td>${esc(row.recommendation)}</td>
+      </tr>`).join('')
+      : '<tr><td colspan="4">No constructability warnings.</td></tr>';
+    constructabilitySection.hidden = false;
   }
 
   // ---- Show individual pull card ----
@@ -291,11 +384,90 @@ document.addEventListener('DOMContentLoaded', () => {
 
     pullTableSection.hidden = true;
     pullCardDetail.hidden = false;
+    renderPullConstructabilityDetail(pullNumber);
+  }
+
+  function renderPullConstructabilityDetail(pullNumber) {
+    if (!pullConstructabilityDetail || !currentConstructabilityPackage) return;
+    const comparison = currentConstructabilityPackage.directionComparisons.find(row => row.pullNumber === pullNumber);
+    if (!comparison) {
+      pullConstructabilityDetail.innerHTML = '';
+      return;
+    }
+    const active = comparison[comparison.recommendedDirection] || comparison.forward;
+    const sectionRows = active.sectionRows.map(row => `<tr>
+      <td>${row.step}</td>
+      <td>${esc(row.type)}</td>
+      <td>${esc(row.racewayId || '—')}</td>
+      <td><input type="number" class="constructability-edit" data-kind="section" data-id="${esc(row.id)}" data-field="lengthFt" value="${row.lengthFt}" min="0" step="0.1"></td>
+      <td><input type="number" class="constructability-edit" data-kind="section" data-id="${esc(row.id)}" data-field="frictionCoefficient" value="${row.frictionCoefficient}" min="0.05" step="0.01"></td>
+      <td><input type="number" class="constructability-edit" data-kind="section" data-id="${esc(row.id)}" data-field="conduitInsideDiameterIn" value="${row.conduitInsideDiameterIn || ''}" min="0" step="0.01"></td>
+      <td>${fmt(row.verticalRiseFt)}</td>
+      <td>${fmt(row.exitTensionLbs)}</td>
+    </tr>`).join('');
+    const bendRows = active.bendRows.length
+      ? active.bendRows.map(row => `<tr>
+        <td>${esc(row.label)}</td>
+        <td><input type="number" class="constructability-edit" data-kind="bend" data-id="${esc(row.id)}" data-field="angleRad" value="${Number(row.angleRad || 0).toFixed(4)}" min="0" step="0.01"></td>
+        <td><input type="number" class="constructability-edit" data-kind="bend" data-id="${esc(row.id)}" data-field="radiusFt" value="${row.radiusFt || ''}" min="0" step="0.1"></td>
+        <td>${fmt(row.exitTensionLbs)}</td>
+        <td>${fmt(row.sidewallPressureLbsPerFt)}</td>
+        <td>${esc(row.status)}</td>
+      </tr>`).join('')
+      : '<tr><td colspan="6">No bends available or inferred. Add route bend data or verify in field.</td></tr>';
+
+    pullConstructabilityDetail.innerHTML = `
+      <section class="nested-section">
+        <h3>Pull Constructability Detail</h3>
+        <p class="field-hint">Editable section and bend inputs update the saved constructability package for this browser project.</p>
+        <table class="result-table" aria-label="Pull section constructability rows">
+          <thead><tr><th>Step</th><th>Type</th><th>Raceway</th><th>Length (ft)</th><th>Friction μ</th><th>Conduit ID (in)</th><th>Rise (ft)</th><th>Exit Tension</th></tr></thead>
+          <tbody>${sectionRows}</tbody>
+        </table>
+        <table class="result-table" aria-label="Pull bend constructability rows">
+          <thead><tr><th>Bend</th><th>Angle (rad)</th><th>Radius (ft)</th><th>Exit Tension</th><th>Sidewall</th><th>Status</th></tr></thead>
+          <tbody>${bendRows}</tbody>
+        </table>
+        <p class="field-hint">Forward max tension ${fmt(comparison.forward.maxTensionLbs)} lbs; reverse max tension ${fmt(comparison.reverse.maxTensionLbs)} lbs. Recommended direction: ${esc(comparison.recommendedDirection)}.</p>
+      </section>`;
+
+    pullConstructabilityDetail.querySelectorAll('.constructability-edit').forEach(input => {
+      input.addEventListener('change', () => {
+        const store = input.dataset.kind === 'bend' ? constructabilityOverrides.bendOverrides : constructabilityOverrides.sectionOverrides;
+        store[input.dataset.id] = { ...(store[input.dataset.id] || {}), [input.dataset.field]: Number(input.value) };
+        rebuildConstructabilityPackage();
+      });
+    });
   }
 
   backToTableBtn.addEventListener('click', () => {
     pullCardDetail.hidden = true;
     pullTableSection.hidden = false;
+  });
+
+  recalculateConstructabilityBtn.addEventListener('click', () => {
+    if (!currentPulls || !currentPulls.length) {
+      showAlertModal('Generate pull cards before recalculating constructability.');
+      return;
+    }
+    rebuildConstructabilityPackage();
+  });
+
+  exportConstructabilityJsonBtn.addEventListener('click', () => {
+    if (!currentConstructabilityPackage) {
+      showAlertModal('No pull constructability package to export.');
+      return;
+    }
+    downloadText('pull_constructability_package.json', JSON.stringify(currentConstructabilityPackage, null, 2), 'application/json');
+  });
+
+  exportConstructabilityHtmlBtn.addEventListener('click', () => {
+    if (!currentConstructabilityPackage) {
+      showAlertModal('No pull constructability package to export.');
+      return;
+    }
+    const html = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Pull Constructability Package</title><link rel="stylesheet" href="style.css"></head><body>${renderPullConstructabilityHTML(currentConstructabilityPackage)}</body></html>`;
+    downloadText('pull_constructability_package.html', html, 'text/html');
   });
 
   // ---- XLSX Export ----
@@ -403,5 +575,18 @@ document.addEventListener('DOMContentLoaded', () => {
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;');
+  }
+
+  function fmt(value) {
+    return value === null || value === undefined || value === '' ? '—' : String(value);
+  }
+
+  function downloadText(filename, content, type) {
+    const blob = new Blob([content], { type });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 0);
   }
 });

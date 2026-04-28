@@ -15,7 +15,23 @@ global.localStorage = {
   const { STORAGE_KEYS } = TableUtils;
 
   const rows = [
-    { id: 'eq1', description: 'Breaker', voltage: '480', category: 'A', subCategory: 'B', x: 1, y: 2, z: 3 }
+    {
+      id: 'eq1',
+      description: 'Breaker',
+      voltage: '480',
+      category: 'A',
+      subCategory: 'B',
+      catalogNumber: 'BR-65',
+      interruptRatingKa: 65,
+      withstandRatingKa: 50,
+      sccrKa: 65,
+      busBracingKa: 50,
+      protectiveDeviceId: 'abb_tmax_160',
+      oneLineRef: 'swbd-1',
+      x: 1,
+      y: 2,
+      z: 3
+    }
   ];
 
   TableUtils.saveToStorage(STORAGE_KEYS.equipment, rows);

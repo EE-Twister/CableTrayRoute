@@ -126,12 +126,98 @@
           </div>
         </section>
 
+        <section class="card" aria-label="Sample projects">
+          <h2>Sample Projects</h2>
+          <div id="sample-projects-panel" aria-live="polite">
+            <p class="text-muted">Loading sample project context...</p>
+          </div>
+        </section>
+
+        <section class="card dash-full-width" aria-label="Product catalog governance">
+          <h2>Product Catalog</h2>
+          <p class="text-muted" style="margin-bottom:0.75rem">Track approved manufacturer catalog rows, verification state, and report warnings for generic product selections.</p>
+          <div id="product-catalog-panel" aria-live="polite">
+            <p class="text-muted">Loading product catalog governance...</p>
+          </div>
+        </section>
+
+        <section class="card dash-full-width" aria-label="Field verification">
+          <h2>Field Verification</h2>
+          <p class="text-muted" style="margin-bottom:0.75rem">Review local field observations, punch items, commissioning notes, and attachment metadata.</p>
+          <div id="field-verification-panel" aria-live="polite">
+            <p class="text-muted">Loading field verification...</p>
+          </div>
+        </section>
+
+        <section class="card dash-full-width" aria-label="BIM coordination">
+          <h2>BIM Coordination</h2>
+          <p class="text-muted" style="margin-bottom:0.75rem">Import BIM element metadata, reconcile quantities, and track BCF-style coordination issues.</p>
+          <div id="bim-coordination-panel" aria-live="polite">
+            <p class="text-muted">Loading BIM coordination...</p>
+          </div>
+        </section>
+
+        <section class="card dash-full-width" aria-label="Equipment evaluation">
+          <h2>Equipment Evaluation</h2>
+          <p class="text-muted" style="margin-bottom:0.75rem">Screen equipment ratings against saved short-circuit, arc-flash, TCC, and cable-duty context.</p>
+          <div id="equipment-evaluation-panel" aria-live="polite">
+            <p class="text-muted">Loading equipment evaluation...</p>
+          </div>
+        </section>
+
         <!-- Studies status -->
         <section class="card dash-full-width" aria-label="Electrical studies status">
           <h2>Electrical Studies</h2>
           <p class="text-muted" style="margin-bottom:0.75rem">Studies with saved results are shown as complete. Open any study to run or refresh it.</p>
           <div id="studies-summary" aria-live="polite">
             <p class="text-muted">Loading…</p>
+          </div>
+        </section>
+
+        <section class="card dash-full-width" aria-label="Lifecycle release packages">
+          <h2>Lifecycle Releases</h2>
+          <p class="text-muted" style="margin-bottom:0.75rem">Freeze the current model, studies, assumptions, and approvals into a local engineering release package for report lineage.</p>
+          <form id="lifecycle-release-form">
+            <div class="form-row">
+              <label for="lifecycle-name">Package Name</label>
+              <input type="text" id="lifecycle-name" name="lifecycle-name" placeholder="IFC electrical model package" autocomplete="off">
+            </div>
+            <div class="form-row">
+              <label for="lifecycle-revision">Revision</label>
+              <input type="text" id="lifecycle-revision" name="lifecycle-revision" placeholder="R1" autocomplete="off">
+            </div>
+            <div class="form-row">
+              <label for="lifecycle-author">Author</label>
+              <input type="text" id="lifecycle-author" name="lifecycle-author" autocomplete="off">
+            </div>
+            <div class="form-row">
+              <label for="lifecycle-status">Status</label>
+              <select id="lifecycle-status" name="lifecycle-status">
+                <option value="released">Released</option>
+                <option value="draft">Draft</option>
+                <option value="superseded">Superseded</option>
+              </select>
+            </div>
+            <div class="form-row">
+              <label for="lifecycle-notes">Notes</label>
+              <textarea id="lifecycle-notes" name="lifecycle-notes" rows="3" placeholder="Release assumptions, hold points, or review notes"></textarea>
+            </div>
+            <button type="submit" class="btn primary-btn">Release Package</button>
+          </form>
+          <div id="lifecycle-release-status" class="report-status" role="status" aria-live="polite"></div>
+          <div id="lifecycle-release-list" aria-live="polite">
+            <p class="text-muted">Loading lifecycle releases...</p>
+          </div>
+        </section>
+
+        <section class="card dash-full-width" aria-label="Design coach action queue">
+          <h2>Design Coach</h2>
+          <p class="text-muted" style="margin-bottom:0.75rem">Cross-study action queue built from validation, DRC, studies, approvals, and lifecycle package state.</p>
+          <div id="design-coach-summary" aria-live="polite">
+            <p class="text-muted">Loading design coach actions...</p>
+          </div>
+          <div id="design-coach-actions" aria-live="polite">
+            <p class="text-muted">Loading...</p>
           </div>
         </section>
       </div>

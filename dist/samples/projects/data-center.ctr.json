@@ -1,0 +1,49 @@
+{
+  "meta": { "version": 1, "scenario": "data-center", "scenarios": ["data-center"], "projectName": "Data Center Power Distribution" },
+  "ductbanks": [],
+  "conduits": [
+    { "id": "CND-A1", "conduit_id": "CND-A1", "type": "EMT", "trade_size": "3 in", "capacity": 7.54, "from": "UPS-A", "to": "PDU-A1" }
+  ],
+  "trays": [
+    { "id": "TR-A", "tray_id": "TR-A", "name": "Data Hall A Ladder Tray", "width": 30, "height": 6, "length": 220, "fillLimitPct": 50 }
+  ],
+  "cables": [
+    { "id": "DC-C-101", "tag": "DC-C-101", "from": "MSB-A", "to": "UPS-A", "conductor_size": "4/C 600 kcmil", "insulation_type": "XHHW-2", "voltage_rating": "600 V", "length": 140, "diameter": 2.4, "route_preference": "TR-A" },
+    { "id": "DC-C-102", "tag": "DC-C-102", "from": "UPS-A", "to": "PDU-A1", "conductor_size": "4/C 350 kcmil", "insulation_type": "XHHW-2", "voltage_rating": "600 V", "length": 85, "diameter": 1.9, "route_preference": "CND-A1" },
+    { "id": "DC-C-103", "tag": "DC-C-103", "from": "PDU-A1", "to": "RPP-A1", "conductor_size": "4/C 4/0 AWG", "insulation_type": "XHHW-2", "voltage_rating": "600 V", "length": 70, "diameter": 1.45, "route_preference": "TR-A" }
+  ],
+  "cableTypicals": [],
+  "panels": [
+    { "id": "PDU-A1", "name": "PDU-A1", "voltage": "415/240 V", "location": "Data Hall A" },
+    { "id": "RPP-A1", "name": "RPP-A1", "voltage": "415/240 V", "location": "Data Hall A" }
+  ],
+  "equipment": [
+    { "id": "MSB-A", "tag": "MSB-A", "description": "Main switchboard A", "area": "Electrical Room A" },
+    { "id": "UPS-A", "tag": "UPS-A", "description": "UPS module A", "area": "UPS Room" }
+  ],
+  "loads": [
+    { "id": "DC-L-101", "tag": "RACK-A01", "description": "IT rack row A01", "kw": 35, "voltage": "415 V", "phases": "3" },
+    { "id": "DC-L-102", "tag": "CRAH-A01", "description": "Computer room air handler", "kw": 22, "voltage": "415 V", "phases": "3" }
+  ],
+  "oneLine": {
+    "activeSheet": 0,
+    "sheets": [
+      {
+        "name": "Data Center A",
+        "components": [
+          { "id": "msb-a", "type": "switchboard", "x": 40, "y": 100, "label": "MSB-A", "connections": [{ "target": "ups-a" }] },
+          { "id": "ups-a", "type": "ups", "x": 230, "y": 100, "label": "UPS-A", "connections": [{ "target": "pdu-a1" }] },
+          { "id": "pdu-a1", "type": "panel", "x": 420, "y": 100, "label": "PDU-A1", "connections": [{ "target": "rpp-a1" }] },
+          { "id": "rpp-a1", "type": "panel", "x": 610, "y": 100, "label": "RPP-A1", "connections": [] }
+        ]
+      }
+    ]
+  },
+  "settings": {
+    "studyResults": {
+      "loadFlow": { "summary": { "pass": true, "minimumBusVoltagePct": 98.1 }, "sample": true },
+      "reliability": { "summary": { "nPlusOne": true, "criticalLoadKw": 57 }, "sample": true }
+    }
+  }
+}
+

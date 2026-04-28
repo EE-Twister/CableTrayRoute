@@ -23,6 +23,7 @@ import {
   runCapacitorBankAnalysis,
   STANDARD_KVAR_SIZES,
 } from '../analysis/capacitorBank.mjs';
+import { buildHarmonicFilterAlternatives } from '../analysis/harmonicStudyCase.mjs';
 
 function describe(name, fn) {
   console.log(name);
@@ -173,6 +174,15 @@ describe('detuningRecommendation — reactor specification', () => {
     const r = detuningRecommendation(5.6, 'caution');
     assert.strictEqual(r.needed, true);
     assert.ok(r.detuningPct != null, 'detuningPct should be set for caution');
+  });
+
+  it('feeds detuning context into harmonic study filter alternatives', () => {
+    const filters = buildHarmonicFilterAlternatives({
+      studyCase: { pccBus: 'PCC-1', nominalVoltageKv: 0.48, utilityScMva: 10, maximumDemandCurrentA: 600 },
+      sourceRows: [{ id: 'vfd-1', tag: 'VFD-1', sourceType: 'vfd', fundamentalCurrentA: 200, spectrumText: '5:35,7:25' }],
+      capacitorBank: { detuning: detuningRecommendation(4.87, 'danger') },
+    });
+    assert.ok(filters.some(row => row.reactorPercent === 5.67));
   });
 });
 

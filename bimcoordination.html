@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="BIM round-trip coordination, quantity reconciliation, and BCF-style issue markup for CableTrayRoute." />
+  <title>BIM Coordination - CableTrayRoute</title>
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/favicon.svg">
+  <meta name="color-scheme" content="light dark">
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    .bim-toolbar { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: end; margin-bottom: 1rem; }
+    .bim-toolbar label { display: grid; gap: 0.25rem; min-width: 11rem; }
+    .bim-summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); gap: 0.75rem; margin: 1rem 0; }
+    .bim-stat { border: 1px solid var(--color-border, #d1d5db); border-radius: 6px; padding: 0.75rem; background: var(--color-surface, #fff); }
+    .bim-stat strong { display: block; font-size: 1.45rem; }
+    .bim-table-wrap { overflow-x: auto; }
+    .bim-table td, .bim-table th { white-space: nowrap; }
+    .bim-issue-form { display: grid; gap: 0.75rem; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); }
+    .bim-issue-form textarea { min-height: 5rem; }
+  </style>
+  <script type="module" src="dirtyTracker.js"></script>
+  <script type="module" src="dist/bimcoordination.js" defer></script>
+</head>
+<body class="bimcoordination-page" data-report-title="BIM Coordination">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <nav class="top-nav" aria-label="Primary">
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
+      <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+    <div id="nav-links" class="nav-links" role="list"></div>
+    <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+  </nav>
+
+  <div id="settings-menu" class="settings-menu">
+    <label for="theme-select">Theme
+      <select id="theme-select">
+        <option value="system">System</option>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+        <option value="high-contrast">High Contrast</option>
+      </select>
+    </label>
+    <label><input type="checkbox" id="compact-toggle" aria-label="Enable compact table mode"> Compact Mode</label>
+    <button id="help-btn" class="btn" aria-expanded="false" title="Show help">Site Help</button>
+    <button id="export-project-btn">Export Project</button>
+    <button id="import-project-btn">Import Project</button>
+    <input type="file" id="import-project-input" accept=".ctr.json" class="hidden" title="Select project file">
+  </div>
+
+  <div class="container">
+    <main id="main-content" class="main-content">
+      <nav aria-label="Breadcrumb">
+        <ol class="breadcrumb-trail">
+          <li><a href="index.html">Home</a></li>
+          <li>Workflow</li>
+          <li aria-current="page">BIM Coordination</li>
+        </ol>
+      </nav>
+
+      <header class="page-header">
+        <h1>BIM Coordination</h1>
+        <p class="text-muted">Local BIM metadata import, stable-ID mapping, quantity reconciliation, and BCF-style issue records.</p>
+      </header>
+
+      <section class="card">
+        <h2>Import and Export</h2>
+        <div class="bim-toolbar">
+          <label for="bim-import-file">Import IFC/JSON
+            <input id="bim-import-file" type="file" accept=".ifc,.json,application/json,text/plain">
+          </label>
+          <button id="bim-clear-elements" type="button" class="btn secondary-btn">Clear Imported Elements</button>
+          <button id="bim-export-json" type="button" class="btn secondary-btn">Export Package JSON</button>
+          <button id="bim-export-html" type="button" class="btn secondary-btn">Printable HTML</button>
+          <button id="bim-export-issues" type="button" class="btn secondary-btn">Export Issues JSON</button>
+        </div>
+        <p id="bim-status" class="report-status" role="status" aria-live="polite"></p>
+      </section>
+
+      <section class="card">
+        <h2>Coordination Summary</h2>
+        <div id="bim-summary" class="bim-summary-grid" aria-live="polite"></div>
+      </section>
+
+      <section class="card">
+        <h2>Connector Exchange</h2>
+        <div class="bim-toolbar">
+          <button id="bim-export-revit-connector" type="button" class="btn secondary-btn">Revit Connector JSON</button>
+          <button id="bim-export-autocad-connector" type="button" class="btn secondary-btn">AutoCAD Connector JSON</button>
+          <button id="bim-export-generic-connector" type="button" class="btn secondary-btn">Generic Connector JSON</button>
+          <label for="bim-connector-file">Preview Return Package
+            <input id="bim-connector-file" type="file" accept=".json,application/json">
+          </label>
+          <button id="bim-connector-accept" type="button" class="btn primary-btn" disabled>Accept Previewed BIM Records</button>
+        </div>
+        <div id="bim-connector-readiness" class="bim-summary-grid" aria-live="polite"></div>
+        <div id="bim-connector-preview" class="bim-table-wrap" aria-live="polite"></div>
+      </section>
+
+      <section class="card">
+        <h2>Imported Elements</h2>
+        <div class="bim-toolbar">
+          <label for="bim-type-filter">Type
+            <select id="bim-type-filter"></select>
+          </label>
+          <label for="bim-mapping-filter">Mapping
+            <select id="bim-mapping-filter">
+              <option value="">All</option>
+              <option value="mapped">Mapped</option>
+              <option value="unmapped">Unmapped</option>
+              <option value="typeMismatch">Type mismatch</option>
+            </select>
+          </label>
+        </div>
+        <div id="bim-elements-table" class="bim-table-wrap" aria-live="polite"></div>
+      </section>
+
+      <section class="card">
+        <h2>Quantity Reconciliation</h2>
+        <div id="bim-reconciliation-table" class="bim-table-wrap" aria-live="polite"></div>
+      </section>
+
+      <section class="card">
+        <h2>BCF-Style Issues</h2>
+        <form id="bim-issue-form" class="bim-issue-form">
+          <label for="bim-issue-title">Title
+            <input id="bim-issue-title" name="title" required autocomplete="off">
+          </label>
+          <label for="bim-issue-elements">Element IDs
+            <input id="bim-issue-elements" name="elementIds" placeholder="Comma-separated BIM element IDs" autocomplete="off">
+          </label>
+          <label for="bim-issue-status">Status
+            <select id="bim-issue-status" name="status">
+              <option value="open">Open</option>
+              <option value="assigned">Assigned</option>
+              <option value="resolved">Resolved</option>
+              <option value="rejected">Rejected</option>
+              <option value="closed">Closed</option>
+            </select>
+          </label>
+          <label for="bim-issue-priority">Priority
+            <select id="bim-issue-priority" name="priority">
+              <option value="medium">Medium</option>
+              <option value="low">Low</option>
+              <option value="high">High</option>
+              <option value="critical">Critical</option>
+            </select>
+          </label>
+          <label for="bim-issue-assignee">Assignee
+            <input id="bim-issue-assignee" name="assignee" autocomplete="off">
+          </label>
+          <label for="bim-issue-description">Description
+            <textarea id="bim-issue-description" name="description"></textarea>
+          </label>
+          <button type="submit" class="btn primary-btn">Add Issue</button>
+        </form>
+        <div id="bim-issues-table" class="bim-table-wrap" aria-live="polite"></div>
+      </section>
+    </main>
+  </div>
+</body>
+</html>

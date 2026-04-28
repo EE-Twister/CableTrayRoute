@@ -1,0 +1,59 @@
+{
+  "projectName": "Connector Demo Project",
+  "projectId": "connector-demo",
+  "scenario": "base",
+  "cables": [
+    {
+      "id": "C-101",
+      "tag": "C-101",
+      "from": "SWBD-1",
+      "to": "P-101",
+      "length": 80,
+      "system": "Power",
+      "voltage_rating": "600 V"
+    }
+  ],
+  "trays": [
+    {
+      "tray_id": "TR-1",
+      "system": "Power",
+      "voltageClass": "600 V",
+      "level": "L1",
+      "area": "Unit A",
+      "lengthFt": 100
+    }
+  ],
+  "conduits": [
+    {
+      "conduit_id": "CD-1",
+      "system": "Control",
+      "voltageClass": "120 V",
+      "level": "L1",
+      "area": "Unit A",
+      "lengthFt": 40
+    }
+  ],
+  "equipment": [
+    {
+      "id": "SWBD-1",
+      "tag": "SWBD-1",
+      "category": "Switchboard",
+      "level": "L1",
+      "area": "Unit A"
+    }
+  ],
+  "bimElements": [
+    {
+      "guid": "g-tr-1",
+      "sourceId": "revit-tr-1",
+      "elementType": "cableTray",
+      "tag": "TR-1",
+      "system": "Power",
+      "voltageClass": "600 V",
+      "level": "L1",
+      "area": "Unit A",
+      "lengthFt": 100
+    }
+  ],
+  "bimIssues": []
+}

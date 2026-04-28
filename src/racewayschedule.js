@@ -199,6 +199,9 @@ function tradeSizeOptions(type){
 const TRAY_WIDTH_OPTIONS=['2','3','4','6','8','9','12','16','18','20','24','30','36'];
 const TRAY_DEPTH_OPTIONS=['2','3','4','5','6','7','8','9','10','11','12'];
 const TRAY_TYPE_OPTIONS=['Ladder (50 % fill)','Solid Bottom (40 % fill)'];
+const SUPPORT_TYPE_OPTIONS=['','trapeze','wallBracket','floorStand','cantilever','strut','directBuried'];
+const CONSTRUCTION_STATUS_OPTIONS=['notStarted','planned','released','inProgress','installed','verified','hold'];
+const CONSTRUCTION_PHASE_OPTIONS=['','IFR','IFC','Construction','Turnover','As-built'];
 
 function ensureDuctbankRows(){
   const tbody=document.querySelector('#ductbankTable tbody');
@@ -427,7 +430,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     {key:'tray_type',label:'Tray Type',type:'select',options:TRAY_TYPE_OPTIONS,default:TRAY_TYPE_OPTIONS[0],validate:['required']},
     {key:'num_slots',label:'Slots',type:'number',tooltip:'Number of longitudinal compartments (divider strips). Fill capacity is divided equally among slots. Default: 1 (single undivided tray).'},
     {key:'slot_groups',label:'Slot Groups (JSON)',type:'text',tooltip:'Optional JSON mapping slot index (0-based) to cable group name. Example: {"0":"power","1":"instrument"}. Leave blank for an undivided tray.'},
-    {key:'allowed_cable_group',label:'Allowed Group',type:'text'}
+    {key:'allowed_cable_group',label:'Allowed Group',type:'text'},
+    {key:'supportFamily',label:'Support Family',type:'text'},
+    {key:'supportType',label:'Support Type',type:'select',options:SUPPORT_TYPE_OPTIONS},
+    {key:'supportSpacingFt',label:'Support Spacing (ft)',type:'number',validate:['numeric']},
+    {key:'accessoryKits',label:'Accessory Kits (JSON)',type:'text',tooltip:'Optional construction accessories. Example: [{"name":"Cover kit","quantity":3,"unit":"ea"}]'},
+    {key:'dividerLane',label:'Divider/Lane',type:'text'},
+    {key:'constructionPhase',label:'Phase',type:'select',options:CONSTRUCTION_PHASE_OPTIONS},
+    {key:'constructionStatus',label:'Status',type:'select',options:CONSTRUCTION_STATUS_OPTIONS,default:'notStarted'},
+    {key:'drawingRef',label:'Drawing Ref',type:'text'},
+    {key:'detailRef',label:'Detail Ref',type:'text'},
+    {key:'labelId',label:'Label ID',type:'text'},
+    {key:'sectionRef',label:'Section Ref',type:'text'},
+    {key:'installArea',label:'Install Area',type:'text'},
+    {key:'constructionNotes',label:'Construction Notes',type:'text'}
   ];
   const trayTable=TableUtils.createTable({
     tableId:'trayTable',
@@ -476,7 +492,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     {key:'end_y',label:'End Y',type:'number',validate:['required','numeric']},
     {key:'end_z',label:'End Z',type:'number',validate:['required','numeric']},
     {key:'capacity',label:'Capacity',type:'number',validate:['numeric']},
-    {key:'allowed_cable_group',label:'Allowed Group',type:'text'}
+    {key:'allowed_cable_group',label:'Allowed Group',type:'text'},
+    {key:'supportFamily',label:'Support Family',type:'text'},
+    {key:'supportType',label:'Support Type',type:'select',options:SUPPORT_TYPE_OPTIONS},
+    {key:'supportSpacingFt',label:'Support Spacing (ft)',type:'number',validate:['numeric']},
+    {key:'accessoryKits',label:'Accessory Kits (JSON)',type:'text'},
+    {key:'constructionPhase',label:'Phase',type:'select',options:CONSTRUCTION_PHASE_OPTIONS},
+    {key:'constructionStatus',label:'Status',type:'select',options:CONSTRUCTION_STATUS_OPTIONS,default:'notStarted'},
+    {key:'drawingRef',label:'Drawing Ref',type:'text'},
+    {key:'detailRef',label:'Detail Ref',type:'text'},
+    {key:'labelId',label:'Label ID',type:'text'},
+    {key:'sectionRef',label:'Section Ref',type:'text'},
+    {key:'installArea',label:'Install Area',type:'text'},
+    {key:'constructionNotes',label:'Construction Notes',type:'text'}
   ];
   const conduitTable=TableUtils.createTable({
     tableId:'conduitTable',

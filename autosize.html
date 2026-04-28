@@ -105,6 +105,94 @@
         and transformer protection.</p>
       </header>
 
+      <section class="method-panel" aria-labelledby="sizing-case-title">
+        <h2 id="sizing-case-title">Transformer and Feeder Sizing Case Basis</h2>
+        <p class="field-hint">Build an auditable package that records load source, growth, transformer data, feeder/protection basis, tap/emergency assumptions, and accepted/rejected sizing alternatives.</p>
+        <div class="grid-3">
+          <label for="sizing-case-name">Case name
+            <input id="sizing-case-name" type="text" value="Transformer / Feeder Sizing Case">
+          </label>
+          <label for="sizing-load-source">Load source
+            <select id="sizing-load-source">
+              <option value="manual">Manual</option>
+              <option value="loadDemandGovernance">Load Demand Governance</option>
+              <option value="panel">Panel</option>
+              <option value="serviceGroup">Service Group</option>
+            </select>
+          </label>
+          <label for="sizing-growth-pct">Future growth (%)
+            <input id="sizing-growth-pct" type="number" step="0.1" value="0">
+          </label>
+          <label for="sizing-load-kw">Manual / imported load (kW)
+            <input id="sizing-load-kw" type="number" step="0.1" placeholder="optional">
+          </label>
+          <label for="sizing-load-kva">Manual / imported load (kVA)
+            <input id="sizing-load-kva" type="number" step="0.1" placeholder="optional">
+          </label>
+          <label for="sizing-pf">Power factor
+            <input id="sizing-pf" type="number" min="0.01" max="1" step="0.01" value="0.9">
+          </label>
+          <label for="sizing-panel-id">Panel ID / tag
+            <input id="sizing-panel-id" type="text" placeholder="panel source filter">
+          </label>
+          <label for="sizing-service-group">Service group
+            <input id="sizing-service-group" type="text" placeholder="default">
+          </label>
+          <label for="sizing-max-parallel">Max parallel sets
+            <input id="sizing-max-parallel" type="number" min="1" max="6" step="1" value="4">
+          </label>
+        </div>
+        <div class="grid-3">
+          <label for="sizing-impedance-pct">Transformer impedance (%)
+            <input id="sizing-impedance-pct" type="number" step="0.01" placeholder="review input">
+          </label>
+          <label for="sizing-bil-kv">BIL (kV)
+            <input id="sizing-bil-kv" type="number" step="0.1" placeholder="review input">
+          </label>
+          <label for="sizing-temp-rise-c">Temperature rise (C)
+            <input id="sizing-temp-rise-c" type="number" step="1" placeholder="review input">
+          </label>
+          <label for="sizing-cooling-class">Cooling class
+            <input id="sizing-cooling-class" type="text" placeholder="AA, OA, FA">
+          </label>
+          <label for="sizing-tap-range-pct">Tap range (%)
+            <input id="sizing-tap-range-pct" type="number" step="0.1" placeholder="optional">
+          </label>
+          <label for="sizing-tap-target-v">Target secondary voltage (V)
+            <input id="sizing-tap-target-v" type="number" step="1" placeholder="optional">
+          </label>
+          <label>
+            <input id="sizing-emergency-enabled" type="checkbox">
+            Emergency / overload allowance
+          </label>
+          <label for="sizing-emergency-pct">Emergency allowance (%)
+            <input id="sizing-emergency-pct" type="number" step="0.1" value="0">
+          </label>
+        </div>
+        <div class="grid-3">
+          <label for="sizing-protection-note">Protection basis note
+            <input id="sizing-protection-note" type="text" placeholder="primary/secondary OCPD basis">
+          </label>
+          <label for="sizing-feeder-note">Feeder basis note
+            <input id="sizing-feeder-note" type="text" placeholder="conductor/protection basis">
+          </label>
+          <label for="sizing-transformer-note">Transformer basis note
+            <input id="sizing-transformer-note" type="text" placeholder="standard size / manufacturer review">
+          </label>
+        </div>
+        <label for="sizing-notes">Case notes
+          <textarea id="sizing-notes" rows="2" placeholder="screening assumptions, reviewer notes, or owner criteria"></textarea>
+        </label>
+        <div id="controls">
+          <button id="build-sizing-package-btn" type="button" class="primary-btn">Build Sizing Package</button>
+          <button id="save-sizing-package-btn" type="button" class="btn">Save to Studies</button>
+          <button id="export-sizing-json-btn" type="button" class="btn">Export JSON</button>
+          <button id="export-sizing-html-btn" type="button" class="btn">Printable HTML</button>
+        </div>
+        <p id="sizing-package-status" class="field-hint" aria-live="polite"></p>
+        <div id="sizing-package-results" role="region" aria-live="polite" aria-label="Transformer and feeder sizing package results"></div>
+      </section>
+
       <!-- Tab navigation -->
       <div class="tab-bar" role="tablist" aria-label="Auto-sizing categories">
         <button class="tab-btn active" role="tab" data-tab="feeder"
@@ -137,6 +225,7 @@
         </details>
 
         <form id="feeder-form" novalidate>
+          <button id="import-governed-demand-btn" class="btn" type="button" title="Import the saved governed demand from the Load List">Import Governed Demand</button>
           <fieldset>
             <legend><strong>Input Mode</strong></legend>
             <label>

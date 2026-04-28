@@ -1,6 +1,13 @@
 const d3 = globalThis.d3;
 import { getOneLine, getStudies, setStudies } from '../dataStore.mjs';
 import { resolveCtForComponent } from './ctMetadata.mjs';
+import {
+  buildHarmonicStudyPackage,
+  HARMONIC_STUDY_CASE_VERSION,
+  normalizeHarmonicSourceRows,
+  renderHarmonicStudyHTML,
+  runHarmonicStudyCase,
+} from './harmonicStudyCase.mjs';
 
 // Convert spectrum description to a map of harmonic order to percent
 export function parseSpectrum(spec) {
@@ -437,7 +444,222 @@ function renderChart(svgEl, data) {
     .attr('stroke-dasharray', '4,2');
 }
 
+function esc(value = '') {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function downloadText(filename, content, type = 'application/json') {
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+function statusBadge(status = '') {
+  const cls = status === 'fail'
+    ? 'badge-error'
+    : status === 'warn' || status === 'missingData' || status === 'review'
+      ? 'badge-warn'
+      : 'badge-ok';
+  return `<span class="badge ${cls}">${esc(status || 'pass')}</span>`;
+}
+
+function sourceRowHtml(row = {}) {
+  return `<tr>
+    <td><input class="harmonic-source-tag" type="text" value="${esc(row.tag || '')}" aria-label="Source tag"></td>
+    <td><select class="harmonic-source-type" aria-label="Source type">
+      ${['vfd', 'ups', 'rectifier', 'ibr', 'arcFurnace', 'generic'].map(type => `<option value="${type}" ${row.sourceType === type ? 'selected' : ''}>${type}</option>`).join('')}
+    </select></td>
+    <td><input class="harmonic-source-ref" type="text" value="${esc(row.componentId || row.busId || '')}" aria-label="Bus or component reference"></td>
+    <td><input class="harmonic-source-current" type="number" min="0" step="0.1" value="${esc(row.fundamentalCurrentA ?? '')}" aria-label="Fundamental current"></td>
+    <td><input class="harmonic-source-kw" type="number" min="0" step="0.1" value="${esc(row.kw ?? '')}" aria-label="Source kW"></td>
+    <td><input class="harmonic-source-spectrum" type="text" value="${esc(row.spectrumText || '')}" placeholder="5:35,7:25,11:9" aria-label="Harmonic spectrum"></td>
+    <td style="text-align:center;"><input class="harmonic-source-interharmonic" type="checkbox" ${row.interharmonic ? 'checked' : ''} aria-label="Interharmonic source"></td>
+    <td><button class="btn harmonic-remove-source" type="button">Remove</button></td>
+  </tr>`;
+}
+
+function readHarmonicStudyCaseFromDom() {
+  return {
+    pccBus: document.getElementById('harmonic-pcc-tag')?.value || '',
+    pccTag: document.getElementById('harmonic-pcc-tag')?.value || '',
+    nominalVoltageKv: document.getElementById('harmonic-nominal-kv')?.value || '',
+    utilityScMva: document.getElementById('harmonic-sc-mva')?.value || '',
+    utilityXrRatio: document.getElementById('harmonic-xr')?.value || '',
+    maximumDemandCurrentA: document.getElementById('harmonic-demand-current')?.value || '',
+    demandCurrentBasis: document.getElementById('harmonic-demand-basis')?.value || '',
+    complianceBasis: document.getElementById('harmonic-compliance-basis')?.value || 'IEEE519-2022',
+    selectedComplianceBasis: document.getElementById('harmonic-compliance-basis')?.value || 'IEEE519-2022',
+    transformerPhaseShift: document.getElementById('harmonic-phase-shift')?.value || '',
+    triplenTreatment: document.getElementById('harmonic-triplen-treatment')?.value || 'screening',
+    zeroSequenceTreatment: document.getElementById('harmonic-triplen-treatment')?.value || 'screening',
+    reportPreset: document.getElementById('harmonic-report-preset')?.value || 'summary',
+  };
+}
+
+function readHarmonicSourceRowsFromDom() {
+  return [...document.querySelectorAll('#harmonic-source-tbody tr')].map((tr, index) => {
+    const ref = tr.querySelector('.harmonic-source-ref')?.value || '';
+    return {
+      id: `source-${index + 1}-${ref || tr.querySelector('.harmonic-source-tag')?.value || 'row'}`,
+      tag: tr.querySelector('.harmonic-source-tag')?.value || `Source ${index + 1}`,
+      sourceType: tr.querySelector('.harmonic-source-type')?.value || 'generic',
+      componentId: ref,
+      busId: ref,
+      fundamentalCurrentA: tr.querySelector('.harmonic-source-current')?.value || '',
+      kw: tr.querySelector('.harmonic-source-kw')?.value || '',
+      spectrumText: tr.querySelector('.harmonic-source-spectrum')?.value || '',
+      interharmonic: tr.querySelector('.harmonic-source-interharmonic')?.checked || false,
+    };
+  });
+}
+
+function renderHarmonicStudyResults(pkg = {}) {
+  const target = document.getElementById('harmonic-study-case-results');
+  if (!target) return;
+  const rows = pkg.complianceRows || [];
+  const filters = pkg.filterAlternatives || [];
+  target.innerHTML = `
+    <h3>IEEE 519 Compliance Rows</h3>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr><th>Source</th><th>Check</th><th>Actual</th><th>Limit</th><th>Margin</th><th>Status</th><th>Recommendation</th></tr></thead>
+        <tbody>${rows.length ? rows.map(row => `<tr>
+          <td>${esc(row.sourceTag)}</td>
+          <td>${esc(row.checkType)}</td>
+          <td>${esc(row.actualValue ?? 'Missing')}</td>
+          <td>${esc(row.limitValue ?? 'Missing')}</td>
+          <td>${esc(row.margin ?? 'Missing')}</td>
+          <td>${statusBadge(row.status)}</td>
+          <td>${esc(row.recommendation)}</td>
+        </tr>`).join('') : '<tr><td colspan="7">No compliance rows.</td></tr>'}</tbody>
+      </table>
+    </div>
+    <h3>Filter Alternatives</h3>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr><th>Name</th><th>Type</th><th>Targets</th><th>Reduction</th><th>Risk</th><th>Status</th><th>Recommendation</th></tr></thead>
+        <tbody>${filters.length ? filters.map(row => `<tr>
+          <td>${esc(row.name)}</td>
+          <td>${esc(row.filterType)}</td>
+          <td>${esc((row.targetHarmonics || []).join(', '))}</td>
+          <td>${esc(row.expectedThdReductionPct ?? '')}%</td>
+          <td>${esc(row.frequencyScanResonanceRisk)}</td>
+          <td>${statusBadge(row.status)}</td>
+          <td>${esc(row.recommendation)}</td>
+        </tr>`).join('') : '<tr><td colspan="7">No filter alternatives generated.</td></tr>'}</tbody>
+      </table>
+    </div>
+    <details>
+      <summary>Study Package JSON</summary>
+      <pre>${esc(JSON.stringify(pkg, null, 2))}</pre>
+    </details>`;
+}
+
+function seedHarmonicStudyPanel() {
+  const tbody = document.getElementById('harmonic-source-tbody');
+  if (!tbody) return;
+  const studies = getStudies();
+  const saved = studies.harmonicStudyCase || (studies.harmonics?.version === HARMONIC_STUDY_CASE_VERSION ? studies.harmonics : null);
+  let pkg = null;
+  try {
+    if (saved) pkg = buildHarmonicStudyPackage(saved);
+  } catch {
+    pkg = null;
+  }
+  if (pkg?.studyCase) {
+    document.getElementById('harmonic-pcc-tag').value = pkg.studyCase.pccTag || pkg.studyCase.pccBus || '';
+    document.getElementById('harmonic-nominal-kv').value = pkg.studyCase.nominalVoltageKv || 0.48;
+    document.getElementById('harmonic-sc-mva').value = pkg.studyCase.utilityScMva ?? '';
+    document.getElementById('harmonic-xr').value = pkg.studyCase.utilityXrRatio || 10;
+    document.getElementById('harmonic-demand-current').value = pkg.studyCase.maximumDemandCurrentA ?? '';
+    document.getElementById('harmonic-demand-basis').value = pkg.studyCase.demandCurrentBasis || '';
+    document.getElementById('harmonic-compliance-basis').value = pkg.studyCase.selectedComplianceBasis || pkg.studyCase.complianceBasis || 'IEEE519-2022';
+    document.getElementById('harmonic-report-preset').value = pkg.studyCase.reportPreset || 'summary';
+    document.getElementById('harmonic-phase-shift').value = pkg.studyCase.transformerPhaseShift || '';
+    document.getElementById('harmonic-triplen-treatment').value = pkg.studyCase.triplenTreatment || 'screening';
+  }
+  const rows = pkg?.sourceRows?.length
+    ? pkg.sourceRows
+    : normalizeHarmonicSourceRows([], { oneLine: getOneLine() });
+  tbody.innerHTML = rows.length
+    ? rows.map(sourceRowHtml).join('')
+    : sourceRowHtml({ tag: 'PCC Source 1', sourceType: 'generic', spectrumText: '5:20,7:14,11:6' });
+  renderHarmonicStudyResults(pkg || { complianceRows: [], filterAlternatives: [] });
+}
+
+function runHarmonicStudyCaseFromDom() {
+  const studies = getStudies();
+  const result = runHarmonicStudyCase({
+    oneLine: getOneLine(),
+    studyCase: readHarmonicStudyCaseFromDom(),
+    sourceRows: readHarmonicSourceRowsFromDom(),
+    frequencyScan: studies.frequencyScan || studies.harmonicFrequencyScan || null,
+    capacitorBank: studies.capacitorBank || studies.capacitorBankSizing || null,
+  });
+  const pkg = buildHarmonicStudyPackage({
+    projectName: studies.projectName || 'Untitled Project',
+    ...result,
+    frequencyScan: studies.frequencyScan || studies.harmonicFrequencyScan || null,
+    capacitorDutyContext: studies.capacitorBank || studies.capacitorBankSizing || null,
+  });
+  globalThis.__lastHarmonicStudyPackage = pkg;
+  const status = document.getElementById('harmonic-study-case-status');
+  if (status) {
+    status.textContent = `${pkg.summary.status.toUpperCase()}: ${pkg.summary.sourceCount} source(s), ${pkg.summary.fail} fail, ${pkg.summary.warn} warning, ${pkg.summary.missingData} missing-data compliance row(s).`;
+  }
+  renderHarmonicStudyResults(pkg);
+  return pkg;
+}
+
+function bindHarmonicStudyPanel() {
+  if (!document.getElementById('harmonic-study-case-section')) return;
+  seedHarmonicStudyPanel();
+  document.getElementById('harmonic-add-source')?.addEventListener('click', () => {
+    document.getElementById('harmonic-source-tbody')?.insertAdjacentHTML('beforeend', sourceRowHtml({ tag: 'New Source', sourceType: 'generic', spectrumText: '5:20,7:14' }));
+  });
+  document.getElementById('harmonic-source-tbody')?.addEventListener('click', event => {
+    const button = event.target.closest?.('.harmonic-remove-source');
+    if (button) button.closest('tr')?.remove();
+  });
+  document.getElementById('harmonic-run-study-case')?.addEventListener('click', () => {
+    try {
+      runHarmonicStudyCaseFromDom();
+    } catch (err) {
+      const status = document.getElementById('harmonic-study-case-status');
+      if (status) status.textContent = err.message || String(err);
+    }
+  });
+  document.getElementById('harmonic-save-study-case')?.addEventListener('click', () => {
+    const pkg = globalThis.__lastHarmonicStudyPackage || runHarmonicStudyCaseFromDom();
+    const studies = getStudies();
+    studies.harmonicStudyCase = pkg;
+    studies.harmonics = pkg.results || studies.harmonics || {};
+    setStudies(studies);
+    const status = document.getElementById('harmonic-study-case-status');
+    if (status) status.textContent = 'Harmonic study case saved to project studies.';
+  });
+  document.getElementById('harmonic-export-json')?.addEventListener('click', () => {
+    const pkg = globalThis.__lastHarmonicStudyPackage || runHarmonicStudyCaseFromDom();
+    downloadText('harmonic-study-case.json', JSON.stringify(pkg, null, 2), 'application/json');
+  });
+  document.getElementById('harmonic-export-html')?.addEventListener('click', () => {
+    const pkg = globalThis.__lastHarmonicStudyPackage || runHarmonicStudyCaseFromDom();
+    downloadText('harmonic-study-case.html', renderHarmonicStudyHTML(pkg), 'text/html');
+  });
+}
+
 if (typeof document !== 'undefined') {
+  bindHarmonicStudyPanel();
   const chartEl = document.getElementById('harmonics-chart');
   if (chartEl) {
     const results = ensureHarmonicResults();

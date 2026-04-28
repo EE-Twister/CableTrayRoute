@@ -1,4 +1,9 @@
 import { analyzeGroundGrid } from './analysis/groundGrid.mjs';
+import {
+  buildAdvancedGroundingPackage,
+  renderAdvancedGroundingHTML,
+} from './analysis/advancedGrounding.mjs';
+import { getStudies, setStudies } from './dataStore.mjs';
 import { normalizePreviewGeometry } from './src/groundgridPreviewGeometry.js';
 import {
   buildGroundGridRecommendations,
@@ -36,6 +41,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const statusBanner = document.getElementById('ground-grid-status');
   const kpiGrid = document.getElementById('ground-grid-kpis');
   const designCoach = document.getElementById('ground-grid-design-coach');
+  const advancedPanel = document.getElementById('advanced-grounding-panel');
+  const riskPointTable = document.getElementById('grounding-risk-point-table');
+  const exportAdvancedJsonBtn = document.getElementById('export-advanced-grounding-json');
+  const exportAdvancedHtmlBtn = document.getElementById('export-advanced-grounding-html');
+  const exportHazardSvgBtn = document.getElementById('export-grounding-hazard-svg');
 
   let hadInitError = false;
 
@@ -89,6 +99,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const svgWidth = 520;
   const svgHeight = 360;
   let latestAnalysisResult = null;
+  let latestAdvancedPackage = null;
 
   function makeSvg(name, attrs = {}) {
     const node = document.createElementNS(SVG_NS, name);
@@ -130,6 +141,223 @@ document.addEventListener('DOMContentLoaded', () => {
     return marginPct >= 0
       ? `${marginPct.toFixed(0)}% below limit`
       : `${Math.abs(marginPct).toFixed(0)}% over limit`;
+  }
+
+  function downloadText(filename, content, type = 'application/json') {
+    const blob = new Blob([content], { type });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 0);
+  }
+
+  function parsePointRows(text, { defaultKind = 'touch', includeMethod = false } = {}) {
+    return String(text || '')
+      .split(/\r?\n/)
+      .map(row => row.trim())
+      .filter(Boolean)
+      .map((row, index) => {
+        const parts = row.split(',').map(part => part.trim());
+        if (includeMethod) {
+          return {
+            spacingM: parseFloat(parts[0]),
+            apparentResistivityOhmM: parseFloat(parts[1]),
+            method: parts[2] || 'wenner',
+            source: parts[3] || '',
+          };
+        }
+        return {
+          label: parts[0] || `Point ${index + 1}`,
+          x: parseFloat(parts[1]),
+          y: parseFloat(parts[2]),
+          kind: parts[3] || defaultKind,
+          notes: parts.slice(4).join(', '),
+        };
+      });
+  }
+
+  function getOptionalNumber(id, fallback = null) {
+    const raw = document.getElementById(id)?.value;
+    const value = parseFloat(raw);
+    return Number.isFinite(value) ? value : fallback;
+  }
+
+  function parseFallOfPotentialRows(text) {
+    return String(text || '')
+      .split(/\r?\n/)
+      .map(row => row.trim())
+      .filter(Boolean)
+      .map((row, index) => {
+        const parts = row.split(',').map(part => part.trim());
+        return {
+          id: `fop-${index + 1}`,
+          testId: parts[0] || `FOP-${index + 1}`,
+          probeSpacingM: parseFloat(parts[1]),
+          measuredResistanceOhm: parseFloat(parts[2]),
+          curveDeviationPct: parseFloat(parts[3]),
+          location: parts[4] || '',
+          notes: parts.slice(5).join(', '),
+        };
+      });
+  }
+
+  function parseTransferredPotentialPaths(text) {
+    return String(text || '')
+      .split(/\r?\n/)
+      .map(row => row.trim())
+      .filter(Boolean)
+      .map((row, index) => {
+        const parts = row.split(',').map(part => part.trim());
+        return {
+          id: `transfer-${index + 1}`,
+          label: parts[0] || `Transferred path ${index + 1}`,
+          distanceM: parseFloat(parts[1]),
+          target: parts[2] || '',
+          notes: parts.slice(3).join(', '),
+        };
+      });
+  }
+
+  function readGroundingFieldFidelityInputs(inputs) {
+    return {
+      soilMeasurements: inputs.soilMeasurements || [],
+      fallOfPotentialRows: parseFallOfPotentialRows(document.getElementById('fall-of-potential-rows')?.value || ''),
+      seasonalInputs: {
+        enabled: Boolean(document.getElementById('seasonal-soil-enabled')?.checked),
+        wetMultiplier: getOptionalNumber('seasonal-wet-multiplier', 0.75),
+        nominalMultiplier: 1,
+        dryMultiplier: getOptionalNumber('seasonal-dry-multiplier', 1.35),
+      },
+      personnelProtection: {
+        bodyWeightKg: 70,
+        bodyImpedanceOhm: getOptionalNumber('field-body-impedance'),
+        gloveClass: document.getElementById('field-glove-class')?.value || '',
+        footwear: document.getElementById('field-footwear')?.value || '',
+        contactResistanceOhm: getOptionalNumber('field-contact-resistance'),
+        en50522Review: Boolean(document.getElementById('en50522-review')?.checked),
+      },
+      fidelityControls: {
+        boundaryExtensionM: getOptionalNumber('grounding-boundary-extension', 20),
+        contourDensity: getOptionalNumber('grounding-contour-density', 25),
+        inspectionPointSpacingM: getOptionalNumber('grounding-inspection-spacing', 5),
+        meshResolutionLabel: document.getElementById('grounding-mesh-resolution')?.value || 'screening',
+        transferredPotentialPaths: parseTransferredPotentialPaths(document.getElementById('transferred-potential-paths')?.value || ''),
+      },
+    };
+  }
+
+  function readAdvancedGroundingInputs(rectangle) {
+    const mode = document.getElementById('grounding-geometry-mode')?.value || 'rectangle';
+    const soilMeasurements = parsePointRows(document.getElementById('soil-measurements')?.value || '', { includeMethod: true })
+      .filter(row => Number.isFinite(row.spacingM) || Number.isFinite(row.apparentResistivityOhmM));
+    const polygon = mode === 'polygon'
+      ? parsePointRows(document.getElementById('polygon-points')?.value || '', { defaultKind: 'touch' })
+        .map((point, index) => ({ id: `poly-${index + 1}`, label: point.label, x: point.x, y: point.y }))
+      : [];
+    const userPoints = parsePointRows(document.getElementById('risk-points')?.value || '', { defaultKind: 'touch' })
+      .filter(point => Number.isFinite(point.x) || Number.isFinite(point.y));
+    const rods = parsePointRows(document.getElementById('advanced-rods')?.value || '', { defaultKind: 'rod' })
+      .map((point, index) => ({
+        id: `adv-rod-${index + 1}`,
+        label: point.label,
+        x: point.x,
+        y: point.y,
+        lengthM: parseFloat(point.kind) || 0,
+        notes: point.notes,
+      }))
+      .filter(rod => Number.isFinite(rod.x) && Number.isFinite(rod.y));
+    const remoteElectrodes = parsePointRows(document.getElementById('remote-electrodes')?.value || '', { defaultKind: 'remote' })
+      .map((point, index) => ({
+        id: `remote-${index + 1}`,
+        label: point.label,
+        distanceM: point.x,
+        bondingPath: point.kind || '',
+        notes: point.notes || `Offset/ref ${point.y || 0}`,
+      }))
+      .filter(electrode => electrode.label);
+    return { mode, soilMeasurements, polygon, userPoints, rods, remoteElectrodes, rectangle };
+  }
+
+  function createAdvancedPackage(result, rectangle) {
+    const inputs = readAdvancedGroundingInputs(rectangle);
+    const fieldData = readGroundingFieldFidelityInputs(inputs);
+    try {
+      return buildAdvancedGroundingPackage({
+        projectName: document.body?.dataset?.reportTitle || 'Ground Grid Analysis',
+        result,
+        rectangle,
+        soilMeasurements: inputs.soilMeasurements,
+        polygon: inputs.polygon,
+        userPoints: inputs.userPoints,
+        rods: inputs.rods,
+        remoteElectrodes: inputs.remoteElectrodes,
+        fieldData,
+      });
+    } catch (err) {
+      return {
+        version: 'advanced-grounding-v1',
+        generatedAt: new Date().toISOString(),
+        projectName: 'Ground Grid Analysis',
+        summary: { geometryMode: inputs.mode, riskPointCount: 0, fail: 0, warn: 0, missingData: 1 },
+        soilModel: null,
+        geometry: null,
+        riskPoints: [],
+        hazardMap: null,
+        fieldFidelity: null,
+        warnings: [err.message || 'Advanced grounding package could not be generated.'],
+        assumptions: ['Advanced grounding package generation requires valid geometry inputs.'],
+      };
+    }
+  }
+
+  function renderAdvancedGroundingPackage(pkg = latestAdvancedPackage) {
+    if (!advancedPanel || !riskPointTable) return;
+    if (!pkg) {
+      advancedPanel.innerHTML = '<p class="field-hint">Run analysis to build the advanced soil, geometry, and hazard-map package.</p>';
+      riskPointTable.innerHTML = '<tr><td colspan="7">No risk points yet.</td></tr>';
+      return;
+    }
+    const summary = pkg.summary || {};
+    const soil = pkg.soilModel || {};
+    const fidelity = pkg.fieldFidelity || {};
+    const fidelitySummary = fidelity.summary || {};
+    advancedPanel.innerHTML = `
+      <div class="groundgrid-advanced-summary">
+        <article class="groundgrid-kpi-card groundgrid-kpi-card--info">
+          <span>Geometry</span>
+          <strong>${escapeHtml(summary.geometryMode || 'rectangle')}</strong>
+          <small>${escapeHtml(summary.areaM2 ?? '--')} m2 area, ${escapeHtml(summary.perimeterM ?? '--')} m perimeter</small>
+        </article>
+        <article class="groundgrid-kpi-card groundgrid-kpi-card--${summary.fail ? 'fail' : summary.warn ? 'warning' : 'pass'}">
+          <span>Hazard Points</span>
+          <strong>${escapeHtml(summary.riskPointCount || 0)}</strong>
+          <small>${escapeHtml(summary.fail || 0)} fail, ${escapeHtml(summary.warn || 0)} warning, ${escapeHtml(summary.missingData || 0)} missing data</small>
+        </article>
+        <article class="groundgrid-kpi-card groundgrid-kpi-card--${soil.status === 'poorFit' ? 'fail' : soil.status === 'review' ? 'warning' : 'pass'}">
+          <span>Soil Fit</span>
+          <strong>${escapeHtml(soil.status || 'missingData')}</strong>
+          <small>rho1 ${escapeHtml(soil.rho1 ?? '--')} ohm-m, rho2 ${escapeHtml(soil.rho2 ?? '--')} ohm-m, h ${escapeHtml(soil.h ?? '--')} m</small>
+        </article>
+        <article class="groundgrid-kpi-card groundgrid-kpi-card--${fidelitySummary.status === 'fail' ? 'fail' : fidelitySummary.status === 'warn' || fidelitySummary.status === 'missingData' ? 'warning' : 'info'}">
+          <span>Field QA</span>
+          <strong>${escapeHtml(fidelitySummary.status || 'notRun')}</strong>
+          <small>${escapeHtml(fidelitySummary.measurementCount || 0)} soil rows, ${escapeHtml(fidelitySummary.fallOfPotentialCount || 0)} FOP tests, ${escapeHtml(fidelitySummary.seasonalScenarioCount || 0)} seasonal cases</small>
+        </article>
+      </div>
+      ${pkg.warnings?.length ? `<p class="alert-warning">${pkg.warnings.map(escapeHtml).join(' ')}</p>` : '<p class="field-hint">Advanced screening overlays are within current warning thresholds.</p>'}
+    `;
+    riskPointTable.innerHTML = (pkg.riskPoints || []).map(point => `
+      <tr class="row-${point.status === 'warn' ? 'warning' : point.status}">
+        <td>${escapeHtml(point.label)}</td>
+        <td>${escapeHtml(point.check)}</td>
+        <td>${escapeHtml(point.actualV ?? '--')}</td>
+        <td>${escapeHtml(point.limitV ?? '--')}</td>
+        <td>${escapeHtml(point.marginPct ?? '--')}</td>
+        <td>${escapeHtml(point.status)}</td>
+        <td>${escapeHtml(point.recommendation)}</td>
+      </tr>
+    `).join('') || '<tr><td colspan="7">No risk points generated.</td></tr>';
   }
 
   function getStatusLabel(status) {
@@ -557,6 +785,21 @@ document.addEventListener('DOMContentLoaded', () => {
         svgEl.appendChild(makeSvg('circle', { cx: x, cy: y, r: 5, class: 'grid-rod' }));
       });
     }
+    if (latestAdvancedPackage?.riskPoints?.length && latestAdvancedPackage?.geometry?.bounds) {
+      const b = latestAdvancedPackage.geometry.bounds;
+      latestAdvancedPackage.riskPoints.forEach(point => {
+        const px = b.width ? (point.x - b.minX) / b.width : 0.5;
+        const py = b.height ? (point.y - b.minY) / b.height : 0.5;
+        const x = startX + (Math.max(0, Math.min(1, px)) * drawWidth);
+        const y = startY + (Math.max(0, Math.min(1, py)) * drawHeight);
+        const marker = makeSvg('g', { class: `grid-risk-marker grid-risk-marker--${point.status}` });
+        marker.appendChild(makeSvg('circle', { cx: x, cy: y, r: 7, class: 'grid-risk-marker-dot' }));
+        const label = makeSvg('text', { x: x + 9, y: y - 9, class: 'grid-risk-marker-label' });
+        label.textContent = point.label;
+        marker.appendChild(label);
+        svgEl.appendChild(marker);
+      });
+    }
 
     drawDimension(svgEl, startX, endY + 24, endX, endY + 24, `Lx = ${formatDim(params.gridLx, params.unit)}`);
     drawDimension(svgEl, startX - 24, endY, startX - 24, startY, `Ly = ${formatDim(params.gridLy, params.unit)}`, -10);
@@ -564,7 +807,8 @@ document.addEventListener('DOMContentLoaded', () => {
     drawDimension(svgEl, endX + 18, startY, endX + 18, Math.min(endY, startY + dy), `Sy = ${formatDim(params.spacingY, params.unit)}`, -10);
 
     const legend = makeSvg('g', { class: 'grid-legend' });
-    legend.appendChild(makeSvg('rect', { x: 16, y: 14, width: 190, height: 66, rx: 6, class: 'grid-legend-box' }));
+    const legendHeight = latestAdvancedPackage?.riskPoints?.length ? (showStepOverlay ? 96 : 80) : 66;
+    legend.appendChild(makeSvg('rect', { x: 16, y: 14, width: 206, height: legendHeight, rx: 6, class: 'grid-legend-box' }));
     legend.appendChild(makeSvg('line', { x1: 28, y1: 34, x2: 58, y2: 34, class: 'grid-conductor' }));
     const conductorText = makeSvg('text', { x: 65, y: 38, class: 'grid-legend-text' });
     conductorText.textContent = 'Grid conductor';
@@ -584,6 +828,12 @@ document.addEventListener('DOMContentLoaded', () => {
       const overlayText = makeSvg('text', { x: 65, y: 76, class: 'grid-legend-text' });
       overlayText.textContent = 'Step-potential estimate';
       legend.appendChild(overlayText);
+    }
+    if (latestAdvancedPackage?.riskPoints?.length) {
+      legend.appendChild(makeSvg('circle', { cx: 43, cy: showStepOverlay ? 92 : 78, r: 6, class: 'grid-risk-marker-dot' }));
+      const riskText = makeSvg('text', { x: 65, y: showStepOverlay ? 96 : 82, class: 'grid-legend-text' });
+      riskText.textContent = 'Advanced risk point';
+      legend.appendChild(riskText);
     }
     svgEl.appendChild(legend);
     drawStepPotentialScale(svgEl, showStepOverlay);
@@ -747,8 +997,35 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
     latestAnalysisResult = r;
+    latestAdvancedPackage = createAdvancedPackage(r, { lengthM: gridLx, widthM: gridLy });
+    const studies = getStudies();
+    studies.groundGrid = {
+      ...r,
+      inputs: {
+        rho,
+        gridLx,
+        gridLy,
+        nx,
+        ny,
+        h,
+        d,
+        Ig,
+        tf,
+        hasRods,
+        rodCount,
+        rodLength,
+        rhoS,
+        hs,
+        bw,
+      },
+      advancedGrounding: latestAdvancedPackage,
+      updatedAt: new Date().toISOString(),
+    };
+    studies.advancedGrounding = latestAdvancedPackage;
+    setStudies(studies);
     renderSafetyDashboard(r);
     renderGridPreview();
+    renderAdvancedGroundingPackage(latestAdvancedPackage);
 
     const section = document.createElement('section');
     section.className = 'results-panel groundgrid-results-detail';
@@ -861,12 +1138,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function handleFormStateChange() {
     latestAnalysisResult = null;
+    latestAdvancedPackage = null;
     if (resultsDiv) {
       resultsDiv.innerHTML = '';
     }
     renderSafetyDashboard(null);
     setRodSpacingVisibility();
     renderGridPreview();
+    renderAdvancedGroundingPackage(null);
   }
 
   if (form) {
@@ -923,7 +1202,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
   renderSafetyDashboard(null);
   renderGridPreview();
+  renderAdvancedGroundingPackage(null);
   setRodSpacingVisibility();
+
+  exportAdvancedJsonBtn?.addEventListener('click', () => {
+    if (!latestAdvancedPackage) return;
+    downloadText('advanced-grounding-package.json', JSON.stringify(latestAdvancedPackage, null, 2), 'application/json');
+  });
+
+  exportAdvancedHtmlBtn?.addEventListener('click', () => {
+    if (!latestAdvancedPackage) return;
+    const html = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Advanced Grounding Package</title></head><body>${renderAdvancedGroundingHTML(latestAdvancedPackage)}</body></html>`;
+    downloadText('advanced-grounding-package.html', html, 'text/html');
+  });
+
+  exportHazardSvgBtn?.addEventListener('click', () => {
+    if (!previewTopSvg) return;
+    downloadText('grounding-hazard-map.svg', previewTopSvg.outerHTML, 'image/svg+xml');
+  });
 
   const initialImperial = getUnits() === 'imperial';
   updateUnitLabels(initialImperial);

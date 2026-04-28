@@ -98,8 +98,48 @@
         </div>
       </fieldset>
 
+      <fieldset>
+        <legend><strong>Reliability Model</strong></legend>
+        <div class="form-grid">
+          <label for="rel-saifi-limit">SAIFI review limit
+            <input id="rel-saifi-limit" type="number" min="0" step="0.1" value="1">
+          </label>
+          <label for="rel-saidi-limit">SAIDI review limit (hr/customer-year)
+            <input id="rel-saidi-limit" type="number" min="0" step="0.1" value="4">
+          </label>
+          <label for="rel-eens-limit">EENS review limit (kWh/year)
+            <input id="rel-eens-limit" type="number" min="0" step="1" value="1000">
+          </label>
+          <label for="rel-voll">Default value of lost load
+            <input id="rel-voll" type="number" min="0" step="0.1" value="10">
+          </label>
+        </div>
+        <label class="checkbox-label">
+          <input id="rel-restoration-enabled" type="checkbox" checked> Apply restoration rows when capacity is adequate
+        </label>
+        <label class="checkbox-label">
+          <input id="rel-common-mode-enabled" type="checkbox" checked> Include common-mode group scenarios
+        </label>
+        <div class="field-row">
+          <label for="rel-customer-rows">Customer/load impact rows (JSON)</label>
+          <textarea id="rel-customer-rows" rows="5" spellcheck="false">[
+  {"id":"cust-1","name":"General Loads","protectionZone":"Z1","customerCount":100,"loadKw":500,"loadClass":"general","valueOfLostLoadPerKwh":10}
+]</textarea>
+        </div>
+        <div class="field-row">
+          <label for="rel-restoration-rows">Restoration/tie-source rows (JSON)</label>
+          <textarea id="rel-restoration-rows" rows="5" spellcheck="false">[
+  {"id":"tie-1","tieSourceId":"TIE-1","switchingDevice":"NO-TIE-1","affectedZone":"Z1","restorationTimeHours":1,"pickupCapacityKw":750,"mode":"manual"}
+]</textarea>
+        </div>
+      </fieldset>
+
       <div id="controls" class="controls-row">
-        <button id="run-btn" type="button">Load from One-Line &amp; Analyse</button>
+        <button id="run-btn" type="button">Run Reliability Model</button>
+        <button id="save-btn" type="button" disabled>Save to Studies</button>
+        <button id="export-json-btn" type="button" disabled>Export JSON</button>
+        <button id="export-csv-btn" type="button" disabled>Export CSV</button>
+        <button id="export-html-btn" type="button" disabled>Printable HTML</button>
       </div>
 
       <!-- Results -->

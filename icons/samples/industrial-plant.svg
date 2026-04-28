@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 180" role="img" aria-labelledby="title desc">
+  <title id="title">Industrial plant routing sample preview</title>
+  <desc id="desc">Cable tray, motor control center, and process loads.</desc>
+  <rect width="360" height="180" rx="8" fill="#f8fafc"/>
+  <path d="M30 118h300" stroke="#475569" stroke-width="12" stroke-linecap="round"/>
+  <path d="M34 118h292" stroke="#cbd5e1" stroke-width="4" stroke-dasharray="10 8"/>
+  <rect x="42" y="40" width="86" height="54" rx="4" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+  <text x="85" y="72" text-anchor="middle" font-family="Inter, Arial" font-size="13" fill="#1e3a8a">SWGR</text>
+  <rect x="156" y="40" width="74" height="54" rx="4" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
+  <text x="193" y="72" text-anchor="middle" font-family="Inter, Arial" font-size="13" fill="#166534">MCC</text>
+  <circle cx="285" cy="60" r="24" fill="#fee2e2" stroke="#dc2626" stroke-width="2"/>
+  <text x="285" y="65" text-anchor="middle" font-family="Inter, Arial" font-size="13" fill="#7f1d1d">M</text>
+  <path d="M128 67h28M230 67h31" stroke="#0f172a" stroke-width="3" fill="none"/>
+  <path d="M193 94v24" stroke="#16a34a" stroke-width="3"/>
+</svg>
+

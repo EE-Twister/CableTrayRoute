@@ -366,6 +366,22 @@ describe('buildTrayHardwareBOM — custom options', () => {
     assert.ok(heavy.supports[0].bracket_qty >= light.supports[0].bracket_qty,
       'heavier load should need more or equal brackets');
   });
+
+  it('includes construction-specific support and accessory rows when metadata exists', () => {
+    const { constructionTakeoff, summary } = buildTrayHardwareBOM([{
+      ...trays[0],
+      supportFamily: 'Unistrut',
+      supportType: 'trapeze',
+      supportSpacingFt: 8,
+      labelId: 'LBL-T1',
+      drawingRef: 'E-201',
+      sectionRef: 'SEC-T1',
+      constructionStatus: 'released',
+      accessoryKits: '[{"name":"Cover kit","quantity":2}]',
+    }]);
+    assert(constructionTakeoff.some(row => row.category === 'Support' && row.item.includes('Unistrut')));
+    assert(summary.some(row => row.item === 'Cover kit' && row.qty === 2));
+  });
 });
 
 console.log('\nAll trayHardware tests complete.');

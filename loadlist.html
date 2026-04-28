@@ -78,6 +78,9 @@
           <button id="export-csv-btn" class="btn" title="Export as CSV">Export CSV</button>
           <button id="import-csv-btn" class="btn" title="Import from CSV">Import CSV</button>
           <button id="copy-btn" class="btn" title="Copy to clipboard">Copy to Clipboard</button>
+          <button id="save-demand-package-btn" class="btn" title="Save governed demand results to studies">Save Demand Package</button>
+          <button id="export-demand-package-btn" class="btn" title="Export governed demand package JSON">Export Demand JSON</button>
+          <button id="print-demand-package-btn" class="btn" title="Open printable governed demand report">Printable Demand HTML</button>
           <input type="file" id="import-input" accept=".json" class="hidden" title="Import JSON file">
           <input type="file" id="import-csv-input" accept=".csv" class="hidden" title="Import CSV file">
         </div>
@@ -114,6 +117,15 @@
                 <th scope="col">Load Factor (%)</th>
                 <th scope="col">Efficiency (%)</th>
                 <th scope="col">Demand Factor (%)</th>
+                <th scope="col">Load Class</th>
+                <th scope="col">Continuous</th>
+                <th scope="col">Noncoincident Group</th>
+                <th scope="col">Largest Motor</th>
+                <th scope="col">Spare/Future (%)</th>
+                <th scope="col">Managed Limit (kW)</th>
+                <th scope="col">Demand Basis</th>
+                <th scope="col">Measured Source</th>
+                <th scope="col">Demand Notes</th>
                 <th scope="col">Phases</th>
                 <th scope="col">Panel Circuit</th>
                 <th scope="col">Notes</th>
@@ -129,6 +141,10 @@
           </table>
         </div>
         <div id="source-summary" class="mt-1"></div>
+        <section class="method-panel mt-1" aria-labelledby="demand-basis-heading">
+          <h2 id="demand-basis-heading">Demand Basis</h2>
+          <div id="demand-basis-summary" aria-live="polite"></div>
+        </section>
       </section>
       <nav class="step-nav" aria-label="Workflow navigation">
         <a href="cableschedule.html" class="step-nav-prev">&#8592; Cable Schedule</a>

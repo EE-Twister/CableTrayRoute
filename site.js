@@ -2125,6 +2125,8 @@ globalThis.document?.addEventListener('keydown', (e) => {
   }
 });
 
+export { initSettings, initDarkMode, initCompactMode, initHelpModal, initNavToggle };
+
 globalThis.initSettings=initSettings;
 globalThis.initDarkMode=initDarkMode;
 globalThis.initCompactMode=initCompactMode;

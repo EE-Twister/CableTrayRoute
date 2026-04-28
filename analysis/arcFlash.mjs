@@ -308,11 +308,14 @@ export async function runArcFlash(options = {}) {
       scOptions = options;
     }
   }
-  const sc = runShortCircuit(scOptions);
-  const { sheets } = getOneLine();
-  const comps = (Array.isArray(sheets[0]?.components)
-    ? sheets.flatMap(s => s.components)
-    : sheets).filter(c => c && c.type !== 'annotation' && c.type !== 'dimension');
+    const sourceOneLine = options?.oneLine && typeof options.oneLine === 'object'
+      ? options.oneLine
+      : getOneLine();
+    const sheets = Array.isArray(sourceOneLine.sheets) ? sourceOneLine.sheets : [];
+    const comps = (Array.isArray(sheets[0]?.components)
+      ? sheets.flatMap(s => s.components)
+      : Array.isArray(sourceOneLine.components) ? sourceOneLine.components : sheets).filter(c => c && c.type !== 'annotation' && c.type !== 'dimension');
+  const sc = runShortCircuit(comps, scOptions);
   const protection = createProtectiveResolver(comps);
   const results = {};
   comps.forEach(comp => {

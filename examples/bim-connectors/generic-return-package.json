@@ -1,0 +1,68 @@
+{
+  "version": "bim-connector-contract-v1",
+  "connectorType": "generic",
+  "sourceApplication": "Generic BIM/CAD Connector Reference Adapter",
+  "sourceVersion": "1.0",
+  "projectId": "connector-demo",
+  "scenario": "base",
+  "createdAt": "2026-04-27T12:10:00.000Z",
+  "elements": [
+    {
+      "guid": "ifc-tr-1",
+      "sourceId": "ifc-42",
+      "elementType": "cableTray",
+      "tag": "TR-1",
+      "name": "IFC Cable Carrier Segment",
+      "system": "Power",
+      "voltageClass": "600 V",
+      "level": "L1",
+      "area": "Unit A",
+      "lengthFt": 100,
+      "quantity": 100,
+      "mappedProjectId": "TR-1"
+    },
+    {
+      "guid": "ifc-support-1",
+      "sourceId": "ifc-99",
+      "elementType": "support",
+      "tag": "SUP-1",
+      "name": "Tray Support",
+      "system": "Power",
+      "level": "L1",
+      "area": "Unit A",
+      "quantity": 4
+    }
+  ],
+  "quantities": [
+    {
+      "elementType": "support",
+      "system": "Power",
+      "voltageClass": "Unassigned",
+      "level": "L1",
+      "area": "Unit A",
+      "quantity": 4,
+      "unit": "ea",
+      "sourceIds": ["ifc-99"]
+    }
+  ],
+  "issues": [
+    {
+      "id": "connector-issue-generic-1",
+      "title": "Map support element",
+      "description": "Support element does not have a matching CableTrayRoute schedule record.",
+      "status": "assigned",
+      "priority": "medium",
+      "assignee": "Coordinator",
+      "elementIds": ["ifc-support-1"],
+      "comments": []
+    }
+  ],
+  "propertySets": [],
+  "mappingHints": [],
+  "warnings": [
+    "Generic fixture includes support elements for issue and mapping review."
+  ],
+  "assumptions": [
+    "Reference generic connector fixture for IFC-style metadata exchange."
+  ]
+}

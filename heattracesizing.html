@@ -325,6 +325,132 @@ selectedWperFt = nearest standard cable rating ≥ required W/ft</pre>
                 <input type="text" id="circuit-case-name" value="HT-1" aria-describedby="circuit-case-name-hint">
                 <p id="circuit-case-name-hint" class="field-hint">Name the current heat-trace branch/run before adding it to the schedule.</p>
               </div>
+              <div class="field-row">
+                <label for="construction-pipe-tag">Pipe tag</label>
+                <input type="text" id="construction-pipe-tag" placeholder="P-101A" autocomplete="off">
+              </div>
+              <div class="field-row">
+                <label for="construction-service">Service</label>
+                <input type="text" id="construction-service" placeholder="Caustic transfer" autocomplete="off">
+              </div>
+              <div class="field-row">
+                <label for="construction-area">Area</label>
+                <input type="text" id="construction-area" placeholder="Unit 200" autocomplete="off">
+              </div>
+              <div class="field-row">
+                <label for="construction-source-panel">Source panel</label>
+                <input type="text" id="construction-source-panel" placeholder="HTP-1" autocomplete="off">
+              </div>
+              <div class="field-row">
+                <label for="construction-controller-tag">Controller tag</label>
+                <input type="text" id="construction-controller-tag" placeholder="HTC-101" autocomplete="off">
+              </div>
+              <div class="field-row">
+                <label for="construction-circuit-number">Circuit number</label>
+                <input type="text" id="construction-circuit-number" placeholder="Ckt 1" autocomplete="off">
+              </div>
+              <div class="field-row heattrace-full-field">
+                <label for="construction-cable-family">Cable family basis</label>
+                <select id="construction-cable-family">
+                  <option value="">Auto-select vendor-neutral family</option>
+                  <option value="sr-industrial">Self-regulating industrial family</option>
+                  <option value="cw-process">Constant-watt process family</option>
+                  <option value="pl-zone">Power-limiting zone family</option>
+                  <option value="mi-high-temp">Mineral-insulated high-temperature family</option>
+                </select>
+              </div>
+              <div class="field-row heattrace-full-field">
+                <label for="construction-accessory-overrides">Accessory overrides JSON</label>
+                <textarea id="construction-accessory-overrides" rows="2" placeholder='{"spliceKit":1,"teeKit":2}'></textarea>
+                <p class="field-hint">Optional manual kit allowances by accessory id. Positive numeric values are added to the generated BOM.</p>
+              </div>
+              <div class="field-row heattrace-full-field">
+                <label for="construction-installation-notes">Installation notes</label>
+                <textarea id="construction-installation-notes" rows="2" placeholder="Weatherproof thermostat at pipe support; field verify clearance."></textarea>
+              </div>
+              <details class="heattrace-section heattrace-full-field">
+                <summary>Advanced Asset / Controls</summary>
+                <div class="field-row">
+                  <label for="advanced-asset-type">Asset type</label>
+                  <select id="advanced-asset-type">
+                    <option value="pipe">Pipe</option>
+                    <option value="tank">Tank</option>
+                    <option value="vessel">Vessel</option>
+                    <option value="skid">Skid</option>
+                    <option value="custom">Custom</option>
+                  </select>
+                </div>
+                <div class="field-row">
+                  <label for="advanced-asset-tag">Asset tag</label>
+                  <input type="text" id="advanced-asset-tag" placeholder="TK-101 / V-101 / SKID-1" autocomplete="off">
+                </div>
+                <div class="field-row">
+                  <label for="advanced-panel-phase">Panel phase</label>
+                  <select id="advanced-panel-phase">
+                    <option value="unassigned">Unassigned</option>
+                    <option value="A">A</option>
+                    <option value="B">B</option>
+                    <option value="C">C</option>
+                    <option value="AB">AB</option>
+                    <option value="BC">BC</option>
+                    <option value="CA">CA</option>
+                    <option value="ABC">ABC</option>
+                  </select>
+                </div>
+                <div class="field-row">
+                  <label for="advanced-diversity-group">Diversity group</label>
+                  <input type="text" id="advanced-diversity-group" placeholder="Startup Group 1" autocomplete="off">
+                </div>
+                <div class="field-row">
+                  <label for="advanced-controller-type">Controller type</label>
+                  <input type="text" id="advanced-controller-type" placeholder="Electronic / RTD / thermostat" autocomplete="off">
+                </div>
+                <div class="field-row">
+                  <label for="advanced-control-mode">Control mode</label>
+                  <input type="text" id="advanced-control-mode" placeholder="Ambient / line sensing / proportional" autocomplete="off">
+                </div>
+                <div class="field-row">
+                  <label for="advanced-sensor-count">Sensor count</label>
+                  <input type="number" id="advanced-sensor-count" min="0" step="1" value="0">
+                </div>
+                <div class="field-row">
+                  <label for="advanced-sensor-location">Sensor location</label>
+                  <input type="text" id="advanced-sensor-location" placeholder="Cold end / vessel shell / return line" autocomplete="off">
+                </div>
+                <label class="field-row heattrace-checkbox-row" for="advanced-high-limit-sensor">
+                  <input type="checkbox" id="advanced-high-limit-sensor">
+                  <span>High-limit sensor / over-temperature protection included</span>
+                </label>
+                <label class="field-row heattrace-checkbox-row" for="advanced-hazardous-enabled">
+                  <input type="checkbox" id="advanced-hazardous-enabled">
+                  <span>Hazardous-area / T-rating verification required</span>
+                </label>
+                <div class="field-row">
+                  <label for="advanced-hazardous-classification">Hazardous classification</label>
+                  <input type="text" id="advanced-hazardous-classification" placeholder="Class I Div 2 Group D" autocomplete="off">
+                </div>
+                <div class="field-row">
+                  <label for="advanced-t-rating-target-c">T-rating target max surface (°C)</label>
+                  <input type="number" id="advanced-t-rating-target-c" min="0" step="1" placeholder="135">
+                </div>
+                <div class="field-row">
+                  <label for="advanced-startup-ambient-c">Minimum startup ambient (°C)</label>
+                  <input type="number" id="advanced-startup-ambient-c" step="1" placeholder="-30">
+                </div>
+                <div class="field-row">
+                  <label for="advanced-startup-diversity">Startup diversity factor</label>
+                  <input type="number" id="advanced-startup-diversity" min="0.1" max="1" step="0.05" placeholder="1">
+                </div>
+                <div class="field-row heattrace-full-field">
+                  <label for="advanced-segments-json">Segment rows JSON</label>
+                  <textarea id="advanced-segments-json" rows="4" placeholder='[{"label":"Tank shell","assetType":"tank","areaSqFt":220,"insulationType":"mineralWool","insulationThicknessIn":2,"ambientTempC":-20,"maintainTempC":35,"cableType":"selfRegulating","wattDensityWPerSqFt":6}]'></textarea>
+                  <p class="field-hint">Optional segment rows for tanks, vessels, skids, or multi-segment pipe circuits. Leave blank to derive one segment from the active pipe sizing case.</p>
+                </div>
+                <div class="field-row heattrace-full-field">
+                  <label for="advanced-notes">Advanced notes</label>
+                  <textarea id="advanced-notes" rows="2" placeholder="Manufacturer to verify sheath temperature and startup current."></textarea>
+                </div>
+              </details>
               <div class="field-row heattrace-full-field heattrace-circuit-list-actions">
                 <button type="button" id="add-circuit-case" class="btn">Add Current Branch</button>
                 <button type="button" id="clear-circuit-cases" class="btn">Clear List</button>
@@ -497,7 +623,11 @@ selectedWperFt = nearest standard cable rating ≥ required W/ft</pre>
               </div>
               <div class="heattrace-report-actions">
                 <button type="button" id="heattrace-generate-report" class="btn">Generate Report Preview</button>
+                <button type="button" id="heattrace-generate-install-package" class="btn">Generate Installation Package</button>
+                <button type="button" id="heattrace-generate-advanced-package" class="btn">Generate Advanced Package</button>
                 <button type="button" id="heattrace-export-report-json" class="btn">Export JSON</button>
+                <button type="button" id="heattrace-export-package-json" class="btn">Export Package JSON</button>
+                <button type="button" id="heattrace-export-advanced-json" class="btn">Export Advanced JSON</button>
                 <button type="button" id="heattrace-print-report" class="btn">Print Report</button>
               </div>
               <p id="heattrace-report-status" class="field-hint" aria-live="polite">Run analysis or add branch cases, then generate the report.</p>

@@ -341,3 +341,467 @@ export function equalAreaCriterion(params) {
       : `System stable for any clearing time (fault Pmax ≥ Pm).`,
   };
 }
+
+export const TRANSIENT_STABILITY_STUDY_VERSION = 'transient-stability-study-case-v1';
+
+const MODEL_TYPES = new Set(['synchronousGenerator', 'inductionMotor', 'load', 'ibr', 'custom']);
+const EVENT_TYPES = new Set(['fault', 'clearFault', 'lineTrip', 'generatorTrip', 'loadStep', 'motorStart', 'ibrTrip', 'setpointStep', 'custom']);
+const REPORT_PRESETS = new Set(['summary', 'dynamicStudy', 'fullStudy']);
+
+function asArray(value) {
+  return Array.isArray(value) ? value : [];
+}
+
+function text(value = '') {
+  return String(value ?? '').trim();
+}
+
+function num(value, fallback = null) {
+  if (value === '' || value == null) return fallback;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function round(value, digits = 4) {
+  if (!Number.isFinite(Number(value))) return null;
+  const factor = 10 ** digits;
+  return Math.round(Number(value) * factor) / factor;
+}
+
+function requireNonNegative(value, field, fallback = 0) {
+  const parsed = num(value, fallback);
+  if (!Number.isFinite(parsed) || parsed < 0) throw new Error(`${field} must be a non-negative number`);
+  return parsed;
+}
+
+function requirePositive(value, field, fallback = 1) {
+  const parsed = num(value, fallback);
+  if (!Number.isFinite(parsed) || parsed <= 0) throw new Error(`${field} must be greater than zero`);
+  return parsed;
+}
+
+function escapeHtml(value = '') {
+  return String(value ?? '').replace(/[&<>"']/g, char => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  }[char]));
+}
+
+function modelLabel(row = {}) {
+  return text(row.tag || row.label || row.name || row.id || row.modelId);
+}
+
+function eventLabel(row = {}) {
+  return text(row.label || row.name || row.eventType || row.type || row.id);
+}
+
+function safeEventId(value = '') {
+  return text(value).replace(/[^a-zA-Z0-9_-]+/g, '-').replace(/^-+|-+$/g, '') || 'event';
+}
+
+export function normalizeTransientStabilityStudyCase(input = {}) {
+  const source = input.studyCase || input;
+  const reportPreset = text(source.reportPreset || 'dynamicStudy');
+  if (!REPORT_PRESETS.has(reportPreset)) throw new Error(`Invalid transient stability report preset: ${reportPreset}`);
+  const frequencyHz = requirePositive(source.frequencyHz ?? source.f, 'frequencyHz', 60);
+  const clearingTimeSec = requirePositive(source.clearingTimeSec ?? source.t_clear, 'clearingTimeSec', 0.1);
+  const simulationDurationSec = requirePositive(source.simulationDurationSec ?? source.t_end, 'simulationDurationSec', 2);
+  const timeStepSec = requirePositive(source.timeStepSec ?? source.dt, 'timeStepSec', 0.001);
+  const channelIntervalSec = requirePositive(source.channelIntervalSec, 'channelIntervalSec', 0.02);
+  const cctSearchMaxSec = requirePositive(source.cctSearchMaxSec, 'cctSearchMaxSec', Math.min(simulationDurationSec * 0.9, 2));
+  if (clearingTimeSec >= simulationDurationSec) throw new Error('clearingTimeSec must be less than simulationDurationSec');
+  return {
+    caseName: text(source.caseName || source.name || 'Transient Stability Study Case'),
+    frequencyHz,
+    clearingTimeSec,
+    simulationDurationSec,
+    timeStepSec,
+    channelIntervalSec,
+    cctSweepEnabled: source.cctSweepEnabled !== false,
+    cctSearchMaxSec,
+    cctMarginWarnSec: requireNonNegative(source.cctMarginWarnSec, 'cctMarginWarnSec', 0.03),
+    rotorAngleWarnDeg: requirePositive(source.rotorAngleWarnDeg, 'rotorAngleWarnDeg', 120),
+    stabilityAngleLimitDeg: requirePositive(source.stabilityAngleLimitDeg, 'stabilityAngleLimitDeg', 180),
+    reportPreset,
+    notes: text(source.notes || ''),
+  };
+}
+
+export function normalizeTransientDynamicModelRows(rows = [], options = {}) {
+  const defaults = options.studyCase || normalizeTransientStabilityStudyCase({});
+  const explicitRows = asArray(rows);
+  const sourceRows = explicitRows.length ? explicitRows : asArray(options.dynamicModels);
+  return sourceRows.map((row, index) => {
+    const modelType = text(row.modelType || row.type || 'synchronousGenerator');
+    if (!MODEL_TYPES.has(modelType)) throw new Error(`Invalid transient dynamic model type: ${modelType}`);
+    const id = text(row.id || row.modelId || `model-${index + 1}`);
+    const missingFields = [];
+    const defaultedFields = [];
+    const readRequired = (keys, field, fallback) => {
+      const explicit = keys.some(key => row[key] !== '' && row[key] != null);
+      if (!explicit) {
+        if (modelType === 'synchronousGenerator') defaultedFields.push(field);
+        else missingFields.push(field);
+      }
+      return num(keys.map(key => row[key]).find(value => value !== '' && value != null), fallback);
+    };
+    const H = readRequired(['H', 'inertiaH', 'inertia'], 'H', 5);
+    const f = num(row.frequencyHz ?? row.f, defaults.frequencyHz);
+    const Pm = readRequired(['Pm', 'mechanicalPowerPu', 'pMechanicalPu'], 'Pm', 0.8);
+    const Pmax_pre = readRequired(['Pmax_pre', 'pmaxPre', 'pmaxPrePu'], 'Pmax_pre', 2.1);
+    const Pmax_fault = readRequired(['Pmax_fault', 'pmaxFault', 'pmaxFaultPu'], 'Pmax_fault', 0.6);
+    const Pmax_post = readRequired(['Pmax_post', 'pmaxPost', 'pmaxPostPu'], 'Pmax_post', 1.75);
+    [['H', H], ['frequencyHz', f], ['Pm', Pm], ['Pmax_pre', Pmax_pre], ['Pmax_fault', Pmax_fault], ['Pmax_post', Pmax_post]]
+      .forEach(([field, value]) => {
+        if (!Number.isFinite(value) || (field === 'Pmax_fault' ? value < 0 : value <= 0)) missingFields.push(field);
+      });
+    return {
+      id,
+      tag: modelLabel(row) || id,
+      modelType,
+      busId: text(row.busId || row.bus || row.oneLineRef || ''),
+      enabled: row.enabled !== false,
+      ratingMva: num(row.ratingMva ?? row.baseMva, null),
+      baseMva: num(row.baseMva ?? row.ratingMva, null),
+      H: round(H, 6),
+      frequencyHz: round(f, 6),
+      Pm: round(Pm, 6),
+      Pmax_pre: round(Pmax_pre, 6),
+      Pmax_fault: round(Pmax_fault, 6),
+      Pmax_post: round(Pmax_post, 6),
+      damping: num(row.damping, 0),
+      exciterModel: text(row.exciterModel || row.avrModel || ''),
+      governorModel: text(row.governorModel || ''),
+      pssModel: text(row.pssModel || ''),
+      ibrControlMode: text(row.ibrControlMode || ''),
+      loadModel: text(row.loadModel || ''),
+      source: text(row.source || 'manual'),
+      notes: text(row.notes || ''),
+      missingFields: [...new Set(missingFields)],
+      defaultedFields: [...new Set(defaultedFields)],
+    };
+  });
+}
+
+export function normalizeTransientDisturbanceEvents(rows = [], options = {}) {
+  const explicitRows = asArray(rows);
+  const sourceRows = explicitRows.length ? explicitRows : asArray(options.disturbanceEvents);
+  return sourceRows.map((row, index) => {
+    const eventType = text(row.eventType || row.type || 'fault');
+    if (!EVENT_TYPES.has(eventType)) throw new Error(`Invalid transient disturbance event type: ${eventType}`);
+    const timeSec = requireNonNegative(row.timeSec ?? row.time, `disturbanceEvents[${index}].timeSec`, 0);
+    return {
+      id: text(row.id || `${safeEventId(eventType)}-${index + 1}`),
+      label: eventLabel(row) || eventType,
+      eventType,
+      timeSec: round(timeSec, 6),
+      durationSec: num(row.durationSec, null),
+      targetId: text(row.targetId || row.modelId || row.componentId || ''),
+      faultType: text(row.faultType || 'threePhase'),
+      clearingTimeSec: num(row.clearingTimeSec ?? row.clearTimeSec, null),
+      pmaxFaultPu: num(row.pmaxFaultPu ?? row.Pmax_fault, null),
+      pmaxPostPu: num(row.pmaxPostPu ?? row.Pmax_post, null),
+      loadStepPct: num(row.loadStepPct, 0),
+      deltaPmPu: num(row.deltaPmPu, 0),
+      enabled: row.enabled !== false,
+      order: Number.isFinite(Number(row.order)) ? Number(row.order) : index,
+      notes: text(row.notes || ''),
+    };
+  }).sort((a, b) => a.timeSec - b.timeSec || a.order - b.order || a.id.localeCompare(b.id));
+}
+
+function deriveOmibParams(model, studyCase, disturbanceEvents) {
+  const events = asArray(disturbanceEvents).filter(row => row.enabled);
+  const fault = events.find(row => row.eventType === 'fault' && (!row.targetId || row.targetId === model.id));
+  const clear = events.find(row => row.eventType === 'clearFault' && (!row.targetId || row.targetId === model.id));
+  const pmDelta = events
+    .filter(row => ['loadStep', 'setpointStep', 'generatorTrip'].includes(row.eventType) && (!row.targetId || row.targetId === model.id))
+    .reduce((sum, row) => sum + (Number(row.deltaPmPu) || 0) + ((Number(row.loadStepPct) || 0) / 100) * model.Pm, 0);
+  return {
+    H: model.H,
+    f: model.frequencyHz || studyCase.frequencyHz,
+    Pm: Math.max(0, model.Pm + pmDelta),
+    Pmax_pre: model.Pmax_pre,
+    Pmax_fault: fault?.pmaxFaultPu ?? model.Pmax_fault,
+    Pmax_post: clear?.pmaxPostPu ?? fault?.pmaxPostPu ?? model.Pmax_post,
+    t_clear: clear?.timeSec ?? fault?.clearingTimeSec ?? studyCase.clearingTimeSec,
+    t_end: studyCase.simulationDurationSec,
+    dt: studyCase.timeStepSec,
+  };
+}
+
+function buildChannelRows(model, simResult, studyCase, eventRows) {
+  const stride = Math.max(1, Math.ceil(studyCase.channelIntervalSec / studyCase.timeStepSec));
+  const events = asArray(eventRows).filter(row => row.enabled && (!row.targetId || row.targetId === model.id));
+  const rows = [];
+  for (let i = 0; i < simResult.time.length; i += stride) {
+    const timeSec = simResult.time[i];
+    const marker = events
+      .filter(row => Math.abs(row.timeSec - timeSec) <= (studyCase.channelIntervalSec / 2))
+      .map(row => row.eventType)
+      .join(',');
+    const angleDeg = simResult.delta[i] * 180 / Math.PI;
+    rows.push({
+      timeSec: round(timeSec, 4),
+      modelId: model.id,
+      modelTag: model.tag,
+      rotorAngleDeg: round(angleDeg, 4),
+      speedDeviationRadPerSec: round(simResult.omega[i], 6),
+      eventMarker: marker,
+      stabilityMarginDeg: round(studyCase.stabilityAngleLimitDeg - angleDeg, 4),
+    });
+  }
+  return rows;
+}
+
+export function runTransientStabilityStudyCase({ studyCase = {}, dynamicModels = [], disturbanceEvents = [] } = {}) {
+  const normalizedCase = normalizeTransientStabilityStudyCase(studyCase);
+  const dynamicModelRows = normalizeTransientDynamicModelRows(dynamicModels, { studyCase: normalizedCase });
+  const disturbanceEventRows = normalizeTransientDisturbanceEvents(disturbanceEvents, { studyCase: normalizedCase });
+  const scenarioRows = [];
+  const channelRows = [];
+  const warningRows = [];
+  if (!disturbanceEventRows.length) {
+    warningRows.push({ severity: 'warning', code: 'missingDisturbanceEvents', message: 'No disturbance event sequence is defined; default clearing time assumptions were used.' });
+  }
+  dynamicModelRows.filter(row => row.enabled).forEach(model => {
+    if (model.modelType !== 'synchronousGenerator') {
+      warningRows.push({
+        severity: 'warning',
+        code: 'unsupportedDynamicModel',
+        sourceId: model.id,
+        message: `${model.tag} uses ${model.modelType}; V1 records metadata and warnings but only simulates synchronous-generator OMIB rows.`,
+      });
+      return;
+    }
+    if (model.missingFields.length) {
+      warningRows.push({ severity: 'warning', code: 'missingDynamicModelData', sourceId: model.id, message: `${model.tag} is missing ${model.missingFields.join(', ')}.` });
+    }
+    if (model.defaultedFields.length) {
+      warningRows.push({ severity: 'info', code: 'defaultedDynamicModelData', sourceId: model.id, message: `${model.tag} defaulted ${model.defaultedFields.join(', ')}.` });
+    }
+    if (model.exciterModel || model.governorModel || model.pssModel) {
+      warningRows.push({ severity: 'warning', code: 'unsupportedControlModel', sourceId: model.id, message: `${model.tag} has AVR/governor/PSS metadata; V1 does not solve detailed control blocks.` });
+    }
+    const params = deriveOmibParams(model, normalizedCase, disturbanceEventRows);
+    try {
+      const delta0 = initialRotorAngle(params.Pm, params.Pmax_pre);
+      const simResult = simulateSwingEquation({ ...params, delta0, t_fault: 0 });
+      const eac = equalAreaCriterion(params);
+      const cct = findCriticalClearingTime({ ...params, delta0, t_fault: 0, t_end: params.t_end }, { tMax: normalizedCase.cctSearchMaxSec });
+      const cctMarginSec = Number.isFinite(cct.cct_s) ? cct.cct_s - params.t_clear : null;
+      const status = !simResult.stable || (cctMarginSec != null && cctMarginSec < 0)
+        ? 'fail'
+        : cctMarginSec != null && cctMarginSec < normalizedCase.cctMarginWarnSec
+          ? 'warn'
+          : simResult.deltaMax_deg >= normalizedCase.rotorAngleWarnDeg
+            ? 'warn'
+            : 'pass';
+      const scenario = {
+        id: `scenario-${model.id}`,
+        modelId: model.id,
+        modelTag: model.tag,
+        modelType: model.modelType,
+        clearingTimeSec: round(params.t_clear, 5),
+        clearingCycles: round(params.t_clear * params.f, 2),
+        stable: simResult.stable,
+        maxRotorAngleDeg: round(simResult.deltaMax_deg, 3),
+        cctSec: round(cct.cct_s, 5),
+        cctCycles: round(cct.cct_cycles, 2),
+        cctMarginSec: round(cctMarginSec, 5),
+        eacCctSec: round(eac.eac_cct_s, 5),
+        instabilityTimeSec: round(simResult.t_unstable, 5),
+        status,
+        recommendation: status === 'fail'
+          ? 'Reduce clearing time, reduce transfer level, or improve post-fault transfer capability.'
+          : status === 'warn'
+            ? 'Review clearing-time margin and high rotor-angle excursion.'
+            : 'Scenario remains stable for the recorded screening assumptions.',
+      };
+      scenarioRows.push(scenario);
+      channelRows.push(...buildChannelRows(model, simResult, normalizedCase, disturbanceEventRows));
+    } catch (error) {
+      scenarioRows.push({
+        id: `scenario-${model.id}`,
+        modelId: model.id,
+        modelTag: model.tag,
+        modelType: model.modelType,
+        clearingTimeSec: normalizedCase.clearingTimeSec,
+        stable: false,
+        maxRotorAngleDeg: null,
+        cctSec: null,
+        cctCycles: null,
+        cctMarginSec: null,
+        eacCctSec: null,
+        instabilityTimeSec: null,
+        status: 'fail',
+        recommendation: error.message,
+      });
+      warningRows.push({ severity: 'error', code: 'simulationError', sourceId: model.id, message: `${model.tag}: ${error.message}` });
+    }
+  });
+  return {
+    studyCase: normalizedCase,
+    dynamicModelRows,
+    disturbanceEventRows,
+    scenarioRows,
+    channelRows,
+    warningRows,
+  };
+}
+
+export function buildCriticalClearingSweep({ studyCase = {}, dynamicModels = [], disturbanceEvents = [] } = {}) {
+  const normalizedCase = normalizeTransientStabilityStudyCase(studyCase);
+  if (!normalizedCase.cctSweepEnabled) return [];
+  const dynamicModelRows = normalizeTransientDynamicModelRows(dynamicModels, { studyCase: normalizedCase });
+  const disturbanceEventRows = normalizeTransientDisturbanceEvents(disturbanceEvents, { studyCase: normalizedCase });
+  return dynamicModelRows.filter(row => row.enabled && row.modelType === 'synchronousGenerator').map(model => {
+    const params = deriveOmibParams(model, normalizedCase, disturbanceEventRows);
+    try {
+      const delta0 = initialRotorAngle(params.Pm, params.Pmax_pre);
+      const cct = findCriticalClearingTime({ ...params, delta0, t_fault: 0, t_end: params.t_end }, { tMax: normalizedCase.cctSearchMaxSec });
+      const margin = cct.cct_s - params.t_clear;
+      const status = margin < 0 ? 'fail' : margin < normalizedCase.cctMarginWarnSec ? 'warn' : 'pass';
+      return {
+        id: `cct-${model.id}`,
+        modelId: model.id,
+        modelTag: model.tag,
+        clearingTimeSec: round(params.t_clear, 5),
+        clearingCycles: round(params.t_clear * params.f, 2),
+        cctSec: round(cct.cct_s, 5),
+        cctCycles: round(cct.cct_cycles, 2),
+        marginSec: round(margin, 5),
+        status,
+        recommendation: status === 'fail' ? 'Clearing time exceeds critical clearing time.' : status === 'warn' ? 'CCT margin is low; verify relay/breaker timing.' : 'CCT margin is acceptable for screening.',
+      };
+    } catch (error) {
+      return {
+        id: `cct-${model.id}`,
+        modelId: model.id,
+        modelTag: model.tag,
+        clearingTimeSec: round(params.t_clear, 5),
+        clearingCycles: round(params.t_clear * params.f, 2),
+        cctSec: null,
+        cctCycles: null,
+        marginSec: null,
+        status: 'fail',
+        recommendation: error.message,
+      };
+    }
+  });
+}
+
+function summarizeTransientPackage({ dynamicModelRows, disturbanceEventRows, scenarioRows, channelRows, cctSweepRows, warningRows }) {
+  const count = status => scenarioRows.filter(row => row.status === status).length + cctSweepRows.filter(row => row.status === status).length;
+  return {
+    modelCount: dynamicModelRows.length,
+    eventCount: disturbanceEventRows.length,
+    scenarioCount: scenarioRows.length,
+    channelCount: channelRows.length,
+    cctSweepCount: cctSweepRows.length,
+    pass: count('pass'),
+    warn: count('warn'),
+    fail: count('fail'),
+    missingData: warningRows.filter(row => /missing/i.test(row.code || row.message || '')).length,
+    warningCount: warningRows.length,
+    minCctMarginSec: scenarioRows.reduce((min, row) => (row.cctMarginSec == null ? min : Math.min(min, row.cctMarginSec)), Infinity),
+    maxRotorAngleDeg: scenarioRows.reduce((max, row) => (row.maxRotorAngleDeg == null ? max : Math.max(max, row.maxRotorAngleDeg)), 0),
+    status: count('fail') ? 'fail' : count('warn') || warningRows.length ? 'review' : 'pass',
+  };
+}
+
+export function buildTransientStabilityPackage(context = {}) {
+  if (context.version === TRANSIENT_STABILITY_STUDY_VERSION && context.summary) return context;
+  const studyCase = normalizeTransientStabilityStudyCase(context.studyCase || context);
+  const dynamicModels = asArray(context.dynamicModels || context.dynamicModelRows);
+  const disturbanceEvents = asArray(context.disturbanceEvents || context.disturbanceEventRows);
+  const legacyResult = context.legacyResult || (context.stable != null || context.deltaMax_deg != null ? context : null);
+  const run = runTransientStabilityStudyCase({ studyCase, dynamicModels, disturbanceEvents });
+  const cctSweepRows = buildCriticalClearingSweep({ studyCase, dynamicModels, disturbanceEvents });
+  const warningRows = [...run.warningRows];
+  if (legacyResult && !legacyResult.version) {
+    warningRows.push({ severity: 'warning', code: 'legacyTransientStabilityResult', message: 'Legacy transient-stability result has no dynamic-model/event study-case basis.' });
+  }
+  const summary = summarizeTransientPackage({ ...run, cctSweepRows, warningRows });
+  if (summary.minCctMarginSec === Infinity) summary.minCctMarginSec = null;
+  return {
+    version: TRANSIENT_STABILITY_STUDY_VERSION,
+    generatedAt: context.generatedAt || new Date().toISOString(),
+    projectName: context.projectName || 'Untitled Project',
+    legacyResult,
+    studyCase: run.studyCase,
+    dynamicModelRows: run.dynamicModelRows,
+    disturbanceEventRows: run.disturbanceEventRows,
+    scenarioRows: run.scenarioRows,
+    channelRows: run.channelRows,
+    cctSweepRows,
+    warningRows,
+    assumptions: [
+      'Transient stability results are deterministic screening outputs using the classical OMIB swing equation for synchronous-generator rows.',
+      'Motor, load, IBR, exciter, governor, AVR, and PSS rows are recorded as review metadata unless represented by the simplified OMIB parameters.',
+      'Disturbance events are advisory sequence records; V1 does not perform full EMT or multi-machine network reduction.',
+    ],
+    summary,
+  };
+}
+
+export function renderTransientStabilityHTML(pkg = {}) {
+  const packageData = buildTransientStabilityPackage(pkg);
+  const table = (rows, columns) => `<table class="report-table"><thead><tr>${columns.map(col => `<th>${escapeHtml(col.label)}</th>`).join('')}</tr></thead><tbody>${
+    rows.length ? rows.map(row => `<tr>${columns.map(col => `<td>${escapeHtml(col.format ? col.format(row[col.key], row) : row[col.key])}</td>`).join('')}</tr>`).join('') : `<tr><td colspan="${columns.length}">No rows.</td></tr>`
+  }</tbody></table>`;
+  return `<section class="report-section" id="rpt-transient-stability">
+  <h2>Transient Stability Study Basis</h2>
+  <p class="report-note">Local transient-stability screening package with dynamic model rows, disturbance sequence, CCT sweep, time-series channels, and study assumptions.</p>
+  <dl class="report-dl">
+    <dt>Case</dt><dd>${escapeHtml(packageData.studyCase.caseName)}</dd>
+    <dt>Models</dt><dd>${escapeHtml(packageData.summary.modelCount)}</dd>
+    <dt>Events</dt><dd>${escapeHtml(packageData.summary.eventCount)}</dd>
+    <dt>Status</dt><dd>${escapeHtml(packageData.summary.status)}</dd>
+  </dl>
+  <h3>Scenario Results</h3>
+  ${table(packageData.scenarioRows, [
+    { key: 'modelTag', label: 'Model' },
+    { key: 'clearingTimeSec', label: 'Clearing s' },
+    { key: 'stable', label: 'Stable' },
+    { key: 'maxRotorAngleDeg', label: 'Max Angle deg' },
+    { key: 'cctSec', label: 'CCT s' },
+    { key: 'cctMarginSec', label: 'Margin s' },
+    { key: 'status', label: 'Status' },
+    { key: 'recommendation', label: 'Recommendation' },
+  ])}
+  <h3>Dynamic Models</h3>
+  ${table(packageData.dynamicModelRows, [
+    { key: 'tag', label: 'Model' },
+    { key: 'modelType', label: 'Type' },
+    { key: 'busId', label: 'Bus' },
+    { key: 'H', label: 'H' },
+    { key: 'Pm', label: 'Pm pu' },
+    { key: 'Pmax_pre', label: 'Pmax Pre' },
+    { key: 'Pmax_fault', label: 'Pmax Fault' },
+    { key: 'Pmax_post', label: 'Pmax Post' },
+  ])}
+  <h3>Disturbance Events</h3>
+  ${table(packageData.disturbanceEventRows, [
+    { key: 'timeSec', label: 'Time s' },
+    { key: 'eventType', label: 'Event' },
+    { key: 'label', label: 'Label' },
+    { key: 'targetId', label: 'Target' },
+    { key: 'notes', label: 'Notes' },
+  ])}
+  <h3>CCT Sweep</h3>
+  ${table(packageData.cctSweepRows, [
+    { key: 'modelTag', label: 'Model' },
+    { key: 'clearingTimeSec', label: 'Clearing s' },
+    { key: 'cctSec', label: 'CCT s' },
+    { key: 'marginSec', label: 'Margin s' },
+    { key: 'status', label: 'Status' },
+    { key: 'recommendation', label: 'Recommendation' },
+  ])}
+  <h3>Warnings</h3>
+  <ul>${packageData.warningRows.length ? packageData.warningRows.map(row => `<li><strong>${escapeHtml(row.severity)}:</strong> ${escapeHtml(row.message)}</li>`).join('') : '<li>No transient-stability warnings.</li>'}</ul>
+</section>`;
+}

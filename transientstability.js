@@ -3,7 +3,11 @@ import {
   findCriticalClearingTime,
   equalAreaCriterion,
   initialRotorAngle,
+  buildTransientStabilityPackage,
+  renderTransientStabilityHTML,
 } from './analysis/transientStability.mjs';
+import { getStudies, setStudies } from './dataStore.mjs';
+import { downloadCSV } from './reports/reporting.mjs';
 
 document.addEventListener('DOMContentLoaded', () => {
   initSettings();
@@ -14,10 +18,42 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const calcBtn   = document.getElementById('calc-btn');
   const cctBtn    = document.getElementById('cct-btn');
+  const runStudyCaseBtn = document.getElementById('run-study-case-btn');
+  const saveStudyBtn = document.getElementById('save-study-btn');
+  const exportJsonBtn = document.getElementById('export-json-btn');
+  const exportCsvBtn = document.getElementById('export-csv-btn');
+  const exportHtmlBtn = document.getElementById('export-html-btn');
   const resultsDiv = document.getElementById('results');
+  let lastPackage = null;
 
   calcBtn.addEventListener('click', () => runSimulation(false));
   cctBtn.addEventListener('click',  () => runSimulation(true));
+  runStudyCaseBtn?.addEventListener('click', runStudyCase);
+  saveStudyBtn?.addEventListener('click', saveStudyCase);
+  exportJsonBtn?.addEventListener('click', () => {
+    if (!lastPackage) return;
+    downloadText('transient-stability-study.json', JSON.stringify(lastPackage, null, 2), 'application/json');
+  });
+  exportHtmlBtn?.addEventListener('click', () => {
+    if (!lastPackage) return;
+    downloadText('transient-stability-study.html', renderTransientStabilityHTML(lastPackage), 'text/html');
+  });
+  exportCsvBtn?.addEventListener('click', () => {
+    if (!lastPackage) return;
+    const rows = [
+      ...lastPackage.scenarioRows.map(row => ({ recordType: 'scenario', ...row })),
+      ...lastPackage.cctSweepRows.map(row => ({ recordType: 'cctSweep', ...row })),
+      ...lastPackage.warningRows.map(row => ({ recordType: 'warning', id: row.sourceId || row.code, status: row.severity, recommendation: row.message })),
+    ];
+    downloadCSV(['recordType', 'id', 'modelTag', 'clearingTimeSec', 'cctSec', 'cctMarginSec', 'maxRotorAngleDeg', 'status', 'recommendation'], rows, 'transient-stability-study.csv');
+  });
+
+  const saved = getStudies().transientStability;
+  if (saved?.version) {
+    lastPackage = saved;
+    renderStudyPackage(saved);
+    setExportEnabled(true);
+  }
 
   function getInputs() {
     return {
@@ -98,6 +134,82 @@ document.addEventListener('DOMContentLoaded', () => {
 
     renderResults(inp, simResult, eac, cctResult, delta0);
     renderPlot(simResult, inp);
+  }
+
+  function getStudyCaseInputs() {
+    const base = getInputs();
+    return {
+      caseName: document.getElementById('case-name')?.value || 'Transient Stability Study Case',
+      frequencyHz: base.f,
+      clearingTimeSec: base.t_clear,
+      simulationDurationSec: base.t_end,
+      timeStepSec: 0.001,
+      channelIntervalSec: parseFloat(document.getElementById('channel-interval')?.value) || 0.02,
+      cctSweepEnabled: document.getElementById('cct-sweep-enabled')?.checked !== false,
+      cctMarginWarnSec: parseFloat(document.getElementById('cct-margin-warn')?.value) || 0.03,
+      rotorAngleWarnDeg: parseFloat(document.getElementById('rotor-angle-warn')?.value) || 120,
+      reportPreset: document.getElementById('report-preset')?.value || 'dynamicStudy',
+    };
+  }
+
+  function runStudyCase() {
+    let dynamicModels;
+    let disturbanceEvents;
+    try {
+      dynamicModels = readJsonRows('dynamic-models-json');
+      disturbanceEvents = readJsonRows('disturbance-events-json');
+      lastPackage = buildTransientStabilityPackage({
+        projectName: 'Active Project',
+        studyCase: getStudyCaseInputs(),
+        dynamicModels,
+        disturbanceEvents,
+      });
+    } catch (err) {
+      showAlertModal('Transient Stability Study Case', err.message);
+      return;
+    }
+    renderStudyPackage(lastPackage);
+    renderPackagePlot(lastPackage);
+    setExportEnabled(true);
+  }
+
+  function saveStudyCase() {
+    if (!lastPackage) return;
+    const studies = getStudies();
+    setStudies({ ...studies, transientStability: lastPackage });
+    showAlertModal('Transient Stability Study Case', 'Transient stability study package saved to study results.');
+  }
+
+  function renderStudyPackage(pkg) {
+    resultsDiv.innerHTML = `${renderTransientStabilityHTML(pkg)}
+      <details class="method-note">
+        <summary>Raw package JSON</summary>
+        <pre>${esc(JSON.stringify(pkg, null, 2))}</pre>
+      </details>`;
+  }
+
+  function renderPackagePlot(pkg) {
+    const model = pkg.dynamicModelRows.find(row => row.enabled && row.modelType === 'synchronousGenerator');
+    if (!model) return;
+    const scenario = pkg.scenarioRows.find(row => row.modelId === model.id) || {};
+    try {
+      const inp = {
+        H: model.H,
+        f: model.frequencyHz || pkg.studyCase.frequencyHz,
+        Pm: model.Pm,
+        Pmax_pre: model.Pmax_pre,
+        Pmax_fault: model.Pmax_fault,
+        Pmax_post: model.Pmax_post,
+        t_clear: scenario.clearingTimeSec || pkg.studyCase.clearingTimeSec,
+        t_end: pkg.studyCase.simulationDurationSec,
+        dt: pkg.studyCase.timeStepSec,
+      };
+      const delta0 = initialRotorAngle(inp.Pm, inp.Pmax_pre);
+      const simResult = simulateSwingEquation({ ...inp, delta0, t_fault: 0 });
+      renderPlot(simResult, inp);
+    } catch {
+      // Package tables still carry the simulation error.
+    }
   }
 
   function renderResults(inp, sim, eac, cct, delta0) {
@@ -204,5 +316,29 @@ document.addEventListener('DOMContentLoaded', () => {
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;');
+  }
+
+  function readJsonRows(id) {
+    const textValue = document.getElementById(id)?.value || '[]';
+    const parsed = JSON.parse(textValue);
+    if (!Array.isArray(parsed)) throw new Error(`${id} must contain a JSON array.`);
+    return parsed;
+  }
+
+  function setExportEnabled(enabled) {
+    [saveStudyBtn, exportJsonBtn, exportCsvBtn, exportHtmlBtn].forEach(btn => {
+      if (btn) btn.disabled = !enabled;
+    });
+  }
+
+  function downloadText(filename, content, type) {
+    const blob = new Blob([content], { type });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(a.href);
   }
 });

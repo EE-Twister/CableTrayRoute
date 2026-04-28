@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 180" role="img" aria-labelledby="title desc">
+  <title id="title">Duct bank sample preview</title>
+  <desc id="desc">Concrete ductbank with underground conduits and feeders.</desc>
+  <rect width="360" height="180" rx="8" fill="#f8fafc"/>
+  <rect x="58" y="54" width="244" height="86" rx="8" fill="#e2e8f0" stroke="#64748b" stroke-width="2"/>
+  <g fill="#dbeafe" stroke="#2563eb" stroke-width="3">
+    <circle cx="122" cy="84" r="18"/>
+    <circle cx="180" cy="84" r="18"/>
+    <circle cx="238" cy="84" r="18"/>
+    <circle cx="122" cy="116" r="18"/>
+    <circle cx="180" cy="116" r="18"/>
+    <circle cx="238" cy="116" r="18"/>
+  </g>
+  <path d="M30 146h300" stroke="#92400e" stroke-width="10" stroke-linecap="round"/>
+  <path d="M122 84h116M122 116h116" stroke="#ef4444" stroke-width="4"/>
+</svg>
+

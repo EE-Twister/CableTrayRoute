@@ -1,0 +1,30 @@
+{
+  "meta": { "version": 1, "scenario": "duct-bank", "scenarios": ["duct-bank"], "projectName": "Duct Bank Thermal Review" },
+  "ductbanks": [
+    { "id": "DB-A", "ductbank_id": "DB-A", "name": "North Service Ductbank", "length": 260, "width": 42, "height": 30, "burialDepth": 36, "soilRho": 90 }
+  ],
+  "conduits": [
+    { "id": "DB-A-C1", "conduit_id": "DB-A-C1", "ductbank_id": "DB-A", "type": "PVC", "trade_size": "5 in", "capacity": 19.64 },
+    { "id": "DB-A-C2", "conduit_id": "DB-A-C2", "ductbank_id": "DB-A", "type": "PVC", "trade_size": "5 in", "capacity": 19.64 }
+  ],
+  "trays": [],
+  "cables": [
+    { "id": "DB-C-101", "tag": "DB-C-101", "from": "SUB-A", "to": "SWBD-N", "conductor_size": "3/C 750 kcmil", "insulation_type": "EPR", "voltage_rating": "15 kV", "length": 260, "diameter": 2.8, "route_preference": "DB-A-C1" },
+    { "id": "DB-C-102", "tag": "DB-C-102", "from": "SUB-A", "to": "SWBD-N", "conductor_size": "3/C 750 kcmil", "insulation_type": "EPR", "voltage_rating": "15 kV", "length": 260, "diameter": 2.8, "route_preference": "DB-A-C2" }
+  ],
+  "cableTypicals": [],
+  "panels": [],
+  "equipment": [
+    { "id": "SUB-A", "tag": "SUB-A", "description": "Utility substation", "area": "North Yard" },
+    { "id": "SWBD-N", "tag": "SWBD-N", "description": "North switchboard", "area": "Building N" }
+  ],
+  "loads": [],
+  "oneLine": { "activeSheet": 0, "sheets": [] },
+  "settings": {
+    "studyResults": {
+      "iec60287": { "summary": { "allowableAmpacityA": 515, "soilThermalResistivity": 90 }, "sample": true },
+      "ductbankThermal": { "summary": { "maxConductorTempC": 78, "thermalMarginC": 12 }, "sample": true }
+    }
+  }
+}
+

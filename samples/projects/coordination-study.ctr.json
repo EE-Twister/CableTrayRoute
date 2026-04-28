@@ -1,0 +1,45 @@
+{
+  "meta": { "version": 1, "scenario": "coordination-study", "scenarios": ["coordination-study"], "projectName": "Protection Coordination Study" },
+  "ductbanks": [],
+  "conduits": [
+    { "id": "PC-CND-1", "conduit_id": "PC-CND-1", "type": "RMC", "trade_size": "4 in", "capacity": 12.74, "from": "SWBD-1", "to": "MCC-1" }
+  ],
+  "trays": [],
+  "cables": [
+    { "id": "PC-C-101", "tag": "PC-C-101", "from": "XFMR-1", "to": "SWBD-1", "conductor_size": "4/C 750 kcmil", "insulation_type": "XHHW-2", "voltage_rating": "600 V", "length": 55, "diameter": 2.6 },
+    { "id": "PC-C-102", "tag": "PC-C-102", "from": "SWBD-1", "to": "MCC-1", "conductor_size": "4/C 500 kcmil", "insulation_type": "XHHW-2", "voltage_rating": "600 V", "length": 100, "diameter": 2.1, "route_preference": "PC-CND-1" }
+  ],
+  "cableTypicals": [],
+  "panels": [
+    { "id": "SWBD-1", "name": "SWBD-1", "voltage": "480 V", "location": "Main Electrical Room" }
+  ],
+  "equipment": [
+    { "id": "UTIL-1", "tag": "UTIL-1", "description": "Utility source", "area": "Service Entrance" },
+    { "id": "XFMR-1", "tag": "XFMR-1", "description": "2500 kVA transformer", "area": "Service Entrance" },
+    { "id": "MCC-1", "tag": "MCC-1", "description": "Motor control center", "area": "Process" }
+  ],
+  "loads": [
+    { "id": "PC-L-101", "tag": "MCC-1", "description": "Grouped motor loads", "kw": 600, "voltage": "480 V", "phases": "3" }
+  ],
+  "oneLine": {
+    "activeSheet": 0,
+    "sheets": [
+      {
+        "name": "Coordination Study",
+        "components": [
+          { "id": "util-1", "type": "source", "x": 40, "y": 100, "label": "Utility", "connections": [{ "target": "xfmr-1" }] },
+          { "id": "xfmr-1", "type": "transformer", "x": 220, "y": 100, "label": "XFMR-1", "connections": [{ "target": "swbd-1" }] },
+          { "id": "swbd-1", "type": "switchboard", "x": 410, "y": 100, "label": "SWBD-1", "connections": [{ "target": "mcc-1" }] },
+          { "id": "mcc-1", "type": "mcc", "x": 600, "y": 100, "label": "MCC-1", "connections": [] }
+        ]
+      }
+    ]
+  },
+  "settings": {
+    "studyResults": {
+      "shortCircuit": { "summary": { "availableFaultCurrentKa": 42.5, "equipmentRatingKa": 65, "pass": true }, "sample": true },
+      "arcFlash": { "summary": { "incidentEnergyCalCm2": 5.7, "workingDistanceIn": 18 }, "sample": true },
+      "tcc": { "summary": { "coordinationPairs": 3, "openIssues": 1 }, "sample": true }
+    }
+  }
+}

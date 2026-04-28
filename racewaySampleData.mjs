@@ -92,7 +92,20 @@ export function normalizeDuctbankRow(row){
     start_z:['start_z','Start Z','startZ'],
     end_x:['end_x','End X','endX'],
     end_y:['end_y','End Y','endY'],
-    end_z:['end_z','End Z','endZ']
+    end_z:['end_z','End Z','endZ'],
+    supportFamily:['supportFamily','support_family','Support Family'],
+    supportType:['supportType','support_type','Support Type'],
+    supportSpacingFt:['supportSpacingFt','support_spacing_ft','Support Spacing'],
+    accessoryKits:['accessoryKits','accessory_kits','Accessory Kits'],
+    dividerLane:['dividerLane','divider_lane','Divider Lane'],
+    constructionPhase:['constructionPhase','construction_phase','Phase'],
+    constructionStatus:['constructionStatus','construction_status','Status'],
+    drawingRef:['drawingRef','drawing_ref','Drawing Ref'],
+    detailRef:['detailRef','detail_ref','Detail Ref'],
+    labelId:['labelId','label_id','Label ID'],
+    sectionRef:['sectionRef','section_ref','Section Ref'],
+    installArea:['installArea','install_area','Install Area'],
+    constructionNotes:['constructionNotes','construction_notes','Construction Notes']
   });
 }
 
@@ -109,7 +122,20 @@ export function normalizeConduitRow(row){
     end_y:['end_y','End Y','endY'],
     end_z:['end_z','End Z','endZ'],
     allowed_cable_group:['allowed_cable_group','allowedGroup','Allowed Group'],
-    capacity:['capacity','Capacity']
+    capacity:['capacity','Capacity'],
+    supportFamily:['supportFamily','support_family','Support Family'],
+    supportType:['supportType','support_type','Support Type'],
+    supportSpacingFt:['supportSpacingFt','support_spacing_ft','Support Spacing'],
+    accessoryKits:['accessoryKits','accessory_kits','Accessory Kits'],
+    dividerLane:['dividerLane','divider_lane','Divider Lane'],
+    constructionPhase:['constructionPhase','construction_phase','Phase'],
+    constructionStatus:['constructionStatus','construction_status','Status'],
+    drawingRef:['drawingRef','drawing_ref','Drawing Ref'],
+    detailRef:['detailRef','detail_ref','Detail Ref'],
+    labelId:['labelId','label_id','Label ID'],
+    sectionRef:['sectionRef','section_ref','Section Ref'],
+    installArea:['installArea','install_area','Install Area'],
+    constructionNotes:['constructionNotes','construction_notes','Construction Notes']
   });
 }
 
@@ -125,7 +151,20 @@ export function normalizeTrayRow(row){
     inside_width:['inside_width','width','Inside Width'],
     tray_depth:['tray_depth','height','Tray Depth'],
     tray_type:['tray_type','Tray Type'],
-    allowed_cable_group:['allowed_cable_group','allowedGroup','Allowed Group']
+    allowed_cable_group:['allowed_cable_group','allowedGroup','Allowed Group'],
+    supportFamily:['supportFamily','support_family','Support Family'],
+    supportType:['supportType','support_type','Support Type'],
+    supportSpacingFt:['supportSpacingFt','support_spacing_ft','Support Spacing'],
+    accessoryKits:['accessoryKits','accessory_kits','Accessory Kits'],
+    dividerLane:['dividerLane','divider_lane','Divider Lane'],
+    constructionPhase:['constructionPhase','construction_phase','Phase'],
+    constructionStatus:['constructionStatus','construction_status','Status'],
+    drawingRef:['drawingRef','drawing_ref','Drawing Ref'],
+    detailRef:['detailRef','detail_ref','Detail Ref'],
+    labelId:['labelId','label_id','Label ID'],
+    sectionRef:['sectionRef','section_ref','Section Ref'],
+    installArea:['installArea','install_area','Install Area'],
+    constructionNotes:['constructionNotes','construction_notes','Construction Notes']
   });
 }
 

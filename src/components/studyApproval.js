@@ -12,10 +12,14 @@
  */
 
 import {
+  getActiveStudyPackageId,
+  getProjectRevisions,
   getStudyApprovals,
+  getStudyPackages,
   setStudyApproval,
   clearStudyApproval,
 } from '../../dataStore.mjs';
+import { summarizeLifecycleLineage } from '../../analysis/projectLifecycle.mjs';
 
 const TODAY = new Date().toISOString().split('T')[0];
 
@@ -74,6 +78,12 @@ export function initStudyApprovalPanel(studyKey, containerId = 'study-review-pan
   const container = document.getElementById(containerId);
   if (!container) return;
   const checklistItems = Array.isArray(options.checklistItems) ? options.checklistItems : [];
+  const lifecycle = summarizeLifecycleLineage({
+    projectRevisions: getProjectRevisions(),
+    studyPackages: getStudyPackages(),
+    activeStudyPackageId: getActiveStudyPackageId(),
+  });
+  const activePackage = lifecycle.activePackage;
 
   // ── Build the panel DOM ───────────────────────────────────────────────────
 
@@ -113,6 +123,8 @@ export function initStudyApprovalPanel(studyKey, containerId = 'study-review-pan
       <div class="study-review-panel__current" aria-live="polite">
         <span id="${badgeId}" class="approval-badge approval-badge--pending">● Pending Review</span>
       </div>
+
+      ${activePackage ? `<p class="field-hint">Lifecycle package: ${esc(activePackage.revision)} - ${esc(activePackage.name)} (${esc(activePackage.status)}), model hash ${esc(activePackage.modelHash)}.</p>` : ''}
 
       <form class="study-review-panel__form" novalidate aria-labelledby="${headingId}">
         <div class="auth-field">

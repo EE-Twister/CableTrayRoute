@@ -1,6 +1,6 @@
 # Competitor Feature Gap Analysis
 
-## Date: 2026-04-26 (website/product competitiveness refresh added 2026-04-26; advanced power systems & DER deep dive added 2026-04-11 / documented 2026-04-12; custom pricing book added 2026-04-11; one-line diagram & TCC deep dive added 2026-04-06; one-line diagram UI pass added 2026-04-05; all prior gaps resolved 2026-04-04; usability/calculation pass added 2026-03-24; original 2026-03-16)
+## Date: 2026-04-27 (expanded page-level input/calculation audit added 2026-04-27; website/product competitiveness refresh added 2026-04-26; advanced power systems & DER deep dive added 2026-04-11 / documented 2026-04-12; custom pricing book added 2026-04-11; one-line diagram & TCC deep dive added 2026-04-06; one-line diagram UI pass added 2026-04-05; all prior gaps resolved 2026-04-04; usability/calculation pass added 2026-03-24; original 2026-03-16)
 
 This document identifies features commonly found in major competitor platforms that are currently missing from CableTrayRoute.
 
@@ -20,13 +20,15 @@ A **2026-04-05 pass** focused specifically on the **one-line diagram editor UI**
 
 A **2026-04-06 pass** performed a focused deep dive on **one-line diagram connectivity features** and the **TCC (Time-Current Curve) engine**, benchmarked against ETAP 2024/2025, EasyPower 2025, SKM PTW 9, PowerWorld Simulator 23, and DIgSILENT PowerFactory 2024. This revealed **10 new gaps** (Gaps #48–#57) across two areas: (1) multi-sheet diagramming and diagram annotation capabilities missing from the one-line editor and (2) advanced TCC curve types, arc flash integration, ground fault protection, and reporting absent from the coordination study tool. See "One-Line Diagram & TCC Deep Dive (2026-04-06)" below.
 
-A **2026-04-11 pass — advanced power systems & DER analysis** performed a focused review of the `analysis/` module tree against the full study catalogs of **ETAP 2024/2025**, **EasyPower 2025**, **SKM PowerTools 9**, **DIgSILENT PowerFactory 2024**, **PSS/E**, **Siemens PSS SINCAL**, **CYME**, and domain-specific sizing calculators (**Schneider Ecodial**, **Caterpillar SpecSizer**, **Eaton Bussmann OSCAR**). The study catalogs were filtered to identify *core* AC/DC power systems analyses that are commonly expected in any modern engineering deliverable (protection, DC, DER, power quality, insulation coordination, economic dispatch). This revealed **13 new gaps** (**Gaps #58–#70**) across DC systems, battery/UPS sizing, renewable/DER integration, harmonic resonance, voltage stability, differential protection, insulation coordination, protection settings interoperability, IEC cable ampacity, voltage flicker, motor derating, quasi-dynamic time-series simulation, and economic optimization. **Gap #59 (Battery / UPS Sizing per IEEE 485) has been implemented 2026-04-12. Gap #58 (DC Short-Circuit & Arc Flash) has been implemented 2026-04-18. Gap #61 (PV/BESS/IBR Modeling) has been implemented 2026-04-18. Gap #62 (IEEE 1547-2018 DER Interconnection Study) has been implemented 2026-04-18. Gap #63 (Frequency Scan / Harmonic Resonance) has been implemented 2026-04-19. Gap #67 (Differential Protection 87B/87T/87G) has been implemented 2026-04-19. The remaining 4 (Gaps #64, #65, #70, and deferred items) are not yet implemented.** See "Advanced Power Systems & DER Deep Dive (2026-04-11)" below.
+A **2026-04-11 pass — advanced power systems & DER analysis** performed a focused review of the `analysis/` module tree against the full study catalogs of **ETAP 2024/2025**, **EasyPower 2025**, **SKM PowerTools 9**, **DIgSILENT PowerFactory 2024**, **PSS/E**, **Siemens PSS SINCAL**, **CYME**, and domain-specific sizing calculators (**Schneider Ecodial**, **Caterpillar SpecSizer**, **Eaton Bussmann OSCAR**). The study catalogs were filtered to identify *core* AC/DC power systems analyses that are commonly expected in any modern engineering deliverable (protection, DC, DER, power quality, insulation coordination, economic dispatch). This revealed **13 new gaps** (**Gaps #58–#70**) across DC systems, battery/UPS sizing, renewable/DER integration, harmonic resonance, voltage stability, differential protection, insulation coordination, protection settings interoperability, IEC cable ampacity, voltage flicker, motor derating, quasi-dynamic time-series simulation, and economic optimization. **Gap #59 (Battery / UPS Sizing per IEEE 485) has been implemented 2026-04-12. Gap #58 (DC Short-Circuit & Arc Flash) has been implemented 2026-04-18. Gap #61 (PV/BESS/IBR Modeling) has been implemented 2026-04-18. Gap #62 (IEEE 1547-2018 DER Interconnection Study) has been implemented 2026-04-18. Gap #63 (Frequency Scan / Harmonic Resonance) has been implemented 2026-04-19. Gap #67 (Differential Protection 87B/87T/87G) has been implemented 2026-04-19. Gaps #64, #65, and #70 are now implemented; deferred native/plugin items remain outside the browser-local scope.** See "Advanced Power Systems & DER Deep Dive (2026-04-11)" below.
 
 A separate **2026-04-11 extension** to the Cost Estimation module added **custom pricing book import/export** — closing the "user-configurable pricing" half of the live-pricing gap without requiring commercial licensing.
 
 A **2026-04-26 website/product competitiveness refresh** compared CableTrayRoute against current positioning and features from ETAP, EasyPower, SKM, Bentley Raceway and Cable Management, MagiCAD/Revit, Eplan Data Portal/eBuild, nVent TraceCalc, Thermon CompuTrace, Chromalox ChromaTrace, SES CDEGS, XGSLab, CYMCAP, Cableizer, and related engineering tools. This revealed **12 additional gaps** (**Gaps #71-#82**) across lifecycle model governance, manufacturer data, heat-trace deliverables, grounding fidelity, cable thermal/pulling workflows, BIM round-trip, field data capture, benchmark/audit confidence, design automation, and public onboarding.
 
-**Current status: 66 of 83 total identified gaps implemented. 1 deferred (native BIM/CAD plugin). Live pricing gap extended with custom CSV pricing book. 16 open gaps remain: advanced power study #65 (OPF) plus website/product competitiveness gaps #71-#82 (excluding #78 now implemented). Gaps #64 (Voltage Stability) and #70 (Voltage Flicker) were implemented and are corrected in the roadmap table below.**
+A **2026-04-27 page-level input/calculation audit** compared the inputs currently exposed on existing CableTrayRoute pages against detailed competitor study workflows. The first pass revealed **10 additional gaps** (**Gaps #83-#92**) where the page exists, but important study-case inputs, calculation modes, or deliverable controls remain missing. A same-day extension added **10 more page-level gaps** (**Gaps #93-#102**) for harmonic/PQ studies, panel/load schedules, transformer/feeder sizing, voltage-drop criteria, capacitor-bank duty, reliability, transient stability, DER/IBR controls, EMF exposure modeling, and cathodic-protection network fidelity.
+
+**Current status: 95 of 103 total identified gaps implemented, plus the deferred native BIM/CAD plugin gap is now partially closed with a browser-local connector contract/readiness gateway. Live pricing gap extended with custom CSV pricing book. Gaps #83 (Short-Circuit Study Case Controls and Duty Basis), #84 (Arc Flash Equipment Data and Mitigation Scenario Editor), #85 (Load Flow Unbalanced Model and Control Device Inputs), #86 (Motor Start Sequence-of-Events and Dynamic Model Editor), #87 (Cable Thermal Fine-Grain Environment Inputs), #88 (Cable Pulling 3D Pull Physics and Constructability Inputs), #89 (Grounding Field-Test, Seasonal Soil, and Fidelity Controls), #90 (TCC / Protection Setting Sheet Governance), #91 (Heat Trace Tanks, Vessels, Multi-Segment Circuits, and Control Fidelity), #92 (Raceway Construction Detailing and Takeoff Controls), #93 (Harmonic Study Source Modeling, PCC Compliance, and Filter Design), #94 (Panel and Load Schedule Demand-Factor Governance), #95 (Transformer and Feeder Auto-Sizing Case Basis), #96 (Voltage Drop Criteria, Operating Case, and Starting Drop Traceability), #97 (Capacitor Bank Switching, Detuning, Protection, and Duty Checks), #98 (Reliability Network Modeling, Restoration Logic, and Customer Indices), and #99 (Transient Stability Dynamic Model Library and Disturbance Events) are now implemented; the remaining 2026-04-27 audit items are page-level input/calculation completeness gaps that should be prioritized before claiming commercial-study parity. Gaps #64 (Voltage Stability), #65 (Optimal Power Flow / Economic Dispatch), #70 (Voltage Flicker), #71 (Lifecycle Project Model / Digital Twin Governance), #72 (Manufacturer Data Portal / Product-Grade Catalogs), #73 (Heat Trace Line List, BOM, and Installation Package), #74 (Advanced Grounding Fidelity), #75 (Cable Thermal Environment Modeling), #76 (BIM Round-Trip / Issue Markup), #77 (Field Data Collection / Commissioning Workflow), #79 (Cross-Study Design Coach), #80 (Electrical Equipment Evaluation and Compliance Inventory), #81 (Public Sample Project Gallery and Guided Demo Workflows), and #82 (Commercial-Grade Report Package Builder) were implemented and are corrected in the roadmap table below.**
 
 ---
 
@@ -384,7 +386,7 @@ Study page `capacitorbank.html` / `capacitorbank.js` provides form inputs for bu
 |---|---|---|
 | **Loss minimization and generation cost optimization** | ETAP Optimal Power Flow, PowerWorld Simulator OPF, DIgSILENT PowerFactory, PSS/E OPF | Optimal power flow (OPF) extends load flow by optimizing generator dispatch, transformer tap positions, and capacitor switching to minimize an objective function (total generation cost, system losses, or voltage deviation) subject to bus voltage limits, branch thermal limits, and generator capability constraints. Economic dispatch — a simplified OPF — determines least-cost generator loading for a given total demand. This is standard for utility operations, industrial facilities with cogeneration, and microgrid dispatch optimization. CableTrayRoute's `analysis/loadFlow.js` solves a conventional Newton-Raphson power flow with fixed generator setpoints; it has no optimization layer, no cost function, no constraint enforcement on branch flows, and no automatic tap/capacitor adjustment. |
 
-**Status:** Not implemented.
+**Status:** ✅ **Implemented 2026-04-27.** `analysis/optimalPowerFlow.mjs` adds deterministic economic dispatch, generator cost/limit normalization, objective scoring for cost/loss/voltage/weighted modes, AC load-flow feasibility checks through the existing load-flow solver, voltage/branch constraint rows, package JSON, and escaped printable HTML. `optimalpowerflow.html` / `src/optimalPowerFlow.js` provide a local workflow for loading one-line generators, editing dispatch limits and costs, running OPF screening, saving to `studyResults.optimalPowerFlow`, and exporting JSON/HTML. Unified reports, commercial report packages, dashboard study status, navigation, and Design Coach now include OPF results, infeasibility, voltage/branch violations, insufficient capacity, and missing cost/rating data. Tests: `tests/optimalPowerFlow.test.mjs` plus updated Design Coach and report-package coverage.
 
 ---
 
@@ -414,7 +416,7 @@ Study page `capacitorbank.html` / `capacitorbank.js` provides form inputs for bu
 |---|---|---|
 | **Full IEC 60909 initial, peak, breaking, and steady-state fault currents** | ETAP IEC 60909 Module, EasyPower IEC SC, DIgSILENT PowerFactory, CYME | IEC 60909 (International Electrotechnical Commission) is the standard short-circuit calculation method used outside North America. It differs from the ANSI/IEEE method in CableTrayRoute in several key ways: (1) voltage factor c (1.05 for max, 0.95 for min) applied to the pre-fault voltage; (2) initial symmetrical SC current Ik" calculated with impedance correction factors for generators (KG), power station units (KSO), and transformers (KT); (3) peak SC current ip = κ × √2 × Ik" where κ depends on R/X ratio; (4) symmetrical breaking current Ib with generator time-dependent decay; (5) steady-state SC current Ik. CableTrayRoute's `analysis/shortCircuit.mjs` uses the ANSI/IEEE method (1/2 cycle and 30-cycle networks with multiplying factors). There is no IEC 60909 voltage factor c, no impedance correction factors KG/KT/KSO, no peak current ip calculation, and no breaking/steady-state current distinction. This is required for all IEC-jurisdiction projects. |
 
-**Status:** Not implemented.
+**Status:** ✅ **Implemented 2026-04-12.** Full IEC 60909-0:2016 equivalent-voltage-source method is implemented in `analysis/iec60909.mjs`; `analysis/shortCircuit.mjs` delegates to that engine when `method === 'IEC'`. See the implementation notes in the roadmap section below.
 
 ---
 
@@ -450,7 +452,7 @@ These features require native desktop integration, external pricing databases, o
 | **AutoCAD / AVEVA / SmartPlant 3D Integration** | Eaton B-Line, Legrand Cablofil, OBO Bettermann, Aeries CARS, Paneldes | Direct plug-ins for AutoCAD (2D/3D), AVEVA, SmartPlant 3D, CATIA V5, SolidWorks. OBO offers a free AutoCAD plug-in for 3D cable sections. CableTrayRoute exports DXF but has no native CAD plug-in. |
 | **BIM Object Library** | Eaton B-Line (CoSPEC), Legrand Cablofil (BIMobject), Niedax (Stabicad), Chalfant, OBO (TraceParts) | Downloadable manufacturer-specific BIM families (Revit RFA, IFC) for cable tray products with parametric sizing. Niedax integrates 226 products into Revit via Stabicad. |
 
-**Status:** Deferred. Requires Windows-native SDKs (Revit API, AutoCAD ARX) or manufacturer partnerships for BIM families. Not feasible as a pure web app.
+**Status:** Partially closed 2026-04-27. `analysis/bimConnectorContract.mjs` now defines a stable browser-local connector package contract for external Revit/AutoCAD/generic desktop add-ins, with connector JSON export/import validation, preview-only return package handling, round-trip diffs, readiness reporting, lifecycle snapshot capture, commercial package metadata, and Design Coach actions. Native Revit API, AutoCAD ARX, AVEVA, SmartPlant, and manufacturer BIM-family plugins remain deferred because they require desktop SDKs and/or commercial partnerships.
 
 ### 2. Real-Time Cost Pricing Database
 
@@ -1042,7 +1044,7 @@ Benchmarked against: **ETAP 2024/2025** (Electric Copilot™, composite networks
 | **IEEE 1547 DER Interconnection Study** | **No** | Yes | Yes | — | — | — | — | — | — | — |
 | **Frequency Scan / Harmonic Resonance** | **No** | Yes | Yes | — | — | — | — | — | — | — |
 | **Voltage Stability (P-V / Q-V Curves)** | **No** | Yes | — | — | — | — | — | — | — | — |
-| **Optimal Power Flow / Economic Dispatch** | **No** | Yes | — | — | — | — | — | — | — | — |
+| **Optimal Power Flow / Economic Dispatch** | **Yes** ✓ | Yes | — | — | — | — | — | — | — | — |
 | **Generator Sizing (NFPA 110)** | **No** | Yes | Yes | — | — | — | — | — | — | — |
 | **Differential Protection (87B/T/G)** | **No** | Yes | Yes | — | — | — | — | — | — | — |
 | **IEC 60909 Short-Circuit Method** | **No** | Yes | Yes | — | — | — | — | — | — | — |
@@ -1094,8 +1096,8 @@ All originally high- and medium-priority feasible items have been implemented:
 
 9. **Cloud-Based Component Library** — Shared organization-wide product library synchronized via the existing collaboration backend. Aligns with Bentley's Components Center model.
 10. ~~**Electrical Digital Twin / Navisworks Export**~~ — ✅ **Implemented 2026-04-11** — `src/exporters/gltf2.mjs` `exportToGLTF2()` exports cable tray solid mesh geometry and cable route polylines as a glTF 2.0 binary (`.glb`) for Navisworks / BIM 360 import. Docs: `docs/gltf-export.md`. Tests: `tests/gltfExport.test.mjs`.
-11. **Revit Plugin / BIM Sync** — Requires Revit SDK (Windows-native C#/.NET). IFC export is the recommended interim step.
-12. **AutoCAD / AVEVA Plugin** — Requires commercial CAD SDK licensing.
+11. **Revit Plugin / BIM Sync** — Partially closed by the 2026-04-27 BIM/CAD connector JSON contract and readiness gateway; native Revit SDK add-in still deferred.
+12. **AutoCAD / AVEVA Plugin** — Partially closed by the connector JSON exchange contract; native AutoCAD/AVEVA/SmartPlant SDK integration still deferred.
 13. **BIM Object Library** — Requires manufacturer data partnerships for Revit RFA / IFC families.
 14. **Live Manufacturer Pricing** — Requires commercial pricing data licenses (RS Means, Eaton/Harrison, Legrand).
 15. ~~**Real-Time Multi-User Collaboration**~~ → Implemented via WebSocket presence bar and `src/collaborationServer.mjs`.
@@ -1196,7 +1198,7 @@ All originally high- and medium-priority feasible items have been implemented:
 **Lower Priority — Advanced studies for transmission-level and utility planning:**
 
 11. **Voltage Stability (P-V / Q-V Curves)** (Gap #64) — Continuation power flow for voltage collapse margin. Important for NERC TPL compliance and large industrial motor loads. Recommended: extend `analysis/loadFlow.js` with CPF mode.
-12. **Optimal Power Flow / Economic Dispatch** (Gap #65) — Loss minimization, generation cost optimization. Most relevant for utility operations and microgrids with multiple dispatchable sources. Recommended module: `analysis/optimalPowerFlow.mjs`.
+12. ~~**Optimal Power Flow / Economic Dispatch** (Gap #65)~~ — ✅ Implemented 2026-04-27. Deterministic economic dispatch and OPF screening via `analysis/optimalPowerFlow.mjs`, `optimalpowerflow.html`, report package output, and Design Coach actions.
 13. **Voltage Flicker (IEC 61000-4-15 Pst/Plt)** (Gap #70) — Important for facilities with arc furnaces, large motor starts, or wind generation. Pst/Plt calculation, IEC 61000-3-3 / IEEE 1453 compliance. Recommended module: `analysis/voltageFlicker.mjs`.
 
 ---
@@ -1236,7 +1238,7 @@ The strongest market pattern is that competing tools sell more than formulas. Th
 - Surface package lineage in `projectreport.html`, exported reports, and study approval banners.
 - Tests: package creation round-trip, immutable snapshot behavior, diff summaries, and report export using the selected package.
 
-**Status:** Not implemented.
+**Status:** Implemented 2026-04-27 with `analysis/projectLifecycle.mjs`, scenario-scoped lifecycle storage, dashboard release packages, revision diff summaries, report lineage, study approval lineage banners, and report package manifest metadata.
 
 ---
 
@@ -1253,7 +1255,7 @@ The strongest market pattern is that competing tools sell more than formulas. Th
 - Add warnings when reports use generic/unapproved parts.
 - Tests: catalog import validation, duplicate catalog-number merge behavior, approved/unapproved filtering, and report warning output.
 
-**Status:** Partially implemented via custom pricing/library features; product-grade catalog governance not implemented.
+**Status:** ✅ **Implemented 2026-04-27.** `analysis/productCatalog.mjs` adds product-grade manufacturer catalog normalization, validation, duplicate merge handling, approved/stale filtering, CSV/JSON import templates for trays/conduits/fittings/heat-trace components/protective devices/cable types, governance package JSON, and escaped printable HTML. `productcatalog.html` / `src/productCatalog.js` add local catalog review, import/export, approval/revoke actions, and verification metadata. `dataStore.mjs`, `src/catalogBrowser.js`, `productconfig.js`, workflow dashboard, Design Coach, unified project report, and commercial report package now surface approved-catalog governance and generic/unapproved/stale product warnings. Tests: `tests/productCatalog.test.mjs` plus updated Design Coach and report-package coverage.
 
 ---
 
@@ -1270,7 +1272,7 @@ The strongest market pattern is that competing tools sell more than formulas. Th
 - Add report tabs: line list, circuit schedule, BOM, installation details, warnings, and manufacturer-verification assumptions.
 - Tests: product selection constraints, BOM counts, controller schedule totals, JSON/HTML report output, and legacy branch-case normalization.
 
-**Status:** Sizing and branch schedule partially implemented; manufacturer-style line list and BOM not implemented.
+**Status:** ✅ **Implemented 2026-04-26.** `analysis/heatTraceInstallationPackage.mjs` adds vendor-neutral heat-trace product families, accessory rules, line-list normalization, product-family selection, controller schedule rollups, BOM generation, structured installation package JSON, and escaped printable HTML. `heattracesizing.html` / `heattracesizing.js` add construction metadata fields for saved branch cases (pipe tag, service, area, source panel, controller, circuit, product family, accessory overrides, installation notes) plus installation-package preview/export actions. `analysis/projectReport.mjs` and `reports/reportPackage.mjs` include heat-trace line list, controller schedule, and BOM in unified/commercial report packages. Tests: `tests/heatTraceInstallationPackage.test.mjs` plus updated report-package coverage.
 
 ---
 
@@ -1281,13 +1283,12 @@ The strongest market pattern is that competing tools sell more than formulas. Th
 | **Grounding analysis beyond rectangular IEEE 80 screening: soil-layer fitting, irregular geometry, danger points, and detailed contour maps** | SES CDEGS, XGSLab, SKM GroundMat, ETAP Ground Grid Systems | Specialist grounding tools compete on visualization and fidelity: Wenner/Schlumberger soil data fitting, multi-layer soil, irregular electrode geometry, 2D/3D touch-step contours, transferred voltage checks, and explicit danger point reporting. CableTrayRoute has a stronger visual ground-grid page than before, but it is still mainly a rectangular IEEE 80 screening workflow. |
 
 **Implementation notes:**
-- Add a soil-model tab for measured apparent resistivity rows and a two-layer fit result (`rho1`, `rho2`, `h`, fit error).
-- Allow polygon/perimeter grid editing plus additional rods, ground rings, and remote electrodes in the SVG map.
-- Add a risk-point table for max touch/step areas and user-added inspection points.
-- Add exported SVG/PNG hazard maps and a calculation-basis appendix that clearly separates IEEE 80 screening from advanced numerical methods.
-- Tests: soil fit deterministic cases, polygon geometry bounds, risk color classification, and report inclusion of danger points.
+- Added `analysis/advancedGrounding.mjs` with deterministic measured-soil normalization, two-layer screening fit, polygon/rectangle geometry normalization, risk-point classification, hazard-map payloads, package generation, and escaped HTML rendering.
+- Extended `groundgrid.html` / `groundgrid.js` with measured soil rows, polygon perimeter inputs, additional rods, remote electrode/transferred-voltage records, user risk points, advanced package summaries, risk-point register, hazard-map SVG markers, and JSON/HTML/SVG exports.
+- Integrated advanced grounding into unified project reports, commercial report packages, and Design Coach actions for failed/warning hazard points, poor soil-fit quality, and transferred-voltage review.
+- Tests: `tests/advancedGrounding.test.mjs`, plus report package and Design Coach coverage.
 
-**Status:** Rectangular IEEE 80 workflow implemented; advanced soil/irregular-grid workflow not implemented.
+**Status:** Implemented 2026-04-27. V1 remains a local screening overlay on IEEE 80 results and is not a replacement for CDEGS/XGSLab-class numerical grounding analysis.
 
 ---
 
@@ -1298,13 +1299,12 @@ The strongest market pattern is that competing tools sell more than formulas. Th
 | **Cable ampacity and thermal modeling for complex installation environments** | CYMCAP, Cableizer, ETAP Underground Raceway Systems, DIgSILENT cable rating workflows | Cable thermal competitors model direct-buried circuits, duct banks, troughs, tunnels, trays, backfill, mutual heating, cyclic loading, cable crossings, soil drying, and installation-specific derating. CableTrayRoute has cable sizing, duct bank, tray fill, IEC 60287, and heat maps, but the workflows are not yet unified into a single thermal environment model that can compare installations and show limiting constraints. |
 
 **Implementation notes:**
-- Create `analysis/cableThermalEnvironment.mjs` to normalize cable, conduit/duct/tray, soil/backfill, ambient, grouping, and load-profile inputs.
-- Add side-by-side installation comparisons: tray vs conduit vs duct bank vs direct burial.
-- Add derating waterfall cards explaining which factor is limiting ampacity.
-- Add conductor temperature timeline for cyclic/daily load profiles.
-- Tests: environment normalization, mutual-heating cases, derating waterfall consistency, and regression examples against existing IEC 60287 tests.
+- Added `analysis/cableThermalEnvironment.mjs` with normalized cable/environment inputs, installation alternatives, IEC 60287-backed evaluations, derating waterfalls, cyclic load temperature timelines, package generation, and escaped HTML rendering.
+- Added `cablethermal.html` / `src/cableThermalEnvironment.js` for schedule/manual cable selection, side-by-side tray/conduit/direct-burial/duct-bank/free-air comparison, timeline display, and JSON/HTML exports.
+- Integrated saved `studyResults.cableThermalEnvironment` into unified project reports, commercial report package manifest/CSV output, and Design Coach actions for overload, high-temperature, and missing-data rows.
+- Tests: `tests/cableThermalEnvironment.test.mjs`, plus report package and Design Coach coverage.
 
-**Status:** Individual calculators partially implemented; unified thermal environment not implemented.
+**Status:** Implemented 2026-04-27. V1 is a deterministic IEC 60287-style screening workflow and is not a replacement for CYMCAP/Cableizer-class finite-element thermal modeling.
 
 ---
 
@@ -1315,13 +1315,12 @@ The strongest market pattern is that competing tools sell more than formulas. Th
 | **BIM model round-trip with IDs, issue markup, and quantity reconciliation** | Bentley Raceway and Cable Management, Revit/MagiCAD, Eplan/BIM integrations, AutoCAD Plant 3D ecosystems | Competitor ecosystems live inside or beside BIM/CAD. CableTrayRoute has IFC export and routing models, but not round-trip import, stable element GUID reconciliation, issue markup, or a workflow to compare calculated quantities against a BIM model takeoff. Full native plugins remain deferred, but browser-native IFC import/BCF issue workflows would close much of the perceived gap. |
 
 **Implementation notes:**
-- Add IFC import/read-only viewer for cable trays, conduits, equipment, and support objects, preserving stable GUIDs.
-- Add a reconciliation view: CableTrayRoute route quantities vs imported BIM quantities by system, voltage class, tray type, and level/area.
-- Add BCF-style issue records with screenshot, element IDs, status, assignee, and comment thread.
-- Export resolved changes as CSV/BCF-like JSON, leaving Revit/AutoCAD native plugins as a later integration.
-- Tests: IFC object extraction fixtures, GUID mapping, quantity diff generation, and issue export/import round-trip.
+- Added `analysis/bimRoundTrip.mjs` with BIM element normalization, simplified IFC/Revit JSON import, stable GUID/source/tag mapping, quantity reconciliation, BCF-style issue records, package generation, and escaped HTML rendering.
+- Added `bimcoordination.html` / `src/bimCoordination.js` for local BIM metadata import, read-only element review, mapping filters, quantity delta tables, issue capture, and JSON/HTML/BCF-like exports.
+- Added scenario-scoped BIM element and issue storage helpers, lifecycle snapshot capture, dashboard status, unified report and commercial package sections, and Design Coach actions for unmapped elements, quantity deltas, and open/rejected BIM issues.
+- Tests: `tests/bimRoundTrip.test.mjs`, plus lifecycle, report package, Design Coach, and static-link coverage.
 
-**Status:** IFC export partially implemented; round-trip and issue markup not implemented.
+**Status:** Implemented 2026-04-27. V1 is a local BIM coordination and reconciliation workflow; native Revit/AutoCAD plugins and automatic model write-back remain deferred.
 
 ---
 
@@ -1338,7 +1337,7 @@ The strongest market pattern is that competing tools sell more than formulas. Th
 - Add report appendix for field verification and unresolved punch items.
 - Tests: offline observation queue, attachment metadata persistence, project merge behavior, and report appendix generation.
 
-**Status:** Mobile field viewing implemented; field data collection not implemented.
+**Status:** ✅ **Implemented 2026-04-27.** `analysis/fieldCommissioning.mjs` adds local field observation normalization, creation, status updates, summaries, package JSON, local attachment size guards, and escaped printable HTML. `fieldview.html` / `fieldview.js` keep the existing read-only QR/hash cable and tray views while adding manual target lookup, equipment targets, verification checklists, punch/as-built notes, status/priority controls, small attachment metadata/thumbnails, target history, and unresolved project field items. `dataStore.mjs`, lifecycle snapshots, workflow dashboard, unified reports, commercial report packages, and Design Coach now include field verification records, unresolved punch/as-built issues, and attachment summaries. Tests: `tests/fieldCommissioning.test.mjs` plus updated lifecycle, Design Coach, and report-package coverage.
 
 ---
 
@@ -1372,7 +1371,7 @@ The strongest market pattern is that competing tools sell more than formulas. Th
 - Preserve an audit trail of accepted/rejected suggestions in study packages.
 - Tests: suggestion ranking, duplicate suppression, safe apply actions, and audit trail persistence.
 
-**Status:** Page-level remediation partially implemented; cross-study coach not implemented.
+**Status:** Implemented 2026-04-27 with `analysis/designCoach.mjs`, scenario-scoped coach decisions, dashboard action queue, safe apply hooks, lifecycle decision snapshots, and report/package action-register metadata.
 
 ---
 
@@ -1406,7 +1405,7 @@ The strongest market pattern is that competing tools sell more than formulas. Th
 - Add lightweight screenshots or SVG previews for each sample.
 - Tests: sample schema validation, sample load/migration, and navigation from sample gallery to target pages.
 
-**Status:** Project templates partially implemented; public sample gallery not implemented.
+**Status:** Implemented. Added a static public sample gallery with six local import-ready project JSON payloads, lightweight SVG previews, deterministic guided demo checklists, landing/dashboard entry points, and sample schema/path tests. The gallery uses local static data rather than cloud-hosted demo projects.
 
 ---
 
@@ -1423,7 +1422,291 @@ The strongest market pattern is that competing tools sell more than formulas. Th
 - Pull report snapshots from `studyPackages[]` so results are reproducible after later project edits.
 - Tests: report schema, section ordering, escaped user data, package snapshot selection, and PDF/HTML parity.
 
-**Status:** Individual report exports partially implemented; commercial-grade report package builder not implemented.
+**Status:** ✅ **Implemented 2026-04-26.** `reports/reportPackage.mjs` builds a structured commercial report package over the unified project report with ordered deliverable sections, package status, manifest JSON, transmittal CSV, quality checklist CSV, data-backed section CSV files, and printable package HTML. `projectreport.html` / `src/projectreport.js` add package revision, prepared/checked/approved metadata, and an Export Package action that downloads the package payload. `tests/reportPackage.test.mjs` covers section ordering, readiness checks, manifest/transmittal/checklist files, heat-trace section inclusion, and package HTML rendering.
+
+---
+
+## Page-Level Input / Calculation Audit (2026-04-27)
+
+Benchmarked against current detailed study workflows from **ETAP**, **EasyPower**, **Bentley Raceway and Cable Management**, **nVent/Raychem TraceCalc Pro**, **Cableizer/CYMCAP-style cable thermal tools**, **SES CDEGS**, **XGSLab**, and **SKM PowerTools**. This audit intentionally ignores missing pages and focuses on pages that already exist but still hide, default, or omit study-case inputs that commercial users expect to control.
+
+### Gap #83 - Short-Circuit Study Case Controls and Duty Basis
+
+| Existing Page(s) | Competitor(s) | Missing Detail |
+|---|---|---|
+| `shortCircuit.html`, `equipmentlist.html`, `analysis/shortCircuit.mjs`, `analysis/equipmentEvaluation.mjs` | EasyPower ShortCircuit / SmartDuty, ETAP short-circuit modules, SKM DAPPER | The page currently exposes a method selector but not a full short-circuit study case. Competitor workflows expose fault type selection, ANSI momentary/interrupting/30-cycle bases, relay current bases, voltage sensitivity cases, line-side versus load-side equipment duty checks, bus filters by area/zone/kV, and DC short-circuit inclusion. CableTrayRoute has ANSI/IEC engines and equipment evaluation, but the page does not let users define or compare the specific duty basis that drives equipment acceptance. |
+
+**Recommended first slice:** Add a `Short-Circuit Study Case` panel with fault type, duty basis, bus/equipment filters, voltage sensitivity range, line/load-side duty option, and report presets. Save the selected case into `studyResults.shortCircuit.studyCase` and feed the selected duty basis into equipment evaluation and Design Coach.
+
+**Priority:** P1. This is a deliverable-confidence gap because commercial short-circuit reports are often reviewed specifically for duty basis and equipment comparison assumptions.
+
+**Status:** ✅ **Implemented 2026-04-27.** Added `analysis/shortCircuitStudyCase.mjs` for auditable study-case normalization, voltage sensitivity, duty rows, package HTML, and report assumptions. `shortCircuit.html` / `studies/shortCircuit.js` now expose method, fault type, duty basis, voltage case, scope, line/load-side duty, and report preset controls. Equipment evaluation, Design Coach, project reports, and commercial report packages consume the packaged duty basis while preserving legacy bus-keyed results.
+
+---
+
+### Gap #84 - Arc Flash Equipment Data and Mitigation Scenario Editor
+
+| Existing Page(s) | Competitor(s) | Missing Detail |
+|---|---|---|
+| `arcFlash.html`, `oneline.html`, `tcc.html`, `analysis/arcFlash.mjs` | ETAP ArcSafety / ArcFault, EasyPower ArcFlash, SKM Arc Flash | The arc-flash engine supports several IEEE 1584-style inputs such as electrode configuration, gap, working distance, and enclosure size, but `arcFlash.html` has no visible equipment-data editor and relies on one-line properties/defaults. Competitors expose equipment type/gap libraries, multiple working distances, bus/equipment inclusion filters, fastest/slowest device logic for single/multiple sources, maintenance mode, ZSI, current-limiting fuses, differential/arc-flash sensing, high-voltage and DC methods, label templates, and mitigation scenario comparisons. |
+
+**Recommended first slice:** Add an `Arc Flash Equipment Data` grid with equipment type, electrode configuration, enclosure dimensions, working distance, bus/equipment include flag, upstream device basis, maintenance-mode/ZSI/current-limiting flags, and scenario comparison rows. Highlight rows that use defaults and include a mitigation-delta report.
+
+**Priority:** P1. The calculation may run, but hidden defaults undermine trust in IEEE 1584 deliverables.
+
+**Status:** ✅ **Implemented 2026-04-27.** `analysis/arcFlashStudyCase.mjs` adds an auditable IEEE 1584 study-case package with normalized equipment rows, visible/defaulted input tracking, baseline plus mitigation scenario comparison, package JSON, escaped HTML rendering, warnings, assumptions, and summary counts. `arcFlash.html` / `studies/arcFlash.js` now expose an editable equipment-data grid for include flag, equipment type, electrode configuration, enclosure type/dimensions, gap, working distance, upstream device basis, clearing-time override, nominal voltage, notes, and explicit mitigation scenarios for maintenance mode, ZSI, current-limiting, and arc-flash sensing. Saved results use the new packaged `studyResults.arcFlash` shape while legacy bus-keyed maps remain reportable. Arc-flash packages feed label/report generation, unified project reports, commercial report packages, equipment evaluation context, and Design Coach actions for high energy, >40 cal/cm² danger rows, defaulted inputs, missing mitigation scenarios, and label-not-ready rows. Tests: `tests/arcFlashStudyCase.test.mjs` plus updated equipment evaluation, design coach, and report package coverage.
+
+---
+
+### Gap #85 - Load Flow Unbalanced Model and Control Device Inputs
+
+| Existing Page(s) | Competitor(s) | Missing Detail |
+|---|---|---|
+| `loadFlow.html`, `oneline.html`, `analysis/loadFlow*.mjs` | ETAP Unbalanced Load Flow, EasyPower Power Flow | The page exposes `Base MVA` and a `Balanced` checkbox, but competitor unbalanced load-flow tools expose explicit phase connections, single-phase and two-phase loads, sequence results, voltage/current unbalance factors, transformer winding connections, grounding types, LTC/regulator controls, switched capacitors, STATCOM/active harmonic filters, load models (constant P/I/Z), source voltage regulation, and open-phase simulation. CableTrayRoute has a one-line load-flow foundation, but the page does not yet let users configure these study-case controls. |
+
+**Recommended first slice:** Add a `Load Flow Study Case` panel with load model, per-phase load/source data, transformer connection/tap controls, voltage limit alarms, regulator/capacitor control settings, open-phase contingency toggles, and result columns for phase/sequence quantities and unbalance factors.
+
+**Priority:** P1. This limits use on distribution, data-center, and industrial systems where unbalance and controls materially affect voltage results.
+
+**Status:** ✅ **Implemented 2026-04-27.** `analysis/loadFlowStudyCase.mjs` adds an auditable load-flow study-case package with balanced/per-phase mode, load-model basis, voltage limits, open-phase screening, control toggles, editable bus/source/load/control rows, deterministic pre-run tap/capacitor/open-phase modifiers, voltage exception rows, unbalance rows, warnings, assumptions, JSON output, and escaped printable HTML. `loadFlow.html` / `studies/loadFlow.js` now expose the study-case editor, per-phase load rows, branch/control rows, structured voltage results, raw package JSON, and JSON/HTML exports. Unified reports, commercial report packages, and Design Coach now consume packaged load-flow output while legacy saved load-flow results remain reportable.
+
+---
+
+### Gap #86 - Motor Start Sequence-of-Events and Dynamic Model Editor
+
+| Existing Page(s) | Competitor(s) | Missing Detail |
+|---|---|---|
+| `motorStart.html`, `analysis/motorStartCalc.mjs`, `oneline.html` | ETAP Motor Acceleration, EasyPower motor-start/power-flow workflows, SKM motor-start studies | CableTrayRoute supports several starter types and some torque/inertia fields through component properties, but `motorStart.html` is mostly a chart and reference table. Competitors expose sequence-of-events editors, multiple motor starts/stops, transition loading, load ramping, VFD frequency control, MOV staged starts, transformer LTC/regulator behavior, switched capacitors, generator/grid parameter variation, dynamic speed/torque/current/voltage/kW/kvar plots, and worst-case result analyzers. |
+
+**Recommended first slice:** Add a `Motor Start Scenario` table where users select motors, start order, delay, starter type, current limit/ramp, load torque curve, inertia, generator/source condition, and reactive compensation state. Persist time-series results and summarize worst voltage dip and acceleration margin.
+
+**Priority:** P1. Large-motor studies are not credible without sequence and dynamic input visibility.
+
+**Status:** âœ… **Implemented 2026-04-27.** `analysis/motorStartStudyCase.mjs` adds an auditable motor-start study-case package with source basis/condition, voltage and acceleration limits, starter/source control assumptions, normalized motor rows, sequence events, time-series voltage/current/speed rows, worst-case acceleration and voltage-dip summaries, warnings, assumptions, JSON output, and escaped printable HTML. `motorStart.html` / `analysis/motorStart.js` now expose a study-case workspace with editable motor/starter/torque rows, event sequencing, run/save actions, package JSON export, printable HTML export, and structured worst-case results while preserving legacy motor-start result maps. Unified reports, commercial report packages, and Design Coach now consume packaged motor-start output.
+
+---
+
+### Gap #87 - Cable Thermal Fine-Grain Environment Inputs
+
+| Existing Page(s) | Competitor(s) | Missing Detail |
+|---|---|---|
+| `cablethermal.html`, `iec60287.html`, `ductbankroute.html`, `analysis/cableThermalEnvironment.mjs` | Cableizer, CYMCAP, ETAP Underground Raceway Systems | `cablethermal.html` compares installation alternatives, but high-fidelity cable thermal tools expose solar radiation, wind at cable surface, neighboring heat sources/sinks, cable crossings, multiple backfill zones, partial soil drying, dry/moist soil resistivity ratios, emergency overload periods, IEC 60853 cyclic ratings, tunnels/channels/trough/riser air temperature models, sheath/bonding loss options, and multi-circuit mutual heating beyond a simple group count. |
+
+**Recommended first slice:** Add an `Advanced Thermal Inputs` section with solar radiation, dry/moist soil resistivity, critical dry-out temperature, backfill geometry rows, adjacent circuit/heat-source rows, emergency overload profile, and IEC 60853 cyclic-rating mode. Mark finite/advanced rows as screening until a dedicated solver is added.
+
+**Priority:** P2. The existing thermal page is useful, but these inputs are where CYMCAP/Cableizer-class tools win engineering confidence.
+
+**Status:** âœ… **Implemented 2026-04-27.** `analysis/cableThermalEnvironment.mjs` now supports advanced deterministic screening inputs for solar/wind exposure, riser/tunnel/channel mode, soil dry-out, weighted backfill zones, adjacent thermal influence rows, sheath/bonding loss mode, emergency overload profiles, and IEC 60853-style cyclic-rating rows while preserving legacy package compatibility. `cablethermal.html` / `cablethermal.js` expose the advanced input fields, save the extended package to `studyResults.cableThermalEnvironment`, and export JSON/printable HTML. Reports, commercial report packages, and Design Coach consume advanced warnings, emergency/cyclic rows, and unresolved advanced thermal issues.
+
+---
+
+### Gap #88 - Cable Pulling 3D Pull Physics and Constructability Inputs
+
+| Existing Page(s) | Competitor(s) | Missing Detail |
+|---|---|---|
+| `pullcards.html`, `optimalRoute.html`, `spoolsheets.html`, `analysis/pullCards.mjs`, `src/pullCalc.js` | SKM CABLE-3D, Bentley Raceway and Cable Management, Aeries CARS | Pull cards exist, but competitor construction workflows model more detailed pull constructability: bend-by-bend sidewall pressure, coefficient of friction per segment, jam ratio, conduit fill by pull section, reel location, feed direction/reverse pull comparison, capstan or pulling equipment limits, pulling lubricant assumptions, vertical rise/drop effects, intermediate pull points, and maximum tension at each bend. |
+
+**Recommended first slice:** Extend pull card generation with editable pull sections, bend table, friction model per segment, reel/feed direction, reverse-pull comparison, jam ratio and sidewall-pressure checks, and a warning table that Design Coach can rank.
+
+**Priority:** P2. Construction users often care more about pull feasibility than total routed length.
+
+**Status:** ✅ **Implemented 2026-04-27.** `analysis/pullConstructability.mjs` adds a deterministic pull-constructability package with normalized assumptions, generated pull sections, bend rows, forward/reverse pull comparison, per-section friction/lubricant modifiers, vertical rise/drop contribution, conduit fill, jam ratio, tension margin, sidewall-pressure checks, warning rows, JSON output, and escaped printable HTML. `pullcards.html` / `pullcards.js` expose editable pull assumptions and selected-pull section/bend rows, save the package to `studyResults.pullConstructability`, and export JSON/HTML. Unified reports, commercial report packages, and Design Coach now include pull constructability status, warnings, manifest/CSV rows, and ranked actions for over-limit or missing-data pull cases.
+
+---
+
+### Gap #89 - Grounding Field-Test, Seasonal Soil, and Finite-Element Fidelity Controls
+
+| Existing Page(s) | Competitor(s) | Missing Detail |
+|---|---|---|
+| `groundgrid.html`, `analysis/advancedGrounding.mjs` | ETAP Ground Grid Systems, SES CDEGS, XGSLab, SKM Ground Mat | The advanced grounding page now supports soil measurements, polygon overlays, and risk points, but specialist tools expose field test QA and model-fidelity controls such as Wenner measurement spacing coverage checks versus grid extent, fall-of-potential test interpretation, seasonal soil variation, glove/footwear/body impedance options, external boundary extensions, conductor current distribution, finite-element/mesh resolution controls, absolute potential contour density, and transferred potential paths to external metallic systems. |
+
+**Recommended first slice:** Add a `Grounding Field Data and Fidelity` panel with measurement-spacing QA, fall-of-potential rows, seasonal soil scenario selector, EN 50522 body/glove/footwear options, boundary extension settings, contour resolution, and explicit finite-element-not-modeled warnings.
+
+**Priority:** P2. Existing results are correctly labeled screening-grade; this closes practical review gaps without claiming CDEGS/XGSLab equivalence.
+
+**Status:** ✅ **Implemented 2026-04-27.** `analysis/groundingFieldFidelity.mjs` adds browser-local field-test QA and fidelity packaging with soil-measurement coverage checks, fall-of-potential curve-stability classification, seasonal wet/nominal/dry soil scenario comparisons, personnel-protection annotations, transferred-potential path records, finite-element-not-modeled warnings, JSON-safe output, and escaped printable HTML. `analysis/advancedGrounding.mjs` now embeds optional `fieldFidelity` data without changing legacy packages. `groundgrid.html` / `groundgrid.js` expose the new field-data and fidelity panel, save the structured package with advanced grounding results, and include it in JSON/HTML exports. Unified reports, commercial report packages, and Design Coach now include field-fidelity summaries, CSV/manifest rows, warnings, and ranked actions for poor soil coverage, unstable fall-of-potential tests, seasonal failures, transferred-potential review items, and screening-only model-fidelity assumptions.
+
+---
+
+### Gap #90 - TCC / Protection Setting Sheet Governance
+
+| Existing Page(s) | Competitor(s) | Missing Detail |
+|---|---|---|
+| `tcc.html`, `oneline.html`, `data/protectiveDevices.mjs`, `analysis/tcc*.mjs` | ETAP Protection & Coordination, EasyPower coordination, SKM CAPTOR | The TCC page plots and coordinates devices, but commercial coordination packages include setting-sheet workflows: CT/PT ratio and connection data, relay function enable flags, pickup/time-dial/instantaneous/ground/differential settings by function, manufacturer-specific setting ranges, setting revision history, relay test values, tolerance bands, multiple setting groups, and exportable relay-setting sheets tied to the one-line device. |
+
+**Recommended first slice:** Add a `Protection Setting Sheet` model and UI for CT/PT data, enabled relay functions, settings by function, setting group/revision, tolerance/test values, and setting-sheet export. Link TCC curves directly to the active setting sheet revision.
+
+**Priority:** P2. The chart is useful, but protection deliverables usually require traceable settings, not only plotted curves.
+
+**Status:** ✅ **Implemented 2026-04-27.** `analysis/protectionSettingSheet.mjs` adds deterministic protection setting-sheet normalization, one-line/TCC linked device rows, relay function rows, setting-group/revision metadata, CT/PT secondary test-value calculations, tolerance bands, package JSON, CSV-ready rows, and escaped printable HTML. `tcc.html` / `analysis/tcc.js` now expose a Protection Setting Sheet panel with build/save/export actions tied to plotted TCC settings and auto-coordination proposals. Unified project reports, commercial report packages, lifecycle snapshots through `studyResults.protectionSettingSheets`, and Design Coach now surface missing CT/PT ratios, disabled functions, missing/failed test rows, unreviewed revisions, and coordination records not tied to an active setting revision.
+
+---
+
+### Gap #91 - Heat Trace Tanks, Vessels, Multi-Segment Circuits, and Control Fidelity
+
+| Existing Page(s) | Competitor(s) | Missing Detail |
+|---|---|---|
+| `heattracesizing.html`, `analysis/heatTraceSizing.mjs`, `analysis/heatTraceInstallationPackage.mjs` | nVent/Raychem TraceCalc Pro, Thermon CompuTrace, Chromalox ChromaTrace | CableTrayRoute now produces line lists, controller schedules, and BOMs for pipe branches, but heat-trace competitors also support tanks/vessels, multi-segment circuits, customized valve and insulation libraries, sheath temperature checks, startup current profiles, controller/sensor placement, hazardous-area T-rating verification, freeze-protection warm-up/transient checks, and circuit phasing/panel load diversity. |
+
+**Recommended first slice:** Add asset type selection (`pipe`, `tank`, `vessel`, `skid`), multi-segment rows with per-segment insulation/ambient/exposure, sheath-temperature warning basis, startup-current estimate, sensor/controller placement fields, and hazardous-area/T-rating verification warnings.
+
+**Priority:** P3. The current pipe package is strong, but industrial heat-trace tools differentiate on non-pipe assets and controls verification.
+
+**Status:** ✅ **Implemented 2026-04-27.** `analysis/heatTraceAdvancedAssets.mjs` adds deterministic advanced heat-trace asset normalization, multi-segment rows, tank/vessel/skid/custom screening calculations, startup-current profile estimates, controller/sensor metadata rows, panel diversity rows, hazardous-area/T-rating warnings, package JSON, and escaped printable HTML. `heattracesizing.html` / `heattracesizing.js` add Advanced Asset / Controls metadata to saved branch cases plus advanced package preview and JSON export. Heat-trace construction packages, unified reports, commercial report packages, and Design Coach now surface advanced asset metadata, startup-current review, sensor/high-limit gaps, panel phase/diversity issues, and manufacturer verification assumptions.
+
+---
+
+### Gap #92 - Raceway Construction Detailing and Takeoff Controls
+
+| Existing Page(s) | Competitor(s) | Missing Detail |
+|---|---|---|
+| `racewayschedule.html`, `trayhardwarebom.html`, `supportspan.html`, `bimcoordination.html`, `projectreport.html` | Bentley Raceway and Cable Management, MagiCAD/Revit, Aeries CARS | Raceway schedules and BOMs exist, but competitor detailed-design pages expose construction detailing controls such as tray accessories by segment, divider/lane assignments, support family/type and spacing tied to drawings, 2D section extraction, cross-section annotation, cable status by construction phase, cable drum/drum assignment, manhole/trench/duct-bank construction details, and raceway labels/drawing sheets. |
+
+**Recommended first slice:** Add segment-level detailing metadata: support type/family, accessory kits, divider/lane allocation, construction phase/status, drawing/detail reference, label ID, and section extraction payload. Feed the metadata into tray hardware BOM, BIM connector packages, report package CSVs, and pull cards.
+
+**Priority:** P3. This improves construction handoff and makes existing raceway pages feel closer to Bentley-style deliverable workflows.
+
+**Status:** ✅ **Implemented 2026-04-27.** `analysis/racewayConstructionDetailing.mjs` adds deterministic raceway construction metadata normalization, support/accessory takeoff rows, section extraction rows, construction-readiness warnings, package JSON, and escaped printable HTML. `racewayschedule.html` / `src/racewayschedule.js` now expose support family/type/spacing, accessory kits, divider/lane, phase/status, drawing/detail refs, labels, section refs, install areas, and notes on tray/conduit rows, with ductbank-level construction metadata preserved in the ductbank table. Tray hardware BOM, pull-card route steps, BIM round-trip/connector exports, unified project reports, commercial report packages, and Design Coach now surface construction-detail metadata and warnings.
+
+---
+
+### Gap #93 - Harmonic Study Source Modeling, PCC Compliance, and Filter Design
+
+| Existing Page(s) | Competitor(s) | Missing Detail |
+|---|---|---|
+| `harmonics.html`, `frequencyscan.html`, `capacitorbank.html`, `analysis/harmonicAnalysis.mjs`, `analysis/frequencyScan.mjs` | ETAP Harmonic Frequency Scan / Harmonic Filters, EasyPower Harmonics, SKM HI_WAVE | CableTrayRoute has harmonic spectra and frequency-scan tools, but commercial power-quality workflows expose a full harmonic study case: point-of-common-coupling definition, utility short-circuit envelope, individual source spectra libraries for VFDs/UPS/rectifiers/IBRs, interharmonics and non-characteristic harmonics, transformer phase-shift and zero-sequence/triplen treatment, IEEE 519 demand-current basis, voltage/current THD/TDD compliance rows, active/passive filter alternatives, and filter component duty checks. |
+
+**Recommended first slice:** Add a `Harmonic Study Case` model with PCC metadata, source-spectrum rows, IEEE 519 current-demand basis, transformer/zero-sequence treatment, filter design alternatives, and compliance result rows that can be reused by frequency scan and capacitor-bank pages.
+
+**Priority:** P1. Harmonic pages already exist, but without PCC and source-model governance the output is closer to a calculator than a reportable power-quality study.
+
+**Status:** ✅ **Implemented 2026-04-27.** `analysis/harmonicStudyCase.mjs` adds deterministic PCC/study-case normalization, harmonic source spectrum rows, IEEE 519 VTHD/individual/TDD compliance rows, frequency-scan/capacitor-duty filter alternatives, package JSON, warnings, assumptions, and escaped printable HTML. `harmonics.html` / `analysis/harmonics.js` now expose PCC metadata, utility short-circuit and demand-current basis, source-spectrum rows, transformer/sequence assumptions, run/save/export controls, and structured compliance/filter outputs while preserving legacy harmonic maps. Unified project reports, commercial report packages, and Design Coach now include harmonic study basis, compliance/filter CSV rows, manifest metadata, and actions for compliance failures, missing PCC data, resonance/filter review, and legacy results without study-case basis.
+
+---
+
+### Gap #94 - Panel and Load Schedule Demand-Factor Governance
+
+| Existing Page(s) | Competitor(s) | Missing Detail |
+|---|---|---|
+| `panelschedule.html`, `loadlist.html`, `autosize.html`, `equipmentlist.html`, `src/loadlist.js` | EasyPower MCC & Panel Schedules / SmartDesign, SKM load schedules, Revit/MagiCAD schedules | Panel and load schedules exist, but competitor design tools expose code-governed load classification and demand workflows: continuous/noncontinuous flags, NEC Article 220 load classes, largest-motor adder, noncoincident load groups, spare/future capacity basis, load-management or EMS limits, panel phase balancing, service/feeder demand summaries, source of measured demand, and synchronized one-line/panelboard/MCC schedule exports. |
+
+**Recommended first slice:** Add load classification columns and a `Demand Basis` panel covering continuous load, demand factor, noncoincident group, largest motor, spare/future allowance, measured-demand source, and phase-balance summary. Feed totals into auto-size, voltage drop, equipment evaluation, and reports.
+
+**Priority:** P1. Most downstream sizing, report review, and owner comments depend on how loads were demanded, not only on the connected kVA total.
+
+**Status:** ✅ **Implemented 2026-04-27.** `analysis/loadDemandGovernance.mjs` adds deterministic load classification, continuous-load flags, noncoincident groups, largest-motor adder, spare/future allowance, managed-load and measured-demand basis handling, panel/service demand summaries, phase-balance rows, warnings, package JSON, and escaped printable HTML. `loadlist.html` / `loadlist.mjs` now expose demand-governance metadata and save/export/print a demand package; `panelschedule.html` / `src/panelSchedule.js` now carry panel demand-basis metadata and governed demand/phase-balance summaries. Auto-size can explicitly import saved governed demand, and unified reports, commercial report packages, and Design Coach include demand-basis summaries, CSV/manifest metadata, and actions for missing classifications, demand-basis gaps, phase imbalance, and panel demand failures.
+
+---
+
+### Gap #95 - Transformer and Feeder Auto-Sizing Case Basis
+
+| Existing Page(s) | Competitor(s) | Missing Detail |
+|---|---|---|
+| `autosize.html`, `equipmentlist.html`, `loadFlow.html`, `shortCircuit.html`, `cableschedule.html` | EasyPower SmartDesign, ETAP Transformer Sizing, SKM equipment evaluation/load schedules | CableTrayRoute can auto-size selected equipment and evaluate ratings, but competitors expose transformer/feeder sizing as an auditable case: connected versus demanded load basis, future-growth factor, transformer impedance/BIL/temperature-rise basis, primary/secondary protection rules, tap range and target voltage, feeder conductor/protection co-sizing, standard size selection, overload/emergency rating, and alternatives with code or manufacturer-rule reasons. |
+
+**Recommended first slice:** Add a transformer/feeder sizing package that records load basis, growth, standard size library, impedance/BIL/rise, protection basis, tap target, emergency rating allowance, and rejected alternatives. Generate a sizing audit table instead of only returning a selected size.
+
+**Priority:** P1. Auto-sizing is only reviewable when the case basis and rejected alternatives are visible.
+
+**Status:** Implemented 2026-04-27. Added `analysis/transformerFeederSizingCase.mjs` for deterministic sizing-case normalization, governed/manual load-basis selection, transformer and feeder alternative rows, protection/tap warning rows, package JSON, and escaped HTML rendering. `autosize.html` now includes a shared sizing-case panel with governed-demand import, future growth, transformer impedance/BIL/rise, emergency/tap, protection-basis, save-to-studies, JSON, and printable HTML controls. Project reports, commercial report packages, and Design Coach now consume `studyResults.transformerFeederSizing`.
+
+---
+
+### Gap #96 - Voltage Drop Criteria, Operating Case, and Starting Drop Traceability
+
+| Existing Page(s) | Competitor(s) | Missing Detail |
+|---|---|---|
+| `voltagedropstudy.html`, `cableschedule.html`, `intlCableSize.html`, `motorStart.html`, `analysis/voltageDropStudy.mjs` | ETAP Cable Sizing, EasyPower power flow / SmartDesign, Caneco-style cable sizing tools | The voltage-drop page computes results, but commercial cable-sizing workflows expose the exact criteria and operating case: feeder versus branch limits, total source-to-load limit, normal/emergency/start cases, load power factor and temperature-adjusted R/X, raceway/conductor material basis, motor minimum starting voltage, transformer tap/source voltage assumptions, upstream/downstream segment chain, and pass/fail reason tied to selected cable alternatives. |
+
+**Recommended first slice:** Add `Voltage Drop Criteria` and `Operating Case` records with normal/start/emergency limits, source voltage/tap, load PF, conductor temperature basis, segment-chain selection, and motor-start minimum voltage. Store criterion failures with cable alternatives and report them as sizing reasons.
+
+**Priority:** P2. This closes the gap between a voltage-drop number and a defensible cable-sizing decision.
+
+**Status:** ✅ **Implemented 2026-04-27.** `analysis/voltageDropStudy.mjs` now adds a packaged voltage-drop study-case layer with explicit feeder/branch/total/normal/emergency/starting criteria, source voltage, transformer tap, load PF, conductor temperature, conductor-material basis, segment-chain notes, motor-start minimum-voltage checks, warning rows, assumptions, escaped printable HTML, and backward-compatible legacy voltage-drop exports. `voltagedropstudy.html` / `voltagedropstudy.js` now expose the criteria and operating-case panel, save packaged results to `studyResults.voltageDropStudy`, and export CSV/JSON/printable HTML. Unified reports, commercial report packages, and Design Coach include voltage-drop study basis rows, CSV/manifest metadata, and actions for failed limits, missing data, total-chain failures, and starting-voltage issues.
+
+---
+
+### Gap #97 - Capacitor Bank Switching, Detuning, Protection, and Duty Checks
+
+| Existing Page(s) | Competitor(s) | Missing Detail |
+|---|---|---|
+| `capacitorbank.html`, `frequencyscan.html`, `harmonics.html`, `analysis/capacitorBank.mjs` | ETAP Power Quality / Harmonic Filters, EasyPower Harmonics, NEPSI filter-design workflows | Capacitor-bank sizing handles kvar and resonance warnings, but competitor workflows expose staged bank controls, automatic power-factor controller settings, detuned reactor percent, filter topology, capacitor voltage/current/rms harmonic duty, inrush and outrush current, breaker/contactor/fuse/discharge resistor selection, switching transient warnings, step size schedule, and coordination with harmonic-filter studies. |
+
+**Recommended first slice:** Add a `Capacitor Bank Duty` tab with stage rows, controller targets/deadband/time delay, detuning reactor settings, duty checks for rms current/voltage/inrush, protective-device fields, discharge time, and linked frequency-scan/filter alternatives.
+
+**Priority:** P2. A kvar correction result is not enough for bank procurement or harmonic-risk review.
+
+**Status:** ✅ **Implemented 2026-04-27.** `analysis/capacitorBank.mjs` now adds a backward-compatible capacitor-bank duty package with stage normalization, controller rows, detuned/filter topology metadata, voltage/RMS-current/kvar/discharge/resonance checks, switching inrush/outrush screening, protection rows, linked frequency-scan/harmonic context, warnings, assumptions, and escaped printable HTML. `capacitorbank.html` / `capacitorbank.js` expose duty-stage JSON, controller, detuning, protection, discharge, and export controls while continuing to run the existing power-factor correction sizing. Unified reports, commercial report packages, and Design Coach include capacitor-bank duty/switching rows, CSV/manifest metadata, and actions for resonance danger, missing protection data, switching-duty review, and failed duty checks.
+
+---
+
+### Gap #98 - Reliability Network Modeling, Restoration Logic, and Customer Indices
+
+| Existing Page(s) | Competitor(s) | Missing Detail |
+|---|---|---|
+| `reliability.html`, `contingency.html`, `workflowdashboard.html`, `analysis/reliabilityAnalysis.mjs` | ETAP Reliability Assessment, EasyPower contingency workflows, CYME distribution reliability | The reliability page reports availability-style results, but distribution reliability tools expose component failure-rate and repair-time libraries, switching/restoration sequences, normally-open tie points, protection-zone isolation, customer counts and load classes, SAIFI/SAIDI/CAIDI/ASAI/EENS/ECOST indices, sensitivity ranking by component contribution, common-mode outage assumptions, and N-1/N-2 scenario sets. |
+
+**Recommended first slice:** Add a `Reliability Model` editor for component failure/repair data, customer/load-class counts, switching devices/tie sources, restoration time, common-mode group, and value-of-lost-load. Report standard customer interruption indices plus top contributing components.
+
+**Priority:** P2. Existing reliability output becomes much more credible when tied to customer-impact indices and restoration logic.
+
+**Status:** ✅ **Implemented 2026-04-27.** `analysis/reliability.js` now keeps legacy `runReliability()` output intact while adding a packaged reliability-network model with component failure/repair rows, customer/load impact rows, restoration/tie-source rows, common-mode scenarios, SAIFI/SAIDI/CAIDI/ASAI/EENS/ECOST indices, top-contributor rankings, warnings, assumptions, and escaped printable HTML. `reliability.html` / `reliability.js` expose reliability-model inputs, customer/restoration JSON rows, study save/export actions, CSV/JSON/HTML exports, and structured index/scenario/contributor output. Unified reports, commercial report packages, and Design Coach include reliability indices, customer-impact CSV/manifest metadata, restoration warnings, legacy-basis warnings, and actions for missing failure/repair/customer data, high indices, restoration-capacity gaps, and common-mode review.
+
+---
+
+### Gap #99 - Transient Stability Dynamic Model Library and Disturbance Events
+
+| Existing Page(s) | Competitor(s) | Missing Detail |
+|---|---|---|
+| `transientstability.html`, `generatorsizing.html`, `motorStart.html`, `ibr.html`, `analysis/transientStability.mjs` | ETAP Transient Stability, EasyPower Dynamic Stability, PowerWorld Simulator, DIgSILENT PowerFactory | CableTrayRoute has an equal-area/swing-equation stability workflow, but competitor dynamic-study pages expose generator model selection, exciter/AVR/governor/PSS blocks, induction motor dynamic models, inverter/BESS dynamic models, load-frequency and voltage-dependent load models, breaker/switch operations, generator/load rejection, ramp changes, critical clearing-time search, protection trip logic, and multi-machine time-series channels. |
+
+**Recommended first slice:** Add a `Dynamic Model and Event Case` layer with machine model rows, exciter/governor/PSS placeholders, load model, event sequence table, fault location/type/clear action, critical-clearing-time sweep, and exported channel list. Keep V1 screening-grade if full dynamic libraries are not implemented.
+
+**Priority:** P2. The existing page is useful for education and screening, but commercial transient-stability studies require explicit dynamic models and event sequencing.
+
+**Status:** ✅ **Implemented 2026-04-27.** `analysis/transientStability.mjs` now keeps the legacy OMIB swing-equation APIs intact while adding a packaged transient-stability study-case layer with normalized study-case controls, dynamic model rows, disturbance event rows, CCT sweep rows, downsampled time-series channel export, warnings, assumptions, and escaped printable HTML. `transientstability.html` / `transientstability.js` add dynamic model and disturbance-event JSON inputs, package save/export actions, structured study output, and continued Plotly rotor-angle plotting. Unified reports, commercial report packages, and Design Coach include transient-stability basis rows, CSV/manifest metadata, and actions for unstable cases, low CCT margin, missing model/event data, unsupported dynamic controls, and legacy results without study-case basis.
+
+---
+
+### Gap #100 - DER / IBR Plant Controller, Grid-Code Curves, and Study Scenarios
+
+| Existing Page(s) | Competitor(s) | Missing Detail |
+|---|---|---|
+| `derinterconnect.html`, `ibr.html`, `optimalpowerflow.html`, `loadFlow.html`, `analysis/derInterconnect.mjs`, `analysis/ibrModeling.mjs` | ETAP Grid Interactive Smart Inverters, PowerWorld renewable dynamic models, DIgSILENT PowerFactory DER studies | DER and IBR pages cover IEEE 1547 screening, PV/BESS, fault current, and Volt-VAR basics, but smart-inverter competitors expose plant-controller modes, Volt-Watt and Watt-PF curves, frequency-watt/droop, reactive priority versus real-power curtailment, ride-through trip curves as editable point sets, grid-forming/grid-following mode, ramp-rate limits, clipping/curtailment, dispatch schedules, aggregate plant capability curves, and scenario comparisons across minimum/maximum feeder load and weak/strong grid conditions. |
+
+**Recommended first slice:** Add an `IBR Grid Support Scenario` model with editable Volt-VAR, Volt-Watt, Watt-PF, frequency-watt, ride-through, ramp-rate, priority mode, grid-following/forming flag, and load/grid-strength cases. Feed results into OPF, load flow, short-circuit, and Design Coach.
+
+**Priority:** P2. Modern DER studies are judged by control curves and scenario coverage, not only rated kW/kVA and a single PCC check.
+
+**Status:** Open.
+
+---
+
+### Gap #101 - EMF Exposure Limits, Phasing, Depth, Shielding, and Validation
+
+| Existing Page(s) | Competitor(s) | Missing Detail |
+|---|---|---|
+| `emf.html`, `racewayschedule.html`, `ductbankroute.html`, `cablethermal.html`, `analysis/emf.mjs` | ETAP Underground Conductor Electromagnetic Fields, Cableizer magnetic-field plots, ELEK cable magnetic-field tools | The EMF page computes a tray-based field profile, but competitor cable-field tools expose 1/C versus 3/C cable layouts, flat/trefoil geometry, burial depth and surface-height profiles, phase-sequence optimization, multiple circuits with balanced/unbalanced load-flow currents and angles, ferromagnetic conduit filtering/permeability, sheath-current effects, DC conductors, exposure standards such as IEEE C95.6 / ICNIRP / ACGIH, measured-field validation, and mitigation comparisons. |
+
+**Recommended first slice:** Add a geometry/source selector for tray, duct-bank, buried flat, buried trefoil, and multi-circuit layouts; include phase sequence, depth/profile height, current angle/unbalance, ferromagnetic enclosure, sheath current, exposure standard limit, and measured-field comparison rows.
+
+**Priority:** P3. EMF is a niche workflow, but missing phasing/depth/standard controls make the current page less useful for utility and public-exposure reviews.
+
+**Status:** Open.
+
+---
+
+### Gap #102 - Cathodic Protection Network, Polarization, and Interference Modeling
+
+| Existing Page(s) | Competitor(s) | Missing Detail |
+|---|---|---|
+| `cathodicprotection.html`, `dissimilarmetals.html`, `groundgrid.html`, `analysis/cathodicProtection.mjs` | SES CorrCAD / CDEGS, CP and AC-interference engineering tools | The cathodic-protection page has a strong local sizing and evidence workflow, but specialist corrosion tools model network interactions: distributed anode beds, protected-structure segmentation, coating-defect locations, polarization curve parameters, impressed-current rectifier output limits, native and polarized potential profiles, bonds and isolation joints, foreign-structure interference, AC/DC stray-current sources, railway/HV corridor coupling, seasonal soil zones, and current-density/potential contour maps. |
+
+**Recommended first slice:** Add a `CP Network Fidelity` section with structure segments, anode-bed geometry, rectifier limits, bond/isolation rows, polarization-curve parameters, interference-source records, seasonal soil scenarios, and potential/current-density profile outputs. Keep it labeled as screening unless a full field solver is added.
+
+**Priority:** P3. The existing CP page is unusually complete for browser-local sizing; this gap targets specialist interference and network fidelity.
+
+**Status:** Open.
 
 ---
 
@@ -1432,21 +1715,71 @@ The strongest market pattern is that competing tools sell more than formulas. Th
 | Priority | # | Gap | Recommended First Slice | Effort | Status |
 |---|---|---|---|---|---|
 | **P1** | 78 | ~~**Calculation Validation, Benchmarks, and Trust Center**~~ | Standards/basis drawers plus public validation page | Medium | ✅ Implemented 2026-04-26 |
-| **P1** | 82 | **Commercial-Grade Report Package Builder** | Structured package builder over existing reports | High | Not implemented |
-| **P1** | 73 | **Heat Trace Line List, BOM, and Installation Package** | Product families + BOM/report tabs | Medium | Not implemented |
-| **P1** | 71 | **Lifecycle Project Model / Digital Twin Governance** | Named study packages and revision snapshots | High | Not implemented |
-| **P2** | 79 | **Cross-Study Design Coach** | Shared suggestion engine and dashboard action queue | Medium | Not implemented |
-| **P2** | 81 | **Sample Project Gallery / Guided Demos** | Curated sample JSON projects and launch cards | Low | Not implemented |
-| **P2** | 80 | **Equipment Evaluation / Compliance Inventory** | Join ratings with short-circuit/arc-flash/TCC results | Medium | Not implemented |
-| **P2** | 74 | **Advanced Grounding Fidelity** | Soil data fitting and risk-point table | High | Not implemented |
-| **P3** | 75 | **Cable Thermal Environment Modeling** | Unified environment model over existing calculators | High | Not implemented |
-| **P3** | 72 | **Manufacturer Data Portal / Product Catalogs** | Approved catalog schema and imports | Medium | Partial |
-| **P3** | 77 | **Field Data Collection / Commissioning** | Field observations and offline queue | Medium | Not implemented |
-| **P4** | 76 | **BIM Round-Trip / Issue Markup** | IFC import, quantity reconciliation, BCF-like issues | High | Not implemented |
+| **P1** | 82 | ~~**Commercial-Grade Report Package Builder**~~ | `reports/reportPackage.mjs`, `projectreport.html`, `src/projectreport.js` | High | ✅ Implemented 2026-04-26 |
+| **P1** | 73 | ~~**Heat Trace Line List, BOM, and Installation Package**~~ | `analysis/heatTraceInstallationPackage.mjs`, heat-trace construction metadata and package exports | Medium | ✅ Implemented 2026-04-26 |
+| **P1** | 71 | ~~**Lifecycle Project Model / Digital Twin Governance**~~ | `analysis/projectLifecycle.mjs`, dashboard release packages, revision diffs, and report lineage | High | Implemented 2026-04-27 |
+| **P2** | 79 | ~~**Cross-Study Design Coach**~~ | `analysis/designCoach.mjs`, dashboard action queue, decision audit trail, and report/package metadata | Medium | Implemented 2026-04-27 |
+| **P2** | 81 | **Sample Project Gallery / Guided Demos** | Curated sample JSON projects and launch cards | Low | ✅ Implemented |
+| **P2** | 80 | ~~**Equipment Evaluation / Compliance Inventory**~~ | `analysis/equipmentEvaluation.mjs`, rating fields, dashboard/report/package integration | Medium | ✅ Implemented |
+| **P2** | 74 | ~~**Advanced Grounding Fidelity**~~ | `analysis/advancedGrounding.mjs`, soil fit, polygon/risk-point overlays, report/package integration | High | ✅ Implemented |
+| **P3** | 75 | ~~**Cable Thermal Environment Modeling**~~ | `analysis/cableThermalEnvironment.mjs`, comparison page, package/report/coach integration | High | ✅ Implemented |
+| **P3** | 72 | ~~**Manufacturer Data Portal / Product Catalogs**~~ | `analysis/productCatalog.mjs`, approved catalog schema/imports, local governance UI, report/package/coach integration | Medium | ✅ Implemented |
+| **P3** | 77 | ~~**Field Data Collection / Commissioning**~~ | `analysis/fieldCommissioning.mjs`, Field View observation capture, dashboard/report/package/coach integration | Medium | ✅ Implemented |
+| **P4** | 76 | ~~**BIM Round-Trip / Issue Markup**~~ | `analysis/bimRoundTrip.mjs`, local BIM metadata import, quantity reconciliation, BCF-like issues, dashboard/report/coach integration | High | ✅ Implemented |
+
+### Recommended Roadmap from 2026-04-27 Page-Level Audit
+
+| Priority | # | Gap | Recommended First Slice | Effort | Status |
+|---|---|---|---|---|---|
+| **P1** | 83 | ~~**Short-Circuit Study Case Controls and Duty Basis**~~ | `analysis/shortCircuitStudyCase.mjs`, study-case panel, duty rows, report/package/coach/equipment integration | Medium | ✅ Implemented 2026-04-27 |
+| **P1** | 84 | ~~**Arc Flash Equipment Data and Mitigation Scenario Editor**~~ | Equipment-data grid for electrode/gap/enclosure/working-distance plus maintenance/ZSI/current-limiting scenarios | High | ✅ Implemented 2026-04-27 |
+| **P1** | 85 | ~~**Load Flow Unbalanced Model and Control Device Inputs**~~ | Per-phase load/source data, transformer connections/taps, regulator/capacitor controls, open-phase case | High | ✅ Implemented 2026-04-27 |
+| **P1** | 86 | ~~**Motor Start Sequence-of-Events and Dynamic Model Editor**~~ | Multi-motor start sequence table with starter parameters, torque/load curves, source/generator conditions, time-series output | High | âœ… Implemented 2026-04-27 |
+| **P2** | 87 | ~~**Cable Thermal Fine-Grain Environment Inputs**~~ | Advanced thermal inputs for solar, soil dry-out, backfill geometry, adjacent heat sources, emergency/cyclic loading | High | âœ… Implemented 2026-04-27 |
+| **P2** | 88 | **Cable Pulling 3D Pull Physics and Constructability Inputs** | Pull-section/bend table, segment friction, reel/feed direction, reverse pull, jam ratio, sidewall pressure | Medium | Implemented |
+| **P2** | 89 | ~~**Grounding Field-Test, Seasonal Soil, and Finite-Element Fidelity Controls**~~ | Field-test QA, fall-of-potential rows, seasonal soil scenario, EN 50522 body/glove/footwear settings, contour controls | Medium | ✅ Implemented 2026-04-27 |
+| **P2** | 90 | ~~**TCC / Protection Setting Sheet Governance**~~ | Relay setting sheet model with CT/PT data, setting groups, function settings, test values, and export | Medium | ✅ Implemented 2026-04-27 |
+| **P3** | 91 | ~~**Heat Trace Tanks, Vessels, Multi-Segment Circuits, and Control Fidelity**~~ | Asset type/multi-segment circuit model, sheath temperature, startup current, sensor/controller placement, T-rating warnings | Medium | ✅ Implemented 2026-04-27 |
+| **P3** | 92 | ~~**Raceway Construction Detailing and Takeoff Controls**~~ | Segment-level support/accessory/divider/phase/detail metadata feeding BOM, BIM connector, reports, and pull cards | Medium | ✅ Implemented 2026-04-27 |
+| **P1** | 93 | **Harmonic Study Source Modeling, PCC Compliance, and Filter Design** | PCC/source-spectrum study case, IEEE 519 basis, filter alternatives, compliance rows, and capacitor-bank duty linkage | High | Open |
+| **P1** | 94 | **Panel and Load Schedule Demand-Factor Governance** | Load classification, demand factors, noncoincident groups, largest motor, spare/future allowance, measured-demand source, phase balance | Medium | Open |
+| **P1** | 95 | ~~**Transformer and Feeder Auto-Sizing Case Basis**~~ | Auditable transformer/feeder sizing package with load basis, growth, impedance/BIL/rise, protection, tap, emergency rating, rejected alternatives | Medium | ✅ Implemented 2026-04-27 |
+| **P2** | 96 | ~~**Voltage Drop Criteria, Operating Case, and Starting Drop Traceability**~~ | Normal/start/emergency criteria, source voltage/tap, load PF, conductor temperature basis, and segment-chain selection | Medium | ✅ Implemented 2026-04-27 |
+| **P2** | 97 | ~~**Capacitor Bank Switching, Detuning, Protection, and Duty Checks**~~ | Stage rows, controller settings, detuning/filter topology, rms/inrush/discharge/protection duty, and frequency-scan linkage | Medium | ✅ Implemented 2026-04-27 |
+| **P2** | 98 | ~~**Reliability Network Modeling, Restoration Logic, and Customer Indices**~~ | Failure/repair library, customer/load classes, switching/tie restoration, common-mode groups, SAIFI/SAIDI/EENS/ECOST | High | ✅ Implemented 2026-04-27 |
+| **P2** | 99 | ~~**Transient Stability Dynamic Model Library and Disturbance Events**~~ | Dynamic model rows, exciter/governor/PSS placeholders, event sequence table, critical-clearing-time sweep, channel export | High | ✅ Implemented 2026-04-27 |
+| **P2** | 100 | **DER / IBR Plant Controller, Grid-Code Curves, and Study Scenarios** | Volt-VAR/Volt-Watt/Watt-PF/frequency-watt curves, ride-through points, ramp limits, grid mode, load/grid-strength cases | High | Open |
+| **P3** | 101 | **EMF Exposure Limits, Phasing, Depth, Shielding, and Validation** | Multi-circuit cable geometry, phase sequence, depth/profile height, current angles, ferromagnetic/sheath effects, exposure limits, measured validation | Medium | Open |
+| **P3** | 102 | **Cathodic Protection Network, Polarization, and Interference Modeling** | Structure/anode network rows, rectifier limits, polarization curves, bonds/isolation, interference sources, seasonal soil, potential profiles | High | Open |
 
 ---
 
 ## Sources
+
+### Page-Level Input / Calculation Audit Sources (2026-04-27)
+- [ETAP Cable Sizing Software](https://etap.com/product/cable-sizing) — cable sizing criteria include load current, voltage drop, motor minimum starting voltage, short-circuit current, protective-device requirements, harmonic spectrum, conductor count, let-through energy, and multiple cable standards.
+- [ETAP ArcSafety / Arc Flash](https://etap.com/solutions/arcflash) — arc-flash calculators and mitigation methods include IEEE 1584, DC/high-voltage calculators, ZSI, maintenance mode, current-limiting fuses, light/pressure sensors, differential protection, HRG, high-speed grounding switches, and arc-quenching devices.
+- [EasyPower ArcFlash Features](https://www.easypower.com/products/features/arcflash/features) — arc-flash workflows include user-definable equipment types/gaps, multiple working distances, source/device clearing logic, PPE and boundary outputs, and label generation.
+- [EasyPower ShortCircuit](https://www.easypower.com/products/features/shortcircuit) — short-circuit workflows include ANSI/IEC calculations, equipment duty comparison, momentary/interruption/relay currents, voltage sensitivity, one-line duty highlighting, and DC short-circuit.
+- [ETAP Unbalanced Load Flow](https://etap.com/product/unbalanced-load-flow-software) — unbalanced load-flow workflows include per-phase/sequence values, transformer connections/grounding, LTC/regulators, load models, control devices, open-phase simulations, and unbalance indices.
+- [ETAP Motor Starting Analysis](https://etap.com/product/motor-acceleration-software) — motor-start workflows include sequence events, VFD frequency control, MOV stages, transformer LTC/regulator behavior, switched capacitors, generator/grid variation, dynamic motor/load models, and time-series plots.
+- [Bentley Raceway and Cable Management](https://mcstaging.us.bentley.com/bentley-raceway-and-cable-management) — raceway/cable workflows include construction drawings, raceway accessories, 2D extractions, duct-bank/manhole/trench design, cable pull cards, drums, labels, manufacturer libraries, and IFC/iTwin exchange.
+- [nVent/Raychem TraceCalc Pro overview](https://blog.chemelex.com/the-basics-of-heat-trace-design) — heat-trace workflows include pipe heat loss, circuits, electrical loads, sheath temperatures, multi-segment circuit designs, customized valve/insulation types, BOMs, and electrical line-list reports.
+- [Cableizer documentation](https://www.cableizer.com/documentation/expanded/) — cable thermal workflows include solar radiation, other buried cables and heat sources/sinks, soil drying, backfill, crossings, tunnels/channels/troughs, transient conductor temperature, and emergency loading.
+- [ETAP Ground Grid Systems](https://etap.com/product/ground-grid-systems-software) — grounding workflows include FEM, irregular geometry, two-layer soil generation from Wenner data, surface material, external boundary extensions, body/gloves/footwear impedance, conductor libraries, step/touch/absolute potential plots, and reports.
+- [SES CDEGS](https://www.sestech.com/en/Product/Package/CDEGS) — grounding/electromagnetic workflows include realistic conductor networks, soil measurement interpretation, fall-of-potential tests, potential distributions, GPR/touch/step voltage, coating stress, leakage current density, and interference studies.
+- [SKM Ground Mat](https://skm.com/groundMat.html) — ground-grid workflows include field-measurement earth models, finite-element ground conductor/rod analysis, grid/ground potential, touch voltage, and step voltage analysis.
+- [ETAP Harmonic Frequency Scan](https://etap.com/product/harmonic-frequency-scan-software) — harmonic studies expose user-defined frequency ranges, bus driving-point impedance, resonance identification, cable impedance over scan range, filter parameter tuning, and tabulated/one-line/plot outputs.
+- [ETAP Harmonic Filters & Sizing](https://etap.com/product/harmonic-filters-sizing-software) — harmonic-filter workflows include filter design and sizing for multiple filter types and IEEE-based harmonic mitigation review.
+- [EasyPower Harmonics](https://www.easypower.com/products/features/harmonics) — harmonic analysis workflows include power-quality problem identification, mitigation, and harmonic-filter modeling.
+- [EasyPower SmartDesign](https://www.easypower.com/products/features/smartdesign) — automated design workflows size switchgear, switchboards, panelboards, panels, MCCs, conductors, breakers, fuses, transformers, and feeders to NEC requirements with reusable design sheets.
+- [ETAP Transformer Sizing](https://etap.com/product/transformer-sizing-software) — transformer sizing workflows consider load growth, adjustment factors, transformer impedance, and BIL requirements.
+- [ETAP Reliability Assessment](https://etap.com/product/distribution-reliability-assessment) — distribution reliability workflows report SAIFI, SAIDI, availability/quality indices, EENS/ECOST sensitivity, and component contribution rankings.
+- [ETAP Transient Stability / Dynamic Modeling](https://etap.com/dynamic-transients/dynamic-modeling) — dynamic studies include synchronous-machine models, exciters, governors, PSS, wind turbine and inverter/BESS models, motor dynamics, faults, switching, generator/load rejection, ramp events, and validated/tuned dynamic models.
+- [EasyPower Dynamic Stability](https://www.easypower.com/products/features/dynamic-stability/features) — dynamic-stability workflows include synchronous generator models with saturation, governor load-step simulation, and exciter/governor model data sheets.
+- [ETAP Grid Interactive Smart Inverters](https://etap.com/product/grid-interactive-smart-inverters) — smart-inverter workflows include Volt-VAR, Volt-Watt, Watt-PF curves, BESS integration, full AC/DC analysis, and two-way power-flow control behavior.
+- [ETAP Underground Conductor Electromagnetic Fields](https://etap.com/product/underground-conductor-electromagnetic-fields) — EMF workflows include flat/trefoil and AC/DC conductor layouts, balanced/unbalanced load-flow current angles, worst-case surface fields, ferromagnetic conduit effects, sheath current effects, and IEEE/ICNIRP/ACGIH exposure limits.
+- [SES CorrCAD](https://www.sestech.com/Product/Package/CorrCAD) — cathodic-protection workflows include ICCP/GACP/SACP analysis, polarization electrochemical potential, stray-current interference mitigation, and polarization-curve digitization.
 
 ### Manufacturer Tools
 - [Eaton B-Line CoSPEC Specifier Center](https://www.eaton.com/us/en-us/products/support-systems/b-line-series-cospec-specifier-center.html)
@@ -1599,7 +1932,7 @@ The strongest market pattern is that competing tools sell more than formulas. Th
 
 ## Next Major Steps — Recommended Roadmap (as of 2026-04-26)
 
-**Active focus: product trust and deliverable quality (Gaps #71-#82).** The 2026-04-26 refresh shows that the fastest competitive improvement is not another isolated calculator. The strongest next slices are: public validation/trust center (#78), commercial-grade report packages (#82), heat-trace construction package (#73), and lifecycle study packages/revision snapshots (#71). Advanced power-system studies (#64, #65, #70) remain valuable, but the site will feel more competitive sooner if existing calculations become easier to trust, package, review, and hand off.
+**Active focus: maintenance and deferred native integrations.** The 2026-04-26 refresh shows that the product trust and deliverable quality slice (#71-#82) is now implemented, including lifecycle packages, catalog governance, heat-trace construction packages, advanced grounding overlays, cable thermal environment modeling, BIM handoff refinement, field commissioning records, cross-study design coaching, equipment evaluation, sample projects, and commercial report packages. Advanced power-system study #65 (OPF) is now implemented as a local screening workflow; deferred native BIM/CAD plugin work is partially de-risked by the connector contract/readiness gateway, while actual native SDK plugins remain outside the browser-local scope.
 
 All prior gaps (#1–#57) have been implemented as of 2026-04-11. The tables below are preserved for historical reference with ✅ status.
 
@@ -1667,8 +2000,8 @@ Full IEC 60909-0:2016 equivalent voltage source method implemented in `analysis/
 
 ### Deferred (Requires Native Desktop Infrastructure or Commercial Licensing)
 
-- **Revit Plugin / Live BIM Sync** — Requires Revit SDK (Windows-native C#/.NET)
-- **AutoCAD / AVEVA / SmartPlant 3D Plugin** — Requires commercial CAD SDK licensing
+- **Revit Plugin / Live BIM Sync** — Partially closed 2026-04-27 by a native-ready connector exchange contract; actual Revit SDK plugin remains deferred.
+- **AutoCAD / AVEVA / SmartPlant 3D Plugin** — Partially closed 2026-04-27 by a generic connector exchange contract; actual CAD/plant SDK plugins remain deferred.
 - **BIM Object Library** — Requires manufacturer data partnerships for Revit RFA / IFC families
 - **Live Manufacturer Pricing Feed** — Requires commercial data licensing (RS Means, Eaton, Legrand)
 - ~~**Cloud-Based Component Library** (#12)~~ — ✅ **Implemented 2026-04-06** — see `tests/cloudLibrary.test.mjs` and `docs/api-reference.md#library-endpoints`
@@ -1688,5 +2021,5 @@ Full IEC 60909-0:2016 equivalent voltage source method implemented in `analysis/
 | **P2** | 66 | ~~**Generator Sizing (NFPA 110)**~~ | `analysis/generatorSizing.mjs` | Medium | ✅ Implemented 2026-04-12 |
 | **P2** | 67 | ~~**Differential Protection (87B/T/G)**~~ | `analysis/differentialProtection.mjs`, `data/protectiveDevices.json` | Medium | ✅ Implemented 2026-04-19 |
 | **P3** | 64 | ~~**Voltage Stability (P-V / Q-V)**~~ | `analysis/voltageStability.mjs` | High | ✅ Implemented 2026-04-20 |
-| **P3** | 65 | **Optimal Power Flow / Economic Dispatch** | `analysis/optimalPowerFlow.mjs` | High | Not implemented |
+| **P3** | 65 | ~~**Optimal Power Flow / Economic Dispatch**~~ | `analysis/optimalPowerFlow.mjs` | High | ✅ Implemented 2026-04-27 |
 | **P3** | 70 | ~~**Voltage Flicker (Pst/Plt)**~~ | `analysis/voltageFlicker.mjs` | Medium | ✅ Implemented 2026-04-19 |

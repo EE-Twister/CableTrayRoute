@@ -1,0 +1,31 @@
+{
+  "meta": { "version": 1, "benchmark": "ductbank-thermal", "scenario": "default", "scenarios": [] },
+  "ductbanks": [
+    {
+      "id": "DB-BM-01",
+      "label": "BM-DUCTBANK-2x2",
+      "rows": 2,
+      "cols": 2,
+      "conduit_od_mm": 63.5,
+      "conduit_material": "PVC",
+      "depth_to_center_m": 0.9,
+      "backfill_rho": 0.9,
+      "native_soil_rho": 1.2,
+      "ambient_temp_c": 25,
+      "load_factor": 0.9,
+      "conductor_kcmil": 350,
+      "conductor_material": "copper",
+      "insulation_type": "XHHW",
+      "notes": "IEEE 835 / Neher-McGrath benchmark: 2×2 PVC duct bank, ρ_backfill=0.9, 350 kcmil Cu XHHW, 90% load factor. Expected group derating ≈ 0.78, ampacity ≈ 285 A."
+    }
+  ],
+  "conduits": [],
+  "trays": [],
+  "cables": [],
+  "cableTypicals": [],
+  "panels": [],
+  "equipment": [],
+  "loads": [],
+  "oneLine": { "components": [], "connections": [], "revision": 0 },
+  "settings": {}
+}

@@ -2,6 +2,7 @@ import "./workflowStatus.js";
 import "../site.js";
 import * as dataStore from "../dataStore.mjs";
 import { exportPanelSchedule } from "../exportPanelSchedule.js";
+import { buildPanelDemandSummary } from "../analysis/loadDemandGovernance.mjs";
 import { ensureFieldAssistiveText, showAlertModal, openModal } from "./components/modal.js";
 
 const projectId = typeof window !== "undefined" ? (window.currentProjectId || "default") : undefined;
@@ -2346,7 +2347,9 @@ function updatePanelStickySummary(panel, panelId, loads, circuitCount) {
     ? loads.filter(load => load?.panelId === panelId).length
     : 0;
   const totals = calculatePanelTotals(panelId);
-  summary.textContent = `${displayName} • ${assignedCount} Assigned Loads • ${circuitCount} Circuits • ${totals.connectedKva.toFixed(2)} kVA Connected`;
+  const demandRow = buildPanelDemandSummary({ panels: [panel], loads })[0] || {};
+  const phase = demandRow.phaseBalance || {};
+  summary.textContent = `${displayName} | ${assignedCount} Assigned Loads | ${circuitCount} Circuits | ${totals.connectedKva.toFixed(2)} kVA Connected | ${demandRow.governedDemandKva || 0} kVA Governed Demand | Phase ${phase.status || 'pass'}${phase.unbalancePct != null ? ` (${phase.unbalancePct}%)` : ''}`;
 }
 
 function updateAssignmentStatus(panelId, loads, circuitCount) {
@@ -2420,6 +2423,12 @@ window.addEventListener("DOMContentLoaded", () => {
   const mainInput = document.getElementById("panel-main-rating");
   const circuitInput = document.getElementById("panel-circuit-count");
   const sccrInput = document.getElementById("panel-sccr");
+  const serviceGroupInput = document.getElementById("panel-service-group");
+  const spareFutureInput = document.getElementById("panel-spare-future");
+  const measuredDemandInput = document.getElementById("panel-measured-demand");
+  const measuredSourceInput = document.getElementById("panel-measured-source");
+  const phaseBalanceLimitInput = document.getElementById("panel-phase-balance-limit");
+  const demandNotesInput = document.getElementById("panel-demand-notes");
   const jumpUnassignedBtn = document.getElementById("panel-jump-unassigned-btn");
   const clearAssignmentsBtn = document.getElementById("panel-clear-assignments-btn");
   const validationHints = document.getElementById("panel-validation-hints");
@@ -2579,6 +2588,12 @@ window.addEventListener("DOMContentLoaded", () => {
     if (sccrInput) {
       sccrInput.value = panel.shortCircuitRating || panel.shortCircuitCurrentRating || "";
     }
+    if (serviceGroupInput) serviceGroupInput.value = panel.serviceGroup || "";
+    if (spareFutureInput) spareFutureInput.value = panel.spareFutureAllowancePct || "";
+    if (measuredDemandInput) measuredDemandInput.value = panel.measuredDemandKw || "";
+    if (measuredSourceInput) measuredSourceInput.value = panel.measuredDemandSource || "";
+    if (phaseBalanceLimitInput) phaseBalanceLimitInput.value = panel.phaseBalanceLimitPct || "";
+    if (demandNotesInput) demandNotesInput.value = panel.demandNotes || "";
     validatePanelInputs();
   };
 
@@ -2933,6 +2948,13 @@ window.addEventListener("DOMContentLoaded", () => {
       updateOneline();
     });
   }
+
+  if (serviceGroupInput) serviceGroupInput.addEventListener("input", () => handleChange("serviceGroup", serviceGroupInput, { render: true }));
+  if (spareFutureInput) spareFutureInput.addEventListener("input", () => handleChange("spareFutureAllowancePct", spareFutureInput, { render: true }));
+  if (measuredDemandInput) measuredDemandInput.addEventListener("input", () => handleChange("measuredDemandKw", measuredDemandInput, { render: true }));
+  if (measuredSourceInput) measuredSourceInput.addEventListener("input", () => handleChange("measuredDemandSource", measuredSourceInput, { render: true }));
+  if (phaseBalanceLimitInput) phaseBalanceLimitInput.addEventListener("input", () => handleChange("phaseBalanceLimitPct", phaseBalanceLimitInput, { render: true }));
+  if (demandNotesInput) demandNotesInput.addEventListener("input", () => handleChange("demandNotes", demandNotesInput, { render: true }));
 
   if (circuitInput) {
     circuitInput.addEventListener("input", () => {

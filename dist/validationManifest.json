@@ -1,12 +1,19 @@
 {
-  "generatedAt": "2026-04-26T23:31:07.739Z",
+  "generatedAt": "2026-04-28T02:47:25.104Z",
   "summary": {
-    "testSuiteCount": 122,
-    "totalAssertions": 3901,
+    "testSuiteCount": 153,
+    "totalAssertions": 5018,
     "benchmarkCount": 6,
     "standardCount": 12
   },
   "testSuites": [
+    {
+      "file": "tests/advancedGrounding.test.mjs",
+      "groups": [
+        "advanced grounding helpers"
+      ],
+      "assertionCount": 33
+    },
     {
       "file": "tests/ampacity.test.mjs",
       "groups": [
@@ -24,6 +31,13 @@
       "assertionCount": 17
     },
     {
+      "file": "tests/arcflash/arcFlashExample.test.cjs",
+      "groups": [
+        "arc flash analysis"
+      ],
+      "assertionCount": 11
+    },
+    {
       "file": "tests/arcFlashLabels.test.mjs",
       "groups": [
         "buildArcFlashLabelData",
@@ -33,11 +47,11 @@
       "assertionCount": 21
     },
     {
-      "file": "tests/arcflash/arcFlashExample.test.cjs",
+      "file": "tests/arcFlashStudyCase.test.mjs",
       "groups": [
-        "arc flash analysis"
+        "arc-flash study case"
       ],
-      "assertionCount": 11
+      "assertionCount": 21
     },
     {
       "file": "tests/autoSaveScheduler.test.mjs",
@@ -83,6 +97,27 @@
       "assertionCount": 43
     },
     {
+      "file": "tests/bimConnectorContract.test.mjs",
+      "groups": [
+        "BIM/CAD connector contract helpers"
+      ],
+      "assertionCount": 31
+    },
+    {
+      "file": "tests/bimConnectorValidator.test.mjs",
+      "groups": [
+        "BIM connector validator harness"
+      ],
+      "assertionCount": 21
+    },
+    {
+      "file": "tests/bimRoundTrip.test.mjs",
+      "groups": [
+        "BIM round-trip helpers"
+      ],
+      "assertionCount": 40
+    },
+    {
       "file": "tests/cableFaultBracing.test.mjs",
       "groups": [
         "calcPeakFactor — IEC 60909-0 §4.3.1.1",
@@ -116,6 +151,20 @@
       "assertionCount": 56
     },
     {
+      "file": "tests/cableThermalAdvancedInputs.test.mjs",
+      "groups": [
+        "advanced cable thermal inputs"
+      ],
+      "assertionCount": 25
+    },
+    {
+      "file": "tests/cableThermalEnvironment.test.mjs",
+      "groups": [
+        "cable thermal environment helpers"
+      ],
+      "assertionCount": 24
+    },
+    {
       "file": "tests/capacitorBank.test.mjs",
       "groups": [
         "requiredKvar — PFC sizing formula",
@@ -124,7 +173,14 @@
         "standardBankSizes — standard kVAR selection",
         "runCapacitorBankAnalysis — integration"
       ],
-      "assertionCount": 48
+      "assertionCount": 49
+    },
+    {
+      "file": "tests/capacitorBankDuty.test.mjs",
+      "groups": [
+        "capacitor bank duty package"
+      ],
+      "assertionCount": 23
     },
     {
       "file": "tests/cathodicProtection.test.mjs",
@@ -283,6 +339,13 @@
       "assertionCount": 89
     },
     {
+      "file": "tests/designCoach.test.mjs",
+      "groups": [
+        "design coach action builder"
+      ],
+      "assertionCount": 104
+    },
+    {
       "file": "tests/designRuleChecker.test.mjs",
       "groups": [
         "trayFillPercent()",
@@ -367,6 +430,13 @@
       "assertionCount": 2
     },
     {
+      "file": "tests/equipmentEvaluation.test.mjs",
+      "groups": [
+        "equipment evaluation"
+      ],
+      "assertionCount": 24
+    },
+    {
       "file": "tests/equipmentPersistence.test.cjs",
       "groups": [],
       "assertionCount": 2
@@ -379,9 +449,16 @@
       "assertionCount": 4
     },
     {
+      "file": "tests/fieldCommissioning.test.mjs",
+      "groups": [
+        "field commissioning helpers"
+      ],
+      "assertionCount": 35
+    },
+    {
       "file": "tests/frequencyScan.test.mjs",
       "groups": [],
-      "assertionCount": 48
+      "assertionCount": 49
     },
     {
       "file": "tests/generatorSizing.test.mjs",
@@ -440,11 +517,19 @@
       "assertionCount": 19
     },
     {
+      "file": "tests/groundingFieldFidelity.test.mjs",
+      "groups": [
+        "grounding field fidelity helpers"
+      ],
+      "assertionCount": 24
+    },
+    {
       "file": "tests/harmonics.test.mjs",
       "groups": [
         "limitForVoltage — IEEE 519",
         "parseSpectrum — array format",
         "parseSpectrum — string format",
+        "harmonic study-case spectrum parser compatibility",
         "currentTHD",
         "singleHarmonicVTHD",
         "neutral triplen current — unbalanced harmonic model",
@@ -455,7 +540,31 @@
         "HS-05 frequencyScan — resonance at h≈4.6 → caution",
         "combined harmonic flow — illustrative scenario"
       ],
-      "assertionCount": 70
+      "assertionCount": 72
+    },
+    {
+      "file": "tests/harmonicStudyCase.test.mjs",
+      "groups": [
+        "harmonic study case normalization",
+        "IEEE 519 compliance and filter alternatives",
+        "harmonic study package"
+      ],
+      "assertionCount": 39
+    },
+    {
+      "file": "tests/heatTraceAdvancedAssets.test.mjs",
+      "groups": [
+        "heat trace advanced asset helpers"
+      ],
+      "assertionCount": 34
+    },
+    {
+      "file": "tests/heatTraceInstallationPackage.test.mjs",
+      "groups": [
+        "heat trace product selection",
+        "heat trace installation package"
+      ],
+      "assertionCount": 38
     },
     {
       "file": "tests/heatTraceReport.test.mjs",
@@ -581,6 +690,13 @@
       "assertionCount": 39
     },
     {
+      "file": "tests/loadDemandGovernance.test.mjs",
+      "groups": [
+        "load demand governance"
+      ],
+      "assertionCount": 26
+    },
+    {
       "file": "tests/loadflow/cablePerKmImpedance.test.mjs",
       "groups": [
         "Cable per-km impedance handling"
@@ -638,6 +754,13 @@
       "assertionCount": 4
     },
     {
+      "file": "tests/loadFlowStudyCase.test.mjs",
+      "groups": [
+        "load-flow study case"
+      ],
+      "assertionCount": 26
+    },
+    {
       "file": "tests/loadlistPersistence.test.cjs",
       "groups": [],
       "assertionCount": 1
@@ -658,6 +781,15 @@
         "getStarterProfile — Autotransformer"
       ],
       "assertionCount": 31
+    },
+    {
+      "file": "tests/motorStartStudyCase.test.mjs",
+      "groups": [
+        "motor-start study case normalization",
+        "motor-start sequence calculations",
+        "motor-start packaging and rendering"
+      ],
+      "assertionCount": 34
     },
     {
       "file": "tests/multiSlotRouting.test.mjs",
@@ -705,6 +837,16 @@
       "assertionCount": 49
     },
     {
+      "file": "tests/optimalPowerFlow.test.mjs",
+      "groups": [
+        "optimal power flow normalization",
+        "economic dispatch",
+        "OPF candidate evaluation",
+        "OPF package and rendering"
+      ],
+      "assertionCount": 28
+    },
+    {
       "file": "tests/pageNavigation.test.cjs",
       "groups": [
         "page navigation"
@@ -720,6 +862,13 @@
         "sizeFeeder() — parallelSuggestion for oversized loads"
       ],
       "assertionCount": 30
+    },
+    {
+      "file": "tests/productCatalog.test.mjs",
+      "groups": [
+        "product catalog governance"
+      ],
+      "assertionCount": 33
     },
     {
       "file": "tests/productConfig.test.mjs",
@@ -743,9 +892,23 @@
       "assertionCount": 8
     },
     {
+      "file": "tests/projectLifecycle.test.mjs",
+      "groups": [
+        "project lifecycle package helpers"
+      ],
+      "assertionCount": 34
+    },
+    {
       "file": "tests/projectStorageMigration.test.mjs",
       "groups": [],
       "assertionCount": 13
+    },
+    {
+      "file": "tests/protectionSettingSheet.test.mjs",
+      "groups": [
+        "protection setting sheet helpers"
+      ],
+      "assertionCount": 27
     },
     {
       "file": "tests/ptVtMetadata.test.mjs",
@@ -768,7 +931,23 @@
         "cableQRPayload",
         "edge cases"
       ],
-      "assertionCount": 49
+      "assertionCount": 52
+    },
+    {
+      "file": "tests/pullConstructability.test.mjs",
+      "groups": [
+        "pull constructability inputs",
+        "pull direction evaluation",
+        "pull constructability package"
+      ],
+      "assertionCount": 26
+    },
+    {
+      "file": "tests/racewayConstructionDetailing.test.mjs",
+      "groups": [
+        "raceway construction detailing helpers"
+      ],
+      "assertionCount": 24
     },
     {
       "file": "tests/racewayRoute.test.cjs",
@@ -812,12 +991,26 @@
       "assertionCount": 23
     },
     {
+      "file": "tests/reliabilityNetworkModel.test.mjs",
+      "groups": [
+        "reliability network model"
+      ],
+      "assertionCount": 42
+    },
+    {
       "file": "tests/reporting.test.cjs",
       "groups": [
         "reporting engine",
         "label templates"
       ],
       "assertionCount": 9
+    },
+    {
+      "file": "tests/reportPackage.test.mjs",
+      "groups": [
+        "commercial report package builder"
+      ],
+      "assertionCount": 156
     },
     {
       "file": "tests/restApi.test.mjs",
@@ -845,6 +1038,13 @@
         "IFC4 round-trip: export → parseRevit"
       ],
       "assertionCount": 113
+    },
+    {
+      "file": "tests/sampleGallery.test.mjs",
+      "groups": [
+        "sample project gallery"
+      ],
+      "assertionCount": 24
     },
     {
       "file": "tests/sampleLinks.test.cjs",
@@ -928,6 +1128,13 @@
         "short circuit engine"
       ],
       "assertionCount": 31
+    },
+    {
+      "file": "tests/shortCircuitStudyCase.test.mjs",
+      "groups": [
+        "short-circuit study case"
+      ],
+      "assertionCount": 19
     },
     {
       "file": "tests/spoolSheets.test.mjs",
@@ -1067,6 +1274,13 @@
       "assertionCount": 11
     },
     {
+      "file": "tests/transformerFeederSizingCase.test.mjs",
+      "groups": [
+        "transformer and feeder sizing case"
+      ],
+      "assertionCount": 31
+    },
+    {
       "file": "tests/transformerProperties.test.mjs",
       "groups": [],
       "assertionCount": 10
@@ -1084,6 +1298,13 @@
       "assertionCount": 28
     },
     {
+      "file": "tests/transientStabilityStudyCase.test.mjs",
+      "groups": [
+        "transient stability study case package"
+      ],
+      "assertionCount": 33
+    },
+    {
       "file": "tests/trayHardware.test.mjs",
       "groups": [
         "trayEndpoints & trayLength",
@@ -1099,7 +1320,7 @@
         "buildTrayHardwareBOM — tee detection",
         "buildTrayHardwareBOM — custom options"
       ],
-      "assertionCount": 53
+      "assertionCount": 55
     },
     {
       "file": "tests/units.test.cjs",
@@ -1143,6 +1364,13 @@
         "benchmark IDs — link integrity"
       ],
       "assertionCount": 30
+    },
+    {
+      "file": "tests/voltageDropCriteria.test.mjs",
+      "groups": [
+        "voltage drop criteria package"
+      ],
+      "assertionCount": 29
     },
     {
       "file": "tests/voltageDropStudy.test.mjs",

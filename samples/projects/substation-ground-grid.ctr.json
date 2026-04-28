@@ -1,0 +1,38 @@
+{
+  "meta": { "version": 1, "scenario": "substation-ground-grid", "scenarios": ["substation-ground-grid"], "projectName": "Substation Ground Grid" },
+  "ductbanks": [],
+  "conduits": [],
+  "trays": [],
+  "cables": [
+    { "id": "SS-C-101", "tag": "SS-C-101", "from": "XFMR-1", "to": "SWGR-1", "conductor_size": "3/C 750 kcmil", "insulation_type": "XLPE", "voltage_rating": "15 kV", "length": 65, "diameter": 2.7 }
+  ],
+  "cableTypicals": [],
+  "panels": [],
+  "equipment": [
+    { "id": "XFMR-1", "tag": "XFMR-1", "description": "12.47 kV / 480 V transformer", "area": "Substation" },
+    { "id": "SWGR-1", "tag": "SWGR-1", "description": "Metal-clad switchgear", "area": "Substation" }
+  ],
+  "loads": [],
+  "oneLine": {
+    "activeSheet": 0,
+    "sheets": [
+      {
+        "name": "Ground Grid Context",
+        "components": [
+          { "id": "xfmr-1", "type": "transformer", "x": 90, "y": 100, "label": "XFMR-1", "connections": [{ "target": "swgr-1" }] },
+          { "id": "swgr-1", "type": "switchgear", "x": 310, "y": 100, "label": "SWGR-1", "connections": [] }
+        ]
+      }
+    ]
+  },
+  "settings": {
+    "studyResults": {
+      "groundGrid": {
+        "inputs": { "gridLengthM": 70, "gridWidthM": 70, "meshSpacingM": 6, "soilResistivityOhmM": 100, "faultCurrentA": 3000, "faultDurationS": 1 },
+        "summary": { "gridResistanceOhm": 0.54, "meshVoltageV": 312, "stepVoltageV": 168 },
+        "sample": true
+      }
+    }
+  }
+}
+

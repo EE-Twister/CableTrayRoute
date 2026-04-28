@@ -1,0 +1,26 @@
+{
+  "meta": { "version": 1, "benchmark": "iec60909-short-circuit", "scenario": "default", "scenarios": [] },
+  "ductbanks": [],
+  "conduits": [],
+  "trays": [],
+  "cables": [],
+  "cableTypicals": [],
+  "panels": [],
+  "equipment": [],
+  "loads": [],
+  "oneLine": { "components": [], "connections": [], "revision": 0 },
+  "settings": {
+    "studyResults": {
+      "iec60909": {
+        "inputs": {
+          "systemKV": 10,
+          "scMvaSource": 500,
+          "xrRatio": 10,
+          "cFactorMode": "max",
+          "faultDurationS": 1.0
+        },
+        "_benchmark": "IEC 60909-0:2016 §4.3 worked example. Expected: I\"k3 ≈ 15.75 kA, c = 1.1, κ ≈ 1.809, ip ≈ 40.3 kA."
+      }
+    }
+  }
+}

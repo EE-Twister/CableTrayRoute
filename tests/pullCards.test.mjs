@@ -206,6 +206,30 @@ describe('buildPullCard', () => {
       assert.ok(['Tray', 'Conduit', 'Field'].includes(step.type));
     }
   });
+
+  it('carries construction detail metadata into route steps', () => {
+    const card = buildPullCard({
+      pull_number: 1,
+      cable_type: 'Power',
+      cable_count: 1,
+      cables: [{ tag: 'C1', diameter: 0.75, weight: 0.5 }],
+      total_length: 20,
+      breakdown: [{
+        tray_id: 'T1',
+        length: 20,
+        start: [0, 0, 0],
+        end: [20, 0, 0],
+        drawingRef: 'E-201',
+        labelId: 'LBL-T1',
+        sectionRef: 'SEC-T1',
+        constructionStatus: 'released',
+      }],
+      route_segments: [{ type: 'straight', length: 20 }],
+    });
+    assert.equal(card.route_steps[0].drawingRef, 'E-201');
+    assert.equal(card.route_steps[0].labelId, 'LBL-T1');
+    assert.equal(card.route_steps[0].constructionDetail.sectionRef, 'SEC-T1');
+  });
 });
 
 describe('buildPullTable', () => {

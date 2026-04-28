@@ -140,6 +140,29 @@
           </aside>
         </div>
       </section>
+      <section class="card" aria-labelledby="tcc-device-settings-title">
+        <h2 id="tcc-device-settings-title">Device Curve Settings</h2>
+        <p class="field-hint">Selected device settings and one-line TCC overrides are edited here before plotting or building setting sheets.</p>
+        <div id="device-settings" class="device-settings-list" aria-live="polite"></div>
+      </section>
+      <section class="card" aria-labelledby="protection-setting-sheet-title">
+        <div class="report-toolbar">
+          <div>
+            <h2 id="protection-setting-sheet-title">Protection Setting Sheet</h2>
+            <p class="field-hint">Build a local setting-sheet package from linked one-line devices, TCC overrides, CT/PT metadata, and the latest coordination state.</p>
+          </div>
+          <div class="button-row">
+            <button id="build-setting-sheet-btn" type="button">Build Setting Sheet</button>
+            <button id="save-setting-sheet-btn" type="button" disabled>Save to Studies</button>
+            <button id="export-setting-sheet-json-btn" type="button" disabled>Export JSON</button>
+            <button id="export-setting-sheet-csv-btn" type="button" disabled>Export CSV</button>
+            <button id="export-setting-sheet-html-btn" type="button" disabled>Printable HTML</button>
+          </div>
+        </div>
+        <div id="protection-setting-sheet-panel" class="setting-sheet-panel" aria-live="polite">
+          <p class="field-hint">Build a setting sheet to create device, function, and relay-test rows.</p>
+        </div>
+      </section>
       <section class="card" aria-labelledby="study-review-panel-heading">
         <div id="study-review-panel"></div>
       </section>

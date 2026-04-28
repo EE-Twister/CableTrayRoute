@@ -33,6 +33,27 @@ import {
   readSavedProject,
   wasSavedProjectMigrated
 } from './projectStorage.js';
+import {
+  MAX_LIFECYCLE_ENTRY_BYTES,
+  estimateLifecycleBytes,
+  pruneLifecycleRevisions,
+} from './analysis/projectLifecycle.mjs';
+import {
+  filterApprovedCatalogRows,
+  mergeProductCatalogRows,
+  normalizeProductCatalog,
+} from './analysis/productCatalog.mjs';
+import {
+  normalizeFieldObservation,
+} from './analysis/fieldCommissioning.mjs';
+import {
+  createBimIssue,
+  normalizeBimElement,
+  updateBimIssue as updateBimIssueRecord,
+} from './analysis/bimRoundTrip.mjs';
+import {
+  normalizeConnectorManifest,
+} from './analysis/bimConnectorContract.mjs';
 
 registerScenario(getCurrentScenarioNameState());
 
@@ -93,8 +114,18 @@ const EXTRA_KEYS = {
   cableTemplates: 'cableTemplates',
   equipmentFilterPresets: 'equipmentFilterPresets',
   trayHardwareCatalogCustomProducts: 'trayHardwareCatalogCustomProducts',
+  productCatalogRows: 'productCatalogRows',
   drcAcceptedFindings: 'drcAcceptedFindings',
   studyApprovals: 'studyApprovals',
+  projectRevisions: 'projectRevisions',
+  studyPackages: 'studyPackages',
+  activeStudyPackageId: 'activeStudyPackageId',
+  designCoachDecisions: 'designCoachDecisions',
+  fieldObservations: 'fieldObservations',
+  bimElements: 'bimElements',
+  bimIssues: 'bimIssues',
+  bimConnectorPackages: 'bimConnectorPackages',
+  activeBimConnectorPackageId: 'activeBimConnectorPackageId',
 };
 
 export const STORAGE_KEYS = { ...KEYS, ...EXTRA_KEYS };
@@ -214,6 +245,22 @@ export const setEquipmentFilterPresets = presets => write(EXTRA_KEYS.equipmentFi
 export const getTrayHardwareCatalogCustomProducts = () => read(EXTRA_KEYS.trayHardwareCatalogCustomProducts, []);
 export const setTrayHardwareCatalogCustomProducts = products => write(EXTRA_KEYS.trayHardwareCatalogCustomProducts, products);
 
+export const getProductCatalogRows = (scenario = getCurrentScenarioNameState()) => read(EXTRA_KEYS.productCatalogRows, [], scenario);
+export const setProductCatalogRows = (rows, scenario = getCurrentScenarioNameState()) => {
+  const normalized = normalizeProductCatalog(Array.isArray(rows) ? rows : []).rows;
+  write(EXTRA_KEYS.productCatalogRows, normalized, scenario);
+  return normalized;
+};
+export const addProductCatalogRows = (rows, scenario = getCurrentScenarioNameState()) => {
+  const imported = Array.isArray(rows) ? rows : [rows].filter(Boolean);
+  const merged = mergeProductCatalogRows(getProductCatalogRows(scenario), imported);
+  write(EXTRA_KEYS.productCatalogRows, merged.rows, scenario);
+  return merged;
+};
+export const getApprovedProductCatalogRows = (filters = {}, scenario = getCurrentScenarioNameState()) => {
+  return filterApprovedCatalogRows(getProductCatalogRows(scenario), { ...filters, approvedOnly: true });
+};
+
 /**
  * DRC accepted findings — engineer "Accept Risk" annotations persisted per scenario.
  * Each entry: { key, ruleId, location, note, reviewedBy?, acceptedAt }
@@ -249,6 +296,133 @@ export const clearStudyApproval = studyKey => {
   const all = getStudyApprovals();
   delete all[studyKey];
   write(EXTRA_KEYS.studyApprovals, all);
+};
+
+export const getProjectRevisions = (scenario = getCurrentScenarioNameState()) => read(EXTRA_KEYS.projectRevisions, [], scenario);
+
+export const setProjectRevisions = (revisions, scenario = getCurrentScenarioNameState()) => {
+  const pruned = pruneLifecycleRevisions(Array.isArray(revisions) ? revisions : []);
+  write(EXTRA_KEYS.projectRevisions, pruned, scenario);
+  return pruned;
+};
+
+export const addProjectRevision = (revision, scenario = getCurrentScenarioNameState()) => {
+  if (estimateLifecycleBytes(revision) > MAX_LIFECYCLE_ENTRY_BYTES) {
+    throw new Error('Lifecycle revision snapshot exceeds the local storage size guard.');
+  }
+  const revisions = [...getProjectRevisions(scenario), revision];
+  return setProjectRevisions(revisions, scenario);
+};
+
+export const getStudyPackages = (scenario = getCurrentScenarioNameState()) => read(EXTRA_KEYS.studyPackages, [], scenario);
+
+export const setStudyPackages = (packages, scenario = getCurrentScenarioNameState()) => {
+  const rows = Array.isArray(packages) ? packages : [];
+  write(EXTRA_KEYS.studyPackages, rows, scenario);
+  return rows;
+};
+
+export const addStudyPackage = (pkg, scenario = getCurrentScenarioNameState()) => {
+  const packages = [...getStudyPackages(scenario), pkg];
+  return setStudyPackages(packages, scenario);
+};
+
+export const getActiveStudyPackageId = (scenario = getCurrentScenarioNameState()) => read(EXTRA_KEYS.activeStudyPackageId, '', scenario);
+export const setActiveStudyPackageId = (id, scenario = getCurrentScenarioNameState()) => {
+  write(EXTRA_KEYS.activeStudyPackageId, id || '', scenario);
+  return id || '';
+};
+
+export const getDesignCoachDecisions = (scenario = getCurrentScenarioNameState()) => read(EXTRA_KEYS.designCoachDecisions, [], scenario);
+export const setDesignCoachDecisions = (decisions, scenario = getCurrentScenarioNameState()) => {
+  const rows = Array.isArray(decisions) ? decisions : [];
+  write(EXTRA_KEYS.designCoachDecisions, rows, scenario);
+  return rows;
+};
+export const addDesignCoachDecision = (decision, scenario = getCurrentScenarioNameState()) => {
+  const decisions = [...getDesignCoachDecisions(scenario), decision];
+  return setDesignCoachDecisions(decisions, scenario);
+};
+
+export const getFieldObservations = (scenario = getCurrentScenarioNameState()) => read(EXTRA_KEYS.fieldObservations, [], scenario);
+export const setFieldObservations = (observations, scenario = getCurrentScenarioNameState()) => {
+  const rows = Array.isArray(observations) ? observations.map(normalizeFieldObservation) : [];
+  write(EXTRA_KEYS.fieldObservations, rows, scenario);
+  return rows;
+};
+export const addFieldObservation = (observation, scenario = getCurrentScenarioNameState()) => {
+  const row = normalizeFieldObservation(observation);
+  const rows = [...getFieldObservations(scenario), row];
+  write(EXTRA_KEYS.fieldObservations, rows, scenario);
+  return row;
+};
+export const updateFieldObservation = (id, patch = {}, scenario = getCurrentScenarioNameState()) => {
+  const rows = getFieldObservations(scenario);
+  const index = rows.findIndex(row => row.id === id);
+  if (index < 0) return null;
+  rows[index] = normalizeFieldObservation({ ...rows[index], ...patch, updatedAt: patch.updatedAt || new Date().toISOString() });
+  write(EXTRA_KEYS.fieldObservations, rows, scenario);
+  return rows[index];
+};
+export const getOpenFieldObservations = (filters = {}, scenario = getCurrentScenarioNameState()) => {
+  return getFieldObservations(scenario).filter(row => {
+    if (!['open', 'pendingReview', 'rejected'].includes(row.status)) return false;
+    if (filters.elementType && row.elementType !== filters.elementType) return false;
+    if (filters.elementId && row.elementId !== String(filters.elementId)) return false;
+    if (filters.priority && row.priority !== filters.priority) return false;
+    return true;
+  });
+};
+
+export const getBimElements = (scenario = getCurrentScenarioNameState()) => read(EXTRA_KEYS.bimElements, [], scenario);
+export const setBimElements = (elements, scenario = getCurrentScenarioNameState()) => {
+  const rows = Array.isArray(elements) ? elements.map(normalizeBimElement) : [];
+  write(EXTRA_KEYS.bimElements, rows, scenario);
+  return rows;
+};
+export const addBimElements = (elements, scenario = getCurrentScenarioNameState()) => {
+  const imported = Array.isArray(elements) ? elements : [elements].filter(Boolean);
+  const rows = [...getBimElements(scenario), ...imported.map(normalizeBimElement)];
+  write(EXTRA_KEYS.bimElements, rows, scenario);
+  return rows;
+};
+export const getBimIssues = (scenario = getCurrentScenarioNameState()) => read(EXTRA_KEYS.bimIssues, [], scenario);
+export const setBimIssues = (issues, scenario = getCurrentScenarioNameState()) => {
+  const rows = Array.isArray(issues) ? issues.map(createBimIssue) : [];
+  write(EXTRA_KEYS.bimIssues, rows, scenario);
+  return rows;
+};
+export const addBimIssue = (issue, scenario = getCurrentScenarioNameState()) => {
+  const row = createBimIssue(issue);
+  const rows = [...getBimIssues(scenario), row];
+  write(EXTRA_KEYS.bimIssues, rows, scenario);
+  return row;
+};
+export const updateBimIssue = (id, patch = {}, scenario = getCurrentScenarioNameState()) => {
+  const rows = getBimIssues(scenario);
+  const index = rows.findIndex(row => row.id === id);
+  if (index < 0) return null;
+  rows[index] = updateBimIssueRecord(rows[index], patch);
+  write(EXTRA_KEYS.bimIssues, rows, scenario);
+  return rows[index];
+};
+
+export const getBimConnectorPackages = (scenario = getCurrentScenarioNameState()) => read(EXTRA_KEYS.bimConnectorPackages, [], scenario);
+export const setBimConnectorPackages = (packages, scenario = getCurrentScenarioNameState()) => {
+  const rows = Array.isArray(packages) ? packages.map(normalizeConnectorManifest) : [];
+  write(EXTRA_KEYS.bimConnectorPackages, rows, scenario);
+  return rows;
+};
+export const addBimConnectorPackage = (pkg, scenario = getCurrentScenarioNameState()) => {
+  const row = normalizeConnectorManifest(pkg);
+  const rows = [row, ...getBimConnectorPackages(scenario).filter(existing => existing.id !== row.id)];
+  write(EXTRA_KEYS.bimConnectorPackages, rows, scenario);
+  return row;
+};
+export const getActiveBimConnectorPackageId = (scenario = getCurrentScenarioNameState()) => read(EXTRA_KEYS.activeBimConnectorPackageId, '', scenario);
+export const setActiveBimConnectorPackageId = (id, scenario = getCurrentScenarioNameState()) => {
+  write(EXTRA_KEYS.activeBimConnectorPackageId, id || '', scenario);
+  return id || '';
 };
 
 
@@ -313,10 +487,28 @@ function ensurePanelFields(panel) {
     voltage: '',
     manufacturer: '',
     model: '',
+    catalogNumber: '',
+    standard: '',
+    interruptRatingKa: '',
+    withstandRatingKa: '',
+    withstandCycles: '',
+    sccrKa: '',
+    busBracingKa: '',
+    shortTimeRatingKa: '',
+    enclosure: '',
+    temperatureRatingC: '',
+    protectiveDeviceId: '',
+    oneLineRef: '',
     phases: '',
     notes: '',
     mainRating: '',
     circuitCount: 42,
+    serviceGroup: '',
+    spareFutureAllowancePct: '',
+    measuredDemandKw: '',
+    measuredDemandSource: '',
+    phaseBalanceLimitPct: '',
+    demandNotes: '',
     ...panel
   };
 }
@@ -532,6 +724,16 @@ function ensureLoadFields(load) {
     loadFactor: '',
     efficiency: '',
     demandFactor: '',
+    loadClass: '',
+    continuous: '',
+    noncoincidentGroup: '',
+    largestMotorCandidate: '',
+    demandBasisCode: '',
+    demandBasisNote: '',
+    spareFuturePct: '',
+    loadManagementLimitKw: '',
+    measuredDemandSource: '',
+    demandNotes: '',
     phases: '',
     circuit: '',
     manufacturer: '',
@@ -925,6 +1127,27 @@ if (typeof window !== 'undefined') {
     setCables,
     getCableTypicals,
     setCableTypicals,
+    getProductCatalogRows,
+    setProductCatalogRows,
+    addProductCatalogRows,
+    getApprovedProductCatalogRows,
+    getFieldObservations,
+    setFieldObservations,
+    addFieldObservation,
+    updateFieldObservation,
+    getOpenFieldObservations,
+    getBimElements,
+    setBimElements,
+    addBimElements,
+    getBimIssues,
+    setBimIssues,
+    addBimIssue,
+    updateBimIssue,
+    getBimConnectorPackages,
+    setBimConnectorPackages,
+    addBimConnectorPackage,
+    getActiveBimConnectorPackageId,
+    setActiveBimConnectorPackageId,
     addCable,
     getDuctbanks,
     setDuctbanks,

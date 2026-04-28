@@ -6,6 +6,9 @@ import { showAlertModal } from './src/components/modal.js';
 (function(){
   let ductbanks=[];
   const DUCTBANK_KEY = TableUtils.STORAGE_KEYS.ductbankSchedule;
+  const SUPPORT_TYPE_OPTIONS = ['', 'trapeze', 'wallBracket', 'floorStand', 'cantilever', 'strut', 'directBuried'];
+  const CONSTRUCTION_STATUS_OPTIONS = ['notStarted', 'planned', 'released', 'inProgress', 'installed', 'verified', 'hold'];
+  const CONSTRUCTION_PHASE_OPTIONS = ['', 'IFR', 'IFC', 'Construction', 'Turnover', 'As-built'];
   let ductbankTbody;
   let filters=[];
   let filterButtons=[];
@@ -147,6 +150,27 @@ import { showAlertModal } from './src/components/modal.js';
     ductbankTbody.appendChild(tr);
   }
 
+  function addTextInputCell(row, db, key, index, type = 'text'){
+    const cell=row.insertCell();
+    setWidth(cell,index);
+    const input=document.createElement('input');
+    input.type=type;
+    input.value=db[key]||'';
+    input.addEventListener('input',e=>{db[key]=e.target.value;saveDuctbanks();});
+    cell.appendChild(input);
+  }
+
+  function addSelectCell(row, db, key, index, options){
+    const cell=row.insertCell();
+    setWidth(cell,index);
+    const select=document.createElement('select');
+    options.forEach(value=>{const o=document.createElement('option');o.value=value;o.textContent=value||'—';select.appendChild(o);});
+    select.value=db[key]||options[0]||'';
+    db[key]=select.value;
+    select.addEventListener('change',e=>{db[key]=e.target.value;saveDuctbanks();});
+    cell.appendChild(select);
+  }
+
   function renderDuctbanks(){
     // Lazily select the table body in case initialization was skipped
     if(!ductbankTbody){
@@ -269,8 +293,21 @@ import { showAlertModal } from './src/components/modal.js';
       TableUtils.applyValidation(ezInput,ezRules);
       ez.appendChild(ezInput);
 
+      addTextInputCell(row, db, 'supportFamily', 11);
+      addSelectCell(row, db, 'supportType', 12, SUPPORT_TYPE_OPTIONS);
+      addTextInputCell(row, db, 'supportSpacingFt', 13, 'number');
+      addTextInputCell(row, db, 'accessoryKits', 14);
+      addSelectCell(row, db, 'constructionPhase', 15, CONSTRUCTION_PHASE_OPTIONS);
+      addSelectCell(row, db, 'constructionStatus', 16, CONSTRUCTION_STATUS_OPTIONS);
+      addTextInputCell(row, db, 'drawingRef', 17);
+      addTextInputCell(row, db, 'detailRef', 18);
+      addTextInputCell(row, db, 'labelId', 19);
+      addTextInputCell(row, db, 'sectionRef', 20);
+      addTextInputCell(row, db, 'installArea', 21);
+      addTextInputCell(row, db, 'constructionNotes', 22);
+
       const act=row.insertCell();
-      setWidth(act,11);
+      setWidth(act,23);
       act.appendChild(iconBtn('👁','viewBtn','View Ductbank',()=>{viewDuctbank(i);}));
       act.appendChild(iconBtn('+','insertBelowBtn','Add Conduit',()=>{addConduit(i);}));
       act.appendChild(iconBtn('\u29C9','duplicateBtn','Duplicate Ductbank',()=>{duplicateDuctbank(i);}));
@@ -281,7 +318,7 @@ import { showAlertModal } from './src/components/modal.js';
       ductbankTbody.appendChild(cRow);
       cRow.style.display=db.expanded?'':'none';
       const cCell=cRow.insertCell();
-      cCell.colSpan=12;
+      cCell.colSpan=24;
       const cTable=document.createElement('table');
       cTable.className='nested-table';
       const cHead=cTable.createTHead();
@@ -353,7 +390,7 @@ import { showAlertModal } from './src/components/modal.js';
   }
 
   function addDuctbank(){
-    ductbanks.push({id:Date.now(),tag:'',from:'',to:'',concrete_encasement:false,start_x:'',start_y:'',start_z:'',end_x:'',end_y:'',end_z:'',conduits:[],expanded:true});
+    ductbanks.push({id:Date.now(),tag:'',from:'',to:'',concrete_encasement:false,start_x:'',start_y:'',start_z:'',end_x:'',end_y:'',end_z:'',supportFamily:'',supportType:'',supportSpacingFt:'',accessoryKits:'',constructionPhase:'',constructionStatus:'notStarted',drawingRef:'',detailRef:'',labelId:'',sectionRef:'',installArea:'',constructionNotes:'',conduits:[],expanded:true});
     renderDuctbanks();
     saveDuctbanks();
   }
@@ -451,6 +488,7 @@ import { showAlertModal } from './src/components/modal.js';
       if(!db.conduits) db.conduits=[];
       if(db.concrete_encasement===undefined) db.concrete_encasement=false;
       ['start_x','start_y','start_z','end_x','end_y','end_z'].forEach(k=>{if(db[k]===undefined) db[k]='';});
+      ['supportFamily','supportType','supportSpacingFt','accessoryKits','constructionPhase','constructionStatus','drawingRef','detailRef','labelId','sectionRef','installArea','constructionNotes'].forEach(k=>{if(db[k]===undefined) db[k]=k==='constructionStatus'?'notStarted':'';});
       db.conduits.forEach(c=>{
         ['start_x','start_y','start_z','end_x','end_y','end_z'].forEach(k=>{if(c[k]===undefined) c[k]=db[k];});
         if(c.allowed_cable_group===undefined) c.allowed_cable_group='';

@@ -1,0 +1,66 @@
+{
+  "meta": { "version": 1, "scenario": "heat-trace-package", "scenarios": ["heat-trace-package"], "projectName": "Heat Trace Installation Package" },
+  "ductbanks": [],
+  "conduits": [],
+  "trays": [
+    { "id": "HT-TR-1", "tray_id": "HT-TR-1", "name": "Heat Trace Home Run Tray", "width": 12, "height": 4, "length": 80, "fillLimitPct": 50 }
+  ],
+  "cables": [
+    { "id": "HTP-101", "tag": "HTP-101", "from": "HTPNL-1", "to": "PIPE-101", "conductor_size": "2/C 12 AWG", "insulation_type": "Heat Trace", "voltage_rating": "120 V", "length": 110, "route_preference": "HT-TR-1" },
+    { "id": "HTP-102", "tag": "HTP-102", "from": "HTPNL-1", "to": "PIPE-102", "conductor_size": "2/C 12 AWG", "insulation_type": "Heat Trace", "voltage_rating": "120 V", "length": 95, "route_preference": "HT-TR-1" }
+  ],
+  "cableTypicals": [],
+  "panels": [
+    { "id": "HTPNL-1", "name": "HTPNL-1", "voltage": "120/208 V", "location": "Unit 20" }
+  ],
+  "equipment": [
+    { "id": "PIPE-101", "tag": "PIPE-101", "description": "Caustic transfer line", "area": "Unit 20" },
+    { "id": "PIPE-102", "tag": "PIPE-102", "description": "Water flush line", "area": "Unit 20" }
+  ],
+  "loads": [],
+  "oneLine": { "activeSheet": 0, "sheets": [] },
+  "settings": {
+    "studyResults": {
+      "heatTraceSizing": {
+        "inputs": { "maintainTempC": 5, "ambientTempC": -20, "insulationThicknessMm": 25, "voltage": 120 },
+        "summary": { "branchCount": 2, "totalLengthFt": 205, "selectedWattDensity": 5 },
+        "warnings": ["Verify startup current and hazardous-area accessory selections with manufacturer."],
+        "sample": true
+      },
+      "heatTraceSizingCircuits": [
+        {
+          "id": "HT-BR-101",
+          "pipeTag": "PIPE-101",
+          "service": "Caustic transfer",
+          "area": "Unit 20",
+          "sourcePanel": "HTPNL-1",
+          "controllerTag": "HTC-101",
+          "circuitNumber": "1",
+          "cableFamilyId": "self-regulating-120",
+          "lengthFt": 110,
+          "voltage": 120,
+          "selectedWattDensity": 5,
+          "cableType": "self-regulating",
+          "installationNotes": "Maintain freeze protection through exposed pipe rack section."
+        },
+        {
+          "id": "HT-BR-102",
+          "pipeTag": "PIPE-102",
+          "service": "Water flush",
+          "area": "Unit 20",
+          "sourcePanel": "HTPNL-1",
+          "controllerTag": "HTC-102",
+          "circuitNumber": "2",
+          "cableFamilyId": "self-regulating-120",
+          "lengthFt": 95,
+          "voltage": 120,
+          "selectedWattDensity": 5,
+          "cableType": "self-regulating",
+          "accessoryOverrides": { "labels": 4 },
+          "installationNotes": "Add sensor on north exposure."
+        }
+      ]
+    }
+  }
+}
+

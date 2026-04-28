@@ -1,0 +1,30 @@
+{
+  "meta": { "version": 1, "benchmark": "ieee80-ground-grid", "scenario": "default", "scenarios": [] },
+  "ductbanks": [],
+  "conduits": [],
+  "trays": [],
+  "cables": [],
+  "cableTypicals": [],
+  "panels": [],
+  "equipment": [],
+  "loads": [],
+  "oneLine": { "components": [], "connections": [], "revision": 0 },
+  "settings": {
+    "studyResults": {
+      "groundGrid": {
+        "inputs": {
+          "gridLengthM": 70,
+          "gridWidthM": 70,
+          "meshSpacingM": 6,
+          "conductorDepthM": 0.6,
+          "soilResistivityOhmM": 100,
+          "faultCurrentA": 3000,
+          "faultDurationS": 1.0,
+          "conductorDiameterM": 0.00953,
+          "numberOfGroundRods": 20
+        },
+        "_benchmark": "IEEE 80-2013 Annex B Example B.1 — 70×70 m rectangular grid, 100 Ω·m soil, 3 kA. Expected: E_m ≈ 312 V, E_s ≈ 168 V, R_g ≈ 0.54 Ω."
+      }
+    }
+  }
+}

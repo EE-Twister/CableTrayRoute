@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Cable thermal environment comparison for tray, conduit, direct burial, duct bank, and free-air installation assumptions." />
+  <title>Cable Thermal Environment - CableTrayRoute</title>
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/favicon.svg">
+  <meta name="color-scheme" content="light dark">
+  <link rel="stylesheet" href="style.css" />
+  <script type="module" src="dirtyTracker.js"></script>
+  <script type="module" src="dist/cablethermal.js" defer></script>
+</head>
+<body class="study-page cablethermal-page" data-report-title="Cable Thermal Environment">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <nav class="top-nav" aria-label="Primary">
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
+      <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+    <div id="nav-links" class="nav-links" role="list"></div>
+    <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+  </nav>
+
+  <div id="settings-menu" class="settings-menu">
+    <label for="theme-select">Theme
+      <select id="theme-select">
+        <option value="system">System</option>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+        <option value="high-contrast">High Contrast</option>
+      </select>
+    </label>
+    <label><input type="checkbox" id="compact-toggle" aria-label="Enable compact table mode"> Compact Mode</label>
+    <button id="help-btn" class="btn" aria-expanded="false" title="Show help">Site Help</button>
+  </div>
+
+  <div class="container">
+    <main id="main-content" class="main-content">
+      <header class="page-header">
+        <p class="eyebrow">IEC 60287 Screening Workflow</p>
+        <h1>Cable Thermal Environment</h1>
+        <p>Compare tray, conduit, direct-burial, duct-bank, and free-air installation assumptions with deterministic screening results.</p>
+      </header>
+
+      <details class="method-panel" open>
+        <summary>Method &amp; Assumptions</summary>
+        <p>V1 uses IEC 60287-style thermal circuit calculations for screening. Duct-bank rows consume saved finite results when available; otherwise they use a conduit-equivalent screening basis. Final ampacity approvals require engineering and project-specific verification.</p>
+      </details>
+
+      <form id="thermal-form" class="card thermal-form">
+        <fieldset>
+          <legend><strong>Cables</strong></legend>
+          <label for="thermal-cables">Cable schedule rows</label>
+          <select id="thermal-cables" multiple size="8" aria-describedby="thermal-cables-hint"></select>
+          <p id="thermal-cables-hint" class="field-hint">Schedule rows are selected by default. Use Ctrl/Cmd-click to change the set.</p>
+          <label for="manual-cables">Manual rows</label>
+          <textarea id="manual-cables" rows="4" spellcheck="false" placeholder="tag, size, design amps, insulation, material, voltage&#10;C-MAN, 4/0 AWG, 180, XLPE, Cu, 600 V"></textarea>
+        </fieldset>
+
+        <fieldset>
+          <legend><strong>Installation Alternatives</strong></legend>
+          <div class="thermal-methods">
+            <label><input type="checkbox" name="thermal-method" value="tray" checked> Tray</label>
+            <label><input type="checkbox" name="thermal-method" value="conduit" checked> Conduit</label>
+            <label><input type="checkbox" name="thermal-method" value="direct-burial" checked> Direct burial</label>
+            <label><input type="checkbox" name="thermal-method" value="ductbank" checked> Duct bank</label>
+            <label><input type="checkbox" name="thermal-method" value="air" checked> Free air</label>
+          </div>
+        </fieldset>
+
+        <fieldset class="thermal-grid">
+          <legend><strong>Environment</strong></legend>
+          <label for="ambient-temp">Ambient air temp (C)<input id="ambient-temp" type="number" value="30" step="1"></label>
+          <label for="earth-temp">Earth temp (C)<input id="earth-temp" type="number" value="20" step="1"></label>
+          <label for="soil-resistivity">Soil thermal resistivity (K m/W)<input id="soil-resistivity" type="number" value="1.2" step="0.1"></label>
+          <label for="burial-depth-mm">Burial depth (mm)<input id="burial-depth-mm" type="number" value="800" step="25"></label>
+          <label for="conduit-od-mm">Conduit OD (mm)<input id="conduit-od-mm" type="number" value="80" step="5"></label>
+          <label for="group-count">Cables in group<input id="group-count" type="number" value="1" min="1" step="1"></label>
+          <label for="group-arrangement">Group arrangement
+            <select id="group-arrangement">
+              <option value="flat">Flat spaced</option>
+              <option value="trefoil">Trefoil touching</option>
+              <option value="flat-touching">Flat touching</option>
+            </select>
+          </label>
+          <label for="frequency-hz">Frequency (Hz)<input id="frequency-hz" type="number" value="60" step="1"></label>
+        </fieldset>
+
+        <fieldset class="thermal-grid">
+          <legend><strong>Advanced Thermal Inputs</strong></legend>
+          <label><input id="advanced-enabled" type="checkbox"> Apply advanced screening modifiers</label>
+          <label for="exposure-mode">Exposure mode
+            <select id="exposure-mode">
+              <option value="standard">Standard</option>
+              <option value="surface">Surface</option>
+              <option value="riser">Riser</option>
+              <option value="tunnel">Tunnel</option>
+              <option value="channel">Channel/trough</option>
+            </select>
+          </label>
+          <label><input id="solar-enabled" type="checkbox"> Solar exposure</label>
+          <label for="solar-radiation">Solar radiation (W/m2)<input id="solar-radiation" type="number" value="0" min="0" step="25"></label>
+          <label for="solar-absorptivity">Absorptivity<input id="solar-absorptivity" type="number" value="0.7" min="0" max="1" step="0.05"></label>
+          <label for="wind-speed-ms">Wind speed (m/s)<input id="wind-speed-ms" type="number" value="0" min="0" step="0.5"></label>
+          <label><input id="dryout-enabled" type="checkbox"> Soil dry-out screening</label>
+          <label for="moist-rho">Moist soil rho (K m/W)<input id="moist-rho" type="number" value="" min="0" step="0.1"></label>
+          <label for="dry-rho">Dry soil rho (K m/W)<input id="dry-rho" type="number" value="" min="0" step="0.1"></label>
+          <label for="dryout-temp">Critical dry-out temp (C)<input id="dryout-temp" type="number" value="" step="1"></label>
+          <label for="sheath-bonding-mode">Sheath/bonding loss
+            <select id="sheath-bonding-mode">
+              <option value="screeningDefault">Screening default</option>
+              <option value="singlePoint">Single-point bonded</option>
+              <option value="bothEndsBonded">Both-ends bonded</option>
+              <option value="crossBonded">Cross-bonded</option>
+            </select>
+          </label>
+          <label for="cyclic-rating-mode">Cyclic rating mode
+            <select id="cyclic-rating-mode">
+              <option value="screeningDefault">Screening default</option>
+              <option value="iec60853Screening">IEC 60853 screening</option>
+              <option value="emergencyProfile">Emergency profile</option>
+            </select>
+          </label>
+          <label for="advanced-notes">Advanced notes<input id="advanced-notes" value="" placeholder="Screening assumptions or review notes"></label>
+        </fieldset>
+
+        <fieldset>
+          <legend><strong>Backfill and Adjacent Heat Sources</strong></legend>
+          <label for="backfill-zones">Backfill zones</label>
+          <textarea id="backfill-zones" rows="4" spellcheck="false" placeholder="name, thickness_mm, rho, moisture, notes&#10;Thermal sand, 300, 0.9, moist, around duct bank"></textarea>
+          <label for="adjacent-influences">Adjacent circuits / heat sources</label>
+          <textarea id="adjacent-influences" rows="4" spellcheck="false" placeholder="label, type, distance_mm, heat_W_per_m, current_A, notes&#10;Parallel feeder, cable, 250, 25, 180, same trench"></textarea>
+        </fieldset>
+
+        <fieldset>
+          <legend><strong>Cyclic Load Profile</strong></legend>
+          <label for="load-profile">Daily profile rows</label>
+          <textarea id="load-profile" rows="4" spellcheck="false" placeholder="hour, load_pct&#10;0, 70&#10;6, 85&#10;12, 100&#10;18, 90&#10;24, 70"></textarea>
+          <label for="emergency-profile">Emergency overload profile</label>
+          <textarea id="emergency-profile" rows="4" spellcheck="false" placeholder="hour, duration_hours, overload_pct, notes&#10;0, 1, 100, normal&#10;1, 2, 115, emergency overload"></textarea>
+        </fieldset>
+
+        <div class="button-row">
+          <button type="submit" class="primary-btn">Evaluate Thermal Environment</button>
+          <button type="button" id="export-thermal-json" class="btn">Export JSON</button>
+          <button type="button" id="export-thermal-html" class="btn">Printable HTML</button>
+        </div>
+      </form>
+
+      <section class="results-panel">
+        <h2>Thermal Summary</h2>
+        <div id="thermal-summary" class="thermal-summary-grid">
+          <p class="field-hint">Run the evaluation to compare installation environments.</p>
+        </div>
+      </section>
+
+      <section class="results-panel">
+        <h2>Evaluation Rows</h2>
+        <div id="thermal-results" class="report-scroll"></div>
+      </section>
+
+      <section class="results-panel">
+        <h2>Temperature Timeline</h2>
+        <div id="thermal-timeline"></div>
+      </section>
+
+      <section class="results-panel">
+        <h2>Advanced Thermal Details</h2>
+        <div id="thermal-advanced-details"></div>
+      </section>
+    </main>
+  </div>
+
+  <div id="help-modal" class="modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="help-title">
+    <div class="modal-content">
+      <button id="close-help-btn" class="close-btn" aria-label="Close Help">&times;</button>
+      <h2 id="help-title">Cable Thermal Environment Help</h2>
+      <p>Select cable schedule rows or enter manual cable rows, choose installation alternatives, and run a screening comparison. Use final engineered ampacity calculations for issued design.</p>
+    </div>
+  </div>
+
+  <script type="module" src="dist/projectManager.js"></script>
+</body>
+</html>

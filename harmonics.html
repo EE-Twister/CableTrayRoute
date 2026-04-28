@@ -79,6 +79,83 @@
         <h1>Harmonic Analysis</h1>
         <p>Compute THD at each bus and compare with IEEE 519 limits.</p>
       </header>
+      <section class="card" id="harmonic-study-case-section">
+        <h2>Harmonic Study Case</h2>
+        <p>Define PCC, source-spectrum, IEEE 519 demand-current, transformer/sequence, and filter-screening assumptions before saving reportable harmonic results.</p>
+        <div class="form-grid">
+          <label>PCC Bus / Tag
+            <input id="harmonic-pcc-tag" type="text" placeholder="PCC-MAIN" autocomplete="off">
+          </label>
+          <label>Nominal Voltage (kV)
+            <input id="harmonic-nominal-kv" type="number" min="0.001" step="0.001" value="0.48">
+          </label>
+          <label>Utility SC MVA
+            <input id="harmonic-sc-mva" type="number" min="0.001" step="0.1" placeholder="100">
+          </label>
+          <label>Utility X/R
+            <input id="harmonic-xr" type="number" min="0.1" step="0.1" value="10">
+          </label>
+          <label>Maximum Demand Current (A)
+            <input id="harmonic-demand-current" type="number" min="0.1" step="0.1" placeholder="1200">
+          </label>
+          <label>Demand-Current Basis
+            <input id="harmonic-demand-basis" type="text" placeholder="12-month peak, utility bill, measured, study">
+          </label>
+          <label>Compliance Basis
+            <select id="harmonic-compliance-basis">
+              <option value="IEEE519-2022">IEEE 519-2022</option>
+              <option value="IEEE519-2014">IEEE 519-2014</option>
+              <option value="projectBasis">Project basis</option>
+            </select>
+          </label>
+          <label>Report Preset
+            <select id="harmonic-report-preset">
+              <option value="summary">Summary</option>
+              <option value="compliance">Compliance</option>
+              <option value="fullStudy">Full Study</option>
+            </select>
+          </label>
+          <label>Transformer Phase Shift
+            <input id="harmonic-phase-shift" type="text" placeholder="Delta-wye, 30 deg, none">
+          </label>
+          <label>Triplen Treatment
+            <select id="harmonic-triplen-treatment">
+              <option value="screening">Screening</option>
+              <option value="blocked">Blocked</option>
+              <option value="passed">Passed</option>
+              <option value="review">Review</option>
+            </select>
+          </label>
+        </div>
+
+        <h3>Harmonic Source Rows</h3>
+        <div class="table-wrap">
+          <table class="data-table" id="harmonic-source-table" aria-label="Harmonic source rows">
+            <thead>
+              <tr>
+                <th scope="col">Tag</th>
+                <th scope="col">Type</th>
+                <th scope="col">Bus / Component</th>
+                <th scope="col">Current (A)</th>
+                <th scope="col">kW</th>
+                <th scope="col">Spectrum</th>
+                <th scope="col">Interharmonic</th>
+                <th scope="col"></th>
+              </tr>
+            </thead>
+            <tbody id="harmonic-source-tbody"></tbody>
+          </table>
+        </div>
+        <div class="button-row" style="margin-top:0.75rem;">
+          <button id="harmonic-add-source" class="btn" type="button">Add Source</button>
+          <button id="harmonic-run-study-case" class="btn btn-primary" type="button">Run Study Case</button>
+          <button id="harmonic-save-study-case" class="btn" type="button">Save to Studies</button>
+          <button id="harmonic-export-json" class="btn" type="button">Export JSON</button>
+          <button id="harmonic-export-html" class="btn" type="button">Printable HTML</button>
+        </div>
+        <div id="harmonic-study-case-status" role="status" style="margin-top:0.75rem;"></div>
+        <div id="harmonic-study-case-results" style="margin-top:1rem;"></div>
+      </section>
       <section class="card">
         <svg id="harmonics-chart" width="800" height="600" xmlns="http://www.w3.org/2000/svg"></svg>
       </section>

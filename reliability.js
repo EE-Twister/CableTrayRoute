@@ -1,5 +1,10 @@
-import { runReliability } from './analysis/reliability.js';
+import {
+  buildReliabilityNetworkPackage,
+  renderReliabilityNetworkHTML,
+  runReliability,
+} from './analysis/reliability.js';
 import { getOneLine, getStudies, setStudies } from './dataStore.mjs';
+import { downloadCSV } from './reports/reporting.mjs';
 
 document.addEventListener('DOMContentLoaded', () => {
   initSettings();
@@ -12,10 +17,22 @@ document.addEventListener('DOMContentLoaded', () => {
   const resultsDiv = document.getElementById('results');
   const chartContainer = document.getElementById('chart-container');
   const overrideArea = document.getElementById('component-override-area');
+  const saveBtn = document.getElementById('save-btn');
+  const exportJsonBtn = document.getElementById('export-json-btn');
+  const exportCsvBtn = document.getElementById('export-csv-btn');
+  const exportHtmlBtn = document.getElementById('export-html-btn');
 
   // Component overrides: id → { mtbf, mttr }
   let overrides = {};
   let loadedComponents = [];
+  let lastPackage = null;
+
+  const saved = getStudies().reliability;
+  if (saved?.version) {
+    lastPackage = saved;
+    setExportEnabled(true);
+    renderResults(saved);
+  }
 
   runBtn.addEventListener('click', () => {
     const { sheets } = getOneLine();
@@ -40,9 +57,18 @@ document.addEventListener('DOMContentLoaded', () => {
     loadedComponents = components;
     buildOverrideTable(allComps);
 
+    let legacyResult;
     let result;
     try {
-      result = runReliability(components);
+      legacyResult = runReliability(components);
+      result = buildReliabilityNetworkPackage({
+        projectName: document.body.dataset.reportTitle || 'Reliability Analysis',
+        components,
+        customerRows: readJsonRows('rel-customer-rows', 'Customer rows'),
+        restorationRows: readJsonRows('rel-restoration-rows', 'Restoration rows'),
+        model: readReliabilityModel(),
+        legacyResult,
+      });
     } catch (err) {
       resultsDiv.innerHTML = `<p class="result-fail">Analysis error: ${esc(err.message)}</p>`;
       return;
@@ -51,10 +77,70 @@ document.addEventListener('DOMContentLoaded', () => {
     const studies = getStudies();
     studies.reliability = result;
     setStudies(studies);
+    lastPackage = result;
+    setExportEnabled(true);
 
     renderResults(result);
-    renderChart(result);
+    renderChart(legacyResult);
   });
+
+  saveBtn?.addEventListener('click', () => {
+    if (!lastPackage) return;
+    setStudies({ ...getStudies(), reliability: lastPackage });
+    showAlertModal('Study Saved', 'Reliability network package saved to project studies.');
+  });
+
+  exportJsonBtn?.addEventListener('click', () => {
+    if (!lastPackage) return;
+    downloadText('reliability-network-package.json', JSON.stringify(lastPackage, null, 2), 'application/json');
+  });
+
+  exportHtmlBtn?.addEventListener('click', () => {
+    if (!lastPackage) return;
+    downloadText('reliability-network-package.html', renderReliabilityNetworkHTML(lastPackage), 'text/html');
+  });
+
+  exportCsvBtn?.addEventListener('click', () => {
+    if (!lastPackage) return;
+    const rows = [
+      ...lastPackage.indexRows.map(row => ({ recordType: 'index', ...row })),
+      ...lastPackage.scenarioRows.map(row => ({ recordType: 'scenario', ...row })),
+      ...lastPackage.contributorRows.map(row => ({ recordType: 'contributor', ...row })),
+      ...lastPackage.warningRows.map(row => ({ recordType: 'warning', ...row })),
+    ];
+    const headers = [...new Set(rows.flatMap(row => Object.keys(row)))];
+    downloadCSV(headers, rows.map(row => headers.map(header => row[header] ?? '')), 'reliability-network.csv');
+  });
+
+  function readReliabilityModel() {
+    const get = id => document.getElementById(id);
+    const getFloat = id => {
+      const value = parseFloat(get(id)?.value || '');
+      return Number.isFinite(value) ? value : undefined;
+    };
+    return {
+      saifiReviewLimit: getFloat('rel-saifi-limit'),
+      saidiReviewLimitHours: getFloat('rel-saidi-limit'),
+      eensReviewLimitKwh: getFloat('rel-eens-limit'),
+      defaultValueOfLostLoadPerKwh: getFloat('rel-voll'),
+      restorationEnabled: Boolean(get('rel-restoration-enabled')?.checked),
+      includeCommonMode: Boolean(get('rel-common-mode-enabled')?.checked),
+    };
+  }
+
+  function readJsonRows(id, label) {
+    const raw = document.getElementById(id)?.value.trim();
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) throw new Error(`${label} JSON must be an array.`);
+    return parsed;
+  }
+
+  function setExportEnabled(enabled) {
+    [saveBtn, exportJsonBtn, exportCsvBtn, exportHtmlBtn].forEach(button => {
+      if (button) button.disabled = !enabled;
+    });
+  }
 
   function buildOverrideTable(comps) {
     // Filter to eligible (non-visual, non-connector) components
@@ -113,6 +199,12 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function renderResults(result) {
+    if (result?.version) {
+      resultsDiv.innerHTML = renderReliabilityNetworkHTML(result);
+      chartContainer.hidden = !result.legacyResult?.componentStats;
+      if (result.legacyResult?.componentStats) renderChart(result.legacyResult);
+      return;
+    }
     const availPct = (result.systemAvailability * 100).toFixed(4);
     const outage = result.expectedOutage.toFixed(1);
     const compCount = Object.keys(result.componentStats).length;
@@ -270,5 +362,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function esc(s) {
     return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function downloadText(fileName, content, type) {
+    const blob = new Blob([content], { type });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = fileName;
+    anchor.click();
+    URL.revokeObjectURL(url);
   }
 });

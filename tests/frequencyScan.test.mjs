@@ -8,6 +8,7 @@ import {
   identifyResonances,
   runFrequencyScan,
 } from '../analysis/frequencyScan.mjs';
+import { buildHarmonicFilterAlternatives } from '../analysis/harmonicStudyCase.mjs';
 
 // ---------------------------------------------------------------------------
 // Helper
@@ -204,6 +205,19 @@ function baseInput(overrides = {}) {
   assert.ok(parallel, 'should find parallel resonance');
   // h_r = √(50000/2000) = √25 = 5 → exactly on 5th harmonic → danger
   assert.ok(['danger', 'caution'].includes(parallel.risk), 'resonance at h=5 should be danger or caution');
+})();
+
+// ---------------------------------------------------------------------------
+// harmonic study-case integration
+// ---------------------------------------------------------------------------
+(function testHarmonicStudyFilterAlternativeUsesFrequencyScanRisk() {
+  const scan = runFrequencyScan(baseInput({ capacitorBanks: [{ kvar: 2000, label: 'Resonant at 5th' }] }));
+  const filters = buildHarmonicFilterAlternatives({
+    studyCase: { pccBus: 'PCC-1', nominalVoltageKv: 4.16, utilityScMva: 50, maximumDemandCurrentA: 1000 },
+    sourceRows: [{ id: 'vfd-1', tag: 'VFD-1', sourceType: 'vfd', fundamentalCurrentA: 300, spectrumText: '5:35,7:25' }],
+    frequencyScan: scan,
+  });
+  assert.ok(filters.some(row => row.frequencyScanResonanceRisk === 'danger' || row.frequencyScanResonanceRisk === 'caution'), 'filter alternatives carry scan resonance risk');
 })();
 
 // ---------------------------------------------------------------------------

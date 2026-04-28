@@ -1,0 +1,111 @@
+{
+  "version": "sample-gallery-v1",
+  "generatedFor": "CableTrayRoute",
+  "samples": [
+    {
+      "id": "industrial-plant",
+      "title": "Industrial Plant Cable Routing",
+      "description": "Motor-control, tray-fill, routing, one-line, and report workflow for a small process unit.",
+      "domain": "Industrial",
+      "tags": ["motor control", "tray fill", "routing"],
+      "workflows": ["Schedules", "Tray Fill", "One-Line", "Reports"],
+      "preview": "icons/samples/industrial-plant.svg",
+      "projectPath": "samples/projects/industrial-plant.ctr.json",
+      "startPage": "workflowdashboard.html",
+      "guidedWorkflow": [
+        { "id": "dashboard", "title": "Review Dashboard", "description": "Confirm imported cable, raceway, and study coverage.", "href": "workflowdashboard.html", "category": "overview" },
+        { "id": "cables", "title": "Inspect Cable Schedule", "description": "Review feeders and branch circuits assigned to tray routes.", "href": "cableschedule.html", "category": "schedules" },
+        { "id": "tray-fill", "title": "Check Tray Fill", "description": "Review tray capacity and fill warning behavior.", "href": "cabletrayfill.html", "category": "studies" },
+        { "id": "one-line", "title": "Review One-Line", "description": "Open the one-line model that matches the sample feeders.", "href": "oneline.html", "category": "model" },
+        { "id": "report", "title": "Generate Report", "description": "Open the unified report package for project deliverables.", "href": "projectreport.html", "category": "reports" }
+      ]
+    },
+    {
+      "id": "data-center",
+      "title": "Data Center Power Distribution",
+      "description": "UPS, panel, feeder, load-flow, and lifecycle release workflow for a modular data hall.",
+      "domain": "Data Center",
+      "tags": ["UPS", "load flow", "lifecycle"],
+      "workflows": ["Load List", "One-Line", "Load Flow", "Lifecycle"],
+      "preview": "icons/samples/data-center.svg",
+      "projectPath": "samples/projects/data-center.ctr.json",
+      "startPage": "workflowdashboard.html",
+      "guidedWorkflow": [
+        { "id": "dashboard", "title": "Review Dashboard", "description": "Review imported panels, loads, and saved studies.", "href": "workflowdashboard.html", "category": "overview" },
+        { "id": "loads", "title": "Review Load List", "description": "Inspect rack, UPS, and cooling loads.", "href": "loadlist.html", "category": "schedules" },
+        { "id": "one-line", "title": "Open One-Line", "description": "Review source, UPS, and distribution topology.", "href": "oneline.html", "category": "model" },
+        { "id": "load-flow", "title": "Open Load Flow", "description": "Review saved load-flow assumptions and results.", "href": "loadFlow.html", "category": "studies" },
+        { "id": "lifecycle", "title": "Create Lifecycle Release", "description": "Use the dashboard release panel to freeze the sample package.", "href": "workflowdashboard.html#lifecycle-release-form", "category": "release" }
+      ]
+    },
+    {
+      "id": "substation-ground-grid",
+      "title": "Substation Ground Grid",
+      "description": "Ground-grid study sample with equipment tags, grid assumptions, and report-ready saved results.",
+      "domain": "Substation",
+      "tags": ["grounding", "IEEE 80", "report"],
+      "workflows": ["Equipment", "Ground Grid", "Reports"],
+      "preview": "icons/samples/substation-ground-grid.svg",
+      "projectPath": "samples/projects/substation-ground-grid.ctr.json",
+      "startPage": "groundgrid.html",
+      "guidedWorkflow": [
+        { "id": "equipment", "title": "Review Equipment", "description": "Inspect switchgear and transformer records used for study context.", "href": "equipmentlist.html", "category": "schedules" },
+        { "id": "ground-grid", "title": "Open Ground Grid Study", "description": "Review the IEEE 80 screening inputs and saved result.", "href": "groundgrid.html", "category": "studies" },
+        { "id": "design-coach", "title": "Check Design Coach", "description": "Review cross-study action ranking for the saved study.", "href": "workflowdashboard.html#design-coach-summary", "category": "review" },
+        { "id": "report", "title": "Open Project Report", "description": "Confirm grounding study metadata is included in the report.", "href": "projectreport.html", "category": "reports" }
+      ]
+    },
+    {
+      "id": "heat-trace-package",
+      "title": "Heat Trace Installation Package",
+      "description": "Saved heat-trace branches with construction metadata for line list, controller schedule, BOM, and warnings.",
+      "domain": "Industrial",
+      "tags": ["heat trace", "BOM", "installation"],
+      "workflows": ["Heat Trace", "BOM", "Reports"],
+      "preview": "icons/samples/heat-trace-package.svg",
+      "projectPath": "samples/projects/heat-trace-package.ctr.json",
+      "startPage": "heattracesizing.html",
+      "guidedWorkflow": [
+        { "id": "heat-trace", "title": "Open Heat Trace", "description": "Review saved branch cases and construction metadata.", "href": "heattracesizing.html", "category": "studies" },
+        { "id": "package", "title": "Review Package Tabs", "description": "Inspect line list, controller schedule, BOM, warnings, and assumptions.", "href": "heattracesizing.html#heattrace-installation-package", "category": "deliverables" },
+        { "id": "dashboard", "title": "Check Dashboard", "description": "See saved heat-trace results in workflow and coach context.", "href": "workflowdashboard.html", "category": "overview" },
+        { "id": "report", "title": "Open Report", "description": "Verify heat-trace package details in the unified report.", "href": "projectreport.html", "category": "reports" }
+      ]
+    },
+    {
+      "id": "duct-bank",
+      "title": "Duct Bank Thermal Review",
+      "description": "Underground duct-bank layout with conduits, cables, thermal-screening study data, and field outputs.",
+      "domain": "Utility",
+      "tags": ["duct bank", "thermal", "field"],
+      "workflows": ["Ductbank", "Ampacity", "Field View"],
+      "preview": "icons/samples/duct-bank.svg",
+      "projectPath": "samples/projects/duct-bank.ctr.json",
+      "startPage": "ductbankroute.html",
+      "guidedWorkflow": [
+        { "id": "ductbank", "title": "Review Duct Bank", "description": "Inspect ductbank and conduit records.", "href": "ductbankroute.html", "category": "schedules" },
+        { "id": "cables", "title": "Review Routed Cables", "description": "Confirm underground feeders assigned to the ductbank.", "href": "cableschedule.html", "category": "schedules" },
+        { "id": "ampacity", "title": "Open IEC 60287", "description": "Review saved thermal screening data.", "href": "iec60287.html", "category": "studies" },
+        { "id": "field", "title": "Open Field View", "description": "Review field-facing context for the underground route.", "href": "fieldview.html", "category": "field" }
+      ]
+    },
+    {
+      "id": "coordination-study",
+      "title": "Protection Coordination Study",
+      "description": "Source, transformer, switchboard, and feeder sample with short-circuit, arc-flash, and TCC study context.",
+      "domain": "Power System",
+      "tags": ["short circuit", "arc flash", "TCC"],
+      "workflows": ["One-Line", "Short Circuit", "Arc Flash", "TCC"],
+      "preview": "icons/samples/coordination-study.svg",
+      "projectPath": "samples/projects/coordination-study.ctr.json",
+      "startPage": "shortCircuit.html",
+      "guidedWorkflow": [
+        { "id": "one-line", "title": "Review One-Line", "description": "Inspect source, transformer, switchboard, and feeders.", "href": "oneline.html", "category": "model" },
+        { "id": "short-circuit", "title": "Open Short Circuit", "description": "Review saved fault-duty assumptions.", "href": "shortCircuit.html", "category": "studies" },
+        { "id": "arc-flash", "title": "Open Arc Flash", "description": "Review saved arc-flash screening inputs.", "href": "arcFlash.html", "category": "studies" },
+        { "id": "tcc", "title": "Open TCC", "description": "Review coordination workflow context.", "href": "tcc.html", "category": "studies" },
+        { "id": "coach", "title": "Review Design Coach", "description": "Check prioritized study approvals and review actions.", "href": "workflowdashboard.html#design-coach-summary", "category": "review" }
+      ]
+    }
+  ]
+}

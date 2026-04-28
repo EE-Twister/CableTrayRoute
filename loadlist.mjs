@@ -1,4 +1,8 @@
 import * as dataStore from './dataStore.mjs';
+import {
+  buildLoadDemandGovernancePackage,
+  renderLoadDemandGovernanceHTML,
+} from './analysis/loadDemandGovernance.mjs';
 import { escapeHtml as escapeAttr, escapeHtml } from './src/htmlUtils.mjs';
 import { showAlertModal } from './src/components/modal.js';
 
@@ -101,6 +105,10 @@ if (typeof window !== 'undefined') {
     const searchInput = document.getElementById('load-search');
     const clearSearchBtn = document.getElementById('clear-search-btn');
     const resultsCount = document.getElementById('load-results-count');
+    const demandBasisDiv = document.getElementById('demand-basis-summary');
+    const saveDemandPackageBtn = document.getElementById('save-demand-package-btn');
+    const exportDemandPackageBtn = document.getElementById('export-demand-package-btn');
+    const printDemandPackageBtn = document.getElementById('print-demand-package-btn');
     const quickFilterButtons = Array.from(document.querySelectorAll ? document.querySelectorAll('.loadlist-chip') : []);
     let clipboard = null;
     let rendering = false;
@@ -122,6 +130,16 @@ if (typeof window !== 'undefined') {
       loadFactor: '',
       efficiency: '',
       demandFactor: '',
+      loadClass: '',
+      continuous: '',
+      noncoincidentGroup: '',
+      largestMotorCandidate: '',
+      demandBasisCode: '',
+      demandBasisNote: '',
+      spareFuturePct: '',
+      loadManagementLimitKw: '',
+      measuredDemandSource: '',
+      demandNotes: '',
       phases: '',
       circuit: '',
       notes: ''
@@ -156,12 +174,13 @@ if (typeof window !== 'undefined') {
   function saveRow(tr) {
     const idx = getStoreIndex(tr);
     const load = gatherRow(tr);
-    const numericFields = ['quantity','voltage','kw','powerFactor','loadFactor','efficiency','demandFactor','phases'];
+    const numericFields = ['quantity','voltage','kw','powerFactor','loadFactor','efficiency','demandFactor','spareFuturePct','loadManagementLimitKw','phases'];
     const rangeFields = [
       { name: 'powerFactor', min: 0, max: 1 },
       { name: 'loadFactor', min: 0, max: 100 },
       { name: 'efficiency', min: 0, max: 100 },
-      { name: 'demandFactor', min: 0, max: 100 }
+      { name: 'demandFactor', min: 0, max: 100 },
+      { name: 'spareFuturePct', min: 0, max: 100 }
     ];
     let valid = true;
     numericFields.forEach(name => {
@@ -200,6 +219,7 @@ if (typeof window !== 'undefined') {
     tr.querySelector('.demand-kw').textContent = format(computed.demandKw);
     recalculateTotals();
     updateSummary();
+    updateDemandBasisSummary();
     const fn = window.opener?.updateComponent || window.updateComponent;
     if (fn) {
       const id = load.ref || load.id || load.tag;
@@ -324,6 +344,25 @@ if (typeof window !== 'undefined') {
       <td><input name="loadFactor" type="number" step="any" maxlength="15" value="${escapeAttr(load.loadFactor || '')}"></td>
       <td><input name="efficiency" type="number" step="any" maxlength="15" value="${escapeAttr(load.efficiency || '')}"></td>
       <td><input name="demandFactor" type="number" step="any" maxlength="15" value="${escapeAttr(load.demandFactor || '')}"></td>
+      <td><select name="loadClass">
+        ${['', 'lighting', 'receptacle', 'motor', 'hvac', 'process', 'ev', 'kitchen', 'heatTrace', 'spare', 'future', 'generic'].map(value => `<option value="${value}"${load.loadClass === value ? ' selected' : ''}>${value}</option>`).join('')}
+      </select></td>
+      <td><select name="continuous">
+        <option value=""></option>
+        <option value="true"${load.continuous === true || load.continuous === 'true' ? ' selected' : ''}>Yes</option>
+        <option value="false"${load.continuous === false || load.continuous === 'false' ? ' selected' : ''}>No</option>
+      </select></td>
+      <td><input name="noncoincidentGroup" type="text" value="${escapeAttr(load.noncoincidentGroup || '')}"></td>
+      <td><select name="largestMotorCandidate">
+        <option value=""></option>
+        <option value="true"${load.largestMotorCandidate === true || load.largestMotorCandidate === 'true' ? ' selected' : ''}>Yes</option>
+        <option value="false"${load.largestMotorCandidate === false || load.largestMotorCandidate === 'false' ? ' selected' : ''}>No</option>
+      </select></td>
+      <td><input name="spareFuturePct" type="number" step="any" maxlength="15" value="${escapeAttr(load.spareFuturePct || '')}"></td>
+      <td><input name="loadManagementLimitKw" type="number" step="any" maxlength="15" value="${escapeAttr(load.loadManagementLimitKw || '')}"></td>
+      <td><input name="demandBasisCode" type="text" value="${escapeAttr(load.demandBasisCode || '')}"></td>
+      <td><input name="measuredDemandSource" type="text" value="${escapeAttr(load.measuredDemandSource || '')}"></td>
+      <td><textarea name="demandBasisNote">${escapeHtml(load.demandBasisNote || '')}</textarea></td>
       <td><input name="phases" type="number" step="any" maxlength="15" value="${escapeAttr(load.phases || '')}"></td>
       <td><input name="circuit" type="text" value="${escapeAttr(load.circuit || '')}"></td>
       <td><textarea name="notes">${escapeHtml(load.notes || '')}</textarea></td>
@@ -454,7 +493,7 @@ if (typeof window !== 'undefined') {
     tfoot.innerHTML = `<tr>
       <td colspan="10">Totals</td>
       <td>${totals.kW.toFixed(2)}</td>
-      <td colspan="7"></td>
+      <td colspan="16"></td>
       <td>${totals.kVA.toFixed(2)}</td>
       <td></td>
       <td>${totals.demandKVA.toFixed(2)}</td>
@@ -477,6 +516,58 @@ if (typeof window !== 'undefined') {
     }
     html += '</tbody></table>';
     summaryDiv.innerHTML = html;
+  }
+
+  function buildCurrentDemandPackage(loads = dataStore.getLoads()) {
+    const studies = dataStore.getStudies();
+    return buildLoadDemandGovernancePackage({
+      projectName: window.currentProjectName || 'Untitled Project',
+      loads,
+      panels: dataStore.getPanels(),
+      basis: studies.loadDemandGovernance?.basis || {},
+    });
+  }
+
+  function updateDemandBasisSummary(loads = dataStore.getLoads()) {
+    if (!demandBasisDiv) return;
+    const pkg = buildCurrentDemandPackage(loads);
+    const summary = pkg.summary || {};
+    const warningRows = (pkg.warnings || []).slice(0, 5).map(row => `<li>${escapeHtml(row.message || row.code || row)}</li>`).join('');
+    demandBasisDiv.innerHTML = `
+      <div class="summary-grid">
+        <div><strong>${summary.connectedKw || 0}</strong><span>Connected kW</span></div>
+        <div><strong>${summary.governedDemandKw || 0}</strong><span>Governed demand kW</span></div>
+        <div><strong>${summary.largestMotorAdderKw || 0}</strong><span>Largest motor adder kW</span></div>
+        <div><strong>${summary.spareFutureAllowanceKw || 0}</strong><span>Spare/future kW</span></div>
+        <div><strong>${summary.noncoincidentReductionKw || 0}</strong><span>Noncoincident reduction kW</span></div>
+        <div><strong>${summary.warningCount || 0}</strong><span>Demand warnings</span></div>
+      </div>
+      ${warningRows ? `<ul class="compact-list">${warningRows}</ul>` : '<p class="muted">Demand governance package is ready for downstream reports.</p>'}`;
+  }
+
+  function saveDemandPackage() {
+    const studies = dataStore.getStudies();
+    studies.loadDemandGovernance = buildCurrentDemandPackage();
+    dataStore.setStudies(studies);
+    showAlertModal('Demand Package Saved', 'Panel and load demand-governance results were saved to study results.');
+  }
+
+  function downloadDemandPackage() {
+    const pkg = buildCurrentDemandPackage();
+    const blob = new Blob([JSON.stringify(pkg, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'load-demand-governance.json';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  function printDemandPackage() {
+    const pkg = buildCurrentDemandPackage();
+    const win = window.open('', '_blank');
+    if (!win) return;
+    win.document.write(`<!DOCTYPE html><html><head><title>Panel and Load Demand Basis</title><link rel="stylesheet" href="style.css"></head><body>${renderLoadDemandGovernanceHTML(pkg)}</body></html>`);
+    win.document.close();
   }
 
   function matchesQuickFilter(load) {
@@ -502,7 +593,13 @@ if (typeof window !== 'undefined') {
       load.description,
       load.manufacturer,
       load.model,
-      load.notes
+      load.notes,
+      load.loadClass,
+      load.noncoincidentGroup,
+      load.demandBasisCode,
+      load.demandBasisNote,
+      load.measuredDemandSource,
+      load.demandNotes
     ].join(' ').toLowerCase();
     return haystack.includes(query);
   }
@@ -526,7 +623,7 @@ if (typeof window !== 'undefined') {
         .filter(entry => matchesLoadFilter(entry.load, filterQuery));
 
       if (hasStoredLoads && !filtered.length) {
-        tbody.innerHTML = `<tr><td colspan="23" class="empty-state">No matching loads for the current search.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="32" class="empty-state">No matching loads for the current search.</td></tr>`;
       } else {
         filtered.forEach((entry, idx) => tbody.appendChild(createRow(entry.load, idx, entry.storeIndex)));
       }
@@ -534,6 +631,7 @@ if (typeof window !== 'undefined') {
       selectAll.checked = false;
       recalculateTotals(loads);
       updateSummary(loads);
+      updateDemandBasisSummary(loads);
 
       if (resultsCount) {
         const resultCount = filtered.length;
@@ -568,6 +666,15 @@ if (typeof window !== 'undefined') {
       'loadFactor',
       'efficiency',
       'demandFactor',
+      'loadClass',
+      'continuous',
+      'noncoincidentGroup',
+      'largestMotorCandidate',
+      'spareFuturePct',
+      'loadManagementLimitKw',
+      'demandBasisCode',
+      'measuredDemandSource',
+      'demandBasisNote',
       'phases',
       'circuit',
       'notes',
@@ -596,6 +703,15 @@ if (typeof window !== 'undefined') {
         full.loadFactor,
         full.efficiency,
         full.demandFactor,
+        full.loadClass,
+        full.continuous,
+        full.noncoincidentGroup,
+        full.largestMotorCandidate,
+        full.spareFuturePct,
+        full.loadManagementLimitKw,
+        full.demandBasisCode,
+        full.measuredDemandSource,
+        full.demandBasisNote,
         full.phases,
         full.circuit,
         full.notes,
@@ -618,7 +734,25 @@ if (typeof window !== 'undefined') {
     const lines = text.trim().split(/\r?\n/);
     if (!lines.length) return [];
     const first = lines[0].toLowerCase();
-    if (first.includes('description') && (first.includes('kw') || first.includes('power'))) lines.shift();
+    if (first.includes('description') && (first.includes('kw') || first.includes('power'))) {
+      const header = lines.shift().split(delimiter).map(c => c.replace(/^"|"$/g, '').trim());
+      const fields = new Set(header);
+      if (fields.has('source') && fields.has('tag') && fields.has('demandFactor')) {
+        return lines.filter(Boolean).map(line => {
+          const cols = line
+            .split(delimiter)
+            .map(c => c.replace(/^"|"$/g, '').replace(/""/g, '"').trim());
+          const load = {};
+          header.forEach((field, index) => {
+            if (field) load[field] = cols[index] ?? '';
+          });
+          const nums = ['quantity','voltage','kw','powerFactor','loadFactor','efficiency','demandFactor','spareFuturePct','loadManagementLimitKw','kva','current','demandKva','demandKw'];
+          if (nums.some(name => load[name] && isNaN(Number(load[name])))) throw new Error('Invalid CSV data');
+          const computed = calculateDerived(load);
+          return { panelId: '', breaker: '', ...load, ...computed };
+        });
+      }
+    }
     return lines.map(line => {
       const cols = line
         .split(delimiter)
@@ -840,6 +974,10 @@ if (typeof window !== 'undefined') {
     });
   });
 
+  if (saveDemandPackageBtn) saveDemandPackageBtn.addEventListener('click', saveDemandPackage);
+  if (exportDemandPackageBtn) exportDemandPackageBtn.addEventListener('click', downloadDemandPackage);
+  if (printDemandPackageBtn) printDemandPackageBtn.addEventListener('click', printDemandPackage);
+
   const importInput = document.getElementById('import-input');
   document.getElementById('import-btn').addEventListener('click', () => importInput.click());
   importInput.addEventListener('change', e => {
@@ -865,6 +1003,16 @@ if (typeof window !== 'undefined') {
             loadFactor: '',
             efficiency: '',
             demandFactor: '',
+            loadClass: '',
+            continuous: '',
+            noncoincidentGroup: '',
+            largestMotorCandidate: '',
+            spareFuturePct: '',
+            loadManagementLimitKw: '',
+            demandBasisCode: '',
+            measuredDemandSource: '',
+            demandBasisNote: '',
+            demandNotes: '',
             phases: '',
             circuit: '',
             notes: '',

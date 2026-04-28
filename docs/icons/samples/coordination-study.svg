@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 180" role="img" aria-labelledby="title desc">
+  <title id="title">Protection coordination sample preview</title>
+  <desc id="desc">One-line source, transformer, switchboard, and coordination curves.</desc>
+  <rect width="360" height="180" rx="8" fill="#f8fafc"/>
+  <circle cx="48" cy="88" r="22" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+  <text x="48" y="93" text-anchor="middle" font-family="Inter, Arial" font-size="12" fill="#1e3a8a">U</text>
+  <rect x="108" y="62" width="62" height="52" rx="4" fill="#fef3c7" stroke="#d97706" stroke-width="2"/>
+  <text x="139" y="93" text-anchor="middle" font-family="Inter, Arial" font-size="12" fill="#92400e">XFMR</text>
+  <rect x="214" y="58" width="62" height="60" rx="4" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
+  <text x="245" y="92" text-anchor="middle" font-family="Inter, Arial" font-size="12" fill="#166534">SWBD</text>
+  <path d="M70 88h38M170 88h44M276 88h38" stroke="#334155" stroke-width="4"/>
+  <path d="M304 132c18-56 28-72 40-88" stroke="#dc2626" stroke-width="3" fill="none"/>
+  <path d="M286 138c18-38 30-54 54-74" stroke="#2563eb" stroke-width="3" fill="none"/>
+</svg>

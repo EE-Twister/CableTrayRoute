@@ -130,6 +130,56 @@ where M = 2H / ωs,  Pe = Pmax × sin(δ)</pre>
         IEEE Std 1110-2002.</p>
       </details>
 
+      <fieldset>
+        <legend><strong>Transient Stability Study Case</strong></legend>
+        <div class="field-row">
+          <label for="case-name">Case Name</label>
+          <input type="text" id="case-name" value="Main Generator Fault Ride-Through">
+        </div>
+        <div class="grid two-col">
+          <label for="report-preset">Report Preset
+            <select id="report-preset">
+              <option value="dynamicStudy" selected>Dynamic Study</option>
+              <option value="summary">Summary</option>
+              <option value="fullStudy">Full Study</option>
+            </select>
+          </label>
+          <label for="channel-interval">Channel Export Interval (s)
+            <input type="number" id="channel-interval" min="0.001" max="1" step="0.001" value="0.02">
+          </label>
+          <label for="cct-margin-warn">CCT Warning Margin (s)
+            <input type="number" id="cct-margin-warn" min="0" max="2" step="0.001" value="0.03">
+          </label>
+          <label for="rotor-angle-warn">Rotor Angle Warning (deg)
+            <input type="number" id="rotor-angle-warn" min="30" max="179" step="1" value="120">
+          </label>
+        </div>
+        <label><input type="checkbox" id="cct-sweep-enabled" checked> Include critical-clearing sweep rows</label>
+        <div class="field-row">
+          <label for="dynamic-models-json">Dynamic Model Rows (JSON)</label>
+          <textarea id="dynamic-models-json" rows="8">[
+  {
+    "id": "gen-1",
+    "tag": "Main Generator",
+    "modelType": "synchronousGenerator",
+    "H": 5,
+    "frequencyHz": 60,
+    "Pm": 0.8,
+    "Pmax_pre": 2.1,
+    "Pmax_fault": 0.6,
+    "Pmax_post": 1.75
+  }
+]</textarea>
+        </div>
+        <div class="field-row">
+          <label for="disturbance-events-json">Disturbance Events (JSON)</label>
+          <textarea id="disturbance-events-json" rows="8">[
+  { "id": "fault-1", "eventType": "fault", "timeSec": 0, "targetId": "gen-1", "faultType": "threePhase" },
+  { "id": "clear-1", "eventType": "clearFault", "timeSec": 0.1, "targetId": "gen-1" }
+]</textarea>
+        </div>
+      </fieldset>
+
       <!-- Machine parameters -->
       <fieldset>
         <legend><strong>Machine Parameters</strong></legend>
@@ -246,6 +296,11 @@ where M = 2H / ωs,  Pe = Pmax × sin(δ)</pre>
       <div id="controls">
         <button id="calc-btn" type="button">Simulate</button>
         <button id="cct-btn" type="button">Simulate + Find CCT</button>
+        <button id="run-study-case-btn" type="button">Run Study Case</button>
+        <button id="save-study-btn" type="button" disabled>Save to Studies</button>
+        <button id="export-json-btn" type="button" disabled>Export JSON</button>
+        <button id="export-csv-btn" type="button" disabled>Export CSV</button>
+        <button id="export-html-btn" type="button" disabled>Printable HTML</button>
       </div>
 
       <div id="results" role="region" aria-live="polite" aria-label="Transient stability results"></div>

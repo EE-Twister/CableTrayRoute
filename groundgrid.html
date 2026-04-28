@@ -148,6 +148,14 @@
                   rock 1000-10000 ohm-m. Use the lowest seasonal value for conservative design.
                 </p>
               </div>
+              <div class="field-row">
+                <label for="soil-measurements">Measured soil rows for two-layer screening</label>
+                <textarea id="soil-measurements" rows="5" spellcheck="false"
+                          placeholder="spacing_m, apparent_rho_ohm_m, method, source&#10;1, 85, wenner, test-1&#10;4, 130, wenner, test-1&#10;12, 210, wenner, test-1"></textarea>
+                <p class="field-hint">
+                  Optional Wenner/Schlumberger apparent-resistivity rows. The fit is a deterministic screening approximation for package documentation.
+                </p>
+              </div>
             </fieldset>
 
             <fieldset class="groundgrid-input-section">
@@ -249,6 +257,129 @@
               <p id="rod-layout-hint" class="field-hint">
                 Enable ground rods to activate interstitial rod spacing.
               </p>
+
+              <div class="field-row">
+                <label for="grounding-geometry-mode">Advanced geometry mode</label>
+                <select id="grounding-geometry-mode" aria-describedby="grounding-geometry-mode-hint">
+                  <option value="rectangle" selected>Use rectangular IEEE 80 grid</option>
+                  <option value="polygon">Use polygon perimeter overlay</option>
+                </select>
+                <p id="grounding-geometry-mode-hint" class="field-hint">
+                  The IEEE 80 calculation remains rectangular. Polygon mode adds screening-grade hazard-map geometry and report overlays.
+                </p>
+              </div>
+
+              <div class="field-row">
+                <label for="polygon-points">Polygon perimeter points (m)</label>
+                <textarea id="polygon-points" rows="5" spellcheck="false"
+                          placeholder="label, x_m, y_m&#10;P1, 0, 0&#10;P2, 30, 0&#10;P3, 30, 20&#10;P4, 0, 20"></textarea>
+                <p class="field-hint">Enter non-self-intersecting perimeter points. Leave blank to use the rectangular grid footprint.</p>
+              </div>
+
+              <div class="field-row">
+                <label for="advanced-rods">Additional advanced rods (m)</label>
+                <textarea id="advanced-rods" rows="3" spellcheck="false"
+                          placeholder="label, x_m, y_m, length_m, notes&#10;Fence rod, 32, 10, 3, bonded to grid"></textarea>
+              </div>
+
+              <div class="field-row">
+                <label for="remote-electrodes">Remote electrodes / transferred-voltage paths</label>
+                <textarea id="remote-electrodes" rows="3" spellcheck="false"
+                          placeholder="label, distance_m, reference, bonding_path, notes&#10;Telco bond, 80, 0, metallic shield, verify isolation"></textarea>
+              </div>
+
+              <div class="field-row">
+                <label for="risk-points">User risk points (m)</label>
+                <textarea id="risk-points" rows="4" spellcheck="false"
+                          placeholder="label, x_m, y_m, touch|step|gpr, notes&#10;Fence gate, 32, 10, gpr, public side"></textarea>
+              </div>
+            </fieldset>
+
+            <fieldset class="groundgrid-input-section">
+              <legend><strong>Grounding Field Data and Fidelity</strong></legend>
+              <div class="field-row">
+                <label for="fall-of-potential-rows">Fall-of-potential test rows</label>
+                <textarea id="fall-of-potential-rows" rows="4" spellcheck="false"
+                          placeholder="test_id, probe_spacing_m, measured_resistance_ohm, curve_deviation_pct, location, notes&#10;FOP-1, 80, 0.42, 4, north fence, stable 62 percent point"></textarea>
+                <p class="field-hint">Optional field-test QA rows. Curve deviation is used as a deterministic screening stability check.</p>
+              </div>
+
+              <div class="field-row">
+                <label>
+                  <input type="checkbox" id="seasonal-soil-enabled">
+                  Include seasonal soil scenarios
+                </label>
+                <p class="field-hint">Adds wet, nominal, and dry screening comparisons without changing the base IEEE 80 result.</p>
+              </div>
+
+              <div class="field-grid two-col">
+                <div class="field-row">
+                  <label for="seasonal-wet-multiplier">Wet-season resistivity multiplier</label>
+                  <input type="number" id="seasonal-wet-multiplier" min="0.1" max="5" step="0.05" value="0.75">
+                </div>
+                <div class="field-row">
+                  <label for="seasonal-dry-multiplier">Dry-season resistivity multiplier</label>
+                  <input type="number" id="seasonal-dry-multiplier" min="0.1" max="5" step="0.05" value="1.35">
+                </div>
+              </div>
+
+              <div class="field-grid two-col">
+                <div class="field-row">
+                  <label for="field-body-impedance">Body impedance annotation (ohm)</label>
+                  <input type="number" id="field-body-impedance" min="0" step="1" placeholder="1000">
+                </div>
+                <div class="field-row">
+                  <label for="field-contact-resistance">Contact resistance annotation (ohm)</label>
+                  <input type="number" id="field-contact-resistance" min="0" step="1" placeholder="0">
+                </div>
+              </div>
+
+              <div class="field-grid two-col">
+                <div class="field-row">
+                  <label for="field-glove-class">Glove / PPE note</label>
+                  <input type="text" id="field-glove-class" placeholder="Class 0 gloves, project-specific">
+                </div>
+                <div class="field-row">
+                  <label for="field-footwear">Footwear / surface note</label>
+                  <input type="text" id="field-footwear" placeholder="EH footwear, crushed rock">
+                </div>
+              </div>
+
+              <div class="field-row">
+                <label>
+                  <input type="checkbox" id="en50522-review">
+                  Flag EN 50522 / project-standard personnel protection review
+                </label>
+              </div>
+
+              <div class="field-grid two-col">
+                <div class="field-row">
+                  <label for="grounding-boundary-extension">Boundary extension for contours (m)</label>
+                  <input type="number" id="grounding-boundary-extension" min="0" step="1" value="20">
+                </div>
+                <div class="field-row">
+                  <label for="grounding-contour-density">Contour density</label>
+                  <input type="number" id="grounding-contour-density" min="5" max="200" step="1" value="25">
+                </div>
+              </div>
+
+              <div class="field-grid two-col">
+                <div class="field-row">
+                  <label for="grounding-inspection-spacing">Inspection-point spacing (m)</label>
+                  <input type="number" id="grounding-inspection-spacing" min="0.5" step="0.5" value="5">
+                </div>
+                <div class="field-row">
+                  <label for="grounding-mesh-resolution">Mesh-resolution label</label>
+                  <input type="text" id="grounding-mesh-resolution" value="screening">
+                </div>
+              </div>
+
+              <div class="field-row">
+                <label for="transferred-potential-paths">Transferred-potential paths</label>
+                <textarea id="transferred-potential-paths" rows="3" spellcheck="false"
+                          placeholder="label, distance_m, target, notes&#10;Fence gate, 45, public fence, verify isolation/bonding"></textarea>
+                <p class="field-hint">These paths are reported as review items. V1 does not solve true transferred-potential gradients.</p>
+              </div>
             </fieldset>
 
             <fieldset class="groundgrid-input-section">
@@ -382,6 +513,43 @@
                      role="img" aria-label="Ground grid elevation showing burial depth and layer bands">
                 </svg>
               </div>
+            </div>
+          </section>
+
+          <section class="results-panel grid-visual-panel" aria-labelledby="advanced-grounding-title">
+            <div class="groundgrid-map-header">
+              <div>
+                <p class="groundgrid-eyebrow">Advanced Screening Overlay</p>
+                <h2 id="advanced-grounding-title">Soil Fit, Hazard Points, and Package Export</h2>
+                <p class="field-hint">These outputs document screening-grade assumptions and require final engineer/specialist verification.</p>
+              </div>
+              <div class="grid-overlay-controls">
+                <button type="button" class="btn" id="export-advanced-grounding-json">Export JSON</button>
+                <button type="button" class="btn" id="export-advanced-grounding-html">Printable HTML</button>
+                <button type="button" class="btn" id="export-grounding-hazard-svg">Hazard SVG</button>
+              </div>
+            </div>
+            <div id="advanced-grounding-panel" class="groundgrid-advanced-panel" aria-live="polite">
+              <p class="field-hint">Run analysis to build the advanced soil, geometry, and hazard-map package.</p>
+            </div>
+            <div class="report-scroll">
+              <table class="results-table">
+                <caption>Risk Point Register</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Point</th>
+                    <th scope="col">Check</th>
+                    <th scope="col">Actual V</th>
+                    <th scope="col">Limit V</th>
+                    <th scope="col">Margin %</th>
+                    <th scope="col">Status</th>
+                    <th scope="col">Recommendation</th>
+                  </tr>
+                </thead>
+                <tbody id="grounding-risk-point-table">
+                  <tr><td colspan="7">No risk points yet.</td></tr>
+                </tbody>
+              </table>
             </div>
           </section>
 

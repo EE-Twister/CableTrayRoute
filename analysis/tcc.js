@@ -12,6 +12,10 @@ import {
 import { runShortCircuit } from './shortCircuit.mjs';
 import { scaleCurve, checkDuty, sanitizeCurve } from './tccUtils.js';
 import { checkCoordination, greedyCoordinate, greedyCoordinateGFP, generateFaultCurrents } from './tccAutoCoord.mjs';
+import {
+  buildProtectionSettingPackage,
+  renderProtectionSettingSheetHTML,
+} from './protectionSettingSheet.mjs';
 import { buildCTIRows, CTI_HEADERS } from '../reports/coordinationReport.mjs';
 import { downloadCSV } from '../reports/reporting.mjs';
 import {
@@ -295,6 +299,12 @@ const coordMarginInput = document.getElementById('coord-margin');
 const viewMenuBtn = document.getElementById('tcc-view-menu-btn');
 const arcFlashOverlayControls = document.getElementById('arc-flash-overlay-controls');
 const afThresholdSelect = document.getElementById('af-threshold-select');
+const settingSheetPanel = document.getElementById('protection-setting-sheet-panel');
+const buildSettingSheetBtn = document.getElementById('build-setting-sheet-btn');
+const saveSettingSheetBtn = document.getElementById('save-setting-sheet-btn');
+const exportSettingSheetJsonBtn = document.getElementById('export-setting-sheet-json-btn');
+const exportSettingSheetCsvBtn = document.getElementById('export-setting-sheet-csv-btn');
+const exportSettingSheetHtmlBtn = document.getElementById('export-setting-sheet-html-btn');
 const chart = d3.select('#tcc-chart');
 const onelinePreviewSvgEl = document.getElementById('oneline-preview');
 const onelinePreviewSvg = onelinePreviewSvgEl ? d3.select(onelinePreviewSvgEl) : null;
@@ -315,6 +325,7 @@ let coordOrderIds = [];
 
 // Last completed auto-coordination result; enables CTI report export
 let lastCoordState = null;
+let latestProtectionSettingPackage = null;
 
 let updatingActiveComponentFromSelect = false;
 
@@ -1076,6 +1087,101 @@ function escapeHtml(value) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+function downloadText(filename, content, type = 'application/json') {
+  const blob = new Blob([content], { type });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 0);
+}
+
+function setSettingSheetExportEnabled(enabled) {
+  [saveSettingSheetBtn, exportSettingSheetJsonBtn, exportSettingSheetCsvBtn, exportSettingSheetHtmlBtn]
+    .filter(Boolean)
+    .forEach(button => {
+      button.disabled = !enabled;
+    });
+}
+
+function renderProtectionSettingPanel(pkg = latestProtectionSettingPackage) {
+  if (!settingSheetPanel) return;
+  if (!pkg) {
+    settingSheetPanel.innerHTML = '<p class="field-hint">Build a setting sheet to create device, function, and relay-test rows.</p>';
+    setSettingSheetExportEnabled(false);
+    return;
+  }
+  const summary = pkg.summary || {};
+  const warningText = (pkg.warnings || []).slice(0, 5).map(escapeHtml).join(' ');
+  settingSheetPanel.innerHTML = `
+    <div class="summary-grid">
+      <article class="summary-card">
+        <span>Devices</span>
+        <strong>${escapeHtml(summary.deviceCount || 0)}</strong>
+      </article>
+      <article class="summary-card">
+        <span>Functions</span>
+        <strong>${escapeHtml(summary.functionCount || 0)}</strong>
+      </article>
+      <article class="summary-card">
+        <span>Test Rows</span>
+        <strong>${escapeHtml(summary.testCount || 0)}</strong>
+      </article>
+      <article class="summary-card">
+        <span>Missing Data</span>
+        <strong>${escapeHtml(summary.missingData || 0)}</strong>
+      </article>
+    </div>
+    ${warningText ? `<p class="alert-warning">${warningText}</p>` : '<p class="field-hint">Setting-sheet package is complete for current screening checks.</p>'}
+    <div class="table-scroll">
+      <table class="results-table">
+        <caption>Protection Devices</caption>
+        <thead><tr><th>Device</th><th>Catalog</th><th>CT</th><th>PT</th><th>Group</th><th>Revision</th><th>Status</th></tr></thead>
+        <tbody>${(pkg.deviceRows || []).map(row => `<tr>
+          <td>${escapeHtml(row.deviceTag)}</td>
+          <td>${escapeHtml(row.catalogDeviceId || row.model || '--')}</td>
+          <td>${escapeHtml(row.ctPrimaryA ?? '--')}:${escapeHtml(row.ctSecondaryA ?? '--')}</td>
+          <td>${escapeHtml(row.ptPrimaryV ?? '--')}:${escapeHtml(row.ptSecondaryV ?? '--')}</td>
+          <td>${escapeHtml(row.activeGroup)}</td>
+          <td>${escapeHtml(row.revision)}</td>
+          <td>${escapeHtml(row.status)}</td>
+        </tr>`).join('') || '<tr><td colspan="7">No protective devices found.</td></tr>'}</tbody>
+      </table>
+    </div>
+    <div class="table-scroll">
+      <table class="results-table">
+        <caption>Function Settings</caption>
+        <thead><tr><th>Device</th><th>Function</th><th>Pickup A</th><th>Secondary A</th><th>Delay / Dial</th><th>Status</th><th>Recommendation</th></tr></thead>
+        <tbody>${(pkg.functionRows || []).map(row => `<tr>
+          <td>${escapeHtml(row.deviceTag)}</td>
+          <td>${escapeHtml(row.functionCode)}</td>
+          <td>${escapeHtml(row.pickupA ?? '--')}</td>
+          <td>${escapeHtml(row.secondaryPickupA ?? '--')}</td>
+          <td>${escapeHtml(row.delaySec ?? row.timeDial ?? '--')}</td>
+          <td>${escapeHtml(row.status)}</td>
+          <td>${escapeHtml(row.recommendation)}</td>
+        </tr>`).join('') || '<tr><td colspan="7">No function rows.</td></tr>'}</tbody>
+      </table>
+    </div>
+    <div class="table-scroll">
+      <table class="results-table">
+        <caption>Relay Test Values</caption>
+        <thead><tr><th>Device</th><th>Function</th><th>Primary A</th><th>Secondary A</th><th>Expected s</th><th>Tolerance s</th><th>Status</th></tr></thead>
+        <tbody>${(pkg.testRows || []).map(row => `<tr>
+          <td>${escapeHtml(row.deviceTag)}</td>
+          <td>${escapeHtml(row.functionCode)}</td>
+          <td>${escapeHtml(row.testCurrentPrimaryA ?? '--')}</td>
+          <td>${escapeHtml(row.secondaryInjectionA ?? '--')}</td>
+          <td>${escapeHtml(row.expectedTripSec ?? '--')}</td>
+          <td>${escapeHtml(row.toleranceMinSec ?? '--')} - ${escapeHtml(row.toleranceMaxSec ?? '--')}</td>
+          <td>${escapeHtml(row.status)}</td>
+        </tr>`).join('') || '<tr><td colspan="7">No test rows.</td></tr>'}</tbody>
+      </table>
+    </div>
+  `;
+  setSettingSheetExportEnabled(true);
 }
 
 function createAnnotationId() {
@@ -2058,6 +2164,78 @@ function updateShortCircuitStudy() {
   return sc;
 }
 
+function buildCurrentProtectionSettingPackage() {
+  persistSettings();
+  const studies = getStudies();
+  const pkg = buildProtectionSettingPackage({
+    projectName: document.body?.dataset?.reportTitle || 'Time-Current Curves',
+    oneLine: getOneLine(),
+    tccSettings: saved,
+    protectiveDevices: libraryDevices,
+    coordinationState: lastCoordState,
+    existingSheets: studies.protectionSettingSheets || null,
+  });
+  latestProtectionSettingPackage = pkg;
+  renderProtectionSettingPanel(pkg);
+  return pkg;
+}
+
+function saveProtectionSettingPackage() {
+  const pkg = latestProtectionSettingPackage || buildCurrentProtectionSettingPackage();
+  const studies = getStudies();
+  studies.protectionSettingSheets = pkg;
+  setStudies(studies);
+  renderProtectionSettingPanel(pkg);
+}
+
+function protectionSettingCsvRows(pkg = latestProtectionSettingPackage) {
+  if (!pkg) return [];
+  return [
+    ...(pkg.deviceRows || []).map(row => ({
+      recordType: 'device',
+      deviceTag: row.deviceTag,
+      componentId: row.componentId,
+      functionCode: '',
+      catalogDeviceId: row.catalogDeviceId,
+      ctPrimaryA: row.ctPrimaryA,
+      ctSecondaryA: row.ctSecondaryA,
+      pickupA: '',
+      secondaryA: '',
+      expectedTripSec: '',
+      status: row.status,
+      recommendation: row.recommendation,
+    })),
+    ...(pkg.functionRows || []).map(row => ({
+      recordType: 'function',
+      deviceTag: row.deviceTag,
+      componentId: row.componentId,
+      functionCode: row.functionCode,
+      catalogDeviceId: '',
+      ctPrimaryA: '',
+      ctSecondaryA: '',
+      pickupA: row.pickupA,
+      secondaryA: row.secondaryPickupA,
+      expectedTripSec: '',
+      status: row.status,
+      recommendation: row.recommendation,
+    })),
+    ...(pkg.testRows || []).map(row => ({
+      recordType: 'test',
+      deviceTag: row.deviceTag,
+      componentId: row.componentId,
+      functionCode: row.functionCode,
+      catalogDeviceId: '',
+      ctPrimaryA: '',
+      ctSecondaryA: '',
+      pickupA: row.testCurrentPrimaryA,
+      secondaryA: row.secondaryInjectionA,
+      expectedTripSec: row.expectedTripSec,
+      status: row.status,
+      recommendation: row.recommendation,
+    })),
+  ];
+}
+
 async function init() {
   try {
     const list = await fetch('data/protectiveDevices.json').then(r => r.json());
@@ -2073,6 +2251,8 @@ async function init() {
   renderOneLinePreview(getActiveComponentId());
 
   updateShortCircuitStudy();
+  latestProtectionSettingPackage = getStudies().protectionSettingSheets || null;
+  renderProtectionSettingPanel(latestProtectionSettingPackage);
 
   if (getActiveComponentId() && deviceSelect && deviceSelect.selectedOptions.length && initialSelection.length) {
     plot();
@@ -2097,6 +2277,8 @@ async function init() {
     updateViewButtonLabel();
     const selection = refreshCatalog({ includeComponentContext: true, includeDeviceParam: true });
     updateShortCircuitStudy();
+    latestProtectionSettingPackage = getStudies().protectionSettingSheets || null;
+    renderProtectionSettingPanel(latestProtectionSettingPackage);
     renderOneLinePreview(getActiveComponentId());
     if (getActiveComponentId() && deviceSelect && deviceSelect.selectedOptions.length && selection.length) {
       plot();
@@ -4079,6 +4261,30 @@ if (exportCtiBtn) {
     downloadCSV(CTI_HEADERS, rows, 'coordination-cti-report.csv');
   });
 }
+buildSettingSheetBtn?.addEventListener('click', () => {
+  buildCurrentProtectionSettingPackage();
+});
+saveSettingSheetBtn?.addEventListener('click', () => {
+  saveProtectionSettingPackage();
+});
+exportSettingSheetJsonBtn?.addEventListener('click', () => {
+  const pkg = latestProtectionSettingPackage || buildCurrentProtectionSettingPackage();
+  downloadText('protection-setting-sheet-package.json', JSON.stringify(pkg, null, 2), 'application/json');
+});
+exportSettingSheetCsvBtn?.addEventListener('click', () => {
+  const pkg = latestProtectionSettingPackage || buildCurrentProtectionSettingPackage();
+  const rows = protectionSettingCsvRows(pkg);
+  downloadCSV(
+    ['recordType', 'deviceTag', 'componentId', 'functionCode', 'catalogDeviceId', 'ctPrimaryA', 'ctSecondaryA', 'pickupA', 'secondaryA', 'expectedTripSec', 'status', 'recommendation'],
+    rows,
+    'protection-setting-sheet.csv'
+  );
+});
+exportSettingSheetHtmlBtn?.addEventListener('click', () => {
+  const pkg = latestProtectionSettingPackage || buildCurrentProtectionSettingPackage();
+  const html = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Protection Setting Sheet</title></head><body>${renderProtectionSettingSheetHTML(pkg)}</body></html>`;
+  downloadText('protection-setting-sheet.html', html, 'text/html');
+});
 if (printPlotBtn) {
   printPlotBtn.addEventListener('click', handlePrintPlot);
 }

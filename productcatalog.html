@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Manufacturer product catalog governance for approved CableTrayRoute product selections." />
+  <title>Product Catalog Governance - CableTrayRoute</title>
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/favicon.svg">
+  <meta name="color-scheme" content="light dark">
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    .catalog-toolbar { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: end; margin-bottom: 1rem; }
+    .catalog-toolbar label { display: grid; gap: 0.25rem; min-width: 11rem; }
+    .catalog-summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); gap: 0.75rem; margin: 1rem 0; }
+    .catalog-stat { border: 1px solid var(--color-border, #d1d5db); border-radius: 6px; padding: 0.75rem; background: var(--color-surface, #fff); }
+    .catalog-stat strong { display: block; font-size: 1.45rem; }
+    .catalog-table-wrap { overflow-x: auto; }
+    .catalog-table td, .catalog-table th { white-space: nowrap; }
+    .catalog-detail { border: 1px solid var(--color-border, #d1d5db); border-radius: 6px; padding: 1rem; margin-top: 1rem; }
+    .catalog-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.75rem; }
+  </style>
+  <script type="module" src="dirtyTracker.js"></script>
+  <script type="module" src="dist/productcatalog.js" defer></script>
+</head>
+<body class="productcatalog-page" data-report-title="Product Catalog Governance">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <nav class="top-nav" aria-label="Primary">
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
+      <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+    <div id="nav-links" class="nav-links" role="list"></div>
+    <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+  </nav>
+
+  <div id="settings-menu" class="settings-menu">
+    <label for="theme-select">Theme
+      <select id="theme-select">
+        <option value="system">System</option>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+        <option value="high-contrast">High Contrast</option>
+      </select>
+    </label>
+    <label><input type="checkbox" id="compact-toggle" aria-label="Enable compact table mode"> Compact Mode</label>
+    <button id="help-btn" class="btn" aria-expanded="false" title="Show help">Site Help</button>
+    <button id="export-project-btn">Export Project</button>
+    <button id="import-project-btn">Import Project</button>
+    <input type="file" id="import-project-input" accept=".ctr.json" class="hidden" title="Select project file">
+  </div>
+
+  <div id="help-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="help-modal-title" hidden>
+    <div class="modal-content">
+      <h2 id="help-modal-title">Product Catalog Help</h2>
+      <button id="close-help-btn" class="modal-close" aria-label="Close help">x</button>
+      <p>Import local CSV or JSON catalog rows, review approval metadata, and export the governed catalog for project reuse.</p>
+    </div>
+  </div>
+
+  <div class="container">
+    <main id="main-content" class="main-content">
+      <header class="page-header">
+        <h1>Manufacturer Product Catalog</h1>
+        <p class="text-muted">Local approved-catalog governance for product-grade selections, BIM references, datasheets, and verification state.</p>
+      </header>
+
+      <section class="card">
+        <h2>Catalog Controls</h2>
+        <div class="catalog-toolbar">
+          <label for="catalog-category-filter">Category
+            <select id="catalog-category-filter"></select>
+          </label>
+          <label for="catalog-manufacturer-filter">Manufacturer
+            <input id="catalog-manufacturer-filter" type="search" placeholder="Any manufacturer">
+          </label>
+          <label for="catalog-standard-filter">Standard
+            <input id="catalog-standard-filter" type="search" placeholder="UL, NEC, IEC">
+          </label>
+          <label for="catalog-source-filter">Source
+            <input id="catalog-source-filter" type="search" placeholder="Any source">
+          </label>
+          <label><input id="catalog-approved-filter" type="checkbox"> Approved only</label>
+          <label><input id="catalog-stale-filter" type="checkbox"> Stale only</label>
+          <button id="catalog-export-json" type="button" class="btn secondary-btn">Export JSON</button>
+          <button id="catalog-export-html" type="button" class="btn secondary-btn">Printable HTML</button>
+        </div>
+        <div class="catalog-toolbar">
+          <label for="catalog-template-type">Template
+            <select id="catalog-template-type"></select>
+          </label>
+          <button id="catalog-download-template" type="button" class="btn secondary-btn">Download Template</button>
+          <label for="catalog-import-file">Import CSV/JSON
+            <input id="catalog-import-file" type="file" accept=".csv,.json,application/json,text/csv">
+          </label>
+        </div>
+        <p id="catalog-status" class="report-status" role="status" aria-live="polite"></p>
+      </section>
+
+      <section class="card">
+        <h2>Governance Summary</h2>
+        <div id="catalog-summary" class="catalog-summary-grid" aria-live="polite"></div>
+      </section>
+
+      <section class="card">
+        <h2>Catalog Rows</h2>
+        <div id="catalog-table" class="catalog-table-wrap" aria-live="polite"></div>
+        <div id="catalog-detail" class="catalog-detail" hidden></div>
+      </section>
+    </main>
+  </div>
+</body>
+</html>

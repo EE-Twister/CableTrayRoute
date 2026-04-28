@@ -15,7 +15,9 @@ try {
 
 const entries = {
   index: 'src/index.js',
+  samplegallery: 'src/sampleGallery.js',
   workflowdashboard: 'src/workflowDashboard.js',
+  bimcoordination: 'src/bimCoordination.js',
   cableschedule: 'src/cableschedule.js',
   panelschedule: 'src/panelSchedule.js',
   racewayschedule: 'src/racewayschedule.js',
@@ -34,6 +36,8 @@ const entries = {
   cableFaultBracing: 'src/cableFaultBracing.js',
   trayhardwarebom: 'src/trayhardwarebom.js',
   intlCableSize: 'src/intlCableSize.js',
+  cablethermal: 'src/cableThermalEnvironment.js',
+  optimalpowerflow: 'src/optimalPowerFlow.js',
   groundgrid: 'src/groundgrid.js',
   capacitorbank: 'src/capacitorbank.js',
   cathodicprotection: 'src/cathodicprotection.js',
@@ -65,6 +69,7 @@ const entries = {
   voltagestability: 'src/voltageStability.js',
   voltagedropstudy: 'src/voltagedropstudy.js',
   productconfig: 'src/productconfig.js',
+  productcatalog: 'src/productCatalog.js',
   fieldview: 'src/fieldview.js',
   scenariocomparison: 'src/scenarioComparison.js',
   '404': 'src/404.js',

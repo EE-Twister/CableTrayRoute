@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Optimal power flow and economic dispatch screening for CableTrayRoute one-line models." />
+  <title>Optimal Power Flow - CableTrayRoute</title>
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/favicon.svg">
+  <meta name="color-scheme" content="light dark">
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    .opf-toolbar { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: end; margin: 1rem 0; }
+    .opf-toolbar label { display: grid; gap: 0.25rem; min-width: 10rem; }
+    .opf-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: 0.75rem; }
+    .opf-summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); gap: 0.75rem; margin: 1rem 0; }
+    .opf-stat { border: 1px solid var(--color-border, #d1d5db); border-radius: 6px; padding: 0.75rem; background: var(--color-surface, #fff); }
+    .opf-stat strong { display: block; font-size: 1.35rem; }
+    .opf-table-wrap { overflow-x: auto; }
+    .opf-table td, .opf-table th { white-space: nowrap; }
+    .opf-generator-input { width: 7rem; }
+  </style>
+  <script type="module" src="dirtyTracker.js"></script>
+  <script type="module" src="dist/optimalpowerflow.js" defer></script>
+</head>
+<body class="study-page optimalpowerflow-page" data-report-title="Optimal Power Flow">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <nav class="top-nav" aria-label="Primary">
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
+      <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+    <div id="nav-links" class="nav-links" role="list"></div>
+    <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+  </nav>
+
+  <div id="settings-menu" class="settings-menu">
+    <label for="theme-select">Theme
+      <select id="theme-select">
+        <option value="system">System</option>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+        <option value="high-contrast">High Contrast</option>
+      </select>
+    </label>
+    <label><input type="checkbox" id="compact-toggle" aria-label="Enable compact table mode"> Compact Mode</label>
+    <button id="help-btn" class="btn" aria-expanded="false" title="Show help">Site Help</button>
+    <button id="export-project-btn">Export Project</button>
+    <button id="import-project-btn">Import Project</button>
+    <input type="file" id="import-project-input" accept=".ctr.json" class="hidden" title="Select project file">
+  </div>
+
+  <div class="container">
+    <main id="main-content" class="main-content">
+      <nav aria-label="Breadcrumb">
+        <ol class="breadcrumb-trail">
+          <li><a href="index.html">Home</a></li>
+          <li><a href="loadFlow.html">Load Flow</a></li>
+          <li aria-current="page">Optimal Power Flow</li>
+        </ol>
+      </nav>
+
+      <header class="page-header">
+        <p class="eyebrow">Power System Screening</p>
+        <h1>Optimal Power Flow</h1>
+        <p>Run deterministic economic dispatch and validate the candidate through the existing load-flow solver.</p>
+      </header>
+
+      <details class="method-panel" open>
+        <summary>Method &amp; Assumptions</summary>
+        <p>V1 performs local economic dispatch plus AC load-flow feasibility checks. It screens cost, loss, voltage, and branch-loading constraints for planning review and does not replace a commercial nonlinear AC OPF engine.</p>
+      </details>
+
+      <form id="opf-form" class="card">
+        <h2>Objective and Constraints</h2>
+        <div class="opf-grid">
+          <label for="opf-base-mva">Base MVA
+            <input id="opf-base-mva" type="number" min="0.1" step="0.1" value="100">
+          </label>
+          <label for="opf-objective">Objective
+            <select id="opf-objective">
+              <option value="cost">Cost</option>
+              <option value="losses">Losses</option>
+              <option value="voltageDeviation">Voltage deviation</option>
+              <option value="weighted">Weighted blend</option>
+            </select>
+          </label>
+          <label for="opf-reserve">Reserve margin (%)
+            <input id="opf-reserve" type="number" min="0" step="0.5" value="0">
+          </label>
+          <label for="opf-voltage-min">Min voltage (pu)
+            <input id="opf-voltage-min" type="number" step="0.01" value="0.95">
+          </label>
+          <label for="opf-voltage-max">Max voltage (pu)
+            <input id="opf-voltage-max" type="number" step="0.01" value="1.05">
+          </label>
+          <label for="opf-branch-max">Branch max loading (%)
+            <input id="opf-branch-max" type="number" min="1" step="1" value="100">
+          </label>
+        </div>
+
+        <h2>Dispatchable Generators</h2>
+        <div class="opf-toolbar">
+          <button type="button" id="opf-add-generator" class="btn secondary-btn">Add Manual Generator</button>
+          <button type="button" id="opf-reload-oneline" class="btn secondary-btn">Reload One-Line Generators</button>
+        </div>
+        <div id="opf-generator-table" class="opf-table-wrap"></div>
+
+        <div class="button-row">
+          <button type="submit" class="primary-btn">Run OPF Screening</button>
+          <button type="button" id="opf-save" class="btn">Save Study Result</button>
+          <button type="button" id="opf-export-json" class="btn">Export JSON</button>
+          <button type="button" id="opf-export-html" class="btn">Printable HTML</button>
+        </div>
+        <p id="opf-status" class="report-status" role="status" aria-live="polite"></p>
+      </form>
+
+      <section class="results-panel">
+        <h2>OPF Summary</h2>
+        <div id="opf-summary" class="opf-summary-grid">
+          <p class="field-hint">Run OPF screening to populate dispatch and feasibility results.</p>
+        </div>
+      </section>
+
+      <section class="results-panel">
+        <h2>Dispatch</h2>
+        <div id="opf-dispatch" class="opf-table-wrap"></div>
+      </section>
+
+      <section class="results-panel">
+        <h2>Constraints and Violations</h2>
+        <div id="opf-constraints" class="opf-table-wrap"></div>
+      </section>
+    </main>
+  </div>
+
+  <div id="help-modal" class="modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="help-title">
+    <div class="modal-content">
+      <button id="close-help-btn" class="close-btn" aria-label="Close Help">&times;</button>
+      <h2 id="help-title">Optimal Power Flow Help</h2>
+      <p>Load the current one-line model, enter generator cost and limit data, choose an objective, and run the screening optimizer. Save results to include them in reports and Design Coach actions.</p>
+    </div>
+  </div>
+
+  <script type="module" src="dist/projectManager.js"></script>
+</body>
+</html>

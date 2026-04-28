@@ -93,9 +93,74 @@ VD% = (2 × I × R × L) / V × 100   [single-phase]</pre>
         the <em>Circuit Type</em> or <em>Service Type</em> field in the cable schedule.</p>
       </details>
 
+      <section class="method-panel" aria-labelledby="criteria-title">
+        <h2 id="criteria-title">Voltage Drop Criteria and Operating Case</h2>
+        <div class="form-grid">
+          <label for="feeder-limit-pct">Feeder limit (%)
+            <input id="feeder-limit-pct" type="number" min="0" max="25" step="0.1" value="3">
+          </label>
+          <label for="branch-limit-pct">Branch limit (%)
+            <input id="branch-limit-pct" type="number" min="0" max="25" step="0.1" value="3">
+          </label>
+          <label for="total-limit-pct">Total source-to-load limit (%)
+            <input id="total-limit-pct" type="number" min="0" max="25" step="0.1" value="5">
+          </label>
+          <label for="normal-limit-pct">Normal case limit (%)
+            <input id="normal-limit-pct" type="number" min="0" max="25" step="0.1" value="3">
+          </label>
+          <label for="emergency-limit-pct">Emergency case limit (%)
+            <input id="emergency-limit-pct" type="number" min="0" max="50" step="0.1" value="5">
+          </label>
+          <label for="starting-limit-pct">Starting-drop limit (%)
+            <input id="starting-limit-pct" type="number" min="0" max="80" step="0.1" value="10">
+          </label>
+          <label for="warning-margin-pct">Warning margin (% of limit)
+            <input id="warning-margin-pct" type="number" min="0" max="100" step="1" value="80">
+          </label>
+          <label for="report-preset">Report preset
+            <select id="report-preset">
+              <option value="summary">Summary</option>
+              <option value="criteria">Criteria</option>
+              <option value="fullStudy" selected>Full Study</option>
+            </select>
+          </label>
+          <label for="case-type">Operating case
+            <select id="case-type">
+              <option value="normal" selected>Normal</option>
+              <option value="emergency">Emergency</option>
+              <option value="start">Motor Start</option>
+            </select>
+          </label>
+          <label for="source-voltage-pct">Source voltage (%)
+            <input id="source-voltage-pct" type="number" min="50" max="125" step="0.1" value="100">
+          </label>
+          <label for="transformer-tap-pct">Transformer tap (%)
+            <input id="transformer-tap-pct" type="number" min="-20" max="20" step="0.1" value="0">
+          </label>
+          <label for="load-power-factor">Load power factor
+            <input id="load-power-factor" type="number" min="0.1" max="1" step="0.01" value="0.9">
+          </label>
+          <label for="conductor-temperature-c">Conductor temperature (C)
+            <input id="conductor-temperature-c" type="number" min="0" max="250" step="1" value="75">
+          </label>
+          <label for="conductor-material-basis">Conductor material basis
+            <input id="conductor-material-basis" type="text" placeholder="Schedule conductor material">
+          </label>
+          <label for="motor-min-start-pu">Motor min starting voltage (pu)
+            <input id="motor-min-start-pu" type="number" min="0.1" max="1.2" step="0.01" value="0.8">
+          </label>
+          <label for="segment-chain-basis-note">Segment-chain basis note
+            <input id="segment-chain-basis-note" type="text" placeholder="Source-to-load chain assumptions">
+          </label>
+        </div>
+      </section>
+
       <div id="controls" class="controls-row">
         <button id="run-btn" type="button">Run Study</button>
         <button id="export-btn" type="button" disabled>Export CSV</button>
+        <button id="save-btn" type="button" disabled>Save to Studies</button>
+        <button id="export-json-btn" type="button" disabled>Export JSON</button>
+        <button id="export-html-btn" type="button" disabled>Printable HTML</button>
       </div>
 
       <!-- Summary cards -->

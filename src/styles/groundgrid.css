@@ -164,6 +164,14 @@
   margin-bottom: 0;
 }
 
+.groundgrid-input-section textarea {
+  width: 100%;
+  min-height: 6rem;
+  resize: vertical;
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  font-size: 0.84rem;
+}
+
 .groundgrid-input-panel input,
 .groundgrid-input-panel select {
   min-height: 2.5rem;
@@ -226,6 +234,13 @@
 .groundgrid-kpi-card--review { border-left-color: var(--groundgrid-warning); }
 .groundgrid-kpi-card--fail { border-left-color: var(--groundgrid-fail); }
 .groundgrid-kpi-card--info { border-left-color: var(--groundgrid-blue); }
+
+.groundgrid-advanced-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.85rem;
+  margin-bottom: 1rem;
+}
 
 .grid-visual-panel {
   padding: 1rem;
@@ -401,6 +416,109 @@
   font-family: sans-serif;
 }
 
+.ground-grid-preview .grid-risk-marker-dot {
+  fill: var(--groundgrid-blue);
+  stroke: #ffffff;
+  stroke-width: 2;
+}
+
+.ground-grid-preview .grid-risk-marker--pass .grid-risk-marker-dot { fill: var(--groundgrid-pass); }
+.ground-grid-preview .grid-risk-marker--warn .grid-risk-marker-dot { fill: var(--groundgrid-warning); }
+.ground-grid-preview .grid-risk-marker--fail .grid-risk-marker-dot { fill: var(--groundgrid-fail); }
+.ground-grid-preview .grid-risk-marker--missingData .grid-risk-marker-dot { fill: #6b7280; }
+
+.ground-grid-preview .grid-risk-marker-label {
+  fill: var(--groundgrid-ink);
+  font-size: 11px;
+  font-weight: 700;
+  paint-order: stroke;
+  stroke: var(--groundgrid-panel);
+  stroke-width: 3px;
+}
+
+.results-table .row-warn,
+.results-table .row-warning {
+  background: color-mix(in srgb, var(--groundgrid-warning) 12%, transparent);
+}
+
+.results-table .row-missingData {
+  background: color-mix(in srgb, #6b7280 10%, transparent);
+}
+
+.thermal-form textarea,
+.thermal-form select[multiple] {
+  width: 100%;
+}
+
+.thermal-form textarea {
+  min-height: 5rem;
+  resize: vertical;
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+}
+
+.thermal-grid,
+.thermal-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.85rem;
+}
+
+.thermal-methods,
+.button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.thermal-card {
+  padding: 1rem;
+  border-left: 5px solid var(--groundgrid-blue, #3478f6);
+  border-radius: 8px;
+  background: var(--surface-raised, #fff);
+  box-shadow: var(--shadow-sm, 0 1px 2px rgba(0,0,0,0.08));
+}
+
+.thermal-card span,
+.thermal-card small {
+  display: block;
+  color: var(--text-muted, #6b7280);
+}
+
+.thermal-card strong {
+  display: block;
+  margin: 0.25rem 0;
+  font-size: 1.6rem;
+}
+
+.thermal-card--pass { border-left-color: var(--groundgrid-pass, #047857); }
+.thermal-card--warn { border-left-color: var(--groundgrid-warning, #b45309); }
+.thermal-card--fail { border-left-color: var(--groundgrid-fail, #b91c1c); }
+
+.thermal-timeline-bars {
+  display: flex;
+  gap: 0.65rem;
+  align-items: end;
+  min-height: 160px;
+}
+
+.thermal-timeline-point {
+  min-width: 64px;
+  display: grid;
+  align-content: end;
+  padding: 0.45rem;
+  border-radius: 8px 8px 0 0;
+  background: color-mix(in srgb, var(--groundgrid-pass, #047857) 24%, transparent);
+}
+
+.thermal-timeline-point--warn {
+  background: color-mix(in srgb, var(--groundgrid-warning, #b45309) 28%, transparent);
+}
+
+.thermal-timeline-point--fail {
+  background: color-mix(in srgb, var(--groundgrid-fail, #b91c1c) 28%, transparent);
+}
+
 .ground-grid-preview .grid-dimension-line,
 .ground-grid-preview .grid-dimension-arrow {
   stroke: var(--groundgrid-muted);
@@ -574,6 +692,10 @@
   }
 
   .groundgrid-kpi-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .groundgrid-advanced-summary {
     grid-template-columns: 1fr;
   }
 

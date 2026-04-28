@@ -73,8 +73,10 @@
         <em>same ordered sequence of raceway segments</em>. Cables in the same pull
         can be pulled simultaneously by field crews.</p>
         <p><strong>Pull tension</strong> is estimated using the capstan equation for
-        bends and a constant friction coefficient (μ = 0.35) for straight runs.
-        Combined cable weight per foot is used for multi-cable pulls.</p>
+        bends, section friction, lubricant assumptions, bend radius, vertical
+        rise/drop, and combined cable weight per foot for multi-cable pulls.
+        The constructability package is screening-grade and requires field
+        verification of conduit dimensions, bend radii, and pulling equipment.</p>
         <p>References: NEC Article 300.31, IEEE Std 1185, AEIC CG5.</p>
         <p>See also:
           <a href="optimalRoute.html">Optimal Route</a>,
@@ -95,10 +97,93 @@
         </div>
       </fieldset>
 
+      <fieldset id="constructabilityInputs">
+        <legend><strong>Pull Constructability Inputs</strong></legend>
+        <p class="field-hint">These assumptions are applied to generated pull cards and saved to <code>studyResults.pullConstructability</code>.</p>
+        <div class="form-grid">
+          <label>Feed Direction
+            <select id="feedDirection">
+              <option value="forward">Forward</option>
+              <option value="reverse">Reverse</option>
+            </select>
+          </label>
+          <label>Default Friction μ
+            <input type="number" id="defaultFriction" value="0.35" min="0.05" max="1.5" step="0.01">
+          </label>
+          <label>Lubricant Factor
+            <input type="number" id="lubricantFactor" value="1" min="0.1" max="5" step="0.1">
+          </label>
+          <label>Ambient Temp (°C)
+            <input type="number" id="ambientTempC" value="30" step="1">
+          </label>
+          <label>Jacket Material
+            <select id="jacketMaterial">
+              <option value="XLPE">XLPE</option>
+              <option value="PVC">PVC</option>
+            </select>
+          </label>
+          <label>Pulling Equipment Limit (lbs)
+            <input type="number" id="pullingEquipmentLimit" min="0" step="10" placeholder="Required for margin">
+          </label>
+          <label>Allowable Sidewall (lbs/ft)
+            <input type="number" id="allowableSidewall" min="0" step="10" placeholder="Required for sidewall check">
+          </label>
+          <label>Default Conduit ID (in)
+            <input type="number" id="defaultConduitId" min="0" step="0.01" placeholder="For jam/fill checks">
+          </label>
+        </div>
+        <div class="option-row">
+          <label>
+            <input type="checkbox" id="compareReverseToggle" checked>
+            Compare reverse pull direction
+          </label>
+        </div>
+        <div class="btn-row">
+          <button type="button" id="recalculateConstructabilityBtn">Recalculate Constructability</button>
+          <button type="button" id="exportConstructabilityJsonBtn">Export Package JSON</button>
+          <button type="button" id="exportConstructabilityHtmlBtn">Printable Package HTML</button>
+        </div>
+      </fieldset>
+
       <!-- Summary section -->
       <section id="summarySection" hidden aria-label="Pull summary">
         <h2>Pull Summary</h2>
         <div id="summaryCards" class="summary-cards" role="status" aria-live="polite"></div>
+      </section>
+
+      <section id="constructabilitySection" hidden aria-label="Pull constructability results">
+        <h2>Pull Constructability</h2>
+        <div id="constructabilitySummary" class="summary-cards" role="status" aria-live="polite"></div>
+        <div class="report-scroll">
+          <table id="constructabilityTable" class="result-table" aria-label="Pull constructability direction comparison">
+            <thead>
+              <tr>
+                <th scope="col">Pull #</th>
+                <th scope="col">Direction</th>
+                <th scope="col">Status</th>
+                <th scope="col">Max Tension</th>
+                <th scope="col">Tension Limit</th>
+                <th scope="col">Max Sidewall</th>
+                <th scope="col">Sidewall Margin</th>
+                <th scope="col">Warnings</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div class="report-scroll">
+          <table id="constructabilityWarningsTable" class="result-table" aria-label="Pull constructability warnings">
+            <thead>
+              <tr>
+                <th scope="col">Pull #</th>
+                <th scope="col">Severity</th>
+                <th scope="col">Warning</th>
+                <th scope="col">Recommendation</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
       </section>
 
       <!-- Pull Table -->
@@ -142,6 +227,7 @@
         <h2 id="pullCardTitle">Pull Card</h2>
         <button type="button" id="backToTableBtn" class="btn">&larr; Back to Pull Table</button>
         <div id="pullCardContent" role="region" aria-live="polite"></div>
+        <div id="pullConstructabilityDetail" role="region" aria-live="polite"></div>
       </section>
 
       <nav class="step-nav" aria-label="Workflow navigation">

@@ -1,5 +1,10 @@
-import { runCapacitorBankAnalysis } from './analysis/capacitorBank.mjs';
+import {
+  buildCapacitorBankDutyPackage,
+  renderCapacitorBankDutyHTML,
+  runCapacitorBankAnalysis,
+} from './analysis/capacitorBank.mjs';
 import { getStudies, setStudies } from './dataStore.mjs';
+import { downloadCSV } from './reports/reporting.mjs';
 import { initStudyApprovalPanel } from './src/components/studyApproval.js';
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -11,6 +16,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const form = document.getElementById('cap-bank-form');
   const resultsDiv = document.getElementById('results');
+  const saveBtn = document.getElementById('cap-save-btn');
+  const exportJsonBtn = document.getElementById('cap-export-json-btn');
+  const exportCsvBtn = document.getElementById('cap-export-csv-btn');
+  const exportHtmlBtn = document.getElementById('cap-export-html-btn');
+  let lastPackage = null;
 
   initStudyApprovalPanel('capacitorBank');
 
@@ -18,6 +28,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const saved = getStudies().capacitorBank;
   if (saved) {
     renderResults(saved);
+    lastPackage = saved.version ? saved : null;
+    setExportEnabled(Boolean(lastPackage));
   }
 
   // --- Form submission ---
@@ -28,7 +40,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let result;
     try {
-      result = runCapacitorBankAnalysis(inputs);
+      const baseResult = runCapacitorBankAnalysis(inputs);
+      result = buildCapacitorBankDutyPackage({
+        projectName: document.body.dataset.reportTitle || 'Capacitor Bank Sizing',
+        baseResult,
+        dutyCase: readDutyCase(baseResult),
+        stageRows: readStageRows(),
+        frequencyScan: getStudies().frequencyScan,
+        harmonicStudy: getStudies().harmonicStudyCase || getStudies().harmonics,
+      });
     } catch (err) {
       showModal('Analysis Error', `<p>${err.message}</p>`, 'error');
       return;
@@ -38,8 +58,36 @@ document.addEventListener('DOMContentLoaded', () => {
     const studies = getStudies();
     studies.capacitorBank = result;
     setStudies(studies);
+    lastPackage = result;
+    setExportEnabled(true);
 
     renderResults(result);
+  });
+
+  saveBtn?.addEventListener('click', () => {
+    if (!lastPackage) return;
+    setStudies({ ...getStudies(), capacitorBank: lastPackage });
+    showModal('Study Saved', '<p>Capacitor bank duty package saved to project studies.</p>', 'success');
+  });
+  exportJsonBtn?.addEventListener('click', () => {
+    if (!lastPackage) return;
+    downloadText('capacitor-bank-duty-package.json', JSON.stringify(lastPackage, null, 2), 'application/json');
+  });
+  exportHtmlBtn?.addEventListener('click', () => {
+    if (!lastPackage) return;
+    downloadText('capacitor-bank-duty-package.html', renderCapacitorBankDutyHTML(lastPackage), 'text/html');
+  });
+  exportCsvBtn?.addEventListener('click', () => {
+    if (!lastPackage) return;
+    const rows = [
+      ...lastPackage.stageRows.map(row => ({ recordType: 'stage', ...row })),
+      ...lastPackage.dutyRows.map(row => ({ recordType: 'duty', ...row })),
+      ...lastPackage.protectionRows.map(row => ({ recordType: 'protection', ...row })),
+      ...lastPackage.switchingRows.map(row => ({ recordType: 'switching', ...row })),
+      ...lastPackage.warningRows.map(row => ({ recordType: 'warning', ...row })),
+    ];
+    const headers = [...new Set(rows.flatMap(row => Object.keys(row)))];
+    downloadCSV(headers, rows.map(row => headers.map(header => row[header] ?? '')), 'capacitor-bank-duty.csv');
   });
 
   // --------------------------------------------------------------------------
@@ -77,7 +125,53 @@ document.addEventListener('DOMContentLoaded', () => {
     return { busLabel, pKw, pfExisting, pfTarget, voltageKv, kvaScMva, dominantHarmonics };
   }
 
-  function renderResults(r) {
+  function readDutyCase(baseResult) {
+    const get = id => document.getElementById(id);
+    const getFloat = id => {
+      const value = parseFloat(get(id)?.value || '');
+      return Number.isFinite(value) ? value : undefined;
+    };
+    return {
+      busLabel: baseResult.busLabel,
+      voltageKv: baseResult.voltageKv,
+      targetPowerFactor: baseResult.pfTarget,
+      controllerDeadband: getFloat('cap-deadband'),
+      controllerTimeDelaySec: getFloat('cap-time-delay'),
+      minimumStepKvar: getFloat('cap-min-step'),
+      controlMode: get('cap-control-mode')?.value || 'automatic',
+      topology: get('cap-topology')?.value || 'plain',
+      reactorPercent: getFloat('cap-reactor-percent'),
+      tunedOrder: getFloat('cap-tuned-order'),
+      targetHarmonics: String(get('cap-target-harmonics')?.value || '').split(',').map(v => Number(v.trim())).filter(Number.isFinite),
+      linkedFilterAlternativeId: get('cap-filter-id')?.value || '',
+      breakerTag: get('cap-breaker-tag')?.value || '',
+      contactorTag: get('cap-contactor-tag')?.value || '',
+      fuseTag: get('cap-fuse-tag')?.value || '',
+      ctRatio: get('cap-ct-ratio')?.value || '',
+      inrushLimitA: getFloat('cap-inrush-limit'),
+      outrushLimitA: getFloat('cap-outrush-limit'),
+      dischargeLimitSec: getFloat('cap-discharge-limit'),
+      unbalanceProtection: Boolean(get('cap-unbalance-protection')?.checked),
+    };
+  }
+
+  function readStageRows() {
+    const raw = document.getElementById('cap-stage-rows')?.value.trim();
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) throw new Error('Stage rows JSON must be an array.');
+    return parsed;
+  }
+
+  function setExportEnabled(enabled) {
+    [saveBtn, exportJsonBtn, exportCsvBtn, exportHtmlBtn].forEach(button => {
+      if (button) button.disabled = !enabled;
+    });
+  }
+
+  function renderResults(savedResult) {
+    const isPackage = savedResult?.version;
+    const r = isPackage ? savedResult.baseResult : savedResult;
     resultsDiv.innerHTML = '';
 
     if (r.kvarRequired === 0) {
@@ -88,6 +182,9 @@ document.addEventListener('DOMContentLoaded', () => {
           </div>
           <p class="field-hint">Existing PF: ${r.pfExisting} &nbsp;|&nbsp; Target PF: ${r.pfTarget}</p>
         </section>`;
+      if (isPackage) {
+        resultsDiv.insertAdjacentHTML('beforeend', renderCapacitorBankDutyHTML(savedResult));
+      }
       return;
     }
 
@@ -157,7 +254,18 @@ document.addEventListener('DOMContentLoaded', () => {
         ${warningsHtml}
 
         <p class="field-hint result-timestamp">Analysis run: ${new Date(r.timestamp).toLocaleString()}</p>
-      </section>`;
+      </section>
+      ${isPackage ? renderCapacitorBankDutyHTML(savedResult) : ''}`;
+  }
+
+  function downloadText(fileName, content, type) {
+    const blob = new Blob([content], { type });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = fileName;
+    anchor.click();
+    URL.revokeObjectURL(url);
   }
 
   function escHtml(str) {

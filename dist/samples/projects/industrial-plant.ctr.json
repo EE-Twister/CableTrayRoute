@@ -1,0 +1,60 @@
+{
+  "meta": { "version": 1, "scenario": "industrial-plant", "scenarios": ["industrial-plant"], "projectName": "Industrial Plant Cable Routing" },
+  "ductbanks": [
+    { "id": "DB-101", "ductbank_id": "DB-101", "name": "Process Unit East Ductbank", "length": 120, "width": 36, "height": 24, "conduits": 4 }
+  ],
+  "conduits": [
+    { "id": "CND-101", "conduit_id": "CND-101", "type": "RMC", "trade_size": "2 in", "capacity": 3.35, "from": "MCC-101", "to": "P-101" },
+    { "id": "CND-102", "conduit_id": "CND-102", "type": "RMC", "trade_size": "1 in", "capacity": 0.86, "from": "JB-101", "to": "AIT-101" }
+  ],
+  "trays": [
+    { "id": "TR-101", "tray_id": "TR-101", "name": "Pipe Rack Tray A", "width": 24, "height": 6, "length": 180, "fillLimitPct": 50 },
+    { "id": "TR-102", "tray_id": "TR-102", "name": "Unit Substation Tray", "width": 18, "height": 4, "length": 95, "fillLimitPct": 50 }
+  ],
+  "cables": [
+    { "id": "C-101", "tag": "C-101", "from": "SWGR-101", "to": "MCC-101", "conductor_size": "3/C 500 kcmil", "insulation_type": "XLPE", "voltage_rating": "5 kV", "length": 180, "diameter": 2.1, "route_preference": "TR-101" },
+    { "id": "C-102", "tag": "C-102", "from": "MCC-101", "to": "P-101", "conductor_size": "3/C 1/0 AWG", "insulation_type": "XHHW-2", "voltage_rating": "600 V", "length": 95, "diameter": 1.1, "route_preference": "CND-101" },
+    { "id": "C-103", "tag": "C-103", "from": "MCC-101", "to": "P-102", "conductor_size": "3/C 2 AWG", "insulation_type": "XHHW-2", "voltage_rating": "600 V", "length": 110, "diameter": 0.95, "route_preference": "TR-102" },
+    { "id": "C-104", "tag": "C-104", "from": "JB-101", "to": "AIT-101", "conductor_size": "2/C 16 AWG", "insulation_type": "PLTC", "voltage_rating": "300 V", "length": 80, "diameter": 0.35, "route_preference": "CND-102" }
+  ],
+  "cableTypicals": [
+    { "id": "TYP-MTR-600V", "name": "600 V motor feeder", "conductor_size": "3/C 1/0 AWG", "insulation_type": "XHHW-2" }
+  ],
+  "panels": [
+    { "id": "MCC-101", "name": "MCC-101", "voltage": "480 V", "location": "Unit Substation" }
+  ],
+  "equipment": [
+    { "id": "SWGR-101", "tag": "SWGR-101", "description": "5 kV switchgear", "area": "Substation" },
+    { "id": "P-101", "tag": "P-101", "description": "Process pump motor", "area": "Process Unit" },
+    { "id": "AIT-101", "tag": "AIT-101", "description": "Analyzer transmitter", "area": "Process Unit" }
+  ],
+  "loads": [
+    { "id": "L-101", "tag": "P-101", "description": "Process pump", "kw": 75, "voltage": "480 V", "phases": "3" },
+    { "id": "L-102", "tag": "P-102", "description": "Cooling fan", "kw": 45, "voltage": "480 V", "phases": "3" }
+  ],
+  "oneLine": {
+    "activeSheet": 0,
+    "sheets": [
+      {
+        "name": "Industrial Plant Sample",
+        "components": [
+          { "id": "src-1", "type": "source", "x": 40, "y": 90, "label": "Utility 5 kV", "connections": [{ "target": "swgr-101" }] },
+          { "id": "swgr-101", "type": "switchgear", "x": 210, "y": 90, "label": "SWGR-101", "connections": [{ "target": "mcc-101" }] },
+          { "id": "mcc-101", "type": "mcc", "x": 390, "y": 90, "label": "MCC-101", "connections": [{ "target": "p-101" }, { "target": "p-102" }] },
+          { "id": "p-101", "type": "motor", "x": 570, "y": 50, "label": "P-101", "connections": [] },
+          { "id": "p-102", "type": "motor", "x": 570, "y": 130, "label": "P-102", "connections": [] }
+        ]
+      }
+    ]
+  },
+  "settings": {
+    "studyResults": {
+      "trayFill": { "summary": { "overCount": 0, "nearCount": 1 }, "sample": true },
+      "loadFlow": { "summary": { "pass": true, "voltageDropPct": 2.4 }, "sample": true }
+    },
+    "studyApprovals": {
+      "loadFlow": { "status": "pending", "reviewedBy": "", "approvedAt": "", "note": "Sample result for guided demo review." }
+    }
+  }
+}
+

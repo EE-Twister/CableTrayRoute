@@ -241,7 +241,88 @@
           </div>
         </fieldset>
 
-        <button type="submit" class="primary-btn">Run Analysis</button>
+        <fieldset>
+          <legend><strong>Capacitor Bank Duty</strong></legend>
+          <div class="field-row">
+            <label for="cap-stage-rows">Stage rows (JSON)</label>
+            <textarea id="cap-stage-rows" rows="5" spellcheck="false">[
+  {"id":"stage-1","label":"Stage 1","kvar":300,"voltageRatingKv":0.6,"switchingDevice":"contactor","stepOrder":1,"enabled":true,"dischargeTimeSec":60},
+  {"id":"stage-2","label":"Stage 2","kvar":300,"voltageRatingKv":0.6,"switchingDevice":"contactor","stepOrder":2,"enabled":true,"dischargeTimeSec":60}
+]</textarea>
+            <p class="field-hint">Leave blank to auto-generate stages from the selected standard bank size.</p>
+          </div>
+          <div class="form-grid">
+            <label for="cap-control-mode">Controller mode
+              <select id="cap-control-mode">
+                <option value="automatic">Automatic</option>
+                <option value="manual">Manual</option>
+                <option value="lockedOut">Locked Out</option>
+              </select>
+            </label>
+            <label for="cap-deadband">PF deadband
+              <input id="cap-deadband" type="number" min="0" step="0.001" value="0.02">
+            </label>
+            <label for="cap-time-delay">Time delay (s)
+              <input id="cap-time-delay" type="number" min="0" step="1" value="30">
+            </label>
+            <label for="cap-min-step">Minimum step (kVAR)
+              <input id="cap-min-step" type="number" min="0" step="1" value="0">
+            </label>
+            <label for="cap-topology">Topology
+              <select id="cap-topology">
+                <option value="plain">Plain capacitor</option>
+                <option value="detuned">Detuned reactor</option>
+                <option value="singleTuned">Single-tuned filter</option>
+                <option value="highPass">High-pass filter</option>
+                <option value="activeFilterLinked">Linked active filter</option>
+              </select>
+            </label>
+            <label for="cap-reactor-percent">Reactor (%)
+              <input id="cap-reactor-percent" type="number" min="0" step="0.01" value="0">
+            </label>
+            <label for="cap-tuned-order">Tuned order
+              <input id="cap-tuned-order" type="number" min="0" step="0.01" value="0">
+            </label>
+            <label for="cap-target-harmonics">Target harmonics
+              <input id="cap-target-harmonics" type="text" value="5,7" placeholder="5,7,11">
+            </label>
+            <label for="cap-filter-id">Linked filter alternative
+              <input id="cap-filter-id" type="text" placeholder="Filter row id">
+            </label>
+            <label for="cap-breaker-tag">Breaker tag
+              <input id="cap-breaker-tag" type="text" placeholder="CB-CAP-1">
+            </label>
+            <label for="cap-contactor-tag">Contactor tag
+              <input id="cap-contactor-tag" type="text" placeholder="K-CAP-1">
+            </label>
+            <label for="cap-fuse-tag">Fuse tag
+              <input id="cap-fuse-tag" type="text" placeholder="FU-CAP-1">
+            </label>
+            <label for="cap-ct-ratio">CT ratio
+              <input id="cap-ct-ratio" type="text" placeholder="600:5">
+            </label>
+            <label for="cap-inrush-limit">Inrush limit (A)
+              <input id="cap-inrush-limit" type="number" min="0" step="1" placeholder="Optional">
+            </label>
+            <label for="cap-outrush-limit">Outrush limit (A)
+              <input id="cap-outrush-limit" type="number" min="0" step="1" placeholder="Optional">
+            </label>
+            <label for="cap-discharge-limit">Discharge limit (s)
+              <input id="cap-discharge-limit" type="number" min="1" step="1" value="60">
+            </label>
+          </div>
+          <label class="checkbox-label">
+            <input id="cap-unbalance-protection" type="checkbox"> Include unbalance protection basis
+          </label>
+        </fieldset>
+
+        <div class="controls-row">
+          <button type="submit" class="primary-btn">Run Duty Check</button>
+          <button type="button" id="cap-save-btn" disabled>Save to Studies</button>
+          <button type="button" id="cap-export-json-btn" disabled>Export JSON</button>
+          <button type="button" id="cap-export-csv-btn" disabled>Export CSV</button>
+          <button type="button" id="cap-export-html-btn" disabled>Printable HTML</button>
+        </div>
 
       </form>
 
