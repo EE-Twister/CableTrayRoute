@@ -2,7 +2,12 @@ import {
   HEAT_TRACE_CABLE_TYPES,
   HEAT_TRACE_COMPONENT_ALLOWANCE_TYPES,
   runHeatTraceSizingAnalysis,
+  selectHeatTraceProduct,
+  buildLineList,
+  buildHeatTraceBOM,
+  buildControllerSchedule,
 } from './analysis/heatTraceSizing.mjs';
+import heatTraceProductCatalog from './data/heatTraceProducts.json';
 import {
   buildHeatTraceBranchSchedule,
   buildHeatTraceReport,
@@ -60,6 +65,20 @@ document.addEventListener('DOMContentLoaded', () => {
   const componentAllowanceRows = document.getElementById('component-allowance-rows');
   const addComponentAllowanceButton = document.getElementById('add-component-allowance');
   const componentAllowanceSummary = document.getElementById('component-allowance-summary');
+  const exportPackageButton = document.getElementById('heattrace-export-package');
+  const autoSelectProductsButton = document.getElementById('heattrace-autoselect-products');
+  const exportLineListCsvButton = document.getElementById('heattrace-export-linelist-csv');
+  const exportBomCsvButton = document.getElementById('heattrace-export-bom-csv');
+  const exportControllerCsvButton = document.getElementById('heattrace-export-controller-csv');
+  const lineListTableDiv = document.getElementById('heattrace-linelist-table');
+  const lineListStatus = document.getElementById('heattrace-linelist-status');
+  const bomTableDiv = document.getElementById('heattrace-bom-table');
+  const controllerTableDiv = document.getElementById('heattrace-controller-table');
+  const installationNotesDiv = document.getElementById('heattrace-installation-notes');
+  const catalogTableDiv = document.getElementById('heattrace-catalog-table');
+  const productFilterType = document.getElementById('product-filter-type');
+  const productFilterVoltage = document.getElementById('product-filter-voltage');
+  const productFilterHazardous = document.getElementById('product-filter-hazardous');
   let activeUnitSystem = unitSystemSelect?.value || 'imperial';
   let sensitivityBaseline = null;
   let sensitivityRecommendations = [];
@@ -2201,6 +2220,343 @@ document.addEventListener('DOMContentLoaded', () => {
       <text x="${x + 22}" y="${y + 5}" fill="var(--text-color, #1f2b3a)" font-size="13">${escHtml(label)}</text>
     `;
   }
+
+  // -------------------------------------------------------------------------
+  // Line List, BOM, Controller Schedule, Installation Notes
+  // -------------------------------------------------------------------------
+
+  function getFilteredCatalog() {
+    let catalog = Array.isArray(heatTraceProductCatalog) ? heatTraceProductCatalog : [];
+    const typeFilter = productFilterType?.value || '';
+    const voltageFilter = productFilterVoltage?.value ? Number(productFilterVoltage.value) : null;
+    const hazFilter = productFilterHazardous?.checked || false;
+    if (typeFilter) catalog = catalog.filter(p => p.type === typeFilter);
+    if (voltageFilter) catalog = catalog.filter(p => Array.isArray(p.voltages) && p.voltages.includes(voltageFilter));
+    if (hazFilter) catalog = catalog.filter(p => Boolean(p.hazardousAreaRating));
+    return catalog;
+  }
+
+  function getNormalizedCircuits() {
+    const { buildHeatTraceBranchSchedule: buildSchedule } = { buildHeatTraceBranchSchedule: buildHeatTraceBranchSchedule };
+    const schedule = buildSchedule(circuitCases);
+    return schedule.rows || [];
+  }
+
+  function renderLineListTable() {
+    if (!lineListTableDiv) return;
+    const circuits = getNormalizedCircuits();
+    if (!circuits.length) {
+      if (lineListStatus) lineListStatus.textContent = 'Add branch cases to populate the line list.';
+      lineListTableDiv.innerHTML = '';
+      return;
+    }
+    const catalog = Array.isArray(heatTraceProductCatalog) ? heatTraceProductCatalog : [];
+    const rows = buildLineList(circuits, catalog);
+    if (lineListStatus) lineListStatus.textContent = `${rows.length} circuit${rows.length === 1 ? '' : 's'} in line list.`;
+    const checkClass = row => {
+      if (row.circuitLengthCheck === 'PASS') return 'fill-ok';
+      if (row.circuitLengthCheck === 'EXCEEDS') return 'fill-over';
+      return 'fill-warn';
+    };
+    const html = `
+      <div class="report-scroll">
+        <table class="report-table heattrace-linelist-tbl">
+          <thead>
+            <tr>
+              <th>#</th><th>Circuit Tag</th><th>Service</th><th>Area</th>
+              <th>Maintain °C</th><th>Ambient °C</th><th>Eff. Length (ft)</th>
+              <th>Product Family</th><th>W/ft</th><th>Required W/ft</th>
+              <th>kW</th><th>Amps</th><th>Startup A</th>
+              <th>Max Ckt (ft)</th><th>Length Check</th>
+              <th>Controller Tag</th><th>Source</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows.map(row => `
+              <tr>
+                <td>${escHtml(row.lineNum)}</td>
+                <td>${escHtml(row.circuitTag)}</td>
+                <td>${escHtml(row.service)}</td>
+                <td>${escHtml(row.areaClassification)}</td>
+                <td>${escHtml(row.maintainTempC)}</td>
+                <td>${escHtml(row.ambientDesignTempC)}</td>
+                <td>${escHtml(row.effectiveLengthFt)}</td>
+                <td>${escHtml(row.productFamily)}</td>
+                <td>${escHtml(row.nominalWPerFt)}</td>
+                <td>${escHtml(row.requiredWPerFt)}</td>
+                <td>${escHtml(row.circuitKw)}</td>
+                <td>${escHtml(row.circuitAmps)}</td>
+                <td>${escHtml(row.startupCurrentA)}</td>
+                <td>${escHtml(row.maxCircuitLengthFt || '—')}</td>
+                <td class="${checkClass(row)}">${escHtml(row.circuitLengthCheck)}</td>
+                <td>${escHtml(row.controllerTag)}</td>
+                <td>${escHtml(row.panelSource)}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>`;
+    lineListTableDiv.innerHTML = html;
+  }
+
+  function renderCatalogTable() {
+    if (!catalogTableDiv) return;
+    const catalog = getFilteredCatalog();
+    if (!catalog.length) {
+      catalogTableDiv.innerHTML = '<p class="field-hint">No products match the current filter.</p>';
+      return;
+    }
+    const typeLabel = { selfRegulating: 'Self-regulating', constantWattage: 'Constant wattage', mineralInsulated: 'Mineral insulated', powerLimiting: 'Power-limiting' };
+    catalogTableDiv.innerHTML = `
+      <div class="report-scroll">
+        <table class="report-table">
+          <thead>
+            <tr><th>ID</th><th>Family</th><th>Type</th><th>W/ft</th><th>Voltages</th><th>Hazardous</th><th>Max Exp. °C</th><th>Description</th></tr>
+          </thead>
+          <tbody>
+            ${catalog.map(p => `<tr>
+              <td>${escHtml(p.id)}</td>
+              <td>${escHtml(p.family)}</td>
+              <td>${escHtml(typeLabel[p.type] || p.type)}</td>
+              <td>${escHtml(p.nominalWPerFt)}</td>
+              <td>${escHtml((p.voltages || []).join(', '))}</td>
+              <td>${p.hazardousAreaRating ? escHtml(p.hazardousAreaRating) : '—'}</td>
+              <td>${escHtml(p.maxExposureTempC)}</td>
+              <td>${escHtml(p.description || '')}</td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>`;
+  }
+
+  function renderBomTable() {
+    if (!bomTableDiv) return;
+    const circuits = getNormalizedCircuits();
+    if (!circuits.length) {
+      bomTableDiv.innerHTML = '<p class="field-hint">Add branch cases to generate the BOM.</p>';
+      return;
+    }
+    const catalog = Array.isArray(heatTraceProductCatalog) ? heatTraceProductCatalog : [];
+    const lineRows = buildLineList(circuits, catalog);
+    const bom = buildHeatTraceBOM(lineRows);
+    bomTableDiv.innerHTML = `
+      <div class="report-scroll">
+        <table class="report-table">
+          <thead>
+            <tr><th>Item</th><th>Description</th><th>Qty</th><th>Unit</th></tr>
+          </thead>
+          <tbody>
+            ${bom.map(item => `<tr>
+              <td>${escHtml(item.item)}</td>
+              <td>${escHtml(item.description)}</td>
+              <td>${escHtml(item.quantity)}</td>
+              <td>${escHtml(item.unit)}</td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>`;
+  }
+
+  function renderControllerTable() {
+    if (!controllerTableDiv) return;
+    const circuits = getNormalizedCircuits();
+    if (!circuits.length) {
+      controllerTableDiv.innerHTML = '<p class="field-hint">Add branch cases to generate the controller schedule.</p>';
+      return;
+    }
+    const catalog = Array.isArray(heatTraceProductCatalog) ? heatTraceProductCatalog : [];
+    const lineRows = buildLineList(circuits, catalog);
+    const schedule = buildControllerSchedule(lineRows);
+    controllerTableDiv.innerHTML = `
+      <div class="report-scroll">
+        <table class="report-table">
+          <thead>
+            <tr><th>Controller Tag</th><th>Panel Source</th><th>Voltage</th><th>Circuits</th><th>Circuit Tags</th><th>Total kW</th><th>Total Amps</th><th>Monitoring</th></tr>
+          </thead>
+          <tbody>
+            ${schedule.map(row => `<tr>
+              <td>${escHtml(row.controllerTag)}</td>
+              <td>${escHtml(row.panelSource)}</td>
+              <td>${escHtml(row.voltageV)} V</td>
+              <td>${escHtml(row.circuitCount)}</td>
+              <td>${escHtml(row.circuitTags)}</td>
+              <td>${escHtml(row.totalKw)}</td>
+              <td>${escHtml(row.totalAmps)}</td>
+              <td>${escHtml(row.monitoringType)}</td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>`;
+  }
+
+  function renderInstallationNotes() {
+    if (!installationNotesDiv) return;
+    const circuits = getNormalizedCircuits();
+    const catalog = Array.isArray(heatTraceProductCatalog) ? heatTraceProductCatalog : [];
+    const productTypes = new Set();
+    const hasHazardous = circuits.some(c => (c.inputs?.environment || '') === 'hazardous-area');
+    const hasHighTemp = circuits.some(c => Number(c.inputs?.maintainTempC) > 120);
+    circuits.forEach(c => {
+      const { product } = selectHeatTraceProduct(c, catalog);
+      if (product) productTypes.add(product.type);
+    });
+
+    const typeNotes = {
+      selfRegulating: '<li>Self-regulating cable output decreases as pipe temperature rises — verify minimum startup output at the coldest expected pipe temperature.</li>',
+      constantWattage: '<li>Constant-wattage cable maintains fixed output regardless of pipe temperature — confirm controller strategy and sheath temperature limits.</li>',
+      mineralInsulated: '<li>MI cable requires factory-terminated assemblies — finalize run lengths before ordering. Confirm bend-radius limits with the installer.</li>',
+    };
+
+    installationNotesDiv.innerHTML = `
+      <div class="heattrace-installation-content">
+        <h3>General Installation Requirements</h3>
+        <ul>
+          <li>Install heat-trace cable per manufacturer installation instructions and IEC 62395-2 / IEEE 515-2017.</li>
+          <li>Attach cable to pipe at the 5 o'clock or 7 o'clock position using manufacturer-supplied fiberglass or aluminum tape every 12 in (300 mm) minimum.</li>
+          <li>Do not cross cables or overlap self-regulating sections beyond the manufacturer maximum.</li>
+          <li>Install thermal insulation and weatherproof cladding after passing the continuity and resistance check.</li>
+          <li>Label each circuit at the controller, at each power-connection junction box, and every 30 ft along the run per IEC 62395-2 §7.5.</li>
+          <li>Perform continuity and insulation-resistance (IR) tests before and after insulation installation per IEEE 515-2017 §9.</li>
+        </ul>
+        ${productTypes.size ? `<h3>Product-Specific Notes</h3><ul>${[...productTypes].map(t => typeNotes[t] || '').join('')}</ul>` : ''}
+        ${hasHazardous ? `<h3>Hazardous Area Requirements</h3>
+        <ul>
+          <li>Verify product temperature classification (T-rating) is compatible with the gas/vapor group and ignition temperature per NEC Article 500 / IEC 60079-30.</li>
+          <li>Confirm end-seal and power-connection kits are rated for the area classification (Class I Div 1/2 or Zone 0/1/2 as applicable).</li>
+          <li>Installations in classified areas require a qualified electrical inspector sign-off before energizing.</li>
+        </ul>` : ''}
+        ${hasHighTemp ? `<h3>High-Temperature Process Notes</h3>
+        <ul>
+          <li>Maintain temperatures above 120 °C require mineral-insulated or specialty high-temperature cable. Verify T-class derating and max sheath temperature.</li>
+          <li>Use high-temperature fiberglass insulation tape and appropriate junction-box ratings.</li>
+        </ul>` : ''}
+        <h3>Pre-Energization Checklist</h3>
+        <ol>
+          <li>Continuity check: verify cable resistance is within ±10 % of manufacturer nominal.</li>
+          <li>Insulation resistance: minimum 1 MΩ at 500 V DC (self-regulating) or 2 MΩ (constant-wattage/MI) before insulation cover.</li>
+          <li>Controller calibration: verify setpoint, high-temperature cutout, and GFCI trip test.</li>
+          <li>Verify circuit breaker rating matches design load and startup current.</li>
+          <li>Confirm all splice and end-seal kits are fully cured and weatherproofed.</li>
+          <li>Energize and confirm controller indicates normal operation.</li>
+        </ol>
+      </div>`;
+  }
+
+  function downloadCsvData(headers, rows, filename) {
+    const lines = [headers.join(',')];
+    rows.forEach(row => {
+      lines.push(headers.map(h => {
+        const val = String(row[h] ?? '');
+        return val.includes(',') || val.includes('"') ? `"${val.replace(/"/g, '""')}"` : val;
+      }).join(','));
+    });
+    const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  function exportLineListCsv() {
+    const circuits = getNormalizedCircuits();
+    if (!circuits.length) { showModal('No Data', '<p>Add branch cases before exporting.</p>', 'info'); return; }
+    const catalog = Array.isArray(heatTraceProductCatalog) ? heatTraceProductCatalog : [];
+    const rows = buildLineList(circuits, catalog);
+    const headers = ['lineNum','circuitTag','service','areaClassification','maintainTempC','ambientDesignTempC','effectiveLengthFt','productFamily','nominalWPerFt','requiredWPerFt','circuitKw','circuitAmps','startupCurrentA','maxCircuitLengthFt','circuitLengthCheck','controllerTag','panelSource'];
+    downloadCsvData(headers, rows, `heat-trace-line-list-${new Date().toISOString().slice(0,10)}.csv`);
+  }
+
+  function exportBomCsv() {
+    const circuits = getNormalizedCircuits();
+    if (!circuits.length) { showModal('No Data', '<p>Add branch cases before exporting.</p>', 'info'); return; }
+    const catalog = Array.isArray(heatTraceProductCatalog) ? heatTraceProductCatalog : [];
+    const lineRows = buildLineList(circuits, catalog);
+    const bom = buildHeatTraceBOM(lineRows);
+    const headers = ['item','description','quantity','unit'];
+    downloadCsvData(headers, bom, `heat-trace-bom-${new Date().toISOString().slice(0,10)}.csv`);
+  }
+
+  function exportControllerCsv() {
+    const circuits = getNormalizedCircuits();
+    if (!circuits.length) { showModal('No Data', '<p>Add branch cases before exporting.</p>', 'info'); return; }
+    const catalog = Array.isArray(heatTraceProductCatalog) ? heatTraceProductCatalog : [];
+    const lineRows = buildLineList(circuits, catalog);
+    const schedule = buildControllerSchedule(lineRows);
+    const headers = ['controllerTag','panelSource','voltageV','circuitCount','circuitTags','totalKw','totalAmps','monitoringType'];
+    downloadCsvData(headers, schedule, `heat-trace-controller-schedule-${new Date().toISOString().slice(0,10)}.csv`);
+  }
+
+  function exportPackageXlsx() {
+    if (typeof XLSX === 'undefined') {
+      showModal('Library Error', '<p>XLSX library not loaded. Ensure the page is fully loaded and try again.</p>', 'error');
+      return;
+    }
+    const circuits = getNormalizedCircuits();
+    if (!circuits.length) { showModal('No Data', '<p>Add branch cases before exporting the package.</p>', 'info'); return; }
+    const catalog = Array.isArray(heatTraceProductCatalog) ? heatTraceProductCatalog : [];
+    const lineRows = buildLineList(circuits, catalog);
+    const bom = buildHeatTraceBOM(lineRows);
+    const controllerSched = buildControllerSchedule(lineRows);
+    const wb = XLSX.utils.book_new();
+
+    // Line List sheet
+    const llHeaders = ['#','Circuit Tag','Service','Area','Maintain °C','Ambient °C','Eff. Length ft','Product Family','W/ft','Req W/ft','kW','Amps','Startup A','Max Ckt ft','Length Check','Controller','Source'];
+    const llData = [llHeaders, ...lineRows.map(r => [r.lineNum,r.circuitTag,r.service,r.areaClassification,r.maintainTempC,r.ambientDesignTempC,r.effectiveLengthFt,r.productFamily,r.nominalWPerFt,r.requiredWPerFt,r.circuitKw,r.circuitAmps,r.startupCurrentA,r.maxCircuitLengthFt||0,r.circuitLengthCheck,r.controllerTag,r.panelSource])];
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(llData), 'Line List');
+
+    // BOM sheet
+    const bomData = [['Item','Description','Quantity','Unit'], ...bom.map(r => [r.item, r.description, r.quantity, r.unit])];
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(bomData), 'BOM');
+
+    // Controller Schedule sheet
+    const csData = [['Controller Tag','Panel Source','Voltage V','Circuits','Circuit Tags','Total kW','Total Amps','Monitoring'], ...controllerSched.map(r => [r.controllerTag, r.panelSource, r.voltageV, r.circuitCount, r.circuitTags, r.totalKw, r.totalAmps, r.monitoringType])];
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(csData), 'Controller Schedule');
+
+    // Assumptions sheet
+    const stamp = new Date().toISOString().slice(0, 10);
+    const assumData = [
+      ['Heat Trace Construction Package'],
+      ['Generated', stamp],
+      ['Project', getProjectName()],
+      [],
+      ['Assumptions'],
+      ['Sizing method', 'Simplified steady-state heat-balance screening (IEC 62395-2 / IEEE 515-2017)'],
+      ['Product selection', 'Nearest catalog product at or above required W/ft, matching voltage and area classification'],
+      ['Accessory quantities', 'Screening estimates only — splice/tee kits require project layout; verify all quantities with manufacturer'],
+      ['Circuit length check', 'Based on product maxCircuitLengthFt for the selected voltage; verify with manufacturer current-limiting tables'],
+    ];
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(assumData), 'Assumptions');
+
+    XLSX.writeFile(wb, `heat-trace-package-${stamp}.xlsx`);
+  }
+
+  function attachPackageHandlers() {
+    autoSelectProductsButton?.addEventListener('click', () => {
+      renderLineListTable();
+      renderBomTable();
+      renderControllerTable();
+      renderInstallationNotes();
+    });
+    exportLineListCsvButton?.addEventListener('click', exportLineListCsv);
+    exportBomCsvButton?.addEventListener('click', exportBomCsv);
+    exportControllerCsvButton?.addEventListener('click', exportControllerCsv);
+    exportPackageButton?.addEventListener('click', exportPackageXlsx);
+    [productFilterType, productFilterVoltage, productFilterHazardous].forEach(el => {
+      el?.addEventListener('change', renderCatalogTable);
+    });
+    document.getElementById('heattrace-tab-linelist')?.addEventListener('click', () => {
+      renderLineListTable();
+      renderCatalogTable();
+    });
+    document.getElementById('heattrace-tab-bom')?.addEventListener('click', renderBomTable);
+    document.getElementById('heattrace-tab-controller')?.addEventListener('click', renderControllerTable);
+    document.getElementById('heattrace-tab-installation')?.addEventListener('click', renderInstallationNotes);
+  }
+
+  attachPackageHandlers();
+  initStudyApprovalPanel('heatTraceSizing', 'study-review-panel-linelist');
+  renderCatalogTable();
+
 });
 
 function initAnalysisTabs() {
