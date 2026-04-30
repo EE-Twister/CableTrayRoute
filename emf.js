@@ -4,7 +4,10 @@ import {
   fieldProfile,
   checkCompliance,
   ICNIRP_LIMITS,
+  buildEmfExposurePackage,
+  renderEmfExposureHTML,
 } from './analysis/emf.mjs';
+import { getStudies, setStudies } from './dataStore.mjs';
 
 document.addEventListener('DOMContentLoaded', () => {
   initSettings();
@@ -15,6 +18,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.getElementById('calc-btn').addEventListener('click', calculate);
   document.getElementById('profile-btn').addEventListener('click', runProfile);
+  initExposureStudy();
 
   function getInputs() {
     return {
@@ -254,6 +258,174 @@ document.addEventListener('DOMContentLoaded', () => {
     g.appendChild(polyline);
 
     svg.appendChild(g);
+  }
+
+  function initExposureStudy() {
+    const circuitsEl = document.getElementById('emf-circuit-rows');
+    const pointsEl = document.getElementById('emf-point-rows');
+    const validationEl = document.getElementById('emf-validation-rows');
+    if (!circuitsEl || !pointsEl || !validationEl) return;
+    circuitsEl.value ||= JSON.stringify([
+      {
+        tag: 'Tray Circuit 1',
+        geometryMode: 'tray',
+        currentA: 100,
+        trayWidthM: 0.3048,
+        phaseSpacingM: 0.05,
+        elevationM: 0,
+        nParallelSets: 1,
+      },
+    ], null, 2);
+    pointsEl.value ||= JSON.stringify([
+      { id: 'public-1m', label: 'Public reference 1 m', xM: 1, yM: 0.6 },
+      { id: 'worker-0-3m', label: 'Worker close approach', xM: 0.3, yM: 0.6 },
+    ], null, 2);
+    validationEl.value ||= JSON.stringify([], null, 2);
+
+    document.getElementById('emf-run-study')?.addEventListener('click', () => {
+      try {
+        renderExposurePackage(buildExposurePackageFromForm());
+      } catch (err) {
+        showAlertModal('EMF Study Error', err.message);
+      }
+    });
+    document.getElementById('emf-save-study')?.addEventListener('click', () => {
+      try {
+        const pkg = buildExposurePackageFromForm();
+        const studies = getStudies();
+        studies.emfExposure = pkg;
+        setStudies(studies);
+        renderExposurePackage(pkg);
+        showAlertModal('EMF Study Saved', 'The EMF exposure package was saved to study results.');
+      } catch (err) {
+        showAlertModal('EMF Study Error', err.message);
+      }
+    });
+    document.getElementById('emf-export-json')?.addEventListener('click', () => {
+      try {
+        const pkg = buildExposurePackageFromForm();
+        downloadText('emf-exposure-package.json', JSON.stringify(pkg, null, 2), 'application/json');
+      } catch (err) {
+        showAlertModal('EMF Study Error', err.message);
+      }
+    });
+    document.getElementById('emf-export-csv')?.addEventListener('click', () => {
+      try {
+        const pkg = buildExposurePackageFromForm();
+        downloadText('emf-exposure-field-rows.csv', rowsToCsv(pkg.fieldRows), 'text/csv');
+      } catch (err) {
+        showAlertModal('EMF Study Error', err.message);
+      }
+    });
+    document.getElementById('emf-export-html')?.addEventListener('click', () => {
+      try {
+        const pkg = buildExposurePackageFromForm();
+        const html = `<!doctype html><html><head><meta charset="utf-8"><title>EMF Exposure Study</title><link rel="stylesheet" href="style.css"></head><body>${renderEmfExposureHTML(pkg)}</body></html>`;
+        downloadText('emf-exposure-package.html', html, 'text/html');
+      } catch (err) {
+        showAlertModal('EMF Study Error', err.message);
+      }
+    });
+  }
+
+  function buildExposurePackageFromForm() {
+    const studyCase = {
+      name: document.getElementById('emf-case-name')?.value || 'EMF Exposure Study Case',
+      frequencyHz: parseFloat(document.getElementById('frequency')?.value || '60'),
+      exposureBasis: document.getElementById('emf-exposure-basis')?.value || 'icnirpPublic',
+      customLimit_uT: parseFloat(document.getElementById('emf-custom-limit')?.value || ''),
+      geometryMode: document.getElementById('emf-geometry-mode')?.value || 'tray',
+      profileHeightM: parseFloat(document.getElementById('emf-profile-height')?.value || '0.6'),
+      phaseSequence: document.getElementById('emf-phase-sequence')?.value || 'ABC',
+      shieldingMode: document.getElementById('emf-shielding-mode')?.value || 'none',
+      shieldingFactor: parseFloat(document.getElementById('emf-shielding-factor')?.value || '1'),
+      reportPreset: document.getElementById('emf-report-preset')?.value || 'summary',
+      notes: document.getElementById('emf-notes')?.value || '',
+    };
+    return buildEmfExposurePackage({
+      projectName: document.querySelector('[data-report-title]')?.dataset.reportTitle || 'CableTrayRoute Project',
+      studyCase,
+      circuitRows: parseJsonRows('emf-circuit-rows', 'circuit rows'),
+      measurementPoints: parseJsonRows('emf-point-rows', 'measurement points'),
+      validationRows: parseJsonRows('emf-validation-rows', 'validation rows'),
+    });
+  }
+
+  function parseJsonRows(id, label) {
+    const value = document.getElementById(id)?.value?.trim();
+    if (!value) return [];
+    try {
+      const parsed = JSON.parse(value);
+      if (!Array.isArray(parsed)) throw new Error(`${label} must be a JSON array`);
+      return parsed;
+    } catch (err) {
+      throw new Error(`Invalid ${label}: ${err.message}`);
+    }
+  }
+
+  function renderExposurePackage(pkg) {
+    const root = document.getElementById('emf-study-results');
+    if (!root) return;
+    const summary = pkg.summary || {};
+    document.getElementById('emf-study-summary').innerHTML = `
+      <div class="result-card ${summary.fail ? 'result-fail' : summary.warn ? 'result-warn' : 'result-ok'}">
+        <h3>Exposure Study Summary</h3>
+        <p>${esc(summary.measurementPointCount || 0)} point(s), ${esc(summary.conductorCount || 0)} conductor(s), max ${esc(summary.maxBRms_uT ?? 'n/a')} uT, ${esc(summary.maxUtilizationPct ?? 'n/a')}% utilization.</p>
+      </div>`;
+    const fieldBody = document.getElementById('emf-field-body');
+    fieldBody.innerHTML = (pkg.fieldRows || []).map(row => `<tr class="${statusClass(row.status)}">
+      <td>${esc(row.label)}</td>
+      <td>${esc(row.xM)}, ${esc(row.yM)}</td>
+      <td>${esc(row.bRms_uT)}</td>
+      <td>${esc(row.limitLabel)} (${esc(row.limit_uT)} uT)</td>
+      <td>${esc(row.utilizationPct)}%</td>
+      <td>${esc(row.status)}</td>
+      <td>${esc(row.recommendation)}</td>
+    </tr>`).join('') || '<tr><td colspan="7">No field rows.</td></tr>';
+    document.getElementById('emf-validation-body').innerHTML = (pkg.validationRows || []).map(row => `<tr class="${statusClass(row.status)}">
+      <td>${esc(row.label)}</td>
+      <td>${esc(row.measuredB_uT ?? 'n/a')}</td>
+      <td>${esc(row.calculatedB_uT ?? 'n/a')}</td>
+      <td>${esc(row.differencePct ?? 'n/a')}%</td>
+      <td>${esc(row.status)}</td>
+      <td>${esc(row.source)}</td>
+    </tr>`).join('') || '<tr><td colspan="6">No validation rows.</td></tr>';
+    document.getElementById('emf-warning-body').innerHTML = (pkg.warningRows || []).map(row => `<tr class="${statusClass(row.severity)}">
+      <td>${esc(row.code)}</td>
+      <td>${esc(row.sourceTag || row.sourceId || '')}</td>
+      <td>${esc(row.severity)}</td>
+      <td>${esc(row.message)}</td>
+      <td>${esc(row.recommendation)}</td>
+    </tr>`).join('') || '<tr><td colspan="5">No warnings.</td></tr>';
+    document.getElementById('emf-study-json').textContent = JSON.stringify(pkg, null, 2);
+    root.hidden = false;
+  }
+
+  function statusClass(status) {
+    if (status === 'fail') return 'result-fail';
+    if (status === 'warn' || status === 'missingData' || status === 'review') return 'result-warn';
+    return 'result-ok';
+  }
+
+  function rowsToCsv(rows = []) {
+    const keys = Array.from(rows.reduce((set, row) => {
+      Object.keys(row || {}).forEach(key => set.add(key));
+      return set;
+    }, new Set()));
+    const escCsv = value => `"${String(value ?? '').replace(/"/g, '""')}"`;
+    return [keys.join(','), ...rows.map(row => keys.map(key => escCsv(row[key])).join(','))].join('\n');
+  }
+
+  function downloadText(filename, text, type) {
+    const blob = new Blob([text], { type });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
   }
 
   function esc(s) {

@@ -6,6 +6,27 @@ import crypto from 'crypto';
 import { promisify } from 'util';
 import { attachCollaborationServer } from './src/collaborationServer.mjs';
 import { validateLibraryPayload } from './src/validation/librarySchema.mjs';
+import {
+  buildCloudLibraryAdoptionPreview,
+  diffCloudLibraryReleases,
+  normalizeCloudLibraryRelease,
+  validateCloudLibraryRelease,
+} from './analysis/cloudComponentLibraryGovernance.mjs';
+import {
+  buildRevitNativeSyncPackage,
+  buildRevitRoundTripPreview,
+  validateRevitConnectorPayload,
+} from './analysis/revitConnectorBridge.mjs';
+import {
+  buildAutoCadNativeSyncPackage,
+  buildAutoCadRoundTripPreview,
+  validateAutoCadConnectorPayload,
+} from './analysis/autocadConnectorBridge.mjs';
+import {
+  buildPlantCadNativeSyncPackage,
+  buildPlantCadRoundTripPreview,
+  validatePlantCadConnectorPayload,
+} from './analysis/plantCadConnectorBridge.mjs';
 
 const scrypt = promisify(crypto.scrypt);
 
@@ -344,6 +365,108 @@ class CloudLibraryStore {
     this.#evictIfNeeded();
     this.cache.set(username, { version, data: nextData, json: compactJson });
     return { version, data: nextData, metrics };
+  }
+}
+
+class OrgLibraryStore {
+  constructor(dataDir) {
+    this.dataDir = dataDir;
+  }
+
+  #safeWorkspaceId(workspaceId, username) {
+    const candidate = String(workspaceId || `${username || 'default'}-workspace`)
+      .trim()
+      .replace(/[^a-zA-Z0-9_-]/g, '-')
+      .slice(0, 80) || 'default-workspace';
+    return candidate;
+  }
+
+  #workspaceDir(workspaceId) {
+    return path.join(this.dataDir, 'org-libraries', workspaceId);
+  }
+
+  async listReleases(workspaceId, username) {
+    const safeWorkspaceId = this.#safeWorkspaceId(workspaceId, username);
+    const dir = this.#workspaceDir(safeWorkspaceId);
+    try {
+      const files = await fs.readdir(dir);
+      const releases = [];
+      for (const file of files.filter(name => name.endsWith('.json')).sort()) {
+        const text = await fs.readFile(path.join(dir, file), 'utf-8');
+        releases.push(normalizeCloudLibraryRelease(JSON.parse(text)));
+      }
+      return {
+        workspaceId: safeWorkspaceId,
+        releases: releases.sort((a, b) => `${b.createdAt}|${b.releaseTag}`.localeCompare(`${a.createdAt}|${a.releaseTag}`)),
+      };
+    } catch (err) {
+      if (err.code === 'ENOENT') return { workspaceId: safeWorkspaceId, releases: [] };
+      throw err;
+    }
+  }
+
+  async getRelease(workspaceId, releaseId, username) {
+    const { releases } = await this.listReleases(workspaceId, username);
+    const release = releases.find(row => row.id === releaseId || row.releaseTag === releaseId);
+    if (!release) {
+      const err = new Error('not-found');
+      err.code = 'NOT_FOUND';
+      throw err;
+    }
+    return release;
+  }
+
+  async saveRelease(workspaceId, releaseInput, username) {
+    const safeWorkspaceId = this.#safeWorkspaceId(workspaceId || releaseInput?.workspaceId, username);
+    const existing = await this.listReleases(safeWorkspaceId, username);
+    const previous = existing.releases[0] || null;
+    const rawRelease = {
+      ...releaseInput,
+      workspaceId: safeWorkspaceId,
+      createdAt: releaseInput?.createdAt || new Date().toISOString(),
+      createdBy: releaseInput?.createdBy || username || '',
+    };
+    const validation = validateCloudLibraryRelease(rawRelease);
+    if (!validation.valid) {
+      const err = new Error('library-release-validation-failed');
+      err.code = 'LIBRARY_RELEASE_VALIDATION_FAILED';
+      err.validation = validation;
+      throw err;
+    }
+    const release = normalizeCloudLibraryRelease({
+      ...rawRelease,
+      validation,
+    });
+    const nextRelease = normalizeCloudLibraryRelease({
+      ...release,
+      validation,
+      diffFromPrevious: diffCloudLibraryReleases(previous, release),
+    });
+    const dir = this.#workspaceDir(safeWorkspaceId);
+    await fs.mkdir(dir, { recursive: true });
+    await fs.writeFile(path.join(dir, `${nextRelease.id}.json`), `${JSON.stringify(nextRelease, null, 2)}\n`);
+    return nextRelease;
+  }
+
+  async updateApproval(workspaceId, releaseId, username, approvalStatus) {
+    const release = await this.getRelease(workspaceId, releaseId, username);
+    const updated = normalizeCloudLibraryRelease({
+      ...release,
+      approvalStatus,
+      status: approvalStatus === 'approved' ? 'released' : release.status,
+      approvedBy: approvalStatus === 'approved' ? username : '',
+      approvedAt: approvalStatus === 'approved' ? new Date().toISOString() : '',
+    });
+    const safeWorkspaceId = this.#safeWorkspaceId(updated.workspaceId, username);
+    const dir = this.#workspaceDir(safeWorkspaceId);
+    await fs.mkdir(dir, { recursive: true });
+    await fs.writeFile(path.join(dir, `${updated.id}.json`), `${JSON.stringify(updated, null, 2)}\n`);
+    return updated;
+  }
+
+  async adoptionPreview({ workspaceId, releaseId, projectLibrary, mergeMode, username }) {
+    const release = await this.getRelease(workspaceId, releaseId, username);
+    return buildCloudLibraryAdoptionPreview({ projectLibrary, release, mergeMode });
   }
 }
 
@@ -804,6 +927,7 @@ export async function createApp(options = {}) {
   const snapshotStore = new SnapshotStore(snapshotsFile, tokenTtlMs);
   await snapshotStore.init();
   const cloudLibraryStore = new CloudLibraryStore(dataDir);
+  const orgLibraryStore = new OrgLibraryStore(dataDir);
   const libraryShareStore = new LibraryShareStore(librarySharesFile);
   await libraryShareStore.init();
   const resetTokenStore = new ResetTokenStore();
@@ -1459,6 +1583,102 @@ When answering queries:
 
   app.use('/api/v1', apiRateLimiter, auth);
 
+  // POST /api/v1/bim/revit/validate — validate a Revit connector return package without mutation.
+  app.post(
+    '/api/v1/bim/revit/validate',
+    csrfProtection,
+    asyncHandler(async (req, res) => {
+      const payload = req.body?.payload || req.body?.connectorPackage || req.body || {};
+      const validation = validateRevitConnectorPayload(payload);
+      res.status(validation.valid ? 200 : 400).json({ validation });
+    })
+  );
+
+  // POST /api/v1/bim/revit/preview — build a review-only round-trip preview for Revit payloads.
+  app.post(
+    '/api/v1/bim/revit/preview',
+    csrfProtection,
+    asyncHandler(async (req, res) => {
+      const payload = req.body?.payload || req.body?.connectorPackage || {};
+      const projectState = req.body?.projectState || {};
+      const preview = buildRevitRoundTripPreview({ payload, projectState });
+      res.status(preview.validation.valid ? 200 : 400).json({ preview });
+    })
+  );
+
+  // POST /api/v1/bim/revit/native-sync-package — generate CI-safe native source readiness metadata.
+  app.post(
+    '/api/v1/bim/revit/native-sync-package',
+    csrfProtection,
+    asyncHandler(async (req, res) => {
+      res.json({ package: buildRevitNativeSyncPackage(req.body || {}) });
+    })
+  );
+
+  // POST /api/v1/bim/autocad/validate — validate an AutoCAD connector return package without mutation.
+  app.post(
+    '/api/v1/bim/autocad/validate',
+    csrfProtection,
+    asyncHandler(async (req, res) => {
+      const payload = req.body?.payload || req.body?.connectorPackage || req.body || {};
+      const validation = validateAutoCadConnectorPayload(payload);
+      res.status(validation.valid ? 200 : 400).json({ validation });
+    })
+  );
+
+  // POST /api/v1/bim/autocad/preview — build a review-only round-trip preview for AutoCAD payloads.
+  app.post(
+    '/api/v1/bim/autocad/preview',
+    csrfProtection,
+    asyncHandler(async (req, res) => {
+      const payload = req.body?.payload || req.body?.connectorPackage || {};
+      const projectState = req.body?.projectState || {};
+      const preview = buildAutoCadRoundTripPreview({ payload, projectState });
+      res.status(preview.validation.valid ? 200 : 400).json({ preview });
+    })
+  );
+
+  // POST /api/v1/bim/autocad/native-sync-package — generate CI-safe native source readiness metadata.
+  app.post(
+    '/api/v1/bim/autocad/native-sync-package',
+    csrfProtection,
+    asyncHandler(async (req, res) => {
+      res.json({ package: buildAutoCadNativeSyncPackage(req.body || {}) });
+    })
+  );
+
+  // POST /api/v1/bim/plantcad/validate - validate an AVEVA/SmartPlant connector return package without mutation.
+  app.post(
+    '/api/v1/bim/plantcad/validate',
+    csrfProtection,
+    asyncHandler(async (req, res) => {
+      const payload = req.body?.payload || req.body?.connectorPackage || req.body || {};
+      const validation = validatePlantCadConnectorPayload(payload);
+      res.status(validation.valid ? 200 : 400).json({ validation });
+    })
+  );
+
+  // POST /api/v1/bim/plantcad/preview - build a review-only round-trip preview for AVEVA/SmartPlant payloads.
+  app.post(
+    '/api/v1/bim/plantcad/preview',
+    csrfProtection,
+    asyncHandler(async (req, res) => {
+      const payload = req.body?.payload || req.body?.connectorPackage || {};
+      const projectState = req.body?.projectState || {};
+      const preview = buildPlantCadRoundTripPreview({ payload, projectState });
+      res.status(preview.validation.valid ? 200 : 400).json({ preview });
+    })
+  );
+
+  // POST /api/v1/bim/plantcad/native-sync-package - generate CI-safe native source readiness metadata.
+  app.post(
+    '/api/v1/bim/plantcad/native-sync-package',
+    csrfProtection,
+    asyncHandler(async (req, res) => {
+      res.json({ package: buildPlantCadNativeSyncPackage(req.body || {}) });
+    })
+  );
+
   /** Load project data or send 404. */
   async function loadProjectData(req, res) {
     const project = req.params.project;
@@ -1585,6 +1805,113 @@ When answering queries:
 
   // Cloud Library endpoints — authenticated via existing auth + csrfProtection middleware
   app.use('/api/v1/library', rateLimiter);
+
+  // GET /api/v1/library/org/releases — list organization/workspace library releases
+  app.get(
+    '/api/v1/library/org/releases',
+    auth,
+    asyncHandler(async (req, res) => {
+      const workspaceId = req.query.workspaceId || req.query.workspace || `${req.username}-workspace`;
+      const result = await orgLibraryStore.listReleases(workspaceId, req.username);
+      res.json(result);
+    })
+  );
+
+  // POST /api/v1/library/org/releases — publish a draft/released organization library version
+  app.post(
+    '/api/v1/library/org/releases',
+    auth,
+    csrfProtection,
+    asyncHandler(async (req, res) => {
+      try {
+        const release = await orgLibraryStore.saveRelease(
+          req.body?.workspaceId || req.body?.workspace || `${req.username}-workspace`,
+          req.body || {},
+          req.username,
+        );
+        res.status(201).json({ release });
+      } catch (err) {
+        if (err.code === 'LIBRARY_RELEASE_VALIDATION_FAILED') {
+          res.status(400).json({ error: 'Library release validation failed', details: err.validation?.errors || [] });
+          return;
+        }
+        throw err;
+      }
+    })
+  );
+
+  // POST /api/v1/library/org/releases/:releaseId/approve — approve an organization library release
+  app.post(
+    '/api/v1/library/org/releases/:releaseId/approve',
+    auth,
+    csrfProtection,
+    asyncHandler(async (req, res) => {
+      try {
+        const release = await orgLibraryStore.updateApproval(
+          req.body?.workspaceId || req.query.workspaceId || `${req.username}-workspace`,
+          req.params.releaseId,
+          req.username,
+          'approved',
+        );
+        res.json({ release });
+      } catch (err) {
+        if (err.code === 'NOT_FOUND') {
+          res.status(404).json({ error: 'Release not found' });
+          return;
+        }
+        throw err;
+      }
+    })
+  );
+
+  // POST /api/v1/library/org/releases/:releaseId/revoke — revoke local approval metadata
+  app.post(
+    '/api/v1/library/org/releases/:releaseId/revoke',
+    auth,
+    csrfProtection,
+    asyncHandler(async (req, res) => {
+      try {
+        const release = await orgLibraryStore.updateApproval(
+          req.body?.workspaceId || req.query.workspaceId || `${req.username}-workspace`,
+          req.params.releaseId,
+          req.username,
+          'revoked',
+        );
+        res.json({ release });
+      } catch (err) {
+        if (err.code === 'NOT_FOUND') {
+          res.status(404).json({ error: 'Release not found' });
+          return;
+        }
+        throw err;
+      }
+    })
+  );
+
+  // POST /api/v1/library/org/adoption-preview — preview local replace/merge adoption without mutation
+  app.post(
+    '/api/v1/library/org/adoption-preview',
+    auth,
+    csrfProtection,
+    asyncHandler(async (req, res) => {
+      try {
+        const preview = await orgLibraryStore.adoptionPreview({
+          workspaceId: req.body?.workspaceId || `${req.username}-workspace`,
+          releaseId: req.body?.releaseId,
+          projectLibrary: req.body?.projectLibrary || {},
+          mergeMode: req.body?.mergeMode || 'merge',
+          username: req.username,
+        });
+        res.json({ preview });
+      } catch (err) {
+        if (err.code === 'NOT_FOUND') {
+          res.status(404).json({ error: 'Release not found' });
+          return;
+        }
+        throw err;
+      }
+    })
+  );
 
   // GET /api/v1/library — load the authenticated user's cloud library
   app.get(

@@ -1,8 +1,8 @@
 {
-  "generatedAt": "2026-04-28T02:47:25.104Z",
+  "generatedAt": "2026-04-28T22:51:53.788Z",
   "summary": {
-    "testSuiteCount": 153,
-    "totalAssertions": 5018,
+    "testSuiteCount": 166,
+    "totalAssertions": 5664,
     "benchmarkCount": 6,
     "standardCount": 12
   },
@@ -54,6 +54,20 @@
       "assertionCount": 21
     },
     {
+      "file": "tests/autocadConnectorBridge.test.mjs",
+      "groups": [
+        "AutoCAD connector bridge"
+      ],
+      "assertionCount": 41
+    },
+    {
+      "file": "tests/autocadNativeSyncBridge.test.mjs",
+      "groups": [
+        "Functional AutoCAD native sync bridge"
+      ],
+      "assertionCount": 38
+    },
+    {
       "file": "tests/autoSaveScheduler.test.mjs",
       "groups": [],
       "assertionCount": 13
@@ -101,7 +115,7 @@
       "groups": [
         "BIM/CAD connector contract helpers"
       ],
-      "assertionCount": 31
+      "assertionCount": 44
     },
     {
       "file": "tests/bimConnectorValidator.test.mjs",
@@ -109,6 +123,13 @@
         "BIM connector validator harness"
       ],
       "assertionCount": 21
+    },
+    {
+      "file": "tests/bimObjectLibrary.test.mjs",
+      "groups": [
+        "BIM object library"
+      ],
+      "assertionCount": 30
     },
     {
       "file": "tests/bimRoundTrip.test.mjs",
@@ -188,6 +209,13 @@
       "assertionCount": 22
     },
     {
+      "file": "tests/cathodicProtectionNetwork.test.mjs",
+      "groups": [
+        "cathodic protection network model"
+      ],
+      "assertionCount": 39
+    },
+    {
       "file": "tests/clashDetect.test.mjs",
       "groups": [
         "detectClashes — empty / no input",
@@ -199,9 +227,16 @@
       "assertionCount": 14
     },
     {
+      "file": "tests/cloudComponentLibraryGovernance.test.mjs",
+      "groups": [
+        "Cloud component library governance helpers"
+      ],
+      "assertionCount": 39
+    },
+    {
       "file": "tests/cloudLibrary.test.mjs",
       "groups": [],
-      "assertionCount": 40
+      "assertionCount": 58
     },
     {
       "file": "tests/collaboration.test.mjs",
@@ -343,7 +378,7 @@
       "groups": [
         "design coach action builder"
       ],
-      "assertionCount": 104
+      "assertionCount": 144
     },
     {
       "file": "tests/designRuleChecker.test.mjs",
@@ -416,6 +451,13 @@
         "checkCompliance"
       ],
       "assertionCount": 32
+    },
+    {
+      "file": "tests/emfExposureStudyCase.test.mjs",
+      "groups": [
+        "EMF exposure study case"
+      ],
+      "assertionCount": 34
     },
     {
       "file": "tests/equipmentArrangementsPage.test.cjs",
@@ -601,6 +643,15 @@
         "runIBRStudy() — fault contribution"
       ],
       "assertionCount": 43
+    },
+    {
+      "file": "tests/ibrPlantController.test.mjs",
+      "groups": [
+        "IBR plant-controller normalization",
+        "IBR plant-controller evaluation and package",
+        "IBR plant-controller integrations"
+      ],
+      "assertionCount": 40
     },
     {
       "file": "tests/iec60287.test.mjs",
@@ -803,6 +854,13 @@
       "assertionCount": 39
     },
     {
+      "file": "tests/nativeBimConnectorKit.test.mjs",
+      "groups": [
+        "native BIM/CAD connector starter kit"
+      ],
+      "assertionCount": 33
+    },
+    {
       "file": "tests/onelineBackgroundImage.test.mjs",
       "groups": [],
       "assertionCount": 37
@@ -864,6 +922,27 @@
       "assertionCount": 30
     },
     {
+      "file": "tests/plantCadConnectorBridge.test.mjs",
+      "groups": [
+        "plant-CAD connector bridge"
+      ],
+      "assertionCount": 41
+    },
+    {
+      "file": "tests/plantCadNativeSyncBridge.test.mjs",
+      "groups": [
+        "Functional plant-CAD native sync bridge"
+      ],
+      "assertionCount": 37
+    },
+    {
+      "file": "tests/pricingFeedGovernance.test.mjs",
+      "groups": [
+        "pricing feed governance"
+      ],
+      "assertionCount": 41
+    },
+    {
       "file": "tests/productCatalog.test.mjs",
       "groups": [
         "product catalog governance"
@@ -896,7 +975,7 @@
       "groups": [
         "project lifecycle package helpers"
       ],
-      "assertionCount": 34
+      "assertionCount": 37
     },
     {
       "file": "tests/projectStorageMigration.test.mjs",
@@ -1010,7 +1089,7 @@
       "groups": [
         "commercial report package builder"
       ],
-      "assertionCount": 156
+      "assertionCount": 216
     },
     {
       "file": "tests/restApi.test.mjs",
@@ -1027,6 +1106,13 @@
       "assertionCount": 13
     },
     {
+      "file": "tests/revitConnectorBridge.test.mjs",
+      "groups": [
+        "Revit connector bridge"
+      ],
+      "assertionCount": 37
+    },
+    {
       "file": "tests/revitImporter.test.mjs",
       "groups": [
         "parseRevit - JSON object input",
@@ -1038,6 +1124,13 @@
         "IFC4 round-trip: export → parseRevit"
       ],
       "assertionCount": 113
+    },
+    {
+      "file": "tests/revitNativeSyncBridge.test.mjs",
+      "groups": [
+        "Functional Revit native sync bridge"
+      ],
+      "assertionCount": 35
     },
     {
       "file": "tests/sampleGallery.test.mjs",
@@ -1385,7 +1478,7 @@
     {
       "file": "tests/voltageFlicker.test.mjs",
       "groups": [],
-      "assertionCount": 65
+      "assertionCount": 92
     },
     {
       "file": "tests/voltageStability.test.mjs",

@@ -33,7 +33,7 @@ const genericPath = 'examples/bim-connectors/generic-return-package.json';
 describe('BIM connector validator harness', () => {
   it('locks the exported connector schema descriptor', () => {
     assert.equal(BIM_CONNECTOR_PACKAGE_SCHEMA.version, 'bim-connector-contract-v1');
-    assert.deepEqual(BIM_CONNECTOR_PACKAGE_SCHEMA.connectorTypes, ['revit', 'autocad', 'generic']);
+    assert.deepEqual(BIM_CONNECTOR_PACKAGE_SCHEMA.connectorTypes, ['revit', 'autocad', 'aveva', 'smartplant', 'generic']);
     ['version', 'connectorType', 'elements', 'quantities', 'issues', 'mappingHints'].forEach(field => {
       assert(BIM_CONNECTOR_PACKAGE_SCHEMA.requiredFields.includes(field));
     });

@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <AssemblyName>CableTrayRoute.AutoCADConnector</AssemblyName>
+    <RootNamespace>CableTrayRoute.AutoCADConnector</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="AcMgd">
+      <HintPath>$(ProgramFiles)\Autodesk\AutoCAD 2026\AcMgd.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="AcDbMgd">
+      <HintPath>$(ProgramFiles)\Autodesk\AutoCAD 2026\AcDbMgd.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+</Project>

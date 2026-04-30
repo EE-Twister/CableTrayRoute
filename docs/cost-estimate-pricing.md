@@ -15,6 +15,16 @@ Imported pricing is saved in your browser and persists between sessions so you d
 
 ---
 
+## Pricing Feed Governance / Quote Basis
+
+The Cost Estimate page also includes a **Pricing Feed Governance / Quote Basis** section for traceable estimate-source records. This workflow is separate from the simple custom pricing book and is intended for vendor quote, distributor export, RS Means/manual-book, and generic default pricing rows.
+
+Governed pricing records track source name, quote number/date/expiry, currency, manufacturer/catalog/category, UOM, unit and labor price, lead time, escalation, approval, verification, and notes. Rows are stored with the active scenario, can be approved or revoked locally, and can be saved to `studyResults.pricingFeedGovernance` for reports and report packages.
+
+Use **Use Approved Pricing for Estimate** to explicitly convert approved governed rows into the estimator's active pricing book. This action does not contact live manufacturer or distributor APIs and does not overwrite manual labor/fitting UI overrides.
+
+---
+
 ## Importing a Pricing Book
 
 1. Open **Cost Estimate** (`costestimate.html`).

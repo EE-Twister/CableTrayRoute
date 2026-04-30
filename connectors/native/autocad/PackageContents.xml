@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ApplicationPackage SchemaVersion="1.0"
+  AutodeskProduct="AutoCAD"
+  Name="CableTrayRoute AutoCAD Connector"
+  AppVersion="1.0.0"
+  ProductCode="{B88E6368-6153-4AA6-8986-FAFD69123C97}">
+  <CompanyDetails Name="CableTrayRoute" />
+  <Components>
+    <RuntimeRequirements SeriesMin="R25.0" Platform="AutoCAD*" />
+    <ComponentEntry AppName="CableTrayRoute.AutoCADConnector"
+      ModuleName="./Contents/Windows/CableTrayRoute.AutoCADConnector.dll"
+      AppDescription="CableTrayRoute connector starter kit"
+      LoadOnCommandInvocation="True">
+      <Commands GroupName="CableTrayRoute">
+        <Command Global="ExportCableTrayRouteJson" Local="ExportCableTrayRouteJson" />
+        <Command Global="ImportCableTrayRoutePreview" Local="ImportCableTrayRoutePreview" />
+        <Command Global="ValidateCableTrayRoutePackage" Local="ValidateCableTrayRoutePackage" />
+        <Command Global="OpenCableTrayRouteBridge" Local="OpenCableTrayRouteBridge" />
+      </Commands>
+    </ComponentEntry>
+  </Components>
+</ApplicationPackage>

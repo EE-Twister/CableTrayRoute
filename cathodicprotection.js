@@ -12,6 +12,10 @@ import { evaluateInterferenceAssessment, parseMitigationActions } from './src/st
 import { COATING_MODEL_TYPES, parseConditionFactorValues, resolveCoatingModel } from './src/studies/cp/coatingModel.js';
 import { initCpLayoutCanvas } from './src/cpLayoutCanvas.js';
 import { initCpProfiles } from './src/cpProfiles.js';
+import {
+  buildCathodicProtectionNetworkPackage,
+  renderCathodicProtectionNetworkHTML
+} from './analysis/cathodicProtectionNetwork.mjs';
 
 const SQFT_TO_SQM = 0.09290304;
 const LB_TO_KG = 0.45359237;
@@ -189,7 +193,45 @@ export function calculatePredictedDesignLife(installedMassKg, anodeCapacityAhPer
   return (installedMassKg * anodeCapacityAhPerKg * utilizationFactor * designFactor) / (requiredCurrentA * 8760);
 }
 
+function normalizeAnalysisInputForLegacyCall(input = {}) {
+  const hasDistributionBasis = [
+    'anodeTypeSystem',
+    'numberOfAnodes',
+    'anodeSpacingM',
+    'anodeDistanceToStructureM',
+    'anodeBurialDepthM',
+    'zoneResistivityOhmM'
+  ].some((field) => input[field] !== undefined && input[field] !== null);
+
+  return {
+    coatingModelType: COATING_MODEL_TYPES.fixed,
+    anodeTypeSystem: 'galvanic',
+    numberOfAnodes: 1,
+    anodeSpacingM: 30,
+    anodeDistanceToStructureM: 3,
+    anodeBurialDepthM: 2,
+    zoneResistivityOhmM: [],
+    measuredInstantOffPotentialMv: -850,
+    simulatedPolarizationShiftMv: 100,
+    testPointCount: 1,
+    passingTestPointCount: 1,
+    nearbyForeignStructures: 'none',
+    dcTractionSystem: 'none',
+    knownInterferenceSources: 'none',
+    mitigationProfile: 'baseline',
+    testMethod: 'instant-off',
+    measurementContext: 'unknown',
+    referenceElectrodeLocation: 'unknown',
+    irDropCompensationMethod: 'unknown',
+    measuredIrDropMv: null,
+    couponDepolarizationMv: null,
+    ...input,
+    useNeutralDistributionModel: input.useNeutralDistributionModel ?? !hasDistributionBasis
+  };
+}
+
 export function runCathodicProtectionAnalysis(input) {
+  input = normalizeAnalysisInputForLegacyCall(input);
   const validationErrors = validateInputs(input);
   if (validationErrors.length) {
     throw new Error(validationErrors.join(' '));
@@ -200,15 +242,27 @@ export function runCathodicProtectionAnalysis(input) {
     : lookupCurrentDensity(input.assetType, input.moistureCategory, input.soilResistivityOhmM, input.soilPh, input.pipeMaterial);
 
   const designCurrentDensityAperM2 = designCurrentDensityMaM2 / 1000;
-  const distributionModel = computeDistributionBySegment({
-    anodeTypeSystem: input.anodeTypeSystem,
-    numberOfAnodes: input.numberOfAnodes,
-    anodeSpacingM: input.anodeSpacingM,
-    anodeDistanceToStructureM: input.anodeDistanceToStructureM,
-    anodeBurialDepthM: input.anodeBurialDepthM,
-    soilResistivityOhmM: input.soilResistivityOhmM,
-    zoneResistivityOhmM: input.zoneResistivityOhmM
-  });
+  const distributionModel = input.useNeutralDistributionModel
+    ? {
+      segmentCount: 1,
+      segments: [{
+        segment: 1,
+        zoneResistivityOhmM: roundTo(input.soilResistivityOhmM, 3),
+        effectivenessFactor: 1,
+        attenuationFactor: 1
+      }],
+      averageEffectivenessFactor: 1,
+      globalAttenuationFactor: 1
+    }
+    : computeDistributionBySegment({
+      anodeTypeSystem: input.anodeTypeSystem,
+      numberOfAnodes: input.numberOfAnodes,
+      anodeSpacingM: input.anodeSpacingM,
+      anodeDistanceToStructureM: input.anodeDistanceToStructureM,
+      anodeBurialDepthM: input.anodeBurialDepthM,
+      soilResistivityOhmM: input.soilResistivityOhmM,
+      zoneResistivityOhmM: input.zoneResistivityOhmM
+    });
   const coatingModel = resolveCoatingModel(input, { segmentCount: distributionModel.segments.length });
   const exposedAreaM2 = input.surfaceAreaM2 * coatingModel.effectiveFactor;
   const areaBasedRequiredCurrentA = calculateRequiredCurrent(exposedAreaM2, designCurrentDensityAperM2);
@@ -878,6 +932,7 @@ if (typeof document !== 'undefined') {
     renderResults(saved, resultsDiv);
     renderTimelinePanel(timelinePanelEl, saved, cpTimelineState);
   }
+  initCpNetworkModel();
 
   cpLayoutCanvasController = initCpLayoutCanvas({
     panelId: 'cp-layout-canvas-panel',
@@ -1313,6 +1368,192 @@ function readFormInputs() {
     verificationTestDate: getValue('verification-test-date'),
     units: isMetric ? 'metric' : 'imperial'
   };
+}
+
+function initCpNetworkModel() {
+  const structuresEl = document.getElementById('cp-network-structures');
+  const anodesEl = document.getElementById('cp-network-anodes');
+  const rectifiersEl = document.getElementById('cp-network-rectifiers');
+  const bondsEl = document.getElementById('cp-network-bonds');
+  const interferenceEl = document.getElementById('cp-network-interference');
+  const polarizationEl = document.getElementById('cp-network-polarization');
+  if (!structuresEl || !anodesEl || !rectifiersEl || !bondsEl || !interferenceEl || !polarizationEl) return;
+
+  const savedPackage = getStudies().cathodicProtectionNetwork;
+  structuresEl.value ||= JSON.stringify(savedPackage?.structureRows || [{
+    id: 's1',
+    tag: 'Pipeline Zone 1',
+    structureType: 'pipe',
+    zone: 'Zone 1',
+    surfaceAreaM2: 100,
+    coatingBreakdownFactor: 0.2,
+    currentDensityMaM2: 10,
+    soilResistivityOhmM: 100,
+    lengthM: 100
+  }], null, 2);
+  anodesEl.value ||= JSON.stringify(savedPackage?.anodeRows || [{
+    id: 'a1',
+    tag: 'Anode Bed 1',
+    anodeType: 'impressedCurrent',
+    zone: 'Zone 1',
+    ratedOutputA: 0.4,
+    bedResistanceOhm: 1.5
+  }], null, 2);
+  rectifiersEl.value ||= JSON.stringify(savedPackage?.rectifierRows || [{
+    id: 'r1',
+    tag: 'Rectifier 1',
+    rectifierType: 'manual',
+    zone: 'Zone 1',
+    voltageRatingV: 24,
+    currentRatingA: 1,
+    operatingVoltageV: 12,
+    operatingCurrentA: 0.3
+  }], null, 2);
+  bondsEl.value ||= JSON.stringify(savedPackage?.bondRows || [], null, 2);
+  interferenceEl.value ||= JSON.stringify(savedPackage?.interferenceRows || [], null, 2);
+  polarizationEl.value ||= JSON.stringify(savedPackage?.polarizationRows || [{
+    structureId: 's1',
+    testStationRef: 'TS-1',
+    instantOffMv: -870,
+    polarizationShiftMv: 110
+  }], null, 2);
+  if (savedPackage) {
+    document.getElementById('cp-network-name').value = savedPackage.networkCase?.name || document.getElementById('cp-network-name').value;
+    document.getElementById('cp-network-criteria').value = savedPackage.networkCase?.criteriaBasis || document.getElementById('cp-network-criteria').value;
+    document.getElementById('cp-network-season').value = savedPackage.networkCase?.seasonalCase || document.getElementById('cp-network-season').value;
+    document.getElementById('cp-network-station-spacing').value = savedPackage.networkCase?.profileStationSpacingM || document.getElementById('cp-network-station-spacing').value;
+    document.getElementById('cp-network-notes').value = savedPackage.networkCase?.notes || '';
+    renderCpNetworkPackage(savedPackage);
+  }
+
+  document.getElementById('cp-network-run')?.addEventListener('click', () => {
+    try {
+      renderCpNetworkPackage(buildCpNetworkPackageFromForm());
+    } catch (error) {
+      showModal('CP Network Model Error', `<p>${escapeHtml(error.message || error)}</p>`, 'error');
+    }
+  });
+  document.getElementById('cp-network-save')?.addEventListener('click', () => {
+    try {
+      const pkg = buildCpNetworkPackageFromForm();
+      const studies = getStudies();
+      studies.cathodicProtectionNetwork = pkg;
+      setStudies(studies);
+      renderCpNetworkPackage(pkg);
+      showModal('CP Network Model Saved', '<p>Cathodic protection network package saved to study results.</p>', 'success');
+    } catch (error) {
+      showModal('CP Network Model Error', `<p>${escapeHtml(error.message || error)}</p>`, 'error');
+    }
+  });
+  document.getElementById('cp-network-export-json')?.addEventListener('click', () => {
+    const pkg = buildCpNetworkPackageFromForm();
+    downloadTextFile('cathodic-protection-network.json', JSON.stringify(pkg, null, 2), 'application/json');
+  });
+  document.getElementById('cp-network-export-csv')?.addEventListener('click', () => {
+    const pkg = buildCpNetworkPackageFromForm();
+    downloadTextFile('cathodic-protection-network.csv', rowsToCsv([
+      ...pkg.criteriaRows.map(row => ({ recordType: 'criteria', ...row })),
+      ...pkg.polarizationRows.map(row => ({ recordType: 'polarization', ...row })),
+      ...pkg.interferenceRows.map(row => ({ recordType: 'interference', ...row })),
+      ...pkg.warningRows.map(row => ({ recordType: 'warning', ...row })),
+    ]), 'text/csv');
+  });
+  document.getElementById('cp-network-export-html')?.addEventListener('click', () => {
+    const pkg = buildCpNetworkPackageFromForm();
+    const html = `<!doctype html><html><head><meta charset="utf-8"><title>CP Network Model</title><link rel="stylesheet" href="style.css"></head><body>${renderCathodicProtectionNetworkHTML(pkg)}</body></html>`;
+    downloadTextFile('cathodic-protection-network.html', html, 'text/html');
+  });
+}
+
+function buildCpNetworkPackageFromForm() {
+  return buildCathodicProtectionNetworkPackage({
+    projectName: document.querySelector('[data-report-title]')?.dataset.reportTitle || 'CableTrayRoute Project',
+    networkCase: {
+      name: document.getElementById('cp-network-name')?.value || 'Cathodic Protection Network Model',
+      criteriaBasis: document.getElementById('cp-network-criteria')?.value || 'naceSp0169',
+      seasonalCase: document.getElementById('cp-network-season')?.value || 'nominal',
+      profileStationSpacingM: Number.parseFloat(document.getElementById('cp-network-station-spacing')?.value || '50'),
+      notes: document.getElementById('cp-network-notes')?.value || ''
+    },
+    structureRows: parseJsonRows('cp-network-structures', 'structure rows'),
+    anodeRows: parseJsonRows('cp-network-anodes', 'anode rows'),
+    rectifierRows: parseJsonRows('cp-network-rectifiers', 'rectifier rows'),
+    bondRows: parseJsonRows('cp-network-bonds', 'bond rows'),
+    interferenceRows: parseJsonRows('cp-network-interference', 'interference rows'),
+    polarizationRows: parseJsonRows('cp-network-polarization', 'polarization rows'),
+    legacySizing: getStudies().cathodicProtection || null
+  });
+}
+
+function parseJsonRows(id, label) {
+  const value = document.getElementById(id)?.value?.trim();
+  if (!value) return [];
+  const parsed = JSON.parse(value);
+  if (!Array.isArray(parsed)) throw new Error(`${label} must be a JSON array`);
+  return parsed;
+}
+
+function renderCpNetworkPackage(pkg) {
+  const root = document.getElementById('cp-network-results');
+  if (!root) return;
+  const summary = pkg.summary || {};
+  document.getElementById('cp-network-summary').innerHTML = `
+    <div class="result-card ${summary.fail ? 'result-fail' : summary.warn || summary.missingData ? 'result-warn' : 'result-ok'}">
+      <p><strong>${escapeHtml(summary.structureCount || 0)}</strong> structure(s), <strong>${escapeHtml(summary.anodeCount || 0)}</strong> anode row(s), total demand <strong>${escapeHtml(summary.totalDemandA ?? 'n/a')} A</strong>, total source <strong>${escapeHtml(summary.totalSourceA ?? 'n/a')} A</strong>.</p>
+    </div>`;
+  document.getElementById('cp-network-criteria-body').innerHTML = (pkg.criteriaRows || []).map(row => `<tr class="${statusClass(row.status)}">
+    <td>${escapeHtml(row.structureTag || row.rectifierId || row.id)}</td>
+    <td>${escapeHtml(row.zone)}</td>
+    <td>${escapeHtml(row.checkType)}</td>
+    <td>${escapeHtml(row.requiredCurrentA ?? '')}</td>
+    <td>${escapeHtml(row.allocatedCurrentA ?? '')}</td>
+    <td>${escapeHtml(row.marginPct ?? '')}%</td>
+    <td>${escapeHtml(row.status)}</td>
+    <td>${escapeHtml(row.recommendation)}</td>
+  </tr>`).join('') || '<tr><td colspan="8">No criteria rows.</td></tr>';
+  document.getElementById('cp-network-polarization-body').innerHTML = (pkg.polarizationRows || []).map(row => `<tr class="${statusClass(row.status)}">
+    <td>${escapeHtml(row.testStationRef)}</td>
+    <td>${escapeHtml(row.instantOffMv ?? 'n/a')}</td>
+    <td>${escapeHtml(row.polarizationShiftMv ?? 'n/a')}</td>
+    <td>${escapeHtml(row.status)}</td>
+    <td>${escapeHtml(row.source)}</td>
+  </tr>`).join('') || '<tr><td colspan="5">No polarization rows.</td></tr>';
+  document.getElementById('cp-network-warning-body').innerHTML = (pkg.warningRows || []).map(row => `<tr class="${statusClass(row.severity)}">
+    <td>${escapeHtml(row.code)}</td>
+    <td>${escapeHtml(row.sourceTag || row.sourceId || '')}</td>
+    <td>${escapeHtml(row.severity)}</td>
+    <td>${escapeHtml(row.message)}</td>
+    <td>${escapeHtml(row.recommendation)}</td>
+  </tr>`).join('') || '<tr><td colspan="5">No warnings.</td></tr>';
+  document.getElementById('cp-network-json').textContent = JSON.stringify(pkg, null, 2);
+  root.hidden = false;
+}
+
+function statusClass(status) {
+  if (status === 'fail') return 'result-fail';
+  if (status === 'warn' || status === 'missingData' || status === 'review') return 'result-warn';
+  return 'result-ok';
+}
+
+function rowsToCsv(rows = []) {
+  const keys = Array.from(rows.reduce((set, row) => {
+    Object.keys(row || {}).forEach(key => set.add(key));
+    return set;
+  }, new Set()));
+  const cell = value => `"${String(value ?? '').replace(/"/g, '""')}"`;
+  return [keys.join(','), ...rows.map(row => keys.map(key => cell(row[key])).join(','))].join('\n');
+}
+
+function downloadTextFile(fileName, value, mediaType) {
+  const blob = new Blob([value], { type: mediaType });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = fileName;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
 }
 
 function renderResults(result, root) {

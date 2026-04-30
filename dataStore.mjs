@@ -54,6 +54,17 @@ import {
 import {
   normalizeConnectorManifest,
 } from './analysis/bimConnectorContract.mjs';
+import {
+  normalizeBimObjectFamily,
+} from './analysis/bimObjectLibrary.mjs';
+import {
+  mergePricingFeedRows,
+  normalizePricingFeedDescriptor,
+  normalizePricingFeedRow,
+} from './analysis/pricingFeedGovernance.mjs';
+import {
+  normalizeComponentLibrarySubscription,
+} from './analysis/cloudComponentLibraryGovernance.mjs';
 
 registerScenario(getCurrentScenarioNameState());
 
@@ -126,6 +137,10 @@ const EXTRA_KEYS = {
   bimIssues: 'bimIssues',
   bimConnectorPackages: 'bimConnectorPackages',
   activeBimConnectorPackageId: 'activeBimConnectorPackageId',
+  bimObjectFamilies: 'bimObjectFamilies',
+  pricingFeedRows: 'pricingFeedRows',
+  pricingFeedDescriptors: 'pricingFeedDescriptors',
+  componentLibrarySubscription: 'componentLibrarySubscription',
 };
 
 export const STORAGE_KEYS = { ...KEYS, ...EXTRA_KEYS };
@@ -423,6 +438,75 @@ export const getActiveBimConnectorPackageId = (scenario = getCurrentScenarioName
 export const setActiveBimConnectorPackageId = (id, scenario = getCurrentScenarioNameState()) => {
   write(EXTRA_KEYS.activeBimConnectorPackageId, id || '', scenario);
   return id || '';
+};
+
+export const getBimObjectFamilies = (scenario = getCurrentScenarioNameState()) => read(EXTRA_KEYS.bimObjectFamilies, [], scenario);
+export const setBimObjectFamilies = (families, scenario = getCurrentScenarioNameState()) => {
+  const rows = Array.isArray(families) ? families.map(normalizeBimObjectFamily) : [];
+  write(EXTRA_KEYS.bimObjectFamilies, rows, scenario);
+  return rows;
+};
+export const addBimObjectFamilies = (families, scenario = getCurrentScenarioNameState()) => {
+  const imported = Array.isArray(families) ? families : [families].filter(Boolean);
+  const existing = new Map(getBimObjectFamilies(scenario).map(row => [row.id, row]));
+  imported.map(normalizeBimObjectFamily).forEach(row => existing.set(row.id, row));
+  const rows = [...existing.values()].sort((a, b) => `${a.manufacturer}|${a.catalogNumber}|${a.familyName}`.localeCompare(`${b.manufacturer}|${b.catalogNumber}|${b.familyName}`));
+  write(EXTRA_KEYS.bimObjectFamilies, rows, scenario);
+  return rows;
+};
+export const getApprovedBimObjectFamilies = (filters = {}, scenario = getCurrentScenarioNameState()) => {
+  const rows = getBimObjectFamilies(scenario).filter(row => row.approved);
+  return rows.filter(row => {
+    if (filters.category && row.category !== filters.category) return false;
+    if (filters.manufacturer && !row.manufacturer.toLowerCase().includes(String(filters.manufacturer).toLowerCase())) return false;
+    if (filters.nativeFormat && row.nativeFormat !== filters.nativeFormat) return false;
+    return true;
+  });
+};
+
+export const getPricingFeedRows = (scenario = getCurrentScenarioNameState()) => read(EXTRA_KEYS.pricingFeedRows, [], scenario);
+export const setPricingFeedRows = (rows, scenario = getCurrentScenarioNameState()) => {
+  const normalized = Array.isArray(rows) ? rows.map(normalizePricingFeedRow) : [];
+  write(EXTRA_KEYS.pricingFeedRows, normalized, scenario);
+  return normalized;
+};
+export const addPricingFeedRows = (rows, scenario = getCurrentScenarioNameState()) => {
+  const imported = Array.isArray(rows) ? rows : [rows].filter(Boolean);
+  const merged = mergePricingFeedRows(getPricingFeedRows(scenario), imported);
+  write(EXTRA_KEYS.pricingFeedRows, merged.rows, scenario);
+  return merged;
+};
+export const getApprovedPricingFeedRows = (filters = {}, scenario = getCurrentScenarioNameState()) => {
+  return getPricingFeedRows(scenario).filter(row => {
+    const approved = row.approved === true || /^(approved|active|accepted)$/i.test(row.approvalStatus || '');
+    if (!approved) return false;
+    if (filters.category && row.category !== filters.category) return false;
+    if (filters.sourceType && row.sourceType !== filters.sourceType) return false;
+    if (filters.manufacturer && !row.manufacturer.toLowerCase().includes(String(filters.manufacturer).toLowerCase())) return false;
+    if (filters.currency && row.currency !== String(filters.currency).toUpperCase()) return false;
+    return true;
+  });
+};
+export const getPricingFeedDescriptors = (scenario = getCurrentScenarioNameState()) => read(EXTRA_KEYS.pricingFeedDescriptors, [], scenario);
+export const setPricingFeedDescriptors = (descriptors, scenario = getCurrentScenarioNameState()) => {
+  const rows = Array.isArray(descriptors) ? descriptors.map(normalizePricingFeedDescriptor) : [];
+  write(EXTRA_KEYS.pricingFeedDescriptors, rows, scenario);
+  return rows;
+};
+export const addPricingFeedDescriptor = (descriptor, scenario = getCurrentScenarioNameState()) => {
+  const row = normalizePricingFeedDescriptor(descriptor);
+  const rows = [row, ...getPricingFeedDescriptors(scenario).filter(existing => existing.id !== row.id)];
+  write(EXTRA_KEYS.pricingFeedDescriptors, rows, scenario);
+  return row;
+};
+
+export const getComponentLibrarySubscription = (scenario = getCurrentScenarioNameState()) => {
+  return normalizeComponentLibrarySubscription(read(EXTRA_KEYS.componentLibrarySubscription, {}, scenario));
+};
+export const setComponentLibrarySubscription = (subscription, scenario = getCurrentScenarioNameState()) => {
+  const row = normalizeComponentLibrarySubscription(subscription);
+  write(EXTRA_KEYS.componentLibrarySubscription, row, scenario);
+  return row;
 };
 
 
@@ -1131,6 +1215,15 @@ if (typeof window !== 'undefined') {
     setProductCatalogRows,
     addProductCatalogRows,
     getApprovedProductCatalogRows,
+    getPricingFeedRows,
+    setPricingFeedRows,
+    addPricingFeedRows,
+    getApprovedPricingFeedRows,
+    getPricingFeedDescriptors,
+    setPricingFeedDescriptors,
+    addPricingFeedDescriptor,
+    getComponentLibrarySubscription,
+    setComponentLibrarySubscription,
     getFieldObservations,
     setFieldObservations,
     addFieldObservation,
@@ -1148,6 +1241,10 @@ if (typeof window !== 'undefined') {
     addBimConnectorPackage,
     getActiveBimConnectorPackageId,
     setActiveBimConnectorPackageId,
+    getBimObjectFamilies,
+    setBimObjectFamilies,
+    addBimObjectFamilies,
+    getApprovedBimObjectFamilies,
     addCable,
     getDuctbanks,
     setDuctbanks,

@@ -5,9 +5,19 @@ const DEFAULT_SECTIONS = [
   'lifecycle',
   'designCoach',
   'productCatalog',
+  'pricingFeedGovernance',
+  'cloudLibraryGovernance',
   'fieldCommissioning',
   'bimRoundTrip',
   'bimConnectorReadiness',
+  'nativeBimConnectorKit',
+  'revitSyncReadiness',
+  'revitNativeSync',
+  'autocadSyncReadiness',
+  'autocadNativeSync',
+  'plantCadSyncReadiness',
+  'plantCadNativeSync',
+  'bimObjectLibrary',
   'shortCircuit',
   'arcFlash',
   'motorStart',
@@ -15,10 +25,14 @@ const DEFAULT_SECTIONS = [
   'capacitorBankDuty',
   'reliabilityNetwork',
   'transientStability',
+  'ibrPlantController',
+  'emfExposure',
+  'cathodicProtectionNetwork',
   'protectionSettingSheets',
   'loadDemandGovernance',
   'transformerFeederSizing',
   'voltageDropStudy',
+  'voltageFlicker',
   'pullConstructability',
   'racewayConstruction',
   'equipmentEvaluation',
@@ -68,6 +82,18 @@ const SECTION_META = {
     deliverableType: 'Approved Catalog Register',
     fileName: 'data/product_catalog_governance.csv',
   },
+  pricingFeedGovernance: {
+    title: 'Pricing Feed and Quote Governance',
+    discipline: 'Project Controls',
+    deliverableType: 'Pricing Source Register',
+    fileName: 'data/pricing_feed_governance.csv',
+  },
+  cloudLibraryGovernance: {
+    title: 'Cloud Component Library Governance',
+    discipline: 'Project Controls',
+    deliverableType: 'Organization Component Library Release Register',
+    fileName: 'data/cloud_component_library_governance.csv',
+  },
   fieldCommissioning: {
     title: 'Field Verification',
     discipline: 'Construction',
@@ -85,6 +111,54 @@ const SECTION_META = {
     discipline: 'Coordination',
     deliverableType: 'Connector Exchange Register',
     fileName: 'data/bim_connector_readiness.csv',
+  },
+  nativeBimConnectorKit: {
+    title: 'Native BIM/CAD Connector Starter Kit',
+    discipline: 'Coordination',
+    deliverableType: 'Native Connector Readiness Package',
+    fileName: 'data/native_bim_connector_kit.csv',
+  },
+  revitSyncReadiness: {
+    title: 'Revit Connector Sync Readiness',
+    discipline: 'Coordination',
+    deliverableType: 'Native Revit Bridge Readiness Package',
+    fileName: 'data/revit_sync_readiness.csv',
+  },
+  revitNativeSync: {
+    title: 'Functional Revit Add-In Sync Readiness',
+    discipline: 'Coordination',
+    deliverableType: 'Functional Revit Native Sync Readiness Package',
+    fileName: 'data/revit_native_sync.csv',
+  },
+  autocadSyncReadiness: {
+    title: 'AutoCAD Connector Sync Readiness',
+    discipline: 'Coordination',
+    deliverableType: 'Native AutoCAD Bridge Readiness Package',
+    fileName: 'data/autocad_sync_readiness.csv',
+  },
+  autocadNativeSync: {
+    title: 'Functional AutoCAD Add-In Sync Readiness',
+    discipline: 'Coordination',
+    deliverableType: 'Functional AutoCAD Native Sync Readiness Package',
+    fileName: 'data/autocad_native_sync.csv',
+  },
+  plantCadSyncReadiness: {
+    title: 'Plant CAD Connector Sync Readiness',
+    discipline: 'Coordination',
+    deliverableType: 'Native Plant CAD Bridge Readiness Package',
+    fileName: 'data/plantcad_sync_readiness.csv',
+  },
+  plantCadNativeSync: {
+    title: 'Functional Plant CAD Add-In Sync Readiness',
+    discipline: 'Coordination',
+    deliverableType: 'Functional Plant CAD Native Sync Readiness Package',
+    fileName: 'data/plantcad_native_sync.csv',
+  },
+  bimObjectLibrary: {
+    title: 'BIM Object Library and Family Metadata',
+    discipline: 'Coordination',
+    deliverableType: 'BIM Family Readiness Register',
+    fileName: 'data/bim_object_library.csv',
   },
   shortCircuit: {
     title: 'Short-Circuit Study Basis',
@@ -128,6 +202,24 @@ const SECTION_META = {
     deliverableType: 'Dynamic Screening Package',
     fileName: 'data/transient_stability.csv',
   },
+  ibrPlantController: {
+    title: 'DER / IBR Plant Controller and Grid-Code Scenarios',
+    discipline: 'DER / Power System',
+    deliverableType: 'Plant Controller Screening Package',
+    fileName: 'data/ibr_plant_controller.csv',
+  },
+  emfExposure: {
+    title: 'EMF Exposure Study Basis',
+    discipline: 'Electrical / Safety',
+    deliverableType: 'EMF Screening Package',
+    fileName: 'data/emf_exposure.csv',
+  },
+  cathodicProtectionNetwork: {
+    title: 'Cathodic Protection Network and Interference Model',
+    discipline: 'Corrosion / Cathodic Protection',
+    deliverableType: 'Network Screening Package',
+    fileName: 'data/cathodic_protection_network.csv',
+  },
   protectionSettingSheets: {
     title: 'Protection Setting Sheets',
     discipline: 'Electrical Protection',
@@ -151,6 +243,12 @@ const SECTION_META = {
     discipline: 'Electrical',
     deliverableType: 'Study Case',
     fileName: 'data/voltage_drop_study.csv',
+  },
+  voltageFlicker: {
+    title: 'Voltage Flicker Study Basis',
+    discipline: 'Electrical',
+    deliverableType: 'Power Quality Study Case',
+    fileName: 'data/voltage_flicker_study.csv',
   },
   pullConstructability: {
     title: 'Cable Pull Constructability',
@@ -402,6 +500,25 @@ function sectionStatus(id, report = {}) {
       || (report.transientStability?.summary?.warningCount || 0) > 0
       || (report.transientStability?.summary?.missingData || 0) > 0) return 'review';
   }
+  if (id === 'ibrPlantController') {
+    if ((report.ibrPlantController?.summary?.fail || 0) > 0) return 'action-required';
+    if ((report.ibrPlantController?.summary?.warn || 0) > 0
+      || (report.ibrPlantController?.summary?.warningCount || 0) > 0
+      || (report.ibrPlantController?.summary?.missingData || 0) > 0) return 'review';
+  }
+  if (id === 'emfExposure') {
+    if ((report.emfExposure?.summary?.fail || 0) > 0) return 'action-required';
+    if ((report.emfExposure?.summary?.warn || 0) > 0
+      || (report.emfExposure?.summary?.warningCount || 0) > 0
+      || (report.emfExposure?.summary?.missingData || 0) > 0
+      || (report.emfExposure?.summary?.validationMismatchCount || 0) > 0) return 'review';
+  }
+  if (id === 'cathodicProtectionNetwork') {
+    if ((report.cathodicProtectionNetwork?.summary?.fail || 0) > 0) return 'action-required';
+    if ((report.cathodicProtectionNetwork?.summary?.warn || 0) > 0
+      || (report.cathodicProtectionNetwork?.summary?.warningCount || 0) > 0
+      || (report.cathodicProtectionNetwork?.summary?.missingData || 0) > 0) return 'review';
+  }
   if (id === 'protectionSettingSheets') {
     if ((report.protectionSettingSheets?.summary?.missingData || 0) > 0
       || asArray(report.protectionSettingSheets?.testRows).some(row => row.status === 'missingData' || row.status === 'fail')) return 'action-required';
@@ -427,6 +544,12 @@ function sectionStatus(id, report = {}) {
       || (report.voltageDropStudy?.summary?.missingData || 0) > 0
       || (report.voltageDropStudy?.summary?.warningCount || 0) > 0) return 'review';
   }
+  if (id === 'voltageFlicker') {
+    if ((report.voltageFlicker?.summary?.fail || 0) > 0) return 'action-required';
+    if ((report.voltageFlicker?.summary?.warn || 0) > 0
+      || (report.voltageFlicker?.summary?.missingData || 0) > 0
+      || (report.voltageFlicker?.summary?.warningCount || 0) > 0) return 'review';
+  }
   if (id === 'pullConstructability') {
     if ((report.pullConstructability?.summary?.fail || 0) > 0) return 'action-required';
     if ((report.pullConstructability?.summary?.warn || 0) > 0
@@ -443,6 +566,20 @@ function sectionStatus(id, report = {}) {
     if ((report.productCatalog?.summary?.duplicates || 0) > 0 || (report.productCatalog?.summary?.unapprovedUsage || 0) > 0) return 'review';
     if ((report.productCatalog?.summary?.stale || 0) > 0 || (report.productCatalog?.summary?.unapproved || 0) > 0) return 'review';
   }
+  if (id === 'pricingFeedGovernance') {
+    if ((report.pricingFeedGovernance?.summary?.conflictCount || 0) > 0
+      || asArray(report.pricingFeedGovernance?.warningRows).some(row => row.severity === 'error')) return 'action-required';
+    if ((report.pricingFeedGovernance?.summary?.staleRowCount || 0) > 0
+      || (report.pricingFeedGovernance?.summary?.expiredRowCount || 0) > 0
+      || (report.pricingFeedGovernance?.summary?.unpricedLineCount || 0) > 0
+      || (report.pricingFeedGovernance?.summary?.warningCount || 0) > 0) return 'review';
+  }
+  if (id === 'cloudLibraryGovernance') {
+    if ((report.cloudLibraryGovernance?.summary?.validationFailureCount || 0) > 0) return 'action-required';
+    if ((report.cloudLibraryGovernance?.summary?.warningCount || 0) > 0
+      || (report.cloudLibraryGovernance?.summary?.adoptionConflictCount || 0) > 0
+      || report.cloudLibraryGovernance?.summary?.status === 'not-run') return 'review';
+  }
   if (id === 'fieldCommissioning') {
     if ((report.fieldCommissioning?.summary?.rejected || 0) > 0) return 'action-required';
     if ((report.fieldCommissioning?.summary?.openItems || 0) > 0) return 'review';
@@ -456,6 +593,65 @@ function sectionStatus(id, report = {}) {
     if ((report.bimConnectorReadiness?.summary?.staleCount || 0) > 0
       || (report.bimConnectorReadiness?.summary?.quantityDeltas || 0) > 0
       || (report.bimConnectorReadiness?.summary?.mappingDeltas || 0) > 0) return 'review';
+  }
+  if (id === 'nativeBimConnectorKit') {
+    if ((report.nativeBimConnectorKit?.summary?.fail || 0) > 0) return 'action-required';
+    if ((report.nativeBimConnectorKit?.summary?.missingData || 0) > 0
+      || (report.nativeBimConnectorKit?.summary?.warningCount || 0) > 0) return 'review';
+  }
+  if (id === 'revitSyncReadiness') {
+    if (report.revitSyncReadiness?.summary?.validationStatus === 'fail'
+      || (report.revitSyncReadiness?.summary?.rejectedPreviewRows || 0) > 0) return 'action-required';
+    if ((report.revitSyncReadiness?.summary?.warningCount || 0) > 0
+      || (report.revitSyncReadiness?.summary?.quantityDeltas || 0) > 0
+      || (report.revitSyncReadiness?.summary?.mappingDeltas || 0) > 0) return 'review';
+  }
+  if (id === 'revitNativeSync') {
+    if (report.revitNativeSync?.summary?.status === 'fail'
+      || (report.revitNativeSync?.summary?.rejectedPreviewRows || 0) > 0) return 'action-required';
+    if ((report.revitNativeSync?.summary?.warningCount || 0) > 0
+      || (report.revitNativeSync?.summary?.commandReadyCount || 0) < (report.revitNativeSync?.summary?.commandCount || 0)
+      || (report.revitNativeSync?.summary?.readyMappingCount || 0) < (report.revitNativeSync?.summary?.exportMappingCount || 0)
+      || (report.revitNativeSync?.summary?.quantityDeltas || 0) > 0
+      || (report.revitNativeSync?.summary?.mappingDeltas || 0) > 0) return 'review';
+  }
+  if (id === 'autocadSyncReadiness') {
+    if (report.autocadSyncReadiness?.summary?.validationStatus === 'fail'
+      || (report.autocadSyncReadiness?.summary?.rejectedPreviewRows || 0) > 0) return 'action-required';
+    if ((report.autocadSyncReadiness?.summary?.warningCount || 0) > 0
+      || (report.autocadSyncReadiness?.summary?.quantityDeltas || 0) > 0
+      || (report.autocadSyncReadiness?.summary?.mappingDeltas || 0) > 0) return 'review';
+  }
+  if (id === 'autocadNativeSync') {
+    if (report.autocadNativeSync?.summary?.status === 'fail'
+      || (report.autocadNativeSync?.summary?.rejectedPreviewRows || 0) > 0) return 'action-required';
+    if ((report.autocadNativeSync?.summary?.warningCount || 0) > 0
+      || (report.autocadNativeSync?.summary?.commandReadyCount || 0) < (report.autocadNativeSync?.summary?.commandCount || 0)
+      || (report.autocadNativeSync?.summary?.readyMappingCount || 0) < (report.autocadNativeSync?.summary?.exportMappingCount || 0)
+      || (report.autocadNativeSync?.summary?.quantityDeltas || 0) > 0
+      || (report.autocadNativeSync?.summary?.mappingDeltas || 0) > 0) return 'review';
+  }
+  if (id === 'plantCadSyncReadiness') {
+    if (report.plantCadSyncReadiness?.summary?.validationStatus === 'fail'
+      || (report.plantCadSyncReadiness?.summary?.rejectedPreviewRows || 0) > 0) return 'action-required';
+    if ((report.plantCadSyncReadiness?.summary?.warningCount || 0) > 0
+      || (report.plantCadSyncReadiness?.summary?.quantityDeltas || 0) > 0
+      || (report.plantCadSyncReadiness?.summary?.mappingDeltas || 0) > 0) return 'review';
+  }
+  if (id === 'plantCadNativeSync') {
+    if (report.plantCadNativeSync?.summary?.status === 'fail'
+      || (report.plantCadNativeSync?.summary?.rejectedPreviewRows || 0) > 0) return 'action-required';
+    if ((report.plantCadNativeSync?.summary?.warningCount || 0) > 0
+      || (report.plantCadNativeSync?.summary?.commandReadyCount || 0) < (report.plantCadNativeSync?.summary?.commandCount || 0)
+      || (report.plantCadNativeSync?.summary?.readyMappingCount || 0) < (report.plantCadNativeSync?.summary?.exportMappingCount || 0)
+      || (report.plantCadNativeSync?.summary?.quantityDeltas || 0) > 0
+      || (report.plantCadNativeSync?.summary?.mappingDeltas || 0) > 0) return 'review';
+  }
+  if (id === 'bimObjectLibrary') {
+    if ((report.bimObjectLibrary?.summary?.conflictCount || 0) > 0) return 'action-required';
+    if ((report.bimObjectLibrary?.summary?.missingFamilyCount || 0) > 0
+      || (report.bimObjectLibrary?.summary?.genericPlaceholderCount || 0) > 0
+      || (report.bimObjectLibrary?.summary?.warningCount || 0) > 0) return 'review';
   }
   if (id === 'advancedGrounding') {
     if ((report.advancedGrounding?.summary?.fail || 0) > 0) return 'action-required';
@@ -528,6 +724,103 @@ function sectionRows(id, report = {}) {
       source: row.source,
     })),
   ];
+  if (id === 'pricingFeedGovernance') return [
+    ...asArray(report.pricingFeedGovernance?.pricingRows).map(row => ({
+      recordType: 'pricingRow',
+      sourceName: row.sourceName,
+      sourceType: row.sourceType,
+      quoteNumber: row.quoteNumber,
+      manufacturer: row.manufacturer,
+      catalogNumber: row.catalogNumber || row.key,
+      category: row.category,
+      uom: row.uom,
+      unitPrice: row.unitPrice,
+      laborUnitPrice: row.laborUnitPrice,
+      currency: row.currency,
+      approvalStatus: row.approvalStatus,
+      expiresAt: row.expiresAt,
+      status: row.approved ? 'approved' : row.approvalStatus,
+      recommendation: row.notes,
+    })),
+    ...asArray(report.pricingFeedGovernance?.estimateCoverageRows).map(row => ({
+      recordType: 'estimateCoverage',
+      sourceName: row.pricingSource,
+      sourceType: row.sourceType,
+      quoteNumber: row.quoteNumber,
+      manufacturer: '',
+      catalogNumber: row.lineItemId,
+      category: row.category,
+      uom: row.unit,
+      unitPrice: row.governedUnitPrice ?? row.estimateUnitPrice,
+      laborUnitPrice: '',
+      currency: row.currency,
+      approvalStatus: row.catalogStatus,
+      expiresAt: row.expiresAt,
+      status: row.status,
+      recommendation: asArray(row.warnings).join('; '),
+    })),
+    ...asArray(report.pricingFeedGovernance?.warningRows).map(row => ({
+      recordType: 'warning',
+      sourceName: '',
+      sourceType: '',
+      quoteNumber: '',
+      manufacturer: '',
+      catalogNumber: row.sourceId,
+      category: row.code,
+      uom: '',
+      unitPrice: '',
+      laborUnitPrice: '',
+      currency: '',
+      approvalStatus: row.severity,
+      expiresAt: '',
+      status: row.severity,
+      recommendation: row.message,
+    })),
+  ];
+  if (id === 'cloudLibraryGovernance') return [
+    ...asArray(report.cloudLibraryGovernance?.releases).map(row => ({
+      recordType: 'release',
+      workspaceId: row.workspaceId,
+      releaseId: row.id,
+      releaseTag: row.releaseTag,
+      name: row.name,
+      status: row.status,
+      approvalStatus: row.approvalStatus,
+      createdBy: row.createdBy,
+      createdAt: row.createdAt,
+      componentCount: row.summary?.componentCount || 0,
+      validationStatus: row.validation?.status || '',
+      recommendation: row.description,
+    })),
+    ...asArray(report.cloudLibraryGovernance?.validationRows).map(row => ({
+      recordType: 'validation',
+      workspaceId: report.cloudLibraryGovernance?.descriptor?.workspaceId || '',
+      releaseId: row.releaseId,
+      releaseTag: row.releaseTag,
+      name: row.id,
+      status: row.status,
+      approvalStatus: '',
+      createdBy: '',
+      createdAt: '',
+      componentCount: '',
+      validationStatus: row.status,
+      recommendation: row.detail,
+    })),
+    ...asArray(report.cloudLibraryGovernance?.warningRows).map(row => ({
+      recordType: 'warning',
+      workspaceId: report.cloudLibraryGovernance?.descriptor?.workspaceId || '',
+      releaseId: row.releaseId,
+      releaseTag: '',
+      name: row.id,
+      status: row.severity,
+      approvalStatus: '',
+      createdBy: '',
+      createdAt: '',
+      componentCount: '',
+      validationStatus: row.severity,
+      recommendation: row.message,
+    })),
+  ];
   if (id === 'fieldCommissioning') return asArray(report.fieldCommissioning?.observations).map(row => ({
     elementType: row.elementType,
     elementId: row.elementId,
@@ -564,6 +857,329 @@ function sectionRows(id, report = {}) {
     warningCount: asArray(row.warnings).length,
     id: row.id,
   }));
+  if (id === 'nativeBimConnectorKit') return [
+    ...asArray(report.nativeBimConnectorKit?.descriptors).map(row => ({
+      recordType: 'descriptor',
+      connectorType: row.connectorType,
+      targetApplication: row.targetApplication,
+      targetVersion: row.targetVersion,
+      contractVersion: row.contractVersion,
+      commandCount: asArray(row.commands).length,
+      templateCount: asArray(row.templateFiles).length,
+      warningCount: asArray(row.warnings).length,
+      status: row.validationStatus || 'review',
+      item: '',
+      recommendation: '',
+    })),
+    ...asArray(report.nativeBimConnectorKit?.installChecklist).map(row => ({
+      recordType: 'installChecklist',
+      connectorType: row.connectorType,
+      targetApplication: '',
+      targetVersion: '',
+      contractVersion: report.nativeBimConnectorKit?.summary?.contractVersion || '',
+      commandCount: '',
+      templateCount: '',
+      warningCount: '',
+      status: row.status,
+      item: row.item,
+      recommendation: row.recommendation,
+    })),
+  ];
+  if (id === 'revitSyncReadiness') return [
+    ...asArray(report.revitSyncReadiness?.validationRows).map(row => ({
+      recordType: 'validation',
+      check: row.check,
+      status: row.status,
+      detail: row.detail,
+      elementType: '',
+      tag: '',
+      guid: '',
+      recommendation: '',
+    })),
+    ...asArray(report.revitSyncReadiness?.syncPreviewRows).map(row => ({
+      recordType: 'syncPreview',
+      check: '',
+      status: row.status,
+      detail: '',
+      elementType: row.elementType,
+      tag: row.tag || row.id,
+      guid: row.guid,
+      recommendation: row.recommendation,
+    })),
+    ...asArray(report.revitSyncReadiness?.warningRows).map(row => ({
+      recordType: 'warning',
+      check: row.id,
+      status: row.severity,
+      detail: row.warning,
+      elementType: '',
+      tag: '',
+      guid: '',
+      recommendation: '',
+    })),
+  ];
+  if (id === 'revitNativeSync') return [
+    ...asArray(report.revitNativeSync?.commandRows).map(row => ({
+      recordType: 'command',
+      check: row.commandClass || row.commandName,
+      status: row.status,
+      detail: row.detail,
+      elementType: '',
+      tag: '',
+      guid: '',
+      recommendation: '',
+    })),
+    ...asArray(report.revitNativeSync?.exportMappingRows).map(row => ({
+      recordType: 'exportMapping',
+      check: row.revitCategory,
+      status: row.status,
+      detail: asArray(row.warnings).join('; '),
+      elementType: row.elementType,
+      tag: row.tagParameter,
+      guid: '',
+      recommendation: row.propertySetName,
+    })),
+    ...asArray(report.revitNativeSync?.validationRows).map(row => ({
+      recordType: 'validation',
+      check: row.check,
+      status: row.status,
+      detail: row.detail,
+      elementType: '',
+      tag: '',
+      guid: '',
+      recommendation: '',
+    })),
+    ...asArray(report.revitNativeSync?.syncPreviewRows).map(row => ({
+      recordType: 'syncPreview',
+      check: '',
+      status: row.status,
+      detail: '',
+      elementType: row.elementType,
+      tag: row.tag || row.id,
+      guid: row.guid,
+      recommendation: row.recommendation,
+    })),
+    ...asArray(report.revitNativeSync?.warningRows).map(row => ({
+      recordType: 'warning',
+      check: row.id,
+      status: row.severity,
+      detail: row.warning,
+      elementType: '',
+      tag: '',
+      guid: '',
+      recommendation: '',
+    })),
+  ];
+  if (id === 'autocadSyncReadiness') return [
+    ...asArray(report.autocadSyncReadiness?.validationRows).map(row => ({
+      recordType: 'validation',
+      check: row.check,
+      status: row.status,
+      detail: row.detail,
+      elementType: '',
+      tag: '',
+      guid: '',
+      recommendation: '',
+    })),
+    ...asArray(report.autocadSyncReadiness?.syncPreviewRows).map(row => ({
+      recordType: 'syncPreview',
+      check: '',
+      status: row.status,
+      detail: '',
+      elementType: row.elementType,
+      tag: row.tag || row.id,
+      guid: row.guid,
+      recommendation: row.recommendation,
+    })),
+    ...asArray(report.autocadSyncReadiness?.warningRows).map(row => ({
+      recordType: 'warning',
+      check: row.id,
+      status: row.severity,
+      detail: row.warning,
+      elementType: '',
+      tag: '',
+      guid: '',
+      recommendation: '',
+    })),
+  ];
+  if (id === 'autocadNativeSync') return [
+    ...asArray(report.autocadNativeSync?.commandRows).map(row => ({
+      recordType: 'command',
+      check: row.commandClass || row.commandName,
+      status: row.status,
+      detail: row.detail,
+      elementType: '',
+      tag: row.commandName,
+      guid: '',
+      recommendation: '',
+    })),
+    ...asArray(report.autocadNativeSync?.exportMappingRows).map(row => ({
+      recordType: 'exportMapping',
+      check: row.autocadObjectType,
+      status: row.status,
+      detail: asArray(row.warnings).join('; '),
+      elementType: row.elementType,
+      tag: row.layerPattern || row.blockNamePattern,
+      guid: row.dxfName,
+      recommendation: row.propertySetName,
+    })),
+    ...asArray(report.autocadNativeSync?.validationRows).map(row => ({
+      recordType: 'validation',
+      check: row.check,
+      status: row.status,
+      detail: row.detail,
+      elementType: '',
+      tag: row.id,
+      guid: '',
+      recommendation: '',
+    })),
+    ...asArray(report.autocadNativeSync?.syncPreviewRows).map(row => ({
+      recordType: 'syncPreview',
+      check: '',
+      status: row.status,
+      detail: '',
+      elementType: row.elementType,
+      tag: row.tag || row.id,
+      guid: row.guid,
+      recommendation: row.recommendation,
+    })),
+    ...asArray(report.autocadNativeSync?.warningRows).map(row => ({
+      recordType: 'warning',
+      check: row.id,
+      status: row.severity,
+      detail: row.warning,
+      elementType: '',
+      tag: '',
+      guid: '',
+      recommendation: '',
+    })),
+  ];
+  if (id === 'plantCadSyncReadiness') return [
+    ...asArray(report.plantCadSyncReadiness?.descriptors).map(row => ({
+      recordType: 'descriptor',
+      connectorType: row.connectorType,
+      check: 'Plant-CAD bridge descriptor',
+      status: row.validation?.valid ? 'pass' : 'fail',
+      detail: row.targetApplication,
+      elementType: '',
+      tag: '',
+      guid: '',
+      recommendation: asArray(row.warnings).join('; '),
+    })),
+    ...asArray(report.plantCadSyncReadiness?.validationRows).map(row => ({
+      recordType: 'validation',
+      connectorType: row.connectorType,
+      check: row.check,
+      status: row.status,
+      detail: row.detail,
+      elementType: '',
+      tag: '',
+      guid: '',
+      recommendation: '',
+    })),
+    ...asArray(report.plantCadSyncReadiness?.syncPreviewRows).map(row => ({
+      recordType: 'syncPreview',
+      connectorType: row.connectorType,
+      check: '',
+      status: row.status,
+      detail: '',
+      elementType: row.elementType,
+      tag: row.tag || row.id,
+      guid: row.guid,
+      recommendation: row.recommendation,
+    })),
+    ...asArray(report.plantCadSyncReadiness?.warningRows).map(row => ({
+      recordType: 'warning',
+      connectorType: row.connectorType,
+      check: row.id,
+      status: row.severity,
+      detail: row.warning,
+      elementType: '',
+      tag: '',
+      guid: '',
+      recommendation: '',
+    })),
+  ];
+  if (id === 'plantCadNativeSync') return [
+    ...asArray(report.plantCadNativeSync?.commandRows).map(row => ({
+      recordType: 'command',
+      connectorType: row.connectorType,
+      check: row.commandName,
+      status: row.status,
+      detail: row.detail,
+      elementType: '',
+      tag: row.id,
+      guid: '',
+      recommendation: '',
+    })),
+    ...asArray(report.plantCadNativeSync?.exportMappingRows).map(row => ({
+      recordType: 'exportMapping',
+      connectorType: '',
+      check: row.plantObjectType,
+      status: row.status,
+      detail: asArray(row.warnings).join('; '),
+      elementType: row.elementType,
+      tag: row.nativeClasses,
+      guid: row.quantityBasis,
+      recommendation: row.propertySetName,
+    })),
+    ...asArray(report.plantCadNativeSync?.validationRows).map(row => ({
+      recordType: 'validation',
+      connectorType: row.connectorType,
+      check: row.check,
+      status: row.status,
+      detail: row.detail,
+      elementType: '',
+      tag: row.id,
+      guid: '',
+      recommendation: '',
+    })),
+    ...asArray(report.plantCadNativeSync?.syncPreviewRows).map(row => ({
+      recordType: 'syncPreview',
+      connectorType: row.connectorType,
+      check: '',
+      status: row.status,
+      detail: '',
+      elementType: row.elementType,
+      tag: row.tag || row.id,
+      guid: row.guid,
+      recommendation: row.recommendation,
+    })),
+    ...asArray(report.plantCadNativeSync?.warningRows).map(row => ({
+      recordType: 'warning',
+      connectorType: '',
+      check: row.id,
+      status: row.severity,
+      detail: row.warning,
+      elementType: '',
+      tag: '',
+      guid: '',
+      recommendation: '',
+    })),
+  ];
+  if (id === 'bimObjectLibrary') return [
+    ...asArray(report.bimObjectLibrary?.familyRows).map(row => ({
+      recordType: 'family',
+      manufacturer: row.manufacturer,
+      catalogNumber: row.catalogNumber,
+      category: row.category,
+      familyName: row.familyName,
+      nativeFormat: row.nativeFormat,
+      ifcClass: row.ifcClass,
+      status: row.approvalStatus,
+      warning: asArray(row.warnings).join('; '),
+    })),
+    ...asArray(report.bimObjectLibrary?.catalogCoverage?.rows).map(row => ({
+      recordType: 'catalogCoverage',
+      manufacturer: row.manufacturer,
+      catalogNumber: row.catalogNumber,
+      category: row.category,
+      familyName: row.familyName,
+      nativeFormat: row.nativeFormat,
+      ifcClass: row.ifcClass,
+      status: row.status,
+      warning: asArray(row.warnings).join('; '),
+    })),
+  ];
   if (id === 'shortCircuit') return asArray(report.shortCircuit?.dutyRows).map(row => ({
     busId: row.busId,
     busTag: row.busTag,
@@ -817,6 +1433,192 @@ function sectionRows(id, report = {}) {
       recommendation: row.message,
     })),
   ];
+  if (id === 'ibrPlantController') return [
+    ...asArray(report.ibrPlantController?.resourceRows).map(row => ({
+      recordType: 'resource',
+      id: row.id,
+      label: row.tag,
+      scenarioId: '',
+      checkType: row.resourceType,
+      actualValue: row.ratedKw,
+      limitValue: row.ratedKva,
+      unit: 'kW/kVA',
+      status: row.status,
+      recommendation: row.notes,
+    })),
+    ...asArray(report.ibrPlantController?.capabilityRows).map(row => ({
+      recordType: 'capability',
+      id: row.id,
+      label: row.scenarioLabel,
+      scenarioId: row.scenarioId,
+      checkType: row.controlMode,
+      actualValue: row.pTotalKw,
+      limitValue: row.qTotalKvar,
+      unit: 'kW/kvar',
+      status: row.status,
+      recommendation: row.recommendation,
+    })),
+    ...asArray(report.ibrPlantController?.gridCodeRows).map(row => ({
+      recordType: 'gridCode',
+      id: row.id,
+      label: row.label,
+      scenarioId: row.scenarioId || '',
+      checkType: row.checkType,
+      actualValue: row.actualValue,
+      limitValue: row.limitValue,
+      unit: '',
+      status: row.status,
+      recommendation: row.recommendation,
+    })),
+    ...asArray(report.ibrPlantController?.warningRows).map(row => ({
+      recordType: 'warning',
+      id: row.sourceId || row.code,
+      label: row.sourceTag || row.code,
+      scenarioId: row.scenarioId || '',
+      checkType: row.code,
+      actualValue: '',
+      limitValue: '',
+      unit: '',
+      status: row.severity,
+      recommendation: row.message,
+    })),
+  ];
+  if (id === 'emfExposure') return [
+    ...asArray(report.emfExposure?.circuitRows).map(row => ({
+      recordType: 'circuit',
+      id: row.id,
+      label: row.tag,
+      xM: row.xM,
+      yM: row.yM,
+      bRms_uT: '',
+      limit_uT: '',
+      utilizationPct: '',
+      status: row.status,
+      recommendation: row.notes,
+    })),
+    ...asArray(report.emfExposure?.fieldRows).map(row => ({
+      recordType: 'field',
+      id: row.id,
+      label: row.label,
+      xM: row.xM,
+      yM: row.yM,
+      bRms_uT: row.bRms_uT,
+      limit_uT: row.limit_uT,
+      utilizationPct: row.utilizationPct,
+      status: row.status,
+      recommendation: row.recommendation,
+    })),
+    ...asArray(report.emfExposure?.profileRows).map(row => ({
+      recordType: 'profile',
+      id: row.id,
+      label: `Profile ${row.distanceM} m`,
+      xM: row.distanceM,
+      yM: row.heightM,
+      bRms_uT: row.bRms_uT,
+      limit_uT: row.limit_uT,
+      utilizationPct: row.utilizationPct,
+      status: row.status,
+      recommendation: '',
+    })),
+    ...asArray(report.emfExposure?.validationRows).map(row => ({
+      recordType: 'validation',
+      id: row.id,
+      label: row.label,
+      xM: '',
+      yM: '',
+      bRms_uT: row.calculatedB_uT,
+      limit_uT: row.measuredB_uT,
+      utilizationPct: row.differencePct,
+      status: row.status,
+      recommendation: row.recommendation,
+    })),
+    ...asArray(report.emfExposure?.warningRows).map(row => ({
+      recordType: 'warning',
+      id: row.sourceId || row.code,
+      label: row.sourceTag || row.code,
+      xM: '',
+      yM: '',
+      bRms_uT: '',
+      limit_uT: '',
+      utilizationPct: '',
+      status: row.severity,
+      recommendation: row.message,
+    })),
+  ];
+  if (id === 'cathodicProtectionNetwork') return [
+    ...asArray(report.cathodicProtectionNetwork?.structureRows).map(row => ({
+      recordType: 'structure',
+      id: row.id,
+      label: row.tag,
+      zone: row.zone,
+      checkType: row.structureType,
+      requiredCurrentA: row.requiredCurrentA,
+      allocatedCurrentA: '',
+      value: row.surfaceAreaM2,
+      status: row.status,
+      recommendation: row.notes,
+    })),
+    ...asArray(report.cathodicProtectionNetwork?.criteriaRows).map(row => ({
+      recordType: 'criteria',
+      id: row.id,
+      label: row.structureTag || row.rectifierId,
+      zone: row.zone,
+      checkType: row.checkType,
+      requiredCurrentA: row.requiredCurrentA,
+      allocatedCurrentA: row.allocatedCurrentA,
+      value: row.marginPct,
+      status: row.status,
+      recommendation: row.recommendation,
+    })),
+    ...asArray(report.cathodicProtectionNetwork?.polarizationRows).map(row => ({
+      recordType: 'polarization',
+      id: row.id,
+      label: row.testStationRef,
+      zone: '',
+      checkType: 'polarization',
+      requiredCurrentA: '',
+      allocatedCurrentA: '',
+      value: row.instantOffMv,
+      status: row.status,
+      recommendation: row.recommendation,
+    })),
+    ...asArray(report.cathodicProtectionNetwork?.potentialProfileRows).map(row => ({
+      recordType: 'profile',
+      id: row.id,
+      label: row.structureTag,
+      zone: row.zone,
+      checkType: 'potentialProfile',
+      requiredCurrentA: '',
+      allocatedCurrentA: '',
+      value: row.estimatedInstantOffMv,
+      status: row.status,
+      recommendation: row.recommendation,
+    })),
+    ...asArray(report.cathodicProtectionNetwork?.interferenceRows).map(row => ({
+      recordType: 'interference',
+      id: row.id,
+      label: row.label,
+      zone: row.zone,
+      checkType: row.sourceType,
+      requiredCurrentA: '',
+      allocatedCurrentA: '',
+      value: row.riskLevel,
+      status: row.status,
+      recommendation: row.notes,
+    })),
+    ...asArray(report.cathodicProtectionNetwork?.warningRows).map(row => ({
+      recordType: 'warning',
+      id: row.sourceId || row.code,
+      label: row.sourceTag || row.code,
+      zone: '',
+      checkType: row.code,
+      requiredCurrentA: '',
+      allocatedCurrentA: '',
+      value: '',
+      status: row.severity,
+      recommendation: row.message,
+    })),
+  ];
   if (id === 'protectionSettingSheets') return [
     ...asArray(report.protectionSettingSheets?.deviceRows).map(row => ({
       recordType: 'device',
@@ -1013,6 +1815,47 @@ function sectionRows(id, report = {}) {
       status: row.severity,
       reason: row.message,
       recommendation: row.code,
+    })),
+  ];
+  if (id === 'voltageFlicker') return [
+    ...asArray(report.voltageFlicker?.loadStepRows).map(row => ({
+      recordType: 'loadStep',
+      target: row.label,
+      loadType: row.loadType,
+      loadKw: row.loadKw,
+      repetitionsPerHour: row.repetitionsPerHour,
+      actualValue: '',
+      limit: '',
+      utilizationPct: '',
+      status: '',
+      source: '',
+      recommendation: row.notes,
+    })),
+    ...asArray(report.voltageFlicker?.complianceRows).map(row => ({
+      recordType: 'compliance',
+      target: row.target,
+      loadType: '',
+      loadKw: '',
+      repetitionsPerHour: '',
+      actualValue: row.actualValue,
+      limit: row.limit,
+      utilizationPct: row.utilizationPct,
+      status: row.status,
+      source: row.source,
+      recommendation: row.recommendation,
+    })),
+    ...asArray(report.voltageFlicker?.warningRows).map(row => ({
+      recordType: 'warning',
+      target: row.id,
+      loadType: '',
+      loadKw: '',
+      repetitionsPerHour: '',
+      actualValue: '',
+      limit: '',
+      utilizationPct: '',
+      status: row.severity,
+      source: '',
+      recommendation: row.message,
     })),
   ];
   if (id === 'pullConstructability') return [
@@ -1333,9 +2176,19 @@ function sectionSummary(id, report = {}) {
   }
   if (id === 'designCoach') return report.designCoach?.summary || {};
   if (id === 'productCatalog') return report.productCatalog?.summary || {};
+  if (id === 'pricingFeedGovernance') return report.pricingFeedGovernance?.summary || {};
+  if (id === 'cloudLibraryGovernance') return report.cloudLibraryGovernance?.summary || {};
   if (id === 'fieldCommissioning') return report.fieldCommissioning?.summary || {};
   if (id === 'bimRoundTrip') return report.bimRoundTrip?.summary || {};
   if (id === 'bimConnectorReadiness') return report.bimConnectorReadiness?.summary || {};
+  if (id === 'nativeBimConnectorKit') return report.nativeBimConnectorKit?.summary || {};
+  if (id === 'revitSyncReadiness') return report.revitSyncReadiness?.summary || {};
+  if (id === 'revitNativeSync') return report.revitNativeSync?.summary || {};
+  if (id === 'autocadSyncReadiness') return report.autocadSyncReadiness?.summary || {};
+  if (id === 'autocadNativeSync') return report.autocadNativeSync?.summary || {};
+  if (id === 'plantCadSyncReadiness') return report.plantCadSyncReadiness?.summary || {};
+  if (id === 'plantCadNativeSync') return report.plantCadNativeSync?.summary || {};
+  if (id === 'bimObjectLibrary') return report.bimObjectLibrary?.summary || {};
   if (id === 'shortCircuit') return report.shortCircuit?.summary || {};
   if (id === 'arcFlash') return report.arcFlash?.summary || {};
   if (id === 'motorStart') return report.motorStart?.summary || {};
@@ -1343,10 +2196,14 @@ function sectionSummary(id, report = {}) {
   if (id === 'capacitorBankDuty') return report.capacitorBankDuty?.summary || {};
   if (id === 'reliabilityNetwork') return report.reliabilityNetwork?.summary || {};
   if (id === 'transientStability') return report.transientStability?.summary || {};
+  if (id === 'ibrPlantController') return report.ibrPlantController?.summary || {};
+  if (id === 'emfExposure') return report.emfExposure?.summary || {};
+  if (id === 'cathodicProtectionNetwork') return report.cathodicProtectionNetwork?.summary || {};
   if (id === 'protectionSettingSheets') return report.protectionSettingSheets?.summary || {};
   if (id === 'loadDemandGovernance') return report.loadDemandGovernance?.summary || {};
   if (id === 'transformerFeederSizing') return report.transformerFeederSizing?.summary || {};
   if (id === 'voltageDropStudy') return report.voltageDropStudy?.summary || {};
+  if (id === 'voltageFlicker') return report.voltageFlicker?.summary || {};
   if (id === 'pullConstructability') return report.pullConstructability?.summary || {};
   if (id === 'equipmentEvaluation') return report.equipmentEvaluation?.summary || {};
   if (id === 'advancedGrounding') return report.advancedGrounding?.summary || {};
@@ -1380,9 +2237,19 @@ export function buildReportPackageSections(report = {}, options = {}) {
       if (id === 'lifecycle') return report.lifecycle?.activePackage;
       if (id === 'designCoach') return report.designCoach;
       if (id === 'productCatalog') return report.productCatalog;
+      if (id === 'pricingFeedGovernance') return report.pricingFeedGovernance;
+      if (id === 'cloudLibraryGovernance') return report.cloudLibraryGovernance;
       if (id === 'fieldCommissioning') return report.fieldCommissioning;
       if (id === 'bimRoundTrip') return report.bimRoundTrip;
-      if (id === 'bimConnectorReadiness') return report.bimConnectorReadiness;
+  if (id === 'bimConnectorReadiness') return report.bimConnectorReadiness;
+  if (id === 'nativeBimConnectorKit') return report.nativeBimConnectorKit;
+  if (id === 'revitSyncReadiness') return report.revitSyncReadiness;
+  if (id === 'revitNativeSync') return report.revitNativeSync;
+  if (id === 'autocadSyncReadiness') return report.autocadSyncReadiness;
+  if (id === 'autocadNativeSync') return report.autocadNativeSync;
+  if (id === 'plantCadSyncReadiness') return report.plantCadSyncReadiness;
+  if (id === 'plantCadNativeSync') return report.plantCadNativeSync;
+  if (id === 'bimObjectLibrary') return report.bimObjectLibrary;
       if (id === 'shortCircuit') return report.shortCircuit;
       if (id === 'arcFlash') return report.arcFlash;
       if (id === 'motorStart') return report.motorStart;
@@ -1390,11 +2257,15 @@ export function buildReportPackageSections(report = {}, options = {}) {
       if (id === 'capacitorBankDuty') return report.capacitorBankDuty;
       if (id === 'reliabilityNetwork') return report.reliabilityNetwork;
       if (id === 'transientStability') return report.transientStability;
+      if (id === 'ibrPlantController') return report.ibrPlantController;
+      if (id === 'emfExposure') return report.emfExposure;
+      if (id === 'cathodicProtectionNetwork') return report.cathodicProtectionNetwork;
       if (id === 'protectionSettingSheets') return report.protectionSettingSheets;
       if (id === 'loadDemandGovernance') return report.loadDemandGovernance;
-      if (id === 'transformerFeederSizing') return report.transformerFeederSizing;
-      if (id === 'voltageDropStudy') return report.voltageDropStudy;
-      if (id === 'pullConstructability') return report.pullConstructability;
+  if (id === 'transformerFeederSizing') return report.transformerFeederSizing;
+  if (id === 'voltageDropStudy') return report.voltageDropStudy;
+  if (id === 'voltageFlicker') return report.voltageFlicker;
+  if (id === 'pullConstructability') return report.pullConstructability;
       if (id === 'racewayConstruction') return report.racewayConstruction;
       if (id === 'equipmentEvaluation') return report.equipmentEvaluation;
       if (id === 'advancedGrounding') return report.advancedGrounding;
@@ -1490,6 +2361,13 @@ export function buildQualityChecklist(report = {}, sections = []) {
         : 'ready',
     });
   }
+  if (report.cloudLibraryGovernance) {
+    checks.push({
+      id: 'cloud-component-library-governance',
+      description: 'Organization component library releases, approval state, and project adoption metadata are included.',
+      status: sectionStatus('cloudLibraryGovernance', report),
+    });
+  }
   if (report.fieldCommissioning) {
     checks.push({
       id: 'field-verification',
@@ -1513,6 +2391,62 @@ export function buildQualityChecklist(report = {}, sections = []) {
       id: 'bim-connector-readiness',
       description: 'BIM/CAD connector exchange package readiness and round-trip deltas are included.',
       status: sectionStatus('bimConnectorReadiness', report),
+    });
+  }
+  if (report.nativeBimConnectorKit) {
+    checks.push({
+      id: 'native-bim-connector-kit',
+      description: 'Native BIM/CAD connector starter kit descriptors, sample payloads, and install readiness are included.',
+      status: sectionStatus('nativeBimConnectorKit', report),
+    });
+  }
+  if (report.revitSyncReadiness) {
+    checks.push({
+      id: 'revit-sync-readiness',
+      description: 'Revit connector bridge readiness, validation rows, and sync preview rows are included.',
+      status: sectionStatus('revitSyncReadiness', report),
+    });
+  }
+  if (report.revitNativeSync) {
+    checks.push({
+      id: 'revit-native-sync',
+      description: 'Functional Revit add-in command coverage, export mapping, and sync preview rows are included.',
+      status: sectionStatus('revitNativeSync', report),
+    });
+  }
+  if (report.autocadSyncReadiness) {
+    checks.push({
+      id: 'autocad-sync-readiness',
+      description: 'AutoCAD connector bridge readiness, validation rows, and sync preview rows are included.',
+      status: sectionStatus('autocadSyncReadiness', report),
+    });
+  }
+  if (report.autocadNativeSync) {
+    checks.push({
+      id: 'autocad-native-sync',
+      description: 'Functional AutoCAD add-in command coverage, export mapping, and sync preview rows are included.',
+      status: sectionStatus('autocadNativeSync', report),
+    });
+  }
+  if (report.plantCadSyncReadiness) {
+    checks.push({
+      id: 'plantcad-sync-readiness',
+      description: 'AVEVA / SmartPlant connector bridge readiness, validation rows, and sync preview rows are included.',
+      status: sectionStatus('plantCadSyncReadiness', report),
+    });
+  }
+  if (report.plantCadNativeSync) {
+    checks.push({
+      id: 'plantcad-native-sync',
+      description: 'Functional AVEVA / SmartPlant command coverage, export mapping, and sync preview rows are included.',
+      status: sectionStatus('plantCadNativeSync', report),
+    });
+  }
+  if (report.bimObjectLibrary) {
+    checks.push({
+      id: 'bim-object-library',
+      description: 'BIM object family metadata, catalog coverage, and connector mapping hints are included.',
+      status: sectionStatus('bimObjectLibrary', report),
     });
   }
   if (report.equipmentEvaluation) {
@@ -1581,6 +2515,27 @@ export function buildQualityChecklist(report = {}, sections = []) {
       status: sectionStatus('transientStability', report),
     });
   }
+  if (report.ibrPlantController) {
+    checks.push({
+      id: 'ibr-plant-controller',
+      description: 'DER / IBR plant controller resources, grid-code curves, scenarios, and warning rows are included.',
+      status: sectionStatus('ibrPlantController', report),
+    });
+  }
+  if (report.emfExposure) {
+    checks.push({
+      id: 'emf-exposure',
+      description: 'EMF exposure circuits, field rows, validation rows, and warning rows are included.',
+      status: sectionStatus('emfExposure', report),
+    });
+  }
+  if (report.cathodicProtectionNetwork) {
+    checks.push({
+      id: 'cathodic-protection-network',
+      description: 'Cathodic protection network structures, anodes, rectifiers, polarization, interference, and profile rows are included.',
+      status: sectionStatus('cathodicProtectionNetwork', report),
+    });
+  }
   if (report.protectionSettingSheets) {
     checks.push({
       id: 'protection-setting-sheets',
@@ -1607,6 +2562,13 @@ export function buildQualityChecklist(report = {}, sections = []) {
       id: 'voltage-drop-study',
       description: 'Voltage-drop criteria, operating-case basis, result rows, segment checks, and warnings are included.',
       status: sectionStatus('voltageDropStudy', report),
+    });
+  }
+  if (report.voltageFlicker) {
+    checks.push({
+      id: 'voltage-flicker-study',
+      description: 'Voltage flicker study case, Pst/Plt compliance rows, load steps, and warnings are included.',
+      status: sectionStatus('voltageFlicker', report),
     });
   }
   if (report.pullConstructability) {
@@ -1692,9 +2654,19 @@ export function renderReportPackageHTML(pkg = {}) {
   const lifecycle = pkg.lifecycle?.activePackage || null;
   const designCoach = pkg.designCoach || null;
   const productCatalog = pkg.productCatalog || null;
+  const pricingFeedGovernance = pkg.pricingFeedGovernance || null;
+  const cloudLibraryGovernance = pkg.cloudLibraryGovernance || null;
   const fieldCommissioning = pkg.fieldCommissioning || null;
   const bimRoundTrip = pkg.bimRoundTrip || null;
   const bimConnectorReadiness = pkg.bimConnectorReadiness || null;
+  const nativeBimConnectorKit = pkg.nativeBimConnectorKit || null;
+  const revitSyncReadiness = pkg.revitSyncReadiness || null;
+  const revitNativeSync = pkg.revitNativeSync || null;
+  const autocadSyncReadiness = pkg.autocadSyncReadiness || null;
+  const autocadNativeSync = pkg.autocadNativeSync || null;
+  const plantCadSyncReadiness = pkg.plantCadSyncReadiness || null;
+  const plantCadNativeSync = pkg.plantCadNativeSync || null;
+  const bimObjectLibrary = pkg.bimObjectLibrary || null;
   const shortCircuit = pkg.shortCircuit || null;
   const arcFlash = pkg.arcFlash || null;
   const motorStart = pkg.motorStart || null;
@@ -1702,10 +2674,14 @@ export function renderReportPackageHTML(pkg = {}) {
   const capacitorBankDuty = pkg.capacitorBankDuty || null;
   const reliabilityNetwork = pkg.reliabilityNetwork || null;
   const transientStability = pkg.transientStability || null;
+  const ibrPlantController = pkg.ibrPlantController || null;
+  const emfExposure = pkg.emfExposure || null;
+  const cathodicProtectionNetwork = pkg.cathodicProtectionNetwork || null;
   const protectionSettingSheets = pkg.protectionSettingSheets || null;
   const loadDemandGovernance = pkg.loadDemandGovernance || null;
   const transformerFeederSizing = pkg.transformerFeederSizing || null;
   const voltageDropStudy = pkg.voltageDropStudy || null;
+  const voltageFlicker = pkg.voltageFlicker || null;
   const pullConstructability = pkg.pullConstructability || null;
   const racewayConstruction = pkg.racewayConstruction || null;
   const equipmentEvaluation = pkg.equipmentEvaluation || null;
@@ -1742,12 +2718,32 @@ export function renderReportPackageHTML(pkg = {}) {
   <p class="meta">${escapeHtml(designCoach.summary?.total || 0)} open action(s), ${escapeHtml(designCoach.summary?.highPriority || 0)} high priority.</p>` : ''}
   ${productCatalog ? `<h2>Product Catalog Governance</h2>
   <p class="meta">${escapeHtml(productCatalog.summary?.approved || 0)} approved, ${escapeHtml(productCatalog.summary?.unapproved || 0)} unapproved, ${escapeHtml(productCatalog.summary?.unapprovedUsage || 0)} usage warning(s).</p>` : ''}
+  ${pricingFeedGovernance ? `<h2>Pricing Feed and Quote Governance</h2>
+  <p class="meta">${escapeHtml(pricingFeedGovernance.summary?.approvedRowCount || 0)} approved pricing row(s), ${escapeHtml(pricingFeedGovernance.summary?.unpricedLineCount || 0)} unpriced/generic estimate line(s), ${escapeHtml(pricingFeedGovernance.summary?.conflictCount || 0)} conflict(s).</p>` : ''}
+  ${cloudLibraryGovernance ? `<h2>Cloud Component Library Governance</h2>
+  <p class="meta">${escapeHtml(cloudLibraryGovernance.summary?.releaseCount || 0)} release(s), ${escapeHtml(cloudLibraryGovernance.summary?.approvedReleaseCount || 0)} approved, ${escapeHtml(cloudLibraryGovernance.summary?.warningCount || 0)} warning(s).</p>` : ''}
   ${fieldCommissioning ? `<h2>Field Verification</h2>
   <p class="meta">${escapeHtml(fieldCommissioning.summary?.openItems || 0)} open item(s), ${escapeHtml(fieldCommissioning.summary?.verified || 0)} verified target(s), ${escapeHtml(fieldCommissioning.summary?.attachmentCount || 0)} attachment record(s).</p>` : ''}
   ${bimRoundTrip ? `<h2>BIM Coordination</h2>
   <p class="meta">${escapeHtml(bimRoundTrip.summary?.elementCount || 0)} imported element(s), ${escapeHtml(bimRoundTrip.summary?.changedGroups || 0)} changed quantity group(s), ${escapeHtml(bimRoundTrip.summary?.openIssues || 0)} open issue(s).</p>` : ''}
   ${bimConnectorReadiness ? `<h2>BIM/CAD Connector Readiness</h2>
   <p class="meta">${escapeHtml(bimConnectorReadiness.summary?.packageCount || 0)} connector package(s), ${escapeHtml(bimConnectorReadiness.summary?.quantityDeltas || 0)} quantity delta(s), ${escapeHtml(bimConnectorReadiness.summary?.mappingDeltas || 0)} mapping delta(s).</p>` : ''}
+  ${nativeBimConnectorKit ? `<h2>Native BIM/CAD Connector Starter Kit</h2>
+  <p class="meta">${escapeHtml(nativeBimConnectorKit.summary?.descriptorCount || 0)} descriptor(s), ${escapeHtml(nativeBimConnectorKit.summary?.samplePayloadCount || 0)} sample payload(s), ${escapeHtml(nativeBimConnectorKit.summary?.missingChecklistItems || 0)} checklist gap(s).</p>` : ''}
+  ${revitSyncReadiness ? `<h2>Revit Connector Sync Readiness</h2>
+  <p class="meta">${escapeHtml(revitSyncReadiness.summary?.validationStatus || 'review')} status, ${escapeHtml(revitSyncReadiness.summary?.acceptedPreviewRows || 0)} accepted preview row(s), ${escapeHtml(revitSyncReadiness.summary?.rejectedPreviewRows || 0)} rejected row(s), ${escapeHtml(revitSyncReadiness.summary?.warningCount || 0)} warning(s).</p>` : ''}
+  ${revitNativeSync ? `<h2>Functional Revit Add-In Sync Readiness</h2>
+  <p class="meta">${escapeHtml(revitNativeSync.summary?.status || 'review')} status, ${escapeHtml(revitNativeSync.summary?.commandReadyCount || 0)} of ${escapeHtml(revitNativeSync.summary?.commandCount || 0)} command(s) ready, ${escapeHtml(revitNativeSync.summary?.readyMappingCount || 0)} of ${escapeHtml(revitNativeSync.summary?.exportMappingCount || 0)} export mapping(s) ready, ${escapeHtml(revitNativeSync.summary?.warningCount || 0)} warning(s).</p>` : ''}
+  ${autocadSyncReadiness ? `<h2>AutoCAD Connector Sync Readiness</h2>
+  <p class="meta">${escapeHtml(autocadSyncReadiness.summary?.validationStatus || 'review')} status, ${escapeHtml(autocadSyncReadiness.summary?.acceptedPreviewRows || 0)} accepted preview row(s), ${escapeHtml(autocadSyncReadiness.summary?.rejectedPreviewRows || 0)} rejected row(s), ${escapeHtml(autocadSyncReadiness.summary?.warningCount || 0)} warning(s).</p>` : ''}
+  ${autocadNativeSync ? `<h2>Functional AutoCAD Add-In Sync Readiness</h2>
+  <p class="meta">${escapeHtml(autocadNativeSync.summary?.status || 'review')} status, ${escapeHtml(autocadNativeSync.summary?.commandReadyCount || 0)} of ${escapeHtml(autocadNativeSync.summary?.commandCount || 0)} command(s) ready, ${escapeHtml(autocadNativeSync.summary?.readyMappingCount || 0)} of ${escapeHtml(autocadNativeSync.summary?.exportMappingCount || 0)} export mapping(s) ready, ${escapeHtml(autocadNativeSync.summary?.warningCount || 0)} warning(s).</p>` : ''}
+  ${plantCadSyncReadiness ? `<h2>Plant CAD Connector Sync Readiness</h2>
+  <p class="meta">${escapeHtml(plantCadSyncReadiness.summary?.validationStatus || 'review')} status, ${escapeHtml(plantCadSyncReadiness.summary?.descriptorCount || 0)} descriptor(s), ${escapeHtml(plantCadSyncReadiness.summary?.acceptedPreviewRows || 0)} accepted preview row(s), ${escapeHtml(plantCadSyncReadiness.summary?.rejectedPreviewRows || 0)} rejected row(s), ${escapeHtml(plantCadSyncReadiness.summary?.warningCount || 0)} warning(s).</p>` : ''}
+  ${plantCadNativeSync ? `<h2>Functional Plant CAD Add-In Sync Readiness</h2>
+  <p class="meta">${escapeHtml(plantCadNativeSync.summary?.status || 'review')} status, ${escapeHtml(plantCadNativeSync.summary?.commandReadyCount || 0)} of ${escapeHtml(plantCadNativeSync.summary?.commandCount || 0)} command(s) ready, ${escapeHtml(plantCadNativeSync.summary?.readyMappingCount || 0)} of ${escapeHtml(plantCadNativeSync.summary?.exportMappingCount || 0)} export mapping(s) ready, ${escapeHtml(plantCadNativeSync.summary?.warningCount || 0)} warning(s).</p>` : ''}
+  ${bimObjectLibrary ? `<h2>BIM Object Library and Family Metadata</h2>
+  <p class="meta">${escapeHtml(bimObjectLibrary.summary?.familyCount || 0)} family row(s), ${escapeHtml(bimObjectLibrary.summary?.readyCatalogRows || 0)} ready catalog row(s), ${escapeHtml(bimObjectLibrary.summary?.missingFamilyCount || 0)} missing family mapping(s).</p>` : ''}
   ${shortCircuit ? `<h2>Short-Circuit Study Basis</h2>
   <p class="meta">${escapeHtml(shortCircuit.summary?.total || 0)} duty row(s), max duty ${escapeHtml(shortCircuit.summary?.maxDutyKA || 0)} kA, basis ${escapeHtml(shortCircuit.studyCase?.dutyBasis || 'n/a')}.</p>` : ''}
   ${arcFlash ? `<h2>Arc Flash Study Basis</h2>
@@ -1762,6 +2758,12 @@ export function renderReportPackageHTML(pkg = {}) {
   <p class="meta">${escapeHtml(reliabilityNetwork.summary?.componentCount || 0)} component(s), ${escapeHtml(reliabilityNetwork.summary?.totalCustomers || 0)} customer(s), SAIFI ${escapeHtml(reliabilityNetwork.summary?.saifi ?? 'n/a')}, SAIDI ${escapeHtml(reliabilityNetwork.summary?.saidi ?? 'n/a')} hr/customer-year.</p>` : ''}
   ${transientStability ? `<h2>Transient Stability Study Basis</h2>
   <p class="meta">${escapeHtml(transientStability.summary?.modelCount || 0)} dynamic model(s), ${escapeHtml(transientStability.summary?.eventCount || 0)} event(s), ${escapeHtml(transientStability.summary?.fail || 0)} fail, ${escapeHtml(transientStability.summary?.warn || 0)} warning, max rotor angle ${escapeHtml(transientStability.summary?.maxRotorAngleDeg ?? 'n/a')} deg.</p>` : ''}
+  ${ibrPlantController ? `<h2>DER / IBR Plant Controller and Grid-Code Scenarios</h2>
+  <p class="meta">${escapeHtml(ibrPlantController.summary?.enabledResourceCount || 0)} enabled resource(s), ${escapeHtml(ibrPlantController.summary?.scenarioCount || 0)} scenario(s), ${escapeHtml(ibrPlantController.summary?.warningCount || 0)} warning(s).</p>` : ''}
+  ${emfExposure ? `<h2>EMF Exposure Study Basis</h2>
+  <p class="meta">${escapeHtml(emfExposure.summary?.measurementPointCount || 0)} point(s), max field ${escapeHtml(emfExposure.summary?.maxBRms_uT ?? 'n/a')} uT, ${escapeHtml(emfExposure.summary?.fail || 0)} fail, ${escapeHtml(emfExposure.summary?.warn || 0)} warning, ${escapeHtml(emfExposure.summary?.warningCount || 0)} warning row(s).</p>` : ''}
+  ${cathodicProtectionNetwork ? `<h2>Cathodic Protection Network and Interference Model</h2>
+  <p class="meta">${escapeHtml(cathodicProtectionNetwork.summary?.structureCount || 0)} structure(s), ${escapeHtml(cathodicProtectionNetwork.summary?.anodeCount || 0)} anode row(s), ${escapeHtml(cathodicProtectionNetwork.summary?.rectifierCount || 0)} rectifier row(s), ${escapeHtml(cathodicProtectionNetwork.summary?.warningCount || 0)} warning row(s).</p>` : ''}
   ${protectionSettingSheets ? `<h2>Protection Setting Sheets</h2>
   <p class="meta">${escapeHtml(protectionSettingSheets.summary?.deviceCount || 0)} device row(s), ${escapeHtml(protectionSettingSheets.summary?.functionCount || 0)} function row(s), ${escapeHtml(protectionSettingSheets.summary?.missingData || 0)} missing-data item(s).</p>` : ''}
   ${loadDemandGovernance ? `<h2>Panel and Load Demand Basis</h2>
@@ -1770,6 +2772,8 @@ export function renderReportPackageHTML(pkg = {}) {
   <p class="meta">${escapeHtml(transformerFeederSizing.summary?.selectedTransformerKva || 0)} kVA transformer, feeder ${escapeHtml(transformerFeederSizing.summary?.selectedFeederConductor || 'n/a')}, ${escapeHtml(transformerFeederSizing.summary?.alternativeCount || 0)} alternative row(s), ${escapeHtml(transformerFeederSizing.summary?.warningCount || 0)} warning(s).</p>` : ''}
   ${voltageDropStudy ? `<h2>Voltage Drop Study Basis</h2>
   <p class="meta">${escapeHtml(voltageDropStudy.summary?.total || 0)} cable row(s), ${escapeHtml(voltageDropStudy.summary?.fail || 0)} fail, ${escapeHtml(voltageDropStudy.summary?.warn || 0)} warning, ${escapeHtml(voltageDropStudy.summary?.missingData || 0)} missing-data row(s).</p>` : ''}
+  ${voltageFlicker ? `<h2>Voltage Flicker Study Basis</h2>
+  <p class="meta">${escapeHtml(voltageFlicker.summary?.loadStepCount || 0)} load step(s), worst Pst ${escapeHtml(voltageFlicker.summary?.worstPst ?? 'n/a')}, Plt ${escapeHtml(voltageFlicker.summary?.plt ?? 'n/a')}, ${escapeHtml(voltageFlicker.summary?.fail || 0)} fail, ${escapeHtml(voltageFlicker.summary?.warn || 0)} warning.</p>` : ''}
   ${pullConstructability ? `<h2>Cable Pull Constructability</h2>
   <p class="meta">${escapeHtml(pullConstructability.summary?.pullCount || 0)} pull(s), ${escapeHtml(pullConstructability.summary?.fail || 0)} fail, ${escapeHtml(pullConstructability.summary?.warn || 0)} warning, ${escapeHtml(pullConstructability.summary?.missingData || 0)} missing-data row(s).</p>` : ''}
   ${racewayConstruction ? `<h2>Raceway Construction Details</h2>
@@ -1826,9 +2830,19 @@ export function buildReportPackage(report = {}, options = {}) {
     lifecycle: report.lifecycle || null,
     designCoach: report.designCoach || null,
     productCatalog: report.productCatalog || null,
+    pricingFeedGovernance: report.pricingFeedGovernance || null,
+    cloudLibraryGovernance: report.cloudLibraryGovernance || null,
     fieldCommissioning: report.fieldCommissioning || null,
     bimRoundTrip: report.bimRoundTrip || null,
     bimConnectorReadiness: report.bimConnectorReadiness || null,
+    nativeBimConnectorKit: report.nativeBimConnectorKit || null,
+    revitSyncReadiness: report.revitSyncReadiness || null,
+    revitNativeSync: report.revitNativeSync || null,
+    autocadSyncReadiness: report.autocadSyncReadiness || null,
+    autocadNativeSync: report.autocadNativeSync || null,
+    plantCadSyncReadiness: report.plantCadSyncReadiness || null,
+    plantCadNativeSync: report.plantCadNativeSync || null,
+    bimObjectLibrary: report.bimObjectLibrary || null,
     shortCircuit: report.shortCircuit || null,
     arcFlash: report.arcFlash || null,
     motorStart: report.motorStart || null,
@@ -1836,10 +2850,14 @@ export function buildReportPackage(report = {}, options = {}) {
     capacitorBankDuty: report.capacitorBankDuty || null,
     reliabilityNetwork: report.reliabilityNetwork || null,
     transientStability: report.transientStability || null,
+    ibrPlantController: report.ibrPlantController || null,
+    emfExposure: report.emfExposure || null,
+    cathodicProtectionNetwork: report.cathodicProtectionNetwork || null,
     protectionSettingSheets: report.protectionSettingSheets || null,
     loadDemandGovernance: report.loadDemandGovernance || null,
     transformerFeederSizing: report.transformerFeederSizing || null,
     voltageDropStudy: report.voltageDropStudy || null,
+    voltageFlicker: report.voltageFlicker || null,
     pullConstructability: report.pullConstructability || null,
     racewayConstruction: report.racewayConstruction || null,
     equipmentEvaluation: report.equipmentEvaluation || null,
@@ -1872,6 +2890,33 @@ export function buildReportPackage(report = {}, options = {}) {
           warnings: asArray(pkg.productCatalog.warnings),
           unresolved: asArray(pkg.productCatalog.unapprovedUsage).slice(0, 50),
         } : null,
+        pricingFeedGovernance: pkg.pricingFeedGovernance ? {
+          summary: pkg.pricingFeedGovernance.summary,
+          warnings: asArray(pkg.pricingFeedGovernance.warnings).slice(0, 50),
+          unresolved: [
+            ...asArray(pkg.pricingFeedGovernance.unpricedRows).slice(0, 50),
+            ...asArray(pkg.pricingFeedGovernance.conflictRows).slice(0, 50),
+            ...asArray(pkg.pricingFeedGovernance.expiredRows).slice(0, 50),
+          ],
+        } : null,
+        cloudLibraryGovernance: pkg.cloudLibraryGovernance ? {
+          summary: pkg.cloudLibraryGovernance.summary,
+          warnings: asArray(pkg.cloudLibraryGovernance.warnings).slice(0, 50),
+          subscription: pkg.cloudLibraryGovernance.subscription,
+          releases: asArray(pkg.cloudLibraryGovernance.releases).map(row => ({
+            id: row.id,
+            workspaceId: row.workspaceId,
+            releaseTag: row.releaseTag,
+            name: row.name,
+            status: row.status,
+            approvalStatus: row.approvalStatus,
+            componentCount: row.summary?.componentCount || 0,
+          })),
+          unresolved: [
+            ...asArray(pkg.cloudLibraryGovernance.validationRows).filter(row => row.status !== 'pass'),
+            ...asArray(pkg.cloudLibraryGovernance.warningRows),
+          ].slice(0, 50),
+        } : null,
         fieldCommissioning: pkg.fieldCommissioning ? {
           summary: pkg.fieldCommissioning.summary,
           warnings: asArray(pkg.fieldCommissioning.warnings),
@@ -1899,6 +2944,113 @@ export function buildReportPackage(report = {}, options = {}) {
           unresolved: [
             ...asArray(pkg.bimConnectorReadiness.roundTripDiff?.quantityDeltas).slice(0, 50),
             ...asArray(pkg.bimConnectorReadiness.roundTripDiff?.mappingDeltas).slice(0, 50),
+          ],
+        } : null,
+        nativeBimConnectorKit: pkg.nativeBimConnectorKit ? {
+          summary: pkg.nativeBimConnectorKit.summary,
+          warnings: asArray(pkg.nativeBimConnectorKit.warnings).slice(0, 50),
+          descriptors: asArray(pkg.nativeBimConnectorKit.descriptors).map(row => ({
+            connectorType: row.connectorType,
+            targetApplication: row.targetApplication,
+            targetVersion: row.targetVersion,
+            contractVersion: row.contractVersion,
+            templateFiles: row.templateFiles,
+          })),
+          unresolved: asArray(pkg.nativeBimConnectorKit.installChecklist)
+            .filter(row => row.status !== 'pass')
+            .slice(0, 50),
+        } : null,
+        revitSyncReadiness: pkg.revitSyncReadiness ? {
+          summary: pkg.revitSyncReadiness.summary,
+          warnings: asArray(pkg.revitSyncReadiness.warnings).slice(0, 50),
+          descriptor: pkg.revitSyncReadiness.descriptor,
+          unresolved: [
+            ...asArray(pkg.revitSyncReadiness.validationRows).filter(row => row.status !== 'pass'),
+            ...asArray(pkg.revitSyncReadiness.syncPreviewRows).filter(row => row.status !== 'accepted'),
+            ...asArray(pkg.revitSyncReadiness.quantityDeltas),
+            ...asArray(pkg.revitSyncReadiness.mappingDeltas),
+          ].slice(0, 50),
+        } : null,
+        revitNativeSync: pkg.revitNativeSync ? {
+          summary: pkg.revitNativeSync.summary,
+          warnings: asArray(pkg.revitNativeSync.warnings).slice(0, 50),
+          nativeSyncCase: pkg.revitNativeSync.nativeSyncCase,
+          sourceManifest: pkg.revitNativeSync.sourceManifest,
+          unresolved: [
+            ...asArray(pkg.revitNativeSync.commandRows).filter(row => row.status !== 'pass'),
+            ...asArray(pkg.revitNativeSync.exportMappingRows).filter(row => row.status !== 'ready'),
+            ...asArray(pkg.revitNativeSync.validationRows).filter(row => row.status !== 'pass'),
+            ...asArray(pkg.revitNativeSync.syncPreviewRows).filter(row => row.status !== 'accepted'),
+            ...asArray(pkg.revitNativeSync.quantityDeltas),
+            ...asArray(pkg.revitNativeSync.mappingDeltas),
+          ].slice(0, 50),
+        } : null,
+        autocadSyncReadiness: pkg.autocadSyncReadiness ? {
+          summary: pkg.autocadSyncReadiness.summary,
+          warnings: asArray(pkg.autocadSyncReadiness.warnings).slice(0, 50),
+          descriptor: pkg.autocadSyncReadiness.descriptor,
+          unresolved: [
+            ...asArray(pkg.autocadSyncReadiness.validationRows).filter(row => row.status !== 'pass'),
+            ...asArray(pkg.autocadSyncReadiness.syncPreviewRows).filter(row => row.status !== 'accepted'),
+            ...asArray(pkg.autocadSyncReadiness.quantityDeltas),
+            ...asArray(pkg.autocadSyncReadiness.mappingDeltas),
+          ].slice(0, 50),
+        } : null,
+        autocadNativeSync: pkg.autocadNativeSync ? {
+          summary: pkg.autocadNativeSync.summary,
+          warnings: asArray(pkg.autocadNativeSync.warnings).slice(0, 50),
+          nativeSyncCase: pkg.autocadNativeSync.nativeSyncCase,
+          sourceManifest: pkg.autocadNativeSync.sourceManifest,
+          unresolved: [
+            ...asArray(pkg.autocadNativeSync.commandRows).filter(row => row.status !== 'pass'),
+            ...asArray(pkg.autocadNativeSync.exportMappingRows).filter(row => row.status !== 'ready'),
+            ...asArray(pkg.autocadNativeSync.validationRows).filter(row => row.status !== 'pass'),
+            ...asArray(pkg.autocadNativeSync.syncPreviewRows).filter(row => row.status !== 'accepted'),
+            ...asArray(pkg.autocadNativeSync.quantityDeltas),
+            ...asArray(pkg.autocadNativeSync.mappingDeltas),
+          ].slice(0, 50),
+        } : null,
+        plantCadSyncReadiness: pkg.plantCadSyncReadiness ? {
+          summary: pkg.plantCadSyncReadiness.summary,
+          warnings: asArray(pkg.plantCadSyncReadiness.warnings).slice(0, 50),
+          descriptors: asArray(pkg.plantCadSyncReadiness.descriptors).map(row => ({
+            connectorType: row.connectorType,
+            targetApplication: row.targetApplication,
+            targetVersion: row.targetVersion,
+            contractVersion: row.contractVersion,
+            templateFiles: row.templateFiles,
+          })),
+          unresolved: [
+            ...asArray(pkg.plantCadSyncReadiness.validationRows).filter(row => row.status !== 'pass'),
+            ...asArray(pkg.plantCadSyncReadiness.syncPreviewRows).filter(row => row.status !== 'accepted'),
+            ...asArray(pkg.plantCadSyncReadiness.quantityDeltas),
+            ...asArray(pkg.plantCadSyncReadiness.mappingDeltas),
+          ].slice(0, 50),
+        } : null,
+        plantCadNativeSync: pkg.plantCadNativeSync ? {
+          summary: pkg.plantCadNativeSync.summary,
+          warnings: asArray(pkg.plantCadNativeSync.warnings).slice(0, 50),
+          nativeSyncCase: pkg.plantCadNativeSync.nativeSyncCase,
+          sourceManifest: pkg.plantCadNativeSync.sourceManifest,
+          unresolved: [
+            ...asArray(pkg.plantCadNativeSync.commandRows).filter(row => row.status !== 'pass'),
+            ...asArray(pkg.plantCadNativeSync.exportMappingRows).filter(row => row.status !== 'ready'),
+            ...asArray(pkg.plantCadNativeSync.validationRows).filter(row => row.status !== 'pass'),
+            ...asArray(pkg.plantCadNativeSync.syncPreviewRows).filter(row => row.status !== 'accepted'),
+            ...asArray(pkg.plantCadNativeSync.quantityDeltas),
+            ...asArray(pkg.plantCadNativeSync.mappingDeltas),
+          ].slice(0, 50),
+        } : null,
+        bimObjectLibrary: pkg.bimObjectLibrary ? {
+          summary: pkg.bimObjectLibrary.summary,
+          warnings: asArray(pkg.bimObjectLibrary.warnings).slice(0, 50),
+          unresolved: [
+            ...asArray(pkg.bimObjectLibrary.catalogCoverage?.rows)
+              .filter(row => row.status !== 'ready')
+              .slice(0, 50),
+            ...asArray(pkg.bimObjectLibrary.connectorHints)
+              .filter(row => row.status === 'genericPlaceholder')
+              .slice(0, 50),
           ],
         } : null,
         shortCircuit: pkg.shortCircuit ? {
@@ -1976,6 +3128,44 @@ export function buildReportPackage(report = {}, options = {}) {
             ...asArray(pkg.transientStability.warningRows),
           ].slice(0, 50),
         } : null,
+        ibrPlantController: pkg.ibrPlantController ? {
+          summary: pkg.ibrPlantController.summary,
+          plantCase: pkg.ibrPlantController.plantCase,
+          warnings: asArray(pkg.ibrPlantController.warningRows).slice(0, 50),
+          unresolved: [
+            ...asArray(pkg.ibrPlantController.capabilityRows)
+              .filter(row => row.status === 'fail' || row.status === 'warn' || row.status === 'missingData'),
+            ...asArray(pkg.ibrPlantController.gridCodeRows)
+              .filter(row => row.status === 'fail' || row.status === 'warn' || row.status === 'missingData'),
+            ...asArray(pkg.ibrPlantController.warningRows),
+          ].slice(0, 50),
+        } : null,
+        emfExposure: pkg.emfExposure ? {
+          summary: pkg.emfExposure.summary,
+          studyCase: pkg.emfExposure.studyCase,
+          warnings: asArray(pkg.emfExposure.warningRows).slice(0, 50),
+          unresolved: [
+            ...asArray(pkg.emfExposure.fieldRows)
+              .filter(row => row.status === 'fail' || row.status === 'warn' || row.status === 'missingData'),
+            ...asArray(pkg.emfExposure.validationRows)
+              .filter(row => row.status === 'fail' || row.status === 'warn' || row.status === 'missingData'),
+            ...asArray(pkg.emfExposure.warningRows),
+          ].slice(0, 50),
+        } : null,
+        cathodicProtectionNetwork: pkg.cathodicProtectionNetwork ? {
+          summary: pkg.cathodicProtectionNetwork.summary,
+          networkCase: pkg.cathodicProtectionNetwork.networkCase,
+          warnings: asArray(pkg.cathodicProtectionNetwork.warningRows).slice(0, 50),
+          unresolved: [
+            ...asArray(pkg.cathodicProtectionNetwork.criteriaRows)
+              .filter(row => row.status === 'fail' || row.status === 'warn' || row.status === 'missingData'),
+            ...asArray(pkg.cathodicProtectionNetwork.polarizationRows)
+              .filter(row => row.status === 'fail' || row.status === 'warn' || row.status === 'missingData'),
+            ...asArray(pkg.cathodicProtectionNetwork.interferenceRows)
+              .filter(row => row.status === 'fail' || row.status === 'warn' || row.status === 'missingData'),
+            ...asArray(pkg.cathodicProtectionNetwork.warningRows),
+          ].slice(0, 50),
+        } : null,
         protectionSettingSheets: pkg.protectionSettingSheets ? {
           summary: pkg.protectionSettingSheets.summary,
           warnings: asArray(pkg.protectionSettingSheets.warnings),
@@ -2024,6 +3214,17 @@ export function buildReportPackage(report = {}, options = {}) {
               .filter(row => row.status === 'warn' || row.status === 'fail' || row.status === 'missingData'),
             ...asArray(pkg.voltageDropStudy.warningRows)
               .filter(row => row.severity === 'error' || row.severity === 'warning'),
+          ].slice(0, 50),
+        } : null,
+        voltageFlicker: pkg.voltageFlicker ? {
+          summary: pkg.voltageFlicker.summary,
+          studyCase: pkg.voltageFlicker.studyCase,
+          warnings: asArray(pkg.voltageFlicker.warningRows).slice(0, 50),
+          unresolved: [
+            ...asArray(pkg.voltageFlicker.complianceRows)
+              .filter(row => row.status === 'warn' || row.status === 'fail' || row.status === 'missingData'),
+            ...asArray(pkg.voltageFlicker.warningRows)
+              .filter(row => row.severity === 'missingData' || row.severity === 'warning'),
           ].slice(0, 50),
         } : null,
         pullConstructability: pkg.pullConstructability ? {

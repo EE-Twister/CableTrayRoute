@@ -124,6 +124,67 @@
         <div id="pricing-basis" class="field-hint" aria-live="polite" style="margin-top:0.25rem"></div>
       </details>
 
+      <details id="pricing-governance">
+        <summary><strong>Pricing Feed Governance / Quote Basis</strong></summary>
+        <p class="field-hint">Import vendor quote, distributor export, RS Means/manual-book, or generic default price rows. These records are local estimate-basis metadata; no live manufacturer pricing feed is contacted.</p>
+        <div class="form-row" style="gap:0.5rem; flex-wrap:wrap;">
+          <label for="pricing-template-source">Template
+            <select id="pricing-template-source">
+              <option value="vendorQuote">Vendor quote</option>
+              <option value="distributorExport">Distributor export</option>
+              <option value="rsMeansBook">RS Means/manual book</option>
+              <option value="manualBook">Manual book</option>
+              <option value="genericDefault">Generic default</option>
+            </select>
+          </label>
+          <button type="button" id="pricing-governance-template-btn">Export Template CSV</button>
+          <button type="button" id="pricing-governance-import-btn">Import Pricing Feed CSV/JSON</button>
+          <input type="file" id="pricing-governance-file" accept=".csv,.json" class="hidden" title="Select pricing feed file">
+          <button type="button" id="pricing-governance-apply-btn">Use Approved Pricing for Estimate</button>
+          <button type="button" id="pricing-governance-save-btn">Save to Studies</button>
+          <button type="button" id="pricing-governance-export-json-btn">Export JSON</button>
+          <button type="button" id="pricing-governance-print-btn">Printable HTML</button>
+        </div>
+        <div class="form-row" style="gap:0.5rem; flex-wrap:wrap;">
+          <label for="pricing-source-filter">Source
+            <select id="pricing-source-filter">
+              <option value="">All</option>
+              <option value="vendorQuote">Vendor quote</option>
+              <option value="distributorExport">Distributor export</option>
+              <option value="rsMeansBook">RS Means book</option>
+              <option value="manualBook">Manual book</option>
+              <option value="genericDefault">Generic default</option>
+            </select>
+          </label>
+          <label for="pricing-category-filter">Category
+            <select id="pricing-category-filter">
+              <option value="">All</option>
+              <option value="cableType">Cable</option>
+              <option value="tray">Tray</option>
+              <option value="conduit">Conduit</option>
+              <option value="fitting">Fitting</option>
+              <option value="labor">Labor</option>
+              <option value="productivity">Productivity</option>
+            </select>
+          </label>
+          <label for="pricing-manufacturer-filter">Manufacturer
+            <input type="search" id="pricing-manufacturer-filter" placeholder="Filter manufacturer">
+          </label>
+          <label for="pricing-status-filter">Status
+            <select id="pricing-status-filter">
+              <option value="">All</option>
+              <option value="approved">Approved</option>
+              <option value="unapproved">Unapproved</option>
+              <option value="expired">Expired</option>
+            </select>
+          </label>
+        </div>
+        <div id="pricing-governance-summary" class="catalog-summary" aria-live="polite"></div>
+        <div id="pricing-governance-table" class="table-scroll-x" aria-label="Pricing feed rows"></div>
+        <h3>Estimate Pricing Coverage</h3>
+        <div id="pricing-governance-coverage" class="table-scroll-x" aria-label="Estimate pricing coverage"></div>
+      </details>
+
       <!-- Actions -->
       <div id="controls" class="controls-row">
         <button id="estimate-btn" type="button">Generate Estimate</button>

@@ -161,6 +161,113 @@
         </svg>
       </div>
 
+      <section class="method-panel" aria-labelledby="emf-study-title">
+        <h2 id="emf-study-title">EMF Exposure Study Case</h2>
+        <div class="form-row">
+          <label for="emf-case-name">Study Case Name</label>
+          <input id="emf-case-name" type="text" value="EMF Exposure Study Case">
+        </div>
+        <div class="form-row">
+          <label for="emf-exposure-basis">Exposure Limit Basis</label>
+          <select id="emf-exposure-basis">
+            <option value="icnirpPublic">ICNIRP public</option>
+            <option value="icnirpOccupational">ICNIRP occupational</option>
+            <option value="ieeeC95">IEEE C95 screening</option>
+            <option value="custom">Custom</option>
+          </select>
+          <label for="emf-custom-limit">Custom Limit (uT)</label>
+          <input id="emf-custom-limit" type="number" min="0.1" step="0.1" value="200">
+        </div>
+        <div class="form-row">
+          <label for="emf-geometry-mode">Geometry Mode</label>
+          <select id="emf-geometry-mode">
+            <option value="tray">Tray</option>
+            <option value="ductbank">Ductbank</option>
+            <option value="directBurial">Direct burial</option>
+            <option value="freeAir">Free air</option>
+            <option value="custom">Custom</option>
+          </select>
+          <label for="emf-profile-height">Profile Height (m)</label>
+          <input id="emf-profile-height" type="number" min="0" step="0.1" value="0.6">
+          <label for="emf-phase-sequence">Phase Sequence</label>
+          <select id="emf-phase-sequence">
+            <option value="ABC">ABC</option>
+            <option value="ACB">ACB</option>
+            <option value="explicit">Explicit angles</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label for="emf-shielding-mode">Shielding / Sheath Mode</label>
+          <select id="emf-shielding-mode">
+            <option value="none">None</option>
+            <option value="ferromagnetic">Ferromagnetic screening</option>
+            <option value="sheath">Cable sheath screening</option>
+            <option value="screeningFactor">Custom screening factor</option>
+          </select>
+          <label for="emf-shielding-factor">Screening Factor</label>
+          <input id="emf-shielding-factor" type="number" min="0.01" max="1" step="0.01" value="1">
+          <label for="emf-report-preset">Report Preset</label>
+          <select id="emf-report-preset">
+            <option value="summary">Summary</option>
+            <option value="criteria">Criteria</option>
+            <option value="fullStudy">Full Study</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label for="emf-notes">Study Notes</label>
+          <textarea id="emf-notes" rows="2" placeholder="Project-specific exposure, measurement, or shielding notes"></textarea>
+        </div>
+        <div class="form-row">
+          <label for="emf-circuit-rows">Circuit Rows (JSON)</label>
+          <textarea id="emf-circuit-rows" rows="9" spellcheck="false"></textarea>
+        </div>
+        <div class="form-row">
+          <label for="emf-point-rows">Measurement / Profile Points (JSON)</label>
+          <textarea id="emf-point-rows" rows="6" spellcheck="false"></textarea>
+        </div>
+        <div class="form-row">
+          <label for="emf-validation-rows">Measured Validation Rows (JSON)</label>
+          <textarea id="emf-validation-rows" rows="5" spellcheck="false"></textarea>
+        </div>
+        <div class="controls-row">
+          <button id="emf-run-study" type="button">Run Exposure Study</button>
+          <button id="emf-save-study" type="button">Save to Studies</button>
+          <button id="emf-export-json" type="button">Export JSON</button>
+          <button id="emf-export-csv" type="button">Export CSV</button>
+          <button id="emf-export-html" type="button">Printable HTML</button>
+        </div>
+      </section>
+
+      <section id="emf-study-results" class="method-panel" hidden aria-labelledby="emf-study-results-title">
+        <h2 id="emf-study-results-title">Exposure Study Results</h2>
+        <div id="emf-study-summary"></div>
+        <h3>Exposure Rows</h3>
+        <table class="result-table">
+          <thead>
+            <tr><th>Point</th><th>Location (m)</th><th>B RMS (uT)</th><th>Limit</th><th>Utilization</th><th>Status</th><th>Recommendation</th></tr>
+          </thead>
+          <tbody id="emf-field-body"></tbody>
+        </table>
+        <h3>Measured Validation</h3>
+        <table class="result-table">
+          <thead>
+            <tr><th>Row</th><th>Measured (uT)</th><th>Calculated (uT)</th><th>Difference</th><th>Status</th><th>Source</th></tr>
+          </thead>
+          <tbody id="emf-validation-body"></tbody>
+        </table>
+        <h3>Warnings</h3>
+        <table class="result-table">
+          <thead>
+            <tr><th>Code</th><th>Source</th><th>Severity</th><th>Message</th><th>Recommendation</th></tr>
+          </thead>
+          <tbody id="emf-warning-body"></tbody>
+        </table>
+        <details>
+          <summary>Package JSON</summary>
+          <pre id="emf-study-json"></pre>
+        </details>
+      </section>
+
       <nav class="step-nav" aria-label="Workflow navigation">
         <a href="arcFlash.html" class="step-nav-prev">&#8592; Arc Flash</a>
       </nav>

@@ -129,6 +129,7 @@ P<sub>dispatch</sub> = P<sub>max</sub> &times; (1 &minus; curtail)</pre>
         <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-bess" id="btn-bess" data-tab="bess">BESS</button>
         <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-fault" id="btn-fault" data-tab="fault">Fault Contribution</button>
         <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-voltvar" id="btn-voltvar" data-tab="voltvar">Volt-VAR</button>
+        <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-plant" id="btn-plant" data-tab="plant">Plant Controller</button>
       </div>
 
       <!-- === PV Array Tab === -->
@@ -432,6 +433,115 @@ P<sub>dispatch</sub> = P<sub>max</sub> &times; (1 &minus; curtail)</pre>
           <div class="result-cards" id="vv-result-cards"></div>
           <canvas id="vv-chart" width="600" height="300" aria-label="P-Q capability diagram" role="img"
                   style="display:none; max-width:100%; margin-top:1rem;"></canvas>
+        </div>
+      </section>
+
+      <!-- === Plant Controller / Grid-Code Scenarios Tab === -->
+      <section id="tab-plant" role="tabpanel" aria-labelledby="btn-plant" hidden>
+        <form id="plant-form" novalidate>
+          <fieldset>
+            <legend><strong>Plant Controller Case</strong></legend>
+            <div class="field-row">
+              <label for="plant-name">Case name</label>
+              <input type="text" id="plant-name" value="IBR Plant Controller Case">
+            </div>
+            <div class="field-row">
+              <label for="plant-pcc">PCC / POI tag</label>
+              <input type="text" id="plant-pcc" value="PCC-1">
+            </div>
+            <div class="field-row">
+              <label for="plant-mode">Plant mode</label>
+              <select id="plant-mode">
+                <option value="gridFollowing">Grid-following</option>
+                <option value="gridForming">Grid-forming</option>
+                <option value="hybrid">Hybrid</option>
+                <option value="unknown">Unknown / TBD</option>
+              </select>
+            </div>
+            <div class="field-row">
+              <label for="plant-control">Primary control mode</label>
+              <select id="plant-control">
+                <option value="voltVar">Volt-VAR</option>
+                <option value="voltWatt">Volt-Watt</option>
+                <option value="wattPF">Watt-PF</option>
+                <option value="freqWatt">Frequency-Watt</option>
+                <option value="constantPF">Constant PF</option>
+                <option value="schedule">Schedule</option>
+                <option value="reactivePriority">Reactive priority</option>
+                <option value="activePowerPriority">Active-power priority</option>
+              </select>
+            </div>
+            <div class="field-row">
+              <label for="plant-priority">kVA priority mode</label>
+              <select id="plant-priority">
+                <option value="activePowerPriority">Active-power priority</option>
+                <option value="reactivePriority">Reactive priority</option>
+              </select>
+            </div>
+            <div class="field-row">
+              <label for="plant-scr">Short-circuit ratio / grid strength</label>
+              <input type="number" id="plant-scr" min="0" step="0.1" value="5">
+            </div>
+            <div class="field-row">
+              <label for="plant-notes">Review notes</label>
+              <textarea id="plant-notes" rows="2" placeholder="Utility, manufacturer, or grid-code assumptions"></textarea>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend><strong>Resource Rows (JSON)</strong></legend>
+            <textarea id="plant-resources" rows="8" spellcheck="false">[
+  {"id":"pv-1","tag":"PV Plant","resourceType":"pv","ratedKw":5000,"ratedKva":5500,"Pstc_kW":5200,"requestedKw":5000,"rampRateKwPerMin":500,"previousKw":4200},
+  {"id":"bess-1","tag":"BESS","resourceType":"bess","ratedKw":2000,"ratedKva":2500,"socPct":70,"requestedKw":1500,"requestedKvar":300}
+]</textarea>
+          </fieldset>
+
+          <fieldset>
+            <legend><strong>Grid-Code Curve Rows (JSON)</strong></legend>
+            <textarea id="plant-curves" rows="9" spellcheck="false">[
+  {"id":"vv-default","curveType":"voltVar","label":"IEEE 1547 Volt-VAR","points":[[0.92,0.44],[0.98,0],[1.02,0],[1.08,-0.44]]},
+  {"id":"vw-default","curveType":"voltWatt","label":"Volt-Watt screening","points":[[1.0,1],[1.06,1],[1.10,0.2]]},
+  {"id":"vride-default","curveType":"voltageRideThrough","label":"Voltage ride-through","points":[[0.5,0],[0.88,2],[1.1,2],[1.2,0]]},
+  {"id":"fride-default","curveType":"frequencyRideThrough","label":"Frequency ride-through","points":[[57,0],[59.5,2],[60.5,2],[62,0]]}
+]</textarea>
+          </fieldset>
+
+          <fieldset>
+            <legend><strong>Scenario Rows (JSON)</strong></legend>
+            <textarea id="plant-scenarios" rows="7" spellcheck="false">[
+  {"id":"base","label":"Base case","scenarioType":"base","voltagePu":1.0,"frequencyHz":60,"shortCircuitRatio":5},
+  {"id":"weak-high-v","label":"Weak grid high voltage","scenarioType":"weakGrid","voltagePu":1.08,"frequencyHz":60.04,"shortCircuitRatio":2.5},
+  {"id":"bess-charge","label":"BESS charge","scenarioType":"bessCharge","voltagePu":1.01,"frequencyHz":60,"bessMode":"charge","pSetpointScalePct":80}
+]</textarea>
+          </fieldset>
+
+          <div class="btn-row">
+            <button type="submit" class="btn btn-primary" id="plant-run-btn">Run Plant Controller Study</button>
+            <button type="button" class="btn" id="plant-save-btn">Save to Studies</button>
+            <button type="button" class="btn" id="plant-json-btn">Export JSON</button>
+            <button type="button" class="btn" id="plant-html-btn">Printable HTML</button>
+          </div>
+        </form>
+
+        <div id="plant-results" class="results-panel hidden" aria-live="polite">
+          <h2>Plant Controller Results</h2>
+          <div class="result-cards" id="plant-result-cards"></div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead><tr><th>Scenario</th><th>Mode</th><th>Control</th><th>kW</th><th>kvar</th><th>SCR</th><th>Status</th><th>Recommendation</th></tr></thead>
+              <tbody id="plant-capability-body"></tbody>
+            </table>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead><tr><th>Severity</th><th>Code</th><th>Source</th><th>Warning</th></tr></thead>
+              <tbody id="plant-warning-body"></tbody>
+            </table>
+          </div>
+          <details>
+            <summary>Raw package JSON</summary>
+            <pre id="plant-json-preview"></pre>
+          </details>
         </div>
       </section>
 

@@ -861,6 +861,94 @@ describe('design coach action builder', () => {
     assert(actions.every(action => action.source.type !== 'bimConnectorReadiness' || action.pageHref === 'bimcoordination.html'));
   });
 
+  it('turns native connector starter-kit readiness gaps into review actions', () => {
+    const actions = buildDesignCoachActions({
+      projectReport: {
+        summary: {},
+        nativeBimConnectorKit: {
+          summary: {
+            descriptorCount: 2,
+            validDescriptorCount: 1,
+            missingChecklistItems: 1,
+            warningCount: 1,
+          },
+          installChecklist: [{
+            id: 'active-connector-package',
+            connectorType: 'exchange',
+            item: 'An active BIM/CAD connector exchange package is available for round-trip testing.',
+            status: 'missingData',
+            recommendation: 'Export a Revit or AutoCAD connector JSON package from BIM Coordination.',
+          }],
+          warnings: ['Native write-back was requested, but V1 supports review-only import preview commands.'],
+        },
+      },
+    });
+    assert(actions.some(action => action.source.type === 'nativeBimConnectorKit' && action.category === 'review'));
+    assert(actions.some(action => action.source.type === 'nativeBimConnectorKit' && action.category === 'missingData'));
+    assert(actions.every(action => action.source.type !== 'nativeBimConnectorKit' || action.pageHref === 'bimcoordination.html'));
+  });
+
+  it('turns BIM object library coverage gaps into catalog and coordination actions', () => {
+    const actions = buildDesignCoachActions({
+      projectReport: {
+        summary: {},
+        bimObjectLibrary: {
+          summary: {
+            missingFamilyCount: 2,
+            conflictCount: 1,
+            genericPlaceholderCount: 1,
+            warningCount: 3,
+          },
+          validationRows: [{
+            familyId: 'family-1',
+            familyName: 'Tray <BIM>',
+            status: 'review',
+            errors: [],
+            warnings: ['family should include connectorTypes for connector/BIM handoff'],
+          }],
+        },
+      },
+    });
+    assert(actions.some(action => action.source.type === 'bimObjectLibrary' && action.category === 'missingData'));
+    assert(actions.some(action => action.source.type === 'bimObjectLibrary' && action.category === 'constructability'));
+    assert(actions.some(action => action.source.type === 'bimObjectLibrary' && action.pageHref === 'productcatalog.html'));
+    assert(actions.some(action => action.source.type === 'bimObjectLibrary' && action.pageHref === 'bimcoordination.html'));
+  });
+
+  it('turns pricing feed governance gaps into cost and review actions', () => {
+    const actions = buildDesignCoachActions({
+      projectReport: {
+        summary: {},
+        pricingFeedGovernance: {
+          summary: { pricingRowCount: 1, unpricedLineCount: 1, conflictCount: 1, warningCount: 2 },
+          estimateCoverageRows: [
+            {
+              lineItemId: 'TR-1',
+              category: 'Tray',
+              status: 'conflict',
+              pricingRowId: 'price-1',
+              pricingSource: 'Supplier <A>',
+              warnings: ['Multiple approved pricing rows conflict for this estimate line.'],
+            },
+            {
+              lineItemId: 'C-1',
+              category: 'Cable',
+              status: 'genericDefault',
+              pricingSource: 'generic/default estimate price',
+              warnings: ['Estimate line uses generic/default pricing.'],
+            },
+          ],
+          warningRows: [
+            { code: 'pricing-row-review', severity: 'warning', sourceId: 'price-1', message: 'quote or feed row is expired' },
+          ],
+        },
+      },
+    });
+    assert(actions.some(action => action.source.type === 'pricingFeedGovernance' && action.category === 'cost'));
+    assert(actions.some(action => action.source.type === 'pricingFeedGovernance' && action.category === 'review'));
+    assert(actions.every(action => action.source.type !== 'pricingFeedGovernance' || action.pageHref === 'costestimate.html'));
+  });
+
   it('turns voltage-drop criteria failures and missing inputs into study actions', () => {
     const actions = buildDesignCoachActions({
       projectReport: {
@@ -899,6 +987,52 @@ describe('design coach action builder', () => {
     assert(actions.every(action => action.source.type !== 'voltageDropStudy' || action.pageHref === 'voltagedropstudy.html'));
   });
 
+  it('turns voltage-flicker compliance failures and missing basis into study actions', () => {
+    const actions = buildDesignCoachActions({
+      projectReport: {
+        summary: {},
+        voltageFlicker: {
+          version: 'voltage-flicker-study-v1',
+          studyCase: { pccTag: 'PCC <Main>', standardBasis: 'IEC61000-4-15' },
+          complianceRows: [
+            {
+              id: 'worst-pst-mandatory',
+              target: 'Pst',
+              actualValue: 1.2,
+              limit: 1,
+              status: 'fail',
+              recommendation: 'Reduce load-step magnitude or add mitigation.',
+            },
+            {
+              id: 'plt-limit',
+              target: 'Plt',
+              actualValue: 0.9,
+              limit: 0.65,
+              status: 'warn',
+              recommendation: 'Confirm long-term flicker basis with measured data.',
+            },
+          ],
+          warningRows: [
+            { id: 'missing-source-short-circuit', severity: 'missingData', message: 'Missing source short-circuit basis.' },
+            { id: 'estimated-plt', severity: 'warning', message: 'Plt is estimated from worst Pst.' },
+            { id: 'screening-method', severity: 'review', message: 'Simplified rectangular voltage-change screening method.' },
+          ],
+          summary: { status: 'fail', fail: 1, warn: 1, missingData: 1, warningCount: 3 },
+        },
+      },
+    });
+    assert(actions.some(action => action.source.type === 'voltageFlicker' && action.category === 'code'));
+    assert(actions.some(action => action.source.type === 'voltageFlicker' && action.category === 'missingData'));
+    assert(actions.some(action => action.source.type === 'voltageFlicker' && action.category === 'review'));
+    assert(actions.every(action => action.source.type !== 'voltageFlicker' || action.pageHref === 'voltageflicker.html'));
+
+    const legacyActions = buildDesignCoachActions({
+      projectReport: { summary: {} },
+      studies: { voltageFlicker: { loadStepResults: [{ pst: 1.1 }], worstPst: 1.1 } },
+    });
+    assert(legacyActions.some(action => action.source.type === 'voltageFlicker' && /study-case basis/i.test(action.title)));
+  });
+
   it('adds lifecycle report-lineage apply action when a released package is inactive', () => {
     const actions = buildDesignCoachActions({
       projectReport: { summary: { projectName: 'North Unit' }, validation: { pass: true } },
@@ -910,6 +1044,266 @@ describe('design coach action builder', () => {
     const action = actions.find(row => row.source.type === 'lifecycle');
     assert(action);
     assert.deepEqual(action.apply, { kind: 'setActiveStudyPackage', packageId: 'pkg-r1' });
+  });
+
+  it('turns Revit bridge readiness gaps into BIM coordination actions', () => {
+    const actions = buildDesignCoachActions({
+      projectReport: {
+        summary: {},
+        revitSyncReadiness: {
+          summary: {
+            validationStatus: 'fail',
+            rejectedPreviewRows: 1,
+            warningCount: 2,
+          },
+          validationRows: [{
+            id: 'payload',
+            check: 'Revit connector payload',
+            status: 'fail',
+            detail: 'Unsupported connector contract version.',
+          }],
+          syncPreviewRows: [{
+            id: 'revit-tr-1',
+            elementType: 'cableTray',
+            tag: 'TR-1',
+            guid: '',
+            status: 'rejected',
+            recommendation: 'Missing stable Revit UniqueId.',
+          }],
+          warnings: ['Automatic Revit model write-back was requested, but V1 bridge commands must remain review-only.'],
+        },
+      },
+    });
+    assert(actions.some(action => action.source.type === 'revitSyncReadiness' && action.category === 'review'));
+    assert(actions.some(action => action.source.type === 'revitSyncReadiness' && action.category === 'constructability'));
+    assert(actions.every(action => action.source.type !== 'revitSyncReadiness' || action.pageHref === 'bimcoordination.html'));
+  });
+
+  it('turns functional Revit add-in readiness gaps into BIM coordination actions', () => {
+    const actions = buildDesignCoachActions({
+      projectReport: {
+        summary: {},
+        revitNativeSync: {
+          summary: {
+            status: 'fail',
+            commandReadyCount: 3,
+            commandCount: 4,
+            rejectedPreviewRows: 1,
+            warningCount: 3,
+          },
+          commandRows: [{
+            commandClass: 'ExportCableTrayRouteJsonCommand',
+            commandName: 'ExportCableTrayRouteJson',
+            status: 'fail',
+            detail: 'FilteredElementCollector coverage is missing.',
+          }],
+          exportMappingRows: [{
+            id: 'map-generic',
+            revitCategory: 'OST_GenericModel',
+            elementType: 'generic',
+            status: 'review',
+            warnings: ['Generic Revit category mapping should be reviewed.'],
+          }],
+          syncPreviewRows: [{
+            id: 'revit-native-1',
+            elementType: 'cableTray',
+            tag: 'TR-1',
+            guid: '',
+            status: 'rejected',
+            recommendation: 'Missing stable Revit UniqueId.',
+          }],
+          warnings: ['Certified Autodesk SDK deployment is outside CI and automatic write-back is unsupported.'],
+        },
+      },
+    });
+    assert(actions.some(action => action.source.type === 'revitNativeSync' && action.category === 'review'));
+    assert(actions.some(action => action.source.type === 'revitNativeSync' && action.category === 'missingData'));
+    assert(actions.some(action => action.source.type === 'revitNativeSync' && action.category === 'constructability'));
+    assert(actions.every(action => action.source.type !== 'revitNativeSync' || action.pageHref === 'bimcoordination.html'));
+  });
+
+  it('turns AutoCAD bridge readiness gaps into BIM coordination actions', () => {
+    const actions = buildDesignCoachActions({
+      projectReport: {
+        summary: {},
+        autocadSyncReadiness: {
+          summary: {
+            validationStatus: 'fail',
+            rejectedPreviewRows: 1,
+            warningCount: 2,
+          },
+          validationRows: [{
+            id: 'payload',
+            check: 'AutoCAD connector payload',
+            status: 'fail',
+            detail: 'Unsupported connector contract version.',
+          }],
+          syncPreviewRows: [{
+            id: 'cad-handle-1',
+            elementType: 'cableTray',
+            tag: 'TR-1',
+            guid: '',
+            status: 'rejected',
+            recommendation: 'Missing stable AutoCAD object handle.',
+          }],
+          warnings: ['Automatic AutoCAD model write-back was requested, but V1 bridge commands must remain review-only.'],
+        },
+      },
+    });
+    assert(actions.some(action => action.source.type === 'autocadSyncReadiness' && action.category === 'review'));
+    assert(actions.some(action => action.source.type === 'autocadSyncReadiness' && action.category === 'constructability'));
+    assert(actions.every(action => action.source.type !== 'autocadSyncReadiness' || action.pageHref === 'bimcoordination.html'));
+  });
+
+  it('turns functional AutoCAD add-in readiness gaps into BIM coordination actions', () => {
+    const actions = buildDesignCoachActions({
+      projectReport: {
+        summary: {},
+        autocadNativeSync: {
+          summary: {
+            status: 'fail',
+            commandReadyCount: 3,
+            commandCount: 4,
+            rejectedPreviewRows: 1,
+            warningCount: 3,
+          },
+          commandRows: [{
+            commandClass: 'ExportCableTrayRouteJsonCommand',
+            commandName: 'ExportCableTrayRouteJson',
+            status: 'fail',
+            detail: 'AutoCAD entity collection coverage is missing.',
+          }],
+          exportMappingRows: [{
+            id: 'map-generic',
+            autocadObjectType: 'Entity',
+            elementType: 'generic',
+            status: 'review',
+            warnings: ['Generic AutoCAD entity mapping should be reviewed.'],
+          }],
+          syncPreviewRows: [{
+            id: 'cad-native-1',
+            elementType: 'cableTray',
+            tag: 'TR-1',
+            sourceId: '',
+            status: 'rejected',
+            recommendation: 'Missing stable AutoCAD object handle.',
+          }],
+          warnings: ['Certified Autodesk deployment is outside CI and automatic write-back is unsupported.'],
+        },
+      },
+    });
+    assert(actions.some(action => action.source.type === 'autocadNativeSync' && action.category === 'review'));
+    assert(actions.some(action => action.source.type === 'autocadNativeSync' && action.category === 'missingData'));
+    assert(actions.some(action => action.source.type === 'autocadNativeSync' && action.category === 'constructability'));
+    assert(actions.every(action => action.source.type !== 'autocadNativeSync' || action.pageHref === 'bimcoordination.html'));
+  });
+
+  it('turns plant-CAD bridge readiness gaps into BIM coordination actions', () => {
+    const actions = buildDesignCoachActions({
+      projectReport: {
+        summary: {},
+        plantCadSyncReadiness: {
+          summary: {
+            validationStatus: 'fail',
+            rejectedPreviewRows: 1,
+            warningCount: 2,
+          },
+          validationRows: [{
+            id: 'payload',
+            check: 'AVEVA connector payload',
+            status: 'fail',
+            detail: 'Unsupported connector contract version.',
+          }],
+          syncPreviewRows: [{
+            id: 'aveva-dbref-1',
+            elementType: 'cableTray',
+            tag: 'TR-1',
+            guid: '',
+            status: 'rejected',
+            recommendation: 'Missing stable plant-CAD element identifier.',
+          }],
+          warnings: ['Certified AVEVA and SmartPlant SDK plugins remain deferred; automatic plant model write-back is unsupported.'],
+        },
+      },
+    });
+    assert(actions.some(action => action.source.type === 'plantCadSyncReadiness' && action.category === 'review'));
+    assert(actions.some(action => action.source.type === 'plantCadSyncReadiness' && action.category === 'constructability'));
+    assert(actions.every(action => action.source.type !== 'plantCadSyncReadiness' || action.pageHref === 'bimcoordination.html'));
+  });
+
+  it('turns functional plant-CAD add-in readiness gaps into BIM coordination actions', () => {
+    const actions = buildDesignCoachActions({
+      projectReport: {
+        summary: {},
+        plantCadNativeSync: {
+          summary: {
+            status: 'fail',
+            commandReadyCount: 7,
+            commandCount: 8,
+            rejectedPreviewRows: 1,
+            warningCount: 3,
+          },
+          commandRows: [{
+            connectorType: 'aveva',
+            commandName: 'ExportCableTrayRouteJson',
+            status: 'fail',
+            detail: 'AVEVA object collection coverage is missing.',
+          }],
+          exportMappingRows: [{
+            id: 'map-generic',
+            plantObjectType: 'GenericPlantObject',
+            elementType: 'generic',
+            status: 'review',
+            warnings: ['Generic plant object mapping should be reviewed.'],
+          }],
+          syncPreviewRows: [{
+            id: 'plant-native-1',
+            connectorType: 'smartplant',
+            elementType: 'equipment',
+            tag: 'PMP-1',
+            guid: '',
+            status: 'rejected',
+            recommendation: 'Missing stable SmartPlant ObjectId.',
+          }],
+          warnings: ['Certified AVEVA and SmartPlant SDK deployment is outside CI and automatic write-back is unsupported.'],
+        },
+      },
+    });
+    assert(actions.some(action => action.source.type === 'plantCadNativeSync' && action.category === 'review'));
+    assert(actions.some(action => action.source.type === 'plantCadNativeSync' && action.category === 'missingData'));
+    assert(actions.some(action => action.source.type === 'plantCadNativeSync' && action.category === 'constructability'));
+    assert(actions.every(action => action.source.type !== 'plantCadNativeSync' || action.pageHref === 'bimcoordination.html'));
+  });
+
+  it('turns cloud component library governance gaps into library actions', () => {
+    const actions = buildDesignCoachActions({
+      projectReport: {
+        summary: {},
+        cloudLibraryGovernance: {
+          summary: {
+            releaseCount: 1,
+            validationFailureCount: 1,
+            adoptionConflictCount: 2,
+            warningCount: 1,
+          },
+          releases: [{
+            id: 'release-r1',
+            releaseTag: 'R1',
+            approvalStatus: 'draft',
+          }],
+          subscription: {
+            releaseId: 'release-r1',
+          },
+          adoptionPreview: {
+            summary: { conflictCount: 2 },
+          },
+        },
+      },
+    });
+    assert(actions.some(action => action.source.type === 'cloudLibraryGovernance' && action.category === 'missingData'));
+    assert(actions.some(action => action.source.type === 'cloudLibraryGovernance' && action.category === 'review'));
+    assert(actions.some(action => action.source.type === 'cloudLibraryGovernance' && action.category === 'constructability'));
+    assert(actions.every(action => action.source.type !== 'cloudLibraryGovernance' || action.pageHref === 'library.html'));
   });
 
   it('ranks and deduplicates deterministically', () => {

@@ -240,6 +240,7 @@ export function captureLifecycleSnapshot(projectState = {}) {
     bimIssues: asArray(source.bimIssues),
     bimConnectorPackages: asArray(source.bimConnectorPackages),
     activeBimConnectorPackageId: source.activeBimConnectorPackageId || '',
+    componentLibrarySubscription: source.componentLibrarySubscription || {},
     assumptions: source.assumptions || {},
     reportContext: source.reportContext || {},
   });

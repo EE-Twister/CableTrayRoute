@@ -193,6 +193,96 @@ async function runTests() {
       assert.ok(body.details.some((entry) => String(entry.path).includes('components[0].subtype')));
     });
 
+    let orgReleaseId;
+    await check('GET /api/v1/library/org/releases lists empty organization releases', async () => {
+      const res = await fetch(`${base}/api/v1/library/org/releases?workspaceId=plant-a`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      assert.strictEqual(res.status, 200);
+      const body = await res.json();
+      assert.strictEqual(body.workspaceId, 'plant-a');
+      assert.ok(Array.isArray(body.releases));
+      assert.strictEqual(body.releases.length, 0);
+    });
+
+    await check('POST /api/v1/library/org/releases publishes a governed release', async () => {
+      const res = await fetch(`${base}/api/v1/library/org/releases`, {
+        method: 'POST',
+        headers: authHeaders(token, csrfToken),
+        body: JSON.stringify({
+          workspaceId: 'plant-a',
+          name: 'Plant A Library',
+          releaseTag: 'R1',
+          status: 'released',
+          data: libraryData,
+          sourcePersonalVersion: savedVersion,
+        }),
+      });
+      assert.strictEqual(res.status, 201);
+      const body = await res.json();
+      orgReleaseId = body.release.id;
+      assert.strictEqual(body.release.workspaceId, 'plant-a');
+      assert.strictEqual(body.release.releaseTag, 'R1');
+      assert.strictEqual(body.release.validation.status, 'pass');
+    });
+
+    await check('POST /api/v1/library/org/releases rejects invalid release data', async () => {
+      const res = await fetch(`${base}/api/v1/library/org/releases`, {
+        method: 'POST',
+        headers: authHeaders(token, csrfToken),
+        body: JSON.stringify({
+          workspaceId: 'plant-a',
+          releaseTag: 'bad',
+          data: {
+            categories: ['equipment', 'equipment'],
+            components: [{ subtype: '', label: '', icon: '', category: '' }],
+            icons: { '': '' },
+          },
+        }),
+      });
+      assert.strictEqual(res.status, 400);
+      const body = await res.json();
+      assert.strictEqual(body.error, 'Library release validation failed');
+      assert.ok(Array.isArray(body.details));
+    });
+
+    await check('organization release approval and adoption preview are available without mutating personal library', async () => {
+      const approved = await fetch(`${base}/api/v1/library/org/releases/${orgReleaseId}/approve`, {
+        method: 'POST',
+        headers: authHeaders(token, csrfToken),
+        body: JSON.stringify({ workspaceId: 'plant-a' }),
+      });
+      assert.strictEqual(approved.status, 200);
+      const approvedBody = await approved.json();
+      assert.strictEqual(approvedBody.release.approvalStatus, 'approved');
+
+      const preview = await fetch(`${base}/api/v1/library/org/adoption-preview`, {
+        method: 'POST',
+        headers: authHeaders(token, csrfToken),
+        body: JSON.stringify({
+          workspaceId: 'plant-a',
+          releaseId: orgReleaseId,
+          projectLibrary: {
+            categories: ['power'],
+            components: [{ subtype: 'local-only', label: 'Local', icon: 'local', category: 'power', ports: 1, schema: {} }],
+            icons: { local: 'icons/components/Local.svg' },
+          },
+          mergeMode: 'merge',
+        }),
+      });
+      assert.strictEqual(preview.status, 200);
+      const body = await preview.json();
+      assert.strictEqual(body.preview.releaseId, orgReleaseId);
+      assert.ok(body.preview.previewData.components.some(row => row.subtype === 'local-only'));
+      assert.ok(body.preview.previewData.components.some(row => row.subtype === 'bus-main'));
+
+      const personal = await fetch(`${base}/api/v1/library`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      const personalBody = await personal.json();
+      assert.strictEqual(personalBody.data.components.length, 1);
+    });
+
     // -----------------------------------------------------------------------
     // Share token tests
     let shareId, shareToken;

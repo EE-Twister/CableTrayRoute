@@ -26,9 +26,16 @@ import { buildEquipmentEvaluationPackage, renderEquipmentEvaluationHTML } from '
 import { buildAdvancedGroundingPackage, renderAdvancedGroundingHTML } from './advancedGrounding.mjs';
 import { buildCableThermalEnvironmentPackage, renderCableThermalEnvironmentHTML } from './cableThermalEnvironment.mjs';
 import { buildProductCatalogGovernancePackage, renderProductCatalogGovernanceHTML } from './productCatalog.mjs';
+import { buildPricingFeedGovernancePackage, renderPricingFeedGovernanceHTML } from './pricingFeedGovernance.mjs';
+import { buildCloudLibraryGovernancePackage, renderCloudLibraryGovernanceHTML } from './cloudComponentLibraryGovernance.mjs';
 import { buildFieldCommissioningPackage, renderFieldCommissioningHTML } from './fieldCommissioning.mjs';
 import { buildBimRoundTripPackage, renderBimRoundTripHTML } from './bimRoundTrip.mjs';
 import { buildConnectorReadinessPackage, renderConnectorReadinessHTML } from './bimConnectorContract.mjs';
+import { buildNativeConnectorKitPackage, renderNativeConnectorKitHTML } from './nativeBimConnectorKit.mjs';
+import { buildBimObjectLibraryPackage, renderBimObjectLibraryHTML } from './bimObjectLibrary.mjs';
+import { buildRevitNativeSyncPackage, buildRevitSyncReadinessPackage, renderRevitNativeSyncHTML, renderRevitSyncReadinessHTML } from './revitConnectorBridge.mjs';
+import { buildAutoCadNativeSyncPackage, buildAutoCadSyncReadinessPackage, renderAutoCadNativeSyncHTML, renderAutoCadSyncReadinessHTML } from './autocadConnectorBridge.mjs';
+import { buildPlantCadNativeSyncPackage, buildPlantCadSyncReadinessPackage, renderPlantCadNativeSyncHTML, renderPlantCadSyncReadinessHTML } from './plantCadConnectorBridge.mjs';
 import { buildOptimalPowerFlowPackage, renderOptimalPowerFlowHTML } from './optimalPowerFlow.mjs';
 import { buildLoadFlowStudyPackage, renderLoadFlowStudyHTML, LOAD_FLOW_STUDY_CASE_VERSION } from './loadFlowStudyCase.mjs';
 import { buildShortCircuitStudyPackage, renderShortCircuitStudyHTML, SHORT_CIRCUIT_STUDY_CASE_VERSION } from './shortCircuitStudyCase.mjs';
@@ -41,9 +48,14 @@ import { buildHarmonicStudyPackage, renderHarmonicStudyHTML, HARMONIC_STUDY_CASE
 import { buildCapacitorBankDutyPackage, renderCapacitorBankDutyHTML, CAPACITOR_BANK_DUTY_VERSION } from './capacitorBank.mjs';
 import { buildReliabilityNetworkPackage, renderReliabilityNetworkHTML, RELIABILITY_NETWORK_VERSION } from './reliability.js';
 import { buildTransientStabilityPackage, renderTransientStabilityHTML, TRANSIENT_STABILITY_STUDY_VERSION } from './transientStability.mjs';
+import { buildIbrPlantControllerPackage, renderIbrPlantControllerHTML, IBR_PLANT_CONTROLLER_VERSION } from './ibrModeling.mjs';
+import { buildEmfExposurePackage, renderEmfExposureHTML, EMF_EXPOSURE_VERSION } from './emf.mjs';
+import { buildCathodicProtectionNetworkPackage, renderCathodicProtectionNetworkHTML, CATHODIC_PROTECTION_NETWORK_VERSION } from './cathodicProtectionNetwork.mjs';
 import { buildLoadDemandGovernancePackage, renderLoadDemandGovernanceHTML } from './loadDemandGovernance.mjs';
 import { buildTransformerFeederSizingPackage, renderTransformerFeederSizingHTML, TRANSFORMER_FEEDER_SIZING_VERSION } from './transformerFeederSizingCase.mjs';
 import { buildVoltageDropStudyPackage, renderVoltageDropStudyHTML, VOLTAGE_DROP_STUDY_VERSION } from './voltageDropStudy.mjs';
+import { buildVoltageFlickerStudyPackage, renderVoltageFlickerStudyHTML, VOLTAGE_FLICKER_STUDY_VERSION } from './voltageFlicker.mjs';
+import { DEFAULT_PRICES, estimateCableCosts, estimateConduitCosts, estimateTrayCosts } from './costEstimate.mjs';
 import { generateSpoolSheets } from './spoolSheets.mjs';
 import protectiveDevices from '../data/protectiveDevices.mjs';
 
@@ -442,6 +454,97 @@ function buildTransientStabilitySection(studies = {}, projectName = '') {
   }
 }
 
+function buildIbrPlantControllerSection(studies = {}, projectName = '') {
+  const saved = studies.ibrPlantController || studies.ibr?.plantControllerPackage;
+  const legacyIbr = studies.ibr || null;
+  const legacyDer = studies.derInterconnect || null;
+  if (!saved && !legacyIbr && !legacyDer) return null;
+  if (saved?.version === IBR_PLANT_CONTROLLER_VERSION) return saved;
+  try {
+    return buildIbrPlantControllerPackage({
+      ...(saved || {}),
+      projectName: saved?.projectName || projectName || 'Untitled Project',
+      plantCase: saved?.plantCase || {
+        name: 'Legacy IBR / DER plant-controller basis',
+        pccTag: legacyDer?.inputs?.pccBus || legacyDer?.inputs?.pccTag || 'PCC',
+        plantMode: 'unknown',
+        controlMode: 'voltVar',
+        priorityMode: 'activePowerPriority',
+      },
+      resourceRows: saved?.resourceRows || [{
+        id: 'legacy-ibr',
+        tag: 'Legacy IBR result',
+        resourceType: 'ibr',
+        ratedKw: legacyIbr?.pvInputs?.Pstc_kW || legacyIbr?.bessInputs?.sRated_kW || legacyIbr?.faultInputs?.sRated_kVA || null,
+        ratedKva: legacyIbr?.pvInputs?.sRated_kVA || legacyIbr?.bessInputs?.sRated_kVA || legacyIbr?.faultInputs?.sRated_kVA || null,
+        requestedKw: legacyIbr?.pvResult?.pAC_kW || legacyIbr?.bessResult?.pAC_kW || null,
+        requestedKvar: legacyIbr?.voltVarResult?.qDroop_kvar || legacyIbr?.bessResult?.qAC_kvar || 0,
+      }],
+      curveRows: saved?.curveRows || [],
+      scenarioRows: saved?.scenarioRows || [{ id: 'legacy', label: 'Legacy result wrapper', scenarioType: 'base' }],
+    });
+  } catch {
+    return null;
+  }
+}
+
+function buildEmfExposureSection(studies = {}, projectName = '') {
+  const saved = studies.emfExposure || (studies.emf?.version === EMF_EXPOSURE_VERSION ? studies.emf : null);
+  const legacy = studies.emf || null;
+  if (!saved && !legacy) return null;
+  if (saved?.version === EMF_EXPOSURE_VERSION) return saved;
+  try {
+    return buildEmfExposurePackage({
+      ...(saved || {}),
+      projectName: saved?.projectName || projectName || 'Untitled Project',
+      studyCase: saved?.studyCase || {
+        name: 'Legacy EMF quick-calculator basis',
+        frequencyHz: legacy?.inputs?.frequency || legacy?.frequency || 60,
+        exposureBasis: 'icnirpPublic',
+        geometryMode: 'tray',
+      },
+      circuitRows: saved?.circuitRows || [{
+        id: 'legacy-emf-circuit',
+        tag: 'Legacy EMF result',
+        currentA: legacy?.inputs?.currentA || legacy?.currentA || 100,
+        trayWidthM: legacy?.inputs?.trayWidthM || legacy?.trayWidthM || 0.3048,
+        conductorOdM: legacy?.inputs?.cableOdM || legacy?.cableOdM || 0.0254,
+        nParallelSets: legacy?.inputs?.nCables || legacy?.nCables || 1,
+      }],
+      measurementPoints: saved?.measurementPoints || [{
+        id: 'legacy-emf-point',
+        label: 'Legacy EMF point',
+        xM: legacy?.inputs?.distanceM || legacy?.distanceM || 1,
+        yM: 0.6,
+      }],
+      validationRows: saved?.validationRows || [],
+    });
+  } catch {
+    return null;
+  }
+}
+
+function buildCathodicProtectionNetworkSection(studies = {}, projectName = '') {
+  const saved = studies.cathodicProtectionNetwork || null;
+  const legacy = studies.cathodicProtection || null;
+  if (!saved && !legacy) return null;
+  if (saved?.version === CATHODIC_PROTECTION_NETWORK_VERSION) return saved;
+  try {
+    return buildCathodicProtectionNetworkPackage({
+      ...(saved || {}),
+      projectName: saved?.projectName || projectName || 'Untitled Project',
+      networkCase: saved?.networkCase || {
+        name: legacy ? 'Legacy CP sizing network wrapper' : 'Cathodic Protection Network Model',
+        criteriaBasis: 'naceSp0169',
+        seasonalCase: 'nominal',
+      },
+      legacySizing: legacy,
+    });
+  } catch {
+    return null;
+  }
+}
+
 function buildProtectionSettingSection(studies = {}) {
   return studies.protectionSettingSheets || null;
 }
@@ -496,6 +599,20 @@ function buildVoltageDropStudySection(studies = {}, cables = [], projectName = '
   }
 }
 
+function buildVoltageFlickerSection(studies = {}, projectName = '') {
+  const saved = studies.voltageFlicker;
+  if (saved?.version === VOLTAGE_FLICKER_STUDY_VERSION) return saved;
+  if (!saved) return null;
+  try {
+    return buildVoltageFlickerStudyPackage({
+      ...(saved || {}),
+      projectName: saved?.projectName || projectName || 'Untitled Project',
+    });
+  } catch {
+    return null;
+  }
+}
+
 function buildProductCatalogUsage({ cables = [], trays = [], conduits = [], equipment = [], panels = [], studies = {} } = {}) {
   const usage = [];
   const add = (row, category, source, label) => {
@@ -518,6 +635,15 @@ function buildProductCatalogUsage({ cables = [], trays = [], conduits = [], equi
   const heatTraceCases = Array.isArray(studies.heatTraceSizingCircuits) ? studies.heatTraceSizingCircuits : [];
   heatTraceCases.forEach(row => add(row, 'heatTraceComponent', 'heattracesizing.html', row.pipeTag || row.name || row.id));
   return usage;
+}
+
+function buildPricingEstimateLineItems({ cables = [], trays = [], conduits = [], studies = {} } = {}) {
+  const routeResults = Array.isArray(studies.routeResults) ? studies.routeResults : [];
+  return [
+    ...estimateCableCosts(cables, routeResults, DEFAULT_PRICES),
+    ...estimateTrayCosts(trays, DEFAULT_PRICES),
+    ...estimateConduitCosts(conduits, DEFAULT_PRICES),
+  ];
 }
 
 // ---------------------------------------------------------------------------
@@ -561,11 +687,17 @@ export function generateProjectReport({
   lifecycle = null,
   designCoach = null,
   productCatalog = [],
+  cloudLibraryReleases = [],
+  componentLibrarySubscription = {},
+  componentLibrary = null,
   fieldObservations = [],
   bimElements = [],
   bimIssues = [],
   bimConnectorPackages = [],
   activeBimConnectorPackageId = '',
+  bimObjectFamilies = [],
+  pricingFeedRows = [],
+  pricingFeedDescriptors = [],
 } = {}) {
   const equipmentEvaluation = buildEquipmentEvaluationPackage({
     equipment,
@@ -585,11 +717,15 @@ export function generateProjectReport({
   const capacitorBankDuty = buildCapacitorBankDutySection(studies, projectName);
   const reliabilityNetwork = buildReliabilityNetworkSection(studies, oneLine, projectName);
   const transientStability = buildTransientStabilitySection(studies, projectName);
+  const ibrPlantController = buildIbrPlantControllerSection(studies, projectName);
+  const emfExposure = buildEmfExposureSection(studies, projectName);
+  const cathodicProtectionNetwork = buildCathodicProtectionNetworkSection(studies, projectName);
   const protectionSettingSheets = buildProtectionSettingSection(studies);
   const pullConstructability = buildPullConstructabilitySection(studies);
   const loadDemandGovernance = buildLoadDemandGovernanceSection(studies, panels, loads, projectName);
   const transformerFeederSizing = buildTransformerFeederSizingSection(studies, panels, loads, projectName);
   const voltageDropStudy = buildVoltageDropStudySection(studies, cables, projectName);
+  const voltageFlicker = buildVoltageFlickerSection(studies, projectName);
   const racewayConstruction = buildRacewayConstructionPackage({
     projectName: projectName || 'Untitled Project',
     trays,
@@ -600,6 +736,19 @@ export function generateProjectReport({
     catalog: productCatalog,
     projectUsage: buildProductCatalogUsage({ cables, trays, conduits, equipment, panels, studies }),
     approvals: approvals.productCatalog || {},
+  });
+  const pricingFeedGovernance = buildPricingFeedGovernancePackage({
+    projectName: projectName || 'Untitled Project',
+    feedDescriptors: pricingFeedDescriptors,
+    pricingRows: pricingFeedRows,
+    catalogRows: productCatalog,
+    estimateLineItems: buildPricingEstimateLineItems({ cables, trays, conduits, studies }),
+  });
+  const cloudLibraryGovernance = buildCloudLibraryGovernancePackage({
+    projectName: projectName || 'Untitled Project',
+    releases: cloudLibraryReleases,
+    componentLibrarySubscription,
+    projectLibrary: componentLibrary || {},
   });
   const fieldCommissioning = buildFieldCommissioningPackage({
     projectName: projectName || 'Untitled Project',
@@ -627,6 +776,148 @@ export function generateProjectReport({
       bimIssues,
     },
   }) : null;
+  const nativeBimConnectorKit = ((Array.isArray(bimConnectorPackages) && bimConnectorPackages.length)
+    || (Array.isArray(bimElements) && bimElements.length)
+    || (Array.isArray(bimIssues) && bimIssues.length)) ? buildNativeConnectorKitPackage({
+      connectorPackages: bimConnectorPackages,
+      activeConnectorPackageId: activeBimConnectorPackageId,
+      projectState: {
+        projectName: projectName || 'Untitled Project',
+        cables,
+        trays,
+        conduits,
+        equipment,
+        bimElements,
+        bimIssues,
+      },
+    }) : null;
+  const bimObjectLibrary = ((Array.isArray(bimObjectFamilies) && bimObjectFamilies.length)
+    || (Array.isArray(productCatalog) && productCatalog.length)) ? buildBimObjectLibraryPackage({
+      projectName: projectName || 'Untitled Project',
+      familyRows: bimObjectFamilies,
+      catalogRows: productCatalog,
+      projectState: {
+        projectName: projectName || 'Untitled Project',
+        cables,
+        trays,
+        conduits,
+        equipment,
+      },
+    }) : null;
+  const revitSyncReadiness = ((Array.isArray(bimConnectorPackages) && bimConnectorPackages.length)
+    || (Array.isArray(bimElements) && bimElements.length)
+    || (Array.isArray(bimObjectFamilies) && bimObjectFamilies.length)
+    || (Array.isArray(productCatalog) && productCatalog.length)) ? buildRevitSyncReadinessPackage({
+      projectName: projectName || 'Untitled Project',
+      projectState: {
+        projectName: projectName || 'Untitled Project',
+        cables,
+        trays,
+        conduits,
+        equipment,
+        bimElements,
+        bimIssues,
+        bimObjectFamilies,
+        productCatalog,
+      },
+      bimObjectFamilies,
+      productCatalog,
+    }) : null;
+  const revitNativeSync = ((Array.isArray(bimConnectorPackages) && bimConnectorPackages.length)
+    || (Array.isArray(bimElements) && bimElements.length)
+    || (Array.isArray(bimObjectFamilies) && bimObjectFamilies.length)
+    || (Array.isArray(productCatalog) && productCatalog.length)) ? buildRevitNativeSyncPackage({
+      projectName: projectName || 'Untitled Project',
+      projectState: {
+        projectName: projectName || 'Untitled Project',
+        cables,
+        trays,
+        conduits,
+        equipment,
+        bimElements,
+        bimIssues,
+        bimObjectFamilies,
+        productCatalog,
+      },
+      bimObjectFamilies,
+      productCatalog,
+    }) : null;
+  const autocadSyncReadiness = ((Array.isArray(bimConnectorPackages) && bimConnectorPackages.length)
+    || (Array.isArray(bimElements) && bimElements.length)
+    || (Array.isArray(bimObjectFamilies) && bimObjectFamilies.length)
+    || (Array.isArray(productCatalog) && productCatalog.length)) ? buildAutoCadSyncReadinessPackage({
+      projectName: projectName || 'Untitled Project',
+      projectState: {
+        projectName: projectName || 'Untitled Project',
+        cables,
+        trays,
+        conduits,
+        equipment,
+        bimElements,
+        bimIssues,
+        bimObjectFamilies,
+        productCatalog,
+      },
+      bimObjectFamilies,
+      productCatalog,
+    }) : null;
+  const autocadNativeSync = ((Array.isArray(bimConnectorPackages) && bimConnectorPackages.length)
+    || (Array.isArray(bimElements) && bimElements.length)
+    || (Array.isArray(bimObjectFamilies) && bimObjectFamilies.length)
+    || (Array.isArray(productCatalog) && productCatalog.length)) ? buildAutoCadNativeSyncPackage({
+      projectName: projectName || 'Untitled Project',
+      projectState: {
+        projectName: projectName || 'Untitled Project',
+        cables,
+        trays,
+        conduits,
+        equipment,
+        bimElements,
+        bimIssues,
+        bimObjectFamilies,
+        productCatalog,
+      },
+      bimObjectFamilies,
+      productCatalog,
+    }) : null;
+  const plantCadSyncReadiness = ((Array.isArray(bimConnectorPackages) && bimConnectorPackages.length)
+    || (Array.isArray(bimElements) && bimElements.length)
+    || (Array.isArray(bimObjectFamilies) && bimObjectFamilies.length)
+    || (Array.isArray(productCatalog) && productCatalog.length)) ? buildPlantCadSyncReadinessPackage({
+      projectName: projectName || 'Untitled Project',
+      projectState: {
+        projectName: projectName || 'Untitled Project',
+        cables,
+        trays,
+        conduits,
+        equipment,
+        bimElements,
+        bimIssues,
+        bimObjectFamilies,
+        productCatalog,
+      },
+      bimObjectFamilies,
+      productCatalog,
+    }) : null;
+  const plantCadNativeSync = ((Array.isArray(bimConnectorPackages) && bimConnectorPackages.length)
+    || (Array.isArray(bimElements) && bimElements.length)
+    || (Array.isArray(bimObjectFamilies) && bimObjectFamilies.length)
+    || (Array.isArray(productCatalog) && productCatalog.length)) ? buildPlantCadNativeSyncPackage({
+      projectName: projectName || 'Untitled Project',
+      projectState: {
+        projectName: projectName || 'Untitled Project',
+        cables,
+        trays,
+        conduits,
+        equipment,
+        bimElements,
+        bimIssues,
+        bimObjectFamilies,
+        productCatalog,
+      },
+      bimObjectFamilies,
+      productCatalog,
+    }) : null;
   return {
     generatedAt: new Date().toISOString(),
     summary:    buildSummarySection(cables, trays, conduits, ductbanks, projectName),
@@ -642,11 +933,15 @@ export function generateProjectReport({
     capacitorBankDuty,
     reliabilityNetwork,
     transientStability,
+    ibrPlantController,
+    emfExposure,
+    cathodicProtectionNetwork,
     protectionSettingSheets,
     pullConstructability,
     loadDemandGovernance,
     transformerFeederSizing,
     voltageDropStudy,
+    voltageFlicker,
     racewayConstruction,
     equipmentEvaluation,
     advancedGrounding,
@@ -654,9 +949,19 @@ export function generateProjectReport({
     loadFlow,
     optimalPowerFlow,
     productCatalog: productCatalogGovernance,
+    pricingFeedGovernance,
+    cloudLibraryGovernance,
     fieldCommissioning,
     bimRoundTrip,
     bimConnectorReadiness,
+    nativeBimConnectorKit,
+    bimObjectLibrary,
+    revitSyncReadiness,
+    revitNativeSync,
+    autocadSyncReadiness,
+    autocadNativeSync,
+    plantCadSyncReadiness,
+    plantCadNativeSync,
     validation: buildValidationSection(cables, trays, conduits),
     lifecycle,
     designCoach,
@@ -690,7 +995,7 @@ export function renderReportHTML(report) {
     return `<span class="badge ${map[s] || ''}">${esc(s)}</span>`;
   };
 
-  const { summary, cables, fill, clashes, spools, heatTrace, shortCircuit, arcFlash, motorStart, harmonicStudy, capacitorBankDuty, reliabilityNetwork, transientStability, protectionSettingSheets, pullConstructability, loadDemandGovernance, transformerFeederSizing, voltageDropStudy, racewayConstruction, equipmentEvaluation, advancedGrounding, cableThermalEnvironment, loadFlow, optimalPowerFlow, productCatalog, fieldCommissioning, bimRoundTrip, bimConnectorReadiness, validation, lifecycle, designCoach } = report;
+  const { summary, cables, fill, clashes, spools, heatTrace, shortCircuit, arcFlash, motorStart, harmonicStudy, capacitorBankDuty, reliabilityNetwork, transientStability, ibrPlantController, emfExposure, cathodicProtectionNetwork, protectionSettingSheets, pullConstructability, loadDemandGovernance, transformerFeederSizing, voltageDropStudy, voltageFlicker, racewayConstruction, equipmentEvaluation, advancedGrounding, cableThermalEnvironment, loadFlow, optimalPowerFlow, productCatalog, pricingFeedGovernance, cloudLibraryGovernance, fieldCommissioning, bimRoundTrip, bimConnectorReadiness, nativeBimConnectorKit, bimObjectLibrary, revitSyncReadiness, revitNativeSync, autocadSyncReadiness, autocadNativeSync, plantCadSyncReadiness, plantCadNativeSync, validation, lifecycle, designCoach } = report;
 
   let html = `
 <header class="report-header">
@@ -761,6 +1066,12 @@ ${reliabilityNetwork ? renderReliabilityNetworkHTML(reliabilityNetwork) : ''}
 
 ${transientStability ? renderTransientStabilityHTML(transientStability) : ''}
 
+${ibrPlantController ? renderIbrPlantControllerHTML(ibrPlantController) : ''}
+
+${emfExposure ? renderEmfExposureHTML(emfExposure) : ''}
+
+${cathodicProtectionNetwork ? renderCathodicProtectionNetworkHTML(cathodicProtectionNetwork) : ''}
+
 ${protectionSettingSheets ? renderProtectionSettingSheetHTML(protectionSettingSheets) : ''}
 
 ${pullConstructability ? renderPullConstructabilityHTML(pullConstructability) : ''}
@@ -770,6 +1081,8 @@ ${loadDemandGovernance ? renderLoadDemandGovernanceHTML(loadDemandGovernance) : 
 ${transformerFeederSizing ? renderTransformerFeederSizingHTML(transformerFeederSizing) : ''}
 
 ${voltageDropStudy ? renderVoltageDropStudyHTML(voltageDropStudy) : ''}
+
+${voltageFlicker ? renderVoltageFlickerStudyHTML(voltageFlicker) : ''}
 
 ${racewayConstruction ? renderRacewayConstructionHTML(racewayConstruction) : ''}
 
@@ -785,11 +1098,31 @@ ${optimalPowerFlow ? renderOptimalPowerFlowHTML(optimalPowerFlow) : ''}
 
 ${productCatalog ? renderProductCatalogGovernanceHTML(productCatalog) : ''}
 
+${pricingFeedGovernance ? renderPricingFeedGovernanceHTML(pricingFeedGovernance) : ''}
+
+${cloudLibraryGovernance ? renderCloudLibraryGovernanceHTML(cloudLibraryGovernance) : ''}
+
 ${fieldCommissioning ? renderFieldCommissioningHTML(fieldCommissioning) : ''}
 
 ${bimRoundTrip ? renderBimRoundTripHTML(bimRoundTrip) : ''}
 
 ${bimConnectorReadiness ? renderConnectorReadinessHTML(bimConnectorReadiness) : ''}
+
+${nativeBimConnectorKit ? renderNativeConnectorKitHTML(nativeBimConnectorKit) : ''}
+
+${bimObjectLibrary ? renderBimObjectLibraryHTML(bimObjectLibrary) : ''}
+
+${revitSyncReadiness ? renderRevitSyncReadinessHTML(revitSyncReadiness) : ''}
+
+${revitNativeSync ? renderRevitNativeSyncHTML(revitNativeSync) : ''}
+
+${autocadSyncReadiness ? renderAutoCadSyncReadinessHTML(autocadSyncReadiness) : ''}
+
+${autocadNativeSync ? renderAutoCadNativeSyncHTML(autocadNativeSync) : ''}
+
+${plantCadSyncReadiness ? renderPlantCadSyncReadinessHTML(plantCadSyncReadiness) : ''}
+
+${plantCadNativeSync ? renderPlantCadNativeSyncHTML(plantCadNativeSync) : ''}
 
 <section class="report-section" id="rpt-cables">
   <h2>Cable Schedule</h2>

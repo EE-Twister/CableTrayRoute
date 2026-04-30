@@ -1,4 +1,6 @@
 import {
+  buildVoltageFlickerStudyPackage,
+  renderVoltageFlickerStudyHTML,
   runVoltageFlickerStudy,
   PST_LIMIT,
   PST_PASS_THRESHOLD,
@@ -40,14 +42,20 @@ document.addEventListener('DOMContentLoaded', () => {
   const form = document.getElementById('flicker-form');
   const resultsDiv = document.getElementById('results');
   const errorsDiv = document.getElementById('calc-errors');
+  const saveBtn = document.getElementById('save-study-btn');
+  const exportJsonBtn = document.getElementById('export-json-btn');
+  const exportHtmlBtn = document.getElementById('export-html-btn');
+  let lastStudy = null;
 
   document.getElementById('add-load-step-btn').addEventListener('click', () => addLoadStepRow());
 
   // Restore saved result or add a default row
   const saved = getStudies().voltageFlicker;
   if (saved) {
-    restoreForm(saved.inputs);
-    renderResults(saved);
+    lastStudy = buildVoltageFlickerStudyPackage(saved);
+    restoreForm(lastStudy.studyCase, lastStudy.loadStepRows, lastStudy.result?.inputs);
+    renderResults(lastStudy);
+    setExportState(true);
   } else {
     addLoadStepRow('Arc Furnace', 5000, 120, 'Arc Furnace');
   }
@@ -56,7 +64,10 @@ document.addEventListener('DOMContentLoaded', () => {
     e.preventDefault();
     let result;
     try {
-      result = runVoltageFlickerStudy(readInputs());
+      result = buildVoltageFlickerStudyPackage({
+        projectName: document.body?.dataset?.reportTitle || '',
+        ...readInputs(),
+      });
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Unable to run flicker study.';
       errorsDiv.hidden = false;
@@ -67,12 +78,43 @@ document.addEventListener('DOMContentLoaded', () => {
     errorsDiv.hidden = true;
     errorsDiv.textContent = '';
 
-    const studies = getStudies();
-    studies.voltageFlicker = result;
-    setStudies(studies);
-
+    lastStudy = result;
+    setExportState(true);
     renderResults(result);
   });
+
+  saveBtn?.addEventListener('click', () => {
+    if (!lastStudy) return;
+    const studies = getStudies();
+    studies.voltageFlicker = lastStudy;
+    setStudies(studies);
+    showModal('Study Saved', '<p>Voltage flicker study package saved to project studies.</p>', 'success');
+  });
+
+  exportJsonBtn?.addEventListener('click', () => {
+    if (!lastStudy) return;
+    downloadText('voltage-flicker-study-package.json', JSON.stringify(lastStudy, null, 2));
+  });
+
+  exportHtmlBtn?.addEventListener('click', () => {
+    if (!lastStudy) return;
+    downloadText('voltage-flicker-study-package.html', `<!doctype html><html><body>${renderVoltageFlickerStudyHTML(lastStudy)}</body></html>`, 'text/html');
+  });
+
+  function setExportState(enabled) {
+    [saveBtn, exportJsonBtn, exportHtmlBtn].forEach(btn => {
+      if (btn) btn.disabled = !enabled;
+    });
+  }
+
+  function downloadText(filename, content, mediaType = 'application/json') {
+    const blob = new Blob([content], { type: mediaType });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 0);
+  }
 
   // -----------------------------------------------------------------------
   // Form reading
@@ -101,12 +143,28 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     return {
-      studyLabel: '',
-      nominalVoltageKv: flt('nominal-kv'),
-      systemKva: flt('system-kva'),
-      xrRatio: flt('xr-ratio'),
-      loadSteps,
-      pstSeriesForPlt,
+      studyCase: {
+        pccTag: document.getElementById('pcc-tag').value.trim(),
+        nominalVoltageKv: flt('nominal-kv'),
+        sourceShortCircuitKva: flt('system-kva'),
+        xrRatio: flt('xr-ratio'),
+        standardBasis: document.getElementById('standard-basis').value,
+        pstPlanningLimit: flt('pst-planning-limit'),
+        pstMandatoryLimit: flt('pst-mandatory-limit'),
+        pltLimit: flt('plt-limit'),
+        observationPeriods: 12,
+        pltBasis: pstSeriesForPlt ? 'measured' : 'estimated',
+        notes: document.getElementById('flicker-notes').value.trim(),
+      },
+      loadStepRows: loadSteps,
+      inputs: {
+        studyLabel: '',
+        nominalVoltageKv: flt('nominal-kv'),
+        systemKva: flt('system-kva'),
+        xrRatio: flt('xr-ratio'),
+        loadSteps,
+        pstSeriesForPlt,
+      },
     };
   }
 
@@ -139,23 +197,48 @@ document.addEventListener('DOMContentLoaded', () => {
   // -----------------------------------------------------------------------
   // Form restoration from saved result
   // -----------------------------------------------------------------------
-  function restoreForm(inputs) {
-    if (!inputs) return;
+  function restoreForm(studyCase, loadStepRows, inputs = {}) {
+    if (!studyCase && !inputs) return;
     const set = (id, v) => { const el = document.getElementById(id); if (el && v != null) el.value = v; };
-    set('system-kva', inputs.systemKva);
-    set('xr-ratio', inputs.xrRatio);
-    set('nominal-kv', inputs.nominalVoltageKv);
+    set('pcc-tag', studyCase?.pccTag || studyCase?.pccBus || '');
+    set('standard-basis', studyCase?.standardBasis);
+    set('pst-planning-limit', studyCase?.pstPlanningLimit);
+    set('pst-mandatory-limit', studyCase?.pstMandatoryLimit);
+    set('plt-limit', studyCase?.pltLimit);
+    set('flicker-notes', studyCase?.notes);
+    set('system-kva', studyCase?.sourceShortCircuitKva || inputs.systemKva);
+    set('xr-ratio', studyCase?.xrRatio || inputs.xrRatio);
+    set('nominal-kv', studyCase?.nominalVoltageKv || inputs.nominalVoltageKv);
     if (Array.isArray(inputs.pstSeriesForPlt) && inputs.pstSeriesForPlt.length > 0) {
       set('pst-series', inputs.pstSeriesForPlt.join(', '));
     }
     document.getElementById('load-steps-list').innerHTML = '';
-    (inputs.loadSteps || []).forEach(s => addLoadStepRow(s.label, s.loadKw, s.repetitionsPerHour));
+    (loadStepRows?.length ? loadStepRows : inputs.loadSteps || []).forEach(s => addLoadStepRow(s.label, s.loadKw, s.repetitionsPerHour, s.loadType || s.type));
   }
 
   // -----------------------------------------------------------------------
   // Results rendering
   // -----------------------------------------------------------------------
   function renderResults(result) {
+    const pkg = result?.version ? result : buildVoltageFlickerStudyPackage(result);
+    const complianceRows = pkg.complianceRows || [];
+    const warningRows = pkg.warningRows || [];
+    result = pkg.result || result;
+    if (!result?.loadStepResults) {
+      resultsDiv.innerHTML = `
+        <section class="results-panel" aria-labelledby="results-heading">
+          <h2 id="results-heading">Flicker Study Package</h2>
+          <div class="result-group">
+            <h3>Warning Rows</h3>
+            ${warningRows.length ? `<ul class="drc-findings">${warningRows.map(row => `<li class="drc-finding drc-warn"><span class="drc-msg">${escapeHtml(row.message)} ${row.recommendation ? `— ${escapeHtml(row.recommendation)}` : ''}</span></li>`).join('')}</ul>` : '<p class="field-hint">No package warning rows.</p>'}
+          </div>
+          <details class="result-group" open>
+            <summary>Package JSON</summary>
+            <pre>${escapeHtml(JSON.stringify(pkg, null, 2))}</pre>
+          </details>
+        </section>`;
+      return;
+    }
     const { loadStepResults, worstPst, worstPstRisk, plt, pltRisk, pltSource, warnings } = result;
 
     const riskClass = r => r === 'fail' ? 'result-fail' : r === 'marginal' ? 'result-warn' : 'result-ok';
@@ -231,6 +314,33 @@ document.addEventListener('DOMContentLoaded', () => {
           <h3>Warnings</h3>
           ${warningHtml}
         </div>
+
+        <div class="result-group">
+          <h3>Compliance Rows</h3>
+          <div class="table-scroll">
+            <table class="data-table" aria-label="Voltage flicker compliance rows">
+              <thead>
+                <tr><th>Target</th><th>Actual</th><th>Limit</th><th>Utilization</th><th>Status</th><th>Recommendation</th></tr>
+              </thead>
+              <tbody>${complianceRows.map(row => `<tr>
+                <td>${escapeHtml(row.target)}</td>
+                <td>${row.actualValue ?? ''}</td>
+                <td>${row.limit ?? ''}</td>
+                <td>${row.utilizationPct == null ? '' : `${row.utilizationPct}%`}</td>
+                <td><span class="${row.status === 'fail' ? 'result-fail' : row.status === 'warn' ? 'result-warn' : 'result-ok'}">${escapeHtml(row.status)}</span></td>
+                <td>${escapeHtml(row.recommendation)}</td>
+              </tr>`).join('')}</tbody>
+            </table>
+          </div>
+        </div>
+
+        <details class="result-group">
+          <summary>Warning Rows, Assumptions, and Package JSON</summary>
+          ${warningRows.length ? `<ul class="drc-findings">${warningRows.map(row => `<li class="drc-finding drc-warn"><span class="drc-msg">${escapeHtml(row.message)} ${row.recommendation ? `— ${escapeHtml(row.recommendation)}` : ''}</span></li>`).join('')}</ul>` : '<p class="field-hint">No package warning rows.</p>'}
+          <h4>Assumptions</h4>
+          <ul>${pkg.assumptions.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul>
+          <pre>${escapeHtml(JSON.stringify(pkg, null, 2))}</pre>
+        </details>
       </section>`;
 
     renderChart(loadStepResults);

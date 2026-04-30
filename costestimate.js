@@ -7,7 +7,24 @@ import {
   parsePricingCSV,
   exportPricingCSV,
 } from './analysis/costEstimate.mjs';
-import { getCables, getTrays, getConduits, getStudies } from './dataStore.mjs';
+import {
+  addPricingFeedRows,
+  getCables,
+  getTrays,
+  getConduits,
+  getPricingFeedDescriptors,
+  getPricingFeedRows,
+  getProductCatalogRows,
+  getStudies,
+  setPricingFeedRows,
+  setStudies,
+} from './dataStore.mjs';
+import {
+  buildPricingFeedGovernancePackage,
+  buildPricingFeedImportTemplate,
+  normalizePricingFeedRow,
+  renderPricingFeedGovernanceHTML,
+} from './analysis/pricingFeedGovernance.mjs';
 
 // Intentionally unscoped — custom pricing is a user preference, not scenario-specific data.
 const STORAGE_KEY = 'ctr-custom-prices';
@@ -22,6 +39,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // ── Custom pricing state ─────────────────────────────────────────────────
   let customPrices = null;          // null = use DEFAULT_PRICES
   let customPricingMeta = { source: '', date: '', rowCount: 0 };
+  let pricingGovernanceRows = getPricingFeedRows();
 
   // Restore persisted custom pricing from localStorage
   try {
@@ -57,7 +75,24 @@ document.addEventListener('DOMContentLoaded', () => {
     showAlertModal('Pricing Reset', 'Unit prices have been reset to default RS Means 2024 mid-range values.');
   });
 
+  document.getElementById('pricing-governance-import-btn')?.addEventListener('click', () => {
+    document.getElementById('pricing-governance-file')?.click();
+  });
+  document.getElementById('pricing-governance-file')?.addEventListener('change', handleGovernanceImport);
+  document.getElementById('pricing-governance-template-btn')?.addEventListener('click', exportGovernanceTemplate);
+  document.getElementById('pricing-governance-export-json-btn')?.addEventListener('click', exportGovernanceJson);
+  document.getElementById('pricing-governance-print-btn')?.addEventListener('click', exportGovernanceHtml);
+  document.getElementById('pricing-governance-apply-btn')?.addEventListener('click', applyApprovedGovernedPricing);
+  document.getElementById('pricing-governance-save-btn')?.addEventListener('click', saveGovernancePackage);
+  [
+    'pricing-source-filter',
+    'pricing-category-filter',
+    'pricing-manufacturer-filter',
+    'pricing-status-filter',
+  ].forEach(id => document.getElementById(id)?.addEventListener('input', renderPricingGovernance));
+
   let lastLineItems = [];
+  renderPricingGovernance();
 
   // ── Pricing helpers ──────────────────────────────────────────────────────
 
@@ -125,6 +160,236 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // ── Price building ───────────────────────────────────────────────────────
 
+  function downloadText(filename, content, mediaType = 'application/json') {
+    const blob = new Blob([content], { type: mediaType });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  function parseGovernanceCsv(text = '') {
+    const lines = text.split(/\r?\n/).filter(line => line.trim() && !line.trim().startsWith('#'));
+    if (lines.length < 2) return [];
+    const split = line => line.split(',').map(cell => cell.trim().replace(/^"|"$/g, '').replace(/""/g, '"'));
+    const headers = split(lines[0]);
+    return lines.slice(1).map(line => {
+      const cells = split(line);
+      return Object.fromEntries(headers.map((header, index) => [header, cells[index] ?? '']));
+    });
+  }
+
+  function filteredGovernanceRows() {
+    const sourceType = document.getElementById('pricing-source-filter')?.value || '';
+    const category = document.getElementById('pricing-category-filter')?.value || '';
+    const manufacturer = (document.getElementById('pricing-manufacturer-filter')?.value || '').toLowerCase();
+    const status = document.getElementById('pricing-status-filter')?.value || '';
+    return pricingGovernanceRows.filter(row => {
+      if (sourceType && row.sourceType !== sourceType) return false;
+      if (category && row.category !== category) return false;
+      if (manufacturer && !row.manufacturer.toLowerCase().includes(manufacturer)) return false;
+      if (status === 'approved' && !row.approved && !/^approved$/i.test(row.approvalStatus || '')) return false;
+      if (status === 'unapproved' && (row.approved || /^approved$/i.test(row.approvalStatus || ''))) return false;
+      if (status === 'expired') {
+        const expires = row.expiresAt ? new Date(row.expiresAt) : null;
+        if (!expires || Number.isNaN(expires.getTime()) || expires.getTime() >= Date.now()) return false;
+      }
+      return true;
+    });
+  }
+
+  function currentGovernancePackage(lineItems = lastLineItems) {
+    return buildPricingFeedGovernancePackage({
+      projectName: 'CableTrayRoute Project',
+      feedDescriptors: getPricingFeedDescriptors(),
+      pricingRows: pricingGovernanceRows,
+      catalogRows: getProductCatalogRows(),
+      estimateLineItems: lineItems,
+    });
+  }
+
+  function renderPricingGovernance() {
+    const summaryEl = document.getElementById('pricing-governance-summary');
+    const tableEl = document.getElementById('pricing-governance-table');
+    const coverageEl = document.getElementById('pricing-governance-coverage');
+    if (!summaryEl || !tableEl) return;
+    const pkg = currentGovernancePackage();
+    const metrics = [
+      ['Rows', pkg.summary.pricingRowCount],
+      ['Approved', pkg.summary.approvedRowCount],
+      ['Stale', pkg.summary.staleRowCount],
+      ['Expired', pkg.summary.expiredRowCount],
+      ['Unpriced lines', pkg.summary.unpricedLineCount],
+      ['Status', pkg.summary.status],
+    ];
+    summaryEl.innerHTML = metrics.map(([label, value]) => `
+      <div class="catalog-stat">
+        <strong>${esc(value)}</strong>
+        <span>${esc(label)}</span>
+      </div>`).join('');
+    const rows = filteredGovernanceRows();
+    tableEl.innerHTML = `<table class="report-table">
+      <thead><tr><th>Source</th><th>Quote</th><th>Manufacturer</th><th>Catalog #/Key</th><th>Category</th><th>UOM</th><th>Unit Price</th><th>Approval</th><th></th></tr></thead>
+      <tbody>${rows.length ? rows.map(row => `<tr>
+        <td>${esc(row.sourceName)}</td>
+        <td>${esc(row.quoteNumber || 'n/a')}</td>
+        <td>${esc(row.manufacturer || 'generic')}</td>
+        <td>${esc(row.catalogNumber || row.key || 'n/a')}</td>
+        <td>${esc(row.category)}</td>
+        <td>${esc(row.uom)}</td>
+        <td>${esc(row.unitPrice ?? row.laborUnitPrice ?? '')} ${esc(row.currency)}</td>
+        <td>${esc(row.approvalStatus)}</td>
+        <td>
+          <button type="button" class="btn secondary-btn" data-pricing-approve="${esc(row.id)}">Approve</button>
+          <button type="button" class="btn secondary-btn" data-pricing-revoke="${esc(row.id)}">Revoke</button>
+        </td>
+      </tr>`).join('') : '<tr><td colspan="9">No pricing feed rows match the current filters.</td></tr>'}</tbody>
+    </table>`;
+    tableEl.querySelectorAll('[data-pricing-approve]').forEach(button => {
+      button.addEventListener('click', () => updatePricingApproval(button.dataset.pricingApprove, true));
+    });
+    tableEl.querySelectorAll('[data-pricing-revoke]').forEach(button => {
+      button.addEventListener('click', () => updatePricingApproval(button.dataset.pricingRevoke, false));
+    });
+    if (coverageEl) {
+      coverageEl.innerHTML = `<table class="report-table">
+        <thead><tr><th>Line Item</th><th>Category</th><th>Pricing Source</th><th>Status</th><th>Warnings</th></tr></thead>
+        <tbody>${pkg.estimateCoverageRows.length ? pkg.estimateCoverageRows.slice(0, 30).map(row => `<tr>
+          <td>${esc(row.lineItemId || row.description)}</td>
+          <td>${esc(row.category)}</td>
+          <td>${esc(row.pricingSource || 'n/a')}</td>
+          <td>${esc(row.status)}</td>
+          <td>${esc((row.warnings || []).join('; '))}</td>
+        </tr>`).join('') : '<tr><td colspan="5">Run the estimate to populate pricing coverage rows.</td></tr>'}</tbody>
+      </table>`;
+    }
+  }
+
+  function persistGovernanceRows(rows) {
+    pricingGovernanceRows = setPricingFeedRows(rows);
+    renderPricingGovernance();
+  }
+
+  function updatePricingApproval(id, approved) {
+    const reviewer = window.prompt?.('Reviewer name for local pricing approval', '') || '';
+    const today = new Date().toISOString().slice(0, 10);
+    persistGovernanceRows(pricingGovernanceRows.map(row => row.id === id ? normalizePricingFeedRow({
+      ...row,
+      approved,
+      approvalStatus: approved ? 'approved' : 'unreviewed',
+      verifiedBy: approved ? reviewer : row.verifiedBy,
+      lastVerified: approved ? today : row.lastVerified,
+    }) : row));
+  }
+
+  function handleGovernanceImport(e) {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = evt => {
+      try {
+        const text = evt.target.result;
+        const parsed = file.name.toLowerCase().endsWith('.json')
+          ? JSON.parse(text)
+          : parseGovernanceCsv(text);
+        const rows = Array.isArray(parsed)
+          ? parsed
+          : Array.isArray(parsed.pricingRows)
+            ? parsed.pricingRows
+            : Array.isArray(parsed.rows)
+              ? parsed.rows
+              : [];
+        if (!rows.length) {
+          showAlertModal('Import Failed', 'No pricing governance rows were found in the selected file.');
+          return;
+        }
+        const result = addPricingFeedRows(rows);
+        pricingGovernanceRows = result.rows;
+        renderPricingGovernance();
+        showAlertModal('Pricing Governance Imported', `Loaded ${rows.length} row(s). ${result.conflicts.length} duplicate/conflict row(s) were detected.`);
+      } catch (err) {
+        showAlertModal('Import Error', 'Could not parse pricing governance file: ' + err.message);
+      }
+    };
+    reader.onerror = () => showAlertModal('Import Error', 'Could not read the pricing governance file.');
+    reader.readAsText(file);
+  }
+
+  function exportGovernanceTemplate() {
+    const sourceType = document.getElementById('pricing-template-source')?.value || 'vendorQuote';
+    const template = buildPricingFeedImportTemplate(sourceType);
+    downloadText(`pricing-feed-${sourceType}-template.csv`, template.csv, 'text/csv');
+  }
+
+  function exportGovernanceJson() {
+    const pkg = currentGovernancePackage();
+    downloadText(`pricing-feed-governance-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(pkg, null, 2));
+  }
+
+  function exportGovernanceHtml() {
+    const pkg = currentGovernancePackage();
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Pricing Feed Governance</title><link rel="stylesheet" href="style.css"></head><body>${renderPricingFeedGovernanceHTML(pkg)}</body></html>`;
+    downloadText(`pricing-feed-governance-${new Date().toISOString().slice(0, 10)}.html`, html, 'text/html');
+  }
+
+  function applyApprovedGovernedPricing() {
+    const prices = {};
+    let applied = 0;
+    pricingGovernanceRows
+      .filter(row => row.approved || /^approved$/i.test(row.approvalStatus || ''))
+      .forEach(row => {
+        const key = row.key || row.catalogNumber || row.description || 'default';
+        if (row.unitPrice === null && row.laborUnitPrice === null) return;
+        if (row.category === 'cableType' || row.category === 'cable') {
+          prices.cable ||= {};
+          prices.cable[key] = row.unitPrice;
+          applied++;
+        } else if (row.category === 'tray') {
+          prices.tray ||= {};
+          prices.tray[key] = row.unitPrice;
+          applied++;
+        } else if (row.category === 'conduit') {
+          prices.conduit ||= {};
+          prices.conduit[key] = row.unitPrice;
+          applied++;
+        } else if (row.category === 'fitting') {
+          prices.fitting = row.unitPrice;
+          applied++;
+        } else if (row.category === 'labor') {
+          prices.labor ||= {};
+          prices.labor[key] = row.laborUnitPrice ?? row.unitPrice;
+          applied++;
+        } else if (row.category === 'productivity') {
+          prices.laborProductivity ||= {};
+          prices.laborProductivity[key] = row.unitPrice;
+          applied++;
+        }
+      });
+    if (!applied) {
+      showAlertModal('No Approved Pricing', 'Approve pricing rows before applying governed pricing to the estimate.');
+      return;
+    }
+    customPrices = prices;
+    customPricingMeta = { source: 'Pricing Feed Governance', date: new Date().toISOString().slice(0, 10), rowCount: applied };
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ prices, meta: customPricingMeta }));
+    } catch { /* storage quota - non-fatal */ }
+    renderPricingBasis();
+    showAlertModal('Governed Pricing Applied', `${applied} approved pricing row(s) were applied to the estimator pricing book.`);
+  }
+
+  function saveGovernancePackage() {
+    const studies = getStudies();
+    const pkg = currentGovernancePackage();
+    setStudies({ ...studies, pricingFeedGovernance: pkg });
+    showAlertModal('Pricing Governance Saved', 'Saved pricing feed governance to studyResults.pricingFeedGovernance.');
+  }
+
   /** Build the merged prices object used for the estimate. */
   function buildMergedPrices() {
     // Start from custom prices (if loaded) or defaults
@@ -183,6 +448,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const conduitItems = estimateConduitCosts(conduits, prices);
 
     lastLineItems = [...cableItems, ...trayItems, ...conduitItems];
+    renderPricingGovernance();
 
     if (!lastLineItems.length) {
       document.getElementById('results').innerHTML =

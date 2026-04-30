@@ -8,6 +8,7 @@ import {
   renderConnectorReadinessHTML,
   validateConnectorImportPackage,
 } from '../analysis/bimConnectorContract.mjs';
+import { buildNativeConnectorSamplePayload } from '../analysis/nativeBimConnectorKit.mjs';
 
 function describe(name, fn) {
   console.log(name);
@@ -29,7 +30,7 @@ const projectState = {
   projectId: 'north-unit',
   scenario: 'base',
   cables: [{ id: 'C-101', tag: 'C-101', from: 'SWBD-1', to: 'P-101', length: 80 }],
-  trays: [{ tray_id: 'TR-1', system: 'Power', level: 'L1', area: 'Unit A', lengthFt: 100, supportType: 'trapeze', drawingRef: 'E-201' }],
+  trays: [{ tray_id: 'TR-1', system: 'Power', level: 'L1', area: 'Unit A', lengthFt: 100, supportType: 'trapeze', drawingRef: 'E-201', manufacturer: 'Cooper', catalogNumber: 'TR-12', category: 'tray' }],
   conduits: [{ conduit_id: 'CD-1', system: 'Control', level: 'L1', area: 'Unit A', lengthFt: 40 }],
   equipment: [{ id: 'SWBD-1', tag: 'SWBD-1', category: 'Switchboard', level: 'L1' }],
   bimElements: [
@@ -54,10 +55,21 @@ const projectState = {
       createdAt: '2026-04-27T10:00:00.000Z',
     },
   ],
+  productCatalog: [{ manufacturer: 'Cooper', catalogNumber: 'TR-12', category: 'tray', approved: true, description: 'Tray' }],
+  bimObjectFamilies: [{
+    manufacturer: 'Cooper',
+    catalogNumber: 'TR-12',
+    category: 'tray',
+    familyName: 'Tray 12',
+    nativeFormat: 'revitFamily',
+    ifcClass: 'IfcCableCarrierSegment',
+    connectorTypes: ['power'],
+    approved: true,
+  }],
 };
 
 describe('BIM/CAD connector contract helpers', () => {
-  it('normalizes Revit, AutoCAD, and generic connector manifests deterministically', () => {
+  it('normalizes Revit, AutoCAD, plant-CAD, and generic connector manifests deterministically', () => {
     const revit = normalizeConnectorManifest({
       connectorType: 'rvt',
       sourceApplication: 'Revit <2026>',
@@ -66,9 +78,13 @@ describe('BIM/CAD connector contract helpers', () => {
       elements: [{ guid: 'g-1', elementType: 'Cable Tray', tag: 'TR-1' }],
     });
     const autocad = normalizeConnectorManifest({ connectorType: 'cad', elements: [] });
+    const aveva = normalizeConnectorManifest({ connectorType: 'e3d', elements: [] });
+    const smartplant = normalizeConnectorManifest({ connectorType: 'sp3d', elements: [] });
     const generic = normalizeConnectorManifest({ connectorType: 'other', elements: [] });
     assert.equal(revit.connectorType, 'revit');
     assert.equal(autocad.connectorType, 'autocad');
+    assert.equal(aveva.connectorType, 'aveva');
+    assert.equal(smartplant.connectorType, 'smartplant');
     assert.equal(generic.connectorType, 'generic');
     assert.equal(revit.elements[0].elementType, 'cableTray');
     assert(revit.id.includes('connector-revit'));
@@ -85,6 +101,8 @@ describe('BIM/CAD connector contract helpers', () => {
     assert(pkg.quantities.some(row => row.elementType === 'cableTray'));
     assert(pkg.elements.some(row => row.sourceProperties?.racewayConstruction?.drawingRef === 'E-201'));
     assert(pkg.propertySets.some(row => row.name === 'CableTrayRoute.RacewayConstruction'));
+    assert(pkg.propertySets.some(row => row.name === 'CableTrayRoute.BimObjectFamily'));
+    assert(pkg.mappingHints.some(row => row.familyName === 'Tray 12'));
     assert.equal(pkg.issues.length, 1);
     assert(pkg.assumptions.some(row => row.includes('review records')));
   });
@@ -173,5 +191,39 @@ describe('BIM/CAD connector contract helpers', () => {
     assert(html.includes('Revit &lt;Connector&gt;'));
     assert(html.includes('Review &lt;connector&gt; warning'));
     assert(!html.includes('Revit <Connector>'));
+  });
+
+  it('accepts native connector starter-kit sample payloads', () => {
+    const sample = buildNativeConnectorSamplePayload({
+      connectorType: 'revit',
+      projectState,
+      createdAt: '2026-04-28T00:00:00.000Z',
+    });
+    const validation = validateConnectorImportPackage(sample);
+    assert.equal(sample.connectorType, 'revit');
+    assert.equal(validation.valid, true);
+    assert(sample.elements.some(row => row.tag === 'TR-1'));
+
+    const autocad = buildNativeConnectorSamplePayload({
+      connectorType: 'autocad',
+      projectState,
+      createdAt: '2026-04-28T00:00:00.000Z',
+    });
+    const autocadValidation = validateConnectorImportPackage(autocad);
+    assert.equal(autocad.connectorType, 'autocad');
+    assert.equal(autocadValidation.valid, true);
+    assert(autocad.elements.some(row => row.tag === 'TR-1'));
+
+    for (const connectorType of ['aveva', 'smartplant']) {
+      const plant = buildNativeConnectorSamplePayload({
+        connectorType,
+        projectState,
+        createdAt: '2026-04-28T00:00:00.000Z',
+      });
+      const plantValidation = validateConnectorImportPackage(plant);
+      assert.equal(plant.connectorType, connectorType);
+      assert.equal(plantValidation.valid, true);
+      assert(plant.elements.some(row => row.tag === 'TR-1'));
+    }
   });
 });

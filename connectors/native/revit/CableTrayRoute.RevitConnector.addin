@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RevitAddIns>
+  <AddIn Type="Command">
+    <Name>CableTrayRoute Export JSON</Name>
+    <Assembly>C:\CableTrayRoute\Connectors\CableTrayRoute.RevitConnector.dll</Assembly>
+    <AddInId>8F688AA7-4F29-4D7E-A9AD-5EA524EA7610</AddInId>
+    <FullClassName>CableTrayRoute.RevitConnector.ExportCableTrayRouteJsonCommand</FullClassName>
+    <VendorId>CTR</VendorId>
+    <VendorDescription>CableTrayRoute connector starter kit</VendorDescription>
+  </AddIn>
+  <AddIn Type="Command">
+    <Name>CableTrayRoute Import Preview</Name>
+    <Assembly>C:\CableTrayRoute\Connectors\CableTrayRoute.RevitConnector.dll</Assembly>
+    <AddInId>8078D8E2-0B57-4577-954E-9F31221DAF92</AddInId>
+    <FullClassName>CableTrayRoute.RevitConnector.ImportCableTrayRoutePreviewCommand</FullClassName>
+    <VendorId>CTR</VendorId>
+    <VendorDescription>CableTrayRoute connector starter kit</VendorDescription>
+  </AddIn>
+  <AddIn Type="Command">
+    <Name>CableTrayRoute Validate Package</Name>
+    <Assembly>C:\CableTrayRoute\Connectors\CableTrayRoute.RevitConnector.dll</Assembly>
+    <AddInId>71D866C5-75F2-4EA4-9D7A-8F918081ED2B</AddInId>
+    <FullClassName>CableTrayRoute.RevitConnector.ValidateCableTrayRoutePackageCommand</FullClassName>
+    <VendorId>CTR</VendorId>
+    <VendorDescription>CableTrayRoute connector starter kit</VendorDescription>
+  </AddIn>
+  <AddIn Type="Command">
+    <Name>CableTrayRoute Open Bridge</Name>
+    <Assembly>C:\CableTrayRoute\Connectors\CableTrayRoute.RevitConnector.dll</Assembly>
+    <AddInId>2C970783-9F03-4D8F-A8D9-87AE401A4F4D</AddInId>
+    <FullClassName>CableTrayRoute.RevitConnector.OpenCableTrayRouteBridgeCommand</FullClassName>
+    <VendorId>CTR</VendorId>
+    <VendorDescription>CableTrayRoute Revit bridge starter kit</VendorDescription>
+  </AddIn>
+</RevitAddIns>

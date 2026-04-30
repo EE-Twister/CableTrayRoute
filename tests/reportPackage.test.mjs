@@ -351,6 +351,44 @@ const report = generateProjectReport({
       assumptions: ['Screening output.'],
       summary: { total: 1, pass: 0, warn: 0, fail: 1, missingData: 0, maxDropPct: 11.2, avgDropPct: 11.2, warningCount: 1, status: 'action-required' },
     },
+    voltageFlicker: {
+      version: 'voltage-flicker-study-v1',
+      generatedAt: '2026-04-27T12:00:00.000Z',
+      projectName: 'North Unit',
+      studyCase: {
+        pccTag: 'PCC <Main>',
+        standardBasis: 'IEC61000-4-15',
+        sourceShortCircuitKva: 50000,
+        pstPlanningLimit: 0.8,
+        pstMandatoryLimit: 1,
+        pltLimit: 0.65,
+        pltBasis: 'estimated',
+        reportPreset: 'fullStudy',
+        notes: 'Utility <allocation> review.',
+      },
+      loadStepRows: [{
+        id: 'vf-step-1',
+        label: 'Arc <Furnace>',
+        loadType: 'Arc Furnace',
+        loadKw: 5000,
+        repetitionsPerHour: 120,
+        notes: 'Batch <mode>.',
+      }],
+      result: {
+        worstPst: 1.2,
+        worstPstRisk: 'fail',
+        plt: 1.2,
+        pltRisk: 'fail',
+        pltSource: 'estimated',
+      },
+      complianceRows: [
+        { id: 'worst-pst-mandatory', target: 'Pst', actualValue: 1.2, limit: 1, utilizationPct: 120, status: 'fail', source: 'calculatedFlicker', recommendation: 'Reduce step magnitude.' },
+        { id: 'plt-limit', target: 'Plt', actualValue: 1.2, limit: 0.65, utilizationPct: 184.6, status: 'fail', source: 'estimatedWorstPst', recommendation: 'Confirm measured series.' },
+      ],
+      warningRows: [{ id: 'estimated-plt', severity: 'warning', message: 'Plt is estimated from worst Pst.' }],
+      assumptions: ['Simplified rectangular voltage-change screening method.'],
+      summary: { loadStepCount: 1, worstPst: 1.2, plt: 1.2, fail: 2, warn: 0, missingData: 0, warningCount: 1, status: 'fail' },
+    },
     optimalPowerFlow: {
       version: 'optimal-power-flow-v1',
       generatedAt: '2026-04-26T12:00:00.000Z',
@@ -683,6 +721,86 @@ const report = generateProjectReport({
       standards: ['UL 891'],
     },
   ],
+  pricingFeedRows: [
+    {
+      sourceType: 'vendorQuote',
+      sourceName: 'Supplier <Cost>',
+      quoteNumber: 'Q-101',
+      quoteDate: '2026-04-26',
+      expiresAt: '2026-06-30',
+      currency: 'USD',
+      manufacturer: 'Acme',
+      catalogNumber: 'SWBD-65',
+      category: 'protectiveDevice',
+      description: 'Switchboard pricing <basis>',
+      uom: 'ea',
+      unitPrice: 10000,
+      approvalStatus: 'approved',
+      approved: true,
+      lastVerified: '2026-04-26',
+    },
+    {
+      sourceType: 'manualBook',
+      sourceName: 'Estimator Book',
+      category: 'cableType',
+      key: 'default',
+      description: 'Cable default <cost>',
+      uom: 'ft',
+      unitPrice: 2.5,
+      approvalStatus: 'approved',
+      approved: true,
+      lastVerified: '2026-04-26',
+    },
+  ],
+  componentLibrary: {
+    categories: ['power'],
+    components: [{ subtype: 'switchboard', label: 'Local Switchboard', icon: 'swbd', category: 'power', ports: 2, schema: {} }],
+    icons: { swbd: 'icons/components/Switchboard.svg' },
+  },
+  cloudLibraryReleases: [
+    {
+      id: 'cloud-release-r1',
+      workspaceId: 'plant-a',
+      name: 'Organization <Component> Library',
+      releaseTag: 'R1',
+      status: 'released',
+      createdAt: '2026-04-26T12:00:00.000Z',
+      createdBy: 'Library <Admin>',
+      approvalStatus: 'approved',
+      approvedBy: 'D. Engineer',
+      approvedAt: '2026-04-26T12:10:00.000Z',
+      data: {
+        categories: ['power', 'protection'],
+        components: [
+          { subtype: 'switchboard', label: 'Approved Switchboard', icon: 'swbd', category: 'power', ports: 4, schema: {} },
+          { subtype: 'breaker', label: 'Breaker', icon: 'breaker', category: 'protection', ports: 2, schema: {} },
+        ],
+        icons: { swbd: 'icons/components/Switchboard.svg', breaker: 'icons/components/Breaker.svg' },
+      },
+    },
+  ],
+  componentLibrarySubscription: {
+    workspaceId: 'plant-a',
+    releaseId: 'cloud-release-r1',
+    releaseTag: 'R1',
+    pinnedVersion: 'org-R1',
+    mergeMode: 'merge',
+  },
+  bimObjectFamilies: [
+    {
+      manufacturer: 'Acme',
+      catalogNumber: 'SWBD-65',
+      category: 'protectiveDevice',
+      familyName: 'Switchboard <BIM>',
+      nativeFormat: 'revitFamily',
+      ifcClass: 'IfcElectricDistributionBoard',
+      connectorTypes: ['power'],
+      nominalDimensions: { widthIn: 36, depthIn: 24 },
+      approved: true,
+      approvalStatus: 'approved',
+      lastVerified: '2026-04-26',
+    },
+  ],
   fieldObservations: [
     {
       id: 'field-c-101',
@@ -815,9 +933,19 @@ describe('commercial report package builder', () => {
     assert(sections.some(section => section.id === 'lifecycle'));
     assert(sections.some(section => section.id === 'designCoach'));
     assert(sections.some(section => section.id === 'productCatalog'));
+    assert(sections.some(section => section.id === 'pricingFeedGovernance'));
+    assert(sections.some(section => section.id === 'cloudLibraryGovernance'));
     assert(sections.some(section => section.id === 'fieldCommissioning'));
     assert(sections.some(section => section.id === 'bimRoundTrip'));
     assert(sections.some(section => section.id === 'bimConnectorReadiness'));
+    assert(sections.some(section => section.id === 'nativeBimConnectorKit'));
+    assert(sections.some(section => section.id === 'revitSyncReadiness'));
+    assert(sections.some(section => section.id === 'revitNativeSync'));
+    assert(sections.some(section => section.id === 'autocadSyncReadiness'));
+    assert(sections.some(section => section.id === 'autocadNativeSync'));
+    assert(sections.some(section => section.id === 'plantCadSyncReadiness'));
+    assert(sections.some(section => section.id === 'plantCadNativeSync'));
+    assert(sections.some(section => section.id === 'bimObjectLibrary'));
     assert(sections.some(section => section.id === 'shortCircuit'));
     assert(sections.some(section => section.id === 'arcFlash'));
     assert(sections.some(section => section.id === 'motorStart'));
@@ -828,6 +956,7 @@ describe('commercial report package builder', () => {
     assert(sections.some(section => section.id === 'loadDemandGovernance'));
     assert(sections.some(section => section.id === 'transformerFeederSizing'));
     assert(sections.some(section => section.id === 'voltageDropStudy'));
+    assert(sections.some(section => section.id === 'voltageFlicker'));
     assert(sections.some(section => section.id === 'pullConstructability'));
     assert(sections.some(section => section.id === 'racewayConstruction'));
     assert(sections.some(section => section.id === 'equipmentEvaluation'));
@@ -860,9 +989,18 @@ describe('commercial report package builder', () => {
     assert(paths.includes('transmittal.csv'));
     assert(paths.includes('quality_checklist.csv'));
     assert(paths.includes('data/product_catalog_governance.csv'));
+    assert(paths.includes('data/pricing_feed_governance.csv'));
+    assert(paths.includes('data/cloud_component_library_governance.csv'));
+    assert(paths.includes('data/bim_object_library.csv'));
     assert(paths.includes('data/field_verification.csv'));
     assert(paths.includes('data/bim_quantity_reconciliation.csv'));
     assert(paths.includes('data/bim_connector_readiness.csv'));
+    assert(paths.includes('data/native_bim_connector_kit.csv'));
+    assert(paths.includes('data/revit_sync_readiness.csv'));
+    assert(paths.includes('data/revit_native_sync.csv'));
+    assert(paths.includes('data/autocad_native_sync.csv'));
+    assert(paths.includes('data/plantcad_sync_readiness.csv'));
+    assert(paths.includes('data/plantcad_native_sync.csv'));
     assert(paths.includes('data/short_circuit_duty_rows.csv'));
     assert(paths.includes('data/arc_flash_scenario_comparison.csv'));
     assert(paths.includes('data/motor_start_worst_cases.csv'));
@@ -880,6 +1018,7 @@ describe('commercial report package builder', () => {
     assert(paths.includes('data/cable_thermal_environment.csv'));
     assert(paths.includes('data/load_flow_voltage_profile.csv'));
     assert(paths.includes('data/voltage_drop_study.csv'));
+    assert(paths.includes('data/voltage_flicker_study.csv'));
     assert(paths.includes('data/optimal_power_flow_dispatch.csv'));
     assert(paths.includes('data/capacitor_bank_duty.csv'));
     assert(paths.includes('data/heat_trace_branch_schedule.csv'));
@@ -892,10 +1031,35 @@ describe('commercial report package builder', () => {
     assert.strictEqual(manifest.preparedBy, 'D. Engineer');
     assert.strictEqual(manifest.lifecycle.activePackage.revision, 'R1');
     assert.strictEqual(manifest.productCatalog.summary.total, 1);
+    assert.strictEqual(manifest.pricingFeedGovernance.summary.pricingRowCount, 2);
+    assert.strictEqual(manifest.pricingFeedGovernance.summary.approvedRowCount, 2);
+    assert.strictEqual(manifest.cloudLibraryGovernance.summary.releaseCount, 1);
+    assert.strictEqual(manifest.cloudLibraryGovernance.summary.approvedReleaseCount, 1);
+    assert.strictEqual(manifest.cloudLibraryGovernance.subscription.releaseId, 'cloud-release-r1');
     assert.strictEqual(manifest.fieldCommissioning.summary.openItems, 1);
     assert.strictEqual(manifest.bimRoundTrip.summary.elementCount, 1);
     assert.strictEqual(manifest.bimRoundTrip.summary.openIssues, 1);
     assert.strictEqual(manifest.bimConnectorReadiness.summary.packageCount, 1);
+    assert.strictEqual(manifest.nativeBimConnectorKit.summary.descriptorCount, 5);
+    assert.strictEqual(manifest.nativeBimConnectorKit.descriptors[0].contractVersion, 'bim-connector-contract-v1');
+    assert.strictEqual(manifest.revitSyncReadiness.summary.contractVersion, 'bim-connector-contract-v1');
+    assert.strictEqual(manifest.revitSyncReadiness.descriptor.connectorType, 'revit');
+    assert.strictEqual(manifest.revitNativeSync.summary.contractVersion, 'bim-connector-contract-v1');
+    assert.strictEqual(manifest.revitNativeSync.nativeSyncCase.descriptor.connectorType, 'revit');
+    assert(manifest.revitNativeSync.sourceManifest.commandRows.some(row => row.commandName === 'ExportCableTrayRouteJson'));
+    assert.strictEqual(manifest.autocadSyncReadiness.summary.contractVersion, 'bim-connector-contract-v1');
+    assert.strictEqual(manifest.autocadSyncReadiness.descriptor.connectorType, 'autocad');
+    assert.strictEqual(manifest.autocadNativeSync.summary.contractVersion, 'bim-connector-contract-v1');
+    assert.strictEqual(manifest.autocadNativeSync.nativeSyncCase.descriptor.connectorType, 'autocad');
+    assert(manifest.autocadNativeSync.sourceManifest.commandRows.some(row => row.commandName === 'ExportCableTrayRouteJson'));
+    assert.strictEqual(manifest.plantCadSyncReadiness.summary.contractVersion, 'bim-connector-contract-v1');
+    assert(manifest.plantCadSyncReadiness.descriptors.some(row => row.connectorType === 'aveva'));
+    assert(manifest.plantCadSyncReadiness.descriptors.some(row => row.connectorType === 'smartplant'));
+    assert.strictEqual(manifest.plantCadNativeSync.summary.contractVersion, 'bim-connector-contract-v1');
+    assert(manifest.plantCadNativeSync.nativeSyncCase.connectorTypes.includes('aveva'));
+    assert(manifest.plantCadNativeSync.sourceManifest.commandRows.some(row => row.commandName === 'ExportCableTrayRouteJson'));
+    assert.strictEqual(manifest.bimObjectLibrary.summary.familyCount, 1);
+    assert(manifest.bimObjectLibrary.unresolved.length >= 1);
     assert.strictEqual(manifest.shortCircuit.summary.total, 1);
     assert.strictEqual(manifest.arcFlash.summary.highEnergyCount, 0);
     assert.strictEqual(manifest.motorStart.summary.maxVoltageSagPct, 22);
@@ -917,6 +1081,9 @@ describe('commercial report package builder', () => {
     assert.strictEqual(manifest.transformerFeederSizing.unresolved[0].caseName, 'Sizing <Case>');
     assert.strictEqual(manifest.voltageDropStudy.summary.fail, 1);
     assert.strictEqual(manifest.voltageDropStudy.unresolved[0].tag, 'C-101 <VD>');
+    assert.strictEqual(manifest.voltageFlicker.summary.loadStepCount, 1);
+    assert.strictEqual(manifest.voltageFlicker.studyCase.pccTag, 'PCC <Main>');
+    assert.strictEqual(manifest.voltageFlicker.unresolved[0].target, 'Pst');
     assert.strictEqual(manifest.pullConstructability.summary.pullCount, 1);
     assert.strictEqual(manifest.pullConstructability.unresolved[0].cableTags, 'C-101 <pull>');
     assert.strictEqual(manifest.racewayConstruction.summary.detailCount, 1);
@@ -946,9 +1113,16 @@ describe('commercial report package builder', () => {
     assert(html.includes('Lifecycle Lineage'));
     assert(html.includes('Design Coach Actions'));
     assert(html.includes('Product Catalog Governance'));
+    assert(html.includes('Pricing Feed and Quote Governance'));
+    assert(html.includes('Voltage Flicker Study Basis'));
+    assert(html.includes('Cloud Component Library Governance'));
     assert(html.includes('Field Verification'));
     assert(html.includes('BIM Coordination'));
     assert(html.includes('BIM/CAD Connector Readiness'));
+    assert(html.includes('Native BIM/CAD Connector Starter Kit'));
+    assert(html.includes('Revit Connector Sync Readiness'));
+    assert(html.includes('Functional AutoCAD Add-In Sync Readiness'));
+    assert(html.includes('Functional Plant CAD Add-In Sync Readiness'));
     assert(html.includes('Short-Circuit Study Basis'));
     assert(html.includes('Arc Flash Study Basis'));
     assert(html.includes('Motor Start Study Basis'));
@@ -971,6 +1145,10 @@ describe('commercial report package builder', () => {
     assert(html.includes('IFC &lt;Release&gt;'));
     assert(!html.includes('IFC <Release>'));
     assert(!html.includes('Resolve <tray> fill'));
+    assert(!html.includes('Supplier <Cost>'));
+    assert(!html.includes('Switchboard pricing <basis>'));
+    assert(!html.includes('Organization <Component> Library'));
+    assert(!html.includes('Library <Admin>'));
     assert(!html.includes('Pump <A>'));
     assert(!html.includes('VFD <Pump>'));
     assert(!html.includes('Filter <A>'));

@@ -4,10 +4,14 @@ import {
   mapBimElementsToProject,
   normalizeBimElement,
 } from './bimRoundTrip.mjs';
+import {
+  buildBimObjectConnectorHints,
+  buildBimObjectPropertySets,
+} from './bimObjectLibrary.mjs';
 
 export const BIM_CONNECTOR_CONTRACT_VERSION = 'bim-connector-contract-v1';
 
-export const BIM_CONNECTOR_SUPPORTED_TYPES = ['revit', 'autocad', 'generic'];
+export const BIM_CONNECTOR_SUPPORTED_TYPES = ['revit', 'autocad', 'aveva', 'smartplant', 'generic'];
 
 export const BIM_CONNECTOR_PACKAGE_SCHEMA = Object.freeze({
   version: BIM_CONNECTOR_CONTRACT_VERSION,
@@ -103,6 +107,8 @@ function normalizeConnectorType(value = '') {
   const raw = stringValue(value || 'generic').toLowerCase().replace(/[\s_-]+/g, '');
   if (['revit', 'rvt', 'autodeskrevit'].includes(raw)) return 'revit';
   if (['autocad', 'acad', 'cad', 'autocadmep', 'civil3d'].includes(raw)) return 'autocad';
+  if (['aveva', 'e3d', 'pdms', 'avevae3d', 'avevapdms'].includes(raw)) return 'aveva';
+  if (['smartplant', 'sp3d', 'hexagonsmartplant', 'hexagonsmartplant3d', 'smartplant3d'].includes(raw)) return 'smartplant';
   if (['generic', 'ifc', 'bim', 'connector', 'other'].includes(raw)) return 'generic';
   return stringValue(value || 'generic').toLowerCase();
 }
@@ -110,6 +116,8 @@ function normalizeConnectorType(value = '') {
 function defaultApplication(type) {
   if (type === 'revit') return 'Autodesk Revit Connector';
   if (type === 'autocad') return 'AutoCAD Connector';
+  if (type === 'aveva') return 'AVEVA E3D / PDMS Connector';
+  if (type === 'smartplant') return 'Hexagon SmartPlant 3D Connector';
   return 'Generic BIM/CAD Connector';
 }
 
@@ -264,6 +272,8 @@ export function normalizeConnectorManifest(payload = {}) {
 export function buildConnectorExportPackage(projectState = {}, options = {}) {
   const connectorType = normalizeConnectorType(options.connectorType || 'generic');
   const state = asObject(projectState);
+  const bimObjectFamilies = asArray(options.bimObjectFamilies || state.bimObjectFamilies);
+  const productCatalog = asArray(options.productCatalog || state.productCatalog || state.catalogRows);
   const elements = [
     ...projectElements(state),
     ...asArray(state.bimElements).map(normalizeBimElement),
@@ -304,8 +314,12 @@ export function buildConnectorExportPackage(projectState = {}, options = {}) {
       { name: 'CableTrayRoute.Project', properties: { projectId: options.projectId || state.projectName || state.name || '' } },
       { name: 'CableTrayRoute.Sync', properties: { connectorType, contractVersion: BIM_CONNECTOR_CONTRACT_VERSION } },
       { name: 'CableTrayRoute.RacewayConstruction', properties: { fields: ['supportFamily', 'supportType', 'supportSpacingFt', 'accessoryKits', 'dividerLane', 'constructionPhase', 'constructionStatus', 'drawingRef', 'detailRef', 'labelId', 'sectionRef', 'installArea', 'constructionNotes'] } },
+      ...buildBimObjectPropertySets({ familyRows: bimObjectFamilies, catalogRows: productCatalog }),
     ],
-    mappingHints: buildMappingHints(elements),
+    mappingHints: [
+      ...buildMappingHints(elements),
+      ...buildBimObjectConnectorHints({ familyRows: bimObjectFamilies, projectState: state }),
+    ],
     warnings: [],
   });
 }

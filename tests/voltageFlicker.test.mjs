@@ -5,6 +5,11 @@ import {
   pltFromPst,
   classifyFlickerRisk,
   runVoltageFlickerStudy,
+  normalizeVoltageFlickerStudyCase,
+  normalizeFlickerLoadStepRows,
+  buildVoltageFlickerComplianceRows,
+  buildVoltageFlickerStudyPackage,
+  renderVoltageFlickerStudyHTML,
   PST_LIMIT,
   PST_PASS_THRESHOLD,
   PLT_OBSERVATION_PERIODS,
@@ -259,6 +264,107 @@ function baseInputs(overrides = {}) {
     /invalid value/,
     'negative Pst in series throws'
   );
+})();
+
+// ---------------------------------------------------------------------------
+// Study-case package helpers
+// ---------------------------------------------------------------------------
+(function testStudyCaseNormalization() {
+  const studyCase = normalizeVoltageFlickerStudyCase({
+    pccTag: 'PCC <A>',
+    sourceShortCircuitMva: 50,
+    standardBasis: 'IEEE1453',
+    pstPlanningLimit: 0.75,
+    pstMandatoryLimit: 1,
+    pltLimit: 0.7,
+    notes: 'Utility <allocation>',
+  });
+  assert.equal(studyCase.pccTag, 'PCC <A>');
+  assert.equal(studyCase.sourceShortCircuitKva, 50000);
+  assert.equal(studyCase.standardBasis, 'IEEE1453');
+  assert.equal(studyCase.pstPlanningLimit, 0.75);
+  assert.equal(studyCase.pltBasis, 'estimated');
+
+  assert.throws(
+    () => normalizeVoltageFlickerStudyCase({ standardBasis: 'bad' }),
+    /Unsupported voltage flicker standard basis/,
+    'invalid standard throws'
+  );
+  assert.throws(
+    () => normalizeVoltageFlickerStudyCase({ sourceShortCircuitKva: -1 }),
+    /source short-circuit kVA/,
+    'negative source basis throws'
+  );
+  assert.throws(
+    () => normalizeVoltageFlickerStudyCase({ pstPlanningLimit: 1.1, pstMandatoryLimit: 1 }),
+    /pstPlanningLimit/,
+    'planning limit above mandatory limit throws'
+  );
+})();
+
+(function testLoadStepNormalizationAndComplianceRows() {
+  const rows = normalizeFlickerLoadStepRows([
+    {
+      label: 'Welder <A>',
+      loadType: 'Welder',
+      loadKw: '750',
+      repetitionsPerHour: '30',
+      notes: 'Shift <1>',
+    },
+  ]);
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].label, 'Welder <A>');
+  assert.equal(rows[0].loadKw, 750);
+  assert.equal(rows[0].repetitionsPerHour, 30);
+  assert.equal(rows[0].loadType, 'Welder');
+
+  assert.throws(
+    () => normalizeFlickerLoadStepRows([{ label: 'bad', loadKw: 0, repetitionsPerHour: 1 }]),
+    /loadKw must be greater than zero/,
+    'invalid load step throws'
+  );
+
+  const result = runVoltageFlickerStudy(baseInputs({ loadSteps: rows, pstSeriesForPlt: [0.7, 0.8, 0.9] }));
+  const compliance = buildVoltageFlickerComplianceRows(
+    result,
+    normalizeVoltageFlickerStudyCase({ sourceShortCircuitKva: 50000 })
+  );
+  assert(compliance.some(row => row.id === 'worst-pst-planning'), 'planning Pst compliance row exists');
+  assert(compliance.some(row => row.id === 'plt-limit' && row.source === 'measuredPstSeries'), 'measured Plt row exists');
+  assert(compliance.every(row => ['pass', 'warn', 'fail', 'missingData'].includes(row.status)), 'statuses normalize');
+})();
+
+(function testPackageAndEscapedHtml() {
+  const pkg = buildVoltageFlickerStudyPackage({
+    projectName: 'North <Unit>',
+    studyCase: {
+      pccTag: 'PCC <Main>',
+      sourceShortCircuitKva: 50000,
+      standardBasis: 'IEC61000-4-15',
+      notes: 'Review <utility> allocation',
+    },
+    loadStepRows: [
+      { label: 'Arc <Furnace>', loadType: 'Arc Furnace', loadKw: 5000, repetitionsPerHour: 120 },
+    ],
+    inputs: { pstSeriesForPlt: [0.7, 0.8, 0.9] },
+  });
+  assert.equal(pkg.version, 'voltage-flicker-study-v1');
+  assert.equal(pkg.summary.loadStepCount, 1);
+  assert(pkg.complianceRows.length >= 4, 'package includes compliance rows');
+  assert(pkg.warningRows.some(row => row.id === 'screening-method'), 'screening assumption warning included');
+
+  const html = renderVoltageFlickerStudyHTML(pkg);
+  assert(html.includes('Voltage Flicker Study Basis'));
+  assert(html.includes('PCC &lt;Main&gt;'));
+  assert(html.includes('Arc &lt;Furnace&gt;'));
+  assert(!html.includes('PCC <Main>'), 'HTML escapes PCC tag');
+
+  const missing = buildVoltageFlickerStudyPackage({
+    studyCase: { pccTag: '', standardBasis: 'utilityCustom' },
+    loadStepRows: [{ label: 'Load', loadKw: 100, repetitionsPerHour: 1 }],
+  });
+  assert.equal(missing.summary.status, 'missingData');
+  assert(missing.warningRows.some(row => row.id === 'missing-source-short-circuit'));
 })();
 
 console.log('✓ voltage flicker tests passed');

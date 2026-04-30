@@ -90,6 +90,8 @@
         <div class="bim-toolbar">
           <button id="bim-export-revit-connector" type="button" class="btn secondary-btn">Revit Connector JSON</button>
           <button id="bim-export-autocad-connector" type="button" class="btn secondary-btn">AutoCAD Connector JSON</button>
+          <button id="bim-export-aveva-connector" type="button" class="btn secondary-btn">AVEVA Connector JSON</button>
+          <button id="bim-export-smartplant-connector" type="button" class="btn secondary-btn">SmartPlant Connector JSON</button>
           <button id="bim-export-generic-connector" type="button" class="btn secondary-btn">Generic Connector JSON</button>
           <label for="bim-connector-file">Preview Return Package
             <input id="bim-connector-file" type="file" accept=".json,application/json">
@@ -98,6 +100,130 @@
         </div>
         <div id="bim-connector-readiness" class="bim-summary-grid" aria-live="polite"></div>
         <div id="bim-connector-preview" class="bim-table-wrap" aria-live="polite"></div>
+      </section>
+
+      <section class="card">
+        <h2>Native Connector Kit</h2>
+        <div class="bim-toolbar">
+          <button id="bim-native-export-descriptor" type="button" class="btn secondary-btn">Export Descriptor JSON</button>
+          <button id="bim-native-export-revit-sample" type="button" class="btn secondary-btn">Sample Revit Payload</button>
+          <button id="bim-native-export-autocad-sample" type="button" class="btn secondary-btn">Sample AutoCAD Payload</button>
+          <button id="bim-native-export-plantcad-sample" type="button" class="btn secondary-btn">Sample Plant CAD Payloads</button>
+          <button id="bim-native-export-html" type="button" class="btn secondary-btn">Printable Kit HTML</button>
+        </div>
+        <div id="bim-native-kit-readiness" class="bim-summary-grid" aria-live="polite"></div>
+        <div id="bim-native-kit-table" class="bim-table-wrap" aria-live="polite"></div>
+      </section>
+
+      <section class="card">
+        <h2>Revit Live Sync Bridge</h2>
+        <p class="text-muted">SDK-ready Revit bridge contract, sample payloads, manifest preview, and review-only return-package validation.</p>
+        <div class="bim-toolbar">
+          <button id="bim-revit-export-descriptor" type="button" class="btn secondary-btn">Revit Bridge Descriptor</button>
+          <button id="bim-revit-export-sample" type="button" class="btn secondary-btn">Revit Bridge Sample JSON</button>
+          <button id="bim-revit-export-addin" type="button" class="btn secondary-btn">.addin Manifest Preview</button>
+          <button id="bim-revit-export-html" type="button" class="btn secondary-btn">Printable Revit Bridge HTML</button>
+          <label for="bim-revit-file">Preview Revit Return Package
+            <input id="bim-revit-file" type="file" accept=".json,application/json">
+          </label>
+        </div>
+        <div id="bim-revit-sync-readiness" class="bim-summary-grid" aria-live="polite"></div>
+        <div id="bim-revit-sync-table" class="bim-table-wrap" aria-live="polite"></div>
+      </section>
+
+      <section class="card">
+        <h2>Functional Revit Add-In Bridge</h2>
+        <p class="text-muted">SDK-ready Revit command source for native element export, package validation, and review-only import preview. CI checks source text and bridge contracts without Autodesk DLLs.</p>
+        <div class="bim-toolbar">
+          <button id="bim-revit-native-export-manifest" type="button" class="btn secondary-btn">Native Source Manifest</button>
+          <button id="bim-revit-native-export-sample" type="button" class="btn secondary-btn">Revit Native Sample JSON</button>
+          <button id="bim-revit-native-export-addin" type="button" class="btn secondary-btn">.addin Preview</button>
+          <button id="bim-revit-native-export-validation" type="button" class="btn secondary-btn">Bridge Validation JSON</button>
+          <button id="bim-revit-native-export-html" type="button" class="btn secondary-btn">Printable Native Sync HTML</button>
+          <label for="bim-revit-native-file">Preview Native Return Package
+            <input id="bim-revit-native-file" type="file" accept=".json,application/json">
+          </label>
+        </div>
+        <div id="bim-revit-native-readiness" class="bim-summary-grid" aria-live="polite"></div>
+        <div id="bim-revit-native-table" class="bim-table-wrap" aria-live="polite"></div>
+      </section>
+
+      <section class="card">
+        <h2>AutoCAD / Plant CAD Sync Bridge</h2>
+        <p class="text-muted">SDK-ready AutoCAD .NET bridge contract, sample payloads, bundle manifest preview, and review-only return-package validation. AVEVA and SmartPlant SDK plugins remain deferred.</p>
+        <div class="bim-toolbar">
+          <button id="bim-autocad-export-descriptor" type="button" class="btn secondary-btn">AutoCAD Bridge Descriptor</button>
+          <button id="bim-autocad-export-sample" type="button" class="btn secondary-btn">AutoCAD Bridge Sample JSON</button>
+          <button id="bim-autocad-export-packagecontents" type="button" class="btn secondary-btn">PackageContents Preview</button>
+          <button id="bim-autocad-export-html" type="button" class="btn secondary-btn">Printable AutoCAD Bridge HTML</button>
+          <label for="bim-autocad-file">Preview AutoCAD Return Package
+            <input id="bim-autocad-file" type="file" accept=".json,application/json">
+          </label>
+        </div>
+        <div id="bim-autocad-sync-readiness" class="bim-summary-grid" aria-live="polite"></div>
+        <div id="bim-autocad-sync-table" class="bim-table-wrap" aria-live="polite"></div>
+      </section>
+
+      <section class="card">
+        <h2>Functional AutoCAD Add-In Bridge</h2>
+        <p class="text-muted">SDK-ready AutoCAD .NET command source for native entity export, package validation, and review-only import preview. CI checks source text and bridge contracts without Autodesk DLLs.</p>
+        <div class="bim-toolbar">
+          <button id="bim-autocad-native-export-manifest" type="button" class="btn secondary-btn">Native Source Manifest</button>
+          <button id="bim-autocad-native-export-sample" type="button" class="btn secondary-btn">AutoCAD Native Sample JSON</button>
+          <button id="bim-autocad-native-export-packagecontents" type="button" class="btn secondary-btn">PackageContents Preview</button>
+          <button id="bim-autocad-native-export-validation" type="button" class="btn secondary-btn">Bridge Validation JSON</button>
+          <button id="bim-autocad-native-export-html" type="button" class="btn secondary-btn">Printable Native Sync HTML</button>
+          <label for="bim-autocad-native-file">Preview Native Return Package
+            <input id="bim-autocad-native-file" type="file" accept=".json,application/json">
+          </label>
+        </div>
+        <div id="bim-autocad-native-readiness" class="bim-summary-grid" aria-live="polite"></div>
+        <div id="bim-autocad-native-table" class="bim-table-wrap" aria-live="polite"></div>
+      </section>
+
+      <section class="card">
+        <h2>Plant CAD Connector Sync Readiness</h2>
+        <p class="text-muted">AVEVA E3D/PDMS and Hexagon SmartPlant 3D connector profiles, sample payloads, template notes, and review-only return-package validation. Certified native SDK plugins remain deferred.</p>
+        <div class="bim-toolbar">
+          <button id="bim-plantcad-export-descriptors" type="button" class="btn secondary-btn">Plant CAD Descriptors</button>
+          <button id="bim-plantcad-export-aveva" type="button" class="btn secondary-btn">AVEVA Sample JSON</button>
+          <button id="bim-plantcad-export-smartplant" type="button" class="btn secondary-btn">SmartPlant Sample JSON</button>
+          <button id="bim-plantcad-export-html" type="button" class="btn secondary-btn">Printable Plant CAD HTML</button>
+          <label for="bim-plantcad-file">Preview Plant CAD Return Package
+            <input id="bim-plantcad-file" type="file" accept=".json,application/json">
+          </label>
+        </div>
+        <div id="bim-plantcad-sync-readiness" class="bim-summary-grid" aria-live="polite"></div>
+        <div id="bim-plantcad-sync-table" class="bim-table-wrap" aria-live="polite"></div>
+      </section>
+
+      <section class="card">
+        <h2>Functional Plant CAD Add-In Bridge</h2>
+        <p class="text-muted">SDK-ready AVEVA E3D/PDMS and SmartPlant 3D command templates for native export, connector validation, and review-only import preview. Certified compiled plugins still require proprietary plant SDK environments.</p>
+        <div class="bim-toolbar">
+          <button id="bim-plantcad-native-export-manifest" type="button" class="btn secondary-btn">Native Source Manifest</button>
+          <button id="bim-plantcad-native-export-aveva" type="button" class="btn secondary-btn">AVEVA Native Sample</button>
+          <button id="bim-plantcad-native-export-smartplant" type="button" class="btn secondary-btn">SmartPlant Native Sample</button>
+          <button id="bim-plantcad-native-export-template" type="button" class="btn secondary-btn">Template Bundle Metadata</button>
+          <button id="bim-plantcad-native-export-validation" type="button" class="btn secondary-btn">Bridge Validation JSON</button>
+          <button id="bim-plantcad-native-export-html" type="button" class="btn secondary-btn">Printable Native HTML</button>
+          <label for="bim-plantcad-native-file">Preview Native Return Package
+            <input id="bim-plantcad-native-file" type="file" accept=".json,application/json">
+          </label>
+        </div>
+        <div id="bim-plantcad-native-readiness" class="bim-summary-grid" aria-live="polite"></div>
+        <div id="bim-plantcad-native-table" class="bim-table-wrap" aria-live="polite"></div>
+      </section>
+
+      <section class="card">
+        <h2>BIM Object Library</h2>
+        <p class="text-muted">Catalog-to-family metadata coverage for connector property sets and mapping hints. Proprietary manufacturer family binaries remain external to this local workflow.</p>
+        <div class="bim-toolbar">
+          <button id="bim-object-library-export-json" type="button" class="btn secondary-btn">Export Library Package JSON</button>
+          <button id="bim-object-library-export-html" type="button" class="btn secondary-btn">Printable Library HTML</button>
+        </div>
+        <div id="bim-object-library-readiness" class="bim-summary-grid" aria-live="polite"></div>
+        <div id="bim-object-library-table" class="bim-table-wrap" aria-live="polite"></div>
       </section>
 
       <section class="card">

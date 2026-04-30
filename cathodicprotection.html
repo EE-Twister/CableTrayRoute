@@ -488,6 +488,98 @@ Life_years = (W_installed × Q_anode × U × F_design) / (I_req × 8760)</pre>
         <button type="submit" class="primary-btn">Run Analysis</button>
       </form>
 
+      <section class="card cp-collapsible-card" aria-labelledby="cp-network-heading">
+        <details open>
+          <summary>
+            <h2 id="cp-network-heading">CP Network Model</h2>
+          </summary>
+          <p class="field-hint">Build a deterministic screening package for structures, anodes, rectifiers, bonds, interference sources, polarization measurements, and potential profiles.</p>
+          <div class="field-row">
+            <label for="cp-network-name">Network case name</label>
+            <input id="cp-network-name" type="text" value="Cathodic Protection Network Model">
+          </div>
+          <div class="field-row">
+            <label for="cp-network-criteria">Criteria basis</label>
+            <select id="cp-network-criteria">
+              <option value="naceSp0169">NACE / AMPP SP0169</option>
+              <option value="iso15589">ISO 15589</option>
+              <option value="project">Project criteria</option>
+            </select>
+            <label for="cp-network-season">Seasonal soil case</label>
+            <select id="cp-network-season">
+              <option value="nominal">Nominal</option>
+              <option value="dry">Dry</option>
+              <option value="wet">Wet</option>
+              <option value="winter">Winter</option>
+              <option value="custom">Custom</option>
+            </select>
+            <label for="cp-network-station-spacing">Profile station spacing (m)</label>
+            <input id="cp-network-station-spacing" type="number" min="1" step="1" value="50">
+          </div>
+          <div class="field-row">
+            <label for="cp-network-structures">Structure rows (JSON)</label>
+            <textarea id="cp-network-structures" rows="7" spellcheck="false"></textarea>
+          </div>
+          <div class="field-row">
+            <label for="cp-network-anodes">Anode rows (JSON)</label>
+            <textarea id="cp-network-anodes" rows="5" spellcheck="false"></textarea>
+          </div>
+          <div class="field-row">
+            <label for="cp-network-rectifiers">Rectifier rows (JSON)</label>
+            <textarea id="cp-network-rectifiers" rows="5" spellcheck="false"></textarea>
+          </div>
+          <div class="field-row">
+            <label for="cp-network-bonds">Bond / isolation rows (JSON)</label>
+            <textarea id="cp-network-bonds" rows="5" spellcheck="false"></textarea>
+          </div>
+          <div class="field-row">
+            <label for="cp-network-interference">Interference source rows (JSON)</label>
+            <textarea id="cp-network-interference" rows="5" spellcheck="false"></textarea>
+          </div>
+          <div class="field-row">
+            <label for="cp-network-polarization">Polarization measurement rows (JSON)</label>
+            <textarea id="cp-network-polarization" rows="5" spellcheck="false"></textarea>
+          </div>
+          <div class="field-row">
+            <label for="cp-network-notes">Network notes</label>
+            <textarea id="cp-network-notes" rows="2"></textarea>
+          </div>
+          <div class="controls-row">
+            <button id="cp-network-run" type="button">Run Network Model</button>
+            <button id="cp-network-save" type="button">Save to Studies</button>
+            <button id="cp-network-export-json" type="button">Export JSON</button>
+            <button id="cp-network-export-csv" type="button">Export CSV</button>
+            <button id="cp-network-export-html" type="button">Printable HTML</button>
+          </div>
+          <section id="cp-network-results" hidden aria-live="polite">
+            <h3>Network Model Results</h3>
+            <div id="cp-network-summary"></div>
+            <div class="table-wrap">
+              <table class="data-table">
+                <thead><tr><th>Target</th><th>Zone</th><th>Check</th><th>Required A</th><th>Available A</th><th>Margin</th><th>Status</th><th>Recommendation</th></tr></thead>
+                <tbody id="cp-network-criteria-body"></tbody>
+              </table>
+            </div>
+            <div class="table-wrap">
+              <table class="data-table">
+                <thead><tr><th>Test Station</th><th>Instant-Off mV</th><th>Shift mV</th><th>Status</th><th>Source</th></tr></thead>
+                <tbody id="cp-network-polarization-body"></tbody>
+              </table>
+            </div>
+            <div class="table-wrap">
+              <table class="data-table">
+                <thead><tr><th>Warning</th><th>Source</th><th>Severity</th><th>Message</th><th>Recommendation</th></tr></thead>
+                <tbody id="cp-network-warning-body"></tbody>
+              </table>
+            </div>
+            <details>
+              <summary>Network package JSON</summary>
+              <pre id="cp-network-json"></pre>
+            </details>
+          </section>
+        </details>
+      </section>
+
       <div id="cp-errors" class="alert-error" hidden role="alert"></div>
       <div id="results" role="region" aria-live="polite" aria-label="Cathodic protection sizing results"></div>
 

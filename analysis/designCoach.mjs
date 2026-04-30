@@ -28,6 +28,11 @@ const STUDY_PAGE_HREF = {
   capacitorBankDuty: 'capacitorbank.html',
   reliabilityNetwork: 'reliability.html',
   transientStability: 'transientstability.html',
+  ibrPlantController: 'ibr.html',
+  emfExposure: 'emf.html',
+  emf: 'emf.html',
+  cathodicProtectionNetwork: 'cathodicprotection.html',
+  cathodicProtection: 'cathodicprotection.html',
   motorStart: 'motorStart.html',
   heatTraceSizing: 'heattracesizing.html',
   heatTraceSizingCircuits: 'heattracesizing.html',
@@ -39,6 +44,7 @@ const STUDY_PAGE_HREF = {
   loadDemandGovernance: 'loadlist.html',
   transformerFeederSizing: 'autosize.html',
   voltageDropStudy: 'voltagedropstudy.html',
+  voltageFlicker: 'voltageflicker.html',
 };
 
 function asArray(value) {
@@ -923,6 +929,245 @@ function transientStabilityActions(report = {}, studies = {}) {
   return actions;
 }
 
+function ibrPlantControllerActions(report = {}, studies = {}) {
+  const pkg = report.ibrPlantController || studies.ibrPlantController || studies.ibr?.plantControllerPackage || null;
+  const actions = [];
+  if (!pkg && (studies.ibr || studies.derInterconnect)) {
+    actions.push(makeAction({
+      title: 'Add DER / IBR plant-controller study basis',
+      description: 'Legacy IBR or DER interconnection results exist without resource rows, grid-code curves, scenario cases, and plant-controller priority assumptions.',
+      severity: 'medium',
+      category: 'review',
+      confidence: 0.82,
+      scope: { studyKey: studies.ibr ? 'ibr' : 'derInterconnect' },
+      source: { type: 'ibrPlantController', key: 'legacy-without-plant-basis' },
+      recommendation: 'Open IBR Modeling and save a Plant Controller / Grid-Code Scenarios package before report release.',
+      tradeoffs: 'Documenting the basis improves utility review traceability but does not replace manufacturer inverter model validation.',
+      pageHref: 'ibr.html',
+    }));
+    return actions;
+  }
+  if (!pkg) return actions;
+  asArray(pkg.capabilityRows)
+    .filter(row => row.status === 'fail' || row.status === 'warn' || row.status === 'missingData')
+    .slice(0, 20)
+    .forEach(row => actions.push(makeAction({
+      title: `${row.scenarioLabel || row.scenarioId} IBR capability needs review`,
+      description: `Plant controller scenario is ${row.status}; ${row.pTotalKw ?? 'n/a'} kW / ${row.qTotalKvar ?? 'n/a'} kvar at SCR ${row.shortCircuitRatio ?? 'n/a'}.`,
+      severity: row.status === 'fail' ? 'high' : 'medium',
+      category: row.status === 'missingData' ? 'missingData' : 'review',
+      confidence: 0.82,
+      scope: { scenarioId: row.scenarioId, controlMode: row.controlMode, shortCircuitRatio: row.shortCircuitRatio },
+      source: { type: 'ibrPlantController', key: `capability:${row.scenarioId}:${row.status}` },
+      recommendation: row.recommendation || 'Review IBR resource ratings, priority mode, grid-strength assumptions, and dispatch setpoints.',
+      tradeoffs: 'Changing priority or curtailment settings can improve voltage/grid-code behavior but may reduce real-power output.',
+      pageHref: 'ibr.html',
+    })));
+  asArray(pkg.gridCodeRows)
+    .filter(row => row.status === 'fail' || row.status === 'warn' || row.status === 'missingData')
+    .slice(0, 20)
+    .forEach(row => actions.push(makeAction({
+      title: `${row.label || row.checkType} grid-code basis needs review`,
+      description: row.recommendation || 'Grid-code curve, ride-through, or dispatch basis needs review.',
+      severity: row.status === 'fail' ? 'high' : 'medium',
+      category: row.status === 'missingData' ? 'missingData' : 'code',
+      confidence: 0.84,
+      scope: { checkType: row.checkType, status: row.status },
+      source: { type: 'ibrPlantController', key: `grid-code:${row.id}:${row.status}` },
+      recommendation: row.recommendation || 'Complete grid-code curve and ride-through point sets.',
+      tradeoffs: 'Final grid-code settings may require utility approval and manufacturer configuration limits.',
+      pageHref: 'ibr.html',
+    })));
+  asArray(pkg.warningRows)
+    .filter(row => /ramp|clip|curtail|weak|forming|ride|curve|priority|missing/i.test(`${row.code || ''} ${row.message || ''}`))
+    .slice(0, 20)
+    .forEach((row, index) => actions.push(makeAction({
+      title: `Review IBR plant-controller warning: ${row.code || 'warning'}`,
+      description: row.message || 'IBR plant-controller warning requires review.',
+      severity: row.severity === 'error' ? 'high' : 'medium',
+      category: /missing/i.test(`${row.code || ''} ${row.message || ''}`) ? 'missingData' : 'review',
+      confidence: 0.78,
+      scope: { sourceId: row.sourceId, scenarioId: row.scenarioId },
+      source: { type: 'ibrPlantController', key: `warning:${row.code || index}:${row.sourceId || ''}:${row.scenarioId || ''}` },
+      recommendation: 'Review the plant-controller package warnings before releasing DER / IBR reports.',
+      tradeoffs: 'Resolving warnings may require curtailment, revised controls, utility data, or detailed manufacturer model studies.',
+      pageHref: 'ibr.html',
+    })));
+  return actions;
+}
+
+function emfExposureActions(report = {}, studies = {}) {
+  const pkg = report.emfExposure || studies.emfExposure || null;
+  const actions = [];
+  if (!pkg && studies.emf) {
+    actions.push(makeAction({
+      title: 'Save EMF exposure study-case basis',
+      description: 'Legacy EMF results exist without auditable circuit geometry, limit basis, validation, and shielding assumptions.',
+      severity: 'medium',
+      category: 'review',
+      confidence: 0.82,
+      scope: { studyKey: 'emf' },
+      source: { type: 'emfExposure', key: 'legacy-without-study-case' },
+      recommendation: 'Open EMF Analysis and save an EMF Exposure Study Case package before report release.',
+      tradeoffs: 'Documenting the basis improves exposure traceability but does not replace certified field assessment.',
+      pageHref: 'emf.html',
+    }));
+    return actions;
+  }
+  if (!pkg) return actions;
+  asArray(pkg.fieldRows)
+    .filter(row => row.status === 'fail' || row.status === 'warn' || row.status === 'missingData')
+    .slice(0, 20)
+    .forEach(row => {
+      actions.push(makeAction({
+        title: row.status === 'fail' ? `Resolve EMF exposure limit failure at ${row.label}` : `Review EMF exposure utilization at ${row.label}`,
+        description: `${row.label || 'EMF point'} is ${row.utilizationPct ?? 'n/a'}% of ${row.limitLabel || 'the exposure limit'}.`,
+        severity: row.status === 'fail' ? 'high' : 'medium',
+        category: row.status === 'missingData' ? 'missingData' : 'safety',
+        confidence: 0.86,
+        scope: { pointId: row.pointId || row.id, utilizationPct: row.utilizationPct, limit: row.limit_uT },
+        source: { type: 'emfExposure', key: `field:${row.id}:${row.status}` },
+        recommendation: row.recommendation || 'Review current, phasing, distance/depth, shielding, and exposure basis.',
+        tradeoffs: 'Mitigation may require layout changes, load management, shielding verification, or access-control assumptions.',
+        pageHref: 'emf.html',
+      }));
+    });
+  asArray(pkg.validationRows)
+    .filter(row => row.status === 'warn' || row.status === 'fail' || row.status === 'missingData')
+    .slice(0, 12)
+    .forEach(row => {
+      actions.push(makeAction({
+        title: `Review EMF measured/calculated validation for ${row.label}`,
+        description: row.status === 'missingData'
+          ? 'Measured validation row is missing measured or calculated field data.'
+          : `Measured/calculated mismatch is ${row.differencePct ?? 'n/a'}%.`,
+        severity: 'medium',
+        category: row.status === 'missingData' ? 'missingData' : 'review',
+        confidence: 0.8,
+        scope: { validationId: row.id, pointId: row.pointId, differencePct: row.differencePct },
+        source: { type: 'emfExposure', key: `validation:${row.id}:${row.status}` },
+        recommendation: row.recommendation || 'Review measurement point, loading, phasing, and shielding assumptions.',
+        tradeoffs: 'Updating the model to match field data can improve traceability but may expose missing source-current or geometry data.',
+        pageHref: 'emf.html',
+      }));
+    });
+  asArray(pkg.warningRows)
+    .filter(row => row.code === 'shielding-screening' || row.severity === 'missingData')
+    .slice(0, 12)
+    .forEach((row, index) => {
+      actions.push(makeAction({
+        title: row.code === 'shielding-screening' ? 'Verify EMF shielding screening assumption' : 'Complete EMF exposure input data',
+        description: row.message || 'EMF exposure package warning requires review.',
+        severity: row.severity === 'missingData' ? 'medium' : 'low',
+        category: row.severity === 'missingData' ? 'missingData' : 'review',
+        confidence: 0.76,
+        scope: { sourceId: row.sourceId, code: row.code },
+        source: { type: 'emfExposure', key: `warning:${row.code || index}:${row.sourceId || ''}` },
+        recommendation: row.recommendation || 'Review EMF package warning rows before release.',
+        tradeoffs: 'Resolving warnings may require project measurements, layout changes, or detailed modeling.',
+        pageHref: 'emf.html',
+      }));
+    });
+  return actions;
+}
+
+function cathodicProtectionNetworkActions(report = {}, studies = {}) {
+  const pkg = report.cathodicProtectionNetwork || studies.cathodicProtectionNetwork || null;
+  const actions = [];
+  if (!pkg && studies.cathodicProtection) {
+    actions.push(makeAction({
+      title: 'Add cathodic-protection network model basis',
+      description: 'Legacy CP sizing results exist without structure/anode/rectifier network rows, polarization evidence, and interference profile rows.',
+      severity: 'medium',
+      category: 'review',
+      confidence: 0.82,
+      scope: { studyKey: 'cathodicProtection' },
+      source: { type: 'cathodicProtectionNetwork', key: 'legacy-without-network-basis' },
+      recommendation: 'Open Cathodic Protection and save a CP Network Model package before report release.',
+      tradeoffs: 'Network rows improve corrosion review traceability but do not replace field survey or qualified CP design review.',
+      pageHref: 'cathodicprotection.html',
+    }));
+    return actions;
+  }
+  if (!pkg) return actions;
+  asArray(pkg.criteriaRows)
+    .filter(row => row.status === 'fail' || row.status === 'warn' || row.status === 'missingData')
+    .slice(0, 20)
+    .forEach(row => actions.push(makeAction({
+      title: row.status === 'fail' ? `${row.structureTag || row.rectifierId} CP criterion fails` : `${row.structureTag || row.rectifierId} CP criterion needs review`,
+      description: `${row.checkType || 'CP criterion'} is ${row.status}; margin ${row.marginPct ?? 'n/a'}%.`,
+      severity: row.status === 'fail' ? 'high' : 'medium',
+      category: row.status === 'missingData' ? 'missingData' : 'code',
+      confidence: 0.84,
+      scope: { rowId: row.id, checkType: row.checkType, zone: row.zone, status: row.status },
+      source: { type: 'cathodicProtectionNetwork', key: `criteria:${row.id}:${row.status}` },
+      recommendation: row.recommendation || 'Review current demand, source allocation, rectifier capacity, and CP criteria basis.',
+      tradeoffs: 'Correcting CP criteria may require added anodes, rectifier changes, coating assumptions, or field verification.',
+      pageHref: 'cathodicprotection.html',
+    })));
+  asArray(pkg.polarizationRows)
+    .filter(row => row.status === 'fail' || row.status === 'warn' || row.status === 'missingData')
+    .slice(0, 20)
+    .forEach(row => actions.push(makeAction({
+      title: `${row.testStationRef || row.id} CP measurement evidence needs review`,
+      description: `Instant-off ${row.instantOffMv ?? 'n/a'} mV and polarization shift ${row.polarizationShiftMv ?? 'n/a'} mV are ${row.status}.`,
+      severity: row.status === 'fail' ? 'high' : 'medium',
+      category: row.status === 'missingData' ? 'missingData' : 'code',
+      confidence: 0.83,
+      scope: { rowId: row.id, structureId: row.structureId, status: row.status },
+      source: { type: 'cathodicProtectionNetwork', key: `polarization:${row.id}:${row.status}` },
+      recommendation: row.recommendation || 'Complete instant-off/polarization data and measurement correction basis.',
+      tradeoffs: 'Measurement updates may require field testing, interruption coordination, or reference electrode corrections.',
+      pageHref: 'cathodicprotection.html',
+    })));
+  asArray(pkg.interferenceRows)
+    .filter(row => row.status === 'fail' || row.status === 'warn' || row.status === 'missingData')
+    .slice(0, 20)
+    .forEach(row => actions.push(makeAction({
+      title: `${row.label || row.id} CP interference risk is unresolved`,
+      description: `${row.sourceType || 'Interference source'} risk is ${row.riskLevel || 'unknown'} with mitigation status ${row.mitigationStatus || row.status}.`,
+      severity: row.status === 'fail' ? 'high' : 'medium',
+      category: 'review',
+      confidence: 0.8,
+      scope: { sourceId: row.id, sourceType: row.sourceType, riskLevel: row.riskLevel, status: row.status },
+      source: { type: 'cathodicProtectionNetwork', key: `interference:${row.id}:${row.status}` },
+      recommendation: 'Review bonds, drainage, isolation, mitigation actions, and verification testing for the interference source.',
+      tradeoffs: 'Interference mitigation may require third-party coordination and can affect adjacent structures.',
+      pageHref: 'cathodicprotection.html',
+    })));
+  asArray(pkg.potentialProfileRows)
+    .filter(row => row.status === 'fail' || row.status === 'warn')
+    .slice(0, 12)
+    .forEach(row => actions.push(makeAction({
+      title: `${row.structureTag || row.structureId} CP potential profile needs review`,
+      description: `Estimated station ${row.stationM ?? 'n/a'} m instant-off potential is ${row.estimatedInstantOffMv ?? 'n/a'} mV.`,
+      severity: row.status === 'fail' ? 'high' : 'medium',
+      category: 'code',
+      confidence: 0.76,
+      scope: { structureId: row.structureId, stationM: row.stationM, status: row.status },
+      source: { type: 'cathodicProtectionNetwork', key: `profile:${row.id}:${row.status}` },
+      recommendation: row.recommendation || 'Review potential profile, seasonal soil case, and current allocation.',
+      tradeoffs: 'Profile mitigation may require closer anode spacing, more test stations, or field revalidation.',
+      pageHref: 'cathodicprotection.html',
+    })));
+  asArray(pkg.warningRows)
+    .filter(row => row.severity === 'missingData' || row.severity === 'fail')
+    .slice(0, 12)
+    .forEach((row, index) => actions.push(makeAction({
+      title: row.severity === 'missingData' ? 'Complete CP network model data' : 'Resolve CP network warning',
+      description: row.message || 'CP network package warning requires review.',
+      severity: row.severity === 'fail' ? 'high' : 'medium',
+      category: row.severity === 'missingData' ? 'missingData' : 'review',
+      confidence: 0.76,
+      scope: { code: row.code, sourceId: row.sourceId },
+      source: { type: 'cathodicProtectionNetwork', key: `warning:${row.code || index}:${row.sourceId || ''}` },
+      recommendation: row.recommendation || 'Review CP network warning rows before release.',
+      tradeoffs: 'Resolving CP warnings may require field data, third-party coordination, or revised source/anode assumptions.',
+      pageHref: 'cathodicprotection.html',
+    })));
+  return actions;
+}
+
 function protectionSettingSheetActions(report = {}, studies = {}) {
   const pkg = report.protectionSettingSheets || studies.protectionSettingSheets || null;
   const actions = [];
@@ -1323,6 +1568,73 @@ function voltageDropStudyActions(report = {}, studies = {}) {
       recommendation: 'Resolve voltage-drop warnings before using the package for construction or procurement decisions.',
       tradeoffs: 'Some screening warnings may be acceptable when backed by project-specific criteria.',
       pageHref: 'voltagedropstudy.html',
+    })));
+  return actions;
+}
+
+function voltageFlickerActions(report = {}, studies = {}) {
+  const pkg = report.voltageFlicker || studies.voltageFlicker || null;
+  const actions = [];
+  if (!pkg) return actions;
+  const packaged = pkg.version === 'voltage-flicker-study-v1';
+  if (!packaged) {
+    actions.push(makeAction({
+      title: 'Save voltage flicker study-case basis',
+      description: 'Voltage flicker results exist without the packaged PCC, standard, limit, and compliance-row basis.',
+      severity: 'medium',
+      category: 'review',
+      confidence: 0.78,
+      scope: { studyKey: 'voltageFlicker' },
+      source: { type: 'voltageFlicker', key: 'legacy-result' },
+      recommendation: 'Open Voltage Flicker, confirm the PCC/source/limit basis, rerun, and save the packaged study.',
+      tradeoffs: 'Packaging does not change the simplified flicker calculation, but it makes the compliance basis reportable.',
+      pageHref: 'voltageflicker.html',
+    }));
+  }
+  if (packaged && (!pkg.studyCase?.pccTag || !pkg.studyCase?.sourceShortCircuitKva)) {
+    actions.push(makeAction({
+      title: 'Complete voltage flicker PCC/source basis',
+      description: 'The voltage flicker package is missing PCC identification or source short-circuit strength.',
+      severity: 'medium',
+      category: 'missingData',
+      confidence: 0.82,
+      scope: { pccTag: pkg.studyCase?.pccTag, sourceShortCircuitKva: pkg.studyCase?.sourceShortCircuitKva },
+      source: { type: 'voltageFlicker', key: 'missing-basis' },
+      recommendation: 'Record the PCC bus/tag and utility or short-circuit-study source kVA/MVA before issuing flicker results.',
+      tradeoffs: 'The PCC basis determines whether Pst/Plt values are meaningful for utility compliance.',
+      pageHref: 'voltageflicker.html',
+    }));
+  }
+  asArray(pkg.complianceRows)
+    .filter(row => row.status === 'fail' || row.status === 'warn' || row.status === 'missingData')
+    .slice(0, 20)
+    .forEach(row => actions.push(makeAction({
+      title: row.status === 'fail' ? `${row.target} flicker limit fails`
+        : row.status === 'warn' ? `${row.target} exceeds planning level`
+          : `${row.target} flicker inputs are incomplete`,
+      description: `${row.target}: actual ${row.actualValue ?? 'n/a'}, limit ${row.limit ?? 'n/a'}, utilization ${row.utilizationPct ?? 'n/a'}%.`,
+      severity: row.status === 'fail' ? 'high' : 'medium',
+      category: row.status === 'missingData' ? 'missingData' : row.status === 'fail' ? 'code' : 'review',
+      confidence: 0.82,
+      scope: { target: row.target, status: row.status, utilizationPct: row.utilizationPct },
+      source: { type: 'voltageFlicker', key: `compliance:${row.id}:${row.status}` },
+      recommendation: row.recommendation || 'Review disturbance magnitude, repetition rate, source strength, utility limits, or mitigation.',
+      tradeoffs: 'Flicker mitigation can require source-strength review, load scheduling, SVC/filter equipment, or operating restrictions.',
+      pageHref: 'voltageflicker.html',
+    })));
+  asArray(pkg.warningRows)
+    .slice(0, 20)
+    .forEach(row => actions.push(makeAction({
+      title: row.id === 'estimated-plt' ? 'Replace estimated Plt with measured Pst series' : 'Review voltage flicker study warning',
+      description: row.message || String(row),
+      severity: row.severity === 'missingData' || row.severity === 'warning' ? 'medium' : 'low',
+      category: row.severity === 'missingData' ? 'missingData' : 'review',
+      confidence: 0.76,
+      scope: { warningId: row.id, severity: row.severity },
+      source: { type: 'voltageFlicker', key: `warning:${row.id || row.message}` },
+      recommendation: row.recommendation || 'Resolve or document the voltage flicker warning before issuing reports.',
+      tradeoffs: 'Some screening assumptions are acceptable for planning, but final PCC compliance may require measured flickermeter data.',
+      pageHref: 'voltageflicker.html',
     })));
   return actions;
 }
@@ -1752,6 +2064,129 @@ function productCatalogActions(report = {}) {
   return [...usageActions, ...duplicateActions];
 }
 
+function pricingFeedGovernanceActions(report = {}) {
+  const pkg = report.pricingFeedGovernance || {};
+  if (!pkg.summary) return [];
+  const coverageActions = asArray(pkg.estimateCoverageRows)
+    .filter(row => ['unpriced', 'genericDefault', 'conflict', 'unapprovedCatalog', 'stale'].includes(row.status))
+    .slice(0, 30)
+    .map(row => makeAction({
+      title: row.status === 'conflict'
+        ? `${row.lineItemId || row.description} has conflicting governed prices`
+        : row.status === 'unpriced'
+          ? `${row.lineItemId || row.description} has no pricing basis`
+          : `${row.lineItemId || row.description} pricing basis needs review`,
+      description: asArray(row.warnings).join(' ') || `Estimate line pricing status is ${row.status}.`,
+      severity: row.status === 'unpriced' || row.status === 'conflict' ? 'high' : 'medium',
+      category: row.status === 'unpriced' ? 'missingData' : row.status === 'genericDefault' ? 'cost' : 'review',
+      confidence: 0.82,
+      scope: {
+        lineItemId: row.lineItemId,
+        category: row.category,
+        status: row.status,
+        pricingSource: row.pricingSource,
+      },
+      source: { type: 'pricingFeedGovernance', key: `coverage:${row.lineItemId}:${row.status}:${row.pricingRowId || 'none'}` },
+      recommendation: 'Open Cost Estimate, import or approve quote/source pricing, and explicitly apply governed pricing before issuing cost reports.',
+      tradeoffs: 'Governed pricing improves estimate traceability but still requires procurement or supplier verification before commercial use.',
+      pageHref: 'costestimate.html',
+    }));
+  const rowActions = asArray(pkg.warningRows)
+    .filter(row => /expired|stale|currency|uom|catalog|escalation|leadTime|invalid/i.test(`${row.code || ''} ${row.message || ''}`))
+    .slice(0, 20)
+    .map((row, index) => makeAction({
+      title: row.severity === 'error' ? 'Fix invalid pricing feed row' : 'Review pricing source governance warning',
+      description: row.message || 'Pricing feed governance reported a quote/source warning.',
+      severity: row.severity === 'error' ? 'high' : 'medium',
+      category: /currency|uom|missing|invalid/i.test(row.message || '') ? 'missingData' : 'review',
+      confidence: 0.8,
+      scope: { code: row.code, sourceId: row.sourceId, severity: row.severity },
+      source: { type: 'pricingFeedGovernance', key: `warning:${row.code || index}:${row.sourceId || ''}` },
+      recommendation: 'Complete pricing source metadata, approval, catalog mapping, and quote verification dates before using governed prices in a report package.',
+      tradeoffs: 'Pricing source cleanup reduces commercial ambiguity but does not replace supplier quote acceptance.',
+      pageHref: 'costestimate.html',
+    }));
+  return [...coverageActions, ...rowActions];
+}
+
+function cloudLibraryGovernanceActions(report = {}) {
+  const pkg = report.cloudLibraryGovernance || {};
+  if (!pkg.summary) return [];
+  const actions = [];
+  if ((pkg.summary.validationFailureCount || 0) > 0) {
+    actions.push(makeAction({
+      title: 'Fix invalid organization component library release',
+      description: 'At least one organization component library release has validation errors.',
+      severity: 'high',
+      category: 'missingData',
+      confidence: 0.82,
+      scope: { validationFailureCount: pkg.summary.validationFailureCount },
+      source: { type: 'cloudLibraryGovernance', key: 'validation-failure' },
+      recommendation: 'Open Library Manager, fix duplicate or malformed component rows, and republish the organization release.',
+      tradeoffs: 'Library validation prevents downstream one-line/component assumptions from drifting across projects.',
+      pageHref: 'library.html',
+    }));
+  }
+  if (pkg.subscription?.releaseId && !asArray(pkg.releases).some(row => row.id === pkg.subscription.releaseId)) {
+    actions.push(makeAction({
+      title: 'Project is pinned to an unavailable library release',
+      description: `Pinned release ${pkg.subscription.releaseId} is not present in the current organization library package.`,
+      severity: 'medium',
+      category: 'review',
+      confidence: 0.8,
+      scope: pkg.subscription,
+      source: { type: 'cloudLibraryGovernance', key: `stale-pin:${pkg.subscription.releaseId}` },
+      recommendation: 'Load the organization library release list and repin the project to an available approved release.',
+      tradeoffs: 'Repinning improves traceability but may require reviewing component diffs before adoption.',
+      pageHref: 'library.html',
+    }));
+  }
+  const unapprovedRelease = asArray(pkg.releases).find(row => row.id === pkg.subscription?.releaseId && row.approvalStatus !== 'approved');
+  if (unapprovedRelease) {
+    actions.push(makeAction({
+      title: 'Adopted component library release is not approved',
+      description: `${unapprovedRelease.releaseTag || unapprovedRelease.id} approval status is ${unapprovedRelease.approvalStatus}.`,
+      severity: 'medium',
+      category: 'review',
+      confidence: 0.82,
+      scope: { releaseId: unapprovedRelease.id, approvalStatus: unapprovedRelease.approvalStatus },
+      source: { type: 'cloudLibraryGovernance', key: `unapproved:${unapprovedRelease.id}` },
+      recommendation: 'Approve the organization release or adopt an approved release before issuing project reports.',
+      tradeoffs: 'Approval metadata is local governance, not formal document control, but it helps avoid personal-only component data in issued packages.',
+      pageHref: 'library.html',
+    }));
+  }
+  if ((pkg.summary.adoptionConflictCount || 0) > 0) {
+    actions.push(makeAction({
+      title: 'Resolve organization library adoption conflicts',
+      description: `${pkg.summary.adoptionConflictCount} merge conflict(s) were found between the project library and the selected release.`,
+      severity: 'medium',
+      category: 'constructability',
+      confidence: 0.78,
+      scope: pkg.adoptionPreview?.summary || {},
+      source: { type: 'cloudLibraryGovernance', key: 'adoption-conflicts' },
+      recommendation: 'Review the merge preview in Library Manager and choose replace or merge explicitly before adopting the release.',
+      tradeoffs: 'Manual conflict review avoids silently overwriting local component definitions.',
+      pageHref: 'library.html',
+    }));
+  }
+  if ((pkg.summary.releaseCount || 0) === 0 && (pkg.summary.warningCount || 0) > 0) {
+    actions.push(makeAction({
+      title: 'Publish custom component library as an organization release',
+      description: 'The project appears to use personal/local component data without an organization release record.',
+      severity: 'low',
+      category: 'review',
+      confidence: 0.72,
+      scope: { warningCount: pkg.summary.warningCount },
+      source: { type: 'cloudLibraryGovernance', key: 'personal-only-library' },
+      recommendation: 'Publish the current component library to an organization workspace release and pin the project to that release.',
+      tradeoffs: 'Publishing creates a traceable release record while keeping adoption local and review-only.',
+      pageHref: 'library.html',
+    }));
+  }
+  return actions;
+}
+
 function fieldCommissioningActions(report = {}) {
   const pkg = report.fieldCommissioning || {};
   return asArray(pkg.openItems)
@@ -1924,6 +2359,564 @@ function bimConnectorReadinessActions(report = {}) {
       recommendation: 'Resolve or assign connector issue records before final model handoff.',
       tradeoffs: 'Connector issues are local exchange records and do not close native BIM issue trackers automatically.',
       pageHref: 'bimcoordination.html',
+    })));
+  return actions;
+}
+
+function nativeBimConnectorKitActions(report = {}) {
+  const pkg = report.nativeBimConnectorKit || {};
+  if (!pkg.summary) return [];
+  const actions = [];
+  if ((pkg.summary.validDescriptorCount || 0) < (pkg.summary.descriptorCount || 0)) {
+    actions.push(makeAction({
+      title: 'Validate native BIM/CAD connector descriptors',
+      description: 'One or more native connector starter-kit descriptors do not match the current connector contract.',
+      severity: 'medium',
+      category: 'review',
+      confidence: 0.86,
+      scope: { descriptorCount: pkg.summary.descriptorCount, validDescriptorCount: pkg.summary.validDescriptorCount },
+      source: { type: 'nativeBimConnectorKit', key: `descriptor:${pkg.summary.validDescriptorCount}:${pkg.summary.descriptorCount}` },
+      recommendation: 'Regenerate the native connector descriptors from BIM Coordination before handing the starter kit to a desktop add-in developer.',
+      tradeoffs: 'Descriptor validation keeps the add-in handoff aligned with the browser connector contract but does not compile or certify an Autodesk plugin.',
+      pageHref: 'bimcoordination.html',
+    }));
+  }
+  asArray(pkg.installChecklist)
+    .filter(row => row.status !== 'pass')
+    .slice(0, 20)
+    .forEach(row => actions.push(makeAction({
+      title: `${row.connectorType || 'Native connector'} install readiness item needs review`,
+      description: row.item || row.recommendation || 'Native connector starter-kit checklist item is not complete.',
+      severity: row.status === 'fail' ? 'high' : 'medium',
+      category: row.status === 'missingData' ? 'missingData' : 'review',
+      confidence: 0.82,
+      scope: { connectorType: row.connectorType, status: row.status, descriptorId: row.descriptorId },
+      source: { type: 'nativeBimConnectorKit', key: `checklist:${row.id || row.connectorType}:${row.status}` },
+      recommendation: row.recommendation || 'Complete the native connector install/readiness checklist before relying on desktop add-in round trips.',
+      tradeoffs: 'The starter kit is SDK-ready source only; compiling and installing it still requires the target desktop environment.',
+      pageHref: 'bimcoordination.html',
+    })));
+  asArray(pkg.warnings)
+    .filter(warning => String(warning).toLowerCase().includes('write-back') || String(warning).toLowerCase().includes('mutating'))
+    .slice(0, 5)
+    .forEach((warning, index) => actions.push(makeAction({
+      title: 'Keep native BIM/CAD connector imports review-only',
+      description: warning,
+      severity: 'medium',
+      category: 'review',
+      confidence: 0.88,
+      scope: { warning },
+      source: { type: 'nativeBimConnectorKit', key: `writeback:${index}:${warning}` },
+      recommendation: 'Remove write-back assumptions from the starter-kit descriptor and document project-specific authoring changes as future extension work.',
+      tradeoffs: 'Review-only imports avoid unintended native model mutations until a certified desktop workflow exists.',
+      pageHref: 'bimcoordination.html',
+    })));
+  return actions;
+}
+
+function revitSyncReadinessActions(report = {}) {
+  const pkg = report.revitSyncReadiness || {};
+  if (!pkg.summary) return [];
+  const actions = [];
+  if (pkg.summary.validationStatus === 'fail' || (pkg.summary.rejectedPreviewRows || 0) > 0) {
+    actions.push(makeAction({
+      title: 'Resolve Revit bridge validation failures',
+      description: `${pkg.summary.rejectedPreviewRows || 0} Revit sync preview row(s) were rejected or the bridge descriptor failed validation.`,
+      severity: 'high',
+      category: 'review',
+      confidence: 0.88,
+      scope: { validationStatus: pkg.summary.validationStatus, rejectedPreviewRows: pkg.summary.rejectedPreviewRows || 0 },
+      source: { type: 'revitSyncReadiness', key: `validation:${pkg.summary.validationStatus}:${pkg.summary.rejectedPreviewRows || 0}` },
+      recommendation: 'Preview the Revit return package in BIM Coordination and correct invalid identifiers, contract version, or element category mappings before accepting records.',
+      tradeoffs: 'The Revit bridge is review-only in V1, so resolving validation issues improves handoff confidence without mutating the native model.',
+      pageHref: 'bimcoordination.html',
+    }));
+  }
+  asArray(pkg.validationRows)
+    .filter(row => row.status !== 'pass')
+    .slice(0, 10)
+    .forEach(row => actions.push(makeAction({
+      title: `${row.check || 'Revit bridge'} readiness needs review`,
+      description: row.detail || 'Revit bridge validation row is not passing.',
+      severity: row.status === 'fail' ? 'high' : 'medium',
+      category: row.status === 'missingData' ? 'missingData' : 'review',
+      confidence: 0.82,
+      scope: { check: row.check, status: row.status },
+      source: { type: 'revitSyncReadiness', key: `row:${row.id || row.check}:${row.status}` },
+      recommendation: 'Regenerate the Revit bridge descriptor, sample payload, or template file list before relying on the add-in handoff.',
+      tradeoffs: 'Bridge readiness is a handoff quality gate; compiled deployment still requires Autodesk SDK review outside CableTrayRoute.',
+      pageHref: 'bimcoordination.html',
+    })));
+  asArray(pkg.syncPreviewRows)
+    .filter(row => row.status === 'review' || row.status === 'rejected')
+    .slice(0, 20)
+    .forEach(row => actions.push(makeAction({
+      title: `${row.tag || row.id || 'Revit element'} mapping requires review`,
+      description: row.recommendation || 'Revit element sync preview row has low confidence or was rejected.',
+      severity: row.status === 'rejected' ? 'high' : 'medium',
+      category: 'constructability',
+      confidence: 0.8,
+      scope: { elementType: row.elementType, tag: row.tag, guid: row.guid, status: row.status },
+      source: { type: 'revitSyncReadiness', key: `preview:${row.id || row.guid || row.tag}:${row.status}` },
+      recommendation: 'Add stable GUID/source IDs, project tags, or BIM object family mapping hints before accepting Revit sync rows.',
+      tradeoffs: 'Stable Revit mappings reduce duplicate or ambiguous BIM records during handoff.',
+      pageHref: 'bimcoordination.html',
+    })));
+  asArray(pkg.warnings)
+    .filter(warning => String(warning).toLowerCase().includes('write-back') || String(warning).toLowerCase().includes('mutation'))
+    .slice(0, 5)
+    .forEach((warning, index) => actions.push(makeAction({
+      title: 'Keep Revit bridge imports review-only',
+      description: warning,
+      severity: 'medium',
+      category: 'review',
+      confidence: 0.9,
+      scope: { warning },
+      source: { type: 'revitSyncReadiness', key: `writeback:${index}:${warning}` },
+      recommendation: 'Document native write-back as future Autodesk add-in extension work and keep V1 import preview non-mutating.',
+      tradeoffs: 'Review-only Revit sync avoids unintended model changes before a certified add-in workflow exists.',
+      pageHref: 'bimcoordination.html',
+    })));
+  return actions;
+}
+
+function revitNativeSyncActions(report = {}) {
+  const pkg = report.revitNativeSync || {};
+  if (!pkg.summary) return [];
+  const actions = [];
+  if (pkg.summary.status === 'fail' || (pkg.summary.rejectedPreviewRows || 0) > 0) {
+    actions.push(makeAction({
+      title: 'Resolve functional Revit add-in bridge failures',
+      description: `${pkg.summary.rejectedPreviewRows || 0} native Revit preview row(s) were rejected or the source/manifest readiness package failed validation.`,
+      severity: 'high',
+      category: 'review',
+      confidence: 0.88,
+      scope: { status: pkg.summary.status, rejectedPreviewRows: pkg.summary.rejectedPreviewRows || 0 },
+      source: { type: 'revitNativeSync', key: `validation:${pkg.summary.status}:${pkg.summary.rejectedPreviewRows || 0}` },
+      recommendation: 'Preview the Revit return package in BIM Coordination and correct source manifest, contract version, or rejected element rows before accepting BIM records.',
+      tradeoffs: 'The native Revit source remains review-only in V1, so resolving failures improves handoff confidence without automatic model mutation.',
+      pageHref: 'bimcoordination.html',
+    }));
+  }
+  asArray(pkg.commandRows)
+    .filter(row => row.status !== 'pass')
+    .slice(0, 10)
+    .forEach(row => actions.push(makeAction({
+      title: `${row.commandClass || row.commandName || 'Revit command'} source coverage needs review`,
+      description: row.detail || 'Functional Revit add-in command coverage is incomplete.',
+      severity: row.status === 'fail' ? 'high' : 'medium',
+      category: 'missingData',
+      confidence: 0.84,
+      scope: { commandClass: row.commandClass, status: row.status },
+      source: { type: 'revitNativeSync', key: `command:${row.commandClass || row.commandName}:${row.status}` },
+      recommendation: 'Regenerate or update the Revit add-in source scaffold so export, validation, import-preview, and bridge-open commands are present in source and manifest metadata.',
+      tradeoffs: 'CI checks source text and manifests; Autodesk API compilation still requires a licensed Revit SDK environment.',
+      pageHref: 'bimcoordination.html',
+    })));
+  asArray(pkg.exportMappingRows)
+    .filter(row => row.status !== 'ready')
+    .slice(0, 20)
+    .forEach(row => actions.push(makeAction({
+      title: `${row.revitCategory || row.elementType || 'Revit'} export mapping needs review`,
+      description: asArray(row.warnings).join(' ') || 'Native Revit export mapping is incomplete or generic.',
+      severity: row.status === 'missingData' ? 'high' : 'medium',
+      category: row.status === 'missingData' ? 'missingData' : 'constructability',
+      confidence: 0.8,
+      scope: { revitCategory: row.revitCategory, elementType: row.elementType, status: row.status },
+      source: { type: 'revitNativeSync', key: `mapping:${row.id || row.revitCategory}:${row.status}` },
+      recommendation: 'Add category, tag, quantity, and BIM family mapping hints before using the Revit native export in model handoff.',
+      tradeoffs: 'Complete mappings reduce ambiguous BIM rows but may require project-specific Revit family and parameter standards.',
+      pageHref: 'bimcoordination.html',
+    })));
+  asArray(pkg.syncPreviewRows)
+    .filter(row => row.status === 'review' || row.status === 'rejected')
+    .slice(0, 20)
+    .forEach(row => actions.push(makeAction({
+      title: `${row.tag || row.id || 'Revit native row'} sync preview requires review`,
+      description: row.recommendation || 'Functional Revit add-in return row has low confidence or was rejected.',
+      severity: row.status === 'rejected' ? 'high' : 'medium',
+      category: 'constructability',
+      confidence: 0.8,
+      scope: { elementType: row.elementType, tag: row.tag, guid: row.guid, status: row.status },
+      source: { type: 'revitNativeSync', key: `preview:${row.id || row.guid || row.tag}:${row.status}` },
+      recommendation: 'Correct Revit UniqueId/sourceId, tag, or mapped project reference before accepting this row into BIM Coordination.',
+      tradeoffs: 'Preview-only acceptance prevents unintended Revit or CableTrayRoute model changes while preserving issue/quantity traceability.',
+      pageHref: 'bimcoordination.html',
+    })));
+  asArray(pkg.warnings)
+    .filter(warning => /write-back|mutation|sdk|certified|Autodesk/i.test(String(warning)))
+    .slice(0, 8)
+    .forEach((warning, index) => actions.push(makeAction({
+      title: 'Review Revit native sync deployment assumption',
+      description: warning,
+      severity: 'medium',
+      category: 'review',
+      confidence: 0.88,
+      scope: { warning },
+      source: { type: 'revitNativeSync', key: `assumption:${index}:${warning}` },
+      recommendation: 'Keep the V1 Revit native bridge as file/preview exchange unless a licensed Autodesk SDK build and project-specific write-back rules are approved.',
+      tradeoffs: 'This avoids overstating connector readiness while still giving developers buildable source and validated exchange contracts.',
+      pageHref: 'bimcoordination.html',
+    })));
+  return actions;
+}
+
+function autocadSyncReadinessActions(report = {}) {
+  const pkg = report.autocadSyncReadiness || {};
+  if (!pkg.summary) return [];
+  const actions = [];
+  if (pkg.summary.validationStatus === 'fail' || (pkg.summary.rejectedPreviewRows || 0) > 0) {
+    actions.push(makeAction({
+      title: 'Resolve AutoCAD bridge validation failures',
+      description: `${pkg.summary.rejectedPreviewRows || 0} AutoCAD sync preview row(s) were rejected or the bridge descriptor failed validation.`,
+      severity: 'high',
+      category: 'review',
+      confidence: 0.88,
+      scope: { validationStatus: pkg.summary.validationStatus, rejectedPreviewRows: pkg.summary.rejectedPreviewRows || 0 },
+      source: { type: 'autocadSyncReadiness', key: `validation:${pkg.summary.validationStatus}:${pkg.summary.rejectedPreviewRows || 0}` },
+      recommendation: 'Preview the AutoCAD return package in BIM Coordination and correct invalid object handles, contract version, or layer/category mappings before accepting records.',
+      tradeoffs: 'The AutoCAD bridge is review-only in V1, so resolving validation issues improves handoff confidence without mutating the native drawing.',
+      pageHref: 'bimcoordination.html',
+    }));
+  }
+  asArray(pkg.validationRows)
+    .filter(row => row.status !== 'pass')
+    .slice(0, 10)
+    .forEach(row => actions.push(makeAction({
+      title: `${row.check || 'AutoCAD bridge'} readiness needs review`,
+      description: row.detail || 'AutoCAD bridge validation row is not passing.',
+      severity: row.status === 'fail' ? 'high' : 'medium',
+      category: row.status === 'missingData' ? 'missingData' : 'review',
+      confidence: 0.82,
+      scope: { check: row.check, status: row.status },
+      source: { type: 'autocadSyncReadiness', key: `row:${row.id || row.check}:${row.status}` },
+      recommendation: 'Regenerate the AutoCAD bridge descriptor, sample payload, or bundle template file list before relying on the add-in handoff.',
+      tradeoffs: 'Bridge readiness is a handoff quality gate; compiled deployment still requires Autodesk SDK review outside CableTrayRoute.',
+      pageHref: 'bimcoordination.html',
+    })));
+  asArray(pkg.syncPreviewRows)
+    .filter(row => row.status === 'review' || row.status === 'rejected')
+    .slice(0, 20)
+    .forEach(row => actions.push(makeAction({
+      title: `${row.tag || row.id || 'AutoCAD element'} mapping requires review`,
+      description: row.recommendation || 'AutoCAD element sync preview row has low confidence or was rejected.',
+      severity: row.status === 'rejected' ? 'high' : 'medium',
+      category: 'constructability',
+      confidence: 0.8,
+      scope: { elementType: row.elementType, tag: row.tag, guid: row.guid, status: row.status },
+      source: { type: 'autocadSyncReadiness', key: `preview:${row.id || row.guid || row.tag}:${row.status}` },
+      recommendation: 'Add stable object handles/source IDs, project tags, or BIM object family mapping hints before accepting AutoCAD sync rows.',
+      tradeoffs: 'Stable AutoCAD mappings reduce duplicate or ambiguous CAD records during handoff.',
+      pageHref: 'bimcoordination.html',
+    })));
+  asArray(pkg.warnings)
+    .filter(warning => /write-back|mutation|aveva|smartplant/i.test(String(warning)))
+    .slice(0, 8)
+    .forEach((warning, index) => actions.push(makeAction({
+      title: /aveva|smartplant/i.test(String(warning)) ? 'Keep AVEVA and SmartPlant plugins deferred' : 'Keep AutoCAD bridge imports review-only',
+      description: warning,
+      severity: 'medium',
+      category: 'review',
+      confidence: 0.9,
+      scope: { warning },
+      source: { type: 'autocadSyncReadiness', key: `warning:${index}:${warning}` },
+      recommendation: /aveva|smartplant/i.test(String(warning))
+        ? 'Document AVEVA and SmartPlant as future SDK-specific connector work and use the AutoCAD bridge only for AutoCAD-compatible handoffs.'
+        : 'Document native write-back as future AutoCAD add-in extension work and keep V1 import preview non-mutating.',
+      tradeoffs: 'Review-only AutoCAD sync avoids unintended drawing changes before a certified add-in workflow exists.',
+      pageHref: 'bimcoordination.html',
+    })));
+  return actions;
+}
+
+function autocadNativeSyncActions(report = {}) {
+  const pkg = report.autocadNativeSync || {};
+  if (!pkg.summary) return [];
+  const actions = [];
+  if (pkg.summary.status === 'fail' || (pkg.summary.rejectedPreviewRows || 0) > 0) {
+    actions.push(makeAction({
+      title: 'Resolve functional AutoCAD add-in bridge failures',
+      description: `${pkg.summary.rejectedPreviewRows || 0} native AutoCAD preview row(s) were rejected or the source/bundle readiness package failed validation.`,
+      severity: 'high',
+      category: 'review',
+      confidence: 0.88,
+      scope: { status: pkg.summary.status, rejectedPreviewRows: pkg.summary.rejectedPreviewRows || 0 },
+      source: { type: 'autocadNativeSync', key: `validation:${pkg.summary.status}:${pkg.summary.rejectedPreviewRows || 0}` },
+      recommendation: 'Preview the AutoCAD return package in BIM Coordination and correct source manifest, contract version, or rejected entity rows before accepting BIM/CAD records.',
+      tradeoffs: 'The native AutoCAD source remains review-only in V1, so resolving failures improves handoff confidence without automatic drawing mutation.',
+      pageHref: 'bimcoordination.html',
+    }));
+  }
+  asArray(pkg.commandRows)
+    .filter(row => row.status !== 'pass')
+    .slice(0, 10)
+    .forEach(row => actions.push(makeAction({
+      title: `${row.commandClass || row.commandName || 'AutoCAD command'} source coverage needs review`,
+      description: row.detail || 'Functional AutoCAD add-in command coverage is incomplete.',
+      severity: row.status === 'fail' ? 'high' : 'medium',
+      category: 'missingData',
+      confidence: 0.84,
+      scope: { commandClass: row.commandClass, status: row.status },
+      source: { type: 'autocadNativeSync', key: `command:${row.commandClass || row.commandName}:${row.status}` },
+      recommendation: 'Regenerate or update the AutoCAD add-in source scaffold so export, validation, import-preview, and bridge-open commands are present in source and bundle manifest metadata.',
+      tradeoffs: 'CI checks source text and manifests; Autodesk API compilation still requires a licensed AutoCAD SDK environment.',
+      pageHref: 'bimcoordination.html',
+    })));
+  asArray(pkg.exportMappingRows)
+    .filter(row => row.status !== 'ready')
+    .slice(0, 20)
+    .forEach(row => actions.push(makeAction({
+      title: `${row.autocadObjectType || row.elementType || 'AutoCAD'} export mapping needs review`,
+      description: asArray(row.warnings).join(' ') || 'Native AutoCAD export mapping is incomplete or generic.',
+      severity: row.status === 'missingData' ? 'high' : 'medium',
+      category: row.status === 'missingData' ? 'missingData' : 'constructability',
+      confidence: 0.8,
+      scope: { autocadObjectType: row.autocadObjectType, elementType: row.elementType, status: row.status },
+      source: { type: 'autocadNativeSync', key: `mapping:${row.id || row.autocadObjectType}:${row.status}` },
+      recommendation: 'Add layer, block, tag, quantity, and BIM family mapping hints before using the AutoCAD native export in model handoff.',
+      tradeoffs: 'Complete mappings reduce ambiguous CAD rows but may require project-specific layer, block, and property-set standards.',
+      pageHref: 'bimcoordination.html',
+    })));
+  asArray(pkg.syncPreviewRows)
+    .filter(row => row.status === 'review' || row.status === 'rejected')
+    .slice(0, 20)
+    .forEach(row => actions.push(makeAction({
+      title: `${row.tag || row.id || 'AutoCAD native row'} sync preview requires review`,
+      description: row.recommendation || 'Functional AutoCAD add-in return row has low confidence or was rejected.',
+      severity: row.status === 'rejected' ? 'high' : 'medium',
+      category: 'constructability',
+      confidence: 0.8,
+      scope: { elementType: row.elementType, tag: row.tag, guid: row.guid, status: row.status },
+      source: { type: 'autocadNativeSync', key: `preview:${row.id || row.guid || row.tag}:${row.status}` },
+      recommendation: 'Correct AutoCAD handle/sourceId, layer/tag, or mapped project reference before accepting this row into BIM Coordination.',
+      tradeoffs: 'Preview-only acceptance prevents unintended AutoCAD or CableTrayRoute model changes while preserving issue/quantity traceability.',
+      pageHref: 'bimcoordination.html',
+    })));
+  asArray(pkg.warnings)
+    .filter(warning => /write-back|mutation|sdk|certified|Autodesk|AutoCAD/i.test(String(warning)))
+    .slice(0, 8)
+    .forEach((warning, index) => actions.push(makeAction({
+      title: 'Review AutoCAD native sync deployment assumption',
+      description: warning,
+      severity: 'medium',
+      category: 'review',
+      confidence: 0.88,
+      scope: { warning },
+      source: { type: 'autocadNativeSync', key: `assumption:${index}:${warning}` },
+      recommendation: 'Keep the V1 AutoCAD native bridge as file/preview exchange unless a licensed Autodesk SDK build and project-specific write-back rules are approved.',
+      tradeoffs: 'This avoids overstating connector readiness while still giving developers buildable source and validated exchange contracts.',
+      pageHref: 'bimcoordination.html',
+    })));
+  return actions;
+}
+
+function plantCadSyncReadinessActions(report = {}) {
+  const pkg = report.plantCadSyncReadiness || {};
+  if (!pkg.summary) return [];
+  const actions = [];
+  if (pkg.summary.validationStatus === 'fail' || (pkg.summary.rejectedPreviewRows || 0) > 0) {
+    actions.push(makeAction({
+      title: 'Resolve plant-CAD bridge validation failures',
+      description: `${pkg.summary.rejectedPreviewRows || 0} AVEVA/SmartPlant sync preview row(s) were rejected or the bridge descriptor failed validation.`,
+      severity: 'high',
+      category: 'review',
+      confidence: 0.88,
+      scope: { validationStatus: pkg.summary.validationStatus, rejectedPreviewRows: pkg.summary.rejectedPreviewRows || 0 },
+      source: { type: 'plantCadSyncReadiness', key: `validation:${pkg.summary.validationStatus}:${pkg.summary.rejectedPreviewRows || 0}` },
+      recommendation: 'Preview the plant-CAD return package in BIM Coordination and correct invalid source IDs, contract version, or discipline/category mappings before accepting records.',
+      tradeoffs: 'The plant-CAD bridge is review-only in V1, so resolving validation issues improves handoff confidence without mutating native plant models.',
+      pageHref: 'bimcoordination.html',
+    }));
+  }
+  asArray(pkg.validationRows)
+    .filter(row => row.status !== 'pass')
+    .slice(0, 12)
+    .forEach(row => actions.push(makeAction({
+      title: `${row.check || 'Plant-CAD bridge'} readiness needs review`,
+      description: row.detail || 'Plant-CAD bridge validation row is not passing.',
+      severity: row.status === 'fail' ? 'high' : 'medium',
+      category: row.status === 'missingData' ? 'missingData' : 'review',
+      confidence: 0.82,
+      scope: { connectorType: row.connectorType, check: row.check, status: row.status },
+      source: { type: 'plantCadSyncReadiness', key: `row:${row.connectorType}:${row.id || row.check}:${row.status}` },
+      recommendation: 'Regenerate the AVEVA/SmartPlant bridge descriptor, sample payload, or template file list before relying on the plant-CAD handoff.',
+      tradeoffs: 'Bridge readiness is a handoff quality gate; compiled deployment still requires proprietary SDK review outside CableTrayRoute.',
+      pageHref: 'bimcoordination.html',
+    })));
+  asArray(pkg.syncPreviewRows)
+    .filter(row => row.status === 'review' || row.status === 'rejected')
+    .slice(0, 20)
+    .forEach(row => actions.push(makeAction({
+      title: `${row.tag || row.id || 'Plant-CAD element'} mapping requires review`,
+      description: row.recommendation || 'Plant-CAD element sync preview row has low confidence or was rejected.',
+      severity: row.status === 'rejected' ? 'high' : 'medium',
+      category: 'constructability',
+      confidence: 0.8,
+      scope: { connectorType: row.connectorType, elementType: row.elementType, tag: row.tag, guid: row.guid, status: row.status },
+      source: { type: 'plantCadSyncReadiness', key: `preview:${row.connectorType}:${row.id || row.guid || row.tag}:${row.status}` },
+      recommendation: 'Add stable plant model IDs, project tags, or BIM object family mapping hints before accepting AVEVA/SmartPlant sync rows.',
+      tradeoffs: 'Stable plant-CAD mappings reduce duplicate or ambiguous records during handoff.',
+      pageHref: 'bimcoordination.html',
+    })));
+  asArray(pkg.warnings)
+    .filter(warning => /sdk|write-back|mutation|certified|proprietary/i.test(String(warning)))
+    .slice(0, 10)
+    .forEach((warning, index) => actions.push(makeAction({
+      title: 'Keep plant-CAD bridge imports review-only',
+      description: warning,
+      severity: 'medium',
+      category: 'review',
+      confidence: 0.9,
+      scope: { warning },
+      source: { type: 'plantCadSyncReadiness', key: `warning:${index}:${warning}` },
+      recommendation: 'Document AVEVA/SmartPlant compiled plugins as future SDK-specific work and keep V1 plant-CAD exchange non-mutating.',
+      tradeoffs: 'Review-only plant-CAD sync avoids unintended model changes before a certified add-in workflow exists.',
+      pageHref: 'bimcoordination.html',
+    })));
+  return actions;
+}
+
+function plantCadNativeSyncActions(report = {}) {
+  const pkg = report.plantCadNativeSync || {};
+  if (!pkg.summary) return [];
+  const actions = [];
+  if (pkg.summary.status === 'fail' || (pkg.summary.rejectedPreviewRows || 0) > 0) {
+    actions.push(makeAction({
+      title: 'Resolve functional plant-CAD bridge failures',
+      description: `${pkg.summary.rejectedPreviewRows || 0} AVEVA/SmartPlant native preview row(s) were rejected or the source/template readiness package failed validation.`,
+      severity: 'high',
+      category: 'review',
+      confidence: 0.88,
+      scope: { status: pkg.summary.status, rejectedPreviewRows: pkg.summary.rejectedPreviewRows || 0 },
+      source: { type: 'plantCadNativeSync', key: `validation:${pkg.summary.status}:${pkg.summary.rejectedPreviewRows || 0}` },
+      recommendation: 'Preview the plant-CAD return package in BIM Coordination and correct source templates, contract version, or rejected plant object rows before accepting records.',
+      tradeoffs: 'The plant-CAD native source remains review-only in V1, so resolving failures improves handoff confidence without automatic plant model mutation.',
+      pageHref: 'bimcoordination.html',
+    }));
+  }
+  asArray(pkg.commandRows)
+    .filter(row => row.status !== 'pass')
+    .slice(0, 12)
+    .forEach(row => actions.push(makeAction({
+      title: `${row.connectorType || 'Plant-CAD'} ${row.commandName || 'command'} source coverage needs review`,
+      description: row.detail || 'Functional AVEVA/SmartPlant command coverage is incomplete.',
+      severity: row.status === 'fail' ? 'high' : 'medium',
+      category: 'missingData',
+      confidence: 0.84,
+      scope: { connectorType: row.connectorType, commandName: row.commandName, status: row.status },
+      source: { type: 'plantCadNativeSync', key: `command:${row.connectorType}:${row.commandName}:${row.status}` },
+      recommendation: 'Update the AVEVA/SmartPlant command templates so export, validation, import-preview, and bridge-open responsibilities are covered.',
+      tradeoffs: 'CI checks source/template text only; proprietary SDK compilation still requires licensed AVEVA or Hexagon environments.',
+      pageHref: 'bimcoordination.html',
+    })));
+  asArray(pkg.exportMappingRows)
+    .filter(row => row.status !== 'ready')
+    .slice(0, 20)
+    .forEach(row => actions.push(makeAction({
+      title: `${row.plantObjectType || row.elementType || 'Plant object'} export mapping needs review`,
+      description: asArray(row.warnings).join(' ') || 'Native plant-CAD export mapping is incomplete or generic.',
+      severity: row.status === 'missingData' ? 'high' : 'medium',
+      category: row.status === 'missingData' ? 'missingData' : 'constructability',
+      confidence: 0.8,
+      scope: { plantObjectType: row.plantObjectType, elementType: row.elementType, status: row.status },
+      source: { type: 'plantCadNativeSync', key: `mapping:${row.id || row.plantObjectType}:${row.status}` },
+      recommendation: 'Add class selectors, tag sources, quantity basis, and BIM family/property-set mapping hints before using native plant-CAD export in model handoff.',
+      tradeoffs: 'Complete mappings reduce ambiguous plant object rows but may require project-specific AVEVA/SmartPlant class and property standards.',
+      pageHref: 'bimcoordination.html',
+    })));
+  asArray(pkg.syncPreviewRows)
+    .filter(row => row.status === 'review' || row.status === 'rejected')
+    .slice(0, 20)
+    .forEach(row => actions.push(makeAction({
+      title: `${row.tag || row.id || 'Plant-CAD native row'} sync preview requires review`,
+      description: row.recommendation || 'Functional plant-CAD add-in return row has low confidence or was rejected.',
+      severity: row.status === 'rejected' ? 'high' : 'medium',
+      category: 'constructability',
+      confidence: 0.8,
+      scope: { connectorType: row.connectorType, elementType: row.elementType, tag: row.tag, guid: row.guid, status: row.status },
+      source: { type: 'plantCadNativeSync', key: `preview:${row.connectorType}:${row.id || row.guid || row.tag}:${row.status}` },
+      recommendation: 'Correct AVEVA DBREF, SmartPlant ObjectId, tag, or mapped project reference before accepting this row into BIM Coordination.',
+      tradeoffs: 'Preview-only acceptance prevents unintended plant model or CableTrayRoute model changes while preserving issue/quantity traceability.',
+      pageHref: 'bimcoordination.html',
+    })));
+  asArray(pkg.warnings)
+    .filter(warning => /write-back|mutation|sdk|certified|AVEVA|SmartPlant|Hexagon|PDMS/i.test(String(warning)))
+    .slice(0, 10)
+    .forEach((warning, index) => actions.push(makeAction({
+      title: 'Review plant-CAD native sync deployment assumption',
+      description: warning,
+      severity: 'medium',
+      category: 'review',
+      confidence: 0.88,
+      scope: { warning },
+      source: { type: 'plantCadNativeSync', key: `assumption:${index}:${warning}` },
+      recommendation: 'Keep the V1 AVEVA/SmartPlant native bridge as file/preview exchange unless a licensed SDK build and project-specific write-back rules are approved.',
+      tradeoffs: 'This avoids overstating connector readiness while still giving developers SDK-ready handoff source/templates and validated exchange contracts.',
+      pageHref: 'bimcoordination.html',
+    })));
+  return actions;
+}
+
+function bimObjectLibraryActions(report = {}) {
+  const pkg = report.bimObjectLibrary || {};
+  if (!pkg.summary) return [];
+  const actions = [];
+  if ((pkg.summary.missingFamilyCount || 0) > 0) {
+    actions.push(makeAction({
+      title: 'Add BIM family metadata for approved catalog rows',
+      description: `${pkg.summary.missingFamilyCount} governed catalog row(s) do not have BIM object family metadata for connector handoff.`,
+      severity: 'medium',
+      category: 'missingData',
+      confidence: 0.84,
+      scope: { missingFamilyCount: pkg.summary.missingFamilyCount },
+      source: { type: 'bimObjectLibrary', key: `missing:${pkg.summary.missingFamilyCount}` },
+      recommendation: 'Open Product Catalog and add local BIM object family metadata or document generic placeholder use before native BIM handoff.',
+      tradeoffs: 'Family metadata improves connector mapping, but proprietary family binaries still require project or manufacturer sources.',
+      pageHref: 'productcatalog.html',
+    }));
+  }
+  if ((pkg.summary.conflictCount || 0) > 0) {
+    actions.push(makeAction({
+      title: 'Resolve conflicting BIM family mappings',
+      description: `${pkg.summary.conflictCount} catalog row(s) match multiple BIM object family records.`,
+      severity: 'high',
+      category: 'constructability',
+      confidence: 0.86,
+      scope: { conflictCount: pkg.summary.conflictCount },
+      source: { type: 'bimObjectLibrary', key: `conflict:${pkg.summary.conflictCount}` },
+      recommendation: 'Review duplicate manufacturer/catalog/category family rows and keep one approved mapping per catalog item.',
+      tradeoffs: 'Resolving conflicts reduces native connector ambiguity but may require discipline review of family naming and type catalogs.',
+      pageHref: 'productcatalog.html',
+    }));
+  }
+  if ((pkg.summary.genericPlaceholderCount || 0) > 0) {
+    actions.push(makeAction({
+      title: 'Review generic BIM connector placeholders',
+      description: `${pkg.summary.genericPlaceholderCount} project element(s) will export with generic BIM family placeholders.`,
+      severity: 'medium',
+      category: 'review',
+      confidence: 0.8,
+      scope: { genericPlaceholderCount: pkg.summary.genericPlaceholderCount },
+      source: { type: 'bimObjectLibrary', key: `generic:${pkg.summary.genericPlaceholderCount}` },
+      recommendation: 'Add manufacturer/catalog fields and matching family metadata for construction-grade BIM handoff where required.',
+      tradeoffs: 'Generic placeholders keep exchanges moving but may require replacement in the authoring model.',
+      pageHref: 'bimcoordination.html',
+    }));
+  }
+  asArray(pkg.validationRows)
+    .filter(row => row.status === 'fail' || row.status === 'review')
+    .slice(0, 20)
+    .forEach(row => actions.push(makeAction({
+      title: `${row.familyName || row.familyId || 'BIM family'} metadata needs review`,
+      description: [...asArray(row.errors), ...asArray(row.warnings)].join(' ') || 'BIM family metadata validation requires review.',
+      severity: row.status === 'fail' ? 'high' : 'medium',
+      category: row.status === 'fail' ? 'missingData' : 'review',
+      confidence: 0.82,
+      scope: { familyId: row.familyId, status: row.status },
+      source: { type: 'bimObjectLibrary', key: `validation:${row.familyId}:${row.status}` },
+      recommendation: 'Complete missing family name, native format, IFC class, dimensions, connector types, and verification metadata.',
+      tradeoffs: 'Completing metadata improves downstream BIM package quality but does not supply proprietary family binaries.',
+      pageHref: 'productcatalog.html',
     })));
   return actions;
 }
@@ -2116,21 +3109,35 @@ export function buildDesignCoachActions(context = {}, options = {}) {
       ...capacitorBankDutyActions(report, studies),
       ...reliabilityNetworkActions(report, studies),
       ...transientStabilityActions(report, studies),
+      ...ibrPlantControllerActions(report, studies),
+      ...emfExposureActions(report, studies),
+      ...cathodicProtectionNetworkActions(report, studies),
       ...protectionSettingSheetActions(report, studies),
       ...loadDemandGovernanceActions(report, studies),
       ...transformerFeederSizingActions(report, studies),
       ...voltageDropStudyActions(report, studies),
+      ...voltageFlickerActions(report, studies),
       ...pullConstructabilityActions(report, studies),
       ...racewayConstructionActions(report),
       ...equipmentEvaluationActions(report),
       ...advancedGroundingActions(report),
       ...cableThermalEnvironmentActions(report),
       ...loadFlowStudyActions(report, studies),
-      ...optimalPowerFlowActions(report),
+    ...optimalPowerFlowActions(report),
     ...productCatalogActions(report),
+    ...pricingFeedGovernanceActions(report),
+    ...cloudLibraryGovernanceActions(report),
     ...fieldCommissioningActions(report),
     ...bimRoundTripActions(report),
-    ...bimConnectorReadinessActions(report),
+      ...bimConnectorReadinessActions(report),
+      ...nativeBimConnectorKitActions(report),
+      ...revitSyncReadinessActions(report),
+      ...revitNativeSyncActions(report),
+      ...autocadSyncReadinessActions(report),
+      ...autocadNativeSyncActions(report),
+      ...plantCadSyncReadinessActions(report),
+      ...plantCadNativeSyncActions(report),
+      ...bimObjectLibraryActions(report),
     ...studyWarningActions(studies),
     ...approvalActions(studies, approvals),
     ...lifecycleActions(context.lifecycle || report.lifecycle || {}, report),

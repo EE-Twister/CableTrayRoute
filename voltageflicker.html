@@ -97,6 +97,45 @@
       <form id="flicker-form" novalidate>
 
         <fieldset>
+          <legend><strong>Voltage Flicker Study Case</strong></legend>
+          <div class="field-row">
+            <label for="pcc-tag">PCC bus/tag</label>
+            <input type="text" id="pcc-tag" placeholder="e.g. Utility PCC / SWGR-01" aria-describedby="pcc-tag-hint">
+            <p id="pcc-tag-hint" class="field-hint">Record the point of common coupling used for the flicker compliance basis.</p>
+          </div>
+
+          <div class="field-row">
+            <label for="standard-basis">Standard basis</label>
+            <select id="standard-basis" aria-describedby="standard-basis-hint">
+              <option value="IEC61000-4-15">IEC 61000-4-15</option>
+              <option value="IEEE1453">IEEE 1453</option>
+              <option value="utilityCustom">Utility custom</option>
+            </select>
+            <p id="standard-basis-hint" class="field-hint">Select the compliance basis for report labeling. V1 uses the same simplified rectangular voltage-change method.</p>
+          </div>
+
+          <div class="field-row">
+            <label for="pst-planning-limit">Pst planning limit</label>
+            <input type="number" id="pst-planning-limit" min="0.01" step="0.01" value="0.8">
+          </div>
+
+          <div class="field-row">
+            <label for="pst-mandatory-limit">Pst mandatory limit</label>
+            <input type="number" id="pst-mandatory-limit" min="0.01" step="0.01" value="1.0">
+          </div>
+
+          <div class="field-row">
+            <label for="plt-limit">Plt limit</label>
+            <input type="number" id="plt-limit" min="0.01" step="0.01" value="0.8">
+          </div>
+
+          <div class="field-row">
+            <label for="flicker-notes">Study notes</label>
+            <textarea id="flicker-notes" rows="2" placeholder="Utility allocation, source basis, measured-data source, or screening notes"></textarea>
+          </div>
+        </fieldset>
+
+        <fieldset>
           <legend><strong>System Data</strong></legend>
 
           <div class="field-row">
@@ -140,6 +179,9 @@
 
         <div class="form-actions">
           <button type="submit" class="btn btn-primary">Run Flicker Study</button>
+          <button type="button" id="save-study-btn" class="btn btn-secondary" disabled>Save to Studies</button>
+          <button type="button" id="export-json-btn" class="btn btn-secondary" disabled>Export JSON</button>
+          <button type="button" id="export-html-btn" class="btn btn-secondary" disabled>Printable HTML</button>
         </div>
       </form>
 

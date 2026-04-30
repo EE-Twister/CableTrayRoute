@@ -7,9 +7,11 @@ import {
   getBimElements,
   getBimConnectorPackages,
   getBimIssues,
+  getBimObjectFamilies,
   getCables,
   getConduits,
   getEquipment,
+  getProductCatalogRows,
   getTrays,
   setActiveBimConnectorPackageId,
   setBimElements,
@@ -27,6 +29,41 @@ import {
   buildConnectorReadinessPackage,
   validateConnectorImportPackage,
 } from '../analysis/bimConnectorContract.mjs';
+import {
+  buildNativeConnectorKitPackage,
+  renderNativeConnectorKitHTML,
+} from '../analysis/nativeBimConnectorKit.mjs';
+import {
+  buildBimObjectLibraryPackage,
+  renderBimObjectLibraryHTML,
+} from '../analysis/bimObjectLibrary.mjs';
+import {
+  buildRevitExportRequest,
+  buildRevitNativeSyncPackage,
+  buildRevitSyncReadinessPackage,
+  renderRevitNativeSyncHTML,
+  renderRevitSyncReadinessHTML,
+  validateRevitConnectorPayload,
+  buildRevitRoundTripPreview,
+} from '../analysis/revitConnectorBridge.mjs';
+import {
+  buildAutoCadExportRequest,
+  buildAutoCadNativeSyncPackage,
+  buildAutoCadSyncReadinessPackage,
+  renderAutoCadNativeSyncHTML,
+  renderAutoCadSyncReadinessHTML,
+  validateAutoCadConnectorPayload,
+  buildAutoCadRoundTripPreview,
+} from '../analysis/autocadConnectorBridge.mjs';
+import {
+  buildPlantCadExportRequest,
+  buildPlantCadNativeSyncPackage,
+  buildPlantCadSyncReadinessPackage,
+  renderPlantCadNativeSyncHTML,
+  renderPlantCadSyncReadinessHTML,
+  validatePlantCadConnectorPayload,
+  buildPlantCadRoundTripPreview,
+} from '../analysis/plantCadConnectorBridge.mjs';
 
 let pendingConnectorPreview = null;
 let pendingConnectorPackage = null;
@@ -74,6 +111,8 @@ function currentProjectState() {
     trays: getTrays(),
     conduits: getConduits(),
     equipment: getEquipment(),
+    productCatalog: getProductCatalogRows(),
+    bimObjectFamilies: getBimObjectFamilies(),
   };
 }
 
@@ -200,6 +239,420 @@ function renderConnectorReadiness() {
     </div>`).join('');
 }
 
+function currentNativeConnectorKit() {
+  return buildNativeConnectorKitPackage({
+    projectState: currentProjectState(),
+    connectorPackages: getBimConnectorPackages(),
+    activeConnectorPackageId: getActiveBimConnectorPackageId(),
+    bimObjectFamilies: getBimObjectFamilies(),
+  });
+}
+
+function renderNativeConnectorKit() {
+  const summaryContainer = document.getElementById('bim-native-kit-readiness');
+  const tableContainer = document.getElementById('bim-native-kit-table');
+  if (!summaryContainer || !tableContainer) return;
+  const pkg = currentNativeConnectorKit();
+  const metrics = [
+    ['Descriptors', pkg.summary.descriptorCount],
+    ['Valid', pkg.summary.validDescriptorCount],
+    ['Checklist gaps', pkg.summary.missingChecklistItems],
+    ['Samples', pkg.summary.samplePayloadCount],
+    ['Contract', pkg.summary.contractVersion],
+    ['Status', pkg.summary.status],
+  ];
+  summaryContainer.innerHTML = metrics.map(([label, value]) => `
+    <div class="bim-stat">
+      <strong>${escapeHtml(value)}</strong>
+      <span>${escapeHtml(label)}</span>
+    </div>`).join('');
+  tableContainer.innerHTML = `
+    <table class="report-table bim-table">
+      <thead><tr><th>Connector</th><th>Target</th><th>Version</th><th>Commands</th><th>Templates</th></tr></thead>
+      <tbody>${pkg.descriptors.map(row => `<tr>
+        <td>${escapeHtml(row.connectorType)}</td>
+        <td>${escapeHtml(row.targetApplication)}</td>
+        <td>${escapeHtml(row.targetVersion)}</td>
+        <td>${escapeHtml(row.commands.map(command => command.name).join(', '))}</td>
+        <td>${escapeHtml(row.templateFiles.length)}</td>
+      </tr>`).join('')}</tbody>
+    </table>
+    <table class="report-table bim-table">
+      <thead><tr><th>Connector</th><th>Checklist Item</th><th>Status</th><th>Recommendation</th></tr></thead>
+      <tbody>${pkg.installChecklist.map(row => `<tr>
+        <td>${escapeHtml(row.connectorType)}</td>
+        <td>${escapeHtml(row.item)}</td>
+        <td>${escapeHtml(row.status)}</td>
+        <td>${escapeHtml(row.recommendation)}</td>
+      </tr>`).join('')}</tbody>
+    </table>`;
+}
+
+function currentBimObjectLibrary() {
+  return buildBimObjectLibraryPackage({
+    catalogRows: getProductCatalogRows(),
+    familyRows: getBimObjectFamilies(),
+    projectState: currentProjectState(),
+  });
+}
+
+function renderBimObjectLibrary() {
+  const summaryContainer = document.getElementById('bim-object-library-readiness');
+  const tableContainer = document.getElementById('bim-object-library-table');
+  if (!summaryContainer || !tableContainer) return;
+  const pkg = currentBimObjectLibrary();
+  const metrics = [
+    ['Families', pkg.summary.familyCount],
+    ['Approved', pkg.summary.approvedFamilyCount],
+    ['Ready catalog rows', `${pkg.summary.readyCatalogRows}/${pkg.summary.catalogRows}`],
+    ['Missing families', pkg.summary.missingFamilyCount],
+    ['Generic hints', pkg.summary.genericPlaceholderCount],
+    ['Status', pkg.summary.status],
+  ];
+  summaryContainer.innerHTML = metrics.map(([label, value]) => `
+    <div class="bim-stat">
+      <strong>${escapeHtml(value)}</strong>
+      <span>${escapeHtml(label)}</span>
+    </div>`).join('');
+  tableContainer.innerHTML = `<table class="report-table bim-table">
+    <thead><tr><th>Catalog Row</th><th>Category</th><th>Family</th><th>Format</th><th>Status</th><th>Warnings</th></tr></thead>
+    <tbody>${pkg.catalogCoverage.rows.length ? pkg.catalogCoverage.rows.slice(0, 50).map(row => `<tr>
+      <td>${escapeHtml(`${row.manufacturer} ${row.catalogNumber}`)}</td>
+      <td>${escapeHtml(row.category)}</td>
+      <td>${escapeHtml(row.familyName || 'n/a')}</td>
+      <td>${escapeHtml(row.nativeFormat || 'generic')}</td>
+      <td>${escapeHtml(row.status)}</td>
+      <td>${escapeHtml(row.warnings.join('; '))}</td>
+    </tr>`).join('') : '<tr><td colspan="6">No governed catalog rows are available for BIM family coverage.</td></tr>'}</tbody>
+  </table>`;
+}
+
+function currentRevitSyncReadiness(payload = null) {
+  return buildRevitSyncReadinessPackage({
+    projectState: currentProjectState(),
+    payload,
+    bimObjectFamilies: getBimObjectFamilies(),
+    productCatalog: getProductCatalogRows(),
+  });
+}
+
+function renderRevitSyncReadiness(pkg = currentRevitSyncReadiness()) {
+  const summaryContainer = document.getElementById('bim-revit-sync-readiness');
+  const tableContainer = document.getElementById('bim-revit-sync-table');
+  if (!summaryContainer || !tableContainer) return;
+  const metrics = [
+    ['Target', `Revit ${pkg.summary.targetVersion}`],
+    ['Contract', pkg.summary.contractVersion],
+    ['Status', pkg.summary.validationStatus],
+    ['Commands', pkg.summary.commandCount],
+    ['Preview', `${pkg.summary.acceptedPreviewRows}/${pkg.summary.rejectedPreviewRows}`],
+    ['Warnings', pkg.summary.warningCount],
+  ];
+  summaryContainer.innerHTML = metrics.map(([label, value]) => `
+    <div class="bim-stat">
+      <strong>${escapeHtml(value)}</strong>
+      <span>${escapeHtml(label)}</span>
+    </div>`).join('');
+  tableContainer.innerHTML = `
+    <table class="report-table bim-table">
+      <thead><tr><th>Check</th><th>Status</th><th>Detail</th></tr></thead>
+      <tbody>${pkg.validationRows.map(row => `<tr>
+        <td>${escapeHtml(row.check)}</td>
+        <td>${escapeHtml(row.status)}</td>
+        <td>${escapeHtml(row.detail)}</td>
+      </tr>`).join('')}</tbody>
+    </table>
+    <table class="report-table bim-table">
+      <thead><tr><th>Revit Element</th><th>Type</th><th>GUID</th><th>Status</th><th>Recommendation</th></tr></thead>
+      <tbody>${pkg.syncPreviewRows.length ? pkg.syncPreviewRows.slice(0, 25).map(row => `<tr>
+        <td>${escapeHtml(row.tag || row.id)}</td>
+        <td>${escapeHtml(row.elementType)}</td>
+        <td>${escapeHtml(row.guid)}</td>
+        <td>${escapeHtml(row.status)}</td>
+        <td>${escapeHtml(row.recommendation)}</td>
+      </tr>`).join('') : '<tr><td colspan="5">No Revit sync preview rows are loaded.</td></tr>'}</tbody>
+    </table>`;
+}
+
+function currentRevitNativeSync(payload = null) {
+  return buildRevitNativeSyncPackage({
+    projectState: currentProjectState(),
+    payload,
+    bimObjectFamilies: getBimObjectFamilies(),
+    productCatalog: getProductCatalogRows(),
+  });
+}
+
+function renderRevitNativeSync(pkg = currentRevitNativeSync()) {
+  const summaryContainer = document.getElementById('bim-revit-native-readiness');
+  const tableContainer = document.getElementById('bim-revit-native-table');
+  if (!summaryContainer || !tableContainer) return;
+  const metrics = [
+    ['Target', `Revit ${pkg.summary.targetVersion}`],
+    ['Contract', pkg.summary.contractVersion],
+    ['Status', pkg.summary.status],
+    ['Commands', `${pkg.summary.commandReadyCount}/${pkg.summary.commandCount}`],
+    ['Mappings', `${pkg.summary.readyMappingCount}/${pkg.summary.exportMappingCount}`],
+    ['Preview', `${pkg.summary.acceptedPreviewRows}/${pkg.summary.rejectedPreviewRows}`],
+    ['Warnings', pkg.summary.warningCount],
+  ];
+  summaryContainer.innerHTML = metrics.map(([label, value]) => `
+    <div class="bim-stat">
+      <strong>${escapeHtml(value)}</strong>
+      <span>${escapeHtml(label)}</span>
+    </div>`).join('');
+  tableContainer.innerHTML = `
+    <table class="report-table bim-table">
+      <thead><tr><th>Command</th><th>Status</th><th>Detail</th></tr></thead>
+      <tbody>${pkg.commandRows.map(row => `<tr>
+        <td>${escapeHtml(row.commandClass || row.commandName)}</td>
+        <td>${escapeHtml(row.status)}</td>
+        <td>${escapeHtml(row.detail)}</td>
+      </tr>`).join('')}</tbody>
+    </table>
+    <table class="report-table bim-table">
+      <thead><tr><th>Revit Category</th><th>Element Type</th><th>Project Type</th><th>Quantity</th><th>Status</th><th>Warnings</th></tr></thead>
+      <tbody>${pkg.exportMappingRows.length ? pkg.exportMappingRows.map(row => `<tr>
+        <td>${escapeHtml(row.revitCategory)}</td>
+        <td>${escapeHtml(row.elementType)}</td>
+        <td>${escapeHtml(row.mappedProjectType)}</td>
+        <td>${escapeHtml(row.quantityBasis)}</td>
+        <td>${escapeHtml(row.status)}</td>
+        <td>${escapeHtml(row.warnings.join('; '))}</td>
+      </tr>`).join('') : '<tr><td colspan="6">No native Revit export mapping rows.</td></tr>'}</tbody>
+    </table>
+    <table class="report-table bim-table">
+      <thead><tr><th>Validation</th><th>Status</th><th>Detail</th></tr></thead>
+      <tbody>${pkg.validationRows.map(row => `<tr>
+        <td>${escapeHtml(row.check)}</td>
+        <td>${escapeHtml(row.status)}</td>
+        <td>${escapeHtml(row.detail)}</td>
+      </tr>`).join('')}</tbody>
+    </table>`;
+}
+
+function currentAutoCadSyncReadiness(payload = null) {
+  return buildAutoCadSyncReadinessPackage({
+    projectState: currentProjectState(),
+    payload,
+    bimObjectFamilies: getBimObjectFamilies(),
+    productCatalog: getProductCatalogRows(),
+  });
+}
+
+function renderAutoCadSyncReadiness(pkg = currentAutoCadSyncReadiness()) {
+  const summaryContainer = document.getElementById('bim-autocad-sync-readiness');
+  const tableContainer = document.getElementById('bim-autocad-sync-table');
+  if (!summaryContainer || !tableContainer) return;
+  const metrics = [
+    ['Target', `${pkg.summary.targetApplication || 'AutoCAD'} ${pkg.summary.targetVersion}`],
+    ['Contract', pkg.summary.contractVersion],
+    ['Status', pkg.summary.validationStatus],
+    ['Commands', pkg.summary.commandCount],
+    ['Preview', `${pkg.summary.acceptedPreviewRows}/${pkg.summary.rejectedPreviewRows}`],
+    ['Warnings', pkg.summary.warningCount],
+  ];
+  summaryContainer.innerHTML = metrics.map(([label, value]) => `
+    <div class="bim-stat">
+      <strong>${escapeHtml(value)}</strong>
+      <span>${escapeHtml(label)}</span>
+    </div>`).join('');
+  tableContainer.innerHTML = `
+    <table class="report-table bim-table">
+      <thead><tr><th>Check</th><th>Status</th><th>Detail</th></tr></thead>
+      <tbody>${pkg.validationRows.map(row => `<tr>
+        <td>${escapeHtml(row.check)}</td>
+        <td>${escapeHtml(row.status)}</td>
+        <td>${escapeHtml(row.detail)}</td>
+      </tr>`).join('')}</tbody>
+    </table>
+    <table class="report-table bim-table">
+      <thead><tr><th>CAD Element</th><th>Type</th><th>GUID/Handle</th><th>Status</th><th>Recommendation</th></tr></thead>
+      <tbody>${pkg.syncPreviewRows.length ? pkg.syncPreviewRows.slice(0, 25).map(row => `<tr>
+        <td>${escapeHtml(row.tag || row.id)}</td>
+        <td>${escapeHtml(row.elementType)}</td>
+        <td>${escapeHtml(row.guid)}</td>
+        <td>${escapeHtml(row.status)}</td>
+        <td>${escapeHtml(row.recommendation)}</td>
+      </tr>`).join('') : '<tr><td colspan="5">No AutoCAD sync preview rows are loaded.</td></tr>'}</tbody>
+    </table>`;
+}
+
+function currentAutoCadNativeSync(payload = null) {
+  return buildAutoCadNativeSyncPackage({
+    projectState: currentProjectState(),
+    payload,
+    bimObjectFamilies: getBimObjectFamilies(),
+    productCatalog: getProductCatalogRows(),
+  });
+}
+
+function renderAutoCadNativeSync(pkg = currentAutoCadNativeSync()) {
+  const summaryContainer = document.getElementById('bim-autocad-native-readiness');
+  const tableContainer = document.getElementById('bim-autocad-native-table');
+  if (!summaryContainer || !tableContainer) return;
+  const metrics = [
+    ['Target', `${pkg.summary.targetApplication || 'AutoCAD'} ${pkg.summary.targetVersion}`],
+    ['Contract', pkg.summary.contractVersion],
+    ['Status', pkg.summary.status],
+    ['Commands', `${pkg.summary.commandReadyCount}/${pkg.summary.commandCount}`],
+    ['Mappings', `${pkg.summary.readyMappingCount}/${pkg.summary.exportMappingCount}`],
+    ['Preview', `${pkg.summary.acceptedPreviewRows}/${pkg.summary.rejectedPreviewRows}`],
+    ['Warnings', pkg.summary.warningCount],
+  ];
+  summaryContainer.innerHTML = metrics.map(([label, value]) => `
+    <div class="bim-stat">
+      <strong>${escapeHtml(value)}</strong>
+      <span>${escapeHtml(label)}</span>
+    </div>`).join('');
+  tableContainer.innerHTML = `
+    <table class="report-table bim-table">
+      <thead><tr><th>Command</th><th>Status</th><th>Detail</th></tr></thead>
+      <tbody>${pkg.commandRows.map(row => `<tr>
+        <td>${escapeHtml(row.commandClass || row.commandName)}</td>
+        <td>${escapeHtml(row.status)}</td>
+        <td>${escapeHtml(row.detail)}</td>
+      </tr>`).join('')}</tbody>
+    </table>
+    <table class="report-table bim-table">
+      <thead><tr><th>AutoCAD Object</th><th>Type</th><th>Layer / Block</th><th>Quantity</th><th>Status</th><th>Warnings</th></tr></thead>
+      <tbody>${pkg.exportMappingRows.length ? pkg.exportMappingRows.map(row => `<tr>
+        <td>${escapeHtml(row.autocadObjectType)}</td>
+        <td>${escapeHtml(row.elementType)}</td>
+        <td>${escapeHtml(`${row.layerPattern || ''} ${row.blockNamePattern || ''}`)}</td>
+        <td>${escapeHtml(row.quantityBasis)}</td>
+        <td>${escapeHtml(row.status)}</td>
+        <td>${escapeHtml(row.warnings.join('; '))}</td>
+      </tr>`).join('') : '<tr><td colspan="6">No AutoCAD native export mapping rows.</td></tr>'}</tbody>
+    </table>
+    <table class="report-table bim-table">
+      <thead><tr><th>Validation</th><th>Status</th><th>Detail</th></tr></thead>
+      <tbody>${pkg.validationRows.map(row => `<tr>
+        <td>${escapeHtml(row.check)}</td>
+        <td>${escapeHtml(row.status)}</td>
+        <td>${escapeHtml(row.detail)}</td>
+      </tr>`).join('')}</tbody>
+    </table>`;
+}
+
+function currentPlantCadSyncReadiness(payload = null) {
+  return buildPlantCadSyncReadinessPackage({
+    projectState: currentProjectState(),
+    payload,
+    bimObjectFamilies: getBimObjectFamilies(),
+    productCatalog: getProductCatalogRows(),
+  });
+}
+
+function renderPlantCadSyncReadiness(pkg = currentPlantCadSyncReadiness()) {
+  const summaryContainer = document.getElementById('bim-plantcad-sync-readiness');
+  const tableContainer = document.getElementById('bim-plantcad-sync-table');
+  if (!summaryContainer || !tableContainer) return;
+  const metrics = [
+    ['Connectors', pkg.summary.connectorTypes],
+    ['Contract', pkg.summary.contractVersion],
+    ['Status', pkg.summary.validationStatus],
+    ['Descriptors', `${pkg.summary.descriptorValidCount}/${pkg.summary.descriptorCount}`],
+    ['Preview', `${pkg.summary.acceptedPreviewRows}/${pkg.summary.rejectedPreviewRows}`],
+    ['Warnings', pkg.summary.warningCount],
+  ];
+  summaryContainer.innerHTML = metrics.map(([label, value]) => `
+    <div class="bim-stat">
+      <strong>${escapeHtml(value)}</strong>
+      <span>${escapeHtml(label)}</span>
+    </div>`).join('');
+  tableContainer.innerHTML = `
+    <table class="report-table bim-table">
+      <thead><tr><th>Connector</th><th>Target</th><th>Version</th><th>Templates</th><th>Warnings</th></tr></thead>
+      <tbody>${pkg.descriptors.map(row => `<tr>
+        <td>${escapeHtml(row.connectorType)}</td>
+        <td>${escapeHtml(row.targetApplication)}</td>
+        <td>${escapeHtml(row.targetVersion)}</td>
+        <td>${escapeHtml(row.templateFiles.length)}</td>
+        <td>${escapeHtml(row.warnings.join('; '))}</td>
+      </tr>`).join('')}</tbody>
+    </table>
+    <table class="report-table bim-table">
+      <thead><tr><th>Check</th><th>Connector</th><th>Status</th><th>Detail</th></tr></thead>
+      <tbody>${pkg.validationRows.map(row => `<tr>
+        <td>${escapeHtml(row.check)}</td>
+        <td>${escapeHtml(row.connectorType)}</td>
+        <td>${escapeHtml(row.status)}</td>
+        <td>${escapeHtml(row.detail)}</td>
+      </tr>`).join('')}</tbody>
+    </table>
+    <table class="report-table bim-table">
+      <thead><tr><th>Plant Element</th><th>Connector</th><th>Type</th><th>GUID/Source</th><th>Status</th><th>Recommendation</th></tr></thead>
+      <tbody>${pkg.syncPreviewRows.length ? pkg.syncPreviewRows.slice(0, 25).map(row => `<tr>
+        <td>${escapeHtml(row.tag || row.id)}</td>
+        <td>${escapeHtml(row.connectorType)}</td>
+        <td>${escapeHtml(row.elementType)}</td>
+        <td>${escapeHtml(row.guid)}</td>
+        <td>${escapeHtml(row.status)}</td>
+        <td>${escapeHtml(row.recommendation)}</td>
+      </tr>`).join('') : '<tr><td colspan="6">No plant-CAD sync preview rows are loaded.</td></tr>'}</tbody>
+    </table>`;
+}
+
+function currentPlantCadNativeSync(payload = null) {
+  return buildPlantCadNativeSyncPackage({
+    projectState: currentProjectState(),
+    payload,
+    bimObjectFamilies: getBimObjectFamilies(),
+    productCatalog: getProductCatalogRows(),
+  });
+}
+
+function renderPlantCadNativeSync(pkg = currentPlantCadNativeSync()) {
+  const summaryContainer = document.getElementById('bim-plantcad-native-readiness');
+  const tableContainer = document.getElementById('bim-plantcad-native-table');
+  if (!summaryContainer || !tableContainer) return;
+  const metrics = [
+    ['Connectors', pkg.summary.connectorTypes],
+    ['Contract', pkg.summary.contractVersion],
+    ['Status', pkg.summary.status],
+    ['Commands', `${pkg.summary.commandReadyCount}/${pkg.summary.commandCount}`],
+    ['Mappings', `${pkg.summary.readyMappingCount}/${pkg.summary.exportMappingCount}`],
+    ['Preview', `${pkg.summary.acceptedPreviewRows}/${pkg.summary.rejectedPreviewRows}`],
+    ['Warnings', pkg.summary.warningCount],
+  ];
+  summaryContainer.innerHTML = metrics.map(([label, value]) => `
+    <div class="bim-stat">
+      <strong>${escapeHtml(value)}</strong>
+      <span>${escapeHtml(label)}</span>
+    </div>`).join('');
+  tableContainer.innerHTML = `
+    <table class="report-table bim-table">
+      <thead><tr><th>Connector</th><th>Command</th><th>Status</th><th>Detail</th></tr></thead>
+      <tbody>${pkg.commandRows.map(row => `<tr>
+        <td>${escapeHtml(row.connectorType)}</td>
+        <td>${escapeHtml(row.commandName)}</td>
+        <td>${escapeHtml(row.status)}</td>
+        <td>${escapeHtml(row.detail)}</td>
+      </tr>`).join('')}</tbody>
+    </table>
+    <table class="report-table bim-table">
+      <thead><tr><th>Plant Object</th><th>Element Type</th><th>Native Classes</th><th>Quantity</th><th>Status</th><th>Warnings</th></tr></thead>
+      <tbody>${pkg.exportMappingRows.map(row => `<tr>
+        <td>${escapeHtml(row.plantObjectType)}</td>
+        <td>${escapeHtml(row.elementType)}</td>
+        <td>${escapeHtml(row.nativeClasses)}</td>
+        <td>${escapeHtml(row.quantityBasis)}</td>
+        <td>${escapeHtml(row.status)}</td>
+        <td>${escapeHtml(row.warnings.join('; '))}</td>
+      </tr>`).join('')}</tbody>
+    </table>
+    <table class="report-table bim-table">
+      <thead><tr><th>Validation</th><th>Connector</th><th>Status</th><th>Detail</th></tr></thead>
+      <tbody>${pkg.validationRows.map(row => `<tr>
+        <td>${escapeHtml(row.check)}</td>
+        <td>${escapeHtml(row.connectorType || '')}</td>
+        <td>${escapeHtml(row.status)}</td>
+        <td>${escapeHtml(row.detail)}</td>
+      </tr>`).join('')}</tbody>
+    </table>`;
+}
+
 function renderConnectorPreview(validation = null, preview = null) {
   const container = document.getElementById('bim-connector-preview');
   const acceptBtn = document.getElementById('bim-connector-accept');
@@ -234,7 +687,11 @@ function renderConnectorPreview(validation = null, preview = null) {
 }
 
 function exportConnectorPackage(connectorType) {
-  const pkg = buildConnectorExportPackage(currentProjectState(), { connectorType });
+  const pkg = buildConnectorExportPackage(currentProjectState(), {
+    connectorType,
+    bimObjectFamilies: getBimObjectFamilies(),
+    productCatalog: getProductCatalogRows(),
+  });
   const stored = addBimConnectorPackage(pkg);
   setActiveBimConnectorPackageId(stored.id);
   downloadText(`${connectorType}-connector-package.json`, JSON.stringify(stored, null, 2));
@@ -278,6 +735,14 @@ function renderAll() {
   renderReconciliation(pkg);
   renderIssues();
   renderConnectorReadiness();
+  renderNativeConnectorKit();
+  renderBimObjectLibrary();
+  renderRevitSyncReadiness();
+  renderRevitNativeSync();
+  renderAutoCadSyncReadiness();
+  renderAutoCadNativeSync();
+  renderPlantCadSyncReadiness();
+  renderPlantCadNativeSync();
 }
 
 async function importBimFile(file) {
@@ -310,9 +775,300 @@ function wireControls() {
   });
   document.getElementById('bim-export-revit-connector')?.addEventListener('click', () => exportConnectorPackage('revit'));
   document.getElementById('bim-export-autocad-connector')?.addEventListener('click', () => exportConnectorPackage('autocad'));
+  document.getElementById('bim-export-aveva-connector')?.addEventListener('click', () => exportConnectorPackage('aveva'));
+  document.getElementById('bim-export-smartplant-connector')?.addEventListener('click', () => exportConnectorPackage('smartplant'));
   document.getElementById('bim-export-generic-connector')?.addEventListener('click', () => exportConnectorPackage('generic'));
   document.getElementById('bim-connector-file')?.addEventListener('change', event => previewConnectorFile(event.target.files?.[0]));
   document.getElementById('bim-connector-accept')?.addEventListener('click', acceptConnectorPreview);
+  document.getElementById('bim-native-export-descriptor')?.addEventListener('click', () => {
+    const pkg = currentNativeConnectorKit();
+    downloadText('native-bim-connector-descriptors.json', JSON.stringify({
+      version: pkg.version,
+      descriptors: pkg.descriptors,
+      manifests: pkg.manifests,
+      installChecklist: pkg.installChecklist,
+    }, null, 2));
+  });
+  document.getElementById('bim-native-export-revit-sample')?.addEventListener('click', () => {
+    const sample = currentNativeConnectorKit().samplePayloads.find(row => row.connectorType === 'revit');
+    downloadText('revit-native-connector-sample.json', JSON.stringify(sample, null, 2));
+  });
+  document.getElementById('bim-native-export-autocad-sample')?.addEventListener('click', () => {
+    const sample = currentNativeConnectorKit().samplePayloads.find(row => row.connectorType === 'autocad');
+    downloadText('autocad-native-connector-sample.json', JSON.stringify(sample, null, 2));
+  });
+  document.getElementById('bim-native-export-plantcad-sample')?.addEventListener('click', () => {
+    const samples = currentNativeConnectorKit().samplePayloads.filter(row => row.connectorType === 'aveva' || row.connectorType === 'smartplant');
+    downloadText('plantcad-native-connector-samples.json', JSON.stringify(samples, null, 2));
+  });
+  document.getElementById('bim-native-export-html')?.addEventListener('click', () => {
+    const pkg = currentNativeConnectorKit();
+    downloadText('native-bim-connector-kit.html', `<!doctype html><html><body>${renderNativeConnectorKitHTML(pkg)}</body></html>`, 'text/html');
+  });
+  document.getElementById('bim-revit-export-descriptor')?.addEventListener('click', () => {
+    const pkg = currentRevitSyncReadiness();
+    downloadText('revit-bridge-descriptor.json', JSON.stringify({
+      version: pkg.version,
+      descriptor: pkg.descriptor,
+      validationRows: pkg.validationRows,
+    }, null, 2));
+  });
+  document.getElementById('bim-revit-export-sample')?.addEventListener('click', () => {
+    const request = buildRevitExportRequest(currentProjectState(), {
+      bimObjectFamilies: getBimObjectFamilies(),
+      productCatalog: getProductCatalogRows(),
+    });
+    downloadText('revit-bridge-sample-payload.json', JSON.stringify(request.connectorPackage, null, 2));
+  });
+  document.getElementById('bim-revit-export-addin')?.addEventListener('click', () => {
+    const pkg = currentRevitSyncReadiness();
+    downloadText('CableTrayRoute.RevitConnector.addin', pkg.descriptor.addinManifest || '', 'application/xml');
+  });
+  document.getElementById('bim-revit-export-html')?.addEventListener('click', () => {
+    const pkg = currentRevitSyncReadiness();
+    downloadText('revit-sync-readiness.html', `<!doctype html><html><body>${renderRevitSyncReadinessHTML(pkg)}</body></html>`, 'text/html');
+  });
+  document.getElementById('bim-revit-file')?.addEventListener('change', async event => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const text = await file.text();
+    const validation = validateRevitConnectorPayload(text);
+    const preview = buildRevitRoundTripPreview({ payload: text, projectState: currentProjectState() });
+    const pkg = currentRevitSyncReadiness(validation.package);
+    renderRevitSyncReadiness(pkg);
+    renderConnectorPreview(validation, preview);
+    pendingConnectorPackage = validation.package;
+    pendingConnectorPreview = preview;
+    setStatus(`Previewed Revit bridge package: ${preview.acceptedElements.length} accepted, ${preview.rejectedElements.length} rejected.`, validation.valid ? 'success' : 'warn');
+  });
+  document.getElementById('bim-revit-native-export-manifest')?.addEventListener('click', () => {
+    const pkg = currentRevitNativeSync();
+    downloadText('revit-native-source-manifest.json', JSON.stringify({
+      version: pkg.version,
+      nativeSyncCase: pkg.nativeSyncCase,
+      sourceManifest: pkg.sourceManifest,
+      commandRows: pkg.commandRows,
+      exportMappingRows: pkg.exportMappingRows,
+      validationRows: pkg.validationRows,
+    }, null, 2));
+  });
+  document.getElementById('bim-revit-native-export-sample')?.addEventListener('click', () => {
+    const pkg = currentRevitNativeSync();
+    downloadText('revit-native-sync-sample-payload.json', JSON.stringify(pkg.samplePayload, null, 2));
+  });
+  document.getElementById('bim-revit-native-export-addin')?.addEventListener('click', () => {
+    const pkg = currentRevitNativeSync();
+    downloadText('CableTrayRoute.RevitConnector.addin', pkg.nativeSyncCase?.descriptor?.addinManifest || '', 'application/xml');
+  });
+  document.getElementById('bim-revit-native-export-validation')?.addEventListener('click', () => {
+    const pkg = currentRevitNativeSync();
+    downloadText('revit-native-sync-bridge-validation.json', JSON.stringify({
+      summary: pkg.summary,
+      validationRows: pkg.validationRows,
+      syncPreviewRows: pkg.syncPreviewRows,
+      warningRows: pkg.warningRows,
+    }, null, 2));
+  });
+  document.getElementById('bim-revit-native-export-html')?.addEventListener('click', () => {
+    const pkg = currentRevitNativeSync();
+    downloadText('revit-native-sync-readiness.html', `<!doctype html><html><body>${renderRevitNativeSyncHTML(pkg)}</body></html>`, 'text/html');
+  });
+  document.getElementById('bim-revit-native-file')?.addEventListener('change', async event => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const text = await file.text();
+    const validation = validateRevitConnectorPayload(text);
+    const preview = buildRevitRoundTripPreview({ payload: text, projectState: currentProjectState() });
+    const pkg = currentRevitNativeSync(validation.package);
+    renderRevitNativeSync(pkg);
+    renderConnectorPreview(validation, preview);
+    pendingConnectorPackage = validation.package;
+    pendingConnectorPreview = preview;
+    setStatus(`Previewed functional Revit add-in return package: ${preview.acceptedElements.length} accepted, ${preview.rejectedElements.length} rejected.`, validation.valid ? 'success' : 'warn');
+  });
+  document.getElementById('bim-autocad-export-descriptor')?.addEventListener('click', () => {
+    const pkg = currentAutoCadSyncReadiness();
+    downloadText('autocad-bridge-descriptor.json', JSON.stringify({
+      version: pkg.version,
+      descriptor: pkg.descriptor,
+      validationRows: pkg.validationRows,
+    }, null, 2));
+  });
+  document.getElementById('bim-autocad-export-sample')?.addEventListener('click', () => {
+    const request = buildAutoCadExportRequest(currentProjectState(), {
+      bimObjectFamilies: getBimObjectFamilies(),
+      productCatalog: getProductCatalogRows(),
+    });
+    downloadText('autocad-bridge-sample-payload.json', JSON.stringify(request.connectorPackage, null, 2));
+  });
+  document.getElementById('bim-autocad-export-packagecontents')?.addEventListener('click', () => {
+    const pkg = currentAutoCadSyncReadiness();
+    downloadText('PackageContents.xml', pkg.descriptor.packageContentsXml || '', 'application/xml');
+  });
+  document.getElementById('bim-autocad-export-html')?.addEventListener('click', () => {
+    const pkg = currentAutoCadSyncReadiness();
+    downloadText('autocad-sync-readiness.html', `<!doctype html><html><body>${renderAutoCadSyncReadinessHTML(pkg)}</body></html>`, 'text/html');
+  });
+  document.getElementById('bim-autocad-file')?.addEventListener('change', async event => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const text = await file.text();
+    const validation = validateAutoCadConnectorPayload(text);
+    const preview = buildAutoCadRoundTripPreview({ payload: text, projectState: currentProjectState() });
+    const pkg = currentAutoCadSyncReadiness(validation.package);
+    renderAutoCadSyncReadiness(pkg);
+    renderConnectorPreview(validation, preview);
+    pendingConnectorPackage = validation.package;
+    pendingConnectorPreview = preview;
+    setStatus(`Previewed AutoCAD bridge package: ${preview.acceptedElements.length} accepted, ${preview.rejectedElements.length} rejected.`, validation.valid ? 'success' : 'warn');
+  });
+  document.getElementById('bim-autocad-native-export-manifest')?.addEventListener('click', () => {
+    const pkg = currentAutoCadNativeSync();
+    downloadText('autocad-native-source-manifest.json', JSON.stringify({
+      version: pkg.version,
+      nativeSyncCase: pkg.nativeSyncCase,
+      sourceManifest: pkg.sourceManifest,
+      commandRows: pkg.commandRows,
+      exportMappingRows: pkg.exportMappingRows,
+      validationRows: pkg.validationRows,
+    }, null, 2));
+  });
+  document.getElementById('bim-autocad-native-export-sample')?.addEventListener('click', () => {
+    const pkg = currentAutoCadNativeSync();
+    downloadText('autocad-native-sync-sample-payload.json', JSON.stringify(pkg.samplePayload, null, 2));
+  });
+  document.getElementById('bim-autocad-native-export-packagecontents')?.addEventListener('click', () => {
+    const pkg = currentAutoCadNativeSync();
+    downloadText('PackageContents.xml', pkg.nativeSyncCase?.descriptor?.packageContentsXml || '', 'application/xml');
+  });
+  document.getElementById('bim-autocad-native-export-validation')?.addEventListener('click', () => {
+    const pkg = currentAutoCadNativeSync();
+    downloadText('autocad-native-sync-bridge-validation.json', JSON.stringify({
+      summary: pkg.summary,
+      validationRows: pkg.validationRows,
+      syncPreviewRows: pkg.syncPreviewRows,
+      warningRows: pkg.warningRows,
+    }, null, 2));
+  });
+  document.getElementById('bim-autocad-native-export-html')?.addEventListener('click', () => {
+    const pkg = currentAutoCadNativeSync();
+    downloadText('autocad-native-sync-readiness.html', `<!doctype html><html><body>${renderAutoCadNativeSyncHTML(pkg)}</body></html>`, 'text/html');
+  });
+  document.getElementById('bim-autocad-native-file')?.addEventListener('change', async event => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const text = await file.text();
+    const validation = validateAutoCadConnectorPayload(text);
+    const preview = buildAutoCadRoundTripPreview({ payload: text, projectState: currentProjectState() });
+    const pkg = currentAutoCadNativeSync(validation.package);
+    renderAutoCadNativeSync(pkg);
+    renderConnectorPreview(validation, preview);
+    pendingConnectorPackage = validation.package;
+    pendingConnectorPreview = preview;
+    setStatus(`Previewed functional AutoCAD add-in return package: ${preview.acceptedElements.length} accepted, ${preview.rejectedElements.length} rejected.`, validation.valid ? 'success' : 'warn');
+  });
+  document.getElementById('bim-plantcad-export-descriptors')?.addEventListener('click', () => {
+    const pkg = currentPlantCadSyncReadiness();
+    downloadText('plantcad-bridge-descriptors.json', JSON.stringify({
+      version: pkg.version,
+      descriptors: pkg.descriptors,
+      validationRows: pkg.validationRows,
+    }, null, 2));
+  });
+  document.getElementById('bim-plantcad-export-aveva')?.addEventListener('click', () => {
+    const request = buildPlantCadExportRequest(currentProjectState(), {
+      descriptor: { connectorType: 'aveva' },
+      bimObjectFamilies: getBimObjectFamilies(),
+      productCatalog: getProductCatalogRows(),
+    });
+    downloadText('aveva-bridge-sample-payload.json', JSON.stringify(request.connectorPackage, null, 2));
+  });
+  document.getElementById('bim-plantcad-export-smartplant')?.addEventListener('click', () => {
+    const request = buildPlantCadExportRequest(currentProjectState(), {
+      descriptor: { connectorType: 'smartplant' },
+      bimObjectFamilies: getBimObjectFamilies(),
+      productCatalog: getProductCatalogRows(),
+    });
+    downloadText('smartplant-bridge-sample-payload.json', JSON.stringify(request.connectorPackage, null, 2));
+  });
+  document.getElementById('bim-plantcad-export-html')?.addEventListener('click', () => {
+    const pkg = currentPlantCadSyncReadiness();
+    downloadText('plantcad-sync-readiness.html', `<!doctype html><html><body>${renderPlantCadSyncReadinessHTML(pkg)}</body></html>`, 'text/html');
+  });
+  document.getElementById('bim-plantcad-file')?.addEventListener('change', async event => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const text = await file.text();
+    const validation = validatePlantCadConnectorPayload(text);
+    const preview = buildPlantCadRoundTripPreview({ payload: text, projectState: currentProjectState() });
+    const pkg = currentPlantCadSyncReadiness(validation.package);
+    renderPlantCadSyncReadiness(pkg);
+    renderConnectorPreview(validation, preview);
+    pendingConnectorPackage = validation.package;
+    pendingConnectorPreview = preview;
+    setStatus(`Previewed plant-CAD bridge package: ${preview.acceptedElements.length} accepted, ${preview.rejectedElements.length} rejected.`, validation.valid ? 'success' : 'warn');
+  });
+  document.getElementById('bim-plantcad-native-export-manifest')?.addEventListener('click', () => {
+    const pkg = currentPlantCadNativeSync();
+    downloadText('plantcad-native-source-manifest.json', JSON.stringify({
+      version: pkg.version,
+      nativeSyncCase: pkg.nativeSyncCase,
+      sourceManifest: pkg.sourceManifest,
+      commandRows: pkg.commandRows,
+      exportMappingRows: pkg.exportMappingRows,
+      validationRows: pkg.validationRows,
+    }, null, 2));
+  });
+  document.getElementById('bim-plantcad-native-export-aveva')?.addEventListener('click', () => {
+    const pkg = currentPlantCadNativeSync();
+    const sample = pkg.samplePayloads.find(row => row.connectorType === 'aveva') || pkg.samplePayloads[0];
+    downloadText('aveva-native-sync-sample-payload.json', JSON.stringify(sample, null, 2));
+  });
+  document.getElementById('bim-plantcad-native-export-smartplant')?.addEventListener('click', () => {
+    const pkg = currentPlantCadNativeSync();
+    const sample = pkg.samplePayloads.find(row => row.connectorType === 'smartplant') || pkg.samplePayloads[0];
+    downloadText('smartplant-native-sync-sample-payload.json', JSON.stringify(sample, null, 2));
+  });
+  document.getElementById('bim-plantcad-native-export-template')?.addEventListener('click', () => {
+    const pkg = currentPlantCadNativeSync();
+    downloadText('plantcad-native-template-bundle.json', JSON.stringify({
+      templateFiles: pkg.sourceManifest.templateFiles,
+      commandRows: pkg.commandRows,
+      assumptions: pkg.assumptions,
+    }, null, 2));
+  });
+  document.getElementById('bim-plantcad-native-export-validation')?.addEventListener('click', () => {
+    const pkg = currentPlantCadNativeSync();
+    downloadText('plantcad-native-sync-bridge-validation.json', JSON.stringify({
+      summary: pkg.summary,
+      validationRows: pkg.validationRows,
+      syncPreviewRows: pkg.syncPreviewRows,
+      warningRows: pkg.warningRows,
+    }, null, 2));
+  });
+  document.getElementById('bim-plantcad-native-export-html')?.addEventListener('click', () => {
+    const pkg = currentPlantCadNativeSync();
+    downloadText('plantcad-native-sync-readiness.html', `<!doctype html><html><body>${renderPlantCadNativeSyncHTML(pkg)}</body></html>`, 'text/html');
+  });
+  document.getElementById('bim-plantcad-native-file')?.addEventListener('change', async event => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const text = await file.text();
+    const validation = validatePlantCadConnectorPayload(text);
+    const preview = buildPlantCadRoundTripPreview({ payload: text, projectState: currentProjectState() });
+    const pkg = currentPlantCadNativeSync(validation.package);
+    renderPlantCadNativeSync(pkg);
+    renderConnectorPreview(validation, preview);
+    pendingConnectorPackage = validation.package;
+    pendingConnectorPreview = preview;
+    setStatus(`Previewed functional plant-CAD add-in return package: ${preview.acceptedElements.length} accepted, ${preview.rejectedElements.length} rejected.`, validation.valid ? 'success' : 'warn');
+  });
+  document.getElementById('bim-object-library-export-json')?.addEventListener('click', () => {
+    downloadText('bim-object-library-package.json', JSON.stringify(currentBimObjectLibrary(), null, 2));
+  });
+  document.getElementById('bim-object-library-export-html')?.addEventListener('click', () => {
+    downloadText('bim-object-library-package.html', `<!doctype html><html><body>${renderBimObjectLibraryHTML(currentBimObjectLibrary())}</body></html>`, 'text/html');
+  });
   document.getElementById('bim-issue-form')?.addEventListener('submit', event => {
     event.preventDefault();
     const formData = new FormData(event.target);

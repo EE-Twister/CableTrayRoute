@@ -31,6 +31,8 @@ export const PST_LIMIT = 1.0;
 
 /** Number of 10-minute Pst periods in a standard 2-hour Plt observation. */
 export const PLT_OBSERVATION_PERIODS = 12;
+export const VOLTAGE_FLICKER_STUDY_VERSION = 'voltage-flicker-study-v1';
+export const VOLTAGE_FLICKER_STANDARD_BASES = Object.freeze(['IEC61000-4-15', 'IEEE1453', 'utilityCustom']);
 
 // ---------------------------------------------------------------------------
 // Pst look-up table — IEC 61000-4-15 Annex A iso-Pst contours
@@ -75,6 +77,40 @@ const PST_TABLE = [
 function round(v, d = 4) {
   const p = 10 ** d;
   return Math.round(v * p) / p;
+}
+
+function asArray(value) {
+  return Array.isArray(value) ? value : [];
+}
+
+function asObject(value) {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+}
+
+function stringValue(value = '') {
+  return String(value ?? '').trim();
+}
+
+function numberOrNull(value) {
+  if (value == null || value === '') return null;
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : null;
+}
+
+function escapeHtml(value = '') {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function normalizeStatus(status) {
+  if (status === 'fail') return 'fail';
+  if (status === 'marginal' || status === 'warn' || status === 'warning') return 'warn';
+  if (status === 'missingData') return 'missingData';
+  return 'pass';
 }
 
 /**
@@ -299,4 +335,307 @@ function validateInputs(inputs) {
       }
     }
   }
+}
+
+export function normalizeVoltageFlickerStudyCase(input = {}) {
+  const source = asObject(input);
+  const standardBasis = stringValue(source.standardBasis || source.standard || 'IEC61000-4-15');
+  if (!VOLTAGE_FLICKER_STANDARD_BASES.includes(standardBasis)) {
+    throw new Error(`Unsupported voltage flicker standard basis: ${standardBasis || 'blank'}`);
+  }
+  const sourceShortCircuitKva = numberOrNull(
+    source.sourceShortCircuitKva ?? source.systemKva ?? (
+      source.sourceShortCircuitMva != null ? Number(source.sourceShortCircuitMva) * 1000 : null
+    )
+  );
+  if (sourceShortCircuitKva != null && sourceShortCircuitKva <= 0) {
+    throw new Error('source short-circuit kVA must be greater than zero');
+  }
+  const xrRatio = numberOrNull(source.xrRatio ?? 10);
+  if (xrRatio != null && xrRatio <= 0) throw new Error('xrRatio must be a positive number');
+  const nominalVoltageKv = numberOrNull(source.nominalVoltageKv ?? source.nominalKv);
+  if (nominalVoltageKv != null && nominalVoltageKv <= 0) throw new Error('nominalVoltageKv must be greater than zero');
+  const pstPlanningLimit = numberOrNull(source.pstPlanningLimit ?? PST_PASS_THRESHOLD);
+  const pstMandatoryLimit = numberOrNull(source.pstMandatoryLimit ?? PST_LIMIT);
+  const pltLimit = numberOrNull(source.pltLimit ?? PST_PASS_THRESHOLD);
+  const observationPeriods = numberOrNull(source.observationPeriods ?? PLT_OBSERVATION_PERIODS);
+  [
+    ['pstPlanningLimit', pstPlanningLimit],
+    ['pstMandatoryLimit', pstMandatoryLimit],
+    ['pltLimit', pltLimit],
+    ['observationPeriods', observationPeriods],
+  ].forEach(([name, value]) => {
+    if (!Number.isFinite(value) || value <= 0) throw new Error(`${name} must be greater than zero`);
+  });
+  if (pstPlanningLimit > pstMandatoryLimit) {
+    throw new Error('pstPlanningLimit must be less than or equal to pstMandatoryLimit');
+  }
+  const pltBasis = stringValue(source.pltBasis || (asArray(source.pstSeriesForPlt).length ? 'measured' : 'estimated'));
+  if (!['measured', 'estimated'].includes(pltBasis)) throw new Error(`Unsupported Plt basis: ${pltBasis}`);
+  const reportPreset = stringValue(source.reportPreset || 'summary');
+  if (!['summary', 'compliance', 'fullStudy'].includes(reportPreset)) {
+    throw new Error(`Unsupported voltage flicker report preset: ${reportPreset}`);
+  }
+  return {
+    pccTag: stringValue(source.pccTag || source.pccBus || source.pcc || ''),
+    pccBus: stringValue(source.pccBus || source.pccTag || ''),
+    nominalVoltageKv,
+    sourceShortCircuitKva,
+    xrRatio,
+    standardBasis,
+    pstPlanningLimit,
+    pstMandatoryLimit,
+    pltLimit,
+    observationPeriods,
+    pltBasis,
+    reportPreset,
+    notes: stringValue(source.notes || source.studyNotes || ''),
+  };
+}
+
+export function normalizeFlickerLoadStepRows(rows = [], options = {}) {
+  const sourceRows = asArray(rows).length ? asArray(rows) : asArray(options.loadSteps);
+  return sourceRows.map((row, index) => {
+    const source = asObject(row);
+    const loadKw = numberOrNull(source.loadKw ?? source.stepKw ?? source.deltaKw);
+    const repetitionsPerHour = numberOrNull(source.repetitionsPerHour ?? source.eventsPerHour ?? source.rph);
+    if (!Number.isFinite(loadKw) || loadKw <= 0) throw new Error(`loadStepRows[${index}].loadKw must be greater than zero`);
+    if (!Number.isFinite(repetitionsPerHour) || repetitionsPerHour <= 0) {
+      throw new Error(`loadStepRows[${index}].repetitionsPerHour must be greater than zero`);
+    }
+    return {
+      id: stringValue(source.id || `flicker-step-${index + 1}`),
+      label: stringValue(source.label || source.name || `Load Step ${index + 1}`),
+      loadType: stringValue(source.loadType || source.type || 'Other'),
+      loadKw,
+      repetitionsPerHour,
+      notes: stringValue(source.notes || ''),
+    };
+  });
+}
+
+function complianceRow({ id, target, actualValue, limit, status, source, recommendation }) {
+  const utilizationPct = Number.isFinite(actualValue) && Number.isFinite(limit) && limit > 0
+    ? round((actualValue / limit) * 100, 1)
+    : null;
+  return {
+    id,
+    target,
+    actualValue: Number.isFinite(actualValue) ? round(actualValue, 4) : null,
+    limit: Number.isFinite(limit) ? round(limit, 4) : null,
+    utilizationPct,
+    status,
+    source,
+    recommendation,
+  };
+}
+
+export function buildVoltageFlickerComplianceRows(result = {}, studyCase = {}) {
+  const rows = [];
+  asArray(result.loadStepResults).forEach((step, index) => {
+    rows.push(complianceRow({
+      id: `pst-step-${index + 1}`,
+      target: `Pst - ${step.label || `Load Step ${index + 1}`}`,
+      actualValue: step.pst,
+      limit: studyCase.pstMandatoryLimit ?? PST_LIMIT,
+      status: normalizeStatus(step.pstRisk),
+      source: 'loadStepResults',
+      recommendation: step.pstRisk === 'fail'
+        ? 'Mitigate flicker at the PCC or reduce disturbance magnitude/repetition rate.'
+        : step.pstRisk === 'marginal'
+          ? 'Confirm utility planning allocation and consider scheduling or mitigation.'
+          : 'No Pst mitigation required for this load step in screening results.',
+    }));
+  });
+  rows.push(complianceRow({
+    id: 'worst-pst-planning',
+    target: 'Pst planning level',
+    actualValue: result.worstPst,
+    limit: studyCase.pstPlanningLimit ?? PST_PASS_THRESHOLD,
+    status: result.worstPst > (studyCase.pstPlanningLimit ?? PST_PASS_THRESHOLD)
+      ? result.worstPst > (studyCase.pstMandatoryLimit ?? PST_LIMIT) ? 'fail' : 'warn'
+      : 'pass',
+    source: 'summary',
+    recommendation: result.worstPst > (studyCase.pstPlanningLimit ?? PST_PASS_THRESHOLD)
+      ? 'Review utility flicker allocation and mitigation before issuing the study.'
+      : 'Worst-case Pst is within the planning level.',
+  }));
+  rows.push(complianceRow({
+    id: 'worst-pst-mandatory',
+    target: 'Pst mandatory limit',
+    actualValue: result.worstPst,
+    limit: studyCase.pstMandatoryLimit ?? PST_LIMIT,
+    status: result.worstPst > (studyCase.pstMandatoryLimit ?? PST_LIMIT) ? 'fail' : 'pass',
+    source: 'summary',
+    recommendation: result.worstPst > (studyCase.pstMandatoryLimit ?? PST_LIMIT)
+      ? 'Mitigation is required before PCC compliance can be claimed.'
+      : 'Worst-case Pst is within the mandatory limit.',
+  }));
+  rows.push(complianceRow({
+    id: 'plt-limit',
+    target: 'Plt long-term limit',
+    actualValue: result.plt,
+    limit: studyCase.pltLimit ?? PST_PASS_THRESHOLD,
+    status: result.plt > (studyCase.pltLimit ?? PST_PASS_THRESHOLD) ? 'fail' : 'pass',
+    source: result.pltSource === 'measured' ? 'measuredPstSeries' : 'estimatedWorstCase',
+    recommendation: result.pltSource === 'measured'
+      ? result.plt > (studyCase.pltLimit ?? PST_PASS_THRESHOLD)
+        ? 'Long-term flicker exceeds the selected limit; review mitigation or operating profile.'
+        : 'Measured Pst series supports Plt compliance screening.'
+      : 'Replace estimated Plt with measured 10-minute Pst series for issued compliance reports.',
+  }));
+  return rows;
+}
+
+export function buildVoltageFlickerStudyPackage(context = {}) {
+  const source = asObject(context);
+  if (source.version === VOLTAGE_FLICKER_STUDY_VERSION) return source;
+  const legacyResult = source.result || source.activeResult || (source.loadStepResults ? source : null);
+  const inputs = asObject(source.inputs || legacyResult?.inputs || source.studyCase || source);
+  const studyCase = normalizeVoltageFlickerStudyCase({
+    ...inputs,
+    ...asObject(source.studyCase),
+  });
+  let loadStepRows = [];
+  const warningRows = [];
+  try {
+    loadStepRows = normalizeFlickerLoadStepRows(source.loadStepRows || inputs.loadSteps || legacyResult?.inputs?.loadSteps || []);
+  } catch (error) {
+    warningRows.push({
+      id: 'load-step-normalization',
+      severity: 'missingData',
+      message: error instanceof Error ? error.message : 'Invalid voltage flicker load-step row.',
+      recommendation: 'Enter at least one load step with positive kW and repetition rate.',
+    });
+  }
+  if (!studyCase.pccTag && !studyCase.pccBus) {
+    warningRows.push({
+      id: 'missing-pcc',
+      severity: 'missingData',
+      message: 'PCC bus/tag is not defined for the flicker study case.',
+      recommendation: 'Record the utility or plant PCC bus/tag used for the flicker assessment.',
+    });
+  }
+  if (!Number.isFinite(studyCase.sourceShortCircuitKva) || studyCase.sourceShortCircuitKva <= 0) {
+    warningRows.push({
+      id: 'missing-source-short-circuit',
+      severity: 'missingData',
+      message: 'PCC short-circuit kVA/MVA is missing.',
+      recommendation: 'Use the saved short-circuit study or utility-provided source envelope at the PCC.',
+    });
+  }
+  let result = legacyResult && asArray(legacyResult.loadStepResults).length ? legacyResult : null;
+  if (!result && Number.isFinite(studyCase.sourceShortCircuitKva) && loadStepRows.length) {
+    result = runVoltageFlickerStudy({
+      studyLabel: stringValue(source.projectName || studyCase.pccTag || ''),
+      nominalVoltageKv: studyCase.nominalVoltageKv,
+      systemKva: studyCase.sourceShortCircuitKva,
+      xrRatio: studyCase.xrRatio,
+      loadSteps: loadStepRows,
+      pstSeriesForPlt: asArray(inputs.pstSeriesForPlt).length ? asArray(inputs.pstSeriesForPlt) : null,
+    });
+  }
+  if (result?.pltSource === 'estimated' || studyCase.pltBasis === 'estimated') {
+    warningRows.push({
+      id: 'estimated-plt',
+      severity: 'review',
+      message: 'Plt is estimated from worst-case Pst rather than a measured 12-period Pst series.',
+      recommendation: 'Use measured 10-minute Pst values for final long-term compliance reporting.',
+    });
+  }
+  const complianceRows = result ? buildVoltageFlickerComplianceRows(result, studyCase) : [];
+  asArray(result?.warnings).forEach((message, index) => {
+    warningRows.push({
+      id: `calculation-warning-${index + 1}`,
+      severity: /exceeds|required|limit/i.test(message) ? 'warning' : 'review',
+      message,
+      recommendation: /exceeds|required|limit/i.test(message)
+        ? 'Review mitigation, load scheduling, source strength, or utility allocation.'
+        : 'Confirm flicker assumptions before issuing.',
+    });
+  });
+  warningRows.push({
+    id: 'screening-method',
+    severity: 'review',
+    message: 'Voltage flicker uses the simplified rectangular voltage-change screening method, not a full time-domain IEC flickermeter.',
+    recommendation: 'Use measured waveform/flickermeter analysis for final utility compliance where required.',
+  });
+  const counts = complianceRows.reduce((acc, row) => {
+    acc[row.status] = (acc[row.status] || 0) + 1;
+    return acc;
+  }, {});
+  return {
+    version: VOLTAGE_FLICKER_STUDY_VERSION,
+    generatedAt: source.generatedAt || new Date().toISOString(),
+    projectName: stringValue(source.projectName || ''),
+    studyCase,
+    loadStepRows,
+    result,
+    complianceRows,
+    warningRows,
+    warnings: warningRows.map(row => row.message),
+    assumptions: [
+      'IEC 61000-4-15 Annex A / IEEE 1453 simplified rectangular voltage-change screening is used.',
+      'Source short-circuit strength is treated as a Thevenin equivalent at the PCC.',
+      'Full time-domain waveform flickermeter processing is not modeled in V1.',
+    ],
+    summary: {
+      total: complianceRows.length,
+      pass: counts.pass || 0,
+      warn: counts.warn || 0,
+      fail: counts.fail || 0,
+      missingData: counts.missingData || 0,
+      loadStepCount: loadStepRows.length,
+      worstPst: result?.worstPst ?? null,
+      plt: result?.plt ?? null,
+      pltSource: result?.pltSource || studyCase.pltBasis,
+      warningCount: warningRows.length,
+      status: (counts.fail || 0) > 0 ? 'fail' : warningRows.some(row => row.severity === 'missingData') ? 'missingData' : (counts.warn || 0) > 0 || warningRows.length ? 'review' : 'pass',
+      legacyWrapped: Boolean(legacyResult && legacyResult.version !== VOLTAGE_FLICKER_STUDY_VERSION),
+    },
+  };
+}
+
+export function renderVoltageFlickerStudyHTML(pkg = {}) {
+  const pack = pkg?.version === VOLTAGE_FLICKER_STUDY_VERSION ? pkg : buildVoltageFlickerStudyPackage(pkg);
+  const summary = pack.summary || {};
+  const studyCase = pack.studyCase || {};
+  return `<section class="report-section" id="rpt-voltage-flicker">
+  <h2>Voltage Flicker Study Basis</h2>
+  <p class="report-note">IEC 61000-4-15 / IEEE 1453 simplified voltage-change screening package. Full waveform flickermeter compliance remains outside V1.</p>
+  <dl class="report-dl">
+    <dt>PCC</dt><dd>${escapeHtml(studyCase.pccTag || studyCase.pccBus || 'Not specified')}</dd>
+    <dt>Standard</dt><dd>${escapeHtml(studyCase.standardBasis)}</dd>
+    <dt>Source Strength</dt><dd>${escapeHtml(studyCase.sourceShortCircuitKva || 'missing')} kVA</dd>
+    <dt>Worst Pst</dt><dd>${escapeHtml(summary.worstPst ?? 'n/a')}</dd>
+    <dt>Plt</dt><dd>${escapeHtml(summary.plt ?? 'n/a')} (${escapeHtml(summary.pltSource || 'n/a')})</dd>
+    <dt>Status</dt><dd>${escapeHtml(summary.status || 'review')}</dd>
+  </dl>
+  <div class="report-scroll">
+    <table class="report-table">
+      <thead><tr><th>Target</th><th>Actual</th><th>Limit</th><th>Utilization</th><th>Status</th><th>Recommendation</th></tr></thead>
+      <tbody>${asArray(pack.complianceRows).length ? asArray(pack.complianceRows).map(row => `<tr>
+        <td>${escapeHtml(row.target)}</td>
+        <td>${escapeHtml(row.actualValue ?? '')}</td>
+        <td>${escapeHtml(row.limit ?? '')}</td>
+        <td>${escapeHtml(row.utilizationPct == null ? '' : `${row.utilizationPct}%`)}</td>
+        <td>${escapeHtml(row.status)}</td>
+        <td>${escapeHtml(row.recommendation)}</td>
+      </tr>`).join('') : '<tr><td colspan="6">No voltage flicker compliance rows.</td></tr>'}</tbody>
+    </table>
+  </div>
+  <div class="report-scroll">
+    <table class="report-table">
+      <thead><tr><th>Load Step</th><th>Type</th><th>kW</th><th>Events/hr</th><th>Notes</th></tr></thead>
+      <tbody>${asArray(pack.loadStepRows).length ? asArray(pack.loadStepRows).map(row => `<tr>
+        <td>${escapeHtml(row.label)}</td>
+        <td>${escapeHtml(row.loadType)}</td>
+        <td>${escapeHtml(row.loadKw)}</td>
+        <td>${escapeHtml(row.repetitionsPerHour)}</td>
+        <td>${escapeHtml(row.notes)}</td>
+      </tr>`).join('') : '<tr><td colspan="5">No load-step rows.</td></tr>'}</tbody>
+    </table>
+  </div>
+  ${asArray(pack.warningRows).length ? `<h3>Warnings</h3><ul>${asArray(pack.warningRows).map(row => `<li>${escapeHtml(row.message)} ${row.recommendation ? `— ${escapeHtml(row.recommendation)}` : ''}</li>`).join('')}</ul>` : ''}
+</section>`;
 }

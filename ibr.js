@@ -4,6 +4,8 @@ import {
   ibrFaultContribution,
   bessDispatch,
   BESS_MODES,
+  buildIbrPlantControllerPackage,
+  renderIbrPlantControllerHTML,
 } from './analysis/ibrModeling.mjs';
 import { getStudies, setStudies } from './dataStore.mjs';
 import { initStudyApprovalPanel } from './src/components/studyApproval.js';
@@ -22,6 +24,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initBESSForm();
   initFaultForm();
   initVoltVarForm();
+  initPlantControllerForm();
   initExportButtons();
 
   // --- Restore saved state ---
@@ -35,7 +38,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (saved.faultResult) renderFaultResults(saved.faultResult);
     if (saved.voltVarInputs) restoreVoltVarForm(saved.voltVarInputs);
     if (saved.voltVarResult) renderVoltVarResults(saved.voltVarResult);
+    if (saved.plantControllerPackage) restorePlantControllerPackage(saved.plantControllerPackage);
   }
+  const plantController = getStudies().ibrPlantController;
+  if (plantController) restorePlantControllerPackage(plantController);
 });
 
 // ---------------------------------------------------------------------------
@@ -442,6 +448,135 @@ function drawPQDiagram(inputs, result) {
 }
 
 // ---------------------------------------------------------------------------
+// Plant Controller / Grid-Code Scenarios Tab
+// ---------------------------------------------------------------------------
+
+function initPlantControllerForm() {
+  const form = document.getElementById('plant-form');
+  if (!form) return;
+  let currentPackage = null;
+  form.addEventListener('submit', e => {
+    e.preventDefault();
+    currentPackage = runPlantControllerFromForm();
+  });
+  document.getElementById('plant-save-btn')?.addEventListener('click', () => {
+    if (!currentPackage) currentPackage = runPlantControllerFromForm();
+    if (!currentPackage) return;
+    const studies = getStudies();
+    studies.ibrPlantController = currentPackage;
+    if (!studies.ibr) studies.ibr = {};
+    studies.ibr.plantControllerPackage = currentPackage;
+    setStudies(studies);
+    showModal('Plant Controller Study Saved', '<p>Saved to studyResults.ibrPlantController for reports and Design Coach.</p>', 'success');
+  });
+  document.getElementById('plant-json-btn')?.addEventListener('click', () => {
+    if (!currentPackage) currentPackage = runPlantControllerFromForm();
+    if (currentPackage) downloadText(JSON.stringify(currentPackage, null, 2), 'ibr-plant-controller-package.json', 'application/json');
+  });
+  document.getElementById('plant-html-btn')?.addEventListener('click', () => {
+    if (!currentPackage) currentPackage = runPlantControllerFromForm();
+    if (currentPackage) downloadText(renderIbrPlantControllerHTML(currentPackage), 'ibr-plant-controller-package.html', 'text/html');
+  });
+}
+
+function runPlantControllerFromForm() {
+  try {
+    const pkg = buildIbrPlantControllerPackage(readPlantControllerInputs());
+    renderPlantControllerResults(pkg);
+    return pkg;
+  } catch (err) {
+    showModal('Plant Controller Error', `<p>${escHtml(err.message)}</p>`, 'error');
+    return null;
+  }
+}
+
+function readPlantControllerInputs() {
+  return {
+    projectName: document.getElementById('plant-name')?.value || 'IBR Plant Controller Case',
+    plantCase: {
+      name: document.getElementById('plant-name')?.value,
+      pccTag: document.getElementById('plant-pcc')?.value,
+      pccBus: document.getElementById('plant-pcc')?.value,
+      plantMode: document.getElementById('plant-mode')?.value,
+      controlMode: document.getElementById('plant-control')?.value,
+      priorityMode: document.getElementById('plant-priority')?.value,
+      shortCircuitRatio: parseFloat(document.getElementById('plant-scr')?.value),
+      reviewNotes: document.getElementById('plant-notes')?.value,
+    },
+    resourceRows: parseJsonTextarea('plant-resources', []),
+    curveRows: parseJsonTextarea('plant-curves', []),
+    scenarioRows: parseJsonTextarea('plant-scenarios', []),
+  };
+}
+
+function parseJsonTextarea(id, fallback) {
+  const value = document.getElementById(id)?.value || '';
+  if (!value.trim()) return fallback;
+  return JSON.parse(value);
+}
+
+function restorePlantControllerPackage(pkg) {
+  if (!pkg) return;
+  setValue('plant-name', pkg.plantCase?.name || pkg.projectName);
+  setValue('plant-pcc', pkg.plantCase?.pccTag || pkg.plantCase?.pccBus);
+  setSelect('plant-mode', pkg.plantCase?.plantMode);
+  setSelect('plant-control', pkg.plantCase?.controlMode);
+  setSelect('plant-priority', pkg.plantCase?.priorityMode);
+  setValue('plant-scr', pkg.plantCase?.shortCircuitRatio);
+  setValue('plant-notes', pkg.plantCase?.reviewNotes);
+  setValue('plant-resources', JSON.stringify(pkg.resourceRows || [], null, 2));
+  setValue('plant-curves', JSON.stringify(pkg.curveRows || [], null, 2));
+  setValue('plant-scenarios', JSON.stringify(pkg.scenarioRows || [], null, 2));
+  renderPlantControllerResults(pkg);
+}
+
+function renderPlantControllerResults(pkg) {
+  const panel = document.getElementById('plant-results');
+  const cards = document.getElementById('plant-result-cards');
+  const body = document.getElementById('plant-capability-body');
+  const warnings = document.getElementById('plant-warning-body');
+  if (!panel || !cards || !body || !warnings) return;
+  const summary = pkg.summary || {};
+  cards.innerHTML = `
+    <div class="result-card">
+      <span class="result-label">Enabled Resources</span>
+      <span class="result-value">${fmt(summary.enabledResourceCount, 0)}</span>
+    </div>
+    <div class="result-card">
+      <span class="result-label">Scenarios</span>
+      <span class="result-value">${fmt(summary.scenarioCount, 0)}</span>
+    </div>
+    <div class="result-card ${summary.warn || summary.missingData ? 'result-card--warn' : ''}">
+      <span class="result-label">Warnings / Missing Data</span>
+      <span class="result-value">${fmt((summary.warn || 0) + (summary.missingData || 0), 0)}</span>
+    </div>
+    <div class="result-card ${summary.fail ? 'result-card--warn' : 'result-card--ok'}">
+      <span class="result-label">Failures</span>
+      <span class="result-value">${fmt(summary.fail || 0, 0)}</span>
+    </div>
+  `;
+  body.innerHTML = (pkg.capabilityRows || []).map(row => `<tr>
+    <td>${escHtml(row.scenarioLabel || row.scenarioId)}</td>
+    <td>${escHtml(row.plantMode)}</td>
+    <td>${escHtml(row.controlMode)}</td>
+    <td>${fmt(Number(row.pTotalKw), 1)}</td>
+    <td>${fmt(Number(row.qTotalKvar), 1)}</td>
+    <td>${row.shortCircuitRatio ?? 'â€”'}</td>
+    <td>${escHtml(row.status)}</td>
+    <td>${escHtml(row.recommendation)}</td>
+  </tr>`).join('') || '<tr><td colspan="8">No capability rows.</td></tr>';
+  warnings.innerHTML = (pkg.warningRows || []).map(row => `<tr>
+    <td>${escHtml(row.severity || 'warning')}</td>
+    <td>${escHtml(row.code || 'warning')}</td>
+    <td>${escHtml(row.sourceTag || row.sourceId || '')}</td>
+    <td>${escHtml(row.message || '')}</td>
+  </tr>`).join('') || '<tr><td colspan="4">No warnings.</td></tr>';
+  const preview = document.getElementById('plant-json-preview');
+  if (preview) preview.textContent = JSON.stringify(pkg, null, 2);
+  panel.classList.remove('hidden');
+}
+
+// ---------------------------------------------------------------------------
 // Export buttons
 // ---------------------------------------------------------------------------
 
@@ -483,6 +618,17 @@ function exportCSV() {
     rows.push(['Volt-VAR', 'Q_min', fmt(r.qMin_kvar, 2), 'kvar']);
     rows.push(['Volt-VAR', 'Q_droop', fmt(r.qDroop_kvar, 2), 'kvar']);
     rows.push(['Volt-VAR', 'Power Factor', fmt(r.operatingPoint.pf, 3), '']);
+  }
+  const plantPackage = getStudies().ibrPlantController || studies.plantControllerPackage;
+  if (plantPackage) {
+    (plantPackage.capabilityRows || []).forEach(row => {
+      rows.push(['Plant Controller', `${row.scenarioLabel || row.scenarioId} kW`, row.pTotalKw ?? '', 'kW']);
+      rows.push(['Plant Controller', `${row.scenarioLabel || row.scenarioId} kvar`, row.qTotalKvar ?? '', 'kvar']);
+      rows.push(['Plant Controller', `${row.scenarioLabel || row.scenarioId} status`, row.status ?? '', '']);
+    });
+    (plantPackage.warningRows || []).forEach(row => {
+      rows.push(['Plant Controller Warning', row.code || 'warning', row.message || '', row.severity || 'warning']);
+    });
   }
 
   const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');

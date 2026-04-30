@@ -16,17 +16,22 @@ import {
   getBimElements,
   getBimConnectorPackages,
   getBimIssues,
+  getBimObjectFamilies,
   getCables,
   getConduits,
+  getComponentLibrarySubscription,
   getDesignCoachDecisions,
   getDrcAcceptedFindings,
   getDuctbanks,
   getEquipment,
   getFieldObservations,
+  getItem,
   getLoads,
   getOneLine,
   getProjectRevisions,
   getProductCatalogRows,
+  getPricingFeedDescriptors,
+  getPricingFeedRows,
   getPanels,
   getStudies,
   getStudyApprovals,
@@ -67,6 +72,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const approvals = getStudyApprovals();
     const state     = getProjectState();
     const projectName = (state && state.name) || document.getElementById('rpt-project-name')?.value?.trim() || 'Untitled Project';
+    const componentLibraryVersion = getItem('componentLibraryVersion', '');
+    const componentLibrary = componentLibraryVersion ? getItem(`componentLibrary_${componentLibraryVersion}`, null) : null;
     const lifecycle = summarizeLifecycleLineage({
       projectRevisions: getProjectRevisions(),
       studyPackages: getStudyPackages(),
@@ -91,6 +98,11 @@ document.addEventListener('DOMContentLoaded', () => {
       bimIssues: getBimIssues(),
       bimConnectorPackages: getBimConnectorPackages(),
       activeBimConnectorPackageId: getActiveBimConnectorPackageId(),
+      bimObjectFamilies: getBimObjectFamilies(),
+      pricingFeedRows: getPricingFeedRows(),
+      pricingFeedDescriptors: getPricingFeedDescriptors(),
+      componentLibrary,
+      componentLibrarySubscription: getComponentLibrarySubscription(),
     });
     const trayCableMap = cables.reduce((acc, cable) => {
       const raceway = cable.route_preference || cable.raceway;

@@ -71,6 +71,7 @@ function baseSnapshot(overrides = {}) {
     bimIssues: [{ id: 'bim-issue-1', title: 'Open BIM item', status: 'open' }],
     bimConnectorPackages: [{ id: 'connector-r1', connectorType: 'revit', createdAt: '2026-04-27T10:00:00.000Z' }],
     activeBimConnectorPackageId: 'connector-r1',
+    componentLibrarySubscription: { workspaceId: 'plant-a', releaseId: 'release-r1', releaseTag: 'R1', pinnedVersion: 'org-R1' },
     ...overrides,
   });
 }
@@ -82,6 +83,7 @@ describe('project lifecycle package helpers', () => {
     assert.equal(dataStore.getActiveStudyPackageId(), '');
     assert.deepEqual(dataStore.getDesignCoachDecisions(), []);
     assert.deepEqual(dataStore.getFieldObservations(), []);
+    assert.equal(dataStore.getComponentLibrarySubscription().releaseId, '');
   });
 
   it('deep-clones snapshots and revisions', () => {
@@ -117,6 +119,12 @@ describe('project lifecycle package helpers', () => {
     assert.equal(snapshot.bimIssues[0].status, 'open');
     assert.equal(snapshot.bimConnectorPackages.length, 1);
     assert.equal(snapshot.activeBimConnectorPackageId, 'connector-r1');
+  });
+
+  it('captures component library subscription metadata in lifecycle snapshots', () => {
+    const snapshot = baseSnapshot();
+    assert.equal(snapshot.componentLibrarySubscription.workspaceId, 'plant-a');
+    assert.equal(snapshot.componentLibrarySubscription.releaseId, 'release-r1');
   });
 
   it('generates stable hashes for equivalent snapshots', () => {
