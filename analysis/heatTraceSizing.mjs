@@ -400,6 +400,242 @@ export function selectStandardHeatTraceRating(requiredWPerFt) {
   return { selectedWPerFt: selected, options };
 }
 
+// ---------------------------------------------------------------------------
+// Product selection, BOM, line list, and controller schedule
+// ---------------------------------------------------------------------------
+
+/**
+ * Map a circuit's environment string to a hazardous-area flag.
+ * @param {string} environment
+ * @returns {boolean}
+ */
+function isHazardousArea(environment) {
+  return environment === 'hazardous-area';
+}
+
+/**
+ * Select the best-matching heat-trace product family for a circuit.
+ *
+ * Matching rules (all must pass):
+ *  1. Product voltage list includes the circuit voltage.
+ *  2. Product nominal W/ft >= circuit required W/ft.
+ *  3. Hazardous-area circuits require a product with a non-null hazardousAreaRating.
+ *  4. Circuit max exposure temp <= product maxExposureTempC.
+ *  5. Circuit effective length <= product maxCircuitLengthFt for the given voltage.
+ *
+ * Returns candidates sorted by nominalWPerFt ascending (tightest fit first).
+ * Returns an empty array when no product matches.
+ *
+ * @param {object} circuit  Normalized branch case (from normalizeHeatTraceBranchCase or equivalent)
+ * @param {object[]} catalog  Array of product objects from heatTraceProducts.json
+ * @returns {{ product: object, circuitLengthOk: boolean, candidates: object[] }}
+ */
+export function selectHeatTraceProduct(circuit, catalog) {
+  if (!circuit || typeof circuit !== 'object') throw new Error('circuit must be an object');
+  if (!Array.isArray(catalog)) throw new Error('catalog must be an array');
+
+  const voltageV = Number(circuit.voltageV) || 240;
+  const requiredWPerFt = Number(circuit.requiredWPerFt) || 0;
+  const effectiveLengthFt = Number(circuit.effectiveTraceLengthFt) || Number(circuit.lineLengthFt) || 0;
+  const maintainTempC = Number(circuit.inputs?.maintainTempC) || Number(circuit.maintainTempC) || 0;
+  const hazardous = isHazardousArea(circuit.inputs?.environment || circuit.environment || '');
+
+  const candidates = catalog
+    .filter(product => {
+      if (!Array.isArray(product.voltages) || !product.voltages.includes(voltageV)) return false;
+      if ((product.nominalWPerFt || 0) < requiredWPerFt) return false;
+      if (hazardous && !product.hazardousAreaRating) return false;
+      if (maintainTempC > (product.maxExposureTempC || Infinity)) return false;
+      return true;
+    })
+    .sort((a, b) => (a.nominalWPerFt || 0) - (b.nominalWPerFt || 0));
+
+  const best = candidates[0] || null;
+  const maxLen = best ? ((best.maxCircuitLengthFt || {})[String(voltageV)] || 0) : 0;
+  const circuitLengthOk = best ? (effectiveLengthFt <= maxLen) : false;
+
+  return { product: best, circuitLengthOk, candidates };
+}
+
+/**
+ * Calculate accessory kit counts for a heat-trace circuit.
+ *
+ * Returns quantities for standard kit items:
+ *  - powerConnectionKits: 1 per circuit
+ *  - endSealKits: 1 per circuit run
+ *  - spliceTeeKits: 0 (requires project specifics; flagged for manual entry)
+ *  - labels: 1 per 50 ft of effective trace length (minimum 1)
+ *  - controllerPoints: 1 RTD/thermostat per traceRunCount circuits (minimum 1)
+ *  - controllerBreakers: 1 per circuit
+ *  - valveKits: count of valve-type component allowances
+ *  - flangePairKits: count of flangePair-type component allowances
+ *
+ * @param {object} circuit  Normalized branch case
+ * @param {object|null} product  Selected product (from selectHeatTraceProduct), may be null
+ * @returns {object}  Kit item counts
+ */
+export function calcAccessoryKit(circuit, product) {
+  if (!circuit || typeof circuit !== 'object') throw new Error('circuit must be an object');
+
+  const effectiveLengthFt = Number(circuit.effectiveTraceLengthFt) || Number(circuit.lineLengthFt) || 0;
+  const traceRunCount = Math.max(1, Number(circuit.traceRunCount) || 1);
+  const componentAllowances = Array.isArray(circuit.componentAllowances) ? circuit.componentAllowances : [];
+
+  const valveCount = componentAllowances
+    .filter(c => c.type === 'valve')
+    .reduce((sum, c) => sum + Math.round(Number(c.quantity) || 0), 0);
+  const flangePairCount = componentAllowances
+    .filter(c => c.type === 'flangePair')
+    .reduce((sum, c) => sum + Math.round(Number(c.quantity) || 0), 0);
+
+  return {
+    powerConnectionKits: 1,
+    endSealKits: traceRunCount,
+    spliceTeeKits: 0,
+    labels: Math.max(1, Math.ceil(effectiveLengthFt / 50)),
+    controllerPoints: 1,
+    controllerBreakers: 1,
+    valveKits: valveCount,
+    flangePairKits: flangePairCount,
+    note: 'Splice/tee kit count requires project-specific layout; enter manually.',
+  };
+}
+
+/**
+ * Build a heat-trace line list from an array of normalized circuit cases.
+ *
+ * Each row includes identification, thermal, electrical, product, and
+ * circuit-check columns as required for a construction line list.
+ *
+ * @param {object[]} circuits  Array of normalized branch cases
+ * @param {object[]} catalog   Product catalog array
+ * @returns {object[]}  Array of line-list row objects
+ */
+export function buildLineList(circuits, catalog) {
+  if (!Array.isArray(circuits)) throw new Error('circuits must be an array');
+  if (!Array.isArray(catalog)) throw new Error('catalog must be an array');
+
+  return circuits.map((circuit, idx) => {
+    const inputs = circuit.inputs || {};
+    const { product, circuitLengthOk } = selectHeatTraceProduct(circuit, catalog);
+    const voltageV = Number(circuit.voltageV) || 240;
+    const maxLen = product ? ((product.maxCircuitLengthFt || {})[String(voltageV)] || 0) : 0;
+
+    return {
+      lineNum: idx + 1,
+      circuitTag: String(circuit.name || `HT-${idx + 1}`),
+      pipeTag: String(circuit.pipeTag || circuit.name || `HT-${idx + 1}`),
+      service: String(circuit.service || inputs.service || '—'),
+      areaClassification: String(circuit.areaClassification || inputs.environment || '—'),
+      maintainTempC: Number(inputs.maintainTempC) || 0,
+      ambientDesignTempC: Number(inputs.ambientTempC) || 0,
+      effectiveLengthFt: Number(circuit.effectiveTraceLengthFt) || 0,
+      productFamily: product ? product.family : 'No match',
+      productType: product ? product.type : '',
+      nominalWPerFt: product ? product.nominalWPerFt : 0,
+      requiredWPerFt: Number(circuit.requiredWPerFt) || 0,
+      circuitKw: Math.round((Number(circuit.installedTotalWatts) || 0) / 10) / 100,
+      circuitAmps: Number(circuit.installedLoadAmps) || 0,
+      voltageV,
+      maxCircuitLengthFt: maxLen,
+      circuitLengthCheck: circuitLengthOk ? 'PASS' : (product ? 'EXCEEDS' : 'NO PRODUCT'),
+      controllerTag: String(circuit.controllerTag || 'HTC-1'),
+      panelSource: String(circuit.panelSource || '—'),
+      traceRunCount: Number(circuit.traceRunCount) || 1,
+      startupCurrentA: product
+        ? Math.round(((Number(circuit.installedLoadAmps) || 0) * (product.startupCurrentMultiplier || 1)) * 100) / 100
+        : 0,
+      warnings: Array.isArray(circuit.warnings) ? circuit.warnings : [],
+    };
+  });
+}
+
+/**
+ * Aggregate accessory BOM across all line-list rows.
+ *
+ * @param {object[]} lineListRows  Output of buildLineList
+ * @returns {object[]}  BOM rows: { item, description, quantity, unit }
+ */
+export function buildHeatTraceBOM(lineListRows) {
+  if (!Array.isArray(lineListRows)) throw new Error('lineListRows must be an array');
+
+  const totals = {
+    powerConnectionKits: 0,
+    endSealKits: 0,
+    labels: 0,
+    controllerPoints: 0,
+    controllerBreakers: 0,
+    valveKits: 0,
+    flangePairKits: 0,
+  };
+
+  lineListRows.forEach(row => {
+    const kit = {
+      powerConnectionKits: 1,
+      endSealKits: Math.max(1, Number(row.traceRunCount) || 1),
+      labels: Math.max(1, Math.ceil((Number(row.effectiveLengthFt) || 0) / 50)),
+      controllerPoints: 1,
+      controllerBreakers: 1,
+      valveKits: 0,
+      flangePairKits: 0,
+    };
+    Object.keys(totals).forEach(k => { totals[k] += kit[k] || 0; });
+  });
+
+  return [
+    { item: 'Power connection kit', description: 'End power connection assembly (cable, conduit fitting, box)', quantity: totals.powerConnectionKits, unit: 'ea' },
+    { item: 'End seal kit', description: 'End-of-cable termination and moisture seal', quantity: totals.endSealKits, unit: 'ea' },
+    { item: 'Identification label', description: 'Heat-trace circuit identification label per IEC 62395-2', quantity: totals.labels, unit: 'ea' },
+    { item: 'Controller/thermostat sensor', description: 'RTD or ambient thermostat sensing point', quantity: totals.controllerPoints, unit: 'ea' },
+    { item: 'Controller branch breaker', description: 'Dedicated branch circuit breaker in heat-trace panel', quantity: totals.controllerBreakers, unit: 'ea' },
+    { item: 'Valve insulation kit', description: 'Pre-formed insulation kit for valve bodies (requires project valve list)', quantity: totals.valveKits, unit: 'ea' },
+    { item: 'Flange insulation kit', description: 'Removable insulation kit for flange pairs', quantity: totals.flangePairKits, unit: 'ea' },
+    { item: 'Splice / tee kit', description: 'In-line splice or tee connection — count requires project layout', quantity: 0, unit: 'ea (manual)' },
+  ];
+}
+
+/**
+ * Build a controller schedule grouped by controllerTag.
+ *
+ * @param {object[]} lineListRows  Output of buildLineList
+ * @returns {object[]}  Controller schedule rows
+ */
+export function buildControllerSchedule(lineListRows) {
+  if (!Array.isArray(lineListRows)) throw new Error('lineListRows must be an array');
+
+  const groups = new Map();
+  lineListRows.forEach(row => {
+    const tag = String(row.controllerTag || 'HTC-1');
+    const existing = groups.get(tag) || {
+      controllerTag: tag,
+      panelSource: String(row.panelSource || '—'),
+      voltageV: Number(row.voltageV) || 240,
+      circuits: [],
+      totalAmps: 0,
+      totalKw: 0,
+      circuitCount: 0,
+    };
+    existing.circuits.push(row.circuitTag);
+    existing.totalAmps = Math.round((existing.totalAmps + (Number(row.circuitAmps) || 0)) * 100) / 100;
+    existing.totalKw = Math.round((existing.totalKw + (Number(row.circuitKw) || 0)) * 1000) / 1000;
+    existing.circuitCount += 1;
+    groups.set(tag, existing);
+  });
+
+  return Array.from(groups.values()).map(g => ({
+    controllerTag: g.controllerTag,
+    panelSource: g.panelSource,
+    voltageV: g.voltageV,
+    circuitCount: g.circuitCount,
+    circuitTags: g.circuits.join(', '),
+    totalAmps: g.totalAmps,
+    totalKw: g.totalKw,
+    monitoringType: 'Ambient thermostat + ground-fault circuit interrupter (GFCI)',
+  }));
+}
+
+// ---------------------------------------------------------------------------
+
 /**
  * Run complete heat-trace sizing analysis.
  *

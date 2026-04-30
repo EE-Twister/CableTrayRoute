@@ -343,6 +343,13 @@ selectedWperFt = nearest standard cable rating ≥ required W/ft</pre>
               <button id="heattrace-tab-circuit" type="button" class="heattrace-tab" role="tab" aria-selected="false" aria-controls="heattrace-panel-circuit" tabindex="-1">Branch Circuit</button>
               <button id="heattrace-tab-temp" type="button" class="heattrace-tab" role="tab" aria-selected="false" aria-controls="heattrace-panel-temp" tabindex="-1">Temperature Profile</button>
               <button id="heattrace-tab-report" type="button" class="heattrace-tab" role="tab" aria-selected="false" aria-controls="heattrace-panel-report" tabindex="-1">Report</button>
+              <button id="heattrace-tab-linelist" type="button" class="heattrace-tab" role="tab" aria-selected="false" aria-controls="heattrace-panel-linelist" tabindex="-1">Line List</button>
+              <button id="heattrace-tab-bom" type="button" class="heattrace-tab" role="tab" aria-selected="false" aria-controls="heattrace-panel-bom" tabindex="-1">BOM</button>
+              <button id="heattrace-tab-controller" type="button" class="heattrace-tab" role="tab" aria-selected="false" aria-controls="heattrace-panel-controller" tabindex="-1">Controller Schedule</button>
+              <button id="heattrace-tab-installation" type="button" class="heattrace-tab" role="tab" aria-selected="false" aria-controls="heattrace-panel-installation" tabindex="-1">Installation Notes</button>
+            </div>
+            <div class="heattrace-package-actions" aria-label="Export package actions">
+              <button type="button" id="heattrace-export-package" class="btn" title="Export multi-sheet XLSX construction package">Export Package (.xlsx)</button>
             </div>
             <label class="heattrace-warning-toggle" for="heattrace-warning-only">
               <span>Show warnings only</span>
@@ -502,6 +509,90 @@ selectedWperFt = nearest standard cable rating ≥ required W/ft</pre>
               </div>
               <p id="heattrace-report-status" class="field-hint" aria-live="polite">Run analysis or add branch cases, then generate the report.</p>
               <div id="heattrace-report-preview" class="heattrace-report-preview" hidden></div>
+            </section>
+          </section>
+
+          <section id="heattrace-panel-linelist" class="heattrace-panel" role="tabpanel" aria-labelledby="heattrace-tab-linelist" tabindex="0" hidden>
+            <section class="card heattrace-dashboard-card" aria-labelledby="linelist-heading">
+              <div class="heattrace-card-heading">
+                <div>
+                  <h2 id="linelist-heading">Heat Trace Line List</h2>
+                  <p>Circuit-by-circuit construction schedule with product selection and length checks.</p>
+                </div>
+                <div class="heattrace-linelist-actions">
+                  <button type="button" id="heattrace-autoselect-products" class="btn">Auto-Select Products</button>
+                  <button type="button" id="heattrace-export-linelist-csv" class="btn">Export CSV</button>
+                </div>
+              </div>
+              <p id="heattrace-linelist-status" class="field-hint" aria-live="polite">Add branch cases to populate the line list.</p>
+              <div id="heattrace-linelist-table" class="heattrace-report-preview" aria-live="polite"></div>
+            </section>
+            <section class="card heattrace-dashboard-card" aria-labelledby="product-catalog-heading">
+              <div class="heattrace-card-heading">
+                <h2 id="product-catalog-heading">Product Catalog Filter</h2>
+              </div>
+              <div class="heattrace-product-filter" role="group" aria-label="Filter product catalog">
+                <label for="product-filter-type">Type
+                  <select id="product-filter-type">
+                    <option value="">All types</option>
+                    <option value="selfRegulating">Self-regulating</option>
+                    <option value="constantWattage">Constant wattage</option>
+                    <option value="mineralInsulated">Mineral insulated</option>
+                  </select>
+                </label>
+                <label for="product-filter-voltage">Voltage
+                  <select id="product-filter-voltage">
+                    <option value="">All voltages</option>
+                    <option value="120">120 V</option>
+                    <option value="240">240 V</option>
+                    <option value="277">277 V</option>
+                    <option value="480">480 V</option>
+                  </select>
+                </label>
+                <label for="product-filter-hazardous">
+                  <input type="checkbox" id="product-filter-hazardous"> Hazardous area only
+                </label>
+              </div>
+              <div id="heattrace-catalog-table" class="heattrace-report-preview" aria-live="polite"></div>
+            </section>
+            <section class="card heattrace-dashboard-card" aria-labelledby="study-approval-linelist-heading">
+              <h2 id="study-approval-linelist-heading">Engineer Review</h2>
+              <div id="study-review-panel-linelist"></div>
+            </section>
+          </section>
+
+          <section id="heattrace-panel-bom" class="heattrace-panel" role="tabpanel" aria-labelledby="heattrace-tab-bom" tabindex="0" hidden>
+            <section class="card heattrace-dashboard-card" aria-labelledby="bom-heading">
+              <div class="heattrace-card-heading">
+                <div>
+                  <h2 id="bom-heading">Accessory Bill of Materials</h2>
+                  <p>Aggregated accessory kit counts across all heat-trace circuits.</p>
+                </div>
+                <button type="button" id="heattrace-export-bom-csv" class="btn">Export BOM CSV</button>
+              </div>
+              <p class="field-hint">Quantities are screening estimates. Splice/tee kits require project-specific layout details. Confirm all items with manufacturer installation instructions.</p>
+              <div id="heattrace-bom-table" class="heattrace-report-preview" aria-live="polite"></div>
+            </section>
+          </section>
+
+          <section id="heattrace-panel-controller" class="heattrace-panel" role="tabpanel" aria-labelledby="heattrace-tab-controller" tabindex="0" hidden>
+            <section class="card heattrace-dashboard-card" aria-labelledby="controller-heading">
+              <div class="heattrace-card-heading">
+                <div>
+                  <h2 id="controller-heading">Controller Schedule</h2>
+                  <p>Circuits grouped by heat-trace controller tag with aggregate load totals.</p>
+                </div>
+                <button type="button" id="heattrace-export-controller-csv" class="btn">Export CSV</button>
+              </div>
+              <p class="field-hint">Controller tags are set per circuit in the circuit case list. Panel source and monitoring type can be updated before exporting the construction package.</p>
+              <div id="heattrace-controller-table" class="heattrace-report-preview" aria-live="polite"></div>
+            </section>
+          </section>
+
+          <section id="heattrace-panel-installation" class="heattrace-panel" role="tabpanel" aria-labelledby="heattrace-tab-installation" tabindex="0" hidden>
+            <section class="card heattrace-dashboard-card" aria-labelledby="installation-heading">
+              <h2 id="installation-heading">Installation Notes</h2>
+              <div id="heattrace-installation-notes" class="heattrace-report-preview" aria-live="polite"></div>
             </section>
           </section>
 
