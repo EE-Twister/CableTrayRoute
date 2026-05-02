@@ -96,6 +96,7 @@ const EXTRA_KEYS = {
   drcAcceptedFindings: 'drcAcceptedFindings',
   studyApprovals: 'studyApprovals',
   reportSnapshots: 'reportSnapshots',
+  lifecyclePackages: 'lifecyclePackages',
 };
 
 export const STORAGE_KEYS = { ...KEYS, ...EXTRA_KEYS };
@@ -278,6 +279,32 @@ export const deleteReportSnapshot = id => {
   const all = getReportSnapshots();
   delete all[id];
   write(EXTRA_KEYS.reportSnapshots, all);
+};
+
+// ---------------------------------------------------------------------------
+// Lifecycle packages (Gap #71 — project model governance)
+// ---------------------------------------------------------------------------
+
+/** Return all saved lifecycle packages as an array, newest first. */
+export const getLifecyclePackages = () => read(EXTRA_KEYS.lifecyclePackages, []);
+
+/**
+ * Append a lifecycle package to storage.
+ * @param {object} pkg - serializable LifecyclePackage object
+ */
+export const addLifecyclePackage = pkg => {
+  const list = getLifecyclePackages();
+  list.unshift(pkg); // newest first
+  write(EXTRA_KEYS.lifecyclePackages, list);
+};
+
+/**
+ * Delete a lifecycle package by id.
+ * @param {string} id
+ */
+export const deleteLifecyclePackage = id => {
+  const list = getLifecyclePackages().filter(p => p.id !== id);
+  write(EXTRA_KEYS.lifecyclePackages, list);
 };
 
 

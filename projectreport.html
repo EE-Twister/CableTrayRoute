@@ -205,6 +205,16 @@
         <p>Presets pre-select the sections most commonly required for each deliverable type. Individual sections can always be toggled after applying a preset.</p>
       </details>
 
+      <!-- Lifecycle package source (Gap #71) -->
+      <div class="rpt-source-row" style="display:flex;align-items:center;gap:.75rem;margin-bottom:.75rem;flex-wrap:wrap;">
+        <label for="rpt-lifecycle-pkg-select" style="font-weight:600;white-space:nowrap;">Data Source:</label>
+        <select id="rpt-lifecycle-pkg-select" class="form-control" style="min-width:260px;" aria-label="Select released package as data source">
+          <option value="">— Live project data —</option>
+        </select>
+      </div>
+      <div id="rpt-lifecycle-banner" class="result-info" role="status" aria-live="polite" hidden
+           style="margin-bottom:.75rem;padding:.5rem .75rem;border-radius:4px;font-size:.875rem;"></div>
+
       <!-- Status bar -->
       <div id="report-status" class="report-status" role="status" aria-live="polite"></div>
 

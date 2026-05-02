@@ -134,6 +134,45 @@
             <p class="text-muted">Loading…</p>
           </div>
         </section>
+
+        <!-- Release Package (Gap #71) -->
+        <section class="card dash-full-width" aria-label="Release package">
+          <h2>Release Package</h2>
+          <p class="text-muted" style="margin-bottom:0.75rem">Freeze the current project state into a named, immutable snapshot for design governance and traceability.</p>
+
+          <form id="release-pkg-form" class="release-pkg-form" aria-label="Release package form" style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem 1rem;margin-bottom:1rem;" novalidate>
+            <div>
+              <label for="pkg-revision" class="field-label">Revision Label</label>
+              <input type="text" id="pkg-revision" name="revisionLabel" class="form-control" placeholder="Rev 1" autocomplete="off">
+            </div>
+            <div>
+              <label for="pkg-author" class="field-label">Author / Engineer</label>
+              <input type="text" id="pkg-author" name="author" class="form-control" placeholder="J. Smith, PE" autocomplete="off">
+            </div>
+            <div>
+              <label for="pkg-status" class="field-label">Status</label>
+              <select id="pkg-status" name="status" class="form-control">
+                <option value="Draft">Draft</option>
+                <option value="Issued for Review">Issued for Review</option>
+                <option value="Approved">Approved</option>
+                <option value="Superseded">Superseded</option>
+              </select>
+            </div>
+            <div>
+              <label for="pkg-notes" class="field-label">Notes</label>
+              <input type="text" id="pkg-notes" name="notes" class="form-control" placeholder="e.g. Issued for HAZOP review" autocomplete="off">
+            </div>
+            <div style="grid-column:1/-1;display:flex;align-items:center;gap:.75rem;">
+              <button type="submit" id="release-pkg-btn" class="btn btn-primary">Release Package</button>
+              <span id="release-pkg-status" class="text-muted" aria-live="polite"></span>
+            </div>
+          </form>
+
+          <h3 style="font-size:.9375rem;margin-bottom:.5rem;">Package History</h3>
+          <div id="pkg-history" aria-live="polite">
+            <p class="text-muted">No packages released yet.</p>
+          </div>
+        </section>
       </div>
 
     </main>
