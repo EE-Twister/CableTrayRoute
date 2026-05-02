@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="Unified project report: cable schedule, raceway fill, clash detection, spool sheets, and validation in one document." />
-  <title>Project Report — CableTrayRoute</title>
+  <meta name="description" content="Commercial-grade report package builder: configurable sections, cover sheet, revision history, multi-format export." />
+  <title>Report Package Builder — CableTrayRoute</title>
   <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icons/favicon.svg">
   <meta property="og:type" content="website">
-  <meta property="og:title" content="Unified Project Report — CableTrayRoute">
-  <meta property="og:description" content="Generate a comprehensive engineering report covering cables, raceways, clashes, spool sheets, and validation.">
+  <meta property="og:title" content="Report Package Builder — CableTrayRoute">
+  <meta property="og:description" content="Build a configurable engineering calculation book with cover sheet, revision history, study results, and multi-format export.">
   <meta property="og:image" content="https://cabletrayroute.com/icons/og-preview.png">
   <meta property="og:site_name" content="CableTrayRoute">
   <meta property="og:url" content="projectreport.html">
@@ -19,8 +19,134 @@
   <link rel="stylesheet" href="style.css" />
   <script type="module" src="dirtyTracker.js"></script>
   <script type="module" src="dist/projectreport.js" defer></script>
+  <style>
+    /* ── Report package builder layout ── */
+    .rpt-builder-layout {
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      gap: 1.5rem;
+      align-items: start;
+    }
+    @media (max-width: 900px) {
+      .rpt-builder-layout { grid-template-columns: 1fr; }
+    }
+    .rpt-config-panel {
+      position: sticky;
+      top: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    .rpt-config-section {
+      border: 1px solid var(--border-color, #d0d0d0);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    .rpt-config-section summary,
+    .rpt-config-section > .rpt-config-header {
+      padding: .5rem .75rem;
+      font-weight: 600;
+      font-size: .875rem;
+      background: var(--surface-2, #f5f5f5);
+      cursor: pointer;
+      user-select: none;
+      list-style: none;
+    }
+    .rpt-config-section > .rpt-config-body {
+      padding: .75rem;
+      display: flex;
+      flex-direction: column;
+      gap: .5rem;
+    }
+    .rpt-config-section details > .rpt-config-body { display: block; padding: .75rem; }
+
+    /* Section groups */
+    .rpt-section-group { margin-bottom: .5rem; }
+    .rpt-section-group-label {
+      font-size: .75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      color: var(--text-muted, #666);
+      margin-bottom: .25rem;
+    }
+    .rpt-section-checks { display: flex; flex-direction: column; gap: .2rem; }
+    .rpt-section-checks label {
+      display: flex;
+      align-items: center;
+      gap: .4rem;
+      font-size: .875rem;
+      cursor: pointer;
+    }
+    .rpt-section-checks input[type="checkbox"] { width: 15px; height: 15px; }
+
+    /* Preset buttons */
+    .rpt-presets { display: flex; flex-wrap: wrap; gap: .4rem; }
+    .rpt-preset-btn {
+      font-size: .75rem;
+      padding: .25rem .6rem;
+      border-radius: 4px;
+      border: 1px solid var(--border-color, #d0d0d0);
+      background: var(--surface-1, #fff);
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .rpt-preset-btn:hover { background: var(--surface-2, #f5f5f5); }
+
+    /* Revision table */
+    #rpt-rev-table { width: 100%; border-collapse: collapse; font-size: .8rem; }
+    #rpt-rev-table th, #rpt-rev-table td { padding: .25rem .4rem; border: 1px solid var(--border-color, #d0d0d0); }
+    #rpt-rev-table th { background: var(--surface-2, #f5f5f5); font-weight: 600; }
+    #rpt-rev-table input { width: 100%; border: none; background: transparent; font-size: .8rem; padding: 1px; }
+
+    /* Actions bar */
+    .rpt-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .5rem;
+      padding: .75rem 0;
+      border-top: 1px solid var(--border-color, #d0d0d0);
+      border-bottom: 1px solid var(--border-color, #d0d0d0);
+      margin-bottom: 1rem;
+    }
+
+    /* Snapshot list */
+    .rpt-snapshot-list { display: flex; flex-direction: column; gap: .35rem; }
+    .rpt-snapshot-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: .4rem;
+      font-size: .8rem;
+      padding: .25rem .4rem;
+      border: 1px solid var(--border-color, #d0d0d0);
+      border-radius: 4px;
+    }
+    .rpt-snapshot-item button { font-size: .75rem; padding: .1rem .4rem; }
+
+    /* Report preview area */
+    .report-preview { min-height: 200px; }
+
+    /* Print styles */
+    @media print {
+      .rpt-config-panel,
+      .rpt-actions,
+      .top-nav,
+      #settings-menu,
+      .breadcrumb-trail,
+      .page-header,
+      .method-panel,
+      #report-status,
+      .step-nav,
+      #help-modal { display: none !important; }
+      .rpt-builder-layout { grid-template-columns: 1fr; }
+      .report-section { page-break-inside: avoid; }
+      .report-cover { page-break-after: always; }
+      .rpt-toc-section { page-break-after: always; }
+    }
+  </style>
 </head>
-<body class="projectreport-page" data-report-title="Project Report">
+<body class="projectreport-page" data-report-title="Report Package Builder">
   <a href="#main-content" class="skip-link">Skip to main content</a>
   <nav class="top-nav" aria-label="Primary">
     <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
@@ -29,7 +155,7 @@
     <div id="nav-links" class="nav-links">
       <a href="index.html">Home</a>
       <a href="submittal.html">Submittal</a>
-      <a href="projectreport.html" class="active" aria-current="page">Project Report</a>
+      <a href="projectreport.html" class="active" aria-current="page">Report Package</a>
     </div>
     <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">⚙</button>
   </nav>
@@ -65,61 +191,145 @@
         <ol class="breadcrumb-trail">
           <li><a href="index.html">Home</a></li>
           <li>Workflow</li>
-          <li aria-current="page">Project Report</li>
+          <li aria-current="page">Report Package Builder</li>
         </ol>
       </nav>
 
       <header class="page-header">
-        <h1>Unified Project Report</h1>
+        <h1>Report Package Builder</h1>
       </header>
 
       <details class="method-panel">
-        <summary>About This Report</summary>
-        <p>The Project Report aggregates all analysis results into a single printable document. It covers:</p>
-        <ul>
-          <li><strong>Cable Schedule</strong> — all cables with routing status and lengths</li>
-          <li><strong>Raceway Fill</strong> — tray and conduit utilisation vs NEC §392.22 limits</li>
-          <li><strong>Clash Detection</strong> — 3D interference analysis (NEMA VE 2 §8.4)</li>
-          <li><strong>Spool Sheets</strong> — prefabrication assembly groups (NEMA VE 2 §9)</li>
-          <li><strong>Validation</strong> — unrouted cables, empty trays, missing data</li>
-        </ul>
-        <p>Use <strong>Print / Save as PDF</strong> to produce the final deliverable.</p>
+        <summary>About This Tool</summary>
+        <p>Build a configurable engineering calculation book from your project data. Select sections, fill in the cover sheet and revision history, choose a preset, then export as PDF, XLSX, HTML, or JSON.</p>
+        <p>Presets pre-select the sections most commonly required for each deliverable type. Individual sections can always be toggled after applying a preset.</p>
       </details>
-
-      <!-- Project name override -->
-      <fieldset id="rpt-options">
-        <legend><strong>Report Options</strong></legend>
-        <div class="form-row">
-          <label for="rpt-project-name">Project Name Override</label>
-          <input type="text" id="rpt-project-name" placeholder="Loaded from project data if blank" autocomplete="off">
-        </div>
-      </fieldset>
-
-      <!-- Actions -->
-      <div id="controls" class="controls-row">
-        <button id="generate-report-btn" type="button" class="btn primary-btn">Generate Report</button>
-        <button id="print-report-btn"    type="button" class="btn">Print / Save as PDF</button>
-        <button id="export-json-btn"     type="button" class="btn secondary-btn">Export JSON</button>
-      </div>
 
       <!-- Status bar -->
       <div id="report-status" class="report-status" role="status" aria-live="polite"></div>
 
-      <!-- Table of contents (visible once report is generated) -->
-      <nav id="report-toc" class="report-toc" aria-label="Report sections" hidden>
-        <strong>Jump to:</strong>
-        <a href="#rpt-summary">Summary</a>
-        <a href="#rpt-cables">Cables</a>
-        <a href="#rpt-fill">Fill</a>
-        <a href="#rpt-clashes">Clashes</a>
-        <a href="#rpt-spools">Spools</a>
-        <a href="#rpt-validation">Validation</a>
-      </nav>
-
-      <!-- Preview area -->
-      <div id="report-preview" class="report-preview" role="region" aria-live="polite" aria-label="Report preview" hidden>
-        <p class="field-hint">Click <strong>Generate Report</strong> to build the report from your project data.</p>
+      <!-- ── Actions ── -->
+      <div class="rpt-actions" role="toolbar" aria-label="Report actions">
+        <button id="rpt-generate-btn"  type="button" class="btn primary-btn">Generate Preview</button>
+        <button id="rpt-print-btn"     type="button" class="btn">Print / PDF</button>
+        <button id="rpt-xlsx-btn"      type="button" class="btn">Export XLSX</button>
+        <button id="rpt-html-btn"      type="button" class="btn secondary-btn">Export HTML</button>
+        <button id="rpt-json-btn"      type="button" class="btn secondary-btn">Export JSON</button>
+        <button id="rpt-snapshot-btn"  type="button" class="btn secondary-btn">Save Snapshot</button>
       </div>
+
+      <!-- ── Two-column builder layout ── -->
+      <div class="rpt-builder-layout">
+
+        <!-- Left: configuration panel -->
+        <aside class="rpt-config-panel" aria-label="Report configuration">
+
+          <!-- Presets -->
+          <div class="rpt-config-section">
+            <div class="rpt-config-header">Presets</div>
+            <div class="rpt-config-body">
+              <div class="rpt-presets" id="rpt-presets-row" role="group" aria-label="Report presets">
+                <button type="button" class="rpt-preset-btn" data-preset="electrical">Electrical Studies</button>
+                <button type="button" class="rpt-preset-btn" data-preset="construction">Construction Package</button>
+                <button type="button" class="rpt-preset-btn" data-preset="heatTrace">Heat Trace</button>
+                <button type="button" class="rpt-preset-btn" data-preset="grounding">Grounding Report</button>
+                <button type="button" class="rpt-preset-btn" data-preset="ownerTurnover">Owner Turnover</button>
+                <button type="button" class="rpt-preset-btn" data-preset="bimHandoff">IFC / BIM Handoff</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Section selector -->
+          <details class="rpt-config-section" open>
+            <summary>Sections</summary>
+            <div class="rpt-config-body" id="rpt-section-checks">
+              <!-- Populated by JS from SECTION_REGISTRY -->
+            </div>
+          </details>
+
+          <!-- Cover sheet -->
+          <details class="rpt-config-section" open>
+            <summary>Cover Sheet</summary>
+            <div class="rpt-config-body">
+              <label class="field-label" for="rpt-project-name">Project Name
+                <input type="text" id="rpt-project-name" class="field-input" placeholder="Loaded from project if blank" autocomplete="off">
+              </label>
+              <label class="field-label" for="rpt-client">Client
+                <input type="text" id="rpt-client" class="field-input" placeholder="Client / Owner" autocomplete="off">
+              </label>
+              <label class="field-label" for="rpt-engineer">Engineer
+                <input type="text" id="rpt-engineer" class="field-input" placeholder="Responsible engineer" autocomplete="off">
+              </label>
+              <label class="field-label" for="rpt-license">License #
+                <input type="text" id="rpt-license" class="field-input" placeholder="PE license number" autocomplete="off">
+              </label>
+              <label class="field-label" for="rpt-date">Date
+                <input type="date" id="rpt-date" class="field-input">
+              </label>
+              <label class="field-label" for="rpt-rev-number">Revision
+                <input type="text" id="rpt-rev-number" class="field-input" placeholder="0" autocomplete="off">
+              </label>
+              <label class="field-label" for="rpt-notes">Cover Notes
+                <textarea id="rpt-notes" class="field-input" rows="2" placeholder="Optional cover page notes"></textarea>
+              </label>
+            </div>
+          </details>
+
+          <!-- Revision history -->
+          <details class="rpt-config-section">
+            <summary>Revision History</summary>
+            <div class="rpt-config-body">
+              <div style="overflow-x:auto;">
+                <table id="rpt-rev-table" aria-label="Revision history">
+                  <thead>
+                    <tr>
+                      <th style="width:3rem">Rev</th>
+                      <th style="width:6rem">Date</th>
+                      <th>Description</th>
+                      <th style="width:4rem">By</th>
+                      <th style="width:2rem" aria-label="Remove"></th>
+                    </tr>
+                  </thead>
+                  <tbody id="rpt-rev-tbody">
+                    <!-- rows added by JS -->
+                  </tbody>
+                </table>
+              </div>
+              <button type="button" id="rpt-add-rev-btn" class="btn" style="margin-top:.4rem;font-size:.8rem;">+ Add Revision</button>
+            </div>
+          </details>
+
+          <!-- Assumptions -->
+          <details class="rpt-config-section">
+            <summary>Assumptions / Basis</summary>
+            <div class="rpt-config-body">
+              <label class="field-label" for="rpt-assumptions">
+                <textarea id="rpt-assumptions" class="field-input" rows="6"
+                  placeholder="Enter design assumptions, applicable codes, calculation basis, and limitations here."></textarea>
+              </label>
+            </div>
+          </details>
+
+          <!-- Saved snapshots -->
+          <details class="rpt-config-section" id="rpt-snapshots-panel">
+            <summary>Saved Snapshots</summary>
+            <div class="rpt-config-body">
+              <div id="rpt-snapshot-list" class="rpt-snapshot-list">
+                <p class="field-hint" style="font-size:.8rem;">No snapshots saved yet.</p>
+              </div>
+            </div>
+          </details>
+
+        </aside>
+
+        <!-- Right: preview -->
+        <div class="rpt-preview-col">
+          <div id="report-preview" class="report-preview" role="region" aria-live="polite" aria-label="Report preview">
+            <p class="field-hint">Configure the package on the left, then click <strong>Generate Preview</strong>.</p>
+          </div>
+        </div>
+
+      </div><!-- /.rpt-builder-layout -->
 
       <nav class="step-nav" aria-label="Workflow navigation">
         <a href="submittal.html" class="step-nav-prev">&#8592; Submittal</a>
@@ -131,12 +341,16 @@
        aria-labelledby="help-title">
     <div class="modal-content">
       <button id="close-help-btn" class="close-btn" aria-label="Close Help">&times;</button>
-      <h2 id="help-title">Project Report Help</h2>
-      <p>Click <em>Generate Report</em> to compile all project data into a single document.</p>
-      <p>The report reads your current project from storage — make sure your cable and raceway
-      schedules are saved before generating.</p>
-      <p>Use <em>Print / Save as PDF</em> to export the report via the browser print dialog.</p>
-      <p>Use <em>Export JSON</em> to download the raw report data for integration with other tools.</p>
+      <h2 id="help-title">Report Package Builder Help</h2>
+      <p>Select a preset to pre-configure sections, or toggle individual sections manually. Fill in the cover sheet and revision history, then click <em>Generate Preview</em> to build the report.</p>
+      <p><strong>Export options:</strong></p>
+      <ul>
+        <li><em>Print / PDF</em> — Opens the browser print dialog. Use "Save as PDF" for a file.</li>
+        <li><em>Export XLSX</em> — Multi-sheet workbook (one sheet per section with tabular data).</li>
+        <li><em>Export HTML</em> — Self-contained HTML file for sharing without a browser session.</li>
+        <li><em>Export JSON</em> — Raw package data for integration with other tools.</li>
+        <li><em>Save Snapshot</em> — Saves the current package to project storage for later reload.</li>
+      </ul>
     </div>
   </div>
 
