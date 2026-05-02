@@ -95,6 +95,7 @@ const EXTRA_KEYS = {
   trayHardwareCatalogCustomProducts: 'trayHardwareCatalogCustomProducts',
   drcAcceptedFindings: 'drcAcceptedFindings',
   studyApprovals: 'studyApprovals',
+  reportSnapshots: 'reportSnapshots',
 };
 
 export const STORAGE_KEYS = { ...KEYS, ...EXTRA_KEYS };
@@ -249,6 +250,34 @@ export const clearStudyApproval = studyKey => {
   const all = getStudyApprovals();
   delete all[studyKey];
   write(EXTRA_KEYS.studyApprovals, all);
+};
+
+// ---------------------------------------------------------------------------
+// Report package snapshots
+// ---------------------------------------------------------------------------
+
+/** Return all saved report package snapshots keyed by snapshot id. */
+export const getReportSnapshots = () => read(EXTRA_KEYS.reportSnapshots, {});
+
+/**
+ * Persist a report package snapshot.
+ * @param {string} id - snapshot identifier (e.g. 'pkg-1234567890')
+ * @param {object} pkg - serializable ReportPackage object
+ */
+export const setReportSnapshot = (id, pkg) => {
+  const all = getReportSnapshots();
+  all[id] = pkg;
+  write(EXTRA_KEYS.reportSnapshots, all);
+};
+
+/**
+ * Delete a saved report package snapshot.
+ * @param {string} id
+ */
+export const deleteReportSnapshot = id => {
+  const all = getReportSnapshots();
+  delete all[id];
+  write(EXTRA_KEYS.reportSnapshots, all);
 };
 
 
@@ -967,6 +996,9 @@ if (typeof window !== 'undefined') {
     loadProject,
     applyRemoteSnapshot,
     importFromCad,
-    exportToCad
+    exportToCad,
+    getReportSnapshots,
+    setReportSnapshot,
+    deleteReportSnapshot
   };
 }
