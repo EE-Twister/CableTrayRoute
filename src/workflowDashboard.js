@@ -6,6 +6,7 @@ import {
 } from '../dataStore.mjs';
 import { trayFillPercent } from '../analysis/designRuleChecker.mjs';
 import { buildLifecyclePackage, summarizePackage } from '../analysis/lifecyclePackage.mjs';
+import { runDesignCoach } from '../analysis/designCoach.mjs';
 import '../site.js';
 
 // Studies tracked in the dashboard with display labels and their storage keys
@@ -86,12 +87,26 @@ function getStudiesCompletedCount() {
   return STUDY_DEFINITIONS.filter(({ key }) => studyHasResults(studies[key])).length;
 }
 
+function getOpenCoachItemCount() {
+  try {
+    const { summary } = runDesignCoach({
+      cables: getCables() || [],
+      trays: getTrays() || [],
+      studies: getStudies() || {},
+    });
+    return summary.safety + summary.compliance;
+  } catch (_) {
+    return 0;
+  }
+}
+
 function renderKpiStrip(container) {
   if (!container) return;
 
   const { workflowCompletionPct, nextRequiredStep } = getWorkflowMetrics();
   const trayViolations = getTrayViolationsCount();
   const studiesCompletedCount = getStudiesCompletedCount();
+  const openCoachItems = getOpenCoachItemCount();
   const totalStudies = STUDY_DEFINITIONS.length;
 
   const kpis = [
@@ -119,6 +134,15 @@ function renderKpiStrip(container) {
       value: studiesCompletedCount,
       helper: `${studiesCompletedCount} of ${totalStudies} studies have saved results.`,
       href: 'studiesdashboard.html',
+    },
+    {
+      label: 'Design coach items',
+      value: openCoachItems,
+      helper: openCoachItems > 0
+        ? `${openCoachItems} safety/compliance item(s) need attention.`
+        : 'No open safety or compliance recommendations.',
+      href: 'designcoach.html',
+      warn: openCoachItems > 0,
     },
   ];
 

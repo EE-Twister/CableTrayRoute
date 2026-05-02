@@ -1372,7 +1372,7 @@ The strongest market pattern is that competing tools sell more than formulas. Th
 - Preserve an audit trail of accepted/rejected suggestions in study packages.
 - Tests: suggestion ranking, duplicate suppression, safe apply actions, and audit trail persistence.
 
-**Status:** Page-level remediation partially implemented; cross-study coach not implemented.
+**Status:** Implemented (2026-05-02). `analysis/designCoach.mjs` aggregates 7 study domains (voltage drop, arc flash, short circuit, tray fill, harmonics, ground grid, load flow). Severity-ranked recommendations with Accept/Dismiss audit trail persisted under `coachAuditTrail` in dataStore. Dedicated page `designcoach.html`, KPI tile on workflow dashboard, 43 unit tests.
 
 ---
 
@@ -1435,7 +1435,7 @@ The strongest market pattern is that competing tools sell more than formulas. Th
 | **P1** | 82 | ~~**Commercial-Grade Report Package Builder**~~ | Structured package builder over existing reports | High | ✅ Implemented |
 | **P1** | 73 | ~~**Heat Trace Line List, BOM, and Installation Package**~~ | Product families + BOM/report tabs | Medium | ✅ Implemented 2026-04-30 |
 | **P1** | 71 | ~~**Lifecycle Project Model / Digital Twin Governance**~~ | Named study packages and revision snapshots | High | ✅ Implemented 2026-05-02 |
-| **P2** | 79 | **Cross-Study Design Coach** | Shared suggestion engine and dashboard action queue | Medium | Not implemented |
+| **P2** | 79 | **Cross-Study Design Coach** | Shared suggestion engine and dashboard action queue | Medium | Implemented |
 | **P2** | 81 | **Sample Project Gallery / Guided Demos** | Curated sample JSON projects and launch cards | Low | Not implemented |
 | **P2** | 80 | **Equipment Evaluation / Compliance Inventory** | Join ratings with short-circuit/arc-flash/TCC results | Medium | Not implemented |
 | **P2** | 74 | **Advanced Grounding Fidelity** | Soil data fitting and risk-point table | High | Not implemented |

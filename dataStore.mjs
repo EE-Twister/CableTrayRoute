@@ -97,6 +97,7 @@ const EXTRA_KEYS = {
   studyApprovals: 'studyApprovals',
   reportSnapshots: 'reportSnapshots',
   lifecyclePackages: 'lifecyclePackages',
+  coachAuditTrail: 'coachAuditTrail',
 };
 
 export const STORAGE_KEYS = { ...KEYS, ...EXTRA_KEYS };
@@ -307,6 +308,12 @@ export const deleteLifecyclePackage = id => {
   write(EXTRA_KEYS.lifecyclePackages, list);
 };
 
+
+// Design Coach audit trail (Gap #79 — cross-study design coach)
+// ---------------------------------------------------------------------------
+
+export const getCoachAuditTrail = () => read(EXTRA_KEYS.coachAuditTrail, []);
+export const setCoachAuditTrail = list => write(EXTRA_KEYS.coachAuditTrail, list);
 
 /**
  * Append a cable record to the existing cable schedule.
