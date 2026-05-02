@@ -56,6 +56,7 @@ const entries = {
   differentialprotection: 'src/differentialProtection.js',
   clashdetect: 'src/clashdetect.js',
   designrulechecker: 'src/designrulechecker.js',
+  designcoach: 'src/designCoach.js',
   spoolsheets: 'src/spoolsheets.js',
   windload: 'src/windload.js',
   structuralcombinations: 'src/structuralcombinations.js',

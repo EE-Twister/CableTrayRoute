@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Cross-Study Design Coach scans all study results in your project and generates ranked, actionable design recommendations for cables, protection, tray fill, grounding, and power quality." />
+  <title>Design Coach — CableTrayRoute</title>
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/favicon.svg">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Design Coach — CableTrayRoute">
+  <meta property="og:description" content="Actionable cross-study design recommendations for electrical engineering projects.">
+  <meta property="og:image" content="https://cabletrayroute.com/icons/og-preview.png">
+  <meta property="og:site_name" content="CableTrayRoute">
+  <meta property="og:url" content="designcoach.html">
+  <link rel="canonical" href="designcoach.html">
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+  <meta name="color-scheme" content="light dark">
+  <link rel="stylesheet" href="style.css" />
+  <script type="module" src="dirtyTracker.js"></script>
+  <script type="module" src="dist/designcoach.js" defer></script>
+  <style>
+    .coach-kpi-strip { margin: 0 0 1.25rem; }
+    .coach-kpi-grid { display: flex; flex-wrap: wrap; gap: 0.75rem; list-style: none; margin: 0; padding: 0; }
+    .coach-kpi-card {
+      flex: 1 1 120px;
+      border-radius: 6px;
+      padding: 0.75rem 1rem;
+      background: var(--surface-2, #f4f4f4);
+      border-left: 4px solid var(--color-border, #ccc);
+      min-width: 100px;
+    }
+    .coach-kpi-card--safety  { border-left-color: #d32f2f; }
+    .coach-kpi-card--compliance { border-left-color: #e65100; }
+    .coach-kpi-card--efficiency { border-left-color: #0288d1; }
+    .coach-kpi-card--missing  { border-left-color: #616161; }
+    .coach-kpi-label { display: block; font-size: 0.78rem; color: var(--color-muted, #666); margin-bottom: 0.25rem; }
+    .coach-kpi-value { display: block; font-size: 1.6rem; font-weight: 700; line-height: 1; }
+    .coach-controls { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin-bottom: 1rem; }
+    .coach-rec {
+      border: 1px solid var(--color-border, #ddd);
+      border-radius: 6px;
+      padding: 0.9rem 1rem;
+      margin-bottom: 0.75rem;
+      border-left-width: 4px;
+    }
+    .coach-rec--safety    { border-left-color: #d32f2f; }
+    .coach-rec--compliance { border-left-color: #e65100; }
+    .coach-rec--efficiency { border-left-color: #0288d1; }
+    .coach-rec--missing_data { border-left-color: #616161; }
+    .coach-rec--dismissed { opacity: 0.45; }
+    .coach-rec-header { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin-bottom: 0.4rem; font-size: 0.82rem; }
+    .coach-rec-source { color: var(--color-muted, #666); }
+    .coach-rec-location { font-weight: 600; }
+    .coach-rec-title { margin: 0.15rem 0 0.35rem; font-size: 1rem; font-weight: 600; }
+    .coach-rec-detail { margin: 0 0 0.35rem; font-size: 0.9rem; color: var(--color-body, #333); }
+    .coach-rec-tradeoffs { margin: 0 0 0.5rem; font-size: 0.82rem; color: var(--color-muted, #666); font-style: italic; }
+    .coach-rec-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+    .coach-accepted-note { font-size: 0.8rem; color: var(--color-muted, #666); }
+    .coach-empty { text-align: center; padding: 2rem; color: var(--color-muted, #666); }
+    @media (max-width: 480px) { .coach-controls { flex-direction: column; align-items: stretch; } }
+  </style>
+</head>
+<body class="coach-page" data-report-title="Design Coach">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <nav class="top-nav" aria-label="Primary">
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
+      <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+    <div id="nav-links" class="nav-links" role="list">
+      <!-- Populated dynamically by navigation.js -->
+    </div>
+    <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+  </nav>
+
+  <div id="settings-menu" class="settings-menu">
+    <label for="theme-select">Theme
+      <select id="theme-select">
+        <option value="system">System</option>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+        <option value="high-contrast">High Contrast</option>
+      </select>
+    </label>
+    <label><input type="checkbox" id="compact-toggle" aria-label="Enable compact table mode"> Compact Mode</label>
+    <label for="unit-select">Units
+      <select id="unit-select">
+        <option value="imperial">Imperial</option>
+        <option value="metric">Metric</option>
+      </select>
+    </label>
+    <button id="help-btn" class="btn" aria-expanded="false" title="Show help">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Site Help</span>
+    </button>
+    <button id="new-project-btn" title="Start a new project">
+      <img src="icons/toolbar/copy.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>New Project</span>
+    </button>
+    <button id="save-project-btn" title="Save current project">
+      <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Save Project</span>
+    </button>
+    <button id="load-project-btn" title="Load an existing project">
+      <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Load Project</span>
+    </button>
+    <button id="export-project-btn" title="Export project data">
+      <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Export Project</span>
+    </button>
+    <button id="import-project-btn" title="Import project data">
+      <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Import Project</span>
+    </button>
+    <input type="file" id="import-project-input" accept=".ctr.json" class="hidden" title="Select project file">
+  </div>
+
+  <div class="container">
+    <main id="main-content" class="main-content">
+      <nav aria-label="Breadcrumb">
+        <ol class="breadcrumb-trail">
+          <li><a href="index.html">Home</a></li>
+          <li>Workflow</li>
+          <li aria-current="page">Design Coach</li>
+        </ol>
+      </nav>
+
+      <header class="page-header">
+        <h1>Cross-Study Design Coach</h1>
+      </header>
+
+      <details class="method-panel" open>
+        <summary>About This Tool</summary>
+        <p>The Design Coach scans all study results in your project and generates
+        specific, actionable recommendations ranked by severity. Run it after completing
+        your electrical studies to identify the highest-priority design changes.</p>
+
+        <dl class="drc-rule-list">
+          <dt>Safety</dt>
+          <dd>Arc flash exposure exceeding PPE Category 4, ground grid touch/step voltage violations — require immediate engineering action.</dd>
+
+          <dt>Compliance</dt>
+          <dd>Voltage drop exceeding NEC limits, tray fill over 40%, harmonic THD above IEEE 519 limits, short-circuit warnings, bus voltages outside ANSI C84.1 Range A, GPR exceedance.</dd>
+
+          <dt>Efficiency</dt>
+          <dd>Cables approaching voltage drop limits — monitor during final load calculations.</dd>
+
+          <dt>Missing Data</dt>
+          <dd>Studies with incomplete input data that may produce unreliable results.</dd>
+        </dl>
+      </details>
+
+      <!-- KPI strip -->
+      <section class="coach-kpi-strip card" aria-label="Recommendation summary" aria-live="polite">
+        <ul class="coach-kpi-grid" id="coach-kpi-grid" role="list">
+          <li class="coach-kpi-card coach-kpi-card--safety">
+            <span class="coach-kpi-label">Safety</span>
+            <span class="coach-kpi-value" id="kpi-safety">—</span>
+          </li>
+          <li class="coach-kpi-card coach-kpi-card--compliance">
+            <span class="coach-kpi-label">Compliance</span>
+            <span class="coach-kpi-value" id="kpi-compliance">—</span>
+          </li>
+          <li class="coach-kpi-card coach-kpi-card--efficiency">
+            <span class="coach-kpi-label">Efficiency</span>
+            <span class="coach-kpi-value" id="kpi-efficiency">—</span>
+          </li>
+          <li class="coach-kpi-card coach-kpi-card--missing">
+            <span class="coach-kpi-label">Missing Data</span>
+            <span class="coach-kpi-value" id="kpi-missing">—</span>
+          </li>
+        </ul>
+      </section>
+
+      <!-- Controls -->
+      <div class="coach-controls">
+        <button id="coach-run-btn" class="primary-btn">Refresh Recommendations</button>
+        <label for="coach-severity-filter">Show:
+          <select id="coach-severity-filter">
+            <option value="all">All Severities</option>
+            <option value="safety">Safety only</option>
+            <option value="compliance">Compliance only</option>
+            <option value="efficiency">Efficiency only</option>
+            <option value="missing_data">Missing Data only</option>
+          </select>
+        </label>
+        <button id="coach-clear-dismissed-btn" class="btn">Clear Dismissed</button>
+      </div>
+
+      <!-- Results -->
+      <section id="coach-results" aria-live="polite" aria-atomic="false"></section>
+
+    </main>
+  </div>
+
+  <div id="help-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="help-modal-title" hidden>
+    <div class="modal-content">
+      <h2 id="help-modal-title">Design Coach Help</h2>
+      <p>The Design Coach reads cable, raceway, and study data from your current
+      project and cross-checks all results for violations and improvement opportunities.</p>
+      <p><strong>Prerequisites:</strong> Complete at least some of the electrical studies
+      (load flow, short circuit, arc flash, voltage drop, harmonics, ground grid)
+      to get meaningful recommendations. The coach will note any studies with missing data.</p>
+      <p><strong>Accept / Dismiss:</strong> Use Accept to document an engineering basis for
+      allowing a known violation. Use Dismiss to hide a recommendation you are not addressing
+      in this project. Accepted records include reviewer name, date, and engineering note.</p>
+      <button id="close-help-btn" class="btn">Close</button>
+    </div>
+  </div>
+
+</body>
+</html>

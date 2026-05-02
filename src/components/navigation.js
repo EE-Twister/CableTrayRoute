@@ -17,6 +17,7 @@ const NAV_ROUTES = [
   { href: 'trayhardwarebom.html', label: 'Tray Hardware BOM', section: 'Workflow', group: 'Raceway', icon: 'icons/raceway.svg' },
   { href: 'clashdetect.html', label: 'Clash Detection', section: 'Workflow', group: 'Validation', icon: 'icons/toolbar/validate.svg' },
   { href: 'designrulechecker.html', label: 'Design Rule Checker', section: 'Workflow', group: 'Validation', icon: 'icons/toolbar/validate.svg' },
+  { href: 'designcoach.html', label: 'Design Coach', section: 'Workflow', group: 'Validation', icon: 'icons/toolbar/validate.svg' },
   { href: 'spoolsheets.html', label: 'Spool Sheets', section: 'Workflow', group: 'Deliverables', icon: 'icons/toolbar/copy.svg' },
   { href: 'windload.html', label: 'Wind Load', section: 'Workflow', group: 'Structural', icon: 'icons/toolbar/validate.svg' },
   { href: 'structuralcombinations.html', label: 'Combined Loads', section: 'Workflow', group: 'Structural', icon: 'icons/toolbar/validate.svg' },
