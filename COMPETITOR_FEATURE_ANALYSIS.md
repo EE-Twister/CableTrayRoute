@@ -26,7 +26,7 @@ A separate **2026-04-11 extension** to the Cost Estimation module added **custom
 
 A **2026-04-26 website/product competitiveness refresh** compared CableTrayRoute against current positioning and features from ETAP, EasyPower, SKM, Bentley Raceway and Cable Management, MagiCAD/Revit, Eplan Data Portal/eBuild, nVent TraceCalc, Thermon CompuTrace, Chromalox ChromaTrace, SES CDEGS, XGSLab, CYMCAP, Cableizer, and related engineering tools. This revealed **12 additional gaps** (**Gaps #71-#82**) across lifecycle model governance, manufacturer data, heat-trace deliverables, grounding fidelity, cable thermal/pulling workflows, BIM round-trip, field data capture, benchmark/audit confidence, design automation, and public onboarding.
 
-**Current status: 66 of 83 total identified gaps implemented. 1 deferred (native BIM/CAD plugin). Live pricing gap extended with custom CSV pricing book. 16 open gaps remain: advanced power study #65 (OPF) plus website/product competitiveness gaps #71-#82 (excluding #78 now implemented). Gaps #64 (Voltage Stability) and #70 (Voltage Flicker) were implemented and are corrected in the roadmap table below.**
+**Current status: 68 of 83 total identified gaps implemented. 1 deferred (native BIM/CAD plugin). Live pricing gap extended with custom CSV pricing book. 14 open gaps remain: advanced power study #65 (OPF) plus website/product competitiveness gaps #72-#77, #79-#81 (excluding #71, #73, #78, #82 now implemented). Gaps #64 (Voltage Stability) and #70 (Voltage Flicker) were implemented and are corrected in the roadmap table below.**
 
 ---
 
@@ -1236,7 +1236,7 @@ The strongest market pattern is that competing tools sell more than formulas. Th
 - Surface package lineage in `projectreport.html`, exported reports, and study approval banners.
 - Tests: package creation round-trip, immutable snapshot behavior, diff summaries, and report export using the selected package.
 
-**Status:** Not implemented.
+**Status:** ✅ **Implemented 2026-05-02.** `analysis/lifecyclePackage.mjs` — pure computation module with `buildLifecyclePackage(config, projectData)` (deep-clone snapshot of cables, trays, studies, approvals, and one-line component count), `summarizePackage(projectData)` (counts without freezing), and `diffLifecyclePackages(pkgA, pkgB)` (cable/tray/study/approval deltas). `STATUS_OPTIONS` — four valid status labels (Draft, Issued for Review, Approved, Superseded). `dataStore.mjs` — three new exports: `getLifecyclePackages()`, `addLifecyclePackage(pkg)`, `deleteLifecyclePackage(id)`, persisted to `EXTRA_KEYS.lifecyclePackages`. Dashboard: `workflowdashboard.html` gains a "Release Package" panel with revision label, author, status select, notes, and a package history table (rev, date, author, status, cable count, study count, actions); `src/workflowDashboard.js` wires `initReleasePackageForm()` and `renderPackageHistory()`. Report builder: `projectreport.html` gains a "Data Source" dropdown and a lineage banner; `src/projectreport.js` adds `activeLifecyclePkg` state, `renderLifecyclePkgSelector()`, `updateLifecycleBanner()`, and `loadProjectDataWithPackage()` so the selected package snapshot is used as the report source; `?pkg=<id>` URL parameter pre-selects a package when navigating from the dashboard. Tests: `tests/lifecyclePackage.test.mjs` — 25 assertions covering STATUS_OPTIONS, summarizePackage counts, buildLifecyclePackage shape/defaults/deep-copy immutability/JSON round-trip, and diffLifecyclePackages for added/removed/changed cables, trays, studies, approvals, and null snapshot robustness.
 
 ---
 
@@ -1423,7 +1423,7 @@ The strongest market pattern is that competing tools sell more than formulas. Th
 - Pull report snapshots from `studyPackages[]` so results are reproducible after later project edits.
 - Tests: report schema, section ordering, escaped user data, package snapshot selection, and PDF/HTML parity.
 
-**Status:** Individual report exports partially implemented; commercial-grade report package builder not implemented.
+**Status:** ✅ **Implemented.** `analysis/reportPackage.mjs` — `SECTION_REGISTRY` (16 sections across Meta/Construction/Studies groups), `PRESET_CONFIGS` (6 named presets: electrical, construction, heatTrace, grounding, ownerTurnover, bimHandoff), `buildReportPackage(config, sectionData)`, `buildCoverSheet()`, `buildRevisionTable()`, `snapshotPackage()`, `getAvailableSections()`, `sectionToAOA()`. `analysis/projectReport.mjs` — section builders for all study and construction sections plus `renderPackageHTML()`. `src/projectreport.js` — full UI orchestration: section checkboxes, preset buttons, cover sheet form, revision table editor, Generate Preview, Print/PDF, Export XLSX (multi-sheet), Export HTML, Export JSON, Save Snapshot, Load Snapshot. `projectreport.html` — two-column builder layout with sticky config panel. Tests: `tests/reportPackage.test.mjs` — 26 assertions covering all registry, preset, builder, snapshot, and sectionToAOA functions.
 
 ---
 
@@ -1432,9 +1432,9 @@ The strongest market pattern is that competing tools sell more than formulas. Th
 | Priority | # | Gap | Recommended First Slice | Effort | Status |
 |---|---|---|---|---|---|
 | **P1** | 78 | ~~**Calculation Validation, Benchmarks, and Trust Center**~~ | Standards/basis drawers plus public validation page | Medium | ✅ Implemented 2026-04-26 |
-| **P1** | 82 | **Commercial-Grade Report Package Builder** | Structured package builder over existing reports | High | Not implemented |
+| **P1** | 82 | ~~**Commercial-Grade Report Package Builder**~~ | Structured package builder over existing reports | High | ✅ Implemented |
 | **P1** | 73 | ~~**Heat Trace Line List, BOM, and Installation Package**~~ | Product families + BOM/report tabs | Medium | ✅ Implemented 2026-04-30 |
-| **P1** | 71 | **Lifecycle Project Model / Digital Twin Governance** | Named study packages and revision snapshots | High | Not implemented |
+| **P1** | 71 | ~~**Lifecycle Project Model / Digital Twin Governance**~~ | Named study packages and revision snapshots | High | ✅ Implemented 2026-05-02 |
 | **P2** | 79 | **Cross-Study Design Coach** | Shared suggestion engine and dashboard action queue | Medium | Not implemented |
 | **P2** | 81 | **Sample Project Gallery / Guided Demos** | Curated sample JSON projects and launch cards | Low | Not implemented |
 | **P2** | 80 | **Equipment Evaluation / Compliance Inventory** | Join ratings with short-circuit/arc-flash/TCC results | Medium | Not implemented |
@@ -1689,4 +1689,5 @@ Full IEC 60909-0:2016 equivalent voltage source method implemented in `analysis/
 | **P2** | 67 | ~~**Differential Protection (87B/T/G)**~~ | `analysis/differentialProtection.mjs`, `data/protectiveDevices.json` | Medium | ✅ Implemented 2026-04-19 |
 | **P3** | 64 | ~~**Voltage Stability (P-V / Q-V)**~~ | `analysis/voltageStability.mjs` | High | ✅ Implemented 2026-04-20 |
 | **P3** | 65 | **Optimal Power Flow / Economic Dispatch** | `analysis/optimalPowerFlow.mjs` | High | Not implemented |
+
 | **P3** | 70 | ~~**Voltage Flicker (Pst/Plt)**~~ | `analysis/voltageFlicker.mjs` | Medium | ✅ Implemented 2026-04-19 |

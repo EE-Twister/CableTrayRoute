@@ -14,6 +14,7 @@ import {
   getStudies, getStudyApprovals,
   getReportSnapshots, setReportSnapshot, deleteReportSnapshot,
   getDrcAcceptedFindings,
+  getLifecyclePackages,
 } from '../dataStore.mjs';
 import { getProjectState } from '../projectStorage.js';
 import { generateProjectReport } from '../analysis/projectReport.mjs';
@@ -493,10 +494,60 @@ function loadSnapshotIntoUI(snap) {
 let lastPkg = null;
 let lastBaseReport = null;
 
+// ---------------------------------------------------------------------------
+// Lifecycle package source (Gap #71)
+// ---------------------------------------------------------------------------
+
+/** The lifecycle package whose snapshot is used as the report data source, or null for live data. */
+let activeLifecyclePkg = null;
+
+function renderLifecyclePkgSelector() {
+  const select = document.getElementById('rpt-lifecycle-pkg-select');
+  if (!select) return;
+  const packages = getLifecyclePackages();
+  select.innerHTML = '<option value="">— Live project data —</option>';
+  for (const pkg of packages) {
+    const date = pkg.createdAt ? pkg.createdAt.slice(0, 10) : '';
+    const opt = document.createElement('option');
+    opt.value = pkg.id;
+    opt.textContent = `${pkg.revisionLabel} — ${pkg.status} — ${date}`;
+    if (activeLifecyclePkg && activeLifecyclePkg.id === pkg.id) opt.selected = true;
+    select.appendChild(opt);
+  }
+}
+
+function updateLifecycleBanner() {
+  const banner = document.getElementById('rpt-lifecycle-banner');
+  if (!banner) return;
+  if (activeLifecyclePkg) {
+    const date = activeLifecyclePkg.createdAt ? activeLifecyclePkg.createdAt.slice(0, 10) : '';
+    banner.textContent = `Data source: Package "${activeLifecyclePkg.revisionLabel}" — ${activeLifecyclePkg.status} — ${date}`;
+    banner.hidden = false;
+  } else {
+    banner.textContent = '';
+    banner.hidden = true;
+  }
+}
+
+/** Override loadProjectData() with snapshot data when a package is selected. */
+function loadProjectDataWithPackage() {
+  if (!activeLifecyclePkg) return loadProjectData();
+  const snap = activeLifecyclePkg.projectSnapshot || {};
+  return {
+    cables:    Array.isArray(snap.cables)  ? snap.cables  : [],
+    trays:     Array.isArray(snap.trays)   ? snap.trays   : [],
+    conduits:  [],
+    ductbanks: [],
+    studies:   snap.studies   || {},
+    approvals: snap.approvals || {},
+    drcResults: [],
+  };
+}
+
 function generatePreview() {
   try {
     setStatus('Generating…', 'info');
-    const projectData = loadProjectData();
+    const projectData = loadProjectDataWithPackage();
     const config      = buildPackageConfig();
     const pkg         = assemblePackage(config, projectData);
     const baseReport  = buildBaseReport(projectData);
@@ -528,6 +579,36 @@ document.addEventListener('DOMContentLoaded', () => {
   // Set default date
   const dateEl = document.getElementById('rpt-date');
   if (dateEl && !dateEl.value) dateEl.value = new Date().toISOString().slice(0, 10);
+
+  // ── Lifecycle package selector (Gap #71) ──
+  renderLifecyclePkgSelector();
+  updateLifecycleBanner();
+
+  // Pre-select a package if ?pkg=<id> is in the URL
+  const urlPkgId = new URLSearchParams(window.location.search).get('pkg');
+  if (urlPkgId) {
+    const found = getLifecyclePackages().find(p => p.id === urlPkgId);
+    if (found) {
+      activeLifecyclePkg = found;
+      const select = document.getElementById('rpt-lifecycle-pkg-select');
+      if (select) select.value = urlPkgId;
+      updateLifecycleBanner();
+    }
+  }
+
+  document.getElementById('rpt-lifecycle-pkg-select')?.addEventListener('change', e => {
+    const id = e.target.value;
+    if (!id) {
+      activeLifecyclePkg = null;
+    } else {
+      activeLifecyclePkg = getLifecyclePackages().find(p => p.id === id) || null;
+    }
+    updateLifecycleBanner();
+    // Rebuild section availability for the chosen source
+    const pd = loadProjectDataWithPackage();
+    const avail = getAvailableSections({ studies: pd.studies, cables: pd.cables, trays: pd.trays, drcResults: pd.drcResults });
+    buildSectionChecks(avail);
+  });
 
   // Build section checkboxes based on available data
   const projectData = loadProjectData();

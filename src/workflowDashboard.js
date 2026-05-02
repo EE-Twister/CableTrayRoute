@@ -1,6 +1,11 @@
 import { workflowOrder, getStepStatus } from './workflowStatus.js';
-import { getCables, getTrays, getConduits, getDuctbanks, getStudies } from '../dataStore.mjs';
+import {
+  getCables, getTrays, getConduits, getDuctbanks, getStudies,
+  getStudyApprovals, getOneLine,
+  getLifecyclePackages, addLifecyclePackage, deleteLifecyclePackage,
+} from '../dataStore.mjs';
 import { trayFillPercent } from '../analysis/designRuleChecker.mjs';
+import { buildLifecyclePackage, summarizePackage } from '../analysis/lifecyclePackage.mjs';
 import '../site.js';
 
 // Studies tracked in the dashboard with display labels and their storage keys
@@ -357,9 +362,124 @@ function renderStudiesSummary(container) {
   container.appendChild(list);
 }
 
+// ---------------------------------------------------------------------------
+// Release Package panel (Gap #71)
+// ---------------------------------------------------------------------------
+
+function esc(str) {
+  return String(str ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function renderPackageHistory(container) {
+  if (!container) return;
+  const packages = getLifecyclePackages();
+  if (!packages.length) {
+    container.innerHTML = '<p class="text-muted">No packages released yet.</p>';
+    return;
+  }
+
+  const table = document.createElement('table');
+  table.className = 'data-table pkg-history-table';
+  table.setAttribute('aria-label', 'Released packages');
+  table.innerHTML = `
+    <thead>
+      <tr>
+        <th>Revision</th>
+        <th>Date</th>
+        <th>Author</th>
+        <th>Status</th>
+        <th>Cables</th>
+        <th>Studies</th>
+        <th>Actions</th>
+      </tr>
+    </thead>`;
+
+  const tbody = document.createElement('tbody');
+  for (const pkg of packages) {
+    const date = pkg.createdAt ? pkg.createdAt.slice(0, 10) : '—';
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${esc(pkg.revisionLabel)}</td>
+      <td>${esc(date)}</td>
+      <td>${esc(pkg.author)}</td>
+      <td><span class="pkg-status-badge pkg-status--${esc(pkg.status.toLowerCase().replace(/ /g, '-'))}">${esc(pkg.status)}</span></td>
+      <td>${esc(pkg.summary?.cableCount ?? 0)}</td>
+      <td>${esc(pkg.summary?.studyCount ?? 0)}</td>
+      <td>
+        <a href="projectreport.html?pkg=${esc(pkg.id)}" class="btn btn-sm">Load in Report Builder</a>
+        <button class="btn btn-sm btn-danger pkg-delete-btn" data-pkg-id="${esc(pkg.id)}" aria-label="Delete package ${esc(pkg.revisionLabel)}">Delete</button>
+      </td>`;
+    tbody.appendChild(tr);
+  }
+  table.appendChild(tbody);
+
+  container.innerHTML = '';
+  container.appendChild(table);
+
+  container.querySelectorAll('.pkg-delete-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.getAttribute('data-pkg-id');
+      if (!id) return;
+      if (!window.confirm(`Delete package "${btn.getAttribute('aria-label').replace('Delete package ', '')}"?`)) return;
+      deleteLifecyclePackage(id);
+      renderPackageHistory(container);
+    });
+  });
+}
+
+function initReleasePackageForm() {
+  const form       = document.getElementById('release-pkg-form');
+  const statusEl   = document.getElementById('release-pkg-status');
+  const historyEl  = document.getElementById('pkg-history');
+
+  if (!form) return;
+
+  // Initial render of history
+  renderPackageHistory(historyEl);
+
+  form.addEventListener('submit', e => {
+    e.preventDefault();
+
+    const revisionLabel = (document.getElementById('pkg-revision')?.value || '').trim() || 'Rev 0';
+    const author        = (document.getElementById('pkg-author')?.value   || '').trim();
+    const status        = document.getElementById('pkg-status')?.value    || 'Draft';
+    const notes         = (document.getElementById('pkg-notes')?.value    || '').trim();
+
+    const projectData = {
+      cables:    getCables(),
+      trays:     getTrays(),
+      studies:   getStudies(),
+      approvals: getStudyApprovals(),
+      oneLine:   getOneLine(),
+    };
+
+    const summary = summarizePackage(projectData);
+    const pkg = buildLifecyclePackage({ revisionLabel, author, status, notes }, projectData);
+
+    addLifecyclePackage(pkg);
+
+    if (statusEl) {
+      statusEl.textContent = `Package "${revisionLabel}" released — ${summary.cableCount} cable(s), ${summary.studyCount} study result(s).`;
+    }
+
+    renderPackageHistory(historyEl);
+
+    // Reset form fields
+    document.getElementById('pkg-revision').value = '';
+    document.getElementById('pkg-author').value   = '';
+    document.getElementById('pkg-notes').value    = '';
+    document.getElementById('pkg-status').value   = 'Draft';
+  });
+}
+
 window.addEventListener('DOMContentLoaded', () => {
   renderKpiStrip(document.getElementById('dashboard-kpi-strip'));
   renderWorkflowSteps(document.getElementById('workflow-step-grid'));
   renderProjectSummary(document.getElementById('project-summary'));
   renderStudiesSummary(document.getElementById('studies-summary'));
+  initReleasePackageForm();
 });
