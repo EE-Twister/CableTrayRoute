@@ -26,7 +26,7 @@ A separate **2026-04-11 extension** to the Cost Estimation module added **custom
 
 A **2026-04-26 website/product competitiveness refresh** compared CableTrayRoute against current positioning and features from ETAP, EasyPower, SKM, Bentley Raceway and Cable Management, MagiCAD/Revit, Eplan Data Portal/eBuild, nVent TraceCalc, Thermon CompuTrace, Chromalox ChromaTrace, SES CDEGS, XGSLab, CYMCAP, Cableizer, and related engineering tools. This revealed **12 additional gaps** (**Gaps #71-#82**) across lifecycle model governance, manufacturer data, heat-trace deliverables, grounding fidelity, cable thermal/pulling workflows, BIM round-trip, field data capture, benchmark/audit confidence, design automation, and public onboarding.
 
-**Current status: 68 of 83 total identified gaps implemented. 1 deferred (native BIM/CAD plugin). Live pricing gap extended with custom CSV pricing book. 14 open gaps remain: advanced power study #65 (OPF) plus website/product competitiveness gaps #72-#77, #79-#81 (excluding #71, #73, #78, #82 now implemented). Gaps #64 (Voltage Stability) and #70 (Voltage Flicker) were implemented and are corrected in the roadmap table below.**
+**Current status: 70 of 83 total identified gaps implemented. 1 deferred (native BIM/CAD plugin). Live pricing gap extended with custom CSV pricing book. 12 open gaps remain: advanced power study #65 (OPF) plus website/product competitiveness gaps #72, #74-#77, #81 (excluding #71, #73, #78, #79, #80, #82 now implemented). Gaps #64 (Voltage Stability) and #70 (Voltage Flicker) were implemented and are corrected in the roadmap table below.**
 
 ---
 
@@ -1389,7 +1389,7 @@ The strongest market pattern is that competing tools sell more than formulas. Th
 - Add dashboard badge for "equipment evaluation incomplete" when devices lack ratings.
 - Tests: rating comparison, missing-data warnings, short-circuit linkage, and report output.
 
-**Status:** Not implemented.
+**Status:** ✅ **Implemented 2026-05-03.** `analysis/equipmentEvaluation.mjs` — `checkInterruptingRating()`, `checkWithstand()` (I²t-adjusted), `checkCableThermalDuty()` (NEC 110.10 / IEC 60364-5-54), `checkSccr()`, `evaluateEquipment(components, cables, studies, catalog)`, `buildEquipmentReport()`, `summariseEvaluation()`. `data/protectiveDevices.json` — added `withstandRatingKA` and `withstandCycles` to all breaker and fuse entries. `equipmentevaluation.html` + `src/equipmentEvaluation.js` — page with KPI strip (total/pass/fail/incomplete), filterable per-check results table (status, rating, fault current, margin, notes), and CSV export. Navigation: Equipment Evaluation added to Studies → Protection group. Workflow Dashboard: added "Equipment Failures" KPI tile. Design Coach: `extractEquipmentEvalRecs()` surfaces failing equipment as Compliance recommendations. Tests: `tests/equipmentEvaluation.test.mjs` — 42 assertions covering all four check functions, `conductorSizeToMm2`, `conductorMaterial`, `evaluateEquipment` integration (pass/fail/incomplete breaker, switchboard, cable segment, edge cases), `buildEquipmentReport`, and `summariseEvaluation`. Docs: `docs/equipment-evaluation.md`.
 
 ---
 
@@ -1437,7 +1437,7 @@ The strongest market pattern is that competing tools sell more than formulas. Th
 | **P1** | 71 | ~~**Lifecycle Project Model / Digital Twin Governance**~~ | Named study packages and revision snapshots | High | ✅ Implemented 2026-05-02 |
 | **P2** | 79 | **Cross-Study Design Coach** | Shared suggestion engine and dashboard action queue | Medium | Implemented |
 | **P2** | 81 | **Sample Project Gallery / Guided Demos** | Curated sample JSON projects and launch cards | Low | Not implemented |
-| **P2** | 80 | **Equipment Evaluation / Compliance Inventory** | Join ratings with short-circuit/arc-flash/TCC results | Medium | Not implemented |
+| **P2** | 80 | ~~**Equipment Evaluation / Compliance Inventory**~~ | Join ratings with short-circuit/arc-flash/TCC results | Medium | ✅ Implemented 2026-05-03 |
 | **P2** | 74 | **Advanced Grounding Fidelity** | Soil data fitting and risk-point table | High | Not implemented |
 | **P3** | 75 | **Cable Thermal Environment Modeling** | Unified environment model over existing calculators | High | Not implemented |
 | **P3** | 72 | **Manufacturer Data Portal / Product Catalogs** | Approved catalog schema and imports | Medium | Partial |

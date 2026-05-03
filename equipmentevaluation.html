@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Equipment Duty Evaluation — check breaker interrupting ratings, bus withstand, cable I²t thermal duty, and SCCR against available fault current." />
+  <title>Equipment Evaluation — CableTrayRoute</title>
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/favicon.svg">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Equipment Evaluation — CableTrayRoute">
+  <meta property="og:description" content="Verify breaker AIC, switchgear withstand, cable I²t duty, and SCCR against short-circuit study results.">
+  <meta property="og:image" content="https://cabletrayroute.com/icons/og-preview.png">
+  <meta property="og:site_name" content="CableTrayRoute">
+  <meta property="og:url" content="equipmentevaluation.html">
+  <link rel="canonical" href="equipmentevaluation.html">
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+  <meta name="color-scheme" content="light dark">
+  <link rel="stylesheet" href="style.css" />
+  <script type="module" src="dirtyTracker.js"></script>
+  <script type="module" src="dist/equipmentevaluation.js" defer></script>
+  <style>
+    .equip-kpi-grid { display: flex; flex-wrap: wrap; gap: 0.75rem; list-style: none; margin: 0 0 1.25rem; padding: 0; }
+    .equip-kpi-card {
+      flex: 1 1 110px;
+      border-radius: 6px;
+      padding: 0.75rem 1rem;
+      background: var(--surface-2, #f4f4f4);
+      border-left: 4px solid var(--color-border, #ccc);
+      min-width: 100px;
+    }
+    .equip-kpi-card--pass       { border-left-color: #2e7d32; }
+    .equip-kpi-card--fail       { border-left-color: #c62828; }
+    .equip-kpi-card--incomplete { border-left-color: #616161; }
+    .equip-kpi-card--total      { border-left-color: #0277bd; }
+    .equip-kpi-label { display: block; font-size: 0.78rem; color: var(--color-muted, #666); margin-bottom: 0.25rem; }
+    .equip-kpi-value { display: block; font-size: 1.6rem; font-weight: 700; line-height: 1; }
+
+    .equip-controls { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin-bottom: 1rem; }
+
+    #equip-table-wrap { overflow-x: auto; }
+    #equip-table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+    #equip-table th,
+    #equip-table td { padding: 0.45rem 0.6rem; text-align: left; border-bottom: 1px solid var(--color-border, #ddd); white-space: nowrap; }
+    #equip-table th { background: var(--surface-2, #f4f4f4); font-weight: 600; }
+    #equip-table tr:hover td { background: var(--surface-hover, #f9f9f9); }
+
+    .status-badge {
+      display: inline-block;
+      padding: 0.15em 0.55em;
+      border-radius: 3px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+    .status-badge--pass       { background: #e8f5e9; color: #2e7d32; }
+    .status-badge--fail       { background: #ffebee; color: #c62828; }
+    .status-badge--incomplete { background: #f5f5f5; color: #616161; }
+
+    .equip-notes { white-space: normal; min-width: 180px; max-width: 360px; font-size: 0.82rem; color: var(--color-muted, #666); }
+    .equip-empty { text-align: center; padding: 2.5rem; color: var(--color-muted, #666); }
+
+    @media (max-width: 600px) { .equip-controls { flex-direction: column; align-items: stretch; } }
+  </style>
+</head>
+<body class="equip-eval-page" data-report-title="Equipment Evaluation">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <nav class="top-nav" aria-label="Primary">
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
+      <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+    <div id="nav-links" class="nav-links" role="list">
+      <!-- Populated dynamically by navigation.js -->
+    </div>
+    <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+  </nav>
+
+  <div id="settings-menu" class="settings-menu">
+    <label for="theme-select">Theme
+      <select id="theme-select">
+        <option value="system">System</option>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+        <option value="high-contrast">High Contrast</option>
+      </select>
+    </label>
+    <label><input type="checkbox" id="compact-toggle" aria-label="Enable compact table mode"> Compact Mode</label>
+    <label for="unit-select">Units
+      <select id="unit-select">
+        <option value="imperial">Imperial</option>
+        <option value="metric">Metric</option>
+      </select>
+    </label>
+    <button id="help-btn" class="btn" aria-expanded="false" title="Show help">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Site Help</span>
+    </button>
+    <button id="new-project-btn" title="Start a new project">
+      <img src="icons/toolbar/copy.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>New Project</span>
+    </button>
+    <button id="save-project-btn" title="Save current project">
+      <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Save Project</span>
+    </button>
+    <button id="load-project-btn" title="Load an existing project">
+      <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Load Project</span>
+    </button>
+    <button id="export-project-btn" title="Export project data">
+      <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Export Project</span>
+    </button>
+    <button id="import-project-btn" title="Import project data">
+      <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Import Project</span>
+    </button>
+    <input type="file" id="import-project-input" accept=".ctr.json" class="hidden" title="Select project file">
+  </div>
+
+  <div class="container">
+    <main id="main-content" class="main-content">
+      <nav aria-label="Breadcrumb">
+        <ol class="breadcrumb-trail">
+          <li><a href="index.html">Home</a></li>
+          <li>Studies</li>
+          <li aria-current="page">Equipment Evaluation</li>
+        </ol>
+      </nav>
+
+      <header class="page-header">
+        <h1>Equipment Evaluation</h1>
+      </header>
+
+      <details class="method-panel" open>
+        <summary>About This Study</summary>
+        <p>Checks every equipment item on the one-line diagram against available fault current from the
+        short-circuit and arc-flash studies. Run the Short Circuit and Arc Flash studies first to get
+        meaningful results.</p>
+        <dl class="drc-rule-list">
+          <dt>AIC Check</dt>
+          <dd>Interrupting rating of breakers and fuses vs. 3-phase bolted fault current (NEC 110.9).</dd>
+          <dt>Withstand Check</dt>
+          <dd>Short-time withstand rating of breakers and switchgear vs. fault current × clearing time (I²t rule).</dd>
+          <dt>Cable Thermal Duty</dt>
+          <dd>Conductor cross-section vs. minimum required by I²t formula per NEC 110.10 / IEC 60364-5-54.</dd>
+          <dt>SCCR</dt>
+          <dd>Short-Circuit Current Rating for motor-control equipment vs. available fault current (NEC 409.22).</dd>
+        </dl>
+      </details>
+
+      <!-- KPI strip -->
+      <section class="card" aria-label="Equipment evaluation summary" aria-live="polite">
+        <ul class="equip-kpi-grid" id="equip-kpi-grid" role="list">
+          <li class="equip-kpi-card equip-kpi-card--total">
+            <span class="equip-kpi-label">Total Items</span>
+            <span class="equip-kpi-value" id="kpi-total">—</span>
+          </li>
+          <li class="equip-kpi-card equip-kpi-card--pass">
+            <span class="equip-kpi-label">Pass</span>
+            <span class="equip-kpi-value" id="kpi-pass">—</span>
+          </li>
+          <li class="equip-kpi-card equip-kpi-card--fail">
+            <span class="equip-kpi-label">Fail</span>
+            <span class="equip-kpi-value" id="kpi-fail">—</span>
+          </li>
+          <li class="equip-kpi-card equip-kpi-card--incomplete">
+            <span class="equip-kpi-label">Incomplete</span>
+            <span class="equip-kpi-value" id="kpi-incomplete">—</span>
+          </li>
+        </ul>
+      </section>
+
+      <!-- Controls -->
+      <div class="equip-controls">
+        <button id="equip-run-btn" class="primary-btn">Run Evaluation</button>
+        <label for="equip-filter-status">Show:
+          <select id="equip-filter-status">
+            <option value="all">All Statuses</option>
+            <option value="fail">Fail only</option>
+            <option value="incomplete">Incomplete only</option>
+            <option value="pass">Pass only</option>
+          </select>
+        </label>
+        <label for="equip-filter-type">Type:
+          <select id="equip-filter-type">
+            <option value="all">All Types</option>
+            <option value="breaker">Breaker / Fuse</option>
+            <option value="switchboard">Switchboard / Panel</option>
+            <option value="cable">Cable</option>
+          </select>
+        </label>
+        <button id="equip-export-csv-btn" class="btn">Export CSV</button>
+      </div>
+
+      <!-- Results table -->
+      <section class="card" aria-label="Equipment evaluation results" aria-live="polite">
+        <div id="equip-table-wrap">
+          <p class="equip-empty" id="equip-empty-msg">Run the evaluation to see results.</p>
+          <table id="equip-table" hidden>
+            <thead>
+              <tr>
+                <th scope="col">Label</th>
+                <th scope="col">Type</th>
+                <th scope="col">Check</th>
+                <th scope="col">Status</th>
+                <th scope="col">Rating (kA)</th>
+                <th scope="col">Fault (kA)</th>
+                <th scope="col">Margin (kA)</th>
+                <th scope="col" class="equip-notes">Notes</th>
+              </tr>
+            </thead>
+            <tbody id="equip-table-body"></tbody>
+          </table>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <div id="help-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="help-modal-title" hidden>
+    <div class="modal-content">
+      <h2 id="help-modal-title">Equipment Evaluation Help</h2>
+      <p>This study reads protective device ratings from the one-line diagram and compares them against
+      fault current results from the Short Circuit and Arc Flash studies.</p>
+      <p><strong>Prerequisites:</strong> Run the Short Circuit study (and optionally the Arc Flash study
+      for clearing times) before evaluating equipment.</p>
+      <p><strong>Adding Ratings:</strong> Open the One-Line editor, select a component, and enter
+      <em>Interrupt Rating (kA)</em>, <em>Withstand Rating (kA)</em>, and <em>Withstand Cycles</em>
+      in the component properties panel. For cable segments, enter the conductor size and insulation type.</p>
+      <p><strong>SCCR:</strong> For MCC components, enter the SCCR value in the component properties panel.</p>
+      <button id="close-help-btn" class="btn">Close</button>
+    </div>
+  </div>
+
+</body>
+</html>

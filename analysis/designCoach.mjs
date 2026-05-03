@@ -11,6 +11,7 @@
 import { NEC_AMPACITY_TABLE } from './autoSize.mjs';
 import { runVoltageDropStudy, NEC_LIMITS } from './voltageDropStudy.mjs';
 import { trayFillPercent } from './designRuleChecker.mjs';
+import { evaluateEquipment, EVAL_STATUS } from './equipmentEvaluation.mjs';
 
 /**
  * @typedef {{
@@ -387,6 +388,64 @@ function sortRecommendations(recs) {
 }
 
 // ---------------------------------------------------------------------------
+// Equipment evaluation recommendations
+// ---------------------------------------------------------------------------
+
+/**
+ * Generate design-coach recommendations from equipment duty evaluation results.
+ * @param {object[]} components  - one-line components (flat)
+ * @param {object[]} cables      - cable schedule
+ * @param {object}   studies     - from getStudies()
+ * @param {object[]} [catalog]   - protectiveDevices catalog
+ * @returns {Recommendation[]}
+ */
+export function extractEquipmentEvalRecs(components, cables, studies, catalog = []) {
+  if (!Array.isArray(components) || components.length === 0) return [];
+  let evals;
+  try {
+    evals = evaluateEquipment(components, cables, studies, catalog);
+  } catch (_) {
+    return [];
+  }
+  const recs = [];
+  for (const entry of evals) {
+    for (const [checkName, result] of Object.entries(entry.checks)) {
+      if (!result) continue;
+      if (result.status === EVAL_STATUS.FAIL) {
+        recs.push({
+          id: `equip:${entry.id}:${checkName}`,
+          sourceStudy: 'equipmentEvaluation',
+          severity: 'compliance',
+          title: `${checkLabel(checkName)} failure — ${entry.label}`,
+          detail: buildFailDetail(checkName, result, entry),
+          location: entry.id,
+          studyPage: 'equipmentevaluation.html',
+          safe_to_apply: false,
+        });
+      }
+    }
+  }
+  return recs;
+}
+
+function checkLabel(name) {
+  const MAP = { aic: 'AIC', withstand: 'Withstand', sccr: 'SCCR', thermal: 'Cable I²t' };
+  return MAP[name] ?? name;
+}
+
+function buildFailDetail(checkName, result, entry) {
+  if (checkName === 'aic')
+    return `${entry.label}: fault ${result.faultKA} kA exceeds device interrupting rating ${result.ratingKA} kA. Replace with a higher-rated device.`;
+  if (checkName === 'withstand')
+    return `${entry.label}: fault ${result.faultKA} kA exceeds adjusted withstand ${result.adjustedRatingKA} kA at clearing time ${result.clearingTimeS} s. Upgrade device or reduce clearing time.`;
+  if (checkName === 'sccr')
+    return `${entry.label}: fault ${result.faultKA} kA exceeds equipment SCCR ${result.sccrKA} kA. Upgrade the assembly rating.`;
+  if (checkName === 'thermal')
+    return `${entry.label}: conductor ${result.actualMm2} mm² is below minimum ${result.minMm2} mm² for I²t duty at ${result.faultKA} kA × ${result.clearingTimeS} s.`;
+  return `${entry.label}: ${checkName} failure.`;
+}
+
+// ---------------------------------------------------------------------------
 // Main entry point
 // ---------------------------------------------------------------------------
 
@@ -396,18 +455,20 @@ function sortRecommendations(recs) {
  * @param {{
  *   cables?: object[],
  *   trays?: object[],
+ *   components?: object[],
  *   studies?: {
  *     arcFlash?: object,
  *     shortCircuit?: object,
  *     harmonics?: object,
  *     groundGrid?: object,
  *     loadFlow?: object,
- *   }
+ *   },
+ *   deviceCatalog?: object[],
  * }} projectData
  * @returns {{ recommendations: Recommendation[], summary: object }}
  */
 export function runDesignCoach(projectData = {}) {
-  const { cables = [], trays = [], studies = {} } = projectData;
+  const { cables = [], trays = [], components = [], studies = {}, deviceCatalog = [] } = projectData;
 
   const all = [
     ...extractVoltageDropRecs(cables),
@@ -417,6 +478,7 @@ export function runDesignCoach(projectData = {}) {
     ...extractHarmonicsRecs(studies.harmonics),
     ...extractGroundGridRecs(studies.groundGrid),
     ...extractLoadFlowRecs(studies.loadFlow),
+    ...extractEquipmentEvalRecs(components, cables, studies, deviceCatalog),
   ];
 
   const unique = suppressDuplicates(all);
