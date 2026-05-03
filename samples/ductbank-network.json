@@ -1,0 +1,64 @@
+{
+  "schemaVersion": 1,
+  "id": "ductbank-network",
+  "title": "Underground Ductbank",
+  "cables": [
+    { "id": "UG-CBL-001", "tag": "UG-CBL-001", "from": "SUBSTATION-SW1", "to": "PAD-XFMR-T2", "cable_type": "Power", "conductor_size": "500 kcmil", "insulation_type": "XLPE", "voltage_rating": "15kV", "length": 180, "route_preference": "DUCTBANK-DB-01", "conductor_material": "CU", "cable_od": 1.18 },
+    { "id": "UG-CBL-002", "tag": "UG-CBL-002", "from": "SUBSTATION-SW1", "to": "PAD-XFMR-T3", "cable_type": "Power", "conductor_size": "500 kcmil", "insulation_type": "XLPE", "voltage_rating": "15kV", "length": 220, "route_preference": "DUCTBANK-DB-01", "conductor_material": "CU", "cable_od": 1.18 },
+    { "id": "UG-CBL-003", "tag": "UG-CBL-003", "from": "SUBSTATION-SW2", "to": "BLDG-MDP", "cable_type": "Power", "conductor_size": "350 kcmil", "insulation_type": "XLPE", "voltage_rating": "15kV", "length": 150, "route_preference": "DUCTBANK-DB-02", "conductor_material": "CU", "cable_od": 1.05 }
+  ],
+  "raceways": {
+    "trays": [],
+    "conduits": [],
+    "ductbanks": [
+      {
+        "ductbank_id": "DUCTBANK-DB-01",
+        "start_x": 0, "start_y": 0, "start_z": -3.5,
+        "end_x": 220, "end_y": 0, "end_z": -3.5,
+        "conduits": [
+          { "conduit_id": "DB01-COND-1", "trade_size": "5\"", "type": "PVC-Schedule-40", "row": 1, "column": 1 },
+          { "conduit_id": "DB01-COND-2", "trade_size": "5\"", "type": "PVC-Schedule-40", "row": 1, "column": 2 },
+          { "conduit_id": "DB01-COND-3", "trade_size": "5\"", "type": "PVC-Schedule-40", "row": 2, "column": 1 },
+          { "conduit_id": "DB01-SPARE-1", "trade_size": "4\"", "type": "PVC-Schedule-40", "row": 2, "column": 2, "spare": true }
+        ],
+        "encasement": "concrete",
+        "coverDepth": 36,
+        "soilThermalResistivity": 90
+      },
+      {
+        "ductbank_id": "DUCTBANK-DB-02",
+        "start_x": 0, "start_y": 30, "start_z": -3.0,
+        "end_x": 150, "end_y": 30, "end_z": -3.0,
+        "conduits": [
+          { "conduit_id": "DB02-COND-1", "trade_size": "4\"", "type": "PVC-Schedule-40", "row": 1, "column": 1 },
+          { "conduit_id": "DB02-SPARE-1", "trade_size": "4\"", "type": "PVC-Schedule-40", "row": 1, "column": 2, "spare": true }
+        ],
+        "encasement": "concrete",
+        "coverDepth": 30,
+        "soilThermalResistivity": 90
+      }
+    ]
+  },
+  "oneline": {
+    "components": [
+      { "id": "SW1", "type": "Switchgear", "label": "Substation\nSW-1 15 kV", "x": 150, "y": 80 },
+      { "id": "T2", "type": "Transformer", "label": "Pad T2\n15kV/480V\n1000 kVA", "x": 80, "y": 250 },
+      { "id": "T3", "type": "Transformer", "label": "Pad T3\n15kV/480V\n1500 kVA", "x": 220, "y": 250 },
+      { "id": "SW2", "type": "Switchgear", "label": "Substation\nSW-2 15 kV", "x": 150, "y": 170 },
+      { "id": "MDP", "type": "PanelBoard", "label": "Bldg MDP\n480V", "x": 150, "y": 340 }
+    ],
+    "connections": [
+      { "from": "SW1", "to": "T2" },
+      { "from": "SW1", "to": "T3" },
+      { "from": "SW2", "to": "MDP" }
+    ]
+  },
+  "studyInputs": {
+    "iec60287": {
+      "soilThermalResistivity": 0.9,
+      "ambientSoilTemp": 20,
+      "installationDepth": 1.05,
+      "conductorTemp": 90
+    }
+  }
+}

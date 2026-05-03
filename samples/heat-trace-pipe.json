@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "id": "heat-trace-pipe",
+  "title": "Heat Trace Pipe Run",
+  "cables": [
+    { "id": "HT-PWR-01", "tag": "HT-PWR-01", "from": "HT-PANEL-1", "to": "JB-HT-01", "cable_type": "Power", "conductor_size": "#12 AWG", "insulation_type": "XHHW-2", "voltage_rating": "600V", "length": 25, "route_preference": "CONDUIT-HT-01", "conductor_material": "CU" },
+    { "id": "HT-PWR-02", "tag": "HT-PWR-02", "from": "JB-HT-01", "to": "JB-HT-02", "cable_type": "Power", "conductor_size": "#12 AWG", "insulation_type": "XHHW-2", "voltage_rating": "600V", "length": 200, "route_preference": "CONDUIT-HT-01", "conductor_material": "CU" }
+  ],
+  "raceways": {
+    "trays": [],
+    "conduits": [
+      { "conduit_id": "CONDUIT-HT-01", "trade_size": "3/4\"", "type": "RGS", "from": "HT-PANEL-1", "to": "JB-HT-02", "length": 225 }
+    ],
+    "ductbanks": []
+  },
+  "oneline": {
+    "components": [
+      { "id": "PANEL-HT", "type": "PanelBoard", "label": "HT Panel\n120V / 20A", "x": 100, "y": 100 },
+      { "id": "CTRL-HT-1", "type": "Load", "label": "Controller\nHTR-1", "x": 100, "y": 200 },
+      { "id": "PIPE-RUN-1", "type": "Load", "label": "Pipe Run 1\n200 ft\n3\" Process Pipe", "x": 100, "y": 300 }
+    ],
+    "connections": [
+      { "from": "PANEL-HT", "to": "CTRL-HT-1" },
+      { "from": "CTRL-HT-1", "to": "PIPE-RUN-1" }
+    ]
+  },
+  "studyInputs": {
+    "heatTrace": {
+      "pipeOuterDiameter": 3.5,
+      "pipeInsulationThickness": 2,
+      "pipeInsulationThermalConductivity": 0.033,
+      "ambientDesignTemp": -20,
+      "maintainTemp": 40,
+      "pipeLength": 200,
+      "supplyVoltage": 120,
+      "heatingCableType": "self-regulating",
+      "areaClassification": "ordinary"
+    }
+  }
+}
