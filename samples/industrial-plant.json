@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "id": "industrial-plant",
+  "title": "Industrial Plant",
+  "cables": [
+    { "id": "OG-CBL-001", "tag": "OG-CBL-001", "from": "SUBSTATION-1", "to": "MCC-A", "conductor_size": "350 kcmil", "insulation_type": "XLPE", "voltage_rating": "15kV", "length": 220, "route_preference": "TRAY-PWR-01", "cable_type": "Power", "conductor_material": "CU" },
+    { "id": "OG-CBL-002", "tag": "OG-CBL-002", "from": "MCC-A", "to": "PUMP-101", "conductor_size": "#2 AWG", "insulation_type": "THWN-2", "voltage_rating": "600V", "length": 85, "route_preference": "TRAY-PWR-01", "cable_type": "Power", "conductor_material": "CU" },
+    { "id": "OG-CBL-003", "tag": "OG-CBL-003", "from": "MCC-A", "to": "COMP-101", "conductor_size": "4/0 AWG", "insulation_type": "THWN-2", "voltage_rating": "600V", "length": 130, "route_preference": "TRAY-PWR-01", "cable_type": "Power", "conductor_material": "CU" },
+    { "id": "IND-CBL-MCC-001", "tag": "IND-CBL-MCC-001", "from": "XFMR-1", "to": "MCC-1", "conductor_size": "350 kcmil", "insulation_type": "XHHW-2", "voltage_rating": "600V", "length": 75, "route_preference": "TRAY-PWR-01", "cable_type": "Power", "conductor_material": "CU" },
+    { "id": "IND-CBL-MTR-101", "tag": "IND-CBL-MTR-101", "from": "MCC-1", "to": "MOTOR-101", "conductor_size": "#6 AWG", "insulation_type": "THWN-2", "voltage_rating": "480V", "length": 60, "route_preference": "TRAY-PWR-01", "cable_type": "Power", "conductor_material": "CU" },
+    { "id": "IND-CBL-MTR-102", "tag": "IND-CBL-MTR-102", "from": "MCC-1", "to": "MOTOR-102", "conductor_size": "#4 AWG", "insulation_type": "THWN-2", "voltage_rating": "480V", "length": 80, "route_preference": "TRAY-PWR-01", "cable_type": "Power", "conductor_material": "CU" },
+    { "id": "IND-CBL-VFD-101", "tag": "IND-CBL-VFD-101", "from": "VFD-1", "to": "MOTOR-103", "conductor_size": "#2 AWG", "insulation_type": "XHHW-2", "voltage_rating": "480V", "length": 45, "route_preference": "TRAY-PWR-01", "cable_type": "Power", "conductor_material": "CU" },
+    { "id": "OG-CBL-004", "tag": "OG-CBL-004", "from": "JB-101", "to": "DCS-1", "conductor_size": "#16 AWG", "insulation_type": "EPR", "voltage_rating": "300V", "length": 60, "route_preference": "TRAY-INST-01", "cable_type": "Instrument", "conductor_material": "CU" },
+    { "id": "OG-CBL-005", "tag": "OG-CBL-005", "from": "JB-102", "to": "DCS-1", "conductor_size": "#16 AWG", "insulation_type": "EPR", "voltage_rating": "300V", "length": 75, "route_preference": "TRAY-INST-01", "cable_type": "Instrument", "conductor_material": "CU" },
+    { "id": "IND-CBL-CTRL-001", "tag": "IND-CBL-CTRL-001", "from": "PLC-1", "to": "MCC-1", "conductor_size": "#14 AWG", "insulation_type": "THHN", "voltage_rating": "600V", "length": 35, "route_preference": "TRAY-CTRL-01", "cable_type": "Control", "conductor_material": "CU" }
+  ],
+  "raceways": {
+    "trays": [
+      { "tray_id": "TRAY-PWR-01", "start_x": 0, "start_y": 0, "start_z": 14, "end_x": 220, "end_y": 0, "end_z": 14, "inside_width": 30, "tray_depth": 4, "tray_type": "Ladder (50 % fill)", "allowed_cable_group": "power" },
+      { "tray_id": "TRAY-INST-01", "start_x": 0, "start_y": 6, "start_z": 14, "end_x": 220, "end_y": 6, "end_z": 14, "inside_width": 12, "tray_depth": 4, "tray_type": "Solid Bottom (40 % fill)", "allowed_cable_group": "instrument" },
+      { "tray_id": "TRAY-CTRL-01", "start_x": 0, "start_y": 12, "start_z": 14, "end_x": 220, "end_y": 12, "end_z": 14, "inside_width": 12, "tray_depth": 4, "tray_type": "Solid Bottom (40 % fill)", "allowed_cable_group": "control" }
+    ],
+    "conduits": [
+      { "conduit_id": "COND-HAZ-01", "trade_size": "2\"", "type": "RGS", "from": "TRAY-PWR-01", "to": "PUMP-101", "length": 15 },
+      { "conduit_id": "COND-HAZ-02", "trade_size": "3\"", "type": "RGS", "from": "TRAY-PWR-01", "to": "COMP-101", "length": 20 }
+    ],
+    "ductbanks": []
+  },
+  "oneline": {
+    "components": [
+      { "id": "SRC-1", "type": "Source", "label": "Utility", "voltage": 15000, "x": 100, "y": 50 },
+      { "id": "XFMR-1", "type": "Transformer", "label": "XFMR-1\n15kV/480V\n1500kVA", "primaryVoltage": 15000, "secondaryVoltage": 480, "kva": 1500, "x": 100, "y": 150 },
+      { "id": "BUS-MV", "type": "Bus", "label": "BUS-MV\n15 kV", "voltage": 15000, "x": 100, "y": 100 },
+      { "id": "BUS-LV", "type": "Bus", "label": "BUS-LV\n480 V", "voltage": 480, "x": 100, "y": 220 },
+      { "id": "MCC-A", "type": "MCC", "label": "MCC-A\n480V", "x": 200, "y": 220 },
+      { "id": "MOTOR-101", "type": "Motor", "label": "PUMP-101\n25 HP", "hp": 25, "x": 300, "y": 280 },
+      { "id": "MOTOR-102", "type": "Motor", "label": "MOTOR-102\n50 HP", "hp": 50, "x": 300, "y": 340 },
+      { "id": "MOTOR-103", "type": "Motor", "label": "MOTOR-103\n75 HP (VFD)", "hp": 75, "x": 300, "y": 400 }
+    ],
+    "connections": [
+      { "from": "SRC-1", "to": "BUS-MV" },
+      { "from": "BUS-MV", "to": "XFMR-1" },
+      { "from": "XFMR-1", "to": "BUS-LV" },
+      { "from": "BUS-LV", "to": "MCC-A" },
+      { "from": "MCC-A", "to": "MOTOR-101" },
+      { "from": "MCC-A", "to": "MOTOR-102" },
+      { "from": "MCC-A", "to": "MOTOR-103" }
+    ]
+  },
+  "studyInputs": {
+    "arcFlash": { "method": "IEEE 1584-2018", "workingDistance": 18, "boltedFaultCurrent": 20000 },
+    "shortCircuit": { "utilityFaultMVA": 500, "systemVoltage": 15000 }
+  }
+}

@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "id": "data-center",
+  "title": "Data Center",
+  "cables": [
+    { "id": "DC-FEED-A", "tag": "DC-FEED-A", "from": "UTILITY-A", "to": "UPS-A", "cable_type": "Power", "conductor_size": "500 kcmil", "insulation_type": "THHN", "voltage_rating": "480V", "length": 95, "route_preference": "TRAY-PWR-A", "cable_od": 1.15, "conductor_material": "CU" },
+    { "id": "DC-FEED-B", "tag": "DC-FEED-B", "from": "UTILITY-B", "to": "UPS-B", "cable_type": "Power", "conductor_size": "500 kcmil", "insulation_type": "THHN", "voltage_rating": "480V", "length": 100, "route_preference": "TRAY-PWR-B", "cable_od": 1.15, "conductor_material": "CU" },
+    { "id": "DC-PDU-A1", "tag": "DC-PDU-A1", "from": "UPS-A", "to": "PDU-A1", "cable_type": "Power", "conductor_size": "250 kcmil", "insulation_type": "THHN", "voltage_rating": "480V", "length": 55, "route_preference": "TRAY-PWR-A", "cable_od": 0.88, "conductor_material": "CU" },
+    { "id": "DC-PDU-B1", "tag": "DC-PDU-B1", "from": "UPS-B", "to": "PDU-B1", "cable_type": "Power", "conductor_size": "250 kcmil", "insulation_type": "THHN", "voltage_rating": "480V", "length": 55, "route_preference": "TRAY-PWR-B", "cable_od": 0.88, "conductor_material": "CU" },
+    { "id": "DC-BRANCH-01", "tag": "DC-BRANCH-01", "from": "PDU-A1", "to": "RACK-ROW-1", "cable_type": "Power", "conductor_size": "#4 AWG", "insulation_type": "THHN", "voltage_rating": "208V", "length": 30, "route_preference": "TRAY-PWR-A", "cable_od": 0.54, "conductor_material": "CU" },
+    { "id": "DC-BRANCH-02", "tag": "DC-BRANCH-02", "from": "PDU-B1", "to": "RACK-ROW-1", "cable_type": "Power", "conductor_size": "#4 AWG", "insulation_type": "THHN", "voltage_rating": "208V", "length": 32, "route_preference": "TRAY-PWR-B", "cable_od": 0.54, "conductor_material": "CU" },
+    { "id": "DC-FIBER-OM4-01", "tag": "DC-FIBER-OM4-01", "from": "MDA-PATCH-1", "to": "HDA-ROW-1", "cable_type": "Fiber", "conductor_size": "#22 AWG", "insulation_type": "LSZH", "voltage_rating": "N/A", "length": 60, "route_preference": "TRAY-FIBER-SPINE", "cable_od": 0.35, "notes": "12-strand OM4 multimode fiber backbone", "conductor_material": "FO" },
+    { "id": "DC-FIBER-OS2-01", "tag": "DC-FIBER-OS2-01", "from": "MDA-PATCH-1", "to": "HDA-ROW-2", "cable_type": "Fiber", "conductor_size": "#22 AWG", "insulation_type": "LSZH", "voltage_rating": "N/A", "length": 75, "route_preference": "TRAY-FIBER-SPINE", "cable_od": 0.28, "notes": "6-strand OS2 singlemode fiber backbone", "conductor_material": "FO" },
+    { "id": "DC-CAT6A-ROW1-01", "tag": "DC-CAT6A-ROW1-01", "from": "HDA-ROW-1", "to": "RACK-A01", "cable_type": "Data", "conductor_size": "#22 AWG", "insulation_type": "LSZH", "voltage_rating": "N/A", "length": 25, "route_preference": "TRAY-DATA-ROW1", "cable_od": 0.33, "notes": "Cat6A 10GBase-T horizontal run", "conductor_material": "CU" },
+    { "id": "DC-CAT6A-ROW2-01", "tag": "DC-CAT6A-ROW2-01", "from": "HDA-ROW-2", "to": "RACK-B01", "cable_type": "Data", "conductor_size": "#22 AWG", "insulation_type": "LSZH", "voltage_rating": "N/A", "length": 28, "route_preference": "TRAY-DATA-ROW2", "cable_od": 0.33, "notes": "Cat6A 10GBase-T horizontal run", "conductor_material": "CU" }
+  ],
+  "raceways": {
+    "trays": [
+      { "tray_id": "TRAY-PWR-A", "start_x": 0, "start_y": 0, "start_z": 10, "end_x": 150, "end_y": 0, "end_z": 10, "inside_width": 24, "tray_depth": 4, "tray_type": "Ladder (50 % fill)", "allowed_cable_group": "power" },
+      { "tray_id": "TRAY-PWR-B", "start_x": 0, "start_y": 6, "start_z": 10.5, "end_x": 150, "end_y": 6, "end_z": 10.5, "inside_width": 24, "tray_depth": 4, "tray_type": "Ladder (50 % fill)", "allowed_cable_group": "power" },
+      { "tray_id": "TRAY-FIBER-SPINE", "start_x": 0, "start_y": 3, "start_z": 12, "end_x": 150, "end_y": 3, "end_z": 12, "inside_width": 12, "tray_depth": 3, "tray_type": "Wire Basket (40 % fill)", "allowed_cable_group": "fiber" },
+      { "tray_id": "TRAY-DATA-ROW1", "start_x": 0, "start_y": 0, "start_z": 1.5, "end_x": 150, "end_y": 0, "end_z": 1.5, "inside_width": 18, "tray_depth": 3, "tray_type": "Solid Bottom (40 % fill)", "allowed_cable_group": "data" },
+      { "tray_id": "TRAY-DATA-ROW2", "start_x": 0, "start_y": 6, "start_z": 1.5, "end_x": 150, "end_y": 6, "end_z": 1.5, "inside_width": 18, "tray_depth": 3, "tray_type": "Solid Bottom (40 % fill)", "allowed_cable_group": "data" }
+    ],
+    "conduits": [],
+    "ductbanks": []
+  },
+  "oneline": {
+    "components": [
+      { "id": "UTIL-A", "type": "Source", "label": "Utility A", "voltage": 480, "x": 50, "y": 50 },
+      { "id": "UTIL-B", "type": "Source", "label": "Utility B", "voltage": 480, "x": 300, "y": 50 },
+      { "id": "UPS-A", "type": "UPS", "label": "UPS-A\n500 kVA", "x": 50, "y": 150 },
+      { "id": "UPS-B", "type": "UPS", "label": "UPS-B\n500 kVA", "x": 300, "y": 150 },
+      { "id": "PDU-A1", "type": "PanelBoard", "label": "PDU-A1\n208V", "x": 50, "y": 250 },
+      { "id": "PDU-B1", "type": "PanelBoard", "label": "PDU-B1\n208V", "x": 300, "y": 250 },
+      { "id": "RACK-ROW-1", "type": "Load", "label": "Server Row 1\n40 kW", "x": 175, "y": 350 }
+    ],
+    "connections": [
+      { "from": "UTIL-A", "to": "UPS-A" },
+      { "from": "UTIL-B", "to": "UPS-B" },
+      { "from": "UPS-A", "to": "PDU-A1" },
+      { "from": "UPS-B", "to": "PDU-B1" },
+      { "from": "PDU-A1", "to": "RACK-ROW-1" },
+      { "from": "PDU-B1", "to": "RACK-ROW-1" }
+    ]
+  },
+  "studyInputs": {
+    "loadFlow": { "systemVoltage": 480, "frequency": 60 },
+    "voltageDrop": { "maxAllowedPercent": 3.0 }
+  }
+}

@@ -1,0 +1,64 @@
+{
+  "schemaVersion": 1,
+  "id": "coordination-study",
+  "title": "Protective Device Coordination",
+  "cables": [
+    { "id": "COORD-CBL-001", "tag": "COORD-CBL-001", "from": "UTILITY-4KV", "to": "BUS-4KV-A", "cable_type": "Power", "conductor_size": "500 kcmil", "insulation_type": "XLPE", "voltage_rating": "5kV", "length": 60, "route_preference": "TRAY-MV-01", "conductor_material": "CU" },
+    { "id": "COORD-CBL-002", "tag": "COORD-CBL-002", "from": "BUS-4KV-A", "to": "XFMR-LV1", "cable_type": "Power", "conductor_size": "350 kcmil", "insulation_type": "XLPE", "voltage_rating": "5kV", "length": 40, "route_preference": "TRAY-MV-01", "conductor_material": "CU" },
+    { "id": "COORD-CBL-003", "tag": "COORD-CBL-003", "from": "XFMR-LV1", "to": "LV-MCC-1", "cable_type": "Power", "conductor_size": "350 kcmil", "insulation_type": "XHHW-2", "voltage_rating": "600V", "length": 35, "route_preference": "TRAY-LV-01", "conductor_material": "CU" },
+    { "id": "COORD-CBL-004", "tag": "COORD-CBL-004", "from": "LV-MCC-1", "to": "MOTOR-LV1", "cable_type": "Power", "conductor_size": "#2 AWG", "insulation_type": "THWN-2", "voltage_rating": "480V", "length": 80, "route_preference": "TRAY-LV-01", "conductor_material": "CU" }
+  ],
+  "raceways": {
+    "trays": [
+      { "tray_id": "TRAY-MV-01", "start_x": 0, "start_y": 0, "start_z": 14, "end_x": 120, "end_y": 0, "end_z": 14, "inside_width": 24, "tray_depth": 4, "tray_type": "Ladder (50 % fill)", "allowed_cable_group": "power" },
+      { "tray_id": "TRAY-LV-01", "start_x": 0, "start_y": 6, "start_z": 12, "end_x": 120, "end_y": 6, "end_z": 12, "inside_width": 30, "tray_depth": 4, "tray_type": "Ladder (50 % fill)", "allowed_cable_group": "power" }
+    ],
+    "conduits": [],
+    "ductbanks": []
+  },
+  "oneline": {
+    "components": [
+      { "id": "UTIL-4KV", "type": "Source", "label": "Utility\n4.16 kV", "voltage": 4160, "x": 200, "y": 40 },
+      { "id": "RELAY-51-1", "type": "Relay", "label": "51-1\nOC Relay", "x": 200, "y": 100 },
+      { "id": "BUS-4KV-A", "type": "Bus", "label": "Bus A\n4.16 kV", "voltage": 4160, "x": 200, "y": 160 },
+      { "id": "BKR-4KV-F1", "type": "Breaker", "label": "BKR-F1\n1200A", "x": 120, "y": 220 },
+      { "id": "FUSE-4KV-F2", "type": "Fuse", "label": "FUSE-F2\n65E", "x": 280, "y": 220 },
+      { "id": "XFMR-LV1", "type": "Transformer", "label": "T-LV1\n4.16kV/480V\n1000 kVA", "x": 120, "y": 300 },
+      { "id": "LV-MCC-1", "type": "MCC", "label": "LV MCC-1\n480V", "x": 120, "y": 380 },
+      { "id": "MCCB-LV1", "type": "Breaker", "label": "MCCB\n200A", "x": 120, "y": 440 },
+      { "id": "MOTOR-LV1", "type": "Motor", "label": "MOTOR-1\n100 HP", "hp": 100, "x": 120, "y": 510 },
+      { "id": "LOAD-4KV-F2", "type": "Load", "label": "Load F2\n500 kVA", "x": 280, "y": 310 }
+    ],
+    "connections": [
+      { "from": "UTIL-4KV", "to": "RELAY-51-1" },
+      { "from": "RELAY-51-1", "to": "BUS-4KV-A" },
+      { "from": "BUS-4KV-A", "to": "BKR-4KV-F1" },
+      { "from": "BUS-4KV-A", "to": "FUSE-4KV-F2" },
+      { "from": "BKR-4KV-F1", "to": "XFMR-LV1" },
+      { "from": "XFMR-LV1", "to": "LV-MCC-1" },
+      { "from": "LV-MCC-1", "to": "MCCB-LV1" },
+      { "from": "MCCB-LV1", "to": "MOTOR-LV1" },
+      { "from": "FUSE-4KV-F2", "to": "LOAD-4KV-F2" }
+    ]
+  },
+  "studyInputs": {
+    "shortCircuit": {
+      "utilityFaultMVA": 300,
+      "systemVoltage": 4160,
+      "xOverR": 15
+    },
+    "arcFlash": {
+      "method": "IEEE 1584-2018",
+      "workingDistance": 24,
+      "boltedFaultCurrent": 18000
+    },
+    "tcc": {
+      "devices": [
+        { "id": "RELAY-51-1", "type": "relay", "curve": "IEC Extremely Inverse", "pickup": 400, "timeDial": 0.3 },
+        { "id": "BKR-4KV-F1", "type": "breaker", "rating": 1200, "ltPickup": 0.9, "ltDelay": 18, "stPickup": 8, "stDelay": 0.3 },
+        { "id": "FUSE-4KV-F2", "type": "fuse", "style": "65E", "voltageRating": "5.5kV" },
+        { "id": "MCCB-LV1", "type": "breaker", "rating": 200, "ltPickup": 1.0, "ltDelay": 12, "stPickup": 10, "stDelay": 0.05 }
+      ]
+    }
+  }
+}

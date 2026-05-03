@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "id": "substation-grounding",
+  "title": "Substation Ground Grid",
+  "cables": [
+    { "id": "GND-CBL-001", "tag": "GND-CBL-001", "from": "115kV-BUS", "to": "XFMR-T1-HV", "cable_type": "Power", "conductor_size": "1000 kcmil", "insulation_type": "XLPE", "voltage_rating": "115kV", "length": 45, "route_preference": "CONDUIT-HV-01", "conductor_material": "CU" },
+    { "id": "GND-CBL-002", "tag": "GND-CBL-002", "from": "XFMR-T1-LV", "to": "13kV-SWGR", "cable_type": "Power", "conductor_size": "350 kcmil", "insulation_type": "XLPE", "voltage_rating": "15kV", "length": 30, "route_preference": "CONDUIT-MV-01", "conductor_material": "CU" },
+    { "id": "GND-CBL-003", "tag": "GND-CBL-003", "from": "13kV-SWGR", "to": "FEEDER-F1", "cable_type": "Power", "conductor_size": "250 kcmil", "insulation_type": "XLPE", "voltage_rating": "15kV", "length": 120, "route_preference": "CONDUIT-MV-01", "conductor_material": "CU" }
+  ],
+  "raceways": {
+    "trays": [],
+    "conduits": [
+      { "conduit_id": "CONDUIT-HV-01", "trade_size": "6\"", "type": "PVC-Schedule-40", "from": "115kV-BUS", "to": "XFMR-T1-HV", "length": 45 },
+      { "conduit_id": "CONDUIT-MV-01", "trade_size": "4\"", "type": "PVC-Schedule-40", "from": "XFMR-T1-LV", "to": "13kV-SWGR", "length": 30 }
+    ],
+    "ductbanks": []
+  },
+  "oneline": {
+    "components": [
+      { "id": "SRC-115KV", "type": "Source", "label": "115 kV\nTransmission", "voltage": 115000, "x": 200, "y": 50 },
+      { "id": "BUS-115KV", "type": "Bus", "label": "115 kV Bus", "voltage": 115000, "x": 200, "y": 120 },
+      { "id": "XFMR-T1", "type": "Transformer", "label": "T1\n115kV/13.8kV\n50 MVA", "primaryVoltage": 115000, "secondaryVoltage": 13800, "kva": 50000, "x": 200, "y": 200 },
+      { "id": "BUS-13KV", "type": "Bus", "label": "13.8 kV Bus", "voltage": 13800, "x": 200, "y": 290 },
+      { "id": "SWGR-13KV", "type": "Switchgear", "label": "13.8 kV\nSwitchgear", "x": 200, "y": 360 },
+      { "id": "FEEDER-F1", "type": "Load", "label": "Feeder F1\n5 MW", "x": 100, "y": 450 },
+      { "id": "FEEDER-F2", "type": "Load", "label": "Feeder F2\n3 MW", "x": 300, "y": 450 }
+    ],
+    "connections": [
+      { "from": "SRC-115KV", "to": "BUS-115KV" },
+      { "from": "BUS-115KV", "to": "XFMR-T1" },
+      { "from": "XFMR-T1", "to": "BUS-13KV" },
+      { "from": "BUS-13KV", "to": "SWGR-13KV" },
+      { "from": "SWGR-13KV", "to": "FEEDER-F1" },
+      { "from": "SWGR-13KV", "to": "FEEDER-F2" }
+    ]
+  },
+  "studyInputs": {
+    "groundGrid": {
+      "gridLength": 120,
+      "gridWidth": 80,
+      "meshSpacing": 10,
+      "conductorDepth": 0.5,
+      "conductorSize": "4/0 AWG",
+      "numGroundRods": 24,
+      "groundRodLength": 10,
+      "soilResistivity": 100,
+      "faultDuration": 0.5,
+      "maxFaultCurrent": 10000,
+      "systemVoltage": 115000
+    },
+    "shortCircuit": { "utilityFaultMVA": 2000, "systemVoltage": 115000 }
+  }
+}

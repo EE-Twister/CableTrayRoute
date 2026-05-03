@@ -1406,7 +1406,7 @@ The strongest market pattern is that competing tools sell more than formulas. Th
 - Add lightweight screenshots or SVG previews for each sample.
 - Tests: sample schema validation, sample load/migration, and navigation from sample gallery to target pages.
 
-**Status:** Project templates partially implemented; public sample gallery not implemented.
+**Status:** ✅ **Implemented 2026-05-03.** `analysis/sampleGallery.mjs` — `SAMPLE_REGISTRY` (6 samples: industrial-plant, data-center, substation-grounding, heat-trace-pipe, ductbank-network, coordination-study), `getSamplesByTag()`, `getSampleById()`, `validateSampleProject()`, `migrateSampleProject()`. `samples/` directory — 6 self-contained project JSON files with cables, raceways, one-line data, and study inputs. `samplegallery.html` + `src/sampleGallery.js` — gallery page with tag-filter chips, sample cards (title, industry badge, description, tags), guided-checklist panel with per-step progress persistence, "Open Sample" (loads project to localStorage, redirects), and "Download JSON" links. `src/components/navigation.js` — Sample Gallery added to Support section. `workflowdashboard.html` and `index.html` — "Try a Sample Project" CTA and "Browse Sample Projects" hero button. Tests: `tests/sampleGallery.test.mjs` — 40 assertions covering registry, tag/id lookup, validation, migration, JSON file integrity, HTML structure, and checklist page references.
 
 ---
 
@@ -1436,7 +1436,7 @@ The strongest market pattern is that competing tools sell more than formulas. Th
 | **P1** | 73 | ~~**Heat Trace Line List, BOM, and Installation Package**~~ | Product families + BOM/report tabs | Medium | ✅ Implemented 2026-04-30 |
 | **P1** | 71 | ~~**Lifecycle Project Model / Digital Twin Governance**~~ | Named study packages and revision snapshots | High | ✅ Implemented 2026-05-02 |
 | **P2** | 79 | **Cross-Study Design Coach** | Shared suggestion engine and dashboard action queue | Medium | Implemented |
-| **P2** | 81 | **Sample Project Gallery / Guided Demos** | Curated sample JSON projects and launch cards | Low | Not implemented |
+| **P2** | 81 | ~~**Sample Project Gallery / Guided Demos**~~ | Curated sample JSON projects and launch cards | Low | ✅ Implemented 2026-05-03 |
 | **P2** | 80 | ~~**Equipment Evaluation / Compliance Inventory**~~ | Join ratings with short-circuit/arc-flash/TCC results | Medium | ✅ Implemented 2026-05-03 |
 | **P2** | 74 | **Advanced Grounding Fidelity** | Soil data fitting and risk-point table | High | Not implemented |
 | **P3** | 75 | **Cable Thermal Environment Modeling** | Unified environment model over existing calculators | High | Not implemented |
