@@ -1,29 +1,41 @@
-import { analyzeGroundGrid } from './analysis/groundGrid.mjs';
+import { analyzeGroundGrid, analyzeGroundGridWithSoil, analyzeIrregularGrid } from './analysis/groundGrid.mjs';
 import { normalizePreviewGeometry } from './src/groundgridPreviewGeometry.js';
 import {
   buildGroundGridRecommendations,
   getGroundGridSafetyMetrics,
 } from './src/groundgridSafetyPresentation.js';
 import { initStudyBasisPanel } from './src/components/studyBasis.js';
+import {
+  wennerApparentResistivity,
+  fitTwoLayerSoil,
+  classifyRiskPoint,
+  buildPolygonGeometry,
+  buildHazardMap,
+  buildRectangularGeometry,
+  evaluateRiskPoints,
+} from './analysis/groundSoilModel.mjs';
 
 document.addEventListener('DOMContentLoaded', () => {
   initStudyBasisPanel('groundGrid', {
-    standard: 'IEEE 80-2013',
-    clause: '§16 — Mesh and step voltage calculations',
+    standard: 'IEEE 80-2013 / IEEE 81-2012',
+    clause: '§16 — Mesh and step voltage; §12.4 — Two-layer soil equivalent',
     formulas: [
-      'Em = ρ If Km Ki / (Lm) — mesh voltage (V)',
-      'Es = ρ If Ks Ki / (Ls) — step voltage (V)',
-      'Rg ≈ ρ (1/Lt + 1/√(20A) (1 + 1/(1 + h √(20/A)))) — grid resistance',
+      'Em = ρ Ig Km Ki / Lm — mesh voltage (V)',
+      'Es = ρ Ig Ks Ki / Ls — step voltage (V)',
+      'Rg = ρ/L + ρ/√(20A) × (1 + 1/(1+h√(20/A))) — grid resistance (Sverak)',
+      'ρa(a) = ρ1 × [1 + 4Σ Kⁿ × (1/√(1+(2nh/a)²) − 1/√(4+(2nh/a)²))] — Sunde image method',
     ],
     assumptions: [
-      'Uniform single-layer soil resistivity from Wenner measurements',
-      'Rectangular grid geometry; irregular shapes approximated at the perimeter',
-      'Touch/step voltage limits from IEEE 80 Table 7 with K_h = 1.0',
+      'IEEE 80 rectangular screening applied to equivalent polygon area and perimeter for irregular grids',
+      'Two-layer soil fitted by Nelder-Mead optimisation on Sunde image-method apparent resistivity (8 terms)',
+      'Hazard map from simplified analytical superposition — not FEM/BEM numerical method',
+      'Touch/step voltage limits: IEEE 80 Table 7 (Kh = 1.0)',
     ],
     limitations: [
-      'Two-layer soil model not yet supported (use SES CDEGS for multi-layer)',
-      'Irregular electrode geometry (L-shaped grids, remote rods) approximated',
-      'Transferred voltage from LV neutrals not automated',
+      'Full numerical accuracy requires SES CDEGS, XGSLab, or equivalent FEM/BEM solver',
+      'Polygon grid equivalence uses area and perimeter only; non-rectangular correction factors are approximated',
+      'Two-layer soil: rho1 used as effective uniform resistivity in IEEE 80 mesh/step formulas',
+      'Transferred voltage from LV neutrals and fences not automated',
     ],
     benchmarkId: 'ieee80-ground-grid',
   });
@@ -929,5 +941,549 @@ document.addEventListener('DOMContentLoaded', () => {
   updateUnitLabels(initialImperial);
   document.querySelectorAll('[data-unit]').forEach(btn => {
     btn.classList.toggle('is-active', btn.dataset.unit === (initialImperial ? 'imperial' : 'metric'));
+  });
+
+  // ---------------------------------------------------------------------------
+  // Gap #74 — Tab navigation
+  // ---------------------------------------------------------------------------
+  const ggTabs = document.querySelectorAll('.gg-tab');
+  const ggPanels = document.querySelectorAll('[id^="gg-panel-"]');
+
+  function switchGGTab(targetId) {
+    ggTabs.forEach(t => {
+      const active = t.dataset.ggTab === targetId;
+      t.setAttribute('aria-selected', active ? 'true' : 'false');
+      t.classList.toggle('active', active);
+    });
+    ggPanels.forEach(p => { p.hidden = p.id !== `gg-panel-${targetId}`; });
+  }
+
+  ggTabs.forEach(tab => tab.addEventListener('click', () => switchGGTab(tab.dataset.ggTab)));
+
+  // ---------------------------------------------------------------------------
+  // Soil Model Tab
+  // ---------------------------------------------------------------------------
+  let soilMeasurements = [];
+  let soilFitResult = null;
+  let soilRowId = 0;
+
+  function renderSoilTable() {
+    const tbody = document.getElementById('soil-measurements-body');
+    if (!tbody) return;
+    tbody.innerHTML = soilMeasurements.map((m, i) => `
+      <tr data-row="${i}">
+        <td>${i + 1}</td>
+        <td><input type="number" class="sm-a" step="0.5" min="0.1" value="${m.a}" aria-label="Electrode spacing row ${i+1}"></td>
+        <td><input type="number" class="sm-rho" step="1" min="1" value="${m.rhoA}" aria-label="Apparent resistivity row ${i+1}"></td>
+        <td><button type="button" class="sm-del btn btn--small" aria-label="Delete row ${i+1}">×</button></td>
+      </tr>`).join('');
+
+    tbody.querySelectorAll('.sm-del').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const row = parseInt(btn.closest('tr').dataset.row, 10);
+        soilMeasurements.splice(row, 1);
+        renderSoilTable();
+      });
+    });
+    tbody.querySelectorAll('.sm-a').forEach(input => {
+      input.addEventListener('change', () => syncSoilMeasurementsFromTable());
+    });
+    tbody.querySelectorAll('.sm-rho').forEach(input => {
+      input.addEventListener('change', () => syncSoilMeasurementsFromTable());
+    });
+  }
+
+  function syncSoilMeasurementsFromTable() {
+    const tbody = document.getElementById('soil-measurements-body');
+    if (!tbody) return;
+    soilMeasurements = Array.from(tbody.querySelectorAll('tr')).map(tr => ({
+      a: parseFloat(tr.querySelector('.sm-a').value) || 1,
+      rhoA: parseFloat(tr.querySelector('.sm-rho').value) || 100,
+    }));
+  }
+
+  function addDefaultSoilRows() {
+    if (soilMeasurements.length === 0) {
+      soilMeasurements = [
+        { a: 1, rhoA: 80 }, { a: 2, rhoA: 95 }, { a: 4, rhoA: 130 },
+        { a: 8, rhoA: 200 }, { a: 16, rhoA: 310 },
+      ];
+    }
+    renderSoilTable();
+  }
+
+  document.getElementById('soil-add-row-btn')?.addEventListener('click', () => {
+    soilMeasurements.push({ a: 2, rhoA: 100 });
+    renderSoilTable();
+  });
+
+  document.getElementById('soil-fit-btn')?.addEventListener('click', () => {
+    syncSoilMeasurementsFromTable();
+    if (soilMeasurements.length < 3) {
+      const { showAlertModal } = window;
+      if (showAlertModal) showAlertModal('Soil Fit', 'At least 3 measurements are required.');
+      return;
+    }
+    try {
+      soilFitResult = fitTwoLayerSoil(soilMeasurements);
+      renderSoilFitResults(soilFitResult);
+      renderSoilFitCurve(soilFitResult);
+      document.getElementById('soil-fit-results').hidden = false;
+    } catch (err) {
+      const { showAlertModal } = window;
+      if (showAlertModal) showAlertModal('Soil Fit Error', err.message);
+    }
+  });
+
+  document.getElementById('soil-use-in-analysis-btn')?.addEventListener('click', () => {
+    if (!soilFitResult) return;
+    const rhoInput = document.getElementById('soil-rho');
+    if (rhoInput) {
+      rhoInput.value = soilFitResult.rho1.toFixed(1);
+      switchGGTab('ieee80');
+    }
+  });
+
+  function renderSoilFitResults(fit) {
+    document.getElementById('soil-rho1-val').textContent = fit.rho1.toFixed(1);
+    document.getElementById('soil-rho2-val').textContent = fit.rho2.toFixed(1);
+    document.getElementById('soil-h-val').textContent = fit.h.toFixed(2);
+    document.getElementById('soil-fit-error-val').textContent = fit.fitError.toFixed(1);
+    const interp = document.getElementById('soil-fit-interp');
+    if (interp) {
+      const K = (fit.rho2 - fit.rho1) / (fit.rho2 + fit.rho1);
+      const dir = fit.rho2 > fit.rho1 ? 'increases' : 'decreases';
+      interp.textContent = `Resistivity ${dir} from top layer (ρ₁ = ${fit.rho1.toFixed(0)} Ω·m) to bottom (ρ₂ = ${fit.rho2.toFixed(0)} Ω·m) at depth h = ${fit.h.toFixed(1)} m. Reflection coefficient K = ${K.toFixed(3)}.`;
+    }
+  }
+
+  function renderSoilFitCurve(fit) {
+    const svgEl = document.getElementById('soil-fit-chart');
+    if (!svgEl) return;
+    const W = 400, H = 220, pad = { top: 20, right: 20, bottom: 40, left: 60 };
+    const plotW = W - pad.left - pad.right;
+    const plotH = H - pad.top - pad.bottom;
+
+    const aMin = Math.min(...soilMeasurements.map(m => m.a));
+    const aMax = Math.max(...soilMeasurements.map(m => m.a));
+    const rhoMin = Math.min(...soilMeasurements.map(m => m.rhoA)) * 0.8;
+    const rhoMax = Math.max(...soilMeasurements.map(m => m.rhoA)) * 1.2;
+
+    function xScale(a) { return pad.left + (Math.log(a / aMin) / Math.log(aMax / aMin)) * plotW; }
+    function yScale(r) { return pad.top + plotH - ((r - rhoMin) / (rhoMax - rhoMin)) * plotH; }
+
+    // Fitted curve points (50 steps in log space)
+    const curvePoints = [];
+    for (let i = 0; i <= 50; i++) {
+      const a = aMin * Math.pow(aMax / aMin, i / 50);
+      const rho = wennerApparentResistivity(fit.rho1, fit.rho2, fit.h, a);
+      curvePoints.push(`${xScale(a).toFixed(1)},${yScale(rho).toFixed(1)}`);
+    }
+
+    const measuredCircles = soilMeasurements.map(m =>
+      `<circle cx="${xScale(m.a).toFixed(1)}" cy="${yScale(m.rhoA).toFixed(1)}" r="5" fill="var(--color-accent)" stroke="var(--color-bg)" stroke-width="1.5" aria-label="${m.a}m: ${m.rhoA} Ω·m"/>`
+    ).join('');
+
+    svgEl.innerHTML = `
+      <line x1="${pad.left}" y1="${pad.top}" x2="${pad.left}" y2="${pad.top + plotH}" stroke="var(--color-muted)" stroke-width="1"/>
+      <line x1="${pad.left}" y1="${pad.top + plotH}" x2="${pad.left + plotW}" y2="${pad.top + plotH}" stroke="var(--color-muted)" stroke-width="1"/>
+      <polyline points="${curvePoints.join(' ')}" fill="none" stroke="var(--color-accent)" stroke-width="2"/>
+      ${measuredCircles}
+      <text x="${pad.left - 8}" y="${pad.top}" text-anchor="end" font-size="11" fill="var(--color-text)">${rhoMax.toFixed(0)}</text>
+      <text x="${pad.left - 8}" y="${pad.top + plotH}" text-anchor="end" font-size="11" fill="var(--color-text)">${rhoMin.toFixed(0)}</text>
+      <text x="${pad.left + plotW / 2}" y="${H - 5}" text-anchor="middle" font-size="11" fill="var(--color-text)">Electrode spacing a (m)</text>
+      <text x="12" y="${pad.top + plotH / 2}" text-anchor="middle" font-size="11" fill="var(--color-text)" transform="rotate(-90,12,${pad.top + plotH / 2})">ρa (Ω·m)</text>
+    `;
+  }
+
+  addDefaultSoilRows();
+
+  // ---------------------------------------------------------------------------
+  // Irregular Grid Tab
+  // ---------------------------------------------------------------------------
+  let polygonVertices = [];
+  let irregularGridResult = null;
+
+  function renderPolygonTable() {
+    const tbody = document.getElementById('polygon-vertices-body');
+    if (!tbody) return;
+    tbody.innerHTML = polygonVertices.map((v, i) => `
+      <tr data-vrow="${i}">
+        <td>${i + 1}</td>
+        <td><input type="number" class="pv-x" step="1" value="${v.x}" aria-label="X vertex ${i+1}"></td>
+        <td><input type="number" class="pv-y" step="1" value="${v.y}" aria-label="Y vertex ${i+1}"></td>
+        <td><button type="button" class="pv-del btn btn--small" aria-label="Delete vertex ${i+1}">×</button></td>
+      </tr>`).join('');
+
+    tbody.querySelectorAll('.pv-del').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const row = parseInt(btn.closest('tr').dataset.vrow, 10);
+        polygonVertices.splice(row, 1);
+        renderPolygonTable();
+        updatePolygonPreview();
+      });
+    });
+    tbody.querySelectorAll('.pv-x, .pv-y').forEach(input => {
+      input.addEventListener('change', () => { syncPolygonFromTable(); updatePolygonPreview(); });
+    });
+  }
+
+  function syncPolygonFromTable() {
+    const tbody = document.getElementById('polygon-vertices-body');
+    if (!tbody) return;
+    polygonVertices = Array.from(tbody.querySelectorAll('tr')).map(tr => ({
+      x: parseFloat(tr.querySelector('.pv-x').value) || 0,
+      y: parseFloat(tr.querySelector('.pv-y').value) || 0,
+    }));
+  }
+
+  function addDefaultPolygon() {
+    if (polygonVertices.length === 0) {
+      polygonVertices = [{ x: 0, y: 0 }, { x: 30, y: 0 }, { x: 30, y: 25 }, { x: 0, y: 25 }];
+      renderPolygonTable();
+      updatePolygonPreview();
+    }
+  }
+
+  function updatePolygonPreview() {
+    const svgEl = document.getElementById('polygon-grid-preview');
+    if (!svgEl || polygonVertices.length < 3) return;
+
+    const spacing = {
+      x: parseFloat(document.getElementById('irr-spacing-x')?.value) || 3,
+      y: parseFloat(document.getElementById('irr-spacing-y')?.value) || 3,
+    };
+    const depth = parseFloat(document.getElementById('irr-depth')?.value) || 0.5;
+
+    let geom;
+    try {
+      geom = buildPolygonGeometry(polygonVertices, spacing.x, spacing.y, depth);
+    } catch { return; }
+
+    const { bounds } = geom;
+    const pad = 20;
+    const W = 400, H = 400;
+    const scaleX = (W - 2 * pad) / (bounds.maxX - bounds.minX || 1);
+    const scaleY = (H - 2 * pad) / (bounds.maxY - bounds.minY || 1);
+    const scale = Math.min(scaleX, scaleY);
+    const toSvgX = x => pad + (x - bounds.minX) * scale;
+    const toSvgY = y => H - pad - (y - bounds.minY) * scale;
+
+    const conductorLines = geom.conductors.map(c =>
+      `<line x1="${toSvgX(c.x1).toFixed(1)}" y1="${toSvgY(c.y1).toFixed(1)}" x2="${toSvgX(c.x2).toFixed(1)}" y2="${toSvgY(c.y2).toFixed(1)}" stroke="var(--color-accent)" stroke-width="1.5" opacity="0.7"/>`
+    ).join('');
+
+    const perimPoints = polygonVertices.map(v => `${toSvgX(v.x).toFixed(1)},${toSvgY(v.y).toFixed(1)}`).join(' ');
+    const vertexCircles = polygonVertices.map((v, i) =>
+      `<circle cx="${toSvgX(v.x).toFixed(1)}" cy="${toSvgY(v.y).toFixed(1)}" r="4" fill="var(--color-accent)" aria-label="Vertex ${i+1} (${v.x}, ${v.y})"/>`
+    ).join('');
+
+    svgEl.innerHTML = `
+      <rect width="${W}" height="${H}" fill="var(--color-surface)" rx="4"/>
+      ${conductorLines}
+      <polygon points="${perimPoints}" fill="none" stroke="var(--color-text)" stroke-width="2"/>
+      ${vertexCircles}
+    `;
+
+    const summary = document.getElementById('irr-geometry-summary');
+    if (summary) {
+      summary.textContent = `Area: ${geom.area.toFixed(1)} m² | Perimeter: ${geom.perimeter.toFixed(1)} m | Conductors: ${geom.conductors.length} segments | Total length: ${geom.totalConductorLength.toFixed(1)} m`;
+    }
+  }
+
+  document.getElementById('polygon-add-vertex-btn')?.addEventListener('click', () => {
+    const last = polygonVertices[polygonVertices.length - 1] || { x: 0, y: 0 };
+    polygonVertices.push({ x: last.x + 5, y: last.y });
+    renderPolygonTable();
+    updatePolygonPreview();
+  });
+
+  ['irr-spacing-x', 'irr-spacing-y', 'irr-depth'].forEach(id => {
+    document.getElementById(id)?.addEventListener('change', updatePolygonPreview);
+  });
+
+  document.getElementById('irregular-analyze-btn')?.addEventListener('click', () => {
+    syncPolygonFromTable();
+    if (polygonVertices.length < 3) {
+      const { showAlertModal } = window;
+      if (showAlertModal) showAlertModal('Irregular Grid', 'At least 3 polygon vertices required.');
+      return;
+    }
+    try {
+      const params = {
+        vertices: polygonVertices,
+        spacingX: parseFloat(document.getElementById('irr-spacing-x')?.value) || 3,
+        spacingY: parseFloat(document.getElementById('irr-spacing-y')?.value) || 3,
+        h: parseFloat(document.getElementById('irr-depth')?.value) || 0.5,
+        d: parseFloat(document.getElementById('irr-diameter')?.value) || 0.013,
+        rho: parseFloat(document.getElementById('irr-rho')?.value) || 100,
+        Ig: parseFloat(document.getElementById('irr-current')?.value) || 5000,
+        tf: parseFloat(document.getElementById('irr-tf')?.value) || 0.5,
+        bw: parseInt(document.getElementById('irr-bw')?.value, 10) || 70,
+      };
+      irregularGridResult = analyzeIrregularGrid(params, soilFitResult);
+      latestAnalysisResult = irregularGridResult;
+      renderIrrResults(irregularGridResult);
+    } catch (err) {
+      const { showAlertModal } = window;
+      if (showAlertModal) showAlertModal('Irregular Grid Error', err.message);
+    }
+  });
+
+  function renderIrrResults(r) {
+    const kpiRow = document.getElementById('irr-kpi-row');
+    if (!kpiRow) return;
+    const touchPct = (r.Em / r.Etouch * 100).toFixed(0);
+    const stepPct = (r.Es / r.Estep * 100).toFixed(0);
+    kpiRow.innerHTML = `
+      <article class="groundgrid-kpi-card groundgrid-kpi-card--${r.touchSafe ? 'pass' : 'fail'}">
+        <span>Touch Voltage</span><strong>${r.Em.toFixed(1)} V</strong>
+        <small>Limit ${r.Etouch.toFixed(1)} V (${touchPct}% utilisation)</small>
+      </article>
+      <article class="groundgrid-kpi-card groundgrid-kpi-card--${r.stepSafe ? 'pass' : 'fail'}">
+        <span>Step Voltage</span><strong>${r.Es.toFixed(1)} V</strong>
+        <small>Limit ${r.Estep.toFixed(1)} V (${stepPct}% utilisation)</small>
+      </article>
+      <article class="groundgrid-kpi-card">
+        <span>GPR</span><strong>${r.GPR.toFixed(1)} V</strong>
+        <small>Rg = ${r.Rg.toFixed(4)} Ω</small>
+      </article>
+      <article class="groundgrid-kpi-card">
+        <span>Area</span><strong>${r.polygonArea.toFixed(1)} m²</strong>
+        <small>L = ${r.effectiveLength.toFixed(1)} m total</small>
+      </article>`;
+    document.getElementById('irr-results').hidden = false;
+  }
+
+  addDefaultPolygon();
+
+  // ---------------------------------------------------------------------------
+  // Hazard Map Tab
+  // ---------------------------------------------------------------------------
+  let hazardMapData = null;
+
+  document.getElementById('hazard-generate-btn')?.addEventListener('click', () => {
+    if (!latestAnalysisResult) {
+      const { showAlertModal } = window;
+      if (showAlertModal) showAlertModal('Hazard Map', 'Run IEEE 80 Screening or Irregular Grid analysis first.');
+      return;
+    }
+    const resolution = parseInt(document.getElementById('hazard-resolution')?.value, 10) || 40;
+    const r = latestAnalysisResult;
+
+    let geom;
+    if (r.isIrregular && polygonVertices.length >= 3) {
+      const spacingX = parseFloat(document.getElementById('irr-spacing-x')?.value) || 3;
+      const spacingY = parseFloat(document.getElementById('irr-spacing-y')?.value) || 3;
+      const depth = parseFloat(document.getElementById('irr-depth')?.value) || 0.5;
+      geom = buildPolygonGeometry(polygonVertices, spacingX, spacingY, depth);
+    } else {
+      const imperial = getUnits() === 'imperial';
+      const lx = imperial ? ftToM(getNum('grid-lx')) : getNum('grid-lx');
+      const ly = imperial ? ftToM(getNum('grid-ly')) : getNum('grid-ly');
+      const nx = getInt('nx'), ny = getInt('ny');
+      const depth = imperial ? ftToM(getNum('burial-depth')) : getNum('burial-depth');
+      geom = buildRectangularGeometry(lx, ly, nx, ny, depth);
+    }
+
+    const cellSize = Math.max(geom.bounds.maxX - geom.bounds.minX,
+                              geom.bounds.maxY - geom.bounds.minY) / resolution;
+
+    try {
+      hazardMapData = buildHazardMap(
+        geom,
+        r.effectiveRho ?? getNum('soil-rho'),
+        r.Ig ?? getNum('grid-current'),
+        r.Rg,
+        r.Etouch,
+        r.Estep,
+        cellSize
+      );
+      renderHazardMapSVG(hazardMapData, geom.bounds, document.getElementById('hazard-voltage-type')?.value || 'risk');
+      document.getElementById('hazard-legend').hidden = false;
+      document.getElementById('hazard-export-btns').hidden = false;
+      updateRiskPointsFromHazardMap(hazardMapData);
+    } catch (err) {
+      const { showAlertModal } = window;
+      if (showAlertModal) showAlertModal('Hazard Map Error', err.message);
+    }
+  });
+
+  document.getElementById('hazard-voltage-type')?.addEventListener('change', () => {
+    if (hazardMapData && latestAnalysisResult) {
+      const geom = latestAnalysisResult.isIrregular && polygonVertices.length >= 3
+        ? buildPolygonGeometry(polygonVertices,
+            parseFloat(document.getElementById('irr-spacing-x')?.value) || 3,
+            parseFloat(document.getElementById('irr-spacing-y')?.value) || 3,
+            parseFloat(document.getElementById('irr-depth')?.value) || 0.5)
+        : buildRectangularGeometry(
+            getNum('grid-lx') * (getUnits() === 'imperial' ? 0.3048 : 1),
+            getNum('grid-ly') * (getUnits() === 'imperial' ? 0.3048 : 1),
+            getInt('nx'), getInt('ny'),
+            getNum('burial-depth') * (getUnits() === 'imperial' ? 0.3048 : 1));
+      renderHazardMapSVG(hazardMapData, geom.bounds, document.getElementById('hazard-voltage-type').value);
+    }
+  });
+
+  function riskColor(riskClass) {
+    return { safe: '#2d8a4e', 'touch-risk': '#e6a817', 'step-risk': '#e07010', 'both-risk': '#c0392b' }[riskClass] || '#888';
+  }
+
+  function renderHazardMapSVG(cells, bounds, mode) {
+    const svgEl = document.getElementById('hazard-map-svg');
+    if (!svgEl || !cells.length) return;
+    const W = 520, H = 400, pad = 20;
+    const plotW = W - 2 * pad, plotH = H - 2 * pad;
+    const dx = bounds.maxX - bounds.minX || 1;
+    const dy = bounds.maxY - bounds.minY || 1;
+    const toSvgX = x => pad + ((x - bounds.minX) / dx) * plotW;
+    const toSvgY = y => H - pad - ((y - bounds.minY) / dy) * plotH;
+
+    const xs = [...new Set(cells.map(c => c.x))].sort((a, b) => a - b);
+    const ys = [...new Set(cells.map(c => c.y))].sort((a, b) => a - b);
+    const cellW = xs.length > 1 ? (toSvgX(xs[1]) - toSvgX(xs[0])) : plotW;
+    const cellH = ys.length > 1 ? Math.abs(toSvgY(ys[1]) - toSvgY(ys[0])) : plotH;
+
+    let maxVal = 1;
+    if (mode !== 'risk') {
+      maxVal = Math.max(...cells.map(c => mode === 'touch' ? c.touchV : c.stepV), 1);
+    }
+
+    function cellColor(c) {
+      if (mode === 'risk') return riskColor(c.riskClass);
+      const val = mode === 'touch' ? c.touchV : c.stepV;
+      const frac = Math.min(val / maxVal, 1);
+      const r = Math.round(frac * 200);
+      const g = Math.round((1 - frac) * 150);
+      return `rgb(${r},${g},50)`;
+    }
+
+    const rects = cells.map(c => {
+      const sx = toSvgX(c.x) - cellW / 2;
+      const sy = toSvgY(c.y) - cellH / 2;
+      return `<rect x="${sx.toFixed(1)}" y="${sy.toFixed(1)}" width="${Math.abs(cellW).toFixed(1)}" height="${Math.abs(cellH).toFixed(1)}" fill="${cellColor(c)}" opacity="0.85"/>`;
+    }).join('');
+
+    svgEl.innerHTML = `
+      <rect width="${W}" height="${H}" fill="var(--color-surface)"/>
+      ${rects}
+      <rect x="${pad}" y="${pad}" width="${plotW}" height="${plotH}" fill="none" stroke="var(--color-muted)" stroke-width="1"/>
+    `;
+  }
+
+  document.getElementById('hazard-export-svg-btn')?.addEventListener('click', () => {
+    const svgEl = document.getElementById('hazard-map-svg');
+    if (!svgEl) return;
+    const serialized = new XMLSerializer().serializeToString(svgEl);
+    const blob = new Blob(['<?xml version="1.0" encoding="UTF-8"?>\n' + serialized], { type: 'image/svg+xml' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'ground-grid-hazard-map.svg';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
+
+  document.getElementById('hazard-export-png-btn')?.addEventListener('click', () => {
+    const svgEl = document.getElementById('hazard-map-svg');
+    if (!svgEl) return;
+    const serialized = new XMLSerializer().serializeToString(svgEl);
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 520; canvas.height = 400;
+      canvas.getContext('2d').drawImage(img, 0, 0);
+      const a = document.createElement('a');
+      a.href = canvas.toDataURL('image/png');
+      a.download = 'ground-grid-hazard-map.png';
+      a.click();
+    };
+    img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(serialized);
+  });
+
+  // ---------------------------------------------------------------------------
+  // Risk Points Tab
+  // ---------------------------------------------------------------------------
+  let userRiskPoints = [];
+
+  function updateRiskPointsFromHazardMap(cells) {
+    if (!cells || !cells.length || !latestAnalysisResult) return;
+    const r = latestAnalysisResult;
+    const autoPoints = evaluateRiskPoints(
+      [{ id: 'auto-touch', label: 'Max Touch Area', x: cells.reduce((a, c) => c.touchV > a.touchV ? c : a).x, y: cells.reduce((a, c) => c.touchV > a.touchV ? c : a).y },
+       { id: 'auto-step',  label: 'Max Step Area',  x: cells.reduce((a, c) => c.stepV  > a.stepV  ? c : a).x, y: cells.reduce((a, c) => c.stepV  > a.stepV  ? c : a).y }],
+      cells, r.Etouch, r.Estep
+    );
+    renderRiskTable([...autoPoints, ...userRiskPoints], r);
+  }
+
+  function renderRiskTable(points, r) {
+    const tbody = document.getElementById('risk-points-body');
+    if (!tbody) return;
+    if (!points.length) {
+      tbody.innerHTML = '<tr><td colspan="9" class="table-empty-state">No risk points defined. Generate Hazard Map or add inspection points.</td></tr>';
+      return;
+    }
+    const rowClass = rc => ({ safe: 'result-safe', 'touch-risk': 'result-review', 'step-risk': 'result-review', 'both-risk': 'result-fail' }[rc] || '');
+    tbody.innerHTML = points.map((p, i) => `
+      <tr class="${rowClass(p.riskClass)}">
+        <td>${escapeHtml(p.label)}</td>
+        <td>${p.x.toFixed(1)}</td>
+        <td>${p.y.toFixed(1)}</td>
+        <td>${p.touchV?.toFixed(1) ?? '--'} V</td>
+        <td>${p.stepV?.toFixed(1) ?? '--'} V</td>
+        <td>${p.touchMarginPct?.toFixed(0) ?? '--'}%</td>
+        <td>${p.stepMarginPct?.toFixed(0) ?? '--'}%</td>
+        <td>${p.riskClass || '--'}</td>
+        <td>${p.id?.startsWith('auto-') ? '' : `<button type="button" class="rp-del btn btn--small" data-rpi="${i}" aria-label="Delete ${escapeHtml(p.label)}">×</button>`}</td>
+      </tr>`).join('');
+
+    tbody.querySelectorAll('.rp-del').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const idx = parseInt(btn.dataset.rpi, 10);
+        userRiskPoints = userRiskPoints.filter((_, j) => j !== idx - 2); // offset by 2 auto rows
+        if (hazardMapData) updateRiskPointsFromHazardMap(hazardMapData);
+      });
+    });
+  }
+
+  document.getElementById('add-risk-point-btn')?.addEventListener('click', () => {
+    document.getElementById('add-risk-point-form').hidden = false;
+  });
+
+  document.getElementById('rp-cancel-btn')?.addEventListener('click', () => {
+    document.getElementById('add-risk-point-form').hidden = true;
+  });
+
+  document.getElementById('rp-add-confirm-btn')?.addEventListener('click', () => {
+    const label = document.getElementById('rp-label')?.value?.trim();
+    const x = parseFloat(document.getElementById('rp-x')?.value);
+    const y = parseFloat(document.getElementById('rp-y')?.value);
+    if (!label || !Number.isFinite(x) || !Number.isFinite(y)) return;
+    userRiskPoints.push({ id: `user-${Date.now()}`, label, x, y });
+    document.getElementById('add-risk-point-form').hidden = true;
+    if (hazardMapData && latestAnalysisResult) {
+      updateRiskPointsFromHazardMap(hazardMapData);
+    } else if (latestAnalysisResult) {
+      renderRiskTable(userRiskPoints, latestAnalysisResult);
+    }
+  });
+
+  document.getElementById('export-risk-csv-btn')?.addEventListener('click', () => {
+    const tbody = document.getElementById('risk-points-body');
+    if (!tbody) return;
+    const rows = Array.from(tbody.querySelectorAll('tr:not(.table-empty-state tr)'));
+    const lines = ['Label,X (m),Y (m),Touch V,Step V,Touch Margin %,Step Margin %,Risk Class'];
+    rows.forEach(tr => {
+      const cells = Array.from(tr.querySelectorAll('td'));
+      if (cells.length >= 8) {
+        lines.push(cells.slice(0, 8).map(td => `"${td.textContent.trim().replace(/"/g, '""')}"`).join(','));
+      }
+    });
+    const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'ground-grid-risk-points.csv';
+    a.click();
+    URL.revokeObjectURL(a.href);
   });
 });

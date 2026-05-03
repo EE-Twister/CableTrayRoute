@@ -115,6 +115,32 @@
         <a href="shortCircuit.html">Short Circuit</a>.</p>
       </details>
 
+      <!-- Advanced grounding tabs (Gap #74) -->
+      <div class="gg-tab-bar" role="tablist" aria-label="Ground grid study sections">
+        <button role="tab" id="gg-tab-ieee80" aria-controls="gg-panel-ieee80"
+                aria-selected="true" class="gg-tab" data-gg-tab="ieee80">
+          IEEE 80 Screening
+        </button>
+        <button role="tab" id="gg-tab-soil" aria-controls="gg-panel-soil"
+                aria-selected="false" class="gg-tab" data-gg-tab="soil">
+          Soil Model
+        </button>
+        <button role="tab" id="gg-tab-grid" aria-controls="gg-panel-grid"
+                aria-selected="false" class="gg-tab" data-gg-tab="grid">
+          Irregular Grid
+        </button>
+        <button role="tab" id="gg-tab-hazard" aria-controls="gg-panel-hazard"
+                aria-selected="false" class="gg-tab" data-gg-tab="hazard">
+          Hazard Map
+        </button>
+        <button role="tab" id="gg-tab-risks" aria-controls="gg-panel-risks"
+                aria-selected="false" class="gg-tab" data-gg-tab="risks">
+          Risk Points
+        </button>
+      </div>
+
+      <!-- Tab 1: existing IEEE 80 content -->
+      <div id="gg-panel-ieee80" role="tabpanel" aria-labelledby="gg-tab-ieee80">
       <div class="groundgrid-shell">
         <aside class="groundgrid-input-panel" aria-label="Ground grid study inputs">
           <form id="ground-grid-form" novalidate>
@@ -411,6 +437,267 @@
           <div id="results" role="region" aria-live="polite" aria-label="Ground grid analysis results"></div>
         </section>
       </div>
+      </div><!-- /gg-panel-ieee80 -->
+
+      <!-- Tab 2: Soil Model -->
+      <div id="gg-panel-soil" role="tabpanel" aria-labelledby="gg-tab-soil" hidden>
+        <div class="gg-panel-content">
+          <h2>Two-Layer Soil Model Fitting</h2>
+          <p class="field-hint">
+            Enter Wenner four-electrode apparent resistivity measurements (ANSI/ASTM G57).
+            Requires at least 3 measurements. The tool fits rho&#x2081;, rho&#x2082;, and h
+            using Sunde's image method with Nelder-Mead optimisation.
+          </p>
+
+          <div class="gg-soil-table-wrap">
+            <table id="soil-measurements-table" class="data-table" aria-label="Soil resistivity measurements">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Electrode spacing a (m)</th>
+                  <th>Apparent resistivity &#x3C1;<sub>a</sub> (&#x2126;&#xB7;m)</th>
+                  <th><span class="sr-only">Delete row</span></th>
+                </tr>
+              </thead>
+              <tbody id="soil-measurements-body">
+                <!-- rows injected by groundgrid.js -->
+              </tbody>
+            </table>
+          </div>
+
+          <div class="gg-soil-controls">
+            <button type="button" id="soil-add-row-btn" class="btn">+ Add Measurement</button>
+            <button type="button" id="soil-fit-btn" class="primary-btn">Fit Two-Layer Soil Model</button>
+          </div>
+
+          <div id="soil-fit-results" class="gg-soil-results" aria-live="polite" hidden>
+            <h3>Fitted Parameters</h3>
+            <div class="gg-soil-kpi-row">
+              <article class="groundgrid-kpi-card">
+                <span>&#x3C1;&#x2081; (top layer)</span>
+                <strong id="soil-rho1-val">--</strong>
+                <small>&#x2126;&#xB7;m</small>
+              </article>
+              <article class="groundgrid-kpi-card">
+                <span>&#x3C1;&#x2082; (bottom layer)</span>
+                <strong id="soil-rho2-val">--</strong>
+                <small>&#x2126;&#xB7;m</small>
+              </article>
+              <article class="groundgrid-kpi-card">
+                <span>Layer depth h</span>
+                <strong id="soil-h-val">--</strong>
+                <small>m</small>
+              </article>
+              <article class="groundgrid-kpi-card">
+                <span>RMS fit error</span>
+                <strong id="soil-fit-error-val">--</strong>
+                <small>%</small>
+              </article>
+            </div>
+            <p class="field-hint" id="soil-fit-interp"></p>
+            <h3>Fitted vs Measured Curve</h3>
+            <svg id="soil-fit-chart" viewBox="0 0 400 220" role="img"
+                 aria-label="Soil resistivity curve: measured points vs fitted two-layer model"
+                 class="gg-soil-chart">
+              <text x="200" y="110" text-anchor="middle" class="chart-placeholder">Run Fit Two-Layer Soil Model to render curve</text>
+            </svg>
+            <div class="gg-soil-actions">
+              <button type="button" id="soil-use-in-analysis-btn" class="btn">
+                Use &#x3C1;&#x2081; in IEEE 80 Screening
+              </button>
+            </div>
+          </div>
+        </div>
+      </div><!-- /gg-panel-soil -->
+
+      <!-- Tab 3: Irregular Grid -->
+      <div id="gg-panel-grid" role="tabpanel" aria-labelledby="gg-tab-grid" hidden>
+        <div class="gg-panel-content">
+          <h2>Irregular (Polygon) Grid</h2>
+          <p class="field-hint">
+            Define the grid boundary as a polygon and set mesh spacing. Conductor scan-line fill
+            is computed automatically. IEEE 80 screening is then applied to the polygon area and
+            perimeter (approximation — see study basis for limitations).
+          </p>
+
+          <div class="gg-irr-layout">
+            <div class="gg-irr-inputs">
+              <h3>Polygon Vertices</h3>
+              <table id="polygon-vertices-table" class="data-table" aria-label="Polygon grid vertices">
+                <thead>
+                  <tr><th>#</th><th>X (m)</th><th>Y (m)</th><th><span class="sr-only">Delete</span></th></tr>
+                </thead>
+                <tbody id="polygon-vertices-body"></tbody>
+              </table>
+              <button type="button" id="polygon-add-vertex-btn" class="btn">+ Add Vertex</button>
+
+              <h3>Mesh &amp; Electrical Parameters</h3>
+              <div class="field-row">
+                <label for="irr-spacing-x">Mesh spacing X (m)</label>
+                <input type="number" id="irr-spacing-x" min="0.5" step="0.5" value="3">
+              </div>
+              <div class="field-row">
+                <label for="irr-spacing-y">Mesh spacing Y (m)</label>
+                <input type="number" id="irr-spacing-y" min="0.5" step="0.5" value="3">
+              </div>
+              <div class="field-row">
+                <label for="irr-depth">Burial depth (m)</label>
+                <input type="number" id="irr-depth" min="0.1" step="0.1" value="0.5">
+              </div>
+              <div class="field-row">
+                <label for="irr-diameter">Conductor diameter (m)</label>
+                <input type="number" id="irr-diameter" min="0.005" step="0.001" value="0.013">
+              </div>
+              <div class="field-row">
+                <label for="irr-rho">Soil resistivity (&#x2126;&#xB7;m)</label>
+                <input type="number" id="irr-rho" min="1" step="1" value="100">
+              </div>
+              <div class="field-row">
+                <label for="irr-current">Max grid current I<sub>g</sub> (A)</label>
+                <input type="number" id="irr-current" min="1" step="100" value="5000">
+              </div>
+              <div class="field-row">
+                <label for="irr-tf">Fault duration (s)</label>
+                <input type="number" id="irr-tf" min="0.01" step="0.01" value="0.5">
+              </div>
+              <div class="field-row">
+                <label for="irr-bw">Body weight</label>
+                <select id="irr-bw">
+                  <option value="70" selected>70 kg</option>
+                  <option value="50">50 kg</option>
+                </select>
+              </div>
+              <button type="button" id="irregular-analyze-btn" class="primary-btn">
+                Run IEEE 80 Screening
+              </button>
+            </div>
+
+            <div class="gg-irr-preview">
+              <h3>Grid Preview</h3>
+              <svg id="polygon-grid-preview" viewBox="0 0 400 400" role="img"
+                   aria-label="Polygon ground grid conductor layout preview"
+                   class="gg-irr-canvas">
+                <text x="200" y="200" text-anchor="middle" class="chart-placeholder">Add vertices to preview the grid</text>
+              </svg>
+              <p id="irr-geometry-summary" class="field-hint"></p>
+
+              <div id="irr-results" class="gg-irr-results" aria-live="polite" hidden>
+                <h3>Screening Results</h3>
+                <div class="gg-soil-kpi-row" id="irr-kpi-row"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div><!-- /gg-panel-grid -->
+
+      <!-- Tab 4: Hazard Map -->
+      <div id="gg-panel-hazard" role="tabpanel" aria-labelledby="gg-tab-hazard" hidden>
+        <div class="gg-panel-content">
+          <h2>Touch &amp; Step Voltage Hazard Map</h2>
+
+          <div class="gg-hazard-notice" role="note">
+            <strong>Screening-level estimate only.</strong>
+            This map uses simplified analytical superposition — not a finite element (FEM) or
+            boundary element (BEM) numerical method. Use SES CDEGS, XGSLab, or equivalent tools
+            for regulatory submissions or complex electrode geometries.
+          </div>
+
+          <div class="gg-hazard-controls">
+            <label for="hazard-resolution">Map resolution
+              <select id="hazard-resolution">
+                <option value="20">Coarse (20&#x00D7;20 — fast)</option>
+                <option value="40" selected>Standard (40&#x00D7;40)</option>
+                <option value="60">Fine (60&#x00D7;60 — slower)</option>
+              </select>
+            </label>
+            <label for="hazard-voltage-type">Show voltages
+              <select id="hazard-voltage-type">
+                <option value="touch">Touch voltage</option>
+                <option value="step">Step voltage</option>
+                <option value="risk" selected>Risk classification</option>
+              </select>
+            </label>
+            <button type="button" id="hazard-generate-btn" class="primary-btn">Generate Hazard Map</button>
+          </div>
+
+          <div id="hazard-map-container" aria-live="polite">
+            <svg id="hazard-map-svg" viewBox="0 0 520 400" role="img"
+                 aria-label="Hazard map showing touch and step voltage risk zones"
+                 class="gg-hazard-map">
+              <text x="260" y="200" text-anchor="middle" class="chart-placeholder">
+                Run IEEE 80 Screening first, then Generate Hazard Map
+              </text>
+            </svg>
+            <div class="gg-hazard-legend" id="hazard-legend" hidden>
+              <span class="gg-legend-safe">&#x25A0; Safe</span>
+              <span class="gg-legend-touch">&#x25A0; Touch risk</span>
+              <span class="gg-legend-step">&#x25A0; Step risk</span>
+              <span class="gg-legend-both">&#x25A0; Both risk</span>
+            </div>
+          </div>
+
+          <div class="gg-hazard-export" id="hazard-export-btns" hidden>
+            <button type="button" id="hazard-export-svg-btn" class="btn">Export SVG</button>
+            <button type="button" id="hazard-export-png-btn" class="btn">Export PNG</button>
+          </div>
+        </div>
+      </div><!-- /gg-panel-hazard -->
+
+      <!-- Tab 5: Risk Points -->
+      <div id="gg-panel-risks" role="tabpanel" aria-labelledby="gg-tab-risks" hidden>
+        <div class="gg-panel-content">
+          <h2>Inspection Point Risk Assessment</h2>
+          <p class="field-hint">
+            Add named inspection points (equipment locations, fence posts, gate handles, etc.)
+            and review touch and step voltage margins. Hazard Map must be generated first.
+          </p>
+
+          <div class="gg-risks-controls">
+            <button type="button" id="add-risk-point-btn" class="btn">+ Add Inspection Point</button>
+            <button type="button" id="export-risk-csv-btn" class="btn">Export CSV</button>
+          </div>
+
+          <!-- Add risk point form (hidden until button clicked) -->
+          <div id="add-risk-point-form" class="gg-risk-form" hidden>
+            <h3>New Inspection Point</h3>
+            <div class="field-row">
+              <label for="rp-label">Label</label>
+              <input type="text" id="rp-label" placeholder="e.g. Gate handle">
+            </div>
+            <div class="field-row">
+              <label for="rp-x">X coordinate (m)</label>
+              <input type="number" id="rp-x" step="0.5" value="0">
+            </div>
+            <div class="field-row">
+              <label for="rp-y">Y coordinate (m)</label>
+              <input type="number" id="rp-y" step="0.5" value="0">
+            </div>
+            <div class="gg-risk-form-actions">
+              <button type="button" id="rp-add-confirm-btn" class="primary-btn">Add Point</button>
+              <button type="button" id="rp-cancel-btn" class="btn">Cancel</button>
+            </div>
+          </div>
+
+          <table id="risk-points-table" class="data-table" aria-label="Inspection point risk assessment">
+            <thead>
+              <tr>
+                <th>Label</th>
+                <th>X (m)</th>
+                <th>Y (m)</th>
+                <th>Touch V</th>
+                <th>Step V</th>
+                <th>Touch margin</th>
+                <th>Step margin</th>
+                <th>Risk</th>
+                <th><span class="sr-only">Delete</span></th>
+              </tr>
+            </thead>
+            <tbody id="risk-points-body">
+              <tr><td colspan="9" class="table-empty-state">Generate Hazard Map to populate automatic risk points, or add inspection points manually.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div><!-- /gg-panel-risks -->
 
       <section class="card">
         <div id="study-basis-panel"></div>
