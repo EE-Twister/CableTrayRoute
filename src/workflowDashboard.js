@@ -7,6 +7,8 @@ import {
 import { trayFillPercent } from '../analysis/designRuleChecker.mjs';
 import { buildLifecyclePackage, summarizePackage } from '../analysis/lifecyclePackage.mjs';
 import { runDesignCoach } from '../analysis/designCoach.mjs';
+import { evaluateEquipment, summariseEvaluation } from '../analysis/equipmentEvaluation.mjs';
+import protectiveDevices from '../data/protectiveDevices.mjs';
 import '../site.js';
 
 // Studies tracked in the dashboard with display labels and their storage keys
@@ -100,6 +102,16 @@ function getOpenCoachItemCount() {
   }
 }
 
+function getEquipmentFailCount() {
+  try {
+    const components = (getOneLine()?.sheets ?? []).flatMap(s => s.components ?? []);
+    const evals = evaluateEquipment(components, getCables() || [], getStudies() || {}, protectiveDevices);
+    return summariseEvaluation(evals).fail;
+  } catch (_) {
+    return 0;
+  }
+}
+
 function renderKpiStrip(container) {
   if (!container) return;
 
@@ -107,6 +119,7 @@ function renderKpiStrip(container) {
   const trayViolations = getTrayViolationsCount();
   const studiesCompletedCount = getStudiesCompletedCount();
   const openCoachItems = getOpenCoachItemCount();
+  const equipFailCount = getEquipmentFailCount();
   const totalStudies = STUDY_DEFINITIONS.length;
 
   const kpis = [
@@ -143,6 +156,15 @@ function renderKpiStrip(container) {
         : 'No open safety or compliance recommendations.',
       href: 'designcoach.html',
       warn: openCoachItems > 0,
+    },
+    {
+      label: 'Equipment failures',
+      value: equipFailCount,
+      helper: equipFailCount > 0
+        ? `${equipFailCount} equipment item(s) exceed their duty rating.`
+        : 'No equipment duty failures detected.',
+      href: 'equipmentevaluation.html',
+      warn: equipFailCount > 0,
     },
   ];
 

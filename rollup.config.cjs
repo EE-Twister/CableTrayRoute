@@ -57,6 +57,7 @@ const entries = {
   clashdetect: 'src/clashdetect.js',
   designrulechecker: 'src/designrulechecker.js',
   designcoach: 'src/designCoach.js',
+  equipmentevaluation: 'src/equipmentEvaluation.js',
   spoolsheets: 'src/spoolsheets.js',
   windload: 'src/windload.js',
   structuralcombinations: 'src/structuralcombinations.js',
