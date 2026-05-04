@@ -84,7 +84,7 @@ function applyPageVisualIdentity(){
     {match:/schedule|list/,value:'schedule'},
     {match:/route|ductbank|pullcards|supportspan/,value:'routing'},
     {match:/fill/,value:'capacity'},
-    {match:/arcflash|harmonics|voltageflicker|motorstart|shortcircuit|loadflow|tcc/,value:'analysis'},
+    {match:/arcflash|harmonics|voltageflicker|motorstart|shortcircuit|loadflow|tcc|conduitbend/,value:'analysis'},
     {match:/oneline|custom-components/,value:'diagram'},
     {match:/account|login|forgot-password|reset-password/,value:'account'},
     {match:/index/,value:'home'}

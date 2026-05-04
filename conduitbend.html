@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Conduit Bend &amp; Pull-Box Schedule. Calculate bend geometry (90°, offset, kick, saddle), check NEC 358.24 cumulative bend limits, and size pull boxes per NEC 314.28." />
+  <title>Conduit Bend Schedule — CableTrayRoute</title>
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/favicon.svg">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Conduit Bend &amp; Pull-Box Schedule — CableTrayRoute">
+  <meta property="og:description" content="Calculate conduit bend geometry and NEC 314.28 pull-box sizing from your conduit runs.">
+  <meta property="og:image" content="https://cabletrayroute.com/icons/og-preview.png">
+  <meta property="og:site_name" content="CableTrayRoute">
+  <meta property="og:url" content="conduitbend.html">
+  <link rel="canonical" href="conduitbend.html">
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+  <meta name="color-scheme" content="light dark">
+  <link rel="stylesheet" href="style.css" />
+  <script type="module" src="dirtyTracker.js"></script>
+  <script type="module" src="dist/conduitbend.js" defer></script>
+</head>
+<body class="conduitbend-page" data-report-title="Conduit Bend Schedule">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <nav class="top-nav" aria-label="Primary">
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
+      <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+    <div id="nav-links" class="nav-links" role="list">
+      <!-- Populated dynamically by navigation.js -->
+    </div>
+    <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+  </nav>
+
+  <div id="settings-menu" class="settings-menu">
+    <label for="theme-select">Theme
+      <select id="theme-select">
+        <option value="system">System</option>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+        <option value="high-contrast">High Contrast</option>
+      </select>
+    </label>
+    <label><input type="checkbox" id="compact-toggle" aria-label="Enable compact table mode"> Compact Mode</label>
+    <label for="unit-select">Units
+      <select id="unit-select">
+        <option value="imperial">Imperial</option>
+        <option value="metric">Metric</option>
+      </select>
+    </label>
+    <button id="help-btn" class="btn" aria-expanded="false" title="Show help">Site Help</button>
+    <button id="new-project-btn" class="btn" title="Start a new project">New Project</button>
+    <button id="save-project-btn" class="btn" title="Save current project">Save Project</button>
+    <button id="load-project-btn" class="btn" title="Load an existing project">Load Project</button>
+    <button id="export-project-btn" class="btn" title="Export project data">Export Project</button>
+    <button id="import-project-btn" class="btn" title="Import project data">Import Project</button>
+    <input type="file" id="import-project-input" accept=".ctr.json" class="hidden" title="Select project file">
+  </div>
+
+  <div class="container">
+    <main id="main-content" class="main-content">
+      <nav aria-label="Breadcrumb">
+        <ol class="breadcrumb-trail">
+          <li><a href="index.html">Home</a></li>
+          <li>Workflow</li>
+          <li aria-current="page">Conduit Bend Schedule</li>
+        </ol>
+      </nav>
+
+      <header class="page-header">
+        <h1>Conduit Bend &amp; Pull-Box Schedule</h1>
+        <p>Calculate bend geometry for 90°, offset, kick, and saddle bends. Validate NEC 358.24 cumulative bend limits and size pull boxes per NEC 314.28.</p>
+      </header>
+
+      <details class="method-panel">
+        <summary>Method &amp; Standards</summary>
+        <p>Bend geometry is calculated using standard multiplier and shrink tables (Tom Henry / Mike Holt). NEC 358.24 limits total bends to <strong>≤ 360°</strong> between pull points for EMT, RMC, IMC, and LFMC.</p>
+        <table class="results-table" aria-label="Bend type reference">
+          <thead>
+            <tr><th>Bend Type</th><th>Degrees Added</th><th>Mark Spacing</th><th>Shrink</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>90° (stub-up)</td><td>90°</td><td>Take-up by conduit size</td><td>= take-up</td></tr>
+            <tr><td>Offset (45°/45°)</td><td>90°</td><td>height × 1.414</td><td>height × 3/8"</td></tr>
+            <tr><td>Offset (30°/30°)</td><td>60°</td><td>height × 2.0</td><td>height × 1/4"</td></tr>
+            <tr><td>Kick (30°)</td><td>30°</td><td>height × 2.0</td><td>0</td></tr>
+            <tr><td>3-Bend Saddle (45°/22.5°/22.5°)</td><td>90°</td><td>height × 2.5 (outer–centre)</td><td>height × 3/16"</td></tr>
+          </tbody>
+        </table>
+        <p><strong>Pull-box sizing (NEC 314.28):</strong>
+          Straight pull: length ≥ 8 × largest trade size.
+          Angle/U pull: dimension ≥ 6 × largest + sum of others on same wall.
+        </p>
+      </details>
+
+      <!-- ------------------------------------------------------------------ -->
+      <!-- Conduit runs section                                                -->
+      <!-- ------------------------------------------------------------------ -->
+      <section aria-label="Conduit runs">
+        <div class="controls-row">
+          <button id="add-run-btn" type="button">+ Add Conduit Run</button>
+          <button id="run-btn" type="button">Calculate</button>
+          <button id="export-btn" type="button" disabled>Export CSV</button>
+        </div>
+
+        <div id="runs-container" aria-label="Conduit run list" role="list">
+          <!-- Dynamic run cards inserted here -->
+        </div>
+      </section>
+
+      <!-- ------------------------------------------------------------------ -->
+      <!-- Pull-box section                                                    -->
+      <!-- ------------------------------------------------------------------ -->
+      <section aria-label="Pull-box sizing" style="margin-top:1.5rem">
+        <div class="controls-row">
+          <strong>Pull-Box Sizing (NEC 314.28)</strong>
+          <button id="add-pullbox-btn" type="button">+ Add Pull Point</button>
+        </div>
+        <div id="pullbox-container" aria-label="Pull-box list" role="list">
+          <!-- Dynamic pull-box cards inserted here -->
+        </div>
+      </section>
+
+      <!-- ------------------------------------------------------------------ -->
+      <!-- Results                                                             -->
+      <!-- ------------------------------------------------------------------ -->
+      <div id="violation-summary" hidden role="alert" aria-live="assertive" aria-label="NEC violations"></div>
+      <div id="results" hidden role="region" aria-live="polite" aria-label="Bend schedule results"></div>
+      <div id="pullbox-results" hidden role="region" aria-live="polite" aria-label="Pull-box sizing results"></div>
+
+      <nav class="step-nav" aria-label="Workflow navigation">
+        <a href="conduitfill.html" class="step-nav-prev">&#8592; Conduit Fill</a>
+        <a href="pullcards.html" class="step-nav-next">Pull Cards &#8594;</a>
+      </nav>
+    </main>
+  </div>
+
+  <div id="help-modal" class="modal" aria-hidden="true" role="dialog" aria-modal="true"
+       aria-labelledby="help-title">
+    <div class="modal-content">
+      <button id="close-help-btn" class="close-btn" aria-label="Close Help">&times;</button>
+      <h2 id="help-title">Conduit Bend Schedule Help</h2>
+      <p>Click <strong>+ Add Conduit Run</strong> to enter a conduit run. For each run specify the conduit trade size and add bends (90°, offset, kick, or saddle) with their dimensions.</p>
+      <p><strong>NEC 358.24:</strong> The total degrees of all bends between pull points must not exceed 360°. A red badge appears if a run violates this limit.</p>
+      <p><strong>Bend geometry:</strong>
+        <em>90°</em> — enter stub-up height.
+        <em>Offset</em> — enter the height to move and choose the bend angle.
+        <em>Kick</em> — enter the kick height.
+        <em>Saddle</em> — enter the obstacle height.
+      </p>
+      <p><strong>Pull-Box Sizing (NEC 314.28):</strong> Click <strong>+ Add Pull Point</strong> to size a pull box. Choose straight or angle/U pull and enter the conduit trade sizes on each wall.</p>
+      <p>Click <strong>Calculate</strong> to run geometry and NEC checks. Use <strong>Export CSV</strong> to download the full bend schedule.</p>
+    </div>
+  </div>
+
+  <script type="module" src="dist/projectManager.js"></script>
+</body>
+</html>
