@@ -72,7 +72,8 @@ const entries = {
   scenariocomparison: 'src/scenarioComparison.js',
   '404': 'src/404.js',
   validation: 'src/validation.js',
-  samplegallery: 'src/sampleGallery.js'
+  samplegallery: 'src/sampleGallery.js',
+  demandschedule: 'src/demandschedule.js'
 };
 
 /**
