@@ -46,6 +46,7 @@ const NAV_ROUTES = [
   { href: 'loadFlow.html', label: 'Load Flow', section: 'Studies', group: 'Power System', icon: 'icons/load.svg' },
   { href: 'voltagestability.html', label: 'Voltage Stability', section: 'Studies', group: 'Power System', icon: 'icons/toolbar/validate.svg' },
   { href: 'shortCircuit.html', label: 'Short Circuit', section: 'Studies', group: 'Protection', icon: 'icons/components/Breaker.svg' },
+  { href: 'iec60909.html', label: 'IEC 60909 Short-Circuit', section: 'Studies', group: 'Protection', icon: 'icons/components/Breaker.svg' },
   { href: 'arcFlash.html', label: 'Arc Flash', section: 'Studies', group: 'Protection', icon: 'icons/toolbar/connect.svg' },
   { href: 'dcshortcircuit.html', label: 'DC Short-Circuit & Arc Flash', section: 'Studies', group: 'Protection', icon: 'icons/components/Breaker.svg' },
   { href: 'differentialprotection.html', label: 'Differential Protection (87)', section: 'Studies', group: 'Protection', icon: 'icons/components/Breaker.svg' },

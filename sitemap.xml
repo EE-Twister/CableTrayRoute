@@ -21,6 +21,7 @@
   <url><loc>panelschedule.html</loc><priority>0.7</priority></url>
   <url><loc>arcFlash.html</loc><priority>0.6</priority></url>
   <url><loc>shortCircuit.html</loc><priority>0.6</priority></url>
+  <url><loc>iec60909.html</loc><priority>0.6</priority></url>
   <url><loc>tcc.html</loc><priority>0.6</priority></url>
   <url><loc>motorStart.html</loc><priority>0.6</priority></url>
   <url><loc>harmonics.html</loc><priority>0.5</priority></url>
