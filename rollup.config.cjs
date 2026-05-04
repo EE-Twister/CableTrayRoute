@@ -47,6 +47,7 @@ const entries = {
   frequencyscan: 'src/frequencyscan.js',
   voltageflicker: 'src/voltageflicker.js',
   iec60287: 'src/iec60287.js',
+  iec60909: 'src/iec60909.js',
   autosize: 'src/autosize.js',
   submittal: 'src/submittal.js',
   projectreport: 'src/projectreport.js',
