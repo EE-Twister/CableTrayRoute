@@ -1640,7 +1640,7 @@ CableTrayRoute's calculation breadth is now strong, but several **operations**, 
 - Add a tab on `conduitfill.html` and a Conduit Schedule preset to the report builder.
 - Tests: bend math on canonical offsets/kicks/saddles, cumulative-degree NEC violation, and pull-box volume cases.
 
-**Status:** Not implemented.
+**Status:** ✅ **Implemented 2026-05-04.** `analysis/conduitBendSchedule.mjs` — pure bend-geometry engine: `bendGeometry()` (90°/offset/kick/3-bend saddle), `cumulativeDegrees()`, `nec358_24Check()`, and `runConduitBendSchedule()` unified entry point. `analysis/pullBoxSizing.mjs` — `straightPullMinLength()` (NEC 314.28(A)(1): 8× largest trade size), `anglePullMinDimension()` (NEC 314.28(A)(2): 6× largest + sum others), `selectStandardBox()`, and `sizePullBox()` unified pull-point sizer. Study page `conduitbend.html` / `conduitbend.js` — dynamic run and pull-box cards, per-bend geometry table, cumulative-degree counter, NEC 358.24 pass/fail badge, pull-box sizing cards with standard-box selection, and CSV export. Navigation: Conduit Bend Schedule added to Workflow → Raceway group in `src/components/navigation.js`. Tests: `tests/conduitBendSchedule.test.mjs` (37 assertions covering all bend types, cumulativeDegrees, nec358_24Check, runConduitBendSchedule integration, and pull-box sizing). Docs: `docs/conduit-bend-schedule.md`.
 
 ---
 
@@ -1745,7 +1745,7 @@ CableTrayRoute's calculation breadth is now strong, but several **operations**, 
 | Priority | # | Gap | Recommended First Slice | Effort | Status |
 |---|---|---|---|---|---|
 | **P1** | 92 | **Electrical Demand & Diversity Estimator (NEC 220)** | Demand-factor library + Demand Schedule tab on load list | Medium | ✅ Implemented 2026-05-04 |
-| **P1** | 93 | **Conduit Bend & Pull-Box Sizing Schedule** | Bend schedule + NEC 314.28 pull-box sizing | Medium | Not implemented |
+| **P1** | 93 | ~~**Conduit Bend & Pull-Box Sizing Schedule**~~ | Bend schedule + NEC 314.28 pull-box sizing | Medium | ✅ Implemented 2026-05-04 |
 | **P1** | 96 | **Bus Duct / Cable Bus Sizing** | Busway library + ampacity / VD / fault-stress page | Medium | Not implemented |
 | **P1** | 99 | **Audit Log + SSO / Enterprise Auth** | Server-side audit-log table + OIDC integration | High | Not implemented |
 | **P2** | 85 | **Embodied Carbon / Sustainability Footprint** | CO₂e fields on library items + sustainability appendix | Medium | Not implemented |

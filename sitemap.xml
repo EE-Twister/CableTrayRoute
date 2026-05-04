@@ -6,6 +6,7 @@
   <url><loc>ductbankroute.html</loc><priority>0.8</priority></url>
   <url><loc>cabletrayfill.html</loc><priority>0.8</priority></url>
   <url><loc>conduitfill.html</loc><priority>0.8</priority></url>
+  <url><loc>conduitbend.html</loc><priority>0.8</priority></url>
   <url><loc>supportspan.html</loc><priority>0.8</priority></url>
   <url><loc>seismicBracing.html</loc><priority>0.8</priority></url>
   <url><loc>trayhardwarebom.html</loc><priority>0.8</priority></url>
