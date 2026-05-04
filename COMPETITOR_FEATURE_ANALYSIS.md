@@ -1,6 +1,6 @@
 # Competitor Feature Gap Analysis
 
-## Date: 2026-04-26 (website/product competitiveness refresh added 2026-04-26; advanced power systems & DER deep dive added 2026-04-11 / documented 2026-04-12; custom pricing book added 2026-04-11; one-line diagram & TCC deep dive added 2026-04-06; one-line diagram UI pass added 2026-04-05; all prior gaps resolved 2026-04-04; usability/calculation pass added 2026-03-24; original 2026-03-16)
+## Date: 2026-05-04 (operations/compliance/construction/enterprise refresh added 2026-05-04; website/product competitiveness refresh added 2026-04-26; advanced power systems & DER deep dive added 2026-04-11 / documented 2026-04-12; custom pricing book added 2026-04-11; one-line diagram & TCC deep dive added 2026-04-06; one-line diagram UI pass added 2026-04-05; all prior gaps resolved 2026-04-04; usability/calculation pass added 2026-03-24; original 2026-03-16)
 
 This document identifies features commonly found in major competitor platforms that are currently missing from CableTrayRoute.
 
@@ -26,7 +26,9 @@ A separate **2026-04-11 extension** to the Cost Estimation module added **custom
 
 A **2026-04-26 website/product competitiveness refresh** compared CableTrayRoute against current positioning and features from ETAP, EasyPower, SKM, Bentley Raceway and Cable Management, MagiCAD/Revit, Eplan Data Portal/eBuild, nVent TraceCalc, Thermon CompuTrace, Chromalox ChromaTrace, SES CDEGS, XGSLab, CYMCAP, Cableizer, and related engineering tools. This revealed **12 additional gaps** (**Gaps #71-#82**) across lifecycle model governance, manufacturer data, heat-trace deliverables, grounding fidelity, cable thermal/pulling workflows, BIM round-trip, field data capture, benchmark/audit confidence, design automation, and public onboarding.
 
-**Current status: 72 of 83 total identified gaps implemented. 1 deferred (native BIM/CAD plugin). Live pricing gap extended with custom CSV pricing book. 10 open gaps remain: advanced power study #65 (OPF) plus website/product competitiveness gaps #72, #74-#77, #81 (excluding #71, #73, #78, #79, #80, #82 now implemented). Gap #64 (Voltage Stability) was implemented and is corrected in the roadmap table below. Gap #68 (IEC 60909) implemented 2026-05-04. Gap #70 (Voltage Flicker IEC 61000-4-15) implemented 2026-05-04.**
+**Current status: 72 of 83 prior identified gaps implemented. 1 deferred (native BIM/CAD plugin). Live pricing gap extended with custom CSV pricing book. 10 prior open gaps remain: advanced power study #65 (OPF) plus website/product competitiveness gaps #72, #74-#77, #81 (excluding #71, #73, #78, #79, #80, #82 now implemented). Gap #64 (Voltage Stability) was implemented and is corrected in the roadmap table below. Gap #68 (IEC 60909) implemented 2026-05-04. Gap #70 (Voltage Flicker IEC 61000-4-15) implemented 2026-05-04.**
+
+A **2026-05-04 refresh** benchmarked against ETAP 2024/2025, EasyPower 2025, SKM PowerTools, DIgSILENT PowerFactory 2024, Siemens PSS SINCAL, PLS-CADD, AGI32/Visual/ElumTools, Eplan Platform, AutoCAD Plant 3D / SmartPlant Electrical, Aeries CARS / Trimble MEP, NFPA 855 BESS hazard tools (DNV / ESRG), and vendor relay platforms (SEL AcSELerator, GE EnerVista, ABB PCM600). It identified **17 new gaps (#83–#99)** across four themes: operations & live data, compliance & risk, construction & MEP, and enterprise & reporting. **All 17 are open.** Combined open gap count across all passes: **27 of 100**.
 
 ---
 
@@ -1450,6 +1452,315 @@ The strongest market pattern is that competing tools sell more than formulas. Th
 | **P3** | 72 | **Manufacturer Data Portal / Product Catalogs** | Approved catalog schema and imports | Medium | Partial |
 | **P3** | 77 | **Field Data Collection / Commissioning** | Field observations and offline queue | Medium | Not implemented |
 | **P4** | 76 | **BIM Round-Trip / Issue Markup** | IFC import, quantity reconciliation, BCF-like issues | High | Not implemented |
+
+---
+
+## Competitor Refresh (2026-05-04) — Operations, Compliance, Construction & Enterprise
+
+Benchmarked against: **ETAP 2024/2025** (Real-Time, Cybersecurity, Substation Designer, NERC compliance suite, Monte Carlo, sustainability reporting), **EasyPower 2025** (Live View, lighting, demand load schedules, switching procedures), **SKM PowerTools** (DAPPER demand calc, Captor switching sequences, GroundMat lightning), **DIgSILENT PowerFactory 2024** (quasi-dynamic time-series, Monte Carlo, insulation coordination, sag-tension), **Siemens PSS SINCAL** (insulation coordination, IEC 62443 cyber compliance), **PLS-CADD** (overhead conductor sag-tension, IEEE 524 stringing tables), **AGI32 / Visual / ElumTools** (photometric/egress lighting), **Eplan Platform** (multi-language UI, audit log, SAP-style enterprise integration), **AutoCAD Plant 3D / SmartPlant Electrical** (P&ID-driven cable routing, hazardous area overlays), **Aeries CARS / Trimble MEP** (conduit bend schedules, pull-box volumes, drum sequencing), **NFPA 855 BESS modeling tools** (Energy Safety Response Group, DNV BESS Hazard Assessment), **vendor relay platforms** (SEL AcSELerator, GE EnerVista, ABB PCM600). The refresh focuses on items that were not part of any previous gap pass and that have visible competitor product equivalents documented in 2024–2026 release notes.
+
+CableTrayRoute's calculation breadth is now strong, but several **operations**, **compliance**, **construction-deliverable**, and **enterprise** capabilities remain absent. The 17 gaps below (#83–#99) span four themes:
+
+1. **Operations & Live Data (#83, #88)** — once a model exists, large customers expect live SCADA/telemetry overlays and time-series load flow against profiles.
+2. **Compliance & Risk (#84, #86, #87, #91, #94)** — cyber compliance, lightning/surge coordination, insulation coordination, BESS safety, and hazardous-area classification are required deliverables for industrial, utility, and ESS projects.
+3. **Construction & MEP (#90, #92, #93, #95, #98)** — sag-tension, demand calculation, conduit/pull-box sizing, photometric lighting, and bus-duct ampacity are routine MEP deliverables that competitors include in their integrated suites.
+4. **Enterprise & Reporting (#85, #89, #96, #97, #99)** — embodied carbon, substation physical layout from one-line, vendor relay-settings export, audit log/SSO, and Monte Carlo studies signal enterprise-grade tooling.
+
+---
+
+### Gap #83 — Real-Time SCADA / Telemetry Live View
+
+| Missing Feature | Competitor(s) | Description |
+|---|---|---|
+| **Live measurement overlay on the one-line from SCADA / IoT tags** | ETAP Real-Time, EasyPower Live View, DIgSILENT StationWare, PowerFactory Monitoring | Once a project model exists, large customers connect it to a live SCADA, BACnet, or IoT tag stream so the same one-line that drove the design also drives operations. Live values (kW, kVAR, kV, breaker status, alarm state) appear as datablocks on the energized one-line, refresh on a configurable interval, and can be exported as a 24-hour trend. CableTrayRoute has a static study-results overlay layer but no live-tag adapter, no polling/refresh layer, no read-only operations role, and no historical trend view. |
+
+**Implementation notes:**
+- Add a generic `liveTagAdapter` interface (REST/Modbus-TCP/MQTT/SCADA-OPC poller) with per-tag mapping to component IDs and overlay attributes.
+- Add a "Live" mode toggle on `oneline.html` that polls the configured adapter, writes values into a per-component `live` namespace, and refreshes datablock overlays.
+- Add a 24-hour trend chart for any tagged element with sparkline thumbnails on the diagram.
+- Add a read-only "Operator" project role that locks editing actions while live mode is on.
+- Tests: adapter polling cadence, value write-through, role enforcement, and trend ring-buffer behaviour.
+
+**Status:** Not implemented.
+
+---
+
+### Gap #84 — Cybersecurity Compliance Audit (NERC CIP / IEC 62443)
+
+| Missing Feature | Competitor(s) | Description |
+|---|---|---|
+| **Cyber-physical compliance checks against NERC CIP-002…013 and IEC 62443-3-3 / -4-2** | ETAP Cybersecurity Module, Siemens PSS SINCAL Cyber, DIgSILENT PowerFactory Cyber Risk, OPSWAT MetaDefender ICS | Utility and large-industrial customers must demonstrate cyber compliance for substation automation, IED/relay communications, and remote engineering access. Competitor tools surface a compliance matrix: BES Cyber System identification, remote access path enumeration, port/protocol inventory, password policy, firmware version checks, and IEC 62443 zone/conduit modelling. CableTrayRoute has no concept of cyber assets, cyber zones, network paths, or compliance evidence — yet the underlying device library (relays, RTUs, switchgear) already contains the data needed to seed it. |
+
+**Implementation notes:**
+- Add `cyberAssetClass`, `cyberCriticality`, `firmwareVersion`, `remoteAccess`, and `protocols[]` fields to relevant device subtypes.
+- Add `analysis/cyberCompliance.mjs` with checks for: BES Cyber System classification (NERC CIP-002), electronic security perimeter completeness (CIP-005), remote access logging (CIP-007), and IEC 62443-3-3 SR/SL coverage matrix.
+- Add a "Cyber Compliance" study page with a per-asset evidence table and a generated compliance letter appendix for the report builder.
+- Tests: rule coverage on a fixture model, missing-evidence flags, and report-letter rendering.
+
+**Status:** Not implemented.
+
+---
+
+### Gap #85 — Embodied Carbon / Sustainability Footprint
+
+| Missing Feature | Competitor(s) | Description |
+|---|---|---|
+| **Cradle-to-gate CO₂e footprint and lifecycle energy-loss reporting** | Cableizer Sustainability Module, ETAP Carbon, Schneider Electric EcoDial sustainability, Hitachi Energy Lumada APM, Bentley iTwin Carbon | Large clients increasingly require CO₂e (kg) reporting for cable, tray, conduit, equipment, and lifetime energy losses. Cableizer and Schneider tools embed manufacturer EPDs (Environmental Product Declarations) into part records and roll up Scope 3 (manufacture/transport) and Scope 2 (operating losses, capitalized over a configurable lifetime) into a single sustainability sheet. CableTrayRoute has cost estimation and loss/ampacity calculations but does not multiply through a CO₂e factor library, has no EPD attachment to library items, and produces no sustainability appendix in the report builder. |
+
+**Implementation notes:**
+- Add `co2eKgPerUnit`, `epdSource`, and `epdValidUntil` fields to library items.
+- Add `analysis/sustainabilityFootprint.mjs` that aggregates embodied CO₂e from BOM and operating CO₂e from grid emission factor × annual losses × project life (NPV optional).
+- Add a "Sustainability" preset to the report package builder with a side-by-side comparison of design alternatives.
+- Tests: unit-CO₂e roll-up, lifetime-energy-loss capitalization, missing-EPD warnings, and preset section ordering.
+
+**Status:** Not implemented.
+
+---
+
+### Gap #86 — Lightning & Surge Protection Coordination (IEEE 998 / IEC 62305)
+
+| Missing Feature | Competitor(s) | Description |
+|---|---|---|
+| **Lightning risk assessment, downconductor sizing, and surge-arrester coordination** | SES CDEGS Lightning Protection, XGSLab LIGHTNING Suite, OBO Construct Lightning, DEHN Distance, Furse StrikeRisk | Utility substations, telecom hubs, BESS sites, and tall industrial structures require a lightning protection system (LPS) study per IEEE 998 (substation shielding) or IEC 62305 (structural LPS). Competitor tools compute strike density, rolling-sphere/electro-geometric model exposure, downconductor count and cross-section, equipotential bonding requirements, and surge arrester MCOV / energy duty per IEEE C62.22 / IEC 60099-5. CableTrayRoute has ground-grid analysis but no lightning module, no rolling-sphere visualization, no surge-arrester coordination, and no IEEE 998 / IEC 62305 risk assessment workflow. |
+
+**Implementation notes:**
+- Add `analysis/lightningProtection.mjs` with strike density (Ng) lookup, rolling-sphere shadow check on user-placed masts/wires, IEC 62305 risk index R1–R4, downconductor sizing, and arrester MCOV/energy-duty selection.
+- Add a 2D plan-view canvas in `lightning.html` for placing masts, structures, and shielded equipment with rolling-sphere overlay.
+- Tie the result into the report package builder as a Lightning Protection appendix.
+- Tests: rolling-sphere geometry, R1–R4 risk index, arrester selection, and report appendix output.
+
+**Status:** Not implemented.
+
+---
+
+### Gap #87 — Insulation Coordination & BIL/CFO Selection (IEC 60071 / IEEE 1313)
+
+| Missing Feature | Competitor(s) | Description |
+|---|---|---|
+| **Statistical and deterministic insulation coordination of BIL/CFO** | DIgSILENT PowerFactory Insulation Coordination, PSS SINCAL, ETAP Transient Analysis (lightning/switching) | Voltage class selection alone is not enough for substation and HV cable design. IEC 60071-2 and IEEE 1313.2 require an insulation coordination study: standard withstand voltages (LIWL/SIWL), expected stresses (lightning, switching, temporary overvoltage), risk-of-failure calculation using statistical CFO + atmospheric-correction factors, and arrester margin checks. CableTrayRoute models steady-state voltages and short-circuit currents but has no surge propagation model, no statistical insulation coordination, and no LIWL/SIWL margin report. |
+
+**Implementation notes:**
+- Add `analysis/insulationCoordination.mjs` with standard insulation level tables per IEC 60071-1 (Table 2/3), atmospheric correction (Ka), arc-back/disruptive-discharge probability, and statistical risk-of-failure integration.
+- Add a study page that accepts equipment voltage class, surge-arrester rating, and expected overvoltages and produces protective-margin and risk-of-failure metrics.
+- Tests: standard-table lookups, Ka correction, statistical integration accuracy, and arrester margin calculation.
+
+**Status:** Not implemented.
+
+---
+
+### Gap #88 — Quasi-Dynamic / Time-Series Load Flow (Annual Profile Sweep)
+
+| Missing Feature | Competitor(s) | Description |
+|---|---|---|
+| **Sequential load flow over an 8760-hour annual profile** | DIgSILENT PowerFactory Quasi-Dynamic Simulation, CYME Time-Series, ETAP Time-Domain Load Flow, OpenDSS | Renewable integration, EV charging hubs, BESS dispatch, and demand-response studies require running a load flow at every time step of an annual profile (8760 hours, sometimes 5-min granularity = 105,120 steps). Competitors save energy KPIs (annual losses, peak hour, hours of voltage violation, hours of over-thermal limit) and per-component duty cycles. CableTrayRoute solves a single operating-point load flow and has no profile loader, no time-series engine, no aggregation/KPI roll-up, and no per-component duty histogram. |
+
+**Implementation notes:**
+- Add a profile loader for CSV/8760 hourly P/Q multipliers per load and per generator/IBR.
+- Add `analysis/quasiDynamic.mjs` that drives `loadFlow.js` over the profile and accumulates KPIs (annual energy, losses, voltage violations, thermal violations, hours of over-load per branch).
+- Add a results dashboard with a time-series chart, a hourly heatmap, and per-asset duty histograms.
+- Tests: profile validation, KPI determinism on a fixture, and incremental cache between runs for performance.
+
+**Status:** Not implemented.
+
+---
+
+### Gap #89 — Substation Physical Layout Generator from One-Line
+
+| Missing Feature | Competitor(s) | Description |
+|---|---|---|
+| **Auto-generate a physical equipment layout from the one-line topology** | ETAP Substation Designer, Eplan Engineering Center, AutoCAD Electrical Plant Layout, Bentley OpenSubstation | Substation EPCs use the one-line to auto-stamp a 2D physical layout with equipment footprints (transformers, breakers, switchgear, cable trenches, control building, fence). Competitor tools snap equipment to bus-bar lanes, enforce IEEE 1119 working clearances, and produce a layout that becomes the basis for civil/structural design and grounding calculation. CableTrayRoute's `equipmentarrangements.html` page lays out tray fields but does not auto-place electrical equipment from the one-line, has no clearance rule library, and does not feed the result into the existing ground-grid or routing pages. |
+
+**Implementation notes:**
+- Add an equipment footprint library keyed by component subtype with configurable working-clearance rectangles.
+- Add `analysis/substationLayout.mjs` that takes the one-line topology and emits a default 2D arrangement with bay-by-bay placement, ties to the routing source/destination coordinates, and seeds the ground-grid perimeter.
+- Add a 2D editor view that round-trips edits back to component metadata.
+- Tests: clearance rule enforcement, deterministic layout from a fixture topology, and integration with ground-grid polygon import.
+
+**Status:** Not implemented.
+
+---
+
+### Gap #90 — Conductor Sag/Tension for Overhead Lines (IEEE 524 / Ruling Span)
+
+| Missing Feature | Competitor(s) | Description |
+|---|---|---|
+| **Catenary sag-tension, ruling-span, and stringing-table generation** | PLS-CADD, Power Line Systems SAPS, Bentley OpenUtilities, Sag10, Caddetail Tower-Line Pro | Overhead distribution and substation yard work require a sag-tension calculation: catenary/parabolic geometry, ruling-span averaging, ACSR thermal elongation, ice/wind loading per ASCE 74 / NESC, and a stringing-table output for the contractor. CableTrayRoute is currently raceway-only on the routing side and has no overhead-line conductor model, no ruling-span engine, and no stringing table. This is a recurring deliverable for utility substation work and yard lighting tie-ins where customers expect a one-stop tool. |
+
+**Implementation notes:**
+- Add `analysis/sagTension.mjs` with parabolic/catenary geometry, ruling-span method, ACSR/AAC/AAAC stress-strain curves, ice-and-wind overlays per ASCE 74, and `stringingTable()` for installation temperatures.
+- Add a study page that lets users define spans, conductor type, NESC weather case, and target tension percentage of UTS.
+- Add a printable stringing-tension chart appendix for the report builder.
+- Tests: catenary vs. parabolic agreement at small sag/span, ruling-span averaging, NESC load case selection, and stringing-table monotonicity.
+
+**Status:** Not implemented.
+
+---
+
+### Gap #91 — NFPA 855 Battery Energy Storage Hazard / Thermal Runaway Modeling
+
+| Missing Feature | Competitor(s) | Description |
+|---|---|---|
+| **Thermal-runaway propagation, off-gas dispersion, and NFPA 855 separation checks** | DNV Battery XT, ESRG BESS Hazard Mitigation Analysis, Energy Safety Response Group HMA Toolkit, PowerFactory BESS Thermal Add-on | NFPA 855 (and IFC 1207) require a Hazard Mitigation Analysis (HMA) for any BESS installation: thermal-runaway propagation between modules and racks, off-gas explosion-risk dispersion, deflagration venting sizing per NFPA 68, and minimum separation distance from exposures. CableTrayRoute has IBR/BESS modeling for electrical performance but does not analyse fire/explosion/thermal-runaway behaviour, has no NFPA 855 separation checker, and does not produce the HMA appendix that AHJs typically require. |
+
+**Implementation notes:**
+- Add `analysis/bessHazard.mjs` with NFPA 855 / IFC 1207 separation distances, lumped thermal-mass propagation between modules (UL 9540A test data fits), and NFPA 68 deflagration vent area sizing.
+- Add a study page with site geometry, exposure objects, and HMA pass/warn/fail checks.
+- Add an HMA appendix (executive summary, propagation timing, vent sizing, separation map) into the report builder.
+- Tests: separation distance lookup, propagation timing on a fixture rack, and vent-area calculation.
+
+**Status:** Not implemented.
+
+---
+
+### Gap #92 — Electrical Demand & Diversity Estimator (NEC 220 / IEC 60439-1)
+
+| Missing Feature | Competitor(s) | Description |
+|---|---|---|
+| **Coincident demand calculation with NEC 220 demand factors and IEC 60439 diversity** | SKM DAPPER Demand Calc, EasyPower Load Schedule, Trace 3D Plus, Schneider Ecodial demand schedules | Switchgear/MCC sizing depends on a NEC 220 (US) or IEC 60439-1 (international) demand calculation that applies category-specific demand factors, coincidence (diversity), and largest-motor adders to the connected load. Competitors produce a printable feeder/panel demand schedule that becomes the basis for service-entrance sizing and utility coordination. CableTrayRoute's `loadlist.mjs` aggregates connected kW/kVA but does not apply NEC 220 demand factors, does not handle category mixing (lighting, receptacles, motors, kitchen, EV), and produces no formal demand schedule artifact. |
+
+**Implementation notes:**
+- Add an NEC 220 demand-factor library (lighting, receptacles, kitchen, motors, dwelling units, EV, datacenter) and an IEC 60439-1 diversity table.
+- Add `analysis/demandSchedule.mjs` that consumes the load list, applies category factors and largest-motor adder per NEC 430.24, and emits a printable demand schedule.
+- Add a Demand Schedule tab on `loadlist.html` and a Service Entrance preset to the report package builder.
+- Tests: per-category factor application, largest-motor adder, NEC vs. IEC parity on common cases, and schedule rendering.
+
+**Status:** Not implemented.
+
+---
+
+### Gap #93 — Conduit Bend & Pull-Box Sizing Schedule (NEC 358.24 / 314.28)
+
+| Missing Feature | Competitor(s) | Description |
+|---|---|---|
+| **Conduit bend offsets/kicks/saddles plus NEC 314.28 pull-box volume sizing** | Aeries CARS Conduit Module, Trimble MEP Conduit, Bentley Raceway, AutoCAD Plant 3D Conduit | Once a conduit run is routed, contractors need a bend schedule (rise, run, multiplier, shrink) per NEC 358.24 limits (no more than 360° between pull points), and pull-box / junction-box volume sizing per NEC 314.28(A). Competitor tools auto-generate this from the 3D route and feed it into a conduit fabrication BOM. CableTrayRoute has 3D routing and pull-card output but does not generate a bend schedule, has no NEC 358.24 cumulative-bend check between pull points, and does not size pull/junction boxes per NEC 314.28. |
+
+**Implementation notes:**
+- Add `analysis/conduitBendSchedule.mjs` that walks each conduit run, identifies pull points, and computes bend types (offset, kick, saddle, 90°), shrinks, and cumulative degrees.
+- Add `analysis/pullBoxSizing.mjs` for NEC 314.28(A)(1) straight-pull and (A)(2) angle-pull volume rules.
+- Add a tab on `conduitfill.html` and a Conduit Schedule preset to the report builder.
+- Tests: bend math on canonical offsets/kicks/saddles, cumulative-degree NEC violation, and pull-box volume cases.
+
+**Status:** Not implemented.
+
+---
+
+### Gap #94 — Hazardous Area Classification (NEC 500–505 / IEC 60079)
+
+| Missing Feature | Competitor(s) | Description |
+|---|---|---|
+| **Class/Division/Zone/Group classification overlay with equipment compatibility check** | Trace 3D Plus Hazardous Area, AutoCAD Plant 3D HazArea, SmartPlant Electrical, OBO Construct EX, Eaton Crouse-Hinds Selector | Process plants, oil & gas, paint booths, hydrogen and biofuel sites require hazardous-area drawings overlaying Class I/II/III, Division 1/2 (NEC) or Zone 0/1/2/20/21/22 (IEC 60079) regions on the equipment plan, then auto-validating that selected equipment carries a matching certification (e.g., Class I Div 2 Group D T3, or II 2 G Ex db IIB T4 Gb). CableTrayRoute has no concept of hazardous areas, no certification metadata on library items, and no compatibility checker. |
+
+**Implementation notes:**
+- Add `hazArea` polygons per project sheet with Class/Division/Zone/Group/Temperature class metadata.
+- Add `hazCertification` fields to library items (NEC marking and IEC ATEX/IECEx code).
+- Add `analysis/hazardousAreaCheck.mjs` that verifies equipment certification against the polygon it sits within and flags non-compliant routing through restricted zones.
+- Tests: polygon containment, marking parser (NEC and IEC), and end-to-end mismatch flag.
+
+**Status:** Not implemented.
+
+---
+
+### Gap #95 — Photometric / Egress & Emergency Lighting Calculator
+
+| Missing Feature | Competitor(s) | Description |
+|---|---|---|
+| **Lumen-method or point-by-point photometric calculation with IES file support** | DIALux, Visual, AGI32, ElumTools, Relux | MEP packages routinely include a lighting calculation: lumen-method average illuminance, point-by-point on the workplane via IES candela distributions, and egress / emergency lighting compliance per NFPA 101 §7.9 (1 fc average / 0.1 fc minimum on the path of egress). CableTrayRoute does not do photometric calculations; competitors covering full electrical design either include lighting natively or hand it off to a sister tool. Adding an MVP-level photometric calculator (rectangular room, single fixture type, lumen method) would close a recurring deliverable gap on building-services jobs. |
+
+**Implementation notes:**
+- Add a minimal IES (LM-63) photometric file parser that reads candela tables.
+- Add `analysis/lighting.mjs` with lumen-method (room cavity ratio, coefficient of utilization) and a simple point-by-point grid for egress paths.
+- Add a study page that places fixtures on a 2D plan and generates an isolux contour and pass/fail egress line.
+- Tests: IES parser, lumen-method spot check vs. published example, and egress 1 fc / 0.1 fc rule application.
+
+**Status:** Not implemented.
+
+---
+
+### Gap #96 — Bus Duct / Cable Bus Sizing & Voltage Drop (NEC 368 / IEEE 605)
+
+| Missing Feature | Competitor(s) | Description |
+|---|---|---|
+| **Bus duct (busway) ampacity, voltage drop, and short-circuit bracing per NEC 368 / IEEE 605** | ETAP Cable & Busway Sizing, EasyPower Cable Sizing, GE Bus Duct Selector, Siemens Sentron Configurator | Large industrial and high-rise feeders increasingly use bus duct (busway / cable bus) instead of large parallel cables. NEC 368 governs ampacity and bracing; IEEE 605 governs mechanical bus stress under fault. Competitor tools compute ampacity (with derating for orientation and stacking), voltage drop, fault stress, and support spacing in a unified bus-duct sizing module. CableTrayRoute has cable sizing and bus-bracing for switchgear but no bus-duct/cable-bus-specific sizing module, no NEC 368 derating, and no IEEE 605 bus-stress check on the run itself. |
+
+**Implementation notes:**
+- Add a busway library (manufacturer / aluminum/copper / 800–6500 A indicative) with ampacity tables, R/X per foot, and short-time withstand.
+- Add `analysis/busDuctSizing.mjs` with NEC 368 derating, voltage drop along run, IEEE 605 mechanical bus-stress check at a user-specified fault current.
+- Add a study page mirroring the cable-sizing UX with run length, ampacity, fault-current input, and a result/violation panel.
+- Tests: derating cases, voltage-drop math, IEEE 605 force calc, and report appendix.
+
+**Status:** Not implemented.
+
+---
+
+### Gap #97 — Vendor Relay-Settings File Export (SEL / GE / ABB / Siemens)
+
+| Missing Feature | Competitor(s) | Description |
+|---|---|---|
+| **Export TCC settings into vendor-native relay configuration files** | SEL AcSELerator (SET/RDB), GE EnerVista (URS), ABB PCM600 (CFG), Siemens DIGSI (XRIO), ETAP Star Settings Export | A coordination study output is operationally useful only when its settings can be loaded into the actual relay. Competitor tools export the per-device pickup, time dial / TMS, instantaneous, and curve family into the vendor's native configuration file format (or at least an IEEE C37.232 COMTRADE-compatible JSON / XML). CableTrayRoute exports CTI tabular reports and CSV/SVG of the TCC chart, but not a vendor-native settings file that a commissioning engineer can load directly. |
+
+**Implementation notes:**
+- Add `reports/relaySettingsExport.mjs` with adapters for SEL SET/RDB, GE URS, ABB CFG, Siemens XRIO, plus a vendor-neutral IEEE C37.232 / IEC 61850 SCL settings-template format.
+- Add an "Export Relay Settings" button on `tcc.html` that emits a per-relay file plus a manifest CSV.
+- Add a Settings Manifest section to the report builder (device, relay model, file name, hash).
+- Tests: vendor file roundtrip on a fixture device, manifest hashing, and unsupported-relay warning.
+
+**Status:** Not implemented.
+
+---
+
+### Gap #98 — Probabilistic / Monte Carlo Load Flow (Renewable & Load Uncertainty)
+
+| Missing Feature | Competitor(s) | Description |
+|---|---|---|
+| **Monte Carlo sampling of stochastic load and renewable generation across many load-flow runs** | DIgSILENT PowerFactory Probabilistic Load Flow, ETAP Monte Carlo, PSS/E Probabilistic Tools, OpenDSS MonteCarlo | Renewable-rich and EV-rich feeders cannot be analysed deterministically. Competitor tools sample load and PV/wind output distributions, run thousands of load flows, and produce probability density functions for bus voltages, branch loadings, and reverse-flow durations. CableTrayRoute has a single-point load flow and has no probabilistic engine, no input-distribution editor, and no PDF/CDF result visualization. |
+
+**Implementation notes:**
+- Add `analysis/probabilisticLoadFlow.mjs` that wraps `loadFlow.js`, samples user-defined PDFs (normal, beta, empirical) for loads and IBR outputs, and aggregates per-bus/branch result histograms.
+- Add a study page with distribution editors, sample count, seed control, and PDF/CDF result charts.
+- Add probability-of-violation badges (e.g., P(V<0.95) = 4%) on the one-line.
+- Tests: deterministic seed reproducibility, distribution sampling correctness, and percentile aggregation accuracy.
+
+**Status:** Not implemented.
+
+---
+
+### Gap #99 — Audit Log, SSO, and Enterprise Authentication
+
+| Missing Feature | Competitor(s) | Description |
+|---|---|---|
+| **Per-user audit trail of every model change plus SAML/OIDC single sign-on** | Eplan Platform (audit + SAP/Active Directory), ETAP Cloud (SSO/audit), Bentley iTwin (SSO/audit/role-based access), MagiCAD Cloud SSO | Enterprise customers require: (1) SAML 2.0 / OIDC SSO against Microsoft Entra ID, Okta, or Google Workspace; (2) a tamper-evident audit log of every CRUD action with user identity, timestamp, and field-level diff; (3) role-based access control (engineer / reviewer / read-only / operator); and (4) project-level data residency declaration. CableTrayRoute has email/password auth and a collaboration backend, but no SSO connector, no field-level audit log, no granular RBAC, and no exportable audit report for compliance. |
+
+**Implementation notes:**
+- Add SAML 2.0 and OIDC support to `server.mjs` with a configurable IdP and just-in-time provisioning.
+- Add a server-side `auditLog` collection storing actor, action, entity ID, before/after JSON-patch diff, and request hash.
+- Add an Admin page with RBAC management and an exportable audit report.
+- Tests: IdP roundtrip on a stub, audit-log diff correctness, RBAC enforcement matrix, and tamper detection (signed log entries).
+
+**Status:** Not implemented.
+
+---
+
+### Recommended Roadmap from 2026-05-04 Refresh
+
+| Priority | # | Gap | Recommended First Slice | Effort | Status |
+|---|---|---|---|---|---|
+| **P1** | 92 | **Electrical Demand & Diversity Estimator (NEC 220)** | Demand-factor library + Demand Schedule tab on load list | Medium | Not implemented |
+| **P1** | 93 | **Conduit Bend & Pull-Box Sizing Schedule** | Bend schedule + NEC 314.28 pull-box sizing | Medium | Not implemented |
+| **P1** | 96 | **Bus Duct / Cable Bus Sizing** | Busway library + ampacity / VD / fault-stress page | Medium | Not implemented |
+| **P1** | 99 | **Audit Log + SSO / Enterprise Auth** | Server-side audit-log table + OIDC integration | High | Not implemented |
+| **P2** | 85 | **Embodied Carbon / Sustainability Footprint** | CO₂e fields on library items + sustainability appendix | Medium | Not implemented |
+| **P2** | 88 | **Quasi-Dynamic / Time-Series Load Flow** | 8760 profile sweep over existing load flow | Medium | Not implemented |
+| **P2** | 91 | **NFPA 855 BESS Hazard Modeling** | Separation/HMA appendix tied to existing IBR data | Medium | Not implemented |
+| **P2** | 94 | **Hazardous Area Classification (NEC 500–505)** | hazArea polygons + certification check on library items | Medium | Not implemented |
+| **P2** | 97 | **Vendor Relay-Settings File Export** | SEL/GE/ABB/Siemens adapters from existing TCC settings | Medium | Not implemented |
+| **P3** | 83 | **Real-Time SCADA / Telemetry Live View** | Generic tag adapter + Live mode on one-line | High | Not implemented |
+| **P3** | 84 | **Cybersecurity Compliance Audit (NERC CIP / IEC 62443)** | Cyber-asset metadata + compliance matrix study | High | Not implemented |
+| **P3** | 86 | **Lightning & Surge Protection (IEEE 998 / IEC 62305)** | Rolling-sphere + IEC 62305 risk index + arrester selection | High | Not implemented |
+| **P3** | 87 | **Insulation Coordination (IEC 60071)** | Standard-table lookup + statistical risk-of-failure | Medium | Not implemented |
+| **P3** | 89 | **Substation Physical Layout Generator** | Footprint library + auto-layout from one-line topology | High | Not implemented |
+| **P3** | 95 | **Photometric / Egress Lighting** | LM-63 parser + lumen method + egress check | Medium | Not implemented |
+| **P3** | 98 | **Probabilistic / Monte Carlo Load Flow** | Distribution sampler over existing load flow | High | Not implemented |
+| **P4** | 90 | **Conductor Sag/Tension (Overhead Lines)** | Catenary + ruling span + stringing table | Medium | Not implemented |
 
 ---
 
