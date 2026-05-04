@@ -1624,7 +1624,7 @@ CableTrayRoute's calculation breadth is now strong, but several **operations**, 
 - Add a Demand Schedule tab on `loadlist.html` and a Service Entrance preset to the report package builder.
 - Tests: per-category factor application, largest-motor adder, NEC vs. IEC parity on common cases, and schedule rendering.
 
-**Status:** Not implemented.
+**Status:** ✅ **Implemented 2026-05-04.** `analysis/demandSchedule.mjs` — `buildDemandSchedule()`, `categorise()`, `iecDiversityFactor()`, `NEC_CATEGORIES` with per-category demand factors (NEC 220.42 lighting, NEC 220.44 receptacles, NEC 430.24 motors + 25% largest adder, NEC Table 220.56 kitchen, NEC 220.60 HVAC, NEC 625.42 EV charging ordinal tiers, NEC 220.53 appliances). IEC 60439-1 Table B.1 diversity factor mode. `demandschedule.html` study page with NEC/IEC mode toggle, summary cards, per-panel service-entrance breakdown, and CSV export. Navigation entry added under Studies → Equipment Sizing. Link added from Load List step-nav. Tests: `tests/demandSchedule.test.mjs` (41 assertions). Docs: `docs/demand-schedule.md`.
 
 ---
 
@@ -1744,7 +1744,7 @@ CableTrayRoute's calculation breadth is now strong, but several **operations**, 
 
 | Priority | # | Gap | Recommended First Slice | Effort | Status |
 |---|---|---|---|---|---|
-| **P1** | 92 | **Electrical Demand & Diversity Estimator (NEC 220)** | Demand-factor library + Demand Schedule tab on load list | Medium | Not implemented |
+| **P1** | 92 | **Electrical Demand & Diversity Estimator (NEC 220)** | Demand-factor library + Demand Schedule tab on load list | Medium | ✅ Implemented 2026-05-04 |
 | **P1** | 93 | **Conduit Bend & Pull-Box Sizing Schedule** | Bend schedule + NEC 314.28 pull-box sizing | Medium | Not implemented |
 | **P1** | 96 | **Bus Duct / Cable Bus Sizing** | Busway library + ampacity / VD / fault-stress page | Medium | Not implemented |
 | **P1** | 99 | **Audit Log + SSO / Enterprise Auth** | Server-side audit-log table + OIDC integration | High | Not implemented |

@@ -5,6 +5,7 @@ const NAV_ROUTES = [
   { href: 'equipmentlist.html', label: 'Equipment List', section: 'Workflow', group: 'Planning', icon: 'icons/equipment.svg' },
   { href: 'equipmentarrangements.html', label: 'Equipment Arrangements', section: 'Workflow', group: 'Planning', icon: 'icons/equipment.svg' },
   { href: 'loadlist.html', label: 'Load List', section: 'Workflow', group: 'Planning', icon: 'icons/load.svg' },
+  { href: 'demandschedule.html', label: 'Demand Schedule', section: 'Studies', group: 'Equipment Sizing', icon: 'icons/load.svg' },
   { href: 'cableschedule.html', label: 'Cable Schedule', section: 'Workflow', group: 'Cable', icon: 'icons/cable.svg' },
   { href: 'panelschedule.html', label: 'Panel Schedule', section: 'Workflow', group: 'Cable', icon: 'icons/panel.svg' },
   { href: 'racewayschedule.html', label: 'Raceway Schedule', section: 'Workflow', group: 'Raceway', icon: 'icons/raceway.svg' },

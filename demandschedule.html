@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Electrical Demand &amp; Diversity Estimator. Applies NEC 220 demand factors and IEC 60439-1 diversity to produce a coincident demand schedule for service-entrance sizing." />
+  <title>Demand Schedule — CableTrayRoute</title>
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/favicon.svg">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Demand &amp; Diversity Estimator — CableTrayRoute">
+  <meta property="og:description" content="Apply NEC 220 / IEC 60439-1 demand factors to your load list and generate a printable demand schedule for service-entrance sizing.">
+  <meta property="og:image" content="https://cabletrayroute.com/icons/og-preview.png">
+  <meta property="og:site_name" content="CableTrayRoute">
+  <meta property="og:url" content="demandschedule.html">
+  <link rel="canonical" href="demandschedule.html">
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+  <meta name="color-scheme" content="light dark">
+  <link rel="stylesheet" href="style.css" />
+  <script type="module" src="dirtyTracker.js"></script>
+  <script type="module" src="dist/demandschedule.js" defer></script>
+</head>
+<body class="demandschedule-page" data-report-title="Demand Schedule">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <nav class="top-nav" aria-label="Primary">
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
+      <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+    <div id="nav-links" class="nav-links" role="list">
+      <!-- Populated dynamically by navigation.js -->
+    </div>
+    <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+  </nav>
+
+  <div id="settings-menu" class="settings-menu">
+    <label for="theme-select">Theme
+      <select id="theme-select">
+        <option value="system">System</option>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+        <option value="high-contrast">High Contrast</option>
+      </select>
+    </label>
+    <label><input type="checkbox" id="compact-toggle" aria-label="Enable compact table mode"> Compact Mode</label>
+    <label for="unit-select">Units
+      <select id="unit-select">
+        <option value="imperial">Imperial</option>
+        <option value="metric">Metric</option>
+      </select>
+    </label>
+    <button id="help-btn" class="btn" aria-expanded="false" title="Show help">Site Help</button>
+    <button id="new-project-btn" class="btn" title="Start a new project">New Project</button>
+    <button id="save-project-btn" class="btn" title="Save current project">Save Project</button>
+    <button id="load-project-btn" class="btn" title="Load an existing project">Load Project</button>
+    <button id="export-project-btn" class="btn" title="Export project data">Export Project</button>
+    <button id="import-project-btn" class="btn" title="Import project data">Import Project</button>
+    <input type="file" id="import-project-input" accept=".ctr.json" class="hidden" title="Select project file">
+  </div>
+
+  <div class="container">
+    <main id="main-content" class="main-content">
+      <nav aria-label="Breadcrumb">
+        <ol class="breadcrumb-trail">
+          <li><a href="index.html">Home</a></li>
+          <li>Studies</li>
+          <li aria-current="page">Demand Schedule</li>
+        </ol>
+      </nav>
+
+      <header class="page-header">
+        <h1>Electrical Demand &amp; Diversity Estimator</h1>
+        <p>Apply NEC 220 demand factors or IEC 60439-1 diversity to produce a coincident demand schedule for service-entrance sizing.</p>
+      </header>
+
+      <details class="method-panel">
+        <summary>Method &amp; Standards</summary>
+        <p>This study reads loads from the <a href="loadlist.html">Load List</a>, automatically categorises each load
+        by its <em>Load Type</em> field, then applies the appropriate code demand factor:</p>
+        <table class="results-table" aria-label="Demand factor categories">
+          <thead>
+            <tr>
+              <th>Category</th>
+              <th>Detection keywords</th>
+              <th>NEC Reference</th>
+              <th>Factor applied</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>Lighting</td><td>light, luminaire, lamp, illum</td><td>NEC 220.42</td><td>100% ≤ 50 kVA; 50% remainder</td></tr>
+            <tr><td>Receptacles</td><td>recept, outlet, plug, strip</td><td>NEC 220.44</td><td>100% first 10 kVA; 50% remainder</td></tr>
+            <tr><td>Motors</td><td>motor, pump, fan, compressor, drive, VFD</td><td>NEC 430.24</td><td>100% all motors + 25% largest</td></tr>
+            <tr><td>Kitchen / Cooking</td><td>kitchen, cook, oven, range, fryer</td><td>NEC Table 220.56</td><td>65%–100% by unit count</td></tr>
+            <tr><td>HVAC / Heating</td><td>hvac, heat, cool, AC, chiller, furnace</td><td>NEC 220.60</td><td>100% (non-coincident selection required)</td></tr>
+            <tr><td>EV Charging</td><td>ev, electric vehicle, charger, EVSE</td><td>NEC 625.42</td><td>100% / 75% / 50% by charger ordinal</td></tr>
+            <tr><td>Fixed Appliances</td><td>appliance, washer, dryer</td><td>NEC 220.53</td><td>75% if ≥ 4 appliances, else 100%</td></tr>
+            <tr><td>Critical / UPS</td><td>ups, critical, server, datacen</td><td>NEC 220</td><td>100%</td></tr>
+            <tr><td>General / Other</td><td>(all others)</td><td>NEC 220</td><td>100%</td></tr>
+          </tbody>
+        </table>
+        <p><strong>IEC 60439-1 mode</strong> applies a single diversity factor to all loads based on consumer count per Table B.1:
+        1.0 (≤ 2), 0.9 (3–5), 0.8 (6–10), 0.7 (11–40), 0.6 (> 40).</p>
+        <p><strong>Override:</strong> Add a <code>necCategory</code> property to any load row to force a specific category.</p>
+      </details>
+
+      <div id="controls" class="controls-row">
+        <label for="mode-select">Standard:
+          <select id="mode-select">
+            <option value="nec">NEC 220 (US)</option>
+            <option value="iec">IEC 60439-1 (International)</option>
+          </select>
+        </label>
+        <button id="run-btn" type="button">Run Demand Schedule</button>
+        <button id="export-btn" type="button" disabled>Export CSV</button>
+      </div>
+
+      <!-- Summary cards -->
+      <div id="summary" hidden role="region" aria-live="polite" aria-label="Demand schedule summary"></div>
+
+      <!-- Per-panel service entrance breakdown -->
+      <div id="source-breakdown" role="region" aria-live="polite" aria-label="Service entrance summary by panel"></div>
+
+      <!-- Detailed results table -->
+      <div id="results" role="region" aria-live="polite" aria-label="Demand schedule detail table"></div>
+
+      <nav class="step-nav" aria-label="Workflow navigation">
+        <a href="loadlist.html" class="step-nav-prev">&#8592; Load List</a>
+        <a href="panelschedule.html" class="step-nav-next">Panel Schedule &#8594;</a>
+      </nav>
+    </main>
+  </div>
+
+  <div id="help-modal" class="modal" aria-hidden="true" role="dialog" aria-modal="true"
+       aria-labelledby="help-title">
+    <div class="modal-content">
+      <button id="close-help-btn" class="close-btn" aria-label="Close Help">&times;</button>
+      <h2 id="help-title">Demand Schedule Help</h2>
+      <p>Click <em>Run Demand Schedule</em> to apply NEC 220 demand factors (or IEC 60439-1 diversity) to all loads in the current project's Load List.</p>
+      <p><strong>How categorisation works:</strong> Each load's <em>Load Type</em> field is scanned for keywords. If a keyword matches a recognised NEC load category, the appropriate code demand factor is applied. Unrecognised types default to 100%.</p>
+      <p><strong>Motors (NEC 430.24):</strong> All motor loads are taken at 100% of their FLA, and the largest motor receives an additional 25% adder.</p>
+      <p><strong>Service Entrance Summary:</strong> Totals are grouped by the <em>Source / Panel</em> field in the Load List so each panel's coincident demand can be read directly.</p>
+      <p><strong>Export CSV:</strong> Downloads the full demand schedule as a CSV for inclusion in submittals or utility coordination packages.</p>
+      <p>Use the <a href="loadlist.html">Load List</a> to set <em>Source</em>, <em>Load Type</em>, <em>kW</em>, <em>Power Factor</em>, and <em>Quantity</em> for each load before running this study.</p>
+    </div>
+  </div>
+
+  <script type="module" src="dist/projectManager.js"></script>
+</body>
+</html>
