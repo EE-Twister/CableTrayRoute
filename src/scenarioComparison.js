@@ -23,8 +23,9 @@ const STUDY_DEFINITIONS = [
   { key: 'arcFlash',     label: 'Arc Flash',        href: 'arcFlash.html' },
   { key: 'shortCircuit', label: 'Short Circuit',     href: 'shortCircuit.html' },
   { key: 'loadFlow',     label: 'Load Flow',         href: 'loadFlow.html' },
-  { key: 'harmonics',    label: 'Harmonics',         href: 'harmonics.html' },
-  { key: 'motorStart',   label: 'Motor Starting',    href: 'motorStart.html' },
+  { key: 'harmonics',      label: 'Harmonics',         href: 'harmonics.html' },
+  { key: 'voltageFlicker', label: 'Voltage Flicker',  href: 'voltageflicker.html' },
+  { key: 'motorStart',     label: 'Motor Starting',   href: 'motorStart.html' },
   { key: 'reliability',  label: 'Reliability / N-1', href: 'reliability.html' },
   { key: 'contingency',  label: 'N-1 Contingency',   href: 'contingency.html' },
 ];
