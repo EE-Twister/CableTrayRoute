@@ -317,6 +317,45 @@
       ]
     },
     {
+      "id": "ieee80-advanced-soil",
+      "title": "IEEE 80 Advanced — Two-Layer Soil Wenner Fit, Polygon Grid, Hazard Map",
+      "studyPage": "groundgrid.html",
+      "standard": "IEEE 80-2013 / ASTM G57",
+      "clause": "§12.4 — Effective soil resistivity; Sunde (1968) image method",
+      "description": "Synthetic two-layer soil with ρ₁ = 100 Ω·m, ρ₂ = 400 Ω·m, h = 3 m. Seven Wenner measurements (a = 1–30 m). Expected: fitted ρ₁ within 5 % of 100, fitted ρ₂ within 10 % of 400, fitted h within 15 % of 3 m. Rectangular polygon (20 × 15 m) screening check: GPR, mesh voltage, and step voltage consistent with analyzeGroundGrid baseline.",
+      "inputs": {
+        "soilMeasurements": [
+          {"a": 1,  "rhoA": 104},
+          {"a": 2,  "rhoA": 118},
+          {"a": 3,  "rhoA": 138},
+          {"a": 5,  "rhoA": 175},
+          {"a": 10, "rhoA": 253},
+          {"a": 20, "rhoA": 341},
+          {"a": 30, "rhoA": 380}
+        ],
+        "trueRho1": 100,
+        "trueRho2": 400,
+        "trueH": 3,
+        "gridLx": 20,
+        "gridLy": 15,
+        "nx": 5,
+        "ny": 4,
+        "h": 0.5,
+        "d": 0.01,
+        "Ig": 2000,
+        "tf": 0.5,
+        "bw": 0.08
+      },
+      "expectedOutputs": {
+        "fittedRho1": {"value": 100, "tolerance": 0.05, "unit": "Ω·m", "toleranceType": "relative"},
+        "fittedRho2": {"value": 400, "tolerance": 0.10, "unit": "Ω·m", "toleranceType": "relative"},
+        "fittedH":    {"value": 3,   "tolerance": 0.15, "unit": "m",    "toleranceType": "relative"},
+        "fitError":   {"max": 5,     "unit": "%"}
+      },
+      "reference": "Sunde (1968) Earth Conduction Effects §3-3; ASTM G57 §7; IEEE 80-2013 §12.4",
+      "sampleFile": "samples/benchmark-ground-grid-advanced.json"
+    },
+    {
       "id": "ieee399",
       "name": "IEEE 399-1997",
       "title": "Recommended Practice for Industrial and Commercial Power System Analysis (Brown Book)",

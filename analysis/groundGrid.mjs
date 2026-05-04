@@ -266,3 +266,131 @@ export function analyzeGroundGrid(params) {
     gprExceedsTouch: GPR > Etouch
   };
 }
+
+/**
+ * Run IEEE 80 grid analysis using a fitted two-layer soil model.
+ *
+ * Per IEEE 80-2013 §12.4, when a two-layer soil model is available the top-layer
+ * resistivity rho1 is used as the effective uniform resistivity for mesh/step
+ * voltage calculations (conservative for most cases where rho1 ≥ rho2).
+ *
+ * @param {object} params          Same as analyzeGroundGrid()
+ * @param {{rho1: number, rho2: number, h: number}|null} soilModel
+ *   Fitted two-layer soil. If null, falls back to params.rho.
+ * @returns {object} Same shape as analyzeGroundGrid() plus {usedTwoLayer, effectiveRho}
+ */
+export function analyzeGroundGridWithSoil(params, soilModel) {
+  let effectiveRho = params.rho;
+  let usedTwoLayer = false;
+
+  if (soilModel && soilModel.rho1 > 0) {
+    effectiveRho = soilModel.rho1;
+    usedTwoLayer = true;
+  }
+
+  const result = analyzeGroundGrid({ ...params, rho: effectiveRho });
+  return { ...result, usedTwoLayer, effectiveRho };
+}
+
+/**
+ * Run IEEE 80 grid analysis for an irregular (polygon) grid.
+ *
+ * The polygon geometry (area, perimeter, total conductor length) is computed
+ * from the vertices and mesh spacing, then the standard IEEE 80 formulas are
+ * applied. This is an engineering approximation — IEEE 80 formulas are strictly
+ * derived for rectangular grids; polygon equivalence is documented in the study
+ * basis as a limitation.
+ *
+ * @param {object} params
+ * @param {Array<{x: number, y: number}>} params.vertices   Perimeter corners (m)
+ * @param {number} params.spacingX   Interior mesh spacing in x direction (m)
+ * @param {number} params.spacingY   Interior mesh spacing in y direction (m)
+ * @param {number} params.h          Burial depth (m)
+ * @param {number} params.d          Conductor diameter (m)
+ * @param {number} params.Ig         Maximum grid current (A)
+ * @param {number} params.tf         Fault duration (s)
+ * @param {boolean} [params.hasRods]
+ * @param {number}  [params.rodCount]
+ * @param {number}  [params.rodLength]
+ * @param {number}  [params.rhoS]
+ * @param {number}  [params.hs]
+ * @param {50|70}   [params.bw]
+ * @param {number}  params.rho  Soil resistivity (Ω·m) — or pass soilModel instead
+ * @param {{rho1: number, rho2: number, h: number}|null} [soilModel]
+ * @returns {object} Same shape as analyzeGroundGrid() plus {isIrregular, vertices, polygonArea, polygonPerimeter}
+ */
+export function analyzeIrregularGrid(params, soilModel = null) {
+  const {
+    vertices, spacingX, spacingY, h, d, Ig, tf,
+    hasRods = false, rodCount = hasRods ? 4 : 0, rodLength = 0,
+    rhoS = 0, hs = 0, bw = 70,
+  } = params;
+
+  if (!vertices || vertices.length < 3) throw new Error('At least 3 polygon vertices required');
+  if (spacingX <= 0 || spacingY <= 0) throw new Error('Mesh spacing must be positive');
+
+  // Polygon area via shoelace
+  let area = 0;
+  const n = vertices.length;
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n;
+    area += vertices[i].x * vertices[j].y - vertices[j].x * vertices[i].y;
+  }
+  area = Math.abs(area) / 2;
+
+  // Perimeter
+  let perimeter = 0;
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n;
+    const dx = vertices[j].x - vertices[i].x;
+    const dy = vertices[j].y - vertices[i].y;
+    perimeter += Math.sqrt(dx * dx + dy * dy);
+  }
+
+  // Approximate bounding box for conductor count estimate
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (const v of vertices) {
+    if (v.x < minX) minX = v.x; if (v.x > maxX) maxX = v.x;
+    if (v.y < minY) minY = v.y; if (v.y > maxY) maxY = v.y;
+  }
+  const nxEst = Math.max(2, Math.round((maxX - minX) / spacingX) + 1);
+  const nyEst = Math.max(2, Math.round((maxY - minY) / spacingY) + 1);
+
+  // Conductor length: sum of horizontal + vertical runs (approximate for polygon)
+  // Use fill fraction relative to bounding box
+  const fillFraction = area / ((maxX - minX) * (maxY - minY));
+  const conductorLength = (nxEst * (maxX - minX) + nyEst * (maxY - minY)) * fillFraction +
+                          perimeter;  // perimeter conductors always present
+
+  const totalRodLength = hasRods ? rodCount * rodLength : 0;
+  const effectiveLength = conductorLength + totalRodLength;
+
+  // Effective mesh spacing (geometric mean of x and y spacings)
+  const D = Math.sqrt(spacingX * spacingY);
+
+  // Reuse formula functions defined earlier in this module
+  const nEff = effectiveN(effectiveLength, perimeter, area);
+  const Km  = meshFactor(D, h, d, nEff, hasRods);
+  const Ks  = stepFactor(D, h, nEff);
+  const Ki  = irregularityFactor(nEff);
+
+  const effectiveRho = (soilModel && soilModel.rho1 > 0) ? soilModel.rho1 : params.rho;
+  const Rg  = gridResistance(effectiveRho, effectiveLength, area, h);
+  const GPR = Ig * Rg;
+  const Em  = (effectiveRho * Ig * Km * Ki) / effectiveLength;
+  const Es  = (effectiveRho * Ig * Ks * Ki) / effectiveLength;
+
+  const effectiveRhoS = rhoS > 0 ? rhoS : effectiveRho;
+  const Cs   = surfaceLayerFactor(effectiveRho, effectiveRhoS, hs > 0 ? hs : 0);
+  const Etouch = tolerableTouch(Cs, effectiveRhoS, tf, bw);
+  const Estep  = tolerableStep(Cs, effectiveRhoS, tf, bw);
+
+  return {
+    A: area, Lp: perimeter, conductorLength, totalRodLength, effectiveLength,
+    D, n: nEff, Km, Ks, Ki, Cs, Rg, GPR, Em, Es, Etouch, Estep,
+    touchSafe: Em <= Etouch, stepSafe: Es <= Estep, gprExceedsTouch: GPR > Etouch,
+    isIrregular: true, vertices,
+    polygonArea: area, polygonPerimeter: perimeter,
+    usedTwoLayer: soilModel != null, effectiveRho,
+  };
+}

@@ -1287,7 +1287,14 @@ The strongest market pattern is that competing tools sell more than formulas. Th
 - Add exported SVG/PNG hazard maps and a calculation-basis appendix that clearly separates IEEE 80 screening from advanced numerical methods.
 - Tests: soil fit deterministic cases, polygon geometry bounds, risk color classification, and report inclusion of danger points.
 
-**Status:** Rectangular IEEE 80 workflow implemented; advanced soil/irregular-grid workflow not implemented.
+**Implementation (2026-05-03):**
+- `analysis/groundSoilModel.mjs` — Wenner/Sunde two-layer soil fitting (coarse grid search + Nelder-Mead simplex), polygon grid geometry engine (scan-line fill + ray-casting clip), simplified-superposition hazard map, and inspection risk-point evaluator.
+- `analysis/groundGrid.mjs` extended — `analyzeGroundGridWithSoil()` (two-layer effective ρ) and `analyzeIrregularGrid()` (polygon area via shoelace formula, IEEE 80 formulas on actual conductor length).
+- `groundgrid.html` / `groundgrid.js` — 5-tab UI: IEEE 80 Screening | Soil Model | Irregular Grid | Hazard Map | Risk Points. SVG polygon editor, soil fit chart, colour-coded hazard map (green/yellow/orange/red), CSV export for risk points.
+- `tests/groundSoilModel.test.mjs` — 40+ assertions covering all exported functions.
+- `docs/ground-grid-advanced.md` — methodology, limitations, and escalation guidance.
+
+**Status:** Implemented (screening-level; not FEM/BEM — disclaimer shown in UI).
 
 ---
 
@@ -1438,7 +1445,7 @@ The strongest market pattern is that competing tools sell more than formulas. Th
 | **P2** | 79 | **Cross-Study Design Coach** | Shared suggestion engine and dashboard action queue | Medium | Implemented |
 | **P2** | 81 | ~~**Sample Project Gallery / Guided Demos**~~ | Curated sample JSON projects and launch cards | Low | ✅ Implemented 2026-05-03 |
 | **P2** | 80 | ~~**Equipment Evaluation / Compliance Inventory**~~ | Join ratings with short-circuit/arc-flash/TCC results | Medium | ✅ Implemented 2026-05-03 |
-| **P2** | 74 | **Advanced Grounding Fidelity** | Soil data fitting and risk-point table | High | Not implemented |
+| **P2** | 74 | **Advanced Grounding Fidelity** | Soil data fitting and risk-point table | High | Implemented 2026-05-03 |
 | **P3** | 75 | **Cable Thermal Environment Modeling** | Unified environment model over existing calculators | High | Not implemented |
 | **P3** | 72 | **Manufacturer Data Portal / Product Catalogs** | Approved catalog schema and imports | Medium | Partial |
 | **P3** | 77 | **Field Data Collection / Commissioning** | Field observations and offline queue | Medium | Not implemented |
