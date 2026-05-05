@@ -35,7 +35,8 @@ export const SECTION_REGISTRY = [
   { key: 'harmonics',     label: 'Harmonics',           group: 'Studies', studyKey: 'harmonics' },
   { key: 'motorStart',    label: 'Motor Starting',      group: 'Studies', studyKey: 'motorStart' },
   { key: 'voltageDrop',   label: 'Voltage Drop Study',  group: 'Studies', studyKey: 'voltageDropStudy' },
-  { key: 'heatTrace',     label: 'Heat Trace',          group: 'Studies', studyKey: 'heatTraceSizing' },
+  { key: 'heatTrace',       label: 'Heat Trace',            group: 'Studies', studyKey: 'heatTraceSizing' },
+  { key: 'sustainability',  label: 'Sustainability Footprint', group: 'Studies', studyKey: 'sustainabilityFootprint' },
 ];
 
 /** Lookup a section definition by key. */
@@ -82,6 +83,11 @@ export const PRESET_CONFIGS = {
     label: 'IFC / BIM Handoff',
     description: 'Cable and raceway data for BIM coordination and COBie handover.',
     sections: ['cover', 'toc', 'cables', 'fill'],
+  },
+  sustainability: {
+    label: 'Sustainability Report',
+    description: 'Embodied CO₂e (Scope 3) and operating CO₂e (Scope 2) footprint with category breakdown and grid factor basis.',
+    sections: ['cover', 'toc', 'revisions', 'assumptions', 'sustainability', 'cables'],
   },
 };
 
