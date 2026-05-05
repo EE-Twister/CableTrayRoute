@@ -20,6 +20,7 @@ const STUDY_DEFINITIONS = [
   { key: 'voltageFlicker',  label: 'Voltage Flicker',      href: 'voltageflicker.html' },
   { key: 'motorStart',      label: 'Motor Starting',       href: 'motorStart.html' },
   { key: 'heatTraceSizing', label: 'Heat Trace Sizing', href: 'heattracesizing.html' },
+  { key: 'busDuctSizing',  label: 'Bus Duct Sizing',   href: 'busdust.html' },
   { key: 'dissimilarMetals', label: 'Dissimilar Metals', href: 'dissimilarmetals.html' },
   { key: 'reliability',  label: 'Reliability / N-1',    href: 'reliability.html' },
   { key: 'contingency',  label: 'N-1 Contingency',      href: 'contingency.html' },

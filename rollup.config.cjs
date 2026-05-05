@@ -74,7 +74,8 @@ const entries = {
   validation: 'src/validation.js',
   samplegallery: 'src/sampleGallery.js',
   demandschedule: 'src/demandschedule.js',
-  conduitbend: 'src/conduitbend.js'
+  conduitbend: 'src/conduitbend.js',
+  busdust: 'src/busDuct.js'
 };
 
 /**

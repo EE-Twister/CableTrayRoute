@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Bus Duct / Cable Bus Sizing. Calculate NEC 368 derated ampacity, voltage drop, and IEEE 605 fault-stress support span for busway runs." />
+  <title>Bus Duct Sizing — CableTrayRoute</title>
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/favicon.svg">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Bus Duct / Cable Bus Sizing — CableTrayRoute">
+  <meta property="og:description" content="Size busway runs: NEC 368 ampacity derating, feeder voltage drop, and IEEE 605 fault-stress support span.">
+  <meta property="og:image" content="https://cabletrayroute.com/icons/og-preview.png">
+  <meta property="og:site_name" content="CableTrayRoute">
+  <meta property="og:url" content="busdust.html">
+  <link rel="canonical" href="busdust.html">
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+  <meta name="color-scheme" content="light dark">
+  <link rel="stylesheet" href="style.css" />
+  <script type="module" src="dirtyTracker.js"></script>
+  <script type="module" src="dist/busdust.js" defer></script>
+</head>
+<body class="busdust-page" data-report-title="Bus Duct Sizing">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <nav class="top-nav" aria-label="Primary">
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
+      <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+    <div id="nav-links" class="nav-links" role="list">
+      <!-- Populated dynamically by navigation.js -->
+    </div>
+    <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+  </nav>
+
+  <div id="settings-menu" class="settings-menu">
+    <label for="theme-select">Theme
+      <select id="theme-select">
+        <option value="system">System</option>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+        <option value="high-contrast">High Contrast</option>
+      </select>
+    </label>
+    <label><input type="checkbox" id="compact-toggle" aria-label="Enable compact table mode"> Compact Mode</label>
+    <button id="help-btn" class="btn" aria-expanded="false" title="Show help">Site Help</button>
+    <button id="new-project-btn" class="btn" title="Start a new project">New Project</button>
+    <button id="save-project-btn" class="btn" title="Save current project">Save Project</button>
+    <button id="load-project-btn" class="btn" title="Load an existing project">Load Project</button>
+    <button id="export-project-btn" class="btn" title="Export project data">Export Project</button>
+    <button id="import-project-btn" class="btn" title="Import project data">Import Project</button>
+    <input type="file" id="import-project-input" accept=".ctr.json" class="hidden" title="Select project file">
+  </div>
+
+  <div class="container">
+    <main id="main-content" class="main-content">
+      <nav aria-label="Breadcrumb">
+        <ol class="breadcrumb-trail">
+          <li><a href="index.html">Home</a></li>
+          <li>Studies</li>
+          <li>Equipment Sizing</li>
+          <li aria-current="page">Bus Duct Sizing</li>
+        </ol>
+      </nav>
+
+      <header class="page-header">
+        <h1>Bus Duct / Cable Bus Sizing</h1>
+        <p>Calculate NEC 368 derated busway ampacity, feeder voltage drop (NEC 215.2), and IEEE 605 fault-stress support span for bus duct runs.</p>
+      </header>
+
+      <details class="method-panel">
+        <summary>Method &amp; Standards</summary>
+        <p><strong>Ampacity (NEC 368):</strong> The manufacturer's rated ampacity (at 40°C ambient, horizontal installation) is derated by three independent factors applied in sequence:</p>
+        <table class="results-table" aria-label="Derating factors">
+          <thead><tr><th>Factor</th><th>Standard</th><th>Conditions</th></tr></thead>
+          <tbody>
+            <tr><td>Orientation</td><td>NEC 368.12</td><td>Horizontal/vertical = 1.0; edge-on = 0.80</td></tr>
+            <tr><td>Ambient temperature</td><td>NEC 310.15(B)(1)(a) analogy</td><td>75°C-rated insulation; reference 40°C = 1.0</td></tr>
+            <tr><td>Stacking / proximity</td><td>Manufacturer guidance</td><td>1 run = 1.0; 2 = 0.80; 3 = 0.70; 4+ = 0.65</td></tr>
+          </tbody>
+        </table>
+        <p><strong>Voltage drop (NEC 215.2):</strong> VD [%] = (√3 × I × L × (R·cosφ + X·sinφ) / V<sub>LL</sub>) × 100.
+           NEC 215.2(A)(4) recommends ≤ 3% on feeder circuits.</p>
+        <p><strong>Fault stress (IEEE 605):</strong> F/L [lbf/ft] = 0.54 × I<sub>kA</sub>² / d<sub>in</sub>. Maximum span derived from
+           S<sub>y</sub> × Z = F × L² / 8 (simply supported beam). Allowable stress: Cu 10 000 psi, Al 6 000 psi (IEEE 605 Table 1).</p>
+        <p class="hint"><strong>Note:</strong> Ampacity and impedance data are indicative mid-range values. Verify against the selected manufacturer's published ratings before procurement.</p>
+      </details>
+
+      <!-- ------------------------------------------------------------------ -->
+      <!-- Input form                                                          -->
+      <!-- ------------------------------------------------------------------ -->
+      <section aria-label="Bus duct run inputs" class="field-group">
+        <h2>Run Parameters</h2>
+
+        <div class="field-row-inline">
+          <label for="run-label">Run label
+            <input type="text" id="run-label" value="Main Feeder Bus Duct" aria-label="Run label">
+          </label>
+          <label for="material">Conductor material
+            <select id="material" aria-label="Conductor material">
+              <option value="Al" selected>Aluminium (Al)</option>
+              <option value="Cu">Copper (Cu)</option>
+            </select>
+          </label>
+          <label for="phases">Phases
+            <select id="phases" aria-label="Phases">
+              <option value="3" selected>3-phase</option>
+              <option value="1">1-phase</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="field-row-inline">
+          <label for="system-voltage">System voltage (V L-L)
+            <input type="number" id="system-voltage" value="480" min="100" step="1" aria-label="System voltage line-to-line in volts">
+          </label>
+          <label for="current-a">Load current (A)
+            <input type="number" id="current-a" value="1500" min="1" step="1" aria-label="Load current in amperes">
+          </label>
+          <label for="length-ft">Run length (ft)
+            <input type="number" id="length-ft" value="100" min="1" step="1" aria-label="Busway run length in feet">
+          </label>
+        </div>
+
+        <h2>Installation Conditions</h2>
+
+        <div class="field-row-inline">
+          <label for="orientation">Orientation
+            <select id="orientation" aria-label="Busway orientation">
+              <option value="horizontal" selected>Horizontal (flat) — standard</option>
+              <option value="vertical">Vertical (flat) — conductors in row</option>
+              <option value="edgeon">Vertical (edge-on) — conductors stacked</option>
+            </select>
+          </label>
+          <label for="ambient-c">Ambient temperature (°C)
+            <input type="number" id="ambient-c" value="40" min="-20" max="74" step="1" aria-label="Ambient temperature in Celsius">
+          </label>
+          <label for="stacked-runs">Stacked busway runs
+            <input type="number" id="stacked-runs" value="1" min="1" max="10" step="1" aria-label="Number of adjacent stacked busway runs">
+          </label>
+        </div>
+
+        <h2>Fault &amp; Structural</h2>
+
+        <div class="field-row-inline">
+          <label for="fault-ka">Available fault current (kA)
+            <input type="number" id="fault-ka" value="65" min="0.1" step="0.1" aria-label="Symmetrical RMS fault current in kiloamperes">
+          </label>
+          <label for="spacing-in">Conductor spacing (in)
+            <input type="number" id="spacing-in" value="6" min="1" step="0.5" aria-label="Centre-to-centre conductor spacing in inches">
+          </label>
+          <label for="span-ft">Installed support span (ft)
+            <input type="number" id="span-ft" value="10" min="1" step="0.5" aria-label="Distance between support hangers in feet">
+          </label>
+        </div>
+
+        <div class="controls-row">
+          <button id="calculate-btn" type="button">Calculate</button>
+          <button id="export-btn" type="button" disabled>Export CSV</button>
+        </div>
+      </section>
+
+      <!-- ------------------------------------------------------------------ -->
+      <!-- Results                                                             -->
+      <!-- ------------------------------------------------------------------ -->
+      <div id="warnings-panel" hidden role="alert" aria-live="assertive" aria-label="Sizing warnings"></div>
+      <div id="results" hidden role="region" aria-live="polite" aria-label="Bus duct sizing results"></div>
+
+      <nav class="step-nav" aria-label="Workflow navigation">
+        <a href="autosize.html" class="step-nav-prev">&#8592; Auto-Size</a>
+        <a href="demandschedule.html" class="step-nav-next">Demand Schedule &#8594;</a>
+      </nav>
+    </main>
+  </div>
+
+  <div id="help-modal" class="modal" aria-hidden="true" role="dialog" aria-modal="true"
+       aria-labelledby="help-title">
+    <div class="modal-content">
+      <button id="close-help-btn" class="close-btn" aria-label="Close Help">&times;</button>
+      <h2 id="help-title">Bus Duct Sizing Help</h2>
+      <p>Enter the busway run parameters and click <strong>Calculate</strong> to obtain ampacity, voltage drop, and fault-stress results.</p>
+      <p><strong>Conductor material:</strong> Aluminium busway typically costs less; copper has lower resistance per foot. The tool selects the smallest standard rating (800–5000 A) that meets the derated load current.</p>
+      <p><strong>Orientation derating (NEC 368.12):</strong> Edge-on installation (conductors stacked vertically with flanges up/down) reduces the effective cooling surface and requires a 0.80 derating factor.</p>
+      <p><strong>Voltage drop (NEC 215.2):</strong> NEC recommends ≤ 3% on feeder circuits. Long runs or high loads may require a higher-rated busway or intermediate sub-feed tap.</p>
+      <p><strong>Fault stress (IEEE 605):</strong> The tool calculates the electromagnetic force per foot at the stated fault current and checks whether the installed support span is within the maximum allowable span for the selected busway conductor cross-section.</p>
+      <p>Use <strong>Export CSV</strong> to download the full sizing summary for reports.</p>
+    </div>
+  </div>
+
+  <script type="module" src="dist/projectManager.js"></script>
+</body>
+</html>
