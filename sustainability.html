@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Sustainability Footprint. Calculate embodied CO₂e (Scope 3) from project BOM and operating CO₂e (Scope 2) from lifetime I²R losses." />
+  <title>Sustainability Footprint — CableTrayRoute</title>
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/favicon.svg">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Sustainability Footprint — CableTrayRoute">
+  <meta property="og:description" content="Calculate embodied and operating CO₂e for cables, trays, conduit, and equipment. Scope 2 + 3 lifecycle footprint for sustainability reports.">
+  <meta property="og:image" content="https://cabletrayroute.com/icons/og-preview.png">
+  <meta property="og:site_name" content="CableTrayRoute">
+  <meta property="og:url" content="sustainability.html">
+  <link rel="canonical" href="sustainability.html">
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+  <meta name="color-scheme" content="light dark">
+  <link rel="stylesheet" href="style.css" />
+  <script type="module" src="dirtyTracker.js"></script>
+  <script type="module" src="dist/sustainability.js" defer></script>
+</head>
+<body class="sustainability-page" data-report-title="Sustainability Footprint">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <nav class="top-nav" aria-label="Primary">
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
+      <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+    <div id="nav-links" class="nav-links" role="list">
+      <!-- Populated dynamically by navigation.js -->
+    </div>
+    <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+  </nav>
+
+  <div id="settings-menu" class="settings-menu">
+    <label for="theme-select">Theme
+      <select id="theme-select">
+        <option value="system">System</option>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+        <option value="high-contrast">High Contrast</option>
+      </select>
+    </label>
+    <label><input type="checkbox" id="compact-toggle" aria-label="Enable compact table mode"> Compact Mode</label>
+    <button id="help-btn" class="btn" aria-expanded="false" title="Show help">Site Help</button>
+    <button id="new-project-btn" class="btn" title="Start a new project">New Project</button>
+    <button id="save-project-btn" class="btn" title="Save current project">Save Project</button>
+    <button id="load-project-btn" class="btn" title="Load an existing project">Load Project</button>
+    <button id="export-project-btn" class="btn" title="Export project data">Export Project</button>
+    <button id="import-project-btn" class="btn" title="Import project data">Import Project</button>
+    <input type="file" id="import-project-input" accept=".ctr.json" class="hidden" title="Select project file">
+  </div>
+
+  <div class="container">
+    <main id="main-content" class="main-content">
+      <nav aria-label="Breadcrumb">
+        <ol class="breadcrumb-trail">
+          <li><a href="index.html">Home</a></li>
+          <li>Studies</li>
+          <li>Equipment Sizing</li>
+          <li aria-current="page">Sustainability Footprint</li>
+        </ol>
+      </nav>
+
+      <header class="page-header">
+        <h1>Sustainability Footprint</h1>
+        <p>Calculate embodied CO₂e (Scope 3, A1–A3 cradle-to-gate) from project BOM and operating CO₂e (Scope 2) from lifetime conductor losses. Suitable for LEED, BREEAM, and client sustainability appendices.</p>
+      </header>
+
+      <details class="method-panel">
+        <summary>Method &amp; Standards</summary>
+        <p><strong>Embodied CO₂e (Scope 3):</strong> Each BOM line item's quantity is multiplied by a unit embodied factor (kg CO₂e per metre or per unit). Factors are sourced from published EPD averages per IEC/EN 15804 (A1–A3, cradle-to-gate). Item-level <code>co2eKgPerUnit</code> overrides take precedence when EPD data is available for a specific product.</p>
+        <p><strong>Operating CO₂e (Scope 2):</strong> Annual conductor losses (kW) × 8 760 h/yr × grid emission factor (kg CO₂e/kWh) × project life (years). Grid factors are national average generation-mix values from IEA and EPA eGRID.</p>
+        <p><strong>Scope boundaries:</strong> This tool covers Scope 2 (purchased electricity losses) and Scope 3 Category 1 (purchased goods and materials — embodied carbon). Scope 1 (on-site diesel for generators) and transport emissions are excluded from the default calculation.</p>
+        <p class="hint"><strong>Disclaimer:</strong> Factors are representative industry averages for screening-level design. Final sustainability reports and LEED/BREEAM submittals must be verified against manufacturer-specific EPDs and the project-specific grid emission factor.</p>
+      </details>
+
+      <!-- ------------------------------------------------------------------ -->
+      <!-- Input form                                                          -->
+      <!-- ------------------------------------------------------------------ -->
+      <section aria-label="Sustainability study parameters" class="field-group">
+        <h2>Study Parameters</h2>
+
+        <div class="field-row-inline">
+          <label for="grid-region">Grid emission region
+            <select id="grid-region" aria-label="Grid emission region">
+              <option value="us" selected>United States (national avg) — 0.386 kg/kWh</option>
+              <option value="eu">European Union (avg) — 0.233 kg/kWh</option>
+              <option value="uk">United Kingdom — 0.207 kg/kWh</option>
+              <option value="ca">Canada (national avg) — 0.130 kg/kWh</option>
+              <option value="au">Australia (NEM avg) — 0.510 kg/kWh</option>
+              <option value="cn">China (national avg) — 0.581 kg/kWh</option>
+              <option value="custom">Custom / project-specific</option>
+            </select>
+          </label>
+          <label for="custom-grid-factor" id="custom-grid-label">Custom grid factor (kg CO₂e/kWh)
+            <input type="number" id="custom-grid-factor" value="0.400" min="0" max="2" step="0.001"
+                   aria-label="Custom grid emission factor in kg CO₂e per kWh">
+          </label>
+          <label for="project-life">Project life (years)
+            <input type="number" id="project-life" value="25" min="1" max="100" step="1"
+                   aria-label="Project design life in years">
+          </label>
+        </div>
+
+        <h2>Operating Losses</h2>
+
+        <div class="field-row-inline">
+          <label for="losses-source">Losses source
+            <select id="losses-source" aria-label="Operating losses source">
+              <option value="none" selected>Omit operating losses</option>
+              <option value="manual">Manual entry (kW)</option>
+              <option value="study">From IEC 60287 study results</option>
+            </select>
+          </label>
+          <label for="losses-kw" id="losses-kw-label">Annual average losses (kW)
+            <input type="number" id="losses-kw" value="0" min="0" step="0.1"
+                   aria-label="Annual average I²R conductor losses in kilowatts" disabled>
+          </label>
+        </div>
+
+        <h2>BOM Source</h2>
+        <p class="hint" id="bom-hint">The BOM is automatically assembled from your cable schedule, raceway schedule, and equipment list. Items without a recognised size or category appear in the Skipped Items panel.</p>
+
+        <h2>Alternative Design Comparison</h2>
+
+        <div class="field-row-inline">
+          <label class="checkbox-label">
+            <input type="checkbox" id="alt-compare-toggle" aria-label="Enable alternative design comparison">
+            Compare with an alternative BOM
+          </label>
+        </div>
+        <p class="hint" id="alt-hint">When enabled, the study will compute a second embodied footprint from a manually entered BOM JSON and show a delta comparison card.</p>
+        <div id="alt-bom-editor" hidden>
+          <label for="alt-bom-json">Alternative BOM (JSON array)
+            <textarea id="alt-bom-json" rows="6" aria-label="Alternative BOM JSON array"
+                      placeholder='[{"type":"cable","quantity":100,"size":"4 AWG","material":"Al","conductors":3}]'></textarea>
+          </label>
+        </div>
+
+        <div class="controls-row">
+          <button id="calculate-btn" type="button">Calculate Footprint</button>
+          <button id="export-btn" type="button" disabled>Export CSV</button>
+        </div>
+      </section>
+
+      <!-- ------------------------------------------------------------------ -->
+      <!-- Results                                                             -->
+      <!-- ------------------------------------------------------------------ -->
+      <div id="skipped-panel" hidden role="alert" aria-live="polite" aria-label="Skipped BOM items"></div>
+      <div id="results" hidden role="region" aria-live="polite" aria-label="Sustainability footprint results"></div>
+
+      <nav class="step-nav" aria-label="Workflow navigation">
+        <a href="busdust.html" class="step-nav-prev">&#8592; Bus Duct Sizing</a>
+        <a href="demandschedule.html" class="step-nav-next">Demand Schedule &#8594;</a>
+      </nav>
+    </main>
+  </div>
+
+  <div id="help-modal" class="modal" aria-hidden="true" role="dialog" aria-modal="true"
+       aria-labelledby="help-title">
+    <div class="modal-content">
+      <button id="close-help-btn" class="close-btn" aria-label="Close Help">&times;</button>
+      <h2 id="help-title">Sustainability Footprint Help</h2>
+      <p>Select a grid region and project life, then click <strong>Calculate Footprint</strong>. The tool reads your project's cable schedule, raceway schedule, and equipment list to assemble a BOM and roll up embodied CO₂e.</p>
+      <p><strong>Grid region:</strong> Sets the national average grid emission factor (kg CO₂e per kWh). Use "Custom" to enter a project-specific factor (e.g. from a PPA or renewable certificate).</p>
+      <p><strong>Operating losses:</strong> Select "From IEC 60287 study results" to pull the total conductor losses calculated in the Cable Ampacity study, or enter a manual value. Losses are capitalised over the project life using the selected grid factor.</p>
+      <p><strong>Skipped items:</strong> BOM entries whose size, material, or category cannot be matched to the library appear in the Skipped Items panel. Add a <code>co2eKgPerUnit</code> field to the item or use a supported size/material to include it.</p>
+      <p><strong>Alternative comparison:</strong> Enable the comparison toggle and paste a BOM JSON array for the alternative design. The tool shows the embodied delta (positive = alternative is heavier, negative = lighter).</p>
+      <p>Use <strong>Export CSV</strong> to download the full line-item breakdown for inclusion in sustainability reports.</p>
+    </div>
+  </div>
+
+  <script type="module" src="dist/projectManager.js"></script>
+</body>
+</html>
