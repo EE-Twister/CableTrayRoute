@@ -13,7 +13,8 @@ import { runShortCircuit } from './shortCircuit.mjs';
 import { scaleCurve, checkDuty, sanitizeCurve } from './tccUtils.js';
 import { checkCoordination, greedyCoordinate, greedyCoordinateGFP, generateFaultCurrents } from './tccAutoCoord.mjs';
 import { buildCTIRows, CTI_HEADERS } from '../reports/coordinationReport.mjs';
-import { downloadCSV } from '../reports/reporting.mjs';
+import { downloadCSV, toCSV } from '../reports/reporting.mjs';
+import { buildExportFiles, MANIFEST_HEADERS } from '../reports/relaySettingsExport.mjs';
 import {
   EXPORT_INLINE_STYLES,
   EXPORT_SCALE,
@@ -288,6 +289,7 @@ const exportPngBtn = document.getElementById('export-png-btn');
 const annotationBtn = document.getElementById('add-annotation-btn');
 const autoCoordBtn = document.getElementById('auto-coord-btn');
 const exportCtiBtn = document.getElementById('export-cti-btn');
+const exportRelaySettingsBtn = document.getElementById('export-relay-settings-btn');
 const coordPanel = document.getElementById('coordination-panel');
 const coordResultsDiv = document.getElementById('coord-results');
 const coordOrderList = document.getElementById('coord-order-list');
@@ -1136,6 +1138,9 @@ function setPlotAvailability(available) {
     if (!available) {
       disableAnnotationMode();
     }
+  }
+  if (exportRelaySettingsBtn) {
+    exportRelaySettingsBtn.disabled = !available;
   }
 }
 
@@ -4077,6 +4082,37 @@ if (exportCtiBtn) {
     const { deviceEntries, result, maxFaultA, margin } = lastCoordState;
     const rows = buildCTIRows(deviceEntries, result, maxFaultA, margin);
     downloadCSV(CTI_HEADERS, rows, 'coordination-cti-report.csv');
+  });
+}
+if (exportRelaySettingsBtn) {
+  exportRelaySettingsBtn.addEventListener('click', () => {
+    const allEntries = [...deviceMap.values()];
+    const { files, manifestRows, warnings } = buildExportFiles(allEntries);
+    if (!manifestRows.length) {
+      showAlertModal('No relay settings to export. Add devices with configurable settings and plot first.', { title: 'No Data' });
+      return;
+    }
+    // Manifest CSV first
+    downloadCSV(MANIFEST_HEADERS, manifestRows, 'relay-settings-manifest.csv');
+    // Per-device files with a small stagger to avoid browser download blocking
+    files.forEach((f, i) => {
+      setTimeout(() => {
+        const blob = new Blob([f.content], { type: f.contentType });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = f.filename;
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(a.href), 0);
+      }, (i + 1) * 300);
+    });
+    if (warnings.length) {
+      setTimeout(() => {
+        showAlertModal(
+          `Export complete with ${warnings.length} warning(s):\n\n${warnings.join('\n')}`,
+          { title: 'Export Warnings' }
+        );
+      }, (files.length + 1) * 300 + 200);
+    }
   });
 }
 if (printPlotBtn) {
