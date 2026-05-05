@@ -37,6 +37,7 @@ export const SECTION_REGISTRY = [
   { key: 'voltageDrop',   label: 'Voltage Drop Study',  group: 'Studies', studyKey: 'voltageDropStudy' },
   { key: 'heatTrace',       label: 'Heat Trace',            group: 'Studies', studyKey: 'heatTraceSizing' },
   { key: 'sustainability',  label: 'Sustainability Footprint', group: 'Studies', studyKey: 'sustainabilityFootprint' },
+  { key: 'tccSettings',     label: 'TCC Settings Manifest', group: 'Studies', studyKey: 'tcc' },
 ];
 
 /** Lookup a section definition by key. */
@@ -57,7 +58,7 @@ export const PRESET_CONFIGS = {
   electrical: {
     label: 'Electrical Studies',
     description: 'Protection coordination, arc flash, load flow, harmonics, and motor starting results.',
-    sections: ['cover', 'toc', 'revisions', 'arcFlash', 'shortCircuit', 'loadFlow', 'harmonics', 'motorStart'],
+    sections: ['cover', 'toc', 'revisions', 'arcFlash', 'shortCircuit', 'loadFlow', 'harmonics', 'motorStart', 'tccSettings'],
   },
   construction: {
     label: 'Construction Cable Package',
