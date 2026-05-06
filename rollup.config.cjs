@@ -78,7 +78,8 @@ const entries = {
   busdust: 'src/busDuct.js',
   sustainability: 'src/sustainability.js',
   quasidynamic: 'src/quasiDynamic.js',
-  bessHazard: 'src/bessHazard.js'
+  bessHazard: 'src/bessHazard.js',
+  hazareaclassification: 'src/hazareaclassification.js'
 };
 
 /**

@@ -38,6 +38,7 @@ export const SECTION_REGISTRY = [
   { key: 'heatTrace',       label: 'Heat Trace',            group: 'Studies', studyKey: 'heatTraceSizing' },
   { key: 'sustainability',  label: 'Sustainability Footprint', group: 'Studies', studyKey: 'sustainabilityFootprint' },
   { key: 'tccSettings',     label: 'TCC Settings Manifest', group: 'Studies', studyKey: 'tcc' },
+  { key: 'hazAreaClass',    label: 'Hazardous Area Classification', group: 'Studies', studyKey: 'hazAreaClassification' },
 ];
 
 /** Lookup a section definition by key. */
@@ -89,6 +90,11 @@ export const PRESET_CONFIGS = {
     label: 'Sustainability Report',
     description: 'Embodied CO₂e (Scope 3) and operating CO₂e (Scope 2) footprint with category breakdown and grid factor basis.',
     sections: ['cover', 'toc', 'revisions', 'assumptions', 'sustainability', 'cables'],
+  },
+  hazardousArea: {
+    label: 'Hazardous Area Report',
+    description: 'NEC 500–505 / IEC 60079 area classification drawing, equipment compatibility matrix, and Ex-protection register.',
+    sections: ['cover', 'toc', 'revisions', 'assumptions', 'hazAreaClass', 'drc'],
   },
 };
 
