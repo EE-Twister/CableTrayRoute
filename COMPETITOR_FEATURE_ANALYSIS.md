@@ -28,7 +28,7 @@ A **2026-04-26 website/product competitiveness refresh** compared CableTrayRoute
 
 **Current status: 73 of 83 prior identified gaps implemented (Gap #96 Bus Duct Sizing implemented 2026-05-05). 1 deferred (native BIM/CAD plugin). Live pricing gap extended with custom CSV pricing book. 10 prior open gaps remain: advanced power study #65 (OPF) plus website/product competitiveness gaps #72, #74-#77, #81 (excluding #71, #73, #78, #79, #80, #82 now implemented). Gap #64 (Voltage Stability) was implemented and is corrected in the roadmap table below. Gap #68 (IEC 60909) implemented 2026-05-04. Gap #70 (Voltage Flicker IEC 61000-4-15) implemented 2026-05-04.**
 
-A **2026-05-04 refresh** benchmarked against ETAP 2024/2025, EasyPower 2025, SKM PowerTools, DIgSILENT PowerFactory 2024, Siemens PSS SINCAL, PLS-CADD, AGI32/Visual/ElumTools, Eplan Platform, AutoCAD Plant 3D / SmartPlant Electrical, Aeries CARS / Trimble MEP, NFPA 855 BESS hazard tools (DNV / ESRG), and vendor relay platforms (SEL AcSELerator, GE EnerVista, ABB PCM600). It identified **17 new gaps (#83–#99)** across four themes: operations & live data, compliance & risk, construction & MEP, and enterprise & reporting. **Gap #96 (Bus Duct Sizing) implemented 2026-05-05; 16 remain open.** Combined open gap count across all passes: **26 of 100**.
+A **2026-05-04 refresh** benchmarked against ETAP 2024/2025, EasyPower 2025, SKM PowerTools, DIgSILENT PowerFactory 2024, Siemens PSS SINCAL, PLS-CADD, AGI32/Visual/ElumTools, Eplan Platform, AutoCAD Plant 3D / SmartPlant Electrical, Aeries CARS / Trimble MEP, NFPA 855 BESS hazard tools (DNV / ESRG), and vendor relay platforms (SEL AcSELerator, GE EnerVista, ABB PCM600). It identified **17 new gaps (#83–#99)** across four themes: operations & live data, compliance & risk, construction & MEP, and enterprise & reporting. **Gap #96 (Bus Duct Sizing) implemented 2026-05-05. Gap #85 (Embodied Carbon) implemented 2026-05-05. Gap #97 (Vendor Relay-Settings Export) implemented 2026-05-05. Gap #88 (Quasi-Dynamic Load Flow) implemented 2026-05-06; 13 remain open.** Combined open gap count across all passes: **23 of 100**.
 
 ---
 
@@ -1513,7 +1513,7 @@ CableTrayRoute's calculation breadth is now strong, but several **operations**, 
 - Add a "Sustainability" preset to the report package builder with a side-by-side comparison of design alternatives.
 - Tests: unit-CO₂e roll-up, lifetime-energy-loss capitalization, missing-EPD warnings, and preset section ordering.
 
-**Status:** Not implemented.
+**Status:** ✅ **Implemented 2026-05-05.** `sustainability.html` / `src/sustainability.js` / `analysis/sustainabilityFootprint.mjs`. CO₂e fields on library items, lifecycle energy-loss capitalisation, sustainability appendix in the report builder. Navigation: Studies → Equipment Sizing. Tests: `tests/sustainability.test.mjs`.
 
 ---
 
@@ -1560,7 +1560,7 @@ CableTrayRoute's calculation breadth is now strong, but several **operations**, 
 - Add a results dashboard with a time-series chart, a hourly heatmap, and per-asset duty histograms.
 - Tests: profile validation, KPI determinism on a fixture, and incremental cache between runs for performance.
 
-**Status:** Not implemented.
+**Status:** ✅ **Implemented 2026-05-06.** `analysis/quasiDynamic.mjs` — `parseProfileCsv()`, `builtinDailyProfile()`, `builtinAnnualProfile()`, `classifyVoltage()`, `runQuasiDynamic()`. Drives `runLoadFlow()` over a user-supplied or built-in time profile; accumulates energy loss (kWh), bus voltage envelope (max/min pu), load factor, peak/valley snapshots, and ANSI C84.1 violation counts. `quasidynamic.html` + `quasidynamic.js` — study page with profile preset selector (24-hour / 8760-hour), CSV file upload, text-area manual entry, dual-axis SVG time-series chart (load profile + voltage envelope band), bus voltage envelope table, peak/valley snapshot tables, and CSV export. `src/quasiDynamic.js` — rollup entry. Navigation: Studies → Power System → Quasi-Dynamic Load Flow. Sitemap updated. Tests: `tests/quasiDynamic.test.mjs` (53 assertions covering constants, CSV parsing, built-in profiles, voltage classification, error handling, 3-bus fixture, and energy accumulation). Docs: `docs/quasi-dynamic-load-flow.md`.
 
 ---
 
@@ -1704,7 +1704,7 @@ CableTrayRoute's calculation breadth is now strong, but several **operations**, 
 - Add a Settings Manifest section to the report builder (device, relay model, file name, hash).
 - Tests: vendor file roundtrip on a fixture device, manifest hashing, and unsupported-relay warning.
 
-**Status:** Not implemented.
+**Status:** ✅ **Implemented 2026-05-05.** `reports/relaySettingsExport.mjs` — SEL SET/RDB, GE URS, ABB CFG, Siemens XRIO, and IEC 61850 SCL adapters. "Export Relay Settings" button on `tcc.html`. Settings Manifest section in report builder. Tests: `tests/relaySettingsExport.test.mjs`.
 
 ---
 
@@ -1748,11 +1748,11 @@ CableTrayRoute's calculation breadth is now strong, but several **operations**, 
 | **P1** | 93 | ~~**Conduit Bend & Pull-Box Sizing Schedule**~~ | Bend schedule + NEC 314.28 pull-box sizing | Medium | ✅ Implemented 2026-05-04 |
 | **P1** | 96 | ~~**Bus Duct / Cable Bus Sizing**~~ | Busway library + ampacity / VD / fault-stress page | Medium | ✅ Implemented 2026-05-05 |
 | **P1** | 99 | **Audit Log + SSO / Enterprise Auth** | Server-side audit-log table + OIDC integration | High | Not implemented |
-| **P2** | 85 | **Embodied Carbon / Sustainability Footprint** | CO₂e fields on library items + sustainability appendix | Medium | Not implemented |
-| **P2** | 88 | **Quasi-Dynamic / Time-Series Load Flow** | 8760 profile sweep over existing load flow | Medium | Not implemented |
+| **P2** | 85 | ~~**Embodied Carbon / Sustainability Footprint**~~ | CO₂e fields on library items + sustainability appendix | Medium | ✅ Implemented 2026-05-05 |
+| **P2** | 88 | ~~**Quasi-Dynamic / Time-Series Load Flow**~~ | 8760 profile sweep over existing load flow | Medium | ✅ Implemented 2026-05-06 |
 | **P2** | 91 | **NFPA 855 BESS Hazard Modeling** | Separation/HMA appendix tied to existing IBR data | Medium | Not implemented |
 | **P2** | 94 | **Hazardous Area Classification (NEC 500–505)** | hazArea polygons + certification check on library items | Medium | Not implemented |
-| **P2** | 97 | **Vendor Relay-Settings File Export** | SEL/GE/ABB/Siemens adapters from existing TCC settings | Medium | Not implemented |
+| **P2** | 97 | ~~**Vendor Relay-Settings File Export**~~ | SEL/GE/ABB/Siemens adapters from existing TCC settings | Medium | ✅ Implemented 2026-05-05 |
 | **P3** | 83 | **Real-Time SCADA / Telemetry Live View** | Generic tag adapter + Live mode on one-line | High | Not implemented |
 | **P3** | 84 | **Cybersecurity Compliance Audit (NERC CIP / IEC 62443)** | Cyber-asset metadata + compliance matrix study | High | Not implemented |
 | **P3** | 86 | **Lightning & Surge Protection (IEEE 998 / IEC 62305)** | Rolling-sphere + IEC 62305 risk index + arrester selection | High | Not implemented |
