@@ -621,6 +621,46 @@ export function buildDRCSection(drcResults = []) {
   return { key: 'drc', title: 'Design Rule Check', rows, pass: errors === 0, errors, warnings };
 }
 
+/**
+ * Build a BESS Hazard HMA section from study results.
+ * @param {object} studies
+ * @param {object} approvals
+ */
+export function buildBessHazardSection(studies = {}, approvals = {}) {
+  const data = studies.bessHazard || null;
+  const approval = approvals.bessHazard || null;
+  if (!data || !data.valid) return { key: 'bessHazard', title: 'BESS Hazard / Thermal Runaway (NFPA 855)', empty: true };
+
+  const { separationChecks = [], propagation = {}, ventArea = {}, summary = {}, providedVentAreaM2 } = data;
+
+  const separationRows = separationChecks.map(c => ({
+    label:       c.label,
+    type:        c.type,
+    actualDistM: c.actualDistM,
+    minDistM:    c.minDistM,
+    status:      c.status,
+  }));
+
+  return {
+    key:      'bessHazard',
+    title:    'BESS Hazard / Thermal Runaway (NFPA 855)',
+    summary:  {
+      overallStatus:         summary.status,
+      ratedKwh:              data.ratedKwh,
+      chemistryName:         data.chemistryName,
+      cellToCell_min:        propagation.cellToCell_min,
+      cellToModule_min:      propagation.cellToModule_min,
+      moduleToRack_min:      propagation.moduleToRack_min,
+      requiredVentAreaM2:    ventArea.ventAreaM2,
+      providedVentAreaM2,
+      ventPass:              providedVentAreaM2 >= ventArea.ventAreaM2,
+      issues:                summary.issues || [],
+    },
+    separationRows,
+    approval,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Full package HTML renderer
 // ---------------------------------------------------------------------------

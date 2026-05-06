@@ -77,7 +77,8 @@ const entries = {
   conduitbend: 'src/conduitbend.js',
   busdust: 'src/busDuct.js',
   sustainability: 'src/sustainability.js',
-  quasidynamic: 'src/quasiDynamic.js'
+  quasidynamic: 'src/quasiDynamic.js',
+  bessHazard: 'src/bessHazard.js'
 };
 
 /**

@@ -23,6 +23,7 @@ const STUDY_DEFINITIONS = [
   { key: 'busDuctSizing',          label: 'Bus Duct Sizing',        href: 'busdust.html' },
   { key: 'sustainabilityFootprint', label: 'Sustainability Footprint', href: 'sustainability.html' },
   { key: 'dissimilarMetals', label: 'Dissimilar Metals', href: 'dissimilarmetals.html' },
+  { key: 'bessHazard', label: 'BESS Hazard (HMA)', href: 'bessHazard.html' },
   { key: 'reliability',  label: 'Reliability / N-1',    href: 'reliability.html' },
   { key: 'contingency',  label: 'N-1 Contingency',      href: 'contingency.html' },
 ];

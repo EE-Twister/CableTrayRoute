@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="NFPA 855 BESS Hazard / Thermal Runaway Modeling. Evaluate separation distances, thermal runaway propagation timing, and NFPA 68 deflagration vent sizing for battery energy storage systems." />
+  <title>BESS Hazard / Thermal Runaway — CableTrayRoute</title>
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/favicon.svg">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="BESS Hazard / Thermal Runaway — CableTrayRoute">
+  <meta property="og:description" content="NFPA 855 separation checks, UL 9540A propagation timing, and NFPA 68 deflagration vent sizing for battery energy storage systems.">
+  <meta property="og:image" content="https://cabletrayroute.com/icons/og-preview.png">
+  <meta property="og:site_name" content="CableTrayRoute">
+  <meta property="og:url" content="bessHazard.html">
+  <link rel="canonical" href="bessHazard.html">
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+  <meta name="color-scheme" content="light dark">
+  <link rel="stylesheet" href="style.css" />
+  <script type="module" src="dirtyTracker.js"></script>
+  <script type="module" src="dist/bessHazard.js" defer></script>
+</head>
+<body class="besshazard-page" data-report-title="BESS Hazard / Thermal Runaway">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <nav class="top-nav" aria-label="Primary">
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
+      <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+    <div id="nav-links" class="nav-links" role="list">
+      <!-- Populated dynamically by navigation.js -->
+    </div>
+    <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+  </nav>
+
+  <div id="settings-menu" class="settings-menu">
+    <label for="theme-select">Theme
+      <select id="theme-select">
+        <option value="system">System</option>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+        <option value="high-contrast">High Contrast</option>
+      </select>
+    </label>
+    <label><input type="checkbox" id="compact-toggle" aria-label="Enable compact table mode"> Compact Mode</label>
+    <button id="help-btn" class="btn" aria-expanded="false" title="Show help">Site Help</button>
+    <button id="new-project-btn" class="btn" title="Start a new project">New Project</button>
+    <button id="save-project-btn" class="btn" title="Save current project">Save Project</button>
+    <button id="load-project-btn" class="btn" title="Load an existing project">Load Project</button>
+    <button id="export-project-btn" class="btn" title="Export project data">Export Project</button>
+    <button id="import-project-btn" class="btn" title="Import project data">Import Project</button>
+    <input type="file" id="import-project-input" accept=".ctr.json" class="hidden" title="Select project file">
+  </div>
+
+  <div class="container">
+    <main id="main-content" class="main-content">
+      <nav aria-label="Breadcrumb">
+        <ol class="breadcrumb-trail">
+          <li><a href="index.html">Home</a></li>
+          <li>Studies</li>
+          <li>Protection</li>
+          <li aria-current="page">BESS Hazard / Thermal Runaway</li>
+        </ol>
+      </nav>
+
+      <header class="page-header">
+        <h1>BESS Hazard / Thermal Runaway Modeling</h1>
+        <p>Evaluate NFPA 855 §15.3 separation requirements, UL 9540A thermal runaway propagation timing, and NFPA 68 §7.4.3 deflagration vent area for battery energy storage systems.</p>
+      </header>
+
+      <details class="method-panel">
+        <summary>Method &amp; Standards</summary>
+        <p><strong>Separation distances (NFPA 855 §15.3):</strong> NFPA 855-2023 Table 15.3.2 specifies minimum clearances from ESS installations to property lines, occupied buildings, and ignition sources based on the total rated energy capacity (kWh):</p>
+        <table class="results-table" aria-label="NFPA 855 separation distances">
+          <thead><tr><th>Exposure type</th><th>≤ 50 kWh system</th><th>&gt; 50 kWh system</th></tr></thead>
+          <tbody>
+            <tr><td>Property line</td><td>0.9 m (3 ft)</td><td>1.5 m (5 ft)</td></tr>
+            <tr><td>Occupied building</td><td>1.5 m (5 ft)</td><td>3.0 m (10 ft)</td></tr>
+            <tr><td>Ignition / electrical source</td><td>0.9 m (3 ft)</td><td>0.9 m (3 ft)</td></tr>
+          </tbody>
+        </table>
+        <p><strong>Propagation timing (UL 9540A):</strong> A lumped thermal-mass model estimates cell-to-cell, module, and rack propagation times from published UL 9540A battery-chemistry test data. Ambient temperature correction uses an Arrhenius approximation (reaction rate doubles every 10°C above 25°C).</p>
+        <p><strong>Deflagration vent area (NFPA 68 §7.4.3):</strong> The Bartknecht correlation from NFPA 68-2018 §7.4.3.2 is used to calculate the minimum vent area for the room, based on enclosure volume, vent opening pressure P<sub>stat</sub>, and chemistry-specific deflagration index K<sub>G</sub>:</p>
+        <p style="font-family:monospace; margin-left:1rem">A<sub>v</sub> = (P<sub>stat</sub><sup>−0.5682</sup> × K<sub>G</sub><sup>0.5922</sup> × V<sup>0.6672</sup> × P<sub>max</sub><sup>0.1723</sup>) / 1640</p>
+        <p class="hint"><strong>Note:</strong> This module provides screening-level calculations. A final Hazard Mitigation Analysis per NFPA 855 §15.3 must be prepared by a qualified engineer and reviewed by the Authority Having Jurisdiction (AHJ).</p>
+      </details>
+
+      <!-- ------------------------------------------------------------------ -->
+      <!-- Input form                                                          -->
+      <!-- ------------------------------------------------------------------ -->
+
+      <section aria-label="ESS system parameters" class="field-group">
+        <h2>Battery Energy Storage System</h2>
+
+        <div class="field-row-inline">
+          <label for="rated-kwh">Total rated capacity (kWh)
+            <input type="number" id="rated-kwh" value="200" min="1" step="1" aria-label="Total rated energy capacity in kilowatt-hours">
+          </label>
+          <label for="chemistry">Battery chemistry
+            <select id="chemistry" aria-label="Battery chemistry">
+              <option value="LFP" selected>LiFePO₄ (LFP) — safest</option>
+              <option value="NMC">NMC (NiMnCo)</option>
+              <option value="NCA">NCA (NiCoAl)</option>
+              <option value="lead-acid">Lead-Acid (VRLA)</option>
+              <option value="NiCd">NiCd</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="field-row-inline">
+          <label for="cells-per-module">Cells per module
+            <input type="number" id="cells-per-module" value="16" min="1" step="1" aria-label="Number of cells per module">
+          </label>
+          <label for="modules-per-rack">Modules per rack
+            <input type="number" id="modules-per-rack" value="8" min="1" step="1" aria-label="Number of modules per rack">
+          </label>
+          <label for="ambient-c">Ambient temperature (°C)
+            <input type="number" id="ambient-c" value="25" min="-20" max="60" step="1" aria-label="Ambient temperature in Celsius">
+          </label>
+        </div>
+      </section>
+
+      <section aria-label="Room and ventilation parameters" class="field-group">
+        <h2>Room &amp; Deflagration Venting</h2>
+
+        <div class="field-row-inline">
+          <label for="volume-m3">Room volume (m³)
+            <input type="number" id="volume-m3" value="50" min="1" step="1" aria-label="Room volume in cubic metres">
+          </label>
+          <label for="pstat-kpa">Vent opening pressure P<sub>stat</sub> (kPa)
+            <input type="number" id="pstat-kpa" value="5" min="0.5" max="100" step="0.5" aria-label="Vent panel opening pressure in kilopascals">
+          </label>
+          <label for="provided-vent-m2">Installed vent area (m²)
+            <input type="number" id="provided-vent-m2" value="0" min="0" step="0.1" aria-label="Installed deflagration vent area in square metres (0 if none)">
+          </label>
+        </div>
+        <p class="hint">Enter the total area of explosion-relief vent panels installed in the room. Enter 0 if the room has no dedicated deflagration venting.</p>
+      </section>
+
+      <section aria-label="Exposure objects" class="field-group">
+        <h2>Exposure Objects</h2>
+        <p class="hint">Add nearby structures or hazard sources to check NFPA 855 §15.3 separation requirements. Leave blank to skip separation checks.</p>
+
+        <div id="exposures-container">
+          <!-- Exposure rows are added dynamically by bessHazard.js -->
+        </div>
+
+        <button type="button" id="add-exposure-btn" class="btn">+ Add Exposure</button>
+      </section>
+
+      <div class="action-row" style="margin:1.5rem 0; display:flex; gap:.75rem; flex-wrap:wrap">
+        <button type="button" id="calculate-btn" class="btn btn--primary">Run HMA Check</button>
+        <button type="button" id="export-btn" class="btn" disabled aria-disabled="true">Export CSV</button>
+      </div>
+
+      <!-- ------------------------------------------------------------------ -->
+      <!-- Warnings panel                                                      -->
+      <!-- ------------------------------------------------------------------ -->
+      <div id="warnings-panel" hidden aria-live="polite"></div>
+
+      <!-- ------------------------------------------------------------------ -->
+      <!-- Results                                                             -->
+      <!-- ------------------------------------------------------------------ -->
+      <section id="results" hidden aria-label="HMA results"></section>
+
+      <!-- ------------------------------------------------------------------ -->
+      <!-- Engineer review / approval panel                                    -->
+      <!-- ------------------------------------------------------------------ -->
+      <div id="study-approval-panel"></div>
+    </main>
+  </div>
+
+  <!-- Help modal -->
+  <div id="help-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="help-title" hidden>
+    <div class="modal-content">
+      <h2 id="help-title">BESS Hazard / Thermal Runaway Help</h2>
+      <p>This study performs a screening-level Hazard Mitigation Analysis (HMA) for battery energy storage systems per NFPA 855-2023, Chapter 15.</p>
+      <h3>Inputs</h3>
+      <ul>
+        <li><strong>Rated capacity (kWh):</strong> Total rated energy of the ESS installation (sum of all BESS units).</li>
+        <li><strong>Chemistry:</strong> Determines K<sub>G</sub>, P<sub>max</sub>, and propagation timing. LFP is the most thermally stable chemistry.</li>
+        <li><strong>Cells/modules per rack:</strong> Used for UL 9540A propagation timing through the rack.</li>
+        <li><strong>Room volume:</strong> Net internal volume of the ESS room used for deflagration vent sizing.</li>
+        <li><strong>P<sub>stat</sub>:</strong> Vent panel opening (activation) pressure, typically 3–10 kPa for lightweight panels.</li>
+        <li><strong>Installed vent area:</strong> Total area of explosion-relief panels. Set to 0 if none are provided.</li>
+        <li><strong>Exposures:</strong> Add property lines, occupied buildings, or ignition sources with measured distances to check NFPA 855 §15.3 clearances.</li>
+      </ul>
+      <h3>Results</h3>
+      <ul>
+        <li><strong>Separation check:</strong> Pass if actual distance ≥ NFPA 855 §15.3 minimum for each exposure.</li>
+        <li><strong>Propagation timing:</strong> Estimated time for thermal runaway cascade from initial cell event to full rack involvement.</li>
+        <li><strong>Deflagration vent:</strong> Required vent area per NFPA 68 §7.4.3.2 Bartknecht correlation. Pass if installed area ≥ required.</li>
+        <li><strong>HMA status:</strong> Overall pass/warn/fail. Fail if any separation or vent check fails, or if propagation time &lt; 30 min without suppression.</li>
+      </ul>
+      <button id="close-help-btn" class="btn">Close</button>
+    </div>
+  </div>
+</body>
+</html>
