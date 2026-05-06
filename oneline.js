@@ -2205,6 +2205,7 @@ let showOverlays = true;
 let showEnergizedState = false;    // Gap #36
 let showProtectionZones = false;   // Gap #50
 let activeZoneId = null;           // Gap #50 – zone currently in component-assignment mode
+let showHazAreaOverlay = false;    // Gap #94 – hazardous area classification overlay
 let orthogonalRouting = false;     // Gap #47
 let symbolStandard = 'ANSI';       // Gap #37 – 'ANSI' or 'IEC'
 let showTitleBlock = false;        // Gap #38
@@ -7160,6 +7161,9 @@ function render() {
   // Gap #50 – Protection zone overlay (rendered first, beneath all other overlays)
   if (showProtectionZones) renderProtectionZones(svg);
 
+  // Gap #94 – Hazardous area classification overlay
+  if (showHazAreaOverlay) renderHazAreaOverlay(svg);
+
   // Gap #36 – Energized / de-energized operating-state overlay
   renderEnergizedState(svg);
 
@@ -7277,6 +7281,99 @@ function renderProtectionZones(svg) {
         dot.setAttribute('stroke-width', '1');
         dot.classList.add('protection-zone-overlay', 'zone-assign-dot');
         svg.appendChild(dot);
+      });
+    }
+  });
+}
+
+// Gap #94 – Hazardous area classification overlay
+// Color-codes components by their assigned hazAreaClassification zone.
+// Components carry an optional `hazAreaId` metadata field; areas and their
+// Ex-compatibility results are read from the project-level hazAreaClassification study.
+function renderHazAreaOverlay(svg) {
+  svg.querySelectorAll('.haz-area-overlay, .haz-area-label, .haz-area-badge').forEach(el => el.remove());
+
+  const hazStudy = (window.__projectStudies && window.__projectStudies.hazAreaClassification) || null;
+  if (!hazStudy || !hazStudy.areas) return;
+
+  // Zone color map — matches IEC severity (Zone 0 = red, Zone 1 = orange, Zone 2 = yellow)
+  const ZONE_COLORS = {
+    '0': 'rgba(220,50,50,0.18)', '1': 'rgba(230,140,40,0.18)', '2': 'rgba(220,200,50,0.18)',
+    '20': 'rgba(220,50,50,0.18)', '21': 'rgba(230,140,40,0.18)', '22': 'rgba(220,200,50,0.18)',
+    // NEC equivalents
+    'I-1': 'rgba(220,50,50,0.18)', 'I-2': 'rgba(220,200,50,0.18)',
+    'II-1': 'rgba(220,50,50,0.18)', 'II-2': 'rgba(220,200,50,0.18)',
+  };
+  const ZONE_STROKE = {
+    '0': '#dc3232', '1': '#e68c28', '2': '#dcc832',
+    '20': '#dc3232', '21': '#e68c28', '22': '#dcc832',
+    'I-1': '#dc3232', 'I-2': '#dcc832',
+    'II-1': '#dc3232', 'II-2': '#dcc832',
+  };
+
+  const areaFailIds = new Set((hazStudy.equipment || [])
+    .filter(r => r.pass === false)
+    .map(r => r.areaId));
+
+  hazStudy.areas.forEach(area => {
+    const areaKey = area.iecZone || area.dustZone ||
+                    (area.necClass && area.necDivision ? `${area.necClass}-${area.necDivision}` : null);
+    const fill   = (areaFailIds.has(area.id) ? 'rgba(220,50,50,0.28)' : ZONE_COLORS[areaKey]) || 'rgba(100,100,220,0.13)';
+    const stroke = (areaFailIds.has(area.id) ? '#dc3232' : ZONE_STROKE[areaKey]) || '#6464dc';
+
+    // Find all components in this area
+    const areaComponents = components.filter(c => c.hazAreaId === area.id);
+    if (areaComponents.length === 0) return;
+
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    areaComponents.forEach(comp => {
+      const b = componentBounds(comp);
+      minX = Math.min(minX, b.left);
+      minY = Math.min(minY, b.top);
+      maxX = Math.max(maxX, b.right);
+      maxY = Math.max(maxY, b.bottom);
+    });
+    if (!Number.isFinite(minX)) return;
+
+    const pad = 14;
+    const rect = document.createElementNS(svgNS, 'rect');
+    rect.setAttribute('x', minX - pad);
+    rect.setAttribute('y', minY - pad);
+    rect.setAttribute('width', maxX - minX + pad * 2);
+    rect.setAttribute('height', maxY - minY + pad * 2);
+    rect.setAttribute('fill', fill);
+    rect.setAttribute('stroke', stroke);
+    rect.setAttribute('stroke-width', '1.5');
+    rect.setAttribute('stroke-dasharray', '5,3');
+    rect.classList.add('haz-area-overlay');
+    const firstConn = svg.querySelector('polyline');
+    if (firstConn) svg.insertBefore(rect, firstConn);
+    else svg.appendChild(rect);
+
+    // Designation label
+    const labelText = `${area.label || area.id} (${area.designation || ''})`;
+    const label = document.createElementNS(svgNS, 'text');
+    label.setAttribute('x', minX - pad + 4);
+    label.setAttribute('y', minY - pad - 4);
+    label.setAttribute('fill', stroke);
+    label.setAttribute('font-size', '10');
+    label.classList.add('haz-area-label');
+    label.textContent = labelText;
+    svg.appendChild(label);
+
+    // Fail badge on failing components
+    if (areaFailIds.has(area.id)) {
+      areaComponents.forEach(comp => {
+        const b = componentBounds(comp);
+        const badge = document.createElementNS(svgNS, 'circle');
+        badge.setAttribute('cx', b.right - 4);
+        badge.setAttribute('cy', b.top + 4);
+        badge.setAttribute('r', '5');
+        badge.setAttribute('fill', '#dc3232');
+        badge.setAttribute('stroke', '#fff');
+        badge.setAttribute('stroke-width', '1');
+        badge.classList.add('haz-area-badge');
+        svg.appendChild(badge);
       });
     }
   });

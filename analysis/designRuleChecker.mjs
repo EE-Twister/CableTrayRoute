@@ -12,6 +12,7 @@
  *   DRC-05  (advisory)     — Cables with no assigned route (unrouted cables)
  *   DRC-06  TIA-568.0-D §4.5 — Structured cabling (Data/Fiber) shares tray with Power cables
  *   DRC-07  NEC 310.10(H) — Parallel conductor requirements (min size, equal length)
+ *   DRC-08  NEC 500/IEC 60079 — Equipment Ex protection type or T-rating incompatible with classified area
  *
  * @module designRuleChecker
  */
@@ -587,6 +588,49 @@ function checkDataCableSegregation(trayCableMap) {
  *   passed:   boolean,
  * }} DrcSummary
  */
+// ---------------------------------------------------------------------------
+// DRC-08 — Hazardous area equipment compatibility (NEC 500 / IEC 60079)
+// ---------------------------------------------------------------------------
+
+/**
+ * Check that equipment assigned to classified hazardous areas has a compatible
+ * Ex protection type, equipment group, and T-rating.
+ *
+ * @param {object[]} equipment  — diagram components with hazAreaId / exProtection fields
+ * @param {object[]} areas      — classified area descriptors
+ * @param {object}   checkResult — output of checkAllEquipment() from hazAreaClassification.mjs
+ * @returns {import('./designRuleChecker.mjs').DrcFinding[]}
+ */
+export function checkHazAreaCompatibility(equipment, areas, checkResult) {
+  const findings = [];
+  if (!checkResult || !Array.isArray(checkResult.results)) return findings;
+
+  for (const result of checkResult.results) {
+    for (const failure of (result.failures || [])) {
+      findings.push({
+        ruleId:     'DRC-08',
+        severity:   DRC_SEVERITY.ERROR,
+        location:   result.label || result.equipId,
+        message:    failure,
+        reference:  'NEC Art. 500 / IEC 60079-0',
+        remediation: 'Select equipment with a compatible Ex protection type, equipment group, and T-rating for the classified area.',
+      });
+    }
+    for (const warning of (result.warnings || [])) {
+      findings.push({
+        ruleId:     'DRC-08',
+        severity:   DRC_SEVERITY.WARNING,
+        location:   result.label || result.equipId,
+        message:    warning,
+        reference:  'NEC Art. 500 / IEC 60079-0',
+        remediation: 'Verify equipment certification and T-rating before installation.',
+      });
+    }
+  }
+
+  return findings;
+}
+
 export function runDRC(input, options = {}) {
   const { trays = [], cables = [], trayCableMap: rawMap = {}, routedCableNames } = input;
 
@@ -603,6 +647,9 @@ export function runDRC(input, options = {}) {
     ...checkUnroutedCables(cables, trayMap, routedCableNames),
     ...checkDataCableSegregation(trayMap),
     ...(options.skipParallelCheck ? [] : checkParallelConductors(cables)),
+    ...(options.hazAreaCheckResult ? checkHazAreaCompatibility(
+        options.hazAreaEquipment || [], options.hazAreas || [], options.hazAreaCheckResult
+      ) : []),
   ];
 
   // Mark each finding with its unique accept-risk key and any matching acceptance.

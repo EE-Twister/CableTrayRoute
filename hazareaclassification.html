@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Hazardous Area Classification per NEC 500–505 and IEC 60079. Define classified zones, assign Ex-rated equipment, and verify protection-type and T-class compatibility." />
+  <title>Hazardous Area Classification — CableTrayRoute</title>
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/favicon.svg">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Hazardous Area Classification — CableTrayRoute">
+  <meta property="og:description" content="NEC 500–505 Class/Division and IEC 60079 Zone classification with Ex equipment compatibility checker.">
+  <meta property="og:image" content="https://cabletrayroute.com/icons/og-preview.png">
+  <meta property="og:site_name" content="CableTrayRoute">
+  <meta property="og:url" content="hazareaclassification.html">
+  <link rel="canonical" href="hazareaclassification.html">
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+  <meta name="color-scheme" content="light dark">
+  <link rel="stylesheet" href="style.css" />
+  <script type="module" src="dirtyTracker.js"></script>
+  <script type="module" src="dist/hazareaclassification.js" defer></script>
+</head>
+<body class="hazarea-page" data-report-title="Hazardous Area Classification">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <nav class="top-nav" aria-label="Primary">
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
+      <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+    <div id="nav-links" class="nav-links" role="list">
+      <!-- Populated dynamically by navigation.js -->
+    </div>
+    <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+  </nav>
+
+  <div id="settings-menu" class="settings-menu">
+    <label for="theme-select">Theme
+      <select id="theme-select">
+        <option value="system">System</option>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+        <option value="high-contrast">High Contrast</option>
+      </select>
+    </label>
+    <label><input type="checkbox" id="compact-toggle" aria-label="Enable compact table mode"> Compact Mode</label>
+    <button id="help-btn" class="btn" aria-expanded="false" title="Show help">Site Help</button>
+    <button id="new-project-btn" class="btn" title="Start a new project">New Project</button>
+    <button id="save-project-btn" class="btn" title="Save current project">Save Project</button>
+    <button id="load-project-btn" class="btn" title="Load an existing project">Load Project</button>
+    <button id="export-project-btn" class="btn" title="Export project data">Export Project</button>
+    <button id="import-project-btn" class="btn" title="Import project data">Import Project</button>
+    <input type="file" id="import-project-input" accept=".ctr.json" class="hidden" title="Select project file">
+  </div>
+
+  <div class="container">
+    <main id="main-content" class="main-content">
+      <nav aria-label="Breadcrumb">
+        <ol class="breadcrumb-trail">
+          <li><a href="index.html">Home</a></li>
+          <li>Studies</li>
+          <li>Protection</li>
+          <li aria-current="page">Hazardous Area Classification</li>
+        </ol>
+      </nav>
+
+      <header class="page-header">
+        <h1>Hazardous Area Classification</h1>
+        <p>Define classified areas (NEC 500–505 Class/Division or IEC 60079 Zone), assign Ex-rated equipment, and verify protection-type and T-class compatibility per NEC Article 500 and IEC 60079-0.</p>
+      </header>
+
+      <details class="method-panel">
+        <summary>Method &amp; Standards</summary>
+        <p><strong>Classification standards:</strong> Two parallel systems are supported:</p>
+        <ul>
+          <li><strong>NEC (Articles 500–506):</strong> Class I/II/III, Division 1/2, with gas groups A–D (Class I) and dust groups E–G (Class II). Class I, Division 1 corresponds approximately to IEC Zones 0 + 1; Division 2 corresponds to Zone 2.</li>
+          <li><strong>IEC 60079-10-1 / NEC Article 505:</strong> Zone 0/1/2 for flammable gases/vapours; Zone 20/21/22 (IEC 60079-10-2 / NEC Article 506) for combustible dust. Equipment groups IIA/IIB/IIC cover gas severity; IIIA/IIIB/IIIC cover dust severity.</li>
+        </ul>
+        <p><strong>Equipment compatibility checks (IEC 60079-0):</strong> Three rules are verified for each device in a classified area:</p>
+        <ol>
+          <li><strong>Protection type vs. zone:</strong> Ex d (flameproof) and Ex ia (intrinsic safety Cat ia) are rated for Zone 0; Ex e (increased safety) requires Zone 1 or 2; Ex n/nA are Zone 2 only. Dust protection types (Ex t, Ex tb) apply to dust zones only.</li>
+          <li><strong>Equipment group vs. gas/dust group:</strong> An equipment group must cover the area's hazard severity. Group IIC covers IIB and IIA; Group IIIC covers IIIB and IIIA.</li>
+          <li><strong>T-rating (maximum surface temperature):</strong> Equipment T-rating must be ≤ the area's required T-class (T6 = 85 °C is the most restrictive; T1 = 450 °C is least restrictive).</li>
+        </ol>
+        <p class="hint"><strong>Note:</strong> This tool provides a compatibility screening check. A formal area classification study per API RP 505 or IEC 60079-10-1 and the Authority Having Jurisdiction (AHJ) approval are required before installation.</p>
+      </details>
+
+      <!-- ================================================================== -->
+      <!-- Tab bar                                                             -->
+      <!-- ================================================================== -->
+      <div class="tab-bar" role="tablist" aria-label="Hazardous area study tabs">
+        <button role="tab" id="tab-areas" aria-controls="panel-areas" aria-selected="true" class="tab-btn tab-btn--active">
+          Classified Areas
+        </button>
+        <button role="tab" id="tab-equipment" aria-controls="panel-equipment" aria-selected="false" class="tab-btn">
+          Equipment Checker
+        </button>
+      </div>
+
+      <!-- ================================================================== -->
+      <!-- Tab 1: Classified Areas                                            -->
+      <!-- ================================================================== -->
+      <div id="panel-areas" role="tabpanel" aria-labelledby="tab-areas">
+
+        <section aria-label="Classified areas" class="field-group">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:.5rem; margin-bottom:.75rem">
+            <h2 style="margin:0">Classified Areas</h2>
+            <button type="button" id="add-area-btn" class="btn">+ Add Area</button>
+          </div>
+          <p class="hint">Define each hazardous area. Assign a unique ID (used to link equipment). Choose NEC Class/Division or IEC Zone classification.</p>
+
+          <div id="areas-container" aria-label="Classified areas list">
+            <!-- Area rows inserted dynamically by hazareaclassification.js -->
+          </div>
+        </section>
+
+        <div class="action-row" style="margin:1.5rem 0; display:flex; gap:.75rem; flex-wrap:wrap">
+          <button type="button" id="run-study-btn" class="btn btn--primary">Run Classification Check</button>
+          <button type="button" id="export-csv-btn" class="btn" disabled aria-disabled="true">Export CSV</button>
+        </div>
+
+        <div id="warnings-panel" hidden aria-live="polite"></div>
+
+        <!-- Area map summary table (rendered after study run) -->
+        <section id="area-results" hidden aria-label="Area classification results"></section>
+
+      </div>
+
+      <!-- ================================================================== -->
+      <!-- Tab 2: Equipment Checker                                           -->
+      <!-- ================================================================== -->
+      <div id="panel-equipment" role="tabpanel" aria-labelledby="tab-equipment" hidden>
+
+        <section aria-label="Ex-rated equipment" class="field-group">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:.5rem; margin-bottom:.75rem">
+            <h2 style="margin:0">Ex-Rated Equipment</h2>
+            <button type="button" id="add-equip-btn" class="btn">+ Add Equipment</button>
+          </div>
+          <p class="hint">Enter each device installed in a classified area. Assign it to an Area ID defined on the Classified Areas tab. The checker verifies Ex protection type, equipment group, and T-rating against the area's requirements.</p>
+
+          <div id="equipment-container" aria-label="Equipment list">
+            <!-- Equipment rows inserted dynamically -->
+          </div>
+        </section>
+
+        <div class="action-row" style="margin:1.5rem 0; display:flex; gap:.75rem; flex-wrap:wrap">
+          <button type="button" id="check-equip-btn" class="btn btn--primary">Check Equipment</button>
+        </div>
+
+        <section id="equipment-results" hidden aria-label="Equipment compatibility results"></section>
+
+      </div>
+
+      <!-- ================================================================== -->
+      <!-- Engineer review / approval panel                                   -->
+      <!-- ================================================================== -->
+      <div id="study-approval-panel"></div>
+
+    </main>
+  </div>
+
+  <!-- Help modal -->
+  <div id="help-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="help-title" hidden>
+    <div class="modal-content">
+      <h2 id="help-title">Hazardous Area Classification Help</h2>
+      <p>This study defines classified hazardous areas and checks Ex-rated equipment compatibility per NEC Articles 500–506 and IEC 60079-0.</p>
+      <h3>Classified Areas Tab</h3>
+      <ul>
+        <li><strong>Standard:</strong> Choose NEC (Class/Division) or IEC (Zone) to match your project's code of record.</li>
+        <li><strong>Area ID:</strong> Short unique identifier (e.g. "pump-room", "compressor-shed"). Used to link equipment to an area.</li>
+        <li><strong>Class / Division (NEC):</strong> Class I = flammable gas; Class II = combustible dust; Class III = ignitable fibres. Division 1 = hazardous under normal conditions; Division 2 = abnormal conditions only.</li>
+        <li><strong>Zone (IEC):</strong> Zone 0 = continuous; Zone 1 = likely (normal); Zone 2 = unlikely (abnormal). Dust zones: 20/21/22.</li>
+        <li><strong>Gas / Dust Group:</strong> Identifies the specific hazardous substance class. Equipment must be rated for the group.</li>
+        <li><strong>T-Rating:</strong> Minimum T-class required by the area (based on the substance's auto-ignition temperature). T6 = 85 °C (most restrictive); T1 = 450 °C (least restrictive).</li>
+      </ul>
+      <h3>Equipment Checker Tab</h3>
+      <ul>
+        <li><strong>Area ID:</strong> Must match an Area ID defined on the Classified Areas tab.</li>
+        <li><strong>Ex Protection Type:</strong> IEC 60079 protection method (d = flameproof, e = increased safety, ia/ib = intrinsic safety, t = dust enclosure, etc.).</li>
+        <li><strong>Equipment Group:</strong> IEC group stamped on the nameplate (IIA/IIB/IIC for gas; IIIA/IIIB/IIIC for dust).</li>
+        <li><strong>T-Rating:</strong> Maximum surface temperature class stamped on the nameplate (T1–T6). Must be ≤ area requirement.</li>
+        <li><strong>Cert Number:</strong> ATEX, IECEx, or NEC listing certificate reference for traceability.</li>
+      </ul>
+      <h3>Result Codes</h3>
+      <ul>
+        <li><strong>PASS:</strong> All checks satisfied — equipment is suitable for the assigned area.</li>
+        <li><strong>FAIL:</strong> One or more compatibility failures — do not install without resolution.</li>
+        <li><strong>WARN:</strong> Missing data (no cert number, no T-rating declared) — verify before installation.</li>
+      </ul>
+      <button id="close-help-btn" class="btn">Close</button>
+    </div>
+  </div>
+</body>
+</html>
