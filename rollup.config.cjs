@@ -79,7 +79,8 @@ const entries = {
   sustainability: 'src/sustainability.js',
   quasidynamic: 'src/quasiDynamic.js',
   bessHazard: 'src/bessHazard.js',
-  hazareaclassification: 'src/hazareaclassification.js'
+  hazareaclassification: 'src/hazareaclassification.js',
+  admin: 'src/admin.js'
 };
 
 /**

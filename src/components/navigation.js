@@ -74,7 +74,8 @@ const NAV_ROUTES = [
   { href: 'samplegallery.html', label: 'Sample Gallery', section: 'Support', icon: 'icons/toolbar/copy.svg' },
   { href: 'validation.html', label: 'Validation & Standards', section: 'Support', icon: 'icons/toolbar/validate.svg' },
   { href: 'help.html', label: 'Help', section: 'Support', icon: 'icons/toolbar/validate.svg' },
-  { href: 'account.html', label: 'Account', section: 'Support', icon: 'icons/toolbar/grid.svg' }
+  { href: 'account.html', label: 'Account', section: 'Support', icon: 'icons/toolbar/grid.svg' },
+  { href: 'admin.html', label: 'Admin', section: 'Support', icon: 'icons/toolbar/validate.svg', adminOnly: true }
 ];
 
 function currentPageName() {
@@ -285,9 +286,11 @@ function mountPersistentNavigation() {
   const navLinks = document.createElement('div');
   navLinks.id = 'nav-links';
   navLinks.className = 'nav-links';
-  const navSections = [...new Set(NAV_ROUTES.map(r => r.section))];
+  const isAdmin = typeof localStorage !== 'undefined' && localStorage.getItem('ctr-user-role') === 'admin';
+  const visibleRoutes = NAV_ROUTES.filter(r => !r.adminOnly || isAdmin);
+  const navSections = [...new Set(visibleRoutes.map(r => r.section))];
   navSections.forEach(section => {
-    const sectionRoutes = NAV_ROUTES.filter(r => r.section === section);
+    const sectionRoutes = visibleRoutes.filter(r => r.section === section);
     if (section === 'Home') {
       navLinks.appendChild(buildLink(sectionRoutes[0], currentRoute));
     } else {
