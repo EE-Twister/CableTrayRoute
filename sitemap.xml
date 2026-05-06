@@ -27,6 +27,7 @@
   <url><loc>motorStart.html</loc><priority>0.6</priority></url>
   <url><loc>harmonics.html</loc><priority>0.5</priority></url>
   <url><loc>loadFlow.html</loc><priority>0.5</priority></url>
+  <url><loc>quasidynamic.html</loc><priority>0.5</priority></url>
   <url><loc>help.html</loc><priority>0.5</priority></url>
   <url><loc>library.html</loc><priority>0.4</priority></url>
   <url><loc>custom-components.html</loc><priority>0.4</priority></url>

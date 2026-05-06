@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Quasi-Dynamic (Time-Series) Load Flow — run the AC load-flow solver across an hourly or 8760-hour demand profile to find voltage envelopes, peak/valley operating points, and annual energy losses." />
+  <title>Quasi-Dynamic Load Flow — CableTrayRoute</title>
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/favicon.svg">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Quasi-Dynamic Load Flow — CableTrayRoute">
+  <meta property="og:description" content="Time-series load flow across an 8760-hour profile. Compute voltage envelopes, peak/valley snapshots, and annual energy losses.">
+  <meta property="og:image" content="https://cabletrayroute.com/icons/og-preview.png">
+  <meta property="og:site_name" content="CableTrayRoute">
+  <meta property="og:url" content="quasidynamic.html">
+  <link rel="canonical" href="quasidynamic.html">
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+  <meta name="color-scheme" content="light dark">
+  <link rel="stylesheet" href="style.css" />
+  <script type="module" src="dirtyTracker.js"></script>
+  <script type="module" src="dist/quasidynamic.js" defer></script>
+</head>
+<body class="quasidynamic-page" data-report-title="Quasi-Dynamic Load Flow">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <nav class="top-nav" aria-label="Primary">
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
+      <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+    <div id="nav-links" class="nav-links" role="list">
+      <!-- Populated dynamically by navigation.js -->
+    </div>
+    <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+  </nav>
+
+  <div id="settings-menu" class="settings-menu">
+    <label for="theme-select">Theme
+      <select id="theme-select">
+        <option value="system">System</option>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+        <option value="high-contrast">High Contrast</option>
+      </select>
+    </label>
+    <label><input type="checkbox" id="compact-toggle" aria-label="Enable compact table mode"> Compact Mode</label>
+    <button id="help-btn" class="btn" aria-expanded="false" title="Show help">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Site Help</span>
+    </button>
+    <button id="new-project-btn" title="Start a new project">
+      <img src="icons/toolbar/copy.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>New Project</span>
+    </button>
+    <button id="save-project-btn" title="Save current project">
+      <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Save Project</span>
+    </button>
+    <button id="load-project-btn" title="Load an existing project">
+      <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Load Project</span>
+    </button>
+    <button id="export-project-btn" title="Export project data">
+      <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Export Project</span>
+    </button>
+    <button id="import-project-btn" title="Import project data">
+      <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Import Project</span>
+    </button>
+    <input type="file" id="import-project-input" accept=".ctr.json" class="hidden" title="Select project file">
+  </div>
+
+  <div class="container">
+    <main id="main-content" class="main-content">
+      <header class="page-header">
+        <h1>Quasi-Dynamic Load Flow</h1>
+      </header>
+
+      <details class="method-panel">
+        <summary>Method &amp; Assumptions</summary>
+        <p>The quasi-dynamic study runs the full Newton-Raphson AC load-flow solver at each timestep in a demand profile. Each step is solved independently (no inter-step dynamics or ramp limits). The result is a time-series of operating points from which voltage envelopes, peak/valley snapshots, and energy losses are derived.</p>
+        <p><strong>Timestep model:</strong></p>
+        <pre>Pd_t = Pd_base × loadScale_t
+Pg_t = Pg_base × genScale_t</pre>
+        <p>All bus loads and shunt elements are scaled uniformly. Generation dispatch is also scaled uniformly — for economic dispatch with generator cost curves use the OPF study.</p>
+        <p><strong>Voltage limits (ANSI C84.1 Range A):</strong></p>
+        <ul>
+          <li>Upper limit: 1.05 pu — <em>fail</em> above this; <em>warn</em> above 1.03 pu</li>
+          <li>Lower limit: 0.95 pu — <em>fail</em> below this; <em>warn</em> below 0.97 pu</li>
+        </ul>
+        <p><strong>Profile format (CSV or text):</strong> One row per timestep. Accepted layouts:</p>
+        <ul>
+          <li>1 column: <code>loadScale</code> — hours are assigned automatically (0, 1, 2 …)</li>
+          <li>2 columns: <code>hour, loadScale</code></li>
+          <li>3 columns: <code>hour, loadScale, genScale</code></li>
+        </ul>
+        <p>Lines beginning with <code>#</code> and header rows starting with "hour" are skipped. Values are per-unit multipliers on the base-case load/generation in the one-line diagram.</p>
+        <p><strong>Energy loss:</strong> Each timestep is assumed to represent 1 hour. Total energy loss (kWh) is the sum of branch losses across all converged timesteps.</p>
+        <p><strong>References:</strong> IEEE Std 399-1997 §14; IEC 60364-8-1:2019 §8 (energy efficiency); CIGRÉ TB 577 (quasi-dynamic simulation of active distribution networks).</p>
+      </details>
+
+      <form id="qd-form" novalidate>
+
+        <fieldset>
+          <legend><strong>Base Case</strong></legend>
+          <p class="field-hint">The base case is taken from the current project's one-line diagram. Open your project and draw the network on the <a href="oneline.html">One-Line</a> page before running this study. Loads and generation defined there will be scaled by the profile below.</p>
+          <div class="field-row">
+            <label for="base-mva">System base MVA</label>
+            <input type="number" id="base-mva" min="0.001" step="1" value="100" required aria-describedby="base-mva-hint">
+            <span class="field-unit">MVA</span>
+            <p id="base-mva-hint" class="field-hint">Per-unit system base. Use 100 MVA for large systems; 1 MVA for small distribution systems.</p>
+          </div>
+          <div class="field-row">
+            <label for="balanced-select">Phase model</label>
+            <select id="balanced-select">
+              <option value="balanced" selected>Balanced three-phase (positive-sequence)</option>
+              <option value="unbalanced">Unbalanced three-phase (A/B/C)</option>
+            </select>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend><strong>Load Profile</strong></legend>
+
+          <div class="field-row">
+            <label for="profile-preset">Built-in profile</label>
+            <select id="profile-preset">
+              <option value="none">— use text input below —</option>
+              <option value="daily">Typical 24-hour commercial weekday</option>
+              <option value="annual">Representative 8760-hour annual (365 days)</option>
+            </select>
+          </div>
+
+          <div class="field-row">
+            <label for="profile-file">Upload CSV</label>
+            <input type="file" id="profile-file" accept=".csv,.txt" aria-describedby="profile-file-hint">
+            <p id="profile-file-hint" class="field-hint">Upload a CSV file with columns: hour, loadScale [, genScale]. Overwrites the text area below.</p>
+          </div>
+
+          <div class="field-row">
+            <label for="profile-text">Profile data</label>
+            <textarea id="profile-text" rows="8" placeholder="# hour, loadScale, genScale&#10;0, 0.55, 1.0&#10;1, 0.50, 1.0&#10;2, 0.48, 1.0&#10;..." aria-describedby="profile-text-hint" spellcheck="false"></textarea>
+            <p id="profile-text-hint" class="field-hint">Enter or paste profile data. One row per hour. loadScale and genScale are per-unit multipliers (1.0 = base case). Use a built-in profile above or upload a CSV to populate this field automatically.</p>
+          </div>
+        </fieldset>
+
+        <div class="form-actions">
+          <button type="submit" id="run-btn" class="btn btn-primary">Run Quasi-Dynamic Study</button>
+          <button type="button" id="export-csv-btn" class="btn" hidden>Export Results (CSV)</button>
+        </div>
+      </form>
+
+      <div id="calc-errors" class="result-fail" hidden aria-live="polite"></div>
+
+      <div id="results" aria-live="polite"></div>
+
+      <section class="card">
+        <div id="study-basis-panel"></div>
+      </section>
+
+      <section class="card">
+        <div id="study-approval-panel"></div>
+      </section>
+
+      <nav class="step-nav" aria-label="Workflow navigation">
+        <a href="loadFlow.html" class="step-nav-prev">← Load Flow</a>
+        <a href="voltagestability.html" class="step-nav-next">Voltage Stability →</a>
+      </nav>
+
+    </main>
+  </div>
+
+  <div id="help-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="help-modal-title" hidden>
+    <div class="modal-content">
+      <button id="close-help-btn" class="modal-close" aria-label="Close help">×</button>
+      <h2 id="help-modal-title">Quasi-Dynamic Load Flow Help</h2>
+      <p>The quasi-dynamic study sweeps a time-varying demand profile through the AC load-flow solver to show how bus voltages and branch flows change across the operating day or year.</p>
+      <h3>When to use</h3>
+      <ul>
+        <li>Annual energy loss estimation for efficiency reporting (IEC 60364-8-1).</li>
+        <li>DER hosting-capacity studies — how much PV/BESS can be connected before voltages violate limits at any hour of the year?</li>
+        <li>Peak/off-peak operating point comparison — which buses are stressed at peak load and which are over-voltage at minimum load?</li>
+        <li>Battery dispatch planning — identify hours where network losses are highest.</li>
+        <li>NERC TPL-001 and IEC 60909 contingency screening over multiple loading conditions.</li>
+      </ul>
+      <h3>Profile setup</h3>
+      <ul>
+        <li>Select a built-in 24-hour or 8760-hour representative profile for quick results.</li>
+        <li>Upload a CSV from your energy meter, SCADA historian, or building energy model.</li>
+        <li>loadScale = 1.0 means full base-case load; 0.5 means 50% of base-case load.</li>
+        <li>genScale applies the same scaling to all generators (useful for curtailment studies).</li>
+      </ul>
+      <h3>Interpreting results</h3>
+      <ul>
+        <li><strong>Voltage envelope</strong>: The maximum and minimum pu voltage seen at each bus across all converged timesteps. Buses with max &gt; 1.05 or min &lt; 0.95 need corrective action.</li>
+        <li><strong>Peak snapshot</strong>: The timestep with highest total system load — worst-case for undervoltage and thermal overload.</li>
+        <li><strong>Valley snapshot</strong>: The timestep with lowest total load — worst-case for overvoltage (especially with embedded DER).</li>
+        <li><strong>Load factor</strong>: Average load ÷ peak load. A load factor close to 1.0 means a flat demand profile; close to 0.5 means highly peaky.</li>
+      </ul>
+      <h3>Limitations</h3>
+      <ul>
+        <li>Each timestep is solved independently — no inertia, ramp limits, or inter-period energy storage dispatch.</li>
+        <li>Uniform load scaling: all buses scale together. For bus-by-bus profiles, provide a custom model via the API.</li>
+        <li>Designed for radial and meshed distribution/sub-transmission networks up to ~200 buses.</li>
+      </ul>
+    </div>
+  </div>
+
+  <footer class="site-footer">
+    <div class="footer-left">
+      <img src="icons/route.svg" alt="CableTrayRoute logo" class="footer-logo" loading="lazy" decoding="async">
+      <span>CableTrayRoute</span>
+    </div>
+    <nav class="footer-links" aria-label="Footer">
+      <a href="docs/index.html">Docs</a>
+      <a href="docs/quickstart.html">Quick Start</a>
+      <a href="index.html">Home</a>
+    </nav>
+  </footer>
+
+</body>
+</html>

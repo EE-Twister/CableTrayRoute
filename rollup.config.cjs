@@ -76,7 +76,8 @@ const entries = {
   demandschedule: 'src/demandschedule.js',
   conduitbend: 'src/conduitbend.js',
   busdust: 'src/busDuct.js',
-  sustainability: 'src/sustainability.js'
+  sustainability: 'src/sustainability.js',
+  quasidynamic: 'src/quasiDynamic.js'
 };
 
 /**
