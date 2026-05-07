@@ -1,19 +1,21 @@
 import * as dataStore from './dataStore.mjs';
 
-const WALL_TYPES = ['Concrete', 'CMU', 'Gypsum', 'Fire Rated', 'Removable Panel'];
+const WALL_TYPES = ['Concrete', 'CMU', 'Gypsum', 'Metal', 'Fire Rated', 'Removable Panel'];
 const VOLTAGE_OPTIONS = ['120V', '208V', '480V', '600V', '4.16kV', '13.8kV', '15kV'];
 const DEFAULT_SCALE = 20;
+const MAX_HISTORY = 50;
 
 const state = {
   room: {
     width: 30,
     depth: 20,
     walls: { north: 'Concrete', south: 'Concrete', east: 'CMU', west: 'CMU' },
-    interiorWalls: []
+    interiorWalls: [],
+    doorways: []
   },
   equipment: [],
   scale: DEFAULT_SCALE,
-  selectedEquipmentId: null,
+  selectedIds: new Set(),
   drag: null,
   wallDraw: {
     enabled: false,
@@ -21,7 +23,8 @@ const state = {
     start: null,
     current: null
   },
-  violations: new Set()
+  violations: new Set(),
+  history: []
 };
 
 let canvas;
@@ -42,16 +45,35 @@ function snapToStep(value, step = 0.5) {
   return Math.round(value / step) * step;
 }
 
-function clearanceDepthFt(voltageText) {
+// NEC 110.26 Condition 2 applies when the facing wall is grounded (metal).
+// Metal walls use Condition 2 clearances; all others use Condition 1.
+function isConductive(wallType) {
+  return wallType === 'Metal';
+}
+
+function clearanceDepthFt(voltageText, facingWallType) {
   const normalized = String(voltageText || '').toLowerCase();
   const kvMatch = normalized.match(/([\d.]+)\s*k\s*v/);
   let volts = Number.parseFloat(normalized);
   if (kvMatch) {
     volts = Number.parseFloat(kvMatch[1]) * 1000;
   }
+  const conductive = isConductive(facingWallType);
   if (!Number.isFinite(volts) || volts <= 150) return 3;
-  if (volts <= 600) return 3.5;
-  return 4;
+  if (volts <= 600) return conductive ? 3.5 : 3;
+  if (volts <= 2500) return conductive ? 4 : 3;
+  if (volts <= 9000) return conductive ? 5 : 4;
+  return conductive ? 6 : 5;
+}
+
+function facingWallType(eq) {
+  switch (eq.facing) {
+    case 'north': return state.room.walls.north;
+    case 'south': return state.room.walls.south;
+    case 'east':  return state.room.walls.east;
+    case 'west':  return state.room.walls.west;
+    default:      return state.room.walls.south;
+  }
 }
 
 function equipmentRect(eq) {
@@ -67,7 +89,7 @@ function insideRoom(rect) {
 }
 
 function workspaceRect(eq) {
-  const depth = clearanceDepthFt(eq.voltage);
+  const depth = clearanceDepthFt(eq.voltage, facingWallType(eq));
   const pad = 0.15;
   switch (eq.facing) {
     case 'north':
@@ -144,6 +166,31 @@ function evaluateViolations() {
   state.violations = violations;
 }
 
+// ── History / Undo ──────────────────────────────────────────────────────────
+
+function pushHistory() {
+  const snapshot = {
+    equipment: state.equipment.map(e => ({ ...e })),
+    interiorWalls: state.room.interiorWalls.map(w => ({ ...w })),
+    doorways: state.room.doorways.map(d => ({ ...d }))
+  };
+  state.history.push(snapshot);
+  if (state.history.length > MAX_HISTORY) state.history.shift();
+}
+
+function undoLastAction() {
+  if (!state.history.length) return;
+  const snapshot = state.history.pop();
+  state.equipment = snapshot.equipment;
+  state.room.interiorWalls = snapshot.interiorWalls;
+  state.room.doorways = snapshot.doorways;
+  const ids = new Set(state.equipment.map(e => e.id));
+  state.selectedIds = new Set([...state.selectedIds].filter(id => ids.has(id)));
+  render();
+}
+
+// ── UI helpers ───────────────────────────────────────────────────────────────
+
 function populateSelect(selectId, values) {
   const select = document.getElementById(selectId);
   if (!select) return;
@@ -201,6 +248,7 @@ function renderInteriorWallList() {
     remove.type = 'button';
     remove.textContent = 'Remove';
     remove.addEventListener('click', () => {
+      pushHistory();
       state.room.interiorWalls.splice(index, 1);
       render();
     });
@@ -208,6 +256,35 @@ function renderInteriorWallList() {
     list.appendChild(row);
   });
 }
+
+function renderDoorwayList() {
+  const list = document.getElementById('doorway-list');
+  if (!list) return;
+  list.innerHTML = '';
+  if (!state.room.doorways.length) {
+    list.textContent = 'No doorways added.';
+    return;
+  }
+  state.room.doorways.forEach((dw, index) => {
+    const row = document.createElement('div');
+    row.className = 'equipment-mini-list-row';
+    const tag = dw.isEgress ? ' · EGRESS' : '';
+    row.innerHTML = `<span>${dw.wall} wall · ${dw.width.toFixed(1)} ft wide · ${dw.position.toFixed(1)} ft from corner${tag}</span>`;
+    const remove = document.createElement('button');
+    remove.className = 'btn';
+    remove.type = 'button';
+    remove.textContent = 'Remove';
+    remove.addEventListener('click', () => {
+      pushHistory();
+      state.room.doorways.splice(index, 1);
+      render();
+    });
+    row.appendChild(remove);
+    list.appendChild(row);
+  });
+}
+
+// ── Canvas drawing helpers ───────────────────────────────────────────────────
 
 function drawRect(rect, className, fillOpacity = 1) {
   const element = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
@@ -223,11 +300,21 @@ function drawRect(rect, className, fillOpacity = 1) {
   return element;
 }
 
-function drawText(text, xFt, yFt, className = 'equipment-room-text') {
+// Font size scales proportionally with zoom so text stays readable without crowding.
+function labelFontSize(variant) {
+  if (variant === 'meta')  return Math.max(6,  Math.min(10, state.scale * 0.40));
+  if (variant === 'block') return Math.max(7,  Math.min(12, state.scale * 0.50));
+  if (variant === 'wall')  return Math.max(8,  Math.min(14, state.scale * 0.60));
+  if (variant === 'door')  return Math.max(7,  Math.min(11, state.scale * 0.45));
+  return Math.max(8, Math.min(14, state.scale * 0.60));
+}
+
+function drawText(text, xFt, yFt, className = 'equipment-room-text', variant = 'wall') {
   const element = document.createElementNS('http://www.w3.org/2000/svg', 'text');
   element.setAttribute('x', String(xFt * state.scale));
   element.setAttribute('y', String(yFt * state.scale));
   element.setAttribute('class', className);
+  element.style.fontSize = `${labelFontSize(variant)}px`;
   element.textContent = text;
   canvas.appendChild(element);
 }
@@ -238,16 +325,142 @@ function drawWallLabel(text, xFt, yFt, anchor = 'start') {
   element.setAttribute('y', String(yFt * state.scale));
   element.setAttribute('class', 'equipment-wall-label');
   element.setAttribute('text-anchor', anchor);
+  element.style.fontSize = `${labelFontSize('wall')}px`;
   element.textContent = text;
   canvas.appendChild(element);
 }
 
-function renderRoom() {
-  const roomRect = drawRect({ x: 0, y: 0, w: state.room.width, h: state.room.depth }, 'equipment-room-outer');
-  roomRect.setAttribute('rx', '4');
-  roomRect.setAttribute('ry', '4');
+// ── Room rendering ───────────────────────────────────────────────────────────
 
-  // Place each wall label in a distinct location so North and West don't overlap
+function wallLineSegments(wallId) {
+  const W = state.room.width;
+  const H = state.room.depth;
+  const wallLength = (wallId === 'north' || wallId === 'south') ? W : H;
+  const doors = state.room.doorways
+    .filter(d => d.wall === wallId)
+    .sort((a, b) => a.position - b.position);
+
+  const segments = [];
+  let cur = 0;
+  doors.forEach(d => {
+    const start = clamp(d.position, 0, wallLength);
+    const end   = clamp(d.position + d.width, 0, wallLength);
+    if (start > cur) segments.push([cur, start]);
+    cur = end;
+  });
+  if (cur < wallLength) segments.push([cur, wallLength]);
+  return segments;
+}
+
+function drawWallLine(x1ft, y1ft, x2ft, y2ft) {
+  const el = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+  const s = state.scale;
+  el.setAttribute('x1', String(x1ft * s));
+  el.setAttribute('y1', String(y1ft * s));
+  el.setAttribute('x2', String(x2ft * s));
+  el.setAttribute('y2', String(y2ft * s));
+  el.setAttribute('class', 'equipment-room-wall');
+  canvas.appendChild(el);
+}
+
+function renderDoorways() {
+  const s = state.scale;
+  const H = state.room.depth;
+  const W = state.room.width;
+
+  state.room.doorways.forEach(dw => {
+    const p = dw.position;
+    const w = dw.width;
+
+    let panelPath = '';
+    let swingPath = '';
+    let labelX = 0;
+    let labelY = 0;
+    let labelAnchor = 'middle';
+
+    switch (dw.wall) {
+      case 'north': {
+        // Hinge at (p, 0), panel goes into room to (p, w), arc from (p+w,0) to (p,w)
+        panelPath = `M ${p*s},0 L ${p*s},${w*s}`;
+        swingPath = `M ${(p+w)*s},0 A ${w*s},${w*s} 0 0,1 ${p*s},${w*s}`;
+        labelX = (p + w / 2) * s;
+        labelY = -6;
+        break;
+      }
+      case 'south': {
+        // Hinge at (p, H), panel goes into room to (p, H-w), arc from (p+w,H) to (p,H-w)
+        panelPath = `M ${p*s},${H*s} L ${p*s},${(H-w)*s}`;
+        swingPath = `M ${(p+w)*s},${H*s} A ${w*s},${w*s} 0 0,0 ${p*s},${(H-w)*s}`;
+        labelX = (p + w / 2) * s;
+        labelY = H * s + 14;
+        break;
+      }
+      case 'west': {
+        // Hinge at (0, p), panel into room to (w, p), arc from (0,p+w) to (w,p)
+        panelPath = `M 0,${p*s} L ${w*s},${p*s}`;
+        swingPath = `M 0,${(p+w)*s} A ${w*s},${w*s} 0 0,0 ${w*s},${p*s}`;
+        labelX = -6;
+        labelY = (p + w / 2) * s;
+        labelAnchor = 'end';
+        break;
+      }
+      case 'east': {
+        // Hinge at (W, p), panel into room to (W-w, p), arc from (W,p+w) to (W-w,p)
+        panelPath = `M ${W*s},${p*s} L ${(W-w)*s},${p*s}`;
+        swingPath = `M ${W*s},${(p+w)*s} A ${w*s},${w*s} 0 0,1 ${(W-w)*s},${p*s}`;
+        labelX = W * s + 6;
+        labelY = (p + w / 2) * s;
+        labelAnchor = 'start';
+        break;
+      }
+      default: return;
+    }
+
+    const panelEl = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    panelEl.setAttribute('d', panelPath);
+    panelEl.setAttribute('class', 'equipment-doorway-panel');
+    canvas.appendChild(panelEl);
+
+    const swingEl = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    swingEl.setAttribute('d', swingPath);
+    swingEl.setAttribute('class', 'equipment-doorway-swing');
+    canvas.appendChild(swingEl);
+
+    if (dw.isEgress) {
+      const labelEl = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      labelEl.setAttribute('x', String(labelX));
+      labelEl.setAttribute('y', String(labelY));
+      labelEl.setAttribute('class', 'equipment-doorway-label');
+      labelEl.setAttribute('text-anchor', labelAnchor);
+      labelEl.style.fontSize = `${labelFontSize('door')}px`;
+      labelEl.textContent = 'EGRESS';
+      canvas.appendChild(labelEl);
+    }
+  });
+}
+
+function renderRoom() {
+  // Room fill (no stroke — walls are drawn as separate lines with doorway gaps)
+  const fillEl = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+  fillEl.setAttribute('x', '0');
+  fillEl.setAttribute('y', '0');
+  fillEl.setAttribute('width', String(state.room.width * state.scale));
+  fillEl.setAttribute('height', String(state.room.depth * state.scale));
+  fillEl.setAttribute('rx', '4');
+  fillEl.setAttribute('ry', '4');
+  fillEl.setAttribute('class', 'equipment-room-fill');
+  canvas.appendChild(fillEl);
+
+  // Draw each wall as segments, leaving gaps at doorways
+  wallLineSegments('north').forEach(([a, b]) => drawWallLine(a, 0,              b, 0));
+  wallLineSegments('south').forEach(([a, b]) => drawWallLine(a, state.room.depth, b, state.room.depth));
+  wallLineSegments('west').forEach(([a, b])  => drawWallLine(0, a,              0, b));
+  wallLineSegments('east').forEach(([a, b])  => drawWallLine(state.room.width, a, state.room.width, b));
+
+  // Door symbols drawn on top of the fill
+  renderDoorways();
+
+  // Wall type labels
   drawWallLabel(`NORTH · ${state.room.walls.north}`, state.room.width / 2, 0.75, 'middle');
   drawWallLabel(`SOUTH · ${state.room.walls.south}`, state.room.width / 2, state.room.depth - 0.25, 'middle');
   drawWallLabel(`WEST · ${state.room.walls.west}`, 0.3, state.room.depth / 2, 'start');
@@ -260,7 +473,6 @@ function renderRoom() {
   });
 
   if (state.wallDraw.enabled && state.wallDraw.start && state.wallDraw.current) {
-    // Auto-detect orientation from drag direction: wider drag = horizontal, taller = vertical
     const dx = Math.abs(state.wallDraw.current.x - state.wallDraw.start.x);
     const dy = Math.abs(state.wallDraw.current.y - state.wallDraw.start.y);
     const orientation = dx > dy ? 'horizontal' : 'vertical';
@@ -315,8 +527,11 @@ function addInteriorWallFromDrag(start, end) {
     length = Math.min(length, Math.max(1, state.room.width - x));
   }
 
+  pushHistory();
   state.room.interiorWalls.push({ orientation, type, x, y, length });
 }
+
+// ── Equipment rendering ──────────────────────────────────────────────────────
 
 function renderEquipment() {
   state.equipment.forEach(eq => {
@@ -327,16 +542,26 @@ function renderEquipment() {
 
     const block = drawRect(eqRect, hasViolation ? 'equipment-block equipment-block-danger' : 'equipment-block');
     block.dataset.id = eq.id;
-    if (state.selectedEquipmentId === eq.id) {
+    if (state.selectedIds.has(eq.id)) {
       block.classList.add('selected');
     }
 
     const textX = eq.x + 0.2;
-    const textY = eq.y + 0.7;
-    drawText(`${eq.name} (${eq.voltage})`, textX, textY, 'equipment-block-label');
-    drawText(`${eq.width.toFixed(1)}×${eq.depth.toFixed(1)} ft · facing ${eq.facing}`, textX, textY + 0.6, 'equipment-block-meta');
+    const textY = eq.y + Math.min(0.7, eq.depth * 0.45);
+    drawText(`${eq.name} (${eq.voltage})`, textX, textY, 'equipment-block-label', 'block');
+    if (eq.depth >= 1.2) {
+      drawText(
+        `${eq.width.toFixed(1)}×${eq.depth.toFixed(1)} ft · ${eq.facing}`,
+        textX,
+        textY + Math.min(0.6, eq.depth * 0.35),
+        'equipment-block-meta',
+        'meta'
+      );
+    }
   });
 }
+
+// ── Gap indicators ───────────────────────────────────────────────────────────
 
 function drawGapIndicator(x1ft, y1ft, x2ft, y2ft, gapFt, orientation) {
   const x1 = x1ft * state.scale;
@@ -353,8 +578,7 @@ function drawGapIndicator(x1ft, y1ft, x2ft, y2ft, gapFt, orientation) {
   line.setAttribute('class', 'equipment-gap-line');
   canvas.appendChild(line);
 
-  const ends = orientation === 'horizontal' ? [[x1, y1], [x2, y2]] : [[x1, y1], [x2, y2]];
-  ends.forEach(([tx, ty]) => {
+  [[x1, y1], [x2, y2]].forEach(([tx, ty]) => {
     const tick = document.createElementNS('http://www.w3.org/2000/svg', 'line');
     if (orientation === 'horizontal') {
       tick.setAttribute('x1', String(tx)); tick.setAttribute('y1', String(ty - tickSize));
@@ -386,19 +610,19 @@ function drawGapIndicator(x1ft, y1ft, x2ft, y2ft, gapFt, orientation) {
   text.setAttribute('y', String(midY + 3));
   text.setAttribute('class', 'equipment-gap-label');
   text.setAttribute('text-anchor', 'middle');
+  text.style.fontSize = `${labelFontSize('meta')}px`;
   text.textContent = label;
   canvas.appendChild(text);
 }
 
 function renderGapIndicators() {
   if (!state.drag) return;
-  const dragging = state.equipment.find(e => e.id === state.drag.id);
+  const dragging = state.equipment.find(e => e.id === state.drag.primaryId);
   if (!dragging) return;
 
   state.equipment.forEach(other => {
     if (other.id === dragging.id) return;
 
-    // Horizontal gap: equipment with overlapping y-ranges
     const overlapY0 = Math.max(dragging.y, other.y);
     const overlapY1 = Math.min(dragging.y + dragging.depth, other.y + other.depth);
     if (overlapY1 > overlapY0) {
@@ -412,7 +636,6 @@ function renderGapIndicators() {
       }
     }
 
-    // Vertical gap: equipment with overlapping x-ranges
     const overlapX0 = Math.max(dragging.x, other.x);
     const overlapX1 = Math.min(dragging.x + dragging.width, other.x + other.width);
     if (overlapX1 > overlapX0) {
@@ -428,10 +651,12 @@ function renderGapIndicators() {
   });
 }
 
+// ── Context menu ─────────────────────────────────────────────────────────────
+
 function createContextMenu() {
   contextMenu = document.createElement('div');
   contextMenu.id = 'canvas-context-menu';
-  contextMenu.style.cssText = 'position:fixed;z-index:9999;background:var(--card-bg,#fff);border:1px solid var(--border-color,#7d8790);border-radius:6px;box-shadow:0 4px 14px rgba(0,0,0,.22);padding:4px 0;min-width:170px;display:none;';
+  contextMenu.style.cssText = 'position:fixed;z-index:9999;background:var(--card-bg,#fff);border:1px solid var(--border-color,#7d8790);border-radius:6px;box-shadow:0 4px 14px rgba(0,0,0,.22);padding:4px 0;min-width:190px;display:none;';
   document.body.appendChild(contextMenu);
   document.addEventListener('click', hideContextMenu);
   document.addEventListener('keydown', e => { if (e.key === 'Escape') hideContextMenu(); });
@@ -458,45 +683,76 @@ function addContextMenuSeparator() {
 }
 
 function showContextMenu(clientX, clientY, eq) {
-  if (!contextMenu || !eq) return;
+  if (!contextMenu) return;
   contextMenu.innerHTML = '';
 
-  addContextMenuItem('Copy', () => {
-    const id = `eq-${Date.now()}-${Math.round(Math.random() * 1000)}`;
-    const copy = { ...eq, id, x: clamp(eq.x + 1, 0, Math.max(0, state.room.width - eq.width)), y: clamp(eq.y + 1, 0, Math.max(0, state.room.depth - eq.depth)) };
-    delete copy.listTag;
-    state.equipment.push(copy);
-    state.selectedEquipmentId = id;
+  // Determine the target set: all selected if right-clicking a selected item, else just this item
+  const selectedList = state.equipment.filter(e => state.selectedIds.has(e.id));
+  const targets = (eq && state.selectedIds.has(eq.id) && selectedList.length > 0)
+    ? selectedList
+    : (eq ? [eq] : []);
+
+  if (!targets.length) return;
+  const isMulti = targets.length > 1;
+
+  const apply = action => {
+    pushHistory();
+    targets.forEach(action);
+    targets.forEach(t => { if (t.listTag) syncEquipmentPosition(t); });
     render();
-  });
-  addContextMenuItem('Delete', () => {
-    state.equipment = state.equipment.filter(e => e.id !== eq.id);
-    if (state.selectedEquipmentId === eq.id) state.selectedEquipmentId = null;
+  };
+
+  if (!isMulti) {
+    addContextMenuItem('Copy', () => {
+      pushHistory();
+      const id = `eq-${Date.now()}-${Math.round(Math.random() * 1000)}`;
+      const copy = { ...eq, id, x: clamp(eq.x + 1, 0, Math.max(0, state.room.width - eq.width)), y: clamp(eq.y + 1, 0, Math.max(0, state.room.depth - eq.depth)) };
+      delete copy.listTag;
+      state.equipment.push(copy);
+      state.selectedIds.clear();
+      state.selectedIds.add(id);
+      render();
+    });
+  }
+
+  addContextMenuItem(`Delete${isMulti ? ` (${targets.length})` : ''}`, () => {
+    pushHistory();
+    const ids = new Set(targets.map(t => t.id));
+    state.equipment = state.equipment.filter(e => !ids.has(e.id));
+    ids.forEach(id => state.selectedIds.delete(id));
     render();
   }, true);
 
   addContextMenuSeparator();
-  addContextMenuItem('Align to North Wall', () => { eq.y = 0; if (eq.listTag) syncEquipmentPosition(eq); render(); });
-  addContextMenuItem('Align to South Wall', () => { eq.y = Math.max(0, state.room.depth - eq.depth); if (eq.listTag) syncEquipmentPosition(eq); render(); });
-  addContextMenuItem('Align to West Wall', () => { eq.x = 0; if (eq.listTag) syncEquipmentPosition(eq); render(); });
-  addContextMenuItem('Align to East Wall', () => { eq.x = Math.max(0, state.room.width - eq.width); if (eq.listTag) syncEquipmentPosition(eq); render(); });
-  addContextMenuItem('Center Horizontally', () => { eq.x = Math.max(0, (state.room.width - eq.width) / 2); if (eq.listTag) syncEquipmentPosition(eq); render(); });
-  addContextMenuItem('Center Vertically', () => { eq.y = Math.max(0, (state.room.depth - eq.depth) / 2); if (eq.listTag) syncEquipmentPosition(eq); render(); });
+  addContextMenuItem('Align to North Wall',  () => apply(e => { e.y = 0; }));
+  addContextMenuItem('Align to South Wall',  () => apply(e => { e.y = Math.max(0, state.room.depth - e.depth); }));
+  addContextMenuItem('Align to West Wall',   () => apply(e => { e.x = 0; }));
+  addContextMenuItem('Align to East Wall',   () => apply(e => { e.x = Math.max(0, state.room.width - e.width); }));
+  addContextMenuItem('Center Horizontally',  () => apply(e => { e.x = Math.max(0, (state.room.width - e.width) / 2); }));
+  addContextMenuItem('Center Vertically',    () => apply(e => { e.y = Math.max(0, (state.room.depth - e.depth) / 2); }));
+
+  if (isMulti) {
+    addContextMenuSeparator();
+    addContextMenuItem('Align Top Edges',    () => { const minY = Math.min(...targets.map(t => t.y));                      apply(e => { e.y = minY; }); });
+    addContextMenuItem('Align Bottom Edges', () => { const maxB = Math.max(...targets.map(t => t.y + t.depth));            apply(e => { e.y = maxB - e.depth; }); });
+    addContextMenuItem('Align Left Edges',   () => { const minX = Math.min(...targets.map(t => t.x));                      apply(e => { e.x = minX; }); });
+    addContextMenuItem('Align Right Edges',  () => { const maxR = Math.max(...targets.map(t => t.x + t.width));            apply(e => { e.x = maxR - e.width; }); });
+  }
 
   addContextMenuSeparator();
-  addContextMenuItem('Snap to Grid (0.5 ft)', () => {
-    eq.x = snapToStep(eq.x, 0.5);
-    eq.y = snapToStep(eq.y, 0.5);
-    if (eq.listTag) syncEquipmentPosition(eq);
-    render();
-  });
+  addContextMenuItem('Snap to Grid (0.5 ft)', () => apply(e => {
+    e.x = snapToStep(e.x, 0.5);
+    e.y = snapToStep(e.y, 0.5);
+  }));
 
   contextMenu.style.display = 'block';
-  const menuW = contextMenu.offsetWidth || 170;
+  const menuW = contextMenu.offsetWidth || 190;
   const menuH = contextMenu.scrollHeight;
   contextMenu.style.left = `${Math.min(clientX, window.innerWidth - menuW - 8)}px`;
   contextMenu.style.top = `${Math.min(clientY, window.innerHeight - menuH - 8)}px`;
 }
+
+// ── Summary / render ─────────────────────────────────────────────────────────
 
 function updateSummary() {
   const total = state.equipment.length;
@@ -512,6 +768,7 @@ function updateSummary() {
 function render() {
   evaluateViolations();
   renderInteriorWallList();
+  renderDoorwayList();
 
   canvas.innerHTML = '';
   const widthPx = state.room.width * state.scale;
@@ -533,6 +790,8 @@ function render() {
   if (zoomLabel) zoomLabel.textContent = `Scale: ${state.scale} px/ft`;
   updateSummary();
 }
+
+// ── State mutations ──────────────────────────────────────────────────────────
 
 function addEquipment() {
   const source = document.getElementById('equipment-source').value;
@@ -566,13 +825,17 @@ function addEquipment() {
 
   const newEq = { id, name, width, depth, voltage, facing, x: startX, y: startY };
   if (listTag) newEq.listTag = listTag;
+
+  pushHistory();
   state.equipment.push(newEq);
-  state.selectedEquipmentId = id;
+  state.selectedIds.clear();
+  state.selectedIds.add(id);
   if (listTag) syncEquipmentPosition(newEq);
   render();
 }
 
 function applyRoomChanges() {
+  pushHistory();
   state.room.width = clamp(parseNumber(document.getElementById('room-width').value, 30), 8, 200);
   state.room.depth = clamp(parseNumber(document.getElementById('room-depth').value, 20), 8, 200);
   ['north', 'south', 'east', 'west'].forEach(direction => {
@@ -598,7 +861,21 @@ function addInteriorWall() {
     ? Math.min(length, state.room.depth - y)
     : Math.min(length, state.room.width - x);
 
+  pushHistory();
   state.room.interiorWalls.push({ orientation, type, x, y, length: Math.max(1, adjustedLength) });
+  render();
+}
+
+function addDoorway() {
+  const wall = document.getElementById('doorway-wall').value;
+  const maxPos = (wall === 'east' || wall === 'west') ? state.room.depth : state.room.width;
+  const position = clamp(parseNumber(document.getElementById('doorway-position').value, 5), 0, maxPos - 1);
+  const width = clamp(parseNumber(document.getElementById('doorway-width').value, 3), 1, Math.min(20, maxPos - position));
+  const isEgress = document.getElementById('doorway-egress').checked;
+
+  pushHistory();
+  const id = `dw-${Date.now()}-${Math.round(Math.random() * 1000)}`;
+  state.room.doorways.push({ id, wall, position, width, isEgress });
   render();
 }
 
@@ -632,13 +909,16 @@ function toFeetCoordinates(event) {
   return { xFt, yFt };
 }
 
+// ── Canvas interactions ───────────────────────────────────────────────────────
+
 function bindCanvasInteractions() {
   canvas.addEventListener('contextmenu', event => {
     event.preventDefault();
     const { xFt, yFt } = toFeetCoordinates(event);
     const picked = pickEquipmentAtPoint(xFt, yFt);
-    if (picked) {
-      state.selectedEquipmentId = picked.id;
+    if (picked && !state.selectedIds.has(picked.id)) {
+      state.selectedIds.clear();
+      state.selectedIds.add(picked.id);
       render();
     }
     showContextMenu(event.clientX, event.clientY, picked);
@@ -647,22 +927,46 @@ function bindCanvasInteractions() {
   canvas.addEventListener('pointerdown', event => {
     const { xFt, yFt } = toFeetCoordinates(event);
     if (state.wallDraw.enabled) {
-      state.selectedEquipmentId = null;
+      state.selectedIds.clear();
       state.wallDraw.start = { x: clamp(xFt, 0, state.room.width), y: clamp(yFt, 0, state.room.depth) };
       state.wallDraw.current = { ...state.wallDraw.start };
       canvas.setPointerCapture(event.pointerId);
       render();
       return;
     }
+
     const picked = pickEquipmentAtPoint(xFt, yFt);
-    state.selectedEquipmentId = picked ? picked.id : null;
+
+    if (event.shiftKey) {
+      // Shift+click toggles the item in/out of the selection
+      if (picked) {
+        if (state.selectedIds.has(picked.id)) {
+          state.selectedIds.delete(picked.id);
+        } else {
+          state.selectedIds.add(picked.id);
+        }
+      }
+      render();
+      return; // Shift+click never starts a drag
+    }
+
     if (picked) {
+      if (!state.selectedIds.has(picked.id)) {
+        // Clicking a new item without shift: replace selection
+        state.selectedIds.clear();
+        state.selectedIds.add(picked.id);
+      }
+      // Start drag for all currently selected items
+      pushHistory();
       state.drag = {
-        id: picked.id,
-        offsetX: xFt - picked.x,
-        offsetY: yFt - picked.y
+        primaryId: picked.id,
+        primaryOffsetX: xFt - picked.x,
+        primaryOffsetY: yFt - picked.y
       };
       canvas.setPointerCapture(event.pointerId);
+    } else {
+      // Click on empty canvas: clear selection
+      state.selectedIds.clear();
     }
     render();
   });
@@ -676,10 +980,22 @@ function bindCanvasInteractions() {
     }
     if (!state.drag) return;
     const { xFt, yFt } = toFeetCoordinates(event);
-    const eq = state.equipment.find(item => item.id === state.drag.id);
-    if (!eq) return;
-    eq.x = clamp(xFt - state.drag.offsetX, 0, Math.max(0, state.room.width - eq.width));
-    eq.y = clamp(yFt - state.drag.offsetY, 0, Math.max(0, state.room.depth - eq.depth));
+    const primary = state.equipment.find(item => item.id === state.drag.primaryId);
+    if (!primary) return;
+
+    const newX = clamp(xFt - state.drag.primaryOffsetX, 0, Math.max(0, state.room.width - primary.width));
+    const newY = clamp(yFt - state.drag.primaryOffsetY, 0, Math.max(0, state.room.depth - primary.depth));
+    const dx = newX - primary.x;
+    const dy = newY - primary.y;
+
+    // Move all selected items by the same delta
+    state.selectedIds.forEach(id => {
+      const eq = state.equipment.find(item => item.id === id);
+      if (!eq) return;
+      eq.x = clamp(eq.x + dx, 0, Math.max(0, state.room.width - eq.width));
+      eq.y = clamp(eq.y + dy, 0, Math.max(0, state.room.depth - eq.depth));
+    });
+
     render();
   });
 
@@ -692,8 +1008,9 @@ function bindCanvasInteractions() {
       return;
     }
     if (state.drag) {
-      const eq = state.equipment.find(item => item.id === state.drag.id);
-      if (eq && eq.listTag) syncEquipmentPosition(eq);
+      state.equipment
+        .filter(eq => state.selectedIds.has(eq.id) && eq.listTag)
+        .forEach(eq => syncEquipmentPosition(eq));
     }
     state.drag = null;
   };
@@ -701,10 +1018,14 @@ function bindCanvasInteractions() {
   canvas.addEventListener('pointercancel', release);
 }
 
+// ── UI bindings ───────────────────────────────────────────────────────────────
+
 function bindUI() {
   document.getElementById('apply-room').addEventListener('click', applyRoomChanges);
   document.getElementById('add-equipment').addEventListener('click', addEquipment);
   document.getElementById('add-interior-wall').addEventListener('click', addInteriorWall);
+  document.getElementById('add-doorway').addEventListener('click', addDoorway);
+
   document.getElementById('draw-wall-mode').addEventListener('click', event => {
     state.wallDraw.enabled = !state.wallDraw.enabled;
     state.wallDraw.start = null;
@@ -724,10 +1045,13 @@ function bindUI() {
     render();
   });
 
+  document.getElementById('undo-action').addEventListener('click', undoLastAction);
+
   document.getElementById('delete-selected-equipment').addEventListener('click', () => {
-    if (!state.selectedEquipmentId) return;
-    state.equipment = state.equipment.filter(eq => eq.id !== state.selectedEquipmentId);
-    state.selectedEquipmentId = null;
+    if (!state.selectedIds.size) return;
+    pushHistory();
+    state.equipment = state.equipment.filter(eq => !state.selectedIds.has(eq.id));
+    state.selectedIds.clear();
     render();
   });
 
@@ -748,6 +1072,14 @@ function bindUI() {
       const select = document.getElementById('equipment-voltage');
       const matching = Array.from(select.options).find(opt => opt.value.toUpperCase() === voltage);
       if (matching) select.value = matching.value;
+    }
+  });
+
+  // Ctrl/Cmd+Z for undo
+  document.addEventListener('keydown', event => {
+    if ((event.ctrlKey || event.metaKey) && event.key === 'z') {
+      event.preventDefault();
+      undoLastAction();
     }
   });
 }
