@@ -365,11 +365,13 @@ function addEquipment() {
   const facing = document.getElementById('equipment-facing').value;
 
   let name = 'Equipment';
+  let listTag = null;
   if (source === 'equipment-list') {
     const index = Number.parseInt(presetSelect.value, 10);
     const item = dataStore.getEquipment()[index];
     if (!item) return;
     name = item.tag || item.description || `Equipment-${state.equipment.length + 1}`;
+    listTag = item.tag || null;
   } else {
     name = customName || `Custom-${state.equipment.length + 1}`;
   }
@@ -378,8 +380,11 @@ function addEquipment() {
   const startX = clamp(1 + state.equipment.length * 0.8, 0, Math.max(0, state.room.width - width));
   const startY = clamp(1 + state.equipment.length * 0.6, 0, Math.max(0, state.room.depth - depth));
 
-  state.equipment.push({ id, name, width, depth, voltage, facing, x: startX, y: startY });
+  const newEq = { id, name, width, depth, voltage, facing, x: startX, y: startY };
+  if (listTag) newEq.listTag = listTag;
+  state.equipment.push(newEq);
   state.selectedEquipmentId = id;
+  if (listTag) syncEquipmentPosition(newEq);
   render();
 }
 
@@ -411,6 +416,16 @@ function addInteriorWall() {
 
   state.room.interiorWalls.push({ orientation, type, x, y, length: Math.max(1, adjustedLength) });
   render();
+}
+
+function syncEquipmentPosition(eq) {
+  const list = dataStore.getEquipment();
+  const idx = list.findIndex(item => item.tag === eq.listTag);
+  if (idx === -1) return;
+  dataStore.updateEquipment(idx, {
+    x: String(Math.round(eq.x * 100) / 100),
+    y: String(Math.round(eq.y * 100) / 100)
+  });
 }
 
 function pickEquipmentAtPoint(xFt, yFt) {
@@ -479,6 +494,10 @@ function bindCanvasInteractions() {
       state.wallDraw.current = null;
       render();
       return;
+    }
+    if (state.drag) {
+      const eq = state.equipment.find(item => item.id === state.drag.id);
+      if (eq && eq.listTag) syncEquipmentPosition(eq);
     }
     state.drag = null;
   };
