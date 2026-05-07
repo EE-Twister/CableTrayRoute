@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Signing in… — CableTrayRoute</title>
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <meta name="robots" content="noindex">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="auth-page">
+  <main id="main-content" class="auth-main" aria-live="polite">
+    <section class="auth-card">
+      <p id="status-msg">Completing sign-in…</p>
+    </section>
+  </main>
+  <script type="module">
+    import { setAuthContextState } from './projectStorage.js';
+
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('token');
+    const csrfToken = params.get('csrfToken');
+    const expiresAt = Number(params.get('expiresAt'));
+    const user = params.get('user');
+    const role = params.get('role');
+
+    const statusMsg = document.getElementById('status-msg');
+
+    if (!token || !csrfToken || !Number.isFinite(expiresAt)) {
+      statusMsg.textContent = 'Sign-in failed: missing session parameters. Redirecting to login…';
+      setTimeout(() => { window.location.href = 'login.html?error=oidc_relay_invalid'; }, 2000);
+    } else {
+      setAuthContextState({ token, csrfToken, expiresAt, user });
+      if (role) {
+        localStorage.setItem('ctr-user-role', role);
+      }
+      // Clear sensitive params from browser history before navigating
+      history.replaceState(null, '', window.location.pathname);
+      window.location.href = 'index.html';
+    }
+  </script>
+</body>
+</html>

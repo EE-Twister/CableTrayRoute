@@ -6,6 +6,7 @@ import crypto from 'crypto';
 import { promisify } from 'util';
 import { attachCollaborationServer } from './src/collaborationServer.mjs';
 import { validateLibraryPayload } from './src/validation/librarySchema.mjs';
+import { appendAuditEntry, queryAuditLog } from './analysis/auditLog.mjs';
 
 const scrypt = promisify(crypto.scrypt);
 
@@ -789,6 +790,13 @@ export async function createApp(options = {}) {
   const sessionsFile = path.join(dataDir, 'sessions.json');
   const snapshotsFile = path.join(dataDir, 'snapshots.json');
   const librarySharesFile = path.join(dataDir, 'library-shares.json');
+  const auditLogFile = path.join(dataDir, 'auditLog.ndjson');
+
+  // In-memory store for OIDC authorization code flows (state → flow data).
+  // Entries expire after 10 minutes and are cleaned up on each new login.
+  const oidcStateStore = new Map();
+  const OIDC_STATE_TTL_MS = 10 * 60 * 1000;
+  let oidcDiscoveryCache = null;
 
   let users = {};
   try {
@@ -1043,8 +1051,12 @@ export async function createApp(options = {}) {
         await saveUsers();
       }
 
+      users[trimmedUser].lastLogin = new Date().toISOString();
+      await saveUsers();
+
       const session = await sessionStore.createSession(trimmedUser);
-      res.json(session);
+      appendAuditEntry(auditLogFile, { actor: trimmedUser, action: 'LOGIN', entityType: 'session' }).catch(() => {});
+      res.json({ ...session, role: getUserRole(trimmedUser) });
     })
   );
 
@@ -1098,6 +1110,33 @@ export async function createApp(options = {}) {
     }
     next();
   };
+
+  // RBAC — role hierarchy (higher number = more privilege).
+  const ROLE_LEVELS = { 'read-only': 0, reviewer: 1, engineer: 2, admin: 3 };
+
+  function getUserRole(username) {
+    const record = users[username];
+    const raw = record?.role;
+    return ROLE_LEVELS[raw] !== undefined ? raw : 'engineer';
+  }
+
+  // Middleware factory: require at least minRole.
+  // Must be used after the `auth` middleware so req.username is populated.
+  function requireRole(minRole) {
+    return (req, res, next) => {
+      const userLevel = ROLE_LEVELS[getUserRole(req.username)] ?? ROLE_LEVELS.engineer;
+      const requiredLevel = ROLE_LEVELS[minRole] ?? 0;
+      if (userLevel < requiredLevel) {
+        res.status(403).json({ error: 'Insufficient permissions' });
+        return;
+      }
+      req.userRole = getUserRole(req.username);
+      next();
+    };
+  }
+
+  // Middleware: block write operations for read-only and reviewer roles.
+  const requireEngineer = requireRole('engineer');
 
 
   app.post(
@@ -1250,6 +1289,12 @@ export async function createApp(options = {}) {
 
   app.use('/projects', auth, csrfProtection);
 
+  // Write operations on projects require at least engineer role.
+  app.post('/projects/:project', requireEngineer);
+  app.delete('/projects/:project', requireEngineer);
+  app.post('/projects/:project/snapshots', requireEngineer);
+  app.delete('/projects/:project/snapshots/:snapshotId', requireEngineer);
+
   app.post(
     '/projects/:project',
     asyncHandler(async (req, res) => {
@@ -1270,6 +1315,16 @@ export async function createApp(options = {}) {
         appendServerTiming(res, 'project.write', saved.metrics.writeMs);
         appendServerTiming(res, 'project.total', persistMs);
 
+        if (!saved.metrics.skippedWrite) {
+          const action = saved.metrics.loadMs === 0 ? 'CREATE' : 'UPDATE';
+          appendAuditEntry(auditLogFile, {
+            actor: username,
+            action,
+            entityType: 'project',
+            entityId: project,
+            projectId: project,
+          }).catch(() => {});
+        }
         res.json({
           version: saved.version,
           unchanged: saved.metrics.skippedWrite
@@ -1673,6 +1728,255 @@ When answering queries:
       res.json({ revoked: true });
     })
   );
+
+  // -------------------------------------------------------------------------
+  // Admin API — requires admin role
+  // -------------------------------------------------------------------------
+
+  app.get(
+    '/api/v1/admin/users',
+    auth,
+    requireRole('admin'),
+    asyncHandler(async (req, res) => {
+      const list = Object.entries(users).map(([username, record]) => ({
+        username,
+        role: record.role ?? 'engineer',
+        email: record.email ?? null,
+        createdAt: record.createdAt ?? null,
+        lastLogin: record.lastLogin ?? null,
+        oidc: Boolean(record.oidcSub),
+      }));
+      res.json({ users: list });
+    })
+  );
+
+  app.patch(
+    '/api/v1/admin/users/:username/role',
+    auth,
+    csrfProtection,
+    requireRole('admin'),
+    asyncHandler(async (req, res) => {
+      const VALID_ROLES = ['read-only', 'reviewer', 'engineer', 'admin'];
+      const { role } = req.body || {};
+      if (!VALID_ROLES.includes(role)) {
+        res.status(400).json({ error: 'Invalid role. Must be one of: ' + VALID_ROLES.join(', ') });
+        return;
+      }
+      const target = req.params.username;
+      if (!users[target]) {
+        res.status(404).json({ error: 'User not found' });
+        return;
+      }
+      const prevRole = users[target].role ?? 'engineer';
+      users[target].role = role;
+      await saveUsers();
+      appendAuditEntry(auditLogFile, {
+        actor: req.username,
+        action: 'ROLE_CHANGE',
+        entityType: 'user',
+        entityId: target,
+        diff: [{ op: 'replace', path: '/role', from: prevRole, value: role }],
+      }).catch(() => {});
+      res.json({ username: target, role });
+    })
+  );
+
+  app.get(
+    '/api/v1/admin/audit-log',
+    auth,
+    requireRole('admin'),
+    asyncHandler(async (req, res) => {
+      const { actor, action, entityType, after, before, limit } = req.query;
+      const parsedLimit = Math.min(Number(limit) || 200, 500);
+      const entries = await queryAuditLog(auditLogFile, {
+        actor: actor || undefined,
+        action: action || undefined,
+        entityType: entityType || undefined,
+        after: after ? Number(after) : undefined,
+        before: before ? Number(before) : undefined,
+        limit: parsedLimit,
+      });
+      res.json({ entries, total: entries.length });
+    })
+  );
+
+  // -------------------------------------------------------------------------
+  // OIDC — authorization code flow with PKCE
+  // -------------------------------------------------------------------------
+
+  function base64urlEncode(buf) {
+    return buf.toString('base64').replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+  }
+
+  async function getOidcDiscovery(issuer) {
+    if (oidcDiscoveryCache) return oidcDiscoveryCache;
+    const resp = await fetch(`${issuer}/.well-known/openid-configuration`);
+    if (!resp.ok) throw new Error(`OIDC discovery failed: ${resp.status}`);
+    oidcDiscoveryCache = await resp.json();
+    return oidcDiscoveryCache;
+  }
+
+  const authRateLimiterOidc = createRateLimiter({ windowMs: rateLimitWindowMs, max: 20 });
+  app.use('/auth/oidc', authRateLimiterOidc);
+
+  app.get(
+    '/auth/oidc/login',
+    asyncHandler(async (req, res) => {
+      const issuer = process.env.OIDC_ISSUER;
+      const clientId = process.env.OIDC_CLIENT_ID;
+      if (!issuer || !clientId) {
+        res.status(503).json({ error: 'OIDC not configured on this server' });
+        return;
+      }
+
+      const discovery = await getOidcDiscovery(issuer);
+      const state = base64urlEncode(crypto.randomBytes(32));
+      const codeVerifier = base64urlEncode(crypto.randomBytes(32));
+      const codeChallengeHash = crypto.createHash('sha256').update(codeVerifier).digest();
+      const codeChallenge = base64urlEncode(codeChallengeHash);
+
+      // Evict stale state entries
+      for (const [k, v] of oidcStateStore) {
+        if (Date.now() - v.createdAt > OIDC_STATE_TTL_MS) oidcStateStore.delete(k);
+      }
+      oidcStateStore.set(state, { codeVerifier, createdAt: Date.now() });
+
+      const redirectUri = process.env.OIDC_REDIRECT_URI ||
+        `${req.secure || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http'}://${req.get('host')}/auth/oidc/callback`;
+
+      const params = new URLSearchParams({
+        response_type: 'code',
+        client_id: clientId,
+        redirect_uri: redirectUri,
+        scope: 'openid email profile',
+        state,
+        code_challenge: codeChallenge,
+        code_challenge_method: 'S256',
+      });
+      res.redirect(`${discovery.authorization_endpoint}?${params}`);
+    })
+  );
+
+  app.get(
+    '/auth/oidc/callback',
+    asyncHandler(async (req, res) => {
+      const { code, state, error } = req.query;
+      if (error || !code || !state) {
+        res.redirect('/login.html?error=oidc_denied');
+        return;
+      }
+      const flow = oidcStateStore.get(String(state));
+      if (!flow || Date.now() - flow.createdAt > OIDC_STATE_TTL_MS) {
+        oidcStateStore.delete(String(state));
+        res.redirect('/login.html?error=oidc_state_invalid');
+        return;
+      }
+      oidcStateStore.delete(String(state));
+
+      const issuer = process.env.OIDC_ISSUER;
+      const clientId = process.env.OIDC_CLIENT_ID;
+      const clientSecret = process.env.OIDC_CLIENT_SECRET || '';
+      const redirectUri = process.env.OIDC_REDIRECT_URI ||
+        `${req.secure || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http'}://${req.get('host')}/auth/oidc/callback`;
+
+      let discovery;
+      try {
+        discovery = await getOidcDiscovery(issuer);
+      } catch {
+        res.redirect('/login.html?error=oidc_discovery_failed');
+        return;
+      }
+
+      // Exchange authorization code for tokens
+      let tokens;
+      try {
+        const tokenResp = await fetch(discovery.token_endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({
+            grant_type: 'authorization_code',
+            code: String(code),
+            redirect_uri: redirectUri,
+            client_id: clientId,
+            client_secret: clientSecret,
+            code_verifier: flow.codeVerifier,
+          }),
+        });
+        if (!tokenResp.ok) throw new Error(`token exchange ${tokenResp.status}`);
+        tokens = await tokenResp.json();
+      } catch {
+        res.redirect('/login.html?error=oidc_token_failed');
+        return;
+      }
+
+      // Fetch identity from userinfo endpoint
+      let userInfo;
+      try {
+        const uiResp = await fetch(discovery.userinfo_endpoint, {
+          headers: { Authorization: `Bearer ${tokens.access_token}` },
+        });
+        if (!uiResp.ok) throw new Error(`userinfo ${uiResp.status}`);
+        userInfo = await uiResp.json();
+      } catch {
+        res.redirect('/login.html?error=oidc_userinfo_failed');
+        return;
+      }
+
+      const sub = String(userInfo.sub);
+      const email = typeof userInfo.email === 'string' ? userInfo.email : sub;
+
+      // JIT provisioning: find existing user by OIDC subject, or create one.
+      let username = null;
+      for (const [uname, record] of Object.entries(users)) {
+        if (record.oidcSub === sub) { username = uname; break; }
+      }
+      if (!username) {
+        const base = (email.split('@')[0] || sub)
+          .replace(/[^a-zA-Z0-9_-]/g, '_')
+          .replace(/_{2,}/g, '_')
+          .slice(0, 80) || 'oidcuser';
+        username = base;
+        let suffix = 2;
+        while (users[username]) { username = `${base}_${suffix++}`; }
+        users[username] = {
+          oidcSub: sub,
+          email,
+          role: 'reviewer',
+          createdAt: new Date().toISOString(),
+          lastLogin: new Date().toISOString(),
+        };
+      } else {
+        users[username].lastLogin = new Date().toISOString();
+      }
+      await saveUsers();
+
+      const session = await sessionStore.createSession(username);
+      appendAuditEntry(auditLogFile, { actor: username, action: 'LOGIN', entityType: 'session' }).catch(() => {});
+
+      // Relay token to the browser via a minimal HTML page that saves to localStorage.
+      const relayParams = new URLSearchParams({
+        token: session.token,
+        csrfToken: session.csrfToken,
+        expiresAt: String(session.expiresAt),
+        user: username,
+        role: getUserRole(username),
+      });
+      res.redirect(`/oidc-relay.html?${relayParams}`);
+    })
+  );
+
+  app.post(
+    '/auth/oidc/logout',
+    auth,
+    csrfProtection,
+    asyncHandler(async (req, res) => {
+      appendAuditEntry(auditLogFile, { actor: req.username, action: 'LOGOUT', entityType: 'session' }).catch(() => {});
+      await sessionStore.revokeUserSessions(req.username);
+      res.json({ loggedOut: true });
+    })
+  );
+
+  // -------------------------------------------------------------------------
 
   app.use((err, req, res, next) => {
     console.error(err);

@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Admin panel for CableTrayRoute: manage user roles, view the audit log, and configure enterprise settings." />
+  <title>Admin — CableTrayRoute</title>
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/favicon.svg">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Admin — CableTrayRoute">
+  <meta property="og:description" content="Manage user roles and audit trail for CableTrayRoute.">
+  <meta property="og:image" content="https://cabletrayroute.com/icons/og-preview.png">
+  <meta property="og:site_name" content="CableTrayRoute">
+  <meta property="og:url" content="admin.html">
+  <link rel="canonical" href="admin.html">
+  <meta name="color-scheme" content="light dark">
+  <link rel="stylesheet" href="style.css" />
+  <script type="module" src="dist/admin.js" defer></script>
+</head>
+<body class="admin-page" data-report-title="Admin">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <nav class="top-nav" aria-label="Primary">
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
+      <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+    <div id="nav-links" class="nav-links" role="list">
+      <!-- Populated dynamically by navigation.js -->
+    </div>
+    <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+  </nav>
+
+  <div id="settings-menu" class="settings-menu">
+    <label for="theme-select">Theme
+      <select id="theme-select">
+        <option value="system">System</option>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+        <option value="high-contrast">High Contrast</option>
+      </select>
+    </label>
+  </div>
+
+  <div class="container">
+    <main id="main-content" class="main-content">
+      <nav aria-label="Breadcrumb">
+        <ol class="breadcrumb-trail">
+          <li><a href="index.html">Home</a></li>
+          <li aria-current="page">Admin</li>
+        </ol>
+      </nav>
+
+      <header class="page-header">
+        <h1>Admin</h1>
+        <p class="page-subtitle">Manage users, roles, and audit trail. Visible to <strong>admin</strong> role only.</p>
+      </header>
+
+      <!-- Access guard: shown while checking role, hidden once confirmed -->
+      <div id="admin-access-check" class="study-card" aria-live="polite">
+        <p>Verifying access…</p>
+      </div>
+
+      <div id="admin-content" class="hidden">
+
+        <!-- ── Users ── -->
+        <section class="study-card" aria-labelledby="users-heading">
+          <h2 id="users-heading">Users</h2>
+          <p class="section-description">Assign roles to control access. Changes take effect on the user's next login.</p>
+
+          <div class="table-toolbar">
+            <button id="refresh-users-btn" class="btn" type="button">Refresh</button>
+          </div>
+
+          <div class="table-scroll-wrapper" role="region" aria-label="Users table" tabindex="0">
+            <table id="users-table" class="data-table">
+              <caption class="sr-only">User accounts and roles</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Username</th>
+                  <th scope="col">Email</th>
+                  <th scope="col">Role</th>
+                  <th scope="col">Auth</th>
+                  <th scope="col">Created</th>
+                  <th scope="col">Last Login</th>
+                  <th scope="col">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="users-tbody">
+                <tr><td colspan="7" class="table-empty">Loading…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- ── Audit Log ── -->
+        <section class="study-card" aria-labelledby="audit-heading">
+          <h2 id="audit-heading">Audit Log</h2>
+          <p class="section-description">Tamper-evident log of all CRUD operations, logins, and role changes.</p>
+
+          <div class="audit-filters" role="search" aria-label="Audit log filters">
+            <label>
+              Actor
+              <input id="filter-actor" type="text" placeholder="Username" class="input-sm" />
+            </label>
+            <label>
+              Action
+              <select id="filter-action" class="input-sm">
+                <option value="">All</option>
+                <option>CREATE</option>
+                <option>UPDATE</option>
+                <option>DELETE</option>
+                <option>READ_SENSITIVE</option>
+                <option>LOGIN</option>
+                <option>LOGOUT</option>
+                <option>ROLE_CHANGE</option>
+              </select>
+            </label>
+            <label>
+              Entity type
+              <input id="filter-entity-type" type="text" placeholder="project / session / user" class="input-sm" />
+            </label>
+            <label>
+              Limit
+              <input id="filter-limit" type="number" value="100" min="1" max="500" class="input-sm" style="width:5rem" />
+            </label>
+            <button id="load-audit-btn" class="btn primary-btn" type="button">Load</button>
+            <button id="export-audit-btn" class="btn" type="button">Export CSV</button>
+          </div>
+
+          <div class="table-scroll-wrapper" role="region" aria-label="Audit log table" tabindex="0">
+            <table id="audit-table" class="data-table">
+              <caption class="sr-only">Audit log entries</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Timestamp</th>
+                  <th scope="col">Actor</th>
+                  <th scope="col">Action</th>
+                  <th scope="col">Entity Type</th>
+                  <th scope="col">Entity ID</th>
+                  <th scope="col">Project</th>
+                  <th scope="col">Hash</th>
+                </tr>
+              </thead>
+              <tbody id="audit-tbody">
+                <tr><td colspan="7" class="table-empty">Click "Load" to fetch entries.</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p id="audit-count" class="table-meta" aria-live="polite"></p>
+        </section>
+
+      </div><!-- #admin-content -->
+    </main>
+  </div>
+
+  <div id="modal-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal-box">
+      <h2 id="modal-title" class="modal-title"></h2>
+      <p id="modal-body" class="modal-body"></p>
+      <div class="modal-actions">
+        <button id="modal-confirm" class="btn primary-btn">Confirm</button>
+        <button id="modal-cancel" class="btn">Cancel</button>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
