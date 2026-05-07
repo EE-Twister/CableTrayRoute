@@ -72,6 +72,7 @@ const NAV_ROUTES = [
   { href: 'voltagedropstudy.html', label: 'Voltage Drop', section: 'Studies', group: 'Cable', icon: 'icons/cable.svg' },
   { href: 'custom-components.html', label: 'Custom Components', section: 'Library', icon: 'icons/components/TextBox.svg' },
   { href: 'library.html', label: 'Library Manager', section: 'Library', icon: 'icons/toolbar/grid.svg' },
+  { href: 'trustcenter.html', label: 'Trust Center', section: 'Support', icon: 'icons/toolbar/validate.svg' },
   { href: 'fieldview.html', label: 'Field View', section: 'Support', icon: 'icons/toolbar/copy.svg' },
   { href: 'samplegallery.html', label: 'Sample Gallery', section: 'Support', icon: 'icons/toolbar/copy.svg' },
   { href: 'validation.html', label: 'Validation & Standards', section: 'Support', icon: 'icons/toolbar/validate.svg' },

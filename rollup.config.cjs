@@ -83,6 +83,7 @@ const entries = {
   admin: 'src/admin.js',
   insulationcoordination: 'src/insulationcoordination.js',
   lighting: 'src/lighting.js',
+  trustcenter: 'src/trustcenter.js',
 };
 
 /**

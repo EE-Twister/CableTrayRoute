@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Trust Center — verify CableTrayRoute calculation engines against published industry benchmarks. Side-by-side comparison of actual vs. expected results with standard references." />
+  <title>Trust Center — CableTrayRoute</title>
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/favicon.svg">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Trust Center — CableTrayRoute">
+  <meta property="og:description" content="Verify calculation engines against published IEEE, IEC, NEC, and NFPA benchmarks.">
+  <meta property="og:image" content="https://cabletrayroute.com/icons/og-preview.png">
+  <meta property="og:site_name" content="CableTrayRoute">
+  <meta property="og:url" content="trustcenter.html">
+  <link rel="canonical" href="trustcenter.html">
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+  <meta name="color-scheme" content="light dark">
+  <link rel="stylesheet" href="style.css" />
+  <script type="module" src="dirtyTracker.js"></script>
+  <script type="module" src="dist/trustcenter.js" defer></script>
+</head>
+<body class="trustcenter-page" data-report-title="Trust Center">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <nav class="top-nav" aria-label="Primary">
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
+      <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+    <div id="nav-links" class="nav-links" role="list">
+      <!-- Populated dynamically by navigation.js -->
+    </div>
+    <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+  </nav>
+
+  <div id="settings-menu" class="settings-menu">
+    <label for="theme-select">Theme
+      <select id="theme-select">
+        <option value="system">System</option>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+        <option value="high-contrast">High Contrast</option>
+      </select>
+    </label>
+    <label><input type="checkbox" id="compact-toggle" aria-label="Enable compact table mode"> Compact Mode</label>
+    <button id="help-btn" class="btn" aria-expanded="false" title="Show help">Site Help</button>
+    <button id="new-project-btn" class="btn" title="Start a new project">New Project</button>
+    <button id="save-project-btn" class="btn" title="Save current project">Save Project</button>
+    <button id="load-project-btn" class="btn" title="Load an existing project">Load Project</button>
+    <button id="export-project-btn" class="btn" title="Export project data">Export Project</button>
+    <button id="import-project-btn" class="btn" title="Import project data">Import Project</button>
+    <input type="file" id="import-project-input" accept=".ctr.json" class="hidden" title="Select project file">
+  </div>
+
+  <div class="container">
+    <main id="main-content" class="main-content">
+      <nav aria-label="Breadcrumb">
+        <ol class="breadcrumb-trail">
+          <li><a href="index.html">Home</a></li>
+          <li>Support</li>
+          <li aria-current="page">Trust Center</li>
+        </ol>
+      </nav>
+
+      <header class="page-header">
+        <h1>Trust Center</h1>
+        <p>Verify that CableTrayRoute calculation engines produce results that match published industry benchmarks derived from IEEE, IEC, NEC, and NFPA standards. Each benchmark is a canonical known-answer problem with analytically-derived expected values.</p>
+      </header>
+
+      <details class="method-panel">
+        <summary>About These Benchmarks</summary>
+        <p>Each benchmark specifies fixed inputs and an expected output derived analytically from a first-principles formula or a table in the governing standard — not from the code under test. A passing result means the engine matches the standard, not just that it is internally consistent.</p>
+        <p>Tolerances account for IEEE 754 floating-point rounding. Results outside tolerance indicate a potential regression in the calculation engine and should be investigated before relying on study outputs for design decisions.</p>
+        <p>Benchmarks currently cover: <strong>EMF Analysis</strong> (Biot-Savart law, ICNIRP 2010), <strong>Battery / UPS Sizing</strong> (IEEE 485-2010), and <strong>Voltage Drop</strong> (NEC 2023 Art. 210.19/215.2).</p>
+      </details>
+
+      <!-- Summary card -->
+      <section class="field-group" id="summary-section" aria-label="Benchmark summary" hidden>
+        <h2>Summary</h2>
+        <div id="summary-card" role="status" aria-live="polite"></div>
+      </section>
+
+      <!-- Run button -->
+      <div class="field-row-inline" style="margin: 1.25rem 0;">
+        <button id="run-benchmarks-btn" class="btn btn-primary" type="button">
+          Run All Benchmarks
+        </button>
+        <span id="run-status" aria-live="polite" style="font-size: 0.85rem; align-self: center;"></span>
+      </div>
+
+      <!-- Results table -->
+      <section id="results-section" aria-label="Benchmark results" hidden>
+        <table class="results-table" id="results-table" aria-label="Benchmark results table">
+          <thead>
+            <tr>
+              <th scope="col">ID</th>
+              <th scope="col">Study Type</th>
+              <th scope="col">Benchmark</th>
+              <th scope="col">Status</th>
+              <th scope="col">Details</th>
+            </tr>
+          </thead>
+          <tbody id="results-tbody"></tbody>
+        </table>
+      </section>
+
+      <!-- Per-benchmark detail panel (populated on row expand) -->
+      <section id="detail-section" aria-label="Benchmark detail" hidden>
+        <div id="detail-panel"></div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- Help modal -->
+  <div id="help-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="help-title" hidden>
+    <div class="modal-content">
+      <h2 id="help-title">Trust Center Help</h2>
+      <p>The Trust Center runs a suite of known-answer benchmarks against the calculation engines used in CableTrayRoute studies.</p>
+      <ul>
+        <li><strong>Run All Benchmarks</strong> — executes every benchmark and shows pass/fail status for each check.</li>
+        <li><strong>Details</strong> — click any row to expand the individual checks, showing expected vs. actual values and % deviation.</li>
+        <li><strong>Green ✓</strong> — the engine output matches the analytically-derived expected value within tolerance.</li>
+        <li><strong>Red ✗</strong> — the output deviates beyond the allowed tolerance. Check the engine for regressions.</li>
+      </ul>
+      <p>Benchmarks are re-run in-browser against the live code — no server request is made. Results are not stored and do not affect project data.</p>
+      <button id="close-help-btn" class="btn">Close</button>
+    </div>
+  </div>
+</body>
+</html>

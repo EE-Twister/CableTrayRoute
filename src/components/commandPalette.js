@@ -36,7 +36,8 @@ const ACTIONS = [
   { id: "workflow:panel", label: "Go to Panel Schedule", keywords: ["navigation", "panel", "branch"], href: "panelschedule.html" },
   { id: "calc:loadflow", label: "Run Load Flow", keywords: ["calculation", "study", "analysis"], trigger: () => clickById("run-loadflow-btn") },
   { id: "calc:shortcircuit", label: "Run Short Circuit", keywords: ["calculation", "study", "analysis", "fault"], trigger: () => clickById("run-shortcircuit-btn") },
-  { id: "calc:arcflash", label: "Run Arc Flash", keywords: ["calculation", "study", "analysis", "hazard"], trigger: () => clickById("run-arcflash-btn") }
+  { id: "calc:arcflash", label: "Run Arc Flash", keywords: ["calculation", "study", "analysis", "hazard"], trigger: () => clickById("run-arcflash-btn") },
+  { id: "support:trustcenter", label: "Go to Trust Center", keywords: ["trust", "benchmark", "validation", "verify", "standards", "confidence"], href: "trustcenter.html" }
 ];
 
 function clickById(id) {
