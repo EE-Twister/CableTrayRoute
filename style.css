@@ -48,6 +48,9 @@
 .swatch-clearance { background:rgba(255,213,110,.85); }
 .swatch-violation { background:rgba(218,50,50,.85); }
 .equipment-summary { margin-top:.4rem; font-size:.88rem; font-weight:600; }
+.equipment-gap-line { stroke:#f97316; stroke-width:1.5; stroke-dasharray:4 3; fill:none; pointer-events:none; }
+.equipment-gap-label { font-size:10px; fill:#f97316; font-weight:700; pointer-events:none; }
+.equipment-gap-label-bg { fill:rgba(255,255,255,.9); stroke:#f97316; stroke-width:1; pointer-events:none; }
 @media (max-width:1100px){ .equipment-arrangement-layout{grid-template-columns:1fr;} .equipment-arrangement-sidebar{max-height:none;} #equipment-arrangement-canvas{min-height:56vh;} }
 
 .cp-geometry-illustration {
