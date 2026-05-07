@@ -476,6 +476,7 @@ function categoryForType(t) {
   switch (t) {
     case 'bus':
       return 'bus';
+    case 'motor':
     case 'motor_load':
     case 'static_load':
       return 'load';
@@ -827,6 +828,49 @@ const builtinComponents = [
         kw: 117.789,
         kvar: 63.576
       }
+    }
+  },
+  {
+    subtype: 'motor',
+    label: 'Motor',
+    icon: asset('icons/components/Motor.svg'),
+    iconIEC: asset('icons/components/iec/IEC_Motor.svg'),
+    category: 'load',
+    type: 'motor',
+    defaultRotation: 0,
+    ports: [
+      { x: 40, y: 0 }
+    ],
+    props: {
+      tag: '',
+      description: '',
+      manufacturer: '',
+      model: '',
+      rated_hp: 100,
+      rated_kw: 74.6,
+      rated_voltage_kv: 0.48,
+      phases: 3,
+      synchronous_speed_rpm: 1800,
+      design_class: 'B',
+      code_letter: 'G',
+      locked_rotor_kva_per_hp: 5.6,
+      full_load_efficiency_pct: 95.0,
+      full_load_pf: 0.90,
+      service_factor: 1.15,
+      starter_type: 'dol',
+      vfd_current_limit_pu: 1.1,
+      initial_voltage_pu: 0.3,
+      ramp_time_s: 10,
+      wye_delta_switch_time_s: 5,
+      autotransformer_tap: 0.65,
+      lr_current_pu: 6.0,
+      thevenin_r: 0.02,
+      thevenin_x: 0.08,
+      inertia: 0.5,
+      load_torque_curve: '0:0 100:100',
+      commissioning_state: 'in_service',
+      service_status: 'normal',
+      notes: ''
     }
   },
   {
@@ -6822,7 +6866,7 @@ function render() {
       bg.setAttribute('height', h);
       bg.setAttribute('fill', vRange.color);
       bg.setAttribute('opacity', 0.3);
-      if (c.subtype === 'motor_load' || c.subtype === 'static_load') {
+      if (c.subtype === 'motor' || c.subtype === 'motor_load' || c.subtype === 'static_load') {
         const rotation = normalizeRotation(Number(c.rotation) || 0);
         const desired = 90;
         const offset = desired - rotation;
@@ -6951,7 +6995,7 @@ function render() {
         selectComponent(c);
       });
       g.appendChild(img);
-      if (c.subtype === 'motor_load') {
+      if (c.subtype === 'motor' || c.subtype === 'motor_load') {
         const letter = document.createElementNS(svgNS, 'text');
         letter.setAttribute('x', cx);
         letter.setAttribute('y', cy + 4);
@@ -8636,7 +8680,7 @@ function selectComponent(compOrId) {
 
     propertyHeading.textContent = `${getComponentListLabel(targetComp)} Properties`;
 
-    const isMotorComponent = targetComp.subtype === 'motor_load';
+    const isMotorComponent = targetComp.subtype === 'motor_load' || targetComp.subtype === 'motor';
     const isStaticLoadComponent = targetComp.subtype === 'static_load';
     const isTransformerComponent = targetComp.type === 'transformer';
     const isSourceCategoryComponent = isSourceComponent(targetComp);
@@ -8843,7 +8887,7 @@ function selectComponent(compOrId) {
         ) {
           return { ...f, type: 'select', options: transformerConnectionOptions };
         }
-        if (targetComp.subtype === 'motor_load' && f.name === 'load_torque_curve') {
+        if ((targetComp.subtype === 'motor_load' || targetComp.subtype === 'motor') && f.name === 'load_torque_curve') {
           return {
             ...f,
             type: 'textarea',
@@ -8884,7 +8928,7 @@ function selectComponent(compOrId) {
       schema = schema.filter(f => !['cable_cable_rating', 'cable_impedance_r', 'cable_impedance_x'].includes(f.name));
     }
 
-    if (targetComp.subtype === 'motor_load') {
+    if (targetComp.subtype === 'motor_load' || targetComp.subtype === 'motor') {
       schema = schema.filter(
         f => !['conductor_type', 'cable_assembly', 'breaker_frame', 'conductor_assembly', 'gap'].includes(f.name)
       );
@@ -9024,7 +9068,7 @@ function selectComponent(compOrId) {
         { name: 'clearing_time', label: 'Clearing Time (s)', type: 'number' }
       ];
 
-      if (targetComp.subtype === 'motor_load') {
+      if (targetComp.subtype === 'motor_load' || targetComp.subtype === 'motor') {
         baseFields = baseFields.filter(
           f => !['gap', 'conductor_type', 'cable_assembly', 'breaker_frame', 'conductor_assembly'].includes(f.name)
         );
@@ -9226,7 +9270,7 @@ function selectComponent(compOrId) {
       seenFieldNames.add(field.name);
       return true;
     });
-    if (targetComp.subtype === 'motor_load') {
+    if (targetComp.subtype === 'motor_load' || targetComp.subtype === 'motor') {
       fields = fields.filter(
         f => !['conductor_type', 'cable_assembly', 'breaker_frame', 'conductor_assembly'].includes(f.name)
       );
@@ -9278,9 +9322,13 @@ function selectComponent(compOrId) {
     const motorStartFields = [];
     const physicalFields = [];
     const generalFields = [];
-    const motorStartFieldNames = ['inrushMultiple', 'thevenin_r', 'thevenin_x', 'inertia', 'load_torque_curve'];
+    const motorStartFieldNames = [
+      'inrushMultiple', 'lr_current_pu', 'thevenin_r', 'thevenin_x', 'inertia', 'load_torque_curve',
+      'starter_type', 'vfd_current_limit_pu', 'initial_voltage_pu', 'ramp_time_s',
+      'wye_delta_switch_time_s', 'autotransformer_tap', 'synchronous_speed_rpm',
+    ];
     fields.forEach(f => {
-      if (targetComp.subtype === 'motor_load' && motorStartFieldNames.includes(f.name)) {
+      if (isMotorComponent && motorStartFieldNames.includes(f.name)) {
         motorStartFields.push(f);
       } else if (impedanceFieldNameSet.has(f.name)) {
         electricalFields.push(f);

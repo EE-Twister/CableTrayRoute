@@ -64,6 +64,78 @@ function validateMccComponent(component, index, errors) {
   }
 }
 
+const NEMA_DESIGN_CLASSES = new Set(['A', 'B', 'C', 'D']);
+const VALID_STARTER_TYPES = new Set(['dol', 'vfd', 'soft_starter', 'wye_delta', 'autotransformer']);
+const VALID_COMMISSIONING_STATES = new Set(['in_service', 'spare', 'decommissioned']);
+
+function validateMotorComponent(component, index, errors) {
+  const subtype = `${component?.subtype || ''}`.trim().toLowerCase();
+  if (subtype !== 'motor') return;
+  if (!isPlainObject(component.props)) {
+    errors.push(buildError(`components[${index}].props`, 'motor component props must be an object.'));
+    return;
+  }
+  const p = component.props;
+
+  const requiredStringProps = ['tag', 'description', 'manufacturer', 'model'];
+  requiredStringProps.forEach((key) => {
+    if (typeof p[key] !== 'string') {
+      errors.push(buildError(
+        `components[${index}].props.${key}`,
+        `motor.${key} is required and must be a string.`,
+      ));
+    }
+  });
+
+  const positiveNumbers = ['rated_hp', 'rated_voltage_kv', 'synchronous_speed_rpm', 'lr_current_pu'];
+  positiveNumbers.forEach((key) => {
+    const val = Number(p[key]);
+    if (!Number.isFinite(val) || val <= 0) {
+      errors.push(buildError(
+        `components[${index}].props.${key}`,
+        `motor.${key} must be a finite number greater than 0.`,
+      ));
+    }
+  });
+
+  const pf = Number(p.full_load_pf);
+  if (!Number.isFinite(pf) || pf <= 0 || pf > 1) {
+    errors.push(buildError(
+      `components[${index}].props.full_load_pf`,
+      'motor.full_load_pf must be a number in the range (0, 1].',
+    ));
+  }
+
+  const eff = Number(p.full_load_efficiency_pct);
+  if (!Number.isFinite(eff) || eff <= 0 || eff > 100) {
+    errors.push(buildError(
+      `components[${index}].props.full_load_efficiency_pct`,
+      'motor.full_load_efficiency_pct must be a number in the range (0, 100].',
+    ));
+  }
+
+  if (p.design_class !== undefined && !NEMA_DESIGN_CLASSES.has(String(p.design_class).toUpperCase())) {
+    errors.push(buildError(
+      `components[${index}].props.design_class`,
+      `motor.design_class must be one of: ${[...NEMA_DESIGN_CLASSES].join(', ')}.`,
+    ));
+  }
+
+  if (p.starter_type !== undefined && !VALID_STARTER_TYPES.has(String(p.starter_type).toLowerCase())) {
+    errors.push(buildError(
+      `components[${index}].props.starter_type`,
+      `motor.starter_type must be one of: ${[...VALID_STARTER_TYPES].join(', ')}.`,
+    ));
+  }
+
+  if (p.commissioning_state !== undefined && !VALID_COMMISSIONING_STATES.has(String(p.commissioning_state))) {
+    errors.push(buildError(
+      `components[${index}].props.commissioning_state`,
+      `motor.commissioning_state must be one of: ${[...VALID_COMMISSIONING_STATES].join(', ')}.`,
+    ));
+  }
+}
+
 function validateComponent(component, index, categoriesSet, subtypeMap, errors) {
   if (!isPlainObject(component)) {
     errors.push(buildError(`components[${index}]`, 'Component must be an object.'));
@@ -98,6 +170,7 @@ function validateComponent(component, index, categoriesSet, subtypeMap, errors) 
   }
 
   validateMccComponent(component, index, errors);
+  validateMotorComponent(component, index, errors);
 
   if (isNonEmptyString(component.subtype)) {
     const normalizedSubtype = component.subtype.trim();

@@ -2488,6 +2488,117 @@
       ]
     },
     {
+      "type": "motor",
+      "subtype": "motor",
+      "label": "Motor",
+      "category": "load",
+      "icon": "icons/components/Motor.svg",
+      "iconIEC": "icons/components/iec/IEC_Motor.svg",
+      "defaultRotation": 0,
+      "ports": [
+        { "x": 40, "y": 0 }
+      ],
+      "props": {
+        "tag": "",
+        "description": "",
+        "manufacturer": "",
+        "model": "",
+        "rated_hp": 100,
+        "rated_kw": 74.6,
+        "rated_voltage_kv": 0.48,
+        "phases": 3,
+        "synchronous_speed_rpm": 1800,
+        "design_class": "B",
+        "code_letter": "G",
+        "locked_rotor_kva_per_hp": 5.6,
+        "full_load_efficiency_pct": 95.0,
+        "full_load_pf": 0.90,
+        "service_factor": 1.15,
+        "starter_type": "dol",
+        "vfd_current_limit_pu": 1.1,
+        "initial_voltage_pu": 0.3,
+        "ramp_time_s": 10,
+        "wye_delta_switch_time_s": 5,
+        "autotransformer_tap": 0.65,
+        "lr_current_pu": 6.0,
+        "thevenin_r": 0.02,
+        "thevenin_x": 0.08,
+        "inertia": 0.5,
+        "load_torque_curve": "0:0 100:100",
+        "commissioning_state": "in_service",
+        "service_status": "normal",
+        "notes": ""
+      },
+      "deviceProperties": [
+        {
+          "DeviceType": "Motor",
+          "PropertyName": "Rated HP / kW",
+          "PurposeUseCase": "Full-load current and torque calculation",
+          "NotesOrComments": "Use rated_hp for NEMA nameplate; rated_kw auto-derived"
+        },
+        {
+          "DeviceType": "Motor",
+          "PropertyName": "Rated Voltage (kV)",
+          "PurposeUseCase": "Voltage base alignment and per-unit scaling",
+          "NotesOrComments": "Must match connected bus voltage"
+        },
+        {
+          "DeviceType": "Motor",
+          "PropertyName": "Design Class (NEMA A/B/C/D)",
+          "PurposeUseCase": "Torque and slip characteristics",
+          "NotesOrComments": "Class B covers most general-purpose induction motors"
+        },
+        {
+          "DeviceType": "Motor",
+          "PropertyName": "Code Letter",
+          "PurposeUseCase": "Locked-rotor kVA per HP — sets inrush range",
+          "NotesOrComments": "Per NEMA MG 1 Table 10-2"
+        },
+        {
+          "DeviceType": "Motor",
+          "PropertyName": "Full-Load Efficiency (%)",
+          "PurposeUseCase": "Converts shaft power to electrical input power",
+          "NotesOrComments": "Used in full-load current calculation"
+        },
+        {
+          "DeviceType": "Motor",
+          "PropertyName": "Full-Load Power Factor",
+          "PurposeUseCase": "Splits kW and kVAR contributions for load flow",
+          "NotesOrComments": "Expressed as decimal (0–1)"
+        },
+        {
+          "DeviceType": "Motor",
+          "PropertyName": "Starter Type",
+          "PurposeUseCase": "Determines inrush current profile during starting",
+          "NotesOrComments": "Options: dol, vfd, soft_starter, wye_delta, autotransformer"
+        },
+        {
+          "DeviceType": "Motor",
+          "PropertyName": "Locked-Rotor Current Multiplier (lr_current_pu)",
+          "PurposeUseCase": "Starting inrush = lr_current_pu × FLA",
+          "NotesOrComments": "Typically 5–7× for NEMA Design B"
+        },
+        {
+          "DeviceType": "Motor",
+          "PropertyName": "Thevenin Impedance (R, X)",
+          "PurposeUseCase": "Voltage sag during starting",
+          "NotesOrComments": "Set from system impedance at motor terminals"
+        },
+        {
+          "DeviceType": "Motor",
+          "PropertyName": "Inertia (kg·m²)",
+          "PurposeUseCase": "Acceleration time calculation",
+          "NotesOrComments": "Combined motor + driven load WK²"
+        },
+        {
+          "DeviceType": "Motor",
+          "PropertyName": "Commissioning State",
+          "PurposeUseCase": "Asset lifecycle tracking",
+          "NotesOrComments": "Values: in_service, spare, decommissioned"
+        }
+      ]
+    },
+    {
       "type": "relay",
       "label": "Relay",
       "icon": "icons/placeholder.svg",
