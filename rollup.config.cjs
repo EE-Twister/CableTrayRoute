@@ -81,7 +81,8 @@ const entries = {
   bessHazard: 'src/bessHazard.js',
   hazareaclassification: 'src/hazareaclassification.js',
   admin: 'src/admin.js',
-  insulationcoordination: 'src/insulationcoordination.js'
+  insulationcoordination: 'src/insulationcoordination.js',
+  lighting: 'src/lighting.js',
 };
 
 /**

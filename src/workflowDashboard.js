@@ -27,6 +27,7 @@ const STUDY_DEFINITIONS = [
   { key: 'reliability',  label: 'Reliability / N-1',    href: 'reliability.html' },
   { key: 'contingency',  label: 'N-1 Contingency',      href: 'contingency.html' },
   { key: 'insulationCoordination', label: 'Insulation Coordination', href: 'insulationcoordination.html' },
+  { key: 'lighting',               label: 'Egress Lighting',         href: 'lighting.html' },
 ];
 
 function getStatusMeta({ complete, label, hint, forStudy = false }) {

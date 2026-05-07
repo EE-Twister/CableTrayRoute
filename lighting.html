@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Egress & Emergency Lighting Calculator. Lumen-method average illuminance, optional IES photometric file upload, and NFPA 101 §7.9.2 egress compliance check." />
+  <title>Egress Lighting — CableTrayRoute</title>
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/favicon.svg">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Egress & Emergency Lighting — CableTrayRoute">
+  <meta property="og:description" content="Calculate average illuminance (lumen method) and verify NFPA 101 §7.9.2 egress compliance for emergency lighting systems.">
+  <meta property="og:image" content="https://cabletrayroute.com/icons/og-preview.png">
+  <meta property="og:site_name" content="CableTrayRoute">
+  <meta property="og:url" content="lighting.html">
+  <link rel="canonical" href="lighting.html">
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+  <meta name="color-scheme" content="light dark">
+  <link rel="stylesheet" href="style.css" />
+  <script type="module" src="dirtyTracker.js"></script>
+  <script type="module" src="dist/lighting.js" defer></script>
+</head>
+<body class="lighting-page" data-report-title="Egress Lighting">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <nav class="top-nav" aria-label="Primary">
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
+      <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+    <div id="nav-links" class="nav-links" role="list">
+      <!-- Populated dynamically by navigation.js -->
+    </div>
+    <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+  </nav>
+
+  <div id="settings-menu" class="settings-menu">
+    <label for="theme-select">Theme
+      <select id="theme-select">
+        <option value="system">System</option>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+        <option value="high-contrast">High Contrast</option>
+      </select>
+    </label>
+    <label><input type="checkbox" id="compact-toggle" aria-label="Enable compact table mode"> Compact Mode</label>
+    <button id="help-btn" class="btn" aria-expanded="false" title="Show help">Site Help</button>
+    <button id="new-project-btn" class="btn" title="Start a new project">New Project</button>
+    <button id="save-project-btn" class="btn" title="Save current project">Save Project</button>
+    <button id="load-project-btn" class="btn" title="Load an existing project">Load Project</button>
+    <button id="export-project-btn" class="btn" title="Export project data">Export Project</button>
+    <button id="import-project-btn" class="btn" title="Import project data">Import Project</button>
+    <input type="file" id="import-project-input" accept=".ctr.json" class="hidden" title="Select project file">
+  </div>
+
+  <div class="container">
+    <main id="main-content" class="main-content">
+      <nav aria-label="Breadcrumb">
+        <ol class="breadcrumb-trail">
+          <li><a href="index.html">Home</a></li>
+          <li>Studies</li>
+          <li>Safety &amp; Compliance</li>
+          <li aria-current="page">Egress Lighting</li>
+        </ol>
+      </nav>
+
+      <header class="page-header">
+        <h1>Egress &amp; Emergency Lighting Calculator</h1>
+        <p>Calculate average maintained illuminance using the lumen method and verify NFPA 101 §7.9.2 egress compliance (average ≥ 1 fc, minimum ≥ 0.1 fc).</p>
+      </header>
+
+      <details class="method-panel">
+        <summary>Method &amp; Standards</summary>
+        <p><strong>Lumen Method (IES HB-10):</strong> The average maintained illuminance on the workplane is calculated as:</p>
+        <p style="margin-left:1.5rem"><em>E<sub>avg</sub> = (N × F × CU × LLF) / A</em></p>
+        <table class="results-table" aria-label="Lumen method parameters">
+          <thead><tr><th>Symbol</th><th>Parameter</th><th>Typical value</th></tr></thead>
+          <tbody>
+            <tr><td>N</td><td>Number of luminaires</td><td>—</td></tr>
+            <tr><td>F</td><td>Initial rated lumens per luminaire</td><td>From IES file or manufacturer</td></tr>
+            <tr><td>CU</td><td>Coefficient of Utilization</td><td>From CU table (RCR + reflectances)</td></tr>
+            <tr><td>LLF</td><td>Light Loss Factor (maintained)</td><td>0.80 typical for LED</td></tr>
+            <tr><td>A</td><td>Room area (ft²)</td><td>L × W</td></tr>
+          </tbody>
+        </table>
+        <p><strong>Room Cavity Ratio (RCR):</strong> RCR = 5 × H<sub>c</sub> × (L + W) / (L × W), where H<sub>c</sub> = fixture mounting height − workplane height.</p>
+        <p><strong>CU table:</strong> Based on a representative generic direct-component LED troffer/panel. For final designs, use the CU table from the manufacturer's IES photometric file.</p>
+        <p><strong>Point-by-point grid:</strong> When fixture positions and an IES photometric file are provided, the tool calculates a 10×10 workplane illuminance grid using the cosine-cube method: E = I(θ) × cos(θ) / D².</p>
+        <p><strong>Egress compliance (NFPA 101-2021 §7.9.2.1):</strong> Average illuminance ≥ 1.0 fc and minimum illuminance ≥ 0.1 fc along the path of egress.</p>
+        <p class="hint"><strong>Note:</strong> The CU table values are indicative. Results should be verified against the selected luminaire's manufacturer-supplied photometric data for final design documentation.</p>
+      </details>
+
+      <!-- ------------------------------------------------------------------ -->
+      <!-- Room & Fixture Inputs                                               -->
+      <!-- ------------------------------------------------------------------ -->
+      <section aria-label="Room and fixture inputs" class="field-group">
+        <h2>Room Dimensions</h2>
+
+        <div class="field-row-inline">
+          <label for="room-label">Room / area label
+            <input type="text" id="room-label" value="Egress Corridor" aria-label="Room label">
+          </label>
+          <label for="room-length">Room length (ft)
+            <input type="number" id="room-length" value="60" min="1" step="1" aria-label="Room length in feet">
+          </label>
+          <label for="room-width">Room width (ft)
+            <input type="number" id="room-width" value="10" min="1" step="1" aria-label="Room width in feet">
+          </label>
+        </div>
+
+        <div class="field-row-inline">
+          <label for="ceiling-height">Ceiling height (ft)
+            <input type="number" id="ceiling-height" value="9" min="4" step="0.5" aria-label="Ceiling height in feet">
+          </label>
+          <label for="mounting-height">Fixture mounting height (ft)
+            <input type="number" id="mounting-height" value="9" min="4" step="0.5" aria-label="Fixture mounting height above floor in feet">
+          </label>
+          <label for="workplane-height">Workplane height (ft)
+            <input type="number" id="workplane-height" value="0" min="0" max="5" step="0.25" aria-label="Workplane height above floor in feet (0 for floor-level egress path)">
+          </label>
+        </div>
+
+        <h2>Reflectances</h2>
+
+        <div class="field-row-inline">
+          <label for="ceiling-refl">Ceiling reflectance
+            <select id="ceiling-refl" aria-label="Ceiling reflectance percentage">
+              <option value="80" selected>80% — white/light</option>
+              <option value="70">70% — off-white</option>
+              <option value="50">50% — medium</option>
+            </select>
+          </label>
+          <label for="wall-refl">Wall reflectance
+            <select id="wall-refl" aria-label="Wall reflectance percentage">
+              <option value="70" selected>70% — light</option>
+              <option value="50">50% — medium</option>
+              <option value="30">30% — dark</option>
+            </select>
+          </label>
+        </div>
+
+        <h2>Fixture Parameters</h2>
+
+        <div class="field-row-inline">
+          <label for="num-fixtures">Number of luminaires
+            <input type="number" id="num-fixtures" value="6" min="1" step="1" aria-label="Number of luminaires in the space">
+          </label>
+          <label for="lumens-per-fixture">Lumens per luminaire (initial rated)
+            <input type="number" id="lumens-per-fixture" value="1600" min="1" step="100" aria-label="Initial rated lumens per luminaire">
+          </label>
+          <label for="llf">Light Loss Factor
+            <input type="number" id="llf" value="0.80" min="0.50" max="1.00" step="0.01" aria-label="Light loss factor (maintained condition, 0.50–1.00)">
+          </label>
+        </div>
+
+        <h2>IES Photometric File <span style="font-weight:400;font-size:.85em;color:var(--color-text-muted)">(optional — enables point-by-point grid)</span></h2>
+
+        <div class="field-row-inline">
+          <label for="ies-file" style="flex:2">IES file (.ies)
+            <input type="file" id="ies-file" accept=".ies,.IES" aria-label="Upload IES photometric file for point-by-point calculation">
+          </label>
+          <div id="ies-status" style="align-self:center;font-size:.85em;color:var(--color-text-muted)" aria-live="polite">No file loaded</div>
+        </div>
+
+        <div id="fixture-positions-section" hidden>
+          <h3>Fixture positions <span style="font-weight:400;font-size:.85em">(ft from room corner)</span></h3>
+          <div id="fixture-positions-list"></div>
+          <button id="add-fixture-btn" type="button" class="btn" style="margin-top:.5rem">+ Add fixture position</button>
+        </div>
+
+        <div class="controls-row">
+          <button id="calculate-btn" type="button">Calculate</button>
+          <button id="export-btn" type="button" disabled>Export CSV</button>
+        </div>
+      </section>
+
+      <!-- ------------------------------------------------------------------ -->
+      <!-- Results                                                             -->
+      <!-- ------------------------------------------------------------------ -->
+      <div id="warnings-panel" hidden role="alert" aria-live="assertive" aria-label="Lighting warnings"></div>
+      <div id="results" hidden role="region" aria-live="polite" aria-label="Lighting study results"></div>
+
+      <nav class="step-nav" aria-label="Workflow navigation">
+        <a href="hazareaclassification.html" class="step-nav-prev">&#8592; Hazardous Area</a>
+        <a href="insulationcoordination.html" class="step-nav-next">Insulation Coordination &#8594;</a>
+      </nav>
+    </main>
+  </div>
+
+  <div id="help-modal" class="modal" aria-hidden="true" role="dialog" aria-modal="true"
+       aria-labelledby="help-title">
+    <div class="modal-content">
+      <button id="close-help-btn" class="close-btn" aria-label="Close Help">&times;</button>
+      <h2 id="help-title">Egress Lighting Help</h2>
+      <p>Enter the room dimensions, reflectances, and luminaire parameters, then click <strong>Calculate</strong> to get the average illuminance and NFPA 101 §7.9.2 egress compliance result.</p>
+      <p><strong>Room Cavity Ratio (RCR):</strong> The tool calculates RCR automatically from the room dimensions and fixture mounting height. A higher RCR means more light is absorbed by wall surfaces before reaching the workplane, resulting in a lower CU.</p>
+      <p><strong>Light Loss Factor (LLF):</strong> Accounts for luminaire lumen depreciation, dirt accumulation, and other maintenance-related losses. A value of 0.80 is typical for LED luminaires on a regular cleaning and relamping schedule.</p>
+      <p><strong>IES file (optional):</strong> Upload an ANSI/IES LM-63 photometric file for your luminaire to enable point-by-point grid calculation. Enter individual fixture positions (x, y from the room corner) after loading an IES file.</p>
+      <p><strong>NFPA 101 §7.9.2.1:</strong> Emergency means of egress lighting must provide not less than an average of 1.0 fc (10.8 lux) and not less than 0.1 fc (1.1 lux) at any point along the path of egress.</p>
+      <p>Use <strong>Export CSV</strong> to download the full calculation summary for report inclusion.</p>
+    </div>
+  </div>
+
+  <script type="module" src="dist/projectManager.js"></script>
+</body>
+</html>

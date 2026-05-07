@@ -40,6 +40,7 @@ export const SECTION_REGISTRY = [
   { key: 'tccSettings',     label: 'TCC Settings Manifest', group: 'Studies', studyKey: 'tcc' },
   { key: 'hazAreaClass',    label: 'Hazardous Area Classification', group: 'Studies', studyKey: 'hazAreaClassification' },
   { key: 'insulationCoord', label: 'Insulation Coordination (BIL/SIL)', group: 'Studies', studyKey: 'insulationCoordination' },
+  { key: 'lighting',        label: 'Egress Lighting (NFPA 101)',       group: 'Studies', studyKey: 'lighting' },
 ];
 
 /** Lookup a section definition by key. */
@@ -96,6 +97,11 @@ export const PRESET_CONFIGS = {
     label: 'Hazardous Area Report',
     description: 'NEC 500–505 / IEC 60079 area classification drawing, equipment compatibility matrix, and Ex-protection register.',
     sections: ['cover', 'toc', 'revisions', 'assumptions', 'hazAreaClass', 'drc'],
+  },
+  egress: {
+    label: 'Egress Lighting Report',
+    description: 'NFPA 101 §7.9.2 egress illuminance compliance — lumen method summary and point-by-point grid.',
+    sections: ['cover', 'toc', 'revisions', 'assumptions', 'lighting'],
   },
 };
 
