@@ -7837,11 +7837,12 @@ function pickEquipmentAtPoint(xFt, yFt) {
 }
 
 function toFeetCoordinates(event) {
-  const rect = canvas.getBoundingClientRect();
-  const svgX = event.clientX - rect.left;
-  const svgY = event.clientY - rect.top;
-  const xFt = (svgX - 20) / state.scale;
-  const yFt = (svgY - 20) / state.scale;
+  const pt = canvas.createSVGPoint();
+  pt.x = event.clientX;
+  pt.y = event.clientY;
+  const svgPt = pt.matrixTransform(canvas.getScreenCTM().inverse());
+  const xFt = (svgPt.x - 20) / state.scale;
+  const yFt = (svgPt.y - 20) / state.scale;
   return { xFt, yFt };
 }
 
