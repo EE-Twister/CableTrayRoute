@@ -58,6 +58,7 @@ const NAV_ROUTES = [
   { href: 'equipmentevaluation.html', label: 'Equipment Evaluation', section: 'Studies', group: 'Protection', icon: 'icons/toolbar/validate.svg' },
   { href: 'bessHazard.html', label: 'BESS Hazard / Thermal Runaway', section: 'Studies', group: 'Protection', icon: 'icons/components/Breaker.svg' },
   { href: 'hazareaclassification.html', label: 'Hazardous Area Classification', section: 'Studies', group: 'Protection', icon: 'icons/toolbar/validate.svg' },
+  { href: 'insulationcoordination.html', label: 'Insulation Coordination (BIL/SIL)', section: 'Studies', group: 'Protection', icon: 'icons/toolbar/validate.svg' },
   { href: 'groundgrid.html', label: 'Ground Grid', section: 'Studies', group: 'Grounding', icon: 'icons/toolbar/validate.svg' },
   { href: 'cathodicprotection.html', label: 'Cathodic Protection', section: 'Studies', group: 'Corrosion Control', icon: 'icons/toolbar/validate.svg' },
   { href: 'dissimilarmetals.html', label: 'Dissimilar Metals', section: 'Studies', group: 'Corrosion Control', icon: 'icons/toolbar/validate.svg' },

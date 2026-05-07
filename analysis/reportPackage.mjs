@@ -39,6 +39,7 @@ export const SECTION_REGISTRY = [
   { key: 'sustainability',  label: 'Sustainability Footprint', group: 'Studies', studyKey: 'sustainabilityFootprint' },
   { key: 'tccSettings',     label: 'TCC Settings Manifest', group: 'Studies', studyKey: 'tcc' },
   { key: 'hazAreaClass',    label: 'Hazardous Area Classification', group: 'Studies', studyKey: 'hazAreaClassification' },
+  { key: 'insulationCoord', label: 'Insulation Coordination (BIL/SIL)', group: 'Studies', studyKey: 'insulationCoordination' },
 ];
 
 /** Lookup a section definition by key. */

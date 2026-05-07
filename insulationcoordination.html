@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Insulation coordination study per IEC 60071-1/2 and IEEE 1313. Select standard BIL and SIL levels, verify surge arrester protective margins, and estimate statistical risk of failure for HV equipment." />
+  <title>Insulation Coordination — CableTrayRoute</title>
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/favicon.svg">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Insulation Coordination — CableTrayRoute">
+  <meta property="og:description" content="IEC 60071 / IEEE 1313 insulation coordination: BIL/SIL selection, atmospheric correction, arrester protective margins, and statistical risk of failure.">
+  <meta property="og:image" content="https://cabletrayroute.com/icons/og-preview.png">
+  <meta property="og:site_name" content="CableTrayRoute">
+  <meta property="og:url" content="insulationcoordination.html">
+  <link rel="canonical" href="insulationcoordination.html">
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+  <meta name="color-scheme" content="light dark">
+  <link rel="stylesheet" href="style.css" />
+  <script type="module" src="dirtyTracker.js"></script>
+  <script type="module" src="dist/insulationcoordination.js" defer></script>
+</head>
+<body class="insulationcoordination-page" data-report-title="Insulation Coordination Study">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <nav class="top-nav" aria-label="Primary">
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
+      <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+    <div id="nav-links" class="nav-links" role="list">
+      <!-- Populated dynamically by navigation.js -->
+    </div>
+    <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+  </nav>
+
+  <div id="settings-menu" class="settings-menu">
+    <label for="theme-select">Theme
+      <select id="theme-select">
+        <option value="system">System</option>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+        <option value="high-contrast">High Contrast</option>
+      </select>
+    </label>
+    <label><input type="checkbox" id="compact-toggle" aria-label="Enable compact table mode"> Compact Mode</label>
+    <button id="help-btn" class="btn" aria-expanded="false" title="Show help">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Site Help</span>
+    </button>
+    <button id="new-project-btn" title="Start a new project">
+      <img src="icons/toolbar/copy.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>New Project</span>
+    </button>
+    <button id="save-project-btn" title="Save current project">
+      <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Save Project</span>
+    </button>
+    <button id="load-project-btn" title="Load an existing project">
+      <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Load Project</span>
+    </button>
+    <button id="export-project-btn" title="Export project data">
+      <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Export Project</span>
+    </button>
+    <button id="import-project-btn" title="Import project data">
+      <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Import Project</span>
+    </button>
+    <input type="file" id="import-project-input" accept=".ctr.json" class="hidden" title="Select project file">
+  </div>
+
+  <div class="container">
+    <main id="main-content" class="main-content">
+      <header class="page-header">
+        <h1>Insulation Coordination</h1>
+        <p class="page-subtitle">IEC 60071-1/2 · IEEE 1313 — BIL/SIL selection, arrester protective margins, statistical risk of failure</p>
+      </header>
+
+      <details class="method-panel">
+        <summary>Method &amp; Assumptions</summary>
+        <p>Insulation coordination selects the lowest <strong>standard insulation level</strong> (BIL and SIL from IEC 60071-1 Tables 2 and 3) that satisfies the required coordination withstand voltage at the equipment location, accounting for altitude, safety factor, and surge arrester protective levels.</p>
+        <p><strong>Step 1 — Required coordination withstand voltage (IEC 60071-2 §3):</strong></p>
+        <pre>Ucw = Urp × Ks × Ka</pre>
+        <p>where Urp = representative overvoltage at the equipment (kV peak), Ks = safety factor (1.15 deterministic / 1.05 statistical), Ka = atmospheric correction factor.</p>
+        <p><strong>Step 2 — Atmospheric correction (IEC 60071-2 §3.3):</strong></p>
+        <pre>Ka = e^(m × H / 8150)</pre>
+        <p>H = altitude (m), m = 1.0 for lightning impulse self-restoring, 0.75 for power frequency non-self-restoring.</p>
+        <p><strong>Step 3 — Standard BIL selection:</strong> Lowest standard LIWV ≥ Ucw from IEC 60071-1 Table 2 (Range I: Um ≤ 245 kV) or Table 3 (Range II: Um &gt; 245 kV).</p>
+        <p><strong>Step 4 — Surge arrester protective margin (IEEE 1313.2 §6):</strong></p>
+        <pre>Mp (%) = (Ucw / Ures − 1) × 100</pre>
+        <p>Required: Mp ≥ 20% for lightning impulse, Mp ≥ 15% for switching impulse.</p>
+        <p><strong>Step 5 — Statistical risk of failure (IEC 60071-2 Annex A, optional):</strong> Simplified Gaussian convolution of the overvoltage stress distribution against the insulation withstand characteristic. Target: R ≤ 10⁻⁴ per event (transmission) or 10⁻³ (distribution).</p>
+      </details>
+
+      <form id="inscoord-form" novalidate>
+
+        <fieldset>
+          <legend><strong>System Data</strong></legend>
+
+          <div class="field-row">
+            <label for="study-label">Study label</label>
+            <input type="text" id="study-label" placeholder="e.g. 138 kV Substation — Lightning Coordination" aria-describedby="study-label-hint">
+            <p id="study-label-hint" class="field-hint">Optional descriptive label for the study.</p>
+          </div>
+
+          <div class="field-row">
+            <label for="nominal-kv">System nominal voltage (kV, L-L)</label>
+            <input type="number" id="nominal-kv" min="1" step="1" value="138" required aria-describedby="nominal-kv-hint">
+            <span class="field-unit">kV</span>
+            <p id="nominal-kv-hint" class="field-hint">System nominal voltage (line-to-line rms). Used for display and TOV calculation reference.</p>
+          </div>
+
+          <div class="field-row">
+            <label for="um-select">Highest voltage for equipment Um (kV)</label>
+            <select id="um-select" required aria-describedby="um-select-hint">
+              <!-- Populated by JS from IEC 60071-1 table -->
+            </select>
+            <p id="um-select-hint" class="field-hint">Select Um from IEC 60071-1. For 138 kV systems use Um = 145 kV; for 230 kV systems use Um = 245 kV.</p>
+          </div>
+
+          <div class="field-row">
+            <label for="altitude-m">Site altitude (m above sea level)</label>
+            <input type="number" id="altitude-m" min="0" max="5000" step="50" value="0" required aria-describedby="altitude-hint">
+            <span class="field-unit">m</span>
+            <p id="altitude-hint" class="field-hint">Altitude correction increases withstand requirements. At sea level Ka = 1.0. At 1000 m Ka ≈ 1.13 (LI).</p>
+          </div>
+
+          <div class="field-row">
+            <label for="grounding-type">System earthing type</label>
+            <select id="grounding-type" aria-describedby="grounding-type-hint">
+              <option value="solidly_grounded">Solidly earthed (TOV factor 1.0×)</option>
+              <option value="low_resistance">Low-resistance earthed (TOV factor 1.3×)</option>
+              <option value="high_resistance">High-resistance earthed (TOV factor 1.73×)</option>
+              <option value="isolated">Isolated / unearthed (TOV factor 1.73×)</option>
+            </select>
+            <p id="grounding-type-hint" class="field-hint">Determines the temporary overvoltage (TOV) magnitude and the minimum surge arrester MCOV requirement.</p>
+          </div>
+
+          <div class="field-row">
+            <label for="approach-select">Coordination approach</label>
+            <select id="approach-select" aria-describedby="approach-hint">
+              <option value="deterministic">Deterministic (Ks = 1.15)</option>
+              <option value="statistical">Statistical (Ks = 1.05, risk estimation enabled)</option>
+            </select>
+            <p id="approach-hint" class="field-hint">Deterministic approach uses a higher safety factor. Statistical approach uses Ks = 1.05 and enables risk-of-failure estimation when stress distribution parameters are entered.</p>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend><strong>Surge Arrester</strong></legend>
+
+          <div class="field-row">
+            <label for="arrester-mcov">Surge arrester MCOV (kV rms)</label>
+            <input type="number" id="arrester-mcov" min="0.1" step="0.1" value="" placeholder="e.g. 84" aria-describedby="mcov-hint">
+            <span class="field-unit">kV rms</span>
+            <p id="mcov-hint" class="field-hint">Maximum Continuous Operating Voltage of the surge arrester. For solidly earthed 145 kV systems: MCOV ≥ 145/√3 ≈ 83.7 kV. Leave blank to skip MCOV check.</p>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend><strong>Lightning Impulse Stress</strong></legend>
+
+          <div class="field-row">
+            <label>
+              <input type="checkbox" id="li-enabled" checked aria-controls="li-fields">
+              Enable lightning impulse coordination
+            </label>
+          </div>
+
+          <div id="li-fields">
+            <div class="field-row">
+              <label for="li-urp">Representative overvoltage Urp (kV peak)</label>
+              <input type="number" id="li-urp" min="1" step="1" value="550" aria-describedby="li-urp-hint">
+              <span class="field-unit">kV peak</span>
+              <p id="li-urp-hint" class="field-hint">Lightning impulse representative overvoltage at the equipment terminals. Typically taken as the arrester lightning impulse residual voltage (protective level) Ures_LI at the maximum discharge current (e.g. 10 kA for station class).</p>
+            </div>
+
+            <div class="field-row">
+              <label for="li-ures">Arrester LI residual voltage Ures (kV peak)</label>
+              <input type="number" id="li-ures" min="1" step="1" value="416" aria-describedby="li-ures-hint">
+              <span class="field-unit">kV peak</span>
+              <p id="li-ures-hint" class="field-hint">Surge arrester lightning impulse protective level at 10 kA (station class) or 5 kA (intermediate class). From manufacturer data sheet. Required to compute protective margin Mp ≥ 20%.</p>
+            </div>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend><strong>Switching Impulse Stress</strong> <span class="field-hint">(Range II or large systems)</span></legend>
+
+          <div class="field-row">
+            <label>
+              <input type="checkbox" id="si-enabled" aria-controls="si-fields">
+              Enable switching impulse coordination
+            </label>
+          </div>
+
+          <div id="si-fields" hidden>
+            <div class="field-row">
+              <label for="si-urp">Representative overvoltage Urp (kV peak)</label>
+              <input type="number" id="si-urp" min="1" step="1" value="850" aria-describedby="si-urp-hint">
+              <span class="field-unit">kV peak</span>
+              <p id="si-urp-hint" class="field-hint">Switching impulse representative overvoltage at the equipment. Typically the arrester switching impulse residual voltage, or 2.0–2.5 pu of Um peak for unprotected systems.</p>
+            </div>
+
+            <div class="field-row">
+              <label for="si-ures">Arrester SI residual voltage Ures (kV peak)</label>
+              <input type="number" id="si-ures" min="1" step="1" value="" placeholder="e.g. 742" aria-describedby="si-ures-hint">
+              <span class="field-unit">kV peak</span>
+              <p id="si-ures-hint" class="field-hint">Surge arrester switching impulse protective level. From manufacturer data sheet. Used to compute Mp ≥ 15%.</p>
+            </div>
+          </div>
+        </fieldset>
+
+        <div id="statistical-panel" hidden>
+          <fieldset>
+            <legend><strong>Statistical Parameters — Lightning Impulse</strong></legend>
+            <p class="field-hint">Required for statistical risk-of-failure estimation (IEC 60071-2 Annex A).</p>
+
+            <div class="field-row">
+              <label for="stat-li-mean">Mean overvoltage μ (kV peak)</label>
+              <input type="number" id="stat-li-mean" min="1" step="1" value="400" aria-describedby="stat-li-mean-hint">
+              <span class="field-unit">kV peak</span>
+              <p id="stat-li-mean-hint" class="field-hint">Mean of the lightning overvoltage distribution at the equipment location. Obtain from electromagnetic transient simulations or line-arrester data.</p>
+            </div>
+
+            <div class="field-row">
+              <label for="stat-li-cov">Coefficient of variation σ/μ</label>
+              <input type="number" id="stat-li-cov" min="0.01" max="0.99" step="0.01" value="0.20" aria-describedby="stat-li-cov-hint">
+              <p id="stat-li-cov-hint" class="field-hint">Coefficient of variation of the overvoltage distribution. Typical value: 0.15–0.25 for lightning on overhead lines.</p>
+            </div>
+          </fieldset>
+        </div>
+
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary">Run Coordination Study</button>
+        </div>
+      </form>
+
+      <script>
+        // Show/hide SI fields based on checkbox
+        document.addEventListener('DOMContentLoaded', () => {
+          const siCheck = document.getElementById('si-enabled');
+          const siFields = document.getElementById('si-fields');
+          if (siCheck && siFields) {
+            siCheck.addEventListener('change', () => { siFields.hidden = !siCheck.checked; });
+          }
+        });
+      </script>
+
+      <div id="calc-errors" class="result-fail" hidden aria-live="polite"></div>
+
+      <div id="results" aria-live="polite"></div>
+
+      <section class="card">
+        <div id="study-basis-panel"></div>
+      </section>
+
+      <nav class="step-nav" aria-label="Workflow navigation">
+        <a href="differentialprotection.html" class="step-nav-prev">← Differential Protection</a>
+        <a href="voltagestability.html" class="step-nav-next">Voltage Stability →</a>
+      </nav>
+
+    </main>
+  </div>
+
+  <div id="help-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="help-modal-title" hidden>
+    <div class="modal-content">
+      <button id="close-help-btn" class="modal-close" aria-label="Close help">×</button>
+      <h2 id="help-modal-title">Insulation Coordination Help</h2>
+      <p>Insulation coordination selects equipment withstand voltages that are economically and technically justified given the overvoltage stresses and the protection provided by surge arresters.</p>
+      <h3>When to use</h3>
+      <ul>
+        <li>Selecting transformer BIL for a new substation.</li>
+        <li>Verifying that the selected surge arrester provides adequate protection margin for HV cables, GIS, or power transformers.</li>
+        <li>Altitude correction for high-elevation substations (> 1000 m above sea level).</li>
+        <li>Statistical risk assessment for transmission projects requiring NERC or utility-level reliability targets.</li>
+      </ul>
+      <h3>Standard insulation levels (IEC 60071-1)</h3>
+      <ul>
+        <li><strong>Range I (Um ≤ 245 kV):</strong> BIL (LIWV) and PFWV selected from Table 2.</li>
+        <li><strong>Range II (Um &gt; 245 kV):</strong> BIL and SIL (SIWV) selected from Table 3. Switching impulse governs.</li>
+      </ul>
+      <h3>Protective margin requirements (IEEE 1313.2 §6)</h3>
+      <ul>
+        <li>Lightning impulse: Mp ≥ 20% between equipment BIL and arrester LI protective level.</li>
+        <li>Switching impulse: Mp ≥ 15% between equipment SIL and arrester SI protective level.</li>
+      </ul>
+      <h3>Typical BIL values by voltage class</h3>
+      <ul>
+        <li>34.5 kV (Um = 36 kV): 170 kV BIL</li>
+        <li>69 kV (Um = 72.5 kV): 325 kV BIL</li>
+        <li>115 kV (Um = 123 kV): 550 kV BIL</li>
+        <li>138 kV (Um = 145 kV): 650 kV BIL</li>
+        <li>230 kV (Um = 245 kV): 1050 kV BIL</li>
+        <li>345 kV (Um = 362 kV): 1175 kV BIL (Range II)</li>
+        <li>500 kV (Um = 550 kV): 1550 kV BIL (Range II)</li>
+      </ul>
+    </div>
+  </div>
+
+  <footer class="site-footer">
+    <div class="footer-left">
+      <img src="icons/route.svg" alt="CableTrayRoute logo" class="footer-logo" loading="lazy" decoding="async">
+      <span>CableTrayRoute</span>
+    </div>
+    <nav class="footer-links" aria-label="Footer">
+      <a href="docs/index.html">Docs</a>
+      <a href="docs/quickstart.html">Quick Start</a>
+      <a href="index.html">Home</a>
+    </nav>
+  </footer>
+
+</body>
+</html>

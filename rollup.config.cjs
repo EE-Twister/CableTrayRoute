@@ -80,7 +80,8 @@ const entries = {
   quasidynamic: 'src/quasiDynamic.js',
   bessHazard: 'src/bessHazard.js',
   hazareaclassification: 'src/hazareaclassification.js',
-  admin: 'src/admin.js'
+  admin: 'src/admin.js',
+  insulationcoordination: 'src/insulationcoordination.js'
 };
 
 /**

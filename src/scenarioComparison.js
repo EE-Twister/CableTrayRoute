@@ -29,6 +29,7 @@ const STUDY_DEFINITIONS = [
   { key: 'motorStart',     label: 'Motor Starting',   href: 'motorStart.html' },
   { key: 'reliability',  label: 'Reliability / N-1', href: 'reliability.html' },
   { key: 'contingency',  label: 'N-1 Contingency',   href: 'contingency.html' },
+  { key: 'insulationCoordination', label: 'Insulation Coordination', href: 'insulationcoordination.html' },
 ];
 
 // ---------------------------------------------------------------------------

@@ -26,6 +26,7 @@ const STUDY_DEFINITIONS = [
   { key: 'bessHazard', label: 'BESS Hazard (HMA)', href: 'bessHazard.html' },
   { key: 'reliability',  label: 'Reliability / N-1',    href: 'reliability.html' },
   { key: 'contingency',  label: 'N-1 Contingency',      href: 'contingency.html' },
+  { key: 'insulationCoordination', label: 'Insulation Coordination', href: 'insulationcoordination.html' },
 ];
 
 function getStatusMeta({ complete, label, hint, forStudy = false }) {
