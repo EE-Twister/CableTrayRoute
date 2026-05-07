@@ -26,6 +26,7 @@ const state = {
 
 let canvas;
 let summaryEl;
+let contextMenu = null;
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
@@ -231,14 +232,26 @@ function drawText(text, xFt, yFt, className = 'equipment-room-text') {
   canvas.appendChild(element);
 }
 
+function drawWallLabel(text, xFt, yFt, anchor = 'start') {
+  const element = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+  element.setAttribute('x', String(xFt * state.scale));
+  element.setAttribute('y', String(yFt * state.scale));
+  element.setAttribute('class', 'equipment-wall-label');
+  element.setAttribute('text-anchor', anchor);
+  element.textContent = text;
+  canvas.appendChild(element);
+}
+
 function renderRoom() {
   const roomRect = drawRect({ x: 0, y: 0, w: state.room.width, h: state.room.depth }, 'equipment-room-outer');
   roomRect.setAttribute('rx', '4');
   roomRect.setAttribute('ry', '4');
 
-  [['north', 0, 0], ['south', 0, state.room.depth], ['west', 0, 0], ['east', state.room.width, 0]].forEach(([direction, x, y]) => {
-    drawText(`${direction.toUpperCase()} · ${state.room.walls[direction]}`, x + 0.3, y + (direction === 'south' ? -0.3 : 0.8), 'equipment-wall-label');
-  });
+  // Place each wall label in a distinct location so North and West don't overlap
+  drawWallLabel(`NORTH · ${state.room.walls.north}`, state.room.width / 2, 0.75, 'middle');
+  drawWallLabel(`SOUTH · ${state.room.walls.south}`, state.room.width / 2, state.room.depth - 0.25, 'middle');
+  drawWallLabel(`WEST · ${state.room.walls.west}`, 0.3, state.room.depth / 2, 'start');
+  drawWallLabel(`EAST · ${state.room.walls.east}`, state.room.width - 0.3, state.room.depth / 2, 'end');
 
   state.room.interiorWalls.forEach(wall => {
     const rect = interiorWallRect(wall);
@@ -247,7 +260,10 @@ function renderRoom() {
   });
 
   if (state.wallDraw.enabled && state.wallDraw.start && state.wallDraw.current) {
-    const orientation = document.getElementById('interior-orientation')?.value || 'vertical';
+    // Auto-detect orientation from drag direction: wider drag = horizontal, taller = vertical
+    const dx = Math.abs(state.wallDraw.current.x - state.wallDraw.start.x);
+    const dy = Math.abs(state.wallDraw.current.y - state.wallDraw.start.y);
+    const orientation = dx > dy ? 'horizontal' : 'vertical';
     const previewRect = wallPreviewRect(state.wallDraw.start, state.wallDraw.current, orientation);
     if (previewRect) {
       drawRect(previewRect, 'equipment-interior-wall', 0.55);
@@ -275,7 +291,9 @@ function wallPreviewRect(start, end, orientation) {
 }
 
 function addInteriorWallFromDrag(start, end) {
-  const orientation = document.getElementById('interior-orientation').value;
+  const dx = Math.abs(end.x - start.x);
+  const dy = Math.abs(end.y - start.y);
+  const orientation = dx > dy ? 'horizontal' : 'vertical';
   const type = document.getElementById('interior-type').value;
   const snappedStartX = snapToStep(start.x, state.wallDraw.snapStep);
   const snappedStartY = snapToStep(start.y, state.wallDraw.snapStep);
@@ -320,6 +338,166 @@ function renderEquipment() {
   });
 }
 
+function drawGapIndicator(x1ft, y1ft, x2ft, y2ft, gapFt, orientation) {
+  const x1 = x1ft * state.scale;
+  const y1 = y1ft * state.scale;
+  const x2 = x2ft * state.scale;
+  const y2 = y2ft * state.scale;
+  const tickSize = 5;
+
+  const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+  line.setAttribute('x1', String(x1));
+  line.setAttribute('y1', String(y1));
+  line.setAttribute('x2', String(x2));
+  line.setAttribute('y2', String(y2));
+  line.setAttribute('class', 'equipment-gap-line');
+  canvas.appendChild(line);
+
+  const ends = orientation === 'horizontal' ? [[x1, y1], [x2, y2]] : [[x1, y1], [x2, y2]];
+  ends.forEach(([tx, ty]) => {
+    const tick = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    if (orientation === 'horizontal') {
+      tick.setAttribute('x1', String(tx)); tick.setAttribute('y1', String(ty - tickSize));
+      tick.setAttribute('x2', String(tx)); tick.setAttribute('y2', String(ty + tickSize));
+    } else {
+      tick.setAttribute('x1', String(tx - tickSize)); tick.setAttribute('y1', String(ty));
+      tick.setAttribute('x2', String(tx + tickSize)); tick.setAttribute('y2', String(ty));
+    }
+    tick.setAttribute('class', 'equipment-gap-line');
+    canvas.appendChild(tick);
+  });
+
+  const midX = (x1 + x2) / 2;
+  const midY = (y1 + y2) / 2;
+  const label = `${gapFt.toFixed(2)}'`;
+  const bgW = Math.max(label.length * 6 + 8, 32);
+
+  const bg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+  bg.setAttribute('x', String(midX - bgW / 2));
+  bg.setAttribute('y', String(midY - 8));
+  bg.setAttribute('width', String(bgW));
+  bg.setAttribute('height', '14');
+  bg.setAttribute('rx', '3');
+  bg.setAttribute('class', 'equipment-gap-label-bg');
+  canvas.appendChild(bg);
+
+  const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+  text.setAttribute('x', String(midX));
+  text.setAttribute('y', String(midY + 3));
+  text.setAttribute('class', 'equipment-gap-label');
+  text.setAttribute('text-anchor', 'middle');
+  text.textContent = label;
+  canvas.appendChild(text);
+}
+
+function renderGapIndicators() {
+  if (!state.drag) return;
+  const dragging = state.equipment.find(e => e.id === state.drag.id);
+  if (!dragging) return;
+
+  state.equipment.forEach(other => {
+    if (other.id === dragging.id) return;
+
+    // Horizontal gap: equipment with overlapping y-ranges
+    const overlapY0 = Math.max(dragging.y, other.y);
+    const overlapY1 = Math.min(dragging.y + dragging.depth, other.y + other.depth);
+    if (overlapY1 > overlapY0) {
+      const midY = (overlapY0 + overlapY1) / 2;
+      if (dragging.x + dragging.width <= other.x) {
+        const gap = other.x - (dragging.x + dragging.width);
+        if (gap < 20) drawGapIndicator(dragging.x + dragging.width, midY, other.x, midY, gap, 'horizontal');
+      } else if (other.x + other.width <= dragging.x) {
+        const gap = dragging.x - (other.x + other.width);
+        if (gap < 20) drawGapIndicator(other.x + other.width, midY, dragging.x, midY, gap, 'horizontal');
+      }
+    }
+
+    // Vertical gap: equipment with overlapping x-ranges
+    const overlapX0 = Math.max(dragging.x, other.x);
+    const overlapX1 = Math.min(dragging.x + dragging.width, other.x + other.width);
+    if (overlapX1 > overlapX0) {
+      const midX = (overlapX0 + overlapX1) / 2;
+      if (dragging.y + dragging.depth <= other.y) {
+        const gap = other.y - (dragging.y + dragging.depth);
+        if (gap < 20) drawGapIndicator(midX, dragging.y + dragging.depth, midX, other.y, gap, 'vertical');
+      } else if (other.y + other.depth <= dragging.y) {
+        const gap = dragging.y - (other.y + other.depth);
+        if (gap < 20) drawGapIndicator(midX, other.y + other.depth, midX, dragging.y, gap, 'vertical');
+      }
+    }
+  });
+}
+
+function createContextMenu() {
+  contextMenu = document.createElement('div');
+  contextMenu.id = 'canvas-context-menu';
+  contextMenu.style.cssText = 'position:fixed;z-index:9999;background:var(--card-bg,#fff);border:1px solid var(--border-color,#7d8790);border-radius:6px;box-shadow:0 4px 14px rgba(0,0,0,.22);padding:4px 0;min-width:170px;display:none;';
+  document.body.appendChild(contextMenu);
+  document.addEventListener('click', hideContextMenu);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') hideContextMenu(); });
+}
+
+function hideContextMenu() {
+  if (contextMenu) contextMenu.style.display = 'none';
+}
+
+function addContextMenuItem(label, action, danger = false) {
+  const btn = document.createElement('button');
+  btn.textContent = label;
+  btn.style.cssText = `display:block;width:100%;padding:6px 14px;background:none;border:none;text-align:left;cursor:pointer;font-size:.875rem;color:${danger ? '#c0392b' : 'var(--text-color,#1f2b3a)'};`;
+  btn.addEventListener('mouseenter', () => { btn.style.background = 'var(--hover-bg,rgba(0,0,0,.07))'; });
+  btn.addEventListener('mouseleave', () => { btn.style.background = 'none'; });
+  btn.addEventListener('click', () => { action(); hideContextMenu(); });
+  contextMenu.appendChild(btn);
+}
+
+function addContextMenuSeparator() {
+  const sep = document.createElement('div');
+  sep.style.cssText = 'border-top:1px solid var(--border-color,#ddd);margin:3px 0;';
+  contextMenu.appendChild(sep);
+}
+
+function showContextMenu(clientX, clientY, eq) {
+  if (!contextMenu || !eq) return;
+  contextMenu.innerHTML = '';
+
+  addContextMenuItem('Copy', () => {
+    const id = `eq-${Date.now()}-${Math.round(Math.random() * 1000)}`;
+    const copy = { ...eq, id, x: clamp(eq.x + 1, 0, Math.max(0, state.room.width - eq.width)), y: clamp(eq.y + 1, 0, Math.max(0, state.room.depth - eq.depth)) };
+    delete copy.listTag;
+    state.equipment.push(copy);
+    state.selectedEquipmentId = id;
+    render();
+  });
+  addContextMenuItem('Delete', () => {
+    state.equipment = state.equipment.filter(e => e.id !== eq.id);
+    if (state.selectedEquipmentId === eq.id) state.selectedEquipmentId = null;
+    render();
+  }, true);
+
+  addContextMenuSeparator();
+  addContextMenuItem('Align to North Wall', () => { eq.y = 0; if (eq.listTag) syncEquipmentPosition(eq); render(); });
+  addContextMenuItem('Align to South Wall', () => { eq.y = Math.max(0, state.room.depth - eq.depth); if (eq.listTag) syncEquipmentPosition(eq); render(); });
+  addContextMenuItem('Align to West Wall', () => { eq.x = 0; if (eq.listTag) syncEquipmentPosition(eq); render(); });
+  addContextMenuItem('Align to East Wall', () => { eq.x = Math.max(0, state.room.width - eq.width); if (eq.listTag) syncEquipmentPosition(eq); render(); });
+  addContextMenuItem('Center Horizontally', () => { eq.x = Math.max(0, (state.room.width - eq.width) / 2); if (eq.listTag) syncEquipmentPosition(eq); render(); });
+  addContextMenuItem('Center Vertically', () => { eq.y = Math.max(0, (state.room.depth - eq.depth) / 2); if (eq.listTag) syncEquipmentPosition(eq); render(); });
+
+  addContextMenuSeparator();
+  addContextMenuItem('Snap to Grid (0.5 ft)', () => {
+    eq.x = snapToStep(eq.x, 0.5);
+    eq.y = snapToStep(eq.y, 0.5);
+    if (eq.listTag) syncEquipmentPosition(eq);
+    render();
+  });
+
+  contextMenu.style.display = 'block';
+  const menuW = contextMenu.offsetWidth || 170;
+  const menuH = contextMenu.scrollHeight;
+  contextMenu.style.left = `${Math.min(clientX, window.innerWidth - menuW - 8)}px`;
+  contextMenu.style.top = `${Math.min(clientY, window.innerHeight - menuH - 8)}px`;
+}
+
 function updateSummary() {
   const total = state.equipment.length;
   const violations = state.violations.size;
@@ -348,6 +526,7 @@ function render() {
   canvas = padGroup;
   renderRoom();
   renderEquipment();
+  renderGapIndicators();
   canvas = previousCanvas;
 
   const zoomLabel = document.getElementById('zoom-label');
@@ -372,6 +551,11 @@ function addEquipment() {
     if (!item) return;
     name = item.tag || item.description || `Equipment-${state.equipment.length + 1}`;
     listTag = item.tag || null;
+    if (listTag && state.equipment.some(e => e.listTag === listTag)) {
+      // eslint-disable-next-line no-alert
+      alert(`"${name}" is already on the canvas. Each equipment item can only be placed once.`);
+      return;
+    }
   } else {
     name = customName || `Custom-${state.equipment.length + 1}`;
   }
@@ -449,6 +633,17 @@ function toFeetCoordinates(event) {
 }
 
 function bindCanvasInteractions() {
+  canvas.addEventListener('contextmenu', event => {
+    event.preventDefault();
+    const { xFt, yFt } = toFeetCoordinates(event);
+    const picked = pickEquipmentAtPoint(xFt, yFt);
+    if (picked) {
+      state.selectedEquipmentId = picked.id;
+      render();
+    }
+    showContextMenu(event.clientX, event.clientY, picked);
+  });
+
   canvas.addEventListener('pointerdown', event => {
     const { xFt, yFt } = toFeetCoordinates(event);
     if (state.wallDraw.enabled) {
@@ -565,6 +760,7 @@ function initialize() {
   ['wall-north', 'wall-south', 'wall-east', 'wall-west', 'interior-type'].forEach(id => populateSelect(id, WALL_TYPES));
   populateSelect('equipment-voltage', VOLTAGE_OPTIONS);
   populateEquipmentPreset();
+  createContextMenu();
   bindUI();
   bindCanvasInteractions();
   render();
