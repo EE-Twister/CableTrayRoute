@@ -109,7 +109,8 @@
             <button id="add-interior-wall" class="btn" type="button">Add Interior Wall</button>
             <button id="draw-wall-mode" class="btn" type="button" aria-pressed="false">Draw Wall on Canvas</button>
           </div>
-          <p class="small-text">Tip: In Draw mode, drag on the canvas to create snapped walls (0.5 ft grid). Drag direction determines orientation — horizontal drag creates a horizontal wall, vertical drag creates a vertical wall.</p>
+          <p class="small-text">Tip: In Draw mode, drag on the canvas to create snapped walls (0.5 ft grid). Drag direction determines orientation.</p>
+          <p class="small-text">Tip: Hold <strong>Shift</strong> and click to select multiple equipment items, then right-click to align them relative to each other.</p>
           <div id="interior-wall-list" class="equipment-mini-list"></div>
 
           <h2>Add Equipment</h2>
@@ -147,11 +148,35 @@
           <button id="add-equipment" class="btn primary-btn">Add Equipment to Layout</button>
           <p class="small-text">Drag equipment blocks inside the drawing area to reposition them.</p>
 
+          <h2>Doorways</h2>
+          <div class="grid-2">
+            <label>Wall
+              <select id="doorway-wall">
+                <option value="north">North</option>
+                <option value="south">South</option>
+                <option value="east">East</option>
+                <option value="west">West</option>
+              </select>
+            </label>
+            <label>Position (ft from corner)
+              <input id="doorway-position" type="number" min="0" step="0.5" value="5">
+            </label>
+            <label>Width (ft)
+              <input id="doorway-width" type="number" min="1" max="20" step="0.25" value="3">
+            </label>
+            <label class="equipment-checkbox-label">
+              <input type="checkbox" id="doorway-egress"> Mark as Means of Egress
+            </label>
+          </div>
+          <button id="add-doorway" class="btn" type="button">Add Doorway</button>
+          <div id="doorway-list" class="equipment-mini-list"></div>
+
           <h2>Legend</h2>
           <ul class="equipment-legend">
             <li><span class="swatch swatch-equipment"></span>Equipment footprint</li>
             <li><span class="swatch swatch-clearance"></span>Required NEC workspace</li>
             <li><span class="swatch swatch-violation"></span>Violation zone</li>
+            <li><span class="swatch swatch-doorway"></span>Doorway / egress</li>
           </ul>
           <p id="arrangement-summary" class="equipment-summary" aria-live="polite"></p>
         </aside>
@@ -161,7 +186,8 @@
             <button id="zoom-out" class="btn" type="button">−</button>
             <span id="zoom-label" class="small-text">Scale: 20 px/ft</span>
             <button id="zoom-in" class="btn" type="button">+</button>
-            <button id="delete-selected-equipment" class="btn" type="button">Delete Selected Equipment</button>
+            <button id="undo-action" class="btn" type="button" title="Undo last action (Ctrl+Z)">Undo</button>
+            <button id="delete-selected-equipment" class="btn" type="button">Delete Selected</button>
           </div>
           <svg id="equipment-arrangement-canvas" viewBox="0 0 1000 700" role="img" aria-label="Equipment room layout canvas"></svg>
         </div>

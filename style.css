@@ -30,15 +30,21 @@
 .equipment-arrangement-canvas-wrap { display:flex; flex-direction:column; gap:.5rem; }
 .equipment-canvas-toolbar { display:flex; gap:.5rem; align-items:center; flex-wrap:wrap; }
 #equipment-arrangement-canvas { width:100%; min-height:70vh; border:1px solid var(--border-color,#7d8790); border-radius:10px; background:linear-gradient(180deg,rgba(140,165,188,.15),rgba(27,32,43,.05)); }
-.equipment-room-outer { fill:rgba(33,43,58,.08); stroke:rgba(66,78,98,.95); stroke-width:2; }
-.equipment-wall-label,.equipment-room-text { font-size:12px; fill:var(--text-color,#1f2b3a); }
+.equipment-room-fill { fill:rgba(33,43,58,.08); stroke:none; }
+.equipment-room-wall { stroke:rgba(66,78,98,.95); stroke-width:2; fill:none; stroke-linecap:square; }
+.equipment-wall-label,.equipment-room-text { fill:var(--text-color,#1f2b3a); /* font-size set dynamically by JS */ }
+.equipment-doorway-panel { stroke:rgba(66,78,98,.95); stroke-width:1.5; fill:none; }
+.equipment-doorway-swing { stroke:rgba(66,78,98,.6); stroke-width:1; fill:none; stroke-dasharray:3 2; }
+.equipment-doorway-label { fill:#0ea36e; font-weight:700; letter-spacing:.04em; }
+.swatch-doorway { background:#0ea36e; }
 .equipment-interior-wall { fill:rgba(56,63,74,.85); }
 .equipment-clearance { fill:rgba(255,213,110,.8); stroke:rgba(200,142,32,.95); stroke-dasharray:4 4; }
 .equipment-clearance-danger { fill:rgba(245,91,91,.35); stroke:rgba(213,32,32,.95); }
 .equipment-block { fill:rgba(38,122,207,.82); stroke:rgba(14,67,122,.95); stroke-width:1.5; cursor:move; }
 .equipment-block.selected { stroke:#fde047; stroke-width:2.5; }
 .equipment-block-danger { fill:rgba(218,50,50,.85); stroke:rgba(125,15,15,.95); }
-.equipment-block-label,.equipment-block-meta { font-size:11px; fill:#fff; pointer-events:none; }
+.equipment-block-label,.equipment-block-meta { fill:#fff; pointer-events:none; /* font-size set dynamically by JS */ }
+.equipment-checkbox-label { display:flex !important; flex-direction:row !important; align-items:center; gap:.4rem; }
 .equipment-mini-list { display:flex; flex-direction:column; gap:.4rem; font-size:.82rem; }
 .equipment-mini-list-row { display:flex; justify-content:space-between; gap:.5rem; align-items:center; }
 .equipment-legend { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:.3rem; font-size:.83rem; }
