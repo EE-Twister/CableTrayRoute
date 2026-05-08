@@ -1,4 +1,5 @@
 import * as dataStore from './dataStore.mjs';
+import { openModal } from './src/components/modal.js';
 
 const WALL_TYPES = ['Concrete', 'CMU', 'Gypsum', 'Metal', 'Fire Rated', 'Removable Panel'];
 const VOLTAGE_OPTIONS = ['120V', '208V', '480V', '600V', '4.16kV', '13.8kV', '15kV'];
@@ -911,6 +912,87 @@ function toFeetCoordinates(event) {
   return { xFt, yFt };
 }
 
+// ── Equipment detail modal ───────────────────────────────────────────────────
+
+function showEquipmentDetailModal(eq) {
+  const listItem = eq.listTag
+    ? dataStore.getEquipment().find(item => item.tag === eq.listTag) || null
+    : null;
+
+  openModal({
+    title: eq.name,
+    primaryText: 'Close',
+    secondaryText: null,
+    defaultWidth: 'medium',
+    render(body) {
+      body.style.padding = '0';
+
+      const card = document.createElement('div');
+      card.className = 'equipment-detail-card';
+
+      function section(label, value) {
+        if (!value && value !== 0) return;
+        const row = document.createElement('div');
+        row.className = 'equipment-detail-row';
+        const lbl = document.createElement('span');
+        lbl.className = 'equipment-detail-label';
+        lbl.textContent = label;
+        const val = document.createElement('span');
+        val.className = 'equipment-detail-value';
+        val.textContent = String(value);
+        row.appendChild(lbl);
+        row.appendChild(val);
+        card.appendChild(row);
+      }
+
+      // Canvas placement data
+      section('Tag', eq.name);
+      if (listItem) {
+        section('Description', listItem.description);
+        section('Category', listItem.category);
+        section('Sub-Category', listItem.subCategory);
+      }
+      section('Voltage', eq.voltage);
+      if (listItem) {
+        section('Phases', listItem.phases);
+        section('Manufacturer', listItem.manufacturer);
+        section('Model', listItem.model);
+      }
+
+      const divider = document.createElement('hr');
+      divider.className = 'equipment-detail-divider';
+      card.appendChild(divider);
+
+      section('Width', `${eq.width.toFixed(1)} ft`);
+      section('Depth', `${eq.depth.toFixed(1)} ft`);
+      section('Facing', eq.facing.charAt(0).toUpperCase() + eq.facing.slice(1));
+      section('Position', `(${eq.x.toFixed(2)}, ${eq.y.toFixed(2)}) ft`);
+
+      const hasViolation = state.violations.has(eq.id);
+      const statusRow = document.createElement('div');
+      statusRow.className = 'equipment-detail-row';
+      const statusLbl = document.createElement('span');
+      statusLbl.className = 'equipment-detail-label';
+      statusLbl.textContent = 'NEC Status';
+      const statusVal = document.createElement('span');
+      statusVal.className = `equipment-detail-value equipment-detail-status${hasViolation ? ' equipment-detail-status--violation' : ' equipment-detail-status--ok'}`;
+      statusVal.textContent = hasViolation ? 'Violation' : 'Compliant';
+      statusRow.appendChild(statusLbl);
+      statusRow.appendChild(statusVal);
+      card.appendChild(statusRow);
+
+      if (listItem && listItem.notes) {
+        const notesDivider = document.createElement('hr');
+        notesDivider.className = 'equipment-detail-divider';
+        card.appendChild(notesDivider);
+        section('Notes', listItem.notes);
+      }
+
+      body.appendChild(card);
+    }
+  });
+}
+
 // ── Canvas interactions ───────────────────────────────────────────────────────
 
 function bindCanvasInteractions() {
@@ -924,6 +1006,14 @@ function bindCanvasInteractions() {
       render();
     }
     showContextMenu(event.clientX, event.clientY, picked);
+  });
+
+  canvas.addEventListener('dblclick', event => {
+    const { xFt, yFt } = toFeetCoordinates(event);
+    const picked = pickEquipmentAtPoint(xFt, yFt);
+    if (picked) {
+      showEquipmentDetailModal(picked);
+    }
   });
 
   canvas.addEventListener('pointerdown', event => {
