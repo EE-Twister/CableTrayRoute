@@ -29,8 +29,8 @@
 .equipment-arrangement-sidebar label { display:flex; flex-direction:column; gap:.25rem; font-size:.86rem; }
 .equipment-arrangement-canvas-wrap { display:flex; flex-direction:column; gap:.5rem; }
 .equipment-canvas-toolbar { display:flex; gap:.5rem; align-items:center; flex-wrap:wrap; }
-#equipment-arrangement-canvas { width:100%; min-height:70vh; border:1px solid var(--border-color,#7d8790); border-radius:10px; background:linear-gradient(180deg,rgba(140,165,188,.15),rgba(27,32,43,.05)); }
-.equipment-room-fill { fill:rgba(33,43,58,.08); stroke:none; }
+#equipment-arrangement-canvas { width:100%; min-height:70vh; border:1px solid var(--border-color,#7d8790); border-radius:10px; background:var(--secondary-color,#fff); user-select:none; }
+.equipment-room-fill { fill:color-mix(in srgb,var(--secondary-color,#f8fafc) 88%,#9eb8d4 12%); stroke:none; }
 .equipment-room-wall { stroke:rgba(66,78,98,.95); stroke-width:2; fill:none; stroke-linecap:square; }
 .equipment-wall-label,.equipment-room-text { fill:var(--text-color,#1f2b3a); /* font-size set dynamically by JS */ }
 .equipment-doorway-panel { stroke:rgba(66,78,98,.95); stroke-width:1.5; fill:none; }
