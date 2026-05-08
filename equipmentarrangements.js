@@ -301,12 +301,14 @@ function drawRect(rect, className, fillOpacity = 1) {
 }
 
 // Font size scales proportionally with zoom so text stays readable without crowding.
+// No minimum: at low scale the SVG viewBox is small so the SVG is scaled up by the browser,
+// keeping the physical pixel size consistent. A minimum would make text appear huge at low zoom.
 function labelFontSize(variant) {
-  if (variant === 'meta')  return Math.max(6,  Math.min(10, state.scale * 0.40));
-  if (variant === 'block') return Math.max(7,  Math.min(12, state.scale * 0.50));
-  if (variant === 'wall')  return Math.max(8,  Math.min(14, state.scale * 0.60));
-  if (variant === 'door')  return Math.max(7,  Math.min(11, state.scale * 0.45));
-  return Math.max(8, Math.min(14, state.scale * 0.60));
+  if (variant === 'meta')  return Math.min(10, state.scale * 0.40);
+  if (variant === 'block') return Math.min(12, state.scale * 0.50);
+  if (variant === 'wall')  return Math.min(14, state.scale * 0.60);
+  if (variant === 'door')  return Math.min(11, state.scale * 0.45);
+  return Math.min(14, state.scale * 0.60);
 }
 
 function drawText(text, xFt, yFt, className = 'equipment-room-text', variant = 'wall') {
@@ -925,6 +927,8 @@ function bindCanvasInteractions() {
   });
 
   canvas.addEventListener('pointerdown', event => {
+    if (event.button !== 0) return;
+    event.preventDefault(); // prevent text-selection on shift+click
     const { xFt, yFt } = toFeetCoordinates(event);
     if (state.wallDraw.enabled) {
       state.selectedIds.clear();
