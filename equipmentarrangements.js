@@ -114,6 +114,32 @@ function interiorWallRect(wall) {
 }
 
 function accessViolation(eq, workspace) {
+  const doorwayAccess = state.room.doorways.some(door => {
+    if (!door.isEgress) return false;
+    const clearance = 0.5;
+    switch (door.wall) {
+      case 'north': {
+        const overlapsX = workspace.x <= door.position + door.width && workspace.x + workspace.w >= door.position;
+        return overlapsX && workspace.y <= clearance;
+      }
+      case 'south': {
+        const overlapsX = workspace.x <= door.position + door.width && workspace.x + workspace.w >= door.position;
+        return overlapsX && workspace.y + workspace.h >= state.room.depth - clearance;
+      }
+      case 'east': {
+        const overlapsY = workspace.y <= door.position + door.width && workspace.y + workspace.h >= door.position;
+        return overlapsY && workspace.x + workspace.w >= state.room.width - clearance;
+      }
+      case 'west': {
+        const overlapsY = workspace.y <= door.position + door.width && workspace.y + workspace.h >= door.position;
+        return overlapsY && workspace.x <= clearance;
+      }
+      default:
+        return false;
+    }
+  });
+  if (doorwayAccess) return false;
+
   const left = workspace.x;
   const right = state.room.width - (workspace.x + workspace.w);
   const top = workspace.y;
