@@ -28,11 +28,20 @@ body.dark-mode h4 {
 
 input[type="number"], input[type="text"], select {
     width: 100%;
-    padding: 8px;
-    margin-bottom: 8px;
+    min-height: 2.5rem;
+    padding: 0.5rem 0.625rem;
+    margin-bottom: var(--space-2);
     border: 1px solid var(--border-color);
     border-radius: 4px;
     box-sizing: border-box;
+}
+
+input[type="number"]:focus-visible,
+input[type="text"]:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+    outline: 2px solid var(--focus-ring-color);
+    outline-offset: 2px;
 }
 
 /* Highlight invalid fields */
@@ -92,11 +101,12 @@ button, .primary-btn {
     color: var(--button-text);
     padding: var(--button-padding);
     margin: var(--button-margin);
+    min-height: 2.5rem;
     border: 1px solid var(--button-bg);
     border-radius: 4px;
     cursor: pointer;
     font-size: 0.9rem;
-    transition: background-color 0.2s;
+    transition: background-color 0.2s, border-color 0.2s, box-shadow 0.2s;
 }
 button:hover, .primary-btn:hover {
     background-color: var(--button-hover-bg);
@@ -217,6 +227,16 @@ body.compact-mode #palette button .palette-icon {
     width: 100%;
     padding: 12px;
 }
+
+.secondary-btn {
+    background-color: var(--secondary-color);
+    color: var(--text-color);
+    border-color: var(--border-color);
+}
+
+.secondary-btn:hover {
+    background-color: color-mix(in srgb, var(--secondary-color) 80%, var(--text-color));
+}
 .primary-btn:hover {
     background-color: var(--button-hover-bg, #0056b3);
 }
@@ -322,4 +342,3 @@ details > summary {
         min-height: 44px;
     }
 }
-
