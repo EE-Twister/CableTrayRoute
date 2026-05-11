@@ -187,6 +187,7 @@ body.modal-open {
     max-height: var(--size-help-modal-height);
     overflow-y: auto;
     position: relative;
+    box-shadow: var(--elevation-md);
 }
 
 @media (max-width: 480px) {
@@ -215,6 +216,44 @@ body.modal-open {
     display: flex;
     flex-direction: column;
     gap: var(--spacing-base);
+}
+
+.modal-title {
+    margin-right: 2rem;
+}
+
+.modal-description {
+    margin: 0;
+    color: var(--color-text-muted, #64748b);
+}
+
+.modal-actions {
+    margin-top: var(--space-4);
+    display: flex;
+    gap: var(--space-2);
+    justify-content: flex-end;
+    flex-wrap: wrap;
+}
+
+.modal-actions .btn {
+    min-width: 8rem;
+}
+
+.close-btn:focus-visible {
+    outline: 2px solid var(--focus-ring-color);
+    outline-offset: 2px;
+}
+
+@media (max-width: 640px) {
+    .modal-actions {
+        flex-direction: column-reverse;
+        align-items: stretch;
+    }
+
+    .modal-actions .btn {
+        width: 100%;
+        min-width: 0;
+    }
 }
 
 .modal-field-grid,
@@ -669,4 +708,3 @@ body.dark-mode .shortcuts-table kbd {
     color: var(--color-text-muted, #6c757d);
     text-align: center;
 }
-
