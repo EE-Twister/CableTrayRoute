@@ -16,6 +16,12 @@ if (typeof window !== 'undefined') {
         { key: 'voltage', label: 'Voltage (V)', type: 'text' },
         { key: 'category', label: 'Category', type: 'text' },
         { key: 'subCategory', label: 'Sub-Category', type: 'text' },
+        { key: 'arrangement', label: 'Arrangement', type: 'text' },
+        { key: 'width', label: 'Width (ft)', type: 'number', step: 'any', maxlength: 15, validate: 'numeric' },
+        { key: 'depth', label: 'Depth (ft)', type: 'number', step: 'any', maxlength: 15, validate: 'numeric' },
+        { key: 'height', label: 'Height (ft)', type: 'number', step: 'any', maxlength: 15, validate: 'numeric' },
+        { key: 'baseElevation', label: 'Base Elev. (ft)', type: 'number', step: 'any', maxlength: 15, validate: 'numeric' },
+        { key: 'lineup', label: 'Lineup', type: 'text' },
         { key: 'manufacturer', label: 'Manufacturer', type: 'text', className: 'manufacturer-input', filter: 'dropdown' },
         { key: 'model', label: 'Model', type: 'text', className: 'model-input' },
         { key: 'phases', label: 'Phases', type: 'text' },
@@ -75,6 +81,8 @@ if (typeof window !== 'undefined') {
     const presetSelect = document.getElementById('equipment-preset-select');
     const savePresetBtn = document.getElementById('save-equipment-preset-btn');
     const bulkCategoryBtn = document.getElementById('bulk-category-btn');
+    const bulkArrangementBtn = document.getElementById('bulk-arrangement-btn');
+    const bulkLineupBtn = document.getElementById('bulk-lineup-btn');
     const clearFiltersBtn = document.getElementById('clear-equipment-filters-btn');
     const resultsCount = document.getElementById('equipment-results-count');
     const quickFilters = document.getElementById('equipment-quick-filters');
@@ -252,7 +260,7 @@ if (typeof window !== 'undefined') {
     };
 
     if (searchInput) {
-      table.globalFilterCols = ['tag', 'description', 'manufacturer', 'category', 'model'];
+      table.globalFilterCols = ['tag', 'description', 'arrangement', 'lineup', 'manufacturer', 'category', 'model'];
       searchInput.addEventListener('input', applyEquipmentFilters);
     }
 
@@ -308,6 +316,52 @@ if (typeof window !== 'undefined') {
           const cell = row.cells[categoryIdx + table.colOffset];
           const input = cell && cell.firstChild ? cell.firstChild : null;
           if (input) input.value = categoryValue;
+        });
+        if (selectedRows.length) {
+          table.save();
+          if (table.onChange) table.onChange();
+        }
+      });
+    }
+
+    if (bulkArrangementBtn) {
+      bulkArrangementBtn.addEventListener('click', () => {
+        const targetArrangement = window.prompt('Assign selected rows to arrangement:');
+        if (targetArrangement === null) return;
+        const arrangementValue = targetArrangement.trim();
+        const arrangementIdx = getColumnIndex('arrangement');
+        if (arrangementIdx === -1) return;
+        const selectedRows = Array.from(table.tbody.rows).filter(row => {
+          const checkbox = row.querySelector('.row-select');
+          return checkbox && checkbox.checked;
+        });
+        selectedRows.forEach(row => {
+          const cell = row.cells[arrangementIdx + table.colOffset];
+          const input = cell && cell.firstChild ? cell.firstChild : null;
+          if (input) input.value = arrangementValue;
+        });
+        if (selectedRows.length) {
+          table.save();
+          if (table.onChange) table.onChange();
+        }
+      });
+    }
+
+    if (bulkLineupBtn) {
+      bulkLineupBtn.addEventListener('click', () => {
+        const targetLineup = window.prompt('Assign selected rows to lineup:');
+        if (targetLineup === null) return;
+        const lineupValue = targetLineup.trim();
+        const lineupIdx = getColumnIndex('lineup');
+        if (lineupIdx === -1) return;
+        const selectedRows = Array.from(table.tbody.rows).filter(row => {
+          const checkbox = row.querySelector('.row-select');
+          return checkbox && checkbox.checked;
+        });
+        selectedRows.forEach(row => {
+          const cell = row.cells[lineupIdx + table.colOffset];
+          const input = cell && cell.firstChild ? cell.firstChild : null;
+          if (input) input.value = lineupValue;
         });
         if (selectedRows.length) {
           table.save();
@@ -409,6 +463,20 @@ if (typeof window !== 'undefined') {
       'Voltage': 'voltage',
       'Category': 'category',
       'Sub-Category': 'subCategory',
+      'Arrangement': 'arrangement',
+      'Equipment Arrangement': 'arrangement',
+      'Layout': 'arrangement',
+      'Width': 'width',
+      'Width (ft)': 'width',
+      'Depth': 'depth',
+      'Depth (ft)': 'depth',
+      'Height': 'height',
+      'Height (ft)': 'height',
+      'Base Elev.': 'baseElevation',
+      'Base Elevation': 'baseElevation',
+      'Base Elev. (ft)': 'baseElevation',
+      'Base Elevation (ft)': 'baseElevation',
+      'Lineup': 'lineup',
       'Manufacturer': 'manufacturer',
       'Model': 'model',
       'Phases': 'phases',

@@ -4,16 +4,26 @@ import { openModal } from './src/components/modal.js';
 const WALL_TYPES = ['Concrete', 'CMU', 'Gypsum', 'Metal', 'Fire Rated', 'Removable Panel'];
 const VOLTAGE_OPTIONS = ['120V', '208V', '480V', '600V', '4.16kV', '13.8kV', '15kV'];
 const DEFAULT_SCALE = 20;
+const DEFAULT_EQUIPMENT_HEIGHT = 7;
+const ELEVATION_WALL_TOLERANCE_FT = 1;
 const MAX_HISTORY = 50;
+const ARRANGEMENTS_KEY = 'equipmentArrangements';
+const WALL_IDS = ['north', 'south', 'east', 'west'];
 
-const state = {
-  room: {
+function defaultRoom() {
+  return {
     width: 30,
     depth: 20,
     walls: { north: 'Concrete', south: 'Concrete', east: 'CMU', west: 'CMU' },
     interiorWalls: [],
     doorways: []
-  },
+  };
+}
+
+const state = {
+  arrangements: [],
+  activeArrangementId: null,
+  room: defaultRoom(),
   equipment: [],
   scale: DEFAULT_SCALE,
   selectedIds: new Set(),
@@ -24,12 +34,17 @@ const state = {
     start: null,
     current: null
   },
+  canvasPadding: 20,
+  showDimensions: true,
   violations: new Set(),
+  violationDetails: new Map(),
   history: []
 };
 
 let canvas;
+let elevationCanvas;
 let summaryEl;
+let clearanceDetailsEl;
 let contextMenu = null;
 
 function clamp(value, min, max) {
@@ -41,9 +56,184 @@ function parseNumber(input, fallback) {
   return Number.isFinite(value) ? value : fallback;
 }
 
+function numberFromFields(source, keys, fallback) {
+  if (!source) return fallback;
+  for (const key of keys) {
+    const raw = source[key];
+    if (raw === undefined || raw === null || raw === '') continue;
+    const value = parseNumber(raw, Number.NaN);
+    if (Number.isFinite(value)) return value;
+  }
+  return fallback;
+}
+
+function equipmentHeightFromSource(source) {
+  return clamp(numberFromFields(source, ['height', 'heightFt', 'equipmentHeight', 'elevationHeight', 'enclosureHeight'], DEFAULT_EQUIPMENT_HEIGHT), 1, 40);
+}
+
+function equipmentBaseElevationFromSource(source) {
+  return clamp(numberFromFields(source, ['baseElevation', 'baseElevationFt', 'mountingHeight', 'z'], 0), 0, 60);
+}
+
 function snapToStep(value, step = 0.5) {
   if (!Number.isFinite(value)) return 0;
   return Math.round(value / step) * step;
+}
+
+function uniqueId(prefix) {
+  return `${prefix}-${Date.now()}-${Math.round(Math.random() * 1000)}`;
+}
+
+function cloneRoom(room = defaultRoom()) {
+  const fallback = defaultRoom();
+  return {
+    width: clamp(parseNumber(room.width, fallback.width), 8, 200),
+    depth: clamp(parseNumber(room.depth, fallback.depth), 8, 200),
+    walls: {
+      north: room.walls?.north || fallback.walls.north,
+      south: room.walls?.south || fallback.walls.south,
+      east: room.walls?.east || fallback.walls.east,
+      west: room.walls?.west || fallback.walls.west
+    },
+    interiorWalls: Array.isArray(room.interiorWalls)
+      ? room.interiorWalls.map(wall => ({ ...wall }))
+      : [],
+    doorways: Array.isArray(room.doorways)
+      ? room.doorways.map(door => ({ swing: 'in', ...door }))
+      : []
+  };
+}
+
+function cloneEquipmentList(equipment = []) {
+  return Array.isArray(equipment) ? equipment.map(eq => ({ ...eq })) : [];
+}
+
+function cloneSavedViews(savedViews = []) {
+  return Array.isArray(savedViews)
+    ? savedViews.map((view, index) => ({
+        id: view.id || uniqueId('view'),
+        name: view.name || `View ${index + 1}`,
+        scale: clamp(parseNumber(view.scale, DEFAULT_SCALE), 8, 45),
+        elevationWall: ['north', 'south', 'east', 'west', 'selected'].includes(view.elevationWall) ? view.elevationWall : 'south',
+        showDimensions: view.showDimensions !== false,
+        selectedIds: Array.isArray(view.selectedIds) ? view.selectedIds.map(String) : []
+      }))
+    : [];
+}
+
+function createArrangement(name, source = null) {
+  return {
+    id: uniqueId('arr'),
+    name: name || 'Arrangement',
+    room: cloneRoom(source?.room),
+    equipment: cloneEquipmentList(source?.equipment),
+    scale: clamp(parseNumber(source?.scale, DEFAULT_SCALE), 8, 45),
+    source: source?.source || 'manual',
+    listAssignment: source?.listAssignment || '',
+    savedViews: cloneSavedViews(source?.savedViews)
+  };
+}
+
+function hydrateArrangement(record, index) {
+  const fallbackName = `Arrangement ${index + 1}`;
+  const arrangement = createArrangement(record?.name || fallbackName, record);
+  if (record?.id) arrangement.id = String(record.id);
+  return arrangement;
+}
+
+function activeArrangementIndex() {
+  return state.arrangements.findIndex(arrangement => arrangement.id === state.activeArrangementId);
+}
+
+function getActiveArrangement() {
+  return state.arrangements[activeArrangementIndex()] || state.arrangements[0] || null;
+}
+
+function snapshotActiveArrangement() {
+  const active = getActiveArrangement();
+  return {
+    id: active?.id || state.activeArrangementId || uniqueId('arr'),
+    name: active?.name || 'Arrangement 1',
+    room: cloneRoom(state.room),
+    equipment: cloneEquipmentList(state.equipment),
+    scale: state.scale,
+    source: active?.source || 'manual',
+    listAssignment: active?.listAssignment || '',
+    savedViews: cloneSavedViews(active?.savedViews)
+  };
+}
+
+function saveActiveArrangementToMemory() {
+  if (!state.arrangements.length) return;
+  const snapshot = snapshotActiveArrangement();
+  const index = activeArrangementIndex();
+  if (index === -1) {
+    state.arrangements.push(snapshot);
+    state.activeArrangementId = snapshot.id;
+  } else {
+    state.arrangements[index] = snapshot;
+  }
+}
+
+let arrangementPersistTimer = null;
+let applyingArrangement = false;
+
+function persistArrangements() {
+  if (!state.arrangements.length) return;
+  saveActiveArrangementToMemory();
+  dataStore.setItem(ARRANGEMENTS_KEY, {
+    activeArrangementId: state.activeArrangementId,
+    arrangements: state.arrangements.map(arrangement => ({
+      id: arrangement.id,
+      name: arrangement.name,
+      room: cloneRoom(arrangement.room),
+      equipment: cloneEquipmentList(arrangement.equipment),
+      scale: arrangement.scale,
+      source: arrangement.source || 'manual',
+      listAssignment: arrangement.listAssignment || '',
+      savedViews: cloneSavedViews(arrangement.savedViews)
+    }))
+  });
+}
+
+function scheduleArrangementPersist() {
+  if (applyingArrangement || !state.arrangements.length || typeof window === 'undefined') return;
+  if (arrangementPersistTimer) window.clearTimeout(arrangementPersistTimer);
+  arrangementPersistTimer = window.setTimeout(() => {
+    arrangementPersistTimer = null;
+    persistArrangements();
+  }, 120);
+}
+
+function applyArrangementToState(arrangement) {
+  if (!arrangement) return;
+  applyingArrangement = true;
+  state.activeArrangementId = arrangement.id;
+  state.room = cloneRoom(arrangement.room);
+  state.equipment = cloneEquipmentList(arrangement.equipment);
+  state.scale = clamp(parseNumber(arrangement.scale, DEFAULT_SCALE), 8, 45);
+  state.selectedIds = new Set();
+  state.drag = null;
+  state.wallDraw.start = null;
+  state.wallDraw.current = null;
+  state.history = [];
+  syncRoomControls();
+  applyingArrangement = false;
+}
+
+function loadArrangements() {
+  const stored = dataStore.getItem(ARRANGEMENTS_KEY, null);
+  const records = Array.isArray(stored?.arrangements)
+    ? stored.arrangements
+    : (Array.isArray(stored) ? stored : []);
+  state.arrangements = records.length
+    ? records.map((record, index) => hydrateArrangement(record, index))
+    : [createArrangement('Arrangement 1')];
+  const storedActiveId = stored?.activeArrangementId;
+  state.activeArrangementId = state.arrangements.some(arrangement => arrangement.id === storedActiveId)
+    ? storedActiveId
+    : state.arrangements[0].id;
+  applyArrangementToState(getActiveArrangement());
 }
 
 // NEC 110.26 Condition 2 applies when the facing wall is grounded (metal).
@@ -163,34 +353,55 @@ function accessViolation(eq, workspace) {
   return false;
 }
 
+function addViolationDetail(violations, details, eq, message) {
+  violations.add(eq.id);
+  if (!details.has(eq.id)) details.set(eq.id, []);
+  const messages = details.get(eq.id);
+  if (!messages.includes(message)) messages.push(message);
+}
+
 function evaluateViolations() {
   const violations = new Set();
+  const details = new Map();
 
   state.equipment.forEach(eq => {
     const eqRect = equipmentRect(eq);
     const workspace = workspaceRect(eq);
 
-    if (!insideRoom(eqRect) || !insideRoom(workspace)) {
-      violations.add(eq.id);
-      return;
+    if (!insideRoom(eqRect)) {
+      addViolationDetail(violations, details, eq, 'Equipment footprint extends outside the room.');
     }
 
-    const overlapsEquipment = state.equipment.some(other => {
-      if (other.id === eq.id) return false;
-      return intersects(eqRect, equipmentRect(other)) || intersects(workspace, equipmentRect(other));
+    if (!insideRoom(workspace)) {
+      addViolationDetail(violations, details, eq, 'Required working clearance extends outside the room.');
+    }
+
+    state.equipment.forEach(other => {
+      if (other.id === eq.id) return;
+      const otherRect = equipmentRect(other);
+      if (intersects(eqRect, otherRect)) {
+        addViolationDetail(violations, details, eq, `Footprint overlaps ${other.name}.`);
+      } else if (intersects(workspace, otherRect)) {
+        addViolationDetail(violations, details, eq, `Working clearance is blocked by ${other.name}.`);
+      }
     });
 
-    const overlapsInterior = state.room.interiorWalls.some(wall => {
+    state.room.interiorWalls.forEach(wall => {
       const wallRect = interiorWallRect(wall);
-      return intersects(eqRect, wallRect) || intersects(workspace, wallRect);
+      if (intersects(eqRect, wallRect)) {
+        addViolationDetail(violations, details, eq, `Footprint overlaps an interior ${wall.type} wall.`);
+      } else if (intersects(workspace, wallRect)) {
+        addViolationDetail(violations, details, eq, `Working clearance is blocked by an interior ${wall.type} wall.`);
+      }
     });
 
-    if (overlapsEquipment || overlapsInterior || accessViolation(eq, workspace)) {
-      violations.add(eq.id);
+    if (accessViolation(eq, workspace)) {
+      addViolationDetail(violations, details, eq, 'Working space does not have a clear access path or egress doorway.');
     }
   });
 
   state.violations = violations;
+  state.violationDetails = details;
 }
 
 // ── History / Undo ──────────────────────────────────────────────────────────
@@ -253,9 +464,48 @@ function populateEquipmentPreset() {
   if (options[0]?.item) {
     const widthInput = document.getElementById('equipment-width');
     const depthInput = document.getElementById('equipment-depth');
+    const heightInput = document.getElementById('equipment-height');
+    const baseElevationInput = document.getElementById('equipment-base-elevation');
     widthInput.value = parseNumber(options[0].item.width, 4);
     depthInput.value = parseNumber(options[0].item.depth, 2);
+    heightInput.value = equipmentHeightFromSource(options[0].item);
+    baseElevationInput.value = equipmentBaseElevationFromSource(options[0].item);
   }
+}
+
+function syncRoomControls() {
+  const widthInput = document.getElementById('room-width');
+  const depthInput = document.getElementById('room-depth');
+  if (widthInput) widthInput.value = state.room.width;
+  if (depthInput) depthInput.value = state.room.depth;
+  ['north', 'south', 'east', 'west'].forEach(direction => {
+    const select = document.getElementById(`wall-${direction}`);
+    if (select) select.value = state.room.walls[direction];
+  });
+}
+
+function renderArrangementControls() {
+  const select = document.getElementById('arrangement-select');
+  const nameInput = document.getElementById('arrangement-name');
+  const countEl = document.getElementById('arrangement-count');
+  const deleteButton = document.getElementById('delete-arrangement');
+  if (!select || !nameInput || !countEl) return;
+
+  const active = getActiveArrangement();
+  const activeIndex = Math.max(0, activeArrangementIndex());
+  select.innerHTML = '';
+  state.arrangements.forEach((arrangement, index) => {
+    const option = document.createElement('option');
+    option.value = arrangement.id;
+    option.textContent = `${index + 1}. ${arrangement.name}`;
+    select.appendChild(option);
+  });
+  if (active) {
+    select.value = active.id;
+    nameInput.value = active.name;
+  }
+  countEl.textContent = `${activeIndex + 1} of ${state.arrangements.length}`;
+  if (deleteButton) deleteButton.disabled = state.arrangements.length <= 1;
 }
 
 function renderInteriorWallList() {
@@ -295,8 +545,9 @@ function renderDoorwayList() {
   state.room.doorways.forEach((dw, index) => {
     const row = document.createElement('div');
     row.className = 'equipment-mini-list-row';
-    const tag = dw.isEgress ? ' · EGRESS' : '';
-    row.innerHTML = `<span>${dw.wall} wall · ${dw.width.toFixed(1)} ft wide · ${dw.position.toFixed(1)} ft from corner${tag}</span>`;
+    const swingText = dw.swing === 'out' ? 'swings out' : 'swings in';
+    const tag = dw.isEgress ? ' - EGRESS' : '';
+    row.innerHTML = `<span>${dw.wall} wall - ${dw.width.toFixed(1)} ft wide - ${dw.position.toFixed(1)} ft from corner - ${swingText}${tag}</span>`;
     const remove = document.createElement('button');
     remove.className = 'btn';
     remove.type = 'button';
@@ -312,6 +563,165 @@ function renderDoorwayList() {
 }
 
 // ── Canvas drawing helpers ───────────────────────────────────────────────────
+
+function activeSavedViews() {
+  const active = getActiveArrangement();
+  if (!active) return [];
+  if (!Array.isArray(active.savedViews)) active.savedViews = [];
+  return active.savedViews;
+}
+
+function renderSavedViewControls() {
+  const select = document.getElementById('saved-view-select');
+  const nameInput = document.getElementById('saved-view-name');
+  const applyButton = document.getElementById('apply-view');
+  const deleteButton = document.getElementById('delete-view');
+  const dimensionsToggle = document.getElementById('show-dimensions');
+  if (dimensionsToggle) dimensionsToggle.checked = state.showDimensions;
+  if (!select) return;
+
+  const views = activeSavedViews();
+  const previous = select.value;
+  select.innerHTML = '';
+  if (!views.length) {
+    const option = document.createElement('option');
+    option.value = '';
+    option.textContent = 'No saved views';
+    select.appendChild(option);
+  } else {
+    views.forEach(view => {
+      const option = document.createElement('option');
+      option.value = view.id;
+      option.textContent = view.name;
+      select.appendChild(option);
+    });
+  }
+
+  const nextValue = views.some(view => view.id === previous) ? previous : (views[0]?.id || '');
+  select.value = nextValue;
+  const activeView = views.find(view => view.id === nextValue);
+  if (nameInput && document.activeElement !== nameInput) {
+    nameInput.value = activeView?.name || '';
+  }
+  if (applyButton) applyButton.disabled = !activeView;
+  if (deleteButton) deleteButton.disabled = !activeView;
+}
+
+function renderClearanceDetails() {
+  if (!clearanceDetailsEl) return;
+  clearanceDetailsEl.innerHTML = '';
+  if (!state.equipment.length) {
+    clearanceDetailsEl.textContent = 'Clearance details will appear after equipment is placed.';
+    return;
+  }
+  if (!state.violationDetails.size) {
+    clearanceDetailsEl.textContent = 'All equipment currently clears the modeled room, walls, doors, and other equipment.';
+    return;
+  }
+
+  const list = document.createElement('ul');
+  state.equipment
+    .filter(eq => state.violationDetails.has(eq.id))
+    .forEach(eq => {
+      const item = document.createElement('li');
+      const title = document.createElement('strong');
+      title.textContent = eq.name;
+      const detail = document.createElement('span');
+      detail.textContent = `: ${state.violationDetails.get(eq.id).join(' ')}`;
+      item.appendChild(title);
+      item.appendChild(detail);
+      list.appendChild(item);
+    });
+  clearanceDetailsEl.appendChild(list);
+}
+
+function applyIconButton(button, config) {
+  if (!button) return;
+  button.classList.add('equipment-icon-btn');
+  button.setAttribute('aria-label', config.label);
+  button.setAttribute('title', config.title || config.label);
+  button.dataset.tooltip = config.tooltip || config.label;
+  button.textContent = '';
+
+  if (config.icon) {
+    const icon = document.createElement('img');
+    icon.src = config.icon;
+    icon.alt = '';
+    icon.className = 'control-icon';
+    icon.loading = 'lazy';
+    icon.decoding = 'async';
+    icon.setAttribute('aria-hidden', 'true');
+    button.appendChild(icon);
+  } else {
+    const symbol = document.createElement('span');
+    symbol.className = 'equipment-toolbar-symbol';
+    symbol.setAttribute('aria-hidden', 'true');
+    symbol.innerHTML = config.symbolHtml || '';
+    button.appendChild(symbol);
+  }
+
+  const label = document.createElement('span');
+  label.className = 'sr-only';
+  label.textContent = config.label;
+  button.appendChild(label);
+}
+
+function compactToolbarControls() {
+  const buttonConfigs = {
+    'prev-arrangement': { label: 'Previous arrangement', symbolHtml: '&lsaquo;' },
+    'next-arrangement': { label: 'Next arrangement', symbolHtml: '&rsaquo;' },
+    'add-arrangement': { label: 'Add arrangement', icon: 'icons/toolbar/add-arrangement.svg' },
+    'duplicate-arrangement': { label: 'Duplicate arrangement', icon: 'icons/toolbar/copy.svg' },
+    'delete-arrangement': { label: 'Delete arrangement', icon: 'icons/toolbar/trash.svg' },
+    'zoom-out': { label: 'Zoom out', symbolHtml: '&minus;' },
+    'zoom-in': { label: 'Zoom in', symbolHtml: '+' },
+    'undo-action': { label: 'Undo last action', title: 'Undo last action (Ctrl+Z)', tooltip: 'Undo', icon: 'icons/toolbar/undo.svg' },
+    'delete-selected-equipment': { label: 'Delete selected equipment', tooltip: 'Delete selected', icon: 'icons/toolbar/delete-selected.svg' },
+    'auto-layout-equipment': { label: 'Auto layout equipment', tooltip: 'Auto layout', icon: 'icons/toolbar/auto-layout.svg' },
+    'build-arrangements-from-list': { label: 'Build arrangements from equipment list', tooltip: 'Build from list', icon: 'icons/toolbar/import.svg' },
+    'snap-selected': { label: 'Snap selected equipment to grid', tooltip: 'Snap selected', icon: 'icons/toolbar/snap.svg' },
+    'align-selected-west': { label: 'Align selected equipment west', tooltip: 'Align west', icon: 'icons/toolbar/align-left.svg' },
+    'align-selected-south': { label: 'Align selected equipment south', tooltip: 'Align south', icon: 'icons/toolbar/align-bottom.svg' },
+    'equal-space-selected': { label: 'Equal-space selected equipment', tooltip: 'Equal space', icon: 'icons/toolbar/distribute-h.svg' },
+    'assign-lineup': { label: 'Assign selected equipment to lineup', tooltip: 'Assign lineup', icon: 'icons/toolbar/connect.svg' },
+    'select-lineup': { label: 'Select lineup equipment', tooltip: 'Select lineup', icon: 'icons/equipment.svg' },
+    'space-lineup': { label: 'Space lineup equipment evenly', tooltip: 'Space lineup', icon: 'icons/toolbar/distribute-v.svg' },
+    'save-view': { label: 'Save view', icon: 'icons/toolbar/validate.svg' },
+    'apply-view': { label: 'Apply view', icon: 'icons/toolbar/redo.svg' },
+    'delete-view': { label: 'Delete view', icon: 'icons/toolbar/delete-view.svg' },
+    'export-layout-report': { label: 'Export layout sheet SVG', tooltip: 'Export sheet SVG', icon: 'icons/toolbar/export.svg' },
+    'download-elevation-svg': { label: 'Download elevation SVG', tooltip: 'Download SVG', icon: 'icons/toolbar/download.svg' }
+  };
+
+  Object.entries(buttonConfigs).forEach(([id, config]) => {
+    applyIconButton(document.getElementById(id), config);
+  });
+
+  const dimensionsToggle = document.getElementById('show-dimensions');
+  const dimensionsLabel = dimensionsToggle?.closest('label');
+  if (!dimensionsLabel) return;
+  dimensionsLabel.classList.remove('equipment-checkbox-label');
+  dimensionsLabel.classList.add('equipment-icon-toggle');
+  dimensionsLabel.setAttribute('title', 'Show dimensions');
+  dimensionsLabel.dataset.tooltip = 'Dimensions';
+  Array.from(dimensionsLabel.childNodes).forEach(node => {
+    if (node.nodeType === Node.TEXT_NODE) node.remove();
+  });
+  if (!dimensionsLabel.querySelector('img')) {
+    const icon = document.createElement('img');
+    icon.src = 'icons/toolbar/dimension.svg';
+    icon.alt = '';
+    icon.className = 'control-icon';
+    icon.loading = 'lazy';
+    icon.decoding = 'async';
+    icon.setAttribute('aria-hidden', 'true');
+    const label = document.createElement('span');
+    label.className = 'sr-only';
+    label.textContent = 'Show dimensions';
+    dimensionsLabel.appendChild(icon);
+    dimensionsLabel.appendChild(label);
+  }
+}
 
 function drawRect(rect, className, fillOpacity = 1) {
   const element = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
@@ -346,6 +756,45 @@ function drawText(text, xFt, yFt, className = 'equipment-room-text', variant = '
   element.style.fontSize = `${labelFontSize(variant)}px`;
   element.textContent = text;
   canvas.appendChild(element);
+}
+
+function drawLine(x1Ft, y1Ft, x2Ft, y2Ft, className) {
+  const element = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+  element.setAttribute('x1', String(x1Ft * state.scale));
+  element.setAttribute('y1', String(y1Ft * state.scale));
+  element.setAttribute('x2', String(x2Ft * state.scale));
+  element.setAttribute('y2', String(y2Ft * state.scale));
+  element.setAttribute('class', className);
+  canvas.appendChild(element);
+  return element;
+}
+
+function drawDimensionText(text, xFt, yFt, anchor = 'middle', rotate = false) {
+  const element = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+  const x = xFt * state.scale;
+  const y = yFt * state.scale;
+  element.setAttribute('x', String(x));
+  element.setAttribute('y', String(y));
+  element.setAttribute('class', 'equipment-dimension-label');
+  element.setAttribute('text-anchor', anchor);
+  if (rotate) element.setAttribute('transform', `rotate(-90 ${x} ${y})`);
+  element.textContent = text;
+  canvas.appendChild(element);
+  return element;
+}
+
+function drawHorizontalDimension(x1Ft, x2Ft, yFt, label) {
+  drawLine(x1Ft, yFt, x2Ft, yFt, 'equipment-dimension-line');
+  drawLine(x1Ft, yFt - 0.18, x1Ft, yFt + 0.18, 'equipment-dimension-tick');
+  drawLine(x2Ft, yFt - 0.18, x2Ft, yFt + 0.18, 'equipment-dimension-tick');
+  drawDimensionText(label, (x1Ft + x2Ft) / 2, yFt - 0.15);
+}
+
+function drawVerticalDimension(xFt, y1Ft, y2Ft, label) {
+  drawLine(xFt, y1Ft, xFt, y2Ft, 'equipment-dimension-line');
+  drawLine(xFt - 0.18, y1Ft, xFt + 0.18, y1Ft, 'equipment-dimension-tick');
+  drawLine(xFt - 0.18, y2Ft, xFt + 0.18, y2Ft, 'equipment-dimension-tick');
+  drawDimensionText(label, xFt - 0.15, (y1Ft + y2Ft) / 2, 'middle', true);
 }
 
 function drawWallLabel(text, xFt, yFt, anchor = 'start') {
@@ -400,6 +849,7 @@ function renderDoorways() {
   state.room.doorways.forEach(dw => {
     const p = dw.position;
     const w = dw.width;
+    const swingsOut = dw.swing === 'out';
 
     let panelPath = '';
     let swingPath = '';
@@ -409,35 +859,47 @@ function renderDoorways() {
 
     switch (dw.wall) {
       case 'north': {
-        // Hinge at (p, 0), panel goes into room to (p, w), arc from (p+w,0) to (p,w)
-        panelPath = `M ${p*s},0 L ${p*s},${w*s}`;
-        swingPath = `M ${(p+w)*s},0 A ${w*s},${w*s} 0 0,1 ${p*s},${w*s}`;
+        panelPath = swingsOut
+          ? `M ${p*s},0 L ${p*s},${-w*s}`
+          : `M ${p*s},0 L ${p*s},${w*s}`;
+        swingPath = swingsOut
+          ? `M ${(p+w)*s},0 A ${w*s},${w*s} 0 0,0 ${p*s},${-w*s}`
+          : `M ${(p+w)*s},0 A ${w*s},${w*s} 0 0,1 ${p*s},${w*s}`;
         labelX = (p + w / 2) * s;
-        labelY = -6;
+        labelY = swingsOut ? -w * s - 6 : -6;
         break;
       }
       case 'south': {
-        // Hinge at (p, H), panel goes into room to (p, H-w), arc from (p+w,H) to (p,H-w)
-        panelPath = `M ${p*s},${H*s} L ${p*s},${(H-w)*s}`;
-        swingPath = `M ${(p+w)*s},${H*s} A ${w*s},${w*s} 0 0,0 ${p*s},${(H-w)*s}`;
+        panelPath = swingsOut
+          ? `M ${p*s},${H*s} L ${p*s},${(H+w)*s}`
+          : `M ${p*s},${H*s} L ${p*s},${(H-w)*s}`;
+        swingPath = swingsOut
+          ? `M ${(p+w)*s},${H*s} A ${w*s},${w*s} 0 0,1 ${p*s},${(H+w)*s}`
+          : `M ${(p+w)*s},${H*s} A ${w*s},${w*s} 0 0,0 ${p*s},${(H-w)*s}`;
         labelX = (p + w / 2) * s;
-        labelY = H * s + 14;
+        labelY = swingsOut ? (H + w) * s + 14 : H * s + 14;
         break;
       }
       case 'west': {
-        // Hinge at (0, p), panel into room to (w, p), arc from (0,p+w) to (w,p)
-        panelPath = `M 0,${p*s} L ${w*s},${p*s}`;
-        swingPath = `M 0,${(p+w)*s} A ${w*s},${w*s} 0 0,0 ${w*s},${p*s}`;
-        labelX = -6;
+        panelPath = swingsOut
+          ? `M 0,${p*s} L ${-w*s},${p*s}`
+          : `M 0,${p*s} L ${w*s},${p*s}`;
+        swingPath = swingsOut
+          ? `M 0,${(p+w)*s} A ${w*s},${w*s} 0 0,1 ${-w*s},${p*s}`
+          : `M 0,${(p+w)*s} A ${w*s},${w*s} 0 0,0 ${w*s},${p*s}`;
+        labelX = swingsOut ? -w * s - 6 : -6;
         labelY = (p + w / 2) * s;
         labelAnchor = 'end';
         break;
       }
       case 'east': {
-        // Hinge at (W, p), panel into room to (W-w, p), arc from (W,p+w) to (W-w,p)
-        panelPath = `M ${W*s},${p*s} L ${(W-w)*s},${p*s}`;
-        swingPath = `M ${W*s},${(p+w)*s} A ${w*s},${w*s} 0 0,1 ${(W-w)*s},${p*s}`;
-        labelX = W * s + 6;
+        panelPath = swingsOut
+          ? `M ${W*s},${p*s} L ${(W+w)*s},${p*s}`
+          : `M ${W*s},${p*s} L ${(W-w)*s},${p*s}`;
+        swingPath = swingsOut
+          ? `M ${W*s},${(p+w)*s} A ${w*s},${w*s} 0 0,0 ${(W+w)*s},${p*s}`
+          : `M ${W*s},${(p+w)*s} A ${w*s},${w*s} 0 0,1 ${(W-w)*s},${p*s}`;
+        labelX = swingsOut ? (W + w) * s + 6 : W * s + 6;
         labelY = (p + w / 2) * s;
         labelAnchor = 'start';
         break;
@@ -466,6 +928,14 @@ function renderDoorways() {
       canvas.appendChild(labelEl);
     }
   });
+}
+
+function canvasPaddingPx() {
+  const maxOutSwingWidth = state.room.doorways.reduce((max, door) => (
+    door.swing === 'out' ? Math.max(max, door.width) : max
+  ), 0);
+  const dimensionPadding = state.showDimensions ? state.scale * 2 : 20;
+  return Math.max(20, Math.ceil(maxOutSwingWidth * state.scale + 28), dimensionPadding);
 }
 
 function renderRoom() {
@@ -591,6 +1061,396 @@ function renderEquipment() {
 }
 
 // ── Gap indicators ───────────────────────────────────────────────────────────
+
+function selectedEquipment() {
+  return state.equipment.filter(eq => state.selectedIds.has(eq.id));
+}
+
+function lineupGroups() {
+  const groups = new Map();
+  state.equipment.forEach(eq => {
+    const name = String(eq.lineup || '').trim();
+    if (!name) return;
+    if (!groups.has(name)) groups.set(name, []);
+    groups.get(name).push(eq);
+  });
+  return groups;
+}
+
+function renderLineups() {
+  lineupGroups().forEach((items, name) => {
+    if (!items.length) return;
+    const minX = Math.max(0, Math.min(...items.map(eq => eq.x)) - 0.35);
+    const minY = Math.max(0, Math.min(...items.map(eq => eq.y)) - 0.35);
+    const maxX = Math.min(state.room.width, Math.max(...items.map(eq => eq.x + eq.width)) + 0.35);
+    const maxY = Math.min(state.room.depth, Math.max(...items.map(eq => eq.y + eq.depth)) + 0.35);
+    drawRect({ x: minX, y: minY, w: maxX - minX, h: maxY - minY }, 'equipment-lineup-outline');
+    drawText(name, minX + 0.15, Math.max(0.35, minY - 0.15), 'equipment-lineup-label', 'meta');
+  });
+}
+
+function renderDimensions() {
+  if (!state.showDimensions) return;
+  drawHorizontalDimension(0, state.room.width, -1.2, `${state.room.width.toFixed(1)}' room width`);
+  drawVerticalDimension(-1.2, 0, state.room.depth, `${state.room.depth.toFixed(1)}' room depth`);
+
+  selectedEquipment().forEach(eq => {
+    drawHorizontalDimension(eq.x, eq.x + eq.width, Math.max(-0.55, eq.y - 0.45), `${eq.width.toFixed(1)}'`);
+    drawVerticalDimension(Math.min(state.room.width + 0.8, eq.x + eq.width + 0.45), eq.y, eq.y + eq.depth, `${eq.depth.toFixed(1)}'`);
+    if (eq.x > 0.05) {
+      drawHorizontalDimension(0, eq.x, Math.min(state.room.depth + 0.8, eq.y + eq.depth + 0.45), `${eq.x.toFixed(1)}' from west`);
+    }
+    if (eq.y > 0.05) {
+      drawVerticalDimension(Math.max(-0.55, eq.x - 0.45), 0, eq.y, `${eq.y.toFixed(1)}' from north`);
+    }
+  });
+}
+
+function selectedElevationWall() {
+  return document.getElementById('elevation-wall')?.value || 'south';
+}
+
+function elevationWallLabel(wall) {
+  if (wall === 'selected') return 'Selected Equipment';
+  return wall.charAt(0).toUpperCase() + wall.slice(1);
+}
+
+function elevationWallLength(wall) {
+  return (wall === 'east' || wall === 'west') ? state.room.depth : state.room.width;
+}
+
+function elevationAxisOffset(eq, wall) {
+  return (wall === 'east' || wall === 'west') ? eq.y : eq.x;
+}
+
+function elevationAxisSpan(eq, wall) {
+  return (wall === 'east' || wall === 'west') ? eq.depth : eq.width;
+}
+
+function oppositeWall(wall) {
+  switch (wall) {
+    case 'north': return 'south';
+    case 'south': return 'north';
+    case 'east': return 'west';
+    case 'west': return 'east';
+    default: return '';
+  }
+}
+
+function equipmentWallGap(eq, wall) {
+  switch (wall) {
+    case 'north': return eq.y;
+    case 'south': return state.room.depth - (eq.y + eq.depth);
+    case 'west': return eq.x;
+    case 'east': return state.room.width - (eq.x + eq.width);
+    default: return Number.POSITIVE_INFINITY;
+  }
+}
+
+function equipmentElevationWall(eq) {
+  const gaps = WALL_IDS
+    .map(wall => ({ wall, gap: Math.max(0, equipmentWallGap(eq, wall)) }))
+    .sort((a, b) => a.gap - b.gap);
+  const nearestGap = gaps[0]?.gap ?? Number.POSITIVE_INFINITY;
+  if (nearestGap > ELEVATION_WALL_TOLERANCE_FT) return '';
+
+  const candidates = gaps
+    .filter(item => item.gap <= Math.max(ELEVATION_WALL_TOLERANCE_FT, nearestGap + 0.01))
+    .map(item => item.wall);
+  const preferredWall = oppositeWall(eq.facing);
+  if (candidates.includes(preferredWall)) return preferredWall;
+  return candidates[0] || '';
+}
+
+function equipmentForElevationWall(wall) {
+  return state.equipment.filter(eq => equipmentElevationWall(eq) === wall);
+}
+
+function syncElevationWallToSelectedEquipment() {
+  const select = document.getElementById('elevation-wall');
+  if (!select || select.value === 'selected') return false;
+  const selectedWalls = new Set(selectedEquipment().map(eq => equipmentElevationWall(eq)).filter(Boolean));
+  if (selectedWalls.size !== 1) return false;
+  const [wall] = selectedWalls;
+  if (select.value === wall) return false;
+  select.value = wall;
+  return true;
+}
+
+function selectedElevationItems() {
+  return state.equipment.filter(eq => state.selectedIds.has(eq.id));
+}
+
+function selectedElevationProfile(items = selectedElevationItems()) {
+  if (!items.length) {
+    return { items: [], axis: 'x', origin: 0, length: 1, axisLabel: 'Selected lineup' };
+  }
+  const minX = Math.min(...items.map(eq => eq.x));
+  const maxX = Math.max(...items.map(eq => eq.x + eq.width));
+  const minY = Math.min(...items.map(eq => eq.y));
+  const maxY = Math.max(...items.map(eq => eq.y + eq.depth));
+  const spreadX = maxX - minX;
+  const spreadY = maxY - minY;
+  const axis = spreadY > spreadX ? 'y' : 'x';
+  return {
+    items,
+    axis,
+    origin: axis === 'y' ? minY : minX,
+    length: Math.max(1, axis === 'y' ? spreadY : spreadX),
+    axisLabel: axis === 'y' ? 'Y-axis centerline' : 'X-axis centerline'
+  };
+}
+
+function truncateLabel(text, maxLength) {
+  const value = String(text || '');
+  if (value.length <= maxLength) return value;
+  return `${value.slice(0, Math.max(1, maxLength - 3))}...`;
+}
+
+function appendElevationElement(tag, attrs = {}, text = '') {
+  const element = document.createElementNS('http://www.w3.org/2000/svg', tag);
+  Object.entries(attrs).forEach(([key, value]) => {
+    if (value === undefined || value === null) return;
+    element.setAttribute(key, String(value));
+  });
+  if (text) element.textContent = text;
+  elevationCanvas.appendChild(element);
+  return element;
+}
+
+function renderElevationGrid(baseY, left, top, wallLength, maxHeight, scale) {
+  for (let elev = 0; elev <= maxHeight + 0.001; elev += 2) {
+    const y = baseY - elev * scale;
+    appendElevationElement('line', {
+      x1: left,
+      y1: y,
+      x2: left + wallLength * scale,
+      y2: y,
+      class: elev === 0 ? 'equipment-elevation-ground' : 'equipment-elevation-grid'
+    });
+    appendElevationElement('text', {
+      x: left - 10,
+      y: y + 4,
+      class: 'equipment-elevation-axis-label',
+      'text-anchor': 'end'
+    }, `${elev.toFixed(0)}'`);
+  }
+
+  for (let offset = 0; offset <= wallLength + 0.001; offset += 5) {
+    const x = left + offset * scale;
+    appendElevationElement('line', {
+      x1: x,
+      y1: top,
+      x2: x,
+      y2: baseY,
+      class: 'equipment-elevation-grid'
+    });
+    appendElevationElement('text', {
+      x,
+      y: baseY + 18,
+      class: 'equipment-elevation-axis-label',
+      'text-anchor': 'middle'
+    }, `${offset.toFixed(0)}'`);
+  }
+}
+
+function renderElevationDoorways(wall, baseY, left, scale) {
+  state.room.doorways
+    .filter(door => door.wall === wall)
+    .forEach(door => {
+      const doorHeight = 7;
+      const x = left + door.position * scale;
+      const y = baseY - doorHeight * scale;
+      appendElevationElement('rect', {
+        x,
+        y,
+        width: Math.max(door.width * scale, 12),
+        height: doorHeight * scale,
+        class: door.isEgress ? 'equipment-elevation-door equipment-elevation-door-egress' : 'equipment-elevation-door'
+      });
+      appendElevationElement('text', {
+        x: x + (door.width * scale) / 2,
+        y: y + 16,
+        class: 'equipment-elevation-door-label',
+        'text-anchor': 'middle'
+      }, door.isEgress ? 'EGRESS' : 'DOOR');
+    });
+}
+
+function renderElevationEquipment(wall, baseY, left, wallLength, scale) {
+  return equipmentForElevationWall(wall)
+    .sort((a, b) => elevationAxisOffset(a, wall) - elevationAxisOffset(b, wall))
+    .map(eq => {
+      const span = clamp(elevationAxisSpan(eq, wall), 0.5, wallLength);
+      const offset = clamp(elevationAxisOffset(eq, wall), 0, Math.max(0, wallLength - span));
+      const height = equipmentHeightFromSource(eq);
+      const baseElevation = equipmentBaseElevationFromSource(eq);
+      const x = left + offset * scale;
+      const y = baseY - (baseElevation + height) * scale;
+      const width = Math.max(span * scale, 28);
+      const blockHeight = Math.max(height * scale, 24);
+      const hasViolation = state.violations.has(eq.id);
+      appendElevationElement('rect', {
+        x,
+        y,
+        width,
+        height: blockHeight,
+        rx: 3,
+        class: hasViolation ? 'equipment-elevation-block equipment-elevation-block-danger' : 'equipment-elevation-block'
+      });
+      appendElevationElement('text', {
+        x: x + 6,
+        y: y + 16,
+        class: 'equipment-elevation-label'
+      }, truncateLabel(eq.name, Math.max(7, Math.floor((width - 8) / 7))));
+      if (blockHeight > 42) {
+        appendElevationElement('text', {
+          x: x + 6,
+          y: y + 32,
+          class: 'equipment-elevation-meta'
+        }, `${span.toFixed(1)} x ${height.toFixed(1)} ft`);
+      }
+      return eq;
+    });
+}
+
+function renderSelectedElevationEquipment(profile, baseY, left, scale) {
+  return profile.items
+    .slice()
+    .sort((a, b) => {
+      const aOffset = profile.axis === 'y' ? a.y : a.x;
+      const bOffset = profile.axis === 'y' ? b.y : b.x;
+      return aOffset - bOffset;
+    })
+    .map(eq => {
+      const span = profile.axis === 'y' ? eq.depth : eq.width;
+      const rawOffset = profile.axis === 'y' ? eq.y : eq.x;
+      const offset = Math.max(0, rawOffset - profile.origin);
+      const height = equipmentHeightFromSource(eq);
+      const baseElevation = equipmentBaseElevationFromSource(eq);
+      const x = left + offset * scale;
+      const y = baseY - (baseElevation + height) * scale;
+      const width = Math.max(span * scale, 28);
+      const blockHeight = Math.max(height * scale, 24);
+      const hasViolation = state.violations.has(eq.id);
+      appendElevationElement('rect', {
+        x,
+        y,
+        width,
+        height: blockHeight,
+        rx: 3,
+        class: hasViolation ? 'equipment-elevation-block equipment-elevation-block-danger' : 'equipment-elevation-block'
+      });
+      appendElevationElement('text', {
+        x: x + 6,
+        y: y + 16,
+        class: 'equipment-elevation-label'
+      }, truncateLabel(eq.name, Math.max(7, Math.floor((width - 8) / 7))));
+      if (blockHeight > 42) {
+        appendElevationElement('text', {
+          x: x + 6,
+          y: y + 32,
+          class: 'equipment-elevation-meta'
+        }, `${span.toFixed(1)} x ${height.toFixed(1)} ft`);
+      }
+      return eq;
+    });
+}
+
+function renderElevation() {
+  if (!elevationCanvas) return;
+  const wall = selectedElevationWall();
+  const selectedMode = wall === 'selected';
+  const profile = selectedMode ? selectedElevationProfile() : null;
+  const wallLength = selectedMode ? profile.length : Math.max(1, elevationWallLength(wall));
+  const equipment = selectedMode ? profile.items : equipmentForElevationWall(wall);
+  const tallestEquipment = equipment.reduce((max, eq) => (
+    Math.max(max, equipmentBaseElevationFromSource(eq) + equipmentHeightFromSource(eq))
+  ), DEFAULT_EQUIPMENT_HEIGHT);
+  const maxHeight = Math.max(10, Math.ceil(tallestEquipment / 2) * 2);
+  const padding = { left: 56, right: 28, top: 34, bottom: 42 };
+  const scale = Math.min(
+    34,
+    Math.max(8, Math.min((860 - padding.left - padding.right) / wallLength, (320 - padding.top - padding.bottom) / maxHeight))
+  );
+  const width = Math.max(720, Math.ceil(wallLength * scale + padding.left + padding.right));
+  const height = Math.max(280, Math.ceil(maxHeight * scale + padding.top + padding.bottom));
+  const baseY = height - padding.bottom;
+
+  elevationCanvas.innerHTML = '';
+  elevationCanvas.setAttribute('viewBox', `0 0 ${width} ${height}`);
+  appendElevationElement('rect', { x: 0, y: 0, width, height, class: 'equipment-elevation-bg' });
+  renderElevationGrid(baseY, padding.left, padding.top, wallLength, maxHeight, scale);
+  if (!selectedMode) {
+    renderElevationDoorways(wall, baseY, padding.left, scale);
+  }
+  const renderedEquipment = selectedMode
+    ? renderSelectedElevationEquipment(profile, baseY, padding.left, scale)
+    : renderElevationEquipment(wall, baseY, padding.left, wallLength, scale);
+
+  appendElevationElement('text', {
+    x: padding.left,
+    y: 22,
+    class: 'equipment-elevation-title'
+  }, `${getActiveArrangement()?.name || 'Arrangement'} - ${elevationWallLabel(wall)} Elevation`);
+  appendElevationElement('text', {
+    x: width - padding.right,
+    y: 22,
+    class: 'equipment-elevation-title',
+    'text-anchor': 'end'
+  }, selectedMode ? profile.axisLabel : `${state.room.walls[wall]} wall`);
+
+  const status = document.getElementById('elevation-status');
+  if (status) {
+    if (selectedMode) {
+      status.textContent = renderedEquipment.length
+        ? `Selected elevation shows ${renderedEquipment.length} equipment item${renderedEquipment.length === 1 ? '' : 's'}.`
+        : 'Select one or more equipment items on the plan to create a centerline elevation.';
+    } else {
+      status.textContent = renderedEquipment.length
+        ? `${elevationWallLabel(wall)} elevation shows ${renderedEquipment.length} equipment item${renderedEquipment.length === 1 ? '' : 's'}.`
+        : `No equipment is placed at the ${elevationWallLabel(wall).toLowerCase()} wall.`;
+    }
+  }
+}
+
+function elevationSvgStyles() {
+  return [
+    '.equipment-elevation-bg{fill:#f8fbff;}',
+    '.equipment-elevation-grid{stroke:#d6dee8;stroke-width:1;}',
+    '.equipment-elevation-ground{stroke:#374151;stroke-width:2;}',
+    '.equipment-elevation-axis-label{fill:#4b5563;font:12px Arial,sans-serif;}',
+    '.equipment-elevation-title{fill:#111827;font:700 14px Arial,sans-serif;}',
+    '.equipment-elevation-block{fill:#267acf;stroke:#0e437a;stroke-width:1.5;}',
+    '.equipment-elevation-block-danger{fill:#da3232;stroke:#7d0f0f;}',
+    '.equipment-elevation-label,.equipment-elevation-meta{fill:#fff;font:700 12px Arial,sans-serif;}',
+    '.equipment-elevation-meta{font-weight:500;}',
+    '.equipment-elevation-door{fill:rgba(14,163,110,.12);stroke:#0ea36e;stroke-width:2;stroke-dasharray:5 3;}',
+    '.equipment-elevation-door-egress{fill:rgba(14,163,110,.22);}',
+    '.equipment-elevation-door-label{fill:#0b7d55;font:700 11px Arial,sans-serif;}'
+  ].join('');
+}
+
+function downloadElevationSvg() {
+  if (!elevationCanvas) return;
+  renderElevation();
+  const clone = elevationCanvas.cloneNode(true);
+  clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+  const style = document.createElementNS('http://www.w3.org/2000/svg', 'style');
+  style.textContent = elevationSvgStyles();
+  clone.insertBefore(style, clone.firstChild);
+  const svg = new XMLSerializer().serializeToString(clone);
+  const blob = new Blob([svg], { type: 'image/svg+xml' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  const arrangementName = getActiveArrangement()?.name || 'arrangement';
+  link.href = url;
+  link.download = `${arrangementName}-${selectedElevationWall()}-elevation.svg`.replace(/[^\w.-]+/g, '-').toLowerCase();
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 0);
+}
 
 function drawGapIndicator(x1ft, y1ft, x2ft, y2ft, gapFt, orientation) {
   const x1 = x1ft * state.scale;
@@ -787,8 +1647,11 @@ function updateSummary() {
   const total = state.equipment.length;
   const violations = state.violations.size;
   if (!summaryEl) return;
+  const firstDetail = state.violationDetails.size
+    ? Array.from(state.violationDetails.values())[0]?.[0]
+    : '';
   summaryEl.textContent = violations
-    ? `${violations} of ${total} equipment item${total === 1 ? '' : 's'} has NEC working-space/access violations.`
+    ? `${violations} of ${total} equipment item${total === 1 ? '' : 's'} has NEC working-space/access violations. ${firstDetail || ''}`.trim()
     : total
       ? `No NEC workspace violations detected for ${total} equipment item${total === 1 ? '' : 's'}.`
       : 'Add equipment to start layout checks.';
@@ -796,31 +1659,662 @@ function updateSummary() {
 
 function render() {
   evaluateViolations();
+  renderArrangementControls();
+  renderSavedViewControls();
   renderInteriorWallList();
   renderDoorwayList();
 
   canvas.innerHTML = '';
   const widthPx = state.room.width * state.scale;
   const heightPx = state.room.depth * state.scale;
-  canvas.setAttribute('viewBox', `0 0 ${Math.max(widthPx + 40, 400)} ${Math.max(heightPx + 40, 300)}`);
+  const padding = canvasPaddingPx();
+  state.canvasPadding = padding;
+  canvas.setAttribute('viewBox', `0 0 ${Math.max(widthPx + padding * 2, 400)} ${Math.max(heightPx + padding * 2, 300)}`);
 
   const padGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-  padGroup.setAttribute('transform', 'translate(20,20)');
+  padGroup.setAttribute('transform', `translate(${padding},${padding})`);
   canvas.appendChild(padGroup);
 
   const previousCanvas = canvas;
   canvas = padGroup;
   renderRoom();
   renderEquipment();
+  renderLineups();
+  renderDimensions();
   renderGapIndicators();
   canvas = previousCanvas;
 
+  renderElevation();
   const zoomLabel = document.getElementById('zoom-label');
   if (zoomLabel) zoomLabel.textContent = `Scale: ${state.scale} px/ft`;
   updateSummary();
+  renderClearanceDetails();
+  scheduleArrangementPersist();
 }
 
 // ── State mutations ──────────────────────────────────────────────────────────
+
+function syncEquipmentListForItems(items) {
+  items
+    .filter(eq => eq.listTag)
+    .forEach(eq => syncEquipmentPosition(eq));
+}
+
+function clampEquipmentPosition(eq) {
+  eq.x = clamp(eq.x, 0, Math.max(0, state.room.width - eq.width));
+  eq.y = clamp(eq.y, 0, Math.max(0, state.room.depth - eq.depth));
+}
+
+function mutateEquipmentItems(items, action) {
+  if (!items.length) return false;
+  pushHistory();
+  items.forEach(action);
+  items.forEach(clampEquipmentPosition);
+  syncEquipmentListForItems(items);
+  render();
+  return true;
+}
+
+function mutateSelectedEquipment(action) {
+  return mutateEquipmentItems(selectedEquipment(), action);
+}
+
+function snapSelectedToGrid() {
+  mutateSelectedEquipment(eq => {
+    eq.x = snapToStep(eq.x, 0.5);
+    eq.y = snapToStep(eq.y, 0.5);
+  });
+}
+
+function alignSelectedEdge(edge) {
+  const items = selectedEquipment();
+  if (!items.length) return;
+  const minX = Math.min(...items.map(eq => eq.x));
+  const minY = Math.min(...items.map(eq => eq.y));
+  const maxX = Math.max(...items.map(eq => eq.x + eq.width));
+  const maxY = Math.max(...items.map(eq => eq.y + eq.depth));
+  mutateEquipmentItems(items, eq => {
+    if (edge === 'west') eq.x = minX;
+    if (edge === 'east') eq.x = maxX - eq.width;
+    if (edge === 'north') eq.y = minY;
+    if (edge === 'south') eq.y = maxY - eq.depth;
+  });
+}
+
+function equalSpaceItems(items) {
+  if (items.length < 2) return false;
+  const minX = Math.min(...items.map(eq => eq.x));
+  const maxX = Math.max(...items.map(eq => eq.x + eq.width));
+  const minY = Math.min(...items.map(eq => eq.y));
+  const maxY = Math.max(...items.map(eq => eq.y + eq.depth));
+  const axis = (maxY - minY) > (maxX - minX) ? 'y' : 'x';
+  const sizeKey = axis === 'x' ? 'width' : 'depth';
+  const crossKey = axis === 'x' ? 'y' : 'x';
+  const spanStart = axis === 'x' ? minX : minY;
+  const spanEnd = axis === 'x' ? maxX : maxY;
+  const crossStart = axis === 'x' ? minY : minX;
+  const sorted = [...items].sort((a, b) => a[axis] - b[axis]);
+  const totalSize = sorted.reduce((sum, eq) => sum + eq[sizeKey], 0);
+  const availableGap = Math.max(0.5, (spanEnd - spanStart - totalSize) / Math.max(1, sorted.length - 1));
+  let cursor = spanStart;
+
+  return mutateEquipmentItems(sorted, eq => {
+    eq[axis] = cursor;
+    eq[crossKey] = crossStart;
+    cursor += eq[sizeKey] + availableGap;
+  });
+}
+
+function equalSpaceSelected() {
+  equalSpaceItems(selectedEquipment());
+}
+
+function lineupInputName() {
+  const input = document.getElementById('lineup-name');
+  return String(input?.value || '').trim();
+}
+
+function setLineupInputName(value) {
+  const input = document.getElementById('lineup-name');
+  if (input) input.value = value;
+}
+
+function resolveLineupName() {
+  const typed = lineupInputName();
+  if (typed) return typed;
+  const selected = selectedEquipment();
+  const existing = selected.find(eq => String(eq.lineup || '').trim())?.lineup ||
+    Array.from(lineupGroups().keys())[0] ||
+    `${getActiveArrangement()?.name || 'Arrangement'} Lineup`;
+  const name = String(existing).trim();
+  setLineupInputName(name);
+  return name;
+}
+
+function assignSelectedLineup() {
+  const items = selectedEquipment();
+  if (!items.length) {
+    alert('Select equipment before assigning a lineup.');
+    return;
+  }
+  const name = resolveLineupName();
+  mutateEquipmentItems(items, eq => { eq.lineup = name; });
+}
+
+function selectLineup() {
+  const name = resolveLineupName().toLowerCase();
+  const matches = state.equipment.filter(eq => String(eq.lineup || '').trim().toLowerCase() === name);
+  if (!matches.length) {
+    alert('No equipment is assigned to that lineup.');
+    return;
+  }
+  state.selectedIds = new Set(matches.map(eq => eq.id));
+  render();
+}
+
+function spaceLineup() {
+  const name = resolveLineupName().toLowerCase();
+  const matches = state.equipment.filter(eq => String(eq.lineup || '').trim().toLowerCase() === name);
+  const targets = matches.length ? matches : selectedEquipment();
+  if (!targets.length) {
+    alert('Select equipment or enter a lineup name before spacing a lineup.');
+    return;
+  }
+  state.selectedIds = new Set(targets.map(eq => eq.id));
+  if (!equalSpaceItems(targets)) render();
+}
+
+function saveNamedView() {
+  const views = activeSavedViews();
+  const select = document.getElementById('saved-view-select');
+  const nameInput = document.getElementById('saved-view-name');
+  const name = String(nameInput?.value || '').trim() || `View ${views.length + 1}`;
+  const existingByName = views.find(view => view.name.toLowerCase() === name.toLowerCase());
+  const existingBySelect = views.find(view => view.id === select?.value);
+  const target = existingByName || existingBySelect;
+  const snapshot = {
+    id: target?.id || uniqueId('view'),
+    name,
+    scale: state.scale,
+    elevationWall: selectedElevationWall(),
+    showDimensions: state.showDimensions,
+    selectedIds: [...state.selectedIds]
+  };
+
+  if (target) {
+    Object.assign(target, snapshot);
+  } else {
+    views.push(snapshot);
+  }
+  persistArrangements();
+  renderSavedViewControls();
+  if (select) select.value = snapshot.id;
+}
+
+function applyNamedView() {
+  const viewId = document.getElementById('saved-view-select')?.value;
+  const view = activeSavedViews().find(item => item.id === viewId);
+  if (!view) return;
+  state.scale = clamp(parseNumber(view.scale, DEFAULT_SCALE), 8, 45);
+  state.showDimensions = view.showDimensions !== false;
+  const elevationWallSelect = document.getElementById('elevation-wall');
+  if (elevationWallSelect) elevationWallSelect.value = view.elevationWall || 'south';
+  const validIds = new Set(state.equipment.map(eq => eq.id));
+  state.selectedIds = new Set((view.selectedIds || []).filter(id => validIds.has(id)));
+  render();
+}
+
+function deleteNamedView() {
+  const viewId = document.getElementById('saved-view-select')?.value;
+  const views = activeSavedViews();
+  const index = views.findIndex(view => view.id === viewId);
+  if (index === -1) return;
+  views.splice(index, 1);
+  persistArrangements();
+  renderSavedViewControls();
+}
+
+function escapeXml(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function viewBoxNumbers(svg) {
+  const box = String(svg.getAttribute('viewBox') || '0 0 1000 700')
+    .split(/\s+/)
+    .map(value => Number.parseFloat(value));
+  return {
+    x: Number.isFinite(box[0]) ? box[0] : 0,
+    y: Number.isFinite(box[1]) ? box[1] : 0,
+    width: Number.isFinite(box[2]) ? box[2] : 1000,
+    height: Number.isFinite(box[3]) ? box[3] : 700
+  };
+}
+
+function serializedSvgContent(svg) {
+  const serializer = new XMLSerializer();
+  return Array.from(svg.cloneNode(true).childNodes)
+    .map(node => serializer.serializeToString(node))
+    .join('');
+}
+
+function planSvgStyles() {
+  return [
+    '.equipment-room-fill,.equipment-room-outer{fill:#f8fbff;stroke:none;}',
+    '.equipment-room-wall{stroke:#424e62;stroke-width:2;fill:none;stroke-linecap:square;}',
+    '.equipment-wall-label,.equipment-room-text{fill:#1f2b3a;font-family:Arial,sans-serif;}',
+    '.equipment-doorway-panel{stroke:#0ea36e;stroke-width:3;fill:none;stroke-linecap:round;}',
+    '.equipment-doorway-swing{stroke:rgba(14,163,110,.72);stroke-width:2;fill:none;stroke-dasharray:3 2;stroke-linecap:round;}',
+    '.equipment-doorway-label{fill:#0ea36e;font:700 11px Arial,sans-serif;letter-spacing:.04em;}',
+    '.equipment-interior-wall{fill:rgba(56,63,74,.85);}',
+    '.equipment-clearance{fill:rgba(255,213,110,.8);stroke:rgba(200,142,32,.95);stroke-dasharray:4 4;}',
+    '.equipment-clearance-danger{fill:rgba(245,91,91,.35);stroke:rgba(213,32,32,.95);}',
+    '.equipment-block{fill:rgba(38,122,207,.82);stroke:rgba(14,67,122,.95);stroke-width:1.5;}',
+    '.equipment-block.selected{stroke:#fde047;stroke-width:2.5;}',
+    '.equipment-block-danger{fill:rgba(218,50,50,.85);stroke:rgba(125,15,15,.95);}',
+    '.equipment-block-label,.equipment-block-meta{fill:#fff;font-family:Arial,sans-serif;pointer-events:none;}',
+    '.equipment-lineup-outline{fill:none;stroke:#2563eb;stroke-width:2;stroke-dasharray:8 5;pointer-events:none;}',
+    '.equipment-lineup-label{fill:#1d4ed8;font:700 10px Arial,sans-serif;pointer-events:none;}',
+    '.equipment-dimension-line,.equipment-dimension-tick{stroke:#111827;stroke-width:1.2;fill:none;pointer-events:none;}',
+    '.equipment-dimension-label{fill:#111827;font:700 11px Arial,sans-serif;pointer-events:none;}',
+    '.equipment-gap-line{stroke:#f97316;stroke-width:1.5;stroke-dasharray:4 3;fill:none;}',
+    '.equipment-gap-label{font:700 10px Arial,sans-serif;fill:#f97316;}',
+    '.equipment-gap-label-bg{fill:#fff;stroke:#f97316;stroke-width:1;}'
+  ].join('');
+}
+
+function layoutReportSvgStyles() {
+  return [
+    'svg{background:#fff;}',
+    '.sheet-title{fill:#111827;font:700 24px Arial,sans-serif;}',
+    '.sheet-subtitle{fill:#4b5563;font:14px Arial,sans-serif;}',
+    '.sheet-panel-title{fill:#111827;font:700 16px Arial,sans-serif;}',
+    planSvgStyles(),
+    elevationSvgStyles()
+  ].join('');
+}
+
+function downloadBlob(text, filename, type) {
+  const blob = new Blob([text], { type });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
+function exportLayoutReportSvg() {
+  if (!canvas || !elevationCanvas) return;
+  render();
+  const planBox = viewBoxNumbers(canvas);
+  const elevationBox = viewBoxNumbers(elevationCanvas);
+  const pageWidth = 1200;
+  const margin = 42;
+  const titleHeight = 72;
+  const panelGap = 44;
+  const planScale = Math.min(1.35, (pageWidth - margin * 2) / planBox.width);
+  const elevationScale = Math.min(1.35, (pageWidth - margin * 2) / elevationBox.width);
+  const planHeight = planBox.height * planScale;
+  const elevationHeight = elevationBox.height * elevationScale;
+  const elevationY = titleHeight + planHeight + panelGap;
+  const pageHeight = elevationY + elevationHeight + margin;
+  const arrangementName = getActiveArrangement()?.name || 'Arrangement';
+  const subtitle = `${state.equipment.length} equipment item${state.equipment.length === 1 ? '' : 's'} - ${state.violations.size} clearance issue${state.violations.size === 1 ? '' : 's'}`;
+  const svg = [
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${pageWidth}" height="${Math.ceil(pageHeight)}" viewBox="0 0 ${pageWidth} ${Math.ceil(pageHeight)}">`,
+    `<style>${layoutReportSvgStyles()}</style>`,
+    '<rect x="0" y="0" width="100%" height="100%" fill="#fff"/>',
+    `<text x="${margin}" y="34" class="sheet-title">${escapeXml(arrangementName)}</text>`,
+    `<text x="${margin}" y="56" class="sheet-subtitle">${escapeXml(subtitle)}</text>`,
+    `<text x="${margin}" y="${titleHeight - 12}" class="sheet-panel-title">Plan View</text>`,
+    `<g transform="translate(${margin},${titleHeight}) scale(${planScale})">${serializedSvgContent(canvas)}</g>`,
+    `<text x="${margin}" y="${elevationY - 12}" class="sheet-panel-title">${escapeXml(elevationWallLabel(selectedElevationWall()))} Elevation</text>`,
+    `<g transform="translate(${margin},${elevationY}) scale(${elevationScale})">${serializedSvgContent(elevationCanvas)}</g>`,
+    '</svg>'
+  ].join('');
+  const filename = `${arrangementName}-layout-report.svg`.replace(/[^\w.-]+/g, '-').toLowerCase();
+  downloadBlob(svg, filename, 'image/svg+xml');
+}
+
+function switchArrangement(id) {
+  if (!id || id === state.activeArrangementId) return;
+  saveActiveArrangementToMemory();
+  const next = state.arrangements.find(arrangement => arrangement.id === id);
+  if (!next) return;
+  applyArrangementToState(next);
+  persistArrangements();
+  render();
+}
+
+function cycleArrangement(direction) {
+  if (state.arrangements.length <= 1) return;
+  const index = activeArrangementIndex();
+  const nextIndex = (index + direction + state.arrangements.length) % state.arrangements.length;
+  switchArrangement(state.arrangements[nextIndex].id);
+}
+
+function addArrangement() {
+  saveActiveArrangementToMemory();
+  const arrangement = createArrangement(`Arrangement ${state.arrangements.length + 1}`);
+  state.arrangements.push(arrangement);
+  applyArrangementToState(arrangement);
+  persistArrangements();
+  render();
+}
+
+function duplicateArrangement() {
+  saveActiveArrangementToMemory();
+  const active = getActiveArrangement();
+  if (!active) return;
+  const arrangement = createArrangement(`${active.name} Copy`, active);
+  state.arrangements.push(arrangement);
+  applyArrangementToState(arrangement);
+  persistArrangements();
+  render();
+}
+
+function deleteArrangement() {
+  if (state.arrangements.length <= 1) return;
+  const index = activeArrangementIndex();
+  if (index === -1) return;
+  state.arrangements.splice(index, 1);
+  const next = state.arrangements[Math.min(index, state.arrangements.length - 1)];
+  applyArrangementToState(next);
+  persistArrangements();
+  render();
+}
+
+function updateActiveArrangementOption() {
+  const active = getActiveArrangement();
+  const select = document.getElementById('arrangement-select');
+  if (!active || !select) return;
+  const index = activeArrangementIndex();
+  Array.from(select.options).forEach(option => {
+    if (option.value === active.id) {
+      option.textContent = `${index + 1}. ${active.name}`;
+    }
+  });
+}
+
+function renameActiveArrangementLive(name) {
+  const active = getActiveArrangement();
+  if (!active) return;
+  active.name = name || `Arrangement ${activeArrangementIndex() + 1}`;
+  updateActiveArrangementOption();
+  scheduleArrangementPersist();
+}
+
+function renameActiveArrangement(name) {
+  const active = getActiveArrangement();
+  if (!active) return;
+  const cleaned = name.trim() || `Arrangement ${activeArrangementIndex() + 1}`;
+  active.name = cleaned;
+  persistArrangements();
+  renderArrangementControls();
+}
+
+function setAutoLayoutStatus(message) {
+  const status = document.getElementById('auto-layout-status');
+  if (status) status.textContent = message;
+}
+
+function resolveEquipmentVoltage(value) {
+  const raw = String(value || '').trim();
+  const compact = raw.replace(/\s+/g, '').toUpperCase();
+  const match = VOLTAGE_OPTIONS.find(option => (
+    option.toUpperCase() === raw.toUpperCase() ||
+    option.replace(/\s+/g, '').toUpperCase() === compact
+  ));
+  return match || document.getElementById('equipment-voltage')?.value || VOLTAGE_OPTIONS[0];
+}
+
+function equipmentFromCatalogItem(item, index) {
+  const widthLimit = Math.max(1, state.room.width);
+  const depthLimit = Math.max(1, state.room.depth);
+  const width = clamp(parseNumber(item.width, 4), 1, Math.min(30, widthLimit));
+  const depth = clamp(parseNumber(item.depth, 2), 1, Math.min(30, depthLimit));
+  const voltage = resolveEquipmentVoltage(item.voltage || item.voltageRating || item.nominalVoltage || item.volts);
+  const name = item.tag || item.name || item.description || `Equipment-${index + 1}`;
+  const equipment = {
+    id: uniqueId('eq'),
+    name,
+    width,
+    depth,
+    height: equipmentHeightFromSource(item),
+    baseElevation: equipmentBaseElevationFromSource(item),
+    voltage,
+    lineup: String(item.lineup || '').trim(),
+    facing: 'south',
+    x: 0,
+    y: 0
+  };
+  if (item.tag) equipment.listTag = item.tag;
+  return equipment;
+}
+
+function equipmentAssignmentName(item) {
+  return String(item.arrangement || item.arrangementName || item.layout || '').trim();
+}
+
+function assignedEquipmentGroups() {
+  const groups = new Map();
+  dataStore.getEquipment().forEach((item, index) => {
+    const assignment = equipmentAssignmentName(item);
+    if (!assignment) return;
+    if (!groups.has(assignment)) groups.set(assignment, []);
+    groups.get(assignment).push(equipmentFromCatalogItem(item, index));
+  });
+  return groups;
+}
+
+function activeArrangementAssignmentName() {
+  const active = getActiveArrangement();
+  return String(active?.listAssignment || active?.name || '').trim();
+}
+
+function equipmentAssignedToActiveArrangement() {
+  const activeName = activeArrangementAssignmentName().toLowerCase();
+  if (!activeName) return [];
+  return dataStore.getEquipment()
+    .filter(item => equipmentAssignmentName(item).toLowerCase() === activeName)
+    .map((item, index) => equipmentFromCatalogItem(item, index));
+}
+
+function normalizeAutoLayoutEquipment(eq, index) {
+  const widthLimit = Math.max(1, state.room.width);
+  const depthLimit = Math.max(1, state.room.depth);
+  return {
+    ...eq,
+    id: eq.id || uniqueId('eq'),
+    name: eq.name || eq.tag || eq.description || `Equipment-${index + 1}`,
+    width: clamp(parseNumber(eq.width, 4), 1, Math.min(30, widthLimit)),
+    depth: clamp(parseNumber(eq.depth, 2), 1, Math.min(30, depthLimit)),
+    height: equipmentHeightFromSource(eq),
+    baseElevation: equipmentBaseElevationFromSource(eq),
+    voltage: resolveEquipmentVoltage(eq.voltage || eq.voltageRating || eq.nominalVoltage || eq.volts),
+    lineup: String(eq.lineup || '').trim(),
+    facing: eq.facing || 'south',
+    x: 0,
+    y: 0
+  };
+}
+
+function autoLayoutCandidateConflicts(eq, x, y, facing, placed) {
+  const candidate = { ...eq, x, y, facing };
+  const rect = equipmentRect(candidate);
+  const workspace = workspaceRect(candidate);
+  const nearWorkspace = {
+    x: workspace.x - 1,
+    y: workspace.y - 1,
+    w: workspace.w + 2,
+    h: workspace.h + 2
+  };
+  if (!insideRoom(rect) || !insideRoom(workspace)) return true;
+
+  const hitsInteriorWall = state.room.interiorWalls.some(wall => {
+    const wallRect = interiorWallRect(wall);
+    return intersects(rect, wallRect) || intersects(workspace, wallRect);
+  });
+  if (hitsInteriorWall) return true;
+
+  return placed.some(other => {
+    const otherRect = equipmentRect(other);
+    const otherWorkspace = workspaceRect(other);
+    const otherNearWorkspace = {
+      x: otherWorkspace.x - 1,
+      y: otherWorkspace.y - 1,
+      w: otherWorkspace.w + 2,
+      h: otherWorkspace.h + 2
+    };
+    return intersects(rect, otherRect) ||
+      intersects(workspace, otherRect) ||
+      intersects(rect, otherWorkspace) ||
+      (intersects(otherRect, nearWorkspace) && !intersects(otherRect, workspace)) ||
+      (intersects(rect, otherNearWorkspace) && !intersects(rect, otherWorkspace));
+  });
+}
+
+function findAutoLayoutPosition(eq, placed) {
+  const step = 0.5;
+  const maxX = Math.max(0, state.room.width - eq.width);
+  const maxY = Math.max(0, state.room.depth - eq.depth);
+  const facingOrder = ['south', 'east', 'north', 'west'];
+
+  for (let y = 0; y <= maxY + 0.001; y += step) {
+    for (let x = 0; x <= maxX + 0.001; x += step) {
+      const snappedX = Number(x.toFixed(2));
+      const snappedY = Number(y.toFixed(2));
+      for (const facing of facingOrder) {
+        if (!autoLayoutCandidateConflicts(eq, snappedX, snappedY, facing, placed)) {
+          return { x: snappedX, y: snappedY, facing };
+        }
+      }
+    }
+  }
+
+  return null;
+}
+
+function fallbackAutoLayoutPosition(eq, index) {
+  const gap = 1;
+  const columns = Math.max(1, Math.floor(Math.max(1, state.room.width - gap) / Math.max(1, eq.width + gap)));
+  const x = gap + (index % columns) * (eq.width + gap);
+  const y = gap + Math.floor(index / columns) * (eq.depth + gap);
+  return {
+    x: clamp(x, 0, Math.max(0, state.room.width - eq.width)),
+    y: clamp(y, 0, Math.max(0, state.room.depth - eq.depth)),
+    facing: 'south'
+  };
+}
+
+function layoutEquipmentItems(items) {
+  const placed = [];
+  let fallbackCount = 0;
+  items.forEach((item, index) => {
+    const eq = normalizeAutoLayoutEquipment(item, index);
+    const position = findAutoLayoutPosition(eq, placed);
+    if (position) {
+      placed.push({ ...eq, ...position });
+    } else {
+      fallbackCount += 1;
+      placed.push({ ...eq, ...fallbackAutoLayoutPosition(eq, index) });
+    }
+  });
+  return { equipment: placed, fallbackCount };
+}
+
+function layoutEquipmentItemsForRoom(items, room) {
+  const previousRoom = state.room;
+  state.room = cloneRoom(room);
+  const result = layoutEquipmentItems(items);
+  state.room = previousRoom;
+  return result;
+}
+
+function findListArrangement(name) {
+  const key = name.toLowerCase();
+  return state.arrangements.find(arrangement => String(arrangement.listAssignment || '').toLowerCase() === key) ||
+    state.arrangements.find(arrangement => (
+      String(arrangement.name || '').toLowerCase() === key &&
+      (arrangement.source === 'equipment-list' || !arrangement.equipment.length)
+    ));
+}
+
+function buildArrangementsFromEquipmentList() {
+  const groups = assignedEquipmentGroups();
+  if (!groups.size) {
+    alert('Assign equipment to an Arrangement on the Equipment List page before building arrangements from the list.');
+    return;
+  }
+
+  saveActiveArrangementToMemory();
+  const activeRoom = cloneRoom(state.room);
+  const activeScale = state.scale;
+  let created = 0;
+  let refreshed = 0;
+  let fallbackCount = 0;
+  let firstArrangement = null;
+
+  groups.forEach((items, name) => {
+    let arrangement = findListArrangement(name);
+    if (!arrangement) {
+      arrangement = createArrangement(name, { room: activeRoom, equipment: [], scale: activeScale, source: 'equipment-list', listAssignment: name });
+      state.arrangements.push(arrangement);
+      created += 1;
+    } else {
+      refreshed += 1;
+    }
+
+    arrangement.name = name;
+    arrangement.source = 'equipment-list';
+    arrangement.listAssignment = name;
+    const layout = layoutEquipmentItemsForRoom(items, arrangement.room);
+    arrangement.equipment = layout.equipment;
+    fallbackCount += layout.fallbackCount;
+    if (!firstArrangement) firstArrangement = arrangement;
+  });
+
+  if (firstArrangement) {
+    applyArrangementToState(firstArrangement);
+  }
+  persistArrangements();
+  render();
+
+  const fallbackText = fallbackCount ? ` ${fallbackCount} item${fallbackCount === 1 ? '' : 's'} used best available placement; check red clearance highlights.` : '';
+  setAutoLayoutStatus(`Built ${groups.size} list arrangement${groups.size === 1 ? '' : 's'} (${created} new, ${refreshed} refreshed).${fallbackText}`);
+}
+
+function autoLayoutEquipment() {
+  const seededFromList = state.equipment.length === 0;
+  const assignedToActive = seededFromList ? equipmentAssignedToActiveArrangement() : [];
+  const sourceEquipment = seededFromList
+    ? (assignedToActive.length ? assignedToActive : dataStore.getEquipment().map((item, index) => equipmentFromCatalogItem(item, index)))
+    : state.equipment.map(eq => ({ ...eq }));
+
+  if (!sourceEquipment.length) {
+    alert('Add equipment to the Equipment List or place custom equipment on the canvas before running Auto Layout.');
+    return;
+  }
+
+  const { equipment, fallbackCount } = layoutEquipmentItems(sourceEquipment);
+  pushHistory();
+  state.equipment = equipment;
+  state.selectedIds.clear();
+  state.equipment
+    .filter(eq => eq.listTag)
+    .forEach(eq => syncEquipmentPosition(eq));
+  render();
+
+  const verb = seededFromList ? (assignedToActive.length ? 'Loaded assigned equipment and laid out' : 'Loaded and laid out') : 'Laid out';
+  const warning = fallbackCount ? ` ${fallbackCount} item${fallbackCount === 1 ? '' : 's'} used best available placement; check red clearance highlights.` : '';
+  setAutoLayoutStatus(`${verb} ${state.equipment.length} equipment item${state.equipment.length === 1 ? '' : 's'}.${warning}`);
+}
 
 function addEquipment() {
   const source = document.getElementById('equipment-source').value;
@@ -828,17 +2322,21 @@ function addEquipment() {
   const customName = document.getElementById('custom-name').value.trim();
   const width = clamp(parseNumber(document.getElementById('equipment-width').value, 4), 1, 30);
   const depth = clamp(parseNumber(document.getElementById('equipment-depth').value, 2), 1, 30);
+  const height = clamp(parseNumber(document.getElementById('equipment-height').value, DEFAULT_EQUIPMENT_HEIGHT), 1, 40);
+  const baseElevation = clamp(parseNumber(document.getElementById('equipment-base-elevation').value, 0), 0, 60);
   const voltage = document.getElementById('equipment-voltage').value;
   const facing = document.getElementById('equipment-facing').value;
 
   let name = 'Equipment';
   let listTag = null;
+  let lineup = '';
   if (source === 'equipment-list') {
     const index = Number.parseInt(presetSelect.value, 10);
     const item = dataStore.getEquipment()[index];
     if (!item) return;
     name = item.tag || item.description || `Equipment-${state.equipment.length + 1}`;
     listTag = item.tag || null;
+    lineup = String(item.lineup || '').trim();
     if (listTag && state.equipment.some(e => e.listTag === listTag)) {
       // eslint-disable-next-line no-alert
       alert(`"${name}" is already on the canvas. Each equipment item can only be placed once.`);
@@ -852,7 +2350,7 @@ function addEquipment() {
   const startX = clamp(1 + state.equipment.length * 0.8, 0, Math.max(0, state.room.width - width));
   const startY = clamp(1 + state.equipment.length * 0.6, 0, Math.max(0, state.room.depth - depth));
 
-  const newEq = { id, name, width, depth, voltage, facing, x: startX, y: startY };
+  const newEq = { id, name, width, depth, height, baseElevation, voltage, lineup, facing, x: startX, y: startY };
   if (listTag) newEq.listTag = listTag;
 
   pushHistory();
@@ -900,11 +2398,12 @@ function addDoorway() {
   const maxPos = (wall === 'east' || wall === 'west') ? state.room.depth : state.room.width;
   const position = clamp(parseNumber(document.getElementById('doorway-position').value, 5), 0, maxPos - 1);
   const width = clamp(parseNumber(document.getElementById('doorway-width').value, 3), 1, Math.min(20, maxPos - position));
+  const swing = document.getElementById('doorway-swing').value === 'out' ? 'out' : 'in';
   const isEgress = document.getElementById('doorway-egress').checked;
 
   pushHistory();
   const id = `dw-${Date.now()}-${Math.round(Math.random() * 1000)}`;
-  state.room.doorways.push({ id, wall, position, width, isEgress });
+  state.room.doorways.push({ id, wall, position, width, swing, isEgress });
   render();
 }
 
@@ -913,6 +2412,12 @@ function syncEquipmentPosition(eq) {
   const idx = list.findIndex(item => item.tag === eq.listTag);
   if (idx === -1) return;
   dataStore.updateEquipment(idx, {
+    width: String(Math.round(eq.width * 100) / 100),
+    depth: String(Math.round(eq.depth * 100) / 100),
+    height: String(Math.round(equipmentHeightFromSource(eq) * 100) / 100),
+    baseElevation: String(Math.round(equipmentBaseElevationFromSource(eq) * 100) / 100),
+    lineup: String(eq.lineup || ''),
+    facing: eq.facing || '',
     x: String(Math.round(eq.x * 100) / 100),
     y: String(Math.round(eq.y * 100) / 100)
   });
@@ -933,8 +2438,8 @@ function toFeetCoordinates(event) {
   pt.x = event.clientX;
   pt.y = event.clientY;
   const svgPt = pt.matrixTransform(canvas.getScreenCTM().inverse());
-  const xFt = (svgPt.x - 20) / state.scale;
-  const yFt = (svgPt.y - 20) / state.scale;
+  const xFt = (svgPt.x - state.canvasPadding) / state.scale;
+  const yFt = (svgPt.y - state.canvasPadding) / state.scale;
   return { xFt, yFt };
 }
 
@@ -991,6 +2496,9 @@ function showEquipmentDetailModal(eq) {
 
       section('Width', `${eq.width.toFixed(1)} ft`);
       section('Depth', `${eq.depth.toFixed(1)} ft`);
+      section('Height', `${equipmentHeightFromSource(eq).toFixed(1)} ft`);
+      section('Base Elev.', `${equipmentBaseElevationFromSource(eq).toFixed(1)} ft`);
+      section('Lineup', eq.lineup);
       section('Facing', eq.facing.charAt(0).toUpperCase() + eq.facing.slice(1));
       section('Position', `(${eq.x.toFixed(2)}, ${eq.y.toFixed(2)}) ft`);
 
@@ -1006,6 +2514,9 @@ function showEquipmentDetailModal(eq) {
       statusRow.appendChild(statusLbl);
       statusRow.appendChild(statusVal);
       card.appendChild(statusRow);
+      if (hasViolation) {
+        section('Clearance Details', (state.violationDetails.get(eq.id) || []).join(' '));
+      }
 
       if (listItem && listItem.notes) {
         const notesDivider = document.createElement('hr');
@@ -1131,6 +2642,11 @@ function bindCanvasInteractions() {
       state.equipment
         .filter(eq => state.selectedIds.has(eq.id) && eq.listTag)
         .forEach(eq => syncEquipmentPosition(eq));
+      if (syncElevationWallToSelectedEquipment()) {
+        state.drag = null;
+        render();
+        return;
+      }
     }
     state.drag = null;
   };
@@ -1141,10 +2657,38 @@ function bindCanvasInteractions() {
 // ── UI bindings ───────────────────────────────────────────────────────────────
 
 function bindUI() {
+  document.getElementById('arrangement-select').addEventListener('change', event => switchArrangement(event.target.value));
+  document.getElementById('prev-arrangement').addEventListener('click', () => cycleArrangement(-1));
+  document.getElementById('next-arrangement').addEventListener('click', () => cycleArrangement(1));
+  document.getElementById('add-arrangement').addEventListener('click', addArrangement);
+  document.getElementById('duplicate-arrangement').addEventListener('click', duplicateArrangement);
+  document.getElementById('delete-arrangement').addEventListener('click', deleteArrangement);
+  document.getElementById('arrangement-name').addEventListener('input', event => renameActiveArrangementLive(event.target.value));
+  document.getElementById('arrangement-name').addEventListener('change', event => renameActiveArrangement(event.target.value));
+
   document.getElementById('apply-room').addEventListener('click', applyRoomChanges);
   document.getElementById('add-equipment').addEventListener('click', addEquipment);
+  document.getElementById('auto-layout-equipment').addEventListener('click', autoLayoutEquipment);
+  document.getElementById('build-arrangements-from-list').addEventListener('click', buildArrangementsFromEquipmentList);
+  document.getElementById('show-dimensions').addEventListener('change', event => {
+    state.showDimensions = event.target.checked;
+    render();
+  });
+  document.getElementById('snap-selected').addEventListener('click', snapSelectedToGrid);
+  document.getElementById('align-selected-west').addEventListener('click', () => alignSelectedEdge('west'));
+  document.getElementById('align-selected-south').addEventListener('click', () => alignSelectedEdge('south'));
+  document.getElementById('equal-space-selected').addEventListener('click', equalSpaceSelected);
+  document.getElementById('assign-lineup').addEventListener('click', assignSelectedLineup);
+  document.getElementById('select-lineup').addEventListener('click', selectLineup);
+  document.getElementById('space-lineup').addEventListener('click', spaceLineup);
+  document.getElementById('save-view').addEventListener('click', saveNamedView);
+  document.getElementById('apply-view').addEventListener('click', applyNamedView);
+  document.getElementById('delete-view').addEventListener('click', deleteNamedView);
+  document.getElementById('export-layout-report').addEventListener('click', exportLayoutReportSvg);
   document.getElementById('add-interior-wall').addEventListener('click', addInteriorWall);
   document.getElementById('add-doorway').addEventListener('click', addDoorway);
+  document.getElementById('elevation-wall').addEventListener('change', renderElevation);
+  document.getElementById('download-elevation-svg').addEventListener('click', downloadElevationSvg);
 
   document.getElementById('draw-wall-mode').addEventListener('click', event => {
     state.wallDraw.enabled = !state.wallDraw.enabled;
@@ -1187,6 +2731,8 @@ function bindUI() {
     if (!item) return;
     document.getElementById('equipment-width').value = parseNumber(item.width, 4);
     document.getElementById('equipment-depth').value = parseNumber(item.depth, 2);
+    document.getElementById('equipment-height').value = equipmentHeightFromSource(item);
+    document.getElementById('equipment-base-elevation').value = equipmentBaseElevationFromSource(item);
     if (item.voltage) {
       const voltage = String(item.voltage).toUpperCase();
       const select = document.getElementById('equipment-voltage');
@@ -1206,15 +2752,20 @@ function bindUI() {
 
 function initialize() {
   canvas = document.getElementById('equipment-arrangement-canvas');
+  elevationCanvas = document.getElementById('equipment-elevation-canvas');
   summaryEl = document.getElementById('arrangement-summary');
+  clearanceDetailsEl = document.getElementById('clearance-detail-list');
   if (!canvas) return;
 
   ['wall-north', 'wall-south', 'wall-east', 'wall-west', 'interior-type'].forEach(id => populateSelect(id, WALL_TYPES));
   populateSelect('equipment-voltage', VOLTAGE_OPTIONS);
   populateEquipmentPreset();
+  loadArrangements();
+  compactToolbarControls();
   createContextMenu();
   bindUI();
   bindCanvasInteractions();
+  window.addEventListener('beforeunload', persistArrangements);
   render();
 }
 

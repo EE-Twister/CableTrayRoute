@@ -133,6 +133,12 @@
             <label>Depth (ft)
               <input id="equipment-depth" type="number" min="1" max="30" step="0.25" value="2">
             </label>
+            <label>Height (ft)
+              <input id="equipment-height" type="number" min="1" max="40" step="0.25" value="7">
+            </label>
+            <label>Base Elev. (ft)
+              <input id="equipment-base-elevation" type="number" min="0" max="60" step="0.25" value="0">
+            </label>
             <label>Voltage
               <select id="equipment-voltage"></select>
             </label>
@@ -164,6 +170,12 @@
             <label>Width (ft)
               <input id="doorway-width" type="number" min="1" max="20" step="0.25" value="3">
             </label>
+            <label>Swing
+              <select id="doorway-swing">
+                <option value="in" selected>Into Room</option>
+                <option value="out">Out of Room</option>
+              </select>
+            </label>
             <label class="equipment-checkbox-label">
               <input type="checkbox" id="doorway-egress"> Mark as Means of Egress
             </label>
@@ -179,17 +191,82 @@
             <li><span class="swatch swatch-doorway"></span>Doorway / egress</li>
           </ul>
           <p id="arrangement-summary" class="equipment-summary" aria-live="polite"></p>
+          <div id="clearance-detail-list" class="equipment-clearance-details" aria-live="polite"></div>
         </aside>
 
         <div class="equipment-arrangement-canvas-wrap">
           <div class="equipment-canvas-toolbar">
+            <div class="equipment-arrangement-switcher" aria-label="Arrangement controls">
+              <button id="prev-arrangement" class="btn" type="button" title="Previous arrangement">Prev</button>
+              <label>Arrangement
+                <select id="arrangement-select"></select>
+              </label>
+              <button id="next-arrangement" class="btn" type="button" title="Next arrangement">Next</button>
+              <label>Name
+                <input id="arrangement-name" type="text" value="Arrangement 1">
+              </label>
+              <span id="arrangement-count" class="small-text">1 of 1</span>
+              <button id="add-arrangement" class="btn" type="button">Add</button>
+              <button id="duplicate-arrangement" class="btn" type="button">Duplicate</button>
+              <button id="delete-arrangement" class="btn" type="button">Delete</button>
+            </div>
             <button id="zoom-out" class="btn" type="button">−</button>
             <span id="zoom-label" class="small-text">Scale: 20 px/ft</span>
             <button id="zoom-in" class="btn" type="button">+</button>
             <button id="undo-action" class="btn" type="button" title="Undo last action (Ctrl+Z)">Undo</button>
             <button id="delete-selected-equipment" class="btn" type="button">Delete Selected</button>
+            <button id="auto-layout-equipment" class="btn" type="button">Auto Layout</button>
+            <button id="build-arrangements-from-list" class="btn" type="button">Build From List</button>
+            <span id="auto-layout-status" class="small-text" aria-live="polite"></span>
+            <div class="equipment-toolbar-group" aria-label="Snap and align controls">
+              <label class="equipment-checkbox-label">
+                <input id="show-dimensions" type="checkbox" checked>
+                Dimensions
+              </label>
+              <button id="snap-selected" class="btn" type="button">Snap Selected</button>
+              <button id="align-selected-west" class="btn" type="button">Align West</button>
+              <button id="align-selected-south" class="btn" type="button">Align South</button>
+              <button id="equal-space-selected" class="btn" type="button">Equal Space</button>
+            </div>
+            <div class="equipment-toolbar-group" aria-label="Lineup controls">
+              <label>Lineup
+                <input id="lineup-name" type="text" placeholder="Lineup A">
+              </label>
+              <button id="assign-lineup" class="btn" type="button">Assign Lineup</button>
+              <button id="select-lineup" class="btn" type="button">Select Lineup</button>
+              <button id="space-lineup" class="btn" type="button">Space Lineup</button>
+            </div>
+            <div class="equipment-toolbar-group" aria-label="Named view and report controls">
+              <label>Saved View
+                <select id="saved-view-select"></select>
+              </label>
+              <label>Name
+                <input id="saved-view-name" type="text" placeholder="Plan / Elevation Sheet">
+              </label>
+              <button id="save-view" class="btn" type="button">Save View</button>
+              <button id="apply-view" class="btn" type="button">Apply View</button>
+              <button id="delete-view" class="btn" type="button">Delete View</button>
+              <button id="export-layout-report" class="btn" type="button">Export Sheet SVG</button>
+            </div>
           </div>
           <svg id="equipment-arrangement-canvas" viewBox="0 0 1000 700" role="img" aria-label="Equipment room layout canvas"></svg>
+          <div class="equipment-elevation-panel" aria-label="Equipment elevation view controls">
+            <div class="equipment-elevation-toolbar">
+              <h2>Elevation View</h2>
+              <label>View
+                <select id="elevation-wall">
+                  <option value="north">North</option>
+                  <option value="south" selected>South</option>
+                  <option value="east">East</option>
+                  <option value="west">West</option>
+                  <option value="selected">Selected Equipment</option>
+                </select>
+              </label>
+              <button id="download-elevation-svg" class="btn" type="button">Download SVG</button>
+              <span id="elevation-status" class="small-text" aria-live="polite"></span>
+            </div>
+            <svg id="equipment-elevation-canvas" viewBox="0 0 1000 320" role="img" aria-label="Equipment wall elevation view"></svg>
+          </div>
         </div>
       </section>
     </main>
