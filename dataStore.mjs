@@ -100,6 +100,7 @@ const EXTRA_KEYS = {
   coachAuditTrail: 'coachAuditTrail',
   groundGridSoilMeasurements: 'groundGridSoilMeasurements',
   groundGridRiskPoints: 'groundGridRiskPoints',
+  mccLineups: 'mccLineups',
 };
 
 export const STORAGE_KEYS = { ...KEYS, ...EXTRA_KEYS };
@@ -322,6 +323,10 @@ export const getGroundGridSoilMeasurements = () => read(EXTRA_KEYS.groundGridSoi
 export const setGroundGridSoilMeasurements = list => write(EXTRA_KEYS.groundGridSoilMeasurements, list);
 export const getGroundGridRiskPoints = () => read(EXTRA_KEYS.groundGridRiskPoints, []);
 export const setGroundGridRiskPoints = list => write(EXTRA_KEYS.groundGridRiskPoints, list);
+
+// MCC lineup layout persistence
+export const getMccLineups = () => read(EXTRA_KEYS.mccLineups, []);
+export const setMccLineups = lineups => write(EXTRA_KEYS.mccLineups, Array.isArray(lineups) ? lineups : []);
 
 /**
  * Append a cable record to the existing cable schedule.
@@ -697,6 +702,7 @@ export function saveProject(projectId, scenario = getCurrentScenarioNameState())
       cables: getCables(),
       cableTypicals: getCableTypicals(),
       cableTemplates: getCableTemplates(),
+      mccLineups: getMccLineups(),
       raceways: {
         trays: getTrays(),
         conduits: getConduits(),
@@ -729,6 +735,7 @@ export function loadProject(projectId, scenario = getCurrentScenarioNameState())
     const cables = payload.cables;
     const cableTypicals = payload.cableTypicals;
     const cableTemplates = payload.cableTemplates;
+    const mccLineups = payload.mccLineups;
     const raceways = payload.raceways || {};
     const oneLine = payload.oneLine || {};
     if (Array.isArray(equipment)) setEquipment(equipment); else setEquipment([]);
@@ -737,6 +744,7 @@ export function loadProject(projectId, scenario = getCurrentScenarioNameState())
     if (Array.isArray(cables)) setCables(cables); else setCables([]);
     if (Array.isArray(cableTypicals)) setCableTypicals(cableTypicals); else setCableTypicals([]);
     if (Array.isArray(cableTemplates)) setCableTemplates(cableTemplates); else setCableTemplates([]);
+    if (Array.isArray(mccLineups)) setMccLineups(mccLineups); else setMccLineups([]);
     setTrays(Array.isArray(raceways.trays) ? raceways.trays : []);
     setConduits(Array.isArray(raceways.conduits) ? raceways.conduits : []);
     setDuctbanks(Array.isArray(raceways.ductbanks) ? raceways.ductbanks : []);
@@ -769,13 +777,14 @@ export function loadProject(projectId, scenario = getCurrentScenarioNameState())
 export function applyRemoteSnapshot(snapshot, projectId) {
   if (!snapshot || typeof snapshot !== 'object') return;
   try {
-    const { equipment, panels, loads, cables, cableTypicals, cableTemplates, raceways = {}, oneLine } = snapshot;
+    const { equipment, panels, loads, cables, cableTypicals, cableTemplates, mccLineups, raceways = {}, oneLine } = snapshot;
     if (Array.isArray(equipment)) setEquipment(equipment);
     if (Array.isArray(panels)) setPanels(panels);
     if (Array.isArray(loads)) setLoads(loads);
     if (Array.isArray(cables)) setCables(cables);
     if (Array.isArray(cableTypicals)) setCableTypicals(cableTypicals);
     if (Array.isArray(cableTemplates)) setCableTemplates(cableTemplates);
+    if (Array.isArray(mccLineups)) setMccLineups(mccLineups);
     setTrays(Array.isArray(raceways.trays) ? raceways.trays : []);
     setConduits(Array.isArray(raceways.conduits) ? raceways.conduits : []);
     setDuctbanks(Array.isArray(raceways.ductbanks) ? raceways.ductbanks : []);
@@ -805,7 +814,7 @@ export function applyRemoteSnapshot(snapshot, projectId) {
 // disallows extras, and verifies basic types.
 function validateProjectSchema(obj) {
   const required = ['ductbanks', 'conduits', 'trays', 'cables', 'cableTypicals', 'panels', 'equipment', 'loads', 'settings'];
-  const optional = ['oneLine'];
+  const optional = ['oneLine', 'mccLineups'];
   const missing = [];
   const extra = [];
 
@@ -830,7 +839,8 @@ function validateProjectSchema(obj) {
     Array.isArray(obj.equipment) &&
     Array.isArray(obj.loads) &&
     obj.settings && typeof obj.settings === 'object' && !Array.isArray(obj.settings) &&
-    (obj.oneLine === undefined || Array.isArray(obj.oneLine) || Array.isArray(obj.oneLine?.sheets));
+    (obj.oneLine === undefined || Array.isArray(obj.oneLine) || Array.isArray(obj.oneLine?.sheets)) &&
+    (obj.mccLineups === undefined || Array.isArray(obj.mccLineups));
 
   const valid = missing.length === 0 && extra.length === 0 && typesValid;
   return { valid, missing, extra };
@@ -850,9 +860,10 @@ export function exportProject() {
     equipment: getEquipment(),
     loads: getLoads(),
     oneLine: getOneLine(),
+    mccLineups: getMccLineups(),
     settings: {}
   };
-  const reserved = new Set([...Object.values(KEYS), 'CTR_PROJECT_V1']);
+  const reserved = new Set([...Object.values(KEYS), EXTRA_KEYS.mccLineups, 'CTR_PROJECT_V1']);
   for (const key of keys()) {
     if (!reserved.has(key)) {
       project.settings[key] = getItem(key);
@@ -958,6 +969,7 @@ export function importProject(obj) {
       equipment: Array.isArray(obj.equipment) ? obj.equipment : [],
       loads: Array.isArray(obj.loads) ? obj.loads : [],
       oneLine: Array.isArray(obj.oneLine) ? obj.oneLine : [],
+      mccLineups: Array.isArray(obj.mccLineups) ? obj.mccLineups : [],
       settings: (obj.settings && typeof obj.settings === 'object') ? obj.settings : {}
     };
   }
@@ -970,6 +982,7 @@ export function importProject(obj) {
   setPanels(Array.isArray(data.panels) ? data.panels : []);
   setEquipment(Array.isArray(data.equipment) ? data.equipment : []);
   setLoads(Array.isArray(data.loads) ? data.loads : []);
+  setMccLineups(Array.isArray(data.mccLineups) ? data.mccLineups : []);
   if (Array.isArray(data.oneLine)) {
     setOneLine({ activeSheet: 0, sheets: data.oneLine });
   } else if (data.oneLine && Array.isArray(data.oneLine.sheets)) {
@@ -978,7 +991,7 @@ export function importProject(obj) {
     setOneLine({ activeSheet: 0, sheets: [] });
   }
 
-  const reserved = new Set([...Object.values(KEYS), 'CTR_PROJECT_V1']);
+  const reserved = new Set([...Object.values(KEYS), EXTRA_KEYS.mccLineups, 'CTR_PROJECT_V1']);
   for (const key of keys()) {
     if (!reserved.has(key) && !(data.settings && key in data.settings)) {
       removeItem(key);
@@ -1015,6 +1028,8 @@ if (typeof window !== 'undefined') {
     addEquipment,
     updateEquipment,
     removeEquipment,
+    getMccLineups,
+    setMccLineups,
     getLoads,
     setLoads,
     addLoad,

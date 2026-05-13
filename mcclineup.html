@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Build MCC lineups with section elevations, bucket sizing, and a simple one-line preview.">
+  <title>MCC Lineups - CableTrayRoute</title>
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/favicon.svg">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="MCC Lineups - CableTrayRoute">
+  <meta property="og:description" content="Create motor control center lineup elevations with bucket sizes and a generated one-line diagram.">
+  <meta property="og:image" content="https://cabletrayroute.com/icons/og-preview.png">
+  <meta property="og:site_name" content="CableTrayRoute">
+  <meta property="og:url" content="mcclineup.html">
+  <link rel="canonical" href="mcclineup.html">
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+  <meta name="color-scheme" content="light dark">
+  <link rel="stylesheet" href="style.css">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      { "@type": "ListItem", "position": 1, "name": "Home", "item": "index.html" },
+      { "@type": "ListItem", "position": 2, "name": "MCC Lineups", "item": "mcclineup.html" }
+    ]
+  }
+  </script>
+  <script type="module" src="dist/mcclineup.js" defer></script>
+</head>
+<body class="mcc-lineup-page" data-page-visual="diagram" data-report-title="MCC Lineups">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <div id="mcc-file-protocol-warning" class="mcc-file-protocol-warning hidden" role="alert">
+    MCC Lineups needs the local app server to run. Browser security blocks the module scripts when this page is opened from a file path, so dropdowns and previews will not initialize.
+    <a href="http://127.0.0.1:5194/mcclineup.html">Open MCC Lineups through localhost</a>.
+  </div>
+  <nav class="top-nav" aria-label="Primary">
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
+      <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+    <div id="nav-links" class="nav-links" role="list"></div>
+
+    <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+  </nav>
+
+  <div id="settings-menu" class="settings-menu">
+    <label for="theme-select">Theme
+      <select id="theme-select">
+        <option value="system">System</option>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+        <option value="high-contrast">High Contrast</option>
+      </select>
+    </label>
+    <label><input type="checkbox" id="compact-toggle" aria-label="Enable compact table mode"> Compact Mode</label>
+    <label for="unit-select">Units
+      <select id="unit-select">
+        <option value="imperial">Imperial</option>
+        <option value="metric">Metric</option>
+      </select>
+    </label>
+    <button id="help-btn" class="btn" aria-expanded="false" title="Show help">Site Help</button>
+    <button id="new-project-btn" class="btn" title="Start a new project">New Project</button>
+    <button id="save-project-btn" class="btn" title="Save current project">Save Project</button>
+    <button id="load-project-btn" class="btn" title="Load an existing project">Load Project</button>
+    <button id="export-project-btn" class="btn" title="Export project data">Export Project</button>
+    <button id="import-project-btn" class="btn" title="Import project data">Import Project</button>
+    <input type="file" id="import-project-input" accept=".ctr.json" class="hidden" title="Select project file">
+  </div>
+
+  <div class="container">
+    <main id="main-content" class="main-content">
+      <header class="page-header">
+        <h1>MCC Lineups</h1>
+        <p>Build MCC section elevations, track bucket unit sizes and inch heights, and generate a simple one-line preview for coordination.</p>
+      </header>
+      <section class="card page-header-graphic page-visual-showcase" aria-label="Page visual overview">
+        <div class="page-visual-copy">
+          <p class="page-visual-kicker">Workspace Preview</p>
+          <h2>MCC Elevation Builder</h2>
+          <p>Lay out sections, bucket stacks, and a coordination one-line before placing the MCC in an equipment room.</p>
+        </div>
+        <img src="icons/graphics/studies-visual.svg" alt="Illustration for MCC lineup elevation and one-line coordination" loading="lazy" decoding="async">
+      </section>
+
+      <section class="card mcc-lineup-layout">
+        <aside class="mcc-lineup-sidebar" aria-label="MCC lineup editor">
+          <div class="mcc-lineup-toolbar">
+            <label>Lineup
+              <select id="mcc-lineup-select"></select>
+            </label>
+            <div class="mcc-lineup-actions">
+              <button id="add-mcc-lineup" class="btn" type="button">Add</button>
+              <button id="duplicate-mcc-lineup" class="btn" type="button">Duplicate</button>
+              <button id="delete-mcc-lineup" class="btn" type="button">Delete</button>
+            </div>
+          </div>
+
+          <h2>Lineup Data</h2>
+          <div class="mcc-profile-panel">
+            <label>Apply Profile Defaults
+              <select id="mcc-profile-preset"></select>
+            </label>
+            <button id="apply-mcc-profile" class="btn" type="button">Apply Profile</button>
+          </div>
+          <div class="mcc-field-grid">
+            <label>Tag
+              <input type="text" data-mcc-lineup-field="tag" placeholder="e.g. MCC-101">
+            </label>
+            <label>Name
+              <input type="text" data-mcc-lineup-field="name" placeholder="e.g. Boiler Area MCC">
+            </label>
+            <label>Equipment Tag (optional)
+              <input type="text" data-mcc-lineup-field="equipmentTag" placeholder="e.g. MCC-101; only needed for Equipment List sync">
+            </label>
+            <label>Voltage
+              <input type="text" data-mcc-lineup-field="voltage" placeholder="e.g. 480V, 600V, 4160V">
+            </label>
+            <label>Horizontal Bus (A)
+              <input type="number" min="1" step="1" data-mcc-lineup-field="horizontalBusRatingA" placeholder="e.g. 1600">
+            </label>
+            <label>Vertical Bus (A)
+              <input type="number" min="1" step="1" data-mcc-lineup-field="verticalBusRatingA" placeholder="e.g. 600">
+            </label>
+            <label>Arrangement
+              <input type="text" data-mcc-lineup-field="arrangement" placeholder="e.g. Front accessible, left-to-right">
+            </label>
+            <label>Unit Height (in)
+              <input type="number" min="1" step="0.5" data-mcc-lineup-field="unitHeightIn" placeholder="6">
+            </label>
+            <label>Section Height (in)
+              <input type="number" min="12" step="0.5" data-mcc-lineup-field="sectionHeightIn" placeholder="90">
+            </label>
+            <label>Top Horizontal Wireway (in)
+              <input type="number" min="0" step="0.5" data-mcc-lineup-field="topHorizontalWirewayHeightIn" placeholder="9">
+            </label>
+            <label>Bottom Horizontal Wireway (in)
+              <input type="number" min="0" step="0.5" data-mcc-lineup-field="bottomHorizontalWirewayHeightIn" placeholder="9">
+            </label>
+            <label>Usable Bucket Stack (in)
+              <input type="number" min="6" step="0.5" data-mcc-lineup-field="usableBucketHeightIn" placeholder="72">
+            </label>
+            <label>Section Depth (in)
+              <input type="number" min="6" step="0.5" data-mcc-lineup-field="sectionDepthIn" placeholder="20">
+            </label>
+          </div>
+
+          <details class="mcc-spec-details">
+            <summary>Additional Information</summary>
+            <div class="mcc-field-grid mcc-field-grid--spec">
+              <label>Bus Material
+                <select data-mcc-spec-field="busMaterial"></select>
+              </label>
+              <label>Bus Plating
+                <select data-mcc-spec-field="busPlating"></select>
+              </label>
+              <label>Other Bus Plating
+                <input type="text" data-mcc-spec-field="busPlatingOther">
+              </label>
+              <label>Short-Circuit Rating (kA)
+                <input type="number" min="0" step="1" data-mcc-spec-field="shortCircuitRatingKa">
+              </label>
+              <label>Communication Protocol
+                <select data-mcc-spec-field="communicationProtocol"></select>
+              </label>
+              <label>Control Voltage
+                <input type="text" data-mcc-spec-field="controlVoltage">
+              </label>
+              <label>Space Heater Voltage
+                <input type="text" data-mcc-spec-field="spaceHeaterVoltage">
+              </label>
+              <label>Enclosure Rating
+                <input type="text" data-mcc-spec-field="enclosureRating">
+              </label>
+              <label>Finish
+                <input type="text" data-mcc-spec-field="finish">
+              </label>
+              <label class="mcc-spec-checkbox">
+                <input type="checkbox" data-mcc-spec-field="spaceHeaterRequired">
+                <span>Space Heater Required</span>
+              </label>
+              <label class="mcc-spec-notes">Specification Notes
+                <textarea rows="3" data-mcc-spec-field="notes"></textarea>
+              </label>
+            </div>
+          </details>
+
+          <details class="mcc-spec-details">
+            <summary>PDF Title Block</summary>
+            <div class="mcc-field-grid mcc-field-grid--spec">
+              <label>Project Name
+                <input type="text" data-mcc-report-field="projectName" placeholder="e.g. Boiler Upgrade">
+              </label>
+              <label>Client
+                <input type="text" data-mcc-report-field="client" placeholder="e.g. Acme Manufacturing">
+              </label>
+              <label>Drawing Number
+                <input type="text" data-mcc-report-field="drawingNumber" placeholder="e.g. E-601">
+              </label>
+              <label>Revision
+                <input type="text" data-mcc-report-field="revision" placeholder="A">
+              </label>
+              <label>Prepared By
+                <input type="text" data-mcc-report-field="preparedBy">
+              </label>
+              <label>Checked By
+                <input type="text" data-mcc-report-field="checkedBy">
+              </label>
+              <label>Report Date
+                <input type="date" data-mcc-report-field="reportDate">
+              </label>
+            </div>
+          </details>
+
+          <div class="mcc-lineup-actions mcc-lineup-actions--wide">
+            <button id="add-mcc-section" class="btn" type="button">Add Section</button>
+            <button id="sync-mcc-equipment" class="btn primary-btn" type="button">Sync Equipment List</button>
+            <button id="export-mcc-lineup-svg" class="btn" type="button">Export SVG Sheet</button>
+            <button id="export-mcc-lineup-pdf" class="btn" type="button">Export PDF Report</button>
+          </div>
+          <p id="mcc-sync-status" class="small-text" aria-live="polite"></p>
+
+          <h2>Layout Checks</h2>
+          <ul id="mcc-validation-list" class="mcc-validation-list" aria-live="polite"></ul>
+        </aside>
+
+        <div class="mcc-lineup-workspace">
+          <div class="mcc-lineup-preview-header">
+            <h2>Elevation View</h2>
+            <span id="mcc-lineup-stats" class="small-text" aria-live="polite"></span>
+          </div>
+          <div id="mcc-elevation-preview" class="mcc-svg-preview"></div>
+
+          <div class="mcc-lineup-preview-header">
+            <h2>Simple One-Line</h2>
+            <span id="mcc-selection-status" class="small-text" aria-live="polite"></span>
+          </div>
+          <div id="mcc-oneline-preview" class="mcc-svg-preview"></div>
+
+          <div class="mcc-lineup-preview-header">
+            <h2>Sections and Buckets</h2>
+          </div>
+          <div id="mcc-section-list" class="mcc-section-list"></div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script type="module" src="dist/index.js" defer></script>
+  <script type="module" src="dist/projectManager.js"></script>
+  <script>
+    if (window.location.protocol === 'file:') {
+      window.addEventListener('DOMContentLoaded', function () {
+        document.getElementById('mcc-file-protocol-warning')?.classList.remove('hidden');
+      });
+    }
+  </script>
+</body>
+</html>

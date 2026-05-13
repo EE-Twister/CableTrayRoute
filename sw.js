@@ -33,6 +33,7 @@ const PRECACHE_URLS = [
   '/icons/load.svg',
   '/icons/components/Breaker.svg',
   '/icons/components/TextBox.svg',
+  '/icons/components/MCC.svg',
   // Toolbar icons used in navigation and settings
   '/icons/toolbar/validate.svg',
   '/icons/toolbar/grid.svg',

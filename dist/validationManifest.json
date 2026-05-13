@@ -1,10 +1,10 @@
 {
-  "generatedAt": "2026-04-26T23:31:07.739Z",
+  "generatedAt": "2026-05-12T22:09:28.256Z",
   "summary": {
-    "testSuiteCount": 122,
-    "totalAssertions": 3901,
+    "testSuiteCount": 146,
+    "totalAssertions": 5722,
     "benchmarkCount": 6,
-    "standardCount": 12
+    "standardCount": 13
   },
   "testSuites": [
     {
@@ -24,6 +24,13 @@
       "assertionCount": 17
     },
     {
+      "file": "tests/arcflash/arcFlashExample.test.cjs",
+      "groups": [
+        "arc flash analysis"
+      ],
+      "assertionCount": 11
+    },
+    {
       "file": "tests/arcFlashLabels.test.mjs",
       "groups": [
         "buildArcFlashLabelData",
@@ -33,11 +40,9 @@
       "assertionCount": 21
     },
     {
-      "file": "tests/arcflash/arcFlashExample.test.cjs",
-      "groups": [
-        "arc flash analysis"
-      ],
-      "assertionCount": 11
+      "file": "tests/auditLog.test.mjs",
+      "groups": [],
+      "assertionCount": 35
     },
     {
       "file": "tests/autoSaveScheduler.test.mjs",
@@ -81,6 +86,39 @@
         "STANDARD_BANK_KWH array"
       ],
       "assertionCount": 43
+    },
+    {
+      "file": "tests/bessHazard.test.mjs",
+      "groups": [
+        "CHEMISTRY_PARAMS constant",
+        "EXPOSURE_TYPES",
+        "separationDistance()",
+        "checkSeparations()",
+        "propagationAmbientFactor()",
+        "propagationTiming()",
+        "deflagrationVentArea()",
+        "hmaSummary()",
+        "runBessHazardStudy() integration"
+      ],
+      "assertionCount": 95
+    },
+    {
+      "file": "tests/busDuctSizing.test.mjs",
+      "groups": [
+        "STANDARD_BUSWAY_RATINGS constant",
+        "BUSWAY_LIBRARY",
+        "necOrientationDerating()",
+        "ambientTempCorrectionFactor()",
+        "stackingDerating()",
+        "necAmpacityDerating()",
+        "voltageDropBusDuct()",
+        "busStressForcePerFt()",
+        "maxSupportSpan()",
+        "selectStandardBusway()",
+        "runBusDuctStudy() — validation",
+        "runBusDuctStudy() — integration"
+      ],
+      "assertionCount": 74
     },
     {
       "file": "tests/cableFaultBracing.test.mjs",
@@ -186,6 +224,25 @@
       "assertionCount": 25
     },
     {
+      "file": "tests/conduitBendSchedule.test.mjs",
+      "groups": [
+        "BEND_TYPES constant",
+        "bendGeometry() — 90° stub-up",
+        "bendGeometry() — offset",
+        "bendGeometry() — kick",
+        "bendGeometry() — 3-bend saddle",
+        "bendGeometry() — unknown type",
+        "cumulativeDegrees()",
+        "nec358_24Check()",
+        "runConduitBendSchedule() integration",
+        "straightPullMinLength() — NEC 314.28(A)(1)",
+        "anglePullMinDimension() — NEC 314.28(A)(2)",
+        "selectStandardBox()",
+        "sizePullBox()"
+      ],
+      "assertionCount": 68
+    },
+    {
       "file": "tests/conduitCount.test.cjs",
       "groups": [
         "displayConduitCount",
@@ -270,6 +327,23 @@
       "assertionCount": 65
     },
     {
+      "file": "tests/demandSchedule.test.mjs",
+      "groups": [
+        "categorise()",
+        "iecDiversityFactor()",
+        "buildDemandSchedule() — empty / edge cases",
+        "buildDemandSchedule() — NEC 220 category factors",
+        "buildDemandSchedule() — NEC 430.24 motor demand",
+        "buildDemandSchedule() — NEC 220.56 kitchen demand",
+        "buildDemandSchedule() — NEC 625.42 EV charging",
+        "buildDemandSchedule() — IEC 60439-1 mode",
+        "buildDemandSchedule() — quantity and power factor",
+        "buildDemandSchedule() — source breakdown",
+        "NEC_CATEGORIES constant"
+      ],
+      "assertionCount": 83
+    },
+    {
       "file": "tests/derInterconnect.test.mjs",
       "groups": [
         "Constants",
@@ -281,6 +355,23 @@
         "runDERInterconnectStudy()"
       ],
       "assertionCount": 89
+    },
+    {
+      "file": "tests/designCoach.test.mjs",
+      "groups": [
+        "SEVERITY_ORDER",
+        "nextLargerConductor()",
+        "extractVoltageDropRecs()",
+        "extractArcFlashRecs()",
+        "extractShortCircuitRecs()",
+        "extractTrayFillRecs()",
+        "extractHarmonicsRecs()",
+        "extractGroundGridRecs()",
+        "extractLoadFlowRecs()",
+        "suppressDuplicates()",
+        "runDesignCoach()"
+      ],
+      "assertionCount": 80
     },
     {
       "file": "tests/designRuleChecker.test.mjs",
@@ -359,12 +450,30 @@
       "groups": [
         "equipment arrangements page"
       ],
-      "assertionCount": 14
+      "assertionCount": 137
     },
     {
       "file": "tests/equipmentColumns.test.cjs",
       "groups": [],
-      "assertionCount": 2
+      "assertionCount": 28
+    },
+    {
+      "file": "tests/equipmentEvaluation.test.mjs",
+      "groups": [
+        "checkInterruptingRating()",
+        "checkWithstand()",
+        "checkCableThermalDuty()",
+        "checkSccr()",
+        "conductorSizeToMm2()",
+        "conductorMaterial()",
+        "evaluateEquipment() — protective device",
+        "evaluateEquipment() — switchboard",
+        "evaluateEquipment() — cable segment on one-line",
+        "evaluateEquipment() — empty / edge cases",
+        "buildEquipmentReport()",
+        "summariseEvaluation()"
+      ],
+      "assertionCount": 77
     },
     {
       "file": "tests/equipmentPersistence.test.cjs",
@@ -440,6 +549,20 @@
       "assertionCount": 19
     },
     {
+      "file": "tests/groundSoilModel.test.mjs",
+      "groups": [
+        "wennerApparentResistivity — Sunde two-layer image method",
+        "fitTwoLayerSoil — two-layer soil fitting",
+        "classifyRiskPoint — risk classification",
+        "buildPolygonGeometry — polygon grid geometry",
+        "buildRectangularGeometry — rectangular grid from IEEE 80 params",
+        "estimateSurfacePotential — simplified potential model",
+        "buildHazardMap — hazard map generation",
+        "evaluateRiskPoints — inspection point evaluation"
+      ],
+      "assertionCount": 52
+    },
+    {
       "file": "tests/harmonics.test.mjs",
       "groups": [
         "limitForVoltage — IEEE 519",
@@ -458,6 +581,23 @@
       "assertionCount": 70
     },
     {
+      "file": "tests/hazAreaClassification.test.mjs",
+      "groups": [
+        "Constants",
+        "classifyArea — NEC",
+        "classifyArea — IEC",
+        "checkEquipmentCompatibility — protection type vs zone",
+        "checkEquipmentCompatibility — equipment group hierarchy",
+        "checkEquipmentCompatibility — T-rating",
+        "checkEquipmentCompatibility — NEC Division",
+        "checkAllEquipment",
+        "classificationReport",
+        "runHazAreaStudy — validation",
+        "runHazAreaStudy — integration"
+      ],
+      "assertionCount": 93
+    },
+    {
       "file": "tests/heatTraceReport.test.mjs",
       "groups": [
         "heat trace branch schedule",
@@ -474,9 +614,15 @@
         "standard cable rating selection",
         "heat trace cable type selection basis",
         "parallel runs and component allowances",
-        "input validation"
+        "input validation",
+        "heatTraceProducts.json catalog schema",
+        "selectHeatTraceProduct — basic matching",
+        "calcAccessoryKit",
+        "buildLineList",
+        "buildHeatTraceBOM",
+        "buildControllerSchedule"
       ],
-      "assertionCount": 36
+      "assertionCount": 87
     },
     {
       "file": "tests/ibrModeling.test.mjs",
@@ -527,11 +673,28 @@
       "assertionCount": 45
     },
     {
+      "file": "tests/iec60909.test.mjs",
+      "groups": [
+        "cFactor — IEC 60909-0:2016 Table 1",
+        "kappaIEC — peak factor κ (IEC 60909-0 §4.3.1.1 Eq. 14)",
+        "thermalMFactor — DC component heating (IEC 60909-0 §4.8.1)",
+        "transformerCorrectionKT — IEC 60909-0 §3.3.3",
+        "computeIEC60909Bus — IEC 60909-0:2016 §4 benchmark (10 kV, 500 MVA)",
+        "runIEC60909Batch — batch runner"
+      ],
+      "assertionCount": 34
+    },
+    {
       "file": "tests/ieee835.test.mjs",
       "groups": [
         "IEEE 835 underground benchmarks"
       ],
       "assertionCount": 3
+    },
+    {
+      "file": "tests/insulationCoordination.test.mjs",
+      "groups": [],
+      "assertionCount": 103
     },
     {
       "file": "tests/intlCableSize.test.mjs",
@@ -565,6 +728,32 @@
         "sizeCable — skippedSizes field present in result"
       ],
       "assertionCount": 104
+    },
+    {
+      "file": "tests/lifecyclePackage.test.mjs",
+      "groups": [
+        "STATUS_OPTIONS",
+        "summarizePackage",
+        "buildLifecyclePackage",
+        "diffLifecyclePackages"
+      ],
+      "assertionCount": 56
+    },
+    {
+      "file": "tests/lighting.test.mjs",
+      "groups": [
+        "GENERIC_CU_TABLE constants",
+        "parseIES",
+        "roomCavityRatio",
+        "cuReflectanceColumn",
+        "coefficientOfUtilization",
+        "averageIlluminance",
+        "interpolateCandela",
+        "pointIlluminanceGrid",
+        "egressComplianceCheck",
+        "runLightingStudy integration"
+      ],
+      "assertionCount": 83
     },
     {
       "file": "tests/loadCombinations.test.mjs",
@@ -643,6 +832,27 @@
       "assertionCount": 1
     },
     {
+      "file": "tests/mccLineup.test.mjs",
+      "groups": [],
+      "assertionCount": 77
+    },
+    {
+      "file": "tests/mccLineupPage.test.cjs",
+      "groups": [
+        "MCC lineup page"
+      ],
+      "assertionCount": 81
+    },
+    {
+      "file": "tests/motorComponent.test.mjs",
+      "groups": [
+        "motor component — library schema validation",
+        "getStarterProfile — reads from motor component props",
+        "motor subtype detection for runMotorStart"
+      ],
+      "assertionCount": 38
+    },
+    {
       "file": "tests/motorStart.test.mjs",
       "groups": [
         "fullLoadCurrent",
@@ -669,6 +879,11 @@
         "Backward compatibility (num_slots=1)"
       ],
       "assertionCount": 39
+    },
+    {
+      "file": "tests/oidc.test.mjs",
+      "groups": [],
+      "assertionCount": 25
     },
     {
       "file": "tests/onelineBackgroundImage.test.mjs",
@@ -709,7 +924,7 @@
       "groups": [
         "page navigation"
       ],
-      "assertionCount": 6
+      "assertionCount": 7
     },
     {
       "file": "tests/parallelCables.test.mjs",
@@ -771,6 +986,11 @@
       "assertionCount": 49
     },
     {
+      "file": "tests/quasiDynamic.test.mjs",
+      "groups": [],
+      "assertionCount": 62
+    },
+    {
       "file": "tests/racewayRoute.test.cjs",
       "groups": [
         "_racewayRoute"
@@ -783,11 +1003,36 @@
       "assertionCount": 5
     },
     {
+      "file": "tests/rbac.test.mjs",
+      "groups": [],
+      "assertionCount": 35
+    },
+    {
       "file": "tests/rebuildTrayData.test.cjs",
       "groups": [
         "rebuildTrayData"
       ],
       "assertionCount": 12
+    },
+    {
+      "file": "tests/relaySettingsExport.test.mjs",
+      "groups": [
+        "resolveSettings",
+        "filterExportableEntries",
+        "hashSettings",
+        "formatSEL — overcurrent relay",
+        "formatSEL — differential relay",
+        "formatGEURS — overcurrent relay",
+        "formatGEURS — differential relay",
+        "formatABBCFG",
+        "formatSiemensXRIO",
+        "formatNeutral",
+        "selectVendorFormat",
+        "buildExportFiles",
+        "MANIFEST_HEADERS",
+        "VENDOR_FORMATS registry"
+      ],
+      "assertionCount": 85
     },
     {
       "file": "tests/reliability.test.mjs",
@@ -820,6 +1065,21 @@
       "assertionCount": 9
     },
     {
+      "file": "tests/reportPackage.test.mjs",
+      "groups": [
+        "SECTION_REGISTRY",
+        "PRESET_CONFIGS",
+        "getSectionDef",
+        "getAvailableSections",
+        "buildCoverSheet",
+        "buildRevisionTable",
+        "buildReportPackage",
+        "snapshotPackage",
+        "sectionToAOA"
+      ],
+      "assertionCount": 93
+    },
+    {
       "file": "tests/restApi.test.mjs",
       "groups": [],
       "assertionCount": 22
@@ -845,6 +1105,20 @@
         "IFC4 round-trip: export → parseRevit"
       ],
       "assertionCount": 113
+    },
+    {
+      "file": "tests/sampleGallery.test.mjs",
+      "groups": [
+        "SAMPLE_REGISTRY",
+        "getSamplesByTag()",
+        "getSampleById()",
+        "validateSampleProject()",
+        "migrateSampleProject()",
+        "Sample JSON files",
+        "samplegallery.html",
+        "guidedChecklist step pages are within pagesUsed"
+      ],
+      "assertionCount": 40
     },
     {
       "file": "tests/sampleLinks.test.cjs",
@@ -986,6 +1260,24 @@
       "assertionCount": 42
     },
     {
+      "file": "tests/sustainabilityFootprint.test.mjs",
+      "groups": [
+        "GRID_EMISSION_FACTORS constant",
+        "CABLE_CO2E constant",
+        "TRAY_CO2E constant",
+        "CONDUIT_CO2E constant",
+        "EQUIPMENT_CO2E constant",
+        "AWG_TO_MM2 lookup table",
+        "cableCO2eFactor()",
+        "trayCO2eFactor()",
+        "conduitCO2eFactor()",
+        "embodiedCO2e()",
+        "operatingCO2e()",
+        "buildSustainabilityReport()"
+      ],
+      "assertionCount": 101
+    },
+    {
       "file": "tests/tableUtilsNavigation.test.cjs",
       "groups": [
         "tableUtils arrow navigation"
@@ -1100,6 +1392,16 @@
         "buildTrayHardwareBOM — custom options"
       ],
       "assertionCount": 53
+    },
+    {
+      "file": "tests/trustcenter.test.mjs",
+      "groups": [
+        "benchmarkRunner — runBenchmark()",
+        "benchmarkRunner — summarize()",
+        "benchmarkLibrary — canonical benchmark results",
+        "runAllBenchmarks()"
+      ],
+      "assertionCount": 50
     },
     {
       "file": "tests/units.test.cjs",
@@ -1551,6 +1853,85 @@
         "Asymmetrical first-cycle peak current calculated with empirical MF, not κ (use IEC 60909 for κ method)",
         "Generator near-to-fault decay not modeled in simplified ANSI method"
       ]
+    },
+    {
+      "id": "ieee80-advanced-soil",
+      "name": "IEEE 80-2013 / ASTM G57",
+      "title": "IEEE 80 Advanced — Two-Layer Soil Wenner Fit, Polygon Grid, Hazard Map",
+      "studyPage": "groundgrid.html",
+      "standard": "IEEE 80-2013 / ASTM G57",
+      "clause": "§12.4 — Effective soil resistivity; Sunde (1968) image method",
+      "description": "Synthetic two-layer soil with ρ₁ = 100 Ω·m, ρ₂ = 400 Ω·m, h = 3 m. Seven Wenner measurements (a = 1–30 m). Expected: fitted ρ₁ within 5 % of 100, fitted ρ₂ within 10 % of 400, fitted h within 15 % of 3 m. Rectangular polygon (20 × 15 m) screening check: GPR, mesh voltage, and step voltage consistent with analyzeGroundGrid baseline.",
+      "inputs": {
+        "soilMeasurements": [
+          {
+            "a": 1,
+            "rhoA": 104
+          },
+          {
+            "a": 2,
+            "rhoA": 118
+          },
+          {
+            "a": 3,
+            "rhoA": 138
+          },
+          {
+            "a": 5,
+            "rhoA": 175
+          },
+          {
+            "a": 10,
+            "rhoA": 253
+          },
+          {
+            "a": 20,
+            "rhoA": 341
+          },
+          {
+            "a": 30,
+            "rhoA": 380
+          }
+        ],
+        "trueRho1": 100,
+        "trueRho2": 400,
+        "trueH": 3,
+        "gridLx": 20,
+        "gridLy": 15,
+        "nx": 5,
+        "ny": 4,
+        "h": 0.5,
+        "d": 0.01,
+        "Ig": 2000,
+        "tf": 0.5,
+        "bw": 0.08
+      },
+      "expectedOutputs": {
+        "fittedRho1": {
+          "value": 100,
+          "tolerance": 0.05,
+          "unit": "Ω·m",
+          "toleranceType": "relative"
+        },
+        "fittedRho2": {
+          "value": 400,
+          "tolerance": 0.1,
+          "unit": "Ω·m",
+          "toleranceType": "relative"
+        },
+        "fittedH": {
+          "value": 3,
+          "tolerance": 0.15,
+          "unit": "m",
+          "toleranceType": "relative"
+        },
+        "fitError": {
+          "max": 5,
+          "unit": "%"
+        }
+      },
+      "reference": "Sunde (1968) Earth Conduction Effects §3-3; ASTM G57 §7; IEEE 80-2013 §12.4",
+      "sampleFile": "samples/benchmark-ground-grid-advanced.json"
     },
     {
       "id": "ieee399",

@@ -4,6 +4,7 @@ const NAV_ROUTES = [
   { href: 'scenarios.html', label: 'Scenario Comparison', section: 'Workflow', group: 'Planning', icon: 'icons/toolbar/copy.svg' },
   { href: 'equipmentlist.html', label: 'Equipment List', section: 'Workflow', group: 'Planning', icon: 'icons/equipment.svg' },
   { href: 'equipmentarrangements.html', label: 'Equipment Arrangements', section: 'Workflow', group: 'Planning', icon: 'icons/equipment.svg' },
+  { href: 'mcclineup.html', label: 'MCC Lineups', section: 'Workflow', group: 'Planning', icon: 'icons/components/MCC.svg' },
   { href: 'loadlist.html', label: 'Load List', section: 'Workflow', group: 'Planning', icon: 'icons/load.svg' },
   { href: 'demandschedule.html', label: 'Demand Schedule', section: 'Studies', group: 'Equipment Sizing', icon: 'icons/load.svg' },
   { href: 'cableschedule.html', label: 'Cable Schedule', section: 'Workflow', group: 'Cable', icon: 'icons/cable.svg' },

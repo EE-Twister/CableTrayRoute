@@ -232,6 +232,7 @@ function createEmptyProjectSections() {
     panels: [],
     loads: [],
     cables: [],
+    mccLineups: [],
     raceways: { trays: [], conduits: [], ductbanks: [] },
     oneLine: { activeSheet: 0, sheets: [] }
   };

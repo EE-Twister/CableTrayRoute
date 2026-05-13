@@ -59,6 +59,8 @@ class MockWebSocket {
 globalThis.window   = {};
 globalThis.location = { protocol: 'http:', host: 'localhost:3000' };
 globalThis.WebSocket = MockWebSocket;
+globalThis.setInterval = () => 0;
+globalThis.clearInterval = () => {};
 
 // Import AFTER stubs are in place
 const { CollabClient, renderPresenceBar } = await import('../src/collaboration.js');

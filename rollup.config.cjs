@@ -60,6 +60,7 @@ const entries = {
   designcoach: 'src/designCoach.js',
   equipmentevaluation: 'src/equipmentEvaluation.js',
   equipmentarrangements: 'src/equipmentarrangements.js',
+  mcclineup: 'src/mcclineup.js',
   spoolsheets: 'src/spoolsheets.js',
   windload: 'src/windload.js',
   structuralcombinations: 'src/structuralcombinations.js',

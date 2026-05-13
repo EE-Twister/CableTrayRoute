@@ -118,11 +118,15 @@
             <label>Source
               <select id="equipment-source">
                 <option value="equipment-list">Equipment List</option>
+                <option value="mcc-lineup">MCC Lineup</option>
                 <option value="custom">Custom</option>
               </select>
             </label>
             <label id="equipment-preset-wrapper">Equipment
               <select id="equipment-preset"></select>
+            </label>
+            <label id="mcc-lineup-preset-wrapper" class="hidden">MCC Lineup
+              <select id="mcc-lineup-preset"></select>
             </label>
             <label id="custom-name-wrapper" class="hidden">Custom Name
               <input id="custom-name" type="text" placeholder="SWGR-1">
@@ -266,6 +270,17 @@
               <span id="elevation-status" class="small-text" aria-live="polite"></span>
             </div>
             <svg id="equipment-elevation-canvas" viewBox="0 0 1000 320" role="img" aria-label="Equipment wall elevation view"></svg>
+          </div>
+          <div id="equipment-mcc-preview-panel" class="equipment-mcc-preview-panel" hidden aria-label="Selected MCC lineup detail">
+            <div class="equipment-mcc-preview-toolbar">
+              <h2 id="equipment-mcc-preview-title">Selected MCC Lineup</h2>
+              <span id="equipment-mcc-preview-status" class="small-text" aria-live="polite"></span>
+              <a id="equipment-mcc-edit-link" class="btn" href="mcclineup.html">Edit MCC Lineup</a>
+            </div>
+            <div class="equipment-mcc-preview-grid">
+              <div id="equipment-mcc-elevation-preview" class="mcc-svg-preview"></div>
+              <div id="equipment-mcc-oneline-preview" class="mcc-svg-preview"></div>
+            </div>
           </div>
         </div>
       </section>

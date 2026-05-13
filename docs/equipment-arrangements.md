@@ -8,7 +8,7 @@ The Equipment Arrangements tool (`equipmentarrangements.html`) provides a drag-a
 - Exterior wall types for north/south/east/west walls.
 - Interior walls with configurable orientation, position, and length.
 - Canvas drag wall tool that creates interior walls snapped to a 0.5 ft grid.
-- Equipment placement from **Equipment List** records or a custom entry.
+- Equipment placement from **Equipment List** records, saved **MCC Lineup** records, or a custom entry.
 - Multiple named arrangements in one project, including layouts built from the Equipment List `Arrangement` field.
 - **Build From List** groups assigned equipment records into separate arrangements and auto-places each group.
 - **Auto Layout** can lay out custom one-off equipment already on the canvas, or load equipment assigned to the active empty arrangement.
@@ -16,6 +16,7 @@ The Equipment Arrangements tool (`equipmentarrangements.html`) provides a drag-a
 - Dimension overlays for room size, selected equipment size, and selected equipment offsets.
 - Named saved views that preserve zoom, selected equipment, dimension visibility, and elevation direction.
 - Wall elevation views for the active arrangement, with selectable north/south/east/west projections and SVG download.
+- Selected MCC lineup detail previews when a placed MCC matches a saved lineup from `mcclineup.html`.
 - Combined layout sheet SVG export with the current plan and elevation on one sheet.
 - Adjustable equipment width/depth, facing direction, and voltage rating.
 - Equipment height and base elevation fields for elevation drawings.
@@ -41,6 +42,14 @@ The Elevation View panel projects equipment from the active arrangement onto the
 Height defaults to 7 ft when no height is supplied; a custom Equipment List column named `height`, `heightFt`, `equipmentHeight`, `elevationHeight`, or `enclosureHeight` can drive the rendered equipment height. The `z`, `baseElevation`, `baseElevationFt`, or `mountingHeight` field can drive the base elevation.
 
 Doorways on the selected wall are shown in the elevation for coordination. Use **Download SVG** to export the current elevation view.
+
+## MCC lineup detail
+
+Use **Source > MCC Lineup** to place a saved MCC lineup directly on the canvas without creating an Equipment List row. The placement keeps a direct lineup reference, so selecting the block shows the detailed section/bucket elevation, horizontal and vertical bus ratings, wireways, and simple one-line under the normal room elevation.
+
+Equipment List rows can still show the same preview when a selected block matches an MCC Lineup by Equipment Tag or Lineup. Edit the lineup on the MCC Lineups page; sync the Equipment List only when you want that lineup represented as an equipment row.
+
+Use **Edit MCC Lineup** in the selected MCC preview to jump back to the matching lineup on `mcclineup.html`.
 
 ## NEC workspace highlighting
 

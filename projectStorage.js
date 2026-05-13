@@ -525,7 +525,7 @@ export function cloneScenarioStorage(from, to) {
   }
 }
 
-const SAVED_PROJECT_SUFFIXES = ['equipment', 'panels', 'loads', 'cables', 'cableTypicals', 'raceways', 'oneLine'];
+const SAVED_PROJECT_SUFFIXES = ['equipment', 'panels', 'loads', 'cables', 'cableTypicals', 'mccLineups', 'raceways', 'oneLine'];
 const SAVED_PROJECT_PRIMARY_SUFFIXES = new Set(SAVED_PROJECT_SUFFIXES.filter(suffix => suffix !== 'equipment'));
 
 class SavedProjectMigrationError extends Error {

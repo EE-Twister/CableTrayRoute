@@ -5,6 +5,8 @@
     "vendor": "ABB",
     "name": "ABB Tmax T3 160A",
     "interruptRating": 65,
+    "withstandRatingKA": 65,
+    "withstandCycles": 3,
     "settings": {
       "pickup": 160,
       "time": 0.2,
@@ -40,6 +42,8 @@
     "vendor": "Siemens",
     "name": "Siemens 3VA 125A",
     "interruptRating": 35,
+    "withstandRatingKA": 35,
+    "withstandCycles": 3,
     "settings": {
       "pickup": 125,
       "time": 0.25,
@@ -75,6 +79,8 @@
     "vendor": "Schneider",
     "name": "Schneider Compact NSX100",
     "interruptRating": 50,
+    "withstandRatingKA": 50,
+    "withstandCycles": 3,
     "settings": {
       "pickup": 100,
       "time": 0.3,
@@ -110,6 +116,8 @@
     "vendor": "Eaton Bussmann",
     "name": "Bussmann LPS-RK-SP 400A",
     "interruptRating": 200,
+    "withstandRatingKA": 200,
+    "withstandCycles": 1,
     "settings": {
       "ampRating": 400,
       "speed": "time_delay"
@@ -138,6 +146,8 @@
     "vendor": "Mersen",
     "name": "Mersen TRS-R 200A",
     "interruptRating": 200,
+    "withstandRatingKA": 200,
+    "withstandCycles": 1,
     "settings": {
       "ampRating": 200,
       "speed": "time_delay"
@@ -241,6 +251,8 @@
     "vendor": "Eaton",
     "name": "Eaton Series C 100A",
     "interruptRating": 25,
+    "withstandRatingKA": 25,
+    "withstandCycles": 3,
     "settings": {
       "pickup": 100,
       "time": 0.2,
@@ -276,6 +288,8 @@
     "vendor": "Mitsubishi",
     "name": "Mitsubishi WS 225A",
     "interruptRating": 42,
+    "withstandRatingKA": 42,
+    "withstandCycles": 3,
     "settings": {
       "pickup": 225,
       "time": 0.3,

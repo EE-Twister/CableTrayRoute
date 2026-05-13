@@ -1,5 +1,6 @@
 import * as dataStore from './dataStore.mjs';
 import { openModal } from './src/components/modal.js';
+import { findMccLineupForEquipment, mccLineupDimensions, renderMccElevationSvg, renderMccOneLineSvg } from './src/mccLineupModel.mjs';
 
 const WALL_TYPES = ['Concrete', 'CMU', 'Gypsum', 'Metal', 'Fire Rated', 'Removable Panel'];
 const VOLTAGE_OPTIONS = ['120V', '208V', '480V', '600V', '4.16kV', '13.8kV', '15kV'];
@@ -45,6 +46,7 @@ let canvas;
 let elevationCanvas;
 let summaryEl;
 let clearanceDetailsEl;
+let mccPreviewPanel;
 let contextMenu = null;
 
 function clamp(value, min, max) {
@@ -471,6 +473,56 @@ function populateEquipmentPreset() {
     heightInput.value = equipmentHeightFromSource(options[0].item);
     baseElevationInput.value = equipmentBaseElevationFromSource(options[0].item);
   }
+}
+
+function setVoltageControl(value) {
+  const select = document.getElementById('equipment-voltage');
+  if (!select || !value) return;
+  const voltage = String(value).toUpperCase();
+  const matching = Array.from(select.options).find(opt => opt.value.toUpperCase() === voltage);
+  if (matching) select.value = matching.value;
+}
+
+function applyEquipmentPreset(index) {
+  const item = dataStore.getEquipment()[index];
+  if (!item) return;
+  document.getElementById('equipment-width').value = parseNumber(item.width, 4);
+  document.getElementById('equipment-depth').value = parseNumber(item.depth, 2);
+  document.getElementById('equipment-height').value = equipmentHeightFromSource(item);
+  document.getElementById('equipment-base-elevation').value = equipmentBaseElevationFromSource(item);
+  setVoltageControl(item.voltage);
+}
+
+function populateMccLineupPreset() {
+  const select = document.getElementById('mcc-lineup-preset');
+  if (!select) return;
+  const lineups = dataStore.getMccLineups();
+  const options = lineups.length
+    ? lineups.map((lineup, idx) => ({
+        value: String(idx),
+        label: `${lineup.tag || `MCC-${idx + 1}`} - ${lineup.name || 'MCC Lineup'}`,
+        item: lineup
+      }))
+    : [{ value: '-1', label: 'No MCC lineups created', item: null }];
+
+  select.innerHTML = '';
+  options.forEach(({ value, label }) => {
+    const option = document.createElement('option');
+    option.value = value;
+    option.textContent = label;
+    select.appendChild(option);
+  });
+}
+
+function applyMccLineupPreset(index) {
+  const lineup = dataStore.getMccLineups()[index];
+  if (!lineup) return;
+  const dimensions = mccLineupDimensions(lineup);
+  document.getElementById('equipment-width').value = dimensions.totalWidthFt;
+  document.getElementById('equipment-depth').value = dimensions.depthFt;
+  document.getElementById('equipment-height').value = dimensions.heightFt;
+  document.getElementById('equipment-base-elevation').value = 0;
+  setVoltageControl(lineup.voltage);
 }
 
 function syncRoomControls() {
@@ -1414,6 +1466,37 @@ function renderElevation() {
   }
 }
 
+function renderSelectedMccLineupPreview() {
+  if (!mccPreviewPanel) return;
+  const selected = selectedEquipment();
+  const title = document.getElementById('equipment-mcc-preview-title');
+  const status = document.getElementById('equipment-mcc-preview-status');
+  const editLink = document.getElementById('equipment-mcc-edit-link');
+  const elevation = document.getElementById('equipment-mcc-elevation-preview');
+  const oneLine = document.getElementById('equipment-mcc-oneline-preview');
+  if (selected.length !== 1) {
+    mccPreviewPanel.hidden = true;
+    return;
+  }
+  const lineup = findMccLineupForEquipment(dataStore.getMccLineups(), selected[0]);
+  if (!lineup) {
+    mccPreviewPanel.hidden = true;
+    return;
+  }
+  const dimensions = mccLineupDimensions(lineup);
+  if (title) title.textContent = `${lineup.tag} MCC Lineup`;
+  if (status) {
+    status.textContent = `${dimensions.sectionCount} sections, ${dimensions.bucketCount} buckets, ${dimensions.totalWidthFt} ft wide.`;
+  }
+  if (editLink) {
+    editLink.href = `mcclineup.html?mccLineupId=${encodeURIComponent(lineup.id)}`;
+    editLink.hidden = false;
+  }
+  if (elevation) elevation.innerHTML = renderMccElevationSvg(lineup, { maxWidth: 900, maxHeight: 360 });
+  if (oneLine) oneLine.innerHTML = renderMccOneLineSvg(lineup, { spacing: 72 });
+  mccPreviewPanel.hidden = false;
+}
+
 function elevationSvgStyles() {
   return [
     '.equipment-elevation-bg{fill:#f8fbff;}',
@@ -1685,6 +1768,7 @@ function render() {
   canvas = previousCanvas;
 
   renderElevation();
+  renderSelectedMccLineupPreview();
   const zoomLabel = document.getElementById('zoom-label');
   if (zoomLabel) zoomLabel.textContent = `Scale: ${state.scale} px/ft`;
   updateSummary();
@@ -2319,6 +2403,7 @@ function autoLayoutEquipment() {
 function addEquipment() {
   const source = document.getElementById('equipment-source').value;
   const presetSelect = document.getElementById('equipment-preset');
+  const mccLineupSelect = document.getElementById('mcc-lineup-preset');
   const customName = document.getElementById('custom-name').value.trim();
   const width = clamp(parseNumber(document.getElementById('equipment-width').value, 4), 1, 30);
   const depth = clamp(parseNumber(document.getElementById('equipment-depth').value, 2), 1, 30);
@@ -2330,6 +2415,7 @@ function addEquipment() {
   let name = 'Equipment';
   let listTag = null;
   let lineup = '';
+  let mccLineupId = '';
   if (source === 'equipment-list') {
     const index = Number.parseInt(presetSelect.value, 10);
     const item = dataStore.getEquipment()[index];
@@ -2342,6 +2428,13 @@ function addEquipment() {
       alert(`"${name}" is already on the canvas. Each equipment item can only be placed once.`);
       return;
     }
+  } else if (source === 'mcc-lineup') {
+    const index = Number.parseInt(mccLineupSelect.value, 10);
+    const item = dataStore.getMccLineups()[index];
+    if (!item) return;
+    name = item.tag || item.name || `MCC-${state.equipment.length + 1}`;
+    lineup = item.tag || item.name || '';
+    mccLineupId = item.id || '';
   } else {
     name = customName || `Custom-${state.equipment.length + 1}`;
   }
@@ -2352,6 +2445,7 @@ function addEquipment() {
 
   const newEq = { id, name, width, depth, height, baseElevation, voltage, lineup, facing, x: startX, y: startY };
   if (listTag) newEq.listTag = listTag;
+  if (mccLineupId) newEq.mccLineupId = mccLineupId;
 
   pushHistory();
   state.equipment.push(newEq);
@@ -2720,25 +2814,28 @@ function bindUI() {
   });
 
   document.getElementById('equipment-source').addEventListener('change', event => {
-    const isCustom = event.target.value === 'custom';
-    document.getElementById('equipment-preset-wrapper').classList.toggle('hidden', isCustom);
+    const source = event.target.value;
+    const isCustom = source === 'custom';
+    const isMccLineup = source === 'mcc-lineup';
+    document.getElementById('equipment-preset-wrapper').classList.toggle('hidden', isCustom || isMccLineup);
+    document.getElementById('mcc-lineup-preset-wrapper').classList.toggle('hidden', !isMccLineup);
     document.getElementById('custom-name-wrapper').classList.toggle('hidden', !isCustom);
+    if (source === 'equipment-list') {
+      applyEquipmentPreset(Number.parseInt(document.getElementById('equipment-preset').value, 10));
+    }
+    if (isMccLineup) {
+      applyMccLineupPreset(Number.parseInt(document.getElementById('mcc-lineup-preset').value, 10));
+    }
   });
 
   document.getElementById('equipment-preset').addEventListener('change', event => {
     const index = Number.parseInt(event.target.value, 10);
-    const item = dataStore.getEquipment()[index];
-    if (!item) return;
-    document.getElementById('equipment-width').value = parseNumber(item.width, 4);
-    document.getElementById('equipment-depth').value = parseNumber(item.depth, 2);
-    document.getElementById('equipment-height').value = equipmentHeightFromSource(item);
-    document.getElementById('equipment-base-elevation').value = equipmentBaseElevationFromSource(item);
-    if (item.voltage) {
-      const voltage = String(item.voltage).toUpperCase();
-      const select = document.getElementById('equipment-voltage');
-      const matching = Array.from(select.options).find(opt => opt.value.toUpperCase() === voltage);
-      if (matching) select.value = matching.value;
-    }
+    applyEquipmentPreset(index);
+  });
+
+  document.getElementById('mcc-lineup-preset').addEventListener('change', event => {
+    const index = Number.parseInt(event.target.value, 10);
+    applyMccLineupPreset(index);
   });
 
   // Ctrl/Cmd+Z for undo
@@ -2755,11 +2852,13 @@ function initialize() {
   elevationCanvas = document.getElementById('equipment-elevation-canvas');
   summaryEl = document.getElementById('arrangement-summary');
   clearanceDetailsEl = document.getElementById('clearance-detail-list');
+  mccPreviewPanel = document.getElementById('equipment-mcc-preview-panel');
   if (!canvas) return;
 
   ['wall-north', 'wall-south', 'wall-east', 'wall-west', 'interior-type'].forEach(id => populateSelect(id, WALL_TYPES));
   populateSelect('equipment-voltage', VOLTAGE_OPTIONS);
   populateEquipmentPreset();
+  populateMccLineupPreset();
   loadArrangements();
   compactToolbarControls();
   createContextMenu();

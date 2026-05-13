@@ -85,7 +85,7 @@ function applyPageVisualIdentity(){
     {match:/route|ductbank|pullcards|supportspan/,value:'routing'},
     {match:/fill/,value:'capacity'},
     {match:/arcflash|harmonics|voltageflicker|motorstart|shortcircuit|loadflow|tcc|conduitbend|busdust|besshazard|insulationcoordination/,value:'analysis'},
-    {match:/oneline|custom-components/,value:'diagram'},
+    {match:/oneline|custom-components|mcclineup|lineup/,value:'diagram'},
     {match:/account|login|forgot-password|reset-password/,value:'account'},
     {match:/index/,value:'home'}
   ];
@@ -942,7 +942,7 @@ function initSettings(){
     });
 
     document.addEventListener('click',e=>{
-      if(open&&!settingsMenu.contains(e.target)&&e.target!==settingsBtn){
+      if(open&&!settingsMenu.contains(e.target)&&!settingsBtn.contains(e.target)){
         close();
       }
     });
@@ -2130,6 +2130,8 @@ globalThis.initDarkMode=initDarkMode;
 globalThis.initCompactMode=initCompactMode;
 globalThis.initHelpModal=initHelpModal;
 globalThis.initNavToggle=initNavToggle;
+
+export { initSettings, initDarkMode, initCompactMode, initHelpModal, initNavToggle };
 globalThis.checkPrereqs=checkPrereqs;
 globalThis.persistConduits=persistConduits;
 globalThis.loadConduits=loadConduits;

@@ -13,6 +13,7 @@ function baseInput(overrides = {}) {
     soilResistivityOhmM: 100,
     soilPh: 7,
     moistureCategory: 'moderate',
+    coatingModelType: 'fixed',
     coatingBreakdownFactor: 0.2,
     surfaceAreaM2: 100,
     currentDensityMethod: 'table',
@@ -23,6 +24,29 @@ function baseInput(overrides = {}) {
     availabilityFactor: 0.95,
     targetLifeYears: 20,
     installedMassKg: 200,
+    anodeTypeSystem: 'galvanic',
+    numberOfAnodes: 4,
+    anodeSpacingM: 25,
+    anodeDistanceToStructureM: 3,
+    anodeBurialDepthM: 2,
+    zoneResistivityOhmM: [100, 100, 100, 100],
+    zoneResistivityInputValid: true,
+    measuredInstantOffPotentialMv: -900,
+    simulatedPolarizationShiftMv: 120,
+    testPointCount: 4,
+    passingTestPointCount: 4,
+    nearbyForeignStructures: 'none',
+    dcTractionSystem: 'none',
+    knownInterferenceSources: 'none',
+    mitigationProfile: 'baseline',
+    mitigationActions: ['baseline survey', 'test station checks'],
+    verificationTestDate: '2026-03-12',
+    testMethod: 'instant-off',
+    measurementContext: 'native-soil',
+    referenceElectrodeLocation: 'local',
+    irDropCompensationMethod: 'instant-off',
+    measuredIrDropMv: 0,
+    couponDepolarizationMv: 0,
     ...overrides
   };
 }
@@ -32,10 +56,10 @@ function baseInput(overrides = {}) {
 
   assert.equal(result.designCurrentDensityMaM2, 10);
   assert.equal(result.exposedAreaM2, 20);
-  assert.equal(result.requiredCurrentA, 0.2105);
-  assert.equal(result.minimumAnodeMassKg, 50.575);
-  assert.equal(result.predictedLifeYears, 79.09);
-  assert.equal(result.safetyMarginYears, 59.09);
+  assert.equal(result.requiredCurrentA, 0.2971);
+  assert.equal(result.minimumAnodeMassKg, 71.361);
+  assert.equal(result.predictedLifeYears, 56.05);
+  assert.equal(result.safetyMarginYears, 36.05);
 
   assert.ok(result.requiredCurrentA > 0);
   assert.ok(result.minimumAnodeMassKg > 0);

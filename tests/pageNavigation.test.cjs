@@ -51,4 +51,9 @@ describe('page navigation', () => {
     const src = fs.readFileSync(path.join(root, 'src/components/navigation.js'), 'utf8');
     assert.ok(src.includes("href: 'equipmentarrangements.html'"), 'navigation.js missing equipmentarrangements.html route');
   });
+
+  it('navigation definitions include MCC lineups route', () => {
+    const src = fs.readFileSync(path.join(root, 'src/components/navigation.js'), 'utf8');
+    assert.ok(src.includes("href: 'mcclineup.html'"), 'navigation.js missing mcclineup.html route');
+  });
 });
