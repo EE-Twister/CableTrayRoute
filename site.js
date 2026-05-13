@@ -331,6 +331,132 @@ function setOperationStatus(statusHost,phase,statusText){
   placeholder.classList.toggle('is-error',phase==='error');
 }
 
+function createSettingsSection(title,description,sectionKey){
+  const section=document.createElement('section');
+  section.className=`settings-menu__section settings-menu__section--${sectionKey}`;
+  section.dataset.settingsSection=sectionKey;
+  const heading=document.createElement('h3');
+  heading.className='settings-menu__section-title';
+  heading.textContent=title;
+  section.appendChild(heading);
+  if(description){
+    const copy=document.createElement('p');
+    copy.className='settings-menu__section-description';
+    copy.textContent=description;
+    section.appendChild(copy);
+  }
+  const body=document.createElement('div');
+  body.className='settings-menu__section-body';
+  body.dataset.settingsSectionBody=sectionKey;
+  section.appendChild(body);
+  return { section, body };
+}
+
+function moveSettingsNode(body,node){
+  if(!body||!node) return;
+  body.appendChild(node);
+}
+
+function enhanceSettingsMenu(settingsMenu){
+  if(!settingsMenu||settingsMenu.dataset.enhanced==='1') return;
+  settingsMenu.dataset.enhanced='1';
+  settingsMenu.classList.add('settings-menu--enhanced');
+
+  const header=document.createElement('div');
+  header.className='settings-menu__header';
+  header.innerHTML='<div><p class="settings-menu__eyebrow">Workspace</p><h2 id="settings-menu-title">Settings</h2></div>';
+  settingsMenu.insertBefore(header,settingsMenu.firstChild);
+  settingsMenu.setAttribute('aria-labelledby','settings-menu-title');
+
+  const project=createSettingsSection(
+    'Project',
+    'Manage the current project, backups, and share links.',
+    'project'
+  );
+  const preferences=createSettingsSection(
+    'Preferences',
+    'Adjust how the workspace looks and reports units.',
+    'preferences'
+  );
+  const tools=createSettingsSection(
+    'Tools',
+    'Run checks, refresh libraries, and create reports.',
+    'tools'
+  );
+  const account=createSettingsSection(
+    'Account',
+    'Server login controls for cloud-backed project workflows.',
+    'account'
+  );
+  account.section.hidden=true;
+
+  const projectNameLabel=document.getElementById('project-name-input')?.closest('label');
+  const themeLabel=document.getElementById('theme-select')?.closest('label');
+  const compactLabel=document.getElementById('compact-toggle')?.closest('label');
+  const unitLabel=document.getElementById('unit-select')?.closest('label');
+  const projectButtons=[
+    document.getElementById('new-project-btn'),
+    document.getElementById('save-project-btn'),
+    document.getElementById('load-project-btn'),
+    document.getElementById('copy-share-link-btn'),
+    document.getElementById('export-project-btn'),
+    document.getElementById('import-project-btn')
+  ];
+  const toolButtons=[
+    document.getElementById('help-btn'),
+    document.getElementById('reopen-onboarding-btn'),
+    document.getElementById('run-self-check-btn'),
+    document.getElementById('refresh-library-btn'),
+    document.getElementById('generate-report-btn'),
+    document.getElementById('export-reports-btn'),
+    document.getElementById('print-labels-btn')
+  ];
+  const statusHost=document.getElementById('settings-operation-status');
+  const lastSaved=document.getElementById('last-saved-indicator');
+
+  moveSettingsNode(project.body,projectNameLabel);
+  projectButtons.forEach(button=>moveSettingsNode(project.body,button));
+  moveSettingsNode(project.body,statusHost);
+  moveSettingsNode(project.body,lastSaved);
+
+  [themeLabel,compactLabel,unitLabel].forEach(label=>moveSettingsNode(preferences.body,label));
+  toolButtons.forEach(button=>moveSettingsNode(tools.body,button));
+
+  [project.section,preferences.section,tools.section,account.section].forEach(section=>{
+    settingsMenu.appendChild(section);
+  });
+
+  settingsMenu.querySelectorAll('label').forEach(label=>{
+    label.classList.add('settings-menu__field');
+  });
+  compactLabel?.classList.add('settings-menu__toggle-row');
+  settingsMenu.querySelectorAll('button,.btn').forEach(button=>{
+    button.classList.add('settings-menu__action');
+  });
+  document.getElementById('save-project-btn')?.classList.add('settings-menu__action--primary');
+
+  const moveUngroupedNode=node=>{
+    if(!node||node.nodeType!==1) return;
+    if(node.closest('.settings-menu__section')) return;
+    if(node.matches('button,.btn')){
+      node.classList.add('settings-menu__action');
+      moveSettingsNode(account.body,node);
+      account.section.hidden=false;
+    }
+  };
+
+  Array.from(settingsMenu.children).forEach(moveUngroupedNode);
+
+  if(typeof MutationObserver!=='undefined'){
+    const observer=new MutationObserver(mutations=>{
+      mutations.forEach(mutation=>{
+        mutation.addedNodes.forEach(moveUngroupedNode);
+      });
+    });
+    observer.observe(settingsMenu,{childList:true});
+  }
+}
+
 async function runOperationWithStatus(statusHost,{pendingText,successText,errorText,operation}){
   setOperationStatus(statusHost,'busy',pendingText);
   try{
@@ -1134,6 +1260,7 @@ function initSettings(){
         }
       });
     });
+    enhanceSettingsMenu(settingsMenu);
   }
   const unitSelect=document.getElementById('unit-select');
   if(unitSelect){

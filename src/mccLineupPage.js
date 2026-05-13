@@ -3,20 +3,30 @@ import {
   DEFAULT_MCC_VERTICAL_WIREWAY_WIDTH_IN,
   MCC_BUS_MATERIAL_TYPES,
   MCC_BUS_PLATING_TYPES,
-  MCC_BUCKET_STATUSES,
   MCC_BUCKET_TYPES,
   MCC_COMMUNICATION_PROTOCOL_TYPES,
-  MCC_MAIN_DEVICE_TYPES,
+  MCC_ARRANGEMENT_TYPES,
+  MCC_BUS_JOIN_PLATING_TYPES,
+  MCC_ENCLOSURE_TYPES,
+  MCC_EXPANSION_COVER_PLATE_TYPES,
+  MCC_GROUND_BUS_LOCATION_TYPES,
+  MCC_GROUND_BUS_REQUIRED_TYPES,
+  MCC_INCOMING_LINE_POWER_TYPES,
+  MCC_MOTOR_PROTECTION_DEVICE_TYPES,
+  MCC_SPACE_HEATER_ACCESSORY_TYPES,
+  MCC_STARTER_TYPES,
   bucketHeightFromUnits,
   bucketUnitsFromHeight,
   createDefaultMccLineup,
   escapeXml,
   mccBucketPositionLabel,
+  mccBusPlatingLabel,
   mccMainDeviceLabel,
   mccLineupDimensions,
-  mccSpecSummary,
+  mccStarterTypeLabel,
   normalizeMccLineup,
   normalizeMccLineups,
+  normalizeMccSpecRequirements,
   renderMccElevationSvg,
   renderMccLineupSheetSvg,
   renderMccOneLineSvg,
@@ -26,6 +36,22 @@ import {
 
 const ACTIVE_LINEUP_KEY = 'mccLineupActiveId';
 let jsPdfLoadPromise = null;
+
+const MCC_SPEC_SELECT_OPTIONS = {
+  busMaterial: MCC_BUS_MATERIAL_TYPES,
+  busPlating: MCC_BUS_PLATING_TYPES,
+  communicationProtocol: MCC_COMMUNICATION_PROTOCOL_TYPES,
+  incomingLinePower: MCC_INCOMING_LINE_POWER_TYPES,
+  enclosureRating: MCC_ENCLOSURE_TYPES,
+  mccArrangement: MCC_ARRANGEMENT_TYPES,
+  expansionCoverPlates: MCC_EXPANSION_COVER_PLATE_TYPES,
+  busJoinPlating: MCC_BUS_JOIN_PLATING_TYPES,
+  groundBusRequired: MCC_GROUND_BUS_REQUIRED_TYPES,
+  groundBusLocation: MCC_GROUND_BUS_LOCATION_TYPES,
+  motorProtectionDevice: MCC_MOTOR_PROTECTION_DEVICE_TYPES
+};
+
+const MCC_SPEC_MULTI_FIELDS = new Set(['spaceHeaterAccessories']);
 
 const state = {
   lineups: [],
@@ -198,6 +224,7 @@ function bucketSummary(context) {
     context.bucket.equipmentTag || context.bucket.loadTag,
     context.bucket.equipmentDescription,
     mainDevice,
+    !mainDevice && mccStarterTypeLabel(context.bucket) ? mccStarterTypeLabel(context.bucket) : '',
     !mainDevice && context.bucket.breakerA ? `${context.bucket.breakerA}A` : '',
     context.bucket.cableTag ? `Cable ${context.bucket.cableTag}` : ''
   ].filter(Boolean).join(' / ');
@@ -219,17 +246,94 @@ function optionList(values, selected) {
   return values.map(value => `<option value="${escapeXml(value)}"${value === selected ? ' selected' : ''}>${escapeXml(value)}</option>`).join('');
 }
 
-function mainDeviceOptionList(selected) {
+function bucketTypeValue(bucket = {}) {
+  if (bucket.type === 'main') {
+    return bucket.mainDevice === 'breaker' ? 'main-breaker' : 'main-mlo';
+  }
+  return bucket.type;
+}
+
+function bucketTypeOptionList(bucket = {}) {
+  const selected = bucketTypeValue(bucket);
   const options = [
-    { value: '', label: '-' },
-    ...MCC_MAIN_DEVICE_TYPES.map(value => ({
-      value,
-      label: value === 'mlo' ? 'MLO' : 'Main Breaker'
-    }))
+    { value: 'main-mlo', label: 'Main-MLO' },
+    { value: 'main-breaker', label: 'Main-Breaker' },
+    ...MCC_BUCKET_TYPES
+      .filter(value => value !== 'main')
+      .map(value => ({ value, label: titleCaseOption(value) }))
   ];
   return options.map(option => (
     `<option value="${escapeXml(option.value)}"${option.value === selected ? ' selected' : ''}>${escapeXml(option.label)}</option>`
   )).join('');
+}
+
+function starterTypeOptionList(selected) {
+  const labels = {
+    '': '-',
+    fvnr: 'FVNR',
+    fvr: 'FVR',
+    'soft-starter': 'Soft Starter',
+    'wye-delta': 'Wye-Delta',
+    'two-speed': 'Two-Speed',
+    'reduced-voltage-autotransformer': 'Reduced Voltage Autotransformer',
+    other: 'Other'
+  };
+  return MCC_STARTER_TYPES.map(value => (
+    `<option value="${escapeXml(value)}"${value === selected ? ' selected' : ''}>${escapeXml(labels[value] || titleCaseOption(value))}</option>`
+  )).join('');
+}
+
+function iconMarkup(src, label) {
+  return `<img src="${escapeXml(src)}" alt="" aria-hidden="true" class="control-icon"><span class="sr-only">${escapeXml(label)}</span>`;
+}
+
+function starterSizeChartContent() {
+  const rows = [
+    ['00', '1 1/2', '1 1/2', '2', '--', '--', '--', '--', '--', '--', '--', '--', '--'],
+    ['0', '3', '3', '5', '--', '--', '--', '--', '--', '--', '--', '--', '--'],
+    ['1', '7 1/2', '7 1/2', '10', '7 1/2', '7 1/2', '10', '10', '10', '15', '10', '10', '15'],
+    ['2', '10', '15', '25', '10', '15', '25', '20', '25', '40', '20', '25', '40'],
+    ['3', '25', '30', '50', '25', '30', '50', '40', '50', '75', '40', '50', '75'],
+    ['4', '40', '50', '100', '40', '50', '100', '75', '75', '150', '60', '75', '150'],
+    ['5', '75', '100', '200', '75', '100', '200', '150', '150', '350', '150', '150', '300'],
+    ['6', '150', '200', '400', '150', '200', '400', '--', '300', '600', '300', '350', '700'],
+    ['7', '--', '300', '600', '--', '300', '600', '--', '450', '900', '500', '500', '1000'],
+    ['8', '--', '450', '900', '--', '450', '900', '--', '700', '1400', '750', '800', '1500'],
+    ['9', '--', '800', '1600', '--', '800', '1600', '--', '1300', '2600', '1500', '1500', '3000']
+  ];
+  const body = rows.map(row => (
+    `<tr>${row.map(cell => `<td>${escapeXml(cell)}</td>`).join('')}</tr>`
+  )).join('');
+  return `
+    <strong>NEMA Size Motor Starters</strong>
+    <span class="mcc-starter-chart-caption">Maximum horsepower, three phase motors.</span>
+    <table>
+      <thead>
+        <tr>
+          <th rowspan="2">NEMA<br>Size</th>
+          <th colspan="3">Full Voltage</th>
+          <th colspan="3">Auto Transformer</th>
+          <th colspan="3">Part Winding</th>
+          <th colspan="3">Wye Delta</th>
+        </tr>
+        <tr>
+          <th>200V</th><th>230V</th><th>460V<br>575V</th>
+          <th>200V</th><th>230V</th><th>460V<br>575V</th>
+          <th>200V</th><th>230V</th><th>460V<br>575V</th>
+          <th>200V</th><th>230V</th><th>460V<br>575V</th>
+        </tr>
+      </thead>
+      <tbody>${body}</tbody>
+    </table>
+  `;
+}
+
+function starterSizeChartTooltip() {
+  return `
+    <span class="mcc-starter-chart-help">
+      <button class="mcc-info-button" type="button" aria-label="NEMA size motor starters chart" aria-controls="mcc-starter-chart-tooltip" aria-expanded="false">i</button>
+    </span>
+  `;
 }
 
 function titleCaseOption(value) {
@@ -241,10 +345,25 @@ function titleCaseOption(value) {
     profinet: 'PROFINET',
     devicenet: 'DeviceNet',
     hardwired: 'Hardwired',
-    'tin-plated': 'Tin Plated',
-    'silver-plated': 'Silver Plated',
+    'tin-plated': 'Tin-Plated',
+    'silver-plated': 'Silver-Plated',
+    'manufacturer-standard': 'Manufacturer Standard',
     bare: 'Bare',
-    other: 'Other'
+    other: 'Other',
+    'front-only': 'Front Only',
+    'back-to-back': 'Back to Back',
+    'NEMA 1': 'NEMA 1',
+    'NEMA 1A': 'NEMA 1A',
+    'NEMA 3R': 'NEMA 3R',
+    'NEMA 12': 'NEMA 12',
+    'horizontal-bottom': 'Horizontal Bottom',
+    'horizontal-top': 'Horizontal Top',
+    'thermal-magnetic': 'Thermal-Magnetic',
+    magnetic: 'Magnetic',
+    'high-temp-cutout': 'High-Temp Cutout',
+    'heater-circuit-breaker': 'Heater Circuit Breaker',
+    'thermostat-controlled': 'Thermostat Controlled',
+    'test-pushbutton-ammeter': 'Test Pushbutton and Ammeter'
   };
   if (labels[value]) return labels[value];
   if (value === 'mlo') return 'MLO';
@@ -291,16 +410,12 @@ function renderSpecRequirementFields(lineup) {
   const spec = lineup.specRequirements || {};
   document.querySelectorAll('[data-mcc-spec-field]').forEach(input => {
     const key = input.dataset.mccSpecField;
-    if (input.tagName === 'SELECT' && key === 'busMaterial') {
-      input.innerHTML = labeledOptionList(MCC_BUS_MATERIAL_TYPES, spec[key]);
+    if (input.tagName === 'SELECT' && MCC_SPEC_SELECT_OPTIONS[key]) {
+      input.innerHTML = labeledOptionList(MCC_SPEC_SELECT_OPTIONS[key], spec[key]);
     }
-    if (input.tagName === 'SELECT' && key === 'busPlating') {
-      input.innerHTML = labeledOptionList(MCC_BUS_PLATING_TYPES, spec[key]);
-    }
-    if (input.tagName === 'SELECT' && key === 'communicationProtocol') {
-      input.innerHTML = labeledOptionList(MCC_COMMUNICATION_PROTOCOL_TYPES, spec[key]);
-    }
-    if (input.type === 'checkbox') {
+    if (input.type === 'checkbox' && MCC_SPEC_MULTI_FIELDS.has(key)) {
+      input.checked = Array.isArray(spec[key]) && spec[key].includes(input.value);
+    } else if (input.type === 'checkbox') {
       input.checked = Boolean(spec[key]);
     } else {
       input.value = spec[key] ?? '';
@@ -312,6 +427,19 @@ function renderSpecRequirementFields(lineup) {
     otherBusPlating.disabled = !enabled;
     otherBusPlating.closest('label')?.classList.toggle('mcc-spec-other-disabled', !enabled);
   }
+  const otherIncomingLinePower = document.querySelector('[data-mcc-spec-field="incomingLinePowerOther"]');
+  if (otherIncomingLinePower) {
+    const enabled = spec.incomingLinePower === 'other';
+    otherIncomingLinePower.disabled = !enabled;
+    otherIncomingLinePower.closest('label')?.classList.toggle('mcc-spec-other-disabled', !enabled);
+  }
+  const spaceHeaterEnabled = Boolean(spec.spaceHeaterRequired);
+  document.querySelectorAll('[data-mcc-spec-field="spaceHeaterVoltage"], [data-mcc-spec-field="spaceHeaterAccessories"]').forEach(input => {
+    input.disabled = !spaceHeaterEnabled;
+  });
+  document.querySelectorAll('.mcc-space-heater-dependent').forEach(element => {
+    element.classList.toggle('mcc-spec-other-disabled', !spaceHeaterEnabled);
+  });
 }
 
 function renderReportTitleBlockFields(lineup) {
@@ -377,6 +505,7 @@ function renderSections(lineup) {
     const panel = document.createElement('section');
     panel.className = 'mcc-section-editor';
     panel.dataset.sectionIndex = String(sectionIndex);
+    panel.dataset.sectionId = String(section.id);
     panel.innerHTML = `
       <div class="mcc-section-editor__header">
         <label>Section Name
@@ -394,23 +523,23 @@ function renderSections(lineup) {
           <button class="btn" type="button" data-section-action="delete-section">Delete</button>
         </div>
       </div>
-      <div class="overflow-x-auto">
+      <div class="overflow-x-auto mcc-bucket-table-wrap">
         <table class="mcc-bucket-table">
           <thead>
             <tr>
-              <th>Move / Drag</th>
               <th>Equipment Tag</th>
               <th>Equipment Description</th>
               <th>Type</th>
-              <th>Main Device</th>
-              <th>Status</th>
               <th>Units</th>
               <th>Height (in)</th>
               <th>HP</th>
               <th>Breaker</th>
-              <th>Starter</th>
-              <th>Cable</th>
+              <th>Starter Type</th>
+              <th><span class="mcc-table-header-with-help">Starter Size ${starterSizeChartTooltip()}</span></th>
+              <th>Motor Htr</th>
+              <th>Htr VA</th>
               <th>Notes</th>
+              <th>Move / Drag</th>
             </tr>
           </thead>
           <tbody>
@@ -419,24 +548,24 @@ function renderSections(lineup) {
                 String(bucket.id) === state.selectedBucketId ? 'mcc-bucket-row-selected' : '',
                 pendingBucketMoveMatches(sectionIndex, bucketIndex) ? 'mcc-bucket-row-moving' : ''
               ].filter(Boolean).join(' ')}" aria-selected="${String(bucket.id) === state.selectedBucketId ? 'true' : 'false'}">
-                <td class="mcc-bucket-actions">
-                  <span class="btn mcc-bucket-drag-handle" role="button" tabindex="0" data-bucket-drag-handle title="Drag bucket to reorder">${state.pendingBucketMove && !pendingBucketMoveMatches(sectionIndex, bucketIndex) ? 'Place' : 'Drag'}</span>
-                  <button class="btn" type="button" data-bucket-action="up" title="Move bucket up">Up</button>
-                  <button class="btn" type="button" data-bucket-action="down" title="Move bucket down">Down</button>
-                  <button class="btn" type="button" data-bucket-action="delete" title="Delete bucket">Delete</button>
-                </td>
                 <td><input type="text" data-bucket-field="equipmentTag" value="${escapeXml(bucket.equipmentTag)}"></td>
                 <td><input type="text" data-bucket-field="equipmentDescription" value="${escapeXml(bucket.equipmentDescription)}"></td>
-                <td><select data-bucket-field="type">${optionList(MCC_BUCKET_TYPES, bucket.type)}</select></td>
-                <td><select data-bucket-field="mainDevice"${bucket.type === 'main' ? '' : ' disabled'}>${mainDeviceOptionList(bucket.mainDevice)}</select></td>
-                <td><select data-bucket-field="status">${optionList(MCC_BUCKET_STATUSES, bucket.status)}</select></td>
+                <td><select data-bucket-field="type">${bucketTypeOptionList(bucket)}</select></td>
                 <td><input type="number" step="0.25" min="0.25" data-bucket-field="sizeUnits" value="${escapeXml(formatNumber(bucket.sizeUnits))}"></td>
                 <td><input type="number" step="0.5" min="1" data-bucket-field="heightIn" value="${escapeXml(formatNumber(bucket.heightIn))}"></td>
                 <td><input type="text" data-bucket-field="hp" value="${escapeXml(bucket.hp)}"></td>
                 <td><input type="text" data-bucket-field="breakerA" value="${escapeXml(bucket.breakerA)}"></td>
+                <td><select data-bucket-field="starterType"${bucket.type === 'starter' ? '' : ' disabled'}>${starterTypeOptionList(bucket.starterType)}</select></td>
                 <td><input type="text" data-bucket-field="starterSize" value="${escapeXml(bucket.starterSize)}"></td>
-                <td><input type="text" data-bucket-field="cableTag" value="${escapeXml(bucket.cableTag)}"></td>
+                <td class="mcc-bucket-check-cell"><input type="checkbox" data-bucket-field="motorSpaceHeaterRequired"${bucket.motorSpaceHeaterRequired ? ' checked' : ''} aria-label="Motor space heater feed required"></td>
+                <td><input type="number" min="0" step="1" data-bucket-field="motorSpaceHeaterVa" value="${escapeXml(bucket.motorSpaceHeaterVa)}"${bucket.motorSpaceHeaterRequired ? '' : ' disabled'}></td>
                 <td><input type="text" data-bucket-field="notes" value="${escapeXml(bucket.notes)}"></td>
+                <td class="mcc-bucket-actions">
+                  <span class="btn mcc-bucket-icon-btn mcc-bucket-drag-handle" role="button" tabindex="0" data-bucket-drag-handle aria-label="${state.pendingBucketMove && !pendingBucketMoveMatches(sectionIndex, bucketIndex) ? 'Place bucket here' : 'Drag bucket to reorder'}" title="${state.pendingBucketMove && !pendingBucketMoveMatches(sectionIndex, bucketIndex) ? 'Place bucket here' : 'Drag bucket to reorder'}">${state.pendingBucketMove && !pendingBucketMoveMatches(sectionIndex, bucketIndex) ? iconMarkup('icons/toolbar/validate.svg', 'Place bucket here') : iconMarkup('icons/toolbar/hand.svg', 'Drag bucket to reorder')}</span>
+                  <button class="btn mcc-bucket-icon-btn" type="button" data-bucket-action="up" aria-label="Move bucket up" title="Move bucket up">${iconMarkup('icons/toolbar/arrow-up.svg', 'Move bucket up')}</button>
+                  <button class="btn mcc-bucket-icon-btn" type="button" data-bucket-action="down" aria-label="Move bucket down" title="Move bucket down">${iconMarkup('icons/toolbar/arrow-down.svg', 'Move bucket down')}</button>
+                  <button class="btn mcc-bucket-icon-btn" type="button" data-bucket-action="delete" aria-label="Delete bucket" title="Delete bucket">${iconMarkup('icons/toolbar/trash.svg', 'Delete bucket')}</button>
+                </td>
               </tr>
             `).join('')}
           </tbody>
@@ -444,6 +573,62 @@ function renderSections(lineup) {
       </div>
     `;
     container.appendChild(panel);
+  });
+}
+
+function bucketTableScrollPositions() {
+  const positions = new Map();
+  document.querySelectorAll('.mcc-section-editor').forEach(panel => {
+    const scroller = panel.querySelector('.mcc-bucket-table-wrap');
+    const key = panel.dataset.sectionId || panel.dataset.sectionIndex;
+    if (scroller && key) {
+      positions.set(key, { left: scroller.scrollLeft, top: scroller.scrollTop });
+    }
+  });
+  return positions;
+}
+
+function restoreBucketTableScrollPositions(positions) {
+  document.querySelectorAll('.mcc-section-editor').forEach(panel => {
+    const scroller = panel.querySelector('.mcc-bucket-table-wrap');
+    const key = panel.dataset.sectionId || panel.dataset.sectionIndex;
+    const position = key ? positions.get(key) : null;
+    if (scroller && position) {
+      scroller.scrollLeft = position.left;
+      scroller.scrollTop = position.top;
+    }
+  });
+}
+
+function activeBucketTableField() {
+  const field = document.activeElement?.closest?.('[data-bucket-field]');
+  const row = field?.closest('[data-bucket-id]');
+  const panel = field?.closest('.mcc-section-editor');
+  if (!field || !row || !panel) return null;
+  return {
+    sectionId: panel.dataset.sectionId,
+    bucketId: row.dataset.bucketId,
+    fieldName: field.dataset.bucketField
+  };
+}
+
+function restoreActiveBucketTableField(target) {
+  if (!target?.sectionId || !target.bucketId || !target.fieldName) return;
+  const panel = document.querySelector(`.mcc-section-editor[data-section-id="${CSS.escape(target.sectionId)}"]`);
+  const row = panel?.querySelector(`[data-bucket-id="${CSS.escape(target.bucketId)}"]`);
+  const field = row?.querySelector(`[data-bucket-field="${CSS.escape(target.fieldName)}"]`);
+  field?.focus?.({ preventScroll: true });
+}
+
+function renderPreservingBucketTableScroll() {
+  const positions = bucketTableScrollPositions();
+  const activeField = activeBucketTableField();
+  render();
+  restoreBucketTableScrollPositions(positions);
+  restoreActiveBucketTableField(activeField);
+  window.requestAnimationFrame(() => {
+    restoreBucketTableScrollPositions(positions);
+    restoreActiveBucketTableField(activeField);
   });
 }
 
@@ -547,7 +732,11 @@ function updateSpecRequirementField(input) {
   if (!lineup) return;
   const key = input.dataset.mccSpecField;
   const numericFields = new Set(['shortCircuitRatingKa']);
-  const value = input.type === 'checkbox'
+  const value = MCC_SPEC_MULTI_FIELDS.has(key)
+    ? Array.from(document.querySelectorAll(`input[type="checkbox"][data-mcc-spec-field="${CSS.escape(key)}"]`))
+      .filter(checkbox => checkbox.checked)
+      .map(checkbox => checkbox.value)
+    : input.type === 'checkbox'
     ? input.checked
     : (numericFields.has(key) ? Number.parseFloat(input.value) : input.value);
   lineup.specRequirements = {
@@ -633,12 +822,30 @@ function updateBucketField(input) {
   } else if (key === 'equipmentTag') {
     context.bucket.equipmentTag = input.value;
     context.bucket.loadTag = input.value;
+  } else if (key === 'motorSpaceHeaterRequired') {
+    context.bucket.motorSpaceHeaterRequired = input.checked;
+    if (!input.checked) context.bucket.motorSpaceHeaterVa = '';
+  } else if (key === 'motorSpaceHeaterVa') {
+    context.bucket.motorSpaceHeaterVa = input.value;
+  } else if (key === 'type') {
+    if (input.value === 'main-mlo' || input.value === 'main-breaker') {
+      context.bucket.type = 'main';
+      context.bucket.mainDevice = input.value === 'main-breaker' ? 'breaker' : 'mlo';
+      context.bucket.status = 'active';
+    } else {
+      context.bucket.type = input.value;
+      context.bucket.mainDevice = '';
+      if (input.value === 'space') context.bucket.status = 'space';
+      if (input.value === 'spare') context.bucket.status = 'spare';
+      if (context.bucket.status === 'space' && input.value !== 'space') context.bucket.status = 'active';
+      if (context.bucket.status === 'spare' && input.value !== 'spare') context.bucket.status = 'active';
+    }
   } else {
     context.bucket[key] = input.value;
   }
   state.lineups[activeIndex()] = normalizeMccLineup(context.lineup, activeIndex());
   persistLineups();
-  render();
+  renderPreservingBucketTableScroll();
 }
 
 function addLineup() {
@@ -683,7 +890,10 @@ function createSpaceBucket(lineup, index, heightIn = 12) {
     loadTag: '',
     hp: '',
     breakerA: '',
+    starterType: '',
     starterSize: '',
+    motorSpaceHeaterRequired: false,
+    motorSpaceHeaterVa: '',
     cableTag: '',
     notes: ''
   };
@@ -743,7 +953,10 @@ function addBucket(context) {
     loadTag: '',
     hp: '',
     breakerA: '',
+    starterType: 'fvnr',
     starterSize: '',
+    motorSpaceHeaterRequired: false,
+    motorSpaceHeaterVa: '',
     cableTag: '',
     notes: ''
   });
@@ -1231,11 +1444,60 @@ function pdfBucketRows(lineup) {
         breaker: bucket.type === 'main'
           ? (mccMainDeviceLabel(bucket) || bucket.breakerA)
           : bucket.breakerA,
+        starter: [mccStarterTypeLabel(bucket), bucket.starterSize].filter(Boolean).join(' / '),
+        motorHeater: bucket.motorSpaceHeaterRequired
+          ? (bucket.motorSpaceHeaterVa ? `Yes / ${bucket.motorSpaceHeaterVa} VA` : 'Yes')
+          : 'No',
         cable: bucket.cableTag,
         notes: bucket.notes
       };
     });
   });
+}
+
+function pdfSpecRows(lineup) {
+  const spec = normalizeMccSpecRequirements(lineup.specRequirements);
+  const incomingLinePower = spec.incomingLinePower === 'other'
+    ? pdfCellText(spec.incomingLinePowerOther || 'Other')
+    : titleCaseOption(spec.incomingLinePower);
+  const heaterStatus = spec.spaceHeaterRequired ? 'Required' : 'Not required';
+  const heaterAccessories = spec.spaceHeaterRequired
+    ? (spec.spaceHeaterAccessories.length
+      ? spec.spaceHeaterAccessories.map(titleCaseOption).join(', ')
+      : 'None specified')
+    : 'Not applicable';
+  const rows = [
+    { group: 'Electrical', item: 'Voltage', value: lineup.voltage },
+    { group: 'Electrical', item: 'Short-Circuit Rating', value: `${spec.shortCircuitRatingKa} kA` },
+    { group: 'Electrical', item: 'Control Voltage', value: spec.controlVoltage },
+    { group: 'Electrical', item: 'Incoming Line Power', value: incomingLinePower },
+    { group: 'Electrical', item: 'Motor Protection Devices', value: titleCaseOption(spec.motorProtectionDevice) },
+    { group: 'Bus', item: 'Horizontal Bus Rating', value: `${lineup.horizontalBusRatingA} A` },
+    { group: 'Bus', item: 'Vertical Bus Rating', value: `${lineup.verticalBusRatingA} A` },
+    { group: 'Bus', item: 'Bus Material', value: titleCaseOption(spec.busMaterial) },
+    { group: 'Bus', item: 'Bus Plating', value: mccBusPlatingLabel(spec) },
+    { group: 'Bus', item: 'Bus Join Plating', value: titleCaseOption(spec.busJoinPlating) },
+    { group: 'Bus', item: 'Ground Bus Required', value: titleCaseOption(spec.groundBusRequired) },
+    { group: 'Bus', item: 'Ground Bus Location', value: spec.groundBusRequired === 'yes' ? titleCaseOption(spec.groundBusLocation) : 'Not applicable' },
+    { group: 'Construction', item: 'MCC Enclosure', value: spec.enclosureRating },
+    { group: 'Construction', item: 'MCC Arrangement', value: titleCaseOption(spec.mccArrangement) },
+    { group: 'Construction', item: 'Expansion Cover Plates', value: titleCaseOption(spec.expansionCoverPlates) },
+    { group: 'Construction', item: 'Finish', value: spec.finish },
+    { group: 'Controls', item: 'Communication Protocol', value: titleCaseOption(spec.communicationProtocol) },
+    { group: 'Options', item: 'Space Heater', value: heaterStatus },
+    { group: 'Options', item: 'Space Heater Voltage', value: spec.spaceHeaterRequired ? spec.spaceHeaterVoltage : 'Not applicable' },
+    { group: 'Options', item: 'Space Heater Accessories', value: heaterAccessories }
+  ];
+  if (spec.notes) {
+    rows.push({ group: 'Notes', item: 'Specification Notes', value: spec.notes });
+  }
+  return rows;
+}
+
+function pdfOneLineBranchCount(lineup) {
+  return lineup.sections.reduce((count, section) => (
+    count + section.buckets.filter(bucket => bucket.type !== 'main').length
+  ), 0);
 }
 
 function addPdfHeader(doc, lineup, subtitle) {
@@ -1307,7 +1569,7 @@ function addSummaryGrid(doc, lineup, dimensions, startY) {
     ['Buckets', dimensions.bucketCount],
     ['Dimensions', `${dimensions.totalWidthIn}" W x ${lineup.sectionDepthIn}" D x ${lineup.sectionHeightIn}" H`],
     ['Arrangement', lineup.arrangement],
-    ['Specs', mccSpecSummary(lineup.specRequirements)]
+    ['Specifications', 'See Specification Requirements page']
   ];
   const columnWidth = 238;
   const rowHeight = 18;
@@ -1327,6 +1589,69 @@ function addSummaryGrid(doc, lineup, dimensions, startY) {
   return startY + Math.ceil(items.length / 3) * rowHeight + 8;
 }
 
+function addSpecificationRequirements(doc, lineup, startY) {
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const margin = 36;
+  const columns = [
+    { key: 'group', label: 'Category', width: 96 },
+    { key: 'item', label: 'Requirement', width: 190 },
+    { key: 'value', label: 'Specified Value', width: pageWidth - margin * 2 - 286 }
+  ];
+  const rows = pdfSpecRows(lineup);
+  const drawTableHeader = y => {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(17, 24, 39);
+    doc.text('Specification Requirements', margin, y);
+    y += 10;
+    doc.setFillColor(30, 64, 175);
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(8);
+    let x = margin;
+    columns.forEach(column => {
+      doc.rect(x, y, column.width, 18, 'F');
+      doc.text(column.label, x + 5, y + 12);
+      x += column.width;
+    });
+    return y + 18;
+  };
+  let y = drawTableHeader(startY);
+  let previousGroup = '';
+  rows.forEach((row, index) => {
+    const cellsForRow = () => columns.map(column => {
+      const value = column.key === 'group' && row.group === previousGroup ? '' : row[column.key];
+      return doc.splitTextToSize(column.key === 'group' && value === '' ? '' : pdfCellText(value), column.width - 10);
+    });
+    let cells = cellsForRow();
+    let rowHeight = Math.max(22, 9 * Math.max(...cells.map(cell => cell.length)) + 10);
+    if (y + rowHeight > pageHeight - 42) {
+      addPdfFooter(doc);
+      doc.addPage('letter', 'landscape');
+      previousGroup = '';
+      y = drawTableHeader(addPdfHeader(doc, lineup, 'Specification Requirements'));
+      cells = cellsForRow();
+      rowHeight = Math.max(22, 9 * Math.max(...cells.map(cell => cell.length)) + 10);
+    }
+    let x = margin;
+    cells.forEach((cell, cellIndex) => {
+      const column = columns[cellIndex];
+      doc.setDrawColor(203, 213, 225);
+      if (index % 2 === 0) doc.setFillColor(248, 250, 252);
+      else doc.setFillColor(255, 255, 255);
+      doc.rect(x, y, column.width, rowHeight, 'FD');
+      doc.setTextColor(17, 24, 39);
+      doc.setFont('helvetica', cellIndex === 0 && String(cell[0] || '').trim() ? 'bold' : 'normal');
+      doc.setFontSize(8);
+      doc.text(cell, x + 5, y + 13);
+      x += column.width;
+    });
+    previousGroup = row.group;
+    y += rowHeight;
+  });
+  return y + 12;
+}
+
 function fitImageSize(image, maxWidth, maxHeight) {
   const scale = Math.min(maxWidth / image.width, maxHeight / image.height);
   return {
@@ -1335,21 +1660,55 @@ function fitImageSize(image, maxWidth, maxHeight) {
   };
 }
 
+async function addPdfOneLinePages(doc, lineup) {
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const margin = 36;
+  const availableWidth = pageWidth - margin * 2;
+  const spacing = 70;
+  const rowHeight = 230;
+  const branchesPerRow = Math.max(1, Math.floor((availableWidth - 150) / spacing));
+  const branchCount = pdfOneLineBranchCount(lineup);
+  const rowCount = Math.max(1, Math.ceil(branchCount / branchesPerRow));
+  let y = addPdfHeader(doc, lineup, 'Simple One-Line');
+  for (let rowIndex = 0; rowIndex < rowCount; rowIndex += 1) {
+    if (y + rowHeight > pageHeight - 42) {
+      addPdfFooter(doc);
+      doc.addPage('letter', 'landscape');
+      y = addPdfHeader(doc, lineup, 'Simple One-Line');
+    }
+    const oneLineSvg = renderMccOneLineSvg(lineup, {
+      spacing,
+      fixedWidth: availableWidth,
+      branchStartIndex: rowIndex * branchesPerRow,
+      branchLimit: branchesPerRow,
+      continuedAbove: rowIndex > 0,
+      continuedBelow: rowIndex < rowCount - 1
+    });
+    const oneLineImage = await svgToPngDataUrl(oneLineSvg);
+    doc.addImage(oneLineImage.dataUrl, 'PNG', margin, y, availableWidth, rowHeight, undefined, 'FAST');
+    y += rowHeight + 16;
+  }
+  addPdfFooter(doc);
+}
+
 function addBucketSchedule(doc, lineup) {
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
   const margin = 36;
   const columns = [
-    { key: 'section', label: 'Section', width: 70 },
-    { key: 'position', label: 'Pos.', width: 38 },
-    { key: 'tag', label: 'Equipment Tag', width: 88 },
-    { key: 'description', label: 'Equipment Description', width: 150 },
-    { key: 'type', label: 'Type', width: 58 },
-    { key: 'units', label: 'Units', width: 42 },
-    { key: 'height', label: 'Ht.', width: 38 },
-    { key: 'breaker', label: 'Main/Breaker', width: 82 },
-    { key: 'cable', label: 'Cable', width: 66 },
-    { key: 'notes', label: 'Notes', width: 78 }
+    { key: 'section', label: 'Section', width: 52 },
+    { key: 'position', label: 'Pos.', width: 34 },
+    { key: 'tag', label: 'Equipment Tag', width: 78 },
+    { key: 'description', label: 'Equipment Description', width: 120 },
+    { key: 'type', label: 'Type', width: 46 },
+    { key: 'units', label: 'Units', width: 34 },
+    { key: 'height', label: 'Ht.', width: 34 },
+    { key: 'breaker', label: 'Main/Breaker', width: 62 },
+    { key: 'starter', label: 'Starter', width: 60 },
+    { key: 'motorHeater', label: 'Motor Htr', width: 64 },
+    { key: 'cable', label: 'Cable', width: 52 },
+    { key: 'notes', label: 'Notes', width: 64 }
   ];
   const drawHeader = y => {
     doc.setFillColor(30, 64, 175);
@@ -1410,20 +1769,21 @@ async function downloadLineupPdfReport() {
     const margin = 36;
     const dimensions = mccLineupDimensions(normalized);
     const elevationSvg = renderMccElevationSvg(normalized, { maxWidth: 1300, maxHeight: 650 });
-    const oneLineSvg = renderMccOneLineSvg(normalized, { spacing: 70 });
-    const [elevationImage, oneLineImage] = await Promise.all([
-      svgToPngDataUrl(elevationSvg),
-      svgToPngDataUrl(oneLineSvg)
-    ]);
+    const elevationImage = await svgToPngDataUrl(elevationSvg);
 
-    let y = addPdfHeader(doc, normalized, 'Elevation and Simple One-Line');
+    let y = addPdfHeader(doc, normalized, 'Elevation');
     y = addPdfTitleBlock(doc, normalized, y);
     y = addSummaryGrid(doc, normalized, dimensions, y);
-    const elevationSize = fitImageSize(elevationImage, pageWidth - margin * 2, 240);
+    const elevationSize = fitImageSize(elevationImage, pageWidth - margin * 2, pageHeight - y - 54);
     doc.addImage(elevationImage.dataUrl, 'PNG', margin, y, elevationSize.width, elevationSize.height, undefined, 'FAST');
-    y += elevationSize.height + 16;
-    const oneLineSize = fitImageSize(oneLineImage, pageWidth - margin * 2, pageHeight - y - 54);
-    doc.addImage(oneLineImage.dataUrl, 'PNG', margin, y, oneLineSize.width, oneLineSize.height, undefined, 'FAST');
+    addPdfFooter(doc);
+
+    doc.addPage('letter', 'landscape');
+    await addPdfOneLinePages(doc, normalized);
+
+    doc.addPage('letter', 'landscape');
+    y = addPdfHeader(doc, normalized, 'Specification Requirements');
+    addSpecificationRequirements(doc, normalized, y);
     addPdfFooter(doc);
 
     doc.addPage('letter', 'landscape');
@@ -1452,6 +1812,59 @@ function handlePreviewBucketKeydown(event) {
   if (!target) return;
   event.preventDefault();
   selectBucket(target.dataset.mccBucketId);
+}
+
+function ensureStarterSizeChartTooltip() {
+  let tooltip = document.getElementById('mcc-starter-chart-tooltip');
+  if (tooltip) return tooltip;
+  tooltip = document.createElement('div');
+  tooltip.id = 'mcc-starter-chart-tooltip';
+  tooltip.className = 'mcc-starter-chart-tooltip';
+  tooltip.setAttribute('role', 'tooltip');
+  tooltip.setAttribute('aria-hidden', 'true');
+  tooltip.innerHTML = starterSizeChartContent();
+  document.body.appendChild(tooltip);
+  return tooltip;
+}
+
+function hideStarterSizeChartTooltip() {
+  const tooltip = document.getElementById('mcc-starter-chart-tooltip');
+  if (tooltip) {
+    tooltip.classList.remove('is-visible');
+    tooltip.setAttribute('aria-hidden', 'true');
+  }
+  document.querySelectorAll('.mcc-info-button[aria-expanded="true"]').forEach(button => {
+    button.setAttribute('aria-expanded', 'false');
+  });
+}
+
+function showStarterSizeChartTooltip(button) {
+  const tooltip = ensureStarterSizeChartTooltip();
+  tooltip.classList.add('is-visible');
+  tooltip.setAttribute('aria-hidden', 'false');
+  document.querySelectorAll('.mcc-info-button').forEach(item => {
+    item.setAttribute('aria-expanded', item === button ? 'true' : 'false');
+  });
+}
+
+function handleStarterSizeChartTooltipClick(event) {
+  const button = event.target.closest('.mcc-info-button');
+  const tooltip = document.getElementById('mcc-starter-chart-tooltip');
+  if (!button) {
+    if (tooltip && !tooltip.contains(event.target)) hideStarterSizeChartTooltip();
+    return;
+  }
+  event.preventDefault();
+  event.stopPropagation();
+  if (button.getAttribute('aria-expanded') === 'true') {
+    hideStarterSizeChartTooltip();
+  } else {
+    showStarterSizeChartTooltip(button);
+  }
+}
+
+function handleStarterSizeChartTooltipKeydown(event) {
+  if (event.key === 'Escape') hideStarterSizeChartTooltip();
 }
 
 function bindUi() {
@@ -1505,6 +1918,8 @@ function bindUi() {
   document.addEventListener('pointercancel', cancelCanvasBucketPointerDrag);
   document.addEventListener('mousemove', updateCanvasBucketMouseTarget);
   document.addEventListener('mouseup', finishCanvasBucketMouseDrag);
+  document.addEventListener('click', handleStarterSizeChartTooltipClick);
+  document.addEventListener('keydown', handleStarterSizeChartTooltipKeydown);
 }
 
 function initialize() {

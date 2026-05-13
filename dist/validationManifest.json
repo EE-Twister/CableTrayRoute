@@ -1,8 +1,8 @@
 {
-  "generatedAt": "2026-05-12T22:09:28.256Z",
+  "generatedAt": "2026-05-13T22:12:08.584Z",
   "summary": {
     "testSuiteCount": 146,
-    "totalAssertions": 5722,
+    "totalAssertions": 5811,
     "benchmarkCount": 6,
     "standardCount": 13
   },
@@ -834,14 +834,14 @@
     {
       "file": "tests/mccLineup.test.mjs",
       "groups": [],
-      "assertionCount": 77
+      "assertionCount": 132
     },
     {
       "file": "tests/mccLineupPage.test.cjs",
       "groups": [
         "MCC lineup page"
       ],
-      "assertionCount": 81
+      "assertionCount": 115
     },
     {
       "file": "tests/motorComponent.test.mjs",

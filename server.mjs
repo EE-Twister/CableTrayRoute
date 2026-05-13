@@ -4,6 +4,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import crypto from 'crypto';
 import { promisify } from 'util';
+import { fileURLToPath } from 'url';
 import { attachCollaborationServer } from './src/collaborationServer.mjs';
 import { validateLibraryPayload } from './src/validation/librarySchema.mjs';
 import { appendAuditEntry, queryAuditLog } from './analysis/auditLog.mjs';
@@ -1990,7 +1991,7 @@ When answering queries:
   return app;
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
   const app = await createApp();
   const port = Number(process.env.PORT) || 3000;
   const server = app.listen(port, () => {

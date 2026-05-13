@@ -163,17 +163,38 @@
               <label>Short-Circuit Rating (kA)
                 <input type="number" min="0" step="1" data-mcc-spec-field="shortCircuitRatingKa">
               </label>
+              <label>Incoming Line Power
+                <select data-mcc-spec-field="incomingLinePower"></select>
+              </label>
+              <label>Other Incoming Line Power
+                <input type="text" data-mcc-spec-field="incomingLinePowerOther" placeholder="Specify incoming location">
+              </label>
               <label>Communication Protocol
                 <select data-mcc-spec-field="communicationProtocol"></select>
               </label>
               <label>Control Voltage
                 <input type="text" data-mcc-spec-field="controlVoltage">
               </label>
-              <label>Space Heater Voltage
-                <input type="text" data-mcc-spec-field="spaceHeaterVoltage">
+              <label>MCC Enclosure
+                <select data-mcc-spec-field="enclosureRating"></select>
               </label>
-              <label>Enclosure Rating
-                <input type="text" data-mcc-spec-field="enclosureRating">
+              <label>MCC Arrangement
+                <select data-mcc-spec-field="mccArrangement"></select>
+              </label>
+              <label>Expansion Cover Plates
+                <select data-mcc-spec-field="expansionCoverPlates"></select>
+              </label>
+              <label>Bus Join Plating
+                <select data-mcc-spec-field="busJoinPlating"></select>
+              </label>
+              <label>Ground Bus Required
+                <select data-mcc-spec-field="groundBusRequired"></select>
+              </label>
+              <label>Ground Bus Location
+                <select data-mcc-spec-field="groundBusLocation"></select>
+              </label>
+              <label>Motor Protection Devices
+                <select data-mcc-spec-field="motorProtectionDevice"></select>
               </label>
               <label>Finish
                 <input type="text" data-mcc-spec-field="finish">
@@ -182,6 +203,28 @@
                 <input type="checkbox" data-mcc-spec-field="spaceHeaterRequired">
                 <span>Space Heater Required</span>
               </label>
+              <label class="mcc-space-heater-dependent">Space Heater Voltage
+                <input type="text" data-mcc-spec-field="spaceHeaterVoltage">
+              </label>
+              <fieldset class="mcc-spec-checkbox-group mcc-space-heater-dependent">
+                <legend>Space Heater Accessories</legend>
+                <label>
+                  <input type="checkbox" data-mcc-spec-field="spaceHeaterAccessories" value="high-temp-cutout">
+                  <span>High-Temp Cutout</span>
+                </label>
+                <label>
+                  <input type="checkbox" data-mcc-spec-field="spaceHeaterAccessories" value="heater-circuit-breaker">
+                  <span>Heater Circuit Breaker</span>
+                </label>
+                <label>
+                  <input type="checkbox" data-mcc-spec-field="spaceHeaterAccessories" value="thermostat-controlled">
+                  <span>Thermostat Controlled</span>
+                </label>
+                <label>
+                  <input type="checkbox" data-mcc-spec-field="spaceHeaterAccessories" value="test-pushbutton-ammeter">
+                  <span>Test Pushbutton and Ammeter</span>
+                </label>
+              </fieldset>
               <label class="mcc-spec-notes">Specification Notes
                 <textarea rows="3" data-mcc-spec-field="notes"></textarea>
               </label>

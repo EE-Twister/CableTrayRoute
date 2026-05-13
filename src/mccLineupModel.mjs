@@ -15,11 +15,20 @@ export const DEFAULT_MCC_SPEC_REQUIREMENTS = {
   busPlating: 'tin-plated',
   busPlatingOther: '',
   shortCircuitRatingKa: 65,
+  incomingLinePower: 'top',
+  incomingLinePowerOther: '',
   spaceHeaterRequired: false,
   spaceHeaterVoltage: '120VAC',
+  spaceHeaterAccessories: [],
   communicationProtocol: 'none',
   controlVoltage: '120VAC',
   enclosureRating: 'NEMA 1',
+  mccArrangement: 'front-only',
+  expansionCoverPlates: 'right',
+  busJoinPlating: 'manufacturer-standard',
+  groundBusRequired: 'yes',
+  groundBusLocation: 'horizontal-bottom',
+  motorProtectionDevice: 'thermal-magnetic',
   finish: 'ANSI 61 gray',
   notes: ''
 };
@@ -37,9 +46,21 @@ export const MCC_BUCKET_TYPES = [
   'main',
   'starter',
   'vfd',
+  'breaker',
   'feeder',
   'space',
   'spare'
+];
+
+export const MCC_STARTER_TYPES = [
+  '',
+  'fvnr',
+  'fvr',
+  'soft-starter',
+  'wye-delta',
+  'two-speed',
+  'reduced-voltage-autotransformer',
+  'other'
 ];
 
 export const MCC_BUCKET_STATUSES = [
@@ -76,6 +97,59 @@ export const MCC_COMMUNICATION_PROTOCOL_TYPES = [
   'devicenet'
 ];
 
+export const MCC_INCOMING_LINE_POWER_TYPES = [
+  'top',
+  'bottom',
+  'left',
+  'right',
+  'other'
+];
+
+export const MCC_ENCLOSURE_TYPES = [
+  'NEMA 1',
+  'NEMA 1A',
+  'NEMA 3R',
+  'NEMA 12'
+];
+
+export const MCC_ARRANGEMENT_TYPES = [
+  'front-only',
+  'back-to-back'
+];
+
+export const MCC_EXPANSION_COVER_PLATE_TYPES = [
+  'left',
+  'right'
+];
+
+export const MCC_SPACE_HEATER_ACCESSORY_TYPES = [
+  'high-temp-cutout',
+  'heater-circuit-breaker',
+  'thermostat-controlled',
+  'test-pushbutton-ammeter'
+];
+
+export const MCC_BUS_JOIN_PLATING_TYPES = [
+  'manufacturer-standard',
+  'tin-plated',
+  'silver-plated'
+];
+
+export const MCC_GROUND_BUS_REQUIRED_TYPES = [
+  'yes',
+  'no'
+];
+
+export const MCC_GROUND_BUS_LOCATION_TYPES = [
+  'horizontal-bottom',
+  'horizontal-top'
+];
+
+export const MCC_MOTOR_PROTECTION_DEVICE_TYPES = [
+  'thermal-magnetic',
+  'magnetic'
+];
+
 function uniqueId(prefix) {
   return `${prefix}-${Date.now()}-${Math.round(Math.random() * 1000)}`;
 }
@@ -107,13 +181,81 @@ function text(value, fallback = '') {
   return stringValue.trim() || fallback;
 }
 
+function choiceToken(value) {
+  return String(value ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+function choiceValue(value, choices, fallback = '') {
+  const token = choiceToken(value);
+  return choices.find(choice => choiceToken(choice) === token) || fallback;
+}
+
+function normalizeMultiChoice(value, choices) {
+  const rawValues = Array.isArray(value)
+    ? value
+    : String(value ?? '')
+      .split(/[,;|]/)
+      .map(part => part.trim())
+      .filter(Boolean);
+  return rawValues.reduce((result, rawValue) => {
+    const normalized = choiceValue(rawValue, choices);
+    if (normalized && !result.includes(normalized)) result.push(normalized);
+    return result;
+  }, []);
+}
+
+function specChoiceLabel(value) {
+  const labels = {
+    top: 'Top',
+    bottom: 'Bottom',
+    left: 'Left',
+    right: 'Right',
+    other: 'Other',
+    'front-only': 'Front Only',
+    'back-to-back': 'Back to Back',
+    'manufacturer-standard': 'Manufacturer Standard',
+    'tin-plated': 'Tin-Plated',
+    'silver-plated': 'Silver-Plated',
+    yes: 'Yes',
+    no: 'No',
+    'horizontal-bottom': 'Horizontal Bottom',
+    'horizontal-top': 'Horizontal Top',
+    'thermal-magnetic': 'Thermal-Magnetic',
+    magnetic: 'Magnetic',
+    'high-temp-cutout': 'High-Temp Cutout',
+    'heater-circuit-breaker': 'Heater Circuit Breaker',
+    'thermostat-controlled': 'Thermostat Controlled',
+    'test-pushbutton-ammeter': 'Test Pushbutton and Ammeter'
+  };
+  return labels[value] || String(value ?? '');
+}
+
 function round(value, digits = 2) {
   const factor = 10 ** digits;
   return Math.round(value * factor) / factor;
 }
 
-function normalizeMainDevice(bucket = {}, type = bucket.type) {
+function normalizeBucketType(bucket = {}) {
+  const value = String(bucket.type || '').trim().toLowerCase();
+  if (value === 'main-mlo' || value === 'main mlo' || value === 'mlo') {
+    return { type: 'main', mainDevice: 'mlo' };
+  }
+  if (value === 'main-breaker' || value === 'main breaker' || value === 'main-circuit-breaker') {
+    return { type: 'main', mainDevice: 'breaker' };
+  }
+  return {
+    type: MCC_BUCKET_TYPES.includes(value) ? value : 'starter',
+    mainDevice: ''
+  };
+}
+
+function normalizeMainDevice(bucket = {}, type = bucket.type, typeMainDevice = '') {
   if (type !== 'main') return '';
+  if (typeMainDevice) return typeMainDevice;
   const value = String(bucket.mainDevice || '').trim().toLowerCase();
   if (value === 'mlo' || value === 'main lug only' || value === 'main lugs only' || value === 'main-lug-only') {
     return 'mlo';
@@ -190,6 +332,8 @@ export function normalizeMccSpecRequirements(spec = {}) {
   const rawBusPlating = text(source.busPlating, DEFAULT_MCC_SPEC_REQUIREMENTS.busPlating);
   const busPlating = rawBusPlating.toLowerCase().replace(/\s+/g, '-');
   const communicationProtocol = text(source.communicationProtocol, DEFAULT_MCC_SPEC_REQUIREMENTS.communicationProtocol).toLowerCase();
+  const incomingLinePower = choiceValue(source.incomingLinePower, MCC_INCOMING_LINE_POWER_TYPES, DEFAULT_MCC_SPEC_REQUIREMENTS.incomingLinePower);
+  const groundBusRequired = choiceValue(source.groundBusRequired, MCC_GROUND_BUS_REQUIRED_TYPES, DEFAULT_MCC_SPEC_REQUIREMENTS.groundBusRequired);
   const busPlatingIsStandard = MCC_BUS_PLATING_TYPES.includes(busPlating);
   return {
     busMaterial: MCC_BUS_MATERIAL_TYPES.includes(busMaterial) ? busMaterial : DEFAULT_MCC_SPEC_REQUIREMENTS.busMaterial,
@@ -198,13 +342,26 @@ export function normalizeMccSpecRequirements(spec = {}) {
       ? text(source.busPlatingOther, DEFAULT_MCC_SPEC_REQUIREMENTS.busPlatingOther)
       : text(source.busPlatingOther, rawBusPlating),
     shortCircuitRatingKa: nonNegativeNumber(source.shortCircuitRatingKa, DEFAULT_MCC_SPEC_REQUIREMENTS.shortCircuitRatingKa),
+    incomingLinePower,
+    incomingLinePowerOther: incomingLinePower === 'other'
+      ? text(source.incomingLinePowerOther, DEFAULT_MCC_SPEC_REQUIREMENTS.incomingLinePowerOther)
+      : text(source.incomingLinePowerOther, DEFAULT_MCC_SPEC_REQUIREMENTS.incomingLinePowerOther),
     spaceHeaterRequired: booleanValue(source.spaceHeaterRequired, DEFAULT_MCC_SPEC_REQUIREMENTS.spaceHeaterRequired),
     spaceHeaterVoltage: text(source.spaceHeaterVoltage, DEFAULT_MCC_SPEC_REQUIREMENTS.spaceHeaterVoltage),
+    spaceHeaterAccessories: normalizeMultiChoice(source.spaceHeaterAccessories, MCC_SPACE_HEATER_ACCESSORY_TYPES),
     communicationProtocol: MCC_COMMUNICATION_PROTOCOL_TYPES.includes(communicationProtocol)
       ? communicationProtocol
       : DEFAULT_MCC_SPEC_REQUIREMENTS.communicationProtocol,
     controlVoltage: text(source.controlVoltage, DEFAULT_MCC_SPEC_REQUIREMENTS.controlVoltage),
-    enclosureRating: text(source.enclosureRating, DEFAULT_MCC_SPEC_REQUIREMENTS.enclosureRating),
+    enclosureRating: choiceValue(source.enclosureRating, MCC_ENCLOSURE_TYPES, DEFAULT_MCC_SPEC_REQUIREMENTS.enclosureRating),
+    mccArrangement: choiceValue(source.mccArrangement, MCC_ARRANGEMENT_TYPES, DEFAULT_MCC_SPEC_REQUIREMENTS.mccArrangement),
+    expansionCoverPlates: choiceValue(source.expansionCoverPlates, MCC_EXPANSION_COVER_PLATE_TYPES, DEFAULT_MCC_SPEC_REQUIREMENTS.expansionCoverPlates),
+    busJoinPlating: choiceValue(source.busJoinPlating, MCC_BUS_JOIN_PLATING_TYPES, DEFAULT_MCC_SPEC_REQUIREMENTS.busJoinPlating),
+    groundBusRequired,
+    groundBusLocation: groundBusRequired === 'yes'
+      ? choiceValue(source.groundBusLocation, MCC_GROUND_BUS_LOCATION_TYPES, DEFAULT_MCC_SPEC_REQUIREMENTS.groundBusLocation)
+      : choiceValue(source.groundBusLocation, MCC_GROUND_BUS_LOCATION_TYPES, DEFAULT_MCC_SPEC_REQUIREMENTS.groundBusLocation),
+    motorProtectionDevice: choiceValue(source.motorProtectionDevice, MCC_MOTOR_PROTECTION_DEVICE_TYPES, DEFAULT_MCC_SPEC_REQUIREMENTS.motorProtectionDevice),
     finish: text(source.finish, DEFAULT_MCC_SPEC_REQUIREMENTS.finish),
     notes: text(source.notes, DEFAULT_MCC_SPEC_REQUIREMENTS.notes)
   };
@@ -226,13 +383,30 @@ export function normalizeMccReportTitleBlock(report = {}) {
 export function mccSpecSummary(spec = {}) {
   const normalized = normalizeMccSpecRequirements(spec);
   const protocol = normalized.communicationProtocol === 'none' ? 'no comms' : normalized.communicationProtocol;
+  const incomingLinePower = normalized.incomingLinePower === 'other'
+    ? text(normalized.incomingLinePowerOther, 'other')
+    : specChoiceLabel(normalized.incomingLinePower);
+  const heaterAccessories = normalized.spaceHeaterAccessories.length
+    ? `space heater accessories: ${normalized.spaceHeaterAccessories.map(specChoiceLabel).join(' / ')}`
+    : '';
+  const groundBus = normalized.groundBusRequired === 'yes'
+    ? `ground bus at ${specChoiceLabel(normalized.groundBusLocation)}`
+    : 'ground bus not required';
   return [
     `${normalized.busMaterial} bus`,
     `${mccBusPlatingLabel(normalized)} bus plating`,
     `${normalized.shortCircuitRatingKa} kA SCCR`,
+    `incoming line power ${incomingLinePower}`,
+    `${normalized.enclosureRating} enclosure`,
+    `${specChoiceLabel(normalized.mccArrangement)} arrangement`,
+    `${specChoiceLabel(normalized.expansionCoverPlates)} expansion cover plate`,
     normalized.spaceHeaterRequired ? 'space heater required' : 'space heater not required',
-    protocol
-  ].join(', ');
+    heaterAccessories,
+    protocol,
+    `${specChoiceLabel(normalized.busJoinPlating)} bus join plating`,
+    groundBus,
+    `${specChoiceLabel(normalized.motorProtectionDevice)} motor protection`
+  ].filter(Boolean).join(', ');
 }
 
 export function createDefaultMccLineup(index = 0) {
@@ -271,8 +445,8 @@ export function createDefaultMccLineup(index = 0) {
         widthIn: DEFAULT_MCC_SECTION_WIDTH_IN,
         verticalWirewayWidthIn: DEFAULT_MCC_VERTICAL_WIREWAY_WIDTH_IN,
         buckets: [
-          { id: uniqueId('mcc-bkt'), label: 'P-101', type: 'starter', status: 'active', sizeUnits: 1, equipmentTag: 'P-101', equipmentDescription: 'Process Pump P-101', loadTag: 'P-101', hp: 25, breakerA: 60, starterSize: 'NEMA 2' },
-          { id: uniqueId('mcc-bkt'), label: 'FAN-102', type: 'starter', status: 'active', sizeUnits: 1, equipmentTag: 'FAN-102', equipmentDescription: 'Ventilation Fan 102', loadTag: 'FAN-102', hp: 15, breakerA: 40, starterSize: 'NEMA 1' },
+          { id: uniqueId('mcc-bkt'), label: 'P-101', type: 'starter', status: 'active', sizeUnits: 1, equipmentTag: 'P-101', equipmentDescription: 'Process Pump P-101', loadTag: 'P-101', hp: 25, breakerA: 60, starterType: 'fvnr', starterSize: 'NEMA 2', motorSpaceHeaterRequired: true, motorSpaceHeaterVa: 250 },
+          { id: uniqueId('mcc-bkt'), label: 'FAN-102', type: 'starter', status: 'active', sizeUnits: 1, equipmentTag: 'FAN-102', equipmentDescription: 'Ventilation Fan 102', loadTag: 'FAN-102', hp: 15, breakerA: 40, starterType: 'fvr', starterSize: 'NEMA 1' },
           { id: uniqueId('mcc-bkt'), label: 'SPACE', type: 'space', status: 'space', sizeUnits: 0.5 }
         ]
       }
@@ -289,15 +463,18 @@ export function normalizeBucket(bucket = {}, unitHeightIn = DEFAULT_MCC_UNIT_HEI
   const normalizedHeight = Number.isFinite(heightIn)
     ? Math.max(1, heightIn)
     : bucketHeightFromUnits(normalizedUnits, unitHeightIn);
-  const type = MCC_BUCKET_TYPES.includes(bucket.type) ? bucket.type : 'starter';
+  const normalizedBucketType = normalizeBucketType(bucket);
+  const type = normalizedBucketType.type;
   const status = MCC_BUCKET_STATUSES.includes(bucket.status) ? bucket.status : (type === 'space' ? 'space' : (type === 'spare' ? 'spare' : 'active'));
   const equipmentTag = text(bucket.equipmentTag, bucket.loadTag || '');
+  const starterType = text(bucket.starterType).toLowerCase().replace(/[\s_]+/g, '-');
+  const motorSpaceHeaterRequired = booleanValue(bucket.motorSpaceHeaterRequired, false);
 
   return {
     id: bucket.id || uniqueId('mcc-bkt'),
     label: text(bucket.label, status === 'active' ? `Bucket ${index + 1}` : status.toUpperCase()),
     type,
-    mainDevice: normalizeMainDevice(bucket, type),
+    mainDevice: normalizeMainDevice(bucket, type, normalizedBucketType.mainDevice),
     status,
     sizeUnits: round(normalizedUnits, 2),
     heightIn: round(normalizedHeight, 2),
@@ -306,7 +483,10 @@ export function normalizeBucket(bucket = {}, unitHeightIn = DEFAULT_MCC_UNIT_HEI
     loadTag: text(bucket.loadTag, equipmentTag),
     hp: text(bucket.hp),
     breakerA: text(bucket.breakerA),
+    starterType: MCC_STARTER_TYPES.includes(starterType) ? starterType : '',
     starterSize: text(bucket.starterSize),
+    motorSpaceHeaterRequired,
+    motorSpaceHeaterVa: text(bucket.motorSpaceHeaterVa ?? bucket.motorSpaceHeaterVA ?? bucket.spaceHeaterVa ?? bucket.spaceHeaterVA),
     cableTag: text(bucket.cableTag),
     notes: text(bucket.notes)
   };
@@ -474,6 +654,14 @@ export function validateMccLineup(lineup) {
           message: `${section.name} ${bucketName} is set as a main breaker but has no breaker rating.`
         });
       }
+      if (bucket.motorSpaceHeaterRequired && !bucket.motorSpaceHeaterVa) {
+        messages.push({
+          severity: 'warning',
+          sectionId: section.id,
+          bucketId: bucket.id,
+          message: `${section.name} ${bucketName} requires a motor space heater feed but has no VA rating.`
+        });
+      }
     });
   });
   return messages;
@@ -539,15 +727,89 @@ function bucketClass(bucket) {
 function selectedBucketDetails(lineup, selectedBucketId) {
   const targetId = String(selectedBucketId || '');
   if (!targetId) return null;
-  for (const section of lineup.sections) {
-    const bucket = section.buckets.find(candidate => String(candidate.id) === targetId);
-    if (bucket) return { ...bucket, sectionName: section.name };
+  for (let sectionIndex = 0; sectionIndex < lineup.sections.length; sectionIndex += 1) {
+    const section = lineup.sections[sectionIndex];
+    let usedHeightIn = 0;
+    for (let bucketIndex = 0; bucketIndex < section.buckets.length; bucketIndex += 1) {
+      const bucket = section.buckets[bucketIndex];
+      const positionLabel = mccBucketPositionLabel(usedHeightIn, bucket, lineup.unitHeightIn);
+      if (String(bucket.id) === targetId) {
+        return {
+          ...bucket,
+          sectionName: section.name,
+          sectionIndex,
+          bucketIndex,
+          positionLabel,
+          sectionPositionLabel: `${sectionIndex + 1}${positionLabel}`
+        };
+      }
+      usedHeightIn += bucket.heightIn;
+    }
   }
   return null;
 }
 
 function bucketDisplayName(bucket) {
   return bucket.equipmentTag || bucket.loadTag || bucket.label;
+}
+
+export function mccStarterTypeLabel(bucket = {}) {
+  const labels = {
+    fvnr: 'FVNR',
+    fvr: 'FVR',
+    'soft-starter': 'Soft Starter',
+    'wye-delta': 'Wye-Delta',
+    'two-speed': 'Two-Speed',
+    'reduced-voltage-autotransformer': 'RV Auto',
+    other: 'Other'
+  };
+  return labels[bucket.starterType] || '';
+}
+
+export function mccStarterTypeSizeLabel(bucket = {}) {
+  const starterType = mccStarterTypeLabel(bucket);
+  const starterSize = text(bucket.starterSize).replace(/^NEMA\s+/i, '');
+  if (starterType && starterSize) return `${starterType}-${starterSize}`;
+  return starterType || starterSize;
+}
+
+export function mccBreakerAtAfLabel(bucket = {}) {
+  const raw = text(bucket.breakerA);
+  if (!raw) return '';
+  if (/\b(?:AT|AF)\b/i.test(raw)) return raw;
+  const ratings = raw.match(/\d+(?:\.\d+)?/g) || [];
+  if (ratings.length >= 2) return `${ratings[0]}AT/${ratings[1]}AF`;
+  if (ratings.length === 1) return `${ratings[0]}AT`;
+  return raw;
+}
+
+export function mccOneLineDeviceKind(bucket = {}) {
+  if (bucket.status === 'space' || bucket.type === 'space') return 'space';
+  if (bucket.status === 'spare' || bucket.type === 'spare') return 'spare';
+  if (bucket.type === 'vfd') return 'vfd';
+  if (bucket.type === 'starter') return 'starter';
+  if (bucket.type === 'main' || bucket.type === 'breaker' || bucket.type === 'feeder') return 'breaker';
+  return 'load';
+}
+
+function mccOneLineDeviceLabel(bucket = {}) {
+  const kind = mccOneLineDeviceKind(bucket);
+  if (kind === 'starter') return mccStarterTypeLabel(bucket) || 'Starter';
+  if (kind === 'vfd') return 'VFD';
+  if (kind === 'breaker') return mccMainDeviceLabel(bucket, { short: true }) || 'CB';
+  if (kind === 'space') return 'Space';
+  if (kind === 'spare') return 'Spare';
+  return bucket.type || 'Load';
+}
+
+function mccOneLineDeviceMeta(bucket = {}) {
+  const kind = mccOneLineDeviceKind(bucket);
+  if (kind === 'starter') return mccStarterTypeSizeLabel(bucket) || 'Starter';
+  if (kind === 'spare') return mccBreakerAtAfLabel(bucket) || 'Spare';
+  if (kind === 'breaker') return mccMainDeviceLabel(bucket, { short: true }) || mccBreakerAtAfLabel(bucket) || 'CB';
+  if (kind === 'vfd') return mccBreakerAtAfLabel(bucket) || 'VFD';
+  if (kind === 'space') return 'Space';
+  return mccBreakerAtAfLabel(bucket) || bucket.type || '';
 }
 
 function svgStyle() {
@@ -578,16 +840,30 @@ function svgStyle() {
     '.mcc-oneline-bus{stroke:#111827;stroke-width:4;stroke-linecap:round;}',
     '.mcc-oneline-node{cursor:pointer;outline:none;}',
     '.mcc-oneline-branch{stroke:#2563eb;stroke-width:2;fill:none;}',
+    '.mcc-oneline-branch-space{stroke:#64748b;stroke-dasharray:4 3;}',
     '.mcc-oneline-device{fill:#ffffff;stroke:#2563eb;stroke-width:1.5;}',
+    '.mcc-oneline-device-starter{fill:#ecfdf5;stroke:#059669;}',
+    '.mcc-oneline-device-vfd{fill:#f5f3ff;stroke:#7c3aed;}',
+    '.mcc-oneline-device-breaker{fill:#eff6ff;stroke:#1d4ed8;}',
+    '.mcc-oneline-device-space{fill:#f8fafc;stroke:#64748b;stroke-dasharray:4 3;}',
+    '.mcc-oneline-device-spare{fill:#f1f5f9;stroke:#64748b;stroke-dasharray:4 3;}',
+    '.mcc-oneline-symbol{fill:#111827;font-size:10px;font-weight:800;}',
+    '.mcc-oneline-symbol-line{stroke:#111827;stroke-width:1.5;fill:none;stroke-linecap:round;}',
+    '.mcc-oneline-symbol-vfd{stroke:#7c3aed;stroke-width:1.6;fill:none;stroke-linecap:round;}',
     '.mcc-oneline-main{fill:#f8fafc;stroke:#111827;stroke-width:1.5;}',
+    '.mcc-oneline-main-node{cursor:pointer;outline:none;}',
+    '.mcc-oneline-position{fill:#1e3a8a;font-size:9px;font-weight:800;}',
     '.mcc-oneline-label{fill:#111827;font-size:10px;font-weight:700;}',
     '.mcc-oneline-meta{fill:#4b5563;font-size:9px;}',
     '.mcc-oneline-selected .mcc-oneline-branch{stroke:#f59e0b;stroke-width:3;}',
     '.mcc-oneline-selected .mcc-oneline-device{fill:#fffbeb;stroke:#f59e0b;stroke-width:3;}',
+    '.mcc-oneline-selected .mcc-oneline-main{fill:#fffbeb;stroke:#f59e0b;stroke-width:3;}',
     '.mcc-oneline-selected .mcc-oneline-label{fill:#92400e;}',
     '.mcc-oneline-selected .mcc-oneline-meta{fill:#92400e;font-weight:700;}',
     '.mcc-oneline-selected-info{fill:#fffbeb;stroke:#f59e0b;stroke-width:1.2;}',
-    '.mcc-oneline-selected-info-text{fill:#92400e;font-size:10px;font-weight:700;}'
+    '.mcc-oneline-selected-info-text{fill:#92400e;font-size:10px;font-weight:700;}',
+    '.mcc-oneline-continuation{fill:#1e3a8a;font-size:9px;font-weight:800;letter-spacing:.4px;}',
+    '.mcc-oneline-continuation-line{stroke:#1e3a8a;stroke-width:1.2;stroke-dasharray:4 3;fill:none;marker-end:url(#mcc-arrow);}'
   ].join('');
 }
 
@@ -710,25 +986,68 @@ export function renderMccOneLineSvg(lineup, options = {}) {
   const normalized = normalizeMccLineup(lineup);
   const selectedBucketId = String(options.selectedBucketId || '');
   const selectedBucket = selectedBucketDetails(normalized, selectedBucketId);
-  const buckets = normalized.sections.flatMap(section => (
-    section.buckets
-      .filter(bucket => bucket.status !== 'space')
-      .map(bucket => ({ ...bucket, sectionName: section.name }))
-  ));
+  const mainBucket = normalized.sections
+    .flatMap((section, sectionIndex) => section.buckets.map((bucket, bucketIndex) => ({
+      ...bucket,
+      sectionName: section.name,
+      sectionIndex,
+      bucketIndex
+    })))
+    .find(bucket => bucket.type === 'main');
+  const allBuckets = normalized.sections.flatMap((section, sectionIndex) => {
+    let usedHeightIn = 0;
+    return section.buckets.map((bucket, bucketIndex) => {
+      const positionLabel = mccBucketPositionLabel(usedHeightIn, bucket, normalized.unitHeightIn);
+      usedHeightIn += bucket.heightIn;
+      return {
+        ...bucket,
+        sectionName: section.name,
+        sectionIndex,
+        bucketIndex,
+        positionLabel,
+        sectionPositionLabel: `${sectionIndex + 1}${positionLabel}`
+      };
+    }).filter(bucket => bucket.type !== 'main');
+  });
+  const branchStartIndex = Math.max(0, Math.floor(Number.parseFloat(options.branchStartIndex) || 0));
+  const requestedBranchLimit = Number.parseFloat(options.branchLimit);
+  const branchLimit = Number.isFinite(requestedBranchLimit) && requestedBranchLimit > 0
+    ? Math.floor(requestedBranchLimit)
+    : allBuckets.length;
+  const buckets = allBuckets.slice(branchStartIndex, branchStartIndex + branchLimit);
   const branchCount = Math.max(1, buckets.length);
   const spacing = positiveNumber(options.spacing, 82, 54);
-  const width = Math.max(620, 140 + branchCount * spacing);
+  const fixedWidth = Number.parseFloat(options.fixedWidth);
+  const width = Number.isFinite(fixedWidth) && fixedWidth > 0
+    ? Math.max(620, fixedWidth)
+    : Math.max(620, 140 + branchCount * spacing);
   const height = 230;
   const busY = 76;
   const firstX = 104;
+  const continuedAbove = Boolean(options.continuedAbove);
+  const continuedBelow = Boolean(options.continuedBelow);
+  const mainSelected = mainBucket && String(mainBucket.id) === selectedBucketId;
+  const mainNodeClass = `mcc-oneline-main-node${mainSelected ? ' mcc-oneline-selected' : ''}`;
+  const mainNodeAttrs = mainBucket
+    ? ` data-mcc-bucket-id="${escapeXml(mainBucket.id)}" tabindex="0" role="button" aria-label="${escapeXml(`${mainBucket.sectionName} main one-line device`)}"`
+    : '';
+  const mainMeta = mainBucket ? mccMainDeviceLabel(mainBucket, { short: true }) : '';
   const parts = [
     `<svg class="mcc-lineup-oneline-svg" xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeXml(normalized.tag)} MCC one-line">`,
     `<style>${svgStyle()}</style>`,
+    '<defs><marker id="mcc-arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,6 L6,3 z" fill="#1e3a8a"></path></marker></defs>',
     `<text x="24" y="28" class="mcc-title">${escapeXml(normalized.tag)} Simple One-Line</text>`,
+    continuedAbove ? '<text x="24" y="48" class="mcc-oneline-continuation">CONT\'D ABOVE</text>' : '',
+    continuedBelow ? `<text x="${width - 116}" y="48" class="mcc-oneline-continuation">CONT'D BELOW</text>` : '',
+    continuedAbove ? `<line x1="24" y1="54" x2="88" y2="54" class="mcc-oneline-continuation-line"></line>` : '',
+    continuedBelow ? `<line x1="${width - 40}" y1="54" x2="${width - 104}" y2="54" class="mcc-oneline-continuation-line"></line>` : '',
     `<line x1="${firstX}" y1="${busY}" x2="${width - 40}" y2="${busY}" class="mcc-oneline-bus"></line>`,
+    `<g class="${mainNodeClass}"${mainNodeAttrs}>`,
     `<line x1="44" y1="${busY}" x2="${firstX}" y2="${busY}" class="mcc-oneline-branch"></line>`,
     `<rect x="22" y="${busY - 17}" width="46" height="34" rx="4" class="mcc-oneline-main"></rect>`,
-    `<text x="45" y="${busY + 4}" text-anchor="middle" class="mcc-oneline-label">MAIN</text>`
+    `<text x="45" y="${busY + 4}" text-anchor="middle" class="mcc-oneline-label">MAIN</text>`,
+    mainMeta ? `<text x="45" y="${busY + 34}" text-anchor="middle" class="mcc-oneline-meta">${escapeXml(mainMeta)}</text>` : '',
+    '</g>'
   ];
 
   buckets.forEach((bucket, index) => {
@@ -736,14 +1055,31 @@ export function renderMccOneLineSvg(lineup, options = {}) {
     const x = firstX + index * spacing;
     const deviceY = 118;
     const label = bucketDisplayName(bucket);
+    const deviceKind = mccOneLineDeviceKind(bucket);
+    const deviceLabel = mccOneLineDeviceLabel(bucket);
+    const branchClass = `mcc-oneline-branch${deviceKind === 'space' ? ' mcc-oneline-branch-space' : ''}`;
+    const deviceClass = `mcc-oneline-device mcc-oneline-device-${deviceKind}`;
     const nodeClass = `mcc-oneline-node${isSelected ? ' mcc-oneline-selected' : ''}`;
-    const nodeLabel = `${bucket.sectionName} ${label} one-line device`;
+    const nodeLabel = `${bucket.sectionName} ${label || deviceLabel} ${deviceLabel} one-line device`;
     parts.push(`<g class="${nodeClass}" data-mcc-bucket-id="${escapeXml(bucket.id)}" tabindex="0" role="button" aria-label="${escapeXml(nodeLabel)}">`);
-    parts.push(`<line x1="${x}" y1="${busY}" x2="${x}" y2="${deviceY}" class="mcc-oneline-branch"></line>`);
-    parts.push(`<rect x="${x - 18}" y="${deviceY}" width="36" height="26" rx="4" class="mcc-oneline-device"></rect>`);
-    parts.push(`<line x1="${x}" y1="${deviceY + 26}" x2="${x}" y2="${deviceY + 52}" class="mcc-oneline-branch"></line>`);
-    parts.push(`<text x="${x}" y="${deviceY + 70}" text-anchor="middle" class="mcc-oneline-label">${escapeXml(label || bucket.type)}</text>`);
-    parts.push(`<text x="${x}" y="${deviceY + 84}" text-anchor="middle" class="mcc-oneline-meta">${escapeXml(mccMainDeviceLabel(bucket, { short: true }) || (bucket.breakerA ? `${bucket.breakerA}A` : bucket.type))}</text>`);
+    parts.push(`<line x1="${x}" y1="${busY}" x2="${x}" y2="${deviceY}" class="${branchClass}"></line>`);
+    parts.push(`<text x="${x + 7}" y="${busY + 16}" class="mcc-oneline-position">${escapeXml(bucket.sectionPositionLabel)}</text>`);
+    parts.push(`<rect x="${x - 20}" y="${deviceY}" width="40" height="28" rx="4" class="${deviceClass}"></rect>`);
+    if (deviceKind === 'starter') {
+      parts.push(`<circle cx="${x}" cy="${deviceY + 14}" r="8" class="mcc-oneline-symbol-line"></circle>`);
+      parts.push(`<text x="${x}" y="${deviceY + 18}" text-anchor="middle" class="mcc-oneline-symbol">M</text>`);
+    } else if (deviceKind === 'vfd') {
+      parts.push(`<path d="M ${x - 12} ${deviceY + 17} C ${x - 8} ${deviceY + 7}, ${x - 2} ${deviceY + 7}, ${x + 2} ${deviceY + 17} S ${x + 10} ${deviceY + 27}, ${x + 14} ${deviceY + 17}" class="mcc-oneline-symbol-vfd"></path>`);
+    } else if (deviceKind === 'breaker') {
+      parts.push(`<line x1="${x - 11}" y1="${deviceY + 20}" x2="${x + 11}" y2="${deviceY + 8}" class="mcc-oneline-symbol-line"></line>`);
+      parts.push(`<circle cx="${x - 12}" cy="${deviceY + 21}" r="2" class="mcc-oneline-symbol-line"></circle>`);
+      parts.push(`<circle cx="${x + 12}" cy="${deviceY + 7}" r="2" class="mcc-oneline-symbol-line"></circle>`);
+    } else if (deviceKind === 'space' || deviceKind === 'spare') {
+      parts.push(`<text x="${x}" y="${deviceY + 18}" text-anchor="middle" class="mcc-oneline-symbol">${deviceKind === 'space' ? 'SPC' : 'SPR'}</text>`);
+    }
+    parts.push(`<line x1="${x}" y1="${deviceY + 28}" x2="${x}" y2="${deviceY + 52}" class="${branchClass}"></line>`);
+    parts.push(`<text x="${x}" y="${deviceY + 70}" text-anchor="middle" class="mcc-oneline-label">${escapeXml(label || deviceLabel)}</text>`);
+    parts.push(`<text x="${x}" y="${deviceY + 84}" text-anchor="middle" class="mcc-oneline-meta">${escapeXml(mccOneLineDeviceMeta(bucket))}</text>`);
     parts.push('</g>');
   });
 
@@ -753,6 +1089,7 @@ export function renderMccOneLineSvg(lineup, options = {}) {
       `Selected Bucket: ${selectedBucket.sectionName}`,
       bucketDisplayName(selectedBucket),
       selectedBucket.equipmentDescription,
+      mccOneLineDeviceLabel(selectedBucket),
       selectedMainDeviceLabel,
       !selectedMainDeviceLabel && selectedBucket.breakerA ? `${selectedBucket.breakerA}A` : '',
       selectedBucket.cableTag ? `Cable ${selectedBucket.cableTag}` : ''
