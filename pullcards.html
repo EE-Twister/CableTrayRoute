@@ -85,12 +85,12 @@
       <!-- Import section -->
       <fieldset>
         <legend><strong>Import Route Data</strong></legend>
-        <p class="field-hint">Import the <code>route_data.xlsx</code> file exported
+        <p class="field-hint">Import the <code>route_data.xlsx</code> or <code>route_data.csv</code> file exported
         from the Optimal Route page, or load pull cards directly from project data
         if routes have been computed in this session.</p>
         <div class="btn-row">
-          <button type="button" id="importXlsxBtn">Import Route XLSX</button>
-          <input type="file" id="xlsxFileInput" accept=".xlsx,.xls" class="hidden" title="Select route data file">
+          <button type="button" id="importXlsxBtn">Import Route File</button>
+          <input type="file" id="xlsxFileInput" accept=".xlsx,.xls,.csv" class="hidden" title="Select route data file">
           <button type="button" id="loadFromProjectBtn">Load from Project</button>
         </div>
       </fieldset>
@@ -99,6 +99,20 @@
       <section id="summarySection" hidden aria-label="Pull summary">
         <h2>Pull Summary</h2>
         <div id="summaryCards" class="summary-cards" role="status" aria-live="polite"></div>
+      </section>
+
+      <section id="pullVisualSection" class="pull-iso-panel" hidden aria-labelledby="pull-iso-title">
+        <div class="pull-iso-header">
+          <div>
+            <h2 id="pull-iso-title">Selected Pull Route</h2>
+            <p id="pull-iso-summary" class="field-hint" aria-live="polite"></p>
+          </div>
+          <div id="pull-iso-status" class="pull-iso-status" aria-live="polite"></div>
+        </div>
+        <div class="pull-iso-grid">
+          <div id="pull-iso-canvas" class="iso-canvas" role="img" aria-label="Selected pull isometric route"></div>
+          <aside id="pull-iso-inspector" class="iso-inspector" aria-live="polite"></aside>
+        </div>
       </section>
 
       <!-- Pull Table -->
@@ -164,7 +178,8 @@
       <p><strong>Pull cards:</strong> Click any row to view a detailed pull card
       showing the step-by-step route, cable list, tension estimate, and
       physical properties.</p>
-      <p><strong>Import:</strong> Use the <code>route_data.xlsx</code> file from the
+      <p><strong>3D route visuals:</strong> Route exports now include start/end coordinates for each segment. Re-export route data after this upgrade to get exact isometric pull routes; older imports still calculate pull tables but show a coordinate-missing visual state.</p>
+      <p><strong>Import:</strong> Use the <code>route_data.xlsx</code> or <code>route_data.csv</code> file from the
       Optimal Route page, or load directly from the current project if routes
       have already been computed.</p>
     </div>

@@ -87,7 +87,13 @@ Example: Wall A has 2", 1½", 1½" conduits → 6 × 2 + 1.5 + 1.5 = 15".
 | Trade size | Conduit trade size in inches (½" to 4") |
 | Bend type | 90°, Offset, Kick, or 3-Bend Saddle |
 | Dimension | Primary bend dimension in inches (stub height / offset rise / kick height / obstacle height) |
-| Angle | Bend angle in degrees — used for Offset and Kick types only |
+| Angle | Bend angle in degrees - used for Offset and Kick types only |
+| Start / End X, Y, Z | Optional physical run endpoints in feet for the 3D layout view |
+| Heading | Initial run heading in degrees, measured in plan from the positive X direction |
+| End tolerance | Allowed distance between the modeled path and entered endpoint before a warning is shown |
+| Bend station | Distance in feet from the run start to the bend marker |
+| Bend plane | Horizontal or vertical bend plane |
+| Bend direction | Left/right for horizontal bends or rise/drop for vertical bends |
 
 ### Pull Box
 
@@ -95,6 +101,8 @@ Example: Wall A has 2", 1½", 1½" conduits → 6 × 2 + 1.5 + 1.5 = 15".
 |---|---|
 | Label | Identifier for the pull point |
 | Pull type | Straight, Angle, or U pull |
+| Box X, Y, Z | Optional physical pull-box coordinates in feet for the 3D layout view |
+| Wall A / Wall B label | Optional physical wall orientation labels used in the 3D callouts |
 | Largest trade size | For straight pulls: the largest conduit entering |
 | Wall A / Wall B | For angle/U pulls: comma-separated list of all conduit trade sizes on each wall |
 
@@ -103,11 +111,24 @@ Example: Wall A has 2", 1½", 1½" conduits → 6 × 2 + 1.5 + 1.5 = 15".
 - **Bend schedule table** — per-bend: type, dimension, degrees, mark spacing, shrink, notes
 - **Cumulative degree total** with NEC 358.24 pass/fail badge
 - **Pull-box sizing card** — minimum required dimensions and nearest standard box size
+- **3D run layout** - code-native SVG isometric view showing run endpoints, bend stations, bend direction, pull-box positions, and endpoint mismatch warnings
 
 ## Export
 
 Click **Export CSV** to download a bend schedule CSV suitable for submittals, coordination
 packages, or field installation documents.
+
+## 3D Layout Notes
+
+The manual layout fields are optional and backward compatible. Existing studies without
+layout data render with generated defaults so older calculations can still be reviewed,
+but those generated defaults are not written back into the study until the user recalculates
+and saves the page.
+
+The isometric view uses the entered coordinates as physical feet. If the bend stations,
+planes, and directions do not produce a path that lands within the entered endpoint
+tolerance, the panel shows an endpoint mismatch warning instead of silently adjusting
+the run.
 
 ## References
 

@@ -10,11 +10,67 @@
  * - Clash Detection
  */
 import { test, expect } from '@playwright/test';
+import fs from 'fs/promises';
+import http from 'http';
 import path from 'path';
 import { fileURLToPath } from 'url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.join(__dirname, '..');
 const pageUrl = file => 'file://' + path.join(root, file);
+
+async function startStaticServer() {
+  const server = http.createServer(async (req, res) => {
+    try {
+      const url = new URL(req.url, 'http://127.0.0.1');
+      const requested = decodeURIComponent(url.pathname === '/' ? '/index.html' : url.pathname);
+      const filePath = path.resolve(root, `.${requested}`);
+      if (!(filePath === root || filePath.startsWith(root + path.sep))) {
+        res.writeHead(403);
+        res.end('Forbidden');
+        return;
+      }
+      const body = await fs.readFile(filePath);
+      const ext = path.extname(filePath).toLowerCase();
+      const type = {
+        '.html': 'text/html; charset=utf-8',
+        '.js': 'text/javascript; charset=utf-8',
+        '.mjs': 'text/javascript; charset=utf-8',
+        '.css': 'text/css; charset=utf-8',
+        '.json': 'application/json; charset=utf-8',
+        '.svg': 'image/svg+xml',
+        '.png': 'image/png',
+      }[ext] || 'application/octet-stream';
+      res.writeHead(200, { 'Content-Type': type });
+      res.end(body);
+    } catch {
+      res.writeHead(404);
+      res.end('Not found');
+    }
+  });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  const { port } = server.address();
+  return {
+    url: file => new URL(file, `http://127.0.0.1:${port}/`).toString(),
+    close: () => new Promise(resolve => server.close(resolve)),
+  };
+}
+
+async function dismissOnboarding(page) {
+  const modal = page.locator('.component-modal').first();
+  if (await modal.count()) {
+    await page.keyboard.press('Escape');
+    await expect(modal).toBeHidden({ timeout: 3000 });
+  }
+  await page.locator('#toast').evaluateAll(nodes => nodes.forEach(node => node.remove()));
+}
+
+async function resetStaticStorage(page, staticSite) {
+  await page.goto(staticSite.url('index.html?e2e_storage_clear=1'));
+  await page.evaluate(() => {
+    localStorage.clear();
+    sessionStorage.clear();
+  });
+}
 
 // -------------------------------------------------------------------------
 // Wind Load Analysis
@@ -223,9 +279,21 @@ test.describe('Tray Hardware BOM', () => {
 // Pull Cards
 // -------------------------------------------------------------------------
 test.describe('Pull Cards', () => {
+  let staticSite;
+
+  test.beforeAll(async () => {
+    staticSite = await startStaticServer();
+  });
+
+  test.afterAll(async () => {
+    await staticSite.close();
+  });
+
   test.beforeEach(async ({ page }) => {
-    await page.goto(pageUrl('pullcards.html?e2e=1&e2e_reset=1'));
+    await resetStaticStorage(page, staticSite);
+    await page.goto(staticSite.url('pullcards.html?e2e=1&e2e_reset=1'));
     await page.waitForLoadState('networkidle');
+    await dismissOnboarding(page);
   });
 
   test('page loads with correct heading', async ({ page }) => {
@@ -248,6 +316,116 @@ test.describe('Pull Cards', () => {
   test('clicking load from project does not crash', async ({ page }) => {
     await page.click('#loadFromProjectBtn');
     await expect(page.locator('body')).toBeVisible();
+  });
+
+  test('renders selected-pull isometric route and updates row selection', async ({ page }) => {
+    await page.evaluate(() => {
+      localStorage.setItem('base:cableSchedule', JSON.stringify([
+        { name: 'PC-1', cable_type: 'Power', diameter: 0.75, weight: 0.5 },
+        { name: 'PC-2', cable_type: 'Control', diameter: 0.45, weight: 0.2 }
+      ]));
+      sessionStorage.setItem('base:routeCache', JSON.stringify({
+        batchResults: [
+          {
+            cable: 'PC-1',
+            status: 'Routed',
+            total_length: 30,
+            breakdown: [
+              { tray_id: 'T1', length: 15, start: [0, 0, 0], end: [15, 0, 0] },
+              { tray_id: 'T2', length: 15, start: [15, 0, 0], end: [30, 5, 0] }
+            ],
+            route_segments: [{ type: 'straight', length: 15 }, { type: 'straight', length: 15 }]
+          },
+          {
+            cable: 'PC-2',
+            status: 'Routed',
+            total_length: 18,
+            breakdown: [
+              { tray_id: 'T3', length: 18, start: [0, 12, 0], end: [18, 12, 4] }
+            ],
+            route_segments: [{ type: 'straight', length: 18 }]
+          }
+        ]
+      }));
+    });
+    await page.goto(staticSite.url('pullcards.html?e2e=1'));
+    await page.waitForLoadState('networkidle');
+    await dismissOnboarding(page);
+    await page.click('#loadFromProjectBtn');
+    await expect(page.locator('#pullVisualSection')).toBeVisible();
+    await expect(page.locator('#pull-iso-canvas svg')).toBeVisible();
+    await expect(page.locator('#pull-iso-status')).toContainText('Exact coordinates');
+
+    await page.locator('#pullTable tbody tr[data-pull="2"]').click();
+    await expect(page.locator('#pull-iso-summary')).toContainText('Pull #2');
+    await expect(page.locator('#pullTable tbody tr[data-pull="2"]')).toHaveClass(/pull-table-selected/);
+  });
+
+  test('shows coordinate-missing visual state for legacy route data', async ({ page }) => {
+    await page.evaluate(() => {
+      localStorage.setItem('base:cableSchedule', JSON.stringify([
+        { name: 'LEGACY-1', cable_type: 'Power', diameter: 0.75, weight: 0.5 }
+      ]));
+      sessionStorage.setItem('base:routeCache', JSON.stringify({
+        batchResults: [{
+          cable: 'LEGACY-1',
+          status: 'Routed',
+          total_length: 20,
+          breakdown: [{ tray_id: 'T1', length: 20 }],
+          route_segments: [{ type: 'straight', length: 20 }]
+        }]
+      }));
+    });
+    await page.goto(staticSite.url('pullcards.html?e2e=1'));
+    await page.waitForLoadState('networkidle');
+    await dismissOnboarding(page);
+    await page.click('#loadFromProjectBtn');
+    await expect(page.locator('#pullVisualSection')).toBeVisible();
+    await expect(page.locator('#pull-iso-status')).toContainText('Coordinate data missing');
+    await expect(page.locator('#pull-iso-canvas')).toContainText('Coordinate data missing');
+  });
+});
+
+// -------------------------------------------------------------------------
+// Conduit Bend Schedule
+// -------------------------------------------------------------------------
+test.describe('Conduit Bend Schedule 3D layout', () => {
+  let staticSite;
+
+  test.beforeAll(async () => {
+    staticSite = await startStaticServer();
+  });
+
+  test.afterAll(async () => {
+    await staticSite.close();
+  });
+
+  test.beforeEach(async ({ page }) => {
+    await resetStaticStorage(page, staticSite);
+    await page.goto(staticSite.url('conduitbend.html?e2e=1&e2e_reset=1'));
+    await page.waitForLoadState('networkidle');
+    await dismissOnboarding(page);
+  });
+
+  test('renders the 3D layout after calculate and highlights selected bends', async ({ page }) => {
+    await page.click('#run-btn');
+    await expect(page.locator('#conduit-iso-canvas svg')).toBeVisible();
+    await expect(page.locator('#conduit-iso-summary')).toContainText('run');
+
+    await page.locator('#runs-container .dynamic-row').first().click();
+    await expect(page.locator('#runs-container .dynamic-row').first()).toHaveClass(/iso-linked-selected/);
+    await expect(page.locator('#conduit-iso-canvas .iso-marker.is-selected')).toBeVisible();
+
+    await page.locator('#pullbox-container .dynamic-card').first().click();
+    await expect(page.locator('#pullbox-container .dynamic-card').first()).toHaveClass(/iso-linked-selected/);
+  });
+
+  test('keeps the 3D layout usable on mobile width', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 820 });
+    await page.click('#run-btn');
+    await expect(page.locator('#conduit-iso-canvas svg')).toBeVisible();
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+    expect(overflow).toBeLessThanOrEqual(2);
   });
 });
 

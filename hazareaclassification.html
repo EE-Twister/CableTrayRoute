@@ -16,9 +16,9 @@
   <link rel="canonical" href="hazareaclassification.html">
   <link rel="dns-prefetch" href="https://fonts.gstatic.com">
   <meta name="color-scheme" content="light dark">
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="style.css?v=hazarea-visual-polish-v4" />
   <script type="module" src="dirtyTracker.js"></script>
-  <script type="module" src="dist/hazareaclassification.js" defer></script>
+  <script type="module" src="dist/hazareaclassification.js?v=hazarea-visual-polish-v4" defer></script>
 </head>
 <body class="hazarea-page" data-report-title="Hazardous Area Classification">
   <a href="#main-content" class="skip-link">Skip to main content</a>
@@ -84,6 +84,51 @@
         </ol>
         <p class="hint"><strong>Note:</strong> This tool provides a compatibility screening check. A formal area classification study per API RP 505 or IEC 60079-10-1 and the Authority Having Jurisdiction (AHJ) approval are required before installation.</p>
       </details>
+
+      <section class="field-group haz-map-panel" aria-labelledby="haz-map-title">
+        <div class="haz-map-panel__header">
+          <div>
+            <h2 id="haz-map-title">Visual Layout</h2>
+            <p class="hint">A schematic 3D volume view of classified areas and equipment positions. Geometry fields are optional; legacy studies receive generated default volumes until real coordinates are entered.</p>
+          </div>
+          <div id="haz-map-summary" class="haz-map-summary" aria-live="polite"></div>
+        </div>
+        <div class="haz-layout-controls" aria-label="Facility layout dimensions">
+          <label>Facility Width (ft)
+            <input type="number" id="haz-layout-width" value="80" min="1" step="1" inputmode="decimal" aria-label="Facility width in feet">
+          </label>
+          <label>Facility Height (ft)
+            <input type="number" id="haz-layout-height" value="50" min="1" step="1" inputmode="decimal" aria-label="Facility height in feet">
+          </label>
+          <label>Grid Spacing (ft)
+            <input type="number" id="haz-layout-grid" value="10" min="1" step="1" inputmode="decimal" aria-label="Grid spacing in feet">
+          </label>
+          <label>Vertical Limit (ft)
+            <input type="number" id="haz-layout-elevation" value="20" min="1" step="1" inputmode="decimal" aria-label="Facility vertical limit in feet">
+          </label>
+        </div>
+        <div class="haz-map-workspace">
+          <div class="haz-map-viewport">
+            <div class="haz-map-view-controls" aria-label="Map view controls">
+              <div class="haz-map-view-controls__group" role="group" aria-label="Rotate map view">
+                <button type="button" id="haz-map-rotate-left" class="btn haz-map-view-btn" aria-label="Rotate map view left" title="Rotate left">&#8630;</button>
+                <button type="button" id="haz-map-rotate-right" class="btn haz-map-view-btn" aria-label="Rotate map view right" title="Rotate right">&#8631;</button>
+              </div>
+              <div class="haz-map-view-controls__group" role="group" aria-label="Pan map view">
+                <button type="button" id="haz-map-pan-left" class="btn haz-map-view-btn" aria-label="Pan map view left" title="Pan left">&larr;</button>
+                <button type="button" id="haz-map-pan-up" class="btn haz-map-view-btn" aria-label="Pan map view up" title="Pan up">&uarr;</button>
+                <button type="button" id="haz-map-pan-down" class="btn haz-map-view-btn" aria-label="Pan map view down" title="Pan down">&darr;</button>
+                <button type="button" id="haz-map-pan-right" class="btn haz-map-view-btn" aria-label="Pan map view right" title="Pan right">&rarr;</button>
+              </div>
+              <button type="button" id="haz-map-reset-view" class="btn haz-map-view-btn" aria-label="Reset map view" title="Reset view">&#8962;</button>
+              <span id="haz-map-view-readout" class="haz-map-view-readout" aria-live="polite"></span>
+            </div>
+            <div id="haz-map-canvas" class="haz-map-canvas" role="img" aria-label="Hazardous area classification plan map"></div>
+            <div id="haz-map-legend" class="haz-map-legend" aria-label="Map legend"></div>
+          </div>
+          <aside id="haz-map-inspector" class="haz-map-inspector" aria-live="polite"></aside>
+        </div>
+      </section>
 
       <!-- ================================================================== -->
       <!-- Tab bar                                                             -->
@@ -172,6 +217,17 @@
         <li><strong>Zone (IEC):</strong> Zone 0 = continuous; Zone 1 = likely (normal); Zone 2 = unlikely (abnormal). Dust zones: 20/21/22.</li>
         <li><strong>Gas / Dust Group:</strong> Identifies the specific hazardous substance class. Equipment must be rated for the group.</li>
         <li><strong>T-Rating:</strong> Minimum T-class required by the area (based on the substance's auto-ignition temperature). T6 = 85 °C (most restrictive); T1 = 450 °C (least restrictive).</li>
+      </ul>
+      <h3>Visual Layout</h3>
+      <ul>
+        <li><strong>Facility dimensions:</strong> Set the schematic volume width, height, and grid spacing in feet.</li>
+        <li><strong>Vertical limit:</strong> Set the elevation scale used by the 3D volume map.</li>
+        <li><strong>View controls:</strong> Rotate, pan, reset, or drag the schematic map view without changing study geometry.</li>
+        <li><strong>Selected Object:</strong> Select a map volume, marker, or row to highlight linked inputs and review details in the inspector.</li>
+        <li><strong>Mini-axis:</strong> Use the X/Y/Z indicator in the map corner to understand the current pivot orientation.</li>
+        <li><strong>Map Footprint:</strong> Use circle or rectangle coordinates plus bottom/top elevation to show each classified volume.</li>
+        <li><strong>Map Position:</strong> Place equipment markers by X/Y/elevation coordinate. Blank equipment positions default to the assigned area center.</li>
+        <li><strong>Markers:</strong> Green circles pass, red diamonds fail, amber triangles warn, and blue squares show unchecked equipment.</li>
       </ul>
       <h3>Equipment Checker Tab</h3>
       <ul>

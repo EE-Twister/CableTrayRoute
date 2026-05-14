@@ -95,6 +95,23 @@
         </p>
       </details>
 
+      <section class="field-group conduit-iso-panel" aria-labelledby="conduit-iso-title">
+        <div class="conduit-iso-header">
+          <div>
+            <h2 id="conduit-iso-title">3D Run Layout</h2>
+            <p id="conduit-iso-summary" class="field-hint" aria-live="polite">Enter physical layout fields to preview conduit runs, bends, and pull points.</p>
+          </div>
+          <div id="conduit-iso-status" class="conduit-iso-status" aria-live="polite"></div>
+        </div>
+        <div class="conduit-iso-grid">
+          <div id="conduit-iso-canvas" class="iso-canvas" role="img" aria-label="Conduit bend isometric layout"></div>
+          <aside id="conduit-iso-inspector" class="iso-inspector" aria-live="polite">
+            <strong>Layout Inspector</strong>
+            <p class="field-hint">Select a bend, endpoint, or pull box in the visual to inspect it.</p>
+          </aside>
+        </div>
+      </section>
+
       <!-- ------------------------------------------------------------------ -->
       <!-- Conduit runs section                                                -->
       <!-- ------------------------------------------------------------------ -->
@@ -150,6 +167,8 @@
         <em>Kick</em> — enter the kick height.
         <em>Saddle</em> — enter the obstacle height.
       </p>
+      <p><strong>3D layout:</strong> Enter run start/end coordinates in feet, heading, bend station, bend plane, and direction. The isometric view uses those fields to show the modeled physical conduit path. If the modeled path does not align with the entered end point within tolerance, a warning appears so the layout can be corrected before field use.</p>
+      <p><strong>Pull points:</strong> Pull-box positions and wall orientation labels are optional but improve the isometric view and construction context.</p>
       <p><strong>Pull-Box Sizing (NEC 314.28):</strong> Click <strong>+ Add Pull Point</strong> to size a pull box. Choose straight or angle/U pull and enter the conduit trade sizes on each wall.</p>
       <p>Click <strong>Calculate</strong> to run geometry and NEC checks. Use <strong>Export CSV</strong> to download the full bend schedule.</p>
     </div>

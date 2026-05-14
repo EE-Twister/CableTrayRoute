@@ -15,6 +15,7 @@ import {
   cuReflectanceColumn,
   coefficientOfUtilization,
   averageIlluminance,
+  generateDefaultFixtureLayout,
   interpolateCandela,
   pointIlluminanceGrid,
   egressComplianceCheck,
@@ -194,6 +195,36 @@ describe('averageIlluminance', () => {
   });
   it('throws on LLF > 1', () => {
     assert.throws(() => averageIlluminance(10, 3000, 0.70, 1.1, 600), /LLF/i);
+  });
+});
+
+// ---------------------------------------------------------------------------
+describe('generateDefaultFixtureLayout', () => {
+  it('60x10 ft corridor with 6 fixtures uses one centered row', () => {
+    const layout = generateDefaultFixtureLayout(60, 10, 6);
+    assert.strictEqual(layout.rows, 1);
+    assert.strictEqual(layout.cols, 6);
+    assert.strictEqual(layout.positions.length, 6);
+    assert.ok(approx(layout.positions[0].x, 8.571, 0.001));
+    assert.ok(approx(layout.positions[0].y, 5, 0.001));
+    assert.ok(approx(layout.positions[5].x, 51.429, 0.001));
+  });
+  it('20x30 ft room with 6 fixtures balances into multiple rows', () => {
+    const layout = generateDefaultFixtureLayout(20, 30, 6);
+    assert.strictEqual(layout.rows, 3);
+    assert.strictEqual(layout.cols, 2);
+    assert.strictEqual(layout.positions.length, 6);
+    assert.ok(layout.positions.every(p => p.x > 0 && p.x < 20 && p.y > 0 && p.y < 30));
+  });
+  it('keeps every fixture inside the room for uneven counts', () => {
+    const layout = generateDefaultFixtureLayout(42, 18, 5);
+    assert.strictEqual(layout.positions.length, 5);
+    assert.ok(layout.positions.every(p => p.x > 0 && p.x < 42 && p.y > 0 && p.y < 18));
+  });
+  it('throws on invalid dimensions or fixture count', () => {
+    assert.throws(() => generateDefaultFixtureLayout(0, 10, 2), /length/i);
+    assert.throws(() => generateDefaultFixtureLayout(10, 0, 2), /width/i);
+    assert.throws(() => generateDefaultFixtureLayout(10, 10, 0), /fixtures/i);
   });
 });
 

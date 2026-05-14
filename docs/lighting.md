@@ -8,6 +8,8 @@ The Egress Lighting study calculates average maintained illuminance using the lu
 
 When an IES photometric file and fixture positions are provided, the tool also performs a point-by-point illuminance grid calculation using the cosine-cube method and displays a pseudo-colour isolux map.
 
+The page includes a live sample layout preview that scales the room from the entered length and width, places luminaires from the entered fixture coordinates when available, and otherwise shows an auto-spaced layout based on the number of luminaires. The preview also shows the egress path, room dimensions, and a height reference for ceiling, mounting, and workplane elevations.
+
 ## Standards
 
 | Standard | Application |
@@ -61,6 +63,10 @@ Per NFPA 101-2021 §7.9.2.1, emergency egress lighting must provide:
 
 The minimum check requires a point-by-point grid (IES file + fixture positions).
 
+## Sample Layout Preview
+
+The layout preview is intended as a quick visual check of the user's input parameters. In lumen-method-only mode, fixture positions are generated from the room aspect ratio and luminaire count so a corridor produces a centerline row while wider rooms produce multiple rows. After an IES file is loaded and fixture coordinates are entered, the same preview switches to those explicit coordinates and flags positions that fall outside the room boundary.
+
 ## CU Table
 
 The built-in CU table represents a generic efficient direct-component LED troffer/panel (BF = 1.0). Three reflectance presets are available:
@@ -91,7 +97,7 @@ import {
 
 ## Tests
 
-`tests/lighting.test.mjs` — 53 assertions covering all calculation functions, IES parser, egress checks, and integration paths.
+`tests/lighting.test.mjs` covers all calculation functions, IES parser, default layout generation, egress checks, and integration paths.
 
 ```sh
 node tests/lighting.test.mjs

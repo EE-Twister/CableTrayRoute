@@ -1,6 +1,7 @@
 import {
   runLightingStudy,
   parseIES,
+  generateDefaultFixtureLayout,
 } from './analysis/lighting.mjs';
 import { getStudies, setStudies } from './dataStore.mjs';
 import { initStudyApprovalPanel } from './src/components/studyApproval.js';
@@ -20,6 +21,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const iesStatus    = document.getElementById('ies-status');
   const fixPosSect   = document.getElementById('fixture-positions-section');
   const addFixBtn    = document.getElementById('add-fixture-btn');
+  const layoutPreview = document.getElementById('lighting-layout-preview');
+  const layoutSummary = document.getElementById('lighting-layout-summary');
+  const layoutStats   = document.getElementById('lighting-layout-stats');
 
   let iesData = null; // parsed IES result
 
@@ -27,6 +31,25 @@ document.addEventListener('DOMContentLoaded', () => {
   exportBtn.addEventListener('click', exportCsv);
   iesFileInput.addEventListener('change', loadIES);
   addFixBtn.addEventListener('click', addFixtureRow);
+  document.getElementById('fixture-positions-list').addEventListener('input', renderLayoutPreviewFromInputs);
+  [
+    'room-label',
+    'room-length',
+    'room-width',
+    'ceiling-height',
+    'mounting-height',
+    'workplane-height',
+    'num-fixtures',
+    'lumens-per-fixture',
+    'llf',
+    'ceiling-refl',
+    'wall-refl',
+  ].forEach((id) => {
+    const control = document.getElementById(id);
+    if (!control) return;
+    control.addEventListener('input', renderLayoutPreviewFromInputs);
+    control.addEventListener('change', renderLayoutPreviewFromInputs);
+  });
 
   // Restore previously saved state
   const saved = getStudies().lighting;
@@ -41,6 +64,7 @@ document.addEventListener('DOMContentLoaded', () => {
     renderResults(saved);
     exportBtn.disabled = false;
   }
+  renderLayoutPreviewFromInputs(saved?.valid ? saved : null);
 
   // -------------------------------------------------------------------
   // IES file loading
@@ -64,10 +88,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (document.querySelectorAll('.fixture-pos-row').length === 0) {
           addFixtureRow();
         }
+        renderLayoutPreviewFromInputs();
       } catch (err) {
         iesData = null;
         iesStatus.textContent = `Parse error: ${escapeHtml(err.message)}`;
         fixPosSect.hidden = true;
+        renderLayoutPreviewFromInputs();
       }
     };
     reader.readAsText(file);
@@ -90,8 +116,30 @@ document.addEventListener('DOMContentLoaded', () => {
         <input type="number" class="fix-y" value="${escapeHtml(String(y))}" min="0" step="0.5" aria-label="Fixture ${idx} Y position">
       </label>
       <button type="button" class="btn remove-fix-btn" aria-label="Remove fixture ${idx}">✕</button>`;
-    row.querySelector('.remove-fix-btn').addEventListener('click', () => row.remove());
+    row.querySelector('.remove-fix-btn').addEventListener('click', () => {
+      row.remove();
+      renumberFixtureRows();
+      renderLayoutPreviewFromInputs();
+    });
     list.appendChild(row);
+    renumberFixtureRows();
+    renderLayoutPreviewFromInputs();
+  }
+
+  function renumberFixtureRows() {
+    const rows = document.querySelectorAll('.fixture-pos-row');
+    rows.forEach((row, idx) => {
+      const num = idx + 1;
+      const labels = row.querySelectorAll('label');
+      const xInput = row.querySelector('.fix-x');
+      const yInput = row.querySelector('.fix-y');
+      const removeBtn = row.querySelector('.remove-fix-btn');
+      if (labels[0]) labels[0].firstChild.textContent = `Fixture ${num} X (ft)`;
+      if (labels[1]) labels[1].firstChild.textContent = `Fixture ${num} Y (ft)`;
+      if (xInput) xInput.setAttribute('aria-label', `Fixture ${num} X position`);
+      if (yInput) yInput.setAttribute('aria-label', `Fixture ${num} Y position`);
+      if (removeBtn) removeBtn.setAttribute('aria-label', `Remove fixture ${num}`);
+    });
   }
 
   function readFixturePositions() {
@@ -130,6 +178,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setStudies(studies);
 
     renderResults(toStore);
+    renderLayoutPreview(inputs, toStore);
     exportBtn.disabled = !result.valid;
   }
 
@@ -143,6 +192,7 @@ document.addEventListener('DOMContentLoaded', () => {
       label:               document.getElementById('room-label').value.trim() || 'Egress Area',
       roomLengthFt:        parseFloat(document.getElementById('room-length').value),
       roomWidthFt:         parseFloat(document.getElementById('room-width').value),
+      ceilingHeightFt:     parseFloat(document.getElementById('ceiling-height').value),
       mountingHeightFt:    parseFloat(document.getElementById('mounting-height').value),
       workplaneHeightFt:   parseFloat(document.getElementById('workplane-height').value),
       numFixtures:         parseInt(document.getElementById('num-fixtures').value, 10),
@@ -162,6 +212,7 @@ document.addEventListener('DOMContentLoaded', () => {
     set('room-label',          inputs.label);
     set('room-length',         inputs.roomLengthFt);
     set('room-width',          inputs.roomWidthFt);
+    set('ceiling-height',      inputs.ceilingHeightFt);
     set('mounting-height',     inputs.mountingHeightFt);
     set('workplane-height',    inputs.workplaneHeightFt);
     set('num-fixtures',        inputs.numFixtures);
@@ -174,6 +225,129 @@ document.addEventListener('DOMContentLoaded', () => {
   // -------------------------------------------------------------------
   // Rendering
   // -------------------------------------------------------------------
+
+  function renderLayoutPreviewFromInputs(result = null) {
+    renderLayoutPreview(readInputs(), result);
+  }
+
+  function renderLayoutPreview(inputs, result = null) {
+    if (!layoutPreview) return;
+
+    const lengthFt = positiveNumber(inputs.roomLengthFt, 60);
+    const widthFt = positiveNumber(inputs.roomWidthFt, 10);
+    const ceilingHeightFt = positiveNumber(inputs.ceilingHeightFt, Math.max(9, positiveNumber(inputs.mountingHeightFt, 9)));
+    const mountingHeightFt = positiveNumber(inputs.mountingHeightFt, ceilingHeightFt);
+    const workplaneHeightFt = nonNegativeNumber(inputs.workplaneHeightFt, 0);
+    const fixtureCount = Math.max(1, Math.floor(positiveNumber(inputs.numFixtures, 1)));
+    const lumens = positiveNumber(inputs.lumensPerFixture, 0);
+    const area = lengthFt * widthFt;
+    const enteredPositions = Array.isArray(inputs.fixturePositions)
+      ? inputs.fixturePositions.filter(pos => isFinite(pos.x) && isFinite(pos.y))
+      : [];
+
+    let layoutSource = 'Auto-spaced preview';
+    let layout;
+    if (enteredPositions.length > 0) {
+      layoutSource = 'Entered fixture positions';
+      layout = { rows: null, cols: null, positions: enteredPositions };
+    } else {
+      layout = generateDefaultFixtureLayout(lengthFt, widthFt, fixtureCount);
+    }
+
+    const viewW = 760;
+    const viewH = 420;
+    const planMaxW = 550;
+    const planMaxH = 245;
+    const planOriginX = 58;
+    const planOriginY = 58;
+    const planScale = Math.min(planMaxW / lengthFt, planMaxH / widthFt);
+    const planW = lengthFt * planScale;
+    const planH = widthFt * planScale;
+    const planX = planOriginX + (planMaxW - planW) / 2;
+    const planY = planOriginY + (planMaxH - planH) / 2;
+    const toX = x => planX + x * planScale;
+    const toY = y => planY + planH - y * planScale;
+    const pathH = Math.min(planH * 0.72, Math.max(18, planH * 0.30));
+    const pathY = planY + planH / 2 - pathH / 2;
+    const markerRadius = Math.max(4, Math.min(8, Math.sqrt((planW * planH) / Math.max(1, layout.positions.length)) * 0.035));
+    const showFixtureNumbers = layout.positions.length <= 24;
+
+    const fixtures = layout.positions.map((pos, idx) => {
+      const outOfBounds = pos.x < 0 || pos.x > lengthFt || pos.y < 0 || pos.y > widthFt;
+      const drawX = clamp(pos.x, 0, lengthFt);
+      const drawY = clamp(pos.y, 0, widthFt);
+      return {
+        ...pos,
+        idx,
+        outOfBounds,
+        sx: toX(drawX),
+        sy: toY(drawY),
+      };
+    });
+    const outOfBoundsCount = fixtures.filter(pos => pos.outOfBounds).length;
+
+    const gridLines = buildPreviewGrid(planX, planY, planW, planH);
+    const fixtureSvg = fixtures.map(pos => `
+      <g class="lighting-layout-fixture${pos.outOfBounds ? ' lighting-layout-fixture--error' : ''}">
+        <circle cx="${round(pos.sx)}" cy="${round(pos.sy)}" r="${round(markerRadius + 5)}" class="lighting-layout-fixture-glow"></circle>
+        <circle cx="${round(pos.sx)}" cy="${round(pos.sy)}" r="${round(markerRadius)}" class="lighting-layout-fixture-core"></circle>
+        ${showFixtureNumbers ? `<text x="${round(pos.sx)}" y="${round(pos.sy + 3.2)}" class="lighting-layout-fixture-label">${pos.idx + 1}</text>` : ''}
+        <title>Fixture ${pos.idx + 1}: ${formatFt(pos.x)} ft, ${formatFt(pos.y)} ft${pos.outOfBounds ? ' outside room boundary' : ''}</title>
+      </g>`).join('');
+
+    const statusText = result?.valid
+      ? `${result.egressCheck.pass ? 'Pass' : 'Fail'} at ${formatFc(result.egressCheck.avgFc)} fc average`
+      : 'Preview only';
+    const statusClass = result?.valid
+      ? (result.egressCheck.pass ? 'lighting-layout-stat--pass' : 'lighting-layout-stat--fail')
+      : '';
+    const roomLabel = inputs.label || 'Egress Area';
+    const luminaireSummary = enteredPositions.length > 0 && enteredPositions.length !== fixtureCount
+      ? `${enteredPositions.length} positioned / ${fixtureCount} total`
+      : `${layout.positions.length} luminaires`;
+
+    layoutSummary.textContent = `${formatFt(lengthFt)} ft x ${formatFt(widthFt)} ft | ${luminaireSummary} | ${layoutSource}`;
+    layoutStats.innerHTML = [
+      ['Area', `${formatArea(area)} sq ft`],
+      ['Layout', fixtureSpacingLabel(layout, lengthFt, widthFt, enteredPositions.length > 0)],
+      ['Mounting', `${formatFt(mountingHeightFt)} ft AFF`],
+      ['Luminaire', lumens > 0 ? `${formatArea(lumens)} lm each` : 'Not set'],
+      ['Status', statusText, statusClass],
+      outOfBoundsCount > 0 ? ['Position check', `${outOfBoundsCount} outside room`, 'lighting-layout-stat--fail'] : null,
+    ].filter(Boolean).map(([label, value, cls = '']) => `
+      <span class="lighting-layout-stat ${cls}">
+        <strong>${escapeHtml(label)}</strong>
+        ${escapeHtml(value)}
+      </span>`).join('');
+
+    layoutPreview.setAttribute(
+      'aria-label',
+      `${roomLabel} sample layout, ${formatFt(lengthFt)} feet by ${formatFt(widthFt)} feet, ${luminaireSummary}, ${layoutSource}.`,
+    );
+    layoutPreview.innerHTML = `
+      <svg class="lighting-layout-svg" viewBox="0 0 ${viewW} ${viewH}" focusable="false" aria-hidden="true">
+        <defs>
+          <marker id="lighting-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" class="lighting-layout-arrow"></path>
+          </marker>
+        </defs>
+        <text x="${planX}" y="28" class="lighting-layout-title">${escapeHtml(roomLabel)}</text>
+        <text x="${planX}" y="46" class="lighting-layout-subtitle">${escapeHtml(layoutSource)}</text>
+        <g class="lighting-layout-plan">
+          <rect x="${round(planX)}" y="${round(planY)}" width="${round(planW)}" height="${round(planH)}" class="lighting-layout-room"></rect>
+          ${gridLines}
+          <rect x="${round(planX)}" y="${round(pathY)}" width="${round(planW)}" height="${round(pathH)}" class="lighting-layout-egress-path"></rect>
+          <line x1="${round(planX + 16)}" y1="${round(planY + planH / 2)}" x2="${round(planX + planW - 16)}" y2="${round(planY + planH / 2)}" class="lighting-layout-path-center" marker-end="url(#lighting-arrow)"></line>
+          <text x="${round(planX + planW / 2)}" y="${round(planY + planH / 2 - pathH / 2 - 8)}" class="lighting-layout-path-label">Egress path</text>
+          ${fixtureSvg}
+          <line x1="${round(planX)}" y1="${round(planY + planH + 28)}" x2="${round(planX + planW)}" y2="${round(planY + planH + 28)}" class="lighting-layout-dimension" marker-start="url(#lighting-arrow)" marker-end="url(#lighting-arrow)"></line>
+          <text x="${round(planX + planW / 2)}" y="${round(planY + planH + 48)}" class="lighting-layout-dimension-label">${formatFt(lengthFt)} ft</text>
+          <line x1="${round(planX - 28)}" y1="${round(planY)}" x2="${round(planX - 28)}" y2="${round(planY + planH)}" class="lighting-layout-dimension" marker-start="url(#lighting-arrow)" marker-end="url(#lighting-arrow)"></line>
+          <text x="${round(planX - 38)}" y="${round(planY + planH / 2)}" class="lighting-layout-dimension-label lighting-layout-dimension-label--vertical">${formatFt(widthFt)} ft</text>
+        </g>
+        ${renderElevationPreview(650, 74, 70, 224, ceilingHeightFt, mountingHeightFt, workplaneHeightFt)}
+      </svg>`;
+  }
 
   function renderResults(result) {
     renderWarnings(result);
@@ -249,6 +423,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <ul>${eg.violations.map(v => `<li>${escapeHtml(v)}</li>`).join('')}</ul>
         </div>` : ''}
       </section>`;
+    if (pg) drawIsoluxCanvas(pg);
   }
 
   function renderGridCard(pg, eg) {
@@ -283,12 +458,6 @@ document.addEventListener('DOMContentLoaded', () => {
       </div>`;
   }
 
-  // Draw pseudo-colour isolux grid on canvas after DOM update
-  document.getElementById('results').addEventListener('DOMNodeInserted', () => {
-    const saved = getStudies().lighting;
-    if (saved?.pointGrid) drawIsoluxCanvas(saved.pointGrid);
-  }, { once: false });
-
   function drawIsoluxCanvas(pg) {
     const canvas = document.getElementById('isolux-canvas');
     if (!canvas) return;
@@ -314,6 +483,81 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  function renderElevationPreview(x, y, w, h, ceilingHeightFt, mountingHeightFt, workplaneHeightFt) {
+    const maxHeight = Math.max(1, ceilingHeightFt, mountingHeightFt, workplaneHeightFt);
+    const floorY = y + h;
+    const heightY = value => y + h - clamp(value, 0, maxHeight) / maxHeight * h;
+    const ceilingY = heightY(ceilingHeightFt);
+    const mountingY = heightY(mountingHeightFt);
+    const workplaneY = heightY(workplaneHeightFt);
+    const mountLabelY = Math.min(floorY - 8, mountingY + (Math.abs(mountingY - ceilingY) < 14 ? 18 : -6));
+    const workLabelY = Math.max(y + 12, workplaneY - (Math.abs(workplaneY - floorY) < 14 ? 8 : 6));
+
+    return `
+      <g class="lighting-layout-elevation">
+        <text x="${x}" y="46" class="lighting-layout-subtitle">Height reference</text>
+        <line x1="${x}" y1="${floorY}" x2="${x + w}" y2="${floorY}" class="lighting-layout-floor"></line>
+        <line x1="${x}" y1="${ceilingY}" x2="${x + w}" y2="${ceilingY}" class="lighting-layout-ceiling"></line>
+        <line x1="${x + w / 2}" y1="${ceilingY}" x2="${x + w / 2}" y2="${floorY}" class="lighting-layout-height-axis"></line>
+        <circle cx="${x + w / 2}" cy="${mountingY}" r="7" class="lighting-layout-elevation-fixture"></circle>
+        <line x1="${x + 8}" y1="${workplaneY}" x2="${x + w - 8}" y2="${workplaneY}" class="lighting-layout-workplane"></line>
+        <text x="${x + w + 10}" y="${Math.max(y + 12, ceilingY - 6)}" class="lighting-layout-elevation-label">Ceiling ${formatFt(ceilingHeightFt)} ft</text>
+        <text x="${x + w + 10}" y="${mountLabelY}" class="lighting-layout-elevation-label">Mount ${formatFt(mountingHeightFt)} ft</text>
+        <text x="${x + w + 10}" y="${workLabelY}" class="lighting-layout-elevation-label">Workplane ${formatFt(workplaneHeightFt)} ft</text>
+      </g>`;
+  }
+
+  function buildPreviewGrid(planX, planY, planW, planH) {
+    const lines = [];
+    for (let i = 1; i < 4; i++) {
+      const x = planX + planW * i / 4;
+      const y = planY + planH * i / 4;
+      lines.push(`<line x1="${round(x)}" y1="${round(planY)}" x2="${round(x)}" y2="${round(planY + planH)}" class="lighting-layout-grid"></line>`);
+      lines.push(`<line x1="${round(planX)}" y1="${round(y)}" x2="${round(planX + planW)}" y2="${round(y)}" class="lighting-layout-grid"></line>`);
+    }
+    return lines.join('');
+  }
+
+  function fixtureSpacingLabel(layout, lengthFt, widthFt, explicit) {
+    if (explicit) return `${layout.positions.length} entered positions`;
+    if (layout.positions.length <= 1) return 'Single fixture';
+    const xSpacing = lengthFt / ((layout.cols || 1) + 1);
+    if ((layout.rows || 1) <= 1) return `${formatFt(xSpacing)} ft along centerline`;
+    const ySpacing = widthFt / ((layout.rows || 1) + 1);
+    return `${formatFt(xSpacing)} ft x ${formatFt(ySpacing)} ft grid`;
+  }
+
+  function positiveNumber(value, fallback) {
+    return isFinite(value) && value > 0 ? value : fallback;
+  }
+
+  function nonNegativeNumber(value, fallback) {
+    return isFinite(value) && value >= 0 ? value : fallback;
+  }
+
+  function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
+  }
+
+  function round(value) {
+    return Number(value).toFixed(2);
+  }
+
+  function formatFt(value) {
+    if (!isFinite(value)) return '0';
+    return Math.abs(value - Math.round(value)) < 0.05 ? String(Math.round(value)) : value.toFixed(1);
+  }
+
+  function formatArea(value) {
+    if (!isFinite(value)) return '0';
+    return Math.round(value).toLocaleString('en-US');
+  }
+
+  function formatFc(value) {
+    if (!isFinite(value)) return '0';
+    return value >= 10 ? value.toFixed(1) : value.toFixed(2);
+  }
+
   // -------------------------------------------------------------------
   // CSV export
   // -------------------------------------------------------------------
@@ -334,6 +578,7 @@ document.addEventListener('DOMContentLoaded', () => {
       ['Lumen Method', 'Room length',             inp.roomLengthFt,            'ft',   ''],
       ['Lumen Method', 'Room width',              inp.roomWidthFt,             'ft',   ''],
       ['Lumen Method', 'Room area',               lm.roomAreaSqFt,             'ft²',  ''],
+      ['Layout Preview', 'Ceiling height',         inp.ceilingHeightFt,         'ft',   ''],
       ['Lumen Method', 'Mounting height',         inp.mountingHeightFt,        'ft',   ''],
       ['Lumen Method', 'Workplane height',        inp.workplaneHeightFt,       'ft',   ''],
       ['Lumen Method', 'Cavity height',           lm.cavityHeightFt,           'ft',   ''],

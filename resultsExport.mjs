@@ -1,10 +1,22 @@
 export function buildSegmentRows(results = []) {
     const rows = [];
+    const parsePoint = point => {
+        if (Array.isArray(point)) return point.map(Number);
+        if (typeof point === 'string') return point.split(',').map(part => Number(part.trim()));
+        return [];
+    };
+    const pointValue = (point, index) => {
+        const parsed = parsePoint(point);
+        return Number.isFinite(parsed[index]) ? parsed[index] : '';
+    };
     results.forEach(res => {
         const reasons = (res.exclusions || []).map(e => e.reason).join('; ');
         let cumulative = 0;
         if (Array.isArray(res.breakdown) && res.breakdown.length) {
             res.breakdown.forEach((seg, idx) => {
+                const routeSeg = (res.route_segments || [])[idx] || {};
+                const start = seg.start || seg.from || routeSeg.start;
+                const end = seg.end || seg.to || routeSeg.end;
                 let elementType = 'tray';
                 let elementId = seg.tray_id || '';
                 if (seg.conduit_id) {
@@ -23,6 +35,12 @@ export function buildSegmentRows(results = []) {
                     element_id: elementId,
                     length: len,
                     cumulative_length: cumulative,
+                    start_x: pointValue(start, 0),
+                    start_y: pointValue(start, 1),
+                    start_z: pointValue(start, 2),
+                    end_x: pointValue(end, 0),
+                    end_y: pointValue(end, 1),
+                    end_z: pointValue(end, 2),
                     reason_codes: reasons
                 });
             });
@@ -34,6 +52,12 @@ export function buildSegmentRows(results = []) {
                 element_id: '',
                 length: '',
                 cumulative_length: '',
+                start_x: '',
+                start_y: '',
+                start_z: '',
+                end_x: '',
+                end_y: '',
+                end_z: '',
                 reason_codes: reasons
             });
         }

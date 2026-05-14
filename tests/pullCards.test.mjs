@@ -9,6 +9,8 @@ import {
   generateQRDataURL,
   cableQRPayload,
 } from '../analysis/pullCards.mjs';
+import { parsePullRouteRows } from '../analysis/pullCardRouteImport.mjs';
+import { buildPullRouteVisualModel } from '../analysis/pullCardVisualModel.mjs';
 
 function describe(name, fn) {
   console.log(name);
@@ -205,6 +207,72 @@ describe('buildPullCard', () => {
       assert.ok(step.step > 0);
       assert.ok(['Tray', 'Conduit', 'Field'].includes(step.type));
     }
+  });
+
+  it('preserves route step coordinates for visual models', () => {
+    const pulls = groupCablesIntoPulls(routeResults, cableList);
+    const pull = pulls.find(p => p.cables.some(c => c.tag === 'C1'));
+    const card = buildPullCard(pull);
+    assert.deepStrictEqual(card.route_steps[0].start, [0, 0, 0]);
+    assert.deepStrictEqual(card.route_steps.at(-1).end, [50, 0, 0]);
+  });
+
+  it('adds segment-level tension trace matching the existing total', () => {
+    const pulls = groupCablesIntoPulls(routeResults, cableList);
+    const card = buildPullCard(pulls[0]);
+    const lastTrace = card.tension_trace.at(-1);
+    assert.ok(lastTrace, 'Expected a final tension trace segment');
+    assert.strictEqual(lastTrace.tensionOut, card.estimated_tension_lbs);
+  });
+});
+
+describe('pull route visual model and import', () => {
+  it('parses start/end coordinate columns from route export rows', () => {
+    const imported = parsePullRouteRows([
+      {
+        cable_tag: 'C9',
+        segment_order: 1,
+        element_type: 'tray',
+        element_id: 'T1',
+        length: 12,
+        start_x: 1,
+        start_y: 2,
+        start_z: 3,
+        end_x: 13,
+        end_y: 2,
+        end_z: 3
+      }
+    ], [{ cable_tag: 'C9', total_length: 12 }]);
+    assert.strictEqual(imported.length, 1);
+    assert.deepStrictEqual(imported[0].breakdown[0].start, [1, 2, 3]);
+    assert.deepStrictEqual(imported[0].breakdown[0].end, [13, 2, 3]);
+  });
+
+  it('builds an exact route visual when every step has coordinates', () => {
+    const pulls = groupCablesIntoPulls(routeResults, cableList);
+    const card = buildPullCard(pulls[0]);
+    const model = buildPullRouteVisualModel(card);
+    assert.strictEqual(model.hasCoordinates, true);
+    assert.strictEqual(model.segments.length, card.route_steps.length);
+    assert.ok(model.markers.some(marker => marker.id.endsWith('-start')));
+    assert.ok(model.markers.some(marker => marker.id.endsWith('-end')));
+  });
+
+  it('shows degraded visual state when imported rows lack coordinates', () => {
+    const imported = parsePullRouteRows([
+      {
+        cable_tag: 'LEGACY',
+        segment_order: 1,
+        element_type: 'tray',
+        element_id: 'T1',
+        length: 12
+      }
+    ]);
+    const pulls = groupCablesIntoPulls(imported, [{ name: 'LEGACY', cable_type: 'Power', diameter: 0.5, weight: 0.2 }]);
+    const card = buildPullCard(pulls[0]);
+    const model = buildPullRouteVisualModel(card);
+    assert.strictEqual(model.hasCoordinates, false);
+    assert.ok(model.warnings.some(warning => warning.includes('Coordinate data is missing')));
   });
 });
 

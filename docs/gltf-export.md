@@ -125,7 +125,7 @@ If you need to manually rotate the model: rotate −90° around the X-axis to co
 
 - **IFC 4.x Export** — `src/exporters/ifc4.mjs` — BIM semantic data for Revit/AutoCAD import
 - **DXF Export** — `bimExport.mjs` — 2D plan view for AutoCAD
-- **Pull Cards** — `analysis/pullCards.mjs` — PDF field documents with QR codes
+- **Pull Cards** - `analysis/pullCards.mjs` and `docs/pull-cards.md` - field documents with exact-coordinate isometric route visuals when `route_data.xlsx` includes segment start/end coordinates
 
 ---
 

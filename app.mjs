@@ -2929,7 +2929,7 @@ const renderBatchResults = (results) => {
         const segmentRows = buildSegmentRows(state.latestRouteData);
         const summaryRows = buildSummaryRows(state.latestRouteData);
 
-        const headers = ['cable_tag','segment_order','element_type','element_id','length','cumulative_length','reason_codes'];
+        const headers = ['cable_tag','segment_order','element_type','element_id','length','cumulative_length','start_x','start_y','start_z','end_x','end_y','end_z','reason_codes'];
         let csv = headers.join(',') + '\n';
         segmentRows.forEach(r => {
             csv += headers.map(h => r[h] !== undefined ? r[h] : '').join(',') + '\n';

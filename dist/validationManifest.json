@@ -1,8 +1,8 @@
 {
-  "generatedAt": "2026-05-13T22:12:08.584Z",
+  "generatedAt": "2026-05-14T03:03:24.180Z",
   "summary": {
     "testSuiteCount": 146,
-    "totalAssertions": 5811,
+    "totalAssertions": 5889,
     "benchmarkCount": 6,
     "standardCount": 13
   },
@@ -235,12 +235,13 @@
         "cumulativeDegrees()",
         "nec358_24Check()",
         "runConduitBendSchedule() integration",
+        "conduit bend visual model",
         "straightPullMinLength() — NEC 314.28(A)(1)",
         "anglePullMinDimension() — NEC 314.28(A)(2)",
         "selectStandardBox()",
         "sizePullBox()"
       ],
-      "assertionCount": 68
+      "assertionCount": 79
     },
     {
       "file": "tests/conduitCount.test.cjs",
@@ -584,6 +585,7 @@
       "file": "tests/hazAreaClassification.test.mjs",
       "groups": [
         "Constants",
+        "Hazardous area visual map model",
         "classifyArea — NEC",
         "classifyArea — IEC",
         "checkEquipmentCompatibility — protection type vs zone",
@@ -595,7 +597,7 @@
         "runHazAreaStudy — validation",
         "runHazAreaStudy — integration"
       ],
-      "assertionCount": 93
+      "assertionCount": 126
     },
     {
       "file": "tests/heatTraceReport.test.mjs",
@@ -748,12 +750,13 @@
         "cuReflectanceColumn",
         "coefficientOfUtilization",
         "averageIlluminance",
+        "generateDefaultFixtureLayout",
         "interpolateCandela",
         "pointIlluminanceGrid",
         "egressComplianceCheck",
         "runLightingStudy integration"
       ],
-      "assertionCount": 83
+      "assertionCount": 98
     },
     {
       "file": "tests/loadCombinations.test.mjs",
@@ -979,11 +982,12 @@
       "groups": [
         "groupCablesIntoPulls",
         "buildPullCard",
+        "pull route visual model and import",
         "buildPullTable",
         "cableQRPayload",
         "edge cases"
       ],
-      "assertionCount": 49
+      "assertionCount": 62
     },
     {
       "file": "tests/quasiDynamic.test.mjs",
@@ -1091,7 +1095,7 @@
         "buildSummaryRows",
         "buildBOM"
       ],
-      "assertionCount": 13
+      "assertionCount": 19
     },
     {
       "file": "tests/revitImporter.test.mjs",

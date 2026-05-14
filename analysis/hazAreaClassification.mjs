@@ -183,6 +183,288 @@ const NEC_GAS_TO_IEC = Object.freeze({ A: 'IIC', B: 'IIC', C: 'IIB', D: 'IIA' })
 /** NEC dust group to IEC subgroup equivalent. */
 const NEC_DUST_TO_IEC_III = Object.freeze({ E: 'IIIC', F: 'IIIB', G: 'IIIA' });
 
+export const DEFAULT_HAZAREA_LAYOUT = Object.freeze({
+  widthFt: 80,
+  heightFt: 50,
+  gridFt: 10,
+  elevationFt: 20
+});
+
+const HAZAREA_COLORS = Object.freeze({
+  severe: Object.freeze({ fill: '#fca5a5', stroke: '#b91c1c', label: 'Zone 0/20 or Div 1' }),
+  elevated: Object.freeze({ fill: '#fdba74', stroke: '#c2410c', label: 'Zone 1/21' }),
+  moderate: Object.freeze({ fill: '#fde68a', stroke: '#b45309', label: 'Zone 2/22 or Div 2' }),
+  general: Object.freeze({ fill: '#bfdbfe', stroke: '#1d4ed8', label: 'Classified area' })
+});
+
+const MARKER_COLORS = Object.freeze({
+  PASS: '#16a34a',
+  FAIL: '#dc2626',
+  WARN: '#d97706',
+  INFO: '#2563eb'
+});
+
+function finiteNumber(value, fallback) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : fallback;
+}
+
+function finitePositive(value, fallback) {
+  const number = Number(value);
+  return Number.isFinite(number) && number > 0 ? number : fallback;
+}
+
+function clamp(value, min, max) {
+  if (max < min) return min;
+  return Math.min(Math.max(value, min), max);
+}
+
+function roundFt(value) {
+  return Number(Number(value).toFixed(3));
+}
+
+export function normalizeHazAreaLayout(layout = {}) {
+  const widthFt = finitePositive(layout.widthFt, DEFAULT_HAZAREA_LAYOUT.widthFt);
+  const heightFt = finitePositive(layout.heightFt, DEFAULT_HAZAREA_LAYOUT.heightFt);
+  const elevationFt = finitePositive(layout.elevationFt, DEFAULT_HAZAREA_LAYOUT.elevationFt);
+  const maxGrid = Math.max(1, Math.min(widthFt, heightFt));
+  const gridFt = clamp(finitePositive(layout.gridFt, DEFAULT_HAZAREA_LAYOUT.gridFt), 1, maxGrid);
+
+  return {
+    widthFt: roundFt(widthFt),
+    heightFt: roundFt(heightFt),
+    gridFt: roundFt(gridFt),
+    elevationFt: roundFt(elevationFt)
+  };
+}
+
+export function defaultHazAreaGeometry(index = 0, layoutInput = {}, totalAreas = 1) {
+  const layout = normalizeHazAreaLayout(layoutInput);
+  const count = Math.max(1, totalAreas);
+  const aspect = layout.widthFt / layout.heightFt;
+  const columns = count === 1 ? 1 : Math.max(1, Math.ceil(Math.sqrt(count * aspect)));
+  const rows = Math.max(1, Math.ceil(count / columns));
+  const column = index % columns;
+  const row = Math.floor(index / columns);
+  const cellWidth = layout.widthFt / columns;
+  const cellHeight = layout.heightFt / rows;
+  const xFt = (column + 0.5) * cellWidth;
+  const yFt = layout.heightFt - ((row + 0.5) * cellHeight);
+  const radiusFt = Math.max(3, Math.min(cellWidth, cellHeight) * 0.28);
+
+  return {
+    shape: 'circle',
+    xFt: roundFt(xFt),
+    yFt: roundFt(yFt),
+    radiusFt: roundFt(radiusFt),
+    zMinFt: 0,
+    zMaxFt: roundFt(layout.elevationFt)
+  };
+}
+
+function normalizeHazAreaGeometry(area = {}, index = 0, layoutInput = {}, totalAreas = 1) {
+  const layout = normalizeHazAreaLayout(layoutInput);
+  const fallback = defaultHazAreaGeometry(index, layout, totalAreas);
+  const rawGeometry = area.geometry && typeof area.geometry === 'object' ? area.geometry : {};
+  const shape = rawGeometry.shape === 'rect' ? 'rect' : 'circle';
+  const xFt = clamp(finiteNumber(rawGeometry.xFt, fallback.xFt), 0, layout.widthFt);
+  const yFt = clamp(finiteNumber(rawGeometry.yFt, fallback.yFt), 0, layout.heightFt);
+  const zMinInput = finiteNumber(rawGeometry.zMinFt, fallback.zMinFt);
+  const zMaxInput = finiteNumber(rawGeometry.zMaxFt, fallback.zMaxFt);
+  const zLow = clamp(Math.min(zMinInput, zMaxInput), 0, layout.elevationFt);
+  const zHigh = clamp(Math.max(zMinInput, zMaxInput), 0, layout.elevationFt);
+  const zMinFt = roundFt(zLow);
+  const zMaxFt = roundFt(zHigh === zLow ? clamp(zLow + 1, 0, layout.elevationFt) : zHigh);
+
+  if (shape === 'rect') {
+    const fallbackWidth = Math.max(6, Math.min(layout.widthFt * 0.25, fallback.radiusFt * 2));
+    const fallbackHeight = Math.max(6, Math.min(layout.heightFt * 0.3, fallback.radiusFt * 2));
+    const widthFt = clamp(finitePositive(rawGeometry.widthFt, fallbackWidth), 1, layout.widthFt);
+    const heightFt = clamp(finitePositive(rawGeometry.heightFt, fallbackHeight), 1, layout.heightFt);
+
+    return {
+      shape,
+      xFt: roundFt(xFt),
+      yFt: roundFt(yFt),
+      widthFt: roundFt(widthFt),
+      heightFt: roundFt(heightFt),
+      zMinFt,
+      zMaxFt
+    };
+  }
+
+  const radiusFt = clamp(finitePositive(rawGeometry.radiusFt, fallback.radiusFt), 1, Math.max(layout.widthFt, layout.heightFt));
+
+  return {
+    shape,
+    xFt: roundFt(xFt),
+    yFt: roundFt(yFt),
+    radiusFt: roundFt(radiusFt),
+    zMinFt,
+    zMaxFt
+  };
+}
+
+export function defaultHazEquipmentPosition(equipment = {}, areaGeometry = null, layoutInput = {}) {
+  const layout = normalizeHazAreaLayout(layoutInput);
+  const fallbackX = areaGeometry ? areaGeometry.xFt : layout.widthFt / 2;
+  const fallbackY = areaGeometry ? areaGeometry.yFt : layout.heightFt / 2;
+  const fallbackZ = areaGeometry && Number.isFinite(areaGeometry.zMinFt) && Number.isFinite(areaGeometry.zMaxFt)
+    ? (areaGeometry.zMinFt + areaGeometry.zMaxFt) / 2
+    : 0;
+
+  return {
+    xFt: roundFt(finiteNumber(equipment.xFt, fallbackX)),
+    yFt: roundFt(finiteNumber(equipment.yFt, fallbackY)),
+    zFt: roundFt(finiteNumber(equipment.zFt, fallbackZ))
+  };
+}
+
+export function pointInHazAreaGeometry(point = {}, geometry = null) {
+  if (!geometry) return false;
+  const xFt = finiteNumber(point.xFt, Number.NaN);
+  const yFt = finiteNumber(point.yFt, Number.NaN);
+  if (!Number.isFinite(xFt) || !Number.isFinite(yFt)) return false;
+  const zFt = finiteNumber(point.zFt, Number.NaN);
+  if (Number.isFinite(zFt) && (zFt < geometry.zMinFt || zFt > geometry.zMaxFt)) return false;
+
+  if (geometry.shape === 'rect') {
+    return Math.abs(xFt - geometry.xFt) <= geometry.widthFt / 2
+      && Math.abs(yFt - geometry.yFt) <= geometry.heightFt / 2;
+  }
+
+  const radiusFt = finitePositive(geometry.radiusFt, 0);
+  const dx = xFt - geometry.xFt;
+  const dy = yFt - geometry.yFt;
+  return Math.sqrt((dx * dx) + (dy * dy)) <= radiusFt;
+}
+
+function areaVisual(area = {}) {
+  const iecZone = area.iecZone || area.dustZone;
+  if (iecZone === '0' || iecZone === '20') return HAZAREA_COLORS.severe;
+  if (iecZone === '1' || iecZone === '21') return HAZAREA_COLORS.elevated;
+  if (iecZone === '2' || iecZone === '22') return HAZAREA_COLORS.moderate;
+  if (area.necDivision === '1') return HAZAREA_COLORS.severe;
+  if (area.necDivision === '2') return HAZAREA_COLORS.moderate;
+  return HAZAREA_COLORS.general;
+}
+
+function equipmentMapStatus(checkRow, geometryWarnings = []) {
+  if (!checkRow) {
+    return geometryWarnings.length ? 'WARN' : 'INFO';
+  }
+
+  if (checkRow.pass === false) return 'FAIL';
+  if (checkRow.pass === null) return 'WARN';
+  if ((checkRow.warnings || []).length || geometryWarnings.length) return 'WARN';
+  return 'PASS';
+}
+
+function markerShape(status) {
+  if (status === 'FAIL') return 'diamond';
+  if (status === 'WARN') return 'triangle';
+  if (status === 'PASS') return 'circle';
+  return 'square';
+}
+
+export function buildHazAreaMapModel(inputs = {}, result = null) {
+  const sourceInputs = result && result._inputs ? result._inputs : inputs;
+  const layout = normalizeHazAreaLayout(sourceInputs.layout || {});
+  const rawAreas = Array.isArray(sourceInputs.areas) ? sourceInputs.areas : [];
+  const rawEquipment = Array.isArray(sourceInputs.equipment) ? sourceInputs.equipment : [];
+  const resultAreas = new Map((result && Array.isArray(result.areas) ? result.areas : []).map((area) => [area.id, area]));
+  const resultEquipment = new Map((result && Array.isArray(result.equipment) ? result.equipment : []).map((equipment) => [equipment.equipId, equipment]));
+
+  const areas = rawAreas.map((area, index) => {
+    const classified = classifyArea(area);
+    const normalizedArea = classified.valid ? classified.area : area;
+    const reportArea = resultAreas.get(area.id);
+    const geometry = normalizeHazAreaGeometry(area, index, layout, rawAreas.length);
+    const visual = areaVisual(normalizedArea);
+
+    return {
+      id: area.id || `area-${index + 1}`,
+      label: area.label || 'Classified Area',
+      standard: normalizedArea.standard || area.standard || 'IEC',
+      designation: reportArea ? reportArea.designation : _areaDesignation(normalizedArea),
+      gasGroup: normalizedArea.gasGroup || normalizedArea.dustGroup || '',
+      tRating: normalizedArea.tRating || '',
+      status: reportArea ? reportArea.status : 'INFO',
+      equipCount: reportArea ? reportArea.equipCount : 0,
+      geometry,
+      fill: visual.fill,
+      stroke: visual.stroke,
+      severityLabel: visual.label
+    };
+  });
+
+  const areaById = new Map(areas.map((area) => [area.id, area]));
+  const equipment = rawEquipment.map((equipmentItem, index) => {
+    const assignedArea = areaById.get(equipmentItem.hazAreaId);
+    const position = defaultHazEquipmentPosition(equipmentItem, assignedArea ? assignedArea.geometry : null, layout);
+    const checkRow = resultEquipment.get(equipmentItem.id);
+    const geometryWarnings = [];
+
+    if (position.xFt < 0 || position.xFt > layout.widthFt
+      || position.yFt < 0 || position.yFt > layout.heightFt
+      || position.zFt < 0 || position.zFt > layout.elevationFt) {
+      geometryWarnings.push('Equipment position is outside the facility volume.');
+    }
+
+    if (assignedArea && !pointInHazAreaGeometry(position, assignedArea.geometry)) {
+      geometryWarnings.push(`Equipment position is outside assigned area ${assignedArea.id}.`);
+    }
+
+    if (!assignedArea && equipmentItem.hazAreaId) {
+      geometryWarnings.push(`Assigned area ${equipmentItem.hazAreaId} is not defined.`);
+    }
+
+    const status = equipmentMapStatus(checkRow, geometryWarnings);
+    const failures = checkRow ? checkRow.failures || [] : [];
+    const warnings = checkRow ? checkRow.warnings || [] : [];
+
+    return {
+      id: equipmentItem.id || `equip-${index + 1}`,
+      label: equipmentItem.label || 'Equipment',
+      hazAreaId: equipmentItem.hazAreaId || '',
+      status,
+      color: MARKER_COLORS[status],
+      marker: markerShape(status),
+      position,
+      failures,
+      warnings,
+      geometryWarnings,
+      issueCount: failures.length + warnings.length + geometryWarnings.length
+    };
+  });
+
+  const summary = equipment.reduce((acc, item) => {
+    if (item.status === 'PASS') acc.pass += 1;
+    else if (item.status === 'FAIL') acc.fail += 1;
+    else if (item.status === 'WARN') acc.warn += 1;
+    else acc.info += 1;
+    return acc;
+  }, { areas: areas.length, equipment: equipment.length, pass: 0, fail: 0, warn: 0, info: 0 });
+
+  summary.status = summary.fail ? 'FAIL' : summary.warn ? 'WARN' : 'PASS';
+
+  return {
+    layout,
+    areas,
+    equipment,
+    summary,
+    legend: [
+      { label: HAZAREA_COLORS.severe.label, fill: HAZAREA_COLORS.severe.fill, stroke: HAZAREA_COLORS.severe.stroke },
+      { label: HAZAREA_COLORS.elevated.label, fill: HAZAREA_COLORS.elevated.fill, stroke: HAZAREA_COLORS.elevated.stroke },
+      { label: HAZAREA_COLORS.moderate.label, fill: HAZAREA_COLORS.moderate.fill, stroke: HAZAREA_COLORS.moderate.stroke },
+      { label: 'Pass equipment', color: MARKER_COLORS.PASS, marker: 'circle' },
+      { label: 'Fail equipment', color: MARKER_COLORS.FAIL, marker: 'diamond' },
+      { label: 'Warning equipment', color: MARKER_COLORS.WARN, marker: 'triangle' },
+      { label: 'Unchecked equipment', color: MARKER_COLORS.INFO, marker: 'square' }
+    ]
+  };
+}
+
 // ---------------------------------------------------------------------------
 // 1. classifyArea — validate and normalise an area descriptor
 // ---------------------------------------------------------------------------
@@ -483,9 +765,14 @@ export function classificationReport(areas, equipment, checkResult) {
       id:           area.id,
       label:        area.label || area.id,
       standard:     area.standard,
+      necClass:     area.necClass || '',
+      necDivision:  area.necDivision || '',
+      iecZone:      area.iecZone || '',
+      dustZone:     area.dustZone || '',
       designation:  _areaDesignation(area),
       gasGroup:     area.gasGroup || area.dustGroup || '—',
       tRating:      area.tRating || '—',
+      geometry:     area.geometry || null,
       equipCount:   areaEquip.length,
       passCount:    passedInArea,
       failCount:    failedInArea,
@@ -561,13 +848,15 @@ export function runHazAreaStudy(inputs) {
 
   const checkResult = checkAllEquipment(equipment, normAreas);
   const report      = classificationReport(normAreas, equipment, checkResult);
+  const result      = {
+    ...report,
+    _inputs: inputs,
+  };
+  result.mapModel = buildHazAreaMapModel(inputs, result);
 
   return {
     valid:   true,
     errors:  [],
-    result: {
-      ...report,
-      _inputs: inputs,
-    },
+    result,
   };
 }

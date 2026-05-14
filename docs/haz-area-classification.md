@@ -163,6 +163,53 @@ The device's declared T-rating (maximum surface temperature) must be ≤ the are
 
 ---
 
+## Visual Layout Map
+
+The page includes a live schematic 3D volume map above the classified-area and equipment tabs. The map is intended to be an engineering layout aid, not a CAD import.
+
+Study-level layout fields:
+
+| Field | Purpose | Default |
+|-------|---------|---------|
+| Facility Width (ft) | X-axis extent of the volume map | 80 |
+| Facility Height (ft) | Y-axis extent of the volume map | 50 |
+| Grid Spacing (ft) | Grid interval shown on the plan | 10 |
+| Vertical Limit (ft) | Z-axis extent of the volume map | 20 |
+
+The viewport toolbar rotates the isometric camera, pans the SVG view, or resets the camera to its default orientation. The map canvas also supports direct drag-to-pan. These controls only move the drawing view; they do not change area geometry, equipment coordinates, saved study data, or compliance results. The mini-axis in the map corner shows the current X/Y/Z orientation after the view is rotated.
+
+Classified areas can define an optional map footprint:
+
+| Field | Shape | Notes |
+|-------|-------|-------|
+| Shape | Circle or rectangle | Circle is the default for legacy studies |
+| Center X / Center Y | Circle and rectangle | Coordinates are in feet from the lower-left facility origin |
+| Radius | Circle | Radius of the classified zone footprint |
+| Width / Height | Rectangle | Rectangle dimensions centered on X/Y |
+| Bottom Elev. / Top Elev. | Circle and rectangle | Vertical limits of the classified volume |
+
+Equipment can define optional X/Y/elevation coordinates. When equipment coordinates are blank, the marker is placed at the center of the assigned area volume. Existing saved studies without geometry still render because default area footprints, elevations, and equipment positions are generated automatically.
+
+The SVG renders a single isometric volume schematic with an intentionally emphasized Z axis so vertical reach is legible in a small browser panel. Circular footprints are shown as translucent spherical/ellipsoidal volumes with their floor footprint, vertical centerline, and elevation label. Rectangular footprints are shown as translucent box volumes. Equipment markers are projected into the same X/Y/Z space with a dashed leader back to the floor plane, so plan position and vertical extent remain visually tied together.
+
+The map and form rows are linked. Selecting a classified volume or equipment marker highlights the matching form row, switches to the relevant tab, and updates the selected-object inspector with classification, geometry, position, status, and issue details. Selecting an area or equipment row highlights the corresponding map object. The result tables and editable rows use the same status accent colors as the map so IDs, severity, and compatibility state can be scanned together.
+
+Map color and marker coding:
+
+| Item | Meaning |
+|------|---------|
+| Red footprint | Zone 0/20 or Division 1 severity |
+| Orange footprint | Zone 1/21 severity |
+| Amber footprint | Zone 2/22 or Division 2 severity |
+| Green circle marker | Equipment compatibility passes |
+| Red diamond marker | Equipment compatibility fails |
+| Amber triangle marker | Missing data or geometry warning |
+| Blue square marker | Equipment has not been checked yet |
+
+The map also checks whether each equipment marker is inside its assigned area footprint and elevation range. A device outside the assigned volume is shown as a warning and the warning is included in the equipment results and CSV export.
+
+---
+
 ## One-Line Diagram Integration
 
 When the hazardous area study is loaded in the one-line diagram, enabling the **Haz Area Overlay** renders:

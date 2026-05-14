@@ -1,8 +1,15 @@
 import { runConduitBendSchedule, BEND_TYPES, OFFSET_TABLE } from './analysis/conduitBendSchedule.mjs';
+import {
+  buildConduitBendVisualModel,
+  normalizeBendLayout,
+  normalizeConduitRunLayout,
+  normalizePullBoxPosition
+} from './analysis/conduitBendVisualModel.mjs';
 import { sizePullBox, STANDARD_BOX_SIZES } from './analysis/pullBoxSizing.mjs';
 import { getStudies, setStudies } from './dataStore.mjs';
 import { initStudyApprovalPanel } from './src/components/studyApproval.js';
 import { escapeHtml } from './src/htmlUtils.mjs';
+import { renderIsometricSvg } from './src/utils/isometricSvg.js';
 
 document.addEventListener('DOMContentLoaded', () => {
   initSettings();
@@ -16,31 +23,60 @@ document.addEventListener('DOMContentLoaded', () => {
   const addPullboxBtn = document.getElementById('add-pullbox-btn');
   const runBtn        = document.getElementById('run-btn');
   const exportBtn     = document.getElementById('export-btn');
+  const isoCanvas     = document.getElementById('conduit-iso-canvas');
+  const isoSummary    = document.getElementById('conduit-iso-summary');
+  const isoStatus     = document.getElementById('conduit-iso-status');
+  const isoInspector  = document.getElementById('conduit-iso-inspector');
+
+  let latestVisualModel = null;
+  let selectedIsoId = '';
+  let runCount = 0;
+  let pbCount = 0;
+  const TRADE_SIZES = [0.5, 0.75, 1, 1.25, 1.5, 2, 2.5, 3, 3.5, 4];
+  const OFFSET_ANGLES = Object.keys(OFFSET_TABLE).map(Number);
 
   addRunBtn.addEventListener('click', () => addRunCard());
   addPullboxBtn.addEventListener('click', () => addPullBoxCard());
   runBtn.addEventListener('click', calculate);
   exportBtn.addEventListener('click', exportCsv);
+  document.getElementById('runs-container').addEventListener('input', renderLivePreviewFromInputs);
+  document.getElementById('runs-container').addEventListener('change', renderLivePreviewFromInputs);
+  document.getElementById('runs-container').addEventListener('click', handleLayoutInputSelection);
+  document.getElementById('pullbox-container').addEventListener('input', renderLivePreviewFromInputs);
+  document.getElementById('pullbox-container').addEventListener('change', renderLivePreviewFromInputs);
+  document.getElementById('pullbox-container').addEventListener('click', handleLayoutInputSelection);
+  isoCanvas?.addEventListener('click', handleIsoSelection);
+  isoCanvas?.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    handleIsoSelection(event);
+  });
 
   // Restore saved state
   const saved = getStudies().conduitBendSchedule;
   if (saved && saved._inputs) {
     restoreInputs(saved._inputs);
     renderResults(saved);
+    exportBtn.disabled = false;
+  } else if (saved && saved.runs) {
+    const legacyInputs = legacyInputsFromResult(saved);
+    restoreInputs(legacyInputs);
+    renderResults({ ...saved, _inputs: legacyInputs });
+    exportBtn.disabled = false;
   } else {
     addRunCard('Conduit Run 1', 1, [{ type: 'offset', dimension: 6, angle: 45 }]);
+    addPullBoxCard('Pull Box 1', 'straight', [1], [], { xFt: 0, yFt: -8, zFt: 0 });
+    renderLivePreviewFromInputs();
   }
 
   // -------------------------------------------------------------------
   // Run card builder
   // -------------------------------------------------------------------
 
-  let runCount = 0;
-
-  function addRunCard(label = '', tradeSize = 1, bends = []) {
+  function addRunCard(label = '', tradeSize = 1, bends = [], layout = null) {
     runCount++;
     const id  = `run-${runCount}`;
     const container = document.getElementById('runs-container');
+    const normalizedLayout = normalizeConduitRunLayout({ layout: layout || {} }, { bends }, runCount - 1);
 
     const card = document.createElement('div');
     card.className = 'dynamic-card field-group';
@@ -59,23 +95,59 @@ document.addEventListener('DOMContentLoaded', () => {
         </label>
         <button type="button" class="btn btn-sm remove-run-btn" aria-label="Remove this run">Remove Run</button>
       </div>
+      <details class="conduit-layout-details" open>
+        <summary>Physical layout</summary>
+        <div class="conduit-layout-grid">
+          <label>Start X (ft)
+            <input type="number" class="run-start-x" step="0.1" value="${formatNumber(normalizedLayout.start.xFt)}" aria-label="Run start X in feet">
+          </label>
+          <label>Start Y (ft)
+            <input type="number" class="run-start-y" step="0.1" value="${formatNumber(normalizedLayout.start.yFt)}" aria-label="Run start Y in feet">
+          </label>
+          <label>Start Z (ft)
+            <input type="number" class="run-start-z" step="0.1" value="${formatNumber(normalizedLayout.start.zFt)}" aria-label="Run start Z in feet">
+          </label>
+          <label>End X (ft)
+            <input type="number" class="run-end-x" step="0.1" value="${formatNumber(normalizedLayout.end.xFt)}" aria-label="Run end X in feet">
+          </label>
+          <label>End Y (ft)
+            <input type="number" class="run-end-y" step="0.1" value="${formatNumber(normalizedLayout.end.yFt)}" aria-label="Run end Y in feet">
+          </label>
+          <label>End Z (ft)
+            <input type="number" class="run-end-z" step="0.1" value="${formatNumber(normalizedLayout.end.zFt)}" aria-label="Run end Z in feet">
+          </label>
+          <label>Heading (deg)
+            <input type="number" class="run-heading" step="1" value="${formatNumber(normalizedLayout.headingDeg)}" aria-label="Run heading degrees">
+          </label>
+          <label>End tolerance (ft)
+            <input type="number" class="run-tolerance" min="0" step="0.1" value="${formatNumber(normalizedLayout.endToleranceFt)}" aria-label="Run end tolerance in feet">
+          </label>
+        </div>
+      </details>
       <div class="bends-list" aria-label="Bends for this run" role="list"></div>
       <button type="button" class="btn btn-sm add-bend-btn">+ Add Bend</button>
     `;
 
-    card.querySelector('.remove-run-btn').addEventListener('click', () => card.remove());
+    card.querySelector('.remove-run-btn').addEventListener('click', () => {
+      card.remove();
+      renderLivePreviewFromInputs();
+    });
     card.querySelector('.add-bend-btn').addEventListener('click', () =>
-      addBendRow(card.querySelector('.bends-list'))
+      addBendRow(card.querySelector('.bends-list'), {})
     );
 
     container.appendChild(card);
 
     const bendsList = card.querySelector('.bends-list');
-    for (const b of bends) addBendRow(bendsList, b.type, b.dimension, b.angle);
-    if (bends.length === 0) addBendRow(bendsList);
+    for (const [bendIndex, b] of bends.entries()) addBendRow(bendsList, b, bendIndex);
+    if (bends.length === 0) addBendRow(bendsList, {}, 0);
   }
 
-  function addBendRow(list, type = 'offset', dimension = '', angle = 45) {
+  function addBendRow(list, bend = {}, bendIndex = null) {
+    const type = bend.type || 'offset';
+    const dimension = bend.dimension ?? '';
+    const angle = bend.angle ?? 45;
+    const normalizedLayout = normalizeBendLayout(bend, bend, bendIndex ?? list.querySelectorAll('.dynamic-row').length);
     const row = document.createElement('div');
     row.className = 'dynamic-row field-row-inline';
     row.setAttribute('role', 'listitem');
@@ -97,11 +169,27 @@ document.addEventListener('DOMContentLoaded', () => {
           ${angleOptions(angle)}
         </select>
       </label>
+      <label>Station (ft)
+        <input type="number" class="bend-station" min="0" step="0.1" value="${formatNumber(normalizedLayout.stationFt)}" aria-label="Bend station from run start in feet">
+      </label>
+      <label>Plane
+        <select class="bend-plane" aria-label="Bend plane">
+          <option value="horizontal" ${normalizedLayout.plane === 'horizontal' ? 'selected' : ''}>Horizontal</option>
+          <option value="vertical" ${normalizedLayout.plane === 'vertical' ? 'selected' : ''}>Vertical</option>
+        </select>
+      </label>
+      <label>Direction
+        <select class="bend-direction" aria-label="Bend direction">
+          ${directionOptions(normalizedLayout.plane, normalizedLayout.direction)}
+        </select>
+      </label>
       <button type="button" class="btn btn-sm remove-bend-btn" aria-label="Remove this bend">&times;</button>
     `;
 
     const typeSelect = row.querySelector('.bend-type');
     const angleLabel = row.querySelector('.angle-label');
+    const planeSelect = row.querySelector('.bend-plane');
+    const directionSelect = row.querySelector('.bend-direction');
     function toggleAngle() {
       const t = typeSelect.value;
       angleLabel.hidden = (t === '90' || t === 'saddle');
@@ -109,19 +197,25 @@ document.addEventListener('DOMContentLoaded', () => {
     typeSelect.addEventListener('change', toggleAngle);
     toggleAngle();
 
-    row.querySelector('.remove-bend-btn').addEventListener('click', () => row.remove());
+    planeSelect.addEventListener('change', () => {
+      directionSelect.innerHTML = directionOptions(planeSelect.value, directionSelect.value);
+    });
+    row.querySelector('.remove-bend-btn').addEventListener('click', () => {
+      row.remove();
+      renderLivePreviewFromInputs();
+    });
     list.appendChild(row);
+    renderLivePreviewFromInputs();
   }
 
   // -------------------------------------------------------------------
   // Pull-box card builder
   // -------------------------------------------------------------------
 
-  let pbCount = 0;
-
-  function addPullBoxCard(label = '', pullType = 'straight', wallA = [], wallB = []) {
+  function addPullBoxCard(label = '', pullType = 'straight', wallA = [], wallB = [], position = null, wallAName = 'Wall A', wallBName = 'Wall B') {
     pbCount++;
     const container = document.getElementById('pullbox-container');
+    const normalizedPosition = normalizePullBoxPosition({ position: position || {} }, pbCount - 1);
 
     const card = document.createElement('div');
     card.className = 'dynamic-card field-group';
@@ -139,6 +233,23 @@ document.addEventListener('DOMContentLoaded', () => {
           </select>
         </label>
         <button type="button" class="btn btn-sm remove-pb-btn" aria-label="Remove pull box">Remove</button>
+      </div>
+      <div class="conduit-layout-grid">
+        <label>Box X (ft)
+          <input type="number" class="pb-x" step="0.1" value="${formatNumber(normalizedPosition.xFt)}" aria-label="Pull box X coordinate in feet">
+        </label>
+        <label>Box Y (ft)
+          <input type="number" class="pb-y" step="0.1" value="${formatNumber(normalizedPosition.yFt)}" aria-label="Pull box Y coordinate in feet">
+        </label>
+        <label>Box Z (ft)
+          <input type="number" class="pb-z" step="0.1" value="${formatNumber(normalizedPosition.zFt)}" aria-label="Pull box Z coordinate in feet">
+        </label>
+        <label>Wall A label
+          <input type="text" class="pb-walla-name" value="${escapeHtml(wallAName || 'Wall A')}" aria-label="Pull box wall A label">
+        </label>
+        <label>Wall B label
+          <input type="text" class="pb-wallb-name" value="${escapeHtml(wallBName || 'Wall B')}" aria-label="Pull box wall B label">
+        </label>
       </div>
       <div class="pb-straight-section">
         <label>Largest conduit trade size (in)
@@ -166,8 +277,12 @@ document.addEventListener('DOMContentLoaded', () => {
     typeSelect.addEventListener('change', toggleSections);
     toggleSections();
 
-    card.querySelector('.remove-pb-btn').addEventListener('click', () => card.remove());
+    card.querySelector('.remove-pb-btn').addEventListener('click', () => {
+      card.remove();
+      renderLivePreviewFromInputs();
+    });
     container.appendChild(card);
+    renderLivePreviewFromInputs();
   }
 
   // -------------------------------------------------------------------
@@ -208,10 +323,29 @@ document.addEventListener('DOMContentLoaded', () => {
     return Array.from(cards).map(card => ({
       label:     card.querySelector('.run-label').value.trim(),
       tradeSize: parseFloat(card.querySelector('.run-trade-size').value),
+      layout: {
+        start: {
+          xFt: parseNumber(card.querySelector('.run-start-x').value),
+          yFt: parseNumber(card.querySelector('.run-start-y').value),
+          zFt: parseNumber(card.querySelector('.run-start-z').value),
+        },
+        end: {
+          xFt: parseNumber(card.querySelector('.run-end-x').value),
+          yFt: parseNumber(card.querySelector('.run-end-y').value),
+          zFt: parseNumber(card.querySelector('.run-end-z').value),
+        },
+        headingDeg: parseNumber(card.querySelector('.run-heading').value),
+        endToleranceFt: parseNumber(card.querySelector('.run-tolerance').value),
+      },
       bends: Array.from(card.querySelectorAll('.bends-list .dynamic-row')).map(row => ({
         type:      row.querySelector('.bend-type').value,
         dimension: parseFloat(row.querySelector('.bend-dim').value),
         angle:     parseFloat(row.querySelector('.bend-angle').value),
+        layout: {
+          stationFt: parseNumber(row.querySelector('.bend-station').value),
+          plane: row.querySelector('.bend-plane').value,
+          direction: row.querySelector('.bend-direction').value,
+        },
       })),
     }));
   }
@@ -225,6 +359,9 @@ document.addEventListener('DOMContentLoaded', () => {
           label:            card.querySelector('.pb-label').value.trim(),
           pullType:         'straight',
           largestTradeSize: parseFloat(card.querySelector('.pb-straight-ts').value),
+          position: readPullBoxPosition(card),
+          wallAName: card.querySelector('.pb-walla-name').value.trim(),
+          wallBName: card.querySelector('.pb-wallb-name').value.trim(),
         };
       }
       const parseWall = el => el.value.split(/[\s,]+/).map(parseFloat).filter(v => v > 0);
@@ -233,8 +370,19 @@ document.addEventListener('DOMContentLoaded', () => {
         pullType: card.querySelector('.pb-type').value,
         wallA:    parseWall(card.querySelector('.pb-walla')),
         wallB:    parseWall(card.querySelector('.pb-wallb')),
+        position: readPullBoxPosition(card),
+        wallAName: card.querySelector('.pb-walla-name').value.trim(),
+        wallBName: card.querySelector('.pb-wallb-name').value.trim(),
       };
     });
+  }
+
+  function readPullBoxPosition(card) {
+    return {
+      xFt: parseNumber(card.querySelector('.pb-x').value),
+      yFt: parseNumber(card.querySelector('.pb-y').value),
+      zFt: parseNumber(card.querySelector('.pb-z').value),
+    };
   }
 
   // -------------------------------------------------------------------
@@ -245,6 +393,7 @@ document.addEventListener('DOMContentLoaded', () => {
     renderViolations(result);
     renderBendSchedule(result.runs || []);
     renderPullBoxResults(result.pullBoxResults || []);
+    renderIsoPreview(result);
   }
 
   function renderViolations(result) {
@@ -344,6 +493,124 @@ document.addEventListener('DOMContentLoaded', () => {
       }).join('')}`;
   }
 
+  function renderLivePreviewFromInputs() {
+    const runsInput = readRunInputs();
+    const pullboxInput = readPullBoxInputs();
+    const result = {
+      ...runConduitBendSchedule(runsInput),
+      pullBoxResults: pullboxInput.map(pb => {
+        try { return sizePullBox(pb); }
+        catch (e) { return { label: pb.label, error: e.message }; }
+      }),
+      _inputs: { runs: runsInput, pullBoxes: pullboxInput },
+    };
+    renderIsoPreview(result);
+  }
+
+  function renderIsoPreview(result) {
+    if (!isoCanvas) return;
+    latestVisualModel = buildConduitBendVisualModel(result);
+    isoCanvas.innerHTML = renderIsometricSvg(latestVisualModel, {
+      titleId: 'conduit-iso-svg-title',
+      descId: 'conduit-iso-svg-desc',
+      selectedId: selectedIsoId,
+      title: 'Conduit bend 3D run layout',
+      desc: 'Isometric layout of conduit runs, bend stations, and pull-box coordinates.'
+    });
+    const summary = latestVisualModel.summary;
+    isoSummary.textContent = `${summary.runs} run${summary.runs === 1 ? '' : 's'}, ${summary.bends} bend${summary.bends === 1 ? '' : 's'}, ${summary.pullBoxes} pull point${summary.pullBoxes === 1 ? '' : 's'} shown from physical layout fields.`;
+    isoStatus.innerHTML = latestVisualModel.summary.hasWarnings
+      ? '<span class="fill-badge fill-warn">Review layout warnings</span>'
+      : '<span class="fill-badge fill-ok">Layout aligned</span>';
+    syncLayoutSelectionClasses();
+    renderIsoInspector();
+  }
+
+  function handleIsoSelection(event) {
+    const target = event.target.closest?.('[data-iso-id]');
+    if (!target) return;
+    event.preventDefault();
+    selectedIsoId = target.dataset.isoId;
+    if (latestVisualModel) {
+      isoCanvas.innerHTML = renderIsometricSvg(latestVisualModel, {
+        titleId: 'conduit-iso-svg-title',
+        descId: 'conduit-iso-svg-desc',
+        selectedId: selectedIsoId,
+        title: 'Conduit bend 3D run layout',
+        desc: 'Isometric layout of conduit runs, bend stations, and pull-box coordinates.'
+      });
+    }
+    syncLayoutSelectionClasses();
+    renderIsoInspector();
+  }
+
+  function handleLayoutInputSelection(event) {
+    if (event.target.closest('button')) return;
+    const bendRow = event.target.closest('#runs-container .dynamic-row');
+    if (bendRow) {
+      const runCard = bendRow.closest('#runs-container .dynamic-card');
+      const runCards = [...document.querySelectorAll('#runs-container .dynamic-card')];
+      const runIndex = runCards.indexOf(runCard);
+      const bendIndex = [...runCard.querySelectorAll('.dynamic-row')].indexOf(bendRow);
+      if (runIndex >= 0 && bendIndex >= 0) {
+        selectedIsoId = `run-${runIndex}-bend-${bendIndex}`;
+        renderIsoPreview({
+          ...runConduitBendSchedule(readRunInputs()),
+          pullBoxResults: readPullBoxInputs().map(pb => {
+            try { return sizePullBox(pb); }
+            catch (e) { return { label: pb.label, error: e.message }; }
+          }),
+          _inputs: { runs: readRunInputs(), pullBoxes: readPullBoxInputs() }
+        });
+      }
+      return;
+    }
+
+    const pullBoxCard = event.target.closest('#pullbox-container .dynamic-card');
+    if (pullBoxCard) {
+      const index = [...document.querySelectorAll('#pullbox-container .dynamic-card')].indexOf(pullBoxCard);
+      if (index >= 0) {
+        selectedIsoId = `pullbox-${index}`;
+        renderLivePreviewFromInputs();
+      }
+    }
+  }
+
+  function syncLayoutSelectionClasses() {
+    document.querySelectorAll('#runs-container .dynamic-row').forEach(row => {
+      const runCard = row.closest('#runs-container .dynamic-card');
+      const runIndex = [...document.querySelectorAll('#runs-container .dynamic-card')].indexOf(runCard);
+      const bendIndex = [...runCard.querySelectorAll('.dynamic-row')].indexOf(row);
+      row.classList.toggle('iso-linked-selected', selectedIsoId === `run-${runIndex}-bend-${bendIndex}`);
+    });
+    document.querySelectorAll('#pullbox-container .dynamic-card').forEach((card, index) => {
+      card.classList.toggle('iso-linked-selected', selectedIsoId === `pullbox-${index}`);
+    });
+  }
+
+  function renderIsoInspector() {
+    if (!isoInspector || !latestVisualModel) return;
+    const selected = [
+      ...(latestVisualModel.markers || []),
+      ...(latestVisualModel.segments || [])
+    ].find(item => item.id === selectedIsoId);
+    const warnings = latestVisualModel.warnings || [];
+    if (!selected) {
+      isoInspector.innerHTML = `
+        <strong>Layout Inspector</strong>
+        <p class="field-hint">Select a bend, endpoint, segment, or pull box in the visual to inspect it.</p>
+        ${warnings.length ? `<ul class="iso-warning-list">${warnings.map(w => `<li>${escapeHtml(w)}</li>`).join('')}</ul>` : ''}`;
+      return;
+    }
+    isoInspector.innerHTML = `
+      <strong>${escapeHtml(selected.label || selected.id)}</strong>
+      <dl class="iso-facts">
+        <div><dt>Type</dt><dd>${escapeHtml(selected.kind || 'layout item')}</dd></div>
+        <div><dt>Status</dt><dd>${escapeHtml(selected.status || 'ok')}</dd></div>
+      </dl>
+      ${warnings.length ? `<ul class="iso-warning-list">${warnings.map(w => `<li>${escapeHtml(w)}</li>`).join('')}</ul>` : ''}`;
+  }
+
   // -------------------------------------------------------------------
   // CSV export
   // -------------------------------------------------------------------
@@ -383,14 +650,43 @@ document.addEventListener('DOMContentLoaded', () => {
   // Restore
   // -------------------------------------------------------------------
 
+  function legacyInputsFromResult(result) {
+    return {
+      runs: (result.runs || []).map((run, index) => ({
+        label: run.label || `Conduit Run ${index + 1}`,
+        tradeSize: run.tradeSize || 1,
+        layout: normalizeConduitRunLayout({}, run, index),
+        bends: (run.bends || []).map((bend, bendIndex) => ({
+          type: bend.type || 'offset',
+          dimension: bend.dimension ?? '',
+          angle: bend.angle || 45,
+          layout: normalizeBendLayout({}, bend, bendIndex),
+        })),
+      })),
+      pullBoxes: (result.pullBoxResults || []).map((box, index) => ({
+        label: box.label || `Pull Box ${index + 1}`,
+        pullType: box.pullType || 'straight',
+        largestTradeSize: 1,
+        wallA: [1],
+        wallB: [],
+        position: normalizePullBoxPosition({}, index),
+        wallAName: 'Wall A',
+        wallBName: 'Wall B',
+      })),
+    };
+  }
+
   function restoreInputs(inputs) {
     if (!inputs) return;
     const { runs = [], pullBoxes = [] } = inputs;
-    for (const r of runs) addRunCard(r.label, r.tradeSize, r.bends || []);
+    for (const r of runs) addRunCard(r.label, r.tradeSize, r.bends || [], r.layout || null);
     for (const pb of pullBoxes) {
       addPullBoxCard(pb.label, pb.pullType,
         pb.wallA || (pb.largestTradeSize ? [pb.largestTradeSize] : []),
-        pb.wallB || []);
+        pb.wallB || [],
+        pb.position || null,
+        pb.wallAName || 'Wall A',
+        pb.wallBName || 'Wall B');
     }
   }
 
@@ -398,7 +694,15 @@ document.addEventListener('DOMContentLoaded', () => {
   // Helpers
   // -------------------------------------------------------------------
 
-  const TRADE_SIZES = [0.5, 0.75, 1, 1.25, 1.5, 2, 2.5, 3, 3.5, 4];
+  function parseNumber(value, fallback = 0) {
+    const number = Number(value);
+    return Number.isFinite(number) ? number : fallback;
+  }
+
+  function formatNumber(value) {
+    const number = Number(value);
+    return Number.isFinite(number) ? String(Math.round(number * 100) / 100) : '';
+  }
 
   function tradeSizeOptions(selected = 1) {
     return TRADE_SIZES.map(ts =>
@@ -406,11 +710,19 @@ document.addEventListener('DOMContentLoaded', () => {
     ).join('');
   }
 
-  const OFFSET_ANGLES = Object.keys(OFFSET_TABLE).map(Number);
-
   function angleOptions(selected = 45) {
     return OFFSET_ANGLES.map(a =>
       `<option value="${a}" ${a === parseFloat(selected) ? 'selected' : ''}>${a}°</option>`
+    ).join('');
+  }
+
+  function directionOptions(plane = 'horizontal', selected = '') {
+    const options = plane === 'vertical'
+      ? [['rise', 'Rise'], ['drop', 'Drop']]
+      : [['left', 'Left'], ['right', 'Right']];
+    const selectedValue = options.some(([value]) => value === selected) ? selected : options[0][0];
+    return options.map(([value, label]) =>
+      `<option value="${value}" ${value === selectedValue ? 'selected' : ''}>${label}</option>`
     ).join('');
   }
 });

@@ -254,6 +254,56 @@ export function averageIlluminance(numFixtures, lumensPerFixture, cu, llf, roomA
   return (numFixtures * lumensPerFixture * cu * llf) / roomAreaSqFt;
 }
 
+/**
+ * Generate a default evenly-spaced fixture layout for plan-view previews.
+ *
+ * The layout chooses a row/column count that keeps fixture spacing reasonably
+ * square in the actual room proportions. Long corridors therefore tend toward
+ * one centerline row, while wider rooms split into multiple rows.
+ *
+ * @param {number} roomLengthFt
+ * @param {number} roomWidthFt
+ * @param {number} numFixtures
+ * @returns {{ rows: number, cols: number, positions: { x: number, y: number }[] }}
+ */
+export function generateDefaultFixtureLayout(roomLengthFt, roomWidthFt, numFixtures) {
+  if (!isFinite(roomLengthFt) || roomLengthFt <= 0) throw new Error('Room length must be > 0');
+  if (!isFinite(roomWidthFt) || roomWidthFt <= 0) throw new Error('Room width must be > 0');
+  if (!isFinite(numFixtures) || numFixtures < 1) throw new Error('Number of fixtures must be >= 1');
+
+  const count = Math.floor(numFixtures);
+  let best = { rows: 1, cols: count, score: Infinity };
+
+  for (let rows = 1; rows <= count; rows++) {
+    const cols = Math.ceil(count / rows);
+    const cellAspect = (roomLengthFt / cols) / (roomWidthFt / rows);
+    const emptySlots = rows * cols - count;
+    const score = Math.abs(Math.log(cellAspect)) + (emptySlots / count) * 0.35;
+    if (score < best.score) best = { rows, cols, score };
+  }
+
+  const positions = [];
+  let remaining = count;
+  for (let row = 0; row < best.rows && remaining > 0; row++) {
+    const rowCount = Math.min(best.cols, remaining);
+    const y = (row + 1) * roomWidthFt / (best.rows + 1);
+    for (let col = 0; col < rowCount; col++) {
+      const x = (col + 1) * roomLengthFt / (rowCount + 1);
+      positions.push({
+        x: +x.toFixed(3),
+        y: +y.toFixed(3),
+      });
+    }
+    remaining -= rowCount;
+  }
+
+  return {
+    rows: best.rows,
+    cols: best.cols,
+    positions,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Point-by-point illuminance grid
 // ---------------------------------------------------------------------------

@@ -72,6 +72,11 @@ export function calcSidewallPressure(bendRadius, tension) {
  * @returns {Object} tension results plus diagnostic fields
  */
 export function calcPullTension(routeSegments = [], cableProps = {}) {
+  const trace = tracePullTension(routeSegments, cableProps);
+  return trace.summary;
+}
+
+export function tracePullTension(routeSegments = [], cableProps = {}) {
   const mu                = cableProps.coeffFriction ?? cableProps.mu ?? 0.35;
   const weight            = cableProps.weight ?? 0;
   const conductorMaterial = cableProps.conductorMaterial ?? 'cu';
@@ -93,9 +98,11 @@ export function calcPullTension(routeSegments = [], cableProps = {}) {
   let stiffnessLbs  = 0;
   let staticApplied = false;
   let firstSegment  = true;
+  const segments = [];
 
-  for (const seg of routeSegments) {
+  for (const [index, seg] of routeSegments.entries()) {
     if (!seg) continue;
+    const tensionIn = tension;
 
     // Effective friction for this segment
     const muEff = (isInitialPull && firstSegment)
@@ -109,6 +116,7 @@ export function calcPullTension(routeSegments = [], cableProps = {}) {
     if (seg.type === 'bend') {
       const angle  = seg.angle  || 0;
       const radius = seg.radius || 1;
+      const stiffnessBefore = stiffnessLbs;
 
       // Straight friction along the arc length
       tension += weight * muEff * (seg.length || 0);
@@ -123,37 +131,58 @@ export function calcPullTension(routeSegments = [], cableProps = {}) {
 
       const swp = calcSidewallPressure(radius, tension);
       if (swp > maxSidewall) maxSidewall = swp;
+      segments.push({
+        index,
+        type: seg.type,
+        length: seg.length || 0,
+        angle,
+        radius,
+        tensionIn,
+        tensionOut: tension,
+        sidewallPressure: swp,
+        stiffnessLbs: stiffnessLbs - stiffnessBefore,
+        effectiveMu: muEff
+      });
     } else {
       tension += weight * muEff * (seg.length || 0);
+      segments.push({
+        index,
+        type: seg.type || 'straight',
+        length: seg.length || 0,
+        tensionIn,
+        tensionOut: tension,
+        sidewallPressure: 0,
+        stiffnessLbs: 0,
+        effectiveMu: muEff
+      });
     }
 
     if (tension > maxTension) maxTension = tension;
   }
 
-  return {
-    totalTension:              tension,
+  const summary = {
+    totalTension: tension,
     maxTension,
-    maxSidewallPressure:       maxSidewall,
-    allowableTension:
-      cableProps.maxTension ??
+    maxSidewallPressure: maxSidewall,
+    allowableTension: cableProps.maxTension ??
       cableProps.allowableTension ??
       cableProps.max_tension ??
       Infinity,
-    allowableSidewallPressure:
-      cableProps.maxSidewallPressure ??
+    allowableSidewallPressure: cableProps.maxSidewallPressure ??
       cableProps.allowableSidewallPressure ??
       cableProps.max_sidewall_pressure ??
       Infinity,
-    // Diagnostics
-    effectiveMu:            muAdj,
-    tempFrictionFactor:     mu > 0 ? Math.round((muAdj / mu) * 10000) / 10000 : 1,
+    effectiveMu: muAdj,
+    tempFrictionFactor: mu > 0 ? Math.round((muAdj / mu) * 10000) / 10000 : 1,
     stiffnessCorrectionLbs: Math.round(stiffnessLbs * 100) / 100,
-    staticFrictionApplied:  staticApplied,
+    staticFrictionApplied: staticApplied,
   };
+  return { summary, segments };
 }
 
 if (typeof self !== 'undefined') {
   self.calcPullTension       = calcPullTension;
   self.calcSidewallPressure  = calcSidewallPressure;
   self.calcStiffnessTension  = calcStiffnessTension;
+  self.tracePullTension      = tracePullTension;
 }

@@ -1,5 +1,8 @@
 import { buildPullTable } from './analysis/pullCards.mjs';
+import { parsePullRouteRows } from './analysis/pullCardRouteImport.mjs';
+import { buildPullRouteVisualModel } from './analysis/pullCardVisualModel.mjs';
 import { getTrays, getCables } from './dataStore.mjs';
+import { renderIsometricSvg } from './src/utils/isometricSvg.js';
 
 document.addEventListener('DOMContentLoaded', () => {
   initSettings();
@@ -13,6 +16,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const loadFromProjectBtn = document.getElementById('loadFromProjectBtn');
   const summarySection = document.getElementById('summarySection');
   const summaryCards = document.getElementById('summaryCards');
+  const pullVisualSection = document.getElementById('pullVisualSection');
+  const pullIsoCanvas = document.getElementById('pull-iso-canvas');
+  const pullIsoSummary = document.getElementById('pull-iso-summary');
+  const pullIsoStatus = document.getElementById('pull-iso-status');
+  const pullIsoInspector = document.getElementById('pull-iso-inspector');
   const pullTableSection = document.getElementById('pullTableSection');
   const pullTableBody = document.querySelector('#pullTable tbody');
   const pullCardDetail = document.getElementById('pullCardDetail');
@@ -23,6 +31,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const exportPullCardsBtn = document.getElementById('exportPullCardsBtn');
 
   let currentPulls = null;
+  let selectedPullNumber = null;
 
   // ---- Import from XLSX ----
 
@@ -41,7 +50,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const wb = XLSX.read(evt.target.result, { type: 'binary' });
         const routeResults = parseRouteXLSX(wb);
         if (!routeResults.length) {
-          showAlertModal('No route data found in the file. Make sure you are importing route_data.xlsx from the Optimal Route page.');
+          showAlertModal('No route data found in the file. Make sure you are importing route_data.xlsx or route_data.csv from the Optimal Route page.');
           return;
         }
         const cableList = getCables();
@@ -99,48 +108,15 @@ document.addEventListener('DOMContentLoaded', () => {
   // ---- Parse route XLSX into result-like objects ----
 
   function parseRouteXLSX(wb) {
-    const segSheet = wb.Sheets['Segments'];
+    const segSheet = wb.Sheets['Segments'] || wb.Sheets[wb.SheetNames?.[0]];
     if (!segSheet) return [];
 
     const rows = XLSX.utils.sheet_to_json(segSheet, { defval: '' });
     if (!rows.length) return [];
 
-    // Group rows by cable_tag
-    const byTag = new Map();
-    for (const row of rows) {
-      const tag = row.cable_tag || row.Cable || '';
-      if (!tag) continue;
-      if (!byTag.has(tag)) byTag.set(tag, []);
-      byTag.get(tag).push(row);
-    }
-
-    // Also try the summary sheet for total_length
-    const summarySheet = wb.Sheets['Summary'];
-    const summaryRows = summarySheet ? XLSX.utils.sheet_to_json(summarySheet, { defval: '' }) : [];
-    const summaryMap = new Map(summaryRows.map(r => [r.cable_tag, r]));
-
-    const results = [];
-    for (const [tag, segs] of byTag) {
-      const breakdown = segs.map(s => ({
-        tray_id: s.element_id || '',
-        conduit_id: s.element_type === 'conduit' ? s.element_id : undefined,
-        ductbankTag: s.element_type === 'ductbank' ? s.element_id : undefined,
-        length: parseFloat(s.length) || 0,
-        start: null,
-        end: null,
-      }));
-      const summaryInfo = summaryMap.get(tag) || {};
-      const totalLen = parseFloat(summaryInfo.total_length) || breakdown.reduce((s, b) => s + b.length, 0);
-
-      results.push({
-        cable: tag,
-        status: '✓ Routed',
-        breakdown,
-        total_length: totalLen,
-        route_segments: breakdown,
-      });
-    }
-    return results;
+    const routeSummarySheet = wb.Sheets['Summary'];
+    const routeSummaryRows = routeSummarySheet ? XLSX.utils.sheet_to_json(routeSummarySheet, { defval: '' }) : [];
+    return parsePullRouteRows(rows, routeSummaryRows);
   }
 
   // ---- Generate pull cards from results ----
@@ -148,6 +124,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function generatePullCards(routeResults, cableList) {
     const { pulls, summary } = buildPullTable(routeResults, cableList);
     currentPulls = pulls;
+    selectedPullNumber = pulls[0]?.pull_number ?? null;
 
     // Render summary
     summaryCards.innerHTML = `
@@ -180,7 +157,8 @@ document.addEventListener('DOMContentLoaded', () => {
         ? esc(p.cable_tags.join(', '))
         : esc(p.cable_tags.slice(0, 3).join(', ')) + ` +${p.cable_tags.length - 3} more`;
       const multiClass = p.cable_count > 1 ? 'multi-cable-pull' : '';
-      return `<tr class="${multiClass}" data-pull="${p.pull_number}">
+      const selectedClass = p.pull_number === selectedPullNumber ? 'pull-table-selected' : '';
+      return `<tr class="${multiClass} ${selectedClass}" data-pull="${p.pull_number}" tabindex="0" aria-selected="${p.pull_number === selectedPullNumber ? 'true' : 'false'}">
         <td>${p.pull_number}</td>
         <td>${esc(p.cable_type)}</td>
         <td>${p.cable_count}</td>
@@ -197,14 +175,97 @@ document.addEventListener('DOMContentLoaded', () => {
 
     pullTableSection.hidden = false;
     pullCardDetail.hidden = true;
+    renderSelectedPullVisual();
 
     // Wire up view buttons
+    pullTableBody.querySelectorAll('tr[data-pull]').forEach(row => {
+      row.addEventListener('click', (event) => {
+        if (event.target.closest('button')) return;
+        selectPull(parseInt(row.dataset.pull, 10));
+      });
+      row.addEventListener('keydown', (event) => {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        event.preventDefault();
+        selectPull(parseInt(row.dataset.pull, 10));
+      });
+    });
+
     pullTableBody.querySelectorAll('.view-pull-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         const num = parseInt(btn.dataset.pull, 10);
+        selectPull(num);
         showPullCard(num);
       });
     });
+  }
+
+  function selectPull(pullNumber) {
+    if (!currentPulls) return;
+    const number = Number(pullNumber);
+    if (!currentPulls.some(pull => pull.pull_number === number)) return;
+    selectedPullNumber = number;
+    updatePullTableSelection();
+    renderSelectedPullVisual();
+  }
+
+  function updatePullTableSelection() {
+    pullTableBody.querySelectorAll('tr[data-pull]').forEach(row => {
+      const selected = Number(row.dataset.pull) === selectedPullNumber;
+      row.classList.toggle('pull-table-selected', selected);
+      row.setAttribute('aria-selected', selected ? 'true' : 'false');
+    });
+  }
+
+  function renderSelectedPullVisual() {
+    if (!currentPulls || !currentPulls.length || selectedPullNumber === null) {
+      pullVisualSection.hidden = true;
+      return;
+    }
+    const pull = currentPulls.find(p => p.pull_number === selectedPullNumber);
+    if (!pull) {
+      pullVisualSection.hidden = true;
+      return;
+    }
+
+    const model = buildPullRouteVisualModel(pull);
+    pullVisualSection.hidden = false;
+    pullIsoSummary.textContent = `Pull #${pull.pull_number}: ${pull.cable_count} cable${pull.cable_count === 1 ? '' : 's'}, ${pull.total_length_ft} ft, ${pull.estimated_tension_lbs} lb estimated tension`;
+    pullIsoStatus.innerHTML = `<span class="status-badge ${model.hasCoordinates ? 'status-ok' : 'status-warning'}">${model.hasCoordinates ? 'Exact coordinates' : 'Coordinate data missing'}</span>`;
+    pullIsoCanvas.innerHTML = renderPullVisualCanvas(model, 'pull-iso-svg-title', 'pull-iso-svg-desc');
+    pullIsoInspector.innerHTML = renderPullInspector(model, pull);
+  }
+
+  function renderPullVisualCanvas(model, titleId, descId) {
+    if (!model.segments.length) {
+      return `<div class="iso-empty-state">
+        <strong>Coordinate data missing</strong>
+        <span>Re-export route_data.xlsx from Optimal Route, then import it here for an exact 3D path.</span>
+      </div>`;
+    }
+    return renderIsometricSvg(model, {
+      titleId,
+      descId,
+      title: model.title,
+      desc: model.description
+    });
+  }
+
+  function renderPullInspector(model, pull) {
+    const summary = model.summary || {};
+    const traceRows = (pull.tension_trace || []).map(trace => `<li>
+      <span>Step ${trace.index + 1}</span>
+      <strong>${formatNumber(trace.tensionOut)} lb</strong>
+      <small>${formatNumber(trace.sidewallPressure)} lb/ft sidewall</small>
+    </li>`).join('');
+    const warnings = model.warnings.map(warning => `<li>${esc(warning)}</li>`).join('');
+    return `
+      <div class="iso-facts">
+        <span><strong>${summary.exactSegments || 0}/${summary.segmentCount || 0}</strong> coordinate segments</span>
+        <span><strong>${formatNumber(summary.maxSidewallPressure)}</strong> lb/ft max sidewall</span>
+      </div>
+      ${warnings ? `<ul class="iso-warning-list">${warnings}</ul>` : ''}
+      <h3>Tension Profile</h3>
+      <ul class="iso-trace-list">${traceRows || '<li><span>No tension trace available</span></li>'}</ul>`;
   }
 
   // ---- Show individual pull card ----
@@ -213,8 +274,15 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!currentPulls) return;
     const pull = currentPulls.find(p => p.pull_number === pullNumber);
     if (!pull) return;
+    selectPull(pullNumber);
 
     pullCardTitle.textContent = `Pull Card #${pull.pull_number}`;
+    const visualModel = buildPullRouteVisualModel(pull);
+    const visualHtml = renderPullVisualCanvas(
+      visualModel,
+      `pull-card-iso-title-${pull.pull_number}`,
+      `pull-card-iso-desc-${pull.pull_number}`
+    );
 
     const cableRows = pull.cables.map(c => `<tr>
       <td>${esc(c.tag)}</td>
@@ -231,9 +299,19 @@ document.addEventListener('DOMContentLoaded', () => {
       <td>${esc(s.type)}</td>
       <td>${esc(s.id || '—')}</td>
       <td>${s.length}</td>
+      <td>${esc(formatPoint(s.start))}</td>
+      <td>${esc(formatPoint(s.end))}</td>
     </tr>`).join('');
 
     pullCardContent.innerHTML = `
+      <div class="pull-card-visual iso-detail-panel">
+        <div>
+          <h3>3D Route</h3>
+          <p class="field-hint">${visualModel.hasCoordinates ? 'Exact start/end coordinates from route data.' : 'Route steps are present, but exact segment coordinates are missing.'}</p>
+        </div>
+        ${visualHtml}
+        <aside class="iso-inspector">${renderPullInspector(visualModel, pull)}</aside>
+      </div>
       <div class="pull-card-grid">
         <div class="pull-card-info">
           <table class="result-table" aria-label="Pull card summary">
@@ -282,6 +360,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 <th scope="col">Type</th>
                 <th scope="col">Raceway ID</th>
                 <th scope="col">Length (ft)</th>
+                <th scope="col">Start XYZ (ft)</th>
+                <th scope="col">End XYZ (ft)</th>
               </tr>
             </thead>
             <tbody>${routeRows}</tbody>
@@ -290,12 +370,14 @@ document.addEventListener('DOMContentLoaded', () => {
       </div>`;
 
     pullTableSection.hidden = true;
+    pullVisualSection.hidden = true;
     pullCardDetail.hidden = false;
   }
 
   backToTableBtn.addEventListener('click', () => {
     pullCardDetail.hidden = true;
     pullTableSection.hidden = false;
+    renderSelectedPullVisual();
   });
 
   // ---- XLSX Export ----
@@ -389,6 +471,8 @@ document.addEventListener('DOMContentLoaded', () => {
           'Type': s.type,
           'Raceway ID': s.id || '',
           'Length (ft)': s.length,
+          'Start XYZ (ft)': formatPoint(s.start),
+          'End XYZ (ft)': formatPoint(s.end),
         });
       }
     }
@@ -403,5 +487,18 @@ document.addEventListener('DOMContentLoaded', () => {
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;');
+  }
+
+  function formatNumber(value) {
+    const number = Number(value);
+    if (!Number.isFinite(number)) return '0';
+    return String(Math.round(number * 10) / 10);
+  }
+
+  function formatPoint(point) {
+    if (!Array.isArray(point) || point.length < 3) return 'Missing';
+    const values = point.map(value => Number(value));
+    if (!values.every(Number.isFinite)) return 'Missing';
+    return values.map(value => formatNumber(value)).join(', ');
   }
 });

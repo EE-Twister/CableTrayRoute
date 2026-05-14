@@ -21,6 +21,11 @@ import {
   selectStandardBox,
   sizePullBox,
 } from '../analysis/pullBoxSizing.mjs';
+import {
+  buildConduitBendVisualModel,
+  buildConduitRunVisualPath,
+  normalizeConduitRunLayout,
+} from '../analysis/conduitBendVisualModel.mjs';
 
 function describe(name, fn) {
   console.log(name);
@@ -281,6 +286,110 @@ describe('runConduitBendSchedule() integration', () => {
     const r = runConduitBendSchedule([{ label: 'Empty', tradeSize: 1, bends: [] }]);
     assert.strictEqual(r.runs[0].totalDegrees, 0);
     assert.strictEqual(r.runs[0].nec358_24Pass, true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+describe('conduit bend visual model', () => {
+  it('generates an isometric path from layout fields and bend geometry', () => {
+    const inputs = [{
+      label: 'Run A',
+      tradeSize: 1,
+      layout: {
+        start: { xFt: 0, yFt: 0, zFt: 0 },
+        end: { xFt: 24, yFt: 1, zFt: 0 },
+        headingDeg: 0,
+        endToleranceFt: 2
+      },
+      bends: [{
+        type: 'offset',
+        dimension: 12,
+        angle: 30,
+        layout: { stationFt: 8, plane: 'horizontal', direction: 'left' }
+      }]
+    }];
+    const result = { ...runConduitBendSchedule(inputs), _inputs: { runs: inputs, pullBoxes: [] }, pullBoxResults: [] };
+    const model = buildConduitBendVisualModel(result);
+    assert.ok(model.segments.length >= 3, 'Expected straight, bend, and final path segments');
+    assert.ok(model.markers.some(marker => marker.kind === 'bend'), 'Expected bend marker');
+    assert.strictEqual(model.summary.bends, 1);
+  });
+
+  it('orders bend stations physically even when rows are entered out of order', () => {
+    const inputs = {
+      label: 'Run B',
+      tradeSize: 1,
+      layout: {
+        start: { xFt: 0, yFt: 0, zFt: 0 },
+        end: { xFt: 40, yFt: 0, zFt: 0 },
+        headingDeg: 0,
+        endToleranceFt: 5
+      },
+      bends: [
+        { type: 'kick', dimension: 6, angle: 30, layout: { stationFt: 20, plane: 'horizontal', direction: 'left' } },
+        { type: 'offset', dimension: 6, angle: 30, layout: { stationFt: 8, plane: 'horizontal', direction: 'right' } },
+      ]
+    };
+    const result = runConduitBendSchedule([inputs]);
+    const path = buildConduitRunVisualPath(result.runs[0], inputs, 0);
+    const bendMarkers = path.markers.filter(marker => marker.kind === 'bend');
+    assert.strictEqual(bendMarkers[0].id, 'run-0-bend-1');
+    assert.strictEqual(bendMarkers[1].id, 'run-0-bend-0');
+  });
+
+  it('warns when modeled path misses the entered endpoint tolerance', () => {
+    const input = {
+      label: 'Misaligned',
+      tradeSize: 1,
+      layout: {
+        start: { xFt: 0, yFt: 0, zFt: 0 },
+        end: { xFt: 20, yFt: 5, zFt: 0 },
+        headingDeg: 0,
+        endToleranceFt: 1
+      },
+      bends: []
+    };
+    const result = runConduitBendSchedule([input]);
+    const path = buildConduitRunVisualPath(result.runs[0], input, 0);
+    assert.ok(path.warnings.some(warning => warning.includes('misses the entered end point')));
+    assert.ok(path.endpointResidualFt > 1);
+  });
+
+  it('places pull-box markers from saved layout inputs', () => {
+    const inputs = [{
+      label: 'Run C',
+      tradeSize: 1,
+      layout: normalizeConduitRunLayout({}, {}, 0),
+      bends: []
+    }];
+    const pullBoxes = [{
+      label: 'PB-1',
+      pullType: 'straight',
+      largestTradeSize: 1,
+      wallA: [1],
+      wallB: [],
+      position: { xFt: 6, yFt: -4, zFt: 2 }
+    }];
+    const result = {
+      ...runConduitBendSchedule(inputs),
+      pullBoxResults: pullBoxes.map(pb => sizePullBox(pb)),
+      _inputs: { runs: inputs, pullBoxes }
+    };
+    const model = buildConduitBendVisualModel(result);
+    const marker = model.markers.find(item => item.id === 'pullbox-0');
+    assert.deepStrictEqual(marker.point, { xFt: 6, yFt: -4, zFt: 2 });
+  });
+
+  it('generates default visual layout for legacy studies without saving inputs', () => {
+    const result = runConduitBendSchedule([{
+      label: 'Legacy',
+      tradeSize: 1,
+      bends: [{ type: '90', dimension: 12 }]
+    }]);
+    const model = buildConduitBendVisualModel(result);
+    assert.ok(model.segments.length > 0);
+    assert.ok(model.markers.some(marker => marker.id === 'run-0-start'));
+    assert.strictEqual(result._inputs, undefined);
   });
 });
 

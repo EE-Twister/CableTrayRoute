@@ -60,6 +60,28 @@ function it(name, fn) {
       assert.strictEqual(rows[1].element_type, "conduit");
       assert.strictEqual(rows[1].element_id, "DB1:1");
     });
+
+    it("exports segment start and end coordinates when present", () => {
+      const rows = buildSegmentRows([
+        {
+          cable: "C2",
+          breakdown: [
+            {
+              length: 12,
+              tray_id: "T2",
+              start: [1, 2, 3],
+              end: [13, 2, 3],
+            },
+          ],
+        },
+      ]);
+      assert.strictEqual(rows[0].start_x, 1);
+      assert.strictEqual(rows[0].start_y, 2);
+      assert.strictEqual(rows[0].start_z, 3);
+      assert.strictEqual(rows[0].end_x, 13);
+      assert.strictEqual(rows[0].end_y, 2);
+      assert.strictEqual(rows[0].end_z, 3);
+    });
   });
 
   describe("buildSummaryRows", () => {

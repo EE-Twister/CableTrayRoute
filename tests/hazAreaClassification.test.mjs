@@ -18,11 +18,17 @@ import {
   EX_PROTECTION_TYPES,
   T_RATINGS,
   NEC_DIV_TO_IEC_ZONE,
+  DEFAULT_HAZAREA_LAYOUT,
   classifyArea,
   checkEquipmentCompatibility,
   checkAllEquipment,
   classificationReport,
   runHazAreaStudy,
+  normalizeHazAreaLayout,
+  defaultHazAreaGeometry,
+  defaultHazEquipmentPosition,
+  pointInHazAreaGeometry,
+  buildHazAreaMapModel,
 } from '../analysis/hazAreaClassification.mjs';
 
 function describe(name, fn) {
@@ -107,6 +113,105 @@ describe('Constants', () => {
   it('Ex t dust zones include Zone 20', () => {
     const t = EX_PROTECTION_TYPES.find(p => p.value === 't');
     assert.ok(t && t.dustZones.includes('20'));
+  });
+});
+
+// ---------------------------------------------------------------------------
+describe('Hazardous area visual map model', () => {
+  it('normalizes missing layout values to defaults', () => {
+    const layout = normalizeHazAreaLayout({});
+    assert.deepStrictEqual(layout, DEFAULT_HAZAREA_LAYOUT);
+  });
+
+  it('clamps invalid grid spacing to the facility size', () => {
+    const layout = normalizeHazAreaLayout({ widthFt: 30, heightFt: 20, gridFt: 100 });
+    assert.strictEqual(layout.widthFt, 30);
+    assert.strictEqual(layout.heightFt, 20);
+    assert.strictEqual(layout.gridFt, 20);
+  });
+
+  it('generates default area geometry for sparse legacy studies', () => {
+    const geometry = defaultHazAreaGeometry(0, { widthFt: 80, heightFt: 50, gridFt: 10 }, 1);
+    assert.strictEqual(geometry.shape, 'circle');
+    assert.strictEqual(geometry.xFt, 40);
+    assert.strictEqual(geometry.yFt, 25);
+    assert.strictEqual(geometry.zMinFt, 0);
+    assert.strictEqual(geometry.zMaxFt, 20);
+    assert.ok(geometry.radiusFt > 0);
+  });
+
+  it('places equipment at the assigned area center when position is omitted', () => {
+    const geometry = { shape: 'circle', xFt: 18, yFt: 12, radiusFt: 6, zMinFt: 2, zMaxFt: 10 };
+    const position = defaultHazEquipmentPosition({}, geometry, { widthFt: 80, heightFt: 50, gridFt: 10 });
+    assert.deepStrictEqual(position, { xFt: 18, yFt: 12, zFt: 6 });
+  });
+
+  it('checks points inside and outside circle footprints', () => {
+    const geometry = { shape: 'circle', xFt: 10, yFt: 10, radiusFt: 5 };
+    assert.ok(pointInHazAreaGeometry({ xFt: 13, yFt: 14 }, geometry));
+    assert.ok(!pointInHazAreaGeometry({ xFt: 20, yFt: 10 }, geometry));
+  });
+
+  it('checks points inside and outside rectangle footprints', () => {
+    const geometry = { shape: 'rect', xFt: 20, yFt: 15, widthFt: 10, heightFt: 6 };
+    assert.ok(pointInHazAreaGeometry({ xFt: 25, yFt: 18 }, geometry));
+    assert.ok(!pointInHazAreaGeometry({ xFt: 26, yFt: 18 }, geometry));
+  });
+
+  it('checks points against vertical zone limits when elevation is provided', () => {
+    const geometry = { shape: 'circle', xFt: 10, yFt: 10, radiusFt: 5, zMinFt: 2, zMaxFt: 8 };
+    assert.ok(pointInHazAreaGeometry({ xFt: 10, yFt: 10, zFt: 5 }, geometry));
+    assert.ok(!pointInHazAreaGeometry({ xFt: 10, yFt: 10, zFt: 12 }, geometry));
+  });
+
+  it('builds a valid map model for legacy inputs without geometry', () => {
+    const model = buildHazAreaMapModel({
+      areas: [{ id: 'z1', label: 'Zone 1', standard: 'IEC', iecZone: '1', gasGroup: 'IIB' }],
+      equipment: [{ id: 'e1', label: 'Junction Box', hazAreaId: 'z1' }]
+    });
+    assert.strictEqual(model.layout.widthFt, 80);
+    assert.strictEqual(model.areas.length, 1);
+    assert.strictEqual(model.equipment.length, 1);
+    assert.strictEqual(model.areas[0].geometry.shape, 'circle');
+    assert.strictEqual(model.areas[0].geometry.zMinFt, 0);
+    assert.strictEqual(model.areas[0].geometry.zMaxFt, 20);
+    assert.strictEqual(model.equipment[0].position.xFt, model.areas[0].geometry.xFt);
+  });
+
+  it('propagates compatibility failures into map marker status', () => {
+    const inputs = {
+      layout: { widthFt: 80, heightFt: 50, gridFt: 10 },
+      areas: [{ id: 'z1', standard: 'IEC', iecZone: '1', gasGroup: 'IIB', geometry: { shape: 'circle', xFt: 40, yFt: 25, radiusFt: 10 } }],
+      equipment: [{ id: 'e1', label: 'Bad Motor', hazAreaId: 'z1', exProtection: 'n', exGroup: 'IIB', xFt: 40, yFt: 25 }]
+    };
+    const { valid, result } = runHazAreaStudy(inputs);
+    assert.ok(valid);
+    assert.strictEqual(result.mapModel.equipment[0].status, 'FAIL');
+    assert.strictEqual(result.mapModel.summary.fail, 1);
+  });
+
+  it('adds a warning when equipment is outside its assigned footprint', () => {
+    const inputs = {
+      layout: { widthFt: 80, heightFt: 50, gridFt: 10 },
+      areas: [{ id: 'z1', standard: 'IEC', iecZone: '2', gasGroup: 'IIB', geometry: { shape: 'circle', xFt: 20, yFt: 20, radiusFt: 5 } }],
+      equipment: [{ id: 'e1', label: 'Panel', hazAreaId: 'z1', exProtection: 'n', exGroup: 'IIB', certNumber: 'IECEx TEST', xFt: 45, yFt: 20 }]
+    };
+    const { valid, result } = runHazAreaStudy(inputs);
+    assert.ok(valid);
+    assert.strictEqual(result.mapModel.equipment[0].status, 'WARN');
+    assert.ok(result.mapModel.equipment[0].geometryWarnings.some(warning => /outside assigned area/.test(warning)));
+  });
+
+  it('adds a warning when equipment is above its assigned volume', () => {
+    const inputs = {
+      layout: { widthFt: 80, heightFt: 50, gridFt: 10, elevationFt: 20 },
+      areas: [{ id: 'z1', standard: 'IEC', iecZone: '2', gasGroup: 'IIB', geometry: { shape: 'circle', xFt: 20, yFt: 20, radiusFt: 8, zMinFt: 0, zMaxFt: 6 } }],
+      equipment: [{ id: 'e1', label: 'Panel', hazAreaId: 'z1', exProtection: 'n', exGroup: 'IIB', certNumber: 'IECEx TEST', xFt: 20, yFt: 20, zFt: 12 }]
+    };
+    const { valid, result } = runHazAreaStudy(inputs);
+    assert.ok(valid);
+    assert.strictEqual(result.mapModel.equipment[0].status, 'WARN');
+    assert.ok(result.mapModel.equipment[0].geometryWarnings.some(warning => /outside assigned area/.test(warning)));
   });
 });
 

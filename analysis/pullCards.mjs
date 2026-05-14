@@ -14,7 +14,7 @@
  *   AEIC CG5 — Underground extruded power cable pulling guide
  */
 
-import { calcPullTension } from '../src/pullCalc.js';
+import { calcPullTension, tracePullTension } from '../src/pullCalc.js';
 
 // ---------------------------------------------------------------------------
 // QR code generation
@@ -78,6 +78,36 @@ export function trayQRPayload(trayId, baseURL = 'https://cabletrayroute.com') {
  * @param {Array} breakdown - route breakdown segments
  * @returns {string} pipe-delimited signature
  */
+function parsePointValue(value) {
+  if (Array.isArray(value)) {
+    const parsed = value.map(Number);
+    return parsed.length >= 3 && parsed.every(Number.isFinite) ? parsed.slice(0, 3) : null;
+  }
+  if (typeof value === 'string') {
+    const parsed = value.split(',').map(part => Number(part.trim()));
+    return parsed.length >= 3 && parsed.every(Number.isFinite) ? parsed.slice(0, 3) : null;
+  }
+  return null;
+}
+
+function normalizeBreakdownSegments(breakdown = [], routeSegments = []) {
+  const source = Array.isArray(breakdown) && breakdown.length ? breakdown : routeSegments;
+  return (source || []).map((seg, index) => {
+    const routeSeg = (routeSegments || [])[index] || {};
+    const start = parsePointValue(seg.start) || parsePointValue(seg.from) || parsePointValue(routeSeg.start);
+    const end = parsePointValue(seg.end) || parsePointValue(seg.to) || parsePointValue(routeSeg.end);
+    return {
+      ...seg,
+      start,
+      end,
+      tray_id: seg.tray_id ?? routeSeg.tray_id ?? (seg.type === 'field' ? 'Field Route' : ''),
+      conduit_id: seg.conduit_id ?? routeSeg.conduit_id,
+      ductbankTag: seg.ductbankTag ?? routeSeg.ductbankTag,
+      length: parseFloat(seg.length ?? routeSeg.length) || 0
+    };
+  });
+}
+
 function routeSignature(breakdown) {
   if (!Array.isArray(breakdown) || breakdown.length === 0) return '';
   return breakdown.map(seg => {
@@ -89,7 +119,7 @@ function routeSignature(breakdown) {
       return `T:${seg.tray_id}`;
     }
     // Field segment — use rounded endpoints as key
-    const fmt = arr => (arr || []).map(v => Number(v).toFixed(1)).join(',');
+    const fmt = arr => (parsePointValue(arr) || []).map(v => Number(v).toFixed(1)).join(',');
     return `F:${fmt(seg.start)}-${fmt(seg.end)}`;
   }).join('|');
 }
@@ -120,13 +150,14 @@ export function groupCablesIntoPulls(routeResults = [], cableList = []) {
   const pullMap = new Map();
 
   for (const result of routeResults) {
-    if (!result || result.status === '✗ Failed' || !Array.isArray(result.breakdown) || result.breakdown.length === 0) {
+    const normalizedBreakdown = normalizeBreakdownSegments(result?.breakdown, result?.route_segments);
+    if (!result || result.status === '✗ Failed' || normalizedBreakdown.length === 0) {
       continue;
     }
 
     const cableSpec = cableLookup.get(result.cable) || {};
     const cableType = (cableSpec.cable_type || result.cable_type || 'Power').trim();
-    const sig = routeSignature(result.breakdown);
+    const sig = routeSignature(normalizedBreakdown);
     if (!sig) continue;
 
     const groupKey = `${cableType}::${sig}`;
@@ -136,9 +167,9 @@ export function groupCablesIntoPulls(routeResults = [], cableList = []) {
         cable_type: cableType,
         signature: sig,
         cables: [],
-        breakdown: result.breakdown,
+        breakdown: normalizedBreakdown,
         total_length: parseFloat(result.total_length) || 0,
-        route_segments: result.route_segments || result.breakdown,
+        route_segments: result.route_segments || normalizedBreakdown,
       });
     }
 
@@ -231,6 +262,10 @@ export function buildPullCard(pull) {
     pull.route_segments || [],
     { weight: totalWeight, coeffFriction: 0.35 }
   );
+  const tensionTrace = tracePullTension(
+    pull.route_segments || [],
+    { weight: totalWeight, coeffFriction: 0.35 }
+  );
 
   // Determine from/to from first and last segments
   const firstSeg = pull.breakdown[0];
@@ -258,6 +293,13 @@ export function buildPullCard(pull) {
     estimated_tension_lbs: Math.round(tensionResult.totalTension * 10) / 10,
     max_tension_lbs: Math.round(tensionResult.maxTension * 10) / 10,
     max_sidewall_pressure: Math.round((tensionResult.maxSidewallPressure || 0) * 10) / 10,
+    tension_trace: tensionTrace.segments.map(segment => ({
+      ...segment,
+      tensionIn: Math.round(segment.tensionIn * 10) / 10,
+      tensionOut: Math.round(segment.tensionOut * 10) / 10,
+      sidewallPressure: Math.round((segment.sidewallPressure || 0) * 10) / 10,
+      stiffnessLbs: Math.round((segment.stiffnessLbs || 0) * 10) / 10
+    })),
   };
 }
 
