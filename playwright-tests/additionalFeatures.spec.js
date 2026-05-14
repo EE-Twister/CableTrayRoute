@@ -64,6 +64,13 @@ async function dismissOnboarding(page) {
   await page.locator('#toast').evaluateAll(nodes => nodes.forEach(node => node.remove()));
 }
 
+async function dismissResume(page) {
+  const noBtn = page.locator('#resume-no-btn');
+  if (await noBtn.count() && await noBtn.isVisible()) {
+    await noBtn.click();
+  }
+}
+
 async function resetStaticStorage(page, staticSite) {
   await page.goto(staticSite.url('index.html?e2e_storage_clear=1'));
   await page.evaluate(() => {
@@ -433,9 +440,21 @@ test.describe('Conduit Bend Schedule 3D layout', () => {
 // Spool Sheets
 // -------------------------------------------------------------------------
 test.describe('Spool Sheets', () => {
+  let staticSite;
+
+  test.beforeAll(async () => {
+    staticSite = await startStaticServer();
+  });
+
+  test.afterAll(async () => {
+    await staticSite.close();
+  });
+
   test.beforeEach(async ({ page }) => {
-    await page.goto(pageUrl('spoolsheets.html?e2e=1&e2e_reset=1'));
+    await resetStaticStorage(page, staticSite);
+    await page.goto(staticSite.url('spoolsheets.html?e2e=1&e2e_reset=1'));
     await page.waitForLoadState('networkidle');
+    await dismissOnboarding(page);
   });
 
   test('page loads with correct heading', async ({ page }) => {
@@ -453,11 +472,237 @@ test.describe('Spool Sheets', () => {
   test('has grid cell and elevation band inputs', async ({ page }) => {
     await expect(page.locator('#gridCell')).toBeVisible();
     await expect(page.locator('#elevBand')).toBeVisible();
+    await expect(page.locator('#splicePlatePairsPerJoint')).toBeVisible();
+    await expect(page.locator('#clampKitsPerSupport')).toBeVisible();
   });
 
   test('clicking generate with no routes does not crash', async ({ page }) => {
     await page.click('#generateBtn');
     await expect(page.locator('body')).toBeVisible();
+  });
+
+  test('renders live spool visual, inspector, and generated summary for project data', async ({ page }) => {
+    await page.evaluate(() => {
+      const trays = [
+        { tray_id: 'TRAY-A', start_x: 0, start_y: 0, start_z: 12, end_x: 24, end_y: 0, end_z: 12, inside_width: 24 },
+        { tray_id: 'TRAY-B', start_x: 4, start_y: 6, start_z: 12, end_x: 28, end_y: 6, end_z: 12, inside_width: 24 },
+        { tray_id: 'TRAY-C', start_x: 0, start_y: 18, start_z: 18, end_x: 18, end_y: 18, end_z: 18, inside_width: 12 },
+      ];
+      const cables = [
+        { cable_tag: 'CBL-1', from: 'MCC-1', to: 'P-101', length_ft: 38, route_preference: 'TRAY-A' },
+      ];
+      localStorage.setItem('CTR_PROJECT_V1', JSON.stringify({ name: 'Spool E2E', trays, cables, settings: { units: 'imperial', theme: 'system' } }));
+      localStorage.setItem('base:traySchedule', JSON.stringify(trays));
+      localStorage.setItem('base:cableSchedule', JSON.stringify(cables));
+    });
+    await page.goto(staticSite.url('spoolsheets.html?e2e=1'));
+    await page.waitForLoadState('networkidle');
+    await dismissOnboarding(page);
+
+    await expect(page.locator('#spoolVisualCanvas svg')).toBeVisible();
+    await expect(page.locator('#spoolPreviewStatus')).toContainText('Exact coordinates');
+    await expect(page.locator('#spoolInspector')).toContainText('SP-001');
+    await expect(page.locator('#spoolInspector')).toContainText('Hardware Takeoff');
+    await expect(page.locator('#spoolFabricationPackage')).toContainText('Shop Package');
+    await expect(page.locator('#spoolBandSummary')).toContainText('Plan Grid Cells');
+    await expect(page.locator('#spoolConstraintSummary')).toContainText('shipping');
+
+    await expect(page.locator('#spoolZoomLevel')).toHaveText('100%');
+    await expect(page.locator('#spoolRotationLevel')).toHaveText('0 deg');
+    await expect(page.locator('#exportSvgBtn')).toBeEnabled();
+    const [svgDownload] = await Promise.all([
+      page.waitForEvent('download'),
+      page.click('#exportSvgBtn'),
+    ]);
+    expect(svgDownload.suggestedFilename()).toMatch(/^spool-visual-sp-\d{3}-\d{4}-\d{2}-\d{2}\.svg$/);
+    const svgPath = await svgDownload.path();
+    expect(svgPath).toBeTruthy();
+    const svgBytes = await fs.readFile(svgPath, 'utf8');
+    expect(svgBytes).toContain('<svg');
+    const [pngDownload] = await Promise.all([
+      page.waitForEvent('download'),
+      page.click('#exportPngBtn'),
+    ]);
+    expect(pngDownload.suggestedFilename()).toMatch(/^spool-visual-sp-\d{3}-\d{4}-\d{2}-\d{2}\.png$/);
+    const pngPath = await pngDownload.path();
+    expect(pngPath).toBeTruthy();
+    const pngBytes = await fs.readFile(pngPath);
+    expect(pngBytes.subarray(0, 4).toString('hex')).toBe('89504e47');
+
+    await page.click('#spoolZoomInBtn');
+    await expect(page.locator('#spoolZoomLevel')).toHaveText('118%');
+    await expect.poll(() => page.locator('#spoolVisualCanvas svg').evaluate(svg => svg.style.transform))
+      .toContain('matrix(1.18');
+    await page.click('#spoolRotateRightBtn');
+    await expect(page.locator('#spoolRotationLevel')).toHaveText('90 deg');
+    await expect.poll(() => page.locator('#spoolVisualCanvas svg').evaluate(svg => svg.style.transform))
+      .toContain('matrix(0, 1.18, -1.18, 0');
+    await page.click('#spoolFitViewBtn');
+    await expect(page.locator('#spoolZoomLevel')).toHaveText('100%');
+    await expect(page.locator('#spoolRotationLevel')).toHaveText('0 deg');
+    await page.click('#spoolViewFrontBtn');
+    await expect(page.locator('#spoolRotationLevel')).toHaveText('90 deg');
+    await page.click('#spoolViewRightBtn');
+    await expect(page.locator('#spoolRotationLevel')).toHaveText('-90 deg');
+    await page.click('#spoolViewSelectedBtn');
+    await expect(page.locator('#spoolIsolateBtn')).toHaveAttribute('aria-pressed', 'true');
+    await page.click('#spoolViewHomeBtn');
+    await expect(page.locator('#spoolRotationLevel')).toHaveText('0 deg');
+    await expect(page.locator('#spoolIsolateBtn')).toHaveAttribute('aria-pressed', 'false');
+    await page.click('#spoolOrbitBtn');
+    await expect(page.locator('#spoolOrbitBtn')).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.locator('#spoolVisualCanvas')).toHaveClass(/is-orbit-tool/);
+    const transformBeforeOrbit = await page.locator('#spoolVisualCanvas svg').evaluate(svg => svg.style.transform);
+    const orbitBox = await page.locator('#spoolVisualCanvas').boundingBox();
+    expect(orbitBox).toBeTruthy();
+    const orbitStartX = orbitBox.x + orbitBox.width / 2 + 120;
+    const orbitStartY = orbitBox.y + orbitBox.height / 2;
+    const orbitEndX = orbitBox.x + orbitBox.width / 2;
+    const orbitEndY = orbitBox.y + orbitBox.height / 2 + 120;
+    const canvas = page.locator('#spoolVisualCanvas');
+    await canvas.dispatchEvent('pointerdown', {
+      pointerId: 17,
+      pointerType: 'mouse',
+      button: 0,
+      buttons: 1,
+      clientX: orbitStartX,
+      clientY: orbitStartY,
+    });
+    await canvas.dispatchEvent('pointermove', {
+      pointerId: 17,
+      pointerType: 'mouse',
+      button: 0,
+      buttons: 1,
+      clientX: orbitEndX,
+      clientY: orbitEndY,
+    });
+    await canvas.dispatchEvent('pointerup', {
+      pointerId: 17,
+      pointerType: 'mouse',
+      button: 0,
+      buttons: 0,
+      clientX: orbitEndX,
+      clientY: orbitEndY,
+    });
+    await expect.poll(() => page.locator('#spoolVisualCanvas svg').evaluate(svg => svg.style.transform))
+      .not.toBe(transformBeforeOrbit);
+    await expect(page.locator('#spoolRotationLevel')).not.toHaveText('0 deg');
+    await page.click('#spoolOrbitBtn');
+    await expect(page.locator('#spoolOrbitBtn')).toHaveAttribute('aria-pressed', 'false');
+    await page.click('#spoolFitViewBtn');
+    await expect(page.locator('#spoolRotationLevel')).toHaveText('0 deg');
+    await page.click('#spoolIsolateBtn');
+    await expect(page.locator('#spoolIsolateBtn')).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.locator('#spoolVisualCanvas')).toHaveClass(/is-isolating/);
+    const transformBeforePan = await page.locator('#spoolVisualCanvas svg').evaluate(svg => svg.style.transform);
+    await page.locator('#spoolVisualCanvas').focus();
+    await page.keyboard.press('ArrowRight');
+    await expect.poll(() => page.locator('#spoolVisualCanvas svg').evaluate(svg => svg.style.transform))
+      .not.toBe(transformBeforePan);
+
+    await page.fill('#gridCell', '10');
+    await expect(page.locator('#gridCellValue')).toHaveText('10 ft');
+    await page.fill('#clampKitsPerSupport', '3');
+    await expect(page.locator('#clampKitsPerSupportValue')).toHaveText('3');
+    await expect(page.locator('#spoolImpact')).toContainText('Clamp kits');
+    await expect(page.locator('#spoolKpis')).toContainText('Spools');
+
+    await page.click('#generateBtn');
+    await expect(page.locator('.spool-summary-table')).toBeVisible();
+    await expect(page.locator('[data-spool-row="SP-001"]')).toBeVisible();
+    await expect(page.locator('#results')).toContainText('Splice Plate Pairs');
+
+    await page.locator('[data-spool-row="SP-001"]').click();
+    await expect(page.locator('[data-spool-row="SP-001"]')).toHaveClass(/is-selected/);
+    await expect(page.locator('#spoolInspector')).toContainText('TRAY');
+  });
+
+  test('exports generated spool sheets as a real XLSX file', async ({ page }) => {
+    await page.evaluate(() => {
+      const trays = [
+        { tray_id: 'XLSX-TRAY-A', start_x: 0, start_y: 0, start_z: 10, end_x: 24, end_y: 0, end_z: 10, inside_width: 24 },
+        { tray_id: 'XLSX-TRAY-B', start_x: 0, start_y: 12, start_z: 12, end_x: 24, end_y: 12, end_z: 12, inside_width: 18 },
+      ];
+      const cables = [
+        { cable_tag: 'XLSX-CBL-1', from: 'SWGR-1', to: 'MTR-1', length_ft: 44, route_preference: 'XLSX-TRAY-A' },
+      ];
+      localStorage.setItem('CTR_PROJECT_V1', JSON.stringify({ name: 'Spool Export E2E', trays, cables, settings: { units: 'imperial', theme: 'system' } }));
+      localStorage.setItem('base:traySchedule', JSON.stringify(trays));
+      localStorage.setItem('base:cableSchedule', JSON.stringify(cables));
+    });
+    await page.goto(staticSite.url('spoolsheets.html?e2e=1'));
+    await page.waitForLoadState('networkidle');
+    await dismissOnboarding(page);
+
+    await page.click('#generateBtn');
+    await expect(page.locator('#exportXlsxBtn')).toBeEnabled();
+
+    const [download] = await Promise.all([
+      page.waitForEvent('download'),
+      page.click('#exportXlsxBtn'),
+    ]);
+    const suggestedFilename = download.suggestedFilename();
+    expect(suggestedFilename).toMatch(/^spool-sheets-\d{4}-\d{2}-\d{2}\.xlsx$/);
+
+    const exportPath = await download.path();
+    expect(exportPath).toBeTruthy();
+    const bytes = await fs.readFile(exportPath);
+    expect(bytes.length).toBeGreaterThan(1000);
+    expect(bytes.subarray(0, 4).toString('hex')).toBe('504b0304');
+  });
+
+  test('uses Raceway Schedule tray edits without requiring manual Save', async ({ page }) => {
+    await page.evaluate(() => {
+      localStorage.setItem('tour_done_racewaySchedule', '1');
+    });
+    await page.goto(staticSite.url('racewayschedule.html?e2e=1'));
+    await page.waitForLoadState('networkidle');
+    await dismissResume(page);
+    await dismissOnboarding(page);
+
+    await page.click('#add-tray-btn');
+    const row = page.locator('#trayTable tbody tr').last();
+    await row.locator('[name="tray_id"]').fill('AUTO-SP-1');
+    await row.locator('[name="start_x"]').fill('0');
+    await row.locator('[name="start_y"]').fill('0');
+    await row.locator('[name="start_z"]').fill('8');
+    await row.locator('[name="end_x"]').fill('24');
+    await row.locator('[name="end_y"]').fill('0');
+    await row.locator('[name="end_z"]').fill('8');
+    await row.locator('[name="inside_width"]').selectOption('12');
+    await row.locator('[name="tray_depth"]').selectOption('4');
+
+    await expect.poll(() => page.evaluate(() => {
+      const rows = JSON.parse(localStorage.getItem('base:traySchedule') || '[]');
+      return rows.some(row => row.tray_id === 'AUTO-SP-1');
+    })).toBe(true);
+
+    await page.goto(staticSite.url('spoolsheets.html?e2e=1'));
+    await page.waitForLoadState('networkidle');
+    await dismissOnboarding(page);
+
+    await expect(page.locator('#spoolPreviewStatus')).toContainText('Exact coordinates for 1 tray segments');
+    await expect(page.locator('#spoolVisualCanvas svg')).toBeVisible();
+    await expect(page.locator('#spoolInspector')).toContainText('AUTO-SP-1');
+  });
+
+  test('keeps live spool preview usable on mobile width', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 820 });
+    await page.evaluate(() => {
+      const trays = [
+        { tray_id: 'M-TRAY-1', start_x: 0, start_y: 0, start_z: 10, end_x: 20, end_y: 0, end_z: 10, inside_width: 12 },
+      ];
+      localStorage.setItem('CTR_PROJECT_V1', JSON.stringify({ name: 'Spool Mobile E2E', trays, cables: [], settings: { units: 'imperial', theme: 'system' } }));
+      localStorage.setItem('base:traySchedule', JSON.stringify(trays));
+      localStorage.setItem('base:cableSchedule', '[]');
+    });
+    await page.goto(staticSite.url('spoolsheets.html?e2e=1'));
+    await page.waitForLoadState('networkidle');
+    await dismissOnboarding(page);
+
+    await expect(page.locator('#spoolVisualCanvas svg')).toBeVisible();
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+    expect(overflow).toBeLessThanOrEqual(2);
   });
 });
 

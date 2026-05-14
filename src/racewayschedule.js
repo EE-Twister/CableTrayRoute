@@ -338,11 +338,44 @@ document.addEventListener('DOMContentLoaded', async () => {
   const dirty = createDirtyTracker();
   const markSaved = () => dirty.markClean();
   const markUnsaved = () => dirty.markDirty();
+  const TABLE_AUTOSAVE_DELAY_MS = 150;
+  let tableAutosaveTimer = null;
+
+  function canAutosaveTable(table) {
+    if (!table?.tbody || !Array.isArray(table.columns)) return false;
+    const requiredCellCount = table.columns.length + (table.colOffset || 0);
+    return Array.from(table.tbody.rows).every(row => row.cells.length >= requiredCellCount);
+  }
+
+  function flushRacewayTableAutosave() {
+    if (tableAutosaveTimer) {
+      clearTimeout(tableAutosaveTimer);
+      tableAutosaveTimer = null;
+    }
+    try {
+      if (canAutosaveTable(tables.trays)) {
+        tables.trays.save();
+      }
+      if (canAutosaveTable(tables.conduits)) {
+        tables.conduits.save();
+        persistAllConduits();
+      }
+      markSaved();
+    } catch (e) {
+      console.error('Failed to auto-save raceway table data', e);
+    }
+  }
+
+  function scheduleRacewayTableAutosave() {
+    if (tableAutosaveTimer) clearTimeout(tableAutosaveTimer);
+    tableAutosaveTimer = setTimeout(flushRacewayTableAutosave, TABLE_AUTOSAVE_DELAY_MS);
+  }
 
   let importInProgress = false;
   let importType = null;
   const handleChange = () => {
     markUnsaved();
+    scheduleRacewayTableAutosave();
     if (importInProgress) {
       importInProgress = false;
       if (importType === 'trays') emitSticky('imports-ready-trays', 'importsReadyTrays');
@@ -351,6 +384,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       emitAsync('imports-ready');
     }
   };
+
+  window.addEventListener('pagehide', flushRacewayTableAutosave);
+  window.addEventListener('beforeunload', flushRacewayTableAutosave);
 
   ['import-tray-xlsx-input','import-conduit-xlsx-input'].forEach(id => {
     document.getElementById(id)?.addEventListener('change', () => {

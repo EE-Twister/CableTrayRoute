@@ -238,6 +238,7 @@ function mountPageTransitions() {
     if (!link) return;
     const href = link.getAttribute('href');
     if (!href || href.startsWith('#') || href.startsWith('mailto:') || href.startsWith('http')) return;
+    if (link.hasAttribute('download') || href.startsWith('blob:') || href.startsWith('data:')) return;
     if (e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
     if (link.target && link.target !== '_self') return;
 

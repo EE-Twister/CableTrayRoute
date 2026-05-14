@@ -70,6 +70,24 @@ describe('generateSpoolSheets — single tray', () => {
     const r = generateSpoolSheets(trays, []);
     assert.ok(r.spools[0].bracketCount >= 1);
   });
+
+  it('calculates shop hardware from joints and supports', () => {
+    const trays = [tray('T1', 0, 0, 10, 24, 0, 10)];
+    const r = generateSpoolSheets(trays, [], {
+      sectionLengthFt: 12,
+      splicePlatePairsPerJoint: 1,
+      clampKitsPerSupport: 2,
+      groundJumpersPerJoint: 1,
+      fieldCutAllowancePct: 0,
+      spareHardwarePct: 0,
+    });
+    const s = r.spools[0];
+    assert.strictEqual(s.hardware.sectionJointCount, 1);
+    assert.strictEqual(s.hardware.splicePlatePairs, 1);
+    assert.strictEqual(s.hardware.clampKits, s.bracketCount * 2);
+    assert.strictEqual(s.hardware.groundJumpers, 1);
+    assert.strictEqual(r.summary.totalClampKits, s.hardware.clampKits);
+  });
 });
 
 // ---------------------------------------------------------------------------

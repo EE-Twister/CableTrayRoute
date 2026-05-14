@@ -258,6 +258,123 @@ kWh_temp = kWh_design / K_temp</pre>
           </div>
         </fieldset>
 
+        <!-- Rack Layout & Connections -->
+        <fieldset>
+          <legend><strong>Rack Layout &amp; Connections</strong></legend>
+          <p class="field-hint">
+            These values generate coordination-level top and elevation views from the selected battery size.
+            Verify final dimensions and connection details against the battery manufacturer shop drawings.
+          </p>
+
+          <div class="battery-layout-grid">
+            <div class="field-row">
+              <label for="rack-dc-bus-voltage-v">DC bus voltage (V)</label>
+              <input type="number" id="rack-dc-bus-voltage-v" min="1" step="1" value="480"
+                     aria-describedby="rack-dc-bus-voltage-hint">
+              <p id="rack-dc-bus-voltage-hint" class="field-hint">
+                Nominal battery string / UPS DC bus voltage used to compute cells in series.
+              </p>
+            </div>
+
+            <div class="field-row">
+              <label for="rack-cell-voltage-v">Nominal cell voltage (V)</label>
+              <input type="number" id="rack-cell-voltage-v" min="0.1" step="0.1" value="2"
+                     aria-describedby="rack-cell-voltage-hint">
+              <p id="rack-cell-voltage-hint" class="field-hint">
+                Typical values: 2.0 V lead-acid, 3.2 V lithium-ion, 1.2 V NiCd.
+              </p>
+            </div>
+
+            <div class="field-row">
+              <label for="rack-cell-capacity-ah">Cell capacity (Ah)</label>
+              <input type="number" id="rack-cell-capacity-ah" min="1" step="1" value="200"
+                     aria-describedby="rack-cell-capacity-hint">
+              <p id="rack-cell-capacity-hint" class="field-hint">
+                Amp-hour capacity per cell string branch at the selected discharge rate.
+              </p>
+            </div>
+
+            <div class="field-row">
+              <label for="rack-cells-per-module">Cells per module</label>
+              <input type="number" id="rack-cells-per-module" min="1" step="1" value="12"
+                     aria-describedby="rack-cells-per-module-hint">
+              <p id="rack-cells-per-module-hint" class="field-hint">
+                Module grouping used for the elevation view and series jumper schedule.
+              </p>
+            </div>
+
+            <div class="field-row">
+              <label for="rack-modules-per-rack">Modules per rack</label>
+              <input type="number" id="rack-modules-per-rack" min="1" step="1" value="40"
+                     aria-describedby="rack-modules-per-rack-hint">
+              <p id="rack-modules-per-rack-hint" class="field-hint">
+                Available module slots per rack frame.
+              </p>
+            </div>
+
+            <div class="field-row">
+              <label for="rack-racks-per-row">Racks per row</label>
+              <input type="number" id="rack-racks-per-row" min="1" step="1" value="4"
+                     aria-describedby="rack-racks-per-row-hint">
+              <p id="rack-racks-per-row-hint" class="field-hint">
+                Maximum rack count before the generated layout starts a second row.
+              </p>
+            </div>
+
+            <div class="field-row">
+              <label for="rack-width-ft">Rack width (ft)</label>
+              <input type="number" id="rack-width-ft" min="0.1" step="0.1" value="2.5">
+            </div>
+
+            <div class="field-row">
+              <label for="rack-depth-ft">Rack depth (ft)</label>
+              <input type="number" id="rack-depth-ft" min="0.1" step="0.1" value="3">
+            </div>
+
+            <div class="field-row">
+              <label for="rack-height-ft">Rack height (ft)</label>
+              <input type="number" id="rack-height-ft" min="0.1" step="0.1" value="7">
+            </div>
+
+            <div class="field-row">
+              <label for="rack-front-aisle-ft">Front aisle (ft)</label>
+              <input type="number" id="rack-front-aisle-ft" min="0.1" step="0.1" value="3">
+            </div>
+
+            <div class="field-row">
+              <label for="rack-rear-clearance-ft">Rear clearance (ft)</label>
+              <input type="number" id="rack-rear-clearance-ft" min="0.1" step="0.1" value="1">
+            </div>
+
+            <div class="field-row">
+              <label for="rack-side-clearance-ft">Side clearance (ft)</label>
+              <input type="number" id="rack-side-clearance-ft" min="0.1" step="0.1" value="2">
+            </div>
+
+            <div class="field-row">
+              <label for="rack-row-spacing-ft">Row spacing (ft)</label>
+              <input type="number" id="rack-row-spacing-ft" min="0.1" step="0.1" value="4">
+            </div>
+
+            <div class="field-row">
+              <label for="rack-terminal-side">Terminal side</label>
+              <select id="rack-terminal-side">
+                <option value="front-left">Front left</option>
+                <option value="front-right">Front right</option>
+                <option value="rear-left">Rear left</option>
+                <option value="rear-right">Rear right</option>
+              </select>
+            </div>
+
+            <div class="field-row battery-layout-check">
+              <label>
+                <input type="checkbox" id="rack-string-protection" checked>
+                Include string fuse/disconnect callouts
+              </label>
+            </div>
+          </div>
+        </fieldset>
+
         <button type="submit" class="primary-btn">Run Analysis</button>
 
       </form>
@@ -294,7 +411,10 @@ kWh_temp = kWh_design / K_temp</pre>
           higher energy density. NiCd excels in extreme cold.</li>
         <li>Enter the battery room ambient temperature. IEEE 485 de-rates capacity below 25 &deg;C.</li>
         <li>Set the design margin (minimum 10% per IEEE 485 &sect;5.4) and UPS power factor.</li>
-        <li>Click <strong>Run Analysis</strong> to see the required bank size and UPS kVA.</li>
+        <li>Confirm or override the rack layout assumptions for DC bus voltage, module grouping,
+          physical rack size, and terminal side.</li>
+        <li>Click <strong>Run Analysis</strong> to see the required bank size, UPS kVA, and rack
+          connection views.</li>
       </ol>
       <h3>Interpreting results</h3>
       <ul>
@@ -306,6 +426,9 @@ kWh_temp = kWh_design / K_temp</pre>
           125% of the specified average load. Use this to evaluate load shedding strategies.</li>
         <li><strong>UPS kVA</strong> — minimum UPS inverter rating based on peak load and
           output power factor. Select the next-larger standard size from the vendor.</li>
+        <li><strong>Rack layout views</strong> — top and elevation views show coordination-level
+          rack envelopes, string routing, parallel bus ties, and disconnect/fuse callouts. Confirm
+          final details with manufacturer shop drawings.</li>
       </ul>
       <p>See <a href="docs/battery-sizing.md">Battery / UPS Sizing Guide</a> for full technical
       details and standards references.</p>

@@ -6,14 +6,16 @@
  * with straight sections, fittings, support brackets, and assigned cables.
  *
  * Industry background:
- *   Trimble SysQue and Bentley Raceway both support LOD-400 spool sheet output.
- *   Prefabrication reduces field labour by 30-50 % for structured raceway runs
- *   (BICSI TDM-1 §12, NEMA VE 2 §9).
+ *   BIMForum LOD defines LOD 400 model elements as carrying fabrication,
+ *   assembly, and installation information. Trimble SysQue literature describes
+ *   data-rich LOD 400 MEP constructible models in Revit. The grouping strategy
+ *   below is a planning heuristic, not a prescribed standard method.
  *
  * References:
- *   NEMA VE 1-2017 §4  — Load Classification / Span
- *   NEMA VE 2-2013 §9  — Prefabrication guidelines
- *   BICSI TDM-1 §12    — Raceway installation
+ *   NEMA BI-50016-2024 (formerly NEMA VE 2) - Cable Tray Installation Guidelines
+ *   BICSI TDMM 15th edition, Chapter 6 - Horizontal Distribution Systems
+ *   BIMForum Level of Development Specification - LOD 400 fabrication context
+ *   Trimble SysQue product literature - LOD 400 MEP constructible modeling
  */
 
 /** Standard tray section length (ft). */
@@ -21,6 +23,13 @@ const DEFAULT_SECTION_LEN = 12;
 
 /** Typical self-weight of a tray (lbs/ft) used when cable weight is unknown. */
 const TRAY_SELF_WEIGHT_LB_FT = 2;
+
+const DEFAULT_SPLICE_PLATE_PAIRS_PER_JOINT = 1;
+const DEFAULT_CLAMP_KITS_PER_SUPPORT = 2;
+const DEFAULT_GROUND_JUMPERS_PER_JOINT = 1;
+const DEFAULT_EXPANSION_FITTING_INTERVAL_FT = 100;
+const DEFAULT_FIELD_CUT_ALLOWANCE_PCT = 5;
+const DEFAULT_SPARE_HARDWARE_PCT = 10;
 
 // ---------------------------------------------------------------------------
 // Geometry helpers
@@ -45,6 +54,10 @@ function trayMidpoint(tray) {
     y: ((parseFloat(tray.start_y) || 0) + (parseFloat(tray.end_y) || 0)) / 2,
     z: ((parseFloat(tray.start_z) || 0) + (parseFloat(tray.end_z) || 0)) / 2,
   };
+}
+
+function getTrayId(tray) {
+  return tray.tray_id || tray.id || '';
 }
 
 // ---------------------------------------------------------------------------
@@ -106,6 +119,112 @@ function assignSpools(trays, options = {}) {
 // Per-spool material calculation
 // ---------------------------------------------------------------------------
 
+function positiveNumber(value, fallback) {
+  const number = Number(value);
+  return Number.isFinite(number) && number >= 0 ? number : fallback;
+}
+
+function withSpares(quantity, sparePct) {
+  const number = positiveNumber(quantity, 0);
+  if (number <= 0) return 0;
+  return Math.ceil(number * (1 + positiveNumber(sparePct, DEFAULT_SPARE_HARDWARE_PCT) / 100));
+}
+
+function calculateHardware(spool, opts = {}) {
+  const spareHardwarePct = positiveNumber(opts.spareHardwarePct, DEFAULT_SPARE_HARDWARE_PCT);
+  const sectionJointCount = Math.max(0, spool.straightSections - 1);
+  const splicePlatePairsPerJoint = positiveNumber(
+    opts.splicePlatePairsPerJoint,
+    DEFAULT_SPLICE_PLATE_PAIRS_PER_JOINT
+  );
+  const clampKitsPerSupport = positiveNumber(opts.clampKitsPerSupport, DEFAULT_CLAMP_KITS_PER_SUPPORT);
+  const groundJumpersPerJoint = positiveNumber(
+    opts.groundJumpersPerJoint,
+    DEFAULT_GROUND_JUMPERS_PER_JOINT
+  );
+  const expansionFittingIntervalFt = positiveNumber(
+    opts.expansionFittingIntervalFt,
+    DEFAULT_EXPANSION_FITTING_INTERVAL_FT
+  );
+  const fieldCutAllowancePct = positiveNumber(
+    opts.fieldCutAllowancePct,
+    DEFAULT_FIELD_CUT_ALLOWANCE_PCT
+  );
+  const fieldCutAllowanceFt = +(spool.totalLengthFt * fieldCutAllowancePct / 100).toFixed(2);
+
+  const baseSplicePlatePairs = Math.ceil(sectionJointCount * splicePlatePairsPerJoint);
+  const baseClampKits = Math.ceil(spool.bracketCount * clampKitsPerSupport);
+  const baseGroundJumpers = Math.ceil(sectionJointCount * groundJumpersPerJoint);
+  const baseExpansionFittings = expansionFittingIntervalFt > 0
+    ? Math.floor(spool.totalLengthFt / expansionFittingIntervalFt)
+    : 0;
+
+  const items = [
+    {
+      item: 'Straight tray sections',
+      quantity: spool.straightSections,
+      baseQuantity: spool.straightSections,
+      spareQuantity: 0,
+      unit: 'ea',
+      basis: `${spool.totalLengthFt.toFixed(1)} ft run / standard section length`,
+    },
+    {
+      item: 'Splice plate pairs',
+      quantity: withSpares(baseSplicePlatePairs, spareHardwarePct),
+      baseQuantity: baseSplicePlatePairs,
+      spareQuantity: Math.max(0, withSpares(baseSplicePlatePairs, spareHardwarePct) - baseSplicePlatePairs),
+      unit: 'pair',
+      basis: `${sectionJointCount} section joint${sectionJointCount === 1 ? '' : 's'} x ${splicePlatePairsPerJoint} pair/joint + spares`,
+    },
+    {
+      item: 'Cable tray clamp kits',
+      quantity: withSpares(baseClampKits, spareHardwarePct),
+      baseQuantity: baseClampKits,
+      spareQuantity: Math.max(0, withSpares(baseClampKits, spareHardwarePct) - baseClampKits),
+      unit: 'kit',
+      basis: `${spool.bracketCount} support bracket${spool.bracketCount === 1 ? '' : 's'} x ${clampKitsPerSupport} kit/support + spares`,
+    },
+    {
+      item: 'Grounding jumpers',
+      quantity: withSpares(baseGroundJumpers, spareHardwarePct),
+      baseQuantity: baseGroundJumpers,
+      spareQuantity: Math.max(0, withSpares(baseGroundJumpers, spareHardwarePct) - baseGroundJumpers),
+      unit: 'ea',
+      basis: `${sectionJointCount} section joint${sectionJointCount === 1 ? '' : 's'} x ${groundJumpersPerJoint} jumper/joint + spares`,
+    },
+    {
+      item: 'Expansion fittings',
+      quantity: withSpares(baseExpansionFittings, spareHardwarePct),
+      baseQuantity: baseExpansionFittings,
+      spareQuantity: Math.max(0, withSpares(baseExpansionFittings, spareHardwarePct) - baseExpansionFittings),
+      unit: 'ea',
+      basis: expansionFittingIntervalFt > 0
+        ? `One every ${expansionFittingIntervalFt} ft of tray run + spares`
+        : 'Disabled',
+    },
+    {
+      item: 'Field-cut allowance',
+      quantity: fieldCutAllowanceFt,
+      baseQuantity: fieldCutAllowanceFt,
+      spareQuantity: 0,
+      unit: 'ft',
+      basis: `${fieldCutAllowancePct}% of tray run length`,
+    },
+  ];
+
+  return {
+    sectionJointCount,
+    splicePlatePairs: items[1].quantity,
+    clampKits: items[2].quantity,
+    groundJumpers: items[3].quantity,
+    expansionFittings: items[4].quantity,
+    fieldCutAllowanceFt,
+    materialLengthWithAllowanceFt: +(spool.totalLengthFt + fieldCutAllowanceFt).toFixed(2),
+    spareHardwarePct,
+    items,
+  };
+}
+
 /**
  * Calculate materials for a single spool assembly.
  *
@@ -144,7 +263,7 @@ function calcSpoolSheet(spoolId, trays, cables, opts = {}) {
   for (const t of trays) {
     const len = trayLength(t);
     totalLengthFt += len;
-    trayIds.push(t.tray_id);
+    trayIds.push(getTrayId(t));
   }
 
   const width_in = parseFloat(trays[0]?.inside_width) || 12;
@@ -180,7 +299,7 @@ function calcSpoolSheet(spoolId, trays, cables, opts = {}) {
     }
   }
 
-  return {
+  const spool = {
     spoolId,
     trayCount:        trays.length,
     totalLengthFt:    +totalLengthFt.toFixed(2),
@@ -190,6 +309,11 @@ function calcSpoolSheet(spoolId, trays, cables, opts = {}) {
     estimatedWeight,
     cables:           spoolCables,
     trayIds,
+  };
+
+  return {
+    ...spool,
+    hardware: calculateHardware(spool, opts),
   };
 }
 
@@ -217,6 +341,12 @@ function calcSpoolSheet(spoolId, trays, cables, opts = {}) {
  *   totalBrackets:      number,
  *   totalEstimatedWeight: number,
  *   totalCableEntries:  number,
+ *   totalSplicePlatePairs: number,
+ *   totalClampKits: number,
+ *   totalGroundJumpers: number,
+ *   totalExpansionFittings: number,
+ *   totalFieldCutAllowanceFt: number,
+ *   totalMaterialLengthWithAllowanceFt: number,
  * }} SpoolSummary
  */
 export function generateSpoolSheets(trays, cables, options = {}) {
@@ -227,6 +357,9 @@ export function generateSpoolSheets(trays, cables, options = {}) {
         spoolCount: 0, totalTrays: 0, totalLengthFt: 0,
         totalSections: 0, totalBrackets: 0, totalEstimatedWeight: 0,
         totalCableEntries: 0,
+        totalSplicePlatePairs: 0, totalClampKits: 0, totalGroundJumpers: 0,
+        totalExpansionFittings: 0, totalFieldCutAllowanceFt: 0,
+        totalMaterialLengthWithAllowanceFt: 0,
       },
     };
   }
@@ -253,6 +386,12 @@ export function generateSpoolSheets(trays, cables, options = {}) {
     acc.totalBrackets         += s.bracketCount;
     acc.totalEstimatedWeight  += s.estimatedWeight;
     acc.totalCableEntries     += s.cables.length;
+    acc.totalSplicePlatePairs += s.hardware?.splicePlatePairs || 0;
+    acc.totalClampKits        += s.hardware?.clampKits || 0;
+    acc.totalGroundJumpers    += s.hardware?.groundJumpers || 0;
+    acc.totalExpansionFittings += s.hardware?.expansionFittings || 0;
+    acc.totalFieldCutAllowanceFt += s.hardware?.fieldCutAllowanceFt || 0;
+    acc.totalMaterialLengthWithAllowanceFt += s.hardware?.materialLengthWithAllowanceFt || s.totalLengthFt;
     return acc;
   }, {
     spoolCount:            spools.length,
@@ -262,9 +401,17 @@ export function generateSpoolSheets(trays, cables, options = {}) {
     totalBrackets:         0,
     totalEstimatedWeight:  0,
     totalCableEntries:     0,
+    totalSplicePlatePairs: 0,
+    totalClampKits:        0,
+    totalGroundJumpers:    0,
+    totalExpansionFittings: 0,
+    totalFieldCutAllowanceFt: 0,
+    totalMaterialLengthWithAllowanceFt: 0,
   });
 
   summary.totalLengthFt = +summary.totalLengthFt.toFixed(2);
+  summary.totalFieldCutAllowanceFt = +summary.totalFieldCutAllowanceFt.toFixed(2);
+  summary.totalMaterialLengthWithAllowanceFt = +summary.totalMaterialLengthWithAllowanceFt.toFixed(2);
 
   return { spools, summary };
 }

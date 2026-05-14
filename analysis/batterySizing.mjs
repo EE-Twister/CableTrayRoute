@@ -294,6 +294,7 @@ export function upsKvaRequired(peakKw, upsPowerFactor = 0.9) {
  * @param {number}  [inputs.ambientTempC=25]      Ambient temperature (°C, default 25)
  * @param {number}  [inputs.designMarginPct=10]   Design margin percentage (default 10)
  * @param {number}  [inputs.upsPowerFactor=0.9]   UPS output power factor (default 0.9)
+ * @param {object}  [inputs.rackLayoutInputs]      Optional physical rack layout overrides for UI rendering
  * @param {{ powerKw: number, durationHours: number }[]} [inputs.loadProfilePeriods]
  *   Optional multi-period duty cycle. When provided, overrides averageLoadKw × runtimeHours
  *   for the net energy calculation. The averageLoadKw is still used for the runtime curve.
@@ -309,6 +310,7 @@ export function runBatterySizingAnalysis(inputs) {
     ambientTempC = 25,
     designMarginPct = 10,
     upsPowerFactor = 0.9,
+    rackLayoutInputs,
     loadProfilePeriods,
   } = inputs;
 
@@ -424,6 +426,9 @@ export function runBatterySizingAnalysis(inputs) {
     // UPS sizing
     kvaRequired:  ups.kvaRequired,
     standardKva:  ups.standardKva,
+    rackLayoutInputs: rackLayoutInputs && typeof rackLayoutInputs === 'object'
+      ? { ...rackLayoutInputs }
+      : undefined,
     // Metadata
     warnings,
     timestamp: new Date().toISOString(),

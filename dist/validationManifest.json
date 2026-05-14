@@ -1,8 +1,8 @@
 {
-  "generatedAt": "2026-05-14T03:03:24.180Z",
+  "generatedAt": "2026-05-14T18:33:46.801Z",
   "summary": {
-    "testSuiteCount": 146,
-    "totalAssertions": 5889,
+    "testSuiteCount": 148,
+    "totalAssertions": 5953,
     "benchmarkCount": 6,
     "standardCount": 13
   },
@@ -72,6 +72,14 @@
         "minimizeCostConductors"
       ],
       "assertionCount": 143
+    },
+    {
+      "file": "tests/batteryRackLayout.test.mjs",
+      "groups": [
+        "normalizeBatteryRackLayoutInputs()",
+        "buildBatteryRackLayoutModel()"
+      ],
+      "assertionCount": 34
     },
     {
       "file": "tests/batterySizing.test.mjs",
@@ -1216,7 +1224,15 @@
         "generateSpoolSheets — grouping",
         "generateSpoolSheets — summary totals"
       ],
-      "assertionCount": 16
+      "assertionCount": 21
+    },
+    {
+      "file": "tests/spoolSheetVisualModel.test.mjs",
+      "groups": [
+        "buildSpoolSheetVisualModel",
+        "summarizeSpoolImpact"
+      ],
+      "assertionCount": 25
     },
     {
       "file": "tests/structuralLoadCombinations.test.mjs",

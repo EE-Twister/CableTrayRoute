@@ -14,6 +14,7 @@
 @import "./src/styles/homepage.css";
 @import "./src/styles/components.css";
 @import "./src/styles/isometric.css";
+@import "./src/styles/spoolsheets.css";
 @import "./src/styles/docs.css";
 @import "./src/styles/context-menu.css";
 @import "./src/styles/panel-schedule.css";
@@ -4168,5 +4169,231 @@ body.theme-high-contrast .haz-row-status-pill {
 
   .haz-map-inspector {
     order: 2;
+  }
+}
+
+.battery-layout-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: .75rem 1rem;
+  align-items: start;
+}
+
+.battery-layout-check {
+  align-self: center;
+}
+
+.battery-layout-check label {
+  display: flex;
+  align-items: center;
+  gap: .45rem;
+}
+
+.battery-rack-layout {
+  display: grid;
+  gap: 1rem;
+}
+
+.battery-rack-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
+  gap: .6rem;
+}
+
+.battery-rack-summary-grid div {
+  border: 1px solid var(--border-color, #d1d5db);
+  border-radius: 8px;
+  padding: .6rem .7rem;
+  background: color-mix(in srgb, var(--card-bg, #ffffff) 94%, #e8f1fb 6%);
+}
+
+.battery-rack-summary-grid span {
+  display: block;
+  font-size: .78rem;
+  color: var(--text-muted, #64748b);
+}
+
+.battery-rack-summary-grid strong {
+  display: block;
+  margin-top: .2rem;
+  font-size: 1.05rem;
+}
+
+.battery-rack-view-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 1rem;
+  align-items: start;
+}
+
+.battery-rack-view {
+  margin: 0;
+  border: 1px solid var(--border-color, #d1d5db);
+  border-radius: 8px;
+  padding: .75rem;
+  background: color-mix(in srgb, var(--card-bg, #ffffff) 96%, #f1f5f9 4%);
+}
+
+.battery-rack-view figcaption {
+  margin-bottom: .5rem;
+  font-weight: 700;
+}
+
+.battery-rack-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  min-height: 260px;
+}
+
+.battery-layout-room {
+  fill: color-mix(in srgb, var(--card-bg, #ffffff) 94%, #f8fafc 6%);
+  stroke: var(--border-color, #94a3b8);
+  stroke-width: 2;
+}
+
+.battery-layout-aisle {
+  fill: color-mix(in srgb, #94a3b8 15%, transparent);
+  stroke: color-mix(in srgb, #64748b 45%, transparent);
+  stroke-width: 1.2;
+  stroke-dasharray: 6 5;
+}
+
+.battery-rack-plan-rack rect,
+.battery-rack-elevation-frame {
+  fill: color-mix(in srgb, #f8fafc 88%, #dbeafe 12%);
+  stroke: color-mix(in srgb, #334155 80%, var(--border-color, #94a3b8));
+  stroke-width: 2;
+}
+
+.battery-rack-plan-rack text,
+.battery-rack-title,
+.battery-rack-small-label,
+.battery-dc-bus-label,
+.battery-polarity-label,
+.battery-string-jumper text {
+  fill: var(--text-color, #0f172a);
+  font-size: 12px;
+  font-weight: 700;
+  paint-order: stroke;
+  stroke: var(--card-bg, #ffffff);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+}
+
+.battery-rack-small-label {
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.battery-bus-line {
+  stroke-width: 4;
+  stroke-linecap: round;
+}
+
+.battery-bus-line--positive {
+  stroke: #dc2626;
+}
+
+.battery-bus-line--negative {
+  stroke: #2563eb;
+}
+
+.battery-string-route {
+  fill: none;
+  stroke-width: 1.8;
+  stroke-dasharray: 5 4;
+  opacity: .88;
+}
+
+.battery-dc-bus-box {
+  fill: color-mix(in srgb, #111827 86%, #334155);
+  stroke: #f8fafc;
+  stroke-width: 1.5;
+}
+
+.battery-dc-bus-label {
+  fill: #ffffff;
+  stroke: #111827;
+  font-size: 10px;
+}
+
+.battery-module-slot {
+  stroke: color-mix(in srgb, #1f2937 50%, transparent);
+  stroke-width: .8;
+}
+
+.battery-module-slot.is-used {
+  opacity: .88;
+}
+
+.battery-module-slot.is-empty {
+  fill: transparent;
+  stroke: color-mix(in srgb, #94a3b8 58%, transparent);
+  stroke-dasharray: 3 3;
+}
+
+.battery-string-jumper line {
+  stroke-width: 2.2;
+  stroke-linecap: round;
+}
+
+.battery-connection-table {
+  min-width: 760px;
+}
+
+.battery-layout-warnings {
+  margin-top: 0;
+}
+
+body.dark-mode .battery-rack-summary-grid div,
+body.dark-mode .battery-rack-view {
+  background: #111827;
+  border-color: #374151;
+}
+
+body.dark-mode .battery-layout-room,
+body.dark-mode .battery-rack-plan-rack rect,
+body.dark-mode .battery-rack-elevation-frame {
+  fill: #0f172a;
+  stroke: #64748b;
+}
+
+body.dark-mode .battery-rack-plan-rack text,
+body.dark-mode .battery-rack-title,
+body.dark-mode .battery-rack-small-label,
+body.dark-mode .battery-polarity-label,
+body.dark-mode .battery-string-jumper text {
+  fill: #f8fafc;
+  stroke: #0f172a;
+}
+
+body.theme-high-contrast .battery-rack-view,
+body.theme-high-contrast .battery-rack-summary-grid div {
+  background: #000;
+  border-color: currentColor;
+}
+
+body.theme-high-contrast .battery-layout-room,
+body.theme-high-contrast .battery-rack-plan-rack rect,
+body.theme-high-contrast .battery-rack-elevation-frame,
+body.theme-high-contrast .battery-module-slot {
+  fill: #000;
+  stroke: currentColor;
+}
+
+body.theme-high-contrast .battery-bus-line,
+body.theme-high-contrast .battery-string-route,
+body.theme-high-contrast .battery-string-jumper line {
+  stroke: currentColor !important;
+}
+
+@media (max-width: 760px) {
+  .battery-rack-view-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .battery-rack-svg {
+    min-height: 220px;
   }
 }

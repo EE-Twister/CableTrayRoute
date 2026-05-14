@@ -141,6 +141,13 @@ Use 15–25% for life-safety and mission-critical systems.
 | Ambient temp (°C) | Battery room / enclosure temperature | −40 to +40 °C |
 | Design margin (%) | IEEE 485 §5.4 additional margin | 10–25% |
 | UPS power factor | UPS output PF (typically 0.9 for modern units) | 0.8–1.0 |
+| DC bus voltage (V) | Nominal battery string / UPS DC bus voltage for rack layout | 125, 240, 480, 600 VDC |
+| Nominal cell voltage (V) | Cell voltage used to compute cells in series | 2.0 lead-acid, 3.2 Li-ion, 1.2 NiCd |
+| Cell capacity (Ah) | Per-cell amp-hour rating at the selected discharge rate | Manufacturer-specific |
+| Cells per module | Cell grouping used for module and jumper layout | 1-24 typical |
+| Modules per rack | Available module slots per rack frame | Manufacturer-specific |
+| Rack geometry | Width, depth, height, racks per row, aisles, and clearances | Project / vendor-specific |
+| Terminal side | Rack side used for generated DC bus routing | Front/rear, left/right |
 
 ---
 
@@ -161,6 +168,18 @@ strategies.
 
 **UPS kVA** — standard UPS size ≥ peak_kW / UPS_PF. This ensures the UPS
 inverter can supply the peak demand without overloading.
+
+**Rack layout views** show a generated top view and elevation view from the
+selected bank size and rack-layout inputs. The top view shows rack envelopes,
+aisles/clearances, the positive and negative DC bus route, and the UPS/DC bus
+tie point. The elevation view shows module slots, occupied modules by string,
+series string grouping, and string jumper callouts. The connection schedule
+lists each series string plus positive and negative home runs to the DC bus.
+
+These views are coordination-level engineering aids. They do not replace
+manufacturer shop drawings, installation drawings, seismic anchorage details,
+ventilation analysis, protective device selection, cable ampacity checks, or
+field-verified terminal layouts.
 
 ---
 
@@ -223,3 +242,10 @@ All functions are exported from `analysis/batterySizing.mjs` with no DOM depende
 | `runtimeCurve(kwhSelected, loadKw, chemistry)` | Runtime at 25/50/75/100/125% load |
 | `upsKvaRequired(peakKw, upsPF)` | UPS kVA requirement and standard size |
 | `runBatterySizingAnalysis(inputs)` | Master orchestrator — call this from the UI |
+
+Rack layout functions are exported from `analysis/batteryRackLayout.mjs`:
+
+| Function | Purpose |
+|----------|---------|
+| `normalizeBatteryRackLayoutInputs(sizingResult, overrides)` | Normalize rack, cell, module, and clearance inputs with stable defaults |
+| `buildBatteryRackLayoutModel(sizingResult, layoutInputs)` | Compute strings, rack placements, connection records, SVG-view geometry, and layout warnings |

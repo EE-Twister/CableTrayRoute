@@ -4,14 +4,54 @@
  *  - Motor Starting      (motorStart.html)
  *  - Time-Current Curves (tcc.html)
  *  - Design Rule Checker (designrulechecker.html)
+ *  - Battery / UPS Sizing (battery.html)
  */
 import { test, expect } from '@playwright/test';
+import fs from 'fs/promises';
+import http from 'http';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root      = path.join(__dirname, '..');
 const pageUrl   = file => 'file://' + path.join(root, file);
+
+async function startStaticServer() {
+  const server = http.createServer(async (req, res) => {
+    try {
+      const url = new URL(req.url, 'http://127.0.0.1');
+      const requested = decodeURIComponent(url.pathname === '/' ? '/index.html' : url.pathname);
+      const filePath = path.resolve(root, `.${requested}`);
+      if (!(filePath === root || filePath.startsWith(root + path.sep))) {
+        res.writeHead(403);
+        res.end('Forbidden');
+        return;
+      }
+      const body = await fs.readFile(filePath);
+      const ext = path.extname(filePath).toLowerCase();
+      const type = {
+        '.html': 'text/html; charset=utf-8',
+        '.js': 'text/javascript; charset=utf-8',
+        '.mjs': 'text/javascript; charset=utf-8',
+        '.css': 'text/css; charset=utf-8',
+        '.json': 'application/json; charset=utf-8',
+        '.svg': 'image/svg+xml',
+        '.png': 'image/png',
+      }[ext] || 'application/octet-stream';
+      res.writeHead(200, { 'Content-Type': type });
+      res.end(body);
+    } catch {
+      res.writeHead(404);
+      res.end('Not found');
+    }
+  });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  const { port } = server.address();
+  return {
+    url: file => new URL(file, `http://127.0.0.1:${port}/`).toString(),
+    close: () => new Promise(resolve => server.close(resolve)),
+  };
+}
 
 // -------------------------------------------------------------------------
 // Harmonic Analysis
@@ -182,6 +222,49 @@ test.describe('Design Rule Checker', () => {
     // Results div should contain some content (pass summary or no-data message)
     const resultsText = await page.locator('#drc-results').textContent();
     expect(resultsText.length).toBeGreaterThan(0);
+  });
+});
+
+// -------------------------------------------------------------------------
+// Battery / UPS Sizing
+// -------------------------------------------------------------------------
+test.describe('Battery / UPS Sizing', () => {
+  let staticSite;
+
+  test.beforeAll(async () => {
+    staticSite = await startStaticServer();
+  });
+
+  test.afterAll(async () => {
+    await staticSite?.close();
+  });
+
+  test.beforeEach(async ({ page }) => {
+    await page.goto(staticSite.url('battery.html?e2e=1&e2e_reset=1'));
+    await page.waitForLoadState('networkidle');
+  });
+
+  test('renders rack layout views and connection schedule after analysis', async ({ page }) => {
+    await page.locator('#battery-form').evaluate(form => form.requestSubmit());
+    await expect(page.locator('#battery-rack-top-svg')).toBeVisible();
+    await expect(page.locator('#battery-rack-elevation-svg')).toBeVisible();
+    await expect(page.locator('.battery-connection-table tbody tr')).toHaveCount(9);
+    await expect(page.locator('.battery-rack-summary-grid')).toContainText('Parallel strings');
+  });
+
+  test('reloads saved rack layout result without persisted SVG markup', async ({ page }) => {
+    await page.fill('#rack-cell-capacity-ah', '500');
+    await page.locator('#battery-form').evaluate(form => form.requestSubmit());
+    await expect(page.locator('#battery-rack-top-svg')).toBeVisible();
+    const stored = await page.evaluate(() => (
+      Array.from({ length: localStorage.length }, (_, index) => localStorage.getItem(localStorage.key(index))).join('\n')
+    ));
+    expect(stored).not.toContain('battery-rack-top-svg');
+    await page.goto(staticSite.url('battery.html?e2e=1'));
+    await page.waitForLoadState('networkidle');
+    await expect(page.locator('#battery-rack-top-svg')).toBeVisible();
+    await expect(page.locator('#battery-rack-elevation-svg')).toBeVisible();
+    await expect(page.locator('.battery-rack-summary-grid')).toContainText('Battery racks');
   });
 });
 
