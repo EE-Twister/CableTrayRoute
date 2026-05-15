@@ -1,8 +1,8 @@
 {
-  "generatedAt": "2026-05-15T04:14:14.752Z",
+  "generatedAt": "2026-05-15T17:44:52.580Z",
   "summary": {
     "testSuiteCount": 148,
-    "totalAssertions": 5953,
+    "totalAssertions": 5964,
     "benchmarkCount": 6,
     "standardCount": 13
   },
@@ -1012,7 +1012,7 @@
     {
       "file": "tests/racewaySampleMapper.test.cjs",
       "groups": [],
-      "assertionCount": 5
+      "assertionCount": 7
     },
     {
       "file": "tests/rbac.test.mjs",
@@ -1109,6 +1109,7 @@
       "file": "tests/revitImporter.test.mjs",
       "groups": [
         "parseRevit - JSON object input",
+        "exportRevit - raceway material",
         "parseRevit - JSON string input",
         "parseRevit - tray coordinate normalization",
         "parseRevit - conduit normalization",
@@ -1116,7 +1117,7 @@
         "exportToIFC4 — output content",
         "IFC4 round-trip: export → parseRevit"
       ],
-      "assertionCount": 113
+      "assertionCount": 119
     },
     {
       "file": "tests/sampleGallery.test.mjs",
@@ -1411,7 +1412,7 @@
         "buildTrayHardwareBOM — tee detection",
         "buildTrayHardwareBOM — custom options"
       ],
-      "assertionCount": 53
+      "assertionCount": 56
     },
     {
       "file": "tests/trustcenter.test.mjs",

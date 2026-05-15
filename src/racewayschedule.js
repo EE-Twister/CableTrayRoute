@@ -198,40 +198,55 @@ const CONDUIT_TYPES=Object.keys(CONDUIT_SPECS);
 function tradeSizeOptions(type){
   return Object.keys(CONDUIT_SPECS[type]||{}).sort((a,b)=>parseSize(a)-parseSize(b));
 }
+const ALL_TRADE_SIZE_OPTIONS=Array.from(new Set(CONDUIT_TYPES.flatMap(type=>tradeSizeOptions(type)))).sort((a,b)=>parseSize(a)-parseSize(b));
 
 const TRAY_WIDTH_OPTIONS=['2','3','4','6','8','9','12','16','18','20','24','30','36'];
 const TRAY_DEPTH_OPTIONS=['2','3','4','5','6','7','8','9','10','11','12'];
 const TRAY_TYPE_OPTIONS=['Ladder (50 % fill)','Solid Bottom (40 % fill)'];
+const TRAY_MATERIAL_OPTIONS=['Steel','Aluminum','Stainless Steel','Fiberglass'];
+const CONDUIT_MATERIAL_OPTIONS=['Steel','Aluminum','PVC','Stainless Steel','Fiberglass'];
 const RACEWAY_VIEW_PRESET_KEY = dataStore.STORAGE_KEYS.racewayScheduleViewPreset || 'racewayScheduleViewPreset';
 const RACEWAY_VIEW_PRESETS = {
   basic: {
-    ductbanks: ['toggle','tag','from','to','concrete_encasement','actions'],
-    trays: ['tray_id','inside_width','tray_depth','tray_type','allowed_cable_group'],
-    conduits: ['conduit_id','type','trade_size','allowed_cable_group']
+    ductbanks: ['toggle','tag','from','to','concrete_encasement'],
+    trays: ['tray_id','inside_width','tray_depth','tray_type','material','allowed_cable_group'],
+    conduits: ['conduit_id','type','material','trade_size','allowed_cable_group']
   },
   geometry: {
-    ductbanks: ['toggle','tag','from','to','start_x','start_y','start_z','end_x','end_y','end_z','actions'],
+    ductbanks: ['toggle','tag','from','to','start_x','start_y','start_z','end_x','end_y','end_z'],
     trays: ['tray_id','start_x','start_y','start_z','end_x','end_y','end_z'],
     conduits: ['conduit_id','type','trade_size','start_x','start_y','start_z','end_x','end_y','end_z']
   },
   fill: {
-    ductbanks: ['toggle','tag','concrete_encasement','actions'],
+    ductbanks: ['toggle','tag','concrete_encasement'],
     trays: ['tray_id','inside_width','tray_depth','tray_type','num_slots','slot_groups','allowed_cable_group'],
     conduits: ['conduit_id','type','trade_size','capacity','allowed_cable_group']
   },
   bim: {
-    ductbanks: ['toggle','tag','from','to','concrete_encasement','start_x','start_y','start_z','end_x','end_y','end_z','actions'],
-    trays: ['tray_id','start_x','start_y','start_z','end_x','end_y','end_z','inside_width','tray_depth','tray_type'],
-    conduits: ['conduit_id','type','trade_size','start_x','start_y','start_z','end_x','end_y','end_z']
+    ductbanks: ['toggle','tag','from','to','concrete_encasement','start_x','start_y','start_z','end_x','end_y','end_z'],
+    trays: ['tray_id','start_x','start_y','start_z','end_x','end_y','end_z','inside_width','tray_depth','tray_type','material'],
+    conduits: ['conduit_id','type','material','trade_size','start_x','start_y','start_z','end_x','end_y','end_z']
   },
   full: null
 };
-const DUCTBANK_COLUMN_KEYS = ['toggle','tag','from','to','concrete_encasement','start_x','start_y','start_z','end_x','end_y','end_z','actions'];
+const DUCTBANK_COLUMN_KEYS = ['toggle','tag','from','to','concrete_encasement','start_x','start_y','start_z','end_x','end_y','end_z'];
 const ROW_ACTION_ICONS = {
-  viewBtn: 'icons/toolbar/auto-layout.svg',
+  viewBtn: 'icons/toolbar/grid.svg',
   insertBelowBtn: 'icons/toolbar/add-arrangement.svg',
   duplicateBtn: 'icons/toolbar/copy.svg',
   removeBtn: 'icons/toolbar/trash.svg'
+};
+const TRAY_ACTION_LABELS = {
+  viewBtn: 'Open tray fill',
+  insertBelowBtn: 'Insert tray row below',
+  duplicateBtn: 'Duplicate tray row',
+  removeBtn: 'Delete tray row'
+};
+const CONDUIT_ACTION_LABELS = {
+  viewBtn: 'Open conduit fill',
+  insertBelowBtn: 'Insert conduit row below',
+  duplicateBtn: 'Duplicate conduit row',
+  removeBtn: 'Delete conduit row'
 };
 
 let racewayTablesRef = null;
@@ -576,6 +591,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     {key:'inside_width',label:'Inside Width (in)',type:'select',options:TRAY_WIDTH_OPTIONS,default:TRAY_WIDTH_OPTIONS[0],validate:['required']},
     {key:'tray_depth',label:'Tray Depth (in)',type:'select',options:TRAY_DEPTH_OPTIONS,default:TRAY_DEPTH_OPTIONS[0],validate:['required']},
     {key:'tray_type',label:'Tray Type',type:'select',options:TRAY_TYPE_OPTIONS,default:TRAY_TYPE_OPTIONS[0],validate:['required']},
+    {key:'material',label:'Material',type:'select',options:TRAY_MATERIAL_OPTIONS,default:TRAY_MATERIAL_OPTIONS[0],tooltip:'Raceway material used by procurement, BIM export, and tray hardware BOM outputs.'},
     {key:'num_slots',label:'Slots',type:'number',tooltip:'Number of longitudinal compartments (divider strips). Fill capacity is divided equally among slots. Default: 1 (single undivided tray).'},
     {key:'slot_groups',label:'Slot Groups (JSON)',type:'text',tooltip:'Optional JSON mapping slot index (0-based) to cable group name. Example: {"0":"power","1":"instrument"}. Leave blank for an undivided tray.'},
     {key:'allowed_cable_group',label:'Allowed Group',type:'text'}
@@ -592,13 +608,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     importBtnId:'import-tray-xlsx-btn',
     deleteAllBtnId:'delete-tray-btn',
     columns:trayColumns,
+    showActionColumn:false,
+    enableContextMenu:true,
+    contextMenuViewLabel:'Open Tray Fill',
+    actionButtonIcons:ROW_ACTION_ICONS,
+    actionButtonLabels:TRAY_ACTION_LABELS,
     onChange:handleChange,
     onSave:markSaved,
     rowCountId:'tray-row-count',
     onView:(row)=>{
       try{
         trayTable.save();
-        const tray={tray_id:row.tray_id,width:parseFloat(row.inside_width),height:parseFloat(row.tray_depth),allowed_cable_group:row.allowed_cable_group,num_slots:Math.max(1,parseInt(row.num_slots)||1),slot_groups:row.slot_groups||null};
+        const tray={tray_id:row.tray_id,width:parseFloat(row.inside_width),height:parseFloat(row.tray_depth),material:row.material||'',allowed_cable_group:row.allowed_cable_group,num_slots:Math.max(1,parseInt(row.num_slots)||1),slot_groups:row.slot_groups||null};
         const cables=cablesForRaceway(row.tray_id);
         dataStore.setItem('trayFillData',{tray,cables});
       }catch(e){console.error('Failed to store tray fill data',e);}
@@ -619,6 +640,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const conduitColumns=[
     {key:'conduit_id',label:'Conduit ID',type:'text',validate:['required']},
     {key:'type',label:'Type',type:'select',options:CONDUIT_TYPES,default:CONDUIT_TYPES[0],validate:['required'],onChange:(el,tr)=>{const sizeSel=tr.querySelector('select[name="trade_size"]');if(sizeSel){const opts=tradeSizeOptions(el.value);sizeSel.innerHTML='';opts.forEach(sz=>{const o=document.createElement('option');o.value=sz;o.textContent=sz;sizeSel.appendChild(o);});}}},
+    {key:'material',label:'Material',type:'select',options:CONDUIT_MATERIAL_OPTIONS,default:CONDUIT_MATERIAL_OPTIONS[0],tooltip:'Raceway material used by procurement and BIM export outputs.'},
     {key:'trade_size',label:'Trade Size',type:'select',options:(tr)=>tradeSizeOptions(tr.querySelector('select[name="type"]').value),validate:['required']},
     {key:'start_x',label:'Start X',type:'number',validate:['required','numeric']},
     {key:'start_y',label:'Start Y',type:'number',validate:['required','numeric']},
@@ -641,13 +663,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     importBtnId:'import-conduit-xlsx-btn',
     deleteAllBtnId:'delete-conduit-btn',
     columns:conduitColumns,
+    showActionColumn:false,
+    enableContextMenu:true,
+    contextMenuViewLabel:'Open Conduit Fill',
+    actionButtonIcons:ROW_ACTION_ICONS,
+    actionButtonLabels:CONDUIT_ACTION_LABELS,
     onChange:handleChange,
     onSave:()=>{markSaved();persistAllConduits();},
     rowCountId:'conduit-row-count',
     onView:(row)=>{
       try{
         const cables=cablesForRaceway(row.conduit_id);
-        dataStore.setItem('conduitFillData',{type:row.type,tradeSize:row.trade_size,cables});
+        dataStore.setItem('conduitFillData',{type:row.type,material:row.material||'',tradeSize:row.trade_size,cables});
       }catch(e){console.error('Failed to store conduit fill data',e);}
       window.location.href='conduitfill.html';
     }
@@ -741,6 +768,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           conduit_id:c.conduit_id,
           tray_id:`${db.tag}-${c.conduit_id}`,
           type:c.type,
+          material:c.material,
           trade_size:c.trade_size,
           start_x:c.start_x,
           start_y:c.start_y,
@@ -1010,6 +1038,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     decorateRacewayActionButtons();
   };
 
+  function optionValue(option){
+    return typeof option === 'object' && option !== null ? option.value : option;
+  }
+
+  function optionLabel(option){
+    return typeof option === 'object' && option !== null ? option.label : option;
+  }
+
   function modalField({ label, name, type = 'text', value = '', options = null, min = null, step = null }){
     const wrap = document.createElement('label');
     wrap.className = 'modal-form-field';
@@ -1024,8 +1060,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     if(options){
       options.forEach(option => {
         const opt = document.createElement('option');
-        opt.value = option;
-        opt.textContent = option;
+        opt.value = optionValue(option);
+        opt.textContent = optionLabel(option);
         field.appendChild(opt);
       });
     }
@@ -1051,6 +1087,256 @@ document.addEventListener('DOMContentLoaded', async () => {
     return rows[rows.length - 1] || {};
   }
 
+  const BATCH_SCOPE_OPTIONS = [
+    {value:'visible',label:'Visible rows'},
+    {value:'all',label:'All rows'}
+  ];
+  const GEOMETRY_BATCH_FIELDS = [
+    {key:'start_x',label:'Start X',type:'number',step:'any'},
+    {key:'start_y',label:'Start Y',type:'number',step:'any'},
+    {key:'start_z',label:'Start Z',type:'number',step:'any'},
+    {key:'end_x',label:'End X',type:'number',step:'any'},
+    {key:'end_y',label:'End Y',type:'number',step:'any'},
+    {key:'end_z',label:'End Z',type:'number',step:'any'}
+  ];
+  const DUCTBANK_BATCH_FIELDS = [
+    {key:'from',label:'From'},
+    {key:'to',label:'To'},
+    {key:'concrete_encasement',label:'Concrete Encasement',options:['No','Yes'],value:'No'},
+    ...GEOMETRY_BATCH_FIELDS
+  ];
+  const DUCTBANK_CONDUIT_BATCH_FIELDS = [
+    {key:'type',label:'Type',options:CONDUIT_TYPES,value:'PVC Sch 40'},
+    {key:'material',label:'Material',options:CONDUIT_MATERIAL_OPTIONS,value:'PVC'},
+    {key:'trade_size',label:'Trade Size',options:ALL_TRADE_SIZE_OPTIONS,value:'4'},
+    {key:'allowed_cable_group',label:'Allowed Group'},
+    ...GEOMETRY_BATCH_FIELDS
+  ];
+  const TRAY_BATCH_FIELDS = [
+    {key:'inside_width',label:'Inside Width (in)',options:TRAY_WIDTH_OPTIONS,value:'24'},
+    {key:'tray_depth',label:'Tray Depth (in)',options:TRAY_DEPTH_OPTIONS,value:'4'},
+    {key:'tray_type',label:'Tray Type',options:TRAY_TYPE_OPTIONS,value:TRAY_TYPE_OPTIONS[0]},
+    {key:'material',label:'Material',options:TRAY_MATERIAL_OPTIONS,value:TRAY_MATERIAL_OPTIONS[0]},
+    {key:'num_slots',label:'Slots',type:'number',min:1,step:1,value:'1'},
+    {key:'slot_groups',label:'Slot Groups (JSON)'},
+    {key:'allowed_cable_group',label:'Allowed Group'},
+    ...GEOMETRY_BATCH_FIELDS
+  ];
+  const CONDUIT_BATCH_FIELDS = [
+    {key:'type',label:'Type',options:CONDUIT_TYPES,value:'EMT'},
+    {key:'material',label:'Material',options:CONDUIT_MATERIAL_OPTIONS,value:CONDUIT_MATERIAL_OPTIONS[0]},
+    {key:'trade_size',label:'Trade Size',options:ALL_TRADE_SIZE_OPTIONS,value:'1'},
+    {key:'capacity',label:'Capacity',type:'number',step:'any'},
+    {key:'allowed_cable_group',label:'Allowed Group'},
+    ...GEOMETRY_BATCH_FIELDS
+  ];
+
+  function rowIsVisible(row){
+    return row && row.style.display !== 'none';
+  }
+
+  function createBatchValueField(field){
+    const hasOptions = Array.isArray(field.options) && field.options.length;
+    const defaultValue = field.value !== undefined
+      ? field.value
+      : (hasOptions ? optionValue(field.options[0]) : '');
+    return modalField({
+      label:'Value',
+      name:'batch_value',
+      type:field.type || 'text',
+      value:defaultValue,
+      options:hasOptions ? field.options : null,
+      min:field.min ?? null,
+      step:field.step ?? null
+    });
+  }
+
+  function selectedBatchTarget(config, form){
+    if(!config.targets) return config;
+    const key = form.elements.batch_target?.value || config.targets[0]?.value;
+    return config.targets.find(target => target.value === key) || config.targets[0];
+  }
+
+  function batchFieldsForForm(config, form){
+    return selectedBatchTarget(config, form)?.fields || config.fields || [];
+  }
+
+  function selectedBatchField(config, form){
+    const fields = batchFieldsForForm(config, form);
+    const key = form.elements.batch_field?.value || fields[0]?.key;
+    return fields.find(field => field.key === key) || fields[0] || null;
+  }
+
+  function applyManagedTableBatchEdit(table, fieldKey, value, scope = 'visible'){
+    if(!table?.tbody || !Array.isArray(table.columns)) return {count:0,skipped:0};
+    const colIndex = table.columns.findIndex(col => col.key === fieldKey);
+    if(colIndex < 0) return {count:0,skipped:0};
+    const column = table.columns[colIndex] || {};
+    const rows = Array.from(table.tbody.rows).filter(row => scope === 'all' || rowIsVisible(row));
+    let count = 0;
+    let skipped = 0;
+    rows.forEach(row => {
+      const cell = row.cells[colIndex + (table.colOffset || 0)];
+      const control = cell?.querySelector('input,select,textarea');
+      if(!control){skipped+=1;return;}
+      if(control.tagName === 'SELECT' && !Array.from(control.options).some(option => option.value === value)){
+        skipped+=1;
+        return;
+      }
+      if(column.type === 'number' && value !== '' && Number.isNaN(Number(value))){
+        skipped+=1;
+        return;
+      }
+      control.value = value;
+      control.dispatchEvent(new Event('input',{bubbles:true}));
+      control.dispatchEvent(new Event('change',{bubbles:true}));
+      count+=1;
+    });
+    if(count){
+      table.save?.();
+      table.updateRowCount?.();
+      table.applyFilters?.();
+      table.onChange?.();
+    }
+    return {count,skipped};
+  }
+
+  function batchEditConfig(kind){
+    const configs = {
+      ductbank: {
+        title:'Batch Edit Ductbank Schedule',
+        label:'Ductbank schedule',
+        description:'Apply one field value to the visible ductbank rows, all ductbank rows, or the nested conduit rows.',
+        targets:[
+          {value:'ductbanks',label:'Ductbank rows',rowLabel:'ductbank rows',fields:DUCTBANK_BATCH_FIELDS},
+          {value:'ductbankConduits',label:'Nested conduits',rowLabel:'nested conduits',fields:DUCTBANK_CONDUIT_BATCH_FIELDS}
+        ],
+        apply({target,field,value,scope}){
+          if(typeof window.applyDuctbankBatchEdit !== 'function') return {count:0,skipped:0};
+          return window.applyDuctbankBatchEdit({target,field:field.key,value,scope});
+        }
+      },
+      tray: {
+        title:'Batch Edit Tray Schedule',
+        label:'Tray schedule',
+        description:'Apply one field value to the visible tray rows or every tray row.',
+        fields:TRAY_BATCH_FIELDS,
+        rowLabel:'tray rows',
+        apply({field,value,scope}){
+          return applyManagedTableBatchEdit(trayTable, field.key, value, scope);
+        }
+      },
+      conduit: {
+        title:'Batch Edit Standalone Conduits',
+        label:'Standalone conduit schedule',
+        description:'Apply one field value to the visible standalone conduit rows or every standalone conduit row.',
+        fields:CONDUIT_BATCH_FIELDS,
+        rowLabel:'standalone conduit rows',
+        apply({field,value,scope}){
+          return applyManagedTableBatchEdit(conduitTable, field.key, value, scope);
+        }
+      }
+    };
+    return configs[kind] || null;
+  }
+
+  function setBatchStatus(form, message){
+    const status = form.querySelector('.batch-edit-status');
+    if(status) status.textContent = message;
+  }
+
+  function announceBatchEdit(config, result, field, scope, target){
+    const summary = document.getElementById('raceway-validation-summary');
+    if(!summary) return;
+    const rowLabel = target?.rowLabel || config.rowLabel || 'rows';
+    const scopeLabel = scope === 'all' ? 'all rows' : 'visible rows';
+    const skippedText = result.skipped ? ` ${result.skipped} skipped because the value is not valid for that row.` : '';
+    summary.className = 'load-validation-summary is-success';
+    summary.textContent = `${config.label}: updated ${result.count} ${rowLabel} for ${field.label} across ${scopeLabel}.${skippedText}`;
+  }
+
+  function openBatchEditModal(kind){
+    const config = batchEditConfig(kind);
+    if(!config) return;
+    document.querySelectorAll('.raceway-section-card details.toolbar-menu-danger').forEach(menu => {
+      menu.removeAttribute('open');
+    });
+    openModal({
+      title: config.title,
+      description: config.description,
+      primaryText: 'Apply Batch Edit',
+      defaultWidth: 'medium',
+      render(body, controller){
+        const form = document.createElement('form');
+        form.className = 'raceway-entry-form load-entry-grid';
+        if(config.targets){
+          form.appendChild(modalField({
+            label:'Table Area',
+            name:'batch_target',
+            options:config.targets.map(target => ({value:target.value,label:target.label})),
+            value:config.targets[0]?.value || ''
+          }));
+        }
+        const fieldWrap = modalField({label:'Field',name:'batch_field',options:[]});
+        const fieldSelect = fieldWrap.querySelector('select');
+        const valueHost = document.createElement('div');
+        const scopeWrap = modalField({label:'Apply To',name:'batch_scope',options:BATCH_SCOPE_OPTIONS,value:'visible'});
+        const status = document.createElement('p');
+        status.className = 'form-helper-text batch-edit-status';
+        status.setAttribute('aria-live','polite');
+
+        function refreshValue(){
+          valueHost.innerHTML = '';
+          const field = selectedBatchField(config, form);
+          if(field) valueHost.appendChild(createBatchValueField(field));
+        }
+
+        function refreshFields(){
+          const fields = batchFieldsForForm(config, form);
+          fieldSelect.innerHTML = '';
+          fields.forEach(field => {
+            const opt = document.createElement('option');
+            opt.value = field.key;
+            opt.textContent = field.label;
+            fieldSelect.appendChild(opt);
+          });
+          refreshValue();
+        }
+
+        form.append(fieldWrap, valueHost, scopeWrap, status);
+        body.appendChild(form);
+        form.elements.batch_target?.addEventListener('change', refreshFields);
+        fieldSelect.addEventListener('change', refreshValue);
+        refreshFields();
+        controller.registerForm(form);
+        return fieldSelect;
+      },
+      onSubmit(controller){
+        const form = controller.body.querySelector('.raceway-entry-form');
+        const field = selectedBatchField(config, form);
+        const target = selectedBatchTarget(config, form);
+        const value = form.elements.batch_value?.value ?? '';
+        const scope = form.elements.batch_scope?.value || 'visible';
+        if(!field){
+          setBatchStatus(form, 'Choose a field before applying the batch edit.');
+          return false;
+        }
+        const result = config.apply({target:target?.value,field,value,scope}) || {count:0,skipped:0};
+        if(!result.count){
+          const scopeText = scope === 'all' ? 'rows' : 'visible rows';
+          const skippedText = result.skipped ? ` ${result.skipped} rows could not use that value.` : '';
+          setBatchStatus(form, `No ${scopeText} were updated.${skippedText}`);
+          return false;
+        }
+        persistAllConduits();
+        markUnsaved();
+        updateRacewayExperience();
+        announceBatchEdit(config, result, field, scope, target);
+        return true;
+      }
+    });
+  }
+
   function openDuctbankEntryModal(){
     const last = (tables.ductbanks?.getData?.() || []).slice(-1)[0] || {};
     openModal({
@@ -1072,10 +1358,12 @@ document.addEventListener('DOMContentLoaded', async () => {
           {label:'End Z',name:'end_z',type:'number',value:'',step:'any'},
           {label:'Conduit Count',name:'conduit_count',type:'number',value:'0',min:0,step:1},
           {label:'Conduit Type',name:'conduit_type',options:CONDUIT_TYPES,value:'PVC Sch 40'},
+          {label:'Conduit Material',name:'conduit_material',options:CONDUIT_MATERIAL_OPTIONS,value:'PVC'},
           {label:'Trade Size',name:'trade_size',options:tradeSizeOptions('PVC Sch 40'),value:'4'},
           {label:'Allowed Group',name:'allowed_cable_group',value:''}
         ]);
         const typeSel = form.elements.conduit_type;
+        const materialSel = form.elements.conduit_material;
         const sizeSel = form.elements.trade_size;
         typeSel.addEventListener('change', () => {
           const sizes = tradeSizeOptions(typeSel.value);
@@ -1086,6 +1374,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             opt.textContent = size;
             sizeSel.appendChild(opt);
           });
+          if(materialSel && (materialSel.value === 'Steel' || materialSel.value === 'PVC')){
+            materialSel.value = /PVC|ENT|LFNC/i.test(typeSel.value) ? 'PVC' : 'Steel';
+          }
         });
         controller.registerForm(form);
         return form.elements.tag;
@@ -1102,6 +1393,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const conduits = Array.from({length: count}, (_, index) => ({
           conduit_id: `${tag}-C${index + 1}`,
           type: values.conduit_type,
+          material: values.conduit_material,
           trade_size: values.trade_size,
           allowed_cable_group: values.allowed_cable_group || '',
           ductbankTag: tag,
@@ -1153,6 +1445,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           {label:'Inside Width (in)',name:'inside_width',options:TRAY_WIDTH_OPTIONS,value:'24'},
           {label:'Tray Depth (in)',name:'tray_depth',options:TRAY_DEPTH_OPTIONS,value:'4'},
           {label:'Tray Type',name:'tray_type',options:TRAY_TYPE_OPTIONS,value:TRAY_TYPE_OPTIONS[0]},
+          {label:'Material',name:'material',options:TRAY_MATERIAL_OPTIONS,value:last.material || TRAY_MATERIAL_OPTIONS[0]},
           {label:'Slots',name:'num_slots',type:'number',value:'1',min:1,step:1},
           {label:'Allowed Group',name:'allowed_cable_group',value:''}
         ]);
@@ -1186,6 +1479,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const form = renderEntryForm(body, [
           {label:'Conduit ID',name:'conduit_id',value:''},
           {label:'Type',name:'type',options:CONDUIT_TYPES,value:initialType},
+          {label:'Material',name:'material',options:CONDUIT_MATERIAL_OPTIONS,value:last.material || CONDUIT_MATERIAL_OPTIONS[0]},
           {label:'Trade Size',name:'trade_size',options:tradeSizeOptions(initialType),value:last.trade_size || tradeSizeOptions(initialType)[0]},
           {label:'Start X',name:'start_x',type:'number',value:last.end_x ?? '',step:'any'},
           {label:'Start Y',name:'start_y',type:'number',value:last.end_y ?? '',step:'any'},
@@ -1197,6 +1491,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           {label:'Allowed Group',name:'allowed_cable_group',value:''}
         ]);
         const typeSel = form.elements.type;
+        const materialSel = form.elements.material;
         const sizeSel = form.elements.trade_size;
         typeSel.addEventListener('change', () => {
           const sizes = tradeSizeOptions(typeSel.value);
@@ -1207,6 +1502,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             opt.textContent = size;
             sizeSel.appendChild(opt);
           });
+          if(materialSel && (materialSel.value === 'Steel' || materialSel.value === 'PVC')){
+            materialSel.value = /PVC|ENT|LFNC/i.test(typeSel.value) ? 'PVC' : 'Steel';
+          }
         });
         controller.registerForm(form);
         return form.elements.conduit_id;
@@ -1230,6 +1528,18 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('add-ductbank-btn')?.addEventListener('click', openDuctbankEntryModal);
   document.getElementById('add-tray-btn')?.addEventListener('click', openTrayEntryModal);
   document.getElementById('add-conduit-btn')?.addEventListener('click', openConduitEntryModal);
+  document.getElementById('batch-ductbank-btn')?.addEventListener('click', event => {
+    event.currentTarget.closest('details')?.removeAttribute('open');
+    openBatchEditModal('ductbank');
+  });
+  document.getElementById('batch-tray-btn')?.addEventListener('click', event => {
+    event.currentTarget.closest('details')?.removeAttribute('open');
+    openBatchEditModal('tray');
+  });
+  document.getElementById('batch-conduit-btn')?.addEventListener('click', event => {
+    event.currentTarget.closest('details')?.removeAttribute('open');
+    openBatchEditModal('conduit');
+  });
   document.querySelectorAll('[data-raceway-view]').forEach(btn => {
     btn.addEventListener('click', () => {
       applyRacewayViewPreset(btn.dataset.racewayView);

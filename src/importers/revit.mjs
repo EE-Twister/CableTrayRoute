@@ -70,6 +70,7 @@ function normalizeTray(t = {}) {
     end_z: num(t.end_z ?? t.ez ?? t.z2 ?? t.EndZ ?? t.end?.z),
     width: num(t.width ?? t.w ?? t.Width ?? t.size_x),
     height: num(t.height ?? t.h ?? t.Height ?? t.size_y),
+    material: t.material || t.Material || t._ctr?.material || "",
   };
 }
 
@@ -84,6 +85,7 @@ function normalizeConduit(c = {}) {
     end_x: num(c.end_x ?? c.ex ?? c.x2 ?? c.end?.x),
     end_y: num(c.end_y ?? c.ey ?? c.y2 ?? c.end?.y),
     end_z: num(c.end_z ?? c.ez ?? c.z2 ?? c.end?.z),
+    material: c.material || c.Material || c._ctr?.material || "",
     capacity: num(c.capacity ?? c.fill),
   };
 }

@@ -428,31 +428,927 @@ body.dark-mode .cable-lead{
 body.ductbank-page {
     margin: 0;
 }
+
+body.ductbank-page .main-content {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3, 1rem);
+}
+
+.ductbank-page-header {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: var(--space-4, 1.5rem);
+}
+
+.ductbank-page-header.page-header-graphic {
+    border-radius: var(--radius-sm, 6px);
+    background:
+        linear-gradient(180deg, color-mix(in srgb, var(--color-primary, #2563eb) 7%, var(--color-surface-strong, #f8fafc)), var(--color-surface-strong, #f8fafc));
+}
+
+.ductbank-page-header.page-header-graphic::before,
+.ductbank-page-header.page-header-graphic::after {
+    display: none;
+}
+
 body.ductbank-page h1 {
-    margin-bottom: 8px;
-    font-size: 1.4rem;
+    margin: 0;
+    font-size: var(--font-size-2xl, 2rem);
     font-family: inherit;
+    letter-spacing: 0;
 }
-body.ductbank-page label {
-    display: inline-block;
-    margin-bottom: 4px;
-    font-size: 0.9rem;
-}
-body.ductbank-page input,
-body.ductbank-page select {
-    width: auto;
-    padding: 2px 4px;
-    font-size: 0.9rem;
-    margin-right: 8px;
+
+.ductbank-action-bar {
     margin-bottom: 0;
-    background: var(--secondary-color);
-    color: var(--text-color);
-    border: 1px solid var(--border-color);
 }
-body.ductbank-page button {
-    padding: var(--button-padding);
-    margin: var(--button-margin);
+
+.ductbank-workflow-strip {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2, 0.75rem);
+    align-items: center;
+    padding: var(--space-2, 0.75rem);
+    border: 1px solid var(--color-border, var(--border-color));
+    border-radius: var(--radius-sm, 6px);
+    background: var(--color-surface, #fff);
+}
+
+.ductbank-workflow-step {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2rem;
+    padding: 0.25rem 0.65rem;
+    border: 1px solid var(--color-border, var(--border-color));
+    border-radius: 999px;
+    color: var(--color-text-muted, #64748b);
+    background: var(--color-surface-strong, #f8fafc);
+    font-size: var(--font-size-sm, 0.875rem);
+    font-weight: 700;
+}
+
+.ductbank-workflow-step.is-current {
+    border-color: color-mix(in srgb, var(--color-primary, #2563eb) 45%, var(--color-border, #cbd5e1));
+    color: var(--color-primary, #2563eb);
+    background: color-mix(in srgb, var(--color-primary, #2563eb) 10%, var(--color-surface, #fff));
+}
+
+.ductbank-workflow-step.is-complete {
+    border-color: color-mix(in srgb, var(--success-text, #166534) 42%, var(--color-border, #cbd5e1));
+    color: var(--success-text, #166534);
+    background: color-mix(in srgb, var(--success-bg, #dcfce7) 65%, var(--color-surface, #fff));
+}
+
+.ductbank-workflow-step.is-blocked {
+    border-color: color-mix(in srgb, var(--warning-text, #92400e) 42%, var(--color-border, #cbd5e1));
+    color: var(--warning-text, #92400e);
+    background: color-mix(in srgb, var(--warning-bg, #fef3c7) 70%, var(--color-surface, #fff));
+}
+
+.ductbank-workflow-step.is-locked {
+    opacity: 0.62;
+}
+
+.ductbank-overview,
+.ductbank-section-card {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3, 1rem);
+}
+
+.ductbank-section-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--space-4, 1.5rem);
+}
+
+.ductbank-section-header h2 {
+    margin: 0;
+    font-size: var(--font-size-lg, 1.125rem);
+}
+
+.ductbank-section-header .field-hint {
+    margin: var(--space-1, 0.25rem) 0 0;
+}
+
+.ductbank-summary-panel {
+    margin: 0;
+}
+
+.ductbank-summary-action {
     cursor: pointer;
+    transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.ductbank-summary-action:hover,
+.ductbank-summary-action:focus-visible {
+    border-color: var(--color-primary, var(--primary-color));
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary, #2563eb) 14%, transparent);
+    outline: none;
+    transform: translateY(-1px);
+}
+
+.ductbank-summary-action.active,
+.ductbank-summary-action[aria-pressed="true"] {
+    border-color: color-mix(in srgb, var(--color-primary, #2563eb) 46%, var(--color-border, #cbd5e1));
+    background: color-mix(in srgb, var(--color-primary, #2563eb) 8%, var(--color-surface-strong, #f8fafc));
+}
+
+.ductbank-warning-list {
+    display: grid;
+    gap: var(--space-2, 0.75rem);
+    padding: var(--space-3, 1rem);
+    border: 1px solid color-mix(in srgb, var(--warning-text, #92400e) 30%, var(--color-border, #cbd5e1));
+    border-radius: var(--radius-sm, 6px);
+    background: color-mix(in srgb, var(--warning-bg, #fef3c7) 35%, var(--color-surface, #fff));
+}
+
+.ductbank-ampacity-over-list {
+    display: grid;
+    gap: var(--space-2, 0.75rem);
+    padding: var(--space-3, 1rem);
+    border: 1px solid color-mix(in srgb, var(--error-text, #991b1b) 30%, var(--color-border, #cbd5e1));
+    border-radius: var(--radius-sm, 6px);
+    background: color-mix(in srgb, var(--error-bg, #fee2e2) 30%, var(--color-surface, #fff));
+}
+
+.ductbank-warning-list[hidden] {
+    display: none;
+}
+
+.ductbank-ampacity-over-list[hidden] {
+    display: none;
+}
+
+.ductbank-warning-list-header {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: var(--space-2, 0.75rem);
+}
+
+.ductbank-ampacity-over-list-header {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: var(--space-2, 0.75rem);
+}
+
+.ductbank-warning-list-header span,
+.ductbank-ampacity-over-list-header span,
+.ductbank-ampacity-over-more,
+.ductbank-warning-more {
+    color: var(--color-text-muted, #64748b);
+    font-size: var(--font-size-sm, 0.875rem);
+}
+
+.ductbank-warning-items {
+    display: grid;
+    gap: var(--space-2, 0.75rem);
+}
+
+.ductbank-ampacity-over-items {
+    display: grid;
+    gap: var(--space-2, 0.75rem);
+}
+
+.ductbank-warning-item {
+    display: grid;
+    grid-template-columns: minmax(6.5rem, 0.35fr) minmax(12rem, 1fr) minmax(12rem, 1fr);
+    gap: var(--space-2, 0.75rem);
+    align-items: center;
+    width: 100%;
+    padding: 0.65rem 0.75rem;
+    border: 1px solid var(--color-border, var(--border-color));
+    border-radius: var(--radius-sm, 6px);
+    background: var(--color-surface, #fff);
+    color: var(--color-text, var(--text-color));
+    text-align: left;
+    cursor: pointer;
+}
+
+.ductbank-ampacity-over-item {
+    display: grid;
+    grid-template-columns: minmax(6rem, 0.35fr) minmax(12rem, 1fr) minmax(14rem, 1fr);
+    gap: var(--space-2, 0.75rem);
+    align-items: center;
+    width: 100%;
+    padding: 0.65rem 0.75rem;
+    border: 1px solid color-mix(in srgb, var(--error-text, #991b1b) 20%, var(--color-border, #cbd5e1));
+    border-radius: var(--radius-sm, 6px);
+    background: var(--color-surface, #fff);
+    color: var(--color-text, var(--text-color));
+    text-align: left;
+    cursor: pointer;
+}
+
+.ductbank-warning-item:hover,
+.ductbank-warning-item:focus-visible {
+    border-color: var(--color-primary, var(--primary-color));
+    outline: none;
+}
+
+.ductbank-ampacity-over-item:hover,
+.ductbank-ampacity-over-item:focus-visible {
+    border-color: var(--color-primary, var(--primary-color));
+    outline: none;
+}
+
+.ductbank-warning-severity {
+    font-weight: 800;
+    color: var(--warning-text, #92400e);
+}
+
+.ductbank-ampacity-over-tag {
+    font-weight: 800;
+    color: var(--error-text, #991b1b);
+}
+
+.ductbank-ampacity-over-message {
+    font-weight: 700;
+}
+
+.ductbank-ampacity-over-detail {
+    color: var(--color-text-muted, #64748b);
+    font-size: var(--font-size-sm, 0.875rem);
+}
+
+.ductbank-warning-item--thermal .ductbank-warning-severity {
+    color: var(--error-text, #991b1b);
+}
+
+.ductbank-warning-item--ampacity .ductbank-warning-severity {
+    color: var(--error-text, #991b1b);
+}
+
+.ductbank-warning-fix {
+    color: var(--color-text-muted, #64748b);
+    font-size: var(--font-size-sm, 0.875rem);
+}
+
+.ductbank-warning-more {
+    margin: 0;
+}
+
+.ductbank-filter-chips {
+    margin-top: var(--space-1, 0.25rem);
+}
+
+.ductbank-details > summary {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-2, 0.75rem);
+    cursor: pointer;
+    font-weight: 700;
+}
+
+.ductbank-details {
+    display: block;
+}
+
+.ductbank-details > summary + * {
+    margin-top: var(--space-3, 1rem);
+}
+
+.ductbank-details > summary small {
+    color: var(--color-text-muted, #6b7280);
+    font-size: var(--font-size-sm, 0.875rem);
+    font-weight: 500;
+}
+
+.ductbank-field-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+    gap: var(--space-3, 1rem);
+    align-items: end;
+}
+
+.ductbank-field-grid--compact {
+    grid-template-columns: minmax(16rem, 1.5fr) minmax(12rem, 0.8fr) minmax(11rem, 0.7fr);
+}
+
+.ductbank-field-grid--spacing {
+    margin-top: var(--space-3, 1rem);
+    grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+}
+
+body.ductbank-page .main-content label {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1, 0.25rem);
+    min-width: 0;
+    margin: 0 !important;
+    color: var(--color-text-muted, #6b7280);
+    font-size: var(--font-size-sm, 0.875rem);
+    font-weight: 700;
+}
+
+body.ductbank-page .main-content input,
+body.ductbank-page .main-content select {
+    min-height: 2.15rem;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0.38rem 0.55rem;
+    border: 1px solid var(--color-border, var(--border-color));
+    border-radius: var(--radius-sm, 6px);
+    background: var(--color-surface-strong, var(--secondary-color));
+    color: var(--color-text, var(--text-color));
+    font-size: var(--font-size-sm, 0.875rem);
+}
+
+body.ductbank-page .main-content input[type="checkbox"] {
+    min-height: 1rem;
+    width: 1rem !important;
+    padding: 0;
+}
+
+.ductbank-toggle-field {
+    flex-direction: row !important;
+    align-items: center;
+    justify-content: flex-start;
+    gap: var(--space-2, 0.75rem);
+    min-height: 2.15rem;
+    color: var(--color-text, var(--text-color));
+}
+
+.ductbank-toggle-field input[type="checkbox"] {
+    flex: 0 0 auto;
+}
+
+.ductbank-toolbar {
+    margin-bottom: 0;
+}
+
+.ductbank-toolbar .table-search {
+    flex: 1 1 18rem;
+    margin: 0;
+}
+
+.ductbank-table-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2, 0.75rem);
+    color: var(--color-text-muted, #64748b);
+    font-size: var(--font-size-sm, 0.875rem);
+}
+
+.ductbank-clear-filter-btn {
+    min-height: 1.75rem;
+    padding: 0.2rem 0.45rem;
+    color: var(--color-primary, var(--primary-color));
+}
+
+.ductbank-clear-filter-btn[hidden] {
+    display: none;
+}
+
+.ductbank-empty-state {
+    display: grid;
+    justify-items: center;
+    gap: var(--space-2, 0.75rem);
+    padding: var(--space-5, 2rem);
+    border: 1px dashed var(--color-border, var(--border-color));
+    border-radius: var(--radius-sm, 6px);
+    background: color-mix(in srgb, var(--color-surface-strong, #f8fafc) 68%, var(--color-surface, #fff));
+    color: var(--color-text-muted, #64748b);
+    text-align: center;
+}
+
+.ductbank-empty-state[hidden] {
+    display: none;
+}
+
+.ductbank-empty-state strong {
+    color: var(--color-text, var(--text-color));
+    font-size: var(--font-size-base, 1rem);
+}
+
+.ductbank-empty-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--space-2, 0.75rem);
+}
+
+.ductbank-empty-state.is-filtered .ductbank-empty-actions {
+    display: none;
+}
+
+.file-toolbar-btn {
+    cursor: pointer;
+}
+
+body.ductbank-page .main-content label.btn.toolbar-btn {
+    display: inline-flex !important;
+    flex-direction: row !important;
+    align-items: center;
+    justify-content: center;
+    min-height: 2.15rem;
+    color: var(--color-text, var(--text-color));
+    font-size: var(--font-size-sm, 0.875rem);
+    font-weight: 600;
+}
+
+.ductbank-entry-form .modal-form-field {
+    display: grid;
+    grid-template-columns: minmax(8rem, 0.42fr) minmax(0, 1fr);
+    align-items: center;
+    gap: 0.35rem 0.75rem;
+    min-width: 0;
+}
+
+.ductbank-entry-form .modal-form-field > span:first-child {
+    color: var(--color-text-muted, #64748b);
+    font-size: var(--font-size-sm, 0.875rem);
+    font-weight: 700;
+}
+
+.ductbank-entry-form .modal-form-field input,
+.ductbank-entry-form .modal-form-field select {
+    width: 100%;
+    min-width: 0;
+}
+
+.ductbank-modal-advanced {
+    grid-column: 1 / -1;
+    padding: var(--space-2, 0.75rem);
+    border: 1px solid var(--color-border, var(--border-color));
+    border-radius: var(--radius-sm, 6px);
+    background: var(--color-surface-strong, #f8fafc);
+}
+
+.ductbank-modal-advanced > summary {
+    cursor: pointer;
+    font-weight: 700;
+}
+
+.ductbank-modal-advanced > .load-entry-grid {
+    margin-top: var(--space-3, 1rem);
+}
+
+body.ductbank-page .toolbar-btn[disabled],
+body.ductbank-page .toolbar-btn[aria-disabled="true"] {
+    cursor: not-allowed;
+    opacity: 0.55;
+}
+
+.ductbank-table-wrap {
+    border: 1px solid var(--color-border, var(--border-color));
+    border-radius: var(--radius-sm, 6px);
+    background: var(--color-surface, var(--card-bg, #fff));
+}
+
+.ductbank-table-wrap:focus-visible {
+    outline: 2px solid var(--color-primary, var(--primary-color));
+    outline-offset: 2px;
+}
+
+.ductbank-page .db-table {
+    border-collapse: separate;
+    border-spacing: 0;
+    min-width: 40rem;
+    margin: 0;
+    font-size: var(--font-size-sm, 0.875rem);
+}
+
+.ductbank-page #cableTable {
+    min-width: 118rem;
+}
+
+.ductbank-page .db-table,
+.ductbank-page .db-table th,
+.ductbank-page .db-table td {
+    border: none;
+}
+
+.ductbank-page .db-table th,
+.ductbank-page .db-table td {
+    padding: 0.55rem;
+    border-bottom: 1px solid var(--color-border, var(--border-color));
+    text-align: left;
+    vertical-align: middle;
+    background: var(--color-surface, #fff);
+}
+
+.ductbank-page .db-table th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: var(--color-surface-strong, #f8fafc);
+    color: var(--color-text-muted, #475569);
+    font-size: var(--font-size-xs, 0.75rem);
+    font-weight: 700;
+    letter-spacing: 0;
+    text-transform: uppercase;
+}
+
+.ductbank-page .db-table .header-sort {
+    width: 100%;
+    justify-content: space-between;
+    color: inherit;
+    text-align: left;
+    text-transform: inherit;
+}
+
+.ductbank-page .db-table tbody tr:hover td {
+    background: color-mix(in srgb, var(--color-primary, #2563eb) 4%, var(--color-surface, #fff));
+}
+
+.ductbank-page #conduitTable th:first-child,
+.ductbank-page #conduitTable td:first-child,
+.ductbank-page #cableTable th:first-child,
+.ductbank-page #cableTable td:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 3;
+    box-shadow: 1px 0 0 var(--color-border, var(--border-color));
+}
+
+.ductbank-page #conduitTable th:first-child,
+.ductbank-page #cableTable th:first-child {
+    z-index: 5;
+}
+
+.ductbank-page .db-table td input,
+.ductbank-page .db-table td select {
+    min-width: 7rem;
+}
+
+.ductbank-page #conduitTable td:nth-child(6),
+.ductbank-page #conduitTable td:nth-child(7),
+.ductbank-page #cableTable td:nth-last-child(-n+2),
+.ductbank-page #heatSourceTable td:last-child {
+    text-align: center;
+}
+
+.ductbank-page .row-icon-btn.removeBtn,
+.ductbank-page .row-icon-btn.duplicateBtn,
+.ductbank-page .row-icon-btn.viewBtn,
+.ductbank-page .row-icon-btn.insertAboveBtn,
+.ductbank-page .row-icon-btn.insertBelowBtn {
+    width: 2rem;
+    height: 2rem;
+    margin: 0;
+    border: 1px solid var(--color-border, var(--border-color));
+    background: var(--color-surface-strong, #fff);
+    color: var(--color-text, var(--text-color));
+}
+
+.ductbank-page .row-icon-btn.removeBtn:hover,
+.ductbank-page .row-icon-btn.removeBtn:focus {
+    border-color: color-mix(in srgb, var(--error-text) 42%, var(--color-border, #cbd5e1));
+    background: color-mix(in srgb, var(--error-bg) 58%, var(--color-surface-strong, #fff));
+}
+
+.ductbank-row-warning td {
+    background: color-mix(in srgb, var(--warning-bg) 18%, var(--color-surface, #fff)) !important;
+}
+
+.ductbank-row-fill-warning td:first-child {
+    box-shadow: inset 3px 0 0 var(--warning-text);
+}
+
+.ductbank-row-thermal-warning td:first-child {
+    box-shadow: inset 3px 0 0 var(--error-text);
+}
+
+.ductbank-row-ampacity-warning td:first-child {
+    box-shadow: inset 3px 0 0 var(--error-text);
+}
+
+.ductbank-subdetails {
+    margin-top: var(--space-2, 0.75rem);
+    padding: var(--space-2, 0.75rem);
+    border: 1px solid var(--color-border, var(--border-color));
+    border-radius: var(--radius-sm, 6px);
+    background: color-mix(in srgb, var(--color-surface, #fff) 72%, var(--color-surface-strong, #f8fafc));
+}
+
+.ductbank-subdetails > summary {
+    cursor: pointer;
+}
+
+.ductbank-visual-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3, 1rem);
+}
+
+.ductbank-warning-area {
+    margin: 0;
+}
+
+.ductbank-grid-wrapper {
+    position: relative;
+    width: 100%;
+    overflow: auto;
+    border: 1px solid var(--color-border, var(--border-color));
+    border-radius: var(--radius-sm, 6px);
+    background: repeating-linear-gradient(
+        45deg,
+        color-mix(in srgb, var(--color-surface-strong, #f8fafc) 86%, transparent),
+        color-mix(in srgb, var(--color-surface-strong, #f8fafc) 86%, transparent) 10px,
+        var(--color-surface, #fff) 10px,
+        var(--color-surface, #fff) 20px
+    );
+}
+
+.ductbank-grid-container {
+    position: relative;
+    display: inline-block;
+    min-width: 100%;
+    transform-origin: 0 0;
+}
+
+.ductbank-page #grid {
+    position: relative;
+    z-index: 1;
+    display: block;
+    margin: 0;
+    border: 0;
+    background: #f7efdf;
+}
+
+.ductbank-soil-backdrop {
+    shape-rendering: crispEdges;
+}
+
+.ductbank-envelope-fill {
+    fill: color-mix(in srgb, var(--color-surface, #fff) 72%, #e2e8f0);
+    fill-opacity: 0.76;
+    stroke: none;
+}
+
+.ductbank-grade-line {
+    stroke: #7c5f2f;
+    stroke-width: 2;
+}
+
+.ductbank-grade-label,
+.ductbank-soil-label,
+.ductbank-depth-callout {
+    fill: #334155;
+    font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    letter-spacing: 0;
+}
+
+.ductbank-grade-label,
+.ductbank-soil-label {
+    font-size: 10px;
+    font-weight: 800;
+}
+
+.ductbank-depth-callout {
+    font-size: 13px;
+    font-weight: 800;
+}
+
+.ductbank-depth-callout-bg {
+    filter: drop-shadow(0 1px 2px rgba(15, 23, 42, 0.12));
+}
+
+.ductbank-dimension-line,
+.ductbank-dimension-extension,
+.ductbank-dimension-leader {
+    stroke: #334155;
+    stroke-width: 1.4;
+    fill: none;
+}
+
+.ductbank-cable-marker {
+    cursor: pointer;
+    outline: none;
+}
+
+.ductbank-cable-marker .ductbank-cable-shape {
+    transition: fill 0.15s ease, stroke 0.15s ease, stroke-width 0.15s ease, filter 0.15s ease;
+}
+
+.ductbank-cable-marker:hover .ductbank-cable-shape,
+.ductbank-cable-marker:focus-visible .ductbank-cable-shape,
+.ductbank-cable-marker.is-selected .ductbank-cable-shape {
+    fill: color-mix(in srgb, var(--color-primary, #2563eb) 22%, #dbeafe);
+    stroke: var(--color-primary, #2563eb);
+    stroke-width: 2.5;
+    filter: drop-shadow(0 1px 2px rgba(15, 23, 42, 0.28));
+}
+
+.ductbank-cable-marker.is-selected .ductbank-cable-shape {
+    fill: color-mix(in srgb, var(--color-primary, #2563eb) 32%, #dbeafe);
+}
+
+.ductbank-cable-label {
+    pointer-events: none;
+    user-select: none;
+}
+
+.ductbank-cable-popover {
+    position: absolute;
+    z-index: 8;
+    width: min(20rem, calc(100% - 1rem));
+    padding: var(--space-3, 1rem);
+    border: 1px solid color-mix(in srgb, var(--color-primary, #2563eb) 24%, var(--color-border, #cbd5e1));
+    border-radius: var(--radius-sm, 6px);
+    background: var(--color-surface, #fff);
+    box-shadow: 0 18px 42px rgba(15, 23, 42, 0.18);
+    color: var(--color-text, var(--text-color));
+}
+
+.ductbank-cable-popover[hidden] {
+    display: none;
+}
+
+.ductbank-cable-popover-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--space-2, 0.75rem);
+    margin-bottom: var(--space-2, 0.75rem);
+}
+
+.ductbank-cable-popover-header span {
+    display: block;
+    color: var(--color-text-muted, #64748b);
+    font-size: var(--font-size-xs, 0.75rem);
+    font-weight: 700;
+    letter-spacing: 0;
+    text-transform: uppercase;
+}
+
+.ductbank-cable-popover-header strong {
+    display: block;
+    margin-top: 0.1rem;
+    font-size: var(--font-size-lg, 1.125rem);
+}
+
+.ductbank-cable-popover-close {
+    flex: 0 0 auto;
+    width: 1.75rem;
+    height: 1.75rem;
+    font-size: var(--font-size-sm, 0.875rem);
+}
+
+.ductbank-cable-popover-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.55rem 0.75rem;
+}
+
+.ductbank-cable-popover-metric {
+    min-width: 0;
+}
+
+.ductbank-cable-popover-metric span {
+    display: block;
+    color: var(--color-text-muted, #64748b);
+    font-size: var(--font-size-xs, 0.75rem);
+    font-weight: 700;
+}
+
+.ductbank-cable-popover-metric strong {
+    display: block;
+    overflow-wrap: anywhere;
+    font-size: var(--font-size-sm, 0.875rem);
+}
+
+.ductbank-cable-popover-statuses {
+    display: grid;
+    gap: var(--space-2, 0.75rem);
+    margin-top: var(--space-3, 1rem);
+}
+
+.ductbank-cable-popover-status {
+    display: grid;
+    gap: 0.15rem;
+    padding: 0.55rem 0.65rem;
+    border: 1px solid var(--color-border, #cbd5e1);
+    border-radius: var(--radius-sm, 6px);
+    background: var(--color-surface-strong, #f8fafc);
+}
+
+.ductbank-cable-popover-status span {
+    color: var(--color-text-muted, #64748b);
+    font-size: var(--font-size-xs, 0.75rem);
+}
+
+.ductbank-cable-popover-status--success {
+    border-color: color-mix(in srgb, var(--success-text, #166534) 28%, var(--color-border, #cbd5e1));
+    background: color-mix(in srgb, var(--success-bg, #dcfce7) 50%, var(--color-surface, #fff));
+}
+
+.ductbank-cable-popover-status--warning {
+    border-color: color-mix(in srgb, var(--warning-text, #92400e) 32%, var(--color-border, #cbd5e1));
+    background: color-mix(in srgb, var(--warning-bg, #fef3c7) 54%, var(--color-surface, #fff));
+}
+
+.ductbank-cable-popover-status--error {
+    border-color: color-mix(in srgb, var(--error-text, #991b1b) 32%, var(--color-border, #cbd5e1));
+    background: color-mix(in srgb, var(--error-bg, #fee2e2) 54%, var(--color-surface, #fff));
+}
+
+.ductbank-cable-popover-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: var(--space-3, 1rem);
+}
+
+.ductbank-row-selected td {
+    background: color-mix(in srgb, var(--color-primary, #2563eb) 10%, var(--color-surface, #fff)) !important;
+}
+
+.ductbank-temp-canvas,
+.ductbank-temp-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    display: none;
+    pointer-events: none;
+}
+
+.ductbank-temp-canvas {
+    z-index: 2;
+    opacity: 0.7;
+}
+
+.ductbank-temp-overlay {
+    z-index: 3;
+}
+
+.ductbank-zoom-toolbar {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1, 0.25rem);
+}
+
+.ductbank-toolbar-symbol {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1rem;
+    height: 1rem;
+    font-size: 1.15rem;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.ductbank-scroll-top {
+    align-self: flex-start;
+    margin: 0;
+}
+
+#analysis-progress-container {
+    padding: var(--space-2, 0.75rem);
+    border: 1px solid var(--color-border, var(--border-color));
+    border-radius: var(--radius-sm, 6px);
+    background: var(--color-surface-strong, #f8fafc);
+}
+
+#analysis-progress-bar {
+    height: 0.55rem;
+    border-radius: 999px;
+    background: var(--color-primary, var(--primary-color));
+}
+
+body.dark-mode.ductbank-page .db-table td,
+body.dark-mode.ductbank-page .db-table th {
+    background: var(--color-surface, #2c3034);
+}
+
+body.dark-mode.ductbank-page .db-table tbody tr:hover td {
+    background: color-mix(in srgb, var(--color-primary, #4f8cff) 12%, var(--color-surface, #2c3034));
+}
+
+body.dark-mode.ductbank-page .ductbank-row-warning td {
+    background: color-mix(in srgb, var(--warning-bg) 24%, var(--color-surface, #2c3034)) !important;
+}
+
+@media (max-width: 760px) {
+    .ductbank-section-header,
+    .ductbank-page-header {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .ductbank-field-grid,
+    .ductbank-field-grid--compact {
+        grid-template-columns: 1fr;
+    }
+
+    .ductbank-details > summary {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .ductbank-warning-item,
+    .ductbank-ampacity-over-item,
+    .ductbank-entry-form .modal-form-field {
+        grid-template-columns: 1fr;
+    }
 }
 
 /* --- Conduit Fill Page --- */

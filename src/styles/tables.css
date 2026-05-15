@@ -641,6 +641,19 @@ body.dark-mode .table-row-focusable:focus-within::after {
     cursor: pointer;
 }
 
+.row-action-group {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-1);
+    white-space: nowrap;
+}
+
+td.icon-action-cell,
+td.raceway-action-cell {
+    text-align: center;
+}
+
 .row-icon-btn .control-icon {
     width: 0.9rem;
     height: 0.9rem;

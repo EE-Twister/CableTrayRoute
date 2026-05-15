@@ -1,7 +1,7 @@
 const assert = require("assert");
 
 async function run() {
-  const { mapConduitRow } = await import("../racewaySampleData.mjs");
+  const { mapConduitRow, mapTrayRow } = await import("../racewaySampleData.mjs");
   const legacy1 = {
     "Conduit ID": "C-001",
     Type: "RMC",
@@ -13,6 +13,7 @@ async function run() {
     type: "EMT",
     tradeSize: "2",
     ductbankTag: "DB-02",
+    Material: "Aluminum",
     "Allowed Group": "A",
   };
   const legacy3 = {
@@ -27,8 +28,11 @@ async function run() {
   assert.equal(r1.conduit_id, "C-001");
   assert.equal(r1.trade_size, "3");
   assert.equal(r1.ductbankTag, "DB-01");
+  assert.equal(r2.material, "Aluminum");
   assert.equal(r2.allowed_cable_group, "A");
   assert.equal(r3.type, "PVC Sch 40");
+  const tray = mapTrayRow({ "Tray ID": "T-001", "Tray Material": "Fiberglass" });
+  assert.equal(tray.material, "Fiberglass");
   console.log("racewaySampleMapper.test passed");
 }
 

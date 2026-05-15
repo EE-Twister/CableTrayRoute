@@ -71,20 +71,86 @@ function getRduct(conduit,params){
 
 function fToC(f){ return (f-32)/1.8; }
 
+const INSULATION_TEMP_LIMIT={
+  THHN:90,
+  XLPE:90,
+  PVC:75,
+  XHHW:90,
+  'XHHW-2':90,
+  'THWN-2':90,
+  THW:75,
+  'THWN':75,
+  TW:60,
+  UF:60
+};
+
+function finiteNumber(value,fallback=0){
+  const num=parseFloat(value);
+  return Number.isFinite(num)?num:fallback;
+}
+
+function cableTemperatureRating(cable){
+  const direct=parseFloat(cable?.insulation_rating);
+  if(Number.isFinite(direct) && direct>0) return direct;
+  const type=String(cable?.insulation_type||'').trim().toUpperCase();
+  return INSULATION_TEMP_LIMIT[type] || 90;
+}
+
+function cableCurrentCarryingConductors(cable){
+  return Math.max(1,finiteNumber(cable?.conductors,1));
+}
+
+function skinEffect(size){
+  const area=sizeToArea(size)/1000;
+  if(!area) return 0;
+  const table=[
+    [0,0],[100,0],[250,0.05],[500,0.1],
+    [1000,0.15],[2000,0.2]
+  ];
+  for(let i=1;i<table.length;i++){
+    const a=table[i-1];
+    const b=table[i];
+    if(area<=b[0]){
+      const t=(area-a[0])/(b[0]-a[0]);
+      return a[1]+t*(b[1]-a[1]);
+    }
+  }
+  return table[table.length-1][1];
+}
+
+function cableHeatLoss(cable,current=finiteNumber(cable?.est_load,0),rating=cableTemperatureRating(cable)){
+  const Rdc=dcResistance(cable.conductor_size,cable.conductor_material,rating);
+  if(!Number.isFinite(Rdc) || Rdc<=0) return 0;
+  return current*current*Rdc*(1+skinEffect(cable.conductor_size))*cableCurrentCarryingConductors(cable);
+}
+
 function solve(conduits,cables,params,width,height,gridSize,ductRes,progressCb,heatSources){
   heatSources=heatSources||[];
   const scale=40,margin=20;
   GRID_SIZE=gridSize||GRID_SIZE;
-  const step=Math.ceil(Math.max(width,height)/GRID_SIZE);
+  let minCenterIn=Infinity;
+  conduits.forEach(cd=>{
+    const area=CONDUIT_SPECS[cd.conduit_type]?.[cd.trade_size];
+    if(!Number.isFinite(area) || area<=0) return;
+    const Rin=Math.sqrt(area/Math.PI);
+    minCenterIn=Math.min(minCenterIn,(finiteNumber(cd.y,0)+Rin));
+  });
+  if(!Number.isFinite(minCenterIn)) minCenterIn=0;
+  const depthIn=Math.max(0,finiteNumber(params.ductbankDepth,0));
+  const coverOffsetPx=Math.max(0,(depthIn-minCenterIn)*scale);
+  const boundaryPadPx=Math.max(12,depthIn || 36)*scale;
+  const solverWidth=width+2*boundaryPadPx;
+  const solverHeight=height+coverOffsetPx+boundaryPadPx;
+  const step=Math.ceil(Math.max(solverWidth,solverHeight)/GRID_SIZE);
   const dx=(0.0254/scale)*step;
-  const nx=Math.ceil(width/step);
-  const ny=Math.ceil(height/step);
+  const nx=Math.ceil(solverWidth/step);
+  const ny=Math.ceil(solverHeight/step);
   let soil=(params.soilResistivity)||90;
   soil*=1-Math.min(params.moistureContent||0,100)/200;
   const k=100/soil;
   const hConv=10;
   const Bi=hConv*dx/k;
-  const earthT=params.earthTemp||20;
+  const earthT=Number.isFinite(params.earthTemp)?params.earthTemp:20;
   const airT=isNaN(params.airTemp)?earthT:params.airTemp;
   const grid=Array.from({length:ny},()=>Array(nx).fill(earthT));
   const newGrid=Array.from({length:ny},()=>Array(nx).fill(earthT));
@@ -99,8 +165,8 @@ function solve(conduits,cables,params,width,height,gridSize,ductRes,progressCb,h
     const Rin=Math.sqrt(CONDUIT_SPECS[cd.conduit_type][cd.trade_size]/Math.PI);
     const cx=(cd.x+Rin)*0.0254;
     const cy=(cd.y+Rin)*0.0254;
-    const cxPx=Math.round((cx/0.0254*scale+margin)/step);
-    const cyPx=Math.round((cy/0.0254*scale+margin)/step);
+    const cxPx=Math.round((cx/0.0254*scale+margin+boundaryPadPx)/step);
+    const cyPx=Math.round((cy/0.0254*scale+margin+coverOffsetPx)/step);
     const rPx=Math.max(1,Math.round((Rin*scale)/step));
     const cells=[];
     for(let j=Math.max(0,cyPx-rPx);j<=Math.min(ny-1,cyPx+rPx);j++){
@@ -119,9 +185,8 @@ function solve(conduits,cables,params,width,height,gridSize,ductRes,progressCb,h
   cables.forEach(c=>{
     const h=heatMap[c.conduit_id];
     if(!h) return;
-    const Rdc=dcResistance(c.conductor_size,c.conductor_material,90);
     const current=parseFloat(c.est_load)||0;
-    const power=current*current*Rdc*(c.conductors||1);
+    const power=cableHeatLoss(c,current);
     h.power+=power;
     const q=power/(Math.PI*h.r*h.r)*dx*dx/k;
     conduitCells[c.conduit_id].forEach(([j,i])=>{ powerGrid[j][i]+=q; });
@@ -137,8 +202,8 @@ function solve(conduits,cables,params,width,height,gridSize,ductRes,progressCb,h
     if(shape==='circle'){
       const r=Math.max(w,ht)/2;
       const cx=x+r, cy=y+r;
-      const cxPx=Math.round((cx*scale+margin)/step);
-      const cyPx=Math.round((cy*scale+margin)/step);
+      const cxPx=Math.round((cx*scale+margin+boundaryPadPx)/step);
+      const cyPx=Math.round((cy*scale+margin+coverOffsetPx)/step);
       const rPx=Math.max(1,Math.round((r*scale)/step));
       for(let j=Math.max(0,cyPx-rPx);j<=Math.min(ny-1,cyPx+rPx);j++){
         for(let i=Math.max(0,cxPx-rPx);i<=Math.min(nx-1,cxPx+rPx);i++){
@@ -152,10 +217,10 @@ function solve(conduits,cables,params,width,height,gridSize,ductRes,progressCb,h
         }
       }
     }else{
-      const x1=Math.round((x*scale+margin)/step);
-      const y1=Math.round((y*scale+margin)/step);
-      const x2=Math.round(((x+w)*scale+margin)/step);
-      const y2=Math.round(((y+ht)*scale+margin)/step);
+      const x1=Math.round((x*scale+margin+boundaryPadPx)/step);
+      const y1=Math.round((y*scale+margin+coverOffsetPx)/step);
+      const x2=Math.round(((x+w)*scale+margin+boundaryPadPx)/step);
+      const y2=Math.round(((y+ht)*scale+margin+coverOffsetPx)/step);
       for(let j=Math.max(0,y1);j<=Math.min(ny-1,y2);j++){
         for(let i=Math.max(0,x1);i<=Math.min(nx-1,x2);i++){
           sourceMask[j][i]=true;
@@ -166,8 +231,9 @@ function solve(conduits,cables,params,width,height,gridSize,ductRes,progressCb,h
       }
     }
   });
-  let diff=Infinity,iter=0,maxIter=500;
-  while(diff>0.01&&iter<maxIter){
+  let diff=Infinity,iter=0,maxIter=2000;
+  const minIter=Math.max(80,GRID_SIZE*4);
+  while((iter<minIter || diff>0.01)&&iter<maxIter){
     diff=0;
     for(let j=0;j<ny;j++){
       for(let i=0;i<nx;i++){
@@ -202,7 +268,22 @@ function solve(conduits,cables,params,width,height,gridSize,ductRes,progressCb,h
     const rduct=getRduct(cd,params)+(ductRes||0);
     temps[cid]=base+p*rduct;
   });
-  return {grid,conduitTemps:temps,iter,residual:diff,ambient:earthT};
+  const cropCols=Math.max(1,GRID_SIZE);
+  const cropRows=Math.max(1,Math.ceil((height/Math.max(width,1))*GRID_SIZE));
+  const visibleGrid=[];
+  for(let j=0;j<cropRows;j++){
+    const yPx=coverOffsetPx+(cropRows===1?0:(j/(cropRows-1))*height);
+    const sourceJ=Math.min(ny-1,Math.max(0,Math.round(yPx/step)));
+    const sourceRow=grid[sourceJ] || [];
+    const row=[];
+    for(let i=0;i<cropCols;i++){
+      const xPx=boundaryPadPx+(cropCols===1?0:(i/(cropCols-1))*width);
+      const sourceI=Math.min(nx-1,Math.max(0,Math.round(xPx/step)));
+      row.push(Number.isFinite(sourceRow[sourceI])?sourceRow[sourceI]:earthT);
+    }
+    visibleGrid.push(row);
+  }
+  return {grid:visibleGrid,conduitTemps:temps,iter,residual:diff,ambient:earthT};
 }
 
 self.onmessage=e=>{

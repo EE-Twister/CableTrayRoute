@@ -194,9 +194,11 @@ Exported routing results are written to `route_data.xlsx`. Load this file in `ca
 
 Use the buttons above each table to **Save** to browser storage, **Load** saved data, and **Import/Export XLSX** files. Templates are available in the `examples` folder (`ductbank_schedule_ductbanks.csv`, `ductbank_schedule_conduits.csv`, `tray_schedule.csv`, and `conduit_schedule.csv`). Save these CSV files as `.xlsx` with matching sheet names before importing.
 
+Use **Batch Edit** from each schedule table's **More** menu to apply a shared field value to visible filtered rows or all rows.
+
 ## Ductbank Analysis
 
-`ductbankroute.html` analyzes underground ductbanks. You can manually enter each conduit and cable or import them from CSV files. Example formats are available at `examples/ductbank_template.csv` and `examples/cables_ductbank.csv`. The **Thermal Analysis** tool overlays a heat map showing estimated earth temperatures. Use **Download Ductbank Data** for an XLSX report, **Export Ductbank Conduits** and **Export Ductbank Cables** for CSVs, or **Export Image** to save the drawing. Ductbank data is saved between sessions; select **Delete Saved Data** from the settings menu to clear it.
+`ductbankroute.html` analyzes underground ductbanks. You can add conduits and cables through guided entry dialogs, import them from CSV files, download CSV templates, or load a complete example from the compact action toolbar. The page applies practical default thermal assumptions, summarizes conduit count, cable count, assignments, warnings, and thermal alerts, and provides quick filters for assigned, unassigned, missing-data, fill-warning, and thermal-alert rows. Actionable warnings jump to the field that needs correction, filtered tables show row counts and empty states, and the **Auto Assign** helper can distribute unassigned cables across available conduits. The workflow strip keeps users moving from **Validate** to **Calculate Fill**, **Thermal**, and **Export**. Example formats are available at `examples/ductbank_template.csv` and `examples/cables_ductbank.csv`. The **Thermal** tool overlays a heat map showing estimated earth temperatures, and selecting an individual cable in the drawing opens quick properties with a table-row shortcut. Use the **Export** menu for the XLSX workbook, conduit and cable CSVs, image export, thermal data, canvas data, and the calculation report. Ductbank data is saved between sessions; select **Delete Saved Data** from the settings menu to clear it.
 
 ## Ductbank Geometry Integration
 

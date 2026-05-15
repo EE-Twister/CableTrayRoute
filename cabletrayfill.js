@@ -2,7 +2,7 @@ import { getItem, setItem, removeItem, keys as storeKeys } from './dataStore.mjs
 import { FILTER_ICON_SVG } from './tableUtils.mjs';
 import { showAlertModal, openModal } from './src/components/modal.js';
 import { createFillGauge } from './src/components/fillGauge.js';
-import { start as startTour, hasDoneTour } from './tour.js';
+import { start as startTour } from './tour.js';
 
 const TRAYFILL_TOUR_STEPS = [
   { selector: '#trayParameters',       message: 'Select the tray you want to analyze: choose width, depth, and tray type. These parameters are used to calculate the NEC-compliant fill percentage.' },
@@ -22,6 +22,12 @@ function escapeHtml(value) {
   }[ch]));
 }
 
+function svgFillColor(pct) {
+  if (pct > 50) return 'rgba(220,53,69,0.18)';
+  if (pct >= 40) return 'rgba(255,193,7,0.20)';
+  return 'rgba(40,167,69,0.12)';
+}
+
 checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Schedule'}]);
 
     document.addEventListener("DOMContentLoaded", async function() {
@@ -30,7 +36,7 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
       initCompactMode();
       initHelpModal('help-btn','helpOverlay','helpClose');
       initNavToggle();
-      const trayGauge = createFillGauge('fill-gauge-container', { label: 'Tray Fill %' });
+      const trayGauge = createFillGauge('fill-gauge-container', { label: 'Current fill', width: 160, strokeWidth: 16 });
       const dirty = createDirtyTracker();
       const markSaved = () => { dirty.markClean(); };
       const markUnsaved = () => { dirty.markDirty(); };
@@ -67,19 +73,29 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
       // Reference to <tbody> in the cable table
       const cableTbody = document.querySelector("#cableTable tbody");
       const cableTable = document.getElementById('cableTable');
+      const expandBtn = document.getElementById('expandBtn');
+      const trayFillValueEl = document.getElementById('trayFillValue');
+      const trayFillLimitEl = document.getElementById('trayFillLimit');
+      const trayFillStatusEl = document.getElementById('trayFillStatus');
       const headerCells = cableTable.querySelectorAll('thead th');
       const filters = [];
       const filterBtns = [];
       let cables = [];
+      if (expandBtn) expandBtn.disabled = true;
       // compartments: up to 5 compartments, each with id, width (in), depth (in), label
       let compartments = [{ id: 1, width: 12, depth: 3, label: '' }];
       headerCells.forEach((th, idx) => {
         if (idx < headerCells.length - 2) {
           const btn = document.createElement('button');
+          const label = th.dataset.filterLabel || th.textContent.replace(/\*/g, '').replace(/\?/g, '').trim() || `Column ${idx + 1}`;
+          const actionSlot = th.querySelector('.tray-column-actions') || th;
+          btn.type = 'button';
           btn.className = 'filter-btn';
+          btn.setAttribute('aria-label', `Filter ${label}`);
+          btn.title = `Filter ${label}`;
           btn.innerHTML = FILTER_ICON_SVG;
           btn.addEventListener('click', e => { e.stopPropagation(); showFilterPopup(btn, idx); });
-          th.appendChild(btn);
+          actionSlot.appendChild(btn);
           filters[idx] = '';
           filterBtns[idx] = btn;
         }
@@ -192,7 +208,10 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
           row.appendChild(lLabel);
           // Remove button
           const rmBtn = document.createElement('button');
-          rmBtn.type = 'button'; rmBtn.textContent = '✖';
+          rmBtn.type = 'button';
+          rmBtn.textContent = 'Remove';
+          rmBtn.setAttribute('aria-label', `Remove compartment ${comp.id}`);
+          rmBtn.title = `Remove compartment ${comp.id}`;
           rmBtn.className = 'comp-remove-btn';
           rmBtn.disabled = compartments.length === 1;
           rmBtn.addEventListener('click', () => {
@@ -263,6 +282,20 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
       });
 
       let fillSummaryEl;
+      function updateTrayFillStatus(fillPercent, limit) {
+        if (trayFillValueEl) trayFillValueEl.textContent = `${fillPercent.toFixed(1)}%`;
+        if (trayFillLimitEl) trayFillLimitEl.textContent = `${limit}%`;
+        if (!trayFillStatusEl) return;
+
+        const warningThreshold = limit * 0.8;
+        const isOverLimit = fillPercent > limit;
+        const isNearLimit = fillPercent >= warningThreshold && !isOverLimit;
+        trayFillStatusEl.textContent = isOverLimit ? 'Over limit' : isNearLimit ? 'Near limit' : 'Within limit';
+        trayFillStatusEl.classList.toggle('is-ok', !isNearLimit && !isOverLimit);
+        trayFillStatusEl.classList.toggle('is-warn', isNearLimit);
+        trayFillStatusEl.classList.toggle('is-danger', isOverLimit);
+      }
+
       function updateTotals() {
         const allow = document.getElementById('trayType').value === 'ladder' ? 50 : 40;
         let totalArea = 0;
@@ -286,8 +319,9 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
         }
         const compLabel = compartments.length > 1 ? ' (worst compartment)' : '';
         fillSummaryEl.textContent = `Total Cable Area: ${totalArea.toFixed(2)} in², Fill: ${worstFill.toFixed(1)}%${compLabel}`;
-        fillSummaryEl.style.color = worstFill > allow ? 'red' : '';
+        fillSummaryEl.style.color = worstFill > allow ? 'var(--color-error)' : '';
         trayGauge.update(worstFill);
+        updateTrayFillStatus(worstFill, allow);
         return { totalArea, fillP: worstFill, allow };
       }
 
@@ -468,8 +502,10 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
         const tdDup = document.createElement("td");
         const btnDup = document.createElement("button");
         btnDup.type = "button";
-        btnDup.textContent = "⧉";
-        btnDup.className = "duplicateBtn";
+        btnDup.className = "duplicateBtn row-icon-btn";
+        btnDup.setAttribute("aria-label", `Duplicate cable row ${idx + 1}`);
+        btnDup.title = "Duplicate cable row";
+        btnDup.innerHTML = '<img src="icons/toolbar/copy.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">';
         btnDup.addEventListener("click", () => {
           const clone = { ...cables[idx] };
           cables.splice(idx + 1, 0, clone);
@@ -482,8 +518,10 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
         const tdRm = document.createElement("td");
         const btnRm = document.createElement("button");
         btnRm.type = "button";
-        btnRm.textContent = "✖";
-        btnRm.className = "removeBtn";
+        btnRm.className = "removeBtn row-icon-btn danger";
+        btnRm.setAttribute("aria-label", `Remove cable row ${idx + 1}`);
+        btnRm.title = "Remove cable row";
+        btnRm.innerHTML = '<img src="icons/toolbar/trash.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">';
         btnRm.addEventListener("click", () => {
           cables.splice(idx, 1);
           renderCableRows();
@@ -1023,12 +1061,6 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
           if (pct >= 40) return 'zone-fill-warning';
           return 'zone-fill-ok';
         }
-        // Returns an rgba fill color for SVG heat-map backgrounds
-        function svgFillColor(pct) {
-          if (pct > 50) return 'rgba(220,53,69,0.18)';
-          if (pct >= 40) return 'rgba(255,193,7,0.20)';
-          return 'rgba(40,167,69,0.12)';
-        }
 
         let voltageWarning = "";
         const allZoneData = [];
@@ -1238,6 +1270,7 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
 
         // 15) Draw the SVG — one rect per compartment, stacked vertically
         document.getElementById("svgContainer").innerHTML = buildCompartmentSvg(compLayouts, trayName, cableColor, 20, fillMap);
+        if (expandBtn) expandBtn.disabled = false;
 
         // 16) Show overflow warnings
         if (overflowHoriz) {
@@ -1728,9 +1761,70 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
         });
       }
 
+      function requestProfileName() {
+        return openModal({
+          title: 'Save Cable Profile',
+          description: 'Name this reusable tray cable set. Profiles are stored in this browser.',
+          primaryText: 'Save Profile',
+          secondaryText: 'Cancel',
+          initialFocusSelector: '#tray-profile-name',
+          render(body, controller) {
+            const form = document.createElement('form');
+            form.className = 'modal-form';
+
+            const field = document.createElement('label');
+            field.className = 'modal-form-field';
+            field.setAttribute('for', 'tray-profile-name');
+            field.textContent = 'Profile name';
+
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.id = 'tray-profile-name';
+            input.maxLength = 80;
+            input.autocomplete = 'off';
+            input.placeholder = 'e.g. Main power tray';
+
+            const error = document.createElement('p');
+            error.className = 'form-field-error';
+            error.setAttribute('role', 'alert');
+
+            field.appendChild(input);
+            form.append(field, error);
+            body.appendChild(form);
+            controller.registerForm(form);
+            controller.setInitialFocus(input);
+
+            return {
+              initialFocus: input,
+              getValue() {
+                return input.value.trim();
+              },
+              setError(message) {
+                error.textContent = message;
+                error.classList.toggle('is-visible', !!message);
+                input.toggleAttribute('aria-invalid', !!message);
+              }
+            };
+          },
+          onSubmit(controller) {
+            const formApi = controller.body.querySelector('#tray-profile-name');
+            const errorEl = controller.body.querySelector('.form-field-error');
+            const name = formApi.value.trim();
+            if (!name) {
+              errorEl.textContent = 'Enter a profile name.';
+              errorEl.classList.add('is-visible');
+              formApi.setAttribute('aria-invalid', 'true');
+              formApi.focus();
+              return false;
+            }
+            return name;
+          }
+        });
+      }
+
       // Save profile
-      document.getElementById("saveProfileBtn").addEventListener("click", () => {
-        const name = prompt("Enter a name for this cable profile:");
+      document.getElementById("saveProfileBtn").addEventListener("click", async () => {
+        const name = await requestProfileName();
         if (!name) return;
         const rows = Array.from(cableTbody.querySelectorAll("tr"));
         const arr = [];
@@ -1931,11 +2025,20 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
 
       // Attach help popups for table headers
       document.querySelectorAll('.helpBtn').forEach(btn => {
-        btn.addEventListener('click', () => {
+        btn.addEventListener('click', event => {
+          event.preventDefault();
+          event.stopPropagation();
+          const help = btn.getAttribute('data-help');
+          if (help) {
+            const column = btn.closest('th');
+            const title = column?.dataset.filterLabel ? `${column.dataset.filterLabel} Help` : 'Help';
+            showAlertModal(title, help);
+            return;
+          }
           const doc = btn.getAttribute('data-doc');
-          if(doc && globalThis.showHelpDoc) showHelpDoc(doc);
-          else if(doc) window.open(doc, '_blank');
-          else showAlertModal('Help', btn.getAttribute('data-help') || '');
+          if (doc && globalThis.showHelpDoc) showHelpDoc(doc);
+          else if (doc) window.open(doc, '_blank');
+          else showAlertModal('Help', '');
         });
       });
 
@@ -1943,9 +2046,6 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
       const tourBtn = document.getElementById('tour-btn');
       if (tourBtn) {
         tourBtn.addEventListener('click', () => startTour(TRAYFILL_TOUR_STEPS, 'trayFill'));
-      }
-      if (!hasDoneTour('trayFill')) {
-        startTour(TRAYFILL_TOUR_STEPS, 'trayFill');
       }
     });
   

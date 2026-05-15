@@ -929,10 +929,21 @@ export function exportToCad(fileType = 'json') {
   let content = JSON.stringify(data, null, 2);
 
   if (fileType === 'csv') {
-    const trayHeader = 'id,start_x,start_y,start_z,end_x,end_y,end_z,width,height';
-    const trayRows = data.trays.map(t => [t.id, t.start_x, t.start_y, t.start_z, t.end_x, t.end_y, t.end_z, t.width, t.height].join(','));
-    const conduitHeader = 'conduit_id,type,trade_size,start_x,start_y,start_z,end_x,end_y,end_z,capacity';
-    const conduitRows = data.conduits.map(c => [c.conduit_id, c.type, c.trade_size, c.start_x, c.start_y, c.start_z, c.end_x, c.end_y, c.end_z, c.capacity].join(','));
+    const trayHeader = 'id,start_x,start_y,start_z,end_x,end_y,end_z,width,height,material';
+    const trayRows = data.trays.map(t => [
+      t.id ?? t.tray_id,
+      t.start_x,
+      t.start_y,
+      t.start_z,
+      t.end_x,
+      t.end_y,
+      t.end_z,
+      t.width ?? t.inside_width,
+      t.height ?? t.tray_depth,
+      t.material
+    ].join(','));
+    const conduitHeader = 'conduit_id,type,material,trade_size,start_x,start_y,start_z,end_x,end_y,end_z,capacity';
+    const conduitRows = data.conduits.map(c => [c.conduit_id, c.type, c.material, c.trade_size, c.start_x, c.start_y, c.start_z, c.end_x, c.end_y, c.end_z, c.capacity].join(','));
     content = `# trays\n${[trayHeader, ...trayRows].join('\n')}\n# conduits\n${[conduitHeader, ...conduitRows].join('\n')}`;
     mime = 'text/csv';
     ext = 'csv';

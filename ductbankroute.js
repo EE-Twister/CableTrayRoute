@@ -52,6 +52,7 @@ function forceShowResumeIfE2E() {
 window.E2E = E2E;
 
 import { getItem, setItem, removeItem, getCables, getConduits } from './dataStore.mjs';
+import { openModal, showAlertModal } from './src/components/modal.js';
 
 checkPrereqs([{key:'ductbankSchedule',page:'racewayschedule.html',label:'Raceway Schedule'}]);
 
@@ -229,9 +230,31 @@ function fToC(f){
   return (f-32)/1.8;
 }
 
+function finiteNumber(value, fallback = 0){
+  const num=parseFloat(value);
+  return Number.isFinite(num)?num:fallback;
+}
+
 function getConductorRating(){
   const val=parseFloat(document.getElementById('conductorRating')?.value);
   return isNaN(val)?90:val;
+}
+
+function cableTemperatureRating(cable){
+  const direct=parseFloat(cable?.insulation_rating);
+  if(Number.isFinite(direct) && direct > 0) return direct;
+  const type=String(cable?.insulation_type || '').trim().toUpperCase();
+  return INSULATION_TEMP_LIMIT[type] || getConductorRating();
+}
+
+function cableCurrentCarryingConductors(cable){
+  return Math.max(1, finiteNumber(cable?.conductors, 1));
+}
+
+function conduitEquivalentDiameterMeters(conduit){
+  const area=CONDUIT_SPECS[conduit?.conduit_type]?.[conduit?.trade_size];
+  if(!Number.isFinite(area) || area <= 0) return 0;
+  return 2 * Math.sqrt(area / Math.PI) * 0.0254;
 }
 
 function insulationTypesForRating(rating){
@@ -267,12 +290,64 @@ function conduitSizeOptions(type){
  return sel;
 }
 
+const DUCTBANK_ROW_ACTION_ICONS = {
+  duplicateBtn: 'icons/toolbar/copy.svg',
+  removeBtn: 'icons/toolbar/trash.svg',
+  viewBtn: 'icons/toolbar/grid.svg',
+  insertAboveBtn: 'icons/toolbar/arrow-up.svg',
+  insertBelowBtn: 'icons/toolbar/arrow-down.svg'
+};
+
+const DUCTBANK_DEFAULTS = Object.freeze({
+  ductbankDepth: '36',
+  earthTemp: '68',
+  airTemp: '86',
+  soilResistivity: '90',
+  moistureContent: '10',
+  hSpacing: '3',
+  vSpacing: '4',
+  topPad: '0',
+  bottomPad: '0',
+  leftPad: '0',
+  rightPad: '0',
+  perRow: '4',
+  conductorRating: '90',
+  gridRes: '20',
+  ductThermRes: '0.0'
+});
+
+const DEFAULT_CABLE_ENTRY = Object.freeze({
+  cable_type: 'Power',
+  diameter: '1.3',
+  conductors: '3',
+  conductor_size: '#2 AWG',
+  est_load: '115',
+  conductor_material: 'Copper',
+  insulation_type: 'THHN',
+  insulation_rating: '90',
+  voltage_rating: '600V',
+  shielding_jacket: ''
+});
+
+const DUCTBANK_CONDUIT_TEMPLATE_HEADERS = ['conduit_id','conduit_type','trade_size','x','y'];
+const DUCTBANK_CABLE_TEMPLATE_HEADERS = [
+  'tag','cable_type','diameter','conductors','conductor_size','insulation_thickness',
+  'weight','est_load','conduit_id','conductor_material','insulation_type',
+  'insulation_rating','voltage_rating','shielding_jacket'
+];
+
 function createButton(text,cls,label,handler){
  const b=document.createElement('button');
  b.type='button';
- b.textContent=text;
  b.className=cls;
  if(label){b.setAttribute('aria-label',label);b.title=label;}
+ const icon=DUCTBANK_ROW_ACTION_ICONS[cls];
+ if(icon){
+   b.classList.add('row-icon-btn');
+   b.innerHTML=`<img src="${icon}" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">`;
+ }else{
+   b.textContent=text;
+ }
  b.addEventListener('click',handler);
  return b;
 }
@@ -288,14 +363,79 @@ function filterTable(table, query){
  });
 }
 
+function ductbankHeaderText(th, index){
+ const label=th.dataset.sortLabel || th.querySelector('.sort-label')?.textContent || th.textContent;
+ return label.trim() || `Column ${index + 1}`;
+}
+
+function refreshDuctbankTableControls(table){
+ if(!table) return;
+ const tableLabel=table.id==='conduitTable' ? 'conduit' : table.id==='cableTable' ? 'cable' : 'row';
+ const headerLabels=Array.from(table.querySelectorAll('thead th')).map(ductbankHeaderText);
+ table.querySelectorAll('tbody tr').forEach((row,rowIndex)=>{
+   const rowId=normalizeDuctbankId(row.children[0]?.querySelector('input,select')?.value);
+   const rowLabel=rowId || `${tableLabel} row ${rowIndex + 1}`;
+   Array.from(row.children).forEach((cell,colIndex)=>{
+     const control=cell.querySelector('input,select,button');
+     if(!control) return;
+     const header=headerLabels[colIndex] || `Column ${colIndex + 1}`;
+     if(control.matches('input,select')){
+       control.setAttribute('aria-label',`${rowLabel} ${header}`);
+       return;
+     }
+     if(control.classList.contains('duplicateBtn')){
+       control.setAttribute('aria-label',`Duplicate ${rowLabel}`);
+       control.title=`Duplicate ${rowLabel}`;
+     }else if(control.classList.contains('removeBtn')){
+       control.setAttribute('aria-label',`Delete ${rowLabel}`);
+       control.title=`Delete ${rowLabel}`;
+     }
+   });
+ });
+}
+
+function refreshDuctbankTables(){
+ ['conduitTable','cableTable','heatSourceTable'].forEach(id=>refreshDuctbankTableControls(document.getElementById(id)));
+}
+
 function makeTableSortable(tableId){
  const table=document.getElementById(tableId);
  if(!table) return;
  const tbody=table.querySelector('tbody');
  let sortIdx=null, asc=true;
- table.querySelectorAll('th[data-idx]').forEach(th=>{
-  th.style.cursor='pointer';
-  th.addEventListener('click',()=>{
+ const sortableHeaders=Array.from(table.querySelectorAll('th[data-idx]'));
+ const updateSortHeaderState=(activeHeader,direction)=>{
+   sortableHeaders.forEach((header,index)=>{
+     const button=header.querySelector('.header-sort');
+     const label=ductbankHeaderText(header,index);
+     const isActive=header===activeHeader;
+     header.classList.toggle('is-sorted',isActive);
+     header.setAttribute('aria-sort',isActive ? (direction==='asc' ? 'ascending' : 'descending') : 'none');
+     if(button){
+       button.dataset.sort=isActive ? direction : 'none';
+       button.setAttribute('aria-label',isActive ? `Sort by ${label}, currently ${direction === 'asc' ? 'ascending' : 'descending'}` : `Sort by ${label}`);
+     }
+   });
+ };
+ sortableHeaders.forEach((th,index)=>{
+  const label=ductbankHeaderText(th,index);
+  th.dataset.sortLabel=label;
+  th.setAttribute('aria-sort','none');
+  const button=document.createElement('button');
+  button.type='button';
+  button.className='header-sort';
+  button.dataset.sort='none';
+  button.setAttribute('aria-label',`Sort by ${label}`);
+  const labelSpan=document.createElement('span');
+  labelSpan.className='sort-label';
+  labelSpan.textContent=label;
+  const indicator=document.createElement('span');
+  indicator.className='sort-indicator';
+  indicator.setAttribute('aria-hidden','true');
+  button.append(labelSpan,indicator);
+  th.textContent='';
+  th.appendChild(button);
+  button.addEventListener('click',()=>{
    const idx=parseInt(th.dataset.idx);
    if(sortIdx===idx) asc=!asc; else {asc=true; sortIdx=idx;}
    const rows=Array.from(tbody.querySelectorAll('tr'));
@@ -309,8 +449,12 @@ function makeTableSortable(tableId){
     return asc?av.localeCompare(bv):bv.localeCompare(av);
    });
    rows.forEach(r=>tbody.appendChild(r));
+   updateSortHeaderState(th,asc ? 'asc' : 'desc');
+   refreshDuctbankTableControls(table);
+   scheduleDuctbankExperienceUpdate();
   });
  });
+ refreshDuctbankTableControls(table);
 }
 
 function packCircles(cables,R){
@@ -368,7 +512,7 @@ function addConduitRow(data={}){
  const idTd=document.createElement('td');const idInput=document.createElement('input');idInput.name='conduit_id';idInput.value=data.conduit_id||'';idTd.appendChild(idInput);tr.appendChild(idTd);
  const typeTd=document.createElement('td');const typeSel=document.createElement('select');typeSel.name='conduit_type';Object.keys(CONDUIT_SPECS).forEach(t=>{const o=document.createElement('option');o.value=t;o.textContent=t;typeSel.appendChild(o);});typeSel.value=data.conduit_type||Object.keys(CONDUIT_SPECS)[0];typeTd.appendChild(typeSel);tr.appendChild(typeTd);
  const sizeTd=document.createElement('td');let sizeSel=conduitSizeOptions(typeSel.value);sizeSel.name='trade_size';sizeTd.appendChild(sizeSel);sizeSel.value=data.trade_size||sizeSel.options[0].value;tr.appendChild(sizeTd);
- typeSel.addEventListener('change',()=>{const old=sizeSel;sizeSel=conduitSizeOptions(typeSel.value);sizeTd.replaceChild(sizeSel,old);});
+ typeSel.addEventListener('change',()=>{const old=sizeSel;sizeSel=conduitSizeOptions(typeSel.value);sizeSel.name='trade_size';sizeTd.replaceChild(sizeSel,old);});
  ['x','y'].forEach(k=>{const td=document.createElement('td');const inp=document.createElement('input');inp.name=k;inp.type='number';inp.value=data[k]||0;if(k==='x'||k==='y')inp.readOnly=true;td.appendChild(inp);tr.appendChild(td);});
  const dupTd=document.createElement('td');dupTd.appendChild(createButton('⧉','duplicateBtn','Duplicate row',()=>{const cloneData=rowToConduit(tr);addConduitRow(cloneData);}));tr.appendChild(dupTd);
  const delTd=document.createElement('td');delTd.appendChild(createButton('✖','removeBtn','Delete row',()=>{tr.remove();drawGrid();
@@ -556,6 +700,26 @@ function getAllConduits(){
 
 function getAllCables(){
  return Array.from(document.querySelectorAll('#cableTable tbody tr')).map(tr=>rowToCable(tr));
+}
+
+function setDuctbankFieldDefault(id, value, onlyBlank){
+ const el=document.getElementById(id);
+ if(!el) return;
+ if(onlyBlank && String(el.value || '').trim()) return;
+ el.value=value;
+}
+
+function applyDuctbankDefaults({ onlyBlank = true, silent = false, persist = true } = {}){
+ Object.entries(DUCTBANK_DEFAULTS).forEach(([id,value])=>setDuctbankFieldDefault(id,value,onlyBlank));
+ updateInsulationOptions();
+ updateHeatSourceVisibility();
+ validateThermalInputs();
+ GRID_SIZE=parseInt(document.getElementById('gridRes')?.value)||20;
+ drawGrid();
+ updateAmpacityReport(false);
+ if(persist) saveDuctbankSession();
+ scheduleDuctbankExperienceUpdate();
+ if(!silent) showToast('Restored practical ductbank defaults');
 }
 
 function saveDuctbankSession(){
@@ -866,8 +1030,7 @@ function calcRcaComponents(cable,params,count=1,total=1){
  rho=Math.min(150,Math.max(40,rho));
  const rho_m=rho/100;
  const burialDepth=(params.ductbankDepth||0)*0.0254;
- const cd=CONDUIT_SPECS[conduit.conduit_type]&&CONDUIT_SPECS[conduit.conduit_type][conduit.trade_size];
- const conduitDiameter=cd?cd*0.0254:0;
+ const conduitDiameter=conduitEquivalentDiameterMeters(conduit);
  let Rsoil=0;
  if(burialDepth>0&&conduitDiameter>0){
   Rsoil=(rho_m/(2*Math.PI))*Math.log(4*burialDepth/conduitDiameter);
@@ -883,35 +1046,67 @@ function calcRca(cable,params,count=1,total=1){
 /* Ampacity via full Neher-McGrath equation
    See docs/AMPACITY_METHOD.md#equation */
 function estimateAmpacity(cable,params,count=1,total=0){
- const rating=getConductorRating();
+ const rating=cableTemperatureRating(cable);
  const Rdc=dcResistance(cable.conductor_size,cable.conductor_material,rating);
  const Yc=skinEffect(cable.conductor_size);
  const dTd=dielectricRise(cable.voltage_rating);
  const comps=calcRcaComponents(cable,params,count,total);
  const Rca=(+comps.Rcond)+(+comps.Rins)+(+comps.Rduct)+(+comps.Rsoil);
  if(!Number.isFinite(Rca)||Rca<=0) return {ampacity:NaN};
- const amb=Math.max(params.earthTemp||20,
+ const amb=Math.max(Number.isFinite(params.earthTemp)?params.earthTemp:20,
                    isNaN(params.airTemp)?-Infinity:params.airTemp);
  const num=rating-(amb+dTd);
- const ampacity=num<0?Infinity:
-   Math.sqrt(num/(Rdc*(1+Yc)*Rca));
+ if(num<=0 || !Number.isFinite(Rdc) || Rdc<=0) return {ampacity:0};
+ const conductorFactor=cableCurrentCarryingConductors(cable);
+ const ampacity=Math.sqrt(num/(Rdc*(1+Yc)*Rca*conductorFactor));
  return {ampacity};
 }
 
 function ampacityDetails(cable,params,count=1,total=0){
  const areaCM=sizeToArea(cable.conductor_size);
  if(!areaCM) return {ampacity:0};
- const rating=getConductorRating();
+ const rating=cableTemperatureRating(cable);
  const Rdc=dcResistance(cable.conductor_size,cable.conductor_material,rating);
  const Yc=skinEffect(cable.conductor_size);
  const dTd=dielectricRise(cable.voltage_rating);
  const comps=calcRcaComponents(cable,params,count,total);
  const Rca=comps.Rca;
- const amb=Math.max(params.earthTemp||20,
+ const amb=Math.max(Number.isFinite(params.earthTemp)?params.earthTemp:20,
                    isNaN(params.airTemp)?-Infinity:params.airTemp);
  const num=rating-(amb+dTd);
- const ampacity=Math.sqrt(num/(Rdc*(1+Yc)*Rca));
- return {Rdc,Yc,deltaTd:dTd,Rcond:comps.Rcond,Rins:comps.Rins,Rduct:comps.Rduct,Rsoil:comps.Rsoil,Rca,ampacity};
+ const conductorFactor=cableCurrentCarryingConductors(cable);
+ const ampacity=num<=0 || !Number.isFinite(Rdc) || Rdc<=0 || !Number.isFinite(Rca) || Rca<=0
+   ? 0
+   : Math.sqrt(num/(Rdc*(1+Yc)*Rca*conductorFactor));
+ return {Rdc,Yc,deltaTd:dTd,Rcond:comps.Rcond,Rins:comps.Rins,Rduct:comps.Rduct,Rsoil:comps.Rsoil,Rca,ampacity,rating,conductorFactor};
+}
+
+function cableHeatLoss(cable,current=finiteNumber(cable?.est_load,0),rating=cableTemperatureRating(cable)){
+ const Rdc=dcResistance(cable.conductor_size,cable.conductor_material,rating);
+ if(!Number.isFinite(Rdc) || Rdc<=0) return 0;
+ return current * current * Rdc * (1 + skinEffect(cable.conductor_size)) * cableCurrentCarryingConductors(cable);
+}
+
+function cableSelfThermalResistance(cable){
+ try{
+   const comps=conductorThermalResistance(cable);
+   return comps.Rcond + comps.Rins;
+ }catch(e){
+   return 0;
+ }
+}
+
+function cableConductorTemperature(cable,conduitTemp,current=finiteNumber(cable?.est_load,0)){
+ const base=Number.isFinite(conduitTemp)?conduitTemp:20;
+ return base + cableHeatLoss(cable,current) * cableSelfThermalResistance(cable);
+}
+
+function conduitTemperatureLimit(conduitId,cables){
+ const ratings=cables
+   .filter(c=>normalizeDuctbankId(c.conduit_id)===normalizeDuctbankId(conduitId))
+   .map(cableTemperatureRating)
+   .filter(r=>Number.isFinite(r) && r>0);
+ return ratings.length?Math.min(...ratings):getConductorRating();
 }
 
 // Iterative ampacity search using Neher‑McGrath temps
@@ -919,16 +1114,17 @@ function ampacityDetails(cable,params,count=1,total=0){
 async function calcFiniteAmpacity(cable, conduits, cables, params){
  const cd=conduits.find(d=>d.conduit_id===cable.conduit_id);
  if(!cd) return NaN;
- const rating=getConductorRating();
+ const rating=cableTemperatureRating(cable);
  const original=cable.est_load;
  let low=0;
  let high=Math.max(parseFloat(original)||1,1);
- let temp=params.earthTemp||20;
+ let temp=Number.isFinite(params.earthTemp)?params.earthTemp:20;
  // increase upper bound until temperature exceeds rating or limit reached
  for(let i=0;i<6;i++){
    cable.est_load=high;
   const res=await solveDuctbankTemperaturesWorker(conduits,cables,params);
-   temp=res.conduitTemps[cable.conduit_id]??temp;
+   const conduitTemp=res.conduitTemps[cable.conduit_id]??temp;
+   temp=cableConductorTemperature(cable,conduitTemp,high);
    if(temp>=rating||high>=2000) break;
    low=high;
    high*=2;
@@ -937,7 +1133,8 @@ async function calcFiniteAmpacity(cable, conduits, cables, params){
    const mid=(low+high)/2;
    cable.est_load=mid;
    const res=await solveDuctbankTemperaturesWorker(conduits,cables,params);
-   temp=res.conduitTemps[cable.conduit_id]??temp;
+   const conduitTemp=res.conduitTemps[cable.conduit_id]??temp;
+   temp=cableConductorTemperature(cable,conduitTemp,mid);
    if(Math.abs(temp-rating)<=0.5){
      low=high=mid;
      break;
@@ -990,12 +1187,13 @@ function updateAmpacityReport(scroll=false){
         `<td>${d.Rdc.toFixed(4)}</td><td>${d.Yc.toFixed(3)}</td><td>${d.deltaTd.toFixed(2)}</td>`+
         `<td>${d.Rcond.toFixed(3)}</td><td>${d.Rins.toFixed(3)}</td><td>${d.Rduct.toFixed(3)}</td>`+
         `<td>${d.Rsoil.toFixed(3)}</td><td>${d.Rca.toFixed(3)}</td>`+
+        `<td>${d.rating.toFixed(0)}</td><td>${d.conductorFactor.toFixed(0)}</td>`+
         `<td>${neher}</td><td>${finite}</td><td>${over?'Yes':''}</td></tr>`;
 }).join('');
 document.getElementById('ampacityReport').innerHTML=
    `<div class="ampacity-container"><table class="db-table ampacity-table"><thead><tr>`+
    `<th>Cable</th><th>Rdc</th><th>Yc</th><th>&Delta;Td</th><th>Rcond</th><th>Rins</th><th>Rduct</th>`+
-   `<th>Rsoil</th><th>Rca</th><th>Neher (A)</th><th>Finite (A)</th><th>Over</th></tr>`+
+   `<th>Rsoil</th><th>Rca</th><th>Tc</th><th>Cond.</th><th>Neher (A)</th><th>Finite (A)</th><th>Over</th></tr>`+
    `</thead><tbody>${rows}</tbody></table></div>`;
  updateCableRowStyles();
  const det=document.getElementById('ampacityDetails');
@@ -1014,6 +1212,344 @@ function updateCableRowStyles(){
  });
 }
 
+function formatDuctbankQuickValue(value, suffix = '', empty = 'Not provided'){
+ const text=String(value ?? '').trim();
+ return text ? `${text}${suffix}` : empty;
+}
+
+function formatDuctbankQuickNumber(value, digits = 2, suffix = '', empty = 'Not provided'){
+ const num=parseFloat(value);
+ if(!Number.isFinite(num)) return empty;
+ return `${num.toFixed(digits)}${suffix}`;
+}
+
+function ductbankCableByTag(tag){
+ const needle=normalizeDuctbankId(tag);
+ return getAllCables().find(cable=>normalizeDuctbankId(cable.tag)===needle) || null;
+}
+
+function ductbankCableRowByTag(tag){
+ const needle=normalizeDuctbankId(tag);
+ return Array.from(document.querySelectorAll('#cableTable tbody tr')).find(row=>{
+   const value=row.children[0]?.querySelector('input')?.value;
+   return normalizeDuctbankId(value)===needle;
+ }) || null;
+}
+
+function ductbankCableFillStatus(cable){
+ const fill=fillResults()[cable.conduit_id];
+ if(!fill) return { label:'No conduit fill data', detail:'Assign this cable to an existing conduit.', tone:'warning' };
+ const count=fill.cables.length || 0;
+ const limit=conduitFillLimit(count);
+ const fillPct=Number.isFinite(fill.fillPct) ? fill.fillPct : 0;
+ const tone=fillPct > limit ? 'error' : fillPct > limit * 0.8 ? 'warning' : 'success';
+ return {
+   label:`${fillPct.toFixed(1)}% fill`,
+   detail:`${cable.conduit_id} limit ${limit}% with ${count} cable${count === 1 ? '' : 's'}`,
+   tone
+ };
+}
+
+function ductbankCableAmpacityStatus(cable){
+ if(window.cableOverLimit && Object.prototype.hasOwnProperty.call(window.cableOverLimit,cable.tag)){
+   return window.cableOverLimit[cable.tag]
+     ? { label:'Ampacity warning', detail:'Estimated load exceeds an available ampacity estimate.', tone:'error' }
+     : { label:'Ampacity OK', detail:'Estimated load is within available ampacity estimates.', tone:'success' };
+ }
+ return { label:'Ampacity not calculated', detail:'Run thermal analysis or refresh ampacity estimates for more detail.', tone:'neutral' };
+}
+
+function cablePopoverMetric(label, value){
+ return `<div class="ductbank-cable-popover-metric"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`;
+}
+
+function cablePopoverStatus(status){
+ return `<div class="ductbank-cable-popover-status ductbank-cable-popover-status--${escapeHtml(status.tone)}"><strong>${escapeHtml(status.label)}</strong><span>${escapeHtml(status.detail)}</span></div>`;
+}
+
+function positionDuctbankCablePopover(popover, point){
+ const wrapper=document.getElementById('gridWrapper');
+ if(!wrapper) return;
+ const rect=wrapper.getBoundingClientRect();
+ const offset=14;
+ const rawLeft=point.clientX-rect.left+wrapper.scrollLeft+offset;
+ const rawTop=point.clientY-rect.top+wrapper.scrollTop+offset;
+ const maxLeft=wrapper.scrollLeft+wrapper.clientWidth-popover.offsetWidth-12;
+ const maxTop=wrapper.scrollTop+wrapper.clientHeight-popover.offsetHeight-12;
+ popover.style.left=`${Math.max(wrapper.scrollLeft+8,Math.min(rawLeft,maxLeft))}px`;
+ popover.style.top=`${Math.max(wrapper.scrollTop+8,Math.min(rawTop,maxTop))}px`;
+}
+
+function renderDuctbankCablePopover(cable, point){
+ const popover=document.getElementById('ductbank-cable-popover');
+ if(!popover) return;
+ const fillStatus=ductbankCableFillStatus(cable);
+ const ampacityStatus=ductbankCableAmpacityStatus(cable);
+ popover.innerHTML=`
+  <div class="ductbank-cable-popover-header">
+   <div>
+    <span>Selected cable</span>
+    <strong>${escapeHtml(cable.tag || 'Cable')}</strong>
+   </div>
+   <button type="button" class="row-icon-btn ductbank-cable-popover-close" data-ductbank-cable-popover-action="close" aria-label="Close cable quick properties">x</button>
+  </div>
+  <div class="ductbank-cable-popover-grid">
+   ${cablePopoverMetric('Type',formatDuctbankQuickValue(cable.cable_type))}
+   ${cablePopoverMetric('Conduit',formatDuctbankQuickValue(cable.conduit_id,'','Unassigned'))}
+   ${cablePopoverMetric('Diameter',formatDuctbankQuickNumber(cable.diameter,2,' in'))}
+   ${cablePopoverMetric('Conductors',formatDuctbankQuickValue(cable.conductors))}
+   ${cablePopoverMetric('Size',formatDuctbankQuickValue(cable.conductor_size))}
+   ${cablePopoverMetric('Load',formatDuctbankQuickNumber(cable.est_load,0,' A'))}
+   ${cablePopoverMetric('Insulation',formatDuctbankQuickValue(cable.insulation_type))}
+   ${cablePopoverMetric('Rating',formatDuctbankQuickValue(cable.insulation_rating,' C'))}
+  </div>
+  <div class="ductbank-cable-popover-statuses">
+   ${cablePopoverStatus(fillStatus)}
+   ${cablePopoverStatus(ampacityStatus)}
+  </div>
+  <div class="ductbank-cable-popover-actions">
+   <button type="button" class="btn toolbar-btn" data-ductbank-cable-popover-action="find-row">Find row</button>
+  </div>
+ `;
+ popover.hidden=false;
+ requestAnimationFrame(()=>positionDuctbankCablePopover(popover,point));
+}
+
+function syncDuctbankCableSelection(){
+ const tag=normalizeDuctbankId(selectedDuctbankCableTag);
+ let found=false;
+ document.querySelectorAll('.ductbank-cable-marker').forEach(marker=>{
+   const selected=normalizeDuctbankId(marker.dataset.ductbankCableTag)===tag && tag;
+   marker.classList.toggle('is-selected',Boolean(selected));
+   marker.setAttribute('aria-pressed',String(Boolean(selected)));
+   if(selected) found=true;
+ });
+ if(tag && !found) hideDuctbankCablePopover();
+}
+
+function selectDuctbankCable(tag, point){
+ const normalized=normalizeDuctbankId(tag);
+ const cable=ductbankCableByTag(normalized);
+ if(!cable) return;
+ selectedDuctbankCableTag=normalized;
+ syncDuctbankCableSelection();
+ renderDuctbankCablePopover(cable,point);
+}
+
+function hideDuctbankCablePopover({ clearSelection = true } = {}){
+ const popover=document.getElementById('ductbank-cable-popover');
+ if(popover){
+   popover.hidden=true;
+   popover.innerHTML='';
+ }
+ if(clearSelection){
+   selectedDuctbankCableTag='';
+   syncDuctbankCableSelection();
+ }
+}
+
+function focusDuctbankCableRow(tag){
+ const row=ductbankCableRowByTag(tag);
+ if(!row) return;
+ clearDuctbankFilters('all');
+ document.querySelectorAll('#cableTable tbody tr').forEach(tr=>tr.classList.remove('ductbank-row-selected'));
+ row.classList.add('ductbank-row-selected');
+ row.scrollIntoView({behavior:'smooth',block:'center'});
+ const first=row.querySelector('input,select,button');
+ if(first){
+   first.focus();
+   if(typeof first.select==='function') first.select();
+ }
+ setTimeout(()=>row.classList.remove('ductbank-row-selected'),3500);
+}
+
+function initDuctbankCablePopover(){
+ const svg=document.getElementById('grid');
+ const popover=document.getElementById('ductbank-cable-popover');
+ if(!svg || !popover) return;
+ svg.addEventListener('click',event=>{
+   const marker=event.target.closest('[data-ductbank-cable-tag]');
+   if(!marker || !svg.contains(marker)) return;
+   event.preventDefault();
+   event.stopPropagation();
+   selectDuctbankCable(marker.dataset.ductbankCableTag,{clientX:event.clientX,clientY:event.clientY});
+ });
+ svg.addEventListener('keydown',event=>{
+   if(event.key!=='Enter' && event.key!==' ') return;
+   const marker=event.target.closest('[data-ductbank-cable-tag]');
+   if(!marker || !svg.contains(marker)) return;
+   event.preventDefault();
+   const rect=marker.getBoundingClientRect();
+   selectDuctbankCable(marker.dataset.ductbankCableTag,{clientX:rect.left+rect.width/2,clientY:rect.top+rect.height/2});
+ });
+ popover.addEventListener('click',event=>{
+   const action=event.target.closest('[data-ductbank-cable-popover-action]')?.dataset.ductbankCablePopoverAction;
+   if(!action) return;
+   event.stopPropagation();
+   if(action==='close') hideDuctbankCablePopover();
+   if(action==='find-row'){
+     focusDuctbankCableRow(selectedDuctbankCableTag);
+     hideDuctbankCablePopover({clearSelection:false});
+   }
+ });
+ document.addEventListener('click',event=>{
+   if(event.target.closest('#ductbank-cable-popover,[data-ductbank-cable-tag]')) return;
+   hideDuctbankCablePopover();
+ });
+ document.addEventListener('keydown',event=>{
+   if(event.key==='Escape') hideDuctbankCablePopover();
+ });
+}
+
+function appendDuctbankSvgElement(parent, tag, attrs={}, text=''){
+ const el=document.createElementNS('http://www.w3.org/2000/svg',tag);
+ Object.entries(attrs).forEach(([key,value])=>{
+   if(value!==undefined && value!==null) el.setAttribute(key,String(value));
+ });
+ if(text) el.textContent=text;
+ parent.appendChild(el);
+ return el;
+}
+
+function formatDuctbankDepthCallout(value){
+ const depth=finiteNumber(value,0);
+ if(depth <= 0) return 'At grade';
+ return `${Math.round(depth * 10) / 10} in`;
+}
+
+function drawDuctbankSoilContext(svg, defs, options){
+ const { width, height, margin, ductWidth, ductHeight, scale, depthIn } = options;
+ const soilPattern=appendDuctbankSvgElement(defs,'pattern',{
+   id:'ductbank-soil-pattern',
+   width:28,
+   height:22,
+   patternUnits:'userSpaceOnUse'
+ });
+ appendDuctbankSvgElement(soilPattern,'rect',{x:0,y:0,width:28,height:22,fill:'#f7efdf'});
+ appendDuctbankSvgElement(soilPattern,'path',{
+   d:'M2 16 C7 12 11 20 17 14 S25 12 28 17',
+   fill:'none',
+   stroke:'#d4b985',
+   'stroke-width':1,
+   'stroke-opacity':0.55
+ });
+ appendDuctbankSvgElement(soilPattern,'circle',{cx:8,cy:7,r:1.2,fill:'#b7935a','fill-opacity':0.45});
+ appendDuctbankSvgElement(soilPattern,'circle',{cx:21,cy:5,r:1,fill:'#b7935a','fill-opacity':0.35});
+ appendDuctbankSvgElement(soilPattern,'circle',{cx:24,cy:17,r:1.3,fill:'#b7935a','fill-opacity':0.32});
+
+ const marker=appendDuctbankSvgElement(defs,'marker',{
+   id:'ductbank-dim-arrow',
+   viewBox:'0 0 8 8',
+   refX:4,
+   refY:4,
+   markerWidth:6,
+   markerHeight:6,
+   orient:'auto-start-reverse'
+ });
+ appendDuctbankSvgElement(marker,'path',{d:'M0 0 L8 4 L0 8 Z',fill:'#334155'});
+
+ appendDuctbankSvgElement(svg,'rect',{
+   x:0,
+   y:0,
+   width,
+   height,
+   fill:'url(#ductbank-soil-pattern)',
+   class:'ductbank-soil-backdrop'
+ });
+
+ appendDuctbankSvgElement(svg,'rect',{
+   x:margin,
+   y:margin,
+   width:ductWidth*scale,
+   height:ductHeight*scale,
+   class:'ductbank-envelope-fill'
+ });
+}
+
+function drawDuctbankGradeCallout(svg, options){
+ const { width, height, margin, ductWidth, scale, depthIn, utilHeatmap: showLegend=false } = options;
+ const group=appendDuctbankSvgElement(svg,'g',{class:'ductbank-grade-callout-layer'});
+ const gradeY=12;
+ appendDuctbankSvgElement(group,'line',{
+   x1:0,
+   x2:width,
+   y1:gradeY,
+   y2:gradeY,
+   class:'ductbank-grade-line',
+   stroke:'#7c5f2f',
+   'stroke-width':2
+ });
+ appendDuctbankSvgElement(group,'text',{
+   x:margin,
+   y:gradeY-4,
+   class:'ductbank-grade-label',
+   fill:'#334155',
+   'font-size':10,
+   'font-weight':800
+ },'GRADE');
+
+ const ductTopY=margin;
+ const dimX=Math.max(8,margin-10);
+ appendDuctbankSvgElement(group,'line',{
+   x1:dimX,
+   x2:dimX,
+   y1:gradeY,
+   y2:ductTopY,
+   class:'ductbank-dimension-line',
+   stroke:'#334155',
+   'stroke-width':1.4,
+   'marker-start':'url(#ductbank-dim-arrow)',
+   'marker-end':'url(#ductbank-dim-arrow)'
+ });
+ appendDuctbankSvgElement(group,'line',{
+   x1:dimX-5,
+   x2:margin,
+   y1:ductTopY,
+   y2:ductTopY,
+   class:'ductbank-dimension-extension',
+   stroke:'#334155',
+   'stroke-width':1.4
+ });
+
+ const labelWidth=178;
+ const labelX=Math.max(margin + 44, Math.min(width-labelWidth-12, margin + Math.max(120, ductWidth*scale*0.18)));
+ const labelY=Math.max(gradeY + 54, ductTopY + 44);
+ appendDuctbankSvgElement(group,'path',{
+   d:`M${dimX + 4} ${Math.max(gradeY + 4,(gradeY + ductTopY)/2)} L${labelX - 10} ${labelY - 6}`,
+   class:'ductbank-dimension-leader',
+   stroke:'#334155',
+   'stroke-width':1.4,
+   fill:'none'
+ });
+ appendDuctbankSvgElement(group,'rect',{
+   x:labelX - 8,
+   y:labelY - 18,
+   width:labelWidth + 14,
+   height:28,
+   rx:5,
+   class:'ductbank-depth-callout-bg',
+   fill:'#ffffff',
+   'fill-opacity':0.98,
+   stroke:'#94a3b8'
+ });
+ appendDuctbankSvgElement(group,'text',{
+   x:labelX,
+   y:labelY,
+   class:'ductbank-depth-callout',
+   fill:'#0f172a',
+   'font-size':13,
+   'font-weight':800
+ },`Elevation to grade: ${formatDuctbankDepthCallout(depthIn)}`);
+ appendDuctbankSvgElement(group,'text',{
+   x:Math.max(margin, width - 118),
+   y:height - (showLegend ? 72 : 12),
+   class:'ductbank-soil-label',
+   fill:'#334155',
+   'font-size':10,
+   'font-weight':800
+ },'Native soil');
+}
+
 function drawGrid(){
  const svg=document.getElementById('grid');
  const heat=document.getElementById('tempCanvas');
@@ -1025,7 +1561,10 @@ function drawGrid(){
  if(oldLegend) oldLegend.remove();
  autoPlaceConduits();
  const conduits=getAllConduits();
- if(conduits.length===0)return;
+ if(conduits.length===0){
+  hideDuctbankCablePopover();
+  return;
+ }
  const topPad=parseFloat(document.getElementById('topPad').value)||0;
  const bottomPad=parseFloat(document.getElementById('bottomPad').value)||0;
  const leftPad=parseFloat(document.getElementById('leftPad').value)||0;
@@ -1061,8 +1600,23 @@ if(document.getElementById('heatSources').checked){
   });
 }
 
+const width=Math.round(Math.max(overallMaxX*scale+2*margin+80,360));
+const height=Math.round(overallMaxY*scale+2*margin+(utilHeatmap?60:20));
+svg.setAttribute('width',width);
+svg.setAttribute('height',height);
+
  const defs=document.createElementNS('http://www.w3.org/2000/svg','defs');
  svg.appendChild(defs);
+
+ drawDuctbankSoilContext(svg, defs, {
+   width,
+   height,
+   margin,
+   ductWidth,
+   ductHeight,
+   scale,
+   depthIn:parseFloat(document.getElementById('ductbankDepth')?.value)||0
+ });
 
  const rect=document.createElementNS('http://www.w3.org/2000/svg','rect');
  rect.setAttribute('x',margin);
@@ -1070,7 +1624,7 @@ if(document.getElementById('heatSources').checked){
  rect.setAttribute('width',ductWidth*scale);
  rect.setAttribute('height',ductHeight*scale);
  rect.setAttribute('fill','none');
- rect.setAttribute('stroke','gray');
+ rect.setAttribute('stroke','#64748b');
  rect.setAttribute('stroke-dasharray','4 2');
 svg.appendChild(rect);
 
@@ -1171,14 +1725,28 @@ heightText.textContent=ductHeight.toFixed(2)+'"';
    if(data){
      const placed=packCircles(data.cables.map(cb=>({tag:cb.tag,r:cb.diameter/2})),Rin);
     placed.forEach(p=>{
+       const cable=ductbankCableByTag(p.tag);
+       const cableGroup=document.createElementNS('http://www.w3.org/2000/svg','g');
+       cableGroup.classList.add('ductbank-cable-marker');
+       cableGroup.dataset.ductbankCableTag=p.tag;
+       cableGroup.setAttribute('role','button');
+       cableGroup.setAttribute('tabindex','0');
+       cableGroup.setAttribute('aria-pressed',String(normalizeDuctbankId(p.tag)===normalizeDuctbankId(selectedDuctbankCableTag)));
+       cableGroup.setAttribute('aria-label',`Cable ${p.tag} in conduit ${c.conduit_id}. Select to view quick properties.`);
+       cableGroup.setAttribute('clip-path',`url(#${clipId})`);
+       const title=document.createElementNS('http://www.w3.org/2000/svg','title');
+       title.textContent=cable
+         ? `${p.tag}: ${formatDuctbankQuickValue(cable.cable_type)} cable in ${formatDuctbankQuickValue(cable.conduit_id,'','unassigned conduit')}`
+         : `${p.tag}: cable in ${c.conduit_id}`;
+       cableGroup.appendChild(title);
        const sc=document.createElementNS('http://www.w3.org/2000/svg','circle');
        sc.setAttribute('cx',cx+p.x*scale);
        sc.setAttribute('cy',cy+p.y*scale);
        sc.setAttribute('r',p.r*scale);
        sc.setAttribute('fill','lightblue');
        sc.setAttribute('stroke','black');
-       sc.setAttribute('clip-path',`url(#${clipId})`);
-       svg.appendChild(sc);
+       sc.classList.add('ductbank-cable-shape');
+       cableGroup.appendChild(sc);
        if(p.tag){
          const fs=Math.max(6,Math.min(p.r*scale,(2*p.r*scale*0.8)/(p.tag.length*0.6)));
          const text=document.createElementNS('http://www.w3.org/2000/svg','text');
@@ -1187,19 +1755,20 @@ heightText.textContent=ductHeight.toFixed(2)+'"';
          text.setAttribute('font-size',fs);
          text.setAttribute('text-anchor','middle');
          text.setAttribute('dominant-baseline','middle');
-         text.setAttribute('clip-path',`url(#${clipId})`);
+         text.classList.add('ductbank-cable-label');
          text.textContent=p.tag;
-         svg.appendChild(text);
+         cableGroup.appendChild(text);
          const text2=document.createElementNS('http://www.w3.org/2000/svg','text');
          text2.setAttribute('x',cx+p.x*scale);
          text2.setAttribute('y',cy+p.y*scale+fs*0.8);
          text2.setAttribute('font-size',Math.max(6,fs*0.7));
          text2.setAttribute('text-anchor','middle');
          text2.setAttribute('dominant-baseline','hanging');
-         text2.setAttribute('clip-path',`url(#${clipId})`);
+         text2.classList.add('ductbank-cable-label');
          text2.textContent=(2*p.r).toFixed(2)+'"';
-         svg.appendChild(text2);
+         cableGroup.appendChild(text2);
        }
+       svg.appendChild(cableGroup);
      });
    }
    const circle=document.createElementNS('http://www.w3.org/2000/svg','circle');
@@ -1207,6 +1776,7 @@ heightText.textContent=ductHeight.toFixed(2)+'"';
   circle.setAttribute('fill',color);
   circle.setAttribute('fill-opacity',utilHeatmap?'0.4':'0.0');
    circle.setAttribute('stroke','black');
+  circle.setAttribute('pointer-events','stroke');
   if(data){
     const names=data.cables.map(c=>c.tag).join(', ');
     circle.setAttribute('title',`${c.conduit_id}: ${data.fillPct.toFixed(1)}% - ${names}`);
@@ -1376,14 +1946,19 @@ heightText.textContent=ductHeight.toFixed(2)+'"';
      svg.appendChild(textV);
    });
  }
+ drawDuctbankGradeCallout(svg, {
+   width,
+   height,
+   margin,
+   ductWidth,
+   scale,
+   depthIn:parseFloat(document.getElementById('ductbankDepth')?.value)||0,
+   utilHeatmap
+ });
  if(utilHeatmap){
    addFillLegend(svg, margin, overallMaxY*scale+margin+20);
  }
-const width=Math.round(overallMaxX*scale+2*margin+80);
-const height=Math.round(overallMaxY*scale+2*margin+(utilHeatmap?60:20));
-svg.setAttribute('width',width);
-svg.setAttribute('height',height);
-svg.style.background='white';
+svg.style.background='#f7efdf';
 if(heat){
   heat.width=width;
   heat.height=height;
@@ -1399,6 +1974,7 @@ if(overlay){
 if(heatVisible && window.lastHeatGrid){
   drawHeatMap(window.lastHeatGrid, window.lastConduitTemps || {}, conduits, window.lastAmbient||0);
 }
+syncDuctbankCableSelection();
 }
 
 function addFillLegend(svg,x,y){
@@ -1568,10 +2144,23 @@ function solveDuctbankTemperatures(conduits,cables,params,progress){
   const height=Math.round(parseFloat(svg.getAttribute('height'))||svg.clientHeight);
   const scale=40,margin=20;
   GRID_SIZE=params.gridSize||GRID_SIZE;
-  const step=Math.ceil(Math.max(width,height)/GRID_SIZE); // pixel step for solver grid
+  let minCenterIn=Infinity;
+  conduits.forEach(cd=>{
+    const area=CONDUIT_SPECS[cd.conduit_type]?.[cd.trade_size];
+    if(!Number.isFinite(area) || area<=0) return;
+    const Rin=Math.sqrt(area/Math.PI);
+    minCenterIn=Math.min(minCenterIn,(finiteNumber(cd.y,0)+Rin));
+  });
+  if(!Number.isFinite(minCenterIn)) minCenterIn=0;
+  const depthIn=Math.max(0,finiteNumber(params.ductbankDepth,0));
+  const coverOffsetPx=Math.max(0,(depthIn-minCenterIn)*scale);
+  const boundaryPadPx=Math.max(12,depthIn || 36)*scale;
+  const solverWidth=width+2*boundaryPadPx;
+  const solverHeight=height+coverOffsetPx+boundaryPadPx;
+  const step=Math.ceil(Math.max(solverWidth,solverHeight)/GRID_SIZE); // pixel step for solver grid
   const dx=(0.0254/scale)*step;
-  const nx=Math.ceil(width/step);
-  const ny=Math.ceil(height/step);
+  const nx=Math.ceil(solverWidth/step);
+  const ny=Math.ceil(solverHeight/step);
   /* Thermal resistivity model based on Neher-McGrath and IEEE Std 835
      see docs/AMPACITY_METHOD.md#soil-resistivity-ranges */
   let soil=(params.soilResistivity)||90;
@@ -1579,7 +2168,7 @@ function solveDuctbankTemperatures(conduits,cables,params,progress){
   const k=100/soil;
   const hConv=10; // W/(m^2*K)
   const Bi=hConv*dx/k;
-  const earthT=params.earthTemp||20;
+  const earthT=Number.isFinite(params.earthTemp)?params.earthTemp:20;
   const airT=isNaN(params.airTemp)?earthT:params.airTemp;
 
   const grid=new Array(ny).fill(0).map(()=>new Array(nx).fill(earthT));
@@ -1595,19 +2184,18 @@ function solveDuctbankTemperatures(conduits,cables,params,progress){
     if(!cd)return;
     const Rin=Math.sqrt(CONDUIT_SPECS[cd.conduit_type][cd.trade_size]/Math.PI);
     const cx=(cd.x+Rin)*0.0254,cy=(cd.y+Rin)*0.0254;
-    const Rdc=dcResistance(c.conductor_size,c.conductor_material,90);
     const current=parseFloat(c.est_load)||0;
-    const power=current*current*Rdc;
+    const power=cableHeatLoss(c,current);
     if(!heatMap[c.conduit_id]){
       heatMap[c.conduit_id]={cx,cy,r:Rin*0.0254,power:0};
     }
-    heatMap[c.conduit_id].power+=power*(c.conductors||1);
+    heatMap[c.conduit_id].power+=power;
   });
 
   Object.keys(heatMap).forEach(cid=>{
     const h=heatMap[cid];
-    const cxPx=Math.round((h.cx/0.0254*scale+margin)/step);
-    const cyPx=Math.round((h.cy/0.0254*scale+margin)/step);
+    const cxPx=Math.round((h.cx/0.0254*scale+margin+boundaryPadPx)/step);
+    const cyPx=Math.round((h.cy/0.0254*scale+margin+coverOffsetPx)/step);
     const rPx=Math.max(1,Math.round((h.r/0.0254*scale)/step));
     const q=h.power/(Math.PI*h.r*h.r)*dx*dx/k;
     for(let j=Math.max(0,cyPx-rPx);j<=Math.min(ny-1,cyPx+rPx);j++){
@@ -1633,8 +2221,8 @@ function solveDuctbankTemperatures(conduits,cables,params,progress){
     if(shape==='circle'){
       const r=Math.max(w,ht)/2;
       const cx=x+r, cy=y+r;
-      const cxPx=Math.round((cx*scale+margin)/step);
-      const cyPx=Math.round((cy*scale+margin)/step);
+      const cxPx=Math.round((cx*scale+margin+boundaryPadPx)/step);
+      const cyPx=Math.round((cy*scale+margin+coverOffsetPx)/step);
       const rPx=Math.max(1,Math.round((r*scale)/step));
       for(let j=Math.max(0,cyPx-rPx);j<=Math.min(ny-1,cyPx+rPx);j++){
         for(let i=Math.max(0,cxPx-rPx);i<=Math.min(nx-1,cxPx+rPx);i++){
@@ -1648,10 +2236,10 @@ function solveDuctbankTemperatures(conduits,cables,params,progress){
         }
       }
     }else{
-      const x1=Math.round((x*scale+margin)/step);
-      const y1=Math.round((y*scale+margin)/step);
-      const x2=Math.round(((x+w)*scale+margin)/step);
-      const y2=Math.round(((y+ht)*scale+margin)/step);
+      const x1=Math.round((x*scale+margin+boundaryPadPx)/step);
+      const y1=Math.round((y*scale+margin+coverOffsetPx)/step);
+      const x2=Math.round(((x+w)*scale+margin+boundaryPadPx)/step);
+      const y2=Math.round(((y+ht)*scale+margin+coverOffsetPx)/step);
       for(let j=Math.max(0,y1);j<=Math.min(ny-1,y2);j++){
         for(let i=Math.max(0,x1);i<=Math.min(nx-1,x2);i++){
           sourceMask[j][i]=true;
@@ -1663,11 +2251,12 @@ function solveDuctbankTemperatures(conduits,cables,params,progress){
     }
   });
 
-  let diff=Infinity,iter=0,maxIter=500;
+  let diff=Infinity,iter=0,maxIter=2000;
+  const minIter=Math.max(80,GRID_SIZE*4);
   return new Promise(resolve=>{
     function step(){
       let count=0;
-      while(diff>0.01&&iter<maxIter&&count<10){
+      while((iter<minIter || diff>0.01)&&iter<maxIter&&count<10){
         diff=0;
         for(let j=0;j<ny;j++){
           for(let i=0;i<nx;i++){
@@ -1706,7 +2295,22 @@ function solveDuctbankTemperatures(conduits,cables,params,progress){
           const rduct=getRduct(cd,params)+(params.ductThermRes||0);
           temps[cid]=base+p*rduct;
         });
-        resolve({grid,conduitTemps:temps,iter,diff,ambient:earthT});
+        const cropCols=Math.max(1,GRID_SIZE);
+        const cropRows=Math.max(1,Math.ceil((height/Math.max(width,1))*GRID_SIZE));
+        const visibleGrid=[];
+        for(let j=0;j<cropRows;j++){
+          const yPx=coverOffsetPx+(cropRows===1?0:(j/(cropRows-1))*height);
+          const sourceJ=Math.min(ny-1,Math.max(0,Math.round(yPx/step)));
+          const sourceRow=grid[sourceJ] || [];
+          const row=[];
+          for(let i=0;i<cropCols;i++){
+            const xPx=boundaryPadPx+(cropCols===1?0:(i/(cropCols-1))*width);
+            const sourceI=Math.min(nx-1,Math.max(0,Math.round(xPx/step)));
+            row.push(Number.isFinite(sourceRow[sourceI])?sourceRow[sourceI]:earthT);
+          }
+          visibleGrid.push(row);
+        }
+        resolve({grid:visibleGrid,conduitTemps:temps,iter,diff,ambient:earthT});
       }
     }
     step();
@@ -1720,7 +2324,7 @@ function solveDuctbankTemperaturesWorker(conduits,cables,params,progress){
   return new Promise(resolve=>{
     let worker;
     try{
-      worker=new Worker('thermalWorker.js');
+      worker=new Worker(`thermalWorker.js?v=${encodeURIComponent(CTR_VERSION)}`);
     }catch(err){
       console.warn('Worker failed, running solver on main thread',err);
       solveDuctbankTemperatures(conduits,cables,{...params,width,height},progress)
@@ -1803,23 +2407,33 @@ const ambientRes=result.ambient;
 window.lastHeatGrid=grid;
 window.lastConduitTemps=conduitTemps;
 window.lastAmbient=ambientRes;
+ window.conduitOverLimit={};
+ Object.entries(conduitTemps || {}).forEach(([conduitId,temp])=>{
+   const rating=conduitTemperatureLimit(conduitId,cables);
+   window.conduitOverLimit[conduitId]={temp,over:temp>rating,rating};
+ });
 if(heatVisible) drawHeatMap(grid,conduitTemps,conduits,ambientRes);
 
  window.finiteAmpacity = {};
  window.cableOverLimit = {};
+ window.cableThermalTemps = {};
  for(const c of cables){
   const areaCM=sizeToArea(c.conductor_size);
   if(!areaCM){
     window.finiteAmpacity[c.tag]='N/A';
     window.cableOverLimit[c.tag]=false;
+    window.cableThermalTemps[c.tag]=NaN;
     continue;
   }
+  const conductorTemp=cableConductorTemperature(c,conduitTemps[c.conduit_id],finiteNumber(c.est_load,0));
+  window.cableThermalTemps[c.tag]=conductorTemp;
   const amp=await calcFiniteAmpacity(c,conduits,cables,params);
   window.finiteAmpacity[c.tag]=isFinite(amp)?amp.toFixed(0):'N/A';
-  window.cableOverLimit[c.tag]=isFinite(amp)&&parseFloat(c.est_load)>amp;
+  window.cableOverLimit[c.tag]=(isFinite(amp)&&parseFloat(c.est_load)>amp) || conductorTemp>cableTemperatureRating(c);
  }
  updateAmpacityReport();
  updateCableRowStyles();
+ scheduleDuctbankExperienceUpdate();
 }
 
 function drawHeatMap(grid, conduitTemps, conduits, ambient){
@@ -1896,7 +2510,9 @@ octx.clearRect(0,0,width,height);
  octx.fillText((maxT*9/5+32).toFixed(0)+'\u00B0F',legendX-4,legendY+8);
  octx.fillText((minT*9/5+32).toFixed(0)+'\u00B0F',legendX-4,legendY+legendH-2);
  const maxTF=maxT*9/5+32;
- const Tc=getConductorRating();
+ const cables=getAllCables();
+ const ratings=cables.map(cableTemperatureRating).filter(r=>Number.isFinite(r) && r>0);
+ const Tc=ratings.length?Math.min(...ratings):getConductorRating();
  if(maxT>Tc){
    console.warn(`Maximum temperature ${maxT.toFixed(1)}\u00B0C exceeds ${Tc}\u00B0C rating.`);
  }
@@ -1918,9 +2534,9 @@ octx.clearRect(0,0,width,height);
    const py=(cd.y+Rin)*scale+margin;
    const t=conduitTemps[cd.conduit_id]??ambient;
    const tf=t*9/5+32;
-   const rating=getConductorRating();
+   const rating=conduitTemperatureLimit(cd.conduit_id,cables);
    const over=t>rating;
-   window.conduitOverLimit[cd.conduit_id]={temp:t,over};
+   window.conduitOverLimit[cd.conduit_id]={temp:t,over,rating};
    if(over){
      console.warn(`Temperature at conduit ${cd.conduit_id} reaches ${t.toFixed(1)}\u00B0C > rating ${rating}\u00B0C`);
    }
@@ -1941,18 +2557,953 @@ function importCSV(file,callback){
  reader.readAsText(file);
 }
 
-document.getElementById('addConduit').addEventListener('click',()=>{addConduitRow();});
-document.getElementById('addCable').addEventListener('click',()=>{addCableRow({autoTag:true});updateInsulationOptions();});
-document.getElementById('sampleConduits').addEventListener('click',()=>{
+let activeDuctbankFilter = 'all';
+let ductbankExperienceRaf = 0;
+let selectedDuctbankCableTag = '';
+
+function setDuctbankText(id, value){
+ const el=document.getElementById(id);
+ if(el) el.textContent=value;
+}
+
+function normalizeDuctbankId(value){
+ return String(value || '').trim();
+}
+
+function rowTextContent(row){
+ let text=row.textContent || '';
+ row.querySelectorAll('input, select').forEach(field=>{
+   text += ' ' + (field.value || '');
+ });
+ return text.toLowerCase();
+}
+
+function duplicateValues(values){
+ const counts=new Map();
+ values.map(normalizeDuctbankId).filter(Boolean).forEach(value=>{
+   counts.set(value,(counts.get(value)||0)+1);
+ });
+ return new Set(Array.from(counts.entries()).filter(([,count])=>count>1).map(([value])=>value));
+}
+
+function conduitFillLimit(cableCount){
+ if(cableCount===1) return 53;
+ if(cableCount===2) return 31;
+ return 40;
+}
+
+function defaultDuctbankIssueDetails(issue){
+ const defaults={
+   missing:{severity:'Missing Data',field:issue.table==='conduit'?'conduit_id':'tag',fix:'Complete the highlighted required field.'},
+   duplicate:{severity:'Duplicate',field:issue.table==='conduit'?'conduit_id':'tag',fix:'Rename the duplicate value so each row has a unique identifier.'},
+   assignment:{severity:'Assignment',field:'conduit_id',fix:'Assign the cable to an existing conduit.'},
+   fill:{severity:'Fill',field:'conduit_id',fix:'Move cables to another conduit or increase the conduit size.'},
+   thermal:{severity:'Thermal',field:'est_load',fix:'Reduce load, increase spacing, or review soil and thermal inputs.'},
+   ampacity:{severity:'Ampacity',field:'est_load',fix:'Reduce load, increase conductor size, or review ampacity assumptions.'}
+ };
+ return defaults[issue.code] || {severity:'Review',field:null,fix:'Review this row before exporting.'};
+}
+
+function addDuctbankIssue(context, issue){
+ const normalized={...defaultDuctbankIssueDetails(issue),...issue};
+ context.issues.push(normalized);
+ const target=normalized.table==='conduit' ? context.conduitIssuesByRow : context.cableIssuesByRow;
+ const list=target.get(normalized.row) || [];
+ list.push(normalized);
+ target.set(normalized.row,list);
+}
+
+function collectDuctbankContext(){
+ const conduits=getAllConduits();
+ const cables=getAllCables();
+ const context={
+   conduits,
+   cables,
+   issues:[],
+   conduitIssuesByRow:new Map(),
+   cableIssuesByRow:new Map(),
+   conduitIds:new Set(conduits.map(c=>normalizeDuctbankId(c.conduit_id)).filter(Boolean)),
+   cableCountByConduit:new Map(),
+   fillMap:{},
+   fillWarningConduits:new Set(),
+   thermalConduits:new Set(),
+   ampacityConduits:new Set(),
+   ampacityCables:new Set()
+ };
+ conduits.forEach(c=>context.cableCountByConduit.set(normalizeDuctbankId(c.conduit_id),0));
+ cables.forEach(c=>{
+   const cid=normalizeDuctbankId(c.conduit_id);
+   if(cid) context.cableCountByConduit.set(cid,(context.cableCountByConduit.get(cid)||0)+1);
+ });
+ try{
+   context.fillMap=fillResults();
+ }catch(e){
+   console.warn('Unable to collect ductbank fill results for summary', e);
+ }
+ const duplicateConduits=duplicateValues(conduits.map(c=>c.conduit_id));
+ const duplicateCables=duplicateValues(cables.map(c=>c.tag));
+ conduits.forEach((conduit,row)=>{
+   const id=normalizeDuctbankId(conduit.conduit_id);
+   if(!id) addDuctbankIssue(context,{table:'conduit',row,code:'missing',field:'conduit_id',message:'Conduit is missing an ID',fix:'Enter a unique conduit ID.'});
+   if(id && duplicateConduits.has(id)) addDuctbankIssue(context,{table:'conduit',row,code:'duplicate',field:'conduit_id',message:`Duplicate conduit ID "${id}"`,fix:'Rename this conduit so every conduit ID is unique.'});
+   if(!CONDUIT_SPECS[conduit.conduit_type] || !CONDUIT_SPECS[conduit.conduit_type][conduit.trade_size]){
+     addDuctbankIssue(context,{table:'conduit',row,code:'missing',field:'trade_size',message:`Conduit ${id || row + 1} needs a valid type and trade size`,fix:'Choose a valid conduit type and trade size.'});
+   }
+ });
+ Object.entries(context.fillMap || {}).forEach(([conduitId,data])=>{
+   const count=data?.cables?.length || 0;
+   if(!count || !Number.isFinite(data.fillPct)) return;
+   const limit=conduitFillLimit(count);
+   if(data.fillPct > limit || data.fillPct > limit * 0.8){
+     context.fillWarningConduits.add(conduitId);
+     const row=conduits.findIndex(c=>normalizeDuctbankId(c.conduit_id)===conduitId);
+     if(row >= 0){
+       addDuctbankIssue(context,{
+         table:'conduit',
+         row,
+         code:'fill',
+         field:'conduit_id',
+         message:`Conduit ${conduitId} fill is ${data.fillPct.toFixed(1)}% of a ${limit}% limit`,
+         fix:'Move one or more cables to another conduit or select a larger trade size.'
+       });
+     }
+   }
+ });
+ Object.entries(window.conduitOverLimit || {}).forEach(([conduitId,result])=>{
+   if(result?.over) context.thermalConduits.add(conduitId);
+ });
+ Object.entries(window.cableOverLimit || {}).forEach(([tag,over])=>{
+   const normalizedTag=normalizeDuctbankId(tag);
+   if(over && normalizedTag) context.ampacityCables.add(normalizedTag);
+ });
+ cables.forEach((cable,row)=>{
+   const tag=normalizeDuctbankId(cable.tag);
+   const conduitId=normalizeDuctbankId(cable.conduit_id);
+   if(!tag) addDuctbankIssue(context,{table:'cable',row,code:'missing',field:'tag',message:'Cable is missing a tag',fix:'Enter a unique cable tag.'});
+   if(tag && duplicateCables.has(tag)) addDuctbankIssue(context,{table:'cable',row,code:'duplicate',field:'tag',message:`Duplicate cable tag "${tag}"`,fix:'Rename this cable so every cable tag is unique.'});
+   if(!(parseFloat(cable.diameter)>0)) addDuctbankIssue(context,{table:'cable',row,code:'missing',field:'diameter',message:`Cable ${tag || row + 1} needs a diameter`,fix:'Enter the outside diameter in inches.'});
+   if(!conduitId) addDuctbankIssue(context,{table:'cable',row,code:'assignment',field:'conduit_id',message:`Cable ${tag || row + 1} is not assigned to a conduit`,fix:'Choose the conduit this cable will be installed in.'});
+   else if(!context.conduitIds.has(conduitId)) addDuctbankIssue(context,{table:'cable',row,code:'assignment',field:'conduit_id',message:`Cable ${tag || row + 1} references missing conduit ${conduitId}`,fix:'Choose an existing conduit or add the missing conduit.'});
+   if(!(parseFloat(cable.insulation_thickness)>0)) addDuctbankIssue(context,{table:'cable',row,code:'missing',field:'insulation_thickness',message:`Cable ${tag || row + 1} needs insulation thickness`,fix:'Enter insulation thickness or select a conductor size with known defaults.'});
+   if(context.fillWarningConduits.has(conduitId)) addDuctbankIssue(context,{table:'cable',row,code:'fill',field:'conduit_id',message:`Cable ${tag || row + 1} is in a conduit near or over fill limit`,fix:'Move this cable to another conduit or increase conduit size.'});
+   if(context.thermalConduits.has(conduitId)){
+     addDuctbankIssue(context,{table:'cable',row,code:'thermal',field:'est_load',message:`Cable ${tag || row + 1} has a thermal alert`,fix:'Reduce estimated load, adjust spacing, or review soil assumptions.'});
+   }
+   if(context.ampacityCables.has(tag)){
+     if(conduitId) context.ampacityConduits.add(conduitId);
+     addDuctbankIssue(context,{table:'cable',row,code:'ampacity',field:'est_load',message:`Cable ${tag || row + 1} exceeds an ampacity estimate`,fix:'Reduce estimated load, increase conductor size, or review ampacity assumptions.'});
+   }
+ });
+ return context;
+}
+
+function hasIssueCode(issues, codes){
+ return issues.some(issue=>codes.includes(issue.code));
+}
+
+function ductbankIssueCodeMatchesFilter(code, filter=activeDuctbankFilter){
+ if(filter==='all' || filter==='assigned' || filter==='unassigned') return true;
+ if(filter==='missing') return ['missing','duplicate','assignment'].includes(code);
+ return code===filter;
+}
+
+function ductbankIssueMatchesActiveFilter(issue, context){
+ if(!issue) return false;
+ if(['all','missing','fill','thermal','ampacity'].includes(activeDuctbankFilter)){
+   return ductbankIssueCodeMatchesFilter(issue.code);
+ }
+ const rowData=issue.table==='conduit'
+   ? context.conduits[issue.row]
+   : context.cables[issue.row];
+ return rowData ? rowMatchesDuctbankFilter(issue.table,rowData,issue.row,context) : true;
+}
+
+function rowMatchesDuctbankFilter(type, rowData, index, context){
+ const issues=type==='conduit'
+   ? context.conduitIssuesByRow.get(index) || []
+   : context.cableIssuesByRow.get(index) || [];
+ if(activeDuctbankFilter==='all') return true;
+ if(type==='conduit'){
+   const id=normalizeDuctbankId(rowData.conduit_id);
+   const assigned=(context.cableCountByConduit.get(id) || 0) > 0;
+   if(activeDuctbankFilter==='assigned') return assigned;
+   if(activeDuctbankFilter==='unassigned') return id ? !assigned : false;
+   if(activeDuctbankFilter==='missing') return hasIssueCode(issues,['missing','duplicate','assignment']);
+   if(activeDuctbankFilter==='fill') return hasIssueCode(issues,['fill']);
+   if(activeDuctbankFilter==='thermal') return context.thermalConduits.has(id);
+   if(activeDuctbankFilter==='ampacity') return context.ampacityConduits.has(id);
+ }else{
+   const tag=normalizeDuctbankId(rowData.tag);
+   const conduitId=normalizeDuctbankId(rowData.conduit_id);
+   const assigned=Boolean(conduitId && context.conduitIds.has(conduitId));
+   if(activeDuctbankFilter==='assigned') return assigned;
+   if(activeDuctbankFilter==='unassigned') return !assigned;
+   if(activeDuctbankFilter==='missing') return hasIssueCode(issues,['missing','duplicate','assignment']);
+   if(activeDuctbankFilter==='fill') return hasIssueCode(issues,['fill']);
+   if(activeDuctbankFilter==='thermal') return context.thermalConduits.has(conduitId);
+   if(activeDuctbankFilter==='ampacity') return context.ampacityCables.has(tag);
+ }
+ return true;
+}
+
+function applyDuctbankQuickFilter(context){
+ const conduitQuery=(document.getElementById('conduit-search')?.value || '').toLowerCase();
+ document.querySelectorAll('#conduitTable tbody tr').forEach((row,index)=>{
+   const data=context.conduits[index] || rowToConduit(row);
+   const textMatch=!conduitQuery || rowTextContent(row).includes(conduitQuery);
+   const filterMatch=rowMatchesDuctbankFilter('conduit',data,index,context);
+   const issues=context.conduitIssuesByRow.get(index) || [];
+   const visibleIssues=issues.filter(issue=>ductbankIssueCodeMatchesFilter(issue.code));
+   row.style.display=textMatch && filterMatch ? '' : 'none';
+   row.classList.toggle('ductbank-row-warning', visibleIssues.length > 0);
+   row.classList.toggle('ductbank-row-fill-warning', hasIssueCode(visibleIssues,['fill']));
+   row.classList.toggle('ductbank-row-thermal-warning', ductbankIssueCodeMatchesFilter('thermal') && context.thermalConduits.has(normalizeDuctbankId(data.conduit_id)));
+   row.classList.toggle('ductbank-row-ampacity-warning', ductbankIssueCodeMatchesFilter('ampacity') && context.ampacityConduits.has(normalizeDuctbankId(data.conduit_id)));
+ });
+ const cableQuery=(document.getElementById('cable-search')?.value || '').toLowerCase();
+ document.querySelectorAll('#cableTable tbody tr').forEach((row,index)=>{
+   const data=context.cables[index] || rowToCable(row);
+   const textMatch=!cableQuery || rowTextContent(row).includes(cableQuery);
+   const filterMatch=rowMatchesDuctbankFilter('cable',data,index,context);
+   const issues=context.cableIssuesByRow.get(index) || [];
+   const visibleIssues=issues.filter(issue=>ductbankIssueCodeMatchesFilter(issue.code));
+   row.style.display=textMatch && filterMatch ? '' : 'none';
+   row.classList.toggle('ductbank-row-warning', visibleIssues.length > 0);
+   row.classList.toggle('ductbank-row-fill-warning', hasIssueCode(visibleIssues,['fill']));
+   row.classList.toggle('ductbank-row-thermal-warning',
+     ductbankIssueCodeMatchesFilter('thermal') && context.thermalConduits.has(normalizeDuctbankId(data.conduit_id)));
+   row.classList.toggle('ductbank-row-ampacity-warning',
+     ductbankIssueCodeMatchesFilter('ampacity') && context.ampacityCables.has(normalizeDuctbankId(data.tag)));
+ });
+ document.querySelectorAll('[data-ductbank-filter]').forEach(btn=>{
+   const active=btn.dataset.ductbankFilter===activeDuctbankFilter;
+   btn.classList.toggle('active',active);
+   btn.setAttribute('aria-pressed',String(active));
+ });
+ document.querySelectorAll('[data-ductbank-summary-filter]').forEach(card=>{
+   const active=card.dataset.ductbankSummaryFilter===activeDuctbankFilter;
+   card.classList.toggle('active',active);
+   card.setAttribute('aria-pressed',String(active));
+ });
+ updateDuctbankTableState(context);
+}
+
+function visibleDuctbankRowCount(selector){
+ return Array.from(document.querySelectorAll(selector)).filter(row=>row.style.display !== 'none').length;
+}
+
+function setDuctbankEmptyState(id, { hidden, title, message, filtered = false }){
+ const state=document.getElementById(id);
+ if(!state) return;
+ state.hidden=hidden;
+ state.classList.toggle('is-filtered',filtered);
+ const titleEl=state.querySelector('strong');
+ const messageEl=state.querySelector('span');
+ if(titleEl && title) titleEl.textContent=title;
+ if(messageEl && message) messageEl.textContent=message;
+}
+
+function hasUnassignedDuctbankCables(context){
+ return context.cables.some(cable=>{
+   const conduitId=normalizeDuctbankId(cable.conduit_id);
+   return !conduitId || !context.conduitIds.has(conduitId);
+ });
+}
+
+function updateDuctbankTableState(context){
+ const conduitVisible=visibleDuctbankRowCount('#conduitTable tbody tr');
+ const cableVisible=visibleDuctbankRowCount('#cableTable tbody tr');
+ const conduitFiltered=Boolean((document.getElementById('conduit-search')?.value || '').trim()) || activeDuctbankFilter !== 'all';
+ const cableFiltered=Boolean((document.getElementById('cable-search')?.value || '').trim()) || activeDuctbankFilter !== 'all';
+ const conduitCount=document.getElementById('conduit-table-count');
+ const cableCount=document.getElementById('cable-table-count');
+ if(conduitCount){
+   conduitCount.textContent=conduitFiltered
+     ? `Showing ${conduitVisible} of ${context.conduits.length} conduit${context.conduits.length === 1 ? '' : 's'}`
+     : `${context.conduits.length} conduit${context.conduits.length === 1 ? '' : 's'}`;
+ }
+ if(cableCount){
+   cableCount.textContent=cableFiltered
+     ? `Showing ${cableVisible} of ${context.cables.length} cable${context.cables.length === 1 ? '' : 's'}`
+     : `${context.cables.length} cable${context.cables.length === 1 ? '' : 's'}`;
+ }
+ const clearConduit=document.getElementById('clearConduitFiltersBtn');
+ const clearCable=document.getElementById('clearCableFiltersBtn');
+ if(clearConduit){
+   clearConduit.hidden=!conduitFiltered;
+   clearConduit.disabled=!conduitFiltered;
+ }
+ if(clearCable){
+   clearCable.hidden=!cableFiltered;
+   clearCable.disabled=!cableFiltered;
+ }
+ setDuctbankEmptyState('conduit-empty-state',{
+   hidden:context.conduits.length > 0 && conduitVisible > 0,
+   filtered:context.conduits.length > 0 && conduitVisible === 0,
+   title:context.conduits.length ? 'No conduits match the current filters' : 'No conduits yet',
+   message:context.conduits.length
+     ? 'Clear filters or adjust the search text to return to the full conduit list.'
+     : 'Add a conduit, import CSV data, or load a complete example to start the layout.'
+ });
+ setDuctbankEmptyState('cable-empty-state',{
+   hidden:context.cables.length > 0 && cableVisible > 0,
+   filtered:context.cables.length > 0 && cableVisible === 0,
+   title:context.cables.length ? 'No cables match the current filters' : 'No cables yet',
+   message:context.cables.length
+     ? 'Clear filters or adjust the search text to return to the full cable list.'
+     : 'Add cables with the guided dialog, import CSV data, or load a complete example.'
+ });
+ const autoAssign=document.getElementById('autoAssignCablesBtn');
+ if(autoAssign){
+   const canAssign=context.conduits.length > 0 && hasUnassignedDuctbankCables(context);
+   setDuctbankButtonEnabled('autoAssignCablesBtn',canAssign,context.conduits.length ? 'All cables are already assigned to valid conduits.' : 'Add conduits before auto assigning cables.');
+ }
+}
+
+function clearDuctbankFilters(scope='all'){
+ if(scope==='all' || scope==='conduit'){
+   const input=document.getElementById('conduit-search');
+   if(input) input.value='';
+ }
+ if(scope==='all' || scope==='cable'){
+   const input=document.getElementById('cable-search');
+   if(input) input.value='';
+ }
+ activeDuctbankFilter='all';
+ updateDuctbankExperience();
+}
+
+function setDuctbankButtonEnabled(id, enabled, disabledTitle){
+ const el=document.getElementById(id);
+ if(!el) return;
+ if(!el.dataset.defaultTitle) el.dataset.defaultTitle=el.title || '';
+ el.disabled=!enabled;
+ el.setAttribute('aria-disabled',String(!enabled));
+ el.title=enabled ? el.dataset.defaultTitle : disabledTitle || el.dataset.defaultTitle;
+}
+
+function setDuctbankWorkflowStep(step, state){
+ const el=document.getElementById(`ductbank-step-${step}`);
+ if(!el) return;
+ el.classList.remove('is-current','is-complete','is-blocked','is-locked');
+ el.classList.add(`is-${state}`);
+}
+
+function updateDuctbankWorkflowState(context, warningCount, thermalCount, ampacityCount=0){
+ const hasConduits=context.conduits.length > 0;
+ const hasCables=context.cables.length > 0;
+ const hasAny=hasConduits || hasCables;
+ const hasHeat=Array.isArray(window.lastHeatGrid) && window.lastHeatGrid.length > 0;
+ const hasFill=hasConduits && Object.keys(context.fillMap || {}).length > 0;
+ const alertCount=thermalCount + ampacityCount;
+ const validated=hasAny && warningCount === 0;
+ setDuctbankWorkflowStep('validate', !hasAny ? 'current' : validated ? 'complete' : 'blocked');
+ setDuctbankWorkflowStep('fill', !hasConduits ? 'locked' : hasFill ? 'complete' : validated ? 'current' : 'locked');
+ setDuctbankWorkflowStep('thermal', !hasConduits || !hasCables ? 'locked' : hasHeat && alertCount === 0 ? 'complete' : hasHeat ? 'blocked' : validated ? 'current' : 'locked');
+ setDuctbankWorkflowStep('export', !hasAny ? 'locked' : validated && (!hasCables || hasHeat || alertCount === 0) ? 'current' : 'locked');
+ setDuctbankButtonEnabled('calc',hasConduits,'Add at least one conduit before calculating fill.');
+ setDuctbankButtonEnabled('thermalBtn',hasConduits && hasCables,'Add conduits and assigned cables before running thermal analysis.');
+ setDuctbankButtonEnabled('heatToggleBtn',hasHeat,'Run thermal analysis before toggling the heat map.');
+ setDuctbankButtonEnabled('exportBtn',hasAny,'Add ductbank data before exporting.');
+ setDuctbankButtonEnabled('exportConduitsBtn',hasConduits,'Add conduits before exporting conduit CSV.');
+ setDuctbankButtonEnabled('exportCablesBtn',hasCables,'Add cables before exporting cable CSV.');
+ setDuctbankButtonEnabled('exportImgBtn',hasConduits,'Calculate a ductbank drawing before exporting an image.');
+ setDuctbankButtonEnabled('exportThermalBtn',hasHeat,'Run thermal analysis before exporting thermal data.');
+ setDuctbankButtonEnabled('exportCanvasDataBtn',hasHeat,'Run thermal analysis before exporting heat map data.');
+ setDuctbankButtonEnabled('downloadCalcReportBtn',hasConduits && hasCables,'Add conduits and cables before downloading a calculation report.');
+}
+
+function focusDuctbankIssue(issue){
+ if(!issue) return;
+ const tableId=issue.table==='conduit' ? 'conduitTable' : 'cableTable';
+ const row=document.querySelectorAll(`#${tableId} tbody tr`)[issue.row];
+ if(!row) return;
+ activeDuctbankFilter=issue.code==='thermal' ? 'thermal' : issue.code==='ampacity' ? 'ampacity' : issue.code==='fill' ? 'fill' : 'missing';
+ updateDuctbankExperience();
+ const field=issue.field ? row.querySelector(`[name="${issue.field}"]`) : row.querySelector('input,select,button');
+ row.scrollIntoView({behavior:'smooth',block:'center'});
+ if(field){
+   field.focus();
+   if(typeof field.select==='function') field.select();
+ }
+}
+
+function currentDuctbankAmpacityParams(){
+ const earthF=parseFloat(document.getElementById('earthTemp')?.value);
+ const airF=parseFloat(document.getElementById('airTemp')?.value);
+ return {
+  earthTemp:isNaN(earthF)?20:fToC(earthF),
+  airTemp:isNaN(airF)?NaN:fToC(airF),
+  soilResistivity:parseFloat(document.getElementById('soilResistivity')?.value)||90,
+  moistureContent:parseFloat(document.getElementById('moistureContent')?.value)||0,
+  heatSources:Boolean(document.getElementById('heatSources')?.checked),
+  hSpacing:parseFloat(document.getElementById('hSpacing')?.value)||3,
+  vSpacing:parseFloat(document.getElementById('vSpacing')?.value)||4,
+  concreteEncasement:Boolean(document.getElementById('concreteEncasement')?.checked),
+  ductbankDepth:parseFloat(document.getElementById('ductbankDepth')?.value)||0,
+  gridSize:parseInt(document.getElementById('gridRes')?.value)||20,
+  ductThermRes:parseFloat(document.getElementById('ductThermRes')?.value)||0
+ };
+}
+
+function formatDuctbankAmpacity(value){
+ return Number.isFinite(value) ? `${Math.round(value)} A` : 'N/A';
+}
+
+function collectDuctbankAmpacityOverEntries(context){
+ if(!context.ampacityCables.size) return [];
+ const params=currentDuctbankAmpacityParams();
+ const total=context.cables.length;
+ const countMap={};
+ context.cables.forEach(cable=>{countMap[cable.conduit_id]=(countMap[cable.conduit_id]||0)+1;});
+ return context.cables.map((cable,row)=>{
+   const tag=normalizeDuctbankId(cable.tag);
+   if(!tag || !context.ampacityCables.has(tag)) return null;
+   const load=finiteNumber(cable.est_load,0);
+   let neher=NaN;
+   let rating=cableTemperatureRating(cable);
+   try{
+     const details=ampacityDetails(cable,params,countMap[cable.conduit_id],total);
+     neher=details.ampacity;
+     rating=details.rating;
+   }catch(e){
+     neher=NaN;
+   }
+   const finite=parseFloat(window.finiteAmpacity?.[cable.tag] ?? window.finiteAmpacity?.[tag]);
+   const conductorTemp=parseFloat(window.cableThermalTemps?.[cable.tag] ?? window.cableThermalTemps?.[tag]);
+   const reasons=[];
+   if(Number.isFinite(neher) && load > neher) reasons.push(`Neher ${formatDuctbankAmpacity(neher)}`);
+   if(Number.isFinite(finite) && load > finite) reasons.push(`Finite ${formatDuctbankAmpacity(finite)}`);
+   if(Number.isFinite(conductorTemp) && Number.isFinite(rating) && conductorTemp > rating){
+     reasons.push(`Temp ${conductorTemp.toFixed(1)}\u00B0C > ${rating.toFixed(0)}\u00B0C`);
+   }
+   return {
+     row,
+     tag,
+     load,
+     neher,
+     finite,
+     conductorTemp,
+     rating,
+     conduitId:normalizeDuctbankId(cable.conduit_id),
+     reasons
+   };
+ }).filter(Boolean);
+}
+
+function focusDuctbankAmpacityOverEntry(entry){
+ if(!entry) return;
+ activeDuctbankFilter='ampacity';
+ updateDuctbankExperience();
+ const row=document.querySelectorAll('#cableTable tbody tr')[entry.row] || ductbankCableRowByTag(entry.tag);
+ if(!row) return;
+ row.scrollIntoView({behavior:'smooth',block:'center'});
+ row.classList.add('ductbank-row-selected');
+ const field=row.querySelector('[name="est_load"]') || row.querySelector('[name="tag"]') || row.querySelector('input,select,button');
+ if(field){
+   field.focus();
+   if(typeof field.select==='function') field.select();
+ }
+ setTimeout(()=>row.classList.remove('ductbank-row-selected'),3500);
+}
+
+function renderDuctbankAmpacityOverList(context){
+ const list=document.getElementById('ductbank-ampacity-over-list');
+ if(!list) return;
+ list.innerHTML='';
+ if(activeDuctbankFilter !== 'all' && activeDuctbankFilter !== 'ampacity'){
+   list.hidden=true;
+   return;
+ }
+ const entries=collectDuctbankAmpacityOverEntries(context);
+ if(!entries.length){
+   list.hidden=true;
+   return;
+ }
+ list.hidden=false;
+ const header=document.createElement('div');
+ header.className='ductbank-ampacity-over-list-header';
+ const title=document.createElement('strong');
+ title.textContent='Ampacity estimates over';
+ const helper=document.createElement('span');
+ helper.textContent='Select a cable to jump to its estimated load field.';
+ header.append(title,helper);
+ list.appendChild(header);
+ const items=document.createElement('div');
+ items.className='ductbank-ampacity-over-items';
+ entries.slice(0,8).forEach(entry=>{
+   const item=document.createElement('button');
+   item.type='button';
+   item.className='ductbank-ampacity-over-item';
+   const tag=document.createElement('span');
+   tag.className='ductbank-ampacity-over-tag';
+   tag.textContent=entry.tag;
+   const message=document.createElement('span');
+   message.className='ductbank-ampacity-over-message';
+   message.textContent=`Load ${formatDuctbankAmpacity(entry.load)} exceeds estimate`;
+   const detail=document.createElement('span');
+   detail.className='ductbank-ampacity-over-detail';
+   const estimates=[
+     `Neher ${formatDuctbankAmpacity(entry.neher)}`,
+     `Finite ${formatDuctbankAmpacity(entry.finite)}`
+   ];
+   const conduit=entry.conduitId ? `Conduit ${entry.conduitId}` : 'No conduit';
+   const extraReasons=entry.reasons.filter(reason=>!reason.startsWith('Neher ') && !reason.startsWith('Finite '));
+   detail.textContent=`${estimates.join(' / ')} - ${conduit}${extraReasons.length ? ` - ${extraReasons.join('; ')}` : ''}`;
+   item.append(tag,message,detail);
+   item.addEventListener('click',()=>focusDuctbankAmpacityOverEntry(entry));
+   items.appendChild(item);
+ });
+ list.appendChild(items);
+ if(entries.length > 8){
+   const more=document.createElement('p');
+   more.className='ductbank-ampacity-over-more';
+   more.textContent=`${entries.length - 8} additional over-limit cable${entries.length - 8 === 1 ? '' : 's'} are visible in the ampacity filter.`;
+   list.appendChild(more);
+ }
+}
+
+function renderDuctbankWarningList(context){
+ const list=document.getElementById('ductbank-warning-list');
+ if(!list) return;
+ list.innerHTML='';
+ const visibleIssues=context.issues.filter(issue=>ductbankIssueMatchesActiveFilter(issue,context));
+ if(!visibleIssues.length){
+   list.hidden=true;
+   return;
+ }
+ list.hidden=false;
+ const header=document.createElement('div');
+ header.className='ductbank-warning-list-header';
+ const title=document.createElement('strong');
+ title.textContent='Actionable warnings';
+ const helper=document.createElement('span');
+ helper.textContent=activeDuctbankFilter==='all'
+   ? 'Select a warning to jump to the row that needs attention.'
+   : 'Showing warnings that match the active filter.';
+ header.append(title,helper);
+ list.appendChild(header);
+ const items=document.createElement('div');
+ items.className='ductbank-warning-items';
+ visibleIssues.slice(0,8).forEach((issue,index)=>{
+   const item=document.createElement('button');
+   item.type='button';
+   item.className=`ductbank-warning-item ductbank-warning-item--${issue.code}`;
+   item.dataset.ductbankIssueIndex=String(index);
+   const severity=document.createElement('span');
+   severity.className='ductbank-warning-severity';
+   severity.textContent=issue.severity;
+   const message=document.createElement('span');
+   message.className='ductbank-warning-message';
+   message.textContent=issue.message;
+   const fix=document.createElement('span');
+   fix.className='ductbank-warning-fix';
+   fix.textContent=issue.fix;
+   item.append(severity,message,fix);
+   item.addEventListener('click',()=>focusDuctbankIssue(issue));
+   items.appendChild(item);
+ });
+ list.appendChild(items);
+ if(visibleIssues.length > 8){
+   const more=document.createElement('p');
+   more.className='ductbank-warning-more';
+   more.textContent=`${visibleIssues.length - 8} additional warning${visibleIssues.length - 8 === 1 ? '' : 's'} are visible in the highlighted table rows.`;
+   list.appendChild(more);
+ }
+}
+
+function updateDuctbankSummary(context){
+ const assigned=context.cables.filter(c=>context.conduitIds.has(normalizeDuctbankId(c.conduit_id))).length;
+ const unassigned=context.cables.length - assigned;
+ const warningCount=context.issues.filter(issue=>!['thermal','ampacity'].includes(issue.code)).length;
+ const thermalCount=context.thermalConduits.size;
+ const ampacityCount=context.ampacityCables.size;
+ setDuctbankText('ductbank-conduit-count',String(context.conduits.length));
+ setDuctbankText('ductbank-cable-count',String(context.cables.length));
+ setDuctbankText('ductbank-assigned-count',String(assigned));
+ setDuctbankText('ductbank-unassigned-count',String(unassigned));
+ setDuctbankText('ductbank-warning-count',String(warningCount));
+ setDuctbankText('ductbank-thermal-count',String(thermalCount));
+ setDuctbankText('ductbank-ampacity-count',String(ampacityCount));
+ const summary=document.getElementById('ductbank-readiness-summary');
+ if(summary){
+   if(!context.conduits.length && !context.cables.length){
+     summary.className='load-validation-summary';
+     summary.textContent='Add conduits and cables or load sample data to begin a ductbank check.';
+   }else if(warningCount || thermalCount || ampacityCount){
+     summary.className='load-validation-summary is-warning';
+     const parts=[];
+     if(warningCount) parts.push(`${warningCount} data or fill warning${warningCount===1?'':'s'}`);
+     if(thermalCount) parts.push(`${thermalCount} thermal alert${thermalCount===1?'':'s'}`);
+     if(ampacityCount) parts.push(`${ampacityCount} ampacity alert${ampacityCount===1?'':'s'}`);
+     summary.textContent=`Review ${parts.join(' and ')} before exporting the calculation package.`;
+   }else{
+     summary.className='load-validation-summary is-success';
+     summary.textContent='Ductbank inputs are ready for fill, thermal analysis, and export.';
+   }
+ }
+ renderDuctbankAmpacityOverList(context);
+ renderDuctbankWarningList(context);
+ updateDuctbankWorkflowState(context, warningCount, thermalCount, ampacityCount);
+}
+
+function decorateDuctbankActionButtons(){
+ document.querySelectorAll('#conduitTable .removeBtn, #conduitTable .duplicateBtn, #cableTable .removeBtn, #cableTable .duplicateBtn, #heatSourceTable .removeBtn').forEach(btn=>{
+   if(btn.dataset.iconified==='true') return;
+   const iconClass=Array.from(btn.classList).find(cls=>DUCTBANK_ROW_ACTION_ICONS[cls]);
+   const icon=DUCTBANK_ROW_ACTION_ICONS[iconClass];
+   if(!icon) return;
+   const label=btn.getAttribute('aria-label') || btn.title || btn.textContent.trim();
+   btn.classList.add('row-icon-btn');
+   btn.title=label;
+   btn.setAttribute('aria-label',label);
+   btn.innerHTML=`<img src="${icon}" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">`;
+   btn.dataset.iconified='true';
+ });
+}
+
+function updateDuctbankExperience(){
+ const context=collectDuctbankContext();
+ updateDuctbankSummary(context);
+ applyDuctbankQuickFilter(context);
+ decorateDuctbankActionButtons();
+ refreshDuctbankTables();
+}
+
+function validateDuctbankInputs({ focusFirst = false, scrollToWarnings = true } = {}){
+ validateThermalInputs();
+ const context=collectDuctbankContext();
+ updateDuctbankSummary(context);
+ applyDuctbankQuickFilter(context);
+ if(context.issues.length){
+   const warningList=document.getElementById('ductbank-warning-list');
+   if(scrollToWarnings && warningList){
+     warningList.scrollIntoView({behavior:'smooth',block:'nearest'});
+   }
+   if(focusFirst) focusDuctbankIssue(context.issues[0]);
+   showToast(`${context.issues.length} ductbank warning${context.issues.length === 1 ? '' : 's'} need review`);
+ }else{
+   showToast('Ductbank inputs look ready');
+ }
+ return context;
+}
+
+function scheduleDuctbankExperienceUpdate(){
+ if(ductbankExperienceRaf) cancelAnimationFrame(ductbankExperienceRaf);
+ ductbankExperienceRaf=requestAnimationFrame(()=>{
+   ductbankExperienceRaf=0;
+   updateDuctbankExperience();
+ });
+}
+
+function initDuctbankExperience(){
+ document.querySelectorAll('[data-ductbank-filter]').forEach(btn=>{
+   btn.addEventListener('click',()=>{
+     activeDuctbankFilter=btn.dataset.ductbankFilter || 'all';
+     updateDuctbankExperience();
+   });
+ });
+ document.querySelectorAll('[data-ductbank-summary-filter]').forEach(card=>{
+   const applySummaryFilter=()=>{
+     activeDuctbankFilter=card.dataset.ductbankSummaryFilter || 'all';
+     updateDuctbankExperience();
+     if(['missing','fill','thermal','ampacity'].includes(activeDuctbankFilter)){
+       const targetId=activeDuctbankFilter==='ampacity' ? 'ductbank-ampacity-over-list' : 'ductbank-warning-list';
+       document.getElementById(targetId)?.scrollIntoView({behavior:'smooth',block:'nearest'});
+     }
+   };
+   card.addEventListener('click',applySummaryFilter);
+   card.addEventListener('keydown',event=>{
+     if(event.key==='Enter' || event.key===' '){
+       event.preventDefault();
+       applySummaryFilter();
+     }
+   });
+ });
+ ['conduit-search','cable-search'].forEach(id=>{
+   const input=document.getElementById(id);
+   if(input) input.addEventListener('input',scheduleDuctbankExperienceUpdate);
+ });
+ document.addEventListener('input',event=>{
+   if(event.target.closest('#conduitTable,#cableTable,#heatSourceTable,#infoSection,#paramSection')){
+     scheduleDuctbankExperienceUpdate();
+   }
+ });
+ document.addEventListener('change',event=>{
+   if(event.target.closest('#conduitTable,#cableTable,#heatSourceTable,#infoSection,#paramSection')){
+     scheduleDuctbankExperienceUpdate();
+   }
+ });
+ document.addEventListener('click',event=>{
+   if(event.target.closest('#addConduit,#addCable,#sampleConduits,#sampleCables,#loadDuctbankExample,#restoreDuctbankDefaults,#autoAssignCablesBtn,#clearConduitFiltersBtn,#clearCableFiltersBtn,#addHeatSource,#resetBtn,#deleteDataBtn,#calc,#thermalBtn,#heatToggleBtn,#conduitTable button,#cableTable button,#heatSourceTable button')){
+     setTimeout(scheduleDuctbankExperienceUpdate,0);
+     setTimeout(scheduleDuctbankExperienceUpdate,800);
+   }
+ });
+ ['#conduitTable tbody','#cableTable tbody','#heatSourceTable tbody','#ampacityReport'].forEach(selector=>{
+   const node=document.querySelector(selector);
+   if(!node) return;
+   const observer=new MutationObserver(scheduleDuctbankExperienceUpdate);
+   observer.observe(node,{childList:true,subtree:true});
+ });
+ scheduleDuctbankExperienceUpdate();
+}
+
+function modalField({ label, name, type = 'text', value = '', options = null, min = null, step = null, required = false, wide = false, help = '' }){
+ const wrap=document.createElement('label');
+ wrap.className=`modal-form-field${wide ? ' modal-form-field-wide' : ''}`;
+ const span=document.createElement('span');
+ span.textContent=label;
+ wrap.appendChild(span);
+ const field=options ? document.createElement('select') : document.createElement('input');
+ field.name=name;
+ if(!options) field.type=type;
+ if(min !== null) field.min=String(min);
+ if(step !== null) field.step=String(step);
+ if(required) field.required=true;
+ if(options){
+   options.forEach(option=>{
+     const opt=document.createElement('option');
+     if(typeof option === 'object'){
+       opt.value=option.value;
+       opt.textContent=option.label;
+     }else{
+       opt.value=option;
+       opt.textContent=option || 'Unassigned';
+     }
+     field.appendChild(opt);
+   });
+ }
+ field.value=value ?? '';
+ wrap.appendChild(field);
+ if(help){
+   const helper=document.createElement('span');
+   helper.className='modal-helper-text';
+   helper.textContent=help;
+   wrap.appendChild(helper);
+ }
+ return wrap;
+}
+
+function getFormData(form){
+ return Object.fromEntries(new FormData(form).entries());
+}
+
+function renderDuctbankEntryForm(body, fields){
+ const form=document.createElement('form');
+ form.className='ductbank-entry-form load-entry-grid';
+ fields.forEach(field=>form.appendChild(modalField(field)));
+ body.appendChild(form);
+ return form;
+}
+
+function generateNextConduitId(){
+ let max=0, digits=0, prefix='C';
+ document.querySelectorAll('#conduitTable tbody tr').forEach(tr=>{
+   const value=tr.children[0]?.querySelector('input')?.value.trim();
+   const match=value && value.match(/^(.*?)(\d+)$/);
+   if(match){
+     prefix=match[1] || 'C';
+     digits=Math.max(digits,match[2].length);
+     max=Math.max(max,parseInt(match[2],10));
+   }
+ });
+ return prefix + String(max + 1).padStart(digits || 1,'0');
+}
+
+function updateSelectOptions(select, values, selectedValue){
+ select.innerHTML='';
+ values.forEach(value=>{
+   const opt=document.createElement('option');
+   opt.value=value;
+   opt.textContent=value || 'Unassigned';
+   select.appendChild(opt);
+ });
+ if(selectedValue !== undefined) select.value=selectedValue;
+}
+
+function conductorSizeEntryOptions(){
+ const values=Array.from(document.querySelectorAll('#sizeList option'))
+   .map(option=>option.value)
+   .filter(Boolean);
+ return values.length ? values : Object.keys(AWG_AREA).map(size=>size.includes('/') || /^\d+$/.test(size) ? `#${size} AWG` : `${size} kcmil`);
+}
+
+async function ensureDuctbankConductorProperties(){
+ if(!Object.keys(window.CONDUCTOR_PROPS || {}).length && typeof loadConductorProperties === 'function'){
+   await loadConductorProperties();
+ }
+ if(window.CONDUCTOR_PROPS) CONDUCTOR_PROPS=window.CONDUCTOR_PROPS;
+}
+
+function applyCableEntryDefaults(form, { force = false } = {}){
+ const size=form.elements.conductor_size?.value.trim();
+ const key=normalizeSizeKey(size);
+ const props=window.CONDUCTOR_PROPS?.[key] || CONDUCTOR_PROPS[key];
+ if(!props) return;
+ const insulation=form.elements.insulation_thickness;
+ const weight=form.elements.weight;
+ const material=form.elements.conductor_material?.value || 'Copper';
+ if(insulation && (force || !insulation.value)) insulation.value=props.insulation_thickness || '';
+ if(weight && (force || !weight.value)){
+   const areaIn2=props.area_cm*7.854e-7;
+   const density=material.toLowerCase().includes('al') ? 0.0975 : 0.323;
+   weight.value=(areaIn2*density*12).toFixed(3);
+ }
+}
+
+function openConduitEntryModal(){
+ const typeOptions=Object.keys(CONDUIT_SPECS);
+ const initialType=typeOptions.includes('PVC Sch 40') ? 'PVC Sch 40' : typeOptions[0];
+ openModal({
+   title:'Add Conduit',
+   description:'Enter the required conduit details. The layout controls will place the row automatically.',
+   primaryText:'Add Conduit',
+   defaultWidth:'medium',
+   render(body,controller){
+     const form=renderDuctbankEntryForm(body,[
+       {label:'Conduit ID',name:'conduit_id',value:generateNextConduitId(),required:true},
+       {label:'Type',name:'conduit_type',options:typeOptions,value:initialType},
+       {label:'Trade Size',name:'trade_size',options:Object.keys(CONDUIT_SPECS[initialType] || {}),value:'4'}
+     ]);
+     const typeSel=form.elements.conduit_type;
+     const sizeSel=form.elements.trade_size;
+     typeSel.addEventListener('change',()=>{
+       updateSelectOptions(sizeSel,Object.keys(CONDUIT_SPECS[typeSel.value] || {}),sizeSel.value);
+       if(!sizeSel.value) sizeSel.value=sizeSel.options[0]?.value || '';
+     });
+     controller.registerForm(form);
+     return form.elements.conduit_id;
+   },
+   onSubmit(controller){
+     const form=controller.body.querySelector('.ductbank-entry-form');
+     const values=getFormData(form);
+     const conduitId=normalizeDuctbankId(values.conduit_id);
+     if(!conduitId){
+       showAlertModal('Conduit ID Required','Enter a conduit ID before adding the row.');
+       return false;
+     }
+     if(getAllConduits().some(conduit=>normalizeDuctbankId(conduit.conduit_id)===conduitId)){
+       showAlertModal('Duplicate Conduit ID','Each conduit needs a unique ID.');
+       return false;
+     }
+     addConduitRow({
+       conduit_id:conduitId,
+       conduit_type:values.conduit_type,
+       trade_size:values.trade_size
+     });
+     drawGrid();
+     updateAmpacityReport(false);
+     saveDuctbankSession();
+     scheduleDuctbankExperienceUpdate();
+     showToast(`Added conduit ${conduitId}`);
+     return true;
+   }
+ });
+}
+
+async function openCableEntryModal(){
+ await ensureDuctbankConductorProperties();
+ const conduits=getAllConduits();
+ const conduitOptions=conduits.map(conduit=>normalizeDuctbankId(conduit.conduit_id)).filter(Boolean);
+ if(!conduitOptions.length) conduitOptions.push('');
+ openModal({
+   title:'Add Cable',
+   description:'Enter the cable fields needed for fill and thermal checks.',
+   primaryText:'Add Cable',
+   defaultWidth:'wide',
+   render(body,controller){
+     const form=renderDuctbankEntryForm(body,[
+       {label:'Cable Tag',name:'tag',value:generateNextCableTag(),required:true},
+       {label:'Type',name:'cable_type',options:['Power','Control','Signal'],value:DEFAULT_CABLE_ENTRY.cable_type},
+       {label:'Conduit',name:'conduit_id',options:conduitOptions,value:conduitOptions[0] || '',help:conduitOptions[0] ? '' : 'Add a conduit first to assign this cable.'},
+       {label:'Outside Diameter (in)',name:'diameter',type:'number',value:DEFAULT_CABLE_ENTRY.diameter,min:0,step:'any',required:true},
+       {label:'Conductors',name:'conductors',type:'number',value:DEFAULT_CABLE_ENTRY.conductors,min:1,step:1},
+       {label:'Conductor Size',name:'conductor_size',options:conductorSizeEntryOptions(),value:DEFAULT_CABLE_ENTRY.conductor_size},
+       {label:'Estimated Load (A)',name:'est_load',type:'number',value:DEFAULT_CABLE_ENTRY.est_load,min:0,step:'any'},
+       {label:'Material',name:'conductor_material',options:['Copper','Aluminum'],value:DEFAULT_CABLE_ENTRY.conductor_material}
+     ]);
+     const details=document.createElement('details');
+     details.className='ductbank-modal-advanced modal-form-field-wide';
+     const summary=document.createElement('summary');
+     summary.textContent='Advanced cable properties';
+     details.appendChild(summary);
+     const advanced=document.createElement('div');
+     advanced.className='load-entry-grid';
+     [
+       {label:'Insulation Type',name:'insulation_type',options:insulationTypesForRating(getConductorRating()),value:DEFAULT_CABLE_ENTRY.insulation_type},
+       {label:'Insulation Rating',name:'insulation_rating',options:['60','75','90'],value:String(getConductorRating())},
+       {label:'Insulation Thickness (in)',name:'insulation_thickness',type:'number',value:'',min:0,step:'any'},
+       {label:'Weight (lb/ft)',name:'weight',type:'number',value:'',min:0,step:'any'},
+       {label:'Voltage Rating',name:'voltage_rating',value:DEFAULT_CABLE_ENTRY.voltage_rating},
+       {label:'Shielding / Jacket',name:'shielding_jacket',options:['','Lead','Copper Tape'],value:DEFAULT_CABLE_ENTRY.shielding_jacket}
+     ].forEach(field=>advanced.appendChild(modalField(field)));
+     details.appendChild(advanced);
+     form.appendChild(details);
+     ['conductor_size','conductor_material'].forEach(name=>{
+       form.elements[name]?.addEventListener('change',()=>applyCableEntryDefaults(form,{force:true}));
+     });
+     applyCableEntryDefaults(form);
+     controller.registerForm(form);
+     return form.elements.tag;
+   },
+   onSubmit(controller){
+     const form=controller.body.querySelector('.ductbank-entry-form');
+     const values=getFormData(form);
+     const tag=normalizeDuctbankId(values.tag);
+     const conduitId=normalizeDuctbankId(values.conduit_id);
+     if(!tag){
+       showAlertModal('Cable Tag Required','Enter a cable tag before adding the row.');
+       return false;
+     }
+     if(getAllCables().some(cable=>normalizeDuctbankId(cable.tag)===tag)){
+       showAlertModal('Duplicate Cable Tag','Each cable needs a unique tag.');
+       return false;
+     }
+     if(!(parseFloat(values.diameter)>0)){
+       showAlertModal('Cable Diameter Required','Enter the cable outside diameter in inches.');
+       return false;
+     }
+     if(conduits.length && !conduitId){
+       showAlertModal('Conduit Assignment Required','Choose the conduit this cable will be installed in.');
+       return false;
+     }
+     if(conduitId && !conduits.some(conduit=>normalizeDuctbankId(conduit.conduit_id)===conduitId)){
+       showAlertModal('Missing Conduit','Choose an existing conduit or add the missing conduit first.');
+       return false;
+     }
+     applyCableEntryDefaults(form);
+     addCableRow({...values,tag,conduit_id:conduitId},{defer:true});
+     updateInsulationOptions();
+     checkInsulationThickness();
+     drawGrid();
+     updateAmpacityReport();
+     saveDuctbankSession();
+     scheduleDuctbankExperienceUpdate();
+     showToast(`Added cable ${tag}`);
+     return true;
+   }
+ });
+}
+
+function loadSampleConduits({ silent = false } = {}){
  document.querySelector('#conduitTable tbody').innerHTML='';
  SAMPLE_CONDUITS.forEach(addConduitRow);
+ const search=document.getElementById('conduit-search');
+ if(search){
+   search.value='';
+   filterTable(document.getElementById('conduitTable'), '');
+ }
  drawGrid();
  updateAmpacityReport(false);
  saveDuctbankSession();
-});
-document.getElementById('sampleCables').addEventListener('click', async ()=>{
+ scheduleDuctbankExperienceUpdate();
+ if(!silent) showToast('Loaded sample conduits');
+}
+
+async function loadSampleCables({ silent = false } = {}){
   if(!Object.keys(window.CONDUCTOR_PROPS||{}).length){
-    await loadConductorProperties();
+    await ensureDuctbankConductorProperties();
   }
   if(window.CONDUCTOR_PROPS) CONDUCTOR_PROPS = window.CONDUCTOR_PROPS;
   const tbody=document.querySelector('#cableTable tbody');
@@ -1976,6 +3527,44 @@ document.getElementById('sampleCables').addEventListener('click', async ()=>{
   drawGrid();
   updateAmpacityReport();
   saveDuctbankSession();
+  scheduleDuctbankExperienceUpdate();
+  if(!silent) showToast('Loaded sample cables');
+}
+
+async function loadCompleteDuctbankExample(){
+ applyDuctbankDefaults({onlyBlank:false,silent:true,persist:false});
+ const tagEl=document.getElementById('ductbankTag');
+ if(tagEl) tagEl.value='DB-01';
+ loadSampleConduits({silent:true});
+ document.querySelectorAll('#conduitTable tbody tr').forEach(row=>{
+   const size=row.querySelector('[name="trade_size"]');
+   if(size && Array.from(size.options).some(option=>option.value==='6')) size.value='6';
+ });
+ autoPlaceConduits();
+ await loadSampleCables({silent:true});
+ validateDuctbankInputs({scrollToWarnings:false});
+ saveDuctbankSession();
+ showToast('Loaded complete ductbank example');
+}
+
+document.getElementById('addConduit').addEventListener('click',openConduitEntryModal);
+document.getElementById('addCable').addEventListener('click',()=>{openCableEntryModal();});
+document.getElementById('validateDuctbankBtn').addEventListener('click',()=>validateDuctbankInputs());
+document.getElementById('restoreDuctbankDefaults').addEventListener('click',()=>applyDuctbankDefaults({onlyBlank:false}));
+document.getElementById('loadDuctbankExample').addEventListener('click',()=>{loadCompleteDuctbankExample();});
+document.getElementById('sampleConduits').addEventListener('click',()=>loadSampleConduits());
+document.getElementById('sampleCables').addEventListener('click',()=>{loadSampleCables();});
+document.getElementById('downloadConduitTemplateBtn').addEventListener('click',()=>downloadDuctbankTemplate('conduits'));
+document.getElementById('downloadCableTemplateBtn').addEventListener('click',()=>downloadDuctbankTemplate('cables'));
+document.getElementById('autoAssignCablesBtn').addEventListener('click',autoAssignUnassignedCables);
+document.getElementById('clearConduitFiltersBtn').addEventListener('click',()=>clearDuctbankFilters('conduit'));
+document.getElementById('clearCableFiltersBtn').addEventListener('click',()=>clearDuctbankFilters('cable'));
+document.addEventListener('click',event=>{
+ const action=event.target.closest('[data-ductbank-empty-action]')?.dataset.ductbankEmptyAction;
+ if(!action) return;
+ if(action==='add-conduit') openConduitEntryModal();
+ if(action==='add-cable') openCableEntryModal();
+ if(action==='complete-example') loadCompleteDuctbankExample();
 });
 
 document.getElementById('importConduits').addEventListener('change',e=>{const f=e.target.files[0];if(f)importCSV(f,data=>{document.querySelector('#conduitTable tbody').innerHTML='';data.forEach(addConduitRow);drawGrid();updateAmpacityReport();saveDuctbankSession();});});
@@ -2018,6 +3607,70 @@ function exportCSV(filename,headers,rows,meta={}){
  const a=document.createElement('a');a.href=url;a.download=filename;document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
 }
 
+function downloadDuctbankTemplate(type){
+ if(type==='conduits'){
+   exportCSV('ductbank_conduits_template.csv',DUCTBANK_CONDUIT_TEMPLATE_HEADERS,[
+     {conduit_id:'C1',conduit_type:'PVC Sch 40',trade_size:'4',x:'0',y:'0'}
+   ],{version:CTR_VERSION,type:'ductbank conduits template'});
+   showToast('Downloaded conduit template');
+   return;
+ }
+ exportCSV('ductbank_cables_template.csv',DUCTBANK_CABLE_TEMPLATE_HEADERS,[
+   {
+     tag:'CBL01',
+     cable_type:'Power',
+     diameter:'1.3',
+     conductors:'3',
+     conductor_size:'#2 AWG',
+     insulation_thickness:'0.05',
+     weight:'3.5',
+     est_load:'115',
+     conduit_id:'C1',
+     conductor_material:'Copper',
+     insulation_type:'THHN',
+     insulation_rating:'90',
+     voltage_rating:'600V',
+     shielding_jacket:''
+   }
+ ],{version:CTR_VERSION,type:'ductbank cables template'});
+ showToast('Downloaded cable template');
+}
+
+function autoAssignUnassignedCables(){
+ const conduitIds=getAllConduits().map(conduit=>normalizeDuctbankId(conduit.conduit_id)).filter(Boolean);
+ if(!conduitIds.length){
+   showToast('Add conduits before auto assigning cables');
+   return;
+ }
+ const validConduits=new Set(conduitIds);
+ const counts=new Map(conduitIds.map(id=>[id,0]));
+ getAllCables().forEach(cable=>{
+   const conduitId=normalizeDuctbankId(cable.conduit_id);
+   if(validConduits.has(conduitId)) counts.set(conduitId,(counts.get(conduitId) || 0) + 1);
+ });
+ let assigned=0;
+ document.querySelectorAll('#cableTable tbody tr').forEach(row=>{
+   const conduitInput=row.querySelector('[name="conduit_id"]');
+   if(!conduitInput) return;
+   const current=normalizeDuctbankId(conduitInput.value);
+   if(current && validConduits.has(current)) return;
+   const next=conduitIds.reduce((best,id)=>(counts.get(id) || 0) < (counts.get(best) || 0) ? id : best,conduitIds[0]);
+   conduitInput.value=next;
+   counts.set(next,(counts.get(next) || 0) + 1);
+   assigned += 1;
+ });
+ if(!assigned){
+   showToast('All cables are already assigned');
+   scheduleDuctbankExperienceUpdate();
+   return;
+ }
+ drawGrid();
+ updateAmpacityReport();
+ saveDuctbankSession();
+ updateDuctbankExperience();
+ showToast(`Assigned ${assigned} cable${assigned === 1 ? '' : 's'} to available conduits`);
+}
+
 function exportConduits(){
  const rows=getAllConduits();
  const headers=['conduit_id','conduit_type','trade_size','x','y'];
@@ -2027,7 +3680,7 @@ function exportConduits(){
 
 function exportCables(){
  const rows=getAllCables();
- const headers=['tag','cable_type','diameter','conductors','conductor_size','weight','est_load','conduit_id','conductor_material','insulation_type','insulation_rating','voltage_rating','shielding_jacket'];
+ const headers=DUCTBANK_CABLE_TEMPLATE_HEADERS;
  const meta={version:CTR_VERSION,timestamp:new Date().toISOString()};
  exportCSV('ductbank_cables.csv',headers,rows,meta);
 }
@@ -2069,7 +3722,7 @@ const exportObj={version:CTR_VERSION,timestamp:new Date().toISOString(),inputs:{
  a.download='ductbank_analysis.json';
  document.body.appendChild(a);a.click();document.body.removeChild(a);
  URL.revokeObjectURL(a.href);
- const csvHeaders=['tag','Rdc','Yc','Rcond','Rins','Rduct','Rsoil','Rca','deltaTd','ampacity'];
+ const csvHeaders=['tag','Rdc','Yc','Rcond','Rins','Rduct','Rsoil','Rca','deltaTd','rating','conductorFactor','ampacity'];
  const meta={version:CTR_VERSION,timestamp:new Date().toISOString(),inputs:JSON.stringify(params)};
  exportCSV('ductbank_analysis.csv',csvHeaders,details,meta);
 }
@@ -2105,25 +3758,27 @@ function buildCalcReport(){
  lines.push('');
  lines.push('Ampacity Results');
  lines.push('----------------');
- lines.push('Cable             Load  Neher  Finite  Overload');
- lines.push('------------------------------------------------');
+ lines.push('Cable             Load  Tc  Cond  Neher  Finite  Overload');
+ lines.push('----------------------------------------------------------');
  cables.forEach(c=>{
   const d=ampacityDetails(c,{...params,earthTemp:fToC(params.earthTemp),airTemp:isNaN(params.airTemp)?NaN:fToC(params.airTemp)},countMap[c.conduit_id],total);
   const finite=parseFloat(window.finiteAmpacity?.[c.tag]);
   const finiteStr=isNaN(finite)?'N/A':finite.toFixed(1);
   const load=parseFloat(c.est_load)||0;
   const over=(load>(isNaN(d.ampacity)?Infinity:d.ampacity))||(load>(isNaN(finite)?Infinity:finite));
-  lines.push(`${(c.tag||'').padEnd(16)}${load.toFixed(1).padStart(5)} ${(d.ampacity.toFixed(1)).padStart(6)} ${finiteStr.padStart(7)} ${over?'Yes':'No'}`);
+  lines.push(`${(c.tag||'').padEnd(16)}${load.toFixed(1).padStart(5)} ${d.rating.toFixed(0).padStart(3)} ${d.conductorFactor.toFixed(0).padStart(5)} ${(d.ampacity.toFixed(1)).padStart(6)} ${finiteStr.padStart(7)} ${over?'Yes':'No'}`);
   lines.push(`  Rdc=${d.Rdc.toFixed(4)}, Yc=${d.Yc.toFixed(3)}, \u0394Td=${d.deltaTd.toFixed(2)}, Rcond=${d.Rcond.toFixed(3)}, Rins=${d.Rins.toFixed(3)}, Rduct=${d.Rduct.toFixed(3)}, Rsoil=${d.Rsoil.toFixed(3)}, Rca=${d.Rca.toFixed(3)}`);
  });
  lines.push('');
- lines.push('Ampacity calculations use the Neher-McGrath equation. Formulas for Yc and \u0394Td appear in the AC Resistance Correction documentation. Rdc, Rcond, Rins, Rduct, Rsoil and Rca are defined in Variable Definitions.');
+ lines.push('Ampacity calculations use the Neher-McGrath equation with cable-specific temperature ratings and current-carrying conductor count. Formulas for Yc and \u0394Td appear in the AC Resistance Correction documentation. Rdc, Rcond, Rins, Rduct, Rsoil and Rca are defined in Variable Definitions.');
  lines.push('');
  lines.push('Variable Legend');
  lines.push('---------------');
  lines.push('load - estimated cable load (A)');
- lines.push('Neher - ampacity via Neher-McGrath (A)');
- lines.push('Finite - ampacity from finite-element solver (A)');
+lines.push('Neher - ampacity via Neher-McGrath (A)');
+lines.push('Finite - ampacity from finite-element solver (A)');
+ lines.push('Tc - cable-specific allowable conductor temperature (\u00B0C)');
+ lines.push('Cond - current-carrying conductor count used for heat loss');
  lines.push('Rdc - dc conductor resistance at T_c (\u03A9/m)');
  lines.push('Yc - ac resistance factor (dimensionless)');
  lines.push('\u0394Td - dielectric-loss temperature rise (\u00B0C)');
@@ -2202,7 +3857,7 @@ const children=[];
  children.push(new docx.Paragraph('Ampacity Results'));
  children.push(new docx.Paragraph('----------------'));
 
-  const rows=[new docx.TableRow({children:['Cable','Load','Rdc','Yc','\u0394Td','Rcond','Rins','Rduct','Rsoil','Rca','Neher','Finite','Overload'].map(t=>
+  const rows=[new docx.TableRow({children:['Cable','Load','Tc','Cond.','Rdc','Yc','\u0394Td','Rcond','Rins','Rduct','Rsoil','Rca','Neher','Finite','Overload'].map(t=>
     new docx.TableCell({children:[new docx.Paragraph(t)]}))})];
 
   cables.forEach(c=>{
@@ -2214,6 +3869,8 @@ const children=[];
    rows.push(new docx.TableRow({children:[
      new docx.TableCell({children:[new docx.Paragraph(c.tag||'')]}),
      new docx.TableCell({children:[new docx.Paragraph(load.toFixed(1))]}),
+     new docx.TableCell({children:[new docx.Paragraph(d.rating.toFixed(0))]}),
+     new docx.TableCell({children:[new docx.Paragraph(d.conductorFactor.toFixed(0))]}),
      new docx.TableCell({children:[new docx.Paragraph(d.Rdc.toFixed(4))]}),
      new docx.TableCell({children:[new docx.Paragraph(d.Yc.toFixed(3))]}),
      new docx.TableCell({children:[new docx.Paragraph(d.deltaTd.toFixed(2))]}),
@@ -2230,7 +3887,7 @@ const children=[];
   children.push(new docx.Table({rows}));
 
  children.push(new docx.Paragraph(''));
- children.push(new docx.Paragraph('Ampacity calculations use the Neher-McGrath equation:'));
+ children.push(new docx.Paragraph('Ampacity calculations use the Neher-McGrath equation with cable-specific temperature ratings and current-carrying conductor count:'));
  children.push(new docx.Paragraph({
    children:[
      new docx.Math({
@@ -2239,7 +3896,7 @@ const children=[];
            children:[
              new docx.MathFraction({
                numerator:[new docx.MathRun('T_c - (T_a + \u0394T_d)')],
-               denominator:[new docx.MathRun('R_dc \u00D7 (1 + Y_c) \u00D7 R_ca')]
+               denominator:[new docx.MathRun('R_dc \u00D7 (1 + Y_c) \u00D7 R_ca \u00D7 N_c')]
              })
            ]
          })
@@ -2341,11 +3998,14 @@ removeItem('ductbankSession');
   if(el) el.value='';
 });
  ['concreteEncasement','heatSources'].forEach(id=>{
-  const el=document.getElementById(id);
-  if(el) el.checked=false;
+ const el=document.getElementById(id);
+ if(el) el.checked=false;
  });
+ applyDuctbankDefaults({onlyBlank:false,silent:true,persist:false});
  drawGrid();
  updateAmpacityReport();
+ saveDuctbankSession();
+ scheduleDuctbankExperienceUpdate();
 }
 
 function showToast(msg){
@@ -2465,7 +4125,7 @@ const markUnsaved = () => dirty.markDirty();
 document.getElementById('conduitTable').addEventListener('input',markUnsaved);
 document.getElementById('cableTable').addEventListener('input',markUnsaved);
 document.getElementById('heatSourceTable').addEventListener('input',markUnsaved);
-['addConduit','sampleConduits','addCable','sampleCables','addHeatSource','deleteDataBtn'].forEach(id=>{const el=document.getElementById(id);if(el)el.addEventListener('click',markUnsaved);});
+['addConduit','sampleConduits','addCable','sampleCables','loadDuctbankExample','restoreDuctbankDefaults','autoAssignCablesBtn','addHeatSource','deleteDataBtn','resetBtn'].forEach(id=>{const el=document.getElementById(id);if(el)el.addEventListener('click',markUnsaved);});
 const impC=document.getElementById('importConduits'); if(impC) impC.addEventListener('change',markUnsaved);
 const impCb=document.getElementById('importCables'); if(impCb) impCb.addEventListener('change',markUnsaved);
 document.getElementById('conduitTable').addEventListener('click',e=>{if(e.target.tagName==='BUTTON') markUnsaved();});
@@ -2521,11 +4181,14 @@ function populateSoilReferences(data){
   }
 }
 updateHeatSourceVisibility();
+initDuctbankCablePopover();
+initDuctbankExperience();
 loadConductorProperties().then(()=>{
   // sync local copy used by inline functions
   if(window.CONDUCTOR_PROPS) CONDUCTOR_PROPS = window.CONDUCTOR_PROPS;
   updateInsulationOptions();
   checkInsulationThickness();
+  applyDuctbankDefaults({onlyBlank:true,silent:true,persist:false});
   loadDuctbankSession();
   const storedRoute = getItem('ductbankRouteData');
   if (storedRoute) {

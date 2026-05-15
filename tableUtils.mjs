@@ -146,6 +146,9 @@ class TableManager {
     this.enableContextMenu = opts.enableContextMenu || false;
     this.enableHeaderContextMenu = opts.enableHeaderContextMenu !== false;
     this.showActionColumn = opts.showActionColumn !== false;
+    this.actionButtonIcons = opts.actionButtonIcons || null;
+    this.actionButtonLabels = opts.actionButtonLabels || {};
+    this.contextMenuViewLabel = opts.contextMenuViewLabel || 'View / Edit Row';
     this.customFilters = new Map();
     this.sortColumnIndex = null;
     this.sortDirection = 'asc';
@@ -185,6 +188,33 @@ class TableManager {
     this.hiddenGroups = new Set();
     this.loadGroupState();
     this.updateRowCount();
+  }
+
+  createActionButton({ className, text, label, onClick }) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = className;
+    const actionLabel = this.actionButtonLabels[className] || label;
+    btn.title = actionLabel;
+    btn.setAttribute('aria-label', actionLabel);
+    const icon = this.actionButtonIcons?.[className];
+    if (icon) {
+      btn.classList.add('row-icon-btn');
+      if (className === 'removeBtn') btn.classList.add('danger');
+      const img = document.createElement('img');
+      img.src = icon;
+      img.alt = '';
+      img.setAttribute('aria-hidden', 'true');
+      img.className = 'control-icon';
+      img.loading = 'lazy';
+      img.decoding = 'async';
+      btn.appendChild(img);
+      btn.dataset.iconified = 'true';
+    } else {
+      btn.textContent = text;
+    }
+    btn.addEventListener('click', onClick);
+    return btn;
   }
 
   initButtons(opts){
@@ -1347,66 +1377,73 @@ class TableManager {
     if (this.showActionColumn) {
       const actTd = tr.insertCell();
       actTd.classList.add('sticky-action-col');
+      let actionTarget = actTd;
+      if (this.actionButtonIcons) {
+        actTd.classList.add('icon-action-cell');
+        actionTarget = document.createElement('div');
+        actionTarget.className = 'row-action-group';
+        actTd.appendChild(actionTarget);
+      }
       const actIdx = this.columns.length + this.colOffset;
       if (this.headerRow && this.headerRow.cells[actIdx] && this.headerRow.cells[actIdx].style.width) {
         actTd.style.width = this.headerRow.cells[actIdx].style.width;
       }
       if(this.onView){
-        const viewBtn=document.createElement('button');
-        viewBtn.textContent='Edit';
-        viewBtn.className='viewBtn';
-        viewBtn.title='Edit row';
-        viewBtn.setAttribute('aria-label','Edit row');
-        viewBtn.addEventListener('click', e => {
-          e.stopPropagation();
-          const row=this.getRowData(tr);
-          this.onView(row,tr);
+        const viewBtn = this.createActionButton({
+          className: 'viewBtn',
+          text: 'Edit',
+          label: 'Edit row',
+          onClick: e => {
+            e.stopPropagation();
+            const row=this.getRowData(tr);
+            this.onView(row,tr);
+          }
         });
-        actTd.appendChild(viewBtn);
+        actionTarget.appendChild(viewBtn);
       }
-      const addBtn=document.createElement('button');
-      addBtn.textContent='Insert';
-      addBtn.className='insertBelowBtn';
-      addBtn.title='Insert row below';
-      addBtn.setAttribute('aria-label','Insert row below');
-      addBtn.addEventListener('click', e => {
-        e.stopPropagation();
-        const newRow=this.addRow();
-        if(newRow) this.tbody.insertBefore(newRow,tr.nextSibling);
-        if(this.onChange) this.onChange();
+      const addBtn = this.createActionButton({
+        className: 'insertBelowBtn',
+        text: 'Insert',
+        label: 'Insert row below',
+        onClick: e => {
+          e.stopPropagation();
+          const newRow=this.addRow();
+          if(newRow) this.tbody.insertBefore(newRow,tr.nextSibling);
+          if(this.onChange) this.onChange();
+        }
       });
-      actTd.appendChild(addBtn);
+      actionTarget.appendChild(addBtn);
 
-      const dupBtn = document.createElement('button');
-      dupBtn.textContent = 'Copy';
-      dupBtn.className='duplicateBtn';
-      dupBtn.title='Duplicate row';
-      dupBtn.setAttribute('aria-label','Duplicate row');
-      dupBtn.addEventListener('click', e => {
-        e.stopPropagation();
-        const row = this.getRowData(tr);
-        const nextRow = typeof this.onDuplicateRowData === 'function'
-          ? this.onDuplicateRowData(row, tr, this)
-          : row;
-        const newRow = this.addRow(nextRow);
-        if (newRow) this.tbody.insertBefore(newRow, tr.nextSibling);
-        if (this.onChange) this.onChange();
+      const dupBtn = this.createActionButton({
+        className: 'duplicateBtn',
+        text: 'Copy',
+        label: 'Duplicate row',
+        onClick: e => {
+          e.stopPropagation();
+          const row = this.getRowData(tr);
+          const nextRow = typeof this.onDuplicateRowData === 'function'
+            ? this.onDuplicateRowData(row, tr, this)
+            : row;
+          const newRow = this.addRow(nextRow);
+          if (newRow) this.tbody.insertBefore(newRow, tr.nextSibling);
+          if (this.onChange) this.onChange();
+        }
       });
-      actTd.appendChild(dupBtn);
+      actionTarget.appendChild(dupBtn);
 
-      const delBtn = document.createElement('button');
-      delBtn.textContent = 'Delete';
-      delBtn.className='removeBtn';
-      delBtn.title='Delete row';
-      delBtn.setAttribute('aria-label','Delete row');
-      delBtn.addEventListener('click', e => {
-        e.stopPropagation();
-        tr.remove();
-        this.save();
-        this.updateRowCount();
-        if (this.onChange) this.onChange();
+      const delBtn = this.createActionButton({
+        className: 'removeBtn',
+        text: 'Delete',
+        label: 'Delete row',
+        onClick: e => {
+          e.stopPropagation();
+          tr.remove();
+          this.save();
+          this.updateRowCount();
+          if (this.onChange) this.onChange();
+        }
       });
-      actTd.appendChild(delBtn);
+      actionTarget.appendChild(delBtn);
     }
 
     Object.keys(this.groupCols || {}).forEach(g => {
@@ -1637,7 +1674,7 @@ class TableManager {
     const items = [];
     if (typeof this.onView === 'function') {
       items.push({
-        label: 'View / Edit Row',
+        label: this.contextMenuViewLabel,
         action: tr => {
           if (!tr) return;
           const row = this.getRowData(tr);
@@ -1893,6 +1930,7 @@ function applyValidation(el, rules = []) {
 }
 
 window.TableUtils = {
+  ContextMenu,
   createTable,
   saveToStorage,
   loadFromStorage,
@@ -1903,6 +1941,7 @@ window.TableUtils = {
 };
 
 export {
+  ContextMenu,
   createTable,
   saveToStorage,
   loadFromStorage,

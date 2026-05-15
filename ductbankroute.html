@@ -66,9 +66,98 @@
 <div class="container">
 <main id="main-content" class="main-content">
 
-<header class="page-header">
- <h1>Ductbank Route</h1>
+<header class="page-header ductbank-page-header">
+ <div>
+  <p class="page-visual-kicker">Underground Raceway Analysis</p>
+  <h1>Ductbank Route</h1>
+  <p class="field-hint">Build conduit layouts, assign cables, and run NEC fill plus thermal checks from one workspace.</p>
+ </div>
 </header>
+
+<div id="ductbank-toolbar-primary" class="ductbank-action-bar loadlist-action-bar mb-1" role="toolbar" aria-label="Ductbank route actions" data-no-print>
+ <div class="toolbar-group">
+  <button id="validateDuctbankBtn" class="btn toolbar-btn" type="button" title="Validate ductbank data before calculations">
+   <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+   Validate
+  </button>
+  <button id="calc" class="btn btn-accent toolbar-btn" type="button" title="Calculate conduit fill and refresh the drawing">
+   <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+   Calculate Fill
+  </button>
+  <button id="thermalBtn" class="btn toolbar-btn" type="button" title="Run thermal analysis">
+   <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+   Thermal
+  </button>
+  <button id="heatToggleBtn" class="btn toolbar-btn" type="button" title="Toggle the thermal heat map">
+   <img src="icons/toolbar/grid-size.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+   Heat Map
+  </button>
+ </div>
+ <div class="toolbar-group">
+  <button id="loadDuctbankExample" class="btn toolbar-btn" type="button" title="Load a complete ductbank example with conduits, cables, and defaults">
+   <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+   Complete Example
+  </button>
+ </div>
+ <details class="toolbar-menu">
+  <summary class="btn toolbar-btn">
+   <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+   Export
+  </summary>
+  <div class="toolbar-menu-panel">
+   <button id="exportBtn" class="btn toolbar-btn" type="button" title="Download ductbank workbook and analysis data">
+    <img src="icons/toolbar/download.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    Workbook
+   </button>
+   <button id="exportConduitsBtn" class="btn toolbar-btn" type="button" title="Export ductbank conduits as CSV">
+    <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    Conduits CSV
+   </button>
+   <button id="exportCablesBtn" class="btn toolbar-btn" type="button" title="Export ductbank cables as CSV">
+    <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    Cables CSV
+   </button>
+   <button id="exportImgBtn" class="btn toolbar-btn" type="button" title="Export the drawing as an image">
+    <img src="icons/toolbar/download.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    Image
+   </button>
+   <button id="exportThermalBtn" class="btn toolbar-btn" type="button" title="Download thermal analysis data">
+    <img src="icons/toolbar/download.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    Thermal Data
+   </button>
+   <button id="exportCanvasDataBtn" class="btn toolbar-btn" type="button" title="Download heat map canvas data">
+    <img src="icons/toolbar/download.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    Canvas Data
+   </button>
+   <button id="downloadCalcReportBtn" class="btn toolbar-btn" type="button" title="Download calculation report">
+    <img src="icons/toolbar/download.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    Report
+   </button>
+  </div>
+ </details>
+ <details class="toolbar-menu toolbar-menu-danger">
+  <summary class="btn secondary-btn toolbar-btn">
+   <img src="icons/toolbar/settings.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+   More
+  </summary>
+  <div class="toolbar-menu-panel">
+   <button id="restoreDuctbankDefaults" class="btn toolbar-btn" type="button" title="Restore practical thermal and layout defaults">
+    <img src="icons/toolbar/settings.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    Restore Defaults
+   </button>
+   <button id="resetBtn" class="btn btn-danger toolbar-btn" type="button" title="Reset ductbank route inputs">
+    <img src="icons/toolbar/trash.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    Reset Inputs
+   </button>
+  </div>
+ </details>
+</div>
+<div id="ductbank-workflow-strip" class="ductbank-workflow-strip" aria-label="Ductbank workflow status" data-no-print>
+ <span id="ductbank-step-validate" class="ductbank-workflow-step" data-step="validate">1. Validate</span>
+ <span id="ductbank-step-fill" class="ductbank-workflow-step" data-step="fill">2. Fill</span>
+ <span id="ductbank-step-thermal" class="ductbank-workflow-step" data-step="thermal">3. Thermal</span>
+ <span id="ductbank-step-export" class="ductbank-workflow-step" data-step="export">4. Export</span>
+</div>
 <details class="method-panel">
   <summary>Method &amp; Assumptions</summary>
   <p>Thermal resistance is evaluated as R = ln(D_e/D_i)/(2πk).</p>
@@ -82,22 +171,104 @@
   <p>Applicability: homogeneous soil and steady-state current.</p>
   <p>See also: <a href="docs/load_calculation_formulas.html">Load Calculation Formulas</a>, <a href="docs/cable_fill_rules.html">Cable Fill Rules</a>, <a href="docs/routing_assumptions.html">Routing Assumptions</a>.</p>
 </details>
-<details id="infoSection" open>
- <summary><strong>Ductbank Info</strong></summary>
- <div>
-  <label>Ductbank Tag<input type="text" id="ductbankTag" style="margin-left:4px;"></label>
-  <label style="margin-left:8px;">Concrete Encasement<input type="checkbox" id="concreteEncasement" style="margin-left:4px;"></label>
- <label style="margin-left:8px;">Ductbank Depth (in)<input type="number" id="ductbankDepth" min="0" step="1" style="width:60px;"></label>
- </div>
-</details>
 
-<details open>
- <summary><strong>Ductbank Conduits</strong></summary>
- <input type="file" id="importConduits" accept=".csv"/>
- <button type="button" id="addConduit">Add Conduit</button>
- <button type="button" id="sampleConduits">Load Sample Data</button>
- <input type="text" id="conduit-search" class="table-search" placeholder="Filter conduits">
+<section class="ductbank-overview card" aria-label="Ductbank readiness summary">
+ <div id="ductbank-summary-panel" class="ductbank-summary-panel load-summary-panel" aria-live="polite">
+  <div class="load-summary-card">
+   <span id="ductbank-conduit-count" class="load-summary-value">0</span>
+   <span class="load-summary-label">Conduits</span>
+  </div>
+  <div class="load-summary-card">
+   <span id="ductbank-cable-count" class="load-summary-value">0</span>
+   <span class="load-summary-label">Cables</span>
+  </div>
+  <div class="load-summary-card ductbank-summary-action" role="button" tabindex="0" aria-pressed="false" aria-controls="conduitTable cableTable" data-ductbank-summary-filter="assigned">
+   <span id="ductbank-assigned-count" class="load-summary-value">0</span>
+   <span class="load-summary-label">Assigned</span>
+  </div>
+  <div class="load-summary-card ductbank-summary-action" role="button" tabindex="0" aria-pressed="false" aria-controls="conduitTable cableTable" data-ductbank-summary-filter="unassigned">
+   <span id="ductbank-unassigned-count" class="load-summary-value">0</span>
+   <span class="load-summary-label">Unassigned</span>
+  </div>
+  <div class="load-summary-card load-summary-warning ductbank-summary-action" role="button" tabindex="0" aria-pressed="false" aria-controls="conduitTable cableTable ductbank-warning-list" data-ductbank-summary-filter="missing">
+   <span id="ductbank-warning-count" class="load-summary-value">0</span>
+   <span class="load-summary-label">Warnings</span>
+  </div>
+  <div class="load-summary-card ductbank-summary-action" role="button" tabindex="0" aria-pressed="false" aria-controls="conduitTable cableTable ductbank-warning-list" data-ductbank-summary-filter="thermal">
+   <span id="ductbank-thermal-count" class="load-summary-value">0</span>
+   <span class="load-summary-label">Thermal Alerts</span>
+  </div>
+  <div class="load-summary-card ductbank-summary-action" role="button" tabindex="0" aria-pressed="false" aria-controls="conduitTable cableTable ductbank-ampacity-over-list" data-ductbank-summary-filter="ampacity">
+   <span id="ductbank-ampacity-count" class="load-summary-value">0</span>
+   <span class="load-summary-label">Ampacity Alerts</span>
+  </div>
+ </div>
+ <p id="ductbank-readiness-summary" class="load-validation-summary" aria-live="polite"></p>
+ <div id="ductbank-ampacity-over-list" class="ductbank-ampacity-over-list" aria-live="polite" hidden></div>
+ <div id="ductbank-warning-list" class="ductbank-warning-list" aria-live="polite" hidden></div>
+ <div class="ductbank-filter-chips loadlist-filter-chips" role="group" aria-label="Ductbank quick filters" data-no-print>
+  <button class="loadlist-chip active" type="button" aria-pressed="true" aria-controls="conduitTable cableTable" data-ductbank-filter="all">All</button>
+  <button class="loadlist-chip" type="button" aria-pressed="false" aria-controls="conduitTable cableTable" data-ductbank-filter="assigned">Assigned</button>
+  <button class="loadlist-chip" type="button" aria-pressed="false" aria-controls="conduitTable cableTable" data-ductbank-filter="unassigned">Unassigned</button>
+  <button class="loadlist-chip" type="button" aria-pressed="false" aria-controls="conduitTable cableTable ductbank-warning-list" data-ductbank-filter="missing">Missing Data</button>
+  <button class="loadlist-chip" type="button" aria-pressed="false" aria-controls="conduitTable cableTable ductbank-warning-list" data-ductbank-filter="fill">Fill Warnings</button>
+  <button class="loadlist-chip" type="button" aria-pressed="false" aria-controls="conduitTable cableTable ductbank-warning-list" data-ductbank-filter="thermal">Thermal Alerts</button>
+  <button class="loadlist-chip" type="button" aria-pressed="false" aria-controls="conduitTable cableTable ductbank-ampacity-over-list" data-ductbank-filter="ampacity">Ampacity Alerts</button>
+ </div>
+</section>
+
+<section id="infoSection" class="ductbank-section-card card" aria-labelledby="ductbank-info-heading">
+ <div class="ductbank-section-header">
+  <div>
+   <h2 id="ductbank-info-heading">Ductbank Setup</h2>
+   <p class="field-hint">Set the route tag, burial depth, and encasement assumptions used by the drawing and thermal checks.</p>
+  </div>
+ </div>
+ <div class="ductbank-field-grid ductbank-field-grid--compact">
+  <label>Ductbank Tag<input type="text" id="ductbankTag"></label>
+  <label class="ductbank-toggle-field"><span>Concrete Encasement</span><input type="checkbox" id="concreteEncasement"></label>
+  <label>Ductbank Depth (in)<input type="number" id="ductbankDepth" min="0" step="1"></label>
+ </div>
+</section>
+
+<section class="ductbank-section-card card" aria-labelledby="ductbank-conduit-heading">
+ <div class="ductbank-section-header">
+  <div>
+   <h2 id="ductbank-conduit-heading">Ductbank Conduits</h2>
+   <p class="field-hint">Define each conduit and let the layout controls position the bank consistently.</p>
+  </div>
+  <div class="schedule-primary-actions">
+   <button type="button" id="addConduit" class="btn primary-btn compact-action-btn" title="Add conduit">
+    <img src="icons/ductbank.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    Add Conduit
+   </button>
+  </div>
+ </div>
+ <div class="ductbank-toolbar cable-toolbar mb-1" role="toolbar" aria-label="Ductbank conduit actions" data-no-print>
+  <div class="toolbar-group">
+   <label class="btn toolbar-btn file-toolbar-btn" for="importConduits" title="Import ductbank conduits from CSV">
+    <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    Import CSV
+   </label>
+   <input type="file" id="importConduits" accept=".csv" class="hidden"/>
+   <button type="button" id="sampleConduits" class="btn toolbar-btn" title="Load sample conduits">
+    <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    Sample
+   </button>
+   <button type="button" id="downloadConduitTemplateBtn" class="btn toolbar-btn" title="Download a conduit CSV template">
+    <img src="icons/toolbar/download.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    Template
+   </button>
+  </div>
+  <input type="text" id="conduit-search" class="table-search" placeholder="Filter conduits" aria-label="Filter conduits" aria-controls="conduitTable">
+ </div>
+ <div class="ductbank-table-meta" data-no-print>
+  <span id="conduit-table-count" aria-live="polite" aria-atomic="true">0 conduits</span>
+  <button type="button" id="clearConduitFiltersBtn" class="btn text-btn ductbank-clear-filter-btn" aria-label="Clear conduit filters">Clear filters</button>
+ </div>
+ <div class="ductbank-table-wrap table-scroll-x" tabindex="0" aria-label="Ductbank conduit table">
  <table id="conduitTable" class="db-table">
+  <caption class="visually-hidden">Ductbank conduit entries</caption>
   <thead>
    <tr>
     <th data-idx="0">ID</th>
@@ -111,20 +282,64 @@
   </thead>
   <tbody></tbody>
  </table>
- </details>
+ </div>
+ <div id="conduit-empty-state" class="ductbank-empty-state" hidden data-no-print>
+  <strong>No conduits yet</strong>
+  <span>Add a conduit, import CSV data, or load a complete example to start the layout.</span>
+  <div class="ductbank-empty-actions">
+   <button type="button" class="btn primary-btn" data-ductbank-empty-action="add-conduit">Add Conduit</button>
+   <button type="button" class="btn toolbar-btn" data-ductbank-empty-action="complete-example">Complete Example</button>
+  </div>
+ </div>
+</section>
 
 
 
 
 
 
-<details open>
- <summary><strong>Cables</strong></summary>
- <input type="file" id="importCables" accept=".csv"/>
- <button type="button" id="addCable">Add Cable</button>
- <button type="button" id="sampleCables">Load Sample Data</button>
- <input type="text" id="cable-search" class="table-search" placeholder="Filter cables">
+<section class="ductbank-section-card card" aria-labelledby="ductbank-cable-heading">
+ <div class="ductbank-section-header">
+  <div>
+   <h2 id="ductbank-cable-heading">Cables</h2>
+   <p class="field-hint">Assign each cable to a ductbank conduit and provide the fields needed for fill and ampacity checks.</p>
+  </div>
+  <div class="schedule-primary-actions">
+   <button type="button" id="addCable" class="btn primary-btn compact-action-btn" title="Add cable">
+    <img src="icons/cable.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    Add Cable
+   </button>
+  </div>
+ </div>
+ <div class="ductbank-toolbar cable-toolbar mb-1" role="toolbar" aria-label="Ductbank cable actions" data-no-print>
+  <div class="toolbar-group">
+   <label class="btn toolbar-btn file-toolbar-btn" for="importCables" title="Import ductbank cables from CSV">
+    <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    Import CSV
+   </label>
+   <input type="file" id="importCables" accept=".csv" class="hidden"/>
+   <button type="button" id="sampleCables" class="btn toolbar-btn" title="Load sample cables">
+    <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    Sample
+   </button>
+   <button type="button" id="downloadCableTemplateBtn" class="btn toolbar-btn" title="Download a cable CSV template">
+    <img src="icons/toolbar/download.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    Template
+   </button>
+   <button type="button" id="autoAssignCablesBtn" class="btn toolbar-btn" title="Assign unassigned cables to available conduits">
+    <img src="icons/toolbar/auto-layout.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    Auto Assign
+   </button>
+  </div>
+  <input type="text" id="cable-search" class="table-search" placeholder="Filter cables" aria-label="Filter cables" aria-controls="cableTable">
+ </div>
+ <div class="ductbank-table-meta" data-no-print>
+  <span id="cable-table-count" aria-live="polite" aria-atomic="true">0 cables</span>
+  <button type="button" id="clearCableFiltersBtn" class="btn text-btn ductbank-clear-filter-btn" aria-label="Clear cable filters">Clear filters</button>
+ </div>
+ <div class="ductbank-table-wrap table-scroll-x" tabindex="0" aria-label="Ductbank cable table">
  <table id="cableTable" class="db-table">
+  <caption class="visually-hidden">Ductbank cable entries</caption>
   <thead>
    <tr>
     <th data-idx="0">Tag</th>
@@ -147,6 +362,15 @@
   </thead>
   <tbody></tbody>
  </table>
+ </div>
+ <div id="cable-empty-state" class="ductbank-empty-state" hidden data-no-print>
+  <strong>No cables yet</strong>
+  <span>Add cables with the guided dialog, import CSV data, or load a complete example.</span>
+  <div class="ductbank-empty-actions">
+   <button type="button" class="btn primary-btn" data-ductbank-empty-action="add-cable">Add Cable</button>
+   <button type="button" class="btn toolbar-btn" data-ductbank-empty-action="complete-example">Complete Example</button>
+  </div>
+ </div>
  <datalist id="sizeList">
   <option value="#22 AWG"></option>
   <option value="#20 AWG"></option>
@@ -170,10 +394,13 @@
   <option value="750 kcmil"></option>
   <option value="1000 kcmil"></option>
  </datalist>
-</details>
-<details id="paramSection" open style="margin-top:8px;">
- <summary><strong>Parameters</strong></summary>
- <div>
+</section>
+<details id="paramSection" open class="ductbank-section-card card ductbank-details">
+ <summary>
+  <span>Thermal Parameters</span>
+  <small>Soil, spacing, and solver assumptions</small>
+ </summary>
+ <div class="ductbank-field-grid">
  <label>Ambient Earth Temperature (&#176;F)
   <span class="help-icon" tabindex="0" role="button" aria-label="Help" aria-expanded="false" aria-describedby="earthTempHelp">?
    <span id="earthTempHelp" class="tooltip">Degrees Fahrenheit of the surrounding soil. Typical 50–80°F.</span>
@@ -217,7 +444,7 @@
   </span>
   <input type="checkbox" id="heatSources" style="margin-left:4px;">
  </label>
- <button type="button" id="addHeatSource" style="display:none;margin-left:4px;">Add Heat Source</button>
+ <button type="button" id="addHeatSource" class="btn toolbar-btn" style="display:none;">Add Heat Source</button>
  <label style="margin-left:8px;">Grid Resolution
   <span class="help-icon" tabindex="0" role="button" aria-label="Help" aria-expanded="false" aria-describedby="gridHelp">?
    <span id="gridHelp" class="tooltip">Number of nodes used for the thermal solver.</span>
@@ -236,7 +463,7 @@
 </label>
 </div>
 
-<details id="soilRef" style="margin-top:8px;">
+<details id="soilRef" class="ductbank-subdetails">
  <summary><strong>Typical Soil Properties</strong></summary>
  <table class="db-table" style="width:auto;">
   <thead>
@@ -257,7 +484,7 @@
  </table>
 </details>
 
-<details id="heatSourceDetails" open style="display:none;margin-top:8px;">
+<details id="heatSourceDetails" open class="ductbank-subdetails" style="display:none;">
  <summary><strong>Adjacent Heat Sources</strong></summary>
  <table id="heatSourceTable" class="db-table">
  <thead>
@@ -276,7 +503,7 @@
  </table>
 </details>
 
-<div style="margin-top:8px;">
+<div class="ductbank-field-grid ductbank-field-grid--spacing">
   <label>Horiz Spacing (in)<input type="number" id="hSpacing" value="3" min="0" step="1" style="width:60px;"></label>
   <label>Vert Spacing (in)<input type="number" id="vSpacing" value="4" min="0" step="1" style="width:60px;"></label>
   <label>Top Clear (in)<input type="number" id="topPad" value="0" min="0" step="1" style="width:60px;"></label>
@@ -287,42 +514,49 @@
 </div>
 </details>
 
-<div id="warning-area" style="display:none;"></div>
-
-<div id="gridWrapper" style="position:relative;overflow:hidden;display:inline-block;">
-  <div id="gridContainer" style="position:relative;display:inline-block;transform-origin:0 0;">
-    <svg id="grid" width="500" height="500" style="position:relative;z-index:1;" xmlns="http://www.w3.org/2000/svg"></svg>
-    <canvas id="tempCanvas" width="500" height="500" style="position:absolute;top:0;left:0;pointer-events:none;z-index:2;display:none;opacity:0.7;"></canvas>
-    <canvas id="tempOverlay" width="500" height="500" style="position:absolute;top:0;left:0;pointer-events:none;z-index:3;display:none;"></canvas>
+<section class="ductbank-section-card card ductbank-visual-card" aria-labelledby="ductbank-results-heading">
+ <div class="ductbank-section-header">
+  <div>
+   <h2 id="ductbank-results-heading">Drawing &amp; Analysis</h2>
+   <p class="field-hint">Review conduit fill, cable placement, thermal overlays, and ampacity estimates.</p>
   </div>
-</div>
-<div id="zoomControls" class="zoom-controls" style="margin-top:4px;">
-  <button id="fitViewBtn">Fit</button>
-  <button id="zoomInBtn">Zoom In</button>
-  <button id="zoomOutBtn">Zoom Out</button>
-</div>
-<label style="display:block;margin-top:4px;"><input type="checkbox" id="hideDrawing"> Hide Drawing</label>
-<label style="display:block;margin-top:4px;"><input type="checkbox" id="utilHeatmapToggle"> Utilization Heatmap</label>
-
-<details id="ampacityDetails" open style="margin-top:8px;">
- <summary><strong>Ampacity Estimates</strong></summary>
- <div id="ampacityReport"></div>
-</details>
-<button id="scrollTopBtn" style="margin-top:4px;">Scroll to Top</button>
-
-<div class="db-button-panel">
- <button id="calc">Calculate Fill</button>
- <button id="thermalBtn">Thermal Analysis</button>
- <button id="heatToggleBtn">Toggle Heat Map</button>
- <button id="exportBtn">Download Ductbank Data</button>
- <button id="exportConduitsBtn">Export Ductbank Conduits</button>
-  <button id="exportCablesBtn">Export Ductbank Cables</button>
-  <button id="exportImgBtn">Export Image</button>
-  <button id="exportThermalBtn">Download Thermal Data</button>
-  <button id="exportCanvasDataBtn">Download Canvas Data</button>
- <button id="downloadCalcReportBtn">Download Calculation Report</button>
-  <button id="resetBtn">Reset Inputs</button>
+  <div id="zoomControls" class="ductbank-zoom-toolbar" role="toolbar" aria-label="Drawing zoom controls" data-no-print>
+   <button id="fitViewBtn" class="row-icon-btn" type="button" title="Fit drawing">
+    <img src="icons/toolbar/auto-layout.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    <span class="sr-only">Fit drawing</span>
+   </button>
+   <button id="zoomInBtn" class="row-icon-btn" type="button" title="Zoom in">
+    <span class="ductbank-toolbar-symbol" aria-hidden="true">+</span>
+    <span class="sr-only">Zoom in</span>
+   </button>
+   <button id="zoomOutBtn" class="row-icon-btn" type="button" title="Zoom out">
+    <span class="ductbank-toolbar-symbol" aria-hidden="true">-</span>
+    <span class="sr-only">Zoom out</span>
+   </button>
+  </div>
  </div>
+ <div class="ductbank-visual-options" data-no-print>
+  <label class="ductbank-toggle-field"><input type="checkbox" id="hideDrawing"> <span>Hide Drawing</span></label>
+  <label class="ductbank-toggle-field"><input type="checkbox" id="utilHeatmapToggle"> <span>Utilization Heatmap</span></label>
+ </div>
+ <div id="warning-area" class="ductbank-warning-area" style="display:none;"></div>
+ <div id="gridWrapper" class="ductbank-grid-wrapper">
+  <div id="gridContainer" class="ductbank-grid-container">
+   <svg id="grid" width="500" height="500" xmlns="http://www.w3.org/2000/svg"></svg>
+   <canvas id="tempCanvas" width="500" height="500" class="ductbank-temp-canvas"></canvas>
+   <canvas id="tempOverlay" width="500" height="500" class="ductbank-temp-overlay"></canvas>
+  </div>
+  <div id="ductbank-cable-popover" class="ductbank-cable-popover" role="dialog" aria-label="Cable quick properties" hidden data-no-print></div>
+ </div>
+ <details id="ampacityDetails" open class="ductbank-subdetails ductbank-ampacity-details">
+  <summary><strong>Ampacity Estimates</strong></summary>
+  <div id="ampacityReport"></div>
+ </details>
+ <button id="scrollTopBtn" class="btn toolbar-btn ductbank-scroll-top" type="button" data-no-print>
+  <img src="icons/toolbar/arrow-up.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+  Scroll to Top
+ </button>
+</section>
 
 <div id="analysis-progress-container" style="display:none;">
   <div id="analysis-progress-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div>
@@ -344,8 +578,9 @@
   <h2>Ductbank Route Help</h2>
   <p>Use the <strong>Ductbank Conduits</strong> table to define each conduit by ID, type, trade size and its X/Y position.</p>
   <p>The <strong>Cables</strong> table lists every cable to be pulled. Diameter is the outside diameter in inches. Specify which conduit each cable is installed in.</p>
-  <p>Click <em>Add Conduit</em> or <em>Add Cable</em> to create rows manually, or use <em>Import&nbsp;CSV</em> to load your own files. <em>Load Sample Data</em> fills the tables with example values.</p>
-  <p>After entering data, press <strong>Calculate Fill</strong> to draw the ductbank. Conduits are colored by fill percentage and display individual cable circles. Hover over a conduit to see its fill and cable tags.</p>
+  <p>Click <em>Add Conduit</em> or <em>Add Cable</em> to enter the key fields in a guided dialog, or use <em>Import&nbsp;CSV</em> to load your own files. <em>Complete Example</em> fills the page with a ready-to-review ductbank.</p>
+  <p>Use <em>Validate</em> before exporting. Actionable warnings identify missing data, duplicate IDs, fill concerns, and thermal alerts; selecting a warning jumps to the row that needs attention.</p>
+  <p>After entering data, press <strong>Calculate Fill</strong> to draw the ductbank. Conduits are colored by fill percentage and display individual cable circles. Select a cable in the drawing to view quick properties and jump to its table row.</p>
   <p>The <strong>Download Ductbank Data</strong> button exports all conduits, cables and fill results to an XLSX file.</p>
   <p><strong>Export Ductbank Conduits</strong> and <strong>Export Ductbank Cables</strong> create CSV files compatible with the import buttons.</p>
   <h3>Reporting and Export</h3>
@@ -355,9 +590,9 @@
   <h3>Ampacity Calculation</h3>
   <p>Ampacity is estimated using the full Neher-McGrath equation:</p>
   <pre>I = sqrt( (T<sub>c</sub> - (T<sub>a</sub> + &Delta;T<sub>d</sub>)) /
-             (R<sub>dc</sub> &times; (1 + Y<sub>c</sub>) &times; R<sub>ca</sub>) )</pre>
-  <p>Here T<sub>c</sub> is the allowable conductor temperature in &deg;C. T<sub>a</sub> comes from the entered earth and air temperatures&mdash;those values are input in &deg;F and converted to &deg;C for the calculation. &Delta;T<sub>d</sub> is the dielectric-loss rise and Y<sub>c</sub> accounts for AC skin effect.</p>
-  <p>The soil resistance uses <code>R<sub>soil</sub> = (&#x03c1;<sub>m</sub> / (2&pi;)) &middot; ln(4&nbsp;d / D)</code> with &#x03c1;<sub>m</sub> = &#x03c1;/100, burial depth <em>d</em> and conduit diameter <em>D</em> in meters. Duct resistance comes from a material and trade-size table and increases when concrete encased.</p>
+             (R<sub>dc</sub> &times; (1 + Y<sub>c</sub>) &times; R<sub>ca</sub> &times; N<sub>c</sub>) )</pre>
+  <p>Here T<sub>c</sub> is the cable-specific allowable conductor temperature in &deg;C and N<sub>c</sub> is the current-carrying conductor count. T<sub>a</sub> comes from the entered earth and air temperatures&mdash;those values are input in &deg;F and converted to &deg;C for the calculation. &Delta;T<sub>d</sub> is the dielectric-loss rise and Y<sub>c</sub> accounts for AC skin effect.</p>
+  <p>The soil resistance uses <code>R<sub>soil</sub> = (&#x03c1;<sub>m</sub> / (2&pi;)) &middot; ln(4&nbsp;d / D)</code> with &#x03c1;<sub>m</sub> = &#x03c1;/100, burial depth <em>d</em> and equivalent conduit diameter <em>D</em> in meters. Duct resistance comes from a material and trade-size table and increases when concrete encased.</p>
   <p>See <a href="docs/AMPACITY_METHOD.html#ac-resistance-correction" target="_blank" rel="noopener noreferrer">AC Resistance Correction</a> for details on skin effect and dielectric loss. Typical soils appear in <a href="docs/AMPACITY_METHOD.html#soil-resistivity-ranges" target="_blank" rel="noopener noreferrer">Soil Resistivity Ranges</a>.</p>
   <h3>Thermal Analysis</h3>
   <p>The <em>Thermal Analysis</em> button overlays a heat map on the drawing. Each conduit center is marked with a yellow dot labeled with the estimated earth temperature in Fahrenheit and the hottest point is highlighted in red.</p>

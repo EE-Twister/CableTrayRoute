@@ -30,6 +30,7 @@ export const sampleTrays = Array.from({length:17}, (_,i) => {
     inside_width: 24,
     tray_depth: 4,
     tray_type: 'Ladder (50 % fill)',
+    material: 'Steel',
     allowed_cable_group: ''
   };
 });
@@ -42,6 +43,7 @@ export const sampleConduits = (() => {
         ductbankTag: db.tag,
         conduit_id: `${db.tag}-C${j}`,
         type: 'PVC Sch 40',
+        material: 'PVC',
         trade_size: '4',
         start_x: 0,
         start_y: i*10,
@@ -57,6 +59,7 @@ export const sampleConduits = (() => {
     arr.push({
       conduit_id: `C-${String(i).padStart(3,'0')}`,
       type: i%2===0? 'EMT' : 'RMC',
+      material: 'Steel',
       trade_size: i%2===0? '2' : '3',
       start_x: 50,
       start_y: 50 + i*5,
@@ -101,6 +104,7 @@ export function normalizeConduitRow(row){
     ductbankTag:['ductbankTag','ductbank','Ductbank','ductbank_tag','Ductbank Tag'],
     conduit_id:['conduit_id','conduitId','Conduit ID'],
     type:['type','Type'],
+    material:['material','Material','raceway_material','Raceway Material','conduit_material','Conduit Material'],
     trade_size:['trade_size','tradeSize','Trade Size'],
     start_x:['start_x','Start X','startX'],
     start_y:['start_y','Start Y','startY'],
@@ -125,6 +129,7 @@ export function normalizeTrayRow(row){
     inside_width:['inside_width','width','Inside Width'],
     tray_depth:['tray_depth','height','Tray Depth'],
     tray_type:['tray_type','Tray Type'],
+    material:['material','Material','raceway_material','Raceway Material','tray_material','Tray Material'],
     allowed_cable_group:['allowed_cable_group','allowedGroup','Allowed Group']
   });
 }

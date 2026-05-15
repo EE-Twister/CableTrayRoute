@@ -1,6 +1,6 @@
 // Alias storage helpers to avoid name conflicts with local functions
 import { getDuctbanks as readStoredDuctbanks, setDuctbanks, setItem, getItem } from './dataStore.mjs';
-import { FILTER_ICON_SVG } from './tableUtils.mjs';
+import { ContextMenu, FILTER_ICON_SVG } from './tableUtils.mjs';
 import { showAlertModal } from './src/components/modal.js';
 
 (function(){
@@ -9,24 +9,71 @@ import { showAlertModal } from './src/components/modal.js';
   let ductbankTbody;
   let filters=[];
   let filterButtons=[];
+  let ductbankClipboard=null;
+  let conduitClipboard=null;
+  let rowContextMenusReady=false;
   let headerCells;
   let cableSizes=[];
   fetch('data/cableSizes.json').then(r=>r.json()).then(d=>{cableSizes=d;});
+  const CONDUIT_MATERIAL_OPTIONS = ['Steel','Aluminum','PVC','Stainless Steel','Fiberglass'];
+  const ROW_ACTION_ICONS = {
+    viewBtn: 'icons/toolbar/grid.svg',
+    insertBelowBtn: 'icons/toolbar/add-arrangement.svg',
+    duplicateBtn: 'icons/toolbar/copy.svg',
+    removeBtn: 'icons/toolbar/trash.svg'
+  };
 
   function iconBtn(sym,cls,label,handler){
     const b=document.createElement('button');
-    b.textContent=sym;
-    b.className=cls;
+    b.type='button';
+    b.className=`${cls} row-icon-btn${cls === 'removeBtn' ? ' danger' : ''}`;
     b.title=label;
     b.setAttribute('aria-label',label);
+    const icon=ROW_ACTION_ICONS[cls];
+    if(icon){
+      const img=document.createElement('img');
+      img.src=icon;
+      img.alt='';
+      img.setAttribute('aria-hidden','true');
+      img.className='control-icon';
+      img.loading='lazy';
+      img.decoding='async';
+      b.appendChild(img);
+      b.dataset.iconified='true';
+    }else{
+      b.textContent=sym;
+    }
     b.addEventListener('click',handler);
     return b;
+  }
+
+  function appendActionButtons(cell,...buttons){
+    cell.classList.add('raceway-action-cell');
+    const group=document.createElement('div');
+    group.className='row-action-group';
+    buttons.forEach(button=>group.appendChild(button));
+    cell.appendChild(group);
   }
 
   function parseSize(sz){
     if(sz.includes('-')){const[w,f]=sz.split('-');const[n,d]=f.split('/');return parseFloat(w)+parseFloat(n)/parseFloat(d);}
     if(sz.includes('/')){const[n,d]=sz.split('/');return parseFloat(n)/parseFloat(d);}
     return parseFloat(sz);
+  }
+
+  function defaultConduitMaterial(type = ''){
+    return /PVC|ENT|LFNC/i.test(String(type)) ? 'PVC' : 'Steel';
+  }
+
+  function populateMaterialOptions(select, value){
+    select.innerHTML = '';
+    CONDUIT_MATERIAL_OPTIONS.forEach(material => {
+      const opt = document.createElement('option');
+      opt.value = material;
+      opt.textContent = material;
+      select.appendChild(opt);
+    });
+    select.value = value && CONDUIT_MATERIAL_OPTIONS.includes(value) ? value : CONDUIT_MATERIAL_OPTIONS[0];
   }
 
   function setWidth(cell,idx){
@@ -119,7 +166,7 @@ import { showAlertModal } from './src/components/modal.js';
     filterButtons=[];
     Array.from(headerCells).forEach((th,idx)=>{
       th.style.position='relative';
-      if(idx>0&&idx<headerCells.length-1){
+      if(idx>0){
         const btn=document.createElement('button');
         btn.className='filter-btn';
         btn.innerHTML=FILTER_ICON_SVG;
@@ -166,6 +213,9 @@ import { showAlertModal } from './src/components/modal.js';
     ductbanks.forEach((db,i)=>{
       const row=document.createElement('tr');
       row.dataset.tag = db.tag;
+      row.dataset.ductbankIndex = String(i);
+      row.tabIndex = 0;
+      row.classList.add('table-row-focusable');
       appendDuctbankRow(row);
       const tgl=row.insertCell();
       setWidth(tgl,0);
@@ -276,24 +326,18 @@ import { showAlertModal } from './src/components/modal.js';
       TableUtils.applyValidation(ezInput,ezRules);
       ez.appendChild(ezInput);
 
-      const act=row.insertCell();
-      setWidth(act,11);
-      act.appendChild(iconBtn('👁','viewBtn','View Ductbank',()=>{viewDuctbank(i);}));
-      act.appendChild(iconBtn('+','insertBelowBtn','Add Conduit',()=>{addConduit(i);}));
-      act.appendChild(iconBtn('\u29C9','duplicateBtn','Duplicate Ductbank',()=>{duplicateDuctbank(i);}));
-      act.appendChild(iconBtn('\u2716','removeBtn','Delete Ductbank',()=>{deleteDuctbank(i);}));
 
       const cRow=document.createElement('tr');
       cRow.classList.add('conduit-container');
       ductbankTbody.appendChild(cRow);
       cRow.style.display=db.expanded?'':'none';
       const cCell=cRow.insertCell();
-      cCell.colSpan=12;
+      cCell.colSpan=11;
       const cTable=document.createElement('table');
       cTable.className='nested-table';
       const cHead=cTable.createTHead();
       const h=cHead.insertRow();
-      ['Conduit ID','Type','Trade Size','Allowed Group','Actions'].forEach(txt=>{
+      ['Conduit ID','Type','Material','Trade Size','Allowed Group'].forEach(txt=>{
         const th=document.createElement('th');
         th.textContent=txt;
         h.appendChild(th);
@@ -302,6 +346,10 @@ import { showAlertModal } from './src/components/modal.js';
       db.conduits.forEach(c=>{if(c.ductbankTag===undefined)c.ductbankTag=db.tag;});
       db.conduits.forEach((c,j)=>{
         const r=cBody.insertRow();
+        r.dataset.ductbankIndex = String(i);
+        r.dataset.conduitIndex = String(j);
+        r.tabIndex = 0;
+        r.classList.add('table-row-focusable');
         if (c.error) r.classList.add('missing-tag-row');
 
         // Conduit ID
@@ -322,6 +370,14 @@ import { showAlertModal } from './src/components/modal.js';
         const typeRules=['required'];
         cell.appendChild(typeSel);
 
+        // Material select
+        cell=r.insertCell();
+        const materialSel=document.createElement('select');
+        const initialMaterial=c.material||defaultConduitMaterial(c.type);
+        populateMaterialOptions(materialSel, initialMaterial);
+        c.material=materialSel.value;
+        cell.appendChild(materialSel);
+
         // Trade size select
         cell=r.insertCell();
         const sizeSel=document.createElement('select');
@@ -335,7 +391,19 @@ import { showAlertModal } from './src/components/modal.js';
         const sizeRules=['required'];
         cell.appendChild(sizeSel);
 
-        typeSel.addEventListener('change',e=>{c.type=e.target.value;populateSizes();c.trade_size=sizeSel.value;TableUtils.applyValidation(typeSel,typeRules);saveDuctbanks();});
+        typeSel.addEventListener('change',e=>{
+          const previousDefault=defaultConduitMaterial(c.type);
+          c.type=e.target.value;
+          populateSizes();
+          c.trade_size=sizeSel.value;
+          if(!c.material||c.material===previousDefault){
+            c.material=defaultConduitMaterial(c.type);
+            materialSel.value=c.material;
+          }
+          TableUtils.applyValidation(typeSel,typeRules);
+          saveDuctbanks();
+        });
+        materialSel.addEventListener('change',e=>{c.material=e.target.value;saveDuctbanks();});
         sizeSel.addEventListener('change',e=>{c.trade_size=e.target.value;TableUtils.applyValidation(sizeSel,sizeRules);saveDuctbanks();});
         TableUtils.applyValidation(typeSel,typeRules);
         TableUtils.applyValidation(sizeSel,sizeRules);
@@ -348,9 +416,6 @@ import { showAlertModal } from './src/components/modal.js';
         agInp.addEventListener('input',e=>{c.allowed_cable_group=e.target.value;saveDuctbanks();});
         cell.appendChild(agInp);
 
-        const actc=r.insertCell();
-        actc.appendChild(iconBtn('\u29C9','duplicateBtn','Duplicate Conduit',()=>{duplicateConduit(i,j);}));
-        actc.appendChild(iconBtn('\u2716','removeBtn','Delete Conduit',()=>{deleteConduit(i,j);}));
       });
       cCell.appendChild(cTable);
     });
@@ -359,9 +424,13 @@ import { showAlertModal } from './src/components/modal.js';
     applyFilters();
   }
 
-  function addDuctbank(data = {}){
+  function cloneData(value){
+    return JSON.parse(JSON.stringify(value || {}));
+  }
+
+  function makeDuctbank(data = {}){
     const next = {
-      id:data.id || Date.now(),
+      id:data.id || Date.now()+Math.random(),
       tag:data.tag || '',
       from:data.from || '',
       to:data.to || '',
@@ -372,10 +441,126 @@ import { showAlertModal } from './src/components/modal.js';
       end_x:data.end_x ?? '',
       end_y:data.end_y ?? '',
       end_z:data.end_z ?? '',
-      conduits:Array.isArray(data.conduits) ? data.conduits : [],
+      conduits:Array.isArray(data.conduits) ? cloneData(data.conduits) : [],
       expanded:data.expanded ?? true
     };
-    next.conduits.forEach(c=>{ if(c.ductbankTag===undefined) c.ductbankTag=next.tag; });
+    next.conduits.forEach(c=>{
+      if(c.ductbankTag===undefined) c.ductbankTag=next.tag;
+      if(c.material===undefined) c.material=defaultConduitMaterial(c.type);
+    });
+    return next;
+  }
+
+  function makeCopiedDuctbank(db){
+    const copy=makeDuctbank(cloneData(db));
+    copy.id=Date.now()+Math.random();
+    copy.conduits.forEach(c=>{c.ductbankTag=copy.tag;});
+    return copy;
+  }
+
+  function makeConduit(db, data = {}){
+    return {
+      conduit_id:data.conduit_id || '',
+      type:data.type || '',
+      material:data.material || defaultConduitMaterial(data.type || ''),
+      trade_size:data.trade_size || '',
+      allowed_cable_group:data.allowed_cable_group || '',
+      ductbankTag:db.tag,
+      start_x:data.start_x ?? db.start_x,
+      start_y:data.start_y ?? db.start_y,
+      start_z:data.start_z ?? db.start_z,
+      end_x:data.end_x ?? db.end_x,
+      end_y:data.end_y ?? db.end_y,
+      end_z:data.end_z ?? db.end_z
+    };
+  }
+
+  function insertDuctbank(index, data = {}){
+    const targetIndex=Math.max(0,Math.min(index,ductbanks.length));
+    ductbanks.splice(targetIndex,0,makeDuctbank(data));
+    renderDuctbanks();
+    saveDuctbanks();
+  }
+
+  function insertConduit(ductbankIndex, conduitIndex, data = {}){
+    const db=ductbanks[ductbankIndex];
+    if(!db) return;
+    const targetIndex=Math.max(0,Math.min(conduitIndex,db.conduits.length));
+    db.conduits.splice(targetIndex,0,makeConduit(db,data));
+    db.expanded=true;
+    renderDuctbanks();
+    saveDuctbanks();
+  }
+
+  function applyDuctbankBatchEdit({target='ductbanks',field,value='',scope='visible'} = {}){
+    let count=0;
+    let skipped=0;
+    const visibleOnly=scope!=='all';
+    const specs=globalThis.CONDUIT_SPECS||{};
+    if(target==='ductbankConduits'){
+      const targets=[];
+      if(visibleOnly){
+        document.querySelectorAll('#ductbankTable tr[data-conduit-index]').forEach(row=>{
+          const container=row.closest('tr.conduit-container');
+          if(row.style.display==='none'||container?.style.display==='none') return;
+          const ductbankIndex=Number.parseInt(row.dataset.ductbankIndex,10);
+          const conduitIndex=Number.parseInt(row.dataset.conduitIndex,10);
+          if(Number.isInteger(ductbankIndex)&&Number.isInteger(conduitIndex)) targets.push([ductbankIndex,conduitIndex]);
+        });
+      }else{
+        ductbanks.forEach((db,ductbankIndex)=>{
+          (db.conduits||[]).forEach((c,conduitIndex)=>targets.push([ductbankIndex,conduitIndex]));
+        });
+      }
+      targets.forEach(([ductbankIndex,conduitIndex])=>{
+        const db=ductbanks[ductbankIndex];
+        const conduit=db?.conduits?.[conduitIndex];
+        if(!db||!conduit){skipped+=1;return;}
+        if(field==='trade_size'){
+          if(!specs[conduit.type]?.[value]){skipped+=1;return;}
+          conduit.trade_size=value;
+        }else if(field==='type'){
+          conduit.type=value;
+          const sizes=Object.keys(specs[value]||{}).sort((a,b)=>parseSize(a)-parseSize(b));
+          conduit.trade_size=sizes[0]||conduit.trade_size||'';
+          if(!conduit.material) conduit.material=defaultConduitMaterial(value);
+        }else if(field){
+          conduit[field]=value;
+        }
+        conduit.ductbankTag=db.tag;
+        count+=1;
+      });
+    }else{
+      const rowIndexes=[];
+      if(visibleOnly){
+        getDuctbankRows().forEach(row=>{
+          if(row.style.display==='none') return;
+          const index=Number.parseInt(row.dataset.ductbankIndex,10);
+          if(Number.isInteger(index)) rowIndexes.push(index);
+        });
+      }else{
+        ductbanks.forEach((db,index)=>rowIndexes.push(index));
+      }
+      rowIndexes.forEach(index=>{
+        const db=ductbanks[index];
+        if(!db){skipped+=1;return;}
+        if(field==='concrete_encasement'){
+          db.concrete_encasement=value==='Yes'||value==='true'||value===true;
+        }else if(field){
+          db[field]=value;
+          if(['start_x','start_y','start_z','end_x','end_y','end_z'].includes(field)){
+            db.conduits.forEach(c=>{c[field]=value;});
+          }
+        }
+        count+=1;
+      });
+    }
+    saveDuctbanks();
+    return {count,skipped};
+  }
+
+  function addDuctbank(data = {}){
+    const next = makeDuctbank(data);
     ductbanks.push(next);
     renderDuctbanks();
     saveDuctbanks();
@@ -383,19 +568,9 @@ import { showAlertModal } from './src/components/modal.js';
 
   function addConduit(i){
     const db=ductbanks[i];
-    ductbanks[i].conduits.push({
-      conduit_id:'',
-      type:'',
-      trade_size:'',
-      allowed_cable_group:'',
-      ductbankTag:db.tag,
-      start_x:db.start_x,
-      start_y:db.start_y,
-      start_z:db.start_z,
-      end_x:db.end_x,
-      end_y:db.end_y,
-      end_z:db.end_z
-    });
+    if(!db) return;
+    ductbanks[i].conduits.push(makeConduit(db));
+    db.expanded=true;
     renderDuctbanks();
     saveDuctbanks();
   }
@@ -424,18 +599,14 @@ import { showAlertModal } from './src/components/modal.js';
   }
 
   function duplicateDuctbank(i){
-    const copy=JSON.parse(JSON.stringify(ductbanks[i]));
-    copy.id=Date.now()+Math.random();
-    // ensure conduits reference the copied ductbank tag
-    copy.conduits.forEach(c=>{c.ductbankTag=copy.tag;});
+    const copy=makeCopiedDuctbank(ductbanks[i]);
     ductbanks.splice(i+1,0,copy);
     renderDuctbanks();
     saveDuctbanks();
   }
 
   function duplicateConduit(i,j){
-    const copy=JSON.parse(JSON.stringify(ductbanks[i].conduits[j]));
-    copy.ductbankTag=ductbanks[i].tag;
+    const copy=makeConduit(ductbanks[i],cloneData(ductbanks[i].conduits[j]));
     ductbanks[i].conduits.splice(j+1,0,copy);
     renderDuctbanks();
     saveDuctbanks();
@@ -478,6 +649,7 @@ import { showAlertModal } from './src/components/modal.js';
         ['start_x','start_y','start_z','end_x','end_y','end_z'].forEach(k=>{if(c[k]===undefined) c[k]=db[k];});
         if(c.allowed_cable_group===undefined) c.allowed_cable_group='';
         if(c.ductbankTag===undefined) c.ductbankTag=db.tag;
+        if(c.material===undefined) c.material=defaultConduitMaterial(c.type);
       });
     });
     renderDuctbanks();
@@ -492,8 +664,8 @@ import { showAlertModal } from './src/components/modal.js';
     }
     const dbData=[['ductbank_id','tag','from','to','concrete_encasement','start_x','start_y','start_z','end_x','end_y','end_z']];
     ductbanks.forEach(db=>dbData.push([db.id,db.tag,db.from,db.to,db.concrete_encasement?1:0,db.start_x,db.start_y,db.start_z,db.end_x,db.end_y,db.end_z]));
-    const cData=[['ductbank_id','ductbankTag','conduit_id','type','trade_size','start_x','start_y','start_z','end_x','end_y','end_z','allowed_cable_group']];
-    ductbanks.forEach(db=>db.conduits.forEach(c=>cData.push([db.id,db.tag||db.id,c.conduit_id,c.type,c.trade_size,c.start_x,c.start_y,c.start_z,c.end_x,c.end_y,c.end_z,c.allowed_cable_group])));
+    const cData=[['ductbank_id','ductbankTag','conduit_id','type','material','trade_size','start_x','start_y','start_z','end_x','end_y','end_z','allowed_cable_group']];
+    ductbanks.forEach(db=>db.conduits.forEach(c=>cData.push([db.id,db.tag||db.id,c.conduit_id,c.type,c.material,c.trade_size,c.start_x,c.start_y,c.start_z,c.end_x,c.end_y,c.end_z,c.allowed_cable_group])));
     const wb=XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(dbData),'Ductbanks');
     XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(cData),'Conduits');
@@ -571,6 +743,7 @@ import { showAlertModal } from './src/components/modal.js';
           p.conduits.push({
             conduit_id:r['conduit_id']||'',
             type:r['type']||'',
+            material:r['material']||r['Material']||defaultConduitMaterial(r['type']||''),
             trade_size:r['trade_size']||'',
             allowed_cable_group:r['allowed_cable_group']||'',
             ductbankTag:r['ductbankTag']||p.tag,
@@ -592,6 +765,82 @@ import { showAlertModal } from './src/components/modal.js';
     reader.readAsBinaryString(file);
   }
 
+  function ductbankIndexFromRow(row){
+    const index=Number.parseInt(row?.dataset?.ductbankIndex,10);
+    return Number.isInteger(index) ? index : -1;
+  }
+
+  function conduitIndexFromRow(row){
+    const index=Number.parseInt(row?.dataset?.conduitIndex,10);
+    return Number.isInteger(index) ? index : -1;
+  }
+
+  function initRowContextMenus(){
+    if(rowContextMenusReady) return;
+    const table=document.getElementById('ductbankTable');
+    if(!table) return;
+    rowContextMenusReady=true;
+    const ductbankMenu=new ContextMenu([
+      {label:'View Ductbank Route',action:row=>{const i=ductbankIndexFromRow(row);if(i>=0)viewDuctbank(i);}},
+      {label:'Expand / Collapse Conduits',action:row=>{const i=ductbankIndexFromRow(row);if(i<0)return;ductbanks[i].expanded=!ductbanks[i].expanded;renderDuctbanks();saveDuctbanks();}},
+      {label:'Add Conduit',action:row=>{const i=ductbankIndexFromRow(row);if(i>=0)addConduit(i);}},
+      {label:'Insert Ductbank Above',action:row=>{const i=ductbankIndexFromRow(row);if(i>=0)insertDuctbank(i);}},
+      {label:'Insert Ductbank Below',action:row=>{const i=ductbankIndexFromRow(row);if(i>=0)insertDuctbank(i+1);}},
+      {label:'Duplicate Ductbank',action:row=>{const i=ductbankIndexFromRow(row);if(i>=0)duplicateDuctbank(i);}},
+      {label:'Copy Ductbank',action:row=>{const i=ductbankIndexFromRow(row);if(i>=0)ductbankClipboard=makeCopiedDuctbank(ductbanks[i]);}},
+      {
+        label:'Paste Ductbank Below',
+        action:row=>{const i=ductbankIndexFromRow(row);if(i>=0&&ductbankClipboard)insertDuctbank(i+1,makeCopiedDuctbank(ductbankClipboard));},
+        isDisabled:()=>!ductbankClipboard
+      },
+      {label:'Delete Ductbank',action:row=>{const i=ductbankIndexFromRow(row);if(i>=0)deleteDuctbank(i);}}
+    ]);
+    const conduitMenu=new ContextMenu([
+      {label:'Insert Conduit Above',action:row=>{const i=ductbankIndexFromRow(row);const j=conduitIndexFromRow(row);if(i>=0&&j>=0)insertConduit(i,j);}},
+      {label:'Insert Conduit Below',action:row=>{const i=ductbankIndexFromRow(row);const j=conduitIndexFromRow(row);if(i>=0&&j>=0)insertConduit(i,j+1);}},
+      {label:'Duplicate Conduit',action:row=>{const i=ductbankIndexFromRow(row);const j=conduitIndexFromRow(row);if(i>=0&&j>=0)duplicateConduit(i,j);}},
+      {label:'Copy Conduit',action:row=>{const i=ductbankIndexFromRow(row);const j=conduitIndexFromRow(row);if(i>=0&&j>=0)conduitClipboard=cloneData(ductbanks[i].conduits[j]);}},
+      {
+        label:'Paste Conduit Below',
+        action:row=>{const i=ductbankIndexFromRow(row);const j=conduitIndexFromRow(row);if(i>=0&&j>=0&&conduitClipboard)insertConduit(i,j+1,conduitClipboard);},
+        isDisabled:()=>!conduitClipboard
+      },
+      {label:'Delete Conduit',action:row=>{const i=ductbankIndexFromRow(row);const j=conduitIndexFromRow(row);if(i>=0&&j>=0)deleteConduit(i,j);}}
+    ]);
+
+    function showMenuForRow(row,x,y){
+      if(!row) return false;
+      if(row.dataset.conduitIndex!==undefined){
+        conduitMenu.show(x,y,row);
+        return true;
+      }
+      if(row.classList.contains('ductbank-row')){
+        ductbankMenu.show(x,y,row);
+        return true;
+      }
+      return false;
+    }
+
+    table.addEventListener('contextmenu',event=>{
+      const row=event.target.closest('tbody tr[data-conduit-index], tbody tr.ductbank-row');
+      if(row&&table.contains(row)){
+        event.preventDefault();
+        showMenuForRow(row,event.pageX,event.pageY);
+      }else if(event.target.closest('#ductbankTable')){
+        event.preventDefault();
+      }
+    });
+
+    table.addEventListener('keydown',event=>{
+      if(!((event.shiftKey&&event.key==='F10')||event.key==='ContextMenu')) return;
+      const row=event.target.closest('tbody tr[data-conduit-index], tbody tr.ductbank-row');
+      if(!row) return;
+      event.preventDefault();
+      const rect=event.target.getBoundingClientRect();
+      showMenuForRow(row,rect.left+rect.width/2+window.pageXOffset,rect.bottom+window.pageYOffset);
+    });
+  }
+
   function initDuctbankTable(){
     ductbankTbody=document.querySelector('#ductbankTable tbody');
     document.getElementById('add-ductbank-btn').addEventListener('click',e=>{
@@ -605,6 +854,7 @@ import { showAlertModal } from './src/components/modal.js';
     document.getElementById('import-ductbank-xlsx-btn').addEventListener('click',()=>document.getElementById('import-ductbank-xlsx-input').click());
     document.getElementById('import-ductbank-xlsx-input').addEventListener('change',e=>{importDuctbankXlsx(e.target.files[0]);e.target.value='';});
     initHeader();
+    initRowContextMenus();
     document.getElementById('clear-ductbank-filters-btn').addEventListener('click',clearFilters);
     const addCableBtn=document.getElementById('addCableBtn');
     if(addCableBtn){
@@ -688,7 +938,7 @@ import { showAlertModal } from './src/components/modal.js';
       cell.appendChild(wtInput);
 
       cell=tr.insertCell();
-      cell.appendChild(iconBtn('\u2716','removeBtn','Delete Cable',()=>{cableRows.splice(i,1);renderCableTable();}));
+      appendActionButtons(cell,iconBtn('Delete','removeBtn','Delete Cable',()=>{cableRows.splice(i,1);renderCableTable();}));
 
       sel.addEventListener('change',e=>{
         const opt=e.target.selectedOptions[0];
@@ -736,5 +986,6 @@ import { showAlertModal } from './src/components/modal.js';
   window.loadDuctbanks=loadDuctbanks;
   window.getDuctbanks=getDuctbanks;
   window.addDuctbankRow=addDuctbank;
+  window.applyDuctbankBatchEdit=applyDuctbankBatchEdit;
 })();
 

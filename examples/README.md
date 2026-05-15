@@ -50,21 +50,21 @@ The `raceway_ids` column contains one or more conduit or tray tags separated by 
 Two files represent the different sheets:
 
 - `ductbank_schedule_ductbanks.csv` — `ductbank_id`, `tag`, `from`, `to`, `concrete_encasement`, `start_x`, `start_y`, `start_z`, `end_x`, `end_y`, `end_z`
-- `ductbank_schedule_conduits.csv` — `ductbank_id`, `ductbankTag`, `conduit_id`, `type`, `trade_size`, `start_x`, `start_y`, `start_z`, `end_x`, `end_y`, `end_z`
+- `ductbank_schedule_conduits.csv` — `ductbank_id`, `ductbankTag`, `conduit_id`, `type`, `material`, `trade_size`, `start_x`, `start_y`, `start_z`, `end_x`, `end_y`, `end_z`
 - `ductbank_conduits.csv` — `conduit_id`, `conduit_type`, `trade_size`, `x`, `y`, `z`, `angle`
 - `ductbank_cables.csv` — `tag`, `cable_type`, `diameter`, `conductors`, `conductor_size`, `weight`, `start_conduit_id`, `end_conduit_id`
 
 ## Cable Trays (`tray_schedule.csv`)
 
-Columns (in order): `tray_id`, `start_x`, `start_y`, `start_z`, `end_x`, `end_y`, `end_z`, `inside_width`, `tray_depth`, `tray_type`
+Columns (in order): `tray_id`, `start_x`, `start_y`, `start_z`, `end_x`, `end_y`, `end_z`, `inside_width`, `tray_depth`, `tray_type`, `material`
 
 ## Stand-alone Conduits (`conduit_schedule.csv`)
 
-Columns (in order): `conduit_id`, `type`, `trade_size`, `start_x`, `start_y`, `start_z`, `end_x`, `end_y`, `end_z`, `capacity`
+Columns (in order): `conduit_id`, `type`, `material`, `trade_size`, `start_x`, `start_y`, `start_z`, `end_x`, `end_y`, `end_z`, `capacity`
 
 ## Tray Import Template (`trays_template.csv`)
 
-Columns (in order): `tray_id`, `start_x`, `start_y`, `start_z`, `end_x`, `end_y`, `end_z`, `inside_width`, `tray_depth`, `tray_type`, `current_fill`, `allowed_cable_group`, `shape`
+Columns (in order): `tray_id`, `start_x`, `start_y`, `start_z`, `end_x`, `end_y`, `end_z`, `inside_width`, `tray_depth`, `tray_type`, `material`, `current_fill`, `allowed_cable_group`, `shape`
 
 ## Cable Import Template (`cables_template.csv`)
 

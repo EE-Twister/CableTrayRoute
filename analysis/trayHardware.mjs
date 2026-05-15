@@ -97,6 +97,11 @@ function trayWidth(tray) {
   return parseFloat(tray.inside_width) || 0;
 }
 
+function trayMaterial(tray) {
+  const material = tray.material || tray.tray_material || tray.raceway_material || 'Steel';
+  return String(material).trim() || 'Steel';
+}
+
 // ---------------------------------------------------------------------------
 // Junction detection
 // ---------------------------------------------------------------------------
@@ -163,6 +168,9 @@ function classifyJunction(group, trays) {
   });
 
   const widths = group.map(entry => trayWidth(trays[entry.trayIndex]));
+  const materials = group.map(entry => trayMaterial(trays[entry.trayIndex]));
+  const uniqueMaterials = [...new Set(materials)];
+  const material = uniqueMaterials.length === 1 ? uniqueMaterials[0] : 'Mixed';
   const trayIds = group.map(entry => trays[entry.trayIndex].tray_id || `tray_${entry.trayIndex}`);
 
   if (n === 2) {
@@ -181,6 +189,8 @@ function classifyJunction(group, trays) {
           tray_ids: trayIds,
           angle: Math.round(bendAngle * 10) / 10,
           widths,
+          materials,
+          material,
         };
       }
       return {
@@ -188,6 +198,8 @@ function classifyJunction(group, trays) {
         tray_ids: trayIds,
         angle: Math.round(bendAngle * 10) / 10,
         widths,
+        materials,
+        material,
       };
     }
     // Angled junction → elbow.  Report the bend angle (e.g. 90° for a
@@ -197,18 +209,20 @@ function classifyJunction(group, trays) {
       tray_ids: trayIds,
       angle: Math.round(bendAngle * 10) / 10,
       widths,
+      materials,
+      material,
     };
   }
 
   if (n === 3) {
-    return { type: 'tee', tray_ids: trayIds, widths };
+    return { type: 'tee', tray_ids: trayIds, widths, materials, material };
   }
 
   if (n === 4) {
-    return { type: 'cross', tray_ids: trayIds, widths };
+    return { type: 'cross', tray_ids: trayIds, widths, materials, material };
   }
 
-  return { type: `junction_${n}`, tray_ids: trayIds, widths };
+  return { type: `junction_${n}`, tray_ids: trayIds, widths, materials, material };
 }
 
 // ---------------------------------------------------------------------------
@@ -331,6 +345,7 @@ export function buildTrayHardwareBOM(trays, options = {}) {
     supports.push({
       tray_id: id,
       tray_type: tray.tray_type || '',
+      material: trayMaterial(tray),
       width: trayWidth(tray),
       depth: parseFloat(tray.tray_depth) || 0,
       length_ft: Math.round(len * 100) / 100,
@@ -344,6 +359,7 @@ export function buildTrayHardwareBOM(trays, options = {}) {
     sections.push({
       tray_id: id,
       tray_type: tray.tray_type || '',
+      material: trayMaterial(tray),
       width: trayWidth(tray),
       depth: parseFloat(tray.tray_depth) || 0,
       length_ft: Math.round(len * 100) / 100,
@@ -361,18 +377,19 @@ export function buildTrayHardwareBOM(trays, options = {}) {
 
 /**
  * Aggregate hardware into a procurement-oriented summary.
- * Groups items by type × width so a purchaser can place orders.
+ * Groups items by type, material, and width so a purchaser can place orders.
  */
 function buildHardwareSummary(fittings, supports, sections, trays) {
   const items = [];
 
-  // Aggregate fittings by type × max width at junction
+  // Aggregate fittings by type, material, and max width at junction.
   const fittingCounts = new Map();
   fittings.forEach(f => {
     const maxWidth = Math.max(...(f.widths || [0]));
-    const key = `${f.type}|${maxWidth}`;
+    const material = f.material || 'Steel';
+    const key = `${f.type}|${material}|${maxWidth}`;
     if (!fittingCounts.has(key)) {
-      fittingCounts.set(key, { item: f.type, width: maxWidth, qty: 0 });
+      fittingCounts.set(key, { item: f.type, material, width: maxWidth, qty: 0 });
     }
     fittingCounts.get(key).qty += 1;
   });
@@ -380,18 +397,20 @@ function buildHardwareSummary(fittings, supports, sections, trays) {
     items.push({
       category: 'Fitting',
       item: formatFittingName(v.item),
+      material: v.material,
       width_in: v.width,
       qty: v.qty,
       unit: 'ea',
     });
   });
 
-  // Aggregate straight sections by width
+  // Aggregate straight sections by material and width.
   const sectionCounts = new Map();
   sections.forEach(s => {
-    const key = `straight|${s.width}`;
+    const material = s.material || 'Steel';
+    const key = `straight|${material}|${s.width}`;
     if (!sectionCounts.has(key)) {
-      sectionCounts.set(key, { width: s.width, qty: 0, coverQty: 0, sectionLen: s.section_length_ft });
+      sectionCounts.set(key, { material, width: s.width, qty: 0, coverQty: 0, sectionLen: s.section_length_ft });
     }
     const entry = sectionCounts.get(key);
     entry.qty += s.straight_sections;
@@ -401,6 +420,7 @@ function buildHardwareSummary(fittings, supports, sections, trays) {
     items.push({
       category: 'Straight Section',
       item: `${v.sectionLen} ft Straight Section`,
+      material: v.material,
       width_in: v.width,
       qty: v.qty,
       unit: 'ea',
@@ -409,6 +429,7 @@ function buildHardwareSummary(fittings, supports, sections, trays) {
       items.push({
         category: 'Cover',
         item: `${v.sectionLen} ft Cover`,
+        material: v.material,
         width_in: v.width,
         qty: v.coverQty,
         unit: 'ea',
@@ -416,12 +437,13 @@ function buildHardwareSummary(fittings, supports, sections, trays) {
     }
   });
 
-  // Aggregate support brackets by width
+  // Aggregate support brackets by material and width.
   const bracketCounts = new Map();
   supports.forEach(s => {
-    const key = `bracket|${s.width}`;
+    const material = s.material || 'Steel';
+    const key = `bracket|${material}|${s.width}`;
     if (!bracketCounts.has(key)) {
-      bracketCounts.set(key, { width: s.width, qty: 0 });
+      bracketCounts.set(key, { material, width: s.width, qty: 0 });
     }
     bracketCounts.get(key).qty += s.bracket_qty;
   });
@@ -429,6 +451,7 @@ function buildHardwareSummary(fittings, supports, sections, trays) {
     items.push({
       category: 'Support',
       item: 'Support Bracket / Trapeze Hanger',
+      material: v.material,
       width_in: v.width,
       qty: v.qty,
       unit: 'ea',

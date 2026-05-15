@@ -1,25 +1,24 @@
 /* --- Cable Tray Fill Page --- */
 body.cabletrayfill-page {
     margin: 0;
-    font-family: Arial, sans-serif;
+    font-family: inherit;
 }
-body.cabletrayfill-page h1 {
-    margin-bottom: 8px;
-    font-size: 1.4rem;
+body.cabletrayfill-page .page-header h1 {
+    margin-bottom: var(--space-2);
 }
 body.cabletrayfill-page #trayParameters {
-    display: inline-block;
+    display: block;
 }
 body.cabletrayfill-page .tray-param-group {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px 16px;
-    max-width: 600px;
+    gap: var(--space-3) var(--space-4);
 }
 body.cabletrayfill-page .tray-param-group .tray-param {
     display: flex;
     flex-direction: column;
-    flex: 0 1 140px;
+    flex: 1 1 150px;
+    min-width: 0;
 }
 body.cabletrayfill-page .tray-param-group .tray-param label {
     display: block;
@@ -36,23 +35,25 @@ body.cabletrayfill-page label {
 body.cabletrayfill-page input[type="text"],
 body.cabletrayfill-page input[type="number"],
 body.cabletrayfill-page select {
-    padding: 2px 4px;
+    min-height: 2.25rem;
+    padding: 0.4rem 0.5rem;
     font-size: 0.9rem;
-    margin-right: 8px;
+    margin-right: 0;
     background: var(--secondary-color);
     color: var(--text-color);
     border: 1px solid var(--border-color);
+    border-radius: 4px;
 }
 body.cabletrayfill-page button {
-    padding: var(--button-padding);
-    font-size: 0.9rem;
-    margin: var(--button-margin);
     cursor: pointer;
+}
+body.cabletrayfill-page .btn {
+    margin: 0;
 }
 body.cabletrayfill-page table {
     border-collapse: collapse;
     width: 100%;
-    margin-top: 12px;
+    margin-top: 0;
 }
 body.cabletrayfill-page table,
 body.cabletrayfill-page th,
@@ -61,8 +62,9 @@ body.cabletrayfill-page td {
 }
 body.cabletrayfill-page th,
 body.cabletrayfill-page td {
-    padding: 6px;
-    text-align: center;
+    padding: 0.65rem;
+    text-align: left;
+    vertical-align: middle;
     font-size: 0.9rem;
 }
 body.cabletrayfill-page th {
@@ -84,54 +86,67 @@ body.cabletrayfill-page #results {
 }
 body.cabletrayfill-page #svgContainer {
     border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
     margin-top: 12px;
     background: #fff;
+    min-height: 4rem;
+    overflow-x: auto;
 }
 body.cabletrayfill-page #expandedSVG {
     display: block;
     margin-top: 48px;
     background: #fff;
 }
-body.cabletrayfill-page .removeBtn,
-body.cabletrayfill-page .duplicateBtn {
+body.cabletrayfill-page .removeBtn:not(.row-icon-btn),
+body.cabletrayfill-page .duplicateBtn:not(.row-icon-btn) {
     border: none;
     padding: 4px 8px;
     font-size: 0.85rem;
     cursor: pointer;
     color: #fff;
 }
-body.cabletrayfill-page .removeBtn {
+body.cabletrayfill-page .removeBtn:not(.row-icon-btn) {
     background-color: #e74c3c;
 }
-body.cabletrayfill-page .removeBtn:hover {
+body.cabletrayfill-page .removeBtn:not(.row-icon-btn):hover {
     background-color: #c0392b;
 }
-body.cabletrayfill-page .duplicateBtn {
+body.cabletrayfill-page .duplicateBtn:not(.row-icon-btn) {
     background-color: #95a5a6;
 }
-body.cabletrayfill-page .duplicateBtn:hover {
+body.cabletrayfill-page .duplicateBtn:not(.row-icon-btn):hover {
     background-color: #7f8c8d;
 }
 body.cabletrayfill-page .helpBtn,
 body.conduitfill-page .helpBtn {
-    background: none;
-    border: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.45rem;
+    height: 1.45rem;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 4px;
     color: var(--primary-color);
     cursor: pointer;
     font-size: 0.85rem;
-    margin-left: 4px;
-    padding: 0 2px;
+    font-weight: 700;
+    line-height: 1;
+    margin-left: 0;
+    padding: 0;
 }
 body.cabletrayfill-page .helpBtn:hover,
 body.conduitfill-page .helpBtn:hover {
-    text-decoration: underline;
+    background: rgba(0, 102, 255, 0.08);
+    border-color: rgba(0, 102, 255, 0.2);
+    text-decoration: none;
 }
 body.cabletrayfill-page .required {
     color: var(--error-text);
 }
 body.cabletrayfill-page #cableTableWrapper {
-    max-height: 250px;
-    overflow-y: auto;
+    max-height: min(58vh, 520px);
+    overflow: auto;
 }
 body.cabletrayfill-page #cableTable thead th {
     position: sticky;
@@ -140,14 +155,11 @@ body.cabletrayfill-page #cableTable thead th {
     z-index: 1;
 }
 body.cabletrayfill-page #profileControls {
-    margin-top: 16px;
-    border: 1px solid var(--border-color);
-    padding: 12px;
-    background: var(--secondary-color);
+    margin-top: var(--space-5);
 }
 body.cabletrayfill-page #profileControls h2 {
-    margin-top: 0;
-    font-size: 1.1rem;
+    margin: 0;
+    font-size: var(--font-size-lg);
 }
 body.cabletrayfill-page #profileList {
     min-width: 160px;
@@ -275,9 +287,314 @@ body.cabletrayfill-page #helpClose {
 }
 
 /* ── Compartment Configuration ──────────────────────────────────────────── */
+body.cabletrayfill-page .tray-fill-card,
+body.cabletrayfill-page .tray-fill-results-card {
+    border: 1px solid var(--border-color);
+}
+
+body.cabletrayfill-page fieldset.tray-fill-card {
+    min-width: 0;
+}
+
+body.cabletrayfill-page fieldset.tray-fill-card legend {
+    padding-inline: var(--space-1);
+}
+
+body.cabletrayfill-page .tray-profile-card,
+body.cabletrayfill-page .tray-cable-entry-card,
+body.cabletrayfill-page .tray-fill-results-card {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+}
+
+body.cabletrayfill-page .tray-profile-actions {
+    display: flex;
+    align-items: end;
+    gap: var(--space-2);
+    flex-wrap: wrap;
+}
+
+body.cabletrayfill-page .tray-profile-actions label {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    margin-bottom: 0;
+    color: var(--color-text-muted);
+    font-weight: 600;
+}
+
+body.cabletrayfill-page .tray-profile-actions select {
+    min-width: 14rem;
+}
+
+body.cabletrayfill-page .tray-fill-results-header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(18rem, 24rem);
+    align-items: start;
+    gap: var(--space-4);
+}
+
+body.cabletrayfill-page .tray-fill-results-header h2 {
+    margin: 0;
+    font-size: var(--font-size-lg);
+}
+
+body.cabletrayfill-page .tray-fill-results-header .field-hint {
+    margin: var(--space-1) 0 0;
+}
+
+body.cabletrayfill-page .tray-fill-gauge-card {
+    display: grid;
+    gap: var(--space-2);
+    padding: var(--space-3);
+    border: 1px solid var(--color-border, var(--border-color));
+    border-radius: var(--radius-md, 8px);
+    background: var(--color-surface, var(--secondary-color));
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45);
+}
+
+body.cabletrayfill-page .tray-fill-gauge-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+}
+
+body.cabletrayfill-page .tray-fill-gauge-title {
+    color: var(--color-text-muted);
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+body.cabletrayfill-page .tray-fill-status {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 1.55rem;
+    padding: 0.15rem 0.55rem;
+    border: 1px solid var(--color-border, var(--border-color));
+    border-radius: var(--radius-pill, 999px);
+    font-size: 0.78rem;
+    font-weight: 700;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+body.cabletrayfill-page .tray-fill-status.is-ok {
+    background: var(--success-bg);
+    border-color: var(--color-success);
+    color: var(--color-success);
+}
+
+body.cabletrayfill-page .tray-fill-status.is-warn {
+    background: var(--warning-bg);
+    border-color: var(--warning-text);
+    color: var(--warning-text);
+}
+
+body.cabletrayfill-page .tray-fill-status.is-danger {
+    background: var(--error-bg);
+    border-color: var(--color-error);
+    color: var(--color-error);
+}
+
+body.cabletrayfill-page .tray-fill-gauge-content {
+    display: grid;
+    grid-template-columns: 10rem minmax(0, 1fr);
+    align-items: center;
+    gap: var(--space-3);
+}
+
+body.cabletrayfill-page .tray-fill-gauge-stats {
+    display: grid;
+    gap: 0.5rem;
+    margin: 0;
+}
+
+body.cabletrayfill-page .tray-fill-gauge-stats div {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-2);
+    padding-bottom: 0.45rem;
+    border-bottom: 1px solid var(--color-border, var(--border-color));
+}
+
+body.cabletrayfill-page .tray-fill-gauge-stats div:last-child {
+    border-bottom: 0;
+    padding-bottom: 0;
+}
+
+body.cabletrayfill-page .tray-fill-gauge-stats dt {
+    color: var(--color-text-muted);
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+body.cabletrayfill-page .tray-fill-gauge-stats dd {
+    margin: 0;
+    color: var(--text-color);
+    font-size: 1rem;
+    font-weight: 700;
+}
+
+body.cabletrayfill-page .tray-fill-toolbar {
+    margin-bottom: 0;
+}
+
+body.cabletrayfill-page .tray-fill-checkbox {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin-bottom: 0;
+}
+
+body.cabletrayfill-page .tray-fill-option-group {
+    flex: 1 1 18rem;
+}
+
+body.cabletrayfill-page #cableTable {
+    min-width: 1460px;
+    table-layout: fixed;
+}
+
+body.cabletrayfill-page #cableTable input,
+body.cabletrayfill-page #cableTable select {
+    width: 100% !important;
+    max-width: 100%;
+}
+
+body.cabletrayfill-page #cableTable thead th {
+    height: 4.75rem;
+    padding: 0;
+    white-space: normal;
+}
+
+body.cabletrayfill-page #cableTable th:nth-child(1) {
+    width: 12rem;
+}
+
+body.cabletrayfill-page #cableTable th:nth-child(2) {
+    width: 12rem;
+}
+
+body.cabletrayfill-page #cableTable th:nth-child(3) {
+    width: 8.5rem;
+}
+
+body.cabletrayfill-page #cableTable th:nth-child(4) {
+    width: 11rem;
+}
+
+body.cabletrayfill-page #cableTable th:nth-child(5) {
+    width: 9.5rem;
+}
+
+body.cabletrayfill-page #cableTable th:nth-child(6) {
+    width: 10rem;
+}
+
+body.cabletrayfill-page #cableTable th:nth-child(7) {
+    width: 14rem;
+}
+
+body.cabletrayfill-page #cableTable th:nth-child(8) {
+    width: 8.5rem;
+}
+
+body.cabletrayfill-page #cableTable th:nth-child(9) {
+    width: 9.5rem;
+}
+
+body.cabletrayfill-page #cableTable th:nth-child(10) {
+    width: 8rem;
+}
+
+body.cabletrayfill-page #cableTable th:nth-child(11),
+body.cabletrayfill-page #cableTable th:nth-child(12) {
+    width: 5.75rem;
+}
+
+body.cabletrayfill-page .tray-table-heading {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(2.35rem, auto) 1.45rem;
+    align-content: center;
+    min-height: 4.75rem;
+    gap: 0.2rem;
+    padding: 0.65rem;
+}
+
+body.cabletrayfill-page .tray-column-label {
+    display: block;
+    min-width: 0;
+    color: var(--text-color);
+    font-weight: 700;
+    line-height: 1.15;
+}
+
+body.cabletrayfill-page .tray-column-label .required {
+    margin-left: 0.15rem;
+}
+
+body.cabletrayfill-page #cableTable th:nth-child(1) .tray-column-label,
+body.cabletrayfill-page #cableTable th:nth-child(2) .tray-column-label,
+body.cabletrayfill-page #cableTable th:nth-child(3) .tray-column-label,
+body.cabletrayfill-page #cableTable th:nth-child(4) .tray-column-label,
+body.cabletrayfill-page #cableTable th:nth-child(7) .tray-column-label,
+body.cabletrayfill-page #cableTable th:nth-child(8) .tray-column-label {
+    white-space: nowrap;
+}
+
+body.cabletrayfill-page .tray-column-actions {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.15rem;
+}
+
+body.cabletrayfill-page #cableTable .filter-btn {
+    width: 1.45rem;
+    height: 1.45rem;
+    margin-left: 0;
+    padding: 0;
+}
+
+body.cabletrayfill-page #cableTable .filter-btn svg {
+    width: 0.82rem;
+    height: 0.82rem;
+}
+
+body.cabletrayfill-page #cableTable .tray-action-col {
+    padding: 0.65rem;
+    text-align: center;
+    vertical-align: middle;
+}
+
+body.cabletrayfill-page #cableTable td:nth-child(11),
+body.cabletrayfill-page #cableTable td:nth-child(12) {
+    text-align: center;
+}
+
+body.cabletrayfill-page #cableTable td:nth-child(7) {
+    min-width: 9rem;
+}
+
+body.cabletrayfill-page #cableTable td:nth-child(7) select {
+    margin-bottom: var(--space-1);
+}
+
+body.cabletrayfill-page #expandBtn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
 body.cabletrayfill-page #compartmentConfig {
-    margin-top: 12px;
-    padding: 10px 14px;
+    margin-top: var(--space-5);
 }
 
 body.cabletrayfill-page .compartment-row {
@@ -320,14 +637,40 @@ body.cabletrayfill-page .comp-remove-btn:disabled {
 }
 
 /* ── Fill Gauge Component ────────────────────────────────────────────────── */
+@media (max-width: 700px) {
+    body.cabletrayfill-page .tray-profile-actions,
+    body.cabletrayfill-page .tray-profile-actions select,
+    body.cabletrayfill-page .tray-profile-actions .btn,
+    body.cabletrayfill-page .tray-fill-toolbar,
+    body.cabletrayfill-page .tray-fill-toolbar .toolbar-group,
+    body.cabletrayfill-page .tray-fill-toolbar .toolbar-menu,
+    body.cabletrayfill-page .tray-fill-toolbar .toolbar-btn,
+    body.cabletrayfill-page .tray-fill-toolbar .toolbar-menu > summary.toolbar-btn {
+        width: 100%;
+    }
+
+    body.cabletrayfill-page .tray-fill-results-header {
+        grid-template-columns: 1fr;
+        align-items: stretch;
+    }
+
+    body.cabletrayfill-page .tray-fill-gauge-content {
+        grid-template-columns: 1fr;
+    }
+
+    body.cabletrayfill-page .fill-gauge-wrapper {
+        justify-content: center;
+    }
+}
+
 .fill-gauge-wrapper {
     display: flex;
     justify-content: center;
-    margin: 8px 0 4px;
+    margin: 0;
 }
 
 .fill-gauge-wrapper svg {
-    max-width: 200px;
+    max-width: 160px;
     width: 100%;
     height: auto;
     overflow: visible;

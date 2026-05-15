@@ -10,7 +10,9 @@ The allowable current **I** in amperes is obtained from:
 I = sqrt( (T_c - (T_a + ΔT_d)) / ( R_dc × (1 + Y_c) × R_ca ) )
 ```
 
-where `R_ca = R_cond + R_ins + R_duct + R_soil`.
+where `R_ca = R_cond + R_ins + R_duct + R_soil`. In the Ductbank Route
+estimator, heat loss is also scaled by `N_c`, the current-carrying conductor
+count for the cable.
 
 ### Variable Definitions
 
@@ -30,6 +32,8 @@ where `R_ca = R_cond + R_ins + R_duct + R_soil`.
   where `ρ_m = ρ / 100` converts resistivity from °C·cm/W to °C·m/W,
   `d` is the burial depth of the conduit in meters and `D` is the conduit
   diameter in meters.
+- **N_c** - current-carrying conductor count used for heat-loss scaling in the
+  Ductbank Route estimator.
 
 These terms follow the notation of NEC 310‑15(C) and Clause 4 of IEEE Std 835.
 

@@ -88,8 +88,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const summarySection = document.createElement('section');
     summarySection.innerHTML = '<h2>Hardware Summary (Procurement View)</h2>';
     summarySection.appendChild(buildTable(
-      ['Category', 'Item Description', 'Width (in)', 'Qty', 'Unit'],
-      bom.summary.map(r => [r.category, r.item, r.width_in || '—', r.qty, r.unit])
+      ['Category', 'Item Description', 'Material', 'Width (in)', 'Qty', 'Unit'],
+      bom.summary.map(r => [r.category, r.item, r.material || 'Steel', r.width_in || '—', r.qty, r.unit])
     ));
     container.appendChild(summarySection);
 
@@ -98,10 +98,11 @@ document.addEventListener('DOMContentLoaded', () => {
       const fitSection = document.createElement('section');
       fitSection.innerHTML = '<h2>Fittings Detail</h2>';
       fitSection.appendChild(buildTable(
-        ['Type', 'Tray IDs', 'Width(s) (in)', 'Angle (°)'],
+        ['Type', 'Tray IDs', 'Material', 'Width(s) (in)', 'Angle (°)'],
         bom.fittings.map(f => [
           formatFittingLabel(f.type),
           (f.tray_ids || []).join(', '),
+          f.material || 'Steel',
           (f.widths || []).join(' / '),
           f.angle != null ? f.angle : '—',
         ])
@@ -114,10 +115,11 @@ document.addEventListener('DOMContentLoaded', () => {
       const supSection = document.createElement('section');
       supSection.innerHTML = '<h2>Support Brackets Detail</h2>';
       supSection.appendChild(buildTable(
-        ['Tray ID', 'Type', 'Width (in)', 'Depth (in)', 'Length (ft)', 'Max Span (ft)', 'Brackets'],
+        ['Tray ID', 'Type', 'Material', 'Width (in)', 'Depth (in)', 'Length (ft)', 'Max Span (ft)', 'Brackets'],
         bom.supports.map(s => [
           s.tray_id,
           s.tray_type || '—',
+          s.material || 'Steel',
           s.width,
           s.depth,
           s.length_ft,
@@ -133,10 +135,11 @@ document.addEventListener('DOMContentLoaded', () => {
       const secSection = document.createElement('section');
       secSection.innerHTML = '<h2>Straight Sections &amp; Covers Detail</h2>';
       secSection.appendChild(buildTable(
-        ['Tray ID', 'Type', 'Width (in)', 'Length (ft)', 'Sections', 'Cover Sections'],
+        ['Tray ID', 'Type', 'Material', 'Width (in)', 'Length (ft)', 'Sections', 'Cover Sections'],
         bom.sections.map(s => [
           s.tray_id,
           s.tray_type || '—',
+          s.material || 'Steel',
           s.width,
           s.length_ft,
           s.straight_sections,
@@ -189,16 +192,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const wb = XLSX.utils.book_new();
 
     // Summary sheet
-    const summaryData = [['Category', 'Item Description', 'Width (in)', 'Qty', 'Unit'],
-      ...bom.summary.map(r => [r.category, r.item, r.width_in || '', r.qty, r.unit])];
+    const summaryData = [['Category', 'Item Description', 'Material', 'Width (in)', 'Qty', 'Unit'],
+      ...bom.summary.map(r => [r.category, r.item, r.material || 'Steel', r.width_in || '', r.qty, r.unit])];
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summaryData), 'Summary');
 
     // Fittings sheet
     if (bom.fittings.length > 0) {
-      const fitData = [['Type', 'Tray IDs', 'Widths (in)', 'Angle (deg)'],
+      const fitData = [['Type', 'Tray IDs', 'Material', 'Widths (in)', 'Angle (deg)'],
         ...bom.fittings.map(f => [
           formatFittingLabel(f.type),
           (f.tray_ids || []).join(', '),
+          f.material || 'Steel',
           (f.widths || []).join(' / '),
           f.angle != null ? f.angle : '',
         ])];
@@ -207,15 +211,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Supports sheet
     if (bom.supports.length > 0) {
-      const supData = [['Tray ID', 'Type', 'Width (in)', 'Depth (in)', 'Length (ft)', 'Max Span (ft)', 'Brackets'],
-        ...bom.supports.map(s => [s.tray_id, s.tray_type, s.width, s.depth, s.length_ft, s.max_span_ft, s.bracket_qty])];
+      const supData = [['Tray ID', 'Type', 'Material', 'Width (in)', 'Depth (in)', 'Length (ft)', 'Max Span (ft)', 'Brackets'],
+        ...bom.supports.map(s => [s.tray_id, s.tray_type, s.material || 'Steel', s.width, s.depth, s.length_ft, s.max_span_ft, s.bracket_qty])];
       XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(supData), 'Supports');
     }
 
     // Sections sheet
     if (bom.sections.length > 0) {
-      const secData = [['Tray ID', 'Type', 'Width (in)', 'Length (ft)', 'Straight Sections', 'Cover Sections'],
-        ...bom.sections.map(s => [s.tray_id, s.tray_type, s.width, s.length_ft, s.straight_sections, s.cover_sections])];
+      const secData = [['Tray ID', 'Type', 'Material', 'Width (in)', 'Length (ft)', 'Straight Sections', 'Cover Sections'],
+        ...bom.sections.map(s => [s.tray_id, s.tray_type, s.material || 'Steel', s.width, s.length_ft, s.straight_sections, s.cover_sections])];
       XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(secData), 'Sections');
     }
 

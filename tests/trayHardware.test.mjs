@@ -32,7 +32,7 @@ function it(name, fn) {
 // ---------------------------------------------------------------------------
 // Helper: make a tray object
 // ---------------------------------------------------------------------------
-function makeTray(id, sx, sy, sz, ex, ey, ez, width = 16, depth = 4, type = 'Ladder') {
+function makeTray(id, sx, sy, sz, ex, ey, ez, width = 16, depth = 4, type = 'Ladder', material = undefined) {
   return {
     tray_id: id,
     start_x: sx, start_y: sy, start_z: sz,
@@ -40,6 +40,7 @@ function makeTray(id, sx, sy, sz, ex, ey, ez, width = 16, depth = 4, type = 'Lad
     inside_width: width,
     tray_depth: depth,
     tray_type: type,
+    ...(material ? { material } : {}),
   };
 }
 
@@ -300,6 +301,20 @@ describe('buildTrayHardwareBOM — L-shaped route', () => {
     const bracketItem = summary.find(s => s.category === 'Support');
     assert.ok(bracketItem, 'summary should include Support brackets');
     assert.strictEqual(bracketItem.qty, 9); // 5 + 4
+  });
+
+  it('carries tray material into details and summary rows', () => {
+    const { supports, sections, summary } = buildTrayHardwareBOM([
+      makeTray('AL1', 0, 0, 0, 12, 0, 0, 24, 4, 'Ladder', 'Aluminum'),
+      makeTray('ST1', 0, 10, 0, 12, 10, 0, 24, 4, 'Ladder', 'Steel'),
+    ]);
+    assert.strictEqual(supports[0].material, 'Aluminum');
+    assert.strictEqual(sections[0].material, 'Aluminum');
+    const straightMaterials = summary
+      .filter(s => s.category === 'Straight Section')
+      .map(s => s.material)
+      .sort();
+    assert.deepStrictEqual(straightMaterials, ['Aluminum', 'Steel']);
   });
 });
 

@@ -1,6 +1,7 @@
 import assert from 'assert';
 import { parseRevit } from '../src/importers/revit.mjs';
 import { exportToIFC4 } from '../src/exporters/ifc4.mjs';
+import { exportRevit } from '../exporters/revit.mjs';
 
 function describe(name, fn) {
   console.log(name);
@@ -20,7 +21,7 @@ function it(name, fn) {
 describe('parseRevit - JSON object input', () => {
   it('parses trays with standard field names', () => {
     const result = parseRevit({
-      trays: [{ id: 'T1', start_x: 0, start_y: 0, start_z: 0, end_x: 10, end_y: 0, end_z: 0, width: 300, height: 100 }],
+      trays: [{ id: 'T1', start_x: 0, start_y: 0, start_z: 0, end_x: 10, end_y: 0, end_z: 0, width: 300, height: 100, material: 'Aluminum' }],
       conduits: []
     });
     assert.strictEqual(result.trays.length, 1);
@@ -29,6 +30,7 @@ describe('parseRevit - JSON object input', () => {
     assert.strictEqual(result.trays[0].end_x, 10);
     assert.strictEqual(result.trays[0].width, 300);
     assert.strictEqual(result.trays[0].height, 100);
+    assert.strictEqual(result.trays[0].material, 'Aluminum');
   });
 
   it('falls back to Trays field name', () => {
@@ -51,12 +53,13 @@ describe('parseRevit - JSON object input', () => {
   it('parses conduits with standard field names', () => {
     const result = parseRevit({
       trays: [],
-      conduits: [{ conduit_id: 'C1', type: 'EMT', trade_size: '1"', start_x: 0, end_x: 5 }]
+      conduits: [{ conduit_id: 'C1', type: 'EMT', material: 'Steel', trade_size: '1"', start_x: 0, end_x: 5 }]
     });
     assert.strictEqual(result.conduits.length, 1);
     assert.strictEqual(result.conduits[0].conduit_id, 'C1');
     assert.strictEqual(result.conduits[0].type, 'EMT');
     assert.strictEqual(result.conduits[0].trade_size, '1"');
+    assert.strictEqual(result.conduits[0].material, 'Steel');
     assert.strictEqual(result.conduits[0].start_x, 0);
     assert.strictEqual(result.conduits[0].end_x, 5);
   });
@@ -92,6 +95,19 @@ describe('parseRevit - JSON object input', () => {
     const result = parseRevit(42);
     assert.deepStrictEqual(result.trays, []);
     assert.deepStrictEqual(result.conduits, []);
+  });
+});
+
+describe('exportRevit - raceway material', () => {
+  it('exports tray and conduit material fields', () => {
+    const result = exportRevit({
+      trays: [{ tray_id: 'T-AL', material: 'Aluminum' }],
+      conduits: [{ conduit_id: 'C-PVC', material: 'PVC' }],
+    });
+    assert.strictEqual(result.trays[0].Material, 'Aluminum');
+    assert.strictEqual(result.trays[0]._ctr.material, 'Aluminum');
+    assert.strictEqual(result.conduits[0].Material, 'PVC');
+    assert.strictEqual(result.conduits[0]._ctr.material, 'PVC');
   });
 });
 

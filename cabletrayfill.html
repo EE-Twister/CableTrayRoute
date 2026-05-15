@@ -25,7 +25,7 @@
   <script type="module" src="dirtyTracker.js"></script>
   <script type="module" src="dist/cabletrayfill.js" defer></script>
 </head>
-  <body class="cabletrayfill-page" data-report-title="Cable Tray Fill">
+  <body class="cabletrayfill-page" data-report-title="Cable Tray Fill" data-page-visual="capacity">
     <a href="#main-content" class="skip-link">Skip to main content</a>
     <nav class="top-nav" aria-label="Primary">
       <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
@@ -67,7 +67,8 @@
       <main id="main-content" class="main-content">
 
         <header class="page-header">
-          <h1>Cable Tray Packing</h1>
+          <h1>Cable Tray Fill</h1>
+          <p>Check tray utilization, compartment loading, and cable packing before routing or export.</p>
         </header>
         <details class="method-panel">
           <summary>Method &amp; Assumptions</summary>
@@ -82,8 +83,17 @@
           <p>See also: <a href="docs/load_calculation_formulas.html">Load Calculation Formulas</a>, <a href="docs/cable_fill_rules.html">Cable Fill Rules</a>, <a href="docs/routing_assumptions.html">Routing Assumptions</a>.</p>
         </details>
 
+        <section class="card page-header-graphic page-visual-showcase" aria-label="Page visual overview">
+          <div class="page-visual-copy">
+            <p class="page-visual-kicker">Workspace Preview</p>
+            <h2>Tray Capacity View</h2>
+            <p>Review tray dimensions, compartment assignments, and NEC fill status with a cross-section diagram.</p>
+          </div>
+          <img src="icons/graphics/fill-visual.svg" alt="Illustration for tray capacity view" loading="lazy" decoding="async">
+        </section>
+
         <!-- TRAY PARAMETERS -->
-        <fieldset id="trayParameters">
+        <fieldset id="trayParameters" class="card tray-fill-card">
     <legend><strong>Tray Parameters</strong></legend>
     <div class="tray-param-group">
       <div class="tray-param">
@@ -124,7 +134,7 @@
   </fieldset>
 
   <!-- COMPARTMENT CONFIGURATION -->
-  <fieldset id="compartmentConfig">
+  <fieldset id="compartmentConfig" class="card tray-fill-card">
     <legend><strong>Compartment Configuration</strong> <button class="helpBtn" data-help="Define up to 5 tray compartments (e.g. divided by separator strips). Each compartment has its own width, depth, and NEC fill limit. Assign cables to compartments using the Compartment column in the cable table." data-doc="docs/tutorial.html#trayfill">?</button></legend>
     <div id="compartmentRows"></div>
     <button id="addCompartmentBtn" type="button">+ Add Compartment</button>
@@ -132,39 +142,120 @@
   </fieldset>
 
   <!-- PROFILE CONTROLS -->
-  <div id="profileControls">
-    <h2>Profile Management <button class="helpBtn" data-help="Profiles are saved locally to your browser." data-doc="docs/tutorial.html#trayfill">?</button></h2>
-    <button id="saveProfileBtn" type="button">Save Profile</button>
-    <label for="profileList">Load Profile:</label>
-    <select id="profileList">
-      <option value="">-- no profiles saved --</option>
-    </select>
-    <button id="loadProfileBtn" type="button">Load Profile</button>
-    <button id="deleteProfileBtn" type="button">Delete Profile</button>
-  </div>
+  <section id="profileControls" class="card tray-fill-card tray-profile-card" aria-labelledby="profile-title">
+    <div class="schedule-card-header">
+      <div>
+        <h2 id="profile-title">Profiles <button class="helpBtn" data-help="Profiles are saved locally to your browser." data-doc="docs/tutorial.html#trayfill">?</button></h2>
+        <p class="field-hint">Save common cable sets and reload them when analyzing similar tray runs.</p>
+      </div>
+      <button id="saveProfileBtn" class="btn toolbar-btn" type="button" title="Save this tray cable profile">
+        <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+        Save Profile
+      </button>
+    </div>
+    <div class="tray-profile-actions">
+      <label for="profileList">Load Profile</label>
+      <select id="profileList">
+        <option value="">-- no profiles saved --</option>
+      </select>
+      <button id="loadProfileBtn" class="btn toolbar-btn" type="button">
+        <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+        Load
+      </button>
+      <button id="deleteProfileBtn" class="btn btn-danger toolbar-btn" type="button">
+        <img src="icons/toolbar/trash.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+        Delete
+      </button>
+    </div>
+  </section>
 
   <!-- CABLE ENTRY TABLE -->
-  <fieldset>
-    <legend><strong>Enter Cables</strong></legend>
-    <button id="addCableBtn" type="button">Add Cable</button>
-    <button id="clearCableFiltersBtn" type="button">Clear Filters</button>
-    <div id="cableTableWrapper">
-    <table id="cableTable">
+  <section class="card cable-schedule-card tray-cable-entry-card" aria-labelledby="cable-entry-title">
+    <div class="schedule-card-header">
+      <div>
+        <h2 id="cable-entry-title">Cable Entries</h2>
+        <p class="field-hint">Enter required cable data, then draw the tray to validate fill and placement.</p>
+      </div>
+      <button id="addCableBtn" class="btn btn-accent toolbar-btn" type="button">
+        <img src="icons/toolbar/add-arrangement.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+        Add Cable
+      </button>
+    </div>
+    <div class="cable-toolbar tray-fill-table-toolbar" role="toolbar" aria-label="Cable entry table actions" data-no-print>
+      <div class="toolbar-group">
+        <button id="clearCableFiltersBtn" class="btn toolbar-btn" type="button" title="Clear cable table filters">
+          <img src="icons/toolbar/delete-view.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+          Clear Filters
+        </button>
+      </div>
+    </div>
+    <div id="cableTableWrapper" class="overflow-x-auto table-viewport">
+    <table id="cableTable" class="sticky-table">
       <caption class="visually-hidden">Cable entries for tray fill calculation</caption>
       <thead>
         <tr>
-          <th scope="col">Tag <span class="required">*</span> <button class="helpBtn" data-help="Unique identifier or label for the cable." data-doc="docs/tutorial.html#trayfill">?</button></th>
-          <th scope="col">Cable Type <span class="required">*</span> <button class="helpBtn" data-help="Classify as Power, Control, or Signal." data-doc="docs/tutorial.html#trayfill">?</button></th>
-          <th scope="col">Conductors <span class="required">*</span> <button class="helpBtn" data-help="Number of conductors in the cable." data-doc="docs/tutorial.html#trayfill">?</button></th>
-          <th scope="col">Conductor Size <span class="required">*</span> <button class="helpBtn" data-help="Gauge or size of each conductor." data-doc="docs/tutorial.html#trayfill">?</button></th>
-          <th scope="col">Cable Rating (V) <button class="helpBtn" data-help="Voltage rating of the cable insulation." data-doc="docs/tutorial.html#trayfill">?</button></th>
-          <th scope="col">Operating Voltage (V) <button class="helpBtn" data-help="Actual working voltage on the cable." data-doc="docs/tutorial.html#trayfill">?</button></th>
-          <th scope="col">OD (in) <span class="required">*</span> <button class="helpBtn" data-help="Outer diameter of the cable in inches." data-doc="docs/tutorial.html#trayfill">?</button></th>
-          <th scope="col">Weight (lbs/ft) <span class="required">*</span> <button class="helpBtn" data-help="Cable weight per foot." data-doc="docs/tutorial.html#trayfill">?</button></th>
-          <th scope="col">Compartment <button class="helpBtn" data-help="Compartment number (1–5). Cables with the same compartment number are packed together in that physical compartment. A divider is automatically shown between stackable and non-stackable cables within a compartment." data-doc="docs/tutorial.html#trayfill">?</button></th>
-          <th scope="col">Circuit Group <button class="helpBtn" data-help="Numeric group for bundling single conductor cables in groups of 3 or 4 conductors." data-doc="docs/tutorial.html#trayfill">?</button></th>
-          <th scope="col">Duplicate</th>
-          <th scope="col">Remove</th>
+          <th scope="col" data-filter-label="Tag">
+            <div class="tray-table-heading">
+              <span class="tray-column-label">Tag<span class="required">*</span></span>
+              <span class="tray-column-actions"><button class="helpBtn" data-help="Unique identifier or label for the cable." data-doc="docs/tutorial.html#trayfill">?</button></span>
+            </div>
+          </th>
+          <th scope="col" data-filter-label="Cable Type">
+            <div class="tray-table-heading">
+              <span class="tray-column-label">Cable Type<span class="required">*</span></span>
+              <span class="tray-column-actions"><button class="helpBtn" data-help="Classify as Power, Control, or Signal." data-doc="docs/tutorial.html#trayfill">?</button></span>
+            </div>
+          </th>
+          <th scope="col" data-filter-label="Conductors">
+            <div class="tray-table-heading">
+              <span class="tray-column-label">Conductors<span class="required">*</span></span>
+              <span class="tray-column-actions"><button class="helpBtn" data-help="Number of conductors in the cable." data-doc="docs/tutorial.html#trayfill">?</button></span>
+            </div>
+          </th>
+          <th scope="col" data-filter-label="Conductor Size">
+            <div class="tray-table-heading">
+              <span class="tray-column-label">Conductor Size<span class="required">*</span></span>
+              <span class="tray-column-actions"><button class="helpBtn" data-help="Gauge or size of each conductor." data-doc="docs/tutorial.html#trayfill">?</button></span>
+            </div>
+          </th>
+          <th scope="col" data-filter-label="Cable Rating">
+            <div class="tray-table-heading">
+              <span class="tray-column-label">Cable Rating (V)</span>
+              <span class="tray-column-actions"><button class="helpBtn" data-help="Voltage rating of the cable insulation." data-doc="docs/tutorial.html#trayfill">?</button></span>
+            </div>
+          </th>
+          <th scope="col" data-filter-label="Operating Voltage">
+            <div class="tray-table-heading">
+              <span class="tray-column-label">Operating Voltage (V)</span>
+              <span class="tray-column-actions"><button class="helpBtn" data-help="Actual working voltage on the cable." data-doc="docs/tutorial.html#trayfill">?</button></span>
+            </div>
+          </th>
+          <th scope="col" data-filter-label="OD">
+            <div class="tray-table-heading">
+              <span class="tray-column-label">OD (in)<span class="required">*</span></span>
+              <span class="tray-column-actions"><button class="helpBtn" data-help="Outer diameter of the cable in inches." data-doc="docs/tutorial.html#trayfill">?</button></span>
+            </div>
+          </th>
+          <th scope="col" data-filter-label="Weight">
+            <div class="tray-table-heading">
+              <span class="tray-column-label">Weight (lbs/ft)<span class="required">*</span></span>
+              <span class="tray-column-actions"><button class="helpBtn" data-help="Cable weight per foot." data-doc="docs/tutorial.html#trayfill">?</button></span>
+            </div>
+          </th>
+          <th scope="col" data-filter-label="Compartment">
+            <div class="tray-table-heading">
+              <span class="tray-column-label">Compartment</span>
+              <span class="tray-column-actions"><button class="helpBtn" data-help="Compartment number (1-5). Cables with the same compartment number are packed together in that physical compartment. A divider is automatically shown between stackable and non-stackable cables within a compartment." data-doc="docs/tutorial.html#trayfill">?</button></span>
+            </div>
+          </th>
+          <th scope="col" data-filter-label="Circuit Group">
+            <div class="tray-table-heading">
+              <span class="tray-column-label">Circuit Group</span>
+              <span class="tray-column-actions"><button class="helpBtn" data-help="Numeric group for bundling single conductor cables in groups of 3 or 4 conductors." data-doc="docs/tutorial.html#trayfill">?</button></span>
+            </div>
+          </th>
+          <th scope="col" class="tray-action-col">Duplicate</th>
+          <th scope="col" class="tray-action-col">Remove</th>
         </tr>
       </thead>
       <tbody>
@@ -180,29 +271,92 @@
     <datalist id="sizeList">
       <!-- Populated by script -->
     </datalist>
-  </fieldset>
+  </section>
 
-  <div id="fill-gauge-container" class="fill-gauge-wrapper"></div>
+  <section class="card tray-fill-results-card" aria-label="Tray fill results">
+    <div class="tray-fill-results-header">
+      <div>
+        <h2>Fill Analysis</h2>
+        <p class="field-hint">Draw the tray to generate the scaled cross-section and compartment warnings.</p>
+      </div>
+      <aside class="tray-fill-gauge-card" aria-label="Tray fill gauge summary" aria-live="polite">
+        <div class="tray-fill-gauge-meta">
+          <span class="tray-fill-gauge-title">Tray Fill Gauge</span>
+          <span id="trayFillStatus" class="tray-fill-status is-ok">Ready</span>
+        </div>
+        <div class="tray-fill-gauge-content">
+          <div id="fill-gauge-container" class="fill-gauge-wrapper"></div>
+          <dl class="tray-fill-gauge-stats">
+            <div>
+              <dt>Current</dt>
+              <dd id="trayFillValue">0.0%</dd>
+            </div>
+            <div>
+              <dt>Limit</dt>
+              <dd id="trayFillLimit">50%</dd>
+            </div>
+          </dl>
+        </div>
+      </aside>
+    </div>
 
-  <!-- CONTROLS: Spacing Checkbox + Draw, Expand, Import/Export -->
-  <div id="controls">
-    <label>
-      <input type="checkbox" id="largeSpacing" />
-      Add one‐diameter spacing between Non-Stackable Cables
-    </label>
-    <br/>
-    <button id="tour-btn" type="button" title="Interactive tour of this page">Take Tour</button>
-    <button id="drawBtn" type="button">Draw Tray</button>
-    <button id="expandBtn" type="button">Expand Image</button>
-    <button id="importExcelBtn" type="button">Import Excel</button>
-    <button id="exportExcelBtn" type="button">Export Excel</button>
-    <button id="importHelpBtn" type="button">Import Help</button>
-    <!-- Hidden file‐picker for .xlsx input -->
-    <input type="file" id="importExcelInput" accept=".xlsx" class="hidden" />
-  </div>
+    <!-- CONTROLS: Spacing Checkbox + Draw, Expand, Import/Export -->
+    <div id="controls" class="cable-toolbar tray-fill-toolbar" role="toolbar" aria-label="Tray fill actions">
+      <div class="toolbar-group tray-fill-option-group">
+        <label class="tray-fill-checkbox">
+          <input type="checkbox" id="largeSpacing" />
+          Add one-diameter spacing between Non-Stackable Cables
+        </label>
+      </div>
+      <div class="toolbar-group">
+        <button id="drawBtn" class="btn btn-accent toolbar-btn" type="button">
+          <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+          Draw Tray
+        </button>
+        <button id="expandBtn" class="btn toolbar-btn" type="button">
+          <img src="icons/toolbar/grid-size.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+          Expand
+        </button>
+      </div>
+      <details class="toolbar-menu">
+        <summary class="btn toolbar-btn">
+          <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+          Import / Export
+        </summary>
+        <div class="toolbar-menu-panel">
+          <button id="importExcelBtn" class="btn toolbar-btn" type="button">
+            <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+            Import Excel
+          </button>
+          <button id="exportExcelBtn" class="btn toolbar-btn" type="button">
+            <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+            Export Excel
+          </button>
+          <button id="importHelpBtn" class="btn toolbar-btn" type="button">
+            <img src="icons/toolbar/hand.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+            Import Help
+          </button>
+        </div>
+      </details>
+      <details class="toolbar-menu">
+        <summary class="btn secondary-btn toolbar-btn">
+          <img src="icons/toolbar/settings.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+          More
+        </summary>
+        <div class="toolbar-menu-panel">
+          <button id="tour-btn" class="btn toolbar-btn" type="button" title="Interactive tour of this page">
+            <img src="icons/toolbar/hand.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+            Take Tour
+          </button>
+        </div>
+      </details>
+      <!-- Hidden file-picker for .xlsx input -->
+      <input type="file" id="importExcelInput" accept=".xlsx" class="hidden" />
+    </div>
 
-  <div id="results"></div>
-  <div id="svgContainer"></div>
+    <div id="results"></div>
+    <div id="svgContainer"></div>
+  </section>
 
   <nav class="step-nav" aria-label="Workflow navigation">
     <a href="ductbankroute.html" class="step-nav-prev">&#8592; Ductbank</a>
