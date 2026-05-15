@@ -2172,6 +2172,8 @@ function initProjectIO(){
 
 globalThis.addEventListener?.('DOMContentLoaded',initProjectIO);
 globalThis.addEventListener?.('DOMContentLoaded',()=>{
+  const params = new URLSearchParams(window.location.search);
+  if (params.has('e2e')) return;
   runOnboardingFlow({source:'auto'}).catch(err=>console.error('Onboarding startup failed',err));
 });
 

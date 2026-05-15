@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Raceway Schedule Documentation</title>
+  <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+  <main class="container">
+    <h1>Raceway Schedule</h1>
+    <p>The Raceway Schedule manages ductbanks, cable trays, and standalone conduits.</p>
+
+    <h2>Entry workflow</h2>
+    <ul>
+      <li>Use <strong>Sample</strong> to load a working set of raceways.</li>
+      <li>Use <strong>Add Ductbank</strong>, <strong>Add Tray</strong>, or <strong>Add Conduit</strong> to enter common fields in a guided form.</li>
+      <li>Ductbank conduits are created inside ductbank rows. Standalone conduits remain in the Conduit Schedule.</li>
+      <li>The top summary shows totals, validation issues, and raceways currently assigned to cables.</li>
+    </ul>
+
+    <h2>Views and filters</h2>
+    <p>Use the <strong>View</strong> menu to switch between Basic Entry, Geometry, Fill / Grouping, BIM Export, and Full Detail. The choice is saved with the project settings.</p>
+    <p>Quick filters isolate missing geometry, duplicate IDs, unused raceways, assigned raceways, ductbank conduits, and standalone conduits.</p>
+
+    <h2>Validation</h2>
+    <p>The page validates missing IDs, duplicate IDs, missing or zero-length geometry, invalid tray dimensions, invalid slot-group JSON, and illegal conduit type / trade-size combinations.</p>
+  </main>
+</body>
+</html>

@@ -403,7 +403,8 @@ body.dark-mode .cable-lead{
 }
 
 /* --- Raceway Schedule Page --- */
-.ductbank-row > td {
+.ductbank-row > td,
+#ductbankTable > tbody > tr:not(.conduit-container) > td {
     background-color: var(--secondary-color);
     font-weight: bold;
 }

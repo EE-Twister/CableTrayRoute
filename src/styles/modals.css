@@ -180,6 +180,8 @@ body.modal-open {
 .modal-content {
     background: var(--secondary-color);
     color: var(--text-color);
+    display: flex;
+    flex-direction: column;
     padding: var(--space-4);
     border-radius: var(--radius-sm);
     max-width: var(--size-modal-md);
@@ -216,6 +218,8 @@ body.modal-open {
     display: flex;
     flex-direction: column;
     gap: var(--spacing-base);
+    min-height: 0;
+    overflow-y: auto;
 }
 
 .modal-title {
@@ -228,6 +232,7 @@ body.modal-open {
 }
 
 .modal-actions {
+    flex: 0 0 auto;
     margin-top: var(--space-4);
     display: flex;
     gap: var(--space-2);
@@ -300,6 +305,14 @@ body.modal-open {
     min-width: 0;
 }
 
+.modal-helper-text {
+    grid-column: 2;
+    margin: calc(var(--spacing-base) / -4) 0 0;
+    color: var(--color-text-muted, #64748b);
+    font-size: 0.8rem;
+    line-height: 1.35;
+}
+
 @media (max-width: 720px) {
     .modal-field-grid,
     .cable-library-grid {
@@ -316,6 +329,10 @@ body.modal-open {
     .modal-field-grid .modal-form-field label,
     .cable-library-grid .modal-form-field label {
         align-items: flex-start;
+    }
+
+    .modal-helper-text {
+        grid-column: 1;
     }
 }
 

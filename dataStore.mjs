@@ -91,6 +91,10 @@ const EXTRA_KEYS = {
   collapsedGroups: 'collapsedGroups',
   cableSchedulePreset: 'cableSchedulePreset',
   cableTemplates: 'cableTemplates',
+  cableTagSettings: 'cableTagSettings',
+  cableChangeLog: 'cableChangeLog',
+  loadListViewPreset: 'loadListViewPreset',
+  racewayScheduleViewPreset: 'racewayScheduleViewPreset',
   equipmentFilterPresets: 'equipmentFilterPresets',
   trayHardwareCatalogCustomProducts: 'trayHardwareCatalogCustomProducts',
   drcAcceptedFindings: 'drcAcceptedFindings',
@@ -212,6 +216,12 @@ export const setCableTypicals = typicals => write(KEYS.cableTypicals, typicals);
 
 export const getCableTemplates = () => read(EXTRA_KEYS.cableTemplates, []);
 export const setCableTemplates = templates => write(EXTRA_KEYS.cableTemplates, templates);
+
+export const getCableTagSettings = () => read(EXTRA_KEYS.cableTagSettings, {});
+export const setCableTagSettings = settings => write(EXTRA_KEYS.cableTagSettings, settings);
+
+export const getCableChangeLog = () => read(EXTRA_KEYS.cableChangeLog, []);
+export const setCableChangeLog = entries => write(EXTRA_KEYS.cableChangeLog, entries);
 
 
 export const getEquipmentFilterPresets = () => read(EXTRA_KEYS.equipmentFilterPresets, []);
@@ -702,6 +712,8 @@ export function saveProject(projectId, scenario = getCurrentScenarioNameState())
       cables: getCables(),
       cableTypicals: getCableTypicals(),
       cableTemplates: getCableTemplates(),
+      cableTagSettings: getCableTagSettings(),
+      cableChangeLog: getCableChangeLog(),
       mccLineups: getMccLineups(),
       raceways: {
         trays: getTrays(),
@@ -735,6 +747,8 @@ export function loadProject(projectId, scenario = getCurrentScenarioNameState())
     const cables = payload.cables;
     const cableTypicals = payload.cableTypicals;
     const cableTemplates = payload.cableTemplates;
+    const cableTagSettings = payload.cableTagSettings;
+    const cableChangeLog = payload.cableChangeLog;
     const mccLineups = payload.mccLineups;
     const raceways = payload.raceways || {};
     const oneLine = payload.oneLine || {};
@@ -744,6 +758,8 @@ export function loadProject(projectId, scenario = getCurrentScenarioNameState())
     if (Array.isArray(cables)) setCables(cables); else setCables([]);
     if (Array.isArray(cableTypicals)) setCableTypicals(cableTypicals); else setCableTypicals([]);
     if (Array.isArray(cableTemplates)) setCableTemplates(cableTemplates); else setCableTemplates([]);
+    if (cableTagSettings && typeof cableTagSettings === 'object' && !Array.isArray(cableTagSettings)) setCableTagSettings(cableTagSettings); else setCableTagSettings({});
+    if (Array.isArray(cableChangeLog)) setCableChangeLog(cableChangeLog); else setCableChangeLog([]);
     if (Array.isArray(mccLineups)) setMccLineups(mccLineups); else setMccLineups([]);
     setTrays(Array.isArray(raceways.trays) ? raceways.trays : []);
     setConduits(Array.isArray(raceways.conduits) ? raceways.conduits : []);
@@ -777,13 +793,15 @@ export function loadProject(projectId, scenario = getCurrentScenarioNameState())
 export function applyRemoteSnapshot(snapshot, projectId) {
   if (!snapshot || typeof snapshot !== 'object') return;
   try {
-    const { equipment, panels, loads, cables, cableTypicals, cableTemplates, mccLineups, raceways = {}, oneLine } = snapshot;
+    const { equipment, panels, loads, cables, cableTypicals, cableTemplates, cableTagSettings, cableChangeLog, mccLineups, raceways = {}, oneLine } = snapshot;
     if (Array.isArray(equipment)) setEquipment(equipment);
     if (Array.isArray(panels)) setPanels(panels);
     if (Array.isArray(loads)) setLoads(loads);
     if (Array.isArray(cables)) setCables(cables);
     if (Array.isArray(cableTypicals)) setCableTypicals(cableTypicals);
     if (Array.isArray(cableTemplates)) setCableTemplates(cableTemplates);
+    if (cableTagSettings && typeof cableTagSettings === 'object' && !Array.isArray(cableTagSettings)) setCableTagSettings(cableTagSettings);
+    if (Array.isArray(cableChangeLog)) setCableChangeLog(cableChangeLog);
     if (Array.isArray(mccLineups)) setMccLineups(mccLineups);
     setTrays(Array.isArray(raceways.trays) ? raceways.trays : []);
     setConduits(Array.isArray(raceways.conduits) ? raceways.conduits : []);
@@ -1015,6 +1033,12 @@ if (typeof window !== 'undefined') {
     setCables,
     getCableTypicals,
     setCableTypicals,
+    getCableTemplates,
+    setCableTemplates,
+    getCableTagSettings,
+    setCableTagSettings,
+    getCableChangeLog,
+    setCableChangeLog,
     addCable,
     getDuctbanks,
     setDuctbanks,

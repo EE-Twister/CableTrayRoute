@@ -139,6 +139,7 @@ class TableManager {
     this.onChange = opts.onChange || null;
     this.onSave = opts.onSave || null;
     this.onView = opts.onView || null;
+    this.onDuplicateRowData = opts.onDuplicateRowData || null;
     this.rowCountEl = opts.rowCountId ? document.getElementById(opts.rowCountId) : null;
     this.selectable = opts.selectable || false;
     this.colOffset = this.selectable ? 1 : 0;
@@ -158,12 +159,15 @@ class TableManager {
     this.measureCtx = null;
     this.updateStickyHeaderOffsets = this.updateStickyHeaderOffsets.bind(this);
     this.queueStickyHeaderUpdate = this.queueStickyHeaderUpdate.bind(this);
+    this.updateStickyColumnOffsets = this.updateStickyColumnOffsets.bind(this);
+    this.queueStickyColumnUpdate = this.queueStickyColumnUpdate.bind(this);
     this.columnInfoPanel = null;
     this.columnInfoTitle = null;
     this.columnInfoBody = null;
     this.handleColumnInfoOutsideClick = this.handleColumnInfoOutsideClick.bind(this);
     this.handleColumnInfoKeyDown = this.handleColumnInfoKeyDown.bind(this);
     this.pendingStickyHeaderUpdate = false;
+    this.pendingStickyColumnUpdate = false;
     this.headerResizeObserver = null;
     this.stickyRowLimit = 1;
     if (typeof ResizeObserver !== 'undefined') {
@@ -171,6 +175,7 @@ class TableManager {
     }
     if (typeof window !== 'undefined') {
       window.addEventListener('resize', this.queueStickyHeaderUpdate);
+      window.addEventListener('resize', this.queueStickyColumnUpdate);
     }
     this.buildHeader();
     this.initButtons(opts);
@@ -228,6 +233,7 @@ class TableManager {
     if (this.selectable) {
       const selTh = document.createElement('th');
       selTh.dataset.role = 'select';
+      selTh.classList.add('sticky-select-col');
       const selAll = document.createElement('input');
       selAll.type = 'checkbox';
       selAll.id = `${this.table.id}-select-all`;
@@ -298,6 +304,10 @@ class TableManager {
       th.style.position = 'relative';
       th.draggable = true;
       th.dataset.index = idx;
+      if (col.sticky === 'left') {
+        th.classList.add('sticky-col');
+        th.dataset.stickyKey = col.key;
+      }
       const sortBtn=document.createElement('button');
       sortBtn.type='button';
       sortBtn.className='header-sort';
@@ -348,6 +358,7 @@ class TableManager {
       actTh.textContent = 'Actions';
       actTh.style.position='relative';
       actTh.dataset.role = 'action';
+      actTh.classList.add('sticky-action-col');
       const res=document.createElement('span');
       res.className='col-resizer';
       res.addEventListener('mousedown',e=>this.startColumnResizeFromHandle(e,actTh));
@@ -364,6 +375,7 @@ class TableManager {
       Array.from(this.thead.rows).forEach(row => this.headerResizeObserver.observe(row));
     }
     this.updateStickyHeaderOffsets();
+    this.queueStickyColumnUpdate();
     this.queueStickyHeaderUpdate();
     this.updateSortIndicators();
   }
@@ -599,6 +611,7 @@ class TableManager {
       const cell = row.cells[cellIndex];
       if (cell) cell.style.width = pxWidth;
     });
+    this.queueStickyColumnUpdate();
     return pxWidth;
   }
 
@@ -701,6 +714,7 @@ class TableManager {
     if (hide) this.hiddenGroups.add(name); else this.hiddenGroups.delete(name);
     this.syncGroupBlankWidth();
     this.queueStickyHeaderUpdate();
+    this.queueStickyColumnUpdate();
   }
 
   toggleGroup(name) {
@@ -777,6 +791,66 @@ class TableManager {
         offset += (height || 0) + gap;
       }
     });
+  }
+
+  queueStickyColumnUpdate() {
+    if (this.pendingStickyColumnUpdate) return;
+    this.pendingStickyColumnUpdate = true;
+    const schedule = (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function')
+      ? cb => window.requestAnimationFrame(cb)
+      : cb => setTimeout(cb, 16);
+    schedule(() => {
+      this.pendingStickyColumnUpdate = false;
+      this.updateStickyColumnOffsets();
+    });
+  }
+
+  updateStickyColumnOffsets() {
+    if (!this.table || !this.headerRow) return;
+    let left = 0;
+    const assignLeft = (cell, value) => {
+      if (!cell) return;
+      cell.style.setProperty('--sticky-left', `${Math.max(0, Math.round(value))}px`);
+    };
+    const getCellWidth = cell => {
+      if (!cell) return 0;
+      const rect = typeof cell.getBoundingClientRect === 'function' ? cell.getBoundingClientRect() : null;
+      return rect && rect.width ? rect.width : (cell.offsetWidth || 0);
+    };
+    if (this.selectable && this.headerRow.cells[0]) {
+      const selectWidth = getCellWidth(this.headerRow.cells[0]);
+      Array.from(this.table.querySelectorAll('.sticky-select-col')).forEach(cell => assignLeft(cell, 0));
+      Array.from(this.tbody.rows).forEach(row => {
+        if (row.cells[0]) {
+          row.cells[0].classList.add('sticky-select-col');
+          assignLeft(row.cells[0], 0);
+        }
+      });
+      left += selectWidth;
+    }
+    this.columns.forEach((col, idx) => {
+      if (col.sticky !== 'left') return;
+      const cellIndex = idx + this.colOffset;
+      const headerCell = this.headerRow.cells[cellIndex];
+      if (!headerCell || headerCell.classList.contains('group-hidden')) return;
+      assignLeft(headerCell, left);
+      Array.from(this.tbody.rows).forEach(row => {
+        const cell = row.cells[cellIndex];
+        if (!cell) return;
+        cell.classList.add('sticky-col');
+        cell.dataset.stickyKey = col.key;
+        assignLeft(cell, left);
+      });
+      left += getCellWidth(headerCell);
+    });
+    if (this.showActionColumn) {
+      const actionIndex = this.columns.length + this.colOffset;
+      const actionHeader = this.headerRow.cells[actionIndex];
+      if (actionHeader) actionHeader.classList.add('sticky-action-col');
+      Array.from(this.tbody.rows).forEach(row => {
+        if (row.cells[actionIndex]) row.cells[actionIndex].classList.add('sticky-action-col');
+      });
+    }
   }
 
   updateRowCount() {
@@ -1051,6 +1125,7 @@ class TableManager {
     if (data.id !== undefined) tr.dataset.id = data.id;
     if (this.selectable) {
       const selTd = tr.insertCell();
+      selTd.classList.add('sticky-select-col');
       const chk = document.createElement('input');
       chk.type = 'checkbox';
       chk.className = 'row-select';
@@ -1062,6 +1137,10 @@ class TableManager {
     }
     this.columns.forEach((col, idx) => {
       const td = tr.insertCell();
+      if (col.sticky === 'left') {
+        td.classList.add('sticky-col');
+        td.dataset.stickyKey = col.key;
+      }
       if (col.group && idx === this.groupFirstIndex[col.group] && this.groupOrder.indexOf(col.group) > 0) {
         td.classList.add('category-separator');
       }
@@ -1122,14 +1201,33 @@ class TableManager {
         }
       }
       el.name = col.key;
+      if (col.readOnly && 'readOnly' in el) {
+        el.readOnly = true;
+        el.setAttribute('aria-readonly', 'true');
+      }
+      if (col.placeholder && 'placeholder' in el) {
+        el.placeholder = col.placeholder;
+      }
       const val = data[col.key] !== undefined ? data[col.key] : col.default;
       if (val !== undefined) {
         if (col.multiple) {
           const vals = Array.isArray(val) ? val : [val];
+          if (el.options) {
+            vals.filter(v => v !== undefined && v !== null && v !== '').forEach(v => {
+              const value = `${v}`;
+              if (!Array.from(el.options).some(o => o.value === value)) {
+                const option = document.createElement('option');
+                option.value = value;
+                option.textContent = value;
+                el.appendChild(option);
+              }
+            });
+          }
           if (el.setSelectedValues) {
-            el.setSelectedValues(vals);
+            el.setSelectedValues(vals.map(v => `${v}`));
           } else if (el.options) {
-            Array.from(el.options).forEach(o => { o.selected = vals.includes(o.value); });
+            const normalized = vals.map(v => `${v}`);
+            Array.from(el.options).forEach(o => { o.selected = normalized.includes(o.value); });
           }
         } else {
           el.value = val;
@@ -1248,49 +1346,66 @@ class TableManager {
     });
     if (this.showActionColumn) {
       const actTd = tr.insertCell();
+      actTd.classList.add('sticky-action-col');
       const actIdx = this.columns.length + this.colOffset;
       if (this.headerRow && this.headerRow.cells[actIdx] && this.headerRow.cells[actIdx].style.width) {
         actTd.style.width = this.headerRow.cells[actIdx].style.width;
       }
       if(this.onView){
         const viewBtn=document.createElement('button');
-        viewBtn.textContent='👁';
+        viewBtn.textContent='Edit';
         viewBtn.className='viewBtn';
-        viewBtn.title='View row';
-        viewBtn.setAttribute('aria-label','View row');
-        viewBtn.addEventListener('click',()=>{
+        viewBtn.title='Edit row';
+        viewBtn.setAttribute('aria-label','Edit row');
+        viewBtn.addEventListener('click', e => {
+          e.stopPropagation();
           const row=this.getRowData(tr);
           this.onView(row,tr);
         });
         actTd.appendChild(viewBtn);
       }
       const addBtn=document.createElement('button');
-      addBtn.textContent='+';
+      addBtn.textContent='Insert';
       addBtn.className='insertBelowBtn';
-      addBtn.title='Add row';
-      addBtn.setAttribute('aria-label','Add row');
-      addBtn.addEventListener('click',()=>{const newRow=this.addRow();if(newRow) this.tbody.insertBefore(newRow,tr.nextSibling);if(this.onChange) this.onChange();});
+      addBtn.title='Insert row below';
+      addBtn.setAttribute('aria-label','Insert row below');
+      addBtn.addEventListener('click', e => {
+        e.stopPropagation();
+        const newRow=this.addRow();
+        if(newRow) this.tbody.insertBefore(newRow,tr.nextSibling);
+        if(this.onChange) this.onChange();
+      });
       actTd.appendChild(addBtn);
 
       const dupBtn = document.createElement('button');
-      dupBtn.textContent = '\u29C9';
+      dupBtn.textContent = 'Copy';
       dupBtn.className='duplicateBtn';
       dupBtn.title='Duplicate row';
       dupBtn.setAttribute('aria-label','Duplicate row');
-      dupBtn.addEventListener('click', () => {
+      dupBtn.addEventListener('click', e => {
+        e.stopPropagation();
         const row = this.getRowData(tr);
-        const newRow = this.addRow(row);
+        const nextRow = typeof this.onDuplicateRowData === 'function'
+          ? this.onDuplicateRowData(row, tr, this)
+          : row;
+        const newRow = this.addRow(nextRow);
         if (newRow) this.tbody.insertBefore(newRow, tr.nextSibling);
         if (this.onChange) this.onChange();
       });
       actTd.appendChild(dupBtn);
 
       const delBtn = document.createElement('button');
-      delBtn.textContent = '\u2716';
+      delBtn.textContent = 'Delete';
       delBtn.className='removeBtn';
       delBtn.title='Delete row';
       delBtn.setAttribute('aria-label','Delete row');
-      delBtn.addEventListener('click', () => { tr.remove(); this.save(); this.updateRowCount(); if (this.onChange) this.onChange(); });
+      delBtn.addEventListener('click', e => {
+        e.stopPropagation();
+        tr.remove();
+        this.save();
+        this.updateRowCount();
+        if (this.onChange) this.onChange();
+      });
       actTd.appendChild(delBtn);
     }
 
@@ -1308,6 +1423,7 @@ class TableManager {
     }
     this.updateRowCount();
     this.updateSelectAllState();
+    this.queueStickyColumnUpdate();
     if (this.sortColumnIndex !== null) this.applySort();
     return tr;
   }
@@ -1532,7 +1648,16 @@ class TableManager {
     items.push(
       { label: 'Insert Row Above', action: tr => { if (!tr) return; const newRow = this.addRow(); this.tbody.insertBefore(newRow, tr); if (this.onChange) this.onChange(); } },
       { label: 'Insert Row Below', action: tr => { if (!tr) return; const newRow = this.addRow(); this.tbody.insertBefore(newRow, tr.nextSibling); if (this.onChange) this.onChange(); } },
-      { label: 'Duplicate Row', action: tr => { if (!tr) return; const data = this.getRowData(tr); const newRow = this.addRow(data); this.tbody.insertBefore(newRow, tr.nextSibling); if (this.onChange) this.onChange(); } },
+      { label: 'Duplicate Row', action: tr => {
+        if (!tr) return;
+        const data = this.getRowData(tr);
+        const nextRow = typeof this.onDuplicateRowData === 'function'
+          ? this.onDuplicateRowData(data, tr, this)
+          : data;
+        const newRow = this.addRow(nextRow);
+        this.tbody.insertBefore(newRow, tr.nextSibling);
+        if (this.onChange) this.onChange();
+      } },
       { label: 'Copy Row', action: tr => { if (!tr) return; clipboard = this.getRowData(tr); } },
       {
         label: 'Paste Row',
@@ -1650,11 +1775,23 @@ class TableManager {
       if (col.multiple) {
         if (!(col.key in values)) return;
         const vals = Array.isArray(rawValue) ? rawValue : (rawValue ? [rawValue] : []);
+        if (el.options) {
+          vals.filter(v => v !== undefined && v !== null && v !== '').forEach(v => {
+            const value = `${v}`;
+            if (!Array.from(el.options).some(opt => opt.value === value)) {
+              const option = document.createElement('option');
+              option.value = value;
+              option.textContent = value;
+              el.appendChild(option);
+            }
+          });
+        }
         if (typeof el.setSelectedValues === 'function') {
-          el.setSelectedValues(vals);
+          el.setSelectedValues(vals.map(v => `${v}`));
         } else if (el.options) {
+          const normalized = vals.map(v => `${v}`);
           Array.from(el.options).forEach(opt => {
-            opt.selected = vals.includes(opt.value);
+            opt.selected = normalized.includes(opt.value);
           });
         }
         el.dispatchEvent(new Event('change', { bubbles: true }));

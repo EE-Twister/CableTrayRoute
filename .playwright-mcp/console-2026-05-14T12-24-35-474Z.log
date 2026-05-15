@@ -65,3 +65,12 @@
 [21599537ms] [WARNING] Autosave skipped: choose Save Project to select a file for updates. @ http://127.0.0.1:4173/dist/chunks/core-ui-c1b074a4.js:0
 [22301838ms] [WARNING] Autosave skipped: choose Save Project to select a file for updates. @ http://127.0.0.1:4173/dist/chunks/core-ui-f684bcce.js:0
 [22601849ms] [WARNING] Autosave skipped: choose Save Project to select a file for updates. @ http://127.0.0.1:4173/dist/chunks/core-ui-f684bcce.js:0
+[22681187ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:4173/icons/equipment.svg:0
+[22681188ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:4173/icons/components/MCC.svg:0
+[22681188ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:4173/icons/load.svg:0
+[22681188ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:4173/icons/raceway.svg:0
+[22681188ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:4173/icons/ductbank.svg:0
+[22681188ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:4173/icons/tray.svg:0
+[22683234ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:4173/icons/conduit.svg:0
+[22683235ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:4173/icons/cable.svg:0
+[22683235ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:4173/icons/panel.svg:0

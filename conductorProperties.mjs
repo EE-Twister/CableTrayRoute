@@ -13,17 +13,8 @@ export async function loadConductorProperties() {
     }
   }
 
-  try {
-    const url = new URL('./data/conductor_properties.json', import.meta.url);
-    const res = await fetch(url);
-    const data = await res.json();
-    window.CONDUCTOR_PROPS = data;
-    return data;
-  } catch (err) {
-    console.warn('Failed to load conductor properties', err);
-    window.CONDUCTOR_PROPS = fallbackData;
-    return fallbackData;
-  }
+  window.CONDUCTOR_PROPS = fallbackData;
+  return fallbackData;
 }
 
 // Ensure the loader is available globally when modules are bundled.

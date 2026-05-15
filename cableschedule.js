@@ -47,7 +47,7 @@ import { sizeConductor } from './sizing.js';
 import ampacity from './ampacity.mjs';
 import { createTable, STORAGE_KEYS } from './tableUtils.mjs';
 import { openModal, showAlertModal } from './src/components/modal.js';
-import { start as startTour, hasDoneTour } from './tour.js';
+import { start as startTour } from './tour.js';
 const { sizeToArea } = ampacity;
 
 const CABLE_TOUR_STEPS = [
@@ -185,54 +185,55 @@ async function initCableSchedule() {
   }
 
   const columns=[
-    {key:'tag',label:'Tag',type:'text',group:'Identification',tooltip:'Unique identifier for the cable'},
+    {key:'tag',label:'Tag',type:'text',group:'Identification',tooltip:'Unique identifier for the cable',sticky:'left',placeholder:'CBL-001'},
     {key:'service_description',label:'Service Description',type:'text',group:'Identification',tooltip:"Description of the cable's purpose"},
-    {key:'from_tag',label:'From Tag',type:'text',datalist:()=>getEquipmentOptions(),group:'Routing / Termination',tooltip:'Starting equipment or location tag'},
-    {key:'to_tag',label:'To Tag',type:'text',datalist:()=>getEquipmentOptions(),group:'Routing / Termination',tooltip:'Ending equipment or location tag'},
-    {key:'start_x',label:'Start X',type:'number',group:'Routing / Termination',tooltip:'X-coordinate of cable start'},
-    {key:'start_y',label:'Start Y',type:'number',group:'Routing / Termination',tooltip:'Y-coordinate of cable start'},
-    {key:'start_z',label:'Start Z',type:'number',group:'Routing / Termination',tooltip:'Z-coordinate of cable start'},
-    {key:'end_x',label:'End X',type:'number',group:'Routing / Termination',tooltip:'X-coordinate of cable end'},
-    {key:'end_y',label:'End Y',type:'number',group:'Routing / Termination',tooltip:'Y-coordinate of cable end'},
-    {key:'end_z',label:'End Z',type:'number',group:'Routing / Termination',tooltip:'Z-coordinate of cable end'},
-    {key:'zone',label:'Cable Zone',type:'number',group:'Routing / Termination',tooltip:'Routing zone or area number'},
-    {key:'raceway_ids',label:'Raceway(s)',type:'select',multiple:true,size:5,options:()=>getRacewayOptions(),group:'Routing / Termination',tooltip:'Select raceway IDs from Raceway Schedule'},
-    {key:'manual_path',label:'Manual Path',type:'text',datalist:()=>getRacewayOptions(),group:'Routing / Termination',tooltip:'Tray IDs separated by > to override route'},
-    {key:'panel_id',label:'Panel ID',type:'text',datalist:()=>getPanelOptions(),group:'Routing / Termination',tooltip:'Panel identifier from Panel Schedule'},
-    {key:'circuit_number',label:'Circuit #',type:'number',group:'Routing / Termination',tooltip:'Circuit number from Panel Schedule'},
-    {key:'circuit_group',label:'Circuit Group',type:'number',group:'Routing / Termination',tooltip:'Circuit grouping number'},
-    {key:'allowed_cable_group',label:'Allowed Group',type:'text',group:'Routing / Termination',tooltip:'Permitted cable grouping identifier'},
-    {key:'manufacturer',label:'Manufacturer',type:'text',group:'Cable Construction & Specs',tooltip:'Manufacturer or vendor for this cable'},
-    {key:'model',label:'Model #',type:'text',group:'Cable Construction & Specs',tooltip:'Manufacturer model number or catalog reference'},
-    {key:'cable_type',label:'Cable Type',type:'select',options:cableTypes,group:'Cable Construction & Specs',tooltip:'Category such as Power, Control, or Signal'},
-    {key:'conductors',label:'Conductors',type:'number',group:'Cable Construction & Specs',tooltip:'Number of conductors within the cable'},
-    {key:'conductor_size',label:'Conductor Size',type:'select',options:conductorSizes,group:'Cable Construction & Specs',tooltip:'Size of each conductor'},
-    {key:'conductor_material',label:'Conductor Material',type:'select',options:conductorMaterials,group:'Cable Construction & Specs',tooltip:'Material of the conductors'},
-    {key:'ambient_temp',label:'Ambient Temp (°C)',type:'number',group:'Cable Construction & Specs',tooltip:'Ambient temperature for sizing'},
-    {key:'install_method',label:'Install Method',type:'select',options:installMethods,group:'Cable Construction & Specs',tooltip:'Installation method'},
-    {key:'insulation_type',label:'Insulation Type',type:'select',options:Object.keys(INSULATION_TEMP_LIMIT),group:'Cable Construction & Specs',tooltip:'Insulation material type'},
-    {key:'insulation_rating',label:'Insul Rating (°C)',type:'select',options:insulationRatings,group:'Cable Construction & Specs',tooltip:'Maximum temperature rating of insulation'},
-    {key:'insulation_thickness',label:'Insul Thick (in)',type:'number',group:'Cable Construction & Specs',tooltip:'Insulation thickness in inches'},
-    {key:'cable_od',label:'Cable O.D. (in)',type:'number',group:'Cable Construction & Specs',tooltip:'Outside diameter of the cable in inches'},
-    {key:'parallel_count',label:'Parallel Runs',type:'number',group:'Cable Construction & Specs',tooltip:'Number of identical cables run in parallel for this circuit (e.g. 3 × 240 kcmil in parallel). Tray fill and ampacity are multiplied by this count.'},
-    {key:'shielding_jacket',label:'Shielding/Jacket',type:'select',options:shieldingOptions,group:'Cable Construction & Specs',tooltip:'Shielding or outer jacket type'},
-    {key:'cable_rating',label:'Cable Rating (V)',type:'number',group:'Electrical Characteristics',tooltip:'Maximum voltage rating'},
-    {key:'operating_voltage',label:'Operating Voltage (V)',type:'number',group:'Electrical Characteristics',tooltip:'Nominal operating voltage'},
-    {key:'est_load',label:'Est Load (A)',type:'number',group:'Electrical Characteristics',tooltip:'Estimated operating current'},
-    {key:'load_flow_current',label:'Load Flow Current (A)',type:'text',group:'Electrical Characteristics',tooltip:'Current captured from the latest load flow study'},
-    {key:'duty_cycle',label:'Duty Cycle (%)',type:'number',group:'Electrical Characteristics',tooltip:'Duty cycle percentage'},
-    {key:'length',label:'Length (ft)',type:'number',group:'Electrical Characteristics',tooltip:'Length of cable run'},
-    {key:'calc_ampacity',label:'Calc Ampacity (A)',type:'number',group:'Electrical Characteristics',tooltip:'Ampacity after code factors'},
-    {key:'impedance',label:'Impedance (Ω)',type:'number',group:'Electrical Characteristics',tooltip:'Circuit impedance used for voltage drop checks'},
-    {key:'code_reference',label:'Code Ref',type:'text',group:'Electrical Characteristics',tooltip:'Code table used'},
-    {key:'voltage_drop_pct',label:'Estimated Voltage Drop (%)',type:'number',group:'Electrical Characteristics',tooltip:'Estimated voltage drop percent'},
-    {key:'sizing_warning',label:'Sizing Warning',type:'text',group:'Electrical Characteristics',tooltip:'Non-compliance details'},
+    {key:'from_tag',label:'From Tag',type:'text',datalist:()=>getEquipmentOptions(),group:'Terminations',tooltip:'Starting equipment or location tag',sticky:'left'},
+    {key:'to_tag',label:'To Tag',type:'text',datalist:()=>getEquipmentOptions(),group:'Terminations',tooltip:'Ending equipment or location tag',sticky:'left'},
+    {key:'raceway_ids',label:'Raceway(s)',type:'select',multiple:true,size:5,options:()=>getRacewayOptions(),group:'Terminations',tooltip:'Select raceway IDs from Raceway Schedule'},
+    {key:'panel_id',label:'Panel ID',type:'text',datalist:()=>getPanelOptions(),group:'Terminations',tooltip:'Panel identifier from Panel Schedule'},
+    {key:'circuit_number',label:'Circuit #',type:'number',group:'Terminations',tooltip:'Circuit number from Panel Schedule'},
+    {key:'start_x',label:'Start X',type:'number',group:'Routing Details',tooltip:'X-coordinate of cable start'},
+    {key:'start_y',label:'Start Y',type:'number',group:'Routing Details',tooltip:'Y-coordinate of cable start'},
+    {key:'start_z',label:'Start Z',type:'number',group:'Routing Details',tooltip:'Z-coordinate of cable start'},
+    {key:'end_x',label:'End X',type:'number',group:'Routing Details',tooltip:'X-coordinate of cable end'},
+    {key:'end_y',label:'End Y',type:'number',group:'Routing Details',tooltip:'Y-coordinate of cable end'},
+    {key:'end_z',label:'End Z',type:'number',group:'Routing Details',tooltip:'Z-coordinate of cable end'},
+    {key:'zone',label:'Cable Zone',type:'number',group:'Routing Details',tooltip:'Routing zone or area number'},
+    {key:'manual_path',label:'Manual Path',type:'text',datalist:()=>getRacewayOptions(),group:'Routing Details',tooltip:'Tray IDs separated by > to override route'},
+    {key:'circuit_group',label:'Circuit Group',type:'number',group:'Routing Details',tooltip:'Circuit grouping number'},
+    {key:'allowed_cable_group',label:'Allowed Group',type:'text',group:'Routing Details',tooltip:'Permitted cable grouping identifier'},
+    {key:'manufacturer',label:'Manufacturer',type:'text',group:'Manufacturer Details',tooltip:'Manufacturer or vendor for this cable'},
+    {key:'model',label:'Model #',type:'text',group:'Manufacturer Details',tooltip:'Manufacturer model number or catalog reference'},
+    {key:'ambient_temp',label:'Ambient Temp (°C)',type:'number',group:'Manufacturer Details',tooltip:'Ambient temperature for sizing'},
+    {key:'insulation_thickness',label:'Insul Thick (in)',type:'number',group:'Manufacturer Details',tooltip:'Insulation thickness in inches'},
+    {key:'cable_od',label:'Cable O.D. (in)',type:'number',group:'Manufacturer Details',tooltip:'Outside diameter of the cable in inches'},
+    {key:'shielding_jacket',label:'Shielding/Jacket',type:'select',options:shieldingOptions,group:'Manufacturer Details',tooltip:'Shielding or outer jacket type'},
+    {key:'cable_rating',label:'Cable Rating (V)',type:'number',group:'Manufacturer Details',tooltip:'Maximum voltage rating'},
+    {key:'cable_type',label:'Cable Type',type:'select',options:cableTypes,group:'Cable Construction',tooltip:'Category such as Power, Control, or Signal'},
+    {key:'conductors',label:'Conductors',type:'number',group:'Cable Construction',tooltip:'Number of conductors within the cable'},
+    {key:'conductor_size',label:'Conductor Size',type:'select',options:conductorSizes,group:'Cable Construction',tooltip:'Size of each conductor'},
+    {key:'conductor_material',label:'Conductor Material',type:'select',options:conductorMaterials,group:'Cable Construction',tooltip:'Material of the conductors'},
+    {key:'install_method',label:'Install Method',type:'select',options:installMethods,group:'Cable Construction',tooltip:'Installation method'},
+    {key:'insulation_type',label:'Insulation Type',type:'select',options:Object.keys(INSULATION_TEMP_LIMIT),group:'Cable Construction',tooltip:'Insulation material type'},
+    {key:'insulation_rating',label:'Insul Rating (°C)',type:'select',options:insulationRatings,group:'Cable Construction',tooltip:'Maximum temperature rating of insulation'},
+    {key:'parallel_count',label:'Parallel Runs',type:'number',group:'Cable Construction',tooltip:'Number of identical cables run in parallel for this circuit (e.g. 3 × 240 kcmil in parallel). Tray fill and ampacity are multiplied by this count.'},
+    {key:'operating_voltage',label:'Operating Voltage (V)',type:'number',group:'Electrical Entry',tooltip:'Nominal operating voltage'},
+    {key:'est_load',label:'Est Load (A)',type:'number',group:'Electrical Entry',tooltip:'Estimated operating current'},
+    {key:'duty_cycle',label:'Duty Cycle (%)',type:'number',group:'Electrical Entry',tooltip:'Duty cycle percentage'},
+    {key:'length',label:'Length (ft)',type:'number',group:'Electrical Entry',tooltip:'Length of cable run'},
+    {key:'load_flow_current',label:'Load Flow Current (A)',type:'text',group:'Calculations',tooltip:'Current captured from the latest load flow study'},
+    {key:'calc_ampacity',label:'Calc Ampacity (A)',type:'number',group:'Calculations',tooltip:'Ampacity after code factors'},
+    {key:'impedance',label:'Impedance (Ω)',type:'number',group:'Calculations',tooltip:'Circuit impedance used for voltage drop checks'},
+    {key:'code_reference',label:'Code Ref',type:'text',group:'Calculations',tooltip:'Code table used'},
+    {key:'voltage_drop_pct',label:'Estimated Voltage Drop (%)',type:'number',group:'Calculations',tooltip:'Estimated voltage drop percent'},
+    {key:'sizing_warning',label:'Sizing Warning',type:'text',group:'Calculations',tooltip:'Non-compliance details'},
     {key:'notes',label:'Notes',type:'text',group:'Notes',tooltip:'Additional comments or notes'},
     {key:'engineer_note',label:'Engineer Note',type:'text',group:'Notes',tooltip:'Engineering annotation, design decision rationale, or field observation'},
-    {key:'review_status',label:'Review Status',type:'select',options:['','pending','approved','flagged'],group:'Notes',tooltip:'Engineer review/approval status for this cable record'}
+    {key:'review_status',label:'Review Status',type:'select',options:['','pending','approved','flagged'],group:'Notes',tooltip:'Engineer review/approval status for this cable record'},
+    {key:'last_modified',label:'Last Modified',type:'text',group:'Notes',tooltip:'Local timestamp for the most recent row edit',readOnly:true}
   ];
 
-  const TYPICAL_EXCLUDED_GROUPS = new Set(['Identification', 'Routing / Termination']);
+  const TYPICAL_EXCLUDED_GROUPS = new Set(['Identification', 'Terminations', 'Routing Details']);
   const ADDITIONAL_TEMPLATE_FIELD_EXCLUSIONS = [
     'install_method',
     'operating_voltage',
@@ -244,7 +245,8 @@ async function initCableSchedule() {
     'calc_ampacity',
     'voltage_drop_pct',
     'sizing_warning',
-    'review_status'
+    'review_status',
+    'last_modified'
   ];
   const TYPICAL_EXCLUDED_KEYS = new Set(
     columns
@@ -290,13 +292,107 @@ async function initCableSchedule() {
   const templateHeaderLookup = buildTemplateHeaderLookup(templateHeaderConfig);
 
   const groupNames = Array.from(new Set(columns.map(col => col.group || 'General')));
+  const BASIC_ENTRY_KEYS = new Set([
+    'tag',
+    'service_description',
+    'from_tag',
+    'to_tag',
+    'raceway_ids',
+    'panel_id',
+    'circuit_number',
+    'cable_type',
+    'conductors',
+    'conductor_size',
+    'conductor_material',
+    'install_method',
+    'insulation_type',
+    'insulation_rating',
+    'parallel_count',
+    'operating_voltage',
+    'est_load',
+    'length',
+    'notes'
+  ]);
   const PRESETS = {
+    entry: { label: 'Basic Entry', groups: ['Identification', 'Terminations', 'Cable Construction', 'Electrical Entry', 'Notes'] },
     full: { label: 'Full Detail', groups: groupNames },
-    routing: { label: 'Routing Focus', groups: ['Identification', 'Routing / Termination', 'Notes'] },
-    electrical: { label: 'Electrical Focus', groups: ['Identification', 'Electrical Characteristics', 'Notes'] },
-    construction: { label: 'Construction Specs', groups: ['Identification', 'Cable Construction & Specs', 'Notes'] }
+    routing: { label: 'Routing Focus', groups: ['Identification', 'Terminations', 'Routing Details', 'Notes'] },
+    electrical: { label: 'Electrical Focus', groups: ['Identification', 'Cable Construction', 'Electrical Entry', 'Calculations', 'Notes'] },
+    construction: { label: 'Construction Specs', groups: ['Identification', 'Cable Construction', 'Manufacturer Details', 'Notes'] }
   };
-  const DEFAULT_PRESET = 'full';
+  const DEFAULT_PRESET = 'entry';
+  const FIELD_HELP_TEXT = {
+    tag: 'Use the project cable numbering standard. Auto tag settings can prefill this value.',
+    raceway_ids: 'Required before routing. Options come from the Raceway Schedule.',
+    conductor_size: 'Required for tray fill, ampacity, and voltage drop calculations.',
+    length: 'Required for voltage drop and route quantity checks.',
+    operating_voltage: 'Used with load current for electrical sizing and review reports.',
+    est_load: 'Estimated operating current for sizing checks.',
+    start_x: 'Used only when routing from explicit start coordinates.',
+    end_x: 'Used only when routing to explicit end coordinates.'
+  };
+  const STARTER_CABLE_TYPES = [
+    {
+      label: '600V Power',
+      cable_type: 'Power',
+      conductors: 3,
+      conductor_size: '#12 AWG',
+      conductor_material: 'Copper',
+      install_method: 'Tray',
+      insulation_type: 'THHN',
+      insulation_rating: '90',
+      cable_rating: 600,
+      shielding_jacket: ''
+    },
+    {
+      label: 'Control Cable',
+      cable_type: 'Control',
+      conductors: 7,
+      conductor_size: '#14 AWG',
+      conductor_material: 'Copper',
+      install_method: 'Tray',
+      insulation_type: 'PVC',
+      insulation_rating: '75',
+      cable_rating: 600,
+      shielding_jacket: ''
+    },
+    {
+      label: 'Instrument Pair',
+      cable_type: 'Signal',
+      conductors: 2,
+      conductor_size: '#18 AWG',
+      conductor_material: 'Copper',
+      install_method: 'Tray',
+      insulation_type: 'XLPE',
+      insulation_rating: '90',
+      cable_rating: 300,
+      shielding_jacket: 'Copper Tape'
+    },
+    {
+      label: 'Ethernet',
+      cable_type: 'Data',
+      conductors: 8,
+      conductor_size: '#24 AWG',
+      conductor_material: 'Copper',
+      install_method: 'Tray',
+      insulation_type: 'PVC',
+      insulation_rating: '60',
+      cable_rating: 300,
+      shielding_jacket: ''
+    },
+    {
+      label: 'Fiber',
+      cable_type: 'Fiber',
+      conductors: 12,
+      conductor_size: '#22 AWG',
+      conductor_material: 'Copper',
+      install_method: 'Tray',
+      insulation_type: 'PVC',
+      insulation_rating: '60',
+      cable_rating: 300,
+      shielding_jacket: ''
+    }
+  ];
 
   columns.forEach(col => {
     if (col.type === 'number') {
@@ -318,12 +414,16 @@ async function initCableSchedule() {
   let activeRow = null;
   let activeTable = null;
   let activeRowData = null;
+  let activeEditorMode = 'edit';
+  let activeEditorColumnFilter = null;
   let editorTypicalControls = null;
   let editorTypicalSelect = null;
   let editorSaveTypicalBtn = null;
   let batchTypicalSelect = null;
   let applyTypicalBtn = null;
   let typicalFilterSelect = null;
+  let applyBatchEditBtn = null;
+  let batchEditCheckboxes = [];
   let tableInstance = null;
   const modalValidationRules = [
     { key: 'length', message: 'Length must be a positive number.' },
@@ -509,6 +609,134 @@ async function initCableSchedule() {
   }
   let cachedCableTemplates = initialTemplates;
 
+  const DEFAULT_TAG_SETTINGS = {
+    enabled: true,
+    prefix: 'CBL-',
+    nextNumber: 1,
+    padding: 3
+  };
+
+  const normalizeTagSettings = input => {
+    const source = input && typeof input === 'object' ? input : {};
+    const nextNumber = Math.max(1, parseInt(source.nextNumber, 10) || DEFAULT_TAG_SETTINGS.nextNumber);
+    const padding = Math.min(8, Math.max(1, parseInt(source.padding, 10) || DEFAULT_TAG_SETTINGS.padding));
+    return {
+      enabled: source.enabled !== false,
+      prefix: typeof source.prefix === 'string' ? source.prefix : DEFAULT_TAG_SETTINGS.prefix,
+      nextNumber,
+      padding
+    };
+  };
+
+  let tagSettings = normalizeTagSettings(
+    typeof dataStore.getCableTagSettings === 'function'
+      ? dataStore.getCableTagSettings()
+      : dataStore.getItem(dataStore.STORAGE_KEYS.cableTagSettings, DEFAULT_TAG_SETTINGS)
+  );
+
+  const saveTagSettings = nextSettings => {
+    tagSettings = normalizeTagSettings(nextSettings);
+    if (typeof dataStore.setCableTagSettings === 'function') {
+      dataStore.setCableTagSettings(tagSettings);
+    } else {
+      dataStore.setItem(dataStore.STORAGE_KEYS.cableTagSettings, tagSettings);
+    }
+    updateTagSettingsControls();
+  };
+
+  const formatCableTag = (settings = tagSettings, number = settings.nextNumber) => {
+    const safeNumber = Math.max(1, parseInt(number, 10) || 1);
+    return `${settings.prefix || ''}${String(safeNumber).padStart(settings.padding || 1, '0')}`;
+  };
+
+  const parseGeneratedTagNumber = tag => {
+    const text = `${tag || ''}`.trim();
+    const prefix = tagSettings.prefix || '';
+    if (!text.startsWith(prefix)) return null;
+    const suffix = text.slice(prefix.length);
+    if (!/^\d+$/.test(suffix)) return null;
+    return parseInt(suffix, 10);
+  };
+
+  const getExistingCableTagSet = () => {
+    const tags = new Set();
+    const rows = tableInstance && typeof tableInstance.getData === 'function' ? tableInstance.getData() : [];
+    rows.forEach(row => {
+      const value = `${row?.tag || ''}`.trim().toLowerCase();
+      if (value) tags.add(value);
+    });
+    return tags;
+  };
+
+  const generateTagSequence = count => {
+    if (!tagSettings.enabled) return { tags: Array(count).fill(''), nextNumber: tagSettings.nextNumber };
+    const used = getExistingCableTagSet();
+    const tags = [];
+    let nextNumber = tagSettings.nextNumber;
+    while (tags.length < count) {
+      const tag = formatCableTag(tagSettings, nextNumber);
+      nextNumber += 1;
+      if (used.has(tag.toLowerCase())) continue;
+      used.add(tag.toLowerCase());
+      tags.push(tag);
+    }
+    return { tags, nextNumber };
+  };
+
+  const generateNextCableTag = () => {
+    const { tags } = generateTagSequence(1);
+    return tags[0] || '';
+  };
+
+  const advanceTagSettingsPastTags = tags => {
+    if (!tagSettings.enabled || !Array.isArray(tags)) return;
+    let max = tagSettings.nextNumber - 1;
+    tags.forEach(tag => {
+      const number = parseGeneratedTagNumber(tag);
+      if (Number.isFinite(number)) max = Math.max(max, number);
+    });
+    if (max >= tagSettings.nextNumber) {
+      saveTagSettings({ ...tagSettings, nextNumber: max + 1 });
+    }
+  };
+
+  const CHANGE_LOG_LIMIT = 50;
+  const readCableChangeLog = () => {
+    const raw = typeof dataStore.getCableChangeLog === 'function'
+      ? dataStore.getCableChangeLog()
+      : dataStore.getItem(dataStore.STORAGE_KEYS.cableChangeLog, []);
+    return Array.isArray(raw) ? raw : [];
+  };
+  const writeCableChangeLog = entries => {
+    const normalized = Array.isArray(entries) ? entries.slice(0, CHANGE_LOG_LIMIT) : [];
+    if (typeof dataStore.setCableChangeLog === 'function') {
+      dataStore.setCableChangeLog(normalized);
+    } else {
+      dataStore.setItem(dataStore.STORAGE_KEYS.cableChangeLog, normalized);
+    }
+  };
+  const formatDateTime = value => {
+    if (!value) return '';
+    const date = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    return date.toLocaleString(undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit'
+    });
+  };
+  const recordCableChange = (action, detail = '') => {
+    const entry = {
+      at: new Date().toISOString(),
+      action,
+      detail
+    };
+    writeCableChangeLog([entry, ...readCableChangeLog()]);
+    updateReadinessPanel();
+  };
+
   function collectRowTypicalIds() {
     const ids = new Set();
     if (!tableInstance || !tableInstance.tbody) return ids;
@@ -520,12 +748,17 @@ async function initCableSchedule() {
   }
 
   function updateBatchActionState() {
-    if (!applyTypicalBtn) return;
-    const hasTemplate = batchTypicalSelect && batchTypicalSelect.value;
     const selectedCount = tableInstance && typeof tableInstance.getSelectedRows === 'function'
       ? tableInstance.getSelectedRows().length
       : 0;
-    applyTypicalBtn.disabled = !(hasTemplate && selectedCount > 0);
+    if (applyTypicalBtn) {
+      const hasTemplate = batchTypicalSelect && batchTypicalSelect.value;
+      applyTypicalBtn.disabled = !(hasTemplate && selectedCount > 0);
+    }
+    if (applyBatchEditBtn) {
+      const hasCheckedField = batchEditCheckboxes.some(input => input && input.checked);
+      applyBatchEditBtn.disabled = !(selectedCount > 0 && hasCheckedField);
+    }
   }
 
   function updateBatchTypicalControls() {
@@ -715,6 +948,15 @@ async function initCableSchedule() {
     const val = rowData[col.key] !== undefined ? rowData[col.key] : col.default;
     if (col.multiple) {
       const values = Array.isArray(val) ? val : (val ? [val] : []);
+      values.filter(v => v !== undefined && v !== null && v !== '').forEach(v => {
+        const value = `${v}`;
+        if (!Array.from(field.options || []).some(option => option.value === value)) {
+          const option = document.createElement('option');
+          option.value = value;
+          option.textContent = value;
+          field.appendChild(option);
+        }
+      });
       const opts = Array.from(field.options || []);
       if (typeof field.setSelectedValues === 'function') {
         field.setSelectedValues(values);
@@ -726,6 +968,14 @@ async function initCableSchedule() {
     }
     if (field.tagName === 'SELECT' && !col.multiple && field.options.length && (val === undefined || val === null)) {
       field.value = field.options[0].value;
+    }
+    if (col.readOnly && 'readOnly' in field) {
+      field.readOnly = true;
+      field.setAttribute('aria-readonly', 'true');
+      field.tabIndex = -1;
+    }
+    if (col.placeholder && 'placeholder' in field) {
+      field.placeholder = col.placeholder;
     }
     return field;
   };
@@ -750,8 +1000,17 @@ async function initCableSchedule() {
       const value = values[key];
       if (field.multiple) {
         const vals = Array.isArray(value) ? value : (value ? [value] : []);
+        vals.filter(v => v !== undefined && v !== null && v !== '').forEach(v => {
+          const normalizedValue = `${v}`;
+          if (!Array.from(field.options || []).some(option => option.value === normalizedValue)) {
+            const option = document.createElement('option');
+            option.value = normalizedValue;
+            option.textContent = normalizedValue;
+            field.appendChild(option);
+          }
+        });
         Array.from(field.options || []).forEach(option => {
-          option.selected = vals.includes(option.value);
+          option.selected = vals.map(v => `${v}`).includes(option.value);
         });
       } else if (value !== undefined && value !== null) {
         field.value = value;
@@ -809,6 +1068,8 @@ async function initCableSchedule() {
     activeRow = null;
     activeTable = null;
     activeRowData = null;
+    activeEditorMode = 'edit';
+    activeEditorColumnFilter = null;
     if (editorTitle) editorTitle.textContent = defaultEditorTitle;
     resetModalValidationState();
   };
@@ -845,7 +1106,11 @@ async function initCableSchedule() {
       delete merged.template_id;
       merged.typical_id = templateId;
       setEditorFieldValues(merged, { skipUndefined: false });
-      applyValuesToActiveRow(merged, { skipUndefined: false });
+      if (activeRow) {
+        applyValuesToActiveRow(merged, { skipUndefined: false });
+      } else {
+        activeRowData = { ...(activeRowData || {}), ...merged };
+      }
       editorTypicalSelect.value = '';
     });
     editorSaveTypicalBtn = document.createElement('button');
@@ -912,14 +1177,19 @@ async function initCableSchedule() {
     if (changed) dataStore.setCableTemplates(normalized);
   });
 
-  const openEditor = (rowData, tr, tableInstance) => {
+  const openEditor = (rowData, tr, tableInstance, options = {}) => {
     if (!editorModal || !editorForm || !editorBody) return;
-    activeRow = tr;
+    activeRow = tr || null;
     activeTable = tableInstance;
     activeRowData = rowData || {};
+    activeEditorMode = options.mode || 'edit';
+    activeEditorColumnFilter = options.columnKeys instanceof Set ? options.columnKeys : null;
     editorFieldMap = new Map();
     editorBody.innerHTML = '';
-    const { order, grouped } = buildGroupMap();
+    const editorColumns = activeEditorColumnFilter
+      ? columns.filter(col => activeEditorColumnFilter.has(col.key))
+      : columns;
+    const { order, grouped } = buildGroupMapForColumns(editorColumns);
     ensureEditorTypicalControls();
     updateEditorTypicalControls();
     if (editorTypicalSelect) editorTypicalSelect.value = '';
@@ -946,6 +1216,14 @@ async function initCableSchedule() {
         field.id = fieldId;
         fieldContainer.appendChild(label);
         fieldContainer.appendChild(field);
+        if (FIELD_HELP_TEXT[col.key]) {
+          const helper = document.createElement('p');
+          helper.className = 'modal-helper-text';
+          helper.id = `${fieldId}-helper`;
+          helper.textContent = FIELD_HELP_TEXT[col.key];
+          field.setAttribute('aria-describedby', [field.getAttribute('aria-describedby'), helper.id].filter(Boolean).join(' '));
+          fieldContainer.appendChild(helper);
+        }
         editorFieldMap.set(col.key, field);
         fieldsWrapper.appendChild(fieldContainer);
       });
@@ -955,7 +1233,9 @@ async function initCableSchedule() {
     setupEditorFieldEnhancements();
     if (editorTitle) {
       const tag = activeRowData?.tag;
-      editorTitle.textContent = tag ? `Cable Details – ${tag}` : (defaultEditorTitle || 'Cable Details');
+      editorTitle.textContent = activeEditorMode === 'new'
+        ? 'Add Cable'
+        : (tag ? `Cable Details - ${tag}` : (defaultEditorTitle || 'Cable Details'));
     }
     editorModal.style.display = 'flex';
     editorModal.setAttribute('aria-hidden', 'false');
@@ -976,11 +1256,28 @@ async function initCableSchedule() {
   if (editorForm) {
     editorForm.addEventListener('submit', e => {
       e.preventDefault();
+      const updatedValues = getEditorFieldValues();
+      if (activeEditorMode === 'new') {
+        if (!activeTable) {
+          closeEditor();
+          return;
+        }
+        if (activeRowData?.typical_id) updatedValues.typical_id = activeRowData.typical_id;
+        updatedValues.last_modified = new Date().toISOString();
+        const tr = activeTable.addRow(updatedValues);
+        if (tr && updatedValues.typical_id) tr.dataset.typicalId = updatedValues.typical_id;
+        advanceTagSettingsPastTags([updatedValues.tag]);
+        if (typeof activeTable.onChange === 'function') {
+          activeTable.onChange();
+        }
+        recordCableChange('Added cable', updatedValues.tag || 'New cable');
+        closeEditor();
+        return;
+      }
       if (!activeRow || !activeTable) {
         closeEditor();
         return;
       }
-      const updatedValues = getEditorFieldValues();
       const offset = activeTable.colOffset || 0;
       activeTable.columns.forEach((col, idx) => {
         const value = updatedValues[col.key];
@@ -1007,6 +1304,7 @@ async function initCableSchedule() {
       if (typeof activeTable.onChange === 'function') {
         activeTable.onChange();
       }
+      if (activeRow) recordCableChange('Updated cable', updatedValues.tag || activeRowData?.tag || 'Cable row');
       closeEditor();
     });
   }
@@ -1028,6 +1326,7 @@ async function initCableSchedule() {
       this.button = document.getElementById('cable-library-btn');
       this.closeBtn = this.modal ? this.modal.querySelector('#close-cable-library-btn') : null;
       this.addBtn = this.modal ? this.modal.querySelector('#cable-library-add-btn') : null;
+      this.starterBtn = this.modal ? this.modal.querySelector('#cable-library-starter-btn') : null;
       this.exportBtn = this.modal ? this.modal.querySelector('#cable-library-export-btn') : null;
       this.importBtn = this.modal ? this.modal.querySelector('#cable-library-import-btn') : null;
       this.importInput = this.modal ? this.modal.querySelector('#cable-library-import-input') : null;
@@ -1060,6 +1359,7 @@ async function initCableSchedule() {
       this.button.addEventListener('click', () => this.open());
       if (this.closeBtn) this.closeBtn.addEventListener('click', () => this.close());
       if (this.addBtn) this.addBtn.addEventListener('click', () => this.startAdd());
+      if (this.starterBtn) this.starterBtn.addEventListener('click', () => this.loadStarterTemplates());
       if (this.exportBtn) this.exportBtn.addEventListener('click', () => this.exportTemplates());
       if (this.importBtn && this.importInput) {
         this.importBtn.addEventListener('click', () => {
@@ -1095,6 +1395,27 @@ async function initCableSchedule() {
       this.templates = normalized;
       if (changed) dataStore.setCableTemplates(normalized);
       this.renderList();
+    }
+
+    loadStarterTemplates() {
+      const existingLabels = new Set(
+        (this.templates || [])
+          .map(tpl => (tpl?.label || '').trim().toLowerCase())
+          .filter(Boolean)
+      );
+      const additions = STARTER_CABLE_TYPES
+        .filter(tpl => !existingLabels.has((tpl.label || '').trim().toLowerCase()))
+        .map(tpl => ({ ...filterTemplateFields(tpl, { keepLabel: true }), template_id: generateTemplateId() }));
+      if (!additions.length) {
+        showAlertModal('Starter Types Loaded', 'The starter cable types are already in the library.');
+        return;
+      }
+      const merged = [...(this.templates || []), ...additions];
+      const { templates: normalized } = ensureTemplateIds(merged);
+      dataStore.setCableTemplates(normalized);
+      this.showList();
+      this.renderList();
+      showAlertModal('Starter Types Loaded', `${additions.length} starter cable type${additions.length === 1 ? '' : 's'} added to the library.`);
     }
 
     exportTemplates() {
@@ -1488,6 +1809,14 @@ async function initCableSchedule() {
           field.id = fieldId;
           fieldContainer.appendChild(label);
           fieldContainer.appendChild(field);
+          if (FIELD_HELP_TEXT[col.key]) {
+            const helper = document.createElement('p');
+            helper.className = 'modal-helper-text';
+            helper.id = `${fieldId}-helper`;
+            helper.textContent = FIELD_HELP_TEXT[col.key];
+            field.setAttribute('aria-describedby', [field.getAttribute('aria-describedby'), helper.id].filter(Boolean).join(' '));
+            fieldContainer.appendChild(helper);
+          }
           this.fieldMap.set(col.key, field);
           wrapper.appendChild(fieldContainer);
         });
@@ -1758,29 +2087,124 @@ async function initCableSchedule() {
     });
   }
 
-  function validateRow(tr){
-    const tagIn = tr.querySelector('[name="tag"]');
-    const sizeIn = tr.querySelector('[name="conductor_size"]');
-    const lengthIn = tr.querySelector('[name="length"]');
-    const racewaySel = tr.querySelector('[name="raceway_ids"]');
-    let valid = true;
-    const getRacewayVals = el => {
-      if (!el) return [];
-      if (typeof el.getSelectedValues === 'function') return el.getSelectedValues();
-      return Array.from(el.selectedOptions || []).map(o => o.value).filter(v => v);
+  const REQUIRED_FIELD_KEYS = new Set(['tag', 'conductor_size', 'length', 'raceway_ids']);
+  const touchedRequiredFields = new WeakSet();
+  const validationSummary = document.getElementById('cable-validation-summary');
+  let validationActive = false;
+
+  function getRacewayValues(el){
+    if (!el) return [];
+    if (typeof el.getSelectedValues === 'function') return el.getSelectedValues();
+    return Array.from(el.selectedOptions || []).map(o => o.value).filter(v => v);
+  }
+
+  function isRequiredFieldValid(key, el){
+    if (!el) return true;
+    if (key === 'raceway_ids') return getRacewayValues(el).length > 0;
+    const value = `${el.value ?? ''}`.trim();
+    if (key === 'length') return value !== '' && !Number.isNaN(Number(value));
+    return value !== '';
+  }
+
+  function isRequiredValueValid(key, row = {}){
+    if (key === 'raceway_ids') {
+      const value = row.raceway_ids;
+      if (Array.isArray(value)) return value.filter(Boolean).length > 0;
+      return `${value || ''}`.trim() !== '';
+    }
+    const value = `${row[key] ?? ''}`.trim();
+    if (key === 'length') return value !== '' && !Number.isNaN(Number(value));
+    return value !== '';
+  }
+
+  function getReadinessSummary(data = []){
+    const counts = {
+      total: data.length,
+      ready: 0,
+      missingRaceway: 0,
+      missingSize: 0,
+      missingLength: 0,
+      duplicateTags: 0,
+      latestEdit: ''
     };
-    const checks = [
-      [tagIn, tagIn && tagIn.value.trim() !== ''],
-      [sizeIn, sizeIn && sizeIn.value.trim() !== ''],
-      [lengthIn, lengthIn && lengthIn.value.trim() !== '' && !isNaN(lengthIn.value)],
-      [racewaySel, getRacewayVals(racewaySel).length > 0]
-    ];
-    checks.forEach(([el, ok]) => {
+    const tagCounts = new Map();
+    data.forEach(row => {
+      const tag = `${row?.tag || ''}`.trim().toLowerCase();
+      if (tag) tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1);
+      if (!isRequiredValueValid('raceway_ids', row)) counts.missingRaceway += 1;
+      if (!isRequiredValueValid('conductor_size', row)) counts.missingSize += 1;
+      if (!isRequiredValueValid('length', row)) counts.missingLength += 1;
+      const ready = Array.from(REQUIRED_FIELD_KEYS).every(key => isRequiredValueValid(key, row));
+      if (ready) counts.ready += 1;
+      const modified = row?.last_modified ? new Date(row.last_modified) : null;
+      if (modified && !Number.isNaN(modified.getTime())) {
+        const current = counts.latestEdit ? new Date(counts.latestEdit) : null;
+        if (!current || modified > current) counts.latestEdit = modified.toISOString();
+      }
+    });
+    tagCounts.forEach(count => {
+      if (count > 1) counts.duplicateTags += count;
+    });
+    return counts;
+  }
+
+  function updateReadinessPanel(dataRows = null){
+    const panel = document.getElementById('routing-readiness-panel');
+    if (!panel) return;
+    const data = Array.isArray(dataRows)
+      ? dataRows
+      : (tableInstance && typeof tableInstance.getData === 'function' ? tableInstance.getData() : []);
+    const summary = getReadinessSummary(data);
+    const setMetric = (name, value) => {
+      const el = panel.querySelector(`[data-metric="${name}"]`);
+      if (el) el.textContent = `${value}`;
+    };
+    setMetric('total', summary.total);
+    setMetric('ready', summary.ready);
+    setMetric('missing-raceway', summary.missingRaceway);
+    setMetric('missing-size', summary.missingSize);
+    setMetric('duplicates', summary.duplicateTags);
+    const latestLog = readCableChangeLog()[0];
+    const lastEdit = summary.latestEdit || latestLog?.at || '';
+    setMetric('last-edit', lastEdit ? formatDateTime(lastEdit) : 'No edits yet');
+    panel.classList.toggle('is-ready', summary.total > 0 && summary.ready === summary.total && summary.duplicateTags === 0);
+    panel.classList.toggle('has-warnings', summary.missingRaceway > 0 || summary.missingSize > 0 || summary.missingLength > 0 || summary.duplicateTags > 0);
+  }
+
+  function updateValidationSummary(totalRows, invalidRows, showAll){
+    if (!validationSummary) return;
+    validationSummary.classList.remove('is-warning', 'is-success');
+    if (!totalRows) {
+      validationSummary.textContent = 'No cables yet. Add Cable to start.';
+      return;
+    }
+    if (!showAll) {
+      validationSummary.textContent = '';
+      return;
+    }
+    if (invalidRows) {
+      validationSummary.textContent = `${invalidRows} cable${invalidRows === 1 ? '' : 's'} need required fields before saving or exporting.`;
+      validationSummary.classList.add('is-warning');
+    } else {
+      validationSummary.textContent = 'Required fields are complete.';
+      validationSummary.classList.add('is-success');
+    }
+  }
+
+  function validateRow(tr, options = {}){
+    const showAll = options.showAll === true;
+    let valid = true;
+    REQUIRED_FIELD_KEYS.forEach(key => {
+      const el = tr.querySelector(`[name="${key}"]`);
       if (!el) return;
-      el.classList.toggle('missing-value', !ok);
+      const ok = isRequiredFieldValid(key, el);
+      const shouldShow = showAll || touchedRequiredFields.has(el);
+      el.classList.toggle('missing-value', !ok && shouldShow);
+      const cell = el.closest('td');
+      if (cell) cell.classList.toggle('missing-value-cell', !ok && shouldShow);
       if (!ok) valid = false;
     });
-    tr.classList.toggle('missing-row', !valid);
+    tr.classList.toggle('missing-row', !valid && showAll);
     return valid;
   }
 
@@ -1807,14 +2231,37 @@ async function initCableSchedule() {
     });
   }
 
-  function validateAllRows(){
+  function validateAllRows(options = {}){
+    const showAll = options.showAll ?? validationActive;
     const rows = Array.from(table.tbody.querySelectorAll('tr'));
     let allValid = true;
+    let invalidRows = 0;
     rows.forEach(tr => {
-      if(!validateRow(tr)) allValid = false;
+      if(!validateRow(tr, { showAll })) {
+        allValid = false;
+        invalidRows += 1;
+      }
     });
     highlightDuplicateTags(rows);
+    updateValidationSummary(rows.length, invalidRows, showAll);
+    updateReadinessPanel(rows.map(tr => {
+      const activeTable = tableInstance || table;
+      return activeTable && typeof activeTable.getRowData === 'function' ? activeTable.getRowData(tr) : {};
+    }));
     return allValid;
+  }
+
+  function stampRowLastModified(tr, at = new Date().toISOString()){
+    if (!tr) return at;
+    const field = tr.querySelector('[name="last_modified"]');
+    if (field) field.value = at;
+    tr.dataset.lastModified = at;
+    return at;
+  }
+
+  function stampRowsLastModified(rows, at = new Date().toISOString()){
+    (rows || []).forEach(tr => stampRowLastModified(tr, at));
+    return at;
   }
 
   const table = createTable({
@@ -1830,9 +2277,16 @@ async function initCableSchedule() {
     deleteAllBtnId:'delete-all-btn',
     selectable:true,
     enableContextMenu:true,
-    showActionColumn:false,
+    showActionColumn:true,
     columns,
     onView:(row,tr)=>openEditor(row,tr,table),
+    onDuplicateRowData: row => {
+      const clone = { ...row };
+      const ids = table.getData().map(r => r.tag).filter(Boolean);
+      clone.tag = generateId(ids, clone.tag);
+      clone.last_modified = new Date().toISOString();
+      return clone;
+    },
     onChange:() => {
       const before = tableData ? [...tableData] : [];
       const data = table.getData();
@@ -1883,10 +2337,17 @@ async function initCableSchedule() {
       }
     },
     onSave:() => {
+      validationActive = true;
+      if (!validateAllRows({ showAll: true })) {
+        showAlertModal('Required Fields Missing', 'Complete Tag, Conductor Size, Length, and Raceway(s) before saving.');
+        markUnsaved();
+        return;
+      }
       markSaved();
       tableData = table.getData();
       dataStore.setCables(tableData); // persist only when user saves
       dataStore.saveProject(projectId);
+      recordCableChange('Saved schedule', `${tableData.length} cable${tableData.length === 1 ? '' : 's'} saved`);
     }
   });
   tableInstance = table;
@@ -1894,26 +2355,86 @@ async function initCableSchedule() {
   initTableSearch();
   validateAllRows();
 
+  const pendingEditedTags = new Set();
+  let editLogTimer = null;
+  const queueEditLog = tr => {
+    const tag = tr?.querySelector('[name="tag"]')?.value?.trim();
+    if (tag) pendingEditedTags.add(tag);
+    if (editLogTimer) window.clearTimeout(editLogTimer);
+    editLogTimer = window.setTimeout(() => {
+      if (!pendingEditedTags.size) return;
+      const tags = Array.from(pendingEditedTags).slice(0, 3);
+      const extra = pendingEditedTags.size > tags.length ? ` and ${pendingEditedTags.size - tags.length} more` : '';
+      pendingEditedTags.clear();
+      recordCableChange('Edited cable data', `${tags.join(', ')}${extra}`);
+    }, 900);
+  };
+
+  if (table.tbody) {
+    const stampUserEdit = e => {
+      const target = e.target;
+      if (!target || !target.name || target.name === 'last_modified') return;
+      if (target.classList && target.classList.contains('row-select')) return;
+      const row = target.closest('tr');
+      if (!row) return;
+      stampRowLastModified(row);
+      queueEditLog(row);
+    };
+    table.tbody.addEventListener('input', stampUserEdit, true);
+    table.tbody.addEventListener('change', stampUserEdit, true);
+  }
+
   if (typeof MutationObserver !== 'undefined' && table?.tbody) {
     const observer = new MutationObserver(() => validateAllRows());
     observer.observe(table.tbody, { childList: true });
   }
 
-  const addRowFromTemplate = templateValues => {
-    if (!tableInstance) return null;
+  const markRequiredFieldTouched = target => {
+    if (!target || !REQUIRED_FIELD_KEYS.has(target.name)) return;
+    touchedRequiredFields.add(target);
+    const row = target.closest('tr');
+    if (row) validateRow(row, { showAll: validationActive });
+    validateAllRows({ showAll: validationActive });
+  };
+
+  if (table.tbody) {
+    table.tbody.addEventListener('focusout', e => markRequiredFieldTouched(e.target));
+    table.tbody.addEventListener('change', e => markRequiredFieldTouched(e.target));
+  }
+
+  const saveScheduleBtn = document.getElementById('save-schedule-btn');
+  if (saveScheduleBtn) {
+    saveScheduleBtn.addEventListener('click', e => {
+      validationActive = true;
+      if (!validateAllRows({ showAll: true })) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        showAlertModal('Required Fields Missing', 'Complete Tag, Conductor Size, Length, and Raceway(s) before saving.');
+      }
+    }, { capture: true });
+  }
+
+  const deleteAllBtn = document.getElementById('delete-all-btn');
+  if (deleteAllBtn) {
+    deleteAllBtn.addEventListener('click', () => {
+      const count = table.getData().length;
+      if (count) recordCableChange('Deleted all cables', `${count} cable${count === 1 ? '' : 's'} removed`);
+    }, { capture: true });
+  }
+
+  const openNewCableEditor = templateValues => {
+    if (!tableInstance) return;
     const templateId = templateValues?.template_id || templateValues?.typical_id || '';
-    const templateCopy = sanitizeTemplate(templateValues || {});
-    if (templateCopy.tag) {
+    const initialValues = sanitizeTemplate(templateValues || {});
+    if (initialValues.tag) {
       const ids = tableInstance.getData().map(r => r.tag).filter(Boolean);
-      templateCopy.tag = generateId(ids, templateCopy.tag);
+      initialValues.tag = generateId(ids, initialValues.tag);
+    } else {
+      initialValues.tag = generateNextCableTag();
     }
-    delete templateCopy.template_id;
-    templateCopy.typical_id = templateId;
-    const tr = tableInstance.addRow(templateCopy);
-    if (typeof tableInstance.onChange === 'function') {
-      tableInstance.onChange();
-    }
-    return tr;
+    delete initialValues.template_id;
+    if (templateId) initialValues.typical_id = templateId;
+    openEditor(initialValues, null, tableInstance, { mode: 'new', columnKeys: BASIC_ENTRY_KEYS });
   };
 
   const addRowBtn = document.getElementById('add-row-btn');
@@ -1923,19 +2444,238 @@ async function initCableSchedule() {
       e.stopImmediatePropagation();
       const template = await chooseTemplateForNewRow();
       if (template === null) return;
-      if (template) {
-        addRowFromTemplate(template);
-      } else {
-        table.addRow();
-        if (typeof table.onChange === 'function') table.onChange();
-      }
+      openNewCableEditor(template || {});
     }, { capture: true });
   }
 
+  const quickAddBtn = document.getElementById('quick-add-cables-btn');
+  const createQuickAddSelect = (values, options = {}) => {
+    const select = document.createElement('select');
+    if (options.multiple) {
+      select.multiple = true;
+      select.size = options.size || 4;
+    } else {
+      const blank = document.createElement('option');
+      blank.value = '';
+      blank.textContent = options.blankLabel || '';
+      select.appendChild(blank);
+    }
+    (values || []).forEach(value => {
+      const option = document.createElement('option');
+      option.value = value;
+      option.textContent = value;
+      select.appendChild(option);
+    });
+    return select;
+  };
+
+  function openQuickAddDialog() {
+    const initialCount = 5;
+    const generated = generateTagSequence(initialCount).tags;
+    let bodyTable = null;
+    const addQuickRow = (values = {}) => {
+      if (!bodyTable) return null;
+      const tr = bodyTable.insertRow();
+      const makeCell = control => {
+        const td = tr.insertCell();
+        td.appendChild(control);
+        return control;
+      };
+      const tagInput = makeCell(document.createElement('input'));
+      tagInput.type = 'text';
+      tagInput.name = 'tag';
+      tagInput.value = values.tag || '';
+      tagInput.placeholder = 'CBL-001';
+      tr.dataset.initialTag = tagInput.value;
+
+      const fromInput = makeCell(document.createElement('input'));
+      fromInput.type = 'text';
+      fromInput.name = 'from_tag';
+      fromInput.setAttribute('list', 'batch-equipment-list');
+      fromInput.value = values.from_tag || '';
+
+      const toInput = makeCell(document.createElement('input'));
+      toInput.type = 'text';
+      toInput.name = 'to_tag';
+      toInput.setAttribute('list', 'batch-equipment-list');
+      toInput.value = values.to_tag || '';
+
+      const typeSelect = makeCell(createQuickAddSelect(cableTypes, { blankLabel: 'Type' }));
+      typeSelect.name = 'cable_type';
+      typeSelect.value = values.cable_type || '';
+
+      const sizeSelect = makeCell(createQuickAddSelect(conductorSizes, { blankLabel: 'Size' }));
+      sizeSelect.name = 'conductor_size';
+      sizeSelect.value = values.conductor_size || '';
+
+      const lengthInput = makeCell(document.createElement('input'));
+      lengthInput.type = 'number';
+      lengthInput.step = 'any';
+      lengthInput.min = '0';
+      lengthInput.name = 'length';
+      lengthInput.value = values.length || '';
+
+      const racewaySelect = makeCell(createQuickAddSelect(getRacewayOptions(), { multiple: true, size: 4 }));
+      racewaySelect.name = 'raceway_ids';
+      const raceways = Array.isArray(values.raceway_ids) ? values.raceway_ids : [];
+      Array.from(racewaySelect.options).forEach(option => {
+        option.selected = raceways.includes(option.value);
+      });
+      return tr;
+    };
+
+    const getQuickRows = () => Array.from(bodyTable?.rows || []);
+    const fillGeneratedTags = () => {
+      const rows = getQuickRows();
+      const sequence = generateTagSequence(rows.length).tags;
+      rows.forEach((tr, idx) => {
+        const input = tr.querySelector('[name="tag"]');
+        if (!input) return;
+        input.value = sequence[idx] || '';
+        tr.dataset.initialTag = input.value;
+      });
+    };
+    const readQuickRow = tr => {
+      const row = {
+        tag: tr.querySelector('[name="tag"]')?.value?.trim() || '',
+        from_tag: tr.querySelector('[name="from_tag"]')?.value?.trim() || '',
+        to_tag: tr.querySelector('[name="to_tag"]')?.value?.trim() || '',
+        cable_type: tr.querySelector('[name="cable_type"]')?.value || '',
+        conductor_size: tr.querySelector('[name="conductor_size"]')?.value || '',
+        length: tr.querySelector('[name="length"]')?.value || '',
+        raceway_ids: Array.from(tr.querySelector('[name="raceway_ids"]')?.selectedOptions || []).map(opt => opt.value)
+      };
+      const changedTagOnly = row.tag && row.tag !== (tr.dataset.initialTag || '');
+      const hasProjectData = row.from_tag || row.to_tag || row.cable_type || row.conductor_size || row.length || row.raceway_ids.length;
+      return (changedTagOnly || hasProjectData) ? row : null;
+    };
+
+    openModal({
+      title: 'Quick Add Multiple Cables',
+      description: 'Enter the core schedule fields for several cables at once.',
+      primaryText: 'Add Cables',
+      secondaryText: 'Cancel',
+      variant: 'wide',
+      render(body) {
+        const toolbar = document.createElement('div');
+        toolbar.className = 'quick-add-toolbar';
+        const addLineBtn = document.createElement('button');
+        addLineBtn.type = 'button';
+        addLineBtn.className = 'btn';
+        addLineBtn.textContent = 'Add Line';
+        const generateBtn = document.createElement('button');
+        generateBtn.type = 'button';
+        generateBtn.className = 'btn';
+        generateBtn.textContent = 'Generate Tags';
+        toolbar.append(addLineBtn, generateBtn);
+
+        const wrapper = document.createElement('div');
+        wrapper.className = 'quick-add-table-wrap';
+        const tableEl = document.createElement('table');
+        tableEl.className = 'quick-add-table';
+        const thead = tableEl.createTHead();
+        const header = thead.insertRow();
+        ['Tag', 'From', 'To', 'Cable Type', 'Conductor Size', 'Length', 'Raceway(s)'].forEach(label => {
+          const th = document.createElement('th');
+          th.textContent = label;
+          header.appendChild(th);
+        });
+        bodyTable = tableEl.createTBody();
+        generated.forEach(tag => addQuickRow({ tag }));
+        wrapper.appendChild(tableEl);
+        body.append(toolbar, wrapper);
+        addLineBtn.addEventListener('click', () => addQuickRow({}));
+        generateBtn.addEventListener('click', fillGeneratedTags);
+        return bodyTable.querySelector('input, select');
+      },
+      onSubmit: () => {
+        if (!tableInstance) return true;
+        const rows = getQuickRows().map(readQuickRow).filter(Boolean);
+        if (!rows.length) {
+          showAlertModal('No Cable Rows', 'Enter at least one cable row before adding.');
+          return false;
+        }
+        const now = new Date().toISOString();
+        rows.forEach(row => {
+          if (!row.tag) row.tag = generateNextCableTag();
+          row.last_modified = now;
+          tableInstance.addRow(row);
+        });
+        advanceTagSettingsPastTags(rows.map(row => row.tag));
+        if (typeof tableInstance.onChange === 'function') tableInstance.onChange();
+        recordCableChange('Quick added cables', `${rows.length} cable${rows.length === 1 ? '' : 's'} added`);
+        return true;
+      }
+    });
+  }
+  if (quickAddBtn) quickAddBtn.addEventListener('click', openQuickAddDialog);
+
   libraryController.setApplyHandler(template => {
-    if (!tableInstance) return;
-    addRowFromTemplate(template);
+    openNewCableEditor(template);
   });
+
+  const tagAutoEnabled = document.getElementById('tag-auto-enabled');
+  const tagPrefixInput = document.getElementById('tag-prefix-input');
+  const tagNextInput = document.getElementById('tag-next-input');
+  const tagPaddingInput = document.getElementById('tag-padding-input');
+  const tagPreview = document.getElementById('tag-settings-preview');
+  const saveTagSettingsBtn = document.getElementById('save-tag-settings-btn');
+
+  function updateTagSettingsControls() {
+    if (tagAutoEnabled) tagAutoEnabled.checked = tagSettings.enabled;
+    if (tagPrefixInput) tagPrefixInput.value = tagSettings.prefix;
+    if (tagNextInput) tagNextInput.value = String(tagSettings.nextNumber);
+    if (tagPaddingInput) tagPaddingInput.value = String(tagSettings.padding);
+    if (tagPreview) {
+      tagPreview.textContent = tagSettings.enabled
+        ? `Next generated tag: ${formatCableTag(tagSettings)}`
+        : 'Automatic tag generation is off.';
+    }
+  }
+
+  const readTagSettingsControls = () => normalizeTagSettings({
+    enabled: tagAutoEnabled ? tagAutoEnabled.checked : tagSettings.enabled,
+    prefix: tagPrefixInput ? tagPrefixInput.value : tagSettings.prefix,
+    nextNumber: tagNextInput ? tagNextInput.value : tagSettings.nextNumber,
+    padding: tagPaddingInput ? tagPaddingInput.value : tagSettings.padding
+  });
+
+  const tagSettingsTrigger = document.getElementById('open-tag-settings-btn');
+  if (tagSettingsTrigger) {
+    tagSettingsTrigger.addEventListener('click', updateTagSettingsControls, { capture: true });
+  }
+  [tagAutoEnabled, tagPrefixInput, tagNextInput, tagPaddingInput].forEach(el => {
+    if (!el) return;
+    el.addEventListener('input', () => {
+      const next = readTagSettingsControls();
+      if (tagPreview) {
+        tagPreview.textContent = next.enabled
+          ? `Next generated tag: ${formatCableTag(next)}`
+          : 'Automatic tag generation is off.';
+      }
+    });
+    el.addEventListener('change', () => {
+      const next = readTagSettingsControls();
+      if (tagPreview) {
+        tagPreview.textContent = next.enabled
+          ? `Next generated tag: ${formatCableTag(next)}`
+          : 'Automatic tag generation is off.';
+      }
+    });
+  });
+  if (saveTagSettingsBtn) {
+    saveTagSettingsBtn.addEventListener('click', () => {
+      saveTagSettings(readTagSettingsControls());
+      recordCableChange('Updated tag settings', formatCableTag(tagSettings));
+    });
+  }
+  attachControlModal('open-tag-settings-btn', 'tag-settings-controls', {
+    title: 'Cable Tag Settings',
+    description: 'Define the automatic numbering pattern used by Add Cable and Quick Add.',
+    initialFocusSelector: 'input, select',
+    closeLabel: 'Close tag settings dialog'
+  });
+  updateTagSettingsControls();
 
   batchTypicalSelect = document.getElementById('batch-typical-select');
   applyTypicalBtn = document.getElementById('apply-typical-selected-btn');
@@ -1973,11 +2713,13 @@ async function initCableSchedule() {
         const current = tableInstance.getRowData(tr);
         const merged = mergeTemplateValues(templateValues, current, { preserveKeys: ['tag'], overwriteExisting: true });
         merged.typical_id = templateAssociation;
+        merged.last_modified = new Date().toISOString();
         delete merged.template_id;
         tableInstance.applyValuesToRow(tr, merged, { skipUndefined: true });
       });
       tableInstance.applyFilters();
       updateBatchTypicalControls();
+      recordCableChange('Applied typical', `${rows.length} selected cable${rows.length === 1 ? '' : 's'}`);
     });
   }
 
@@ -2007,6 +2749,101 @@ async function initCableSchedule() {
         typicalFilterSelect.value = '';
       }
       applyTypicalFilter();
+    });
+  }
+
+  const batchRacewayInput = document.getElementById('batch-raceway-input');
+  const batchCableTypeInput = document.getElementById('batch-cable-type-input');
+  const batchVoltageInput = document.getElementById('batch-voltage-input');
+  const batchFromInput = document.getElementById('batch-from-input');
+  const batchToInput = document.getElementById('batch-to-input');
+  const batchEquipmentList = document.getElementById('batch-equipment-list');
+  applyBatchEditBtn = document.getElementById('apply-batch-edit-btn');
+  batchEditCheckboxes = [
+    document.getElementById('batch-set-raceway'),
+    document.getElementById('batch-set-cable-type'),
+    document.getElementById('batch-set-voltage'),
+    document.getElementById('batch-set-from'),
+    document.getElementById('batch-set-to')
+  ].filter(Boolean);
+
+  const setSelectOptions = (select, values, options = {}) => {
+    if (!select) return;
+    const { blankLabel = null } = options;
+    const previous = Array.from(select.selectedOptions || []).map(opt => opt.value);
+    select.innerHTML = '';
+    if (blankLabel !== null) {
+      const blank = document.createElement('option');
+      blank.value = '';
+      blank.textContent = blankLabel;
+      select.appendChild(blank);
+    }
+    (values || []).forEach(value => {
+      const option = document.createElement('option');
+      option.value = value;
+      option.textContent = value;
+      select.appendChild(option);
+    });
+    Array.from(select.options).forEach(option => {
+      option.selected = previous.includes(option.value);
+    });
+  };
+
+  function populateBatchEditControls() {
+    setSelectOptions(batchRacewayInput, getRacewayOptions());
+    setSelectOptions(batchCableTypeInput, cableTypes, { blankLabel: 'Select cable type' });
+    if (batchEquipmentList) {
+      batchEquipmentList.innerHTML = '';
+      getEquipmentOptions().forEach(item => {
+        const option = document.createElement('option');
+        option.value = item;
+        batchEquipmentList.appendChild(option);
+      });
+    }
+    updateBatchActionState();
+  }
+
+  const batchEditTrigger = document.getElementById('open-batch-edit-btn');
+  if (batchEditTrigger) {
+    batchEditTrigger.addEventListener('click', populateBatchEditControls, { capture: true });
+  }
+  attachControlModal('open-batch-edit-btn', 'batch-edit-controls', {
+    title: 'Batch Edit Cables',
+    description: 'Select rows in the schedule, choose the fields to update, then apply common values.',
+    initialFocusSelector: 'input, select, button',
+    closeLabel: 'Close batch edit dialog'
+  });
+  batchEditCheckboxes.forEach(input => {
+    input.addEventListener('change', updateBatchActionState);
+  });
+  if (applyBatchEditBtn) {
+    applyBatchEditBtn.addEventListener('click', () => {
+      if (!tableInstance || typeof tableInstance.getSelectedRows !== 'function') return;
+      const rows = tableInstance.getSelectedRows();
+      if (!rows.length) return;
+      const values = {};
+      if (document.getElementById('batch-set-raceway')?.checked) {
+        values.raceway_ids = Array.from(batchRacewayInput?.selectedOptions || []).map(opt => opt.value).filter(Boolean);
+      }
+      if (document.getElementById('batch-set-cable-type')?.checked) {
+        values.cable_type = batchCableTypeInput ? batchCableTypeInput.value : '';
+      }
+      if (document.getElementById('batch-set-voltage')?.checked) {
+        values.operating_voltage = batchVoltageInput ? batchVoltageInput.value : '';
+      }
+      if (document.getElementById('batch-set-from')?.checked) {
+        values.from_tag = batchFromInput ? batchFromInput.value : '';
+      }
+      if (document.getElementById('batch-set-to')?.checked) {
+        values.to_tag = batchToInput ? batchToInput.value : '';
+      }
+      values.last_modified = new Date().toISOString();
+      rows.forEach(tr => {
+        tableInstance.applyValuesToRow(tr, values, { skipUndefined: true });
+      });
+      tableInstance.applyFilters();
+      updateBatchActionState();
+      recordCableChange('Batch edited cables', `${rows.length} selected cable${rows.length === 1 ? '' : 's'}`);
     });
   }
 
@@ -2071,32 +2908,6 @@ async function initCableSchedule() {
     return id;
   }
 
-  table.tbody.addEventListener('click', e => {
-    const btn = e.target;
-    const tr = btn.closest('tr');
-    if (!tr) return;
-    if (btn.classList.contains('duplicateBtn')) {
-      e.stopImmediatePropagation();
-      const data = table.getData();
-      const idx = Array.from(table.tbody.rows).indexOf(tr);
-      const clone = { ...data[idx] };
-      const ids = data.map(r => r.tag).filter(Boolean);
-      clone.tag = generateId(ids, clone.tag);
-      data.splice(idx + 1, 0, clone);
-      table.setData(data);
-      table.save();
-      if (table.onChange) table.onChange();
-    } else if (btn.classList.contains('removeBtn')) {
-      e.stopImmediatePropagation();
-      const data = table.getData();
-      const idx = Array.from(table.tbody.rows).indexOf(tr);
-      data.splice(idx, 1);
-      table.setData(data);
-      table.save();
-      if (table.onChange) table.onChange();
-    }
-  });
-
   // Provide a setData method similar to Tabulator for convenience.
   table.setData = function(rows){
     this.tbody.innerHTML='';
@@ -2108,11 +2919,6 @@ async function initCableSchedule() {
 
   // Ensure the table is populated with any existing data on load.
   table.setData(tableData);
-
-  // If no saved data exists, display a single empty row so the table isn't blank
-  if (!tableData || tableData.length === 0) {
-    table.addRow();
-  }
 
   applySizingHighlight();
   applyReviewStatusHighlight();
@@ -2150,6 +2956,7 @@ async function initCableSchedule() {
       table.save();
       validateAllRows();
       markSaved();
+      recordCableChange('Loaded sample data', `${sampleCables.length} sample cable${sampleCables.length === 1 ? '' : 's'} loaded`);
       if (Array.isArray(sampleTemplates) && sampleTemplates.length) {
         const { templates: normalized } = ensureTemplateIds(sampleTemplates);
         dataStore.setCableTemplates(normalized);
@@ -2159,13 +2966,315 @@ async function initCableSchedule() {
     }
   });
 
-  const origExport = table.exportXlsx.bind(table);
-  table.exportXlsx = function(){
-    if(!validateAllRows()){
-      showAlertModal('Validation Error', 'Please complete required fields before exporting.');
+  const normalizeImportHeader = header => String(header || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '');
+  const importAliasMap = new Map([
+    ['cabletag', 'tag'],
+    ['cableid', 'tag'],
+    ['cable', 'tag'],
+    ['from', 'from_tag'],
+    ['source', 'from_tag'],
+    ['to', 'to_tag'],
+    ['destination', 'to_tag'],
+    ['tray', 'raceway_ids'],
+    ['trayid', 'raceway_ids'],
+    ['raceway', 'raceway_ids'],
+    ['raceways', 'raceway_ids'],
+    ['route', 'raceway_ids'],
+    ['size', 'conductor_size'],
+    ['conductorsize', 'conductor_size'],
+    ['runlength', 'length'],
+    ['lengthft', 'length'],
+    ['voltage', 'operating_voltage'],
+    ['type', 'cable_type'],
+    ['cabletype', 'cable_type']
+  ]);
+  const importHeaderLookup = new Map();
+  columns.forEach(col => {
+    importHeaderLookup.set(normalizeImportHeader(col.key), col.key);
+    importHeaderLookup.set(normalizeImportHeader(col.label), col.key);
+  });
+  importAliasMap.forEach((value, key) => importHeaderLookup.set(key, value));
+  const resolveImportHeaderKey = header => importHeaderLookup.get(normalizeImportHeader(header)) || '';
+  const parseImportValue = (key, value) => {
+    if (value === undefined || value === null) return '';
+    if (key === 'raceway_ids') {
+      if (Array.isArray(value)) return value.map(v => `${v}`.trim()).filter(Boolean);
+      return `${value}`.split(/[,;|>]+/).map(part => part.trim()).filter(Boolean);
+    }
+    return typeof value === 'string' ? value.trim() : value;
+  };
+  table.importXlsx = async function(file) {
+    if (!file) return;
+    if (typeof XLSX === 'undefined' || !XLSX?.read || !XLSX?.utils?.sheet_to_json) {
+      showAlertModal('Import Error', 'Excel import is not available in this environment.');
       return;
     }
-    origExport();
+    let rows = [];
+    try {
+      const buffer = await file.arrayBuffer();
+      const workbook = XLSX.read(buffer, { type: 'array' });
+      const sheetName = workbook.SheetNames && workbook.SheetNames[0];
+      if (!sheetName) {
+        showAlertModal('Import Error', 'No sheets were found in the selected file.');
+        return;
+      }
+      rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { defval: '', raw: true });
+    } catch (err) {
+      console.error('Failed to read cable import file', err);
+      showAlertModal('Import Error', 'Unable to read the selected Excel file.');
+      return;
+    }
+    if (!rows.length) {
+      showAlertModal('Import Error', 'No cable rows were found in the selected file.');
+      return;
+    }
+    const headers = Object.keys(rows[0] || {});
+    const mappingSelects = new Map();
+    let appendCheckbox = null;
+    openModal({
+      title: 'Map Cable Import',
+      description: 'Match each spreadsheet column to a Cable Schedule field before importing.',
+      primaryText: 'Import Rows',
+      secondaryText: 'Cancel',
+      variant: 'wide',
+      render(body) {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'import-mapping-grid';
+        headers.forEach(header => {
+          const row = document.createElement('div');
+          row.className = 'import-mapping-row';
+          const label = document.createElement('span');
+          label.textContent = header;
+          const select = document.createElement('select');
+          const skip = document.createElement('option');
+          skip.value = '';
+          skip.textContent = 'Do not import';
+          select.appendChild(skip);
+          columns.forEach(col => {
+            const option = document.createElement('option');
+            option.value = col.key;
+            option.textContent = col.label;
+            select.appendChild(option);
+          });
+          select.value = resolveImportHeaderKey(header);
+          mappingSelects.set(header, select);
+          row.append(label, select);
+          wrapper.appendChild(row);
+        });
+        const appendLabel = document.createElement('label');
+        appendLabel.className = 'inline-check';
+        appendCheckbox = document.createElement('input');
+        appendCheckbox.type = 'checkbox';
+        appendLabel.append(appendCheckbox, document.createTextNode(' Append to existing schedule'));
+        body.append(wrapper, appendLabel);
+        return wrapper.querySelector('select');
+      },
+      onSubmit: () => {
+        const mappings = Array.from(mappingSelects.entries())
+          .map(([header, select]) => [header, select.value])
+          .filter(([, key]) => key);
+        if (!mappings.length) {
+          showAlertModal('Import Mapping Required', 'Map at least one spreadsheet column before importing.');
+          return false;
+        }
+        const importedRows = rows.map(source => {
+          const row = {};
+          mappings.forEach(([header, key]) => {
+            row[key] = parseImportValue(key, source[header]);
+          });
+          row.last_modified = new Date().toISOString();
+          return row;
+        }).filter(row => Object.entries(row).some(([key, value]) => {
+          if (key === 'last_modified') return false;
+          return Array.isArray(value) ? value.length > 0 : `${value ?? ''}`.trim() !== '';
+        }));
+        if (!importedRows.length) {
+          showAlertModal('Import Error', 'No usable cable data was found after mapping.');
+          return false;
+        }
+        const nextRows = appendCheckbox && appendCheckbox.checked
+          ? [...table.getData(), ...importedRows]
+          : importedRows;
+        table.setData(nextRows);
+        advanceTagSettingsPastTags(importedRows.map(row => row.tag));
+        if (typeof table.onChange === 'function') table.onChange();
+        recordCableChange('Imported cables', `${importedRows.length} cable${importedRows.length === 1 ? '' : 's'} imported from Excel`);
+        return true;
+      }
+    });
+  };
+
+  const REPORT_MODE_LABELS = {
+    visible: 'Visible Columns',
+    full: 'Full Schedule',
+    'routing-ready': 'Routing-Ready',
+    'missing-data': 'Missing Data'
+  };
+  const reportModeSelect = document.getElementById('cable-report-mode');
+  const reportSummary = document.getElementById('cable-report-summary');
+  const reportExportBtn = document.getElementById('report-export-btn');
+  const reportPrintBtn = document.getElementById('report-print-btn');
+  const getReportMode = () => reportModeSelect?.value || 'visible';
+  const getDuplicateTagLookup = data => {
+    const counts = new Map();
+    data.forEach(row => {
+      const key = `${row?.tag || ''}`.trim().toLowerCase();
+      if (!key) return;
+      counts.set(key, (counts.get(key) || 0) + 1);
+    });
+    return counts;
+  };
+  const rowHasMissingData = (row, duplicateLookup = null) => {
+    const missingRequired = Array.from(REQUIRED_FIELD_KEYS).some(key => !isRequiredValueValid(key, row));
+    const tag = `${row?.tag || ''}`.trim().toLowerCase();
+    const duplicate = tag && duplicateLookup && duplicateLookup.get(tag) > 1;
+    return missingRequired || duplicate;
+  };
+  const getReportColumns = mode => {
+    if (mode !== 'visible') return columns;
+    const offset = table.colOffset || 0;
+    return columns.filter((col, idx) => {
+      const headerCell = table.headerRow?.cells[idx + offset];
+      return !headerCell || !headerCell.classList.contains('group-hidden');
+    });
+  };
+  const getReportRows = mode => {
+    const data = table.getData();
+    const duplicateLookup = getDuplicateTagLookup(data);
+    if (mode === 'routing-ready') {
+      return data.filter(row => Array.from(REQUIRED_FIELD_KEYS).every(key => isRequiredValueValid(key, row)));
+    }
+    if (mode === 'missing-data') {
+      return data.filter(row => rowHasMissingData(row, duplicateLookup));
+    }
+    return data;
+  };
+  const formatReportValue = value => {
+    if (Array.isArray(value)) return value.join(', ');
+    return value == null ? '' : value;
+  };
+  const exportCableReport = mode => {
+    if (typeof XLSX === 'undefined' || !XLSX?.utils) {
+      showAlertModal('Export Error', 'Excel export is not available in this environment.');
+      return;
+    }
+    const reportMode = REPORT_MODE_LABELS[mode] ? mode : 'visible';
+    const reportColumns = getReportColumns(reportMode);
+    const reportRows = getReportRows(reportMode);
+    const sheetData = [
+      reportColumns.map(col => col.label),
+      ...reportRows.map(row => reportColumns.map(col => formatReportValue(row[col.key])))
+    ];
+    const workbook = XLSX.utils.book_new();
+    const sheet = XLSX.utils.aoa_to_sheet(sheetData);
+    XLSX.utils.book_append_sheet(workbook, sheet, REPORT_MODE_LABELS[reportMode].slice(0, 31));
+    const stamp = new Date().toISOString().split('T')[0];
+    const suffix = reportMode.replace(/[^a-z0-9]+/gi, '-').toLowerCase();
+    XLSX.writeFile(workbook, `cable-schedule-${suffix}-${stamp}.xlsx`);
+  };
+  const renderCablePrintReport = mode => {
+    const host = document.getElementById('cable-print-report');
+    if (!host) return;
+    const reportMode = REPORT_MODE_LABELS[mode] ? mode : 'visible';
+    const reportColumns = getReportColumns(reportMode);
+    const reportRows = getReportRows(reportMode);
+    host.innerHTML = '';
+    host.removeAttribute('aria-hidden');
+    const meta = document.createElement('div');
+    meta.className = 'print-report-meta';
+    const title = document.createElement('strong');
+    title.textContent = `Cable Schedule - ${REPORT_MODE_LABELS[reportMode]}`;
+    const generated = document.createElement('span');
+    generated.textContent = `Generated ${formatDateTime(new Date())}`;
+    meta.append(title, generated);
+    const tableEl = document.createElement('table');
+    tableEl.className = 'cable-print-table';
+    const thead = tableEl.createTHead();
+    const header = thead.insertRow();
+    reportColumns.forEach(col => {
+      const th = document.createElement('th');
+      th.textContent = col.label;
+      header.appendChild(th);
+    });
+    const tbody = tableEl.createTBody();
+    reportRows.forEach(row => {
+      const tr = tbody.insertRow();
+      reportColumns.forEach(col => {
+        const td = tr.insertCell();
+        td.textContent = formatReportValue(row[col.key]);
+      });
+    });
+    if (!reportRows.length) {
+      const tr = tbody.insertRow();
+      const td = tr.insertCell();
+      td.colSpan = Math.max(1, reportColumns.length);
+      td.textContent = 'No cable rows match this report.';
+    }
+    host.append(meta, tableEl);
+  };
+  const printCableReport = mode => {
+    renderCablePrintReport(mode);
+    window.print();
+  };
+  const updateReportSummary = () => {
+    if (!reportSummary) return;
+    const mode = getReportMode();
+    const rowCount = getReportRows(mode).length;
+    const columnCount = getReportColumns(mode).length;
+    reportSummary.textContent = `${rowCount} row${rowCount === 1 ? '' : 's'} and ${columnCount} column${columnCount === 1 ? '' : 's'} will be included.`;
+  };
+  const reportTrigger = document.getElementById('open-report-options-btn');
+  if (reportTrigger) reportTrigger.addEventListener('click', updateReportSummary, { capture: true });
+  attachControlModal('open-report-options-btn', 'cable-report-controls', {
+    title: 'Cable Report Options',
+    description: 'Choose which rows and columns to export or print.',
+    initialFocusSelector: 'select, button',
+    closeLabel: 'Close report options dialog'
+  });
+  if (reportModeSelect) reportModeSelect.addEventListener('change', updateReportSummary);
+  if (reportExportBtn) reportExportBtn.addEventListener('click', () => table.exportXlsx());
+  if (reportPrintBtn) reportPrintBtn.addEventListener('click', () => printCableReport(getReportMode()));
+  const printScheduleBtn = document.getElementById('print-schedule-btn');
+  if (printScheduleBtn) printScheduleBtn.addEventListener('click', () => printCableReport(getReportMode()));
+  updateReportSummary();
+
+  const changeLogBtn = document.getElementById('open-change-log-btn');
+  if (changeLogBtn) {
+    changeLogBtn.addEventListener('click', () => {
+      const entries = readCableChangeLog();
+      openModal({
+        title: 'Cable Change Log',
+        description: entries.length ? 'Recent local Cable Schedule changes.' : 'No Cable Schedule changes have been recorded yet.',
+        primaryText: 'Close',
+        secondaryText: null,
+        render(body) {
+          if (!entries.length) return null;
+          const list = document.createElement('ol');
+          list.className = 'change-log-list';
+          entries.slice(0, 20).forEach(entry => {
+            const item = document.createElement('li');
+            const action = document.createElement('strong');
+            action.textContent = entry.action || 'Change';
+            const meta = document.createElement('span');
+            meta.textContent = `${formatDateTime(entry.at)}${entry.detail ? ` - ${entry.detail}` : ''}`;
+            item.append(action, meta);
+            list.appendChild(item);
+          });
+          body.appendChild(list);
+          return list.querySelector('li');
+        }
+      });
+    });
+  }
+
+  table.exportXlsx = function(){
+    validationActive = true;
+    const mode = getReportMode();
+    if(mode !== 'missing-data' && !validateAllRows({ showAll: true })){
+      showAlertModal('Required Fields Missing', 'Complete Tag, Conductor Size, Length, and Raceway(s) before exporting.');
+      return;
+    }
+    exportCableReport(mode);
   };
 
   function getCableSchedule(){
@@ -2214,9 +3323,6 @@ async function initCableSchedule() {
   const tourBtn = document.getElementById('tour-btn');
   if (tourBtn) {
     tourBtn.addEventListener('click', () => startTour(CABLE_TOUR_STEPS, 'cableSchedule'));
-  }
-  if (!hasDoneTour('cableSchedule')) {
-    startTour(CABLE_TOUR_STEPS, 'cableSchedule');
   }
 
   window.dispatchEvent(new Event('cableschedule-ready'));

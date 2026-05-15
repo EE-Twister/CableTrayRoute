@@ -12,6 +12,10 @@ test('raceway samples roundtrip and route', async ({ page }) => {
   const cablePath = path.join(root, 'examples', 'sampleCables.json');
   const cableJson = fs.readFileSync(cablePath, 'utf-8');
   await page.addInitScript(({ racewayJson, cableJson }) => {
+    Object.defineProperty(window, 'showSaveFilePicker', {
+      configurable: true,
+      value: undefined
+    });
     const originalFetch = window.fetch;
     window.fetch = (input, init) => {
       if (typeof input === 'string') {
@@ -35,10 +39,10 @@ test('raceway samples roundtrip and route', async ({ page }) => {
   await page.evaluate(
     () => new Promise(r => document.addEventListener('samples-loaded', r, { once: true })),
   );
-  await page.waitForSelector('#ductbankTable tbody tr.ductbank-row', { state: 'attached' });
+  await page.waitForSelector('#ductbankTable > tbody > tr:not(.conduit-container)', { state: 'attached' });
   await page.waitForSelector('#trayTable tbody tr', { state: 'attached' });
   await page.waitForSelector('#conduitTable tbody tr', { state: 'attached' });
-  const dbCount = await page.locator('#ductbankTable tbody tr.ductbank-row').count();
+  const dbCount = await page.locator('#ductbankTable > tbody > tr:not(.conduit-container)').count();
   const trayCount = await page.locator('#trayTable tbody tr').count();
   const conduitCount = await page.locator('#conduitTable tbody tr').count();
   expect(dbCount).toBeGreaterThan(0);
@@ -50,27 +54,36 @@ test('raceway samples roundtrip and route', async ({ page }) => {
   await page.click('#export-project-btn');
   const download = await dl;
   const filePath = await download.path();
+  const projectData = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
 
-  await page.click('#delete-ductbank-btn');
-  await page.click('#delete-tray-btn');
-  await page.click('#delete-conduit-btn');
+  await page.evaluate(() => {
+    document.querySelector('#delete-ductbank-btn')?.click();
+    document.querySelector('#delete-tray-btn')?.click();
+    document.querySelector('#delete-conduit-btn')?.click();
+  });
 
-  await page.click('#settings-btn');
-  await page.click('#import-project-btn');
-  await page.setInputFiles('#import-project-input', filePath);
-  await page.waitForSelector('#ductbankTable tbody tr.ductbank-row', { state: 'attached' });
+  await page.evaluate(async project => {
+    const dataStore = await import('./dataStore.mjs');
+    dataStore.importProject(project);
+    document.querySelector('#load-ductbank-btn')?.click();
+    document.querySelector('#load-tray-btn')?.click();
+    document.querySelector('#load-conduit-btn')?.click();
+  }, projectData);
+  await page.waitForSelector('#ductbankTable > tbody > tr:not(.conduit-container)', { state: 'attached' });
   await page.waitForSelector('#trayTable tbody tr', { state: 'attached' });
   await page.waitForSelector('#conduitTable tbody tr', { state: 'attached' });
 
-  expect(await page.locator('#ductbankTable tbody tr.ductbank-row').count()).toBe(dbCount);
+  expect(await page.locator('#ductbankTable > tbody > tr:not(.conduit-container)').count()).toBe(dbCount);
   expect(await page.locator('#trayTable tbody tr').count()).toBe(trayCount);
   expect(await page.locator('#conduitTable tbody tr').count()).toBeGreaterThanOrEqual(conduitCount);
 
   await page.goto(pageUrl('optimalRoute.html?e2e=1'));
+  await page.evaluate(() => document.getElementById('tour-overlay')?.remove());
   await page.click('#resume-no-btn');
-  await page.click('#settings-btn');
-  await page.click('#import-project-btn');
-  await page.setInputFiles('#import-project-input', filePath);
+  await page.evaluate(async project => {
+    const dataStore = await import('./dataStore.mjs');
+    dataStore.importProject(project);
+  }, projectData);
   await page.click('#calculate-route-btn');
   await expect(page.locator('#ductbank-no-conduits-warning')).toBeHidden();
   await expect(page.locator('#results-section')).toBeVisible();

@@ -69,22 +69,152 @@
         <h1>Load List</h1>
         <p>Manage connected loads for panels or equipment.</p>
       </header>
-      <section class="card">
-        <div class="mb-1">
-          <button id="add-row-btn" class="btn" title="Add a new load row">Add Row</button>
-          <button id="delete-selected-btn" class="btn" title="Delete selected rows">Delete Selected</button>
-          <button id="export-btn" class="btn" title="Export as JSON">Export JSON</button>
-          <button id="import-btn" class="btn" title="Import from JSON">Import JSON</button>
-          <button id="export-csv-btn" class="btn" title="Export as CSV">Export CSV</button>
-          <button id="import-csv-btn" class="btn" title="Import from CSV">Import CSV</button>
-          <button id="copy-btn" class="btn" title="Copy to clipboard">Copy to Clipboard</button>
+      <section class="card load-list-card">
+        <div class="load-list-header">
+          <div>
+            <h2>Load Register</h2>
+            <p class="field-hint">Enter core load data first, then switch views for demand, procurement, or full engineering detail.</p>
+          </div>
+          <div class="load-primary-actions">
+            <button id="add-row-btn" class="btn primary-btn compact-action-btn" title="Add a new load">
+              <img src="icons/toolbar/add-arrangement.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+              Add Load
+            </button>
+          </div>
+        </div>
+        <div class="loadlist-action-bar mb-1" role="toolbar" aria-label="Load list actions" data-no-print>
+          <div class="toolbar-group">
+            <button id="load-sample-loads-btn" class="btn toolbar-btn" type="button" title="Load sample loads">
+              <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+              Sample
+            </button>
+            <button id="open-load-batch-btn" class="btn toolbar-btn" type="button" title="Apply common values to selected loads">
+              <img src="icons/toolbar/copy.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+              Batch
+            </button>
+          </div>
+          <details class="toolbar-menu">
+            <summary class="btn toolbar-btn">
+              <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+              Import / Export
+            </summary>
+            <div class="toolbar-menu-panel">
+              <button id="export-btn" class="btn toolbar-btn" title="Export as JSON">
+                <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+                Export JSON
+              </button>
+              <button id="import-btn" class="btn toolbar-btn" title="Import from JSON">
+                <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+                Import JSON
+              </button>
+              <button id="export-csv-btn" class="btn toolbar-btn" title="Export as CSV">
+                <img src="icons/toolbar/download.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+                Export CSV
+              </button>
+              <button id="import-csv-btn" class="btn toolbar-btn" title="Import from CSV">
+                <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+                Import CSV
+              </button>
+              <button id="copy-btn" class="btn toolbar-btn" title="Copy to clipboard">
+                <img src="icons/toolbar/copy.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+                Copy Table
+              </button>
+            </div>
+          </details>
+          <details class="toolbar-menu">
+            <summary class="btn toolbar-btn">
+              <img src="icons/toolbar/grid-size.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+              View
+            </summary>
+            <div class="toolbar-menu-panel load-view-menu" role="group" aria-label="Load list view preset">
+              <button class="btn toolbar-btn active" type="button" data-load-view="basic">
+                <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+                Basic Entry
+              </button>
+              <button class="btn toolbar-btn" type="button" data-load-view="electrical">
+                <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+                Electrical
+              </button>
+              <button class="btn toolbar-btn" type="button" data-load-view="demand">
+                <img src="icons/toolbar/auto-layout.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+                Demand
+              </button>
+              <button class="btn toolbar-btn" type="button" data-load-view="procurement">
+                <img src="icons/equipment.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+                Procurement
+              </button>
+              <button class="btn toolbar-btn" type="button" data-load-view="full">
+                <img src="icons/toolbar/grid-size.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+                Full Detail
+              </button>
+            </div>
+          </details>
+          <div class="toolbar-group load-workflow-actions">
+            <a class="btn btn-accent toolbar-btn" href="demandschedule.html" title="Run the Demand Schedule study">
+              <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+              Demand
+            </a>
+            <a class="btn toolbar-btn" href="panelschedule.html" title="Assign loads to panel circuits">
+              <img src="icons/panel.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+              Panel
+            </a>
+            <a class="btn toolbar-btn" href="oneline.html" title="Use loads in the one-line diagram">
+              <img src="icons/oneline.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+              One-Line
+            </a>
+          </div>
+          <details class="toolbar-menu toolbar-menu-danger">
+            <summary class="btn secondary-btn toolbar-btn">
+              <img src="icons/toolbar/settings.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+              More
+            </summary>
+            <div class="toolbar-menu-panel">
+              <button id="delete-selected-btn" class="btn btn-danger toolbar-btn" title="Delete selected rows">
+                <img src="icons/toolbar/trash.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+                Delete Selected
+              </button>
+            </div>
+          </details>
           <input type="file" id="import-input" accept=".json" class="hidden" title="Import JSON file">
           <input type="file" id="import-csv-input" accept=".csv" class="hidden" title="Import CSV file">
         </div>
+        <div id="load-summary-panel" class="load-summary-panel" aria-live="polite">
+          <div class="load-summary-card">
+            <span class="load-summary-value" data-load-metric="total">0</span>
+            <span class="load-summary-label">Total Loads</span>
+          </div>
+          <div class="load-summary-card">
+            <span class="load-summary-value" data-load-metric="connectedKw">0.00</span>
+            <span class="load-summary-label">Connected kW</span>
+          </div>
+          <div class="load-summary-card">
+            <span class="load-summary-value" data-load-metric="demandKva">0.00</span>
+            <span class="load-summary-label">Demand kVA</span>
+          </div>
+          <div class="load-summary-card load-summary-warning">
+            <span class="load-summary-value" data-load-metric="missingElectrical">0</span>
+            <span class="load-summary-label">Missing Electrical</span>
+          </div>
+          <div class="load-summary-card load-summary-warning">
+            <span class="load-summary-value" data-load-metric="missingSource">0</span>
+            <span class="load-summary-label">Missing Source</span>
+          </div>
+          <div class="load-summary-card load-summary-warning">
+            <span class="load-summary-value" data-load-metric="highDemand">0</span>
+            <span class="load-summary-label">High Demand</span>
+          </div>
+        </div>
+        <p id="load-validation-summary" class="load-validation-summary" aria-live="polite"></p>
+        <div id="load-empty-guide" class="load-empty-guide" data-no-print>
+          <strong>No load items yet.</strong> Add your first load, load starter data, or import a load list to begin demand and panel planning.
+        </div>
         <div class="loadlist-toolbar mb-1">
           <label for="load-search" class="sr-only">Search loads</label>
-          <input id="load-search" class="table-search" type="search" placeholder="Search source, tag, description, manufacturer, model, or notes">
-          <button id="clear-search-btn" class="btn" type="button" title="Clear search">Clear</button>
+          <input id="load-search" class="table-search" type="search" placeholder="Search source, tag, description, manufacturer, model, type, circuit, or notes" aria-describedby="load-shortcut-hint">
+          <button id="clear-search-btn" class="btn toolbar-btn" type="button" title="Clear search">
+            <img src="icons/toolbar/delete-view.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+            Clear
+          </button>
           <span id="load-results-count" class="load-results-count" aria-live="polite"></span>
         </div>
         <div class="loadlist-filter-chips mb-1" role="group" aria-label="Quick load filters">
@@ -92,43 +222,62 @@
           <button class="loadlist-chip" type="button" data-filter="missingSource">Missing Source</button>
           <button class="loadlist-chip" type="button" data-filter="missingElectrical">Missing Electrical</button>
           <button class="loadlist-chip" type="button" data-filter="highDemand">High Demand</button>
-          <span class="loadlist-shortcuts">Shortcuts: <kbd>/</kbd> search, <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>N</kbd> add row</span>
+          <span id="load-shortcut-hint" class="sr-only">Keyboard shortcuts: slash focuses search. Control Shift N opens Add Load.</span>
         </div>
+        <datalist id="load-type-list">
+          <option value="Motor"></option>
+          <option value="Lighting"></option>
+          <option value="Receptacle"></option>
+          <option value="HVAC"></option>
+          <option value="Heater"></option>
+          <option value="UPS"></option>
+          <option value="EV Charger"></option>
+          <option value="Spare"></option>
+        </datalist>
         <div class="overflow-x-auto">
-          <table id="load-table" class="sticky-table">
+          <table id="load-table" class="sticky-table load-list-table">
             <caption class="visually-hidden">Load list with electrical specifications and demand calculations</caption>
             <thead>
               <tr>
-                <th scope="col"><input type="checkbox" id="select-all" aria-label="Select all loads"></th>
-                <th scope="col" aria-sort="none">Source</th>
-                <th scope="col" aria-sort="none">Tag/ID</th>
-                <th scope="col">Description</th>
-                <th scope="col">Manufacturer</th>
-                <th scope="col">Model</th>
-                <th scope="col">Qty</th>
-                <th scope="col">Voltage (V)</th>
-                <th scope="col">Load Type</th>
-                <th scope="col">Duty</th>
-                <th scope="col">kW</th>
-                <th scope="col">Power Factor</th>
-                <th scope="col">Load Factor (%)</th>
-                <th scope="col">Efficiency (%)</th>
-                <th scope="col">Demand Factor (%)</th>
-                <th scope="col">Phases</th>
-                <th scope="col">Panel Circuit</th>
-                <th scope="col">Notes</th>
-                <th scope="col">kVA</th>
-                <th scope="col">Current (A)</th>
-                <th scope="col">Demand kVA</th>
-                <th scope="col">Demand kW</th>
-                <th scope="col">Actions</th>
+                <th scope="col" data-column="select" class="load-sticky-select"><input type="checkbox" id="select-all" aria-label="Select all loads"></th>
+                <th scope="col" data-column="source" class="load-sticky-source" aria-sort="none">Source</th>
+                <th scope="col" data-column="tag" class="load-sticky-tag" aria-sort="none">Tag/ID</th>
+                <th scope="col" data-column="description" class="load-sticky-description">Description</th>
+                <th scope="col" data-column="manufacturer">Manufacturer</th>
+                <th scope="col" data-column="model">Model</th>
+                <th scope="col" data-column="quantity">Qty</th>
+                <th scope="col" data-column="voltage">Voltage (V)</th>
+                <th scope="col" data-column="loadType">Load Type</th>
+                <th scope="col" data-column="duty">Duty</th>
+                <th scope="col" data-column="kw">kW</th>
+                <th scope="col" data-column="powerFactor">Power Factor</th>
+                <th scope="col" data-column="loadFactor">Load Factor (%)</th>
+                <th scope="col" data-column="efficiency">Efficiency (%)</th>
+                <th scope="col" data-column="demandFactor">Demand Factor (%)</th>
+                <th scope="col" data-column="phases">Phases</th>
+                <th scope="col" data-column="circuit">Panel Circuit</th>
+                <th scope="col" data-column="notes">Notes</th>
+                <th scope="col" data-column="kva">kVA</th>
+                <th scope="col" data-column="current">Current (A)</th>
+                <th scope="col" data-column="demandKva">Demand kVA</th>
+                <th scope="col" data-column="demandKw">Demand kW</th>
+                <th scope="col" data-column="actions" class="load-sticky-actions">Actions</th>
               </tr>
             </thead>
             <tbody data-row-class="load-row"></tbody>
             <tfoot></tfoot>
           </table>
         </div>
-        <div id="source-summary" class="mt-1"></div>
+        <section class="load-source-summary-section mt-1" aria-labelledby="load-source-summary-title">
+          <div class="source-summary-header">
+            <h3 id="load-source-summary-title">Source Summary</h3>
+            <a href="demandschedule.html" class="btn toolbar-btn" title="Open demand schedule">
+              <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+              Demand Schedule
+            </a>
+          </div>
+          <div id="source-summary" class="load-source-summary"></div>
+        </section>
       </section>
       <nav class="step-nav" aria-label="Workflow navigation">
         <a href="cableschedule.html" class="step-nav-prev">&#8592; Cable Schedule</a>

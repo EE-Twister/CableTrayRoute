@@ -35,6 +35,13 @@ import { showAlertModal } from './src/components/modal.js';
     }
   }
 
+  function getDuctbankRows(){
+    if(!ductbankTbody) return [];
+    return Array.from(ductbankTbody.children).filter(row => (
+      row.matches('tr') && !row.classList.contains('conduit-container')
+    ));
+  }
+
   function showFilterPopup(btn,index){
     document.querySelectorAll('.filter-popup').forEach(p=>p.remove());
     const popup=document.createElement('div');
@@ -73,7 +80,7 @@ import { showAlertModal } from './src/components/modal.js';
   }
 
   function applyFilters(){
-    const rows=Array.from(ductbankTbody.querySelectorAll('tr.ductbank-row'));
+    const rows=getDuctbankRows();
     rows.forEach((row,i)=>{
       let visible=true;
       for(let c=1;c<headerCells.length-1;c++){
@@ -94,7 +101,7 @@ import { showAlertModal } from './src/components/modal.js';
       row.style.display=visible?'':'none';
       const cRow=row.nextElementSibling;
       if(cRow&&cRow.classList.contains('conduit-container')){
-        cRow.style.display=visible&&ductbanks[i].expanded?'':'none';
+        cRow.style.display=visible&&ductbanks[i]?.expanded?'':'none';
       }
     });
   }
@@ -352,8 +359,24 @@ import { showAlertModal } from './src/components/modal.js';
     applyFilters();
   }
 
-  function addDuctbank(){
-    ductbanks.push({id:Date.now(),tag:'',from:'',to:'',concrete_encasement:false,start_x:'',start_y:'',start_z:'',end_x:'',end_y:'',end_z:'',conduits:[],expanded:true});
+  function addDuctbank(data = {}){
+    const next = {
+      id:data.id || Date.now(),
+      tag:data.tag || '',
+      from:data.from || '',
+      to:data.to || '',
+      concrete_encasement:!!data.concrete_encasement,
+      start_x:data.start_x ?? '',
+      start_y:data.start_y ?? '',
+      start_z:data.start_z ?? '',
+      end_x:data.end_x ?? '',
+      end_y:data.end_y ?? '',
+      end_z:data.end_z ?? '',
+      conduits:Array.isArray(data.conduits) ? data.conduits : [],
+      expanded:data.expanded ?? true
+    };
+    next.conduits.forEach(c=>{ if(c.ductbankTag===undefined) c.ductbankTag=next.tag; });
+    ductbanks.push(next);
     renderDuctbanks();
     saveDuctbanks();
   }
@@ -458,7 +481,7 @@ import { showAlertModal } from './src/components/modal.js';
       });
     });
     renderDuctbanks();
-    const rendered=ductbankTbody.querySelectorAll('tr.ductbank-row').length;
+    const rendered=getDuctbankRows().length;
     console.assert(rendered===ductbanks.length,`Rendered ${rendered} ductbanks, expected ${ductbanks.length}`);
   }
 
@@ -571,7 +594,10 @@ import { showAlertModal } from './src/components/modal.js';
 
   function initDuctbankTable(){
     ductbankTbody=document.querySelector('#ductbankTable tbody');
-    document.getElementById('add-ductbank-btn').addEventListener('click',addDuctbank);
+    document.getElementById('add-ductbank-btn').addEventListener('click',e=>{
+      if(e.currentTarget?.dataset?.guidedAdd==='true') return;
+      addDuctbank();
+    });
     document.getElementById('save-ductbank-btn').addEventListener('click',saveDuctbanks);
     document.getElementById('load-ductbank-btn').addEventListener('click',loadDuctbanks);
     document.getElementById('delete-ductbank-btn').addEventListener('click',()=>{ductbanks=[];renderDuctbanks();saveDuctbanks();});
@@ -709,5 +735,6 @@ import { showAlertModal } from './src/components/modal.js';
   window.saveDuctbanks=saveDuctbanks;
   window.loadDuctbanks=loadDuctbanks;
   window.getDuctbanks=getDuctbanks;
+  window.addDuctbankRow=addDuctbank;
 })();
 

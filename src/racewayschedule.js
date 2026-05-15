@@ -6,8 +6,8 @@ import "../ductbankTable.js";
 import "../e2e-helpers.js";
 import { emitAsync } from "../utils/safeEvents.mjs";
 import * as dataStore from "../dataStore.mjs";
-import { showAlertModal } from "./components/modal.js";
-import { start as startTour, hasDoneTour } from "../tour.js";
+import { openModal, showAlertModal } from "./components/modal.js";
+import { start as startTour } from "../tour.js";
 
 const RACEWAY_TOUR_STEPS = [
   { selector: '#add-tray-btn',          message: 'Add a Cable Tray — enter width, depth, start/end 3D coordinates, and tray type (ladder, solid bottom, wire mesh).' },
@@ -28,12 +28,15 @@ import {
 
 // ---- Inline E2E helpers (no external import) ----
 const E2E = new URLSearchParams(location.search).has('e2e');
+const DUCTBANK_ROW_SELECTOR = '#ductbankTable > tbody > tr:not(.conduit-container)';
 
 function e2eOpenDetailsAndControls() {
   const E2E = new URLSearchParams(location.search).has('e2e');
   if (!E2E) return;
   // open <details> to reveal nested buttons
-  document.querySelectorAll('details').forEach(d => { d.open = true; });
+  document.querySelectorAll('details').forEach(d => {
+    if(!d.classList.contains('toolbar-menu')) d.open = true;
+  });
   // unhide common containers that gate buttons in E2E
   ['#settings-panel', '#controls', '#toolbar', '#sidebar'].forEach(sel => {
     const el = document.querySelector(sel);
@@ -199,6 +202,117 @@ function tradeSizeOptions(type){
 const TRAY_WIDTH_OPTIONS=['2','3','4','6','8','9','12','16','18','20','24','30','36'];
 const TRAY_DEPTH_OPTIONS=['2','3','4','5','6','7','8','9','10','11','12'];
 const TRAY_TYPE_OPTIONS=['Ladder (50 % fill)','Solid Bottom (40 % fill)'];
+const RACEWAY_VIEW_PRESET_KEY = dataStore.STORAGE_KEYS.racewayScheduleViewPreset || 'racewayScheduleViewPreset';
+const RACEWAY_VIEW_PRESETS = {
+  basic: {
+    ductbanks: ['toggle','tag','from','to','concrete_encasement','actions'],
+    trays: ['tray_id','inside_width','tray_depth','tray_type','allowed_cable_group'],
+    conduits: ['conduit_id','type','trade_size','allowed_cable_group']
+  },
+  geometry: {
+    ductbanks: ['toggle','tag','from','to','start_x','start_y','start_z','end_x','end_y','end_z','actions'],
+    trays: ['tray_id','start_x','start_y','start_z','end_x','end_y','end_z'],
+    conduits: ['conduit_id','type','trade_size','start_x','start_y','start_z','end_x','end_y','end_z']
+  },
+  fill: {
+    ductbanks: ['toggle','tag','concrete_encasement','actions'],
+    trays: ['tray_id','inside_width','tray_depth','tray_type','num_slots','slot_groups','allowed_cable_group'],
+    conduits: ['conduit_id','type','trade_size','capacity','allowed_cable_group']
+  },
+  bim: {
+    ductbanks: ['toggle','tag','from','to','concrete_encasement','start_x','start_y','start_z','end_x','end_y','end_z','actions'],
+    trays: ['tray_id','start_x','start_y','start_z','end_x','end_y','end_z','inside_width','tray_depth','tray_type'],
+    conduits: ['conduit_id','type','trade_size','start_x','start_y','start_z','end_x','end_y','end_z']
+  },
+  full: null
+};
+const DUCTBANK_COLUMN_KEYS = ['toggle','tag','from','to','concrete_encasement','start_x','start_y','start_z','end_x','end_y','end_z','actions'];
+const ROW_ACTION_ICONS = {
+  viewBtn: 'icons/toolbar/auto-layout.svg',
+  insertBelowBtn: 'icons/toolbar/add-arrangement.svg',
+  duplicateBtn: 'icons/toolbar/copy.svg',
+  removeBtn: 'icons/toolbar/trash.svg'
+};
+
+let racewayTablesRef = null;
+let activeRacewayFilter = 'all';
+let activeRacewayViewPreset = 'basic';
+let updateRacewayExperience = () => {};
+
+const normalize=s=>(s||'').trim().toUpperCase();
+
+function parseNumber(value){
+  const parsed = Number.parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function hasCompleteGeometry(row){
+  return ['start_x','start_y','start_z','end_x','end_y','end_z'].every(key => parseNumber(row?.[key]) !== null);
+}
+
+function segmentLength(row){
+  if(!hasCompleteGeometry(row)) return null;
+  const sx=parseNumber(row.start_x), sy=parseNumber(row.start_y), sz=parseNumber(row.start_z);
+  const ex=parseNumber(row.end_x), ey=parseNumber(row.end_y), ez=parseNumber(row.end_z);
+  return Math.hypot(ex-sx, ey-sy, ez-sz);
+}
+
+function isZeroLength(row){
+  const length = segmentLength(row);
+  return length !== null && length === 0;
+}
+
+function normalizeConduitForDuctbank(row, ductbankTag, ductbank = {}){
+  const normalized = normalizeConduitRow(row || {});
+  return {
+    ...normalized,
+    ductbankTag: normalized.ductbankTag || ductbankTag || '',
+    start_x: normalized.start_x ?? ductbank.start_x ?? '',
+    start_y: normalized.start_y ?? ductbank.start_y ?? '',
+    start_z: normalized.start_z ?? ductbank.start_z ?? '',
+    end_x: normalized.end_x ?? ductbank.end_x ?? '',
+    end_y: normalized.end_y ?? ductbank.end_y ?? '',
+    end_z: normalized.end_z ?? ductbank.end_z ?? ''
+  };
+}
+
+function normalizeRacewaySampleSets({ ductbanks = [], trays = [], conduits = [] } = {}){
+  const dbRows = (ductbanks || []).map(row => {
+    const db = normalizeDuctbankRow(row);
+    db.conduits = Array.isArray(row?.conduits)
+      ? row.conduits.map(c => normalizeConduitForDuctbank(c, db.tag, db))
+      : [];
+    db.expanded = row?.expanded ?? false;
+    return db;
+  });
+  const trayRows = (trays || []).map(normalizeTrayRow);
+  const standaloneConduits = [];
+  const allConduits = [];
+  const dbByTag = new Map(dbRows.map(db => [normalize(db.tag), db]));
+
+  (conduits || []).map(normalizeConduitRow).forEach(conduit => {
+    const tag = normalize(conduit.ductbankTag || conduit.ductbank_tag || conduit.ductbank);
+    const targetDb = tag ? dbByTag.get(tag) : null;
+    if (targetDb) {
+      const embedded = normalizeConduitForDuctbank(conduit, targetDb.tag, targetDb);
+      targetDb.conduits = targetDb.conduits || [];
+      const exists = targetDb.conduits.some(existing => normalize(existing.conduit_id) === normalize(embedded.conduit_id));
+      if(!exists) targetDb.conduits.push(embedded);
+      if(!allConduits.some(existing => normalize(existing.conduit_id) === normalize(embedded.conduit_id))) allConduits.push(embedded);
+    } else {
+      standaloneConduits.push(conduit);
+      if(!allConduits.some(existing => normalize(existing.conduit_id) === normalize(conduit.conduit_id))) allConduits.push(conduit);
+    }
+  });
+
+  dbRows.forEach(db => {
+    (db.conduits || []).forEach(conduit => {
+      if (!allConduits.some(existing => normalize(existing.conduit_id) === normalize(conduit.conduit_id))) allConduits.push(conduit);
+    });
+  });
+
+  return { ductbanks: dbRows, trays: trayRows, standaloneConduits, allConduits };
+}
 
 function ensureDuctbankRows(){
   const tbody=document.querySelector('#ductbankTable tbody');
@@ -208,33 +322,43 @@ function ensureDuctbankRows(){
     tr.classList.add('ductbank-row');
     tbody.appendChild(tr);
   });
-  // Ensure all tbody rows carry the ductbank-row class
-  tbody.querySelectorAll('tr').forEach(tr=>tr.classList.add('ductbank-row'));
+  Array.from(tbody.children).forEach(tr=>{
+    if(tr.tagName !== 'TR') return;
+    tr.classList.toggle('ductbank-row', !tr.classList.contains('conduit-container'));
+  });
+  Array.from(tbody.children)
+    .filter(tr=>tr.classList.contains('conduit-container'))
+    .forEach(tr=>tr.querySelectorAll('tr.ductbank-row').forEach(row=>row.classList.remove('ductbank-row')));
+}
+
+function getDuctbankRows(){
+  return Array.from(document.querySelectorAll(DUCTBANK_ROW_SELECTOR));
 }
 
 async function renderRacewaySamples({ ductbanks = [], trays = [], conduits = [] }) {
   if (_renderingRaceway) return;
   _renderingRaceway = true;
   try {
-    clearRacewayTables();
-    const dbTbody = document.querySelector('#ductbankTable tbody');
-    ductbanks.forEach(db => {
-      const tr = document.createElement('tr');
-      tr.classList.add('ductbank-row');
-      dbTbody?.appendChild(tr);
-    });
-    const trayTbody = document.querySelector('#trayTable tbody');
-    trays.forEach(tray => {
-      const tr = document.createElement('tr');
-      trayTbody?.appendChild(tr);
-    });
-    const condTbody = document.querySelector('#conduitTable tbody');
-    conduits.forEach(c => {
-      const tr = document.createElement('tr');
-      condTbody?.appendChild(tr);
-    });
-    const rendered = dbTbody?.querySelectorAll('tr.ductbank-row')?.length ?? 0;
-    console.assert(rendered === ductbanks.length, `Assertion failed: Ductbank table rendered ${rendered} rows for ${ductbanks.length} samples`);
+    const normalized = normalizeRacewaySampleSets({ ductbanks, trays, conduits });
+    try {
+      dataStore.setDuctbanks(normalized.ductbanks);
+      dataStore.setTrays(normalized.trays);
+      dataStore.setConduits(normalized.allConduits);
+    } catch(e) {
+      console.error('Failed to store raceway sample data', e);
+    }
+    if (racewayTablesRef?.ductbanks?.setData) {
+      await racewayTablesRef.ductbanks.setData(normalized.ductbanks);
+    } else if (typeof window.loadDuctbanks === 'function') {
+      window.loadDuctbanks();
+    }
+    if (racewayTablesRef?.trays?.setData) racewayTablesRef.trays.setData(normalized.trays);
+    if (racewayTablesRef?.conduits?.setData) racewayTablesRef.conduits.setData(normalized.standaloneConduits);
+    ensureDuctbankRows();
+    updateRacewayExperience();
+    const rendered = getDuctbankRows().length;
+    console.assert(rendered === normalized.ductbanks.length,
+      `Assertion failed: Ductbank table rendered ${rendered} rows for ${normalized.ductbanks.length} samples`);
     wireRacewayHandlersOnce();
     emitSticky('samples-loaded', 'samplesLoaded');
   } finally {
@@ -272,10 +396,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   initHelpModal('conduit-help-btn','conduit-help-modal');
   initNavToggle();
 
-  const selectBtn=document.createElement('button');
-  selectBtn.id='select-raceway-btn';
-  selectBtn.textContent='Select Raceway';
-  document.querySelector('.page-header')?.appendChild(selectBtn);
+  const selectBtn=document.getElementById('select-raceway-btn') || document.createElement('button');
+  if(!selectBtn.id) {
+    selectBtn.id='select-raceway-btn';
+    selectBtn.textContent='Select Raceway';
+    document.getElementById('raceway-more-actions')?.appendChild(selectBtn);
+  }
   const racewaySelect=document.createElement('select');
   racewaySelect.multiple=true;
   racewaySelect.style.display='none';
@@ -376,6 +502,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const handleChange = () => {
     markUnsaved();
     scheduleRacewayTableAutosave();
+    updateRacewayExperience();
     if (importInProgress) {
       importInProgress = false;
       if (importType === 'trays') emitSticky('imports-ready-trays', 'importsReadyTrays');
@@ -407,18 +534,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  const importProjInput=document.getElementById('import-project-input');
-  if(importProjInput){
-    importProjInput.addEventListener('change',async()=>{
-      await renderRacewaySamples({
-        ductbanks: dataStore.getDuctbanks ? dataStore.getDuctbanks() : [],
-        trays: dataStore.getTrays ? dataStore.getTrays() : [],
-        conduits: dataStore.getConduits ? dataStore.getConduits() : []
-      });
-      whenPresent('#ductbankTable tbody tr.ductbank-row', () => emitSticky('samples-loaded','samplesLoaded'));
-    });
-  }
-
   if(typeof initDuctbankTable==='function'){
     initDuctbankTable();
     const dbTable=document.getElementById('ductbankTable');
@@ -439,7 +554,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         if(typeof window.loadDuctbanks==='function') window.loadDuctbanks();
         ensureDuctbankRows();
-        const rendered=document.querySelectorAll('#ductbankTable tbody tr.ductbank-row').length;
+        const rendered=getDuctbankRows().length;
         console.assert(rendered===rows.length && rendered>0,
           `Ductbank table rendered ${rendered} rows for ${rows.length} samples`);
         tableLoadState.ductbanks = true;
@@ -468,7 +583,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const trayTable=TableUtils.createTable({
     tableId:'trayTable',
     storageKey:TableUtils.STORAGE_KEYS.trays,
-    addRowBtnId:'add-tray-btn',
+    addRowBtnId:null,
     saveBtnId:'save-tray-btn',
     loadBtnId:'load-tray-btn',
     clearFiltersBtnId:'clear-tray-filters-btn',
@@ -517,7 +632,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const conduitTable=TableUtils.createTable({
     tableId:'conduitTable',
     storageKey:TableUtils.STORAGE_KEYS.conduits,
-    addRowBtnId:'add-conduit-btn',
+    addRowBtnId:null,
     saveBtnId:'save-conduit-btn',
     loadBtnId:'load-conduit-btn',
     clearFiltersBtnId:'clear-conduit-filters-btn',
@@ -547,6 +662,33 @@ document.addEventListener('DOMContentLoaded', async () => {
   };
   conduitTable.getDataCount=function(){return this.getData().length;};
   tables.conduits=conduitTable;
+  racewayTablesRef = tables;
+  function reconcileConduitOwnershipOnLoad(){
+    const ductbanks = tables.ductbanks?.getData?.() || [];
+    if(!ductbanks.length) return;
+    const byTag = new Map(ductbanks.map(db => [normalize(db.tag), db]));
+    const standalone = [];
+    let moved = false;
+    conduitTable.getData().forEach(conduit => {
+      const target = byTag.get(normalize(conduit.ductbankTag || conduit.ductbank_tag));
+      if(target){
+        target.conduits = target.conduits || [];
+        if(!target.conduits.some(existing => normalize(existing.conduit_id) === normalize(conduit.conduit_id))){
+          target.conduits.push({ ...conduit, ductbankTag: target.tag });
+          moved = true;
+        }
+      }else{
+        standalone.push(conduit);
+      }
+    });
+    if(!moved) return;
+    dataStore.setDuctbanks(ductbanks);
+    tables.ductbanks.setData?.(ductbanks);
+    conduitTable.setData(standalone);
+    const embedded = ductbanks.flatMap(db => db.conduits || []);
+    dataStore.setConduits([...embedded, ...standalone]);
+  }
+  reconcileConduitOwnershipOnLoad();
 
   if(typeof window.saveDuctbanks==='function'){
     const origSave=window.saveDuctbanks;
@@ -575,17 +717,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         trays=sampleTrays;
         conduits=sampleConduits;
       }
-      const dbRows = ductbanks.map(normalizeDuctbankRow);
-      const trayRows = trays.map(normalizeTrayRow);
-      const conduitRowsRaw = conduits.map(normalizeConduitRow);
-      await renderRacewaySamples({ ductbanks: dbRows, trays: trayRows, conduits: conduitRowsRaw });
-      try {
-        dataStore.setDuctbanks(dbRows);
-        dataStore.setTrays(trayRows);
-        dataStore.setConduits(conduitRowsRaw);
-      } catch(e) { console.error('Failed to store sample data', e); }
+      const normalized = normalizeRacewaySampleSets({ ductbanks, trays, conduits });
+      await renderRacewaySamples({ ductbanks, trays, conduits });
       markSaved();
-      showToast(`Loaded samples: ${dbRows.length} ductbanks, ${conduitRowsRaw.length} conduits, ${trayRows.length} trays.`, 'success');
+      showToast(`Loaded samples: ${normalized.ductbanks.length} ductbanks, ${normalized.allConduits.length} conduits, ${normalized.trays.length} trays.`, 'success');
     }catch(err){
       console.error(err);
       showToast('Sample load failed – see console.','error');
@@ -638,11 +773,492 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
   window.getRacewaySchedule=getRacewaySchedule;
   persistAllConduits();
+
+  function getRacewaySnapshot(){
+    const ductbanks = tables.ductbanks?.getData?.() || [];
+    const trays = trayTable.getData();
+    const standaloneConduits = conduitTable.getData();
+    const embeddedConduits = ductbanks.flatMap((db, ductbankIndex) => (db.conduits || []).map((c, conduitIndex) => ({
+      ...c,
+      ductbankTag: c.ductbankTag || db.tag,
+      __ductbankIndex: ductbankIndex,
+      __conduitIndex: conduitIndex
+    })));
+    const conduits = [...embeddedConduits, ...standaloneConduits];
+    return { ductbanks, trays, standaloneConduits, embeddedConduits, conduits };
+  }
+
+  function duplicateSet(values){
+    const counts = new Map();
+    values.map(value => String(value || '').trim()).filter(Boolean).forEach(value => {
+      counts.set(value, (counts.get(value) || 0) + 1);
+    });
+    return new Set(Array.from(counts.entries()).filter(([, count]) => count > 1).map(([value]) => value));
+  }
+
+  function getAssignedRacewayIds(){
+    const ids = new Set();
+    try {
+      dataStore.getCables().forEach(cable => {
+        const raw = cable.raceway_ids ?? cable.racewayIds ?? cable.raceway_id ?? cable.raceway ?? cable.tray_id ?? '';
+        const list = Array.isArray(raw) ? raw : String(raw).split(',');
+        list.map(value => String(value || '').trim()).filter(Boolean).forEach(id => ids.add(id));
+      });
+    } catch(e) {
+      console.warn('Failed to read cable raceway assignments', e);
+    }
+    return ids;
+  }
+
+  function collectRacewayIssues(){
+    const snapshot = getRacewaySnapshot();
+    const issues = [];
+    const duplicateDuctbanks = duplicateSet(snapshot.ductbanks.map(db => db.tag));
+    const duplicateTrays = duplicateSet(snapshot.trays.map(tray => tray.tray_id));
+    const duplicateConduits = duplicateSet(snapshot.conduits.map(conduit => conduit.conduit_id));
+
+    snapshot.ductbanks.forEach((db, row) => {
+      if(!String(db.tag || '').trim()) issues.push({message:'Ductbank is missing a tag',table:'ductbank',row,col:'tag',code:'missing'});
+      if(duplicateDuctbanks.has(String(db.tag || '').trim())) issues.push({message:`Duplicate ductbank tag "${db.tag}"`,table:'ductbank',row,col:'tag',code:'duplicate'});
+      if(!hasCompleteGeometry(db)) issues.push({message:`Ductbank ${db.tag || row + 1} is missing geometry`,table:'ductbank',row,col:'start_x',code:'missing'});
+      if(isZeroLength(db)) issues.push({message:`Ductbank ${db.tag || row + 1} has zero length`,table:'ductbank',row,col:'end_x',code:'geometry'});
+    });
+
+    snapshot.trays.forEach((tray, row) => {
+      if(!String(tray.tray_id || '').trim()) issues.push({message:'Tray is missing an ID',table:'tray',row,col:'tray_id',code:'missing'});
+      if(duplicateTrays.has(String(tray.tray_id || '').trim())) issues.push({message:`Duplicate tray ID "${tray.tray_id}"`,table:'tray',row,col:'tray_id',code:'duplicate'});
+      if(!hasCompleteGeometry(tray)) issues.push({message:`Tray ${tray.tray_id || row + 1} is missing geometry`,table:'tray',row,col:'start_x',code:'missing'});
+      if(isZeroLength(tray)) issues.push({message:`Tray ${tray.tray_id || row + 1} has zero length`,table:'tray',row,col:'end_x',code:'geometry'});
+      if(parseNumber(tray.inside_width) === null || parseNumber(tray.inside_width) <= 0) issues.push({message:`Tray ${tray.tray_id || row + 1} needs a positive inside width`,table:'tray',row,col:'inside_width',code:'missing'});
+      if(parseNumber(tray.tray_depth) === null || parseNumber(tray.tray_depth) <= 0) issues.push({message:`Tray ${tray.tray_id || row + 1} needs a positive depth`,table:'tray',row,col:'tray_depth',code:'missing'});
+      if(String(tray.slot_groups || '').trim()){
+        try { JSON.parse(tray.slot_groups); } catch {
+          issues.push({message:`Tray ${tray.tray_id || row + 1} has invalid slot group JSON`,table:'tray',row,col:'slot_groups',code:'format'});
+        }
+      }
+    });
+
+    snapshot.conduits.forEach((conduit, index) => {
+      const row = snapshot.standaloneConduits.indexOf(conduit);
+      const isStandalone = row >= 0;
+      const targetRow = isStandalone ? row : conduit.__ductbankIndex ?? index;
+      const targetTable = isStandalone ? 'conduit' : 'ductbank';
+      if(!String(conduit.conduit_id || '').trim()) issues.push({message:'Conduit is missing an ID',table:targetTable,row:targetRow,col:'conduit_id',code:'missing'});
+      if(duplicateConduits.has(String(conduit.conduit_id || '').trim())) issues.push({message:`Duplicate conduit ID "${conduit.conduit_id}"`,table:targetTable,row:targetRow,col:'conduit_id',code:'duplicate'});
+      if(!hasCompleteGeometry(conduit)) issues.push({message:`Conduit ${conduit.conduit_id || index + 1} is missing geometry`,table:targetTable,row:targetRow,col:'start_x',code:'missing'});
+      if(isZeroLength(conduit)) issues.push({message:`Conduit ${conduit.conduit_id || index + 1} has zero length`,table:targetTable,row:targetRow,col:'end_x',code:'geometry'});
+      if(!CONDUIT_SPECS[conduit.type] || !CONDUIT_SPECS[conduit.type][conduit.trade_size]) {
+        issues.push({message:`Conduit ${conduit.conduit_id || index + 1} has illegal size`,table:targetTable,row:targetRow,col:'trade_size',code:'format'});
+      }
+    });
+
+    return issues;
+  }
+
+  function setText(id, value){
+    const el = document.getElementById(id);
+    if(el) el.textContent = value;
+  }
+
+  function updateRacewaySummary(){
+    const snapshot = getRacewaySnapshot();
+    const issues = collectRacewayIssues();
+    const assignedIds = getAssignedRacewayIds();
+    const allIds = new Set([
+      ...snapshot.ductbanks.map(db => db.tag),
+      ...snapshot.trays.map(tray => tray.tray_id),
+      ...snapshot.conduits.map(conduit => conduit.conduit_id)
+    ].map(value => String(value || '').trim()).filter(Boolean));
+    const assignedCount = Array.from(allIds).filter(id => assignedIds.has(id)).length;
+    const totalRaceways = snapshot.ductbanks.length + snapshot.trays.length + snapshot.conduits.length;
+    setText('raceway-total-count', String(totalRaceways));
+    setText('raceway-ductbank-count', String(snapshot.ductbanks.length));
+    setText('raceway-tray-count', String(snapshot.trays.length));
+    setText('raceway-conduit-count', `${snapshot.conduits.length}`);
+    setText('raceway-issue-count', String(issues.length));
+    setText('raceway-assigned-count', String(assignedCount));
+    const summary = document.getElementById('raceway-validation-summary');
+    if(summary){
+      summary.className = issues.length ? 'load-validation-summary is-warning' : 'load-validation-summary is-success';
+      summary.textContent = issues.length
+        ? `${issues.length} schedule issue${issues.length === 1 ? '' : 's'} need review before routing or BIM export.`
+        : 'Raceway schedules are ready for routing and export.';
+    }
+    return { snapshot, issues, assignedIds };
+  }
+
+  function rowHasIssue(issues, table, row, codes = null){
+    return issues.some(issue => issue.table === table && issue.row === row && (!codes || codes.includes(issue.code)));
+  }
+
+  function racewayIdFor(type, row){
+    if(type === 'ductbank') return row.tag || '';
+    if(type === 'tray') return row.tray_id || '';
+    return row.conduit_id || row.tray_id || '';
+  }
+
+  function matchesRacewayFilter(type, row, index, context){
+    if(activeRacewayFilter === 'all') return true;
+    const id = String(racewayIdFor(type, row) || '').trim();
+    if(activeRacewayFilter === 'missing') return !hasCompleteGeometry(row) || rowHasIssue(context.issues, type, index, ['missing','geometry','format']);
+    if(activeRacewayFilter === 'duplicates') return rowHasIssue(context.issues, type, index, ['duplicate']);
+    if(activeRacewayFilter === 'unused') return id ? !context.assignedIds.has(id) : false;
+    if(activeRacewayFilter === 'assigned') return id ? context.assignedIds.has(id) : false;
+    if(activeRacewayFilter === 'ductbank') return type === 'ductbank' && (row.conduits || []).length > 0;
+    if(activeRacewayFilter === 'standalone') return type === 'conduit';
+    return true;
+  }
+
+  function applyDuctbankQuickFilter(context){
+    const rows = getDuctbankRows();
+    rows.forEach((row, index) => {
+      const db = context.snapshot.ductbanks[index] || {};
+      const visible = matchesRacewayFilter('ductbank', db, index, context);
+      row.style.display = visible ? '' : 'none';
+      const conduitRow = row.nextElementSibling;
+      if(conduitRow?.classList?.contains('conduit-container')) {
+        conduitRow.style.display = visible && db.expanded ? '' : 'none';
+      }
+    });
+  }
+
+  function applyManagedTableQuickFilter(table, type, context){
+    if(!table?.customFilters) return;
+    if(activeRacewayFilter === 'all'){
+      table.customFilters.delete('racewayQuick');
+    }else{
+      table.customFilters.set('racewayQuick', row => {
+        const data = table.getRowData(row);
+        const index = Array.from(table.tbody.rows).indexOf(row);
+        return matchesRacewayFilter(type, data, index, context);
+      });
+    }
+    table.applyFilters();
+  }
+
+  function applyRacewayQuickFilter(){
+    const context = updateRacewaySummary();
+    applyDuctbankQuickFilter(context);
+    applyManagedTableQuickFilter(trayTable, 'tray', context);
+    applyManagedTableQuickFilter(conduitTable, 'conduit', context);
+    document.querySelectorAll('[data-raceway-filter]').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.racewayFilter === activeRacewayFilter);
+    });
+  }
+
+  function setManagedTableColumnVisibility(table, visibleKeys){
+    if(!table?.headerRow) return;
+    const showAll = !visibleKeys;
+    table.columns.forEach((col, index) => {
+      const visible = showAll || visibleKeys.includes(col.key);
+      const cellIndex = index + table.colOffset;
+      table.headerRow.cells[cellIndex]?.classList.toggle('raceway-column-hidden', !visible);
+      Array.from(table.tbody.rows).forEach(row => {
+        row.cells[cellIndex]?.classList.toggle('raceway-column-hidden', !visible);
+      });
+    });
+    table.queueStickyColumnUpdate?.();
+  }
+
+  function setDuctbankColumnVisibility(visibleKeys){
+    const showAll = !visibleKeys;
+    const table = document.getElementById('ductbankTable');
+    if(!table) return;
+    const rows = [
+      ...Array.from(table.tHead?.rows || []),
+      ...getDuctbankRows()
+    ];
+    rows.forEach(row => {
+      DUCTBANK_COLUMN_KEYS.forEach((key, index) => {
+        row.cells[index]?.classList.toggle('raceway-column-hidden', !(showAll || visibleKeys.includes(key)));
+      });
+    });
+  }
+
+  function applyRacewayViewPreset(presetName, { persist = true } = {}){
+    activeRacewayViewPreset = RACEWAY_VIEW_PRESETS[presetName] !== undefined ? presetName : 'basic';
+    const preset = RACEWAY_VIEW_PRESETS[activeRacewayViewPreset];
+    setDuctbankColumnVisibility(preset?.ductbanks || null);
+    setManagedTableColumnVisibility(trayTable, preset?.trays || null);
+    setManagedTableColumnVisibility(conduitTable, preset?.conduits || null);
+    document.querySelectorAll('[data-raceway-view]').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.racewayView === activeRacewayViewPreset);
+    });
+    if(persist) dataStore.setItem(RACEWAY_VIEW_PRESET_KEY, activeRacewayViewPreset);
+  }
+
+  function decorateRacewayActionButtons(){
+    document.querySelectorAll('#ductbankTable .viewBtn, #ductbankTable .insertBelowBtn, #ductbankTable .duplicateBtn, #ductbankTable .removeBtn, #trayTable .viewBtn, #trayTable .insertBelowBtn, #trayTable .duplicateBtn, #trayTable .removeBtn, #conduitTable .viewBtn, #conduitTable .insertBelowBtn, #conduitTable .duplicateBtn, #conduitTable .removeBtn').forEach(btn => {
+      if(btn.dataset.iconified === 'true') return;
+      const iconClass = Array.from(btn.classList).find(cls => ROW_ACTION_ICONS[cls]);
+      const icon = ROW_ACTION_ICONS[iconClass];
+      if(!icon) return;
+      const label = btn.getAttribute('aria-label') || btn.title || btn.textContent.trim();
+      btn.classList.add('row-icon-btn');
+      btn.title = label;
+      btn.setAttribute('aria-label', label);
+      btn.innerHTML = `<img src="${icon}" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">`;
+      btn.dataset.iconified = 'true';
+    });
+  }
+
+  updateRacewayExperience = () => {
+    if(!racewayTablesRef) return;
+    updateRacewaySummary();
+    applyRacewayQuickFilter();
+    applyRacewayViewPreset(activeRacewayViewPreset, { persist: false });
+    decorateRacewayActionButtons();
+  };
+
+  function modalField({ label, name, type = 'text', value = '', options = null, min = null, step = null }){
+    const wrap = document.createElement('label');
+    wrap.className = 'modal-form-field';
+    const span = document.createElement('span');
+    span.textContent = label;
+    wrap.appendChild(span);
+    const field = options ? document.createElement('select') : document.createElement('input');
+    field.name = name;
+    if(!options) field.type = type;
+    if(min !== null) field.min = String(min);
+    if(step !== null) field.step = String(step);
+    if(options){
+      options.forEach(option => {
+        const opt = document.createElement('option');
+        opt.value = option;
+        opt.textContent = option;
+        field.appendChild(opt);
+      });
+    }
+    field.value = value ?? '';
+    wrap.appendChild(field);
+    return wrap;
+  }
+
+  function getFormData(form){
+    return Object.fromEntries(new FormData(form).entries());
+  }
+
+  function renderEntryForm(body, fields){
+    const form = document.createElement('form');
+    form.className = 'raceway-entry-form load-entry-grid';
+    fields.forEach(field => form.appendChild(modalField(field)));
+    body.appendChild(form);
+    return form;
+  }
+
+  function lastRowData(table){
+    const rows = table?.getData?.() || [];
+    return rows[rows.length - 1] || {};
+  }
+
+  function openDuctbankEntryModal(){
+    const last = (tables.ductbanks?.getData?.() || []).slice(-1)[0] || {};
+    openModal({
+      title: 'Add Ductbank',
+      description: 'Create the ductbank run and optionally seed conduits inside it.',
+      primaryText: 'Add Ductbank',
+      defaultWidth: 'wide',
+      render(body, controller){
+        const form = renderEntryForm(body, [
+          {label:'Tag',name:'tag',value:''},
+          {label:'From',name:'from',value:last.to || ''},
+          {label:'To',name:'to',value:''},
+          {label:'Concrete Encasement',name:'concrete_encasement',options:['No','Yes'],value:'No'},
+          {label:'Start X',name:'start_x',type:'number',value:last.end_x ?? '',step:'any'},
+          {label:'Start Y',name:'start_y',type:'number',value:last.end_y ?? '',step:'any'},
+          {label:'Start Z',name:'start_z',type:'number',value:last.end_z ?? '',step:'any'},
+          {label:'End X',name:'end_x',type:'number',value:'',step:'any'},
+          {label:'End Y',name:'end_y',type:'number',value:'',step:'any'},
+          {label:'End Z',name:'end_z',type:'number',value:'',step:'any'},
+          {label:'Conduit Count',name:'conduit_count',type:'number',value:'0',min:0,step:1},
+          {label:'Conduit Type',name:'conduit_type',options:CONDUIT_TYPES,value:'PVC Sch 40'},
+          {label:'Trade Size',name:'trade_size',options:tradeSizeOptions('PVC Sch 40'),value:'4'},
+          {label:'Allowed Group',name:'allowed_cable_group',value:''}
+        ]);
+        const typeSel = form.elements.conduit_type;
+        const sizeSel = form.elements.trade_size;
+        typeSel.addEventListener('change', () => {
+          const sizes = tradeSizeOptions(typeSel.value);
+          sizeSel.innerHTML = '';
+          sizes.forEach(size => {
+            const opt = document.createElement('option');
+            opt.value = size;
+            opt.textContent = size;
+            sizeSel.appendChild(opt);
+          });
+        });
+        controller.registerForm(form);
+        return form.elements.tag;
+      },
+      onSubmit(controller){
+        const form = controller.body.querySelector('.raceway-entry-form');
+        const values = getFormData(form);
+        const tag = String(values.tag || '').trim();
+        if(!tag){
+          showAlertModal('Ductbank Tag Required', 'Enter a ductbank tag before adding the row.');
+          return false;
+        }
+        const count = Math.max(0, Math.min(99, Number.parseInt(values.conduit_count, 10) || 0));
+        const conduits = Array.from({length: count}, (_, index) => ({
+          conduit_id: `${tag}-C${index + 1}`,
+          type: values.conduit_type,
+          trade_size: values.trade_size,
+          allowed_cable_group: values.allowed_cable_group || '',
+          ductbankTag: tag,
+          start_x: values.start_x,
+          start_y: values.start_y,
+          start_z: values.start_z,
+          end_x: values.end_x,
+          end_y: values.end_y,
+          end_z: values.end_z
+        }));
+        window.addDuctbankRow?.({
+          tag,
+          from: values.from,
+          to: values.to,
+          concrete_encasement: values.concrete_encasement === 'Yes',
+          start_x: values.start_x,
+          start_y: values.start_y,
+          start_z: values.start_z,
+          end_x: values.end_x,
+          end_y: values.end_y,
+          end_z: values.end_z,
+          conduits,
+          expanded: count > 0
+        });
+        persistAllConduits();
+        markUnsaved();
+        updateRacewayExperience();
+        return true;
+      }
+    });
+  }
+
+  function openTrayEntryModal(){
+    const last = lastRowData(trayTable);
+    openModal({
+      title: 'Add Tray',
+      description: 'Enter the core tray definition. Coordinates can be chained from the previous tray.',
+      primaryText: 'Add Tray',
+      defaultWidth: 'wide',
+      render(body, controller){
+        const form = renderEntryForm(body, [
+          {label:'Tray ID',name:'tray_id',value:''},
+          {label:'Start X',name:'start_x',type:'number',value:last.end_x ?? '',step:'any'},
+          {label:'Start Y',name:'start_y',type:'number',value:last.end_y ?? '',step:'any'},
+          {label:'Start Z',name:'start_z',type:'number',value:last.end_z ?? '',step:'any'},
+          {label:'End X',name:'end_x',type:'number',value:'',step:'any'},
+          {label:'End Y',name:'end_y',type:'number',value:'',step:'any'},
+          {label:'End Z',name:'end_z',type:'number',value:'',step:'any'},
+          {label:'Inside Width (in)',name:'inside_width',options:TRAY_WIDTH_OPTIONS,value:'24'},
+          {label:'Tray Depth (in)',name:'tray_depth',options:TRAY_DEPTH_OPTIONS,value:'4'},
+          {label:'Tray Type',name:'tray_type',options:TRAY_TYPE_OPTIONS,value:TRAY_TYPE_OPTIONS[0]},
+          {label:'Slots',name:'num_slots',type:'number',value:'1',min:1,step:1},
+          {label:'Allowed Group',name:'allowed_cable_group',value:''}
+        ]);
+        controller.registerForm(form);
+        return form.elements.tray_id;
+      },
+      onSubmit(controller){
+        const values = getFormData(controller.body.querySelector('.raceway-entry-form'));
+        if(!String(values.tray_id || '').trim()){
+          showAlertModal('Tray ID Required', 'Enter a tray ID before adding the row.');
+          return false;
+        }
+        trayTable.addRow(values);
+        trayTable.save();
+        markUnsaved();
+        updateRacewayExperience();
+        return true;
+      }
+    });
+  }
+
+  function openConduitEntryModal(){
+    const last = lastRowData(conduitTable);
+    openModal({
+      title: 'Add Standalone Conduit',
+      description: 'Use this for conduits outside a ductbank. Ductbank conduits are added from a ductbank row.',
+      primaryText: 'Add Conduit',
+      defaultWidth: 'wide',
+      render(body, controller){
+        const initialType = last.type || 'EMT';
+        const form = renderEntryForm(body, [
+          {label:'Conduit ID',name:'conduit_id',value:''},
+          {label:'Type',name:'type',options:CONDUIT_TYPES,value:initialType},
+          {label:'Trade Size',name:'trade_size',options:tradeSizeOptions(initialType),value:last.trade_size || tradeSizeOptions(initialType)[0]},
+          {label:'Start X',name:'start_x',type:'number',value:last.end_x ?? '',step:'any'},
+          {label:'Start Y',name:'start_y',type:'number',value:last.end_y ?? '',step:'any'},
+          {label:'Start Z',name:'start_z',type:'number',value:last.end_z ?? '',step:'any'},
+          {label:'End X',name:'end_x',type:'number',value:'',step:'any'},
+          {label:'End Y',name:'end_y',type:'number',value:'',step:'any'},
+          {label:'End Z',name:'end_z',type:'number',value:'',step:'any'},
+          {label:'Capacity',name:'capacity',type:'number',value:'',step:'any'},
+          {label:'Allowed Group',name:'allowed_cable_group',value:''}
+        ]);
+        const typeSel = form.elements.type;
+        const sizeSel = form.elements.trade_size;
+        typeSel.addEventListener('change', () => {
+          const sizes = tradeSizeOptions(typeSel.value);
+          sizeSel.innerHTML = '';
+          sizes.forEach(size => {
+            const opt = document.createElement('option');
+            opt.value = size;
+            opt.textContent = size;
+            sizeSel.appendChild(opt);
+          });
+        });
+        controller.registerForm(form);
+        return form.elements.conduit_id;
+      },
+      onSubmit(controller){
+        const values = getFormData(controller.body.querySelector('.raceway-entry-form'));
+        if(!String(values.conduit_id || '').trim()){
+          showAlertModal('Conduit ID Required', 'Enter a conduit ID before adding the row.');
+          return false;
+        }
+        conduitTable.addRow(values);
+        conduitTable.save();
+        persistAllConduits();
+        markUnsaved();
+        updateRacewayExperience();
+        return true;
+      }
+    });
+  }
+
+  document.getElementById('add-ductbank-btn')?.addEventListener('click', openDuctbankEntryModal);
+  document.getElementById('add-tray-btn')?.addEventListener('click', openTrayEntryModal);
+  document.getElementById('add-conduit-btn')?.addEventListener('click', openConduitEntryModal);
+  document.querySelectorAll('[data-raceway-view]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      applyRacewayViewPreset(btn.dataset.racewayView);
+      btn.closest('details')?.removeAttribute('open');
+    });
+  });
+  document.querySelectorAll('[data-raceway-filter]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      activeRacewayFilter = btn.dataset.racewayFilter || 'all';
+      applyRacewayQuickFilter();
+    });
+  });
+  document.getElementById('import-cad-btn')?.addEventListener('click', () => document.getElementById('import-cad-input')?.click());
+  document.getElementById('export-cad-btn')?.addEventListener('click', () => dataStore.exportToCad('json'));
+  ['load-ductbank-btn','delete-ductbank-btn','load-tray-btn','delete-tray-btn','load-conduit-btn','delete-conduit-btn','clear-ductbank-filters-btn','clear-tray-filters-btn','clear-conduit-filters-btn'].forEach(id => {
+    document.getElementById(id)?.addEventListener('click', () => requestAnimationFrame(updateRacewayExperience));
+  });
+  document.addEventListener('imports-ready', () => requestAnimationFrame(updateRacewayExperience));
+  try {
+    activeRacewayViewPreset = dataStore.getItem(RACEWAY_VIEW_PRESET_KEY, 'basic') || 'basic';
+  } catch {
+    activeRacewayViewPreset = 'basic';
+  }
+  requestAnimationFrame(updateRacewayExperience);
   const loadSamplesBtn=document.getElementById('raceway-load-samples');
   console.assert(loadSamplesBtn,'#raceway-load-samples button missing');
   loadSamplesBtn?.addEventListener('click', () => {
     onRacewayLoadSamples();
-    whenPresent('#ductbankTable tbody tr.ductbank-row', () => emitSticky('samples-loaded','samplesLoaded'));
+    whenPresent(DUCTBANK_ROW_SELECTOR, () => emitSticky('samples-loaded','samplesLoaded'));
   });
 
   const normalize=s=>(s||'').trim().toUpperCase();
@@ -736,7 +1352,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   const params=new URLSearchParams(window.location.search);
   if(params.get('expandAll')==='true'){
-    document.querySelectorAll('#ductbankTable tbody tr.ductbank-row td:first-child button').forEach(btn=>{if(btn.textContent==='\u25B6') btn.click();});
+    getDuctbankRows().forEach(row=>{
+      const btn = row.cells[0]?.querySelector('button');
+      if(btn?.textContent==='\u25B6') btn.click();
+    });
   }
   if(params.get('focus')==='ductbanks'){
     const tbl=document.getElementById('ductbankTable');
@@ -760,7 +1379,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       row=document.querySelector(`#conduitTable tbody tr:nth-child(${issue.row+1})`);
       el=row?row.querySelector(`[name="${issue.col}"]`):null;
     }else if(issue.table==='ductbank'){
-      const rows=document.querySelectorAll('#ductbankTable tbody tr.ductbank-row');
+      const rows=getDuctbankRows();
       row=rows[issue.row];
       el=row?row.cells[1].querySelector('input'):null;
     }
@@ -771,38 +1390,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function lintRaceways(){
-    const issues=[];
-    // Duplicate ductbank tags
-    const ductbanks=getDuctbanks();
-    const dbTags=new Set();
-    ductbanks.forEach((db,i)=>{
-      if(dbTags.has(db.tag)) issues.push({message:`Duplicate ductbank tag "${db.tag}"`,table:'ductbank',row:i});
-      dbTags.add(db.tag);
-    });
-    // Tray checks
-    const trays=trayTable.getData();
-    const trayIds=new Set();
-    trays.forEach((t,i)=>{
-      if(trayIds.has(t.tray_id)) issues.push({message:`Duplicate tray ID "${t.tray_id}"`,table:'tray',row:i,col:'tray_id'});
-      trayIds.add(t.tray_id);
-      const sx=parseFloat(t.start_x), sy=parseFloat(t.start_y), sz=parseFloat(t.start_z);
-      const ex=parseFloat(t.end_x), ey=parseFloat(t.end_y), ez=parseFloat(t.end_z);
-      if(sx===ex && sy===ey && sz===ez) issues.push({message:`Tray ${t.tray_id} has zero length`,table:'tray',row:i,col:'end_x'});
-      if(ex<sx || ey<sy || ez<sz) issues.push({message:`Tray ${t.tray_id} has non-monotonic coordinates`,table:'tray',row:i,col:'end_x'});
-    });
-    // Conduit checks
-    const conduits=conduitTable.getData();
-    const cIds=new Set();
-    conduits.forEach((c,i)=>{
-      if(cIds.has(c.conduit_id)) issues.push({message:`Duplicate conduit ID "${c.conduit_id}"`,table:'conduit',row:i,col:'conduit_id'});
-      cIds.add(c.conduit_id);
-      const sx=parseFloat(c.start_x), sy=parseFloat(c.start_y), sz=parseFloat(c.start_z);
-      const ex=parseFloat(c.end_x), ey=parseFloat(c.end_y), ez=parseFloat(c.end_z);
-      if([sx,sy,sz,ex,ey,ez].some(v=>!Number.isFinite(v))) issues.push({message:`Dangling conduit ${c.conduit_id}`,table:'conduit',row:i,col:'start_x'});
-      if(ex<sx || ey<sy || ez<sz) issues.push({message:`Conduit ${c.conduit_id} has non-monotonic coordinates`,table:'conduit',row:i,col:'end_x'});
-      if(!CONDUIT_SPECS[c.type] || !CONDUIT_SPECS[c.type][c.trade_size]) issues.push({message:`Conduit ${c.conduit_id} has illegal size`,table:'conduit',row:i,col:'trade_size'});
-    });
-    return issues;
+    return collectRacewayIssues();
   }
 
   const exportRevitBtn = document.getElementById('export-revit-btn');
@@ -833,6 +1421,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
       }
       lintPanel.classList.remove('hidden');
+      updateRacewayExperience();
     });
   }
 
@@ -868,9 +1457,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   const tourBtn = document.getElementById('tour-btn');
   if (tourBtn) {
     tourBtn.addEventListener('click', () => startTour(RACEWAY_TOUR_STEPS, 'racewaySchedule'));
-  }
-  if (!hasDoneTour('racewaySchedule')) {
-    startTour(RACEWAY_TOUR_STEPS, 'racewaySchedule');
   }
 });
 

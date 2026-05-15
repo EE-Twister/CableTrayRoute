@@ -47,7 +47,7 @@ For rollout safety, keep older fingerprinted files available until all clients h
 The new landing page (`index.html`) links to every tool in the suite and outlines
 the recommended end-to-end workflow:
 
-1. **Cable Schedule** – define cables to be routed.
+1. **Cable Schedule** – define cables with guided entry, quick multi-add, smart tags, reusable cable types, batch edits, import mapping, and routing-ready checks.
 2. **Raceway Schedule** – set up trays, conduits, and ductbanks.
 3. **Ductbank** – analyze underground ductbanks.
 4. **Tray Fill** – visualize tray utilization.

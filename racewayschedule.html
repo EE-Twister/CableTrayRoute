@@ -68,14 +68,84 @@
       <header class="page-header">
         <h1>Raceway Schedule</h1>
         <p>Centralized tables for managing raceway data.</p>
-        <button id="raceway-load-samples">Load Sample Data</button>
-        <button id="tour-btn" class="btn" title="Interactive tour of this page">Take Tour</button>
-        <button id="validate-raceway-btn">Validate</button>
-        <button id="import-cad-btn" onclick="document.getElementById('import-cad-input').click()">Import CAD</button>
-        <input type="file" id="import-cad-input" accept=".json,.ifc" class="hidden">
-        <button id="export-cad-btn" onclick="dataStore.exportToCad('json')">Export CAD</button>
-        <button id="export-revit-btn" title="Export tray and conduit data as Revit-compatible JSON for round-trip BIM sync">Export to Revit</button>
       </header>
+      <div id="raceway-toolbar-primary" class="raceway-action-bar loadlist-action-bar mb-1" role="toolbar" aria-label="Raceway schedule actions" data-no-print>
+        <div class="toolbar-group">
+          <button id="raceway-load-samples" class="btn toolbar-btn" type="button" title="Load sample raceways">
+            <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+            Sample
+          </button>
+          <button id="validate-raceway-btn" class="btn toolbar-btn" type="button" title="Validate raceway schedules">
+            <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+            Validate
+          </button>
+        </div>
+        <details class="toolbar-menu">
+          <summary class="btn toolbar-btn">
+            <img src="icons/toolbar/grid-size.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+            View
+          </summary>
+          <div class="toolbar-menu-panel raceway-view-menu" role="group" aria-label="Raceway schedule view preset">
+            <button class="btn toolbar-btn active" type="button" data-raceway-view="basic">
+              <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+              Basic Entry
+            </button>
+            <button class="btn toolbar-btn" type="button" data-raceway-view="geometry">
+              <img src="icons/toolbar/dimension.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+              Geometry
+            </button>
+            <button class="btn toolbar-btn" type="button" data-raceway-view="fill">
+              <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+              Fill / Grouping
+            </button>
+            <button class="btn toolbar-btn" type="button" data-raceway-view="bim">
+              <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+              BIM Export
+            </button>
+            <button class="btn toolbar-btn" type="button" data-raceway-view="full">
+              <img src="icons/toolbar/grid-size.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+              Full Detail
+            </button>
+          </div>
+        </details>
+        <details class="toolbar-menu">
+          <summary class="btn toolbar-btn">
+            <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+            CAD / BIM
+          </summary>
+          <div class="toolbar-menu-panel">
+            <button id="import-cad-btn" class="btn toolbar-btn" type="button" title="Import CAD or Revit raceway geometry">
+              <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+              Import CAD
+            </button>
+            <button id="export-cad-btn" class="btn toolbar-btn" type="button" title="Export tray and conduit data as CAD JSON">
+              <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+              Export CAD
+            </button>
+            <button id="export-revit-btn" class="btn toolbar-btn" type="button" title="Export tray and conduit data as Revit-compatible JSON for round-trip BIM sync">
+              <img src="icons/toolbar/download.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+              Export Revit
+            </button>
+          </div>
+        </details>
+        <details class="toolbar-menu">
+          <summary class="btn secondary-btn toolbar-btn">
+            <img src="icons/toolbar/settings.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+            More
+          </summary>
+          <div id="raceway-more-actions" class="toolbar-menu-panel">
+            <button id="select-raceway-btn" class="btn toolbar-btn" type="button" title="Select raceways from the active project">
+              <img src="icons/raceway.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+              Select Raceway
+            </button>
+            <button id="tour-btn" class="btn toolbar-btn" type="button" title="Interactive tour of this page">
+              <img src="icons/toolbar/hand.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+              Tour
+            </button>
+          </div>
+        </details>
+        <input type="file" id="import-cad-input" accept=".json,.ifc" class="hidden">
+      </div>
       <details class="method-panel">
         <summary>Method &amp; Assumptions</summary>
         <p>Schedules summarize geometry where volume V = L × A.</p>
@@ -98,17 +168,105 @@
         </div>
         <img src="icons/graphics/fill-visual.svg" alt="Illustration for raceway capacity view" loading="lazy" decoding="async">
       </section>
-      <section class="card">
-        <h2>Ductbank Schedule</h2>
-        <div class="table-import-export">
-          <button id="save-ductbank-btn">Save</button>
-          <button id="load-ductbank-btn">Load</button>
-          <button id="clear-ductbank-filters-btn">Clear Filters</button>
-          <button id="export-ductbank-xlsx-btn">Export XLSX</button>
-          <input type="file" id="import-ductbank-xlsx-input" accept=".xlsx" class="hidden">
-          <button id="import-ductbank-xlsx-btn">Import XLSX</button>
-          <button id="delete-ductbank-btn">Delete All</button>
-          <button id="ductbank-help-btn" aria-expanded="false">Help</button>
+      <section class="raceway-overview card" aria-label="Raceway readiness summary">
+        <div id="raceway-summary-panel" class="raceway-summary-panel load-summary-panel" aria-live="polite">
+          <div class="load-summary-card">
+            <span id="raceway-total-count" class="load-summary-value">0</span>
+            <span class="load-summary-label">Raceways</span>
+          </div>
+          <div class="load-summary-card">
+            <span id="raceway-ductbank-count" class="load-summary-value">0</span>
+            <span class="load-summary-label">Ductbanks</span>
+          </div>
+          <div class="load-summary-card">
+            <span id="raceway-tray-count" class="load-summary-value">0</span>
+            <span class="load-summary-label">Trays</span>
+          </div>
+          <div class="load-summary-card">
+            <span id="raceway-conduit-count" class="load-summary-value">0</span>
+            <span class="load-summary-label">Conduits</span>
+          </div>
+          <div class="load-summary-card load-summary-warning">
+            <span id="raceway-issue-count" class="load-summary-value">0</span>
+            <span class="load-summary-label">Issues</span>
+          </div>
+          <div class="load-summary-card">
+            <span id="raceway-assigned-count" class="load-summary-value">0</span>
+            <span class="load-summary-label">Assigned</span>
+          </div>
+        </div>
+        <p id="raceway-validation-summary" class="load-validation-summary" aria-live="polite"></p>
+        <div class="raceway-filter-chips loadlist-filter-chips" role="group" aria-label="Raceway quick filters" data-no-print>
+          <button class="loadlist-chip active" type="button" data-raceway-filter="all">All</button>
+          <button class="loadlist-chip" type="button" data-raceway-filter="missing">Missing Geometry</button>
+          <button class="loadlist-chip" type="button" data-raceway-filter="duplicates">Duplicate IDs</button>
+          <button class="loadlist-chip" type="button" data-raceway-filter="unused">Unused</button>
+          <button class="loadlist-chip" type="button" data-raceway-filter="assigned">Assigned</button>
+          <button class="loadlist-chip" type="button" data-raceway-filter="ductbank">Ductbank Conduits</button>
+          <button class="loadlist-chip" type="button" data-raceway-filter="standalone">Standalone Conduits</button>
+        </div>
+      </section>
+      <section id="ductbank-section" class="card raceway-section-card">
+        <div class="raceway-section-header">
+          <div>
+            <h2>Ductbank Schedule</h2>
+            <p class="field-hint">Create ductbank runs and expand a row to manage conduits inside the bank.</p>
+          </div>
+          <div class="schedule-primary-actions">
+            <button id="add-ductbank-btn" class="btn primary-btn compact-action-btn add-row-btn" type="button" data-guided-add="true" title="Add ductbank">
+              <img src="icons/ductbank.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+              Add Ductbank
+            </button>
+          </div>
+        </div>
+        <div class="raceway-toolbar cable-toolbar mb-1" role="toolbar" aria-label="Ductbank schedule actions" data-no-print>
+          <div class="toolbar-group">
+            <button id="save-ductbank-btn" class="btn toolbar-btn" type="button" title="Save ductbanks">
+              <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+              Save
+            </button>
+            <button id="load-ductbank-btn" class="btn toolbar-btn" type="button" title="Load ductbanks">
+              <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+              Load
+            </button>
+          </div>
+          <details class="toolbar-menu">
+            <summary class="btn toolbar-btn">
+              <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+              Import / Export
+            </summary>
+            <div class="toolbar-menu-panel">
+              <button id="export-ductbank-xlsx-btn" class="btn toolbar-btn" type="button" title="Export ductbanks as XLSX">
+                <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+                Export XLSX
+              </button>
+              <input type="file" id="import-ductbank-xlsx-input" accept=".xlsx" class="hidden">
+              <button id="import-ductbank-xlsx-btn" class="btn toolbar-btn" type="button" title="Import ductbanks from XLSX">
+                <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+                Import XLSX
+              </button>
+            </div>
+          </details>
+          <details class="toolbar-menu toolbar-menu-danger">
+            <summary class="btn secondary-btn toolbar-btn">
+              <img src="icons/toolbar/settings.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+              More
+            </summary>
+            <div class="toolbar-menu-panel">
+              <button id="clear-ductbank-filters-btn" class="btn toolbar-btn" type="button" title="Clear ductbank filters">
+                <img src="icons/toolbar/delete-view.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+                Clear Filters
+              </button>
+              <button id="ductbank-help-btn" class="btn toolbar-btn" type="button" aria-expanded="false" title="Ductbank help">
+                <img src="icons/toolbar/hand.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+                Help
+              </button>
+              <button id="delete-ductbank-btn" class="btn btn-danger toolbar-btn" type="button" title="Delete all ductbanks">
+                <img src="icons/toolbar/trash.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+                Delete All
+              </button>
+            </div>
+          </details>
         </div>
         <div id="ductbank-table" class="table-scroll">
           <table id="ductbankTable" class="sticky-table">
@@ -133,25 +291,73 @@
           </table>
         </div>
         <div class="table-footer">
-          <button id="add-ductbank-btn" class="primary-btn add-row-btn">Add Ductbank</button>
           <div id="ductbank-row-count" class="row-count"></div>
         </div>
       </section>
 
       <!-- Tray Table -->
-      <section class="card">
-        <h2>Tray Schedule</h2>
-        <div class="table-import-export">
-          <button id="save-tray-btn">Save</button>
-          <button id="load-tray-btn">Load</button>
-          <button id="clear-tray-filters-btn">Clear Filters</button>
-          <button id="export-tray-xlsx-btn">Export XLSX</button>
-          <input type="file" id="import-tray-xlsx-input" accept=".xlsx" class="hidden">
-          <button id="import-tray-xlsx-btn">Import XLSX</button>
-          <button id="delete-tray-btn">Delete All Rows</button>
-          <button id="tray-help-btn" aria-expanded="false">Help</button>
+      <section id="tray-section" class="card raceway-section-card">
+        <div class="raceway-section-header">
+          <div>
+            <h2>Tray Schedule</h2>
+            <p class="field-hint">Tray rows auto-save to the active project and are immediately available to Tray Fill, Routing, and Spool Sheets.</p>
+          </div>
+          <div class="schedule-primary-actions">
+            <button id="add-tray-btn" class="btn primary-btn compact-action-btn add-row-btn" type="button" title="Add tray">
+              <img src="icons/tray.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+              Add Tray
+            </button>
+          </div>
         </div>
-        <p class="field-hint">Tray rows auto-save to the active project and are immediately available to Tray Fill, Routing, and Spool Sheets.</p>
+        <div class="raceway-toolbar cable-toolbar mb-1" role="toolbar" aria-label="Tray schedule actions" data-no-print>
+          <div class="toolbar-group">
+            <button id="save-tray-btn" class="btn toolbar-btn" type="button" title="Save trays">
+              <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+              Save
+            </button>
+            <button id="load-tray-btn" class="btn toolbar-btn" type="button" title="Load trays">
+              <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+              Load
+            </button>
+          </div>
+          <details class="toolbar-menu">
+            <summary class="btn toolbar-btn">
+              <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+              Import / Export
+            </summary>
+            <div class="toolbar-menu-panel">
+              <button id="export-tray-xlsx-btn" class="btn toolbar-btn" type="button" title="Export trays as XLSX">
+                <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+                Export XLSX
+              </button>
+              <input type="file" id="import-tray-xlsx-input" accept=".xlsx" class="hidden">
+              <button id="import-tray-xlsx-btn" class="btn toolbar-btn" type="button" title="Import trays from XLSX">
+                <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+                Import XLSX
+              </button>
+            </div>
+          </details>
+          <details class="toolbar-menu toolbar-menu-danger">
+            <summary class="btn secondary-btn toolbar-btn">
+              <img src="icons/toolbar/settings.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+              More
+            </summary>
+            <div class="toolbar-menu-panel">
+              <button id="clear-tray-filters-btn" class="btn toolbar-btn" type="button" title="Clear tray filters">
+                <img src="icons/toolbar/delete-view.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+                Clear Filters
+              </button>
+              <button id="tray-help-btn" class="btn toolbar-btn" type="button" aria-expanded="false" title="Tray help">
+                <img src="icons/toolbar/hand.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+                Help
+              </button>
+              <button id="delete-tray-btn" class="btn btn-danger toolbar-btn" type="button" title="Delete all tray rows">
+                <img src="icons/toolbar/trash.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+                Delete All
+              </button>
+            </div>
+          </details>
+        </div>
         <div id="tray-table" class="table-scroll">
           <table id="trayTable" class="sticky-table">
             <caption class="visually-hidden">Tray schedule with segment dimensions and coordinates</caption>
@@ -160,23 +366,72 @@
           </table>
         </div>
         <div class="table-footer">
-          <button id="add-tray-btn" class="primary-btn add-row-btn">Add Tray</button>
           <div id="tray-row-count" class="row-count"></div>
         </div>
       </section>
 
       <!-- Conduit Table -->
-      <section class="card">
-        <h2>Conduit Schedule</h2>
-        <div class="table-import-export">
-          <button id="save-conduit-btn">Save</button>
-          <button id="load-conduit-btn">Load</button>
-          <button id="clear-conduit-filters-btn">Clear Filters</button>
-          <button id="export-conduit-xlsx-btn">Export XLSX</button>
-          <input type="file" id="import-conduit-xlsx-input" accept=".xlsx" class="hidden">
-          <button id="import-conduit-xlsx-btn">Import XLSX</button>
-          <button id="delete-conduit-btn">Delete All Rows</button>
-          <button id="conduit-help-btn" aria-expanded="false">Help</button>
+      <section id="conduit-section" class="card raceway-section-card">
+        <div class="raceway-section-header">
+          <div>
+            <h2>Conduit Schedule</h2>
+            <p class="field-hint">Record standalone conduits; ductbank conduits live inside the Ductbank Schedule rows.</p>
+          </div>
+          <div class="schedule-primary-actions">
+            <button id="add-conduit-btn" class="btn primary-btn compact-action-btn add-row-btn" type="button" title="Add conduit">
+              <img src="icons/conduit.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+              Add Conduit
+            </button>
+          </div>
+        </div>
+        <div class="raceway-toolbar cable-toolbar mb-1" role="toolbar" aria-label="Conduit schedule actions" data-no-print>
+          <div class="toolbar-group">
+            <button id="save-conduit-btn" class="btn toolbar-btn" type="button" title="Save conduits">
+              <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+              Save
+            </button>
+            <button id="load-conduit-btn" class="btn toolbar-btn" type="button" title="Load conduits">
+              <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+              Load
+            </button>
+          </div>
+          <details class="toolbar-menu">
+            <summary class="btn toolbar-btn">
+              <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+              Import / Export
+            </summary>
+            <div class="toolbar-menu-panel">
+              <button id="export-conduit-xlsx-btn" class="btn toolbar-btn" type="button" title="Export conduits as XLSX">
+                <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+                Export XLSX
+              </button>
+              <input type="file" id="import-conduit-xlsx-input" accept=".xlsx" class="hidden">
+              <button id="import-conduit-xlsx-btn" class="btn toolbar-btn" type="button" title="Import conduits from XLSX">
+                <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+                Import XLSX
+              </button>
+            </div>
+          </details>
+          <details class="toolbar-menu toolbar-menu-danger">
+            <summary class="btn secondary-btn toolbar-btn">
+              <img src="icons/toolbar/settings.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+              More
+            </summary>
+            <div class="toolbar-menu-panel">
+              <button id="clear-conduit-filters-btn" class="btn toolbar-btn" type="button" title="Clear conduit filters">
+                <img src="icons/toolbar/delete-view.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+                Clear Filters
+              </button>
+              <button id="conduit-help-btn" class="btn toolbar-btn" type="button" aria-expanded="false" title="Conduit help">
+                <img src="icons/toolbar/hand.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+                Help
+              </button>
+              <button id="delete-conduit-btn" class="btn btn-danger toolbar-btn" type="button" title="Delete all conduit rows">
+                <img src="icons/toolbar/trash.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+                Delete All
+              </button>
+            </div>
+          </details>
         </div>
         <div id="conduit-table" class="table-scroll">
           <table id="conduitTable" class="sticky-table">
@@ -186,7 +441,6 @@
           </table>
         </div>
         <div class="table-footer">
-          <button id="add-conduit-btn" class="primary-btn add-row-btn">Add Conduit</button>
           <div id="conduit-row-count" class="row-count"></div>
         </div>
       </section>
@@ -201,7 +455,7 @@
     <div class="modal-content">
       <button id="close-help-btn" class="close-btn" aria-label="Close Help">&times;</button>
       <h2 id="help-title">Raceway Schedule Help</h2>
-      <p>Use these tables to manage raceway information. Each section offers a Help button with usage tips and example templates for import/export.</p>
+      <p>Use these tables to manage raceway information. Each section offers a Help button with usage tips and example templates for import/export. See <a href="docs/raceway-schedule.html">Raceway Schedule documentation</a> for the full workflow.</p>
     </div>
   </div>
 

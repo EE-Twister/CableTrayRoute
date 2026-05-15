@@ -201,6 +201,18 @@
     overflow: visible !important;
   }
 
+  .cable-schedule-card .table-viewport {
+    display: none !important;
+  }
+
+  .cable-print-report {
+    display: block !important;
+  }
+
+  .cable-print-report table {
+    width: 100% !important;
+  }
+
   /* Expand collapsed groups */
   .group-hidden {
     display: table-row !important;

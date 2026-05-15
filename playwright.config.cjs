@@ -9,6 +9,13 @@ module.exports = defineConfig({
   timeout: 30000,
   projects: [
     { name: 'firefox', use: { browserName: 'firefox' } },
-    { name: 'msedge', use: { browserName: 'chromium', channel: 'msedge' } },
+    {
+      name: 'msedge',
+      use: {
+        browserName: 'chromium',
+        channel: 'msedge',
+        launchOptions: { args: ['--allow-file-access-from-files'] }
+      }
+    },
   ],
 });

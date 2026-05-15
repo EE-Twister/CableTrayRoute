@@ -9,6 +9,13 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.join(__dirname, '..');
 const pageUrl = file => 'file://' + path.join(root, file);
 
+async function openToolbarMenu(page, label) {
+  const menu = page.locator('details.toolbar-menu').filter({ has: page.locator(`summary:has-text("${label}")`) });
+  if (!(await menu.evaluate(el => el.open))) {
+    await menu.locator('summary').click();
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Cable schedule export
 // ---------------------------------------------------------------------------
@@ -24,6 +31,7 @@ test.describe('Cable Schedule export', () => {
       return document.querySelectorAll('#cableScheduleTable tbody tr').length > 0;
     }, { timeout: 5000 });
 
+    await openToolbarMenu(page, 'Import / Export');
     const downloadPromise = page.waitForEvent('download');
     await page.click('#export-xlsx-btn');
     const download = await downloadPromise;
@@ -31,6 +39,7 @@ test.describe('Cable Schedule export', () => {
   });
 
   test('import file chooser opens on import button click', async ({ page }) => {
+    await openToolbarMenu(page, 'Import / Export');
     const fileChooserPromise = page.waitForEvent('filechooser');
     await page.click('#import-xlsx-btn');
     const chooser = await fileChooserPromise;
