@@ -152,26 +152,33 @@ describe('runReliability - expectedOutage', () => {
 });
 
 describe('runReliability - result structure', () => {
-  it('always returns empty n1Failures and n2Failures arrays', () => {
+  it('detects n1Failures for radial topologies while keeping n2Failures empty', () => {
     const components = [
-      { id: 'bus-x', type: 'bus', mtbf: 8760, mttr: 4 }
+      { id: 'source', type: 'bus', mtbf: 1000, mttr: 10, connections: [{ target: 'breaker' }] },
+      { id: 'breaker', type: 'breaker', mtbf: 1000, mttr: 10, connections: [{ target: 'source' }, { target: 'load' }] },
+      { id: 'load', type: 'bus', mtbf: 1000, mttr: 10, connections: [{ target: 'breaker' }] }
     ];
     const result = runReliability(components);
-    assert.deepStrictEqual(result.n1Failures, []);
+    assert.deepStrictEqual(result.n1Failures, ['breaker']);
     assert.deepStrictEqual(result.n2Failures, []);
   });
 
-  it('always returns empty n1FailureDetails object', () => {
-    const result = runReliability([]);
-    assert.deepStrictEqual(result.n1FailureDetails, {});
+  it('returns n1FailureDetails for detected failures', () => {
+    const result = runReliability([
+      { id: 'source', type: 'bus', mtbf: 1000, mttr: 10, connections: [{ target: 'breaker' }] },
+      { id: 'breaker', type: 'breaker', mtbf: 1000, mttr: 10, connections: [{ target: 'source' }, { target: 'load' }] },
+      { id: 'load', type: 'bus', mtbf: 1000, mttr: 10, connections: [{ target: 'breaker' }] }
+    ]);
+    assert.deepStrictEqual(result.n1FailureDetails, { breaker: { isolatedLoads: ['load'] } });
   });
 
-  it('systemAvailability is 1 when N-1 analysis produces no failures', () => {
-    // Currently n1Impacts is always empty, so systemAvailability = 1 - 0 = 1
+  it('systemAvailability drops below 1 when N-1 analysis detects failures', () => {
     const result = runReliability([
-      { id: 'bus-y', type: 'bus', mtbf: 8760, mttr: 4 }
+      { id: 'source', type: 'bus', mtbf: 1000, mttr: 10, connections: [{ target: 'breaker' }] },
+      { id: 'breaker', type: 'breaker', mtbf: 1000, mttr: 10, connections: [{ target: 'source' }, { target: 'load' }] },
+      { id: 'load', type: 'bus', mtbf: 1000, mttr: 10, connections: [{ target: 'breaker' }] }
     ]);
-    assert.strictEqual(result.systemAvailability, 1);
+    assert.ok(result.systemAvailability < 1);
   });
 
   it('returns all expected keys in result', () => {
