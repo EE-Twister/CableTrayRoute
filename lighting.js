@@ -361,9 +361,9 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    const lm = result.lumenMethod;
-    const eg = result.egressCheck;
-    const pg = result.pointGrid;
+    const lm = sanitizeLumenMethod(result.lumenMethod);
+    const eg = sanitizeEgressCheck(result.egressCheck);
+    const pg = sanitizePointGrid(result.pointGrid);
 
     const avgClass = eg.pass ? 'fill-ok' : 'fill-over';
     const avgLabel = eg.pass ? '✓ Pass' : '✗ Fail';
@@ -444,6 +444,50 @@ document.addEventListener('DOMContentLoaded', () => {
           style="display:block;margin-top:.75rem;border:1px solid var(--color-border)"
           aria-label="Pseudo-colour isolux grid"></canvas>
       </section>`;
+  }
+
+  function sanitizeLumenMethod(value) {
+    const lm = value && typeof value === 'object' ? value : {};
+    return {
+      avgFc: finiteDisplay(lm.avgFc),
+      roomAreaSqFt: finiteDisplay(lm.roomAreaSqFt),
+      rcr: finiteDisplay(lm.rcr),
+      cavityHeightFt: finiteDisplay(lm.cavityHeightFt),
+      cu: finiteDisplay(lm.cu),
+      llf: finiteDisplay(lm.llf),
+      ceilingReflPct: finiteDisplay(lm.ceilingReflPct),
+      wallReflPct: finiteDisplay(lm.wallReflPct),
+    };
+  }
+
+  function sanitizeEgressCheck(value) {
+    const eg = value && typeof value === 'object' ? value : {};
+    const avgFc = finiteNumber(eg.avgFc, 0);
+    const minFc = eg.minFc === null ? null : finiteNumber(eg.minFc, null);
+    return {
+      pass: Boolean(eg.pass),
+      avgFc,
+      avgThresholdFc: finiteDisplay(eg.avgThresholdFc),
+      minFc,
+      minThresholdFc: finiteDisplay(eg.minThresholdFc),
+      violations: Array.isArray(eg.violations)
+        ? eg.violations.map(v => String(v))
+        : [],
+    };
+  }
+
+  function sanitizePointGrid(value) {
+    if (!value || typeof value !== 'object') return null;
+    return {
+      avgFc: finiteNumber(value.avgFc, 0),
+      maxFc: finiteNumber(value.maxFc, 0),
+      minFc: finiteNumber(value.minFc, 0),
+      rows: Math.max(1, Math.floor(finiteNumber(value.rows, 1))),
+      cols: Math.max(1, Math.floor(finiteNumber(value.cols, 1))),
+      grid: Array.isArray(value.grid)
+        ? value.grid.map(cell => finiteNumber(cell, 0))
+        : [],
+    };
   }
 
   function renderWarnings(result) {
@@ -556,6 +600,16 @@ document.addEventListener('DOMContentLoaded', () => {
   function formatFc(value) {
     if (!isFinite(value)) return '0';
     return value >= 10 ? value.toFixed(1) : value.toFixed(2);
+  }
+
+  function finiteNumber(value, fallback) {
+    const num = Number(value);
+    return Number.isFinite(num) ? num : fallback;
+  }
+
+  function finiteDisplay(value) {
+    const num = finiteNumber(value, null);
+    return num === null ? '—' : num;
   }
 
   // -------------------------------------------------------------------
