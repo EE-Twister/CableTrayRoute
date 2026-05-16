@@ -7758,7 +7758,11 @@ function autoCoordinate() {
       if (i === 0) return;
       const entry = phaseOrderedEntries[i];
       if (!entry || !r.found) return;
-      entry.overrides = { ...entry.overrides, time: r.timeDial };
+      const baseSettings = entry.selection?.baseDevice?.settings || {};
+      const phaseDialKey = (baseSettings.longTimePickup !== undefined || baseSettings.longTimeDelay !== undefined)
+        ? 'longTimeDelay'
+        : 'time';
+      entry.overrides = { ...entry.overrides, [phaseDialKey]: r.timeDial };
       if (typeof updateDeviceInputs === 'function') updateDeviceInputs(entry);
     });
   } else if (phaseDeviceEntries.length === 1) {
