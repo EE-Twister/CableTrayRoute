@@ -1191,16 +1191,9 @@ export async function createApp(options = {}) {
         res.json({ message: 'If that account exists, a reset token has been generated.' });
         return;
       }
-      const token = resetTokenStore.create(trimmedUser);
-      // Write token to a dedicated audit log file so it is never exposed in general
-      // stdout log streams. Administrators retrieve the token from this file only.
-      const auditLogPath = path.join(dataDir, 'password-reset-audit.log');
-      const auditEntry = `${new Date().toISOString()} [password-reset] token_for="${trimmedUser}" expires_in=15min token=${token}\n`;
-      await fs.appendFile(auditLogPath, auditEntry).catch(err => {
-        console.error(`[password-reset] Failed to write audit log: ${err.message}`);
-      });
-      console.error(`[password-reset] Reset requested for "${trimmedUser}". Token written to ${auditLogPath}`);
-      res.json({ message: 'If that account exists, a reset token has been generated. Contact your administrator for the token.' });
+      resetTokenStore.create(trimmedUser);
+      console.error(`[password-reset] Reset requested for "${trimmedUser}".`);
+      res.json({ message: 'If that account exists, a reset token has been generated.' });
     })
   );
 
