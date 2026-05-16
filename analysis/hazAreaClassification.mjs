@@ -190,6 +190,11 @@ export const DEFAULT_HAZAREA_LAYOUT = Object.freeze({
   elevationFt: 20
 });
 
+export const MAX_HAZAREA_LAYOUT_WIDTH_FT = 2000;
+export const MAX_HAZAREA_LAYOUT_HEIGHT_FT = 2000;
+export const MAX_HAZAREA_LAYOUT_ELEVATION_FT = 1000;
+export const MAX_HAZAREA_GRID_LINES_PER_AXIS = 200;
+
 const HAZAREA_COLORS = Object.freeze({
   severe: Object.freeze({ fill: '#fca5a5', stroke: '#b91c1c', label: 'Zone 0/20 or Div 1' }),
   elevated: Object.freeze({ fill: '#fdba74', stroke: '#c2410c', label: 'Zone 1/21' }),
@@ -224,11 +229,24 @@ function roundFt(value) {
 }
 
 export function normalizeHazAreaLayout(layout = {}) {
-  const widthFt = finitePositive(layout.widthFt, DEFAULT_HAZAREA_LAYOUT.widthFt);
-  const heightFt = finitePositive(layout.heightFt, DEFAULT_HAZAREA_LAYOUT.heightFt);
-  const elevationFt = finitePositive(layout.elevationFt, DEFAULT_HAZAREA_LAYOUT.elevationFt);
+  const widthFt = clamp(
+    finitePositive(layout.widthFt, DEFAULT_HAZAREA_LAYOUT.widthFt),
+    1,
+    MAX_HAZAREA_LAYOUT_WIDTH_FT
+  );
+  const heightFt = clamp(
+    finitePositive(layout.heightFt, DEFAULT_HAZAREA_LAYOUT.heightFt),
+    1,
+    MAX_HAZAREA_LAYOUT_HEIGHT_FT
+  );
+  const elevationFt = clamp(
+    finitePositive(layout.elevationFt, DEFAULT_HAZAREA_LAYOUT.elevationFt),
+    1,
+    MAX_HAZAREA_LAYOUT_ELEVATION_FT
+  );
   const maxGrid = Math.max(1, Math.min(widthFt, heightFt));
-  const gridFt = clamp(finitePositive(layout.gridFt, DEFAULT_HAZAREA_LAYOUT.gridFt), 1, maxGrid);
+  const minGrid = Math.max(widthFt / MAX_HAZAREA_GRID_LINES_PER_AXIS, heightFt / MAX_HAZAREA_GRID_LINES_PER_AXIS, 1);
+  const gridFt = clamp(finitePositive(layout.gridFt, DEFAULT_HAZAREA_LAYOUT.gridFt), minGrid, maxGrid);
 
   return {
     widthFt: roundFt(widthFt),

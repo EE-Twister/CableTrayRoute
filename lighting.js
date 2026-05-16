@@ -2,6 +2,7 @@ import {
   runLightingStudy,
   parseIES,
   generateDefaultFixtureLayout,
+  MAX_LIGHTING_FIXTURE_LAYOUT_COUNT,
 } from './analysis/lighting.mjs';
 import { getStudies, setStudies } from './dataStore.mjs';
 import { initStudyApprovalPanel } from './src/components/studyApproval.js';
@@ -238,11 +239,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const ceilingHeightFt = positiveNumber(inputs.ceilingHeightFt, Math.max(9, positiveNumber(inputs.mountingHeightFt, 9)));
     const mountingHeightFt = positiveNumber(inputs.mountingHeightFt, ceilingHeightFt);
     const workplaneHeightFt = nonNegativeNumber(inputs.workplaneHeightFt, 0);
-    const fixtureCount = Math.max(1, Math.floor(positiveNumber(inputs.numFixtures, 1)));
+    const fixtureCount = Math.min(
+      MAX_LIGHTING_FIXTURE_LAYOUT_COUNT,
+      Math.max(1, Math.floor(positiveNumber(inputs.numFixtures, 1)))
+    );
     const lumens = positiveNumber(inputs.lumensPerFixture, 0);
     const area = lengthFt * widthFt;
     const enteredPositions = Array.isArray(inputs.fixturePositions)
-      ? inputs.fixturePositions.filter(pos => isFinite(pos.x) && isFinite(pos.y))
+      ? inputs.fixturePositions
+        .slice(0, MAX_LIGHTING_FIXTURE_LAYOUT_COUNT)
+        .filter(pos => isFinite(pos.x) && isFinite(pos.y))
       : [];
 
     let layoutSource = 'Auto-spaced preview';
