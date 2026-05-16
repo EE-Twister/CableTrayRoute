@@ -34,13 +34,17 @@ export class CollabClient extends EventTarget {
   #reconnectAttempt = 0;
   #intentionalClose = false;
   #pingTimer = null;
+  #token;
+  #csrfToken;
   /** Sequence number of the last patch received from the server. */
   #lastSeq = 0;
 
-  constructor({ projectId, username }) {
+  constructor({ projectId, username, token = '', csrfToken = '' }) {
     super();
     this.#projectId = projectId;
     this.#username = username;
+    this.#token = token;
+    this.#csrfToken = csrfToken;
   }
 
   get connected() {
@@ -54,7 +58,10 @@ export class CollabClient extends EventTarget {
 
     this.#intentionalClose = false;
     this.#lastSeq = 0;
-    this.#ws = new WebSocket(WS_URL);
+    const wsUrl = new URL(WS_URL);
+    if (this.#token) wsUrl.searchParams.set('token', this.#token);
+    if (this.#csrfToken) wsUrl.searchParams.set('csrfToken', this.#csrfToken);
+    this.#ws = new WebSocket(wsUrl.toString());
 
     this.#ws.addEventListener('open', () => {
       this.#reconnectAttempt = 0;

@@ -21,8 +21,14 @@
  *
  * @param {import('http').Server} httpServer
  * @param {object} wss - WebSocketServer instance
+ * @param {{
+ *   sessionStore?: { get(token: string): Promise<object|null> },
+ *   maxMessageBytes?: number
+ * }} [options]
  */
-export function attachCollaborationServer(httpServer, wss) {
+export function attachCollaborationServer(httpServer, wss, options = {}) {
+  const sessionStore = options.sessionStore;
+  const maxMessageBytes = Number(options.maxMessageBytes) > 0 ? Number(options.maxMessageBytes) : 64 * 1024;
   // projectId → Set of { ws, username }
   const rooms = new Map();
   // projectId → monotonically increasing sequence counter
@@ -52,19 +58,45 @@ export function attachCollaborationServer(httpServer, wss) {
   }
 
   httpServer.on('upgrade', (request, socket, head) => {
-    const { pathname } = new URL(request.url, 'http://localhost');
+    const upgradeUrl = new URL(request.url, 'http://localhost');
+    const { pathname } = upgradeUrl;
     if (pathname !== '/ws/collab') {
       socket.destroy();
       return;
     }
-    wss.handleUpgrade(request, socket, head, ws => {
-      wss.emit('connection', ws, request);
-    });
+    const completeUpgrade = (authSession = null) => {
+      request.authSession = authSession;
+      wss.handleUpgrade(request, socket, head, ws => {
+        wss.emit('connection', ws, request);
+      });
+    };
+    if (!sessionStore) {
+      completeUpgrade();
+      return;
+    }
+    const headers = request.headers || {};
+    const originHeader = headers.origin;
+    const hostHeader = headers.host;
+    if (typeof originHeader !== 'string' || typeof hostHeader !== 'string') return socket.destroy();
+    let originHost;
+    try { originHost = new URL(originHeader).host; } catch { return socket.destroy(); }
+    if (originHost !== hostHeader) return socket.destroy();
+    const authHeader = headers.authorization;
+    const [scheme, headerToken = ''] = String(authHeader || '').split(' ');
+    const queryToken = upgradeUrl.searchParams.get('token') || '';
+    const token = (scheme === 'Bearer' && headerToken) ? headerToken : queryToken;
+    const csrfToken = headers['x-csrf-token'] || upgradeUrl.searchParams.get('csrfToken');
+    if (!token || typeof csrfToken !== 'string') return socket.destroy();
+    Promise.resolve(sessionStore.get(token)).then(session => {
+      if (!session || csrfToken !== session.csrfToken) return socket.destroy();
+      completeUpgrade(session);
+    }).catch(() => socket.destroy());
   });
 
-  wss.on('connection', (ws) => {
+  wss.on('connection', (ws, request) => {
+    const userFromSession = request?.authSession?.username;
     let currentProjectId = null;
-    let currentUsername = null;
+    let currentUsername = String(userFromSession || 'Anonymous').slice(0, 100);
 
     function removeFromRoom() {
       if (!currentProjectId) return;
@@ -93,7 +125,11 @@ export function attachCollaborationServer(httpServer, wss) {
       if (msg.type === 'join') {
         removeFromRoom();
         currentProjectId = String(msg.projectId || '');
-        currentUsername = String(msg.username || 'Anonymous').slice(0, 100);
+        if (!currentProjectId) {
+          ws.send(JSON.stringify({ type: 'error', message: 'projectId is required' }));
+          return;
+        }
+        currentUsername = String(userFromSession || msg.username || 'Anonymous').slice(0, 100);
         if (!rooms.has(currentProjectId)) rooms.set(currentProjectId, new Set());
         if (!seqCounters.has(currentProjectId)) seqCounters.set(currentProjectId, 0);
         rooms.get(currentProjectId).add({ ws, username: currentUsername });
@@ -113,6 +149,10 @@ export function attachCollaborationServer(httpServer, wss) {
       if (msg.type === 'patch') {
         if (!currentProjectId) {
           ws.send(JSON.stringify({ type: 'error', message: 'Join a project first' }));
+          return;
+        }
+        if (Buffer.byteLength(JSON.stringify(msg.patch ?? null), 'utf8') > maxMessageBytes) {
+          ws.send(JSON.stringify({ type: 'error', message: 'Patch too large' }));
           return;
         }
         // Assign the next sequence number to this patch

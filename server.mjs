@@ -828,6 +828,7 @@ export async function createApp(options = {}) {
   }
 
   const app = express();
+  app.set('sessionStore', sessionStore);
 
   if (enforceHttps) {
     app.enable('trust proxy');
@@ -2030,7 +2031,10 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.a
   // Real-time collaboration via WebSocket
   try {
     const { WebSocketServer } = await import('ws');
-    attachCollaborationServer(server, new WebSocketServer({ noServer: true }));
+    attachCollaborationServer(server, new WebSocketServer({ noServer: true }), {
+      sessionStore: app.get('sessionStore'),
+      maxMessageBytes: 64 * 1024,
+    });
   } catch {
     // ws not installed — collaboration disabled; app still works fine
     console.info('ws package not found; real-time collaboration disabled');

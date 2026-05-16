@@ -41,7 +41,12 @@ export function initCollaboration({ projectId, username } = {}) {
   const authState = getAuthContextState ? getAuthContextState() : null;
   const resolvedUsername = username || (authState && authState.user) || 'Guest';
 
-  activeClient = new CollabClient({ projectId, username: resolvedUsername });
+  activeClient = new CollabClient({
+    projectId,
+    username: resolvedUsername,
+    token: authState?.token || '',
+    csrfToken: authState?.csrfToken || '',
+  });
 
   // Conflict notifications (out-of-order patches warning)
   initConflictNotifications(activeClient);
