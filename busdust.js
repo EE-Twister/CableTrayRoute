@@ -25,8 +25,12 @@ document.addEventListener('DOMContentLoaded', () => {
   const saved = getStudies().busDuctSizing;
   if (saved && saved._inputs) {
     restoreInputs(saved._inputs);
-    renderResults(saved);
-    exportBtn.disabled = false;
+    const restoredResult = runBusDuctStudy(saved._inputs);
+    const studies = getStudies();
+    studies.busDuctSizing = { ...restoredResult, _inputs: saved._inputs };
+    setStudies(studies);
+    renderResults(studies.busDuctSizing);
+    exportBtn.disabled = !restoredResult.valid;
   }
 
   // -------------------------------------------------------------------
