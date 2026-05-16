@@ -923,6 +923,11 @@ document.addEventListener('DOMContentLoaded', () => {
     return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
   }
 
+  function csvSpreadsheetSafe(value) {
+    const text = String(value ?? '');
+    return /^[=+\-@]/.test(text) ? `'${text}` : text;
+  }
+
   function buildScheduleCsv(rows) {
     const header = [
       'Cable Tag',
@@ -942,8 +947,8 @@ document.addEventListener('DOMContentLoaded', () => {
       const size = row.cable.conductor_size || row.cable.size || '';
       const status = row.err || !row.result ? `Error${row.err ? `: ${row.err}` : ''}` : 'OK';
       return [
-        tag,
-        size,
+        csvSpreadsheetSafe(tag),
+        csvSpreadsheetSafe(size),
         row.conductors,
         row.sysType,
         row.spacing_mm.toFixed(1),
