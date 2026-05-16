@@ -222,6 +222,19 @@ async function initializeApp() {
         heatmapEnabled: false,
     };
 
+    const storeLatestRouteResults = (batchResults, meta = {}) => {
+        try {
+            setItem('latestRouteResults', {
+                batchResults: Array.isArray(batchResults) ? batchResults : [],
+                source: 'optimalRoute',
+                updatedAt: new Date().toISOString(),
+                ...meta
+            });
+        } catch (error) {
+            console.warn('Unable to store latest route results', error);
+        }
+    };
+
     // --- ELEMENT REFERENCES ---
     const elements = {
         fillLimitIn: document.getElementById('fill-limit'),
@@ -3933,6 +3946,7 @@ const renderBatchResults = (results) => {
             const cache = getItem(cacheKey);
             if (cache) {
                 state.latestRouteData = cache.batchResults;
+                storeLatestRouteResults(cache.batchResults, { projectHash, source: 'optimalRouteCache' });
                 state.finalTrays = cache.finalTrays;
                 const resMap = new Map((cache.batchResults || []).map(r => [r.cable, r]));
                 state.cableList.forEach(c => {
@@ -4045,6 +4059,7 @@ const renderBatchResults = (results) => {
                     buildFieldSegmentCableMap(batchResults);
                     setCables(state.cableList);
                     state.latestRouteData = batchResults;
+                    storeLatestRouteResults(batchResults, { projectHash });
                     renderBatchResults(batchResults);
                     const nameMap = new Map(state.cableList.map(c => [c.name, c]));
                     state.trayCableMap = {};
@@ -4265,6 +4280,7 @@ const renderBatchResults = (results) => {
         }
 
         state.latestRouteData = Array.from(resultMap.values()).sort((a,b) => a.index - b.index).map(v => v.row);
+        storeLatestRouteResults(state.latestRouteData, { source: 'optimalRouteRebalance' });
         buildFieldSegmentCableMap(state.latestRouteData);
 
         const nameMap = new Map(state.cableList.map(c => [c.name, c]));

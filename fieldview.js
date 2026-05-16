@@ -14,6 +14,25 @@
 
 import { getCables, getTrays } from './dataStore.mjs';
 
+const PREVIEW_CABLE = {
+  tag: 'C-1042',
+  cable_type: 'Power',
+  from_tag: 'SWGR-01',
+  to_tag: 'MCC-02',
+  conductors: '3/C + G',
+  conductor_size: '500 kcmil Cu',
+  cable_od: '1.62',
+  allowed_cable_group: '600 V Power',
+  tray_ids: ['TR-101', 'TR-102', 'TR-203'],
+  notes: 'Verify tray bend clearance before pull.'
+};
+
+const PREVIEW_TRAYS = [
+  { tray_id: 'TR-101', label: 'Main electrical room' },
+  { tray_id: 'TR-102', label: 'Pipe rack west' },
+  { tray_id: 'TR-203', label: 'MCC mezzanine' }
+];
+
 // ---------------------------------------------------------------------------
 // URL hash parsing
 // ---------------------------------------------------------------------------
@@ -46,7 +65,7 @@ function fieldRow(label, value) {
     </div>`;
 }
 
-function renderCableCard(cable, trays) {
+function renderCableCard(cable, trays, options = {}) {
   const trayList = Array.isArray(cable.tray_ids) && cable.tray_ids.length
     ? cable.tray_ids.join(' → ')
     : (cable.tray_id || '—');
@@ -69,9 +88,30 @@ function renderCableCard(cable, trays) {
 
   const cableTag = cable.tag || '-';
   const encodedCableTag = encodeURIComponent(cableTag);
+  const cardLabel = options.preview
+    ? `Sample cable preview: ${cableTag}`
+    : `Cable detail: ${cableTag}`;
+  const actions = options.preview
+    ? `
+        <a href="cableschedule.html" class="fv-btn fv-btn-secondary">
+          Open Cable Schedule
+        </a>
+        <a href="pullcards.html" class="fv-btn fv-btn-secondary">
+          Pull Cards
+        </a>`
+    : `
+        <a href="cableschedule.html#cable=${encodedCableTag}" class="fv-btn fv-btn-secondary">
+          Open Full Schedule
+        </a>
+        <a href="pullcards.html" class="fv-btn fv-btn-secondary">
+          Pull Cards
+        </a>
+        <button class="fv-btn fv-btn-print" onclick="window.print()">
+          Print
+        </button>`;
 
   return `
-    <article class="fv-card" aria-label="Cable detail: ${esc(cableTag)}">
+    <article class="fv-card" aria-label="${esc(cardLabel)}">
       <header class="fv-card-header">
         <div class="fv-tag">${esc(cableTag)}</div>
         ${cable.cable_type ? `<span class="fv-type-badge ${typeClass}">${esc(cable.cable_type)}</span>` : ''}
@@ -87,15 +127,7 @@ function renderCableCard(cable, trays) {
         ${fieldRow('Notes', cable.notes || cable.note || '')}
       </div>
       <div class="fv-actions">
-        <a href="cableschedule.html#cable=${encodedCableTag}" class="fv-btn fv-btn-secondary">
-          Open Full Schedule
-        </a>
-        <a href="pullcards.html" class="fv-btn fv-btn-secondary">
-          Pull Cards
-        </a>
-        <button class="fv-btn fv-btn-print" onclick="window.print()">
-          Print
-        </button>
+        ${actions}
       </div>
     </article>`;
 }
@@ -157,13 +189,27 @@ function renderNoData(kind) {
     </div>`;
 }
 
+function renderDesktopPreview() {
+  return `
+    <div class="fv-desktop-only">
+      <div class="fv-preview-note" role="status">
+        <span class="fv-label">Sample preview</span>
+        <span class="fv-preview-note-copy">This sample card appears on desktop when no cable or tray QR target is selected.</span>
+      </div>
+      ${renderCableCard(PREVIEW_CABLE, PREVIEW_TRAYS, { preview: true })}
+    </div>`;
+}
+
 function renderNoHash() {
   return `
-    <div class="fv-message fv-message-info" role="status">
-      <div class="fv-message-icon" aria-hidden="true">&#8505;</div>
-      <h2>Field View</h2>
-      <p>Scan a QR code from a pull card or tray hardware tag to see cable or tray details here.</p>
-      <a href="index.html" class="fv-btn fv-btn-secondary">Go to Home</a>
+    ${renderDesktopPreview()}
+    <div class="fv-mobile-only">
+      <div class="fv-message fv-message-info" role="status">
+        <div class="fv-message-icon" aria-hidden="true">&#8505;</div>
+        <h2>Field View</h2>
+        <p>Scan a QR code from a pull card or tray hardware tag to see cable or tray details here.</p>
+        <a href="index.html" class="fv-btn fv-btn-secondary">Go to Home</a>
+      </div>
     </div>`;
 }
 

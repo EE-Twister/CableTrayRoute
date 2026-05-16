@@ -1,4 +1,4 @@
-import { buildTrayHardwareBOM } from '../analysis/trayHardware.mjs';
+import { buildTrayHardwareBOM, enrichTrayBOMWithQR } from '../analysis/trayHardware.mjs';
 import { getTrays } from '../dataStore.mjs';
 import { showAlertModal } from './components/modal.js';
 import { mountCatalogBrowser } from './catalogBrowser.js';
@@ -32,7 +32,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   let lastBOM = null;
 
-  generateBtn.addEventListener('click', () => {
+  generateBtn.addEventListener('click', async () => {
     const trays = getTrays();
     if (!trays || trays.length === 0) {
       showAlertModal('No Tray Data', 'No trays found in the Raceway Schedule. Add trays first.');
@@ -62,6 +62,7 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
+    await enrichTrayBOMWithQR(bom, { baseURL: fieldViewBaseURL() });
     lastBOM = bom;
     renderBOM(bom, resultsDiv);
     exportXlsxBtn.disabled = false;
@@ -115,7 +116,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const supSection = document.createElement('section');
       supSection.innerHTML = '<h2>Support Brackets Detail</h2>';
       supSection.appendChild(buildTable(
-        ['Tray ID', 'Type', 'Material', 'Width (in)', 'Depth (in)', 'Length (ft)', 'Max Span (ft)', 'Brackets'],
+        ['Tray ID', 'Type', 'Material', 'Width (in)', 'Depth (in)', 'Length (ft)', 'Max Span (ft)', 'Brackets', 'Field View URL'],
         bom.supports.map(s => [
           s.tray_id,
           s.tray_type || '—',
@@ -125,6 +126,7 @@ document.addEventListener('DOMContentLoaded', () => {
           s.length_ft,
           s.max_span_ft,
           s.bracket_qty,
+          s.field_view_url || '-',
         ])
       ));
       container.appendChild(supSection);
@@ -135,7 +137,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const secSection = document.createElement('section');
       secSection.innerHTML = '<h2>Straight Sections &amp; Covers Detail</h2>';
       secSection.appendChild(buildTable(
-        ['Tray ID', 'Type', 'Material', 'Width (in)', 'Length (ft)', 'Sections', 'Cover Sections'],
+        ['Tray ID', 'Type', 'Material', 'Width (in)', 'Length (ft)', 'Sections', 'Cover Sections', 'Field View URL'],
         bom.sections.map(s => [
           s.tray_id,
           s.tray_type || '—',
@@ -144,6 +146,7 @@ document.addEventListener('DOMContentLoaded', () => {
           s.length_ft,
           s.straight_sections,
           s.cover_sections,
+          s.field_view_url || '-',
         ])
       ));
       container.appendChild(secSection);
@@ -211,19 +214,28 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Supports sheet
     if (bom.supports.length > 0) {
-      const supData = [['Tray ID', 'Type', 'Material', 'Width (in)', 'Depth (in)', 'Length (ft)', 'Max Span (ft)', 'Brackets'],
-        ...bom.supports.map(s => [s.tray_id, s.tray_type, s.material || 'Steel', s.width, s.depth, s.length_ft, s.max_span_ft, s.bracket_qty])];
+      const supData = [['Tray ID', 'Type', 'Material', 'Width (in)', 'Depth (in)', 'Length (ft)', 'Max Span (ft)', 'Brackets', 'Field View URL'],
+        ...bom.supports.map(s => [s.tray_id, s.tray_type, s.material || 'Steel', s.width, s.depth, s.length_ft, s.max_span_ft, s.bracket_qty, s.field_view_url || ''])];
       XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(supData), 'Supports');
     }
 
     // Sections sheet
     if (bom.sections.length > 0) {
-      const secData = [['Tray ID', 'Type', 'Material', 'Width (in)', 'Length (ft)', 'Straight Sections', 'Cover Sections'],
-        ...bom.sections.map(s => [s.tray_id, s.tray_type, s.material || 'Steel', s.width, s.length_ft, s.straight_sections, s.cover_sections])];
+      const secData = [['Tray ID', 'Type', 'Material', 'Width (in)', 'Length (ft)', 'Straight Sections', 'Cover Sections', 'Field View URL'],
+        ...bom.sections.map(s => [s.tray_id, s.tray_type, s.material || 'Steel', s.width, s.length_ft, s.straight_sections, s.cover_sections, s.field_view_url || ''])];
       XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(secData), 'Sections');
     }
 
     const stamp = new Date().toISOString().split('T')[0];
     XLSX.writeFile(wb, `tray-hardware-bom-${stamp}.xlsx`);
+  }
+
+  function fieldViewBaseURL() {
+    try {
+      const base = new URL('.', window.location.href);
+      return base.href.replace(/\/$/, '');
+    } catch {
+      return 'https://cabletrayroute.com';
+    }
   }
 });

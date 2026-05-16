@@ -15,8 +15,10 @@ import {
   getReportSnapshots, setReportSnapshot, deleteReportSnapshot,
   getDrcAcceptedFindings,
   getLifecyclePackages,
+  getItem,
 } from '../dataStore.mjs';
 import { getProjectState } from '../projectStorage.js';
+import { buildDeliverableReadinessDiagnostics } from '../analysis/deliverableWorkflow.mjs';
 import { generateProjectReport } from '../analysis/projectReport.mjs';
 import {
   renderPackageHTML,
@@ -544,6 +546,49 @@ function loadProjectDataWithPackage() {
   };
 }
 
+function currentReportReadinessDiagnostics() {
+  const projectData = loadProjectDataWithPackage();
+  const snap = activeLifecyclePkg?.projectSnapshot || {};
+  return buildDeliverableReadinessDiagnostics({
+    cables: projectData.cables,
+    trays: projectData.trays,
+    conduits: projectData.conduits,
+    ductbanks: projectData.ductbanks,
+    studies: projectData.studies,
+    drcResults: projectData.drcResults,
+    routeResults: activeLifecyclePkg
+      ? snap.latestRouteResults || snap.routeResults || []
+      : getItem('latestRouteResults', null),
+    reportSnapshots: activeLifecyclePkg ? snap.reportSnapshots || {} : getReportSnapshots(),
+    lifecyclePackages: getLifecyclePackages(),
+  });
+}
+
+function renderReportReadiness() {
+  const el = document.getElementById('rpt-deliverable-readiness');
+  if (!el) return;
+  const diagnostics = currentReportReadinessDiagnostics();
+  const action = diagnostics.nextAction;
+  const routeCount = diagnostics.health.routeResults;
+  const snapshotCount = diagnostics.health.reportSnapshots;
+  const packageCount = diagnostics.health.lifecyclePackages;
+  el.classList.toggle('is-warning', action.severity === 'warning' || action.severity === 'critical');
+  el.classList.toggle('is-ready', diagnostics.ready.projectReport && routeCount > 0);
+  el.innerHTML = `
+    <div>
+      <strong>Report readiness: ${diagnostics.health.reportSections} section(s) available.</strong>
+      <p>${routeCount} route result(s), ${diagnostics.health.pullGroups} pull group(s), ${diagnostics.health.spoolCount} spool(s), ${snapshotCount} saved snapshot(s), and ${packageCount} release package(s).</p>
+    </div>
+    <span class="workflow-next-action__meta">${escAttr(action.label)}</span>
+    <div class="workflow-next-action__actions">
+      <button type="button" class="btn primary-btn" data-action="generate-report-preview">Generate Preview</button>
+      <a class="btn secondary-btn" href="pullcards.html">Pull Cards</a>
+      <a class="btn secondary-btn" href="spoolsheets.html">Spool Sheets</a>
+      <a class="btn secondary-btn" href="workflowdashboard.html">Dashboard</a>
+    </div>`;
+  el.querySelector('[data-action="generate-report-preview"]')?.addEventListener('click', generatePreview);
+}
+
 function generatePreview() {
   try {
     setStatus('Generating…', 'info');
@@ -562,6 +607,7 @@ function generatePreview() {
 
     const sectionCount = Object.keys(pkg.sections).length;
     setStatus(`Preview built — ${sectionCount} section(s) included.`, 'success');
+    renderReportReadiness();
   } catch (err) {
     console.error('[projectreport] Generation failed:', err);
     setStatus('Generation failed: ' + err.message, 'error');
@@ -608,6 +654,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const pd = loadProjectDataWithPackage();
     const avail = getAvailableSections({ studies: pd.studies, cables: pd.cables, trays: pd.trays, drcResults: pd.drcResults });
     buildSectionChecks(avail);
+    renderReportReadiness();
   });
 
   // Build section checkboxes based on available data
@@ -619,6 +666,7 @@ document.addEventListener('DOMContentLoaded', () => {
     drcResults: projectData.drcResults,
   });
   buildSectionChecks(available);
+  renderReportReadiness();
 
   // Default preset: ownerTurnover (all sections, scoped to available)
   applyPreset('ownerTurnover');
@@ -673,6 +721,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const snap = snapshotPackage(lastPkg);
     setReportSnapshot(snap.id, snap);
     renderSnapshotList();
+    renderReportReadiness();
     // Open the snapshots panel
     const panel = document.getElementById('rpt-snapshots-panel');
     if (panel) panel.open = true;

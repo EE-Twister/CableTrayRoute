@@ -422,6 +422,7 @@ function currentCoreDiagnostics() {
     studies: getStudies(),
     reportSnapshots: getReportSnapshots(),
     deliverables: getLifecyclePackages(),
+    latestRouteResults: getItem('latestRouteResults', null),
     reconcilePending: Boolean(getItem('oneLineScheduleReconcilePending', false))
   });
 }
@@ -471,8 +472,13 @@ function renderWorkflowCoreDiagnostics() {
       ['One-Line', `${health.oneLineComponents} components`],
       ['Cable Schedule', `${health.scheduleReady}/${health.cableRows} schedule-ready`],
       ['Routing', `${health.routingReady}/${health.cableRows} routing-ready`],
+      ['Route Results', health.routeResults],
+      ['Pull Cards', `${health.pullGroups} pull group${health.pullGroups === 1 ? '' : 's'}`],
+      ['Spool Sheets', `${health.spoolSheets} spool${health.spoolSheets === 1 ? '' : 's'}`],
       ['Raceways', health.raceways],
       ['Studies', health.studies],
+      ['Report Snapshots', health.reportSnapshots],
+      ['Release Packages', health.lifecyclePackages],
       ['Deliverables', health.deliverables]
     ];
     healthEl.innerHTML = `

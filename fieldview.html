@@ -43,8 +43,26 @@
       text-decoration: none;
     }
     .fv-topbar-brand span {
-      color: var(--color-muted, #555);
+      color: var(--color-text-muted, #555);
       font-weight: 400;
+    }
+
+    .fv-shell {
+      width: 100%;
+    }
+
+    .fv-desktop-panel {
+      display: none;
+    }
+
+    .fv-device-preview,
+    .fv-device-frame,
+    .fv-device-screen {
+      width: 100%;
+    }
+
+    .fv-device-speaker {
+      display: none;
     }
 
     .fv-container {
@@ -76,7 +94,7 @@
     .fv-tag {
       font-size: 1.6rem;
       font-weight: 700;
-      letter-spacing: -0.02em;
+      letter-spacing: 0;
       color: var(--color-primary, #1a56db);
       line-height: 1.1;
       word-break: break-all;
@@ -94,7 +112,7 @@
     .fv-type-power   { background: #fee2e2; color: #b91c1c; }
     .fv-type-control { background: #fef3c7; color: #92400e; }
     .fv-type-signal  { background: #d1fae5; color: #065f46; }
-    .fv-tray-label   { font-size: 1rem; color: var(--color-muted, #555); }
+    .fv-tray-label   { font-size: 1rem; color: var(--color-text-muted, #555); }
 
     /* Field rows — label above value for narrow screens */
     .fv-fields {
@@ -115,13 +133,13 @@
       font-weight: 600;
       text-transform: uppercase;
       letter-spacing: 0.07em;
-      color: var(--color-muted, #666);
+      color: var(--color-text-muted, #666);
     }
 
     .fv-value {
       font-size: 1.15rem;
       font-weight: 500;
-      color: var(--color-fg, #111);
+      color: var(--color-text, #111);
       word-break: break-word;
     }
 
@@ -167,7 +185,7 @@
 
     .fv-btn-print {
       background: var(--color-surface, #fff);
-      color: var(--color-fg, #111);
+      color: var(--color-text, #111);
       border: 1.5px solid var(--color-border, #ddd);
     }
     .fv-btn-print:hover { background: var(--color-surface-alt, #f5f5f5); }
@@ -188,6 +206,7 @@
       font-size: 2.5rem;
       margin-bottom: 0.5rem;
       line-height: 1;
+      color: var(--color-primary, #1a56db);
     }
 
     .fv-message h2 {
@@ -198,7 +217,31 @@
     .fv-message p {
       font-size: 0.95rem;
       margin: 0 0 1rem;
-      color: var(--color-muted, #555);
+      color: #475569;
+    }
+
+    .fv-desktop-only {
+      display: none;
+    }
+
+    .fv-mobile-only {
+      display: block;
+    }
+
+    .fv-preview-note {
+      display: grid;
+      gap: 0.25rem;
+      margin: 0 0 0.75rem;
+      padding: 0.65rem 0.85rem;
+      border-left: 4px solid var(--color-primary, #1a56db);
+      background: var(--color-primary-subtle, #eff6ff);
+      color: #0f172a;
+      font-size: 0.9rem;
+      line-height: 1.35;
+    }
+
+    .fv-preview-note-copy {
+      color: #475569;
     }
 
     /* -----------------------------------------------------------------------
@@ -207,7 +250,26 @@
     @media print {
       .fv-topbar,
       .fv-actions,
+      .fv-desktop-panel,
+      .fv-device-speaker,
       .top-nav { display: none !important; }
+      .fv-shell,
+      .fv-device-preview,
+      .fv-device-frame,
+      .fv-device-screen,
+      .fv-container {
+        display: block;
+        width: auto;
+        max-width: none;
+        min-height: 0;
+        height: auto;
+        margin: 0;
+        padding: 0;
+        overflow: visible;
+        background: transparent;
+        border: 0;
+        box-shadow: none;
+      }
       .fv-card {
         box-shadow: none;
         border: 1px solid #999;
@@ -225,6 +287,142 @@
         gap: 1rem;
       }
       .fv-label { width: 9rem; flex-shrink: 0; }
+    }
+
+    @media (min-width: 900px) {
+      .fieldview-page {
+        background:
+          radial-gradient(circle at 12% 8%, color-mix(in srgb, var(--color-primary, #1a56db) 12%, transparent), transparent 22rem),
+          linear-gradient(135deg, var(--secondary-color, #f6f8fb), var(--color-surface, #fff));
+      }
+
+      .fv-shell {
+        display: grid;
+        grid-template-columns: minmax(18rem, 1fr) minmax(22rem, 27rem);
+        gap: 4rem;
+        align-items: center;
+        max-width: 1120px;
+        min-height: calc(100vh - 58px);
+        margin: 0 auto;
+        padding: 3rem 2rem;
+        box-sizing: border-box;
+      }
+
+      .fv-desktop-panel {
+        display: block;
+        max-width: 32rem;
+      }
+
+      .fv-desktop-kicker {
+        margin: 0 0 0.7rem;
+        color: var(--color-primary, #1a56db);
+        font-size: 0.78rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .fv-desktop-panel h1 {
+        margin: 0 0 0.8rem;
+        color: var(--color-text, #111);
+        font-size: 2.35rem;
+        line-height: 1.08;
+        letter-spacing: 0;
+      }
+
+      .fv-desktop-panel p {
+        margin: 0;
+        max-width: 28rem;
+        color: var(--color-text-muted, #555);
+        font-size: 1rem;
+        line-height: 1.55;
+      }
+
+      .fv-desktop-summary {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 1rem;
+        margin-top: 2rem;
+      }
+
+      .fv-desktop-summary-item {
+        padding: 0 0 0 0.85rem;
+        border-left: 4px solid var(--color-primary, #1a56db);
+      }
+
+      .fv-desktop-summary-item strong {
+        display: block;
+        margin-bottom: 0.2rem;
+        color: var(--color-text, #111);
+        font-size: 0.95rem;
+      }
+
+      .fv-desktop-summary-item span {
+        color: var(--color-text-muted, #555);
+        font-size: 0.86rem;
+        line-height: 1.35;
+      }
+
+      .fv-device-preview {
+        justify-self: center;
+        max-width: 27rem;
+      }
+
+      .fv-device-frame {
+        position: relative;
+        box-sizing: border-box;
+        padding: 2.45rem 0.85rem 1rem;
+        border-radius: 2.45rem;
+        background: linear-gradient(145deg, #111827, #293241);
+        box-shadow: 0 1.5rem 4rem rgba(15, 23, 42, 0.28), inset 0 0 0 1px rgba(255,255,255,0.12);
+      }
+
+      .fv-device-frame::after {
+        content: "";
+        display: block;
+        width: 5.2rem;
+        height: 0.28rem;
+        margin: 0.75rem auto 0;
+        border-radius: 999px;
+        background: rgba(255,255,255,0.35);
+      }
+
+      .fv-device-speaker {
+        display: block;
+        position: absolute;
+        top: 1.05rem;
+        left: 50%;
+        width: 5rem;
+        height: 0.34rem;
+        border-radius: 999px;
+        background: rgba(255,255,255,0.28);
+        transform: translateX(-50%);
+      }
+
+      .fv-device-screen {
+        box-sizing: border-box;
+        height: min(720px, calc(100vh - 10rem));
+        min-height: 590px;
+        overflow-y: auto;
+        border: 1px solid rgba(15, 23, 42, 0.22);
+        border-radius: 1.75rem;
+        background: var(--secondary-color, #f6f8fb);
+        box-shadow: inset 0 0 0 1px rgba(255,255,255,0.45);
+      }
+
+      .fv-container {
+        max-width: none;
+        margin: 0;
+        padding: 1rem;
+      }
+
+      .fv-desktop-only {
+        display: block;
+      }
+
+      .fv-mobile-only {
+        display: none;
+      }
     }
   </style>
 </head>
@@ -249,14 +447,39 @@
     </nav>
   </header>
 
-  <div class="fv-container">
-    <main id="main-content">
-      <!-- Cable or tray card injected here by fieldview.js -->
-      <div id="fv-content" aria-live="polite" aria-label="Field view content">
-        <!-- Loading placeholder — replaced immediately by JS -->
-        <p class="field-hint" style="text-align:center;padding:2rem 0;">Loading…</p>
+  <div class="fv-shell">
+    <section class="fv-desktop-panel" aria-labelledby="fv-desktop-title">
+      <p class="fv-desktop-kicker">Desktop preview</p>
+      <h1 id="fv-desktop-title">Field View</h1>
+      <p>Mobile QR targets open a compact read-only view for cable and tray details. The phone preview shows the same layout field crews see on site.</p>
+      <div class="fv-desktop-summary" aria-label="Field view summary">
+        <div class="fv-desktop-summary-item">
+          <strong>Large labels</strong>
+          <span>Readable at arm's length on a job site.</span>
+        </div>
+        <div class="fv-desktop-summary-item">
+          <strong>QR ready</strong>
+          <span>Pull cards and tray tags open directly to the selected record.</span>
+        </div>
       </div>
-    </main>
+    </section>
+
+    <div class="fv-device-preview" aria-label="Mobile field view preview">
+      <div class="fv-device-frame">
+        <div class="fv-device-speaker" aria-hidden="true"></div>
+        <div class="fv-device-screen">
+          <div class="fv-container">
+            <main id="main-content">
+              <!-- Cable or tray card injected here by fieldview.js -->
+              <div id="fv-content" aria-live="polite" aria-label="Field view content">
+                <!-- Loading placeholder — replaced immediately by JS -->
+                <p class="field-hint" style="text-align:center;padding:2rem 0;">Loading…</p>
+              </div>
+            </main>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script type="module" src="dist/projectManager.js"></script>

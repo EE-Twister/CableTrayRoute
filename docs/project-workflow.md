@@ -32,4 +32,17 @@ Schedule pages can still be used first. When a schedule already contains equipme
 - **Load List** shows grouped validation counts, equipment-tag source suggestions, and a next-action strip that continues to One-Line or Cable Schedule once loads are ready.
 - **Project Dashboard** surfaces a project-level next action, step-specific blockers, direct fix links, schedule-ready/routing-ready health, pending studies, pending deliverables, and pending One-Line reconcile state.
 - **Fill / Routing** now shows routing diagnostics for schedule-ready cables, routing-ready cables, coordinate-ready cables, invalid raceway references, geometry blockers, and handoff context on tray/conduit fill pages.
-- **Sample Gallery** includes a Project Workflow Core sample that exercises equipment, loads, one-line links, cable schedule rows, raceways, study data, and report snapshots.
+- **Deliverables** use saved route results from Optimal Route to expose pull-card groups, spool-sheet readiness, report-section readiness, saved snapshots, and release-package status on the downstream pages.
+- **Ductbank Route** includes a next-action strip for conduit setup, cable assignment, fill calculation, thermal review, and calculation-report export.
+- **Sample Gallery** includes visual thumbnail cards for the Project Workflow Core sample plus realistic commercial office, water treatment pump station, and EV charging depot samples. These projects exercise equipment, loads, one-line links, cable schedule rows, raceway geometry, route results, study data, report snapshots, and release packages.
+
+## Deliverable Handoff Rules
+
+Optimal Route writes the latest route output to the project store as `latestRouteResults`. Pull Cards, Spool Sheets, the Workflow Dashboard, and the Report Package Builder read that same project-level route output, so the user can move from routing to field deliverables without re-importing files.
+
+The handoff stays explicit:
+
+- Pull Cards can load the latest project route results or import a route workbook.
+- Spool Sheets remain driven by Raceway Schedule tray geometry, with route-result counts shown as downstream context.
+- Project Report shows route results, pull groups, spool counts, report snapshots, and release packages before preview generation.
+- No deliverable page deletes or silently overwrites schedule records.

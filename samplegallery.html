@@ -40,14 +40,18 @@
       border-radius: 999px;
       border: 1px solid var(--color-border, #ccc);
       background: var(--surface-1, #fff);
+      color: var(--color-text, #0f172a);
       font-size: 0.82rem;
       cursor: pointer;
       transition: background 0.15s, color 0.15s;
     }
+    .tag-chip:not([aria-pressed="true"]) {
+      color: var(--color-text, #0f172a) !important;
+    }
     .tag-chip:hover,
     .tag-chip[aria-pressed="true"] {
       background: var(--color-primary, #1565c0);
-      color: #fff;
+      color: #fff !important;
       border-color: var(--color-primary, #1565c0);
     }
     .gallery-grid {
@@ -59,16 +63,39 @@
     .sample-card {
       border: 1px solid var(--color-border, #ddd);
       border-radius: 8px;
-      padding: 1.1rem 1.1rem 0.9rem;
+      padding: 0;
       background: var(--surface-1, #fff);
       display: flex;
       flex-direction: column;
-      gap: 0.5rem;
-      transition: box-shadow 0.15s;
+      gap: 0;
+      overflow: hidden;
+      transition: box-shadow 0.15s, transform 0.15s;
+    }
+    .sample-card:hover {
+      transform: translateY(-1px);
     }
     .sample-card:focus-within,
     .sample-card--selected {
       box-shadow: 0 0 0 2px var(--color-primary, #1565c0);
+    }
+    .sample-card__media {
+      aspect-ratio: 16 / 9;
+      background: var(--surface-2, #f0f4f8);
+      border-bottom: 1px solid var(--color-border, #ddd);
+      overflow: hidden;
+    }
+    .sample-card__media img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .sample-card__body {
+      display: flex;
+      flex: 1;
+      flex-direction: column;
+      gap: 0.55rem;
+      padding: 1rem 1.05rem 0.95rem;
     }
     .sample-card__header {
       display: flex;
@@ -260,11 +287,12 @@
 
       <details class="method-panel" open>
         <summary>About This Gallery</summary>
-        <p>Each sample is a complete, ready-to-explore project. Click <strong>Open Sample</strong>
+        <p>Each visual card represents a complete, ready-to-explore project. Click <strong>Open Sample</strong>
         to load it as your current project and follow the guided checklist to tour the relevant pages.
         Use <strong>Download JSON</strong> to save a copy for offline reference.</p>
-        <p>Samples cover the most common electrical design workflows: cable routing, tray fill,
-        arc flash, TCC coordination, ground grid, heat trace, underground ductbank, and load flow.</p>
+        <p>Samples cover the most common electrical design workflows: commercial tenant power,
+        pump station MCCs, EV charging depots, cable routing, tray fill, arc flash,
+        TCC coordination, ground grid, heat trace, underground ductbank, and load flow.</p>
       </details>
 
       <!-- Guided checklist panel (populated by JS) -->

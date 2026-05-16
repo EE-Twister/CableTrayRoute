@@ -24,6 +24,7 @@ assert(Array.isArray(payload.cables));
 assert(Array.isArray(payload.trays));
 assert.equal(payload.settings.oneLineScheduleReconcilePending, false);
 assert(payload.settings.studies.demandSchedule);
+assert.equal(payload.settings.latestRouteResults.batchResults.length, 4);
 assert(payload.settings.reportSnapshots['workflow-core-report']);
 
 const store = {};
@@ -43,6 +44,7 @@ const diagnostics = buildWorkflowCoreDiagnostics({
   conduits: payload.conduits,
   ductbanks: payload.ductbanks,
   studies: payload.settings.studies,
+  latestRouteResults: payload.settings.latestRouteResults,
   reportSnapshots: payload.settings.reportSnapshots,
   deliverables: payload.settings.lifecyclePackages,
   reconcilePending: payload.settings.oneLineScheduleReconcilePending
@@ -52,6 +54,9 @@ assert.equal(diagnostics.health.equipment, 5);
 assert.equal(diagnostics.health.completeLoads, 3);
 assert.equal(diagnostics.health.scheduleReady, 4);
 assert.equal(diagnostics.health.routingReady, 4);
+assert.equal(diagnostics.health.routeResults, 4);
+assert(diagnostics.health.pullGroups > 0);
+assert(diagnostics.health.spoolSheets > 0);
 assert.equal(diagnostics.blockers.filter(item => item.severity === 'critical').length, 0);
 
 console.log('✓ workflow core sample');

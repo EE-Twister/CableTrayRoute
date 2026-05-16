@@ -4,6 +4,7 @@
 import assert from 'assert';
 import {
   buildTrayHardwareBOM,
+  enrichTrayBOMWithQR,
   buildJunctionMap,
   classifyJunction,
   supportBracketCount,
@@ -382,5 +383,31 @@ describe('buildTrayHardwareBOM — custom options', () => {
       'heavier load should need more or equal brackets');
   });
 });
+
+console.log('enrichTrayBOMWithQR');
+try {
+  const bom = buildTrayHardwareBOM([
+    makeTray('TRAY-01', 0, 0, 0, 12, 0, 0),
+  ]);
+  const calls = [];
+  await enrichTrayBOMWithQR(bom, {
+    baseURL: 'http://localhost:3000',
+    generateQRDataURL: async url => {
+      calls.push(url);
+      return `qr:${url}`;
+    }
+  });
+  const support = bom.supports[0];
+  const section = bom.sections[0];
+  assert.strictEqual(support.field_view_url, 'http://localhost:3000/fieldview.html#tray=TRAY-01');
+  assert.strictEqual(section.field_view_url, 'http://localhost:3000/fieldview.html#tray=TRAY-01');
+  assert.strictEqual(support.qr_data_url, 'qr:http://localhost:3000/fieldview.html#tray=TRAY-01');
+  assert.strictEqual(section.qr_data_url, 'qr:http://localhost:3000/fieldview.html#tray=TRAY-01');
+  assert.deepStrictEqual(calls, ['http://localhost:3000/fieldview.html#tray=TRAY-01']);
+  console.log('  \u2713 enriches tray BOM rows with Field View QR data');
+} catch (err) {
+  console.error('  \u2717 enriches tray BOM rows with Field View QR data', err.message || err);
+  process.exitCode = 1;
+}
 
 console.log('\nAll trayHardware tests complete.');

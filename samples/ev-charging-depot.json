@@ -1,0 +1,791 @@
+{
+  "schemaVersion": 1,
+  "id": "ev-charging-depot",
+  "title": "EV Charging Depot",
+  "meta": {
+    "version": 1,
+    "scenario": "default",
+    "scenarios": ["default"]
+  },
+  "ductbanks": [
+    {
+      "id": "DB-EV-SVC-300",
+      "ductbank_id": "DB-EV-SVC-300",
+      "description": "Utility service ductbank from padmount transformer to EV switchboard",
+      "conduit_count": 8,
+      "trade_size": "4",
+      "length": 210,
+      "length_ft": 210,
+      "start_x": 0,
+      "start_y": 48,
+      "start_z": -4,
+      "end_x": 210,
+      "end_y": 48,
+      "end_z": -4,
+      "conduits": [
+        {
+          "conduit_id": "CND-EV-SVC-300",
+          "type": "PVC",
+          "trade_size": "4",
+          "start_x": 0,
+          "start_y": 48,
+          "start_z": -4,
+          "end_x": 210,
+          "end_y": 48,
+          "end_z": -4
+        },
+        {
+          "conduit_id": "CND-EV-SPARE-301",
+          "type": "PVC",
+          "trade_size": "4",
+          "start_x": 0,
+          "start_y": 52,
+          "start_z": -4,
+          "end_x": 210,
+          "end_y": 52,
+          "end_z": -4
+        }
+      ]
+    }
+  ],
+  "conduits": [
+    {
+      "id": "CND-EV-SVC-300",
+      "conduit_id": "CND-EV-SVC-300",
+      "description": "Main service feeder conduit in utility ductbank",
+      "type": "PVC",
+      "trade_size": "4",
+      "material": "PVC",
+      "length": 210,
+      "length_ft": 210,
+      "start_x": 0,
+      "start_y": 48,
+      "start_z": -4,
+      "end_x": 210,
+      "end_y": 48,
+      "end_z": -4
+    },
+    {
+      "id": "CND-EVSE-301",
+      "conduit_id": "CND-EVSE-301",
+      "description": "Charger feeder conduit to dispenser EVSE-301",
+      "type": "RMC",
+      "trade_size": "2",
+      "material": "Steel",
+      "length": 64,
+      "length_ft": 64,
+      "start_x": 92,
+      "start_y": 0,
+      "start_z": 9,
+      "end_x": 142,
+      "end_y": 28,
+      "end_z": 2
+    },
+    {
+      "id": "CND-EVSE-302",
+      "conduit_id": "CND-EVSE-302",
+      "description": "Charger feeder conduit to dispenser EVSE-302",
+      "type": "RMC",
+      "trade_size": "2",
+      "material": "Steel",
+      "length": 78,
+      "length_ft": 78,
+      "start_x": 92,
+      "start_y": 4,
+      "start_z": 9,
+      "end_x": 168,
+      "end_y": 34,
+      "end_z": 2
+    },
+    {
+      "id": "CND-EVSE-303",
+      "conduit_id": "CND-EVSE-303",
+      "description": "Charger feeder conduit to dispenser EVSE-303",
+      "type": "RMC",
+      "trade_size": "2",
+      "material": "Steel",
+      "length": 82,
+      "length_ft": 82,
+      "start_x": 92,
+      "start_y": 8,
+      "start_z": 9,
+      "end_x": 175,
+      "end_y": 52,
+      "end_z": 2
+    },
+    {
+      "id": "CND-EVSE-304",
+      "conduit_id": "CND-EVSE-304",
+      "description": "Charger feeder conduit to dispenser EVSE-304",
+      "type": "RMC",
+      "trade_size": "2",
+      "material": "Steel",
+      "length": 96,
+      "length_ft": 96,
+      "start_x": 92,
+      "start_y": 12,
+      "start_z": 9,
+      "end_x": 188,
+      "end_y": 60,
+      "end_z": 2
+    }
+  ],
+  "trays": [
+    {
+      "id": "TR-EV-CANOPY-300",
+      "tray_id": "TR-EV-CANOPY-300",
+      "description": "Charging canopy feeder tray serving EVSE rows",
+      "width": 24,
+      "height": 6,
+      "length": 140,
+      "length_ft": 140,
+      "material": "Aluminum",
+      "fill": 34,
+      "inside_width": 24,
+      "tray_depth": 6,
+      "tray_type": "Ladder",
+      "current_fill": 34,
+      "start_x": 0,
+      "start_y": 0,
+      "start_z": 12,
+      "end_x": 140,
+      "end_y": 0,
+      "end_z": 12
+    },
+    {
+      "id": "TR-EV-COMM-300",
+      "tray_id": "TR-EV-COMM-300",
+      "description": "Low-voltage network tray for charger controls and metering",
+      "width": 8,
+      "height": 4,
+      "length": 120,
+      "length_ft": 120,
+      "material": "Aluminum",
+      "fill": 18,
+      "inside_width": 8,
+      "tray_depth": 4,
+      "tray_type": "Wire Basket",
+      "current_fill": 18,
+      "start_x": 0,
+      "start_y": 8,
+      "start_z": 12,
+      "end_x": 120,
+      "end_y": 8,
+      "end_z": 12
+    }
+  ],
+  "cables": [
+    {
+      "id": "CBL-UTIL-SWBD-EV-300",
+      "tag": "CBL-UTIL-SWBD-EV-300",
+      "name": "CBL-UTIL-SWBD-EV-300",
+      "from": "UTILITY-EV-300",
+      "from_tag": "UTILITY-EV-300",
+      "to": "SWBD-EV-300",
+      "to_tag": "SWBD-EV-300",
+      "cable_type": "Power",
+      "conductors": 3,
+      "conductor_size": "3-1000 kcmil AL",
+      "insulation_type": "XHHW-2",
+      "voltage_rating": "600V",
+      "length": 210,
+      "length_ft": 210,
+      "raceway_ids": ["CND-EV-SVC-300"],
+      "route_preference": "CND-EV-SVC-300",
+      "diameter": 2.65,
+      "cable_od": 2.65,
+      "weight": 6.1,
+      "voltage": "480",
+      "conductor_material": "AL"
+    },
+    {
+      "id": "CBL-SWBD-CHGA-300",
+      "tag": "CBL-SWBD-CHGA-300",
+      "name": "CBL-SWBD-CHGA-300",
+      "from": "SWBD-EV-300",
+      "from_tag": "SWBD-EV-300",
+      "to": "CHG-BD-A",
+      "to_tag": "CHG-BD-A",
+      "cable_type": "Power",
+      "conductors": 3,
+      "conductor_size": "3-500 kcmil CU",
+      "insulation_type": "XHHW-2",
+      "voltage_rating": "600V",
+      "length": 72,
+      "length_ft": 72,
+      "raceway_ids": ["TR-EV-CANOPY-300"],
+      "route_preference": "TR-EV-CANOPY-300",
+      "diameter": 2.1,
+      "cable_od": 2.1,
+      "weight": 5.6,
+      "voltage": "480",
+      "conductor_material": "CU"
+    },
+    {
+      "id": "CBL-SWBD-CHGB-300",
+      "tag": "CBL-SWBD-CHGB-300",
+      "name": "CBL-SWBD-CHGB-300",
+      "from": "SWBD-EV-300",
+      "from_tag": "SWBD-EV-300",
+      "to": "CHG-BD-B",
+      "to_tag": "CHG-BD-B",
+      "cable_type": "Power",
+      "conductors": 3,
+      "conductor_size": "3-500 kcmil CU",
+      "insulation_type": "XHHW-2",
+      "voltage_rating": "600V",
+      "length": 82,
+      "length_ft": 82,
+      "raceway_ids": ["TR-EV-CANOPY-300"],
+      "route_preference": "TR-EV-CANOPY-300",
+      "diameter": 2.1,
+      "cable_od": 2.1,
+      "weight": 5.6,
+      "voltage": "480",
+      "conductor_material": "CU"
+    },
+    {
+      "id": "CBL-CHGA-EVSE-301",
+      "tag": "CBL-CHGA-EVSE-301",
+      "name": "CBL-CHGA-EVSE-301",
+      "from": "CHG-BD-A",
+      "from_tag": "CHG-BD-A",
+      "to": "EVSE-301",
+      "to_tag": "EVSE-301",
+      "cable_type": "Power",
+      "conductors": 3,
+      "conductor_size": "3-#1/0 CU",
+      "insulation_type": "XHHW-2",
+      "voltage_rating": "600V",
+      "length": 64,
+      "length_ft": 64,
+      "raceway_ids": ["CND-EVSE-301"],
+      "route_preference": "CND-EVSE-301",
+      "diameter": 0.92,
+      "cable_od": 0.92,
+      "weight": 1.8,
+      "voltage": "480",
+      "conductor_material": "CU"
+    },
+    {
+      "id": "CBL-CHGA-EVSE-302",
+      "tag": "CBL-CHGA-EVSE-302",
+      "name": "CBL-CHGA-EVSE-302",
+      "from": "CHG-BD-A",
+      "from_tag": "CHG-BD-A",
+      "to": "EVSE-302",
+      "to_tag": "EVSE-302",
+      "cable_type": "Power",
+      "conductors": 3,
+      "conductor_size": "3-#1/0 CU",
+      "insulation_type": "XHHW-2",
+      "voltage_rating": "600V",
+      "length": 78,
+      "length_ft": 78,
+      "raceway_ids": ["CND-EVSE-302"],
+      "route_preference": "CND-EVSE-302",
+      "diameter": 0.92,
+      "cable_od": 0.92,
+      "weight": 1.8,
+      "voltage": "480",
+      "conductor_material": "CU"
+    },
+    {
+      "id": "CBL-CHGB-EVSE-303",
+      "tag": "CBL-CHGB-EVSE-303",
+      "name": "CBL-CHGB-EVSE-303",
+      "from": "CHG-BD-B",
+      "from_tag": "CHG-BD-B",
+      "to": "EVSE-303",
+      "to_tag": "EVSE-303",
+      "cable_type": "Power",
+      "conductors": 3,
+      "conductor_size": "3-#1/0 CU",
+      "insulation_type": "XHHW-2",
+      "voltage_rating": "600V",
+      "length": 82,
+      "length_ft": 82,
+      "raceway_ids": ["CND-EVSE-303"],
+      "route_preference": "CND-EVSE-303",
+      "diameter": 0.92,
+      "cable_od": 0.92,
+      "weight": 1.8,
+      "voltage": "480",
+      "conductor_material": "CU"
+    },
+    {
+      "id": "CBL-CHGB-EVSE-304",
+      "tag": "CBL-CHGB-EVSE-304",
+      "name": "CBL-CHGB-EVSE-304",
+      "from": "CHG-BD-B",
+      "from_tag": "CHG-BD-B",
+      "to": "EVSE-304",
+      "to_tag": "EVSE-304",
+      "cable_type": "Power",
+      "conductors": 3,
+      "conductor_size": "3-#1/0 CU",
+      "insulation_type": "XHHW-2",
+      "voltage_rating": "600V",
+      "length": 96,
+      "length_ft": 96,
+      "raceway_ids": ["CND-EVSE-304"],
+      "route_preference": "CND-EVSE-304",
+      "diameter": 0.92,
+      "cable_od": 0.92,
+      "weight": 1.8,
+      "voltage": "480",
+      "conductor_material": "CU"
+    },
+    {
+      "id": "CBL-EMS-CHGNET-300",
+      "tag": "CBL-EMS-CHGNET-300",
+      "name": "CBL-EMS-CHGNET-300",
+      "from": "EMS-300",
+      "from_tag": "EMS-300",
+      "to": "CHG-BD-A",
+      "to_tag": "CHG-BD-A",
+      "cable_type": "Control",
+      "conductors": 4,
+      "conductor_size": "4-#18 CU shielded",
+      "insulation_type": "LSZH",
+      "voltage_rating": "300V",
+      "length": 120,
+      "length_ft": 120,
+      "raceway_ids": ["TR-EV-COMM-300"],
+      "route_preference": "TR-EV-COMM-300",
+      "diameter": 0.24,
+      "cable_od": 0.24,
+      "weight": 0.09,
+      "voltage": "24",
+      "conductor_material": "CU"
+    }
+  ],
+  "cableTypicals": [],
+  "panels": [
+    {
+      "tag": "CHG-BD-A",
+      "description": "Charging distribution board A",
+      "voltage": "480",
+      "source": "SWBD-EV-300",
+      "busRating": "800"
+    },
+    {
+      "tag": "CHG-BD-B",
+      "description": "Charging distribution board B",
+      "voltage": "480",
+      "source": "SWBD-EV-300",
+      "busRating": "800"
+    },
+    {
+      "tag": "EMS-300",
+      "description": "Charging energy management controller",
+      "voltage": "120",
+      "source": "SWBD-EV-300",
+      "busRating": "60"
+    }
+  ],
+  "equipment": [
+    {
+      "tag": "UTILITY-EV-300",
+      "description": "Utility service transformer for EV depot",
+      "voltage": "480",
+      "category": "Transformer",
+      "subCategory": "Padmount",
+      "arrangement": "Service Yard",
+      "lineup": "Utility Service",
+      "manufacturer": "Utility",
+      "model": "2500 kVA PMT",
+      "phases": "3"
+    },
+    {
+      "tag": "SWBD-EV-300",
+      "description": "480 V EV charging switchboard",
+      "voltage": "480",
+      "category": "Distribution",
+      "subCategory": "Switchboard",
+      "arrangement": "Electrical Room",
+      "lineup": "SWBD-EV-300",
+      "manufacturer": "Siemens",
+      "model": "SB3",
+      "phases": "3"
+    },
+    {
+      "tag": "CHG-BD-A",
+      "description": "Charging distribution board serving EVSE 301-302",
+      "voltage": "480",
+      "category": "Panel",
+      "subCategory": "Distribution Board",
+      "arrangement": "Canopy Row A",
+      "lineup": "EV Charger Boards",
+      "manufacturer": "ABB",
+      "model": "ReliaGear",
+      "phases": "3"
+    },
+    {
+      "tag": "CHG-BD-B",
+      "description": "Charging distribution board serving EVSE 303-304",
+      "voltage": "480",
+      "category": "Panel",
+      "subCategory": "Distribution Board",
+      "arrangement": "Canopy Row B",
+      "lineup": "EV Charger Boards",
+      "manufacturer": "ABB",
+      "model": "ReliaGear",
+      "phases": "3"
+    },
+    {
+      "tag": "EMS-300",
+      "description": "Fleet charging energy management system",
+      "voltage": "120",
+      "category": "Control",
+      "subCategory": "Energy Management",
+      "arrangement": "Electrical Room",
+      "lineup": "Controls",
+      "manufacturer": "ChargePoint",
+      "model": "Power Management",
+      "phases": "1"
+    },
+    {
+      "tag": "EVSE-301",
+      "description": "150 kW DC fast charger dispenser 301",
+      "voltage": "480",
+      "category": "EVSE",
+      "subCategory": "DC Fast Charger",
+      "arrangement": "Canopy Row A",
+      "lineup": "EVSE Row A",
+      "manufacturer": "ChargePoint",
+      "model": "Express Plus",
+      "phases": "3"
+    },
+    {
+      "tag": "EVSE-302",
+      "description": "150 kW DC fast charger dispenser 302",
+      "voltage": "480",
+      "category": "EVSE",
+      "subCategory": "DC Fast Charger",
+      "arrangement": "Canopy Row A",
+      "lineup": "EVSE Row A",
+      "manufacturer": "ChargePoint",
+      "model": "Express Plus",
+      "phases": "3"
+    },
+    {
+      "tag": "EVSE-303",
+      "description": "150 kW DC fast charger dispenser 303",
+      "voltage": "480",
+      "category": "EVSE",
+      "subCategory": "DC Fast Charger",
+      "arrangement": "Canopy Row B",
+      "lineup": "EVSE Row B",
+      "manufacturer": "ABB",
+      "model": "Terra 184",
+      "phases": "3"
+    },
+    {
+      "tag": "EVSE-304",
+      "description": "150 kW DC fast charger dispenser 304",
+      "voltage": "480",
+      "category": "EVSE",
+      "subCategory": "DC Fast Charger",
+      "arrangement": "Canopy Row B",
+      "lineup": "EVSE Row B",
+      "manufacturer": "ABB",
+      "model": "Terra 184",
+      "phases": "3"
+    }
+  ],
+  "loads": [
+    {
+      "source": "CHG-BD-A",
+      "tag": "EVSE-301",
+      "description": "DC fast charger stall 301",
+      "quantity": "1",
+      "voltage": "480",
+      "loadType": "EV Charger",
+      "duty": "Continuous",
+      "kw": "150",
+      "powerFactor": "0.98",
+      "loadFactor": "100",
+      "efficiency": "96",
+      "demandFactor": "80",
+      "phases": "3",
+      "circuit": "CHG-BD-A-01"
+    },
+    {
+      "source": "CHG-BD-A",
+      "tag": "EVSE-302",
+      "description": "DC fast charger stall 302",
+      "quantity": "1",
+      "voltage": "480",
+      "loadType": "EV Charger",
+      "duty": "Continuous",
+      "kw": "150",
+      "powerFactor": "0.98",
+      "loadFactor": "100",
+      "efficiency": "96",
+      "demandFactor": "80",
+      "phases": "3",
+      "circuit": "CHG-BD-A-02"
+    },
+    {
+      "source": "CHG-BD-B",
+      "tag": "EVSE-303",
+      "description": "DC fast charger stall 303",
+      "quantity": "1",
+      "voltage": "480",
+      "loadType": "EV Charger",
+      "duty": "Continuous",
+      "kw": "150",
+      "powerFactor": "0.98",
+      "loadFactor": "100",
+      "efficiency": "96",
+      "demandFactor": "75",
+      "phases": "3",
+      "circuit": "CHG-BD-B-01"
+    },
+    {
+      "source": "CHG-BD-B",
+      "tag": "EVSE-304",
+      "description": "DC fast charger stall 304",
+      "quantity": "1",
+      "voltage": "480",
+      "loadType": "EV Charger",
+      "duty": "Continuous",
+      "kw": "150",
+      "powerFactor": "0.98",
+      "loadFactor": "100",
+      "efficiency": "96",
+      "demandFactor": "75",
+      "phases": "3",
+      "circuit": "CHG-BD-B-02"
+    },
+    {
+      "source": "EMS-300",
+      "tag": "EMS-300-CTRL",
+      "description": "Charging controls, metering, and network equipment",
+      "quantity": "1",
+      "voltage": "120",
+      "loadType": "Controls",
+      "duty": "Continuous",
+      "kw": "2.4",
+      "powerFactor": "0.90",
+      "loadFactor": "100",
+      "efficiency": "100",
+      "demandFactor": "100",
+      "phases": "1",
+      "circuit": "EMS-300-01"
+    }
+  ],
+  "oneLine": {
+    "activeSheet": 0,
+    "sheets": [
+      {
+        "id": "ev-depot-main",
+        "name": "EV Depot One-Line",
+        "components": [
+          {
+            "id": "comp-utility-ev-300",
+            "type": "source",
+            "subtype": "utility_source",
+            "label": "UTILITY-EV-300",
+            "ref": "UTILITY-EV-300",
+            "x": 100,
+            "y": 140,
+            "equipmentRef": "UTILITY-EV-300",
+            "scheduleLinks": { "equipment": "UTILITY-EV-300" },
+            "connections": [
+              { "target": "comp-swbd-ev-300", "cable": { "tag": "CBL-UTIL-SWBD-EV-300", "conductor_size": "3-1000 kcmil AL", "length": 210 } }
+            ]
+          },
+          {
+            "id": "comp-swbd-ev-300",
+            "type": "equipment",
+            "subtype": "switchboard",
+            "label": "SWBD-EV-300",
+            "ref": "SWBD-EV-300",
+            "x": 320,
+            "y": 140,
+            "equipmentRef": "SWBD-EV-300",
+            "scheduleLinks": { "equipment": "SWBD-EV-300" },
+            "connections": [
+              { "target": "comp-chg-bd-a", "cable": { "tag": "CBL-SWBD-CHGA-300", "conductor_size": "3-500 kcmil CU", "length": 72 } },
+              { "target": "comp-chg-bd-b", "cable": { "tag": "CBL-SWBD-CHGB-300", "conductor_size": "3-500 kcmil CU", "length": 82 } },
+              { "target": "comp-ems-300", "cable": { "tag": "CBL-EMS-CHGNET-300", "conductor_size": "4-#18 CU shielded", "length": 120 } }
+            ]
+          },
+          {
+            "id": "comp-chg-bd-a",
+            "type": "panel",
+            "subtype": "distribution_board",
+            "label": "CHG-BD-A",
+            "ref": "CHG-BD-A",
+            "x": 560,
+            "y": 80,
+            "panelRef": "CHG-BD-A",
+            "equipmentRef": "CHG-BD-A",
+            "scheduleLinks": { "panel": "CHG-BD-A", "equipment": "CHG-BD-A" },
+            "connections": [
+              { "target": "comp-evse-301", "cable": { "tag": "CBL-CHGA-EVSE-301", "conductor_size": "3-#1/0 CU", "length": 64 } },
+              { "target": "comp-evse-302", "cable": { "tag": "CBL-CHGA-EVSE-302", "conductor_size": "3-#1/0 CU", "length": 78 } }
+            ]
+          },
+          {
+            "id": "comp-chg-bd-b",
+            "type": "panel",
+            "subtype": "distribution_board",
+            "label": "CHG-BD-B",
+            "ref": "CHG-BD-B",
+            "x": 560,
+            "y": 220,
+            "panelRef": "CHG-BD-B",
+            "equipmentRef": "CHG-BD-B",
+            "scheduleLinks": { "panel": "CHG-BD-B", "equipment": "CHG-BD-B" },
+            "connections": [
+              { "target": "comp-evse-303", "cable": { "tag": "CBL-CHGB-EVSE-303", "conductor_size": "3-#1/0 CU", "length": 82 } },
+              { "target": "comp-evse-304", "cable": { "tag": "CBL-CHGB-EVSE-304", "conductor_size": "3-#1/0 CU", "length": 96 } }
+            ]
+          },
+          {
+            "id": "comp-ems-300",
+            "type": "panel",
+            "subtype": "control_panel",
+            "label": "EMS-300",
+            "ref": "EMS-300",
+            "x": 560,
+            "y": 360,
+            "panelRef": "EMS-300",
+            "equipmentRef": "EMS-300",
+            "scheduleLinks": { "panel": "EMS-300", "equipment": "EMS-300" }
+          },
+          {
+            "id": "comp-evse-301",
+            "type": "load",
+            "subtype": "ev_charger_load",
+            "label": "EVSE-301",
+            "ref": "EVSE-301",
+            "x": 820,
+            "y": 40,
+            "loadRef": "EVSE-301",
+            "equipmentRef": "EVSE-301",
+            "scheduleLinks": { "load": "EVSE-301", "equipment": "EVSE-301" }
+          },
+          {
+            "id": "comp-evse-302",
+            "type": "load",
+            "subtype": "ev_charger_load",
+            "label": "EVSE-302",
+            "ref": "EVSE-302",
+            "x": 820,
+            "y": 120,
+            "loadRef": "EVSE-302",
+            "equipmentRef": "EVSE-302",
+            "scheduleLinks": { "load": "EVSE-302", "equipment": "EVSE-302" }
+          },
+          {
+            "id": "comp-evse-303",
+            "type": "load",
+            "subtype": "ev_charger_load",
+            "label": "EVSE-303",
+            "ref": "EVSE-303",
+            "x": 820,
+            "y": 220,
+            "loadRef": "EVSE-303",
+            "equipmentRef": "EVSE-303",
+            "scheduleLinks": { "load": "EVSE-303", "equipment": "EVSE-303" }
+          },
+          {
+            "id": "comp-evse-304",
+            "type": "load",
+            "subtype": "ev_charger_load",
+            "label": "EVSE-304",
+            "ref": "EVSE-304",
+            "x": 820,
+            "y": 300,
+            "loadRef": "EVSE-304",
+            "equipmentRef": "EVSE-304",
+            "scheduleLinks": { "load": "EVSE-304", "equipment": "EVSE-304" }
+          }
+        ],
+        "connections": []
+      }
+    ]
+  },
+  "mccLineups": [],
+  "settings": {
+    "studies": {
+      "demandSchedule": {
+        "status": "Run",
+        "connectedKw": 602.4,
+        "diversifiedDemandKw": 464.4,
+        "updatedAt": "2026-05-01T15:00:00.000Z"
+      },
+      "loadFlow": {
+        "status": "Run",
+        "minBusVoltagePercent": 96.8,
+        "updatedAt": "2026-05-01T15:05:00.000Z"
+      },
+      "harmonics": {
+        "status": "Draft",
+        "estimatedThdiPercent": 8.5,
+        "updatedAt": "2026-05-01T15:10:00.000Z"
+      },
+      "voltageDrop": {
+        "status": "Run",
+        "maxDropPercent": 2.9,
+        "updatedAt": "2026-05-01T15:15:00.000Z"
+      }
+    },
+    "latestRouteResults": {
+      "source": "sample",
+      "updatedAt": "2026-05-01T15:20:00.000Z",
+      "batchResults": [
+        {
+          "cable": "CBL-UTIL-SWBD-EV-300",
+          "status": "Routed",
+          "total_length": 210,
+          "route_segments": [
+            { "type": "conduit", "conduit_id": "CND-EV-SVC-300", "ductbankTag": "DB-EV-SVC-300", "length": 210, "start": [0, 48, -4], "end": [210, 48, -4] }
+          ]
+        },
+        {
+          "cable": "CBL-SWBD-CHGA-300",
+          "status": "Routed",
+          "total_length": 72,
+          "route_segments": [
+            { "type": "tray", "tray_id": "TR-EV-CANOPY-300", "length": 72, "start": [0, 0, 12], "end": [72, 0, 12] }
+          ]
+        },
+        {
+          "cable": "CBL-CHGB-EVSE-304",
+          "status": "Routed",
+          "total_length": 96,
+          "route_segments": [
+            { "type": "conduit", "conduit_id": "CND-EVSE-304", "length": 96, "start": [92, 12, 9], "end": [188, 60, 2] }
+          ]
+        }
+      ]
+    },
+    "reportSnapshots": {
+      "ev-depot-ifr": {
+        "id": "ev-depot-ifr",
+        "title": "EV Charging Depot IFR Report",
+        "createdAt": "2026-05-01T15:25:00.000Z",
+        "sections": ["Equipment List", "Load List", "One-Line", "Cable Schedule", "Raceway Schedule", "Load Flow", "Harmonics"]
+      }
+    },
+    "lifecyclePackages": [
+      {
+        "id": "ev-depot-ifr-a",
+        "revisionLabel": "IFR",
+        "author": "Sample Engineer",
+        "status": "Issued for Review",
+        "createdAt": "2026-05-01T15:30:00.000Z",
+        "summary": {
+          "cableCount": 8,
+          "studyCount": 4
+        }
+      }
+    ],
+    "oneLineScheduleReconcilePending": false
+  }
+}

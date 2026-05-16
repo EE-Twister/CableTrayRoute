@@ -8,8 +8,10 @@ import {
   getDuctbanks,
   getStudies,
   getLifecyclePackages,
-  getReportSnapshots
+  getReportSnapshots,
+  getItem
 } from '../dataStore.mjs';
+import { normalizeRouteResults } from '../analysis/deliverableWorkflow.mjs';
 
 export const workflowOrder = [
   {
@@ -291,10 +293,19 @@ export function getStepStatus(key, overrides = {}) {
   if (canonicalKey === 'deliverables') {
     const packages = readData(overrides, 'lifecyclePackages', getLifecyclePackages, []);
     const snapshots = readData(overrides, 'reportSnapshots', getReportSnapshots, {});
+    const routeResults = readData(overrides, 'latestRouteResults', () => getItem('latestRouteResults', null), null);
     const packageCount = Array.isArray(packages) ? packages.length : 0;
     const snapshotCount = countReportSnapshots(snapshots);
+    const routeCount = normalizeRouteResults(routeResults).length;
     const total = packageCount + snapshotCount;
     if (total > 0) return { complete: true, label: pluralize(total, 'deliverable', 'deliverables') };
+    if (routeCount > 0) {
+      return {
+        complete: false,
+        label: `${routeCount} routed cable${routeCount === 1 ? '' : 's'} ready`,
+        hint: 'Create pull cards, spool sheets, and a project report snapshot.'
+      };
+    }
     return { complete: false, label: 'No deliverables yet', hint: 'Create a project report or release package after review.' };
   }
 

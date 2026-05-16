@@ -12,6 +12,8 @@ export const SAMPLE_REGISTRY = [
     industry: 'Industrial Electrical',
     description: 'A complete project path from equipment and loads through one-line reconciliation, cable schedule, raceways, routing readiness, study results, and report snapshot.',
     tags: ['workflow', 'equipment', 'loads', 'one-line', 'routing'],
+    image: 'assets/sample-projects/project-workflow-core.jpg',
+    imageAlt: 'Integrated electrical workflow workspace with one-line, schedules, routing, and report visuals.',
     projectFile: 'samples/project-workflow-core.json',
     pagesUsed: ['equipmentlist.html', 'loadlist.html', 'oneline.html', 'workflowdashboard.html', 'cableschedule.html', 'racewayschedule.html', 'projectreport.html'],
     guidedChecklist: [
@@ -28,6 +30,8 @@ export const SAMPLE_REGISTRY = [
     industry: 'Oil & Gas / Industrial',
     description: '480 V MCC feeders, motor cables, VFD shielded outputs, and instrument triads in hazardous-area ladder and solid-bottom trays.',
     tags: ['routing', 'tray-fill', 'arc-flash', 'tcc'],
+    image: 'assets/sample-projects/industrial-plant.jpg',
+    imageAlt: 'Industrial electrical room with MCC cabinets, routed cable tray, and process equipment.',
     projectFile: 'samples/industrial-plant.json',
     pagesUsed: ['cableschedule.html', 'racewayschedule.html', 'cabletrayfill.html', 'arcFlash.html', 'tcc.html'],
     guidedChecklist: [
@@ -39,11 +43,67 @@ export const SAMPLE_REGISTRY = [
     ],
   },
   {
+    id: 'commercial-office-fitout',
+    title: 'Commercial Office Fitout',
+    industry: 'Commercial / Tenant Improvement',
+    description: 'A tenant improvement package with service distribution, panelboards, lighting, receptacle, and RTU loads carried through schedules, one-line, raceways, and voltage-drop review.',
+    tags: ['workflow', 'commercial', 'equipment', 'loads', 'voltage-drop'],
+    image: 'assets/sample-projects/commercial-office-fitout.jpg',
+    imageAlt: 'Commercial office electrical room connected to ceiling raceways and rooftop HVAC equipment.',
+    projectFile: 'samples/commercial-office-fitout.json',
+    pagesUsed: ['equipmentlist.html', 'loadlist.html', 'oneline.html', 'cableschedule.html', 'racewayschedule.html', 'demandschedule.html', 'voltagedropstudy.html', 'projectreport.html'],
+    guidedChecklist: [
+      { step: 1, label: 'Review office equipment', page: 'equipmentlist.html', hint: 'Check the main distribution panel, transformer, panelboards, and rooftop unit records.' },
+      { step: 2, label: 'Validate tenant loads', page: 'loadlist.html', hint: 'Confirm lighting, receptacle, and HVAC loads are sourced from the correct panel tags.' },
+      { step: 3, label: 'Open the one-line', page: 'oneline.html', hint: 'Review the service-to-panel workflow and linked component references.' },
+      { step: 4, label: 'Check cable and raceway schedules', page: 'cableschedule.html', hint: 'Confirm schedule-ready and routing-ready feeder and branch circuit rows.' },
+      { step: 5, label: 'Review voltage drop and report snapshot', page: 'voltagedropstudy.html', hint: 'Use the saved study metadata and report snapshot to test deliverable handoff.' },
+    ],
+  },
+  {
+    id: 'water-treatment-pump-station',
+    title: 'Water Treatment Pump Station',
+    industry: 'Water / Wastewater',
+    description: 'A pump station power package with switchgear, MCC, VFD-fed pumps, PLC controls, ductbank routing, motor-start context, and arc-flash study metadata.',
+    tags: ['workflow', 'pump-station', 'mcc', 'ductbank', 'motor-start', 'arc-flash'],
+    image: 'assets/sample-projects/water-treatment-pump-station.jpg',
+    imageAlt: 'Water treatment pump station with switchgear, MCC, pumps, and underground ductbank cutaway.',
+    projectFile: 'samples/water-treatment-pump-station.json',
+    pagesUsed: ['equipmentlist.html', 'loadlist.html', 'oneline.html', 'cableschedule.html', 'racewayschedule.html', 'ductbankroute.html', 'motorStart.html', 'arcFlash.html', 'projectreport.html'],
+    guidedChecklist: [
+      { step: 1, label: 'Review pump station equipment', page: 'equipmentlist.html', hint: 'Check switchgear, MCC, VFD, PLC, and pump equipment tags.' },
+      { step: 2, label: 'Review process loads', page: 'loadlist.html', hint: 'Confirm pump, mixer, and controls loads are linked back to MCC and PLC sources.' },
+      { step: 3, label: 'Inspect ductbank and tray routing', page: 'ductbankroute.html', hint: 'Validate underground conduit geometry and the gallery tray handoff.' },
+      { step: 4, label: 'Open motor-start and arc-flash context', page: 'motorStart.html', hint: 'Use the seeded study metadata to test study pages without starting empty.' },
+      { step: 5, label: 'Review deliverable snapshot', page: 'projectreport.html', hint: 'Inspect the saved report snapshot and release package context.' },
+    ],
+  },
+  {
+    id: 'ev-charging-depot',
+    title: 'EV Charging Depot',
+    industry: 'EV Infrastructure',
+    description: 'A fleet charging depot with utility service, transformer, charger distribution boards, high-power EVSE feeders, demand management, routing, harmonics, and voltage-drop context.',
+    tags: ['workflow', 'ev', 'load-flow', 'demand', 'routing', 'harmonics'],
+    image: 'assets/sample-projects/ev-charging-depot.jpg',
+    imageAlt: 'EV charging depot with canopy chargers, switchboard, and routed feeder infrastructure.',
+    projectFile: 'samples/ev-charging-depot.json',
+    pagesUsed: ['equipmentlist.html', 'loadlist.html', 'oneline.html', 'cableschedule.html', 'racewayschedule.html', 'loadFlow.html', 'harmonics.html', 'voltagedropstudy.html', 'workflowdashboard.html'],
+    guidedChecklist: [
+      { step: 1, label: 'Review charging equipment', page: 'equipmentlist.html', hint: 'Check the utility service, transformer, switchboard, charger boards, and EVSE tags.' },
+      { step: 2, label: 'Review managed charging loads', page: 'loadlist.html', hint: 'Confirm demand factors and source panel references for each charger.' },
+      { step: 3, label: 'Inspect one-line links', page: 'oneline.html', hint: 'Review charger feeders and component references before reconciling schedules.' },
+      { step: 4, label: 'Check routing readiness', page: 'workflowdashboard.html', hint: 'Use the dashboard health metrics to confirm cable and raceway readiness.' },
+      { step: 5, label: 'Review load-flow and harmonics context', page: 'loadFlow.html', hint: 'Use the seeded study metadata to test analysis-page handoffs.' },
+    ],
+  },
+  {
     id: 'data-center',
     title: 'Data Center',
     industry: 'Data Center / IT',
     description: 'Redundant A/B 480 V UPS feeds, 208 V PDU branches, overhead OM4/OS2 fiber backbone, and Cat6A horizontal distribution in hot/cold aisle layout.',
     tags: ['routing', 'tray-fill', 'load-flow', 'voltage-drop'],
+    image: 'assets/sample-projects/data-center.jpg',
+    imageAlt: 'Data center server aisles with overhead power trays, fiber trays, UPS, and PDU equipment.',
     projectFile: 'samples/data-center.json',
     pagesUsed: ['cableschedule.html', 'racewayschedule.html', 'cabletrayfill.html', 'loadFlow.html', 'voltagedropstudy.html'],
     guidedChecklist: [
@@ -60,6 +120,8 @@ export const SAMPLE_REGISTRY = [
     industry: 'Transmission & Substation',
     description: '115 kV / 13.8 kV substation with IEEE 80 ground grid design: mesh conductor, ground rods, touch/step voltage compliance, and GPR calculation.',
     tags: ['grounding', 'ground-grid', 'safety'],
+    image: 'assets/sample-projects/substation-grounding.jpg',
+    imageAlt: 'Outdoor substation yard with a below-grade copper ground grid visualization.',
     projectFile: 'samples/substation-grounding.json',
     pagesUsed: ['groundgrid.html', 'shortCircuit.html', 'arcFlash.html'],
     guidedChecklist: [
@@ -75,6 +137,8 @@ export const SAMPLE_REGISTRY = [
     industry: 'Process / Petrochemical',
     description: 'Freeze-protection heat trace for a 200 ft process pipe: watt-density sizing, product scheduling, BOM, and controller list.',
     tags: ['heat-trace', 'sizing', 'bom'],
+    image: 'assets/sample-projects/heat-trace-pipe.jpg',
+    imageAlt: 'Insulated process pipe with heat trace cable, junction box, and controller equipment.',
     projectFile: 'samples/heat-trace-pipe.json',
     pagesUsed: ['heattracesizing.html'],
     guidedChecklist: [
@@ -89,6 +153,8 @@ export const SAMPLE_REGISTRY = [
     industry: 'Utility / Civil',
     description: 'Three-circuit 15 kV underground ductbank with concrete encasement, IEC 60287 thermal derating, and conduit fill check.',
     tags: ['routing', 'ductbank', 'conduit-fill', 'ampacity'],
+    image: 'assets/sample-projects/ductbank-network.jpg',
+    imageAlt: 'Concrete-encased underground ductbank cutaway with conduits, cables, and soil layers.',
     projectFile: 'samples/ductbank-network.json',
     pagesUsed: ['ductbankroute.html', 'conduitfill.html', 'iec60287.html'],
     guidedChecklist: [
@@ -103,6 +169,8 @@ export const SAMPLE_REGISTRY = [
     industry: 'Industrial / Commercial',
     description: 'Medium-voltage one-line with overcurrent relay, fuse, and molded-case breaker coordination for a 4.16 kV industrial distribution system.',
     tags: ['tcc', 'arc-flash', 'short-circuit', 'protection'],
+    image: 'assets/sample-projects/coordination-study.jpg',
+    imageAlt: 'Protective device coordination workspace with breakers, relay equipment, and study visuals.',
     projectFile: 'samples/coordination-study.json',
     pagesUsed: ['tcc.html', 'shortCircuit.html', 'arcFlash.html', 'oneline.html'],
     guidedChecklist: [
@@ -173,6 +241,30 @@ export function migrateSampleProject(obj) {
   return copy;
 }
 
+function normalizeSampleOneLine(obj = {}) {
+  const oneLine = obj.oneLine || obj.oneline;
+  if (Array.isArray(oneLine)) {
+    return { activeSheet: 0, sheets: oneLine };
+  }
+  if (oneLine && Array.isArray(oneLine.sheets)) {
+    return { activeSheet: oneLine.activeSheet || 0, sheets: oneLine.sheets };
+  }
+  if (oneLine && (Array.isArray(oneLine.components) || Array.isArray(oneLine.connections))) {
+    return {
+      activeSheet: 0,
+      sheets: [
+        {
+          id: `${obj.id || 'sample'}-main`,
+          name: obj.title || 'Sample One-Line',
+          components: Array.isArray(oneLine.components) ? oneLine.components : [],
+          connections: Array.isArray(oneLine.connections) ? oneLine.connections : [],
+        },
+      ],
+    };
+  }
+  return { activeSheet: 0, sheets: [] };
+}
+
 export function sampleProjectToImportPayload(obj = {}) {
   const raceways = obj.raceways || {};
   const settings = { ...(obj.settings || {}) };
@@ -191,7 +283,7 @@ export function sampleProjectToImportPayload(obj = {}) {
     panels: Array.isArray(obj.panels) ? obj.panels : [],
     equipment: Array.isArray(obj.equipment) ? obj.equipment : [],
     loads: Array.isArray(obj.loads) ? obj.loads : [],
-    oneLine: obj.oneLine || obj.oneline || { activeSheet: 0, sheets: [] },
+    oneLine: normalizeSampleOneLine(obj),
     mccLineups: Array.isArray(obj.mccLineups) ? obj.mccLineups : [],
     settings
   };

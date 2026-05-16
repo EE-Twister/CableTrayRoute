@@ -10,7 +10,7 @@
  */
 
 import { calcMaxSpan, NEMA_LOAD_CLASSES } from './supportSpan.mjs';
-import { generateQRDataURL } from './pullCards.mjs';
+import { generateQRDataURL, trayQRPayload } from './pullCards.mjs';
 
 /** Distance threshold (ft) for treating two endpoints as coincident. */
 const COINCIDENCE_TOL = 0.5;
@@ -481,9 +481,9 @@ function formatFittingName(type) {
  * This is a separate async step so that the synchronous buildTrayHardwareBOM API
  * is not affected.
  *
- * Each entry in `supports` and `sections` gains a `qr_data_url` field whose value
- * is a PNG data URL encoding a URL that links to the raceway schedule filtered to
- * that tray ID.
+ * Each entry in `supports` and `sections` gains `field_view_url` and
+ * `qr_data_url` fields. The QR image encodes the field-view tray URL for that
+ * tray ID.
  *
  * @param {{ supports: Array, sections: Array }} bom - result of buildTrayHardwareBOM
  * @param {{ baseURL?: string }} [options]
@@ -491,15 +491,17 @@ function formatFittingName(type) {
  */
 export async function enrichTrayBOMWithQR(bom, options = {}) {
   const baseURL = options.baseURL || 'https://cabletrayroute.com';
+  const generator = options.generateQRDataURL || generateQRDataURL;
   const allRows = [...(bom.supports || []), ...(bom.sections || [])];
   const seen = new Map();
   await Promise.all(
     allRows.map(async row => {
       const id = row.tray_id;
       if (!id) return;
+      const url = trayQRPayload(id, baseURL);
+      row.field_view_url = url;
       if (!seen.has(id)) {
-        const url = `${baseURL}/racewayschedule.html#tray=${encodeURIComponent(id)}`;
-        seen.set(id, generateQRDataURL(url));
+        seen.set(id, generator(url));
       }
       row.qr_data_url = await seen.get(id);
     })

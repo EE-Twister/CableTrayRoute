@@ -3086,6 +3086,112 @@ function updateDuctbankWorkflowState(context, warningCount, thermalCount, ampaci
  setDuctbankButtonEnabled('exportThermalBtn',hasHeat,'Run thermal analysis before exporting thermal data.');
  setDuctbankButtonEnabled('exportCanvasDataBtn',hasHeat,'Run thermal analysis before exporting heat map data.');
  setDuctbankButtonEnabled('downloadCalcReportBtn',hasConduits && hasCables,'Add conduits and cables before downloading a calculation report.');
+ renderDuctbankNextAction(context, warningCount, thermalCount, ampacityCount);
+}
+
+function ductbankNextActionButton(label, action, primary=false){
+ return `<button type="button" class="btn ${primary ? 'primary-btn' : 'secondary-btn'}" data-ductbank-next-action="${action}">${escapeHtml(label)}</button>`;
+}
+
+function renderDuctbankNextAction(context, warningCount, thermalCount, ampacityCount=0){
+ const el=document.getElementById('ductbank-next-action');
+ if(!el) return;
+ const hasConduits=context.conduits.length > 0;
+ const hasCables=context.cables.length > 0;
+ const hasHeat=Array.isArray(window.lastHeatGrid) && window.lastHeatGrid.length > 0;
+ const hasFill=hasConduits && Object.keys(context.fillMap || {}).length > 0;
+ const assigned=context.cables.filter(c=>context.conduitIds.has(normalizeDuctbankId(c.conduit_id))).length;
+ const alertCount=thermalCount + ampacityCount;
+ let title='Ductbank inputs are ready.';
+ let detail='Run the final exports or continue to the report package.';
+ let meta=`${context.conduits.length} conduit(s), ${assigned}/${context.cables.length} assigned cable(s)`;
+ let actions=[
+   ductbankNextActionButton('Download Calc Report','calc-report',true),
+   '<a class="btn secondary-btn" href="projectreport.html">Project Report</a>'
+ ];
+ let warning=false;
+
+ if(!hasConduits){
+   title='Add ductbank conduits.';
+   detail='The underground route needs conduit records before fill, thermal checks, or exports can run.';
+   meta='No conduits loaded';
+   actions=[
+     ductbankNextActionButton('Load Complete Example','load-sample',true),
+     ductbankNextActionButton('Add Conduit','add-conduit')
+   ];
+   warning=true;
+ }else if(!hasCables){
+   title='Add or assign ductbank cables.';
+   detail='Thermal and ampacity checks need cable records assigned to the conduit layout.';
+   meta=`${context.conduits.length} conduit(s) ready`;
+   actions=[
+     ductbankNextActionButton('Load Sample Cables','sample-cables',true),
+     ductbankNextActionButton('Add Cable','add-cable')
+   ];
+   warning=true;
+ }else if(warningCount){
+   title='Resolve ductbank validation warnings.';
+   detail=`${warningCount} data, assignment, or fill warning(s) need review before release exports.`;
+   meta=`${assigned}/${context.cables.length} assigned cable(s)`;
+   actions=[
+     ductbankNextActionButton('Validate and Focus','validate',true),
+     ductbankNextActionButton('Calculate Fill','calculate-fill')
+   ];
+   warning=true;
+ }else if(!hasFill){
+   title='Calculate conduit fill.';
+   detail='Conduit and cable inputs are present; calculate fill before running thermal checks.';
+   meta=`${assigned}/${context.cables.length} assigned cable(s)`;
+   actions=[
+     ductbankNextActionButton('Calculate Fill','calculate-fill',true),
+     ductbankNextActionButton('Validate','validate')
+   ];
+ }else if(!hasHeat){
+   title='Run ductbank thermal analysis.';
+   detail='Fill is available. Run thermal to complete the underground route check.';
+   meta=`${context.conduits.length} conduit(s), ${context.cables.length} cable(s)`;
+   actions=[
+     ductbankNextActionButton('Run Thermal','thermal',true),
+     ductbankNextActionButton('Calculate Fill','calculate-fill')
+   ];
+ }else if(alertCount){
+   title='Review thermal and ampacity alerts.';
+   detail=`${thermalCount} thermal alert(s) and ${ampacityCount} ampacity alert(s) need review before exporting.`;
+   meta='Thermal analysis complete with alerts';
+   actions=[
+     ductbankNextActionButton('Show Alerts','show-alerts',true),
+     ductbankNextActionButton('Run Thermal Again','thermal')
+   ];
+   warning=true;
+ }
+
+ el.classList.toggle('is-warning',warning);
+ el.classList.toggle('is-ready',!warning && hasConduits && hasCables && hasFill && hasHeat);
+ el.innerHTML=`
+   <div>
+     <strong>${escapeHtml(title)}</strong>
+     <p>${escapeHtml(detail)}</p>
+   </div>
+   <span class="workflow-next-action__meta">${escapeHtml(meta)}</span>
+   <div class="workflow-next-action__actions">${actions.join('')}</div>`;
+ el.querySelectorAll('[data-ductbank-next-action]').forEach(button=>{
+   button.addEventListener('click',()=>{
+     const action=button.dataset.ductbankNextAction;
+     if(action==='load-sample') document.getElementById('loadDuctbankExample')?.click();
+     if(action==='add-conduit') document.getElementById('addConduit')?.click();
+     if(action==='sample-cables') document.getElementById('sampleCables')?.click();
+     if(action==='add-cable') document.getElementById('addCable')?.click();
+     if(action==='validate') validateDuctbankInputs({focusFirst:true});
+     if(action==='calculate-fill') document.getElementById('calc')?.click();
+     if(action==='thermal') document.getElementById('thermalBtn')?.click();
+     if(action==='calc-report') document.getElementById('downloadCalcReportBtn')?.click();
+     if(action==='show-alerts'){
+       activeDuctbankFilter=thermalCount ? 'thermal' : 'ampacity';
+       updateDuctbankExperience();
+       document.getElementById('ductbank-warning-list')?.scrollIntoView({behavior:'smooth',block:'nearest'});
+     }
+   });
+ });
 }
 
 function focusDuctbankIssue(issue){

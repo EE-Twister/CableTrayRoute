@@ -1,8 +1,8 @@
 {
-  "generatedAt": "2026-05-16T01:35:24.197Z",
+  "generatedAt": "2026-05-16T14:06:33.084Z",
   "summary": {
-    "testSuiteCount": 155,
-    "totalAssertions": 6152,
+    "testSuiteCount": 156,
+    "totalAssertions": 6193,
     "benchmarkCount": 6,
     "standardCount": 13
   },
@@ -334,6 +334,11 @@
         "runDcShortCircuitStudy"
       ],
       "assertionCount": 65
+    },
+    {
+      "file": "tests/deliverableWorkflow.test.mjs",
+      "groups": [],
+      "assertionCount": 14
     },
     {
       "file": "tests/demandSchedule.test.mjs",
@@ -1008,9 +1013,10 @@
         "pull route visual model and import",
         "buildPullTable",
         "cableQRPayload",
+        "trayQRPayload",
         "edge cases"
       ],
-      "assertionCount": 62
+      "assertionCount": 70
     },
     {
       "file": "tests/quasiDynamic.test.mjs",
@@ -1143,10 +1149,11 @@
         "validateSampleProject()",
         "migrateSampleProject()",
         "Sample JSON files",
+        "Sample thumbnail files",
         "samplegallery.html",
         "guidedChecklist step pages are within pagesUsed"
       ],
-      "assertionCount": 40
+      "assertionCount": 50
     },
     {
       "file": "tests/sampleLinks.test.cjs",
@@ -1437,7 +1444,7 @@
         "buildTrayHardwareBOM — tee detection",
         "buildTrayHardwareBOM — custom options"
       ],
-      "assertionCount": 56
+      "assertionCount": 61
     },
     {
       "file": "tests/trustcenter.test.mjs",
@@ -1528,7 +1535,7 @@
     {
       "file": "tests/workflowCoreSample.test.mjs",
       "groups": [],
-      "assertionCount": 16
+      "assertionCount": 20
     },
     {
       "file": "tests/workflowStatus.test.mjs",

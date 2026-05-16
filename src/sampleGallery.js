@@ -102,6 +102,23 @@ function buildCard(sample) {
   if (activeSampleId === sample.id) article.classList.add('sample-card--selected');
   article.dataset.sampleId = sample.id;
 
+  if (sample.image) {
+    const media = document.createElement('div');
+    media.className = 'sample-card__media';
+    const img = document.createElement('img');
+    img.src = sample.image;
+    img.alt = sample.imageAlt || `${sample.title} sample project thumbnail`;
+    img.loading = 'lazy';
+    img.decoding = 'async';
+    img.width = 960;
+    img.height = 540;
+    media.appendChild(img);
+    article.appendChild(media);
+  }
+
+  const body = document.createElement('div');
+  body.className = 'sample-card__body';
+
   const header = document.createElement('div');
   header.className = 'sample-card__header';
 
@@ -156,10 +173,11 @@ function buildCard(sample) {
   actions.appendChild(dlLink);
   actions.appendChild(guideBtn);
 
-  article.appendChild(header);
-  article.appendChild(desc);
-  article.appendChild(tagList);
-  article.appendChild(actions);
+  body.appendChild(header);
+  body.appendChild(desc);
+  body.appendChild(tagList);
+  body.appendChild(actions);
+  article.appendChild(body);
   return article;
 }
 

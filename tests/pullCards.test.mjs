@@ -8,6 +8,8 @@ import {
   buildPullTable,
   generateQRDataURL,
   cableQRPayload,
+  trayQRPayload,
+  enrichPullCardsWithQR,
 } from '../analysis/pullCards.mjs';
 import { parsePullRouteRows } from '../analysis/pullCardRouteImport.mjs';
 import { buildPullRouteVisualModel } from '../analysis/pullCardVisualModel.mjs';
@@ -224,6 +226,13 @@ describe('buildPullCard', () => {
     assert.ok(lastTrace, 'Expected a final tension trace segment');
     assert.strictEqual(lastTrace.tensionOut, card.estimated_tension_lbs);
   });
+
+  it('adds field-view URLs for each cable in the pull', () => {
+    const pulls = groupCablesIntoPulls(routeResults, cableList);
+    const card = buildPullCard(pulls[0], { baseURL: 'http://localhost:3000' });
+    assert.ok(card.cables.every(c => c.field_view_url), 'Each cable should have a Field View URL');
+    assert.ok(card.cables[0].field_view_url.startsWith('http://localhost:3000/fieldview.html#cable='));
+  });
 });
 
 describe('pull route visual model and import', () => {
@@ -379,6 +388,18 @@ describe('cableQRPayload', () => {
 });
 
 // Async tests for generateQRDataURL — run after all sync tests via top-level await
+describe('trayQRPayload', () => {
+  it('produces a Field View URL with the tray ID in the fragment', () => {
+    const payload = trayQRPayload('TRAY-001', 'http://localhost:3000');
+    assert.strictEqual(payload, 'http://localhost:3000/fieldview.html#tray=TRAY-001');
+  });
+
+  it('URL-encodes special characters in the tray ID', () => {
+    const payload = trayQRPayload('TRAY A/B');
+    assert.ok(payload.includes('TRAY%20A%2FB'), `Got: ${payload}`);
+  });
+});
+
 console.log('generateQRDataURL (async)');
 async function runQRTests() {
   const tests = [
@@ -409,6 +430,31 @@ async function runQRTests() {
   }
 }
 await runQRTests();
+
+console.log('enrichPullCardsWithQR (async)');
+async function runPullCardEnrichmentTests() {
+  try {
+    const { pulls } = buildPullTable(routeResults, cableList, { baseURL: 'http://localhost:3000' });
+    const calls = [];
+    await enrichPullCardsWithQR(pulls, {
+      baseURL: 'http://localhost:3000',
+      generateQRDataURL: async url => {
+        calls.push(url);
+        return `qr:${url}`;
+      }
+    });
+    const cable = pulls.flatMap(p => p.cables).find(c => c.tag === 'C1');
+    assert.ok(cable, 'Expected enriched cable C1');
+    assert.strictEqual(cable.field_view_url, 'http://localhost:3000/fieldview.html#cable=C1');
+    assert.strictEqual(cable.qr_data_url, 'qr:http://localhost:3000/fieldview.html#cable=C1');
+    assert.ok(calls.every(url => url.includes('/fieldview.html#cable=')), `Unexpected QR URLs: ${calls.join(', ')}`);
+    console.log('  \u2713 enriches pull-card cables with Field View QR data');
+  } catch (err) {
+    console.error('  \u2717 enriches pull-card cables with Field View QR data', err.message || err);
+    process.exitCode = 1;
+  }
+}
+await runPullCardEnrichmentTests();
 
 describe('edge cases', () => {
   it('handles cables with no matching cable list entry', () => {

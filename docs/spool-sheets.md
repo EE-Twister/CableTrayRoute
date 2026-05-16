@@ -40,6 +40,12 @@ After generation, **Export to Excel (XLSX)** downloads a real `.xlsx` workbook n
 
 The visual export buttons download the current preview as either SVG or PNG. The exported image reflects the current selected spool, rotation, zoom, pan, and isolate state.
 
+## Project Workflow Handoff
+
+The page includes a spool readiness strip above the planner. It reports whether Raceway Schedule tray geometry is available, how many trays have start/end coordinates, how many spool groups are currently previewable, and how many saved route results are available for downstream deliverables.
+
+The strip links back to Raceway Schedule when tray geometry is missing, triggers **Generate Spool Sheets** when inputs are ready, and links onward to Pull Cards and the Report Package Builder. This keeps the module usable by itself while making the integrated path explicit.
+
 ## Reference Basis
 
 The page uses standards and product literature as context rather than as a prescribed spool-generation standard. NEMA BI-50016-2024 (formerly NEMA VE 2) supports cable tray installation and support context. BICSI TDMM 15th edition Chapter 6 supports ICT horizontal distribution pathway context. BIMForum LOD Specification and Trimble SysQue literature support the LOD 400 fabrication-modeling context. The grid-cell, elevation-band, and max-segment grouping rules are CableTrayRoute planning heuristics and should be checked against project fabrication, transport, and installation constraints.

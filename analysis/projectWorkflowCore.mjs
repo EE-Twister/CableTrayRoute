@@ -1,5 +1,6 @@
 import { summarizeEquipment } from './equipmentWorkflow.mjs';
 import { summarizeLoadValidation } from './loadWorkflow.mjs';
+import { buildDeliverableReadinessDiagnostics } from './deliverableWorkflow.mjs';
 import { countOneLineComponents, getCableReadiness } from '../src/workflowStatus.js';
 
 function hasValue(value) {
@@ -54,6 +55,16 @@ export function buildWorkflowCoreDiagnostics(project = {}) {
     + meaningfulRecords(project.ductbanks).length;
   const studies = countObjectRecords(project.studies);
   const deliverables = countObjectRecords(project.reportSnapshots) + countObjectRecords(project.deliverables);
+  const deliverableDiagnostics = buildDeliverableReadinessDiagnostics({
+    cables: project.cables || [],
+    trays: project.trays || [],
+    conduits: project.conduits || [],
+    ductbanks: project.ductbanks || [],
+    studies: project.studies || {},
+    routeResults: project.routeResults || project.latestRouteResults || [],
+    reportSnapshots: project.reportSnapshots || {},
+    lifecyclePackages: project.deliverables || []
+  });
   const reconcilePending = Boolean(project.reconcilePending);
   const blockers = [];
 
@@ -96,6 +107,11 @@ export function buildWorkflowCoreDiagnostics(project = {}) {
   if (cableReadiness.scheduleReady > 0 && cableReadiness.routingReady === 0) {
     blockers.push(makeBlocker('Fill / Routing', 'warning', 'Assign raceways to cables', `${cableReadiness.scheduleReady} schedule-ready cables still need raceway assignments.`, 'cableschedule.html'));
   }
+  if (cableReadiness.routingReady > 0 && deliverableDiagnostics.health.routeResults === 0) {
+    blockers.push(makeBlocker('Fill / Routing', 'warning', 'Run routing for deliverables', 'Pull cards and procurement need route results from Optimal Route.', 'optimalRoute.html'));
+  } else if (deliverableDiagnostics.missingRouteResultTags.length > 0) {
+    blockers.push(makeBlocker('Fill / Routing', 'warning', 'Refresh route results', `${deliverableDiagnostics.missingRouteResultTags.length} schedule-ready cables do not have matching route results.`, 'optimalRoute.html'));
+  }
 
   if (studies === 0) {
     blockers.push(makeBlocker('Studies', 'info', 'Run workflow studies', 'No saved study results are available yet.', 'demandschedule.html'));
@@ -114,6 +130,11 @@ export function buildWorkflowCoreDiagnostics(project = {}) {
       scheduleReady: cableReadiness.scheduleReady,
       routingReady: cableReadiness.routingReady,
       raceways,
+      routeResults: deliverableDiagnostics.health.routeResults,
+      pullGroups: deliverableDiagnostics.health.pullGroups,
+      spoolSheets: deliverableDiagnostics.health.spoolCount,
+      reportSnapshots: deliverableDiagnostics.health.reportSnapshots,
+      lifecyclePackages: deliverableDiagnostics.health.lifecyclePackages,
       studies,
       deliverables,
       reconcilePending
@@ -121,6 +142,7 @@ export function buildWorkflowCoreDiagnostics(project = {}) {
     equipment: equipmentSummary,
     loads: loadSummary,
     cables: cableReadiness,
+    deliverables: deliverableDiagnostics,
     blockers,
     nextAction: findNextAction(blockers)
   };

@@ -1,7 +1,18 @@
-import { buildPullTable } from './analysis/pullCards.mjs';
+import { buildPullTable, cableQRPayload } from './analysis/pullCards.mjs';
 import { parsePullRouteRows } from './analysis/pullCardRouteImport.mjs';
 import { buildPullRouteVisualModel } from './analysis/pullCardVisualModel.mjs';
-import { getTrays, getCables } from './dataStore.mjs';
+import { buildDeliverableReadinessDiagnostics, normalizeRouteResults } from './analysis/deliverableWorkflow.mjs';
+import {
+  getTrays,
+  getCables,
+  getConduits,
+  getDuctbanks,
+  getStudies,
+  getReportSnapshots,
+  getLifecyclePackages,
+  getItem,
+  keys,
+} from './dataStore.mjs';
 import { renderIsometricSvg } from './src/utils/isometricSvg.js';
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -29,6 +40,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const backToTableBtn = document.getElementById('backToTableBtn');
   const exportPullTableBtn = document.getElementById('exportPullTableBtn');
   const exportPullCardsBtn = document.getElementById('exportPullCardsBtn');
+  const pullHandoff = document.getElementById('pull-deliverable-handoff');
 
   let currentPulls = null;
   let selectedPullNumber = null;
@@ -63,45 +75,15 @@ document.addEventListener('DOMContentLoaded', () => {
     xlsxFileInput.value = '';
   });
 
-  // ---- Load from project (sessionStorage cache) ----
+  // ---- Load from project route results ----
 
   loadFromProjectBtn.addEventListener('click', () => {
-    // Try to get cached route results from sessionStorage
-    const scenarios = Object.keys(sessionStorage).filter(k => k.includes(':'));
-    let cached = null;
-    for (const key of Object.keys(sessionStorage)) {
-      if (key.endsWith('routeCache') || key.includes('routeCache')) {
-        try {
-          cached = JSON.parse(sessionStorage.getItem(key));
-        } catch { /* skip */ }
-        if (cached && cached.batchResults) break;
-        cached = null;
-      }
-    }
-
-    if (cached && Array.isArray(cached.batchResults) && cached.batchResults.length > 0) {
-      const cableList = getCables();
-      generatePullCards(cached.batchResults, cableList);
+    const candidate = bestRouteResultCandidate();
+    if (candidate) {
+      generatePullCards(candidate.routeResults, getCables());
+      renderPullDeliverableHandoff(candidate);
       return;
     }
-
-    // Fallback: try localStorage
-    for (const key of Object.keys(localStorage)) {
-      if (key.endsWith('routeCache') || key.includes('routeCache')) {
-        try {
-          cached = JSON.parse(localStorage.getItem(key));
-        } catch { /* skip */ }
-        if (cached && cached.batchResults) break;
-        cached = null;
-      }
-    }
-
-    if (cached && Array.isArray(cached.batchResults) && cached.batchResults.length > 0) {
-      const cableList = getCables();
-      generatePullCards(cached.batchResults, cableList);
-      return;
-    }
-
     showAlertModal('No route results found in the current session. Please run cable routing on the Optimal Route page first, or import a route_data.xlsx file.');
   });
 
@@ -122,7 +104,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // ---- Generate pull cards from results ----
 
   function generatePullCards(routeResults, cableList) {
-    const { pulls, summary } = buildPullTable(routeResults, cableList);
+    const { pulls, summary } = buildPullTable(routeResults, cableList, { baseURL: fieldViewBaseURL() });
     currentPulls = pulls;
     selectedPullNumber = pulls[0]?.pull_number ?? null;
 
@@ -176,6 +158,7 @@ document.addEventListener('DOMContentLoaded', () => {
     pullTableSection.hidden = false;
     pullCardDetail.hidden = true;
     renderSelectedPullVisual();
+    renderPullDeliverableHandoff();
 
     // Wire up view buttons
     pullTableBody.querySelectorAll('tr[data-pull]').forEach(row => {
@@ -196,6 +179,136 @@ document.addEventListener('DOMContentLoaded', () => {
         selectPull(num);
         showPullCard(num);
       });
+    });
+  }
+
+  function addRouteCandidate(candidates, seen, key, label, payload) {
+    const routeResults = normalizeRouteResults(payload);
+    if (!routeResults.length || seen.has(key)) return;
+    seen.add(key);
+    const updatedAt = payload?.updatedAt || payload?.generatedAt || payload?.createdAt || payload?.timestamp || '';
+    candidates.push({
+      key,
+      label,
+      routeResults,
+      updatedAt,
+      source: payload?.source || label,
+    });
+  }
+
+  function readSessionRouteCandidates(candidates, seen) {
+    try {
+      for (const key of Object.keys(sessionStorage)) {
+        const normalized = key.toLowerCase();
+        if (!normalized.includes('routecache') && !normalized.includes('routeresult')) continue;
+        let payload = null;
+        try {
+          payload = JSON.parse(sessionStorage.getItem(key));
+        } catch {
+          payload = null;
+        }
+        addRouteCandidate(candidates, seen, `session:${key}`, 'Current session route cache', payload);
+      }
+    } catch {
+      // Session storage can be unavailable in hardened browser contexts.
+    }
+  }
+
+  function readRouteResultCandidates() {
+    const candidates = [];
+    const seen = new Set();
+    addRouteCandidate(candidates, seen, 'latestRouteResults', 'Latest project route results', getItem('latestRouteResults', null));
+
+    for (const key of keys()) {
+      const lower = String(key).toLowerCase();
+      if (key === 'latestRouteResults') continue;
+      if (!lower.includes('routecache') && !lower.includes('routeresult') && !lower.startsWith('route-')) continue;
+      addRouteCandidate(candidates, seen, `project:${key}`, `Project route cache (${key})`, getItem(key, null));
+    }
+
+    readSessionRouteCandidates(candidates, seen);
+    return candidates;
+  }
+
+  function routeCandidateTime(candidate) {
+    const time = Date.parse(candidate?.updatedAt || '');
+    return Number.isFinite(time) ? time : 0;
+  }
+
+  function bestRouteResultCandidate() {
+    const candidates = readRouteResultCandidates();
+    if (candidates.length) {
+      return candidates.sort((a, b) => {
+        const timeDelta = routeCandidateTime(b) - routeCandidateTime(a);
+        if (timeDelta) return timeDelta;
+        return b.routeResults.length - a.routeResults.length;
+      })[0];
+    }
+
+    const derived = currentDeliverableDiagnostics([]).routeResults;
+    if (!derived.length) return null;
+    return {
+      key: 'derived-cable-route-segments',
+      label: 'Cable schedule route segments',
+      routeResults: derived,
+      updatedAt: '',
+      source: 'cableSchedule',
+    };
+  }
+
+  function currentDeliverableDiagnostics(routeResults = []) {
+    return buildDeliverableReadinessDiagnostics({
+      cables: getCables(),
+      trays: getTrays(),
+      conduits: getConduits(),
+      ductbanks: getDuctbanks(),
+      studies: getStudies(),
+      routeResults,
+      reportSnapshots: getReportSnapshots(),
+      lifecyclePackages: getLifecyclePackages(),
+    });
+  }
+
+  function renderPullDeliverableHandoff(candidate = bestRouteResultCandidate()) {
+    if (!pullHandoff) return;
+    const routeResults = candidate?.routeResults || [];
+    const diagnostics = currentDeliverableDiagnostics(routeResults);
+    const missing = diagnostics.missingRouteResultTags.length;
+    const ready = routeResults.length > 0;
+    pullHandoff.classList.toggle('is-warning', !ready || missing > 0);
+    pullHandoff.classList.toggle('is-ready', ready && missing === 0);
+
+    if (!ready) {
+      pullHandoff.innerHTML = `
+        <div>
+          <strong>Run routing before creating pull cards.</strong>
+          <p>No saved route results are available. Pull cards need route results from Optimal Route or a route_data.xlsx import.</p>
+        </div>
+        <span class="workflow-next-action__meta">${diagnostics.health.routingReady} routing-ready cable(s)</span>
+        <div class="workflow-next-action__actions">
+          <a class="btn primary-btn" href="optimalRoute.html">Open Optimal Route</a>
+          <a class="btn secondary-btn" href="cableschedule.html">Cable Schedule</a>
+        </div>`;
+      return;
+    }
+
+    const routeLabel = candidate?.label || 'Project route results';
+    const missingText = missing
+      ? `${missing} schedule-ready cable(s) are missing route results`
+      : 'All schedule-ready routed cables have matching route results';
+    pullHandoff.innerHTML = `
+      <div>
+        <strong>Pull-card inputs are available.</strong>
+        <p>${esc(routeLabel)}: ${routeResults.length} routed cable(s), ${diagnostics.health.pullGroups} pull group(s). ${esc(missingText)}.</p>
+      </div>
+      <span class="workflow-next-action__meta">${diagnostics.health.routeCoverage}% route coverage</span>
+      <div class="workflow-next-action__actions">
+        <button type="button" class="btn primary-btn" data-action="load-project-routes">Load Route Results</button>
+        <a class="btn secondary-btn" href="spoolsheets.html">Spool Sheets</a>
+        <a class="btn secondary-btn" href="projectreport.html">Project Report</a>
+      </div>`;
+    pullHandoff.querySelector('[data-action="load-project-routes"]')?.addEventListener('click', () => {
+      generatePullCards(routeResults, getCables());
     });
   }
 
@@ -284,7 +397,9 @@ document.addEventListener('DOMContentLoaded', () => {
       `pull-card-iso-desc-${pull.pull_number}`
     );
 
-    const cableRows = pull.cables.map(c => `<tr>
+    const cableRows = pull.cables.map(c => {
+      const fieldViewUrl = c.field_view_url || cableQRPayload(c.tag, fieldViewBaseURL());
+      return `<tr>
       <td>${esc(c.tag)}</td>
       <td>${esc(c.cable_type)}</td>
       <td>${c.conductors}</td>
@@ -292,7 +407,9 @@ document.addEventListener('DOMContentLoaded', () => {
       <td>${c.diameter}</td>
       <td>${c.weight || '—'}</td>
       <td>${esc(c.allowed_cable_group || '—')}</td>
-    </tr>`).join('');
+      <td><a href="${escAttr(fieldViewUrl)}">Open</a></td>
+    </tr>`;
+    }).join('');
 
     const routeRows = pull.route_steps.map(s => `<tr>
       <td>${s.step}</td>
@@ -345,6 +462,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <th scope="col">OD (in)</th>
                 <th scope="col">Weight (lbs/ft)</th>
                 <th scope="col">Group</th>
+                <th scope="col">Field View</th>
               </tr>
             </thead>
             <tbody>${cableRows}</tbody>
@@ -455,6 +573,7 @@ document.addEventListener('DOMContentLoaded', () => {
           'OD (in)': c.diameter,
           'Weight (lbs/ft)': c.weight || '',
           'Cable Group': c.allowed_cable_group || '',
+          'Field View URL': c.field_view_url || cableQRPayload(c.tag, fieldViewBaseURL()),
         });
       }
     }
@@ -489,6 +608,21 @@ document.addEventListener('DOMContentLoaded', () => {
       .replace(/>/g, '&gt;');
   }
 
+  function escAttr(s) {
+    return esc(s)
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function fieldViewBaseURL() {
+    try {
+      const base = new URL('.', window.location.href);
+      return base.href.replace(/\/$/, '');
+    } catch {
+      return 'https://cabletrayroute.com';
+    }
+  }
+
   function formatNumber(value) {
     const number = Number(value);
     if (!Number.isFinite(number)) return '0';
@@ -501,4 +635,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!values.every(Number.isFinite)) return 'Missing';
     return values.map(value => formatNumber(value)).join(', ');
   }
+
+  renderPullDeliverableHandoff();
 });

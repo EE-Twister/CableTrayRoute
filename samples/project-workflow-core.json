@@ -13,8 +13,28 @@
       "ductbank_id": "DB-101",
       "description": "Underground feeder ductbank from utility service to electrical room",
       "conduit_count": 4,
-      "trade_size": "4 in",
-      "length": 120
+      "trade_size": "4",
+      "length": 120,
+      "length_ft": 120,
+      "start_x": 0,
+      "start_y": 32,
+      "start_z": -4,
+      "end_x": 120,
+      "end_y": 32,
+      "end_z": -4,
+      "conduits": [
+        {
+          "conduit_id": "CND-PMP-101",
+          "type": "RMC",
+          "trade_size": "2",
+          "start_x": 0,
+          "start_y": 32,
+          "start_z": -4,
+          "end_x": 85,
+          "end_y": 32,
+          "end_z": -4
+        }
+      ]
     }
   ],
   "conduits": [
@@ -23,9 +43,16 @@
       "conduit_id": "CND-PMP-101",
       "description": "Motor feeder conduit to cooling water pump",
       "type": "RMC",
-      "trade_size": "2 in",
+      "trade_size": "2",
       "material": "Steel",
-      "length": 85
+      "length": 85,
+      "length_ft": 85,
+      "start_x": 0,
+      "start_y": 32,
+      "start_z": -4,
+      "end_x": 85,
+      "end_y": 32,
+      "end_z": -4
     }
   ],
   "trays": [
@@ -36,45 +63,92 @@
       "width": 24,
       "height": 6,
       "length": 160,
+      "length_ft": 160,
       "material": "Aluminum",
-      "fill": 28
+      "fill": 28,
+      "inside_width": 24,
+      "tray_depth": 6,
+      "tray_type": "Ladder",
+      "current_fill": 28,
+      "start_x": 0,
+      "start_y": 0,
+      "start_z": 12,
+      "end_x": 160,
+      "end_y": 0,
+      "end_z": 12
     }
   ],
   "cables": [
     {
       "tag": "CBL-SWBD-MCC-101",
+      "name": "CBL-SWBD-MCC-101",
       "from": "SWBD-101",
+      "from_tag": "SWBD-101",
       "to": "MCC-101",
+      "to_tag": "MCC-101",
+      "cable_type": "Power",
+      "conductors": 3,
       "conductor_size": "3-500 kcmil CU",
       "length": 145,
+      "length_ft": 145,
       "raceway_ids": ["TR-PWR-101"],
+      "route_preference": "TR-PWR-101",
+      "diameter": 2.1,
+      "weight": 5.6,
       "voltage": "480"
     },
     {
       "tag": "CBL-MCC-PMP-101",
+      "name": "CBL-MCC-PMP-101",
       "from": "MCC-101",
+      "from_tag": "MCC-101",
       "to": "PMP-101",
+      "to_tag": "PMP-101",
+      "cable_type": "Power",
+      "conductors": 3,
       "conductor_size": "3-#4 CU",
       "length": 95,
+      "length_ft": 95,
       "raceway_ids": ["CND-PMP-101"],
+      "route_preference": "CND-PMP-101",
+      "diameter": 0.75,
+      "weight": 1.15,
       "voltage": "480"
     },
     {
       "tag": "CBL-SWBD-XFMR-101",
+      "name": "CBL-SWBD-XFMR-101",
       "from": "SWBD-101",
+      "from_tag": "SWBD-101",
       "to": "XFMR-101",
+      "to_tag": "XFMR-101",
+      "cable_type": "Power",
+      "conductors": 3,
       "conductor_size": "3-#1 CU",
       "length": 62,
+      "length_ft": 62,
       "raceway_ids": ["TR-PWR-101"],
+      "route_preference": "TR-PWR-101",
+      "diameter": 0.95,
+      "weight": 1.9,
       "voltage": "480"
     },
     {
       "tag": "CBL-XFMR-LP-101",
+      "name": "CBL-XFMR-LP-101",
       "from": "XFMR-101",
+      "from_tag": "XFMR-101",
       "to": "LP-101",
+      "to_tag": "LP-101",
+      "cable_type": "Power",
+      "conductors": 4,
       "conductor_size": "4-#2 CU",
       "length": 35,
+      "length_ft": 35,
       "raceway_ids": ["TR-PWR-101"],
+      "route_preference": "TR-PWR-101",
+      "diameter": 1.05,
+      "weight": 2.4,
       "voltage": "208"
     }
   ],
@@ -299,6 +373,115 @@
         "availableFaultKa": 22.4,
         "updatedAt": "2026-05-01T12:05:00.000Z"
       }
+    },
+    "latestRouteResults": {
+      "source": "sample",
+      "updatedAt": "2026-05-01T12:20:00.000Z",
+      "batchResults": [
+        {
+          "cable": "CBL-SWBD-MCC-101",
+          "status": "Routed",
+          "total_length": 145,
+          "breakdown": [
+            {
+              "tray_id": "TR-PWR-101",
+              "length": 145,
+              "start": [0, 0, 12],
+              "end": [145, 0, 12]
+            }
+          ],
+          "route_segments": [
+            {
+              "type": "tray",
+              "tray_id": "TR-PWR-101",
+              "length": 145,
+              "start": [0, 0, 12],
+              "end": [145, 0, 12]
+            }
+          ]
+        },
+        {
+          "cable": "CBL-MCC-PMP-101",
+          "status": "Routed",
+          "total_length": 95,
+          "breakdown": [
+            {
+              "conduit_id": "CND-PMP-101",
+              "ductbankTag": "DB-101",
+              "length": 85,
+              "start": [0, 32, -4],
+              "end": [85, 32, -4]
+            },
+            {
+              "tray_id": "TR-PWR-101",
+              "length": 10,
+              "start": [85, 32, -4],
+              "end": [95, 0, 12]
+            }
+          ],
+          "route_segments": [
+            {
+              "type": "conduit",
+              "conduit_id": "CND-PMP-101",
+              "ductbankTag": "DB-101",
+              "length": 85,
+              "start": [0, 32, -4],
+              "end": [85, 32, -4]
+            },
+            {
+              "type": "tray",
+              "tray_id": "TR-PWR-101",
+              "length": 10,
+              "start": [85, 32, -4],
+              "end": [95, 0, 12]
+            }
+          ]
+        },
+        {
+          "cable": "CBL-SWBD-XFMR-101",
+          "status": "Routed",
+          "total_length": 62,
+          "breakdown": [
+            {
+              "tray_id": "TR-PWR-101",
+              "length": 62,
+              "start": [0, 0, 12],
+              "end": [62, 0, 12]
+            }
+          ],
+          "route_segments": [
+            {
+              "type": "tray",
+              "tray_id": "TR-PWR-101",
+              "length": 62,
+              "start": [0, 0, 12],
+              "end": [62, 0, 12]
+            }
+          ]
+        },
+        {
+          "cable": "CBL-XFMR-LP-101",
+          "status": "Routed",
+          "total_length": 35,
+          "breakdown": [
+            {
+              "tray_id": "TR-PWR-101",
+              "length": 35,
+              "start": [62, 0, 12],
+              "end": [97, 0, 12]
+            }
+          ],
+          "route_segments": [
+            {
+              "type": "tray",
+              "tray_id": "TR-PWR-101",
+              "length": 35,
+              "start": [62, 0, 12],
+              "end": [97, 0, 12]
+            }
+          ]
+        }
+      ]
     },
     "reportSnapshots": {
       "workflow-core-report": {

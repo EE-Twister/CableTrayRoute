@@ -63,6 +63,32 @@ export function trayQRPayload(trayId, baseURL = 'https://cabletrayroute.com') {
   return `${baseURL}/fieldview.html#tray=${encodeURIComponent(trayId)}`;
 }
 
+/**
+ * Add QR PNG data URLs to the cable rows in generated pull cards.
+ * Each cable already carries the URL to encode as `field_view_url`; this async
+ * step only materializes the image data when an export surface needs it.
+ *
+ * @param {Array} pulls - pull cards from buildPullTable()
+ * @param {{ baseURL?: string, generateQRDataURL?: Function }} [options]
+ * @returns {Promise<void>} mutates pulls in place
+ */
+export async function enrichPullCardsWithQR(pulls = [], options = {}) {
+  const baseURL = options.baseURL || 'https://cabletrayroute.com';
+  const generator = options.generateQRDataURL || generateQRDataURL;
+  const seen = new Map();
+  const cableRows = (Array.isArray(pulls) ? pulls : []).flatMap(pull => pull.cables || []);
+  await Promise.all(cableRows.map(async cable => {
+    const tag = cable?.tag;
+    if (!tag) return;
+    const url = cable.field_view_url || cableQRPayload(tag, baseURL);
+    cable.field_view_url = url;
+    if (!seen.has(url)) {
+      seen.set(url, generator(url));
+    }
+    cable.qr_data_url = await seen.get(url);
+  }));
+}
+
 // ---------------------------------------------------------------------------
 // Route signature — canonical key for grouping cables by shared path
 // ---------------------------------------------------------------------------
@@ -219,7 +245,8 @@ export function groupCablesIntoPulls(routeResults = [], cableList = []) {
  * @param {Pull} pull - a pull object from groupCablesIntoPulls
  * @returns {PullCard} enriched pull card with tension and route detail
  */
-export function buildPullCard(pull) {
+export function buildPullCard(pull, options = {}) {
+  const baseURL = options.baseURL || 'https://cabletrayroute.com';
   const totalWeight = pull.cables.reduce((sum, c) => {
     const p = Math.max(1, parseInt(c.parallel_count) || 1);
     return sum + (c.weight || 0) * p;
@@ -280,7 +307,10 @@ export function buildPullCard(pull) {
     cable_type: pull.cable_type,
     cable_count: pull.cable_count,
     parallel_cable_count: parallelCableCount,
-    cables: pull.cables,
+    cables: pull.cables.map(cable => ({
+      ...cable,
+      field_view_url: cableQRPayload(cable.tag, baseURL)
+    })),
     cable_tags: pull.cables.map(c => c.tag),
     from: formatPt(firstSeg?.start),
     to: formatPt(lastSeg?.end),
@@ -315,9 +345,9 @@ export function buildPullCard(pull) {
  * @param {Array} cableList - cable schedule
  * @returns {{ pulls: Array<PullCard>, summary: PullSummary }}
  */
-export function buildPullTable(routeResults = [], cableList = []) {
+export function buildPullTable(routeResults = [], cableList = [], options = {}) {
   const groups = groupCablesIntoPulls(routeResults, cableList);
-  const pulls = groups.map(g => buildPullCard(g));
+  const pulls = groups.map(g => buildPullCard(g, options));
 
   const totalCables = pulls.reduce((s, p) => s + p.cable_count, 0);
   const totalPulls = pulls.length;

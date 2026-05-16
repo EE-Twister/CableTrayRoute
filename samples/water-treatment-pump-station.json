@@ -1,0 +1,681 @@
+{
+  "schemaVersion": 1,
+  "id": "water-treatment-pump-station",
+  "title": "Water Treatment Pump Station",
+  "meta": {
+    "version": 1,
+    "scenario": "default",
+    "scenarios": ["default"]
+  },
+  "ductbanks": [
+    {
+      "id": "DB-PMP-200",
+      "ductbank_id": "DB-PMP-200",
+      "description": "Underground service ductbank from utility transformer to pump station switchgear",
+      "conduit_count": 6,
+      "trade_size": "4",
+      "length": 180,
+      "length_ft": 180,
+      "start_x": 0,
+      "start_y": 24,
+      "start_z": -4,
+      "end_x": 180,
+      "end_y": 24,
+      "end_z": -4,
+      "conduits": [
+        {
+          "conduit_id": "CND-SVC-200",
+          "type": "PVC",
+          "trade_size": "4",
+          "start_x": 0,
+          "start_y": 24,
+          "start_z": -4,
+          "end_x": 180,
+          "end_y": 24,
+          "end_z": -4
+        },
+        {
+          "conduit_id": "CND-PMP-201",
+          "type": "PVC",
+          "trade_size": "3",
+          "start_x": 180,
+          "start_y": 24,
+          "start_z": -4,
+          "end_x": 245,
+          "end_y": 24,
+          "end_z": -4
+        }
+      ]
+    }
+  ],
+  "conduits": [
+    {
+      "id": "CND-SVC-200",
+      "conduit_id": "CND-SVC-200",
+      "description": "Service feeder conduit in ductbank",
+      "type": "PVC",
+      "trade_size": "4",
+      "material": "PVC",
+      "length": 180,
+      "length_ft": 180,
+      "start_x": 0,
+      "start_y": 24,
+      "start_z": -4,
+      "end_x": 180,
+      "end_y": 24,
+      "end_z": -4
+    },
+    {
+      "id": "CND-PMP-201",
+      "conduit_id": "CND-PMP-201",
+      "description": "VFD output conduit to high service pump P-201",
+      "type": "RMC",
+      "trade_size": "3",
+      "material": "Steel",
+      "length": 88,
+      "length_ft": 88,
+      "start_x": 85,
+      "start_y": 0,
+      "start_z": 8,
+      "end_x": 160,
+      "end_y": 28,
+      "end_z": 4
+    },
+    {
+      "id": "CND-PMP-202",
+      "conduit_id": "CND-PMP-202",
+      "description": "Across-the-line pump feeder conduit to standby pump P-202",
+      "type": "RMC",
+      "trade_size": "2",
+      "material": "Steel",
+      "length": 72,
+      "length_ft": 72,
+      "start_x": 85,
+      "start_y": 4,
+      "start_z": 8,
+      "end_x": 148,
+      "end_y": 38,
+      "end_z": 4
+    },
+    {
+      "id": "CND-CTRL-200",
+      "conduit_id": "CND-CTRL-200",
+      "description": "PLC and instrument control conduit to wet well",
+      "type": "PVC-coated RMC",
+      "trade_size": "1",
+      "material": "Steel",
+      "length": 120,
+      "length_ft": 120,
+      "start_x": 72,
+      "start_y": 8,
+      "start_z": 8,
+      "end_x": 182,
+      "end_y": 45,
+      "end_z": 5
+    }
+  ],
+  "trays": [
+    {
+      "id": "TR-PMP-GAL-200",
+      "tray_id": "TR-PMP-GAL-200",
+      "description": "Pump gallery power and control cable tray",
+      "width": 18,
+      "height": 6,
+      "length": 96,
+      "length_ft": 96,
+      "material": "Aluminum",
+      "fill": 36,
+      "inside_width": 18,
+      "tray_depth": 6,
+      "tray_type": "Ladder",
+      "current_fill": 36,
+      "start_x": 0,
+      "start_y": 0,
+      "start_z": 12,
+      "end_x": 96,
+      "end_y": 0,
+      "end_z": 12
+    },
+    {
+      "id": "TR-CTRL-200",
+      "tray_id": "TR-CTRL-200",
+      "description": "Low-voltage control tray to PLC and instrument panels",
+      "width": 12,
+      "height": 4,
+      "length": 80,
+      "length_ft": 80,
+      "material": "Aluminum",
+      "fill": 22,
+      "inside_width": 12,
+      "tray_depth": 4,
+      "tray_type": "Solid Bottom",
+      "current_fill": 22,
+      "start_x": 0,
+      "start_y": 8,
+      "start_z": 12,
+      "end_x": 80,
+      "end_y": 8,
+      "end_z": 12
+    }
+  ],
+  "cables": [
+    {
+      "id": "CBL-UTIL-SWGR-200",
+      "tag": "CBL-UTIL-SWGR-200",
+      "name": "CBL-UTIL-SWGR-200",
+      "from": "UTILITY-TX-200",
+      "from_tag": "UTILITY-TX-200",
+      "to": "SWGR-200",
+      "to_tag": "SWGR-200",
+      "cable_type": "Power",
+      "conductors": 3,
+      "conductor_size": "3-750 kcmil AL",
+      "insulation_type": "XHHW-2",
+      "voltage_rating": "600V",
+      "length": 180,
+      "length_ft": 180,
+      "raceway_ids": ["CND-SVC-200"],
+      "route_preference": "CND-SVC-200",
+      "diameter": 2.35,
+      "cable_od": 2.35,
+      "weight": 4.9,
+      "voltage": "480",
+      "conductor_material": "AL"
+    },
+    {
+      "id": "CBL-SWGR-MCC-200",
+      "tag": "CBL-SWGR-MCC-200",
+      "name": "CBL-SWGR-MCC-200",
+      "from": "SWGR-200",
+      "from_tag": "SWGR-200",
+      "to": "MCC-200",
+      "to_tag": "MCC-200",
+      "cable_type": "Power",
+      "conductors": 3,
+      "conductor_size": "3-500 kcmil CU",
+      "insulation_type": "XHHW-2",
+      "voltage_rating": "600V",
+      "length": 68,
+      "length_ft": 68,
+      "raceway_ids": ["TR-PMP-GAL-200"],
+      "route_preference": "TR-PMP-GAL-200",
+      "diameter": 2.1,
+      "cable_od": 2.1,
+      "weight": 5.6,
+      "voltage": "480",
+      "conductor_material": "CU"
+    },
+    {
+      "id": "CBL-MCC-VFD-201",
+      "tag": "CBL-MCC-VFD-201",
+      "name": "CBL-MCC-VFD-201",
+      "from": "MCC-200",
+      "from_tag": "MCC-200",
+      "to": "VFD-201",
+      "to_tag": "VFD-201",
+      "cable_type": "Power",
+      "conductors": 3,
+      "conductor_size": "3-#1/0 CU",
+      "insulation_type": "XHHW-2",
+      "voltage_rating": "600V",
+      "length": 36,
+      "length_ft": 36,
+      "raceway_ids": ["TR-PMP-GAL-200"],
+      "route_preference": "TR-PMP-GAL-200",
+      "diameter": 0.92,
+      "cable_od": 0.92,
+      "weight": 1.8,
+      "voltage": "480",
+      "conductor_material": "CU"
+    },
+    {
+      "id": "CBL-VFD-PMP-201",
+      "tag": "CBL-VFD-PMP-201",
+      "name": "CBL-VFD-PMP-201",
+      "from": "VFD-201",
+      "from_tag": "VFD-201",
+      "to": "PMP-201",
+      "to_tag": "PMP-201",
+      "cable_type": "VFD Power",
+      "conductors": 3,
+      "conductor_size": "3-#1/0 CU shielded",
+      "insulation_type": "XLPE",
+      "voltage_rating": "1000V",
+      "length": 88,
+      "length_ft": 88,
+      "raceway_ids": ["CND-PMP-201"],
+      "route_preference": "CND-PMP-201",
+      "diameter": 1.12,
+      "cable_od": 1.12,
+      "weight": 2.35,
+      "voltage": "480",
+      "conductor_material": "CU"
+    },
+    {
+      "id": "CBL-MCC-PMP-202",
+      "tag": "CBL-MCC-PMP-202",
+      "name": "CBL-MCC-PMP-202",
+      "from": "MCC-200",
+      "from_tag": "MCC-200",
+      "to": "PMP-202",
+      "to_tag": "PMP-202",
+      "cable_type": "Power",
+      "conductors": 3,
+      "conductor_size": "3-#2 CU",
+      "insulation_type": "THHN",
+      "voltage_rating": "600V",
+      "length": 72,
+      "length_ft": 72,
+      "raceway_ids": ["CND-PMP-202"],
+      "route_preference": "CND-PMP-202",
+      "diameter": 0.75,
+      "cable_od": 0.75,
+      "weight": 1.15,
+      "voltage": "480",
+      "conductor_material": "CU"
+    },
+    {
+      "id": "CBL-MCC-PLC-200",
+      "tag": "CBL-MCC-PLC-200",
+      "name": "CBL-MCC-PLC-200",
+      "from": "MCC-200",
+      "from_tag": "MCC-200",
+      "to": "PLC-200",
+      "to_tag": "PLC-200",
+      "cable_type": "Control",
+      "conductors": 12,
+      "conductor_size": "12-#14 CU",
+      "insulation_type": "THHN",
+      "voltage_rating": "600V",
+      "length": 54,
+      "length_ft": 54,
+      "raceway_ids": ["TR-CTRL-200"],
+      "route_preference": "TR-CTRL-200",
+      "diameter": 0.46,
+      "cable_od": 0.46,
+      "weight": 0.38,
+      "voltage": "120",
+      "conductor_material": "CU"
+    },
+    {
+      "id": "CBL-PLC-WW-201",
+      "tag": "CBL-PLC-WW-201",
+      "name": "CBL-PLC-WW-201",
+      "from": "PLC-200",
+      "from_tag": "PLC-200",
+      "to": "WW-IO-201",
+      "to_tag": "WW-IO-201",
+      "cable_type": "Instrument",
+      "conductors": 8,
+      "conductor_size": "8-#16 CU twisted shielded",
+      "insulation_type": "EPR",
+      "voltage_rating": "300V",
+      "length": 120,
+      "length_ft": 120,
+      "raceway_ids": ["CND-CTRL-200"],
+      "route_preference": "CND-CTRL-200",
+      "diameter": 0.38,
+      "cable_od": 0.38,
+      "weight": 0.2,
+      "voltage": "24",
+      "conductor_material": "CU"
+    }
+  ],
+  "cableTypicals": [],
+  "panels": [
+    {
+      "tag": "PLC-200",
+      "description": "Pump station PLC and controls panel",
+      "voltage": "120",
+      "source": "MCC-200",
+      "busRating": "100"
+    }
+  ],
+  "equipment": [
+    {
+      "tag": "UTILITY-TX-200",
+      "description": "Utility-owned padmount transformer",
+      "voltage": "480",
+      "category": "Transformer",
+      "subCategory": "Padmount",
+      "arrangement": "Exterior Service Yard",
+      "lineup": "Utility Service",
+      "manufacturer": "Utility",
+      "model": "1000 kVA PMT",
+      "phases": "3"
+    },
+    {
+      "tag": "SWGR-200",
+      "description": "480 V pump station switchgear",
+      "voltage": "480",
+      "category": "Distribution",
+      "subCategory": "Switchgear",
+      "arrangement": "Electrical Room",
+      "lineup": "SWGR-200",
+      "manufacturer": "Eaton",
+      "model": "Pow-R-Line Xpert",
+      "phases": "3"
+    },
+    {
+      "tag": "MCC-200",
+      "description": "Pump motor control center",
+      "voltage": "480",
+      "category": "Distribution",
+      "subCategory": "MCC",
+      "arrangement": "Electrical Room",
+      "lineup": "MCC-200",
+      "manufacturer": "Allen-Bradley",
+      "model": "CENTERLINE 2100",
+      "phases": "3"
+    },
+    {
+      "tag": "VFD-201",
+      "description": "High service pump VFD",
+      "voltage": "480",
+      "category": "Drive",
+      "subCategory": "VFD",
+      "arrangement": "Electrical Room",
+      "lineup": "MCC-200",
+      "manufacturer": "Rockwell",
+      "model": "PowerFlex 755",
+      "phases": "3"
+    },
+    {
+      "tag": "PLC-200",
+      "description": "Pump station control panel",
+      "voltage": "120",
+      "category": "Control",
+      "subCategory": "PLC Panel",
+      "arrangement": "Control Room",
+      "lineup": "Controls",
+      "manufacturer": "Schneider Electric",
+      "model": "Modicon M580",
+      "phases": "1"
+    },
+    {
+      "tag": "PMP-201",
+      "description": "High service pump",
+      "voltage": "480",
+      "category": "Mechanical Load",
+      "subCategory": "Pump",
+      "arrangement": "Pump Gallery",
+      "lineup": "Process Pumps",
+      "manufacturer": "Goulds",
+      "model": "VIT",
+      "phases": "3"
+    },
+    {
+      "tag": "PMP-202",
+      "description": "Standby transfer pump",
+      "voltage": "480",
+      "category": "Mechanical Load",
+      "subCategory": "Pump",
+      "arrangement": "Pump Gallery",
+      "lineup": "Process Pumps",
+      "manufacturer": "Flygt",
+      "model": "NP-3202",
+      "phases": "3"
+    }
+  ],
+  "loads": [
+    {
+      "source": "VFD-201",
+      "tag": "PMP-201",
+      "description": "High service pump motor",
+      "quantity": "1",
+      "voltage": "480",
+      "loadType": "Motor",
+      "duty": "Continuous",
+      "kw": "74.6",
+      "powerFactor": "0.88",
+      "loadFactor": "100",
+      "efficiency": "94",
+      "demandFactor": "125",
+      "phases": "3",
+      "circuit": "VFD-201-LOAD"
+    },
+    {
+      "source": "MCC-200",
+      "tag": "PMP-202",
+      "description": "Standby transfer pump motor",
+      "quantity": "1",
+      "voltage": "480",
+      "loadType": "Motor",
+      "duty": "Standby",
+      "kw": "37.3",
+      "powerFactor": "0.86",
+      "loadFactor": "100",
+      "efficiency": "92",
+      "demandFactor": "100",
+      "phases": "3",
+      "circuit": "MCC-200-04"
+    },
+    {
+      "source": "MCC-200",
+      "tag": "MIX-201",
+      "description": "Chemical mixer motor",
+      "quantity": "1",
+      "voltage": "480",
+      "loadType": "Motor",
+      "duty": "Intermittent",
+      "kw": "5.6",
+      "powerFactor": "0.84",
+      "loadFactor": "75",
+      "efficiency": "89",
+      "demandFactor": "100",
+      "phases": "3",
+      "circuit": "MCC-200-06"
+    },
+    {
+      "source": "PLC-200",
+      "tag": "WW-IO-201",
+      "description": "Wet well instrumentation and remote I/O",
+      "quantity": "1",
+      "voltage": "120",
+      "loadType": "Controls",
+      "duty": "Continuous",
+      "kw": "1.2",
+      "powerFactor": "0.90",
+      "loadFactor": "100",
+      "efficiency": "100",
+      "demandFactor": "100",
+      "phases": "1",
+      "circuit": "PLC-200-02"
+    }
+  ],
+  "oneLine": {
+    "activeSheet": 0,
+    "sheets": [
+      {
+        "id": "pump-station-main",
+        "name": "Pump Station One-Line",
+        "components": [
+          {
+            "id": "comp-utility-tx-200",
+            "type": "source",
+            "subtype": "utility_source",
+            "label": "UTILITY-TX-200",
+            "ref": "UTILITY-TX-200",
+            "x": 100,
+            "y": 120,
+            "equipmentRef": "UTILITY-TX-200",
+            "scheduleLinks": { "equipment": "UTILITY-TX-200" },
+            "connections": [
+              { "target": "comp-swgr-200", "cable": { "tag": "CBL-UTIL-SWGR-200", "conductor_size": "3-750 kcmil AL", "length": 180 } }
+            ]
+          },
+          {
+            "id": "comp-swgr-200",
+            "type": "equipment",
+            "subtype": "switchgear",
+            "label": "SWGR-200",
+            "ref": "SWGR-200",
+            "x": 320,
+            "y": 120,
+            "equipmentRef": "SWGR-200",
+            "scheduleLinks": { "equipment": "SWGR-200" },
+            "connections": [
+              { "target": "comp-mcc-200", "cable": { "tag": "CBL-SWGR-MCC-200", "conductor_size": "3-500 kcmil CU", "length": 68 } }
+            ]
+          },
+          {
+            "id": "comp-mcc-200",
+            "type": "equipment",
+            "subtype": "mcc",
+            "label": "MCC-200",
+            "ref": "MCC-200",
+            "x": 540,
+            "y": 120,
+            "equipmentRef": "MCC-200",
+            "scheduleLinks": { "equipment": "MCC-200" },
+            "connections": [
+              { "target": "comp-vfd-201", "cable": { "tag": "CBL-MCC-VFD-201", "conductor_size": "3-#1/0 CU", "length": 36 } },
+              { "target": "comp-pmp-202", "cable": { "tag": "CBL-MCC-PMP-202", "conductor_size": "3-#2 CU", "length": 72 } },
+              { "target": "comp-plc-200", "cable": { "tag": "CBL-MCC-PLC-200", "conductor_size": "12-#14 CU", "length": 54 } }
+            ]
+          },
+          {
+            "id": "comp-vfd-201",
+            "type": "equipment",
+            "subtype": "vfd",
+            "label": "VFD-201",
+            "ref": "VFD-201",
+            "x": 760,
+            "y": 80,
+            "equipmentRef": "VFD-201",
+            "scheduleLinks": { "equipment": "VFD-201" },
+            "connections": [
+              { "target": "comp-pmp-201", "cable": { "tag": "CBL-VFD-PMP-201", "conductor_size": "3-#1/0 CU shielded", "length": 88 } }
+            ]
+          },
+          {
+            "id": "comp-pmp-201",
+            "type": "load",
+            "subtype": "motor_load",
+            "label": "PMP-201",
+            "ref": "PMP-201",
+            "x": 980,
+            "y": 80,
+            "loadRef": "PMP-201",
+            "equipmentRef": "PMP-201",
+            "scheduleLinks": { "load": "PMP-201", "equipment": "PMP-201" }
+          },
+          {
+            "id": "comp-pmp-202",
+            "type": "load",
+            "subtype": "motor_load",
+            "label": "PMP-202",
+            "ref": "PMP-202",
+            "x": 760,
+            "y": 190,
+            "loadRef": "PMP-202",
+            "equipmentRef": "PMP-202",
+            "scheduleLinks": { "load": "PMP-202", "equipment": "PMP-202" }
+          },
+          {
+            "id": "comp-plc-200",
+            "type": "panel",
+            "subtype": "control_panel",
+            "label": "PLC-200",
+            "ref": "PLC-200",
+            "x": 760,
+            "y": 300,
+            "panelRef": "PLC-200",
+            "equipmentRef": "PLC-200",
+            "scheduleLinks": { "panel": "PLC-200", "equipment": "PLC-200" },
+            "connections": [
+              { "target": "comp-ww-io-201", "cable": { "tag": "CBL-PLC-WW-201", "conductor_size": "8-#16 CU twisted shielded", "length": 120 } }
+            ]
+          },
+          {
+            "id": "comp-ww-io-201",
+            "type": "load",
+            "subtype": "control_load",
+            "label": "WW-IO-201",
+            "ref": "WW-IO-201",
+            "x": 980,
+            "y": 300,
+            "loadRef": "WW-IO-201",
+            "scheduleLinks": { "load": "WW-IO-201" }
+          }
+        ],
+        "connections": []
+      }
+    ]
+  },
+  "mccLineups": [
+    {
+      "id": "MCC-200",
+      "name": "MCC-200",
+      "sections": [
+        { "id": "SEC-1", "description": "Main incoming and high service pump starter" },
+        { "id": "SEC-2", "description": "Standby pump starter and control transformer" },
+        { "id": "SEC-3", "description": "VFD-201 feeder and bypass compartment" }
+      ]
+    }
+  ],
+  "settings": {
+    "studies": {
+      "motorStart": {
+        "status": "Run",
+        "largestMotorHp": 100,
+        "minVoltagePercent": 92.4,
+        "updatedAt": "2026-05-01T14:00:00.000Z"
+      },
+      "arcFlash": {
+        "status": "Run",
+        "maxIncidentEnergy": 5.8,
+        "updatedAt": "2026-05-01T14:05:00.000Z"
+      },
+      "loadFlow": {
+        "status": "Run",
+        "minBusVoltagePercent": 97.1,
+        "updatedAt": "2026-05-01T14:10:00.000Z"
+      }
+    },
+    "latestRouteResults": {
+      "source": "sample",
+      "updatedAt": "2026-05-01T14:15:00.000Z",
+      "batchResults": [
+        {
+          "cable": "CBL-UTIL-SWGR-200",
+          "status": "Routed",
+          "total_length": 180,
+          "route_segments": [
+            { "type": "conduit", "conduit_id": "CND-SVC-200", "ductbankTag": "DB-PMP-200", "length": 180, "start": [0, 24, -4], "end": [180, 24, -4] }
+          ]
+        },
+        {
+          "cable": "CBL-VFD-PMP-201",
+          "status": "Routed",
+          "total_length": 88,
+          "route_segments": [
+            { "type": "conduit", "conduit_id": "CND-PMP-201", "length": 88, "start": [85, 0, 8], "end": [160, 28, 4] }
+          ]
+        }
+      ]
+    },
+    "reportSnapshots": {
+      "pump-station-ifr": {
+        "id": "pump-station-ifr",
+        "title": "Water Treatment Pump Station IFR Report",
+        "createdAt": "2026-05-01T14:20:00.000Z",
+        "sections": ["Equipment List", "Load List", "One-Line", "Ductbank Route", "Motor Start", "Arc Flash"]
+      }
+    },
+    "lifecyclePackages": [
+      {
+        "id": "pump-station-ifr-a",
+        "revisionLabel": "IFR",
+        "author": "Sample Engineer",
+        "status": "Issued for Review",
+        "createdAt": "2026-05-01T14:25:00.000Z",
+        "summary": {
+          "cableCount": 7,
+          "studyCount": 3
+        }
+      }
+    ],
+    "oneLineScheduleReconcilePending": false
+  }
+}

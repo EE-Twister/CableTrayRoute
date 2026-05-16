@@ -3,7 +3,18 @@ import {
   buildSpoolSheetVisualModel,
   summarizeSpoolImpact,
 } from './analysis/spoolSheetVisualModel.mjs';
-import { getTrays, getCables, on } from './dataStore.mjs';
+import { buildDeliverableReadinessDiagnostics } from './analysis/deliverableWorkflow.mjs';
+import {
+  getTrays,
+  getCables,
+  getConduits,
+  getDuctbanks,
+  getStudies,
+  getReportSnapshots,
+  getLifecyclePackages,
+  getItem,
+  on,
+} from './dataStore.mjs';
 import { showAlertModal } from './src/components/modal.js';
 
 const SVG_WIDTH = 860;
@@ -53,6 +64,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const constraintSummary = document.getElementById('spoolConstraintSummary');
   const bandSummary     = document.getElementById('spoolBandSummary');
   const fabricationPackage = document.getElementById('spoolFabricationPackage');
+  const handoff          = document.getElementById('spool-deliverable-handoff');
   const zoomOutBtn      = document.getElementById('spoolZoomOutBtn');
   const zoomInBtn       = document.getElementById('spoolZoomInBtn');
   const rotateLeftBtn   = document.getElementById('spoolRotateLeftBtn');
@@ -394,9 +406,74 @@ document.addEventListener('DOMContentLoaded', () => {
       previousPreviewSummary ? summarizeSpoolImpact(previousPreviewSummary, model.summary) : null
     );
     bandSummary.innerHTML = renderBandSummary(model);
+    renderSpoolDeliverableHandoff(model);
     applyViewNavigation();
     updateSpoolRowSelection();
     previousPreviewSummary = { ...model.summary };
+  }
+
+  function currentSpoolDeliverableDiagnostics() {
+    return buildDeliverableReadinessDiagnostics({
+      cables: getCables(),
+      trays: getTrays(),
+      conduits: getConduits(),
+      ductbanks: getDuctbanks(),
+      studies: getStudies(),
+      routeResults: getItem('latestRouteResults', null),
+      reportSnapshots: getReportSnapshots(),
+      lifecyclePackages: getLifecyclePackages(),
+    });
+  }
+
+  function renderSpoolDeliverableHandoff(model) {
+    if (!handoff || !model) return;
+    const diagnostics = currentSpoolDeliverableDiagnostics();
+    const routeCount = diagnostics.health.routeResults;
+    handoff.classList.toggle('is-warning', !model.hasTrayData || !model.hasCoordinates);
+    handoff.classList.toggle('is-ready', model.hasTrayData && model.hasCoordinates);
+
+    if (!model.hasTrayData) {
+      handoff.innerHTML = `
+        <div>
+          <strong>Add tray geometry for spool sheets.</strong>
+          <p>Spool sheets need Raceway Schedule tray records before fabrication groups can be created.</p>
+        </div>
+        <span class="workflow-next-action__meta">${diagnostics.health.routingReady} routing-ready cable(s)</span>
+        <div class="workflow-next-action__actions">
+          <a class="btn primary-btn" href="racewayschedule.html">Open Raceway Schedule</a>
+          <a class="btn secondary-btn" href="cableschedule.html">Cable Schedule</a>
+        </div>`;
+      return;
+    }
+
+    if (!model.hasCoordinates) {
+      handoff.innerHTML = `
+        <div>
+          <strong>Complete tray coordinates.</strong>
+          <p>${model.coordinateCount} of ${model.trayCount} tray segment(s) have start/end coordinates. Spool visuals and fabrication packages need coordinate-ready raceways.</p>
+        </div>
+        <span class="workflow-next-action__meta">${model.summary.spoolCount} preview spool(s)</span>
+        <div class="workflow-next-action__actions">
+          <a class="btn primary-btn" href="racewayschedule.html">Fix Coordinates</a>
+          <a class="btn secondary-btn" href="projectreport.html">Project Report</a>
+        </div>`;
+      return;
+    }
+
+    handoff.innerHTML = `
+      <div>
+        <strong>Spool sheet inputs are ready.</strong>
+        <p>${model.summary.spoolCount} spool(s), ${model.coordinateCount}/${model.trayCount} coordinate-ready tray(s), and ${routeCount} routed cable result(s) are available for downstream deliverables.</p>
+      </div>
+      <span class="workflow-next-action__meta">${diagnostics.health.reportSections} report section(s)</span>
+      <div class="workflow-next-action__actions">
+        <button type="button" class="btn primary-btn" data-action="generate-spools">Generate Spool Sheets</button>
+        <a class="btn secondary-btn" href="pullcards.html">Pull Cards</a>
+        <a class="btn secondary-btn" href="projectreport.html">Project Report</a>
+      </div>`;
+    handoff.querySelector('[data-action="generate-spools"]')?.addEventListener('click', () => {
+      generateBtn.click();
+    });
   }
 
   function hasNavigablePreview() {

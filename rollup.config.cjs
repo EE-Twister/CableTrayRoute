@@ -115,6 +115,7 @@ function manualChunks(id) {
 
 module.exports = {
   input: entries,
+  maxParallelFileOps: 64,
   output: {
     dir: 'dist',
     format: 'es',

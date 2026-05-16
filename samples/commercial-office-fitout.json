@@ -1,0 +1,523 @@
+{
+  "schemaVersion": 1,
+  "id": "commercial-office-fitout",
+  "title": "Commercial Office Fitout",
+  "meta": {
+    "version": 1,
+    "scenario": "default",
+    "scenarios": ["default"]
+  },
+  "ductbanks": [],
+  "conduits": [
+    {
+      "id": "CND-LTG-101",
+      "conduit_id": "CND-LTG-101",
+      "description": "Lighting branch circuit conduit above open office ceiling",
+      "type": "EMT",
+      "trade_size": "3/4",
+      "material": "Steel",
+      "length": 110,
+      "length_ft": 110,
+      "start_x": 55,
+      "start_y": 6,
+      "start_z": 10,
+      "end_x": 160,
+      "end_y": 42,
+      "end_z": 10
+    },
+    {
+      "id": "CND-REC-101",
+      "conduit_id": "CND-REC-101",
+      "description": "Receptacle branch circuit conduit through workstation zone",
+      "type": "EMT",
+      "trade_size": "3/4",
+      "material": "Steel",
+      "length": 90,
+      "length_ft": 90,
+      "start_x": 60,
+      "start_y": 10,
+      "start_z": 9,
+      "end_x": 148,
+      "end_y": 36,
+      "end_z": 9
+    },
+    {
+      "id": "CND-RTU-101",
+      "conduit_id": "CND-RTU-101",
+      "description": "Rooftop unit feeder conduit from panel PP-100",
+      "type": "EMT",
+      "trade_size": "1",
+      "material": "Steel",
+      "length": 135,
+      "length_ft": 135,
+      "start_x": 60,
+      "start_y": 10,
+      "start_z": 9,
+      "end_x": 130,
+      "end_y": 58,
+      "end_z": 18
+    }
+  ],
+  "trays": [
+    {
+      "id": "TR-ELEC-100",
+      "tray_id": "TR-ELEC-100",
+      "description": "Electrical room feeder tray above ceiling corridor",
+      "width": 12,
+      "height": 4,
+      "length": 88,
+      "length_ft": 88,
+      "material": "Aluminum",
+      "fill": 31,
+      "inside_width": 12,
+      "tray_depth": 4,
+      "tray_type": "Ladder",
+      "current_fill": 31,
+      "start_x": 0,
+      "start_y": 0,
+      "start_z": 11,
+      "end_x": 88,
+      "end_y": 0,
+      "end_z": 11
+    }
+  ],
+  "cables": [
+    {
+      "id": "CBL-MDP-TXF-01",
+      "tag": "CBL-MDP-TXF-01",
+      "name": "CBL-MDP-TXF-01",
+      "from": "MDP-100",
+      "from_tag": "MDP-100",
+      "to": "TX-100",
+      "to_tag": "TX-100",
+      "cable_type": "Power",
+      "conductors": 3,
+      "conductor_size": "3-#1/0 CU",
+      "insulation_type": "THHN",
+      "voltage_rating": "600V",
+      "length": 58,
+      "length_ft": 58,
+      "raceway_ids": ["TR-ELEC-100"],
+      "route_preference": "TR-ELEC-100",
+      "diameter": 0.92,
+      "cable_od": 0.92,
+      "weight": 1.8,
+      "voltage": "480",
+      "conductor_material": "CU"
+    },
+    {
+      "id": "CBL-TXF-LP-100",
+      "tag": "CBL-TXF-LP-100",
+      "name": "CBL-TXF-LP-100",
+      "from": "TX-100",
+      "from_tag": "TX-100",
+      "to": "LP-100",
+      "to_tag": "LP-100",
+      "cable_type": "Power",
+      "conductors": 4,
+      "conductor_size": "4-#1 CU",
+      "insulation_type": "THHN",
+      "voltage_rating": "600V",
+      "length": 24,
+      "length_ft": 24,
+      "raceway_ids": ["TR-ELEC-100"],
+      "route_preference": "TR-ELEC-100",
+      "diameter": 0.82,
+      "cable_od": 0.82,
+      "weight": 1.55,
+      "voltage": "208",
+      "conductor_material": "CU"
+    },
+    {
+      "id": "CBL-MDP-PP-100",
+      "tag": "CBL-MDP-PP-100",
+      "name": "CBL-MDP-PP-100",
+      "from": "MDP-100",
+      "from_tag": "MDP-100",
+      "to": "PP-100",
+      "to_tag": "PP-100",
+      "cable_type": "Power",
+      "conductors": 3,
+      "conductor_size": "3-#2/0 CU",
+      "insulation_type": "THHN",
+      "voltage_rating": "600V",
+      "length": 70,
+      "length_ft": 70,
+      "raceway_ids": ["TR-ELEC-100"],
+      "route_preference": "TR-ELEC-100",
+      "diameter": 1.02,
+      "cable_od": 1.02,
+      "weight": 2.1,
+      "voltage": "480",
+      "conductor_material": "CU"
+    },
+    {
+      "id": "CBL-LP-LTG-101",
+      "tag": "CBL-LP-LTG-101",
+      "name": "CBL-LP-LTG-101",
+      "from": "LP-100",
+      "from_tag": "LP-100",
+      "to": "LTG-101",
+      "to_tag": "LTG-101",
+      "cable_type": "Power",
+      "conductors": 2,
+      "conductor_size": "2-#10 CU",
+      "insulation_type": "THHN",
+      "voltage_rating": "600V",
+      "length": 110,
+      "length_ft": 110,
+      "raceway_ids": ["CND-LTG-101"],
+      "route_preference": "CND-LTG-101",
+      "diameter": 0.31,
+      "cable_od": 0.31,
+      "weight": 0.18,
+      "voltage": "120",
+      "conductor_material": "CU"
+    },
+    {
+      "id": "CBL-PP-REC-101",
+      "tag": "CBL-PP-REC-101",
+      "name": "CBL-PP-REC-101",
+      "from": "PP-100",
+      "from_tag": "PP-100",
+      "to": "REC-101",
+      "to_tag": "REC-101",
+      "cable_type": "Power",
+      "conductors": 2,
+      "conductor_size": "2-#12 CU",
+      "insulation_type": "THHN",
+      "voltage_rating": "600V",
+      "length": 90,
+      "length_ft": 90,
+      "raceway_ids": ["CND-REC-101"],
+      "route_preference": "CND-REC-101",
+      "diameter": 0.26,
+      "cable_od": 0.26,
+      "weight": 0.12,
+      "voltage": "120",
+      "conductor_material": "CU"
+    },
+    {
+      "id": "CBL-PP-RTU-101",
+      "tag": "CBL-PP-RTU-101",
+      "name": "CBL-PP-RTU-101",
+      "from": "PP-100",
+      "from_tag": "PP-100",
+      "to": "RTU-101",
+      "to_tag": "RTU-101",
+      "cable_type": "Power",
+      "conductors": 3,
+      "conductor_size": "3-#8 CU",
+      "insulation_type": "THHN",
+      "voltage_rating": "600V",
+      "length": 135,
+      "length_ft": 135,
+      "raceway_ids": ["CND-RTU-101"],
+      "route_preference": "CND-RTU-101",
+      "diameter": 0.48,
+      "cable_od": 0.48,
+      "weight": 0.42,
+      "voltage": "480",
+      "conductor_material": "CU"
+    }
+  ],
+  "cableTypicals": [],
+  "panels": [
+    {
+      "tag": "LP-100",
+      "description": "208/120 V lighting panel",
+      "voltage": "208/120",
+      "source": "TX-100",
+      "busRating": "225"
+    },
+    {
+      "tag": "PP-100",
+      "description": "480/277 V power panel",
+      "voltage": "480/277",
+      "source": "MDP-100",
+      "busRating": "400"
+    }
+  ],
+  "equipment": [
+    {
+      "tag": "MDP-100",
+      "description": "480/277 V main distribution panel",
+      "voltage": "480/277",
+      "category": "Distribution",
+      "subCategory": "Panelboard",
+      "arrangement": "Electrical Room",
+      "lineup": "MDP-100",
+      "manufacturer": "Square D",
+      "model": "I-Line",
+      "phases": "3"
+    },
+    {
+      "tag": "TX-100",
+      "description": "75 kVA 480-208/120 V transformer",
+      "voltage": "480/208",
+      "category": "Transformer",
+      "subCategory": "Dry Type",
+      "arrangement": "Electrical Room",
+      "lineup": "TX-100",
+      "manufacturer": "Eaton",
+      "model": "V48M28T75EE",
+      "phases": "3"
+    },
+    {
+      "tag": "LP-100",
+      "description": "Lighting and receptacle panel",
+      "voltage": "208/120",
+      "category": "Panel",
+      "subCategory": "Lighting Panel",
+      "arrangement": "Electrical Room",
+      "lineup": "LP-100",
+      "manufacturer": "Square D",
+      "model": "NF",
+      "phases": "3"
+    },
+    {
+      "tag": "PP-100",
+      "description": "480/277 V mechanical power panel",
+      "voltage": "480/277",
+      "category": "Panel",
+      "subCategory": "Power Panel",
+      "arrangement": "Electrical Room",
+      "lineup": "PP-100",
+      "manufacturer": "Eaton",
+      "model": "Pow-R-Line",
+      "phases": "3"
+    },
+    {
+      "tag": "RTU-101",
+      "description": "Rooftop unit serving office suite",
+      "voltage": "480",
+      "category": "Mechanical Load",
+      "subCategory": "RTU",
+      "arrangement": "Roof",
+      "lineup": "Mechanical Equipment",
+      "manufacturer": "Trane",
+      "model": "Precedent",
+      "phases": "3"
+    }
+  ],
+  "loads": [
+    {
+      "source": "LP-100",
+      "tag": "LTG-101",
+      "description": "Open office LED lighting",
+      "quantity": "1",
+      "voltage": "120",
+      "loadType": "Lighting",
+      "duty": "Continuous",
+      "kw": "4.8",
+      "powerFactor": "0.95",
+      "loadFactor": "100",
+      "efficiency": "100",
+      "demandFactor": "100",
+      "phases": "1",
+      "circuit": "LP-100-01"
+    },
+    {
+      "source": "PP-100",
+      "tag": "REC-101",
+      "description": "Workstation receptacle allowance",
+      "quantity": "72",
+      "voltage": "120",
+      "loadType": "Receptacle",
+      "duty": "Intermittent",
+      "kw": "10.8",
+      "powerFactor": "0.90",
+      "loadFactor": "100",
+      "efficiency": "100",
+      "demandFactor": "50",
+      "phases": "1",
+      "circuit": "PP-100-07"
+    },
+    {
+      "source": "PP-100",
+      "tag": "RTU-101",
+      "description": "Office rooftop unit",
+      "quantity": "1",
+      "voltage": "480",
+      "loadType": "HVAC",
+      "duty": "Continuous",
+      "kw": "12.0",
+      "powerFactor": "0.88",
+      "loadFactor": "100",
+      "efficiency": "91",
+      "demandFactor": "125",
+      "phases": "3",
+      "circuit": "PP-100-12"
+    }
+  ],
+  "oneLine": {
+    "activeSheet": 0,
+    "sheets": [
+      {
+        "id": "commercial-office-main",
+        "name": "Office Tenant One-Line",
+        "components": [
+          {
+            "id": "comp-mdp-100",
+            "type": "source",
+            "subtype": "utility_source",
+            "label": "MDP-100",
+            "ref": "MDP-100",
+            "x": 120,
+            "y": 120,
+            "equipmentRef": "MDP-100",
+            "scheduleLinks": { "equipment": "MDP-100" },
+            "connections": [
+              { "target": "comp-tx-100", "cable": { "tag": "CBL-MDP-TXF-01", "conductor_size": "3-#1/0 CU", "length": 58 } },
+              { "target": "comp-pp-100", "cable": { "tag": "CBL-MDP-PP-100", "conductor_size": "3-#2/0 CU", "length": 70 } }
+            ]
+          },
+          {
+            "id": "comp-tx-100",
+            "type": "transformer",
+            "subtype": "two_winding_transformer",
+            "label": "TX-100",
+            "ref": "TX-100",
+            "x": 360,
+            "y": 120,
+            "equipmentRef": "TX-100",
+            "scheduleLinks": { "equipment": "TX-100" },
+            "connections": [
+              { "target": "comp-lp-100", "cable": { "tag": "CBL-TXF-LP-100", "conductor_size": "4-#1 CU", "length": 24 } }
+            ]
+          },
+          {
+            "id": "comp-lp-100",
+            "type": "panel",
+            "subtype": "panelboard",
+            "label": "LP-100",
+            "ref": "LP-100",
+            "x": 600,
+            "y": 120,
+            "panelRef": "LP-100",
+            "equipmentRef": "LP-100",
+            "scheduleLinks": { "panel": "LP-100", "equipment": "LP-100" },
+            "connections": [
+              { "target": "comp-ltg-101", "cable": { "tag": "CBL-LP-LTG-101", "conductor_size": "2-#10 CU", "length": 110 } }
+            ]
+          },
+          {
+            "id": "comp-pp-100",
+            "type": "panel",
+            "subtype": "panelboard",
+            "label": "PP-100",
+            "ref": "PP-100",
+            "x": 360,
+            "y": 300,
+            "panelRef": "PP-100",
+            "equipmentRef": "PP-100",
+            "scheduleLinks": { "panel": "PP-100", "equipment": "PP-100" },
+            "connections": [
+              { "target": "comp-rec-101", "cable": { "tag": "CBL-PP-REC-101", "conductor_size": "2-#12 CU", "length": 90 } },
+              { "target": "comp-rtu-101", "cable": { "tag": "CBL-PP-RTU-101", "conductor_size": "3-#8 CU", "length": 135 } }
+            ]
+          },
+          {
+            "id": "comp-ltg-101",
+            "type": "load",
+            "subtype": "lighting_load",
+            "label": "LTG-101",
+            "ref": "LTG-101",
+            "x": 820,
+            "y": 120,
+            "loadRef": "LTG-101",
+            "scheduleLinks": { "load": "LTG-101" }
+          },
+          {
+            "id": "comp-rec-101",
+            "type": "load",
+            "subtype": "receptacle_load",
+            "label": "REC-101",
+            "ref": "REC-101",
+            "x": 600,
+            "y": 300,
+            "loadRef": "REC-101",
+            "scheduleLinks": { "load": "REC-101" }
+          },
+          {
+            "id": "comp-rtu-101",
+            "type": "load",
+            "subtype": "hvac_load",
+            "label": "RTU-101",
+            "ref": "RTU-101",
+            "x": 600,
+            "y": 440,
+            "loadRef": "RTU-101",
+            "equipmentRef": "RTU-101",
+            "scheduleLinks": { "load": "RTU-101", "equipment": "RTU-101" }
+          }
+        ],
+        "connections": []
+      }
+    ]
+  },
+  "mccLineups": [],
+  "settings": {
+    "studies": {
+      "demandSchedule": {
+        "status": "Run",
+        "totalDemandKva": 34.1,
+        "updatedAt": "2026-05-01T13:00:00.000Z"
+      },
+      "voltageDrop": {
+        "status": "Run",
+        "maxDropPercent": 2.7,
+        "updatedAt": "2026-05-01T13:05:00.000Z"
+      },
+      "shortCircuit": {
+        "status": "Draft",
+        "availableFaultKa": 18.2,
+        "updatedAt": "2026-05-01T13:10:00.000Z"
+      }
+    },
+    "latestRouteResults": {
+      "source": "sample",
+      "updatedAt": "2026-05-01T13:15:00.000Z",
+      "batchResults": [
+        {
+          "cable": "CBL-MDP-TXF-01",
+          "status": "Routed",
+          "total_length": 58,
+          "route_segments": [
+            { "type": "tray", "tray_id": "TR-ELEC-100", "length": 58, "start": [0, 0, 11], "end": [58, 0, 11] }
+          ]
+        },
+        {
+          "cable": "CBL-LP-LTG-101",
+          "status": "Routed",
+          "total_length": 110,
+          "route_segments": [
+            { "type": "conduit", "conduit_id": "CND-LTG-101", "length": 110, "start": [55, 6, 10], "end": [160, 42, 10] }
+          ]
+        }
+      ]
+    },
+    "reportSnapshots": {
+      "commercial-office-ifr": {
+        "id": "commercial-office-ifr",
+        "title": "Commercial Office Fitout IFR Report",
+        "createdAt": "2026-05-01T13:20:00.000Z",
+        "sections": ["Equipment List", "Load List", "One-Line", "Cable Schedule", "Voltage Drop"]
+      }
+    },
+    "lifecyclePackages": [
+      {
+        "id": "commercial-office-issue-a",
+        "revisionLabel": "IFR",
+        "author": "Sample Engineer",
+        "status": "Issued for Review",
+        "createdAt": "2026-05-01T13:25:00.000Z",
+        "summary": {
+          "cableCount": 6,
+          "studyCount": 3
+        }
+      }
+    ],
+    "oneLineScheduleReconcilePending": false
+  }
+}

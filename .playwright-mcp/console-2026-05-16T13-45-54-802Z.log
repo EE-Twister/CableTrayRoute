@@ -1,0 +1,32 @@
+[  449910ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:4173/assets/sample-projects/ductbank-network.jpg:0
+[  450175ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:4173/assets/sample-projects/industrial-plant.jpg:0
+[  450439ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:4173/assets/sample-projects/water-treatment-pump-station.jpg:0
+[  450439ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:4173/assets/sample-projects/coordination-study.jpg:0
+[  450439ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:4173/assets/sample-projects/heat-trace-pipe.jpg:0
+[  450890ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:4173/assets/sample-projects/commercial-office-fitout.jpg:0
+[  452302ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:4173/assets/sample-projects/ev-charging-depot.jpg:0
+[  452674ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:4173/assets/sample-projects/water-treatment-pump-station.jpg:0
+[  452674ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:4173/assets/sample-projects/ductbank-network.jpg:0
+[  453124ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:4173/assets/sample-projects/project-workflow-core.jpg:0
+[  453124ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:4173/assets/sample-projects/commercial-office-fitout.jpg:0
+[  453946ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:4173/assets/sample-projects/substation-grounding.jpg:0
+[  455217ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:4173/assets/sample-projects/heat-trace-pipe.jpg:0
+[  456489ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:4173/assets/sample-projects/substation-grounding.jpg:0
+[  456489ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:4173/assets/sample-projects/ductbank-network.jpg:0
+[  456489ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:4173/assets/sample-projects/coordination-study.jpg:0
+[  456489ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:4173/assets/sample-projects/ev-charging-depot.jpg:0
+[  456489ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:4173/assets/sample-projects/project-workflow-core.jpg:0
+[  457263ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:4173/assets/sample-projects/industrial-plant.jpg:0
+[  458534ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:4173/assets/sample-projects/commercial-office-fitout.jpg:0
+[  458534ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:4173/assets/sample-projects/water-treatment-pump-station.jpg:0
+[  458534ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:4173/assets/sample-projects/data-center.jpg:0
+[  771120ms] [WARNING] Autosave skipped: choose Save Project to select a file for updates. @ http://127.0.0.1:4173/dist/chunks/core-ui-f0e92fa0.js:0
+[ 1071124ms] [WARNING] Autosave skipped: choose Save Project to select a file for updates. @ http://127.0.0.1:4173/dist/chunks/core-ui-f0e92fa0.js:0
+[ 1371118ms] [WARNING] Autosave skipped: choose Save Project to select a file for updates. @ http://127.0.0.1:4173/dist/chunks/core-ui-f0e92fa0.js:0
+[ 1671117ms] [WARNING] Autosave skipped: choose Save Project to select a file for updates. @ http://127.0.0.1:4173/dist/chunks/core-ui-f0e92fa0.js:0
+[ 1971122ms] [WARNING] Autosave skipped: choose Save Project to select a file for updates. @ http://127.0.0.1:4173/dist/chunks/core-ui-f0e92fa0.js:0
+[ 2271110ms] [WARNING] Autosave skipped: choose Save Project to select a file for updates. @ http://127.0.0.1:4173/dist/chunks/core-ui-f0e92fa0.js:0
+[ 2571122ms] [WARNING] Autosave skipped: choose Save Project to select a file for updates. @ http://127.0.0.1:4173/dist/chunks/core-ui-f0e92fa0.js:0
+[ 2871123ms] [WARNING] Autosave skipped: choose Save Project to select a file for updates. @ http://127.0.0.1:4173/dist/chunks/core-ui-f0e92fa0.js:0
+[ 3345621ms] [WARNING] Autosave skipped: choose Save Project to select a file for updates. @ http://127.0.0.1:4173/dist/chunks/core-ui-f0e92fa0.js:0
+[ 3645624ms] [WARNING] Autosave skipped: choose Save Project to select a file for updates. @ http://127.0.0.1:4173/dist/chunks/core-ui-f0e92fa0.js:0

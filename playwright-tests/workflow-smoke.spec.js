@@ -18,9 +18,94 @@ const workflowPages = [
   'racewayschedule.html',
   'cabletrayfill.html',
   'conduitfill.html',
+  'ductbankroute.html',
   'optimalRoute.html',
+  'pullcards.html',
+  'spoolsheets.html',
   'projectreport.html'
 ];
+
+function seedDeliverableWorkflow() {
+  localStorage.clear();
+  sessionStorage.clear();
+  localStorage.setItem('base:cableSchedule', JSON.stringify([
+    {
+      tag: 'CBL-1',
+      name: 'CBL-1',
+      from_tag: 'SWBD-101',
+      to_tag: 'MCC-101',
+      conductor_size: '#4 AWG',
+      length: 80,
+      length_ft: 80,
+      raceway_ids: ['TR-1'],
+      route_preference: 'TR-1',
+      cable_type: 'Power',
+      conductors: 3,
+      diameter: 0.8,
+      weight: 1.2
+    },
+    {
+      tag: 'CBL-2',
+      name: 'CBL-2',
+      from_tag: 'MCC-101',
+      to_tag: 'PMP-101',
+      conductor_size: '#8 AWG',
+      length: 70,
+      length_ft: 70,
+      raceway_ids: ['TR-1'],
+      route_preference: 'TR-1',
+      cable_type: 'Power',
+      conductors: 3,
+      diameter: 0.6,
+      weight: 0.9
+    }
+  ]));
+  localStorage.setItem('base:traySchedule', JSON.stringify([
+    {
+      tray_id: 'TR-1',
+      start_x: 0,
+      start_y: 0,
+      start_z: 12,
+      end_x: 80,
+      end_y: 0,
+      end_z: 12,
+      inside_width: 12,
+      tray_depth: 4,
+      length_ft: 80
+    }
+  ]));
+  localStorage.setItem('base:conduitSchedule', JSON.stringify([]));
+  localStorage.setItem('base:ductbankSchedule', JSON.stringify([]));
+  localStorage.setItem('base:studyResults', JSON.stringify({
+    demandSchedule: { status: 'Run', totalDemandKva: 25 }
+  }));
+  localStorage.setItem('base:latestRouteResults', JSON.stringify({
+    source: 'playwright',
+    updatedAt: '2026-05-01T12:00:00.000Z',
+    batchResults: [
+      {
+        cable: 'CBL-1',
+        status: 'Routed',
+        total_length: 80,
+        breakdown: [{ tray_id: 'TR-1', length: 80, start: [0, 0, 12], end: [80, 0, 12] }],
+        route_segments: [{ type: 'tray', tray_id: 'TR-1', length: 80, start: [0, 0, 12], end: [80, 0, 12] }]
+      },
+      {
+        cable: 'CBL-2',
+        status: 'Routed',
+        total_length: 70,
+        breakdown: [{ tray_id: 'TR-1', length: 70, start: [0, 0, 12], end: [70, 0, 12] }],
+        route_segments: [{ type: 'tray', tray_id: 'TR-1', length: 70, start: [0, 0, 12], end: [70, 0, 12] }]
+      }
+    ]
+  }));
+  localStorage.setItem('base:reportSnapshots', JSON.stringify({
+    'smoke-report': { id: 'smoke-report', createdAt: '2026-05-01T12:30:00.000Z', sections: ['Cable Schedule'] }
+  }));
+  localStorage.setItem('base:lifecyclePackages', JSON.stringify([
+    { id: 'smoke-ifr', revisionLabel: 'IFR', status: 'Issued for Review', createdAt: '2026-05-01T12:35:00.000Z' }
+  ]));
+}
 
 async function startStaticServer() {
   const server = http.createServer(async (req, res) => {
@@ -306,6 +391,41 @@ test('fill pages show project handoff context', async ({ page }) => {
   await expect(page.locator('#conduit-fill-handoff')).toContainText('Routing');
 });
 
+test('pull cards load saved project route results', async ({ page }) => {
+  await page.addInitScript(seedDeliverableWorkflow);
+  await page.goto(server.url('pullcards.html?e2e=1'), { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('#pull-deliverable-handoff')).toContainText('Pull-card inputs are available');
+  await expect(page.locator('#pull-deliverable-handoff')).toContainText('2 routed cable');
+  await page.locator('#pull-deliverable-handoff [data-action="load-project-routes"]').click();
+  await expect(page.locator('#pullTableSection')).toBeVisible();
+  await expect(page.locator('#pullTable tbody tr')).toHaveCount(1);
+});
+
+test('spool sheets show geometry handoff and generate output', async ({ page }) => {
+  await page.addInitScript(seedDeliverableWorkflow);
+  await page.goto(server.url('spoolsheets.html?e2e=1'), { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('#spool-deliverable-handoff')).toContainText('Spool sheet inputs are ready');
+  await expect(page.locator('#spool-deliverable-handoff')).toContainText('2 routed cable result');
+  await page.locator('#spool-deliverable-handoff [data-action="generate-spools"]').click();
+  await expect(page.locator('#results')).toContainText('Spool');
+});
+
+test('project report exposes deliverable readiness before preview', async ({ page }) => {
+  await page.addInitScript(seedDeliverableWorkflow);
+  await page.goto(server.url('projectreport.html?e2e=1'), { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('#rpt-deliverable-readiness')).toContainText('Report readiness');
+  await expect(page.locator('#rpt-deliverable-readiness')).toContainText('2 route result');
+  await expect(page.locator('#rpt-deliverable-readiness')).toContainText('1 spool');
+  await page.locator('#rpt-deliverable-readiness [data-action="generate-report-preview"]').click();
+  await expect(page.locator('#report-status')).toContainText('Preview built');
+});
+
+test('ductbank route exposes a next action for empty underground workflow', async ({ page }) => {
+  await page.goto(server.url('ductbankroute.html?e2e=1&e2e_reset=1'), { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('#ductbank-next-action')).toContainText('Add ductbank conduits');
+  await expect(page.locator('#ductbank-next-action')).toContainText('Load Complete Example');
+});
+
 test('workflow dashboard exposes next action, blockers, and health metrics', async ({ page }) => {
   await page.goto(server.url('workflowdashboard.html?e2e=1&e2e_reset=1'), { waitUntil: 'domcontentloaded' });
   await expect(page.locator('#dashboard-next-action-strip')).toContainText('Next action');
@@ -315,8 +435,18 @@ test('workflow dashboard exposes next action, blockers, and health metrics', asy
 
 test('sample gallery lists the full project workflow sample', async ({ page }) => {
   await page.goto(server.url('samplegallery.html?e2e=1&e2e_reset=1'), { waitUntil: 'domcontentloaded' });
+  const sampleCards = page.locator('[data-sample-id]');
+  await expect.poll(() => sampleCards.count()).toBeGreaterThanOrEqual(10);
+  await expect(page.locator('[data-sample-id] .sample-card__media img')).toHaveCount(10);
+  await expect.poll(async () => page.locator('[data-sample-id] .sample-card__media img').evaluateAll(images => images.every(img => img.complete && img.naturalWidth >= 900 && img.naturalHeight >= 500))).toBe(true);
   await expect(page.getByRole('heading', { name: 'Project Workflow Core' })).toBeVisible();
   await expect(page.locator('[data-sample-id="project-workflow-core"]')).toContainText('equipment');
+  await expect(page.getByRole('heading', { name: 'Commercial Office Fitout' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Water Treatment Pump Station' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'EV Charging Depot' })).toBeVisible();
+  await page.locator('[data-sample-id="commercial-office-fitout"] .primary-btn').click();
+  await expect(page.locator('#checklist-panel')).toContainText('Guided Workflow: Commercial Office Fitout');
+  await expect(page.locator('[data-sample-id="commercial-office-fitout"]')).toHaveClass(/sample-card--selected/);
 });
 
 test('one-line loads styled assets and opens reconcile preview', async ({ page }) => {

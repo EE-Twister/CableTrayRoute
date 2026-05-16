@@ -29,6 +29,12 @@ Quick filters help isolate rows that need attention:
 
 The page validates missing IDs, duplicate IDs, missing or zero-length geometry, invalid tray dimensions, invalid slot-group JSON, and illegal conduit type / trade-size combinations.
 
+## Field View QR Targets
+
+Tray hardware outputs include a Field View URL for each tray row. The QR payload
+for a tray is `fieldview.html#tray=TRAY_ID`, so scanning a tray tag opens the
+mobile tray card instead of the full desktop Raceway Schedule.
+
 ## Import behavior
 
 - Tray and conduit XLSX imports open a mapping and preview step before data is applied.

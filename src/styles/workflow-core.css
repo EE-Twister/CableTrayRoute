@@ -45,6 +45,16 @@
   background: linear-gradient(90deg, color-mix(in srgb, var(--primary-color, #2563eb) 9%, var(--card-bg, #fff)), var(--card-bg, #fff));
 }
 
+.workflow-next-action.is-ready {
+  border-color: color-mix(in srgb, var(--success-color, #16a34a) 40%, var(--border-color, #d1d5db));
+  background: linear-gradient(90deg, color-mix(in srgb, var(--success-color, #16a34a) 8%, var(--card-bg, #fff)), var(--card-bg, #fff));
+}
+
+.workflow-next-action.is-warning {
+  border-color: color-mix(in srgb, var(--warning-color, #f59e0b) 45%, var(--border-color, #d1d5db));
+  background: linear-gradient(90deg, color-mix(in srgb, var(--warning-color, #f59e0b) 9%, var(--card-bg, #fff)), var(--card-bg, #fff));
+}
+
 .workflow-next-action strong {
   display: block;
   color: var(--text-color, #111827);
@@ -59,6 +69,20 @@
   display: flex;
   gap: .5rem;
   flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.workflow-next-action__meta {
+  color: var(--color-text-muted, #64748b);
+  font-size: .84rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.workflow-next-action__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem;
   justify-content: flex-end;
 }
 

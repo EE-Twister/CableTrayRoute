@@ -51,9 +51,16 @@ const complete = buildWorkflowCoreDiagnostics({
   loads: [{ source: 'SWBD-101', tag: 'PMP-101', kw: '18.6', voltage: '480', powerFactor: '0.85', phases: '3' }],
   oneLine: { activeSheet: 0, sheets: [{ components: [{ id: 'swbd' }] }] },
   cables: [{ tag: 'CBL-1', from: 'SWBD-101', to: 'PMP-101', conductor_size: '3-#4 CU', length: 80, raceway_id: 'TR-1' }],
-  trays: [{ tray_id: 'TR-1' }],
+  trays: [{ tray_id: 'TR-1', start_x: 0, start_y: 0, start_z: 10, end_x: 80, end_y: 0, end_z: 10, inside_width: 12, tray_depth: 4 }],
   conduits: [],
   ductbanks: [],
+  routeResults: [{
+    cable: 'CBL-1',
+    status: 'Routed',
+    total_length: 80,
+    breakdown: [{ tray_id: 'TR-1', length: 80, start: [0, 0, 10], end: [80, 0, 10] }],
+    route_segments: [{ type: 'straight', tray_id: 'TR-1', length: 80, start: [0, 0, 10], end: [80, 0, 10] }]
+  }],
   studies: { demandSchedule: { status: 'Run' } },
   reportSnapshots: { report: { id: 'report' } },
   deliverables: [{ id: 'pkg' }]
