@@ -194,26 +194,49 @@ export function scaleCurve(device = {}, overrides = {}) {
   );
   const profile = pickCurveProfile(device, selectedProfileId);
   const combinedBase = { ...baseSettings, ...profile.settings };
+  const hasLongTimeModel = combinedBase.longTimePickup !== undefined
+    || combinedBase.longTimeDelay !== undefined;
 
-  const pickup = firstDefined(
-    overrides.pickup,
-    overrides.longTimePickup,
-    overrides.ampRating,
-    combinedBase.pickup,
-    combinedBase.longTimePickup,
-    combinedBase.ampRating,
-    device.ampRating,
-    1
-  );
-  const time = firstDefined(
-    overrides.time,
-    overrides.delay,
-    overrides.longTimeDelay,
-    combinedBase.time,
-    combinedBase.delay,
-    combinedBase.longTimeDelay,
-    1
-  );
+  const pickup = hasLongTimeModel
+    ? firstDefined(
+      overrides.longTimePickup,
+      overrides.pickup,
+      overrides.ampRating,
+      combinedBase.longTimePickup,
+      combinedBase.pickup,
+      combinedBase.ampRating,
+      device.ampRating,
+      1
+    )
+    : firstDefined(
+      overrides.pickup,
+      overrides.longTimePickup,
+      overrides.ampRating,
+      combinedBase.pickup,
+      combinedBase.longTimePickup,
+      combinedBase.ampRating,
+      device.ampRating,
+      1
+    );
+  const time = hasLongTimeModel
+    ? firstDefined(
+      overrides.longTimeDelay,
+      overrides.time,
+      overrides.delay,
+      combinedBase.longTimeDelay,
+      combinedBase.time,
+      combinedBase.delay,
+      1
+    )
+    : firstDefined(
+      overrides.time,
+      overrides.delay,
+      overrides.longTimeDelay,
+      combinedBase.time,
+      combinedBase.delay,
+      combinedBase.longTimeDelay,
+      1
+    );
   const rawShortTimePickup = firstDefined(overrides.shortTimePickup, combinedBase.shortTimePickup);
   const rawShortTimeDelay = firstDefined(overrides.shortTimeDelay, combinedBase.shortTimeDelay);
   const parsedShortTimePickup = Number(rawShortTimePickup);
