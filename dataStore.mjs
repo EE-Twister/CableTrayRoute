@@ -1028,6 +1028,7 @@ export function importProject(obj) {
   }
   if (data.settings) {
     for (const [k, v] of Object.entries(data.settings)) {
+      if (reserved.has(k)) continue;
       setItem(k, v);
     }
   }

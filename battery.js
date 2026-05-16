@@ -162,7 +162,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const warnings = Array.isArray(r.warnings) ? r.warnings : [];
     const warningsHtml = warnings.length
       ? `<ul class="drc-findings">${warnings.map(w =>
-          `<li class="drc-finding drc-warn"><span class="drc-msg">${w}</span></li>`
+          `<li class="drc-finding drc-warn"><span class="drc-msg">${escHtml(w)}</span></li>`
         ).join('')}</ul>`
       : '';
 
