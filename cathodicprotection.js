@@ -1555,10 +1555,10 @@ function renderResults(result, root) {
           <tbody>
             ${result.distributionModel.segments.map((segment) => `
               <tr>
-                <td>${segment.segment}</td>
-                <td>${segment.zoneResistivityOhmM}</td>
-                <td>${segment.effectivenessFactor}</td>
-                <td>${segment.attenuationFactor}</td>
+                <td>${escapeHtml(segment.segment)}</td>
+                <td>${escapeHtml(segment.zoneResistivityOhmM)}</td>
+                <td>${escapeHtml(segment.effectivenessFactor)}</td>
+                <td>${escapeHtml(segment.attenuationFactor)}</td>
               </tr>`).join('')}
           </tbody>
         </table>
