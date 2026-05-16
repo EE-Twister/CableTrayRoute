@@ -2021,10 +2021,21 @@ When answering queries:
     }
     if (originUrl.host !== host) return false;
 
-    const requestUrl = new URL(request.url || '/ws/collab', `http://${host}`);
-    const token = requestUrl.searchParams.get('token') || '';
-    const csrfHeader = request.headers['x-csrf-token'];
-    const csrfToken = typeof csrfHeader === 'string' ? csrfHeader : (requestUrl.searchParams.get('csrfToken') || '');
+    const protocolHeader = request.headers['sec-websocket-protocol'];
+    if (typeof protocolHeader !== 'string') return false;
+
+    const protocols = protocolHeader.split(',').map((value) => value.trim()).filter(Boolean);
+    const authProtocol = protocols.find((value) => value.startsWith('auth.')) || '';
+    const csrfProtocol = protocols.find((value) => value.startsWith('csrf.')) || '';
+    if (!authProtocol || !csrfProtocol) return false;
+
+    let token = '';
+    try {
+      token = Buffer.from(authProtocol.slice(5).replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8');
+    } catch {
+      return false;
+    }
+    const csrfToken = csrfProtocol.slice(5);
     if (!token || !csrfToken || !/^[0-9a-fA-F]+$/.test(csrfToken)) return false;
 
     const session = await sessionStore.get(token);

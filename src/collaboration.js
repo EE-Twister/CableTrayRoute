@@ -20,14 +20,25 @@
 const WS_URL = (() => {
   if (typeof window === 'undefined') return null;
   const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const authToken = typeof localStorage !== 'undefined' ? (localStorage.getItem('authToken') || '') : '';
-  const csrfToken = typeof localStorage !== 'undefined' ? (localStorage.getItem('authCsrfToken') || '') : '';
-  const params = new URLSearchParams();
-  if (authToken) params.set('token', authToken);
-  if (csrfToken) params.set('csrfToken', csrfToken);
-  const query = params.toString();
-  return `${proto}//${location.host}/ws/collab${query ? `?${query}` : ''}`;
+  return `${proto}//${location.host}/ws/collab`;
 })();
+
+function buildWsProtocols() {
+  if (typeof localStorage === 'undefined' || typeof TextEncoder === 'undefined') return ['ctr-collab'];
+  const authToken = localStorage.getItem('authToken') || '';
+  const csrfToken = localStorage.getItem('authCsrfToken') || '';
+  const protocols = ['ctr-collab'];
+
+  if (authToken) {
+    const encoded = btoa(String.fromCharCode(...new TextEncoder().encode(authToken)))
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/g, '');
+    protocols.push(`auth.${encoded}`);
+  }
+  if (csrfToken) protocols.push(`csrf.${csrfToken}`);
+  return protocols;
+}
 
 const RECONNECT_DELAYS_MS = [1000, 2000, 5000, 10000, 30000];
 const PING_INTERVAL_MS = 25000;
@@ -60,7 +71,7 @@ export class CollabClient extends EventTarget {
 
     this.#intentionalClose = false;
     this.#lastSeq = 0;
-    this.#ws = new WebSocket(WS_URL);
+    this.#ws = new WebSocket(WS_URL, buildWsProtocols());
 
     this.#ws.addEventListener('open', () => {
       this.#reconnectAttempt = 0;
