@@ -78,6 +78,8 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function renderResults(r) {
+    const text = value => escHtml(String(value ?? ''));
+    const numberText = value => Number.isFinite(value) ? String(value) : text(value);
     resultsDiv.innerHTML = '';
 
     if (r.kvarRequired === 0) {
@@ -86,7 +88,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <div class="result-badge result-badge--pass" role="status">
             ✓ Power factor is already at or above target — no capacitor bank required.
           </div>
-          <p class="field-hint">Existing PF: ${r.pfExisting} &nbsp;|&nbsp; Target PF: ${r.pfTarget}</p>
+          <p class="field-hint">Existing PF: ${numberText(r.pfExisting)} &nbsp;|&nbsp; Target PF: ${numberText(r.pfTarget)}</p>
         </section>`;
       return;
     }
@@ -94,30 +96,31 @@ document.addEventListener('DOMContentLoaded', () => {
     const riskColors = { safe: 'result-badge--pass', caution: 'result-badge--warn', danger: 'result-badge--fail' };
     const riskIcons  = { safe: '✓', caution: '⚠', danger: '✗' };
 
+    const resonanceRisk = (r.resonance && Object.hasOwn(riskColors, r.resonance.riskLevel)) ? r.resonance.riskLevel : 'caution';
     const resonanceHtml = r.resonance
-      ? `<div class="result-badge ${riskColors[r.resonance.riskLevel]}" role="status">
-           ${riskIcons[r.resonance.riskLevel]} Resonance order h<sub>r</sub> = ${r.resonance.harmonicOrder}
-           — <strong>${r.resonance.riskLevel.toUpperCase()}</strong>
-           ${r.resonance.nearestDominant ? `(near h=${r.resonance.nearestDominant})` : ''}
+      ? `<div class="result-badge ${riskColors[resonanceRisk]}" role="status">
+           ${riskIcons[resonanceRisk]} Resonance order h<sub>r</sub> = ${numberText(r.resonance.harmonicOrder)}
+           — <strong>${text(resonanceRisk).toUpperCase()}</strong>
+           ${r.resonance.nearestDominant ? `(near h=${numberText(r.resonance.nearestDominant)})` : ''}
          </div>`
       : `<p class="field-hint">Resonance check skipped — short-circuit MVA not provided.</p>`;
 
     const detuningHtml = r.detuning.needed
       ? `<div class="alert-warn" role="note">
            <strong>Detuned reactor recommended:</strong>
-           ${r.detuning.detuningPct}% detuning factor
-           (series resonant order h = ${r.detuning.tunedToOrder}).<br>
-           <span class="field-hint">${r.detuning.rationale}</span>
+           ${numberText(r.detuning.detuningPct)}% detuning factor
+           (series resonant order h = ${numberText(r.detuning.tunedToOrder)}).<br>
+           <span class="field-hint">${text(r.detuning.rationale)}</span>
          </div>`
-      : `<p class="field-hint">${r.detuning.rationale}</p>`;
+      : `<p class="field-hint">${text(r.detuning.rationale)}</p>`;
 
     const warningsHtml = r.warnings.length
       ? `<ul class="drc-findings">${r.warnings.map(w =>
-          `<li class="drc-finding drc-warn"><span class="drc-msg">${w}</span></li>`).join('')}</ul>`
+          `<li class="drc-finding drc-warn"><span class="drc-msg">${text(w)}</span></li>`).join('')}</ul>`
       : '';
 
     const sizeOptionsHtml = r.standardSizes.map(s =>
-      `<span class="tag${s === r.bankSize ? ' tag--primary' : ''}">${s} kVAR</span>`
+      `<span class="tag${s === r.bankSize ? ' tag--primary' : ''}">${numberText(s)} kVAR</span>`
     ).join(' ');
 
     resultsDiv.innerHTML = `
@@ -128,22 +131,22 @@ document.addEventListener('DOMContentLoaded', () => {
         <div class="result-group">
           <div class="result-row">
             <span class="result-label">Required reactive compensation</span>
-            <span class="result-value">${r.kvarRequired} kVAR</span>
+            <span class="result-value">${numberText(r.kvarRequired)} kVAR</span>
           </div>
           <p class="field-hint result-formula">
-            Q<sub>cap</sub> = P × (tan(cos⁻¹(${r.pfExisting})) − tan(cos⁻¹(${r.pfTarget})))
-            = ${r.pKw} × (${r.tanDeltaExisting} − ${r.tanDeltaTarget}) = ${r.kvarRequired} kVAR
+            Q<sub>cap</sub> = P × (tan(cos⁻¹(${numberText(r.pfExisting)})) − tan(cos⁻¹(${numberText(r.pfTarget)})))
+            = ${numberText(r.pKw)} × (${numberText(r.tanDeltaExisting)} − ${numberText(r.tanDeltaTarget)}) = ${numberText(r.kvarRequired)} kVAR
           </p>
         </div>
 
         <div class="result-group">
           <div class="result-row">
             <span class="result-label">Recommended standard bank size</span>
-            <span class="result-value">${r.bankSize} kVAR</span>
+            <span class="result-value">${numberText(r.bankSize)} kVAR</span>
           </div>
           <div class="result-row">
             <span class="result-label">2-stage switched option</span>
-            <span class="result-value">2 × ${r.stageKvar} kVAR</span>
+            <span class="result-value">2 × ${numberText(r.stageKvar)} kVAR</span>
           </div>
           <p class="field-hint">Standard sizes near required: ${sizeOptionsHtml}</p>
         </div>
@@ -156,7 +159,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         ${warningsHtml}
 
-        <p class="field-hint result-timestamp">Analysis run: ${new Date(r.timestamp).toLocaleString()}</p>
+        <p class="field-hint result-timestamp">Analysis run: ${text(new Date(r.timestamp).toLocaleString())}</p>
       </section>`;
   }
 
