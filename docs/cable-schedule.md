@@ -8,6 +8,7 @@ The Cable Schedule page is optimized for fast entry first, with deeper routing a
 - Use **Quick Add** to enter several cables at once with tag, termination, cable type, conductor size, length, and raceway fields.
 - Use **Tag Settings** to define the automatic cable numbering pattern used by Add Cable and Quick Add.
 - The default **Basic Entry** view shows identification, terminations, cable construction, electrical entry, and notes.
+- Cable construction now includes **EGC Size** and **EGC Material**, and electrical entry includes **OCPD Rating (A)** plus **Terminal Temp (C)** for selected NEC 110.14(C), 240.4, and 250.122 screening in the Design Rule Checker.
 - Advanced routing coordinates, manufacturer details, and calculated fields remain available through **View Preset**.
 
 ## Cable Typicals
@@ -29,6 +30,9 @@ The Cable Schedule page is optimized for fast entry first, with deeper routing a
 
 - Required schedule fields are Tag, From/To, Conductor Size, and Length.
 - Raceway assignment is required for routing-ready status, but the schedule can be saved while routing assignments are still in progress.
+- When Conductor Size and OCPD Rating are both entered for a power cable, Design Rule Checker screens selected NEC 240.4(D), 240.6(A), and terminal-temperature ampacity issues. Blank Terminal Temp lets the checker infer 60 C through 100 A equipment and 75 C above 100 A; enter the actual equipment termination rating when known.
+- When EGC Size and OCPD Rating are both entered for a power cable, Design Rule Checker screens the selected copper EGC size against NEC 250.122. Non-copper EGC materials are flagged for manual verification rather than checked against the copper sizing breakpoints.
+- When Raceway ID(s) point to a conduit record and cable OD or area is entered, Design Rule Checker screens selected NEC Chapter 9 Table 1 conduit fill limits. Missing conduit type/trade size or cable OD is reported as a data-quality warning.
 - Missing required fields are highlighted after the field is touched, or when saving/exporting.
 - Save and export show a summary when required fields are incomplete.
 

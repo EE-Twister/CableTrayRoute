@@ -8,6 +8,8 @@
  *   DRC-04 — Grounding conductor (NEC 250.122)
  *   DRC-05 — Unrouted cables
  *   DRC-06 — Structured cabling EMI segregation (TIA-568.0-D §4.5)
+ *   DRC-09 — Conductor/OCPD protection screening (NEC 240.4 / 240.6(A))
+ *   DRC-10 — Conduit fill screening (NEC Chapter 9)
  *   Summary counts and passed flag
  *   formatDrcReport output
  */
@@ -50,6 +52,15 @@ function makeCable(name, opts = {}) {
     design_current: opts.design_current ?? null,
     allowed_cable_group: opts.allowed_cable_group ?? '',
     ground_size: opts.ground_size ?? null,
+    ...opts,
+  };
+}
+
+function makeConduit(id, opts = {}) {
+  return {
+    conduit_id: id,
+    conduit_type: opts.conduit_type ?? 'EMT',
+    trade_size: opts.trade_size ?? '1',
     ...opts,
   };
 }
@@ -229,11 +240,81 @@ describe('DRC-04 Grounding', () => {
     assert.strictEqual(drc04[0].severity, DRC_SEVERITY.WARNING);
   });
 
+  it('treats a zero ground_size as missing EGC data', () => {
+    const cables = [makeCable('C1', { cable_type: 'Power', ground_size: 0 })];
+    const { findings } = runDRC({ trays: [], cables, trayCableMap: {} });
+    const drc04 = findings.filter(f => f.ruleId === 'DRC-04');
+    assert.ok(drc04.length > 0, 'Expected DRC-04 WARNING');
+    assert.strictEqual(drc04[0].severity, DRC_SEVERITY.WARNING);
+  });
+
   it('no finding when ground_size is set', () => {
     const cables = [makeCable('C1', { cable_type: 'Power', ground_size: '4' })];
     const { findings } = runDRC({ trays: [], cables, trayCableMap: {} });
     const drc04 = findings.filter(f => f.ruleId === 'DRC-04');
     assert.strictEqual(drc04.length, 0);
+  });
+
+  it('raises ERROR when EGC is smaller than selected NEC 250.122 copper size', () => {
+    const cables = [makeCable('C1', {
+      cable_type: 'Power',
+      ground_size: '#12 AWG',
+      ocpd_rating: 60,
+    })];
+    const { findings } = runDRC({ trays: [], cables, trayCableMap: {} });
+    const drc04 = findings.filter(f => f.ruleId === 'DRC-04');
+    assert.ok(drc04.length > 0, 'Expected DRC-04 sizing finding');
+    assert.strictEqual(drc04[0].severity, DRC_SEVERITY.ERROR);
+    assert.ok(drc04[0].message.includes('#10 AWG'), 'Expected required #10 AWG in message');
+  });
+
+  it('no finding when EGC meets selected NEC 250.122 copper size', () => {
+    const cables = [makeCable('C1', {
+      cable_type: 'Power',
+      ground_size: '#10 AWG',
+      ocpd_rating: 60,
+    })];
+    const { findings } = runDRC({ trays: [], cables, trayCableMap: {} });
+    const drc04 = findings.filter(f => f.ruleId === 'DRC-04');
+    assert.strictEqual(drc04.length, 0);
+  });
+
+  it('normalizes numeric AWG EGC sizes for sizing checks', () => {
+    const cables = [makeCable('C1', {
+      cable_type: 'Power',
+      ground_size: '8',
+      breaker_amps: '100 A',
+    })];
+    const { findings } = runDRC({ trays: [], cables, trayCableMap: {} });
+    const drc04 = findings.filter(f => f.ruleId === 'DRC-04');
+    assert.strictEqual(drc04.length, 0);
+  });
+
+  it('flags smaller-than-Table-250.122 EGC sizes instead of treating them as missing', () => {
+    const cables = [makeCable('C1', {
+      cable_type: 'Power',
+      ground_size: '#18 AWG',
+      ocpd_rating: 15,
+    })];
+    const { findings } = runDRC({ trays: [], cables, trayCableMap: {} });
+    const drc04 = findings.filter(f => f.ruleId === 'DRC-04');
+    assert.ok(drc04.length > 0, 'Expected DRC-04 sizing finding');
+    assert.strictEqual(drc04[0].severity, DRC_SEVERITY.ERROR);
+    assert.ok(drc04[0].message.includes('#14 AWG'), 'Expected required #14 AWG in message');
+  });
+
+  it('warns instead of applying copper EGC sizing when EGC material is aluminum', () => {
+    const cables = [makeCable('C1', {
+      cable_type: 'Power',
+      ground_size: '#8 AWG',
+      ground_material: 'Aluminum',
+      ocpd_rating: 100,
+    })];
+    const { findings } = runDRC({ trays: [], cables, trayCableMap: {} });
+    const drc04 = findings.filter(f => f.ruleId === 'DRC-04');
+    assert.ok(drc04.length > 0, 'Expected DRC-04 material scope warning');
+    assert.strictEqual(drc04[0].severity, DRC_SEVERITY.WARNING);
+    assert.ok(drc04[0].message.includes('copper'), 'Expected copper scope note');
   });
 
   it('skips non-power cables', () => {
@@ -252,8 +333,184 @@ describe('DRC-04 Grounding', () => {
 });
 
 // ---------------------------------------------------------------------------
+// DRC-09 — Conductor/OCPD protection
+// ---------------------------------------------------------------------------
+describe('DRC-09 Conductor/OCPD Protection', () => {
+  it('raises ERROR when OCPD exceeds selected NEC 240.4(D) small-conductor maximum', () => {
+    const cables = [makeCable('C1', {
+      cable_type: 'Power',
+      conductor_size: '#12 AWG',
+      ground_size: '#10 AWG',
+      ocpd_rating: 25,
+    })];
+    const { findings } = runDRC({ trays: [], cables, trayCableMap: {} });
+    const drc09 = findings.filter(f => f.ruleId === 'DRC-09');
+    assert.ok(drc09.length > 0, 'Expected DRC-09 small-conductor finding');
+    assert.strictEqual(drc09[0].severity, DRC_SEVERITY.ERROR);
+    assert.ok(drc09[0].message.includes('20 A'), 'Expected #12 copper 20 A limit in message');
+  });
+
+  it('warns when OCPD exceeds terminal-temperature ampacity', () => {
+    const cables = [makeCable('C1', {
+      cable_type: 'Power',
+      conductor_size: '#4 AWG',
+      ground_size: '#8 AWG',
+      terminal_temp_rating: 75,
+      ocpd_rating: 90,
+    })];
+    const { findings } = runDRC({ trays: [], cables, trayCableMap: {} });
+    const drc09 = findings.filter(f => f.ruleId === 'DRC-09');
+    assert.ok(drc09.length > 0, 'Expected DRC-09 terminal ampacity warning');
+    assert.strictEqual(drc09[0].severity, DRC_SEVERITY.WARNING);
+    assert.ok(drc09[0].message.includes('85 A'), 'Expected #4 copper 75C ampacity in message');
+  });
+
+  it('downgrades small-conductor OCPD findings to WARNING when a motor allowance cue is present', () => {
+    const cables = [makeCable('MTR-1', {
+      cable_type: 'Power',
+      service_description: 'Motor branch circuit',
+      conductor_size: '#12 AWG',
+      ground_size: '#10 AWG',
+      ocpd_rating: 35,
+    })];
+    const { findings } = runDRC({ trays: [], cables, trayCableMap: {} });
+    const drc09 = findings.filter(f => f.ruleId === 'DRC-09');
+    assert.ok(drc09.length > 0, 'Expected DRC-09 motor allowance finding');
+    assert.strictEqual(drc09[0].severity, DRC_SEVERITY.WARNING);
+  });
+
+  it('does not warn when conductor ampacity covers the selected OCPD', () => {
+    const cables = [makeCable('C1', {
+      cable_type: 'Power',
+      conductor_size: '#3 AWG',
+      ground_size: '#8 AWG',
+      ocpd_rating: 80,
+    })];
+    const { findings } = runDRC({ trays: [], cables, trayCableMap: {} });
+    const drc09 = findings.filter(f => f.ruleId === 'DRC-09');
+    assert.strictEqual(drc09.length, 0);
+  });
+
+  it('warns when OCPD rating is not in selected NEC 240.6(A) standard sizes', () => {
+    const cables = [makeCable('C1', {
+      cable_type: 'Power',
+      conductor_size: '#4 AWG',
+      ground_size: '#10 AWG',
+      ocpd_rating: 32,
+    })];
+    const { findings } = runDRC({ trays: [], cables, trayCableMap: {} });
+    const drc09 = findings.filter(f => f.ruleId === 'DRC-09');
+    assert.ok(drc09.length > 0, 'Expected DRC-09 standard-rating warning');
+    assert.strictEqual(drc09[0].severity, DRC_SEVERITY.WARNING);
+    assert.ok(drc09[0].reference.includes('240.6'));
+  });
+
+  it('can be skipped via skipOcpdProtection option', () => {
+    const cables = [makeCable('C1', {
+      cable_type: 'Power',
+      conductor_size: '#12 AWG',
+      ground_size: '#10 AWG',
+      ocpd_rating: 25,
+    })];
+    const { findings } = runDRC(
+      { trays: [], cables, trayCableMap: {} },
+      { skipOcpdProtection: true }
+    );
+    const drc09 = findings.filter(f => f.ruleId === 'DRC-09');
+    assert.strictEqual(drc09.length, 0);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // DRC-05 — Unrouted cables
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// DRC-10 - Conduit fill screening
+// ---------------------------------------------------------------------------
+describe('DRC-10 Conduit Fill', () => {
+  it('raises ERROR when assigned conduit fill exceeds the selected Chapter 9 limit', () => {
+    const conduits = [makeConduit('CND-1', { trade_size: '1' })];
+    const cables = [
+      makeCable('C-1', { cable_od: 0.5, raceway_ids: ['CND-1'], ground_size: '#10 AWG' }),
+      makeCable('C-2', { cable_od: 0.5, raceway_ids: ['CND-1'], ground_size: '#10 AWG' }),
+      makeCable('C-3', { cable_od: 0.5, raceway_ids: ['CND-1'], ground_size: '#10 AWG' }),
+    ];
+    const { findings } = runDRC({ trays: [], conduits, cables, trayCableMap: {} });
+    const drc10 = findings.filter(f => f.ruleId === 'DRC-10');
+    assert.ok(drc10.length > 0, 'Expected DRC-10 overfill finding');
+    assert.strictEqual(drc10[0].severity, DRC_SEVERITY.ERROR);
+    assert.ok(drc10[0].message.includes('40 %'), 'Expected three-cable 40 % limit in message');
+  });
+
+  it('does not warn when conduit fill is below the selected limit', () => {
+    const conduits = [makeConduit('CND-1', { trade_size: '2' })];
+    const cables = [
+      makeCable('C-1', { cable_od: 0.5, raceway_ids: ['CND-1'], ground_size: '#10 AWG' }),
+      makeCable('C-2', { cable_od: 0.5, raceway_ids: ['CND-1'], ground_size: '#10 AWG' }),
+      makeCable('C-3', { cable_od: 0.5, raceway_ids: ['CND-1'], ground_size: '#10 AWG' }),
+    ];
+    const { findings } = runDRC({ trays: [], conduits, cables, trayCableMap: {} });
+    const drc10 = findings.filter(f => f.ruleId === 'DRC-10');
+    assert.strictEqual(drc10.length, 0);
+  });
+
+  it('raises WARNING when conduit fill is near the selected limit', () => {
+    const conduits = [makeConduit('CND-1', { trade_size: '1' })];
+    const cables = [
+      makeCable('C-1', { cable_od: 0.365, raceway_ids: ['CND-1'], ground_size: '#10 AWG' }),
+      makeCable('C-2', { cable_od: 0.365, raceway_ids: ['CND-1'], ground_size: '#10 AWG' }),
+      makeCable('C-3', { cable_od: 0.365, raceway_ids: ['CND-1'], ground_size: '#10 AWG' }),
+    ];
+    const { findings } = runDRC({ trays: [], conduits, cables, trayCableMap: {} });
+    const drc10 = findings.filter(f => f.ruleId === 'DRC-10');
+    assert.strictEqual(drc10.length, 1, 'Expected one near-limit warning');
+    assert.strictEqual(drc10[0].severity, DRC_SEVERITY.WARNING);
+  });
+
+  it('warns when assigned cables are missing OD or area data', () => {
+    const conduits = [makeConduit('CND-1', { trade_size: '2' })];
+    const cables = [makeCable('C-1', { raceway_ids: ['CND-1'], ground_size: '#10 AWG' })];
+    const { findings } = runDRC({ trays: [], conduits, cables, trayCableMap: {} });
+    const drc10 = findings.filter(f => f.ruleId === 'DRC-10');
+    assert.strictEqual(drc10.length, 1);
+    assert.strictEqual(drc10[0].severity, DRC_SEVERITY.WARNING);
+    assert.ok(drc10[0].message.includes('outside diameter'));
+  });
+
+  it('warns when an assigned conduit is missing a recognized type or size', () => {
+    const conduits = [makeConduit('CND-1', { conduit_type: 'unknown', trade_size: '' })];
+    const cables = [makeCable('C-1', { cable_od: 0.5, raceway_ids: ['CND-1'], ground_size: '#10 AWG' })];
+    const { findings } = runDRC({ trays: [], conduits, cables, trayCableMap: {} });
+    const drc10 = findings.filter(f => f.ruleId === 'DRC-10');
+    assert.strictEqual(drc10.length, 1);
+    assert.strictEqual(drc10[0].severity, DRC_SEVERITY.WARNING);
+    assert.ok(drc10[0].message.includes('recognized conduit type'));
+  });
+
+  it('can be skipped via skipConduitFill option', () => {
+    const conduits = [makeConduit('CND-1', { trade_size: '1' })];
+    const cables = [
+      makeCable('C-1', { cable_od: 0.5, raceway_ids: ['CND-1'], ground_size: '#10 AWG' }),
+      makeCable('C-2', { cable_od: 0.5, raceway_ids: ['CND-1'], ground_size: '#10 AWG' }),
+      makeCable('C-3', { cable_od: 0.5, raceway_ids: ['CND-1'], ground_size: '#10 AWG' }),
+    ];
+    const { findings } = runDRC(
+      { trays: [], conduits, cables, trayCableMap: {} },
+      { skipConduitFill: true }
+    );
+    const drc10 = findings.filter(f => f.ruleId === 'DRC-10');
+    assert.strictEqual(drc10.length, 0);
+  });
+
+  it('treats conduit-assigned cables as routed for DRC-05', () => {
+    const conduits = [makeConduit('CND-1', { trade_size: '2' })];
+    const cables = [makeCable('C-1', { cable_od: 0.5, raceway_ids: ['CND-1'], ground_size: '#10 AWG' })];
+    const { findings } = runDRC({ trays: [], conduits, cables, trayCableMap: {} });
+    const drc05 = findings.filter(f => f.ruleId === 'DRC-05');
+    assert.strictEqual(drc05.length, 0);
+  });
+});
+
 describe('DRC-05 Unrouted Cables', () => {
   it('flags cables not present in trayCableMap', () => {
     const cables = [makeCable('C1'), makeCable('C2')];

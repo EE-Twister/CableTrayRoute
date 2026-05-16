@@ -203,9 +203,10 @@ test.describe('Design Rule Checker', () => {
     await expect(page.locator('#drc-results')).toBeAttached();
   });
 
-  test('skip-grounding and skip-ampacity checkboxes are present', async ({ page }) => {
+  test('rule skip checkboxes are present', async ({ page }) => {
     await expect(page.locator('#drc-skip-grounding')).toBeAttached();
     await expect(page.locator('#drc-skip-ampacity')).toBeAttached();
+    await expect(page.locator('#drc-skip-conduit-fill')).toBeAttached();
   });
 
   test('clicking Run with no data does not crash', async ({ page }) => {

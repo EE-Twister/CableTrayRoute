@@ -99,7 +99,7 @@ function collectTestSuites() {
 function loadBenchmarks() {
   if (!fs.existsSync(BENCHMARKS_FILE)) {
     console.warn('[manifest] data/validationBenchmarks.json not found');
-    return { benchmarks: [], standards: [] };
+    return { benchmarks: [], standards: [], necComplianceMatrix: [] };
   }
   return JSON.parse(fs.readFileSync(BENCHMARKS_FILE, 'utf8'));
 }
@@ -110,7 +110,7 @@ function loadBenchmarks() {
 
 function buildManifest() {
   const suites = collectTestSuites();
-  const { benchmarks, standards } = loadBenchmarks();
+  const { benchmarks, standards, necComplianceMatrix } = loadBenchmarks();
 
   const totalAssertions = suites.reduce((s, t) => s + t.assertionCount, 0);
 
@@ -121,10 +121,12 @@ function buildManifest() {
       totalAssertions,
       benchmarkCount: benchmarks ? benchmarks.length : 0,
       standardCount: standards ? standards.length : 0,
+      necComplianceCount: necComplianceMatrix ? necComplianceMatrix.length : 0,
     },
     testSuites: suites,
     benchmarks: benchmarks || [],
     standards: standards || [],
+    necComplianceMatrix: necComplianceMatrix || [],
   };
 
   // Ensure dist/ exists

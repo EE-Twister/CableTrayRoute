@@ -149,7 +149,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <tr>
               <td>Voltage drop (%)</td>
               <td><strong>${vd.vdPercent}%</strong></td>
-              <td><span class="fill-badge ${vdClass}">${vd.passNec ? `✓ Pass ≤ ${vd.necThresholdPct}%` : `✗ Exceeds ${vd.necThresholdPct}% limit`}</span></td>
+              <td><span class="fill-badge ${vdClass}">${vd.passNec ? `✓ Within ${vd.necThresholdPct}% recommendation` : `✗ Exceeds ${vd.necThresholdPct}% recommendation`}</span></td>
             </tr>
             <tr><td>Voltage drop (V, L–L)</td><td>${vd.vdLineToLineV} V</td><td></td></tr>
             <tr><td>Voltage drop (V, L–N)</td><td>${vd.vdLineToNeutralV} V</td><td></td></tr>
@@ -227,8 +227,8 @@ document.addEventListener('DOMContentLoaded', () => {
       ['Ampacity', 'Reactance (selected)',  sb.xMohmPerFt,               'mΩ/ft', ''],
       // Voltage drop
       ['Voltage Drop', 'VD line-to-line',   vd.vdLineToLineV,   'V',   ''],
-      ['Voltage Drop', 'VD percent',        vd.vdPercent,       '%',   vd.passNec ? 'Pass' : 'FAIL'],
-      ['Voltage Drop', 'NEC threshold',     vd.necThresholdPct, '%',   ''],
+      ['Voltage Drop', 'VD percent',        vd.vdPercent,       '%',   vd.passNec ? 'Within recommendation' : 'Above recommendation'],
+      ['Voltage Drop', 'NEC recommendation', vd.necThresholdPct, '%',   ''],
       ['Voltage Drop', 'Run resistance',    vd.rOhmTotal,       'Ω',   ''],
       ['Voltage Drop', 'Run reactance',     vd.xOhmTotal,       'Ω',   ''],
       // Fault stress

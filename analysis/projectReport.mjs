@@ -590,8 +590,8 @@ export function buildVoltageDropSection(studies = {}, approvals = {}) {
     to:         r.to       || r.load      || '—',
     dropPct:    r.dropPct  ?? r.drop_pct  ?? '—',
     dropV:      r.dropV    ?? r.drop_v    ?? '—',
-    limitPct:   r.limitPct ?? r.limit_pct ?? '—',
-    status:     r.status   ?? (parseFloat(r.dropPct) > parseFloat(r.limitPct) ? 'fail' : 'pass'),
+    limitPct:   r.limitPct ?? r.limit_pct ?? r.limit ?? '—',
+    status:     r.evaluated === false ? 'not evaluated' : (r.status ?? (parseFloat(r.dropPct) > parseFloat(r.limitPct) ? 'fail' : 'pass')),
   }));
 
   return { key: 'voltageDrop', title: 'Voltage Drop Study', rows, approval };
@@ -683,7 +683,7 @@ export function renderPackageHTML(pkg, baseReport = {}) {
     const map = {
       ok: 'badge-ok', near: 'badge-warn', over: 'badge-error',
       pass: 'badge-ok', warning: 'badge-warn', fail: 'badge-error',
-      info: 'badge-info', error: 'badge-error',
+      info: 'badge-info', error: 'badge-error', 'not evaluated': 'badge-info',
     };
     return `<span class="badge ${map[String(s).toLowerCase()] || ''}">${esc(s)}</span>`;
   };
@@ -956,7 +956,7 @@ export function renderPackageHTML(pkg, baseReport = {}) {
   ${approvalBadgeHTML(s.approval)}
   ${s.empty ? emptySection('Voltage Drop') : `
   <div class="report-scroll"><table class="report-table">
-    <thead><tr><th>Cable / Circuit</th><th>From</th><th>To</th><th>Drop (%)</th><th>Drop (V)</th><th>Limit (%)</th><th>Status</th></tr></thead>
+    <thead><tr><th>Cable / Circuit</th><th>From</th><th>To</th><th>Drop (%)</th><th>Drop (V)</th><th>Recommendation (%)</th><th>Status</th></tr></thead>
     <tbody>${(s.rows || []).map(r => `<tr>
       <td>${esc(r.id)}</td><td>${esc(r.from)}</td><td>${esc(r.to)}</td>
       <td>${fmt(r.dropPct)}</td><td>${fmt(r.dropV)}</td><td>${fmt(r.limitPct)}</td>

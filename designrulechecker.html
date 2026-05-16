@@ -123,6 +123,10 @@
           <dt>DRC-05 — Unrouted Cables</dt>
           <dd>Lists cables present in the Cable Schedule that have no assigned
           tray or field route after routing.</dd>
+          <dt>DRC-10 - Conduit Fill (NEC Chapter 9)</dt>
+          <dd>Screens assigned conduit/raceway cables against selected Chapter
+          9 Table 1 fill limits when conduit type, trade size, and cable OD or
+          area data are available.</dd>
         </dl>
       </details>
 
@@ -146,6 +150,12 @@
           <label>
             <input type="checkbox" id="drc-skip-ampacity">
             Skip ampacity derating checks (DRC-03)
+          </label>
+        </div>
+        <div class="control-row">
+          <label>
+            <input type="checkbox" id="drc-skip-conduit-fill">
+            Skip conduit fill checks (DRC-10)
           </label>
         </div>
         <div class="btn-row">

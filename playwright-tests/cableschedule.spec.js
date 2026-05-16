@@ -14,6 +14,8 @@ async function seedRaceway(page, trayId = 'R1') {
 
 async function addCable(page, {
   tag = 'C1',
+  fromTag = 'MCC-1',
+  toTag = 'LOAD-1',
   conductorSize = '#14 AWG',
   length = '10',
   raceway = 'R1'
@@ -22,6 +24,8 @@ async function addCable(page, {
   await page.click('#add-row-btn');
   await expect(page.locator('#cable-editor-modal[aria-hidden="false"]')).toBeVisible();
   await page.fill('#cable-editor-tag', tag);
+  await page.fill('#cable-editor-from_tag', fromTag);
+  await page.fill('#cable-editor-to_tag', toTag);
   await page.selectOption('#cable-editor-conductor_size', { label: conductorSize });
   await page.fill('#cable-editor-length', length);
   await page.selectOption('#cable-editor-raceway_ids', raceway);

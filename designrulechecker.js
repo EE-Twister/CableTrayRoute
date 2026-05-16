@@ -5,7 +5,7 @@
  * raceway data and displays findings grouped by severity.
  */
 import { runDRC, formatDrcReport, DRC_SEVERITY } from './analysis/designRuleChecker.mjs';
-import { getTrays, getCables, getDrcAcceptedFindings, setDrcAcceptedFindings } from './dataStore.mjs';
+import { getTrays, getConduits, getCables, getDrcAcceptedFindings, setDrcAcceptedFindings } from './dataStore.mjs';
 import { openModal } from './src/components/modal.js';
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -21,6 +21,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const fillLimitIn       = document.getElementById('drc-fill-limit');
   const skipGndChk    = document.getElementById('drc-skip-grounding');
   const skipAmpChk    = document.getElementById('drc-skip-ampacity');
+  const skipConduitChk = document.getElementById('drc-skip-conduit-fill');
   const resultsDiv    = document.getElementById('drc-results');
   const summaryDiv    = document.getElementById('drc-summary');
 
@@ -142,8 +143,9 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   function runAndRender() {
-    const trays  = getTrays()  || [];
-    const cables = getCables() || [];
+    const trays    = getTrays()    || [];
+    const conduits = getConduits() || [];
+    const cables   = getCables()   || [];
 
     // Route cache is written under a content-addressed key (route-<hash>) by app.mjs via dataStore.
     // Scan sessionStorage first (in-session results), then localStorage for any matching entry.
@@ -181,11 +183,12 @@ document.addEventListener('DOMContentLoaded', () => {
     let result;
     try {
       result = runDRC(
-        { trays, cables, trayCableMap, routedCableNames },
+        { trays, conduits, cables, trayCableMap, routedCableNames },
         {
           fillLimit,
           skipGrounding:   skipGndChk.checked,
           skipAmpacity:    skipAmpChk.checked,
+          skipConduitFill: skipConduitChk?.checked || false,
           acceptedFindings,
         }
       );

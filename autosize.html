@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="NEC equipment auto-sizing: conductor, overcurrent device, motor branch circuit, and transformer sizing per NEC 2023." />
+  <meta name="description" content="NEC-informed equipment auto-sizing: selected conductor, overcurrent device, motor branch circuit, and transformer sizing checks for NEC 2023 workflows." />
   <title>Auto-Size Equipment — CableTrayRoute</title>
   <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icons/favicon.svg">
   <!-- Open Graph / Social sharing -->
   <meta property="og:type" content="website">
   <meta property="og:title" content="Auto-Size Equipment — CableTrayRoute">
-  <meta property="og:description" content="Automatically size conductors, breakers, and transformers per NEC 2023.">
+  <meta property="og:description" content="Run selected NEC 2023 sizing checks for conductors, breakers, and transformers.">
   <meta property="og:image" content="https://cabletrayroute.com/icons/og-preview.png">
   <meta property="og:site_name" content="CableTrayRoute">
   <meta property="og:url" content="autosize.html">
@@ -101,8 +101,8 @@
       <header class="page-header">
         <h1>Auto-Size Equipment</h1>
         <p class="page-subtitle">Automatically select conductor sizes, overcurrent device ratings,
-        and transformer kVA per NEC 2023. Covers feeders, branch circuits, motor circuits,
-        and transformer protection.</p>
+        and transformer kVA using selected NEC 2023 rule checks. Covers feeders, branch circuits,
+        motor circuits, and transformer protection as an engineering aid.</p>
       </header>
 
       <!-- Tab navigation -->
@@ -127,9 +127,11 @@
           <summary>Method — NEC 210.20 / 215.3 / 240.4 / 310.15 / 392.80</summary>
           <p>For <strong>continuous loads</strong> (≥3 hours): conductor ampacity and OCPD rating
           must be at least 125% of the load current (NEC 210.20(A), 215.3).</p>
-          <p>Conductor size is selected from NEC Table 310.15(B)(16). Ambient temperature,
+          <p>Conductor size is selected from NEC Table 310.16 baseline ampacity values (formerly Table 310.15(B)(16)). Ambient temperature,
           bundling, and cable tray correction factors per NEC 310.15(B)(1)(a), 310.15(C)(1),
           and 392.80(A) are applied based on the Installation Conditions you enter below.</p>
+          <p>NEC 110.14(C) terminal-temperature limits are applied separately from the insulation ampacity table.
+          Leave the terminal rating blank to infer 60 C through 100 A equipment and 75 C above 100 A.</p>
           <p>OCPD rating is the next standard rating from NEC 240.6(A) at or above
           required load ampacity (NEC 240.4(B)). For small conductors, NEC 240.4(D)
           limits maximum OCPD to #14 Cu = 15A, #12 Cu = 20A, #10 Cu = 30A,
@@ -200,6 +202,17 @@
                 <option value="90">90°C (Type THHN, XHHW-2)</option>
               </select>
             </div>
+
+            <div class="field-row">
+              <label for="feeder-terminal-temp">Equipment terminal temperature rating</label>
+              <select id="feeder-terminal-temp">
+                <option value="">Infer from equipment rating</option>
+                <option value="60">60 C</option>
+                <option value="75">75 C</option>
+                <option value="90">90 C</option>
+              </select>
+              <p class="field-hint">NEC 110.14(C) screen: blank infers 60 C through 100 A equipment and 75 C above 100 A.</p>
+            </div>
           </fieldset>
 
           <fieldset>
@@ -247,6 +260,7 @@
           Ambient temperature, bundling, and cable tray correction factors per
           NEC 310.15(B)(1)(a), 310.15(C)(1), and 392.80(A) are applied based on the
           Installation Conditions you enter below.</p>
+          <p>NEC 110.14(C) terminal-temperature limits are applied to the selected branch-circuit conductor.</p>
           <p><strong>Branch circuit OCPD (inverse time breaker):</strong> ≤ 250% of FLC
           per NEC Table 430.52. Next standard OCPD size is selected.</p>
           <p><strong>Overload relay:</strong> set at 115% of FLC for motors with service
@@ -290,6 +304,17 @@
                 <option value="copper">Copper</option>
                 <option value="aluminum">Aluminum</option>
               </select>
+            </div>
+
+            <div class="field-row">
+              <label for="motor-terminal-temp">Equipment terminal temperature rating</label>
+              <select id="motor-terminal-temp">
+                <option value="">Infer from OCPD rating</option>
+                <option value="60">60 C</option>
+                <option value="75">75 C</option>
+                <option value="90">90 C</option>
+              </select>
+              <p class="field-hint">NEC 110.14(C) screen for branch-circuit conductor ampacity.</p>
             </div>
 
             <div class="field-row">
@@ -342,7 +367,8 @@
           current ≤ 9A) per NEC Table 450.3(B). Next standard OCPD size is selected.</p>
           <p><strong>Secondary OCPD:</strong> ≤ 125% of secondary rated current per NEC 450.3(B).</p>
           <p><strong>Secondary conductors:</strong> sized at 125% of secondary rated current
-          (continuous load per NEC 310.15(B)(16)).</p>
+          (continuous load using the NEC Table 310.16 baseline ampacity check).</p>
+          <p>NEC 110.14(C) terminal-temperature limits are applied to the selected secondary conductor.</p>
         </details>
 
         <form id="xfmr-form" novalidate>
@@ -371,6 +397,17 @@
               <label for="xfmr-secondary">Secondary voltage (V)</label>
               <input type="number" id="xfmr-secondary" min="1" step="1" value="208">
             </div>
+
+            <div class="field-row">
+              <label for="xfmr-secondary-terminal-temp">Secondary terminal temperature rating</label>
+              <select id="xfmr-secondary-terminal-temp">
+                <option value="">Infer from secondary OCPD</option>
+                <option value="60">60 C</option>
+                <option value="75">75 C</option>
+                <option value="90">90 C</option>
+              </select>
+              <p class="field-hint">NEC 110.14(C) screen for secondary conductor ampacity.</p>
+            </div>
           </fieldset>
 
           <div id="controls">
@@ -392,12 +429,13 @@
     <div class="modal-content">
       <button id="close-help-btn" class="close-btn" aria-label="Close Help">&times;</button>
       <h2 id="help-title">Auto-Size Equipment Help</h2>
-      <p>This tool applies NEC 2023 rules to automatically size conductors, overcurrent
-      protection devices (OCPD), and transformers.</p>
+      <p>This tool applies selected NEC 2023 sizing checks to help size conductors, overcurrent
+      protection devices (OCPD), and transformers. Final designs still require engineer/AHJ review.</p>
       <h3>Feeder / Branch Circuit</h3>
       <p>Enter the load current (or kW/PF), check if the load is continuous, and select
-      conductor material and temperature rating. The tool selects the smallest NEC-compliant
-      conductor from Table 310.15(B)(16) and the next standard OCPD from NEC 240.6(A).</p>
+      conductor material and temperature rating. The tool selects the smallest conductor from
+      NEC Table 310.16 baseline values and the next standard OCPD from NEC 240.6(A), within the
+      entered assumptions.</p>
       <h3>Motor Branch Circuit</h3>
       <p>Enter motor HP, voltage, and phase. The tool looks up NEC table FLC values and
       applies NEC 430.22 (conductor) and NEC 430.52 (breaker) rules automatically.</p>

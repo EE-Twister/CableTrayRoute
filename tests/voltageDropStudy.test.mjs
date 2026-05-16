@@ -29,15 +29,15 @@ function it(name, fn) {
 
 // ---------------------------------------------------------------------------
 describe('NEC_LIMITS', () => {
-  it('feeder limit is 3 %', () => {
+  it('feeder recommendation is 3 %', () => {
     assert.strictEqual(NEC_LIMITS.feeder, 3);
   });
 
-  it('branch limit is 3 %', () => {
+  it('branch recommendation is 3 %', () => {
     assert.strictEqual(NEC_LIMITS.branch, 3);
   });
 
-  it('combined limit is 5 %', () => {
+  it('combined recommendation is 5 %', () => {
     assert.strictEqual(NEC_LIMITS.combined, 5);
   });
 });
@@ -79,11 +79,14 @@ describe('evaluateCable', () => {
     const result = evaluateCable({ cable_tag: 'C01', est_load: '100', cable_rating: '480' });
     assert.strictEqual(result.status, 'pass');
     assert.strictEqual(result.dropPct, 0);
+    assert.strictEqual(result.evaluated, false);
+    assert.ok(result.basis.includes('informational-note recommendation'));
   });
 
   it('returns pass for cable with no load data', () => {
     const result = evaluateCable({ cable_tag: 'C02', length: '500', cable_rating: '480' });
     assert.strictEqual(result.status, 'pass');
+    assert.strictEqual(result.evaluated, false);
   });
 
   it('populates tag, from, to fields from cable object', () => {
@@ -110,6 +113,7 @@ describe('evaluateCable', () => {
     const result = evaluateCable(cable);
     assert.strictEqual(result.circuitType, 'feeder');
     assert.strictEqual(result.limit, NEC_LIMITS.feeder);
+    assert.strictEqual(result.basis, 'NEC 2023 voltage-drop informational-note recommendation');
   });
 
   it('applies branch limit for branch circuits', () => {
@@ -172,13 +176,14 @@ describe('runVoltageDropStudy', () => {
 
   it('summary total equals number of cables', () => {
     const cables = [
-      { cable_tag: 'A', est_load: '10', cable_rating: '480', length: '50' },
+      { cable_tag: 'A', est_load: '10', cable_rating: '480', length: '50', conductor_size: '12', conductor_material: 'CU' },
       { cable_tag: 'B', est_load: '10', cable_rating: '480', length: '0' },
       { cable_tag: 'C' },
     ];
     const { summary } = runVoltageDropStudy(cables);
     assert.strictEqual(summary.total, 3);
-    assert.strictEqual(summary.pass + summary.warn + summary.fail, 3);
+    assert.strictEqual(summary.pass + summary.warn + summary.fail + summary.notEvaluated, 3);
+    assert.strictEqual(summary.notEvaluated, 2);
   });
 
   it('summary maxDropPct is >= avgDropPct', () => {
@@ -201,6 +206,8 @@ describe('runVoltageDropStudy', () => {
     assert.ok('status' in r);
     assert.ok('circuitType' in r);
     assert.ok('limit' in r);
+    assert.ok('evaluated' in r);
+    assert.ok('basis' in r);
     assert.ok(['pass', 'warn', 'fail'].includes(r.status));
     assert.ok(['feeder', 'branch'].includes(r.circuitType));
   });

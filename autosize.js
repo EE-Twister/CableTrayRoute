@@ -40,6 +40,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const continuous = document.getElementById('feeder-continuous').checked;
     const material = document.getElementById('feeder-material').value;
     const tempRating = parseInt(document.getElementById('feeder-temp').value, 10);
+    const terminalTempValue = document.getElementById('feeder-terminal-temp').value;
+    const terminalTempRating = terminalTempValue ? parseInt(terminalTempValue, 10) : null;
     const ambientTempC = parseFloat(document.getElementById('feeder-ambient').value) || 30;
     const bundledConductors = parseInt(document.getElementById('feeder-bundled').value, 10) || 3;
     const installationType = document.getElementById('feeder-install').value;
@@ -47,13 +49,13 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       if (mode === 'amps') {
         const loadAmps = parseFloat(document.getElementById('feeder-amps').value);
-        result = sizeFeeder({ loadAmps, continuous, material, tempRating, ambientTempC, bundledConductors, installationType });
+        result = sizeFeeder({ loadAmps, continuous, material, tempRating, terminalTempRating, ambientTempC, bundledConductors, installationType });
       } else {
         const kw = parseFloat(document.getElementById('feeder-kw').value);
         const pf = parseFloat(document.getElementById('feeder-pf').value);
         const voltage = parseFloat(document.getElementById('feeder-voltage').value);
         const phase = document.getElementById('feeder-phase').value;
-        result = sizeFeederFromKw({ kw, pf, voltage, phase, continuous, material, tempRating, ambientTempC, bundledConductors, installationType });
+        result = sizeFeederFromKw({ kw, pf, voltage, phase, continuous, material, tempRating, terminalTempRating, ambientTempC, bundledConductors, installationType });
       }
     } catch (err) {
       renderError('feeder-results', err.message);
@@ -66,6 +68,7 @@ document.addEventListener('DOMContentLoaded', () => {
         ambientTempC,
         bundledConductors,
         installationType,
+        terminalTempRating: result.terminalTempRating,
         allowAluminum: true,
         maxParallel: 4,
       });
@@ -84,13 +87,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const voltage = parseInt(document.getElementById('motor-voltage').value, 10);
     const phase = document.getElementById('motor-phase').value;
     const material = document.getElementById('motor-material').value;
+    const terminalTempValue = document.getElementById('motor-terminal-temp').value;
+    const terminalTempRating = terminalTempValue ? parseInt(terminalTempValue, 10) : null;
     const highSF = document.getElementById('motor-highsf').checked;
     const ambientTempC = parseFloat(document.getElementById('motor-ambient').value) || 30;
     const bundledConductors = parseInt(document.getElementById('motor-bundled').value, 10) || 3;
     const installationType = document.getElementById('motor-install').value;
     let result;
     try {
-      result = sizeMotorBranch({ hp, voltage, phase, material, highSF, ambientTempC, bundledConductors, installationType });
+      result = sizeMotorBranch({ hp, voltage, phase, material, terminalTempRating, highSF, ambientTempC, bundledConductors, installationType });
     } catch (err) {
       renderError('motor-results', err.message);
       return;
@@ -124,9 +129,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const primaryVoltage = parseFloat(document.getElementById('xfmr-primary').value);
     const secondaryVoltage = parseFloat(document.getElementById('xfmr-secondary').value);
     const phase = document.getElementById('xfmr-phase').value;
+    const secondaryTerminalTempValue = document.getElementById('xfmr-secondary-terminal-temp').value;
+    const secondaryTerminalTempRating = secondaryTerminalTempValue ? parseInt(secondaryTerminalTempValue, 10) : null;
     let result;
     try {
-      result = sizeTransformer({ loadKva, primaryVoltage, secondaryVoltage, phase });
+      result = sizeTransformer({ loadKva, primaryVoltage, secondaryVoltage, phase, secondaryTerminalTempRating });
     } catch (err) {
       renderError('xfmr-results', err.message);
       return;
@@ -163,8 +170,10 @@ document.addEventListener('DOMContentLoaded', () => {
             ${r.bundledConductors > 3 ? row('Bundled conductors', `${r.bundledConductors} (derating applied)`) : ''}
             ${r.installationType !== 'conduit' ? row('Installation type', installLabel[r.installationType] || r.installationType) : ''}
             ${r.deratingFactor < 1 ? row('Combined derating factor', r.deratingFactor.toFixed(3)) : ''}
-            ${row('Conductor size', `${r.conductorSize} (${r.material}, ${r.tempRating}°C)`)}
+            ${row('Conductor size', `${r.conductorSize} (${r.material}, ${r.insulationTempRating || r.tempRating} C insulation)`)}
+            ${row('Terminal temperature cap', `${r.terminalTempRating} C`)}
             ${row('Conductor ampacity', `${r.conductorAmpacity} A`)}
+            ${r.tableAmpacity && r.tableAmpacity !== r.conductorAmpacity ? row('Table ampacity before terminal cap', `${r.tableAmpacity} A`) : ''}
             ${r.deratingFactor < 1 ? row('Installed ampacity (derated)', `${r.installedAmpacity} A`) : ''}
             ${row('OCPD rating', `${r.ocpdRating} A`)}
           </tbody>
@@ -195,7 +204,9 @@ document.addEventListener('DOMContentLoaded', () => {
             ${r.installationType !== 'conduit' ? row('Installation type', installLabel[r.installationType] || r.installationType) : ''}
             ${r.deratingFactor < 1 ? row('Combined derating factor', r.deratingFactor.toFixed(3)) : ''}
             ${row('Branch circuit conductor', `${r.conductorSize || 'N/A'} (${r.material})`)}
+            ${row('Terminal temperature cap', `${r.terminalTempRating} C`)}
             ${row('Conductor ampacity', r.conductorAmpacity ? `${r.conductorAmpacity} A` : 'N/A')}
+            ${r.tableAmpacity && r.tableAmpacity !== r.conductorAmpacity ? row('Table ampacity before terminal cap', `${r.tableAmpacity} A`) : ''}
             ${r.deratingFactor < 1 ? row('Installed ampacity (derated)', r.installedAmpacity ? `${r.installedAmpacity} A` : 'N/A') : ''}
             ${row('Branch circuit OCPD', `${r.ocpdRating} A ${r.ocpdType}`)}
             ${row('Overload relay setpoint', `${r.overloadSetpoint} A (${r.overloadPercent}% of FLC)`)}
@@ -226,7 +237,8 @@ document.addEventListener('DOMContentLoaded', () => {
             ${row('Secondary voltage', `${r.secondaryVoltage} V`)}
             ${row('Secondary rated current', `${r.secondaryRatedAmps} A`)}
             ${row('Secondary OCPD', `${r.secondaryOcpdRating} A (125% of rated)`)}
-            ${r.secondaryConductorSize ? row('Secondary conductors', `${r.secondaryConductorSize} (${r.secondaryConductorAmpacity} A)`) : ''}
+            ${r.secondaryConductorSize ? row('Secondary conductors', `${r.secondaryConductorSize} (${r.secondaryConductorAmpacity} A, ${r.secondaryTerminalTempRating} C terminal cap)`) : ''}
+            ${r.secondaryTableAmpacity && r.secondaryTableAmpacity !== r.secondaryConductorAmpacity ? row('Secondary table ampacity before terminal cap', `${r.secondaryTableAmpacity} A`) : ''}
           </tbody>
         </table>
         <details class="method-panel">

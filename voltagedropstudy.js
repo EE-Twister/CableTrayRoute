@@ -51,16 +51,20 @@ document.addEventListener('DOMContentLoaded', () => {
           <span class="result-value">${s.total}</span>
         </div>
         <div class="result-card result-pass">
-          <span class="result-label">Compliant</span>
+          <span class="result-label">Within Recommendation</span>
           <span class="result-value">${s.pass}</span>
         </div>
         <div class="result-card result-warn">
-          <span class="result-label">Near Limit</span>
+          <span class="result-label">Near Recommendation</span>
           <span class="result-value">${s.warn}</span>
         </div>
         <div class="result-card result-fail">
-          <span class="result-label">Exceeds Limit</span>
+          <span class="result-label">Above Recommendation</span>
           <span class="result-value">${s.fail}</span>
+        </div>
+        <div class="result-card">
+          <span class="result-label">Not Evaluated</span>
+          <span class="result-value">${s.notEvaluated ?? 0}</span>
         </div>
         <div class="result-card">
           <span class="result-label">Max Drop</span>
@@ -104,11 +108,11 @@ document.addEventListener('DOMContentLoaded', () => {
           <td class="num ${r.dropPct > r.limit ? 'fail-value' : ''}">${r.dropPct > 0 ? r.dropPct.toFixed(2) : '—'}</td>
           <td class="num">${r.limit}</td>
           <td>${esc(r.circuitType)}</td>
-          <td class="status-cell status-${r.status}">${r.status.toUpperCase()}</td>
+          <td class="status-cell status-${r.evaluated ? r.status : 'not-evaluated'}">${r.evaluated ? r.status.toUpperCase() : 'NOT EVALUATED'}</td>
         </tr>`).join('');
 
     resultsEl.innerHTML = `
-      <table class="results-table" aria-label="Voltage drop compliance results">
+      <table class="results-table" aria-label="Voltage drop recommendation results">
         <thead>
           <tr>
             <th scope="col">Cable Tag</th>
@@ -119,7 +123,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <th scope="col" class="num">Load (A)</th>
             <th scope="col" class="num">Voltage (V)</th>
             <th scope="col" class="num">Drop (%)</th>
-            <th scope="col" class="num">Limit (%)</th>
+            <th scope="col" class="num">Recommendation (%)</th>
             <th scope="col">Type</th>
             <th scope="col">Status</th>
           </tr>
@@ -130,7 +134,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function exportCSV() {
     if (!lastStudy) return;
-    const headers = ['Cable Tag','From','To','Conductor','Length (ft)','Load (A)','Voltage (V)','Drop (%)','Limit (%)','Circuit Type','Status'];
+    const headers = ['Cable Tag','From','To','Conductor','Length (ft)','Load (A)','Voltage (V)','Drop (%)','Recommendation (%)','Circuit Type','Status','Basis'];
     const rows = lastStudy.results.map(r => [
       r.tag, r.from, r.to,
       `${r.conductorSize} ${r.material}`,
@@ -140,7 +144,8 @@ document.addEventListener('DOMContentLoaded', () => {
       r.dropPct > 0 ? r.dropPct.toFixed(2) : '',
       r.limit,
       r.circuitType,
-      r.status.toUpperCase(),
+      r.evaluated ? r.status.toUpperCase() : 'NOT EVALUATED',
+      r.basis || '',
     ]);
     downloadCSV(headers, rows, 'voltage-drop-study.csv');
   }

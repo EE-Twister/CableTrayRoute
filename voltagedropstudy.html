@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="Project-wide voltage drop compliance study. Checks all cables against NEC 215.2 / 210.19 limits (3% feeder, 3% branch) and flags circuits that exceed recommended thresholds." />
+  <meta name="description" content="Project-wide voltage drop recommendation study. Screens cables against NEC 215.2 / 210.19 informational-note recommendations and flags circuits that exceed selected thresholds." />
   <title>Voltage Drop Study — CableTrayRoute</title>
   <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icons/favicon.svg">
   <meta property="og:type" content="website">
-  <meta property="og:title" content="Voltage Drop Compliance Study — CableTrayRoute">
-  <meta property="og:description" content="Analyse all project cables for NEC voltage drop compliance in a single report.">
+  <meta property="og:title" content="Voltage Drop Recommendation Study — CableTrayRoute">
+  <meta property="og:description" content="Analyze all project cables against NEC voltage-drop informational-note recommendations in a single report.">
   <meta property="og:image" content="https://cabletrayroute.com/icons/og-preview.png">
   <meta property="og:site_name" content="CableTrayRoute">
   <meta property="og:url" content="voltagedropstudy.html">
@@ -70,26 +70,27 @@
       </nav>
 
       <header class="page-header">
-        <h1>Voltage Drop Compliance Study</h1>
+        <h1>Voltage Drop Recommendation Study</h1>
       </header>
 
       <details class="method-panel">
         <summary>Method &amp; Standards</summary>
-        <p>Voltage drop is calculated using the DC resistance method adjusted for AC impedance
-        and temperature correction per conductor material:</p>
+        <p>Voltage drop is calculated as a screening check using conductor DC resistance with
+        temperature correction per conductor material. This page does not model full AC impedance
+        or power-factor reactance effects:</p>
         <pre>VD% = (√3 × I × R × L) / V × 100   [3-phase]
 VD% = (2 × I × R × L) / V × 100   [single-phase]</pre>
         <p>where <em>I</em> = load current (A), <em>R</em> = conductor resistance per unit length
         (Ω/m at operating temperature), <em>L</em> = one-way length (m), and <em>V</em> = nominal
         line voltage (V).</p>
-        <p><strong>NEC limits (informational notes):</strong></p>
+        <p><strong>NEC recommendations (informational notes):</strong></p>
         <ul>
           <li>NEC 215.2(A)(3): Feeder circuits — ≤ 3 % recommended</li>
           <li>NEC 210.19(A)(1): Branch circuits — ≤ 3 % recommended</li>
           <li>Combined feeder + branch — ≤ 5 % recommended</li>
         </ul>
-        <p>Cables without length, load current, or voltage data are excluded from compliance
-        checking but are listed in the table. Circuit type (feeder/branch) is determined from
+        <p>Cables without length, load current, voltage, or conductor-size data are marked
+        <strong>Not Evaluated</strong> but remain listed in the table. Circuit type (feeder/branch) is determined from
         the <em>Circuit Type</em> or <em>Service Type</em> field in the cable schedule.</p>
       </details>
 
@@ -102,7 +103,7 @@ VD% = (2 × I × R × L) / V × 100   [single-phase]</pre>
       <div id="summary" hidden role="region" aria-live="polite" aria-label="Study summary"></div>
 
       <!-- Detailed results table -->
-      <div id="results" role="region" aria-live="polite" aria-label="Voltage drop compliance table"></div>
+      <div id="results" role="region" aria-live="polite" aria-label="Voltage drop recommendation table"></div>
 
       <nav class="step-nav" aria-label="Workflow navigation">
         <a href="contingency.html" class="step-nav-prev">&#8592; N-1 Contingency</a>
@@ -115,19 +116,19 @@ VD% = (2 × I × R × L) / V × 100   [single-phase]</pre>
     <div class="modal-content">
       <button id="close-help-btn" class="close-btn" aria-label="Close Help">&times;</button>
       <h2 id="help-title">Voltage Drop Study Help</h2>
-      <p>Click <em>Run Study</em> to analyse all cables in the current project against NEC
-      voltage drop limits. Cables are retrieved from the Cable Schedule.</p>
+      <p>Click <em>Run Study</em> to analyze all cables in the current project against NEC
+      voltage-drop informational-note recommendations. Cables are retrieved from the Cable Schedule.</p>
       <p><strong>Status indicators:</strong></p>
       <ul>
-        <li><strong>PASS</strong> — drop is below 80 % of the NEC recommended limit</li>
-        <li><strong>WARN</strong> — drop is between 80 % and 100 % of the limit (near-limit)</li>
-        <li><strong>FAIL</strong> — drop exceeds the NEC recommended limit</li>
+        <li><strong>PASS</strong> — drop is below 80 % of the NEC recommended threshold</li>
+        <li><strong>WARN</strong> — drop is between 80 % and 100 % of the recommended threshold</li>
+        <li><strong>FAIL</strong> — drop exceeds the NEC recommended threshold</li>
+        <li><strong>NOT EVALUATED</strong> — length, current, voltage, or conductor size is missing</li>
       </ul>
-      <p>Rows without sufficient data (missing length, current, or voltage) show a dash and
-      are counted as PASS.</p>
+      <p>Rows without sufficient data show a dash and are counted separately from recommendation results.</p>
       <p>Use <em>Export CSV</em> to download the full table for inclusion in project
       documentation or submittals.</p>
-      <p><strong>Improving compliance:</strong> Increase conductor size, reduce run length,
+      <p><strong>Improving recommendation status:</strong> Increase conductor size, reduce run length,
       or add intermediate distribution panels to reduce voltage drop on failing circuits.</p>
     </div>
   </div>

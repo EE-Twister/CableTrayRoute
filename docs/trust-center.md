@@ -30,8 +30,18 @@ Results are shown in a table. Click any row or its **Details** button to expand 
 | EMF-003 | EMF Analysis | ICNIRP 2010; IEC 62110:2009 | Compliance at 250 µT: GP limit exceeded, occupational limit not exceeded |
 | BAT-001 | Battery / UPS Sizing | IEEE 485-2010 §4 | Duty-cycle energy: 10 kW×2 h + 5 kW×1 h = 25 kWh |
 | BAT-002 | Battery / UPS Sizing | IEEE 485-2010 §5.2–5.4 | Li-ion design capacity at 25 °C, 10 % margin: 15.44 kWh |
-| VDROP-001 | Voltage Drop | NEC 2023 Art. 210.19(A)(1) | #12 AWG Cu / 10 A / 30 ft → below 3 % limit, status = pass |
-| VDROP-002 | Voltage Drop | NEC 2023 Art. 210.19(A)(1) | #14 AWG Cu / 20 A / 150 ft → above 3 % limit, status = warn or fail |
+| VDROP-001 | Voltage Drop | NEC 2023 Art. 210.19(A)(1) Informational Note | #12 AWG Cu / 10 A / 30 ft -> below 3 % recommendation, status = pass |
+| VDROP-002 | Voltage Drop | NEC 2023 Art. 210.19(A)(1) Informational Note | #14 AWG Cu / 20 A / 150 ft -> above 3 % recommendation, status = warn or fail |
+
+## NFPA 70 (NEC) 2023 Scope Matrix
+
+The Validation & Standards page includes a module-by-module NFPA 70 (NEC) 2023 scope matrix. The matrix distinguishes selected NEC-informed checks from full code compliance:
+
+- **Scope Defined** means the page documents the support boundary and review expectations.
+- **Partial** means selected NEC references are implemented, but complete article coverage, local amendments, listings, or AHJ review remain outside the automated scope.
+- **Screening** means the tool provides a design-quality warning or recommendation check, not an enforceable code pass/fail result by itself.
+
+Voltage drop is intentionally listed as recommendation screening because NEC 210.19 and 215.2 voltage-drop text is informational-note guidance. Auto-Size is listed as partial because it now applies selected NEC 110.14(C) terminal-temperature caps, but equipment listings, special conditions, and complete Article 240/430/450 decision trees still require engineering review. The Design Rule Checker now screens selected conductor/OCPD protection issues under NEC 240.4 and 240.6(A), selected copper EGC sizes from OCPD ratings under NEC 250.122, and selected conduit fill conditions using NEC Chapter 9 Table 1 limits where conduit type, trade size, and cable OD/area data are available. Alternate conductor material, upsized phase conductors, parallel EGCs, next-size-rule conditions, special conduit-fill cases, and project-specific conditions still require engineering/AHJ review.
 
 ## Interpreting Results
 

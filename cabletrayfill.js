@@ -6,7 +6,7 @@ import { start as startTour } from './tour.js';
 import { getCableAssignedRacewayIds, summarizeCableWorkflow } from './analysis/scheduleWorkflow.mjs';
 
 const TRAYFILL_TOUR_STEPS = [
-  { selector: '#trayParameters',       message: 'Select the tray you want to analyze: choose width, depth, and tray type. These parameters are used to calculate the NEC-compliant fill percentage.' },
+  { selector: '#trayParameters',       message: 'Select the tray you want to analyze: choose width, depth, and tray type. These parameters are used to calculate a selected NEC-informed fill percentage.' },
   { selector: '#addCableBtn',          message: 'Add cables to this tray. The tool will visualize how they pack into the cross-section.' },
   { selector: '#fill-gauge-container', message: 'The fill gauge shows the current fill percentage. NEC §392.22(A) limits tray fill to 40% for multi-conductor cables. Yellow = near limit, red = over limit.' },
   { selector: '#drawBtn',              message: 'Click Draw Tray to render the cross-section visualization with each cable shown to scale.' },

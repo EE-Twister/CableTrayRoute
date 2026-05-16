@@ -10,6 +10,13 @@ function esc(s) {
     .replace(/"/g, '&quot;');
 }
 
+function slug(value) {
+  return String(value ?? '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '') || 'item';
+}
+
 // ---------------------------------------------------------------------------
 // Render helpers
 // ---------------------------------------------------------------------------
@@ -56,6 +63,54 @@ function renderStandards(standards) {
           <ul class="study-basis__list study-basis__list--warn">
             ${s.limitations.map(l => `<li>${esc(l)}</li>`).join('')}
           </ul>` : ''}
+      </div>
+    </details>`).join('');
+}
+
+function statusLabel(status) {
+  const labels = {
+    'scope-defined': 'Scope Defined',
+    partial: 'Partial',
+    screening: 'Screening',
+    supported: 'Supported',
+    'not-supported': 'Not Supported',
+  };
+  return labels[status] || String(status || 'Review');
+}
+
+function renderBulletList(items, className = 'study-basis__list') {
+  if (!Array.isArray(items) || !items.length) return '';
+  return `
+    <ul class="${className}">
+      ${items.map(item => `<li>${esc(item)}</li>`).join('')}
+    </ul>`;
+}
+
+function renderComplianceMatrix(items) {
+  const container = document.getElementById('nec-compliance-matrix');
+  if (!container) return;
+
+  if (!Array.isArray(items) || !items.length) {
+    container.innerHTML = '<p class="field-hint">No NEC 2023 scope matrix is defined.</p>';
+    return;
+  }
+
+  container.innerHTML = items.map(item => `
+    <details class="validation-item" id="nec-${slug(item.id || item.module)}">
+      <summary class="validation-item__summary">
+        <span class="validation-item__name">${esc(item.module)}</span>
+        <span class="validation-status-badge validation-status-badge--${slug(item.status)}">${esc(statusLabel(item.status))}</span>
+        <a class="validation-item__link btn btn--sm" href="${esc(item.page)}" target="_self">Open page &rarr;</a>
+      </summary>
+      <div class="validation-item__body">
+        <p><strong>NEC 2023 Scope:</strong> ${esc(item.nec2023Scope)}</p>
+        ${item.implemented && item.implemented.length ? `
+          <p><strong>Implemented Checks:</strong></p>
+          ${renderBulletList(item.implemented)}` : ''}
+        ${item.gaps && item.gaps.length ? `
+          <p><strong>Remaining Gaps:</strong></p>
+          ${renderBulletList(item.gaps, 'study-basis__list study-basis__list--warn')}` : ''}
+        ${item.nextAction ? `<p class="field-hint"><strong>Next action:</strong> ${esc(item.nextAction)}</p>` : ''}
       </div>
     </details>`).join('');
 }
@@ -158,6 +213,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (manifest) {
     renderKPIs(manifest);
     renderStandards(manifest.standards);
+    renderComplianceMatrix(manifest.necComplianceMatrix);
     renderBenchmarks(manifest.benchmarks);
     renderTestSuites(manifest.testSuites);
   } else {
@@ -167,6 +223,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (resp.ok) {
         const data = await resp.json();
         renderStandards(data.standards || []);
+        renderComplianceMatrix(data.necComplianceMatrix || []);
         renderBenchmarks(data.benchmarks || []);
 
         // Update KPI placeholders with what we know
@@ -179,6 +236,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     } catch {
       // Leave placeholders
+      renderComplianceMatrix([]);
     }
     document.getElementById('test-suites-list').innerHTML =
       '<p class="field-hint">Test suite index not yet generated. Run <code>npm run build:manifest</code>.</p>';

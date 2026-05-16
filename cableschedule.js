@@ -100,10 +100,11 @@ async function initCableSchedule() {
   const INSULATION_TEMP_LIMIT = {
     THHN:90,XLPE:90,PVC:75,XHHW:90,'XHHW-2':90,'THWN-2':90,THW:75,THWN:75,TW:60,UF:60
   };
-  const conductorSizes = ['#22 AWG','#20 AWG','#18 AWG','#16 AWG','#14 AWG','#12 AWG','#10 AWG','#8 AWG','#6 AWG','#4 AWG','#2 AWG','#1 AWG','1/0 AWG','2/0 AWG','3/0 AWG','4/0 AWG','250 kcmil','350 kcmil','500 kcmil','750 kcmil','1000 kcmil'];
+  const conductorSizes = ['#22 AWG','#20 AWG','#18 AWG','#16 AWG','#14 AWG','#12 AWG','#10 AWG','#8 AWG','#6 AWG','#4 AWG','#3 AWG','#2 AWG','#1 AWG','1/0 AWG','2/0 AWG','3/0 AWG','4/0 AWG','250 kcmil','300 kcmil','350 kcmil','400 kcmil','500 kcmil','600 kcmil','750 kcmil','1000 kcmil'];
   const cableTypes = ['Power','Control','Signal','Data','Fiber'];
   const conductorMaterials = ['Copper','Aluminum'];
   const insulationRatings = ['60','75','90'];
+  const terminalTempRatings = ['','60','75','90'];
   const shieldingOptions = ['', 'Lead', 'Copper Tape'];
   const installMethods = ['Conduit','Tray','Direct Buried'];
 
@@ -220,12 +221,16 @@ async function initCableSchedule() {
     {key:'conductors',label:'Conductors',type:'number',group:'Cable Construction',tooltip:'Number of conductors within the cable'},
     {key:'conductor_size',label:'Conductor Size',type:'select',options:conductorSizes,group:'Cable Construction',tooltip:'Size of each conductor'},
     {key:'conductor_material',label:'Conductor Material',type:'select',options:conductorMaterials,group:'Cable Construction',tooltip:'Material of the conductors'},
+    {key:'ground_size',label:'EGC Size',type:'select',options:conductorSizes,group:'Cable Construction',tooltip:'Equipment grounding conductor size used for NEC 250.122 screening'},
+    {key:'ground_material',label:'EGC Material',type:'select',options:conductorMaterials,group:'Cable Construction',tooltip:'Equipment grounding conductor material. The DRC currently screens selected copper EGC sizes.'},
     {key:'install_method',label:'Install Method',type:'select',options:installMethods,group:'Cable Construction',tooltip:'Installation method'},
     {key:'insulation_type',label:'Insulation Type',type:'select',options:Object.keys(INSULATION_TEMP_LIMIT),group:'Cable Construction',tooltip:'Insulation material type'},
     {key:'insulation_rating',label:'Insul Rating (°C)',type:'select',options:insulationRatings,group:'Cable Construction',tooltip:'Maximum temperature rating of insulation'},
     {key:'parallel_count',label:'Parallel Runs',type:'number',group:'Cable Construction',tooltip:'Number of identical cables run in parallel for this circuit (e.g. 3 × 240 kcmil in parallel). Tray fill and ampacity are multiplied by this count.'},
     {key:'operating_voltage',label:'Operating Voltage (V)',type:'number',group:'Electrical Entry',tooltip:'Nominal operating voltage'},
     {key:'est_load',label:'Est Load (A)',type:'number',group:'Electrical Entry',tooltip:'Estimated operating current'},
+    {key:'ocpd_rating',label:'OCPD Rating (A)',type:'number',group:'Electrical Entry',tooltip:'Overcurrent protective device rating used for NEC 240.4/250.122 screening'},
+    {key:'terminal_temp_rating',label:'Terminal Temp (C)',type:'select',options:terminalTempRatings,group:'Electrical Entry',tooltip:'Equipment terminal temperature rating for NEC 110.14(C); blank lets DRC infer 60C through 100A and 75C above 100A'},
     {key:'duty_cycle',label:'Duty Cycle (%)',type:'number',group:'Electrical Entry',tooltip:'Duty cycle percentage'},
     {key:'length',label:'Length (ft)',type:'number',group:'Electrical Entry',tooltip:'Length of cable run'},
     {key:'load_flow_current',label:'Load Flow Current (A)',type:'text',group:'Calculations',tooltip:'Current captured from the latest load flow study'},
@@ -245,6 +250,7 @@ async function initCableSchedule() {
     'install_method',
     'operating_voltage',
     'est_load',
+    'terminal_temp_rating',
     'load_flow_current',
     'ambient_temp',
     'duty_cycle',
@@ -311,12 +317,16 @@ async function initCableSchedule() {
     'conductors',
     'conductor_size',
     'conductor_material',
+    'ground_size',
+    'ground_material',
     'install_method',
     'insulation_type',
     'insulation_rating',
     'parallel_count',
     'operating_voltage',
     'est_load',
+    'ocpd_rating',
+    'terminal_temp_rating',
     'length',
     'notes'
   ]);
@@ -332,6 +342,9 @@ async function initCableSchedule() {
     tag: 'Use the project cable numbering standard. Auto tag settings can prefill this value.',
     raceway_ids: 'Required before routing. Options come from the Raceway Schedule.',
     conductor_size: 'Required for tray fill, ampacity, and voltage drop calculations.',
+    ground_size: 'Used with OCPD Rating by Design Rule Checker for selected NEC 250.122 EGC screening.',
+    ocpd_rating: 'Used with EGC Size and Conductor Size by Design Rule Checker for selected NEC 240.4 and 250.122 screening.',
+    terminal_temp_rating: 'Optional NEC 110.14(C) termination rating. Leave blank to infer 60C through 100A equipment and 75C above 100A.',
     length: 'Required for voltage drop and route quantity checks.',
     operating_voltage: 'Used with load current for electrical sizing and review reports.',
     est_load: 'Estimated operating current for sizing checks.',
@@ -345,9 +358,13 @@ async function initCableSchedule() {
       conductors: 3,
       conductor_size: '#12 AWG',
       conductor_material: 'Copper',
+      ground_size: '#12 AWG',
+      ground_material: 'Copper',
       install_method: 'Tray',
       insulation_type: 'THHN',
       insulation_rating: '90',
+      terminal_temp_rating: '60',
+      ocpd_rating: 20,
       cable_rating: 600,
       shielding_jacket: ''
     },

@@ -53,6 +53,40 @@ describe('validationBenchmarks.json — schema', () => {
     assert.ok(data.standards.length >= 6, `Expected ≥6 standards, got ${data.standards.length}`);
   });
 
+  it('has NEC compliance matrix entries with required scope fields', () => {
+    const raw = fs.readFileSync(benchmarksPath, 'utf8');
+    const data = JSON.parse(raw);
+    assert.ok(Array.isArray(data.necComplianceMatrix), 'necComplianceMatrix must be an array');
+    assert.ok(data.necComplianceMatrix.length >= 6, `Expected >=6 NEC matrix entries, got ${data.necComplianceMatrix.length}`);
+    for (const item of data.necComplianceMatrix) {
+      assert.ok(item.id, 'NEC matrix entry missing id');
+      assert.ok(item.module, `NEC matrix ${item.id} missing module`);
+      assert.ok(item.page && /\.html$/.test(item.page), `NEC matrix ${item.id} page must be an HTML file`);
+      assert.ok(item.status, `NEC matrix ${item.id} missing status`);
+      assert.ok(item.nec2023Scope, `NEC matrix ${item.id} missing nec2023Scope`);
+      assert.ok(Array.isArray(item.gaps), `NEC matrix ${item.id} gaps must be an array`);
+      assert.ok(item.nextAction, `NEC matrix ${item.id} missing nextAction`);
+    }
+  });
+
+  it('defines voltage-drop as recommendation screening, not full compliance', () => {
+    const { necComplianceMatrix } = JSON.parse(fs.readFileSync(benchmarksPath, 'utf8'));
+    const voltageDrop = necComplianceMatrix.find(item => item.id === 'nec-voltage-drop');
+    assert.ok(voltageDrop, 'Missing nec-voltage-drop matrix row');
+    assert.strictEqual(voltageDrop.status, 'screening');
+    assert.ok(/informational-note recommendations/i.test(voltageDrop.nec2023Scope));
+    assert.ok(voltageDrop.gaps.some(gap => /not an enforceable pass\/fail code limit/i.test(gap)));
+  });
+
+  it('defines Auto-Size as selected NEC checks only', () => {
+    const { necComplianceMatrix } = JSON.parse(fs.readFileSync(benchmarksPath, 'utf8'));
+    const autoSize = necComplianceMatrix.find(item => item.id === 'nec-autosize');
+    assert.ok(autoSize, 'Missing nec-autosize matrix row');
+    assert.strictEqual(autoSize.status, 'partial');
+    assert.ok(/selected NEC 2023 references/i.test(autoSize.nec2023Scope));
+    assert.ok(autoSize.gaps.some(gap => /complete NEC Article 240, 430, or 450/i.test(gap)));
+  });
+
   it('every benchmark has required fields: id, title, studyPage, standard', () => {
     const { benchmarks } = JSON.parse(fs.readFileSync(benchmarksPath, 'utf8'));
     for (const b of benchmarks) {
@@ -183,6 +217,15 @@ describe('benchmark IDs — link integrity', () => {
     );
     for (const s of standards) {
       assert.ok(/\.html$/.test(s.studyPage), `Standard ${s.id} studyPage must end in .html`);
+    }
+  });
+
+  it('every NEC matrix page is a known HTML filename pattern', () => {
+    const { necComplianceMatrix } = JSON.parse(
+      fs.readFileSync(path.join(ROOT, 'data', 'validationBenchmarks.json'), 'utf8')
+    );
+    for (const item of necComplianceMatrix) {
+      assert.ok(/\.html$/.test(item.page), `NEC matrix ${item.id} page must end in .html`);
     }
   });
 });

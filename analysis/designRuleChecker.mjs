@@ -8,14 +8,30 @@
  *   DRC-01  NEC 392.22(A)  — Tray fill exceeds 40 % of usable cross-section
  *   DRC-02  NEC 392.6(H)   — Voltage-class segregation (mixed cable groups)
  *   DRC-03  NEC 310.15     — Cable exceeds rated ampacity (with tray derating)
- *   DRC-04  NEC 250.122    — Power cables have no grounding conductor defined
+ *   DRC-04  NEC 250.122    — Power cables have no EGC, or selected EGC is undersized
  *   DRC-05  (advisory)     — Cables with no assigned route (unrouted cables)
  *   DRC-06  TIA-568.0-D §4.5 — Structured cabling (Data/Fiber) shares tray with Power cables
  *   DRC-07  NEC 310.10(H) — Parallel conductor requirements (min size, equal length)
  *   DRC-08  NEC 500/IEC 60079 — Equipment Ex protection type or T-rating incompatible with classified area
+ *   DRC-09  NEC 240.4 / 240.6(A) — Conductor OCPD protection screening
+ *   DRC-10  NEC Chapter 9 Table 1 / Informative Annex C - Conduit fill screening
  *
  * @module designRuleChecker
  */
+
+import {
+  buildConduitCableMap,
+  evaluateConduitFill,
+  recordId,
+} from './conduitFill.mjs';
+import {
+  inferTerminalTempRating,
+  nextStandardOcpd,
+  normalizeConductorMaterial,
+  normalizeTemperatureRating,
+  smallConductorMaxOcpd,
+  tableAmpacity,
+} from './autoSize.mjs';
 
 // ---------------------------------------------------------------------------
 // Severity constants
@@ -49,7 +65,7 @@ const TRAY_DERATING_FACTORS = [
 ];
 
 // ---------------------------------------------------------------------------
-// NEC Table 310.15(B)(16) baseline ampacity — 75 °C copper, used as default
+// NEC Table 310.16 baseline ampacity (formerly 310.15(B)(16)) — 75 °C copper, used as default
 // when cable record lacks explicit ampacity data.
 // ---------------------------------------------------------------------------
 const BASELINE_AMPACITY = {
@@ -59,6 +75,103 @@ const BASELINE_AMPACITY = {
   '4/0 AWG': 230, '250 kcmil': 255, '350 kcmil': 310,
   '500 kcmil': 380, '750 kcmil': 475, '1000 kcmil': 545,
 };
+
+// ---------------------------------------------------------------------------
+// Selected NEC 250.122 copper equipment grounding conductor minimums.
+// These are common OCPD rating breakpoints used for DRC screening only; final
+// EGC sizing must still account for conductor material, upsized phase
+// conductors, parallel equipment grounding conductors, and AHJ requirements.
+// ---------------------------------------------------------------------------
+const EGC_SIZE_ORDER = [
+  '#22 AWG', '#20 AWG', '#18 AWG', '#16 AWG', '#14 AWG', '#12 AWG',
+  '#10 AWG', '#8 AWG', '#6 AWG', '#4 AWG', '#3 AWG', '#2 AWG',
+  '#1 AWG', '1/0 AWG', '2/0 AWG', '3/0 AWG', '4/0 AWG',
+  '250 kcmil', '350 kcmil', '400 kcmil', '500 kcmil', '700 kcmil',
+  '800 kcmil',
+];
+
+const EGC_SIZE_RANK = new Map(EGC_SIZE_ORDER.map((size, index) => [size, index]));
+
+const COPPER_EGC_MINIMUMS_BY_OCPD = [
+  { maxOcpd: 15, size: '#14 AWG' },
+  { maxOcpd: 20, size: '#12 AWG' },
+  { maxOcpd: 60, size: '#10 AWG' },
+  { maxOcpd: 100, size: '#8 AWG' },
+  { maxOcpd: 200, size: '#6 AWG' },
+  { maxOcpd: 300, size: '#4 AWG' },
+  { maxOcpd: 400, size: '#3 AWG' },
+  { maxOcpd: 500, size: '#2 AWG' },
+  { maxOcpd: 600, size: '#1 AWG' },
+  { maxOcpd: 800, size: '1/0 AWG' },
+  { maxOcpd: 1000, size: '2/0 AWG' },
+  { maxOcpd: 1200, size: '3/0 AWG' },
+];
+
+const EGC_SIZE_FIELDS = [
+  'ground_size',
+  'egc_size',
+  'ground_conductor',
+  'grounding_conductor',
+  'equipment_grounding_conductor',
+];
+
+const EGC_MATERIAL_FIELDS = [
+  'ground_material',
+  'egc_material',
+  'ground_conductor_material',
+  'grounding_conductor_material',
+  'equipment_grounding_conductor_material',
+];
+
+const OCPD_RATING_FIELDS = [
+  'ocpd_rating',
+  'ocpd_amps',
+  'ocpd_size',
+  'ocpdRating',
+  'breaker_size',
+  'breaker_amps',
+  'breakerAmps',
+  'fuse_size',
+  'fuse_amps',
+  'fuseAmps',
+  'protective_device_rating',
+  'protectiveDeviceRating',
+  'protection_amps',
+  'protection_size',
+  'overcurrent_device_rating',
+  'overcurrent_protection_amps',
+  'max_ocpd',
+  'maxOcpd',
+  'mocp',
+];
+
+const CONDUCTOR_SIZE_FIELDS = [
+  'conductor_size',
+  'conductorSize',
+  'cable_size',
+  'wire_size',
+  'conductor',
+  'size',
+  'awg',
+];
+
+const CONDUCTOR_MATERIAL_FIELDS = [
+  'conductor_material',
+  'conductorMaterial',
+  'material',
+  'phase_conductor_material',
+  'phaseConductorMaterial',
+  'wire_material',
+];
+
+const TERMINAL_TEMP_FIELDS = [
+  'terminal_temp_rating',
+  'terminalTempRating',
+  'terminal_rating',
+  'termination_temp_rating',
+  'terminationTempRating',
+  'equipment_terminal_temp',
+];
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -122,6 +235,116 @@ function baselineAmpacity(size) {
   if (!size) return null;
   const key = size.trim();
   return BASELINE_AMPACITY[key] ?? null;
+}
+
+function firstDefinedText(record, fields) {
+  for (const field of fields) {
+    const value = record[field];
+    if (value == null) continue;
+    const text = String(value).trim();
+    if (text) return text;
+  }
+  return '';
+}
+
+function parsePositiveNumber(value) {
+  if (typeof value === 'number') return Number.isFinite(value) && value > 0 ? value : null;
+  const text = String(value ?? '').trim();
+  if (!text) return null;
+  const direct = Number.parseFloat(text);
+  if (Number.isFinite(direct) && direct > 0) return direct;
+  const match = text.match(/(\d+(?:\.\d+)?)/);
+  if (!match) return null;
+  const parsed = Number.parseFloat(match[1]);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+function normalizeEgcSize(value) {
+  const text = String(value ?? '').trim();
+  if (!text) return null;
+  const normalized = text.replace(/\s+/g, ' ').toUpperCase();
+  const awg = normalized.match(/^#?\s*(22|20|18|16|14|12|10|8|6|4|3|2|1)\s*(AWG)?$/);
+  if (awg) return `#${awg[1]} AWG`;
+  const zeroAwg = normalized.match(/^(1\/0|2\/0|3\/0|4\/0)\s*(AWG)?$/);
+  if (zeroAwg) return `${zeroAwg[1]} AWG`;
+  const kcmil = normalized.match(/^(250|350|400|500|700|800)\s*(KCMIL|MCM)?$/);
+  if (kcmil) return `${kcmil[1]} kcmil`;
+  const bare = normalized.match(/^(\d+)$/);
+  if (bare) {
+    const numeric = Number.parseInt(bare[1], 10);
+    if (EGC_SIZE_RANK.has(`#${numeric} AWG`)) return `#${numeric} AWG`;
+    if (numeric >= 250) return `${numeric} kcmil`;
+  }
+  return null;
+}
+
+function normalizeConductorSize(value) {
+  const text = String(value ?? '').trim();
+  if (!text) return null;
+  const normalized = text.replace(/\s+/g, ' ').toUpperCase();
+  const awg = normalized.match(/^#?\s*(14|12|10|8|6|4|3|2|1)\s*(AWG)?$/);
+  if (awg) return `#${awg[1]} AWG`;
+  const zeroAwg = normalized.match(/^(1\/0|2\/0|3\/0|4\/0)\s*(AWG)?$/);
+  if (zeroAwg) return `${zeroAwg[1]} AWG`;
+  const kcmil = normalized.match(/^(250|300|350|400|500|600|750|1000)\s*(KCMIL|MCM)?$/);
+  if (kcmil) return `${kcmil[1]} kcmil`;
+  return null;
+}
+
+function cableEgcMaterial(cable) {
+  const text = firstDefinedText(cable, EGC_MATERIAL_FIELDS).toLowerCase();
+  if (!text) return '';
+  if (text === 'cu' || text.includes('copper')) return 'copper';
+  if (text === 'al' || text.includes('alum')) return 'aluminum';
+  return text;
+}
+
+function requiredCopperEgcSize(ocpdRating) {
+  const rating = parsePositiveNumber(ocpdRating);
+  if (!rating) return null;
+  const row = COPPER_EGC_MINIMUMS_BY_OCPD.find(entry => rating <= entry.maxOcpd);
+  return row?.size ?? null;
+}
+
+function compareEgcSizes(actualSize, requiredSize) {
+  const actualRank = EGC_SIZE_RANK.get(actualSize);
+  const requiredRank = EGC_SIZE_RANK.get(requiredSize);
+  if (actualRank == null || requiredRank == null) return null;
+  return actualRank - requiredRank;
+}
+
+function cableOcpdRating(cable) {
+  for (const field of OCPD_RATING_FIELDS) {
+    const rating = parsePositiveNumber(cable[field]);
+    if (rating) return rating;
+  }
+  return null;
+}
+
+function cableConductorMaterial(cable) {
+  const text = firstDefinedText(cable, CONDUCTOR_MATERIAL_FIELDS);
+  if (text) return normalizeConductorMaterial(text);
+  const sizeText = firstDefinedText(cable, CONDUCTOR_SIZE_FIELDS);
+  return /(^|\s)(AL|ALUM|ALUMINUM)(\s|$)/i.test(sizeText)
+    ? 'aluminum'
+    : 'copper';
+}
+
+function cableTerminalTempRating(cable, ocpdRating) {
+  const text = firstDefinedText(cable, TERMINAL_TEMP_FIELDS);
+  if (text) return normalizeTemperatureRating(text, inferTerminalTempRating({ requiredOcpd: ocpdRating }));
+  return inferTerminalTempRating({ requiredOcpd: ocpdRating });
+}
+
+function hasCircuitSpecificOcpdAllowance(cable) {
+  const text = [
+    cable.circuit_type,
+    cable.load_type,
+    cable.service_description,
+    cable.notes,
+    cable.engineer_note,
+  ].map(value => String(value ?? '').toLowerCase()).join(' ');
+  return /\b(motor|hvac|air conditioning|refrigeration|transformer|tap)\b/.test(text);
 }
 
 // ---------------------------------------------------------------------------
@@ -430,8 +653,9 @@ function checkParallelConductors(cables) {
 
 /**
  * DRC-04 — Grounding conductor check.
- * Power cables should have a grounding conductor.  If a power cable record
- * has no ground or EGC defined, flag it.
+ * Power cables should have an equipment grounding conductor. If a power cable
+ * record has no EGC defined, flag it. If the row also includes an OCPD rating,
+ * screen the recorded copper EGC size against selected NEC 250.122 breakpoints.
  *
  * @param {object[]} cables  Cable schedule rows.
  * @returns {DrcFinding[]}
@@ -444,8 +668,10 @@ function checkGrounding(cables) {
     const cableType = (cable.cable_type ?? cable.type ?? '').toLowerCase();
     if (cableType && cableType !== 'power' && cableType !== 'pwr') continue;
 
+    const egcRaw = firstDefinedText(cable, EGC_SIZE_FIELDS);
+    const egcSize = normalizeEgcSize(egcRaw);
     const hasGround =
-      parseFloat(cable.ground_size ?? cable.egc_size ?? cable.ground_conductor) > 0 ||
+      Boolean(egcSize) ||
       String(cable.grounded ?? '').toLowerCase() === 'true' ||
       String(cable.includes_ground ?? '').toLowerCase() === 'true';
 
@@ -459,6 +685,135 @@ function checkGrounding(cables) {
           `Verify NEC 250.122 compliance.`,
         remediation: `Add an equipment grounding conductor (EGC) sized per NEC Table 250.122 based on the OCPD rating for cable "${name}". Record the EGC size in the Cable Schedule ground_size column.`,
         reference: 'NEC 250.122',
+      });
+      continue;
+    }
+
+    const ocpdRating = cableOcpdRating(cable);
+    const egcMaterial = cableEgcMaterial(cable);
+    if (ocpdRating && egcMaterial && egcMaterial !== 'copper') {
+      findings.push({
+        ruleId: 'DRC-04',
+        severity: DRC_SEVERITY.WARNING,
+        location: name,
+        message:
+          `Power cable "${name}" records an ${egcMaterial} EGC. ` +
+          `The automated NEC 250.122 sizing screen currently covers selected copper EGC values only.`,
+        remediation:
+          `Verify the EGC size for cable "${name}" against the applicable NEC 250.122 material row ` +
+          `and document the basis in the engineer note.`,
+        reference: 'NEC 250.122',
+      });
+      continue;
+    }
+
+    const requiredSize = requiredCopperEgcSize(ocpdRating);
+    if (!egcSize || !ocpdRating || !requiredSize) continue;
+
+    const sizeComparison = compareEgcSizes(egcSize, requiredSize);
+    if (sizeComparison != null && sizeComparison < 0) {
+      findings.push({
+        ruleId: 'DRC-04',
+        severity: DRC_SEVERITY.ERROR,
+        location: name,
+        message:
+          `Power cable "${name}" EGC ${egcSize} is smaller than the selected ` +
+          `NEC 250.122 copper EGC minimum of ${requiredSize} for a ${ocpdRating} A OCPD.`,
+        detail:
+          `Recorded EGC: ${egcSize}; OCPD rating: ${ocpdRating} A; ` +
+          `selected copper EGC minimum: ${requiredSize}.`,
+        remediation:
+          `Increase the recorded EGC to at least ${requiredSize} copper for cable "${name}", ` +
+          `or document the engineered basis for alternate conductor material, upsized phase ` +
+          `conductors, parallel EGCs, or other NEC 250.122 conditions.`,
+        reference: 'NEC 250.122',
+      });
+    }
+  }
+  return findings;
+}
+
+/**
+ * DRC-09 — Conductor overcurrent protection screening.
+ * Screens the selected phase conductor size against small-conductor limits,
+ * standard OCPD ratings, and the inferred or recorded terminal temperature
+ * ampacity. This is intentionally conservative because Article 240 includes
+ * next-size, motor, tap, and equipment-specific rules that still require review.
+ *
+ * @param {object[]} cables  Cable schedule rows.
+ * @returns {DrcFinding[]}
+ */
+function checkOcpdProtection(cables) {
+  const findings = [];
+  for (const cable of cables) {
+    const name = cable.name ?? cable.tag;
+    if (!name) continue;
+    const cableType = (cable.cable_type ?? cable.type ?? '').toLowerCase();
+    if (cableType && cableType !== 'power' && cableType !== 'pwr') continue;
+
+    const ocpdRating = cableOcpdRating(cable);
+    if (!ocpdRating) continue;
+
+    const conductorSize = normalizeConductorSize(firstDefinedText(cable, CONDUCTOR_SIZE_FIELDS));
+    if (!conductorSize) continue;
+
+    const standardOcpd = nextStandardOcpd(ocpdRating);
+    if (standardOcpd !== ocpdRating) {
+      findings.push({
+        ruleId: 'DRC-09',
+        severity: DRC_SEVERITY.WARNING,
+        location: name,
+        message:
+          `Cable "${name}" uses ${ocpdRating} A OCPD, which is not listed in the selected NEC 240.6(A) standard rating table.`,
+        detail: standardOcpd
+          ? `Next higher selected standard rating is ${standardOcpd} A.`
+          : 'The OCPD rating is above the selected standard rating range used by this checker.',
+        remediation:
+          `Verify the protective device for cable "${name}" is a listed standard ampere rating ` +
+          `or document the engineered basis for the selected rating.`,
+        reference: 'NEC 240.6(A)',
+      });
+    }
+
+    const material = cableConductorMaterial(cable);
+    const terminalTempRating = cableTerminalTempRating(cable, ocpdRating);
+    const terminalAmpacity = tableAmpacity(conductorSize, material, terminalTempRating);
+    const smallConductorMax = smallConductorMaxOcpd(conductorSize, material);
+
+    if (smallConductorMax !== null && ocpdRating > smallConductorMax) {
+      const hasAllowanceCue = hasCircuitSpecificOcpdAllowance(cable);
+      findings.push({
+        ruleId: 'DRC-09',
+        severity: hasAllowanceCue ? DRC_SEVERITY.WARNING : DRC_SEVERITY.ERROR,
+        location: name,
+        message:
+          `Cable "${name}" ${conductorSize} ${material} is protected at ${ocpdRating} A, ` +
+          `above the selected NEC 240.4(D) small-conductor maximum of ${smallConductorMax} A.`,
+        remediation:
+          hasAllowanceCue
+            ? `Document the applicable NEC Article 240/430/440/450 exception basis for cable "${name}", ` +
+              `or lower the OCPD/upsize the phase conductor if no circuit-specific allowance applies.`
+            : `Lower the OCPD to ${smallConductorMax} A or less, upsize the phase conductor, ` +
+              `or document the applicable NEC exception if this is a motor, HVAC, tap, or other special circuit.`,
+        reference: 'NEC 240.4(D)',
+      });
+      continue;
+    }
+
+    if (terminalAmpacity !== null && ocpdRating > terminalAmpacity) {
+      findings.push({
+        ruleId: 'DRC-09',
+        severity: DRC_SEVERITY.WARNING,
+        location: name,
+        message:
+          `Cable "${name}" ${conductorSize} ${material} has ${terminalAmpacity} A ampacity ` +
+          `at the ${terminalTempRating}C terminal column, below the ${ocpdRating} A OCPD rating.`,
+        detail:
+          `Terminal temperature basis: ${terminalTempRating}C; conductor material: ${material}.`,
+        remediation:
+          `Verify NEC 240.4(B) next-size conditions or any circuit-specific Article 240/430/440 allowance. ` +
+          `If none applies, lower the OCPD or upsize the conductor for cable "${name}".`,
+        reference: 'NEC 110.14(C) / 240.4(B)',
       });
     }
   }
@@ -475,6 +830,104 @@ function checkGrounding(cables) {
  * @param {Set<string>}           [routedNames] Optional set of cable names known to be routed.
  * @returns {DrcFinding[]}
  */
+/**
+ * DRC-10 - Conduit fill screening.
+ *
+ * Screens assigned conduit/raceway cables against selected NEC Chapter 9
+ * Table 1 fill limits using the internal area and cable OD data available in
+ * the project. Missing conduit size/type or cable OD is reported as a warning.
+ *
+ * @param {object[]}               conduits         Raceway schedule conduit rows.
+ * @param {Map<string, object[]>}  conduitCableMap  Conduit -> cables map.
+ * @returns {DrcFinding[]}
+ */
+function checkConduitFill(conduits, conduitCableMap) {
+  const findings = [];
+
+  for (const conduit of conduits) {
+    const conduitId = recordId(conduit);
+    if (!conduitId) continue;
+    const assignedCables = conduitCableMap.get(conduitId) ?? [];
+    if (assignedCables.length === 0) continue;
+
+    const evaluation = evaluateConduitFill(conduit, assignedCables);
+    const label = evaluation.conduitId || conduitId;
+    const cableList = evaluation.assignedCableNames.length
+      ? evaluation.assignedCableNames.join(', ')
+      : `${assignedCables.length} assigned cable${assignedCables.length !== 1 ? 's' : ''}`;
+
+    if (!evaluation.internalAreaIn2) {
+      findings.push({
+        ruleId: 'DRC-10',
+        severity: DRC_SEVERITY.WARNING,
+        location: label,
+        message:
+          `Conduit "${label}" has assigned cables but is missing a recognized conduit type and trade size for fill screening.`,
+        detail:
+          `Assigned cables: ${cableList}. Enter a supported conduit type and trade size in the Raceway Schedule.`,
+        reference: 'NEC Chapter 9, Table 1 / Informative Annex C',
+        remediation:
+          'Set the conduit/raceway type and trade size, or document the external conduit-fill calculation basis before issuing raceway schedules.',
+      });
+      continue;
+    }
+
+    if (evaluation.missingAreaCables.length > 0) {
+      findings.push({
+        ruleId: 'DRC-10',
+        severity: DRC_SEVERITY.WARNING,
+        location: label,
+        message:
+          `Conduit "${label}" has assigned cables missing outside diameter or area data, so fill cannot be fully verified.`,
+        detail:
+          `Missing OD/area: ${evaluation.missingAreaCables.join(', ')}. ` +
+          `Known cable area: ${evaluation.cableAreaTotalIn2.toFixed(3)} in2.`,
+        reference: 'NEC Chapter 9, Table 1 / Informative Annex C',
+        remediation:
+          'Enter cable OD/diameter or cable area for each assigned cable, then rerun the Design Rule Checker.',
+      });
+    }
+
+    if (!evaluation.fillLimit || evaluation.fillPercent === null) continue;
+
+    const fillFraction = evaluation.fillPercent / 100;
+    if (fillFraction > evaluation.fillLimit) {
+      findings.push({
+        ruleId: 'DRC-10',
+        severity: DRC_SEVERITY.ERROR,
+        location: label,
+        message:
+          `Conduit "${label}" fill ${evaluation.fillPercent.toFixed(1)} % exceeds the selected ` +
+          `${(evaluation.fillLimit * 100).toFixed(0)} % NEC Chapter 9 Table 1 limit for ` +
+          `${evaluation.cableCount} cable${evaluation.cableCount !== 1 ? 's' : ''}.`,
+        detail:
+          `${evaluation.conduitType} ${evaluation.tradeSize}: ${evaluation.internalAreaIn2.toFixed(3)} in2 internal area; ` +
+          `assigned cable area: ${evaluation.cableAreaTotalIn2.toFixed(3)} in2; cables: ${cableList}.`,
+        reference: 'NEC Chapter 9, Table 1 / Informative Annex C',
+        remediation:
+          'Upsize the conduit, split the cable set across additional raceways, or verify a project-specific conduit-fill calculation basis.',
+      });
+    } else if (fillFraction > evaluation.fillLimit * 0.9) {
+      findings.push({
+        ruleId: 'DRC-10',
+        severity: DRC_SEVERITY.WARNING,
+        location: label,
+        message:
+          `Conduit "${label}" fill ${evaluation.fillPercent.toFixed(1)} % is within 10 % of the selected ` +
+          `${(evaluation.fillLimit * 100).toFixed(0)} % NEC Chapter 9 Table 1 limit.`,
+        detail:
+          `${evaluation.conduitType} ${evaluation.tradeSize}: ${evaluation.internalAreaIn2.toFixed(3)} in2 internal area; ` +
+          `assigned cable area: ${evaluation.cableAreaTotalIn2.toFixed(3)} in2; cables: ${cableList}.`,
+        reference: 'NEC Chapter 9, Table 1 / Informative Annex C',
+        remediation:
+          'Review spare capacity before adding future cables, or reserve a larger/parallel conduit where growth is expected.',
+      });
+    }
+  }
+
+  return findings;
+}
+
 function checkUnroutedCables(cables, trayCableMap, routedNames = new Set()) {
   const findings = [];
 
@@ -559,14 +1012,18 @@ function checkDataCableSegregation(trayCableMap) {
  *
  * @param {object}   input
  * @param {object[]} input.trays        Raceway schedule rows (from dataStore.getTrays()).
+ * @param {object[]} [input.conduits]   Conduit rows (from dataStore.getConduits()).
  * @param {object[]} input.cables       Cable schedule rows (from dataStore.getCables()).
  * @param {object}   input.trayCableMap Plain object { tray_id: cableObj[] } from routing state.
+ * @param {object}   [input.conduitCableMap] Plain object { conduit_id: cableObj[] } from routing state.
  * @param {Set<string>} [input.routedCableNames]  Names of cables that have field routes.
  * @param {object}   [options]
  * @param {number}   [options.fillLimit=0.40]   Tray fill fraction limit.
  * @param {boolean}  [options.skipGrounding]    Skip DRC-04 grounding checks.
  * @param {boolean}  [options.skipAmpacity]       Skip DRC-03 ampacity checks.
  * @param {boolean}  [options.skipParallelCheck] Skip DRC-07 parallel conductor checks.
+ * @param {boolean}  [options.skipOcpdProtection] Skip DRC-09 conductor/OCPD checks.
+ * @param {boolean}  [options.skipConduitFill] Skip DRC-10 conduit fill checks.
  *
  * @returns {{ findings: DrcFinding[], summary: DrcSummary }}
  *
@@ -632,19 +1089,35 @@ export function checkHazAreaCompatibility(equipment, areas, checkResult) {
 }
 
 export function runDRC(input, options = {}) {
-  const { trays = [], cables = [], trayCableMap: rawMap = {}, routedCableNames } = input;
+  const {
+    trays = [],
+    conduits = [],
+    cables = [],
+    trayCableMap: rawMap = {},
+    conduitCableMap: rawConduitMap = {},
+    routedCableNames,
+  } = input;
 
   // Convert plain object map to ES Map for internal use
   const trayMap = rawMap instanceof Map
     ? rawMap
     : new Map(Object.entries(rawMap));
+  const conduitMap = buildConduitCableMap(conduits, cables, rawConduitMap);
+  const routedNames = routedCableNames instanceof Set
+    ? new Set(routedCableNames)
+    : new Set(routedCableNames ? [...routedCableNames] : []);
+  for (const cabs of conduitMap.values()) {
+    cabs.forEach(c => { if (c.name ?? c.tag) routedNames.add(c.name ?? c.tag); });
+  }
 
   const findings = [
     ...checkTrayFill(trays, options),
     ...checkSegregation(trays, trayMap),
     ...(options.skipAmpacity ? [] : checkAmpacity(cables, trayMap)),
     ...(options.skipGrounding ? [] : checkGrounding(cables)),
-    ...checkUnroutedCables(cables, trayMap, routedCableNames),
+    ...(options.skipOcpdProtection ? [] : checkOcpdProtection(cables)),
+    ...(options.skipConduitFill ? [] : checkConduitFill(conduits, conduitMap)),
+    ...checkUnroutedCables(cables, trayMap, routedNames),
     ...checkDataCableSegregation(trayMap),
     ...(options.skipParallelCheck ? [] : checkParallelConductors(cables)),
     ...(options.hazAreaCheckResult ? checkHazAreaCompatibility(

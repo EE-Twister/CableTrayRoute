@@ -55,7 +55,7 @@ The following features were identified as gaps and have since been implemented:
 | Reliability / N-1 Analysis | `analysis/reliability.js` | `reliability.html` | `tests/reliabilityAnalysis.test.mjs` |
 | Cost Estimation | `analysis/costEstimate.mjs` | `costestimate.html` | `tests/costEstimate.test.mjs` |
 | Real-Time Multi-User Collaboration | `src/collaborationServer.mjs`, `src/collabManager.js` | *(all pages via presence bar)* | `tests/collaboration.test.mjs`, `tests/collaborationServer.test.mjs` |
-| Voltage Drop Compliance Study | `analysis/voltageDropStudy.mjs` | `voltagedropstudy.html` | `tests/voltageDropStudy.test.mjs` |
+| Voltage Drop Recommendation Study | `analysis/voltageDropStudy.mjs` | `voltagedropstudy.html` | `tests/voltageDropStudy.test.mjs` |
 | AI/LLM Copilot (Natural Language Queries) | `src/copilot.js`, `/api/copilot` in `server.mjs` | All pages (floating panel) | `tests/copilot.test.mjs` |
 | QR Code Tag Generation for Field Access | `analysis/pullCards.mjs`, `analysis/trayHardware.mjs` | `pullcards.html`, `trayhardwarebom.html` | `tests/pullCards.test.mjs` |
 | Open REST API / Scripting Interface | `server.mjs` (`/api/v1/` routes) | *(API)* | `tests/api.test.mjs` |
@@ -697,7 +697,7 @@ These gaps describe areas where CableTrayRoute's calculation engine uses simplif
 |---|---|---|
 | **NEC 310.15(B) & (C) derating in conductor auto-selection** | ETAP cable sizing, EasyPower SmartDesign | `analysis/autoSize.mjs` looks up NEC ampacity tables at the 30°C baseline and selects the next-larger standard conductor size. It does not apply: (1) ambient temperature correction factors per NEC Table 310.15(B)(1)(a); (2) more-than-3-conductors bundling/grouping derating per NEC 310.15(C); or (3) tray fill derating per NEC 392.80(A). The result is that auto-selected conductors may be undersized once installation conditions are accounted for. ETAP and EasyPower both apply all three derating sequences before finalizing a conductor size. |
 
-**Status:** ✅ Implemented. `analysis/autoSize.mjs` now contains the full NEC correction factor stack:
+**Status:** ✅ Implemented. `analysis/autoSize.mjs` now contains the selected NEC correction-factor stack:
 - `AMBIENT_TEMP_CORRECTION` table — NEC Table 310.15(B)(1)(a) factors for 60/75/90°C insulation ratings at ambient temperatures 10–90°C.
 - `BUNDLING_FACTORS` table — NEC 310.15(C)(1) adjustment factors for 1–40+ current-carrying conductors in a raceway.
 - `TRAY_FILL_FACTORS` map — NEC 392.80(A): `conduit` (1.0), `tray_spaced` (1.0), `tray_touching` (0.65).
@@ -717,7 +717,7 @@ These gaps describe areas where CableTrayRoute's calculation engine uses simplif
 **Status:** ✅ Implemented. `analysis/autoSize.mjs` includes `CU_COST_PER_FT` and `AL_COST_PER_FT` tables (RS Means–based indicative pricing) and four new exported functions:
 - `conductorCostPerFt(size, material)` — $/ft lookup.
 - `meetsParallelRequirement(size)` — NEC 310.10(H) ≥ 1/0 AWG check.
-- `evaluateConductorOption(requiredAmps, material, tempRating, nParallel, options)` — returns ampacity, installed ampacity (after derating), cost per ft per phase, and NEC compliance notes.
+- `evaluateConductorOption(requiredAmps, material, tempRating, nParallel, options)` — returns ampacity, installed ampacity (after derating), cost per ft per phase, and NEC reference notes.
 - `minimizeCostConductors(requiredAmps, tempRating, {allowAluminum, maxParallel, …})` — evaluates all Cu/Al × 1–4 parallel combinations, filters NEC 310.10(H) violations, and returns options sorted cheapest-first.
 `autosize.js` renders a "Conductor Cost Comparison" table below the feeder sizing result, with "selected" and "cheapest" badges, percentage-vs-baseline column, and RS Means disclaimer. Cu vs. Al savings of 20–40% are typical for large conductors.
 

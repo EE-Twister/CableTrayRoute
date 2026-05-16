@@ -10,6 +10,8 @@ import {
   smallConductorMaxOcpd,
   nextStandardXfmrKva,
   selectConductorSize,
+  tableAmpacity,
+  inferTerminalTempRating,
   motorFLC3Ph,
   motorFLC1Ph,
   sizeFeeder,
@@ -113,9 +115,9 @@ describe('nextStandardXfmrKva', () => {
 });
 
 // ---------------------------------------------------------------------------
-// selectConductorSize — NEC Table 310.15(B)(16)
+// selectConductorSize — NEC Table 310.16 baseline
 // ---------------------------------------------------------------------------
-describe('selectConductorSize — NEC Table 310.15(B)(16)', () => {
+describe('selectConductorSize — NEC Table 310.16 baseline', () => {
   it('#12 AWG copper 75°C is 25A', () => {
     const r = selectConductorSize(25, 'copper', 75);
     assert.strictEqual(r.size, '#12 AWG');
@@ -151,6 +153,29 @@ describe('selectConductorSize — NEC Table 310.15(B)(16)', () => {
     const r = selectConductorSize(18, 'aluminum', 75);
     // Should get #12 AWG aluminum (20A) not #14
     assert.ok(r.size !== '#14 AWG');
+  });
+
+  it('uses 60C aluminum ampacity data when requested', () => {
+    assert.strictEqual(tableAmpacity('#10 AWG', 'aluminum', 60), 25);
+  });
+
+  it('infers 60C terminals through 100A and 75C above 100A', () => {
+    assert.strictEqual(inferTerminalTempRating({ requiredOcpd: 100 }), 60);
+    assert.strictEqual(inferTerminalTempRating({ requiredOcpd: 125 }), 75);
+  });
+
+  it('applies NEC 110.14(C) terminal caps separately from insulation ampacity', () => {
+    const r = selectConductorSize(25, 'copper', 90, { terminalTempRating: 60 });
+    assert.strictEqual(r.size, '#10 AWG');
+    assert.strictEqual(r.tableAmpacity, 40);
+    assert.strictEqual(r.terminalAmpacity, 30);
+    assert.strictEqual(r.terminalTempRating, 60);
+  });
+
+  it('keeps 75C terminal caps for larger equipment', () => {
+    const r = selectConductorSize(150, 'copper', 90, { terminalTempRating: 75 });
+    assert.strictEqual(r.size, '1/0 AWG');
+    assert.strictEqual(r.terminalAmpacity, 150);
   });
 });
 
@@ -205,8 +230,9 @@ describe('sizeFeeder — NEC 210.20 / 215.3 / 240.4', () => {
     // OCPD: next standard ≥ required load ampacity 75A → 80A
     const r = sizeFeeder({ loadAmps: 60, continuous: true });
     assert.strictEqual(r.requiredAmps, 75);
-    assert.strictEqual(r.conductorSize, '#4 AWG');
+    assert.strictEqual(r.conductorSize, '#3 AWG');
     assert.strictEqual(r.conductorAmpacity, 85);
+    assert.strictEqual(r.terminalTempRating, 60);
     assert.strictEqual(r.ocpdRating, 80);
   });
 
@@ -215,7 +241,9 @@ describe('sizeFeeder — NEC 210.20 / 215.3 / 240.4', () => {
     // OCPD: next standard ≥ 100A → 100A
     const r = sizeFeeder({ loadAmps: 100, continuous: false });
     assert.strictEqual(r.requiredAmps, 100);
-    assert.strictEqual(r.conductorSize, '#3 AWG'); // 100A exactly
+    assert.strictEqual(r.conductorSize, '#1 AWG');
+    assert.strictEqual(r.conductorAmpacity, 110);
+    assert.strictEqual(r.terminalTempRating, 60);
     assert.strictEqual(r.ocpdRating, 100);
   });
 
@@ -231,6 +259,7 @@ describe('sizeFeeder — NEC 210.20 / 215.3 / 240.4', () => {
   it('includes NEC references', () => {
     const r = sizeFeeder({ loadAmps: 30, continuous: true });
     assert.ok(r.nec && r.nec.continuousRule);
+    assert.ok(r.nec.terminalRule && r.nec.terminalRule.includes('110.14'));
   });
 
   it('applies NEC 240.4(D) and avoids #12 copper on a 25A feeder', () => {
@@ -252,7 +281,8 @@ describe('sizeMotorBranch — NEC 430', () => {
     const r = sizeMotorBranch({ hp: 10, voltage: 460, phase: '3ph' });
     assert.strictEqual(r.flc, 14);
     assert.strictEqual(r.conductorRequired, 17.5);
-    assert.strictEqual(r.conductorSize, '#14 AWG');
+    assert.strictEqual(r.conductorSize, '#12 AWG');
+    assert.strictEqual(r.terminalTempRating, 60);
     assert.strictEqual(r.ocpdRequired, 35);
     assert.strictEqual(r.ocpdRating, 35);
     assert.ok(Math.abs(r.overloadSetpoint - 16.1) < 0.1);

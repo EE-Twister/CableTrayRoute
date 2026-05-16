@@ -196,7 +196,7 @@ export const BENCHMARKS = [
   },
 
   // -------------------------------------------------------------------------
-  // Voltage Drop Study — NEC 2023 Art. 210.19 / 215.2
+  // Voltage Drop Study — NEC 2023 Art. 210.19 / 215.2 informational-note recommendations
   // -------------------------------------------------------------------------
   {
     id: 'VDROP-001',
@@ -205,7 +205,7 @@ export const BENCHMARKS = [
     standardRef: 'NEC 2023 Art. 210.19(A)(1) Informational Note',
     description:
       '#12 AWG copper, single-phase 120 V, 10 A, 30 ft one-way run. ' +
-      'Well within NEC 3 % branch-circuit limit — status must be "pass".',
+      'Well within NEC 3 % branch-circuit recommendation — status must be "pass".',
     run() {
       const r = evaluateCable({
         conductor_size:     '12 AWG',
@@ -224,13 +224,13 @@ export const BENCHMARKS = [
     checks: [
       {
         key: 'drop_pct',
-        description: 'Voltage drop (%) must be below 3 % limit',
+        description: 'Voltage drop (%) must be below 3 % recommendation',
         expectedVal: 1.5,    // Midpoint of expected range; tolerance keeps [0, 3) passing
         tolerance: 1.5,
       },
       {
         key: 'status_pass',
-        description: 'Compliance status = pass',
+        description: 'Recommendation status = pass',
         expectedVal: 1,
         tolerance: 0,
       },
@@ -244,7 +244,7 @@ export const BENCHMARKS = [
     standardRef: 'NEC 2023 Art. 210.19(A)(1) Informational Note',
     description:
       '#14 AWG copper, single-phase 120 V, 20 A, 150 ft one-way run. ' +
-      'Heavily loaded long run on a small conductor — voltage drop exceeds 3 %; ' +
+      'Heavily loaded long run on a small conductor — voltage drop exceeds the 3 % recommendation; ' +
       'status must be "warn" or "fail".',
     run() {
       const r = evaluateCable({
@@ -264,13 +264,13 @@ export const BENCHMARKS = [
     checks: [
       {
         key: 'drop_pct',
-        description: 'Voltage drop (%) must exceed 3 % limit',
+        description: 'Voltage drop (%) must exceed 3 % recommendation',
         expectedVal: 12,     // Midpoint of expected range [3, 21 %]; actual ≈ 15 %
         tolerance: 9,
       },
       {
         key: 'status_not_pass',
-        description: 'Compliance status is warn or fail (not pass)',
+        description: 'Recommendation status is warn or fail (not pass)',
         expectedVal: 1,
         tolerance: 0,
       },

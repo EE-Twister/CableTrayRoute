@@ -1,10 +1,11 @@
 {
-  "generatedAt": "2026-05-16T14:06:33.084Z",
+  "generatedAt": "2026-05-16T21:01:14.462Z",
   "summary": {
-    "testSuiteCount": 156,
-    "totalAssertions": 6193,
+    "testSuiteCount": 157,
+    "totalAssertions": 6304,
     "benchmarkCount": 6,
-    "standardCount": 13
+    "standardCount": 13,
+    "necComplianceCount": 8
   },
   "testSuites": [
     {
@@ -37,7 +38,7 @@
         "buildLabelSheetHtml",
         "generateArcFlashLabel"
       ],
-      "assertionCount": 21
+      "assertionCount": 25
     },
     {
       "file": "tests/auditLog.test.mjs",
@@ -55,7 +56,7 @@
         "nextStandardOcpd — NEC 240.6(A)",
         "smallConductorMaxOcpd — NEC 240.4(D)",
         "nextStandardXfmrKva",
-        "selectConductorSize — NEC Table 310.15(B)(16)",
+        "selectConductorSize — NEC Table 310.16 baseline",
         "motorFLC3Ph — NEC Table 430.250",
         "motorFLC1Ph — NEC Table 430.248",
         "sizeFeeder — NEC 210.20 / 215.3 / 240.4",
@@ -71,7 +72,7 @@
         "evaluateConductorOption",
         "minimizeCostConductors"
       ],
-      "assertionCount": 143
+      "assertionCount": 157
     },
     {
       "file": "tests/batteryRackLayout.test.mjs",
@@ -260,6 +261,13 @@
       "assertionCount": 3
     },
     {
+      "file": "tests/conduitFill.test.mjs",
+      "groups": [
+        "conduit fill helpers"
+      ],
+      "assertionCount": 20
+    },
+    {
       "file": "tests/contingency.test.mjs",
       "groups": [
         "runContingency — result structure",
@@ -395,6 +403,8 @@
         "DRC-02 Voltage Segregation",
         "DRC-03 Ampacity Derating",
         "DRC-04 Grounding",
+        "DRC-09 Conductor/OCPD Protection",
+        "DRC-10 Conduit Fill",
         "DRC-05 Unrouted Cables",
         "Summary",
         "formatDrcReport()",
@@ -406,7 +416,7 @@
         "formatDrcReport() — accepted risk section",
         "DRC-06 — Structured cabling EMI segregation"
       ],
-      "assertionCount": 83
+      "assertionCount": 123
     },
     {
       "file": "tests/differentialProtection.test.mjs",
@@ -1065,7 +1075,7 @@
         "MANIFEST_HEADERS",
         "VENDOR_FORMATS registry"
       ],
-      "assertionCount": 85
+      "assertionCount": 93
     },
     {
       "file": "tests/reliability.test.mjs",
@@ -1497,7 +1507,7 @@
         "benchmark sample project files — structure",
         "benchmark IDs — link integrity"
       ],
-      "assertionCount": 30
+      "assertionCount": 48
     },
     {
       "file": "tests/voltageDropStudy.test.mjs",
@@ -1507,7 +1517,7 @@
         "evaluateCable",
         "runVoltageDropStudy"
       ],
-      "assertionCount": 42
+      "assertionCount": 49
     },
     {
       "file": "tests/voltageFlicker.test.mjs",
@@ -1874,17 +1884,18 @@
     },
     {
       "id": "nec-neher-mcgrath",
-      "name": "NEC 310 / Neher-McGrath",
-      "title": "NEC Table 310.16–310.21 Ampacity / Neher-McGrath duct bank method",
+      "name": "NFPA 70 (NEC) 2023 - Selected Ampacity Checks",
+      "title": "Selected NEC 2023 Article 310 ampacity references / Neher-McGrath duct bank method",
       "studyPage": "cableschedule.html",
-      "scope": "North American conductor ampacity tables and duct bank derating factors",
+      "scope": "Selected North American conductor ampacity references and duct bank derating factors used by the cable schedule, auto-size, and duct bank workflows. This is not a full NEC compliance engine.",
       "assumptions": [
-        "Pre-computed values at 30 °C ambient, 75 °C or 90 °C conductor temperature",
-        "Single conductor in conduit or cable in free air as per NEC installation conditions"
+        "Pre-computed values at 30 C ambient, 75 C or 90 C conductor temperature",
+        "Selected installation conditions entered by the user are used for ambient, bundling, tray, or duct bank derating"
       ],
       "limitations": [
-        "Tabulated values; non-standard installations require IEC 60287 or direct Neher-McGrath calculation",
-        "NEC tables cover copper and aluminum; exotic conductors not included"
+        "Terminal temperature limitations, conductor insulation/listing details, and equipment listing requirements require engineer/AHJ review",
+        "Local amendments, special occupancies, installation exceptions, and complete Chapter 9 raceway details are not fully modeled",
+        "Tabulated values and screening calculations do not replace a stamped NFPA 70 design review"
       ]
     },
     {
@@ -2012,6 +2023,156 @@
         "Unbalanced (unsymmetrical) load flow not supported",
         "DC power flow approximation not available"
       ]
+    }
+  ],
+  "necComplianceMatrix": [
+    {
+      "id": "nec-validation-scope",
+      "module": "Validation & Standards",
+      "page": "validation.html",
+      "status": "scope-defined",
+      "nec2023Scope": "Publishes selected NFPA 70 (NEC) 2023 references, assumptions, limitations, and module-by-module scope.",
+      "implemented": [
+        "Supported standards metadata",
+        "Benchmark and automated-test evidence",
+        "Explicit NEC 2023 scope matrix"
+      ],
+      "gaps": [
+        "Does not certify the full application as NFPA 70 compliant",
+        "Does not model local amendments, AHJ interpretations, equipment listings, or construction-document signoff"
+      ],
+      "nextAction": "Keep NEC language scoped to selected checks and route final compliance decisions to engineer/AHJ review."
+    },
+    {
+      "id": "nec-autosize",
+      "module": "Auto-Size Equipment",
+      "page": "autosize.html",
+      "status": "partial",
+      "nec2023Scope": "Screens feeders, branch circuits, motor branch circuits, transformer OCPD, selected standard OCPD sizes, and conductor ampacity using selected NEC 2023 references.",
+      "implemented": [
+        "Continuous-load factor for selected feeder/branch sizing",
+        "Selected standard OCPD sizes",
+        "NEC Table 310.16 baseline conductor ampacity with ambient, bundling, and tray factors",
+        "Selected NEC 110.14(C) terminal-temperature cap handling for feeder, motor, and transformer conductor sizing",
+        "Selected motor FLC and transformer sizing references"
+      ],
+      "gaps": [
+        "Conductor/listing details, equipment-specific listing constraints, and all NEC 110.14(C) conditions are not fully enforced",
+        "Does not implement the complete NEC Article 240, 430, or 450 decision trees",
+        "Does not cover every conductor type, insulation, wiring method, occupancy, or AHJ amendment"
+      ],
+      "nextAction": "Use as a sizing aid, then verify final conductor, OCPD, terminal temperature, and listing constraints in the construction design."
+    },
+    {
+      "id": "nec-load-demand",
+      "module": "Load List & Demand Schedule",
+      "page": "loadlist.html",
+      "status": "partial",
+      "nec2023Scope": "Captures load records and selected demand/schedule calculations that support NEC Article 220 style design workflows.",
+      "implemented": [
+        "Structured load records by source, voltage, phase, demand, and power factor",
+        "Workflow links from loads into one-line, cable schedule, and downstream studies"
+      ],
+      "gaps": [
+        "Full NEC Article 220 service/feeder demand calculation coverage is not complete",
+        "Special occupancy, dwelling, healthcare, EV, industrial process, and local amendment rules require manual review",
+        "Demand factors entered by users are not a substitute for project-specific code classification"
+      ],
+      "nextAction": "Add project demand classification profiles before presenting this as a full Article 220 compliance workflow."
+    },
+    {
+      "id": "nec-voltage-drop",
+      "module": "Voltage Drop Study",
+      "page": "voltagedropstudy.html",
+      "status": "screening",
+      "nec2023Scope": "Screens cable voltage drop against NEC informational-note recommendations for feeder, branch, and combined paths.",
+      "implemented": [
+        "3 percent feeder recommendation",
+        "3 percent branch-circuit recommendation",
+        "5 percent combined feeder-plus-branch recommendation metadata",
+        "Project-wide cable schedule scan"
+      ],
+      "gaps": [
+        "NEC voltage-drop text is informational-note guidance, not an enforceable pass/fail code limit by itself",
+        "Combined upstream-plus-downstream path aggregation is not fully modeled",
+        "The primary study is a screening method and does not replace impedance-method verification where reactance and power factor matter"
+      ],
+      "nextAction": "Label results as recommendation status and add explicit feeder-plus-branch path aggregation before treating combined results as complete."
+    },
+    {
+      "id": "nec-raceway-fill",
+      "module": "Raceway, Tray, and Fill",
+      "page": "cabletrayfill.html",
+      "status": "partial",
+      "nec2023Scope": "Screens selected cable tray and conduit fill conditions for tray/raceway planning.",
+      "implemented": [
+        "Cable tray fill percentage checks in routing and reporting",
+        "Conduit/tray fill calculators and over-limit warnings",
+        "Design Rule Checker DRC-10 screens assigned conduit fill from conduit type, trade size, cable OD/area, and selected Chapter 9 Table 1 limits",
+        "Cable schedule routing readiness indicators"
+      ],
+      "gaps": [
+        "Conduit Chapter 9 conditions, conductor insulation details, nipples, multiconductor cable rules, and all raceway types are not fully modeled across every page",
+        "Project report conduit area estimates are screening values unless sourced from verified conduit data",
+        "Tray fill limits vary by cable type, installation, and Article 392 condition and require final review"
+      ],
+      "nextAction": "Unify DRC-10 conduit-fill basis with fill pages, reports, ductbanks, and routing before claiming complete NEC raceway fill coverage."
+    },
+    {
+      "id": "nec-design-rule-checker",
+      "module": "Design Rule Checker",
+      "page": "designrulechecker.html",
+      "status": "partial",
+      "nec2023Scope": "Checks selected cable tray, conduit fill, ampacity derating, grounding presence and selected sizing, segregation, routing, and parallel-conductor issues.",
+      "implemented": [
+        "Selected tray fill warnings",
+        "Selected ampacity derating warnings",
+        "Equipment grounding conductor presence warning",
+        "Selected copper equipment grounding conductor sizing checks from OCPD rating",
+        "Selected conductor/OCPD protection checks for NEC 240.4(D), 240.6(A), and terminal-temperature ampacity screening",
+        "Selected conduit fill screening using NEC Chapter 9 Table 1 limits when conduit/raceway assignments and cable OD/area data are available",
+        "Parallel conductor minimum-size and equal-length data warnings"
+      ],
+      "gaps": [
+        "Equipment grounding conductor sizing currently covers selected copper sizing breakpoints and common OCPD fields; alternate materials, upsized phase conductors, parallel EGCs, and special cases require final review",
+        "Conductor/OCPD checks are conservative screening only and do not implement every next-size, tap, motor, HVAC, transformer, feeder, or equipment-specific exception",
+        "Conduit fill checks are selected screening only and do not implement every Chapter 9 note, nipple condition, all insulation/raceway variations, or ductbank-specific path condition",
+        "Does not implement complete neutral, adjustment, correction, exception, or conductor-count logic",
+        "Findings are quality gates and review prompts, not a full NEC plan-check"
+      ],
+      "nextAction": "Expand conductor/OCPD exception handling, conduit-fill edge cases, and rule-specific basis notes before expanding DRC language beyond selected checks."
+    },
+    {
+      "id": "nec-equipment-evaluation",
+      "module": "Equipment Evaluation",
+      "page": "equipmentevaluation.html",
+      "status": "partial",
+      "nec2023Scope": "Screens equipment interrupting rating, withstand, and short-circuit duty data used in NEC 110 and equipment evaluation workflows.",
+      "implemented": [
+        "AIC/SCCR-style rating comparisons",
+        "Equipment duty warnings from available fault-current data"
+      ],
+      "gaps": [
+        "Does not perform complete NEC 110, 409, listing, labeling, field-marking, or selective coordination review",
+        "Equipment data quality depends on user-entered ratings and upstream study assumptions"
+      ],
+      "nextAction": "Keep results framed as equipment-duty screening until equipment-listing and field-label workflows are complete."
+    },
+    {
+      "id": "nec-hazardous-areas",
+      "module": "Hazardous Area Screening",
+      "page": "hazareaclassification.html",
+      "status": "screening",
+      "nec2023Scope": "Screens equipment compatibility with entered hazardous-area classification data.",
+      "implemented": [
+        "Class/division and zone-oriented compatibility checks",
+        "Warnings for protection type, group, and temperature-rating conflicts"
+      ],
+      "gaps": [
+        "Does not perform full NEC Articles 500 through 506 wiring-method, seal, marking, or classification-boundary design",
+        "Area classification inputs and equipment certificates require specialist review"
+      ],
+      "nextAction": "Treat as a hazardous-area screening aid until classification workflow, seal requirements, and wiring-method checks are expanded."
     }
   ]
 }

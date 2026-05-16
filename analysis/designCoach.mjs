@@ -71,7 +71,7 @@ export function extractVoltageDropRecs(cables) {
         sourceStudy: 'voltageDropStudy',
         severity: 'compliance',
         title: `Increase cable ${tag} conductor${next ? ` to ${next}` : ''}`,
-        detail: `Voltage drop ${r.dropPct.toFixed(1)}% exceeds the NEC ${r.circuitType} limit of ${r.limit}%. ` +
+        detail: `Voltage drop ${r.dropPct.toFixed(1)}% exceeds the NEC ${r.circuitType} recommendation of ${r.limit}%. ` +
           (next
             ? `Upsizing from ${r.conductorSize} to ${next} will reduce resistance and drop.`
             : `Consider shortening the route or splitting the load.`),
@@ -87,8 +87,8 @@ export function extractVoltageDropRecs(cables) {
         id: `vd-warn:${tag}`,
         sourceStudy: 'voltageDropStudy',
         severity: 'efficiency',
-        title: `Cable ${tag} approaching voltage drop limit (${r.dropPct.toFixed(1)}%)`,
-        detail: `Voltage drop ${r.dropPct.toFixed(1)}% is within 20% of the NEC ${r.circuitType} limit of ${r.limit}%. ` +
+        title: `Cable ${tag} approaching voltage drop recommendation (${r.dropPct.toFixed(1)}%)`,
+        detail: `Voltage drop ${r.dropPct.toFixed(1)}% is within 20% of the NEC ${r.circuitType} recommendation of ${r.limit}%. ` +
           `Monitor during final load calculations.`,
         location: tag,
         studyPage: 'voltagedropstudy.html',

@@ -92,9 +92,18 @@
       <!-- Supported standards -->
       <section class="card" aria-labelledby="standards-heading">
         <h2 id="standards-heading">Supported Standards</h2>
-        <p>Each standard listed below is implemented in the corresponding study module. Click a standard to view its study page, or expand the row to read scope, assumptions, and known limitations.</p>
+        <p>Each standard listed below is implemented only to the scope shown in the corresponding study module. Click a standard to view its study page, or expand the row to read scope, assumptions, and known limitations.</p>
         <div id="standards-list" aria-live="polite">
           <p class="field-hint">Loading standards…</p>
+        </div>
+      </section>
+
+      <!-- NEC scope matrix -->
+      <section class="card" aria-labelledby="nec-matrix-heading">
+        <h2 id="nec-matrix-heading">NFPA 70 (NEC) 2023 Scope Matrix</h2>
+        <p>This matrix separates selected NEC-informed checks from full code compliance. It shows what the application currently screens, what remains outside the implemented scope, and where engineer/AHJ review is still required.</p>
+        <div id="nec-compliance-matrix" aria-live="polite">
+          <p class="field-hint">Loading NEC 2023 scope matrix...</p>
         </div>
       </section>
 
@@ -124,7 +133,7 @@
           <ul class="study-basis__list">
             <li>Each study page shows a <strong>Calculation Basis</strong> panel listing the governing standard, key formulas, and known limitations.</li>
             <li>Benchmark cases on this page reproduce published example problems with tolerance-band assertions verified by automated tests.</li>
-            <li>Where gaps exist between the implemented method and the full standard (e.g., near-to-generator correction factors), these are documented in the relevant study's Calculation Basis panel and in the limitations table below.</li>
+            <li>Where gaps exist between the implemented method and the full standard (e.g., near-to-generator correction factors), these are documented in the relevant study's Calculation Basis panel and the scope matrix above.</li>
             <li>This tool is a browser-native engineering aid, not a replacement for dedicated power-system analysis platforms such as ETAP, EasyPower, or SKM for projects requiring full dynamic simulation, three-phase unbalanced analysis, or regulatory filing.</li>
           </ul>
         </div>

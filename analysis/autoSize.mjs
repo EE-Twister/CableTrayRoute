@@ -1,15 +1,16 @@
 /**
- * NEC Equipment Auto-Sizing
+ * NEC-Informed Equipment Auto-Sizing
  *
  * Automatically selects conductor sizes, overcurrent device ratings, and transformer
- * kVA ratings based on NEC 2023 rules.
+ * kVA ratings based on selected NEC 2023 rule checks.
  *
  * Key NEC references:
  *   NEC 210.20  — Overcurrent protection for continuous loads (125%)
  *   NEC 215.3   — Feeders for continuous loads (125%)
  *   NEC 240.4   — Protection of conductors
  *   NEC 240.6(A)— Standard ampere ratings for fuses and circuit breakers
- *   NEC 310.15  — Ampacity tables (Table 310.15(B)(16) used as baseline)
+ *   NEC 110.14(C) — Terminal temperature limitations
+ *   NEC 310.16  — Ampacity tables (formerly Table 310.15(B)(16); used as baseline)
  *   NEC 430.22  — Motor branch circuit conductor sizing (125% of FLC)
  *   NEC 430.52  — Motor branch circuit short-circuit and ground-fault protection
  *   NEC 430.250 — Full load current — three-phase AC motors (Table)
@@ -28,35 +29,34 @@ export const STANDARD_OCPD_RATINGS = [
 ];
 
 // ---------------------------------------------------------------------------
-// NEC Table 310.15(B)(16) — Ampacity of insulated conductors rated 0–2000V
+// NEC Table 310.16 (formerly 310.15(B)(16)) — Ampacity of insulated conductors rated 0–2000V
 // in conduit/cable, 60/75/90°C columns, 30°C ambient, ≤3 current-carrying conductors
 //
-// Format: [size, ampacity_60C_Cu, ampacity_75C_Cu, ampacity_90C_Cu,
-//                ampacity_75C_Al, ampacity_90C_Al]
+// Format: size plus 60C/75C/90C copper and aluminum ampacity columns.
 // ---------------------------------------------------------------------------
 export const NEC_AMPACITY_TABLE = [
-  // size       60°C Cu  75°C Cu  90°C Cu  75°C Al  90°C Al
-  { size: '#14 AWG',  cu60: 15,  cu75: 20,  cu90: 25,  al75: null, al90: null  },
-  { size: '#12 AWG',  cu60: 20,  cu75: 25,  cu90: 30,  al75: 20,   al90: 25    },
-  { size: '#10 AWG',  cu60: 30,  cu75: 35,  cu90: 40,  al75: 30,   al90: 35    },
-  { size: '#8 AWG',   cu60: 40,  cu75: 50,  cu90: 55,  al75: 40,   al90: 45    },
-  { size: '#6 AWG',   cu60: 55,  cu75: 65,  cu90: 75,  al75: 50,   al90: 60    },
-  { size: '#4 AWG',   cu60: 70,  cu75: 85,  cu90: 95,  al75: 65,   al90: 75    },
-  { size: '#3 AWG',   cu60: 85,  cu75: 100, cu90: 110, al75: 75,   al90: 85    },
-  { size: '#2 AWG',   cu60: 95,  cu75: 115, cu90: 130, al75: 90,   al90: 100   },
-  { size: '#1 AWG',   cu60: 110, cu75: 130, cu90: 145, al75: 100,  al90: 115   },
-  { size: '1/0 AWG',  cu60: 125, cu75: 150, cu90: 170, al75: 120,  al90: 135   },
-  { size: '2/0 AWG',  cu60: 145, cu75: 175, cu90: 195, al75: 135,  al90: 150   },
-  { size: '3/0 AWG',  cu60: 165, cu75: 200, cu90: 225, al75: 155,  al90: 175   },
-  { size: '4/0 AWG',  cu60: 195, cu75: 230, cu90: 260, al75: 180,  al90: 205   },
-  { size: '250 kcmil',cu60: 215, cu75: 255, cu90: 290, al75: 205,  al90: 230   },
-  { size: '300 kcmil',cu60: 240, cu75: 285, cu90: 320, al75: 230,  al90: 255   },
-  { size: '350 kcmil',cu60: 260, cu75: 310, cu90: 350, al75: 250,  al90: 280   },
-  { size: '400 kcmil',cu60: 280, cu75: 335, cu90: 380, al75: 270,  al90: 305   },
-  { size: '500 kcmil',cu60: 320, cu75: 380, cu90: 430, al75: 310,  al90: 350   },
-  { size: '600 kcmil',cu60: 355, cu75: 420, cu90: 475, al75: 340,  al90: 385   },
-  { size: '750 kcmil',cu60: 400, cu75: 475, cu90: 535, al75: 385,  al90: 435   },
-  { size: '1000 kcmil',cu60: 455,cu75: 545, cu90: 615, al75: 445,  al90: 500   },
+  // size       60°C Cu  75°C Cu  90°C Cu  60°C Al  75°C Al  90°C Al
+  { size: '#14 AWG',  cu60: 15,  cu75: 20,  cu90: 25,  al60: null, al75: null, al90: null  },
+  { size: '#12 AWG',  cu60: 20,  cu75: 25,  cu90: 30,  al60: 15,   al75: 20,   al90: 25    },
+  { size: '#10 AWG',  cu60: 30,  cu75: 35,  cu90: 40,  al60: 25,   al75: 30,   al90: 35    },
+  { size: '#8 AWG',   cu60: 40,  cu75: 50,  cu90: 55,  al60: 35,   al75: 40,   al90: 45    },
+  { size: '#6 AWG',   cu60: 55,  cu75: 65,  cu90: 75,  al60: 40,   al75: 50,   al90: 60    },
+  { size: '#4 AWG',   cu60: 70,  cu75: 85,  cu90: 95,  al60: 55,   al75: 65,   al90: 75    },
+  { size: '#3 AWG',   cu60: 85,  cu75: 100, cu90: 110, al60: 65,   al75: 75,   al90: 85    },
+  { size: '#2 AWG',   cu60: 95,  cu75: 115, cu90: 130, al60: 75,   al75: 90,   al90: 100   },
+  { size: '#1 AWG',   cu60: 110, cu75: 130, cu90: 145, al60: 85,   al75: 100,  al90: 115   },
+  { size: '1/0 AWG',  cu60: 125, cu75: 150, cu90: 170, al60: 100,  al75: 120,  al90: 135   },
+  { size: '2/0 AWG',  cu60: 145, cu75: 175, cu90: 195, al60: 115,  al75: 135,  al90: 150   },
+  { size: '3/0 AWG',  cu60: 165, cu75: 200, cu90: 225, al60: 130,  al75: 155,  al90: 175   },
+  { size: '4/0 AWG',  cu60: 195, cu75: 230, cu90: 260, al60: 150,  al75: 180,  al90: 205   },
+  { size: '250 kcmil',cu60: 215, cu75: 255, cu90: 290, al60: 170,  al75: 205,  al90: 230   },
+  { size: '300 kcmil',cu60: 240, cu75: 285, cu90: 320, al60: 195,  al75: 230,  al90: 255   },
+  { size: '350 kcmil',cu60: 260, cu75: 310, cu90: 350, al60: 210,  al75: 250,  al90: 280   },
+  { size: '400 kcmil',cu60: 280, cu75: 335, cu90: 380, al60: 225,  al75: 270,  al90: 305   },
+  { size: '500 kcmil',cu60: 320, cu75: 380, cu90: 430, al60: 260,  al75: 310,  al90: 350   },
+  { size: '600 kcmil',cu60: 355, cu75: 420, cu90: 475, al60: 285,  al75: 340,  al90: 385   },
+  { size: '750 kcmil',cu60: 400, cu75: 475, cu90: 535, al60: 320,  al75: 385,  al90: 435   },
+  { size: '1000 kcmil',cu60: 455,cu75: 545, cu90: 615, al60: 375,  al75: 445,  al90: 500   },
 ];
 
 // ---------------------------------------------------------------------------
@@ -272,6 +272,38 @@ export function smallConductorMaxOcpd(size, material = 'copper') {
   return null;
 }
 
+export function normalizeConductorMaterial(material = 'copper') {
+  const text = String(material || '').toLowerCase();
+  return text.includes('al') ? 'aluminum' : 'copper';
+}
+
+export function normalizeTemperatureRating(value, fallback = 75) {
+  const rating = Number.parseInt(value, 10);
+  if (rating >= 90) return 90;
+  if (rating >= 75) return 75;
+  if (rating >= 60) return 60;
+  return fallback;
+}
+
+export function ampacityColumn(material = 'copper', tempRating = 75) {
+  const prefix = normalizeConductorMaterial(material) === 'aluminum' ? 'al' : 'cu';
+  const rating = normalizeTemperatureRating(tempRating);
+  return `${prefix}${rating}`;
+}
+
+export function tableAmpacity(size, material = 'copper', tempRating = 75) {
+  const row = NEC_AMPACITY_TABLE.find(entry => entry.size === size);
+  if (!row) return null;
+  const ampacity = row[ampacityColumn(material, tempRating)];
+  return ampacity ?? null;
+}
+
+export function inferTerminalTempRating({ requiredOcpd = null, equipmentRatedAmps = null } = {}) {
+  const rating = Number.parseFloat(equipmentRatedAmps ?? requiredOcpd);
+  if (Number.isFinite(rating) && rating > 0 && rating <= 100) return 60;
+  return 75;
+}
+
 /**
  * Find the next standard transformer kVA at or above the required kVA.
  *
@@ -284,7 +316,7 @@ export function nextStandardXfmrKva(requiredKva, phase = '3ph') {
 }
 
 /**
- * Select conductor size from NEC Table 310.15(B)(16) for a required ampacity,
+ * Select conductor size from NEC Table 310.16 (formerly 310.15(B)(16)) for a required ampacity,
  * optionally applying ambient temperature, bundling, and cable tray correction factors.
  *
  * When derating factors are provided the required ampacity is divided by the
@@ -299,12 +331,24 @@ export function nextStandardXfmrKva(requiredKva, phase = '3ph') {
  * @param {number}  [options.bundledConductors=1]    Number of current-carrying conductors in raceway
  * @param {'conduit'|'tray_spaced'|'tray_touching'} [options.installationType='conduit']
  * @param {number|null} [options.requiredOcpd]   Minimum OCPD rating that must be allowed by NEC 240.4(D)
- * @returns {{size: string, ampacity: number, deratingFactor: number, trayFactor: number}|null}
+ * @param {60|75|90|null} [options.terminalTempRating] Equipment termination temperature rating for NEC 110.14(C)
+ * @returns {{size: string, ampacity: number, tableAmpacity: number, terminalAmpacity: number, installedAmpacity: number, deratingFactor: number, trayFactor: number}|null}
  */
 export function selectConductorSize(requiredAmps, material = 'copper', tempRating = 75, options = {}) {
-  const { ambientTempC = 30, bundledConductors = 1, installationType = 'conduit', requiredOcpd = null } = options;
+  const {
+    ambientTempC = 30,
+    bundledConductors = 1,
+    installationType = 'conduit',
+    requiredOcpd = null,
+    terminalTempRating = null,
+  } = options;
+  const normalizedMaterial = normalizeConductorMaterial(material);
+  const insulationTempRating = normalizeTemperatureRating(tempRating);
+  const normalizedTerminalTempRating = terminalTempRating == null
+    ? null
+    : normalizeTemperatureRating(terminalTempRating, insulationTempRating);
 
-  const tempFactor = ambientTempFactor(ambientTempC, tempRating);
+  const tempFactor = ambientTempFactor(ambientTempC, insulationTempRating);
   const bundleFactor = bundlingFactor(bundledConductors);
   const trayFactor = trayFillFactor(installationType);
   const combinedFactor = tempFactor * bundleFactor * trayFactor;
@@ -314,19 +358,36 @@ export function selectConductorSize(requiredAmps, material = 'copper', tempRatin
   // Gross up required ampacity so that: table_value × combined_factor ≥ requiredAmps
   const adjustedRequired = combinedFactor < 1 ? requiredAmps / combinedFactor : requiredAmps;
 
-  const col = material === 'aluminum'
-    ? (tempRating >= 90 ? 'al90' : 'al75')
-    : (tempRating >= 90 ? 'cu90' : tempRating >= 75 ? 'cu75' : 'cu60');
+  const col = ampacityColumn(normalizedMaterial, insulationTempRating);
+  const terminalCol = normalizedTerminalTempRating == null
+    ? null
+    : ampacityColumn(normalizedMaterial, normalizedTerminalTempRating);
 
   const entry = NEC_AMPACITY_TABLE.find(row => {
     const amp = row[col];
-    if (amp === null || amp < adjustedRequired) return false;
+    if (amp == null || amp < adjustedRequired) return false;
+    const terminalAmp = terminalCol ? row[terminalCol] : amp;
+    if (terminalAmp == null || terminalAmp < requiredAmps) return false;
     if (requiredOcpd === null) return true;
-    const maxSmallOcpd = smallConductorMaxOcpd(row.size, material);
+    const maxSmallOcpd = smallConductorMaxOcpd(row.size, normalizedMaterial);
     return maxSmallOcpd === null || requiredOcpd <= maxSmallOcpd;
   });
   if (!entry) return null;
-  return { size: entry.size, ampacity: entry[col], deratingFactor: combinedFactor, trayFactor };
+  const tableValue = entry[col];
+  const terminalAmpacity = terminalCol ? entry[terminalCol] : tableValue;
+  const deratedAmpacity = tableValue * combinedFactor;
+  return {
+    size: entry.size,
+    ampacity: terminalAmpacity,
+    tableAmpacity: tableValue,
+    terminalAmpacity,
+    terminalTempRating: normalizedTerminalTempRating,
+    insulationTempRating,
+    deratedAmpacity,
+    installedAmpacity: Math.min(deratedAmpacity, terminalAmpacity),
+    deratingFactor: combinedFactor,
+    trayFactor,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -382,15 +443,16 @@ export function meetsParallelRequirement(size) {
  * @param {number} [options.ambientTempC=30]
  * @param {number} [options.bundledConductors=1]   Applies only when nParallel === 1
  * @param {'conduit'|'tray_spaced'|'tray_touching'} [options.installationType='conduit']
+ * @param {60|75|90|null} [options.terminalTempRating]
  * @returns {object|null}  null when no table entry can satisfy the requirement
  */
 export function evaluateConductorOption(requiredAmps, material, tempRating, nParallel, options = {}) {
-  const { ambientTempC = 30, installationType = 'conduit' } = options;
+  const { ambientTempC = 30, installationType = 'conduit', terminalTempRating = null } = options;
   // Parallel sets each run in a separate conduit → 3 current-carrying conductors/conduit
   const bundledConductors = nParallel > 1 ? 3 : (options.bundledConductors ?? 1);
 
   const conductor = selectConductorSize(requiredAmps / nParallel, material, tempRating, {
-    ambientTempC, bundledConductors, installationType,
+    ambientTempC, bundledConductors, installationType, terminalTempRating,
   });
   if (!conductor) return null;
 
@@ -415,9 +477,11 @@ export function evaluateConductorOption(requiredAmps, material, tempRating, nPar
     size: conductor.size,
     material,
     tempRating,
+    terminalTempRating: conductor.terminalTempRating,
     nParallel,
-    tableAmpacity: conductor.ampacity,
-    installedAmpacity: Math.round(conductor.ampacity * conductor.deratingFactor * nParallel * 10) / 10,
+    tableAmpacity: conductor.tableAmpacity,
+    terminalAmpacity: conductor.terminalAmpacity,
+    installedAmpacity: Math.round(conductor.installedAmpacity * nParallel * 10) / 10,
     deratingFactor: conductor.deratingFactor,
     costPerFtEach: costEach,
     costPerFtPerPhase,
@@ -440,6 +504,7 @@ export function evaluateConductorOption(requiredAmps, material, tempRating, nPar
  * @param {'conduit'|'tray_spaced'|'tray_touching'} [options.installationType='conduit']
  * @param {boolean} [options.allowAluminum=true]
  * @param {number}  [options.maxParallel=4]
+ * @param {60|75|90|null} [options.terminalTempRating]
  * @returns {Array<object>}   Code-compliant options sorted by costPerFtPerPhase ascending
  */
 export function minimizeCostConductors(requiredAmps, tempRating = 75, options = {}) {
@@ -449,6 +514,7 @@ export function minimizeCostConductors(requiredAmps, tempRating = 75, options = 
     installationType = 'conduit',
     allowAluminum = true,
     maxParallel = 4,
+    terminalTempRating = null,
   } = options;
 
   const results = [];
@@ -457,7 +523,7 @@ export function minimizeCostConductors(requiredAmps, tempRating = 75, options = 
   for (const material of materials) {
     for (let nParallel = 1; nParallel <= maxParallel; nParallel++) {
       const opt = evaluateConductorOption(requiredAmps, material, tempRating, nParallel, {
-        ambientTempC, bundledConductors, installationType,
+        ambientTempC, bundledConductors, installationType, terminalTempRating,
       });
       if (!opt || opt.violatesParallelRule) continue;
       results.push(opt);
@@ -525,7 +591,7 @@ export function motorFLC1Ph(hp, voltage) {
  * Rules applied:
  *   - If continuous: required ampacity = 125% of load current (NEC 210.20/215.3)
  *   - If non-continuous: required ampacity = 100% of load current
- *   - Conductor: select smallest NEC 310.15(B)(16) size ≥ required ampacity after
+ *   - Conductor: select smallest NEC Table 310.16 baseline size ≥ required ampacity after
  *     applying ambient temperature correction (NEC 310.15(B)(1)(a)) and bundling
  *     adjustment factor (NEC 310.15(C)(1)) when installation conditions are provided
  *   - OCPD: next standard size ≥ conductor ampacity (NEC 240.4(B))
@@ -548,24 +614,30 @@ export function sizeFeeder(params) {
     ambientTempC = 30,
     bundledConductors = 1,
     installationType = 'conduit',
+    terminalTempRating = null,
+    equipmentRatedAmps = null,
   } = params;
 
   if (loadAmps <= 0) throw new Error('Load current must be positive');
 
   const requiredAmps = continuous ? loadAmps * 1.25 : loadAmps;
   const ocpd = nextStandardOcpd(requiredAmps);
+  const appliedTerminalTempRating = terminalTempRating == null || terminalTempRating === ''
+    ? inferTerminalTempRating({ requiredOcpd: ocpd, equipmentRatedAmps })
+    : terminalTempRating;
   const conductor = selectConductorSize(requiredAmps, material, tempRating, {
     ambientTempC,
     bundledConductors,
     installationType,
     requiredOcpd: ocpd,
+    terminalTempRating: appliedTerminalTempRating,
   });
   if (!conductor) {
     // Find the minimum parallel set count that satisfies the load (NEC 310.10(H))
     let parallelSuggestion = null;
     for (let nParallel = 2; nParallel <= 6; nParallel++) {
       const opt = evaluateConductorOption(requiredAmps, material, tempRating, nParallel, {
-        ambientTempC, installationType,
+        ambientTempC, installationType, terminalTempRating: appliedTerminalTempRating,
       });
       if (opt && !opt.violatesParallelRule) {
         parallelSuggestion = {
@@ -591,7 +663,11 @@ export function sizeFeeder(params) {
     requiredAmps: Math.round(requiredAmps * 100) / 100,
     conductorSize: conductor.size,
     conductorAmpacity: conductor.ampacity,
-    installedAmpacity: Math.round(conductor.ampacity * derating * 10) / 10,
+    tableAmpacity: conductor.tableAmpacity,
+    terminalAmpacity: conductor.terminalAmpacity,
+    terminalTempRating: conductor.terminalTempRating,
+    insulationTempRating: conductor.insulationTempRating,
+    installedAmpacity: Math.round(conductor.installedAmpacity * 10) / 10,
     deratingFactor: derating,
     ambientTempC,
     bundledConductors,
@@ -601,8 +677,9 @@ export function sizeFeeder(params) {
     ocpdRating: ocpd,
     nec: {
       continuousRule: 'NEC 210.20(A) / 215.3 — 125% of continuous load',
-      conductorRule: 'NEC 310.15(B)(16) — 75°C column',
-      ambientRule: ambientTempC !== 30 ? `NEC 310.15(B)(1)(a) — ambient ${ambientTempC}°C correction factor ${ambientTempFactor(ambientTempC, tempRating).toFixed(2)}` : null,
+      conductorRule: `NEC Table 310.16 (formerly 310.15(B)(16)) — ${conductor.insulationTempRating}C insulation data with NEC 110.14(C) ${conductor.terminalTempRating}C terminal cap`,
+      terminalRule: `NEC 110.14(C) — conductor ampacity limited by ${conductor.terminalTempRating}C equipment termination rating`,
+      ambientRule: ambientTempC !== 30 ? `NEC 310.15(B)(1)(a) — ambient ${ambientTempC}°C correction factor ${ambientTempFactor(ambientTempC, conductor.insulationTempRating).toFixed(2)}` : null,
       bundlingRule: bundledConductors > 3 ? `NEC 310.15(C)(1) — ${bundledConductors} conductors bundling factor ${bundlingFactor(bundledConductors).toFixed(2)}` : null,
       trayRule: installationType === 'tray_touching' ? 'NEC 392.80(A)(1)(b) — cable tray, cables touching: 0.65× derating factor' : null,
       ocpdRule: 'NEC 240.4(B) / 240.6(A) — standard OCPD at or above required load ampacity',
@@ -647,6 +724,8 @@ export function sizeMotorBranch(params) {
     ambientTempC = 30,
     bundledConductors = 1,
     installationType = 'conduit',
+    terminalTempRating = null,
+    equipmentRatedAmps = null,
   } = params;
 
   if (hp <= 0) throw new Error('Motor HP must be positive');
@@ -659,13 +738,21 @@ export function sizeMotorBranch(params) {
 
   // Branch circuit conductor: 125% of FLC (NEC 430.22)
   const conductorRequired = flc * 1.25;
-  const conductor = selectConductorSize(conductorRequired, material, 75, { ambientTempC, bundledConductors, installationType });
 
   // Branch circuit OCPD: 250% for inverse time breaker (NEC 430.52, Table 430.52)
   // If 250% doesn't correspond to a standard size, next standard size above is allowed
   // per NEC 430.52(C)(1)
   const ocpdRequired = flc * 2.5;
   const ocpd = nextStandardOcpd(ocpdRequired);
+  const appliedTerminalTempRating = terminalTempRating == null || terminalTempRating === ''
+    ? inferTerminalTempRating({ requiredOcpd: ocpd, equipmentRatedAmps })
+    : terminalTempRating;
+  const conductor = selectConductorSize(conductorRequired, material, 75, {
+    ambientTempC,
+    bundledConductors,
+    installationType,
+    terminalTempRating: appliedTerminalTempRating,
+  });
 
   // Overload relay: 115% if high service factor, else 125% (NEC 430.32(A)(1))
   const overloadPercent = highSF ? 1.15 : 1.25;
@@ -682,7 +769,11 @@ export function sizeMotorBranch(params) {
     conductorRequired: Math.round(conductorRequired * 100) / 100,
     conductorSize: conductor ? conductor.size : null,
     conductorAmpacity: conductor ? conductor.ampacity : null,
-    installedAmpacity: conductor ? Math.round(conductor.ampacity * derating * 10) / 10 : null,
+    tableAmpacity: conductor ? conductor.tableAmpacity : null,
+    terminalAmpacity: conductor ? conductor.terminalAmpacity : null,
+    terminalTempRating: conductor ? conductor.terminalTempRating : appliedTerminalTempRating,
+    insulationTempRating: conductor ? conductor.insulationTempRating : 75,
+    installedAmpacity: conductor ? Math.round(conductor.installedAmpacity * 10) / 10 : null,
     deratingFactor: derating,
     ambientTempC,
     bundledConductors,
@@ -697,7 +788,8 @@ export function sizeMotorBranch(params) {
     overloadPercent: Math.round(overloadPercent * 100),
     nec: {
       flcSource: phase === '1ph' ? 'NEC Table 430.248' : 'NEC Table 430.250',
-      conductorRule: 'NEC 430.22 — 125% of motor FLC',
+      conductorRule: `NEC 430.22 — 125% of motor FLC; NEC 110.14(C) ${appliedTerminalTempRating}C terminal cap`,
+      terminalRule: `NEC 110.14(C) — conductor ampacity limited by ${appliedTerminalTempRating}C equipment termination rating`,
       ambientRule: ambientTempC !== 30 ? `NEC 310.15(B)(1)(a) — ambient ${ambientTempC}°C correction factor ${ambientTempFactor(ambientTempC, 75).toFixed(2)}` : null,
       bundlingRule: bundledConductors > 3 ? `NEC 310.15(C)(1) — ${bundledConductors} conductors bundling factor ${bundlingFactor(bundledConductors).toFixed(2)}` : null,
       trayRule: installationType === 'tray_touching' ? 'NEC 392.80(A)(1)(b) — cable tray, cables touching: 0.65× derating factor' : null,
@@ -732,7 +824,9 @@ export function sizeTransformer(params) {
     loadKva,
     primaryVoltage,
     secondaryVoltage,
-    phase = '3ph'
+    phase = '3ph',
+    secondaryTerminalTempRating = null,
+    secondaryEquipmentRatedAmps = null,
   } = params;
 
   if (loadKva <= 0) throw new Error('Load kVA must be positive');
@@ -752,9 +846,14 @@ export function sizeTransformer(params) {
   // Secondary OCPD: 125% (NEC 450.3(B))
   const secondaryOcpdRequired = secondaryRatedAmps * 1.25;
   const secondaryOcpd = nextStandardOcpd(secondaryOcpdRequired);
+  const appliedSecondaryTerminalTempRating = secondaryTerminalTempRating == null || secondaryTerminalTempRating === ''
+    ? inferTerminalTempRating({ requiredOcpd: secondaryOcpd, equipmentRatedAmps: secondaryEquipmentRatedAmps })
+    : secondaryTerminalTempRating;
 
   // Size secondary conductors: 125% of secondary rated current (continuous load rule)
-  const secondaryConductor = selectConductorSize(secondaryRatedAmps * 1.25, 'copper', 75);
+  const secondaryConductor = selectConductorSize(secondaryRatedAmps * 1.25, 'copper', 75, {
+    terminalTempRating: appliedSecondaryTerminalTempRating,
+  });
 
   return {
     loadKva,
@@ -771,11 +870,14 @@ export function sizeTransformer(params) {
     secondaryOcpdRating: secondaryOcpd,
     secondaryConductorSize: secondaryConductor ? secondaryConductor.size : null,
     secondaryConductorAmpacity: secondaryConductor ? secondaryConductor.ampacity : null,
+    secondaryTableAmpacity: secondaryConductor ? secondaryConductor.tableAmpacity : null,
+    secondaryTerminalAmpacity: secondaryConductor ? secondaryConductor.terminalAmpacity : null,
+    secondaryTerminalTempRating: secondaryConductor ? secondaryConductor.terminalTempRating : appliedSecondaryTerminalTempRating,
     nec: {
       xfmrSizing: 'Next NEMA standard kVA (phase-specific) ≥ required load kVA',
       primaryRule: `NEC 450.3(B), Table 450.3(B) — ${primaryOcpdFactor === 1.25 ? '125%' : '167%'} of primary rated current`,
       secondaryRule: 'NEC 450.3(B), Table 450.3(B) — 125% of secondary rated current',
-      conductorRule: 'NEC 310.15(B)(16) — secondary conductor at 125% rated current',
+      conductorRule: `NEC Table 310.16 (formerly 310.15(B)(16)) — secondary conductor at 125% rated current with NEC 110.14(C) ${appliedSecondaryTerminalTempRating}C terminal cap`,
     }
   };
 }
