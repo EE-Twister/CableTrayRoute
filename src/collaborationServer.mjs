@@ -21,8 +21,11 @@
  *
  * @param {import('http').Server} httpServer
  * @param {object} wss - WebSocketServer instance
+ * @param {object} [options]
+ * @param {(request: import('http').IncomingMessage) => Promise<{ok: boolean, username?: string}>} [options.authorizeUpgrade]
  */
-export function attachCollaborationServer(httpServer, wss) {
+export function attachCollaborationServer(httpServer, wss, options = {}) {
+  const { authorizeUpgrade } = options;
   // projectId → Set of { ws, username }
   const rooms = new Map();
   // projectId → monotonically increasing sequence counter
@@ -51,20 +54,35 @@ export function attachCollaborationServer(httpServer, wss) {
     }
   }
 
-  httpServer.on('upgrade', (request, socket, head) => {
+  httpServer.on('upgrade', async (request, socket, head) => {
     const { pathname } = new URL(request.url, 'http://localhost');
     if (pathname !== '/ws/collab') {
       socket.destroy();
       return;
+    }
+    if (authorizeUpgrade) {
+      try {
+        const authz = await authorizeUpgrade(request);
+        if (!authz?.ok) {
+          socket.write('HTTP/1.1 401 Unauthorized\r\nConnection: close\r\n\r\n');
+          socket.destroy();
+          return;
+        }
+        request.collabAuth = authz;
+      } catch {
+        socket.write('HTTP/1.1 401 Unauthorized\r\nConnection: close\r\n\r\n');
+        socket.destroy();
+        return;
+      }
     }
     wss.handleUpgrade(request, socket, head, ws => {
       wss.emit('connection', ws, request);
     });
   });
 
-  wss.on('connection', (ws) => {
+  wss.on('connection', (ws, request) => {
     let currentProjectId = null;
-    let currentUsername = null;
+    let currentUsername = request?.collabAuth?.username || null;
 
     function removeFromRoom() {
       if (!currentProjectId) return;
@@ -93,7 +111,7 @@ export function attachCollaborationServer(httpServer, wss) {
       if (msg.type === 'join') {
         removeFromRoom();
         currentProjectId = String(msg.projectId || '');
-        currentUsername = String(msg.username || 'Anonymous').slice(0, 100);
+        currentUsername = currentUsername || String(msg.username || 'Anonymous').slice(0, 100);
         if (!rooms.has(currentProjectId)) rooms.set(currentProjectId, new Set());
         if (!seqCounters.has(currentProjectId)) seqCounters.set(currentProjectId, 0);
         rooms.get(currentProjectId).add({ ws, username: currentUsername });

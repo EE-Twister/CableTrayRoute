@@ -2030,7 +2030,38 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.a
   // Real-time collaboration via WebSocket
   try {
     const { WebSocketServer } = await import('ws');
-    attachCollaborationServer(server, new WebSocketServer({ noServer: true }));
+    attachCollaborationServer(server, new WebSocketServer({ noServer: true }), {
+      authorizeUpgrade: async (request) => {
+        const origin = request.headers.origin;
+        const host = request.headers.host;
+        if (typeof origin === 'string') {
+          try {
+            const parsedOrigin = new URL(origin);
+            if (!host || parsedOrigin.host !== host) return { ok: false };
+          } catch {
+            return { ok: false };
+          }
+        }
+
+        const header = request.headers.authorization || '';
+        const [scheme, token] = header.split(' ');
+        if (scheme !== 'Bearer' || !token) return { ok: false };
+        const session = await sessionStore.get(token);
+        if (!session) return { ok: false };
+
+        const csrfHeader = request.headers['x-csrf-token'];
+        if (typeof csrfHeader !== 'string' || !/^[0-9a-fA-F]+$/.test(csrfHeader)) return { ok: false };
+        let provided;
+        try {
+          provided = Buffer.from(csrfHeader, 'hex');
+        } catch {
+          return { ok: false };
+        }
+        const expected = Buffer.from(session.csrfToken, 'hex');
+        if (provided.length !== expected.length || !crypto.timingSafeEqual(provided, expected)) return { ok: false };
+        return { ok: true, username: session.username };
+      }
+    });
   } catch {
     // ws not installed — collaboration disabled; app still works fine
     console.info('ws package not found; real-time collaboration disabled');
