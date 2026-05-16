@@ -55,7 +55,12 @@ document.addEventListener('DOMContentLoaded', () => {
   const saved = getStudies().insulationCoordination;
   if (saved) {
     restoreForm(saved.inputs);
-    renderResults(saved);
+    try {
+      const restoredResult = runInsulationCoordinationStudy(readInputs());
+      renderResults(restoredResult);
+    } catch {
+      // Ignore invalid/malformed persisted data and wait for a fresh user submission.
+    }
   }
 
   // Toggle statistical panel visibility
