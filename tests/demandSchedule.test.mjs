@@ -235,6 +235,13 @@ describe('buildDemandSchedule() — NEC 430.24 motor demand', () => {
     assert.strictEqual(result.rows[0].demandFactor, 1.25);
     assert.strictEqual(result.summary.totalDemandKw, 12.5);
   });
+
+  it('keeps the 125% largest-motor adder in dwelling profile', () => {
+    const loads = [{ tag: 'M1', kw: '10', quantity: '1', loadType: 'motor', powerFactor: '1' }];
+    const result = buildDemandSchedule(loads, { mode: 'nec', profile: 'dwelling' });
+    assert.strictEqual(result.rows[0].demandFactor, 1.25);
+    assert.strictEqual(result.summary.totalDemandKw, 12.5);
+  });
 });
 
 // ---------------------------------------------------------------------------

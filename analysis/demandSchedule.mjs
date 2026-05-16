@@ -64,7 +64,7 @@ export const DEMAND_PROFILES = {
     label: 'Dwelling Unit',
     standard: 'NEC Article 220 dwelling unit calculations',
     description: 'Dwelling unit calculations require a dedicated standard/optional dwelling method; this profile keeps load rows at 100% and flags review.',
-    conservativeCategories: ['lighting', 'receptacle', 'motor', 'kitchen', 'hvac', 'ev', 'appliance', 'critical', 'general'],
+    conservativeCategories: ['lighting', 'receptacle', 'kitchen', 'hvac', 'ev', 'appliance', 'critical', 'general'],
   },
   healthcare: {
     label: 'Health Care Facility',
