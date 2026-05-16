@@ -71,6 +71,27 @@ const routeResults = {
 
 assert.equal(normalizeRouteResults(routeResults).length, 1);
 
+
+const forged = buildDeliverableReadinessDiagnostics({
+  cables,
+  trays,
+  routeResults: {
+    batchResults: [
+      {
+        cable: 'CBL-999',
+        status: 'Routed',
+        total_length: 20,
+        breakdown: [{ tray_id: 'TR-HIDDEN', length: 20 }],
+        route_segments: [{ tray_id: 'TR-HIDDEN', length: 20 }],
+      },
+    ],
+  },
+});
+
+assert.equal(forged.health.routeResults, 0);
+assert.deepEqual(forged.missingRouteResultTags, ['CBL-101', 'CBL-102']);
+
+
 const partial = buildDeliverableReadinessDiagnostics({
   cables,
   trays,

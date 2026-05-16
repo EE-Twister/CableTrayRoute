@@ -1,7 +1,7 @@
 import { buildPullTable, cableQRPayload } from './analysis/pullCards.mjs';
 import { parsePullRouteRows } from './analysis/pullCardRouteImport.mjs';
 import { buildPullRouteVisualModel } from './analysis/pullCardVisualModel.mjs';
-import { buildDeliverableReadinessDiagnostics, normalizeRouteResults } from './analysis/deliverableWorkflow.mjs';
+import { buildDeliverableReadinessDiagnostics, filterRouteResultsForProject, normalizeRouteResults } from './analysis/deliverableWorkflow.mjs';
 import {
   getTrays,
   getCables,
@@ -182,8 +182,8 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  function addRouteCandidate(candidates, seen, key, label, payload) {
-    const routeResults = normalizeRouteResults(payload);
+  function addRouteCandidate(candidates, seen, key, label, payload, projectData) {
+    const routeResults = filterRouteResultsForProject(normalizeRouteResults(payload), projectData);
     if (!routeResults.length || seen.has(key)) return;
     seen.add(key);
     const updatedAt = payload?.updatedAt || payload?.generatedAt || payload?.createdAt || payload?.timestamp || '';
@@ -196,7 +196,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  function readSessionRouteCandidates(candidates, seen) {
+  function readSessionRouteCandidates(candidates, seen, projectData) {
     try {
       for (const key of Object.keys(sessionStorage)) {
         const normalized = key.toLowerCase();
@@ -207,7 +207,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch {
           payload = null;
         }
-        addRouteCandidate(candidates, seen, `session:${key}`, 'Current session route cache', payload);
+        addRouteCandidate(candidates, seen, `session:${key}`, 'Current session route cache', payload, projectData);
       }
     } catch {
       // Session storage can be unavailable in hardened browser contexts.
@@ -217,16 +217,22 @@ document.addEventListener('DOMContentLoaded', () => {
   function readRouteResultCandidates() {
     const candidates = [];
     const seen = new Set();
-    addRouteCandidate(candidates, seen, 'latestRouteResults', 'Latest project route results', getItem('latestRouteResults', null));
+    const projectData = {
+      cables: getCables(),
+      trays: getTrays(),
+      conduits: getConduits(),
+      ductbanks: getDuctbanks(),
+    };
+    addRouteCandidate(candidates, seen, 'latestRouteResults', 'Latest project route results', getItem('latestRouteResults', null), projectData);
 
     for (const key of keys()) {
       const lower = String(key).toLowerCase();
       if (key === 'latestRouteResults') continue;
       if (!lower.includes('routecache') && !lower.includes('routeresult') && !lower.startsWith('route-')) continue;
-      addRouteCandidate(candidates, seen, `project:${key}`, `Project route cache (${key})`, getItem(key, null));
+      addRouteCandidate(candidates, seen, `project:${key}`, `Project route cache (${key})`, getItem(key, null), projectData);
     }
 
-    readSessionRouteCandidates(candidates, seen);
+    readSessionRouteCandidates(candidates, seen, projectData);
     return candidates;
   }
 

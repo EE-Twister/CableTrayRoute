@@ -108,6 +108,64 @@ export function normalizeRouteResults(source) {
   return [];
 }
 
+
+function knownCableTags(cables = []) {
+  return new Set(meaningfulRecords(cables).map(cableTag).map(normalizedKey).filter(Boolean));
+}
+
+function collectRacewayIds(rows = [], fields = []) {
+  const ids = new Set();
+  meaningfulRecords(rows).forEach(row => {
+    for (const field of fields) {
+      const value = row?.[field];
+      const key = normalizedKey(value);
+      if (key) ids.add(key);
+    }
+  });
+  return ids;
+}
+
+function routeResultRacewayIds(result) {
+  const ids = [];
+  const entries = [
+    ...(Array.isArray(result?.breakdown) ? result.breakdown : []),
+    ...(Array.isArray(result?.route_segments) ? result.route_segments : []),
+  ];
+  for (const entry of entries) {
+    if (!entry || typeof entry !== 'object') continue;
+    ids.push(
+      entry.tray_id,
+      entry.trayId,
+      entry.raceway_id,
+      entry.racewayId,
+      entry.conduit_id,
+      entry.conduitId,
+      entry.ductbankTag,
+      entry.ductbank_tag,
+      entry.ductbank_id,
+      entry.ductbankId,
+      entry.id,
+    );
+  }
+  return ids.map(normalizedKey).filter(Boolean).filter(id => id !== 'field route');
+}
+
+export function filterRouteResultsForProject(routeResults = [], { cables = [], trays = [], conduits = [], ductbanks = [] } = {}) {
+  const cableTags = knownCableTags(cables);
+  const racewayIds = new Set([
+    ...collectRacewayIds(trays, ['tray_id', 'trayId', 'id', 'tag']),
+    ...collectRacewayIds(conduits, ['conduit_id', 'conduitId', 'id', 'tag']),
+    ...collectRacewayIds(ductbanks, ['tag', 'id', 'ductbankTag', 'ductbank_id']),
+  ]);
+
+  return normalizeRouteResults(routeResults).filter(result => {
+    const tag = normalizedKey(routeResultTag(result));
+    if (!tag || !cableTags.has(tag)) return false;
+    const referencedRaceways = routeResultRacewayIds(result);
+    return referencedRaceways.every(id => racewayIds.has(id));
+  });
+}
+
 export function routeResultsFromCableRows(cables = []) {
   return meaningfulRecords(cables)
     .filter(cableHasRouteSegments)
@@ -115,8 +173,8 @@ export function routeResultsFromCableRows(cables = []) {
     .filter(routeResultSucceeded);
 }
 
-function mergedRouteResults(routeResults = [], cables = []) {
-  const explicit = normalizeRouteResults(routeResults);
+function mergedRouteResults(routeResults = [], { cables = [], trays = [], conduits = [], ductbanks = [] } = {}) {
+  const explicit = filterRouteResultsForProject(routeResults, { cables, trays, conduits, ductbanks });
   const explicitTags = new Set(explicit.map(routeResultTag).map(normalizedKey).filter(Boolean));
   const fromCables = routeResultsFromCableRows(cables).filter(result => {
     const key = normalizedKey(routeResultTag(result));
@@ -185,7 +243,12 @@ export function buildDeliverableReadinessDiagnostics({
   const conduitRows = meaningfulRecords(conduits);
   const ductbankRows = meaningfulRecords(ductbanks);
   const cableSummary = summarizeCableWorkflow(cableRows);
-  const allRouteResults = mergedRouteResults(routeResults, cableRows);
+  const allRouteResults = mergedRouteResults(routeResults, {
+    cables: cableRows,
+    trays: trayRows,
+    conduits: conduitRows,
+    ductbanks: ductbankRows,
+  });
   const routedRouteResults = allRouteResults.filter(routeResultSucceeded);
   const routedTags = uniqueRoutedCableTags(routedRouteResults);
   const scheduleReadyTags = cableRows
