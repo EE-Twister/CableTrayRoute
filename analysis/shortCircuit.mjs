@@ -515,9 +515,6 @@ function computeLetThroughLimitKA(baseDevice, scaledDevice, faultKA) {
     }, 0);
     if (maxPeak > 0) return maxPeak / 1000;
   }
-  if (Number.isFinite(baseDevice.interruptRating) && baseDevice.interruptRating > 0 && faultKA > baseDevice.interruptRating) {
-    return baseDevice.interruptRating;
-  }
   return null;
 }
 

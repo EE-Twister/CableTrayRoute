@@ -133,6 +133,50 @@ global.localStorage = {
       assert(Math.abs(ratioBase - ratioLimited) < 0.05, 'fault components should scale consistently');
     });
 
+
+    it('does not cap available fault current to interrupt rating-only devices', () => {
+      const buildModel = withTcc => {
+        const breaker = {
+          id: 'breaker1',
+          type: 'breaker',
+          connections: [{ target: 'bus480', sourcePort: 1, targetPort: 0 }]
+        };
+        if (withTcc) breaker.tccId = 'eaton_seriesC_100';
+        return {
+          activeSheet: 0,
+          sheets: [{
+            name: 'Breaker Duty',
+            components: [
+              {
+                id: 'utility',
+                type: 'utility_source',
+                voltage: 480,
+                thevenin_mva: 1200,
+                connections: [{ target: 'breaker1', sourcePort: 0, targetPort: 0 }]
+              },
+              breaker,
+              { id: 'bus480', type: 'bus', subtype: 'Bus' }
+            ]
+          }]
+        };
+      };
+
+      setItem('tccSettings', { devices: [], settings: {}, componentOverrides: {} });
+
+      setOneLine(buildModel(false));
+      const baseline = runShortCircuit();
+      const base = baseline.bus480;
+      assert(base, 'baseline bus should exist');
+      assert(base.threePhaseKA > 25, 'baseline fault should exceed interrupt rating threshold');
+
+      setOneLine(buildModel(true));
+      const withProtection = runShortCircuit();
+      const bus = withProtection.bus480;
+      assert(bus, 'protected bus should exist');
+      assert(Math.abs(bus.threePhaseKA - base.threePhaseKA) < 0.05, 'interrupt rating must not cap available fault current');
+      assert(!bus.protectionLimit, 'no protection limit metadata should be applied without let-through data');
+    });
+
     it('derives generator source impedance from rated and subtransient fields', () => {
       setOneLine({
         activeSheet: 0,
