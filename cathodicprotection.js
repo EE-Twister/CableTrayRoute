@@ -585,6 +585,12 @@ function normalizeSavedStudy(saved) {
     return null;
   }
 
+  const normalizedInput = normalizeAnalysisInput(saved);
+  if (!normalizedInput) {
+    return null;
+  }
+
+  const recomputed = runCathodicProtectionAnalysis(normalizedInput);
   const compliance = saved.compliance && typeof saved.compliance === 'object'
     ? saved.compliance
     : {
@@ -600,10 +606,24 @@ function normalizeSavedStudy(saved) {
 
   return {
     ...saved,
+    ...recomputed,
+    timestamp: saved.timestamp || recomputed.timestamp,
     timelineState: normalizeTimelineState(saved.timelineState),
     compliance,
     complianceHistory: existingHistory
   };
+}
+
+function normalizeAnalysisInput(candidate) {
+  if (!candidate || typeof candidate !== 'object') {
+    return null;
+  }
+  const normalized = {
+    ...candidate,
+    zoneResistivityOhmM: parseZoneResistivityValues(candidate.zoneResistivityOhmM)
+  };
+  const validationErrors = validateInputs(normalized);
+  return validationErrors.length ? null : normalized;
 }
 
 function normalizeTimelineState(state) {
