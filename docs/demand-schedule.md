@@ -20,9 +20,23 @@ Populate the [Load List](loadlist.html) with:
 - **Quantity** — number of units of this load
 - **Power Factor** — used to compute kVA; defaults to 1.0 if not set
 
+Before running NEC mode, select the **Demand Profile** that best matches the project. The profile is a scope boundary: categories that need a dedicated Article 220 method for that occupancy stay at 100% demand and are listed in the review notes.
+
 ## NEC 220 Mode
 
 Each load is auto-categorised by scanning its **Load Type** for keywords, then the appropriate code demand factor is applied.
+
+### Demand Profiles
+
+| Profile | Behavior |
+|---|---|
+| Commercial / Non-Dwelling | Default selected Article 220 screening profile; existing category factors are applied. |
+| Industrial / Process | Motor and general loads are screened normally; lighting, receptacle, kitchen, and appliance reductions are held at 100% unless documented separately. |
+| Dwelling Unit | Rows are held at 100% and flagged for a dedicated dwelling standard/optional Article 220 calculation. |
+| Health Care Facility | Selected general loads are screened, but health-care-specific reductions are held at 100% and flagged for Article 220 / Article 517 review. |
+| Marina / Shore Power | Selected general loads are screened, but shore-power-specific reductions are held at 100% and flagged for Article 220 / Article 555 review. |
+
+The review panel is intentional. It prevents the estimator from silently applying the commercial/non-dwelling factor library to occupancies that need separate NEC calculation paths.
 
 ### Category Table
 
@@ -93,6 +107,11 @@ Add a `necCategory` property to a load row (via JSON import) to force a specific
 | Connected Load (kW / kVA) | Sum of nameplate kW × quantity, before demand factors |
 | Demand Load (kW / kVA) | Coincident demand after applying code factors |
 | Overall Demand Factor | Demand ÷ Connected (aggregate) |
+| Demand Profile | Selected project classification profile used to apply or withhold demand factors |
+
+### Demand Profile Review
+
+When the selected profile withholds a demand reduction, the review panel lists the affected category, NEC reference area, and recommended action. Keep the conservative 100% basis, document the project-specific demand factor, or use the detailed occupancy-specific calculation outside the screening engine.
 
 ### Service Entrance Summary
 

@@ -1,8 +1,8 @@
 {
-  "generatedAt": "2026-05-16T21:01:14.462Z",
+  "generatedAt": "2026-05-16T22:51:03.231Z",
   "summary": {
     "testSuiteCount": 157,
-    "totalAssertions": 6304,
+    "totalAssertions": 6324,
     "benchmarkCount": 6,
     "standardCount": 13,
     "necComplianceCount": 8
@@ -361,9 +361,10 @@
         "buildDemandSchedule() — IEC 60439-1 mode",
         "buildDemandSchedule() — quantity and power factor",
         "buildDemandSchedule() — source breakdown",
+        "buildDemandSchedule() — demand classification profiles",
         "NEC_CATEGORIES constant"
       ],
-      "assertionCount": 83
+      "assertionCount": 103
     },
     {
       "file": "tests/derInterconnect.test.mjs",
@@ -2071,14 +2072,16 @@
       "nec2023Scope": "Captures load records and selected demand/schedule calculations that support NEC Article 220 style design workflows.",
       "implemented": [
         "Structured load records by source, voltage, phase, demand, and power factor",
+        "Demand Schedule profiles for commercial/non-dwelling, industrial/process, dwelling, healthcare, and marina/shore-power screening",
+        "Profile review notes that keep unsupported occupancy-specific categories at 100 percent demand instead of silently applying unrelated reductions",
         "Workflow links from loads into one-line, cable schedule, and downstream studies"
       ],
       "gaps": [
         "Full NEC Article 220 service/feeder demand calculation coverage is not complete",
-        "Special occupancy, dwelling, healthcare, EV, industrial process, and local amendment rules require manual review",
+        "Special occupancy, dwelling, healthcare, EV, industrial process, marina/shore-power, and local amendment rules require manual review",
         "Demand factors entered by users are not a substitute for project-specific code classification"
       ],
-      "nextAction": "Add project demand classification profiles before presenting this as a full Article 220 compliance workflow."
+      "nextAction": "Add detailed occupancy-specific Article 220 calculation worksheets before presenting demand scheduling as a full NEC compliance workflow."
     },
     {
       "id": "nec-voltage-drop",

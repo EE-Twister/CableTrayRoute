@@ -43,6 +43,44 @@ export const NEC_CATEGORIES = {
 };
 
 /**
+ * Demand classification profiles. Profiles intentionally keep unsupported
+ * occupancies conservative instead of applying a demand reduction from a
+ * different Article 220 workflow.
+ */
+export const DEMAND_PROFILES = {
+  commercial: {
+    label: 'Commercial / Non-Dwelling',
+    standard: 'NEC Article 220 selected non-dwelling factors',
+    description: 'Default selected NEC Article 220 workflow for commercial/non-dwelling load schedules.',
+    conservativeCategories: [],
+  },
+  industrial: {
+    label: 'Industrial / Process',
+    standard: 'NEC Article 220 / 430 selected industrial screening',
+    description: 'Keeps process, lighting, receptacle, kitchen, and appliance demand conservative unless a project-specific basis is documented.',
+    conservativeCategories: ['lighting', 'receptacle', 'kitchen', 'appliance'],
+  },
+  dwelling: {
+    label: 'Dwelling Unit',
+    standard: 'NEC Article 220 dwelling unit calculations',
+    description: 'Dwelling unit calculations require a dedicated standard/optional dwelling method; this profile keeps load rows at 100% and flags review.',
+    conservativeCategories: ['lighting', 'receptacle', 'motor', 'kitchen', 'hvac', 'ev', 'appliance', 'critical', 'general'],
+  },
+  healthcare: {
+    label: 'Health Care Facility',
+    standard: 'NEC Article 220 health care load calculations / Article 517 coordination',
+    description: 'Health care occupancies include dedicated Article 220 health care provisions and Article 517 design context; unsupported reductions are held at 100%.',
+    conservativeCategories: ['lighting', 'receptacle', 'kitchen', 'appliance', 'ev'],
+  },
+  marina: {
+    label: 'Marina / Shore Power',
+    standard: 'NEC Article 220 and Article 555 load calculations',
+    description: 'Marina and shore-power calculations require Article 555 demand-factor handling; unsupported reductions are held at 100%.',
+    conservativeCategories: ['lighting', 'receptacle', 'kitchen', 'appliance', 'ev'],
+  },
+};
+
+/**
  * NEC Table 220.56 — Commercial Kitchen Equipment demand factors.
  * Index 0 = 1 unit, index 4 = 5 units, ≥ 6 = 0.65.
  */
@@ -130,6 +168,15 @@ export function categorise(loadType) {
   return 'general';
 }
 
+export function normalizeDemandProfile(profile) {
+  const key = String(profile || 'commercial').trim().toLowerCase().replace(/[^a-z0-9]+/g, '_');
+  if (DEMAND_PROFILES[key]) return key;
+  if (key === 'non_dwelling' || key === 'commercial_non_dwelling') return 'commercial';
+  if (key === 'health_care' || key === 'healthcare_facility') return 'healthcare';
+  if (key === 'shore_power') return 'marina';
+  return 'commercial';
+}
+
 // ---------------------------------------------------------------------------
 // Core demand calculation
 // ---------------------------------------------------------------------------
@@ -180,7 +227,10 @@ export function categorise(loadType) {
  * @property {number}       summary.totalDemandKva
  * @property {number}       summary.diversityFactor    IEC overall (if IEC mode)
  * @property {string}       mode  'nec' | 'iec'
+ * @property {string}       profile
+ * @property {string}       profileLabel
  * @property {Object[]}     sourceBreakdown  Per-panel demand summary
+ * @property {Object[]}     reviewNotes  Conservative profile notes and data-quality prompts
  */
 
 /**
@@ -213,9 +263,11 @@ function connectedKw(load) {
  */
 export function buildDemandSchedule(loads, options = {}) {
   const mode = options.mode || options.standard || 'nec';
+  const profile = normalizeDemandProfile(options.profile || options.demandProfile);
+  const profileInfo = DEMAND_PROFILES[profile];
 
   if (!Array.isArray(loads) || loads.length === 0) {
-    return _emptyResult(mode);
+    return _emptyResult(mode, profile);
   }
 
   // -------------------------------------------------------------------------
@@ -257,6 +309,8 @@ export function buildDemandSchedule(loads, options = {}) {
     return {
       rows,
       mode,
+      profile,
+      profileLabel: profileInfo.label,
       summary: {
         totalConnectedKw:  round2(totalConnKw),
         totalConnectedKva: round2(totalConnKva),
@@ -265,6 +319,7 @@ export function buildDemandSchedule(loads, options = {}) {
         diversityFactor:   df,
       },
       sourceBreakdown: _buildSourceBreakdown(rows),
+      reviewNotes: _buildProfileReviewNotes(enriched, profile),
     };
   }
 
@@ -302,6 +357,7 @@ export function buildDemandSchedule(loads, options = {}) {
   let totalDemandKva = 0;
 
   const rows = [];
+  const reviewNotes = _buildProfileReviewNotes(enriched, profile);
 
   for (const e of enriched) {
     const { load, category, connKw, connKva, pf } = e;
@@ -312,7 +368,12 @@ export function buildDemandSchedule(loads, options = {}) {
     let note = '';
     let std  = NEC_CATEGORIES[category].standard;
 
-    switch (category) {
+    if (profileInfo.conservativeCategories.includes(category)) {
+      df = 1.0;
+      std = profileInfo.standard;
+      note = `100% conservative demand for ${profileInfo.label}; verify the applicable NEC Article 220 calculation path.`;
+    } else {
+      switch (category) {
       case 'lighting': {
         // Compute the proportional factor this row contributes to the category total
         const categoryDemand  = lightingDemandKw(lightingTotal);
@@ -371,6 +432,7 @@ export function buildDemandSchedule(loads, options = {}) {
         note = '100% demand (critical / unclassified load)';
         break;
       }
+      }
     }
 
     const dKw  = connKw  * df;
@@ -384,6 +446,8 @@ export function buildDemandSchedule(loads, options = {}) {
   return {
     rows,
     mode,
+    profile,
+    profileLabel: profileInfo.label,
     summary: {
       totalConnectedKw:  round2(totalConnKw),
       totalConnectedKva: round2(totalConnKva),
@@ -392,6 +456,7 @@ export function buildDemandSchedule(loads, options = {}) {
       diversityFactor:   totalConnKw > 0 ? round2(totalDemandKw / totalConnKw) : 1,
     },
     sourceBreakdown: _buildSourceBreakdown(rows),
+    reviewNotes,
   };
 }
 
@@ -444,10 +509,46 @@ function _buildSourceBreakdown(rows) {
   }));
 }
 
-function _emptyResult(mode) {
+function _buildProfileReviewNotes(enriched, profile) {
+  const profileInfo = DEMAND_PROFILES[profile] || DEMAND_PROFILES.commercial;
+  const notes = [];
+  const categories = new Set(enriched.map(e => e.category));
+  for (const category of categories) {
+    if (!profileInfo.conservativeCategories.includes(category)) continue;
+    const label = NEC_CATEGORIES[category]?.label || category;
+    notes.push({
+      severity: 'warning',
+      category,
+      label,
+      profile,
+      profileLabel: profileInfo.label,
+      message: `${label} loads are held at 100% demand under the ${profileInfo.label} profile.`,
+      reference: profileInfo.standard,
+      remediation: 'Select the matching NEC Article 220 calculation method, document the project-specific demand factor, or keep the conservative 100% demand basis.',
+    });
+  }
+  if (profile !== 'commercial') {
+    notes.unshift({
+      severity: 'info',
+      category: 'profile',
+      label: profileInfo.label,
+      profile,
+      profileLabel: profileInfo.label,
+      message: profileInfo.description,
+      reference: profileInfo.standard,
+      remediation: 'Use this profile as a screening boundary until the detailed occupancy-specific calculation is documented.',
+    });
+  }
+  return notes;
+}
+
+function _emptyResult(mode, profile = 'commercial') {
+  const profileInfo = DEMAND_PROFILES[profile] || DEMAND_PROFILES.commercial;
   return {
     rows: [],
     mode,
+    profile,
+    profileLabel: profileInfo.label,
     summary: {
       totalConnectedKw:  0,
       totalConnectedKva: 0,
@@ -456,5 +557,6 @@ function _emptyResult(mode) {
       diversityFactor:   1,
     },
     sourceBreakdown: [],
+    reviewNotes: [],
   };
 }

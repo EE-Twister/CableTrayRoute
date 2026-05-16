@@ -1,4 +1,4 @@
-import { buildDemandSchedule, NEC_CATEGORIES, iecDiversityFactor } from './analysis/demandSchedule.mjs';
+import { buildDemandSchedule, NEC_CATEGORIES, DEMAND_PROFILES, iecDiversityFactor } from './analysis/demandSchedule.mjs';
 import { getLoads } from './dataStore.mjs';
 import { downloadCSV } from './reports/reporting.mjs';
 import { showAlertModal } from './src/components/modal.js';
@@ -13,7 +13,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const runBtn     = document.getElementById('run-btn');
   const exportBtn  = document.getElementById('export-btn');
   const modeSelect = document.getElementById('mode-select');
+  const profileSelect = document.getElementById('profile-select');
   const summaryEl  = document.getElementById('summary');
+  const reviewEl   = document.getElementById('review-notes');
   const resultsEl  = document.getElementById('results');
   const breakdownEl = document.getElementById('source-breakdown');
 
@@ -29,9 +31,10 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
     const mode = modeSelect ? modeSelect.value : 'nec';
+    const profile = profileSelect ? profileSelect.value : 'commercial';
     let result;
     try {
-      result = buildDemandSchedule(loads, { mode });
+      result = buildDemandSchedule(loads, { mode, profile });
     } catch (err) {
       showAlertModal('Calculation Error', err.message);
       return;
@@ -39,6 +42,7 @@ document.addEventListener('DOMContentLoaded', () => {
     lastResult = result;
     exportBtn.disabled = false;
     renderSummary(result);
+    renderReviewNotes(result.reviewNotes || []);
     renderTable(result.rows);
     renderBreakdown(result.sourceBreakdown);
   }
@@ -64,12 +68,17 @@ document.addEventListener('DOMContentLoaded', () => {
       ? (summary.totalDemandKw / summary.totalConnectedKw)
       : 1;
     const modeLabel = mode === 'iec' ? 'IEC 60439-1' : 'NEC 220';
+    const profileLabel = mode === 'iec' ? 'Consumer Count' : result.profileLabel || DEMAND_PROFILES.commercial.label;
     summaryEl.hidden = false;
     summaryEl.innerHTML = `
       <div class="result-grid">
         <div class="result-card">
           <span class="result-label">Standard</span>
           <span class="result-value">${esc(modeLabel)}</span>
+        </div>
+        <div class="result-card">
+          <span class="result-label">Demand Profile</span>
+          <span class="result-value">${esc(profileLabel)}</span>
         </div>
         <div class="result-card">
           <span class="result-label">Connected Load (kW)</span>
@@ -92,6 +101,25 @@ document.addEventListener('DOMContentLoaded', () => {
           <span class="result-value">${pct(overallDf)}</span>
         </div>
       </div>`;
+  }
+
+  function renderReviewNotes(notes) {
+    if (!reviewEl) return;
+    if (!notes.length) {
+      reviewEl.hidden = true;
+      reviewEl.innerHTML = '';
+      return;
+    }
+    const items = notes.map(note => `
+      <li class="demand-review-note demand-review-note-${esc(note.severity || 'info')}">
+        <strong>${esc(note.label || note.category)}</strong>
+        <span>${esc(note.message)}</span>
+        <small>${esc(note.reference || '')}${note.remediation ? ' - ' + esc(note.remediation) : ''}</small>
+      </li>`).join('');
+    reviewEl.hidden = false;
+    reviewEl.innerHTML = `
+      <h2 class="section-heading">Demand Profile Review</h2>
+      <ul class="demand-review-list">${items}</ul>`;
   }
 
   function renderTable(rows) {

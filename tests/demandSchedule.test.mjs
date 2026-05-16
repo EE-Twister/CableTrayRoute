@@ -8,8 +8,10 @@ import assert from 'assert';
 import {
   buildDemandSchedule,
   categorise,
+  DEMAND_PROFILES,
   iecDiversityFactor,
   NEC_CATEGORIES,
+  normalizeDemandProfile,
 } from '../analysis/demandSchedule.mjs';
 
 function describe(name, fn) {
@@ -342,6 +344,60 @@ describe('buildDemandSchedule() — source breakdown', () => {
     const result = buildDemandSchedule(loads, { mode: 'nec' });
     const sources = result.sourceBreakdown.map(s => s.source);
     assert.ok(sources.includes('(unassigned)'));
+  });
+});
+
+// ---------------------------------------------------------------------------
+describe('buildDemandSchedule() — demand classification profiles', () => {
+  it('defaults to commercial non-dwelling profile', () => {
+    const result = buildDemandSchedule([{ tag: 'R1', kw: '20', loadType: 'receptacle', powerFactor: '1' }]);
+    assert.strictEqual(result.profile, 'commercial');
+    assert.strictEqual(result.profileLabel, DEMAND_PROFILES.commercial.label);
+    assert.strictEqual(result.summary.totalDemandKw, 15);
+    assert.deepStrictEqual(result.reviewNotes, []);
+  });
+
+  it('normalizes common demand profile aliases', () => {
+    assert.strictEqual(normalizeDemandProfile('commercial non dwelling'), 'commercial');
+    assert.strictEqual(normalizeDemandProfile('health care'), 'healthcare');
+    assert.strictEqual(normalizeDemandProfile('shore power'), 'marina');
+    assert.strictEqual(normalizeDemandProfile('unknown'), 'commercial');
+  });
+
+  it('keeps industrial lighting and receptacles at 100% and emits review notes', () => {
+    const loads = [
+      { tag: 'L1', kw: '80', loadType: 'LED lighting', powerFactor: '1' },
+      { tag: 'R1', kw: '20', loadType: 'receptacle', powerFactor: '1' },
+      { tag: 'M1', kw: '10', loadType: 'motor', powerFactor: '1' },
+    ];
+    const result = buildDemandSchedule(loads, { mode: 'nec', profile: 'industrial' });
+    assert.strictEqual(result.profile, 'industrial');
+    assert.strictEqual(result.rows.find(r => r.tag === 'L1').demandFactor, 1);
+    assert.strictEqual(result.rows.find(r => r.tag === 'R1').demandFactor, 1);
+    assert.strictEqual(result.rows.find(r => r.tag === 'M1').demandFactor, 1.25);
+    assert.ok(result.reviewNotes.some(note => note.category === 'lighting'));
+    assert.ok(result.reviewNotes.some(note => note.category === 'receptacle'));
+  });
+
+  it('keeps dwelling profile loads at 100% and flags the dedicated calculation path', () => {
+    const loads = [
+      { tag: 'LTG', kw: '80', loadType: 'lighting', powerFactor: '1' },
+      { tag: 'APP', kw: '10', loadType: 'fixed appliance', powerFactor: '1' },
+    ];
+    const result = buildDemandSchedule(loads, { mode: 'nec', profile: 'dwelling' });
+    assert.strictEqual(result.summary.totalConnectedKw, 90);
+    assert.strictEqual(result.summary.totalDemandKw, 90);
+    assert.ok(result.reviewNotes.some(note => note.reference.includes('dwelling')));
+  });
+
+  it('returns profile metadata in IEC mode without changing IEC diversity math', () => {
+    const loads = Array.from({ length: 4 }, (_, i) => ({
+      tag: `L${i + 1}`, kw: '10', loadType: 'lighting', powerFactor: '1'
+    }));
+    const result = buildDemandSchedule(loads, { mode: 'iec', profile: 'healthcare' });
+    assert.strictEqual(result.summary.totalDemandKw, 36);
+    assert.strictEqual(result.profile, 'healthcare');
+    assert.ok(result.reviewNotes.some(note => note.category === 'profile'));
   });
 });
 

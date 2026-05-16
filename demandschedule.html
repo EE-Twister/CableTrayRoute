@@ -101,6 +101,9 @@
         </table>
         <p><strong>IEC 60439-1 mode</strong> applies a single diversity factor to all loads based on consumer count per Table B.1:
         1.0 (≤ 2), 0.9 (3–5), 0.8 (6–10), 0.7 (11–40), 0.6 (> 40).</p>
+        <p><strong>Demand Profile:</strong> Select the project type before running NEC mode. Profiles that need a dedicated
+        Article 220 calculation keep unsupported categories at 100% demand and show review notes instead of silently applying
+        commercial/non-dwelling reductions.</p>
         <p><strong>Override:</strong> Add a <code>necCategory</code> property to any load row to force a specific category.</p>
       </details>
 
@@ -111,12 +114,24 @@
             <option value="iec">IEC 60439-1 (International)</option>
           </select>
         </label>
+        <label for="profile-select">Demand Profile:
+          <select id="profile-select">
+            <option value="commercial">Commercial / Non-Dwelling</option>
+            <option value="industrial">Industrial / Process</option>
+            <option value="dwelling">Dwelling Unit</option>
+            <option value="healthcare">Health Care Facility</option>
+            <option value="marina">Marina / Shore Power</option>
+          </select>
+        </label>
         <button id="run-btn" type="button">Run Demand Schedule</button>
         <button id="export-btn" type="button" disabled>Export CSV</button>
       </div>
 
       <!-- Summary cards -->
       <div id="summary" hidden role="region" aria-live="polite" aria-label="Demand schedule summary"></div>
+
+      <!-- Occupancy/profile review notes -->
+      <div id="review-notes" hidden role="region" aria-live="polite" aria-label="Demand profile review notes"></div>
 
       <!-- Per-panel service entrance breakdown -->
       <div id="source-breakdown" role="region" aria-live="polite" aria-label="Service entrance summary by panel"></div>

@@ -4,6 +4,7 @@
  *  - Motor Starting      (motorStart.html)
  *  - Time-Current Curves (tcc.html)
  *  - Design Rule Checker (designrulechecker.html)
+ *  - Demand Schedule (demandschedule.html)
  *  - Battery / UPS Sizing (battery.html)
  */
 import { test, expect } from '@playwright/test';
@@ -223,6 +224,45 @@ test.describe('Design Rule Checker', () => {
     // Results div should contain some content (pass summary or no-data message)
     const resultsText = await page.locator('#drc-results').textContent();
     expect(resultsText.length).toBeGreaterThan(0);
+  });
+});
+
+// -------------------------------------------------------------------------
+// Demand Schedule
+// -------------------------------------------------------------------------
+test.describe('Demand Schedule', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto(pageUrl('demandschedule.html?e2e=1&e2e_reset=1'));
+    await page.waitForLoadState('networkidle');
+  });
+
+  test('page loads with demand profile controls', async ({ page }) => {
+    await expect(page.locator('h1')).toContainText('Demand');
+    await expect(page.locator('#mode-select')).toBeAttached();
+    await expect(page.locator('#profile-select')).toBeAttached();
+    await expect(page.locator('#review-notes')).toBeAttached();
+  });
+
+  test('runs a conservative profile with visible review notes', async ({ page }) => {
+    const errors = [];
+    page.on('pageerror', e => errors.push(e.message));
+
+    await page.goto(pageUrl('loadlist.html?e2e=1&e2e_reset=1'));
+    await page.waitForLoadState('networkidle');
+    await page.click('#load-sample-loads-btn');
+    await expect(page.locator('#load-table tbody tr')).toHaveCount(5);
+
+    await page.goto(pageUrl('demandschedule.html?e2e=1'));
+    await page.waitForLoadState('networkidle');
+    await page.locator('#profile-select').selectOption('dwelling');
+    await page.click('#run-btn');
+
+    await expect(page.locator('#summary')).toBeVisible();
+    await expect(page.locator('#summary')).toContainText('Dwelling Unit');
+    await expect(page.locator('#review-notes')).toBeVisible();
+    await expect(page.locator('#review-notes')).toContainText('Demand Profile Review');
+    await expect(page.locator('#results table tbody tr')).toHaveCount(5);
+    assert_no_critical_errors(errors);
   });
 });
 
