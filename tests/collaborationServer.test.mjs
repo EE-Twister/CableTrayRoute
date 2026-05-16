@@ -255,6 +255,23 @@ describe('attachCollaborationServer — leave', () => {
   });
 });
 
+
+  it('resets sync sequence after the last member leaves a project', () => {
+    const { httpServer, wss } = setupServer();
+    const alice = joinClient(httpServer, wss, 'proj1', 'alice');
+
+    alice._receive({ type: 'patch', projectId: 'proj1', username: 'alice', patch: { n: 1 } });
+    const acks = alice.sentOfType('ack');
+    assert.strictEqual(acks[acks.length - 1].seq, 1, 'first patch should advance seq to 1');
+
+    alice.close();
+
+    const bob = joinClient(httpServer, wss, 'proj1', 'bob');
+    const sync = bob.sentOfType('sync');
+    assert.ok(sync.length >= 1, 'rejoin should receive sync');
+    assert.strictEqual(sync[sync.length - 1].seq, 0, 'seq should reset after room cleanup');
+  });
+
 describe('attachCollaborationServer — close event', () => {
   it('removes client from room on ws close', () => {
     const { httpServer, wss } = setupServer();

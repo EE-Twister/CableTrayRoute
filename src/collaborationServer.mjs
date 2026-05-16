@@ -84,8 +84,10 @@ export function attachCollaborationServer(httpServer, wss, options = {}) {
       const room = rooms.get(currentProjectId);
       if (room) {
         room.forEach(c => { if (c.ws === ws) room.delete(c); });
-        if (room.size === 0) rooms.delete(currentProjectId);
-        else broadcastPresence(currentProjectId);
+        if (room.size === 0) {
+          rooms.delete(currentProjectId);
+          seqCounters.delete(currentProjectId);
+        } else broadcastPresence(currentProjectId);
       }
     }
 
@@ -105,7 +107,7 @@ export function attachCollaborationServer(httpServer, wss, options = {}) {
 
       if (msg.type === 'join') {
         removeFromRoom();
-        currentProjectId = String(msg.projectId || '');
+        currentProjectId = String(msg.projectId || '').slice(0, 200);
         currentUsername = String(msg.username || 'Anonymous').slice(0, 100);
         if (!rooms.has(currentProjectId)) rooms.set(currentProjectId, new Set());
         if (!seqCounters.has(currentProjectId)) seqCounters.set(currentProjectId, 0);
