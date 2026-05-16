@@ -86,6 +86,15 @@ function safeEntries(results = {}) {
   });
 }
 
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function sanitizeFileName(value, fallback = 'equipment') {
   if (typeof value !== 'string') {
     if (value && typeof value.toString === 'function') {
@@ -143,6 +152,7 @@ export function buildLabelSheetHtml(results = {}, projectName = '') {
   const entries = safeEntries(results);
   const date = new Date().toISOString().split('T')[0];
   const heading = projectName ? `Arc Flash Warning Labels — ${projectName}` : 'Arc Flash Warning Labels';
+  const safeHeading = escapeHtml(heading);
 
   const labelCells = entries.map(([id, info]) => {
     const data = buildArcFlashLabelData(id, info);
@@ -158,7 +168,7 @@ export function buildLabelSheetHtml(results = {}, projectName = '') {
 <style>${LABEL_SHEET_STYLE}</style>
 </head>
 <body>
-<h1>${heading}</h1>
+<h1>${safeHeading}</h1>
 <p class="meta">Generated: ${date} &nbsp;|&nbsp; ${entries.length} label(s)</p>
 <button class="no-print" onclick="window.print()">Print All Labels</button>
 <div class="label-grid">
@@ -176,7 +186,7 @@ ${labelCells}
  */
 export function openLabelPrintWindow(results = {}, projectName = '') {
   const html = buildLabelSheetHtml(results, projectName);
-  const win = window.open('', '_blank');
+  const win = window.open('', '_blank', 'noopener,noreferrer');
   if (!win) return null;
   win.document.open();
   win.document.write(html);

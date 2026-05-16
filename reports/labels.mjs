@@ -35,11 +35,20 @@ try {
   }
 } catch {}
 
+function escapeXml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 export function generateArcFlashLabel(data = {}) {
   let svg = template;
   Object.entries(data).forEach(([k, v]) => {
     const re = new RegExp(`{{${k}}}`, 'g');
-    svg = svg.replace(re, v ?? '');
+    svg = svg.replace(re, escapeXml(v));
   });
   return svg;
 }

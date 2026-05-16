@@ -132,6 +132,12 @@ describe('buildLabelSheetHtml', () => {
     const html = buildLabelSheetHtml({ bus1: warningInfo });
     assert.ok(html.includes('@media print'), 'Expected @media print in style');
   });
+
+  it('escapes project name markup in heading', () => {
+    const html = buildLabelSheetHtml({ bus1: warningInfo }, '<img src=x onerror=alert(1)>');
+    assert.ok(html.includes('&lt;img src=x onerror=alert(1)&gt;'), 'Expected escaped project name in heading');
+    assert.ok(!html.includes('<img src=x onerror=alert(1)>'), 'Expected raw project name markup to be absent');
+  });
 });
 
 // ── generateArcFlashLabel ─────────────────────────────────────────────────────
@@ -150,6 +156,25 @@ describe('generateArcFlashLabel', () => {
     const svg = generateArcFlashLabel(data);
     const unresolved = svg.match(/\{\{[^}]+\}\}/g);
     assert.ok(!unresolved, `Unresolved tokens found: ${JSON.stringify(unresolved)}`);
+  });
+
+  it('escapes xml/html special characters in substituted values', () => {
+    const svg = generateArcFlashLabel({
+      signalColor: '#f57c00',
+      signalWord: 'WARNING',
+      equipmentTag: 'MCC-1</tspan><script>alert(1)</script>',
+      voltage: '480 V',
+      incidentEnergy: '1.00 cal/cm²',
+      workingDistance: '18 in',
+      arcFlashBoundary: '24 in',
+      limitedApproach: 'N/A',
+      restrictedApproach: 'N/A',
+      upstreamDevice: 'CB-1',
+      ppeCategory: '2',
+      studyDate: '2026-04-07'
+    });
+    assert.ok(svg.includes('&lt;/tspan&gt;&lt;script&gt;alert(1)&lt;/script&gt;'), 'Expected escaped injected markup');
+    assert.ok(!svg.includes('<script>alert(1)</script>'), 'Expected raw script tag to be absent');
   });
 });
 
