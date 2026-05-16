@@ -98,6 +98,38 @@ function clonePoints(points = []) {
   return points.map((point) => ({ ...point }));
 }
 
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+
+function sanitizeLabel(value, fallback = '') {
+  const trimmed = String(value ?? fallback).trim();
+  return trimmed.slice(0, 80) || fallback;
+}
+
+function sanitizePoint(point, fallbackLabel = '') {
+  return {
+    x: toNumber(point?.x, 0),
+    y: toNumber(point?.y, 0),
+    label: sanitizeLabel(point?.label, fallbackLabel)
+  };
+}
+
+function sanitizeSegment(segment, fallbackLabel = '') {
+  return {
+    x1: toNumber(segment?.x1, 0),
+    y1: toNumber(segment?.y1, 0),
+    x2: toNumber(segment?.x2, 0),
+    y2: toNumber(segment?.y2, 0),
+    label: sanitizeLabel(segment?.label, fallbackLabel)
+  };
+}
+
 function clamp01(value) {
   return clamp(value, 0, 1);
 }
@@ -297,12 +329,15 @@ export function initCpLayoutCanvas({
     }
 
     state.viewport = {
-      ...state.viewport,
-      ...(layout.viewport || {})
+      scale: clamp(toNumber(layout.viewport?.scale, state.viewport.scale), 0.2, 3.5),
+      x: toNumber(layout.viewport?.x, state.viewport.x),
+      y: toNumber(layout.viewport?.y, state.viewport.y)
     };
     state.layers = {
-      ...state.layers,
-      ...(layout.layers || {})
+      [LAYERS.structure]: Boolean(layout.layers?.[LAYERS.structure] ?? state.layers[LAYERS.structure]),
+      [LAYERS.anodes]: Boolean(layout.layers?.[LAYERS.anodes] ?? state.layers[LAYERS.anodes]),
+      [LAYERS.wiring]: Boolean(layout.layers?.[LAYERS.wiring] ?? state.layers[LAYERS.wiring]),
+      [LAYERS.measurement]: Boolean(layout.layers?.[LAYERS.measurement] ?? state.layers[LAYERS.measurement])
     };
     if (typeof layout.heatmapEnabled === 'boolean') {
       state.heatmapEnabled = layout.heatmapEnabled;
@@ -322,16 +357,25 @@ export function initCpLayoutCanvas({
 
     if (layout.geometry && typeof layout.geometry === 'object') {
       if (Array.isArray(layout.geometry.anodes) && layout.geometry.anodes.length) {
-        state.geometry.anodes = clonePoints(layout.geometry.anodes);
+        state.geometry.anodes = layout.geometry.anodes
+          .slice(0, 100)
+          .map((point, index) => sanitizePoint(point, `A${index + 1}`));
       }
       if (Array.isArray(layout.geometry.testPoints) && layout.geometry.testPoints.length) {
-        state.geometry.testPoints = clonePoints(layout.geometry.testPoints);
+        state.geometry.testPoints = layout.geometry.testPoints
+          .slice(0, 200)
+          .map((point, index) => sanitizePoint(point, `TP${index + 1}`));
       }
       if (layout.geometry.referenceElectrode && typeof layout.geometry.referenceElectrode === 'object') {
-        state.geometry.referenceElectrode = { ...layout.geometry.referenceElectrode };
+        state.geometry.referenceElectrode = {
+          x: toNumber(layout.geometry.referenceElectrode.x, state.geometry.referenceElectrode.x),
+          y: toNumber(layout.geometry.referenceElectrode.y, state.geometry.referenceElectrode.y)
+        };
       }
       if (Array.isArray(layout.geometry.structureSegments) && layout.geometry.structureSegments.length) {
-        state.geometry.structureSegments = clonePoints(layout.geometry.structureSegments);
+        state.geometry.structureSegments = layout.geometry.structureSegments
+          .slice(0, 100)
+          .map((segment, index) => sanitizeSegment(segment, `S${index + 1}`));
       }
     }
   }
@@ -697,15 +741,15 @@ export function initCpLayoutCanvas({
         class="cp-layout-structure-line ${activeSegmentIndex === index ? 'is-hovered' : ''}"
         data-segment-index="${index}"
       />
-      <text x="${(segment.x1 + segment.x2) / 2}" y="${segment.y1 - 14}" class="cp-layout-segment-label" text-anchor="middle" data-segment-index="${index}">${segment.label}</text>
+      <text x="${(segment.x1 + segment.x2) / 2}" y="${segment.y1 - 14}" class="cp-layout-segment-label" text-anchor="middle" data-segment-index="${index}">${escapeHtml(segment.label)}</text>
     `).join('');
 
     const anodeMarkup = anodes.map((anode, index) => `
       <g class="cp-layout-anode" data-drag-kind="anode" data-index="${index}">
         <circle cx="${anode.x}" cy="${anode.y}" r="9" class="cp-layout-anode-node">
-          <title>${anode.label}: anode bed position used for current distribution.</title>
+          <title>${escapeHtml(anode.label)}: anode bed position used for current distribution.</title>
         </circle>
-        <text x="${anode.x}" y="${anode.y - 14}" text-anchor="middle" class="cp-layout-anode-label">${anode.label}</text>
+        <text x="${anode.x}" y="${anode.y - 14}" text-anchor="middle" class="cp-layout-anode-label">${escapeHtml(anode.label)}</text>
       </g>
     `).join('');
 
@@ -716,9 +760,9 @@ export function initCpLayoutCanvas({
     const measurementMarkup = testPoints.map((point, index) => `
       <g class="cp-layout-test-point" data-drag-kind="test-point" data-index="${index}">
         <rect x="${point.x - 7}" y="${point.y - 7}" width="14" height="14" rx="2" class="cp-layout-test-node">
-          <title>${point.label}: test point for structure potential verification.</title>
+          <title>${escapeHtml(point.label)}: test point for structure potential verification.</title>
         </rect>
-        <text x="${point.x}" y="${point.y + 22}" text-anchor="middle" class="cp-layout-test-label">${point.label}</text>
+        <text x="${point.x}" y="${point.y + 22}" text-anchor="middle" class="cp-layout-test-label">${escapeHtml(point.label)}</text>
       </g>
     `).join('');
 
