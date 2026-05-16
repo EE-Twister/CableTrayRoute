@@ -24,6 +24,10 @@ const CHEMISTRY_CELL_DEFAULTS = Object.freeze({
 
 const TERMINAL_SIDES = new Set(['front-left', 'front-right', 'rear-left', 'rear-right']);
 const RACK_GAP_FT = 0.5;
+const MAX_MODULES_PER_RACK = 200;
+const MAX_RACKS_PER_ROW = 24;
+const MAX_CELLS_PER_MODULE = 200;
+const MAX_TOTAL_MODULES = 20000;
 
 function finite(value) {
   const number = Number(value);
@@ -44,8 +48,13 @@ function positiveNumber(overrides, key, fallback, warnings, label, options = {})
     }
     return options.integer ? Math.max(1, Math.round(fallback)) : fallback;
   }
-  if (options.integer) return Math.max(1, Math.round(value));
-  return value;
+
+  const normalized = options.integer ? Math.max(1, Math.round(value)) : value;
+  if (Number.isFinite(options.max) && normalized > options.max) {
+    warnings.push(`${label} exceeded the maximum of ${options.max} and was capped.`);
+    return options.max;
+  }
+  return normalized;
 }
 
 function booleanValue(value, fallback) {
@@ -172,12 +181,12 @@ export function normalizeBatteryRackLayoutInputs(sizingResult = {}, overrides = 
     dcBusVoltageV: round(positiveNumber(overrides, 'dcBusVoltageV', DEFAULT_LAYOUT.dcBusVoltageV, warnings, 'DC bus voltage'), 3),
     nominalCellVoltageV: round(positiveNumber(overrides, 'nominalCellVoltageV', nominalCellVoltageDefault, warnings, 'Nominal cell voltage'), 3),
     cellCapacityAh: round(positiveNumber(overrides, 'cellCapacityAh', DEFAULT_LAYOUT.cellCapacityAh, warnings, 'Cell capacity'), 3),
-    cellsPerModule: positiveNumber(overrides, 'cellsPerModule', DEFAULT_LAYOUT.cellsPerModule, warnings, 'Cells per module', { integer: true }),
-    modulesPerRack: positiveNumber(overrides, 'modulesPerRack', DEFAULT_LAYOUT.modulesPerRack, warnings, 'Modules per rack', { integer: true }),
+    cellsPerModule: positiveNumber(overrides, 'cellsPerModule', DEFAULT_LAYOUT.cellsPerModule, warnings, 'Cells per module', { integer: true, max: MAX_CELLS_PER_MODULE }),
+    modulesPerRack: positiveNumber(overrides, 'modulesPerRack', DEFAULT_LAYOUT.modulesPerRack, warnings, 'Modules per rack', { integer: true, max: MAX_MODULES_PER_RACK }),
     rackWidthFt: round(positiveNumber(overrides, 'rackWidthFt', DEFAULT_LAYOUT.rackWidthFt, warnings, 'Rack width'), 3),
     rackDepthFt: round(positiveNumber(overrides, 'rackDepthFt', DEFAULT_LAYOUT.rackDepthFt, warnings, 'Rack depth'), 3),
     rackHeightFt: round(positiveNumber(overrides, 'rackHeightFt', DEFAULT_LAYOUT.rackHeightFt, warnings, 'Rack height'), 3),
-    racksPerRow: positiveNumber(overrides, 'racksPerRow', DEFAULT_LAYOUT.racksPerRow, warnings, 'Racks per row', { integer: true }),
+    racksPerRow: positiveNumber(overrides, 'racksPerRow', DEFAULT_LAYOUT.racksPerRow, warnings, 'Racks per row', { integer: true, max: MAX_RACKS_PER_ROW }),
     frontAisleFt: round(positiveNumber(overrides, 'frontAisleFt', DEFAULT_LAYOUT.frontAisleFt, warnings, 'Front aisle'), 3),
     rearClearanceFt: round(positiveNumber(overrides, 'rearClearanceFt', DEFAULT_LAYOUT.rearClearanceFt, warnings, 'Rear clearance'), 3),
     sideClearanceFt: round(positiveNumber(overrides, 'sideClearanceFt', DEFAULT_LAYOUT.sideClearanceFt, warnings, 'Side clearance'), 3),
@@ -202,19 +211,24 @@ export function buildBatteryRackLayoutModel(sizingResult = {}, layoutInputs = {}
   const modulesPerString = Math.ceil(cellsPerString / inputs.cellsPerModule);
   const stringKwh = round(stringVoltageV * inputs.cellCapacityAh / 1000, 3);
   const requiredParallelStrings = Math.max(1, Math.ceil(targetBankKwh / stringKwh));
-  const totalModules = modulesPerString * requiredParallelStrings;
+  const uncappedTotalModules = modulesPerString * requiredParallelStrings;
+  const totalModules = Math.min(MAX_TOTAL_MODULES, uncappedTotalModules);
   const rackCount = Math.max(1, Math.ceil(totalModules / inputs.modulesPerRack));
   const rows = Math.ceil(rackCount / inputs.racksPerRow);
   const columns = Math.min(inputs.racksPerRow, rackCount);
   const totalRackSlots = rackCount * inputs.modulesPerRack;
   const unusedRackSlots = totalRackSlots - totalModules;
-  const installedKwh = round(requiredParallelStrings * stringKwh, 2);
+  const modeledParallelStrings = Math.ceil(totalModules / modulesPerString);
+  if (uncappedTotalModules > MAX_TOTAL_MODULES) {
+    warnings.push(`Computed module count ${uncappedTotalModules} exceeded the maximum of ${MAX_TOTAL_MODULES} and was capped.`);
+  }
+  const installedKwh = round(modeledParallelStrings * stringKwh, 2);
   const racks = makeRacks(rackCount, inputs);
   const strings = [];
   const connections = [];
   let globalModuleSlot = 0;
 
-  for (let stringIndex = 0; stringIndex < requiredParallelStrings; stringIndex += 1) {
+  for (let stringIndex = 0; stringIndex < modeledParallelStrings; stringIndex += 1) {
     const stringId = `S${stringIndex + 1}`;
     const ranges = [];
     for (let moduleIndex = 1; moduleIndex <= modulesPerString; moduleIndex += 1) {
@@ -326,7 +340,7 @@ export function buildBatteryRackLayoutModel(sizingResult = {}, layoutInputs = {}
       cellCapacityAh: inputs.cellCapacityAh,
       stringKwh,
       modulesPerString,
-      requiredParallelStrings,
+      requiredParallelStrings: modeledParallelStrings,
       totalModules,
       modulesPerRack: inputs.modulesPerRack,
       rackCount,
