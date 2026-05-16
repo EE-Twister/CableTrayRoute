@@ -25,7 +25,17 @@ export const MANIFEST_HEADERS = [
 export function resolveSettings(entry = {}) {
   const base = entry.baseDevice?.settings || {};
   const overrides = entry.overrideSource || {};
-  return { ...base, ...overrides };
+  const merged = { ...base };
+  for (const key of Object.keys(base)) {
+    if (Object.prototype.hasOwnProperty.call(overrides, key)) {
+      merged[key] = overrides[key];
+    }
+  }
+  return merged;
+}
+
+function sanitizeInlineValue(value) {
+  return String(value).replace(/[\u0000-\u001f\u007f]/g, ' ').trim();
 }
 
 /**
@@ -88,8 +98,8 @@ export function formatSEL(entry = {}) {
   const ts = new Date().toISOString();
   const lines = [
     `; SEL Relay Settings File`,
-    `; Device  : ${dev.name || entry.name || 'Unknown'} (${dev.id || ''})`,
-    `; Vendor  : ${dev.vendor || 'SEL'}`,
+    `; Device  : ${sanitizeInlineValue(dev.name || entry.name || 'Unknown')} (${sanitizeInlineValue(dev.id || '')})`,
+    `; Vendor  : ${sanitizeInlineValue(dev.vendor || 'SEL')}`,
     `; Generated: ${ts}`,
     `;`,
   ];
@@ -98,13 +108,13 @@ export function formatSEL(entry = {}) {
 
   if (subtype === 'relay_87') {
     lines.push(`[DIFFERENTIAL]`);
-    if (s.slope1 !== undefined)                    lines.push(`SLP1=${s.slope1}`);
-    if (s.slope2 !== undefined)                    lines.push(`SLP2=${s.slope2}`);
-    if (s.minPickupPu !== undefined)               lines.push(`O87P=${s.minPickupPu}`);
-    if (s.breakpointPu !== undefined)              lines.push(`IRS1=${s.breakpointPu}`);
-    if (s.tapSetting !== undefined)                lines.push(`TAP1=${s.tapSetting}`);
-    if (s.secondHarmonicThresholdPct !== undefined) lines.push(`PCT2=${s.secondHarmonicThresholdPct}`);
-    if (s.fifthHarmonicThresholdPct !== undefined)  lines.push(`PCT5=${s.fifthHarmonicThresholdPct}`);
+    if (s.slope1 !== undefined)                    lines.push(`SLP1=${sanitizeInlineValue(s.slope1)}`);
+    if (s.slope2 !== undefined)                    lines.push(`SLP2=${sanitizeInlineValue(s.slope2)}`);
+    if (s.minPickupPu !== undefined)               lines.push(`O87P=${sanitizeInlineValue(s.minPickupPu)}`);
+    if (s.breakpointPu !== undefined)              lines.push(`IRS1=${sanitizeInlineValue(s.breakpointPu)}`);
+    if (s.tapSetting !== undefined)                lines.push(`TAP1=${sanitizeInlineValue(s.tapSetting)}`);
+    if (s.secondHarmonicThresholdPct !== undefined) lines.push(`PCT2=${sanitizeInlineValue(s.secondHarmonicThresholdPct)}`);
+    if (s.fifthHarmonicThresholdPct !== undefined)  lines.push(`PCT5=${sanitizeInlineValue(s.fifthHarmonicThresholdPct)}`);
   } else {
     const pickup   = s.longTimePickup  ?? s.pickup;
     const tms      = s.tms ?? s.longTimeDelay ?? s.time;
@@ -114,12 +124,12 @@ export function formatSEL(entry = {}) {
     const curve    = SEL_CURVE_MAP[s.curveProfile ?? s.curveFamily] ?? 'U1';
 
     lines.push(`[OVERCURRENT]`);
-    if (instPkup !== undefined) lines.push(`50P1P=${instPkup}`);
-    if (pickup    !== undefined) lines.push(`51P1P=${pickup}`);
-    if (tms       !== undefined) lines.push(`51P1TD=${tms}`);
+    if (instPkup !== undefined) lines.push(`50P1P=${sanitizeInlineValue(instPkup)}`);
+    if (pickup    !== undefined) lines.push(`51P1P=${sanitizeInlineValue(pickup)}`);
+    if (tms       !== undefined) lines.push(`51P1TD=${sanitizeInlineValue(tms)}`);
     lines.push(`51P1C=${curve}`);
-    if (stPickup  !== undefined) lines.push(`51P1SP=${stPickup}`);
-    if (stDelay   !== undefined) lines.push(`51P1SD=${stDelay}`);
+    if (stPickup  !== undefined) lines.push(`51P1SP=${sanitizeInlineValue(stPickup)}`);
+    if (stDelay   !== undefined) lines.push(`51P1SD=${sanitizeInlineValue(stDelay)}`);
   }
 
   lines.push('');
@@ -153,8 +163,8 @@ export function formatGEURS(entry = {}) {
   const ts = new Date().toISOString();
   const lines = [
     `# GE EnerVista Settings File`,
-    `# Device  : ${dev.name || entry.name || 'Unknown'} (${dev.id || ''})`,
-    `# Vendor  : ${dev.vendor || 'GE'}`,
+    `# Device  : ${sanitizeInlineValue(dev.name || entry.name || 'Unknown')} (${sanitizeInlineValue(dev.id || '')})`,
+    `# Vendor  : ${sanitizeInlineValue(dev.vendor || 'GE')}`,
     `# Generated: ${ts}`,
     `#`,
   ];
@@ -163,13 +173,13 @@ export function formatGEURS(entry = {}) {
 
   if (subtype === 'relay_87') {
     lines.push(`# Differential protection`);
-    if (s.slope1 !== undefined)                    lines.push(`DIFF_SLOPE1=${s.slope1}`);
-    if (s.slope2 !== undefined)                    lines.push(`DIFF_SLOPE2=${s.slope2}`);
-    if (s.minPickupPu !== undefined)               lines.push(`DIFF_PICKUP=${s.minPickupPu}`);
-    if (s.breakpointPu !== undefined)              lines.push(`DIFF_BREAKPOINT=${s.breakpointPu}`);
-    if (s.tapSetting !== undefined)                lines.push(`TAP_W1=${s.tapSetting}`);
-    if (s.secondHarmonicThresholdPct !== undefined) lines.push(`PCT2H=${s.secondHarmonicThresholdPct}`);
-    if (s.fifthHarmonicThresholdPct !== undefined)  lines.push(`PCT5H=${s.fifthHarmonicThresholdPct}`);
+    if (s.slope1 !== undefined)                    lines.push(`DIFF_SLOPE1=${sanitizeInlineValue(s.slope1)}`);
+    if (s.slope2 !== undefined)                    lines.push(`DIFF_SLOPE2=${sanitizeInlineValue(s.slope2)}`);
+    if (s.minPickupPu !== undefined)               lines.push(`DIFF_PICKUP=${sanitizeInlineValue(s.minPickupPu)}`);
+    if (s.breakpointPu !== undefined)              lines.push(`DIFF_BREAKPOINT=${sanitizeInlineValue(s.breakpointPu)}`);
+    if (s.tapSetting !== undefined)                lines.push(`TAP_W1=${sanitizeInlineValue(s.tapSetting)}`);
+    if (s.secondHarmonicThresholdPct !== undefined) lines.push(`PCT2H=${sanitizeInlineValue(s.secondHarmonicThresholdPct)}`);
+    if (s.fifthHarmonicThresholdPct !== undefined)  lines.push(`PCT5H=${sanitizeInlineValue(s.fifthHarmonicThresholdPct)}`);
   } else {
     const pickup   = s.longTimePickup  ?? s.pickup;
     const tms      = s.tms ?? s.longTimeDelay ?? s.time;
@@ -178,12 +188,12 @@ export function formatGEURS(entry = {}) {
     const stDelay  = s.shortTimeDelay;
     const curve    = GE_CURVE_MAP[s.curveProfile ?? s.curveFamily] ?? 'INVS';
 
-    if (pickup    !== undefined) lines.push(`OC_PICKUP=${pickup}`);
-    if (tms       !== undefined) lines.push(`OC_TIME_DIAL=${tms}`);
+    if (pickup    !== undefined) lines.push(`OC_PICKUP=${sanitizeInlineValue(pickup)}`);
+    if (tms       !== undefined) lines.push(`OC_TIME_DIAL=${sanitizeInlineValue(tms)}`);
     lines.push(`OC_CURVE=${curve}`);
-    if (stPickup  !== undefined) lines.push(`OC_ST_PICKUP=${stPickup}`);
-    if (stDelay   !== undefined) lines.push(`OC_ST_DELAY=${stDelay}`);
-    if (instPkup  !== undefined) lines.push(`INST_PICKUP=${instPkup}`);
+    if (stPickup  !== undefined) lines.push(`OC_ST_PICKUP=${sanitizeInlineValue(stPickup)}`);
+    if (stDelay   !== undefined) lines.push(`OC_ST_DELAY=${sanitizeInlineValue(stDelay)}`);
+    if (instPkup  !== undefined) lines.push(`INST_PICKUP=${sanitizeInlineValue(instPkup)}`);
   }
 
   lines.push('');
