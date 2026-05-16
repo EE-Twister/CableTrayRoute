@@ -161,21 +161,24 @@ document.addEventListener('DOMContentLoaded', () => {
   function renderResults(r) {
     resultsDiv.innerHTML = '';
 
+    const safe = value => escHtml(String(value ?? '—'));
+    const num = value => Number.isFinite(Number(value)) ? String(Number(value)) : '—';
+
     const dipHtml = r.voltageDip
       ? `<div class="result-badge ${r.voltageDip.acceptable ? 'result-badge--pass' : 'result-badge--fail'}" role="status">
-           ${r.voltageDip.acceptable ? '✓' : '✗'} Motor start voltage dip: ${r.voltageDip.dipPct}%
-           (limit ${r.voltageDip.limit}%)
+           ${r.voltageDip.acceptable ? '✓' : '✗'} Motor start voltage dip: ${safe(num(r.voltageDip.dipPct))}%
+           (limit ${safe(num(r.voltageDip.limit))}%)
          </div>`
       : '';
 
     const fuelHtml = r.fuelRuntime
       ? `<div class="result-row">
            <span class="result-label">Fuel consumption rate</span>
-           <span class="result-value">${r.fuelRuntime.fuelRateGalPerHr} gal/hr</span>
+           <span class="result-value">${safe(num(r.fuelRuntime.fuelRateGalPerHr))} gal/hr</span>
          </div>
          <div class="result-row">
-           <span class="result-label">Estimated runtime (${r.fuelCapGal} gal tank)</span>
-           <span class="result-value">${r.fuelRuntime.runtimeHours} hours</span>
+           <span class="result-label">Estimated runtime (${safe(num(r.fuelCapGal))} gal tank)</span>
+           <span class="result-value">${safe(num(r.fuelRuntime.runtimeHours))} hours</span>
          </div>`
       : `<p class="field-hint">Enter fuel tank capacity to calculate runtime.</p>`;
 
@@ -190,20 +193,20 @@ document.addEventListener('DOMContentLoaded', () => {
     const loadRowsHtml = r.loads.map(l =>
       `<tr>
          <td>${escHtml(l.label || '—')}</td>
-         <td>${l.kw} kW</td>
-         <td>${l.demandFactor}</td>
-         <td>${l.contributionKw} kW</td>
+         <td>${safe(num(l.kw))} kW</td>
+         <td>${safe(num(l.demandFactor))}</td>
+         <td>${safe(num(l.contributionKw))} kW</td>
        </tr>`
     ).join('');
 
     const typeInfo = r.nfpa110Info;
     const typeBadge = typeInfo
-      ? `<span class="tag tag--primary">${typeInfo.label}</span> — ${escHtml(typeInfo.description)} ` +
-        `(transfer ≤ ${typeInfo.responseTimeSec} s)`
+      ? `<span class="tag tag--primary">${safe(typeInfo.label)}</span> — ${escHtml(typeInfo.description)} ` +
+        `(transfer ≤ ${safe(num(typeInfo.responseTimeSec))} s)`
       : '';
 
     const sizeOptionsHtml = r.standardSizeOptions.map(s =>
-      `<span class="tag${s === r.selectedSizeKw ? ' tag--primary' : ''}">${s} kW</span>`
+      `<span class="tag${s === r.selectedSizeKw ? ' tag--primary' : ''}">${safe(num(s))} kW</span>`
     ).join(' ');
 
     resultsDiv.innerHTML = `
@@ -221,7 +224,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <tbody>${loadRowsHtml}</tbody>
             <tfoot>
               <tr><td colspan="3"><strong>Total continuous load</strong></td>
-                  <td><strong>${r.continuousKw} kW</strong></td></tr>
+                  <td><strong>${safe(num(r.continuousKw))} kW</strong></td></tr>
             </tfoot>
           </table>
         </div>
@@ -229,18 +232,18 @@ document.addEventListener('DOMContentLoaded', () => {
         <div class="result-group">
           <h3>Site Derating</h3>
           <div class="result-row">
-            <span class="result-label">Altitude factor (${r.altitudeFt} ft, ${r.aspiration})</span>
+            <span class="result-label">Altitude factor (${safe(num(r.altitudeFt))} ft, ${safe(r.aspiration)})</span>
             <span class="result-value">${(r.altitudeFactor * 100).toFixed(1)}%</span>
           </div>
           <p class="field-hint">${escHtml(r.altitudeNote)}</p>
           <div class="result-row">
-            <span class="result-label">Temperature factor (${r.ambientC} °C ambient)</span>
+            <span class="result-label">Temperature factor (${safe(num(r.ambientC))} °C ambient)</span>
             <span class="result-value">${(r.tempFactor * 100).toFixed(1)}%</span>
           </div>
           <p class="field-hint">${escHtml(r.tempNote)}</p>
           <div class="result-row result-row--total">
             <span class="result-label">Site-derated required output</span>
-            <span class="result-value">${r.siteDeratedKw} kW</span>
+            <span class="result-value">${safe(num(r.siteDeratedKw))} kW</span>
           </div>
         </div>
 
@@ -249,11 +252,11 @@ document.addEventListener('DOMContentLoaded', () => {
           <h3>Largest Motor Step Load</h3>
           <div class="result-row">
             <span class="result-label">Motor starting demand</span>
-            <span class="result-value">${r.stepLoad.startingKva} kVA / ${r.stepLoad.startingKw} kW</span>
+            <span class="result-value">${safe(num(r.stepLoad.startingKva))} kVA / ${safe(num(r.stepLoad.startingKw))} kW</span>
           </div>
           <div class="result-row">
             <span class="result-label">Generator kW needed for motor start</span>
-            <span class="result-value">${r.stepLoad.recommendedGenKw} kW</span>
+            <span class="result-value">${safe(num(r.stepLoad.recommendedGenKw))} kW</span>
           </div>
           ${dipHtml}
         </div>` : ''}
@@ -262,11 +265,11 @@ document.addEventListener('DOMContentLoaded', () => {
           <h3>Selected Generator Size</h3>
           <div class="result-row result-row--total">
             <span class="result-label">Minimum required</span>
-            <span class="result-value">${r.requiredKw} kW</span>
+            <span class="result-value">${safe(num(r.requiredKw))} kW</span>
           </div>
           <div class="result-row result-row--total">
             <span class="result-label">Selected standard size</span>
-            <span class="result-value">${r.selectedSizeKw} kW</span>
+            <span class="result-value">${safe(num(r.selectedSizeKw))} kW</span>
           </div>
           <p class="field-hint">Nearby standard sizes: ${sizeOptionsHtml}</p>
         </div>
@@ -278,7 +281,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         ${warningsHtml}
 
-        <p class="field-hint result-timestamp">Analysis run: ${new Date(r.timestamp).toLocaleString()}</p>
+        <p class="field-hint result-timestamp">Analysis run: ${safe(new Date(r.timestamp).toLocaleString())}</p>
       </section>`;
   }
 
