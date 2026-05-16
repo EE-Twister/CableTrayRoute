@@ -55,12 +55,12 @@ document.addEventListener('DOMContentLoaded', () => {
   const saved = getStudies().conduitBendSchedule;
   if (saved && saved._inputs) {
     restoreInputs(saved._inputs);
-    renderResults(saved);
+    calculate();
     exportBtn.disabled = false;
   } else if (saved && saved.runs) {
     const legacyInputs = legacyInputsFromResult(saved);
     restoreInputs(legacyInputs);
-    renderResults({ ...saved, _inputs: legacyInputs });
+    calculate();
     exportBtn.disabled = false;
   } else {
     addRunCard('Conduit Run 1', 1, [{ type: 'offset', dimension: 6, angle: 45 }]);
@@ -145,7 +145,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function addBendRow(list, bend = {}, bendIndex = null) {
     const type = bend.type || 'offset';
-    const dimension = bend.dimension ?? '';
+    const dimension = formatNumber(parseNumber(bend.dimension));
     const angle = bend.angle ?? 45;
     const normalizedLayout = normalizeBendLayout(bend, bend, bendIndex ?? list.querySelectorAll('.dynamic-row').length);
     const row = document.createElement('div');
@@ -254,14 +254,14 @@ document.addEventListener('DOMContentLoaded', () => {
       <div class="pb-straight-section">
         <label>Largest conduit trade size (in)
           <select class="pb-straight-ts" aria-label="Largest trade size">
-            ${tradeSizeOptions(wallA[0] || 1)}
+            ${tradeSizeOptions(parseNumber(wallA[0]) || 1)}
           </select>
         </label>
       </div>
       <div class="pb-angle-section" hidden>
         <p class="hint">Enter trade sizes of all conduits entering each wall (comma-separated).</p>
-        <label>Wall A conduit sizes (in): <input type="text" class="pb-walla" placeholder="e.g. 2, 1.5, 1" value="${wallA.join(', ')}"></label>
-        <label>Wall B conduit sizes (in): <input type="text" class="pb-wallb" placeholder="e.g. 2, 1.5"    value="${wallB.join(', ')}"></label>
+        <label>Wall A conduit sizes (in): <input type="text" class="pb-walla" placeholder="e.g. 2, 1.5, 1" value="${escapeHtml(sanitizeTradeSizeList(wallA).join(', '))}"></label>
+        <label>Wall B conduit sizes (in): <input type="text" class="pb-wallb" placeholder="e.g. 2, 1.5"    value="${escapeHtml(sanitizeTradeSizeList(wallB).join(', '))}"></label>
       </div>
     `;
 
@@ -428,17 +428,17 @@ document.addEventListener('DOMContentLoaded', () => {
         <tr>
           <td>${i + 1}</td>
           <td>${escapeHtml(b.type === '90' ? '90° Stub-up' : b.type.charAt(0).toUpperCase() + b.type.slice(1))}</td>
-          <td>${b.dimension}"</td>
-          <td>${b.degrees}°</td>
-          <td>${b.markSpacing}"</td>
-          <td>${b.shrink}"</td>
+          <td>${formatNumber(parseNumber(b.dimension))}"</td>
+          <td>${formatNumber(parseNumber(b.degrees))}°</td>
+          <td>${formatNumber(parseNumber(b.markSpacing))}"</td>
+          <td>${formatNumber(parseNumber(b.shrink))}"</td>
           <td>${escapeHtml(b.note)}</td>
         </tr>`).join('');
 
       return `
         <section aria-label="Bend schedule for ${escapeHtml(run.label)}" style="margin-bottom:1.5rem">
           <h3>${escapeHtml(run.label)}
-            <span class="fill-badge ${passClass}" style="font-size:.8em;margin-left:.5em">${passLabel} — ${run.totalDegrees}° total</span>
+            <span class="fill-badge ${passClass}" style="font-size:.8em;margin-left:.5em">${passLabel} — ${formatNumber(parseNumber(run.totalDegrees))}° total</span>
           </h3>
           <p style="font-size:.85em;color:var(--color-text-muted)">${escapeHtml(run.nec358_24Message)}</p>
           ${rows ? `
@@ -453,7 +453,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <tfoot>
               <tr>
                 <td colspan="3"><strong>Total</strong></td>
-                <td><strong>${run.totalDegrees}°</strong></td>
+                <td><strong>${formatNumber(parseNumber(run.totalDegrees))}°</strong></td>
                 <td colspan="3"></td>
               </tr>
             </tfoot>
@@ -697,6 +697,14 @@ document.addEventListener('DOMContentLoaded', () => {
   function parseNumber(value, fallback = 0) {
     const number = Number(value);
     return Number.isFinite(number) ? number : fallback;
+  }
+
+  function sanitizeTradeSizeList(values) {
+    if (!Array.isArray(values)) return [];
+    return values
+      .map(v => parseNumber(v, NaN))
+      .filter(v => Number.isFinite(v) && v > 0)
+      .map(v => formatNumber(v));
   }
 
   function formatNumber(value) {
