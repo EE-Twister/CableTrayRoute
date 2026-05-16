@@ -697,6 +697,32 @@ function decodeSvgDataUrl(dataUrl) {
   }
 }
 
+const SAFE_IMPORTED_ICON_TAGS = new Set(['line', 'rect', 'circle', 'path', 'text']);
+
+function sanitizeImportedIconNode(node) {
+  if (!node || node.nodeType !== 1) return false;
+  const tag = node.tagName.toLowerCase();
+  if (!SAFE_IMPORTED_ICON_TAGS.has(tag)) return false;
+  const walker = document.createTreeWalker(node, NodeFilter.SHOW_ELEMENT);
+  let current = walker.currentNode;
+  while (current) {
+    if (!SAFE_IMPORTED_ICON_TAGS.has(current.tagName.toLowerCase())) return false;
+    Array.from(current.attributes).forEach(attr => {
+      const name = attr.name.toLowerCase();
+      const value = String(attr.value || '').trim().toLowerCase();
+      if (name.startsWith('on') || name === 'style') {
+        current.removeAttribute(attr.name);
+        return;
+      }
+      if ((name === 'href' || name === 'xlink:href') && (value.startsWith('javascript:') || value.startsWith('data:'))) {
+        current.removeAttribute(attr.name);
+      }
+    });
+    current = walker.nextNode();
+  }
+  return true;
+}
+
 function importIconData(dataUrl) {
   ensureIconCanvas();
   clearIconCanvas({ resetData: false });
@@ -723,6 +749,7 @@ function importIconData(dataUrl) {
           if (node.nodeType !== 1) return;
           if (node.getAttribute('data-icon-grid') || node.tagName.toLowerCase() === 'defs') return;
           const imported = node.cloneNode(true);
+          if (!sanitizeImportedIconNode(imported)) return;
           imported.dataset.iconShape = '1';
           if (!imported.dataset.shapeType) {
             const tag = imported.tagName.toLowerCase();
