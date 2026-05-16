@@ -67,6 +67,7 @@ export const GENERIC_CU_TABLE = Object.freeze([
 export const NFPA_EGRESS_AVG_FC  = 1.0;
 /** NFPA 101-2021 §7.9.2.1 — minimum illuminance threshold on egress path. */
 export const NFPA_EGRESS_MIN_FC  = 0.1;
+export const MAX_LIGHTING_FIXTURE_LAYOUT_COUNT = 1000;
 
 // ---------------------------------------------------------------------------
 // IES LM-63 photometric file parser
@@ -271,7 +272,7 @@ export function generateDefaultFixtureLayout(roomLengthFt, roomWidthFt, numFixtu
   if (!isFinite(roomWidthFt) || roomWidthFt <= 0) throw new Error('Room width must be > 0');
   if (!isFinite(numFixtures) || numFixtures < 1) throw new Error('Number of fixtures must be >= 1');
 
-  const count = Math.floor(numFixtures);
+  const count = Math.min(MAX_LIGHTING_FIXTURE_LAYOUT_COUNT, Math.floor(numFixtures));
   let best = { rows: 1, cols: count, score: Infinity };
 
   for (let rows = 1; rows <= count; rows++) {

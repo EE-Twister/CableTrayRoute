@@ -19,6 +19,10 @@ import {
   T_RATINGS,
   NEC_DIV_TO_IEC_ZONE,
   DEFAULT_HAZAREA_LAYOUT,
+  MAX_HAZAREA_LAYOUT_WIDTH_FT,
+  MAX_HAZAREA_LAYOUT_HEIGHT_FT,
+  MAX_HAZAREA_LAYOUT_ELEVATION_FT,
+  MAX_HAZAREA_GRID_LINES_PER_AXIS,
   classifyArea,
   checkEquipmentCompatibility,
   checkAllEquipment,
@@ -128,6 +132,19 @@ describe('Hazardous area visual map model', () => {
     assert.strictEqual(layout.widthFt, 30);
     assert.strictEqual(layout.heightFt, 20);
     assert.strictEqual(layout.gridFt, 20);
+  });
+
+  it('caps layout dimensions and enforces minimum grid spacing density', () => {
+    const layout = normalizeHazAreaLayout({
+      widthFt: Number.MAX_SAFE_INTEGER,
+      heightFt: Number.MAX_SAFE_INTEGER,
+      elevationFt: Number.MAX_SAFE_INTEGER,
+      gridFt: 0.01
+    });
+    assert.strictEqual(layout.widthFt, MAX_HAZAREA_LAYOUT_WIDTH_FT);
+    assert.strictEqual(layout.heightFt, MAX_HAZAREA_LAYOUT_HEIGHT_FT);
+    assert.strictEqual(layout.elevationFt, MAX_HAZAREA_LAYOUT_ELEVATION_FT);
+    assert.strictEqual(layout.gridFt, MAX_HAZAREA_LAYOUT_WIDTH_FT / MAX_HAZAREA_GRID_LINES_PER_AXIS);
   });
 
   it('generates default area geometry for sparse legacy studies', () => {

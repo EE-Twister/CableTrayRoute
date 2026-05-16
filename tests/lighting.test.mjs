@@ -16,6 +16,7 @@ import {
   coefficientOfUtilization,
   averageIlluminance,
   generateDefaultFixtureLayout,
+  MAX_LIGHTING_FIXTURE_LAYOUT_COUNT,
   interpolateCandela,
   pointIlluminanceGrid,
   egressComplianceCheck,
@@ -225,6 +226,10 @@ describe('generateDefaultFixtureLayout', () => {
     assert.throws(() => generateDefaultFixtureLayout(0, 10, 2), /length/i);
     assert.throws(() => generateDefaultFixtureLayout(10, 0, 2), /width/i);
     assert.throws(() => generateDefaultFixtureLayout(10, 10, 0), /fixtures/i);
+  });
+  it('caps fixture count to prevent unbounded preview generation', () => {
+    const layout = generateDefaultFixtureLayout(60, 10, MAX_LIGHTING_FIXTURE_LAYOUT_COUNT * 10);
+    assert.strictEqual(layout.positions.length, MAX_LIGHTING_FIXTURE_LAYOUT_COUNT);
   });
 });
 
