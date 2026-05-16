@@ -45,6 +45,53 @@ function toNumber(value, scale = 1) {
   return Number.isFinite(num) ? num * scale : 0;
 }
 
+
+function pickFiniteNumber(values, scale = 1) {
+  for (const value of values) {
+    const numeric = Number(value);
+    if (Number.isFinite(numeric)) return numeric * scale;
+  }
+  return null;
+}
+
+function resolveBusBaseKV(component) {
+  const baseKV = pickFiniteNumber([
+    component?.baseKV,
+    component?.baseKv,
+    component?.base_kv,
+    component?.baseVoltageKV,
+    component?.base_voltage_kv,
+    component?.voltageKV,
+    component?.voltage_kv,
+    component?.kv,
+    component?.kV,
+    component?.rating?.baseKV,
+    component?.rating?.baseKv,
+    component?.rating?.base_kv,
+    component?.settings?.baseKV,
+    component?.settings?.baseKv,
+    component?.settings?.base_kv,
+    component?.props?.baseKV,
+    component?.props?.baseKv,
+    component?.props?.base_kv
+  ]);
+  if (baseKV && baseKV > 0) return baseKV;
+
+  const derivedKV = pickFiniteNumber([
+    component?.voltage,
+    component?.baseVoltage,
+    component?.base_voltage,
+    component?.nominalVoltage,
+    component?.nominal_voltage,
+    component?.rating?.voltage,
+    component?.settings?.voltage,
+    component?.props?.voltage
+  ], 0.001);
+  if (derivedKV && derivedKV > 0) return derivedKV;
+
+  return 1;
+}
+
 function isUsableComponent(comp) {
   return comp && !IGNORED_TYPES.has(comp.type);
 }
@@ -954,9 +1001,9 @@ export function runLoadFlow(modelOrOpts = {}, maybeOpts = {}) {
         label,
         ref,
         type: c.busType || (idx === 0 ? 'slack' : 'PQ'),
-        Vm: c.Vm,
-        Va: c.Va,
-        baseKV: c.baseKV || 1,
+        Vm: pickFiniteNumber([c.Vm]) || 1,
+        Va: pickFiniteNumber([c.Va]) || 0,
+        baseKV: resolveBusBaseKV(c),
         Pd: loadPQ.kw,
         Qd: loadPQ.kvar,
         Pg: genPQ.kw,
