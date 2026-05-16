@@ -1191,16 +1191,9 @@ export async function createApp(options = {}) {
         res.json({ message: 'If that account exists, a reset token has been generated.' });
         return;
       }
-      const token = resetTokenStore.create(trimmedUser);
-      // Write token to a dedicated audit log file so it is never exposed in general
-      // stdout log streams. Administrators retrieve the token from this file only.
-      const auditLogPath = path.join(dataDir, 'password-reset-audit.log');
-      const auditEntry = `${new Date().toISOString()} [password-reset] token_for="${trimmedUser}" expires_in=15min token=${token}\n`;
-      await fs.appendFile(auditLogPath, auditEntry).catch(err => {
-        console.error(`[password-reset] Failed to write audit log: ${err.message}`);
-      });
-      console.error(`[password-reset] Reset requested for "${trimmedUser}". Token written to ${auditLogPath}`);
-      res.json({ message: 'If that account exists, a reset token has been generated. Contact your administrator for the token.' });
+      resetTokenStore.create(trimmedUser);
+      console.error(`[password-reset] Reset requested for "${trimmedUser}".`);
+      res.json({ message: 'If that account exists, a reset token has been generated.' });
     })
   );
 
@@ -2015,6 +2008,39 @@ When answering queries:
     res.status(500).json({ error: 'Internal server error' });
   });
 
+
+  app.set('collabUpgradeValidator', async (request) => {
+    const origin = String(request.headers.origin || '');
+    const host = String(request.headers.host || '');
+    if (!origin || !host) return false;
+    let originUrl;
+    try {
+      originUrl = new URL(origin);
+    } catch {
+      return false;
+    }
+    if (originUrl.host !== host) return false;
+
+    const requestUrl = new URL(request.url || '/ws/collab', `http://${host}`);
+    const token = requestUrl.searchParams.get('token') || '';
+    const csrfHeader = request.headers['x-csrf-token'];
+    const csrfToken = typeof csrfHeader === 'string' ? csrfHeader : (requestUrl.searchParams.get('csrfToken') || '');
+    if (!token || !csrfToken || !/^[0-9a-fA-F]+$/.test(csrfToken)) return false;
+
+    const session = await sessionStore.get(token);
+    if (!session) return false;
+
+    let provided;
+    try {
+      provided = Buffer.from(csrfToken, 'hex');
+    } catch {
+      return false;
+    }
+    const expected = Buffer.from(session.csrfToken, 'hex');
+    if (provided.length !== expected.length) return false;
+    return crypto.timingSafeEqual(provided, expected);
+  });
+
   return app;
 }
 
@@ -2030,7 +2056,9 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.a
   // Real-time collaboration via WebSocket
   try {
     const { WebSocketServer } = await import('ws');
-    attachCollaborationServer(server, new WebSocketServer({ noServer: true }));
+    attachCollaborationServer(server, new WebSocketServer({ noServer: true }), {
+      validateUpgrade: app.get('collabUpgradeValidator'),
+    });
   } catch {
     // ws not installed — collaboration disabled; app still works fine
     console.info('ws package not found; real-time collaboration disabled');

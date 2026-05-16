@@ -22,7 +22,8 @@
  * @param {import('http').Server} httpServer
  * @param {object} wss - WebSocketServer instance
  */
-export function attachCollaborationServer(httpServer, wss) {
+export function attachCollaborationServer(httpServer, wss, options = {}) {
+  const validateUpgrade = typeof options.validateUpgrade === 'function' ? options.validateUpgrade : null;
   // projectId → Set of { ws, username }
   const rooms = new Map();
   // projectId → monotonically increasing sequence counter
@@ -51,11 +52,23 @@ export function attachCollaborationServer(httpServer, wss) {
     }
   }
 
-  httpServer.on('upgrade', (request, socket, head) => {
+  httpServer.on('upgrade', async (request, socket, head) => {
     const { pathname } = new URL(request.url, 'http://localhost');
     if (pathname !== '/ws/collab') {
       socket.destroy();
       return;
+    }
+    if (validateUpgrade) {
+      let valid = false;
+      try {
+        valid = await validateUpgrade(request);
+      } catch {
+        valid = false;
+      }
+      if (!valid) {
+        socket.destroy();
+        return;
+      }
     }
     wss.handleUpgrade(request, socket, head, ws => {
       wss.emit('connection', ws, request);
@@ -71,8 +84,10 @@ export function attachCollaborationServer(httpServer, wss) {
       const room = rooms.get(currentProjectId);
       if (room) {
         room.forEach(c => { if (c.ws === ws) room.delete(c); });
-        if (room.size === 0) rooms.delete(currentProjectId);
-        else broadcastPresence(currentProjectId);
+        if (room.size === 0) {
+          rooms.delete(currentProjectId);
+          seqCounters.delete(currentProjectId);
+        } else broadcastPresence(currentProjectId);
       }
     }
 
@@ -92,7 +107,7 @@ export function attachCollaborationServer(httpServer, wss) {
 
       if (msg.type === 'join') {
         removeFromRoom();
-        currentProjectId = String(msg.projectId || '');
+        currentProjectId = String(msg.projectId || '').slice(0, 200);
         currentUsername = String(msg.username || 'Anonymous').slice(0, 100);
         if (!rooms.has(currentProjectId)) rooms.set(currentProjectId, new Set());
         if (!seqCounters.has(currentProjectId)) seqCounters.set(currentProjectId, 0);

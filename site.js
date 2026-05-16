@@ -2647,8 +2647,14 @@ globalThis.showSelfCheckModal=showSelfCheckModal;
     function startCollab() {
       const auth = getAuthContextState ? getAuthContextState() : null;
       if (!auth) return; // only start when logged in
+      if (window.localStorage?.getItem('ctrEnableCollaboration') !== 'true') return;
       const projectId = (window.currentProjectId || 'default').trim();
-      initCollaboration({ projectId, username: auth.user });
+      initCollaboration({
+        projectId,
+        username: auth.user,
+        authToken: auth.token,
+        csrfToken: auth.csrfToken,
+      });
     }
     startCollab();
     // Re-init when project changes (project manager fires storage events)

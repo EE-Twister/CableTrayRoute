@@ -76,12 +76,12 @@ document.addEventListener('DOMContentLoaded', () => {
       return `<tr>
         <td>${esc(c.id || c.tag || '—')}</td>
         <td>${esc(c.type || '—')}</td>
-        <td><input type="number" class="ov-mtbf" data-id="${esc(c.id)}"
-            min="1" step="1" value="${ov.mtbf ?? (c.mtbf || '')}"
-            placeholder="${c.mtbf || 'e.g. 8760'}" aria-label="MTBF hours for ${esc(c.id)}"></td>
-        <td><input type="number" class="ov-mttr" data-id="${esc(c.id)}"
-            min="0" step="0.5" value="${ov.mttr ?? (c.mttr || '')}"
-            placeholder="${c.mttr || 'e.g. 4'}" aria-label="MTTR hours for ${esc(c.id)}"></td>
+        <td><input type="number" class="ov-mtbf" data-id="${escAttr(c.id)}"
+            min="1" step="1" value="${escAttr(ov.mtbf ?? (c.mtbf || ''))}"
+            placeholder="${escAttr(c.mtbf || 'e.g. 8760')}" aria-label="MTBF hours for ${escAttr(c.id)}"></td>
+        <td><input type="number" class="ov-mttr" data-id="${escAttr(c.id)}"
+            min="0" step="0.5" value="${escAttr(ov.mttr ?? (c.mttr || ''))}"
+            placeholder="${escAttr(c.mttr || 'e.g. 4')}" aria-label="MTTR hours for ${escAttr(c.id)}"></td>
       </tr>`;
     }).join('');
 
@@ -270,5 +270,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function esc(s) {
     return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function escAttr(s) {
+    return esc(s).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
 });

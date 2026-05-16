@@ -5771,7 +5771,10 @@ async function openCustomCurveBuilder(curveId = null) {
       if (isPdf) {
         const pdfModule = await ensurePdfJs();
         pendingPdfUrl = URL.createObjectURL(file);
-        const pdf = await pdfModule.getDocument({ url: pendingPdfUrl }).promise;
+        const pdf = await pdfModule.getDocument({
+          url: pendingPdfUrl,
+          isEvalSupported: false
+        }).promise;
         const page = await pdf.getPage(1);
         const viewport = page.getViewport({ scale: 1.6 });
         const tempCanvas = doc.createElement('canvas');

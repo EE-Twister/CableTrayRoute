@@ -515,9 +515,6 @@ function computeLetThroughLimitKA(baseDevice, scaledDevice, faultKA) {
     }, 0);
     if (maxPeak > 0) return maxPeak / 1000;
   }
-  if (Number.isFinite(baseDevice.interruptRating) && baseDevice.interruptRating > 0 && faultKA > baseDevice.interruptRating) {
-    return baseDevice.interruptRating;
-  }
   return null;
 }
 
@@ -756,7 +753,7 @@ export function runShortCircuit(modelOrOpts = {}, maybeOpts = {}) {
         return { r: 1e-6, x: 1e-6 };
       }
       if (comp?.id) missingImpedanceComponents.add(comp.id);
-      return { r: 1e6, x: 1e6 };
+      return { r: 0.0001, x: 0.0001 };
     }
     return { r, x };
   };
@@ -832,7 +829,7 @@ export function runShortCircuit(modelOrOpts = {}, maybeOpts = {}) {
     if (lowImpedanceWarning) {
       entry.warnings = [lowImpedanceWarning];
     } else if (missingImpedanceComponents.has(comp.id)) {
-      entry.warnings = ['Impedance data missing; results limited by default high resistance.'];
+      entry.warnings = ['Impedance data missing; results defaulted to conservative low impedance.'];
     }
 
     limitFaultByProtection(entry, comp, comps, compMap, protectiveLookupCache, scaledDeviceCache, tccSettings);

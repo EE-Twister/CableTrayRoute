@@ -20,7 +20,13 @@
 const WS_URL = (() => {
   if (typeof window === 'undefined') return null;
   const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-  return `${proto}//${location.host}/ws/collab`;
+  const authToken = typeof localStorage !== 'undefined' ? (localStorage.getItem('authToken') || '') : '';
+  const csrfToken = typeof localStorage !== 'undefined' ? (localStorage.getItem('authCsrfToken') || '') : '';
+  const params = new URLSearchParams();
+  if (authToken) params.set('token', authToken);
+  if (csrfToken) params.set('csrfToken', csrfToken);
+  const query = params.toString();
+  return `${proto}//${location.host}/ws/collab${query ? `?${query}` : ''}`;
 })();
 
 const RECONNECT_DELAYS_MS = [1000, 2000, 5000, 10000, 30000];
