@@ -1530,12 +1530,12 @@ function renderResults(result, root) {
               <tr>
                 <td>${escapeHtml(scenario.label)}</td>
                 <td>${escapeHtml(scenario.approvalStatus || 'Review required')}</td>
-                <td>${scenario.coatingFactor}</td>
-                <td>${scenario.requiredCurrentA}</td>
-                <td>${scenario.worstCaseSegmentDemandA} (${escapeHtml(scenario.worstCaseSegmentLabel || 'Segment 1')})</td>
-                <td>${scenario.minimumAnodeMassKg} kg (${scenario.minimumAnodeMassLb} lb)</td>
-                <td>${scenario.predictedLifeYears}</td>
-                <td>${scenario.safetyMarginYears} years (${scenario.safetyMarginPercent}%)</td>
+                <td>${formatFiniteValue(scenario.coatingFactor, 4)}</td>
+                <td>${formatFiniteValue(scenario.requiredCurrentA, 6)}</td>
+                <td>${formatFiniteValue(scenario.worstCaseSegmentDemandA, 6)} (${escapeHtml(scenario.worstCaseSegmentLabel || 'Segment 1')})</td>
+                <td>${formatFiniteValue(scenario.minimumAnodeMassKg, 3)} kg (${formatFiniteValue(scenario.minimumAnodeMassLb, 3)} lb)</td>
+                <td>${formatFiniteValue(scenario.predictedLifeYears, 2)}</td>
+                <td>${formatFiniteValue(scenario.safetyMarginYears, 2)} years (${formatFiniteValue(scenario.safetyMarginPercent, 2)}%)</td>
               </tr>`).join('')}
           </tbody>
         </table>
@@ -1607,6 +1607,17 @@ function formatDelta(value, unit = '') {
   }
   const sign = value > 0 ? '+' : '';
   return `${sign}${roundTo(value, 2)}${unit ? ` ${unit}` : ''}`;
+}
+
+function formatFiniteValue(value, decimals = null) {
+  const parsed = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(parsed)) {
+    return 'n/a';
+  }
+  if (Number.isInteger(decimals) && decimals >= 0) {
+    return parsed.toFixed(decimals);
+  }
+  return String(parsed);
 }
 
 function buildComparisonPanelMarkup(activeStudy, baselineStudy) {
