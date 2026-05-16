@@ -162,24 +162,33 @@ document.addEventListener('DOMContentLoaded', () => {
     const warnings = Array.isArray(r.warnings) ? r.warnings : [];
     const warningsHtml = warnings.length
       ? `<ul class="drc-findings">${warnings.map(w =>
-          `<li class="drc-finding drc-warn"><span class="drc-msg">${w}</span></li>`
+          `<li class="drc-finding drc-warn"><span class="drc-msg">${escHtml(String(w))}</span></li>`
         ).join('')}</ul>`
       : '';
 
     // Runtime curve table rows
-    const runtimeRows = r.runtimeCurvePoints.map(pt => {
-      const highlight = pt.loadFraction === 1.00 ? ' style="font-weight:600"' : '';
+    const runtimePoints = Array.isArray(r.runtimeCurvePoints) ? r.runtimeCurvePoints : [];
+    const runtimeRows = runtimePoints.map(pt => {
+      const loadFraction = Number(pt?.loadFraction);
+      const loadKw = Number(pt?.loadKw);
+      const runtimeHours = Number(pt?.runtimeHours);
+      if (!Number.isFinite(loadFraction) || !Number.isFinite(loadKw) || !Number.isFinite(runtimeHours)) return '';
+      const highlight = loadFraction === 1.00 ? ' style="font-weight:600"' : '';
       return `<tr${highlight}>
-        <td>${Math.round(pt.loadFraction * 100)}%</td>
-        <td>${pt.loadKw.toFixed(1)} kW</td>
-        <td>${pt.runtimeHours.toFixed(2)} h</td>
+        <td>${Math.round(loadFraction * 100)}%</td>
+        <td>${loadKw.toFixed(1)} kW</td>
+        <td>${runtimeHours.toFixed(2)} h</td>
       </tr>`;
     }).join('');
 
     // Bank options tags
-    const bankOptionsHtml = r.bankOptions.map(s =>
-      `<span class="tag${s === r.selectedBankKwh ? ' tag--primary' : ''}">${s} kWh</span>`
-    ).join(' ');
+    const selectedBankKwh = Number(r.selectedBankKwh);
+    const bankOptions = Array.isArray(r.bankOptions) ? r.bankOptions : [];
+    const bankOptionsHtml = bankOptions.map(s => {
+      const bankKwh = Number(s);
+      if (!Number.isFinite(bankKwh)) return '';
+      return `<span class="tag${bankKwh === selectedBankKwh ? ' tag--primary' : ''}">${bankKwh} kWh</span>`;
+    }).join(' ');
 
     // K_temp status colour
     const tempClass = r.kTempFactor < 0.85
