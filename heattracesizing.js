@@ -727,9 +727,10 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function renderDetailItem(label, value) {
+    const safeValue = value == null ? '' : escHtml(String(value));
     return `<article class="heattrace-detail-item">
       <span>${escHtml(label)}</span>
-      <strong>${value}</strong>
+      <strong>${safeValue}</strong>
     </article>`;
   }
 
