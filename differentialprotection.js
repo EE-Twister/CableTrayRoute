@@ -167,14 +167,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const warningsHtml = r.warnings.length
       ? `<ul class="drc-findings">${r.warnings.map(w =>
-          `<li class="drc-finding drc-warn"><span class="drc-msg">${w}</span></li>`
+          `<li class="drc-finding drc-warn"><span class="drc-msg">${escHtml(String(w ?? ''))}</span></li>`
         ).join('')}</ul>`
       : '';
 
     const tripClass = r.tripResult.trip ? 'status-fail' : 'status-pass';
     const tripLabel = r.tripResult.trip ? '⚡ TRIP' : '✓ NO TRIP';
     const restrainHtml = r.harmonic.restrain
-      ? `<p class="field-hint">${r.harmonic.reason}</p>`
+      ? `<p class="field-hint">${escHtml(String(r.harmonic.reason ?? ''))}</p>`
       : '';
 
     const ctMismatchHtml = !r.ctMismatch.acceptable
@@ -223,7 +223,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <tr><td>I₁ (CT₁ secondary normalised to tap, pu)</td><td>${r.currents.i1Pu.toFixed(4)}</td></tr>
             <tr><td>I₂ (CT₂ secondary normalised to tap, pu)</td><td>${r.currents.i2Pu.toFixed(4)}</td></tr>
             <tr><td>CT₁ / CT₂ nominal tap</td><td>${r.ctMismatch.nominalTap.toFixed(4)}</td></tr>
-            <tr><td>Set tap</td><td>${r.inputs.tapSetting}</td></tr>
+            <tr><td>Set tap</td><td>${escHtml(String(r.inputs.tapSetting ?? ''))}</td></tr>
             <tr><td>CT mismatch</td><td>${r.ctMismatch.mismatchPct.toFixed(2)}%</td></tr>
             <tr><td>2nd harmonic</td><td>${r.harmonic.secondPct.toFixed(1)}%</td></tr>
             <tr><td>5th harmonic</td><td>${r.harmonic.fifthPct.toFixed(1)}%</td></tr>
