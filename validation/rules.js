@@ -614,5 +614,18 @@ export function runValidation(components = [], studies = {}) {
     msgs.forEach(msg => issues.push({ component: id, message: msg }));
   });
 
+  const reliabilityFailures = studies?.reliability?.n1Failures || [];
+  const reliabilityDetails = studies?.reliability?.n1FailureDetails || {};
+  reliabilityFailures.forEach(id => {
+    const isolatedLoads = reliabilityDetails[id]?.isolatedLoads || [];
+    const isolatedMsg = isolatedLoads.length
+      ? ` Isolates: ${isolatedLoads.map(loadId => describe(loadId)).join(', ')}.`
+      : '';
+    issues.push({
+      component: id,
+      message: `Single point of failure under N-1 reliability check.${isolatedMsg}`
+    });
+  });
+
   return issues;
 }

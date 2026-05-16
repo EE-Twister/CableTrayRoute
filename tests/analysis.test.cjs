@@ -116,15 +116,15 @@ function caseToDiagram(data) {
       assert.strictEqual(label, 'REF-1');
     });
 
-    it('does not emit radial reliability failures', () => {
+    it('emits radial reliability failures', () => {
       const source = { id: 'source', type: 'bus', connections: [{ target: 'breaker' }] };
       const breaker = { id: 'breaker', type: 'breaker', tag: 'BRK-1', connections: [{ target: 'source' }, { target: 'load' }] };
       const load = { id: 'load', type: 'bus', props: { tag: 'LD-1' }, connections: [{ target: 'breaker' }] };
       const components = [source, breaker, load];
 
       const reliability = runReliability(components);
-      assert.deepStrictEqual(reliability.n1Failures, []);
-      assert.deepStrictEqual(reliability.n1FailureDetails, {});
+      assert.deepStrictEqual(reliability.n1Failures, ['breaker']);
+      assert.deepStrictEqual(reliability.n1FailureDetails, { breaker: { isolatedLoads: ['load'] } });
 
       const issues = runValidation(components, {
         reliability: {
@@ -132,7 +132,7 @@ function caseToDiagram(data) {
           n1FailureDetails: reliability.n1FailureDetails
         }
       });
-      assert.strictEqual(issues.length, 0);
+      assert.strictEqual(issues.length, 1);
     });
   });
 })();
