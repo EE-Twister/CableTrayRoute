@@ -158,6 +158,18 @@ describe('resolveSettings', () => {
   it('returns empty object for empty entry', () => {
     assert.deepStrictEqual(resolveSettings({}), {});
   });
+
+  it('ignores override keys that are not present in base settings', () => {
+    const s = resolveSettings({
+      ...GE_RELAY_ENTRY,
+      overrideSource: {
+        longTimePickup: 175,
+        injectedSetting: 999999,
+      },
+    });
+    assert.strictEqual(s.longTimePickup, 175);
+    assert.ok(!Object.prototype.hasOwnProperty.call(s, 'injectedSetting'));
+  });
 });
 
 // ─── filterExportableEntries ──────────────────────────────────────────────
@@ -243,6 +255,18 @@ describe('formatSEL — overcurrent relay', () => {
   it('includes SEL file header comment', () => {
     assert.ok(out.startsWith('; SEL Relay Settings File'), `got:\n${out}`);
   });
+
+  it('sanitizes control characters from line-oriented values', () => {
+    const injected = {
+      ...GE_RELAY_ENTRY,
+      overrideSource: {
+        longTimePickup: '150\n50P1P=999999',
+      },
+    };
+    const text = formatSEL(injected);
+    assert.ok(text.includes('51P1P=150 50P1P=999999'), `got:\n${text}`);
+    assert.ok(!text.includes('\n50P1P=999999\n'), `got:\n${text}`);
+  });
 });
 
 describe('formatSEL — differential relay', () => {
@@ -284,6 +308,18 @@ describe('formatGEURS — overcurrent relay', () => {
     const out = formatGEURS(GE_RELAY_ENTRY);
     assert.ok(out.startsWith('# GE EnerVista Settings File'), `got:\n${out}`);
   });
+
+  it('sanitizes control characters from GE line values', () => {
+    const injected = {
+      ...GE_RELAY_ENTRY,
+      overrideSource: {
+        longTimePickup: '125\nINST_PICKUP=777777',
+      },
+    };
+    const text = formatGEURS(injected);
+    assert.ok(text.includes('OC_PICKUP=125 INST_PICKUP=777777'), `got:\n${text}`);
+    assert.ok(!text.includes('\nINST_PICKUP=777777\n'), `got:\n${text}`);
+  });
 });
 
 describe('formatGEURS — differential relay', () => {
@@ -324,6 +360,17 @@ describe('formatABBCFG', () => {
     assert.ok(!out.includes('<Test>'), 'raw < should be escaped');
     assert.ok(out.includes('&lt;Test&gt;'), `got:\n${out}`);
   });
+
+  it('does not emit arbitrary parameter keys from overrideSource', () => {
+    const out = formatABBCFG({
+      ...ABB_BREAKER_ENTRY,
+      overrideSource: {
+        ...ABB_BREAKER_ENTRY.overrideSource,
+        UNDOCUMENTED_VENDOR_PARAM: '999',
+      },
+    });
+    assert.ok(!out.includes('UNDOCUMENTED_VENDOR_PARAM'), `got:\n${out}`);
+  });
 });
 
 // ─── formatSiemensXRIO ────────────────────────────────────────────────────
@@ -349,6 +396,17 @@ describe('formatSiemensXRIO', () => {
     const out = formatSiemensXRIO(SIEMENS_BREAKER_ENTRY);
     assert.ok(out.includes('name="pickup"'), `got:\n${out}`);
     assert.ok(out.includes('name="time"'), `got:\n${out}`);
+  });
+
+  it('does not emit arbitrary parameter keys from overrideSource', () => {
+    const out = formatSiemensXRIO({
+      ...SIEMENS_BREAKER_ENTRY,
+      overrideSource: {
+        ...SIEMENS_BREAKER_ENTRY.overrideSource,
+        UNDOCUMENTED_VENDOR_PARAM: '999',
+      },
+    });
+    assert.ok(!out.includes('UNDOCUMENTED_VENDOR_PARAM'), `got:\n${out}`);
   });
 });
 
