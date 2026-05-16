@@ -697,6 +697,31 @@ function decodeSvgDataUrl(dataUrl) {
   }
 }
 
+const IMPORTABLE_SVG_TAGS = new Set(['line', 'rect', 'circle', 'path', 'text']);
+const IMPORTABLE_ATTRS = {
+  line: ['x1', 'y1', 'x2', 'y2', 'stroke', 'stroke-width', 'stroke-linecap', 'stroke-linejoin', 'fill', 'opacity'],
+  rect: ['x', 'y', 'width', 'height', 'rx', 'ry', 'stroke', 'stroke-width', 'stroke-linecap', 'stroke-linejoin', 'fill', 'opacity'],
+  circle: ['cx', 'cy', 'r', 'stroke', 'stroke-width', 'stroke-linecap', 'stroke-linejoin', 'fill', 'opacity'],
+  path: ['d', 'stroke', 'stroke-width', 'stroke-linecap', 'stroke-linejoin', 'fill', 'opacity'],
+  text: ['x', 'y', 'fill', 'font-size', 'font-family', 'font-weight', 'text-anchor', 'dominant-baseline', 'opacity']
+};
+
+function sanitizeImportedIconNode(node) {
+  if (!node || node.nodeType !== 1) return null;
+  const tag = node.tagName.toLowerCase();
+  if (!IMPORTABLE_SVG_TAGS.has(tag)) return null;
+  const sanitized = document.createElementNS(SVG_NS, tag);
+  const allowedAttrs = IMPORTABLE_ATTRS[tag] || [];
+  allowedAttrs.forEach(attr => {
+    const value = node.getAttribute(attr);
+    if (value !== null) sanitized.setAttribute(attr, value);
+  });
+  if (tag === 'text') {
+    sanitized.textContent = node.textContent || '';
+  }
+  return sanitized;
+}
+
 function importIconData(dataUrl) {
   ensureIconCanvas();
   clearIconCanvas({ resetData: false });
@@ -722,7 +747,8 @@ function importIconData(dataUrl) {
         Array.from(root.children).forEach(node => {
           if (node.nodeType !== 1) return;
           if (node.getAttribute('data-icon-grid') || node.tagName.toLowerCase() === 'defs') return;
-          const imported = node.cloneNode(true);
+          const imported = sanitizeImportedIconNode(node);
+          if (!imported) return;
           imported.dataset.iconShape = '1';
           if (!imported.dataset.shapeType) {
             const tag = imported.tagName.toLowerCase();
