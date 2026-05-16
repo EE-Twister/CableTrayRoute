@@ -60,6 +60,20 @@ describe('normalizeBatteryRackLayoutInputs()', () => {
     assert.strictEqual(inputs.terminalSide, 'front-left');
     assert.ok(inputs.inputWarnings.length >= 4, 'expected warnings for invalid overrides');
   });
+
+  it('caps untrusted layout fan-out inputs', () => {
+    const inputs = normalizeBatteryRackLayoutInputs(baseSizingResult(), {
+      cellsPerModule: 999999,
+      modulesPerRack: 999999,
+      racksPerRow: 999999,
+    });
+    assert.strictEqual(inputs.cellsPerModule, 200);
+    assert.strictEqual(inputs.modulesPerRack, 200);
+    assert.strictEqual(inputs.racksPerRow, 24);
+    assert.ok(inputs.inputWarnings.some(w => w.includes('Cells per module exceeded the maximum')));
+    assert.ok(inputs.inputWarnings.some(w => w.includes('Modules per rack exceeded the maximum')));
+    assert.ok(inputs.inputWarnings.some(w => w.includes('Racks per row exceeded the maximum')));
+  });
 });
 
 describe('buildBatteryRackLayoutModel()', () => {
@@ -107,6 +121,16 @@ describe('buildBatteryRackLayoutModel()', () => {
       () => buildBatteryRackLayoutModel({ chemistry: 'lead-acid-agm' }),
       /selectedBankKwh or kwhFinal/
     );
+  });
+
+  it('caps modeled module fan-out derived from bank size', () => {
+    const model = buildBatteryRackLayoutModel(baseSizingResult(), {
+      cellCapacityAh: 0.001,
+      modulesPerRack: 200,
+    });
+    assert.strictEqual(model.summary.totalModules, 20000);
+    assert.strictEqual(model.summary.requiredParallelStrings, 1000);
+    assert.ok(model.warnings.some(w => w.includes('exceeded the maximum of 20000 and was capped')));
   });
 });
 
