@@ -201,6 +201,20 @@ describe('findCoordinatingTimeDial', () => {
     assert.strictEqual(reCheck.coordinated, true, 'Re-check must confirm coordination');
   });
 
+  it('uses longTimeDelay dial key for long-time devices when override already exists', () => {
+    const longTimeDownstream = scaleCurve(ge, { pickup: 1.5, longTimeDelay: 0.2, instantaneous: 0, shortTimePickup: 0 });
+    const longTimeFaultCurrents = generateFaultCurrents(100, 700, 50);
+    const r = findCoordinatingTimeDial(
+      ge,
+      { pickup: 1.5, longTimeDelay: 0.15, instantaneous: 0, shortTimePickup: 0 },
+      longTimeDownstream,
+      longTimeFaultCurrents,
+      0.3
+    );
+    assert.strictEqual(r.found, true, 'Should find a coordinating dial for long-time relay');
+    assert(Math.abs((r.scaledResult.settings?.longTimeDelay ?? 0) - r.timeDial) < 1e-6);
+  });
+
   it('scaledResult has settings.time equal to timeDial', () => {
     const r = findCoordinatingTimeDial(abb, { pickup: 160 }, downstream, faultCurrents, 0.3);
     assert(r.scaledResult, 'scaledResult must be set');

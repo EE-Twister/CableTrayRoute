@@ -23,13 +23,18 @@ const DEFAULT_MARGIN = 0.3;
 
 /**
  * Return the override key used to vary the time dial for a device.
- * IEC 60255-151 formula-based relays use 'tms'; all others use 'time'.
+ * IEC 60255-151 formula-based relays use 'tms'.
+ * Long-time electronic trip models use 'longTimeDelay'.
+ * Other devices use the legacy 'time' alias.
  *
  * @param {object} device - Raw device object from protectiveDevices.json
- * @returns {string} 'tms' | 'time'
+ * @returns {string} 'tms' | 'longTimeDelay' | 'time'
  */
 function dialOverrideKey(device) {
-  return device?.iec60255 === true ? 'tms' : 'time';
+  if (device?.iec60255 === true) return 'tms';
+  const base = device?.settings ?? {};
+  if (base.longTimePickup !== undefined || base.longTimeDelay !== undefined) return 'longTimeDelay';
+  return 'time';
 }
 
 /**
