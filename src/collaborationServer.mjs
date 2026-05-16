@@ -22,7 +22,8 @@
  * @param {import('http').Server} httpServer
  * @param {object} wss - WebSocketServer instance
  */
-export function attachCollaborationServer(httpServer, wss) {
+export function attachCollaborationServer(httpServer, wss, options = {}) {
+  const validateUpgrade = typeof options.validateUpgrade === 'function' ? options.validateUpgrade : null;
   // projectId → Set of { ws, username }
   const rooms = new Map();
   // projectId → monotonically increasing sequence counter
@@ -51,11 +52,23 @@ export function attachCollaborationServer(httpServer, wss) {
     }
   }
 
-  httpServer.on('upgrade', (request, socket, head) => {
+  httpServer.on('upgrade', async (request, socket, head) => {
     const { pathname } = new URL(request.url, 'http://localhost');
     if (pathname !== '/ws/collab') {
       socket.destroy();
       return;
+    }
+    if (validateUpgrade) {
+      let valid = false;
+      try {
+        valid = await validateUpgrade(request);
+      } catch {
+        valid = false;
+      }
+      if (!valid) {
+        socket.destroy();
+        return;
+      }
     }
     wss.handleUpgrade(request, socket, head, ws => {
       wss.emit('connection', ws, request);
