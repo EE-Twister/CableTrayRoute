@@ -776,6 +776,11 @@ function resolveOptions(options = {}) {
   };
 }
 
+function isSubPath(parentDir, targetPath) {
+  const relative = path.relative(parentDir, targetPath);
+  return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
+}
+
 export async function createApp(options = {}) {
   const {
     dataDir,
@@ -785,6 +790,7 @@ export async function createApp(options = {}) {
     rateLimitMax,
     enforceHttps
   } = resolveOptions(options);
+  const dataDirWithinStaticRoot = isSubPath(staticRoot, dataDir);
 
   await fs.mkdir(dataDir, { recursive: true });
   const usersFile = path.join(dataDir, 'users.json');
@@ -930,6 +936,27 @@ export async function createApp(options = {}) {
       return originalSend(compressed);
     };
 
+    next();
+  });
+  app.use((req, res, next) => {
+    if (!dataDirWithinStaticRoot) {
+      next();
+      return;
+    }
+
+    let decodedPath;
+    try {
+      decodedPath = decodeURIComponent(req.path);
+    } catch {
+      res.status(400).end();
+      return;
+    }
+
+    const requestedPath = path.resolve(staticRoot, `.${decodedPath}`);
+    if (isSubPath(dataDir, requestedPath)) {
+      res.status(404).end();
+      return;
+    }
     next();
   });
   app.use(
