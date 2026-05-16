@@ -113,15 +113,22 @@ document.addEventListener('DOMContentLoaded', () => {
   // -----------------------------------------------------------------------
   // Dynamic row builder
   // -----------------------------------------------------------------------
+  function sanitizeNumberForInput(value, fallback) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+  }
+
   function addLoadStepRow(label = '', kw = 1000, rph = 10, type = 'Other') {
     const container = document.getElementById('load-steps-list');
     const row = document.createElement('div');
+    const safeKw = sanitizeNumberForInput(kw, 1000);
+    const safeRph = sanitizeNumberForInput(rph, 10);
     row.className = 'dynamic-row field-row-inline';
     row.innerHTML = `
       <input type="text" class="load-label" value="${escapeHtml(label)}" placeholder="Label" aria-label="Load step label">
-      <input type="number" class="load-kw" min="0.1" step="1" value="${kw}" aria-label="Step load (kW)" required>
+      <input type="number" class="load-kw" min="0.1" step="1" value="${safeKw}" aria-label="Step load (kW)" required>
       <span class="field-unit">kW</span>
-      <input type="number" class="load-rph" min="0.001" step="0.1" value="${rph}" aria-label="Repetitions per hour" required>
+      <input type="number" class="load-rph" min="0.001" step="0.1" value="${safeRph}" aria-label="Repetitions per hour" required>
       <span class="field-unit">events/hr</span>
       <select class="load-type-select" aria-label="Load type">
         <option${type === 'Arc Furnace'   ? ' selected' : ''}>Arc Furnace</option>
