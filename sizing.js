@@ -75,6 +75,9 @@ export function sizeConductor(load = {}, params = {}) {
       conductor_size: sz,
       conductor_material: params.material || 'cu',
       insulation_rating: params.insulation_rating || 90,
+      est_load: current,
+      operating_voltage: voltage,
+      cable_rating: voltage,
       voltage_rating: voltage
     };
     const vd = calculateVoltageDrop(cable, params.length || 0, phases);
