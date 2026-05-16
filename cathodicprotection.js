@@ -1621,6 +1621,76 @@ function countCriteriaPasses(result) {
   return rows.filter((row) => row?.status === 'pass').length;
 }
 
+
+function coerceFiniteNumber(value, fallback = 0, { min = -Infinity, max = Infinity } = {}) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return fallback;
+  }
+  return Math.min(max, Math.max(min, numeric));
+}
+
+function sanitizeGeometryPoint(point, fallbackX, fallbackY) {
+  if (!point || typeof point !== 'object') {
+    return { x: fallbackX, y: fallbackY };
+  }
+  return {
+    x: coerceFiniteNumber(point.x, fallbackX, { min: -5000, max: 5000 }),
+    y: coerceFiniteNumber(point.y, fallbackY, { min: -5000, max: 5000 })
+  };
+}
+
+function sanitizeLayoutGeometry(geometry, fallbackGeometry) {
+  if (!geometry || typeof geometry !== 'object') {
+    return fallbackGeometry;
+  }
+  const maxItems = 100;
+  const structureSegments = Array.isArray(geometry.structureSegments)
+    ? geometry.structureSegments.slice(0, maxItems).map((segment, index) => ({
+      x1: coerceFiniteNumber(segment?.x1, fallbackGeometry.structureSegments[index % fallbackGeometry.structureSegments.length].x1, { min: -5000, max: 5000 }),
+      y1: coerceFiniteNumber(segment?.y1, fallbackGeometry.structureSegments[index % fallbackGeometry.structureSegments.length].y1, { min: -5000, max: 5000 }),
+      x2: coerceFiniteNumber(segment?.x2, fallbackGeometry.structureSegments[index % fallbackGeometry.structureSegments.length].x2, { min: -5000, max: 5000 }),
+      y2: coerceFiniteNumber(segment?.y2, fallbackGeometry.structureSegments[index % fallbackGeometry.structureSegments.length].y2, { min: -5000, max: 5000 })
+    }))
+    : fallbackGeometry.structureSegments;
+  const anodes = Array.isArray(geometry.anodes)
+    ? geometry.anodes.slice(0, maxItems).map((anode, index) => sanitizeGeometryPoint(anode, fallbackGeometry.anodes[index % fallbackGeometry.anodes.length].x, fallbackGeometry.anodes[index % fallbackGeometry.anodes.length].y))
+    : fallbackGeometry.anodes;
+  const testPoints = Array.isArray(geometry.testPoints)
+    ? geometry.testPoints.slice(0, maxItems).map((point, index) => sanitizeGeometryPoint(point, fallbackGeometry.testPoints[index % fallbackGeometry.testPoints.length].x, fallbackGeometry.testPoints[index % fallbackGeometry.testPoints.length].y))
+    : fallbackGeometry.testPoints;
+  const referenceElectrode = sanitizeGeometryPoint(
+    geometry.referenceElectrode,
+    fallbackGeometry.referenceElectrode.x,
+    fallbackGeometry.referenceElectrode.y
+  );
+  return { structureSegments, anodes, testPoints, referenceElectrode };
+}
+
+function sanitizeComparisonStudy(study) {
+  const normalized = normalizeSavedStudy(study);
+  if (!normalized) {
+    return null;
+  }
+  if (!Number.isFinite(Number(normalized.requiredCurrentA)) || !Number.isFinite(Number(normalized.predictedLifeYears))) {
+    return null;
+  }
+  const fallbackGeometry = resolveLayoutGeometry({ ...normalized, cpLayout: null });
+  return {
+    ...normalized,
+    requiredCurrentA: coerceFiniteNumber(normalized.requiredCurrentA, 0, { min: 0, max: 1e6 }),
+    predictedLifeYears: coerceFiniteNumber(normalized.predictedLifeYears, 0, { min: 0, max: 1e4 }),
+    interferenceAssessment: {
+      ...(normalized.interferenceAssessment && typeof normalized.interferenceAssessment === 'object' ? normalized.interferenceAssessment : {}),
+      score: coerceFiniteNumber(normalized.interferenceAssessment?.score, 0, { min: 0, max: 100 })
+    },
+    cpLayout: {
+      ...(normalized.cpLayout && typeof normalized.cpLayout === 'object' ? normalized.cpLayout : {}),
+      geometry: sanitizeLayoutGeometry(normalized.cpLayout?.geometry, fallbackGeometry)
+    }
+  };
+}
+
 function formatDelta(value, unit = '') {
   if (!Number.isFinite(value)) {
     return 'n/a';
@@ -1653,17 +1723,17 @@ function buildComparisonPanelMarkup(activeStudy, baselineStudy) {
           <article class="cp-delta-card">
             <h4>Required current Δ</h4>
             <p>${formatDelta(requiredCurrentDelta, 'A')}</p>
-            <small>A: ${activeStudy.requiredCurrentA} A · B: ${baselineStudy.requiredCurrentA} A</small>
+            <small>A: ${escapeHtml(String(activeStudy.requiredCurrentA))} A · B: ${escapeHtml(String(baselineStudy.requiredCurrentA))} A</small>
           </article>
           <article class="cp-delta-card">
             <h4>Predicted life Δ</h4>
             <p>${formatDelta(lifeDelta, 'years')}</p>
-            <small>A: ${activeStudy.predictedLifeYears} y · B: ${baselineStudy.predictedLifeYears} y</small>
+            <small>A: ${escapeHtml(String(activeStudy.predictedLifeYears))} y · B: ${escapeHtml(String(baselineStudy.predictedLifeYears))} y</small>
           </article>
           <article class="cp-delta-card">
             <h4>Risk score Δ</h4>
             <p>${formatDelta(riskDelta)}</p>
-            <small>A: ${activeStudy.interferenceAssessment?.score || 0} · B: ${baselineStudy.interferenceAssessment?.score || 0}</small>
+            <small>A: ${escapeHtml(String(activeStudy.interferenceAssessment?.score || 0))} · B: ${escapeHtml(String(baselineStudy.interferenceAssessment?.score || 0))}</small>
           </article>
           <article class="cp-delta-card">
             <h4>Criteria pass count Δ</h4>
@@ -1784,13 +1854,13 @@ function resolveLayoutGeometry(study) {
 function parseComparisonStudyFromImport(rawText) {
   const parsed = JSON.parse(rawText);
   if (parsed?.studyResults?.cathodicProtection) {
-    return normalizeSavedStudy(parsed.studyResults.cathodicProtection);
+    return sanitizeComparisonStudy(parsed.studyResults.cathodicProtection);
   }
   if (parsed?.cathodicProtection) {
-    return normalizeSavedStudy(parsed.cathodicProtection);
+    return sanitizeComparisonStudy(parsed.cathodicProtection);
   }
   if (parsed?.requiredCurrentA && parsed?.predictedLifeYears) {
-    return normalizeSavedStudy(parsed);
+    return sanitizeComparisonStudy(parsed);
   }
   return null;
 }
