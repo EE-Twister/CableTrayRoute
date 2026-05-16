@@ -63,18 +63,23 @@ function renderResults(res) {
 
   for (const [id, r] of entries) {
     const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td>${id}</td>
-      <td>${r.prefaultKV}</td>
-      <td>${r.cFactor}</td>
-      <td>${r.kappa}</td>
-      <td>${r.threePhaseKA}</td>
-      <td>${r.lineToGroundKA}</td>
-      <td>${r.lineToLineKA}</td>
-      <td>${r.ip}</td>
-      <td>${r.Ib}</td>
-      <td>${r.Ith}</td>
-    `;
+    const values = [
+      id,
+      r.prefaultKV,
+      r.cFactor,
+      r.kappa,
+      r.threePhaseKA,
+      r.lineToGroundKA,
+      r.lineToLineKA,
+      r.ip,
+      r.Ib,
+      r.Ith,
+    ];
+    values.forEach(value => {
+      const td = document.createElement('td');
+      td.textContent = value == null ? '' : String(value);
+      tr.appendChild(td);
+    });
     tbody.appendChild(tr);
   }
   resultsSection.hidden = false;
