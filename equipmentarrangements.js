@@ -10,6 +10,13 @@ const ELEVATION_WALL_TOLERANCE_FT = 1;
 const MAX_HISTORY = 50;
 const ARRANGEMENTS_KEY = 'equipmentArrangements';
 const WALL_IDS = ['north', 'south', 'east', 'west'];
+const INTERIOR_ORIENTATIONS = ['horizontal', 'vertical'];
+const DOOR_SWINGS = ['in', 'out'];
+
+function normalizeStringOption(value, allowed, fallback) {
+  const text = typeof value === 'string' ? value.trim() : '';
+  return allowed.includes(text) ? text : fallback;
+}
 
 function defaultRoom() {
   return {
@@ -88,20 +95,34 @@ function uniqueId(prefix) {
 
 function cloneRoom(room = defaultRoom()) {
   const fallback = defaultRoom();
+  const wallType = direction => normalizeStringOption(room.walls?.[direction], WALL_TYPES, fallback.walls[direction]);
   return {
     width: clamp(parseNumber(room.width, fallback.width), 8, 200),
     depth: clamp(parseNumber(room.depth, fallback.depth), 8, 200),
     walls: {
-      north: room.walls?.north || fallback.walls.north,
-      south: room.walls?.south || fallback.walls.south,
-      east: room.walls?.east || fallback.walls.east,
-      west: room.walls?.west || fallback.walls.west
+      north: wallType('north'),
+      south: wallType('south'),
+      east: wallType('east'),
+      west: wallType('west')
     },
     interiorWalls: Array.isArray(room.interiorWalls)
-      ? room.interiorWalls.map(wall => ({ ...wall }))
+      ? room.interiorWalls.map(wall => ({
+          orientation: normalizeStringOption(wall?.orientation, INTERIOR_ORIENTATIONS, 'horizontal'),
+          type: normalizeStringOption(wall?.type, WALL_TYPES, WALL_TYPES[0]),
+          x: clamp(parseNumber(wall?.x, 0), 0, 200),
+          y: clamp(parseNumber(wall?.y, 0), 0, 200),
+          length: clamp(parseNumber(wall?.length, 1), 1, 200)
+        }))
       : [],
     doorways: Array.isArray(room.doorways)
-      ? room.doorways.map(door => ({ swing: 'in', ...door }))
+      ? room.doorways.map(door => ({
+          id: door?.id ? String(door.id) : uniqueId('door'),
+          wall: normalizeStringOption(door?.wall, WALL_IDS, 'north'),
+          position: clamp(parseNumber(door?.position, 0), 0, 200),
+          width: clamp(parseNumber(door?.width, 3), 1, 20),
+          swing: normalizeStringOption(door?.swing, DOOR_SWINGS, 'in'),
+          isEgress: Boolean(door?.isEgress)
+        }))
       : []
   };
 }
@@ -571,7 +592,8 @@ function renderInteriorWallList() {
   state.room.interiorWalls.forEach((wall, index) => {
     const row = document.createElement('div');
     row.className = 'equipment-mini-list-row';
-    row.innerHTML = `<span>${wall.orientation} wall · ${wall.type} · (${wall.x.toFixed(1)}, ${wall.y.toFixed(1)}) · ${wall.length.toFixed(1)} ft</span>`;
+    const summary = document.createElement('span');
+    summary.textContent = `${wall.orientation} wall · ${wall.type} · (${wall.x.toFixed(1)}, ${wall.y.toFixed(1)}) · ${wall.length.toFixed(1)} ft`;
     const remove = document.createElement('button');
     remove.className = 'btn';
     remove.type = 'button';
@@ -581,6 +603,7 @@ function renderInteriorWallList() {
       state.room.interiorWalls.splice(index, 1);
       render();
     });
+    row.appendChild(summary);
     row.appendChild(remove);
     list.appendChild(row);
   });
@@ -599,7 +622,8 @@ function renderDoorwayList() {
     row.className = 'equipment-mini-list-row';
     const swingText = dw.swing === 'out' ? 'swings out' : 'swings in';
     const tag = dw.isEgress ? ' - EGRESS' : '';
-    row.innerHTML = `<span>${dw.wall} wall - ${dw.width.toFixed(1)} ft wide - ${dw.position.toFixed(1)} ft from corner - ${swingText}${tag}</span>`;
+    const summary = document.createElement('span');
+    summary.textContent = `${dw.wall} wall - ${dw.width.toFixed(1)} ft wide - ${dw.position.toFixed(1)} ft from corner - ${swingText}${tag}`;
     const remove = document.createElement('button');
     remove.className = 'btn';
     remove.type = 'button';
@@ -609,6 +633,7 @@ function renderDoorwayList() {
       state.room.doorways.splice(index, 1);
       render();
     });
+    row.appendChild(summary);
     row.appendChild(remove);
     list.appendChild(row);
   });
