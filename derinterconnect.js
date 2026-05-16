@@ -280,7 +280,7 @@ function renderResults(result) {
     ${result.harmonics.violations.length > 0 ? `
     <div class="result-card result-card--warn">
       <span class="result-label">Harmonic Violations</span>
-      <span class="result-value">${result.harmonics.violations.map(v => `${v.order}th: ${v.actual_pct}% > ${v.limit_pct}%`).join('; ')}</span>
+      <span class="result-value">${result.harmonics.violations.map(v => escHtml(`${v.order}th: ${v.actual_pct}% > ${v.limit_pct}%`)).join('; ')}</span>
     </div>` : ''}
   `;
 }
