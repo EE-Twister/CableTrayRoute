@@ -59,7 +59,13 @@ document.addEventListener('DOMContentLoaded', () => {
   const saved = getStudies().sustainabilityFootprint;
   if (saved && saved._inputs) {
     restoreInputs(saved._inputs);
-    renderResults(saved._result, saved._bom);
+    const restoredInputs = readInputs();
+    const restoredBom = buildBomFromProject();
+    const restoredOptions = buildOptions(restoredInputs, restoredBom);
+    const restoredResult = buildSustainabilityReport(restoredBom, restoredOptions);
+    renderResults(restoredResult, restoredBom);
+    lastResult = restoredResult;
+    lastBom = restoredBom;
     exportBtn.disabled = false;
   }
 
@@ -272,6 +278,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const gridDef = GRID_EMISSION_FACTORS[result.gridRegion] || {};
     const fmtT    = kg => (kg / 1000).toFixed(3);
     const fmtKg   = kg => kg.toFixed(1);
+    const safeProjectLifeYears = Number.isFinite(Number(result.projectLifeYears)) ? Number(result.projectLifeYears) : 25;
+    const safeGridFactorKgPerKwh = Number.isFinite(Number(result.gridFactorKgPerKwh)) ? Number(result.gridFactorKgPerKwh) : 0;
 
     const opSection = result.operating
       ? `<section class="field-group" aria-label="Operating CO₂e" style="margin-bottom:1.5rem">
@@ -279,8 +287,8 @@ document.addEventListener('DOMContentLoaded', () => {
           <table class="results-table" aria-label="Operating losses summary">
             <tbody>
               <tr><td>Annual conductor losses</td><td><strong>${result.operating.annualKwh.toFixed(0).toLocaleString()} kWh/yr</strong></td></tr>
-              <tr><td>Grid emission factor</td><td>${result.gridFactorKgPerKwh} kg CO₂e/kWh (${escapeHtml(gridDef.label || result.gridRegion)})</td></tr>
-              <tr><td>Project life</td><td>${result.projectLifeYears} years</td></tr>
+              <tr><td>Grid emission factor</td><td>${safeGridFactorKgPerKwh} kg CO₂e/kWh (${escapeHtml(gridDef.label || result.gridRegion)})</td></tr>
+              <tr><td>Project life</td><td>${safeProjectLifeYears} years</td></tr>
               <tr><td>Lifetime energy consumption</td><td>${(result.operating.lifetimeKwh / 1000).toFixed(1)} MWh</td></tr>
               <tr><td>Operating CO₂e (Scope 2)</td><td><strong>${fmtKg(result.operating.lifetimeKgCO2e)} kg (${fmtT(result.operating.lifetimeKgCO2e)} t)</strong></td></tr>
             </tbody>
@@ -357,7 +365,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <div class="kpi-card">
           <div class="kpi-label">Operating CO₂e (Scope 2)</div>
           <div class="kpi-value">${result.operating ? fmtT(result.operating.lifetimeKgCO2e) : '—'} t</div>
-          <div class="kpi-sub">${result.operating ? `over ${result.projectLifeYears} yr` : 'not calculated'}</div>
+          <div class="kpi-sub">${result.operating ? `over ${safeProjectLifeYears} yr` : 'not calculated'}</div>
         </div>
         <div class="kpi-card">
           <div class="kpi-label">Total CO₂e</div>
