@@ -111,12 +111,17 @@ document.addEventListener('DOMContentLoaded', () => {
   // -----------------------------------------------------------------------
   // Dynamic row builders
   // -----------------------------------------------------------------------
+  function safeNumber(value, fallback = 0) {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : fallback;
+  }
+
   function addCapBankRow(kvar = 600, label = '') {
     const container = document.getElementById('cap-banks-list');
     const row = document.createElement('div');
     row.className = 'dynamic-row field-row-inline';
     row.innerHTML = `
-      <input type="number" class="cap-kvar" min="1" step="50" value="${kvar}" aria-label="Capacitor bank kVAR" required>
+      <input type="number" class="cap-kvar" min="1" step="50" value="${safeNumber(kvar, 600)}" aria-label="Capacitor bank kVAR" required>
       <span class="field-unit">kVAR</span>
       <input type="text" class="cap-label" value="${escapeHtml(label)}" placeholder="Label (optional)" aria-label="Cap bank label">
       <button type="button" class="btn btn-icon remove-row-btn" aria-label="Remove this capacitor bank">×</button>
@@ -130,9 +135,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const row = document.createElement('div');
     row.className = 'dynamic-row field-row-inline';
     row.innerHTML = `
-      <input type="number" class="filter-reactor-pct" min="0.1" max="99" step="0.01" value="${reactorPct}" aria-label="Reactor %" required>
+      <input type="number" class="filter-reactor-pct" min="0.1" max="99" step="0.01" value="${safeNumber(reactorPct, 5.67)}" aria-label="Reactor %" required>
       <span class="field-unit">% reactor</span>
-      <input type="number" class="filter-kvar" min="1" step="50" value="${kvar}" aria-label="Filter kVAR" required>
+      <input type="number" class="filter-kvar" min="1" step="50" value="${safeNumber(kvar, 600)}" aria-label="Filter kVAR" required>
       <span class="field-unit">kVAR</span>
       <input type="text" class="filter-label" value="${escapeHtml(label)}" placeholder="Label" aria-label="Filter label">
       <button type="button" class="btn btn-icon remove-row-btn" aria-label="Remove this filter">×</button>
@@ -146,11 +151,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const row = document.createElement('div');
     row.className = 'dynamic-row field-row-inline';
     row.innerHTML = `
-      <input type="number" class="cable-r" min="0" step="0.001" value="${rOhmPerKft}" aria-label="R (Ω/kft)" required>
+      <input type="number" class="cable-r" min="0" step="0.001" value="${safeNumber(rOhmPerKft, 0.05)}" aria-label="R (Ω/kft)" required>
       <span class="field-unit">Ω/kft R</span>
-      <input type="number" class="cable-x" min="0" step="0.001" value="${xOhmPerKft}" aria-label="X (Ω/kft)">
+      <input type="number" class="cable-x" min="0" step="0.001" value="${safeNumber(xOhmPerKft, 0.04)}" aria-label="X (Ω/kft)">
       <span class="field-unit">Ω/kft X</span>
-      <input type="number" class="cable-length" min="0.001" step="0.1" value="${lengthKft}" aria-label="Length (kft)" required>
+      <input type="number" class="cable-length" min="0.001" step="0.1" value="${safeNumber(lengthKft, 0.5)}" aria-label="Length (kft)" required>
       <span class="field-unit">kft</span>
       <input type="text" class="cable-label" value="${escapeHtml(label)}" placeholder="Label" aria-label="Cable label">
       <button type="button" class="btn btn-icon remove-row-btn" aria-label="Remove this cable">×</button>
@@ -186,7 +191,9 @@ document.addEventListener('DOMContentLoaded', () => {
   // Results rendering
   // -----------------------------------------------------------------------
   function renderResults(result) {
-    const { points, resonances, warnings } = result;
+    const points = Array.isArray(result?.points) ? result.points : [];
+    const resonances = Array.isArray(result?.resonances) ? result.resonances : [];
+    const warnings = Array.isArray(result?.warnings) ? result.warnings : [];
 
     const warningHtml = warnings.length
       ? `<ul class="drc-findings">${warnings.map(w =>
@@ -208,9 +215,9 @@ document.addEventListener('DOMContentLoaded', () => {
               const riskClass = r.risk === 'danger' ? 'result-fail'
                 : r.risk === 'caution' ? 'result-warn' : 'result-ok';
               return `<tr>
-                <td>${r.h}</td>
-                <td>${r.freqHz}</td>
-                <td>${r.zMagOhm.toFixed(3)}</td>
+                <td>${escapeHtml(String(safeNumber(r.h, 0)))}</td>
+                <td>${escapeHtml(String(safeNumber(r.freqHz, 0)))}</td>
+                <td>${escapeHtml(safeNumber(r.zMagOhm, 0).toFixed(3))}</td>
                 <td>${escapeHtml(r.type === 'parallel' ? 'Parallel (peak)' : 'Series (trough)')}</td>
                 <td><span class="${riskClass}">${escapeHtml(r.risk.toUpperCase())}</span></td>
               </tr>`;
@@ -253,12 +260,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 </tr></thead>
                 <tbody>
                   ${points.map(p => `<tr>
-                    <td>${p.h}</td>
-                    <td>${p.freqHz}</td>
-                    <td>${p.zMagOhm}</td>
-                    <td>${p.zPhaseDeg}</td>
-                    <td>${p.zRealOhm}</td>
-                    <td>${p.zImagOhm}</td>
+                    <td>${escapeHtml(String(safeNumber(p.h, 0)))}</td>
+                    <td>${escapeHtml(String(safeNumber(p.freqHz, 0)))}</td>
+                    <td>${escapeHtml(String(safeNumber(p.zMagOhm, 0)))}</td>
+                    <td>${escapeHtml(String(safeNumber(p.zPhaseDeg, 0)))}</td>
+                    <td>${escapeHtml(String(safeNumber(p.zRealOhm, 0)))}</td>
+                    <td>${escapeHtml(String(safeNumber(p.zImagOhm, 0)))}</td>
                   </tr>`).join('')}
                 </tbody>
               </table>
