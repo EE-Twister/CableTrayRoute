@@ -20,6 +20,7 @@ const MM_TO_M = 0.001;
 const FT_TO_M = 0.3048;
 const SQM_TO_SQFT = 10.76391041671;
 const COMMISSIONING_CHECKLIST_ITEMS = [];
+const MAX_NUMBER_OF_ANODES = 10000;
 
 const TABLE_CURRENT_DENSITY_MA_M2 = {
   pipe: { low: 5, moderate: 10, high: 20 },
@@ -488,8 +489,8 @@ function validateInputs(input) {
     errors.push('anodeTypeSystem must be galvanic or iccp.');
   }
 
-  if (!Number.isInteger(input.numberOfAnodes) || input.numberOfAnodes <= 0) {
-    errors.push('numberOfAnodes must be a positive integer.');
+  if (!Number.isInteger(input.numberOfAnodes) || input.numberOfAnodes <= 0 || input.numberOfAnodes > MAX_NUMBER_OF_ANODES) {
+    errors.push(`numberOfAnodes must be a positive integer up to ${MAX_NUMBER_OF_ANODES}.`);
   }
 
   ['anodeSpacingM', 'anodeDistanceToStructureM', 'anodeBurialDepthM'].forEach((fieldName) => {
