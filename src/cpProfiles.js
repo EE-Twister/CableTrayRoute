@@ -34,6 +34,12 @@ function drawBand({ y, h, className }) {
   return `<rect x="0" y="${y}" width="100%" height="${h}" class="${className}"></rect>`;
 }
 
+
+function toFiniteNumber(value, fallback = 0) {
+  const num = Number(value);
+  return Number.isFinite(num) ? num : fallback;
+}
+
 export function initCpProfiles({
   root,
   profileData,
@@ -86,8 +92,8 @@ export function initCpProfiles({
     const innerWidth = width - padding.left - padding.right;
     const innerHeight = height - padding.top - padding.bottom;
     const allRows = Object.values(rowsByScenario).flat();
-    const distances = allRows.map((row) => row.distanceM ?? 0);
-    const values = allRows.map((row) => row.value ?? 0);
+    const distances = allRows.map((row) => toFiniteNumber(row?.distanceM));
+    const values = allRows.map((row) => toFiniteNumber(row?.value));
     const distanceMax = Math.max(...distances, 1);
     const yDomain = extent(values);
 
@@ -115,11 +121,18 @@ export function initCpProfiles({
         return;
       }
       const points = rows
-        .map((row) => `${x(row.distanceM)},${y(row.value)}`)
+        .map((row) => {
+          const distance = toFiniteNumber(row?.distanceM);
+          const value = toFiniteNumber(row?.value);
+          return `${x(distance)},${y(value)}`;
+        })
         .join(' ');
       chartContent.push(`<polyline points="${points}" class="cp-profile-line cp-profile-line--${scenarioKey}"></polyline>`);
       rows.forEach((row, index) => {
-        chartContent.push(`<circle cx="${x(row.distanceM)}" cy="${y(row.value)}" r="4.5" class="cp-profile-point cp-profile-point--${passClass(metric, row.passMetricValue)}" data-segment-index="${index}" data-distance="${row.distanceM}"></circle>`);
+        const distance = toFiniteNumber(row?.distanceM);
+        const value = toFiniteNumber(row?.value);
+        const passMetricValue = toFiniteNumber(row?.passMetricValue, value);
+        chartContent.push(`<circle cx="${x(distance)}" cy="${y(value)}" r="4.5" class="cp-profile-point cp-profile-point--${passClass(metric, passMetricValue)}" data-segment-index="${index}" data-distance="${distance}"></circle>`);
       });
     });
 
@@ -128,7 +141,7 @@ export function initCpProfiles({
       const hoverRows = rowsByScenario.base || [];
       const target = hoverRows[hoverIndex] || hoverRows[hoverRows.length - 1];
       if (target) {
-        const crosshairX = x(target.distanceM);
+        const crosshairX = x(toFiniteNumber(target?.distanceM));
         chartContent.push(`<line x1="${crosshairX}" y1="${padding.top}" x2="${crosshairX}" y2="${padding.top + innerHeight}" class="cp-crosshair"></line>`);
       }
     }
