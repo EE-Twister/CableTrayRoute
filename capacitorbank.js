@@ -78,15 +78,16 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function renderResults(r) {
+    const safe = normalizeResult(r);
     resultsDiv.innerHTML = '';
 
-    if (r.kvarRequired === 0) {
+    if (safe.kvarRequired === 0) {
       resultsDiv.innerHTML = `
         <section class="results-panel">
           <div class="result-badge result-badge--pass" role="status">
             ✓ Power factor is already at or above target — no capacitor bank required.
           </div>
-          <p class="field-hint">Existing PF: ${r.pfExisting} &nbsp;|&nbsp; Target PF: ${r.pfTarget}</p>
+          <p class="field-hint">Existing PF: ${safe.pfExisting} &nbsp;|&nbsp; Target PF: ${safe.pfTarget}</p>
         </section>`;
       return;
     }
@@ -94,56 +95,56 @@ document.addEventListener('DOMContentLoaded', () => {
     const riskColors = { safe: 'result-badge--pass', caution: 'result-badge--warn', danger: 'result-badge--fail' };
     const riskIcons  = { safe: '✓', caution: '⚠', danger: '✗' };
 
-    const resonanceHtml = r.resonance
-      ? `<div class="result-badge ${riskColors[r.resonance.riskLevel]}" role="status">
-           ${riskIcons[r.resonance.riskLevel]} Resonance order h<sub>r</sub> = ${r.resonance.harmonicOrder}
-           — <strong>${r.resonance.riskLevel.toUpperCase()}</strong>
-           ${r.resonance.nearestDominant ? `(near h=${r.resonance.nearestDominant})` : ''}
+    const resonanceHtml = safe.resonance
+      ? `<div class="result-badge ${riskColors[safe.resonance.riskLevel]}" role="status">
+           ${riskIcons[safe.resonance.riskLevel]} Resonance order h<sub>r</sub> = ${safe.resonance.harmonicOrder}
+           — <strong>${safe.resonance.riskLevel.toUpperCase()}</strong>
+           ${safe.resonance.nearestDominant ? `(near h=${safe.resonance.nearestDominant})` : ''}
          </div>`
       : `<p class="field-hint">Resonance check skipped — short-circuit MVA not provided.</p>`;
 
-    const detuningHtml = r.detuning.needed
+    const detuningHtml = safe.detuning.needed
       ? `<div class="alert-warn" role="note">
            <strong>Detuned reactor recommended:</strong>
-           ${r.detuning.detuningPct}% detuning factor
-           (series resonant order h = ${r.detuning.tunedToOrder}).<br>
-           <span class="field-hint">${r.detuning.rationale}</span>
+           ${safe.detuning.detuningPct}% detuning factor
+           (series resonant order h = ${safe.detuning.tunedToOrder}).<br>
+           <span class="field-hint">${safe.detuning.rationale}</span>
          </div>`
-      : `<p class="field-hint">${r.detuning.rationale}</p>`;
+      : `<p class="field-hint">${safe.detuning.rationale}</p>`;
 
-    const warningsHtml = r.warnings.length
-      ? `<ul class="drc-findings">${r.warnings.map(w =>
+    const warningsHtml = safe.warnings.length
+      ? `<ul class="drc-findings">${safe.warnings.map(w =>
           `<li class="drc-finding drc-warn"><span class="drc-msg">${w}</span></li>`).join('')}</ul>`
       : '';
 
-    const sizeOptionsHtml = r.standardSizes.map(s =>
-      `<span class="tag${s === r.bankSize ? ' tag--primary' : ''}">${s} kVAR</span>`
+    const sizeOptionsHtml = safe.standardSizes.map(s =>
+      `<span class="tag${s === safe.bankSize ? ' tag--primary' : ''}">${s} kVAR</span>`
     ).join(' ');
 
     resultsDiv.innerHTML = `
       <section class="results-panel" aria-labelledby="results-heading">
         <h2 id="results-heading">Capacitor Bank Sizing Results</h2>
-        ${r.busLabel ? `<p class="field-hint">Bus / Node: <strong>${escHtml(r.busLabel)}</strong></p>` : ''}
+        ${safe.busLabel ? `<p class="field-hint">Bus / Node: <strong>${safe.busLabel}</strong></p>` : ''}
 
         <div class="result-group">
           <div class="result-row">
             <span class="result-label">Required reactive compensation</span>
-            <span class="result-value">${r.kvarRequired} kVAR</span>
+            <span class="result-value">${safe.kvarRequired} kVAR</span>
           </div>
           <p class="field-hint result-formula">
-            Q<sub>cap</sub> = P × (tan(cos⁻¹(${r.pfExisting})) − tan(cos⁻¹(${r.pfTarget})))
-            = ${r.pKw} × (${r.tanDeltaExisting} − ${r.tanDeltaTarget}) = ${r.kvarRequired} kVAR
+            Q<sub>cap</sub> = P × (tan(cos⁻¹(${safe.pfExisting})) − tan(cos⁻¹(${safe.pfTarget})))
+            = ${safe.pKw} × (${safe.tanDeltaExisting} − ${safe.tanDeltaTarget}) = ${safe.kvarRequired} kVAR
           </p>
         </div>
 
         <div class="result-group">
           <div class="result-row">
             <span class="result-label">Recommended standard bank size</span>
-            <span class="result-value">${r.bankSize} kVAR</span>
+            <span class="result-value">${safe.bankSize} kVAR</span>
           </div>
           <div class="result-row">
             <span class="result-label">2-stage switched option</span>
-            <span class="result-value">2 × ${r.stageKvar} kVAR</span>
+            <span class="result-value">2 × ${safe.stageKvar} kVAR</span>
           </div>
           <p class="field-hint">Standard sizes near required: ${sizeOptionsHtml}</p>
         </div>
@@ -156,8 +157,46 @@ document.addEventListener('DOMContentLoaded', () => {
 
         ${warningsHtml}
 
-        <p class="field-hint result-timestamp">Analysis run: ${new Date(r.timestamp).toLocaleString()}</p>
+        <p class="field-hint result-timestamp">Analysis run: ${new Date(safe.timestamp).toLocaleString()}</p>
       </section>`;
+  }
+
+
+  function normalizeResult(result) {
+    const safeWarnings = Array.isArray(result.warnings) ? result.warnings.map(w => escHtml(String(w))) : [];
+    const safeSizes = Array.isArray(result.standardSizes)
+      ? result.standardSizes.map(s => Number(s)).filter(Number.isFinite)
+      : [];
+
+    const safeResonance = result.resonance
+      ? {
+          riskLevel: ['safe', 'caution', 'danger'].includes(result.resonance.riskLevel) ? result.resonance.riskLevel : 'safe',
+          harmonicOrder: Number(result.resonance.harmonicOrder),
+          nearestDominant: Number.isFinite(Number(result.resonance.nearestDominant)) ? Number(result.resonance.nearestDominant) : null
+        }
+      : null;
+
+    return {
+      busLabel: escHtml(String(result.busLabel || '')),
+      pfExisting: Number(result.pfExisting),
+      pfTarget: Number(result.pfTarget),
+      pKw: Number(result.pKw),
+      tanDeltaExisting: Number(result.tanDeltaExisting),
+      tanDeltaTarget: Number(result.tanDeltaTarget),
+      kvarRequired: Number(result.kvarRequired),
+      bankSize: Number(result.bankSize),
+      stageKvar: Number(result.stageKvar),
+      timestamp: result.timestamp,
+      detuning: {
+        needed: Boolean(result.detuning?.needed),
+        detuningPct: Number(result.detuning?.detuningPct),
+        tunedToOrder: Number(result.detuning?.tunedToOrder),
+        rationale: escHtml(String(result.detuning?.rationale || ''))
+      },
+      warnings: safeWarnings,
+      standardSizes: safeSizes,
+      resonance: safeResonance
+    };
   }
 
   function escHtml(str) {
