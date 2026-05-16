@@ -1828,8 +1828,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     whenPresent(DUCTBANK_ROW_SELECTOR, () => emitSticky('samples-loaded','samplesLoaded'));
   });
 
-  const normalize=s=>(s||'').trim().toUpperCase();
-
   function attachConduitsToDuctbanks(rows){
     const banks=(typeof window.getDuctbanks==='function'?window.getDuctbanks():[]);
     const tags=new Set(banks.map(db=>normalize(db.tag)));
