@@ -75,7 +75,8 @@ function forceShowResumeIfE2E() {
 
 window.E2E = E2E;
 
-import { getOneLine, setOneLine, setEquipment, setPanels, setLoads, getCables, setCables, addRaceway, getItem, setItem, getStudies, setStudies, on, getCurrentScenario, switchScenario, STORAGE_KEYS, loadProject, saveProject } from './dataStore.mjs';
+import { getOneLine, setOneLine, getEquipment, setEquipment, getPanels, setPanels, getLoads, setLoads, getCables, setCables, addRaceway, getItem, setItem, getStudies, setStudies, on, getCurrentScenario, switchScenario, STORAGE_KEYS, loadProject, saveProject } from './dataStore.mjs';
+import { previewScheduleReconcile, applyScheduleReconcilePreview } from './analysis/scheduleReconcile.mjs';
 import { runLoadFlow } from './analysis/loadFlow.js';
 import { renderLoadFlowResultsHtml } from './analysis/loadFlowResultsRenderer.js';
 import { runShortCircuit } from './analysis/shortCircuit.mjs';
@@ -2265,7 +2266,8 @@ let layers = [];             // layer definitions for the active sheet: [{id,nam
 let layersHistory = [];      // parallel snapshot array to history[], each entry is deep copy of layers
 let layersHistoryIndex = -1; // mirrors historyIndex
 let activeLayerId = null;    // layer id assigned to newly placed components (null = unassigned)
-let syncing = false;
+const SCHEDULE_RECONCILE_PENDING_KEY = 'oneLineScheduleReconcilePending';
+let scheduleReconcilePending = Boolean(getItem(SCHEDULE_RECONCILE_PENDING_KEY, false));
 let lintPanel = null;
 let lintList = null;
 let clickSelectTimer = null;
@@ -3031,7 +3033,7 @@ if (runLFBtn) runLFBtn.addEventListener('click', () => {
   const studies = getStudies();
   studies.loadFlow = res;
   setStudies(studies);
-  syncSchedules(false);
+  markScheduleReconcilePending();
   renderStudyResults();
   renderLoadFlowResults(res);
   render();
@@ -7220,10 +7222,8 @@ function render() {
   // Gap #49 – Arc Flash label badge overlays
   if (arcFlashLabelMode) renderArcFlashLabelOverlays(svg);
 
-  if (lengthsChanged && !syncing) {
-    syncing = true;
-    syncSchedules(false);
-    syncing = false;
+  if (lengthsChanged) {
+    markScheduleReconcilePending();
     render();
   }
 }
@@ -8170,9 +8170,10 @@ function save(notify = true) {
   setItem('diagramScale', diagramScale);
   const issues = validateDiagram();
   if (issues.length === 0) {
-    syncSchedules(notify);
+    markScheduleReconcilePending();
+    if (notify) showToast('One-line saved. Use Reconcile Schedules to update linked schedules.');
   } else if (notify) {
-    showToast('Fix validation issues before syncing schedules');
+    showToast('Fix validation issues before reconciling schedules');
   }
 }
 
@@ -9295,6 +9296,72 @@ function selectComponent(compOrId) {
       });
     }
 
+    const makeScheduleLinkOptions = records => {
+      const seen = new Set();
+      const options = [{ value: '', label: '--None--' }];
+      (Array.isArray(records) ? records : []).forEach(record => {
+        const value = String(record?.ref || record?.id || record?.tag || record?.cable_id || record?.cableId || '').trim();
+        if (!value || seen.has(value)) return;
+        seen.add(value);
+        const description = record?.description || record?.name || record?.loadType || '';
+        options.push({
+          value,
+          label: description ? `${value} - ${description}` : value
+        });
+      });
+      return options;
+    };
+
+    const setScheduleLink = (comp, key, directKey, value) => {
+      if (!comp.scheduleLinks || typeof comp.scheduleLinks !== 'object') comp.scheduleLinks = {};
+      const nextValue = String(value || '').trim();
+      if (nextValue) {
+        comp.scheduleLinks[key] = nextValue;
+        comp[directKey] = nextValue;
+      } else {
+        delete comp.scheduleLinks[key];
+        delete comp[directKey];
+      }
+      if (!Object.keys(comp.scheduleLinks).length) delete comp.scheduleLinks;
+    };
+
+    const scheduleLinkFieldDefs = [
+      {
+        name: 'equipmentRef',
+        label: 'Equipment Record',
+        type: 'select',
+        options: makeScheduleLinkOptions(getEquipment()),
+        getValue: comp => comp.scheduleLinks?.equipment || comp.equipmentRef || '',
+        setValue: (comp, value) => setScheduleLink(comp, 'equipment', 'equipmentRef', value)
+      },
+      {
+        name: 'loadRef',
+        label: 'Load Record',
+        type: 'select',
+        options: makeScheduleLinkOptions(getLoads()),
+        getValue: comp => comp.scheduleLinks?.load || comp.loadRef || '',
+        setValue: (comp, value) => setScheduleLink(comp, 'load', 'loadRef', value)
+      },
+      {
+        name: 'panelRef',
+        label: 'Panel Record',
+        type: 'select',
+        options: makeScheduleLinkOptions(getPanels()),
+        getValue: comp => comp.scheduleLinks?.panel || comp.panelRef || '',
+        setValue: (comp, value) => setScheduleLink(comp, 'panel', 'panelRef', value)
+      },
+      {
+        name: 'cableRef',
+        label: 'Cable Record',
+        type: 'select',
+        options: makeScheduleLinkOptions(getCables()),
+        getValue: comp => comp.scheduleLinks?.cable || comp.cableRef || '',
+        setValue: (comp, value) => setScheduleLink(comp, 'cable', 'cableRef', value)
+      }
+    ];
+    fields.push(...scheduleLinkFieldDefs);
+    const scheduleLinkFieldNames = new Set(scheduleLinkFieldDefs.map(field => field.name));
+
     const hasTccField = fields.some(f => f.name === 'tccId');
 
     const applyChanges = () => {
@@ -9311,7 +9378,7 @@ function selectComponent(compOrId) {
       pushHistory();
       render();
       save();
-      syncSchedules();
+      markScheduleReconcilePending();
     };
     modal._applyChanges = applyChanges;
 
@@ -9321,6 +9388,7 @@ function selectComponent(compOrId) {
     const electricalFields = [];
     const motorStartFields = [];
     const physicalFields = [];
+    const scheduleLinkFields = [];
     const generalFields = [];
     const motorStartFieldNames = [
       'inrushMultiple', 'lr_current_pu', 'thevenin_r', 'thevenin_x', 'inertia', 'load_torque_curve',
@@ -9328,7 +9396,9 @@ function selectComponent(compOrId) {
       'wye_delta_switch_time_s', 'autotransformer_tap', 'synchronous_speed_rpm',
     ];
     fields.forEach(f => {
-      if (isMotorComponent && motorStartFieldNames.includes(f.name)) {
+      if (scheduleLinkFieldNames.has(f.name)) {
+        scheduleLinkFields.push(f);
+      } else if (isMotorComponent && motorStartFieldNames.includes(f.name)) {
         motorStartFields.push(f);
       } else if (impedanceFieldNameSet.has(f.name)) {
         electricalFields.push(f);
@@ -9439,6 +9509,7 @@ function selectComponent(compOrId) {
     };
 
     createTabSection('general', 'General', 'General', generalFields);
+    createTabSection('links', 'Links', 'Schedule Links', scheduleLinkFields);
     createTabSection('electrical', 'Electrical', 'Electrical', electricalFields);
     createTabSection('physical', 'Physical', 'Physical', physicalFields);
     createTabSection('motor', 'Motor Start', 'Motor Start', motorStartFields);
@@ -11377,7 +11448,7 @@ async function editCableComponent(comp) {
   pushHistory();
   render();
   save();
-  syncSchedules();
+  markScheduleReconcilePending();
 }
 
 async function init() {
@@ -11521,7 +11592,7 @@ async function init() {
   renderLayerPanel();
   renderBgPanel();
   const initIssues = validateDiagram();
-  if (!initIssues.length) syncSchedules(false);
+  if (!initIssues.length) markScheduleReconcilePending();
 
   const prefixBtn = document.getElementById('prefix-settings-btn');
   if (prefixBtn) prefixBtn.addEventListener('click', editPrefixes);
@@ -11733,6 +11804,9 @@ async function init() {
   if (shareBtn) shareBtn.addEventListener('click', shareDiagram);
   const sampleBtn = document.getElementById('sample-diagram-btn');
   if (sampleBtn) sampleBtn.addEventListener('click', loadSampleDiagram);
+  const reconcileBtn = document.getElementById('reconcile-schedules-btn');
+  if (reconcileBtn) reconcileBtn.addEventListener('click', openScheduleReconcileModal);
+  updateScheduleReconcileButtonState();
   const onelineExportBtn = document.getElementById('export-oneline-data-btn');
   if (onelineExportBtn) onelineExportBtn.addEventListener('click', exportOneLineDiagnostics);
   document.getElementById('add-sheet-btn').addEventListener('click', () => addSheet());
@@ -12609,7 +12683,7 @@ async function init() {
           pushHistory();
           render();
           save();
-          syncSchedules();
+          markScheduleReconcilePending();
           showToast('Properties pasted');
         } else {
           showToast('Properties already match');
@@ -12930,7 +13004,7 @@ async function init() {
     startTour();
     localStorage.setItem('onelineTourDone', 'true');
   });
-  if (!localStorage.getItem('onelineTourDone')) {
+  if (!E2E && !localStorage.getItem('onelineTourDone')) {
     startTour();
     localStorage.setItem('onelineTourDone', 'true');
   }
@@ -13107,11 +13181,10 @@ async function init() {
   // ----------------------------------------------------------------
   // Gap #46 – Datablock config: hook into the existing Views button
   // ----------------------------------------------------------------
-  const viewMenuBtn = document.getElementById('view-menu-btn');
-  if (viewMenuBtn) {
+  const datablockViewMenuBtn = document.getElementById('view-menu-btn');
+  if (datablockViewMenuBtn) {
     diagramDatablockConfig = getItem('diagramDatablockConfig') || {};
-    const originalClickHandler = viewMenuBtn._clickHandler;
-    viewMenuBtn.addEventListener('click', () => {
+    datablockViewMenuBtn.addEventListener('click', () => {
       openDatablocksModal();
     });
   }
@@ -13513,7 +13586,7 @@ function updateComponent(id, fields = {}) {
   save(false);
 }
 
-function syncSchedules(notify = true) {
+function buildScheduleDataFromDiagram() {
   const all = sheets.flatMap(s => s.components);
   const findPanelId = id => {
     const visited = new Set();
@@ -13598,9 +13671,6 @@ function syncSchedules(notify = true) {
   const buses = all
     .filter(c => isBusComponent(c))
     .map(mapFields);
-  setEquipment([...equipment, ...buses]);
-  setPanels([...panels, ...buses]);
-  setLoads(loads);
   const cableSpecs = [];
   const seenTags = new Set();
   all
@@ -13631,8 +13701,213 @@ function syncSchedules(notify = true) {
       cableSpecs.push(spec);
     });
   });
-  setCables(cableSpecs);
-  if (notify) showToast('Schedules synced');
+  return {
+    equipment: [...equipment, ...buses],
+    panels: [...panels, ...buses],
+    loads,
+    cables: cableSpecs
+  };
+}
+
+function updateScheduleReconcileButtonState() {
+  const btn = document.getElementById('reconcile-schedules-btn');
+  if (!btn) return;
+  btn.dataset.pending = scheduleReconcilePending ? 'true' : 'false';
+  btn.title = scheduleReconcilePending
+    ? 'Preview pending schedule updates from this one-line'
+    : 'Preview schedule updates from this one-line';
+}
+
+function markScheduleReconcilePending(pending = true) {
+  scheduleReconcilePending = !!pending;
+  setItem(SCHEDULE_RECONCILE_PENDING_KEY, scheduleReconcilePending);
+  updateScheduleReconcileButtonState();
+}
+
+function collectionLabel(name) {
+  return ({
+    equipment: 'Equipment',
+    panels: 'Panels',
+    loads: 'Loads',
+    cables: 'Cables'
+  })[name] || name;
+}
+
+function appendReconcileTable(container, preview) {
+  const table = document.createElement('table');
+  table.className = 'data-table';
+  table.setAttribute('aria-label', 'Schedule reconcile preview');
+
+  const thead = document.createElement('thead');
+  const headerRow = document.createElement('tr');
+  ['Schedule', 'Create', 'Update', 'Conflicts', 'Unchanged'].forEach(label => {
+    const th = document.createElement('th');
+    th.textContent = label;
+    headerRow.appendChild(th);
+  });
+  thead.appendChild(headerRow);
+  table.appendChild(thead);
+
+  const tbody = document.createElement('tbody');
+  ['equipment', 'panels', 'loads', 'cables'].forEach(collection => {
+    const row = document.createElement('tr');
+    const counts = preview[collection]?.counts || {};
+    [
+      collectionLabel(collection),
+      counts.creates || 0,
+      counts.updates || 0,
+      counts.conflicts || 0,
+      counts.unchanged || 0
+    ].forEach(value => {
+      const cell = document.createElement('td');
+      cell.textContent = String(value);
+      row.appendChild(cell);
+    });
+    tbody.appendChild(row);
+  });
+  table.appendChild(tbody);
+  container.appendChild(table);
+
+  const affectedRows = [];
+  ['equipment', 'panels', 'loads', 'cables'].forEach(collection => {
+    const collectionPreview = preview[collection] || {};
+    (collectionPreview.creates || []).forEach(item => {
+      affectedRows.push({
+        collection,
+        action: 'Create',
+        identity: item.identity,
+        fields: Object.keys(item.record || {}).filter(key => item.record[key] !== null && item.record[key] !== undefined && String(item.record[key]).trim() !== '')
+      });
+    });
+    (collectionPreview.updates || []).forEach(item => {
+      affectedRows.push({ collection, action: 'Update', identity: item.identity, fields: item.fields || [] });
+    });
+    (collectionPreview.conflicts || []).forEach(item => {
+      affectedRows.push({
+        collection,
+        action: 'Conflict',
+        identity: item.identity,
+        fields: (item.fields || []).map(field => `${field.field}: schedule "${field.currentValue}" preserved over one-line "${field.incomingValue}"`)
+      });
+    });
+    (collectionPreview.unchanged || []).forEach(item => {
+      affectedRows.push({ collection, action: 'Unchanged', identity: item.identity, fields: [] });
+    });
+  });
+  if (!affectedRows.length) return;
+
+  const details = document.createElement('details');
+  details.open = true;
+  const summary = document.createElement('summary');
+  summary.textContent = 'Affected records';
+  details.appendChild(summary);
+
+  const affectedTable = document.createElement('table');
+  affectedTable.className = 'data-table reconcile-affected-table';
+  affectedTable.setAttribute('aria-label', 'Affected schedule records');
+  const affectedHead = document.createElement('thead');
+  const affectedHeader = document.createElement('tr');
+  ['Schedule', 'Action', 'Record', 'Fields'].forEach(label => {
+    const th = document.createElement('th');
+    th.textContent = label;
+    affectedHeader.appendChild(th);
+  });
+  affectedHead.appendChild(affectedHeader);
+  affectedTable.appendChild(affectedHead);
+
+  const affectedBody = document.createElement('tbody');
+  affectedRows.forEach(item => {
+    const row = document.createElement('tr');
+    [
+      collectionLabel(item.collection),
+      item.action,
+      item.identity || '(new record)',
+      item.fields.length ? item.fields.join(', ') : 'No field changes'
+    ].forEach(value => {
+      const cell = document.createElement('td');
+      cell.textContent = String(value);
+      row.appendChild(cell);
+    });
+    affectedBody.appendChild(row);
+  });
+  affectedTable.appendChild(affectedBody);
+  details.appendChild(affectedTable);
+  container.appendChild(details);
+}
+
+function appendConflictSummary(container, preview) {
+  const conflicts = ['equipment', 'panels', 'loads', 'cables'].flatMap(collection => {
+    return (preview[collection]?.conflicts || []).flatMap(item => {
+      return item.fields.map(field => ({
+        collection,
+        identity: item.identity,
+        ...field
+      }));
+    });
+  });
+  if (!conflicts.length) return;
+
+  const details = document.createElement('details');
+  details.open = true;
+  const summary = document.createElement('summary');
+  summary.textContent = 'Conflicts preserve existing schedule values';
+  details.appendChild(summary);
+
+  const list = document.createElement('ul');
+  conflicts.slice(0, 8).forEach(conflict => {
+    const item = document.createElement('li');
+    item.textContent = `${collectionLabel(conflict.collection)} ${conflict.identity || '(new record)'}: ${conflict.field} is "${conflict.currentValue}" in the schedule and "${conflict.incomingValue}" in the one-line.`;
+    list.appendChild(item);
+  });
+  if (conflicts.length > 8) {
+    const item = document.createElement('li');
+    item.textContent = `${conflicts.length - 8} additional conflict(s) are hidden from this preview.`;
+    list.appendChild(item);
+  }
+  details.appendChild(list);
+  container.appendChild(details);
+}
+
+function openScheduleReconcileModal() {
+  save(false);
+  const incoming = buildScheduleDataFromDiagram();
+  const preview = previewScheduleReconcile({
+    equipment: getEquipment(),
+    panels: getPanels(),
+    loads: getLoads(),
+    cables: getCables()
+  }, incoming);
+  const hasChanges = preview.totals.creates > 0 || preview.totals.updates > 0;
+
+  return openModal({
+    title: 'Reconcile Schedules',
+    description: 'Preview one-line updates before applying them to schedules. Existing non-empty schedule values are preserved when conflicts are found.',
+    primaryText: hasChanges ? 'Apply Reconcile' : 'Close',
+    secondaryText: hasChanges ? 'Cancel' : null,
+    defaultWidth: 'wide',
+    onSubmit() {
+      if (!hasChanges) return true;
+      const next = applyScheduleReconcilePreview(preview);
+      setEquipment(next.equipment);
+      setPanels(next.panels);
+      setLoads(next.loads);
+      setCables(next.cables);
+      markScheduleReconcilePending(false);
+      if (projectId) saveProject(projectId);
+      showToast(`Schedules reconciled: ${preview.totals.creates} create(s), ${preview.totals.updates} update(s), ${preview.totals.conflicts} conflict(s) preserved`);
+      return true;
+    },
+    render(container) {
+      const summary = document.createElement('p');
+      summary.textContent = hasChanges
+        ? `${preview.totals.creates} create(s), ${preview.totals.updates} update(s), ${preview.totals.conflicts} conflict field(s), ${preview.totals.unchanged} unchanged record(s).`
+        : `No schedule changes detected. ${preview.totals.conflicts} conflict field(s) would be preserved.`;
+      container.appendChild(summary);
+      appendReconcileTable(container, preview);
+      appendConflictSummary(container, preview);
+      return null;
+    }
+  });
 }
 
 function serializeState() {

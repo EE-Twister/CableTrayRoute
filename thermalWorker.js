@@ -124,6 +124,19 @@ function cableHeatLoss(cable,current=finiteNumber(cable?.est_load,0),rating=cabl
   return current*current*Rdc*(1+skinEffect(cable.conductor_size))*cableCurrentCarryingConductors(cable);
 }
 
+function isCompleteHeatSource(src){
+  const width=parseFloat(src?.width);
+  const height=parseFloat(src?.height);
+  const temperature=parseFloat(src?.temperature);
+  const x=parseFloat(src?.x);
+  const y=parseFloat(src?.y);
+  return Number.isFinite(width) && width > 0
+    && Number.isFinite(height) && height > 0
+    && Number.isFinite(temperature)
+    && Number.isFinite(x)
+    && Number.isFinite(y);
+}
+
 function solve(conduits,cables,params,width,height,gridSize,ductRes,progressCb,heatSources){
   heatSources=heatSources||[];
   const scale=40,margin=20;
@@ -141,7 +154,13 @@ function solve(conduits,cables,params,width,height,gridSize,ductRes,progressCb,h
   const boundaryPadPx=Math.max(12,depthIn || 36)*scale;
   const solverWidth=width+2*boundaryPadPx;
   const solverHeight=height+coverOffsetPx+boundaryPadPx;
-  const step=Math.ceil(Math.max(solverWidth,solverHeight)/GRID_SIZE);
+  const referenceWidth=Math.max(1,finiteNumber(params.solverReferenceWidth,width));
+  const referenceHeight=Math.max(1,finiteNumber(params.solverReferenceHeight,height));
+  const referenceSolverWidth=referenceWidth+2*boundaryPadPx;
+  const referenceSolverHeight=referenceHeight+coverOffsetPx+boundaryPadPx;
+  const requestedStep=Math.ceil(Math.max(solverWidth,solverHeight)/GRID_SIZE);
+  const referenceStep=Math.ceil(Math.max(referenceSolverWidth,referenceSolverHeight)/GRID_SIZE);
+  const step=Math.max(4,Math.min(requestedStep,referenceStep,scale*2));
   const dx=(0.0254/scale)*step;
   const nx=Math.ceil(solverWidth/step);
   const ny=Math.ceil(solverHeight/step);
@@ -192,13 +211,13 @@ function solve(conduits,cables,params,width,height,gridSize,ductRes,progressCb,h
     conduitCells[c.conduit_id].forEach(([j,i])=>{ powerGrid[j][i]+=q; });
   });
 
-  (heatSources||[]).forEach(src=>{
-    const tempC=isNaN(parseFloat(src.temperature))?earthT:fToC(parseFloat(src.temperature));
+  (heatSources||[]).filter(isCompleteHeatSource).forEach(src=>{
+    const tempC=fToC(parseFloat(src.temperature));
     const shape=(src.shape||'').toLowerCase();
-    const x=parseFloat(src.x)||0;
-    const y=parseFloat(src.y)||0;
-    const w=parseFloat(src.width)||0;
-    const ht=parseFloat(src.height)||0;
+    const x=parseFloat(src.x);
+    const y=parseFloat(src.y);
+    const w=parseFloat(src.width);
+    const ht=parseFloat(src.height);
     if(shape==='circle'){
       const r=Math.max(w,ht)/2;
       const cx=x+r, cy=y+r;
@@ -270,14 +289,18 @@ function solve(conduits,cables,params,width,height,gridSize,ductRes,progressCb,h
   });
   const cropCols=Math.max(1,GRID_SIZE);
   const cropRows=Math.max(1,Math.ceil((height/Math.max(width,1))*GRID_SIZE));
+  const drawingOriginX=Number.isFinite(params.drawingOriginX)?params.drawingOriginX:margin;
+  const drawingOriginY=Number.isFinite(params.drawingOriginY)?params.drawingOriginY:margin;
+  const cropOriginX=boundaryPadPx+margin-drawingOriginX;
+  const cropOriginY=coverOffsetPx+margin-drawingOriginY;
   const visibleGrid=[];
   for(let j=0;j<cropRows;j++){
-    const yPx=coverOffsetPx+(cropRows===1?0:(j/(cropRows-1))*height);
+    const yPx=cropOriginY+(cropRows===1?0:(j/(cropRows-1))*height);
     const sourceJ=Math.min(ny-1,Math.max(0,Math.round(yPx/step)));
     const sourceRow=grid[sourceJ] || [];
     const row=[];
     for(let i=0;i<cropCols;i++){
-      const xPx=boundaryPadPx+(cropCols===1?0:(i/(cropCols-1))*width);
+      const xPx=cropOriginX+(cropCols===1?0:(i/(cropCols-1))*width);
       const sourceI=Math.min(nx-1,Math.max(0,Math.round(xPx/step)));
       row.push(Number.isFinite(sourceRow[sourceI])?sourceRow[sourceI]:earthT);
     }

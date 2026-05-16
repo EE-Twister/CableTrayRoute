@@ -1,8 +1,9 @@
-import { getItem, setItem, removeItem, keys as storeKeys } from './dataStore.mjs';
+import { getItem, setItem, removeItem, keys as storeKeys, getTrays, getCables } from './dataStore.mjs';
 import { FILTER_ICON_SVG } from './tableUtils.mjs';
 import { showAlertModal, openModal } from './src/components/modal.js';
 import { createFillGauge } from './src/components/fillGauge.js';
 import { start as startTour } from './tour.js';
+import { getCableAssignedRacewayIds, summarizeCableWorkflow } from './analysis/scheduleWorkflow.mjs';
 
 const TRAYFILL_TOUR_STEPS = [
   { selector: '#trayParameters',       message: 'Select the tray you want to analyze: choose width, depth, and tray type. These parameters are used to calculate the NEC-compliant fill percentage.' },
@@ -20,6 +21,49 @@ function escapeHtml(value) {
     '"': '&quot;',
     "'": '&#39;'
   }[ch]));
+}
+
+function readStoredList(reader) {
+  try {
+    const value = reader();
+    return Array.isArray(value) ? value : [];
+  } catch (error) {
+    console.warn('Unable to read workflow handoff data', error);
+    return [];
+  }
+}
+
+function renderTrayFillHandoff(context = {}) {
+  const el = document.getElementById('tray-fill-handoff');
+  if (!el) return;
+  const trays = readStoredList(getTrays);
+  const cables = readStoredList(getCables);
+  const selectedTray = context.tray || null;
+  const selectedCables = Array.isArray(context.cables) ? context.cables : [];
+  const trayId = selectedTray?.tray_id || selectedTray?.tag || selectedTray?.id || '';
+  const schedule = summarizeCableWorkflow(cables);
+  const assignedToTray = trayId
+    ? cables.filter(cable => getCableAssignedRacewayIds(cable).some(id => id === trayId)).length
+    : 0;
+  const title = trayId
+    ? `Reviewing ${trayId}`
+    : (trays.length ? 'Select a tray from the Raceway Schedule' : 'Add raceways before tray fill review');
+  const detail = trayId
+    ? `${selectedCables.length || assignedToTray} cable(s) are loaded for this tray. ${schedule.routingReady} cable schedule row(s) are routing-ready.`
+    : (trays.length
+        ? `${trays.length} tray record(s) are available. Open a tray from Routing or the Raceway Schedule for a project-specific fill check.`
+        : 'Tray Fill still works standalone, but the project workflow starts with tray geometry in the Raceway Schedule.');
+  el.innerHTML = `
+    <div>
+      <strong>${escapeHtml(title)}</strong>
+      <p>${escapeHtml(detail)}</p>
+    </div>
+    <span>
+      <a class="btn" href="racewayschedule.html">Raceway Schedule</a>
+      <a class="btn" href="cableschedule.html">Cable Schedule</a>
+      <a class="btn" href="optimalRoute.html">Routing</a>
+    </span>
+  `;
 }
 
 function svgFillColor(pct) {
@@ -1968,10 +2012,13 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
       if(importExcelInput) importExcelInput.addEventListener('change',markUnsaved);
       ['saveProfileBtn','loadProfileBtn','exportExcelBtn'].forEach(id=>{const el=document.getElementById(id);if(el) el.addEventListener('click',markSaved);});
 
+      let trayHandoffContext = {};
+      renderTrayFillHandoff(trayHandoffContext);
       const stored = getItem('trayFillData');
       if (stored) {
         try {
           const { tray, cables: storedCables } = stored;
+          trayHandoffContext = { tray, cables: Array.isArray(storedCables) ? storedCables : [] };
           document.getElementById('trayWidth').value = tray.width;
           document.getElementById('trayDepth').value = tray.height;
           document.getElementById('trayName').value = tray.tray_id || '';
@@ -2017,6 +2064,7 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
           }
           renderCableRows();
           document.getElementById('drawBtn').click();
+          renderTrayFillHandoff(trayHandoffContext);
         } catch (e) {
           console.error('Failed to load trayFillData', e);
         }

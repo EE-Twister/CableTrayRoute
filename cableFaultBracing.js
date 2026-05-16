@@ -3,6 +3,7 @@ import {
   calcPeakFactor,
 } from './analysis/cableFaultBracing.mjs';
 import { getCables } from './dataStore.mjs';
+import { showAlertModal } from './src/components/modal.js';
 import cableSizes from './data/cableSizes.json' assert { type: 'json' };
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -53,6 +54,14 @@ document.addEventListener('DOMContentLoaded', () => {
   const forceVectorsPanel  = document.getElementById('forceVectorsPanel');
   const forceVectorSvg     = document.getElementById('forceVectorSvg');
   const vectorLegend       = document.getElementById('vectorLegend');
+  const reviewModeBadge    = document.getElementById('reviewModeBadge');
+  const reviewPeakMultiplier = document.getElementById('reviewPeakMultiplier');
+  const reviewSpacingSource  = document.getElementById('reviewSpacingSource');
+  const reviewCleatInterval  = document.getElementById('reviewCleatInterval');
+  const reviewSafetyFactor   = document.getElementById('reviewSafetyFactor');
+  const reviewGuidance       = document.getElementById('reviewGuidance');
+  const actionStatus         = document.getElementById('faultBracingActionStatus');
+  const faultPresetButtons   = Array.from(document.querySelectorAll('[data-fault-preset]'));
 
   // Build a lookup map from cable size key → OD in mm (cableSizes OD is in inches)
   const odLookup = {};
@@ -62,6 +71,10 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   let unitSystem = 'metric';
+  let latestSingleResult = null;
+  let latestSingleParams = null;
+  let latestScheduleRows = [];
+  let latestScheduleParams = null;
 
   function mmToIn(mm) {
     return mm / 25.4;
@@ -69,6 +82,59 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function inToMm(inches) {
     return inches * 25.4;
+  }
+
+  function formatLength(mm, metricDigits = 1, imperialDigits = 2) {
+    return unitSystem === 'metric'
+      ? `${mm.toFixed(metricDigits)} mm`
+      : `${mmToIn(mm).toFixed(imperialDigits)} in`;
+  }
+
+  function showInputAlert(message) {
+    showAlertModal('Check Inputs', message);
+  }
+
+  function showCalculationError(message) {
+    showAlertModal('Calculation Error', message);
+  }
+
+  function setActionStatus(message) {
+    if (!actionStatus) return;
+    actionStatus.textContent = message;
+  }
+
+  async function copyText(text, successMessage) {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        const copyArea = document.createElement('textarea');
+        copyArea.value = text;
+        copyArea.setAttribute('readonly', '');
+        copyArea.style.position = 'fixed';
+        copyArea.style.opacity = '0';
+        document.body.appendChild(copyArea);
+        copyArea.select();
+        document.execCommand('copy');
+        copyArea.remove();
+      }
+      setActionStatus(successMessage);
+    } catch (err) {
+      console.error('Copy failed', err);
+      showAlertModal('Copy Failed', 'The result summary could not be copied. Select and copy the result text manually.');
+    }
+  }
+
+  function downloadText(filename, text, mimeType = 'text/plain') {
+    const blob = new Blob([text], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
   }
 
   function setLengthLabels() {
@@ -93,6 +159,7 @@ document.addEventListener('DOMContentLoaded', () => {
     unitsMetricBtn.setAttribute('aria-pressed', String(unitSystem === 'metric'));
     setLengthLabels();
     updateDerivedSpacing();
+    updateInputReview();
   }
 
   unitsImperialBtn.addEventListener('click', () => toggleUnits('imperial'));
@@ -101,11 +168,30 @@ document.addEventListener('DOMContentLoaded', () => {
   unitsMetricBtn.setAttribute('aria-pressed', 'true');
   setLengthLabels();
 
+  faultPresetButtons.forEach(button => {
+    button.addEventListener('click', () => {
+      faultCurrentInput.value = button.dataset.faultCurrent || faultCurrentInput.value;
+      xrRatioInput.value = button.dataset.xrRatio || xrRatioInput.value;
+      resultsDiv.innerHTML = '';
+      scheduleResultsDiv.innerHTML = '';
+      forceVectorsPanel.classList.add('hidden');
+      latestSingleResult = null;
+      latestSingleParams = null;
+      latestScheduleRows = [];
+      latestScheduleParams = null;
+      updateKappaPreview();
+      updateInputReview();
+      setActionStatus(`${button.textContent.trim()} preset applied.`);
+      calcBtn.focus();
+    });
+  });
+
   // ── Arrangement row visibility ───────────────────────────────────────────
   function updateArrangementVisibility() {
     const isThreePhase = systemTypeSel.value === 'three-phase';
     arrangementRow.hidden = !isThreePhase;
     forceVectorsPanel.classList.toggle('hidden', !isThreePhase || !resultsDiv.innerHTML);
+    updateInputReview();
   }
   function setArrangement(arrangement) {
     arrangementSel.value = arrangement;
@@ -114,9 +200,11 @@ document.addEventListener('DOMContentLoaded', () => {
       card.classList.toggle('active', active);
       card.setAttribute('aria-checked', String(active));
       card.setAttribute('aria-pressed', String(active));
+      card.tabIndex = active ? 0 : -1;
     });
+    updateInputReview();
   }
-  arrangementCards.forEach(card => {
+  arrangementCards.forEach((card, index) => {
     card.addEventListener('click', () => {
       setArrangement(card.dataset.arrangement);
     });
@@ -124,6 +212,21 @@ document.addEventListener('DOMContentLoaded', () => {
       if (event.key === 'Enter' || event.key === ' ') {
         event.preventDefault();
         setArrangement(card.dataset.arrangement);
+        return;
+      }
+      if (['ArrowRight', 'ArrowDown', 'ArrowLeft', 'ArrowUp', 'Home', 'End'].includes(event.key)) {
+        event.preventDefault();
+        const lastIndex = arrangementCards.length - 1;
+        const nextIndex = event.key === 'Home'
+          ? 0
+          : event.key === 'End'
+            ? lastIndex
+            : ['ArrowRight', 'ArrowDown'].includes(event.key)
+              ? (index + 1) % arrangementCards.length
+              : (index - 1 + arrangementCards.length) % arrangementCards.length;
+        const nextCard = arrangementCards[nextIndex];
+        setArrangement(nextCard.dataset.arrangement);
+        nextCard.focus();
       }
     });
   });
@@ -138,6 +241,7 @@ document.addEventListener('DOMContentLoaded', () => {
     spacingODRow.classList.toggle('hidden', !isOD);
     derivedSpacingNote.classList.toggle('hidden', !isOD);
     if (isOD) updateDerivedSpacing();
+    updateInputReview();
   }
 
   function updateDerivedSpacing() {
@@ -149,6 +253,7 @@ document.addEventListener('DOMContentLoaded', () => {
     } else {
       derivedSpacingNote.textContent = 'Enter a valid cable OD above.';
     }
+    updateInputReview();
   }
 
   spacingDirectRadio.addEventListener('change', updateSpacingMode);
@@ -174,13 +279,94 @@ document.addEventListener('DOMContentLoaded', () => {
   xrRatioInput.addEventListener('input', updateKappaPreview);
   updateKappaPreview();
 
+  [faultCurrentInput, xrRatioInput, spacingInput, cleatSpacingInput, safetyFactorInput, cleatRatingInput].forEach(input => {
+    input.addEventListener('input', updateInputReview);
+  });
+
+  function updateInputReview() {
+    const iSc = parseFloat(faultCurrentInput.value);
+    const xr = parseFloat(xrRatioInput.value);
+    const cleatSpan = parseFloat(cleatSpacingInput.value) * (unitSystem === 'metric' ? 1 : 25.4);
+    const sf = parseFloat(safetyFactorInput.value);
+    const issues = [];
+    const isSchedule = scheduleModeRadio.checked;
+
+    reviewModeBadge.textContent = isSchedule ? 'Cable Schedule' : 'Single Cable';
+
+    if (Number.isFinite(iSc) && iSc > 0 && Number.isFinite(xr) && xr >= 0) {
+      const kappa = calcPeakFactor(xr);
+      const peakMultiplier = kappa * Math.SQRT2;
+      reviewPeakMultiplier.textContent = `${peakMultiplier.toFixed(2)}x RMS (${(iSc * peakMultiplier).toFixed(2)} kA peak)`;
+    } else {
+      reviewPeakMultiplier.textContent = '-';
+      issues.push('fault current and X/R');
+    }
+
+    if (isSchedule) {
+      reviewSpacingSource.textContent = 'Cable Schedule OD or size lookup';
+    } else if (spacingFromODRadio.checked) {
+      const od = parseFloat(cableODInput.value);
+      if (Number.isFinite(od) && od > 0) {
+        const spacingMm = unitSystem === 'metric' ? od : inToMm(od);
+        reviewSpacingSource.textContent = `Cable OD (${formatLength(spacingMm)})`;
+      } else {
+        reviewSpacingSource.textContent = '-';
+        issues.push('cable OD');
+      }
+    } else {
+      const spacing = parseFloat(spacingInput.value);
+      if (Number.isFinite(spacing) && spacing > 0) {
+        const spacingMm = unitSystem === 'metric' ? spacing : inToMm(spacing);
+        reviewSpacingSource.textContent = `Direct entry (${formatLength(spacingMm)})`;
+      } else {
+        reviewSpacingSource.textContent = '-';
+        issues.push('cable spacing');
+      }
+    }
+
+    if (Number.isFinite(cleatSpan) && cleatSpan > 0) {
+      reviewCleatInterval.textContent = formatLength(cleatSpan, 0, 2);
+    } else {
+      reviewCleatInterval.textContent = '-';
+      issues.push('cleat interval');
+    }
+
+    if (Number.isFinite(sf) && sf >= 1) {
+      reviewSafetyFactor.textContent = `${sf.toFixed(1)}x`;
+    } else {
+      reviewSafetyFactor.textContent = '-';
+      issues.push('safety factor');
+    }
+
+    if (issues.length) {
+      reviewGuidance.textContent = `Resolve ${issues.join(', ')} before calculating.`;
+    } else if (isSchedule) {
+      reviewGuidance.textContent = 'Ready to evaluate the Cable Schedule. Rows without cable OD will use the size lookup first, then a flagged 50 mm assumption.';
+    } else if (cleatRatingInput.value && Number.isFinite(parseFloat(cleatRatingInput.value))) {
+      reviewGuidance.textContent = 'Ready to calculate and compare the selected cleat rating against the required IEC 61914 strength.';
+    } else {
+      reviewGuidance.textContent = 'Ready to calculate the required IEC 61914 rated cleat strength. Enter a known cleat rating if you want a pass/fail check.';
+    }
+  }
+
   // ── Evaluation mode toggle ───────────────────────────────────────────────
   function updateMode() {
     const isSingle = singleModeRadio.checked;
     scheduleSection.hidden = isSingle;
+    calcBtn.textContent = isSingle
+      ? 'Calculate Required Cleat Strength'
+      : 'Evaluate Cable Schedule';
+    calcBtn.setAttribute('aria-label', calcBtn.textContent);
+    if (loadScheduleBtn) loadScheduleBtn.hidden = true;
     resultsDiv.innerHTML = '';
     scheduleResultsDiv.innerHTML = '';
     forceVectorsPanel.classList.add('hidden');
+    latestSingleResult = null;
+    latestSingleParams = null;
+    latestScheduleRows = [];
+    latestScheduleParams = null;
+    setActionStatus('');
+    updateInputReview();
   }
   singleModeRadio.addEventListener('change', updateMode);
   scheduleModeRadio.addEventListener('change', updateMode);
@@ -197,6 +383,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // ── Single-cable calculation ─────────────────────────────────────────────
   calcBtn.addEventListener('click', () => {
+    if (scheduleModeRadio.checked) {
+      runScheduleEvaluation();
+      return;
+    }
     const iSc        = parseFloat(faultCurrentInput.value);
     const xr         = parseFloat(xrRatioInput.value);
     const sysType    = systemTypeSel.value;
@@ -207,23 +397,23 @@ document.addEventListener('DOMContentLoaded', () => {
     const knownRating = parseFloat(cleatRatingInput.value);
 
     if (!Number.isFinite(iSc) || iSc <= 0) {
-      showAlertModal('Enter a positive fault current (kA).');
+      showInputAlert('Enter a positive fault current (kA).');
       return;
     }
     if (!Number.isFinite(xr) || xr < 0) {
-      showAlertModal('Enter a non-negative X/R ratio.');
+      showInputAlert('Enter a non-negative X/R ratio.');
       return;
     }
     if (!Number.isFinite(spacing) || spacing <= 0) {
-      showAlertModal('Enter a positive cable spacing (mm).');
+      showInputAlert('Enter a positive cable spacing.');
       return;
     }
     if (!Number.isFinite(cleatSpan) || cleatSpan <= 0) {
-      showAlertModal('Enter a positive cleat spacing (mm).');
+      showInputAlert('Enter a positive cleat spacing.');
       return;
     }
     if (!Number.isFinite(sf) || sf < 1) {
-      showAlertModal('Safety factor must be ≥ 1.');
+      showInputAlert('Safety factor must be at least 1.0.');
       return;
     }
 
@@ -239,17 +429,22 @@ document.addEventListener('DOMContentLoaded', () => {
         safetyFactor:    sf,
       });
     } catch (err) {
-      showAlertModal(`Calculation error: ${err.message}`);
+      showCalculationError(err.message);
       return;
     }
 
     const userRating = Number.isFinite(knownRating) && knownRating > 0
       ? knownRating : null;
-
-    renderSingleResult(result, {
+    latestSingleResult = result;
+    latestSingleParams = {
       iSc, xr, sysType, arrg, spacing, cleatSpan, sf, userRating,
-    });
+    };
+    latestScheduleRows = [];
+    latestScheduleParams = null;
+
+    renderSingleResult(result, latestSingleParams);
     renderForceVectors(result, { sysType, arrg });
+    setActionStatus('Single-cable result updated.');
   });
 
   function renderForceVectors(result, params) {
@@ -313,12 +508,55 @@ document.addEventListener('DOMContentLoaded', () => {
                  ${r.requiredStrength_kN.toFixed(2)} kN required
                </td></tr>`;
 
-    const cardClass = adequate === false ? 'result-fail' : 'result-ok';
+    const cardClass = adequate === false
+      ? 'fault-bracing-result fault-bracing-result--fail'
+      : 'fault-bracing-result fault-bracing-result--ok';
     const configurationSvg = buildResultConfigurationSvg(r, params);
+    const decisionClass = adequate === false
+      ? 'fault-bracing-decision--fail'
+      : adequate === true
+        ? 'fault-bracing-decision--pass'
+        : 'fault-bracing-decision--info';
+    const decisionTitle = adequate === false
+      ? 'Cleat selection is undersized'
+      : adequate === true
+        ? 'Cleat selection is adequate'
+        : 'Specify this minimum cleat rating';
+    const decisionBody = adequate === false
+      ? `Select a cleat rated at least ${r.requiredStrength_kN.toFixed(2)} kN, or reduce the cleat spacing and recalculate.`
+      : adequate === true
+        ? `${params.userRating.toFixed(2)} kN rated strength meets the ${r.requiredStrength_kN.toFixed(2)} kN requirement.`
+        : `Use a cleat with an IEC 61914 rated tensile strength of at least ${r.requiredStrength_kN.toFixed(2)} kN.`;
 
     resultsDiv.innerHTML = `
       <div class="result-card ${cardClass}" role="status" aria-live="polite">
         <h2>Result</h2>
+        <div class="fault-bracing-decision ${decisionClass}">
+          <span>Decision</span>
+          <strong>${decisionTitle}</strong>
+          <p>${decisionBody}</p>
+        </div>
+        <div class="fault-bracing-kpi-grid" aria-label="Fault bracing calculation summary">
+          <div class="fault-bracing-kpi">
+            <span>Required Strength</span>
+            <strong>${r.requiredStrength_kN.toFixed(2)} kN</strong>
+          </div>
+          <div class="fault-bracing-kpi">
+            <span>Cleat Load</span>
+            <strong>${r.cleatLoad_kN.toFixed(3)} kN</strong>
+          </div>
+          <div class="fault-bracing-kpi">
+            <span>Force</span>
+            <strong>${forceDisplay}</strong>
+          </div>
+          <div class="fault-bracing-kpi">
+            <span>Peak Current</span>
+            <strong>${r.iPeak_kA.toFixed(3)} kA</strong>
+          </div>
+        </div>
+        <div class="fault-bracing-result-actions" aria-label="Result actions">
+          <button type="button" class="fault-bracing-ghost-btn" data-copy-single-result>Copy Summary</button>
+        </div>
         <table class="result-table" aria-label="Fault bracing results">
           <tbody>
             <tr><th scope="row">Peak factor κ</th>
@@ -415,10 +653,39 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // ── Schedule mode ────────────────────────────────────────────────────────
-  loadScheduleBtn.addEventListener('click', () => {
+  function parsePositiveNumber(value) {
+    const number = parseFloat(value);
+    return Number.isFinite(number) && number > 0 ? number : null;
+  }
+
+  function resolveCableSpacingFromSchedule(cable, conductors, size) {
+    const key = `${conductors}C-${size}`;
+    const explicitOd = parsePositiveNumber(cable.cable_od ?? cable.OD ?? cable.od ?? cable.diameter);
+    if (explicitOd) {
+      return {
+        spacing_mm: explicitOd * 25.4,
+        spacingSource: 'Schedule OD',
+        spacingQuality: 'schedule',
+      };
+    }
+    if (odLookup[key]) {
+      return {
+        spacing_mm: odLookup[key],
+        spacingSource: 'Size lookup',
+        spacingQuality: 'lookup',
+      };
+    }
+    return {
+      spacing_mm: 50,
+      spacingSource: 'Assumed 50 mm',
+      spacingQuality: 'assumed',
+    };
+  }
+
+  function runScheduleEvaluation() {
     const cables = getCables();
     if (!cables.length) {
-      showAlertModal('No cables found in the Cable Schedule.  Please add cables first.');
+      showAlertModal('No Cables Found', 'No cables found in the Cable Schedule. Add cables first, then return here to evaluate cleat strength.');
       return;
     }
 
@@ -428,38 +695,26 @@ document.addEventListener('DOMContentLoaded', () => {
     const sf        = parseFloat(safetyFactorInput.value);
 
     if (!Number.isFinite(iSc) || iSc <= 0) {
-      showAlertModal('Enter a positive fault current (kA).');
+      showInputAlert('Enter a positive fault current (kA).');
       return;
     }
     if (!Number.isFinite(xr) || xr < 0) {
-      showAlertModal('Enter a non-negative X/R ratio.');
+      showInputAlert('Enter a non-negative X/R ratio.');
       return;
     }
     if (!Number.isFinite(cleatSpan) || cleatSpan <= 0) {
-      showAlertModal('Enter a positive cleat spacing (mm).');
+      showInputAlert('Enter a positive cleat spacing.');
       return;
     }
     if (!Number.isFinite(sf) || sf < 1) {
-      showAlertModal('Safety factor must be ≥ 1.');
+      showInputAlert('Safety factor must be at least 1.0.');
       return;
     }
 
     const rows = cables.map(cable => {
-      // Resolve OD → spacing
       const conductors = cable.conductors != null ? String(cable.conductors) : '3';
       const size       = cable.conductor_size || cable.size || '';
-      const key        = `${conductors}C-${size}`;
-      let spacing_mm   = 0;
-
-      if (cable.cable_od != null && parseFloat(cable.cable_od) > 0) {
-        // Explicit OD on cable record (stored in inches in the schedule)
-        spacing_mm = parseFloat(cable.cable_od) * 25.4;
-      } else if (odLookup[key]) {
-        spacing_mm = odLookup[key];
-      } else {
-        spacing_mm = 50;  // fallback 50 mm when OD unknown
-      }
-
+      const spacing = resolveCableSpacingFromSchedule(cable, conductors, size);
       const sysType = (parseInt(conductors, 10) === 2) ? 'single-phase' : 'three-phase';
 
       let result = null;
@@ -470,7 +725,7 @@ document.addEventListener('DOMContentLoaded', () => {
           xrRatio:         xr,
           systemType:      sysType,
           arrangement:     'trefoil',
-          spacing_mm,
+          spacing_mm:      spacing.spacing_mm,
           cleatSpacing_mm: cleatSpan,
           safetyFactor:    sf,
         });
@@ -478,74 +733,258 @@ document.addEventListener('DOMContentLoaded', () => {
         err = e.message;
       }
 
-      return { cable, spacing_mm, sysType, result, err };
+      return { cable, conductors, size, sysType, result, err, ...spacing };
     });
 
-    renderScheduleResults(rows, { iSc, xr, cleatSpan, sf });
-  });
+    rows.sort((a, b) => {
+      const aError = a.err || !a.result ? 1 : 0;
+      const bError = b.err || !b.result ? 1 : 0;
+      if (aError !== bError) return bError - aError;
+      return (b.result?.requiredStrength_kN ?? -Infinity) - (a.result?.requiredStrength_kN ?? -Infinity);
+    });
 
-  function renderScheduleResults(rows, params) {
+    latestScheduleRows = rows;
+    latestScheduleParams = { iSc, xr, cleatSpan, sf };
+    latestSingleResult = null;
+    latestSingleParams = null;
+
+    renderScheduleResultsV2(rows, latestScheduleParams);
+    setActionStatus('Cable Schedule results updated.');
+  }
+  loadScheduleBtn.addEventListener('click', runScheduleEvaluation);
+
+  function renderScheduleResultsV2(rows, params) {
     if (!rows.length) {
       scheduleResultsDiv.innerHTML = '<p>No cables to display.</p>';
       return;
     }
 
-    const tableRows = rows.map(({ cable, spacing_mm, result, err }) => {
-      const tag  = esc(cable.tag || cable.cable_tag || '—');
-      const size = esc(cable.conductor_size || cable.size || '—');
+    const validRows = rows.filter(row => row.result && !row.err);
+    const errorCount = rows.length - validRows.length;
+    const assumedCount = rows.filter(row => row.spacingQuality === 'assumed').length;
+    const lookupCount = rows.filter(row => row.spacingQuality === 'lookup').length;
+    const maxRow = validRows[0] || null;
+    const averageRequired = validRows.length
+      ? validRows.reduce((sum, row) => sum + row.result.requiredStrength_kN, 0) / validRows.length
+      : 0;
+
+    const tableRows = rows.map(({ cable, conductors, spacing_mm, spacingSource, spacingQuality, sysType, result, err }) => {
+      const tag = esc(cable.tag || cable.cable_tag || cable.id || '-');
+      const size = esc(cable.conductor_size || cable.size || '-');
       const spacingDisplay = unitSystem === 'metric' ? spacing_mm.toFixed(1) : mmToIn(spacing_mm).toFixed(2);
       const forceDisplay = result
         ? (unitSystem === 'metric' ? result.forcePerMeter_Nm.toFixed(1) : result.forcePerMeter_lbfFt.toFixed(1))
-        : '—';
+        : '-';
+      const rowClass = err || !result
+        ? 'schedule-row--error'
+        : spacingQuality === 'assumed'
+          ? 'schedule-row--assumed'
+          : '';
+      const sourceClass = err || !result
+        ? 'schedule-source--error'
+        : spacingQuality === 'assumed'
+          ? 'schedule-source--assumed'
+          : spacingQuality === 'lookup'
+            ? 'schedule-source--lookup'
+            : '';
+      const systemLabel = sysType === 'single-phase'
+        ? `${esc(conductors)} conductor`
+        : `${esc(conductors)} conductor`;
+
       if (err || !result) {
-        return `<tr>
-          <td>${tag}</td><td>${size}</td>
-          <td>${spacing_mm > 0 ? spacingDisplay : '—'}</td>
-          <td>—</td><td>—</td>
+        return `<tr class="${rowClass}">
+          <td>${tag}</td>
+          <td>${size}</td>
+          <td>${systemLabel}</td>
+          <td>${spacing_mm > 0 ? spacingDisplay : '-'}</td>
+          <td><span class="schedule-source ${sourceClass}">${esc(spacingSource)}</span></td>
+          <td>-</td>
+          <td>-</td>
           <td class="status-badge result-fail">Error${err ? ': ' + esc(err) : ''}</td>
         </tr>`;
       }
-      return `<tr>
+
+      return `<tr class="${rowClass}">
         <td>${tag}</td>
         <td>${size}</td>
+        <td>${systemLabel}</td>
         <td>${spacingDisplay}</td>
+        <td><span class="schedule-source ${sourceClass}">${esc(spacingSource)}</span></td>
         <td>${forceDisplay}</td>
         <td>${result.cleatLoad_kN.toFixed(3)}</td>
-        <td class="status-badge result-ok">≥ ${result.requiredStrength_kN.toFixed(2)} kN</td>
+        <td class="status-badge result-ok">&ge; ${result.requiredStrength_kN.toFixed(2)} kN</td>
       </tr>`;
     }).join('');
 
+    const assumedWarning = assumedCount
+      ? `<p class="report-alert report-alert--warning">${assumedCount} cable${assumedCount === 1 ? '' : 's'} used the 50 mm fallback spacing because no Cable Schedule OD or size-library OD was available. Add cable OD values for a more defensible result.</p>`
+      : '';
+    const errorWarning = errorCount
+      ? `<p class="report-alert report-alert--error">${errorCount} cable${errorCount === 1 ? '' : 's'} could not be evaluated. Review the error row${errorCount === 1 ? '' : 's'} below.</p>`
+      : '';
+
     scheduleResultsDiv.innerHTML = `
       <h2>Cable Schedule Results</h2>
+      <div class="fault-bracing-schedule-summary" aria-label="Cable schedule bracing summary">
+        <div>
+          <span>Cables Evaluated</span>
+          <strong>${validRows.length} of ${rows.length}</strong>
+        </div>
+        <div>
+          <span>Highest Requirement</span>
+          <strong>${maxRow ? `${maxRow.result.requiredStrength_kN.toFixed(2)} kN` : '-'}</strong>
+        </div>
+        <div>
+          <span>Average Requirement</span>
+          <strong>${validRows.length ? `${averageRequired.toFixed(2)} kN` : '-'}</strong>
+        </div>
+        <div>
+          <span>OD Lookup / Fallback</span>
+          <strong>${lookupCount} / ${assumedCount}</strong>
+        </div>
+      </div>
       <p class="field-hint">
         I<sub>sc</sub> = ${params.iSc.toFixed(1)} kA, X/R = ${params.xr.toFixed(1)},
         cleat spacing = ${unitSystem === 'metric' ? `${params.cleatSpan.toFixed(0)} mm` : `${mmToIn(params.cleatSpan).toFixed(2)} in`}, SF = ${params.sf}.
-        Cable OD derived from conductor size where available; 50 mm assumed otherwise.
+        Results are sorted by required strength, highest first.
       </p>
-      <table class="result-table schedule-result-table"
-             aria-label="Cable fault bracing results">
-        <thead>
-          <tr>
-            <th scope="col">Cable Tag</th>
-            <th scope="col">Size</th>
-            <th scope="col">Spacing (${unitSystem === 'metric' ? 'mm' : 'in'})</th>
-            <th scope="col">Force (${unitSystem === 'metric' ? 'N/m' : 'lbf/ft'})</th>
-            <th scope="col">Cleat Load (kN)</th>
-            <th scope="col">Required Strength</th>
-          </tr>
-        </thead>
-        <tbody>${tableRows}</tbody>
-      </table>
+      <div class="fault-bracing-result-actions" aria-label="Schedule result actions">
+        <button type="button" class="fault-bracing-ghost-btn" data-copy-schedule-results>Copy Summary</button>
+        <button type="button" class="fault-bracing-ghost-btn" data-export-schedule-csv>Export CSV</button>
+      </div>
+      ${assumedWarning}
+      ${errorWarning}
+      <div class="fault-bracing-table-wrap">
+        <table class="result-table schedule-result-table"
+               aria-label="Cable fault bracing results">
+          <thead>
+            <tr>
+              <th scope="col">Cable Tag</th>
+              <th scope="col">Size</th>
+              <th scope="col">System</th>
+              <th scope="col">Spacing (${unitSystem === 'metric' ? 'mm' : 'in'})</th>
+              <th scope="col">Spacing Source</th>
+              <th scope="col">Force (${unitSystem === 'metric' ? 'N/m' : 'lbf/ft'})</th>
+              <th scope="col">Cleat Load (kN)</th>
+              <th scope="col">Required Strength</th>
+            </tr>
+          </thead>
+          <tbody>${tableRows}</tbody>
+        </table>
+      </div>
       <p class="method-note">
-        Forces per IEC 60909-0:2016 and Ampère's force law.
+        Forces per IEC 60909-0:2016 and Ampere's force law.
         Required strength includes IEC 61914 safety factor of ${params.sf}.
       </p>`;
   }
+
+  function formatSingleResultSummary(result, params) {
+    const ratingLine = params.userRating
+      ? `Known cleat rating: ${params.userRating.toFixed(2)} kN (${params.userRating >= result.requiredStrength_kN ? 'PASS' : 'FAIL'})`
+      : 'Known cleat rating: not entered';
+    return [
+      'Cable Fault Bracing Summary',
+      `Fault current: ${params.iSc.toFixed(1)} kA RMS`,
+      `X/R ratio: ${params.xr.toFixed(1)}`,
+      `Peak factor: ${result.peakFactor.toFixed(4)}`,
+      `Peak fault current: ${result.iPeak_kA.toFixed(3)} kA`,
+      `System: ${params.sysType === 'three-phase' ? `three-phase ${params.arrg}` : 'single-phase / DC'}`,
+      `Cable spacing: ${formatLength(params.spacing)}`,
+      `Cleat interval: ${formatLength(params.cleatSpan, 0, 2)}`,
+      `Electromagnetic force: ${result.forcePerMeter_Nm.toFixed(1)} N/m (${result.forcePerMeter_lbfFt.toFixed(1)} lbf/ft)`,
+      `Cleat load: ${result.cleatLoad_kN.toFixed(3)} kN`,
+      `Required rated cleat strength: ${result.requiredStrength_kN.toFixed(2)} kN (SF ${result.safetyFactor})`,
+      ratingLine,
+    ].join('\n');
+  }
+
+  function formatScheduleSummary(rows, params) {
+    const validRows = rows.filter(row => row.result && !row.err);
+    const assumedCount = rows.filter(row => row.spacingQuality === 'assumed').length;
+    const topRows = validRows.slice(0, 5).map((row, index) => {
+      const tag = row.cable.tag || row.cable.cable_tag || row.cable.id || '-';
+      return `${index + 1}. ${tag}: ${row.result.requiredStrength_kN.toFixed(2)} kN required (${row.spacingSource})`;
+    });
+    return [
+      'Cable Fault Bracing Schedule Summary',
+      `Fault current: ${params.iSc.toFixed(1)} kA RMS`,
+      `X/R ratio: ${params.xr.toFixed(1)}`,
+      `Cleat interval: ${formatLength(params.cleatSpan, 0, 2)}`,
+      `Safety factor: ${params.sf}`,
+      `Cables evaluated: ${validRows.length} of ${rows.length}`,
+      `Rows using assumed 50 mm spacing: ${assumedCount}`,
+      'Highest required strengths:',
+      ...(topRows.length ? topRows : ['No valid cable rows.']),
+    ].join('\n');
+  }
+
+  function csvCell(value) {
+    const text = String(value ?? '');
+    return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+  }
+
+  function buildScheduleCsv(rows) {
+    const header = [
+      'Cable Tag',
+      'Size',
+      'Conductors',
+      'System',
+      'Spacing mm',
+      'Spacing Source',
+      'Force N/m',
+      'Force lbf/ft',
+      'Cleat Load kN',
+      'Required Strength kN',
+      'Status',
+    ];
+    const lines = rows.map(row => {
+      const tag = row.cable.tag || row.cable.cable_tag || row.cable.id || '';
+      const size = row.cable.conductor_size || row.cable.size || '';
+      const status = row.err || !row.result ? `Error${row.err ? `: ${row.err}` : ''}` : 'OK';
+      return [
+        tag,
+        size,
+        row.conductors,
+        row.sysType,
+        row.spacing_mm.toFixed(1),
+        row.spacingSource,
+        row.result ? row.result.forcePerMeter_Nm.toFixed(1) : '',
+        row.result ? row.result.forcePerMeter_lbfFt.toFixed(1) : '',
+        row.result ? row.result.cleatLoad_kN.toFixed(3) : '',
+        row.result ? row.result.requiredStrength_kN.toFixed(2) : '',
+        status,
+      ].map(csvCell).join(',');
+    });
+    return [header.map(csvCell).join(','), ...lines].join('\n');
+  }
+
+  resultsDiv.addEventListener('click', event => {
+    const target = event.target;
+    if (!(target instanceof Element) || !target.closest('[data-copy-single-result]')) return;
+    if (!latestSingleResult || !latestSingleParams) return;
+    copyText(formatSingleResultSummary(latestSingleResult, latestSingleParams), 'Fault bracing summary copied.');
+  });
+
+  scheduleResultsDiv.addEventListener('click', event => {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    if (target.closest('[data-copy-schedule-results]')) {
+      if (!latestScheduleRows.length || !latestScheduleParams) return;
+      copyText(formatScheduleSummary(latestScheduleRows, latestScheduleParams), 'Schedule summary copied.');
+      return;
+    }
+    if (target.closest('[data-export-schedule-csv]')) {
+      if (!latestScheduleRows.length) return;
+      downloadText('cable-fault-bracing-results.csv', buildScheduleCsv(latestScheduleRows), 'text/csv');
+      setActionStatus('Schedule CSV exported.');
+    }
+  });
 
   function esc(s) {
     return String(s)
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;');
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
   }
 });

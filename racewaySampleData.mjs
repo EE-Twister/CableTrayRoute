@@ -30,6 +30,7 @@ export const sampleTrays = Array.from({length:17}, (_,i) => {
     inside_width: 24,
     tray_depth: 4,
     tray_type: 'Ladder (50 % fill)',
+    cover_condition: 'No Cover',
     material: 'Steel',
     allowed_cable_group: ''
   };
@@ -129,6 +130,7 @@ export function normalizeTrayRow(row){
     inside_width:['inside_width','width','Inside Width'],
     tray_depth:['tray_depth','height','Tray Depth'],
     tray_type:['tray_type','Tray Type'],
+    cover_condition:['cover_condition','coverCondition','Cover Condition','Cover','cover_type','Cover Type'],
     material:['material','Material','raceway_material','Raceway Material','tray_material','Tray Material'],
     allowed_cable_group:['allowed_cable_group','allowedGroup','Allowed Group']
   });

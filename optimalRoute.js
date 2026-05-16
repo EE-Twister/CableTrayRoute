@@ -88,6 +88,7 @@ function wireResumeTracking() {
 
 function showResumeModalForE2E() {
   if (!E2E) return;
+  if (!searchParams.has('showResume')) return;
   try {
     if (sessionStorage.getItem('resume:choice')) return;
   } catch {}
@@ -105,7 +106,7 @@ function showResumeModalForE2E() {
 
 document.addEventListener('exclusions-found', () => {
   const details = document.getElementById('route-breakdown-details');
-  if (details) details.open = true;
+  if (details) details.classList.add('has-alerts');
 });
 
 /**
@@ -165,7 +166,8 @@ function initializePage() {
   if (tourBtn) {
     tourBtn.addEventListener('click', () => startTour(OPTIMALROUTE_TOUR_STEPS, 'optimalRoute'));
   }
-  if (!hasDoneTour('optimalRoute')) {
+  const shouldAutoStartTour = new URLSearchParams(location.search).has('tour') && !hasDoneTour('optimalRoute');
+  if (shouldAutoStartTour) {
     startTour(OPTIMALROUTE_TOUR_STEPS, 'optimalRoute');
   }
 }

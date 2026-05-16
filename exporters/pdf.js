@@ -15,19 +15,32 @@ async function loadScript(url) {
   });
 }
 
-if (!window.jspdf?.jsPDF) {
-  await loadScript('dist/vendor/jspdf.umd.min.js');
-}
-const { jsPDF } = window.jspdf || {};
-if (typeof jsPDF !== 'function') {
-  throw new Error('jsPDF library is not loaded');
-}
+let pdfDependenciesPromise = null;
 
-const svg2pdfUrl = new URL('dist/vendor/svg2pdf.es.min.js', document.baseURI).href;
-const svg2pdfModule = await import(svg2pdfUrl);
-const svg2pdf = svg2pdfModule?.default || svg2pdfModule?.svg2pdf;
-if (typeof svg2pdf !== 'function') {
-  throw new Error('svg2pdf module failed to load');
+async function loadPdfDependencies() {
+  if (!pdfDependenciesPromise) {
+    pdfDependenciesPromise = (async () => {
+      if (!window.jspdf?.jsPDF) {
+        await loadScript('dist/vendor/jspdf.umd.min.js');
+      }
+      const { jsPDF } = window.jspdf || {};
+      if (typeof jsPDF !== 'function') {
+        throw new Error('jsPDF library is not loaded');
+      }
+
+      const svg2pdfUrl = new URL('dist/vendor/svg2pdf.es.min.js', document.baseURI).href;
+      const svg2pdfModule = await import(svg2pdfUrl);
+      const svg2pdf = svg2pdfModule?.default || svg2pdfModule?.svg2pdf;
+      if (typeof svg2pdf !== 'function') {
+        throw new Error('svg2pdf module failed to load');
+      }
+      return { jsPDF, svg2pdf };
+    })().catch(err => {
+      pdfDependenciesPromise = null;
+      throw err;
+    });
+  }
+  return pdfDependenciesPromise;
 }
 
 const XLINK_NS = 'http://www.w3.org/1999/xlink';
@@ -73,6 +86,7 @@ async function inlineSvgImages(svg) {
  * @param {number} opts.activeSheet Index of the currently active sheet.
  */
 export async function exportPDF({ svgEl, sheets, loadSheet, serializeDiagram, activeSheet }) {
+  const { jsPDF, svg2pdf } = await loadPdfDependencies();
   const width = svgEl.viewBox.baseVal?.width || svgEl.width.baseVal.value;
   const height = svgEl.viewBox.baseVal?.height || svgEl.height.baseVal.value;
   const pdf = new jsPDF({ orientation: width > height ? 'landscape' : 'portrait', unit: 'pt', format: [width, height] });

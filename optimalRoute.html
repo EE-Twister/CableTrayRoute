@@ -4,12 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="Landing page for configuring the optimal 3D cable routing system.">
-    <title>Optimal 3D Cable Routing — CableTrayRoute</title>
+    <title>Optimal Route Planner - CableTrayRoute</title>
     <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="icons/favicon.svg">
   <!-- Open Graph / Social sharing -->
   <meta property="og:type" content="website">
-  <meta property="og:title" content="Optimal Cable Routing — CableTrayRoute">
+  <meta property="og:title" content="Optimal Route Planner - CableTrayRoute">
   <meta property="og:description" content="Compute optimal 3D cable routes using Dijkstra pathfinding with capacity and thermal constraints.">
   <meta property="og:image" content="https://cabletrayroute.com/icons/og-preview.png">
   <meta property="og:site_name" content="CableTrayRoute">
@@ -22,6 +22,7 @@
   <link rel="dns-prefetch" href="https://fonts.gstatic.com">
   <meta name="color-scheme" content="light dark">
   <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="src/styles/routing.css?v=optimal-route-workspace">
     <script src="https://cdn.plot.ly/plotly-2.27.0.min.js" crossorigin="anonymous" defer></script>
     <script src="dist/vendor/xlsx.full.min.js" defer></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"
@@ -64,7 +65,7 @@
       })();
     </script>
 </head>
-<body data-page-visual="routing" data-report-title="Optimal Cable Route">
+<body class="optimal-route-page" data-page-visual="routing" data-report-title="Optimal Cable Route">
     <a href="#main-content" class="skip-link">Skip to main content</a>
     <nav class="top-nav" aria-label="Primary">
         <button id="sidebar-toggle" class="sidebar-toggle" aria-label="Toggle Sidebar">☰</button>
@@ -106,50 +107,34 @@
         <input type="file" id="import-project-input" accept=".ctr.json" class="hidden" title="Select project file">
     </div>
     <div class="container">
-        <aside class="sidebar">
+        <aside class="sidebar optimal-route-sidebar">
             <header>
-                <h2>Input Parameters</h2>
+                <h2>Routing Setup</h2>
+                <p class="sidebar-note">Set the routing approach, confirm the data is ready, then run the route study.</p>
             </header>
-            
-            <!-- Cable specification fields moved to the routing options card -->
-            
-            <section>
-                <h3>Routing Parameters</h3>
+
+            <section class="route-control-panel">
+                <h3>Run Setup</h3>
+
+                 <label for="route-preset">Routing Preset</label>
+                 <select id="route-preset">
+                    <option value="conservative">Conservative</option>
+                    <option value="tray-preferred">Tray Preferred</option>
+                    <option value="field-allowed">Allow Field Routes</option>
+                    <option value="high-density">High Density Review</option>
+                    <option value="custom">Custom</option>
+                 </select>
+                 <p id="route-preset-description" class="route-preset-description">Uses a 40% tray fill limit and higher field-route cost for a conservative first pass.</p>
+
                  <label for="fill-limit">Max Tray Fill (%)
                     <span class="help-icon" tabindex="0" role="button" aria-label="Help" aria-expanded="false" aria-describedby="fill-limit-help">?
                         <span id="fill-limit-help" class="tooltip">The maximum allowed fill capacity for a cable tray, based on standards like the NEC 40% rule.</span>
                     </span>
                  </label>
-                 <input type="range" id="fill-limit" min="20" max="80" value="40" step="5">
-                 <span id="fill-limit-value">40%</span>
-
-                 <label for="proximity-threshold">Tray Proximity Threshold (in)
-                    <span class="help-icon" tabindex="0" role="button" aria-label="Help" aria-expanded="false" aria-describedby="proximity-help">?
-                        <span id="proximity-help" class="tooltip">The maximum distance a cable can jump from its start or end point to connect to a nearby tray or ductbank segment.</span>
-                    </span>
-                </label>
-                <input type="number" id="proximity-threshold" value="72" min="0" step="1">
-
-                 <label for="max-field-edge">Max Field Connection Distance (in)
-                    <span class="help-icon" tabindex="0" role="button" aria-label="Help" aria-expanded="false" aria-describedby="max-field-help">?
-                        <span id="max-field-help" class="tooltip">Maximum distance between automatically generated field nodes. Increase for large networks to keep them connectable.</span>
-                    </span>
-                 </label>
-                 <input type="number" id="max-field-edge" value="1000" min="0" max="10000" step="1">
-
-                 <label for="field-route-penalty">Field Route Cost Multiplier
-                    <span class="help-icon" tabindex="0" role="button" aria-label="Help" aria-expanded="false" aria-describedby="field-penalty-help">?
-                        <span id="field-penalty-help" class="tooltip">This makes field routing (not in a tray) more expensive than routing within a tray. A value of 3 means every inch of field routing costs as much as 3 inches of tray routing, encouraging the algorithm to use trays whenever possible.</span>
-                    </span>
-                 </label>
-                 <input type="number" id="field-route-penalty" value="3.0" min="0" step="0.1">
-
-                 <label for="shared-field-penalty">Shared Field Route Cost Multiplier
-                    <span class="help-icon" tabindex="0" role="button" aria-label="Help" aria-expanded="false" aria-describedby="shared-field-help">?
-                        <span id="shared-field-help" class="tooltip">Multiplier applied when a cable uses an existing field-routed path from a previous cable. Use a value less than 1 to make shared field routes cheaper than new field routes.</span>
-                    </span>
-                 </label>
-                 <input type="number" id="shared-field-penalty" value="0.5" min="0" step="0.1">
+                 <div class="range-field">
+                    <input type="range" id="fill-limit" min="20" max="80" value="40" step="5">
+                    <span id="fill-limit-value">40%</span>
+                 </div>
 
                  <label for="conduit-type">Preferred Conduit Type</label>
                  <select id="conduit-type">
@@ -166,9 +151,42 @@
                     <option value="PVC Type A">PVC Type A</option>
                     <option value="PVC Type EB">PVC Type EB</option>
                  </select>
-                 
+
+                 <details class="advanced-routing-settings">
+                    <summary>Advanced routing settings</summary>
+
+                    <label for="proximity-threshold">Tray Proximity Threshold (in)
+                        <span class="help-icon" tabindex="0" role="button" aria-label="Help" aria-expanded="false" aria-describedby="proximity-help">?
+                            <span id="proximity-help" class="tooltip">The maximum distance a cable can jump from its start or end point to connect to a nearby tray or ductbank segment.</span>
+                        </span>
+                    </label>
+                    <input type="number" id="proximity-threshold" value="72" min="0" step="1">
+
+                    <label for="max-field-edge">Max Field Connection Distance (in)
+                        <span class="help-icon" tabindex="0" role="button" aria-label="Help" aria-expanded="false" aria-describedby="max-field-help">?
+                            <span id="max-field-help" class="tooltip">Maximum distance between automatically generated field nodes. Increase for large networks to keep them connectable.</span>
+                        </span>
+                    </label>
+                    <input type="number" id="max-field-edge" value="1000" min="0" max="10000" step="1">
+
+                    <label for="field-route-penalty">Field Route Cost Multiplier
+                        <span class="help-icon" tabindex="0" role="button" aria-label="Help" aria-expanded="false" aria-describedby="field-penalty-help">?
+                            <span id="field-penalty-help" class="tooltip">This makes field routing (not in a tray) more expensive than routing within a tray. A value of 3 means every inch of field routing costs as much as 3 inches of tray routing, encouraging the algorithm to use trays whenever possible.</span>
+                        </span>
+                    </label>
+                    <input type="number" id="field-route-penalty" value="3.0" min="0" step="0.1">
+
+                    <label for="shared-field-penalty">Shared Field Route Cost Multiplier
+                        <span class="help-icon" tabindex="0" role="button" aria-label="Help" aria-expanded="false" aria-describedby="shared-field-help">?
+                            <span id="shared-field-help" class="tooltip">Multiplier applied when a cable uses an existing field-routed path from a previous cable. Use a value less than 1 to make shared field routes cheaper than new field routes.</span>
+                        </span>
+                    </label>
+                    <input type="number" id="shared-field-penalty" value="0.5" min="0" step="0.1">
+                 </details>
+
+                 <div id="route-context" class="route-context" role="status" aria-live="polite">Add trays and cables to enable route calculation.</div>
                  <button id="tour-btn" class="btn" title="Interactive tour of this page">Take Tour</button>
-                 <button id="calculate-route-btn" class="primary-btn">▶ Calculate Optimal Route</button>
+                 <button id="calculate-route-btn" class="primary-btn">Run Routing</button>
                  <div id="progress-container" style="display:none;">
                      <div id="progress-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div>
                      <span id="progress-label"></span>
@@ -180,19 +198,19 @@
         <main id="main-content" class="main-content">
 
             <header class="page-header">
-                <h1>Optimal 3D Cable Routing System</h1>
-                <p>Find the most efficient path for routing cables through tray networks with capacity constraints.</p>
+                <h1>Optimal Route Planner</h1>
+                <p>Validate routing inputs, calculate cable paths, and review why each route was selected.</p>
                 <button id="import-cad-btn" onclick="document.getElementById('import-cad-input').click()">Import CAD</button>
                 <input type="file" id="import-cad-input" accept=".json,.ifc" style="display:none;" onchange="dataStore.importFromCad(this.files[0])">
                 <button id="export-cad-btn" onclick="dataStore.exportToCad('json')">Export CAD</button>
             </header>
             <details class="method-panel">
                 <summary>Method &amp; Assumptions</summary>
-                <p>Optimal paths are computed using Dijkstra where C = Σ w_i.</p>
+                <p>Optimal paths are computed using Dijkstra where C = &Sigma; w_i.</p>
                 <p>Variables:</p>
                 <ul>
-                    <li>w_i – weight of segment i</li>
-                    <li>C – total path cost</li>
+                    <li>w_i - weight of segment i</li>
+                    <li>C - total path cost</li>
                 </ul>
                 <p>Citations: <a href="docs/math.html">Shortest path algorithms</a></p>
                 <p>Applicability: non-negative weights and connected graphs.</p>
@@ -207,32 +225,47 @@
                 <a href="examples/ductbank_schedule_conduits.csv" download>Download sample ductbank_schedule_conduits.csv</a>
             </div>
 
-            <section class="card page-header-graphic page-visual-showcase" aria-label="Page visual overview">
-        <div class="page-visual-copy">
-          <p class="page-visual-kicker">Workspace Preview</p>
-          <h2>Routing Planner</h2>
-          <p>Coordinate endpoints and constraints to produce cleaner, field-ready cable paths.</p>
-        </div>
-        <img src="icons/graphics/routing-visual.svg" alt="Illustration for routing planner" loading="lazy" decoding="async">
-      </section>
+            <section class="card route-readiness-card" aria-labelledby="route-readiness-title">
+                <div class="route-card-heading">
+                    <div>
+                        <h2 id="route-readiness-title">Routing Readiness</h2>
+                        <p class="field-hint">This panel confirms whether the tray network and cable list are ready for calculation.</p>
+                    </div>
+                    <div id="route-readiness-status" class="route-readiness-status" role="status" aria-live="polite">Checking inputs</div>
+                </div>
+                <div id="route-readiness-panel" class="routing-readiness-panel"></div>
+                <div id="route-readiness-actions" class="route-readiness-actions"></div>
+            </section>
 
       <div id="empty-state-banner" class="card empty-state-banner" role="region" aria-label="Getting started" hidden>
         <div class="empty-state-content">
           <img src="icons/route.svg" alt="" aria-hidden="true" class="empty-state-icon">
-          <h2 class="empty-state-heading">No tray network loaded yet</h2>
-          <p class="empty-state-description">Add cable tray segments and cables below, or load the sample network to explore the routing engine.</p>
+          <h2 id="empty-state-heading" class="empty-state-heading">Start with routing data</h2>
+          <p id="empty-state-description" class="empty-state-description">Load a sample network, import from the schedules, or add trays and cables manually.</p>
           <div class="empty-state-actions">
-            <button class="btn primary-btn" onclick="document.getElementById('load-sample-trays-btn').click(); document.getElementById('load-sample-cables-btn').click();">
+            <button id="load-sample-network-btn" class="btn primary-btn">
               Load Sample Network
             </button>
+            <button id="import-schedules-btn" class="btn">Import From Schedules</button>
             <a class="btn" href="racewayschedule.html">Go to Raceway Schedule</a>
             <a class="btn" href="cableschedule.html">Go to Cable Schedule</a>
           </div>
         </div>
       </div>
 
-      <section class="card">
-                <h2>Cable Tray Network</h2>
+      <details class="card route-source-data-panel">
+        <summary>
+          <span>Source Data</span>
+          <small>Raceway network, cable list, imports, and manual overrides</small>
+        </summary>
+        <div class="route-source-data-grid">
+      <section class="route-data-card">
+                <div class="route-card-heading">
+                    <div>
+                        <h2>Cable Tray Network</h2>
+                        <p class="field-hint">Primary source should be the Raceway Schedule; manual entry remains available for quick studies.</p>
+                    </div>
+                </div>
                 <div class="table-controls">
                     <button id="load-sample-trays-btn">Load Sample Tray Network</button>
                     <div class="table-import-export">
@@ -245,8 +278,8 @@
                 </div>
 
                 <div id="manual-entry-section">
-                    <details>
-                        <summary>Add New Tray Segment</summary>
+                    <details class="advanced-entry-panel">
+                        <summary>Advanced manual tray entry</summary>
                         <div class="tray-form">
                              <input type="text" id="t-id" placeholder="Tray ID">
                              <input type="number" id="t-sx" placeholder="Start X (ft)" step="0.1">
@@ -282,7 +315,7 @@
                         </div>
                     </details>
                     <details id="manual-tray-table-details">
-                        <summary id="manual-tray-summary">Manual Cable Tray Entry Table</summary>
+                        <summary id="manual-tray-summary">Tray table</summary>
                         <input type="text" id="tray-search" class="table-search" placeholder="Filter trays">
                         <div id="manual-tray-table-container" class="table-scroll"></div>
                     </details>
@@ -294,8 +327,13 @@
                 </details>
             </section>
 
-            <section class="card">
-                <h2>Cable Routing Options</h2>
+            <section class="route-data-card">
+                <div class="route-card-heading">
+                    <div>
+                        <h2>Cable Routing Options</h2>
+                        <p class="field-hint">Import the Cable Schedule first when available; use manual rows for quick route studies.</p>
+                    </div>
+                </div>
 
                 <div id="batch-section">
                     <button id="add-cable-btn">Add Cable to List</button>
@@ -311,8 +349,8 @@
                         </div>
                         <button id="clear-cables-btn">Clear Cable List</button>
                     </div>
-                    <details id="manual-route-details">
-                        <summary>Manual Route Entry</summary>
+                    <details id="manual-route-details" class="advanced-entry-panel">
+                        <summary>Advanced manual route entry</summary>
                         <p>Use the "Manual Path" column to enter tray IDs (e.g. TR1&gt;TR2) or coordinate waypoints
                         (e.g. 0,0,0;10,0,0) for a cable. Leave blank to auto-route.</p>
                     </details>
@@ -323,44 +361,87 @@
                     </details>
                 </div>
             </section>
+        </div>
+      </details>
             
-            <section id="results-section" class="card" style="display:none;">
-                <h2>Routing Results</h2>
-                <div id="messages"></div>
-                <div id="metrics" class="columns"></div>
-                <details id="mismatched-raceways-details" style="display:none;">
-                    <summary>Mismatched Raceway Segments</summary>
-                    <ul id="mismatched-raceways-list" class="exclusions-list"></ul>
-                </details>
-                <details id="route-breakdown-details">
-                    <summary>Route Breakdown</summary>
-                    <div id="route-breakdown-container"></div>
-                </details>
-                <details id="pull-checks-details" style="display:none;">
-                    <summary>Cable Pull Checks</summary>
-                    <div id="pull-checks-container"></div>
-                </details>
-                <h3>3D Route Visualization</h3>
-                <div id="plot-3d"></div>
-                <div class="plot-controls">
-                    <button id="popout-plot-btn">Open Full Screen</button>
-                    <button id="reset-view-btn">Reset View</button>
-                    <button id="view-toggle-btn">2D View</button>
-                    <button id="export-png-btn">Export PNG</button>
-                    <button id="export-gltf-btn">Export 3D Model (.glb)</button>
-                    <label><input type="checkbox" id="ductbank-toggle" checked> Show Ductbanks</label>
-                    <label><input type="checkbox" id="heatmap-toggle"> Utilization Heatmap</label>
+            <section id="results-section" class="card route-results-card" style="display:none;">
+                <div class="route-card-heading">
+                    <div>
+                        <h2>Routing Results</h2>
+                        <p class="field-hint">Start with the decision summary, then drill into route details, pull checks, and tray utilization.</p>
+                    </div>
                 </div>
+
+                <div class="route-results-workspace">
+                    <div class="route-visual-shell">
+                        <div class="route-visual-header">
+                            <div>
+                                <h3>3D Route Visualization</h3>
+                                <p id="route-selection-status" class="field-hint">Select a route or tray row to highlight it in the model.</p>
+                            </div>
+                            <div class="route-plot-legend" aria-label="Visualization legend">
+                                <span><i class="legend-line legend-line-tray"></i>Tray route</span>
+                                <span><i class="legend-line legend-line-field"></i>Field route</span>
+                                <span><i class="legend-block legend-block-tray"></i>Tray network</span>
+                                <span><i class="legend-block legend-block-conduit"></i>Conduit</span>
+                                <span><i class="legend-dot legend-dot-start"></i>Start</span>
+                                <span><i class="legend-dot legend-dot-end"></i>End</span>
+                            </div>
+                        </div>
+                        <div id="plot-3d"></div>
+                        <div class="plot-controls">
+                            <button id="popout-plot-btn">Open Full Screen</button>
+                            <button id="reset-view-btn">Reset View</button>
+                            <button id="view-toggle-btn">2D View</button>
+                            <label><input type="checkbox" id="ductbank-toggle" checked> Show Ductbanks</label>
+                            <label><input type="checkbox" id="heatmap-toggle"> Utilization Heatmap</label>
+                        </div>
+                    </div>
+
+                    <aside class="route-review-sidebar" aria-label="Route review summary">
+                        <div id="route-summary-panel" class="route-summary-panel"></div>
+                        <div id="messages"></div>
+                        <div id="metrics" class="columns route-shared-routes"></div>
+                        <details id="mismatched-raceways-details" style="display:none;">
+                            <summary>Mismatched Raceway Segments</summary>
+                            <ul id="mismatched-raceways-list" class="exclusions-list"></ul>
+                        </details>
+                        <details id="pull-checks-details" style="display:none;">
+                            <summary>Cable Pull Checks</summary>
+                            <div id="pull-checks-container"></div>
+                        </details>
+                    </aside>
+                </div>
+
                 <details id="updated-utilization-details">
                     <summary>Updated Tray Utilization</summary>
                     <div id="updated-utilization-container"></div>
                 </details>
-                <button id="export-csv-btn">Download Route Data (XLSX)</button>
-                <button id="export-routes-btn">Export Routes</button>
-                <button id="download-bom-btn">Download BOM</button>
-                <button id="rebalance-btn">Rebalance Tray Fill</button>
-                <button id="open-fill-btn">Open Tray Fill Tool</button>
-                <button id="export-tray-fills-btn">Export Tray Fills</button>
+
+                <details id="route-breakdown-details">
+                    <summary>Route List</summary>
+                    <div id="route-breakdown-container"></div>
+                </details>
+
+                <div class="route-action-groups" aria-label="Post-route actions">
+                    <div class="route-action-group">
+                        <h3>Export</h3>
+                        <button id="export-csv-btn">Download Route Data (XLSX)</button>
+                        <button id="export-routes-btn">Export Routes</button>
+                        <button id="export-png-btn">Export PNG</button>
+                        <button id="export-gltf-btn">Export 3D Model (.glb)</button>
+                    </div>
+                    <div class="route-action-group">
+                        <h3>Analysis</h3>
+                        <button id="download-bom-btn">Download BOM</button>
+                        <button id="rebalance-btn">Rebalance Tray Fill</button>
+                    </div>
+                    <div class="route-action-group">
+                        <h3>Fill Tools</h3>
+                        <button id="open-fill-btn">Open Tray Fill Tool</button>
+                        <button id="export-tray-fills-btn">Export Tray Fills</button>
+                    </div>
+                </div>
             </section>
         </main>
     </div>
@@ -392,7 +473,6 @@
         <summary>Debug Console</summary>
         <pre id="debug-log"></pre>
     </details>
-    <script type="module" src="app.mjs"></script>
   <script type="module" src="dist/projectManager.js"></script>
 </body>
 </html>

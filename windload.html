@@ -114,8 +114,8 @@
           <li><strong>K_zt</strong> — topographic factor (1.0 flat terrain, &gt;1.0 near hilltops or ridges)</li>
           <li><strong>V</strong> — basic wind speed (mph) from ASCE 7-22 Fig. 26.5-1A (Risk Cat II)</li>
           <li><strong>G = 0.85</strong> — gust factor for rigid structures (ASCE 7-22 §26.11)</li>
-          <li><strong>C_f</strong> — force coefficient: 1.3 empty tray, 1.6 partial fill, 2.0 full/solid fill</li>
-          <li><strong>A_f</strong> — projected area = tray width (ft) × span length (ft)</li>
+          <li><strong>C_f</strong> — force coefficient from tray construction, fill condition, cover condition, or engineer override</li>
+          <li><strong>A_f</strong> — projected area = tray width (ft) × span length (ft) × optional exposed-area factor</li>
         </ul>
 
         <p>NEMA tray capacity check uses NEMA VE 1-2017 load class definitions, scaled
@@ -125,6 +125,7 @@
         <p>Citations:
           <a href="docs/standards.html">ASCE 7-22 §26 and §29</a>,
           NEMA VE 1-2017, NEMA VE 2-2006.
+          See <a href="docs/wind-load.md">Wind Load Assumptions</a> for construction and cover handling.
         </p>
         <p>See also:
           <a href="supportspan.html">Support Span Calculator</a>,
@@ -223,15 +224,61 @@
         </div>
 
         <div class="field-row">
-          <label for="fill-level">Tray Fill Level</label>
+          <label for="tray-construction">Tray Construction</label>
+          <select id="tray-construction" aria-describedby="constructionHint">
+            <option value="ladder" selected>Ladder / open rung</option>
+            <option value="ventilated">Ventilated / wire basket</option>
+            <option value="solid-bottom">Solid bottom</option>
+          </select>
+          <p id="constructionHint" class="field-hint">
+            Schedule mode infers this from each tray's Raceway Schedule type when available.
+            Solid-bottom trays are treated as flat-plate wind surfaces.
+          </p>
+        </div>
+
+        <div class="field-row">
+          <label for="fill-level">Tray Fill Condition</label>
           <select id="fill-level" aria-describedby="fillHint">
-            <option value="empty">Empty — open ladder tray (C_f = 1.3)</option>
-            <option value="partial" selected>Partially filled (C_f = 1.6)</option>
-            <option value="full">Fully filled / solid (C_f = 2.0)</option>
+            <option value="empty">Empty</option>
+            <option value="partial" selected>Partially filled</option>
+            <option value="full">Fully filled</option>
           </select>
           <p id="fillHint" class="field-hint">
-            Affects the force coefficient C_f. A fully filled or solid-bottom tray
-            acts as a flat plate; an empty ladder tray allows wind to pass through.
+            Affects the force coefficient C_f. Fully filled trays are treated as
+            solid surfaces; empty open trays allow more wind to pass through.
+          </p>
+        </div>
+
+        <div class="field-row">
+          <label for="cover-condition">Cover Condition</label>
+          <select id="cover-condition" aria-describedby="coverHint">
+            <option value="none" selected>No cover</option>
+            <option value="ventilated">Ventilated cover</option>
+            <option value="solid">Solid cover / hood</option>
+          </select>
+          <p id="coverHint" class="field-hint">
+            Solid covers make the tray behave more like a flat plate. Schedule mode
+            uses each tray's cover value when the Raceway Schedule includes one.
+          </p>
+        </div>
+
+        <div class="field-row">
+          <label for="force-coefficient-override">C<sub>f</sub> Override (optional)</label>
+          <input type="number" id="force-coefficient-override" min="0.1" max="5" step="0.01"
+                 placeholder="Auto" aria-describedby="cfOverrideHint">
+          <p id="cfOverrideHint" class="field-hint">
+            Leave blank to use the selected assumptions. Enter a project-specific
+            coefficient only when directed by manufacturer data or engineering criteria.
+          </p>
+        </div>
+
+        <div class="field-row">
+          <label for="projected-area-factor">Projected Area Factor</label>
+          <input type="number" id="projected-area-factor" min="0.1" max="5" step="0.05"
+                 value="1.00" aria-describedby="areaFactorHint">
+          <p id="areaFactorHint" class="field-hint">
+            Multiplies tray width × span for unusually exposed covers, side plates,
+            or project-specific effective area adjustments.
           </p>
         </div>
 
@@ -282,8 +329,9 @@
 
       <!-- Schedule mode section -->
       <section id="schedule-section" hidden aria-label="Schedule evaluation">
-        <p>Reads tray widths from the Raceway Schedule and cable weights from the
-        cable schedule to evaluate each tray at the wind parameters entered above.</p>
+        <p>Reads tray widths, tray type, and cover condition from the Raceway
+        Schedule where available. Cable weights come from the cable schedule.
+        Fill condition and engineering overrides use the defaults entered above.</p>
         <button type="button" id="schedule-btn">Evaluate Trays from Schedule</button>
         <div id="schedule-results" role="region" aria-live="polite"
              aria-label="Schedule wind load results"></div>
@@ -305,8 +353,9 @@
       cable tray installations per ASCE 7-22.</p>
       <p><strong>Single tray mode:</strong> enter wind parameters and tray geometry,
       then click <em>Calculate Wind Load</em>.</p>
-      <p><strong>Schedule mode:</strong> reads tray widths from the current project's
-      Raceway Schedule and evaluates every tray using the entered wind parameters.</p>
+      <p><strong>Schedule mode:</strong> reads tray widths, tray type, and cover
+      condition from the current project's Raceway Schedule where available, then
+      evaluates every tray using the entered wind parameters.</p>
       <p>Get basic wind speed V from the
       <a href="https://asce7hazardtool.online/" target="_blank" rel="noopener">ASCE 7 Hazard Tool</a>
       for your project location.</p>

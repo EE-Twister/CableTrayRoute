@@ -1,8 +1,8 @@
 {
-  "generatedAt": "2026-05-15T17:44:52.580Z",
+  "generatedAt": "2026-05-16T01:35:24.197Z",
   "summary": {
-    "testSuiteCount": 148,
-    "totalAssertions": 5964,
+    "testSuiteCount": 155,
+    "totalAssertions": 6152,
     "benchmarkCount": 6,
     "standardCount": 13
   },
@@ -433,7 +433,7 @@
       "groups": [
         "estimateDissimilarMetalsRisk"
       ],
-      "assertionCount": 6
+      "assertionCount": 49
     },
     {
       "file": "tests/ductbankSolver.test.cjs",
@@ -488,6 +488,11 @@
       "file": "tests/equipmentPersistence.test.cjs",
       "groups": [],
       "assertionCount": 2
+    },
+    {
+      "file": "tests/equipmentWorkflowCore.test.mjs",
+      "groups": [],
+      "assertionCount": 21
     },
     {
       "file": "tests/exportAllReports.test.cjs",
@@ -843,6 +848,11 @@
       "assertionCount": 1
     },
     {
+      "file": "tests/loadWorkflowCore.test.mjs",
+      "groups": [],
+      "assertionCount": 14
+    },
+    {
       "file": "tests/mccLineup.test.mjs",
       "groups": [],
       "assertionCount": 132
@@ -974,6 +984,11 @@
       "assertionCount": 13
     },
     {
+      "file": "tests/projectWorkflowCore.test.mjs",
+      "groups": [],
+      "assertionCount": 11
+    },
+    {
       "file": "tests/ptVtMetadata.test.mjs",
       "groups": [
         "ptVtMetadata"
@@ -1012,7 +1027,7 @@
     {
       "file": "tests/racewaySampleMapper.test.cjs",
       "groups": [],
-      "assertionCount": 7
+      "assertionCount": 8
     },
     {
       "file": "tests/rbac.test.mjs",
@@ -1153,6 +1168,16 @@
         "buildCableComparison — study data shape contract"
       ],
       "assertionCount": 43
+    },
+    {
+      "file": "tests/scheduleReconcile.test.mjs",
+      "groups": [],
+      "assertionCount": 16
+    },
+    {
+      "file": "tests/scheduleWorkflow.test.mjs",
+      "groups": [],
+      "assertionCount": 35
     },
     {
       "file": "tests/seismicBracing.test.mjs",
@@ -1493,11 +1518,22 @@
         "calcKz — velocity pressure exposure coefficient",
         "calcVelocityPressure — q_z",
         "trayForceCf",
+        "trayWindProfile",
         "calcWindForce",
         "checkNemaCapacity",
         "NEMA_LOAD_CLASSES"
       ],
-      "assertionCount": 35
+      "assertionCount": 55
+    },
+    {
+      "file": "tests/workflowCoreSample.test.mjs",
+      "groups": [],
+      "assertionCount": 16
+    },
+    {
+      "file": "tests/workflowStatus.test.mjs",
+      "groups": [],
+      "assertionCount": 11
     },
     {
       "file": "analysis/loadFlow.idealTie.test.mjs",

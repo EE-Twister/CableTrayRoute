@@ -36,6 +36,12 @@ window.E2E = E2E;
 import { emitAsync } from './utils/safeEvents.mjs';
 import { fetchDataFile } from './src/fetchUtils.mjs';
 import { showAlertModal } from './src/components/modal.js';
+import { createDirtyTracker } from './dirtyTracker.js';
+import {
+    buildRoutingReadinessDiagnostics,
+    cableHasRoutingCoordinates,
+    getCableAssignedRacewayIds
+} from './analysis/scheduleWorkflow.mjs';
 
 /**
  * Escape a string for safe insertion into HTML content or attributes.
@@ -220,6 +226,17 @@ async function initializeApp() {
     const elements = {
         fillLimitIn: document.getElementById('fill-limit'),
         fillLimitOut: document.getElementById('fill-limit-value'),
+        routePreset: document.getElementById('route-preset'),
+        routePresetDescription: document.getElementById('route-preset-description'),
+        routeContext: document.getElementById('route-context'),
+        routeReadinessPanel: document.getElementById('route-readiness-panel'),
+        routeReadinessStatus: document.getElementById('route-readiness-status'),
+        routeReadinessActions: document.getElementById('route-readiness-actions'),
+        emptyStateBanner: document.getElementById('empty-state-banner'),
+        emptyStateHeading: document.getElementById('empty-state-heading'),
+        emptyStateDescription: document.getElementById('empty-state-description'),
+        loadSampleNetworkBtn: document.getElementById('load-sample-network-btn'),
+        importSchedulesBtn: document.getElementById('import-schedules-btn'),
         calculateBtn: document.getElementById('calculate-route-btn'),
         loadSampleTraysBtn: document.getElementById('load-sample-trays-btn'),
         batchSection: document.getElementById('batch-section'),
@@ -240,9 +257,11 @@ async function initializeApp() {
         importCablesBtn: document.getElementById('import-cables-btn'),
         downloadCablesTemplateBtn: document.getElementById('download-cables-template-btn'),
         resultsSection: document.getElementById('results-section'),
+        routeSummaryPanel: document.getElementById('route-summary-panel'),
         messages: document.getElementById('messages'),
         metrics: document.getElementById('metrics'),
         routeBreakdownContainer: document.getElementById('route-breakdown-container'),
+        routeBreakdownDetails: document.getElementById('route-breakdown-details'),
         pullChecksContainer: document.getElementById('pull-checks-container'),
         pullChecksDetails: document.getElementById('pull-checks-details'),
         mismatchedRacewaysDetails: document.getElementById('mismatched-raceways-details'),
@@ -255,7 +274,9 @@ async function initializeApp() {
         exportGltfBtn: document.getElementById('export-gltf-btn'),
         ductbankToggle: document.getElementById('ductbank-toggle'),
         heatmapToggle: document.getElementById('heatmap-toggle'),
+        routeSelectionStatus: document.getElementById('route-selection-status'),
         updatedUtilizationContainer: document.getElementById('updated-utilization-container'),
+        updatedUtilizationDetails: document.getElementById('updated-utilization-details'),
         exportCsvBtn: document.getElementById('export-csv-btn'),
         exportRoutesBtn: document.getElementById('export-routes-btn'),
         downloadBomBtn: document.getElementById('download-bom-btn'),
@@ -572,6 +593,9 @@ async function initializeApp() {
             elements.cableListSummary.textContent =
                 `Cables to Route Table (${state.cableList.length})`;
         }
+        if (typeof updateRoutingReadiness === 'function') {
+            updateRoutingReadiness();
+        }
     };
 
     const syncManualPath = cable => {
@@ -599,10 +623,18 @@ async function initializeApp() {
                 cableList: state.cableList,
                 darkMode: document.body.classList.contains('dark-mode'),
                 conduitType: elements.conduitType ? elements.conduitType.value : 'EMT',
+                routePreset: elements.routePreset ? elements.routePreset.value : 'conservative',
+                fillLimit: parseFloat(elements.fillLimitIn?.value) || 40,
                 proximityThreshold: parseFloat(document.getElementById('proximity-threshold')?.value) || 72,
+                maxFieldEdge: parseFloat(document.getElementById('max-field-edge')?.value) || 1000,
+                fieldPenalty: parseFloat(document.getElementById('field-route-penalty')?.value) || 3,
+                sharedPenalty: parseFloat(document.getElementById('shared-field-penalty')?.value) || 0.5,
                 includeDuctbankOutlines: state.includeDuctbankOutlines,
             };
             setItem('ctrSession', data);
+            if (typeof updateRoutingReadiness === 'function') {
+                updateRoutingReadiness();
+            }
         } catch (e) {
             console.error('Failed to save session', e);
         }
@@ -619,9 +651,32 @@ async function initializeApp() {
                 if (data.conduitType && elements.conduitType) {
                     elements.conduitType.value = data.conduitType;
                 }
+                if (data.routePreset && elements.routePreset) {
+                    elements.routePreset.value = data.routePreset;
+                }
+                if (data.fillLimit !== undefined && elements.fillLimitIn) {
+                    elements.fillLimitIn.value = data.fillLimit;
+                    updateFillLimitDisplay();
+                }
                 const prox = document.getElementById('proximity-threshold');
                 if (prox && data.proximityThreshold !== undefined) {
                     prox.value = data.proximityThreshold;
+                }
+                const maxField = document.getElementById('max-field-edge');
+                if (maxField && data.maxFieldEdge !== undefined) {
+                    maxField.value = data.maxFieldEdge;
+                }
+                const fieldPenalty = document.getElementById('field-route-penalty');
+                if (fieldPenalty && data.fieldPenalty !== undefined) {
+                    fieldPenalty.value = data.fieldPenalty;
+                }
+                const sharedPenalty = document.getElementById('shared-field-penalty');
+                if (sharedPenalty && data.sharedPenalty !== undefined) {
+                    sharedPenalty.value = data.sharedPenalty;
+                }
+                if (elements.routePresetDescription && elements.routePreset) {
+                    const preset = ROUTE_PRESETS[elements.routePreset.value] || ROUTE_PRESETS.custom;
+                    elements.routePresetDescription.textContent = preset.description;
                 }
                 if (data.includeDuctbankOutlines !== undefined) {
                     state.includeDuctbankOutlines = !!data.includeDuctbankOutlines;
@@ -961,6 +1016,9 @@ async function initializeApp() {
         );
         if (typeof displayConduitCount === 'function') {
             displayConduitCount(conduitCount, hasSchedule);
+        }
+        if (typeof updateRoutingReadiness === 'function') {
+            updateRoutingReadiness();
         }
     };
 
@@ -1906,8 +1964,264 @@ async function initializeApp() {
         return cables;
     };
 
+    const ROUTE_PRESETS = {
+        conservative: {
+            label: 'Conservative',
+            fillLimit: 40,
+            proximityThreshold: 72,
+            maxFieldEdge: 1000,
+            fieldPenalty: 4,
+            sharedPenalty: 0.7,
+            description: 'Uses a 40% tray fill limit and higher field-route cost for a conservative first pass.'
+        },
+        'tray-preferred': {
+            label: 'Tray Preferred',
+            fillLimit: 45,
+            proximityThreshold: 72,
+            maxFieldEdge: 1000,
+            fieldPenalty: 6,
+            sharedPenalty: 0.8,
+            description: 'Strongly favors existing trays and conduits before accepting field-routed connections.'
+        },
+        'field-allowed': {
+            label: 'Allow Field Routes',
+            fillLimit: 50,
+            proximityThreshold: 120,
+            maxFieldEdge: 1500,
+            fieldPenalty: 1.8,
+            sharedPenalty: 0.45,
+            description: 'Allows longer endpoint jumps and lower field-route cost when tray coverage is incomplete.'
+        },
+        'high-density': {
+            label: 'High Density Review',
+            fillLimit: 70,
+            proximityThreshold: 96,
+            maxFieldEdge: 1200,
+            fieldPenalty: 3,
+            sharedPenalty: 0.55,
+            description: 'Raises the fill limit for what-if studies and highlights trays that need follow-up review.'
+        },
+        custom: {
+            label: 'Custom',
+            description: 'Uses the current routing values without applying a preset.'
+        }
+    };
+
+    let applyingRoutePreset = false;
+
     const updateFillLimitDisplay = () => {
         elements.fillLimitOut.textContent = `${elements.fillLimitIn.value}%`;
+    };
+
+    const setNumberInputValue = (id, value) => {
+        const input = document.getElementById(id);
+        if (input) input.value = value;
+    };
+
+    const applyRoutePreset = (presetKey) => {
+        const preset = ROUTE_PRESETS[presetKey] || ROUTE_PRESETS.custom;
+        if (elements.routePresetDescription) {
+            elements.routePresetDescription.textContent = preset.description;
+        }
+        if (presetKey === 'custom') {
+            updateRoutingReadiness();
+            saveSession();
+            return;
+        }
+        applyingRoutePreset = true;
+        elements.fillLimitIn.value = preset.fillLimit;
+        setNumberInputValue('proximity-threshold', preset.proximityThreshold);
+        setNumberInputValue('max-field-edge', preset.maxFieldEdge);
+        setNumberInputValue('field-route-penalty', preset.fieldPenalty);
+        setNumberInputValue('shared-field-penalty', preset.sharedPenalty);
+        updateFillLimitDisplay();
+        applyingRoutePreset = false;
+        updateRoutingReadiness();
+        saveSession();
+    };
+
+    const markCustomPreset = () => {
+        if (applyingRoutePreset || !elements.routePreset) return;
+        elements.routePreset.value = 'custom';
+        if (elements.routePresetDescription) {
+            elements.routePresetDescription.textContent = ROUTE_PRESETS.custom.description;
+        }
+    };
+
+    const getRoutingCounts = () => {
+        const trays = state.trayData.filter(t => (t.raceway_type || 'tray') === 'tray');
+        const conduits = state.trayData.filter(t => t.raceway_type === 'conduit');
+        const ductbanks = state.ductbankData?.ductbanks || [];
+        const routableSegments = state.trayData.filter(t => t.raceway_type !== 'ductbank');
+        return {
+            trays,
+            conduits,
+            ductbanks,
+            routableSegments,
+            cables: state.cableList || []
+        };
+    };
+
+    const getDuplicateIds = (rows) => {
+        const seen = new Set();
+        const dupes = new Set();
+        rows.forEach(row => {
+            const id = String(row.tray_id || '').trim();
+            if (!id) return;
+            if (seen.has(id)) dupes.add(id);
+            seen.add(id);
+        });
+        return Array.from(dupes);
+    };
+
+    const hasValidRouteGeometry = (row) => {
+        const nums = ['start_x', 'start_y', 'start_z', 'end_x', 'end_y', 'end_z', 'width', 'height']
+            .map(key => parseFloat(row[key]));
+        return nums.every(Number.isFinite) && nums[6] > 0 && nums[7] > 0;
+    };
+
+    const getGroupWarnings = (trays, cables) => {
+        const trayGroups = new Set(trays.map(t => String(t.allowed_cable_group || '').trim()).filter(Boolean));
+        const hasOpenTray = trays.some(t => !String(t.allowed_cable_group || '').trim());
+        if (hasOpenTray || trayGroups.size === 0) return [];
+        const cableGroups = new Set(cables.map(c => String(c.allowed_cable_group || '').trim()).filter(Boolean));
+        return Array.from(cableGroups).filter(group => !trayGroups.has(group));
+    };
+
+    const getFillWarnings = (trays) => {
+        const fillLimit = parseFloat(elements.fillLimitIn.value) / 100;
+        return trays.filter(tray => {
+            const max = (parseFloat(tray.width) || 0) * (parseFloat(tray.height) || 0) * fillLimit;
+            return max > 0 && (parseFloat(tray.current_fill) || 0) > max;
+        });
+    };
+
+    const getRoutingReadiness = () => {
+        const counts = getRoutingCounts();
+        const duplicateIds = getDuplicateIds(counts.routableSegments);
+        const missingGeometry = counts.routableSegments.filter(row => !hasValidRouteGeometry(row));
+        const groupWarnings = getGroupWarnings(counts.routableSegments, counts.cables);
+        const overLimit = getFillWarnings(counts.trays);
+        const geometryWarnings = [
+            ...(state.geometryWarnings?.ductbanks || []),
+            ...(state.geometryWarnings?.conduits || [])
+        ];
+        const diagnostics = buildRoutingReadinessDiagnostics({
+            cables: counts.cables,
+            trays: counts.trays,
+            conduits: counts.conduits,
+            ductbanks: counts.ductbanks
+        });
+        const blocking = [];
+        const warnings = [];
+        if (counts.routableSegments.length === 0) blocking.push('Add or import at least one tray, conduit, or ductbank conduit.');
+        if (counts.cables.length === 0) blocking.push('Add or import at least one cable.');
+        if (counts.cables.length && diagnostics.coordinateReady === 0) blocking.push('Add start/end XYZ coordinates for at least one cable before running routing.');
+        if (missingGeometry.length) blocking.push(`${missingGeometry.length} raceway segment(s) need valid geometry.`);
+        if (duplicateIds.length) blocking.push(`${duplicateIds.length} duplicate raceway ID(s) need unique names.`);
+        if (diagnostics.invalidAssignedRefs.length) blocking.push(`${diagnostics.invalidAssignedRefs.length} cable raceway assignment(s) do not match the Raceway Schedule.`);
+        if (diagnostics.cableSummary.missingSchedule) warnings.push(`${diagnostics.cableSummary.missingSchedule} cable row(s) are not schedule-ready.`);
+        if (diagnostics.cableSummary.missingRaceway) warnings.push(`${diagnostics.cableSummary.missingRaceway} schedule-ready cable row(s) need raceway assignments.`);
+        if (diagnostics.coordinateReady > 0 && diagnostics.coordinateReady < diagnostics.cableSummary.total) {
+            warnings.push(`${diagnostics.cableSummary.total - diagnostics.coordinateReady} cable row(s) are missing start/end coordinates for auto-routing.`);
+        }
+        if (groupWarnings.length) warnings.push(`No matching raceway group for ${groupWarnings.join(', ')}.`);
+        if (overLimit.length) warnings.push(`${overLimit.length} tray(s) already exceed the selected fill limit.`);
+        if (geometryWarnings.length) warnings.push(`${geometryWarnings.length} ductbank/conduit geometry warning(s) were found.`);
+        return {
+            ...counts,
+            diagnostics,
+            duplicateIds,
+            missingGeometry,
+            groupWarnings,
+            overLimit,
+            geometryWarnings,
+            blocking,
+            warnings,
+            ready: blocking.length === 0
+        };
+    };
+
+    const readinessItem = (value, label, status = '') => `
+        <div class="readiness-item ${status}">
+            <span class="readiness-value">${escapeHtml(value)}</span>
+            <span class="readiness-label">${escapeHtml(label)}</span>
+        </div>
+    `;
+
+    const updateEmptyStateBanner = () => {
+        if (!elements.emptyStateBanner) return;
+        const readiness = getRoutingReadiness();
+        const noRaceways = readiness.routableSegments.length === 0;
+        const noCables = readiness.cables.length === 0;
+        elements.emptyStateBanner.hidden = !(noRaceways || noCables);
+        if (!elements.emptyStateBanner.hidden) {
+            if (noRaceways && noCables) {
+                elements.emptyStateHeading.textContent = 'Start with routing data';
+                elements.emptyStateDescription.textContent = 'Load a sample network, import from the schedules, or add trays and cables manually.';
+            } else if (noRaceways) {
+                elements.emptyStateHeading.textContent = 'Raceway network needed';
+                elements.emptyStateDescription.textContent = 'Import the Raceway Schedule or add tray/conduit geometry before running routes.';
+            } else {
+                elements.emptyStateHeading.textContent = 'Cable list needed';
+                elements.emptyStateDescription.textContent = 'Import the Cable Schedule or add cables before running the routing calculation.';
+            }
+        }
+    };
+
+    const updateRoutingReadiness = () => {
+        const readiness = getRoutingReadiness();
+        if (elements.routeReadinessPanel) {
+            elements.routeReadinessPanel.classList.toggle('is-ready', readiness.ready && readiness.warnings.length === 0);
+            elements.routeReadinessPanel.classList.toggle('has-warnings', readiness.warnings.length > 0 || readiness.blocking.length > 0);
+            elements.routeReadinessPanel.innerHTML = [
+                readinessItem(readiness.cables.length, 'Cable rows', readiness.cables.length ? 'readiness-ready' : 'readiness-warning'),
+                readinessItem(readiness.diagnostics.cableSummary.scheduleReady, 'Schedule-ready', readiness.diagnostics.cableSummary.scheduleReady ? 'readiness-ready' : 'readiness-warning'),
+                readinessItem(readiness.diagnostics.cableSummary.routingReady, 'Routing-ready', readiness.diagnostics.cableSummary.routingReady ? 'readiness-ready' : 'readiness-warning'),
+                readinessItem(readiness.diagnostics.coordinateReady, 'Coordinate-ready', readiness.diagnostics.coordinateReady ? 'readiness-ready' : 'readiness-warning'),
+                readinessItem(readiness.routableSegments.length, 'Raceway segments', readiness.routableSegments.length ? 'readiness-ready' : 'readiness-warning'),
+                readinessItem(readiness.diagnostics.invalidAssignedRefs.length, 'Invalid assignments', readiness.diagnostics.invalidAssignedRefs.length ? 'readiness-warning' : 'readiness-ready'),
+                readinessItem(readiness.missingGeometry.length, 'Geometry issues', readiness.missingGeometry.length ? 'readiness-warning' : 'readiness-ready'),
+                readinessItem(readiness.overLimit.length, 'Fill warnings', readiness.overLimit.length ? 'readiness-warning' : 'readiness-ready')
+            ].join('');
+        }
+        if (elements.routeReadinessStatus) {
+            elements.routeReadinessStatus.textContent = readiness.ready
+                ? (readiness.warnings.length ? 'Ready with warnings' : 'Ready to route')
+                : 'Needs input';
+            elements.routeReadinessStatus.className = `route-readiness-status ${readiness.ready ? 'is-ready' : 'is-blocked'} ${readiness.warnings.length ? 'has-warnings' : ''}`;
+        }
+        if (elements.routeReadinessActions) {
+            const next = readiness.diagnostics.nextAction;
+            const notes = [...readiness.blocking, ...readiness.warnings];
+            const invalidRows = readiness.diagnostics.invalidAssignedRefs.slice(0, 4)
+                .map(item => `<li>${escapeHtml(item.cable)} references ${escapeHtml(item.raceway)}</li>`)
+                .join('');
+            elements.routeReadinessActions.innerHTML = `
+                <div class="route-next-actions">
+                    <strong>${escapeHtml(next.label)}</strong>
+                    <p>${escapeHtml(next.detail)}</p>
+                    ${next.href && isSafeUrl(next.href) ? `<a class="btn btn-sm" href="${escapeAttr(next.href)}">Open Step</a>` : ''}
+                </div>
+                ${notes.length ? `<ul>${notes.map(note => `<li>${escapeHtml(note)}</li>`).join('')}</ul>` : '<p>All required route inputs are available.</p>'}
+                ${invalidRows ? `<details class="route-invalid-assignment-details"><summary>Invalid raceway references</summary><ul>${invalidRows}</ul></details>` : ''}
+            `;
+        }
+        if (elements.routeContext) {
+            elements.routeContext.textContent = readiness.ready
+                ? `${readiness.diagnostics.coordinateReady} coordinate-ready cable(s), ${readiness.diagnostics.cableSummary.routingReady} routing-ready schedule row(s), ${readiness.routableSegments.length} routable segment(s).`
+                : readiness.blocking[0] || 'Add trays and cables to enable route calculation.';
+        }
+        if (elements.calculateBtn) {
+            elements.calculateBtn.disabled = !readiness.ready && !E2E;
+            elements.calculateBtn.setAttribute('aria-disabled', readiness.ready ? 'false' : 'true');
+            elements.calculateBtn.textContent = readiness.ready
+                ? `Route ${readiness.cables.length} Cable${readiness.cables.length === 1 ? '' : 's'}`
+                : 'Run Routing';
+            elements.calculateBtn.title = readiness.ready ? 'Run optimal route calculation' : readiness.blocking.join(' ');
+        }
+        updateEmptyStateBanner();
+        return readiness;
     };
 
     const renderTable = (container, headers, data, styleFn = null, formatters = {}) => {
@@ -2007,6 +2321,22 @@ async function initializeApp() {
         elements.trayUtilizationContainer.querySelectorAll('.fill-btn').forEach(btn => {
             btn.addEventListener('click', () => openTrayFill(btn.dataset.tray));
         });
+        elements.trayUtilizationContainer.querySelectorAll('tbody tr').forEach(row => {
+            const trayId = row.querySelector('.fill-btn')?.dataset.tray || row.cells?.[0]?.textContent?.trim();
+            if (!trayId) return;
+            row.dataset.trayId = trayId;
+            row.tabIndex = 0;
+            row.classList.add('interactive-row');
+            row.addEventListener('click', event => {
+                if (event.target.closest('button, a, input, select')) return;
+                highlightTraySegment(trayId);
+            });
+            row.addEventListener('keydown', event => {
+                if (event.key !== 'Enter' && event.key !== ' ') return;
+                event.preventDefault();
+                highlightTraySegment(trayId);
+            });
+        });
     };
 
 const openTrayFill = (trayId) => {
@@ -2059,31 +2389,61 @@ const openDuctbankRoute = (dbId, conduitId) => {
     window.open('ductbankroute.html', '_blank');
 };
 
+ const buildUtilizationRows = (utilization, baseTrays = state.trayData) => {
+     const fillLimit = parseFloat(elements.fillLimitIn.value) / 100;
+     const baseById = new Map((baseTrays || []).map(tray => [tray.tray_id, tray]));
+     return Object.entries(utilization || {}).map(([id, data]) => {
+         const base = baseById.get(id);
+         const baseMax = base
+             ? (parseFloat(base.width) || 0) * (parseFloat(base.height) || 0) * fillLimit
+             : data.max_fill;
+         const beforeFill = base ? (parseFloat(base.current_fill) || 0) : 0;
+         const beforePct = baseMax ? (beforeFill / baseMax) * 100 : 0;
+         const afterPct = Number(data.utilization_percentage) || 0;
+         return {
+             tray_id: id,
+             before_pct: beforePct,
+             full_pct: afterPct,
+             delta_pct: afterPct - beforePct,
+             available: Number(data.available_capacity || 0).toFixed(2),
+             utilization: afterPct.toFixed(1),
+             fill: `<button class="fill-btn" data-tray="${escapeAttr(id)}">Open</button>`
+         };
+     });
+ };
+
  const renderUpdatedUtilizationTable = () => {
      if (!state.updatedUtilData || state.updatedUtilData.length === 0) {
          elements.updatedUtilizationContainer.innerHTML = '';
          return;
      }
-     const fillLimit = parseFloat(elements.fillLimitIn.value) / 100;
-     const fillLimitPct = fillLimit * 100;
+     const renderUtilBar = (val) => {
+         const pct = Math.max(0, Math.min(Number(val) || 0, 100));
+         const color = pct > 80 ? 'var(--error-bg)' : pct > 60 ? 'var(--warning-bg)' : 'var(--success-bg)';
+         return `
+             <div class="util-bar">
+                 <div class="util-bar-fill" style="width:${pct.toFixed(1)}%; background-color:${color};"></div>
+                 <div class="util-bar-marker" style="left:100%;"></div>
+             </div>
+             <span class="util-label">${pct.toFixed(1)}%</span>
+         `;
+     };
      const formatters = {
-         full_pct: (val) => {
-             const pct = Math.min(val, 100).toFixed(1);
-             const color = val > 80 ? 'var(--error-bg)' : val > 60 ? 'var(--warning-bg)' : 'var(--success-bg)';
-             return `
-                 <div class="util-bar">
-                     <div class="util-bar-fill" style="width:${pct}%; background-color:${color};"></div>
-                     <div class="util-bar-marker" style="left:${fillLimitPct}%;"></div>
-                 </div>
-                 <span class="util-label">${pct}%</span>
-             `;
+         before_pct: renderUtilBar,
+         full_pct: renderUtilBar,
+         delta_pct: (val) => {
+             const delta = Number(val) || 0;
+             const sign = delta > 0 ? '+' : '';
+             return `<span class="${delta > 0 ? 'route-delta-positive' : 'route-delta-neutral'}">${sign}${delta.toFixed(1)}%</span>`;
          }
      };
      renderTable(
          elements.updatedUtilizationContainer,
          [
              { label: 'Tray ID', key: 'tray_id' },
-             { label: 'Utilization', key: 'full_pct' },
+             { label: 'Before', key: 'before_pct' },
+             { label: 'After', key: 'full_pct' },
+             { label: 'Delta', key: 'delta_pct' },
              { label: 'Available (in²)', key: 'available' },
              { label: 'Tray Fill', key: 'fill' }
          ],
@@ -2094,7 +2454,24 @@ const openDuctbankRoute = (dbId, conduitId) => {
      elements.updatedUtilizationContainer.querySelectorAll('.fill-btn').forEach(btn => {
          btn.addEventListener('click', () => openTrayFill(btn.dataset.tray));
      });
+     elements.updatedUtilizationContainer.querySelectorAll('tbody tr').forEach((row, index) => {
+         const trayId = state.updatedUtilData[index]?.tray_id;
+         if (!trayId) return;
+         row.dataset.trayId = trayId;
+         row.tabIndex = 0;
+         row.classList.add('interactive-row');
+         row.addEventListener('click', event => {
+             if (event.target.closest('button, a, input, select')) return;
+             highlightTraySegment(trayId);
+         });
+         row.addEventListener('keydown', event => {
+             if (event.key !== 'Enter' && event.key !== ' ') return;
+             event.preventDefault();
+             highlightTraySegment(trayId);
+         });
+     });
      addSortHandlers(elements.updatedUtilizationContainer, state.updatedUtilData, renderUpdatedUtilizationTable, updatedUtilSort);
+     renderRouteSummaryPanel(state.latestRouteData);
  };
     
     
@@ -2151,7 +2528,7 @@ const openDuctbankRoute = (dbId, conduitId) => {
             updateTableCounts();
             return;
         }
-        let table = '<table class="sticky-table"><thead><tr>' +
+        let table = '<table id="trayTable" class="sticky-table"><thead><tr>' +
             '<th data-key="tray_id">Tray ID</th>' +
             '<th data-key="start_x">Start (X,Y,Z)</th>' +
             '<th data-key="end_x">End (X,Y,Z)</th>' +
@@ -2416,6 +2793,127 @@ const openDuctbankRoute = (dbId, conduitId) => {
     const downloadTraySample=()=>downloadSampleTemplate(trayTemplateHeaders,'tray_list_template.xlsx');
 const downloadCableSample=()=>downloadSampleTemplate(cableTemplateHeaders,'cable_options_template.xlsx');
 
+const isRoutedResult = (result) => {
+    return !!result && String(result.status || '').toLowerCase().includes('routed');
+};
+
+const formatRouteDistance = (value) => {
+    const num = Number(value);
+    if (!Number.isFinite(num)) return 'N/A';
+    const fmt = globalThis.units?.formatDistance || (v => `${v.toFixed(2)} ft`);
+    return fmt(num);
+};
+
+const getRejectedReasonCounts = (results = []) => {
+    const counts = {};
+    results.forEach(result => {
+        (result.exclusions || []).forEach(exclusion => {
+            if (!exclusion.reason) return;
+            counts[exclusion.reason] = (counts[exclusion.reason] || 0) + 1;
+        });
+        (result.mismatched_records || []).forEach(record => {
+            const reason = record.reason || 'mismatched raceway';
+            counts[reason] = (counts[reason] || 0) + 1;
+        });
+    });
+    return counts;
+};
+
+const routeIssueAdvice = (result) => {
+    if (isRoutedResult(result)) return [];
+    const reasons = new Set([
+        ...(result.exclusions || []).map(ex => ex.reason).filter(Boolean),
+        ...(result.mismatched_records || []).map(record => record.reason).filter(Boolean)
+    ]);
+    const advice = [];
+    const matchingCable = state.cableList.find(cable => {
+        const tag = cable.name || cable.tag || cable.id || cable.ref;
+        return String(tag || '') === String(result.cable || '');
+    });
+    if (matchingCable && !cableHasRoutingCoordinates(matchingCable)) {
+        advice.push('Add start/end XYZ coordinates for this cable, then rerun routing.');
+    }
+    if (matchingCable) {
+        const readiness = getRoutingReadiness();
+        const assignedRefs = new Set(getCableAssignedRacewayIds(matchingCable));
+        const invalidRefs = readiness.diagnostics.invalidAssignedRefs
+            .filter(item => item.cable === (matchingCable.name || matchingCable.tag || matchingCable.id || matchingCable.ref || '(untagged cable)') && assignedRefs.has(item.raceway))
+            .map(item => item.raceway);
+        if (invalidRefs.length) {
+            advice.push(`Confirm raceway assignment(s) ${invalidRefs.join(', ')} exist in the Raceway Schedule.`);
+        }
+    }
+    if ([...reasons].some(reason => /fill|capacity/i.test(reason))) {
+        advice.push('Review tray fill or lower the cable group density before rerouting.');
+    }
+    if ([...reasons].some(reason => /group|segregation|mismatch/i.test(reason))) {
+        advice.push('Check allowed cable group values in the cable and raceway schedules.');
+    }
+    if (result.total_length === 'N/A' || reasons.size === 0) {
+        advice.push('Check that start/end coordinates are near the tray network or increase the proximity threshold.');
+    }
+    return advice;
+};
+
+const buildRouteExplanation = (result) => {
+    if (!result) return '';
+    const points = [];
+    if (isRoutedResult(result)) {
+        const trayCount = Number(result.tray_segments_count) || 0;
+        const fieldLength = Number(result.field_length) || 0;
+        points.push(`${escapeHtml(result.mode || 'Automatic')} route selected using ${trayCount} tray/conduit segment${trayCount === 1 ? '' : 's'}.`);
+        if (fieldLength > 0) {
+            points.push(`${escapeHtml(formatRouteDistance(fieldLength))} of field routing was used for endpoint jumps or network gaps.`);
+        } else {
+            points.push('No field routing was needed for this cable.');
+        }
+        if ((result.exclusions || []).length) {
+            points.push(`${result.exclusions.length} candidate segment${result.exclusions.length === 1 ? '' : 's'} rejected by fill, group, or geometry rules.`);
+        } else {
+            points.push('No rejected raceway segments were reported for this route.');
+        }
+    } else {
+        points.push('No valid route was found for this cable.');
+        routeIssueAdvice(result).forEach(item => points.push(item));
+    }
+    return `<ul class="route-explanation-list">${points.map(point => `<li>${point}</li>`).join('')}</ul>`;
+};
+
+const renderRouteSummaryPanel = (results = []) => {
+    if (!elements.routeSummaryPanel) return;
+    if (!results || results.length === 0) {
+        elements.routeSummaryPanel.innerHTML = '';
+        return;
+    }
+    const routed = results.filter(isRoutedResult);
+    const failed = results.length - routed.length;
+    const totalLength = routed.reduce((sum, row) => sum + (Number(row.total_length) || 0), 0);
+    const fieldLength = routed.reduce((sum, row) => sum + (Number(row.field_length) || 0), 0);
+    const longest = routed.reduce((max, row) => Math.max(max, Number(row.total_length) || 0), 0);
+    const overFillCount = (state.updatedUtilData || []).filter(row => Number(row.full_pct) > 80).length;
+    const reasonCounts = getRejectedReasonCounts(results);
+    const reasonText = Object.entries(reasonCounts)
+        .map(([reason, count]) => `${count} ${reason.replace(/_/g, ' ')}`)
+        .join('; ');
+    const nextActions = [];
+    if (failed) nextActions.push('Open failed cable rows in Route Breakdown and review the suggested fixes.');
+    if (overFillCount) nextActions.push('Review Updated Tray Utilization for trays above 80%.');
+    if (fieldLength > 0) nextActions.push('Check field-routed length and shared field route recommendations.');
+    if (!nextActions.length) nextActions.push('Review highlighted routes and export the route package when ready.');
+    elements.routeSummaryPanel.innerHTML = `
+        <div class="route-kpi-grid">
+            <div class="route-kpi-card route-kpi-card--success"><span>${routed.length}</span><strong>Routed</strong></div>
+            <div class="route-kpi-card ${failed ? 'route-kpi-card--danger' : ''}"><span>${failed}</span><strong>Failed</strong></div>
+            <div class="route-kpi-card"><span>${escapeHtml(formatRouteDistance(totalLength))}</span><strong>Total length</strong></div>
+            <div class="route-kpi-card"><span>${escapeHtml(formatRouteDistance(fieldLength))}</span><strong>Field route</strong></div>
+            <div class="route-kpi-card"><span>${escapeHtml(formatRouteDistance(longest))}</span><strong>Longest cable</strong></div>
+            <div class="route-kpi-card ${overFillCount ? 'route-kpi-card--warning' : ''}"><span>${overFillCount}</span><strong>Fill warnings</strong></div>
+        </div>
+        ${reasonText ? `<p class="route-rejection-summary"><strong>Rejected segments:</strong> ${escapeHtml(reasonText)}</p>` : ''}
+        <div class="route-next-actions"><strong>Next:</strong><ul>${nextActions.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul></div>
+    `;
+};
+
 const renderPullChecks = (results) => {
     if (!elements.pullChecksContainer || !elements.pullChecksDetails) return;
     if (!results || results.length === 0) {
@@ -2442,42 +2940,39 @@ const renderBatchResults = (results) => {
         let totalField = 0;
         let routedCount = 0;
         let failedCount = 0;
-        let html = '';
-        const reasonCounts = {};
+        let rowsHtml = '';
         const fmt = globalThis.units?.formatDistance || (v => `${v.toFixed(2)} ft`);
         results.forEach((res, idx) => {
             const tl = parseFloat(res.total_length);
             const fl = parseFloat(res.field_length);
             if (!isNaN(tl)) totalLength += tl;
             if (!isNaN(fl)) totalField += fl;
-            const isSuccess = res.status && res.status.startsWith('✓');
+            const isSuccess = isRoutedResult(res);
             if (isSuccess) routedCount++; else failedCount++;
-            const lockBtn = state.cableList[idx]?.locked ? '' : ` <button class="lock-route-btn" data-idx="${idx}">Lock Route</button>`;
+            const lockBtn = state.cableList[idx]?.locked ? '' : `<button class="lock-route-btn" data-idx="${idx}">Lock</button>`;
             const rowClass = isSuccess ? 'route-success' : 'route-failed';
             const totalLabel = isSuccess ? `${fmt(tl)}` : 'N/A';
             const fieldLabel = isSuccess ? `${fmt(fl)} field` : '';
-            const segsLabel = isSuccess ? ` · ${res.segments_count} segs` : '';
-            html += `<details class="${rowClass}"><summary>${escapeHtml(res.cable)} <span class="route-status-badge">${escapeHtml(res.status)}</span> <span class="route-mode-badge">${escapeHtml(res.mode)}</span> ${escapeHtml(totalLabel)}${fieldLabel ? ' · ' + escapeHtml(fieldLabel) : ''}${escapeHtml(segsLabel)} <button class="view-map-btn" data-index="${idx}">View on Map</button>${lockBtn}</summary>`;
-            if (res.exclusions && res.exclusions.length > 0) {
-                res.exclusions.forEach(ex => {
-                    if (ex.reason) {
-                        reasonCounts[ex.reason] = (reasonCounts[ex.reason] || 0) + 1;
-                    }
-                });
-            }
+            const segsLabel = isSuccess ? `${res.segments_count || 0}` : '0';
+            const issueParts = [];
+            if (!isSuccess) issueParts.push('No route');
+            if ((res.exclusions || []).length) issueParts.push(`${res.exclusions.length} rejected`);
+            if ((res.mismatched_records || []).length) issueParts.push(`${res.mismatched_records.length} mismatch`);
+            const issues = issueParts.length ? issueParts.join(', ') : 'None';
+            let detailHtml = buildRouteExplanation(res);
             if (res.mismatched_records && res.mismatched_records.length > 0) {
-                html += '<p class="exclusions-title"><strong>Mismatched Raceways:</strong></p><ul class="exclusions-list">';
+                detailHtml += '<p class="exclusions-title"><strong>Mismatched Raceways:</strong></p><ul class="exclusions-list">';
                 res.mismatched_records.forEach(m => {
                     const id = m.tray_id || m.id || 'unknown';
                     const reason = m.reason.replace(/_/g, ' ');
                     const cable = m.cable_id ? ` (cable ${m.cable_id})` : '';
                     const link = m.filter && isSafeUrl(m.filter) ? ` <a href="${escapeAttr(m.filter)}">Filter</a>` : '';
-                    html += `<li>${escapeHtml(id)}: ${escapeHtml(reason)}${escapeHtml(cable)}${link}</li>`;
+                    detailHtml += `<li>${escapeHtml(id)}: ${escapeHtml(reason)}${escapeHtml(cable)}${link}</li>`;
                 });
-                html += '</ul>';
+                detailHtml += '</ul>';
             }
             if (res.breakdown && res.breakdown.length > 0) {
-                html += '<div class="table-scroll"><table class="sticky-table"><thead><tr><th>Segment</th><th>Raceway ID</th><th>Conduit</th><th>Type</th><th>From</th><th>To</th><th>Length</th><th>Recommended Raceway</th><th>Fill</th></tr></thead><tbody>';
+                detailHtml += '<div class="table-scroll"><table class="sticky-table route-segment-table"><thead><tr><th>Segment</th><th>Raceway ID</th><th>Conduit</th><th>Type</th><th>From</th><th>To</th><th>Length</th><th>Recommended Raceway</th><th>Fill</th></tr></thead><tbody>';
                 res.breakdown.forEach(b => {
                     let link = '';
                     let racewayId = b.tray_id || '';
@@ -2491,20 +2986,36 @@ const renderBatchResults = (results) => {
                     } else if (b.tray_id && b.tray_id !== 'Field Route' && b.tray_id !== 'N/A') {
                         link = `<button class="tray-fill-btn" data-tray="${escapeAttr(b.tray_id)}">Fill</button>`;
                     }
-                    html += `<tr><td>${escapeHtml(b.segment)}</td><td>${escapeHtml(racewayId)}</td><td>${escapeHtml(conduit)}</td><td>${escapeHtml(b.type)}</td><td>${escapeHtml(b.from)}</td><td>${escapeHtml(b.to)}</td><td>${escapeHtml(b.length)}</td><td>${escapeHtml(b.raceway || '')}</td><td>${link}</td></tr>`;
+                    detailHtml += `<tr><td>${escapeHtml(b.segment)}</td><td>${escapeHtml(racewayId)}</td><td>${escapeHtml(conduit)}</td><td>${escapeHtml(b.type)}</td><td>${escapeHtml(b.from)}</td><td>${escapeHtml(b.to)}</td><td>${escapeHtml(b.length)}</td><td>${escapeHtml(b.raceway || '')}</td><td>${link}</td></tr>`;
                 });
-                html += '</tbody></table></div>';
+                detailHtml += '</tbody></table></div>';
             }
-            html += '</details>';
+            rowsHtml += `<tr class="route-list-row ${rowClass}" data-route-index="${idx}" tabindex="0">
+                <td>${escapeHtml(res.cable)}</td>
+                <td><span class="route-status-badge">${escapeHtml(res.status)}</span></td>
+                <td><span class="route-mode-badge">${escapeHtml(res.mode)}</span></td>
+                <td>${escapeHtml(totalLabel)}</td>
+                <td>${escapeHtml(fieldLabel || `${fmt(0)} field`)}</td>
+                <td>${escapeHtml(segsLabel)}</td>
+                <td>${escapeHtml(issues)}</td>
+                <td><span class="route-row-actions"><button class="view-map-btn" data-index="${idx}">Highlight</button><button class="route-detail-toggle" data-index="${idx}" aria-expanded="false">Details</button>${lockBtn}</span></td>
+            </tr>
+            <tr class="route-detail-row" data-route-detail-index="${idx}" hidden>
+                <td colspan="8">${detailHtml}</td>
+            </tr>`;
         });
-        const summaryClass = failedCount > 0 ? 'route-summary-warn' : 'route-summary-ok';
-        const overall = `<div class="route-summary-banner ${summaryClass}">` +
-            `<span class="rs-routed">✓ ${routedCount} routed</span>` +
-            (failedCount > 0 ? `<span class="rs-failed">✗ ${failedCount} failed</span>` : '') +
-            `<span class="rs-total">${fmt(totalLength)} total</span>` +
-            `<span class="rs-field">${fmt(totalField)} field</span>` +
-            `</div>`;
-        elements.routeBreakdownContainer.innerHTML = overall + html;
+        elements.routeBreakdownContainer.innerHTML = `
+            <p class="route-list-caption">${routedCount} routed${failedCount ? `, ${failedCount} failed` : ''}. Select a row to highlight it in the model; open Details only when the segment-level path is needed.</p>
+            <div class="table-scroll route-list-scroll">
+                <table class="sticky-table route-list-table">
+                    <thead><tr><th>Cable</th><th>Status</th><th>Mode</th><th>Total</th><th>Field</th><th>Segments</th><th>Issues</th><th>Actions</th></tr></thead>
+                    <tbody>${rowsHtml}</tbody>
+                </table>
+            </div>`;
+        if (elements.routeBreakdownDetails) {
+            elements.routeBreakdownDetails.open = false;
+        }
+        renderRouteSummaryPanel(results);
         const mismatches = [];
         results.forEach(r => {
             if (r.mismatched_records && r.mismatched_records.length) {
@@ -2523,11 +3034,6 @@ const renderBatchResults = (results) => {
         } else {
             elements.mismatchedRacewaysList.innerHTML = '';
             elements.mismatchedRacewaysDetails.style.display = 'none';
-        }
-        const summaryParts = Object.entries(reasonCounts).map(([r, c]) => `${escapeHtml(c)} ${escapeHtml(r.replace(/_/g, ' '))}`);
-        if (summaryParts.length) {
-            const summaryHtml = `<div class="message info">Rejected segments: ${summaryParts.join('; ')}</div>`;
-            elements.messages.insertAdjacentHTML('afterbegin', summaryHtml);
         }
         if (results.some(r => (r.exclusions && r.exclusions.length > 0) || (r.mismatched_records && r.mismatched_records.length > 0))) {
             emitAsync('exclusions-found');
@@ -2568,6 +3074,31 @@ const renderBatchResults = (results) => {
                 highlightCableRoute(idx);
             });
         });
+        elements.routeBreakdownContainer.querySelectorAll('.route-detail-toggle').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const idx = parseInt(btn.dataset.index, 10);
+                const row = elements.routeBreakdownContainer.querySelector(`.route-detail-row[data-route-detail-index="${idx}"]`);
+                if (!row) return;
+                const nextHidden = !row.hidden ? true : false;
+                row.hidden = nextHidden;
+                btn.setAttribute('aria-expanded', String(!nextHidden));
+                btn.textContent = nextHidden ? 'Details' : 'Hide';
+            });
+        });
+        elements.routeBreakdownContainer.querySelectorAll('tr[data-route-index]').forEach(row => {
+            row.addEventListener('click', event => {
+                if (event.target.closest('button, a, input, select')) return;
+                const idx = parseInt(row.dataset.routeIndex, 10);
+                if (Number.isFinite(idx)) highlightCableRoute(idx);
+            });
+            row.addEventListener('keydown', event => {
+                if (event.key !== 'Enter' && event.key !== ' ') return;
+                event.preventDefault();
+                const idx = parseInt(row.dataset.routeIndex, 10);
+                if (Number.isFinite(idx)) highlightCableRoute(idx);
+            });
+        });
         elements.routeBreakdownContainer.querySelectorAll('.lock-route-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -2591,7 +3122,7 @@ const renderBatchResults = (results) => {
             return;
         }
         state.cableList.forEach(syncManualPath);
-        let html = '<h4>Cables to Route:</h4><table class="sticky-table"><thead><tr>' +
+        let html = '<h4>Cables to Route:</h4><table id="cables-panel" class="sticky-table"><thead><tr>' +
             '<th data-key="name">Tag</th>' +
             '<th data-key="start_tag">Start Tag</th>' +
             '<th data-key="end_tag">End Tag</th>' +
@@ -2808,6 +3339,23 @@ const renderBatchResults = (results) => {
         emitSticky('samples-loaded','samplesLoaded');
     };
 
+    const loadSampleNetwork = () => {
+        loadSampleTrays();
+        loadSampleCables();
+        updateRoutingReadiness();
+    };
+
+    const importSchedulesForRouting = async () => {
+        await loadSchedulesIntoSession();
+        renderManualTrayTable();
+        updateCableListDisplay();
+        rebuildTrayData();
+        updateTrayDisplay();
+        updateTableCounts();
+        saveSession();
+        showToast('Schedules imported for routing', 'success');
+    };
+
     const addCableToBatch = () => {
         const newCable = {
             name: nextCableName(),
@@ -2853,6 +3401,13 @@ const renderBatchResults = (results) => {
 
     const showMessage = (type, text) => {
         elements.messages.innerHTML += `<div class="message ${escapeHtml(type)}">${escapeHtml(text)}</div>`;
+    };
+
+    const scrollResultsIntoView = () => {
+        if (!elements.resultsSection) return;
+        requestAnimationFrame(() => {
+            elements.resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
     };
 
     const exportRoutesJSON = () => {
@@ -3303,6 +3858,21 @@ const renderBatchResults = (results) => {
 
     const mainCalculation = async () => {
         if (!validateInputs(['proximity-threshold','max-field-edge','field-route-penalty','shared-field-penalty'])) return;
+        let readiness = updateRoutingReadiness();
+        if (!readiness.ready) {
+            await loadSchedulesIntoSession();
+            renderManualTrayTable();
+            updateCableListDisplay();
+            rebuildTrayData();
+            updateTrayDisplay();
+            readiness = updateRoutingReadiness();
+        }
+        if (!readiness.ready) {
+            elements.resultsSection.style.display = 'block';
+            elements.messages.innerHTML = `<div class="message warning">${escapeHtml(readiness.blocking[0] || 'Add trays and cables before running routing.')}</div>`;
+            renderRouteSummaryPanel([]);
+            return;
+        }
         elements.resultsSection.style.display = 'block';
         elements.messages.innerHTML = '';
         elements.progressContainer.style.display = 'block';
@@ -3369,17 +3939,7 @@ const renderBatchResults = (results) => {
                     const r = resMap.get(c.name);
                     c.route_segments = r ? r.route_segments || [] : [];
                 });
-                const fillLimit = parseFloat(elements.fillLimitIn.value) / 100;
-                const utilData = Object.entries(cache.utilization).map(([id, data]) => {
-                    const fullPct = (data.current_fill * fillLimit / data.max_fill) * 100;
-                    return {
-                        tray_id: id,
-                        full_pct: fullPct,
-                        utilization: data.utilization_percentage.toFixed(1),
-                        available: data.available_capacity.toFixed(2),
-                        fill: `<button class="fill-btn" data-tray="${id}">Open</button>`
-                    };
-                });
+                const utilData = buildUtilizationRows(cache.utilization, trayDataForRun);
                 state.updatedUtilData = utilData;
                 renderUpdatedUtilizationTable();
                 buildFieldSegmentCableMap(cache.batchResults);
@@ -3394,6 +3954,7 @@ const renderBatchResults = (results) => {
                 elements.progressContainer.style.display = 'none';
                 elements.cancelRoutingBtn.style.display = 'none';
                 visualize(trayDataForRun, cache.allRoutes, "Batch Route Visualization");
+                scrollResultsIntoView();
                 return;
             }
 
@@ -3427,9 +3988,9 @@ const renderBatchResults = (results) => {
                             ? ` — ~${etaSec.toFixed(0)}s left`
                             : ` — ~${(etaSec / 60).toFixed(1)}m left`;
                     }
-                    const statusIcon = msg.success === false ? '✗' : '✓';
+                    const statusIcon = msg.success === false ? 'Failed' : 'Routed';
                     const cableLabel = msg.cableName ? `: ${msg.cableName}` : '';
-                    elements.progressLabel.textContent = `${statusIcon} Routing cable ${msg.completed}/${total}${cableLabel}${etaText}`;
+                    elements.progressLabel.textContent = `${statusIcon}: cable ${msg.completed}/${total}${cableLabel}${etaText}`;
                 } else if (msg.type === 'cancelled') {
                     elements.progressLabel.textContent = `Paused (${msg.completed}/${state.cableList.length})`;
                 } else if (msg.type === 'done') {
@@ -3450,7 +4011,7 @@ const renderBatchResults = (results) => {
                         }
                         return {
                             cable: cable.name,
-                            status: result.success ? '✓ Routed' : '✗ Failed',
+                            status: result.success ? 'Routed' : 'Failed',
                             mode: cable.locked ? 'Locked' : (result.manual ? (result.manual_raceway ? 'Manual Raceway' : 'Manual Path') : 'Automatic'),
                             manual_raceway: !!result.manual_raceway,
                             total_length: result.success ? result.total_length.toFixed(2) : 'N/A',
@@ -3577,17 +4138,7 @@ const renderBatchResults = (results) => {
                     visualize(trayDataForRun, allRoutesForPlotting, "Batch Route Visualization");
 
                     const finalUtilization = msg.utilization;
-                    const fillLimit = parseFloat(elements.fillLimitIn.value) / 100;
-                    const utilData = Object.entries(finalUtilization).map(([id, data]) => {
-                        const fullPct = (data.current_fill * fillLimit / data.max_fill) * 100;
-                        return {
-                            tray_id: id,
-                            full_pct: fullPct,
-                            utilization: data.utilization_percentage.toFixed(1),
-                            available: data.available_capacity.toFixed(2),
-                            fill: `<button class="fill-btn" data-tray="${id}">Open</button>`
-                        };
-                    });
+                    const utilData = buildUtilizationRows(finalUtilization, trayDataForRun);
                     state.finalTrays = msg.finalTrays;
                     state.updatedUtilData = utilData;
                     renderUpdatedUtilizationTable();
@@ -3595,6 +4146,7 @@ const renderBatchResults = (results) => {
                     elements.progressLabel.textContent = `Complete (${(msg.wallTime/1000).toFixed(2)}s)`;
                     elements.progressContainer.style.display = 'none';
                     elements.cancelRoutingBtn.style.display = 'none';
+                    scrollResultsIntoView();
 
                     setItem(cacheKey, {
                         batchResults,
@@ -3735,16 +4287,7 @@ const renderBatchResults = (results) => {
         });
 
         const finalUtilization = routingSystem.getTrayUtilization();
-        const utilData = Object.entries(finalUtilization).map(([id, data]) => {
-            const fullPct = (data.current_fill * fillLimit / data.max_fill) * 100;
-            return {
-                tray_id: id,
-                full_pct: fullPct,
-                utilization: data.utilization_percentage.toFixed(1),
-                available: data.available_capacity.toFixed(2),
-                fill: `<button class="fill-btn" data-tray="${id}">Open</button>`
-            };
-        });
+        const utilData = buildUtilizationRows(finalUtilization, trayData);
 
         state.finalTrays = Array.from(routingSystem.trays.values()).map(t => ({ ...t }));
         state.updatedUtilData = utilData;
@@ -4074,6 +4617,12 @@ const renderBatchResults = (results) => {
         if (!state.latestRouteData[idx]) return;
         reset3DView();
         const route = state.latestRouteData[idx];
+        elements.routeBreakdownContainer?.querySelectorAll('[data-route-index]').forEach(row => {
+            row.classList.toggle('is-selected', Number(row.dataset.routeIndex) === idx);
+        });
+        if (elements.routeSelectionStatus) {
+            elements.routeSelectionStatus.textContent = `Highlighted route: ${route.cable}`;
+        }
         const traces = [];
         (route.route_segments || []).forEach(seg => {
             const color = seg.ductbankTag ? 'saddlebrown' : 'blue';
@@ -4099,6 +4648,37 @@ const renderBatchResults = (results) => {
         });
         Plotly.addTraces(elements.plot3d, traces);
         window.current3DPlot.traces.push(...traces);
+    };
+
+    const highlightTraySegment = (trayId) => {
+        if (!globalThis.Plotly) {
+            console.warn('Plotly is not loaded');
+            return;
+        }
+        const trays = state.finalTrays.length ? state.finalTrays : state.trayData;
+        const tray = trays.find(t => t.tray_id === trayId);
+        if (!tray) return;
+        reset3DView();
+        elements.updatedUtilizationContainer?.querySelectorAll('tbody tr').forEach(row => {
+            row.classList.toggle('is-selected', row.dataset.trayId === trayId);
+        });
+        if (elements.routeSelectionStatus) {
+            elements.routeSelectionStatus.textContent = `Highlighted tray: ${trayId}`;
+        }
+        const trace = {
+            x: [tray.start_x, tray.end_x],
+            y: [tray.start_y, tray.end_y],
+            z: [tray.start_z, tray.end_z],
+            mode: 'lines',
+            type: 'scatter3d',
+            line: { color: '#0f766e', width: 14 },
+            name: `Selected ${trayId}`,
+            showlegend: false,
+            hoverinfo: 'text',
+            text: [`Selected tray ${trayId}`]
+        };
+        Plotly.addTraces(elements.plot3d, [trace]);
+        window.current3DPlot.traces.push(trace);
     };
 
     const applyViewMode = () => {
@@ -4163,10 +4743,30 @@ Plotly.newPlot(document.getElementById('plot'), data, layout, {responsive: true}
     
     
     // --- INITIALIZATION & EVENT LISTENERS ---
-    elements.fillLimitIn.addEventListener('input', updateFillLimitDisplay);
-    const proximityInput = document.getElementById('proximity-threshold');
-    if (proximityInput) proximityInput.addEventListener('change', saveSession);
+    elements.fillLimitIn.addEventListener('input', () => {
+        markCustomPreset();
+        updateFillLimitDisplay();
+        updateRoutingReadiness();
+    });
+    if (elements.routePreset) {
+        elements.routePreset.addEventListener('change', () => applyRoutePreset(elements.routePreset.value));
+    }
+    ['proximity-threshold', 'max-field-edge', 'field-route-penalty', 'shared-field-penalty'].forEach(id => {
+        const input = document.getElementById(id);
+        if (!input) return;
+        input.addEventListener('input', () => {
+            markCustomPreset();
+            updateRoutingReadiness();
+        });
+        input.addEventListener('change', saveSession);
+    });
     elements.calculateBtn.addEventListener('click', mainCalculation);
+    if (elements.loadSampleNetworkBtn) {
+        elements.loadSampleNetworkBtn.addEventListener('click', loadSampleNetwork);
+    }
+    if (elements.importSchedulesBtn) {
+        elements.importSchedulesBtn.addEventListener('click', importSchedulesForRouting);
+    }
     if (elements.loadSampleTraysBtn) {
         elements.loadSampleTraysBtn.addEventListener('click', loadSampleTrays);
     }
@@ -4319,26 +4919,7 @@ Plotly.newPlot(document.getElementById('plot'), data, layout, {responsive: true}
         await finalizeLoad();
     }
 
-    // Show empty-state banner when the user has no tray/cable data loaded,
-    // and hide it as soon as any data is added.
-    const emptyStateBanner = document.getElementById('empty-state-banner');
-    if (emptyStateBanner) {
-        const trayTbody = document.querySelector('#trayTable tbody');
-        const cableContainer = document.getElementById('cable-list-container');
-        const updateEmptyState = () => {
-            const noTrays = !trayTbody || trayTbody.rows.length === 0;
-            const noCables = state.cableList.length === 0;
-            emptyStateBanner.hidden = !(noTrays && noCables);
-        };
-        updateEmptyState();
-        // Re-evaluate when table rows are added/removed
-        if (trayTbody) {
-            new MutationObserver(updateEmptyState).observe(trayTbody, { childList: true });
-        }
-        if (cableContainer) {
-            new MutationObserver(updateEmptyState).observe(cableContainer, { childList: true, subtree: true });
-        }
-    }
+    updateRoutingReadiness();
 
     async function runSelfCheck(){
         const diag={};

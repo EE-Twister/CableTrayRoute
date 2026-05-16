@@ -1,9 +1,9 @@
 import './workflowStatus.js';
 import '../site.js';
-import { SAMPLE_REGISTRY, getSamplesByTag, validateSampleProject, migrateSampleProject } from '../analysis/sampleGallery.mjs';
+import { importProject } from '../dataStore.mjs';
+import { SAMPLE_REGISTRY, getSamplesByTag, validateSampleProject, migrateSampleProject, sampleProjectToImportPayload } from '../analysis/sampleGallery.mjs';
 
 const PROGRESS_KEY_PREFIX = 'ctr_sample_progress_';
-const PROJECT_KEY = 'ctr_project';
 
 // ── State ────────────────────────────────────────────────────────────────────
 
@@ -195,7 +195,11 @@ async function openSample(sample) {
   }
 
   try {
-    localStorage.setItem(PROJECT_KEY, JSON.stringify(migrated));
+    const imported = importProject(sampleProjectToImportPayload(migrated));
+    if (!imported) {
+      showToast('Sample import was cancelled or could not be applied.', 'error');
+      return;
+    }
   } catch {
     showToast('Could not save sample to project storage (storage full?)', 'error');
     return;

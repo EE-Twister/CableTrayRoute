@@ -69,20 +69,33 @@
 
       <header class="page-header">
         <h1>Equipment List</h1>
-        <p>Manage equipment items with basic details.</p>
+        <p>Build the project equipment basis that downstream loads, one-lines, schedules, and reports can reference.</p>
       </header>
-      <section class="card">
-        <div class="mb-1">
-          <button id="add-row-btn" class="btn primary-btn add-row-btn" title="Add a new row">Add Row</button>
-          <button id="add-column-btn" class="btn" title="Add a new column">Add Column</button>
-          <button id="delete-selected-btn" class="btn" title="Delete selected rows">Delete Selected</button>
-          <button id="export-xlsx-btn" class="btn" title="Export as Excel">Export XLSX</button>
+      <section class="card equipment-list-page">
+        <div id="equipment-summary-cards" class="workflow-summary-grid equipment-summary-panel" aria-label="Equipment summary"></div>
+        <div id="equipment-empty-guide" class="equipment-empty-guide" hidden>
+          <div>
+            <strong>No equipment records yet.</strong>
+            <p>Add equipment, import a list, or load starter records to establish the first workflow step.</p>
+          </div>
+          <div class="equipment-empty-guide__actions">
+            <button id="empty-add-equipment-btn" class="btn primary-btn" type="button">Add Equipment</button>
+            <button id="empty-import-equipment-btn" class="btn" type="button">Import Equipment</button>
+            <button id="empty-starter-equipment-btn" class="btn" type="button">Load Starter Equipment</button>
+          </div>
+        </div>
+        <div class="equipment-action-bar mb-1">
+          <button id="add-row-btn" class="btn primary-btn add-row-btn" type="button" title="Add equipment with guided fields">Add Equipment</button>
+          <button id="load-starter-equipment-btn" class="btn" type="button" title="Load starter equipment records">Load Starter Equipment</button>
+          <button id="add-column-btn" class="btn" type="button" title="Add a new column">Add Column</button>
+          <button id="delete-selected-btn" class="btn" type="button" title="Delete selected rows">Delete Selected</button>
+          <button id="export-xlsx-btn" class="btn" type="button" title="Export as Excel">Export XLSX</button>
           <input type="file" id="import-xlsx-input" accept=".xlsx" class="hidden" title="Import from Excel">
-          <button id="import-xlsx-btn" class="btn" title="Import from Excel">Import XLSX</button>
+          <button id="import-xlsx-btn" class="btn" type="button" title="Import from Excel">Import XLSX</button>
           <input type="file" id="import-csv-input" accept=".csv" class="hidden" title="Import from CSV">
-          <button id="import-csv-btn" class="btn" title="Import from CSV">Import CSV</button>
+          <button id="import-csv-btn" class="btn" type="button" title="Import from CSV">Import CSV</button>
           <input type="file" id="import-xml-input" accept=".xml" class="hidden" title="Import from XML">
-          <button id="import-xml-btn" class="btn" title="Import from XML">Import XML</button>
+          <button id="import-xml-btn" class="btn" type="button" title="Import from XML">Import XML</button>
         </div>
         <div class="equipment-toolbar mb-1">
           <input type="text" id="equipment-search" class="table-search" placeholder="Search tag, description, arrangement, lineup, manufacturer, category, or model" title="Search by equipment details">
@@ -108,6 +121,12 @@
             <tbody></tbody>
           </table>
         </div>
+        <nav class="step-nav equipment-step-nav" aria-label="Workflow navigation">
+          <a href="workflowdashboard.html" class="step-nav-prev">&#8592; Workflow Dashboard</a>
+          <a href="index.html" class="step-nav-link">Home</a>
+          <a href="oneline.html" class="step-nav-link">Optional One-Line</a>
+          <a href="loadlist.html" class="step-nav-next">Next: Load List &#8594;</a>
+        </nav>
         <div id="add-column-modal" class="modal hidden">
           <div class="modal-content">
             <label>Key <input type="text" id="new-col-key"></label>

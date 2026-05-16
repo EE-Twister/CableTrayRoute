@@ -19,13 +19,16 @@ The Cable Schedule page is optimized for fast entry first, with deeper routing a
 
 ## Readiness
 
-- The readiness panel summarizes total cables, routing-ready cables, missing raceway assignments, missing conductor sizes, duplicate tags, and the latest local change.
-- A cable is considered routing-ready when Tag, Conductor Size, Length, and Raceway(s) are complete.
+- The readiness panel summarizes total cables, schedule-ready cables, routing-ready cables, missing schedule fields, missing raceway assignments, duplicate tags, and the latest local change.
+- A cable is **schedule-ready** when Tag, From/To, Conductor Size, and Length are complete.
+- A cable is **routing-ready** when it is schedule-ready and also has a Raceway, Raceway ID(s), Route Preference, manual path, tray, conduit, or ductbank assignment.
+- Fill and routing pages use routing-ready cables. Studies and reporting can still use schedule-ready cable records when raceway assignment is not required.
 - Tag, From Tag, To Tag, and Actions stay visible while scrolling across the wide schedule.
 
 ## Validation
 
-- Required fields are Tag, Conductor Size, Length, and Raceway(s).
+- Required schedule fields are Tag, From/To, Conductor Size, and Length.
+- Raceway assignment is required for routing-ready status, but the schedule can be saved while routing assignments are still in progress.
 - Missing required fields are highlighted after the field is touched, or when saving/exporting.
 - Save and export show a summary when required fields are incomplete.
 
@@ -36,7 +39,8 @@ The Cable Schedule page is optimized for fast entry first, with deeper routing a
 
 ## Import, Export, and Print
 
-- XLSX import opens a mapping step so spreadsheet headers can be matched to Cable Schedule fields before rows are imported.
+- XLSX import opens a mapping and preview step so spreadsheet headers can be matched to Cable Schedule fields before rows are imported.
+- Import mode defaults to **Merge with existing rows**. Matching cable tags update blank fields, conflicting non-empty values are shown in the preview and preserved, and unmatched existing rows are not deleted unless **Replace current schedule** is selected.
 - **Report Options** supports visible-column, full-schedule, routing-ready, and missing-data XLSX/print outputs.
 - The print action creates a read-only report table so printed schedules do not depend on inline form controls.
 

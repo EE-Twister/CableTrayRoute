@@ -1,0 +1,1260 @@
+.dissimilar-metals-page .main-content {
+  width: 100%;
+  box-sizing: border-box;
+  max-width: 1480px;
+  margin: 0 auto;
+}
+
+.dissimilar-metals-page .corrosion-page-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-4, 1rem);
+  align-items: center;
+  margin-bottom: var(--space-5, 1.5rem);
+  padding: var(--space-5, 1.5rem);
+  border: 1px solid color-mix(in srgb, var(--color-border, #e2e8f0) 82%, var(--color-primary, #2563eb));
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--color-primary, #2563eb) 9%, var(--color-surface-strong, #ffffff)), var(--color-surface-strong, #ffffff) 54%),
+    var(--color-surface-strong, #ffffff);
+  box-shadow: var(--elevation-sm, 0 1px 3px rgba(0, 0, 0, .08));
+}
+
+.dissimilar-metals-page .corrosion-header-copy {
+  min-width: 0;
+}
+
+.dissimilar-metals-page .corrosion-header-copy h1 {
+  margin: 0;
+  color: var(--color-text, #0f172a);
+  font-size: clamp(1.65rem, 2.4vw, 2.25rem);
+  line-height: 1.12;
+}
+
+.dissimilar-metals-page .corrosion-header-copy p {
+  max-width: 72ch;
+  margin: .45rem 0 0;
+  color: var(--color-text-muted, #64748b);
+  font-size: .92rem;
+  line-height: 1.4;
+}
+
+.dissimilar-metals-page .corrosion-workflow-steps {
+  display: grid;
+  grid-template-columns: repeat(3, max-content);
+  gap: .45rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dissimilar-metals-page .corrosion-workflow-steps li {
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  min-height: 2.15rem;
+  padding: .3rem .55rem .3rem .35rem;
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 999px;
+  background: var(--color-surface-strong, #ffffff);
+  color: var(--color-text, #0f172a);
+  font-size: .78rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.dissimilar-metals-page .corrosion-workflow-steps span,
+.dissimilar-metals-page .corrosion-input-section legend span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.35rem;
+  height: 1.35rem;
+  border-radius: 999px;
+  background: var(--color-primary, #2563eb);
+  color: #ffffff;
+  font-size: .72rem;
+  font-weight: 800;
+}
+
+.dissimilar-metals-page .corrosion-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(20rem, .75fr);
+  gap: var(--space-4, 1rem);
+  align-items: start;
+}
+
+.dissimilar-metals-page .corrosion-input-card,
+.dissimilar-metals-page .corrosion-reference-card,
+.dissimilar-metals-page .corrosion-results-card {
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 8px;
+  background: var(--color-surface-strong, #ffffff);
+  box-shadow: var(--elevation-sm, 0 1px 3px rgba(0, 0, 0, .08));
+}
+
+.dissimilar-metals-page .corrosion-input-card {
+  min-width: 0;
+  padding: var(--space-4, 1rem);
+}
+
+.dissimilar-metals-page .corrosion-reference-rail {
+  position: sticky;
+  top: var(--space-4, 1rem);
+  display: grid;
+  gap: var(--space-3, .75rem);
+  min-width: 0;
+}
+
+.dissimilar-metals-page .corrosion-reference-card {
+  margin: 0;
+  padding: var(--space-4, 1rem);
+}
+
+.dissimilar-metals-page .corrosion-section-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4, 1rem);
+  margin-bottom: var(--space-3, .75rem);
+}
+
+.dissimilar-metals-page .corrosion-section-heading h2,
+.dissimilar-metals-page .corrosion-card-heading h2,
+.dissimilar-metals-page .corrosion-card-heading h3 {
+  margin: 0;
+  color: var(--color-text, #0f172a);
+  line-height: 1.2;
+}
+
+.dissimilar-metals-page .corrosion-section-heading .field-hint,
+.dissimilar-metals-page .corrosion-card-heading .field-hint,
+.dissimilar-metals-page .corrosion-result-actions .field-hint {
+  margin: 0;
+}
+
+.dissimilar-metals-page .corrosion-entry-form {
+  display: grid;
+  gap: var(--space-3, .75rem);
+}
+
+.dissimilar-metals-page .corrosion-input-section {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: .35rem var(--space-3, .75rem);
+  min-width: 0;
+  margin: 0;
+  padding: var(--space-4, 1rem) 0 0;
+  border: 0;
+  border-top: 1px solid color-mix(in srgb, var(--color-border, #e2e8f0) 78%, transparent);
+}
+
+.dissimilar-metals-page .corrosion-input-section:first-of-type {
+  padding-top: .5rem;
+  border-top: 0;
+}
+
+.dissimilar-metals-page .corrosion-input-section legend {
+  display: flex;
+  align-items: center;
+  gap: .45rem;
+  width: 100%;
+  margin: 0 0 .75rem;
+  padding: 0;
+  color: var(--color-text, #0f172a);
+}
+
+.dissimilar-metals-page .corrosion-input-section legend strong {
+  font-size: .98rem;
+}
+
+.dissimilar-metals-page .corrosion-input-section .field-row {
+  min-width: 0;
+}
+
+.dissimilar-metals-page .corrosion-input-section label {
+  display: block;
+  margin-bottom: .3rem;
+  color: var(--color-text, #0f172a);
+  font-size: .8rem;
+  font-weight: 700;
+}
+
+.dissimilar-metals-page .corrosion-input-section input,
+.dissimilar-metals-page .corrosion-input-section select {
+  margin-bottom: 0;
+  border-radius: 6px;
+  background: var(--color-surface-strong, #ffffff);
+}
+
+.dissimilar-metals-page .corrosion-input-section .field-hint {
+  grid-column: 1 / -1;
+  margin: .15rem 0 .4rem;
+  line-height: 1.45;
+}
+
+.dissimilar-metals-page .corrosion-inline-note {
+  grid-column: 1 / -1;
+  margin: .15rem 0 .35rem;
+}
+
+.dissimilar-metals-page .corrosion-inline-note summary {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.7rem;
+  color: var(--color-primary, #2563eb);
+  font-size: .78rem;
+  font-weight: 700;
+}
+
+.dissimilar-metals-page .corrosion-inline-note p {
+  max-width: 78ch;
+  margin: .25rem 0 0;
+  color: var(--color-text-muted, #64748b);
+  font-size: .8rem;
+  line-height: 1.45;
+}
+
+.dissimilar-metals-page .corrosion-reference-card summary {
+  color: var(--color-text, #0f172a);
+  font-size: .95rem;
+}
+
+.dissimilar-metals-page .corrosion-reference-card p {
+  margin: .75rem 0 0;
+  color: var(--color-text-muted, #64748b);
+  font-size: .86rem;
+  line-height: 1.5;
+}
+
+.dissimilar-metals-page .corrosion-reference-card pre {
+  max-width: 100%;
+  margin: .8rem 0 0;
+  padding: .75rem;
+  overflow-x: auto;
+  border: 1px solid color-mix(in srgb, var(--color-border, #e2e8f0) 78%, transparent);
+  border-radius: 6px;
+  background: var(--color-surface, #f8fafc);
+  color: var(--color-text, #0f172a);
+  font-size: .76rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+
+.dissimilar-metals-page .corrosion-reference-table {
+  font-size: .78rem;
+}
+
+.dissimilar-metals-page .corrosion-severity-scale {
+  display: grid;
+  gap: .45rem;
+  margin: .75rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dissimilar-metals-page .corrosion-severity-scale li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem;
+  min-height: 2.15rem;
+  padding: .35rem .55rem;
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--color-surface-strong, #ffffff) 88%, var(--color-surface, #f8fafc));
+}
+
+.dissimilar-metals-page .corrosion-severity-scale span {
+  color: var(--color-text-muted, #64748b);
+  font-size: .78rem;
+  font-weight: 700;
+}
+
+.dissimilar-metals-page .corrosion-severity-scale strong {
+  color: var(--color-text, #0f172a);
+  font-size: .85rem;
+}
+
+.dissimilar-metals-page #calc-errors {
+  margin-top: var(--space-4, 1rem);
+}
+
+.dissimilar-metals-page .corrosion-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .65rem;
+  align-items: stretch;
+  margin-top: .2rem;
+  padding-top: var(--space-3, .75rem);
+  border-top: 1px solid color-mix(in srgb, var(--color-border, #e2e8f0) 78%, transparent);
+}
+
+.dissimilar-metals-page .corrosion-form-actions .primary-btn,
+.dissimilar-metals-page .corrosion-form-actions .secondary-btn {
+  width: auto;
+  min-width: min(100%, 13rem);
+  margin: 0;
+}
+
+.dissimilar-metals-page .corrosion-form-actions .primary-btn {
+  flex: 1 1 18rem;
+}
+
+.dissimilar-metals-page .corrosion-results-card {
+  margin-top: var(--space-5, 1.5rem);
+  padding: var(--space-4, 1rem);
+}
+
+.dissimilar-metals-page .corrosion-results-heading {
+  margin-bottom: var(--space-4, 1rem);
+}
+
+.dissimilar-metals-page .corrosion-severity-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2rem;
+  padding: .35rem .7rem;
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 999px;
+  background: var(--color-surface, #f8fafc);
+  color: var(--color-text, #0f172a);
+  font-size: .82rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.dissimilar-metals-page .corrosion-result-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-2, .5rem);
+  margin-bottom: var(--space-3, .75rem);
+}
+
+.dissimilar-metals-page .corrosion-kpi-card {
+  min-width: 0;
+  min-height: 7.2rem;
+  padding: .8rem;
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-top: 3px solid #64748b;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--color-surface-strong, #ffffff) 94%, var(--color-surface, #f8fafc));
+}
+
+.dissimilar-metals-page .corrosion-kpi-card span {
+  display: block;
+  margin-bottom: .4rem;
+  color: var(--color-text-muted, #64748b);
+  font-size: .72rem;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.dissimilar-metals-page .corrosion-kpi-card strong {
+  display: block;
+  color: var(--color-text, #0f172a);
+  font-size: 1rem;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.dissimilar-metals-page .corrosion-kpi-card small {
+  display: block;
+  margin-top: .4rem;
+  color: var(--color-text-muted, #64748b);
+  font-size: .78rem;
+  line-height: 1.35;
+}
+
+.dissimilar-metals-page .corrosion-kpi-card--negligible,
+.dissimilar-metals-page .corrosion-kpi-card--low,
+.dissimilar-metals-page .corrosion-severity-badge--negligible,
+.dissimilar-metals-page .corrosion-severity-badge--low {
+  border-color: color-mix(in srgb, #16a34a 38%, var(--color-border, #e2e8f0));
+}
+
+.dissimilar-metals-page .corrosion-kpi-card--negligible,
+.dissimilar-metals-page .corrosion-kpi-card--low {
+  border-top-color: #16a34a;
+}
+
+.dissimilar-metals-page .corrosion-severity-badge--negligible,
+.dissimilar-metals-page .corrosion-severity-badge--low {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.dissimilar-metals-page .corrosion-kpi-card--moderate,
+.dissimilar-metals-page .corrosion-severity-badge--moderate {
+  border-color: color-mix(in srgb, #f59e0b 42%, var(--color-border, #e2e8f0));
+}
+
+.dissimilar-metals-page .corrosion-kpi-card--moderate {
+  border-top-color: #f59e0b;
+}
+
+.dissimilar-metals-page .corrosion-severity-badge--moderate {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.dissimilar-metals-page .corrosion-kpi-card--high,
+.dissimilar-metals-page .corrosion-severity-badge--high {
+  border-color: color-mix(in srgb, #f97316 42%, var(--color-border, #e2e8f0));
+}
+
+.dissimilar-metals-page .corrosion-kpi-card--high {
+  border-top-color: #f97316;
+}
+
+.dissimilar-metals-page .corrosion-severity-badge--high {
+  background: #ffedd5;
+  color: #9a3412;
+}
+
+.dissimilar-metals-page .corrosion-kpi-card--severe,
+.dissimilar-metals-page .corrosion-severity-badge--severe {
+  border-color: color-mix(in srgb, #dc2626 42%, var(--color-border, #e2e8f0));
+}
+
+.dissimilar-metals-page .corrosion-kpi-card--severe {
+  border-top-color: #dc2626;
+}
+
+.dissimilar-metals-page .corrosion-severity-badge--severe {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.dissimilar-metals-page .corrosion-result-body-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(18rem, .56fr);
+  gap: var(--space-3, .75rem);
+  align-items: stretch;
+}
+
+.dissimilar-metals-page .corrosion-action-card,
+.dissimilar-metals-page .corrosion-details-card {
+  min-width: 0;
+  padding: var(--space-4, 1rem);
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--color-surface-strong, #ffffff) 94%, var(--color-surface, #f8fafc));
+}
+
+.dissimilar-metals-page .corrosion-details-card {
+  margin-top: var(--space-3, .75rem);
+}
+
+.dissimilar-metals-page .corrosion-action-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2, .5rem);
+}
+
+.dissimilar-metals-page .corrosion-action-list {
+  display: grid;
+  gap: .5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dissimilar-metals-page .corrosion-action-list li {
+  min-width: 0;
+}
+
+.dissimilar-metals-page .corrosion-action-disclosure {
+  margin: 0;
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 6px;
+  background: var(--color-surface-strong, #ffffff);
+}
+
+.dissimilar-metals-page .corrosion-action-disclosure summary {
+  min-height: 2.2rem;
+  padding: .45rem .65rem;
+  color: var(--color-text, #0f172a);
+  font-size: .88rem;
+  font-weight: 800;
+}
+
+.dissimilar-metals-page .corrosion-action-disclosure p {
+  margin: 0;
+  padding: 0 .65rem .65rem;
+  color: var(--color-text-muted, #64748b);
+  font-size: .82rem;
+  line-height: 1.4;
+}
+
+.dissimilar-metals-page .corrosion-timeline-card {
+  margin-top: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--border-color, #d1d5db);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--card-bg, #ffffff) 94%, #f8fafc);
+}
+
+.dissimilar-metals-page .corrosion-timeline-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.dissimilar-metals-page .corrosion-timeline-header h3 {
+  margin: 0 0 .25rem;
+  font-size: 1rem;
+}
+
+.dissimilar-metals-page .corrosion-timeline-kicker {
+  margin: 0 0 .2rem;
+  color: var(--color-text-muted, #64748b);
+  font-size: .72rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.dissimilar-metals-page .corrosion-status-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2rem;
+  padding: .35rem .65rem;
+  border: 1px solid var(--border-color, #d1d5db);
+  border-radius: 999px;
+  background: var(--card-bg, #ffffff);
+  color: var(--text-color, #0f172a);
+  font-size: .82rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.dissimilar-metals-page .corrosion-status-pill--within,
+.dissimilar-metals-page .corrosion-status-pill--stable {
+  border-color: #86efac;
+  background: #dcfce7;
+  color: #166534;
+}
+
+.dissimilar-metals-page .corrosion-status-pill--monitor {
+  border-color: #fde68a;
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.dissimilar-metals-page .corrosion-status-pill--critical {
+  border-color: #fed7aa;
+  background: #ffedd5;
+  color: #9a3412;
+}
+
+.dissimilar-metals-page .corrosion-status-pill--exceeded {
+  border-color: #fecaca;
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.dissimilar-metals-page .corrosion-comparison-card {
+  margin-top: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--border-color, #d1d5db);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--card-bg, #ffffff) 94%, #f8fafc);
+}
+
+.dissimilar-metals-page .corrosion-card-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: .8rem;
+}
+
+.dissimilar-metals-page .corrosion-card-heading--stacked {
+  display: block;
+}
+
+.dissimilar-metals-page .corrosion-card-heading h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.dissimilar-metals-page .corrosion-card-heading .field-hint {
+  max-width: 34rem;
+  margin: 0;
+}
+
+.dissimilar-metals-page .corrosion-table-wrap {
+  overflow-x: auto;
+}
+
+.dissimilar-metals-page .corrosion-comparison-table th small,
+.dissimilar-metals-page .corrosion-comparison-table td small {
+  display: block;
+  margin-top: .25rem;
+  color: var(--color-text-muted, #64748b);
+  font-size: .76rem;
+  font-weight: 500;
+}
+
+.dissimilar-metals-page .corrosion-comparison-table tr.is-current {
+  background: color-mix(in srgb, var(--primary-color, #0d6efd) 8%, var(--card-bg, #ffffff));
+}
+
+.dissimilar-metals-page .corrosion-current-badge {
+  display: inline-flex;
+  margin-left: .35rem;
+  padding: .1rem .35rem;
+  border: 1px solid color-mix(in srgb, var(--primary-color, #0d6efd) 48%, #ffffff);
+  border-radius: 999px;
+  color: var(--primary-color, #0d6efd);
+  font-size: .68rem;
+  font-weight: 800;
+  vertical-align: middle;
+}
+
+.dissimilar-metals-page .corrosion-result-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: .75rem 1rem;
+  align-items: center;
+  min-width: 0;
+  margin: 0;
+  padding: var(--space-4, 1rem);
+  border: 1px solid var(--border-color, #d1d5db);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--card-bg, #ffffff) 94%, #f8fafc);
+}
+
+.dissimilar-metals-page .corrosion-result-actions .field-hint {
+  margin: 0;
+}
+
+.dissimilar-metals-page .corrosion-result-action-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .45rem;
+  justify-content: flex-end;
+}
+
+.dissimilar-metals-page .corrosion-result-action-buttons .secondary-btn {
+  width: auto;
+  min-height: 2.1rem;
+  margin: 0;
+  padding: .38rem .7rem;
+  font-size: .82rem;
+}
+
+.dissimilar-metals-page .corrosion-action-status {
+  grid-column: 1 / -1;
+  min-height: 1rem;
+  color: var(--color-text-muted, #64748b);
+  font-size: .78rem;
+}
+
+.dissimilar-metals-page .corrosion-assumptions {
+  margin-top: 1rem;
+  padding: .8rem;
+  border: 1px solid var(--border-color, #d1d5db);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--card-bg, #ffffff) 94%, #f8fafc);
+}
+
+.dissimilar-metals-page .corrosion-assumptions summary {
+  cursor: pointer;
+  color: var(--text-color, #0f172a);
+  font-weight: 800;
+}
+
+.dissimilar-metals-page .corrosion-assumptions .corrosion-table-wrap {
+  margin-top: .7rem;
+}
+
+.dissimilar-metals-page .corrosion-compatibility-warning {
+  margin: 1rem 0;
+  padding: .9rem 1rem;
+  border: 1px solid var(--border-color, #d1d5db);
+  border-left: 4px solid #64748b;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--card-bg, #ffffff) 94%, #f8fafc);
+}
+
+.dissimilar-metals-page .corrosion-compatibility-warning--high {
+  border-left-color: #dc2626;
+  background: color-mix(in srgb, #fee2e2 68%, var(--card-bg, #ffffff));
+}
+
+.dissimilar-metals-page .corrosion-compatibility-warning--review {
+  border-left-color: #f97316;
+  background: color-mix(in srgb, #ffedd5 62%, var(--card-bg, #ffffff));
+}
+
+.dissimilar-metals-page .corrosion-compatibility-warning--info {
+  border-left-color: #2563eb;
+  background: color-mix(in srgb, #dbeafe 58%, var(--card-bg, #ffffff));
+}
+
+.dissimilar-metals-page .corrosion-compatibility-warning h3 {
+  margin: 0 0 .4rem;
+  font-size: 1rem;
+}
+
+.dissimilar-metals-page .corrosion-compatibility-summary {
+  font-weight: 700;
+}
+
+.dissimilar-metals-page .corrosion-compatibility-warning p {
+  margin: 0;
+  color: var(--text-color, #0f172a);
+  line-height: 1.45;
+}
+
+.dissimilar-metals-page .corrosion-warning-drivers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .4rem;
+  margin: .75rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dissimilar-metals-page .corrosion-warning-drivers li {
+  padding: .2rem .45rem;
+  border: 1px solid color-mix(in srgb, var(--border-color, #d1d5db) 70%, #ffffff);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .64);
+  color: var(--text-color, #0f172a);
+  font-size: .76rem;
+  font-weight: 700;
+}
+
+.dissimilar-metals-page .corrosion-warning-detail {
+  margin: .75rem 0 0;
+}
+
+.dissimilar-metals-page .corrosion-warning-detail summary {
+  color: var(--color-primary, #2563eb);
+  font-size: .8rem;
+  font-weight: 800;
+}
+
+.dissimilar-metals-page .corrosion-warning-detail p {
+  margin-top: .4rem;
+  font-size: .84rem;
+}
+
+.dissimilar-metals-page .corrosion-timeline-grid {
+  display: grid;
+  grid-template-columns: minmax(320px, .95fr) minmax(320px, 1.05fr);
+  gap: 1rem;
+  align-items: stretch;
+}
+
+.dissimilar-metals-page .corrosion-visual-panel,
+.dissimilar-metals-page .corrosion-controls-panel {
+  min-width: 0;
+}
+
+.dissimilar-metals-page .corrosion-visual {
+  height: 100%;
+  min-height: 230px;
+  padding: .85rem;
+  border: 1px solid color-mix(in srgb, var(--border-color, #d1d5db) 82%, #ffffff);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, .82), rgba(241, 245, 249, .86)),
+    repeating-linear-gradient(90deg, rgba(100, 116, 139, .08) 0 1px, transparent 1px 24px);
+  box-sizing: border-box;
+}
+
+.dissimilar-metals-page .corrosion-visual-label {
+  margin-bottom: .7rem;
+  color: var(--color-text-muted, #64748b);
+  font-size: .78rem;
+  font-weight: 700;
+}
+
+.dissimilar-metals-page .corrosion-visual-member {
+  position: relative;
+  min-height: 118px;
+  overflow: hidden;
+  border: 1px solid #64748b;
+  border-radius: 7px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, .58), transparent 42%),
+    linear-gradient(90deg, #cbd5e1, #f8fafc 46%, #94a3b8);
+  box-shadow: inset 0 -18px 32px rgba(15, 23, 42, .12);
+}
+
+.dissimilar-metals-page .corrosion-visual-svg {
+  display: block;
+  width: 100%;
+  min-height: 118px;
+}
+
+.dissimilar-metals-page .corrosion-visual-attack {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--corrosion-progress, 0%);
+  min-width: 0;
+  background:
+    linear-gradient(90deg, rgba(127, 29, 29, .94), rgba(194, 65, 12, .78) 58%, rgba(251, 146, 60, .34));
+  clip-path: polygon(0 0, 91% 0, 100% 10%, 90% 22%, 100% 35%, 88% 49%, 100% 65%, 91% 82%, 98% 100%, 0 100%);
+  transition: width .12s ease-out;
+}
+
+.dissimilar-metals-page .corrosion-visual-pits {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 15% 22%, rgba(69, 26, 3, .55) 0 2px, transparent 2.5px),
+    radial-gradient(circle at 27% 68%, rgba(124, 45, 18, .55) 0 3px, transparent 3.5px),
+    radial-gradient(circle at 44% 36%, rgba(69, 26, 3, .44) 0 2px, transparent 2.5px),
+    radial-gradient(circle at 63% 74%, rgba(124, 45, 18, .38) 0 2.5px, transparent 3px),
+    radial-gradient(circle at 80% 30%, rgba(69, 26, 3, .34) 0 2px, transparent 2.5px);
+  opacity: var(--corrosion-pit-opacity, .12);
+  pointer-events: none;
+}
+
+.dissimilar-metals-page .corrosion-visual-face {
+  position: absolute;
+  inset: 0;
+  border-left: 3px solid rgba(100, 116, 139, .36);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .7);
+  pointer-events: none;
+}
+
+.dissimilar-metals-page .corrosion-visual-metal {
+  position: absolute;
+  right: .75rem;
+  bottom: .65rem;
+  max-width: min(72%, 24rem);
+  padding: .2rem .45rem;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, .78);
+  color: #0f172a;
+  font-size: .86rem;
+  font-weight: 700;
+}
+
+.dissimilar-metals-page .corrosion-visual-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .8rem;
+  margin-top: .75rem;
+  color: var(--color-text-muted, #64748b);
+  font-size: .78rem;
+}
+
+.dissimilar-metals-page .corrosion-visual-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+}
+
+.dissimilar-metals-page .corrosion-legend-swatch {
+  width: .75rem;
+  height: .75rem;
+  border: 1px solid rgba(15, 23, 42, .24);
+  border-radius: 2px;
+}
+
+.dissimilar-metals-page .corrosion-legend-swatch--attack {
+  background: #c2410c;
+}
+
+.dissimilar-metals-page .corrosion-legend-swatch--metal {
+  background: #cbd5e1;
+}
+
+.dissimilar-metals-page .corrosion-controls-panel {
+  display: flex;
+  flex-direction: column;
+  gap: .75rem;
+}
+
+.dissimilar-metals-page .corrosion-slider-label {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: .75rem;
+  margin: 0;
+  font-size: .88rem;
+}
+
+.dissimilar-metals-page .corrosion-slider-label strong {
+  color: var(--primary-color, #0d6efd);
+  font-size: 1rem;
+}
+
+.dissimilar-metals-page input[type="range"][data-corrosion-slider] {
+  width: 100%;
+  accent-color: #c2410c;
+}
+
+.dissimilar-metals-page .corrosion-slider-scale {
+  display: flex;
+  justify-content: space-between;
+  margin-top: -.4rem;
+  color: var(--color-text-muted, #64748b);
+  font-size: .76rem;
+}
+
+.dissimilar-metals-page .corrosion-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: .6rem;
+  margin-top: .15rem;
+}
+
+.dissimilar-metals-page .corrosion-metric {
+  min-height: 4.4rem;
+  padding: .65rem;
+  border: 1px solid var(--border-color, #d1d5db);
+  border-radius: 6px;
+  background: var(--card-bg, #ffffff);
+}
+
+.dissimilar-metals-page .corrosion-metric span {
+  display: block;
+  margin-bottom: .35rem;
+  color: var(--color-text-muted, #64748b);
+  font-size: .72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.dissimilar-metals-page .corrosion-metric strong {
+  display: block;
+  color: var(--text-color, #0f172a);
+  font-size: .96rem;
+  line-height: 1.3;
+}
+
+.dissimilar-metals-page .corrosion-thickness-panel {
+  padding: .7rem;
+  border: 1px solid var(--border-color, #d1d5db);
+  border-left: 4px solid #22c55e;
+  border-radius: 6px;
+  background: var(--card-bg, #ffffff);
+}
+
+.dissimilar-metals-page .corrosion-thickness-panel--monitor {
+  border-left-color: #f59e0b;
+}
+
+.dissimilar-metals-page .corrosion-thickness-panel--critical {
+  border-left-color: #f97316;
+}
+
+.dissimilar-metals-page .corrosion-thickness-panel--exceeded {
+  border-left-color: #ef4444;
+}
+
+.dissimilar-metals-page .corrosion-thickness-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: .75rem;
+  margin-bottom: .55rem;
+}
+
+.dissimilar-metals-page .corrosion-thickness-heading span {
+  color: var(--color-text-muted, #64748b);
+  font-size: .72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.dissimilar-metals-page .corrosion-thickness-heading strong {
+  color: var(--text-color, #0f172a);
+  font-size: .9rem;
+}
+
+.dissimilar-metals-page .corrosion-thickness-bar {
+  height: .55rem;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--border-color, #d1d5db) 75%, #ffffff);
+  border-radius: 999px;
+  background: #fee2e2;
+}
+
+.dissimilar-metals-page .corrosion-thickness-bar i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #16a34a, #86efac);
+  transition: width .12s ease-out;
+}
+
+.dissimilar-metals-page .corrosion-thickness-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: .5rem;
+  margin-top: .65rem;
+}
+
+.dissimilar-metals-page .corrosion-thickness-grid div {
+  min-width: 0;
+}
+
+.dissimilar-metals-page .corrosion-thickness-grid span {
+  display: block;
+  color: var(--color-text-muted, #64748b);
+  font-size: .68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.dissimilar-metals-page .corrosion-thickness-grid strong {
+  display: block;
+  margin-top: .2rem;
+  color: var(--text-color, #0f172a);
+  font-size: .86rem;
+}
+
+.dissimilar-metals-page .corrosion-thickness-panel p {
+  margin: .65rem 0 0;
+  color: var(--color-text-muted, #64748b);
+  font-size: .8rem;
+  line-height: 1.35;
+}
+
+.dissimilar-metals-page .corrosion-milestones {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-color, #d1d5db);
+}
+
+.dissimilar-metals-page .corrosion-milestone-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: .7rem;
+}
+
+.dissimilar-metals-page .corrosion-milestone {
+  min-height: 8rem;
+  padding: .75rem;
+  border: 1px solid var(--border-color, #d1d5db);
+  border-left: 4px solid #94a3b8;
+  border-radius: 6px;
+  background: var(--card-bg, #ffffff);
+}
+
+.dissimilar-metals-page .corrosion-milestone--monitor {
+  border-left-color: #f59e0b;
+}
+
+.dissimilar-metals-page .corrosion-milestone--critical {
+  border-left-color: #f97316;
+}
+
+.dissimilar-metals-page .corrosion-milestone--exceeded {
+  border-left-color: #ef4444;
+}
+
+.dissimilar-metals-page .corrosion-milestone span {
+  display: block;
+  color: var(--color-text-muted, #64748b);
+  font-size: .72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.dissimilar-metals-page .corrosion-milestone strong {
+  display: block;
+  margin: .25rem 0 .5rem;
+  color: var(--primary-color, #0d6efd);
+  font-size: 1.05rem;
+}
+
+.dissimilar-metals-page .corrosion-milestone h4 {
+  margin: 0 0 .35rem;
+  font-size: .92rem;
+}
+
+.dissimilar-metals-page .corrosion-milestone p {
+  margin: 0;
+  color: var(--color-text-muted, #64748b);
+  font-size: .82rem;
+  line-height: 1.35;
+}
+
+body.dark-mode.dissimilar-metals-page .corrosion-page-header,
+body.dark-mode.dissimilar-metals-page .corrosion-input-card,
+body.dark-mode.dissimilar-metals-page .corrosion-reference-card,
+body.dark-mode.dissimilar-metals-page .corrosion-results-card,
+body.dark-mode.dissimilar-metals-page .corrosion-kpi-card,
+body.dark-mode.dissimilar-metals-page .corrosion-action-card,
+body.dark-mode.dissimilar-metals-page .corrosion-action-disclosure,
+body.dark-mode.dissimilar-metals-page .corrosion-details-card,
+body.dark-mode.dissimilar-metals-page .corrosion-timeline-card,
+body.dark-mode.dissimilar-metals-page .corrosion-comparison-card,
+body.dark-mode.dissimilar-metals-page .corrosion-result-actions,
+body.dark-mode.dissimilar-metals-page .corrosion-assumptions,
+body.dark-mode.dissimilar-metals-page .corrosion-visual {
+  background:
+    linear-gradient(180deg, rgba(15, 23, 42, .94), rgba(30, 41, 59, .92)),
+    repeating-linear-gradient(90deg, rgba(148, 163, 184, .10) 0 1px, transparent 1px 24px);
+}
+
+body.dark-mode.dissimilar-metals-page .corrosion-workflow-steps li,
+body.dark-mode.dissimilar-metals-page .corrosion-input-section input,
+body.dark-mode.dissimilar-metals-page .corrosion-input-section select,
+body.dark-mode.dissimilar-metals-page .corrosion-reference-card pre,
+body.dark-mode.dissimilar-metals-page .corrosion-severity-scale li {
+  background: #1e293b;
+  color: #f8fafc;
+}
+
+body.dark-mode.dissimilar-metals-page .corrosion-visual-member {
+  border-color: #94a3b8;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, .18), transparent 42%),
+    linear-gradient(90deg, #64748b, #cbd5e1 46%, #475569);
+}
+
+body.dark-mode.dissimilar-metals-page .corrosion-visual-metal {
+  background: rgba(15, 23, 42, .78);
+  color: #f8fafc;
+}
+
+body.dark-mode.dissimilar-metals-page .corrosion-metric {
+  background: #1e293b;
+}
+
+body.dark-mode.dissimilar-metals-page .corrosion-compatibility-warning,
+body.dark-mode.dissimilar-metals-page .corrosion-thickness-panel {
+  background: #1e293b;
+}
+
+body.dark-mode.dissimilar-metals-page .corrosion-warning-drivers li {
+  background: rgba(15, 23, 42, .72);
+}
+
+body.dark-mode.dissimilar-metals-page .corrosion-milestone {
+  background: #1e293b;
+}
+
+body.theme-high-contrast.dissimilar-metals-page .corrosion-page-header,
+body.theme-high-contrast.dissimilar-metals-page .corrosion-input-card,
+body.theme-high-contrast.dissimilar-metals-page .corrosion-reference-card,
+body.theme-high-contrast.dissimilar-metals-page .corrosion-results-card,
+body.theme-high-contrast.dissimilar-metals-page .corrosion-kpi-card,
+body.theme-high-contrast.dissimilar-metals-page .corrosion-action-card,
+body.theme-high-contrast.dissimilar-metals-page .corrosion-action-disclosure,
+body.theme-high-contrast.dissimilar-metals-page .corrosion-details-card,
+body.theme-high-contrast.dissimilar-metals-page .corrosion-workflow-steps li,
+body.theme-high-contrast.dissimilar-metals-page .corrosion-severity-scale li,
+body.theme-high-contrast.dissimilar-metals-page .corrosion-timeline-card,
+body.theme-high-contrast.dissimilar-metals-page .corrosion-comparison-card,
+body.theme-high-contrast.dissimilar-metals-page .corrosion-result-actions,
+body.theme-high-contrast.dissimilar-metals-page .corrosion-assumptions,
+body.theme-high-contrast.dissimilar-metals-page .corrosion-visual,
+body.theme-high-contrast.dissimilar-metals-page .corrosion-visual-member,
+body.theme-high-contrast.dissimilar-metals-page .corrosion-milestone,
+body.theme-high-contrast.dissimilar-metals-page .corrosion-metric,
+body.theme-high-contrast.dissimilar-metals-page .corrosion-status-pill,
+body.theme-high-contrast.dissimilar-metals-page .corrosion-compatibility-warning,
+body.theme-high-contrast.dissimilar-metals-page .corrosion-thickness-panel {
+  border-color: #000;
+  background: #fff;
+  color: #000;
+}
+
+body.theme-high-contrast.dissimilar-metals-page .corrosion-visual-attack {
+  background: #000;
+}
+
+@media (max-width: 860px) {
+  .dissimilar-metals-page .corrosion-page-header,
+  .dissimilar-metals-page .corrosion-workspace,
+  .dissimilar-metals-page .corrosion-result-body-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .dissimilar-metals-page .corrosion-reference-rail {
+    position: static;
+  }
+
+  .dissimilar-metals-page .corrosion-workflow-steps {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .dissimilar-metals-page .corrosion-workflow-steps li {
+    justify-content: center;
+  }
+
+  .dissimilar-metals-page .corrosion-result-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dissimilar-metals-page .corrosion-timeline-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .dissimilar-metals-page .corrosion-card-heading,
+  .dissimilar-metals-page .corrosion-timeline-header,
+  .dissimilar-metals-page .corrosion-slider-label {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .dissimilar-metals-page .corrosion-result-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .dissimilar-metals-page .corrosion-result-action-buttons {
+    justify-content: flex-start;
+  }
+
+  .dissimilar-metals-page .corrosion-milestone-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .dissimilar-metals-page .corrosion-status-pill {
+    white-space: normal;
+  }
+}
+
+@media (max-width: 560px) {
+  .dissimilar-metals-page .corrosion-page-header,
+  .dissimilar-metals-page .corrosion-input-card,
+  .dissimilar-metals-page .corrosion-reference-card,
+  .dissimilar-metals-page .corrosion-results-card,
+  .dissimilar-metals-page .corrosion-comparison-card,
+  .dissimilar-metals-page .corrosion-timeline-card {
+    padding: .75rem;
+  }
+
+  .dissimilar-metals-page .corrosion-workflow-steps,
+  .dissimilar-metals-page .corrosion-result-summary-grid,
+  .dissimilar-metals-page .corrosion-input-section {
+    grid-template-columns: 1fr;
+  }
+
+  .dissimilar-metals-page .corrosion-workflow-steps li {
+    justify-content: flex-start;
+  }
+
+  .dissimilar-metals-page .corrosion-section-heading,
+  .dissimilar-metals-page .corrosion-results-heading {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .dissimilar-metals-page .corrosion-metrics-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .dissimilar-metals-page .corrosion-thickness-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dissimilar-metals-page .corrosion-visual-member {
+    min-height: 96px;
+  }
+}

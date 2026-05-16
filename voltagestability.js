@@ -16,6 +16,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const resultsDiv = document.getElementById('results');
   const errorsDiv = document.getElementById('calc-errors');
   const exportBtn = document.getElementById('export-csv-btn');
+  let busCounter = 0;
+  let branchCounter = 0;
 
   document.getElementById('add-bus-btn').addEventListener('click', () => addBusRow());
   document.getElementById('add-branch-btn').addEventListener('click', () => addBranchRow());
@@ -61,8 +63,6 @@ document.addEventListener('DOMContentLoaded', () => {
   // ---------------------------------------------------------------------------
   // Bus rows
   // ---------------------------------------------------------------------------
-  let busCounter = 0;
-
   function addBusRow(defaults = {}) {
     busCounter++;
     const id = defaults.id || `B${busCounter}`;
@@ -107,8 +107,6 @@ document.addEventListener('DOMContentLoaded', () => {
   // ---------------------------------------------------------------------------
   // Branch rows
   // ---------------------------------------------------------------------------
-  let branchCounter = 0;
-
   function addBranchRow(defaults = {}) {
     branchCounter++;
     const from = defaults.from || '';

@@ -1,7 +1,8 @@
 // Alias storage helpers to avoid name conflicts with local functions
 import { getDuctbanks as readStoredDuctbanks, setDuctbanks, setItem, getItem } from './dataStore.mjs';
 import { ContextMenu, FILTER_ICON_SVG } from './tableUtils.mjs';
-import { showAlertModal } from './src/components/modal.js';
+import { openModal, showAlertModal } from './src/components/modal.js';
+import { applyRecordImport, previewRecordImport } from './analysis/scheduleWorkflow.mjs';
 
 (function(){
   let ductbanks=[];
@@ -672,15 +673,195 @@ import { showAlertModal } from './src/components/modal.js';
     XLSX.writeFile(wb,'ductbank_schedule.xlsx');
   }
 
-  function importDuctbankXlsx(file){
+  function readImportField(row,names){
+    for(const name of names){
+      if(Object.prototype.hasOwnProperty.call(row,name)) return row[name];
+    }
+    const lookup=Object.fromEntries(Object.keys(row).map(key=>[String(key).toLowerCase(),key]));
+    for(const name of names){
+      const key=lookup[String(name).toLowerCase()];
+      if(key!==undefined) return row[key];
+    }
+    return '';
+  }
+
+  function normalizeImportTag(value){
+    return String(value||'').trim().toLowerCase();
+  }
+
+  function parseImportedDuctbanks(dbJson,cJson){
+    const mapByTag={};
+    const mapById={};
+    const imported=dbJson.map(r=>{
+      const db={
+        id:readImportField(r,['ductbank_id','id'])||Date.now()+Math.random(),
+        tag:readImportField(r,['tag'])||'',
+        from:readImportField(r,['from'])||'',
+        to:readImportField(r,['to'])||'',
+        concrete_encasement:['1','true','yes'].includes(String(readImportField(r,['concrete_encasement'])).trim().toLowerCase())||readImportField(r,['concrete_encasement'])===true,
+        start_x:readImportField(r,['start_x'])||'',
+        start_y:readImportField(r,['start_y'])||'',
+        start_z:readImportField(r,['start_z'])||'',
+        end_x:readImportField(r,['end_x'])||'',
+        end_y:readImportField(r,['end_y'])||'',
+        end_z:readImportField(r,['end_z'])||'',
+        conduits:[],
+        expanded:false
+      };
+      mapByTag[normalizeImportTag(db.tag)]=db;
+      mapById[String(db.id)]=db;
+      return db;
+    });
+    cJson.forEach(r=>{
+      const ductbankTag=readImportField(r,['ductbankTag','ductbanktag','tag']);
+      const ductbankId=readImportField(r,['ductbank_id','id']);
+      const parent=mapByTag[normalizeImportTag(ductbankTag)]||mapById[String(ductbankId)];
+      if(parent){
+        parent.conduits.push({
+          conduit_id:readImportField(r,['conduit_id','id'])||'',
+          type:readImportField(r,['type'])||'',
+          material:readImportField(r,['material','Material'])||defaultConduitMaterial(readImportField(r,['type'])||''),
+          trade_size:readImportField(r,['trade_size'])||'',
+          allowed_cable_group:readImportField(r,['allowed_cable_group'])||'',
+          ductbankTag:ductbankTag||parent.tag,
+          start_x:readImportField(r,['start_x'])||parent.start_x,
+          start_y:readImportField(r,['start_y'])||parent.start_y,
+          start_z:readImportField(r,['start_z'])||parent.start_z,
+          end_x:readImportField(r,['end_x'])||parent.end_x,
+          end_y:readImportField(r,['end_y'])||parent.end_y,
+          end_z:readImportField(r,['end_z'])||parent.end_z
+        });
+      }
+    });
+    return imported;
+  }
+
+  function stripDuctbankConduits(db){
+    const { conduits, ...rest } = db || {};
+    return rest;
+  }
+
+  function ductbankIdentity(db){
+    return normalizeImportTag(db?.tag)||normalizeImportTag(db?.id)||normalizeImportTag(db?.ductbank_id);
+  }
+
+  function flattenDuctbankConduits(rows){
+    return (rows||[]).flatMap(db=>(db.conduits||[]).map(c=>{
+      const parent=db.tag||db.id||c.ductbankTag||'';
+      const conduitId=c.conduit_id||c.id||c.ref||'';
+      return {
+        ...c,
+        ductbankTag:c.ductbankTag||db.tag,
+        __identity:parent&&conduitId?`${parent}::${conduitId}`:conduitId
+      };
+    }));
+  }
+
+  function previewDuctbankImport(currentRows,incomingRows,mode){
+    return {
+      ductbanks:previewRecordImport(
+        (currentRows||[]).map(stripDuctbankConduits),
+        (incomingRows||[]).map(stripDuctbankConduits),
+        { mode, identityFields:['tag','id','ductbank_id','ref'] }
+      ),
+      conduits:previewRecordImport(
+        flattenDuctbankConduits(currentRows),
+        flattenDuctbankConduits(incomingRows),
+        { mode, identityFields:['__identity','conduit_id','id','ref'] }
+      )
+    };
+  }
+
+  function mergeDuctbankImportRows(currentRows,incomingRows,mode){
+    if(mode==='append') return [...currentRows.map(cloneData), ...incomingRows.map(cloneData)];
+    if(mode==='replace') return incomingRows.map(cloneData);
+    const next=currentRows.map(cloneData);
+    const index=new Map();
+    next.forEach((db,idx)=>{
+      const key=ductbankIdentity(db);
+      if(key&&!index.has(key)) index.set(key,idx);
+    });
+    incomingRows.forEach(imported=>{
+      const key=ductbankIdentity(imported);
+      const existingIndex=key?index.get(key):undefined;
+      if(existingIndex===undefined){
+        next.push(cloneData(imported));
+        return;
+      }
+      const existing=next[existingIndex];
+      const top=applyRecordImport(
+        [stripDuctbankConduits(existing)],
+        [stripDuctbankConduits(imported)],
+        { mode:'merge', identityFields:['tag','id','ductbank_id','ref'] }
+      )[0];
+      const conduits=applyRecordImport(
+        existing.conduits||[],
+        imported.conduits||[],
+        { mode:'merge', identityFields:['conduit_id','id','ref'] }
+      ).map(c=>({
+        ...c,
+        ductbankTag:c.ductbankTag||top.tag||existing.tag
+      }));
+      next[existingIndex]={...existing,...top,conduits};
+    });
+    return next;
+  }
+
+  async function chooseDuctbankImportMode(importedRows){
+    let modeSelect=null;
+    let previewPanel=null;
+    const refreshPreview=()=>{
+      if(!previewPanel) return;
+      const mode=modeSelect?.value||'merge';
+      const preview=previewDuctbankImport(ductbanks,importedRows,mode);
+      previewPanel.innerHTML=`
+        <p><strong>Ductbanks:</strong> ${preview.ductbanks.creates} create, ${preview.ductbanks.updates} update, ${preview.ductbanks.conflicts} conflict, ${preview.ductbanks.unchanged} unchanged.</p>
+        <p><strong>Conduits:</strong> ${preview.conduits.creates} create, ${preview.conduits.updates} update, ${preview.conduits.conflicts} conflict, ${preview.conduits.unchanged} unchanged.</p>
+        <p>${preview.ductbanks.preserved} existing ductbank row(s) preserved${preview.ductbanks.removed?`, ${preview.ductbanks.removed} removed by replace mode`:''}. Merge keeps existing non-empty values when conflicts are found.</p>
+      `;
+    };
+    return openModal({
+      title:'Preview Ductbank Import',
+      description:'Choose how the workbook should be applied before updating the ductbank schedule.',
+      primaryText:'Apply Import',
+      secondaryText:'Cancel',
+      defaultWidth:'wide',
+      render(body){
+        const modeLabel=document.createElement('label');
+        modeLabel.className='modal-form-field';
+        modeLabel.textContent='Import Mode';
+        modeSelect=document.createElement('select');
+        [
+          ['merge','Merge with existing rows (recommended)'],
+          ['append','Append as new rows'],
+          ['replace','Replace current ductbank schedule']
+        ].forEach(([value,text])=>{
+          const option=document.createElement('option');
+          option.value=value;
+          option.textContent=text;
+          modeSelect.appendChild(option);
+        });
+        modeSelect.addEventListener('change',refreshPreview);
+        modeLabel.appendChild(modeSelect);
+        previewPanel=document.createElement('div');
+        previewPanel.className='import-preview-list';
+        body.append(modeLabel,previewPanel);
+        refreshPreview();
+        return modeSelect;
+      },
+      onSubmit:()=>modeSelect?.value||'merge'
+    });
+  }
+
+  async function importDuctbankXlsx(file){
     if(!file) return;
     if(typeof XLSX==='undefined'){
       showAlertModal('Library Error', 'XLSX library not loaded.');
       return;
     }
-    const reader=new FileReader();
-    reader.onload=e=>{
-      const wb=XLSX.read(e.target.result,{type:'binary'});
+    try{
+      const buffer=await file.arrayBuffer();
+      const wb=XLSX.read(buffer,{type:'array'});
       const dbSheet=wb.Sheets['Ductbanks']||wb.Sheets[wb.SheetNames[0]];
       const cSheet=wb.Sheets['Conduits']||wb.Sheets[wb.SheetNames[1]];
 
@@ -714,55 +895,19 @@ import { showAlertModal } from './src/components/modal.js';
 
       const dbJson=XLSX.utils.sheet_to_json(dbSheet,{defval:''});
       const cJson=XLSX.utils.sheet_to_json(cSheet,{defval:''});
-      const normalizeTag=s=>String(s||'').trim().toLowerCase();
-      const mapByTag={};
-      const mapById={};
-      ductbanks=dbJson.map(r=>{
-        const db={
-          id:r['ductbank_id']||r['id']||Date.now()+Math.random(),
-          tag:r['tag']||'',
-          from:r['from']||'',
-          to:r['to']||'',
-          concrete_encasement:r['concrete_encasement']==='1'||r['concrete_encasement']==='true'||r['concrete_encasement']===true,
-          start_x:r['start_x']||'',
-          start_y:r['start_y']||'',
-          start_z:r['start_z']||'',
-          end_x:r['end_x']||'',
-          end_y:r['end_y']||'',
-          end_z:r['end_z']||'',
-          conduits:[],
-          expanded:false
-        };
-        mapByTag[normalizeTag(db.tag)]=db;
-        mapById[String(db.id)]=db;
-        return db;
-      });
-      cJson.forEach(r=>{
-        const p=mapByTag[normalizeTag(r['ductbankTag'])]||mapById[String(r['ductbank_id'])];
-        if(p){
-          p.conduits.push({
-            conduit_id:r['conduit_id']||'',
-            type:r['type']||'',
-            material:r['material']||r['Material']||defaultConduitMaterial(r['type']||''),
-            trade_size:r['trade_size']||'',
-            allowed_cable_group:r['allowed_cable_group']||'',
-            ductbankTag:r['ductbankTag']||p.tag,
-            start_x:r['start_x']||p.start_x,
-            start_y:r['start_y']||p.start_y,
-            start_z:r['start_z']||p.start_z,
-            end_x:r['end_x']||p.end_x,
-            end_y:r['end_y']||p.end_y,
-            end_z:r['end_z']||p.end_z
-          });
-        }
-      });
+      const importedDuctbanks=parseImportedDuctbanks(dbJson,cJson);
+      const mode=await chooseDuctbankImportMode(importedDuctbanks);
+      if(!mode) return;
+      ductbanks=mergeDuctbankImportRows(ductbanks,importedDuctbanks,mode);
       renderDuctbanks();
       saveDuctbanks();
       if (typeof document !== 'undefined' && document.dispatchEvent) {
         document.dispatchEvent(new Event('imports-ready'));
       }
-    };
-    reader.readAsBinaryString(file);
+    }catch(error){
+      console.error('Failed to import ductbank workbook', error);
+      showAlertModal('Import Error', 'Unable to read the selected ductbank workbook.');
+    }
   }
 
   function ductbankIndexFromRow(row){

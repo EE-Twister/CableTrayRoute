@@ -25,10 +25,13 @@ The Load List page is designed for fast load entry first, with deeper engineerin
 
 - **Import CSV** opens a mapping step when headers are present so non-native column names can be matched to Load List fields.
 - **Import JSON** accepts native load data and can also map non-native object keys.
+- Imports show replace and merge counts before changes are applied. Merge matches by `ref`, `id`, `tag`, or description and does not delete existing rows absent from the import.
 - **Export CSV**, **Export JSON**, and **Copy Table** include calculated kVA, current, demand kVA, and demand kW.
 
 ## Downstream Workflow
 
 - Summary cards show total loads, connected kW, demand kVA, missing electrical fields, missing source values, and high-demand loads.
+- Source / Panel fields suggest Equipment List tags when equipment records are available.
+- Validation groups blockers by missing source, kW, voltage, power factor, and phases.
 - The source summary groups totals by Source / Panel.
-- Use **Demand**, **Panel**, and **One-Line** actions to continue into demand scheduling, panel assignment, and one-line work.
+- Use the next-action strip to continue to One-Line once loads are complete, or continue directly to Cable Schedule when the project path does not need a diagram first.

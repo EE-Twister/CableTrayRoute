@@ -6,6 +6,7 @@ const NAV_ROUTES = [
   { href: 'equipmentarrangements.html', label: 'Equipment Arrangements', section: 'Workflow', group: 'Planning', icon: 'icons/equipment.svg' },
   { href: 'mcclineup.html', label: 'MCC Lineups', section: 'Workflow', group: 'Planning', icon: 'icons/components/MCC.svg' },
   { href: 'loadlist.html', label: 'Load List', section: 'Workflow', group: 'Planning', icon: 'icons/load.svg' },
+  { href: 'oneline.html', label: 'One-Line', section: 'Workflow', group: 'Planning', icon: 'icons/oneline.svg' },
   { href: 'demandschedule.html', label: 'Demand Schedule', section: 'Studies', group: 'Equipment Sizing', icon: 'icons/load.svg' },
   { href: 'cableschedule.html', label: 'Cable Schedule', section: 'Workflow', group: 'Cable', icon: 'icons/cable.svg' },
   { href: 'panelschedule.html', label: 'Panel Schedule', section: 'Workflow', group: 'Cable', icon: 'icons/panel.svg' },
@@ -35,7 +36,6 @@ const NAV_ROUTES = [
   { href: 'productconfig.html', label: 'Product Configurator', section: 'Workflow', group: 'Deliverables', icon: 'icons/toolbar/grid-size.svg' },
   { href: 'intlCableSize.html', label: 'Intl Cable Sizing', section: 'Studies', group: 'Cable', icon: 'icons/cable.svg' },
   { href: 'iec60287.html', label: 'IEC 60287 Ampacity', section: 'Studies', group: 'Cable', icon: 'icons/cable.svg' },
-  { href: 'oneline.html', label: 'One-Line', section: 'Workflow', group: 'Planning', icon: 'icons/oneline.svg' },
   { href: 'tcc.html', label: 'TCC', section: 'Studies', group: 'Protection', icon: 'icons/toolbar/validate.svg' },
   { href: 'harmonics.html', label: 'Harmonics', section: 'Studies', group: 'Power Quality', icon: 'icons/toolbar/grid-size.svg' },
   { href: 'capacitorbank.html', label: 'Capacitor Bank', section: 'Studies', group: 'Power Quality', icon: 'icons/toolbar/grid-size.svg' },
@@ -145,7 +145,7 @@ function buildDropdown(section, routes, currentRoute) {
   }, {});
   const groupNames = Object.keys(groupedRoutes);
   const sectionGroupOrder = {
-    Workflow: ['Planning', 'Raceway', 'Cable', 'Structural', 'Validation', 'Optimization', 'Deliverables'],
+    Workflow: ['Planning', 'Cable', 'Raceway', 'Optimization', 'Structural', 'Validation', 'Deliverables'],
     Studies: ['Grounding', 'Corrosion Control', 'Cable', 'Protection', 'Power System', 'Power Quality', 'Equipment Sizing', 'Motor', 'Renewable']
   };
   const orderedGroupNames = [
@@ -367,7 +367,7 @@ function mountPersistentNavigation() {
     toggleBtn.setAttribute('aria-label', 'Toggle sidebar navigation');
     toggleBtn.setAttribute('aria-expanded', 'false');
     toggleBtn.setAttribute('aria-controls', 'app-sidebar-nav');
-    toggleBtn.innerHTML = '<img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon">';
+    toggleBtn.innerHTML = '<img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon"><span class="sidebar-toggle-label">Menu</span>';
     topNav.insertBefore(toggleBtn, topNav.firstChild);
   }
 

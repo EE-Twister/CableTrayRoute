@@ -7,6 +7,22 @@ export const SCHEMA_VERSION = 1;
 
 export const SAMPLE_REGISTRY = [
   {
+    id: 'project-workflow-core',
+    title: 'Project Workflow Core',
+    industry: 'Industrial Electrical',
+    description: 'A complete project path from equipment and loads through one-line reconciliation, cable schedule, raceways, routing readiness, study results, and report snapshot.',
+    tags: ['workflow', 'equipment', 'loads', 'one-line', 'routing'],
+    projectFile: 'samples/project-workflow-core.json',
+    pagesUsed: ['equipmentlist.html', 'loadlist.html', 'oneline.html', 'workflowdashboard.html', 'cableschedule.html', 'racewayschedule.html', 'projectreport.html'],
+    guidedChecklist: [
+      { step: 1, label: 'Review equipment list', page: 'equipmentlist.html', hint: 'Confirm switchboard, MCC, transformer, panel, and process equipment tags.' },
+      { step: 2, label: 'Review load list', page: 'loadlist.html', hint: 'Check source links back to equipment tags and confirm required electrical fields.' },
+      { step: 3, label: 'Open one-line', page: 'oneline.html', hint: 'Review linked components and run Reconcile Schedules if pending.' },
+      { step: 4, label: 'Check dashboard', page: 'workflowdashboard.html', hint: 'Use blockers and project health to confirm the workflow path.' },
+      { step: 5, label: 'Review deliverables', page: 'projectreport.html', hint: 'Inspect the saved report snapshot and release package context.' },
+    ],
+  },
+  {
     id: 'industrial-plant',
     title: 'Industrial Plant',
     industry: 'Oil & Gas / Industrial',
@@ -130,9 +146,11 @@ export function validateSampleProject(obj) {
   if (typeof obj.id !== 'string' || !obj.id) errors.push('Missing id');
   if (typeof obj.title !== 'string' || !obj.title) errors.push('Missing title');
   if (!Array.isArray(obj.cables)) errors.push('Missing cables array');
-  if (typeof obj.raceways !== 'object' || obj.raceways === null) {
-    errors.push('Missing raceways object');
-  } else {
+  const hasNestedRaceways = obj.raceways && typeof obj.raceways === 'object';
+  const hasTopLevelRaceways = Array.isArray(obj.trays) && Array.isArray(obj.conduits) && Array.isArray(obj.ductbanks);
+  if (!hasNestedRaceways && !hasTopLevelRaceways) {
+    errors.push('Missing raceway arrays');
+  } else if (hasNestedRaceways) {
     if (!Array.isArray(obj.raceways.trays)) errors.push('Missing raceways.trays array');
     if (!Array.isArray(obj.raceways.conduits)) errors.push('Missing raceways.conduits array');
     if (!Array.isArray(obj.raceways.ductbanks)) errors.push('Missing raceways.ductbanks array');
@@ -153,4 +171,28 @@ export function migrateSampleProject(obj) {
   }
   // Future version bumps go here as: if (copy.schemaVersion < N) { ... copy.schemaVersion = N; }
   return copy;
+}
+
+export function sampleProjectToImportPayload(obj = {}) {
+  const raceways = obj.raceways || {};
+  const settings = { ...(obj.settings || {}) };
+  ['studies', 'reportSnapshots', 'lifecyclePackages', 'oneLineScheduleReconcilePending'].forEach(key => {
+    if (Object.prototype.hasOwnProperty.call(obj, key) && !Object.prototype.hasOwnProperty.call(settings, key)) {
+      settings[key] = obj[key];
+    }
+  });
+  return {
+    meta: obj.meta || { version: 1, scenario: 'default', scenarios: ['default'] },
+    ductbanks: Array.isArray(obj.ductbanks) ? obj.ductbanks : (Array.isArray(raceways.ductbanks) ? raceways.ductbanks : []),
+    conduits: Array.isArray(obj.conduits) ? obj.conduits : (Array.isArray(raceways.conduits) ? raceways.conduits : []),
+    trays: Array.isArray(obj.trays) ? obj.trays : (Array.isArray(raceways.trays) ? raceways.trays : []),
+    cables: Array.isArray(obj.cables) ? obj.cables : [],
+    cableTypicals: Array.isArray(obj.cableTypicals) ? obj.cableTypicals : [],
+    panels: Array.isArray(obj.panels) ? obj.panels : [],
+    equipment: Array.isArray(obj.equipment) ? obj.equipment : [],
+    loads: Array.isArray(obj.loads) ? obj.loads : [],
+    oneLine: obj.oneLine || obj.oneline || { activeSheet: 0, sheets: [] },
+    mccLineups: Array.isArray(obj.mccLineups) ? obj.mccLineups : [],
+    settings
+  };
 }

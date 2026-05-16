@@ -289,18 +289,31 @@
         display: flex;
         align-items: center;
         justify-content: center;
+        gap: 0.35rem;
         order: 0;
         background: var(--color-primary);
         border: none;
         border-radius: 0.35rem;
-        font-size: 1.25rem;
+        font-size: 0.84rem;
+        font-weight: 750;
         cursor: pointer;
         color: #fff;
-        min-width: 40px;
+        min-width: 5.2rem;
         min-height: 36px;
         flex-shrink: 0;
-        padding: 0 0.5rem;
+        padding: 0 0.7rem;
         box-shadow: 0 1px 3px rgba(0,0,0,0.25);
+    }
+}
+
+.sidebar-toggle-label {
+    display: none;
+}
+
+@media (max-width: 700px) {
+    .sidebar-toggle-label {
+        display: inline;
+        line-height: 1;
     }
 }
 
@@ -459,6 +472,25 @@
 
 .nav-brand-name {
     @media (max-width: 480px) {
+        display: none;
+    }
+}
+
+.project-display-chip {
+    display: inline-flex;
+    align-items: center;
+    min-height: 1.8rem;
+    max-width: min(28vw, 18rem);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--color-text-muted);
+    font-size: 0.82rem;
+    font-weight: 600;
+}
+
+@media (max-width: 900px) {
+    .project-display-chip {
         display: none;
     }
 }

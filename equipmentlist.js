@@ -1,5 +1,15 @@
 import * as dataStore from './dataStore.mjs';
 import './tableUtils.mjs';
+import { openModal, showAlertModal } from './src/components/modal.js';
+import {
+  applyBulkEquipmentUpdate,
+  inferEquipmentMapping,
+  mapRowsToEquipment,
+  mergeEquipmentRows,
+  previewEquipmentImport,
+  starterEquipment,
+  summarizeEquipment
+} from './analysis/equipmentWorkflow.mjs';
 
 if (typeof window !== 'undefined') {
   window.addEventListener('DOMContentLoaded', () => {
@@ -52,11 +62,8 @@ if (typeof window !== 'undefined') {
       tableId: 'equipment-table',
       storageKey: TableUtils.STORAGE_KEYS.equipment,
       columnsKey: TableUtils.STORAGE_KEYS.equipmentColumns,
-      addRowBtnId: 'add-row-btn',
       deleteSelectedBtnId: 'delete-selected-btn',
       exportBtnId: 'export-xlsx-btn',
-      importInputId: 'import-xlsx-input',
-      importBtnId: 'import-xlsx-btn',
       selectable: true,
       enableContextMenu: true,
       showActionColumn: false,
@@ -87,6 +94,15 @@ if (typeof window !== 'undefined') {
     const resultsCount = document.getElementById('equipment-results-count');
     const quickFilters = document.getElementById('equipment-quick-filters');
     const validationSummary = document.getElementById('equipment-validation-summary');
+    const summaryCards = document.getElementById('equipment-summary-cards');
+    const emptyGuide = document.getElementById('equipment-empty-guide');
+    const starterBtn = document.getElementById('load-starter-equipment-btn');
+    const emptyAddBtn = document.getElementById('empty-add-equipment-btn');
+    const emptyImportBtn = document.getElementById('empty-import-equipment-btn');
+    const emptyStarterBtn = document.getElementById('empty-starter-equipment-btn');
+    const addEquipmentBtn = document.getElementById('add-row-btn');
+    const importXlsxBtn = document.getElementById('import-xlsx-btn');
+    const importXlsxInput = document.getElementById('import-xlsx-input');
 
     const presets = Array.isArray(dataStore.getEquipmentFilterPresets()) ? dataStore.getEquipmentFilterPresets() : [];
 
@@ -99,6 +115,33 @@ if (typeof window !== 'undefined') {
     };
 
     const getVisibleRowCount = () => Array.from(table.tbody.rows).filter(row => row.style.display !== 'none').length;
+    const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, ch => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;'
+    })[ch]);
+
+    const renderEquipmentSummary = () => {
+      if (!summaryCards) return;
+      const summary = summarizeEquipment(table.getData());
+      const cards = [
+        { label: 'Equipment', value: summary.total },
+        { label: 'Missing Tags', value: summary.missingTags, warn: summary.missingTags > 0 },
+        { label: 'Duplicate Tags', value: summary.duplicateTags, warn: summary.duplicateTags > 0 },
+        { label: 'Missing Voltage', value: summary.missingVoltage, warn: summary.missingVoltage > 0 },
+        { label: 'Missing Manufacturer', value: summary.missingManufacturer, warn: summary.missingManufacturer > 0 },
+        { label: 'Arrangements', value: summary.assignedArrangements }
+      ];
+      summaryCards.innerHTML = cards.map(card => `
+        <article class="workflow-summary-card${card.warn ? ' workflow-summary-card--warn' : ''}">
+          <span>${escapeHtml(card.label)}</span>
+          <strong>${escapeHtml(card.value)}</strong>
+        </article>
+      `).join('');
+      if (emptyGuide) emptyGuide.hidden = summary.total > 0;
+    };
 
     const updateResultSummary = () => {
       if (!resultsCount) return;
@@ -215,6 +258,7 @@ if (typeof window !== 'undefined') {
           ? `${issueCount} validation issue${issueCount === 1 ? '' : 's'} detected. Fix highlighted cells.`
           : 'No validation issues detected.';
       }
+      renderEquipmentSummary();
     };
 
     applyEquipmentFilters = () => {
@@ -259,6 +303,274 @@ if (typeof window !== 'undefined') {
       }
     };
 
+    const commitEquipmentRows = rows => {
+      table.setData(rows);
+      table.save();
+      if (table.onChange) table.onChange();
+    };
+
+    const openEquipmentModal = async () => {
+      const result = await openModal({
+        title: 'Add Equipment',
+        description: 'Capture the fields downstream modules need for load source links and one-line references.',
+        primaryText: 'Add Equipment',
+        secondaryText: 'Cancel',
+        defaultWidth: 'medium',
+        render(body, controller) {
+          const form = document.createElement('form');
+          form.className = 'modal-form equipment-modal-form';
+          form.innerHTML = `
+            <label>Equipment Tag<input name="tag" type="text" placeholder="SWBD-101" required></label>
+            <label>Description<input name="description" type="text" placeholder="480 V main switchboard"></label>
+            <label>Voltage<input name="voltage" type="text" placeholder="480/277" required></label>
+            <label>Category<input name="category" type="text" placeholder="Distribution"></label>
+            <label>Sub-Category<input name="subCategory" type="text" placeholder="Switchboard"></label>
+            <label>Arrangement<input name="arrangement" type="text" placeholder="Electrical Room A"></label>
+            <label>Lineup<input name="lineup" type="text" placeholder="SWBD-101"></label>
+            <label>Manufacturer<input name="manufacturer" type="text" placeholder="Square D"></label>
+            <label>Model<input name="model" type="text" placeholder="Power-Style QED"></label>
+            <label>Phases<input name="phases" type="text" placeholder="3"></label>
+            <label class="modal-form-field--full">Notes<input name="notes" type="text" placeholder="Main service equipment"></label>
+          `;
+          body.appendChild(form);
+          controller.registerForm(form);
+          return form.querySelector('input[name="tag"]');
+        },
+        onSubmit(controller) {
+          const form = controller.body.querySelector('form');
+          const data = Object.fromEntries(new FormData(form).entries());
+          if (!String(data.tag || '').trim()) {
+            form.querySelector('[name="tag"]').focus();
+            return false;
+          }
+          return data;
+        }
+      });
+      if (!result) return;
+      table.addRow(result);
+      table.save();
+      if (table.onChange) table.onChange();
+    };
+
+    const getSelectedIndexes = () => Array.from(table.tbody.rows)
+      .map((row, index) => ({ row, index }))
+      .filter(entry => entry.row.querySelector('.row-select')?.checked)
+      .map(entry => entry.index);
+
+    const openBulkModal = async (field, title, label) => {
+      const indexes = getSelectedIndexes();
+      if (!indexes.length) {
+        await showAlertModal('No Rows Selected', 'Select one or more equipment rows before applying a bulk update.');
+        return;
+      }
+      const result = await openModal({
+        title,
+        description: `${indexes.length} selected equipment row${indexes.length === 1 ? '' : 's'} will be updated.`,
+        primaryText: 'Apply',
+        secondaryText: 'Cancel',
+        render(body, controller) {
+          const form = document.createElement('form');
+          form.className = 'modal-form equipment-bulk-form';
+          form.innerHTML = `<label>${escapeHtml(label)}<input name="value" type="text" required></label>`;
+          body.appendChild(form);
+          controller.registerForm(form);
+          return form.querySelector('input');
+        },
+        onSubmit(controller) {
+          const input = controller.body.querySelector('[name="value"]');
+          return String(input.value || '').trim();
+        }
+      });
+      if (result === null) return;
+      commitEquipmentRows(applyBulkEquipmentUpdate(table.getData(), indexes, field, result));
+    };
+
+    const loadStarterEquipment = () => {
+      const current = table.getData().filter(row => Object.values(row).some(value => String(value || '').trim()));
+      const next = current.length ? mergeEquipmentRows(current, starterEquipment) : starterEquipment;
+      commitEquipmentRows(next);
+    };
+
+    const parseCsvLine = line => {
+      const cells = [];
+      let current = '';
+      let quoted = false;
+      for (let i = 0; i < line.length; i += 1) {
+        const ch = line[i];
+        if (ch === '"' && quoted && line[i + 1] === '"') {
+          current += '"';
+          i += 1;
+        } else if (ch === '"') {
+          quoted = !quoted;
+        } else if (ch === ',' && !quoted) {
+          cells.push(current.trim());
+          current = '';
+        } else {
+          current += ch;
+        }
+      }
+      cells.push(current.trim());
+      return cells;
+    };
+
+    const parseCsvText = text => {
+      const lines = String(text || '').split(/\r?\n/).filter(line => line.trim());
+      if (!lines.length) return { headers: [], rows: [] };
+      const headers = parseCsvLine(lines[0]).map(header => header.trim());
+      const rows = lines.slice(1).map(parseCsvLine);
+      return { headers, rows };
+    };
+
+    const parseXlsxFile = file => new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = e => {
+        try {
+          const wb = XLSX.read(e.target.result, { type: 'binary' });
+          const sheet = wb.Sheets[wb.SheetNames[0]];
+          const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+          const headers = (rows.shift() || []).map(header => String(header || '').trim());
+          resolve({ headers, rows });
+        } catch (err) {
+          reject(err);
+        }
+      };
+      reader.onerror = () => reject(reader.error);
+      reader.readAsBinaryString(file);
+    });
+
+    const parseXmlText = text => {
+      const doc = new DOMParser().parseFromString(text, 'application/xml');
+      const items = Array.from(doc.getElementsByTagName('equipment'))
+        .concat(Array.from(doc.getElementsByTagName('item')));
+      const headers = new Set();
+      const rows = items.map(el => {
+        const row = {};
+        Array.from(el.children).forEach(child => {
+          headers.add(child.tagName);
+          row[child.tagName] = child.textContent || '';
+        });
+        return row;
+      });
+      return { headers: Array.from(headers), rows };
+    };
+
+    const openImportMappingModal = async headers => {
+      const fields = ['id', 'ref', 'tag', 'description', 'voltage', 'category', 'subCategory', 'arrangement', 'width', 'depth', 'height', 'baseElevation', 'lineup', 'manufacturer', 'model', 'phases', 'notes', 'x', 'y', 'z'];
+      const inferred = inferEquipmentMapping(headers);
+      headers.forEach(header => {
+        if (!inferred[header] && fieldMap[header]) inferred[header] = fieldMap[header];
+      });
+      return openModal({
+        title: 'Map Equipment Import',
+        description: 'Review how incoming columns should map before replacing or merging equipment records.',
+        primaryText: 'Preview Import',
+        secondaryText: 'Cancel',
+        defaultWidth: 'wide',
+        render(body, controller) {
+          const form = document.createElement('form');
+          form.className = 'modal-form import-mapping-form';
+          form.innerHTML = `
+            <div class="import-mapping-grid">
+              ${headers.map((header, index) => `
+                <label>
+                  <span>${escapeHtml(header)}</span>
+                  <select name="import-field-${index}" data-header-index="${index}">
+                    <option value="">Do not import</option>
+                    ${fields.map(field => `<option value="${field}"${inferred[header] === field ? ' selected' : ''}>${field}</option>`).join('')}
+                  </select>
+                </label>
+              `).join('')}
+            </div>
+          `;
+          body.appendChild(form);
+          controller.registerForm(form);
+          return form.querySelector('select');
+        },
+        onSubmit(controller) {
+          const form = controller.body.querySelector('form');
+          const mapping = {};
+          headers.forEach((header, index) => {
+            const value = form.elements[`import-field-${index}`]?.value || '';
+            if (value) mapping[header] = value;
+          });
+          if (!Object.keys(mapping).length) return false;
+          return mapping;
+        }
+      });
+    };
+
+    const openEquipmentImportPreview = async incomingRows => {
+      const preview = previewEquipmentImport(table.getData(), incomingRows);
+      return openModal({
+        title: 'Preview Equipment Import',
+        description: 'Choose whether this import replaces the current Equipment List or merges by ref, id, or tag.',
+        primaryText: 'Replace Existing',
+        secondaryText: 'Cancel',
+        defaultWidth: 'medium',
+        render(body, controller) {
+          const mergeBtn = document.createElement('button');
+          mergeBtn.type = 'button';
+          mergeBtn.className = 'btn';
+          mergeBtn.textContent = 'Merge Records';
+          mergeBtn.addEventListener('click', () => controller.close({ mode: 'merge' }));
+          const summary = document.createElement('div');
+          summary.className = 'import-preview-list';
+          summary.innerHTML = `
+            <p><strong>${preview.incoming}</strong> incoming records found.</p>
+            <ul>
+              <li>Replace would write ${preview.replaceCount} records.</li>
+              <li>Merge would create ${preview.mergeCreates}, update ${preview.mergeUpdates}, and leave ${preview.mergeUnchanged} unchanged.</li>
+              <li>Merge does not delete existing equipment rows that are absent from the import.</li>
+            </ul>
+          `;
+          body.appendChild(summary);
+          body.appendChild(mergeBtn);
+        },
+        onSubmit() {
+          return { mode: 'replace' };
+        }
+      });
+    };
+
+    const handleImportRows = async ({ headers, rows }) => {
+      if (!headers.length || !rows.length) {
+        await showAlertModal('No Import Rows', 'The selected file did not contain equipment rows to import.');
+        return;
+      }
+      const mapping = await openImportMappingModal(headers);
+      if (!mapping) return;
+      const incomingRows = mapRowsToEquipment(rows, headers, mapping);
+      if (!incomingRows.length) {
+        await showAlertModal('No Equipment Records', 'The selected mapping did not produce any equipment records.');
+        return;
+      }
+      const decision = await openEquipmentImportPreview(incomingRows);
+      if (!decision) return;
+      commitEquipmentRows(decision.mode === 'merge'
+        ? mergeEquipmentRows(table.getData(), incomingRows)
+        : incomingRows);
+    };
+
+    if (addEquipmentBtn) addEquipmentBtn.addEventListener('click', openEquipmentModal);
+    if (emptyAddBtn) emptyAddBtn.addEventListener('click', openEquipmentModal);
+    if (starterBtn) starterBtn.addEventListener('click', loadStarterEquipment);
+    if (emptyStarterBtn) emptyStarterBtn.addEventListener('click', loadStarterEquipment);
+    if (emptyImportBtn && importXlsxInput) emptyImportBtn.addEventListener('click', () => importXlsxInput.click());
+    if (importXlsxBtn && importXlsxInput) {
+      importXlsxBtn.addEventListener('click', () => importXlsxInput.click());
+      importXlsxInput.addEventListener('change', async e => {
+        const file = e.target.files[0];
+        e.target.value = '';
+        if (!file) return;
+        try {
+          await handleImportRows(await parseXlsxFile(file));
+        } catch (err) {
+          console.error('[equipmentlist] XLSX import failed:', err);
+          await showAlertModal('Import Failed', 'The selected XLSX file could not be imported.');
+        }
+      });
+    }
+
     if (searchInput) {
       table.globalFilterCols = ['tag', 'description', 'arrangement', 'lineup', 'manufacturer', 'category', 'model'];
       searchInput.addEventListener('input', applyEquipmentFilters);
@@ -302,72 +614,15 @@ if (typeof window !== 'undefined') {
     }
 
     if (bulkCategoryBtn) {
-      bulkCategoryBtn.addEventListener('click', () => {
-        const targetCategory = window.prompt('Set selected rows to category:');
-        if (targetCategory === null) return;
-        const categoryValue = targetCategory.trim();
-        const categoryIdx = getColumnIndex('category');
-        if (categoryIdx === -1) return;
-        const selectedRows = Array.from(table.tbody.rows).filter(row => {
-          const checkbox = row.querySelector('.row-select');
-          return checkbox && checkbox.checked;
-        });
-        selectedRows.forEach(row => {
-          const cell = row.cells[categoryIdx + table.colOffset];
-          const input = cell && cell.firstChild ? cell.firstChild : null;
-          if (input) input.value = categoryValue;
-        });
-        if (selectedRows.length) {
-          table.save();
-          if (table.onChange) table.onChange();
-        }
-      });
+      bulkCategoryBtn.addEventListener('click', () => openBulkModal('category', 'Set Equipment Category', 'Category'));
     }
 
     if (bulkArrangementBtn) {
-      bulkArrangementBtn.addEventListener('click', () => {
-        const targetArrangement = window.prompt('Assign selected rows to arrangement:');
-        if (targetArrangement === null) return;
-        const arrangementValue = targetArrangement.trim();
-        const arrangementIdx = getColumnIndex('arrangement');
-        if (arrangementIdx === -1) return;
-        const selectedRows = Array.from(table.tbody.rows).filter(row => {
-          const checkbox = row.querySelector('.row-select');
-          return checkbox && checkbox.checked;
-        });
-        selectedRows.forEach(row => {
-          const cell = row.cells[arrangementIdx + table.colOffset];
-          const input = cell && cell.firstChild ? cell.firstChild : null;
-          if (input) input.value = arrangementValue;
-        });
-        if (selectedRows.length) {
-          table.save();
-          if (table.onChange) table.onChange();
-        }
-      });
+      bulkArrangementBtn.addEventListener('click', () => openBulkModal('arrangement', 'Assign Equipment Arrangement', 'Arrangement'));
     }
 
     if (bulkLineupBtn) {
-      bulkLineupBtn.addEventListener('click', () => {
-        const targetLineup = window.prompt('Assign selected rows to lineup:');
-        if (targetLineup === null) return;
-        const lineupValue = targetLineup.trim();
-        const lineupIdx = getColumnIndex('lineup');
-        if (lineupIdx === -1) return;
-        const selectedRows = Array.from(table.tbody.rows).filter(row => {
-          const checkbox = row.querySelector('.row-select');
-          return checkbox && checkbox.checked;
-        });
-        selectedRows.forEach(row => {
-          const cell = row.cells[lineupIdx + table.colOffset];
-          const input = cell && cell.firstChild ? cell.firstChild : null;
-          if (input) input.value = lineupValue;
-        });
-        if (selectedRows.length) {
-          table.save();
-          if (table.onChange) table.onChange();
-        }
-      });
+      bulkLineupBtn.addEventListener('click', () => openBulkModal('lineup', 'Assign Equipment Lineup', 'Lineup'));
     }
 
     if (clearFiltersBtn) {
@@ -490,8 +745,8 @@ if (typeof window !== 'undefined') {
     const csvInput = document.getElementById('import-csv-input');
     if (csvBtn && csvInput) {
       csvBtn.addEventListener('click', () => csvInput.click());
-      csvInput.addEventListener('change', e => {
-        importCsv(e.target.files[0]);
+      csvInput.addEventListener('change', async e => {
+        await importCsv(e.target.files[0]);
         e.target.value = '';
       });
     }
@@ -500,66 +755,52 @@ if (typeof window !== 'undefined') {
     const xmlInput = document.getElementById('import-xml-input');
     if (xmlBtn && xmlInput) {
       xmlBtn.addEventListener('click', () => xmlInput.click());
-      xmlInput.addEventListener('change', e => {
-        importXml(e.target.files[0]);
+      xmlInput.addEventListener('change', async e => {
+        await importXml(e.target.files[0]);
         e.target.value = '';
       });
     }
 
-    function mapExternal(obj = {}) {
-      const row = {};
-      Object.keys(fieldMap).forEach(key => {
-        const internal = fieldMap[key];
-        row[internal] = obj[key] || obj[key.toLowerCase()] || '';
-      });
-      return row;
-    }
-
     function importCsv(file) {
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = e => {
-        const text = e.target.result;
-        const lines = text.split(/\r?\n/).filter(l => l.trim());
-        if (!lines.length) return;
-        const headers = lines.shift().split(',').map(h => h.trim());
-        const rows = lines.map(line => {
-          const cells = line.split(',');
-          const obj = {};
-          headers.forEach((h, i) => obj[h] = cells[i] ? cells[i].trim() : '');
-          return obj;
-        });
-        table.tbody.innerHTML = '';
-        rows.forEach(r => table.addRow(mapExternal(r)));
-        table.applyFilters();
-        table.save();
-        if (table.onChange) table.onChange();
-      };
-      reader.readAsText(file);
+      if (!file) return Promise.resolve();
+      return new Promise(resolve => {
+        const reader = new FileReader();
+        reader.onload = async e => {
+          try {
+            await handleImportRows(parseCsvText(e.target.result));
+          } catch (err) {
+            console.error('[equipmentlist] CSV import failed:', err);
+            await showAlertModal('Import Failed', 'The selected CSV file could not be imported.');
+          }
+          resolve();
+        };
+        reader.onerror = async () => {
+          await showAlertModal('Import Failed', 'The selected CSV file could not be read.');
+          resolve();
+        };
+        reader.readAsText(file);
+      });
     }
 
     function importXml(file) {
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = e => {
-        const text = e.target.result;
-        const doc = new DOMParser().parseFromString(text, 'application/xml');
-        const items = Array.from(doc.getElementsByTagName('equipment'))
-          .concat(Array.from(doc.getElementsByTagName('item')));
-        table.tbody.innerHTML = '';
-        items.forEach(el => {
-          const obj = {};
-          Object.keys(fieldMap).forEach(key => {
-            const n = el.getElementsByTagName(key)[0];
-            if (n) obj[key] = n.textContent;
-          });
-          table.addRow(mapExternal(obj));
-        });
-        table.applyFilters();
-        table.save();
-        if (table.onChange) table.onChange();
-      };
-      reader.readAsText(file);
+      if (!file) return Promise.resolve();
+      return new Promise(resolve => {
+        const reader = new FileReader();
+        reader.onload = async e => {
+          try {
+            await handleImportRows(parseXmlText(e.target.result));
+          } catch (err) {
+            console.error('[equipmentlist] XML import failed:', err);
+            await showAlertModal('Import Failed', 'The selected XML file could not be imported.');
+          }
+          resolve();
+        };
+        reader.onerror = async () => {
+          await showAlertModal('Import Failed', 'The selected XML file could not be read.');
+          resolve();
+        };
+        reader.readAsText(file);
+      });
     }
   });
 }

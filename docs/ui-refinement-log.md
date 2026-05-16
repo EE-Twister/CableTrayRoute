@@ -13,7 +13,14 @@
 - Corrected Ductbank thermal estimates to use cable-specific temperature ratings, current-carrying conductor counts, equivalent conduit diameter in soil resistance, and burial-depth-aware finite solver boundaries.
 - Added an overview-card ampacity-over list so over-limit cable estimates are visible without opening the full ampacity table.
 - Split ductbank thermal and ampacity alerts into separate overview filters and scoped actionable warnings to the active filter.
-- Added native-soil context, grade line, and an elevation-to-grade callout to the ductbank route drawing.
+- Added scaled native-soil context, a sky band above grade, and an elevation-to-grade callout to the ductbank route drawing.
+- Reworked the Optimal Route page with opt-in page tour behavior, routing presets, readiness checks, clearer empty-state actions, result summary KPIs, route explanations, plot legend, row-to-model highlighting, before/after utilization, and grouped export/analysis/fill actions.
+- Reframed the Optimal Route results into a model-first review workspace, moved source tables into a secondary Source Data panel, and replaced stacked route cards with a compact route list table with expandable segment details.
+- Aligned the ductbank thermal heat map to the same scaled drawing origin as the ductbank, expanded surrounding soil by burial depth on each side, kept solver resolution independent of the visual earth/sky padding, and added an Earth/Sky Context toggle.
+- Prevented incomplete ductbank heat-source rows from being treated as a 0 F source at the ductbank origin, removing the false cold spot at the upper-left of the heat map.
+- Improved Fault Cable Bracing usability by making onboarding opt-in on that page, removing false invalid states from converted spacing inputs, and switching the primary action when users choose schedule evaluation.
+- Added a Fault Cable Bracing calculation setup review, clearer single-result decision summary, and schedule result triage with OD-source badges, fallback warnings, and highest-required-strength sorting.
+- Added lower-priority Fault Cable Bracing polish: common fault-current presets, keyboard arrow navigation for arrangement selection, copyable result summaries, and CSV export for schedule results.
 
 ## 2026-05-11
 

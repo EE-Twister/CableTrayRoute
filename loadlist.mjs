@@ -1,6 +1,12 @@
 import * as dataStore from './dataStore.mjs';
 import { escapeHtml as escapeAttr, escapeHtml } from './src/htmlUtils.mjs';
 import { openModal, showAlertModal } from './src/components/modal.js';
+import {
+  getEquipmentSourceOptions,
+  mergeLoadRows,
+  previewLoadImport,
+  summarizeLoadValidation
+} from './analysis/loadWorkflow.mjs';
 
 const E2E = typeof location !== 'undefined' && new URLSearchParams(location.search).has('e2e');
 if (E2E && typeof localStorage !== 'undefined' && new URLSearchParams(location.search).has('e2e_reset')) {
@@ -92,6 +98,7 @@ if (typeof window !== 'undefined') {
     const projectId = window.currentProjectId || 'default';
     dataStore.loadProject(projectId);
     dataStore.on(dataStore.STORAGE_KEYS.loads, () => dataStore.saveProject(projectId));
+    dataStore.on(dataStore.STORAGE_KEYS.equipment, () => refreshSourceOptions());
     initSettings();
     initDarkMode();
     initCompactMode();
@@ -110,6 +117,8 @@ if (typeof window !== 'undefined') {
     const quickFilterButtons = Array.from(document.querySelectorAll ? document.querySelectorAll('.loadlist-chip') : []);
     const summaryPanel = document.getElementById('load-summary-panel');
     const validationSummary = document.getElementById('load-validation-summary');
+    const nextActionEl = document.getElementById('load-next-action');
+    const sourceList = document.getElementById('load-source-list');
     const emptyGuide = document.getElementById('load-empty-guide');
     const sampleLoadsBtn = document.getElementById('load-sample-loads-btn');
     const batchEditBtn = document.getElementById('open-load-batch-btn');
@@ -491,17 +500,71 @@ if (typeof window !== 'undefined') {
   function updateValidationSummary(loads = dataStore.getLoads()) {
     if (!validationSummary) return;
     const visibleLoads = getVisibleLoads(loads);
-    const missingLoads = visibleLoads.filter(load => requiredMissing(load).length);
+    const validation = summarizeLoadValidation(visibleLoads);
     if (!visibleLoads.length) {
       validationSummary.textContent = '';
       validationSummary.className = 'load-validation-summary';
-    } else if (missingLoads.length) {
-      validationSummary.textContent = `${missingLoads.length} load${missingLoads.length === 1 ? '' : 's'} need Source, kW, Voltage, Power Factor, or Phases before demand studies and exports are complete.`;
+    } else if (validation.incomplete) {
+      const parts = [
+        validation.missingSource ? `${validation.missingSource} missing source` : '',
+        validation.missingKw ? `${validation.missingKw} missing kW` : '',
+        validation.missingVoltage ? `${validation.missingVoltage} missing voltage` : '',
+        validation.missingPowerFactor ? `${validation.missingPowerFactor} missing power factor` : '',
+        validation.missingPhases ? `${validation.missingPhases} missing phases` : ''
+      ].filter(Boolean);
+      validationSummary.textContent = `${validation.incomplete} load${validation.incomplete === 1 ? '' : 's'} need workflow fields: ${parts.join(', ')}.`;
       validationSummary.className = 'load-validation-summary is-warning';
     } else {
       validationSummary.textContent = 'All loads have the required source and electrical fields.';
       validationSummary.className = 'load-validation-summary is-success';
     }
+  }
+
+  function updateLoadNextAction(loads = dataStore.getLoads()) {
+    if (!nextActionEl) return;
+    const validation = summarizeLoadValidation(getVisibleLoads(loads));
+    if (!validation.total) {
+      nextActionEl.innerHTML = `
+        <div>
+          <strong>Next action: Add loads</strong>
+          <p>Use equipment tags as sources so the one-line and cable schedule can reconcile cleanly.</p>
+        </div>
+        <a class="btn primary-btn" href="equipmentlist.html">Review Equipment</a>
+      `;
+      return;
+    }
+    if (validation.incomplete) {
+      const blockerFilter = validation.missingSource ? 'missingSource' : 'missingElectrical';
+      nextActionEl.innerHTML = `
+        <div>
+          <strong>Next action: Complete load readiness</strong>
+          <p>${validation.incomplete} load${validation.incomplete === 1 ? '' : 's'} still need source, kW, voltage, power factor, or phases.</p>
+        </div>
+        <button class="btn primary-btn" type="button" data-filter="${blockerFilter}">Show Blockers</button>
+      `;
+      nextActionEl.querySelector('button')?.addEventListener('click', () => {
+        activeQuickFilter = blockerFilter;
+        quickFilterButtons.forEach(chip => chip.classList.toggle('active', chip.dataset.filter === activeQuickFilter));
+        render();
+      });
+      return;
+    }
+    nextActionEl.innerHTML = `
+      <div>
+        <strong>Next action: Continue to One-Line</strong>
+        <p>${validation.complete} load${validation.complete === 1 ? '' : 's'} are ready for diagram reconciliation, demand review, or cable schedule work.</p>
+      </div>
+      <span>
+        <a class="btn primary-btn" href="oneline.html">Continue to One-Line</a>
+        <a class="btn" href="cableschedule.html">Continue to Cable Schedule</a>
+      </span>
+    `;
+  }
+
+  function refreshSourceOptions() {
+    if (!sourceList) return;
+    const options = getEquipmentSourceOptions(dataStore.getEquipment());
+    sourceList.innerHTML = options.map(value => `<option value="${escapeAttr(value)}"></option>`).join('');
   }
 
   function updateEmptyGuide(loads = dataStore.getLoads()) {
@@ -510,8 +573,10 @@ if (typeof window !== 'undefined') {
   }
 
   function updateLoadStatus(loads = dataStore.getLoads()) {
+    refreshSourceOptions();
     updateSummaryCards(loads);
     updateValidationSummary(loads);
+    updateLoadNextAction(loads);
     updateEmptyGuide(loads);
   }
 
@@ -536,7 +601,7 @@ if (typeof window !== 'undefined') {
     tr.classList.add(rowClass);
     tr.innerHTML = `
       <td data-column="select" class="load-sticky-select"><input type="checkbox" class="row-select" aria-label="Select row"></td>
-      <td data-column="source" class="load-sticky-source"><input name="source" type="text" value="${escapeAttr(load.source || '')}" placeholder="SWBD-1"></td>
+      <td data-column="source" class="load-sticky-source"><input name="source" type="text" list="load-source-list" value="${escapeAttr(load.source || '')}" placeholder="SWBD-101"></td>
       <td data-column="tag" class="load-sticky-tag"><input name="tag" type="text" value="${escapeAttr(load.tag || '')}" placeholder="MTR-101"></td>
       <td data-column="description" class="load-sticky-description"><input name="description" type="text" value="${escapeAttr(load.description || '')}" placeholder="Load description"></td>
       <td data-column="manufacturer"><input name="manufacturer" type="text" class="manufacturer-input" value="${escapeAttr(load.manufacturer || '')}"></td>
@@ -962,7 +1027,7 @@ if (typeof window !== 'undefined') {
             <span>Preview</span>
             <textarea readonly rows="4">${escapeHtml(preview)}</textarea>
           </label>
-          <p class="field-hint">At minimum, map Description plus the electrical fields you have available. Existing Load List data will be replaced.</p>
+          <p class="field-hint">At minimum, map Description plus the electrical fields you have available. A preview will show replace and merge counts before changes are applied.</p>
         `;
         body.appendChild(form);
         return form.querySelector('select');
@@ -991,6 +1056,50 @@ if (typeof window !== 'undefined') {
       return null;
     }
     return loads;
+  }
+
+  async function openLoadImportPreview(incomingLoads) {
+    const preview = previewLoadImport(dataStore.getLoads(), incomingLoads);
+    return openModal({
+      title: 'Preview Load Import',
+      description: 'Choose whether this import replaces the current Load List or merges by ref, id, tag, or description.',
+      primaryText: 'Replace Existing',
+      secondaryText: 'Cancel',
+      defaultWidth: 'medium',
+      render(body, controller) {
+        const mergeBtn = document.createElement('button');
+        mergeBtn.type = 'button';
+        mergeBtn.className = 'btn';
+        mergeBtn.textContent = 'Merge Records';
+        mergeBtn.addEventListener('click', () => controller.close({ mode: 'merge' }));
+        const summary = document.createElement('div');
+        summary.className = 'import-preview-list';
+        summary.innerHTML = `
+          <p><strong>${preview.incoming}</strong> incoming load records found.</p>
+          <ul>
+            <li>Replace would write ${preview.replaceCount} load rows.</li>
+            <li>Merge would create ${preview.mergeCreates}, update ${preview.mergeUpdates}, and leave ${preview.mergeUnchanged} unchanged.</li>
+            <li>Merge keeps existing load rows that are absent from the import.</li>
+          </ul>
+        `;
+        body.appendChild(summary);
+        body.appendChild(mergeBtn);
+      },
+      onSubmit() {
+        return { mode: 'replace' };
+      }
+    });
+  }
+
+  async function applyImportedLoads(incomingLoads) {
+    if (!incomingLoads) return;
+    const decision = await openLoadImportPreview(incomingLoads);
+    if (!decision) return;
+    const nextLoads = decision.mode === 'merge'
+      ? mergeLoadRows(dataStore.getLoads(), incomingLoads)
+      : incomingLoads;
+    dataStore.setLoads(nextLoads.map(load => ({ ...load, ...calculateDerived(load) })));
+    render();
   }
 
   async function importCsvText(text) {
@@ -1267,7 +1376,7 @@ if (typeof window !== 'undefined') {
         </label>
         <label class="modal-form-field">
           <span>Source / Panel</span>
-          <input name="source" type="text" value="${escapeAttr(load.source || '')}" placeholder="SWBD-1">
+          <input name="source" type="text" list="load-source-list" value="${escapeAttr(load.source || '')}" placeholder="SWBD-101">
         </label>
         <label class="modal-form-field">
           <span>Load Type</span>
@@ -1370,7 +1479,7 @@ if (typeof window !== 'undefined') {
         form.className = 'modal-form batch-edit-controls';
         form.innerHTML = `
           <label><input data-batch-toggle="source" type="checkbox"> Source / Panel</label>
-          <input data-batch-field="source" type="text" placeholder="SWBD-1">
+          <input data-batch-field="source" type="text" list="load-source-list" placeholder="SWBD-101">
           <label><input data-batch-toggle="loadType" type="checkbox"> Load Type</label>
           <select data-batch-field="loadType">
             <option value=""></option>
@@ -1481,10 +1590,7 @@ if (typeof window !== 'undefined') {
     file.text().then(async text => {
       try {
         const loads = await importJsonText(text);
-        if (loads) {
-          dataStore.setLoads(loads);
-          render();
-        }
+        await applyImportedLoads(loads);
       } catch (err) {
         console.error('[loadlist] JSON import failed:', err);
         showAlertModal('Import Error', 'Invalid load data. Please check the file format and try again.');
@@ -1501,10 +1607,7 @@ if (typeof window !== 'undefined') {
     file.text().then(async text => {
       try {
         const loads = await importCsvText(text);
-        if (loads) {
-          dataStore.setLoads(loads);
-          render();
-        }
+        await applyImportedLoads(loads);
       } catch (err) {
         console.error('[loadlist] CSV import failed:', err);
         showAlertModal('Import Error', 'Invalid CSV load data. Please check the file format and try again.');

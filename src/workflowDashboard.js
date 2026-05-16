@@ -1,13 +1,14 @@
-import { workflowOrder, getStepStatus } from './workflowStatus.js';
+import { workflowOrder, getStepStatus, getCableReadiness, countOneLineComponents } from './workflowStatus.js';
 import {
-  getCables, getTrays, getConduits, getDuctbanks, getStudies,
+  getEquipment, getLoads, getCables, getTrays, getConduits, getDuctbanks, getStudies,
   getStudyApprovals, getOneLine,
-  getLifecyclePackages, addLifecyclePackage, deleteLifecyclePackage,
+  getLifecyclePackages, getReportSnapshots, getItem, addLifecyclePackage, deleteLifecyclePackage,
 } from '../dataStore.mjs';
 import { trayFillPercent } from '../analysis/designRuleChecker.mjs';
 import { buildLifecyclePackage, summarizePackage } from '../analysis/lifecyclePackage.mjs';
 import { runDesignCoach } from '../analysis/designCoach.mjs';
 import { evaluateEquipment, summariseEvaluation } from '../analysis/equipmentEvaluation.mjs';
+import { buildWorkflowCoreDiagnostics } from '../analysis/projectWorkflowCore.mjs';
 import protectiveDevices from '../data/protectiveDevices.mjs';
 import '../site.js';
 
@@ -140,7 +141,7 @@ function renderKpiStrip(container) {
       label: 'Next required step',
       value: nextRequiredStep ? nextRequiredStep.step.label : 'Done',
       helper: nextRequiredStep ? 'Recommended next action in the workflow.' : 'All required workflow steps are complete.',
-      href: nextRequiredStep ? nextRequiredStep.step.href : 'reporting.html',
+      href: nextRequiredStep ? nextRequiredStep.step.href : 'projectreport.html',
     },
     {
       label: 'Tray fill warnings',
@@ -153,7 +154,7 @@ function renderKpiStrip(container) {
       label: 'Studies completed',
       value: studiesCompletedCount,
       helper: `${studiesCompletedCount} of ${totalStudies} studies have saved results.`,
-      href: 'studiesdashboard.html',
+      href: 'demandschedule.html',
     },
     {
       label: 'Design coach items',
@@ -219,6 +220,7 @@ function renderWorkflowSteps(container) {
   if (progressTrack && progressFill) {
     progressFill.style.width = `${workflowCompletionPct}%`;
     progressTrack.setAttribute('aria-valuenow', completedCount);
+    progressTrack.setAttribute('aria-valuemax', workflowOrder.length);
   }
   const nextStepEl = document.getElementById('workflow-next-step');
   if (nextStepEl) {
@@ -284,44 +286,59 @@ function renderWorkflowSteps(container) {
 function renderProjectSummary(container) {
   if (!container) return;
 
-  const cables = getCables().length;
+  const equipment = getEquipment().filter(row => Object.values(row || {}).some(value => String(value ?? '').trim() !== '')).length;
+  const loads = getLoads().filter(row => Object.values(row || {}).some(value => String(value ?? '').trim() !== '')).length;
+  const cables = getCables();
+  const cableReadiness = getCableReadiness(cables);
+  const oneLineComponents = countOneLineComponents(getOneLine());
   const trays = getTrays().length;
   const conduits = getConduits().length;
   const ductbanks = getDuctbanks().length;
+  const raceways = trays + conduits + ductbanks;
   const trayViolations = getTrayViolationsCount();
+  const studiesStatus = getStepStatus('studies');
+  const deliverablesStatus = getStepStatus('deliverables');
 
   const stats = [
     {
+      label: 'Equipment',
+      value: equipment,
+      href: 'equipmentlist.html',
+      icon: 'icons/equipment.svg',
+      subtitle: 'linked to Equipment List',
+      state: equipment > 0 ? 'linked' : 'neutral',
+    },
+    {
+      label: 'Loads',
+      value: loads,
+      href: 'loadlist.html',
+      icon: 'icons/load.svg',
+      subtitle: 'linked to Load List',
+      state: loads > 0 ? 'linked' : 'neutral',
+    },
+    {
+      label: 'One-Line Components',
+      value: oneLineComponents,
+      href: 'oneline.html',
+      icon: 'icons/oneline.svg',
+      subtitle: 'reconcile schedules explicitly',
+      state: oneLineComponents > 0 ? 'linked' : 'neutral',
+    },
+    {
       label: 'Cables',
-      value: cables,
+      value: cableReadiness.total,
       href: 'cableschedule.html',
       icon: 'icons/components/Feeder.svg',
-      subtitle: 'linked to Cable Schedule',
-      state: 'linked',
+      subtitle: `${cableReadiness.scheduleReady} schedule-ready, ${cableReadiness.routingReady} routing-ready`,
+      state: cableReadiness.total > 0 ? (cableReadiness.missingSchedule > 0 ? 'warn' : 'linked') : 'neutral',
     },
     {
-      label: 'Trays',
-      value: trays,
+      label: 'Raceways',
+      value: raceways,
       href: 'racewayschedule.html',
       icon: 'icons/components/Busway.svg',
-      subtitle: 'linked to Raceway Schedule',
-      state: 'linked',
-    },
-    {
-      label: 'Conduits',
-      value: conduits,
-      href: 'racewayschedule.html',
-      icon: 'icons/components/Bus.svg',
-      subtitle: 'linked to Raceway Schedule',
-      state: 'linked',
-    },
-    {
-      label: 'Ductbanks',
-      value: ductbanks,
-      href: 'ductbankroute.html',
-      icon: 'icons/ductbank.svg',
-      subtitle: 'linked to Ductbank Route',
-      state: 'linked',
+      subtitle: `${trays} tray(s), ${conduits} conduit(s), ${ductbanks} ductbank(s)`,
+      state: raceways > 0 ? 'linked' : 'neutral',
     },
     {
       label: 'Trays over 80% fill',
@@ -332,6 +349,22 @@ function renderProjectSummary(container) {
         ? `${trayViolations} warning${trayViolations === 1 ? '' : 's'} need mitigation.`
         : 'No active fill warnings.',
       state: trayViolations > 0 ? 'warn' : 'neutral',
+    },
+    {
+      label: 'Studies',
+      value: studiesStatus.complete ? studiesStatus.label : 0,
+      href: 'demandschedule.html',
+      icon: 'icons/toolbar/validate.svg',
+      subtitle: studiesStatus.hint || studiesStatus.label,
+      state: studiesStatus.complete ? 'linked' : 'neutral',
+    },
+    {
+      label: 'Deliverables',
+      value: deliverablesStatus.complete ? deliverablesStatus.label : 0,
+      href: 'projectreport.html',
+      icon: 'icons/toolbar/copy.svg',
+      subtitle: deliverablesStatus.hint || deliverablesStatus.label,
+      state: deliverablesStatus.complete ? 'linked' : 'neutral',
     },
   ];
 
@@ -375,6 +408,85 @@ function renderProjectSummary(container) {
   });
 
   container.appendChild(list);
+}
+
+function currentCoreDiagnostics() {
+  return buildWorkflowCoreDiagnostics({
+    equipment: getEquipment(),
+    loads: getLoads(),
+    oneLine: getOneLine(),
+    cables: getCables(),
+    trays: getTrays(),
+    conduits: getConduits(),
+    ductbanks: getDuctbanks(),
+    studies: getStudies(),
+    reportSnapshots: getReportSnapshots(),
+    deliverables: getLifecyclePackages(),
+    reconcilePending: Boolean(getItem('oneLineScheduleReconcilePending', false))
+  });
+}
+
+function renderWorkflowCoreDiagnostics() {
+  const diagnostics = currentCoreDiagnostics();
+  const nextEl = document.getElementById('dashboard-next-action-strip');
+  if (nextEl) {
+    const action = diagnostics.nextAction;
+    nextEl.innerHTML = `
+      <div>
+        <strong>Next action: ${esc(action.label)}</strong>
+        <p>${esc(action.detail)}</p>
+      </div>
+      <a class="btn primary-btn" href="${esc(action.href)}">Open Step</a>
+    `;
+  }
+
+  const blockersEl = document.getElementById('dashboard-blockers');
+  if (blockersEl) {
+    const actionable = diagnostics.blockers.filter(item => item.severity !== 'info');
+    if (!actionable.length) {
+      blockersEl.innerHTML = '<p class="text-muted">No critical workflow blockers found. Review studies and deliverables next.</p>';
+    } else {
+      blockersEl.innerHTML = `
+        <ul class="dashboard-blocker-list">
+          ${actionable.map(item => `
+            <li class="dashboard-blocker dashboard-blocker--${esc(item.severity)}">
+              <div>
+                <strong>${esc(item.step)}: ${esc(item.label)}</strong>
+                <span>${esc(item.detail)}</span>
+              </div>
+              <a class="btn" href="${esc(item.href)}">Fix</a>
+            </li>
+          `).join('')}
+        </ul>
+      `;
+    }
+  }
+
+  const healthEl = document.getElementById('dashboard-health');
+  if (healthEl) {
+    const health = diagnostics.health;
+    const metrics = [
+      ['Equipment', health.equipment],
+      ['Loads', `${health.completeLoads}/${health.loads} complete`],
+      ['One-Line', `${health.oneLineComponents} components`],
+      ['Cable Schedule', `${health.scheduleReady}/${health.cableRows} schedule-ready`],
+      ['Routing', `${health.routingReady}/${health.cableRows} routing-ready`],
+      ['Raceways', health.raceways],
+      ['Studies', health.studies],
+      ['Deliverables', health.deliverables]
+    ];
+    healthEl.innerHTML = `
+      <div class="dashboard-health-grid">
+        ${metrics.map(([label, value]) => `
+          <article class="workflow-summary-card">
+            <span>${esc(label)}</span>
+            <strong>${esc(value)}</strong>
+          </article>
+        `).join('')}
+      </div>
+      ${health.reconcilePending ? '<p class="dashboard-reconcile-warning">One-Line changes are pending schedule reconcile.</p>' : ''}
+    `;
+  }
 }
 
 function renderStudiesSummary(container) {
@@ -531,6 +643,7 @@ function initReleasePackageForm() {
 
 window.addEventListener('DOMContentLoaded', () => {
   renderKpiStrip(document.getElementById('dashboard-kpi-strip'));
+  renderWorkflowCoreDiagnostics();
   renderWorkflowSteps(document.getElementById('workflow-step-grid'));
   renderProjectSummary(document.getElementById('project-summary'));
   renderStudiesSummary(document.getElementById('studies-summary'));

@@ -99,11 +99,28 @@
         </div>
       </section>
 
+      <section id="dashboard-next-action-strip" class="workflow-next-action dash-full-width" aria-live="polite" aria-label="Recommended next action"></section>
+
+      <section class="dashboard-core-panels dash-full-width" aria-label="Project workflow health">
+        <div class="card">
+          <h2>Workflow Blockers</h2>
+          <div id="dashboard-blockers" aria-live="polite">
+            <p class="text-muted">Loading blockersâ€¦</p>
+          </div>
+        </div>
+        <div class="card">
+          <h2>Project Health</h2>
+          <div id="dashboard-health" aria-live="polite">
+            <p class="text-muted">Loading health metricsâ€¦</p>
+          </div>
+        </div>
+      </section>
+
       <!-- Progress overview -->
       <section class="card workflow-summary dash-full-width" aria-live="polite" aria-label="Workflow progress overview">
         <h2>Workflow Progress</h2>
-        <p id="workflow-progress-text">0 of 7 workflow steps complete.</p>
-        <div class="workflow-progress-track" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="7" aria-labelledby="workflow-progress-text" id="workflow-progress-bar-track">
+        <p id="workflow-progress-text">0 of 8 workflow steps complete.</p>
+        <div class="workflow-progress-track" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="8" aria-labelledby="workflow-progress-text" id="workflow-progress-bar-track">
           <div class="workflow-progress-fill" id="workflow-progress-fill" style="width:0%"></div>
         </div>
         <p id="workflow-next-step"></p>

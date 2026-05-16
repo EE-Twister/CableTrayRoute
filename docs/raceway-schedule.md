@@ -9,7 +9,8 @@ The Raceway Schedule manages ductbanks, cable trays, and standalone conduits.
 - Ductbank conduits are created inside ductbank rows. Standalone conduits remain in the Conduit Schedule.
 - Tray and conduit rows include **Material** so procurement, BIM export, and downstream BOM outputs can distinguish steel, aluminum, PVC, stainless steel, and fiberglass raceways.
 - Use **Batch Edit** from a table's **More** menu to apply one field value to the visible filtered rows or every row. Ductbanks can batch edit either ductbank rows or the nested conduit rows.
-- The top summary shows total raceways, ductbanks, trays, conduits, validation issues, and raceways currently assigned to cables.
+- The top summary shows total raceways, ductbanks, trays, conduits, validation issues, assigned raceways, missing IDs, missing geometry, and unused raceways.
+- The next-action strip points to the highest-value repair or continuation step, such as fixing IDs, completing geometry, returning to Cable Schedule for assignments, or continuing into fill checks.
 
 ## Views and filters
 
@@ -27,3 +28,10 @@ Quick filters help isolate rows that need attention:
 ## Validation
 
 The page validates missing IDs, duplicate IDs, missing or zero-length geometry, invalid tray dimensions, invalid slot-group JSON, and illegal conduit type / trade-size combinations.
+
+## Import behavior
+
+- Tray and conduit XLSX imports open a mapping and preview step before data is applied.
+- Ductbank XLSX imports now preview ductbank and nested conduit creates, updates, conflicts, and unchanged rows before applying.
+- Import mode defaults to **Merge with existing rows** so matching raceway IDs can fill blank fields without deleting existing rows.
+- Conflicting non-empty values are surfaced in the preview and the existing schedule value is preserved. Use **Replace current schedule** only when the spreadsheet should become the authoritative schedule.

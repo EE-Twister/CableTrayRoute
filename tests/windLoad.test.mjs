@@ -9,6 +9,9 @@ import {
   calcKz,
   calcVelocityPressure,
   trayForceCf,
+  trayWindProfile,
+  normalizeTrayConstruction,
+  normalizeCoverCondition,
   calcWindForce,
   checkNemaCapacity,
   NEMA_LOAD_CLASSES,
@@ -99,6 +102,50 @@ describe('trayForceCf', () => {
   it('partial = 1.6', () => assert.strictEqual(trayForceCf('partial'), 1.6));
   it('full = 2.0', () => assert.strictEqual(trayForceCf('full'), 2.0));
   it('unknown defaults to 1.6', () => assert.strictEqual(trayForceCf('bogus'), 1.6));
+  it('solid-bottom empty tray uses flat-plate coefficient', () => {
+    assert.strictEqual(trayForceCf('empty', { trayConstruction: 'solid-bottom' }), 2.0);
+  });
+  it('solid cover uses flat-plate coefficient', () => {
+    assert.strictEqual(trayForceCf('empty', { trayConstruction: 'ladder', coverCondition: 'solid' }), 2.0);
+  });
+  it('ventilated cover is at least partial-fill coefficient', () => {
+    assert.strictEqual(trayForceCf('empty', { coverCondition: 'ventilated' }), 1.6);
+  });
+});
+
+// ---------------------------------------------------------------------------
+describe('trayWindProfile', () => {
+  it('normalizes tray type text from the Raceway Schedule', () => {
+    assert.strictEqual(normalizeTrayConstruction('Ladder (50 % fill)'), 'ladder');
+    assert.strictEqual(normalizeTrayConstruction('Wire Basket (40 % fill)'), 'ventilated');
+    assert.strictEqual(normalizeTrayConstruction('Solid Bottom (40 % fill)'), 'solid-bottom');
+  });
+
+  it('normalizes cover condition text from schedules and imports', () => {
+    assert.strictEqual(normalizeCoverCondition('No Cover'), 'none');
+    assert.strictEqual(normalizeCoverCondition('Ventilated Cover'), 'ventilated');
+    assert.strictEqual(normalizeCoverCondition('Solid Cover'), 'solid');
+  });
+
+  it('reports labels and source basis for the selected profile', () => {
+    const profile = trayWindProfile({
+      trayConstruction: 'solid-bottom',
+      fillLevel: 'empty',
+      coverCondition: 'none',
+    });
+    assert.strictEqual(profile.Cf, 2.0);
+    assert.strictEqual(profile.trayConstructionLabel, 'Solid bottom');
+    assert.ok(profile.forceCoefficientSource.includes('solid-bottom tray'));
+  });
+
+  it('allows an engineer force-coefficient override', () => {
+    const profile = trayWindProfile({
+      fillLevel: 'empty',
+      forceCoefficientOverride: 1.85,
+    });
+    assert.strictEqual(profile.Cf, 1.85);
+    assert.ok(profile.forceCoefficientSource.includes('engineer override'));
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -134,6 +181,25 @@ describe('calcWindForce', () => {
     const empty = calcWindForce({ ...base, fillLevel: 'empty' });
     const full  = calcWindForce({ ...base, fillLevel: 'full'  });
     assert.ok(full.windForce_lbs > empty.windForce_lbs);
+  });
+
+  it('solid-bottom construction increases empty tray force', () => {
+    const ladder = calcWindForce({ ...base, fillLevel: 'empty', trayConstruction: 'ladder' });
+    const solid = calcWindForce({ ...base, fillLevel: 'empty', trayConstruction: 'solid-bottom' });
+    assert.ok(solid.windForce_lbs > ladder.windForce_lbs);
+    assert.strictEqual(solid.Cf, 2.0);
+  });
+
+  it('projected area factor scales projected area and force', () => {
+    const baseArea = calcWindForce(base);
+    const adjusted = calcWindForce({ ...base, projectedAreaFactor: 1.25 });
+    assert.strictEqual(adjusted.projectedAreaFactor, 1.25);
+    assert.ok(adjusted.projectedArea_ft2 > baseArea.projectedArea_ft2);
+    assert.ok(adjusted.windForce_lbs > baseArea.windForce_lbs);
+  });
+
+  it('throws for invalid force coefficient override', () => {
+    assert.throws(() => calcWindForce({ ...base, forceCoefficientOverride: 0 }), /Force coefficient/);
   });
 
   it('throws for zero tray width', () => {

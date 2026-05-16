@@ -3,18 +3,18 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Browser-based toolkit for cable scheduling, tray fill analysis, and optimal routing in electrical design.">
+  <meta name="description" content="Browser-based electrical project workspace for equipment lists, load lists, one-line diagrams, schedules, routing, studies, and deliverables.">
   <title>Cable Tray Route</title>
   <!-- Open Graph / Social sharing -->
   <meta property="og:type" content="website">
-  <meta property="og:title" content="CableTrayRoute — Integrated Cable Routing Workflow">
-  <meta property="og:description" content="Browser-based toolkit unifying cable scheduling, analysis, and routing for streamlined electrical design.">
+  <meta property="og:title" content="CableTrayRoute - Integrated Project Workflow">
+  <meta property="og:description" content="Browser-based electrical project workspace for planning, schedules, routing, studies, and deliverables.">
   <meta property="og:image" content="https://cabletrayroute.com/icons/og-preview.png">
   <meta property="og:site_name" content="CableTrayRoute">
   <!-- Twitter / X card -->
   <meta name="twitter:card" content="summary">
-  <meta name="twitter:title" content="CableTrayRoute — Integrated Cable Routing Workflow">
-  <meta name="twitter:description" content="Browser-based toolkit unifying cable scheduling, analysis, and routing for streamlined electrical design.">
+  <meta name="twitter:title" content="CableTrayRoute - Integrated Project Workflow">
+  <meta name="twitter:description" content="Browser-based electrical project workspace for planning, schedules, routing, studies, and deliverables.">
   <!-- PWA -->
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#2563eb" media="(prefers-color-scheme: light)">
@@ -39,7 +39,7 @@
       {
         "@type": "Organization",
         "name": "CableTrayRoute",
-        "description": "Browser-based toolkit for cable scheduling, tray fill analysis, and optimal routing in electrical design.",
+        "description": "Browser-based electrical project workspace for equipment lists, load lists, one-line diagrams, schedules, routing, studies, and deliverables.",
         "logo": {
           "@type": "ImageObject",
           "url": "icons/route.svg"
@@ -48,7 +48,7 @@
       {
         "@type": "WebApplication",
         "name": "CableTrayRoute",
-        "description": "Browser-based toolkit unifying cable scheduling, analysis, and routing for streamlined electrical design.",
+        "description": "Browser-based electrical project workspace unifying planning, schedules, routing, studies, and deliverables.",
         "applicationCategory": "BusinessApplication",
         "operatingSystem": "Any",
         "offers": {
@@ -69,7 +69,7 @@
   }
   </script>
 </head>
-<body>
+<body class="home-page">
   <a href="#main-content" class="skip-link">Skip to main content</a>
   <nav class="top-nav" aria-label="Primary">
     <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
@@ -108,101 +108,330 @@
     <button id="import-project-btn"><img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async"><span>Import Project</span></button>
     <input type="file" id="import-project-input" accept=".ctr.json" class="hidden" title="Select project file">
   </div>
-  <header class="hero" role="banner">
-    <h1 class="hero-title">Integrated Cable Routing Workflow</h1>
-    <p class="hero-tagline">Browser-based toolkit unifying cable scheduling, analysis, and routing for streamlined design.</p>
-    <div class="hero-actions" aria-label="Primary actions">
-      <a class="hero-action-btn" href="cableschedule.html"><img src="icons/cable.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">Start Workflow</a>
-      <a class="hero-action-btn secondary" href="docs/quickstart.html"><img src="icons/route.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">Open Quick Start</a>
-      <a class="hero-action-btn secondary" href="samplegallery.html"><img src="icons/toolbar/copy.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">Browse Sample Projects</a>
+  <header class="hero home-command" role="banner">
+    <div class="home-command__inner">
+      <div class="home-command__copy">
+        <h1 class="hero-title">Project Workflow Command Center</h1>
+        <p class="hero-tagline">Build the project from equipment and loads through one-line context, schedule reconciliation, routing, studies, and deliverables.</p>
+        <div class="hero-actions" aria-label="Primary actions">
+          <a class="hero-action-btn" href="equipmentlist.html"><img src="icons/equipment.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">Start Equipment List</a>
+          <a class="hero-action-btn secondary" href="workflowdashboard.html"><img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">Open Dashboard</a>
+          <a class="hero-action-btn secondary" href="samplegallery.html"><img src="icons/toolbar/copy.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">Browse Samples</a>
+        </div>
+        <div class="home-next-action" aria-label="Recommended next action">
+          <div>
+            <span class="home-next-action__label">Next Action</span>
+            <strong id="home-next-action-title">Start Equipment List</strong>
+            <span id="home-next-action-detail">Create equipment records before downstream schedules.</span>
+          </div>
+          <div class="home-next-action__meta">
+            <span id="home-next-action-metrics">0 equipment items / 0 loads / 0 cable rows</span>
+            <a id="home-next-action-link" href="equipmentlist.html">Open Equipment List</a>
+          </div>
+        </div>
+      </div>
+      <div class="home-command__side">
+        <section class="home-command__project" aria-labelledby="home-project-card-title">
+          <div>
+            <h2 id="home-project-card-title">Untitled Project</h2>
+            <p id="home-project-card-meta">Local workspace</p>
+          </div>
+          <dl>
+            <div>
+              <dt>Records</dt>
+              <dd id="home-project-record-count">0 records</dd>
+            </div>
+            <div>
+              <dt>Raceways</dt>
+              <dd id="home-project-route-count">0 raceways</dd>
+            </div>
+          </dl>
+        </section>
+        <section class="workflow-summary home-command__panel" aria-live="polite" id="workflow-summary-section" aria-labelledby="workflow-progress-heading">
+          <h2 id="workflow-progress-heading">Project Readiness</h2>
+          <p id="workflow-progress-text">0 of 8 workflow steps complete.</p>
+          <div class="workflow-progress-track" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="8" aria-labelledby="workflow-progress-text" id="workflow-progress-bar-track">
+            <div class="workflow-progress-fill" id="workflow-progress-fill" style="width:0%"></div>
+          </div>
+          <p id="workflow-next-step">Next recommended step: <a href="equipmentlist.html">Equipment List</a></p>
+          <a class="home-command__dashboard-link" href="workflowdashboard.html">View full workflow dashboard</a>
+        </section>
+      </div>
     </div>
-    <p class="hero-keyboard-hint" aria-label="Press Control plus K to open the command palette">
-      Press <kbd>Ctrl</kbd>+<kbd>K</kbd> to search commands &amp; navigate
-    </p>
   </header>
   <div class="container">
     <main id="main-content" class="main-content">
-      <section class="about" id="about">
-        <h2>Why CableTrayRoute?</h2>
-        <p>CableTrayRoute streamlines electrical design by linking scheduling, analysis, and routing tools in one browser-based workflow. Engineers can define cables, assess tray and conduit capacity, and generate optimal paths without juggling spreadsheets. Automated checks against fill limits and thermal constraints reduce errors and rework. The unified interface accelerates planning and helps deliver consistent, code-compliant results on complex projects.</p>
-      </section>
-      <section class="card tool-graphics">
-        <h2>Tools</h2>
-        <p>Open the right workspace in one click — each area links directly to the relevant pages.</p>
-        <div class="tool-graphics-grid">
-          <a href="cableschedule.html" class="tool-graphic-card tool-graphic-card--schedules">
-            <img src="icons/graphics/schedule-visual.svg" alt="Illustration previewing cable and raceway schedules" loading="lazy" decoding="async">
-            <span class="tool-graphic-title">Schedules &amp; Lists</span>
-            <span class="tool-graphic-meta">Equipment list, load list, cable schedule, raceway schedule</span>
+      <section class="home-section home-section--workflow" aria-labelledby="home-workflow-title">
+        <div class="home-section__header">
+          <div>
+            <h2 id="home-workflow-title">Project Path</h2>
+            <p>Follow the recommended sequence or open any module independently. Shared data moves between modules only through explicit workflow actions.</p>
+          </div>
+          <a class="home-section__link" href="workflowdashboard.html">Workflow dashboard</a>
+        </div>
+        <div class="workflow-grid">
+          <a href="equipmentlist.html" class="workflow-card" data-storage-key="equipmentList" data-step="1">
+            <img src="icons/equipment.svg" alt="Equipment icon" class="workflow-icon" loading="lazy" decoding="async">
+            <span>1. Equipment List</span>
+            <span class="status">Incomplete</span>
           </a>
-          <a href="cabletrayfill.html" class="tool-graphic-card tool-graphic-card--fill">
-            <img src="icons/graphics/fill-visual.svg" alt="Illustration previewing tray and conduit fill analysis" loading="lazy" decoding="async">
-            <span class="tool-graphic-title">Fill &amp; Capacity Analysis</span>
-            <span class="tool-graphic-meta">Tray fill, conduit fill, ductbank route, support span</span>
+          <a href="loadlist.html" class="workflow-card" data-storage-key="loadList" data-step="2">
+            <img src="icons/load.svg" alt="Load icon" class="workflow-icon" loading="lazy" decoding="async">
+            <span>2. Load List</span>
+            <span class="status">Incomplete</span>
           </a>
-          <a href="optimalRoute.html" class="tool-graphic-card tool-graphic-card--routing">
-            <img src="icons/graphics/routing-visual.svg" alt="Illustration previewing optimal route and one-line workflows" loading="lazy" decoding="async">
-            <span class="tool-graphic-title">Routing &amp; One-Line</span>
-            <span class="tool-graphic-meta">Optimal route, pull cards, one-line diagrams</span>
+          <a href="oneline.html" class="workflow-card" data-storage-key="oneLineDiagram" data-step="3">
+            <img src="icons/oneline.svg" alt="One-line icon" class="workflow-icon" loading="lazy" decoding="async">
+            <span>3. One-Line</span>
+            <span class="status">Incomplete</span>
           </a>
-          <a href="shortCircuit.html" class="tool-graphic-card tool-graphic-card--studies">
-            <img src="icons/graphics/studies-visual.svg" alt="Illustration previewing electrical studies pages" loading="lazy" decoding="async">
-            <span class="tool-graphic-title">Electrical Studies</span>
-            <span class="tool-graphic-meta">Arc flash, short circuit, harmonics, cathodic protection, motor start, load flow, TCC</span>
+          <a href="cableschedule.html" class="workflow-card" data-storage-key="cableSchedule" data-step="4">
+            <img src="icons/cable.svg" alt="Cable icon" class="workflow-icon" loading="lazy" decoding="async">
+            <span>4. Cable Schedule</span>
+            <span class="status">Incomplete</span>
           </a>
-          <a href="fieldview.html" class="tool-graphic-card tool-graphic-card--fieldview">
-            <img src="icons/graphics/fieldview-visual.svg" alt="Illustration previewing field snapshots, as-built overlays, and site verification workflows" loading="lazy" decoding="async">
-            <span class="tool-graphic-title">Field View</span>
-            <span class="tool-graphic-meta">Site-ready snapshots, as-built context, and field verification</span>
+          <a href="racewayschedule.html" class="workflow-card" data-storage-key="racewaySchedule" data-step="5">
+            <img src="icons/raceway.svg" alt="Raceway icon" class="workflow-icon" loading="lazy" decoding="async">
+            <span>5. Raceway Schedule</span>
+            <span class="status">Incomplete</span>
+          </a>
+          <a href="cabletrayfill.html" class="workflow-card" data-storage-key="fillRouting" data-step="6">
+            <img src="icons/tray.svg" alt="Tray icon" class="workflow-icon" loading="lazy" decoding="async">
+            <span>6. Fill / Routing</span>
+            <span class="status">Incomplete</span>
+          </a>
+          <a href="demandschedule.html" class="workflow-card" data-storage-key="studies" data-step="7">
+            <img src="icons/toolbar/validate.svg" alt="Studies icon" class="workflow-icon" loading="lazy" decoding="async">
+            <span>7. Studies</span>
+            <span class="status">Incomplete</span>
+          </a>
+          <a href="projectreport.html" class="workflow-card" data-storage-key="deliverables" data-step="8">
+            <img src="icons/toolbar/copy.svg" alt="Deliverables icon" class="workflow-icon" loading="lazy" decoding="async">
+            <span>8. Deliverables</span>
+            <span class="status">Incomplete</span>
           </a>
         </div>
       </section>
-      <section class="card">
-        <h2>Workflow</h2>
-        <section class="workflow-summary" aria-live="polite" hidden id="workflow-summary-section">
-          <p id="workflow-progress-text">0 of 7 workflow steps complete.</p>
-          <div class="workflow-progress-track" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="7" aria-labelledby="workflow-progress-text" id="workflow-progress-bar-track">
-            <div class="workflow-progress-fill" id="workflow-progress-fill" style="width:0%"></div>
+      <section class="home-section home-section--preview" aria-labelledby="home-preview-title">
+        <div class="home-section__header">
+          <div>
+            <h2 id="home-preview-title">Workspace Preview</h2>
+            <p>Core project surfaces stay close together: model relationships, schedule rows, fill status, and readiness notes.</p>
           </div>
-          <p id="workflow-next-step">Next recommended step: <a href="cableschedule.html">1. Cable Schedule</a></p>
-          <p><a href="workflowdashboard.html">View full dashboard →</a></p>
-        </section>
-        <div class="workflow-grid">
-          <a href="cableschedule.html" class="workflow-card" data-storage-key="cableSchedule">
-            <img src="icons/cable.svg" alt="Cable icon" class="workflow-icon" loading="lazy" decoding="async">
-            <span>1. Cable Schedule</span>
-            <span class="status">Incomplete</span>
-          </a>
-          <a href="racewayschedule.html" class="workflow-card" data-storage-key="racewaySchedule">
-            <img src="icons/raceway.svg" alt="Raceway icon" class="workflow-icon" loading="lazy" decoding="async">
-            <span>2. Raceway Schedule</span>
-            <span class="status">Incomplete</span>
-          </a>
-          <a href="ductbankroute.html" class="workflow-card" data-storage-key="ductbankSchedule">
-            <img src="icons/ductbank.svg" alt="Ductbank icon" class="workflow-icon" loading="lazy" decoding="async">
-            <span>3. Ductbank</span>
-            <span class="status">Incomplete</span>
-          </a>
-          <a href="cabletrayfill.html" class="workflow-card" data-storage-key="traySchedule">
-            <img src="icons/tray.svg" alt="Tray icon" class="workflow-icon" loading="lazy" decoding="async">
-            <span>4. Tray Fill</span>
-            <span class="status">Incomplete</span>
-          </a>
-          <a href="conduitfill.html" class="workflow-card" data-storage-key="conduitSchedule">
-            <img src="icons/conduit.svg" alt="Conduit icon" class="workflow-icon" loading="lazy" decoding="async">
-            <span>5. Conduit Fill</span>
-            <span class="status">Incomplete</span>
-          </a>
-          <a href="optimalRoute.html" class="workflow-card" data-storage-key="optimalRoute">
-            <img src="icons/route.svg" alt="Route icon" class="workflow-icon" loading="lazy" decoding="async">
-            <span>6. Optimal Cable Route</span>
-            <span class="status">Incomplete</span>
-          </a>
-          <a href="oneline.html" class="workflow-card" data-storage-key="oneLineDiagram">
-            <img src="icons/oneline.svg" alt="One-line icon" class="workflow-icon" loading="lazy" decoding="async">
-            <span>7. One-Line Diagram</span>
-            <span class="status">Incomplete</span>
-          </a>
+        </div>
+        <div class="workspace-preview-grid">
+          <article class="preview-panel preview-panel--diagram">
+            <div class="preview-panel__header">
+              <h3>One-Line Preview</h3>
+              <a href="oneline.html">Open One-Line</a>
+            </div>
+            <p class="preview-panel__summary" id="home-oneline-summary">No one-line components yet. Schedules can still be built independently.</p>
+            <svg class="mini-oneline" viewBox="0 0 520 260" role="img" aria-label="One-line diagram preview">
+              <defs>
+                <marker id="home-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+                  <path d="M 0 0 L 10 5 L 0 10 z"></path>
+                </marker>
+              </defs>
+              <line x1="260" y1="35" x2="260" y2="88" class="mini-oneline__line"></line>
+              <circle cx="260" cy="102" r="15" class="mini-oneline__node mini-oneline__node--source"></circle>
+              <text x="260" y="24">UTILITY</text>
+              <text x="260" y="126">13.8 kV</text>
+              <line x1="260" y1="118" x2="260" y2="160" class="mini-oneline__line"></line>
+              <rect x="220" y="160" width="80" height="38" rx="5" class="mini-oneline__box"></rect>
+              <text x="260" y="184">MSB-1</text>
+              <path d="M 260 198 L 95 198 L 95 222" class="mini-oneline__line"></path>
+              <path d="M 260 198 L 205 198 L 205 222" class="mini-oneline__line"></path>
+              <path d="M 260 198 L 315 198 L 315 222" class="mini-oneline__line"></path>
+              <path d="M 260 198 L 425 198 L 425 222" class="mini-oneline__line"></path>
+              <g>
+                <rect x="58" y="222" width="74" height="26" rx="4" class="mini-oneline__load"></rect>
+                <text x="95" y="240">PANEL-1</text>
+              </g>
+              <g>
+                <rect x="168" y="222" width="74" height="26" rx="4" class="mini-oneline__load"></rect>
+                <text x="205" y="240">MCC-1</text>
+              </g>
+              <g>
+                <rect x="278" y="222" width="74" height="26" rx="4" class="mini-oneline__load"></rect>
+                <text x="315" y="240">PANEL-2</text>
+              </g>
+              <g>
+                <rect x="388" y="222" width="74" height="26" rx="4" class="mini-oneline__load"></rect>
+                <text x="425" y="240">UPS-1</text>
+              </g>
+            </svg>
+          </article>
+          <article class="preview-panel preview-panel--schedule">
+            <div class="preview-panel__header">
+              <h3>Cable Schedule Preview</h3>
+              <a href="cableschedule.html">Open Schedule</a>
+            </div>
+            <div class="mini-table" id="home-cable-preview-table" role="table" aria-label="Cable schedule preview">
+              <div role="row" class="mini-table__head">
+                <span role="columnheader">Tag</span>
+                <span role="columnheader">From</span>
+                <span role="columnheader">To</span>
+                <span role="columnheader">Size</span>
+                <span role="columnheader">Status</span>
+              </div>
+              <div role="row" class="mini-table__empty">
+                <span role="cell">No cable rows yet. Start the Cable Schedule to populate this preview.</span>
+              </div>
+            </div>
+          </article>
+          <article class="preview-panel preview-panel--routing">
+            <div class="preview-panel__header">
+              <h3>Routing / Fill Status</h3>
+              <a href="optimalRoute.html">Open Routing</a>
+            </div>
+            <div class="route-kpi-grid">
+              <div>
+                <span>Raceways</span>
+                <strong id="home-raceway-count">0</strong>
+                <small id="home-raceway-label">defined</small>
+              </div>
+              <div>
+                <span>Avg Fill</span>
+                <strong id="home-avg-fill">--</strong>
+                <small>after routing</small>
+              </div>
+              <div>
+                <span>Review</span>
+                <strong id="home-route-warning-count">0</strong>
+                <small>warnings</small>
+              </div>
+            </div>
+            <div class="route-meter-list">
+              <div><span>Schedule-ready</span><b id="home-schedule-ready-meter" style="width:0%"></b></div>
+              <div><span>Routing-ready</span><b id="home-routing-ready-meter" style="width:0%"></b></div>
+              <div><span>Deliverable-ready</span><b id="home-deliverable-ready-meter" style="width:0%"></b></div>
+            </div>
+          </article>
+          <article class="preview-panel preview-panel--readiness">
+            <div class="preview-panel__header">
+              <h3>Readiness Details</h3>
+              <a href="workflowdashboard.html">Open Dashboard</a>
+            </div>
+            <ol class="readiness-list" id="home-readiness-list">
+              <li><span>Equipment basis</span><strong>Not started</strong></li>
+              <li><span>Load relationships</span><strong>Not started</strong></li>
+              <li><span>Schedule reconcile</span><strong>Manual</strong></li>
+              <li><span>Report package</span><strong>Pending</strong></li>
+            </ol>
+          </article>
+        </div>
+      </section>
+      <section class="home-section" aria-labelledby="home-principles-title">
+        <div class="home-section__header">
+          <div>
+            <h2 id="home-principles-title">How The Workspace Fits Together</h2>
+            <p>Use one module at a time or keep the project integrated with explicit reconciliation and readiness checks.</p>
+          </div>
+        </div>
+        <div class="principle-grid">
+          <article class="principle-card">
+            <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="principle-card__icon" loading="lazy" decoding="async">
+            <h3>Standalone Modules</h3>
+            <p>Open equipment, load, schedule, routing, study, or deliverable pages directly when you only need one task.</p>
+          </article>
+          <article class="principle-card">
+            <img src="icons/oneline.svg" alt="" aria-hidden="true" class="principle-card__icon" loading="lazy" decoding="async">
+            <h3>Explicit Reconcile</h3>
+            <p>Use One-Line reconciliation to preview creates, updates, and conflicts before schedule data changes.</p>
+          </article>
+          <article class="principle-card">
+            <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="principle-card__icon" loading="lazy" decoding="async">
+            <h3>Readiness Tracking</h3>
+            <p>See what is schedule-ready, routing-ready, study-ready, and ready for reports as the project matures.</p>
+          </article>
+        </div>
+      </section>
+      <section class="home-section tool-groups" aria-labelledby="home-tools-title">
+        <div class="home-section__header">
+          <div>
+            <h2 id="home-tools-title">Tool Shortcuts</h2>
+            <p>Jump to the workspace you need without losing the integrated project context.</p>
+          </div>
+        </div>
+        <div class="tool-group-grid">
+          <section class="tool-group-card tool-group-card--planning" aria-labelledby="planning-tools-title">
+            <div class="tool-group-card__heading">
+              <img src="icons/equipment.svg" alt="" aria-hidden="true" loading="lazy" decoding="async">
+              <div>
+                <h3 id="planning-tools-title">Planning</h3>
+                <span>4 tools</span>
+              </div>
+            </div>
+            <a href="equipmentlist.html"><img src="icons/equipment.svg" alt="" aria-hidden="true" loading="lazy" decoding="async"><span>Equipment List</span></a>
+            <a href="loadlist.html"><img src="icons/load.svg" alt="" aria-hidden="true" loading="lazy" decoding="async"><span>Load List</span></a>
+            <a href="oneline.html"><img src="icons/oneline.svg" alt="" aria-hidden="true" loading="lazy" decoding="async"><span>One-Line</span></a>
+            <a href="workflowdashboard.html"><img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" loading="lazy" decoding="async"><span>Project Dashboard</span></a>
+          </section>
+          <section class="tool-group-card tool-group-card--schedules" aria-labelledby="schedule-tools-title">
+            <div class="tool-group-card__heading">
+              <img src="icons/cable.svg" alt="" aria-hidden="true" loading="lazy" decoding="async">
+              <div>
+                <h3 id="schedule-tools-title">Schedules</h3>
+                <span>4 tools</span>
+              </div>
+            </div>
+            <a href="cableschedule.html"><img src="icons/cable.svg" alt="" aria-hidden="true" loading="lazy" decoding="async"><span>Cable Schedule</span></a>
+            <a href="racewayschedule.html"><img src="icons/raceway.svg" alt="" aria-hidden="true" loading="lazy" decoding="async"><span>Raceway Schedule</span></a>
+            <a href="panelschedule.html"><img src="icons/panel.svg" alt="" aria-hidden="true" loading="lazy" decoding="async"><span>Panel Schedule</span></a>
+            <a href="procurementschedule.html"><img src="icons/toolbar/export.svg" alt="" aria-hidden="true" loading="lazy" decoding="async"><span>Procurement Schedule</span></a>
+          </section>
+          <section class="tool-group-card tool-group-card--routing" aria-labelledby="routing-tools-title">
+            <div class="tool-group-card__heading">
+              <img src="icons/route.svg" alt="" aria-hidden="true" loading="lazy" decoding="async">
+              <div>
+                <h3 id="routing-tools-title">Raceway / Fill / Routing</h3>
+                <span>4 tools</span>
+              </div>
+            </div>
+            <a href="cabletrayfill.html"><img src="icons/tray.svg" alt="" aria-hidden="true" loading="lazy" decoding="async"><span>Tray Fill</span></a>
+            <a href="conduitfill.html"><img src="icons/conduit.svg" alt="" aria-hidden="true" loading="lazy" decoding="async"><span>Conduit Fill</span></a>
+            <a href="ductbankroute.html"><img src="icons/ductbank.svg" alt="" aria-hidden="true" loading="lazy" decoding="async"><span>Ductbank</span></a>
+            <a href="optimalRoute.html"><img src="icons/route.svg" alt="" aria-hidden="true" loading="lazy" decoding="async"><span>Optimal Route</span></a>
+          </section>
+          <section class="tool-group-card tool-group-card--studies" aria-labelledby="study-tools-title">
+            <div class="tool-group-card__heading">
+              <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" loading="lazy" decoding="async">
+              <div>
+                <h3 id="study-tools-title">Studies</h3>
+                <span>4 tools</span>
+              </div>
+            </div>
+            <a href="demandschedule.html"><img src="icons/load.svg" alt="" aria-hidden="true" loading="lazy" decoding="async"><span>Demand Schedule</span></a>
+            <a href="loadFlow.html"><img src="icons/Bus.svg" alt="" aria-hidden="true" loading="lazy" decoding="async"><span>Load Flow</span></a>
+            <a href="shortCircuit.html"><img src="icons/components/Breaker.svg" alt="" aria-hidden="true" loading="lazy" decoding="async"><span>Short Circuit</span></a>
+            <a href="arcFlash.html"><img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" loading="lazy" decoding="async"><span>Arc Flash</span></a>
+          </section>
+          <section class="tool-group-card tool-group-card--deliverables" aria-labelledby="deliverable-tools-title">
+            <div class="tool-group-card__heading">
+              <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" loading="lazy" decoding="async">
+              <div>
+                <h3 id="deliverable-tools-title">Deliverables</h3>
+                <span>4 tools</span>
+              </div>
+            </div>
+            <a href="projectreport.html"><img src="icons/toolbar/export.svg" alt="" aria-hidden="true" loading="lazy" decoding="async"><span>Project Report</span></a>
+            <a href="pullcards.html"><img src="icons/toolbar/copy.svg" alt="" aria-hidden="true" loading="lazy" decoding="async"><span>Pull Cards</span></a>
+            <a href="spoolsheets.html"><img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" loading="lazy" decoding="async"><span>Spool Sheets</span></a>
+            <a href="submittal.html"><img src="icons/toolbar/download.svg" alt="" aria-hidden="true" loading="lazy" decoding="async"><span>Submittal Package</span></a>
+          </section>
+          <section class="tool-group-card tool-group-card--field" aria-labelledby="field-tools-title">
+            <div class="tool-group-card__heading">
+              <img src="icons/route.svg" alt="" aria-hidden="true" loading="lazy" decoding="async">
+              <div>
+                <h3 id="field-tools-title">Field / Support</h3>
+                <span>4 tools</span>
+              </div>
+            </div>
+            <a href="fieldview.html"><img src="icons/route.svg" alt="" aria-hidden="true" loading="lazy" decoding="async"><span>Field View</span></a>
+            <a href="samplegallery.html"><img src="icons/toolbar/copy.svg" alt="" aria-hidden="true" loading="lazy" decoding="async"><span>Sample Gallery</span></a>
+            <a href="validation.html"><img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" loading="lazy" decoding="async"><span>Validation &amp; Standards</span></a>
+            <a href="docs/index.html"><img src="icons/annotation.svg" alt="" aria-hidden="true" loading="lazy" decoding="async"><span>Documentation</span></a>
+          </section>
         </div>
       </section>
     </main>
@@ -211,57 +440,64 @@
     <div class="modal-content" data-variant="wide">
       <button id="close-help-btn" class="close-btn" aria-label="Close Help">&times;</button>
       <h2 id="help-title">CableTrayRoute Help</h2>
-      <p class="modal-description">Browser-based toolkit for cable scheduling, analysis, and optimal routing. Work through the steps in order — data flows automatically from one tool to the next.</p>
+      <p class="modal-description">Browser-based toolkit for electrical scheduling, one-line modeling, analysis, routing, and deliverables. Use modules independently or follow the integrated workflow and reconcile schedule data explicitly when ready.</p>
 
-      <h3>7-Step Workflow</h3>
+      <h3>8-Step Workflow</h3>
       <ol class="help-workflow-list">
+        <li>
+          <img src="icons/equipment.svg" alt="" class="workflow-icon" aria-hidden="true" loading="lazy" decoding="async">
+          <div>
+            <strong><a href="equipmentlist.html">Equipment List</a></strong>
+            <span>Define major equipment tags, ratings, descriptions, and locations.</span>
+          </div>
+        </li>
+        <li>
+          <img src="icons/load.svg" alt="" class="workflow-icon" aria-hidden="true" loading="lazy" decoding="async">
+          <div>
+            <strong><a href="loadlist.html">Load List</a></strong>
+            <span>Capture loads, source relationships, demand factors, and operating data.</span>
+          </div>
+        </li>
+        <li>
+          <img src="icons/oneline.svg" alt="" class="workflow-icon" aria-hidden="true" loading="lazy" decoding="async">
+          <div>
+            <strong><a href="oneline.html">One-Line</a></strong>
+            <span>Draw electrical relationships and use Reconcile Schedules to preview schedule updates.</span>
+          </div>
+        </li>
         <li>
           <img src="icons/cable.svg" alt="" class="workflow-icon" aria-hidden="true" loading="lazy" decoding="async">
           <div>
             <strong><a href="cableschedule.html">Cable Schedule</a></strong>
-            <span>Define cables: tag, size, conductor type, allowed raceway groups, and start/end coordinates.</span>
+            <span>Complete schedule-ready cable rows with tag, from/to, conductor size, and length.</span>
           </div>
         </li>
         <li>
           <img src="icons/raceway.svg" alt="" class="workflow-icon" aria-hidden="true" loading="lazy" decoding="async">
           <div>
             <strong><a href="racewayschedule.html">Raceway Schedule</a></strong>
-            <span>Catalog trays, conduits, and ductbanks — including dimensions, fill limits, and node coordinates.</span>
-          </div>
-        </li>
-        <li>
-          <img src="icons/ductbank.svg" alt="" class="workflow-icon" aria-hidden="true" loading="lazy" decoding="async">
-          <div>
-            <strong><a href="ductbankroute.html">Ductbank Analysis</a></strong>
-            <span>Analyze underground ductbanks for thermal constraints and cable placement.</span>
+            <span>Catalog trays, conduits, and ductbanks for fill and routing.</span>
           </div>
         </li>
         <li>
           <img src="icons/tray.svg" alt="" class="workflow-icon" aria-hidden="true" loading="lazy" decoding="async">
           <div>
-            <strong><a href="cabletrayfill.html">Tray Fill</a></strong>
-            <span>Visualize cross-sectional cable placement in trays and check fill percentages.</span>
+            <strong><a href="cabletrayfill.html">Fill / Routing</a></strong>
+            <span>Run tray fill, conduit fill, ductbank checks, and optimal routing.</span>
           </div>
         </li>
         <li>
-          <img src="icons/conduit.svg" alt="" class="workflow-icon" aria-hidden="true" loading="lazy" decoding="async">
+          <img src="icons/toolbar/validate.svg" alt="" class="workflow-icon" aria-hidden="true" loading="lazy" decoding="async">
           <div>
-            <strong><a href="conduitfill.html">Conduit Fill</a></strong>
-            <span>Evaluate standalone conduit loading against NEC fill limits.</span>
+            <strong><a href="demandschedule.html">Studies</a></strong>
+            <span>Run demand, load flow, short-circuit, arc flash, TCC, harmonics, and motor studies.</span>
           </div>
         </li>
         <li>
-          <img src="icons/route.svg" alt="" class="workflow-icon" aria-hidden="true" loading="lazy" decoding="async">
+          <img src="icons/toolbar/copy.svg" alt="" class="workflow-icon" aria-hidden="true" loading="lazy" decoding="async">
           <div>
-            <strong><a href="optimalRoute.html">Optimal Cable Route</a></strong>
-            <span>Run Dijkstra-based pathfinding to find least-cost routes respecting tray capacity and thermal limits. View results in 3D.</span>
-          </div>
-        </li>
-        <li>
-          <img src="icons/oneline.svg" alt="" class="workflow-icon" aria-hidden="true" loading="lazy" decoding="async">
-          <div>
-            <strong><a href="oneline.html">One-Line Diagram</a></strong>
-            <span>Draw and edit interactive electrical single-line diagrams, then export to PDF or DXF.</span>
+            <strong><a href="projectreport.html">Deliverables</a></strong>
+            <span>Generate reports, pull cards, spool sheets, procurement schedules, estimates, and submittals.</span>
           </div>
         </li>
       </ol>

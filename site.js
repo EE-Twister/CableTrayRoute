@@ -7,7 +7,31 @@ import { mountCopilot } from "./src/copilot.js";
 import "./src/components/navigation.js";
 import "./src/components/commandPalette.js";
 import "./units.js";
-import { exportProject, importProject, getOneLine, getStudies, loadProject, saveProject, getDuctbanks, getConduits, applyRemoteSnapshot } from "./dataStore.mjs";
+import {
+  exportProject,
+  importProject,
+  getOneLine,
+  getStudies,
+  loadProject,
+  saveProject,
+  getDuctbanks,
+  getConduits,
+  getEquipment,
+  getLoads,
+  getCables,
+  getTrays,
+  getLifecyclePackages,
+  getReportSnapshots,
+  getItem,
+  applyRemoteSnapshot
+} from "./dataStore.mjs";
+import {
+  workflowOrder as PROJECT_WORKFLOW_STEPS,
+  getWorkflowStepForPage,
+  getStepStatus,
+  getCableReadiness,
+  countOneLineComponents
+} from "./src/workflowStatus.js";
 import { runValidation } from "./validation/rules.js";
 import {
   PROJECT_KEY,
@@ -44,6 +68,15 @@ let lastSavedIndicatorTimer=null;
 
 const ONBOARDING_SAMPLE_PROJECT={
   name:'Sample Project - Getting Started',
+  equipment:[
+    {id:'SUB-1',tag:'SUB-1',description:'Utility substation',category:'Source',voltage:'13.8kV',x:0,y:0,z:0},
+    {id:'MCC-1',tag:'MCC-1',description:'Main motor control center',category:'Distribution',voltage:'480V',x:80,y:0,z:0},
+    {id:'PANEL-A',tag:'PANEL-A',description:'Area panelboard',category:'Panel',voltage:'480V',x:150,y:40,z:0}
+  ],
+  loads:[
+    {id:'MOTOR-101',tag:'MOTOR-101',description:'Cooling tower fan motor',source:'PANEL-A',kw:75,voltage:'480V',loadType:'Motor'},
+    {id:'UPS-1',tag:'UPS-1',description:'Control UPS',source:'PANEL-A',kw:15,voltage:'480V',loadType:'UPS'}
+  ],
   cables:[
     {id:'CABLE-001',from:'MCC-1',to:'PANEL-A',conductor_size:'500 kcmil',insulation_type:'XLPE',voltage_rating:'5kV',length:180,route_preference:'TRAY-01'},
     {id:'CABLE-002',from:'PANEL-A',to:'MOTOR-101',conductor_size:'2/0 AWG',insulation_type:'THHN',voltage_rating:'600V',length:95,route_preference:'TRAY-02'},
@@ -58,7 +91,21 @@ const ONBOARDING_SAMPLE_PROJECT={
   ],
   ductbanks:[
     {tag:'DB-01',from:'SUB-1',to:'MCC-1',concrete_encasement:true,start_x:-80,start_y:0,start_z:-4,end_x:0,end_y:0,end_z:-4}
-  ]
+  ],
+  oneLine:{
+    activeSheet:0,
+    sheets:[{
+      name:'Sample One-Line',
+      components:[
+        {id:'sub-1',ref:'SUB-1',label:'SUB-1',type:'utility_source',subtype:'utility',x:80,y:120,connections:[{target:'mcc-1'}]},
+        {id:'mcc-1',ref:'MCC-1',label:'MCC-1',type:'equipment',subtype:'switchgear',x:300,y:120,connections:[{target:'panel-a'}]},
+        {id:'panel-a',ref:'PANEL-A',label:'PANEL-A',type:'panel',subtype:'panelboard',x:520,y:120,connections:[{target:'motor-101'},{target:'ups-1'}]},
+        {id:'motor-101',ref:'MOTOR-101',label:'MOTOR-101',type:'load',subtype:'motor_load',x:740,y:80,connections:[]},
+        {id:'ups-1',ref:'UPS-1',label:'UPS-1',type:'load',subtype:'ups_load',x:740,y:180,connections:[]}
+      ],
+      connections:[]
+    }]
+  }
 };
 
 function ensureOperationToast(){
@@ -144,6 +191,9 @@ function saveOnboardingSettings(patch={}){
 }
 
 async function initializeSampleProject(){
+  setProjectKey('equipment',JSON.stringify(ONBOARDING_SAMPLE_PROJECT.equipment));
+  setProjectKey('loadList',JSON.stringify(ONBOARDING_SAMPLE_PROJECT.loads));
+  setProjectKey('oneLineDiagram',JSON.stringify(ONBOARDING_SAMPLE_PROJECT.oneLine));
   setProjectKey('cableSchedule',JSON.stringify(ONBOARDING_SAMPLE_PROJECT.cables));
   setProjectKey('traySchedule',JSON.stringify(ONBOARDING_SAMPLE_PROJECT.trays));
   setProjectKey('conduitSchedule',JSON.stringify(ONBOARDING_SAMPLE_PROJECT.conduits));
@@ -158,6 +208,7 @@ async function initializeSampleProject(){
 
 async function runOnboardingFlow({force=false,source='auto'}={}){
   if(typeof document==='undefined') return;
+  if(!force&&new URLSearchParams(window.location.search).has('e2e')) return;
   const state=getOnboardingSettings();
   if(!force&&state.completed===true&&state.version===ONBOARDING_VERSION) return;
   if(!force&&state.dismissedVersion===ONBOARDING_VERSION) return;
@@ -166,41 +217,48 @@ async function runOnboardingFlow({force=false,source='auto'}={}){
   const steps=[
     {
       title:'Welcome to CableTrayRoute',
-      description:'This quick onboarding walks you through the core workflow in under a minute.',
-      details:`${stepIndicator(0)}\n\nCableTrayRoute is a browser-based electrical raceway design tool. Everything is saved locally in your browser — no account needed to get started.\n\nYou will set up cables, trays, conduits, and ductbanks, then run routing, fill, clash detection, and generate reports.`
+      description:'This quick onboarding walks you through the project workflow in under a minute.',
+      details:`${stepIndicator(0)}\n\nCableTrayRoute modules can be used independently, but the integrated path is Equipment List -> Load List -> One-Line -> Cable Schedule -> Raceway Schedule -> Fill / Routing -> Studies -> Deliverables.\n\nThe One-Line no longer overwrites schedules automatically. Use Reconcile Schedules when you want to preview and apply schedule updates.`
     },
     {
       title:'Load a sample project in one click',
-      description:'Need a working baseline? Seed the workflow with sample cables, raceways, and a ductbank.',
-      details:`${stepIndicator(1)}\n\nClick "Load Sample Project" to populate a sample dataset: 3 cables, 2 trays, 1 conduit, and 1 ductbank. This lets you explore every feature without manual data entry.`,
+      description:'Need a working baseline? Seed the workflow with sample equipment, loads, cables, raceways, and a one-line.',
+      details:`${stepIndicator(1)}\n\nClick "Load Sample Project" to populate a sample dataset with equipment, loads, a one-line, 3 cables, 2 trays, 1 conduit, and 1 ductbank. This lets you explore the integrated workflow without manual data entry.`,
       showSampleLoader:true
     },
     {
-      title:'Step 1 — Build your Cable Schedule',
-      description:'Start by defining the cables in your project.',
-      details:`${stepIndicator(2)}\n\nGo to Cable Schedule to enter each cable's ID, endpoints, conductor size, insulation type, voltage rating, and length.\n\nTip: assign a "Route Preference" (tray or conduit ID) to each cable so the routing engine knows where to place it.`,
-      link:{href:'cableschedule.html',label:'Open Cable Schedule'}
-    },
-    {
-      title:'Step 2 — Define Raceways',
-      description:'Add cable trays, conduits, and ductbanks.',
-      details:`${stepIndicator(3)}\n\nGo to Raceway Schedule to enter tray dimensions (width, depth), start/end coordinates, and tray type.\n\nThe fill analysis uses NEC §392.22 limits. Tray fill is automatically computed when you navigate to Cable Tray Fill.`,
-      link:{href:'racewayschedule.html',label:'Open Raceway Schedule'}
-    },
-    {
-      title:'Step 3 — Run Routing and Analysis',
-      description:'Compute the optimal route and run clash detection.',
-      details:`${stepIndicator(4)}\n\n• Optimal Route — finds shortest paths for each cable through the tray network.\n• Clash Detection — flags 3D interference and clearance violations (NEMA VE 2 §8.4).\n• Spool Sheets — generates prefab assembly groups for field installation.\n• Project Report — aggregates all analysis results into one printable document.`,
+      title:'Step 1 - Equipment and Loads',
+      description:'Start with the project inventory and load definitions.',
+      details:`${stepIndicator(2)}\n\nUse Equipment List for major equipment, then Load List for load records and source relationships. Either page can still be used by itself when you are only building one schedule.`,
       links:[
-        {href:'optimalRoute.html',label:'Optimal Route'},
-        {href:'clashdetect.html',label:'Clash Detection'},
-        {href:'projectreport.html',label:'Project Report'},
+        {href:'equipmentlist.html',label:'Open Equipment List'},
+        {href:'loadlist.html',label:'Open Load List'}
+      ]
+    },
+    {
+      title:'Step 2 - One-Line and Reconcile',
+      description:'Draw the model and choose when schedule data should update.',
+      details:`${stepIndicator(3)}\n\nUse One-Line to model the electrical relationships. When you want those records to feed schedules, click Reconcile Schedules and review the create, update, and conflict counts before applying.`,
+      link:{href:'oneline.html',label:'Open One-Line'}
+    },
+    {
+      title:'Step 3 - Cable and Raceway Schedules',
+      description:'Complete schedule-ready cables and routing-ready raceway assignments.',
+      details:`${stepIndicator(4)}\n\nCable rows are schedule-ready when they have tag, from/to, conductor size, and length. They become routing-ready after a raceway assignment is added. Raceway Schedule captures trays, conduits, and ductbanks for fill and routing.`,
+      links:[
+        {href:'cableschedule.html',label:'Open Cable Schedule'},
+        {href:'racewayschedule.html',label:'Open Raceway Schedule'}
       ]
     },
     {
       title:'Settings, help, and collaboration',
-      description:'Find everything you need from the ⚙ Settings menu.',
-      details:`${stepIndicator(5)}\n\n• Use ⚙ Settings > Site Help for reference documentation.\n• Save and load projects using the project buttons in Settings.\n• When logged in, real-time collaboration is active automatically — co-editors appear in the presence bar at the top of the page.\n• Reopen this tour at any time from Settings > Reopen Onboarding.`
+      description:'Find everything you need from the settings menu.',
+      details:`${stepIndicator(5)}\n\nAfter the model is coordinated, run fill/routing pages, studies, and deliverables from the workflow navigation.\n\nUse Settings > Site Help for reference documentation. Save and load projects using the project buttons in Settings. Reopen this tour at any time from Settings > Reopen Onboarding.`,
+      links:[
+        {href:'cabletrayfill.html',label:'Tray Fill'},
+        {href:'optimalRoute.html',label:'Optimal Route'},
+        {href:'projectreport.html',label:'Project Report'}
+      ]
     }
   ];
 
@@ -457,12 +515,12 @@ function enhanceSettingsMenu(settingsMenu){
   }
 }
 
-async function runOperationWithStatus(statusHost,{pendingText,successText,errorText,operation}){
+async function runOperationWithStatus(statusHost,{pendingText,successText,errorText,operation,toastSuccess=true}){
   setOperationStatus(statusHost,'busy',pendingText);
   try{
     const result=await operation();
     setOperationStatus(statusHost,'success',successText);
-    showOperationToast(successText,'success');
+    if(toastSuccess) showOperationToast(successText,'success');
     return result;
   }catch(err){
     console.error(errorText,err);
@@ -479,10 +537,28 @@ function currentProjectFromHash(){
   const hash=location.hash;
   if(!hash||hash==='#'||hash.startsWith('#project=')) return '';
   try{
-    return decodeURIComponent(hash.slice(1)).trim();
+    const value=decodeURIComponent(hash.slice(1)).trim();
+    return isPageAnchorHash(value)?'':value;
   }catch{
     return '';
   }
+}
+
+function isPageAnchorHash(value){
+  if(!value||typeof document==='undefined') return false;
+  try{
+    if(document.getElementById?.(value)) return true;
+    if(typeof document.querySelector==='function'&&typeof CSS!=='undefined'&&typeof CSS.escape==='function'){
+      return Boolean(document.querySelector(`[name="${CSS.escape(value)}"]`));
+    }
+  }catch{}
+  return false;
+}
+
+function displayProjectName(rawName){
+  const name=String(rawName||'').trim();
+  if(!name||name==='default'||isPageAnchorHash(name)) return 'Untitled';
+  return name;
 }
 
 if(typeof window!=='undefined'){
@@ -643,7 +719,7 @@ async function saveCheckpoint(){
 
 async function updateProjectDisplay(snapshot){
   const proj=snapshot||getProjectState();
-  const name=proj.name||'Untitled';
+  const name=displayProjectName(proj.name);
   try{
     const hash=await sha256Hex(canonicalJSONString(proj));
     let span=document.getElementById('project-display');
@@ -668,7 +744,11 @@ async function updateProjectDisplay(snapshot){
         }
       }
     }
-    if(span) span.textContent=`Project: ${name} (hash: ${hash.slice(0,8)})`;
+    if(span){
+      span.classList?.add('project-display-chip');
+      span.textContent=`Project: ${name}`;
+      span.title=`Project hash: ${hash.slice(0,8)}`;
+    }
   }catch(e){console.error('hash failed',e);}
 }
 
@@ -916,7 +996,7 @@ async function loadProjectFromHash(){
   } else if(location.hash){
     try{
       const name=decodeURIComponent(location.hash.slice(1));
-      if(name) loadProject(name);
+      if(name&&!isPageAnchorHash(name)) loadProject(name);
     }catch(e){console.error('hash load failed',e);}
   }
 }
@@ -930,11 +1010,11 @@ function applyProjectHash(){
     }else{
       try{
         const stateName=(getProjectState().name||'').trim();
-        if(stateName) activeName=stateName;
+        if(stateName&&!isPageAnchorHash(stateName)) activeName=stateName;
       }catch(e){ console.warn('Could not read project name from state:', e); }
       if(!activeName){
         const globalName=typeof window.currentProjectId==='string'?window.currentProjectId.trim():'';
-        if(globalName&&globalName!=='default') activeName=globalName;
+        if(globalName&&globalName!=='default'&&!isPageAnchorHash(globalName)) activeName=globalName;
       }
     }
     window.currentProjectId=activeName||'default';
@@ -949,13 +1029,310 @@ function applyProjectHash(){
     }
   }
   if(typeof document==='undefined'||typeof location==='undefined') return;
-  const navHash=location.hash||(activeName?`#${encodeURIComponent(activeName)}`:'');
+  const projectHash=currentProjectFromHash();
+  const navHash=projectHash?`#${encodeURIComponent(projectHash)}`:(activeName?`#${encodeURIComponent(activeName)}`:'');
   if(!navHash) return;
   document.querySelectorAll('a[href$=".html"]').forEach(a=>{
     const href=a.getAttribute('href');
     if(!href||href.includes('#')) return;
     a.setAttribute('href',href+navHash);
   });
+}
+
+function hasWorkflowValue(value){
+  if(Array.isArray(value)) return value.some(hasWorkflowValue);
+  if(value&&typeof value==='object') return Object.keys(value).length>0;
+  return value!==null&&value!==undefined&&String(value).trim()!=='';
+}
+
+function meaningfulHomeRecords(records){
+  if(!Array.isArray(records)) return [];
+  return records.filter(record=>{
+    if(!record||typeof record!=='object') return false;
+    return Object.entries(record).some(([key,value])=>!key.startsWith('_')&&hasWorkflowValue(value));
+  });
+}
+
+function safeReadHomeData(getter,fallback){
+  try{return getter();}
+  catch(err){
+    console.warn('Homepage summary read failed',err);
+    return fallback;
+  }
+}
+
+function homeField(record,names){
+  for(const name of names){
+    if(hasWorkflowValue(record?.[name])) return record[name];
+  }
+  return '';
+}
+
+function homeCableTag(cable){
+  return homeField(cable,['tag','id','cable_id','cableId','ref'])||'Untitled';
+}
+
+function homeCableFrom(cable){
+  return homeField(cable,['from','from_tag','fromTag','source','source_tag'])||'--';
+}
+
+function homeCableTo(cable){
+  return homeField(cable,['to','to_tag','toTag','destination','load','load_tag'])||'--';
+}
+
+function homeCableSize(cable){
+  return homeField(cable,['conductor_size','conductorSize','cable_size','wire_size','size'])||'--';
+}
+
+function countHomeStudies(studies){
+  if(!studies||typeof studies!=='object') return 0;
+  return Object.values(studies).filter(hasWorkflowValue).length;
+}
+
+function countHomeReportSnapshots(snapshots){
+  if(Array.isArray(snapshots)) return snapshots.length;
+  if(snapshots&&typeof snapshots==='object') return Object.keys(snapshots).length;
+  return 0;
+}
+
+function pluralHome(count,singular,plural=singular+'s'){
+  return `${count} ${count===1?singular:plural}`;
+}
+
+function stripWorkflowNumber(label){
+  return String(label||'').replace(/^\d+\.\s*/,'');
+}
+
+function setHomeText(id,text){
+  const el=document.getElementById(id);
+  if(el) el.textContent=text;
+}
+
+function setHomeLink(id,href,text){
+  const el=document.getElementById(id);
+  if(!el) return;
+  el.setAttribute('href',href);
+  el.textContent=text;
+}
+
+function numericPercent(record,names){
+  for(const name of names){
+    const raw=record?.[name];
+    if(raw===null||raw===undefined||raw==='') continue;
+    const value=Number(String(raw).replace('%',''));
+    if(Number.isFinite(value)) return value;
+  }
+  return null;
+}
+
+function averageHomeFill(records){
+  const values=records
+    .map(record=>numericPercent(record,['fill_pct','fillPercent','percent_fill','percentFill','fill','tray_fill_pct','conduit_fill_pct']))
+    .filter(value=>Number.isFinite(value));
+  if(!values.length) return null;
+  return Math.round(values.reduce((sum,value)=>sum+value,0)/values.length);
+}
+
+function collectHomepageSummary(){
+  const equipment=meaningfulHomeRecords(safeReadHomeData(getEquipment,[]));
+  const loads=meaningfulHomeRecords(safeReadHomeData(getLoads,[]));
+  const oneLine=safeReadHomeData(getOneLine,{activeSheet:0,sheets:[]});
+  const cables=meaningfulHomeRecords(safeReadHomeData(getCables,[]));
+  const trays=meaningfulHomeRecords(safeReadHomeData(getTrays,[]));
+  const conduits=meaningfulHomeRecords(safeReadHomeData(getConduits,[]));
+  const ductbanks=meaningfulHomeRecords(safeReadHomeData(getDuctbanks,[]));
+  const studies=safeReadHomeData(getStudies,{});
+  const lifecyclePackages=safeReadHomeData(getLifecyclePackages,[]);
+  const reportSnapshots=safeReadHomeData(getReportSnapshots,{});
+  const reconcilePending=Boolean(safeReadHomeData(()=>getItem('oneLineScheduleReconcilePending',false),false));
+  const cableReadiness=getCableReadiness(cables);
+  const oneLineComponents=countOneLineComponents(oneLine);
+  const raceways=trays.length+conduits.length+ductbanks.length;
+  const stepStatuses=PROJECT_WORKFLOW_STEPS.map(step=>({
+    ...step,
+    status:getStepStatus(step.key,{
+      equipment,
+      loads,
+      oneLine,
+      cables,
+      trays,
+      conduits,
+      ductbanks,
+      studies,
+      lifecyclePackages,
+      reportSnapshots
+    })
+  }));
+  const completeCount=stepStatuses.filter(step=>step.status.complete).length;
+  const nextStep=stepStatuses.find(step=>!step.status.complete)||stepStatuses[stepStatuses.length-1];
+  const packageCount=Array.isArray(lifecyclePackages)?lifecyclePackages.length:0;
+  const reportCount=countHomeReportSnapshots(reportSnapshots);
+  const routeRecords=[...trays,...conduits,...ductbanks];
+
+  return {
+    equipment,
+    loads,
+    oneLine,
+    oneLineComponents,
+    cables,
+    trays,
+    conduits,
+    ductbanks,
+    studies,
+    studyCount:countHomeStudies(studies),
+    lifecyclePackages,
+    reportCount:packageCount+reportCount,
+    reconcilePending,
+    cableReadiness,
+    raceways,
+    routeRecords,
+    averageFill:averageHomeFill(routeRecords),
+    routeWarnings:routeRecords.filter(record=>{
+      const pct=numericPercent(record,['fill_pct','fillPercent','percent_fill','percentFill','fill']);
+      return Number.isFinite(pct)&&pct>40;
+    }).length,
+    stepStatuses,
+    completeCount,
+    nextStep
+  };
+}
+
+function renderHomeCablePreview(cables){
+  const table=document.getElementById('home-cable-preview-table');
+  if(!table) return;
+  const head=table.querySelector('.mini-table__head');
+  table.replaceChildren();
+  if(head) table.appendChild(head);
+
+  const rows=cables.slice(0,3);
+  if(!rows.length){
+    const empty=document.createElement('div');
+    empty.className='mini-table__empty';
+    empty.setAttribute('role','row');
+    const cell=document.createElement('span');
+    cell.setAttribute('role','cell');
+    cell.textContent='No cable rows yet. Start the Cable Schedule to populate this preview.';
+    empty.appendChild(cell);
+    table.appendChild(empty);
+    return;
+  }
+
+  rows.forEach(cable=>{
+    const row=document.createElement('div');
+    row.setAttribute('role','row');
+    const status=getCableReadiness([cable]);
+    const statusClass=status.routingReady?'status-dot--ready':status.scheduleReady?'status-dot--route':'status-dot--open';
+    const statusText=status.routingReady?'Routing-ready':status.scheduleReady?'Schedule-ready':'Needs schedule';
+    [
+      homeCableTag(cable),
+      homeCableFrom(cable),
+      homeCableTo(cable),
+      homeCableSize(cable)
+    ].forEach(value=>{
+      const cell=document.createElement('span');
+      cell.setAttribute('role','cell');
+      cell.textContent=value;
+      row.appendChild(cell);
+    });
+    const statusCell=document.createElement('span');
+    statusCell.setAttribute('role','cell');
+    const dot=document.createElement('i');
+    dot.className=`status-dot ${statusClass}`;
+    statusCell.appendChild(dot);
+    statusCell.append(statusText);
+    row.appendChild(statusCell);
+    table.appendChild(row);
+  });
+}
+
+function renderHomeReadiness(summary){
+  const list=document.getElementById('home-readiness-list');
+  if(!list) return;
+  const items=[
+    ['Equipment basis',summary.equipment.length?pluralHome(summary.equipment.length,'item'):'Not started'],
+    ['Load relationships',summary.loads.length?pluralHome(summary.loads.length,'load'):'Not started'],
+    ['Schedule reconcile',summary.reconcilePending?'Pending':'Manual'],
+    ['Cable schedule',summary.cableReadiness.total?`${summary.cableReadiness.scheduleReady}/${summary.cableReadiness.total} ready`:'Not started'],
+    ['Raceway model',summary.raceways?pluralHome(summary.raceways,'raceway','raceways'):'Not started'],
+    ['Reports',summary.reportCount?pluralHome(summary.reportCount,'deliverable'):'Pending']
+  ];
+  list.replaceChildren();
+  items.forEach(([label,value])=>{
+    const item=document.createElement('li');
+    const labelEl=document.createElement('span');
+    labelEl.textContent=label;
+    const valueEl=document.createElement('strong');
+    valueEl.textContent=value;
+    item.append(labelEl,valueEl);
+    list.appendChild(item);
+  });
+}
+
+function renderHomepageCommandCenter(){
+  if(typeof document==='undefined'||!document.body?.classList?.contains('home-page')) return;
+  const summary=collectHomepageSummary();
+  let projectName='Untitled';
+  try{projectName=displayProjectName(getProjectState().name);}
+  catch{}
+
+  setHomeText('home-project-card-title',projectName==='Untitled'?'Untitled Project':projectName);
+  setHomeText('home-project-card-meta',summary.completeCount?`${summary.completeCount} of ${PROJECT_WORKFLOW_STEPS.length} workflow steps complete`:'Local workspace');
+  setHomeText('home-project-record-count',pluralHome(summary.equipment.length+summary.loads.length+summary.cables.length,'record'));
+  setHomeText('home-project-route-count',pluralHome(summary.raceways,'raceway','raceways'));
+
+  if(summary.reconcilePending){
+    setHomeText('home-next-action-title','Reconcile One-Line');
+    setHomeText('home-next-action-detail','One-Line changes are pending schedule reconcile.');
+    setHomeLink('home-next-action-link','oneline.html','Open One-Line');
+  } else if(summary.nextStep){
+    const stepName=stripWorkflowNumber(summary.nextStep.label);
+    const actionPrefix=summary.completeCount?'Continue':'Start';
+    setHomeText('home-next-action-title',`${actionPrefix} ${stepName}`);
+    setHomeText('home-next-action-detail',summary.nextStep.status.hint||summary.nextStep.hint||summary.nextStep.status.label);
+    setHomeLink('home-next-action-link',summary.nextStep.href,`Open ${stepName}`);
+  }
+  setHomeText('home-next-action-metrics',`${pluralHome(summary.equipment.length,'equipment item')} / ${pluralHome(summary.loads.length,'load')} / ${pluralHome(summary.cableReadiness.total,'cable row')}`);
+
+  const sheetCount=Array.isArray(summary.oneLine?.sheets)?summary.oneLine.sheets.length:0;
+  setHomeText(
+    'home-oneline-summary',
+    summary.oneLineComponents
+      ? `${pluralHome(summary.oneLineComponents,'component')} across ${pluralHome(sheetCount,'sheet')}`
+      : 'No one-line components yet. Schedules can still be built independently.'
+  );
+
+  renderHomeCablePreview(summary.cables);
+
+  setHomeText('home-raceway-count',String(summary.raceways));
+  setHomeText('home-raceway-label',summary.raceways?'available':'defined');
+  setHomeText('home-avg-fill',summary.averageFill===null?'--':`${summary.averageFill}%`);
+  setHomeText('home-route-warning-count',String(summary.routeWarnings));
+  const total=Math.max(summary.cableReadiness.total,1);
+  const schedulePct=Math.round((summary.cableReadiness.scheduleReady/total)*100);
+  const routePct=Math.round((summary.cableReadiness.routingReady/total)*100);
+  const deliverablePct=Math.round((summary.completeCount/PROJECT_WORKFLOW_STEPS.length)*100);
+  const scheduleMeter=document.getElementById('home-schedule-ready-meter');
+  const routeMeter=document.getElementById('home-routing-ready-meter');
+  const deliverableMeter=document.getElementById('home-deliverable-ready-meter');
+  if(scheduleMeter) scheduleMeter.style.width=`${schedulePct}%`;
+  if(routeMeter) routeMeter.style.width=`${routePct}%`;
+  if(deliverableMeter) deliverableMeter.style.width=`${deliverablePct}%`;
+
+  renderHomeReadiness(summary);
+}
+
+function initHomepageCommandCenter(){
+  if(typeof document==='undefined'||!document.body?.classList?.contains('home-page')) return;
+  renderHomepageCommandCenter();
+  onProjectChange(()=>renderHomepageCommandCenter());
+}
+
+if(typeof document!=='undefined'){
+  if(document.readyState==='loading'){
+    document.addEventListener('DOMContentLoaded',initHomepageCommandCenter,{once:true});
+  }else{
+    initHomepageCommandCenter();
+  }
 }
 
 // History and autosave features have been removed to avoid exceeding
@@ -1730,20 +2107,13 @@ function initTableEmptyStates(){
 globalThis.document?.addEventListener('DOMContentLoaded',initTableEmptyStates);
 
 // ─── Workflow Step Navigator ────────────────────────────────────────────────
-const WORKFLOW_STEPS=[
-  {href:'cableschedule.html',label:'Cable Schedule',short:'1. Cables'},
-  {href:'racewayschedule.html',label:'Raceway Schedule',short:'2. Raceways'},
-  {href:'ductbankroute.html',label:'Ductbank',short:'3. Ductbank'},
-  {href:'cabletrayfill.html',label:'Tray Fill',short:'4. Tray Fill'},
-  {href:'conduitfill.html',label:'Conduit Fill',short:'5. Conduit Fill'},
-  {href:'optimalRoute.html',label:'Optimal Cable Route',short:'6. Routing'},
-  {href:'oneline.html',label:'One-Line Diagram',short:'7. One-Line'},
-];
+const WORKFLOW_STEPS=PROJECT_WORKFLOW_STEPS;
 
 function initWorkflowStepNav(){
   if(typeof document==='undefined') return;
   const page=window.location.pathname.split('/').pop()||'index.html';
-  const idx=WORKFLOW_STEPS.findIndex(s=>s.href===page);
+  const currentStep=getWorkflowStepForPage(page);
+  const idx=currentStep?WORKFLOW_STEPS.findIndex(s=>s.key===currentStep.key):-1;
   if(idx<0) return; // Not a workflow page
 
   const step=WORKFLOW_STEPS[idx];
@@ -2090,6 +2460,7 @@ function initProjectIO(){
     pendingText:'Loading project from URL…',
     successText:'Project URL sync complete.',
     errorText:'Project URL sync failed',
+    toastSuccess:false,
     operation:async()=>{
       await loadProjectFromHash();
       applyProjectHash();
@@ -2174,6 +2545,7 @@ globalThis.addEventListener?.('DOMContentLoaded',initProjectIO);
 globalThis.addEventListener?.('DOMContentLoaded',()=>{
   const params = new URLSearchParams(window.location.search);
   if (params.has('e2e')) return;
+  if (document.body?.dataset.onboarding === 'manual') return;
   runOnboardingFlow({source:'auto'}).catch(err=>console.error('Onboarding startup failed',err));
 });
 

@@ -1,0 +1,326 @@
+{
+  "schemaVersion": 1,
+  "id": "project-workflow-core",
+  "title": "Project Workflow Core",
+  "meta": {
+    "version": 1,
+    "scenario": "default",
+    "scenarios": ["default"]
+  },
+  "ductbanks": [
+    {
+      "id": "DB-101",
+      "ductbank_id": "DB-101",
+      "description": "Underground feeder ductbank from utility service to electrical room",
+      "conduit_count": 4,
+      "trade_size": "4 in",
+      "length": 120
+    }
+  ],
+  "conduits": [
+    {
+      "id": "CND-PMP-101",
+      "conduit_id": "CND-PMP-101",
+      "description": "Motor feeder conduit to cooling water pump",
+      "type": "RMC",
+      "trade_size": "2 in",
+      "material": "Steel",
+      "length": 85
+    }
+  ],
+  "trays": [
+    {
+      "id": "TR-PWR-101",
+      "tray_id": "TR-PWR-101",
+      "description": "Main power cable tray through process area",
+      "width": 24,
+      "height": 6,
+      "length": 160,
+      "material": "Aluminum",
+      "fill": 28
+    }
+  ],
+  "cables": [
+    {
+      "tag": "CBL-SWBD-MCC-101",
+      "from": "SWBD-101",
+      "to": "MCC-101",
+      "conductor_size": "3-500 kcmil CU",
+      "length": 145,
+      "raceway_ids": ["TR-PWR-101"],
+      "voltage": "480"
+    },
+    {
+      "tag": "CBL-MCC-PMP-101",
+      "from": "MCC-101",
+      "to": "PMP-101",
+      "conductor_size": "3-#4 CU",
+      "length": 95,
+      "raceway_ids": ["CND-PMP-101"],
+      "voltage": "480"
+    },
+    {
+      "tag": "CBL-SWBD-XFMR-101",
+      "from": "SWBD-101",
+      "to": "XFMR-101",
+      "conductor_size": "3-#1 CU",
+      "length": 62,
+      "raceway_ids": ["TR-PWR-101"],
+      "voltage": "480"
+    },
+    {
+      "tag": "CBL-XFMR-LP-101",
+      "from": "XFMR-101",
+      "to": "LP-101",
+      "conductor_size": "4-#2 CU",
+      "length": 35,
+      "raceway_ids": ["TR-PWR-101"],
+      "voltage": "208"
+    }
+  ],
+  "cableTypicals": [],
+  "panels": [
+    {
+      "tag": "LP-101",
+      "description": "Lighting and receptacle panel",
+      "voltage": "208/120",
+      "source": "XFMR-101",
+      "busRating": "225"
+    }
+  ],
+  "equipment": [
+    {
+      "tag": "SWBD-101",
+      "description": "480 V main switchboard",
+      "voltage": "480/277",
+      "category": "Distribution",
+      "subCategory": "Switchboard",
+      "arrangement": "Electrical Room A",
+      "lineup": "SWBD-101",
+      "manufacturer": "Square D",
+      "model": "Power-Style QED",
+      "phases": "3"
+    },
+    {
+      "tag": "MCC-101",
+      "description": "Process motor control center",
+      "voltage": "480",
+      "category": "Distribution",
+      "subCategory": "MCC",
+      "arrangement": "Process Area",
+      "lineup": "MCC-101",
+      "manufacturer": "Allen-Bradley",
+      "model": "CENTERLINE 2100",
+      "phases": "3"
+    },
+    {
+      "tag": "XFMR-101",
+      "description": "480-208/120 V dry-type transformer",
+      "voltage": "480/208",
+      "category": "Transformer",
+      "subCategory": "Dry Type",
+      "arrangement": "Electrical Room A",
+      "lineup": "XFMR-101",
+      "manufacturer": "Eaton",
+      "model": "V48M28T75EE",
+      "phases": "3"
+    },
+    {
+      "tag": "LP-101",
+      "description": "208/120 V panelboard",
+      "voltage": "208/120",
+      "category": "Panel",
+      "subCategory": "Lighting Panel",
+      "arrangement": "Electrical Room A",
+      "lineup": "LP-101",
+      "manufacturer": "Square D",
+      "model": "NF",
+      "phases": "3"
+    },
+    {
+      "tag": "PMP-101",
+      "description": "Cooling water pump",
+      "voltage": "480",
+      "category": "Mechanical Load",
+      "subCategory": "Pump",
+      "arrangement": "Process Area",
+      "lineup": "Process Pumps",
+      "manufacturer": "Goulds",
+      "model": "3196",
+      "phases": "3"
+    }
+  ],
+  "loads": [
+    {
+      "source": "MCC-101",
+      "tag": "PMP-101",
+      "description": "Cooling water pump motor",
+      "quantity": "1",
+      "voltage": "480",
+      "loadType": "Motor",
+      "duty": "Continuous",
+      "kw": "18.6",
+      "powerFactor": "0.85",
+      "loadFactor": "100",
+      "efficiency": "92",
+      "demandFactor": "125",
+      "phases": "3",
+      "circuit": "MCC-101-01"
+    },
+    {
+      "source": "LP-101",
+      "tag": "LTG-101",
+      "description": "Process building lighting",
+      "quantity": "1",
+      "voltage": "120",
+      "loadType": "Lighting",
+      "duty": "Continuous",
+      "kw": "3.2",
+      "powerFactor": "0.95",
+      "loadFactor": "100",
+      "efficiency": "100",
+      "demandFactor": "100",
+      "phases": "1",
+      "circuit": "LP-101-03"
+    },
+    {
+      "source": "LP-101",
+      "tag": "REC-101",
+      "description": "General receptacles",
+      "quantity": "12",
+      "voltage": "120",
+      "loadType": "Receptacle",
+      "duty": "Intermittent",
+      "kw": "0.18",
+      "powerFactor": "0.90",
+      "loadFactor": "100",
+      "efficiency": "100",
+      "demandFactor": "50",
+      "phases": "1",
+      "circuit": "LP-101-05"
+    }
+  ],
+  "oneLine": {
+    "activeSheet": 0,
+    "sheets": [
+      {
+        "id": "workflow-core-main",
+        "name": "Main One-Line",
+        "components": [
+          {
+            "id": "comp-swbd-101",
+            "type": "source",
+            "subtype": "utility_source",
+            "label": "SWBD-101",
+            "ref": "SWBD-101",
+            "x": 120,
+            "y": 120,
+            "equipmentRef": "SWBD-101",
+            "scheduleLinks": { "equipment": "SWBD-101" },
+            "connections": [
+              { "target": "comp-mcc-101", "cable": { "tag": "CBL-SWBD-MCC-101", "conductor_size": "3-500 kcmil CU", "length": 145 } },
+              { "target": "comp-xfmr-101", "cable": { "tag": "CBL-SWBD-XFMR-101", "conductor_size": "3-#1 CU", "length": 62 } }
+            ]
+          },
+          {
+            "id": "comp-mcc-101",
+            "type": "equipment",
+            "subtype": "mcc",
+            "label": "MCC-101",
+            "ref": "MCC-101",
+            "x": 360,
+            "y": 120,
+            "equipmentRef": "MCC-101",
+            "scheduleLinks": { "equipment": "MCC-101" },
+            "connections": [
+              { "target": "comp-pmp-101", "cable": { "tag": "CBL-MCC-PMP-101", "conductor_size": "3-#4 CU", "length": 95 } }
+            ]
+          },
+          {
+            "id": "comp-pmp-101",
+            "type": "load",
+            "subtype": "motor_load",
+            "label": "PMP-101",
+            "ref": "PMP-101",
+            "x": 600,
+            "y": 120,
+            "loadRef": "PMP-101",
+            "equipmentRef": "PMP-101",
+            "scheduleLinks": { "load": "PMP-101", "equipment": "PMP-101" }
+          },
+          {
+            "id": "comp-xfmr-101",
+            "type": "transformer",
+            "subtype": "two_winding_transformer",
+            "label": "XFMR-101",
+            "ref": "XFMR-101",
+            "x": 360,
+            "y": 300,
+            "equipmentRef": "XFMR-101",
+            "scheduleLinks": { "equipment": "XFMR-101" },
+            "connections": [
+              { "target": "comp-lp-101", "cable": { "tag": "CBL-XFMR-LP-101", "conductor_size": "4-#2 CU", "length": 35 } }
+            ]
+          },
+          {
+            "id": "comp-lp-101",
+            "type": "panel",
+            "subtype": "panelboard",
+            "label": "LP-101",
+            "ref": "LP-101",
+            "x": 600,
+            "y": 300,
+            "panelRef": "LP-101",
+            "scheduleLinks": { "panel": "LP-101", "equipment": "LP-101" }
+          }
+        ],
+        "connections": []
+      }
+    ]
+  },
+  "mccLineups": [
+    {
+      "id": "MCC-101",
+      "name": "MCC-101",
+      "sections": [
+        { "id": "SEC-1", "description": "Incoming and pump starter section" }
+      ]
+    }
+  ],
+  "settings": {
+    "studies": {
+      "demandSchedule": {
+        "status": "Run",
+        "totalDemandKva": 41.8,
+        "updatedAt": "2026-05-01T12:00:00.000Z"
+      },
+      "shortCircuit": {
+        "status": "Run",
+        "availableFaultKa": 22.4,
+        "updatedAt": "2026-05-01T12:05:00.000Z"
+      }
+    },
+    "reportSnapshots": {
+      "workflow-core-report": {
+        "id": "workflow-core-report",
+        "title": "Workflow Core Sample Report",
+        "createdAt": "2026-05-01T12:30:00.000Z",
+        "sections": ["Equipment List", "Load List", "One-Line", "Cable Schedule", "Raceway Schedule"]
+      }
+    },
+    "lifecyclePackages": [
+      {
+        "id": "workflow-core-ifr",
+        "revisionLabel": "IFR",
+        "author": "Sample Engineer",
+        "status": "Issued for Review",
+        "createdAt": "2026-05-01T12:35:00.000Z",
+        "summary": {
+          "cableCount": 4,
+          "studyCount": 2
+        }
+      }
+    ],
+    "oneLineScheduleReconcilePending": false
+  }
+}

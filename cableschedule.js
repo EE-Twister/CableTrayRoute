@@ -48,6 +48,12 @@ import ampacity from './ampacity.mjs';
 import { createTable, STORAGE_KEYS } from './tableUtils.mjs';
 import { openModal, showAlertModal } from './src/components/modal.js';
 import { start as startTour } from './tour.js';
+import {
+  applyCableImport,
+  getCableEndpointOptions,
+  previewCableImport,
+  summarizeCableWorkflow
+} from './analysis/scheduleWorkflow.mjs';
 const { sizeToArea } = ampacity;
 
 const CABLE_TOUR_STEPS = [
@@ -125,18 +131,19 @@ async function initCableSchedule() {
   }
 
   function getEquipmentOptions(){
-    const toLabel=value=>{
-      if(value===null||value===undefined) return '';
-      try{return String(value).trim();}catch{return '';}
-    };
-    const names=new Set();
+    let equipment = [];
+    let loads = [];
+    let panels = [];
     try{
-      dataStore.getEquipment().forEach(eq=>{
-        const friendly=toLabel(eq?.ref)||toLabel(eq?.description)||toLabel(eq?.id);
-        if(friendly) names.add(friendly);
-      });
+      equipment = dataStore.getEquipment();
     }catch(e){ console.warn('getEquipmentOptions: failed to read equipment', e); }
-    return Array.from(names);
+    try{
+      loads = dataStore.getLoads();
+    }catch(e){ console.warn('getEquipmentOptions: failed to read loads', e); }
+    try{
+      panels = dataStore.getPanels();
+    }catch(e){ console.warn('getEquipmentOptions: failed to read panels', e); }
+    return getCableEndpointOptions({ equipment, loads, panels });
   }
 
   function attachControlModal(buttonId, containerId, options = {}) {
@@ -2087,7 +2094,8 @@ async function initCableSchedule() {
     });
   }
 
-  const REQUIRED_FIELD_KEYS = new Set(['tag', 'conductor_size', 'length', 'raceway_ids']);
+  const REQUIRED_FIELD_KEYS = new Set(['tag', 'from_tag', 'to_tag', 'conductor_size', 'length']);
+  const ROUTING_FIELD_KEYS = new Set(['raceway_ids']);
   const touchedRequiredFields = new WeakSet();
   const validationSummary = document.getElementById('cable-validation-summary');
   let validationActive = false;
@@ -2102,7 +2110,7 @@ async function initCableSchedule() {
     if (!el) return true;
     if (key === 'raceway_ids') return getRacewayValues(el).length > 0;
     const value = `${el.value ?? ''}`.trim();
-    if (key === 'length') return value !== '' && !Number.isNaN(Number(value));
+    if (key === 'length') return value !== '' && Number.isFinite(Number(value)) && Number(value) > 0;
     return value !== '';
   }
 
@@ -2113,37 +2121,21 @@ async function initCableSchedule() {
       return `${value || ''}`.trim() !== '';
     }
     const value = `${row[key] ?? ''}`.trim();
-    if (key === 'length') return value !== '' && !Number.isNaN(Number(value));
+    if (key === 'length') return value !== '' && Number.isFinite(Number(value)) && Number(value) > 0;
     return value !== '';
   }
 
   function getReadinessSummary(data = []){
     const counts = {
-      total: data.length,
-      ready: 0,
-      missingRaceway: 0,
-      missingSize: 0,
-      missingLength: 0,
-      duplicateTags: 0,
+      ...summarizeCableWorkflow(data),
       latestEdit: ''
     };
-    const tagCounts = new Map();
     data.forEach(row => {
-      const tag = `${row?.tag || ''}`.trim().toLowerCase();
-      if (tag) tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1);
-      if (!isRequiredValueValid('raceway_ids', row)) counts.missingRaceway += 1;
-      if (!isRequiredValueValid('conductor_size', row)) counts.missingSize += 1;
-      if (!isRequiredValueValid('length', row)) counts.missingLength += 1;
-      const ready = Array.from(REQUIRED_FIELD_KEYS).every(key => isRequiredValueValid(key, row));
-      if (ready) counts.ready += 1;
       const modified = row?.last_modified ? new Date(row.last_modified) : null;
       if (modified && !Number.isNaN(modified.getTime())) {
         const current = counts.latestEdit ? new Date(counts.latestEdit) : null;
         if (!current || modified > current) counts.latestEdit = modified.toISOString();
       }
-    });
-    tagCounts.forEach(count => {
-      if (count > 1) counts.duplicateTags += count;
     });
     return counts;
   }
@@ -2160,15 +2152,67 @@ async function initCableSchedule() {
       if (el) el.textContent = `${value}`;
     };
     setMetric('total', summary.total);
-    setMetric('ready', summary.ready);
+    setMetric('ready', summary.scheduleReady);
+    setMetric('routing-ready', summary.routingReady);
     setMetric('missing-raceway', summary.missingRaceway);
+    setMetric('missing-from-to', summary.missingFromTo);
     setMetric('missing-size', summary.missingSize);
     setMetric('duplicates', summary.duplicateTags);
     const latestLog = readCableChangeLog()[0];
     const lastEdit = summary.latestEdit || latestLog?.at || '';
     setMetric('last-edit', lastEdit ? formatDateTime(lastEdit) : 'No edits yet');
-    panel.classList.toggle('is-ready', summary.total > 0 && summary.ready === summary.total && summary.duplicateTags === 0);
-    panel.classList.toggle('has-warnings', summary.missingRaceway > 0 || summary.missingSize > 0 || summary.missingLength > 0 || summary.duplicateTags > 0);
+    panel.classList.toggle('is-ready', summary.total > 0 && summary.routingReady === summary.total && summary.duplicateTags === 0);
+    panel.classList.toggle('has-warnings', summary.missingSchedule > 0 || summary.missingRaceway > 0 || summary.duplicateTags > 0);
+    updateCableNextAction(summary);
+  }
+
+  function updateCableNextAction(summary){
+    const host = document.getElementById('cable-workflow-next-action');
+    if (!host) return;
+    let title = 'Continue to Raceway Schedule';
+    let detail = 'Cable schedule rows are ready for raceway coordination and fill checks.';
+    let primaryHref = 'racewayschedule.html';
+    let primaryText = 'Open Raceway Schedule';
+    let secondaryHref = 'workflowdashboard.html';
+    let secondaryText = 'View Dashboard';
+
+    if (summary.total === 0) {
+      title = 'Add cable schedule rows';
+      detail = 'Create cables manually, import a schedule, or reconcile from the one-line before routing.';
+      primaryHref = '#cableScheduleTable';
+      primaryText = 'Start Cable Schedule';
+      secondaryHref = 'oneline.html';
+      secondaryText = 'Open One-Line';
+    } else if (summary.missingSchedule > 0 || summary.duplicateTags > 0) {
+      title = 'Finish schedule-ready cable fields';
+      detail = summary.missingSchedule > 0
+        ? `${summary.missingSchedule} cable${summary.missingSchedule === 1 ? '' : 's'} need tag, From/To, conductor size, or length before routing.`
+        : `${summary.duplicateTags} cable tag row${summary.duplicateTags === 1 ? '' : 's'} are duplicated and need review before routing.`;
+      primaryHref = '#cableScheduleTable';
+      primaryText = 'Review Cable Rows';
+    } else if (summary.missingRaceway > 0) {
+      title = 'Assign raceways for routing';
+      detail = `${summary.missingRaceway} schedule-ready cable${summary.missingRaceway === 1 ? '' : 's'} still need raceway assignments.`;
+      primaryHref = 'racewayschedule.html';
+      primaryText = 'Open Raceway Schedule';
+      secondaryHref = '#open-batch-edit-btn';
+      secondaryText = 'Batch Assign';
+    } else {
+      detail = `${summary.routingReady} cable${summary.routingReady === 1 ? '' : 's'} are routing-ready. Continue to fill checks or review the dashboard.`;
+      primaryHref = 'cabletrayfill.html';
+      primaryText = 'Run Fill Check';
+    }
+
+    host.innerHTML = `
+      <div>
+        <strong>${title}</strong>
+        <p>${detail}</p>
+      </div>
+      <span>
+        <a class="btn secondary-btn" href="${secondaryHref}">${secondaryText}</a>
+        <a class="btn primary-btn" href="${primaryHref}">${primaryText}</a>
+      </span>
+    `;
   }
 
   function updateValidationSummary(totalRows, invalidRows, showAll){
@@ -2339,7 +2383,7 @@ async function initCableSchedule() {
     onSave:() => {
       validationActive = true;
       if (!validateAllRows({ showAll: true })) {
-        showAlertModal('Required Fields Missing', 'Complete Tag, Conductor Size, Length, and Raceway(s) before saving.');
+        showAlertModal('Schedule Fields Missing', 'Complete Tag, From Tag, To Tag, Conductor Size, and Length before saving. Raceway assignments can be completed later for routing-ready status.');
         markUnsaved();
         return;
       }
@@ -3030,7 +3074,37 @@ async function initCableSchedule() {
     }
     const headers = Object.keys(rows[0] || {});
     const mappingSelects = new Map();
-    let appendCheckbox = null;
+    let modeSelect = null;
+    let previewPanel = null;
+    const resolveMappings = () => Array.from(mappingSelects.entries())
+      .map(([header, select]) => [header, select.value])
+      .filter(([, key]) => key);
+    const buildImportedRows = mappings => rows.map(source => {
+      const row = {};
+      mappings.forEach(([header, key]) => {
+        row[key] = parseImportValue(key, source[header]);
+      });
+      row.last_modified = new Date().toISOString();
+      return row;
+    }).filter(row => Object.entries(row).some(([key, value]) => {
+      if (key === 'last_modified') return false;
+      return Array.isArray(value) ? value.length > 0 : `${value ?? ''}`.trim() !== '';
+    }));
+    const refreshImportPreview = () => {
+      if (!previewPanel) return;
+      const mappings = resolveMappings();
+      if (!mappings.length) {
+        previewPanel.textContent = 'Map at least one column to preview the import.';
+        return;
+      }
+      const importedRows = buildImportedRows(mappings);
+      const mode = modeSelect?.value || 'merge';
+      const preview = previewCableImport(table.getData(), importedRows, { mode });
+      previewPanel.innerHTML = `
+        <p><strong>Preview:</strong> ${preview.creates} create, ${preview.updates} update, ${preview.conflicts} conflict, ${preview.unchanged} unchanged.</p>
+        <p>${preview.preserved} existing rows preserved${preview.removed ? `, ${preview.removed} removed by replace mode` : ''}. Conflicts preserve existing non-empty schedule values unless you edit them after import.</p>
+      `;
+    };
     openModal({
       title: 'Map Cable Import',
       description: 'Match each spreadsheet column to a Cable Schedule field before importing.',
@@ -3057,48 +3131,50 @@ async function initCableSchedule() {
             select.appendChild(option);
           });
           select.value = resolveImportHeaderKey(header);
+          select.addEventListener('change', refreshImportPreview);
           mappingSelects.set(header, select);
           row.append(label, select);
           wrapper.appendChild(row);
         });
-        const appendLabel = document.createElement('label');
-        appendLabel.className = 'inline-check';
-        appendCheckbox = document.createElement('input');
-        appendCheckbox.type = 'checkbox';
-        appendLabel.append(appendCheckbox, document.createTextNode(' Append to existing schedule'));
-        body.append(wrapper, appendLabel);
+        const modeLabel = document.createElement('label');
+        modeLabel.className = 'modal-form-field';
+        modeLabel.textContent = 'Import Mode';
+        modeSelect = document.createElement('select');
+        [
+          ['merge', 'Merge with existing rows (recommended)'],
+          ['append', 'Append as new rows'],
+          ['replace', 'Replace current schedule']
+        ].forEach(([value, label]) => {
+          const option = document.createElement('option');
+          option.value = value;
+          option.textContent = label;
+          modeSelect.appendChild(option);
+        });
+        modeSelect.addEventListener('change', refreshImportPreview);
+        modeLabel.appendChild(modeSelect);
+        previewPanel = document.createElement('div');
+        previewPanel.className = 'import-preview-list';
+        body.append(wrapper, modeLabel, previewPanel);
+        refreshImportPreview();
         return wrapper.querySelector('select');
       },
       onSubmit: () => {
-        const mappings = Array.from(mappingSelects.entries())
-          .map(([header, select]) => [header, select.value])
-          .filter(([, key]) => key);
+        const mappings = resolveMappings();
         if (!mappings.length) {
           showAlertModal('Import Mapping Required', 'Map at least one spreadsheet column before importing.');
           return false;
         }
-        const importedRows = rows.map(source => {
-          const row = {};
-          mappings.forEach(([header, key]) => {
-            row[key] = parseImportValue(key, source[header]);
-          });
-          row.last_modified = new Date().toISOString();
-          return row;
-        }).filter(row => Object.entries(row).some(([key, value]) => {
-          if (key === 'last_modified') return false;
-          return Array.isArray(value) ? value.length > 0 : `${value ?? ''}`.trim() !== '';
-        }));
+        const importedRows = buildImportedRows(mappings);
         if (!importedRows.length) {
           showAlertModal('Import Error', 'No usable cable data was found after mapping.');
           return false;
         }
-        const nextRows = appendCheckbox && appendCheckbox.checked
-          ? [...table.getData(), ...importedRows]
-          : importedRows;
+        const mode = modeSelect?.value || 'merge';
+        const nextRows = applyCableImport(table.getData(), importedRows, { mode });
         table.setData(nextRows);
         advanceTagSettingsPastTags(importedRows.map(row => row.tag));
         if (typeof table.onChange === 'function') table.onChange();
-        recordCableChange('Imported cables', `${importedRows.length} cable${importedRows.length === 1 ? '' : 's'} imported from Excel`);
+        recordCableChange('Imported cables', `${importedRows.length} cable${importedRows.length === 1 ? '' : 's'} imported from Excel using ${mode} mode`);
         return true;
       }
     });
@@ -3126,9 +3202,10 @@ async function initCableSchedule() {
   };
   const rowHasMissingData = (row, duplicateLookup = null) => {
     const missingRequired = Array.from(REQUIRED_FIELD_KEYS).some(key => !isRequiredValueValid(key, row));
+    const missingRouting = Array.from(ROUTING_FIELD_KEYS).some(key => !isRequiredValueValid(key, row));
     const tag = `${row?.tag || ''}`.trim().toLowerCase();
     const duplicate = tag && duplicateLookup && duplicateLookup.get(tag) > 1;
-    return missingRequired || duplicate;
+    return missingRequired || missingRouting || duplicate;
   };
   const getReportColumns = mode => {
     if (mode !== 'visible') return columns;
@@ -3142,7 +3219,8 @@ async function initCableSchedule() {
     const data = table.getData();
     const duplicateLookup = getDuplicateTagLookup(data);
     if (mode === 'routing-ready') {
-      return data.filter(row => Array.from(REQUIRED_FIELD_KEYS).every(key => isRequiredValueValid(key, row)));
+      return data.filter(row => Array.from(REQUIRED_FIELD_KEYS).every(key => isRequiredValueValid(key, row))
+        && Array.from(ROUTING_FIELD_KEYS).every(key => isRequiredValueValid(key, row)));
     }
     if (mode === 'missing-data') {
       return data.filter(row => rowHasMissingData(row, duplicateLookup));

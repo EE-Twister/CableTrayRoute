@@ -99,20 +99,149 @@ export function calcVelocityPressure(params) {
 // Force coefficient C_f for cable trays
 // ---------------------------------------------------------------------------
 
-/**
- * Force coefficient for a cable tray cross-section.
- *
- * Modeled as an open-frame flat element (ASCE 7-22 §29.4):
- *   - Empty ladder tray:     C_f = 1.3 (wind partly passes through open rungs)
- *   - Partially filled:      C_f = 1.6
- *   - Fully filled / solid:  C_f = 2.0 (flat plate)
- *
- * @param {'empty'|'partial'|'full'} fillLevel
- * @returns {number}
- */
-export function trayForceCf(fillLevel) {
-  const cf = { empty: 1.3, partial: 1.6, full: 2.0 };
-  return cf[fillLevel] ?? 1.6;
+// Labels and normalizers are exported so UI pages can share the same
+// assumptions used by the calculation engine.
+export const TRAY_CONSTRUCTION_LABELS = {
+  ladder: 'Ladder / open rung',
+  ventilated: 'Ventilated / wire basket',
+  'solid-bottom': 'Solid bottom',
+};
+
+export const COVER_CONDITION_LABELS = {
+  none: 'No cover',
+  ventilated: 'Ventilated cover',
+  solid: 'Solid cover / hood',
+};
+
+export const FILL_LEVEL_LABELS = {
+  empty: 'Empty',
+  partial: 'Partially filled',
+  full: 'Fully filled',
+};
+
+const BASE_FILL_CF = {
+  empty: 1.3,
+  partial: 1.6,
+  full: 2.0,
+};
+
+function normalizeToken(value) {
+  return String(value ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/[_/]+/g, '-')
+    .replace(/\s+/g, '-');
+}
+
+export function normalizeFillLevel(value, fallback = 'partial') {
+  const token = normalizeToken(value);
+  if (token.includes('empty') || token === '0' || token === 'none') return 'empty';
+  if (token.includes('full') || token.includes('filled') || token === '100') return 'full';
+  if (token.includes('partial') || token.includes('partially')) return 'partial';
+  const numeric = Number(value);
+  if (Number.isFinite(numeric)) {
+    if (numeric <= 0) return 'empty';
+    if (numeric >= 100) return 'full';
+    return 'partial';
+  }
+  return Object.prototype.hasOwnProperty.call(FILL_LEVEL_LABELS, fallback) ? fallback : 'partial';
+}
+
+export function normalizeTrayConstruction(value, fallback = 'ladder') {
+  const token = normalizeToken(value);
+  if (token.includes('solid')) return 'solid-bottom';
+  if (
+    token.includes('wire') ||
+    token.includes('basket') ||
+    token.includes('vent') ||
+    token.includes('mesh') ||
+    token.includes('perforated') ||
+    token.includes('trough')
+  ) {
+    return 'ventilated';
+  }
+  if (token.includes('ladder') || token.includes('rung') || token.includes('open')) return 'ladder';
+  return Object.prototype.hasOwnProperty.call(TRAY_CONSTRUCTION_LABELS, fallback) ? fallback : 'ladder';
+}
+
+export function normalizeCoverCondition(value, fallback = 'none') {
+  const token = normalizeToken(value);
+  if (
+    !token ||
+    token === 'none' ||
+    token === 'no' ||
+    token === 'no-cover' ||
+    token === 'uncovered' ||
+    token === 'open'
+  ) {
+    return 'none';
+  }
+  if (token.includes('vent') || token.includes('louver') || token.includes('perforated')) return 'ventilated';
+  if (token.includes('solid') || token.includes('hood') || token.includes('cover') || token === 'yes') return 'solid';
+  return Object.prototype.hasOwnProperty.call(COVER_CONDITION_LABELS, fallback) ? fallback : 'none';
+}
+
+function optionalPositiveNumber(value, label) {
+  if (value === undefined || value === null || value === '') return null;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    throw new Error(`${label} must be a positive number`);
+  }
+  return parsed;
+}
+
+export function trayForceCf(fillLevel, options = {}) {
+  return trayWindProfile({ ...options, fillLevel }).Cf;
+}
+
+export function trayWindProfile(params = {}) {
+  const trayConstruction = normalizeTrayConstruction(
+    params.trayConstruction ?? params.construction ?? params.trayType,
+  );
+  const fillLevel = normalizeFillLevel(params.fillLevel);
+  const coverCondition = normalizeCoverCondition(params.coverCondition ?? params.cover);
+  const override = optionalPositiveNumber(
+    params.forceCoefficientOverride ?? params.CfOverride,
+    'Force coefficient override',
+  );
+
+  let Cf = BASE_FILL_CF[fillLevel] ?? BASE_FILL_CF.partial;
+  const basis = [FILL_LEVEL_LABELS[fillLevel]];
+
+  if (trayConstruction === 'solid-bottom') {
+    Cf = Math.max(Cf, 2.0);
+    basis.push('solid-bottom tray');
+  } else if (trayConstruction === 'ventilated') {
+    basis.push('ventilated tray');
+  } else {
+    basis.push('open ladder tray');
+  }
+
+  if (coverCondition === 'solid') {
+    Cf = Math.max(Cf, 2.0);
+    basis.push('solid cover');
+  } else if (coverCondition === 'ventilated') {
+    Cf = Math.max(Cf, 1.6);
+    basis.push('ventilated cover');
+  } else {
+    basis.push('no cover');
+  }
+
+  if (override !== null) {
+    Cf = override;
+    basis.push('engineer override');
+  }
+
+  return {
+    Cf,
+    trayConstruction,
+    trayConstructionLabel: TRAY_CONSTRUCTION_LABELS[trayConstruction],
+    fillLevel,
+    fillLevelLabel: FILL_LEVEL_LABELS[fillLevel],
+    coverCondition,
+    coverConditionLabel: COVER_CONDITION_LABELS[coverCondition],
+    forceCoefficientSource: basis.join(', '),
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -129,6 +258,10 @@ export function trayForceCf(fillLevel) {
  * @param {number} params.trayWidth_in  – Tray inside width (inches)
  * @param {number} params.spanLength_ft – Support span length (ft)
  * @param {'empty'|'partial'|'full'} params.fillLevel – Tray fill level
+ * @param {'ladder'|'ventilated'|'solid-bottom'} [params.trayConstruction] – Tray construction
+ * @param {'none'|'ventilated'|'solid'} [params.coverCondition] – Cover condition
+ * @param {number} [params.forceCoefficientOverride] – Optional engineer-entered C_f
+ * @param {number} [params.projectedAreaFactor=1.0] – Optional exposed-area multiplier
  * @param {number} [params.K_zt=1.0]   – Topographic factor
  * @param {number} [params.G=0.85]     – Gust factor (0.85 rigid per ASCE 7-22)
  * @returns {{
@@ -136,6 +269,8 @@ export function trayForceCf(fillLevel) {
  *   q_z_psf:         number,  // Velocity pressure (lbs/ft²)
  *   Cf:              number,  // Force coefficient
  *   G:               number,  // Gust factor
+ *   baseProjectedArea_ft2: number, // Width x span before factor (ft²)
+ *   projectedAreaFactor: number,
  *   projectedArea_ft2: number, // Tray projected area (ft²)
  *   windForce_lbs:   number,  // Total wind force per span (lbs)
  *   windForce_per_ft: number, // Wind force per linear foot of tray (lbs/ft)
@@ -144,10 +279,15 @@ export function trayForceCf(fillLevel) {
  */
 export function calcWindForce(params) {
   const {
-    V, z_ft, exposure, trayWidth_in, spanLength_ft, fillLevel,
+    V, z_ft, exposure, trayWidth_in, spanLength_ft,
   } = params;
   const G   = params.G   ?? 0.85;
-  const Cf  = trayForceCf(fillLevel);
+  const windProfile = trayWindProfile(params);
+  const Cf = windProfile.Cf;
+  const projectedAreaFactor = optionalPositiveNumber(
+    params.projectedAreaFactor ?? 1.0,
+    'Projected area factor',
+  ) ?? 1.0;
 
   if (!Number.isFinite(trayWidth_in) || trayWidth_in <= 0) {
     throw new Error('Tray width must be a positive number (inches)');
@@ -157,7 +297,8 @@ export function calcWindForce(params) {
   }
 
   const trayWidth_ft = trayWidth_in / 12;
-  const projectedArea_ft2 = trayWidth_ft * spanLength_ft;
+  const baseProjectedArea_ft2 = trayWidth_ft * spanLength_ft;
+  const projectedArea_ft2 = baseProjectedArea_ft2 * projectedAreaFactor;
 
   const q_z_psf = calcVelocityPressure({ V, z_ft, exposure, K_zt: params.K_zt, K_e: params.K_e });
   const Kz      = calcKz(z_ft, exposure);
@@ -171,6 +312,9 @@ export function calcWindForce(params) {
     q_z_psf:          Math.round(q_z_psf * 100) / 100,
     Cf,
     G,
+    ...windProfile,
+    baseProjectedArea_ft2: Math.round(baseProjectedArea_ft2 * 100) / 100,
+    projectedAreaFactor,
     projectedArea_ft2: Math.round(projectedArea_ft2 * 100) / 100,
     windForce_lbs:    Math.round(windForce_lbs * 10) / 10,
     windForce_per_ft: Math.round(windForce_per_ft * 10) / 10,

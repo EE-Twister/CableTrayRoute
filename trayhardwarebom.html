@@ -21,7 +21,11 @@
   <link rel="stylesheet" href="style.css" />
   <script src="cdnFallback.js" defer></script>
   <script>
-    initCdnFallback([{ global: 'XLSX', label: 'Excel export (XLSX)' }]);
+    document.addEventListener('DOMContentLoaded', () => {
+      if (typeof initCdnFallback === 'function') {
+        initCdnFallback([{ global: 'XLSX', label: 'Excel export (XLSX)' }]);
+      }
+    });
   </script>
   <script type="module" src="dist/trayhardwarebom.js" defer></script>
 </head>

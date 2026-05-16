@@ -194,8 +194,21 @@
             <span id="raceway-assigned-count" class="load-summary-value">0</span>
             <span class="load-summary-label">Assigned</span>
           </div>
+          <div class="load-summary-card load-summary-warning">
+            <span id="raceway-missing-id-count" class="load-summary-value">0</span>
+            <span class="load-summary-label">Missing IDs</span>
+          </div>
+          <div class="load-summary-card load-summary-warning">
+            <span id="raceway-missing-geometry-count" class="load-summary-value">0</span>
+            <span class="load-summary-label">Missing Geometry</span>
+          </div>
+          <div class="load-summary-card">
+            <span id="raceway-unused-count" class="load-summary-value">0</span>
+            <span class="load-summary-label">Unused</span>
+          </div>
         </div>
         <p id="raceway-validation-summary" class="load-validation-summary" aria-live="polite"></p>
+        <div id="raceway-next-action" class="workflow-next-action" aria-live="polite" data-no-print></div>
         <div class="raceway-filter-chips loadlist-filter-chips" role="group" aria-label="Raceway quick filters" data-no-print>
           <button class="loadlist-chip active" type="button" data-raceway-filter="all">All</button>
           <button class="loadlist-chip" type="button" data-raceway-filter="missing">Missing Geometry</button>
@@ -456,8 +469,9 @@
         </div>
       </section>
       <nav class="step-nav" aria-label="Workflow navigation">
-        <a href="panelschedule.html" class="step-nav-prev">&#8592; Panel Schedule</a>
-        <a href="ductbankroute.html" class="step-nav-next">Ductbank &#8594;</a>
+        <a href="cableschedule.html" class="step-nav-prev">&#8592; Cable Schedule</a>
+        <a href="workflowdashboard.html" class="step-nav-link">Dashboard</a>
+        <a href="cabletrayfill.html" class="step-nav-next">Fill / Routing &#8594;</a>
       </nav>
     </main>
   </div>

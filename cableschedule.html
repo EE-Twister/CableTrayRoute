@@ -302,11 +302,19 @@
           </div>
           <div class="readiness-item readiness-ready">
             <span class="readiness-value" data-metric="ready">0</span>
-            <span class="readiness-label">Ready to Route</span>
+            <span class="readiness-label">Schedule-Ready</span>
+          </div>
+          <div class="readiness-item readiness-ready">
+            <span class="readiness-value" data-metric="routing-ready">0</span>
+            <span class="readiness-label">Routing-Ready</span>
           </div>
           <div class="readiness-item readiness-warning">
             <span class="readiness-value" data-metric="missing-raceway">0</span>
             <span class="readiness-label">Missing Raceway</span>
+          </div>
+          <div class="readiness-item readiness-warning">
+            <span class="readiness-value" data-metric="missing-from-to">0</span>
+            <span class="readiness-label">Missing From/To</span>
           </div>
           <div class="readiness-item readiness-warning">
             <span class="readiness-value" data-metric="missing-size">0</span>
@@ -321,6 +329,7 @@
             <span class="readiness-label">Last Change</span>
           </div>
         </div>
+        <div id="cable-workflow-next-action" class="workflow-next-action" aria-live="polite" data-no-print></div>
         <div class="table-search-container">
           <label for="table-search">Search cables</label>
           <input type="search" id="table-search" class="table-search" placeholder="Search all columns" aria-label="Search cable schedule">
@@ -336,8 +345,9 @@
         <p id="cable-validation-summary" class="cable-validation-summary" aria-live="polite"></p>
       </section>
       <nav class="step-nav" aria-label="Workflow navigation">
-        <a href="index.html" class="step-nav-prev">&#8592; Home</a>
-        <a href="panelschedule.html" class="step-nav-next">Panel Schedule &#8594;</a>
+        <a href="oneline.html" class="step-nav-prev">&#8592; One-Line</a>
+        <a href="workflowdashboard.html" class="step-nav-link">Dashboard</a>
+        <a href="racewayschedule.html" class="step-nav-next">Raceway Schedule &#8594;</a>
       </nav>
     </main>
   </div>

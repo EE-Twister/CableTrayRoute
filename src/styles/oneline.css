@@ -610,15 +610,15 @@
   transform: rotate(225deg);
 }
 
-#sources-section > summary::before { background-image: url('icons/sources.svg'); }
-#equipment-section > summary::before { background-image: url('icons/equipment.svg'); }
-#protection-section > summary::before { background-image: url('icons/components/Breaker.svg'); }
-#bus-section > summary::before { background-image: url('icons/Bus.svg'); }
-#load-section > summary::before { background-image: url('icons/load.svg'); }
-#cable-section > summary::before { background-image: url('icons/oneline.svg'); }
-#links-section > summary::before { background-image: url('icons/links.svg'); }
-#annotations-section > summary::before { background-image: url('icons/annotation.svg'); }
-#template-section > summary::before { background-image: url('icons/oneline.svg'); }
+#sources-section > summary::before { background-image: url('../../icons/sources.svg'); }
+#equipment-section > summary::before { background-image: url('../../icons/equipment.svg'); }
+#protection-section > summary::before { background-image: url('../../icons/components/Breaker.svg'); }
+#bus-section > summary::before { background-image: url('../../icons/Bus.svg'); }
+#load-section > summary::before { background-image: url('../../icons/load.svg'); }
+#cable-section > summary::before { background-image: url('../../icons/oneline.svg'); }
+#links-section > summary::before { background-image: url('../../icons/links.svg'); }
+#annotations-section > summary::before { background-image: url('../../icons/annotation.svg'); }
+#template-section > summary::before { background-image: url('../../icons/oneline.svg'); }
 
 .palette-section .section-buttons {
   --palette-column-min: 6rem;

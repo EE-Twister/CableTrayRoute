@@ -70,6 +70,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 let heatVisible=false;
 let utilHeatmap=false;
 window.lastHeatGrid=null;
+window.lastHeatGridMeta=null;
 window.lastConduitTemps=null;
 window.lastAmbient=0;
 window.lastHeatImgData=null;
@@ -670,7 +671,8 @@ function addHeatSourceRow(data={}){
     inp.type=f==='tag'?'text':'number';
     inp.name=f;
   }
-  inp.value=data[f]||'';
+  if(f==='shape' && !data[f]) data[f]=HEAT_SOURCE_SHAPES[0];
+  inp.value=data[f] ?? '';
   td.appendChild(inp);
   tr.appendChild(td);
  });
@@ -681,17 +683,38 @@ function addHeatSourceRow(data={}){
  saveDuctbankSession();
 }
 
+function parseHeatSourceNumber(value){
+ const text=String(value ?? '').trim();
+ if(!text) return '';
+ const parsed=parseFloat(text);
+ return Number.isFinite(parsed) ? parsed : '';
+}
+
 function rowToHeatSource(tr){
  const vals=Array.from(tr.children).slice(0,7)
                 .map(td=>td.querySelector('input,select')?.value);
  const [tag,shape,width,height,temperature,x,y]=vals;
- return {tag,shape,width:parseFloat(width)||0,height:parseFloat(height)||0,
-         temperature:parseFloat(temperature)||0,
-         x:parseFloat(x)||0,y:parseFloat(y)||0};
+ return {tag,shape:shape || HEAT_SOURCE_SHAPES[0],width:parseHeatSourceNumber(width),height:parseHeatSourceNumber(height),
+         temperature:parseHeatSourceNumber(temperature),
+         x:parseHeatSourceNumber(x),y:parseHeatSourceNumber(y)};
 }
 
-function getAllHeatSources(){
- return Array.from(document.querySelectorAll('#heatSourceTable tbody tr')).map(rowToHeatSource);
+function isCompleteHeatSource(src){
+ const width=parseFloat(src?.width);
+ const height=parseFloat(src?.height);
+ const temperature=parseFloat(src?.temperature);
+ const x=parseFloat(src?.x);
+ const y=parseFloat(src?.y);
+ return Number.isFinite(width) && width > 0
+   && Number.isFinite(height) && height > 0
+   && Number.isFinite(temperature)
+   && Number.isFinite(x)
+   && Number.isFinite(y);
+}
+
+function getAllHeatSources({ includeIncomplete = false } = {}){
+ const sources=Array.from(document.querySelectorAll('#heatSourceTable tbody tr')).map(rowToHeatSource);
+ return includeIncomplete ? sources : sources.filter(isCompleteHeatSource);
 }
 
 function getAllConduits(){
@@ -711,6 +734,8 @@ function setDuctbankFieldDefault(id, value, onlyBlank){
 
 function applyDuctbankDefaults({ onlyBlank = true, silent = false, persist = true } = {}){
  Object.entries(DUCTBANK_DEFAULTS).forEach(([id,value])=>setDuctbankFieldDefault(id,value,onlyBlank));
+ const earthContextToggle=document.getElementById('showEarthContext');
+ if(earthContextToggle && !onlyBlank) earthContextToggle.checked=true;
  updateInsulationOptions();
  updateHeatSourceVisibility();
  validateThermalInputs();
@@ -732,7 +757,8 @@ function saveDuctbankSession(){
   soilResistivity:document.getElementById('soilResistivity').value,
   moistureContent:document.getElementById('moistureContent').value,
   heatSources:document.getElementById('heatSources').checked,
-  heatSourceData:getAllHeatSources(),
+  showEarthContext:document.getElementById('showEarthContext')?.checked !== false,
+  heatSourceData:getAllHeatSources({ includeIncomplete:true }),
   hSpacing:document.getElementById('hSpacing').value,
   vSpacing:document.getElementById('vSpacing').value,
   topPad:document.getElementById('topPad').value,
@@ -764,6 +790,7 @@ function loadDuctbankSession(){
   if(s.moistureContent!==undefined)document.getElementById('moistureContent').value=s.moistureContent;
   if(s.conductorRating!==undefined)document.getElementById('conductorRating').value=s.conductorRating;
   if(s.heatSources!==undefined)document.getElementById('heatSources').checked=s.heatSources;
+  if(s.showEarthContext!==undefined)document.getElementById('showEarthContext').checked=s.showEarthContext;
   if(Array.isArray(s.heatSourceData)){
     document.querySelector('#heatSourceTable tbody').innerHTML='';
     s.heatSourceData.forEach(addHeatSourceRow);
@@ -1401,6 +1428,10 @@ function initDuctbankCablePopover(){
  });
 }
 
+const DUCTBANK_DRAWING_MARGIN=20;
+const DUCTBANK_DRAWING_SCALE=40;
+const DUCTBANK_SKY_HEIGHT=64;
+
 function appendDuctbankSvgElement(parent, tag, attrs={}, text=''){
  const el=document.createElementNS('http://www.w3.org/2000/svg',tag);
  Object.entries(attrs).forEach(([key,value])=>{
@@ -1417,8 +1448,32 @@ function formatDuctbankDepthCallout(value){
  return `${Math.round(depth * 10) / 10} in`;
 }
 
+function showDuctbankEarthContext(){
+ return document.getElementById('showEarthContext')?.checked !== false;
+}
+
+function ductbankDrawingContext(scale=DUCTBANK_DRAWING_SCALE){
+ const depthIn=Math.max(0,finiteNumber(document.getElementById('ductbankDepth')?.value,0));
+ const showContext=showDuctbankEarthContext();
+ const skyHeight=showContext ? DUCTBANK_SKY_HEIGHT : 0;
+ const gradeY=skyHeight;
+ const soilPad=showContext ? depthIn * scale : 0;
+ const ductTopY=showContext ? gradeY + soilPad : DUCTBANK_DRAWING_MARGIN;
+ return { depthIn, showContext, skyHeight, gradeY, soilPad, sideSoilPx:soilPad, bottomSoilPx:soilPad, ductTopY };
+}
+
 function drawDuctbankSoilContext(svg, defs, options){
- const { width, height, margin, ductWidth, ductHeight, scale, depthIn } = options;
+ const { width, height, originX, originY, gradeY, ductWidth, ductHeight, scale, showContext } = options;
+ const skyGradient=appendDuctbankSvgElement(defs,'linearGradient',{
+   id:'ductbank-sky-gradient',
+   x1:'0%',
+   y1:'0%',
+   x2:'0%',
+   y2:'100%'
+ });
+ appendDuctbankSvgElement(skyGradient,'stop',{offset:'0%', 'stop-color':'#dbeafe'});
+ appendDuctbankSvgElement(skyGradient,'stop',{offset:'100%', 'stop-color':'#eff6ff'});
+
  const soilPattern=appendDuctbankSvgElement(defs,'pattern',{
    id:'ductbank-soil-pattern',
    width:28,
@@ -1448,28 +1503,67 @@ function drawDuctbankSoilContext(svg, defs, options){
  });
  appendDuctbankSvgElement(marker,'path',{d:'M0 0 L8 4 L0 8 Z',fill:'#334155'});
 
- appendDuctbankSvgElement(svg,'rect',{
-   x:0,
-   y:0,
-   width,
-   height,
-   fill:'url(#ductbank-soil-pattern)',
-   class:'ductbank-soil-backdrop'
- });
+ if(showContext){
+   appendDuctbankSvgElement(svg,'rect',{
+     x:0,
+     y:0,
+     width,
+     height:gradeY,
+     fill:'url(#ductbank-sky-gradient)',
+     class:'ductbank-sky-backdrop'
+   });
+
+   appendDuctbankSvgElement(svg,'rect',{
+     x:0,
+     y:gradeY,
+     width,
+     height:Math.max(0,height-gradeY),
+     fill:'url(#ductbank-soil-pattern)',
+     class:'ductbank-soil-backdrop'
+   });
+
+   appendDuctbankSvgElement(svg,'rect',{
+     x:0,
+     y:gradeY-3,
+     width,
+     height:6,
+     class:'ductbank-grade-surface'
+   });
+ }else{
+   appendDuctbankSvgElement(svg,'rect',{
+     x:0,
+     y:0,
+     width,
+     height,
+     fill:'#ffffff',
+     class:'ductbank-no-context-backdrop'
+   });
+ }
 
  appendDuctbankSvgElement(svg,'rect',{
-   x:margin,
-   y:margin,
+   x:originX,
+   y:originY,
    width:ductWidth*scale,
    height:ductHeight*scale,
+   fill:'#f8fafc',
+   'fill-opacity':0.76,
    class:'ductbank-envelope-fill'
  });
 }
 
 function drawDuctbankGradeCallout(svg, options){
- const { width, height, margin, ductWidth, scale, depthIn, utilHeatmap: showLegend=false } = options;
+ const {
+   width,
+   height,
+   originX,
+   originY,
+   gradeY,
+   ductWidth,
+   scale,
+   depthIn,
+   utilHeatmap: showLegend=false
+ } = options;
  const group=appendDuctbankSvgElement(svg,'g',{class:'ductbank-grade-callout-layer'});
- const gradeY=12;
  appendDuctbankSvgElement(group,'line',{
    x1:0,
    x2:width,
@@ -1480,16 +1574,25 @@ function drawDuctbankGradeCallout(svg, options){
    'stroke-width':2
  });
  appendDuctbankSvgElement(group,'text',{
-   x:margin,
-   y:gradeY-4,
+   x:originX,
+   y:gradeY-6,
    class:'ductbank-grade-label',
    fill:'#334155',
    'font-size':10,
    'font-weight':800
- },'GRADE');
+ },'GRADE / GROUND LEVEL');
+ appendDuctbankSvgElement(group,'text',{
+   x:Math.max(originX, width - 62),
+   y:Math.max(16, gradeY/2 + 4),
+   class:'ductbank-sky-label',
+   fill:'#1e3a8a',
+   'font-size':10,
+   'font-weight':800
+ },'Sky');
 
- const ductTopY=margin;
- const dimX=Math.max(8,margin-10);
+ const ductTopY=originY;
+ const coverPx=Math.max(0, ductTopY - gradeY);
+ const dimX=Math.max(8,originX-10);
  appendDuctbankSvgElement(group,'line',{
    x1:dimX,
    x2:dimX,
@@ -1503,7 +1606,16 @@ function drawDuctbankGradeCallout(svg, options){
  });
  appendDuctbankSvgElement(group,'line',{
    x1:dimX-5,
-   x2:margin,
+   x2:originX,
+   y1:gradeY,
+   y2:gradeY,
+   class:'ductbank-dimension-extension',
+   stroke:'#334155',
+   'stroke-width':1.4
+ });
+ appendDuctbankSvgElement(group,'line',{
+   x1:dimX-5,
+   x2:originX,
    y1:ductTopY,
    y2:ductTopY,
    class:'ductbank-dimension-extension',
@@ -1511,11 +1623,13 @@ function drawDuctbankGradeCallout(svg, options){
    'stroke-width':1.4
  });
 
- const labelWidth=178;
- const labelX=Math.max(margin + 44, Math.min(width-labelWidth-12, margin + Math.max(120, ductWidth*scale*0.18)));
- const labelY=Math.max(gradeY + 54, ductTopY + 44);
+ const labelWidth=190;
+ const labelX=Math.max(originX + 44, Math.min(width-labelWidth-12, originX + Math.max(120, ductWidth*scale*0.18)));
+ const labelY=coverPx >= 90
+   ? Math.min(ductTopY - 20, gradeY + Math.max(58, coverPx*0.08))
+   : Math.max(gradeY + 54, ductTopY + 44);
  appendDuctbankSvgElement(group,'path',{
-   d:`M${dimX + 4} ${Math.max(gradeY + 4,(gradeY + ductTopY)/2)} L${labelX - 10} ${labelY - 6}`,
+   d:`M${dimX + 4} ${Math.min(ductTopY - 6, gradeY + Math.max(20, coverPx*0.18))} L${labelX - 10} ${labelY - 6}`,
    class:'ductbank-dimension-leader',
    stroke:'#334155',
    'stroke-width':1.4,
@@ -1541,8 +1655,8 @@ function drawDuctbankGradeCallout(svg, options){
    'font-weight':800
  },`Elevation to grade: ${formatDuctbankDepthCallout(depthIn)}`);
  appendDuctbankSvgElement(group,'text',{
-   x:Math.max(margin, width - 118),
-   y:height - (showLegend ? 72 : 12),
+   x:Math.max(originX, width - 118),
+   y:Math.min(height - (showLegend ? 72 : 12), gradeY + 28),
    class:'ductbank-soil-label',
    fill:'#334155',
    'font-size':10,
@@ -1569,8 +1683,11 @@ function drawGrid(){
  const bottomPad=parseFloat(document.getElementById('bottomPad').value)||0;
  const leftPad=parseFloat(document.getElementById('leftPad').value)||0;
  const rightPad=parseFloat(document.getElementById('rightPad').value)||0;
-const margin=20;
-const scale=40; // pixels per unit
+const margin=DUCTBANK_DRAWING_MARGIN;
+const scale=DUCTBANK_DRAWING_SCALE; // pixels per inch
+const { depthIn, showContext, gradeY, ductTopY, sideSoilPx, bottomSoilPx } = ductbankDrawingContext(scale);
+const originX=margin + sideSoilPx;
+const originY=ductTopY;
 const fillMap=fillResults();
 let maxX=0,maxY=0;
 conduits.forEach(c=>{
@@ -1600,8 +1717,10 @@ if(document.getElementById('heatSources').checked){
   });
 }
 
-const width=Math.round(Math.max(overallMaxX*scale+2*margin+80,360));
-const height=Math.round(overallMaxY*scale+2*margin+(utilHeatmap?60:20));
+const rightContextPx=showContext ? sideSoilPx : 0;
+const bottomContextPx=showContext ? bottomSoilPx : margin;
+const width=Math.round(Math.max(overallMaxX*scale+originX+rightContextPx+margin+80,360));
+const height=Math.round(overallMaxY*scale+originY+bottomContextPx+(utilHeatmap?60:20));
 svg.setAttribute('width',width);
 svg.setAttribute('height',height);
 
@@ -1611,26 +1730,28 @@ svg.setAttribute('height',height);
  drawDuctbankSoilContext(svg, defs, {
    width,
    height,
-   margin,
+   originX,
+   originY,
+   gradeY,
    ductWidth,
    ductHeight,
    scale,
-   depthIn:parseFloat(document.getElementById('ductbankDepth')?.value)||0
+   showContext
  });
 
  const rect=document.createElementNS('http://www.w3.org/2000/svg','rect');
- rect.setAttribute('x',margin);
- rect.setAttribute('y',margin);
+ rect.setAttribute('x',originX);
+ rect.setAttribute('y',originY);
  rect.setAttribute('width',ductWidth*scale);
  rect.setAttribute('height',ductHeight*scale);
  rect.setAttribute('fill','none');
  rect.setAttribute('stroke','#64748b');
  rect.setAttribute('stroke-dasharray','4 2');
-svg.appendChild(rect);
+ svg.appendChild(rect);
 
  // overall dimension lines
- const widthY=margin+ductHeight*scale+15;
- const wStart=margin, wEnd=margin+ductWidth*scale;
+ const widthY=originY+ductHeight*scale+15;
+ const wStart=originX, wEnd=originX+ductWidth*scale;
  const widthLine=document.createElementNS('http://www.w3.org/2000/svg','line');
  widthLine.setAttribute('x1',wStart);
  widthLine.setAttribute('x2',wEnd);
@@ -1663,16 +1784,16 @@ svg.appendChild(widthText);
  const tag=document.getElementById('ductbankTag').value.trim();
  if(tag){
    const tagText=document.createElementNS('http://www.w3.org/2000/svg','text');
-   tagText.setAttribute('x',margin+ductWidth*scale/2);
-   tagText.setAttribute('y',margin-4);
+   tagText.setAttribute('x',originX+ductWidth*scale/2);
+   tagText.setAttribute('y',originY-4);
    tagText.setAttribute('font-size','14');
    tagText.setAttribute('text-anchor','middle');
    tagText.textContent=tag;
    svg.appendChild(tagText);
  }
 
- const heightX=margin+ductWidth*scale+15;
- const hStart=margin, hEnd=margin+ductHeight*scale;
+ const heightX=originX+ductWidth*scale+15;
+ const hStart=originY, hEnd=originY+ductHeight*scale;
  const heightLine=document.createElementNS('http://www.w3.org/2000/svg','line');
  heightLine.setAttribute('x1',heightX);
  heightLine.setAttribute('x2',heightX);
@@ -1706,8 +1827,8 @@ heightText.textContent=ductHeight.toFixed(2)+'"';
  conduits.forEach(c=>{
    const Rin=Math.sqrt(CONDUIT_SPECS[c.conduit_type][c.trade_size]/Math.PI);
    const R=Rin*scale;
-   const cx=c.x*scale+R+margin;
-   const cy=c.y*scale+R+margin;
+   const cx=c.x*scale+R+originX;
+   const cy=c.y*scale+R+originY;
   const data=fillMap[c.conduit_id];
   let color=utilHeatmap?'green':'lightgray';
   if(utilHeatmap && data){
@@ -1807,14 +1928,14 @@ heightText.textContent=ductHeight.toFixed(2)+'"';
      const ht=parseFloat(h.height)||0;
      const shape=(h.shape||'').toLowerCase();
      const color='orange';
-     let hx=x*scale+margin;
-     let hy=y*scale+margin;
+     let hx=x*scale+originX;
+     let hy=y*scale+originY;
      let wScaled=w*scale;
      let hScaled=ht*scale;
      if(shape==='circle'){
        const r=Math.max(w,ht)/2*scale;
-       hx=x*scale+margin;
-       hy=y*scale+margin;
+       hx=x*scale+originX;
+       hy=y*scale+originY;
        wScaled=hScaled=2*r;
        const cx=hx+r;
        const cy=hy+r;
@@ -1879,9 +2000,9 @@ heightText.textContent=ductHeight.toFixed(2)+'"';
          svg.appendChild(tagText);
        }
      }
-     const rightEdge=margin+ductWidth*scale;
-    const bottomEdge=margin+ductHeight*scale;
-    const topEdge=margin;
+     const rightEdge=originX+ductWidth*scale;
+    const bottomEdge=originY+ductHeight*scale;
+    const topEdge=originY;
     // horizontal dimension
      const dx=x-ductWidth;
      const lineH=document.createElementNS('http://www.w3.org/2000/svg','line');
@@ -1946,19 +2067,23 @@ heightText.textContent=ductHeight.toFixed(2)+'"';
      svg.appendChild(textV);
    });
  }
- drawDuctbankGradeCallout(svg, {
-   width,
-   height,
-   margin,
-   ductWidth,
-   scale,
-   depthIn:parseFloat(document.getElementById('ductbankDepth')?.value)||0,
-   utilHeatmap
- });
- if(utilHeatmap){
-   addFillLegend(svg, margin, overallMaxY*scale+margin+20);
+ if(showContext){
+   drawDuctbankGradeCallout(svg, {
+     width,
+     height,
+     originX,
+     originY,
+     gradeY,
+     ductWidth,
+     scale,
+     depthIn,
+     utilHeatmap
+   });
  }
-svg.style.background='#f7efdf';
+ if(utilHeatmap){
+   addFillLegend(svg, originX, overallMaxY*scale+originY+20);
+ }
+svg.style.background=showContext ? '#f7efdf' : '#ffffff';
 if(heat){
   heat.width=width;
   heat.height=height;
@@ -1971,8 +2096,12 @@ if(overlay){
   overlay.style.width=width+'px';
   overlay.style.height=height+'px';
 }
-if(heatVisible && window.lastHeatGrid){
+const heatMeta=window.lastHeatGridMeta || {};
+if(heatVisible && window.lastHeatGrid && heatMeta.width===width && heatMeta.height===height && heatMeta.originX===originX && heatMeta.originY===originY && heatMeta.showContext===showContext){
   drawHeatMap(window.lastHeatGrid, window.lastConduitTemps || {}, conduits, window.lastAmbient||0);
+}else if(heatVisible){
+  if(heat) heat.style.display='none';
+  if(overlay) overlay.style.display='none';
 }
 syncDuctbankCableSelection();
 }
@@ -2057,6 +2186,13 @@ function validateThermalInputs(){
   }
   if(checkInsulationThickness()){
     warnings.push('Enter insulation thickness for all cables.');
+  }
+  if(document.getElementById('heatSources')?.checked){
+    const heatRows=getAllHeatSources({ includeIncomplete:true });
+    const incompleteCount=heatRows.filter(src=>!isCompleteHeatSource(src)).length;
+    if(incompleteCount){
+      warnings.push(`${incompleteCount} incomplete heat source row${incompleteCount===1?' is':'s are'} ignored. Enter positive width/height, temperature, X, and Y values.`);
+    }
   }
   document.querySelectorAll('#cableTable tbody tr').forEach(tr=>{
     const loadCell=tr.children[7];
@@ -2157,7 +2293,13 @@ function solveDuctbankTemperatures(conduits,cables,params,progress){
   const boundaryPadPx=Math.max(12,depthIn || 36)*scale;
   const solverWidth=width+2*boundaryPadPx;
   const solverHeight=height+coverOffsetPx+boundaryPadPx;
-  const step=Math.ceil(Math.max(solverWidth,solverHeight)/GRID_SIZE); // pixel step for solver grid
+  const referenceWidth=Math.max(1,finiteNumber(params.solverReferenceWidth,width));
+  const referenceHeight=Math.max(1,finiteNumber(params.solverReferenceHeight,height));
+  const referenceSolverWidth=referenceWidth+2*boundaryPadPx;
+  const referenceSolverHeight=referenceHeight+coverOffsetPx+boundaryPadPx;
+  const requestedStep=Math.ceil(Math.max(solverWidth,solverHeight)/GRID_SIZE);
+  const referenceStep=Math.ceil(Math.max(referenceSolverWidth,referenceSolverHeight)/GRID_SIZE);
+  const step=Math.max(4,Math.min(requestedStep,referenceStep,scale*2)); // pixel step for solver grid
   const dx=(0.0254/scale)*step;
   const nx=Math.ceil(solverWidth/step);
   const ny=Math.ceil(solverHeight/step);
@@ -2210,14 +2352,14 @@ function solveDuctbankTemperatures(conduits,cables,params,progress){
     }
   });
 
-  const heatSources=params.heatSourceData||[];
+  const heatSources=(params.heatSourceData||[]).filter(isCompleteHeatSource);
   heatSources.forEach(src=>{
-    const tempC=isNaN(parseFloat(src.temperature))?earthT:fToC(parseFloat(src.temperature));
+    const tempC=fToC(parseFloat(src.temperature));
     const shape=(src.shape||'').toLowerCase();
-    const x=parseFloat(src.x)||0;
-    const y=parseFloat(src.y)||0;
-    const w=parseFloat(src.width)||0;
-    const ht=parseFloat(src.height)||0;
+    const x=parseFloat(src.x);
+    const y=parseFloat(src.y);
+    const w=parseFloat(src.width);
+    const ht=parseFloat(src.height);
     if(shape==='circle'){
       const r=Math.max(w,ht)/2;
       const cx=x+r, cy=y+r;
@@ -2297,14 +2439,18 @@ function solveDuctbankTemperatures(conduits,cables,params,progress){
         });
         const cropCols=Math.max(1,GRID_SIZE);
         const cropRows=Math.max(1,Math.ceil((height/Math.max(width,1))*GRID_SIZE));
+        const drawingOriginX=Number.isFinite(params.drawingOriginX)?params.drawingOriginX:margin;
+        const drawingOriginY=Number.isFinite(params.drawingOriginY)?params.drawingOriginY:margin;
+        const cropOriginX=boundaryPadPx+margin-drawingOriginX;
+        const cropOriginY=coverOffsetPx+margin-drawingOriginY;
         const visibleGrid=[];
         for(let j=0;j<cropRows;j++){
-          const yPx=coverOffsetPx+(cropRows===1?0:(j/(cropRows-1))*height);
+          const yPx=cropOriginY+(cropRows===1?0:(j/(cropRows-1))*height);
           const sourceJ=Math.min(ny-1,Math.max(0,Math.round(yPx/step)));
           const sourceRow=grid[sourceJ] || [];
           const row=[];
           for(let i=0;i<cropCols;i++){
-            const xPx=boundaryPadPx+(cropCols===1?0:(i/(cropCols-1))*width);
+            const xPx=cropOriginX+(cropCols===1?0:(i/(cropCols-1))*width);
             const sourceI=Math.min(nx-1,Math.max(0,Math.round(xPx/step)));
             row.push(Number.isFinite(sourceRow[sourceI])?sourceRow[sourceI]:earthT);
           }
@@ -2363,6 +2509,9 @@ async function runFiniteThermalAnalysis(){
  const octx=overlay.getContext('2d');
  octx.clearRect(0,0,width,height);
  const scale=40,margin=20;
+ const drawingContext=ductbankDrawingContext(DUCTBANK_DRAWING_SCALE);
+ const drawingOriginX=DUCTBANK_DRAWING_MARGIN + drawingContext.sideSoilPx;
+ const drawingOriginY=drawingContext.ductTopY;
  const earthF=parseFloat(document.getElementById('earthTemp').value);
  const airF=parseFloat(document.getElementById('airTemp').value);
 const ambient=isNaN(earthF)?20:fToC(earthF);
@@ -2381,7 +2530,11 @@ const params={
   earthTemp:ambient,
   airTemp:isNaN(airF)?NaN:fToC(airF),
   gridSize:GRID_SIZE,
-  ductThermRes:ductRes
+  ductThermRes:ductRes,
+  drawingOriginX,
+  drawingOriginY,
+  solverReferenceWidth:Math.max(360,width-(drawingContext.showContext ? drawingContext.sideSoilPx*2 : 0)),
+  solverReferenceHeight:Math.max(360,height-(drawingContext.showContext ? Math.max(0,drawingContext.skyHeight+drawingContext.soilPad+drawingContext.bottomSoilPx-DUCTBANK_DRAWING_MARGIN) : 0))
  };
 
  const pc=document.getElementById('analysis-progress-container');
@@ -2405,6 +2558,7 @@ const grid=result.grid;
 const conduitTemps=result.conduitTemps;
 const ambientRes=result.ambient;
 window.lastHeatGrid=grid;
+window.lastHeatGridMeta={width,height,originX:drawingOriginX,originY:drawingOriginY,showContext:drawingContext.showContext};
 window.lastConduitTemps=conduitTemps;
 window.lastAmbient=ambientRes;
  window.conduitOverLimit={};
@@ -2445,8 +2599,13 @@ function drawHeatMap(grid, conduitTemps, conduits, ambient){
  const svg=document.getElementById('grid');
  const width=Math.round(parseFloat(svg.getAttribute('width'))||svg.clientWidth);
  const height=Math.round(parseFloat(svg.getAttribute('height'))||svg.clientHeight);
-const stepX=Math.ceil(width/(grid[0]?.length||1));
-const stepY=Math.ceil(height/(grid.length||1));
+const rows=Array.isArray(grid)?grid.length:0;
+const cols=rows ? (grid[0]?.length||0) : 0;
+if(!rows || !cols) return;
+const cellX=width/cols;
+const cellY=height/rows;
+const heatContext=ductbankDrawingContext(DUCTBANK_DRAWING_SCALE);
+const heatmapStartY=heatContext.showContext ? heatContext.gradeY : 0;
 const img=ctx.createImageData(width,height);
 let maxT=-Infinity,maxPx=0,maxPy=0;
 let minT=Infinity;
@@ -2467,21 +2626,35 @@ let minT=Infinity;
    ];
  }
  for(let j=0;j<grid.length;j++){
-   for(let i=0;i<grid[j].length;i++){
-     const T=grid[j][i];
-     if(T>maxT){maxT=T;maxPx=i*stepX+stepX/2;maxPy=j*stepY+stepY/2;}
+   const rowCenterY=(j+0.5)*cellY;
+   if(rowCenterY < heatmapStartY) continue;
+   for(let i=0;i<cols;i++){
+     const T=finiteNumber(grid[j]?.[i],ambient);
+     if(!Number.isFinite(T)) continue;
+     if(T>maxT){maxT=T;maxPx=i*cellX+cellX/2;maxPy=rowCenterY;}
      if(T<minT)minT=T;
    }
  }
+ if(!Number.isFinite(maxT) || !Number.isFinite(minT)){
+   maxT=finiteNumber(ambient,20);
+   minT=maxT;
+   maxPx=width/2;
+   maxPy=Math.max(heatmapStartY,height/2);
+ }
  const range=maxT-minT||1;
  for(let j=0;j<grid.length;j++){
-   for(let i=0;i<grid[j].length;i++){
-     const T=grid[j][i];
+   const yStart=Math.max(Math.floor(j*cellY),Math.ceil(heatmapStartY));
+   const yEnd=Math.min(height,Math.ceil((j+1)*cellY));
+   if(yEnd<=yStart) continue;
+   for(let i=0;i<cols;i++){
+     const T=finiteNumber(grid[j]?.[i],ambient);
      const frac=(T-minT)/range;
      const [r,g,b]=viridisColor(frac);
-     for(let dy=0;dy<stepY;dy++){
-       for(let dx=0;dx<stepX;dx++){
-         const idx=((j*stepY+dy)*width+(i*stepX+dx))*4;
+     const xStart=Math.floor(i*cellX);
+     const xEnd=Math.min(width,Math.ceil((i+1)*cellX));
+     for(let y=yStart;y<yEnd;y++){
+       for(let x=xStart;x<xEnd;x++){
+         const idx=(y*width+x)*4;
         img.data[idx]=r;
         img.data[idx+1]=g;
         img.data[idx+2]=b;
@@ -2527,11 +2700,13 @@ octx.clearRect(0,0,width,height);
  octx.fillText(maxTF.toFixed(1)+'\u00B0F',maxPx+8,maxPy-8);
 
  window.conduitOverLimit={};
- const scale=40,margin=20;
+ const scale=DUCTBANK_DRAWING_SCALE;
+ const { ductTopY, sideSoilPx } = ductbankDrawingContext(scale);
+ const originX=DUCTBANK_DRAWING_MARGIN + sideSoilPx;
  conduits.forEach(cd=>{
    const Rin=Math.sqrt(CONDUIT_SPECS[cd.conduit_type][cd.trade_size]/Math.PI);
-   const px=(cd.x+Rin)*scale+margin;
-   const py=(cd.y+Rin)*scale+margin;
+   const px=(cd.x+Rin)*scale+originX;
+   const py=(cd.y+Rin)*scale+ductTopY;
    const t=conduitTemps[cd.conduit_id]??ambient;
    const tf=t*9/5+32;
    const rating=conduitTemperatureLimit(cd.conduit_id,cables);
@@ -3955,6 +4130,7 @@ img.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(source);
 function downloadThermalData(){
  const data={
    grid:window.lastHeatGrid,
+   gridMeta:window.lastHeatGridMeta,
    conduitTemps:window.lastConduitTemps,
    ambient:window.lastAmbient,
    logs:window.thermalLogs||[]
@@ -4001,6 +4177,10 @@ removeItem('ductbankSession');
  const el=document.getElementById(id);
  if(el) el.checked=false;
  });
+ const earthContextToggle=document.getElementById('showEarthContext');
+ if(earthContextToggle) earthContextToggle.checked=true;
+ window.lastHeatGrid=null;
+ window.lastHeatGridMeta=null;
  applyDuctbankDefaults({onlyBlank:false,silent:true,persist:false});
  drawGrid();
  updateAmpacityReport();
@@ -4016,7 +4196,7 @@ function showToast(msg){
  setTimeout(()=>t.classList.remove('show'),3000);
 }
 
-function toggleHeatMap(){
+async function toggleHeatMap(){
  const canvas=document.getElementById('tempCanvas');
  const overlay=document.getElementById('tempOverlay');
  if(!canvas||!overlay)return;
@@ -4027,12 +4207,24 @@ function toggleHeatMap(){
    octx.clearRect(0,0,overlay.width,overlay.height);
    canvas.style.display='none';
    overlay.style.display='none';
- }else if(window.lastHeatGrid){
+   heatVisible=false;
+   return;
+ }
+ heatVisible=true;
+ const svg=document.getElementById('grid');
+ const width=Math.round(parseFloat(svg.getAttribute('width'))||svg.clientWidth);
+ const height=Math.round(parseFloat(svg.getAttribute('height'))||svg.clientHeight);
+ const context=ductbankDrawingContext(DUCTBANK_DRAWING_SCALE);
+ const originX=DUCTBANK_DRAWING_MARGIN + context.sideSoilPx;
+ const originY=context.ductTopY;
+ const heatMeta=window.lastHeatGridMeta || {};
+ if(window.lastHeatGrid && heatMeta.width===width && heatMeta.height===height && heatMeta.originX===originX && heatMeta.originY===originY && heatMeta.showContext===context.showContext){
    drawHeatMap(window.lastHeatGrid, window.lastConduitTemps||{}, getAllConduits(), window.lastAmbient||0);
    canvas.style.display='block';
    overlay.style.display='block';
+ }else{
+   await runFiniteThermalAnalysis();
  }
- heatVisible=!heatVisible;
 }
 
 document.getElementById('exportConduitsBtn').addEventListener('click',exportConduits);
@@ -4066,6 +4258,19 @@ if(hideDrawing){
 const utilHeatmapToggle=document.getElementById('utilHeatmapToggle');
 if(utilHeatmapToggle){
   utilHeatmapToggle.addEventListener('change',e=>{utilHeatmap=e.target.checked;drawGrid();});
+}
+
+const showEarthContextToggle=document.getElementById('showEarthContext');
+if(showEarthContextToggle){
+  showEarthContextToggle.addEventListener('change',async()=>{
+    if(heatVisible){
+      await runFiniteThermalAnalysis();
+    }else{
+      drawGrid();
+    }
+    saveDuctbankSession();
+    scheduleDuctbankExperienceUpdate();
+  });
 }
 
 document.getElementById('deleteDataBtn').addEventListener('click',deleteSavedData);
@@ -4107,7 +4312,7 @@ document.addEventListener('keydown',e=>{
  }
 });
 
-['ductbankTag','concreteEncasement','ductbankDepth','earthTemp','airTemp','soilResistivity','moistureContent','heatSources','hSpacing','vSpacing','topPad','bottomPad','leftPad','rightPad','perRow','conductorRating','gridRes','ductThermRes'].forEach(id=>{
+['ductbankTag','concreteEncasement','ductbankDepth','earthTemp','airTemp','soilResistivity','moistureContent','heatSources','showEarthContext','hSpacing','vSpacing','topPad','bottomPad','leftPad','rightPad','perRow','conductorRating','gridRes','ductThermRes'].forEach(id=>{
  const el=document.getElementById(id);
  if(el){
   el.addEventListener('input',saveDuctbankSession);
@@ -4121,7 +4326,7 @@ window.addEventListener('beforeunload',saveDuctbankSession);
 const dirty = createDirtyTracker();
 const markSaved = () => dirty.markClean();
 const markUnsaved = () => dirty.markDirty();
-['ductbankTag','concreteEncasement','ductbankDepth','earthTemp','airTemp','soilResistivity','moistureContent','heatSources','hSpacing','vSpacing','topPad','bottomPad','leftPad','rightPad','perRow','conductorRating','gridRes','ductThermRes'].forEach(id=>{const el=document.getElementById(id);if(el){el.addEventListener('input',markUnsaved);el.addEventListener('change',markUnsaved);}});
+['ductbankTag','concreteEncasement','ductbankDepth','earthTemp','airTemp','soilResistivity','moistureContent','heatSources','showEarthContext','hSpacing','vSpacing','topPad','bottomPad','leftPad','rightPad','perRow','conductorRating','gridRes','ductThermRes'].forEach(id=>{const el=document.getElementById(id);if(el){el.addEventListener('input',markUnsaved);el.addEventListener('change',markUnsaved);}});
 document.getElementById('conduitTable').addEventListener('input',markUnsaved);
 document.getElementById('cableTable').addEventListener('input',markUnsaved);
 document.getElementById('heatSourceTable').addEventListener('input',markUnsaved);

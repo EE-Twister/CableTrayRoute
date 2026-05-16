@@ -33,11 +33,61 @@
     .result-configuration-diagram { margin: 1rem 0; }
     .result-configuration-diagram figcaption { font-weight: 600; margin-bottom: 0.5rem; }
     .result-configuration-diagram svg { width: min(100%, 540px); height: auto; border: 1px solid var(--border-color, #cbd5e1); border-radius: 8px; background: var(--secondary-color, #f8fafc); }
+    .cablefaultbracing-page .page-header p { margin: 0.35rem 0 0; color: var(--color-text-muted, #64748b); max-width: 72ch; }
+    .fault-bracing-review { margin: 1rem 0; padding: 0.9rem; border: 1px solid var(--border-color, #cbd5e1); border-radius: 8px; background: var(--color-surface-strong, #fff); box-shadow: var(--elevation-sm, 0 1px 2px rgba(15, 23, 42, 0.06)); }
+    .fault-bracing-review-header { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 0.75rem; }
+    .fault-bracing-review-header h2 { margin: 0; font-size: 1rem; }
+    .fault-bracing-mode-badge { display: inline-flex; align-items: center; min-height: 1.7rem; padding: 0.2rem 0.65rem; border: 1px solid color-mix(in srgb, var(--primary-color, #2563eb) 40%, var(--border-color, #cbd5e1)); border-radius: 999px; color: var(--primary-color, #2563eb); background: color-mix(in srgb, var(--primary-color, #2563eb) 9%, transparent); font-size: 0.8rem; font-weight: 700; }
+    .fault-bracing-review-grid, .fault-bracing-kpi-grid, .fault-bracing-schedule-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.55rem; margin: 0; }
+    .fault-bracing-review-grid > div, .fault-bracing-kpi, .fault-bracing-schedule-summary > div { min-width: 0; padding: 0.65rem; border: 1px solid color-mix(in srgb, var(--border-color, #cbd5e1) 82%, transparent); border-radius: 6px; background: color-mix(in srgb, var(--secondary-color, #f8fafc) 88%, transparent); }
+    .fault-bracing-review-grid dt, .fault-bracing-kpi span, .fault-bracing-schedule-summary span { display: block; margin-bottom: 0.25rem; color: var(--color-text-muted, #64748b); font-size: 0.72rem; font-weight: 700; letter-spacing: 0; text-transform: uppercase; }
+    .fault-bracing-review-grid dd, .fault-bracing-kpi strong, .fault-bracing-schedule-summary strong { margin: 0; color: var(--text-color, #0f172a); font-size: 1rem; font-weight: 800; line-height: 1.2; overflow-wrap: anywhere; }
+    .fault-bracing-review-note { margin: 0.75rem 0 0; color: var(--color-text-muted, #64748b); font-size: 0.88rem; }
+    .fault-bracing-decision { margin-bottom: 0.75rem; padding: 0.8rem 0.9rem; border: 1px solid var(--border-color, #cbd5e1); border-left-width: 4px; border-radius: 8px; background: var(--color-surface-strong, #fff); }
+    .fault-bracing-decision span { display: block; margin-bottom: 0.2rem; color: var(--color-text-muted, #64748b); font-size: 0.72rem; font-weight: 800; letter-spacing: 0; text-transform: uppercase; }
+    .fault-bracing-decision strong { display: block; color: var(--text-color, #0f172a); font-size: 1.1rem; }
+    .fault-bracing-decision p { margin: 0.35rem 0 0; color: var(--color-text-muted, #64748b); }
+    .fault-bracing-decision--pass { border-left-color: #22c55e; }
+    .fault-bracing-decision--fail { border-left-color: #ef4444; }
+    .fault-bracing-decision--info { border-left-color: var(--primary-color, #2563eb); }
+    .fault-bracing-result { margin-top: 1rem; padding: 1rem; border: 1px solid var(--border-color, #cbd5e1); border-top: 4px solid var(--primary-color, #2563eb); border-radius: 8px; background: var(--color-surface-strong, #fff); }
+    .fault-bracing-result--ok { border-top-color: #22c55e; }
+    .fault-bracing-result--fail { border-top-color: #ef4444; }
+    .fault-bracing-kpi-grid { margin-bottom: 0.85rem; }
+    .fault-bracing-table-wrap { overflow-x: auto; border: 1px solid var(--border-color, #cbd5e1); border-radius: 8px; }
+    .fault-bracing-table-wrap .result-table { margin: 0; min-width: 820px; }
+    .schedule-source { display: inline-flex; align-items: center; min-height: 1.5rem; padding: 0.12rem 0.5rem; border-radius: 999px; background: #dbeafe; color: #1e40af; font-size: 0.78rem; font-weight: 700; white-space: nowrap; }
+    .schedule-source--lookup { background: #dcfce7; color: #166534; }
+    .schedule-source--assumed { background: #fef3c7; color: #92400e; }
+    .schedule-source--error { background: #fee2e2; color: #991b1b; }
+    .schedule-row--assumed td { background: color-mix(in srgb, #fef3c7 42%, transparent); }
+    .schedule-row--error td { background: color-mix(in srgb, #fee2e2 50%, transparent); }
+    .fault-bracing-preset-row, .fault-bracing-result-actions { display: flex; flex-wrap: wrap; gap: 0.45rem; align-items: center; margin: 0.45rem 0 0.65rem; }
+    .fault-bracing-preset-row .field-hint { flex: 1 0 100%; margin: 0 0 0.15rem; }
+    .fault-bracing-chip-btn, .fault-bracing-ghost-btn { min-height: 2rem; margin: 0; padding: 0.25rem 0.65rem; border-radius: 999px; font-size: 0.8rem; font-weight: 700; }
+    .fault-bracing-chip-btn { border: 1px solid color-mix(in srgb, var(--primary-color, #2563eb) 38%, var(--border-color, #cbd5e1)); color: var(--primary-color, #2563eb); background: color-mix(in srgb, var(--primary-color, #2563eb) 7%, var(--color-surface-strong, #fff)); }
+    .fault-bracing-chip-btn:hover, .fault-bracing-chip-btn:focus-visible { background: color-mix(in srgb, var(--primary-color, #2563eb) 14%, var(--color-surface-strong, #fff)); }
+    .fault-bracing-ghost-btn { border: 1px solid var(--border-color, #cbd5e1); color: var(--text-color, #0f172a); background: var(--color-surface-strong, #fff); }
+    .fault-bracing-ghost-btn:hover, .fault-bracing-ghost-btn:focus-visible { border-color: var(--primary-color, #2563eb); color: var(--primary-color, #2563eb); }
+    .fault-bracing-action-status { min-height: 1.25rem; margin: 0.25rem 0 0; color: var(--color-text-muted, #64748b); font-size: 0.86rem; }
+    body.dark-mode .fault-bracing-review, body.dark-mode .fault-bracing-decision, body.dark-mode .fault-bracing-result { background: var(--color-surface-strong, #1e293b); }
+    body.dark-mode .fault-bracing-review-grid > div, body.dark-mode .fault-bracing-kpi, body.dark-mode .fault-bracing-schedule-summary > div { background: color-mix(in srgb, var(--color-surface-strong, #1e293b) 86%, transparent); }
+    body.dark-mode .fault-bracing-review-grid dd, body.dark-mode .fault-bracing-kpi strong, body.dark-mode .fault-bracing-schedule-summary strong, body.dark-mode .fault-bracing-decision strong { color: var(--text-color, #f8fafc); }
+    body.dark-mode .fault-bracing-chip-btn, body.dark-mode .fault-bracing-ghost-btn { background: var(--color-surface-strong, #1e293b); }
+    body.dark-mode .schedule-row--assumed td { background: color-mix(in srgb, #78350f 34%, transparent); }
+    body.dark-mode .schedule-row--error td { background: color-mix(in srgb, #7f1d1d 34%, transparent); }
+    @media (max-width: 700px) {
+      .fault-bracing-review { padding: 0.75rem; }
+      .fault-bracing-review-grid, .fault-bracing-kpi-grid, .fault-bracing-schedule-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 460px) {
+      .fault-bracing-review-grid, .fault-bracing-kpi-grid, .fault-bracing-schedule-summary { grid-template-columns: 1fr; }
+    }
   </style>
   <script type="module" src="dirtyTracker.js"></script>
   <script type="module" src="dist/cableFaultBracing.js" defer></script>
 </head>
-<body class="cablefaultbracing-page" data-report-title="Fault Cable Bracing">
+<body class="cablefaultbracing-page" data-report-title="Fault Cable Bracing" data-onboarding="manual">
   <a href="#main-content" class="skip-link">Skip to main content</a>
   <nav class="top-nav" aria-label="Primary">
     <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
@@ -99,6 +149,7 @@
 
       <header class="page-header">
         <h1>Cable Fault Bracing Calculator</h1>
+        <p>Check the cleat strength needed to restrain cables during a short-circuit event, then compare the result against a selected cleat rating or the project Cable Schedule.</p>
       </header>
 
       <details class="method-panel">
@@ -173,6 +224,12 @@ Three-phase:    F = √3×10⁻⁷ × i_peak² / d  [N/m]</pre>
             HV (&gt;36 kV) up to 85 kA.  Use the prospective (maximum) fault
             current for a conservative cleat selection.
           </p>
+          <div class="fault-bracing-preset-row" aria-label="Common fault current presets">
+            <span class="field-hint">Common starting points:</span>
+            <button type="button" class="fault-bracing-chip-btn" data-fault-preset data-fault-current="25" data-xr-ratio="5">LV switchboard</button>
+            <button type="button" class="fault-bracing-chip-btn" data-fault-preset data-fault-current="31.5" data-xr-ratio="15">MV feeder</button>
+            <button type="button" class="fault-bracing-chip-btn" data-fault-preset data-fault-current="50" data-xr-ratio="25">Transformer terminals</button>
+          </div>
         </div>
 
         <div class="field-row">
@@ -251,7 +308,7 @@ Three-phase:    F = √3×10⁻⁷ × i_peak² / d  [N/m]</pre>
           <label for="spacing">
             d — Centre-to-centre cable spacing (<span id="spacingUnitLabel">mm</span>)
           </label>
-          <input type="number" id="spacing" min="1" max="2000" step="1"
+          <input type="number" id="spacing" min="1" max="2000" step="any"
                  value="50" aria-describedby="spacingHint" aria-required="true">
           <p id="spacingHint" class="field-hint">
             Distance between the centres of adjacent conductors.  For touching
@@ -265,7 +322,7 @@ Three-phase:    F = √3×10⁻⁷ × i_peak² / d  [N/m]</pre>
           <label for="cableOD">
             Cable outer diameter (<span id="odUnitLabel">mm</span>)
           </label>
-          <input type="number" id="cableOD" min="1" max="500" step="0.5"
+          <input type="number" id="cableOD" min="1" max="500" step="any"
                  value="40" aria-describedby="cableODHint">
           <p id="cableODHint" class="field-hint">
             For touching cables the centre-to-centre spacing equals the OD.
@@ -287,7 +344,7 @@ Three-phase:    F = √3×10⁻⁷ × i_peak² / d  [N/m]</pre>
             <button class="helpBtn" data-doc="docs/standards.html#cleat-spacing"
                     aria-label="Help — cleat spacing">?</button>
           </label>
-          <input type="number" id="cleatSpacing" min="1" max="10000" step="50"
+          <input type="number" id="cleatSpacing" min="1" max="10000" step="any"
                  value="900" aria-describedby="cleatSpacingHint" aria-required="true">
           <p id="cleatSpacingHint" class="field-hint">
             Distance between adjacent cleats along the cable run.  Each cleat
@@ -336,8 +393,46 @@ Three-phase:    F = √3×10⁻⁷ × i_peak² / d  [N/m]</pre>
         </label>
       </fieldset>
 
+      <section class="fault-bracing-review" id="inputReview" aria-label="Calculation setup review">
+        <div class="fault-bracing-review-header">
+          <h2>Calculation Setup</h2>
+          <span class="fault-bracing-mode-badge" id="reviewModeBadge">Single Cable</span>
+        </div>
+        <dl class="fault-bracing-review-grid">
+          <div>
+            <dt>Peak Multiplier</dt>
+            <dd id="reviewPeakMultiplier">-</dd>
+          </div>
+          <div>
+            <dt>Spacing Source</dt>
+            <dd id="reviewSpacingSource">-</dd>
+          </div>
+          <div>
+            <dt>Cleat Interval</dt>
+            <dd id="reviewCleatInterval">-</dd>
+          </div>
+          <div>
+            <dt>Safety Factor</dt>
+            <dd id="reviewSafetyFactor">-</dd>
+          </div>
+        </dl>
+        <p class="fault-bracing-review-note" id="reviewGuidance">Review the inputs above before calculating.</p>
+      </section>
+
+      <!-- Schedule mode section -->
+      <section id="scheduleSection" hidden aria-label="Schedule evaluation">
+        <p>This mode reads cables from the Cable Schedule and evaluates the
+        required cleat strength for each cable using the fault system parameters
+        entered above.  Cable spacing is derived from the cable OD in the
+        schedule where available.</p>
+        <button type="button" id="loadScheduleBtn" hidden>Evaluate Cables from Schedule</button>
+        <div id="scheduleResults" role="region" aria-live="polite"
+             aria-label="Schedule fault bracing results"></div>
+      </section>
+
       <div id="controls">
         <button id="calcBtn" type="button">Calculate Required Cleat Strength</button>
+        <p class="fault-bracing-action-status" id="faultBracingActionStatus" role="status" aria-live="polite"></p>
       </div>
 
       <div id="results" role="region" aria-live="polite" aria-label="Fault bracing results"></div>
@@ -346,17 +441,6 @@ Three-phase:    F = √3×10⁻⁷ × i_peak² / d  [N/m]</pre>
         <p class="field-hint" id="vectorLegend"></p>
         <svg id="forceVectorSvg" viewBox="0 0 420 240" role="img" aria-label="Cable phase force vector diagram"></svg>
       </div>
-
-      <!-- Schedule mode section -->
-      <section id="scheduleSection" hidden aria-label="Schedule evaluation">
-        <p>This mode reads cables from the Cable Schedule and evaluates the
-        required cleat strength for each cable using the fault system parameters
-        entered above.  Cable spacing is derived from the cable OD in the
-        schedule where available.</p>
-        <button type="button" id="loadScheduleBtn">Evaluate Cables from Schedule</button>
-        <div id="scheduleResults" role="region" aria-live="polite"
-             aria-label="Schedule fault bracing results"></div>
-      </section>
 
       <nav class="step-nav" aria-label="Workflow navigation">
         <a href="seismicBracing.html" class="step-nav-prev">&#8592; Seismic Bracing</a>

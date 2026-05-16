@@ -31,8 +31,9 @@ async function run() {
   assert.equal(r2.material, "Aluminum");
   assert.equal(r2.allowed_cable_group, "A");
   assert.equal(r3.type, "PVC Sch 40");
-  const tray = mapTrayRow({ "Tray ID": "T-001", "Tray Material": "Fiberglass" });
+  const tray = mapTrayRow({ "Tray ID": "T-001", "Tray Material": "Fiberglass", Cover: "Solid Cover" });
   assert.equal(tray.material, "Fiberglass");
+  assert.equal(tray.cover_condition, "Solid Cover");
   console.log("racewaySampleMapper.test passed");
 }
 

@@ -18,6 +18,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const calculateBtn = document.getElementById('calculate-btn');
   const exportBtn    = document.getElementById('export-btn');
   const addExpBtn    = document.getElementById('add-exposure-btn');
+  let exposureCount = 0;
 
   calculateBtn.addEventListener('click', calculate);
   exportBtn.addEventListener('click', exportCsv);
@@ -37,8 +38,6 @@ document.addEventListener('DOMContentLoaded', () => {
   // -------------------------------------------------------------------
   // Exposure table management
   // -------------------------------------------------------------------
-
-  let exposureCount = 0;
 
   function addExposureRow(defaults = {}) {
     const container = document.getElementById('exposures-container');

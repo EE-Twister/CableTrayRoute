@@ -1,3 +1,3 @@
-tray_id,start_x,start_y,start_z,end_x,end_y,end_z,inside_width,tray_depth,tray_type,material
-H1-A,0,0,10,40,0,10,16,4,Ladder (50 % fill),Steel
-H1-B,40,0,10,80,0,10,16,4,Solid Bottom (40 % fill),Aluminum
+tray_id,start_x,start_y,start_z,end_x,end_y,end_z,inside_width,tray_depth,tray_type,cover_condition,material
+H1-A,0,0,10,40,0,10,16,4,Ladder (50 % fill),No Cover,Steel
+H1-B,40,0,10,80,0,10,16,4,Solid Bottom (40 % fill),Solid Cover,Aluminum

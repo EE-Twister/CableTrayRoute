@@ -1536,6 +1536,15 @@ class TableManager {
     this.updateRowCount();
   }
 
+  setData(data = []) {
+    this.tbody.innerHTML = '';
+    (Array.isArray(data) ? data : []).forEach(row => this.addRow(row));
+    this.applyFilters();
+    this.updateRowCount();
+    this.updateSelectAllState();
+    this.queueStickyColumnUpdate();
+  }
+
   clearFilters() {
     this.filters=this.filters.map(()=> '');
     this.filterButtons.forEach(btn=>btn.classList.remove('filtered'));

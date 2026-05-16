@@ -8,6 +8,11 @@ import { emitAsync } from "../utils/safeEvents.mjs";
 import * as dataStore from "../dataStore.mjs";
 import { openModal, showAlertModal } from "./components/modal.js";
 import { start as startTour } from "../tour.js";
+import {
+  applyRecordImport,
+  previewRecordImport,
+  summarizeRacewayWorkflow
+} from "../analysis/scheduleWorkflow.mjs";
 
 const RACEWAY_TOUR_STEPS = [
   { selector: '#add-tray-btn',          message: 'Add a Cable Tray — enter width, depth, start/end 3D coordinates, and tray type (ladder, solid bottom, wire mesh).' },
@@ -203,13 +208,14 @@ const ALL_TRADE_SIZE_OPTIONS=Array.from(new Set(CONDUIT_TYPES.flatMap(type=>trad
 const TRAY_WIDTH_OPTIONS=['2','3','4','6','8','9','12','16','18','20','24','30','36'];
 const TRAY_DEPTH_OPTIONS=['2','3','4','5','6','7','8','9','10','11','12'];
 const TRAY_TYPE_OPTIONS=['Ladder (50 % fill)','Solid Bottom (40 % fill)'];
+const TRAY_COVER_OPTIONS=['No Cover','Ventilated Cover','Solid Cover'];
 const TRAY_MATERIAL_OPTIONS=['Steel','Aluminum','Stainless Steel','Fiberglass'];
 const CONDUIT_MATERIAL_OPTIONS=['Steel','Aluminum','PVC','Stainless Steel','Fiberglass'];
 const RACEWAY_VIEW_PRESET_KEY = dataStore.STORAGE_KEYS.racewayScheduleViewPreset || 'racewayScheduleViewPreset';
 const RACEWAY_VIEW_PRESETS = {
   basic: {
     ductbanks: ['toggle','tag','from','to','concrete_encasement'],
-    trays: ['tray_id','inside_width','tray_depth','tray_type','material','allowed_cable_group'],
+    trays: ['tray_id','inside_width','tray_depth','tray_type','cover_condition','material','allowed_cable_group'],
     conduits: ['conduit_id','type','material','trade_size','allowed_cable_group']
   },
   geometry: {
@@ -219,12 +225,12 @@ const RACEWAY_VIEW_PRESETS = {
   },
   fill: {
     ductbanks: ['toggle','tag','concrete_encasement'],
-    trays: ['tray_id','inside_width','tray_depth','tray_type','num_slots','slot_groups','allowed_cable_group'],
+    trays: ['tray_id','inside_width','tray_depth','tray_type','cover_condition','num_slots','slot_groups','allowed_cable_group'],
     conduits: ['conduit_id','type','trade_size','capacity','allowed_cable_group']
   },
   bim: {
     ductbanks: ['toggle','tag','from','to','concrete_encasement','start_x','start_y','start_z','end_x','end_y','end_z'],
-    trays: ['tray_id','start_x','start_y','start_z','end_x','end_y','end_z','inside_width','tray_depth','tray_type','material'],
+    trays: ['tray_id','start_x','start_y','start_z','end_x','end_y','end_z','inside_width','tray_depth','tray_type','cover_condition','material'],
     conduits: ['conduit_id','type','material','trade_size','start_x','start_y','start_z','end_x','end_y','end_z']
   },
   full: null
@@ -591,6 +597,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     {key:'inside_width',label:'Inside Width (in)',type:'select',options:TRAY_WIDTH_OPTIONS,default:TRAY_WIDTH_OPTIONS[0],validate:['required']},
     {key:'tray_depth',label:'Tray Depth (in)',type:'select',options:TRAY_DEPTH_OPTIONS,default:TRAY_DEPTH_OPTIONS[0],validate:['required']},
     {key:'tray_type',label:'Tray Type',type:'select',options:TRAY_TYPE_OPTIONS,default:TRAY_TYPE_OPTIONS[0],validate:['required']},
+    {key:'cover_condition',label:'Cover',type:'select',options:TRAY_COVER_OPTIONS,default:TRAY_COVER_OPTIONS[0],tooltip:'Cover condition used by wind load calculations. Solid covers are treated as flat-plate wind surfaces.'},
     {key:'material',label:'Material',type:'select',options:TRAY_MATERIAL_OPTIONS,default:TRAY_MATERIAL_OPTIONS[0],tooltip:'Raceway material used by procurement, BIM export, and tray hardware BOM outputs.'},
     {key:'num_slots',label:'Slots',type:'number',tooltip:'Number of longitudinal compartments (divider strips). Fill capacity is divided equally among slots. Default: 1 (single undivided tray).'},
     {key:'slot_groups',label:'Slot Groups (JSON)',type:'text',tooltip:'Optional JSON mapping slot index (0-based) to cable group name. Example: {"0":"power","1":"instrument"}. Leave blank for an undivided tray.'},
@@ -619,7 +626,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     onView:(row)=>{
       try{
         trayTable.save();
-        const tray={tray_id:row.tray_id,width:parseFloat(row.inside_width),height:parseFloat(row.tray_depth),material:row.material||'',allowed_cable_group:row.allowed_cable_group,num_slots:Math.max(1,parseInt(row.num_slots)||1),slot_groups:row.slot_groups||null};
+        const tray={tray_id:row.tray_id,width:parseFloat(row.inside_width),height:parseFloat(row.tray_depth),tray_type:row.tray_type||'',cover_condition:row.cover_condition||'',material:row.material||'',allowed_cable_group:row.allowed_cable_group,num_slots:Math.max(1,parseInt(row.num_slots)||1),slot_groups:row.slot_groups||null};
         const cables=cablesForRaceway(row.tray_id);
         dataStore.setItem('trayFillData',{tray,cables});
       }catch(e){console.error('Failed to store tray fill data',e);}
@@ -690,6 +697,35 @@ document.addEventListener('DOMContentLoaded', async () => {
   conduitTable.getDataCount=function(){return this.getData().length;};
   tables.conduits=conduitTable;
   racewayTablesRef = tables;
+  wireRacewayImportPreview(trayTable, trayColumns, {
+    label: 'Tray Schedule',
+    identityFields: ['tray_id', 'trayId', 'id', 'tag', 'ref'],
+    aliases: {
+      trayid: 'tray_id',
+      id: 'tray_id',
+      width: 'inside_width',
+      insidewidth: 'inside_width',
+      depth: 'tray_depth',
+      traydepth: 'tray_depth',
+      type: 'tray_type',
+      traytype: 'tray_type',
+      cover: 'cover_condition',
+      material: 'material'
+    }
+  });
+  wireRacewayImportPreview(conduitTable, conduitColumns, {
+    label: 'Conduit Schedule',
+    identityFields: ['conduit_id', 'conduitId', 'tray_id', 'trayId', 'id', 'tag', 'ref'],
+    aliases: {
+      conduitid: 'conduit_id',
+      id: 'conduit_id',
+      conduittype: 'type',
+      type: 'type',
+      tradesize: 'trade_size',
+      size: 'trade_size',
+      material: 'material'
+    }
+  });
   function reconcileConduitOwnershipOnLoad(){
     const ductbanks = tables.ductbanks?.getData?.() || [];
     if(!ductbanks.length) return;
@@ -802,6 +838,164 @@ document.addEventListener('DOMContentLoaded', async () => {
   window.getRacewaySchedule=getRacewaySchedule;
   persistAllConduits();
 
+  function normalizeImportHeader(header) {
+    return String(header || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '');
+  }
+
+  function buildRacewayImportLookup(columns, aliases = {}) {
+    const lookup = new Map();
+    columns.forEach(col => {
+      lookup.set(normalizeImportHeader(col.key), col.key);
+      lookup.set(normalizeImportHeader(col.label), col.key);
+    });
+    Object.entries(aliases).forEach(([header, key]) => lookup.set(normalizeImportHeader(header), key));
+    return lookup;
+  }
+
+  function readRacewayImportRows(file) {
+    if (!file) return Promise.resolve([]);
+    if (typeof XLSX === 'undefined' || !XLSX?.read || !XLSX?.utils?.sheet_to_json) {
+      showAlertModal('Import Error', 'Excel import is not available in this environment.');
+      return Promise.resolve([]);
+    }
+    return file.arrayBuffer()
+      .then(buffer => {
+        const workbook = XLSX.read(buffer, { type: 'array' });
+        const sheetName = workbook.SheetNames && workbook.SheetNames[0];
+        if (!sheetName) return [];
+        return XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { defval: '', raw: true });
+      })
+      .catch(error => {
+        console.error('Failed to read raceway import file', error);
+        showAlertModal('Import Error', 'Unable to read the selected Excel file.');
+        return [];
+      });
+  }
+
+  function wireRacewayImportPreview(table, columns, options = {}) {
+    const label = options.label || 'Raceway Schedule';
+    const lookup = buildRacewayImportLookup(columns, options.aliases || {});
+    const resolveHeaderKey = header => lookup.get(normalizeImportHeader(header)) || '';
+    const parseValue = value => (typeof value === 'string' ? value.trim() : value ?? '');
+    table.importXlsx = async file => {
+      const rows = await readRacewayImportRows(file);
+      if (!rows.length) {
+        showAlertModal('Import Error', `No ${label.toLowerCase()} rows were found in the selected file.`);
+        return;
+      }
+      const headers = Object.keys(rows[0] || {});
+      const mappingSelects = new Map();
+      let modeSelect = null;
+      let previewPanel = null;
+      const resolveMappings = () => Array.from(mappingSelects.entries())
+        .map(([header, select]) => [header, select.value])
+        .filter(([, key]) => key);
+      const buildRows = mappings => rows.map(source => {
+        const next = {};
+        mappings.forEach(([header, key]) => {
+          next[key] = parseValue(source[header]);
+        });
+        return next;
+      }).filter(row => Object.values(row).some(value => String(value ?? '').trim() !== ''));
+      const refreshPreview = () => {
+        if (!previewPanel) return;
+        const mappings = resolveMappings();
+        if (!mappings.length) {
+          previewPanel.textContent = 'Map at least one column to preview the import.';
+          return;
+        }
+        const importedRows = buildRows(mappings);
+        const mode = modeSelect?.value || 'merge';
+        const preview = previewRecordImport(table.getData(), importedRows, {
+          mode,
+          identityFields: options.identityFields || ['id', 'tag', 'ref']
+        });
+        previewPanel.innerHTML = `
+          <p><strong>Preview:</strong> ${preview.creates} create, ${preview.updates} update, ${preview.conflicts} conflict, ${preview.unchanged} unchanged.</p>
+          <p>${preview.preserved} existing rows preserved${preview.removed ? `, ${preview.removed} removed by replace mode` : ''}. Conflicts preserve existing non-empty raceway values.</p>
+        `;
+      };
+
+      openModal({
+        title: `Map ${label} Import`,
+        description: 'Match spreadsheet columns to schedule fields, then review the merge impact before applying.',
+        primaryText: 'Apply Import',
+        secondaryText: 'Cancel',
+        variant: 'wide',
+        render(body) {
+          const wrapper = document.createElement('div');
+          wrapper.className = 'import-mapping-grid';
+          headers.forEach(header => {
+            const row = document.createElement('div');
+            row.className = 'import-mapping-row';
+            const fieldLabel = document.createElement('span');
+            fieldLabel.textContent = header;
+            const select = document.createElement('select');
+            const skip = document.createElement('option');
+            skip.value = '';
+            skip.textContent = 'Do not import';
+            select.appendChild(skip);
+            columns.forEach(col => {
+              const option = document.createElement('option');
+              option.value = col.key;
+              option.textContent = col.label;
+              select.appendChild(option);
+            });
+            select.value = resolveHeaderKey(header);
+            select.addEventListener('change', refreshPreview);
+            mappingSelects.set(header, select);
+            row.append(fieldLabel, select);
+            wrapper.appendChild(row);
+          });
+          const modeLabel = document.createElement('label');
+          modeLabel.className = 'modal-form-field';
+          modeLabel.textContent = 'Import Mode';
+          modeSelect = document.createElement('select');
+          [
+            ['merge', 'Merge with existing rows (recommended)'],
+            ['append', 'Append as new rows'],
+            ['replace', 'Replace current schedule']
+          ].forEach(([value, text]) => {
+            const option = document.createElement('option');
+            option.value = value;
+            option.textContent = text;
+            modeSelect.appendChild(option);
+          });
+          modeSelect.addEventListener('change', refreshPreview);
+          modeLabel.appendChild(modeSelect);
+          previewPanel = document.createElement('div');
+          previewPanel.className = 'import-preview-list';
+          body.append(wrapper, modeLabel, previewPanel);
+          refreshPreview();
+          return wrapper.querySelector('select');
+        },
+        onSubmit: () => {
+          const mappings = resolveMappings();
+          if (!mappings.length) {
+            showAlertModal('Import Mapping Required', 'Map at least one spreadsheet column before importing.');
+            return false;
+          }
+          const importedRows = buildRows(mappings);
+          if (!importedRows.length) {
+            showAlertModal('Import Error', `No usable ${label.toLowerCase()} data was found after mapping.`);
+            return false;
+          }
+          const mode = modeSelect?.value || 'merge';
+          const nextRows = applyRecordImport(table.getData(), importedRows, {
+            mode,
+            identityFields: options.identityFields || ['id', 'tag', 'ref']
+          });
+          table.setData(nextRows);
+          table.save();
+          handleChange();
+          updateRacewayExperience();
+          showToast(`${label}: applied ${importedRows.length} imported row${importedRows.length === 1 ? '' : 's'} using ${mode} mode.`, 'success');
+          return true;
+        }
+      });
+    };
+  }
+
   function getRacewaySnapshot(){
     const ductbanks = tables.ductbanks?.getData?.() || [];
     const trays = trayTable.getData();
@@ -892,19 +1086,21 @@ document.addEventListener('DOMContentLoaded', async () => {
     const snapshot = getRacewaySnapshot();
     const issues = collectRacewayIssues();
     const assignedIds = getAssignedRacewayIds();
-    const allIds = new Set([
-      ...snapshot.ductbanks.map(db => db.tag),
-      ...snapshot.trays.map(tray => tray.tray_id),
-      ...snapshot.conduits.map(conduit => conduit.conduit_id)
-    ].map(value => String(value || '').trim()).filter(Boolean));
-    const assignedCount = Array.from(allIds).filter(id => assignedIds.has(id)).length;
-    const totalRaceways = snapshot.ductbanks.length + snapshot.trays.length + snapshot.conduits.length;
-    setText('raceway-total-count', String(totalRaceways));
-    setText('raceway-ductbank-count', String(snapshot.ductbanks.length));
-    setText('raceway-tray-count', String(snapshot.trays.length));
-    setText('raceway-conduit-count', `${snapshot.conduits.length}`);
+    const workflowSummary = summarizeRacewayWorkflow({
+      ductbanks: snapshot.ductbanks,
+      trays: snapshot.trays,
+      conduits: snapshot.conduits,
+      assignedIds
+    });
+    setText('raceway-total-count', String(workflowSummary.total));
+    setText('raceway-ductbank-count', String(workflowSummary.ductbanks));
+    setText('raceway-tray-count', String(workflowSummary.trays));
+    setText('raceway-conduit-count', `${workflowSummary.conduits}`);
     setText('raceway-issue-count', String(issues.length));
-    setText('raceway-assigned-count', String(assignedCount));
+    setText('raceway-assigned-count', String(workflowSummary.assignedRaceways));
+    setText('raceway-missing-id-count', String(workflowSummary.missingIds));
+    setText('raceway-missing-geometry-count', String(workflowSummary.missingGeometry));
+    setText('raceway-unused-count', String(workflowSummary.unusedRaceways));
     const summary = document.getElementById('raceway-validation-summary');
     if(summary){
       summary.className = issues.length ? 'load-validation-summary is-warning' : 'load-validation-summary is-success';
@@ -912,7 +1108,66 @@ document.addEventListener('DOMContentLoaded', async () => {
         ? `${issues.length} schedule issue${issues.length === 1 ? '' : 's'} need review before routing or BIM export.`
         : 'Raceway schedules are ready for routing and export.';
     }
-    return { snapshot, issues, assignedIds };
+    updateRacewayNextAction({ ...workflowSummary, issues: issues.length, assignedCableRefs: assignedIds.size });
+    return { snapshot, issues, assignedIds, workflowSummary };
+  }
+
+  function updateRacewayNextAction(summary){
+    const host = document.getElementById('raceway-next-action');
+    if(!host) return;
+    let title = 'Continue to fill and routing checks';
+    let detail = 'Raceway records have IDs, geometry, and dimensions for downstream routing tools.';
+    let primaryHref = 'cabletrayfill.html';
+    let primaryText = 'Open Tray Fill';
+    let secondaryHref = 'cableschedule.html';
+    let secondaryText = 'Review Cable Assignments';
+
+    if(summary.total === 0){
+      title = 'Add raceway records';
+      detail = 'Create trays, conduits, or ductbanks so schedule-ready cables have routing destinations.';
+      primaryHref = '#ductbank-section';
+      primaryText = 'Start Raceway Schedule';
+      secondaryHref = 'cableschedule.html';
+      secondaryText = 'Open Cable Schedule';
+    }else if(summary.missingIds > 0 || summary.duplicateIds > 0){
+      title = 'Resolve raceway ID issues';
+      detail = `${summary.missingIds} raceway${summary.missingIds === 1 ? '' : 's'} are missing IDs and ${summary.duplicateIds} duplicate ID row${summary.duplicateIds === 1 ? '' : 's'} need review.`;
+      primaryHref = '#raceway-summary-panel';
+      primaryText = 'Review IDs';
+    }else if(summary.missingGeometry > 0){
+      title = 'Complete raceway geometry';
+      detail = `${summary.missingGeometry} raceway${summary.missingGeometry === 1 ? '' : 's'} need start/end coordinates before routing and BIM export.`;
+      primaryHref = '#raceway-summary-panel';
+      primaryText = 'Review Geometry';
+    }else if(summary.missingDimensions > 0){
+      title = 'Complete fill dimensions';
+      detail = `${summary.missingDimensions} raceway${summary.missingDimensions === 1 ? '' : 's'} need tray dimensions or conduit type and trade size.`;
+      primaryHref = '#raceway-summary-panel';
+      primaryText = 'Review Dimensions';
+    }else if(summary.assignedRaceways === 0 && summary.assignedCableRefs > 0){
+      title = 'Connect cable assignments to raceway IDs';
+      detail = 'Cable assignments exist, but none match the current raceway IDs.';
+      primaryHref = 'cableschedule.html';
+      primaryText = 'Fix Cable Assignments';
+    }else if(summary.assignedRaceways === 0){
+      title = 'Assign cables to raceways';
+      detail = 'Raceways are defined. Assign schedule-ready cables before running fill and route checks.';
+      primaryHref = 'cableschedule.html';
+      primaryText = 'Open Cable Schedule';
+    }else{
+      detail = `${summary.assignedRaceways} raceway${summary.assignedRaceways === 1 ? '' : 's'} are assigned to cables. Continue into fill or routing checks.`;
+    }
+
+    host.innerHTML = `
+      <div>
+        <strong>${title}</strong>
+        <p>${detail}</p>
+      </div>
+      <span>
+        <a class="btn secondary-btn" href="${secondaryHref}">${secondaryText}</a>
+        <a class="btn primary-btn" href="${primaryHref}">${primaryText}</a>
+      </span>
+    `;
   }
 
   function rowHasIssue(issues, table, row, codes = null){
@@ -1116,6 +1371,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     {key:'inside_width',label:'Inside Width (in)',options:TRAY_WIDTH_OPTIONS,value:'24'},
     {key:'tray_depth',label:'Tray Depth (in)',options:TRAY_DEPTH_OPTIONS,value:'4'},
     {key:'tray_type',label:'Tray Type',options:TRAY_TYPE_OPTIONS,value:TRAY_TYPE_OPTIONS[0]},
+    {key:'cover_condition',label:'Cover',options:TRAY_COVER_OPTIONS,value:TRAY_COVER_OPTIONS[0]},
     {key:'material',label:'Material',options:TRAY_MATERIAL_OPTIONS,value:TRAY_MATERIAL_OPTIONS[0]},
     {key:'num_slots',label:'Slots',type:'number',min:1,step:1,value:'1'},
     {key:'slot_groups',label:'Slot Groups (JSON)'},
@@ -1445,6 +1701,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           {label:'Inside Width (in)',name:'inside_width',options:TRAY_WIDTH_OPTIONS,value:'24'},
           {label:'Tray Depth (in)',name:'tray_depth',options:TRAY_DEPTH_OPTIONS,value:'4'},
           {label:'Tray Type',name:'tray_type',options:TRAY_TYPE_OPTIONS,value:TRAY_TYPE_OPTIONS[0]},
+          {label:'Cover',name:'cover_condition',options:TRAY_COVER_OPTIONS,value:last.cover_condition || TRAY_COVER_OPTIONS[0]},
           {label:'Material',name:'material',options:TRAY_MATERIAL_OPTIONS,value:last.material || TRAY_MATERIAL_OPTIONS[0]},
           {label:'Slots',name:'num_slots',type:'number',value:'1',min:1,step:1},
           {label:'Allowed Group',name:'allowed_cable_group',value:''}

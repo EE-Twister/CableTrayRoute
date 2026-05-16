@@ -3,7 +3,7 @@ Designed to find the optimal cable route for your cable.
 
 ## Quick Start
 
-For a step-by-step overview of the workflow, see the [Quick Start](docs/quickstart.html) guide. Each tool can run on its own, but following the six steps in sequence provides a smoother experience.
+For a step-by-step overview of the workflow, see the [Project Workflow](docs/project-workflow.md) guide. Each tool can run on its own, but following the eight-step project path provides a smoother integrated experience.
 
 ## Secure Authentication & API Hardening
 
@@ -44,18 +44,21 @@ For rollout safety, keep older fingerprinted files available until all clients h
 
 ## Landing Page and Workflow
 
-The new landing page (`index.html`) links to every tool in the suite and outlines
+The landing page (`index.html`) links to every tool in the suite and outlines
 the recommended end-to-end workflow:
 
-1. **Cable Schedule** – define cables with guided entry, quick multi-add, smart tags, reusable cable types, batch edits, import mapping, and routing-ready checks.
-2. **Raceway Schedule** – set up trays, conduits, and ductbanks.
-3. **Ductbank** – analyze underground ductbanks.
-4. **Tray Fill** – visualize tray utilization.
-5. **Conduit Fill** – evaluate conduit loading.
-6. **Optimal Cable Route** – generate the final route.
+1. **Equipment List** - define major equipment tags, ratings, and locations.
+2. **Load List** - capture load records and source relationships.
+3. **One-Line** - model electrical relationships and explicitly reconcile schedules when ready.
+4. **Cable Schedule** - complete schedule-ready cable rows with tag, from/to, conductor size, and length.
+5. **Raceway Schedule** - set up trays, conduits, and ductbanks.
+6. **Fill / Routing** - run tray/conduit fill, ductbank checks, and route assignments.
+7. **Studies** - run demand, load flow, short-circuit, arc flash, TCC, harmonics, motor start, and related studies.
+8. **Deliverables** - generate project reports, pull cards, spool sheets, procurement, estimate, and submittal outputs.
 
-Each tool can be used independently, but the homepage lets you access the
-entire sequence from one place.
+Each tool can be used independently. Following the shared workflow lets project
+data move between modules through explicit reconcile actions instead of hidden
+cross-module overwrites. See [`docs/project-workflow.md`](docs/project-workflow.md).
 
 ## New Feature: Cross-Sheet Off-Page Connectors
 
@@ -168,10 +171,10 @@ diagram with the cables placed according to their properties.
 A tray CSV used for import must include the following headers:
 
 ```
-tray_id,start_x,start_y,start_z,end_x,end_y,end_z,inside_width,tray_depth,tray_type,current_fill,allowed_cable_group,shape
+tray_id,start_x,start_y,start_z,end_x,end_y,end_z,inside_width,tray_depth,tray_type,cover_condition,current_fill,allowed_cable_group,shape
 ```
 
-All coordinates are in **feet**. Inside width and tray depth are in **inches** and `current_fill` is the occupied area in square inches. A sample file is available at `examples/trays_template.csv`.
+All coordinates are in **feet**. Inside width and tray depth are in **inches**. `cover_condition` may be `No Cover`, `Ventilated Cover`, or `Solid Cover` and is used by the Wind Load page. `current_fill` is the occupied area in square inches. A sample file is available at `examples/trays_template.csv`.
 
 ### Cable CSV Format
 Cables can be imported with these column headers:
@@ -189,7 +192,7 @@ Exported routing results are written to `route_data.xlsx`. Load this file in `ca
 `racewayschedule.html` centralizes raceway data in three editable tables.
 
 - **Ductbank Schedule** – list each ductbank by `Tag`, `From`, and `To`. Expand a row to add its conduits (`Conduit ID`, `Type`, `Trade Size`, `From`, `To`).
- - **Tray Schedule** – record tray segments with start and end coordinates plus `Inside Width`, `Tray Depth`, and `Tray Type`.
+ - **Tray Schedule** – record tray segments with start and end coordinates plus `Inside Width`, `Tray Depth`, `Tray Type`, and `Cover`.
 - **Conduit Schedule** – catalog stand-alone conduits with start/end coordinates, `Type`, `Trade Size`, and `Capacity`.
 
 Use the buttons above each table to **Save** to browser storage, **Load** saved data, and **Import/Export XLSX** files. Templates are available in the `examples` folder (`ductbank_schedule_ductbanks.csv`, `ductbank_schedule_conduits.csv`, `tray_schedule.csv`, and `conduit_schedule.csv`). Save these CSV files as `.xlsx` with matching sheet names before importing.

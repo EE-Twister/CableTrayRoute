@@ -1074,8 +1074,21 @@ body.ductbank-page .toolbar-btn[aria-disabled="true"] {
     background: #f7efdf;
 }
 
+.ductbank-sky-backdrop {
+    shape-rendering: crispEdges;
+}
+
 .ductbank-soil-backdrop {
     shape-rendering: crispEdges;
+}
+
+.ductbank-no-context-backdrop {
+    shape-rendering: crispEdges;
+}
+
+.ductbank-grade-surface {
+    fill: #7c5f2f;
+    fill-opacity: 0.18;
 }
 
 .ductbank-envelope-fill {
@@ -1090,6 +1103,7 @@ body.ductbank-page .toolbar-btn[aria-disabled="true"] {
 }
 
 .ductbank-grade-label,
+.ductbank-sky-label,
 .ductbank-soil-label,
 .ductbank-depth-callout {
     fill: #334155;
@@ -1098,9 +1112,14 @@ body.ductbank-page .toolbar-btn[aria-disabled="true"] {
 }
 
 .ductbank-grade-label,
+.ductbank-sky-label,
 .ductbank-soil-label {
     font-size: 10px;
     font-weight: 800;
+}
+
+.ductbank-sky-label {
+    fill: #1e3a8a;
 }
 
 .ductbank-depth-callout {

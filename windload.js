@@ -3,6 +3,9 @@ import {
   calcVelocityPressure,
   calcKz,
   checkNemaCapacity,
+  normalizeCoverCondition,
+  normalizeFillLevel,
+  normalizeTrayConstruction,
   NEMA_LOAD_CLASSES,
 } from './analysis/windLoad.mjs';
 import { getTrays, getCables } from './dataStore.mjs';
@@ -72,6 +75,50 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   updateQzPreview();
 
+  function readOptionalNumber(id) {
+    const el = document.getElementById(id);
+    const raw = el ? String(el.value || '').trim() : '';
+    if (!raw) return undefined;
+    return parseFloat(raw);
+  }
+
+  function getAerodynamicInputs() {
+    return {
+      trayConstruction: document.getElementById('tray-construction')?.value || 'ladder',
+      fillLevel: document.getElementById('fill-level')?.value || 'partial',
+      coverCondition: document.getElementById('cover-condition')?.value || 'none',
+      forceCoefficientOverride: readOptionalNumber('force-coefficient-override'),
+      projectedAreaFactor: readOptionalNumber('projected-area-factor') ?? 1.0,
+    };
+  }
+
+  function scheduleAerodynamicInputs(tray, defaults) {
+    const rawConstruction = tray.tray_type ?? tray.trayType ?? tray.type;
+    const rawCover = tray.cover_condition ?? tray.coverCondition ?? tray.cover_type ?? tray.coverType ?? tray.cover;
+    const rawFill = tray.wind_fill_level ?? tray.fill_level ?? tray.fillLevel ?? tray.current_fill;
+    const trayConstruction = normalizeTrayConstruction(
+      rawConstruction,
+      defaults.trayConstruction,
+    );
+    const coverCondition = rawCover === undefined || rawCover === null || rawCover === ''
+      ? defaults.coverCondition
+      : normalizeCoverCondition(rawCover, defaults.coverCondition);
+    const fillLevel = rawFill === undefined || rawFill === null || rawFill === ''
+      ? defaults.fillLevel
+      : normalizeFillLevel(rawFill, defaults.fillLevel);
+
+    return {
+      ...defaults,
+      trayConstruction,
+      coverCondition,
+      fillLevel,
+    };
+  }
+
+  function formatCf(value) {
+    return Number.isFinite(value) ? value.toFixed(2).replace(/\.?0+$/, '') : '—';
+  }
+
   // ---- Single tray mode ----
   calcBtn.addEventListener('click', () => {
     const V           = parseFloat(document.getElementById('wind-speed').value);
@@ -80,7 +127,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const K_zt        = parseFloat(document.getElementById('k-zt').value) || 1.0;
     const trayWidth   = parseFloat(document.getElementById('tray-width').value);
     const spanLength  = parseFloat(document.getElementById('span-length').value);
-    const fillLevel   = document.getElementById('fill-level').value;
+    const aerodynamicInputs = getAerodynamicInputs();
     const cableWeight = parseFloat(document.getElementById('cable-weight').value) || 0;
     const nemaClass   = document.getElementById('nema-class').value;
 
@@ -103,7 +150,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let result;
     try {
-      result = calcWindForce({ V, z_ft, exposure, K_zt, trayWidth_in: trayWidth, spanLength_ft: spanLength, fillLevel });
+      result = calcWindForce({
+        V,
+        z_ft,
+        exposure,
+        K_zt,
+        trayWidth_in: trayWidth,
+        spanLength_ft: spanLength,
+        ...aerodynamicInputs,
+      });
     } catch (err) {
       showAlertModal('Calculation Error', err.message);
       return;
@@ -116,7 +171,7 @@ document.addEventListener('DOMContentLoaded', () => {
       spanLength_ft: spanLength,
     });
 
-    renderSingleResult(result, capacity, { V, z_ft, exposure, trayWidth, spanLength, fillLevel, cableWeight, nemaClass });
+    renderSingleResult(result, capacity, { V, z_ft, exposure, trayWidth, spanLength, cableWeight, nemaClass });
   });
 
   function renderSingleResult(r, cap, params) {
@@ -134,9 +189,15 @@ document.addEventListener('DOMContentLoaded', () => {
             <tr><th scope="row">K<sub>z</sub> (velocity pressure exp. coeff.)</th><td>${r.Kz.toFixed(4)}</td></tr>
             <tr><th scope="row">Velocity Pressure q<sub>z</sub></th><td><strong>${r.q_z_psf.toFixed(2)} lbs/ft²</strong></td></tr>
             <tr><th scope="row">Gust Factor G</th><td>${r.G.toFixed(2)}</td></tr>
-            <tr><th scope="row">Force Coefficient C<sub>f</sub></th><td>${r.Cf.toFixed(1)} (${esc(params.fillLevel)} fill)</td></tr>
+            <tr><th scope="row">Tray Construction</th><td>${esc(r.trayConstructionLabel)}</td></tr>
+            <tr><th scope="row">Fill Condition</th><td>${esc(r.fillLevelLabel)}</td></tr>
+            <tr><th scope="row">Cover Condition</th><td>${esc(r.coverConditionLabel)}</td></tr>
+            <tr><th scope="row">Force Coefficient C<sub>f</sub></th><td>${formatCf(r.Cf)}</td></tr>
+            <tr><th scope="row">C<sub>f</sub> Basis</th><td>${esc(r.forceCoefficientSource)}</td></tr>
             <tr><th scope="row">Effective Wind Pressure</th><td>${r.windPressure_psf.toFixed(2)} lbs/ft²</td></tr>
-            <tr><th scope="row">Tray Projected Area</th><td>${r.projectedArea_ft2.toFixed(2)} ft²</td></tr>
+            <tr><th scope="row">Base Projected Area</th><td>${r.baseProjectedArea_ft2.toFixed(2)} ft²</td></tr>
+            <tr><th scope="row">Projected Area Factor</th><td>${r.projectedAreaFactor.toFixed(2)}</td></tr>
+            <tr><th scope="row">Effective Projected Area</th><td>${r.projectedArea_ft2.toFixed(2)} ft²</td></tr>
             <tr><th scope="row">Total Wind Force (per span)</th><td><strong>${r.windForce_lbs.toFixed(1)} lbs</strong></td></tr>
             <tr><th scope="row">Wind Force per Linear Foot</th><td><strong>${r.windForce_per_ft.toFixed(1)} lbs/ft</strong></td></tr>
             ${cap.verticalCapacity_lbs_ft != null ? `
@@ -156,7 +217,7 @@ document.addEventListener('DOMContentLoaded', () => {
     = ${r.q_z_psf.toFixed(2)} lbs/ft²</pre>
           <p>Design wind force (ASCE 7-22 §29.4):</p>
           <pre>F = q_z × G × C_f × A_f
-  = ${r.q_z_psf.toFixed(2)} × ${r.G.toFixed(2)} × ${r.Cf.toFixed(1)} × ${r.projectedArea_ft2.toFixed(2)}
+  = ${r.q_z_psf.toFixed(2)} × ${r.G.toFixed(2)} × ${formatCf(r.Cf)} × ${r.projectedArea_ft2.toFixed(2)}
   = ${r.windForce_lbs.toFixed(1)} lbs</pre>
           <p>Force per linear foot = ${r.windForce_lbs.toFixed(1)} / ${params.spanLength} = ${r.windForce_per_ft.toFixed(1)} lbs/ft</p>
         </details>
@@ -178,7 +239,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const z_ft     = parseFloat(document.getElementById('tray-height').value);
       const exposure = document.getElementById('exposure').value;
       const K_zt     = parseFloat(document.getElementById('k-zt').value) || 1.0;
-      const fillLevel = document.getElementById('fill-level').value;
+      const aerodynamicDefaults = getAerodynamicInputs();
       const nemaClass = document.getElementById('nema-class').value;
       const spanLength = parseFloat(document.getElementById('span-length').value) || 12;
 
@@ -207,9 +268,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const rows = trays.map(tray => {
         const trayWidth = parseFloat(tray.inside_width) || 12;
+        const aerodynamicInputs = scheduleAerodynamicInputs(tray, aerodynamicDefaults);
         let result = null;
         try {
-          result = calcWindForce({ V, z_ft, exposure, K_zt, trayWidth_in: trayWidth, spanLength_ft: spanLength, fillLevel });
+          result = calcWindForce({
+            V,
+            z_ft,
+            exposure,
+            K_zt,
+            trayWidth_in: trayWidth,
+            spanLength_ft: spanLength,
+            ...aerodynamicInputs,
+          });
         } catch { /* skip trays with invalid data */ }
         const cableWeight = trayWeightMap[tray.tray_id] || 0;
         const capacity = result ? checkNemaCapacity({
@@ -218,7 +288,7 @@ document.addEventListener('DOMContentLoaded', () => {
           nemaClass,
           spanLength_ft: spanLength,
         }) : null;
-        return { tray, trayWidth, result, capacity, cableWeight };
+        return { tray, trayWidth, result, capacity, cableWeight, aerodynamicInputs };
       });
 
       renderScheduleResults(rows, { V, z_ft, exposure, spanLength, nemaClass });
@@ -231,7 +301,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return `<tr>
           <td>${esc(tray.tray_id)}</td>
           <td>${esc(String(trayWidth))}"</td>
-          <td colspan="5">—</td>
+          <td colspan="9">—</td>
         </tr>`;
       }
       const overload = capacity?.overCapacity;
@@ -239,11 +309,15 @@ document.addEventListener('DOMContentLoaded', () => {
       return `<tr class="${rowClass}">
         <td>${esc(tray.tray_id)}</td>
         <td>${esc(String(trayWidth))}"</td>
+        <td>${esc(result.trayConstructionLabel)}</td>
+        <td>${esc(result.coverConditionLabel)}</td>
+        <td>${esc(result.fillLevelLabel)}</td>
+        <td>${formatCf(result.Cf)}</td>
         <td>${result.q_z_psf.toFixed(2)}</td>
         <td>${result.windForce_per_ft.toFixed(1)}</td>
         <td>${cableWeight.toFixed(1)}</td>
         <td>${capacity ? capacity.verticalCapacity_lbs_ft.toFixed(1) : '—'}</td>
-        <td class="status-badge ${rowClass}">${capacity ? (overload ? 'Over' : 'OK') : '—'}</td>
+        <td class="status-badge ${rowClass}" title="${esc(result.forceCoefficientSource)}">${capacity ? (overload ? 'Over' : 'OK') : '—'}</td>
       </tr>`;
     }).join('');
 
@@ -254,6 +328,10 @@ document.addEventListener('DOMContentLoaded', () => {
           <tr>
             <th scope="col">Tray ID</th>
             <th scope="col">Width</th>
+            <th scope="col">Construction</th>
+            <th scope="col">Cover</th>
+            <th scope="col">Fill</th>
+            <th scope="col">C<sub>f</sub></th>
             <th scope="col">q<sub>z</sub> (lbs/ft²)</th>
             <th scope="col">Wind Force (lbs/ft)</th>
             <th scope="col">Cable Load (lbs/ft)</th>
@@ -264,6 +342,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <tbody>${tableRows}</tbody>
       </table>
       <p class="method-note">Wind force per ASCE 7-22 §29.4 at z = ${esc(String(params.z_ft))} ft, span = ${esc(String(params.spanLength))} ft.
+      Construction is inferred from Raceway Schedule tray type; cover is read from Raceway Schedule when present and otherwise uses the page default.
       Vertical cable load from conductor size lookup; verify with cable data sheets.</p>`;
   }
 

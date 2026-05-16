@@ -98,6 +98,10 @@ test.describe('Wind Load Analysis', () => {
     await expect(page.locator('#tray-height')).toBeVisible();
     await expect(page.locator('#tray-width')).toBeVisible();
     await expect(page.locator('#span-length')).toBeVisible();
+    await expect(page.locator('#tray-construction')).toBeVisible();
+    await expect(page.locator('#cover-condition')).toBeVisible();
+    await expect(page.locator('#force-coefficient-override')).toBeVisible();
+    await expect(page.locator('#projected-area-factor')).toBeVisible();
   });
 
   test('has calculate button', async ({ page }) => {

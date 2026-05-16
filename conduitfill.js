@@ -1,6 +1,7 @@
-import { getItem, removeItem } from './dataStore.mjs';
+import { getItem, removeItem, getCables, getConduits, getDuctbanks } from './dataStore.mjs';
 import { showAlertModal } from './src/components/modal.js';
 import { createFillGauge } from './src/components/fillGauge.js';
+import { summarizeCableWorkflow } from './analysis/scheduleWorkflow.mjs';
 
 checkPrereqs([{key:'conduitSchedule',page:'racewayschedule.html',label:'Raceway Schedule'}]);
 
@@ -12,6 +13,51 @@ checkPrereqs([{key:'conduitSchedule',page:'racewayschedule.html',label:'Raceway 
         '"': '&quot;',
         "'": '&#39;'
       }[ch]));
+    }
+
+    function readStoredList(reader) {
+      try {
+        const value = reader();
+        return Array.isArray(value) ? value : [];
+      } catch (error) {
+        console.warn('Unable to read conduit workflow handoff data', error);
+        return [];
+      }
+    }
+
+    function countDuctbankConduits(ductbanks) {
+      return ductbanks.reduce((sum, ductbank) => sum + ((ductbank.conduits || []).length), 0);
+    }
+
+    function renderConduitFillHandoff(context = {}) {
+      const el = document.getElementById('conduit-fill-handoff');
+      if (!el) return;
+      const cables = readStoredList(getCables);
+      const conduits = readStoredList(getConduits);
+      const ductbanks = readStoredList(getDuctbanks);
+      const schedule = summarizeCableWorkflow(cables);
+      const loadedCables = Array.isArray(context.cables) ? context.cables.length : 0;
+      const conduitCount = conduits.length + countDuctbankConduits(ductbanks);
+      const label = [context.type, context.tradeSize].filter(Boolean).join(' ');
+      const title = loadedCables
+        ? `Reviewing ${label || 'selected conduit'}`
+        : (conduitCount ? 'Select a conduit from Routing or Raceway Schedule' : 'Add conduits before project fill review');
+      const detail = loadedCables
+        ? `${loadedCables} cable(s) are loaded for this conduit fill check. ${schedule.routingReady} cable schedule row(s) are routing-ready.`
+        : (conduitCount
+            ? `${conduitCount} conduit record(s) are available. Open a routed conduit segment for a project-specific fill check.`
+            : 'Conduit Fill still works standalone, but integrated workflow data starts in the Raceway Schedule and Cable Schedule.');
+      el.innerHTML = `
+        <div>
+          <strong>${escapeHtml(title)}</strong>
+          <p>${escapeHtml(detail)}</p>
+        </div>
+        <span>
+          <a class="btn" href="racewayschedule.html">Raceway Schedule</a>
+          <a class="btn" href="cableschedule.html">Cable Schedule</a>
+          <a class="btn" href="optimalRoute.html">Routing</a>
+        </span>
+      `;
     }
 
     const CONDUIT_SPECS = {
@@ -380,10 +426,13 @@ checkPrereqs([{key:'conduitSchedule',page:'racewayschedule.html',label:'Raceway 
       tableBody.addEventListener('click',e=>{if(e.target.tagName==='BUTTON') markUnsaved();});
       ['copyPngBtn','printBtn','copyBtn'].forEach(id=>{const el=document.getElementById(id);if(el)el.addEventListener('click',markSaved);});
 
+      let conduitHandoffContext = {};
+      renderConduitFillHandoff(conduitHandoffContext);
       const stored = getItem('conduitFillData');
       if (stored) {
         try {
           const { type, tradeSize, cables } = stored;
+          conduitHandoffContext = { type, tradeSize, cables: Array.isArray(cables) ? cables : [] };
           if (type) {
             typeSel.value = type;
             populateSizes();
@@ -405,6 +454,7 @@ checkPrereqs([{key:'conduitSchedule',page:'racewayschedule.html',label:'Raceway 
             });
           }
           document.getElementById('drawBtn').click();
+          renderConduitFillHandoff(conduitHandoffContext);
         } catch (e) {
           console.error('Failed to load conduitFillData', e);
         }
