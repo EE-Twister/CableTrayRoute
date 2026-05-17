@@ -13717,7 +13717,7 @@ function buildScheduleDataFromDiagram() {
       const value = typeof f.getValue === 'function'
         ? f.getValue(c)
         : c[f.name];
-      fields[f.name] = value ?? f.default ?? fields[f.name] ?? '';
+      fields[f.name] = value ?? fields[f.name] ?? '';
     });
     return fields;
   };
