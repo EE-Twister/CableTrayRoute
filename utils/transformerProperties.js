@@ -2,6 +2,7 @@ import { normalizeVoltageToVolts, toBaseKV } from './voltage.js';
 import { calculateTransformerImpedance } from './transformerImpedance.js';
 
 const numberPattern = /[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?/;
+const explicitKvNumericPattern = /^[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?$/;
 
 function getCandidateValue(record, key) {
   if (!record || typeof record !== 'object' || !key) return undefined;
@@ -94,8 +95,8 @@ function parseExplicitBaseKV(raw) {
   if (typeof raw === 'string') {
     const trimmed = raw.trim();
     if (!trimmed) return null;
-    if (/[a-zA-Z]/.test(trimmed)) return toBaseKV(trimmed);
-    return parseNumeric(trimmed);
+    if (explicitKvNumericPattern.test(trimmed)) return parseNumeric(trimmed);
+    return toBaseKV(trimmed);
   }
   return toBaseKV(raw);
 }
