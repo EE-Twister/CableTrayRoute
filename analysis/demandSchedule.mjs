@@ -274,7 +274,7 @@ export function buildDemandSchedule(loads, options = {}) {
   // 1. Enrich each load with category and connected kW
   // -------------------------------------------------------------------------
   const enriched = loads.map(load => {
-    const category = (load.necCategory && NEC_CATEGORIES[load.necCategory])
+    const category = (load.necCategory && Object.hasOwn(NEC_CATEGORIES, load.necCategory))
       ? load.necCategory
       : categorise(load.loadType);
     const connKw   = connectedKw(load);
