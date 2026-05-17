@@ -93,7 +93,8 @@ export function runValidation(components = [], studies = {}) {
   components.forEach(c => {
     const isCt = c?.subtype === 'ct' || c?.type === 'ct';
     if (!isCt) return;
-    const props = c.props && typeof c.props === 'object' ? c.props : c;
+    const hasProps = c.props && typeof c.props === 'object';
+    const props = hasProps ? c.props : c;
     const missing = [];
 
     if (!`${props.tag ?? ''}`.trim()) missing.push('tag');
@@ -114,6 +115,19 @@ export function runValidation(components = [], studies = {}) {
 
     const locationContext = `${props.location_context ?? ''}`.trim().toLowerCase();
     if (!['metering', 'protection'].includes(locationContext)) missing.push('location_context');
+
+    const ctKeys = [
+      'tag', 'ratio_primary', 'ratio_secondary', 'accuracy_class', 'burden_va', 'knee_point_v', 'polarity',
+      'location_context', 'protected_device_id', 'meter_id', 'relay_id', 'ct_id', 'current_transformer_id'
+    ];
+    if (hasProps) {
+      const conflicts = ctKeys.filter(key => Object.prototype.hasOwnProperty.call(c, key)
+        && Object.prototype.hasOwnProperty.call(props, key)
+        && `${c[key] ?? ''}`.trim() !== `${props[key] ?? ''}`.trim());
+      if (conflicts.length) {
+        missing.push(`conflicting_top_level_fields(${conflicts.join('|')})`);
+      }
+    }
 
     if (missing.length) {
       issues.push({
