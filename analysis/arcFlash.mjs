@@ -162,27 +162,80 @@ function createProtectiveResolver(comps = []) {
     return parents;
   }
 
-  function visit(component, stack = new Set()) {
+  function visit(component) {
     if (!component?.id) return null;
     if (cache.has(component.id)) return cache.get(component.id);
-    if (stack.has(component.id)) {
-      cache.set(component.id, null);
-      return null;
-    }
-    stack.add(component.id);
-    let result = null;
-    if (component?.tccId && isProtectiveComponent(component)) {
-      result = component;
-    } else {
-      const parents = getParents(component);
-      for (const parent of parents) {
-        result = visit(parent.component, stack);
-        if (result) break;
+
+    const stack = [];
+    const active = new Set();
+    stack.push({ component, entered: false, parents: [], index: 0, result: null });
+
+    while (stack.length) {
+      const frame = stack[stack.length - 1];
+      const current = frame.component;
+      const currentId = current?.id;
+
+      if (!currentId) {
+        stack.pop();
+        continue;
       }
+
+      if (!frame.entered) {
+        if (cache.has(currentId)) {
+          const cached = cache.get(currentId);
+          stack.pop();
+          if (cached && stack.length && !stack[stack.length - 1].result) {
+            stack[stack.length - 1].result = cached;
+          }
+          continue;
+        }
+
+        if (active.has(currentId)) {
+          cache.set(currentId, null);
+          stack.pop();
+          continue;
+        }
+
+        frame.entered = true;
+        active.add(currentId);
+
+        if (current?.tccId && isProtectiveComponent(current)) {
+          frame.result = current;
+        } else {
+          frame.parents = getParents(current);
+        }
+      }
+
+      if (frame.result || frame.index >= frame.parents.length) {
+        active.delete(currentId);
+        cache.set(currentId, frame.result || null);
+        stack.pop();
+
+        if (frame.result && stack.length && !stack[stack.length - 1].result) {
+          stack[stack.length - 1].result = frame.result;
+        }
+        continue;
+      }
+
+      const nextParent = frame.parents[frame.index++]?.component;
+      const nextId = nextParent?.id;
+      if (!nextId) continue;
+
+      if (cache.has(nextId)) {
+        const cached = cache.get(nextId);
+        if (cached) frame.result = cached;
+        continue;
+      }
+
+      if (active.has(nextId)) {
+        cache.set(nextId, null);
+        continue;
+      }
+
+      stack.push({ component: nextParent, entered: false, parents: [], index: 0, result: null });
     }
-    stack.delete(component.id);
-    cache.set(component.id, result || null);
-    return result;
+
+    return cache.get(component.id) || null;
   }
 
   return {
