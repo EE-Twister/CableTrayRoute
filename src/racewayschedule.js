@@ -404,7 +404,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   };
   resetTableLoadState();
-  const projectId = window.currentProjectId || 'default';
+  const projectId = window.currentProjectId;
   dataStore.loadProject(projectId);
   const save = () => dataStore.saveProject(projectId);
   [dataStore.STORAGE_KEYS.ductbanks, dataStore.STORAGE_KEYS.trays, dataStore.STORAGE_KEYS.conduits].forEach(k => dataStore.on(k, save));
