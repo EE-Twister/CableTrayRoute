@@ -33,7 +33,7 @@ export function normalizeVoltageToVolts(raw) {
     if (typeof value === 'string') {
       const trimmed = value.trim();
       if (!trimmed) return null;
-      const match = trimmed.match(/-?\d+(?:\.\d+)?/);
+      const match = trimmed.match(/[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?/);
       if (!match) return null;
       const num = Number(match[0]);
       if (!Number.isFinite(num)) return null;
