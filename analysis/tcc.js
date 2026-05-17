@@ -7763,10 +7763,11 @@ function autoCoordinate() {
       if (i === 0) return;
       const entry = phaseOrderedEntries[i];
       if (!entry || !r.found) return;
-      const baseSettings = entry.selection?.baseDevice?.settings || {};
+      const baseDevice = entry.selection?.baseDevice;
+      const baseSettings = baseDevice?.settings || {};
       const phaseDialKey = (baseSettings.longTimePickup !== undefined || baseSettings.longTimeDelay !== undefined)
         ? 'longTimeDelay'
-        : 'time';
+        : (baseDevice?.iec60255 === true ? 'tms' : 'time');
       entry.overrides = { ...entry.overrides, [phaseDialKey]: r.timeDial };
       if (typeof updateDeviceInputs === 'function') updateDeviceInputs(entry);
     });
