@@ -570,17 +570,16 @@ function combineParallel(base, addition) {
 
 function resolveUpstreamImpedance(comp, comps, compMap, cache) {
   if (!comp?.id) return null;
-  const visited = new Set([comp.id]);
+  const visited = new Set();
   let current = comp;
-  while (current) {
-    const parent = findParentInfo(current, comps, compMap, visited);
-    if (!parent?.component?.id || visited.has(parent.component.id)) break;
-    const candidate = computeImpedance(parent.component, comps, compMap, cache);
+  while (current?.id && !visited.has(current.id)) {
+    visited.add(current.id);
+    const candidate = computeImpedance(current, comps, compMap, cache);
     if (candidate && (Math.abs(candidate.r) >= 1e-9 || Math.abs(candidate.x) >= 1e-9)) {
       return { r: candidate.r, x: candidate.x };
     }
-    visited.add(parent.component.id);
-    current = parent.component;
+    const parent = findParentInfo(current, comps, compMap, visited);
+    current = parent?.component || null;
   }
   return null;
 }
