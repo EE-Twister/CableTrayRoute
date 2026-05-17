@@ -103,6 +103,8 @@ function voltageStatus(vm, min, max) {
 function getGenerationKw(bus) {
   if (!bus || typeof bus !== 'object') return 0;
 
+  if (Number.isFinite(bus.generation)) return bus.generation;
+
   if (bus.generation && typeof bus.generation === 'object') {
     const kw = bus.generation.kw ?? bus.generation.kW;
     if (Number.isFinite(kw)) return kw;
