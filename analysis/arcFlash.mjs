@@ -285,7 +285,9 @@ async function loadDevices() {
         showAlertModal('Library Error', 'Protective device library failed to load. Arc flash analysis may be unavailable.');
       }
     }
-    deviceCache = [];
+    const loadErr = new Error('Protective device library failed to load');
+    loadErr.cause = err;
+    throw loadErr;
   }
   return deviceCache;
 }
