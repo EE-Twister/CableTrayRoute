@@ -91,12 +91,19 @@ export function runMotorStart() {
       || type === 'motor'
       || !!c.motor;
     if (!isMotor) return;
-    const hp = parseNum(c.rating || c.hp || c.props?.hp);
+    const hp = parseNum(c.rating || c.hp || c.props?.rated_hp || c.props?.hp);
+    const voltageKv = Number(c.props?.rated_voltage_kv ?? c.props?.baseKV);
     const volts = c.voltage ?? c.volts ?? c.props?.voltage ?? c.props?.volts;
-    const V = Number(volts) || 480;
-    const pfRaw = Number(c.pf ?? c.power_factor ?? c.props?.pf ?? c.props?.power_factor);
+    const V = Number(volts) || (voltageKv ? voltageKv * 1000 : 480);
+    const pfRaw = Number(
+      c.pf ?? c.power_factor
+      ?? c.props?.full_load_pf ?? c.props?.pf ?? c.props?.power_factor
+    );
     const pf = pfRaw > 1 ? pfRaw / 100 : (pfRaw || 0.9);
-    const effRaw = Number(c.efficiency ?? c.eff ?? c.props?.efficiency ?? c.props?.eff);
+    const effRaw = Number(
+      c.efficiency ?? c.eff
+      ?? c.props?.full_load_efficiency_pct ?? c.props?.efficiency ?? c.props?.eff
+    );
     const eff = effRaw > 1 ? effRaw / 100 : (effRaw || 0.9);
     const multiple = Number(
       c.inrushMultiple
@@ -120,7 +127,7 @@ export function runMotorStart() {
     ) || 0;
     const Zth = Math.hypot(theveninR, theveninX);
     const inertia = Number(c.inertia ?? c.props?.inertia) || 0;
-    const speed = Number(c.speed ?? c.props?.speed) || 1800;
+    const speed = Number(c.speed ?? c.props?.synchronous_speed_rpm ?? c.props?.speed) || 1800;
     const baseTorque = hp ? (hp * 746) / (2 * Math.PI * speed / 60) : 0;
     const loadCurve = parseTorqueCurve(
       c.load_torque_curve
