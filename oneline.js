@@ -9775,7 +9775,10 @@ function selectComponent(compOrId) {
           kwVal = kvaVal * pfMagnitude;
         }
 
-        if (!Number.isFinite(kvaVal) && Number.isFinite(kwVal) && pfMagnitude !== null && pfMagnitude > 0) {
+        const sourceIsWattsOrPf = source === 'watts' || pfFieldNames.includes(source);
+        if (sourceIsWattsOrPf && Number.isFinite(kwVal) && pfMagnitude !== null && pfMagnitude > 0) {
+          kvaVal = kwVal / pfMagnitude;
+        } else if (!Number.isFinite(kvaVal) && Number.isFinite(kwVal) && pfMagnitude !== null && pfMagnitude > 0) {
           kvaVal = kwVal / pfMagnitude;
         }
 
