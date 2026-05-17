@@ -5050,8 +5050,7 @@ function resolveTransformerVoltageValue(transformer, portIndex) {
     if (!key || seen.has(key)) continue;
     seen.add(key);
     const value = transformer[key] ?? transformer.props?.[key] ?? metaProps[key];
-    const num = parseVoltageNumber(value);
-    if (num !== null) return num;
+    if (parseVoltageNumber(value) !== null) return value;
   }
   return null;
 }
