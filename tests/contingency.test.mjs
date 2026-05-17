@@ -223,6 +223,53 @@ describe('runContingency — transient stability coupling', () => {
     assert.strictEqual(contingencies[0].transientStability.checked, false);
   });
 
+  it('with checkTransientStability:true and bus.generation.kw, checked is true', () => {
+    const model = {
+      buses: [
+        { id: 'G1', label: 'Gen Bus', Vm: 1.02, Va: 0, generation: { kw: 2000, kvar: 0 }, connections: [] },
+        { id: 'B2', label: 'Load Bus', Vm: 1.0,  Va: 0, connections: [] },
+      ],
+      branches: [{ id: 'L1', name: 'Line 1', type: 'line' }],
+    };
+    const { contingencies } = runContingency(model, {
+      checkTransientStability: true,
+      generatorInertiaH: 5.0,
+      baseMVA: 100,
+    });
+    assert.strictEqual(contingencies[0].transientStability.checked, true);
+  });
+
+  it('treats Pg in kW consistently with generation.kw', () => {
+    const pgModel = {
+      buses: [
+        { id: 'G1', label: 'Gen Bus', Vm: 1.0, Va: 0, Pg: 2000, connections: [] },
+        { id: 'B2', label: 'Load Bus', Vm: 1.0, Va: 0, connections: [] },
+      ],
+      branches: [{ id: 'L1', name: 'Line 1', type: 'line' }],
+    };
+    const genModel = {
+      buses: [
+        { id: 'G1', label: 'Gen Bus', Vm: 1.0, Va: 0, generation: { kw: 2000, kvar: 0 }, connections: [] },
+        { id: 'B2', label: 'Load Bus', Vm: 1.0, Va: 0, connections: [] },
+      ],
+      branches: [{ id: 'L1', name: 'Line 1', type: 'line' }],
+    };
+
+    const pgRun = runContingency(pgModel, { checkTransientStability: true });
+    const genRun = runContingency(genModel, { checkTransientStability: true });
+
+    assert.strictEqual(pgRun.contingencies[0].transientStability.checked, true);
+    assert.strictEqual(genRun.contingencies[0].transientStability.checked, true);
+    assert.strictEqual(
+      pgRun.contingencies[0].transientStability.deltaMax_deg,
+      genRun.contingencies[0].transientStability.deltaMax_deg,
+    );
+    assert.strictEqual(
+      pgRun.contingencies[0].transientStability.stable,
+      genRun.contingencies[0].transientStability.stable,
+    );
+  });
+
   it('with checkTransientStability:true and a generator bus, checked is true', () => {
     const model = {
       buses: [
