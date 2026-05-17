@@ -8,9 +8,15 @@ let deviceCache = null;
 const PROTECTIVE_TYPES = new Set(['breaker', 'fuse', 'relay', 'recloser', 'contactor', 'switch']);
 function isProtectiveComponent(component) {
   if (!component || typeof component !== 'object') return false;
-  if (component.category === 'protection') return true;
+  const category = typeof component.category === 'string' ? component.category.toLowerCase() : '';
+  if (category === 'protection') return true;
+  const subtype = typeof component.subtype === 'string' ? component.subtype.toLowerCase() : '';
+  if (PROTECTIVE_TYPES.has(subtype)) return true;
+  if ([...PROTECTIVE_TYPES].some(token => subtype.includes(token))) return true;
   if (!component.type) return true;
-  return PROTECTIVE_TYPES.has(component.type);
+  const type = typeof component.type === 'string' ? component.type.toLowerCase() : '';
+  if (PROTECTIVE_TYPES.has(type)) return true;
+  return [...PROTECTIVE_TYPES].some(token => type.includes(token));
 }
 const FALLBACK_TYPES = new Set(['motor_load', 'static_load', 'load', 'panel', 'equipment', 'bus', 'cable', 'mcc']);
 const UPSTREAM_CANDIDATE_TYPES = new Set([
