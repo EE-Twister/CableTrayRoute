@@ -2201,7 +2201,21 @@ let connectSource = null;
 let tempConnection = null;
 let hoverPort = null;
 let selectedConnection = null;
-let diagramScale = getItem('diagramScale', { unitPerPx: 1, unit: 'in' });
+const DEFAULT_DIAGRAM_SCALE = Object.freeze({ unitPerPx: 1, unit: 'in' });
+const MIN_DIAGRAM_UNIT_PER_PX = 1e-6;
+const MAX_DIAGRAM_UNIT_PER_PX = 1e6;
+
+function normalizeDiagramScale(rawScale) {
+  const fallback = { ...DEFAULT_DIAGRAM_SCALE };
+  if (!rawScale || typeof rawScale !== 'object' || Array.isArray(rawScale)) return fallback;
+  const unitPerPx = Number(rawScale.unitPerPx);
+  if (!Number.isFinite(unitPerPx) || unitPerPx <= 0) return fallback;
+  const clampedUnitPerPx = Math.min(Math.max(unitPerPx, MIN_DIAGRAM_UNIT_PER_PX), MAX_DIAGRAM_UNIT_PER_PX);
+  const unit = typeof rawScale.unit === 'string' && rawScale.unit.trim() ? rawScale.unit.trim() : fallback.unit;
+  return { unitPerPx: clampedUnitPerPx, unit };
+}
+
+let diagramScale = normalizeDiagramScale(getItem('diagramScale', DEFAULT_DIAGRAM_SCALE));
 const DEFAULT_DIAGRAM_ZOOM = 1;
 const MIN_DIAGRAM_ZOOM = 0.25;
 const MAX_DIAGRAM_ZOOM = 4;
@@ -8234,7 +8248,7 @@ function save(notify = true) {
     connections = [];
   }
   setOneLine({ activeSheet, sheets: sheetData });
-  setItem('diagramScale', diagramScale);
+  setItem('diagramScale', normalizeDiagramScale(diagramScale));
   const issues = validateDiagram();
   if (issues.length === 0) {
     markScheduleReconcilePending();
@@ -14292,7 +14306,7 @@ async function importDiagram(data) {
     switchScenario(data.meta.scenario);
   }
   data = migrateDiagram(data);
-  diagramScale = data.scale || { unitPerPx: 1, unit: 'in' };
+  diagramScale = normalizeDiagramScale(data.scale);
   setItem('diagramScale', diagramScale);
   templates = data.templates || [];
   saveTemplates();
