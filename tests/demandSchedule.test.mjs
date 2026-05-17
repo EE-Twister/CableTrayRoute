@@ -133,6 +133,13 @@ describe('buildDemandSchedule() — empty / edge cases', () => {
     assert.strictEqual(result.summary.totalConnectedKw, 0);
     assert.strictEqual(result.rows.length, 1);
   });
+
+  it('ignores inherited necCategory names and falls back to auto-categorisation', () => {
+    const result = buildDemandSchedule([{ kw: '1', quantity: '1', loadType: 'general', necCategory: 'constructor' }], { mode: 'nec' });
+    assert.strictEqual(result.rows.length, 1);
+    assert.strictEqual(result.rows[0].necCategory, 'general');
+    assert.strictEqual(result.summary.totalDemandKw, 1);
+  });
 });
 
 // ---------------------------------------------------------------------------
