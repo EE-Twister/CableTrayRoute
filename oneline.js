@@ -9934,7 +9934,7 @@ function selectComponent(compOrId) {
       const parseKvValue = raw => {
         if (raw === null || raw === undefined) return null;
         const directKv = toBaseKV(raw);
-        if (Number.isFinite(directKv) && directKv > 0) return directKv;
+        if (Number.isFinite(directKv) && directKv > 0.2) return directKv;
         const numeric = parseNumericValue(raw);
         if (!Number.isFinite(numeric) || numeric <= 0) return null;
         if (numeric > 1000) return numeric / 1000;
