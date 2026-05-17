@@ -96,6 +96,13 @@ function parseNumeric(value) {
 }
 
 function toKV(value) {
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    if (normalized.includes('kv')) {
+      const num = parseNumeric(value);
+      return num === null ? null : num;
+    }
+  }
   const num = parseNumeric(value);
   if (num === null) return null;
   return num > 100 ? num / 1000 : num;
@@ -236,9 +243,11 @@ function getIBRStudyMetadata(comp) {
     return null;
   };
   const sRated_kVA = read('rated_kva', 'kva', 'kVA', 's_rated_kva') || 0;
+  const fromVoltage = toKV(pickValue(comp, 'voltage'));
+  const fromVolts = toKV(pickValue(comp, 'volts'));
   const vLL_kV = (
-    toKV(pickValue(comp, 'voltage')) ??
-    toKV(pickValue(comp, 'volts')) ??
+    (fromVoltage !== null && fromVoltage > 0 ? fromVoltage : null) ??
+    (fromVolts !== null && fromVolts > 0 ? fromVolts : null) ??
     read('rated_kv', 'baseKV')
   ) || 0;
   const limitFactor = read('fault_limit_factor') || IBR_DEFAULTS.faultCurrentLimitFactor;

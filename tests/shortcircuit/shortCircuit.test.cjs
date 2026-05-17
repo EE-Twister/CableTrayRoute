@@ -231,6 +231,56 @@ global.localStorage = {
       assert(Math.abs(bus.ibr.Ifault_A - 1323.0943668928928) < 1e-6, 'Fault contribution should match 480 V base');
     });
 
+    it('preserves explicit kV voltage units in IBR metadata', () => {
+      setOneLine({
+        activeSheet: 0,
+        sheets: [{
+          name: 'IBR kV voltage',
+          components: [
+            {
+              id: 'ibr1',
+              type: 'pv_inverter',
+              rated_kva: 1100,
+              voltage: '230kV',
+              connections: [{ target: 'bus1', sourcePort: 0, targetPort: 0 }]
+            },
+            { id: 'bus1', type: 'bus', subtype: 'Bus' }
+          ]
+        }]
+      });
+
+      const res = runShortCircuit();
+      const bus = res.bus1;
+      assert(bus && bus.ibr, 'IBR metadata should be attached');
+      assert(Math.abs(bus.ibr.vLL_kV - 230) < 1e-9, 'Explicit kV values should not be divided by 1000');
+      assert(Math.abs(bus.ibr.Ifault_A - 3.0373644596497704) < 1e-9, 'Fault contribution should use 230 kV base');
+    });
+
+    it('falls back to rated_kv when IBR voltage parses to nonpositive values', () => {
+      setOneLine({
+        activeSheet: 0,
+        sheets: [{
+          name: 'IBR voltage fallback',
+          components: [
+            {
+              id: 'ibr1',
+              type: 'pv_inverter',
+              rated_kva: 1000,
+              rated_kv: 13.8,
+              voltage: '0',
+              connections: [{ target: 'bus1', sourcePort: 0, targetPort: 0 }]
+            },
+            { id: 'bus1', type: 'bus', subtype: 'Bus' }
+          ]
+        }]
+      });
+
+      const res = runShortCircuit();
+      const bus = res.bus1;
+      assert(bus && bus.ibr, 'IBR metadata should be attached via rated_kv fallback');
+      assert(Math.abs(bus.ibr.vLL_kV - 13.8) < 1e-9, 'rated_kv should be used when voltage is nonpositive');
+    });
+
     it('includes normalized UPS metadata in short-circuit results', () => {
       setOneLine({
         activeSheet: 0,
