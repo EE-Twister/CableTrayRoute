@@ -705,6 +705,13 @@ const shapeDashPatterns = {
   dotted: '2 2'
 };
 
+function normalizeLowerChoice(value, fallback, allowed, aliases = {}) {
+  const raw = typeof value === 'string' ? value : fallback;
+  const normalized = typeof raw === 'string' ? raw.toLowerCase() : '';
+  const mapped = aliases[normalized] || normalized;
+  return allowed.includes(mapped) ? mapped : fallback;
+}
+
 function ensureShapeDefaults(comp) {
   if (!comp || comp.subtype !== 'annotation_custom_shape') return;
   if (!comp.props || typeof comp.props !== 'object') comp.props = {};
@@ -721,11 +728,17 @@ function ensureShapeDefaults(comp) {
       if (fallback !== undefined) comp[key] = fallback;
     }
   });
-  comp.shapeType = (comp.shapeType || defaults.shapeType || 'rectangle').toLowerCase();
-  if (comp.shapeType === 'rounded_rectangle') comp.shapeType = 'rounded';
-  if (!['rectangle', 'rounded', 'circle'].includes(comp.shapeType)) comp.shapeType = 'rectangle';
-  comp.strokeStyle = (comp.strokeStyle || defaults.strokeStyle || 'solid').toLowerCase();
-  if (!['solid', 'dashed', 'dotted'].includes(comp.strokeStyle)) comp.strokeStyle = 'solid';
+  comp.shapeType = normalizeLowerChoice(
+    comp.shapeType,
+    normalizeLowerChoice(defaults.shapeType, 'rectangle', ['rectangle', 'rounded', 'circle'], { rounded_rectangle: 'rounded' }),
+    ['rectangle', 'rounded', 'circle'],
+    { rounded_rectangle: 'rounded' }
+  );
+  comp.strokeStyle = normalizeLowerChoice(
+    comp.strokeStyle,
+    normalizeLowerChoice(defaults.strokeStyle, 'solid', ['solid', 'dashed', 'dotted']),
+    ['solid', 'dashed', 'dotted']
+  );
   let strokeWidth = Number(comp.strokeWidth);
   if (!Number.isFinite(strokeWidth) || strokeWidth <= 0) {
     strokeWidth = Number(defaults.strokeWidth) || 1;
@@ -6901,8 +6914,13 @@ function render() {
         g.appendChild(txt);
       } else {
         if (c.subtype === 'annotation_custom_shape') ensureShapeDefaults(c);
-        const shapeType = (c.shapeType || 'rectangle').toLowerCase();
-        const strokeStyle = (c.strokeStyle || 'solid').toLowerCase();
+        const shapeType = normalizeLowerChoice(
+          c.shapeType,
+          'rectangle',
+          ['rectangle', 'rounded', 'circle'],
+          { rounded_rectangle: 'rounded' }
+        );
+        const strokeStyle = normalizeLowerChoice(c.strokeStyle, 'solid', ['solid', 'dashed', 'dotted']);
         const strokeColor = c.strokeColor || '#333';
         const fillColor = c.fillColor && c.fillColor !== 'none' && c.fillColor !== 'transparent'
           ? c.fillColor
