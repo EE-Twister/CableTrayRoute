@@ -218,6 +218,51 @@ export function traySlotFillPercent(tray, slotIndex, slotFillSqIn) {
  * @param {number} conductorCount
  * @returns {number}
  */
+
+function parseSlotGroupAssignments(rawSlotGroups, slotGroupsMap, numSlots) {
+  const assignments = new Map();
+  const addAssignment = (slotKey, groupValue) => {
+    const slotIndex = Number.parseInt(String(slotKey), 10);
+    const group = String(groupValue ?? '').trim();
+    if (!Number.isInteger(slotIndex) || slotIndex < 0 || slotIndex >= numSlots || !group) return false;
+    if (assignments.has(group) && assignments.get(group) !== slotIndex) return false;
+    assignments.set(group, slotIndex);
+    return true;
+  };
+
+  const applyEntries = (entries) => {
+    for (const [slotKey, groupValue] of entries) {
+      if (!addAssignment(slotKey, groupValue)) return false;
+    }
+    return true;
+  };
+
+  if (rawSlotGroups) {
+    try {
+      const parsed = typeof rawSlotGroups === 'string' ? JSON.parse(rawSlotGroups) : rawSlotGroups;
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+      if (!applyEntries(Object.entries(parsed))) return null;
+      return assignments;
+    } catch {
+      return null;
+    }
+  }
+
+  if (slotGroupsMap instanceof Map) {
+    if (!applyEntries(slotGroupsMap.entries())) return null;
+    return assignments;
+  }
+
+  return null;
+}
+
+function cableSlotIndex(cable) {
+  const raw = cable.slot_index ?? cable.slotIndex ?? cable.tray_slot;
+  if (raw === undefined || raw === null || raw === '') return null;
+  const parsed = Number.parseInt(String(raw), 10);
+  return Number.isInteger(parsed) ? parsed : null;
+}
+
 function derateFactor(conductorCount) {
   for (const entry of TRAY_DERATING_FACTORS) {
     if (conductorCount <= entry.maxConductors) return entry.factor;
@@ -449,27 +494,22 @@ function checkSegregation(trays, trayCableMap) {
     );
 
     if (groups.size > 1) {
-      // Suppress DRC-02 when the tray is physically compartmented with a valid
-      // slot_groups mapping — mixed groups are intentional in that configuration
-      // because a listed metallic divider strip separates the voltage classes.
       const numSlots = Math.max(1, parseInt(tray.num_slots) || 1);
       if (numSlots > 1) {
-        const rawSlotGroups = tray.slot_groups;
-        let slotGroupsValid = false;
-        if (rawSlotGroups) {
-          try {
-            const parsed = typeof rawSlotGroups === 'string'
-              ? JSON.parse(rawSlotGroups)
-              : rawSlotGroups;
-            // Valid if at least one slot has a group assignment
-            slotGroupsValid = Object.keys(parsed).length > 0;
-          } catch { /* malformed JSON — not valid */ }
+        const assignments = parseSlotGroupAssignments(tray.slot_groups, tray.slotGroups, numSlots);
+        if (assignments) {
+          const groupsCovered = [...groups].every(group => assignments.has(group));
+          const assignedSlots = new Set([...groups].map(group => assignments.get(group)));
+          const groupsSeparated = assignedSlots.size === groups.size;
+          const cablesRespectAssignments = cables.every((cable) => {
+            const group = (cable.allowed_cable_group ?? cable.cable_group ?? '').trim();
+            if (!group || !assignments.has(group)) return true;
+            const slotIndex = cableSlotIndex(cable);
+            if (slotIndex === null) return true;
+            return slotIndex === assignments.get(group);
+          });
+          if (groupsCovered && groupsSeparated && cablesRespectAssignments) continue;
         }
-        // Also accept a slotGroups Map (from the routing system)
-        if (!slotGroupsValid && tray.slotGroups instanceof Map) {
-          slotGroupsValid = tray.slotGroups.size > 0;
-        }
-        if (slotGroupsValid) continue;
       }
 
       const trayGroup = (tray.allowed_cable_group ?? '').trim();

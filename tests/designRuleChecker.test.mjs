@@ -169,6 +169,25 @@ describe('DRC-02 Voltage Segregation', () => {
     assert.strictEqual(drc02.length, 0);
   });
 
+
+  it('does not suppress DRC-02 when slot_groups only covers one of multiple groups', () => {
+    const trays = [makeTray('T1', 5, 12, 4, { num_slots: 2, slot_groups: JSON.stringify({ 0: 'HV' }) })];
+    const cable1 = { name: 'C1', allowed_cable_group: 'HV' };
+    const cable2 = { name: 'C2', allowed_cable_group: 'LV' };
+    const { findings } = runDRC({ trays, cables: [], trayCableMap: { T1: [cable1, cable2] } });
+    const drc02 = findings.filter(f => f.ruleId === 'DRC-02');
+    assert.ok(drc02.length > 0, 'Expected DRC-02 finding for incomplete slot_groups mapping');
+  });
+
+  it('suppresses DRC-02 when every mixed group has a distinct mapped slot', () => {
+    const trays = [makeTray('T1', 5, 12, 4, { num_slots: 2, slot_groups: JSON.stringify({ 0: 'HV', 1: 'LV' }) })];
+    const cable1 = { name: 'C1', allowed_cable_group: 'HV', slot_index: 0 };
+    const cable2 = { name: 'C2', allowed_cable_group: 'LV', slot_index: 1 };
+    const { findings } = runDRC({ trays, cables: [], trayCableMap: { T1: [cable1, cable2] } });
+    const drc02 = findings.filter(f => f.ruleId === 'DRC-02');
+    assert.strictEqual(drc02.length, 0, 'Expected DRC-02 suppression for valid per-group compartment mapping');
+  });
+
   it('ignores cables with no group assigned', () => {
     const trays = [makeTray('T1', 5)];
     const cable1 = { name: 'C1', allowed_cable_group: '' };
