@@ -631,6 +631,7 @@ function computePrefaultKV(comp, comps, compMap, cache, visited = new Set()) {
   const voltageCandidates = [
     pickValue(comp, 'voltage'),
     pickValue(comp, 'volts'),
+    pickValue(comp, 'rated_kv'),
     pickValue(comp, 'voltage_class'),
     pickValue(comp, 'kV'),
     pickValue(comp, 'kv'),
