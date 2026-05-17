@@ -566,6 +566,16 @@ async function initCableSchedule() {
   };
 
   const cloneTemplates = templates => (Array.isArray(templates) ? templates.map(t => JSON.parse(JSON.stringify(t))) : []);
+  const sanitizeTemplateFieldValue = value => {
+    if (value == null) return '';
+    if (Array.isArray(value)) {
+      return value.map(item => (item == null ? '' : `${item}`)).join(', ');
+    }
+    if (typeof value === 'object') {
+      return JSON.stringify(value);
+    }
+    return value;
+  };
   const filterTemplateFields = (input = {}, options = {}) => {
     const { keepLabel = true, keepTypicalId = false } = options;
     const copy = { ...input };
@@ -580,6 +590,9 @@ async function initCableSchedule() {
     if (!keepTypicalId && Object.prototype.hasOwnProperty.call(copy, 'typical_id')) {
       delete copy.typical_id;
     }
+    Object.keys(copy).forEach(key => {
+      copy[key] = sanitizeTemplateFieldValue(copy[key]);
+    });
     return copy;
   };
   const generateTemplateId = () => {
@@ -1450,12 +1463,6 @@ async function initCableSchedule() {
         showAlertModal('Notice', 'No cable typicals to export yet.');
         return;
       }
-      const safeValue = value => {
-        if (Array.isArray(value)) {
-          return value.map(item => (item == null ? '' : `${item}`)).join(', ');
-        }
-        return value == null ? '' : value;
-      };
       const templatesForExport = this.templates.map(tpl =>
         filterTemplateFields(tpl, { keepLabel: true, keepTypicalId: true })
       );
@@ -1465,9 +1472,9 @@ async function initCableSchedule() {
           const headerRow = headerConfig.map(cfg => cfg.header);
           const rows = templatesForExport.map(tpl =>
             headerConfig.map(({ key }) => {
-              if (key === 'label') return safeValue(tpl.label);
-              if (key === 'template_id') return safeValue(tpl.template_id);
-              return safeValue(tpl[key]);
+              if (key === 'label') return sanitizeTemplateFieldValue(tpl.label);
+              if (key === 'template_id') return sanitizeTemplateFieldValue(tpl.template_id);
+              return sanitizeTemplateFieldValue(tpl[key]);
             })
           );
           const sheetData = [headerRow, ...rows];
