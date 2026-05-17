@@ -237,12 +237,34 @@ describe('sumCableWeights', () => {
     const cables = [{ conductors: 3, size: '#4 AWG' }];
     assert.strictEqual(sumCableWeights(cables), w);
   });
+
+  it('throws for negative explicit weight_lb_ft', () => {
+    const cables = [{ weight_lb_ft: -2, quantity: 1 }];
+    assert.throws(() => sumCableWeights(cables), /positive finite/);
+  });
+
+  it('throws for non-finite explicit weight_lb_ft', () => {
+    const cables = [{ weight_lb_ft: 'NaN', quantity: 1 }];
+    assert.throws(() => sumCableWeights(cables), /positive finite/);
+  });
+
+  it('throws for negative quantity', () => {
+    const cables = [{ conductors: 3, size: '#4 AWG', quantity: -1 }];
+    assert.throws(() => sumCableWeights(cables), /quantity/);
+  });
 });
 
 // ---------------------------------------------------------------------------
 // evaluateTrays
 // ---------------------------------------------------------------------------
 describe('evaluateTrays', () => {
+
+  it('flags trays with invalid cable data', () => {
+    const trays = [{ tray_id: 'T1', cables: [{ weight_lb_ft: -5, quantity: 1 }] }];
+    const [r] = evaluateTrays(trays, '16A');
+    assert.strictEqual(r.result.status, 'INVALID');
+  });
+
   it('returns one result per tray', () => {
     const trays = [
       { tray_id: 'T1', inside_width: 12, cables: [] },
