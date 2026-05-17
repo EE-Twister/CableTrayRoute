@@ -296,6 +296,35 @@ describe('runValidation - PT/VT completeness and compatibility', () => {
     const ptIssues = issues.filter(issue => issue.component === 'pt-3');
     assert.deepStrictEqual(ptIssues, []);
   });
+
+  it('flags PT/VT when consumer links via explicit pt_vt_id field', () => {
+    const components = [
+      {
+        id: 'meter-explicit',
+        type: 'meter',
+        props: {
+          voltage: 480,
+          pt_vt_id: 'pt-4'
+        }
+      },
+      {
+        id: 'pt-4',
+        subtype: 'pt_vt',
+        type: 'vt',
+        props: {
+          tag: 'PT-4',
+          primary_voltage: 12470,
+          secondary_voltage: 120,
+          accuracy_class: '0.3',
+          burden_va: 50,
+          connection_type: 'wye-grounded',
+          fuse_protection: 'yes'
+        }
+      }
+    ];
+    const issues = runValidation(components, {});
+    assert.ok(issues.some(issue => issue.component === 'pt-4' && issue.message.includes('incompatible')));
+  });
 });
 
 
