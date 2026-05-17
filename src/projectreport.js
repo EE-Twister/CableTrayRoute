@@ -181,21 +181,18 @@ function escAttr(s) {
 
 function getLatestRouteCacheState() {
   const latestState = getItem('latestRouteResults', {}) || {};
-  if (latestState.trayCableMap && Object.keys(latestState.trayCableMap).length) {
-    return latestState;
+
+  const trayCableMap = latestState && typeof latestState === 'object'
+    ? latestState.trayCableMap
+    : null;
+
+  if (!trayCableMap || typeof trayCableMap !== 'object' || Array.isArray(trayCableMap)) {
+    return {};
   }
 
-  for (const storage of [sessionStorage, localStorage]) {
-    for (const key of Object.keys(storage)) {
-      if (!key.includes('route-')) continue;
-      try {
-        const parsed = JSON.parse(storage.getItem(key));
-        if (parsed && parsed.trayCableMap) return parsed;
-      } catch {
-        // Skip malformed cache entries.
-      }
-    }
-  }
+  const entries = Object.entries(trayCableMap);
+  if (!entries.length) return {};
+  if (!entries.every(([, cables]) => Array.isArray(cables))) return {};
 
   return latestState;
 }
@@ -205,7 +202,9 @@ function loadProjectData() {
   const trays = getTrays();
   const conduits = getConduits();
   const routeState = getLatestRouteCacheState();
-  const routedCableNames = routeState.routedCableNames || (routeState.batchResults || [])
+  const routedCableNames = Array.isArray(routeState.routedCableNames)
+    ? routeState.routedCableNames
+    : (routeState.batchResults || [])
     .filter(r => r.cable && r.status && r.status.includes('Routed'))
     .map(r => r.cable);
   const drcRun = runDRC({
