@@ -1069,6 +1069,40 @@ describe('runValidation - generator required attributes', () => {
     ];
     assert.deepStrictEqual(runValidation(components, {}), []);
   });
+
+  it('flags a generator when top-level study fields conflict with valid props values', () => {
+    const components = [
+      {
+        id: 'gen-3',
+        type: 'generator',
+        subtype: 'synchronous',
+        rated_mva: 0,
+        xdpp_pu: 0,
+        props: {
+          tag: 'GEN-3',
+          description: 'Generator with conflicting fields',
+          manufacturer: 'Generic',
+          model: 'G-100',
+          rated_mva: 1.2,
+          rated_kv: 0.48,
+          xdpp_pu: 0.2,
+          xdp_pu: 0.3,
+          xd_pu: 1.6,
+          h_constant_s: 3.5,
+          governor_mode: 'droop',
+          avr_mode: 'automatic',
+          min_kw: 0,
+          max_kw: 1000,
+          ramp_kw_per_min: 60
+        }
+      }
+    ];
+    const issues = runValidation(components, {});
+    const generatorIssue = issues.find(issue => issue.component === 'gen-3');
+    assert.ok(generatorIssue);
+    assert.ok(generatorIssue.message.includes('rated_mva'));
+    assert.ok(generatorIssue.message.includes('xdpp_pu'));
+  });
 });
 
 describe('runValidation - capacitor/reactor tuning attributes', () => {

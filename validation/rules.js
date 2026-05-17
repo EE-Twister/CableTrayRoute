@@ -517,31 +517,36 @@ export function runValidation(components = [], studies = {}) {
     const type = `${c?.type ?? ''}`.trim().toLowerCase();
     const isGenerator = type === 'generator' || subtype === 'generator' || subtype === 'synchronous' || subtype === 'asynchronous';
     if (!isGenerator) return;
-    const props = c.props && typeof c.props === 'object' ? c.props : c;
+    const props = c.props && typeof c.props === 'object' ? c.props : {};
+    const getGeneratorValue = key => (
+      c && Object.prototype.hasOwnProperty.call(c, key)
+        ? c[key]
+        : props[key]
+    );
     const missing = [];
-    if (!`${props.tag ?? ''}`.trim()) missing.push('tag');
-    if (!`${props.description ?? ''}`.trim()) missing.push('description');
-    if (!`${props.manufacturer ?? ''}`.trim()) missing.push('manufacturer');
-    if (!`${props.model ?? ''}`.trim()) missing.push('model');
-    const ratedMva = Number(props.rated_mva);
+    if (!`${getGeneratorValue('tag') ?? ''}`.trim()) missing.push('tag');
+    if (!`${getGeneratorValue('description') ?? ''}`.trim()) missing.push('description');
+    if (!`${getGeneratorValue('manufacturer') ?? ''}`.trim()) missing.push('manufacturer');
+    if (!`${getGeneratorValue('model') ?? ''}`.trim()) missing.push('model');
+    const ratedMva = Number(getGeneratorValue('rated_mva'));
     if (!Number.isFinite(ratedMva) || ratedMva <= 0) missing.push('rated_mva');
-    const ratedKv = Number(props.rated_kv);
+    const ratedKv = Number(getGeneratorValue('rated_kv'));
     if (!Number.isFinite(ratedKv) || ratedKv <= 0) missing.push('rated_kv');
-    const xdppPu = Number(props.xdpp_pu);
+    const xdppPu = Number(getGeneratorValue('xdpp_pu'));
     if (!Number.isFinite(xdppPu) || xdppPu <= 0) missing.push('xdpp_pu');
-    const xdpPu = Number(props.xdp_pu);
+    const xdpPu = Number(getGeneratorValue('xdp_pu'));
     if (!Number.isFinite(xdpPu) || xdpPu <= 0) missing.push('xdp_pu');
-    const xdPu = Number(props.xd_pu);
+    const xdPu = Number(getGeneratorValue('xd_pu'));
     if (!Number.isFinite(xdPu) || xdPu <= 0) missing.push('xd_pu');
-    const hConstant = Number(props.h_constant_s);
+    const hConstant = Number(getGeneratorValue('h_constant_s'));
     if (!Number.isFinite(hConstant) || hConstant <= 0) missing.push('h_constant_s');
-    if (!`${props.governor_mode ?? ''}`.trim()) missing.push('governor_mode');
-    if (!`${props.avr_mode ?? ''}`.trim()) missing.push('avr_mode');
-    const minKw = Number(props.min_kw);
+    if (!`${getGeneratorValue('governor_mode') ?? ''}`.trim()) missing.push('governor_mode');
+    if (!`${getGeneratorValue('avr_mode') ?? ''}`.trim()) missing.push('avr_mode');
+    const minKw = Number(getGeneratorValue('min_kw'));
     if (!Number.isFinite(minKw) || minKw < 0) missing.push('min_kw');
-    const maxKw = Number(props.max_kw);
+    const maxKw = Number(getGeneratorValue('max_kw'));
     if (!Number.isFinite(maxKw) || maxKw <= 0 || (Number.isFinite(minKw) && minKw > maxKw)) missing.push('max_kw');
-    const rampKwPerMin = Number(props.ramp_kw_per_min);
+    const rampKwPerMin = Number(getGeneratorValue('ramp_kw_per_min'));
     if (!Number.isFinite(rampKwPerMin) || rampKwPerMin <= 0) missing.push('ramp_kw_per_min');
     if (missing.length) {
       issues.push({
