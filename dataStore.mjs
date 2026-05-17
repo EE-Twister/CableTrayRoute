@@ -631,6 +631,11 @@ function ensureLoadFields(load) {
     l.kw = l.power;
     delete l.power;
   }
+  const hasKw = typeof l.kw === 'string' ? l.kw.trim() !== '' : l.kw != null && l.kw !== '';
+  if ('watts' in l && !hasKw) {
+    const watts = Number.parseFloat(l.watts);
+    if (!Number.isNaN(watts)) l.kw = watts / 1000;
+  }
   return {
     id: '',
     ref: '',
