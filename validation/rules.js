@@ -356,8 +356,10 @@ export function runValidation(components = [], studies = {}) {
 
   // Panel required field completeness for panel studies and reports
   components.forEach(c => {
+    const type = `${c?.type ?? ''}`.trim().toLowerCase();
     const subtype = `${c?.subtype ?? ''}`.trim().toLowerCase();
-    const isPanel = (c?.type === 'panel' || subtype === 'panel') && subtype !== 'mcc';
+    const isMcc = type === 'mcc' || subtype === 'mcc' || subtype.endsWith('_mcc');
+    const isPanel = (type === 'panel' || subtype === 'panel' || subtype.startsWith('panel_')) && !isMcc;
     if (!isPanel) return;
     const props = c.props && typeof c.props === 'object' ? c.props : c;
     const missing = [];
@@ -387,7 +389,9 @@ export function runValidation(components = [], studies = {}) {
 
   // MCC required field completeness for lineup and study metadata
   components.forEach(c => {
-    const isMcc = c?.subtype === 'mcc' || c?.type === 'mcc';
+    const type = `${c?.type ?? ''}`.trim().toLowerCase();
+    const subtype = `${c?.subtype ?? ''}`.trim().toLowerCase();
+    const isMcc = type === 'mcc' || subtype === 'mcc' || subtype.endsWith('_mcc');
     if (!isMcc) return;
     const props = c.props && typeof c.props === 'object' ? c.props : c;
     const missing = [];
