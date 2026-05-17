@@ -95,6 +95,8 @@ const PREVIEW_SHAPE_DASH_PATTERNS = {
   dashed: '8 4',
   dotted: '2 2'
 };
+const MAX_PREVIEW_ANNOTATION_TEXT_LENGTH = 4000;
+const MAX_PREVIEW_ANNOTATION_LINES = 24;
 
 const clampValue = (value, min, max) => {
   if (!Number.isFinite(value)) return min;
@@ -135,7 +137,8 @@ function normalizeAnnotationPreview(comp) {
   const fillColor = typeof pick('fillColor') === 'string' && pick('fillColor').trim()
     ? pick('fillColor').trim()
     : '#ffffff';
-  const text = typeof pick('text') === 'string' ? pick('text') : (typeof comp.text === 'string' ? comp.text : '');
+  const rawText = typeof pick('text') === 'string' ? pick('text') : (typeof comp.text === 'string' ? comp.text : '');
+  const text = rawText.slice(0, MAX_PREVIEW_ANNOTATION_TEXT_LENGTH);
   return {
     subtype,
     shapeType,
@@ -147,6 +150,16 @@ function normalizeAnnotationPreview(comp) {
     cornerRadius,
     text
   };
+}
+
+function buildAnnotationPreviewLines(content) {
+  if (!content) return [];
+  return content
+    .slice(0, MAX_PREVIEW_ANNOTATION_TEXT_LENGTH)
+    .split(/\r?\n/, MAX_PREVIEW_ANNOTATION_LINES)
+    .map(line => line.trim())
+    .filter(Boolean)
+    .slice(0, MAX_PREVIEW_ANNOTATION_LINES);
 }
 
 function buildComponentPreviewDefinitionMap() {
@@ -8498,9 +8511,7 @@ function renderOneLinePreview(componentId) {
         .attr('rx', 8)
         .attr('ry', 8);
       const content = (config.text && config.text.trim()) || datum.label || '';
-      const lines = content
-        ? content.split(/\r?\n/).map(line => line.trim()).filter(Boolean)
-        : [];
+      const lines = buildAnnotationPreviewLines(content);
       if (lines.length) {
         const textEl = group.append('text')
           .attr('class', 'preview-annotation-text')
