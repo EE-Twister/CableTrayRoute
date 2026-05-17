@@ -870,13 +870,13 @@ export async function createApp(options = {}) {
     // styles because the existing codebase relies on inline handlers; this
     // still blocks external script injection, javascript: URIs, data: scripts,
     // and loading resources from untrusted origins.
-    // Remaining external script sources are limited to pages that still use
-    // Plotly/PapaParse from CDNs; core study/runtime libraries are local.
+    // Keep script execution restricted to same-origin code so third-party CDN
+    // supply-chain changes cannot run in the application origin.
     res.setHeader(
       'Content-Security-Policy',
       [
         "default-src 'self'",
-        "script-src 'self' 'unsafe-inline' https://cdn.plot.ly https://cdnjs.cloudflare.com",
+        "script-src 'self' 'unsafe-inline'",
         "style-src 'self' 'unsafe-inline'",
         "img-src 'self' data: blob:",
         "connect-src 'self'",
