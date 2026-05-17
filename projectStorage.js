@@ -372,9 +372,20 @@ function listPrefixedKeys(prefix) {
   return [...keys];
 }
 
+const SCENARIO_NAME_MAX_LENGTH = 64;
+const SCENARIO_NAME_PATTERN = /^[A-Za-z0-9_-]+$/;
+
 function sanitizeScenarioName(name) {
   if (typeof name !== 'string') return '';
-  return name.trim();
+  const trimmed = name.trim();
+  if (!trimmed) return '';
+  if (trimmed.length > SCENARIO_NAME_MAX_LENGTH) return '';
+  if (!SCENARIO_NAME_PATTERN.test(trimmed)) return '';
+  return trimmed;
+}
+
+export function isValidScenarioName(name) {
+  return sanitizeScenarioName(name) === name;
 }
 
 function ensureScenarioList(list) {

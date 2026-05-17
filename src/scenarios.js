@@ -1,4 +1,5 @@
 import { listScenarios, getCurrentScenario, switchScenario, cloneScenario, getOneLine, getRevisions, restoreRevision, getCablesForScenario } from '../dataStore.mjs';
+import { isValidScenarioName } from '../projectStorage.js';
 import { showAlertModal, openModal } from './components/modal.js';
 
 function ensureDefaults() {
@@ -177,6 +178,10 @@ function initScenarioUI() {
   dupBtn?.addEventListener('click', () => {
     const name = prompt('New scenario name');
     if (name) {
+      if (!isValidScenarioName(name)) {
+        showAlertModal('Invalid Scenario Name', 'Use 1-64 characters: letters, numbers, hyphen (-), or underscore (_).');
+        return;
+      }
       cloneScenario(name);
       populateSelect(select);
       select.value = name;
