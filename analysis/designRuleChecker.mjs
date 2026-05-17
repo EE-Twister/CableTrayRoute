@@ -347,6 +347,15 @@ function hasCircuitSpecificOcpdAllowance(cable) {
   return /\b(motor|hvac|air conditioning|refrigeration|transformer|tap)\b/.test(text);
 }
 
+function normalizedCableType(cable) {
+  return (cable.cable_type ?? cable.type ?? '').toLowerCase();
+}
+
+function isPowerCable(cable) {
+  const cableType = normalizedCableType(cable);
+  return cableType === '' || cableType === 'power' || cableType === 'pwr';
+}
+
 // ---------------------------------------------------------------------------
 // Rule implementations
 // ---------------------------------------------------------------------------
@@ -519,8 +528,7 @@ function checkAmpacity(cables, trayCableMap) {
     if (!name) continue;
 
     // Only check power cables (not control/signal — those are not ampacity-rated)
-    const cableType = (cable.cable_type ?? cable.type ?? '').toLowerCase();
-    if (cableType && cableType !== 'power' && cableType !== 'pwr') continue;
+    if (!isPowerCable(cable)) continue;
 
     const ratedAmpacity =
       parseFloat(cable.ampacity) ||
@@ -538,8 +546,7 @@ function checkAmpacity(cables, trayCableMap) {
       const cohabitants = trayCableMap.get(trayId) ?? [];
       // Count current-carrying conductors (power cables × conductors × parallel sets)
       const conductorCount = cohabitants.reduce((sum, c) => {
-        const type = (c.cable_type ?? c.type ?? '').toLowerCase();
-        if (type && type !== 'power' && type !== 'pwr') return sum;
+        if (!isPowerCable(c)) return sum;
         const conductors = parseInt(c.conductors, 10) || 3;
         const parallelSets = Math.max(1, parseInt(c.parallel_count) || 1);
         return sum + conductors * parallelSets;
@@ -665,8 +672,7 @@ function checkGrounding(cables) {
   for (const cable of cables) {
     const name = cable.name ?? cable.tag;
     if (!name) continue;
-    const cableType = (cable.cable_type ?? cable.type ?? '').toLowerCase();
-    if (cableType && cableType !== 'power' && cableType !== 'pwr') continue;
+    if (!isPowerCable(cable)) continue;
 
     const egcRaw = firstDefinedText(cable, EGC_SIZE_FIELDS);
     const egcSize = normalizeEgcSize(egcRaw);
@@ -748,8 +754,7 @@ function checkOcpdProtection(cables) {
   for (const cable of cables) {
     const name = cable.name ?? cable.tag;
     if (!name) continue;
-    const cableType = (cable.cable_type ?? cable.type ?? '').toLowerCase();
-    if (cableType && cableType !== 'power' && cableType !== 'pwr') continue;
+    if (!isPowerCable(cable)) continue;
 
     const ocpdRating = cableOcpdRating(cable);
     if (!ocpdRating) continue;
@@ -968,17 +973,15 @@ function checkDataCableSegregation(trayCableMap) {
   const findings = [];
   for (const [trayId, cables] of trayCableMap) {
     if (cables.length < 2) continue;
-    const hasPower = cables.some(c =>
-      (c.cable_type ?? c.type ?? '').toLowerCase() === 'power'
-    );
+    const hasPower = cables.some(c => isPowerCable(c));
     const hasStructured = cables.some(c => {
-      const t = (c.cable_type ?? c.type ?? '').toLowerCase();
+      const t = normalizedCableType(c);
       return t === 'data' || t === 'fiber';
     });
     if (!hasPower || !hasStructured) continue;
     const structuredNames = cables
       .filter(c => {
-        const t = (c.cable_type ?? c.type ?? '').toLowerCase();
+        const t = normalizedCableType(c);
         return t === 'data' || t === 'fiber';
       })
       .map(c => c.name ?? c.tag)
