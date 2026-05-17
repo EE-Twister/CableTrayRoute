@@ -226,7 +226,7 @@ async function initCableSchedule() {
     {key:'install_method',label:'Install Method',type:'select',options:installMethods,group:'Cable Construction',tooltip:'Installation method'},
     {key:'insulation_type',label:'Insulation Type',type:'select',options:Object.keys(INSULATION_TEMP_LIMIT),group:'Cable Construction',tooltip:'Insulation material type'},
     {key:'insulation_rating',label:'Insul Rating (°C)',type:'select',options:insulationRatings,group:'Cable Construction',tooltip:'Maximum temperature rating of insulation'},
-    {key:'parallel_count',label:'Parallel Runs',type:'number',group:'Cable Construction',tooltip:'Number of identical cables run in parallel for this circuit (e.g. 3 × 240 kcmil in parallel). Tray fill and ampacity are multiplied by this count.'},
+    {key:'parallel_count',label:'Parallel Runs',type:'number',group:'Cable Construction',min:1,step:1,tooltip:'Number of identical cables run in parallel for this circuit (e.g. 3 × 240 kcmil in parallel). Tray fill and ampacity are multiplied by this count.'},
     {key:'operating_voltage',label:'Operating Voltage (V)',type:'number',group:'Electrical Entry',tooltip:'Nominal operating voltage'},
     {key:'est_load',label:'Est Load (A)',type:'number',group:'Electrical Entry',tooltip:'Estimated operating current'},
     {key:'ocpd_rating',label:'OCPD Rating (A)',type:'number',group:'Electrical Entry',tooltip:'Overcurrent protective device rating used for NEC 240.4/250.122 screening'},

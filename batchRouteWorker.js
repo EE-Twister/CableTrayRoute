@@ -2,6 +2,7 @@ importScripts('routeWorker.js');
 
 let state = null;
 let cancel = false;
+const getParallelCount = (value) => Math.max(1, Number.parseInt(value, 10) || 1);
 
 function processFrom(index) {
     const { system, cables, results, allRoutes } = state;
@@ -18,7 +19,7 @@ function processFrom(index) {
         }
 
         const cable = cables[i];
-        const cableArea = Math.PI * (cable.diameter / 2) ** 2 * (parseInt(cable.parallel_count) || 1);
+        const cableArea = Math.PI * (cable.diameter / 2) ** 2 * getParallelCount(cable.parallel_count);
         const routeStart = performance.now();
         const result = system.calculateRoute(
             cable.start,
@@ -83,7 +84,7 @@ self.onmessage = function(e) {
         cancel = false;
         cables.forEach((c, idx) => {
             if (c.locked && Array.isArray(c.route_segments) && c.route_segments.length) {
-                const area = Math.PI * (c.diameter / 2) ** 2 * (parseInt(c.parallel_count) || 1);
+                const area = Math.PI * (c.diameter / 2) ** 2 * getParallelCount(c.parallel_count);
                 const traySegs = c.route_segments.filter(seg => seg.tray_id).map(seg => seg.tray_id);
                 system.updateTrayFill(traySegs, area);
                 system.recordSharedFieldSegments(c.route_segments);
@@ -124,4 +125,3 @@ self.onmessage = function(e) {
         }
     }
 };
-
