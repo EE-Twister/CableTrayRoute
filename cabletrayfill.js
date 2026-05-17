@@ -364,7 +364,7 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
         const compLabel = compartments.length > 1 ? ' (worst compartment)' : '';
         fillSummaryEl.textContent = `Total Cable Area: ${totalArea.toFixed(2)} in², Fill: ${worstFill.toFixed(1)}%${compLabel}`;
         fillSummaryEl.style.color = worstFill > allow ? 'var(--color-error)' : '';
-        trayGauge.update(worstFill);
+        trayGauge.update(worstFill, allow);
         updateTrayFillStatus(worstFill, allow);
         return { totalArea, fillP: worstFill, allow };
       }

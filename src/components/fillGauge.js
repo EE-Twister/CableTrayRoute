@@ -20,7 +20,7 @@ const DEFAULT_ZONES = [
  * @param {number} [options.strokeWidth=18]    - Arc stroke width.
  * @param {string} [options.label='Fill %']    - Label shown below numeric value.
  * @param {Array}  [options.zones]             - Color zone thresholds.
- * @returns {{ update: function(number): void }}
+ * @returns {{ update: function(number, number=): void }}
  */
 export function createFillGauge(containerId, options = {}) {
   const {
@@ -111,9 +111,9 @@ export function createFillGauge(containerId, options = {}) {
   container.appendChild(svg);
 
   // ── Public API ────────────────────────────────────────────────────────────
-  function update(percentage) {
+  function update(percentage, allowedLimit = null) {
     const pct = Math.max(0, percentage);
-    const color = getZoneColor(pct, zones);
+    const color = getColorForValue(pct, zones, allowedLimit);
 
     if (pct <= 0) {
       fillArc.setAttribute('d', `M ${cx - r} ${cy} L ${cx - r} ${cy}`);
@@ -159,4 +159,13 @@ function getZoneColor(pct, zones) {
     if (pct <= zone.limit) return zone.color;
   }
   return zones[zones.length - 1].color;
+}
+
+function getColorForValue(pct, zones, allowedLimit) {
+  if (!Number.isFinite(allowedLimit) || allowedLimit <= 0) {
+    return getZoneColor(pct, zones);
+  }
+  if (pct > allowedLimit) return '#dc3545';
+  if (pct > allowedLimit * 0.9) return '#ffc107';
+  return '#28a745';
 }
