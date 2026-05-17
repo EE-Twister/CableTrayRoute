@@ -1816,23 +1816,44 @@ function formatOptionLabel(value) {
 }
 
 function formatDetailValue(value) {
-  if (value === null || value === undefined) return '';
-  if (Array.isArray(value)) {
-    return value
-      .map(item => formatDetailValue(item))
-      .filter(str => str)
-      .join(', ');
-  }
-  if (typeof value === 'boolean') {
-    return value ? 'Yes' : 'No';
-  }
-  if (typeof value === 'number') {
-    return formatSettingValue(value);
-  }
-  if (typeof value === 'string') {
-    return value.trim();
-  }
-  return '';
+  const MAX_ARRAY_DEPTH = 8;
+  const MAX_ARRAY_ITEMS = 100;
+  const MAX_OUTPUT_LENGTH = 1000;
+
+  const trimOutput = str => {
+    if (!str) return '';
+    if (str.length <= MAX_OUTPUT_LENGTH) return str;
+    return `${str.slice(0, MAX_OUTPUT_LENGTH - 1)}…`;
+  };
+
+  const walk = (current, depth, seen) => {
+    if (current === null || current === undefined) return '';
+    if (Array.isArray(current)) {
+      if (depth >= MAX_ARRAY_DEPTH || seen.has(current)) return '[…]';
+      seen.add(current);
+      const parts = [];
+      const maxItems = Math.min(current.length, MAX_ARRAY_ITEMS);
+      for (let idx = 0; idx < maxItems; idx += 1) {
+        const part = walk(current[idx], depth + 1, seen);
+        if (part) parts.push(part);
+      }
+      if (current.length > MAX_ARRAY_ITEMS) parts.push('…');
+      seen.delete(current);
+      return trimOutput(parts.join(', '));
+    }
+    if (typeof current === 'boolean') {
+      return current ? 'Yes' : 'No';
+    }
+    if (typeof current === 'number') {
+      return formatSettingValue(current);
+    }
+    if (typeof current === 'string') {
+      return current.trim();
+    }
+    return '';
+  };
+
+  return walk(value, 0, new Set());
 }
 
 function normalizeSettingOptions(options) {
