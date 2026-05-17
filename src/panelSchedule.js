@@ -1042,8 +1042,10 @@ export function assignLoadToBreaker(panelId, loadIndex, breaker) {
  * @returns {{connectedKva:number,connectedKw:number,demandKva:number,demandKw:number}}
  */
 export function calculatePanelTotals(panelId) {
+  const panels = dataStore.getPanels();
+  const panel = findPanelByIdentifier(panels, panelId);
   const loads = dataStore.getLoads().filter(l => l.panelId === panelId);
-  return loads.reduce((acc, l) => {
+  const totals = loads.reduce((acc, l) => {
     const cKva = parseFloat(l.kva) || 0;
     const cKw = parseFloat(l.kw) || 0;
     const dKva = parseFloat(l.demandKva) || cKva;
@@ -1054,6 +1056,33 @@ export function calculatePanelTotals(panelId) {
     acc.demandKw += dKw;
     return acc;
   }, { connectedKva: 0, connectedKw: 0, demandKva: 0, demandKw: 0 });
+
+  if (!panel) return totals;
+  const breakerDetails = ensureBreakerDetails(panel);
+  let customVaTotal = 0;
+  Object.values(breakerDetails).forEach(detail => {
+    if (!detail || detail.loadVaPerPhase == null) return;
+    if (detail.loadVaPerPhase && typeof detail.loadVaPerPhase === "object" && !Array.isArray(detail.loadVaPerPhase)) {
+      Object.values(detail.loadVaPerPhase).forEach(value => {
+        const parsed = parseFloat(value);
+        if (Number.isFinite(parsed) && parsed > 0) {
+          customVaTotal += parsed;
+        }
+      });
+      return;
+    }
+    const parsed = parseFloat(detail.loadVaPerPhase);
+    if (Number.isFinite(parsed) && parsed > 0) {
+      customVaTotal += parsed;
+    }
+  });
+
+  if (customVaTotal > 0) {
+    const customKva = customVaTotal / 1000;
+    totals.connectedKva += customKva;
+    totals.demandKva += customKva;
+  }
+  return totals;
 }
 
 const COLUMN_HEADERS = {
