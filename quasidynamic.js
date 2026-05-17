@@ -426,6 +426,12 @@ document.addEventListener('DOMContentLoaded', () => {
   // ---------------------------------------------------------------------------
   // CSV export
   // ---------------------------------------------------------------------------
+  function encodeCsvCell(value) {
+    const raw = value == null ? '' : String(value);
+    const neutralized = /^[=+\-@]/.test(raw) ? `'${raw}` : raw;
+    return `"${neutralized.replaceAll('"', '""')}"`;
+  }
+
   function exportCsv(result) {
     const rows = ['hour,loadScale,genScale,converged,totalLoadKw,totalLossKw'];
     for (const t of result.timeSeries) {
@@ -435,7 +441,7 @@ document.addEventListener('DOMContentLoaded', () => {
     rows.push('Bus voltage envelope:');
     rows.push('busId,busLabel,maxVm_pu,minVm_pu,maxResult,minResult');
     for (const b of result.busEnvelope) {
-      rows.push(`${b.id},${escapeHtml(b.label)},${b.maxVm.toFixed(4)},${b.minVm.toFixed(4)},${b.maxRisk},${b.minRisk}`);
+      rows.push(`${encodeCsvCell(b.id)},${encodeCsvCell(b.label)},${b.maxVm.toFixed(4)},${b.minVm.toFixed(4)},${b.maxRisk},${b.minRisk}`);
     }
     const blob = new Blob([rows.join('\n')], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
