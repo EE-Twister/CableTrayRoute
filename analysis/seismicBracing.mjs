@@ -185,6 +185,9 @@ export function calcComponentForceFactor(params) {
 export function calcBraceForces(params) {
   const { sds, sd1, riskCategory, wp, z, h } = params;
   const ip = params.ip ?? 1.0;
+  if (!Number.isFinite(wp) || wp <= 0) {
+    throw new Error('wp must be a finite positive number (lbs/ft).');
+  }
 
   const sdc = calcSeismicDesignCategory(sds, sd1, riskCategory);
   const spacing = maxBraceSpacing(sdc);

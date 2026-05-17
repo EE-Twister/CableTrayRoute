@@ -312,6 +312,26 @@ describe('calcBraceForces — Ip=1.5 increases forces', () => {
   });
 });
 
+describe('calcBraceForces — wp validation', () => {
+  const base = {
+    sds: 0.6, sd1: 0.25, riskCategory: 'II', z: 10, h: 30,
+  };
+
+  it('throws for negative wp', () => {
+    assert.throws(
+      () => calcBraceForces({ ...base, wp: -1 }),
+      /wp/i
+    );
+  });
+
+  it('throws for non-finite wp', () => {
+    assert.throws(
+      () => calcBraceForces({ ...base, wp: Number.POSITIVE_INFINITY }),
+      /wp/i
+    );
+  });
+});
+
 // ---------------------------------------------------------------------------
 // evaluateTraysBracing
 // ---------------------------------------------------------------------------
