@@ -163,10 +163,12 @@ export function sumCableWeights(cables) {
     }
 
     // Otherwise look up in the built-in table
-    const conductors = cable.conductors != null ? String(cable.conductors) : null;
     const size = (cable.size ?? cable.conductor_size) != null
       ? String(cable.size ?? cable.conductor_size)
       : null;
+    const conductors = cable.conductors != null
+      ? String(cable.conductors)
+      : (size ? '3' : null);
     const key = conductors && size ? `${conductors}C-${size}` : null;
     const unitWeight = (key && CABLE_WEIGHT_LB_FT[key]) || 0;
     return total + qty * unitWeight;
