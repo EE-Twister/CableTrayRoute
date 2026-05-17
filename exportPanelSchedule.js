@@ -1,6 +1,9 @@
 import * as dataStore from './dataStore.mjs';
 import { showAlertModal } from './src/components/modal.js';
 
+const DEFAULT_PANEL_CIRCUIT_COUNT = 42;
+const MAX_PANEL_CIRCUITS = 512;
+
 function parsePositiveInt(value) {
   if (value == null) return null;
   const parsed = Number.parseInt(value, 10);
@@ -9,9 +12,9 @@ function parsePositiveInt(value) {
 
 function getPanelCircuitCount(panel) {
   const explicit = parsePositiveInt(panel?.circuitCount || panel?.circuit_count);
-  if (explicit) return explicit;
-  if (Array.isArray(panel?.breakers)) return panel.breakers.length;
-  return 42;
+  if (explicit) return Math.min(explicit, MAX_PANEL_CIRCUITS);
+  if (Array.isArray(panel?.breakers) && panel.breakers.length > 0) return Math.min(panel.breakers.length, MAX_PANEL_CIRCUITS);
+  return DEFAULT_PANEL_CIRCUIT_COUNT;
 }
 
 function getPanelSystem(panel) {

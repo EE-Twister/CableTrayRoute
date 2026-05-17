@@ -397,11 +397,20 @@ export const addRaceway = raceway => {
  * @returns {GenericRecord[]}
  */
 export const getPanels = () => read(KEYS.panels, []);
+
+const DEFAULT_PANEL_CIRCUIT_COUNT = 42;
+const MAX_PANEL_CIRCUITS = 512;
+
+function normalizePanelCircuitCount(value) {
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed) || parsed < 1) return DEFAULT_PANEL_CIRCUIT_COUNT;
+  return Math.min(parsed, MAX_PANEL_CIRCUITS);
+}
 /**
  * @param {GenericRecord} panel
  */
 function ensurePanelFields(panel) {
-  return {
+  const normalized = {
     id: '',
     description: '',
     ref: '',
@@ -411,9 +420,11 @@ function ensurePanelFields(panel) {
     phases: '',
     notes: '',
     mainRating: '',
-    circuitCount: 42,
+    circuitCount: DEFAULT_PANEL_CIRCUIT_COUNT,
     ...panel
   };
+  normalized.circuitCount = normalizePanelCircuitCount(normalized.circuitCount);
+  return normalized;
 }
 /**
  * @param {GenericRecord[]} panels
