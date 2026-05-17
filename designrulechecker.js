@@ -5,7 +5,7 @@
  * raceway data and displays findings grouped by severity.
  */
 import { runDRC, formatDrcReport, DRC_SEVERITY } from './analysis/designRuleChecker.mjs';
-import { getTrays, getConduits, getCables, getDrcAcceptedFindings, setDrcAcceptedFindings } from './dataStore.mjs';
+import { getTrays, getConduits, getCables, getItem, getDrcAcceptedFindings, setDrcAcceptedFindings } from './dataStore.mjs';
 import { openModal } from './src/components/modal.js';
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -147,27 +147,25 @@ document.addEventListener('DOMContentLoaded', () => {
     const conduits = getConduits() || [];
     const cables   = getCables()   || [];
 
-    // Route cache is written under a content-addressed key (route-<hash>) by app.mjs via dataStore.
-    // Scan sessionStorage first (in-session results), then localStorage for any matching entry.
+    // Use the route state published by the router instead of scanning arbitrary storage keys.
     let trayCableMap = {};
     let routedCableNames = new Set();
     try {
-      let cachedEntry = null;
-      for (const storage of [sessionStorage, localStorage]) {
-        for (const key of Object.keys(storage)) {
-          if (key.includes('route-')) {
-            try {
-              const parsed = JSON.parse(storage.getItem(key));
-              if (parsed && parsed.trayCableMap) { cachedEntry = parsed; break; }
-            } catch { /* skip malformed entry */ }
+      const latestRouteResults = getItem('latestRouteResults', null);
+      const hasValidMap = latestRouteResults
+        && typeof latestRouteResults === 'object'
+        && latestRouteResults.trayCableMap
+        && typeof latestRouteResults.trayCableMap === 'object'
+        && !Array.isArray(latestRouteResults.trayCableMap);
+      const batchResults = Array.isArray(latestRouteResults?.batchResults)
+        ? latestRouteResults.batchResults
+        : [];
+      if (hasValidMap) {
+        trayCableMap = latestRouteResults.trayCableMap;
+        batchResults.forEach(r => {
+          if (r && typeof r === 'object' && r.cable && typeof r.status === 'string' && r.status.includes('Routed')) {
+            routedCableNames.add(r.cable);
           }
-        }
-        if (cachedEntry) break;
-      }
-      if (cachedEntry) {
-        trayCableMap = cachedEntry.trayCableMap || {};
-        (cachedEntry.batchResults || []).forEach(r => {
-          if (r.cable && r.status && r.status.includes('Routed')) routedCableNames.add(r.cable);
         });
       }
     } catch (e) {
