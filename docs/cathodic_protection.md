@@ -99,7 +99,7 @@ Acceptance checks now evaluate **corrected** values and retain raw values in out
 - For `coupon` tests with supplied depolarization: `V_corrected = V_raw + |ΔV_coupon|`
 - For coupon workflows with missing explicit polarization shift, the shift defaults to `|ΔV_coupon|`
 
-When required metadata is missing (unknown context/location, no compensation value for ON/coupon methods, or compensation explicitly set to `none`), the study reports validation warnings so acceptance decisions can be reviewed with caution.
+When required metadata is missing (unknown context/location, no compensation value for ON/coupon methods, or compensation explicitly set to `none`), the study reports validation warnings so acceptance decisions can be reviewed with caution. In addition, `on-potential` requires `ΔV_IR > 0` and `coupon` requires `ΔV_coupon > 0` at validation time so default/zero correction values cannot be treated as corrected evidence.
 
 ## Assumptions and Limits
 
