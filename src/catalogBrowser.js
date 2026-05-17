@@ -19,19 +19,35 @@ const CATALOG_URL = 'data/manufacturer_catalog.json';
 
 let catalogCache = null;
 
+function normalizeCustomProduct(product) {
+  if (!product || typeof product !== 'object') return null;
+  const id = String(product.id || '').trim();
+  if (!id) return null;
+  return {
+    ...product,
+    id,
+  };
+}
+
 function getCustomProducts() {
   const stored = getTrayHardwareCatalogCustomProducts();
-  return Array.isArray(stored) ? stored : [];
+  if (!Array.isArray(stored)) return [];
+  return stored.map(normalizeCustomProduct).filter(Boolean);
 }
 
 function setCustomProducts(products) {
-  setTrayHardwareCatalogCustomProducts(Array.isArray(products) ? products : []);
+  const normalized = Array.isArray(products)
+    ? products.map(normalizeCustomProduct).filter(Boolean)
+    : [];
+  setTrayHardwareCatalogCustomProducts(normalized);
 }
 
 function mergeCatalogProducts(base, custom) {
   const byId = new Map();
   for (const product of base) byId.set(product.id, product);
-  for (const product of custom) byId.set(product.id, product);
+  for (const product of custom) {
+    if (!byId.has(product.id)) byId.set(product.id, product);
+  }
   return [...byId.values()];
 }
 
