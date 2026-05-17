@@ -845,22 +845,17 @@ class CableRoutingSystem {
             }
         });
         
-        // 2. A* Search Algorithm
-        const heuristic = (node) =>
-            this.manhattanDistance(graph.nodes[node].point, graph.nodes['end'].point);
+        // 2. Dijkstra Search Algorithm
         const distances = {};
         const prev = {};
         Object.keys(graph.nodes).forEach(node => (distances[node] = Infinity));
         distances['start'] = 0;
 
         const pq = new MinHeap();
-        pq.push('start', heuristic('start'));
-        const visited = new Set();
+        pq.push('start', 0);
 
         while (!pq.isEmpty()) {
             const u = pq.pop();
-            if (visited.has(u)) continue;
-            visited.add(u);
             if (u === 'end') break;
 
             for (const v in graph.edges[u]) {
@@ -869,7 +864,7 @@ class CableRoutingSystem {
                 if (alt < distances[v]) {
                     distances[v] = alt;
                     prev[v] = { node: u, edge };
-                    pq.push(v, alt + heuristic(v));
+                    pq.push(v, alt);
                 }
             }
         }
