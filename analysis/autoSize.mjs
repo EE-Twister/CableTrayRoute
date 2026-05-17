@@ -299,8 +299,9 @@ export function tableAmpacity(size, material = 'copper', tempRating = 75) {
 }
 
 export function inferTerminalTempRating({ requiredOcpd = null, equipmentRatedAmps = null } = {}) {
-  const rating = Number.parseFloat(equipmentRatedAmps ?? requiredOcpd);
-  if (Number.isFinite(rating) && rating > 0 && rating <= 100) return 60;
+  const equipmentRating = Number.parseFloat(equipmentRatedAmps);
+  if (!Number.isFinite(equipmentRating) || equipmentRating <= 0) return 60;
+  if (equipmentRating <= 100) return 60;
   return 75;
 }
 

@@ -159,9 +159,10 @@ describe('selectConductorSize — NEC Table 310.16 baseline', () => {
     assert.strictEqual(tableAmpacity('#10 AWG', 'aluminum', 60), 25);
   });
 
-  it('infers 60C terminals through 100A and 75C above 100A', () => {
-    assert.strictEqual(inferTerminalTempRating({ requiredOcpd: 100 }), 60);
-    assert.strictEqual(inferTerminalTempRating({ requiredOcpd: 125 }), 75);
+  it('defaults to 60C without equipment rating and uses equipment rating threshold when provided', () => {
+    assert.strictEqual(inferTerminalTempRating({ requiredOcpd: 125 }), 60);
+    assert.strictEqual(inferTerminalTempRating({ equipmentRatedAmps: 90 }), 60);
+    assert.strictEqual(inferTerminalTempRating({ equipmentRatedAmps: 125 }), 75);
   });
 
   it('applies NEC 110.14(C) terminal caps separately from insulation ampacity', () => {
@@ -294,7 +295,7 @@ describe('sizeMotorBranch — NEC 430', () => {
     // OCPD: 250% × 65 = 162.5A → 175A standard
     const r = sizeMotorBranch({ hp: 50, voltage: 460, phase: '3ph' });
     assert.strictEqual(r.flc, 65);
-    assert.strictEqual(r.conductorSize, '#4 AWG');
+    assert.strictEqual(r.conductorSize, '#3 AWG');
     assert.strictEqual(r.ocpdRating, 175);
   });
 
@@ -319,6 +320,14 @@ describe('sizeMotorBranch — NEC 430', () => {
   it('includes NEC references', () => {
     const r = sizeMotorBranch({ hp: 25, voltage: 460 });
     assert.ok(r.nec && r.nec.conductorRule && r.nec.ocpdRule);
+  });
+
+  it('does not infer 75C terminals from oversized motor OCPD when equipment rating is omitted', () => {
+    const r = sizeMotorBranch({ hp: 40, voltage: 460, phase: '3ph', material: 'copper' });
+    assert.strictEqual(r.flc, 52);
+    assert.strictEqual(r.ocpdRating, 150);
+    assert.strictEqual(r.terminalTempRating, 60);
+    assert.strictEqual(r.conductorSize, '#4 AWG');
   });
 });
 
