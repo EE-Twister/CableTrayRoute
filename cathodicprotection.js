@@ -1373,6 +1373,15 @@ function renderResults(result, root) {
     : (criteriaEvidence.overallStatus === 'fail' ? 'result-badge--fail' : '');
   const reportExport = result.reportExport || buildReportExportData(result, getStudyApprovals().cathodicProtection || null);
   const verificationPlan = reportExport.verificationPlan || {};
+  const verificationRequiredCommissioningTests = Array.isArray(verificationPlan.requiredCommissioningTests)
+    ? verificationPlan.requiredCommissioningTests
+    : [];
+  const verificationMonitoringIntervals = Array.isArray(verificationPlan.monitoringIntervals)
+    ? verificationPlan.monitoringIntervals
+    : [];
+  const verificationCorrectiveActionThresholds = Array.isArray(verificationPlan.correctiveActionThresholds)
+    ? verificationPlan.correctiveActionThresholds
+    : [];
   const complianceState = result.compliance?.complianceState || 'provisional';
   const complianceBadgeClass = complianceState === 'compliant'
     ? 'result-badge--pass'
@@ -1531,9 +1540,9 @@ function renderResults(result, root) {
 
       <div class="result-group" aria-label="Verification and commissioning plan">
         <h3>Verification and Commissioning Plan</h3>
-        <p class="field-hint">Required commissioning tests: ${escapeHtml((verificationPlan.requiredCommissioningTests || []).join(' | ') || 'Not defined')}</p>
-        <p class="field-hint">Monitoring intervals: ${escapeHtml((verificationPlan.monitoringIntervals || []).join(' | ') || 'Not defined')}</p>
-        <p class="field-hint">Trigger thresholds for corrective action: ${escapeHtml((verificationPlan.correctiveActionThresholds || []).join(' | ') || 'Not defined')}</p>
+        <p class="field-hint">Required commissioning tests: ${escapeHtml(verificationRequiredCommissioningTests.join(' | ') || 'Not defined')}</p>
+        <p class="field-hint">Monitoring intervals: ${escapeHtml(verificationMonitoringIntervals.join(' | ') || 'Not defined')}</p>
+        <p class="field-hint">Trigger thresholds for corrective action: ${escapeHtml(verificationCorrectiveActionThresholds.join(' | ') || 'Not defined')}</p>
       </div>
 
       ${sensitivityRows.length ? `
