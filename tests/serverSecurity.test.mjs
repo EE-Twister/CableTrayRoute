@@ -548,7 +548,8 @@ async function httpsRedirectScenario() {
     dataDir: tmpDir,
     tokenTtlMs: 5000,
     rateLimit: { windowMs: 60000, max: 100 },
-    enforceHttps: true
+    enforceHttps: true,
+    httpsRedirectHost: 'app.example.test'
   });
   const baseUrl = `http://127.0.0.1:${port}`;
 
@@ -568,12 +569,12 @@ async function httpsRedirectScenario() {
     await check('redirects non-API HTTP requests with 308 to preserve method', async () => {
       const res = await fetch(`${baseUrl}/login.html`, {
         method: 'GET',
-        headers: { host: '127.0.0.1' },
+        headers: { host: 'attacker.example.test' },
         redirect: 'manual'
       });
       assert.strictEqual(res.status, 308, 'navigation requests should use 308 redirect');
       const location = res.headers.get('location');
-      assert(location && location.startsWith('https://'), 'should redirect to HTTPS');
+      assert.strictEqual(location, 'https://app.example.test/login.html', 'should redirect to configured HTTPS host');
     });
   } finally {
     await closeServer(server);
@@ -587,4 +588,3 @@ async function httpsRedirectScenario() {
   await passwordChangeScenario();
   await httpsRedirectScenario();
 })();
-

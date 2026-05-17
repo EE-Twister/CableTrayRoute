@@ -761,7 +761,8 @@ function resolveOptions(options = {}) {
     staticRoot = process.cwd(),
     tokenTtlMs = DEFAULT_TOKEN_TTL_MS,
     rateLimit = {},
-    enforceHttps = process.env.NODE_ENV === 'production'
+    enforceHttps = process.env.NODE_ENV === 'production',
+    httpsRedirectHost = process.env.HTTPS_REDIRECT_HOST || ''
   } = options;
 
   const { windowMs = DEFAULT_RATE_LIMIT_WINDOW_MS, max = DEFAULT_RATE_LIMIT_MAX } = rateLimit;
@@ -772,7 +773,8 @@ function resolveOptions(options = {}) {
     tokenTtlMs: Number(tokenTtlMs) || DEFAULT_TOKEN_TTL_MS,
     rateLimitWindowMs: Number(windowMs) || DEFAULT_RATE_LIMIT_WINDOW_MS,
     rateLimitMax: Number(max) || DEFAULT_RATE_LIMIT_MAX,
-    enforceHttps: Boolean(enforceHttps)
+    enforceHttps: Boolean(enforceHttps),
+    httpsRedirectHost: String(httpsRedirectHost || '').trim()
   };
 }
 
@@ -788,7 +790,8 @@ export async function createApp(options = {}) {
     tokenTtlMs,
     rateLimitWindowMs,
     rateLimitMax,
-    enforceHttps
+    enforceHttps,
+    httpsRedirectHost
   } = resolveOptions(options);
   const dataDirWithinStaticRoot = isSubPath(staticRoot, dataDir);
 
@@ -836,7 +839,7 @@ export async function createApp(options = {}) {
         next();
         return;
       }
-      if (!req.headers.host) {
+      if (!httpsRedirectHost) {
         res.status(400).json({ error: 'HTTPS required' });
         return;
       }
@@ -851,7 +854,7 @@ export async function createApp(options = {}) {
         res.status(400).json({ error: 'HTTPS required' });
         return;
       }
-      res.redirect(308, `https://${req.headers.host}${req.originalUrl}`);
+      res.redirect(308, `https://${httpsRedirectHost}${req.originalUrl}`);
     });
   }
 
