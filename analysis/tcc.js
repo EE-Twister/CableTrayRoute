@@ -7854,12 +7854,12 @@ function renderCoordOrderList() {
     return;
   }
 
-  // Merge existing coordOrderIds with newly plotted devices
-  const plotted = new Set(protective.map(e => e.selection.uid));
-  coordOrderIds = coordOrderIds.filter(uid => plotted.has(uid));
-  protective.forEach(e => {
-    if (!coordOrderIds.includes(e.selection.uid)) coordOrderIds.push(e.selection.uid);
-  });
+  // Keep only currently plotted devices and default to load→source ordering.
+  const defaultOrderIds = [...protective].reverse().map(e => e.selection.uid);
+  const plotted = new Set(defaultOrderIds);
+  const existingOrder = coordOrderIds.filter(uid => plotted.has(uid));
+  const missingIds = defaultOrderIds.filter(uid => !existingOrder.includes(uid));
+  coordOrderIds = [...existingOrder, ...missingIds];
 
   coordOrderList.innerHTML = '';
   coordOrderIds.forEach((uid, index) => {
