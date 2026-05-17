@@ -58,7 +58,7 @@ describe('setStudyApproval', () => {
   it('stores a full approval record under the correct key', () => {
     resetStore();
     const record = {
-      status: 'approved',
+      status: 'pending',
       reviewedBy: 'J. Smith PE',
       approvedAt: '2026-04-04',
       note: 'Results verified.',
@@ -70,12 +70,12 @@ describe('setStudyApproval', () => {
 
   it('stores a second study independently from the first', () => {
     resetStore();
-    setStudyApproval('arcFlash',    { status: 'approved', reviewedBy: 'A', approvedAt: '2026-04-01', note: '' });
+    setStudyApproval('arcFlash',    { status: 'pending', reviewedBy: 'A', approvedAt: '2026-04-01', note: '' });
     setStudyApproval('loadFlow',    { status: 'flagged',  reviewedBy: 'B', approvedAt: '2026-04-02', note: 'Check' });
     setStudyApproval('shortCircuit',{ status: 'pending',  reviewedBy: '',  approvedAt: '2026-04-03', note: '' });
 
     const all = getStudyApprovals();
-    assert.strictEqual(all['arcFlash'].status,     'approved');
+    assert.strictEqual(all['arcFlash'].status,     'pending');
     assert.strictEqual(all['loadFlow'].status,      'flagged');
     assert.strictEqual(all['shortCircuit'].status,  'pending');
     assert.strictEqual(Object.keys(all).length, 3);
@@ -95,9 +95,9 @@ describe('setStudyApproval', () => {
   it('overwrites an existing record when given a full object', () => {
     resetStore();
     setStudyApproval('harmonics', { status: 'flagged', reviewedBy: 'Old', approvedAt: '2026-01-01', note: '' });
-    setStudyApproval('harmonics', { status: 'approved', reviewedBy: 'New', approvedAt: '2026-04-04', note: 'OK' });
+    setStudyApproval('harmonics', { status: 'pending', reviewedBy: 'New', approvedAt: '2026-04-04', note: 'OK' });
     const all = getStudyApprovals();
-    assert.strictEqual(all['harmonics'].status,     'approved');
+    assert.strictEqual(all['harmonics'].status,     'pending');
     assert.strictEqual(all['harmonics'].reviewedBy, 'New');
   });
 });
@@ -105,7 +105,7 @@ describe('setStudyApproval', () => {
 describe('clearStudyApproval', () => {
   it('removes only the specified study key', () => {
     resetStore();
-    setStudyApproval('arcFlash', { status: 'approved', reviewedBy: 'A', approvedAt: '2026-04-04', note: '' });
+    setStudyApproval('arcFlash', { status: 'pending', reviewedBy: 'A', approvedAt: '2026-04-04', note: '' });
     setStudyApproval('loadFlow', { status: 'pending',  reviewedBy: '',  approvedAt: '2026-04-04', note: '' });
 
     clearStudyApproval('arcFlash');
@@ -136,17 +136,15 @@ describe('getApprovalBadgeHTML', () => {
     assert.ok(html.includes('approval-badge--pending'));
   });
 
-  it('returns an approved badge with reviewer name and date', () => {
+  it('normalizes approved status to pending badge', () => {
     const html = getApprovalBadgeHTML({
-      status: 'approved',
+      status: 'pending',
       reviewedBy: 'J. Smith PE',
       approvedAt: '2026-04-04',
       note: '',
     });
-    assert.ok(html.includes('approval-badge--approved'), 'Should have approved class');
-    assert.ok(html.includes('Approved by PE'),           'Should label as Approved by PE');
-    assert.ok(html.includes('J. Smith PE'),              'Should include reviewer name');
-    assert.ok(html.includes('2026-04-04'),               'Should include date');
+    assert.ok(html.includes('approval-badge--pending'), 'Should normalize to pending class');
+    assert.ok(html.includes('Pending Review'),           'Should normalize label to pending');
   });
 
   it('returns a flagged badge', () => {
@@ -157,7 +155,7 @@ describe('getApprovalBadgeHTML', () => {
 
   it('escapes HTML in reviewer name to prevent XSS', () => {
     const html = getApprovalBadgeHTML({
-      status: 'approved',
+      status: 'flagged',
       reviewedBy: '<script>alert(1)</script>',
       approvedAt: '2026-04-04',
       note: '',
