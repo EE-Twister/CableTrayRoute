@@ -45,6 +45,14 @@ function parseNumeric(value) {
   return null;
 }
 
+function firstParsedNumeric(...values) {
+  for (const value of values) {
+    const parsed = parseNumeric(value);
+    if (parsed !== null) return parsed;
+  }
+  return null;
+}
+
 function pickValue(comp, ...keys) {
   if (!comp) return undefined;
   for (const key of keys) {
@@ -342,16 +350,16 @@ export async function runArcFlash(options = {}) {
     const gap = Number.isFinite(gapRaw) && gapRaw > 0 ? gapRaw : 25;
     const workingDistanceRaw = parseNumeric(comp.working_distance);
     const dist = Number.isFinite(workingDistanceRaw) && workingDistanceRaw > 0 ? workingDistanceRaw : 455;
-    const heightRaw = parseNumeric(comp.enclosure_height ?? comp.box_height);
-    const widthRaw = parseNumeric(comp.enclosure_width ?? comp.box_width);
-    const depthRaw = parseNumeric(comp.enclosure_depth ?? comp.box_depth);
+    const heightRaw = firstParsedNumeric(comp.enclosure_height, comp.box_height);
+    const widthRaw = firstParsedNumeric(comp.enclosure_width, comp.box_width);
+    const depthRaw = firstParsedNumeric(comp.enclosure_depth, comp.box_depth);
     const h = Number.isFinite(heightRaw) && heightRaw > 0 ? heightRaw : 508;
     const w = Number.isFinite(widthRaw) && widthRaw > 0 ? widthRaw : 508;
     const de = Number.isFinite(depthRaw) && depthRaw > 0 ? depthRaw : 508;
     const sizeFactor = Math.cbrt((h * w * de) / (508 * 508 * 508)) || 1;
     const time = clearingTime(comp, Ibf, devices, protectiveComp, sc, protectiveDevice);
     const cfg = (comp.electrode_config || 'VCB').toUpperCase();
-    const voltageSettingRaw = parseNumeric(comp.kV ?? comp.baseKV ?? comp.prefault_voltage);
+    const voltageSettingRaw = firstParsedNumeric(comp.kV, comp.baseKV, comp.prefault_voltage);
     const V = Number.isFinite(voltageSettingRaw) && voltageSettingRaw > 0 ? voltageSettingRaw : 0.48;
     const rawIa = Ibf > 0 && time > 0
       ? arcingCurrent(Ibf, V, gap, cfg, enclosure)
