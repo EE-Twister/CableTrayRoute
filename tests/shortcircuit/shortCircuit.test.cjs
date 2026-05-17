@@ -256,6 +256,32 @@ global.localStorage = {
       assert(Math.abs(bus.ibr.Ifault_A - 3.0373644596497704) < 1e-9, 'Fault contribution should use 230 kV base');
     });
 
+
+    it('prefers the numeric token attached to kV in mixed-unit IBR voltage labels', () => {
+      setOneLine({
+        activeSheet: 0,
+        sheets: [{
+          name: 'IBR mixed units',
+          components: [
+            {
+              id: 'ibr1',
+              type: 'pv_inverter',
+              rated_kva: 1000,
+              voltage: '480 V (0.48 kV)',
+              connections: [{ target: 'bus1', sourcePort: 0, targetPort: 0 }]
+            },
+            { id: 'bus1', type: 'bus', subtype: 'Bus' }
+          ]
+        }]
+      });
+
+      const res = runShortCircuit();
+      const bus = res.bus1;
+      assert(bus && bus.ibr, 'IBR metadata should be attached');
+      assert(Math.abs(bus.ibr.vLL_kV - 0.48) < 1e-9, 'Mixed-unit label should resolve to the kV token');
+      assert(Math.abs(bus.ibr.Ifault_A - 1323.0943668928928) < 1e-6, 'Fault contribution should match 0.48 kV base');
+    });
+
     it('falls back to rated_kv when IBR voltage parses to nonpositive values', () => {
       setOneLine({
         activeSheet: 0,
