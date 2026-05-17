@@ -2650,7 +2650,7 @@ globalThis.showSelfCheckModal=showSelfCheckModal;
       const auth = getAuthContextState ? getAuthContextState() : null;
       if (!auth) return; // only start when logged in
       if (window.localStorage?.getItem('ctrEnableCollaboration') !== 'true') return;
-      const projectId = (window.currentProjectId || 'default').trim();
+      const projectId = (window.currentProjectId || '').trim();
       initCollaboration({
         projectId,
         username: auth.user,
@@ -2670,7 +2670,7 @@ globalThis.showSelfCheckModal=showSelfCheckModal;
     document.addEventListener('ctr:remote-patch', (ev) => {
       const patch = ev.detail && ev.detail.patch;
       if (!patch || typeof patch !== 'object') return;
-      const projectId = (window.currentProjectId || 'default').trim();
+      const projectId = (window.currentProjectId || '').trim();
       applyRemoteSnapshot(patch, projectId);
     });
     // Clean up on page unload

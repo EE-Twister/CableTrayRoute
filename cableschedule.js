@@ -78,7 +78,7 @@ if (document.readyState === 'loading') {
 // behaviour needed to populate the schedule table.
 
 async function initCableSchedule() {
-  const projectId = window.currentProjectId || 'default';
+  const projectId = window.currentProjectId;
   dataStore.loadProject(projectId);
   initSettings();
   initDarkMode();

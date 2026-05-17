@@ -4,7 +4,7 @@ import * as dataStore from "../dataStore.mjs";
 import { exportPanelSchedule } from "../exportPanelSchedule.js";
 import { ensureFieldAssistiveText, showAlertModal, openModal } from "./components/modal.js";
 
-const projectId = typeof window !== "undefined" ? (window.currentProjectId || "default") : undefined;
+const projectId = typeof window !== "undefined" ? window.currentProjectId : undefined;
 
 function getPanelIdentifierCandidates(panel) {
   if (!panel) return [];
