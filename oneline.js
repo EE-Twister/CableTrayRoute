@@ -8754,7 +8754,7 @@ function selectComponent(compOrId) {
       rawSchema = inferSchemaFromProps({ ...metaProps, ...(targetComp.props || {}) });
     }
 
-    const motorHorsepowerIndicators = new Set(['hp', 'horsepower', 'rating']);
+    const motorHorsepowerIndicators = new Set(['hp', 'horsepower']);
     const rawSchemaFieldNames = new Set(
       rawSchema
         .map(field => field && field.name)
@@ -9524,7 +9524,6 @@ function selectComponent(compOrId) {
       const driverFieldNames = [
         'hp',
         'horsepower',
-        'rating',
         'pf',
         'power_factor',
         'efficiency',
@@ -9599,7 +9598,7 @@ function selectComponent(compOrId) {
       };
 
       const updateMotorDerivedFields = () => {
-        const hpVal = getNumeric(['hp', 'horsepower', 'rating']);
+        const hpVal = getNumeric(['hp', 'horsepower']);
         let effVal = getNumeric(['efficiency', 'eff'], { percent: true });
         let pfVal = getNumeric(['pf', 'power_factor'], { percent: true });
         let voltageVal = getNumeric(['voltage', 'volts', 'volts_primary', 'volts_secondary']);
