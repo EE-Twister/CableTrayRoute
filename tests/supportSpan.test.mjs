@@ -238,6 +238,12 @@ describe('sumCableWeights', () => {
     assert.strictEqual(sumCableWeights(cables), w);
   });
 
+  it('defaults missing conductors to 3 when conductor_size is present', () => {
+    const w = CABLE_WEIGHT_LB_FT['3C-500 kcmil'];
+    const cables = [{ conductor_size: '500 kcmil', quantity: 2 }];
+    assert.strictEqual(sumCableWeights(cables), w * 2);
+  });
+
   it('throws for negative explicit weight_lb_ft', () => {
     const cables = [{ weight_lb_ft: -2, quantity: 1 }];
     assert.throws(() => sumCableWeights(cables), /positive finite/);
