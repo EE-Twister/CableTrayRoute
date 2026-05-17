@@ -2023,6 +2023,9 @@ function getCommissioningChecklist(approval = null) {
 }
 
 function isCommissioningChecklistComplete(approval = null) {
+  if (!COMMISSIONING_CHECKLIST_ITEMS.length) {
+    return false;
+  }
   const checklist = getCommissioningChecklist(approval);
   return COMMISSIONING_CHECKLIST_ITEMS.every((item) => {
     const completion = checklist[item.key];
