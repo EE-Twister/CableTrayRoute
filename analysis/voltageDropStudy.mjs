@@ -59,7 +59,7 @@ export function classifyCircuit(cable) {
  *   dropPct: number,
  *   circuitType: 'feeder'|'branch',
  *   limit: number,
- *   status: 'pass'|'warn'|'fail',
+ *   status: 'pass'|'warn'|'fail'|'not-evaluated',
  *   evaluated: boolean,
  *   basis: string
  * }}
@@ -82,7 +82,7 @@ export function evaluateCable(cable, lengthFt) {
 
   let status;
   if (!evaluated) {
-    status = 'pass'; // no data - preserve legacy status while marking the row not evaluated
+    status = 'not-evaluated';
   } else if (dropPct > limit) {
     status = 'fail';
   } else if (dropPct > limit * 0.8) {

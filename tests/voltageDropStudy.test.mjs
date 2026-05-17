@@ -75,17 +75,17 @@ describe('classifyCircuit', () => {
 
 // ---------------------------------------------------------------------------
 describe('evaluateCable', () => {
-  it('returns pass for cable with no length data', () => {
+  it('returns not-evaluated for cable with no length data', () => {
     const result = evaluateCable({ cable_tag: 'C01', est_load: '100', cable_rating: '480' });
-    assert.strictEqual(result.status, 'pass');
+    assert.strictEqual(result.status, 'not-evaluated');
     assert.strictEqual(result.dropPct, 0);
     assert.strictEqual(result.evaluated, false);
     assert.ok(result.basis.includes('informational-note recommendation'));
   });
 
-  it('returns pass for cable with no load data', () => {
+  it('returns not-evaluated for cable with no load data', () => {
     const result = evaluateCable({ cable_tag: 'C02', length: '500', cable_rating: '480' });
-    assert.strictEqual(result.status, 'pass');
+    assert.strictEqual(result.status, 'not-evaluated');
     assert.strictEqual(result.evaluated, false);
   });
 
@@ -208,7 +208,7 @@ describe('runVoltageDropStudy', () => {
     assert.ok('limit' in r);
     assert.ok('evaluated' in r);
     assert.ok('basis' in r);
-    assert.ok(['pass', 'warn', 'fail'].includes(r.status));
+    assert.ok(['pass', 'warn', 'fail', 'not-evaluated'].includes(r.status));
     assert.ok(['feeder', 'branch'].includes(r.circuitType));
   });
 });
