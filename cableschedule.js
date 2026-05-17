@@ -519,13 +519,15 @@ async function initCableSchedule() {
     });
   };
 
-  const calculateVoltageDrop = (length, current, impedance) => {
+  const calculateVoltageDrop = (length, current, impedance, operatingVoltage) => {
     const len = Number(length);
     const cur = Number(current);
     const imp = Number(impedance);
-    if (!Number.isFinite(len) || !Number.isFinite(cur) || !Number.isFinite(imp)) return null;
-    if (len <= 0 || cur <= 0 || imp <= 0) return null;
-    return len * cur * imp;
+    const voltage = Number(operatingVoltage);
+    if (!Number.isFinite(len) || !Number.isFinite(cur) || !Number.isFinite(imp) || !Number.isFinite(voltage)) return null;
+    if (len <= 0 || cur <= 0 || imp <= 0 || voltage <= 0) return null;
+    const dropVolts = len * cur * imp;
+    return (dropVolts / voltage) * 100;
   };
   window.calculateVoltageDrop = calculateVoltageDrop;
 
@@ -533,13 +535,14 @@ async function initCableSchedule() {
     const lengthField = editorFieldMap.get('length');
     const currentField = editorFieldMap.get('est_load');
     const impedanceField = editorFieldMap.get('impedance');
+    const operatingVoltageField = editorFieldMap.get('operating_voltage');
     const voltageField = editorFieldMap.get('voltage_drop_pct');
-    if (!lengthField || !currentField || !impedanceField || !voltageField) return;
+    if (!lengthField || !currentField || !impedanceField || !operatingVoltageField || !voltageField) return;
     voltageField.readOnly = true;
     voltageField.setAttribute('aria-readonly', 'true');
     voltageField.tabIndex = -1;
     const updateVoltageDropField = () => {
-      const result = calculateVoltageDrop(lengthField.value, currentField.value, impedanceField.value);
+      const result = calculateVoltageDrop(lengthField.value, currentField.value, impedanceField.value, operatingVoltageField.value);
       if (result === null) {
         voltageField.value = '';
       } else {
@@ -549,7 +552,7 @@ async function initCableSchedule() {
         activeRowData.voltage_drop_pct = voltageField.value;
       }
     };
-    [lengthField, currentField, impedanceField].forEach(field => {
+    [lengthField, currentField, impedanceField, operatingVoltageField].forEach(field => {
       field.addEventListener('input', updateVoltageDropField);
       field.addEventListener('change', updateVoltageDropField);
     });
