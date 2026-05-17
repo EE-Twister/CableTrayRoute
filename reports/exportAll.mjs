@@ -137,6 +137,18 @@ const crcTable = new Uint32Array(256).map((_, n) => {
   }
   return c >>> 0;
 });
+
+function sanitizeZipFileName(name, fallback = 'report') {
+  const raw = String(name || '');
+  const normalized = raw.replace(/\\/g, '/').split('/').pop() || '';
+  const stripped = normalized
+    .replace(/\.\.+/g, '.')
+    .replace(/[^a-zA-Z0-9._-]+/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^[_\.\-]+|[_\.\-]+$/g, '');
+  return stripped || fallback;
+}
+
 function crc32(buf) {
   let crc = -1;
   for (let i = 0; i < buf.length; i++) {
@@ -149,7 +161,8 @@ class SimpleZip {
   constructor() { this.entries = []; }
   file(name, data) {
     if (typeof data === 'string') data = new TextEncoder().encode(data);
-    this.entries.push({ name, data });
+    const safeName = sanitizeZipFileName(name);
+    this.entries.push({ name: safeName, data });
   }
   async generateAsync({ type = 'nodebuffer' } = {}) {
     const fileRecords = [];
@@ -246,8 +259,8 @@ export function buildReportZip(data = {}) {
   // Add CSVs for each section
   sections.forEach(sec => {
     const csv = toCSV(sec.headers, sec.rows);
-    const name = sec.title.toLowerCase().replace(/\s+/g, '_') + '.csv';
-    zip.file(name, csv);
+    const baseName = sanitizeZipFileName(sec.title.toLowerCase().replace(/\s+/g, '_'), 'analysis');
+    zip.file(`${baseName}.csv`, csv);
   });
 
   // Arc flash labels

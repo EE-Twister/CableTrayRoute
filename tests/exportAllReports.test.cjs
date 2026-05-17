@@ -30,5 +30,17 @@ function it(name, fn){
       assert(files.includes('loadflow_analysis.csv'));
       assert(files.includes('Main_Switchboard.svg'));
     });
+
+    it('sanitizes zip entry names derived from untrusted keys', async () => {
+      const data = {
+        analyses: { '../../analysis_escape': [{ id: 'B1', Vm: 1 }] },
+        arcFlash: { 'BUS/../../outside': { incidentEnergy: 1, boundary: 2 } }
+      };
+      const zip = buildReportZip(data);
+      const files = Object.keys(zip.files);
+      assert(files.includes('analysis_escape_analysis.csv'));
+      assert(files.includes('BUS_._._outside.svg'));
+      assert(!files.some(name => name.includes('..') || name.includes('/') || name.includes('\\')));
+    });
   });
 })();
