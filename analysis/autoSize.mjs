@@ -445,15 +445,21 @@ export function meetsParallelRequirement(size) {
  * @param {number} [options.bundledConductors=1]   Applies only when nParallel === 1
  * @param {'conduit'|'tray_spaced'|'tray_touching'} [options.installationType='conduit']
  * @param {60|75|90|null} [options.terminalTempRating]
+ * @param {number|null} [options.requiredOcpd]
  * @returns {object|null}  null when no table entry can satisfy the requirement
  */
 export function evaluateConductorOption(requiredAmps, material, tempRating, nParallel, options = {}) {
-  const { ambientTempC = 30, installationType = 'conduit', terminalTempRating = null } = options;
+  const {
+    ambientTempC = 30,
+    installationType = 'conduit',
+    terminalTempRating = null,
+    requiredOcpd = nextStandardOcpd(requiredAmps),
+  } = options;
   // Parallel sets each run in a separate conduit → 3 current-carrying conductors/conduit
   const bundledConductors = nParallel > 1 ? 3 : (options.bundledConductors ?? 1);
 
   const conductor = selectConductorSize(requiredAmps / nParallel, material, tempRating, {
-    ambientTempC, bundledConductors, installationType, terminalTempRating,
+    ambientTempC, bundledConductors, installationType, terminalTempRating, requiredOcpd,
   });
   if (!conductor) return null;
 
@@ -506,6 +512,7 @@ export function evaluateConductorOption(requiredAmps, material, tempRating, nPar
  * @param {boolean} [options.allowAluminum=true]
  * @param {number}  [options.maxParallel=4]
  * @param {60|75|90|null} [options.terminalTempRating]
+ * @param {number|null} [options.requiredOcpd]
  * @returns {Array<object>}   Code-compliant options sorted by costPerFtPerPhase ascending
  */
 export function minimizeCostConductors(requiredAmps, tempRating = 75, options = {}) {
@@ -516,6 +523,7 @@ export function minimizeCostConductors(requiredAmps, tempRating = 75, options = 
     allowAluminum = true,
     maxParallel = 4,
     terminalTempRating = null,
+    requiredOcpd = nextStandardOcpd(requiredAmps),
   } = options;
 
   const results = [];
@@ -524,7 +532,7 @@ export function minimizeCostConductors(requiredAmps, tempRating = 75, options = 
   for (const material of materials) {
     for (let nParallel = 1; nParallel <= maxParallel; nParallel++) {
       const opt = evaluateConductorOption(requiredAmps, material, tempRating, nParallel, {
-        ambientTempC, bundledConductors, installationType, terminalTempRating,
+        ambientTempC, bundledConductors, installationType, terminalTempRating, requiredOcpd,
       });
       if (!opt || opt.violatesParallelRule) continue;
       results.push(opt);
