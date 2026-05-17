@@ -58,6 +58,7 @@ function escapeHtml(str) {
 }
 /** Alias for escapeHtml — use in attribute value contexts for readability. */
 const escapeAttr = escapeHtml;
+const getParallelCount = (value) => Math.max(1, Number.parseInt(value, 10) || 1);
 
 /**
  * Return true only for URLs that are safe to use as href values.
@@ -2374,7 +2375,7 @@ const openConduitFill = (cables) => {
     }).filter(Boolean);
     const spec = CONDUIT_SPECS[conduitType] || {};
     const count = cableObjs.length;
-    const totalArea = cableObjs.reduce((s, c) => s + Math.PI * Math.pow(c.diameter / 2, 2) * (parseInt(c.parallel_count) || 1), 0);
+    const totalArea = cableObjs.reduce((s, c) => s + Math.PI * Math.pow(c.diameter / 2, 2) * getParallelCount(c.parallel_count), 0);
     /* NEC Chapter 9 Table 1 fill limits (see docs/standards.md) */
     const fillPct = count === 1 ? 0.53 : count === 2 ? 0.31 : 0.40;
     let tradeSize = null;
@@ -4232,7 +4233,7 @@ const renderBatchResults = (results) => {
             const cable = cableMap.get(name);
             const info = resultMap.get(name);
             if (!cable || !info) return;
-            const area = Math.PI * (cable.diameter / 2) ** 2 * (parseInt(cable.parallel_count) || 1);
+            const area = Math.PI * (cable.diameter / 2) ** 2 * getParallelCount(cable.parallel_count);
             if (Array.isArray(info.row.tray_segments)) {
                 routingSystem.updateTrayFill(info.row.tray_segments, -area, cable.allowed_cable_group);
             }
