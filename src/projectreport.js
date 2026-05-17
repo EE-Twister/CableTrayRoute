@@ -13,12 +13,12 @@ import {
   getCables, getTrays, getConduits, getDuctbanks,
   getStudies, getStudyApprovals,
   getReportSnapshots, setReportSnapshot, deleteReportSnapshot,
-  getDrcAcceptedFindings,
   getLifecyclePackages,
   getItem,
 } from '../dataStore.mjs';
 import { getProjectState } from '../projectStorage.js';
 import { buildDeliverableReadinessDiagnostics } from '../analysis/deliverableWorkflow.mjs';
+import { runDRC } from '../analysis/designRuleChecker.mjs';
 import { generateProjectReport } from '../analysis/projectReport.mjs';
 import {
   renderPackageHTML,
@@ -180,14 +180,24 @@ function escAttr(s) {
 // ---------------------------------------------------------------------------
 
 function loadProjectData() {
+  const cables = getCables();
+  const trays = getTrays();
+  const routeState = getItem('latestRouteResults', {}) || {};
+  const drcRun = runDRC({
+    trays,
+    cables,
+    trayCableMap: routeState.trayCableMap || {},
+    routedCableNames: routeState.routedCableNames,
+  });
+
   return {
-    cables:    getCables(),
-    trays:     getTrays(),
+    cables,
+    trays,
     conduits:  getConduits(),
     ductbanks: getDuctbanks(),
     studies:   getStudies(),
     approvals: getStudyApprovals(),
-    drcResults: getDrcAcceptedFindings ? getDrcAcceptedFindings() : [],
+    drcResults: Array.isArray(drcRun?.findings) ? drcRun.findings : [],
   };
 }
 
