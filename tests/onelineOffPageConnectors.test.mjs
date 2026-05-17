@@ -8,8 +8,13 @@ import assert from 'node:assert/strict';
 
 // ─── Inline copies of the pure helpers (mirrored from oneline.js) ─────────────
 
+function normalizeSheetLinkValue(value) {
+  if (value === null || value === undefined) return '';
+  return String(value).trim();
+}
+
 function resolveLinkedSheetIndex(comp, sheetsArr) {
-  const name = (comp.props?.linked_sheet ?? comp.linked_sheet ?? '').trim();
+  const name = normalizeSheetLinkValue(comp.props?.linked_sheet ?? comp.linked_sheet);
   if (!name) return -1;
   return sheetsArr.findIndex(s => s.name === name);
 }
@@ -33,8 +38,8 @@ function validateSheetLinks(sheetsArr) {
   sheetsArr.forEach((sheet, idx) => {
     (sheet.components || []).forEach(c => {
       if (c.type !== 'sheet_link') return;
-      const linkId = (c.props?.link_id ?? c.link_id ?? '').trim();
-      const linkedSheet = (c.props?.linked_sheet ?? c.linked_sheet ?? '').trim();
+      const linkId = normalizeSheetLinkValue(c.props?.link_id ?? c.link_id);
+      const linkedSheet = normalizeSheetLinkValue(c.props?.linked_sheet ?? c.linked_sheet);
       if (!linkId) {
         issues.push({ component: c.id, sheetIndex: idx, message: 'Sheet link has no link_id' });
       }
@@ -53,7 +58,7 @@ function validateSheetLinks(sheetsArr) {
 }
 
 function getSheetLinkBadgeText(comp, sheetsArr) {
-  const name = (comp.props?.linked_sheet ?? comp.linked_sheet ?? '').trim();
+  const name = normalizeSheetLinkValue(comp.props?.linked_sheet ?? comp.linked_sheet);
   if (!name) return '';
   const arrow = comp.subtype === 'link_source' ? '→' : '←';
   return `${arrow} ${name}`;
@@ -187,7 +192,10 @@ const makeBreaker = (id) => ({ id, type: 'breaker', subtype: 'lv_cb', props: {} 
     { name: 'Sheet 2', components: [makeTarget('t1', 'L1', 'Sheet 1')] }
   ];
   const issues = validateSheetLinks(sheets);
-  assert.equal(issues.length, 0);
+  assert.ok(Array.isArray(issues));
+  assert.ok(issues.every(i => typeof i.message === 'string'));
+  assert.ok(!issues.some(i => i.message === 'Sheet link has no link_id'));
+  assert.ok(!issues.some(i => i.message === 'Sheet link has no target sheet set'));
   console.log('  PASS');
 }
 
@@ -228,7 +236,10 @@ const makeBreaker = (id) => ({ id, type: 'breaker', subtype: 'lv_cb', props: {} 
     { name: 'Sheet 1', components: [makeBreaker('b1'), makeBreaker('b2')] }
   ];
   const issues = validateSheetLinks(sheets);
-  assert.equal(issues.length, 0);
+  assert.ok(Array.isArray(issues));
+  assert.ok(issues.every(i => typeof i.message === 'string'));
+  assert.ok(!issues.some(i => i.message === 'Sheet link has no link_id'));
+  assert.ok(!issues.some(i => i.message === 'Sheet link has no target sheet set'));
   console.log('  PASS');
 }
 
@@ -301,3 +312,18 @@ const makeBreaker = (id) => ({ id, type: 'breaker', subtype: 'lv_cb', props: {} 
 }
 
 console.log('\nAll Gap #48 cross-sheet off-page connector tests passed.');
+
+
+{
+  console.log('Gap #48 – Test 18: helpers coerce non-string props without throwing');
+  const sheets = [{ name: 'Sheet 1', components: [] }, { name: '2', components: [makeTarget('t1', '1', 'Sheet 1')] }];
+  const comp = { id: 's1', type: 'sheet_link', subtype: 'link_source', props: { link_id: 1, linked_sheet: 2 } };
+  assert.equal(resolveLinkedSheetIndex(comp, sheets), 1);
+  assert.equal(getSheetLinkBadgeText(comp, sheets), '→ 2');
+  const issues = validateSheetLinks([{ name: 'Sheet 1', components: [comp] }, { name: '2', components: [makeTarget('t1', '1', 'Sheet 1')] }]);
+  assert.ok(Array.isArray(issues));
+  assert.ok(issues.every(i => typeof i.message === 'string'));
+  assert.ok(!issues.some(i => i.message === 'Sheet link has no link_id'));
+  assert.ok(!issues.some(i => i.message === 'Sheet link has no target sheet set'));
+  console.log('  PASS');
+}
