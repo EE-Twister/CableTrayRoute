@@ -566,6 +566,8 @@ async function initCableSchedule() {
   };
 
   const cloneTemplates = templates => (Array.isArray(templates) ? templates.map(t => JSON.parse(JSON.stringify(t))) : []);
+  const MAX_TEMPLATE_IMPORT_FILE_BYTES = 5 * 1024 * 1024;
+  const MAX_TEMPLATE_IMPORT_COUNT = 5000;
   const filterTemplateFields = (input = {}, options = {}) => {
     const { keepLabel = true, keepTypicalId = false } = options;
     const copy = { ...input };
@@ -1535,6 +1537,11 @@ async function initCableSchedule() {
           resetInput();
           return;
         }
+        if (typeof file.size === 'number' && file.size > MAX_TEMPLATE_IMPORT_FILE_BYTES) {
+          showAlertModal('Import Error', 'The selected file is too large to import. Please choose a file smaller than 5 MB.');
+          resetInput();
+          return;
+        }
         const name = (file.name || '').toLowerCase();
         const type = (file.type || '').toLowerCase();
         const isExcel = name.endsWith('.xlsx') || type.includes('spreadsheet');
@@ -1569,11 +1576,21 @@ async function initCableSchedule() {
             resetInput();
             return;
           }
+          if (rows.length > MAX_TEMPLATE_IMPORT_COUNT) {
+            showAlertModal('Import Error', 'The selected file contains too many cable typicals to import.');
+            resetInput();
+            return;
+          }
           candidates = rows
             .map(row => this.normalizeExcelRow(row))
             .filter(Boolean);
         } else {
           const text = await file.text();
+          if (text.length > MAX_TEMPLATE_IMPORT_FILE_BYTES) {
+            showAlertModal('Import Error', 'The selected file is too large to import. Please choose a file smaller than 5 MB.');
+            resetInput();
+            return;
+          }
           let parsed;
           try {
             parsed = JSON.parse(text);
@@ -1589,6 +1606,11 @@ async function initCableSchedule() {
         }
         if (!candidates.length) {
           showAlertModal('Import Error', 'No cable typicals found in the selected file.');
+          resetInput();
+          return;
+        }
+        if (candidates.length > MAX_TEMPLATE_IMPORT_COUNT) {
+          showAlertModal('Import Error', 'The selected file contains too many cable typicals to import.');
           resetInput();
           return;
         }
