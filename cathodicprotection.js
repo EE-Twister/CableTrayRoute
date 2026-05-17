@@ -593,12 +593,16 @@ function normalizeSavedStudy(saved) {
 
   const recomputed = runCathodicProtectionAnalysis(normalizedInput);
   const compliance = saved.compliance && typeof saved.compliance === 'object'
-    ? saved.compliance
+    ? {
+      ...saved.compliance,
+      failedCheckKeys: Array.isArray(saved.compliance.failedCheckKeys) ? saved.compliance.failedCheckKeys : []
+    }
     : {
       profileId: CP_STANDARDS_PROFILE.profileId,
       requiredChecks: buildInitialComplianceStatus(),
       optionalChecks: {},
-      lastEvaluatedAt: null
+      lastEvaluatedAt: null,
+      failedCheckKeys: []
     };
 
   const existingHistory = Array.isArray(saved.complianceHistory)
@@ -715,7 +719,8 @@ function summarizeTimelineStep(stepKey, result) {
     return `Criteria evaluation is ${criteriaStatus}; ${countCriteriaPasses(result)} criteria currently pass with correction context ${result.measurementContext || 'unknown'}.`;
   }
   const label = result.compliance?.complianceState || 'provisional';
-  return `Compliance gate resolved as ${label}; unresolved checks: ${(result.compliance?.failedCheckKeys || []).join(', ') || 'none'}.`;
+  const failedCheckKeys = Array.isArray(result.compliance?.failedCheckKeys) ? result.compliance.failedCheckKeys : [];
+  return `Compliance gate resolved as ${label}; unresolved checks: ${failedCheckKeys.join(', ') || 'none'}.`;
 }
 
 function resolveTimelineCheckpoints(stepDefinition, result) {
