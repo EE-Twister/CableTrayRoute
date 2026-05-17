@@ -562,6 +562,37 @@ describe('runValidation - dc_bus required attributes', () => {
     assert.ok(dcIssue.message.includes('short_circuit_rating_ka'));
   });
 
+
+
+  it('handles adversarial object values without throwing', () => {
+    const components = [
+      {
+        id: 'dc-bus-ref-3',
+        type: 'bus',
+        connections: [{ target: 'dc-bus-3' }]
+      },
+      {
+        id: 'dc-bus-3',
+        type: 'bus',
+        subtype: 'dc_bus',
+        connections: [{ target: 'dc-bus-ref-3' }],
+        props: {
+          nominal_voltage_vdc: { toString: 'x' },
+          grounding_scheme: { toString: 'x' },
+          max_continuous_current_a: { toString: 'x' },
+          short_circuit_rating_ka: { toString: 'x' }
+        }
+      }
+    ];
+    assert.doesNotThrow(() => runValidation(components, {}));
+    const issues = runValidation(components, {});
+    const dcIssue = issues.find(issue => issue.component === 'dc-bus-3');
+    assert.ok(dcIssue);
+    assert.ok(dcIssue.message.includes('nominal_voltage_vdc'));
+    assert.ok(dcIssue.message.includes('grounding_scheme'));
+    assert.ok(dcIssue.message.includes('max_continuous_current_a'));
+    assert.ok(dcIssue.message.includes('short_circuit_rating_ka'));
+  });
   it('does not flag a dc_bus with all required fields present', () => {
     const components = [
       {
