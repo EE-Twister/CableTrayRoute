@@ -724,7 +724,6 @@ export function runShortCircuit(modelOrOpts = {}, maybeOpts = {}) {
     cablesMissingImpedance.add(component.id);
     (component.connections || []).forEach(conn => {
       if (typeof conn?.target === 'string') cableDefaultTargets.add(conn.target);
-      if (typeof conn?.source === 'string') cableDefaultTargets.add(conn.source);
     });
     const upstream = reverseConnectionMap.get(component.id);
     if (upstream) {
