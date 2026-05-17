@@ -24,6 +24,14 @@ document.addEventListener('DOMContentLoaded', () => {
   const scheduleSection    = document.getElementById('scheduleSection');
   const scheduleResultsDiv = document.getElementById('scheduleResults');
 
+  function parseNonNegativeFinite(value) {
+    const parsed = Number.parseFloat(value);
+    if (!Number.isFinite(parsed) || parsed < 0) {
+      return null;
+    }
+    return parsed;
+  }
+
   // Mode toggle
   function updateMode() {
     const isSingle = singleModeRadio.checked;
@@ -194,7 +202,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (trayId && trayWeightMap[trayId] !== undefined) {
         let w = 0;
         if (cable.weight_lb_ft != null) {
-          w = parseFloat(cable.weight_lb_ft) || 0;
+          w = parseNonNegativeFinite(cable.weight_lb_ft) ?? 0;
         } else {
           const conductors = cable.conductors != null ? String(cable.conductors) : '3';
           const size = cable.conductor_size || cable.size || '';
@@ -207,7 +215,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const rows = trays.map(tray => {
       // Tray self-weight: estimate from tray type (2 lbs/ft default, adjust for wider trays)
-      const selfWeight = 2 + (parseFloat(tray.inside_width) || 12) * 0.05;
+      const trayWidth = parseNonNegativeFinite(tray.inside_width) ?? 12;
+      const selfWeight = 2 + trayWidth * 0.05;
       const wp = (trayWeightMap[tray.tray_id] || 0) + selfWeight;
       let result;
       try {
