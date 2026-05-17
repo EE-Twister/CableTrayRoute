@@ -148,16 +148,25 @@ export function calcMaxSpan(actualLoad, loadClass) {
  */
 export function sumCableWeights(cables) {
   return cables.reduce((total, cable) => {
-    const qty = Number(cable.quantity) || 1;
+    const qty = cable.quantity == null ? 1 : Number(cable.quantity);
+    if (!Number.isFinite(qty) || qty <= 0) {
+      throw new Error('Cable quantity must be a positive finite number');
+    }
 
     // If the caller provided an explicit weight, use it directly
     if (cable.weight_lb_ft != null) {
-      return total + qty * Number(cable.weight_lb_ft);
+      const explicitWeight = Number(cable.weight_lb_ft);
+      if (!Number.isFinite(explicitWeight) || explicitWeight <= 0) {
+        throw new Error('Cable weight_lb_ft must be a positive finite number');
+      }
+      return total + qty * explicitWeight;
     }
 
     // Otherwise look up in the built-in table
     const conductors = cable.conductors != null ? String(cable.conductors) : null;
-    const size = cable.size != null ? String(cable.size) : null;
+    const size = (cable.size ?? cable.conductor_size) != null
+      ? String(cable.size ?? cable.conductor_size)
+      : null;
     const key = conductors && size ? `${conductors}C-${size}` : null;
     const unitWeight = (key && CABLE_WEIGHT_LB_FT[key]) || 0;
     return total + qty * unitWeight;
@@ -174,11 +183,24 @@ export function sumCableWeights(cables) {
 export function evaluateTrays(trays, loadClass) {
   return trays.map(tray => {
     const cables = Array.isArray(tray.cables) ? tray.cables : [];
-    const loadPerFt = sumCableWeights(cables);
+    let loadPerFt = 0;
     let result;
-    if (loadPerFt > 0) {
+    try {
+      loadPerFt = sumCableWeights(cables);
+    } catch (err) {
+      result = {
+        maxSpan: 0,
+        ratedSpan: 0,
+        ratedLoad: 0,
+        utilizationRatio: 0,
+        status: 'INVALID',
+        recommendation: err.message,
+      };
+    }
+
+    if (!result && loadPerFt > 0) {
       result = calcMaxSpan(loadPerFt, loadClass);
-    } else {
+    } else if (!result) {
       // No cables yet — return rated span at zero utilization
       const cls = NEMA_LOAD_CLASSES[loadClass];
       result = {

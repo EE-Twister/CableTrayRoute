@@ -172,38 +172,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const loadClass = loadClassSel.value;
 
-    // Build a weight map: tray_id → total lbs/ft
-    // Cables are matched to trays via their route_preference field
-    const trayWeightMap = {};
-    trays.forEach(t => { trayWeightMap[t.tray_id] = 0; });
-
-    cables.forEach(cable => {
-      const trayId = cable.route_preference;
-      if (trayId && trayWeightMap[trayId] !== undefined) {
-        // Use stored weight_lb_ft if present, else derive from conductor info
-        let w = 0;
-        if (cable.weight_lb_ft != null) {
-          w = parseFloat(cable.weight_lb_ft) || 0;
-        } else {
-          const conductors = cable.conductors != null ? String(cable.conductors) : '3';
-          const size = cable.conductor_size || cable.size || '';
-          const key = `${conductors}C-${size}`;
-          w = CABLE_WEIGHT_LB_FT[key] || 0;
-        }
-        trayWeightMap[trayId] += w;
-      }
-    });
-
     const rows = trays.map(tray => {
-      const actualLoad = trayWeightMap[tray.tray_id] || 0;
+      const trayCables = cables.filter(cable => cable.route_preference === tray.tray_id);
+      let actualLoad = 0;
       let result;
-      if (actualLoad > 0) {
+
+      try {
+        actualLoad = sumCableWeights(trayCables);
+      } catch (err) {
+        result = { status: 'INVALID', recommendation: err.message };
+      }
+
+      if (!result && actualLoad > 0) {
         try {
           result = calcMaxSpan(actualLoad, loadClass);
-        } catch {
-          result = null;
+        } catch (err) {
+          result = { status: 'INVALID', recommendation: err.message };
         }
       }
+
       return { tray, actualLoad, result };
     });
 
@@ -226,6 +213,17 @@ document.addEventListener('DOMContentLoaded', () => {
           <td>—</td>
           <td>—</td>
           <td class="status-badge result-ok">NO CABLES</td>
+        </tr>`;
+      }
+      if (result.status === 'INVALID') {
+        return `<tr class="result-fail">
+          <td>${esc(tray.tray_id)}</td>
+          <td>${esc(tray.tray_type || '—')}</td>
+          <td>${esc(String(tray.inside_width ?? '—'))}</td>
+          <td>${Number.isFinite(actualLoad) ? actualLoad.toFixed(3) : '—'}</td>
+          <td>—</td>
+          <td>—</td>
+          <td class="status-badge result-fail">INVALID DATA</td>
         </tr>`;
       }
       const statusClass = result.status === 'OK' ? 'result-ok' : 'result-fail';
