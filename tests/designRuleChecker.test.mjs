@@ -872,6 +872,38 @@ describe('DRC-06 — Structured cabling EMI segregation', () => {
     assert.ok(drc06[0].message.includes('FIBER-SPINE-01'), 'Message should name the structured cable');
   });
 
+  it('fires WARNING when a Data cable shares a tray with a pwr alias cable', () => {
+    const trayCableMap = {
+      'TRAY-PWR-ALIAS': [
+        makeCable('PWR-ALIAS-01', { cable_type: 'pwr' }),
+        makeCable('DATA-001', { cable_type: 'Data' }),
+      ],
+    };
+    const { findings } = runDRC({
+      trays: [makeTray('TRAY-PWR-ALIAS', 0)],
+      cables: [],
+      trayCableMap,
+    });
+    const drc06 = findings.filter(f => f.ruleId === 'DRC-06');
+    assert.strictEqual(drc06.length, 1, 'Expected DRC-06 for pwr alias + Data mixing');
+  });
+
+  it('fires WARNING when a Data cable shares a tray with a legacy blank cable_type power cable', () => {
+    const trayCableMap = {
+      'TRAY-BLANK-POWER': [
+        makeCable('LEGACY-PWR-001', { cable_type: '' }),
+        makeCable('DATA-001', { cable_type: 'Data' }),
+      ],
+    };
+    const { findings } = runDRC({
+      trays: [makeTray('TRAY-BLANK-POWER', 0)],
+      cables: [],
+      trayCableMap,
+    });
+    const drc06 = findings.filter(f => f.ruleId === 'DRC-06');
+    assert.strictEqual(drc06.length, 1, 'Expected DRC-06 for blank cable_type + Data mixing');
+  });
+
   it('does NOT fire when only Data cables share a tray (no power)', () => {
     const trayCableMap = {
       'TRAY-DATA-ONLY': [
