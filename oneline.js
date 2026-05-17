@@ -6797,7 +6797,7 @@ function render() {
     if (c.type === 'sheet_link') {
       const badge = getSheetLinkBadgeText(c, sheets);
       if (badge) tooltipParts.push(`Navigate: ${badge} (double-click)`);
-      const lid = (c.props?.link_id ?? '').trim();
+      const lid = normalizeSheetLinkValue(c.props?.link_id);
       if (lid) tooltipParts.push(`Link ID: ${lid}`);
     }
     if (tooltipParts.length) g.setAttribute('data-tooltip', tooltipParts.join('\n'));
@@ -7998,8 +7998,13 @@ function addSheet(name) {
  * Resolve the sheet index for a sheet_link component from its linked_sheet prop.
  * Returns -1 if the name is blank or no sheet with that name exists.
  */
+function normalizeSheetLinkValue(value) {
+  if (value === null || value === undefined) return '';
+  return String(value).trim();
+}
+
 function resolveLinkedSheetIndex(comp, sheetsArr) {
-  const name = (comp.props?.linked_sheet ?? comp.linked_sheet ?? '').trim();
+  const name = normalizeSheetLinkValue(comp.props?.linked_sheet ?? comp.linked_sheet);
   if (!name) return -1;
   return sheetsArr.findIndex(s => s.name === name);
 }
@@ -8031,8 +8036,8 @@ function validateSheetLinks(sheetsArr) {
   sheetsArr.forEach((sheet, idx) => {
     (sheet.components || []).forEach(c => {
       if (c.type !== 'sheet_link') return;
-      const linkId = (c.props?.link_id ?? c.link_id ?? '').trim();
-      const linkedSheet = (c.props?.linked_sheet ?? c.linked_sheet ?? '').trim();
+      const linkId = normalizeSheetLinkValue(c.props?.link_id ?? c.link_id);
+      const linkedSheet = normalizeSheetLinkValue(c.props?.linked_sheet ?? c.linked_sheet);
       if (!linkId) {
         issues.push({ component: c.id, sheetIndex: idx, message: 'Sheet link has no link_id' });
       }
@@ -8055,7 +8060,7 @@ function validateSheetLinks(sheetsArr) {
  * e.g. '→ Sheet 2' (source) or '← Sheet 1' (target). Empty string if unconfigured.
  */
 function getSheetLinkBadgeText(comp, sheetsArr) {
-  const name = (comp.props?.linked_sheet ?? comp.linked_sheet ?? '').trim();
+  const name = normalizeSheetLinkValue(comp.props?.linked_sheet ?? comp.linked_sheet);
   if (!name) return '';
   const arrow = comp.subtype === 'link_source' ? '→' : '←';
   return `${arrow} ${name}`;
@@ -8066,7 +8071,7 @@ function getSheetLinkBadgeText(comp, sheetsArr) {
  * partner connector. Called on double-click of any sheet_link component.
  */
 function navigateToLinkedSheet(comp) {
-  const linkId = (comp.props?.link_id ?? comp.link_id ?? '').trim();
+  const linkId = normalizeSheetLinkValue(comp.props?.link_id ?? comp.link_id);
   let targetIdx = resolveLinkedSheetIndex(comp, sheets);
   let pairedComp = null;
   if (linkId) {
@@ -8077,7 +8082,7 @@ function navigateToLinkedSheet(comp) {
     }
   }
   if (targetIdx === -1) {
-    const name = (comp.props?.linked_sheet ?? comp.linked_sheet ?? '').trim();
+    const name = normalizeSheetLinkValue(comp.props?.linked_sheet ?? comp.linked_sheet);
     showToast(`Sheet link target "${name || '(unset)'}" not found`);
     return;
   }
