@@ -38,6 +38,15 @@ function normalizeIdList(value) {
   return value.split(',').map(v => v.trim()).filter(Boolean);
 }
 
+function getConsumerLinkedPtVtId(component) {
+  return `${readField(component, 'pt_vt_id')
+    || readField(component, 'vt_id')
+    || readField(component, 'pt_id')
+    || readField(component, 'potential_transformer_id')
+    || readField(component, 'voltage_transformer_id')
+    || ''}`.trim();
+}
+
 export function runValidation(components = [], studies = {}) {
   const issues = [];
   const componentLookup = new Map(components.map(c => [c.id, c]));
@@ -159,6 +168,9 @@ export function runValidation(components = [], studies = {}) {
         `${props.meter_id ?? ''}`.trim(),
         `${props.relay_id ?? ''}`.trim(),
         ...normalizeIdList(props.consumer_ids),
+        ...components
+          .filter(target => getConsumerLinkedPtVtId(target) === `${c.id ?? ''}`.trim())
+          .map(target => `${target?.id ?? ''}`.trim()),
         ...(Array.isArray(c.connections) ? c.connections.map(conn => `${conn?.target ?? ''}`.trim()) : [])
       ].filter(Boolean)
     );
