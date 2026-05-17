@@ -351,13 +351,11 @@ function accessViolation(eq, workspace) {
         return false;
     }
   });
-  if (doorwayAccess) return false;
-
   const left = workspace.x;
   const right = state.room.width - (workspace.x + workspace.w);
   const top = workspace.y;
   const bottom = state.room.depth - (workspace.y + workspace.h);
-  const perimeterAccess = left >= 3 || right >= 3 || top >= 3 || bottom >= 3;
+  const perimeterAccess = doorwayAccess || left >= 3 || right >= 3 || top >= 3 || bottom >= 3;
   if (!perimeterAccess) return true;
 
   const hasNearbyBlocker = state.equipment.some(other => {
