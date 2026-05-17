@@ -2184,8 +2184,24 @@ function loadConduits(){
     }
   }catch(e){ console.warn('loadConduits: cache read failed', e); }
   let ductbanks=[];let conduits=[];
-  try{ductbanks=getDuctbanks();}catch(e){ console.warn('loadConduits: getDuctbanks failed', e); }
-  try{conduits=getConduits();}catch(e){ console.warn('loadConduits: getConduits failed', e); }
+  try{
+    const raw=localStorage?.getItem('ductbankSchedule');
+    if(raw!=null){
+      const parsed=JSON.parse(raw);
+      ductbanks=Array.isArray(parsed)?parsed:[];
+    }else{
+      ductbanks=getDuctbanks();
+    }
+  }catch(e){ console.warn('loadConduits: ductbankSchedule read failed', e); }
+  try{
+    const raw=localStorage?.getItem('conduitSchedule');
+    if(raw!=null){
+      const parsed=JSON.parse(raw);
+      conduits=Array.isArray(parsed)?parsed:[];
+    }else{
+      conduits=getConduits();
+    }
+  }catch(e){ console.warn('loadConduits: conduitSchedule read failed', e); }
   const flattened=[];
   ductbanks=ductbanks.map(db=>{
     (db.conduits||[]).forEach(c=>{
