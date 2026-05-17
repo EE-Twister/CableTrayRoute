@@ -138,6 +138,10 @@ async function check(name, fn) {
 async function fetchNoFollow(url, init = {}) {
   return fetch(url, { ...init, redirect: 'manual' });
 }
+function getCookieHeaderFromSetCookie(setCookieHeader) {
+  if (!setCookieHeader) return '';
+  return setCookieHeader.split(';')[0];
+}
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -182,6 +186,7 @@ process.env.OIDC_REDIRECT_URI = `${appBase}/auth/oidc/callback`;
 
 let relayUrl = null;
 let capturedState = null;
+let oidcCookie = '';
 
 await check('/auth/oidc/login redirects to IdP authorization_endpoint', async () => {
   const r = await fetchNoFollow(`${appBase}/auth/oidc/login`);
@@ -193,12 +198,14 @@ await check('/auth/oidc/login redirects to IdP authorization_endpoint', async ()
   assert.ok(capturedState, 'state parameter present');
   assert.equal(locationUrl.searchParams.get('code_challenge_method'), 'S256', 'PKCE S256 used');
   assert.ok(locationUrl.searchParams.get('code_challenge'), 'code_challenge present');
+  oidcCookie = getCookieHeaderFromSetCookie(r.headers.get('set-cookie'));
+  assert.ok(oidcCookie.startsWith('oidc_state_binding='), 'OIDC binding cookie was set');
 });
 
 // Simulate the IdP callback by calling our callback directly with the state from the login step
 await check('/auth/oidc/callback with valid code provisions user and redirects to relay', async () => {
   const callbackUrl = `${appBase}/auth/oidc/callback?code=stub_auth_code_abc123&state=${capturedState}`;
-  const r = await fetchNoFollow(callbackUrl);
+  const r = await fetchNoFollow(callbackUrl, { headers: { Cookie: oidcCookie } });
   assert.ok([301, 302, 303, 307, 308].includes(r.status), `expected redirect, got ${r.status}`);
   const location = r.headers.get('location');
   assert.ok(location.includes('oidc-relay.html'), `expected relay redirect, got ${location}`);
@@ -228,7 +235,10 @@ await check('second OIDC login for same sub reuses existing account', async () =
   const r2 = await fetchNoFollow(`${appBase}/auth/oidc/login`);
   const location2 = r2.headers.get('location');
   const state2 = new URL(location2).searchParams.get('state');
-  const r3 = await fetchNoFollow(`${appBase}/auth/oidc/callback?code=stub_auth_code_abc123&state=${state2}`);
+  const cookie2 = getCookieHeaderFromSetCookie(r2.headers.get('set-cookie'));
+  const r3 = await fetchNoFollow(`${appBase}/auth/oidc/callback?code=stub_auth_code_abc123&state=${state2}`, {
+    headers: { Cookie: cookie2 },
+  });
   const location3 = r3.headers.get('location');
   const secondUsername = new URL(location3, appBase).searchParams.get('user');
   assert.equal(secondUsername, firstUsername, 'same username on re-login');
@@ -252,7 +262,10 @@ await check('JIT-provisioned user appears in admin users list', async () => {
   // Login as OIDC user via another flow
   const r1 = await fetchNoFollow(`http://127.0.0.1:${p2}/auth/oidc/login`);
   const st = new URL(r1.headers.get('location')).searchParams.get('state');
-  const r2 = await fetchNoFollow(`http://127.0.0.1:${p2}/auth/oidc/callback?code=stub_auth_code_abc123&state=${st}`);
+  const cookie = getCookieHeaderFromSetCookie(r1.headers.get('set-cookie'));
+  const r2 = await fetchNoFollow(`http://127.0.0.1:${p2}/auth/oidc/callback?code=stub_auth_code_abc123&state=${st}`, {
+    headers: { Cookie: cookie },
+  });
   const relayParams = new URL(r2.headers.get('location'), `http://127.0.0.1:${p2}`).searchParams;
   const token = relayParams.get('token');
 
@@ -288,6 +301,14 @@ await check('callback with unknown state redirects to login with error', async (
   const r = await fetchNoFollow(`${errBase}/auth/oidc/callback?code=abc&state=not_a_real_state`);
   assert.ok([301, 302, 303].includes(r.status));
   assert.ok(r.headers.get('location').includes('error='), 'error param in redirect');
+});
+
+await check('callback without OIDC state cookie is rejected', async () => {
+  const login = await fetchNoFollow(`${errBase}/auth/oidc/login`);
+  const state = new URL(login.headers.get('location')).searchParams.get('state');
+  const callback = await fetchNoFollow(`${errBase}/auth/oidc/callback?code=stub_auth_code_abc123&state=${state}`);
+  assert.ok([301, 302, 303].includes(callback.status));
+  assert.ok(callback.headers.get('location').includes('oidc_state_invalid'), 'missing state cookie is rejected');
 });
 
 await check('callback with IdP error param redirects to login with error', async () => {

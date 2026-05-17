@@ -1828,6 +1828,29 @@ When answering queries:
   function base64urlEncode(buf) {
     return buf.toString('base64').replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
   }
+  function serializeCookie(name, value, attrs = {}) {
+    const parts = [`${name}=${encodeURIComponent(value)}`];
+    if (attrs.maxAge !== undefined) parts.push(`Max-Age=${Math.floor(Number(attrs.maxAge))}`);
+    if (attrs.path) parts.push(`Path=${attrs.path}`);
+    if (attrs.httpOnly) parts.push('HttpOnly');
+    if (attrs.secure) parts.push('Secure');
+    if (attrs.sameSite) parts.push(`SameSite=${attrs.sameSite}`);
+    return parts.join('; ');
+  }
+  function getCookieValue(req, cookieName) {
+    const header = req.headers.cookie;
+    if (!header || typeof header !== 'string') return null;
+    for (const entry of header.split(';')) {
+      const [rawName, ...rest] = entry.trim().split('=');
+      if (rawName !== cookieName) continue;
+      try {
+        return decodeURIComponent(rest.join('='));
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  }
 
   async function getOidcDiscovery(issuer) {
     if (oidcDiscoveryCache) return oidcDiscoveryCache;
@@ -1860,7 +1883,15 @@ When answering queries:
       for (const [k, v] of oidcStateStore) {
         if (Date.now() - v.createdAt > OIDC_STATE_TTL_MS) oidcStateStore.delete(k);
       }
-      oidcStateStore.set(state, { codeVerifier, createdAt: Date.now() });
+      const stateBinding = base64urlEncode(crypto.randomBytes(32));
+      oidcStateStore.set(state, { codeVerifier, stateBinding, createdAt: Date.now() });
+      res.setHeader('Set-Cookie', serializeCookie('oidc_state_binding', stateBinding, {
+        path: '/auth/oidc',
+        maxAge: Math.floor(OIDC_STATE_TTL_MS / 1000),
+        httpOnly: true,
+        sameSite: 'Lax',
+        secure: req.secure || req.headers['x-forwarded-proto'] === 'https',
+      }));
 
       const redirectUri = process.env.OIDC_REDIRECT_URI ||
         `${req.secure || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http'}://${req.get('host')}/auth/oidc/callback`;
@@ -1892,7 +1923,34 @@ When answering queries:
         res.redirect('/login.html?error=oidc_state_invalid');
         return;
       }
+      const stateBindingCookie = getCookieValue(req, 'oidc_state_binding');
+      const expectedBinding = Buffer.from(flow.stateBinding || '');
+      const providedBinding = Buffer.from(stateBindingCookie || '');
+      if (
+        !flow.stateBinding ||
+        !stateBindingCookie ||
+        expectedBinding.length !== providedBinding.length ||
+        !crypto.timingSafeEqual(expectedBinding, providedBinding)
+      ) {
+        oidcStateStore.delete(String(state));
+        res.setHeader('Set-Cookie', serializeCookie('oidc_state_binding', '', {
+          path: '/auth/oidc',
+          maxAge: 0,
+          httpOnly: true,
+          sameSite: 'Lax',
+          secure: req.secure || req.headers['x-forwarded-proto'] === 'https',
+        }));
+        res.redirect('/login.html?error=oidc_state_invalid');
+        return;
+      }
       oidcStateStore.delete(String(state));
+      res.setHeader('Set-Cookie', serializeCookie('oidc_state_binding', '', {
+        path: '/auth/oidc',
+        maxAge: 0,
+        httpOnly: true,
+        sameSite: 'Lax',
+        secure: req.secure || req.headers['x-forwarded-proto'] === 'https',
+      }));
 
       const issuer = process.env.OIDC_ISSUER;
       const clientId = process.env.OIDC_CLIENT_ID;
