@@ -333,8 +333,9 @@ export function exportProcurementCSV(report) {
   const CRLF = '\r\n';
 
   function esc(v) {
-    const s = String(v ?? '');
-    return s.includes(',') || s.includes('"') || s.includes('\n')
+    const raw = String(v ?? '');
+    const s = /^[=+\-@\t\r]/.test(raw) ? `'${raw}` : raw;
+    return s.includes(',') || s.includes('"') || s.includes('\n') || s.includes('\r')
       ? `"${s.replace(/"/g, '""')}"` : s;
   }
 
