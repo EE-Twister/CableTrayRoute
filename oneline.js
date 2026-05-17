@@ -5110,6 +5110,38 @@ function resolveVoltageMagnitude(component) {
   return null;
 }
 
+
+function getFiniteVoltageMagnitudes(voltageMag) {
+  if (typeof voltageMag === 'number') {
+    return Number.isFinite(voltageMag) ? [voltageMag] : [];
+  }
+  if (!voltageMag || typeof voltageMag !== 'object') return [];
+  const mags = [];
+  for (const value of Object.values(voltageMag)) {
+    const numeric = Number(value);
+    if (Number.isFinite(numeric)) mags.push(numeric);
+  }
+  return mags;
+}
+
+function getVoltageMagnitudeEntries(voltageMag) {
+  if (!voltageMag || typeof voltageMag !== 'object') return [];
+  const entries = [];
+  for (const [phase, value] of Object.entries(voltageMag)) {
+    const numeric = Number(value);
+    if (Number.isFinite(numeric)) entries.push([phase, numeric]);
+  }
+  return entries;
+}
+
+function sanitizeOverlayStudyFields(component) {
+  if (!component || typeof component !== 'object') return component;
+  const cleanedMags = getFiniteVoltageMagnitudes(component.voltage_mag);
+  if (component.voltage_mag !== undefined && cleanedMags.length === 0) {
+    delete component.voltage_mag;
+  }
+  return component;
+}
 function computeComponentOperatingVoltage(component) {
   if (!component) return null;
   const nominal = resolveNominalVoltage(component);
@@ -5769,6 +5801,7 @@ function normalizeComponent(c) {
       typeof conn === 'string' ? { target: conn } : conn
     )
   };
+  sanitizeOverlayStudyFields(nc);
   if (typeof nc.labelOffset !== 'object' || nc.labelOffset === null) {
     nc.labelOffset = { x: 0, y: 0 };
   } else {
@@ -6829,9 +6862,13 @@ function render() {
     }
     const cx = c.x + w / 2;
     const cy = c.y + h / 2;
-    if (showOverlays && c.voltage_mag !== undefined) {
-      const mags = typeof c.voltage_mag === 'object' ? Object.values(c.voltage_mag) : [c.voltage_mag];
-      const dev = Math.max(...mags.map(v => Math.abs(v - 1) * 100));
+    const voltageMagnitudes = getFiniteVoltageMagnitudes(c.voltage_mag);
+    if (showOverlays && voltageMagnitudes.length) {
+      let dev = 0;
+      for (const mag of voltageMagnitudes) {
+        const magDev = Math.abs(mag - 1) * 100;
+        if (magDev > dev) dev = magDev;
+      }
       let color = '#4caf50';
       if (dev > 10) color = '#f44336';
       else if (dev > 5) color = '#ffeb3b';
@@ -6844,20 +6881,21 @@ function render() {
       overlay.setAttribute('opacity', 0.3);
       g.appendChild(overlay);
     }
-    if (showOverlays && (c.voltage_mag !== undefined || c.shortCircuit?.threePhaseKA !== undefined)) {
+    const voltageMagnitudeEntries = getVoltageMagnitudeEntries(c.voltage_mag);
+    if (showOverlays && (voltageMagnitudeEntries.length || c.shortCircuit?.threePhaseKA !== undefined)) {
       const txt = document.createElementNS(svgNS, 'text');
       txt.setAttribute('x', cx);
       txt.setAttribute('y', cy - (h / 2) - 4);
       txt.setAttribute('text-anchor', 'middle');
       txt.setAttribute('class', 'overlay-label');
       const parts = [];
-      if (c.voltage_mag !== undefined) {
+      if (voltageMagnitudeEntries.length) {
         if (typeof c.voltage_mag === 'object') {
-          parts.push(Object.entries(c.voltage_mag)
-            .map(([ph, v]) => `${ph}:${Number(v).toFixed(3)} pu`)
+          parts.push(voltageMagnitudeEntries
+            .map(([ph, v]) => `${ph}:${v.toFixed(3)} pu`)
             .join(' '));
         } else {
-          parts.push(`${Number(c.voltage_mag).toFixed(3)} pu`);
+          parts.push(`${voltageMagnitudeEntries[0][1].toFixed(3)} pu`);
         }
       }
       if (c.shortCircuit?.threePhaseKA !== undefined) {
