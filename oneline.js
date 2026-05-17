@@ -1104,7 +1104,7 @@ const transformerConnectionOptions = [
   'Open Delta',
   'Open Wye'
 ];
-const manufacturerModels = {
+const manufacturerModels = Object.freeze({
   ABB: ['MNS', 'SafeGear'],
   Siemens: ['SB1', 'S6'],
   GE: ['EntelliGuard', 'Spectra'],
@@ -1112,7 +1112,14 @@ const manufacturerModels = {
   Caterpillar: ['XQ125', 'C175'],
   Cummins: ['C900', 'QSK60'],
   Generac: ['G2000', 'Industrial']
-};
+});
+const manufacturerOptions = Object.keys(manufacturerModels);
+
+function getManufacturerModels(manu) {
+  if (!Object.hasOwn(manufacturerModels, manu)) return [];
+  const models = manufacturerModels[manu];
+  return Array.isArray(models) ? models : [];
+}
 
 function createTuningField(name, label, type, help) {
   return {
@@ -8896,11 +8903,11 @@ function selectComponent(compOrId) {
           return { ...f, type: 'select', options: thermalRatings };
         }
         if (f.name === 'manufacturer') {
-          return { ...f, type: 'select', options: Object.keys(manufacturerModels) };
+          return { ...f, type: 'select', options: manufacturerOptions };
         }
         if (f.name === 'model') {
-          const manu = targetComp.manufacturer || Object.keys(manufacturerModels)[0];
-          return { ...f, type: 'select', options: manufacturerModels[manu] || [] };
+          const manu = targetComp.manufacturer || manufacturerOptions[0];
+          return { ...f, type: 'select', options: getManufacturerModels(manu) };
         }
         if (
           targetComp.type === 'transformer'
@@ -10420,7 +10427,7 @@ function selectComponent(compOrId) {
 
     if (manufacturerInput && modelInput) {
       const updateModels = () => {
-        const models = manufacturerModels[manufacturerInput.value] || [];
+        const models = getManufacturerModels(manufacturerInput.value);
         modelInput.innerHTML = '';
         models.forEach(m => {
           const o = document.createElement('option');
@@ -10431,7 +10438,7 @@ function selectComponent(compOrId) {
         });
       };
       manufacturerInput.addEventListener('change', updateModels);
-      if (!manufacturerInput.value) manufacturerInput.value = Object.keys(manufacturerModels)[0];
+      if (!manufacturerInput.value) manufacturerInput.value = manufacturerOptions[0];
       updateModels();
     }
 
