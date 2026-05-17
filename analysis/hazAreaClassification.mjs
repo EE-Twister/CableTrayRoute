@@ -139,7 +139,7 @@ export const T_RATINGS = Object.freeze([
  * Each protection type is permitted in specific zones.
  */
 export const EX_PROTECTION_TYPES = Object.freeze([
-  { value: 'd',   label: 'Ex d — Flameproof enclosure',           zones: ['0','1','2'], dustZones: [] },
+  { value: 'd',   label: 'Ex d — Flameproof enclosure',           zones: ['1','2'],     dustZones: [] },
   { value: 'e',   label: 'Ex e — Increased safety',               zones: ['1','2'],     dustZones: [] },
   { value: 'ia',  label: 'Ex ia — Intrinsic safety (Cat ia)',      zones: ['0','1','2'], dustZones: ['20','21','22'] },
   { value: 'ib',  label: 'Ex ib — Intrinsic safety (Cat ib)',      zones: ['1','2'],     dustZones: ['21','22'] },

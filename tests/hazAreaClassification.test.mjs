@@ -322,6 +322,14 @@ describe('checkEquipmentCompatibility — protection type vs zone', () => {
     assert.ok(pass);
   });
 
+  it('Ex d fails Zone 0 (generic flameproof is not Zone 0 rated)', () => {
+    const { pass, failures } = checkEquipmentCompatibility(
+      { id: 'e1', label: 'Motor', exProtection: 'd' }, zone0
+    );
+    assert.ok(!pass);
+    assert.ok(failures.length > 0);
+  });
+
   it('Ex e fails Zone 0 (not rated for continuous exposure)', () => {
     const { pass, failures } = checkEquipmentCompatibility(
       { id: 'e1', label: 'JB', exProtection: 'e' }, zone0
