@@ -249,11 +249,16 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       // Accumulate cable weight per tray
-      const trayWeightMap = {};
-      trays.forEach(t => { trayWeightMap[t.tray_id] = 0; });
+      const trayWeightMap = Object.create(null);
+      trays.forEach(t => {
+        const trayId = t?.tray_id;
+        if (typeof trayId === 'string' && trayId.length > 0) {
+          trayWeightMap[trayId] = 0;
+        }
+      });
       cables.forEach(cable => {
         const trayId = cable.route_preference;
-        if (trayId && trayWeightMap[trayId] !== undefined) {
+        if (typeof trayId === 'string' && Object.hasOwn(trayWeightMap, trayId)) {
           let w = 0;
           if (cable.weight_lb_ft != null) {
             w = parseFloat(cable.weight_lb_ft) || 0;
@@ -281,7 +286,8 @@ document.addEventListener('DOMContentLoaded', () => {
             ...aerodynamicInputs,
           });
         } catch { /* skip trays with invalid data */ }
-        const cableWeight = trayWeightMap[tray.tray_id] || 0;
+        const rawCableWeight = Object.hasOwn(trayWeightMap, tray.tray_id) ? trayWeightMap[tray.tray_id] : 0;
+        const cableWeight = Number.isFinite(rawCableWeight) ? rawCableWeight : 0;
         const capacity = result ? checkNemaCapacity({
           cableWeight_lbs_ft: cableWeight,
           windForce_per_ft: result.windForce_per_ft,
