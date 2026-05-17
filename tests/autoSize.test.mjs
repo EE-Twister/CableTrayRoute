@@ -728,6 +728,14 @@ describe('minimizeCostConductors', () => {
     });
   });
 
+
+  it('enforces NEC 240.4(D) in cost optimization for small conductors', () => {
+    const opts = minimizeCostConductors(25, 75, { allowAluminum: false, maxParallel: 1 });
+    assert.ok(opts.length > 0);
+    assert.strictEqual(opts[0].size, '#10 AWG');
+    assert.ok(!opts.some(opt => opt.size === '#12 AWG'));
+  });
+
   it('all installed ampacities satisfy the required load', () => {
     const required = 200;
     const opts = minimizeCostConductors(required, 75);
