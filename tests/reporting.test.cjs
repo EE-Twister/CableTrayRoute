@@ -38,6 +38,22 @@ function it(name, fn){
       const pdf = await toPDF('Test', headers, rows);
       assert(pdf.byteLength > 0);
     });
+
+    it('neutralizes spreadsheet formula strings in CSV cells', () => {
+      const headers = ['name', 'value'];
+      const rows = [{ name: '=HYPERLINK("https://example.com")', value: '  +SUM(1,2)' }];
+      const csv = toCSV(headers, rows);
+      assert(csv.includes("'=HYPERLINK"));
+      assert(csv.includes("'  +SUM(1,2)"));
+    });
+
+    it('keeps numeric values unchanged for CSV exports', () => {
+      const headers = ['delta'];
+      const rows = [{ delta: -5 }];
+      const csv = toCSV(headers, rows);
+      assert(csv.includes('-5'));
+      assert(!csv.includes("'-5"));
+    });
   });
 
   describe('label templates', () => {

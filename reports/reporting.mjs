@@ -46,17 +46,22 @@ async function ensureJsPDF() {
  * @param {Array<Object>} rows
  * @returns {string}
  */
+function sanitizeCsvCell(value) {
+  const raw = value ?? '';
+  let cell = String(raw);
+  if (typeof raw === 'string' && /^[\s]*[=+\-@]/.test(cell)) {
+    cell = `'${cell}`;
+  }
+  if (cell.includes(',') || cell.includes('"')) {
+    cell = '"' + cell.replace(/"/g, '""') + '"';
+  }
+  return cell;
+}
+
 export function toCSV(headers = [], rows = []) {
   const lines = [headers.join(',')];
   rows.forEach(r => {
-    const line = headers.map(h => {
-      const val = r[h] ?? '';
-      let cell = String(val);
-      if (cell.includes(',') || cell.includes('"')) {
-        cell = '"' + cell.replace(/"/g, '""') + '"';
-      }
-      return cell;
-    }).join(',');
+    const line = headers.map(h => sanitizeCsvCell(r[h])).join(',');
     lines.push(line);
   });
   return lines.join('\n');
