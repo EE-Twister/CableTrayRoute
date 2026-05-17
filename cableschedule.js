@@ -566,6 +566,22 @@ async function initCableSchedule() {
   };
 
   const cloneTemplates = templates => (Array.isArray(templates) ? templates.map(t => JSON.parse(JSON.stringify(t))) : []);
+
+  const MAX_TEMPLATE_IMPORT_FILE_BYTES = 2 * 1024 * 1024;
+  const MAX_TEMPLATE_IMPORT_COUNT = 500;
+  const MAX_TEMPLATE_IMPORT_FIELD_LENGTH = 512;
+
+  const truncateImportedTemplateValues = (input = {}) => {
+    const out = {};
+    Object.entries(input || {}).forEach(([key, value]) => {
+      if (typeof value === 'string') {
+        out[key] = value.slice(0, MAX_TEMPLATE_IMPORT_FIELD_LENGTH);
+      } else {
+        out[key] = value;
+      }
+    });
+    return out;
+  };
   const filterTemplateFields = (input = {}, options = {}) => {
     const { keepLabel = true, keepTypicalId = false } = options;
     const copy = { ...input };
@@ -1538,6 +1554,11 @@ async function initCableSchedule() {
         const name = (file.name || '').toLowerCase();
         const type = (file.type || '').toLowerCase();
         const isExcel = name.endsWith('.xlsx') || type.includes('spreadsheet');
+        if (typeof file.size === 'number' && file.size > MAX_TEMPLATE_IMPORT_FILE_BYTES) {
+          showAlertModal('Import Error', 'Selected file is too large. Maximum import size is 2 MB.');
+          resetInput();
+          return;
+        }
         let candidates;
         if (isExcel) {
           if (typeof XLSX === 'undefined' || !XLSX || typeof XLSX.read !== 'function' || !XLSX.utils || typeof XLSX.utils.sheet_to_json !== 'function') {
@@ -1592,6 +1613,11 @@ async function initCableSchedule() {
           resetInput();
           return;
         }
+        if (candidates.length > MAX_TEMPLATE_IMPORT_COUNT) {
+          showAlertModal('Import Error', `Selected file contains too many cable typicals. Maximum allowed is ${MAX_TEMPLATE_IMPORT_COUNT}.`);
+          resetInput();
+          return;
+        }
         const existingIds = new Set(
           (this.templates || [])
             .map(tpl => tpl && tpl.template_id)
@@ -1599,6 +1625,7 @@ async function initCableSchedule() {
         );
         const imported = candidates
           .map(tpl => filterTemplateFields(tpl, { keepLabel: true, keepTypicalId: true }))
+          .map(tpl => truncateImportedTemplateValues(tpl))
           .map(tpl => {
             const copy = { ...tpl };
             copy.template_id = copy.template_id || generateTemplateId();
