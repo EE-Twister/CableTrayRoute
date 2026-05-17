@@ -100,12 +100,26 @@ function voltageStatus(vm, min, max) {
  * @param {number} baseMVA
  * @returns {Array<{busId:string, Pm_pu:number}>}
  */
+function getGenerationKw(bus) {
+  if (!bus || typeof bus !== 'object') return 0;
+
+  if (bus.generation && typeof bus.generation === 'object') {
+    const kw = bus.generation.kw ?? bus.generation.kW;
+    if (Number.isFinite(kw)) return kw;
+  }
+
+  if (Number.isFinite(bus.Pg)) return bus.Pg;
+  if (Number.isFinite(bus.gen_MW)) return bus.gen_MW * 1000;
+
+  return 0;
+}
+
 function identifyGeneratorBuses(model, baseMVA) {
   const gens = [];
   for (const bus of (model.buses || [])) {
-    const Pg = bus.Pg ?? bus.gen_MW ?? bus.generation ?? 0;
-    if (Number.isFinite(Pg) && Pg > 0) {
-      gens.push({ busId: bus.id, Pm_pu: Pg / baseMVA });
+    const Pg_kw = getGenerationKw(bus);
+    if (Number.isFinite(Pg_kw) && Pg_kw > 0) {
+      gens.push({ busId: bus.id, Pm_pu: (Pg_kw / 1000) / baseMVA });
     }
   }
   return gens;
