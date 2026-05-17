@@ -1,5 +1,6 @@
 import assert from 'assert';
 import { calculateTransformerImpedance } from '../utils/transformerImpedance.js';
+import { normalizeVoltageToVolts } from '../utils/voltage.js';
 import {
   computeTransformerBaseKV,
   deriveTransformerBaseKV,
@@ -115,4 +116,10 @@ const approxEqual = (a, b, tolerance = 1e-9) => {
   approxEqual(Number(impedanceFromBase.x.toFixed(6)), 0.0055, 1e-5);
   approxEqual(Number(impedanceFromPrefault.r.toFixed(6)), 0.00055, 1e-6);
   approxEqual(Number(impedanceFromPrefault.x.toFixed(6)), 0.0055, 1e-5);
+}
+
+// Scientific-notation voltage strings should normalize correctly in volts.
+{
+  const volts = normalizeVoltageToVolts('4.16e3 V');
+  approxEqual(volts, 4160, 1e-9);
 }
