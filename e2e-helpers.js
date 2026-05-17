@@ -2,13 +2,8 @@ export const E2E = new URLSearchParams(location.search).get('e2e') === '1';
 
 export function suppressResumeIfE2E() {
   if (!E2E) return;
-  // Do NOT clear storage by default; only when ?e2e_reset=1 is present.
-  const qs = new URLSearchParams(location.search);
-  const shouldClear = qs.has('e2e_reset');
-  if (shouldClear) {
-    try { localStorage.clear(); sessionStorage.clear(); } catch {}
-  }
-  // Do NOT auto-click resume buttons. Let tests click #resume-no-btn.
+  // Never clear browser storage from URL-controlled E2E flags.
+  // Let tests control resume behavior via the modal buttons only.
 }
 
 // Show resume modal in E2E so tests can click the No button
