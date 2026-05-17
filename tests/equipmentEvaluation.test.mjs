@@ -359,6 +359,21 @@ describe('buildEquipmentReport()', () => {
     assert.strictEqual(rows[0].length, REPORT_HEADERS.length);
   });
 
+  it('neutralizes spreadsheet formula prefixes in report cells', () => {
+    const evals = [{
+      id: '=2+3',
+      label: '@cmd',
+      type: 'breaker',
+      status: 'fail',
+      checks: {
+        aic: { status: 'fail', ratingKA: 10, faultKA: 20, marginKA: -10 },
+      },
+    }];
+    const [row] = buildEquipmentReport(evals);
+    assert.strictEqual(row[0], "'=2+3");
+    assert.strictEqual(row[1], "'@cmd");
+  });
+
   it('returns empty array for empty evaluations', () => {
     assert.deepStrictEqual(buildEquipmentReport([]), []);
   });

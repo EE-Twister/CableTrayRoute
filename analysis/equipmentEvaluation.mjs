@@ -379,15 +379,15 @@ export function buildEquipmentReport(evaluations) {
       const rating  = _checkRatingStr(checkName, result);
       const notes   = _checkNotes(checkName, result);
       rows.push([
-        entry.id,
-        entry.label,
-        entry.type,
-        checkName,
-        result.status,
-        rating,
-        result.faultKA  != null ? String(result.faultKA)  : '',
-        result.marginKA != null ? String(result.marginKA) : '',
-        notes,
+        _escapeSpreadsheetCell(entry.id),
+        _escapeSpreadsheetCell(entry.label),
+        _escapeSpreadsheetCell(entry.type),
+        _escapeSpreadsheetCell(checkName),
+        _escapeSpreadsheetCell(result.status),
+        _escapeSpreadsheetCell(rating),
+        _escapeSpreadsheetCell(result.faultKA  != null ? String(result.faultKA)  : ''),
+        _escapeSpreadsheetCell(result.marginKA != null ? String(result.marginKA) : ''),
+        _escapeSpreadsheetCell(notes),
       ]);
     }
   }
@@ -411,6 +411,11 @@ export function summariseEvaluation(evaluations) {
 // ---------------------------------------------------------------------------
 // Private helpers
 // ---------------------------------------------------------------------------
+
+function _escapeSpreadsheetCell(value) {
+  const cell = String(value ?? '');
+  return /^[=+\-@]/.test(cell) ? `'${cell}` : cell;
+}
 
 function numOrNull(v) {
   const n = Number(v);
