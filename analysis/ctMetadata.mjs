@@ -5,10 +5,10 @@ function coerceNumber(value) {
 
 function readField(comp, key) {
   if (!comp || typeof comp !== 'object') return undefined;
-  if (Object.prototype.hasOwnProperty.call(comp, key)) return comp[key];
   if (comp.props && typeof comp.props === 'object' && Object.prototype.hasOwnProperty.call(comp.props, key)) {
     return comp.props[key];
   }
+  if (Object.prototype.hasOwnProperty.call(comp, key)) return comp[key];
   return undefined;
 }
 
@@ -22,7 +22,7 @@ export function isCtComponent(comp) {
 export function parseCtRatio(ctLike) {
   const primary = coerceNumber(readField(ctLike, 'ratio_primary'));
   const secondary = coerceNumber(readField(ctLike, 'ratio_secondary'));
-  if (!Number.isFinite(primary) || !Number.isFinite(secondary) || secondary <= 0) {
+  if (!Number.isFinite(primary) || !Number.isFinite(secondary) || primary <= 0 || secondary <= 0 || primary < secondary) {
     return null;
   }
   return {
