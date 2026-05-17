@@ -890,7 +890,7 @@ export function exportProject() {
     mccLineups: getMccLineups(),
     settings: {}
   };
-  const reserved = new Set([...Object.values(KEYS), EXTRA_KEYS.mccLineups, 'CTR_PROJECT_V1']);
+  const reserved = new Set([...Object.values(KEYS), EXTRA_KEYS.mccLineups, REVISION_KEY, 'CTR_PROJECT_V1']);
   for (const key of keys()) {
     if (!reserved.has(key)) {
       project.settings[key] = getItem(key);
@@ -1029,7 +1029,7 @@ export function importProject(obj) {
     setOneLine({ activeSheet: 0, sheets: [] });
   }
 
-  const reserved = new Set([...Object.values(KEYS), EXTRA_KEYS.mccLineups, 'CTR_PROJECT_V1']);
+  const reserved = new Set([...Object.values(KEYS), EXTRA_KEYS.mccLineups, REVISION_KEY, 'CTR_PROJECT_V1']);
   for (const key of keys()) {
     if (!reserved.has(key) && !(data.settings && key in data.settings)) {
       removeItem(key);
@@ -1037,7 +1037,9 @@ export function importProject(obj) {
   }
   if (data.settings) {
     for (const [k, v] of Object.entries(data.settings)) {
-      setItem(k, v);
+      if (!reserved.has(k)) {
+        setItem(k, v);
+      }
     }
   }
   if (importScenario) switchScenario(importScenario);
