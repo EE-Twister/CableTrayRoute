@@ -147,9 +147,6 @@ function ensureComponentField(component, key, defaultValue) {
     return;
   }
   if (hasRootValue || hasPropValue) return;
-  const nextValue = typeof defaultValue === 'function' ? defaultValue(component) : defaultValue;
-  component[key] = nextValue;
-  component.props[key] = nextValue;
 }
 
 function applySubtypeDefaults(component, subtype) {
