@@ -88,11 +88,23 @@ export function resolveTransformerXrRatio(record) {
   return pickNumeric(record, xrKeys);
 }
 
+function parseExplicitBaseKV(raw) {
+  if (raw === null || raw === undefined) return null;
+  if (typeof raw === 'number') return Number.isFinite(raw) ? raw : null;
+  if (typeof raw === 'string') {
+    const trimmed = raw.trim();
+    if (!trimmed) return null;
+    if (/[a-zA-Z]/.test(trimmed)) return toBaseKV(trimmed);
+    return parseNumeric(trimmed);
+  }
+  return toBaseKV(raw);
+}
+
 export function readTransformerBaseKV(record) {
   const baseKeys = ['baseKV', 'kV', 'kv', 'prefault_voltage'];
   for (const key of baseKeys) {
     const raw = getCandidateValue(record, key);
-    const kv = parseNumeric(raw);
+    const kv = parseExplicitBaseKV(raw);
     if (Number.isFinite(kv) && kv > 0) return kv;
   }
   return null;
