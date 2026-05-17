@@ -615,7 +615,8 @@ export function runValidation(components = [], studies = {}) {
 
   // Differential relay (87) required field completeness
   components.forEach(c => {
-    const isRelay87 = c?.subtype === 'relay_87';
+    const subtype = `${c?.subtype ?? ''}`.trim();
+    const isRelay87 = c?.type === 'relay' && (subtype === 'relay_87' || subtype.endsWith('_relay_87'));
     if (!isRelay87) return;
     const props = c.props && typeof c.props === 'object' ? c.props : c;
     const missing = [];
