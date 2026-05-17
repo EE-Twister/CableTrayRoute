@@ -1,4 +1,4 @@
-import { normalizeVoltageToVolts } from './voltage.js';
+import { normalizeVoltageToVolts, toBaseKV } from './voltage.js';
 
 function parseNumeric(raw) {
   if (raw === null || raw === undefined) return null;
@@ -16,6 +16,19 @@ function parseNumeric(raw) {
   return null;
 }
 
+
+function parseExplicitBaseKV(raw) {
+  if (raw === null || raw === undefined) return null;
+  if (typeof raw === 'number') return Number.isFinite(raw) ? raw : null;
+  if (typeof raw === 'string') {
+    const trimmed = raw.trim();
+    if (!trimmed) return null;
+    if (/[a-zA-Z]/.test(trimmed)) return toBaseKV(trimmed);
+    return parseNumeric(trimmed);
+  }
+  return toBaseKV(raw);
+}
+
 function resolveVoltageKV(inputs) {
   if (!inputs) return null;
   if (inputs.voltageKV !== undefined && inputs.voltageKV !== null) {
@@ -30,7 +43,7 @@ function resolveVoltageKV(inputs) {
     if (kv > 0) return kv;
   }
   if (inputs.baseKV !== undefined || inputs.prefault_voltage !== undefined) {
-    const kv = parseNumeric(inputs.baseKV ?? inputs.prefault_voltage);
+    const kv = parseExplicitBaseKV(inputs.baseKV ?? inputs.prefault_voltage);
     if (Number.isFinite(kv) && kv > 0) return kv;
   }
   return null;

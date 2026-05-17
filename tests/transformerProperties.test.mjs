@@ -89,3 +89,30 @@ const approxEqual = (a, b, tolerance = 1e-9) => {
   approxEqual(Number(impedance.r.toFixed(6)), 0.53732, 1e-6);
   approxEqual(Number(impedance.x.toFixed(6)), 5.373201, 1e-6);
 }
+
+
+// Explicit unit-suffixed baseKV/prefault_voltage fields must be parsed with units
+{
+  const baseKV = computeTransformerBaseKV({ baseKV: '480 V' });
+  approxEqual(baseKV, 0.48, 1e-9);
+
+  const impedanceFromBase = calculateTransformerImpedance({
+    kva: 2500,
+    percentZ: 6,
+    xrRatio: 10,
+    baseKV: '480 V'
+  });
+  const impedanceFromPrefault = calculateTransformerImpedance({
+    kva: 2500,
+    percentZ: 6,
+    xrRatio: 10,
+    prefault_voltage: '480 V'
+  });
+
+  assert(impedanceFromBase, 'Impedance should be calculated for unit-suffixed baseKV');
+  assert(impedanceFromPrefault, 'Impedance should be calculated for unit-suffixed prefault voltage');
+  approxEqual(Number(impedanceFromBase.r.toFixed(6)), 0.00055, 1e-6);
+  approxEqual(Number(impedanceFromBase.x.toFixed(6)), 0.0055, 1e-5);
+  approxEqual(Number(impedanceFromPrefault.r.toFixed(6)), 0.00055, 1e-6);
+  approxEqual(Number(impedanceFromPrefault.x.toFixed(6)), 0.0055, 1e-5);
+}
