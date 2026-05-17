@@ -4079,8 +4079,13 @@ if (autoCoordBtn) {
 if (exportCtiBtn) {
   exportCtiBtn.addEventListener('click', () => {
     if (!lastCoordState) return;
-    const { deviceEntries, result, maxFaultA, margin } = lastCoordState;
-    const rows = buildCTIRows(deviceEntries, result, maxFaultA, margin);
+    const { deviceEntries, result, gfpResult, maxFaultA, margin } = lastCoordState;
+    const phaseEntries = deviceEntries.filter(entry => !entry.device?.groundFault);
+    const gfpEntries = deviceEntries.filter(entry => entry.device?.groundFault === true);
+    const rows = [
+      ...buildCTIRows(phaseEntries, result, maxFaultA, margin),
+      ...buildCTIRows(gfpEntries, gfpResult, maxFaultA, margin)
+    ];
     downloadCSV(CTI_HEADERS, rows, 'coordination-cti-report.csv');
   });
 }
