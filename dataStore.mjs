@@ -241,7 +241,7 @@ export const setDrcAcceptedFindings = list => write(EXTRA_KEYS.drcAcceptedFindin
 /**
  * Study-level engineer approval / PE stamp records.
  * Keyed by study name (e.g. 'arcFlash', 'loadFlow', 'shortCircuit').
- * Each entry: { status: 'pending'|'approved'|'flagged', reviewedBy, approvedAt, note }
+ * Each entry: { status: 'pending'|'flagged', reviewedBy, approvedAt, note }
  * @returns {Object.<string, {status:string, reviewedBy:string, approvedAt:string, note:string}>}
  */
 export const getStudyApprovals = () => read(EXTRA_KEYS.studyApprovals, {});
@@ -253,7 +253,15 @@ export const getStudyApprovals = () => read(EXTRA_KEYS.studyApprovals, {});
  */
 export const setStudyApproval = (studyKey, approval) => {
   const all = getStudyApprovals();
-  all[studyKey] = { ...all[studyKey], ...approval };
+  const status = approval?.status === 'flagged' ? 'flagged' : 'pending';
+  all[studyKey] = {
+    ...all[studyKey],
+    ...approval,
+    status,
+    reviewedBy: typeof approval?.reviewedBy === 'string' ? approval.reviewedBy : (all[studyKey]?.reviewedBy || ''),
+    approvedAt: typeof approval?.approvedAt === 'string' ? approval.approvedAt : (all[studyKey]?.approvedAt || ''),
+    note: typeof approval?.note === 'string' ? approval.note : (all[studyKey]?.note || ''),
+  };
   write(EXTRA_KEYS.studyApprovals, all);
 };
 

@@ -21,13 +21,11 @@ const TODAY = new Date().toISOString().split('T')[0];
 
 const STATUS_LABELS = {
   pending:  'Pending Review',
-  approved: 'Approved by PE',
   flagged:  'Flagged — Needs Attention',
 };
 
 const STATUS_BADGE_CLASS = {
   pending:  'approval-badge--pending',
-  approved: 'approval-badge--approved',
   flagged:  'approval-badge--flagged',
 };
 
@@ -52,11 +50,12 @@ function esc(s) {
  * @returns {string} HTML string
  */
 export function getApprovalBadgeHTML(approval) {
-  if (!approval || approval.status === 'pending') {
+  const normalizedStatus = approval?.status === 'flagged' ? 'flagged' : 'pending';
+  if (!approval || normalizedStatus === 'pending') {
     return '<span class="approval-badge approval-badge--pending">● Pending Review</span>';
   }
-  const cls  = esc(STATUS_BADGE_CLASS[approval.status] ?? 'approval-badge--pending');
-  const lbl  = esc(STATUS_LABELS[approval.status]      ?? approval.status);
+  const cls  = esc(STATUS_BADGE_CLASS[normalizedStatus] ?? 'approval-badge--pending');
+  const lbl  = esc(STATUS_LABELS[normalizedStatus]      ?? approval.status);
   const by   = approval.reviewedBy ? ` — ${esc(approval.reviewedBy)}` : '';
   const date = approval.approvedAt ? `, ${esc(approval.approvedAt)}` : '';
   return `<span class="approval-badge ${cls}">● ${lbl}${by}${date}</span>`;
@@ -119,11 +118,10 @@ export function initStudyApprovalPanel(studyKey, containerId = 'study-review-pan
           <label for="${statusId}">Status</label>
           <select id="${statusId}" name="status" aria-describedby="${statusId}-hint">
             <option value="pending">Pending Review</option>
-            <option value="approved">Approved by PE</option>
-            <option value="flagged">Flagged — Needs Attention</option>
+                        <option value="flagged">Flagged — Needs Attention</option>
           </select>
           <span id="${statusId}-hint" class="field-hint">
-            Set to <em>Approved by PE</em> once the study results have been reviewed and accepted.
+            Approval stamping requires authenticated server-side review. This panel stores local coordination notes only.
           </span>
         </div>
 
@@ -133,7 +131,7 @@ export function initStudyApprovalPanel(studyKey, containerId = 'study-review-pan
                  placeholder="Name, title, or initials"
                  autocomplete="name"
                  aria-describedby="${byId}-hint">
-          <span id="${byId}-hint" class="field-hint">PE name, initials, or licence number.</span>
+          <span id="${byId}-hint" class="field-hint">Reviewer name or initials (informational only).</span>
         </div>
 
         <div class="auth-field">
@@ -141,7 +139,7 @@ export function initStudyApprovalPanel(studyKey, containerId = 'study-review-pan
           <input id="${dateId}" name="approvedAt" type="date"
                  value="${TODAY}"
                  aria-describedby="${dateId}-hint">
-          <span id="${dateId}-hint" class="field-hint">Date of review (defaults to today).</span>
+          <span id="${dateId}-hint" class="field-hint">Review date (informational only).</span>
         </div>
 
         <div class="auth-field">
