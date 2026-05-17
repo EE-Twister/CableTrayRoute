@@ -45,12 +45,7 @@ function setReadyWhen(selector, attrName, id, timeoutMs = 25000) {
 
 function suppressResumeIfE2E() {
   if (!E2E) return;
-  // Do NOT clear storage by default; only when ?e2e_reset=1 is present.
-  const qs = new URLSearchParams(location.search);
-  const shouldClear = qs.has('e2e_reset');
-  if (shouldClear) {
-    try { localStorage.clear(); sessionStorage.clear(); } catch {}
-  }
+  // Never clear user storage from URL-controlled flags on production pages.
   // Do NOT auto-click resume buttons. Let tests click #resume-no-btn.
 }
 
