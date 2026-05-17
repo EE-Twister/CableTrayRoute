@@ -207,6 +207,10 @@ export function groupCablesIntoPulls(routeResults = [], cableList = []) {
       conductor_size: cableSpec.conductor_size || result.conductor_size || '',
       diameter: parseFloat(cableSpec.diameter) || parseFloat(result.diameter) || 0,
       weight: parseFloat(cableSpec.weight) || parseFloat(result.weight) || 0,
+      parallel_count: Math.max(
+        1,
+        parseInt(cableSpec.parallel_count ?? result.parallel_count, 10) || 1
+      ),
       allowed_cable_group: cableSpec.allowed_cable_group || '',
     });
   }
