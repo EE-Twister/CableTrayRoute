@@ -836,6 +836,23 @@ function getCustomPhaseLoadsForSpan(panel, detail, spanCircuits) {
   return totals;
 }
 
+function getPhaseLoadsForSpan(panel, detail, spanCircuits, defaultTotalPower) {
+  const totals = new Map();
+  if (!panel || !Array.isArray(spanCircuits) || !spanCircuits.length) return totals;
+  const share = Number.isFinite(defaultTotalPower) ? defaultTotalPower / spanCircuits.length : null;
+  spanCircuits.forEach(circuit => {
+    const block = getBreakerBlock(panel, circuit);
+    const phaseLabel = getPhaseLabel(panel, circuit);
+    if (!phaseLabel) return;
+    const phaseKey = getPhaseLoadKey(phaseLabel, block);
+    const custom = getDetailPhaseLoad(detail, phaseKey);
+    const amount = custom != null ? custom : share;
+    if (amount == null) return;
+    totals.set(phaseLabel, (totals.get(phaseLabel) || 0) + amount);
+  });
+  return totals;
+}
+
 function createPhaseSummary(panel, panelId, loads, circuitCount) {
   const sequence = getPanelPhaseSequence(panel);
   if (!sequence.length) return null;
@@ -850,16 +867,6 @@ function createPhaseSummary(panel, panelId, loads, circuitCount) {
 
   const seenLoads = new Set();
   const totalBreakers = Number.isFinite(circuitCount) && circuitCount > 0 ? circuitCount : panel.breakers?.length || 0;
-  const customPhaseStarts = new Set();
-
-  Object.entries(breakerDetails).forEach(([key, detail]) => {
-    if (!detail || detail.loadVaPerPhase == null) return;
-    const parsed = Number.parseInt(key, 10);
-    if (Number.isFinite(parsed)) {
-      customPhaseStarts.add(parsed);
-    }
-  });
-
   for (let circuit = 1; circuit <= totalBreakers; circuit++) {
     const block = getBreakerBlock(panel, circuit);
     const start = block && Number.isFinite(Number(block.start)) ? Number(block.start) : circuit;
@@ -882,13 +889,16 @@ function createPhaseSummary(panel, panelId, loads, circuitCount) {
     const span = getLoadBreakerSpan(load, panel, totalBreakers);
     if (!span.length) return;
     const startCircuit = span[0];
-    if (customPhaseStarts.has(startCircuit)) return;
     const value = getPhasePowerValue(load, system);
+    const detail = getBreakerDetail(panel, startCircuit);
     if (value == null) return;
     const share = span.length > 0 ? value / span.length : value;
     span.forEach(slot => {
       const phase = getPhaseLabel(panel, slot);
       if (!phase) return;
+      const block = getBreakerBlock(panel, slot);
+      const phaseKey = getPhaseLoadKey(phase, block);
+      if (detail && getDetailPhaseLoad(detail, phaseKey) != null) return;
       totals[phase] += share;
     });
   });
@@ -1759,43 +1769,20 @@ function createCircuitCell(panel, panelId, loads, breaker, circuitCount, positio
     }
 
     const spanCircuits = assignedSpan.length ? assignedSpan : (blockCircuits.length ? blockCircuits : [breaker]);
-    const customPhaseLoads = getCustomPhaseLoadsForSpan(panel, breakerDetail, spanCircuits);
-    if (customPhaseLoads.size) {
+    const totalPower = getPhasePowerValue(assignedLoad, system);
+    const phaseLoads = getPhaseLoadsForSpan(panel, breakerDetail, spanCircuits, totalPower);
+    if (phaseLoads.size) {
       const contribution = document.createElement("div");
       contribution.className = "panel-slot-phase-load";
       const formatter = new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 });
       const unit = system === "dc" ? "W" : "VA";
-      customPhaseLoads.forEach((amount, phase) => {
+      phaseLoads.forEach((amount, phase) => {
         const chip = document.createElement("span");
         chip.className = "panel-slot-phase-chip";
         chip.textContent = `${phase}: ${formatter.format(amount)} ${unit}`;
         contribution.appendChild(chip);
       });
       details.appendChild(contribution);
-    } else {
-      const totalPower = getPhasePowerValue(assignedLoad, system);
-      if (totalPower != null && spanCircuits.length) {
-        const phaseTotals = new Map();
-        const share = spanCircuits.length ? totalPower / spanCircuits.length : totalPower;
-        spanCircuits.forEach(slotNumber => {
-          const phase = getPhaseLabel(panel, slotNumber);
-          if (!phase) return;
-          phaseTotals.set(phase, (phaseTotals.get(phase) || 0) + share);
-        });
-        if (phaseTotals.size) {
-          const contribution = document.createElement("div");
-          contribution.className = "panel-slot-phase-load";
-          const formatter = new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 });
-          const unit = system === "dc" ? "W" : "VA";
-          phaseTotals.forEach((amount, phase) => {
-            const chip = document.createElement("span");
-            chip.className = "panel-slot-phase-chip";
-            chip.textContent = `${phase}: ${formatter.format(amount)} ${unit}`;
-            contribution.appendChild(chip);
-          });
-          details.appendChild(contribution);
-        }
-      }
     }
   } else if (block) {
     details.classList.add("panel-slot-details-empty");
