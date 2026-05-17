@@ -3574,7 +3574,9 @@ const renderBatchResults = (results) => {
             (res.breakdown || []).forEach(seg => {
                 if (!seg.tray_id) return;
                 const cable = state.cableList.find(c => (c.tag || c.cable_tag) === res.cable);
-                const w = cable && cable.weight_lb_ft != null ? parseFloat(cable.weight_lb_ft) || 0 : 0;
+                const w = cable
+                    ? parseFloat(cable.weight_lb_ft != null ? cable.weight_lb_ft : cable.weight) || 0
+                    : 0;
                 trayWeights[seg.tray_id] = (trayWeights[seg.tray_id] || 0) + w;
             });
         });
