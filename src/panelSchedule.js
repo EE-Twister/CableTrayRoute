@@ -1045,23 +1045,37 @@ export function calculatePanelTotals(panelId) {
   const panels = dataStore.getPanels();
   const panel = findPanelByIdentifier(panels, panelId);
   const loads = dataStore.getLoads().filter(l => l.panelId === panelId);
-  const totals = loads.reduce((acc, l) => {
-    const cKva = parseFloat(l.kva) || 0;
-    const cKw = parseFloat(l.kw) || 0;
-    const dKva = parseFloat(l.demandKva) || cKva;
-    const dKw = parseFloat(l.demandKw) || cKw;
-    acc.connectedKva += cKva;
-    acc.connectedKw += cKw;
-    acc.demandKva += dKva;
-    acc.demandKw += dKw;
-    return acc;
-  }, { connectedKva: 0, connectedKw: 0, demandKva: 0, demandKw: 0 });
+  if (!panel) {
+    return loads.reduce((acc, l) => {
+      const cKva = parseFloat(l.kva) || 0;
+      const cKw = parseFloat(l.kw) || 0;
+      const dKva = parseFloat(l.demandKva) || cKva;
+      const dKw = parseFloat(l.demandKw) || cKw;
+      acc.connectedKva += cKva;
+      acc.connectedKw += cKw;
+      acc.demandKva += dKva;
+      acc.demandKw += dKw;
+      return acc;
+    }, { connectedKva: 0, connectedKw: 0, demandKva: 0, demandKw: 0 });
+  }
 
-  if (!panel) return totals;
+  const circuitCount = getPanelCircuitCount(panel);
+  const breakerStarts = new Set();
+  for (let circuit = 1; circuit <= circuitCount; circuit++) {
+    const block = getBreakerBlock(panel, circuit);
+    const start = block && Number.isFinite(Number(block.start)) ? Number(block.start) : circuit;
+    if (start >= 1 && start <= circuitCount) {
+      breakerStarts.add(start);
+    }
+  }
+
   const breakerDetails = ensureBreakerDetails(panel);
+  const customStarts = new Set();
   let customVaTotal = 0;
-  Object.values(breakerDetails).forEach(detail => {
+  breakerStarts.forEach(start => {
+    const detail = breakerDetails[String(start)];
     if (!detail || detail.loadVaPerPhase == null) return;
+    customStarts.add(start);
     if (detail.loadVaPerPhase && typeof detail.loadVaPerPhase === "object" && !Array.isArray(detail.loadVaPerPhase)) {
       Object.values(detail.loadVaPerPhase).forEach(value => {
         const parsed = parseFloat(value);
@@ -1076,6 +1090,23 @@ export function calculatePanelTotals(panelId) {
       customVaTotal += parsed;
     }
   });
+
+  const totals = loads.reduce((acc, l) => {
+    const span = getLoadBreakerSpan(l, panel, circuitCount);
+    const startCircuit = span.length ? span[0] : null;
+    if (startCircuit != null && customStarts.has(startCircuit)) {
+      return acc;
+    }
+    const cKva = parseFloat(l.kva) || 0;
+    const cKw = parseFloat(l.kw) || 0;
+    const dKva = parseFloat(l.demandKva) || cKva;
+    const dKw = parseFloat(l.demandKw) || cKw;
+    acc.connectedKva += cKva;
+    acc.connectedKw += cKw;
+    acc.demandKva += dKva;
+    acc.demandKw += dKw;
+    return acc;
+  }, { connectedKva: 0, connectedKw: 0, demandKva: 0, demandKw: 0 });
 
   if (customVaTotal > 0) {
     const customKva = customVaTotal / 1000;
