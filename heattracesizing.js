@@ -2443,12 +2443,18 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function downloadCsvData(headers, rows, filename) {
+    const sanitizeCsvCell = (value) => {
+      let normalized = String(value ?? '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+      if (/^[=+\-@]/.test(normalized)) normalized = `'${normalized}`;
+      return normalized;
+    };
+    const formatCsvCell = (value) => {
+      const sanitized = sanitizeCsvCell(value);
+      return /[",\n]/.test(sanitized) ? `"${sanitized.replace(/"/g, '""')}"` : sanitized;
+    };
     const lines = [headers.join(',')];
     rows.forEach(row => {
-      lines.push(headers.map(h => {
-        const val = String(row[h] ?? '');
-        return val.includes(',') || val.includes('"') ? `"${val.replace(/"/g, '""')}"` : val;
-      }).join(','));
+      lines.push(headers.map(h => formatCsvCell(row[h])).join(','));
     });
     const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
     const a = document.createElement('a');
