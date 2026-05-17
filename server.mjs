@@ -15,6 +15,8 @@ const DEFAULT_DATA_DIR = process.env.SERVER_DATA_DIR
   ? path.resolve(process.env.SERVER_DATA_DIR)
   : path.join(process.cwd(), 'server_data');
 const DEFAULT_TOKEN_TTL_MS = Number.parseInt(process.env.AUTH_TOKEN_TTL_MS || '3600000', 10);
+const DEFAULT_SESSION_MAX_LIFETIME_MS = Number.parseInt(process.env.AUTH_SESSION_MAX_LIFETIME_MS || '28800000', 10);
+const SESSION_REFRESH_WINDOW_MS = 5 * 60 * 1000;
 const DEFAULT_RATE_LIMIT_WINDOW_MS = Number.parseInt(
   process.env.PROJECT_RATE_LIMIT_WINDOW_MS || '900000',
   10
@@ -604,9 +606,10 @@ function createRateLimiter({ windowMs, max }) {
 }
 
 class FileSessionStore {
-  constructor(filePath, ttlMs) {
+  constructor(filePath, ttlMs, maxLifetimeMs = DEFAULT_SESSION_MAX_LIFETIME_MS) {
     this.filePath = filePath;
     this.ttlMs = ttlMs;
+    this.maxLifetimeMs = maxLifetimeMs;
     this.sessions = new Map();
     this.ready = false;
   }
@@ -619,7 +622,9 @@ class FileSessionStore {
         const now = Date.now();
         Object.entries(data).forEach(([token, session]) => {
           if (session && session.expiresAt && session.expiresAt > now) {
-            this.sessions.set(token, session);
+            const issuedAt = Number(session.issuedAt) || (Number(session.expiresAt) - this.ttlMs);
+            const absoluteExpiresAt = Number(session.absoluteExpiresAt) || (issuedAt + this.maxLifetimeMs);
+            this.sessions.set(token, { ...session, issuedAt, absoluteExpiresAt });
           }
         });
       }
@@ -656,12 +661,37 @@ class FileSessionStore {
       }
     }
 
+    const issuedAt = Date.now();
     const token = crypto.randomBytes(32).toString('hex');
     const csrfToken = crypto.randomBytes(32).toString('hex');
-    const expiresAt = Date.now() + this.ttlMs;
-    this.sessions.set(token, { username, csrfToken, expiresAt });
+    const expiresAt = issuedAt + this.ttlMs;
+    const absoluteExpiresAt = issuedAt + this.maxLifetimeMs;
+    this.sessions.set(token, { username, csrfToken, expiresAt, issuedAt, absoluteExpiresAt });
     await this.#persist();
     return { token, csrfToken, expiresAt };
+  }
+
+  async refreshSession(token) {
+    await this.#pruneExpired();
+    const current = this.sessions.get(token);
+    if (!current) return null;
+    const now = Date.now();
+    if ((current.expiresAt - now) > SESSION_REFRESH_WINDOW_MS) return null;
+    if (current.absoluteExpiresAt <= now) return null;
+
+    this.sessions.delete(token);
+    const newToken = crypto.randomBytes(32).toString('hex');
+    const csrfToken = crypto.randomBytes(32).toString('hex');
+    const expiresAt = Math.min(now + this.ttlMs, current.absoluteExpiresAt);
+    this.sessions.set(newToken, {
+      username: current.username,
+      csrfToken,
+      expiresAt,
+      issuedAt: current.issuedAt,
+      absoluteExpiresAt: current.absoluteExpiresAt
+    });
+    await this.#persist();
+    return { token: newToken, csrfToken, expiresAt };
   }
 
   async revokeUserSessions(username) {
@@ -1175,7 +1205,11 @@ export async function createApp(options = {}) {
     auth,
     csrfProtection,
     asyncHandler(async (req, res) => {
-      const newSession = await sessionStore.createSession(req.username);
+      const newSession = await sessionStore.refreshSession(req.authToken);
+      if (!newSession) {
+        res.status(401).json({ error: 'Session not eligible for refresh' });
+        return;
+      }
       res.json(newSession);
     })
   );
