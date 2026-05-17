@@ -6,6 +6,12 @@ import { showAlertModal } from '../src/components/modal.js';
 let deviceCache = null;
 
 const PROTECTIVE_TYPES = new Set(['breaker', 'fuse', 'relay', 'recloser', 'contactor', 'switch']);
+function isProtectiveComponent(component) {
+  if (!component || typeof component !== 'object') return false;
+  if (component.category === 'protection') return true;
+  if (!component.type) return true;
+  return PROTECTIVE_TYPES.has(component.type);
+}
 const FALLBACK_TYPES = new Set(['motor_load', 'static_load', 'load', 'panel', 'equipment', 'bus', 'cable', 'mcc']);
 const UPSTREAM_CANDIDATE_TYPES = new Set([
   'transformer',
@@ -157,7 +163,7 @@ function createProtectiveResolver(comps = []) {
     }
     stack.add(component.id);
     let result = null;
-    if (component?.tccId) {
+    if (component?.tccId && isProtectiveComponent(component)) {
       result = component;
     } else {
       const parents = getParents(component);
@@ -241,7 +247,7 @@ function clearingTime(comp, Ibf, devices, protectiveComp, scResults, protectiveD
     if (protectiveClearing !== null) return protectiveClearing;
   }
   const deviceComp = protectiveComp || comp;
-  if (!deviceComp?.tccId) return 0.2;
+  if (!deviceComp?.tccId || !isProtectiveComponent(deviceComp)) return 0.2;
   const dev = protectiveDevice || devices.find(d => d.id === deviceComp.tccId);
   if (!dev) return 0.2;
   const saved = getItem('tccSettings', { devices: [], settings: {}, componentOverrides: {} });
@@ -323,7 +329,9 @@ export async function runArcFlash(options = {}) {
     const shortCircuitAvailable = Number.isFinite(fault?.threePhaseKA) && fault.threePhaseKA > 0;
     const Ibf = shortCircuitAvailable ? fault.threePhaseKA : 0;
     const protectiveComp = protection.findNearest(comp);
-    const protectiveDevice = protectiveComp ? devices.find(d => d.id === protectiveComp.tccId) : null;
+    const protectiveDevice = protectiveComp && isProtectiveComponent(protectiveComp)
+      ? devices.find(d => d.id === protectiveComp.tccId)
+      : null;
     const compClearing = parseNumeric(comp?.clearing_time);
     const upstreamClearing = protectiveComp && protectiveComp !== comp
       ? parseNumeric(protectiveComp?.clearing_time)
