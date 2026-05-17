@@ -8040,26 +8040,34 @@ function renderOneLinePreview(componentId) {
   const neighborSet = componentId && adjacency.has(componentId)
     ? adjacency.get(componentId)
     : new Set();
-  const neighborCount = neighborSet.size + 1; // include the active component itself
   const includeEntireSheet = sameSheetSelections.length > 0;
-  const MAX_COMPONENTS = includeEntireSheet
-    ? Math.max(sheetComponents.length, sameSheetSelections.length + neighborCount, 50)
-    : Math.max(20, neighborCount, sameSheetSelections.length + 5);
-  const addUnique = (list, id) => {
+  const MAX_COMPONENTS = includeEntireSheet ? Math.max(sheetComponents.length, 50) : 20;
+  const MAX_PREVIEW_NEIGHBORS = Math.max(MAX_COMPONENTS * 3, sameSheetSelections.length + 5);
+  const boundedNeighbors = [];
+  for (const id of neighborSet) {
+    if (!componentMap.has(id)) continue;
+    boundedNeighbors.push(id);
+    if (boundedNeighbors.length >= MAX_PREVIEW_NEIGHBORS) break;
+  }
+
+  const addUnique = (list, seen, id) => {
     if (!id) return;
     if (!componentMap.has(id)) return;
-    if (list.includes(id)) return;
+    if (seen.has(id)) return;
+    seen.add(id);
     list.push(id);
   };
 
   const orderedTargets = [];
-  addUnique(orderedTargets, componentId);
-  neighborSet.forEach(id => addUnique(orderedTargets, id));
+  const orderedTargetSet = new Set();
+  addUnique(orderedTargets, orderedTargetSet, componentId);
+  boundedNeighbors.forEach(id => addUnique(orderedTargets, orderedTargetSet, id));
 
   const prioritizedTargets = [];
-  addUnique(prioritizedTargets, componentId);
-  neighborSet.forEach(id => addUnique(prioritizedTargets, id));
-  sameSheetSelections.forEach(id => addUnique(prioritizedTargets, id));
+  const prioritizedTargetSet = new Set();
+  addUnique(prioritizedTargets, prioritizedTargetSet, componentId);
+  boundedNeighbors.forEach(id => addUnique(prioritizedTargets, prioritizedTargetSet, id));
+  sameSheetSelections.forEach(id => addUnique(prioritizedTargets, prioritizedTargetSet, id));
 
   const availableTargets = prioritizedTargets.length ? prioritizedTargets : orderedTargets;
   if (!availableTargets.length) {
