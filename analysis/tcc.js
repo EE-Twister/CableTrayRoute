@@ -6804,8 +6804,8 @@ function plot() {
       allTimes.push(normalizedDuration);
     } else if (entry.kind === 'transformerDamage' || entry.kind === 'motorStart' || entry.kind === 'motorThermal') {
       entry.curve.forEach(point => {
-        if (point.current > 0) allCurrents.push(point.current);
-        if (point.time > 0) allTimes.push(point.time);
+        if (Number.isFinite(point.current) && point.current > 0) allCurrents.push(point.current);
+        if (Number.isFinite(point.time) && point.time > 0) allTimes.push(point.time);
       });
     }
   });
@@ -9071,7 +9071,9 @@ function resolveMotorThermalLimit(
   if (!Number.isFinite(stallTime) || stallTime <= 0) return null;
   const serviceFactor = normalizeServiceFactor(getNumericValue(motor, ['service_factor', 'sf', 'serviceFactor']));
   const continuousCurrent = Math.max(fla * serviceFactor, fla * 1.05);
+  if (!Number.isFinite(continuousCurrent) || continuousCurrent <= 0) return null;
   const thermalConstant = lockedRotor * lockedRotor * stallTime;
+  if (!Number.isFinite(thermalConstant) || thermalConstant <= 0) return null;
   let longTime = thermalConstant / (continuousCurrent * continuousCurrent);
   if (!Number.isFinite(longTime) || longTime <= stallTime) {
     longTime = stallTime * 3;
@@ -9095,7 +9097,8 @@ function resolveMotorThermalLimit(
     .map(time => {
       const current = Math.max(Math.sqrt(thermalConstant / time), continuousCurrent);
       return { time, current };
-    });
+    })
+    .filter(point => Number.isFinite(point.time) && point.time > 0 && Number.isFinite(point.current) && point.current > 0);
   if (!points.length) return null;
   const last = points[points.length - 1];
   if (last) last.current = continuousCurrent;
