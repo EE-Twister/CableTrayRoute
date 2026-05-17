@@ -663,7 +663,8 @@ export function runValidation(components = [], studies = {}) {
   });
 
   // TCC duty/coordination violations from studies
-  Object.entries(studies.duty || {}).forEach(([id, msgs = []]) => {
+  Object.entries(studies?.duty && typeof studies.duty === 'object' ? studies.duty : {}).forEach(([id, msgs]) => {
+    if (!Array.isArray(msgs)) return;
     msgs.forEach(msg => issues.push({ component: id, message: msg }));
   });
 
