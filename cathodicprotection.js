@@ -595,6 +595,9 @@ function normalizeSavedStudy(saved) {
   const compliance = saved.compliance && typeof saved.compliance === 'object'
     ? {
       ...saved.compliance,
+      requiredChecks: saved.compliance.requiredChecks && typeof saved.compliance.requiredChecks === 'object'
+        ? saved.compliance.requiredChecks
+        : buildInitialComplianceStatus(),
       failedCheckKeys: Array.isArray(saved.compliance.failedCheckKeys) ? saved.compliance.failedCheckKeys : []
     }
     : {
@@ -1961,10 +1964,11 @@ function renderCalculationBasis(root, basis) {
 
 function renderComplianceStatusPanel(root, requiredChecks = {}, lastEvaluatedAt = null, compliance = {}) {
   if (!root) return;
+  const normalizedRequiredChecks = requiredChecks && typeof requiredChecks === 'object' ? requiredChecks : {};
 
   const rows = getRequiredComplianceChecks().map((checkKey) => {
     const check = CP_STANDARDS_PROFILE.checks[checkKey];
-    const status = requiredChecks[checkKey] || 'not-run';
+    const status = normalizedRequiredChecks[checkKey] || 'not-run';
     return {
       key: checkKey,
       label: check?.label || checkKey,
