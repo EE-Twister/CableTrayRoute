@@ -92,7 +92,7 @@ export function readTransformerBaseKV(record) {
   const baseKeys = ['baseKV', 'kV', 'kv', 'prefault_voltage'];
   for (const key of baseKeys) {
     const raw = getCandidateValue(record, key);
-    const kv = toBaseKV(raw);
+    const kv = parseNumeric(raw);
     if (Number.isFinite(kv) && kv > 0) return kv;
   }
   return null;
