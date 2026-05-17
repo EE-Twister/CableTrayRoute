@@ -224,11 +224,15 @@ async function initializeApp() {
     };
 
     const storeLatestRouteResults = (batchResults, meta = {}) => {
+        const hasValidMap = meta.trayCableMap
+            && typeof meta.trayCableMap === 'object'
+            && !Array.isArray(meta.trayCableMap);
         try {
             setItem('latestRouteResults', {
                 batchResults: Array.isArray(batchResults) ? batchResults : [],
                 source: 'optimalRoute',
                 updatedAt: new Date().toISOString(),
+                ...(hasValidMap ? { trayCableMap: meta.trayCableMap } : {}),
                 ...meta
             });
         } catch (error) {
@@ -3949,7 +3953,11 @@ const renderBatchResults = (results) => {
             const cache = getItem(cacheKey);
             if (cache) {
                 state.latestRouteData = cache.batchResults;
-                storeLatestRouteResults(cache.batchResults, { projectHash, source: 'optimalRouteCache' });
+                storeLatestRouteResults(cache.batchResults, {
+                    projectHash,
+                    source: 'optimalRouteCache',
+                    trayCableMap: cache.trayCableMap || {}
+                });
                 state.finalTrays = cache.finalTrays;
                 const resMap = new Map((cache.batchResults || []).map(r => [r.cable, r]));
                 state.cableList.forEach(c => {
@@ -4062,7 +4070,6 @@ const renderBatchResults = (results) => {
                     buildFieldSegmentCableMap(batchResults);
                     setCables(state.cableList);
                     state.latestRouteData = batchResults;
-                    storeLatestRouteResults(batchResults, { projectHash });
                     renderBatchResults(batchResults);
                     const nameMap = new Map(state.cableList.map(c => [c.name, c]));
                     state.trayCableMap = {};
@@ -4080,6 +4087,7 @@ const renderBatchResults = (results) => {
                             }
                         });
                     });
+                    storeLatestRouteResults(batchResults, { projectHash, trayCableMap: state.trayCableMap });
                     const cableMapForArea = new Map(state.cableList.map(c => [c.name, c.diameter]));
                     const cableMapForObj = new Map(state.cableList.map(c => [c.name, c]));
                     const tempSystem = new CableRoutingSystem({});
@@ -4283,7 +4291,6 @@ const renderBatchResults = (results) => {
         }
 
         state.latestRouteData = Array.from(resultMap.values()).sort((a,b) => a.index - b.index).map(v => v.row);
-        storeLatestRouteResults(state.latestRouteData, { source: 'optimalRouteRebalance' });
         buildFieldSegmentCableMap(state.latestRouteData);
 
         const nameMap = new Map(state.cableList.map(c => [c.name, c]));
@@ -4304,6 +4311,8 @@ const renderBatchResults = (results) => {
                 }
             });
         });
+
+        storeLatestRouteResults(state.latestRouteData, { source: 'optimalRouteRebalance', trayCableMap: state.trayCableMap });
 
         const finalUtilization = routingSystem.getTrayUtilization();
         const utilData = buildUtilizationRows(finalUtilization, trayData);
