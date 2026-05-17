@@ -8699,9 +8699,7 @@ function selectComponent(compOrId) {
       'load_kw',
       'load_kvar',
       'impedance_r',
-      'impedance_x',
-      'thevenin_r',
-      'thevenin_x'
+      'impedance_x'
     ]);
     const staticCalculatedFields = isStaticLoadComponent
       ? new Set(['load_kw', 'load_kvar', 'baseKV', 'kV', 'kv', 'prefault_voltage'])
@@ -9607,20 +9605,10 @@ function selectComponent(compOrId) {
           if (Number.isFinite(baseKv) && baseKv > 0) voltageVal = baseKv * 1000;
         }
         let phasesVal = getNumeric(['phases', 'phase_count', 'phaseCount']);
-        const multipleVal = getNumeric([
-          'inrushMultiple',
-          'lr_current_pu',
-          'locked_rotor_multiple',
-          'lockedRotorMultiple'
-        ]);
-
         const loadKwInput = motorInputMap.get('load_kw');
         const loadKvarInput = motorInputMap.get('load_kvar');
         const impRInput = motorInputMap.get('impedance_r');
         const impXInput = motorInputMap.get('impedance_x');
-        const thRInput = motorInputMap.get('thevenin_r');
-        const thXInput = motorInputMap.get('thevenin_x');
-
         effVal = effVal !== null ? clamp(effVal, 0.01, 0.9999) : null;
         pfVal = pfVal !== null ? clamp(pfVal, 0.01, 0.9999) : null;
         phasesVal = Number.isFinite(phasesVal) && phasesVal > 0 ? phasesVal : 3;
@@ -9655,24 +9643,6 @@ function selectComponent(compOrId) {
               const reactance = impedanceMag * sinPhi;
               impRInput.value = formatNumber(resistance, 4);
               impXInput.value = formatNumber(reactance, 4);
-            }
-          }
-        }
-
-        const supplyPf = 0.25;
-        const sagTarget = 0.3;
-        if (lineCurrent && lineCurrent > 0 && voltageValid !== null && (thRInput || thXInput)) {
-          const inrushMultiple = Number.isFinite(multipleVal) && multipleVal > 0 ? multipleVal : 6;
-          const lockedRotorCurrent = lineCurrent * inrushMultiple;
-          if (lockedRotorCurrent > 0) {
-            const isSinglePhase = phasesVal <= 1.5;
-            const phaseVoltage = isSinglePhase ? voltageValid : voltageValid / Math.sqrt(3);
-            const theveninMag = (sagTarget * phaseVoltage) / lockedRotorCurrent;
-            if (Number.isFinite(theveninMag) && theveninMag > 0) {
-              const pfClamp = clamp(supplyPf, 0.01, 0.9999);
-              const sinSupply = Math.sqrt(Math.max(1 - pfClamp * pfClamp, 0));
-              if (thRInput) thRInput.value = formatNumber(theveninMag * pfClamp, 4);
-              if (thXInput) thXInput.value = formatNumber(theveninMag * sinSupply, 4);
             }
           }
         }
