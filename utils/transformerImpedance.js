@@ -16,6 +16,7 @@ function parseNumeric(raw) {
   return null;
 }
 
+const explicitKvNumericPattern = /^[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?$/;
 
 function parseExplicitBaseKV(raw) {
   if (raw === null || raw === undefined) return null;
@@ -23,8 +24,8 @@ function parseExplicitBaseKV(raw) {
   if (typeof raw === 'string') {
     const trimmed = raw.trim();
     if (!trimmed) return null;
-    if (/[a-zA-Z]/.test(trimmed)) return toBaseKV(trimmed);
-    return parseNumeric(trimmed);
+    if (explicitKvNumericPattern.test(trimmed)) return parseNumeric(trimmed);
+    return toBaseKV(trimmed);
   }
   return toBaseKV(raw);
 }

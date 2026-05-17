@@ -123,3 +123,28 @@ const approxEqual = (a, b, tolerance = 1e-9) => {
   const volts = normalizeVoltageToVolts('4.16e3 V');
   approxEqual(volts, 4160, 1e-9);
 }
+
+// Scientific-notation explicit baseKV/prefault_voltage strings should parse as numeric kV.
+{
+  const baseFromKV = computeTransformerBaseKV({ baseKV: '4.8e-1' });
+  const baseFromPrefault = computeTransformerBaseKV({ prefault_voltage: '1.5e1' });
+  approxEqual(baseFromKV, 0.48, 1e-9);
+  approxEqual(baseFromPrefault, 15, 1e-9);
+
+  const impedanceSci = calculateTransformerImpedance({
+    kva: 2500,
+    percentZ: 6,
+    xrRatio: 10,
+    baseKV: '4.8e-1'
+  });
+  const impedanceNumeric = calculateTransformerImpedance({
+    kva: 2500,
+    percentZ: 6,
+    xrRatio: 10,
+    baseKV: 0.48
+  });
+  assert(impedanceSci, 'Impedance should be calculated for scientific-notation baseKV');
+  assert(impedanceNumeric, 'Impedance should be calculated for numeric baseKV');
+  approxEqual(impedanceSci.r, impedanceNumeric.r, 1e-12);
+  approxEqual(impedanceSci.x, impedanceNumeric.x, 1e-12);
+}
