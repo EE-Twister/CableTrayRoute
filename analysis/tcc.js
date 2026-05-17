@@ -819,14 +819,25 @@ function sanitizeCustomCurveProfiles(rawProfiles = []) {
   if (!Array.isArray(rawProfiles)) return [];
   const seenIds = new Set();
   let counter = 0;
+  const MAX_SUFFIX_COUNTER = Number.MAX_SAFE_INTEGER;
   const ensureName = (name, index) => {
     if (typeof name === 'string' && name.trim()) return name.trim();
     return `Curve ${index + 1}`;
   };
-  const syncCounter = id => {
+  const parseTrailingCounter = id => {
+    if (typeof id !== 'string') return null;
     const match = /([0-9]+)$/.exec(id);
-    if (match) {
-      counter = Math.max(counter, Number(match[1]));
+    if (!match) return null;
+    const suffix = match[1];
+    if (suffix.length > 15) return null;
+    const parsed = Number(suffix);
+    if (!Number.isSafeInteger(parsed) || parsed < 0) return null;
+    return Math.min(parsed, MAX_SUFFIX_COUNTER);
+  };
+  const syncCounter = id => {
+    const suffixCounter = parseTrailingCounter(id);
+    if (suffixCounter !== null) {
+      counter = Math.max(counter, suffixCounter);
     }
   };
   const reserveId = candidate => {
@@ -4847,9 +4858,12 @@ async function openCustomCurveBuilder(curveId = null) {
   const syncVariantCounter = id => {
     if (typeof id !== 'string') return;
     const match = /([0-9]+)$/.exec(id);
-    if (match) {
-      variantCounter = Math.max(variantCounter, Number(match[1]));
-    }
+    if (!match) return;
+    const suffix = match[1];
+    if (suffix.length > 15) return;
+    const parsed = Number(suffix);
+    if (!Number.isSafeInteger(parsed) || parsed < 0) return;
+    variantCounter = Math.max(variantCounter, Math.min(parsed, Number.MAX_SAFE_INTEGER));
   };
 
   const reserveVariantId = candidate => {
