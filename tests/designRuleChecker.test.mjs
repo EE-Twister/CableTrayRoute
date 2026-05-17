@@ -671,7 +671,7 @@ describe('runDRC — accepted findings', () => {
     // 12" × 4" = 48 in²; 20 in² → 41.7 % → triggers DRC-01 ERROR
     const trays = [makeTray('T1', 20, 12, 4)];
     const result = runDRC({ trays, cables: [], trayCableMap: {} }, {
-      acceptedFindings: [{ key: 'DRC-01:T1', ruleId: 'DRC-01', location: 'T1', note: 'Approved per EE-001' }],
+      acceptedFindings: [{ key: 'DRC-01:T1', signature: 'DRC-01|T1|error|Tray fill 41.7 % exceeds NEC 392.22(A) limit of 40 %.|Inside width: 12 in, depth: 4 in, fill: 20.00 in².|NEC 392.22(A)|Widen or deepen the tray, add a parallel tray segment, or use the Optimal Route page to reroute cables to adjacent trays with available capacity.', ruleId: 'DRC-01', location: 'T1', note: 'Approved per EE-001' }],
     });
     const finding = result.findings.find(f => f.ruleId === 'DRC-01' && f.location === 'T1');
     assert.ok(finding, 'DRC-01 finding should exist');
@@ -682,7 +682,7 @@ describe('runDRC — accepted findings', () => {
   it('summary.passed is true when all errors are accepted', () => {
     const trays = [makeTray('T1', 20, 12, 4)];
     const result = runDRC({ trays, cables: [], trayCableMap: {} }, {
-      acceptedFindings: [{ key: 'DRC-01:T1', ruleId: 'DRC-01', location: 'T1', note: 'OK' }],
+      acceptedFindings: [{ key: 'DRC-01:T1', signature: 'DRC-01|T1|error|Tray fill 41.7 % exceeds NEC 392.22(A) limit of 40 %.|Inside width: 12 in, depth: 4 in, fill: 20.00 in².|NEC 392.22(A)|Widen or deepen the tray, add a parallel tray segment, or use the Optimal Route page to reroute cables to adjacent trays with available capacity.', ruleId: 'DRC-01', location: 'T1', note: 'OK' }],
     });
     assert.strictEqual(result.summary.errors, 0);
     assert.strictEqual(result.summary.accepted, 1);
@@ -695,7 +695,7 @@ describe('runDRC — accepted findings', () => {
       makeTray('T2', 20, 12, 4), // overfill → DRC-01 ERROR
     ];
     const result = runDRC({ trays, cables: [], trayCableMap: {} }, {
-      acceptedFindings: [{ key: 'DRC-01:T1', ruleId: 'DRC-01', location: 'T1', note: 'OK' }],
+      acceptedFindings: [{ key: 'DRC-01:T1', signature: 'DRC-01|T1|error|Tray fill 41.7 % exceeds NEC 392.22(A) limit of 40 %.|Inside width: 12 in, depth: 4 in, fill: 20.00 in².|NEC 392.22(A)|Widen or deepen the tray, add a parallel tray segment, or use the Optimal Route page to reroute cables to adjacent trays with available capacity.', ruleId: 'DRC-01', location: 'T1', note: 'OK' }],
     });
     assert.strictEqual(result.summary.accepted, 1);
     assert.strictEqual(result.summary.errors, 1);   // T2 still an error
@@ -705,9 +705,18 @@ describe('runDRC — accepted findings', () => {
   it('non-matching key does not mark finding as accepted', () => {
     const trays = [makeTray('T1', 20, 12, 4)];
     const result = runDRC({ trays, cables: [], trayCableMap: {} }, {
-      acceptedFindings: [{ key: 'DRC-01:T9', ruleId: 'DRC-01', location: 'T9', note: 'Wrong tray' }],
+      acceptedFindings: [{ key: 'DRC-01:T9', signature: 'x', ruleId: 'DRC-01', location: 'T9', note: 'Wrong tray' }],
     });
     const finding = result.findings.find(f => f.ruleId === 'DRC-01');
+    assert.strictEqual(finding.isAccepted, false);
+  });
+
+  it('does not accept finding when signature mismatches', () => {
+    const trays = [makeTray('T1', 20, 12, 4)];
+    const result = runDRC({ trays, cables: [], trayCableMap: {} }, {
+      acceptedFindings: [{ key: 'DRC-01:T1', signature: 'DRC-01|T1|error|old message', note: 'Stale acceptance' }],
+    });
+    const finding = result.findings.find(f => f.ruleId === 'DRC-01' && f.location === 'T1');
     assert.strictEqual(finding.isAccepted, false);
   });
 });
@@ -832,6 +841,7 @@ describe('formatDrcReport() — accepted risk section', () => {
     const result = runDRC({ trays, cables: [], trayCableMap: {} }, {
       acceptedFindings: [{
         key: 'DRC-01:T1',
+        signature: 'DRC-01|T1|error|Tray fill 41.7 % exceeds NEC 392.22(A) limit of 40 %.|Inside width: 12 in, depth: 4 in, fill: 20.00 in².|NEC 392.22(A)|Widen or deepen the tray, add a parallel tray segment, or use the Optimal Route page to reroute cables to adjacent trays with available capacity.',
         ruleId: 'DRC-01',
         location: 'T1',
         note: 'Approved per ENG-042',

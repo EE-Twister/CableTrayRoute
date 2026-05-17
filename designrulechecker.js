@@ -122,6 +122,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const acceptance = {
         key,
+        signature: finding.acceptedSignature,
         ruleId:     finding.ruleId,
         location:   finding.location,
         note:       result.note,

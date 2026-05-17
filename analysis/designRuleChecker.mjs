@@ -1131,6 +1131,19 @@ export function checkHazAreaCompatibility(equipment, areas, checkResult) {
   return findings;
 }
 
+function acceptanceSignatureForFinding(finding) {
+  const normalized = [
+    finding.ruleId,
+    finding.location,
+    finding.severity,
+    finding.message,
+    finding.detail ?? '',
+    finding.reference ?? '',
+    finding.remediation ?? '',
+  ].map(value => String(value ?? '').trim()).join('|');
+  return normalized;
+}
+
 export function runDRC(input, options = {}) {
   const {
     trays = [],
@@ -1172,7 +1185,10 @@ export function runDRC(input, options = {}) {
   const acceptedList = Array.isArray(options.acceptedFindings) ? options.acceptedFindings : [];
   for (const f of findings) {
     f.acceptedKey = `${f.ruleId}:${f.location}`;
-    const acceptance = acceptedList.find(a => a.key === f.acceptedKey);
+    f.acceptedSignature = acceptanceSignatureForFinding(f);
+    const acceptance = acceptedList.find(a =>
+      a.key === f.acceptedKey && a.signature === f.acceptedSignature
+    );
     if (acceptance) {
       f.isAccepted     = true;
       f.acceptanceNote = acceptance.note;
