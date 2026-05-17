@@ -454,6 +454,10 @@
       }
     }
 
+    function cloneJsonValue(value) {
+      return parseJsonSafe(JSON.stringify(value), null);
+    }
+
     function escapeHtml(value) {
       return String(value ?? '')
         .replaceAll('&', '&amp;')
@@ -476,7 +480,7 @@
     function getStructuredPayload() {
       return {
         categories: [...structuredState.categories],
-        components: structuredState.components.map((component) => ({ ...component })),
+        components: structuredState.components.map((component) => cloneJsonValue(component) || {}),
         icons: { ...structuredState.icons },
       };
     }
@@ -610,16 +614,22 @@
       const parsedCategories = Array.isArray(data.categories) ? data.categories : [];
       const parsedIcons = iconsValue
         || (data && typeof data.icons === 'object' && data.icons ? data.icons : {});
-      structuredState.components = parsedComponents.map((component) => ({
-        subtype: component?.subtype ?? '',
-        label: component?.label ?? '',
-        category: component?.category ?? '',
-        icon: component?.icon ?? '',
-        ports: Number.isFinite(Number(component?.ports)) ? Number(component.ports) : NaN,
-        schema: (component?.schema && typeof component.schema === 'object' && !Array.isArray(component.schema))
-          ? component.schema
-          : {},
-      }));
+      structuredState.components = parsedComponents.map((component) => {
+        const normalized = (component && typeof component === 'object' && !Array.isArray(component))
+          ? cloneJsonValue(component) || {}
+          : {};
+        if (!Object.hasOwn(normalized, 'subtype') || normalized.subtype == null) normalized.subtype = '';
+        if (!Object.hasOwn(normalized, 'label') || normalized.label == null) normalized.label = '';
+        if (!Object.hasOwn(normalized, 'category') || normalized.category == null) normalized.category = '';
+        if (!Object.hasOwn(normalized, 'icon') || normalized.icon == null) normalized.icon = '';
+        if (!Object.hasOwn(normalized, 'schema')
+          || typeof normalized.schema !== 'object'
+          || normalized.schema == null
+          || Array.isArray(normalized.schema)) {
+          normalized.schema = {};
+        }
+        return normalized;
+      });
       structuredState.categories = parsedCategories.map((value) => String(value ?? ''));
       structuredState.icons = Object.fromEntries(
         Object.entries(parsedIcons || {}).map(([k, v]) => [k, String(v ?? '')]),
