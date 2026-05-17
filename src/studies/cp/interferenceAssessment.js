@@ -37,6 +37,12 @@ const MITIGATION_PROFILES = {
   }
 };
 
+const MINIMUM_PROFILE_BY_RISK_LEVEL = {
+  low: 'baseline',
+  medium: 'enhanced',
+  high: 'critical'
+};
+
 function normalizeToken(value) {
   return String(value || '')
     .trim()
@@ -55,7 +61,7 @@ export function evaluateInterferenceAssessment(input) {
   const dcTractionSystem = input.dcTractionSystem || 'none';
   const knownInterferenceSources = input.knownInterferenceSources || 'none';
   const mitigationProfileId = input.mitigationProfile || 'baseline';
-  const mitigationProfile = MITIGATION_PROFILES[mitigationProfileId] || MITIGATION_PROFILES.baseline;
+  const selectedMitigationProfile = MITIGATION_PROFILES[mitigationProfileId] || MITIGATION_PROFILES.baseline;
   const mitigationActions = Array.isArray(input.mitigationActions)
     ? input.mitigationActions.map((action) => normalizeToken(action)).filter((action) => action.length > 0)
     : [];
@@ -86,15 +92,22 @@ export function evaluateInterferenceAssessment(input) {
 
   const totalScore = riskFactorScores.reduce((sum, factor) => sum + factor.score, 0);
   const riskLevel = totalScore >= 13 ? 'high' : (totalScore >= 6 ? 'medium' : 'low');
-  const requiredMitigations = mitigationProfile.requiredMitigations;
+  const minimumProfileId = MINIMUM_PROFILE_BY_RISK_LEVEL[riskLevel] || 'baseline';
+  const minimumMitigationProfile = MITIGATION_PROFILES[minimumProfileId] || MITIGATION_PROFILES.baseline;
+  const requiredMitigations = minimumMitigationProfile.requiredMitigations;
   const missingMitigations = requiredMitigations.filter((requiredAction) => !mitigationActions.includes(requiredAction));
   const verificationDateValid = /^\d{4}-\d{2}-\d{2}$/.test(verificationTestDate);
   const unresolvedHighRisk = riskLevel === 'high' && (missingMitigations.length > 0 || !verificationDateValid);
+  const profileBelowRiskMinimum = selectedMitigationProfile.id !== minimumMitigationProfile.id;
 
   return {
     profile: {
-      id: mitigationProfile.id,
-      label: mitigationProfile.label
+      id: selectedMitigationProfile.id,
+      label: selectedMitigationProfile.label
+    },
+    minimumProfile: {
+      id: minimumMitigationProfile.id,
+      label: minimumMitigationProfile.label
     },
     score: totalScore,
     riskLevel,
@@ -104,6 +117,7 @@ export function evaluateInterferenceAssessment(input) {
     missingMitigations,
     verificationTestDate: verificationTestDate || null,
     verificationDateValid,
-    unresolvedHighRisk
+    unresolvedHighRisk,
+    profileBelowRiskMinimum
   };
 }
