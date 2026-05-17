@@ -9010,7 +9010,7 @@ function selectComponent(compOrId) {
 
     if (targetComp.subtype === 'motor_load' || targetComp.subtype === 'motor') {
       schema = schema.filter(
-        f => !['conductor_type', 'cable_assembly', 'breaker_frame', 'conductor_assembly', 'gap'].includes(f.name)
+        f => !['conductor_type', 'cable_assembly', 'breaker_frame', 'conductor_assembly'].includes(f.name)
       );
     }
 
@@ -9150,7 +9150,7 @@ function selectComponent(compOrId) {
 
       if (targetComp.subtype === 'motor_load' || targetComp.subtype === 'motor') {
         baseFields = baseFields.filter(
-          f => !['gap', 'conductor_type', 'cable_assembly', 'breaker_frame', 'conductor_assembly'].includes(f.name)
+          f => !['conductor_type', 'cable_assembly', 'breaker_frame', 'conductor_assembly'].includes(f.name)
         );
       }
 
