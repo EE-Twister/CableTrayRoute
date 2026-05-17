@@ -180,7 +180,7 @@ All coordinates are in **feet**. Inside width and tray depth are in **inches**. 
 Cables can be imported with these column headers:
 
 ```
-tag,from_tag,to_tag,cable_type,conductors,conductor_size,cable_od,allowed_cable_group,start_x,start_y,start_z,end_x,end_y,end_z
+tag,from_tag,to_tag,cable_type,conductors,conductor_size,cable_od,weight,allowed_cable_group,start_x,start_y,start_z,end_x,end_y,end_z
 ```
 
 Start and end coordinates use **feet**. Cable OD is in **inches**. See `examples/cables_template.csv` for a template.

@@ -348,6 +348,7 @@ async function initializeApp() {
         ['to_tag','end_tag'],
         'cable_type','conductors','conductor_size',
         ['cable_od','diameter'],
+        ['weight','weight_lb_ft'],
         'allowed_cable_group','start_x','start_y','start_z','end_x','end_y','end_z'
     ];
 
@@ -2762,6 +2763,7 @@ const openDuctbankRoute = (dbId, conduitId) => {
                     c.conductors !== undefined ? c.conductors : '',
                     c.conductor_size || '',
                     c.diameter !== undefined ? c.diameter : '',
+                    c.weight !== undefined ? c.weight : '',
                     c.allowed_cable_group || '',
                     c.start[0], c.start[1], c.start[2],
                     c.end[0], c.end[1], c.end[2]
@@ -2790,7 +2792,7 @@ const openDuctbankRoute = (dbId, conduitId) => {
                 conductors:parseInt(t.conductors)||0,
                 conductor_size:t.conductor_size||'#12 AWG',
                 diameter:parseFloat(t.cable_od||t.diameter)||0,
-                weight:parseFloat(t.weight)||0,
+                weight:parseFloat(t.weight||t.weight_lb_ft)||0,
                 allowed_cable_group:t.allowed_cable_group||'',
                 start:[parseFloat(t.start_x)||0,parseFloat(t.start_y)||0,parseFloat(t.start_z)||0],
                 end:[parseFloat(t.end_x)||0,parseFloat(t.end_y)||0,parseFloat(t.end_z)||0],
