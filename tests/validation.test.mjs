@@ -218,6 +218,24 @@ describe('runValidation - meter CT/PT completeness', () => {
     ];
     assert.deepStrictEqual(runValidation(components, {}), []);
   });
+
+  it('flags a meter with top-level metering enabled when props is desynchronized', () => {
+    const components = [
+      {
+        id: 'meter-4',
+        type: 'meter',
+        supports_thd: true,
+        ct_ratio: '',
+        pt_ratio: '',
+        props: {}
+      }
+    ];
+    const issues = runValidation(components, {});
+    assert.strictEqual(issues.length, 1);
+    assert.strictEqual(issues[0].component, 'meter-4');
+    assert.ok(issues[0].message.includes('CT ratio'));
+    assert.ok(issues[0].message.includes('PT ratio'));
+  });
 });
 
 describe('runValidation - PT/VT completeness and compatibility', () => {

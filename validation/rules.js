@@ -207,15 +207,14 @@ export function runValidation(components = [], studies = {}) {
   // Meter ratio completeness for study-enabled metering features
   components.forEach(c => {
     if (c.type !== 'meter') return;
-    const props = c.props && typeof c.props === 'object' ? c.props : c;
     const meteringEnabled = Boolean(
-      props.supports_thd
-      || props.supports_flicker
-      || props.supports_waveform_capture
+      readField(c, 'supports_thd')
+      || readField(c, 'supports_flicker')
+      || readField(c, 'supports_waveform_capture')
     );
     if (!meteringEnabled) return;
-    const ctRatio = `${props.ct_ratio ?? ''}`.trim();
-    const ptRatio = `${props.pt_ratio ?? ''}`.trim();
+    const ctRatio = `${readField(c, 'ct_ratio') ?? ''}`.trim();
+    const ptRatio = `${readField(c, 'pt_ratio') ?? ''}`.trim();
     if (!ctRatio || !ptRatio) {
       issues.push({
         component: c.id,
