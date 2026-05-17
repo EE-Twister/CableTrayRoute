@@ -6,6 +6,9 @@ import { ensureFieldAssistiveText, showAlertModal, openModal } from "./component
 
 const projectId = typeof window !== "undefined" ? window.currentProjectId : undefined;
 
+const DEFAULT_PANEL_CIRCUIT_COUNT = 42;
+const MAX_PANEL_CIRCUITS = 512;
+
 function getPanelIdentifierCandidates(panel) {
   if (!panel) return [];
   return [panel.id, panel.ref, panel.panel_id, panel.tag]
@@ -269,9 +272,9 @@ function parsePositiveInt(value) {
 
 function getPanelCircuitCount(panel) {
   const explicit = parsePositiveInt(panel?.circuitCount);
-  if (explicit) return explicit;
-  if (Array.isArray(panel?.breakers)) return panel.breakers.length;
-  return 42;
+  if (explicit) return Math.min(explicit, MAX_PANEL_CIRCUITS);
+  if (Array.isArray(panel?.breakers) && panel.breakers.length > 0) return Math.min(panel.breakers.length, MAX_PANEL_CIRCUITS);
+  return DEFAULT_PANEL_CIRCUIT_COUNT;
 }
 
 function getPanelSystem(panel) {
@@ -2564,8 +2567,8 @@ window.addEventListener("DOMContentLoaded", () => {
     const circuitInvalid = Number.isFinite(circuitValue) ? circuitValue < 1 : false;
     markInvalid(circuitInput, circuitInvalid);
     if (circuitInvalid) {
-      fieldErrors.circuitCount = 'Use 1 or greater for number of circuits.';
-      hints.push('Number of circuits must be 1 or greater.');
+      fieldErrors.circuitCount = `Use between 1 and ${MAX_PANEL_CIRCUITS} for number of circuits.`;
+      hints.push(`Number of circuits must be between 1 and ${MAX_PANEL_CIRCUITS}.`);
     }
 
     const mainRating = mainInput ? Number.parseFloat(mainInput.value) : null;
@@ -2985,7 +2988,9 @@ window.addEventListener("DOMContentLoaded", () => {
 
   if (circuitInput) {
     circuitInput.addEventListener("input", () => {
-      const count = parseInt(circuitInput.value, 10) || 0;
+      const parsed = parseInt(circuitInput.value, 10) || 0;
+      const count = Math.max(1, Math.min(MAX_PANEL_CIRCUITS, parsed));
+      circuitInput.value = String(count);
       panel.circuitCount = count;
       if (!Array.isArray(panel.breakers)) panel.breakers = [];
       const loads = dataStore.getLoads();
