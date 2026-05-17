@@ -665,6 +665,33 @@ function findDirectBusId(comp, busMap) {
 const DEFAULT_BFS_WARN_THRESHOLD = 2000;
 const DEFAULT_BFS_MAX_NODES = 10000;
 
+function mapNearestBusIds(adjacency, busMap) {
+  if (!(adjacency instanceof Map) || !(busMap instanceof Map) || !busMap.size) return new Map();
+  const nearestByNode = new Map();
+  const queue = [];
+  let head = 0;
+
+  busMap.forEach((_bus, busId) => {
+    nearestByNode.set(busId, busId);
+    queue.push(busId);
+  });
+
+  while (head < queue.length) {
+    const id = queue[head];
+    head += 1;
+    const nearestBusId = nearestByNode.get(id);
+    const neighbors = adjacency.get(id);
+    if (!neighbors) continue;
+    for (const neighbor of neighbors) {
+      if (nearestByNode.has(neighbor)) continue;
+      nearestByNode.set(neighbor, nearestBusId);
+      queue.push(neighbor);
+    }
+  }
+
+  return nearestByNode;
+}
+
 function findNearestBusId(comp, busMap, adjacency, options) {
   if (!comp || !comp.id) return null;
   const direct = findDirectBusId(comp, busMap);
@@ -900,10 +927,13 @@ export function buildLoadFlowModel(oneLine = {}) {
     buses = components.map(cloneBusComponent);
   }
   const busMap = new Map(buses.map(b => [b.id, b]));
+  const nearestBusByNode = mapNearestBusIds(adjacency, busMap);
 
   components.forEach(comp => {
     if (!comp || isBusComponent(comp) || typeof comp.busType === 'string' && comp.busType) return;
-    const busId = findDirectBusId(comp, busMap) || findNearestBusId(comp, busMap, adjacency);
+    const busId = findDirectBusId(comp, busMap)
+      || nearestBusByNode.get(comp.id)
+      || findNearestBusId(comp, busMap, adjacency);
     if (!busId) return;
     const bus = busMap.get(busId);
     if (!bus) return;
