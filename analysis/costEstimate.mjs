@@ -261,6 +261,43 @@ export function summarizeCosts(lineItems = []) {
  * @param {string} csvText  Raw CSV text
  * @returns {{ prices: Object, meta: { source: string, date: string, rowCount: number, warnings: string[] } }}
  */
+function parseCSVLine(line) {
+  const fields = [];
+  let current = '';
+  let inQuotes = false;
+
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') {
+      if (inQuotes && line[i + 1] === '"') {
+        current += '"';
+        i++;
+      } else {
+        inQuotes = !inQuotes;
+      }
+    } else if (ch === ',' && !inQuotes) {
+      fields.push(current.trim());
+      current = '';
+    } else {
+      current += ch;
+    }
+  }
+
+  fields.push(current.trim());
+  return fields;
+}
+
+function sanitizeSpreadsheetCell(value) {
+  const text = String(value ?? '');
+  if (!text) return '';
+  return /^[=+\-@\t\r]/.test(text) ? `'${text}` : text;
+}
+
+function encodeCSVCell(value) {
+  const text = sanitizeSpreadsheetCell(value);
+  return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+}
+
 export function parsePricingCSV(csvText) {
   const prices = {};
   const warnings = [];
@@ -282,7 +319,7 @@ export function parsePricingCSV(csvText) {
 
     // Parse header row
     if (!headerParsed) {
-      const cols = raw.split(',').map(c => c.trim().toLowerCase());
+      const cols = parseCSVLine(raw).map(c => c.toLowerCase());
       if (cols.includes('category') && cols.includes('unit_price')) {
         colIndex = {
           category: cols.indexOf('category'),
@@ -300,7 +337,7 @@ export function parsePricingCSV(csvText) {
       continue;
     }
 
-    const fields = raw.split(',');
+    const fields = parseCSVLine(raw);
     const get = idx => (idx >= 0 && idx < fields.length ? fields[idx].trim() : '');
 
     const category = get(colIndex.category).toLowerCase();
@@ -371,8 +408,8 @@ export function parsePricingCSV(csvText) {
  * @returns {string} CSV text
  */
 export function exportPricingCSV(prices = {}, meta = {}) {
-  const source = meta.source || '';
-  const date   = meta.date   || new Date().toISOString().slice(0, 10);
+  const source = sanitizeSpreadsheetCell(meta.source || '');
+  const date   = sanitizeSpreadsheetCell(meta.date || new Date().toISOString().slice(0, 10));
   const rows   = [];
 
   rows.push('# CableTrayRoute Pricing Book');
@@ -385,7 +422,7 @@ export function exportPricingCSV(prices = {}, meta = {}) {
     if (!map || typeof map !== 'object') return;
     Object.entries(map).forEach(([key, price]) => {
       if (Number.isFinite(price)) {
-        rows.push(`${category},${key},${price},${unit},${source},${date}`);
+        rows.push([category, key, price, unit, source, date].map(encodeCSVCell).join(','));
       }
     });
   }
@@ -395,7 +432,7 @@ export function exportPricingCSV(prices = {}, meta = {}) {
   addRows('conduit', prices.conduit, '$/ft');
 
   if (Number.isFinite(prices.fitting)) {
-    rows.push(`fitting,,${prices.fitting},$,${source},${date}`);
+    rows.push(['fitting', '', prices.fitting, '$', source, date].map(encodeCSVCell).join(','));
   }
 
   addRows('labor',        prices.labor,            '$/hr');
