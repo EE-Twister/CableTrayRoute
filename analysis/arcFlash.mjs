@@ -271,7 +271,10 @@ function clearingTime(comp, Ibf, devices, protectiveComp, scResults, protectiveD
   if (settings.instantaneous && effectiveKA * 1000 >= settings.instantaneous) {
     return Math.max(settings.instantaneousDelay || 0.01, 0.005);
   }
-  return interpolateTime(scaled.curve || [], effectiveKA * 1000);
+  const clearingCurve = Array.isArray(scaled.maxCurve) && scaled.maxCurve.length
+    ? scaled.maxCurve
+    : scaled.curve || [];
+  return interpolateTime(clearingCurve, effectiveKA * 1000);
 }
 
 // IEEE 1584‑2018 arcing current model
@@ -491,4 +494,3 @@ export function incidentEnergyLimitCurve(params, thresholdCalCm2, currentRangeKA
   points.sort((a, b) => a.current - b.current);
   return points;
 }
-
