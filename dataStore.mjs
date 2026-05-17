@@ -509,6 +509,7 @@ export const removeEquipment = index => {
  * @returns {OneLineSheet[]}
  */
 export const getOneLine = (scenario = getCurrentScenarioNameState()) => {
+  const normalizeActiveSheet = value => (Number.isInteger(value) && value >= 0 ? value : 0);
   const data = read(KEYS.oneLine, {}, scenario);
   if (Array.isArray(data)) {
     // legacy array of components
@@ -516,7 +517,7 @@ export const getOneLine = (scenario = getCurrentScenarioNameState()) => {
   }
   if (data && Array.isArray(data.sheets)) {
     return {
-      activeSheet: data.activeSheet || 0,
+      activeSheet: normalizeActiveSheet(data.activeSheet),
       sheets: data.sheets.map(s => ({
         name: s.name,
         components: Array.isArray(s.components) ? s.components : [],
@@ -578,10 +579,11 @@ export const restoreRevision = (index, scenario = getCurrentScenarioNameState())
 };
 
 export const setOneLine = (data, scenario = getCurrentScenarioNameState()) => {
+  const normalizeActiveSheet = value => (Number.isInteger(value) && value >= 0 ? value : 0);
   const prev = getOneLine(scenario);
   if (Array.isArray(prev.sheets) && prev.sheets.length) addRevision(prev.sheets, scenario);
   const payload = {
-    activeSheet: data.activeSheet || 0,
+    activeSheet: normalizeActiveSheet(data.activeSheet),
     sheets: Array.isArray(data.sheets) ? data.sheets : []
   };
   write(KEYS.oneLine, payload, scenario);

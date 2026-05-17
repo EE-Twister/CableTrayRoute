@@ -11612,7 +11612,8 @@ async function init() {
   });
   setItem('labelCounters', labelCounters);
 
-  activeSheet = Math.min(storedActive, sheets.length - 1);
+  const normalizedStoredActive = Number.isInteger(storedActive) ? storedActive : 0;
+  activeSheet = Math.min(Math.max(normalizedStoredActive, 0), sheets.length - 1);
   components = sheets[activeSheet].components;
   connections = sheets[activeSheet].connections;
   // Gap #51: load layers for the initial active sheet
@@ -14351,7 +14352,8 @@ async function __oneline_init() {
       connections: Array.isArray(s.connections) ? s.connections : [],
     }));
     if (!sheets.length) sheets = [{ name: 'Sheet 1', components: [], connections: [] }];
-    activeSheet = Math.min(remoteActiveSheet, sheets.length - 1);
+    const normalizedRemoteActive = Number.isInteger(remoteActiveSheet) ? remoteActiveSheet : 0;
+    activeSheet = Math.min(Math.max(normalizedRemoteActive, 0), sheets.length - 1);
     components = sheets[activeSheet].components;
     connections = sheets[activeSheet].connections;
     renderSheetTabs();
