@@ -1070,33 +1070,10 @@ export function calculatePanelTotals(panelId) {
   }
 
   const breakerDetails = ensureBreakerDetails(panel);
-  const customStarts = new Set();
-  let customVaTotal = 0;
-  breakerStarts.forEach(start => {
-    const detail = breakerDetails[String(start)];
-    if (!detail || detail.loadVaPerPhase == null) return;
-    customStarts.add(start);
-    if (detail.loadVaPerPhase && typeof detail.loadVaPerPhase === "object" && !Array.isArray(detail.loadVaPerPhase)) {
-      Object.values(detail.loadVaPerPhase).forEach(value => {
-        const parsed = parseFloat(value);
-        if (Number.isFinite(parsed) && parsed > 0) {
-          customVaTotal += parsed;
-        }
-      });
-      return;
-    }
-    const parsed = parseFloat(detail.loadVaPerPhase);
-    if (Number.isFinite(parsed) && parsed > 0) {
-      customVaTotal += parsed;
-    }
-  });
 
-  const totals = loads.reduce((acc, l) => {
+  return loads.reduce((acc, l) => {
     const span = getLoadBreakerSpan(l, panel, circuitCount);
     const startCircuit = span.length ? span[0] : null;
-    if (startCircuit != null && customStarts.has(startCircuit)) {
-      return acc;
-    }
     const cKva = parseFloat(l.kva) || 0;
     const cKw = parseFloat(l.kw) || 0;
     const dKva = parseFloat(l.demandKva) || cKva;
@@ -1105,15 +1082,40 @@ export function calculatePanelTotals(panelId) {
     acc.connectedKw += cKw;
     acc.demandKva += dKva;
     acc.demandKw += dKw;
+
+    if (startCircuit == null || !breakerStarts.has(startCircuit)) {
+      return acc;
+    }
+
+    const detail = breakerDetails[String(startCircuit)];
+    if (!detail || detail.loadVaPerPhase == null) {
+      return acc;
+    }
+
+    if (detail.loadVaPerPhase && typeof detail.loadVaPerPhase === "object" && !Array.isArray(detail.loadVaPerPhase)) {
+      const connectedShare = span.length > 0 ? (cKva * 1000) / span.length : 0;
+      const demandShare = span.length > 0 ? (dKva * 1000) / span.length : 0;
+      span.forEach(slot => {
+        const phase = getPhaseLabel(panel, slot);
+        const block = getBreakerBlock(panel, slot);
+        const phaseKey = getPhaseLoadKey(phase, block);
+        const rawValue = phaseKey ? detail.loadVaPerPhase[phaseKey] : null;
+        const parsed = parseFloat(rawValue);
+        if (!Number.isFinite(parsed) || parsed < 0) return;
+        acc.connectedKva += (parsed - connectedShare) / 1000;
+        acc.demandKva += (parsed - demandShare) / 1000;
+      });
+      return acc;
+    }
+
+    const parsed = parseFloat(detail.loadVaPerPhase);
+    if (!Number.isFinite(parsed) || parsed < 0) {
+      return acc;
+    }
+    acc.connectedKva += (parsed - (cKva * 1000)) / 1000;
+    acc.demandKva += (parsed - (dKva * 1000)) / 1000;
     return acc;
   }, { connectedKva: 0, connectedKw: 0, demandKva: 0, demandKw: 0 });
-
-  if (customVaTotal > 0) {
-    const customKva = customVaTotal / 1000;
-    totals.connectedKva += customKva;
-    totals.demandKva += customKva;
-  }
-  return totals;
 }
 
 const COLUMN_HEADERS = {
