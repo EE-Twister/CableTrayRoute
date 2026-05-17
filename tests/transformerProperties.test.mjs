@@ -65,3 +65,27 @@ const approxEqual = (a, b, tolerance = 1e-9) => {
   assert(transformer.impedance && Number.isFinite(transformer.impedance.r), 'Impedance.r should be numeric');
   assert(transformer.impedance && Number.isFinite(transformer.impedance.x), 'Impedance.x should be numeric');
 }
+
+
+// Explicit baseKV fields must be interpreted as kV values, not volts
+{
+  const transformer = {
+    type: 'transformer',
+    kva: 2500,
+    percent_z: 6,
+    xr_ratio: 10,
+    baseKV: 15
+  };
+  const baseKV = computeTransformerBaseKV(transformer);
+  approxEqual(baseKV, 15, 1e-9);
+
+  const impedance = calculateTransformerImpedance({
+    kva: 2500,
+    percentZ: 6,
+    xrRatio: 10,
+    baseKV: 15
+  });
+  assert(impedance, 'Impedance should be calculated for explicit baseKV');
+  approxEqual(Number(impedance.r.toFixed(6)), 0.53732, 1e-6);
+  approxEqual(Number(impedance.x.toFixed(6)), 5.373201, 1e-6);
+}
