@@ -210,6 +210,10 @@ export function analyzeGroundGrid(params) {
   const Ks = stepFactor(D, h, n);
   const Ki = irregularityFactor(n);
 
+  if (!Number.isFinite(Km) || Km < 0) throw new Error('Computed mesh factor is invalid for the selected geometry');
+  if (!Number.isFinite(Ks) || Ks < 0) throw new Error('Computed step factor is invalid for the selected geometry');
+  if (!Number.isFinite(Ki) || Ki < 0) throw new Error('Computed irregularity factor is invalid for the selected geometry');
+
   // Lm and Ls — effective lengths for voltage calculations (IEEE 80-2013 §16.5)
   // For grids without ground rods: Lm = Ls = L
   const Lm = effectiveLength;
@@ -224,6 +228,9 @@ export function analyzeGroundGrid(params) {
   // Mesh and step voltages
   const Em = (rho * Ig * Km * Ki) / Lm;
   const Es = (rho * Ig * Ks * Ki) / Ls;
+
+  if (!Number.isFinite(Em) || Em < 0) throw new Error('Computed mesh voltage is invalid for the selected geometry');
+  if (!Number.isFinite(Es) || Es < 0) throw new Error('Computed step voltage is invalid for the selected geometry');
 
   // Surface layer factor
   const effectiveRhoS = rhoS > 0 ? rhoS : rho;

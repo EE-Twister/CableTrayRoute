@@ -271,4 +271,23 @@ describe('analyzeGroundGrid — integration', () => {
   it('throws for negative rod length', () => {
     assert.throws(() => analyzeGroundGrid({ ...base, hasRods: true, rodCount: 4, rodLength: -1 }));
   });
+
+
+  it('throws when derived mesh factor yields a non-physical mesh voltage', () => {
+    assert.throws(() => analyzeGroundGrid({
+      rho: 100,
+      gridLx: 30.48,
+      gridLy: 30.48,
+      nx: 100,
+      ny: 100,
+      h: 0.4572,
+      d: 0.01,
+      Ig: 5000,
+      tf: 0.5,
+      hasRods: true,
+      rodCount: 10000,
+      rodLength: 1.3716,
+      bw: 70,
+    }), /Computed mesh factor is invalid|Computed mesh voltage is invalid/);
+  });
 });
