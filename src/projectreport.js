@@ -179,21 +179,47 @@ function escAttr(s) {
 // Project data assembly
 // ---------------------------------------------------------------------------
 
+function getLatestRouteCacheState() {
+  const latestState = getItem('latestRouteResults', {}) || {};
+  if (latestState.trayCableMap && Object.keys(latestState.trayCableMap).length) {
+    return latestState;
+  }
+
+  for (const storage of [sessionStorage, localStorage]) {
+    for (const key of Object.keys(storage)) {
+      if (!key.includes('route-')) continue;
+      try {
+        const parsed = JSON.parse(storage.getItem(key));
+        if (parsed && parsed.trayCableMap) return parsed;
+      } catch {
+        // Skip malformed cache entries.
+      }
+    }
+  }
+
+  return latestState;
+}
+
 function loadProjectData() {
   const cables = getCables();
   const trays = getTrays();
-  const routeState = getItem('latestRouteResults', {}) || {};
+  const conduits = getConduits();
+  const routeState = getLatestRouteCacheState();
+  const routedCableNames = routeState.routedCableNames || (routeState.batchResults || [])
+    .filter(r => r.cable && r.status && r.status.includes('Routed'))
+    .map(r => r.cable);
   const drcRun = runDRC({
     trays,
+    conduits,
     cables,
     trayCableMap: routeState.trayCableMap || {},
-    routedCableNames: routeState.routedCableNames,
+    routedCableNames,
   });
 
   return {
     cables,
     trays,
-    conduits:  getConduits(),
+    conduits,
     ductbanks: getDuctbanks(),
     studies:   getStudies(),
     approvals: getStudyApprovals(),
