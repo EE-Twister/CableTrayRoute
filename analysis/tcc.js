@@ -8041,10 +8041,11 @@ function renderOneLinePreview(componentId) {
     ? adjacency.get(componentId)
     : new Set();
   const neighborCount = neighborSet.size + 1; // include the active component itself
-  const includeEntireSheet = sameSheetSelections.length > 0;
-  const MAX_COMPONENTS = includeEntireSheet
-    ? Math.max(sheetComponents.length, sameSheetSelections.length + neighborCount, 50)
-    : Math.max(20, neighborCount, sameSheetSelections.length + 5);
+  const HARD_MAX_PREVIEW_COMPONENTS = 200;
+  const maxComponents = Math.min(
+    HARD_MAX_PREVIEW_COMPONENTS,
+    Math.max(20, neighborCount, sameSheetSelections.length + 5)
+  );
   const addUnique = (list, id) => {
     if (!id) return;
     if (!componentMap.has(id)) return;
@@ -8107,13 +8108,8 @@ function renderOneLinePreview(componentId) {
   if (onelinePreviewContainer) onelinePreviewContainer.classList.remove('empty');
   if (onelinePreviewEmpty) onelinePreviewEmpty.classList.add('hidden');
 
-  let displayedTargets;
-  if (includeEntireSheet) {
-    displayedTargets = sheetComponents.map(comp => comp.id);
-  } else {
-    displayedTargets = availableTargets.slice(0, MAX_COMPONENTS);
-  }
-  const truncatedCount = includeEntireSheet ? 0 : Math.max(0, availableTargets.length - displayedTargets.length);
+  const displayedTargets = availableTargets.slice(0, maxComponents);
+  const truncatedCount = Math.max(0, availableTargets.length - displayedTargets.length);
   const displayedSet = new Set(displayedTargets);
   const hiddenSelectionCount = sameSheetSelections.filter(id => !displayedSet.has(id)).length;
 
