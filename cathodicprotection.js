@@ -563,6 +563,14 @@ function validateInputs(input) {
     errors.push('couponDepolarizationMv cannot be negative.');
   }
 
+  if (input.testMethod === 'on-potential' && (!Number.isFinite(input.measuredIrDropMv) || input.measuredIrDropMv <= 0)) {
+    errors.push('on-potential testMethod requires measuredIrDropMv greater than 0 mV.');
+  }
+
+  if (input.testMethod === 'coupon' && (!Number.isFinite(input.couponDepolarizationMv) || input.couponDepolarizationMv <= 0)) {
+    errors.push('coupon testMethod requires couponDepolarizationMv greater than 0 mV.');
+  }
+
   return errors;
 }
 
