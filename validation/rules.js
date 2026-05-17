@@ -5,6 +5,24 @@ function coerceNumber(value) {
   return Number.isFinite(num) ? num : null;
 }
 
+
+function safeNumber(value) {
+  try {
+    return Number(value);
+  } catch {
+    return NaN;
+  }
+}
+
+function safeTrimmedText(value) {
+  if (value == null) return '';
+  try {
+    return `${value}`.trim();
+  } catch {
+    return '';
+  }
+}
+
 function readField(component, key) {
   if (!component || typeof component !== 'object') return undefined;
   if (Object.prototype.hasOwnProperty.call(component, key)) return component[key];
@@ -339,12 +357,12 @@ export function runValidation(components = [], studies = {}) {
     if (!isDcBus) return;
     const props = c.props && typeof c.props === 'object' ? c.props : c;
     const missing = [];
-    const nominalVoltage = Number(props.nominal_voltage_vdc);
+    const nominalVoltage = safeNumber(props.nominal_voltage_vdc);
     if (!Number.isFinite(nominalVoltage) || nominalVoltage <= 0) missing.push('nominal_voltage_vdc');
-    if (!`${props.grounding_scheme ?? ''}`.trim()) missing.push('grounding_scheme');
-    const maxContinuousCurrent = Number(props.max_continuous_current_a);
+    if (!safeTrimmedText(props.grounding_scheme)) missing.push('grounding_scheme');
+    const maxContinuousCurrent = safeNumber(props.max_continuous_current_a);
     if (!Number.isFinite(maxContinuousCurrent) || maxContinuousCurrent <= 0) missing.push('max_continuous_current_a');
-    const shortCircuitRating = Number(props.short_circuit_rating_ka);
+    const shortCircuitRating = safeNumber(props.short_circuit_rating_ka);
     if (!Number.isFinite(shortCircuitRating) || shortCircuitRating <= 0) missing.push('short_circuit_rating_ka');
     if (missing.length) {
       issues.push({
