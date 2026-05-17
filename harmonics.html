@@ -434,20 +434,37 @@
       return 'steelblue';
     }
 
+    function clampHMax(value) {
+      const n = Number(value);
+      if (!Number.isFinite(n)) return 25;
+      return Math.min(50, Math.max(5, Math.round(n)));
+    }
+
+    function isValidSweepPoint(point) {
+      return point && Number.isFinite(point.h) && Number.isFinite(point.zPu);
+    }
+
+    function isValidResonance(point) {
+      return point && Number.isFinite(point.hOrder) && Number.isFinite(point.zPu);
+    }
+
     function renderFreqChart(sweep, resonances, hMax) {
+      const safeHMax = clampHMax(hMax);
+      const safeSweep = Array.isArray(sweep) ? sweep.filter(isValidSweepPoint) : [];
+      const safeResonances = Array.isArray(resonances) ? resonances.filter(isValidResonance) : [];
       const width  = Number(chartEl.getAttribute('width'))  || 800;
       const height = Number(chartEl.getAttribute('height')) || 350;
       const m = { top: 20, right: 20, bottom: 50, left: 60 };
       const svg = d3.select(chartEl);
       svg.selectAll('*').remove();
 
-      if (!sweep.length) return;
+      if (!safeSweep.length) return;
 
       const xScale = d3.scaleLinear()
-        .domain([1, hMax])
+        .domain([1, safeHMax])
         .range([m.left, width - m.right]);
 
-      const zMax  = Math.min(d3.max(sweep, d => d.zPu) || 1, 50);
+      const zMax  = Math.min(d3.max(safeSweep, d => d.zPu) || 1, 50);
       const yScale = d3.scaleLinear()
         .domain([0, zMax * 1.1])
         .nice()
@@ -456,7 +473,7 @@
       // Axis
       svg.append('g')
         .attr('transform', `translate(0,${height - m.bottom})`)
-        .call(d3.axisBottom(xScale).ticks(Math.min(hMax, 25)).tickFormat(d => `h${d}`))
+        .call(d3.axisBottom(xScale).ticks(Math.min(safeHMax, 25)).tickFormat(d => `h${d}`))
         .selectAll('text').attr('font-size', '11px');
 
       svg.append('g')
@@ -477,7 +494,7 @@
         .text('Impedance Z (pu)');
 
       // Danger zone bands (±0.3 around each integer harmonic)
-      for (let h = 2; h <= hMax; h++) {
+      for (let h = 2; h <= safeHMax; h++) {
         svg.append('rect')
           .attr('x', xScale(h - 0.3))
           .attr('width', xScale(h + 0.3) - xScale(h - 0.3))
@@ -497,14 +514,14 @@
         .curve(d3.curveMonotoneX);
 
       svg.append('path')
-        .datum(sweep)
+        .datum(safeSweep)
         .attr('fill', 'none')
         .attr('stroke', 'steelblue')
         .attr('stroke-width', 2)
         .attr('d', line);
 
       // Resonance peak markers
-      resonances.forEach(r => {
+      safeResonances.forEach(r => {
         const cx = xScale(r.hOrder);
         const cy = yScale(Math.min(r.zPu, zMax));
         svg.append('circle')
@@ -539,7 +556,7 @@
         busVoltageKv:   Number(document.getElementById('fs-bus-kv').value) || 13.8,
         scMVA:          Number(document.getElementById('fs-sc-mva').value) || 100,
         fBase:          Number(document.getElementById('fs-fbase').value)  || 60,
-        hMax:           Number(document.getElementById('fs-hmax').value)   || 25,
+        hMax:           clampHMax(document.getElementById('fs-hmax').value),
         capacitorBanks: collectBanks()
       };
 
@@ -550,11 +567,12 @@
 
       // Populate results table
       resultsTbody.innerHTML = '';
-      if (!resonances.length) {
+      const safeResonances = Array.isArray(resonances) ? resonances.filter(isValidResonance) : [];
+      if (!safeResonances.length) {
         resultsTbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--text-muted,#666);">
           No resonance peaks detected in the sweep range.</td></tr>`;
       } else {
-        resonances.forEach(r => {
+        safeResonances.forEach(r => {
           const riskStyle = `color:${riskColor(r.risk)};font-weight:600`;
           const tr = document.createElement('tr');
           tr.innerHTML = `
@@ -567,14 +585,14 @@
         });
       }
 
-      dangerBanner.hidden = !resonances.some(r => r.risk === 'danger');
+      dangerBanner.hidden = !safeResonances.some(r => r.risk === 'danger');
       resultsDiv.hidden = false;
     });
 
     // Restore persisted results if available
     const saved = getStudies()?.freqScan;
     if (saved?.results?.sweep?.length) {
-      renderFreqChart(saved.results.sweep, saved.results.resonances || [], saved.params?.hMax || 25);
+      renderFreqChart(saved.results.sweep, saved.results.resonances || [], clampHMax(saved.params?.hMax));
     }
   </script>
   <script type="module">
