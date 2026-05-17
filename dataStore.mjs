@@ -24,6 +24,7 @@ import {
   registerScenario,
   getCurrentScenarioNameState,
   setCurrentScenarioNameState,
+  isValidScenarioName,
   readScenarioValue,
   writeScenarioValue,
   removeScenarioValue,
@@ -981,10 +982,10 @@ export function exportToCad(fileType = 'json') {
  */
 export function importProject(obj) {
   const { meta, ...rest } = obj || {};
+  const importScenario = meta && isValidScenarioName(meta.scenario) ? meta.scenario : null;
   if (meta && Array.isArray(meta.scenarios)) {
     setScenarioListState(meta.scenarios);
   }
-  if (meta && meta.scenario) switchScenario(meta.scenario);
   let data = rest;
   const { valid, missing, extra } = validateProjectSchema(data);
   if (!valid) {
@@ -1039,6 +1040,7 @@ export function importProject(obj) {
       setItem(k, v);
     }
   }
+  if (importScenario) switchScenario(importScenario);
   return true;
 }
 
