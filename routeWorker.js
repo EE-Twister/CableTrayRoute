@@ -373,9 +373,9 @@ class CableRoutingSystem {
         const result = [];
         let i = 0;
         while (i < segments.length) {
-            const curr = { ...segments[i] };
+            const curr = { ...segments[i], start: segments[i].start.slice(), end: segments[i].end.slice() };
             if (curr.type === 'tray' && i + 1 < segments.length) {
-                const next = { ...segments[i + 1] };
+                const next = { ...segments[i + 1], start: segments[i + 1].start.slice(), end: segments[i + 1].end.slice() };
                 if (next.type === 'field') {
                     const oTray = this._segmentOrientation(curr);
                     const oField = this._segmentOrientation(next);
