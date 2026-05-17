@@ -236,7 +236,11 @@ function getIBRStudyMetadata(comp) {
     return null;
   };
   const sRated_kVA = read('rated_kva', 'kva', 'kVA', 's_rated_kva') || 0;
-  const vLL_kV = read('voltage', 'volts', 'rated_kv', 'baseKV') || 0;
+  const vLL_kV = (
+    toKV(pickValue(comp, 'voltage')) ??
+    toKV(pickValue(comp, 'volts')) ??
+    read('rated_kv', 'baseKV')
+  ) || 0;
   const limitFactor = read('fault_limit_factor') || IBR_DEFAULTS.faultCurrentLimitFactor;
   const rideThrough = comp.ride_through !== false && comp.rideThrough !== false;
   if (!sRated_kVA || !vLL_kV) return null;

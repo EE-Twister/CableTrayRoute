@@ -204,6 +204,32 @@ global.localStorage = {
       assert(bus.threePhaseKA < 1, 'xdpp should limit source current contribution');
     });
 
+
+    it('normalizes IBR voltage fields expressed in volts before fault contribution math', () => {
+      setOneLine({
+        activeSheet: 0,
+        sheets: [{
+          name: 'IBR volts normalization',
+          components: [
+            {
+              id: 'ibr1',
+              type: 'pv_inverter',
+              rated_kva: 1000,
+              voltage: '480V',
+              connections: [{ target: 'bus1', sourcePort: 0, targetPort: 0 }]
+            },
+            { id: 'bus1', type: 'bus', subtype: 'Bus' }
+          ]
+        }]
+      });
+
+      const res = runShortCircuit();
+      const bus = res.bus1;
+      assert(bus && bus.ibr, 'IBR metadata should be attached');
+      assert(Math.abs(bus.ibr.vLL_kV - 0.48) < 1e-9, 'IBR voltage should be normalized to kV');
+      assert(Math.abs(bus.ibr.Ifault_A - 1323.0943668928928) < 1e-6, 'Fault contribution should match 480 V base');
+    });
+
     it('includes normalized UPS metadata in short-circuit results', () => {
       setOneLine({
         activeSheet: 0,
