@@ -94,6 +94,7 @@ Library Manager imports `.json`, `.csv`, `.xlsx`, and `.xls` files.
 - Use **Import mode → Replace library** to overwrite the current editor state.
 - Use **Import mode → Merge into existing** to merge categories/icons and upsert components by `subtype`.
 - Spreadsheet imports use workbook sheets documented in [componentLibraryTemplateSpec.md](componentLibraryTemplateSpec.md).
+- Import safeguards reject oversized files before parsing (10 MB max file size, 10-sheet max workbook, 20,000-row max per sheet/CSV, 2,000-character max per cell, and 10,000 imported components max).
 
 Use **Download Template** in Library Manager to export a starter workbook containing all supported sheets and sample rows.
 

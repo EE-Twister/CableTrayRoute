@@ -781,6 +781,36 @@
       }
     }
 
+    
+    const IMPORT_LIMITS = {
+      maxFileBytes: 10 * 1024 * 1024,
+      maxCsvRows: 20000,
+      maxWorkbookSheets: 10,
+      maxRowsPerSheet: 20000,
+      maxCellChars: 2000,
+      maxComponents: 10000,
+    };
+
+    function assertImportFileSize(file) {
+      if (file.size > IMPORT_LIMITS.maxFileBytes) {
+        throw new Error('Import file is too large. Maximum size is 10 MB.');
+      }
+    }
+
+    function assertRowCount(rows, label) {
+      if (rows.length > IMPORT_LIMITS.maxRowsPerSheet) {
+        throw new Error(`${label} has too many rows. Maximum is ${IMPORT_LIMITS.maxRowsPerSheet}.`);
+      }
+    }
+
+    function clampCellValue(value) {
+      const normalized = String(value ?? '').trim();
+      if (normalized.length > IMPORT_LIMITS.maxCellChars) {
+        throw new Error(`A cell value exceeds the maximum length of ${IMPORT_LIMITS.maxCellChars} characters.`);
+      }
+      return normalized;
+    }
+
     function parseBoolean(value) {
       if (typeof value === 'boolean') return value;
       if (typeof value !== 'string') return false;
@@ -816,16 +846,19 @@
 
     function parseCsvRows(text) {
       const lines = text
-        .split(/\r?\n/)
+        .split(/?
+/)
         .map((line) => line.trim())
         .filter((line) => line.length > 0);
       if (!lines.length) return [];
-      const headers = parseCsvLine(lines[0]).map((header) => header.trim());
-      return lines.slice(1).map((line) => {
+      const headers = parseCsvLine(lines[0]).map((header) => clampCellValue(header));
+      const dataLines = lines.slice(1);
+      assertRowCount(dataLines, 'CSV import');
+      return dataLines.map((line) => {
         const cols = parseCsvLine(line);
         const row = {};
         headers.forEach((header, index) => {
-          row[header] = String(cols[index] ?? '').trim();
+          row[header] = clampCellValue(cols[index]);
         });
         return row;
       });
@@ -901,6 +934,9 @@
         if (key && path) icons[key] = path;
       });
 
+      if (components.length > IMPORT_LIMITS.maxComponents) {
+        throw new Error(`Import has too many components. Maximum is ${IMPORT_LIMITS.maxComponents}.`);
+      }
       return {
         categories: [...new Set(categories)],
         components,
@@ -911,6 +947,7 @@
     async function parseLibraryImportFile(file) {
       const name = file.name.toLowerCase();
       if (name.endsWith('.json')) {
+        assertImportFileSize(file);
         const obj = parseJsonSafe(await file.text(), null);
         if (!obj) throw new Error('Invalid JSON file.');
         return {
@@ -923,6 +960,7 @@
         };
       }
       if (name.endsWith('.csv')) {
+        assertImportFileSize(file);
         const rows = parseCsvRows(await file.text());
         return {
           version: '',
@@ -930,15 +968,23 @@
         };
       }
       if (name.endsWith('.xlsx') || name.endsWith('.xls')) {
+        assertImportFileSize(file);
         if (!globalThis.XLSX) {
           throw new Error('Spreadsheet parser unavailable. Please import JSON or CSV instead.');
         }
         const data = new Uint8Array(await file.arrayBuffer());
         const workbook = XLSX.read(data, { type: 'array' });
+        if (workbook.SheetNames.length > IMPORT_LIMITS.maxWorkbookSheets) {
+          throw new Error(`Workbook has too many sheets. Maximum is ${IMPORT_LIMITS.maxWorkbookSheets}.`);
+        }
         const sheets = {};
         workbook.SheetNames.forEach((sheetName) => {
           const sheet = workbook.Sheets[sheetName];
-          sheets[sheetName] = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+          const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+          assertRowCount(rows, `Sheet "${sheetName}"`);
+          sheets[sheetName] = rows.map((row) => Object.fromEntries(
+            Object.entries(row).map(([key, value]) => [clampCellValue(key), clampCellValue(value)]),
+          ));
         });
         return {
           version: '',
