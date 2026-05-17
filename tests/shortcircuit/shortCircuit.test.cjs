@@ -190,7 +190,6 @@ global.localStorage = {
               rated_kv: 13.8,
               rated_mva: 2.5,
               xdpp_pu: 0.2,
-              volts: 13800,
               connections: [{ target: 'bus1', sourcePort: 0, targetPort: 0 }]
             },
             { id: 'bus1', type: 'bus', subtype: 'Bus' }
@@ -200,6 +199,8 @@ global.localStorage = {
       const res = runShortCircuit();
       const bus = res.bus1;
       assert(bus, 'bus results should exist');
+      assert(Math.abs(bus.prefaultKV - 13.8) < 0.01, 'rated_kv should set prefault voltage');
+      assert.strictEqual(bus.method, 'IEC', 'medium-voltage generator should use IEC method');
       assert(bus.threePhaseKA > 0.1, 'generator-based fault current should be non-zero');
       assert(bus.threePhaseKA < 1, 'xdpp should limit source current contribution');
     });
