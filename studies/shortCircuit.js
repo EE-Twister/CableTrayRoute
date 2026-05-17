@@ -13,8 +13,7 @@ function buildModel() {
   const comps = Array.isArray(sheets[0]?.components)
     ? sheets.flatMap(s => s.components)
     : sheets;
-  let buses = comps.filter(c => c.subtype === 'Bus');
-  if (buses.length === 0) buses = comps;
+  const buses = comps;
   return { buses };
 }
 

@@ -700,8 +700,7 @@ export function runShortCircuit(modelOrOpts = {}, maybeOpts = {}) {
       : sheets;
     comps = comps.filter(c => c && c.type !== 'annotation' && c.type !== 'dimension');
   }
-  let buses = comps.filter(c => c.subtype === 'Bus');
-  if (buses.length === 0) buses = comps;
+  const buses = comps;
   const compMap = new Map(comps.map(c => [c.id, c]));
   const impedanceCache = new Map();
   const voltageCache = new Map();

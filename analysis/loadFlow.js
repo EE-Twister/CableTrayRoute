@@ -941,8 +941,7 @@ export function runLoadFlow(modelOrOpts = {}, maybeOpts = {}) {
   let busComps;
   if (model && model.buses) {
     const usable = model.buses.filter(isUsableComponent);
-    let selected = usable.filter(isBusComponent);
-    if (selected.length === 0) selected = usable;
+    const selected = usable;
     const busMap = new Map();
     busComps = selected.map(bus => {
       const clone = { ...bus };
@@ -980,8 +979,7 @@ export function runLoadFlow(modelOrOpts = {}, maybeOpts = {}) {
     }
   } else if (Array.isArray(model)) {
     const usable = model.filter(isUsableComponent);
-    busComps = usable.filter(isBusComponent);
-    if (busComps.length === 0) busComps = usable;
+    busComps = usable;
   }
   const busIds = busComps.map(b => b.id);
   const phases = balanced ? ['balanced'] : ['A', 'B', 'C'];
