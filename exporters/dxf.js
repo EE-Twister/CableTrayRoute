@@ -1,11 +1,22 @@
 import { Drawing } from './simpleDxf.js';
 
+function sanitizeDXFText(value) {
+  const text = String(value ?? '');
+  const withoutControls = text.replace(/[\r\n\u0000-\u001F\u007F]/g, ' ').trim();
+  return withoutControls || 'Component';
+}
+
+function toFiniteNumber(value, fallback = 0) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : fallback;
+}
+
 function buildDXF(components = []) {
   const d = new Drawing();
   components.forEach(c => {
-    const x = c.x || 0;
-    const y = c.y || 0;
-    const name = c.subtype || 'Component';
+    const x = toFiniteNumber(c.x);
+    const y = toFiniteNumber(c.y);
+    const name = sanitizeDXFText(c.subtype || 'Component');
     d.drawText(x, y, 5, name);
   });
   return d.toDxfString();
