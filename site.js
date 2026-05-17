@@ -1608,7 +1608,9 @@ function initSettings(){
           const headers=['sample'];
           const rows=[{sample:'demo'}];
           downloadCSV(headers,rows,'reports.csv');
-          const issues=runValidation(getOneLine().sheets,getStudies());
+          const oneLine=getOneLine();
+          const components=(oneLine?.sheets||[]).flatMap(sheet=>Array.isArray(sheet.components)?sheet.components:[]);
+          const issues=runValidation(components,getStudies());
           const vHeaders=['component','message'];
           const vRows=issues.length?issues:[{component:'-',message:'No issues'}];
           downloadCSV(vHeaders,vRows,'validation-report.csv');
