@@ -350,5 +350,30 @@ global.localStorage = {
       assert.strictEqual(bus.ups.rated_kva, 500);
       assert.strictEqual(bus.ups.runtime_battery_min, 15);
     });
+    it('falls back to derived method when component method is non-string', () => {
+      setOneLine({
+        activeSheet: 0,
+        sheets: [{
+          name: 'Method type hardening',
+          components: [
+            {
+              id: 'busBadMethod',
+              type: 'bus',
+              subtype: 'Bus',
+              kV: 4.16,
+              method: { bad: true },
+              z1: { r: 0, x: 0.15 },
+              z2: { r: 0, x: 0.15 },
+              z0: { r: 0, x: 0.15 }
+            }
+          ]
+        }]
+      });
+      const res = runShortCircuit();
+      assert(res.busBadMethod, 'bus result should be produced');
+      assert.strictEqual(res.busBadMethod.method, 'IEC');
+      assert(res.busBadMethod.threePhaseKA > 0, 'analysis should complete');
+    });
+
   });
 })();

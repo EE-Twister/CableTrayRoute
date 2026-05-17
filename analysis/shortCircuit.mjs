@@ -792,7 +792,10 @@ export function runShortCircuit(modelOrOpts = {}, maybeOpts = {}) {
     }
 
     const prefaultKV = computePrefaultKV(comp, comps, compMap, voltageCache) || 1;
-    const method = (comp.method || opts.method || (prefaultKV > 1 ? 'IEC' : 'ANSI')).toUpperCase();
+    const methodCandidate = comp.method ?? opts.method ?? (prefaultKV > 1 ? 'IEC' : 'ANSI');
+    const method = typeof methodCandidate === 'string'
+      ? methodCandidate.toUpperCase()
+      : (prefaultKV > 1 ? 'IEC' : 'ANSI');
 
     let entry;
     if (method === 'IEC') {

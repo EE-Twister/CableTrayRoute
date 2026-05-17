@@ -416,7 +416,8 @@ export async function runArcFlash(options = {}) {
     const de = Number.isFinite(depthRaw) && depthRaw > 0 ? depthRaw : 508;
     const sizeFactor = Math.cbrt((h * w * de) / (508 * 508 * 508)) || 1;
     const time = clearingTime(comp, Ibf, devices, protectiveComp, sc, protectiveDevice);
-    const cfg = (comp.electrode_config || 'VCB').toUpperCase();
+    const cfgCandidate = comp.electrode_config ?? 'VCB';
+    const cfg = typeof cfgCandidate === 'string' ? cfgCandidate.toUpperCase() : 'VCB';
     const voltageSettingRaw = firstParsedNumeric(comp.kV, comp.baseKV, comp.prefault_voltage);
     const V = Number.isFinite(voltageSettingRaw) && voltageSettingRaw > 0 ? voltageSettingRaw : 0.48;
     const rawIa = Ibf > 0 && time > 0
