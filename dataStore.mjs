@@ -802,7 +802,7 @@ export function applyRemoteSnapshot(snapshot, projectId) {
     if (Array.isArray(cableTemplates)) setCableTemplates(cableTemplates);
     if (cableTagSettings && typeof cableTagSettings === 'object' && !Array.isArray(cableTagSettings)) setCableTagSettings(cableTagSettings);
     if (Array.isArray(cableChangeLog)) setCableChangeLog(cableChangeLog);
-    if (Array.isArray(mccLineups)) setMccLineups(mccLineups);
+    if (Array.isArray(mccLineups)) setMccLineups(mccLineups); else setMccLineups([]);
     setTrays(Array.isArray(raceways.trays) ? raceways.trays : []);
     setConduits(Array.isArray(raceways.conduits) ? raceways.conduits : []);
     setDuctbanks(Array.isArray(raceways.ductbanks) ? raceways.ductbanks : []);
