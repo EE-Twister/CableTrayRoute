@@ -12460,9 +12460,36 @@ async function init() {
           const toPort = hoverPort.port;
           const created = ensureConnection(fromComp, toComp, fromPort, toPort);
           if (created) {
-            pushHistory();
-            render();
-            save();
+            const createdConn = (fromComp.connections || []).find(conn =>
+              conn.target === toComp.id
+              && normalizePortIndex(conn.sourcePort) === normalizePortIndex(fromPort)
+              && normalizePortIndex(conn.targetPort) === normalizePortIndex(toPort)
+            );
+            const result = createdConn ? await chooseCable(fromComp, toComp, createdConn) : null;
+            if (!result) {
+              fromComp.connections = (fromComp.connections || []).filter(conn => conn !== createdConn);
+              render();
+              save();
+            } else if (createdConn) {
+              const updatedCable = { ...result.cable };
+              if (hasImpedance(result.cable)) updatedCable.impedance = { ...result.cable.impedance };
+              const resolvedPhases = parseCablePhases(result.phases ?? updatedCable);
+              updatedCable.phases = resolvedPhases.slice();
+              createdConn.cable = updatedCable;
+              createdConn.phases = resolvedPhases.slice();
+              createdConn.conductors = result.conductors;
+              if (result.impedance && typeof result.impedance === 'object') {
+                createdConn.impedance = { ...result.impedance };
+              } else if (hasImpedance(updatedCable)) {
+                createdConn.impedance = { ...updatedCable.impedance };
+              } else {
+                delete createdConn.impedance;
+              }
+              pushHistory();
+              render();
+              save();
+              markScheduleReconcilePending();
+            }
           }
         }
         connectSource = null;
