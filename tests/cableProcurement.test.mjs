@@ -353,6 +353,47 @@ describe('exportProcurementCSV', () => {
     // Expect exactly: header + TOTALS = 2 lines
     assert.strictEqual(lines.length, 2, `expected 2 lines for empty report, got ${lines.length}`);
   });
+
+
+  it('neutralizes spreadsheet formula prefixes in user-controlled fields', () => {
+    const maliciousReport = {
+      lineItems: [{
+        spec_key: '=2+2::#12 AWG',
+        cable_type: '@SUM(1+1)',
+        conductor_size: '+10 AWG',
+        conductors: '	=CMD()',
+        material: 'copper',
+        cut_count: 1,
+        total_required_ft: 100,
+        selected_reel_size: { name: '250 ft', feet: 250 },
+        num_reels: 1,
+        total_ordered_ft: 250,
+        waste_ft: 150,
+        waste_pct: 60,
+      }],
+      summary: {
+        total_cut_count: 1,
+        total_required_ft: 100,
+        total_ordered_ft: 250,
+        total_waste_ft: 150,
+        avg_waste_pct: 60,
+      },
+    };
+
+    const csv = exportProcurementCSV(maliciousReport);
+    const dataRow = csv.split('\r\n')[1];
+    assert.ok(dataRow.includes("'=2+2::#12 AWG"));
+    assert.ok(dataRow.includes("'@SUM(1+1)"));
+    assert.ok(dataRow.includes("'+10 AWG"));
+    assert.ok(dataRow.includes("'\t=CMD()"));
+  });
+
+  it('quotes carriage-return values to preserve valid CSV rows', () => {
+    const report = calculateProcurement(sampleResults, cableList);
+    report.lineItems[0].cable_type = 'Power\rAlt';
+    const csv = exportProcurementCSV(report);
+    assert.ok(csv.includes('"Power\rAlt"'));
+  });
 });
 
 // ---------------------------------------------------------------------------
