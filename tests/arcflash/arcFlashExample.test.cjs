@@ -51,7 +51,17 @@ global.localStorage = {
       assert.strictEqual(af.upstreamDevice, 'ABB Tmax T3 160A');
       const today = new Date().toISOString().split('T')[0];
       assert.strictEqual(af.studyDate, today);
+
+      setOneLine({ activeSheet: 0, sheets: [{ name: 'S2', components: [
+        { id: 'BUS2', kV: 0.48, z1: { r: 0, x: 0.05 }, z2: { r: 0, x: 0.05 }, z0: { r: 0, x: 0.05 },
+          sources: [{ z1: { r: 0, x: 0.02 }, z2: { r: 0, x: 0.02 }, z0: { r: 0, x: 0.02 } }],
+          enclosure: 'Box', gap: 32, working_distance: 455, electrode_config: { bad: true } }
+      ] }] });
+      const hardened = await runArcFlash();
+      assert(hardened.BUS2, 'arc flash result should be produced for non-string electrode config');
+      assert(Number.isFinite(hardened.BUS2.incidentEnergy), 'incident energy should be numeric');
     });
+
   });
 })();
 
