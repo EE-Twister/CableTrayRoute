@@ -9185,9 +9185,15 @@ function parseNumeric(value) {
   const normalized = trimmed.replace(/,/g, '');
   const direct = Number(normalized);
   if (Number.isFinite(direct)) return direct;
-  const match = normalized.match(/^(-?\d+(?:\.\d+)?)(?:\s*[a-zA-Z]+)?$/);
+  const match = normalized.match(/^(-?\d+(?:\.\d+)?)(?:\s*([a-zA-Z]+))?$/);
   if (!match) return null;
-  return Number(match[1]);
+  const numeric = Number(match[1]);
+  if (!Number.isFinite(numeric)) return null;
+  const suffix = (match[2] || '').toLowerCase();
+  if (!suffix) return numeric;
+  if (suffix === 'kv') return numeric * 1000;
+  if (suffix === 'v') return numeric;
+  return numeric;
 }
 
 function getNumericValue(comp, keys) {
