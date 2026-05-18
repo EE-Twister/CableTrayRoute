@@ -282,6 +282,35 @@ global.localStorage = {
       assert(Math.abs(bus.ibr.Ifault_A - 1323.0943668928928) < 1e-6, 'Fault contribution should match 0.48 kV base');
     });
 
+    it('handles long digit-only voltage labels without regex backtracking slowdowns', () => {
+      const longDigits = '9'.repeat(5000);
+      setOneLine({
+        activeSheet: 0,
+        sheets: [{
+          name: 'IBR long numeric label',
+          components: [
+            {
+              id: 'ibr1',
+              type: 'pv_inverter',
+              rated_kva: 1000,
+              rated_kv: 0.48,
+              voltage: longDigits,
+              connections: [{ target: 'bus1', sourcePort: 0, targetPort: 0 }]
+            },
+            { id: 'bus1', type: 'bus', subtype: 'Bus' }
+          ]
+        }]
+      });
+
+      const started = Date.now();
+      const res = runShortCircuit();
+      const elapsedMs = Date.now() - started;
+      const bus = res.bus1;
+      assert(bus && bus.ibr, 'IBR metadata should be attached');
+      assert(elapsedMs < 250, `long non-kV labels should parse quickly (elapsed ${elapsedMs} ms)`);
+      assert.strictEqual(bus.ibr.vLL_kV, 0.48, 'invalid long voltage input should fall back to rated_kv');
+    });
+
     it('falls back to rated_kv when IBR voltage parses to nonpositive values', () => {
       setOneLine({
         activeSheet: 0,

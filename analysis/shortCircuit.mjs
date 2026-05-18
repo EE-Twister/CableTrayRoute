@@ -98,10 +98,12 @@ function parseNumeric(value) {
 function toKV(value) {
   if (typeof value === 'string') {
     const normalized = value.trim().toLowerCase();
-    const kvMatch = normalized.match(/([-+]?\d*\.?\d+(?:[eE][-+]?\d+)?)\s*k\s*v\b/);
-    if (kvMatch) {
-      const num = Number.parseFloat(kvMatch[1]);
-      return Number.isFinite(num) ? num : null;
+    if (normalized.includes('kv')) {
+      const kvMatch = normalized.match(/([-+]?\d*\.?\d+(?:[eE][-+]?\d+)?)\s*k\s*v\b/);
+      if (kvMatch) {
+        const num = Number.parseFloat(kvMatch[1]);
+        return Number.isFinite(num) ? num : null;
+      }
     }
   }
   const num = parseNumeric(value);
