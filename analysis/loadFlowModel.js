@@ -435,7 +435,9 @@ function extractPQ(source) {
     if (visited.has(current)) continue;
     visited.add(current);
     visitedNodes += 1;
-    if (visitedNodes > MAX_PQ_TRAVERSAL_NODES) break;
+    if (visitedNodes > MAX_PQ_TRAVERSAL_NODES) {
+      throw new RangeError(`Load-flow PQ data exceeds maximum supported nesting depth (${MAX_PQ_TRAVERSAL_NODES} object nodes).`);
+    }
 
     if (Array.isArray(current)) {
       current.forEach(item => stack.push(item));
