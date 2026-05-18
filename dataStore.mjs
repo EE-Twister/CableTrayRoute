@@ -153,8 +153,10 @@ const crossWindowKeys = new Set([
 if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
   window.addEventListener('storage', e => {
     if (!e.key) return;
-    const [scenario, key] = e.key.split(':');
-    if (!key || scenario !== getCurrentScenarioNameState()) return;
+    const scenarioPrefix = `${getCurrentScenarioNameState()}:`;
+    if (!e.key.startsWith(scenarioPrefix)) return;
+    const key = e.key.slice(scenarioPrefix.length);
+    if (!key || key.includes(':')) return;
     if (!crossWindowKeys.has(key)) return;
     try {
       const val = e.newValue ? JSON.parse(e.newValue) : undefined;
