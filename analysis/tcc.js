@@ -9185,16 +9185,9 @@ function parseNumeric(value) {
   const normalized = trimmed.replace(/,/g, '');
   const direct = Number(normalized);
   if (Number.isFinite(direct)) return direct;
-  const match = normalized.match(/^(-?\d+(?:\.\d+)?)(?:\s*([kKmM])(?:[a-zA-Z]*)?)?$/);
+  const match = normalized.match(/^(-?\d+(?:\.\d+)?)(?:\s*[a-zA-Z]+)?$/);
   if (!match) return null;
-  let num = Number(match[1]);
-  const prefix = match[2];
-  if (prefix) {
-    if (prefix === 'k' || prefix === 'K') num *= 1000;
-    else if (prefix === 'M') num *= 1e6;
-    else if (prefix === 'm') num *= 0.001;
-  }
-  return num;
+  return Number(match[1]);
 }
 
 function getNumericValue(comp, keys) {
