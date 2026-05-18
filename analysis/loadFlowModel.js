@@ -226,33 +226,6 @@ function deriveTransformerImpedance(comp, fromRole, toRole, fromBus, toBus) {
   return impedance || null;
 }
 
-function computeExistingTapRatio(tap) {
-  if (tap === null || tap === undefined) return null;
-  if (typeof tap === 'number') return Number.isFinite(tap) ? tap : null;
-  if (typeof tap === 'object' && tap !== null) {
-    const ratio = parseNumeric(tap.ratio);
-    return ratio !== null ? ratio : null;
-  }
-  return null;
-}
-
-function deriveTransformerTap(comp, tap, fromRole, toRole, fromBus, toBus) {
-  if (!isTransformerComponent(comp)) return tap;
-  const fromKV = determineSideKV(comp, fromRole, fromBus);
-  const toKV = determineSideKV(comp, toRole, toBus);
-  if (!fromKV || !toKV || Math.abs(toKV) < 1e-9) return tap;
-  const desiredRatio = fromKV / toKV;
-  if (!Number.isFinite(desiredRatio) || desiredRatio <= 0) return tap;
-  const existingRatio = computeExistingTapRatio(tap);
-  if (existingRatio !== null && Math.abs(existingRatio - desiredRatio) < 1e-6) {
-    return tap;
-  }
-  if (tap && typeof tap === 'object' && tap !== null) {
-    return { ...tap, ratio: desiredRatio };
-  }
-  return { ratio: desiredRatio };
-}
-
 function toNumber(value, scale = 1) {
   const num = Number(value);
   return Number.isFinite(num) ? num * scale : 0;
@@ -1149,8 +1122,7 @@ export function buildLoadFlowModel(oneLine = {}) {
         }
       }
       const explicitTie = zeroImpedance;
-      let tap = cloneData(comp.tap);
-      tap = deriveTransformerTap(comp, tap, fromSide, toSide, fromBus, toBus);
+      const tap = cloneData(comp.tap);
       const shunt = cloneData(comp.shunt);
       const rating = comp.rating ?? comp.ampacity ?? comp.currentRating;
       const phases = comp.phases ? cloneData(comp.phases) : undefined;

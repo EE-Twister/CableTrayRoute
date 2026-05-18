@@ -69,9 +69,8 @@ describe('Transformer orientation handling', () => {
     assert(branch, 'Transformer branch should be constructed');
     assert.strictEqual(branch.from, 'hv_bus', 'Transformer should orient from the primary bus');
     assert.strictEqual(branch.to, 'lv_bus', 'Transformer secondary should remain on the to side');
-    assert(branch.tap, 'Derived tap data should be present');
-    const expectedRatio = 13.8 / 0.48;
-    assert(Math.abs(branch.tap.ratio - expectedRatio) < 1e-6, 'Tap ratio should match the primary to secondary voltage ratio');
+    assert(branch.tap, 'Explicit tap data should be preserved');
+    assert(Math.abs(branch.tap.ratio - 1) < 1e-6, 'Tap ratio should remain the configured off-nominal value');
 
     const result = runLoadFlow(model, { baseMVA: 10, balanced: true });
     assert(result.converged, 'Load flow should converge with correctly oriented transformer');
