@@ -836,78 +836,106 @@ function deriveReactiveFromPF(kw, record) {
   return kvarMag * sign;
 }
 
+const MAX_PQ_TRAVERSAL_NODES = 20000;
+
 function sumPQ(value) {
   if (value === null || value === undefined) {
     return { kw: 0, kvar: 0 };
   }
-  if (typeof value === 'number') {
-    return { kw: toNumber(value), kvar: 0 };
-  }
-  if (Array.isArray(value)) {
-    return value.reduce((acc, item) => {
-      const { kw, kvar } = sumPQ(item);
-      return { kw: acc.kw + kw, kvar: acc.kvar + kvar };
-    }, { kw: 0, kvar: 0 });
-  }
-  if (typeof value !== 'object') {
-    return { kw: 0, kvar: 0 };
-  }
-  let kw = 0;
-  let kvar = 0;
-  let hasDirect = false;
-  const directKw = value.kw ?? value.kW ?? value.P ?? value.p;
-  const directKvar = value.kvar ?? value.kVAr ?? value.Q ?? value.q;
-  if (directKw !== undefined) {
-    const added = toNumber(directKw);
-    if (added) hasDirect = true;
-    kw += added;
-  }
-  const kvarProvided = directKvar !== undefined;
-  const kvarAuthoritative = isReactiveAuthoritative(value, kvarProvided);
-  if (kvarProvided && kvarAuthoritative) {
-    const added = toNumber(directKvar);
-    if (added) hasDirect = true;
-    kvar += added;
-  }
-  if (value.watts !== undefined) {
-    const added = toNumber(value.watts, 0.001);
-    if (added) hasDirect = true;
-    kw += added;
-  }
-  if (value.hp !== undefined) {
-    const added = toNumber(value.hp, 0.746);
-    if (added) hasDirect = true;
-    kw += added;
-  }
-  if ((!kvarAuthoritative || !kvarProvided) && kw) {
-    const derived = deriveReactiveFromPF(kw, value);
-    if (derived) {
-      kvar += derived;
-      hasDirect = true;
+  const stack = [value];
+  const visited = new WeakSet();
+  let visitedNodes = 0;
+  let totalKw = 0;
+  let totalKvar = 0;
+
+  while (stack.length) {
+    const current = stack.pop();
+    if (current === null || current === undefined) continue;
+    if (typeof current === 'number') {
+      totalKw += toNumber(current);
+      continue;
+    }
+    if (typeof current !== 'object') continue;
+    if (visited.has(current)) continue;
+    visited.add(current);
+    visitedNodes += 1;
+    if (visitedNodes > MAX_PQ_TRAVERSAL_NODES) break;
+
+    if (Array.isArray(current)) {
+      current.forEach(item => stack.push(item));
+      continue;
+    }
+
+    let localKw = 0;
+    let localKvar = 0;
+    let hasDirect = false;
+    const directKw = current.kw ?? current.kW ?? current.P ?? current.p;
+    const directKvar = current.kvar ?? current.kVAr ?? current.Q ?? current.q;
+    if (directKw !== undefined) {
+      const added = toNumber(directKw);
+      if (added) hasDirect = true;
+      localKw += added;
+    }
+    const kvarProvided = directKvar !== undefined;
+    const kvarAuthoritative = isReactiveAuthoritative(current, kvarProvided);
+    if (kvarProvided && kvarAuthoritative) {
+      const added = toNumber(directKvar);
+      if (added) hasDirect = true;
+      localKvar += added;
+    }
+    if (current.watts !== undefined) {
+      const added = toNumber(current.watts, 0.001);
+      if (added) hasDirect = true;
+      localKw += added;
+    }
+    if (current.hp !== undefined) {
+      const added = toNumber(current.hp, 0.746);
+      if (added) hasDirect = true;
+      localKw += added;
+    }
+    if ((!kvarAuthoritative || !kvarProvided) && localKw) {
+      const derived = deriveReactiveFromPF(localKw, current);
+      if (derived) {
+        localKvar += derived;
+        hasDirect = true;
+      }
+    }
+
+    totalKw += localKw;
+    totalKvar += localKvar;
+    if (!hasDirect) {
+      Object.keys(current).forEach(key => {
+        const child = current[key];
+        if (!child || typeof child !== 'object') return;
+        stack.push(child);
+      });
     }
   }
-  if (!hasDirect) {
-    Object.keys(value).forEach(key => {
-      const child = value[key];
-      if (!child || typeof child !== 'object') return;
-      const { kw: childKw, kvar: childKvar } = sumPQ(child);
-      kw += childKw;
-      kvar += childKvar;
-    });
-  }
-  return { kw, kvar };
+
+  return { kw: totalKw, kvar: totalKvar };
 }
 
 function resolvePhaseRecord(record, phase) {
   if (!record || typeof record !== 'object') return null;
   const variants = [phase, phase?.toLowerCase?.(), phase?.toUpperCase?.()];
-  for (const key of variants) {
-    if (!key) continue;
-    if (record[key] !== undefined) return record[key];
-  }
-  if (record.phases) {
-    const nested = resolvePhaseRecord(record.phases, phase);
-    if (nested) return nested;
+  const stack = [record];
+  const visited = new WeakSet();
+  let visitedNodes = 0;
+
+  while (stack.length) {
+    const current = stack.pop();
+    if (!current || typeof current !== 'object') continue;
+    if (visited.has(current)) continue;
+    visited.add(current);
+    visitedNodes += 1;
+    if (visitedNodes > MAX_PQ_TRAVERSAL_NODES) return null;
+    for (const key of variants) {
+      if (!key) continue;
+      if (current[key] !== undefined) return current[key];
+    }
+    if (current.phases && typeof current.phases === 'object') {
+      stack.push(current.phases);
+    }
   }
   return null;
 }
