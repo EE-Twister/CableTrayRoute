@@ -1031,6 +1031,10 @@ export function importProject(obj) {
     };
   }
 
+  if (importScenario) {
+    switchScenario(importScenario);
+  }
+
   setDuctbanks(data.ductbanks);
   setConduits(data.conduits);
   setTrays(data.trays);
@@ -1061,7 +1065,6 @@ export function importProject(obj) {
       }
     }
   }
-  if (importScenario) switchScenario(importScenario);
   return true;
 }
 
