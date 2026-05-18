@@ -13471,15 +13471,16 @@ function resolveComponentVoltageVolts(comp, options = {}) {
   if (comp.cable && typeof comp.cable === 'object') containers.push(comp.cable);
   containers.push(comp);
   const primaryKeys = [
-    'rated_voltage',
-    'rated_volts',
-    'voltage_rating',
     'voltage',
     'volts',
     'voltage_v',
-    'voltage_kv'
+    'voltage_kv',
+    'operating_voltage',
+    'rated_voltage',
+    'rated_volts',
+    'voltage_rating'
   ];
-  const directKeys = includeOperatingVoltage ? [...primaryKeys, 'operating_voltage'] : primaryKeys;
+  const directKeys = includeOperatingVoltage ? primaryKeys : primaryKeys.filter(key => key !== 'operating_voltage');
   for (const container of containers) {
     if (!container || typeof container !== 'object') continue;
     for (const key of directKeys) {
