@@ -417,12 +417,10 @@ let cachedStudyResults = getStudies();
 const studyAttributeResolvers = {
   arcFlash: comp => {
     if (!comp) return null;
-    if (comp.arcFlash && typeof comp.arcFlash === 'object') return comp.arcFlash;
     return cachedStudyResults?.arcFlash?.[comp.id] || null;
   },
   shortCircuit: comp => {
     if (!comp) return null;
-    if (comp.shortCircuit && typeof comp.shortCircuit === 'object') return comp.shortCircuit;
     return cachedStudyResults?.shortCircuit?.[comp.id] || null;
   },
   reliability: comp => {
@@ -4218,19 +4216,19 @@ function resolveComponentAttribute(comp, key) {
     return value;
   }
   const segments = key.split('.');
+  const resolver = studyAttributeResolvers[segments[0]];
+  if (resolver) {
+    const base = resolver(comp);
+    if (base && typeof base === 'object') {
+      const studyValue = getNestedValue(base, segments.slice(1));
+      if (studyValue !== undefined) return studyValue;
+    }
+  }
   let value = getNestedValue(comp, segments);
   if (value !== undefined) return value;
   if (comp.props && typeof comp.props === 'object') {
     value = getNestedValue(comp.props, segments);
     if (value !== undefined) return value;
-  }
-  const resolver = studyAttributeResolvers[segments[0]];
-  if (resolver) {
-    const base = resolver(comp);
-    if (base && typeof base === 'object') {
-      value = getNestedValue(base, segments.slice(1));
-      if (value !== undefined) return value;
-    }
   }
   return undefined;
 }
