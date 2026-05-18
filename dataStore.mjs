@@ -1051,6 +1051,7 @@ export function importProject(obj) {
   } else {
     setOneLine({ activeSheet: 0, sheets: [] });
   }
+  removeItem(REVISION_KEY);
 
   const reserved = new Set([...Object.values(KEYS), EXTRA_KEYS.mccLineups, REVISION_KEY, 'CTR_PROJECT_V1']);
   for (const key of keys()) {
