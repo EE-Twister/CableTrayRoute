@@ -2281,6 +2281,7 @@ const MAX_DIAGRAM_ZOOM = 4;
 const DEFAULT_VIEWPORT_WIDTH = 960;
 const DEFAULT_VIEWPORT_HEIGHT = 540;
 const STATIC_VIEWPORT_SCALE = 4;
+const MAX_DYNAMIC_VIEWPORT_SPAN = 50000;
 const STATIC_VIEWPORT_BOUNDS = {
   minX: -DEFAULT_VIEWPORT_WIDTH * STATIC_VIEWPORT_SCALE / 2,
   minY: -DEFAULT_VIEWPORT_HEIGHT * STATIC_VIEWPORT_SCALE / 2,
@@ -2754,16 +2755,20 @@ function updateDiagramViewport(bounds) {
       const minHeight = STATIC_VIEWPORT_BOUNDS.height;
       const paddedWidth = rawWidth + pad * 2;
       const paddedHeight = rawHeight + pad * 2;
-      const width = Math.max(minWidth, paddedWidth);
-      const height = Math.max(minHeight, paddedHeight);
+      const width = Math.min(MAX_DYNAMIC_VIEWPORT_SPAN, Math.max(minWidth, paddedWidth));
+      const height = Math.min(MAX_DYNAMIC_VIEWPORT_SPAN, Math.max(minHeight, paddedHeight));
       const centerX = (bounds.minX + bounds.maxX) / 2;
       const centerY = (bounds.minY + bounds.maxY) / 2;
-      nextViewport = {
-        minX: centerX - width / 2,
-        minY: centerY - height / 2,
-        width,
-        height
-      };
+      const minX = centerX - width / 2;
+      const minY = centerY - height / 2;
+      if (Number.isFinite(centerX) && Number.isFinite(centerY) && Number.isFinite(minX) && Number.isFinite(minY)) {
+        nextViewport = {
+          minX,
+          minY,
+          width,
+          height
+        };
+      }
     }
   }
   if (needsInitialViewportCenter) {
