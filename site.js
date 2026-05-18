@@ -1008,25 +1008,10 @@ function applyProjectHash(){
     if(fromHash){
       activeName=fromHash;
     }else{
-      try{
-        const stateName=(getProjectState().name||'').trim();
-        if(stateName&&!isPageAnchorHash(stateName)) activeName=stateName;
-      }catch(e){ console.warn('Could not read project name from state:', e); }
-      if(!activeName){
-        const globalName=typeof window.currentProjectId==='string'?window.currentProjectId.trim():'';
-        if(globalName&&globalName!=='default'&&!isPageAnchorHash(globalName)) activeName=globalName;
-      }
+      const globalName=typeof window.currentProjectId==='string'?window.currentProjectId.trim():'';
+      if(globalName&&globalName!=='default'&&!isPageAnchorHash(globalName)) activeName=globalName;
     }
     window.currentProjectId=activeName||'default';
-    if(activeName){
-      try{
-        const proj=getProjectState();
-        if((proj.name||'')!==activeName){
-          proj.name=activeName;
-          setProjectState(proj);
-        }
-      }catch(err){console.warn('Project name sync failed',err);}
-    }
   }
   if(typeof document==='undefined'||typeof location==='undefined') return;
   const projectHash=currentProjectFromHash();
