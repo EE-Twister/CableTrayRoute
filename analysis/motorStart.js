@@ -13,7 +13,9 @@ function parseTorqueCurve(spec) {
   const pts = [];
   if (Array.isArray(spec)) {
     spec.forEach(p => {
+      if (typeof p !== 'string') return;
       const [s, t] = p.split(':');
+      if (s === undefined || t === undefined) return;
       pts.push({ s: Number(s), t: Number(t) });
     });
   } else if (typeof spec === 'string') {
