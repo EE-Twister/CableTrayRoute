@@ -767,8 +767,9 @@ export function loadProject(projectId, scenario = getCurrentScenarioNameState())
   if (!projectId) return false;
   try {
     const rawPayload = readSavedProject(projectId);
-    const payload = rawPayload || {};
-    const migrated = rawPayload ? wasSavedProjectMigrated(projectId) : false;
+    if (!rawPayload) return false;
+    const payload = rawPayload;
+    const migrated = wasSavedProjectMigrated(projectId);
     const equipment = payload.equipment;
     const panels = payload.panels;
     const loads = payload.loads;
