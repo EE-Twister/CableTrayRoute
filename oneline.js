@@ -13418,7 +13418,8 @@ function buildCableSpecFromComponent(comp, allComps) {
   spec.conductors = outbound?.conductors || cable.conductors || '';
   const unitPerPx = diagramScale.unitPerPx || 1;
   const slackPctRaw = parseFloat(cable.slack_pct);
-  const slackMultiplier = Number.isFinite(slackPctRaw) ? (1 + (slackPctRaw / 100)) : 1;
+  const slackPct = Number.isFinite(slackPctRaw) ? Math.max(0, slackPctRaw) : 0;
+  const slackMultiplier = 1 + (slackPct / 100);
   const autoLen = (outbound?.length || 0) * unitPerPx * slackMultiplier;
   let finalLen = autoLen;
   if (cable.manual_length) {
