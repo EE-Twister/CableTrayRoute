@@ -708,8 +708,8 @@ export function runShortCircuit(modelOrOpts = {}, maybeOpts = {}) {
       : sheets;
     comps = comps.filter(c => c && c.type !== 'annotation' && c.type !== 'dimension');
   }
-  let buses = comps.filter(comp => comp?.subtype === 'Bus' || comp?.type === 'bus');
-  if (buses.length === 0) buses = comps;
+  const busNodes = comps.filter(comp => comp?.subtype === 'Bus' || comp?.type === 'bus');
+  const hasBusNodes = busNodes.length > 0;
   const compMap = new Map(comps.map(c => [c.id, c]));
   const impedanceCache = new Map();
   const voltageCache = new Map();
@@ -779,9 +779,9 @@ export function runShortCircuit(modelOrOpts = {}, maybeOpts = {}) {
     return { r, x };
   };
 
-  buses.forEach(comp => {
+  comps.forEach(comp => {
     const baseZ = computeImpedance(comp, comps, compMap, impedanceCache);
-    const fallbackZ = (comp?.subtype === 'Bus' || comp?.type === 'bus')
+    const fallbackZ = (!hasBusNodes || comp?.subtype === 'Bus' || comp?.type === 'bus')
       ? resolveUpstreamImpedance(comp, comps, compMap, impedanceCache)
       : null;
     let z1 = comp.z1 ? toImpedance(comp.z1) : baseZ;
