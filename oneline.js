@@ -2726,6 +2726,29 @@ function applyDiagramZoom({ adjustScroll = false, previousZoom, focusPoint } = {
 }
 
 function updateDiagramViewport(bounds) {
+  let nextViewport = { ...STATIC_VIEWPORT_BOUNDS };
+  if (bounds && Number.isFinite(bounds.minX) && Number.isFinite(bounds.minY) &&
+      Number.isFinite(bounds.maxX) && Number.isFinite(bounds.maxY)) {
+    const rawWidth = bounds.maxX - bounds.minX;
+    const rawHeight = bounds.maxY - bounds.minY;
+    if (Number.isFinite(rawWidth) && Number.isFinite(rawHeight) && rawWidth >= 0 && rawHeight >= 0) {
+      const pad = 200;
+      const minWidth = STATIC_VIEWPORT_BOUNDS.width;
+      const minHeight = STATIC_VIEWPORT_BOUNDS.height;
+      const paddedWidth = rawWidth + pad * 2;
+      const paddedHeight = rawHeight + pad * 2;
+      const width = Math.max(minWidth, paddedWidth);
+      const height = Math.max(minHeight, paddedHeight);
+      const centerX = (bounds.minX + bounds.maxX) / 2;
+      const centerY = (bounds.minY + bounds.maxY) / 2;
+      nextViewport = {
+        minX: centerX - width / 2,
+        minY: centerY - height / 2,
+        width,
+        height
+      };
+    }
+  }
   if (needsInitialViewportCenter) {
     if (bounds && Number.isFinite(bounds.minX) && Number.isFinite(bounds.minY) &&
         Number.isFinite(bounds.maxX) && Number.isFinite(bounds.maxY)) {
@@ -2739,7 +2762,7 @@ function updateDiagramViewport(bounds) {
       pendingInitialCenter = getStaticViewportCenter();
     }
   }
-  diagramViewport = { ...STATIC_VIEWPORT_BOUNDS };
+  diagramViewport = nextViewport;
 }
 
 function updateZoomDisplay() {
