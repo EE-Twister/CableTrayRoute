@@ -13370,6 +13370,7 @@ async function init() {
 }
 
 function getCategory(c) {
+  if (c?.type === 'panel') return 'panel';
   return subtypeCategory[c.subtype] || c.type;
 }
 
