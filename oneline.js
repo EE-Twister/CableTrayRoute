@@ -566,7 +566,12 @@ function setNestedComponentValue(comp, path = [], rawValue, type) {
 
 function inferSchemaFromProps(props, path = []) {
   const schema = [];
+  const reservedTopLevelFieldNames = new Set([
+    'id', 'type', 'subtype', 'x', 'y', 'width', 'height', 'rotation', 'flipped', 'label',
+    'ports', 'connections', 'meta', 'svg', 'icon', 'scheduleLinks', 'props'
+  ]);
   Object.entries(props || {}).forEach(([key, value]) => {
+    if (!path.length && reservedTopLevelFieldNames.has(key)) return;
     const currentPath = [...path, key];
     if (value && typeof value === 'object' && !Array.isArray(value)) {
       schema.push(...inferSchemaFromProps(value, currentPath));
@@ -9304,6 +9309,11 @@ function selectComponent(compOrId) {
     };
 
     const applyFieldFromForm = (target, field, formData) => {
+      const reservedTopLevelFieldNames = new Set([
+        'id', 'type', 'subtype', 'x', 'y', 'width', 'height', 'rotation', 'flipped', 'label',
+        'ports', 'connections', 'meta', 'svg', 'icon', 'scheduleLinks', 'props'
+      ]);
+      if (reservedTopLevelFieldNames.has(field.name) && typeof field.setValue !== 'function') return;
       const hasPropKey = !!(
         target
         && target.props
