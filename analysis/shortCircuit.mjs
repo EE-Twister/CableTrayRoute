@@ -684,7 +684,7 @@ function computePrefaultKV(comp, comps, compMap, cache, visited = new Set()) {
 
 /**
  * Symmetrical component short‑circuit engine with basic ANSI C37 and
- * IEC 60909 support. Each component is treated as a bus with sequence
+ * IEC 60909 support. Bus components are treated as study nodes with sequence
  * impedances back to the source. Optional `sources` allows multiple
  * upstream contributions. Components may specify:
  *   - `prefault_voltage` (line‑to‑line kV)
@@ -708,7 +708,8 @@ export function runShortCircuit(modelOrOpts = {}, maybeOpts = {}) {
       : sheets;
     comps = comps.filter(c => c && c.type !== 'annotation' && c.type !== 'dimension');
   }
-  const buses = comps;
+  let buses = comps.filter(comp => comp?.subtype === 'Bus' || comp?.type === 'bus');
+  if (buses.length === 0) buses = comps;
   const compMap = new Map(comps.map(c => [c.id, c]));
   const impedanceCache = new Map();
   const voltageCache = new Map();
