@@ -119,6 +119,12 @@ function describeComponentMetadata(meta = {}) {
   return null;
 }
 
+function isCableConnection(conn = {}) {
+  const type = String(conn.componentType || '').toLowerCase();
+  const subtype = String(conn.componentSubtype || '').toLowerCase();
+  return type === 'cable' || subtype.includes('cable');
+}
+
 /** Basic complex number helpers used by the load-flow solver */
 function toComplex(re = 0, im = 0) {
   return { re, im };
@@ -162,7 +168,7 @@ function buildYBus(buses, baseMVA) {
       if (j < 0) return;
       const Z = toPerUnitZ(conn.impedance || { r: 0, x: 0 }, bus.baseKV || 1, baseMVA);
       const mag2 = Z.re * Z.re + Z.im * Z.im;
-      let treatAsIdealTie = conn.idealTie === true;
+      let treatAsIdealTie = false;
       if (mag2 < MIN_COMPLEX_MAG) {
         warnings.push({
           type: 'zero_impedance_branch',
@@ -179,7 +185,7 @@ function buildYBus(buses, baseMVA) {
           connectionSide: conn.connectionSide,
           connectionConfig: conn.connectionConfig
         });
-        treatAsIdealTie = true;
+        treatAsIdealTie = isCableConnection(conn);
       }
       if (treatAsIdealTie) {
         conn.idealTie = true;
@@ -452,9 +458,9 @@ function solvePhase(buses, baseMVA, options = {}) {
       const Vj = toComplex(Vm[j] * Math.cos(Va[j]), Vm[j] * Math.sin(Va[j]));
       const Z = toPerUnitZ(conn.impedance || { r: 0, x: 0 }, bus.baseKV || 1, baseMVA);
       const mag2 = Z.re * Z.re + Z.im * Z.im;
-      let treatAsIdealTie = conn.idealTie === true;
+      let treatAsIdealTie = false;
       if (mag2 < MIN_COMPLEX_MAG) {
-        treatAsIdealTie = true;
+        treatAsIdealTie = isCableConnection(conn);
       }
       if (treatAsIdealTie) {
         conn.idealTie = true;
@@ -1006,8 +1012,7 @@ export function runLoadFlow(modelOrOpts = {}, maybeOpts = {}) {
           componentSubtype: branch.subtype,
           componentName: branch.name,
           componentLabel: branch.label,
-          componentRef: branch.ref,
-          idealTie: branch.idealTie === true
+          componentRef: branch.ref
         });
       });
     }
@@ -1061,8 +1066,7 @@ export function runLoadFlow(modelOrOpts = {}, maybeOpts = {}) {
           phases: conn.phases,
           componentPort: conn.componentPort,
           connectionSide: conn.connectionSide,
-          connectionConfig: conn.connectionConfig,
-          idealTie: conn.idealTie === true
+          connectionConfig: conn.connectionConfig
         }))
       };
     });
