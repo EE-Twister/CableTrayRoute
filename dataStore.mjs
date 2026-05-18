@@ -767,9 +767,8 @@ export function loadProject(projectId, scenario = getCurrentScenarioNameState())
   if (!projectId) return false;
   try {
     const rawPayload = readSavedProject(projectId);
-    if (!rawPayload) return false;
     const payload = rawPayload || {};
-    const migrated = wasSavedProjectMigrated(projectId);
+    const migrated = rawPayload ? wasSavedProjectMigrated(projectId) : false;
     const equipment = payload.equipment;
     const panels = payload.panels;
     const loads = payload.loads;
@@ -799,7 +798,7 @@ export function loadProject(projectId, scenario = getCurrentScenarioNameState())
       setOneLine(oneLine || { activeSheet: 0, sheets: [] }, scenario);
     }
     if (migrated) saveProject(projectId, scenario);
-    return true;
+    return !!rawPayload;
   } catch (e) {
     console.error('Failed to load project', e);
     return false;
