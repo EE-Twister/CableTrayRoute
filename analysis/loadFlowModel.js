@@ -777,20 +777,70 @@ function isBranchDevice(comp) {
   return false;
 }
 
+const MAX_CLONE_DEPTH = 200;
+const MAX_CLONE_NODES = 10000;
+
 export function cloneData(value) {
   if (value === null || value === undefined) return value;
-  if (Array.isArray(value)) {
-    return value.map(cloneData);
-  }
-  if (typeof value === 'object') {
-    const out = {};
-    Object.keys(value).forEach(key => {
-      const val = value[key];
-      if (val !== undefined) out[key] = cloneData(val);
+  if (typeof value !== 'object') return value;
+
+  const root = Array.isArray(value) ? [] : {};
+  const seen = new WeakMap([[value, root]]);
+  const stack = [{ source: value, target: root, depth: 0 }];
+  let nodesVisited = 1;
+
+  while (stack.length > 0) {
+    const frame = stack.pop();
+    if (!frame) continue;
+    if (frame.depth >= MAX_CLONE_DEPTH) {
+      throw new Error('Load-flow input exceeds maximum supported nesting depth.');
+    }
+    if (nodesVisited > MAX_CLONE_NODES) {
+      throw new Error('Load-flow input exceeds maximum supported object size.');
+    }
+
+    if (Array.isArray(frame.source)) {
+      frame.source.forEach(item => {
+        if (item === undefined) return;
+        if (item === null || typeof item !== 'object') {
+          frame.target.push(item);
+          return;
+        }
+        const existing = seen.get(item);
+        if (existing) {
+          frame.target.push(existing);
+          return;
+        }
+        const nextTarget = Array.isArray(item) ? [] : {};
+        frame.target.push(nextTarget);
+        seen.set(item, nextTarget);
+        stack.push({ source: item, target: nextTarget, depth: frame.depth + 1 });
+        nodesVisited += 1;
+      });
+      continue;
+    }
+
+    Object.keys(frame.source).forEach(key => {
+      const item = frame.source[key];
+      if (item === undefined) return;
+      if (item === null || typeof item !== 'object') {
+        frame.target[key] = item;
+        return;
+      }
+      const existing = seen.get(item);
+      if (existing) {
+        frame.target[key] = existing;
+        return;
+      }
+      const nextTarget = Array.isArray(item) ? [] : {};
+      frame.target[key] = nextTarget;
+      seen.set(item, nextTarget);
+      stack.push({ source: item, target: nextTarget, depth: frame.depth + 1 });
+      nodesVisited += 1;
     });
-    return out;
   }
-  return value;
+
+  return root;
 }
 
 function deriveLinearSegmentImpedance(comp) {
