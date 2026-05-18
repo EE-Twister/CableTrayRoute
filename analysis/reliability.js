@@ -4,20 +4,6 @@ function isVisualComponent(comp) {
   return comp ? VISUAL_TYPES.has(comp.type) : false;
 }
 
-function isConnectorComponent(comp) {
-  if (!comp) return false;
-  const type = (comp.type || '').toLowerCase();
-  if (!type) return false;
-  if (type.includes('link')) return true;
-  if (type.includes('cable')) return true;
-  if (type.includes('feeder')) return true;
-  if (type.includes('conductor')) return true;
-  if (type.includes('tap')) return true;
-  if (type.includes('splice')) return true;
-  return false;
-}
-
-
 function buildAdjacency(components = [], skipIds = new Set()) {
   const adj = new Map();
   components.forEach(c => {
@@ -54,7 +40,7 @@ function findConnected(startIds = [], adj = new Map()) {
 export function runReliability(components = []) {
   // Filter out non-operational components like dimensions or annotations
   const ops = components.filter(c => !isVisualComponent(c));
-  const eligible = ops.filter(c => !isConnectorComponent(c));
+  const eligible = ops;
   // Compute component availability and expected downtime per year
   const componentStats = {};
   const availMap = {};
