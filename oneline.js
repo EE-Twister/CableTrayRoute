@@ -554,18 +554,33 @@ function readNestedValue(holder, path = []) {
   if (!holder || typeof holder !== 'object') return undefined;
   let current = holder;
   for (const key of path) {
-    if (!current || typeof current !== 'object' || !(key in current)) return undefined;
+    if (
+      !current
+      || typeof current !== 'object'
+      || isUnsafeNestedPathSegment(key)
+      || !Object.prototype.hasOwnProperty.call(current, key)
+    ) {
+      return undefined;
+    }
     current = current[key];
   }
   return current;
 }
 
+function isUnsafeNestedPathSegment(segment) {
+  return segment === '__proto__' || segment === 'prototype' || segment === 'constructor';
+}
+
 function writeNestedValue(holder, path = [], value) {
   if (!holder || typeof holder !== 'object' || !path.length) return;
+  if (path.some(isUnsafeNestedPathSegment)) return;
   let current = holder;
   for (let i = 0; i < path.length - 1; i += 1) {
     const key = path[i];
-    if (!current[key] || typeof current[key] !== 'object') current[key] = {};
+    const next = current[key];
+    if (!Object.prototype.hasOwnProperty.call(current, key) || !next || typeof next !== 'object') {
+      current[key] = {};
+    }
     current = current[key];
   }
   current[path[path.length - 1]] = value;
@@ -611,6 +626,7 @@ function inferSchemaFromProps(props, path = []) {
   ]);
   Object.entries(props || {}).forEach(([key, value]) => {
     if (!path.length && reservedTopLevelFieldNames.has(key)) return;
+    if (isUnsafeNestedPathSegment(key)) return;
     const currentPath = [...path, key];
     if (value && typeof value === 'object' && !Array.isArray(value)) {
       schema.push(...inferSchemaFromProps(value, currentPath));
