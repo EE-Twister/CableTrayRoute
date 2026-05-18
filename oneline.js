@@ -13330,7 +13330,7 @@ async function init() {
 }
 
 function getCategory(c) {
-  return c.type || subtypeCategory[c.subtype];
+  return subtypeCategory[c.subtype] || c.type;
 }
 
 function formatLoadFlowCurrentValue(value) {
