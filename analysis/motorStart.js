@@ -200,9 +200,6 @@ export function runMotorStart() {
 
 function ensureMotorStartResults() {
   const studies = getStudies();
-  if (studies?.motorStart && Object.keys(studies.motorStart).length) {
-    return studies.motorStart;
-  }
   const res = runMotorStart();
   studies.motorStart = res;
   setStudies(studies);
