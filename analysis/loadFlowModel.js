@@ -437,42 +437,61 @@ function addPQ(target, addition) {
   return out;
 }
 
+const MAX_PQ_TRAVERSAL_NODES = 20000;
+
 function extractPQ(source) {
   if (source === null || source === undefined) return null;
-  if (typeof source === 'number') {
-    const kw = toNumber(source);
-    return kw ? { kw, kvar: 0 } : null;
-  }
-  if (Array.isArray(source)) {
-    return source.reduce((acc, item) => addPQ(acc, extractPQ(item)), null);
-  }
-  if (typeof source !== 'object') return null;
-  let kw = toNumber(source.kw ?? source.kW ?? source.P ?? source.p);
-  kw += toNumber(source.watts, 0.001);
-  kw += toNumber(source.hp, 0.746);
-  const directKvar = source.kvar ?? source.kVAr ?? source.Q ?? source.q;
-  const kvarProvided = directKvar !== undefined;
-  const kvarAuthoritative = isReactiveAuthoritative(source, kvarProvided);
-  let kvar = 0;
-  if (kvarProvided && kvarAuthoritative) {
-    kvar += toNumber(directKvar);
-  }
-  if ((!kvarAuthoritative || !kvarProvided) && kw) {
-    const derived = deriveReactiveFromPF(kw, source);
-    if (derived) kvar += derived;
-  }
-  if (!kw && !kvar) {
-    let nested = null;
-    Object.keys(source).forEach(key => {
-      const child = source[key];
+  const stack = [source];
+  const visited = new WeakSet();
+  let visitedNodes = 0;
+  let total = null;
+
+  while (stack.length) {
+    const current = stack.pop();
+    if (current === null || current === undefined) continue;
+    if (typeof current === 'number') {
+      const kw = toNumber(current);
+      if (kw) total = addPQ(total, { kw, kvar: 0 });
+      continue;
+    }
+    if (typeof current !== 'object') continue;
+    if (visited.has(current)) continue;
+    visited.add(current);
+    visitedNodes += 1;
+    if (visitedNodes > MAX_PQ_TRAVERSAL_NODES) break;
+
+    if (Array.isArray(current)) {
+      current.forEach(item => stack.push(item));
+      continue;
+    }
+
+    let kw = toNumber(current.kw ?? current.kW ?? current.P ?? current.p);
+    kw += toNumber(current.watts, 0.001);
+    kw += toNumber(current.hp, 0.746);
+    const directKvar = current.kvar ?? current.kVAr ?? current.Q ?? current.q;
+    const kvarProvided = directKvar !== undefined;
+    const kvarAuthoritative = isReactiveAuthoritative(current, kvarProvided);
+    let kvar = 0;
+    if (kvarProvided && kvarAuthoritative) {
+      kvar += toNumber(directKvar);
+    }
+    if ((!kvarAuthoritative || !kvarProvided) && kw) {
+      const derived = deriveReactiveFromPF(kw, current);
+      if (derived) kvar += derived;
+    }
+    if (kw || kvar) {
+      total = addPQ(total, { kw, kvar });
+      continue;
+    }
+
+    Object.keys(current).forEach(key => {
+      const child = current[key];
       if (!child || typeof child !== 'object') return;
-      const pq = extractPQ(child);
-      if (pq) nested = addPQ(nested, pq);
+      stack.push(child);
     });
-    if (nested) return nested;
   }
-  if (!kw && !kvar) return null;
-  return { kw, kvar };
+
+  return total;
 }
 
 function isLoadDevice(comp) {
