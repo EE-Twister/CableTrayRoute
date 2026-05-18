@@ -501,6 +501,17 @@ function categoryForType(t) {
   }
 }
 
+const PALETTE_CATEGORIES = new Set([
+  'equipment',
+  'sources',
+  'protection',
+  'load',
+  'bus',
+  'cable',
+  'links',
+  'annotations'
+]);
+
 function isProtectionComponent(comp) {
   if (!comp || typeof comp !== 'object') return false;
   const subtypeMeta = componentMeta[comp.subtype];
@@ -1632,7 +1643,10 @@ async function loadComponentLibrary() {
       }
     }
     const resolvedType = definition.type || baseType;
-    const category = definition.category || categoryForType(resolvedType);
+    const requestedCategory = typeof definition.category === 'string' ? definition.category.trim().toLowerCase() : '';
+    const category = PALETTE_CATEGORIES.has(requestedCategory)
+      ? requestedCategory
+      : categoryForType(resolvedType);
     const icon = resolveIconSource(definition.icon, definition.symbol);
     const ports = normalizePortsForCategory(category, definition.ports, resolvedType, subtype);
     const defaultRotation = normalizeRotation(
