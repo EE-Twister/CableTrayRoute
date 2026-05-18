@@ -1224,10 +1224,19 @@ function buildAnnotationContextItems(datum) {
   ];
 }
 
+function findSettingsDeviceDiv(uid) {
+  if (!settingsDiv || uid === undefined || uid === null) return null;
+  const expected = String(uid);
+  const nodes = settingsDiv.querySelectorAll('.device-settings[data-uid]');
+  for (const node of nodes) {
+    if (node.dataset.uid === expected) return node;
+  }
+  return null;
+}
+
 function focusDeviceSettings(uid) {
   if (!settingsDiv || !uid) return;
-  const selectorValue = String(uid).replace(/"/g, '\\"');
-  const target = settingsDiv.querySelector(`.device-settings[data-uid="${selectorValue}"]`);
+  const target = findSettingsDeviceDiv(uid);
   if (!target) return;
   target.classList.add('device-settings-highlight');
   const removeHighlight = () => target.classList.remove('device-settings-highlight');
@@ -6733,8 +6742,7 @@ function gatherOverridesFromInputs(uid) {
   if (!settingsDiv) {
     return snapOverridesToOptions(entry.baseDevice, entry.overrideSource || {});
   }
-  const selectorValue = String(uid).replace(/"/g, '\\"');
-  const div = settingsDiv.querySelector(`.device-settings[data-uid="${selectorValue}"]`);
+  const div = findSettingsDeviceDiv(uid);
   if (!div) {
     return snapOverridesToOptions(entry.baseDevice, entry.overrideSource || {});
   }
@@ -7625,7 +7633,7 @@ function plot() {
 
   const updateDeviceInputs = entry => {
     if (!settingsDiv) return;
-    const div = settingsDiv.querySelector(`.device-settings[data-uid="${entry.selection.uid}"]`);
+    const div = findSettingsDeviceDiv(entry.selection.uid);
     if (!div) return;
     Object.entries(entry.overrides).forEach(([field, value]) => {
       const input = div.querySelector(`[data-field="${field}"]`);
