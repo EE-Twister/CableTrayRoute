@@ -1080,7 +1080,7 @@ export function calculatePanelTotals(panelId) {
 
   const breakerDetails = ensureBreakerDetails(panel);
 
-  return loads.reduce((acc, l) => {
+  const totals = loads.reduce((acc, l) => {
     const span = getLoadBreakerSpan(l, panel, circuitCount);
     const startCircuit = span.length ? span[0] : null;
     const cKva = parseFloat(l.kva) || 0;
@@ -1125,6 +1125,40 @@ export function calculatePanelTotals(panelId) {
     acc.demandKva += (parsed - (dKva * 1000)) / 1000;
     return acc;
   }, { connectedKva: 0, connectedKw: 0, demandKva: 0, demandKw: 0 });
+
+  breakerStarts.forEach(startCircuit => {
+    const matchedLoad = loads.find(l => {
+      const span = getLoadBreakerSpan(l, panel, circuitCount);
+      return span.length && span[0] === startCircuit;
+    });
+    if (matchedLoad) return;
+
+    const detail = breakerDetails[String(startCircuit)];
+    if (!detail || detail.loadVaPerPhase == null) return;
+
+    if (detail.loadVaPerPhase && typeof detail.loadVaPerPhase === "object" && !Array.isArray(detail.loadVaPerPhase)) {
+      const block = getBreakerBlock(panel, startCircuit);
+      const span = block ? getBlockCircuits(panel, block, circuitCount) : [startCircuit];
+      span.forEach(slot => {
+        const phase = getPhaseLabel(panel, slot);
+        const slotBlock = getBreakerBlock(panel, slot);
+        const phaseKey = getPhaseLoadKey(phase, slotBlock);
+        const rawValue = phaseKey ? detail.loadVaPerPhase[phaseKey] : null;
+        const parsed = parseFloat(rawValue);
+        if (!Number.isFinite(parsed) || parsed < 0) return;
+        totals.connectedKva += parsed / 1000;
+        totals.demandKva += parsed / 1000;
+      });
+      return;
+    }
+
+    const parsed = parseFloat(detail.loadVaPerPhase);
+    if (!Number.isFinite(parsed) || parsed < 0) return;
+    totals.connectedKva += parsed / 1000;
+    totals.demandKva += parsed / 1000;
+  });
+
+  return totals;
 }
 
 const COLUMN_HEADERS = {
