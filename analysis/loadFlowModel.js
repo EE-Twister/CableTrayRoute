@@ -943,21 +943,23 @@ function cloneBusComponent(comp) {
 function resolveBusBaseKV(comp) {
   if (!comp || typeof comp !== 'object') return null;
   const direct = [
-    comp.baseKV,
-    comp.kV,
-    comp.kv,
-    comp.nominalVoltage,
-    comp.nominal_voltage,
-    comp.prefault_voltage,
-    comp.voltage,
-    comp.volts,
-    comp.props?.baseKV,
-    comp.props?.voltage,
-    comp.parameters?.baseKV,
-    comp.parameters?.voltage
+    { value: comp.baseKV, asKV: true },
+    { value: comp.kV, asKV: true },
+    { value: comp.kv, asKV: true },
+    { value: comp.nominalVoltage, asKV: true },
+    { value: comp.nominal_voltage, asKV: true },
+    { value: comp.prefault_voltage, asKV: true },
+    { value: comp.voltage, asKV: false },
+    { value: comp.volts, asKV: false },
+    { value: comp.props?.baseKV, asKV: true },
+    { value: comp.props?.voltage, asKV: false },
+    { value: comp.parameters?.baseKV, asKV: true },
+    { value: comp.parameters?.voltage, asKV: false }
   ];
   for (const candidate of direct) {
-    const base = toBaseKV(candidate);
+    const base = candidate.asKV
+      ? toBaseKV({ kV: candidate.value })
+      : toBaseKV({ voltage: candidate.value });
     if (Number.isFinite(base) && base > 0) return base;
   }
   const volts = normalizeVoltageToVolts(comp?.props?.operating_voltage ?? comp?.cable?.operating_voltage);
