@@ -362,9 +362,6 @@ export function frequencyScan({
 
 function ensureHarmonicResults() {
   const studies = getStudies();
-  if (studies?.harmonics && Object.keys(studies.harmonics).length) {
-    return studies.harmonics;
-  }
   const res = runHarmonics();
   studies.harmonics = res;
   setStudies(studies);
