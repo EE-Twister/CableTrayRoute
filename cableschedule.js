@@ -2364,16 +2364,17 @@ async function initCableSchedule() {
     },
     onChange:() => {
       const before = tableData ? [...tableData] : [];
-      const data = table.getData();
-      suppressCablesUpdate = true;
-      dataStore.setCables(data); // auto-persist edits
-      suppressCablesUpdate = false;
-      tableData = data;
       markUnsaved();
       applySizingHighlight();
       applyReviewStatusHighlight();
       validateAllRows();
       updateBatchTypicalControls();
+
+      const data = table.getData();
+      suppressCablesUpdate = true;
+      dataStore.setCables(data); // auto-persist edits after recalculating derived fields
+      suppressCablesUpdate = false;
+      tableData = data;
 
       // Register undo/redo entry (skip during undo/redo restoration)
       if (!window.__isUndoRedoOp && window.__undoManager) {
