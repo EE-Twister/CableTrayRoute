@@ -974,13 +974,19 @@ export function assignLoadToBreaker(panelId, loadIndex, breaker) {
     return;
   }
   const blockSize = Number(block.size) && Number(block.size) > 0 ? Number(block.size) : 1;
+  const { breakerPoles: _ignoredBreakerPoles, ...loadWithoutBreakerPoles } = load || {};
+  const intrinsicRequiredPoles = Math.max(1, getLoadPoleCount(loadWithoutBreakerPoles, panel));
+  if (blockSize < intrinsicRequiredPoles) {
+    showAlertModal('Configuration Error', `Cannot assign load: selected breaker is ${blockSize}-pole but load requires ${intrinsicRequiredPoles} poles.`);
+    return;
+  }
   const loadWithBreaker = { ...load, breaker: startCircuit, breakerPoles: blockSize };
   const span = getLoadBreakerSpan(loadWithBreaker, panel, circuitCount);
   if (!span.length) {
     showAlertModal('Configuration Error', 'Unable to assign load: invalid breaker selection.');
     return;
   }
-  const requiredPoles = Math.max(blockSize, getLoadPoleCount(loadWithBreaker, panel));
+  const requiredPoles = Math.max(blockSize, intrinsicRequiredPoles);
   if (circuitCount && span[span.length - 1] > circuitCount) {
     showAlertModal('Configuration Error', `Breaker selection requires ${requiredPoles} spaces on the same side of the panel but exceeds the available circuits.`);
     return;
