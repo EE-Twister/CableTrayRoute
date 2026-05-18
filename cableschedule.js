@@ -13,9 +13,13 @@ function suppressResumeIfE2E() {
   if (!E2E) return;
   // Do NOT clear storage by default; only when ?e2e_reset=1 is present.
   const qs = new URLSearchParams(location.search);
-  const shouldClear = qs.has('e2e_reset');
-  if (shouldClear) {
-    try { localStorage.clear(); sessionStorage.clear(); } catch {}
+  const shouldClear = qs.get('e2e_reset') === '1';
+  const isLocalE2EHost = /^(localhost|127\.0\.0\.1|\[::1\])$/i.test(location.hostname);
+  if (shouldClear && isLocalE2EHost) {
+    try {
+      localStorage.clear();
+      sessionStorage.clear();
+    } catch {}
   }
   // Do NOT auto-click resume buttons. Let tests click #resume-no-btn.
 }
