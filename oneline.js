@@ -13508,7 +13508,7 @@ function resolveComponentVoltageVolts(comp, options = {}) {
     if (!container || typeof container !== 'object') continue;
     for (const key of directKeys) {
       if (!(key in container)) continue;
-      const resolved = normalizeVoltageToVolts({ [key]: container[key] });
+      const resolved = normalizeVoltageToVolts(container[key]);
       if (resolved !== null && Number.isFinite(resolved) && resolved > 0) {
         return resolved;
       }
