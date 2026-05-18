@@ -396,10 +396,14 @@ function deriveReactiveFromPF(kw, record) {
   const kwAbs = Math.abs(Number(kw) || 0);
   if (!kwAbs) return 0;
   const kva = kwAbs / pf.magnitude;
-  const kvarMag = Math.sqrt(Math.max(0, kva * kva - kwAbs * kwAbs));
-  if (!kvarMag) return 0;
+  if (!Number.isFinite(kva)) return 0;
+  const squaredDelta = kva * kva - kwAbs * kwAbs;
+  if (!Number.isFinite(squaredDelta) || squaredDelta <= 0) return 0;
+  const kvarMag = Math.sqrt(squaredDelta);
+  if (!Number.isFinite(kvarMag) || !kvarMag) return 0;
   const sign = resolveReactiveSign(record, pf.sign);
-  return kvarMag * sign;
+  const kvar = kvarMag * sign;
+  return Number.isFinite(kvar) ? kvar : 0;
 }
 
 function addPQ(target, addition) {

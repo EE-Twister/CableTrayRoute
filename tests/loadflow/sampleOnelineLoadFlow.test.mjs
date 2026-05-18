@@ -137,4 +137,29 @@ describe('Simple feeder load flow', () => {
     assert(loadBus, 'Load bus should be reported');
     assert(loadBus.Vm < 1, 'Load bus voltage should sag under reactive draw');
   });
+  it('ignores non-finite reactive derivation from extremely small power factors', () => {
+    const model = {
+      buses: [
+        { id: 'source', type: 'slack', baseKV: 13.8 },
+        { id: 'load', type: 'PQ', baseKV: 13.8, load: { kw: 1, pf: 1e-308 } }
+      ],
+      branches: [
+        {
+          id: 'feeder',
+          from: 'source',
+          to: 'load',
+          impedance: { r: 0.5, x: 0.9 }
+        }
+      ]
+    };
+
+    const result = runLoadFlow(model, { baseMVA: 1, balanced: true });
+    assert(result.converged, 'Load flow should converge');
+    assert(Number.isFinite(result.summary.totalLoadKVAR), 'Reactive summary should remain finite');
+    assert(Math.abs(result.summary.totalLoadKVAR) < 1e-9, 'Invalid PF-derived reactive demand should be ignored');
+    const source = result.sources.find(bus => bus.id === 'source');
+    assert(source, 'Source should be reported');
+    assert(Number.isFinite(source.Qg), 'Source reactive generation should remain finite');
+  });
+
 });
