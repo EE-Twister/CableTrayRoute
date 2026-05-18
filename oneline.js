@@ -643,10 +643,11 @@ function isBusComponent(c) {
 }
 
 function isSourceComponent(comp) {
-  if (!comp || comp.type === 'transformer') return false;
+  if (!comp) return false;
+  const type = typeof comp.type === 'string' ? comp.type.toLowerCase() : '';
+  if (type === 'transformer') return false;
   const category = resolveComponentCategory(comp);
   if (category === 'sources') return true;
-  const type = (comp.type || '').toLowerCase();
   return type === 'utility_source' || type === 'generator' || type === 'pv_inverter';
 }
 
