@@ -13466,11 +13466,10 @@ function showToast(msg, linkText, linkHref) {
 function resolveComponentVoltageVolts(comp, options = {}) {
   if (!comp || typeof comp !== 'object') return null;
   const { includeOperatingVoltage = true } = options;
-  const containers = [];
+  const containers = [comp];
   if (comp.props && typeof comp.props === 'object') containers.push(comp.props);
   if (comp.parameters && typeof comp.parameters === 'object') containers.push(comp.parameters);
   if (comp.cable && typeof comp.cable === 'object') containers.push(comp.cable);
-  containers.push(comp);
   const primaryKeys = [
     'voltage',
     'volts',
