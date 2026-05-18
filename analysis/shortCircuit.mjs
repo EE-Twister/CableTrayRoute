@@ -664,7 +664,15 @@ function computePrefaultKV(comp, comps, compMap, cache, visited = new Set()) {
   }
   const parent = findParentInfo(comp, comps, compMap, visited);
   if (parent?.component) {
-    const upstreamKV = computePrefaultKV(parent.component, comps, compMap, cache, visited);
+    const { component: upstream, connection, reversed } = parent;
+    let upstreamKV;
+    if (upstream.type === 'transformer' && connection) {
+      const portIndex = normalizePortIndex(reversed ? connection?.targetPort : connection?.sourcePort);
+      upstreamKV = toKV(getTransformerVoltageForPort(upstream, portIndex));
+    }
+    if (!upstreamKV) {
+      upstreamKV = computePrefaultKV(upstream, comps, compMap, cache, visited);
+    }
     cache.set(comp.id, upstreamKV);
     visited.delete(comp.id);
     return upstreamKV;
