@@ -300,6 +300,8 @@ const compWidth = 80;
 const compHeight = 40;
 const attributeLineHeight = 12;
 const viewAttributeStorageKey = 'diagramViewAttributes';
+const maxViewAttributeCount = 250;
+const maxViewAttributeLength = 128;
 const defaultPaletteWidth = 250;
 const minPaletteWidth = 100;
 const maxPaletteWidth = 600;
@@ -431,10 +433,38 @@ const studyAttributeResolvers = {
   }
 };
 
+function sanitizeViewAttributeKey(key) {
+  if (typeof key !== 'string') return '';
+  const normalized = key.trim();
+  if (!normalized || normalized.length > maxViewAttributeLength) return '';
+  return normalized;
+}
+
+function sanitizeViewAttributeList(keys) {
+  if (!Array.isArray(keys)) return [];
+  const seen = new Set();
+  const normalized = [];
+  for (const key of keys) {
+    const safeKey = sanitizeViewAttributeKey(key);
+    if (!safeKey || seen.has(safeKey)) continue;
+    seen.add(safeKey);
+    normalized.push(safeKey);
+    if (normalized.length >= maxViewAttributeCount) break;
+  }
+  normalized.sort();
+  return normalized;
+}
+
 const storedViewAttributes = getItem(viewAttributeStorageKey, []);
-const initialViewAttributes = Array.isArray(storedViewAttributes)
-  ? storedViewAttributes.filter(key => typeof key === 'string' && key.trim())
-  : [];
+const initialViewAttributes = sanitizeViewAttributeList(storedViewAttributes);
+if (Array.isArray(storedViewAttributes)) {
+  const needsPersistedCleanup =
+    storedViewAttributes.length !== initialViewAttributes.length ||
+    storedViewAttributes.some((key, idx) => key !== initialViewAttributes[idx]);
+  if (needsPersistedCleanup) {
+    setItem(viewAttributeStorageKey, initialViewAttributes);
+  }
+}
 let viewAttributes = new Set(initialViewAttributes);
 let attributeOptions = [];
 const attributeOptionsMap = new Map();
@@ -4354,8 +4384,8 @@ function openViewModal() {
         } else {
           viewAttributes.delete(option.key);
         }
-        const persisted = Array.from(viewAttributes);
-        persisted.sort();
+        const persisted = sanitizeViewAttributeList(Array.from(viewAttributes));
+        viewAttributes = new Set(persisted);
         setItem(viewAttributeStorageKey, persisted);
         updateViewButtonLabel();
         render();
@@ -4714,7 +4744,8 @@ function refreshAttributeOptions() {
   const registerOption = key => {
     if (!key) return null;
     if (attributeIgnoreKeys.has(key)) return null;
-    const normalized = String(key);
+    const normalized = sanitizeViewAttributeKey(key);
+    if (!normalized) return null;
     if (optionMap.has(normalized)) return optionMap.get(normalized);
     const override = attributeDisplayOverrides[normalized];
     const label = override?.label || formatAttributeLabel(normalized);
@@ -4838,6 +4869,7 @@ function refreshAttributeOptions() {
     registerStudyAttributes('reliability', mapped);
   }
 
+  viewAttributes = new Set(sanitizeViewAttributeList(Array.from(viewAttributes)));
   viewAttributes.forEach(key => registerOption(key));
 
   attributeOptions = Array.from(optionMap.values()).sort((a, b) => a.label.localeCompare(b.label));
