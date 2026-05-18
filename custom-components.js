@@ -63,6 +63,20 @@ const MIN_COMPONENT_WIDTH = Number(widthInput?.min) || 20;
 const MAX_COMPONENT_WIDTH = Number(widthInput?.max) || 600;
 const MIN_COMPONENT_HEIGHT = Number(heightInput?.min) || 20;
 const MAX_COMPONENT_HEIGHT = Number(heightInput?.max) || 400;
+const MAX_PORTS_PER_SIDE = Math.max(
+  0,
+  Number(portTopInput?.max) || Number(portRightInput?.max) || Number(portBottomInput?.max) || Number(portLeftInput?.max) || 12
+);
+const ALLOWED_CATEGORIES = new Set([
+  'equipment',
+  'sources',
+  'protection',
+  'load',
+  'bus',
+  'cable',
+  'links',
+  'annotations'
+]);
 let iconCanvasSize = { width: ICON_CANVAS_SIZE, height: ICON_CANVAS_SIZE };
 
 let textStyleState = {
@@ -1112,6 +1126,11 @@ function sanitizeNumber(input, fallback) {
   return Number.isFinite(value) ? value : fallback;
 }
 
+function sanitizePortCount(input) {
+  const total = Math.max(0, Math.floor(Number(input) || 0));
+  return Math.min(total, MAX_PORTS_PER_SIDE);
+}
+
 function clearPropertyRows() {
   propertyList.innerHTML = '';
 }
@@ -1473,10 +1492,17 @@ function normalizeImportedComponent(raw) {
   const type = String(raw.type || raw.category || '').trim() || 'equipment';
   if (!subtype) return null;
   const label = String(raw.label || subtype);
-  const category = String(raw.category || '').trim() || type;
-  const width = sanitizeNumber(raw.width, 80);
-  const height = sanitizeNumber(raw.height, 40);
-  const counts = raw.portCounts || inferPortCounts(raw.ports || [], width, height);
+  const rawCategory = String(raw.category || '').trim().toLowerCase();
+  const category = ALLOWED_CATEGORIES.has(rawCategory) ? rawCategory : categorySelect?.value || 'equipment';
+  const width = Math.min(Math.max(sanitizeNumber(raw.width, DEFAULT_COMPONENT_WIDTH), MIN_COMPONENT_WIDTH), MAX_COMPONENT_WIDTH);
+  const height = Math.min(Math.max(sanitizeNumber(raw.height, DEFAULT_COMPONENT_HEIGHT), MIN_COMPONENT_HEIGHT), MAX_COMPONENT_HEIGHT);
+  const importedCounts = raw.portCounts || inferPortCounts(raw.ports || [], width, height);
+  const counts = {
+    top: sanitizePortCount(importedCounts.top),
+    right: sanitizePortCount(importedCounts.right),
+    bottom: sanitizePortCount(importedCounts.bottom),
+    left: sanitizePortCount(importedCounts.left)
+  };
   const defaultRotation = normalizeRotationValue(raw.defaultRotation);
   const props = raw.props && typeof raw.props === 'object' ? raw.props : {};
   const properties = Array.isArray(raw.properties)
