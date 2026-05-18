@@ -278,6 +278,7 @@ const DERIVED_SYNC_KEYS = {
   ductbanks: 'ductbankSchedule',
   cableTypicals: 'cableTypicals'
 };
+const NON_EXPORTABLE_SETTING_KEYS = new Set(['gistToken']);
 const UNDO_COALESCE_WINDOW_MS = 200;
 const derivedStorageCache = new Map();
 const mutationCounters = new Map();
@@ -1274,6 +1275,19 @@ export function setProjectKey(key, value, options = {}) {
         try { storage.setItem(key, value); }
         catch (e) { handleStorageWriteError('project save failed', e); }
       }
+    }
+    return;
+  }
+  if (NON_EXPORTABLE_SETTING_KEYS.has(key)) {
+    if (!options.skipLocalStorage) {
+      const storage = getStorage();
+      trySetStorage(storage, key, value);
+    }
+    if (project.settings && Object.prototype.hasOwnProperty.call(project.settings, key)) {
+      const oldProject = cloneProject();
+      delete project.settings[key];
+      pushUndo(oldProject, { coalesceKey: `setProjectKey:${key}`, allowCoalesce: true });
+      persistProject({ changeSet: createChangeSet(['settings:other']), mutationType: `setProjectKey:${key}:redact` });
     }
     return;
   }
