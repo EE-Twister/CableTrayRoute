@@ -31,7 +31,7 @@ function it(name, fn) {
 }
 
 describe('Load flow nested PQ parsing safety', () => {
-  it('handles deeply nested bus load objects without stack overflow', () => {
+  it('rejects deeply nested bus load objects with a bounded error', () => {
     const model = {
       buses: [
         { id: 'source', type: 'slack', baseKV: 13.8 },
@@ -42,11 +42,13 @@ describe('Load flow nested PQ parsing safety', () => {
       ]
     };
 
-    const result = runLoadFlow(model, { baseMVA: 10, balanced: true });
-    assert.strictEqual(typeof result.converged, 'boolean');
+    assert.throws(
+      () => runLoadFlow(model, { baseMVA: 10, balanced: true }),
+      /maximum supported nesting depth/i
+    );
   });
 
-  it('handles deeply nested component load objects when building model', () => {
+  it('rejects deeply nested component load objects when building model', () => {
     const oneLine = {
       sheets: [
         {
@@ -61,7 +63,9 @@ describe('Load flow nested PQ parsing safety', () => {
       ]
     };
 
-    const model = buildLoadFlowModel(oneLine);
-    assert(Array.isArray(model.buses));
+    assert.throws(
+      () => buildLoadFlowModel(oneLine),
+      /maximum supported nesting depth/i
+    );
   });
 });
