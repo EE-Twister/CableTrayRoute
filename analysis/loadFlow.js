@@ -466,13 +466,15 @@ function solvePhase(buses, baseMVA, options = {}) {
       const ViPrime = div(Vi, t);
       const yShFrom = conn.shunt?.from ? toPerUnitY(conn.shunt.from, bus.baseKV || 1, baseMVA) : toComplex(0, 0);
       const yShTo = conn.shunt?.to ? toPerUnitY(conn.shunt.to, working[j].baseKV || 1, baseMVA) : toComplex(0, 0);
-      const Iij = add(mul(sub(ViPrime, Vj), y), mul(ViPrime, yShFrom));
+      const Iseries = mul(sub(ViPrime, Vj), y);
+      const Iij = add(Iseries, mul(ViPrime, yShFrom));
       const Sij = mul(Vi, conj(Iij));
       const scale = baseMVA * 1000; // convert per-unit results to kW/kvar
       const P = Sij.re * scale;
       const Q = Sij.im * scale;
       const Ipu = Math.hypot(Iij.re, Iij.im);
-      const Ipu2 = Ipu * Ipu;
+      const IseriesPu = Math.hypot(Iseries.re, Iseries.im);
+      const IseriesPu2 = IseriesPu * IseriesPu;
       const baseKV = bus.baseKV || working[j].baseKV || 1;
       const baseCurrentKA = baseKV ? baseMVA / (Math.sqrt(3) * baseKV) : 0;
       const currentKA = Ipu * baseCurrentKA;
@@ -481,8 +483,8 @@ function solvePhase(buses, baseMVA, options = {}) {
       const toKV = Vm[j] * (working[j].baseKV || 0);
       const dropKV = fromKV - toKV;
       const dropPct = fromKV ? (dropKV / fromKV) * 100 : 0;
-      const lossKW = Ipu2 * (Z.re || 0) * scale;
-      const lossKVAR = Ipu2 * (Z.im || 0) * scale;
+      const lossKW = IseriesPu2 * (Z.re || 0) * scale;
+      const lossKVAR = IseriesPu2 * (Z.im || 0) * scale;
       const ViPrimeMag2 = ViPrime.re * ViPrime.re + ViPrime.im * ViPrime.im;
       const VjMag2 = Vj.re * Vj.re + Vj.im * Vj.im;
       const shuntFromLossKW = ViPrimeMag2 * (yShFrom.re || 0) * scale;
@@ -1096,4 +1098,3 @@ export function runLoadFlow(modelOrOpts = {}, maybeOpts = {}) {
   });
   return combined;
 }
-
