@@ -164,6 +164,61 @@ export default [
     }
   },
   {
+    "id": "sample_mv_breaker_1200",
+    "type": "breaker",
+    "vendor": "Sample Study",
+    "name": "Sample MV Breaker 1200A",
+    "interruptRating": 25,
+    "withstandRatingKA": 25,
+    "withstandCycles": 5,
+    "settings": {
+      "pickup": 1200,
+      "time": 0.3,
+      "instantaneous": 9600
+    },
+    "settingOptions": {
+      "pickup": [800, 1000, 1200, 1400],
+      "time": [0.1, 0.2, 0.3, 0.5],
+      "instantaneous": [6000, 8000, 9600, 12000]
+    },
+    "curve": [
+      { "current": 1200, "time": 100 },
+      { "current": 4800, "time": 3 },
+      { "current": 9600, "time": 0.3 },
+      { "current": 14400, "time": 0.08 }
+    ],
+    "tolerance": {
+      "timeLower": 0.8,
+      "timeUpper": 1.25
+    }
+  },
+  {
+    "id": "mv_fuse_65e",
+    "type": "fuse",
+    "vendor": "Sample Study",
+    "name": "65E MV Power Fuse",
+    "interruptRating": 50,
+    "withstandRatingKA": 50,
+    "withstandCycles": 1,
+    "settings": {
+      "ampRating": 65
+    },
+    "settingOptions": {
+      "ampRating": [50, 65, 80, 100]
+    },
+    "curve": [
+      { "current": 65, "time": 600 },
+      { "current": 130, "time": 60 },
+      { "current": 325, "time": 3 },
+      { "current": 650, "time": 0.3 },
+      { "current": 1300, "time": 0.05 }
+    ],
+    "tolerance": {
+      "timeLower": 0.85,
+      "timeUpper": 1.2
+    }
+  },
+  {
     "id": "ge_multilin_750",
     "type": "relay",
     "vendor": "GE",

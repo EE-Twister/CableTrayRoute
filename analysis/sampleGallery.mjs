@@ -29,17 +29,16 @@ export const SAMPLE_REGISTRY = [
     title: 'Industrial Plant',
     industry: 'Oil & Gas / Industrial',
     description: '480 V MCC feeders, motor cables, VFD shielded outputs, and instrument triads in hazardous-area ladder and solid-bottom trays.',
-    tags: ['routing', 'tray-fill', 'arc-flash', 'tcc'],
+    tags: ['routing', 'tray-fill', 'arc-flash'],
     image: 'assets/sample-projects/industrial-plant.jpg',
     imageAlt: 'Industrial electrical room with MCC cabinets, routed cable tray, and process equipment.',
     projectFile: 'samples/industrial-plant.json',
-    pagesUsed: ['cableschedule.html', 'racewayschedule.html', 'cabletrayfill.html', 'arcFlash.html', 'tcc.html'],
+    pagesUsed: ['cableschedule.html', 'racewayschedule.html', 'cabletrayfill.html', 'arcFlash.html'],
     guidedChecklist: [
       { step: 1, label: 'Review cable schedule', page: 'cableschedule.html', hint: 'Inspect the pre-loaded MCC feeders, motor cables, and instrument triads.' },
       { step: 2, label: 'Inspect raceway schedule', page: 'racewayschedule.html', hint: 'Check the power, instrument, and control tray layout.' },
       { step: 3, label: 'Verify tray fill', page: 'cabletrayfill.html', hint: 'Confirm all trays are below their rated fill limit.' },
       { step: 4, label: 'Run arc flash study', page: 'arcFlash.html', hint: 'Review incident energy for each bus using IEEE 1584-2018.' },
-      { step: 5, label: 'Check TCC coordination', page: 'tcc.html', hint: 'Verify relay and fuse curves maintain selectivity.' },
     ],
   },
   {
@@ -176,7 +175,7 @@ export const SAMPLE_REGISTRY = [
     guidedChecklist: [
       { step: 1, label: 'Open one-line diagram', page: 'oneline.html', hint: 'Review the 4.16 kV distribution one-line with source, transformer, and loads.' },
       { step: 2, label: 'Run short circuit study', page: 'shortCircuit.html', hint: 'Verify fault currents for relay and fuse setting selection.' },
-      { step: 3, label: 'Check TCC curves', page: 'tcc.html', hint: 'Confirm relay, fuse, and breaker curves are selective at all fault levels.' },
+      { step: 3, label: 'Check TCC curves', page: 'tcc.html?component=BKR-4KV-F1&device=sample_mv_breaker_1200&tccContext=adjacent', hint: 'Confirm relay, fuse, and breaker curves are selective at all fault levels.' },
       { step: 4, label: 'Review arc flash results', page: 'arcFlash.html', hint: 'Check incident energy and PPE requirements at each bus.' },
     ],
   },
@@ -241,38 +240,243 @@ export function migrateSampleProject(obj) {
   return copy;
 }
 
+const SAMPLE_COMPONENT_TYPE_ALIASES = {
+  source: { type: 'utility_source', subtype: 'utility' },
+  utility: { type: 'utility_source', subtype: 'utility' },
+  utility_source: { type: 'utility_source', subtype: 'utility' },
+  bus: { type: 'bus', subtype: 'bus' },
+  breaker: { type: 'breaker', subtype: 'lv_cb' },
+  fuse: { type: 'fuse', subtype: 'class_rk1' },
+  relay: { type: 'relay', subtype: 'relay' },
+  transformer: { type: 'transformer', subtype: 'two_winding' },
+  mcc: { type: 'mcc', subtype: 'mcc' },
+  motor: { type: 'motor_load', subtype: 'motor_load' },
+  load: { type: 'static_load', subtype: 'static_load' },
+};
+
+function normalizeSampleToken(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, '_');
+}
+
+function sampleDefaultRotationForType(type) {
+  const normalized = normalizeSampleToken(type);
+  if (normalized === 'bus' || normalized === 'annotation') return 0;
+  if (normalized === 'static_load' || normalized === 'motor_load' || normalized === 'load' || normalized.endsWith('_load')) {
+    return 270;
+  }
+  return 90;
+}
+
+function isMediumVoltageSampleComponent(component = {}) {
+  const joined = [
+    component.id,
+    component.label,
+    component.ref,
+    component.voltage,
+    component.kV,
+    component.baseKV,
+    component.rated_voltage_kv,
+  ].map(value => String(value || '').toLowerCase()).join(' ');
+  return /\b(4kv|4\.16|5kv|13\.8|15kv|mv)\b/.test(joined);
+}
+
+function normalizeSampleOneLineComponent(component = {}) {
+  const rawType = normalizeSampleToken(component.type || component.category || component.subtype);
+  const rawSubtype = normalizeSampleToken(component.subtype);
+  const alias = SAMPLE_COMPONENT_TYPE_ALIASES[rawType] || SAMPLE_COMPONENT_TYPE_ALIASES[rawSubtype] || null;
+  const type = alias?.type || rawType || rawSubtype || 'equipment';
+  let subtype = rawSubtype || alias?.subtype || type;
+  if (type === 'breaker' && !rawSubtype && isMediumVoltageSampleComponent(component)) {
+    subtype = 'mv_cb';
+  }
+  const normalized = {
+    ...component,
+    type,
+    subtype,
+    connections: Array.isArray(component.connections)
+      ? component.connections.map(connection => ({ ...connection }))
+      : [],
+  };
+  if (normalized.rotation === undefined && normalized.rot === undefined) {
+    normalized.rotation = sampleDefaultRotationForType(type);
+  }
+  return normalized;
+}
+
 function normalizeSampleOneLine(obj = {}) {
   const oneLine = obj.oneLine || obj.oneline;
   if (Array.isArray(oneLine)) {
-    return { activeSheet: 0, sheets: oneLine };
+    return { activeSheet: 0, sheets: oneLine.map(normalizeOneLineSheet) };
   }
   if (oneLine && Array.isArray(oneLine.sheets)) {
-    return { activeSheet: oneLine.activeSheet || 0, sheets: oneLine.sheets };
+    return { activeSheet: oneLine.activeSheet || 0, sheets: oneLine.sheets.map(normalizeOneLineSheet) };
   }
   if (oneLine && (Array.isArray(oneLine.components) || Array.isArray(oneLine.connections))) {
     return {
       activeSheet: 0,
       sheets: [
-        {
+        normalizeOneLineSheet({
           id: `${obj.id || 'sample'}-main`,
           name: obj.title || 'Sample One-Line',
           components: Array.isArray(oneLine.components) ? oneLine.components : [],
           connections: Array.isArray(oneLine.connections) ? oneLine.connections : [],
-        },
+        }),
       ],
     };
   }
   return { activeSheet: 0, sheets: [] };
 }
 
+function normalizeOneLineSheet(sheet = {}) {
+  const components = Array.isArray(sheet.components)
+    ? sheet.components.map(normalizeSampleOneLineComponent)
+    : [];
+  const byId = new Map(components.map(component => [component.id, component]));
+  const sheetConnections = Array.isArray(sheet.connections) ? sheet.connections : [];
+  sheetConnections.forEach(connection => {
+    if (!connection || typeof connection !== 'object') return;
+    const from = connection.from || connection.fromId || connection.source || connection.sourceId;
+    const to = connection.to || connection.toId || connection.target || connection.targetId;
+    if (!from || !to) return;
+    const source = byId.get(from);
+    if (!source) return;
+    const alreadyLinked = source.connections.some(existing => (
+      (existing.target || existing.to || existing.targetId) === to
+    ));
+    if (alreadyLinked) return;
+    const {
+      from: _from,
+      fromId: _fromId,
+      source: _source,
+      sourceId: _sourceId,
+      to: _to,
+      toId: _toId,
+      target: _target,
+      targetId: _targetId,
+      ...rest
+    } = connection;
+    source.connections.push({ ...rest, target: to });
+  });
+  return {
+    ...sheet,
+    components,
+    connections: sheetConnections.map(connection => ({ ...connection })),
+  };
+}
+
+function resolveSampleTccLibraryDevice(device = {}, component = null) {
+  const explicit = typeof device.tccId === 'string' && device.tccId.trim()
+    ? device.tccId.trim()
+    : (typeof device.libraryId === 'string' && device.libraryId.trim() ? device.libraryId.trim() : '');
+  if (explicit) return explicit;
+  const type = normalizeSampleToken(device.type || component?.type || component?.subtype);
+  const curve = normalizeSampleToken(device.curve || device.curveFamily || device.style);
+  if (type === 'relay') {
+    if (curve.includes('extremely') || curve === 'ei') return 'iec_ei_relay';
+    if (curve.includes('very') || curve === 'vi') return 'iec_vi_relay';
+    if (curve.includes('long') || curve === 'lti') return 'iec_lti_relay';
+    return 'iec_ni_relay';
+  }
+  if (type === 'fuse') {
+    if (curve.includes('65e')) return 'mv_fuse_65e';
+    return 'mersen_trs200r';
+  }
+  if (type === 'breaker') {
+    const rating = Number(device.rating ?? device.ampRating ?? device.pickup);
+    if (Number.isFinite(rating) && rating >= 1000) return 'sample_mv_breaker_1200';
+    if (Number.isFinite(rating) && rating >= 180) return 'mitsubishi_ws_225';
+    return 'abb_tmax_160';
+  }
+  return '';
+}
+
+function buildSampleTccOverrides(device = {}, libraryId = '') {
+  const overrides = {};
+  const type = normalizeSampleToken(device.type);
+  const rating = Number(device.rating ?? device.ampRating);
+  if (type === 'relay') {
+    if (Number.isFinite(Number(device.pickup))) overrides.pickup = Number(device.pickup);
+    if (Number.isFinite(Number(device.timeDial))) overrides.tms = Number(device.timeDial);
+    if (Number.isFinite(Number(device.tms))) overrides.tms = Number(device.tms);
+  } else if (type === 'fuse') {
+    if (Number.isFinite(rating)) {
+      overrides.ampRating = rating;
+    } else if (normalizeSampleToken(device.style).includes('65e')) {
+      overrides.ampRating = 65;
+    }
+  } else if (type === 'breaker') {
+    if (Number.isFinite(rating)) overrides.pickup = rating;
+    if (Number.isFinite(Number(device.ltDelay))) overrides.time = Number(device.ltDelay);
+    if (Number.isFinite(Number(device.stPickup)) && Number.isFinite(rating)) {
+      overrides.instantaneous = Number(device.stPickup) * rating;
+    } else if (Number.isFinite(Number(device.instantaneous))) {
+      overrides.instantaneous = Number(device.instantaneous);
+    }
+  }
+  if (libraryId === 'sample_mv_breaker_1200' && !Number.isFinite(overrides.instantaneous)) {
+    overrides.instantaneous = 9600;
+  }
+  return overrides;
+}
+
+function applySampleTccSettings(obj = {}, oneLine, settings) {
+  const devices = Array.isArray(obj.studyInputs?.tcc?.devices) ? obj.studyInputs.tcc.devices : [];
+  if (!devices.length || !oneLine || !Array.isArray(oneLine.sheets)) return settings;
+  const componentMap = new Map();
+  oneLine.sheets.forEach(sheet => {
+    (sheet.components || []).forEach(component => {
+      if (component?.id) componentMap.set(component.id, component);
+    });
+  });
+  const existing = settings.tccSettings && typeof settings.tccSettings === 'object'
+    ? settings.tccSettings
+    : {};
+  const nextDevices = Array.isArray(existing.devices) ? [...existing.devices] : [];
+  const componentOverrides = existing.componentOverrides && typeof existing.componentOverrides === 'object'
+    ? { ...existing.componentOverrides }
+    : {};
+  let linkedCount = 0;
+  devices.forEach(device => {
+    if (!device || typeof device !== 'object' || !device.id) return;
+    const component = componentMap.get(device.id);
+    if (!component) return;
+    const libraryId = resolveSampleTccLibraryDevice(device, component);
+    if (!libraryId) return;
+    component.tccId = component.tccId || libraryId;
+    const overrides = buildSampleTccOverrides(device, libraryId);
+    if (Object.keys(overrides).length) {
+      component.tccOverrides = { ...(component.tccOverrides || {}), ...overrides };
+      componentOverrides[component.id] = { ...(componentOverrides[component.id] || {}), ...overrides };
+    }
+    const uid = `component:${component.id}`;
+    if (!nextDevices.includes(uid)) nextDevices.push(uid);
+    linkedCount += 1;
+  });
+  if (!linkedCount) return settings;
+  return {
+    ...settings,
+    tccSettings: {
+      ...existing,
+      devices: nextDevices,
+      settings: existing.settings && typeof existing.settings === 'object' ? existing.settings : {},
+      componentOverrides,
+    },
+  };
+}
+
 export function sampleProjectToImportPayload(obj = {}) {
   const raceways = obj.raceways || {};
-  const settings = { ...(obj.settings || {}) };
+  const oneLine = normalizeSampleOneLine(obj);
+  let settings = { ...(obj.settings || {}) };
   ['studies', 'reportSnapshots', 'lifecyclePackages', 'oneLineScheduleReconcilePending'].forEach(key => {
     if (Object.prototype.hasOwnProperty.call(obj, key) && !Object.prototype.hasOwnProperty.call(settings, key)) {
       settings[key] = obj[key];
     }
   });
+  settings = applySampleTccSettings(obj, oneLine, settings);
   return {
     meta: obj.meta || { version: 1, scenario: 'default', scenarios: ['default'] },
     ductbanks: Array.isArray(obj.ductbanks) ? obj.ductbanks : (Array.isArray(raceways.ductbanks) ? raceways.ductbanks : []),
@@ -283,7 +487,7 @@ export function sampleProjectToImportPayload(obj = {}) {
     panels: Array.isArray(obj.panels) ? obj.panels : [],
     equipment: Array.isArray(obj.equipment) ? obj.equipment : [],
     loads: Array.isArray(obj.loads) ? obj.loads : [],
-    oneLine: normalizeSampleOneLine(obj),
+    oneLine,
     mccLineups: Array.isArray(obj.mccLineups) ? obj.mccLineups : [],
     settings
   };

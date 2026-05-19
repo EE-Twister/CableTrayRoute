@@ -1,6 +1,6 @@
 import './workflowStatus.js';
 import '../site.js';
-import { importProject } from '../dataStore.mjs';
+import { importProject, saveProject } from '../dataStore.mjs';
 import { SAMPLE_REGISTRY, getSamplesByTag, validateSampleProject, migrateSampleProject, sampleProjectToImportPayload } from '../analysis/sampleGallery.mjs';
 
 const PROGRESS_KEY_PREFIX = 'ctr_sample_progress_';
@@ -218,6 +218,9 @@ async function openSample(sample) {
       showToast('Sample import was cancelled or could not be applied.', 'error');
       return;
     }
+    const projectId = (window.currentProjectId && window.currentProjectId.trim()) || 'default';
+    window.currentProjectId = projectId;
+    saveProject(projectId);
   } catch {
     showToast('Could not save sample to project storage (storage full?)', 'error');
     return;
@@ -262,7 +265,8 @@ function showChecklist(sample) {
     const link = document.createElement('a');
     link.className = 'checklist-step__link';
     link.href = step.page;
-    link.textContent = `Go to ${step.page.replace('.html', '')} →`;
+    const pageLabel = step.page.split(/[?#]/)[0].replace('.html', '');
+    link.textContent = `Go to ${pageLabel} →`;
     link.addEventListener('click', () => {
       markStepDone(sample.id, idx);
     });

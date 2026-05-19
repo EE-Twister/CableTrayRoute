@@ -10595,11 +10595,25 @@ function selectComponent(compOrId) {
         tccActions.className = 'prop-tab-actions';
         const tccBtn = document.createElement('button');
         tccBtn.type = 'button';
-        tccBtn.textContent = 'Edit TCC';
         tccBtn.classList.add('btn');
+        const updateTccActionLabel = () => {
+          const hasAssignedDevice = !!tccInput.value;
+          tccBtn.textContent = hasAssignedDevice ? 'View TCC Curve' : 'Assign/View TCC';
+          tccBtn.title = hasAssignedDevice
+            ? 'Open the TCC page with this device and adjacent protective devices selected.'
+            : 'Open the TCC page after assigning a protective device.';
+        };
+        updateTccActionLabel();
+        tccInput.addEventListener('change', updateTccActionLabel);
         tccBtn.addEventListener('click', () => {
-          const dev = tccInput.value ? `&device=${encodeURIComponent(tccInput.value)}` : '';
-          window.open(`tcc.html?component=${encodeURIComponent(targetComp.id)}${dev}`, '_blank');
+          if (!targetComp.id) return;
+          applyChanges();
+          const navParams = new URLSearchParams();
+          navParams.set('component', targetComp.id);
+          const assignedDevice = targetComp.tccId || tccInput.value;
+          if (assignedDevice) navParams.set('device', assignedDevice);
+          navParams.set('tccContext', 'adjacent');
+          window.location.href = `tcc.html?${navParams.toString()}`;
         });
         tccActions.appendChild(tccBtn);
         generalPanel.appendChild(tccActions);

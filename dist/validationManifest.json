@@ -1,8 +1,8 @@
 {
-  "generatedAt": "2026-05-16T22:51:03.231Z",
+  "generatedAt": "2026-05-19T16:38:36.051Z",
   "summary": {
-    "testSuiteCount": 157,
-    "totalAssertions": 6324,
+    "testSuiteCount": 160,
+    "totalAssertions": 6481,
     "benchmarkCount": 6,
     "standardCount": 13,
     "necComplianceCount": 8
@@ -29,7 +29,7 @@
       "groups": [
         "arc flash analysis"
       ],
-      "assertionCount": 11
+      "assertionCount": 13
     },
     {
       "file": "tests/arcFlashLabels.test.mjs",
@@ -72,7 +72,7 @@
         "evaluateConductorOption",
         "minimizeCostConductors"
       ],
-      "assertionCount": 157
+      "assertionCount": 165
     },
     {
       "file": "tests/batteryRackLayout.test.mjs",
@@ -80,7 +80,7 @@
         "normalizeBatteryRackLayoutInputs()",
         "buildBatteryRackLayoutModel()"
       ],
-      "assertionCount": 34
+      "assertionCount": 43
     },
     {
       "file": "tests/batterySizing.test.mjs",
@@ -160,7 +160,7 @@
         "exportProcurementCSV",
         "STANDARD_REEL_SIZES"
       ],
-      "assertionCount": 56
+      "assertionCount": 61
     },
     {
       "file": "tests/capacitorBank.test.mjs",
@@ -230,7 +230,7 @@
         "attachCollaborationServer — close event",
         "attachCollaborationServer — invalid JSON"
       ],
-      "assertionCount": 25
+      "assertionCount": 28
     },
     {
       "file": "tests/conduitBendSchedule.test.mjs",
@@ -277,7 +277,7 @@
         "runContingency — summary counts",
         "runContingency — transient stability coupling"
       ],
-      "assertionCount": 42
+      "assertionCount": 48
     },
     {
       "file": "tests/costEstimate.test.mjs",
@@ -292,7 +292,7 @@
         "parsePricingCSV — malformed input",
         "exportPricingCSV — roundtrip"
       ],
-      "assertionCount": 74
+      "assertionCount": 79
     },
     {
       "file": "tests/cp/coatingModel.test.mjs",
@@ -346,7 +346,7 @@
     {
       "file": "tests/deliverableWorkflow.test.mjs",
       "groups": [],
-      "assertionCount": 14
+      "assertionCount": 16
     },
     {
       "file": "tests/demandSchedule.test.mjs",
@@ -364,7 +364,7 @@
         "buildDemandSchedule() — demand classification profiles",
         "NEC_CATEGORIES constant"
       ],
-      "assertionCount": 103
+      "assertionCount": 108
     },
     {
       "file": "tests/derInterconnect.test.mjs",
@@ -417,7 +417,7 @@
         "formatDrcReport() — accepted risk section",
         "DRC-06 — Structured cabling EMI segregation"
       ],
-      "assertionCount": 123
+      "assertionCount": 128
     },
     {
       "file": "tests/differentialProtection.test.mjs",
@@ -498,7 +498,7 @@
         "buildEquipmentReport()",
         "summariseEvaluation()"
       ],
-      "assertionCount": 77
+      "assertionCount": 79
     },
     {
       "file": "tests/equipmentPersistence.test.cjs",
@@ -515,7 +515,7 @@
       "groups": [
         "exportAll reports"
       ],
-      "assertionCount": 4
+      "assertionCount": 7
     },
     {
       "file": "tests/frequencyScan.test.mjs",
@@ -562,7 +562,7 @@
         "tolerableStep — IEEE 80-2013 Eq. 29/30",
         "analyzeGroundGrid — integration"
       ],
-      "assertionCount": 36
+      "assertionCount": 37
     },
     {
       "file": "tests/groundGridPreviewGeometry.test.mjs",
@@ -626,7 +626,7 @@
         "runHazAreaStudy — validation",
         "runHazAreaStudy — integration"
       ],
-      "assertionCount": 126
+      "assertionCount": 132
     },
     {
       "file": "tests/heatTraceReport.test.mjs",
@@ -785,7 +785,7 @@
         "egressComplianceCheck",
         "runLightingStudy integration"
       ],
-      "assertionCount": 98
+      "assertionCount": 99
     },
     {
       "file": "tests/loadCombinations.test.mjs",
@@ -802,11 +802,32 @@
       "assertionCount": 39
     },
     {
+      "file": "tests/loadflow/baseKvHintRegression.test.mjs",
+      "groups": [
+        "load-flow base kV numeric hints"
+      ],
+      "assertionCount": 2
+    },
+    {
       "file": "tests/loadflow/cablePerKmImpedance.test.mjs",
       "groups": [
         "Cable per-km impedance handling"
       ],
       "assertionCount": 9
+    },
+    {
+      "file": "tests/loadflow/cloneDataSafety.test.mjs",
+      "groups": [
+        "Load flow branch clone safety"
+      ],
+      "assertionCount": 1
+    },
+    {
+      "file": "tests/loadflow/deepNestedLoadSafety.test.mjs",
+      "groups": [
+        "Load flow nested PQ parsing safety"
+      ],
+      "assertionCount": 2
     },
     {
       "file": "tests/loadflow/ieeeCases.test.cjs",
@@ -835,7 +856,7 @@
         "Published sample one-line load flow",
         "Simple feeder load flow"
       ],
-      "assertionCount": 30
+      "assertionCount": 35
     },
     {
       "file": "tests/loadflow/transformerOrientation.test.mjs",
@@ -920,7 +941,7 @@
     {
       "file": "tests/oidc.test.mjs",
       "groups": [],
-      "assertionCount": 25
+      "assertionCount": 28
     },
     {
       "file": "tests/onelineBackgroundImage.test.mjs",
@@ -935,7 +956,7 @@
     {
       "file": "tests/onelineOffPageConnectors.test.mjs",
       "groups": [],
-      "assertionCount": 25
+      "assertionCount": 37
     },
     {
       "file": "tests/onelineProtectionZones.test.mjs",
@@ -1106,7 +1127,7 @@
         "reporting engine",
         "label templates"
       ],
-      "assertionCount": 9
+      "assertionCount": 13
     },
     {
       "file": "tests/reportPackage.test.mjs",
@@ -1159,12 +1180,14 @@
         "getSampleById()",
         "validateSampleProject()",
         "migrateSampleProject()",
+        "sampleProjectToImportPayload()",
         "Sample JSON files",
+        "Coordination sample one-line",
         "Sample thumbnail files",
         "samplegallery.html",
         "guidedChecklist step pages are within pagesUsed"
       ],
-      "assertionCount": 50
+      "assertionCount": 62
     },
     {
       "file": "tests/sampleLinks.test.cjs",
@@ -1209,9 +1232,10 @@
         "calcBraceForces — SDC A/B (no bracing required)",
         "calcBraceForces — SDC D (bracing required)",
         "calcBraceForces — Ip=1.5 increases forces",
+        "calcBraceForces — wp validation",
         "evaluateTraysBracing"
       ],
-      "assertionCount": 53
+      "assertionCount": 55
     },
     {
       "file": "tests/seismicWindCombined.test.mjs",
@@ -1257,7 +1281,7 @@
       "groups": [
         "short circuit engine"
       ],
-      "assertionCount": 31
+      "assertionCount": 52
     },
     {
       "file": "tests/spoolSheets.test.mjs",
@@ -1299,7 +1323,7 @@
         "clearStudyApproval",
         "getApprovalBadgeHTML"
       ],
-      "assertionCount": 26
+      "assertionCount": 24
     },
     {
       "file": "tests/studyBasis.test.mjs",
@@ -1321,7 +1345,7 @@
         "sumCableWeights",
         "evaluateTrays"
       ],
-      "assertionCount": 42
+      "assertionCount": 47
     },
     {
       "file": "tests/sustainabilityFootprint.test.mjs",
@@ -1407,13 +1431,14 @@
     {
       "file": "tests/tcc/tccAutoCoord.test.mjs",
       "groups": [
+        "TCC one-line context selection",
         "interpolateTime",
         "generateFaultCurrents",
         "checkCoordination",
         "findCoordinatingTimeDial",
         "greedyCoordinate"
       ],
-      "assertionCount": 63
+      "assertionCount": 69
     },
     {
       "file": "tests/tcc/tccUtils.test.cjs",
@@ -1425,7 +1450,7 @@
     {
       "file": "tests/transformerProperties.test.mjs",
       "groups": [],
-      "assertionCount": 10
+      "assertionCount": 15
     },
     {
       "file": "tests/transientStability.test.mjs",
@@ -1498,7 +1523,7 @@
         "runValidation - TCC duty violations",
         "runValidation - multiple simultaneous violations"
       ],
-      "assertionCount": 196
+      "assertionCount": 212
     },
     {
       "file": "tests/validationManifest.test.mjs",

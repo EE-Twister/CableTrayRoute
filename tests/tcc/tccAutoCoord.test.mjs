@@ -13,6 +13,13 @@ import {
   greedyCoordinate,
   generateFaultCurrents
 } from '../../analysis/tccAutoCoord.mjs';
+import {
+  createDirectedConnectionMap,
+  addDirectedConnection,
+  collectAdjacentDeviceUids,
+  collectAdjacentDeviceRelationships,
+  collectNearestDirectionalDeviceUids
+} from '../../analysis/tccContext.mjs';
 
 function describe(name, fn) { console.log(name); fn(); }
 function it(name, fn) {
@@ -26,6 +33,59 @@ const ge = rawDevices.find(d => d.id === 'ge_multilin_750');
 
 assert(abb, 'abb_tmax_160 device must exist in protectiveDevices.json');
 assert(ge, 'ge_multilin_750 device must exist in protectiveDevices.json');
+
+describe('TCC one-line context selection', () => {
+  it('selects nearest upstream and downstream protective device uids', () => {
+    const flow = createDirectedConnectionMap(['UTIL', 'MAIN', 'XFMR', 'FEEDER', 'MOTOR']);
+    addDirectedConnection(flow, 'UTIL', 'MAIN');
+    addDirectedConnection(flow, 'MAIN', 'XFMR');
+    addDirectedConnection(flow, 'XFMR', 'FEEDER');
+    addDirectedConnection(flow, 'FEEDER', 'MOTOR');
+
+    const devices = new Map([
+      ['UTIL', 'component:UTIL'],
+      ['MAIN', 'component:MAIN'],
+      ['FEEDER', 'component:FEEDER']
+    ]);
+
+    assert.deepStrictEqual(
+      [...collectAdjacentDeviceUids('XFMR', flow, devices, 4)],
+      ['component:MAIN', 'component:FEEDER']
+    );
+    assert.deepStrictEqual(
+      [...collectAdjacentDeviceRelationships('XFMR', flow, devices, 4)],
+      [
+        ['component:MAIN', 'upstream'],
+        ['component:FEEDER', 'downstream']
+      ]
+    );
+  });
+
+  it('stops at the nearest protective device in each direction', () => {
+    const flow = createDirectedConnectionMap(['UTILITY', 'RELAY', 'MAIN', 'XFMR', 'FEEDER', 'LOAD']);
+    addDirectedConnection(flow, 'UTILITY', 'RELAY');
+    addDirectedConnection(flow, 'RELAY', 'MAIN');
+    addDirectedConnection(flow, 'MAIN', 'XFMR');
+    addDirectedConnection(flow, 'XFMR', 'FEEDER');
+    addDirectedConnection(flow, 'FEEDER', 'LOAD');
+
+    const devices = new Map([
+      ['UTILITY', 'component:UTILITY'],
+      ['RELAY', 'component:RELAY'],
+      ['MAIN', 'component:MAIN'],
+      ['FEEDER', 'component:FEEDER']
+    ]);
+
+    assert.deepStrictEqual(
+      [...collectNearestDirectionalDeviceUids('MAIN', flow, devices, 'upstream', 4)],
+      ['component:RELAY']
+    );
+    assert.deepStrictEqual(
+      [...collectNearestDirectionalDeviceUids('MAIN', flow, devices, 'downstream', 4)],
+      ['component:FEEDER']
+    );
+  });
+});
 
 // ──────────────────────────────────────────────────────────────────────────────
 describe('interpolateTime', () => {

@@ -84,7 +84,7 @@ GFP curves will now appear as **dashed purple lines** whenever GFP devices are p
 
 ### Step 2 — Select GFP Devices
 
-1. In the **Devices** panel, scroll to the **Ground Fault Relays (GFP)** group
+1. In the **Devices** panel, choose the **Ground Fault** task filter
 2. Select one or more GFP relay entries:
    - **GFP Normal Inverse – Residual (3I₀)** — NI family, residual sensing
    - **GFP Very Inverse – Residual (3I₀)** — VI family, residual sensing

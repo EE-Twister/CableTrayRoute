@@ -163,6 +163,58 @@ describe('migrateSampleProject()', () => {
   });
 });
 
+describe('sampleProjectToImportPayload()', () => {
+  it('hydrates flat one-line connections onto source components', () => {
+    const payload = sampleProjectToImportPayload({
+      schemaVersion: 1,
+      id: 'flat-links',
+      title: 'Flat Links',
+      cables: [],
+      raceways: { trays: [], conduits: [], ductbanks: [] },
+      oneline: {
+        components: [
+          { id: 'SRC', type: 'Source', label: 'Source' },
+          { id: 'LOAD', type: 'Load', label: 'Load' },
+        ],
+        connections: [
+          { from: 'SRC', to: 'LOAD', tag: 'FDR-1' },
+        ],
+      },
+    });
+    const [sheet] = payload.oneLine.sheets;
+    assert.strictEqual(sheet.components[0].connections.length, 1);
+    assert.deepStrictEqual(sheet.components[0].connections[0], { tag: 'FDR-1', target: 'LOAD' });
+    assert.strictEqual(sheet.connections.length, 1);
+  });
+
+  it('does not duplicate component-owned connections', () => {
+    const payload = sampleProjectToImportPayload({
+      schemaVersion: 1,
+      id: 'component-links',
+      title: 'Component Links',
+      cables: [],
+      raceways: { trays: [], conduits: [], ductbanks: [] },
+      oneLine: {
+        activeSheet: 0,
+        sheets: [
+          {
+            name: 'Main',
+            components: [
+              { id: 'SRC', type: 'Source', connections: [{ target: 'LOAD' }] },
+              { id: 'LOAD', type: 'Load' },
+            ],
+            connections: [
+              { from: 'SRC', to: 'LOAD' },
+            ],
+          },
+        ],
+      },
+    });
+    const [source] = payload.oneLine.sheets[0].components;
+    assert.deepStrictEqual(source.connections, [{ target: 'LOAD' }]);
+  });
+});
+
 describe('Sample JSON files', () => {
   SAMPLE_REGISTRY.forEach(sample => {
     const filePath = path.join(ROOT, sample.projectFile);
@@ -205,6 +257,36 @@ describe('Sample JSON files', () => {
   });
 });
 
+describe('Coordination sample one-line', () => {
+  it('maps flat sample links to rendered one-line connections', () => {
+    const filePath = path.join(ROOT, 'samples/coordination-study.json');
+    const parsed = migrateSampleProject(JSON.parse(fs.readFileSync(filePath, 'utf8')));
+    const payload = sampleProjectToImportPayload(parsed);
+    const [sheet] = payload.oneLine.sheets;
+    const componentLinks = sheet.components.flatMap(component =>
+      (component.connections || []).map(connection => ({ from: component.id, to: connection.target })),
+    );
+    assert.strictEqual(sheet.connections.length, 9);
+    assert.strictEqual(componentLinks.length, 9);
+    assert.ok(componentLinks.some(connection => connection.from === 'UTIL-4KV' && connection.to === 'RELAY-51-1'));
+  });
+
+  it('links sample TCC devices to one-line components', () => {
+    const filePath = path.join(ROOT, 'samples/coordination-study.json');
+    const parsed = migrateSampleProject(JSON.parse(fs.readFileSync(filePath, 'utf8')));
+    const payload = sampleProjectToImportPayload(parsed);
+    const [sheet] = payload.oneLine.sheets;
+    const relay = sheet.components.find(component => component.id === 'RELAY-51-1');
+    const mainBreaker = sheet.components.find(component => component.id === 'BKR-4KV-F1');
+    const fuse = sheet.components.find(component => component.id === 'FUSE-4KV-F2');
+    assert.strictEqual(relay.tccId, 'iec_ei_relay');
+    assert.strictEqual(mainBreaker.tccId, 'sample_mv_breaker_1200');
+    assert.strictEqual(fuse.tccId, 'mv_fuse_65e');
+    assert.ok(payload.settings.tccSettings.devices.includes('component:BKR-4KV-F1'));
+    assert.strictEqual(payload.settings.tccSettings.componentOverrides['RELAY-51-1'].pickup, 400);
+  });
+});
+
 describe('Sample thumbnail files', () => {
   SAMPLE_REGISTRY.forEach(sample => {
     it(`${sample.image} exists`, () => {
@@ -238,8 +320,9 @@ describe('guidedChecklist step pages are within pagesUsed', () => {
   SAMPLE_REGISTRY.forEach(sample => {
     it(`${sample.id} checklist pages are in pagesUsed`, () => {
       sample.guidedChecklist.forEach(step => {
+        const basePage = step.page.split(/[?#]/)[0];
         assert.ok(
-          sample.pagesUsed.includes(step.page),
+          sample.pagesUsed.includes(basePage),
           `Step "${step.label}" page "${step.page}" not listed in pagesUsed for "${sample.id}"`,
         );
       });

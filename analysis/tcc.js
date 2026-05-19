@@ -2,6 +2,7 @@ const d3 = globalThis.d3;
 import {
   getItem,
   setItem,
+  getCables,
   getOneLine,
   setOneLine,
   getStudies,
@@ -11,7 +12,13 @@ import {
 } from '../dataStore.mjs';
 import { runShortCircuit } from './shortCircuit.mjs';
 import { scaleCurve, checkDuty, sanitizeCurve } from './tccUtils.js';
-import { checkCoordination, greedyCoordinate, greedyCoordinateGFP, generateFaultCurrents } from './tccAutoCoord.mjs';
+import { checkCoordination, greedyCoordinate, greedyCoordinateGFP, generateFaultCurrents, interpolateTime } from './tccAutoCoord.mjs';
+import {
+  createDirectedConnectionMap,
+  addDirectedConnection,
+  collectAdjacentDeviceUids,
+  collectAdjacentDeviceRelationships
+} from './tccContext.mjs';
 import { buildCTIRows, CTI_HEADERS } from '../reports/coordinationReport.mjs';
 import { downloadCSV, toCSV } from '../reports/reporting.mjs';
 import { buildExportFiles, MANIFEST_HEADERS } from '../reports/relaySettingsExport.mjs';
@@ -30,6 +37,21 @@ import componentLibrary from '../componentLibrary.json' with { type: 'json' };
 
 const PROTECTIVE_TYPES = new Set(['breaker', 'fuse', 'relay', 'relay_87', 'recloser', 'contactor', 'switch']);
 const MOTOR_TYPES = new Set(['motor_load', 'motor', 'motor_starter', 'motor_controller']);
+
+function normalizeProtectionType(value) {
+  return String(value || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
+}
+
+function isProtectiveType(value) {
+  return PROTECTIVE_TYPES.has(normalizeProtectionType(value));
+}
+
+function isMotorComponent(component) {
+  if (!component) return false;
+  return MOTOR_TYPES.has(normalizeProtectionType(component.type))
+    || MOTOR_TYPES.has(normalizeProtectionType(component.subtype));
+}
+
 const CMIL_TO_MM2 = 0.000506707478; // 1 circular mil in mm^2
 const DEFAULT_INRUSH_MULTIPLE = 12;
 const DEFAULT_INRUSH_DURATION = 0.1;
@@ -48,6 +70,9 @@ const MOTOR_START_POSTTIME_RATIO = 1.1;
 const MOTOR_START_MIN_PRETIME = 0.01;
 const MOTOR_START_PLOT_FLOOR = 0.01;
 const MOTOR_START_PLOT_CEILING = 10000;
+const DEFAULT_MOTOR_COLD_START_DURATION = 10;
+const DEFAULT_MOTOR_HOT_START_DURATION = 6;
+const EQUIPMENT_OVERLAY_KINDS = new Set(['cable', 'inrush', 'transformerDamage', 'motorStart', 'motorThermal']);
 const K_CONSTANTS = {
   copper: { 60: 103, 75: 118, 90: 143 },
   aluminum: { 60: 75, 75: 87, 90: 99 }
@@ -310,6 +335,15 @@ const coordMarginInput = document.getElementById('coord-margin');
 const viewMenuBtn = document.getElementById('tcc-view-menu-btn');
 const arcFlashOverlayControls = document.getElementById('arc-flash-overlay-controls');
 const afThresholdSelect = document.getElementById('af-threshold-select');
+const contextBanner = document.getElementById('tcc-context-banner');
+const contextTitle = document.getElementById('tcc-context-title');
+const contextSubtitle = document.getElementById('tcc-context-subtitle');
+const contextRelationships = document.getElementById('tcc-context-relationships');
+const contextBackBtn = document.getElementById('tcc-back-oneline-btn');
+const coordStatusSummary = document.getElementById('coord-status-summary');
+const equipmentMetricsPanel = document.getElementById('tcc-equipment-metrics');
+const hoverTooltip = document.getElementById('tcc-hover-tooltip');
+const tccChartContainer = document.querySelector('.tcc-chart-container');
 const chart = d3.select('#tcc-chart');
 const onelinePreviewSvgEl = document.getElementById('oneline-preview');
 const onelinePreviewSvg = onelinePreviewSvgEl ? d3.select(onelinePreviewSvgEl) : null;
@@ -326,6 +360,8 @@ const previewPositionOverrides = new Map();
 let activePlotted = null;
 let activeCurvesUpdater = null;
 let activeCoordMarkerDrawer = null;
+let activeEquipmentOverlays = [];
+let activeEquipmentConstraintChecks = [];
 let coordOrderIds = [];
 
 // Last completed auto-coordination result; enables CTI report export
@@ -463,7 +499,10 @@ function computeLegendLayout(entries, availableWidth) {
 
   entries.forEach(entry => {
     const baseLabel = entry.selection?.name || entry.name || entry.selection?.baseDevice?.name || '';
-    const legendLabel = baseLabel || entry.name || entry.selection?.baseDevice?.name || 'Device';
+    const relationship = entry.relationship?.role && entry.relationship.role !== 'additional'
+      ? `${entry.relationship.label}: `
+      : '';
+    const legendLabel = `${relationship}${baseLabel || entry.name || entry.selection?.baseDevice?.name || 'Device'}`;
     const viewSummaries = formatViewSummaries(entry);
     const metrics = estimateLegendItemMetrics(legendLabel, viewSummaries);
     if (cursorX > 0 && cursorX + metrics.width > safeWidth) {
@@ -508,6 +547,8 @@ function setActiveViewOptions(optionIds, { persist = true } = {}) {
 const params = new URLSearchParams(window.location.search);
 const compId = params.get('component');
 const deviceParam = params.get('device');
+const tccContextParam = params.get('tccContext') || params.get('context');
+const resetToAdjacentContext = !!compId && tccContextParam === 'adjacent';
 const annotationBtnDefaultLabel = annotationBtn ? annotationBtn.textContent : 'Add Annotation';
 const ANNOTATION_ACTIVE_LABEL = 'Click chart to place annotation';
 const DEFAULT_PRINT_HEADER = 'Time-Current Curves';
@@ -522,6 +563,7 @@ let componentRecords = [];
 let componentLookup = new Map();
 let neighborMap = new Map();
 let connectionIndex = new Map();
+let componentFlowMap = new Map();
 let componentDeviceMap = new Map();
 let pendingPlotRefresh = null;
 let activeComponentId = compId || null;
@@ -534,10 +576,153 @@ let arcFlashOverlayComponentId = null;
 // Fixed purple palette for GFP curves — visually distinct from d3.schemeCategory10
 const GFP_COLOR_PALETTE = ['#7c3aed', '#6d28d9', '#5b21b6', '#4c1d95', '#a78bfa'];
 
+const CONTEXT_ROLE_META = {
+  upstream: {
+    role: 'upstream',
+    label: 'Upstream',
+    order: 0,
+    className: 'is-upstream',
+    color: '#c2410c'
+  },
+  selected: {
+    role: 'selected',
+    label: 'Selected Device',
+    order: 1,
+    className: 'is-selected-device',
+    color: '#0d6efd'
+  },
+  downstream: {
+    role: 'downstream',
+    label: 'Downstream',
+    order: 2,
+    className: 'is-downstream',
+    color: '#15803d'
+  },
+  additional: {
+    role: 'additional',
+    label: 'Additional Device',
+    order: 5,
+    className: 'is-additional',
+    color: '#64748b'
+  }
+};
+
 function getActiveComponentId() {
   if (!activeComponentId) return null;
   if (!componentLookup.has(activeComponentId)) return null;
   return activeComponentId;
+}
+
+function getContextDeviceRelationshipMap(contextId = getActiveComponentId()) {
+  const relationships = new Map();
+  if (!contextId) return relationships;
+  const selectedEntry = componentDeviceMap.get(contextId);
+  collectAdjacentDeviceRelationships(
+    contextId,
+    componentFlowMap,
+    getComponentDeviceUidMap(),
+    MAX_NEIGHBOR_DEPTH
+  ).forEach((role, uid) => {
+    if (role === 'upstream' || role === 'downstream') {
+      relationships.set(uid, role);
+    }
+  });
+  if (selectedEntry?.uid) {
+    relationships.set(selectedEntry.uid, 'selected');
+  }
+  return relationships;
+}
+
+function getDeviceRelationship(uid, relationshipMap = getContextDeviceRelationshipMap()) {
+  const role = relationshipMap.get(uid) || 'additional';
+  return CONTEXT_ROLE_META[role] || CONTEXT_ROLE_META.additional;
+}
+
+function getContextComponentRelationshipMap(contextId = getActiveComponentId()) {
+  const deviceRelationshipMap = getContextDeviceRelationshipMap(contextId);
+  const componentRelationshipMap = new Map();
+  componentDeviceMap.forEach((entry, componentId) => {
+    if (!entry?.uid) return;
+    const relationship = getDeviceRelationship(entry.uid, deviceRelationshipMap);
+    if (relationship.role !== 'additional') {
+      componentRelationshipMap.set(componentId, relationship);
+    }
+  });
+  return componentRelationshipMap;
+}
+
+function getCurveColorForComponentId(componentId) {
+  if (!componentId || !Array.isArray(activePlotted)) return null;
+  const entry = activePlotted.find(plotEntry => plotEntry.selection?.componentId === componentId);
+  return entry?.color || null;
+}
+
+function sortDeviceIdsForContext(ids) {
+  const relationshipMap = getContextDeviceRelationshipMap();
+  return [...ids].sort((a, b) => {
+    const aMeta = getDeviceRelationship(a, relationshipMap);
+    const bMeta = getDeviceRelationship(b, relationshipMap);
+    if (aMeta.order !== bMeta.order) return aMeta.order - bMeta.order;
+    const aName = deviceMap.get(a)?.name || a;
+    const bName = deviceMap.get(b)?.name || b;
+    return aName.localeCompare(bName);
+  });
+}
+
+function renderTccContextBanner() {
+  if (!contextBanner) return;
+  const contextId = getActiveComponentId();
+  const record = contextId ? componentLookup.get(contextId) : null;
+  if (!contextId || !record) {
+    contextBanner.classList.add('hidden');
+    return;
+  }
+
+  const component = record.component;
+  const assignedEntry = componentDeviceMap.get(contextId);
+  const componentName = componentLabel(component);
+  contextBanner.classList.remove('hidden');
+  if (contextTitle) {
+    contextTitle.textContent = `${componentName} TCC`;
+  }
+  if (contextSubtitle) {
+    const parts = [record.sheetName || 'One-line'];
+    if (assignedEntry?.baseDevice?.name) {
+      parts.push(`Assigned device: ${assignedEntry.baseDevice.name}`);
+    }
+    contextSubtitle.textContent = parts.join(' | ');
+  }
+  if (!contextRelationships) return;
+
+  const relationshipMap = getContextDeviceRelationshipMap(contextId);
+  const entriesByRole = new Map([
+    ['upstream', []],
+    ['selected', []],
+    ['downstream', []]
+  ]);
+  relationshipMap.forEach((role, uid) => {
+    if (!entriesByRole.has(role)) return;
+    const entry = deviceMap.get(uid);
+    if (entry) entriesByRole.get(role).push(entry);
+  });
+
+  contextRelationships.innerHTML = '';
+  ['upstream', 'selected', 'downstream'].forEach(role => {
+    const meta = CONTEXT_ROLE_META[role];
+    const entries = entriesByRole.get(role) || [];
+    const chip = document.createElement('span');
+    chip.className = `tcc-context-chip ${meta.className}`;
+    chip.setAttribute('role', 'listitem');
+
+    const label = document.createElement('span');
+    label.className = 'tcc-context-chip-label';
+    label.textContent = meta.label;
+    const value = document.createElement('span');
+    value.className = 'tcc-context-chip-value';
+    value.textContent = entries.length ? entries.map(entry => entry.name).join(', ') : 'Not found';
+    chip.append(label, value);
+    contextRelationships.appendChild(chip);
+  });
 }
 
 function updateComponentContextUI() {
@@ -548,6 +733,7 @@ function updateComponentContextUI() {
   if (openBtn) {
     openBtn.style.display = hasContext ? 'inline-block' : 'none';
   }
+  renderTccContextBanner();
 }
 
 if (compId) {
@@ -569,6 +755,10 @@ const COMPONENT_FALLBACK_GROUP = 'One-Line Devices';
 const LIBRARY_FALLBACK_GROUP = 'Library Devices';
 const OTHER_MANUFACTURER_GROUP = 'Other Manufacturers';
 const OVERLAY_GROUP_SET = new Set([...Object.values(OVERLAY_GROUP_LABELS), SYSTEM_OVERLAY_GROUP]);
+
+function isEquipmentOverlayKind(kind) {
+  return EQUIPMENT_OVERLAY_KINDS.has(kind);
+}
 
 const TYPE_LABEL_OVERRIDES = {
   'lv breaker': 'LV Breaker',
@@ -996,7 +1186,11 @@ saved.customCurveCounter = saved.customCurves.reduce((max, curve) => {
 annotations = (saved.annotations || []).map(sanitizeAnnotation).filter(Boolean);
 saved.annotations = annotations.map(exportAnnotation);
 
+const BUTTON_READY_TITLES = new WeakMap();
+
 setPlotAvailability(false);
+updateCoordinationStatus('Choose devices and update the plot.');
+renderEquipmentMetrics([], []);
 
 updateViewButtonLabel();
 
@@ -1008,7 +1202,7 @@ const MIN_DELAY = 0.001;
 const MAX_DELAY = 1e5;
 
 function selectedDeviceIds() {
-  return [...deviceSelect.selectedOptions].map(o => o.value);
+  return sortDeviceIdsForContext([...deviceSelect.selectedOptions].map(o => o.value));
 }
 
 function applySelectionSet(selection, { persist = false } = {}) {
@@ -1019,6 +1213,7 @@ function applySelectionSet(selection, { persist = false } = {}) {
   });
   renderSelectedSummary();
   renderSettings();
+  renderOneLinePreview(getActiveComponentId());
   if (persist) {
     persistSettings();
   }
@@ -1029,25 +1224,36 @@ function renderSelectedSummary() {
   selectedSummary.innerHTML = '';
   const ids = selectedDeviceIds();
   if (deviceModalBtn) {
-    deviceModalBtn.textContent = ids.length ? `Choose Devices (${ids.length})` : 'Choose Devices';
+    deviceModalBtn.textContent = ids.length ? `${ids.length} Devices Selected` : 'Choose Devices';
   }
   if (!ids.length) {
     const empty = document.createElement('p');
     empty.className = 'selected-device-empty';
     empty.textContent = 'No devices selected.';
     selectedSummary.appendChild(empty);
+    renderTccContextBanner();
     return;
   }
   const list = document.createElement('div');
   list.className = 'selected-device-list';
+  const relationshipMap = getContextDeviceRelationshipMap();
   ids.forEach(uid => {
     const entry = deviceMap.get(uid);
+    const relationship = getDeviceRelationship(uid, relationshipMap);
     const chip = document.createElement('span');
-    chip.className = 'selected-device-chip';
-    chip.textContent = entry ? entry.name : uid;
+    chip.className = `selected-device-chip ${relationship.className}`;
+    chip.dataset.contextRole = relationship.role;
+    const role = document.createElement('span');
+    role.className = 'selected-device-role';
+    role.textContent = relationship.label;
+    const name = document.createElement('span');
+    name.className = 'selected-device-name';
+    name.textContent = entry ? entry.name : uid;
+    chip.append(role, name);
     list.appendChild(chip);
   });
   selectedSummary.appendChild(list);
+  renderTccContextBanner();
 }
 
 function formatSettingLabel(field = '') {
@@ -1094,6 +1300,23 @@ function formatSettingValue(value) {
   return num.toFixed(3).replace(/0+$/, '').replace(/\.$/, '');
 }
 
+function formatCoordinationCurrent(value) {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return '';
+  if (Math.abs(num) >= 1000) return Math.round(num).toLocaleString('en-US');
+  if (Math.abs(num) >= 100) return num.toFixed(1).replace(/\.0$/, '');
+  if (Math.abs(num) >= 10) return num.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
+  return num.toFixed(3).replace(/0+$/, '').replace(/\.$/, '');
+}
+
+function formatCoordinationSeconds(value) {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return '';
+  if (Math.abs(num) >= 1000) return num.toLocaleString('en-US', { maximumFractionDigits: 1 });
+  if (Math.abs(num) >= 10) return num.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
+  return num.toFixed(3).replace(/0+$/, '').replace(/\.$/, '');
+}
+
 function escapeHtml(value) {
   if (value === null || value === undefined) return '';
   return String(value)
@@ -1102,6 +1325,92 @@ function escapeHtml(value) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+function formatHoverSettings(entry) {
+  const settings = entry?.scaled?.settings || entry?.overrides || {};
+  const fields = [
+    ['pickup', 'Pickup', 'A'],
+    ['time', 'Delay', 's'],
+    ['shortTimePickup', 'ST Pickup', 'A'],
+    ['shortTimeDelay', 'ST Delay', 's'],
+    ['instantaneousPickup', 'INST', 'A'],
+    ['instantaneous', 'INST', 'A'],
+    ['curveProfileLabel', 'Curve', '']
+  ];
+  const seen = new Set();
+  const seenLabels = new Set();
+  const parts = [];
+  fields.forEach(([field, label, unit]) => {
+    if (seen.has(field)) return;
+    if (field === 'instantaneous' && settings.instantaneousPickup !== undefined) return;
+    seen.add(field);
+    const value = settings[field];
+    const formatted = formatSettingValue(value);
+    if (!formatted) return;
+    if (seenLabels.has(label)) return;
+    seenLabels.add(label);
+    parts.push(`${label}: ${formatted}${unit ? ` ${unit}` : ''}`);
+  });
+  return parts.length ? parts.join(' | ') : 'Using device library settings';
+}
+
+function findNearestCurvePoint(curve, current) {
+  if (!Array.isArray(curve) || !curve.length || !(current > 0)) return null;
+  const target = Math.log(current);
+  return curve.reduce((closest, point) => {
+    if (!point || !(point.current > 0) || !(point.time > 0)) return closest;
+    if (!closest) return point;
+    return Math.abs(Math.log(point.current) - target) < Math.abs(Math.log(closest.current) - target)
+      ? point
+      : closest;
+  }, null);
+}
+
+function showCurveHoverTooltip(event, entry, x, y, margin) {
+  if (!hoverTooltip || !tccChartContainer || !entry || chart.classed('annotation-mode')) {
+    hideCurveHoverTooltip();
+    return;
+  }
+  const chartNode = chart.node();
+  if (!chartNode) return;
+  const [svgX, svgY] = d3.pointer(event, chartNode);
+  const localX = svgX - margin.left;
+  const localY = svgY - margin.top;
+  if (localX < 0 || localY < 0) {
+    hideCurveHoverTooltip();
+    return;
+  }
+  const current = x.invert(localX);
+  const point = findNearestCurvePoint(entry.scaled?.curve, current);
+  if (!point) {
+    hideCurveHoverTooltip();
+    return;
+  }
+  const relationship = entry.relationship?.role !== 'additional' ? entry.relationship?.label : '';
+  const deviceName = entry.selection?.name || entry.selection?.baseDevice?.name || 'Device';
+  hoverTooltip.innerHTML = [
+    `<strong>${escapeHtml(deviceName)}</strong>`,
+    relationship ? `<span>${escapeHtml(relationship)}</span>` : '',
+    `<span>I: ${escapeHtml(formatSettingValue(point.current))} A | t: ${escapeHtml(formatSettingValue(point.time))} s</span>`,
+    `<span>${escapeHtml(formatHoverSettings(entry))}</span>`
+  ].filter(Boolean).join('');
+  hoverTooltip.classList.add('visible');
+  hoverTooltip.setAttribute('aria-hidden', 'false');
+
+  const containerRect = tccChartContainer.getBoundingClientRect();
+  const tooltipRect = hoverTooltip.getBoundingClientRect();
+  const left = clampValue(event.clientX - containerRect.left + 14, 8, Math.max(8, containerRect.width - tooltipRect.width - 8));
+  const top = clampValue(event.clientY - containerRect.top + 14, 8, Math.max(8, containerRect.height - tooltipRect.height - 8));
+  hoverTooltip.style.left = `${left}px`;
+  hoverTooltip.style.top = `${top}px`;
+
+  const nearestX = x(point.current);
+  const nearestY = y(point.time);
+  if (Number.isFinite(nearestX) && Number.isFinite(nearestY)) {
+    hoverTooltip.dataset.current = formatSettingValue(point.current);
+    hoverTooltip.dataset.time = formatSettingValue(point.time);
+  }
 }
 
 function createAnnotationId() {
@@ -1147,25 +1456,46 @@ function persistAnnotations({ skipSetItem = false } = {}) {
   }
 }
 
-function setPlotAvailability(available) {
-  if (printPlotBtn) {
-    printPlotBtn.disabled = !available;
+function setButtonAvailability(button, available, disabledTitle, readyTitle = '') {
+  if (!button) return;
+  if (!BUTTON_READY_TITLES.has(button)) {
+    BUTTON_READY_TITLES.set(button, readyTitle || button.getAttribute('title') || '');
   }
-  if (exportSvgBtn) {
-    exportSvgBtn.disabled = !available;
-  }
-  if (exportPngBtn) {
-    exportPngBtn.disabled = !available;
-  }
-  if (annotationBtn) {
-    annotationBtn.disabled = !available;
-    if (!available) {
-      disableAnnotationMode();
+  button.disabled = !available;
+  if (available) {
+    const readyTitle = BUTTON_READY_TITLES.get(button) || '';
+    if (readyTitle) {
+      button.setAttribute('title', readyTitle);
+    } else {
+      button.removeAttribute('title');
     }
+  } else if (disabledTitle) {
+    button.setAttribute('title', disabledTitle);
   }
-  if (exportRelaySettingsBtn) {
-    exportRelaySettingsBtn.disabled = !available;
+}
+
+function updateCoordinationStatus(message, variant = 'neutral') {
+  if (!coordStatusSummary) return;
+  coordStatusSummary.textContent = message || '';
+  coordStatusSummary.dataset.status = variant;
+}
+
+function hideCurveHoverTooltip() {
+  if (!hoverTooltip) return;
+  hoverTooltip.classList.remove('visible');
+  hoverTooltip.setAttribute('aria-hidden', 'true');
+}
+
+function setPlotAvailability(available) {
+  setButtonAvailability(printPlotBtn, available, 'Update the plot before printing.', 'Print the current TCC plot.');
+  setButtonAvailability(exportSvgBtn, available, 'Update the plot before exporting SVG.');
+  setButtonAvailability(exportPngBtn, available, 'Update the plot before exporting PNG.');
+  setButtonAvailability(annotationBtn, available, 'Update the plot before adding annotations.', 'Add an annotation to the current plot.');
+  if (!available) {
+    disableAnnotationMode();
+    hideCurveHoverTooltip();
   }
+  setButtonAvailability(exportRelaySettingsBtn, available, 'Update the plot before exporting relay settings.', 'Download vendor-native relay configuration files and manifest CSV.');
 }
 
 function enableAnnotationMode() {
@@ -2044,13 +2374,14 @@ function updateEntryOverrideFromControl(entry, control) {
 function refreshCatalog({
   preserveSelection = false,
   includeComponentContext = !preserveSelection,
-  includeDeviceParam = !preserveSelection
+  includeDeviceParam = !preserveSelection,
+  resetSelection = false
 } = {}) {
-  const previousSelection = preserveSelection ? new Set(selectedDeviceIds()) : new Set();
+  const previousSelection = preserveSelection && !resetSelection ? new Set(selectedDeviceIds()) : new Set();
   buildComponentData();
   rebuildCatalog();
   const available = new Set(deviceEntries.map(entry => entry.uid));
-  const defaults = new Set((saved.devices || []).filter(id => available.has(id)));
+  const defaults = new Set(resetSelection ? [] : (saved.devices || []).filter(id => available.has(id)));
   const contextId = getActiveComponentId();
   if (preserveSelection) {
     previousSelection.forEach(id => {
@@ -2065,10 +2396,14 @@ function refreshCatalog({
     });
   }
   if (includeDeviceParam && deviceParam) {
+    const hasComponentDevice = [...defaults].some(id => {
+      const entry = deviceMap.get(id);
+      return entry?.kind === 'component' && entry.baseDeviceId === deviceParam;
+    });
     const libraryEntry = deviceEntries.find(
       entry => entry.kind === 'library' && entry.baseDeviceId === deviceParam
     );
-    if (libraryEntry) defaults.add(libraryEntry.uid);
+    if (libraryEntry && !hasComponentDevice) defaults.add(libraryEntry.uid);
   }
   deviceEntries
     .filter(entry => entry.autoSelect)
@@ -2127,7 +2462,11 @@ async function init() {
     libraryDevices = [];
   }
 
-  const initialSelection = refreshCatalog({ includeComponentContext: true, includeDeviceParam: true });
+  const initialSelection = refreshCatalog({
+    includeComponentContext: true,
+    includeDeviceParam: true,
+    resetSelection: resetToAdjacentContext
+  });
 
   renderOneLinePreview(getActiveComponentId());
 
@@ -2141,6 +2480,13 @@ async function init() {
     const selection = refreshCatalog({ preserveSelection: true });
     updateShortCircuitStudy();
     renderOneLinePreview(getActiveComponentId());
+    if (getActiveComponentId() && deviceSelect && deviceSelect.selectedOptions.length && selection.length) {
+      plot();
+    }
+  });
+
+  on(STORAGE_KEYS.cables, () => {
+    const selection = refreshCatalog({ preserveSelection: true, includeComponentContext: true });
     if (getActiveComponentId() && deviceSelect && deviceSelect.selectedOptions.length && selection.length) {
       plot();
     }
@@ -2178,6 +2524,7 @@ function buildComponentData() {
   const lookup = new Map();
   const neighbors = new Map();
   const connections = new Map();
+  const flow = createDirectedConnectionMap();
   (sheets || []).forEach((sheet, idx) => {
     const sheetName = sheet?.name || `Sheet ${idx + 1}`;
     (sheet?.components || []).forEach(comp => {
@@ -2185,6 +2532,7 @@ function buildComponentData() {
       lookup.set(comp.id, { component: comp, sheetName, sheetIndex: idx, sheet });
       neighbors.set(comp.id, new Set());
       connections.set(comp.id, []);
+      if (comp.id) flow.set(String(comp.id), { upstream: new Set(), downstream: new Set() });
     });
     (sheet?.connections || []).forEach(conn => {
       if (!conn) return;
@@ -2197,6 +2545,7 @@ function buildComponentData() {
       const sourceRecord = lookup.get(from);
       const targetRecord = lookup.get(to);
       if (!sourceRecord || !targetRecord) return;
+      addDirectedConnection(flow, from, to);
       connections.get(from)?.push({ conn, source: sourceRecord.component, target: targetRecord.component });
       connections.get(to)?.push({ conn, source: targetRecord.component, target: sourceRecord.component });
     });
@@ -2208,6 +2557,7 @@ function buildComponentData() {
       neighbors.get(conn.target)?.add(component.id);
       const targetRecord = lookup.get(conn.target);
       if (!targetRecord) return;
+      addDirectedConnection(flow, component.id, conn.target);
       connections.get(component.id)?.push({ conn, source: component, target: targetRecord.component });
       connections.get(conn.target)?.push({ conn, source: targetRecord.component, target: component });
     });
@@ -2216,6 +2566,7 @@ function buildComponentData() {
   componentLookup = lookup;
   neighborMap = neighbors;
   connectionIndex = connections;
+  componentFlowMap = flow;
   if (activeComponentId && !componentLookup.has(activeComponentId)) {
     activeComponentId = null;
     updateComponentContextUI();
@@ -2296,7 +2647,7 @@ function describeComponentPlotAvailability(component, baseDevice) {
     || MOTOR_TYPES.has(normalizedBase);
   if (isMotor) {
     const refPhases = parsePhases(component.phases).length || 3;
-    const refVoltage = inferVoltage(component);
+    const refVoltage = inferMotorOverlayVoltage(component, inferVoltage(component));
     const partial = collectMotorOperatingData(component, refVoltage, refPhases, { allowPartial: true });
     if (!partial || !Number.isFinite(partial.voltage) || partial.voltage <= 0) {
       return 'Provide the motor rated voltage before plotting this component.';
@@ -2311,10 +2662,10 @@ function describeComponentPlotAvailability(component, baseDevice) {
     if (!base) {
       return 'Motor data is incomplete; verify the full-load and locked-rotor values before plotting.';
     }
-    const startMetrics = resolveMotorStartingMetrics(component, refVoltage, refPhases, base);
-    const thermalMetrics = resolveMotorThermalLimit(component, refVoltage, refPhases, base, startMetrics);
-    if (!startMetrics && !thermalMetrics) {
-      return 'Provide the motor starting or stall time before plotting this component.';
+    const startProfiles = resolveMotorStartProfiles(component, base);
+    const thermalMetrics = resolveMotorThermalLimit(component, refVoltage, refPhases, base, startProfiles[0]);
+    if (!startProfiles.length && !thermalMetrics) {
+      return 'Provide the motor starting, stall, or locked-rotor data before plotting this component.';
     }
     return null;
   }
@@ -2347,9 +2698,9 @@ function describeComponentPlotAvailability(component, baseDevice) {
     }
     return null;
   }
-  const isProtective = PROTECTIVE_TYPES.has(normalizedType)
-    || PROTECTIVE_TYPES.has(normalizedSubtype)
-    || PROTECTIVE_TYPES.has(normalizedBase);
+  const isProtective = isProtectiveType(component.type)
+    || isProtectiveType(component.subtype)
+    || isProtectiveType(baseDevice?.type);
   const isTransformer = normalizedType.includes('transformer')
     || normalizedSubtype.includes('transformer')
     || normalizedBase.includes('transformer');
@@ -2388,7 +2739,7 @@ function describeComponentPlotAvailability(component, baseDevice) {
 function buildComponentEntries() {
   const entries = [];
   componentRecords.forEach(({ component, sheetName }) => {
-    if (!PROTECTIVE_TYPES.has(component.type) || !component.tccId) return;
+    if (!(isProtectiveType(component.type) || isProtectiveType(component.subtype)) || !component.tccId) return;
     const base = libraryDevices.find(dev => dev.id === component.tccId);
     if (!base) return;
     const overrides = snapOverridesToOptions(
@@ -2470,7 +2821,7 @@ function buildComponentAssignmentOptions(component) {
   };
 
   libraryDevices
-    .filter(dev => PROTECTIVE_TYPES.has(normalizeTypeKey(dev.type)))
+    .filter(dev => isProtectiveType(dev.type))
     .forEach(dev => {
       const normalizedType = normalizeTypeKey(dev.type);
       const isMatch = normalizedComponentType && (
@@ -2544,7 +2895,7 @@ function buildCustomCurveEntries() {
 
 function buildLibraryEntries() {
   return libraryDevices
-    .filter(dev => PROTECTIVE_TYPES.has(dev.type) && !dev.groundFault)
+    .filter(dev => isProtectiveType(dev.type) && !dev.groundFault)
     .map(dev => ({
       uid: dev.id,
       kind: 'library',
@@ -2560,7 +2911,7 @@ function buildLibraryEntries() {
 
 function buildGFPLibraryEntries() {
   return libraryDevices
-    .filter(dev => PROTECTIVE_TYPES.has(dev.type) && dev.groundFault === true)
+    .filter(dev => isProtectiveType(dev.type) && dev.groundFault === true)
     .map(dev => ({
       uid: dev.id,
       kind: 'library',
@@ -2714,7 +3065,15 @@ async function confirmCustomCurveRemoval(entry) {
   }
 }
 
-function collectNeighborDeviceDefaults(targetId, depthLimit = MAX_NEIGHBOR_DEPTH) {
+function getComponentDeviceUidMap() {
+  const uidMap = new Map();
+  componentDeviceMap.forEach((entry, componentId) => {
+    if (entry?.uid) uidMap.set(String(componentId), entry.uid);
+  });
+  return uidMap;
+}
+
+function collectUndirectedNeighborDeviceDefaults(targetId, depthLimit = MAX_NEIGHBOR_DEPTH) {
   const defaults = new Set();
   if (!targetId || !neighborMap.has(targetId)) return defaults;
   const visited = new Set([targetId]);
@@ -2736,6 +3095,77 @@ function collectNeighborDeviceDefaults(targetId, depthLimit = MAX_NEIGHBOR_DEPTH
   return defaults;
 }
 
+function collectNeighborDeviceDefaults(targetId, depthLimit = MAX_NEIGHBOR_DEPTH) {
+  const directedDefaults = collectAdjacentDeviceUids(
+    targetId,
+    componentFlowMap,
+    getComponentDeviceUidMap(),
+    depthLimit
+  );
+  if (directedDefaults.size) return directedDefaults;
+  return collectUndirectedNeighborDeviceDefaults(targetId, depthLimit);
+}
+
+function collectContextComponents(targetId, depthLimit = MAX_NEIGHBOR_DEPTH) {
+  const components = [];
+  if (!targetId || !componentLookup.has(targetId)) return components;
+  const visited = new Set([targetId]);
+  const queue = [{ id: targetId, depth: 0 }];
+  while (queue.length) {
+    const { id, depth } = queue.shift();
+    const record = componentLookup.get(id);
+    if (record?.component) components.push(record.component);
+    if (depth >= depthLimit) continue;
+    (neighborMap.get(id) || new Set()).forEach(neighborId => {
+      if (visited.has(neighborId) || !componentLookup.has(neighborId)) return;
+      visited.add(neighborId);
+      queue.push({ id: neighborId, depth: depth + 1 });
+    });
+  }
+  return components;
+}
+
+function normalizeIdentityToken(value) {
+  if (value === undefined || value === null) return '';
+  return String(value).trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+function componentIdentityTokens(component) {
+  const tokens = new Set();
+  ['id', 'ref', 'tag', 'equipmentTag', 'equipment_tag', 'name', 'label'].forEach(key => {
+    const raw = getComponentValue(component, key);
+    const normalized = normalizeIdentityToken(raw);
+    if (normalized) tokens.add(normalized);
+    if (typeof raw === 'string') {
+      raw.split(/\r?\n/).forEach(part => {
+        const line = normalizeIdentityToken(part);
+        if (line) tokens.add(line);
+      });
+    }
+  });
+  return tokens;
+}
+
+function cableEndpointValue(cable, keys) {
+  const list = Array.isArray(keys) ? keys : [keys];
+  for (const key of list) {
+    const raw = cable?.[key];
+    const normalized = normalizeIdentityToken(raw);
+    if (normalized) return normalized;
+  }
+  return '';
+}
+
+function cableMatchesComponentEndpoint(cableEndpoint, component) {
+  if (!cableEndpoint || !component) return false;
+  return componentIdentityTokens(component).has(cableEndpoint);
+}
+
+function findContextComponentByEndpoint(cableEndpoint, contextComponents) {
+  if (!cableEndpoint) return null;
+  return contextComponents.find(component => cableMatchesComponentEndpoint(cableEndpoint, component)) || null;
+}
+
 function buildTransformerInrushEntries(targetId) {
   const overlays = [];
   const reference = componentLookup.get(targetId)?.component;
@@ -2743,13 +3173,9 @@ function buildTransformerInrushEntries(targetId) {
   const refVoltage = inferVoltage(reference);
   const refPhases = parsePhases(reference.phases).length || 3;
   const transformers = new Map();
-  if (reference.type === 'transformer') {
-    transformers.set(reference.id, reference);
-  }
-  (neighborMap.get(targetId) || new Set()).forEach(id => {
-    const neighbor = componentLookup.get(id)?.component;
-    if (!neighbor || neighbor.type !== 'transformer') return;
-    if (!transformers.has(neighbor.id)) transformers.set(neighbor.id, neighbor);
+  collectContextComponents(targetId).forEach(component => {
+    if (normalizeProtectionType(component?.type) !== 'transformer') return;
+    if (!transformers.has(component.id)) transformers.set(component.id, component);
   });
   transformers.forEach(transformer => {
     const inrush = computeTransformerInrush(transformer, refVoltage, refPhases);
@@ -2777,13 +3203,9 @@ function buildTransformerDamageEntries(targetId) {
   const refVoltage = inferVoltage(reference);
   const refPhases = parsePhases(reference.phases).length || 3;
   const transformers = new Map();
-  if (reference.type === 'transformer') {
-    transformers.set(reference.id, reference);
-  }
-  (neighborMap.get(targetId) || new Set()).forEach(id => {
-    const neighbor = componentLookup.get(id)?.component;
-    if (!neighbor || neighbor.type !== 'transformer') return;
-    if (!transformers.has(neighbor.id)) transformers.set(neighbor.id, neighbor);
+  collectContextComponents(targetId).forEach(component => {
+    if (normalizeProtectionType(component?.type) !== 'transformer') return;
+    if (!transformers.has(component.id)) transformers.set(component.id, component);
   });
   transformers.forEach(transformer => {
     const damage = buildTransformerDamageCurve(transformer, refVoltage, refPhases);
@@ -2806,34 +3228,143 @@ function buildTransformerDamageEntries(targetId) {
 function buildCableEntries(targetId) {
   const overlays = [];
   const seen = new Set();
-  componentRecords.forEach(({ component }) => {
-    (component.connections || []).forEach(conn => {
-      if (component.id !== targetId && conn.target !== targetId) return;
-      const source = component.id === targetId ? component : componentLookup.get(conn.target)?.component;
-      const other = component.id === targetId ? componentLookup.get(conn.target)?.component : component;
-      const cableInfo = resolveCableInfo(component, other, conn);
-      if (!cableInfo) return;
-      const tag = cableInfo.tag || `edge:${[component.id, conn.target].sort().join('~')}`;
-      if (seen.has(tag)) return;
-      const phases = parsePhases(conn.phases || cableInfo.phases || (other?.phases ?? source?.phases));
-      const curve = buildCableCurve(cableInfo, phases.length || 3);
-      if (!curve) return;
-      seen.add(tag);
-      overlays.push({
-        uid: `cable:${tag}`,
-        kind: 'cable',
-        name: `${cableInfo.tag || 'Cable'} Damage${other ? ` (${componentLabel(source)} → ${componentLabel(other)})` : ''}`,
-        deviceCategory: 'cable',
-        deviceType: 'cable damage',
-        curve: curve.curve,
-        ampacity: curve.ampacity,
-        sourceLabel: componentLabel(source),
-        targetLabel: other ? componentLabel(other) : '',
-        autoSelect: true
+  const contextComponents = collectContextComponents(targetId);
+  const contextIds = new Set(contextComponents.map(component => component.id).filter(Boolean));
+
+  const addCableOverlay = ({ cableInfo, source, target, tag }) => {
+    if (!cableInfo || !source || !target) return;
+    const cableTag = tag || cableInfo.tag || cableInfo.id || `edge:${[source.id, target.id].sort().join('~')}`;
+    if (seen.has(cableTag)) return;
+    const phases = parsePhases(cableInfo.phases || target?.phases || source?.phases);
+    const curve = buildCableCurve(cableInfo, phases.length || 3);
+    if (!curve) return;
+    const descriptor = parseConductorsDescriptor(cableInfo.conductors);
+    seen.add(cableTag);
+    overlays.push({
+      uid: `cable:${cableTag}`,
+      kind: 'cable',
+      name: `${cableInfo.tag || cableInfo.id || 'Cable'} Damage (${componentLabel(source)} -> ${componentLabel(target)})`,
+      deviceCategory: 'cable',
+      deviceType: 'cable damage',
+      curve: curve.curve,
+      ampacity: curve.ampacity,
+      sourceId: source.id,
+      targetId: target.id,
+      sourceLabel: componentLabel(source),
+      targetLabel: componentLabel(target),
+      conductorSize: cableInfo.conductor_size || cableInfo.conductorSize || cableInfo.size || cableInfo.awg || descriptor.size || '',
+      conductorMaterial: cableInfo.conductor_material || cableInfo.material || '',
+      insulationType: cableInfo.insulation_type || cableInfo.insulationType || cableInfo.insulation || '',
+      length: cableInfo.length || cableInfo.length_ft || cableInfo.lengthFt || null,
+      autoSelect: true
+    });
+  };
+
+  contextComponents.forEach(component => {
+    (connectionIndex.get(component.id) || []).forEach(({ conn, source, target }) => {
+      if (!source?.id || !target?.id) return;
+      if (!contextIds.has(source.id) || !contextIds.has(target.id)) return;
+      const cableInfo = resolveCableInfo(source, target, conn);
+      addCableOverlay({
+        cableInfo,
+        source,
+        target,
+        tag: cableInfo?.tag || cableInfo?.id || `edge:${[source.id, target.id].sort().join('~')}`
       });
     });
   });
+
+  getCables().forEach((cable, index) => {
+    if (!cable || typeof cable !== 'object') return;
+    const fromEndpoint = cableEndpointValue(cable, ['from', 'from_id', 'fromId', 'source', 'source_id', 'sourceId', 'origin']);
+    const toEndpoint = cableEndpointValue(cable, ['to', 'to_id', 'toId', 'target', 'target_id', 'targetId', 'destination']);
+    const source = findContextComponentByEndpoint(fromEndpoint, contextComponents);
+    const target = findContextComponentByEndpoint(toEndpoint, contextComponents);
+    if (!source || !target) return;
+    addCableOverlay({
+      cableInfo: cable,
+      source,
+      target,
+      tag: cable.tag || cable.id || `schedule:${index}`
+    });
+  });
+
   return overlays.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+}
+
+function inferMotorOverlayVoltage(motor, fallbackVoltage) {
+  const direct = inferVoltage(motor);
+  if (Number.isFinite(direct) && direct > 0) return direct;
+  if (!motor?.id || !neighborMap.has(motor.id)) {
+    return Number.isFinite(fallbackVoltage) && fallbackVoltage > 0 ? fallbackVoltage : null;
+  }
+  const visited = new Set([motor.id]);
+  const queue = [{ id: motor.id, depth: 0 }];
+  while (queue.length) {
+    const { id, depth } = queue.shift();
+    const component = componentLookup.get(id)?.component;
+    if (component && normalizeProtectionType(component.type) === 'transformer') {
+      const candidates = getTransformerVoltageCandidates(component);
+      const secondary = candidates.length ? Math.min(...candidates) : null;
+      if (Number.isFinite(secondary) && secondary > 0) return secondary;
+    }
+    if (depth >= MAX_NEIGHBOR_DEPTH) continue;
+    (neighborMap.get(id) || new Set()).forEach(neighborId => {
+      if (visited.has(neighborId)) return;
+      visited.add(neighborId);
+      queue.push({ id: neighborId, depth: depth + 1 });
+    });
+  }
+  return Number.isFinite(fallbackVoltage) && fallbackVoltage > 0 ? fallbackVoltage : null;
+}
+
+function resolveMotorStartProfiles(motor, baseData) {
+  if (!baseData) return [];
+  const { fla, lockedRotor, startTime } = baseData;
+  if (!Number.isFinite(fla) || fla <= 0) return [];
+  if (!Number.isFinite(lockedRotor) || lockedRotor <= 0) return [];
+  const coldStartTime = getNumericValue(motor, [
+    'cold_start_time_s',
+    'coldStartTime',
+    'cold_start_time',
+    'cold_start_seconds',
+    'cold_acceleration_time',
+    'cold_accel_time',
+    'cold_start_duration'
+  ]);
+  const hotStartTime = getNumericValue(motor, [
+    'hot_start_time_s',
+    'hotStartTime',
+    'hot_start_time',
+    'hot_start_seconds',
+    'hot_acceleration_time',
+    'hot_accel_time',
+    'hot_start_duration'
+  ]);
+  const profiles = [];
+  if (Number.isFinite(coldStartTime) && coldStartTime > 0) {
+    profiles.push({ key: 'cold', label: 'Cold Start', startTime: coldStartTime, estimated: false });
+  }
+  if (Number.isFinite(hotStartTime) && hotStartTime > 0) {
+    profiles.push({ key: 'hot', label: 'Hot Start', startTime: hotStartTime, estimated: false });
+  }
+  if (!profiles.length && Number.isFinite(startTime) && startTime > 0) {
+    profiles.push({ key: 'start', label: 'Motor Start', startTime, estimated: false });
+  }
+  if (!profiles.length) {
+    profiles.push(
+      { key: 'cold', label: 'Cold Start', startTime: DEFAULT_MOTOR_COLD_START_DURATION, estimated: true },
+      { key: 'hot', label: 'Hot Start', startTime: DEFAULT_MOTOR_HOT_START_DURATION, estimated: true }
+    );
+  }
+  return profiles
+    .map(profile => ({
+      ...profile,
+      fla,
+      lockedRotor,
+      curve: buildMotorStartingCurve({ fla, lockedRotor, startTime: profile.startTime })
+    }))
+    .filter(profile => profile.curve.length);
 }
 
 function buildMotorOverlayEntries(targetId) {
@@ -2845,34 +3376,39 @@ function buildMotorOverlayEntries(targetId) {
   const seen = new Set();
 
   const addMotor = motor => {
-    if (!motor || !MOTOR_TYPES.has(motor.type)) return;
+    if (!isMotorComponent(motor)) return;
     if (seen.has(motor.id)) return;
-    const base = collectMotorOperatingData(motor, refVoltage, refPhases);
+    const motorVoltage = inferMotorOverlayVoltage(motor, refVoltage);
+    const base = collectMotorOperatingData(motor, motorVoltage, refPhases);
     if (!base) return;
-    const startMetrics = resolveMotorStartingMetrics(motor, refVoltage, refPhases, base);
-    const thermalMetrics = resolveMotorThermalLimit(motor, refVoltage, refPhases, base, startMetrics);
-    if (!startMetrics && !thermalMetrics) return;
+    const startProfiles = resolveMotorStartProfiles(motor, base);
+    const thermalReference = startProfiles.find(profile => profile.key === 'cold') || startProfiles[0] || null;
+    const thermalMetrics = resolveMotorThermalLimit(motor, motorVoltage, refPhases, base, thermalReference);
+    if (!startProfiles.length && !thermalMetrics) return;
     seen.add(motor.id);
-    if (startMetrics) {
+    startProfiles.forEach(profile => {
       overlays.push({
-        uid: `motor-start:${motor.id}:${targetId}`,
+        uid: `motor-start:${profile.key}:${motor.id}:${targetId}`,
         kind: 'motorStart',
-        name: `${componentLabel(motor)} Motor Starting`,
+        name: `${componentLabel(motor)} ${profile.label}${profile.estimated ? ' (est.)' : ''}`,
         deviceCategory: 'motor',
         deviceType: 'motor starting',
-        curve: startMetrics.curve,
-        fla: startMetrics.fla,
-        lockedRotor: startMetrics.lockedRotor,
-        startTime: startMetrics.startTime,
+        curve: profile.curve,
+        fla: profile.fla,
+        lockedRotor: profile.lockedRotor,
+        startTime: profile.startTime,
+        startProfile: profile.label,
+        estimated: profile.estimated,
+        voltage: base.voltage,
         sourceLabel: componentLabel(motor),
         autoSelect: true
       });
-    }
+    });
     if (thermalMetrics) {
       overlays.push({
         uid: `motor-thermal:${motor.id}:${targetId}`,
         kind: 'motorThermal',
-        name: `${componentLabel(motor)} Motor Thermal Limit`,
+        name: `${componentLabel(motor)} Motor Thermal Limit${thermalReference?.estimated ? ' (est.)' : ''}`,
         deviceCategory: 'motor',
         deviceType: 'motor thermal limit',
         curve: thermalMetrics.curve,
@@ -2881,17 +3417,15 @@ function buildMotorOverlayEntries(targetId) {
         serviceFactor: thermalMetrics.serviceFactor,
         stallTime: thermalMetrics.stallTime,
         continuousCurrent: thermalMetrics.continuousCurrent,
+        estimated: Boolean(thermalReference?.estimated),
+        voltage: base.voltage,
         sourceLabel: componentLabel(motor),
         autoSelect: true
       });
     }
   };
 
-  addMotor(reference);
-  (neighborMap.get(targetId) || new Set()).forEach(id => {
-    const neighbor = componentLookup.get(id)?.component;
-    addMotor(neighbor);
-  });
+  collectContextComponents(targetId).forEach(addMotor);
 
   return overlays.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
 }
@@ -3095,15 +3629,21 @@ function describeEntryAttributes(entry) {
   }
   if (entry.kind === 'cable') {
     return [
+      { label: 'Conductor Size', value: entry.conductorSize || '', range: '' },
+      { label: 'Material', value: entry.conductorMaterial ? formatOptionLabel(entry.conductorMaterial) : '', range: '' },
+      { label: 'Insulation', value: entry.insulationType || '', range: '' },
       { label: 'Ampacity', value: entry.ampacity !== undefined ? `${formatSettingValue(entry.ampacity)} A` : '', range: '' },
       { label: 'Data Points', value: Array.isArray(entry.curve) ? `${entry.curve.length} points` : '', range: '' }
     ];
   }
   if (entry.kind === 'motorStart') {
     return [
+      { label: 'Start Profile', value: entry.startProfile || '', range: '' },
       { label: 'Full-Load Amps', value: entry.fla !== undefined ? `${formatSettingValue(entry.fla)} A` : '', range: '' },
       { label: 'Locked Rotor', value: entry.lockedRotor !== undefined ? `${formatSettingValue(entry.lockedRotor)} A` : '', range: '' },
-      { label: 'Start Time', value: entry.startTime !== undefined ? `${formatSettingValue(entry.startTime)} s` : '', range: '' }
+      { label: 'Start Time', value: entry.startTime !== undefined ? `${formatSettingValue(entry.startTime)} s` : '', range: '' },
+      { label: 'Voltage', value: entry.voltage !== undefined ? `${formatSettingValue(entry.voltage)} V` : '', range: '' },
+      { label: 'Source', value: entry.estimated ? 'Estimated' : '', range: '' }
     ];
   }
   if (entry.kind === 'motorThermal') {
@@ -3113,6 +3653,8 @@ function describeEntryAttributes(entry) {
       { label: 'Stall Time', value: entry.stallTime !== undefined ? `${formatSettingValue(entry.stallTime)} s` : '', range: '' },
       { label: 'Service Factor', value: entry.serviceFactor !== undefined ? formatSettingValue(entry.serviceFactor) : '', range: '' },
       { label: 'Continuous Current', value: entry.continuousCurrent !== undefined ? `${formatSettingValue(entry.continuousCurrent)} A` : '', range: '' },
+      { label: 'Voltage', value: entry.voltage !== undefined ? `${formatSettingValue(entry.voltage)} V` : '', range: '' },
+      { label: 'Source', value: entry.estimated ? 'Estimated' : '', range: '' },
       { label: 'Data Points', value: Array.isArray(entry.curve) ? `${entry.curve.length} points` : '', range: '' }
     ];
   }
@@ -3716,7 +4258,47 @@ function renderDeviceDetails(entry, container, doc, options = {}) {
 }
 
 async function openDeviceSelectionModal() {
-  const typeGroups = buildTypeGroups();
+  const contextRelationshipMap = getContextDeviceRelationshipMap();
+  const quickFilters = [
+    {
+      id: 'context',
+      label: 'One-Line Context',
+      count: [...contextRelationshipMap.keys()].filter(uid => deviceMap.has(uid)).length,
+      predicate: entry => contextRelationshipMap.has(entry.uid)
+    },
+    {
+      id: 'library',
+      label: 'Library',
+      count: deviceEntries.filter(entry => entry.kind === 'library' && !entry.isCustom && entry.baseDevice?.groundFault !== true).length,
+      predicate: entry => entry.kind === 'library' && !entry.isCustom && entry.baseDevice?.groundFault !== true
+    },
+    {
+      id: 'custom',
+      label: 'Custom Curves',
+      count: deviceEntries.filter(entry => entry.isCustom).length,
+      predicate: entry => entry.isCustom
+    },
+    {
+      id: 'gfp',
+      label: 'Ground Fault',
+      count: deviceEntries.filter(entry => entry.baseDevice?.groundFault === true).length,
+      predicate: entry => entry.baseDevice?.groundFault === true
+    },
+    {
+      id: 'all',
+      label: 'All Devices',
+      count: deviceEntries.length,
+      predicate: () => true
+    }
+  ];
+  let activeQuickFilter = contextRelationshipMap.size ? 'context' : 'all';
+  const getActiveQuickFilter = () => quickFilters.find(filter => filter.id === activeQuickFilter) || quickFilters[quickFilters.length - 1];
+  const filterModalEntries = () => deviceEntries.filter(entry => getActiveQuickFilter().predicate(entry));
+  let typeGroups = buildTypeGroups(filterModalEntries());
+  if (!typeGroups.length && activeQuickFilter !== 'all') {
+    activeQuickFilter = 'all';
+    typeGroups = buildTypeGroups(filterModalEntries());
+  }
   if (!typeGroups.length) {
     await openModal({
       title: 'Select Devices',
@@ -3768,10 +4350,34 @@ async function openDeviceSelectionModal() {
 
   const getActiveTypeGroup = () => typeGroups.find(group => group.id === activeTypeId) || typeGroups[0] || null;
 
+  function syncActiveDeviceContext() {
+    const selectedContext = findSelectedContext();
+    activeTypeId = selectedContext?.group?.id || typeGroups[0]?.id || null;
+    activeManufacturer = selectedContext?.manufacturer?.name
+      || (typeGroups.find(group => group.id === activeTypeId)?.manufacturers[0]?.name)
+      || null;
+    activeEntry = selectedContext?.entry
+      || (typeGroups.find(group => group.id === activeTypeId)?.manufacturers.find(m => m.name === activeManufacturer)?.entries[0])
+      || null;
+  }
+
+  function refreshTypeGroupsForFilter() {
+    typeGroups = buildTypeGroups(filterModalEntries());
+    if (!typeGroups.length && activeQuickFilter !== 'all') {
+      activeQuickFilter = 'all';
+      typeGroups = buildTypeGroups(filterModalEntries());
+    }
+    syncActiveDeviceContext();
+  }
+
+  syncActiveDeviceContext();
+
+  let filterContainer;
   let typeContainer;
   let manufacturerContainer;
   let modelContainer;
   let detailContainer;
+  let selectionSummaryContainer;
   const modelElements = new Map();
   const firstButtonRef = { current: null };
 
@@ -3782,10 +4388,94 @@ async function openDeviceSelectionModal() {
     modelElements.forEach(({ item }, uid) => {
       item.classList.toggle('active', !!entry && uid === entry.uid);
     });
-    renderDeviceDetails(entry, detailContainer, docRef.current, {
-      allowAssignment: true,
-      onAssign: handleAssignment
+    renderDeviceDetails(entry, detailContainer, docRef.current);
+  }
+
+  function updateModelSelectionIndicators() {
+    modelElements.forEach(({ item, checkbox }, uid) => {
+      const selected = selectionSet.has(uid);
+      if (item) item.classList.toggle('is-selected', selected);
+      if (checkbox) checkbox.checked = selected;
     });
+  }
+
+  const getSelectedEntries = () => sortDeviceIdsForContext([...selectionSet])
+    .map(id => deviceMap.get(id))
+    .filter(Boolean);
+
+  function renderQuickFilters() {
+    if (!filterContainer || !docRef.current) return;
+    filterContainer.innerHTML = '';
+    quickFilters.forEach(filter => {
+      const button = docRef.current.createElement('button');
+      button.type = 'button';
+      button.className = 'device-filter-btn';
+      if (filter.id === activeQuickFilter) button.classList.add('active');
+      button.textContent = `${filter.label} (${filter.count})`;
+      button.disabled = filter.count === 0 && filter.id !== 'all';
+      button.addEventListener('click', () => {
+        if (button.disabled || activeQuickFilter === filter.id) return;
+        activeQuickFilter = filter.id;
+        refreshTypeGroupsForFilter();
+        renderQuickFilters();
+        renderDeviceTypes();
+        renderManufacturers();
+        renderModels();
+        updateActiveEntry(activeEntry);
+      });
+      filterContainer.appendChild(button);
+    });
+  }
+
+  function renderSelectionSummary() {
+    if (!selectionSummaryContainer || !docRef.current) return;
+    const doc = docRef.current;
+    selectionSummaryContainer.innerHTML = '';
+    const heading = doc.createElement('h3');
+    heading.className = 'device-selection-subtitle';
+    heading.textContent = 'Selected Devices';
+    selectionSummaryContainer.appendChild(heading);
+
+    const selectedEntries = getSelectedEntries();
+    if (!selectedEntries.length) {
+      const empty = doc.createElement('p');
+      empty.className = 'device-detail-empty';
+      empty.textContent = 'No devices selected for plotting.';
+      selectionSummaryContainer.appendChild(empty);
+      return;
+    }
+
+    const list = doc.createElement('ul');
+    list.className = 'component-selection-list';
+    selectedEntries.forEach(entry => {
+      const relationship = getDeviceRelationship(entry.uid, contextRelationshipMap);
+      const item = doc.createElement('li');
+      item.className = `component-selection-item ${relationship.className}`;
+      const name = doc.createElement('span');
+      name.className = 'component-selection-name';
+      name.textContent = entry.name;
+      const role = doc.createElement('span');
+      role.className = 'component-selection-role';
+      role.textContent = relationship.label;
+      const removeBtn = doc.createElement('button');
+      removeBtn.type = 'button';
+      removeBtn.className = 'component-selection-remove';
+      removeBtn.textContent = 'Remove';
+      removeBtn.addEventListener('click', () => {
+        selectionSet.delete(entry.uid);
+        applySelectionSet(selectionSet);
+        updateModelSelectionIndicators();
+        renderSelectionSummary();
+      });
+      item.append(role, name, removeBtn);
+      list.appendChild(item);
+    });
+    selectionSummaryContainer.appendChild(list);
+
+    const summary = doc.createElement('p');
+    summary.className = 'component-selection-summary-text';
+    summary.textContent = `${selectedEntries.length} device${selectedEntries.length === 1 ? '' : 's'} selected for plotting.`;
+    selectionSummaryContainer.appendChild(summary);
   }
 
   function renderDeviceTypes() {
@@ -3794,6 +4484,14 @@ async function openDeviceSelectionModal() {
     firstButtonRef.current = firstButtonRef.current && docRef.current.contains(firstButtonRef.current)
       ? firstButtonRef.current
       : null;
+    if (!typeGroups.length) {
+      const empty = docRef.current.createElement('p');
+      empty.className = 'device-detail-empty';
+      empty.textContent = 'No devices match this filter.';
+      typeContainer.appendChild(empty);
+      updateActiveEntry(null);
+      return;
+    }
     typeGroups.forEach(group => {
       const button = docRef.current.createElement('button');
       button.type = 'button';
@@ -3879,8 +4577,9 @@ async function openDeviceSelectionModal() {
       activeEntry = manufacturer.entries.find(entry => selectionSet.has(entry.uid)) || manufacturer.entries[0] || null;
     }
     manufacturer.entries.forEach((entry, index) => {
+      const relationship = getDeviceRelationship(entry.uid, contextRelationshipMap);
       const item = docRef.current.createElement('div');
-      item.className = 'device-model-item';
+      item.className = `device-model-item ${relationship.className}`;
       if (activeEntry && activeEntry.uid === entry.uid) {
         item.classList.add('active');
       }
@@ -3896,6 +4595,8 @@ async function openDeviceSelectionModal() {
           selectionSet.delete(entry.uid);
         }
         applySelectionSet(selectionSet);
+        updateModelSelectionIndicators();
+        renderSelectionSummary();
       });
       checkbox.addEventListener('focus', () => updateActiveEntry(entry));
       item.appendChild(checkbox);
@@ -3911,7 +4612,9 @@ async function openDeviceSelectionModal() {
 
       const badge = docRef.current.createElement('span');
       badge.className = 'device-model-badge';
-      if (entry.kind === 'component') {
+      if (relationship.role !== 'additional') {
+        badge.textContent = relationship.label;
+      } else if (entry.kind === 'component') {
         badge.textContent = 'One-Line';
       } else if (entry.kind === 'library') {
         badge.textContent = 'Library';
@@ -3958,6 +4661,15 @@ async function openDeviceSelectionModal() {
       const leftPane = doc.createElement('div');
       leftPane.className = 'device-selection-left';
 
+      const filtersHeading = doc.createElement('h3');
+      filtersHeading.className = 'device-selection-subtitle';
+      filtersHeading.textContent = 'Task Filters';
+      leftPane.appendChild(filtersHeading);
+
+      filterContainer = doc.createElement('div');
+      filterContainer.className = 'device-filter-list';
+      leftPane.appendChild(filterContainer);
+
       const typesHeading = doc.createElement('h3');
       typesHeading.className = 'device-selection-subtitle';
       typesHeading.textContent = 'Device Types';
@@ -3998,6 +4710,7 @@ async function openDeviceSelectionModal() {
       layout.append(leftPane, rightPane);
       container.appendChild(layout);
 
+      renderQuickFilters();
       renderDeviceTypes();
       renderManufacturers();
       renderModels();
@@ -4227,6 +4940,17 @@ openBtn.addEventListener('click', () => {
     window.open(`oneline.html?component=${encodeURIComponent(targetId)}`, '_blank');
   }
 });
+if (contextBackBtn) {
+  contextBackBtn.addEventListener('click', () => {
+    const targetId = getActiveComponentId() || activeComponentId || compId;
+    const url = new URL('oneline.html', window.location.href);
+    if (targetId) {
+      url.searchParams.set('component', targetId);
+      url.searchParams.set('componentModal', '1');
+    }
+    window.location.href = url.toString();
+  });
+}
 
 function applyPlotAndPersistence() {
   plot();
@@ -6614,7 +7338,7 @@ function syncComponentOverrides(componentSettings) {
   let changed = false;
   (data.sheets || []).forEach(sheet => {
     (sheet.components || []).forEach(comp => {
-      if (!PROTECTIVE_TYPES.has(comp.type)) return;
+      if (!(isProtectiveType(comp.type) || isProtectiveType(comp.subtype))) return;
       const baseDevice = libraryDevices.find(dev => dev.id === comp.tccId);
       const rawOverrides = componentSettings[comp.id];
       const overrides = snapOverridesToOptions(baseDevice, rawOverrides || {});
@@ -6749,12 +7473,221 @@ function gatherOverridesFromInputs(uid) {
   return snapOverridesToOptions(entry.baseDevice, collectOverridesFromDiv(div));
 }
 
+function formatMetricValue(value, unit = '') {
+  const numeric = typeof value === 'number' ? value : parseNumeric(value);
+  let formatted = '';
+  if (Number.isFinite(numeric)) {
+    if (unit === 'A' || unit === 'V') {
+      formatted = formatCoordinationCurrent(numeric);
+    } else if (unit === 's') {
+      formatted = formatCoordinationSeconds(numeric);
+    } else {
+      formatted = formatSettingValue(numeric);
+    }
+  } else {
+    formatted = formatSettingValue(value);
+  }
+  if (!formatted) return '';
+  return unit ? `${formatted} ${unit}` : formatted;
+}
+
+function equipmentMetricRows(entry) {
+  if (!entry || !isEquipmentOverlayKind(entry.kind)) return [];
+  const estimated = entry.estimated ? 'Estimated' : '';
+  if (entry.kind === 'inrush') {
+    return [
+      { label: 'Current', value: formatMetricValue(entry.current, 'A') },
+      { label: 'Duration', value: formatMetricValue(entry.duration, 's') }
+    ];
+  }
+  if (entry.kind === 'transformerDamage') {
+    return [
+      { label: 'FLA', value: formatMetricValue(entry.fla, 'A') },
+      { label: 'Points', value: Array.isArray(entry.curve) ? String(entry.curve.length) : '' }
+    ];
+  }
+  if (entry.kind === 'cable') {
+    return [
+      { label: 'Size', value: entry.conductorSize || '' },
+      { label: 'Material', value: entry.conductorMaterial ? formatOptionLabel(entry.conductorMaterial) : '' },
+      { label: 'Insulation', value: entry.insulationType || '' },
+      { label: 'Ampacity', value: formatMetricValue(entry.ampacity, 'A') },
+      { label: 'Length', value: formatMetricValue(parseNumeric(entry.length), 'ft') },
+      { label: 'Points', value: Array.isArray(entry.curve) ? String(entry.curve.length) : '' }
+    ];
+  }
+  if (entry.kind === 'motorStart') {
+    return [
+      { label: 'Profile', value: entry.startProfile || 'Start' },
+      { label: 'FLA', value: formatMetricValue(entry.fla, 'A') },
+      { label: 'LRA', value: formatMetricValue(entry.lockedRotor, 'A') },
+      { label: 'Duration', value: formatMetricValue(entry.startTime, 's') },
+      { label: 'Voltage', value: formatMetricValue(entry.voltage, 'V') },
+      { label: 'Source', value: estimated }
+    ];
+  }
+  if (entry.kind === 'motorThermal') {
+    return [
+      { label: 'FLA', value: formatMetricValue(entry.fla, 'A') },
+      { label: 'LRA', value: formatMetricValue(entry.lockedRotor, 'A') },
+      { label: 'Stall', value: formatMetricValue(entry.stallTime, 's') },
+      { label: 'Continuous', value: formatMetricValue(entry.continuousCurrent, 'A') },
+      { label: 'SF', value: formatMetricValue(entry.serviceFactor) },
+      { label: 'Voltage', value: formatMetricValue(entry.voltage, 'V') },
+      { label: 'Source', value: estimated }
+    ];
+  }
+  return [];
+}
+
+function equipmentMetricTitle(entry) {
+  if (!entry) return 'Equipment';
+  if (entry.kind === 'inrush') return 'Transformer Inrush';
+  if (entry.kind === 'transformerDamage') return 'Transformer Damage';
+  if (entry.kind === 'cable') return 'Cable Damage';
+  if (entry.kind === 'motorStart') return entry.startProfile || 'Motor Start';
+  if (entry.kind === 'motorThermal') return 'Motor Thermal Limit';
+  return entry.name || 'Equipment';
+}
+
+function renderEquipmentMetrics(overlays = [], checks = []) {
+  if (!equipmentMetricsPanel) return;
+  const entries = overlays.filter(entry => isEquipmentOverlayKind(entry.kind));
+  if (!entries.length) {
+    equipmentMetricsPanel.innerHTML = '';
+    equipmentMetricsPanel.classList.add('hidden');
+    return;
+  }
+  const cards = entries.map(entry => {
+    const rows = equipmentMetricRows(entry)
+      .filter(row => row.value !== undefined && row.value !== null && row.value !== '')
+      .map(row => `<div><dt>${escapeHtml(row.label)}</dt><dd>${escapeHtml(row.value)}</dd></div>`)
+      .join('');
+    const subtitle = [entry.sourceLabel, entry.targetLabel].filter(Boolean).join(' -> ');
+    return `
+      <article class="tcc-equipment-card" data-kind="${escapeHtml(entry.kind)}">
+        <h3>${escapeHtml(equipmentMetricTitle(entry))}</h3>
+        <p>${escapeHtml(subtitle || entry.name || '')}</p>
+        <dl>${rows}</dl>
+      </article>
+    `;
+  }).join('');
+  const checkItems = checks.map(check => `
+    <li class="tcc-equipment-check" data-status="${escapeHtml(check.status)}">
+      <strong>${escapeHtml(check.label)}</strong>
+      <span>${escapeHtml(check.detail)}</span>
+    </li>
+  `).join('');
+  const checkBlock = checkItems
+    ? `<ul class="tcc-equipment-checks" aria-label="Equipment protection checks">${checkItems}</ul>`
+    : '';
+  equipmentMetricsPanel.innerHTML = `
+    <div class="tcc-equipment-metrics-heading">
+      <h2>Equipment Reference Metrics</h2>
+      <span>${entries.length} ${entries.length === 1 ? 'reference' : 'references'}</span>
+    </div>
+    <div class="tcc-equipment-grid">${cards}</div>
+    ${checkBlock}
+  `;
+  equipmentMetricsPanel.classList.remove('hidden');
+}
+
+function protectiveCheckCurve(entry, mode) {
+  if (!entry?.scaled) return [];
+  if (mode === 'rideThrough') {
+    return entry.scaled.minCurve?.length ? entry.scaled.minCurve : (entry.scaled.curve || []);
+  }
+  return entry.scaled.maxCurve?.length ? entry.scaled.maxCurve : (entry.scaled.curve || []);
+}
+
+function protectiveCheckName(entry) {
+  return entry?.selection?.name || entry?.selection?.baseDevice?.name || entry?.selection?.uid || 'Protective device';
+}
+
+function computeRideThroughCheck(overlay, protectiveEntries) {
+  const current = overlay.current || overlay.lockedRotor;
+  const duration = overlay.normalizedDuration || overlay.duration || overlay.startTime;
+  if (!Number.isFinite(current) || current <= 0 || !Number.isFinite(duration) || duration <= 0) return null;
+  let worst = null;
+  protectiveEntries.forEach(entry => {
+    const tripTime = interpolateTime(protectiveCheckCurve(entry, 'rideThrough'), current);
+    const margin = tripTime - duration;
+    if (!worst || margin < worst.margin) {
+      worst = { entry, tripTime, margin };
+    }
+  });
+  if (!worst) return null;
+  const status = worst.margin > 0 ? 'ok' : 'warning';
+  const eventName = overlay.kind === 'inrush'
+    ? 'inrush'
+    : `${overlay.startProfile || 'motor start'}${overlay.estimated ? ' estimate' : ''}`.toLowerCase();
+  return {
+    status,
+    label: overlay.sourceLabel || overlay.name || 'Equipment',
+    detail: status === 'ok'
+      ? `${protectiveCheckName(worst.entry)} rides through ${eventName} by ${formatCoordinationSeconds(worst.margin)} s.`
+      : `${protectiveCheckName(worst.entry)} may trip during ${eventName}; margin ${formatCoordinationSeconds(worst.margin)} s at ${formatCoordinationCurrent(current)} A.`
+  };
+}
+
+function computeDamageLimitCheck(overlay, protectiveEntries) {
+  const points = Array.isArray(overlay.curve)
+    ? overlay.curve.filter(point => Number.isFinite(point.current) && point.current > 0 && Number.isFinite(point.time) && point.time > 0)
+    : [];
+  if (!points.length) return null;
+  let worst = null;
+  points.forEach(point => {
+    let best = null;
+    protectiveEntries.forEach(entry => {
+      const tripTime = interpolateTime(protectiveCheckCurve(entry, 'damage'), point.current);
+      const margin = point.time - tripTime;
+      if (!best || margin > best.margin) {
+        best = { entry, tripTime, margin, point };
+      }
+    });
+    if (!best) return;
+    if (!worst || best.margin < worst.margin) worst = best;
+  });
+  if (!worst) return null;
+  const status = worst.margin >= 0 ? 'ok' : 'warning';
+  const noun = overlay.kind === 'cable'
+    ? 'cable damage'
+    : overlay.kind === 'motorThermal'
+      ? 'motor thermal limit'
+      : 'transformer damage';
+  return {
+    status,
+    label: overlay.sourceLabel || overlay.name || 'Equipment',
+    detail: status === 'ok'
+      ? `${protectiveCheckName(worst.entry)} clears before ${noun} with ${formatCoordinationSeconds(worst.margin)} s margin.`
+      : `No plotted device clears before ${noun}; worst margin ${formatCoordinationSeconds(worst.margin)} s at ${formatCoordinationCurrent(worst.point.current)} A.`
+  };
+}
+
+function computeEquipmentConstraintChecks(plotted = [], overlays = []) {
+  const protectiveEntries = plotted.filter(entry => isProtectiveType(entry.selection?.baseDevice?.type));
+  if (!protectiveEntries.length) return [];
+  return overlays
+    .filter(entry => isEquipmentOverlayKind(entry.kind))
+    .map(entry => {
+      if (entry.kind === 'inrush' || entry.kind === 'motorStart') {
+        return computeRideThroughCheck(entry, protectiveEntries);
+      }
+      return computeDamageLimitCheck(entry, protectiveEntries);
+    })
+    .filter(Boolean);
+}
+
 function plot() {
   contextMenu.hide();
   chart.selectAll('*').remove();
   violationDiv.textContent = '';
   annotationContext = null;
   setPlotAvailability(false);
+  updateCoordinationStatus('Updating plot...', 'pending');
+  activeEquipmentOverlays = [];
+  activeEquipmentConstraintChecks = [];
+  renderEquipmentMetrics([], []);
   chart.classed('annotation-mode', false);
   let selectionIds = selectedDeviceIds();
   let selections = selectionIds.map(id => deviceMap.get(id)).filter(Boolean);
@@ -6774,7 +7707,10 @@ function plot() {
       if (contextEntry) {
         addUid(contextEntry.uid);
       }
-      collectNeighborDeviceDefaults(contextComponentId, 1).forEach(addUid);
+      collectNeighborDeviceDefaults(contextComponentId).forEach(addUid);
+      deviceEntries
+        .filter(entry => entry?.autoSelect && isEquipmentOverlayKind(entry.kind))
+        .forEach(entry => addUid(entry.uid));
       if (!changed) return false;
       applySelectionSet(selectionIds);
       saved.devices = [...selectionIds];
@@ -6783,13 +7719,19 @@ function plot() {
       return true;
     };
     if (ensureSelectionIds()) {
+      selectionIds = selectedDeviceIds();
       selections = selectionIds.map(id => deviceMap.get(id)).filter(Boolean);
     }
   }
-  if (!selections.length) return;
+  if (!selections.length) {
+    updateCoordinationStatus('No devices selected. Choose devices to update the plot.', 'warning');
+    renderEquipmentMetrics([], []);
+    return;
+  }
 
   const devicePlots = [];
   const overlays = [];
+  const relationshipMap = getContextDeviceRelationshipMap(contextComponentId);
 
   selections.forEach(selection => {
     if (selection.kind === 'library' || selection.kind === 'component') {
@@ -6797,17 +7739,21 @@ function plot() {
         selection.baseDevice,
         {
           ...selection.overrideSource,
-          ...gatherOverridesFromInputs(selection.uid)
+        ...gatherOverridesFromInputs(selection.uid)
         }
       );
       const scaled = scaleCurve(selection.baseDevice, overrides);
-      devicePlots.push({ selection, overrides, scaled });
-    } else if (selection.kind === 'cable' || selection.kind === 'inrush' || selection.kind === 'transformerDamage' || selection.kind === 'motorStart' || selection.kind === 'motorThermal') {
+      devicePlots.push({ selection, overrides, scaled, relationship: getDeviceRelationship(selection.uid, relationshipMap) });
+    } else if (isEquipmentOverlayKind(selection.kind)) {
       overlays.push({ ...selection });
     }
   });
 
-  if (!devicePlots.length && !overlays.length) return;
+  if (!devicePlots.length && !overlays.length) {
+    updateCoordinationStatus('No plottable curves are available for the selected devices.', 'warning');
+    renderEquipmentMetrics([], []);
+    return;
+  }
 
   let allCurrents = [];
   let allTimes = [];
@@ -6851,7 +7797,7 @@ function plot() {
   }
 
   // Arc flash incident energy limit curve overlay (Gap #54)
-  if (activeViewOptions.has('arcFlashOverlay')) {
+  if (activeViewOptions.includes('arcFlashOverlay')) {
     const afResults = studies?.arcFlash;
     const afEntry = arcFlashOverlayComponentId
       ? afResults?.[arcFlashOverlayComponentId]
@@ -6926,36 +7872,45 @@ function plot() {
   const y = d3.scaleLog()
     .domain([Math.max(minTime / 1.5, 0.001), Math.max(maxTime * 1.3, minTime * 2)])
     .range([height, 0]);
+  const pageStyles = getComputedStyle(document.body);
+  const chartTextColor = pageStyles.getPropertyValue('--text-color').trim() || '#333';
+  const chartAxisColor = pageStyles.getPropertyValue('--border-color').trim() || '#999';
   const xAxis = d3.axisBottom(x).ticks(10, '~g');
   const yAxis = d3.axisLeft(y).ticks(10, '~g');
 
-  g.append('g').attr('transform', `translate(0,${height})`).call(xAxis);
-  g.append('g').call(yAxis);
+  const xAxisGroup = g.append('g').attr('transform', `translate(0,${height})`).call(xAxis);
+  const yAxisGroup = g.append('g').call(yAxis);
+  [xAxisGroup, yAxisGroup].forEach(axisGroup => {
+    axisGroup.selectAll('text').attr('fill', chartTextColor);
+    axisGroup.selectAll('path,line')
+      .attr('stroke', chartAxisColor)
+      .attr('stroke-opacity', 0.85);
+  });
 
   g.append('g')
     .attr('class', 'grid grid-x')
     .attr('transform', `translate(0,${height})`)
     .call(xAxis.tickSize(-height).tickFormat(''))
     .call(axis => axis.select('.domain').remove())
-    .call(axis => axis.selectAll('line').attr('stroke', '#999').attr('stroke-opacity', 0.2));
+    .call(axis => axis.selectAll('line').attr('stroke', chartAxisColor).attr('stroke-opacity', 0.28));
   g.append('g')
     .attr('class', 'grid grid-y')
     .call(yAxis.tickSize(-width).tickFormat(''))
     .call(axis => axis.select('.domain').remove())
-    .call(axis => axis.selectAll('line').attr('stroke', '#999').attr('stroke-opacity', 0.2));
+    .call(axis => axis.selectAll('line').attr('stroke', chartAxisColor).attr('stroke-opacity', 0.28));
 
   g.append('text')
     .attr('x', width / 2)
     .attr('y', height + margin.bottom - 5)
     .attr('text-anchor', 'middle')
-    .attr('fill', '#333')
+    .attr('fill', chartTextColor)
     .text('Current (A)');
 
   g.append('text')
     .attr('x', width / 2)
     .attr('y', -margin.top + 20)
     .attr('text-anchor', 'middle')
-    .attr('fill', '#333')
+    .attr('fill', chartTextColor)
     .text('Current (A)');
 
   g.append('text')
@@ -6963,7 +7918,7 @@ function plot() {
     .attr('x', -height / 2)
     .attr('y', -margin.left + 15)
     .attr('text-anchor', 'middle')
-    .attr('fill', '#333')
+    .attr('fill', chartTextColor)
     .text('Time (s)');
 
   g.append('text')
@@ -6971,7 +7926,7 @@ function plot() {
     .attr('x', -height / 2)
     .attr('y', width + margin.right - 20)
     .attr('text-anchor', 'middle')
-    .attr('fill', '#333')
+    .attr('fill', chartTextColor)
     .text('Time (s)');
 
   const clipIdBase = chart.attr('id') || 'tcc-chart';
@@ -7068,7 +8023,7 @@ function plot() {
     legendItem.append('text')
       .attr('x', 20)
       .attr('y', 12)
-      .attr('fill', '#333')
+      .attr('fill', chartTextColor)
       .attr('font-size', 12)
       .text(legendLabel);
 
@@ -7247,21 +8202,22 @@ function plot() {
     const selection = plotEntry.selection;
     const scaled = plotEntry.scaled;
     const entry = { ...plotEntry, selection, scaled };
+    const isSelectedContextDevice = entry.relationship?.role === 'selected';
     entry.bandPath = deviceLayer.append('path')
       .datum(scaled.envelope || [])
       .attr('fill', entry.color)
-      .attr('opacity', 0.15)
+      .attr('opacity', isSelectedContextDevice ? 0.2 : 0.12)
       .attr('stroke', 'none');
     entry.minPath = deviceLayer.append('path')
       .datum(scaled.minCurve || [])
       .attr('fill', 'none')
-      .attr('stroke-width', 1)
+      .attr('stroke-width', isSelectedContextDevice ? 1.4 : 1)
       .attr('stroke-opacity', 0.6)
       .attr('stroke-dasharray', '4,4');
     entry.maxPath = deviceLayer.append('path')
       .datum(scaled.maxCurve || [])
       .attr('fill', 'none')
-      .attr('stroke-width', 1)
+      .attr('stroke-width', isSelectedContextDevice ? 1.4 : 1)
       .attr('stroke-opacity', 0.6)
       .attr('stroke-dasharray', '4,4');
     entry.peakPath = deviceLayer.append('path')
@@ -7277,11 +8233,17 @@ function plot() {
     entry.path = deviceLayer.append('path')
       .datum(scaled.curve)
       .attr('fill', 'none')
-      .attr('stroke-width', entry.isGFP ? 2.5 : 2)
+      .attr('stroke-width', isSelectedContextDevice ? 3.25 : (entry.isGFP ? 2.5 : 2))
       .attr('stroke', entry.color)
+      .attr('opacity', isSelectedContextDevice ? 1 : 0.86)
       .attr('stroke-dasharray', entry.isGFP ? '8,4' : null)
       .attr('stroke-linecap', entry.isGFP ? 'round' : null)
+      .attr('tabindex', 0)
       .style('cursor', 'move')
+      .on('mousemove', event => showCurveHoverTooltip(event, entry, x, y, margin))
+      .on('mouseleave', hideCurveHoverTooltip)
+      .on('focus', event => showCurveHoverTooltip(event, entry, x, y, margin))
+      .on('blur', hideCurveHoverTooltip)
       .on('contextmenu', event => {
         event.preventDefault();
         event.stopPropagation();
@@ -7289,6 +8251,7 @@ function plot() {
     });
     return entry;
   });
+  const equipmentOverlays = overlays.filter(entry => isEquipmentOverlayKind(entry.kind));
 
   const viewCalloutLayer = g.append('g').attr('class', 'view-callout-layer');
 
@@ -7535,6 +8498,12 @@ function plot() {
         });
     });
     updateDutyResults(violations);
+    activeEquipmentOverlays = equipmentOverlays;
+    activeEquipmentConstraintChecks = computeEquipmentConstraintChecks(plotted, equipmentOverlays);
+    renderEquipmentMetrics(equipmentOverlays, activeEquipmentConstraintChecks);
+    if (activeEquipmentConstraintChecks.some(check => check.status === 'warning')) {
+      updateCoordinationStatus('Equipment reference checks need review. See the metrics below the chart status.', 'warning');
+    }
     updateViewCallouts();
   };
 
@@ -7666,7 +8635,7 @@ function plot() {
         startPickup: entry.overrides.pickup ?? entry.scaled.settings?.pickup ?? entry.selection.baseDevice.settings?.pickup ?? 1,
         startDelay: entry.overrides.time ?? entry.scaled.settings?.time ?? entry.selection.baseDevice.settings?.time ?? entry.selection.baseDevice.settings?.delay ?? 0.1
       };
-      entry.path.attr('stroke-width', 3);
+      entry.path.attr('stroke-width', entry.relationship?.role === 'selected' ? 3.75 : 3);
     })
     .on('drag', event => {
       const state = entry.dragState;
@@ -7683,7 +8652,7 @@ function plot() {
       updateCurves();
     })
     .on('end', () => {
-      entry.path.attr('stroke-width', 2);
+      entry.path.attr('stroke-width', entry.relationship?.role === 'selected' ? 3.25 : (entry.isGFP ? 2.5 : 2));
       entry.dragState = null;
       persistSettings();
       plot();
@@ -7757,6 +8726,11 @@ function plot() {
     });
   };
 
+  renderOneLinePreview(getActiveComponentId());
+  updateCoordinationStatus(
+    `${plotted.length} device ${plotted.length === 1 ? 'curve is' : 'curves are'} plotted. Run Auto-Coordinate to check margins.`,
+    'ok'
+  );
   renderCoordOrderList();
   updateCurves();
 }
@@ -7766,6 +8740,7 @@ function autoCoordinate() {
     showCoordResults(null, false, 'Plot devices first before running Auto-Coordinate.');
     return;
   }
+  updateCoordinationStatus('Checking coordination margins...', 'pending');
 
   const contextId = getActiveComponentId();
   const faultKA = contextId ? getStudies().shortCircuit?.[contextId]?.threePhaseKA : null;
@@ -7787,7 +8762,7 @@ function autoCoordinate() {
 
   // Filter to protective devices only
   orderedEntries = orderedEntries.filter(e =>
-    PROTECTIVE_TYPES.has(e.selection?.baseDevice?.type)
+    isProtectiveType(e.selection?.baseDevice?.type)
   );
 
   if (orderedEntries.length < 2) {
@@ -7864,14 +8839,33 @@ function showCoordResults(results, allCoordinated, message) {
 
   if (message || !results) {
     coordResultsDiv.innerHTML = `<p class="coord-status">${escapeHtml(message || 'No results.')}</p>`;
+    updateCoordinationStatus(message || 'No coordination results are available.', 'warning');
     return;
   }
 
   const lines = [];
   if (allCoordinated) {
     lines.push('<p class="coord-status coord-ok">All adjacent device pairs are coordinated.</p>');
+    updateCoordinationStatus('All adjacent device pairs are coordinated.', 'ok');
   } else {
-    lines.push('<p class="coord-status coord-fail">Coordination gaps remain — see details below.</p>');
+    const violationEntries = results.flatMap((r, index) => (
+      index === 0
+        ? []
+        : (r.violations || []).map(v => ({ ...v, device: r.id }))
+    ));
+    const failedDevices = results.filter((r, index) => index > 0 && !r.found).length;
+    const worst = violationEntries
+      .filter(v => Number.isFinite(v.gap))
+      .sort((a, b) => a.gap - b.gap)[0] || null;
+    const violationCount = violationEntries.length;
+    const statusDetail = violationCount
+      ? `${violationCount} ${violationCount === 1 ? 'violation' : 'violations'} across ${failedDevices} ${failedDevices === 1 ? 'device' : 'devices'}`
+      : `${failedDevices} ${failedDevices === 1 ? 'device needs' : 'devices need'} review`;
+    const worstDetail = worst
+      ? ` Worst gap: ${formatCoordinationSeconds(worst.gap)} s at ${formatCoordinationCurrent(worst.current)} A.`
+      : '';
+    lines.push(`<p class="coord-status coord-fail">Coordination gaps remain: ${escapeHtml(statusDetail)}.${escapeHtml(worstDetail)}</p>`);
+    updateCoordinationStatus(`Coordination gaps remain: ${statusDetail}.${worstDetail} Review the details below the chart.`, 'error');
   }
 
   results.forEach((r, i) => {
@@ -7890,20 +8884,62 @@ function showCoordResults(results, allCoordinated, message) {
       (r.violations ?? []).slice(0, 3).forEach(v => {
         if (!Number.isFinite(v.gap)) return;
         lines.push(
-          `<p class="coord-violation-detail">&nbsp;&nbsp;I=${formatSettingValue(v.current)} A: gap ${v.gap.toFixed(3)} s (need ${(parseFloat(coordMarginInput?.value) || 0.3).toFixed(2)} s)</p>`
+          `<p class="coord-violation-detail">I=${formatCoordinationCurrent(v.current)} A: gap ${formatCoordinationSeconds(v.gap)} s (need ${formatCoordinationSeconds(parseFloat(coordMarginInput?.value) || 0.3)} s)</p>`
         );
       });
     }
   });
 
+  if (activeEquipmentConstraintChecks.length) {
+    const warnings = activeEquipmentConstraintChecks.filter(check => check.status === 'warning');
+    const statusClass = warnings.length ? 'coord-warn' : 'coord-ok-item';
+    const summary = warnings.length
+      ? `${warnings.length} equipment reference ${warnings.length === 1 ? 'check needs' : 'checks need'} review.`
+      : 'Equipment reference checks are within the plotted protective curves.';
+    lines.push(`<p class="${statusClass}"><strong>Equipment references</strong> - ${escapeHtml(summary)}</p>`);
+    activeEquipmentConstraintChecks.slice(0, 6).forEach(check => {
+      lines.push(
+        `<p class="coord-violation-detail">${escapeHtml(check.label)}: ${escapeHtml(check.detail)}</p>`
+      );
+    });
+    if (warnings.length && allCoordinated) {
+      updateCoordinationStatus(`${summary} Review the equipment metrics below the chart status.`, 'warning');
+    }
+  }
+
   coordResultsDiv.innerHTML = lines.join('');
+}
+
+function moveCoordOrderUid(fromUid, toUid) {
+  if (!fromUid || !toUid || fromUid === toUid) return false;
+  const fromIdx = coordOrderIds.indexOf(fromUid);
+  const toIdx = coordOrderIds.indexOf(toUid);
+  if (fromIdx === -1 || toIdx === -1) return false;
+  coordOrderIds.splice(fromIdx, 1);
+  coordOrderIds.splice(toIdx, 0, fromUid);
+  renderCoordOrderList();
+  return true;
+}
+
+function moveCoordOrderIndex(index, delta) {
+  const nextIndex = index + delta;
+  if (nextIndex < 0 || nextIndex >= coordOrderIds.length) return false;
+  const [uid] = coordOrderIds.splice(index, 1);
+  coordOrderIds.splice(nextIndex, 0, uid);
+  renderCoordOrderList();
+  const escapedUid = typeof CSS !== 'undefined' && typeof CSS.escape === 'function'
+    ? CSS.escape(uid)
+    : String(uid).replace(/"/g, '\\"');
+  const moved = coordOrderList?.querySelector(`[data-uid="${escapedUid}"]`);
+  moved?.focus?.();
+  return true;
 }
 
 function renderCoordOrderList() {
   if (!coordOrderList) return;
   const entries = activePlotted ?? [];
   const protective = entries.filter(e =>
-    PROTECTIVE_TYPES.has(e.selection?.baseDevice?.type)
+    isProtectiveType(e.selection?.baseDevice?.type)
   );
   if (!protective.length) {
     coordOrderList.innerHTML = '';
@@ -7925,21 +8961,56 @@ function renderCoordOrderList() {
     const item = document.createElement('div');
     item.className = 'coord-order-item';
     item.dataset.uid = uid;
+    item.setAttribute('role', 'listitem');
+    item.tabIndex = 0;
     item.draggable = true;
-    item.innerHTML =
-      `<span class="coord-order-badge" style="background:${escapeHtml(entry.color)};color:#fff">${index + 1}</span> ` +
-      escapeHtml(name);
+    const handle = document.createElement('span');
+    handle.className = 'coord-order-handle';
+    handle.setAttribute('aria-hidden', 'true');
+    const badge = document.createElement('span');
+    badge.className = 'coord-order-badge';
+    badge.style.background = entry.color;
+    badge.style.color = '#fff';
+    badge.textContent = String(index + 1);
+    const label = document.createElement('span');
+    label.className = 'coord-order-label';
+    label.textContent = name;
+    const controlName = name.replace(/\s+/g, ' ').trim();
+    item.setAttribute('aria-label', `${controlName} coordination order ${index + 1}`);
+    const actions = document.createElement('span');
+    actions.className = 'coord-order-actions';
+    const upBtn = document.createElement('button');
+    upBtn.type = 'button';
+    upBtn.className = 'coord-order-move';
+    upBtn.dataset.direction = 'up';
+    upBtn.disabled = index === 0;
+    upBtn.title = 'Move toward load side';
+    upBtn.setAttribute('aria-label', `Move ${controlName} toward load side`);
+    upBtn.addEventListener('click', () => moveCoordOrderIndex(index, -1));
+    const downBtn = document.createElement('button');
+    downBtn.type = 'button';
+    downBtn.className = 'coord-order-move';
+    downBtn.dataset.direction = 'down';
+    downBtn.disabled = index === coordOrderIds.length - 1;
+    downBtn.title = 'Move toward source side';
+    downBtn.setAttribute('aria-label', `Move ${controlName} toward source side`);
+    downBtn.addEventListener('click', () => moveCoordOrderIndex(index, 1));
+    actions.append(upBtn, downBtn);
+    item.append(handle, badge, label, actions);
     item.addEventListener('dragstart', ev => { ev.dataTransfer.setData('uid', uid); });
     item.addEventListener('dragover', ev => ev.preventDefault());
     item.addEventListener('drop', ev => {
       const fromUid = ev.dataTransfer.getData('uid');
-      if (fromUid === uid) return;
-      const fromIdx = coordOrderIds.indexOf(fromUid);
-      const toIdx = coordOrderIds.indexOf(uid);
-      if (fromIdx === -1 || toIdx === -1) return;
-      coordOrderIds.splice(fromIdx, 1);
-      coordOrderIds.splice(toIdx, 0, fromUid);
-      renderCoordOrderList();
+      moveCoordOrderUid(fromUid, uid);
+    });
+    item.addEventListener('keydown', ev => {
+      if (ev.key === 'ArrowUp' && (ev.altKey || ev.ctrlKey)) {
+        ev.preventDefault();
+        moveCoordOrderIndex(index, -1);
+      } else if (ev.key === 'ArrowDown' && (ev.altKey || ev.ctrlKey)) {
+        ev.preventDefault();
+        moveCoordOrderIndex(index, 1);
+      }
     });
     coordOrderList.appendChild(item);
   });
@@ -8181,6 +9252,24 @@ function renderOneLinePreview(componentId) {
     return normalized < 0 ? normalized + 360 : normalized;
   };
 
+  const defaultPreviewRotationFor = (comp, definition) => {
+    if (definition && Number.isFinite(Number(definition.defaultRotation))) {
+      return normalizeRotation(Number(definition.defaultRotation));
+    }
+    const type = normalizeTypeKey(comp?.type || comp?.subtype || definition?.type || definition?.category || '');
+    if (type === 'bus' || type === 'annotation') return 0;
+    if (type === 'load' || type === 'static_load' || type === 'motor_load' || type.endsWith('_load')) return 270;
+    return 90;
+  };
+
+  const resolvePreviewRotation = (comp, definition) => {
+    const rawRotation = comp?.rotation ?? comp?.rot;
+    if (rawRotation !== undefined && rawRotation !== null && rawRotation !== '') {
+      return normalizeRotation(rawRotation);
+    }
+    return defaultPreviewRotationFor(comp, definition);
+  };
+
   const computeBounds = (x, y, width, height, rotation) => {
     if (!rotation) {
       return {
@@ -8226,7 +9315,8 @@ function renderOneLinePreview(componentId) {
     const compHeight = Number.isFinite(comp.height) ? Number(comp.height) : DEFAULT_HEIGHT;
     const compX = Number.isFinite(comp.x) ? Number(comp.x) : 0;
     const compY = Number.isFinite(comp.y) ? Number(comp.y) : 0;
-    const rotation = normalizeRotation(comp.rotation ?? comp.rot ?? 0);
+    const definition = getPreviewDefinition(comp);
+    const rotation = resolvePreviewRotation(comp, definition);
     const baseBounds = computeBounds(compX, compY, compWidth, compHeight, rotation);
     const spanWidth = baseBounds.right - baseBounds.left;
     const spanHeight = baseBounds.bottom - baseBounds.top;
@@ -8238,7 +9328,6 @@ function renderOneLinePreview(componentId) {
       top: centerY - spanHeight / 2,
       bottom: centerY + spanHeight / 2
     };
-    const definition = getPreviewDefinition(comp);
     const icon = definition?.icon || resolveIconSource(comp.icon, comp.symbol);
     const category = definition?.category || definition?.type || comp.type || '';
     const previewType = definition?.type || comp.type || '';
@@ -8333,6 +9422,7 @@ function renderOneLinePreview(componentId) {
     return `${sheetKey}:${compId}`;
   };
 
+  const componentRelationshipMap = getContextComponentRelationshipMap(componentId);
   const nodes = displayedTargets.map(id => {
     const comp = componentMap.get(id);
     const meta = componentPreviewMeta.get(id);
@@ -8362,6 +9452,7 @@ function renderOneLinePreview(componentId) {
     const originalHeight = Number.isFinite(meta.originalHeight) ? meta.originalHeight : compHeight;
     const widthScale = Number.isFinite(originalWidth) && originalWidth > 0 ? visualWidth / originalWidth : 1;
     const heightScale = Number.isFinite(originalHeight) && originalHeight > 0 ? visualHeight / originalHeight : 1;
+    const relationship = componentRelationshipMap.get(comp.id) || null;
     return {
       id: comp.id,
       label: componentLabel(comp),
@@ -8376,6 +9467,8 @@ function renderOneLinePreview(componentId) {
       active: comp.id === componentId,
       component: comp,
       selected: selectedIds.has(comp.id),
+      relationship,
+      curveColor: getCurveColorForComponentId(comp.id) || relationship?.color || null,
       width: visualWidth,
       height: visualHeight,
       rotation,
@@ -8433,6 +9526,11 @@ function renderOneLinePreview(componentId) {
   }));
 
   const nodeById = new Map(nodes.map(node => [node.id, node]));
+  const nodeXs = nodes.map(node => node.x).filter(Number.isFinite);
+  const nodeYs = nodes.map(node => node.y).filter(Number.isFinite);
+  const nodeSpanX = nodeXs.length ? Math.max(...nodeXs) - Math.min(...nodeXs) : 0;
+  const nodeSpanY = nodeYs.length ? Math.max(...nodeYs) - Math.min(...nodeYs) : 0;
+  const useSidePreviewLabels = nodes.length > 2 && nodeSpanY > Math.max(80, nodeSpanX * 1.35);
 
   const linkGroup = onelinePreviewSvg.append('g').attr('class', 'preview-links');
   const edgeKey = edge => (edge.source < edge.target ? `${edge.source}--${edge.target}` : `${edge.target}--${edge.source}`);
@@ -8477,6 +9575,7 @@ function renderOneLinePreview(componentId) {
       const classes = ['preview-node'];
       if (d.active) classes.push('is-active');
       else if (d.selected) classes.push('is-selected');
+      if (d.relationship?.role) classes.push(`is-${d.relationship.role}`);
       return classes.join(' ');
     })
     .attr('transform', d => `translate(${d.x},${d.y})`)
@@ -8516,7 +9615,9 @@ function renderOneLinePreview(componentId) {
     .attr('height', d => d.height)
     .attr('rx', d => computeOutlineRadius(d))
     .attr('ry', d => computeOutlineRadius(d))
-    .attr('fill', 'transparent');
+    .attr('fill', 'transparent')
+    .style('stroke', d => d.curveColor || null)
+    .style('stroke-width', d => (d.curveColor ? (d.active ? '3px' : '2.5px') : null));
 
   const standardShapeGroup = shapeGroup.filter(d => !d.annotation);
 
@@ -8622,6 +9723,27 @@ function renderOneLinePreview(componentId) {
     return Math.round(datum.height / 2 + baseGap);
   };
 
+  const labelPlacement = datum => {
+    if (useSidePreviewLabels && !datum.annotation) {
+      const placeRight = datum.x <= width * 0.62;
+      const sideOffset = Math.round(Math.max(28, datum.width / 2 + 12));
+      return {
+        x: placeRight ? sideOffset : -sideOffset,
+        y: 0,
+        anchor: placeRight ? 'start' : 'end',
+        baseline: 'middle',
+        side: true
+      };
+    }
+    return {
+      x: 0,
+      y: labelOffset(datum),
+      anchor: 'middle',
+      baseline: 'hanging',
+      side: false
+    };
+  };
+
   const labelLinesFor = datum => {
     if (datum.annotation && datum.annotation.subtype === 'annotation_text_box') return [];
     return wrapPreviewLabel(datum.label);
@@ -8629,27 +9751,53 @@ function renderOneLinePreview(componentId) {
 
   node.append('text')
     .attr('class', 'preview-node-label')
-    .attr('text-anchor', 'middle')
-    .attr('dominant-baseline', 'hanging')
-    .attr('y', d => labelOffset(d))
+    .attr('text-anchor', d => labelPlacement(d).anchor)
+    .attr('dominant-baseline', d => labelPlacement(d).baseline)
+    .attr('x', d => labelPlacement(d).x)
+    .attr('y', d => labelPlacement(d).y)
     .each(function renderLabel(datum) {
       const lines = labelLinesFor(datum);
       if (!lines.length) {
         d3.select(this).attr('display', 'none');
         return;
       }
+      const placement = labelPlacement(datum);
       const label = d3.select(this);
+      const lineHeight = 15;
+      const firstDy = placement.side ? -((lines.length - 1) * lineHeight) / 2 : 0;
       label.selectAll('tspan')
         .data(lines)
         .enter()
         .append('tspan')
-        .attr('x', 0)
-        .attr('dy', (line, index) => (index === 0 ? 0 : 16))
+        .attr('x', placement.x)
+        .attr('dy', (line, index) => (index === 0 ? firstDy : lineHeight))
         .text(line => line);
     });
 
+  node.each(function addLabelBackground() {
+    const textNode = this.querySelector?.('text.preview-node-label');
+    if (!textNode || textNode.getAttribute('display') === 'none') return;
+    try {
+      const box = textNode.getBBox();
+      d3.select(this)
+        .insert('rect', 'text.preview-node-label')
+        .attr('class', 'preview-node-label-bg')
+        .attr('x', box.x - 4)
+        .attr('y', box.y - 3)
+        .attr('width', box.width + 8)
+        .attr('height', box.height + 6)
+        .attr('rx', 4)
+        .attr('ry', 4);
+    } catch {
+      // getBBox can fail for detached SVG nodes; labels remain readable without the backing plate.
+    }
+  });
+
   node.append('title')
-    .text(d => (d.sheet ? `${d.label} (${d.sheet})` : d.label));
+    .text(d => {
+      const role = d.relationship?.label ? `${d.relationship.label} - ` : '';
+      return d.sheet ? `${role}${d.label} (${d.sheet})` : `${role}${d.label}`;
+    });
 
   const dragBehavior = d3.drag()
     .on('start', function handlePreviewDragStart(event, datum) {
@@ -8782,6 +9930,65 @@ function inferVoltage(comp) {
     return num;
   }
   return null;
+}
+
+function parseVoltageFieldValue(raw, key = '') {
+  const num = parseNumeric(raw);
+  if (!Number.isFinite(num) || num <= 0) return null;
+  const rawText = typeof raw === 'string' ? raw : '';
+  if (String(key).toLowerCase().includes('kv') && !/\b(kv|v)\b/i.test(rawText)) {
+    return num * 1000;
+  }
+  return num;
+}
+
+function getComponentSearchText(comp, keys) {
+  return keys
+    .map(key => getComponentValue(comp, key))
+    .filter(value => value !== undefined && value !== null && value !== '')
+    .map(value => String(value))
+    .join('\n');
+}
+
+function getTransformerVoltageCandidates(transformer) {
+  const values = [];
+  const explicitKeys = [
+    'volts_hv',
+    'volts_lv',
+    'volts_tv',
+    'volts_primary',
+    'volts_secondary',
+    'primary_voltage',
+    'secondary_voltage',
+    'voltage',
+    'volts',
+    'baseKV',
+    'kV'
+  ];
+  explicitKeys.forEach(key => {
+    const raw = getComponentValue(transformer, key);
+    const volts = parseVoltageFieldValue(raw, key);
+    if (Number.isFinite(volts) && volts > 0) values.push(volts);
+  });
+  const text = getComponentSearchText(transformer, ['label', 'name', 'description']);
+  [...text.matchAll(/(\d+(?:,\d{3})*(?:\.\d+)?)\s*(kv|v)\b/gi)].forEach(match => {
+    const numeric = Number(String(match[1]).replace(/,/g, ''));
+    if (!Number.isFinite(numeric) || numeric <= 0) return;
+    const unit = String(match[2]).toLowerCase();
+    values.push(unit === 'kv' ? numeric * 1000 : numeric);
+  });
+  return [...new Set(values.map(value => Math.round(value * 1000) / 1000))]
+    .filter(value => Number.isFinite(value) && value > 0);
+}
+
+function extractTransformerLabelRatings(transformer) {
+  const text = getComponentSearchText(transformer, ['label', 'name', 'description']);
+  const kvaMatch = text.match(/(\d+(?:,\d{3})*(?:\.\d+)?)\s*(mva|kva)\b/i);
+  const kva = kvaMatch
+    ? Number(String(kvaMatch[1]).replace(/,/g, '')) * (kvaMatch[2].toLowerCase() === 'mva' ? 1000 : 1)
+    : null;
+  const voltages = getTransformerVoltageCandidates(transformer);
+  return { kva, voltages };
 }
 
 function computeTransformerInrush(transformer, referenceVoltage, refPhases = 3) {
@@ -8931,16 +10138,33 @@ function resolveTransformerOperatingPoint(transformer, referenceVoltage, refPhas
   ];
   sideDefs.forEach(({ kvaKey, voltsKey, label }) => {
     const kva = getNumericValue(transformer, kvaKey);
-    const volts = getNumericValue(transformer, voltsKey);
+    const volts = parseVoltageFieldValue(getComponentValue(transformer, voltsKey), voltsKey);
     if (!Number.isFinite(kva) || !Number.isFinite(volts)) return;
     sides.push({ kva, volts, label });
   });
   if (!sides.length) {
+    const labelRatings = extractTransformerLabelRatings(transformer);
+    if (Number.isFinite(labelRatings.kva) && labelRatings.kva > 0 && labelRatings.voltages.length) {
+      const sortedVoltages = [...labelRatings.voltages].sort((a, b) => b - a);
+      sortedVoltages.forEach((volts, index) => {
+        const label = index === 0
+          ? 'HV'
+          : index === sortedVoltages.length - 1
+            ? 'LV'
+            : `Winding ${index + 1}`;
+        sides.push({ kva: labelRatings.kva, volts, label });
+      });
+    }
+  }
+  if (!sides.length) {
     const kva = getNumericValue(transformer, ['kva', 'kva_base']);
-    let volts = getNumericValue(transformer, ['volts_secondary', 'volts_primary', 'voltage', 'volts']);
+    let volts = parseVoltageFieldValue(getComponentValue(transformer, 'volts_secondary'), 'volts_secondary')
+      ?? parseVoltageFieldValue(getComponentValue(transformer, 'volts_primary'), 'volts_primary')
+      ?? parseVoltageFieldValue(getComponentValue(transformer, 'voltage'), 'voltage')
+      ?? parseVoltageFieldValue(getComponentValue(transformer, 'volts'), 'volts');
     if (!Number.isFinite(volts)) {
-      const baseKv = getNumericValue(transformer, ['baseKV', 'kV']);
-      if (Number.isFinite(baseKv)) volts = baseKv * 1000;
+      volts = parseVoltageFieldValue(getComponentValue(transformer, 'baseKV'), 'baseKV')
+        ?? parseVoltageFieldValue(getComponentValue(transformer, 'kV'), 'kV');
     }
     if (Number.isFinite(kva) && Number.isFinite(volts)) {
       sides.push({ kva, volts, label: 'Secondary' });
@@ -8948,7 +10172,10 @@ function resolveTransformerOperatingPoint(transformer, referenceVoltage, refPhas
   }
   if (!sides.length) {
     const mva = getNumericValue(transformer, 'mva');
-    const volts = getNumericValue(transformer, ['volts_secondary', 'volts_primary', 'voltage', 'volts']);
+    const volts = parseVoltageFieldValue(getComponentValue(transformer, 'volts_secondary'), 'volts_secondary')
+      ?? parseVoltageFieldValue(getComponentValue(transformer, 'volts_primary'), 'volts_primary')
+      ?? parseVoltageFieldValue(getComponentValue(transformer, 'voltage'), 'voltage')
+      ?? parseVoltageFieldValue(getComponentValue(transformer, 'volts'), 'volts');
     if (Number.isFinite(mva) && Number.isFinite(volts)) {
       sides.push({ kva: mva * 1000, volts, label: 'Secondary' });
     }

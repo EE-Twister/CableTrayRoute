@@ -35,6 +35,7 @@ Schedule pages can still be used first. When a schedule already contains equipme
 - **Deliverables** use saved route results from Optimal Route to expose pull-card groups, spool-sheet readiness, report-section readiness, saved snapshots, and release-package status on the downstream pages.
 - **Ductbank Route** includes a next-action strip for conduit setup, cable assignment, fill calculation, thermal review, and calculation-report export.
 - **Sample Gallery** includes visual thumbnail cards for the Project Workflow Core sample plus realistic commercial office, water treatment pump station, and EV charging depot samples. These projects exercise equipment, loads, one-line links, cable schedule rows, raceway geometry, route results, study data, report snapshots, and release packages.
+- **TCC** can open directly from a one-line protective device, plot the selected device with its nearest upstream and downstream protective devices, show transformer inrush/damage, motor cold/hot starting, motor thermal, and cable damage reference metrics where project data is available, and show a context banner plus matching one-line preview highlights.
 
 ## Deliverable Handoff Rules
 
