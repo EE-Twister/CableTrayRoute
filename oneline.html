@@ -103,6 +103,16 @@
               <label for="scenario-select" class="scenario-label">Scenario</label>
               <select id="scenario-select"></select>
             </div>
+            <div class="operating-state-group">
+              <label for="operating-state-select" class="scenario-label">Operating</label>
+              <select id="operating-state-select" aria-label="Operating state">
+                <option value="normal">Normal</option>
+                <option value="emergency">Emergency</option>
+                <option value="maintenance">Maintenance</option>
+                <option value="switching">Switching</option>
+                <option value="alternate">Alternate</option>
+              </select>
+            </div>
             <div class="scenario-action-group">
               <button id="scenario-duplicate-btn" type="button" class="btn">Duplicate</button>
               <button id="scenario-diff-btn" type="button" class="btn">Diff</button>
@@ -119,6 +129,8 @@
             <input type="file" id="diagram-import-input" accept=".json" class="hidden-input">
             <button id="diagram-import-btn" type="button" class="icon-button" title="Import Diagram" aria-label="Import Diagram"><img src="./icons/toolbar/import.svg" alt="" loading="lazy" decoding="async"></button>
             <button id="sample-diagram-btn" type="button" class="btn" title="Load sample diagram">Load Sample</button>
+            <button id="auto-build-oneline-btn" type="button" class="btn" title="Build or update the one-line from Equipment and Load List records">Auto-Build</button>
+            <button id="auto-arrange-btn" type="button" class="btn" title="Arrange devices from source to load">Auto Arrange</button>
             <button id="diagram-share-btn" type="button" class="btn" title="Share diagram">Share</button>
             <button id="studies-panel-btn" type="button" class="btn" title="Open studies panel">Studies</button>
             <button id="reconcile-schedules-btn" type="button" class="btn" title="Preview schedule updates from this one-line">Reconcile Schedules</button>
@@ -133,7 +145,7 @@
             <button id="connect-btn" class="icon-button" title="Connect components (C)" aria-label="Connect"><img src="./icons/toolbar/connect.svg" alt="" loading="lazy" decoding="async"></button>
             <button id="undo-btn" class="icon-button" title="Undo (Ctrl+Z)" aria-label="Undo"><img src="./icons/toolbar/undo.svg" alt="" loading="lazy" decoding="async"></button>
             <button id="redo-btn" class="icon-button" title="Redo (Ctrl+Y)" aria-label="Redo"><img src="./icons/toolbar/redo.svg" alt="" loading="lazy" decoding="async"></button>
-            <button id="history-sidebar-toggle" class="btn" type="button" aria-controls="history-sidebar" aria-expanded="true">History</button>
+            <button id="history-sidebar-toggle" class="btn" type="button" aria-controls="history-sidebar" aria-expanded="true">Inspector</button>
             <button id="layers-panel-toggle" class="btn" type="button" aria-controls="layers-panel" aria-expanded="false" title="Toggle named layers panel">Layers</button>
             <!-- Gap #50: Protection zones panel toggle -->
             <button id="protection-zones-panel-toggle" class="btn" type="button" aria-controls="protection-zones-panel" aria-expanded="false" title="Toggle protection zones panel">Zones</button>
@@ -150,6 +162,7 @@
             <button id="align-bottom-btn" class="icon-button" title="Align Bottom" aria-label="Align Bottom"><img src="./icons/toolbar/align-bottom.svg" alt="" loading="lazy" decoding="async"></button>
             <button id="distribute-h-btn" class="icon-button" title="Distribute Horizontal" aria-label="Distribute Horizontal"><img src="./icons/toolbar/distribute-h.svg" alt="" loading="lazy" decoding="async"></button>
             <button id="distribute-v-btn" class="icon-button" title="Distribute Vertical" aria-label="Distribute Vertical"><img src="./icons/toolbar/distribute-v.svg" alt="" loading="lazy" decoding="async"></button>
+            <button id="auto-space-equipment-btn" class="btn" type="button" title="Standardize horizontal spacing for equipment rows">Auto Space Equipment</button>
           </div>
           <div class="toolbar-group" aria-label="Files">
             <span class="toolbar-group-label">Files</span>
@@ -203,6 +216,34 @@
             <span class="toolbar-group-label">View</span>
               <div class="view-group">
                 <button id="view-menu-btn" type="button" class="btn" aria-haspopup="dialog" aria-expanded="false">Views</button>
+                <label class="view-select-field" title="Choose a drawing datablock format">
+                  <span>Data</span>
+                  <select id="datablock-format-select" aria-label="Datablock format">
+                    <option value="off">Off</option>
+                    <option value="nameplate">Nameplate</option>
+                    <option value="study">Studies</option>
+                    <option value="protection">Protection</option>
+                    <option value="cable">Cable</option>
+                    <option value="custom">Custom</option>
+                  </select>
+                </label>
+                <label class="view-select-field" title="Choose how much datablock detail is shown on the canvas">
+                  <span>Data Size</span>
+                  <select id="datablock-density-select" aria-label="Datablock size">
+                    <option value="compact">Compact</option>
+                    <option value="expanded">Expanded</option>
+                  </select>
+                </label>
+                <label class="view-select-field" title="Color devices by design status or study result">
+                  <span>Color</span>
+                  <select id="data-state-overlay-select" aria-label="Color devices by">
+                    <option value="none">None</option>
+                    <option value="review">Data State</option>
+                    <option value="validation">Validation</option>
+                    <option value="studies">Studies</option>
+                    <option value="arcFlash">Arc Flash</option>
+                  </select>
+                </label>
                 <label class="icon-button" title="Show/hide minimap overview" aria-label="Toggle minimap">
                   <input type="checkbox" id="minimap-toggle" class="hidden-input">
                   Map
@@ -227,6 +268,18 @@
               <input type="search" id="find-device-input" name="device" placeholder="Device tag" aria-label="Device tag" autocomplete="off">
               <button type="submit" class="btn">Go</button>
             </form>
+            <label class="diagram-filter-field" title="Dim devices outside the selected review focus">
+              <span>Filter</span>
+              <select id="diagram-filter-select" aria-label="Diagram filter">
+                <option value="all">All</option>
+                <option value="incomplete">Incomplete</option>
+                <option value="assumptions">Assumptions</option>
+                <option value="generated">Generated</option>
+                <option value="protection">Protection</option>
+                <option value="loads">Loads</option>
+                <option value="equipment">Equipment</option>
+              </select>
+            </label>
           </div>
         </div>
         <button id="palette-toggle" class="palette-toggle" aria-label="Toggle palette" aria-controls="palette" aria-expanded="false" title="Toggle navigation">
@@ -238,7 +291,29 @@
               <template id="palette-button-template">
                 <button draggable="true" data-subtype="" title="Drag to canvas or click to add"></button>
               </template>
-              <input type="text" id="palette-search" placeholder="Search" aria-label="Filter components">
+              <div class="palette-command-bar">
+                <label class="palette-search-field">
+                  <span class="visually-hidden">Search components</span>
+                  <input type="text" id="palette-search" placeholder="Search components" aria-label="Filter components">
+                </label>
+                <div class="palette-filter-strip" role="group" aria-label="Component category filter">
+                  <button type="button" class="palette-filter active" data-palette-filter="all">All</button>
+                  <button type="button" class="palette-filter" data-palette-filter="sources">Sources</button>
+                  <button type="button" class="palette-filter" data-palette-filter="equipment">Equipment</button>
+                  <button type="button" class="palette-filter" data-palette-filter="protection">Protection</button>
+                  <button type="button" class="palette-filter" data-palette-filter="load">Loads</button>
+                  <button type="button" class="palette-filter" data-palette-filter="cable">Cables</button>
+                  <button type="button" class="palette-filter" data-palette-filter="annotations">Notes</button>
+                </div>
+              </div>
+              <section id="palette-pinned" class="palette-pinned" aria-label="Frequent components">
+                <div class="palette-pinned-header">
+                  <span>Frequent</span>
+                  <button type="button" id="palette-clear-filter-btn" class="palette-clear-filter">Show All</button>
+                </div>
+                <div id="palette-pinned-buttons" class="palette-pinned-buttons"></div>
+              </section>
+              <p id="palette-no-results" class="palette-no-results" hidden>No matching components.</p>
               <div class="palette-scroll">
                 <div class="palette-card card">
                   <h3>Sources</h3>
@@ -359,18 +434,27 @@
               </ul>
             </div>
           </div>
-          <aside id="history-sidebar" class="history-sidebar" aria-label="History and checkpoints">
-            <div class="history-sidebar-header">
-              <h3>History</h3>
-              <button id="add-checkpoint-btn" type="button" class="btn">Add checkpoint</button>
+          <aside id="history-sidebar" class="history-sidebar" aria-label="One-line inspector">
+            <div class="right-rail-tabs" role="tablist" aria-label="Inspector panels">
+              <button id="right-rail-properties-tab" class="right-rail-tab is-active" type="button" role="tab" aria-selected="true" data-right-rail-tab="properties">Properties</button>
+              <button id="right-rail-validation-tab" class="right-rail-tab" type="button" role="tab" aria-selected="false" data-right-rail-tab="validation">Validation</button>
+              <button id="right-rail-history-tab" class="right-rail-tab" type="button" role="tab" aria-selected="false" data-right-rail-tab="history">History</button>
             </div>
-            <section class="history-sidebar-section" aria-labelledby="checkpoint-list-heading">
-              <h4 id="checkpoint-list-heading">Checkpoints</h4>
-              <ul id="checkpoint-list" class="history-list"></ul>
-            </section>
-            <section class="history-sidebar-section" aria-labelledby="history-events-heading">
-              <h4 id="history-events-heading">Change events</h4>
-              <ul id="history-events" class="history-list"></ul>
+            <section id="right-rail-properties" class="right-rail-panel" role="tabpanel" aria-labelledby="right-rail-properties-tab" data-right-rail-panel="properties"></section>
+            <section id="right-rail-validation" class="right-rail-panel hidden" role="tabpanel" aria-labelledby="right-rail-validation-tab" data-right-rail-panel="validation"></section>
+            <section id="right-rail-history" class="right-rail-panel hidden" role="tabpanel" aria-labelledby="right-rail-history-tab" data-right-rail-panel="history">
+              <div class="history-sidebar-header">
+                <h3>History</h3>
+                <button id="add-checkpoint-btn" type="button" class="btn">Add checkpoint</button>
+              </div>
+              <section class="history-sidebar-section" aria-labelledby="checkpoint-list-heading">
+                <h4 id="checkpoint-list-heading">Checkpoints</h4>
+                <ul id="checkpoint-list" class="history-list"></ul>
+              </section>
+              <section class="history-sidebar-section" aria-labelledby="history-events-heading">
+                <h4 id="history-events-heading">Change events</h4>
+                <ul id="history-events" class="history-list"></ul>
+              </section>
             </section>
           </aside>
           <!-- Gap #51: Named Layer Management panel -->

@@ -31,6 +31,53 @@ function limitForVoltage(kv) {
   return 12;
 }
 
+function pickValue(comp, key) {
+  if (!comp || !key) return undefined;
+  if (Object.prototype.hasOwnProperty.call(comp, key)) {
+    return comp[key];
+  }
+  if (comp.props && typeof comp.props === 'object' && Object.prototype.hasOwnProperty.call(comp.props, key)) {
+    return comp.props[key];
+  }
+  return undefined;
+}
+
+function pickFirst(comp, keys) {
+  for (const key of keys) {
+    const value = pickValue(comp, key);
+    if (value !== undefined && value !== null && value !== '') return value;
+  }
+  return undefined;
+}
+
+function truthyStudyFlag(value) {
+  if (value === true) return true;
+  if (value === false || value === undefined || value === null) return false;
+  const text = String(value).trim().toLowerCase();
+  return ['1', 'true', 'yes', 'y', 'on'].includes(text);
+}
+
+function readLoadKw(comp) {
+  const load = pickValue(comp, 'load');
+  const direct = Number(load?.kw ?? load?.P ?? pickFirst(comp, ['kw', 'kW', 'load_kw', 'rated_kw', 'output_kw']));
+  if (Number.isFinite(direct) && direct > 0) return direct;
+  const hp = Number(pickFirst(comp, ['hp', 'horsepower']));
+  if (Number.isFinite(hp) && hp > 0) return hp * 0.746;
+  return 0;
+}
+
+function readVoltage(comp) {
+  const volts = Number(pickFirst(comp, ['voltage', 'volts']));
+  if (Number.isFinite(volts) && volts > 0) return volts;
+  const kv = Number(pickFirst(comp, ['baseKV', 'kV', 'kv', 'rated_voltage_kv', 'ac_voltage_kv']));
+  return Number.isFinite(kv) && kv > 0 ? kv * 1000 : 0;
+}
+
+function readArray(comp, keys) {
+  const value = pickFirst(comp, keys);
+  return Array.isArray(value) ? value : [];
+}
+
 /**
  * Frequency‑domain harmonic study. For each component flagged as a harmonic
  * source, a rudimentary admittance aggregation is performed to estimate bus
@@ -47,18 +94,18 @@ export function runHarmonics() {
   const results = {};
 
   comps.forEach(c => {
-    if (!c.harmonicSource) return;
-    const spectrum = parseSpectrum(c.harmonics);
-    const V = Number(c.voltage) || (Number(c.baseKV) || 0) * 1000;
-    const P = Number(c.load?.kw || c.load?.P || c.kw || 0);
+    if (!truthyStudyFlag(pickFirst(c, ['harmonicSource', 'harmonic_source']))) return;
+    const spectrum = parseSpectrum(pickFirst(c, ['harmonics', 'harmonic_spectrum', 'spectrum']));
+    const V = readVoltage(c);
+    const P = readLoadKw(c);
     const I1 = V ? P * 1000 / (Math.sqrt(3) * V) : 0;
 
     // Base short‑circuit admittance if provided (scMVA) else assume 1 pu
-    const scMVA = Number(c.scMVA) || 0;
+    const scMVA = Number(pickFirst(c, ['scMVA', 'short_circuit_mva', 'thevenin_mva'])) || 0;
     const yBase = V ? (scMVA ? scMVA / ((V / 1000) ** 2) : 1) : 1;
 
     // Shunt capacitor banks
-    const capB = (c.capacitors || []).reduce((sum, cap) => {
+    const capB = readArray(c, ['capacitors', 'capacitorBanks']).reduce((sum, cap) => {
       const kvar = Number(cap.kvar) || 0;
       const kv = Number(cap.kv) || (V / 1000) || 1;
       return sum + (kvar / (kv * kv));
@@ -66,7 +113,7 @@ export function runHarmonics() {
 
     // Tuned filters provide large admittance at a specific harmonic order
     const filterMap = {};
-    (c.filters || []).forEach(f => {
+    readArray(c, ['filters', 'harmonicFilters']).forEach(f => {
       const ord = Number(f.order);
       if (!ord) return;
       const kvar = Number(f.kvar) || 0;
@@ -85,7 +132,8 @@ export function runHarmonics() {
       i2 += Ih * Ih;
       const y = yBase + capB * h + (filterMap[h] || 0);
       const Vh = y ? Ih / y : 0;
-      v2 += (Vh / V) * (Vh / V);
+      const vPu = V ? Vh / V : 0;
+      v2 += vPu * vPu;
     });
 
     const ithd = I1 ? Math.sqrt(i2) / I1 * 100 : 0;
@@ -137,31 +185,35 @@ export function runHarmonicsUnbalanced(phaseData = {}) {
   const results = {};
 
   comps.forEach(c => {
-    if (!c.harmonicSource) return;
+    if (!truthyStudyFlag(pickFirst(c, ['harmonicSource', 'harmonic_source']))) return;
 
-    const V = Number(c.voltage) || (Number(c.baseKV) || 0) * 1000;
-    const P = Number(c.load?.kw || c.load?.P || c.kw || 0);
+    const V = readVoltage(c);
+    const P = readLoadKw(c);
     const I1 = V ? P * 1000 / (Math.sqrt(3) * V) : 0;
     const kv = V / 1000;
 
     // Per-phase spectra — fall back to balanced single spectrum
     const override = phaseData[c.id] || {};
-    const specA = parseSpectrum(override.harmonicsA ?? c.harmonicsA ?? c.harmonics);
-    const specB = parseSpectrum(override.harmonicsB ?? c.harmonicsB ?? c.harmonics);
-    const specC = parseSpectrum(override.harmonicsC ?? c.harmonicsC ?? c.harmonics);
+    const baseSpectrum = pickFirst(c, ['harmonics', 'harmonic_spectrum', 'spectrum']);
+    const compHarmonicsA = pickValue(c, 'harmonicsA');
+    const compHarmonicsB = pickValue(c, 'harmonicsB');
+    const compHarmonicsC = pickValue(c, 'harmonicsC');
+    const specA = parseSpectrum(override.harmonicsA ?? compHarmonicsA ?? baseSpectrum);
+    const specB = parseSpectrum(override.harmonicsB ?? compHarmonicsB ?? baseSpectrum);
+    const specC = parseSpectrum(override.harmonicsC ?? compHarmonicsC ?? baseSpectrum);
     const balanced = !override.harmonicsA && !override.harmonicsB && !override.harmonicsC
-      && !c.harmonicsA && !c.harmonicsB && !c.harmonicsC;
+      && !compHarmonicsA && !compHarmonicsB && !compHarmonicsC;
 
     // Admittance network (same as runHarmonics)
-    const scMVA = Number(c.scMVA) || 0;
+    const scMVA = Number(pickFirst(c, ['scMVA', 'short_circuit_mva', 'thevenin_mva'])) || 0;
     const yBase = V ? (scMVA ? scMVA / (kv ** 2) : 1) : 1;
-    const capB = (c.capacitors || []).reduce((sum, cap) => {
+    const capB = readArray(c, ['capacitors', 'capacitorBanks']).reduce((sum, cap) => {
       const kvar = Number(cap.kvar) || 0;
       const cv = Number(cap.kv) || kv || 1;
       return sum + (kvar / (cv * cv));
     }, 0);
     const filterMap = {};
-    (c.filters || []).forEach(f => {
+    readArray(c, ['filters', 'harmonicFilters']).forEach(f => {
       const ord = Number(f.order);
       if (!ord) return;
       const kvar = Number(f.kvar) || 0;

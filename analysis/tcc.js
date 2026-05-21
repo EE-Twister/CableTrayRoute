@@ -31,6 +31,7 @@ import {
   computeCanvasDimensions,
 } from './chartExportUtils.mjs';
 import { openModal, showAlertModal } from '../src/components/modal.js';
+import { buildOneLineProbeUrl, openOneLineProbe } from '../src/crossProbe.js';
 import { incidentEnergyLimitCurve } from './arcFlash.mjs';
 import conductorProperties from '../conductorPropertiesData.mjs';
 import componentLibrary from '../componentLibrary.json' with { type: 'json' };
@@ -73,6 +74,9 @@ const MOTOR_START_PLOT_CEILING = 10000;
 const DEFAULT_MOTOR_COLD_START_DURATION = 10;
 const DEFAULT_MOTOR_HOT_START_DURATION = 6;
 const EQUIPMENT_OVERLAY_KINDS = new Set(['cable', 'inrush', 'transformerDamage', 'motorStart', 'motorThermal']);
+const TCC_DEFAULT_CHART_WIDTH = 800;
+const TCC_DEFAULT_CHART_HEIGHT = 600;
+const TCC_MIN_PLOT_HEIGHT = 480;
 const K_CONSTANTS = {
   copper: { 60: 103, 75: 118, 90: 143 },
   aluminum: { 60: 75, 75: 87, 90: 99 }
@@ -324,6 +328,7 @@ const violationDiv = document.getElementById('violation');
 const printPlotBtn = document.getElementById('print-plot-btn');
 const exportSvgBtn = document.getElementById('export-svg-btn');
 const exportPngBtn = document.getElementById('export-png-btn');
+const exportReviewBtn = document.getElementById('export-review-btn');
 const annotationBtn = document.getElementById('add-annotation-btn');
 const autoCoordBtn = document.getElementById('auto-coord-btn');
 const exportCtiBtn = document.getElementById('export-cti-btn');
@@ -332,6 +337,9 @@ const coordPanel = document.getElementById('coordination-panel');
 const coordResultsDiv = document.getElementById('coord-results');
 const coordOrderList = document.getElementById('coord-order-list');
 const coordMarginInput = document.getElementById('coord-margin');
+const rangePresetSelect = document.getElementById('tcc-range-preset');
+const calloutScopeLabel = document.getElementById('tcc-callout-scope-label');
+const calloutScopeSelect = document.getElementById('tcc-callout-scope');
 const viewMenuBtn = document.getElementById('tcc-view-menu-btn');
 const arcFlashOverlayControls = document.getElementById('arc-flash-overlay-controls');
 const afThresholdSelect = document.getElementById('af-threshold-select');
@@ -343,6 +351,7 @@ const contextBackBtn = document.getElementById('tcc-back-oneline-btn');
 const coordStatusSummary = document.getElementById('coord-status-summary');
 const equipmentMetricsPanel = document.getElementById('tcc-equipment-metrics');
 const hoverTooltip = document.getElementById('tcc-hover-tooltip');
+const pinnedDetailPanel = document.getElementById('tcc-pinned-detail');
 const tccChartContainer = document.querySelector('.tcc-chart-container');
 const chart = d3.select('#tcc-chart');
 const onelinePreviewSvgEl = document.getElementById('oneline-preview');
@@ -372,6 +381,7 @@ let updatingActiveComponentFromSelect = false;
 
 const TCC_VIEW_OPTIONS = [
   { id: 'none', label: 'No Additional View', field: null, description: 'Hide device settings in the legend.' },
+  { id: 'callouts', label: 'Chart Callouts', field: null, shortLabel: 'Callouts', description: 'Show draggable labels on the chart with the device tag and selected settings.' },
   { id: 'pickup', label: 'Pickup', field: 'pickup', unit: 'A', shortLabel: 'Pickup', description: 'Display the long-time pickup current.' },
   { id: 'time', label: 'Delay', field: 'time', unit: 's', shortLabel: 'Delay', description: 'Display the long-time delay setting.' },
   { id: 'shortTimePickup', label: 'Short-Time Pickup', field: 'shortTimePickup', unit: 'A', shortLabel: 'ST Pickup', description: 'Display the short-time pickup current.' },
@@ -385,6 +395,24 @@ const TCC_VIEW_OPTIONS = [
 ];
 
 const viewOptionMap = new Map(TCC_VIEW_OPTIONS.map(option => [option.id, option]));
+
+const TCC_RANGE_PRESETS = [
+  { id: 'full', label: 'Full Range' },
+  { id: 'coordination', label: 'Coordination Region' },
+  { id: 'motorStart', label: 'Motor Starting' },
+  { id: 'transformerInrush', label: 'Transformer Inrush' },
+  { id: 'faultCurrent', label: 'Fault Current Region' }
+];
+
+const rangePresetMap = new Map(TCC_RANGE_PRESETS.map(option => [option.id, option]));
+
+const TCC_CALLOUT_SCOPES = [
+  { id: 'context', label: 'Context Devices' },
+  { id: 'selected', label: 'Selected Device' },
+  { id: 'all', label: 'All Plotted Devices' }
+];
+
+const calloutScopeMap = new Map(TCC_CALLOUT_SCOPES.map(option => [option.id, option]));
 
 const CUSTOM_CURVE_SETTING_OPTIONS = TCC_VIEW_OPTIONS
   .filter(option => option.field)
@@ -420,10 +448,66 @@ function normalizeViewOptionList(input) {
   return normalized;
 }
 
+function normalizeRangePreset(value) {
+  const preset = typeof value === 'string' ? value.trim() : '';
+  return rangePresetMap.has(preset) ? preset : 'full';
+}
+
+function setActiveRangePreset(value, { persist = true } = {}) {
+  activeRangePreset = normalizeRangePreset(value);
+  if (rangePresetSelect) {
+    rangePresetSelect.value = activeRangePreset;
+  }
+  if (persist) {
+    saved.rangePreset = activeRangePreset;
+    saved.viewOptions = [...activeViewOptions];
+    saved.calloutScope = activeCalloutScope;
+    setItem('tccSettings', saved);
+  }
+}
+
+function normalizeCalloutScope(value) {
+  const scope = typeof value === 'string' ? value.trim() : '';
+  return calloutScopeMap.has(scope) ? scope : 'context';
+}
+
+function updateCalloutScopeControl() {
+  if (!calloutScopeLabel || !calloutScopeSelect) return;
+  const visible = areCalloutsEnabled();
+  calloutScopeLabel.classList.toggle('hidden', !visible);
+  calloutScopeSelect.disabled = !visible;
+  calloutScopeSelect.value = activeCalloutScope;
+}
+
+function setActiveCalloutScope(value, { persist = true } = {}) {
+  activeCalloutScope = normalizeCalloutScope(value);
+  if (calloutScopeSelect) {
+    calloutScopeSelect.value = activeCalloutScope;
+  }
+  if (persist) {
+    saved.calloutScope = activeCalloutScope;
+    saved.viewOptions = [...activeViewOptions];
+    saved.rangePreset = activeRangePreset;
+    setItem('tccSettings', saved);
+  }
+}
+
 function getActiveViewConfigs() {
   return activeViewOptions
     .map(id => viewOptionMap.get(id))
     .filter(option => option && option.field);
+}
+
+function areCalloutsEnabled() {
+  return activeViewOptions.includes('callouts');
+}
+
+function shouldRenderCalloutForEntry(entry) {
+  if (!entry?.selection) return false;
+  const role = entry.relationship?.role || '';
+  if (activeCalloutScope === 'all') return true;
+  if (activeCalloutScope === 'selected') return role === 'selected';
+  return role === 'upstream' || role === 'selected' || role === 'downstream';
 }
 
 function formatViewValue(option, value) {
@@ -455,13 +539,50 @@ function formatViewSummaries(entry) {
     .filter(Boolean);
 }
 
-function summarizeActiveViewLabels() {
-  const configs = getActiveViewConfigs();
-  if (!configs.length) return null;
-  if (configs.length === 1) {
-    return configs[0].shortLabel || configs[0].label;
+function normalizeCalloutLine(value) {
+  return typeof value === 'string' ? value.replace(/\s+/g, ' ').trim() : '';
+}
+
+function firstCalloutLine(value) {
+  if (typeof value !== 'string') return '';
+  const firstLine = value
+    .split(/\r?\n/)
+    .map(line => normalizeCalloutLine(line))
+    .find(Boolean);
+  return firstLine || normalizeCalloutLine(value);
+}
+
+function getComponentCalloutTag(component) {
+  if (!component) return '';
+  const tagKeys = ['tag', 'ref', 'deviceTag', 'device_tag', 'equipmentTag', 'equipment_tag'];
+  for (const key of tagKeys) {
+    const value = normalizeCalloutLine(getComponentValue(component, key));
+    if (value) return value;
   }
-  const labels = configs.map(option => option.shortLabel || option.label);
+  return firstCalloutLine(getComponentValue(component, 'label'))
+    || normalizeCalloutLine(getComponentValue(component, 'name'))
+    || normalizeCalloutLine(component.id);
+}
+
+function formatCalloutDeviceLabel(entry) {
+  if (!entry || !entry.selection) return 'Device';
+  const component = entry.selection.component;
+  const componentText = component ? getComponentCalloutTag(component) : '';
+  return normalizeCalloutLine(componentText)
+    || normalizeCalloutLine(entry.selection.name)
+    || normalizeCalloutLine(entry.name)
+    || normalizeCalloutLine(entry.selection.baseDevice?.name)
+    || 'Device';
+}
+
+function summarizeActiveViewLabels() {
+  const options = TCC_VIEW_OPTIONS
+    .filter(option => option.id !== 'none' && activeViewOptions.includes(option.id));
+  if (!options.length) return null;
+  if (options.length === 1) {
+    return options[0].shortLabel || options[0].label;
+  }
+  const labels = options.map(option => option.shortLabel || option.label);
   if (labels.length <= 2) {
     return labels.join(', ');
   }
@@ -538,8 +659,11 @@ function setActiveViewOptions(optionIds, { persist = true } = {}) {
     || normalized.some((value, index) => value !== activeViewOptions[index]);
   activeViewOptions = normalized;
   if (changed) updateViewButtonLabel();
+  updateCalloutScopeControl();
   if (persist) {
     saved.viewOptions = [...activeViewOptions];
+    saved.rangePreset = activeRangePreset;
+    saved.calloutScope = activeCalloutScope;
     setItem('tccSettings', saved);
   }
 }
@@ -572,6 +696,10 @@ let annotations = [];
 let annotationContext = null;
 let arcFlashOverlayThreshold = 8; // cal/cm² — default PPE Category 2
 let arcFlashOverlayComponentId = null;
+let activeRangePreset = 'full';
+let activeCalloutScope = 'context';
+let activeLegendFocusKey = null;
+let plotRefreshPending = false;
 
 // Fixed purple palette for GFP curves — visually distinct from d3.schemeCategory10
 const GFP_COLOR_PALETTE = ['#7c3aed', '#6d28d9', '#5b21b6', '#4c1d95', '#a78bfa'];
@@ -807,6 +935,11 @@ function loadSavedSettings() {
     stored.viewOptions = normalizeViewOptionList(stored.viewOptions);
   }
   delete stored.viewOption;
+  stored.rangePreset = normalizeRangePreset(stored.rangePreset);
+  stored.calloutScope = normalizeCalloutScope(stored.calloutScope);
+  if (!stored.assumptionConfirmations || typeof stored.assumptionConfirmations !== 'object' || Array.isArray(stored.assumptionConfirmations)) {
+    stored.assumptionConfirmations = {};
+  }
   if (typeof stored.printIncludePreview !== 'boolean') stored.printIncludePreview = false;
   if (!Array.isArray(stored.customCurves)) stored.customCurves = [];
   stored.customCurves = stored.customCurves.map(sanitizeCustomCurve).filter(Boolean);
@@ -1177,6 +1310,19 @@ let saved = loadSavedSettings();
 
 let activeViewOptions = normalizeViewOptionList(saved.viewOptions);
 saved.viewOptions = [...activeViewOptions];
+activeRangePreset = normalizeRangePreset(saved.rangePreset);
+saved.rangePreset = activeRangePreset;
+if (rangePresetSelect) {
+  rangePresetSelect.value = activeRangePreset;
+}
+activeCalloutScope = normalizeCalloutScope(saved.calloutScope);
+saved.calloutScope = activeCalloutScope;
+if (calloutScopeSelect) {
+  calloutScopeSelect.value = activeCalloutScope;
+}
+if (!saved.assumptionConfirmations || typeof saved.assumptionConfirmations !== 'object') {
+  saved.assumptionConfirmations = {};
+}
 saved.customCurves = normalizeCustomCurveSequences(saved.customCurves);
 saved.customCurveCounter = saved.customCurves.reduce((max, curve) => {
   const seq = Number(curve.sequence);
@@ -1193,6 +1339,7 @@ updateCoordinationStatus('Choose devices and update the plot.');
 renderEquipmentMetrics([], []);
 
 updateViewButtonLabel();
+updateCalloutScopeControl();
 
 init();
 
@@ -1236,13 +1383,21 @@ function renderSelectedSummary() {
   }
   const list = document.createElement('div');
   list.className = 'selected-device-list';
+  list.setAttribute('role', 'list');
   const relationshipMap = getContextDeviceRelationshipMap();
-  ids.forEach(uid => {
-    const entry = deviceMap.get(uid);
-    const relationship = getDeviceRelationship(uid, relationshipMap);
+  const summaryItems = ids.map(uid => ({
+    uid,
+    entry: deviceMap.get(uid),
+    relationship: getDeviceRelationship(uid, relationshipMap)
+  }));
+  const contextItems = summaryItems.filter(item => item.relationship.role !== 'additional');
+  const additionalItems = summaryItems.filter(item => item.relationship.role === 'additional');
+  const visibleItems = contextItems.length ? contextItems : summaryItems.slice(0, 4);
+  visibleItems.forEach(({ uid, entry, relationship }) => {
     const chip = document.createElement('span');
     chip.className = `selected-device-chip ${relationship.className}`;
     chip.dataset.contextRole = relationship.role;
+    chip.setAttribute('role', 'listitem');
     const role = document.createElement('span');
     role.className = 'selected-device-role';
     role.textContent = relationship.label;
@@ -1252,6 +1407,30 @@ function renderSelectedSummary() {
     chip.append(role, name);
     list.appendChild(chip);
   });
+  const hiddenItems = contextItems.length ? additionalItems : summaryItems.slice(visibleItems.length);
+  if (hiddenItems.length) {
+    const chip = document.createElement('span');
+    chip.className = 'selected-device-chip is-additional is-summary-chip';
+    chip.dataset.contextRole = 'additional';
+    chip.setAttribute('role', 'listitem');
+    chip.title = hiddenItems
+      .map(item => item.entry ? item.entry.name : item.uid)
+      .join('\n');
+    chip.setAttribute(
+      'aria-label',
+      `${hiddenItems.length} additional selected ${hiddenItems.length === 1 ? 'reference' : 'references'}: ${chip.title}`
+    );
+    const role = document.createElement('span');
+    role.className = 'selected-device-role';
+    role.textContent = 'Additional';
+    const name = document.createElement('span');
+    name.className = 'selected-device-name';
+    name.textContent = hiddenItems.length === 1
+      ? '1 equipment reference selected'
+      : `${hiddenItems.length} equipment references selected`;
+    chip.append(role, name);
+    list.appendChild(chip);
+  }
   selectedSummary.appendChild(list);
   renderTccContextBanner();
 }
@@ -1367,6 +1546,38 @@ function findNearestCurvePoint(curve, current) {
   }, null);
 }
 
+function getHoverClientPoint(event) {
+  if (!event) return null;
+  if (event.type !== 'focus' && Number.isFinite(event.clientX) && Number.isFinite(event.clientY)) {
+    return { clientX: event.clientX, clientY: event.clientY };
+  }
+  const rect = event.currentTarget?.getBoundingClientRect?.();
+  if (rect && Number.isFinite(rect.left) && Number.isFinite(rect.top)) {
+    return {
+      clientX: rect.left + (rect.width / 2),
+      clientY: rect.top + (rect.height / 2)
+    };
+  }
+  if (Number.isFinite(event.clientX) && Number.isFinite(event.clientY)) {
+    return { clientX: event.clientX, clientY: event.clientY };
+  }
+  return null;
+}
+
+function positionHoverTooltip(event) {
+  if (!hoverTooltip || !tccChartContainer) return;
+  const containerRect = tccChartContainer.getBoundingClientRect();
+  const tooltipRect = hoverTooltip.getBoundingClientRect();
+  const clientPoint = getHoverClientPoint(event) || {
+    clientX: containerRect.left + 16,
+    clientY: containerRect.top + 16
+  };
+  const left = clampValue(clientPoint.clientX - containerRect.left + 14, 8, Math.max(8, containerRect.width - tooltipRect.width - 8));
+  const top = clampValue(clientPoint.clientY - containerRect.top + 14, 8, Math.max(8, containerRect.height - tooltipRect.height - 8));
+  hoverTooltip.style.left = `${left}px`;
+  hoverTooltip.style.top = `${top}px`;
+}
+
 function showCurveHoverTooltip(event, entry, x, y, margin) {
   if (!hoverTooltip || !tccChartContainer || !entry || chart.classed('annotation-mode')) {
     hideCurveHoverTooltip();
@@ -1397,13 +1608,7 @@ function showCurveHoverTooltip(event, entry, x, y, margin) {
   ].filter(Boolean).join('');
   hoverTooltip.classList.add('visible');
   hoverTooltip.setAttribute('aria-hidden', 'false');
-
-  const containerRect = tccChartContainer.getBoundingClientRect();
-  const tooltipRect = hoverTooltip.getBoundingClientRect();
-  const left = clampValue(event.clientX - containerRect.left + 14, 8, Math.max(8, containerRect.width - tooltipRect.width - 8));
-  const top = clampValue(event.clientY - containerRect.top + 14, 8, Math.max(8, containerRect.height - tooltipRect.height - 8));
-  hoverTooltip.style.left = `${left}px`;
-  hoverTooltip.style.top = `${top}px`;
+  positionHoverTooltip(event);
 
   const nearestX = x(point.current);
   const nearestY = y(point.time);
@@ -1411,6 +1616,191 @@ function showCurveHoverTooltip(event, entry, x, y, margin) {
     hoverTooltip.dataset.current = formatSettingValue(point.current);
     hoverTooltip.dataset.time = formatSettingValue(point.time);
   }
+}
+
+function findNearestOverlayPoint(event, curve, x, margin) {
+  if (!Array.isArray(curve) || !curve.length) return null;
+  if (event?.type === 'focus') {
+    return curve[Math.floor(curve.length / 2)] || null;
+  }
+  const chartNode = chart.node();
+  if (!chartNode || !event) return null;
+  const [svgX, svgY] = d3.pointer(event, chartNode);
+  const localX = svgX - margin.left;
+  const localY = svgY - margin.top;
+  if (!Number.isFinite(localX) || !Number.isFinite(localY) || localX < 0 || localY < 0) return null;
+  const current = x.invert(localX);
+  return findNearestCurvePoint(curve, current);
+}
+
+function equipmentOverlayAriaLabel(entry) {
+  if (!entry) return 'Equipment reference';
+  const subtitle = [entry.sourceLabel, entry.targetLabel].filter(Boolean).join(' to ');
+  const rows = equipmentMetricRows(entry)
+    .filter(row => row.value !== undefined && row.value !== null && row.value !== '')
+    .map(row => `${row.label}: ${row.value}`)
+    .join(', ');
+  return [equipmentMetricTitle(entry), subtitle || entry.name, rows].filter(Boolean).join(', ');
+}
+
+function showEquipmentOverlayTooltip(event, entry, x, margin, curve = entry?.curve) {
+  if (!hoverTooltip || !tccChartContainer || !entry || chart.classed('annotation-mode')) {
+    hideCurveHoverTooltip();
+    return;
+  }
+  const subtitle = [entry.sourceLabel, entry.targetLabel].filter(Boolean).join(' -> ');
+  const rows = equipmentMetricRows(entry)
+    .filter(row => row.value !== undefined && row.value !== null && row.value !== '')
+    .map(row => `<span>${escapeHtml(row.label)}: ${escapeHtml(row.value)}</span>`);
+  const point = entry.kind === 'inrush'
+    ? {
+      current: entry.current,
+      time: entry.normalizedDuration ?? entry.duration ?? DEFAULT_INRUSH_DURATION
+    }
+    : findNearestOverlayPoint(event, curve, x, margin);
+  const pointLabel = point && entry.kind !== 'inrush'
+    ? `<span>Point: ${escapeHtml(formatMetricValue(point.current, 'A'))} @ ${escapeHtml(formatMetricValue(point.time, 's'))}</span>`
+    : '';
+  const overlayLabel = subtitle || entry.name || '';
+
+  hoverTooltip.innerHTML = [
+    `<strong>${escapeHtml(equipmentMetricTitle(entry))}</strong>`,
+    overlayLabel ? `<span>${escapeHtml(overlayLabel)}</span>` : '',
+    pointLabel,
+    ...rows
+  ].filter(Boolean).join('');
+  hoverTooltip.classList.add('visible');
+  hoverTooltip.setAttribute('aria-hidden', 'false');
+  positionHoverTooltip(event);
+
+  if (point) {
+    hoverTooltip.dataset.current = formatSettingValue(point.current);
+    hoverTooltip.dataset.time = formatSettingValue(point.time);
+  }
+}
+
+function bindEquipmentOverlayTooltip(selection, entry, x, margin, curve) {
+  return selection
+    .attr('tabindex', 0)
+    .attr('role', 'img')
+    .attr('aria-label', equipmentOverlayAriaLabel(entry))
+    .style('cursor', 'help')
+    .on('mousemove', event => showEquipmentOverlayTooltip(event, entry, x, margin, curve))
+    .on('click', event => {
+      event.stopPropagation();
+      showPinnedEquipmentDetail(event, entry, x, margin, curve);
+    })
+    .on('keydown', event => {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      event.preventDefault();
+      showPinnedEquipmentDetail(event, entry, x, margin, curve);
+    })
+    .on('mouseleave', hideCurveHoverTooltip)
+    .on('focus', event => showEquipmentOverlayTooltip(event, entry, x, margin, curve))
+    .on('blur', hideCurveHoverTooltip);
+}
+
+function entryInteractiveKey(entry) {
+  return String(
+    entry?.selection?.uid
+    || entry?.uid
+    || entry?.name
+    || entry?.label
+    || ''
+  );
+}
+
+function clearPinnedChartDetail() {
+  if (!pinnedDetailPanel) return;
+  pinnedDetailPanel.innerHTML = '';
+  pinnedDetailPanel.classList.add('hidden');
+}
+
+function renderPinnedChartDetail({ title, subtitle = '', rows = [], color = '', actions = '' }) {
+  if (!pinnedDetailPanel) return;
+  const detailRows = rows
+    .filter(row => row && row.label && row.value !== undefined && row.value !== null && row.value !== '')
+    .map(row => `<div><dt>${escapeHtml(row.label)}</dt><dd>${escapeHtml(row.value)}</dd></div>`)
+    .join('');
+  const swatch = color
+    ? `<span class="tcc-pinned-swatch" style="background:${escapeHtml(color)}"></span>`
+    : '';
+  pinnedDetailPanel.innerHTML = `
+    <div class="tcc-pinned-detail-header">
+      <div>
+        <h3>${swatch}${escapeHtml(title || 'Chart Detail')}</h3>
+        ${subtitle ? `<p>${escapeHtml(subtitle)}</p>` : ''}
+      </div>
+      <button type="button" class="tcc-pinned-close" aria-label="Close chart detail">Close</button>
+    </div>
+    <dl>${detailRows}</dl>
+    ${actions}
+  `;
+  pinnedDetailPanel.classList.remove('hidden');
+  pinnedDetailPanel.querySelector('.tcc-pinned-close')?.addEventListener('click', clearPinnedChartDetail, { once: true });
+}
+
+function curvePinnedRows(entry, point) {
+  const rows = [];
+  const relationship = entry?.relationship?.role !== 'additional' ? entry.relationship?.label : '';
+  if (relationship) rows.push({ label: 'Role', value: relationship });
+  if (point) {
+    rows.push({ label: 'Current', value: formatMetricValue(point.current, 'A') });
+    rows.push({ label: 'Time', value: formatMetricValue(point.time, 's') });
+  }
+  formatViewSummaries(entry).forEach(summary => {
+    const [label, ...rest] = String(summary).split(':');
+    rows.push({ label: label || 'Setting', value: rest.join(':').trim() || summary });
+  });
+  if (!rows.some(row => row.label === 'Settings')) {
+    rows.push({ label: 'Settings', value: formatHoverSettings(entry) });
+  }
+  return rows;
+}
+
+function showPinnedCurveDetail(event, entry, x, margin) {
+  if (!entry || chart.classed('annotation-mode')) return;
+  hideCurveHoverTooltip();
+  const chartNode = chart.node();
+  if (!chartNode) return;
+  let point = null;
+  if (event?.type === 'focus' || event?.type === 'keydown') {
+    const curve = entry.scaled?.curve || [];
+    point = curve[Math.floor(curve.length / 2)] || curve[0] || null;
+  } else {
+    const [svgX] = d3.pointer(event, chartNode);
+    const current = x.invert(svgX - margin.left);
+    point = findNearestCurvePoint(entry.scaled?.curve, current);
+  }
+  const title = entry.selection?.name || entry.selection?.baseDevice?.name || 'Protective Device';
+  renderPinnedChartDetail({
+    title,
+    rows: curvePinnedRows(entry, point),
+    color: entry.color
+  });
+}
+
+function showPinnedEquipmentDetail(event, entry, x, margin, curve = entry?.curve) {
+  if (!entry || chart.classed('annotation-mode')) return;
+  hideCurveHoverTooltip();
+  const subtitle = [entry.sourceLabel, entry.targetLabel].filter(Boolean).join(' -> ');
+  const point = entry.kind === 'inrush'
+    ? {
+      current: entry.current,
+      time: entry.normalizedDuration ?? entry.duration ?? DEFAULT_INRUSH_DURATION
+    }
+    : findNearestOverlayPoint(event, curve, x, margin);
+  const rows = [...equipmentMetricRows(entry)];
+  if (point && entry.kind !== 'inrush') {
+    rows.unshift({ label: 'Nearest Point', value: `${formatMetricValue(point.current, 'A')} at ${formatMetricValue(point.time, 's')}` });
+  }
+  renderPinnedChartDetail({
+    title: equipmentMetricTitle(entry),
+    subtitle: subtitle || entry.name || '',
+    rows,
+    color: entry.color,
+    actions: equipmentAssumptionActions(entry)
+  });
 }
 
 function createAnnotationId() {
@@ -1452,6 +1842,7 @@ function persistAnnotations({ skipSetItem = false } = {}) {
   saved.annotations = annotations.map(exportAnnotation);
   if (!skipSetItem) {
     saved.viewOptions = [...activeViewOptions];
+    saved.rangePreset = activeRangePreset;
     setItem('tccSettings', saved);
   }
 }
@@ -1480,6 +1871,39 @@ function updateCoordinationStatus(message, variant = 'neutral') {
   coordStatusSummary.dataset.status = variant;
 }
 
+function setPlotButtonPending(pending) {
+  if (!plotBtn) return;
+  plotBtn.classList.toggle('plot-refresh-pending', !!pending);
+  plotBtn.textContent = pending ? 'Updating Plot' : 'Update Plot';
+}
+
+function markPlotDirty(message = 'Inputs changed. Update Plot to refresh the chart.') {
+  plotRefreshPending = false;
+  setPlotButtonPending(false);
+  setPlotAvailability(false);
+  updateCoordinationStatus(message, 'warning');
+}
+
+function markPlotRefreshPending(message = 'Inputs changed. Updating plot...') {
+  plotRefreshPending = true;
+  setPlotAvailability(false);
+  setPlotButtonPending(true);
+  updateCoordinationStatus(message, 'pending');
+}
+
+function clearPlotRefreshPending() {
+  plotRefreshPending = false;
+  setPlotButtonPending(false);
+}
+
+function markCoordinationStale() {
+  if (!activePlotted || !activePlotted.length) return;
+  lastCoordState = null;
+  exportCtiBtn?.classList.add('hidden');
+  if (activeCoordMarkerDrawer) activeCoordMarkerDrawer(null, []);
+  updateCoordinationStatus('Coordination margin changed. Run Auto-Coordinate again to refresh margin results.', 'warning');
+}
+
 function hideCurveHoverTooltip() {
   if (!hoverTooltip) return;
   hoverTooltip.classList.remove('visible');
@@ -1490,6 +1914,7 @@ function setPlotAvailability(available) {
   setButtonAvailability(printPlotBtn, available, 'Update the plot before printing.', 'Print the current TCC plot.');
   setButtonAvailability(exportSvgBtn, available, 'Update the plot before exporting SVG.');
   setButtonAvailability(exportPngBtn, available, 'Update the plot before exporting PNG.');
+  setButtonAvailability(exportReviewBtn, available, 'Update the plot before exporting the review package.', 'Download the current chart, one-line preview, metrics, and coordination summary as HTML.');
   setButtonAvailability(annotationBtn, available, 'Update the plot before adding annotations.', 'Add an annotation to the current plot.');
   if (!available) {
     disableAnnotationMode();
@@ -1621,7 +2046,10 @@ function buildCurveContextItems(entry) {
     items.push({
       label: 'Open in One-Line',
       onSelect: () => {
-        window.open(`oneline.html?component=${encodeURIComponent(selection.componentId)}`, '_blank');
+        openOneLineProbe(
+          { componentId: selection.componentId, probeType: 'tcc' },
+          { probeType: 'tcc', newTab: true }
+        );
       }
     });
   } else if (selection.kind === 'library') {
@@ -2044,6 +2472,7 @@ async function handlePrintPlot() {
       saved.printFooter = footerValue;
       saved.printIncludePreview = includePreview;
       saved.viewOptions = [...activeViewOptions];
+      saved.rangePreset = activeRangePreset;
       setItem('tccSettings', saved);
       return { header: headerValue, footer: footerValue, includePreview };
     }
@@ -2141,6 +2570,108 @@ function handleExportPNG() {
   };
   img.onerror = () => URL.revokeObjectURL(svgUrl);
   img.src = svgUrl;
+}
+
+function serializeReviewNode(node, { removeIds = true } = {}) {
+  if (!node) return '';
+  const clone = node.cloneNode(true);
+  if (removeIds) {
+    clone.querySelectorAll?.('[id]').forEach(el => el.removeAttribute('id'));
+    if (clone.removeAttribute) clone.removeAttribute('id');
+  }
+  return clone.outerHTML || '';
+}
+
+function buildReviewExportMarkup({ chartMarkup, previewMarkup, metricsMarkup, coordinationMarkup, statusText, rangeLabel }) {
+  const generated = new Date().toLocaleString();
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>TCC Review Package</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    body { font-family: "Segoe UI", Arial, sans-serif; margin: 24px; color: #111827; background: #fff; }
+    header { margin-bottom: 18px; border-bottom: 1px solid #d1d5db; padding-bottom: 12px; }
+    h1 { margin: 0 0 6px; font-size: 1.45rem; }
+    h2 { margin: 22px 0 10px; font-size: 1.05rem; color: #1d4ed8; }
+    .meta { color: #4b5563; font-size: 0.9rem; }
+    .status { margin: 12px 0; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 8px; background: #f8fafc; font-weight: 600; }
+    .review-visuals { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 16px; align-items: start; }
+    .review-chart svg, .review-preview svg { width: 100%; height: auto; }
+    .review-preview { padding: 12px; border: 1px solid #d1d5db; border-radius: 8px; background: #f8fafc; }
+    .tcc-equipment-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; }
+    .tcc-equipment-card { padding: 10px; border: 1px solid #d1d5db; border-radius: 8px; }
+    .tcc-equipment-card h3 { margin: 0 0 4px; font-size: 0.95rem; }
+    .tcc-equipment-card p { margin: 0 0 8px; color: #4b5563; font-size: 0.82rem; }
+    dl { display: grid; gap: 4px; margin: 0; }
+    dl > div { display: grid; grid-template-columns: 46% 1fr; gap: 6px; }
+    dt { color: #6b7280; font-size: 0.78rem; }
+    dd { margin: 0; font-size: 0.82rem; font-weight: 600; }
+    .coord-status, .coord-ok-item, .coord-warn, .coord-violation-detail { margin: 6px 0; }
+    .coord-warn, .coord-fail { color: #9a3412; }
+    .coord-ok, .coord-ok-item { color: #166534; }
+    @media print {
+      body { margin: 12mm; }
+      .review-visuals { grid-template-columns: minmax(0, 1fr) 260px; }
+    }
+    @media (max-width: 900px) {
+      .review-visuals { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Time-Current Curve Review</h1>
+    <div class="meta">Generated ${escapeHtml(generated)}${rangeLabel ? ` | Range: ${escapeHtml(rangeLabel)}` : ''}</div>
+  </header>
+  <div class="status">${escapeHtml(statusText || 'No status available.')}</div>
+  <section class="review-visuals">
+    <div class="review-chart">${chartMarkup}</div>
+    <aside class="review-preview">${previewMarkup || '<p>No one-line preview available.</p>'}</aside>
+  </section>
+  ${metricsMarkup ? `<section><h2>Equipment Reference Metrics</h2>${metricsMarkup}</section>` : ''}
+  ${coordinationMarkup ? `<section><h2>Coordination Results</h2>${coordinationMarkup}</section>` : ''}
+</body>
+</html>`;
+}
+
+function handleExportReview() {
+  if (!exportReviewBtn || exportReviewBtn.disabled) return;
+  const svgNode = buildExportSvgNode();
+  if (!svgNode) return;
+  const serializer = new XMLSerializer();
+  const chartMarkup = serializer.serializeToString(svgNode);
+  let previewMarkup = '';
+  if (onelinePreviewSvgEl && !onelinePreviewSvgEl.classList.contains('hidden')) {
+    const previewNode = onelinePreviewSvgEl.cloneNode(true);
+    previewNode.removeAttribute('id');
+    if (!previewNode.getAttribute('xmlns')) {
+      previewNode.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+    }
+    previewMarkup = serializer.serializeToString(previewNode);
+  }
+  const metricsMarkup = equipmentMetricsPanel && !equipmentMetricsPanel.classList.contains('hidden')
+    ? serializeReviewNode(equipmentMetricsPanel)
+    : '';
+  const coordinationMarkup = coordPanel && !coordPanel.classList.contains('hidden')
+    ? serializeReviewNode(coordPanel)
+    : '';
+  const rangeLabel = rangePresetMap.get(activeRangePreset)?.label || 'Full Range';
+  const html = buildReviewExportMarkup({
+    chartMarkup,
+    previewMarkup,
+    metricsMarkup,
+    coordinationMarkup,
+    statusText: coordStatusSummary?.textContent || '',
+    rangeLabel
+  });
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'tcc-review-package.html';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 0);
 }
 
 function formatOptionLabel(value) {
@@ -2418,6 +2949,7 @@ function refreshCatalog({
   saved.devices = selection;
   persistAnnotations({ skipSetItem: true });
   saved.viewOptions = [...activeViewOptions];
+  saved.rangePreset = activeRangePreset;
   setItem('tccSettings', saved);
   return selection;
 }
@@ -2496,10 +3028,17 @@ async function init() {
     saved = loadSavedSettings();
     activeViewOptions = normalizeViewOptionList(saved.viewOptions);
     saved.viewOptions = [...activeViewOptions];
+    activeRangePreset = normalizeRangePreset(saved.rangePreset);
+    saved.rangePreset = activeRangePreset;
+    if (rangePresetSelect) rangePresetSelect.value = activeRangePreset;
+    activeCalloutScope = normalizeCalloutScope(saved.calloutScope);
+    saved.calloutScope = activeCalloutScope;
+    if (calloutScopeSelect) calloutScopeSelect.value = activeCalloutScope;
     annotations = (saved.annotations || []).map(sanitizeAnnotation).filter(Boolean);
     saved.annotations = annotations.map(exportAnnotation);
     renderAnnotations();
     updateViewButtonLabel();
+    updateCalloutScopeControl();
     const selection = refreshCatalog({ includeComponentContext: true, includeDeviceParam: true });
     updateShortCircuitStudy();
     renderOneLinePreview(getActiveComponentId());
@@ -2515,6 +3054,7 @@ function selectDefaults(ids) {
   saved.devices = valid;
   persistAnnotations({ skipSetItem: true });
   saved.viewOptions = [...activeViewOptions];
+  saved.rangePreset = activeRangePreset;
   setItem('tccSettings', saved);
 }
 
@@ -2948,6 +3488,7 @@ function persistCustomCurveState({ refresh = true } = {}) {
     return Number.isFinite(seq) ? Math.max(max, seq) : max;
   }, saved.customCurveCounter || 0);
   saved.viewOptions = [...activeViewOptions];
+  saved.rangePreset = activeRangePreset;
   setItem('tccSettings', saved);
   if (refresh) {
     refreshCatalog({ preserveSelection: true, includeComponentContext: true });
@@ -3188,6 +3729,13 @@ function buildTransformerInrushEntries(targetId) {
       deviceType: 'transformer inrush',
       current: inrush.current,
       duration: inrush.duration,
+      inrushMultiple: inrush.multiple,
+      fla: inrush.fla,
+      multipleEstimated: inrush.multipleEstimated,
+      durationEstimated: inrush.durationEstimated,
+      estimated: inrush.multipleEstimated || inrush.durationEstimated,
+      operatingSide: inrush.operating?.side,
+      operatingVoltage: inrush.operating?.volts,
       sourceId: transformer.id,
       sourceLabel: componentLabel(transformer),
       autoSelect: true
@@ -3218,6 +3766,10 @@ function buildTransformerDamageEntries(targetId) {
       deviceType: 'transformer damage',
       curve: damage.curve,
       fla: damage.fla,
+      operatingSide: damage.operating?.side,
+      operatingVoltage: damage.operating?.volts,
+      dataSource: damage.operating?.source || '',
+      sourceId: transformer.id,
       sourceLabel: componentLabel(transformer),
       autoSelect: true
     });
@@ -3256,6 +3808,11 @@ function buildCableEntries(targetId) {
       conductorMaterial: cableInfo.conductor_material || cableInfo.material || '',
       insulationType: cableInfo.insulation_type || cableInfo.insulationType || cableInfo.insulation || '',
       length: cableInfo.length || cableInfo.length_ft || cableInfo.lengthFt || null,
+      materialEstimated: curve.materialEstimated,
+      insulationEstimated: curve.insulationEstimated,
+      conductorsPerPhase: curve.conductorsPerPhase,
+      parallel: curve.parallel,
+      estimated: curve.materialEstimated || curve.insulationEstimated,
       autoSelect: true
     });
   };
@@ -3400,6 +3957,7 @@ function buildMotorOverlayEntries(targetId) {
         startProfile: profile.label,
         estimated: profile.estimated,
         voltage: base.voltage,
+        sourceId: motor.id,
         sourceLabel: componentLabel(motor),
         autoSelect: true
       });
@@ -3419,6 +3977,7 @@ function buildMotorOverlayEntries(targetId) {
         continuousCurrent: thermalMetrics.continuousCurrent,
         estimated: Boolean(thermalReference?.estimated),
         voltage: base.voltage,
+        sourceId: motor.id,
         sourceLabel: componentLabel(motor),
         autoSelect: true
       });
@@ -3861,10 +4420,10 @@ function describeComponentDetailRows(entry, usedLabels = new Set()) {
 
   const componentType = String(component.type || component.subtype || '').toLowerCase();
   if (componentType.includes('cable')) {
-    const sizeValue = pickValue(['conductor_size', 'conductorSize', 'size', 'awg']);
+    const sizeValue = pickValue(['conductor_size', 'conductorSize', 'size_awg_kcmil', 'conductor_size_awg_kcmil', 'size', 'awg']);
     const conductorsDescriptor = pickValue(['conductors']);
     const materialValue = pickValue(['conductor_material', 'material']);
-    const insulationRaw = pickValue(['insulation_rating', 'temperature_rating', 'insulation']);
+    const insulationRaw = pickValue(['insulation_rating', 'temperature_rating', 'temp_rating_c', 'insulation_temp_c', 'insulation']);
 
     const resolvedSize = (() => {
       if (sizeValue) return formatDetailValue(sizeValue);
@@ -3877,7 +4436,7 @@ function describeComponentDetailRows(entry, usedLabels = new Set()) {
 
     if (resolvedSize) {
       pushRow('Conductor Size', resolvedSize);
-      ['conductor_size', 'conductorsize', 'size', 'awg', 'conductors'].forEach(key => normalizedSkip.add(key));
+      ['conductor_size', 'conductorsize', 'size_awg_kcmil', 'conductor_size_awg_kcmil', 'size', 'awg', 'conductors'].forEach(key => normalizedSkip.add(key));
     }
     if (materialValue) {
       pushRow('Conductor Material', formatOptionLabel(materialValue));
@@ -3889,7 +4448,7 @@ function describeComponentDetailRows(entry, usedLabels = new Set()) {
         ? `${formatSettingValue(numeric)} °C`
         : formatDetailValue(insulationRaw);
       pushRow('Insulation Rating', formatted);
-      ['insulation_rating', 'insulationrating', 'temperature_rating', 'temperaturerating', 'insulation']
+      ['insulation_rating', 'insulationrating', 'temperature_rating', 'temperaturerating', 'temp_rating_c', 'insulation_temp_c', 'insulation']
         .forEach(key => normalizedSkip.add(key));
     }
   }
@@ -4822,6 +5381,7 @@ deviceSelect.addEventListener('change', () => {
   renderSelectedSummary();
   renderSettings();
   persistSettings();
+  markPlotDirty('Device selection changed. Update Plot to refresh the chart.');
   if (!updatingActiveComponentFromSelect) {
     const selectedEntries = selectedDeviceIds()
       .map(id => deviceMap.get(id))
@@ -4896,6 +5456,31 @@ if (exportSvgBtn) {
 if (exportPngBtn) {
   exportPngBtn.addEventListener('click', handleExportPNG);
 }
+if (exportReviewBtn) {
+  exportReviewBtn.addEventListener('click', handleExportReview);
+}
+if (rangePresetSelect) {
+  rangePresetSelect.value = activeRangePreset;
+  rangePresetSelect.addEventListener('change', () => {
+    setActiveRangePreset(rangePresetSelect.value);
+    if (deviceSelect && deviceSelect.selectedOptions.length) {
+      requestPlotRefresh('Range preset changed. Updating plot...');
+    }
+  });
+}
+if (calloutScopeSelect) {
+  calloutScopeSelect.value = activeCalloutScope;
+  calloutScopeSelect.addEventListener('change', () => {
+    setActiveCalloutScope(calloutScopeSelect.value);
+    if (deviceSelect && deviceSelect.selectedOptions.length) {
+      requestPlotRefresh('Callout scope changed. Updating plot...');
+    }
+  });
+}
+if (coordMarginInput) {
+  coordMarginInput.addEventListener('input', markCoordinationStale);
+  coordMarginInput.addEventListener('change', markCoordinationStale);
+}
 if (afThresholdSelect) {
   afThresholdSelect.addEventListener('change', () => {
     const val = Number(afThresholdSelect.value);
@@ -4917,9 +5502,20 @@ if (annotationBtn) {
   });
 }
 chart.on('click.annotation', handleAnnotationPlacement);
+chart.on('click.pinnedDetail', event => {
+  if (event.target === chart.node()) {
+    clearPinnedChartDetail();
+  }
+});
 chart.on('contextmenu.hideMenu', () => {
   contextMenu.hide();
 });
+if (equipmentMetricsPanel) {
+  equipmentMetricsPanel.addEventListener('click', handleEquipmentAssumptionAction);
+}
+if (pinnedDetailPanel) {
+  pinnedDetailPanel.addEventListener('click', handleEquipmentAssumptionAction);
+}
 if (settingsDiv) {
   const handleSettingMutation = event => {
     const target = event.target;
@@ -4937,18 +5533,16 @@ linkBtn.addEventListener('click', linkComponent);
 openBtn.addEventListener('click', () => {
   const targetId = getActiveComponentId() || activeComponentId || compId;
   if (targetId) {
-    window.open(`oneline.html?component=${encodeURIComponent(targetId)}`, '_blank');
+    openOneLineProbe({ componentId: targetId, probeType: 'tcc' }, { probeType: 'tcc', newTab: true });
   }
 });
 if (contextBackBtn) {
   contextBackBtn.addEventListener('click', () => {
     const targetId = getActiveComponentId() || activeComponentId || compId;
-    const url = new URL('oneline.html', window.location.href);
-    if (targetId) {
-      url.searchParams.set('component', targetId);
-      url.searchParams.set('componentModal', '1');
-    }
-    window.location.href = url.toString();
+    openOneLineProbe(
+      { componentId: targetId, probeType: 'tcc' },
+      { probeType: 'tcc', componentModal: true }
+    );
   });
 }
 
@@ -4957,7 +5551,8 @@ function applyPlotAndPersistence() {
   persistSettings();
 }
 
-function requestPlotRefresh() {
+function requestPlotRefresh(message = 'Inputs changed. Updating plot...') {
+  markPlotRefreshPending(message);
   if (typeof requestAnimationFrame !== 'function') {
     applyPlotAndPersistence();
     return;
@@ -5269,7 +5864,10 @@ async function openComponentBrowserModal() {
       actions.appendChild(toggleBtn);
       const openLink = docRef.current.createElement('a');
       openLink.className = 'btn secondary-btn';
-      openLink.href = `oneline.html?component=${encodeURIComponent(entry.componentId)}`;
+      openLink.href = buildOneLineProbeUrl(
+        { componentId: entry.componentId, probeType: 'tcc' },
+        { probeType: 'tcc' }
+      );
       openLink.target = '_blank';
       openLink.rel = 'noopener';
       openLink.textContent = 'Open in One-Line';
@@ -7328,6 +7926,7 @@ function persistSettings() {
   saved.settings = deviceSettings;
   saved.componentOverrides = componentSettings;
   saved.viewOptions = [...activeViewOptions];
+  saved.rangePreset = activeRangePreset;
   persistAnnotations({ skipSetItem: true });
   setItem('tccSettings', saved);
   syncComponentOverrides(componentSettings);
@@ -7491,26 +8090,124 @@ function formatMetricValue(value, unit = '') {
   return unit ? `${formatted} ${unit}` : formatted;
 }
 
+function assumptionKeyForEntry(entry) {
+  return String(entry?.uid || entry?.name || '');
+}
+
+function isAssumptionConfirmed(entry) {
+  const key = assumptionKeyForEntry(entry);
+  return Boolean(key && saved.assumptionConfirmations?.[key]);
+}
+
+function equipmentDataQualityLabel(entry) {
+  if (!entry) return '';
+  if (entry.estimated) {
+    return isAssumptionConfirmed(entry) ? 'Confirmed assumption' : 'Estimated / assumed';
+  }
+  return entry.dataSource || 'Project data';
+}
+
+function entryNeedsAssumptionAction(entry) {
+  return Boolean(entry?.estimated);
+}
+
+function confirmEquipmentAssumption(entry) {
+  const key = assumptionKeyForEntry(entry);
+  if (!key) return;
+  if (!saved.assumptionConfirmations || typeof saved.assumptionConfirmations !== 'object') {
+    saved.assumptionConfirmations = {};
+  }
+  saved.assumptionConfirmations[key] = {
+    confirmedAt: new Date().toISOString(),
+    label: entry.name || equipmentMetricTitle(entry)
+  };
+  saved.viewOptions = [...activeViewOptions];
+  saved.rangePreset = activeRangePreset;
+  saved.calloutScope = activeCalloutScope;
+  setItem('tccSettings', saved);
+  renderEquipmentMetrics(activeEquipmentOverlays, activeEquipmentConstraintChecks);
+  showPinnedEquipmentDetail(null, entry, null, null);
+  updateCoordinationStatus(`${equipmentMetricTitle(entry)} assumption confirmed. Re-run Auto-Coordinate if this changes the review basis.`, 'ok');
+}
+
+function sourceComponentIdForEquipmentEntry(entry) {
+  if (!entry) return null;
+  const candidates = [entry.sourceId, entry.targetId].filter(Boolean);
+  return candidates.find(componentId => componentLookup.has(componentId)) || null;
+}
+
+function openEquipmentSource(entry) {
+  const componentId = sourceComponentIdForEquipmentEntry(entry);
+  if (!componentId) return;
+  renderOneLinePreview(componentId);
+  updateCoordinationStatus(`${equipmentMetricTitle(entry)} source shown in the one-line preview. Use Back to One-Line to edit source data.`, 'neutral');
+}
+
+function equipmentAssumptionActions(entry) {
+  if (!entryNeedsAssumptionAction(entry)) return '';
+  const key = escapeHtml(assumptionKeyForEntry(entry));
+  const confirmed = isAssumptionConfirmed(entry);
+  const confirmLabel = confirmed ? 'Confirmed' : 'Confirm Assumption';
+  return `
+    <div class="tcc-assumption-actions" data-entry-key="${key}">
+      <button type="button" class="tcc-assumption-confirm" data-action="confirm-assumption" data-entry-key="${key}"${confirmed ? ' disabled' : ''}>${confirmLabel}</button>
+      <button type="button" class="tcc-assumption-source" data-action="open-assumption-source" data-entry-key="${key}">Select Source</button>
+    </div>
+  `;
+}
+
+function findEquipmentEntryByKey(key) {
+  if (!key) return null;
+  return activeEquipmentOverlays.find(entry => assumptionKeyForEntry(entry) === key) || null;
+}
+
+function handleEquipmentAssumptionAction(event) {
+  const button = event.target?.closest?.('[data-action][data-entry-key]');
+  if (!button) return;
+  const entry = findEquipmentEntryByKey(button.dataset.entryKey);
+  if (!entry) return;
+  event.preventDefault();
+  if (button.dataset.action === 'confirm-assumption') {
+    confirmEquipmentAssumption(entry);
+  } else if (button.dataset.action === 'open-assumption-source') {
+    openEquipmentSource(entry);
+  }
+}
+
 function equipmentMetricRows(entry) {
   if (!entry || !isEquipmentOverlayKind(entry.kind)) return [];
-  const estimated = entry.estimated ? 'Estimated' : '';
+  const quality = equipmentDataQualityLabel(entry);
   if (entry.kind === 'inrush') {
+    const duration = Number.isFinite(entry.normalizedDuration) && entry.normalizedDuration > 0
+      ? entry.normalizedDuration
+      : entry.duration;
     return [
+      { label: 'Data Quality', value: quality },
+      { label: 'FLA', value: formatMetricValue(entry.fla, 'A') },
+      { label: 'Multiple', value: entry.inrushMultiple ? `${formatSettingValue(entry.inrushMultiple)}x${entry.multipleEstimated ? ' assumed' : ''}` : '' },
       { label: 'Current', value: formatMetricValue(entry.current, 'A') },
-      { label: 'Duration', value: formatMetricValue(entry.duration, 's') }
+      { label: 'Duration', value: `${formatMetricValue(duration, 's')}${entry.durationEstimated ? ' assumed' : ''}` },
+      { label: 'Voltage', value: formatMetricValue(entry.operatingVoltage, 'V') },
+      { label: 'Side', value: entry.operatingSide || '' }
     ];
   }
   if (entry.kind === 'transformerDamage') {
     return [
+      { label: 'Data Quality', value: quality },
       { label: 'FLA', value: formatMetricValue(entry.fla, 'A') },
+      { label: 'Voltage', value: formatMetricValue(entry.operatingVoltage, 'V') },
+      { label: 'Side', value: entry.operatingSide || '' },
       { label: 'Points', value: Array.isArray(entry.curve) ? String(entry.curve.length) : '' }
     ];
   }
   if (entry.kind === 'cable') {
     return [
+      { label: 'Data Quality', value: quality },
       { label: 'Size', value: entry.conductorSize || '' },
-      { label: 'Material', value: entry.conductorMaterial ? formatOptionLabel(entry.conductorMaterial) : '' },
-      { label: 'Insulation', value: entry.insulationType || '' },
+      { label: 'Material', value: entry.conductorMaterial ? formatOptionLabel(entry.conductorMaterial) : 'Copper assumed' },
+      { label: 'Insulation', value: entry.insulationType || (entry.insulationEstimated ? '90 C assumed' : '') },
+      { label: 'Conductors/Phase', value: formatMetricValue(entry.conductorsPerPhase) },
+      { label: 'Parallel Sets', value: formatMetricValue(entry.parallel) },
       { label: 'Ampacity', value: formatMetricValue(entry.ampacity, 'A') },
       { label: 'Length', value: formatMetricValue(parseNumeric(entry.length), 'ft') },
       { label: 'Points', value: Array.isArray(entry.curve) ? String(entry.curve.length) : '' }
@@ -7518,23 +8215,23 @@ function equipmentMetricRows(entry) {
   }
   if (entry.kind === 'motorStart') {
     return [
+      { label: 'Data Quality', value: quality },
       { label: 'Profile', value: entry.startProfile || 'Start' },
       { label: 'FLA', value: formatMetricValue(entry.fla, 'A') },
       { label: 'LRA', value: formatMetricValue(entry.lockedRotor, 'A') },
       { label: 'Duration', value: formatMetricValue(entry.startTime, 's') },
-      { label: 'Voltage', value: formatMetricValue(entry.voltage, 'V') },
-      { label: 'Source', value: estimated }
+      { label: 'Voltage', value: formatMetricValue(entry.voltage, 'V') }
     ];
   }
   if (entry.kind === 'motorThermal') {
     return [
+      { label: 'Data Quality', value: quality },
       { label: 'FLA', value: formatMetricValue(entry.fla, 'A') },
       { label: 'LRA', value: formatMetricValue(entry.lockedRotor, 'A') },
       { label: 'Stall', value: formatMetricValue(entry.stallTime, 's') },
       { label: 'Continuous', value: formatMetricValue(entry.continuousCurrent, 'A') },
       { label: 'SF', value: formatMetricValue(entry.serviceFactor) },
       { label: 'Voltage', value: formatMetricValue(entry.voltage, 'V') },
-      { label: 'Source', value: estimated }
     ];
   }
   return [];
@@ -7569,6 +8266,7 @@ function renderEquipmentMetrics(overlays = [], checks = []) {
         <h3>${escapeHtml(equipmentMetricTitle(entry))}</h3>
         <p>${escapeHtml(subtitle || entry.name || '')}</p>
         <dl>${rows}</dl>
+        ${equipmentAssumptionActions(entry)}
       </article>
     `;
   }).join('');
@@ -7678,8 +8376,84 @@ function computeEquipmentConstraintChecks(plotted = [], overlays = []) {
     .filter(Boolean);
 }
 
+function pushCurveRangeValues(curve, currents, times) {
+  (Array.isArray(curve) ? curve : []).forEach(point => {
+    if (Number.isFinite(point.current) && point.current > 0) currents.push(point.current);
+    if (Number.isFinite(point.time) && point.time > 0) times.push(point.time);
+  });
+}
+
+function collectRangeValuesForPreset(preset, devicePlots, overlays, faultCurrentA, allCurrents, allTimes) {
+  const currents = [];
+  const times = [];
+  const includeDeviceCurves = entries => {
+    entries.forEach(entry => {
+      pushCurveRangeValues(entry.scaled?.curve, currents, times);
+      pushCurveRangeValues(entry.scaled?.minCurve, currents, times);
+      pushCurveRangeValues(entry.scaled?.maxCurve, currents, times);
+    });
+  };
+  const includeOverlays = entries => {
+    entries.forEach(entry => {
+      if (entry.kind === 'inrush') {
+        if (entry.current > 0) currents.push(entry.current);
+        const duration = entry.normalizedDuration ?? entry.duration ?? DEFAULT_INRUSH_DURATION;
+        if (duration > 0) times.push(duration);
+      } else {
+        pushCurveRangeValues(entry.curve, currents, times);
+      }
+    });
+  };
+
+  if (preset === 'coordination') {
+    includeDeviceCurves(devicePlots);
+    if (faultCurrentA > 0) currents.push(faultCurrentA);
+  } else if (preset === 'motorStart') {
+    includeDeviceCurves(devicePlots);
+    includeOverlays(overlays.filter(entry => entry.kind === 'motorStart' || entry.kind === 'motorThermal'));
+  } else if (preset === 'transformerInrush') {
+    includeDeviceCurves(devicePlots);
+    includeOverlays(overlays.filter(entry => entry.kind === 'inrush' || entry.kind === 'transformerDamage'));
+  } else if (preset === 'faultCurrent' && faultCurrentA > 0) {
+    includeDeviceCurves(devicePlots);
+    currents.push(faultCurrentA / 4, faultCurrentA, faultCurrentA * 4);
+    times.push(0.001, 0.01, 0.1, 1, 10);
+  }
+
+  return {
+    currents: currents.length ? currents : allCurrents,
+    times: times.length ? times : allTimes
+  };
+}
+
+function resolvePlotDomains(devicePlots, overlays, faultCurrentA, allCurrents, allTimes) {
+  const preset = normalizeRangePreset(activeRangePreset);
+  const { currents, times } = collectRangeValuesForPreset(preset, devicePlots, overlays, faultCurrentA, allCurrents, allTimes);
+  const minCurrent = d3.min(currents) || 1;
+  const maxCurrent = d3.max(currents) || minCurrent * 10;
+  const minTime = d3.min(times) || 0.01;
+  const maxTime = d3.max(times) || minTime * 10;
+  let currentDomain = [Math.max(minCurrent / 1.5, 0.01), Math.max(maxCurrent * 1.5, minCurrent * 1.2)];
+  let timeDomain = [Math.max(minTime / 1.5, 0.001), Math.max(maxTime * 1.3, minTime * 2)];
+
+  if (preset === 'faultCurrent' && faultCurrentA > 0) {
+    currentDomain = [Math.max(faultCurrentA / 5, 0.01), Math.max(faultCurrentA * 5, faultCurrentA + 1)];
+    timeDomain = [0.001, Math.max(10, maxTime * 1.2)];
+  } else if (preset === 'motorStart') {
+    timeDomain[0] = Math.min(timeDomain[0], 0.01);
+    timeDomain[1] = Math.max(timeDomain[1], 30);
+  } else if (preset === 'transformerInrush') {
+    timeDomain[0] = Math.min(timeDomain[0], 0.001);
+    timeDomain[1] = Math.max(timeDomain[1], 2);
+  }
+
+  return { currentDomain, timeDomain };
+}
+
 function plot() {
   contextMenu.hide();
+  clearPinnedChartDetail();
+  activeLegendFocusKey = null;
   chart.selectAll('*').remove();
   violationDiv.textContent = '';
   annotationContext = null;
@@ -7687,6 +8461,8 @@ function plot() {
   updateCoordinationStatus('Updating plot...', 'pending');
   activeEquipmentOverlays = [];
   activeEquipmentConstraintChecks = [];
+  lastCoordState = null;
+  exportCtiBtn?.classList.add('hidden');
   renderEquipmentMetrics([], []);
   chart.classed('annotation-mode', false);
   let selectionIds = selectedDeviceIds();
@@ -7715,6 +8491,7 @@ function plot() {
       applySelectionSet(selectionIds);
       saved.devices = [...selectionIds];
       saved.viewOptions = [...activeViewOptions];
+      saved.rangePreset = activeRangePreset;
       setItem('tccSettings', saved);
       return true;
     };
@@ -7726,6 +8503,7 @@ function plot() {
   if (!selections.length) {
     updateCoordinationStatus('No devices selected. Choose devices to update the plot.', 'warning');
     renderEquipmentMetrics([], []);
+    clearPlotRefreshPending();
     return;
   }
 
@@ -7752,6 +8530,7 @@ function plot() {
   if (!devicePlots.length && !overlays.length) {
     updateCoordinationStatus('No plottable curves are available for the selected devices.', 'warning');
     renderEquipmentMetrics([], []);
+    clearPlotRefreshPending();
     return;
   }
 
@@ -7837,7 +8616,8 @@ function plot() {
   }
 
   const BASE_MARGIN = { top: 24, right: 90, bottom: 70, left: 70 };
-  const baseWidth = +chart.attr('width') - BASE_MARGIN.left - BASE_MARGIN.right;
+  const svgWidth = Number(chart.attr('width')) || TCC_DEFAULT_CHART_WIDTH;
+  const baseWidth = svgWidth - BASE_MARGIN.left - BASE_MARGIN.right;
   const color = d3.scaleOrdinal(d3.schemeCategory10);
   const plottables = [...devicePlots, ...overlays];
   let gfpColorIndex = 0;
@@ -7860,17 +8640,21 @@ function plot() {
     left: BASE_MARGIN.left
   };
   const width = baseWidth;
-  const height = +chart.attr('height') - margin.top - margin.bottom;
+  const baseSvgHeight = TCC_DEFAULT_CHART_HEIGHT;
+  const svgHeight = Math.max(baseSvgHeight, margin.top + TCC_MIN_PLOT_HEIGHT + margin.bottom);
+  chart
+    .attr('height', svgHeight)
+    .attr('viewBox', `0 0 ${svgWidth} ${svgHeight}`)
+    .attr('preserveAspectRatio', 'xMidYMin meet');
+  const height = svgHeight - margin.top - margin.bottom;
   const g = chart.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
-  const minCurrent = d3.min(allCurrents) || 1;
-  const maxCurrent = d3.max(allCurrents) || minCurrent * 10;
-  const minTime = d3.min(allTimes) || 0.01;
-  const maxTime = d3.max(allTimes) || minTime * 10;
+  const faultCurrentA = fault ? fault * 1000 : null;
+  const { currentDomain, timeDomain } = resolvePlotDomains(devicePlots, overlays, faultCurrentA, allCurrents, allTimes);
   const x = d3.scaleLog()
-    .domain([Math.max(minCurrent / 1.5, 0.01), Math.max(maxCurrent * 1.5, minCurrent * 1.2)])
+    .domain(currentDomain)
     .range([0, width]);
   const y = d3.scaleLog()
-    .domain([Math.max(minTime / 1.5, 0.001), Math.max(maxTime * 1.3, minTime * 2)])
+    .domain(timeDomain)
     .range([height, 0]);
   const pageStyles = getComputedStyle(document.body);
   const chartTextColor = pageStyles.getPropertyValue('--text-color').trim() || '#333';
@@ -7942,8 +8726,8 @@ function plot() {
   const plotLayer = g.append('g')
     .attr('class', 'tcc-plot-layer')
     .attr('clip-path', `url(#${clipId})`);
-  const overlayLayer = plotLayer.append('g').attr('class', 'tcc-overlay-layer');
   const deviceLayer = plotLayer.append('g').attr('class', 'tcc-device-layer');
+  const overlayLayer = plotLayer.append('g').attr('class', 'tcc-overlay-layer');
   const indicatorLayer = plotLayer.append('g').attr('class', 'tcc-indicator-layer');
 
   const legend = chart.append('g')
@@ -7952,7 +8736,29 @@ function plot() {
 
   legendLayouts.forEach(layout => {
     const { entry, viewSummaries, legendLabel, x: itemX, y: itemY } = layout;
-    const legendItem = legend.append('g').attr('transform', `translate(${itemX},${itemY})`);
+    const legendKey = entryInteractiveKey(entry);
+    const legendItem = legend.append('g')
+      .attr('class', 'tcc-legend-item')
+      .attr('transform', `translate(${itemX},${itemY})`)
+      .attr('role', 'button')
+      .attr('tabindex', 0)
+      .attr('data-entry-key', legendKey)
+      .attr('aria-label', `Highlight ${legendLabel} on the chart`)
+      .attr('title', 'Click to highlight this curve. Double-click to focus its settings.')
+      .style('cursor', 'pointer')
+      .on('click', event => {
+        event.stopPropagation();
+        toggleLegendFocus(entry);
+      })
+      .on('dblclick', event => {
+        event.stopPropagation();
+        if (entry.selection?.uid) focusDeviceSettings(entry.selection.uid);
+      })
+      .on('keydown', event => {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        event.preventDefault();
+        toggleLegendFocus(entry);
+      });
     if (entry.kind === 'cable') {
       legendItem.append('line')
         .attr('x1', 0)
@@ -8119,34 +8925,51 @@ function plot() {
     motorStartCurves.set(entry, sanitized);
   });
 
-  overlays.filter(entry => entry.kind === 'cable').forEach(entry => {
-    overlayLayer.append('path')
-      .datum(entry.curve)
+  const appendEquipmentOverlayPath = (entry, curve, strokeDasharray, strokeWidth = 2) => {
+    const safeCurve = Array.isArray(curve) ? curve : [];
+    const pathData = safeCurve.length ? line(safeCurve) : null;
+    const visiblePath = overlayLayer.append('path')
+      .datum(safeCurve)
+      .attr('class', 'tcc-equipment-overlay-path')
       .attr('fill', 'none')
       .attr('stroke', entry.color)
-      .attr('stroke-width', 2)
-      .attr('stroke-dasharray', '6,3')
-      .attr('d', entry.curve.length ? line(entry.curve) : null);
+      .attr('stroke-width', strokeWidth)
+      .attr('stroke-dasharray', strokeDasharray || null)
+      .attr('d', pathData)
+      .attr('aria-hidden', 'true')
+      .style('pointer-events', 'none');
+    if (pathData) {
+      bindEquipmentOverlayTooltip(
+        overlayLayer.append('path')
+          .datum(safeCurve)
+          .attr('class', 'tcc-overlay-hit-target')
+          .attr('fill', 'none')
+          .attr('stroke', 'transparent')
+          .attr('stroke-width', Math.max(12, strokeWidth + 8))
+          .attr('stroke-linecap', 'round')
+          .attr('stroke-linejoin', 'round')
+          .attr('d', pathData)
+          .style('pointer-events', 'stroke'),
+        entry,
+        x,
+        margin,
+        safeCurve
+      );
+    }
+    entry.overlayPath = visiblePath;
+    return visiblePath;
+  };
+
+  overlays.filter(entry => entry.kind === 'cable').forEach(entry => {
+    appendEquipmentOverlayPath(entry, entry.curve, '6,3');
   });
 
   overlays.filter(entry => entry.kind === 'transformerDamage').forEach(entry => {
-    overlayLayer.append('path')
-      .datum(entry.curve)
-      .attr('fill', 'none')
-      .attr('stroke', entry.color)
-      .attr('stroke-width', 2)
-      .attr('stroke-dasharray', '8,4')
-      .attr('d', entry.curve.length ? line(entry.curve) : null);
+    appendEquipmentOverlayPath(entry, entry.curve, '8,4');
   });
 
   overlays.filter(entry => entry.kind === 'motorThermal').forEach(entry => {
-    overlayLayer.append('path')
-      .datum(entry.curve)
-      .attr('fill', 'none')
-      .attr('stroke', entry.color)
-      .attr('stroke-width', 2)
-      .attr('stroke-dasharray', '4,1,1,1')
-      .attr('d', entry.curve.length ? line(entry.curve) : null);
+    appendEquipmentOverlayPath(entry, entry.curve, '4,1,1,1');
   });
 
   overlays.filter(entry => entry.kind === 'inrush').forEach(entry => {
@@ -8154,38 +8977,48 @@ function plot() {
     const duration = entry.normalizedDuration ?? DEFAULT_INRUSH_DURATION;
     const xPos = x(entry.current);
     const yPos = y(duration);
+    if (!Number.isFinite(xPos) || !Number.isFinite(yPos)) return;
     const size = 6;
-    overlayLayer.append('line')
-      .attr('x1', xPos - size)
-      .attr('x2', xPos + size)
-      .attr('y1', yPos - size)
-      .attr('y2', yPos + size)
+    const labelY = yPos - size - 2 < 12 ? size + 14 : -size - 2;
+    const marker = bindEquipmentOverlayTooltip(
+      overlayLayer.append('g')
+        .attr('class', 'tcc-overlay-marker tcc-inrush-marker')
+        .attr('transform', `translate(${xPos},${yPos})`),
+      entry,
+      x,
+      margin
+    );
+    marker.append('circle')
+      .attr('class', 'tcc-overlay-marker-hit-target')
+      .attr('r', 14)
+      .attr('fill', 'transparent')
+      .style('pointer-events', 'all');
+    marker.append('line')
+      .attr('x1', -size)
+      .attr('x2', size)
+      .attr('y1', -size)
+      .attr('y2', size)
       .attr('stroke', entry.color)
       .attr('stroke-width', 2);
-    overlayLayer.append('line')
-      .attr('x1', xPos - size)
-      .attr('x2', xPos + size)
-      .attr('y1', yPos + size)
-      .attr('y2', yPos - size)
+    marker.append('line')
+      .attr('x1', -size)
+      .attr('x2', size)
+      .attr('y1', size)
+      .attr('y2', -size)
       .attr('stroke', entry.color)
       .attr('stroke-width', 2);
-    overlayLayer.append('text')
-      .attr('x', xPos + size + 4)
-      .attr('y', Math.max(12, yPos - size - 2))
+    marker.append('text')
+      .attr('x', size + 4)
+      .attr('y', labelY)
       .attr('fill', entry.color)
       .attr('font-size', 12)
-      .text(`Inrush – ${formatSettingValue(entry.current)} A @ ${formatSettingValue(duration)} s`);
+      .text(`Inrush - ${formatSettingValue(entry.current)} A @ ${formatSettingValue(duration)} s`);
+    entry.overlayMarker = marker;
   });
 
   overlays.filter(entry => entry.kind === 'motorStart').forEach(entry => {
     const curve = motorStartCurves.get(entry) || entry.curve;
-    overlayLayer.append('path')
-      .datum(curve)
-      .attr('fill', 'none')
-      .attr('stroke', entry.color)
-      .attr('stroke-width', 2)
-      .attr('stroke-dasharray', '2,2')
-      .attr('d', curve.length ? line(curve) : null);
+    appendEquipmentOverlayPath(entry, curve, '2,2');
   });
 
   overlays.filter(entry => entry.kind === 'arcFlashLimit').forEach(entry => {
@@ -8241,6 +9074,15 @@ function plot() {
       .attr('tabindex', 0)
       .style('cursor', 'move')
       .on('mousemove', event => showCurveHoverTooltip(event, entry, x, y, margin))
+      .on('click', event => {
+        event.stopPropagation();
+        showPinnedCurveDetail(event, entry, x, margin);
+      })
+      .on('keydown', event => {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        event.preventDefault();
+        showPinnedCurveDetail(event, entry, x, margin);
+      })
       .on('mouseleave', hideCurveHoverTooltip)
       .on('focus', event => showCurveHoverTooltip(event, entry, x, y, margin))
       .on('blur', hideCurveHoverTooltip)
@@ -8253,23 +9095,60 @@ function plot() {
   });
   const equipmentOverlays = overlays.filter(entry => isEquipmentOverlayKind(entry.kind));
 
+  const setEntryVisualFocus = (entry, active, dimmed) => {
+    [
+      entry.path,
+      entry.bandPath,
+      entry.minPath,
+      entry.maxPath,
+      entry.peakPath,
+      entry.overlayPath,
+      entry.overlayMarker
+    ].filter(Boolean).forEach(selection => {
+      selection.classed('is-highlighted', active).classed('is-dimmed', dimmed);
+    });
+  };
+
+  function clearLegendFocus() {
+    activeLegendFocusKey = null;
+    [...plotted, ...equipmentOverlays].forEach(entry => setEntryVisualFocus(entry, false, false));
+    legend.selectAll('.tcc-legend-item').classed('is-active', false).classed('is-muted', false);
+  }
+
+  function toggleLegendFocus(entry) {
+    const key = entryInteractiveKey(entry);
+    if (!key) return;
+    if (activeLegendFocusKey === key) {
+      clearLegendFocus();
+      updateCoordinationStatus('Legend highlight cleared.', 'neutral');
+      return;
+    }
+    activeLegendFocusKey = key;
+    [...plotted, ...equipmentOverlays].forEach(item => {
+      const isActive = entryInteractiveKey(item) === key;
+      setEntryVisualFocus(item, isActive, !isActive);
+    });
+    legend.selectAll('.tcc-legend-item')
+      .classed('is-active', function isActiveLegend() {
+        return this.getAttribute('data-entry-key') === key;
+      })
+      .classed('is-muted', function isMutedLegend() {
+        return this.getAttribute('data-entry-key') !== key;
+      });
+    updateCoordinationStatus(`${entry.selection?.name || entry.name || 'Curve'} highlighted from the legend. Select it again to clear.`, 'neutral');
+  }
+
   const viewCalloutLayer = g.append('g').attr('class', 'view-callout-layer');
 
   const buildViewCalloutData = () => {
-    const configs = getActiveViewConfigs();
-    if (!configs.length) return [];
+    if (!areCalloutsEnabled()) return [];
     return plotted
       .map(entry => {
         if (!entry || !entry.selection) return null;
         if (entry.selection.kind !== 'library' && entry.selection.kind !== 'component') return null;
+        if (!shouldRenderCalloutForEntry(entry)) return null;
         const summaries = formatViewSummaries(entry);
-        if (!summaries.length) return null;
-        const deviceLabel = entry.selection?.name
-          || entry.name
-          || entry.selection?.baseDevice?.name
-          || entry.selection?.component?.label
-          || entry.selection?.component?.name
-          || 'Device';
+        const deviceLabel = formatCalloutDeviceLabel(entry);
         const curve = Array.isArray(entry.scaled?.curve) ? entry.scaled.curve : [];
         if (!curve.length) return null;
         const anchor = curve[Math.floor(curve.length / 2)] || curve[curve.length - 1] || curve[0];
@@ -8727,6 +9606,7 @@ function plot() {
   };
 
   renderOneLinePreview(getActiveComponentId());
+  clearPlotRefreshPending();
   updateCoordinationStatus(
     `${plotted.length} device ${plotted.length === 1 ? 'curve is' : 'curves are'} plotted. Run Auto-Coordinate to check margins.`,
     'ok'
@@ -8832,6 +9712,12 @@ function autoCoordinate() {
   showCoordResults(combinedResults, combinedCoordinated);
 }
 
+function coordinationNextAction(result, violation) {
+  const device = result?.id || 'upstream device';
+  const current = Number.isFinite(violation?.current) ? ` near ${formatCoordinationCurrent(violation.current)} A` : '';
+  return `Next step: increase delay or pickup on ${device}${current}, then rerun Auto-Coordinate and verify equipment references.`;
+}
+
 function showCoordResults(results, allCoordinated, message) {
   if (!coordPanel || !coordResultsDiv) return;
   coordPanel.open = true;
@@ -8861,8 +9747,9 @@ function showCoordResults(results, allCoordinated, message) {
     const statusDetail = violationCount
       ? `${violationCount} ${violationCount === 1 ? 'violation' : 'violations'} across ${failedDevices} ${failedDevices === 1 ? 'device' : 'devices'}`
       : `${failedDevices} ${failedDevices === 1 ? 'device needs' : 'devices need'} review`;
+    const worstResult = worst ? results.find(result => result.id === worst.device) : null;
     const worstDetail = worst
-      ? ` Worst gap: ${formatCoordinationSeconds(worst.gap)} s at ${formatCoordinationCurrent(worst.current)} A.`
+      ? ` Worst gap: ${formatCoordinationSeconds(worst.gap)} s at ${formatCoordinationCurrent(worst.current)} A. ${coordinationNextAction(worstResult, worst)}`
       : '';
     lines.push(`<p class="coord-status coord-fail">Coordination gaps remain: ${escapeHtml(statusDetail)}.${escapeHtml(worstDetail)}</p>`);
     updateCoordinationStatus(`Coordination gaps remain: ${statusDetail}.${worstDetail} Review the details below the chart.`, 'error');
@@ -8884,7 +9771,7 @@ function showCoordResults(results, allCoordinated, message) {
       (r.violations ?? []).slice(0, 3).forEach(v => {
         if (!Number.isFinite(v.gap)) return;
         lines.push(
-          `<p class="coord-violation-detail">I=${formatCoordinationCurrent(v.current)} A: gap ${formatCoordinationSeconds(v.gap)} s (need ${formatCoordinationSeconds(parseFloat(coordMarginInput?.value) || 0.3)} s)</p>`
+          `<p class="coord-violation-detail">I=${formatCoordinationCurrent(v.current)} A: gap ${formatCoordinationSeconds(v.gap)} s (need ${formatCoordinationSeconds(parseFloat(coordMarginInput?.value) || 0.3)} s). ${escapeHtml(coordinationNextAction(r, v))}</p>`
         );
       });
     }
@@ -9225,12 +10112,40 @@ function renderOneLinePreview(componentId) {
     .append('path')
     .attr('class', 'oneline-preview-grid-line')
     .attr('d', `M ${gridSize} 0 L 0 0 0 ${gridSize}`);
+  defs.append('marker')
+    .attr('id', 'oneline-preview-flow-arrow')
+    .attr('viewBox', '0 0 8 8')
+    .attr('refX', 7)
+    .attr('refY', 4)
+    .attr('markerWidth', 6)
+    .attr('markerHeight', 6)
+    .attr('orient', 'auto-start-reverse')
+    .append('path')
+    .attr('class', 'preview-orientation-arrow-head')
+    .attr('d', 'M 0 0 L 8 4 L 0 8 z');
 
   onelinePreviewSvg.append('rect')
     .attr('class', 'oneline-preview-grid')
     .attr('width', width)
     .attr('height', height)
     .attr('fill', `url(#${gridPatternId})`);
+  const orientationCue = onelinePreviewSvg.append('g')
+    .attr('class', 'preview-orientation-cue')
+    .attr('transform', `translate(${Math.max(16, width - 72)}, 18)`);
+  orientationCue.append('text')
+    .attr('x', 0)
+    .attr('y', 0)
+    .text('Source');
+  orientationCue.append('line')
+    .attr('x1', 22)
+    .attr('x2', 22)
+    .attr('y1', 8)
+    .attr('y2', 54)
+    .attr('marker-end', 'url(#oneline-preview-flow-arrow)');
+  orientationCue.append('text')
+    .attr('x', 0)
+    .attr('y', 72)
+    .text('Load');
   onelinePreviewSvgEl.classList.remove('hidden');
   if (onelinePreviewContainer) onelinePreviewContainer.classList.remove('empty');
   if (onelinePreviewEmpty) onelinePreviewEmpty.classList.add('hidden');
@@ -9749,6 +10664,14 @@ function renderOneLinePreview(componentId) {
     return wrapPreviewLabel(datum.label);
   };
 
+  node.filter(d => labelPlacement(d).side && labelLinesFor(d).length)
+    .append('line')
+    .attr('class', 'preview-node-label-leader')
+    .attr('x1', d => (labelPlacement(d).x >= 0 ? d.width / 2 : -d.width / 2))
+    .attr('y1', 0)
+    .attr('x2', d => labelPlacement(d).x + (labelPlacement(d).x >= 0 ? -6 : 6))
+    .attr('y2', 0);
+
   node.append('text')
     .attr('class', 'preview-node-label')
     .attr('text-anchor', d => labelPlacement(d).anchor)
@@ -9994,27 +10917,43 @@ function extractTransformerLabelRatings(transformer) {
 function computeTransformerInrush(transformer, referenceVoltage, refPhases = 3) {
   const operating = resolveTransformerOperatingPoint(transformer, referenceVoltage, refPhases);
   if (!operating) return null;
-  const multiple = resolveInrushMultiple(transformer);
-  const duration = resolveInrushDuration(transformer);
-  return { current: operating.fla * multiple, duration };
+  const multiple = resolveInrushMultipleInfo(transformer);
+  const duration = resolveInrushDurationInfo(transformer);
+  return {
+    current: operating.fla * multiple.value,
+    duration: duration.value,
+    multiple: multiple.value,
+    multipleEstimated: multiple.estimated,
+    durationEstimated: duration.estimated,
+    fla: operating.fla,
+    operating
+  };
 }
 
 function resolveInrushMultiple(comp) {
+  return resolveInrushMultipleInfo(comp).value;
+}
+
+function resolveInrushMultipleInfo(comp) {
   const keys = ['inrush_multiple', 'inrushMultiple', 'inrush_multiplier', 'xfmr_inrush_multiple', 'xfmrInrushMultiple'];
   for (const key of keys) {
     const val = parseNumeric(getComponentValue(comp, key));
-    if (Number.isFinite(val) && val > 0) return val;
+    if (Number.isFinite(val) && val > 0) return { value: val, estimated: false, sourceKey: key };
   }
-  return DEFAULT_INRUSH_MULTIPLE;
+  return { value: DEFAULT_INRUSH_MULTIPLE, estimated: true, sourceKey: '' };
 }
 
 function resolveInrushDuration(comp) {
+  return resolveInrushDurationInfo(comp).value;
+}
+
+function resolveInrushDurationInfo(comp) {
   const keys = ['inrush_duration', 'inrushDuration', 'xfmr_inrush_duration'];
   for (const key of keys) {
     const val = parseNumeric(getComponentValue(comp, key));
-    if (Number.isFinite(val) && val > 0) return val;
+    if (Number.isFinite(val) && val > 0) return { value: val, estimated: false, sourceKey: key };
   }
-  return DEFAULT_INRUSH_DURATION;
+  return { value: DEFAULT_INRUSH_DURATION, estimated: true, sourceKey: '' };
 }
 
 function isConductorSegmentComponent(comp) {
@@ -10090,16 +11029,16 @@ function getKConstant(material, insulation) {
 
 function buildCableCurve(cable, phases = 3) {
   const descriptor = parseConductorsDescriptor(cable.conductors);
-  const size = cable.conductor_size || descriptor.size || cable.size || cable.awg;
+  const size = cable.conductor_size || cable.conductorSize || cable.size_awg_kcmil || cable.conductor_size_awg_kcmil || descriptor.size || cable.size || cable.awg;
   const baseArea = areaFromSize(size);
   if (!baseArea) return null;
-  const parallel = Number(cable.parallel_count || cable.parallels || cable.parallel) || 1;
+  const parallel = Number(cable.parallel_count || cable.parallel_sets || cable.parallelSets || cable.parallels || cable.parallel) || 1;
   const perPhase = Number(cable.conductors_per_phase || cable.conductorsPerPhase) || null;
   const phaseCount = phases || 3;
   const inferredPerPhase = perPhase || (descriptor.count ? Math.max(1, Math.round(descriptor.count / phaseCount)) : 1);
   const effectiveArea = baseArea * inferredPerPhase * parallel;
-  const material = cable.conductor_material || cable.material || 'copper';
-  const insulation = Number(cable.insulation_rating || cable.temperature_rating || 90);
+  const material = cable.conductor_material || cable.conductorMaterial || cable.material || 'copper';
+  const insulation = Number(cable.insulation_rating || cable.temperature_rating || cable.temp_rating_c || cable.insulation_temp_c || 90);
   const k = getKConstant(material, insulation);
   if (!k) return null;
   const areaMm2 = effectiveArea * CMIL_TO_MM2;
@@ -10109,7 +11048,11 @@ function buildCableCurve(cable, phases = 3) {
   })).filter(p => Number.isFinite(p.current) && p.current > 0);
   return {
     curve,
-    ampacity: Number(cable.ampacity || cable.calc_ampacity || cable.rating || '') || null
+    ampacity: Number(cable.ampacity || cable.calc_ampacity || cable.thermal_rating_ampacity || cable.rating || '') || null,
+    materialEstimated: !(cable.conductor_material || cable.conductorMaterial || cable.material),
+    insulationEstimated: !(cable.insulation_rating || cable.temperature_rating || cable.temp_rating_c || cable.insulation_temp_c),
+    conductorsPerPhase: inferredPerPhase,
+    parallel
   };
 }
 
@@ -10123,7 +11066,8 @@ function buildTransformerDamageCurve(transformer, referenceVoltage, refPhases = 
   if (!points.length) return null;
   return {
     curve: points.sort((a, b) => a.time - b.time),
-    fla: operating.fla
+    fla: operating.fla,
+    operating
   };
 }
 
@@ -10140,7 +11084,7 @@ function resolveTransformerOperatingPoint(transformer, referenceVoltage, refPhas
     const kva = getNumericValue(transformer, kvaKey);
     const volts = parseVoltageFieldValue(getComponentValue(transformer, voltsKey), voltsKey);
     if (!Number.isFinite(kva) || !Number.isFinite(volts)) return;
-    sides.push({ kva, volts, label });
+    sides.push({ kva, volts, label, source: 'Project data' });
   });
   if (!sides.length) {
     const labelRatings = extractTransformerLabelRatings(transformer);
@@ -10152,7 +11096,7 @@ function resolveTransformerOperatingPoint(transformer, referenceVoltage, refPhas
           : index === sortedVoltages.length - 1
             ? 'LV'
             : `Winding ${index + 1}`;
-        sides.push({ kva: labelRatings.kva, volts, label });
+        sides.push({ kva: labelRatings.kva, volts, label, source: 'Component label' });
       });
     }
   }
@@ -10167,7 +11111,7 @@ function resolveTransformerOperatingPoint(transformer, referenceVoltage, refPhas
         ?? parseVoltageFieldValue(getComponentValue(transformer, 'kV'), 'kV');
     }
     if (Number.isFinite(kva) && Number.isFinite(volts)) {
-      sides.push({ kva, volts, label: 'Secondary' });
+      sides.push({ kva, volts, label: 'Secondary', source: 'Project data' });
     }
   }
   if (!sides.length) {
@@ -10177,7 +11121,7 @@ function resolveTransformerOperatingPoint(transformer, referenceVoltage, refPhas
       ?? parseVoltageFieldValue(getComponentValue(transformer, 'voltage'), 'voltage')
       ?? parseVoltageFieldValue(getComponentValue(transformer, 'volts'), 'volts');
     if (Number.isFinite(mva) && Number.isFinite(volts)) {
-      sides.push({ kva: mva * 1000, volts, label: 'Secondary' });
+      sides.push({ kva: mva * 1000, volts, label: 'Secondary', source: 'Project data' });
     }
   }
   if (!sides.length) return null;
@@ -10197,7 +11141,7 @@ function resolveTransformerOperatingPoint(transformer, referenceVoltage, refPhas
   const apparent = kva * 1000;
   const fla = phases === 1 ? apparent / volts : apparent / (Math.sqrt(3) * volts);
   if (!Number.isFinite(fla) || fla <= 0) return null;
-  return { fla, volts, phases, side: selected.label };
+  return { fla, volts, phases, side: selected.label, source: selected.source || 'Project data' };
 }
 
 function collectMotorOperatingData(

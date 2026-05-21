@@ -209,7 +209,17 @@ export function conductorMaterial(cable) {
 // Main evaluator
 // ---------------------------------------------------------------------------
 
-const PROTECTIVE_TYPES = new Set(['breaker', 'fuse', 'relay', 'recloser', 'disconnect']);
+const PROTECTIVE_TYPES = new Set([
+  'breaker',
+  'fuse',
+  'relay',
+  'recloser',
+  'disconnect',
+  'switch',
+  'contactor',
+  'motor_starter',
+  'motor_controller'
+]);
 const ENCLOSURE_TYPES  = new Set(['switchboard', 'panel', 'mcc', 'busway', 'dc_bus']);
 
 /**

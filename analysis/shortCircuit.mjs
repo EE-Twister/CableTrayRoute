@@ -4,6 +4,7 @@ import { resolveCtForComponent } from './ctMetadata.mjs';
 import { resolvePtVtForComponent } from './ptVtMetadata.mjs';
 import protectiveDevices from '../data/protectiveDevices.mjs';
 import { calculateTransformerImpedance } from '../utils/transformerImpedance.js';
+import { computeImpedanceFromPerKm } from '../utils/cableImpedance.js';
 import { computeIEC60909Bus } from './iec60909.mjs';
 import { ibrFaultContribution, IBR_DEFAULTS } from './ibrModeling.mjs';
 
@@ -37,14 +38,37 @@ function toImpedance(value) {
 
 function deriveLinearSegmentImpedance(comp) {
   if (!comp || typeof comp !== 'object') return null;
-  const containers = [comp, comp.props, comp.parameters, comp.cable].filter(v => v && typeof v === 'object');
+  const containers = [comp, comp.props, comp.props?.cable, comp.parameters, comp.cable].filter(v => v && typeof v === 'object');
   let lengthFt = null;
+  let lengthForPerKm = null;
+  let lengthUnit = null;
   let rPerKft = null;
   let xPerKft = null;
+  let rPerKm = null;
+  let xPerKm = null;
   for (const container of containers) {
     if (lengthFt === null) {
-      const val = Number(container.length_ft ?? container.length);
+      const val = Number(container.length_ft ?? container.lengthFt);
       if (Number.isFinite(val) && val > 0) lengthFt = val;
+    }
+    if (lengthForPerKm === null) {
+      const ft = Number(container.length_ft ?? container.lengthFt);
+      const meters = Number(container.length_m ?? container.lengthMeters);
+      const km = Number(container.length_km ?? container.lengthKilometers);
+      const generic = Number(container.length);
+      if (Number.isFinite(km) && km > 0) {
+        lengthForPerKm = km;
+        lengthUnit = 'km';
+      } else if (Number.isFinite(meters) && meters > 0) {
+        lengthForPerKm = meters;
+        lengthUnit = 'm';
+      } else if (Number.isFinite(ft) && ft > 0) {
+        lengthForPerKm = ft;
+        lengthUnit = 'ft';
+      } else if (Number.isFinite(generic) && generic > 0) {
+        lengthForPerKm = generic;
+        lengthUnit = container.length_unit || container.lengthUnit || container.unit || 'ft';
+      }
     }
     if (rPerKft === null) {
       const val = Number(container.r_ohm_per_kft);
@@ -54,12 +78,36 @@ function deriveLinearSegmentImpedance(comp) {
       const val = Number(container.x_ohm_per_kft);
       if (Number.isFinite(val) && val >= 0) xPerKft = val;
     }
+    if (rPerKm === null) {
+      const val = Number(container.r_ohm_per_km ?? container.resistance_per_km);
+      if (Number.isFinite(val) && val >= 0) rPerKm = val;
+    }
+    if (xPerKm === null) {
+      const val = Number(container.x_ohm_per_km ?? container.reactance_per_km);
+      if (Number.isFinite(val) && val >= 0) xPerKm = val;
+    }
   }
-  if (!Number.isFinite(lengthFt) || !Number.isFinite(rPerKft) || !Number.isFinite(xPerKft)) return null;
-  return {
-    r: (rPerKft * lengthFt) / 1000,
-    x: (xPerKft * lengthFt) / 1000
-  };
+  if (Number.isFinite(lengthFt) && Number.isFinite(rPerKft) && Number.isFinite(xPerKft)) {
+    return {
+      r: (rPerKft * lengthFt) / 1000,
+      x: (xPerKft * lengthFt) / 1000
+    };
+  }
+  if (Number.isFinite(lengthForPerKm) && (Number.isFinite(rPerKm) || Number.isFinite(xPerKm))) {
+    const derived = computeImpedanceFromPerKm({
+      resistancePerKm: rPerKm,
+      reactancePerKm: xPerKm,
+      length: lengthForPerKm,
+      unit: lengthUnit
+    });
+    if (derived) {
+      return {
+        r: Number.isFinite(Number(derived.r)) ? Number(derived.r) : 0,
+        x: Number.isFinite(Number(derived.x)) ? Number(derived.x) : 0
+      };
+    }
+  }
+  return null;
 }
 
 function extractComponentImpedance(comp) {

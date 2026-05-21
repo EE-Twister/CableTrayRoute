@@ -4,6 +4,17 @@ function isVisualComponent(comp) {
   return comp ? VISUAL_TYPES.has(comp.type) : false;
 }
 
+function pickValue(comp, key) {
+  if (!comp || !key) return undefined;
+  if (Object.prototype.hasOwnProperty.call(comp, key)) {
+    return comp[key];
+  }
+  if (comp.props && typeof comp.props === 'object' && Object.prototype.hasOwnProperty.call(comp.props, key)) {
+    return comp.props[key];
+  }
+  return undefined;
+}
+
 function buildAdjacency(components = [], skipIds = new Set()) {
   const adj = new Map();
   components.forEach(c => {
@@ -45,8 +56,8 @@ export function runReliability(components = []) {
   const componentStats = {};
   const availMap = {};
   eligible.forEach(c => {
-    const mtbf = Number(c.mtbf);
-    const mttr = Number(c.mttr);
+    const mtbf = Number(pickValue(c, 'mtbf'));
+    const mttr = Number(pickValue(c, 'mttr'));
     if (mtbf > 0 && mttr >= 0) {
       const availability = mtbf / (mtbf + mttr);
       // expected downtime hours per year

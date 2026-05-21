@@ -16,6 +16,7 @@ import {
   setCoachAuditTrail,
 } from '../dataStore.mjs';
 import { openModal } from './components/modal.js';
+import { buildOneLineProbeUrl } from './crossProbe.js';
 
 document.addEventListener('DOMContentLoaded', () => {
   initSettings();
@@ -200,6 +201,10 @@ document.addEventListener('DOMContentLoaded', () => {
         safety: 'Safety', compliance: 'Compliance',
         efficiency: 'Efficiency', missing_data: 'Missing Data',
       };
+      const oneLineHref = buildOneLineProbeUrl(
+        { probe: rec.location, location: rec.location, tag: rec.location, ref: rec.location },
+        { probeType: 'study' }
+      );
 
       article.innerHTML = `
         <div class="coach-rec-header">
@@ -211,6 +216,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <p class="coach-rec-detail">${escHtml(rec.detail)}</p>
         ${rec.tradeoffs ? `<p class="coach-rec-tradeoffs">Trade-off: ${escHtml(rec.tradeoffs)}</p>` : ''}
         <div class="coach-rec-actions">
+          <a class="cross-probe-link" href="${escHtml(oneLineHref)}">Show on One-Line</a>
           ${isAccepted
             ? `<span class="coach-accepted-note">Accepted${entry.reviewedBy ? ` by ${escHtml(entry.reviewedBy)}` : ''} on ${new Date(entry.decidedAt).toLocaleDateString()}: ${escHtml(entry.note)}</span>
                <button class="coach-revoke-btn btn" data-id="${escHtml(rec.id)}">Revoke</button>`

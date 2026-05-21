@@ -128,7 +128,7 @@
     }
     &.active {
         font-weight: 600;
-        color: var(--color-primary);
+        color: #1e3a8a;
         background: color-mix(in srgb, var(--color-primary) 14%, transparent);
     }
     &:focus-visible {
@@ -558,7 +558,7 @@
 
 .workflow-step-nav-label {
     font-weight: 600;
-    color: var(--color-primary);
+    color: #1e3a8a;
     white-space: nowrap;
 }
 
@@ -592,6 +592,11 @@
 body.dark-mode .workflow-step-nav {
     background: color-mix(in srgb, var(--color-primary) 12%, #1a1d20);
     border-bottom-color: color-mix(in srgb, var(--color-primary) 30%, transparent);
+}
+
+body.dark-mode .nav-dropdown-trigger.active,
+body.dark-mode .workflow-step-nav-label {
+    color: #bfdbfe;
 }
 
 body.dark-mode .workflow-step-nav-link {

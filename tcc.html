@@ -89,7 +89,7 @@
         </div>
         <button id="tcc-back-oneline-btn" type="button" class="btn secondary-btn">Back to One-Line</button>
       </section>
-      <section class="card">
+      <section class="card tcc-study-card">
         <div id="tcc-controls" class="tcc-controls">
           <div class="device-select-group">
             <span id="device-select-title" class="device-select-title">Devices</span>
@@ -98,16 +98,18 @@
             <button id="device-modal-btn" type="button" class="device-modal-btn" aria-haspopup="dialog" aria-controls="device-select">
               Choose Devices
             </button>
-            <div id="selected-device-summary" class="selected-device-summary" role="list" aria-live="polite"></div>
+            <div id="selected-device-summary" class="selected-device-summary" aria-live="polite"></div>
           </div>
           <button id="plot-btn" type="button">Update Plot</button>
           <button id="auto-coord-btn" type="button" title="Find minimum time dial settings that achieve selective coordination for the plotted devices">Auto-Coordinate</button>
+          <button id="add-annotation-btn" type="button" disabled title="Update the plot before adding annotations.">Add Annotation</button>
           <details class="tcc-action-menu">
             <summary>Export</summary>
             <div class="tcc-print-controls">
             <button id="print-plot-btn" type="button" disabled title="Update the plot before printing.">Print Plot</button>
             <button id="export-svg-btn" type="button" disabled title="Download TCC chart as SVG vector graphic">Export SVG</button>
             <button id="export-png-btn" type="button" disabled title="Download TCC chart as high-resolution PNG (2×)">Export PNG</button>
+            <button id="export-review-btn" type="button" disabled title="Update the plot before exporting the review package.">Export Review</button>
             <button id="export-cti-btn" type="button" class="hidden" title="Download coordination time interval report as CSV">Export CTI Report</button>
             <button id="export-relay-settings-btn" type="button" disabled title="Update the plot before exporting relay settings.">Export Relay Settings</button>
             </div>
@@ -115,7 +117,6 @@
           <details class="tcc-action-menu">
             <summary>Tools</summary>
             <div class="tcc-tool-controls">
-              <button id="add-annotation-btn" type="button" disabled title="Update the plot before adding annotations.">Add Annotation</button>
               <button id="custom-curve-btn" type="button">Custom Curve Builder</button>
               <button id="link-btn" type="button" class="hidden">Link to Component</button>
               <button id="open-btn" type="button" class="hidden">View Component</button>
@@ -134,31 +135,52 @@
           <label class="coord-margin-label" title="Minimum required time separation between upstream and downstream trip times (seconds)">
             Margin&nbsp;<input id="coord-margin" type="number" min="0.05" max="2.0" step="0.05" value="0.3" class="coord-margin-input" aria-label="Coordination time margin in seconds">&nbsp;s
           </label>
+          <label class="tcc-range-label" title="Limit the chart axes to the most relevant review region">
+            Range
+            <select id="tcc-range-preset" aria-label="TCC chart range preset">
+              <option value="full">Full Range</option>
+              <option value="coordination">Coordination Region</option>
+              <option value="motorStart">Motor Starting</option>
+              <option value="transformerInrush">Transformer Inrush</option>
+              <option value="faultCurrent">Fault Current Region</option>
+            </select>
+          </label>
+          <label id="tcc-callout-scope-label" class="tcc-callout-scope-label hidden" title="Choose which plotted devices receive chart callouts">
+            Callouts
+            <select id="tcc-callout-scope" aria-label="TCC chart callout scope">
+              <option value="context">Context Devices</option>
+              <option value="selected">Selected Device</option>
+              <option value="all">All Plotted Devices</option>
+            </select>
+          </label>
         </div>
+        <div id="coord-status-summary" class="coord-status-summary" role="status" aria-live="polite">Choose devices and update the plot.</div>
         <div class="tcc-visualization">
           <div class="tcc-chart-container">
-            <div id="coord-status-summary" class="coord-status-summary" role="status" aria-live="polite">Choose devices and update the plot.</div>
-            <div id="tcc-equipment-metrics" class="tcc-equipment-metrics hidden" aria-live="polite"></div>
             <svg id="tcc-chart" width="800" height="600" xmlns="http://www.w3.org/2000/svg"></svg>
             <div id="tcc-hover-tooltip" class="tcc-hover-tooltip" aria-hidden="true"></div>
-            <div id="violation" class="violation"></div>
-            <details id="coordination-panel" class="coordination-panel hidden">
-              <summary class="coord-panel-summary">Coordination Results</summary>
-              <div class="coord-panel-body">
-                <div id="coord-order-section">
-                  <h3 class="coord-section-heading">Device Order (Load &rarr; Source)</h3>
-                  <div id="coord-order-list" class="coord-order-list" role="list" aria-label="Device coordination order"></div>
-                </div>
-                <div id="coord-results" class="coord-results" aria-live="polite" aria-label="Coordination results"></div>
-              </div>
-            </details>
           </div>
           <aside class="tcc-oneline-preview empty" aria-labelledby="oneline-preview-title" aria-live="polite">
             <h2 id="oneline-preview-title">One-Line Layout</h2>
             <svg id="oneline-preview" width="320" height="320" xmlns="http://www.w3.org/2000/svg" role="img" aria-describedby="oneline-preview-note"></svg>
             <p id="oneline-preview-empty" class="oneline-preview-empty">Select a one-line component to see its connections.</p>
             <p id="oneline-preview-note" class="oneline-preview-note hidden"></p>
+            <aside id="tcc-pinned-detail" class="tcc-pinned-detail hidden" aria-live="polite" aria-label="Pinned chart detail"></aside>
           </aside>
+        </div>
+        <div class="tcc-supporting-panels">
+          <div id="tcc-equipment-metrics" class="tcc-equipment-metrics hidden" aria-live="polite"></div>
+          <div id="violation" class="violation"></div>
+          <details id="coordination-panel" class="coordination-panel hidden">
+            <summary class="coord-panel-summary">Coordination Results</summary>
+            <div class="coord-panel-body">
+              <div id="coord-order-section">
+                <h3 class="coord-section-heading">Device Order (Load &rarr; Source)</h3>
+                <div id="coord-order-list" class="coord-order-list" role="list" aria-label="Device coordination order"></div>
+              </div>
+              <div id="coord-results" class="coord-results" aria-live="polite" aria-label="Coordination results"></div>
+            </div>
+          </details>
         </div>
       </section>
     </main>

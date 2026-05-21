@@ -7,6 +7,7 @@ import {
   previewLoadImport,
   summarizeLoadValidation
 } from './analysis/loadWorkflow.mjs';
+import { openOneLineProbe } from './src/crossProbe.js';
 
 const E2E = typeof location !== 'undefined' && new URLSearchParams(location.search).has('e2e');
 if (E2E && typeof localStorage !== 'undefined' && new URLSearchParams(location.search).has('e2e_reset')) {
@@ -640,6 +641,18 @@ if (typeof window !== 'undefined') {
     });
 
     const actTd = tr.querySelector('.row-actions');
+    const oneLineBtn = document.createElement('button');
+    oneLineBtn.type = 'button';
+    oneLineBtn.className = 'cross-probe-link cross-probe-link--icon';
+    oneLineBtn.title = 'Show load on the one-line';
+    oneLineBtn.setAttribute('aria-label', 'Show load on the one-line');
+    setButtonContents(oneLineBtn, 'icons/oneline.svg', '');
+    oneLineBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      openOneLineProbe(gatherRow(tr), { probeType: 'load' });
+    });
+    actTd.appendChild(oneLineBtn);
+
     const insertBtn = document.createElement('button');
     insertBtn.type = 'button';
     insertBtn.className = 'insertBelowBtn row-icon-btn';
@@ -675,6 +688,7 @@ if (typeof window !== 'undefined') {
 
   const menu = new ContextMenu();
   menu.setItems([
+    { label: 'Show on One-Line', action: tr => { if (!tr) return; openOneLineProbe(gatherRow(tr), { probeType: 'load' }); } },
     { label: 'Insert Row Above', action: tr => { if (!tr) return; insertLoad(getStoreIndex(tr), blankLoad); } },
     { label: 'Insert Row Below', action: tr => { if (!tr) return; insertLoad(getStoreIndex(tr) + 1, blankLoad); } },
     { label: 'Copy Row', action: tr => { if (!tr) return; clipboard = JSON.parse(JSON.stringify(gatherRow(tr))); } },

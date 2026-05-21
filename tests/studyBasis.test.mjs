@@ -136,6 +136,28 @@ describe('initStudyBasisPanel — basic rendering', () => {
     );
   });
 
+  it('renders saved project design basis when supplied', () => {
+    containers['study-basis-panel'] = makeContainer('study-basis-panel');
+    initStudyBasisPanel('test', {
+      standard: 'IEEE X',
+      projectDesignBasis: {
+        codeBasis: {
+          primaryCode: 'NEC',
+          edition: '2023',
+          jurisdiction: 'Texas',
+          ahj: 'Owner Electrical Authority',
+        },
+        approvalRules: {
+          releaseRequiresReviewer: true,
+          reviewer: 'Electrical Lead',
+        },
+      },
+    });
+    const html = containers['study-basis-panel'].innerHTML;
+    assert.ok(html.includes('Project Design Basis'), 'Project design basis section should render');
+    assert.ok(html.includes('NEC 2023'), 'Project code basis should render');
+  });
+
   it('omits benchmark link when benchmarkId not provided', () => {
     containers['study-basis-panel'] = makeContainer('study-basis-panel');
     initStudyBasisPanel('test', { standard: 'IEEE 80' });

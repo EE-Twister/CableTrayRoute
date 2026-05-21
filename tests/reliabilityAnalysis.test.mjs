@@ -69,6 +69,15 @@ describe('runReliability - component filtering', () => {
     assert.ok('bus-1' in result.componentStats);
     assert.ok('brk-1' in result.componentStats);
   });
+
+  it('reads MTBF and MTTR from component props', () => {
+    const components = [
+      { id: 'prop-brk', type: 'breaker', props: { mtbf: 8760, mttr: 4 } }
+    ];
+    const result = runReliability(components);
+    assert.ok('prop-brk' in result.componentStats);
+    assert.ok(result.componentStats['prop-brk'].downtime > 0);
+  });
 });
 
 describe('runReliability - availability calculation', () => {

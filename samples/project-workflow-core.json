@@ -362,6 +362,62 @@
     }
   ],
   "settings": {
+    "designBasis": {
+      "schemaVersion": 1,
+      "codeBasis": {
+        "primaryCode": "NEC",
+        "edition": "2023",
+        "jurisdiction": "Sample Industrial Site",
+        "ahj": "Owner Electrical Authority",
+        "unitSystem": "imperial"
+      },
+      "sizingDefaults": {
+        "conductorMaterial": "copper",
+        "insulationType": "THWN-2",
+        "temperatureRatingC": 75,
+        "installationType": "conduit",
+        "defaultPowerFactor": 0.9,
+        "voltageDropLimitPct": 3,
+        "continuousLoadPolicy": "assume-continuous"
+      },
+      "routingDefaults": {
+        "defaultLengthFt": 100,
+        "defaultTrayId": "TR-PWR-101",
+        "defaultTrayWidthIn": 18,
+        "defaultTrayDepthIn": 6,
+        "defaultTrayElevationFt": 12,
+        "fillLimitPct": 40,
+        "fieldRoutePolicy": "allow-field-legs"
+      },
+      "studyPrerequisites": {
+        "requireUtilityFault": true,
+        "requireProtectiveDeviceSettings": false,
+        "requireEquipmentCoordinates": true,
+        "requireArcFlashInputs": false
+      },
+      "approvalRules": {
+        "generatedRecordsRequireReview": true,
+        "routeResultsRequireReview": true,
+        "studiesRequireReview": true,
+        "releaseRequiresReviewer": true,
+        "reviewer": "Sample Engineer"
+      },
+      "updatedAt": "2026-05-01T12:00:00.000Z"
+    },
+    "designGateApprovals": {
+      "route-result-review": {
+        "status": "reviewed",
+        "reviewedBy": "Sample Engineer",
+        "approvedAt": "2026-05-01T12:25:00.000Z",
+        "note": "Sample route results reviewed for workflow demonstration."
+      },
+      "study-result-review": {
+        "status": "reviewed",
+        "reviewedBy": "Sample Engineer",
+        "approvedAt": "2026-05-01T12:25:00.000Z",
+        "note": "Sample study results reviewed for workflow demonstration."
+      }
+    },
     "studies": {
       "demandSchedule": {
         "status": "Run",

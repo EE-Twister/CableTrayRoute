@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="80" height="40" viewBox="0 0 80 40">
+  <g fill="none" stroke="#333" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="2" y1="20" x2="16" y2="20"/>
+    <rect x="16" y="8" width="48" height="24" rx="3" fill="#fff"/>
+    <line x1="64" y1="20" x2="78" y2="20"/>
+    <circle cx="31" cy="20" r="7"/>
+    <line x1="42" y1="14" x2="56" y2="14"/>
+    <line x1="42" y1="20" x2="56" y2="20"/>
+    <line x1="42" y1="26" x2="56" y2="26"/>
+  </g>
+  <text x="31" y="21" text-anchor="middle" dominant-baseline="middle" font-family="Arial, Helvetica, sans-serif" font-size="8" font-weight="700" fill="#333">M</text>
+</svg>

@@ -2,6 +2,7 @@ import { buildPullTable } from './pullCards.mjs';
 import { buildSpoolSheetVisualModel } from './spoolSheetVisualModel.mjs';
 import { getAvailableSections } from './reportPackage.mjs';
 import { summarizeCableWorkflow } from './scheduleWorkflow.mjs';
+import { buildDesignBasisReview } from './designBasis.mjs';
 
 function hasValue(value) {
   if (Array.isArray(value)) return value.some(hasValue);
@@ -237,6 +238,13 @@ export function buildDeliverableReadinessDiagnostics({
   routeResults = [],
   reportSnapshots = {},
   lifecyclePackages = [],
+  designBasis = undefined,
+  designGateApprovals = {},
+  studyApprovals = {},
+  equipment = [],
+  oneLine = {},
+  tccSettings = null,
+  enforceDesignBasis = false,
 } = {}) {
   const cableRows = meaningfulRecords(cables);
   const trayRows = meaningfulRecords(trays);
@@ -274,7 +282,44 @@ export function buildDeliverableReadinessDiagnostics({
   });
   const reportSnapshotCount = countObjectRecords(reportSnapshots);
   const lifecyclePackageCount = Array.isArray(lifecyclePackages) ? lifecyclePackages.length : 0;
+  const designReview = (enforceDesignBasis || designBasis !== undefined)
+    ? buildDesignBasisReview({
+        designBasis,
+        designGateApprovals,
+        equipment,
+        oneLine,
+        cables: cableRows,
+        trays: trayRows,
+        conduits: conduitRows,
+        ductbanks: ductbankRows,
+        studies,
+        studyApprovals,
+        routeResults,
+        tccSettings,
+      })
+    : null;
   const actions = [];
+
+  if (designReview) {
+    designReview.deliverableBlockers.forEach(gate => {
+      actions.push(makeAction(
+        gate.category || 'Design Basis',
+        gate.severity,
+        gate.label,
+        gate.detail,
+        gate.href || 'workflowdashboard.html'
+      ));
+    });
+    if (!designReview.deliverableBlockers.length && designReview.openGateCount > 0) {
+      actions.push(makeAction(
+        'Design Basis',
+        'info',
+        'Review open design gates',
+        `${designReview.openGateCount} design basis gate(s) remain open for assumptions, generated records, or review history.`,
+        'workflowdashboard.html'
+      ));
+    }
+  }
 
   if (cableSummary.scheduleReady === 0) {
     actions.push(makeAction('Cable Schedule', 'warning', 'Complete schedule-ready cables', 'Pull cards, procurement, and reports need cable tags, endpoints, conductor sizes, and lengths.', 'cableschedule.html'));
@@ -326,7 +371,10 @@ export function buildDeliverableReadinessDiagnostics({
       reportSnapshots: reportSnapshotCount,
       lifecyclePackages: lifecyclePackageCount,
       deliverables: reportSnapshotCount + lifecyclePackageCount,
+      designBasisReviewGates: designReview ? designReview.openGateCount : 0,
+      blockingReviewGates: designReview ? designReview.deliverableBlockers.length : 0,
     },
+    designReview,
     routeResults: routedRouteResults,
     missingRouteResultTags,
     cableSummary,
@@ -340,7 +388,7 @@ export function buildDeliverableReadinessDiagnostics({
       routeResults: routedRouteResults.length > 0,
       pullCards: pullSummary.summary.total_pulls > 0,
       spoolSheets: spoolModel.summary.spoolCount > 0 && spoolModel.hasCoordinates,
-      projectReport: availableSections.size > 4,
+      projectReport: availableSections.size > 4 && (!designReview || designReview.readyForDeliverables),
       reportSnapshot: reportSnapshotCount > 0,
       releasePackage: lifecyclePackageCount > 0,
     },

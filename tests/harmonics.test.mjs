@@ -113,6 +113,50 @@ describe('limitForVoltage — IEEE 519', () => {
   });
 });
 
+const harmonicsStore = {};
+global.localStorage = {
+  getItem: key => (key in harmonicsStore ? harmonicsStore[key] : null),
+  setItem: (key, value) => {
+    harmonicsStore[key] = value;
+  },
+  removeItem: key => {
+    delete harmonicsStore[key];
+  }
+};
+
+const { setOneLine } = await import('../dataStore.mjs');
+const { runHarmonics } = await import('../analysis/harmonics.js');
+
+describe('runHarmonics - one-line component fields', () => {
+  it('reads harmonic source inputs from component props', () => {
+    setOneLine({
+      activeSheet: 0,
+      sheets: [
+        {
+          name: 'Harmonics',
+          components: [
+            {
+              id: 'vfd-1',
+              type: 'motor_controller',
+              props: {
+                harmonicSource: true,
+                harmonics: '5:30 7:20',
+                voltage: 480,
+                hp: 100,
+                scMVA: 50
+              }
+            }
+          ]
+        }
+      ]
+    });
+
+    const results = runHarmonics();
+    assert.ok(results['vfd-1'], 'Expected harmonics result for props-only VFD');
+    assert.ok(results['vfd-1'].ithd > 0, 'Expected ITHD to be calculated from props-only spectrum');
+  });
+});
+
 // ---------------------------------------------------------------------------
 describe('parseSpectrum — array format', () => {
   it('empty array returns empty map', () => {

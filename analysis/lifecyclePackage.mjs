@@ -49,6 +49,14 @@ function countStudies(studies) {
   }).length;
 }
 
+function oneLineComponents(oneLine = {}) {
+  if (Array.isArray(oneLine.components)) return oneLine.components;
+  if (Array.isArray(oneLine.sheets)) {
+    return oneLine.sheets.flatMap(sheet => Array.isArray(sheet.components) ? sheet.components : []);
+  }
+  return [];
+}
+
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
@@ -64,7 +72,7 @@ export function summarizePackage(projectData = {}) {
   const trays   = Array.isArray(projectData.trays)  ? projectData.trays  : [];
   const studies = projectData.studies || {};
   const oneLine = projectData.oneLine || {};
-  const components = Array.isArray(oneLine.components) ? oneLine.components : [];
+  const components = oneLineComponents(oneLine);
 
   return {
     cableCount:           cables.length,
@@ -85,8 +93,12 @@ export function summarizePackage(projectData = {}) {
  *   projectSnapshot: {
  *     cables: any[],
  *     trays: any[],
+ *     equipment: any[],
  *     studies: object,
  *     approvals: object,
+ *     designBasis: object|null,
+ *     designGateApprovals: object,
+ *     oneLine: object,
  *     oneLineComponentCount: number,
  *   },
  *   summary: {
@@ -110,8 +122,12 @@ export function summarizePackage(projectData = {}) {
  * @param {{
  *   cables?: any[],
  *   trays?: any[],
+ *   equipment?: any[],
  *   studies?: object,
  *   approvals?: object,
+ *   designBasis?: object|null,
+ *   designGateApprovals?: object,
+ *   tccSettings?: object|null,
  *   oneLine?: object,
  * }} projectData
  * @returns {LifecyclePackage}
@@ -121,10 +137,14 @@ export function buildLifecyclePackage(config = {}, projectData = {}) {
 
   const cables    = deepClone(Array.isArray(projectData.cables) ? projectData.cables : []);
   const trays     = deepClone(Array.isArray(projectData.trays)  ? projectData.trays  : []);
+  const equipment = deepClone(Array.isArray(projectData.equipment) ? projectData.equipment : []);
   const studies   = deepClone(projectData.studies   || {});
   const approvals = deepClone(projectData.approvals || {});
-  const oneLine   = projectData.oneLine || {};
-  const components = Array.isArray(oneLine.components) ? oneLine.components : [];
+  const designBasis = deepClone(projectData.designBasis || null);
+  const designGateApprovals = deepClone(projectData.designGateApprovals || {});
+  const tccSettings = deepClone(projectData.tccSettings || null);
+  const oneLine   = deepClone(projectData.oneLine || {});
+  const components = oneLineComponents(oneLine);
 
   const summary = {
     cableCount:            cables.length,
@@ -140,7 +160,18 @@ export function buildLifecyclePackage(config = {}, projectData = {}) {
     author:        String(config.author        || ''),
     status,
     notes:         String(config.notes         || ''),
-    projectSnapshot: { cables, trays, studies, approvals, oneLineComponentCount: components.length },
+    projectSnapshot: {
+      cables,
+      trays,
+      equipment,
+      studies,
+      approvals,
+      designBasis,
+      designGateApprovals,
+      tccSettings,
+      oneLine,
+      oneLineComponentCount: components.length
+    },
     summary,
   };
 }

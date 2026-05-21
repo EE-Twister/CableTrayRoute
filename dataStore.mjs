@@ -102,6 +102,8 @@ const EXTRA_KEYS = {
   studyApprovals: 'studyApprovals',
   reportSnapshots: 'reportSnapshots',
   lifecyclePackages: 'lifecyclePackages',
+  designBasis: 'designBasis',
+  designGateApprovals: 'designGateApprovals',
   coachAuditTrail: 'coachAuditTrail',
   groundGridSoilMeasurements: 'groundGridSoilMeasurements',
   groundGridRiskPoints: 'groundGridRiskPoints',
@@ -331,6 +333,12 @@ export const deleteLifecyclePackage = id => {
   const list = getLifecyclePackages().filter(p => p.id !== id);
   write(EXTRA_KEYS.lifecyclePackages, list);
 };
+
+// Project-level design basis wizard settings
+export const getDesignBasis = () => read(EXTRA_KEYS.designBasis, null);
+export const setDesignBasis = basis => write(EXTRA_KEYS.designBasis, basis);
+export const getDesignGateApprovals = () => read(EXTRA_KEYS.designGateApprovals, {});
+export const setDesignGateApprovals = approvals => write(EXTRA_KEYS.designGateApprovals, approvals && typeof approvals === 'object' && !Array.isArray(approvals) ? approvals : {});
 
 
 // Design Coach audit trail (Gap #79 — cross-study design coach)
@@ -743,6 +751,8 @@ export function saveProject(projectId, scenario = getCurrentScenarioNameState())
       cableTemplates: getCableTemplates(),
       cableTagSettings: getCableTagSettings(),
       cableChangeLog: getCableChangeLog(),
+      designBasis: getDesignBasis(),
+      designGateApprovals: getDesignGateApprovals(),
       mccLineups: getMccLineups(),
       raceways: {
         trays: getTrays(),
@@ -778,6 +788,8 @@ export function loadProject(projectId, scenario = getCurrentScenarioNameState())
     const cableTemplates = payload.cableTemplates;
     const cableTagSettings = payload.cableTagSettings;
     const cableChangeLog = payload.cableChangeLog;
+    const designBasis = payload.designBasis;
+    const designGateApprovals = payload.designGateApprovals;
     const mccLineups = payload.mccLineups;
     const raceways = payload.raceways || {};
     const oneLine = payload.oneLine || {};
@@ -789,6 +801,8 @@ export function loadProject(projectId, scenario = getCurrentScenarioNameState())
     if (Array.isArray(cableTemplates)) setCableTemplates(cableTemplates); else setCableTemplates([]);
     if (cableTagSettings && typeof cableTagSettings === 'object' && !Array.isArray(cableTagSettings)) setCableTagSettings(cableTagSettings); else setCableTagSettings({});
     if (Array.isArray(cableChangeLog)) setCableChangeLog(cableChangeLog); else setCableChangeLog([]);
+    if (designBasis && typeof designBasis === 'object' && !Array.isArray(designBasis)) setDesignBasis(designBasis); else setDesignBasis(null);
+    if (designGateApprovals && typeof designGateApprovals === 'object' && !Array.isArray(designGateApprovals)) setDesignGateApprovals(designGateApprovals); else setDesignGateApprovals({});
     if (Array.isArray(mccLineups)) setMccLineups(mccLineups); else setMccLineups([]);
     setTrays(Array.isArray(raceways.trays) ? raceways.trays : []);
     setConduits(Array.isArray(raceways.conduits) ? raceways.conduits : []);
@@ -822,7 +836,7 @@ export function loadProject(projectId, scenario = getCurrentScenarioNameState())
 export function applyRemoteSnapshot(snapshot, projectId) {
   if (!snapshot || typeof snapshot !== 'object') return;
   try {
-    const { equipment, panels, loads, cables, cableTypicals, cableTemplates, cableTagSettings, cableChangeLog, mccLineups, raceways = {}, oneLine } = snapshot;
+    const { equipment, panels, loads, cables, cableTypicals, cableTemplates, cableTagSettings, cableChangeLog, designBasis, designGateApprovals, mccLineups, raceways = {}, oneLine } = snapshot;
     if (Array.isArray(equipment)) setEquipment(equipment);
     if (Array.isArray(panels)) setPanels(panels);
     if (Array.isArray(loads)) setLoads(loads);
@@ -831,6 +845,8 @@ export function applyRemoteSnapshot(snapshot, projectId) {
     if (Array.isArray(cableTemplates)) setCableTemplates(cableTemplates);
     if (cableTagSettings && typeof cableTagSettings === 'object' && !Array.isArray(cableTagSettings)) setCableTagSettings(cableTagSettings);
     if (Array.isArray(cableChangeLog)) setCableChangeLog(cableChangeLog);
+    if (designBasis && typeof designBasis === 'object' && !Array.isArray(designBasis)) setDesignBasis(designBasis);
+    if (designGateApprovals && typeof designGateApprovals === 'object' && !Array.isArray(designGateApprovals)) setDesignGateApprovals(designGateApprovals);
     if (Array.isArray(mccLineups)) setMccLineups(mccLineups); else setMccLineups([]);
     setTrays(Array.isArray(raceways.trays) ? raceways.trays : []);
     setConduits(Array.isArray(raceways.conduits) ? raceways.conduits : []);
@@ -1113,6 +1129,10 @@ if (typeof window !== 'undefined') {
     restoreRevision,
     getStudies,
     setStudies,
+    getDesignBasis,
+    setDesignBasis,
+    getDesignGateApprovals,
+    setDesignGateApprovals,
     getItem,
     setItem,
     removeItem,

@@ -134,4 +134,101 @@ test.describe("CableTrayRoute workflow", () => {
     });
     expect(prevented).toBe(true);
   });
+
+  test("design basis gates drive Auto-Build and block report export", async ({ page }) => {
+    const designBasis = {
+      schemaVersion: 1,
+      codeBasis: {
+        primaryCode: "NEC",
+        edition: "2023",
+        jurisdiction: "E2E Test",
+        ahj: "Test AHJ",
+        unitSystem: "imperial",
+      },
+      sizingDefaults: {
+        conductorMaterial: "aluminum",
+        insulationType: "XHHW-2",
+        temperatureRatingC: 75,
+        installationType: "conduit",
+        defaultPowerFactor: 0.86,
+        voltageDropLimitPct: 4,
+        continuousLoadPolicy: "assume-continuous",
+      },
+      routingDefaults: {
+        defaultLengthFt: 120,
+        defaultTrayId: "TR-E2E-001",
+        defaultTrayWidthIn: 18,
+        defaultTrayDepthIn: 6,
+        defaultTrayElevationFt: 12,
+        fillLimitPct: 35,
+        fieldRoutePolicy: "allow-field-legs",
+      },
+      studyPrerequisites: {
+        requireUtilityFault: false,
+        requireProtectiveDeviceSettings: true,
+        requireEquipmentCoordinates: true,
+        requireArcFlashInputs: false,
+      },
+      approvalRules: {
+        generatedRecordsRequireReview: true,
+        routeResultsRequireReview: true,
+        studiesRequireReview: false,
+        releaseRequiresReviewer: true,
+        reviewer: "E2E Reviewer",
+      },
+      updatedAt: "2026-05-20T00:00:00.000Z",
+    };
+
+    await page.addInitScript(({ designBasis }) => {
+      localStorage.clear();
+      localStorage.setItem("ctr_current_scenario_v1", "base");
+      localStorage.setItem("ctr_scenarios_v1", JSON.stringify(["base"]));
+      localStorage.setItem("base:designBasis", JSON.stringify(designBasis));
+      localStorage.setItem("base:designGateApprovals", JSON.stringify({}));
+      localStorage.setItem("base:tccSettings", JSON.stringify({ devices: [], settings: {}, componentOverrides: {} }));
+      localStorage.setItem("base:equipment", JSON.stringify([
+        { tag: "SWBD-E2E", voltage: "480", category: "Distribution", subCategory: "Switchboard", x: 0, y: 0, z: 0 },
+        { tag: "PMP-E2E", voltage: "480", category: "Mechanical Load", subCategory: "Pump", x: 95, y: 0, z: 0 },
+      ]));
+      localStorage.setItem("base:loadList", JSON.stringify([
+        { source: "SWBD-E2E", tag: "PMP-E2E", kw: "11", voltage: "480", powerFactor: "0.86", phases: "3", duty: "Continuous" },
+      ]));
+      localStorage.setItem("base:oneLineDiagram", JSON.stringify({ activeSheet: 0, sheets: [] }));
+      localStorage.setItem("base:cableSchedule", JSON.stringify([]));
+      localStorage.setItem("base:traySchedule", JSON.stringify([]));
+      localStorage.setItem("base:conduitSchedule", JSON.stringify([]));
+      localStorage.setItem("base:ductbankSchedule", JSON.stringify([]));
+      localStorage.setItem("base:studyResults", JSON.stringify({}));
+      localStorage.setItem("base:studyApprovals", JSON.stringify({}));
+      localStorage.setItem("base:reportSnapshots", JSON.stringify({}));
+      localStorage.setItem("base:lifecyclePackages", JSON.stringify([]));
+    }, { designBasis });
+
+    await page.goto(pageUrl("workflowdashboard.html?e2e=1"));
+    await expect(page.locator("#dashboard-guided-workflow")).toContainText("Auto-Build Workflow");
+    await expect(page.locator("#dashboard-guided-workflow")).toContainText("Missing Information Prompts");
+    await expect(page.locator("#dashboard-compliance-matrix")).toContainText("Protective-device settings confirmed");
+    await expect(page.locator("#dashboard-review-gates")).toContainText("Confirm protective-device settings");
+    await page.click('[data-review-gate="protective-device-settings"]');
+    await expect(page.locator(".component-modal")).toContainText("Review Gate: Confirm protective-device settings");
+    await page.selectOption("#review-gate-status", "flagged");
+    await page.fill("#review-gate-note", "Waiting on final TCC settings sheet.");
+    await page.click(".component-modal .primary-btn");
+    await expect(page.locator("#dashboard-auto-build-status")).toContainText("flagged");
+    const flaggedApproval = await page.evaluate(() => JSON.parse(localStorage.getItem("base:designGateApprovals"))["protective-device-settings"]);
+    expect(flaggedApproval.status).toBe("flagged");
+    await page.click("#dashboard-auto-build-btn");
+    await expect(page.locator("#dashboard-auto-build-status")).toContainText("Auto-built");
+    await expect(page.locator("#dashboard-compliance-matrix")).toContainText("Deliverable review gates resolved");
+
+    const generatedCable = await page.evaluate(() => JSON.parse(localStorage.getItem("base:cableSchedule"))[0]);
+    expect(generatedCable.insulation_type).toBe("XHHW-2");
+    expect(generatedCable._designBasis.insulationType).toBe("XHHW-2");
+    expect(generatedCable.raceway_id).toBe("TR-E2E-001");
+
+    await page.goto(pageUrl("projectreport.html?e2e=1"));
+    await expect(page.locator("#rpt-deliverable-readiness")).toContainText("design basis gate");
+    await page.click("#rpt-json-btn");
+    await expect(page.locator("#report-status")).toContainText("JSON export blocked");
+  });
 });

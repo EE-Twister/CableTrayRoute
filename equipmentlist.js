@@ -10,6 +10,7 @@ import {
   starterEquipment,
   summarizeEquipment
 } from './analysis/equipmentWorkflow.mjs';
+import { createCrossProbeLink } from './src/crossProbe.js';
 
 if (typeof window !== 'undefined') {
   window.addEventListener('DOMContentLoaded', () => {
@@ -113,6 +114,37 @@ if (typeof window !== 'undefined') {
       const cell = row.cells[idx + table.colOffset];
       return cell && cell.firstChild ? cell.firstChild : null;
     };
+    const createOneLineIcon = () => {
+      const img = document.createElement('img');
+      img.src = 'icons/oneline.svg';
+      img.alt = '';
+      img.setAttribute('aria-hidden', 'true');
+      img.className = 'control-icon';
+      img.loading = 'lazy';
+      img.decoding = 'async';
+      return img;
+    };
+    const decorateEquipmentCrossProbe = () => {
+      const tagIndex = getColumnIndex('tag');
+      if (tagIndex === -1) return;
+      Array.from(table.tbody.rows).forEach(row => {
+        const cell = row.cells[tagIndex + table.colOffset];
+        if (!cell || cell.querySelector('.cross-probe-link')) return;
+        const link = createCrossProbeLink(table.getRowData(row), {
+          probeType: 'equipment',
+          className: 'cross-probe-link cross-probe-link--icon cross-probe-inline',
+          label: '',
+          title: 'Show equipment on the one-line',
+          ariaLabel: 'Show equipment on the one-line',
+          getQuery: () => table.getRowData(row)
+        });
+        link.appendChild(createOneLineIcon());
+        cell.appendChild(link);
+      });
+    };
+    if (typeof MutationObserver !== 'undefined') {
+      new MutationObserver(() => decorateEquipmentCrossProbe()).observe(table.tbody, { childList: true });
+    }
 
     const getVisibleRowCount = () => Array.from(table.tbody.rows).filter(row => row.style.display !== 'none').length;
     const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, ch => ({
@@ -277,6 +309,7 @@ if (typeof window !== 'undefined') {
         table.setCustomFilter('equipment-category', null);
       }
       table.applyFilters();
+      decorateEquipmentCrossProbe();
       updateResultSummary();
       renderQuickFilters();
       validateEquipmentRows();
@@ -645,6 +678,7 @@ if (typeof window !== 'undefined') {
     refreshCategoryOptions();
     renderQuickFilters();
     applyEquipmentFilters();
+    decorateEquipmentCrossProbe();
 
     function generateId(existing, base) {
       let id = base || 'item';

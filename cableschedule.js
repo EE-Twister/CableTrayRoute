@@ -49,6 +49,7 @@ import {
   previewCableImport,
   summarizeCableWorkflow
 } from './analysis/scheduleWorkflow.mjs';
+import { openOneLineProbe } from './src/crossProbe.js';
 const { sizeToArea } = ampacity;
 
 const CABLE_TOUR_STEPS = [
@@ -184,6 +185,36 @@ async function initCableSchedule() {
         placeholder.remove();
         trigger.setAttribute('aria-expanded', 'false');
       });
+    });
+  }
+
+  function createOneLineIcon(){
+    const img = document.createElement('img');
+    img.src = 'icons/oneline.svg';
+    img.alt = '';
+    img.setAttribute('aria-hidden', 'true');
+    img.className = 'control-icon';
+    img.loading = 'lazy';
+    img.decoding = 'async';
+    return img;
+  }
+
+  function decorateCableCrossProbeActions(activeTable){
+    if (!activeTable?.tbody) return;
+    Array.from(activeTable.tbody.rows).forEach(row => {
+      const actionCell = row.querySelector('.row-action-group') || row.querySelector('.sticky-action-col');
+      if (!actionCell || actionCell.querySelector('.cross-probe-link')) return;
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'cross-probe-link cross-probe-link--icon';
+      button.title = 'Show cable on the one-line';
+      button.setAttribute('aria-label', 'Show cable on the one-line');
+      button.appendChild(createOneLineIcon());
+      button.addEventListener('click', e => {
+        e.stopPropagation();
+        openOneLineProbe(activeTable.getRowData(row), { probeType: 'cable' });
+      });
+      actionCell.prepend(button);
     });
   }
 
@@ -2418,6 +2449,7 @@ async function initCableSchedule() {
     }
   });
   tableInstance = table;
+  decorateCableCrossProbeActions(table);
   window.cableScheduleTable = table;
   initTableSearch();
   validateAllRows();
@@ -2452,7 +2484,10 @@ async function initCableSchedule() {
   }
 
   if (typeof MutationObserver !== 'undefined' && table?.tbody) {
-    const observer = new MutationObserver(() => validateAllRows());
+    const observer = new MutationObserver(() => {
+      validateAllRows();
+      decorateCableCrossProbeActions(table);
+    });
     observer.observe(table.tbody, { childList: true });
   }
 

@@ -64,7 +64,7 @@ export function getStarterProfile(c) {
   ).toString().toLowerCase().replace(/[-\s]/g, '_');
   return {
     type,
-    vfdCurrentLimitPu: Number(c.vfd_current_limit_pu ?? c.props?.vfd_current_limit_pu) || 1.1,
+    vfdCurrentLimitPu: Number(c.vfd_current_limit_pu ?? c.props?.vfd_current_limit_pu ?? c.current_limit_pu ?? c.props?.current_limit_pu) || 1.1,
     initialVoltagePu:  Number(c.initial_voltage_pu   ?? c.props?.initial_voltage_pu)   || 0.3,
     rampTimeSec:       Number(c.ramp_time_s           ?? c.props?.ramp_time_s)           || 10,
     wyeDeltaSwitchTimeSec: Number(c.wye_delta_switch_time_s ?? c.props?.wye_delta_switch_time_s) || 5,
@@ -91,6 +91,11 @@ export function runMotorStart() {
       || type === 'motor_load'
       || subtype === 'motor'
       || type === 'motor'
+      || type === 'motor_controller'
+      || type === 'motor_starter'
+      || subtype === 'vfd'
+      || subtype === 'soft_starter'
+      || subtype.includes('starter')
       || !!c.motor;
     if (!isMotor) return;
     const hp = parseNum(c.rating || c.hp || c.props?.rated_hp || c.props?.hp);

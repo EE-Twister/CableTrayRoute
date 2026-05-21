@@ -58,6 +58,27 @@ At runtime each placed component also carries these standard properties on its s
 
 Add new objects to the JSON array and provide matching icons to extend the palette without modifying JavaScript code.
 
+## Default Motor Control and Disconnect Symbols
+
+The shipped one-line palette includes dedicated motor-control entries for VFD, soft starter, FVNR starter, FVR starter, and combination starter. These components carry starter type, current limit/ramp, SCCR, voltage, phase, enclosure, and commissioning fields so they can be reviewed separately from the driven motor.
+
+The protection palette also includes fused disconnect, non-fused disconnect, load-break switch, visible-blade disconnect, and contactor entries. These include load-break, fuse, withstand, SCCR, visible-open, and lockable fields where applicable.
+
+## Study Input Coverage
+
+The one-line property editor augments placed components with a **Studies** tab so study prerequisites are visible where users edit the equipment:
+
+| Study | Prompted fields |
+|-------|-----------------|
+| Load Flow / Short Circuit | Rated voltage, source strength, impedance, transformer kVA/%Z/X/R, cable length and R/X per length |
+| Arc Flash | Clearing time, enclosure/open-air basis, electrode gap, working distance, enclosure height/width/depth, electrode configuration |
+| TCC | Protective curve assignment, transformer inrush multiple/duration, motor locked-rotor/start/stall data, cable conductor size/material/temperature rating |
+| Motor Start | HP, FLA, PF, efficiency, locked-rotor multiple, Thevenin R/X, inertia, load torque curve, starter limits and ramp settings |
+| Harmonics | Harmonic source flag, harmonic profile library selection, current/estimated-voltage order chart modal, editable spectrum, saved custom profiles, per-phase spectra, and short-circuit strength at the study bus |
+| Reliability | MTBF and MTTR |
+
+Study engines read both top-level component fields and nested `props` fields. This keeps imported/custom libraries usable even when the same engineering data is stored under `props`.
+
 ## Icons
 
 Place custom SVG files under `icons/components/` and reference them in `componentLibrary.json`. Missing icons fall back to `icons/placeholder.svg`.

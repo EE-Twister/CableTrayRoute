@@ -78,7 +78,19 @@ const TYPE_ALIASES = new Map([
   ['pt_vt', 'pt_vt'],
   ['vt', 'pt_vt'],
   ['pt', 'pt_vt'],
-  ['ups', 'ups']
+  ['ups', 'ups'],
+  ['vfd', 'motor'],
+  ['soft_starter', 'motor'],
+  ['fvnr_starter', 'motor'],
+  ['fvr_starter', 'motor'],
+  ['combination_starter', 'motor'],
+  ['motor_starter', 'motor'],
+  ['motor_controller', 'motor'],
+  ['fused_disconnect', 'switch'],
+  ['non_fused_disconnect', 'switch'],
+  ['load_break_switch', 'switch'],
+  ['visible_blade_disconnect', 'switch'],
+  ['contactor', 'switch']
 ]);
 
 function canonicalType(type) {

@@ -1186,13 +1186,43 @@ body.dark-mode .panel-slot-meta span {
     font-weight: 600;
 }
 
+body[data-report-title="Time-Current Curves"] .page-header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.15rem 0.85rem;
+    margin-bottom: 0.5rem;
+    padding: 0.65rem 0.9rem;
+}
+
+body[data-report-title="Time-Current Curves"] .page-header.page-header-graphic::before,
+body[data-report-title="Time-Current Curves"] .page-header.page-header-graphic::after {
+    display: none;
+}
+
+body[data-report-title="Time-Current Curves"] .page-header h1 {
+    font-size: clamp(1.35rem, 2vw, 1.8rem);
+    margin: 0;
+}
+
+body[data-report-title="Time-Current Curves"] .page-header p {
+    margin: 0;
+    font-size: 0.95rem;
+}
+
+body[data-report-title="Time-Current Curves"] .page-header #project-share-btn {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    margin-top: 0;
+}
+
 .tcc-context-banner {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 1rem;
-    margin-bottom: 1rem;
-    padding: 1rem;
+    gap: 0.65rem;
+    margin-bottom: 0.65rem;
+    padding: 0.6rem 0.75rem;
     border: 1px solid var(--border-color, #d1d5db);
     border-left: 4px solid var(--primary-color, #0d6efd);
     border-radius: 8px;
@@ -1205,7 +1235,7 @@ body.dark-mode .panel-slot-meta span {
 
 .tcc-context-main {
     display: grid;
-    gap: 0.35rem;
+    gap: 0.2rem;
     min-width: 0;
 }
 
@@ -1219,19 +1249,22 @@ body.dark-mode .panel-slot-meta span {
 
 .tcc-context-banner h2 {
     margin: 0;
-    font-size: 1.15rem;
+    font-size: 1.02rem;
 }
 
 .tcc-context-banner p {
     margin: 0;
     color: var(--text-muted, #64748b);
+    font-size: 0.84rem;
 }
 
 .tcc-context-relationships {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.5rem;
-    margin-top: 0.25rem;
+    gap: 0.35rem;
+    margin-top: 0.1rem;
+    max-height: 2rem;
+    overflow: hidden;
 }
 
 .tcc-context-chip,
@@ -1242,8 +1275,25 @@ body.dark-mode .panel-slot-meta span {
     min-width: 0;
 }
 
+.selected-device-summary {
+    min-width: 0;
+}
+
+.selected-device-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    min-width: 0;
+}
+
+.tcc-controls .selected-device-list {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 0.1rem;
+}
+
 .tcc-context-chip {
-    padding: 0.35rem 0.55rem;
+    padding: 0.22rem 0.42rem;
     border: 1px solid var(--border-color, #d1d5db);
     border-radius: 8px;
     background: var(--color-surface, #ffffff);
@@ -1296,6 +1346,10 @@ body.dark-mode .panel-slot-meta span {
     color: #475569;
 }
 
+.selected-device-chip.is-summary-chip {
+    max-width: 100%;
+}
+
 body.dark-mode .tcc-context-banner {
     background: #1f2226;
     border-color: rgba(255, 255, 255, 0.18);
@@ -1310,18 +1364,46 @@ body.dark-mode .tcc-context-chip {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 0.75rem;
+    gap: 0.5rem;
 }
 
 .tcc-controls .device-select-group {
     flex: 1 0 100%;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.3rem 0.55rem;
     margin-bottom: 0;
+}
+
+.tcc-controls .device-select-title {
+    grid-column: 1;
+    grid-row: 1;
+}
+
+.tcc-controls .device-select-hint {
+    grid-column: 2;
+    grid-row: 1;
+    margin: 0;
+    font-size: 0.82rem;
+    line-height: 1.25;
+}
+
+.tcc-controls .device-modal-btn {
+    grid-column: 3;
+    grid-row: 1 / span 2;
+}
+
+.tcc-controls .selected-device-summary {
+    grid-column: 1 / -1;
 }
 
 .tcc-controls button,
 .tcc-print-controls button,
 .tcc-controls .device-modal-btn {
     margin: 0;
+    min-height: 2.3rem;
+    padding-block: 0.4rem;
 }
 
 .tcc-controls .device-modal-btn {
@@ -1533,6 +1615,48 @@ body.dark-mode .device-filter-btn {
     min-width: 5.75rem;
     min-height: 2.5rem;
     margin: 0;
+}
+
+.tcc-range-label,
+.tcc-callout-scope-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    min-height: 2.3rem;
+    margin: 0;
+    color: var(--text-color);
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.tcc-callout-scope-label.hidden {
+    display: none;
+}
+
+.tcc-range-label select,
+.tcc-callout-scope-label select {
+    min-width: 10rem;
+    min-height: 2.3rem;
+    margin: 0;
+    padding: 0.35rem 0.5rem;
+    border: 1px solid var(--border-color, #d1d5db);
+    border-radius: 6px;
+    background: var(--color-surface, #ffffff);
+    color: var(--text-color, #212529);
+}
+
+body.dark-mode .tcc-range-label select,
+body.dark-mode .tcc-callout-scope-label select {
+    background: #1f2226;
+    color: #f8f9fa;
+    border-color: rgba(255, 255, 255, 0.18);
+}
+
+.tcc-controls button.plot-refresh-pending {
+    background: #f59e0b;
+    background-color: #f59e0b;
+    border-color: #d97706;
+    color: #111827;
 }
 
 .tcc-view-option-list {
@@ -1817,25 +1941,32 @@ body.dark-mode .tcc-crosshair-text {
 }
 
 .tcc-visualization {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(260px, 320px);
     gap: 1rem;
-    align-items: stretch;
+    align-items: start;
     justify-content: flex-start;
-    margin-top: 1.5rem;
+    margin-top: 0;
+    max-width: 1280px;
 }
 
 .tcc-chart-container {
     position: relative;
-    flex: 999 1 620px;
     min-width: 0;
-    max-width: 820px;
+    max-width: 1020px;
     width: 100%;
     overflow: hidden;
 }
 
+.tcc-supporting-panels {
+    display: grid;
+    gap: 0.9rem;
+    margin-top: 1rem;
+    max-width: 1280px;
+}
+
 .coord-status-summary {
-    margin-bottom: 0.75rem;
+    margin: 1rem 0 0.75rem;
     padding: 0.55rem 0.75rem;
     border: 1px solid var(--border-color, #d1d5db);
     border-radius: 8px;
@@ -1867,7 +1998,6 @@ body.dark-mode .tcc-crosshair-text {
 .tcc-equipment-metrics {
     display: grid;
     gap: 0.75rem;
-    margin-bottom: 0.9rem;
     padding: 0.75rem;
     border: 1px solid var(--border-color, #d1d5db);
     border-radius: 8px;
@@ -1954,6 +2084,25 @@ body.dark-mode .tcc-crosshair-text {
     overflow-wrap: anywhere;
     color: var(--text-color, #212529);
     font-weight: 600;
+}
+
+.tcc-assumption-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin-top: 0.55rem;
+}
+
+.tcc-assumption-actions button {
+    min-height: 2rem;
+    padding: 0.25rem 0.55rem;
+    border-radius: 6px;
+    font-size: 0.78rem;
+}
+
+.tcc-assumption-actions button:disabled {
+    cursor: default;
+    opacity: 0.7;
 }
 
 .tcc-equipment-checks {
@@ -2108,6 +2257,131 @@ body.dark-mode .tcc-crosshair-text {
     font-size: 0.85rem;
 }
 
+.tcc-pinned-detail {
+    position: static;
+    width: 100%;
+    max-height: 18rem;
+    overflow: auto;
+    box-sizing: border-box;
+    margin-top: 0.35rem;
+    padding: 0.75rem;
+    border: 1px solid rgba(15, 23, 42, 0.16);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.96);
+    box-shadow: 0 10px 22px rgba(15, 23, 42, 0.14);
+    color: #111827;
+}
+
+.tcc-pinned-detail.hidden {
+    display: none;
+}
+
+.tcc-pinned-detail-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 0.6rem;
+}
+
+.tcc-pinned-detail h3 {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin: 0;
+    font-size: 0.95rem;
+    line-height: 1.2;
+}
+
+.tcc-pinned-detail p {
+    margin: 0.25rem 0 0;
+    color: #64748b;
+    font-size: 0.8rem;
+}
+
+.tcc-pinned-detail dl {
+    display: grid;
+    gap: 0.35rem;
+    margin: 0;
+}
+
+.tcc-pinned-detail dl > div {
+    display: grid;
+    grid-template-columns: minmax(6rem, 42%) minmax(0, 1fr);
+    gap: 0.5rem;
+}
+
+.tcc-pinned-detail dt {
+    color: #64748b;
+    font-size: 0.78rem;
+}
+
+.tcc-pinned-detail dd {
+    min-width: 0;
+    margin: 0;
+    color: #0f172a;
+    font-size: 0.82rem;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+}
+
+.tcc-pinned-swatch {
+    width: 0.85rem;
+    height: 0.85rem;
+    border: 1px solid rgba(15, 23, 42, 0.22);
+    border-radius: 999px;
+    flex: 0 0 auto;
+}
+
+.tcc-pinned-close {
+    min-height: 1.9rem;
+    padding: 0.25rem 0.45rem;
+    border: 1px solid var(--border-color, #d1d5db);
+    border-radius: 6px;
+    background: var(--color-surface, #ffffff);
+    color: var(--text-color, #212529);
+    font-size: 0.78rem;
+}
+
+body.dark-mode .tcc-pinned-detail {
+    background: rgba(31, 34, 38, 0.97);
+    border-color: rgba(255, 255, 255, 0.18);
+    color: #f8fafc;
+}
+
+body.dark-mode .tcc-pinned-detail p,
+body.dark-mode .tcc-pinned-detail dt {
+    color: rgba(255, 255, 255, 0.68);
+}
+
+body.dark-mode .tcc-pinned-detail dd {
+    color: #f8fafc;
+}
+
+.tcc-equipment-overlay-path {
+    pointer-events: none;
+}
+
+.tcc-overlay-hit-target,
+.tcc-overlay-marker {
+    outline: none;
+    cursor: help;
+}
+
+.tcc-overlay-marker line,
+.tcc-overlay-marker text {
+    pointer-events: none;
+}
+
+.tcc-overlay-hit-target:focus {
+    stroke: rgba(37, 99, 235, 0.24);
+}
+
+.tcc-overlay-marker:focus .tcc-overlay-marker-hit-target {
+    stroke: rgba(37, 99, 235, 0.36);
+    stroke-width: 2;
+}
+
 body.dark-mode .coord-status-summary {
     background: #1f2226;
     border-color: rgba(255, 255, 255, 0.18);
@@ -2165,7 +2439,7 @@ body.dark-mode .tcc-hover-tooltip {
     color: #f8fafc;
 }
 
-.tcc-chart-container .violation {
+.tcc-supporting-panels .violation {
     margin-top: 1rem;
 }
 
@@ -2211,10 +2485,43 @@ body.dark-mode .tcc-oneline-preview {
     display: none;
 }
 
+@media (max-width: 860px) {
+    .tcc-visualization {
+        grid-template-columns: 1fr;
+    }
+
+    .tcc-chart-container,
+    .tcc-oneline-preview {
+        max-width: none;
+        width: 100%;
+    }
+}
+
 @media (max-width: 760px) {
     .tcc-context-banner {
         flex-direction: column;
         align-items: stretch;
+    }
+
+    .tcc-study-card {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .tcc-study-card .coord-status-summary {
+        order: 1;
+    }
+
+    .tcc-study-card .tcc-visualization {
+        order: 2;
+    }
+
+    .tcc-study-card .tcc-controls {
+        order: 3;
+    }
+
+    .tcc-study-card .tcc-supporting-panels {
+        order: 4;
     }
 
     .tcc-controls {
@@ -2223,7 +2530,16 @@ body.dark-mode .tcc-oneline-preview {
     }
 
     .tcc-controls .device-select-group {
+        grid-template-columns: 1fr;
         gap: 0.35rem;
+    }
+
+    .tcc-controls .device-select-title,
+    .tcc-controls .device-select-hint,
+    .tcc-controls .device-modal-btn,
+    .tcc-controls .selected-device-summary {
+        grid-column: 1;
+        grid-row: auto;
     }
 
     .tcc-controls .device-select-hint {
@@ -2237,8 +2553,15 @@ body.dark-mode .tcc-oneline-preview {
         min-height: 0;
     }
 
+    .tcc-controls .selected-device-list {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        padding-bottom: 0.15rem;
+    }
+
     .tcc-controls .selected-device-chip {
-        max-width: 100%;
+        flex: 0 0 auto;
+        max-width: min(17rem, 82vw);
         padding: 0.2rem 0.55rem;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -2277,6 +2600,26 @@ body.dark-mode .tcc-oneline-preview {
         min-height: 2.5rem;
     }
 
+    .tcc-range-label {
+        flex: 1 1 100%;
+        align-items: stretch;
+        flex-direction: column;
+        gap: 0.25rem;
+    }
+
+    .tcc-callout-scope-label {
+        flex: 1 1 100%;
+        align-items: stretch;
+        flex-direction: column;
+        gap: 0.25rem;
+    }
+
+    .tcc-range-label select,
+    .tcc-callout-scope-label select {
+        width: 100%;
+        min-width: 0;
+    }
+
     .coord-margin-input,
     .tcc-controls input.coord-margin-input[type="number"] {
         flex: 1 1 4.75rem;
@@ -2284,10 +2627,18 @@ body.dark-mode .tcc-oneline-preview {
         width: auto;
     }
 
-    .tcc-chart-container,
-    .tcc-oneline-preview {
-        flex-basis: 100%;
-        max-width: none;
+    .tcc-chart-container {
+        overflow-x: auto;
+        overflow-y: hidden;
+        padding-bottom: 0.25rem;
+    }
+
+    #tcc-chart {
+        min-width: 720px;
+    }
+
+    .tcc-pinned-detail {
+        max-height: none;
     }
 
     .tcc-oneline-preview {
@@ -2314,6 +2665,17 @@ body.dark-mode .preview-link {
 
 body.dark-mode .preview-link-label {
     fill: #a5d6a7;
+}
+
+.preview-node-label-leader {
+    stroke: rgba(71, 85, 105, 0.58);
+    stroke-width: 1;
+    stroke-dasharray: 3, 3;
+    pointer-events: none;
+}
+
+body.dark-mode .preview-node-label-leader {
+    stroke: rgba(226, 232, 240, 0.52);
 }
 
 .preview-node {
@@ -2428,8 +2790,41 @@ body.dark-mode .preview-node-label-bg {
     fill: none;
 }
 
+.preview-orientation-cue {
+    pointer-events: none;
+}
+
+.preview-orientation-cue text {
+    fill: var(--text-muted, #6c757d);
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.preview-orientation-cue line {
+    stroke: rgba(15, 23, 42, 0.5);
+    stroke-width: 1.25;
+    stroke-linecap: round;
+}
+
+.preview-orientation-arrow-head {
+    fill: rgba(15, 23, 42, 0.55);
+}
+
 body.dark-mode .oneline-preview-grid-line {
     stroke: rgba(255, 255, 255, 0.1);
+}
+
+body.dark-mode .preview-orientation-cue text {
+    fill: rgba(255, 255, 255, 0.72);
+}
+
+body.dark-mode .preview-orientation-cue line {
+    stroke: rgba(255, 255, 255, 0.52);
+}
+
+body.dark-mode .preview-orientation-arrow-head {
+    fill: rgba(255, 255, 255, 0.58);
 }
 
 .preview-annotation-box {
@@ -2460,6 +2855,40 @@ body.dark-mode .preview-annotation-box {
 .tcc-view-badges {
     display: flex;
     gap: 0.5rem;
+}
+
+.tcc-legend-item {
+    outline: none;
+}
+
+.tcc-legend-item text,
+.tcc-legend-item rect,
+.tcc-legend-item line {
+    transition: opacity 0.16s ease, stroke-width 0.16s ease;
+}
+
+.tcc-legend-item:focus-visible text {
+    font-weight: 700;
+    text-decoration: underline;
+}
+
+.tcc-legend-item.is-active text {
+    font-weight: 700;
+}
+
+.tcc-legend-item.is-muted {
+    opacity: 0.45;
+}
+
+.tcc-device-layer path.is-highlighted,
+.tcc-overlay-layer .is-highlighted {
+    opacity: 1 !important;
+    stroke-width: 4 !important;
+}
+
+.tcc-device-layer path.is-dimmed,
+.tcc-overlay-layer .is-dimmed {
+    opacity: 0.22 !important;
 }
 
 .tcc-view-badge-bg {

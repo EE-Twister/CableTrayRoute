@@ -7,6 +7,7 @@
 import { runDRC, formatDrcReport, DRC_SEVERITY } from './analysis/designRuleChecker.mjs';
 import { getTrays, getConduits, getCables, getItem, getDrcAcceptedFindings, setDrcAcceptedFindings } from './dataStore.mjs';
 import { openModal } from './src/components/modal.js';
+import { buildOneLineProbeUrl } from './src/crossProbe.js';
 
 document.addEventListener('DOMContentLoaded', () => {
   initSettings();
@@ -234,6 +235,11 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     const rows = sorted.map(f => {
+      const oneLineHref = buildOneLineProbeUrl(
+        { probe: f.location, location: f.location, tag: f.location, ref: f.location },
+        { probeType: 'validation' }
+      );
+      const oneLineLink = `<a class="cross-probe-link" href="${escapeHtml(oneLineHref)}" aria-label="Show ${escapeHtml(f.location)} on the one-line">Show on One-Line</a>`;
       if (f.isAccepted) {
         // Render accepted finding with amber badge and note
         const ref = f.reference
@@ -251,6 +257,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <div class="drc-accepted-block">
               <p class="drc-acceptance-note">${escapeHtml(f.acceptanceNote)}</p>
               ${f.acceptedBy ? `<p class="drc-accepted-by">Reviewed by: ${escapeHtml(f.acceptedBy)}</p>` : ''}
+              ${oneLineLink}
               <button class="drc-revoke-btn" data-key="${escapeHtml(f.acceptedKey)}"
                       type="button" aria-label="Revoke acceptance for ${escapeHtml(f.ruleId)} at ${escapeHtml(f.location)}">
                 Revoke
@@ -283,6 +290,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <p class="drc-message">${escapeHtml(f.message)}</p>
           ${detail}
           ${remediation}
+          ${oneLineLink}
           <button class="drc-accept-btn" data-key="${escapeHtml(f.acceptedKey)}"
                   type="button" aria-label="Accept risk for ${escapeHtml(f.ruleId)} at ${escapeHtml(f.location)}">
             Accept Risk

@@ -17,12 +17,51 @@
  *   });
  */
 
+import { summarizeDesignBasis } from '../../analysis/designBasis.mjs';
+
 function esc(s) {
   return String(s ?? '')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
+}
+
+function readProjectDesignBasis(config = {}) {
+  if (Object.prototype.hasOwnProperty.call(config, 'projectDesignBasis')) {
+    return { available: true, value: config.projectDesignBasis };
+  }
+  const store = globalThis.window?.dataStore || globalThis.dataStore || null;
+  if (store && typeof store.getDesignBasis === 'function') {
+    try {
+      return { available: true, value: store.getDesignBasis() };
+    } catch {
+      return { available: false, value: null };
+    }
+  }
+  return { available: false, value: null };
+}
+
+function renderProjectDesignBasis(config = {}) {
+  const { available, value } = readProjectDesignBasis(config);
+  if (!available) return '';
+  const summary = summarizeDesignBasis(value);
+  const notes = [
+    ...summary.missing,
+    ...summary.warnings,
+    ...(summary.reviewGates.length ? [`${summary.reviewGates.length} project review gate(s) are active.`] : [])
+  ];
+  return `<div class="study-basis__section study-basis__section--project">
+        <h4>Project Design Basis</h4>
+        <ul class="study-basis__list">
+          <li>${esc(summary.configured ? summary.codeLabel : 'Design Basis Wizard has not been saved.')}</li>
+          <li>${esc(summary.sizingLabel)}</li>
+          <li>${esc(summary.routingLabel)}</li>
+        </ul>
+        ${notes.length ? `<ul class="study-basis__list study-basis__list--warn">
+          ${notes.map(note => `<li>${esc(note)}</li>`).join('\n          ')}
+        </ul>` : ''}
+       </div>`;
 }
 
 /**
@@ -85,6 +124,7 @@ export function initStudyBasisPanel(studyKey, config = {}, containerId = 'study-
          <a href="validation.html#${esc(benchmarkId)}">View benchmark case &rarr;</a>
        </p>`
     : '';
+  const projectDesignBasisHtml = renderProjectDesignBasis(config);
 
   const headerId = `${containerId}-heading`;
 
@@ -97,6 +137,7 @@ export function initStudyBasisPanel(studyKey, config = {}, containerId = 'study-
       <div class="study-basis-panel__body">
         ${formulaHtml}
         ${assumptionsHtml}
+        ${projectDesignBasisHtml}
         ${limitationsHtml}
         ${benchmarkLink}
       </div>

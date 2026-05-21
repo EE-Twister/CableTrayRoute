@@ -86,6 +86,7 @@ import { runValidation } from './validation/rules.js';
 import { exportPDF } from './exporters/pdf.js';
 import { exportDXF, exportDWG } from './exporters/dxf.js';
 import { ensureFieldAssistiveText, openModal, showAlertModal } from './src/components/modal.js';
+import { resolveOneLineProbe } from './src/crossProbe.js';
 import { normalizeVoltageToVolts, toBaseKV } from './utils/voltage.js';
 import { calculateTransformerImpedance } from './utils/transformerImpedance.js';
 import { computeImpedanceFromPerKm } from './utils/cableImpedance.js';
@@ -168,6 +169,12 @@ const physicalFieldNameSet = new Set([
   'air_gap',
   'arc_gap',
   'working_distance',
+  'enclosure_height',
+  'enclosure_width',
+  'enclosure_depth',
+  'box_height',
+  'box_width',
+  'box_depth',
   'clearance',
   'physical_spacing'
 ]);
@@ -183,6 +190,36 @@ const physicalFieldKeywordList = [
   'cabinet',
   'housing'
 ];
+
+const studyInputFieldNameSet = new Set([
+  'mtbf',
+  'mttr',
+  'clearing_time',
+  'enclosure',
+  'gap',
+  'working_distance',
+  'enclosure_height',
+  'enclosure_width',
+  'enclosure_depth',
+  'box_height',
+  'box_width',
+  'box_depth',
+  'electrode_config',
+  'electrode_configuration',
+  'inrush_multiple',
+  'inrush_duration',
+  'harmonicSource',
+  'harmonic_source',
+  'harmonicProfileId',
+  'harmonic_profile_id',
+  'harmonics',
+  'harmonic_spectrum',
+  'harmonicsA',
+  'harmonicsB',
+  'harmonicsC',
+  'scMVA',
+  'short_circuit_mva'
+]);
 
 const impedanceFieldNameSet = new Set([
   'impedance_r',
@@ -298,8 +335,15 @@ function clampStudiesWidth(value, fallback = defaultStudiesWidth) {
 
 const compWidth = 80;
 const compHeight = 40;
+const equipmentHorizontalAutoSpace = 190;
+const equipmentAutoSpaceRowTolerance = 70;
 const attributeLineHeight = 12;
 const viewAttributeStorageKey = 'diagramViewAttributes';
+const datablockFormatStorageKey = 'oneLineDatablockFormat';
+const datablockDensityStorageKey = 'oneLineDatablockDensity';
+const dataStateOverlayStorageKey = 'oneLineDataStateOverlay';
+const operatingStateStorageKey = 'oneLineOperatingState';
+const paletteFilterStorageKey = 'oneLinePaletteFilter';
 const maxViewAttributeCount = 250;
 const maxViewAttributeLength = 128;
 const defaultPaletteWidth = 250;
@@ -473,6 +517,72 @@ let componentAttributeLabelMap = new Map();
 const viewComponentStorageKey = 'diagramViewComponentSelection';
 let selectedViewComponent = getItem(viewComponentStorageKey, null);
 
+const datablockFormatPresets = Object.freeze({
+  off: [],
+  nameplate: ['voltage', 'volts', 'rating_a', 'kva', 'hp', 'percent_z', 'manufacturer', 'model'],
+  study: ['voltage_mag', 'shortCircuit.threePhaseKA', 'shortCircuit.asymKA', 'arcFlash.incidentEnergy', 'arcFlash.ppeCategory', 'reliability.availability'],
+  protection: ['rating_a', 'frame_a', 'interrupt_rating_ka', 'short_circuit_rating_ka', 'clearing_time', 'shortCircuit.threePhaseKA', 'arcFlash.incidentEnergy'],
+  cable: ['voltage', 'length', 'cable_type', 'conductor_size', 'conductor_material', 'short_circuit_rating_ka']
+});
+const datablockFormatLabels = Object.freeze({
+  off: 'Off',
+  nameplate: 'Nameplate',
+  study: 'Studies',
+  protection: 'Protection',
+  cable: 'Cable',
+  custom: 'Custom'
+});
+const datablockDensityLabels = Object.freeze({
+  compact: 'Compact',
+  expanded: 'Expanded'
+});
+let datablockFormatMode = getItem(datablockFormatStorageKey, viewAttributes.size ? 'custom' : 'off');
+if (!Object.prototype.hasOwnProperty.call(datablockFormatLabels, datablockFormatMode)) {
+  datablockFormatMode = viewAttributes.size ? 'custom' : 'off';
+}
+let datablockDensityMode = getItem(datablockDensityStorageKey, 'compact');
+if (!Object.prototype.hasOwnProperty.call(datablockDensityLabels, datablockDensityMode)) {
+  datablockDensityMode = 'compact';
+}
+
+const dataStateOverlayLabels = Object.freeze({
+  none: 'None',
+  review: 'Data State',
+  validation: 'Validation',
+  studies: 'Studies',
+  arcFlash: 'Arc Flash'
+});
+let dataStateOverlayMode = getItem(dataStateOverlayStorageKey, 'none');
+if (!Object.prototype.hasOwnProperty.call(dataStateOverlayLabels, dataStateOverlayMode)) {
+  dataStateOverlayMode = 'none';
+}
+
+const operatingStateLabels = Object.freeze({
+  normal: 'Normal',
+  emergency: 'Emergency',
+  maintenance: 'Maintenance',
+  switching: 'Switching',
+  alternate: 'Alternate'
+});
+let activeOperatingState = getItem(operatingStateStorageKey, 'normal');
+if (!Object.prototype.hasOwnProperty.call(operatingStateLabels, activeOperatingState)) {
+  activeOperatingState = 'normal';
+}
+
+const paletteCategoryFilters = Object.freeze({
+  all: 'All',
+  sources: 'Sources',
+  equipment: 'Equipment',
+  protection: 'Protection',
+  load: 'Loads',
+  cable: 'Cables',
+  annotations: 'Annotations'
+});
+let activePaletteCategoryFilter = getItem(paletteFilterStorageKey, 'all');
+if (!Object.prototype.hasOwnProperty.call(paletteCategoryFilters, activePaletteCategoryFilter)) {
+  activePaletteCategoryFilter = 'all';
+}
+
 function compKey(type, subtype) {
   return subtype ? `${type}_${subtype}` : type;
 }
@@ -484,16 +594,28 @@ function normalizeRotation(angle) {
 }
 
 function defaultRotationForType(type, category) {
-  const resolved = type || category;
-  if (resolved === 'bus' || resolved === 'annotation') return 0;
-  if (
-    category === 'load' ||
-    resolved === 'load' ||
-    (typeof resolved === 'string' && resolved.endsWith('_load'))
-  ) {
-    return 270;
-  }
+  const resolved = String(type || category || '').toLowerCase();
+  const resolvedCategory = String(category || categoryForType(resolved) || '').toLowerCase();
+  if (resolved === 'bus' || resolved === 'annotation' || resolved === 'dimension' || resolved === 'group') return 0;
+  if (resolvedCategory === 'bus' || resolvedCategory === 'load' || resolvedCategory === 'annotations' || resolvedCategory === 'links') return 0;
   return 90;
+}
+
+function defaultRotationForMeta(meta, type = null) {
+  return normalizeRotation(meta?.defaultRotation ?? defaultRotationForType(type || meta?.type, meta?.category));
+}
+
+function defaultRotationForComponent(comp) {
+  const meta = componentMeta[comp?.subtype] || {};
+  return normalizeRotation(meta.defaultRotation ?? defaultRotationForType(comp?.type || meta.type, meta.category || resolveComponentCategory(comp)));
+}
+
+function visualSizeForRotation(width, height, rotation) {
+  const normalized = normalizeRotation(rotation);
+  if (normalized === 90 || normalized === 270) {
+    return { width: height, height: width };
+  }
+  return { width, height };
 }
 
 function categoryForType(t) {
@@ -687,11 +809,12 @@ function coerceNumber(value, fallback) {
 }
 
 function normalizePortsForCategory(category, ports, type, subtype) {
-  const base = Array.isArray(ports) && ports.length ? ports : defaultPorts(type, subtype);
+  const hasDefinedPorts = Array.isArray(ports) && ports.length > 0;
+  const base = hasDefinedPorts ? ports : defaultPorts(type, subtype);
   if (category === 'load') {
-    const defaultX = compWidth;
-    const defaultY = compHeight / 2;
-    if (!base.length) {
+    const defaultX = compWidth / 2;
+    const defaultY = 0;
+    if (!hasDefinedPorts || !base.length) {
       return [{ x: defaultX, y: defaultY }];
     }
     if (base.length === 1) {
@@ -1349,6 +1472,9 @@ function ensureBaselineFieldSchema(schema, fieldSpec) {
     if (!existing.label) existing.label = fieldSpec.label;
     if (!existing.type) existing.type = fieldSpec.type || 'text';
     if (fieldSpec.rows && !existing.rows) existing.rows = fieldSpec.rows;
+    ['options', 'help', 'placeholder', 'min', 'max', 'step'].forEach(key => {
+      if (fieldSpec[key] !== undefined && existing[key] === undefined) existing[key] = fieldSpec[key];
+    });
     return;
   }
   schema.push({
@@ -1356,7 +1482,13 @@ function ensureBaselineFieldSchema(schema, fieldSpec) {
     label: fieldSpec.label,
     type: fieldSpec.type || 'text',
     required: Boolean(fieldSpec.required),
-    ...(fieldSpec.rows ? { rows: fieldSpec.rows } : {})
+    ...(fieldSpec.rows ? { rows: fieldSpec.rows } : {}),
+    ...(fieldSpec.options ? { options: fieldSpec.options } : {}),
+    ...(fieldSpec.help ? { help: fieldSpec.help } : {}),
+    ...(fieldSpec.placeholder ? { placeholder: fieldSpec.placeholder } : {}),
+    ...(fieldSpec.min !== undefined ? { min: fieldSpec.min } : {}),
+    ...(fieldSpec.max !== undefined ? { max: fieldSpec.max } : {}),
+    ...(fieldSpec.step !== undefined ? { step: fieldSpec.step } : {})
   });
 }
 
@@ -1586,6 +1718,396 @@ function ensurePtVtMetadata() {
   });
 }
 
+const commonStudyFieldSpecs = [
+  { name: 'mtbf', label: 'MTBF (hr)', type: 'number', required: false, defaultValue: '' },
+  { name: 'mttr', label: 'MTTR (hr)', type: 'number', required: false, defaultValue: '' }
+];
+
+const arcFlashStudyFieldSpecs = [
+  { name: 'clearing_time', label: 'Clearing Time (s)', type: 'number', required: false, defaultValue: '' },
+  {
+    name: 'enclosure',
+    label: 'Arc Flash Enclosure',
+    type: 'select',
+    required: false,
+    defaultValue: 'box',
+    options: [
+      { value: 'box', label: 'Box / enclosed' },
+      { value: 'open', label: 'Open air' },
+      { value: 'NEMA 1', label: 'NEMA 1' },
+      { value: 'NEMA 3R', label: 'NEMA 3R' },
+      { value: 'NEMA 4', label: 'NEMA 4' },
+      { value: 'NEMA 4X', label: 'NEMA 4X' }
+    ]
+  },
+  { name: 'gap', label: 'Electrode Gap (mm)', type: 'number', required: false, defaultValue: '' },
+  { name: 'working_distance', label: 'Working Distance (mm)', type: 'number', required: false, defaultValue: '' },
+  { name: 'enclosure_height', label: 'Enclosure Height (mm)', type: 'number', required: false, defaultValue: '' },
+  { name: 'enclosure_width', label: 'Enclosure Width (mm)', type: 'number', required: false, defaultValue: '' },
+  { name: 'enclosure_depth', label: 'Enclosure Depth (mm)', type: 'number', required: false, defaultValue: '' },
+  {
+    name: 'electrode_config',
+    label: 'Electrode Configuration',
+    type: 'select',
+    required: false,
+    defaultValue: 'VCB',
+    options: ['VCB', 'VCBB', 'HCB', 'VOA', 'HOA']
+  }
+];
+
+const transformerTccStudyFieldSpecs = [
+  { name: 'inrush_multiple', label: 'Transformer Inrush Multiple (x FLA)', type: 'number', required: false, defaultValue: 12 },
+  { name: 'inrush_duration', label: 'Transformer Inrush Duration (s)', type: 'number', required: false, defaultValue: 0.1 }
+];
+
+const harmonicProfileStorageKey = 'harmonicProfileLibrary';
+const manualHarmonicProfileId = 'custom';
+const builtInHarmonicProfiles = [
+  {
+    id: 'six_pulse_vfd',
+    label: '6-pulse VFD / rectifier',
+    spectrum: '5:35 7:25 11:12 13:8',
+    description: 'Typical untreated six-pulse input current profile.'
+  },
+  {
+    id: 'six_pulse_line_reactor',
+    label: '6-pulse VFD with line reactor',
+    spectrum: '5:20 7:14 11:9 13:7',
+    description: 'Reduced characteristic harmonics for a six-pulse drive with input impedance.'
+  },
+  {
+    id: 'twelve_pulse_drive',
+    label: '12-pulse drive / rectifier',
+    spectrum: '11:12 13:10 23:5 25:4',
+    description: 'Dominant harmonics shifted to the 11th, 13th, 23rd, and 25th orders.'
+  },
+  {
+    id: 'eighteen_pulse_drive',
+    label: '18-pulse drive / rectifier',
+    spectrum: '17:8 19:7 35:3 37:3',
+    description: 'Dominant harmonics shifted higher for eighteen-pulse front ends.'
+  },
+  {
+    id: 'active_front_end',
+    label: 'Active front-end drive',
+    spectrum: '5:4 7:3 11:2 13:1',
+    description: 'Low-distortion active front-end or active filter corrected profile.'
+  },
+  {
+    id: 'ups_inverter',
+    label: 'UPS / inverter',
+    spectrum: '5:3 7:2 11:1',
+    description: 'Low-distortion inverter source profile.'
+  },
+  {
+    id: manualHarmonicProfileId,
+    label: 'Custom / manual spectrum',
+    spectrum: '',
+    description: 'Use the entered harmonic spectrum for this component.'
+  }
+];
+
+function normalizeHarmonicProfile(profile) {
+  if (!profile || typeof profile !== 'object') return null;
+  const label = String(profile.label || profile.name || '').trim();
+  const spectrum = String(profile.spectrum || '').trim();
+  const id = String(profile.id || label.toLowerCase().replace(/[^a-z0-9]+/g, '_')).replace(/^_+|_+$/g, '');
+  if (!id || !label) return null;
+  return {
+    id,
+    label,
+    spectrum,
+    description: String(profile.description || '').trim(),
+    custom: !!profile.custom
+  };
+}
+
+function getCustomHarmonicProfiles() {
+  const stored = getItem(harmonicProfileStorageKey, []);
+  if (!Array.isArray(stored)) return [];
+  return stored
+    .map(profile => normalizeHarmonicProfile({ ...profile, custom: true }))
+    .filter(Boolean);
+}
+
+function getHarmonicProfileLibrary() {
+  const builtIns = builtInHarmonicProfiles.map(profile => ({ ...profile, custom: false }));
+  const customProfiles = getCustomHarmonicProfiles();
+  const reservedIds = new Set(builtIns.map(profile => profile.id));
+  return [
+    ...builtIns.filter(profile => profile.id !== manualHarmonicProfileId),
+    ...customProfiles.filter(profile => !reservedIds.has(profile.id)),
+    builtIns.find(profile => profile.id === manualHarmonicProfileId)
+  ].filter(Boolean);
+}
+
+function getHarmonicProfileOptions() {
+  return getHarmonicProfileLibrary().map(profile => ({
+    value: profile.id,
+    label: profile.custom ? `${profile.label} (custom)` : profile.label
+  }));
+}
+
+function findHarmonicProfileById(id) {
+  const normalizedId = String(id || '').trim();
+  return getHarmonicProfileLibrary().find(profile => profile.id === normalizedId) || null;
+}
+
+function findHarmonicProfileBySpectrum(spectrum) {
+  const normalizedSpectrum = String(spectrum || '').trim();
+  if (!normalizedSpectrum) return null;
+  return getHarmonicProfileLibrary()
+    .filter(profile => profile.id !== manualHarmonicProfileId)
+    .find(profile => profile.spectrum === normalizedSpectrum) || null;
+}
+
+function defaultHarmonicProfileId(meta) {
+  const type = `${meta?.type || ''}`.trim().toLowerCase();
+  const subtype = `${meta?.subtype || ''}`.trim().toLowerCase();
+  if (subtype === 'vfd' || subtype.includes('vfd') || type === 'rectifier' || subtype.includes('rectifier')) {
+    return 'six_pulse_vfd';
+  }
+  if (subtype === 'soft_starter' || subtype.includes('soft_starter')) {
+    return manualHarmonicProfileId;
+  }
+  if (type === 'ups' || subtype.includes('ups')) return 'ups_inverter';
+  if (type.includes('inverter') || subtype.includes('inverter')) return 'ups_inverter';
+  return manualHarmonicProfileId;
+}
+
+function saveCustomHarmonicProfile(label, spectrum) {
+  const normalizedLabel = String(label || '').trim();
+  const normalizedSpectrum = String(spectrum || '').trim();
+  if (!normalizedLabel || !normalizedSpectrum) return null;
+  const baseId = normalizedLabel.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'custom_profile';
+  const profile = {
+    id: `custom_${baseId}`,
+    label: normalizedLabel,
+    spectrum: normalizedSpectrum,
+    description: 'Custom harmonic profile.',
+    custom: true
+  };
+  const existing = getCustomHarmonicProfiles().filter(item => item.id !== profile.id);
+  existing.push(profile);
+  setItem(harmonicProfileStorageKey, existing);
+  return profile;
+}
+
+function parseHarmonicSpectrumPoints(spec) {
+  const map = new Map();
+  if (!spec) return [];
+  if (Array.isArray(spec)) {
+    spec.forEach((value, index) => {
+      const pct = Number(value);
+      const order = index + 1;
+      if (Number.isFinite(pct) && pct > 0 && order > 1) map.set(order, pct);
+    });
+  } else if (typeof spec === 'string') {
+    spec.split(/[,\s]+/).forEach(part => {
+      if (!part) return;
+      const [orderPart, pctPart] = part.split(':');
+      const order = Number(orderPart);
+      const pct = Number(pctPart ?? orderPart);
+      if (Number.isFinite(order) && Number.isFinite(pct) && order > 1 && pct >= 0) {
+        map.set(order, pct);
+      }
+    });
+  }
+  return [...map.entries()]
+    .map(([order, pct]) => ({ order, pct }))
+    .sort((a, b) => a.order - b.order);
+}
+
+function harmonicThdPercent(points) {
+  if (!Array.isArray(points) || !points.length) return 0;
+  const sumSquares = points.reduce((sum, point) => {
+    const pct = Number(point?.pct);
+    return Number.isFinite(pct) ? sum + pct * pct : sum;
+  }, 0);
+  return Math.sqrt(sumSquares);
+}
+
+function formatHarmonicMetric(value, decimals = 1) {
+  if (!Number.isFinite(value)) return '';
+  const factor = 10 ** decimals;
+  const rounded = Math.round(value * factor) / factor;
+  let text = rounded.toFixed(decimals);
+  text = text.replace(/\.0+$/, '');
+  text = text.replace(/(\.[0-9]*[1-9])0+$/, '$1');
+  return text;
+}
+
+function estimateVoltageHarmonicPoints(currentPoints, { voltage, loadKw, scMVA } = {}) {
+  if (
+    !Array.isArray(currentPoints)
+    || !currentPoints.length
+    || !Number.isFinite(voltage)
+    || voltage <= 0
+    || !Number.isFinite(loadKw)
+    || loadKw <= 0
+    || !Number.isFinite(scMVA)
+    || scMVA <= 0
+  ) {
+    return [];
+  }
+  const baseCurrent = loadKw * 1000 / (Math.sqrt(3) * voltage);
+  const kv = voltage / 1000;
+  const yBase = scMVA / (kv * kv);
+  if (!Number.isFinite(baseCurrent) || baseCurrent <= 0 || !Number.isFinite(yBase) || yBase <= 0) return [];
+  return currentPoints.map(point => {
+    const harmonicCurrent = baseCurrent * (point.pct / 100);
+    const harmonicVoltage = harmonicCurrent / yBase;
+    const pct = harmonicVoltage / voltage * 100;
+    return {
+      order: point.order,
+      pct: Number.isFinite(pct) && pct > 0 ? pct : 0
+    };
+  });
+}
+
+const harmonicStudyFieldSpecs = [
+  { name: 'harmonicSource', label: 'Harmonic Source', type: 'checkbox', required: false, defaultValue: (comp, meta) => isDefaultHarmonicSourceMeta(meta || comp) },
+  { name: 'harmonicProfileId', label: 'Harmonic Profile', type: 'select', required: false, defaultValue: (comp, meta) => defaultHarmonicProfileId(meta || comp), options: () => getHarmonicProfileOptions() },
+  { name: 'harmonics', label: 'Harmonic Spectrum (order:pct)', type: 'text', required: false, defaultValue: (comp, meta) => defaultHarmonicSpectrum(meta || comp), placeholder: '5:35 7:25 11:12 13:8' },
+  { name: 'scMVA', label: 'Short-Circuit Strength at Bus (MVA)', type: 'number', required: false, defaultValue: '' },
+  { name: 'harmonicsA', label: 'Phase A Harmonics (order:pct)', type: 'text', required: false, defaultValue: '' },
+  { name: 'harmonicsB', label: 'Phase B Harmonics (order:pct)', type: 'text', required: false, defaultValue: '' },
+  { name: 'harmonicsC', label: 'Phase C Harmonics (order:pct)', type: 'text', required: false, defaultValue: '' }
+];
+
+const motorStudyFieldSpecs = [
+  { name: 'full_load_amps', label: 'Full-Load Amps (A)', type: 'number', required: false, defaultValue: comp => comp.rated_current_a || comp.rated_current || '' },
+  { name: 'pf', label: 'Power Factor', type: 'number', required: false, defaultValue: 0.88 },
+  { name: 'efficiency', label: 'Efficiency (%)', type: 'number', required: false, defaultValue: 95 },
+  { name: 'lr_current_pu', label: 'Locked-Rotor Current (x FLA)', type: 'number', required: false, defaultValue: 6 },
+  { name: 'inrushMultiple', label: 'Inrush Multiple (x FLA)', type: 'number', required: false, defaultValue: 6 },
+  { name: 'thevenin_r', label: 'Thevenin R (ohm)', type: 'number', required: false, defaultValue: '' },
+  { name: 'thevenin_x', label: 'Thevenin X (ohm)', type: 'number', required: false, defaultValue: '' },
+  { name: 'inertia', label: 'Inertia (kg*m^2)', type: 'number', required: false, defaultValue: '' },
+  { name: 'load_torque_curve', label: 'Load Torque Curve (speed%:torque%)', type: 'textarea', required: false, rows: 3, defaultValue: '0:0 100:100' },
+  { name: 'start_time_s', label: 'Start Time (s)', type: 'number', required: false, defaultValue: '' },
+  { name: 'stall_time', label: 'Stall Time (s)', type: 'number', required: false, defaultValue: '' },
+  { name: 'synchronous_speed_rpm', label: 'Synchronous Speed (rpm)', type: 'number', required: false, defaultValue: '' },
+  { name: 'current_limit_pu', label: 'Current Limit (x FLA)', type: 'number', required: false, defaultValue: '' },
+  { name: 'vfd_current_limit_pu', label: 'VFD Current Limit (x FLA)', type: 'number', required: false, defaultValue: '' },
+  { name: 'initial_voltage_pu', label: 'Initial Voltage (pu)', type: 'number', required: false, defaultValue: '' },
+  { name: 'ramp_time_s', label: 'Ramp Time (s)', type: 'number', required: false, defaultValue: '' }
+];
+
+function isMotorStudyComponentMeta(meta) {
+  if (!meta || typeof meta !== 'object') return false;
+  const type = `${meta.type || ''}`.trim().toLowerCase();
+  const subtype = `${meta.subtype || ''}`.trim().toLowerCase();
+  return type === 'motor_load'
+    || type === 'motor'
+    || type === 'motor_controller'
+    || type === 'motor_starter'
+    || subtype === 'motor_load'
+    || subtype === 'motor'
+    || subtype.includes('starter')
+    || subtype === 'vfd'
+    || subtype === 'soft_starter';
+}
+
+function isTransformerStudyComponentMeta(meta) {
+  if (!meta || typeof meta !== 'object') return false;
+  const type = `${meta.type || ''}`.trim().toLowerCase();
+  const subtype = `${meta.subtype || ''}`.trim().toLowerCase();
+  return type === 'transformer' || subtype.includes('transformer') || subtype.includes('xfmr');
+}
+
+function isArcFlashStudyComponentMeta(meta) {
+  if (!isDiagramAssetComponentMeta(meta)) return false;
+  const type = `${meta.type || ''}`.trim().toLowerCase();
+  const subtype = `${meta.subtype || ''}`.trim().toLowerCase();
+  return type !== 'cable' && type !== 'busway' && subtype !== 'cable' && subtype !== 'busway';
+}
+
+function isHarmonicStudyComponentMeta(meta) {
+  if (!meta || typeof meta !== 'object') return false;
+  const type = `${meta.type || ''}`.trim().toLowerCase();
+  const subtype = `${meta.subtype || ''}`.trim().toLowerCase();
+  return ['pv_inverter', 'bess_inverter', 'rectifier', 'ups', 'static_load'].includes(type)
+    || type === 'motor_controller'
+    || subtype === 'vfd'
+    || subtype === 'soft_starter'
+    || subtype.includes('inverter')
+    || subtype.includes('rectifier')
+    || subtype.includes('ups');
+}
+
+function isDefaultHarmonicSourceMeta(meta) {
+  if (!meta || typeof meta !== 'object') return false;
+  const type = `${meta.type || ''}`.trim().toLowerCase();
+  const subtype = `${meta.subtype || ''}`.trim().toLowerCase();
+  return ['pv_inverter', 'bess_inverter', 'rectifier', 'ups'].includes(type)
+    || subtype === 'vfd'
+    || subtype.includes('vfd')
+    || subtype.includes('inverter')
+    || subtype.includes('rectifier')
+    || subtype.includes('ups');
+}
+
+function defaultHarmonicSpectrum(meta) {
+  const profile = findHarmonicProfileById(defaultHarmonicProfileId(meta));
+  return profile?.spectrum || '';
+}
+
+function resolveStudyInputFieldSpecs(meta) {
+  if (!isDiagramAssetComponentMeta(meta)) return [];
+  const specs = [...commonStudyFieldSpecs];
+  if (isArcFlashStudyComponentMeta(meta)) specs.push(...arcFlashStudyFieldSpecs);
+  if (isTransformerStudyComponentMeta(meta)) specs.push(...transformerTccStudyFieldSpecs);
+  if (isHarmonicStudyComponentMeta(meta)) specs.push(...harmonicStudyFieldSpecs);
+  if (isMotorStudyComponentMeta(meta)) specs.push(...motorStudyFieldSpecs);
+  return specs;
+}
+
+function ensureStudyInputFieldsOnComponent(comp, meta) {
+  if (!comp || typeof comp !== 'object') return comp;
+  const specs = resolveStudyInputFieldSpecs(meta || comp);
+  if (!specs.length) return comp;
+  if (!comp.props || typeof comp.props !== 'object') {
+    comp.props = { ...(comp.props || {}) };
+  }
+  specs.forEach(spec => {
+    const hasCompValue = Object.prototype.hasOwnProperty.call(comp, spec.name);
+    const hasPropsValue = Object.prototype.hasOwnProperty.call(comp.props, spec.name);
+    if (hasCompValue || hasPropsValue) {
+      if (!hasCompValue && hasPropsValue) comp[spec.name] = comp.props[spec.name];
+      if (hasCompValue && !hasPropsValue) comp.props[spec.name] = comp[spec.name];
+      return;
+    }
+    const nextValue = typeof spec.defaultValue === 'function' ? spec.defaultValue(comp, meta) : spec.defaultValue;
+    comp[spec.name] = nextValue;
+    comp.props[spec.name] = nextValue;
+  });
+  return comp;
+}
+
+function ensureStudyInputMetadata() {
+  Object.entries(componentMeta).forEach(([key, meta]) => {
+    const specs = resolveStudyInputFieldSpecs(meta);
+    if (!specs.length) return;
+    if (!meta.props || typeof meta.props !== 'object') {
+      meta.props = { ...(meta.props || {}) };
+    }
+    specs.forEach(spec => {
+      if (!Object.prototype.hasOwnProperty.call(meta.props, spec.name)) {
+        const nextValue = typeof spec.defaultValue === 'function' ? spec.defaultValue(meta.props, meta) : spec.defaultValue;
+        meta.props[spec.name] = nextValue;
+      }
+    });
+    const schemaKeys = new Set([key, meta.subtype].filter(Boolean));
+    schemaKeys.forEach(schemaKey => {
+      if (!Array.isArray(propSchemas[schemaKey])) {
+        propSchemas[schemaKey] = inferSchemaFromProps(meta.props || {});
+      }
+      specs.forEach(spec => ensureBaselineFieldSchema(propSchemas[schemaKey], spec));
+    });
+  });
+}
+
 function loadStoredCustomComponents() {
   const stored = getItem(customComponentStorageKey, [], customComponentScenarioKey);
   if (!Array.isArray(stored)) return [];
@@ -1749,7 +2271,7 @@ async function loadComponentLibrary() {
   };
 
   try {
-    const res = await fetch(asset('componentLibrary.json'));
+    const res = await fetch(asset('componentLibrary.json'), { cache: 'no-store' });
     const data = await res.json();
     const comps = Array.isArray(data.components) ? data.components : [];
     comps.forEach(c => registerDefinition(c));
@@ -1767,6 +2289,7 @@ async function loadComponentLibrary() {
   ensureMccMetadata();
   ensurePtVtMetadata();
   ensureBaselineComponentMetadata();
+  ensureStudyInputMetadata();
 
   buildPalette();
   refreshAttributeOptions();
@@ -1901,6 +2424,9 @@ function buildPalette() {
   closePaletteContextMenu();
   const palette = document.getElementById('component-buttons');
   const btnTemplate = document.getElementById('palette-button-template');
+  const pinnedContainer = document.getElementById('palette-pinned-buttons');
+  const noResults = document.getElementById('palette-no-results');
+  if (pinnedContainer) pinnedContainer.innerHTML = '';
   const sectionContainers = {
     sources: document.getElementById('sources-buttons'),
     equipment: document.getElementById('equipment-buttons'),
@@ -1914,11 +2440,156 @@ function buildPalette() {
   Object.values(sectionContainers).forEach(c => {
     if (c) c.innerHTML = '';
   });
+  const normalizePaletteFilterCategory = cat => {
+    if (cat === 'bus' || cat === 'busway' || cat === 'panel') return 'equipment';
+    if (cat === 'load') return 'load';
+    return cat || 'equipment';
+  };
+  const paletteButtonMatchesFilter = (btn, term, activeFilter) => {
+    const label = (btn.dataset.label || '').toLowerCase();
+    const sub = (btn.dataset.subtype || '').toLowerCase();
+    const type = (btn.dataset.type || '').toLowerCase();
+    const category = btn.dataset.filterCategory || btn.dataset.category || '';
+    const matchesText = !term || label.includes(term) || sub.includes(term) || type.includes(term);
+    const matchesCategory = activeFilter === 'all' || category === activeFilter;
+    return matchesText && matchesCategory;
+  };
+  const frequentPattern = /\b(utility|source|switchboard|panel|transformer|xfmr|breaker|fuse|disconnect|vfd|motor|cable segment|busway)\b/i;
+  const frequentKeys = new Set([
+    'utility',
+    'source',
+    'switchboard',
+    'panel',
+    'xfmr',
+    'transformer',
+    'breaker',
+    'fuse',
+    'fused_disconnect',
+    'non_fused_disconnect',
+    'vfd',
+    'motor',
+    'motor_load',
+    'cable',
+    'busway'
+  ]);
+  const isFrequentPaletteComponent = (cat, subKey, meta) => {
+    const category = normalizePaletteFilterCategory(cat);
+    if (!['sources', 'equipment', 'protection', 'load', 'cable'].includes(category)) return false;
+    const key = String(subKey || meta?.subtype || meta?.type || '').toLowerCase();
+    const label = String(meta?.label || '').toLowerCase();
+    return frequentKeys.has(key) || frequentPattern.test(label);
+  };
+  const createPaletteButton = (cat, subKey, meta, { pinned = false } = {}) => {
+    const btn = btnTemplate ? btnTemplate.content.firstElementChild.cloneNode(true) : document.createElement('button');
+    btn.draggable = true;
+    btn.setAttribute('draggable', 'true');
+    btn.dataset.type = meta.type;
+    btn.dataset.category = cat;
+    btn.dataset.filterCategory = normalizePaletteFilterCategory(cat);
+    if (meta.subtype) {
+      btn.dataset.subtype = meta.subtype;
+      btn.setAttribute('data-subtype', meta.subtype);
+    } else {
+      btn.dataset.subtype = '';
+      btn.setAttribute('data-subtype', '');
+    }
+    btn.setAttribute('data-testid', 'palette-button');
+    btn.dataset.label = meta.label;
+    btn.title = `${meta.label} - Drag to canvas or click to add`;
+    btn.setAttribute('aria-label', meta.label || meta.subtype || meta.type || subKey);
+    if (pinned) btn.classList.add('palette-pinned-button');
+    const rotation = defaultRotationForMeta(meta, meta?.type);
+    const iconWrapper = document.createElement('span');
+    iconWrapper.className = 'palette-icon';
+    iconWrapper.dataset.rotation = String(rotation);
+    const iconImg = document.createElement('img');
+    iconImg.src = meta.icon;
+    iconImg.alt = '';
+    iconImg.setAttribute('aria-hidden', 'true');
+    iconWrapper.appendChild(iconImg);
+    btn.innerHTML = '';
+    btn.appendChild(iconWrapper);
+    const labelSpan = document.createElement('span');
+    labelSpan.className = 'palette-label';
+    labelSpan.textContent = meta.label || meta.subtype || meta.type || subKey;
+    btn.appendChild(labelSpan);
+    btn.addEventListener('click', () => {
+      const comp = addComponent({ type: meta.type, subtype: subKey, placeAtViewportCenter: true });
+      if (comp) {
+        selection = [comp];
+        selected = comp;
+        selectedConnection = null;
+        setRightRailTab('properties');
+        showToast(`${comp.label || meta.label || 'Component'} added`);
+      }
+      render();
+      if (comp) zoomToComponents([comp], { maxZoom: 1.35, pad: 90 });
+      save();
+    });
+    btn.addEventListener('dragstart', e => {
+      e.dataTransfer.setData('text/plain', JSON.stringify({ type: meta.type, subtype: subKey }));
+      setDragPreview(e, meta, rotation);
+    });
+    btn.dataset.custom = meta.isCustom ? '1' : '0';
+    btn.addEventListener('contextmenu', e => {
+      e.preventDefault();
+      openPaletteContextMenu(meta, btn, e.clientX, e.clientY);
+    });
+    btn.addEventListener('keydown', e => {
+      if (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) {
+        e.preventDefault();
+        const rect = btn.getBoundingClientRect();
+        openPaletteContextMenu(
+          meta,
+          btn,
+          rect.left + rect.width / 2,
+          rect.top + rect.height / 2
+        );
+      }
+    });
+    return btn;
+  };
+  const applyPaletteFilters = () => {
+    const paletteSearch = document.getElementById('palette-search');
+    const term = paletteSearch?.value.trim().toLowerCase() || '';
+    const activeFilter = Object.prototype.hasOwnProperty.call(paletteCategoryFilters, activePaletteCategoryFilter)
+      ? activePaletteCategoryFilter
+      : 'all';
+    let visibleCount = 0;
+    palette.querySelectorAll('button[data-testid="palette-button"]').forEach(btn => {
+      const visible = paletteButtonMatchesFilter(btn, term, activeFilter);
+      btn.hidden = !visible;
+      if (visible) visibleCount += 1;
+    });
+    document.querySelectorAll('#component-buttons .palette-filter').forEach(button => {
+      const active = button.dataset.paletteFilter === activeFilter;
+      button.classList.toggle('active', active);
+      button.setAttribute('aria-pressed', active ? 'true' : 'false');
+    });
+    document.querySelectorAll('#component-buttons details').forEach(det => {
+      const sectionFilter = det.dataset.filterCategory || det.dataset.category || '';
+      const categoryVisible = activeFilter === 'all' || sectionFilter === activeFilter;
+      const buttons = Array.from(det.querySelectorAll('button[data-testid="palette-button"]'));
+      const hasVisibleButton = buttons.some(btn => !btn.hidden);
+      const card = det.closest('.palette-card');
+      if (card) card.hidden = !categoryVisible || (!hasVisibleButton && term);
+      if (term && hasVisibleButton) det.open = true;
+    });
+    const pinned = document.getElementById('palette-pinned');
+    if (pinned) {
+      const hasPinned = Array.from(pinned.querySelectorAll('button[data-testid="palette-button"]')).some(btn => !btn.hidden);
+      pinned.hidden = !hasPinned;
+    }
+    if (noResults) noResults.hidden = visibleCount > 0;
+  };
   Object.entries(sectionContainers).forEach(([cat, container]) => {
     const summary = container?.parentElement?.querySelector('summary');
     if (!summary) return;
     const details = summary.closest('details');
-    if (details) details.dataset.category = cat;
+    if (details) {
+      details.dataset.category = cat;
+      details.dataset.filterCategory = normalizePaletteFilterCategory(cat);
+    }
     Array.from(summary.childNodes).forEach(node => {
       if (node.nodeType === Node.TEXT_NODE) {
         summary.removeChild(node);
@@ -1932,68 +2603,24 @@ function buildPalette() {
     }
     label.textContent = cat.charAt(0).toUpperCase() + cat.slice(1);
   });
+  const pinnedKeys = new Set();
+  const pinnedLabels = new Set();
   Object.entries(componentTypes).forEach(([cat, subs]) => {
-    const container = sectionContainers[cat] || palette;
+    const container = sectionContainers[cat] || (cat === 'busway' ? sectionContainers.equipment : null) || palette;
     subs.forEach(subKey => {
       const meta = componentMeta[subKey];
       if (!meta || meta.hidden) return;
-      const btn = btnTemplate ? btnTemplate.content.firstElementChild.cloneNode(true) : document.createElement('button');
-      btn.draggable = true;
-      btn.setAttribute('draggable', 'true');
-      btn.dataset.type = meta.type;
-      if (meta.subtype) {
-        btn.dataset.subtype = meta.subtype;
-        btn.setAttribute('data-subtype', meta.subtype);
-      } else {
-        btn.dataset.subtype = '';
-        btn.setAttribute('data-subtype', '');
-      }
-      btn.setAttribute('data-testid', 'palette-button');
-      btn.dataset.label = meta.label;
-      btn.title = `${meta.label} - Drag to canvas or click to add`;
-      btn.setAttribute('aria-label', meta.label || meta.subtype || meta.type || subKey);
-      const rotation = normalizeRotation(meta?.defaultRotation ?? defaultRotationForType(meta?.type, meta?.category));
-      const iconWrapper = document.createElement('span');
-      iconWrapper.className = 'palette-icon';
-      iconWrapper.dataset.rotation = String(rotation);
-      const iconImg = document.createElement('img');
-      iconImg.src = meta.icon;
-      iconImg.alt = '';
-      iconImg.setAttribute('aria-hidden', 'true');
-      iconWrapper.appendChild(iconImg);
-      btn.innerHTML = '';
-      btn.appendChild(iconWrapper);
-      const labelSpan = document.createElement('span');
-      labelSpan.className = 'palette-label';
-      labelSpan.textContent = meta.label || meta.subtype || meta.type || subKey;
-      btn.appendChild(labelSpan);
-      btn.addEventListener('click', () => {
-        addComponent({ type: meta.type, subtype: subKey, placeAtViewportCenter: true });
-        render();
-        save();
-      });
-      btn.addEventListener('dragstart', e => {
-        e.dataTransfer.setData('text/plain', JSON.stringify({ type: meta.type, subtype: subKey }));
-        setDragPreview(e, meta, rotation);
-      });
-      btn.dataset.custom = meta.isCustom ? '1' : '0';
-      btn.addEventListener('contextmenu', e => {
-        e.preventDefault();
-        openPaletteContextMenu(meta, btn, e.clientX, e.clientY);
-      });
-      btn.addEventListener('keydown', e => {
-        if (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) {
-          e.preventDefault();
-          const rect = btn.getBoundingClientRect();
-          openPaletteContextMenu(
-            meta,
-            btn,
-            rect.left + rect.width / 2,
-            rect.top + rect.height / 2
-          );
-        }
-      });
+      const btn = createPaletteButton(cat, subKey, meta);
       container.appendChild(btn);
+      if (pinnedContainer && pinnedKeys.size < 10 && isFrequentPaletteComponent(cat, subKey, meta)) {
+        const key = `${cat}:${subKey}`;
+        const labelKey = String(meta.label || meta.subtype || meta.type || subKey || '').trim().toLowerCase();
+        if (!pinnedKeys.has(key) && !pinnedLabels.has(labelKey)) {
+          pinnedKeys.add(key);
+          pinnedLabels.add(labelKey);
+          pinnedContainer.appendChild(createPaletteButton(cat, subKey, meta, { pinned: true }));
+        }
+      }
     });
   });
   document.querySelectorAll('#component-buttons details').forEach(det => {
@@ -2006,33 +2633,56 @@ function buildPalette() {
       placeholder.textContent = 'No components available';
       container.appendChild(placeholder);
     }
-    const stored = localStorage.getItem(key);
+    const stored = getItem(key, null);
     if (stored !== null) {
-      det.open = stored === 'true';
+      det.open = stored === true || stored === 'true';
     } else if (!hasButtons) {
       det.open = true;
     }
-    det.addEventListener('toggle', () => {
-      localStorage.setItem(key, det.open);
-    });
+    if (!det.dataset.paletteToggleBound) {
+      det.addEventListener('toggle', () => {
+        setItem(key, det.open);
+      });
+      det.dataset.paletteToggleBound = '1';
+    }
   });
   const paletteSearch = document.getElementById('palette-search');
-  if (paletteSearch) {
+  if (paletteSearch && !paletteSearch.dataset.paletteSearchBound) {
     paletteSearch.addEventListener('input', () => {
-      const term = paletteSearch.value.trim().toLowerCase();
-      palette.querySelectorAll('button').forEach(btn => {
-        const sub = (btn.dataset.subtype || '').toLowerCase();
-        const label = (btn.dataset.label || componentMeta[btn.dataset.subtype]?.label || '').toLowerCase();
-        btn.style.display = !term || sub.includes(term) || label.includes(term) ? '' : 'none';
-      });
+      applyPaletteFilters();
     });
     paletteSearch.addEventListener('keydown', e => {
       if (e.key === 'Escape') {
         paletteSearch.value = '';
-        paletteSearch.dispatchEvent(new Event('input'));
+        activePaletteCategoryFilter = 'all';
+        setItem(paletteFilterStorageKey, activePaletteCategoryFilter);
+        applyPaletteFilters();
       }
     });
+    paletteSearch.dataset.paletteSearchBound = '1';
   }
+  document.querySelectorAll('#component-buttons .palette-filter').forEach(button => {
+    if (button.dataset.paletteFilterBound) return;
+    button.addEventListener('click', () => {
+      const filter = button.dataset.paletteFilter || 'all';
+      activePaletteCategoryFilter = Object.prototype.hasOwnProperty.call(paletteCategoryFilters, filter) ? filter : 'all';
+      setItem(paletteFilterStorageKey, activePaletteCategoryFilter);
+      applyPaletteFilters();
+    });
+    button.dataset.paletteFilterBound = '1';
+  });
+  const clearFilterBtn = document.getElementById('palette-clear-filter-btn');
+  if (clearFilterBtn && !clearFilterBtn.dataset.paletteClearBound) {
+    clearFilterBtn.addEventListener('click', () => {
+      const paletteSearchInput = document.getElementById('palette-search');
+      if (paletteSearchInput) paletteSearchInput.value = '';
+      activePaletteCategoryFilter = 'all';
+      setItem(paletteFilterStorageKey, activePaletteCategoryFilter);
+      applyPaletteFilters();
+    });
+    clearFilterBtn.dataset.paletteClearBound = '1';
+  }
+  applyPaletteFilters();
 }
 
 function closePaletteContextMenu() {
@@ -2094,6 +2744,7 @@ let sheets = [];
 let activeSheet = 0;
 let components = [];
 let connections = [];
+let diagramEntityIdCounter = 0;
 let selection = [];
 let selected = null;
 let dragOffset = null;
@@ -2103,6 +2754,21 @@ let dragConnections = null;
 let draggingLabel = null;
 let clipboard = [];
 let propertyClipboard = null;
+
+function createDiagramEntityId(prefix = 'n') {
+  const safePrefix = String(prefix || 'n').replace(/[^a-zA-Z0-9_-]/g, '') || 'n';
+  const hasId = id => {
+    if (!id) return false;
+    if ((components || []).some(comp => comp?.id === id)) return true;
+    return (sheets || []).some(sheet => (sheet?.components || []).some(comp => comp?.id === id));
+  };
+  let id = '';
+  do {
+    diagramEntityIdCounter += 1;
+    id = `${safePrefix}${Date.now().toString(36)}${diagramEntityIdCounter.toString(36)}`;
+  } while (hasId(id));
+  return id;
+}
 
 const PROPERTY_CLIPBOARD_EXCLUDE_KEYS = new Set([
   'id',
@@ -2260,6 +2926,8 @@ let connectSource = null;
 let tempConnection = null;
 let hoverPort = null;
 let selectedConnection = null;
+let rightRailActiveTab = 'properties';
+let diagramFilterMode = getItem('oneLineDiagramFilterMode', 'all');
 const DEFAULT_DIAGRAM_SCALE = Object.freeze({ unitPerPx: 1, unit: 'in' });
 const MIN_DIAGRAM_UNIT_PER_PX = 1e-6;
 const MAX_DIAGRAM_UNIT_PER_PX = 1e6;
@@ -2809,7 +3477,98 @@ function adjustZoom(factor, opts = {}) {
   setDiagramZoom((diagramZoom || DEFAULT_DIAGRAM_ZOOM) * factor, opts);
 }
 
-function zoomToFit() {
+function getComponentCollectionBounds(items = []) {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  items.forEach(comp => {
+    if (!comp || comp.type === 'dimension') return;
+    const b = componentBounds(comp);
+    minX = Math.min(minX, b.left);
+    minY = Math.min(minY, b.top);
+    maxX = Math.max(maxX, b.right);
+    maxY = Math.max(maxY, b.bottom);
+  });
+  if (!Number.isFinite(minX)) return null;
+  return { minX, minY, maxX, maxY };
+}
+
+function zoomToBounds(bounds, { pad = 80, maxZoom = 1.25 } = {}) {
+  if (!bounds) return false;
+  const svg = document.getElementById('diagram');
+  const editor = svg?.parentElement;
+  if (!(editor instanceof HTMLElement)) return false;
+  const contentW = bounds.maxX - bounds.minX + pad * 2;
+  const contentH = bounds.maxY - bounds.minY + pad * 2;
+  const containerW = editor.clientWidth;
+  const containerH = editor.clientHeight;
+  if (!containerW || !containerH || contentW <= 0 || contentH <= 0) return false;
+  const cappedMax = Number.isFinite(maxZoom) ? Math.max(MIN_DIAGRAM_ZOOM, Math.min(MAX_DIAGRAM_ZOOM, maxZoom)) : MAX_DIAGRAM_ZOOM;
+  const fitZoom = clampZoom(Math.min(containerW / contentW, containerH / contentH, cappedMax));
+  const prevZoom = diagramZoom || DEFAULT_DIAGRAM_ZOOM;
+  diagramZoom = fitZoom;
+  setItem('diagramZoom', Number(diagramZoom.toFixed(2)));
+  applyDiagramZoom({ adjustScroll: false, previousZoom: prevZoom });
+  const centerX = (bounds.minX + bounds.maxX) / 2;
+  const centerY = (bounds.minY + bounds.maxY) / 2;
+  const nextLeft = (centerX - diagramViewport.minX) * diagramZoom - editor.clientWidth / 2;
+  const nextTop = (centerY - diagramViewport.minY) * diagramZoom - editor.clientHeight / 2;
+  editor.scrollLeft = Math.max(0, nextLeft);
+  editor.scrollTop = Math.max(0, nextTop);
+  updateZoomDisplay();
+  renderMinimap();
+  return true;
+}
+
+function zoomToComponents(targets = components, options = {}) {
+  const uniqueTargets = [];
+  const seen = new Set();
+  targets.forEach(comp => {
+    if (!comp || seen.has(comp.id)) return;
+    seen.add(comp.id);
+    uniqueTargets.push(comp);
+  });
+  return zoomToBounds(getComponentCollectionBounds(uniqueTargets), options);
+}
+
+function getConnectedComponentNeighborhood(targets, depth = 1) {
+  const startItems = Array.isArray(targets) ? targets : [targets];
+  const byId = new Map(components.map(comp => [comp.id, comp]));
+  const visited = new Set();
+  const queue = [];
+  startItems.forEach(item => {
+    const comp = typeof item === 'string' ? byId.get(item) : item;
+    if (!comp?.id || visited.has(comp.id)) return;
+    visited.add(comp.id);
+    queue.push({ id: comp.id, distance: 0 });
+  });
+  for (let idx = 0; idx < queue.length; idx += 1) {
+    const entry = queue[idx];
+    if (entry.distance >= depth) continue;
+    const comp = byId.get(entry.id);
+    const neighborIds = new Set();
+    (comp?.connections || []).forEach(conn => {
+      if (conn?.target) neighborIds.add(conn.target);
+    });
+    components.forEach(other => {
+      (other.connections || []).forEach(conn => {
+        if (conn?.target === entry.id) neighborIds.add(other.id);
+      });
+    });
+    neighborIds.forEach(id => {
+      if (!byId.has(id) || visited.has(id)) return;
+      visited.add(id);
+      queue.push({ id, distance: entry.distance + 1 });
+    });
+  }
+  return Array.from(visited).map(id => byId.get(id)).filter(Boolean);
+}
+
+function zoomToComponentNeighborhood(targets, options = {}) {
+  const neighborhood = getConnectedComponentNeighborhood(targets, options.depth ?? 1);
+  return zoomToComponents(neighborhood, { pad: 100, maxZoom: 1.25, ...options });
+}
+
+function zoomToFit(options = {}) {
+  if (components.length && zoomToComponents(components, { pad: 90, maxZoom: 1.2, ...options })) return true;
   if (!components.length) return;
   const svg = document.getElementById('diagram');
   const editor = svg?.parentElement;
@@ -2844,8 +3603,10 @@ function zoomToFit() {
 }
 
 // Gap #42 – Zoom to selection (Shift+F)
-function zoomToSelection() {
+function zoomToSelection(options = {}) {
   const targets = selection.length ? selection : (selected ? [selected] : []);
+  if (targets.length && zoomToComponents(targets, { pad: 90, maxZoom: 1.45, ...options })) return true;
+  if (!targets.length) return zoomToFit(options);
   if (!targets.length) { zoomToFit(); return; }
   const svg = document.getElementById('diagram');
   const editor = svg?.parentElement;
@@ -2900,7 +3661,13 @@ function updateStatusBar() {
     }
   }
   if (modeEl) {
-    modeEl.textContent = connectMode ? 'Connect mode — click a port to start, another to finish (Esc to cancel)' : '';
+    if (!connectMode) {
+      modeEl.textContent = '';
+    } else if (connectSource?.component) {
+      modeEl.textContent = `Connect mode: ${connectSource.component.label || connectSource.component.id} selected; click the next device (Esc to cancel)`;
+    } else {
+      modeEl.textContent = 'Connect mode: click a device or port, then click the next device (Esc to cancel)';
+    }
   }
 }
 
@@ -3011,6 +3778,697 @@ function findComponentByTag(query) {
   return exact || partial;
 }
 
+function normalizeScheduleIdentity(value) {
+  return normalizeSearchValue(value);
+}
+
+function scheduleRecordIdentity(record) {
+  if (!record || typeof record !== 'object') return '';
+  return normalizeTagValue(record.id || record.tag || record.ref || record.name || record.description);
+}
+
+function findScheduleRecordForComponent(comp, records = []) {
+  if (!comp || !Array.isArray(records)) return null;
+  const keys = [
+    comp.scheduleLinks?.equipment,
+    comp.scheduleLinks?.panel,
+    comp.scheduleLinks?.load,
+    comp.scheduleLinks?.cable,
+    comp.equipmentRef,
+    comp.panelRef,
+    comp.loadRef,
+    comp.cableRef,
+    comp.ref,
+    comp.tag,
+    comp.id,
+    getComponentTag(comp)
+  ].map(normalizeScheduleIdentity).filter(Boolean);
+  return records.find(record => {
+    const values = [
+      record.id,
+      record.tag,
+      record.ref,
+      record.name,
+      record.description
+    ].map(normalizeScheduleIdentity).filter(Boolean);
+    return values.some(value => keys.includes(value));
+  }) || null;
+}
+
+function setComponentScheduleLink(comp, key, value) {
+  if (!comp || !key) return;
+  const directKey = {
+    equipment: 'equipmentRef',
+    panel: 'panelRef',
+    load: 'loadRef',
+    cable: 'cableRef'
+  }[key];
+  const nextValue = normalizeTagValue(value);
+  if (!comp.scheduleLinks || typeof comp.scheduleLinks !== 'object') comp.scheduleLinks = {};
+  if (nextValue) {
+    comp.scheduleLinks[key] = nextValue;
+    if (directKey) comp[directKey] = nextValue;
+  } else {
+    delete comp.scheduleLinks[key];
+    if (directKey) comp[directKey] = '';
+  }
+  if (!Object.keys(comp.scheduleLinks).length) delete comp.scheduleLinks;
+}
+
+function scheduleKeyForComponent(comp) {
+  const category = getCategory(comp);
+  if (category === 'load') return 'load';
+  if (category === 'panel') return 'panel';
+  if (category === 'cable') return 'cable';
+  return 'equipment';
+}
+
+function scheduleCollectionForKey(key) {
+  if (key === 'load') return getLoads();
+  if (key === 'panel') return getPanels();
+  if (key === 'cable') return getCables();
+  return getEquipment();
+}
+
+function hasResolvedScheduleLink(comp) {
+  if (!comp) return false;
+  const keys = [...new Set([scheduleKeyForComponent(comp), 'equipment', 'panel', 'load', 'cable'].filter(Boolean))];
+  return keys.some(key => {
+    if (!comp.scheduleLinks?.[key] && !comp[`${key}Ref`] && key !== scheduleKeyForComponent(comp)) return false;
+    return !!findScheduleRecordForComponent(comp, scheduleCollectionForKey(key));
+  });
+}
+
+function persistScheduleCollectionForKey(key, records) {
+  if (key === 'load') {
+    setLoads(records);
+  } else if (key === 'panel') {
+    setPanels(records);
+  } else if (key === 'cable') {
+    setCables(records);
+  } else {
+    setEquipment(records);
+  }
+}
+
+function buildScheduleRecordFromComponent(comp, key = scheduleKeyForComponent(comp)) {
+  const tag = getComponentTag(comp) || comp?.id || '';
+  const voltage = resolveComponentVoltageVolts(comp);
+  const base = {
+    id: comp.ref || tag || comp.id,
+    ref: comp.id || '',
+    tag,
+    description: comp.description || comp.label || '',
+    voltage: Number.isFinite(voltage) ? formatVoltageString(voltage) : (comp.voltage || comp.volts || ''),
+    category: getCategory(comp),
+    subCategory: comp.subtype || '',
+    manufacturer: comp.manufacturer || comp.props?.manufacturer || '',
+    model: comp.model || comp.props?.model || '',
+    phases: comp.phases || comp.props?.phases || '',
+    notes: comp.notes || ''
+  };
+  if (key === 'load') {
+    return {
+      ...base,
+      source: comp.source || comp.panelRef || comp.scheduleLinks?.panel || '',
+      kw: comp.load?.kw ?? comp.props?.load?.kw ?? comp.kw ?? comp.load_kw ?? ''
+    };
+  }
+  if (key === 'cable') {
+    return {
+      ...base,
+      from_tag: comp.from_tag || '',
+      to_tag: comp.to_tag || '',
+      cable_type: comp.cable?.cable_type || comp.cable_type || '',
+      conductors: comp.cable?.conductors || comp.conductors || '',
+      phases: formatCablePhases(comp.cable || comp)
+    };
+  }
+  return base;
+}
+
+function autoLinkComponentToSchedule(comp, { createIfMissing = true } = {}) {
+  if (!comp) return false;
+  const key = scheduleKeyForComponent(comp);
+  const records = scheduleCollectionForKey(key);
+  const existing = findScheduleRecordForComponent(comp, records);
+  if (existing) {
+    setComponentScheduleLink(comp, key, scheduleRecordIdentity(existing) || existing.id || existing.tag);
+    return true;
+  }
+  if (!createIfMissing) return false;
+  const next = buildScheduleRecordFromComponent(comp, key);
+  records.push(next);
+  persistScheduleCollectionForKey(key, records);
+  setComponentScheduleLink(comp, key, next.id || next.tag);
+  return true;
+}
+
+function selectedConnectionContext() {
+  if (!selectedConnection?.component) return null;
+  const source = selectedConnection.component;
+  const index = selectedConnection.index;
+  const conn = Array.isArray(source.connections) ? source.connections[index] : null;
+  if (!conn) return null;
+  const target = components.find(comp => comp.id === conn.target) || null;
+  return { source, index, conn, target };
+}
+
+function connectionTag(source, target, conn = null) {
+  const existing = conn?.cable?.tag || conn?.cable_tag || conn?.tag;
+  if (normalizeTagValue(existing)) return normalizeTagValue(existing);
+  const from = normalizeTagValue(getComponentTag(source) || source?.id || 'FROM').replace(/\s+/g, '-');
+  const to = normalizeTagValue(getComponentTag(target) || target?.id || 'TO').replace(/\s+/g, '-');
+  return `CBL-${from}-${to}`;
+}
+
+function upsertCableScheduleRecordForConnection(source, target, conn, fields = {}) {
+  if (!source || !target || !conn) return null;
+  const tag = normalizeTagValue(fields.tag || connectionTag(source, target, conn));
+  if (!tag) return null;
+  const voltage = resolveConnectionVoltageVolts(source, conn, 'source')
+    || resolveConnectionVoltageVolts(target, conn, 'target');
+  const baseRecord = {
+    id: tag,
+    tag,
+    from_tag: getComponentTag(source) || source.id || '',
+    to_tag: getComponentTag(target) || target.id || '',
+    voltage: Number.isFinite(voltage) ? formatVoltageString(voltage) : '',
+    cable_type: fields.cable_type || conn.cable?.cable_type || '',
+    phases: fields.phases || formatCablePhases(conn.phases || conn.cable || source),
+    conductors: fields.conductors || conn.conductors || conn.cable?.conductors || '',
+    conductor_size: fields.conductor_size || conn.cable?.conductor_size || '',
+    notes: fields.notes || conn.cable?.notes || '',
+    generated: true,
+    review_status: 'assumed',
+    source: 'One-Line'
+  };
+  const cables = getCables();
+  const existingIndex = cables.findIndex(cable => {
+    const key = normalizeScheduleIdentity(cable.id || cable.tag || cable.ref);
+    return key && key === normalizeScheduleIdentity(tag);
+  });
+  if (existingIndex >= 0) {
+    cables[existingIndex] = { ...baseRecord, ...cables[existingIndex], ...fields, id: cables[existingIndex].id || tag, tag };
+  } else {
+    cables.push({ ...baseRecord, ...fields });
+  }
+  setCables(cables);
+  conn.cable = {
+    ...(conn.cable || {}),
+    ...fields,
+    tag,
+    provisional: false,
+    scheduleLinked: true
+  };
+  conn.cableRef = tag;
+  conn.cable_tag = tag;
+  conn.generated = conn.generated || true;
+  conn.reviewStatus = conn.reviewStatus || 'assumed';
+  return existingIndex >= 0 ? cables[existingIndex] : cables[cables.length - 1];
+}
+
+function markComponentAssumption(comp, note = 'Marked for user review') {
+  if (!comp) return false;
+  const entry = {
+    note,
+    source: 'One-Line review',
+    createdAt: new Date().toISOString()
+  };
+  if (!Array.isArray(comp.assumptions)) comp.assumptions = [];
+  comp.assumptions.push(entry);
+  comp.reviewStatus = 'assumed';
+  return true;
+}
+
+function getComponentReviewBadges(comp) {
+  const badges = [];
+  if (!comp || typeof comp !== 'object') return badges;
+  if (comp.generated) badges.push({ text: 'G', label: 'Generated from project data', className: 'generated' });
+  if (comp.reviewStatus === 'assumed' || (Array.isArray(comp.assumptions) && comp.assumptions.length)) {
+    badges.push({ text: 'A', label: 'Assumption needs review', className: 'assumption' });
+  }
+  if (!hasResolvedScheduleLink(comp)) {
+    badges.push({ text: 'L', label: 'Schedule link missing', className: 'link' });
+  }
+  return badges;
+}
+
+function componentMatchesDiagramFilter(comp) {
+  if (!comp || diagramFilterMode === 'all') return true;
+  if (diagramFilterMode === 'generated') return !!comp.generated;
+  if (diagramFilterMode === 'assumptions') {
+    return comp.reviewStatus === 'assumed' || (Array.isArray(comp.assumptions) && comp.assumptions.length);
+  }
+  if (diagramFilterMode === 'incomplete') {
+    const linked = hasResolvedScheduleLink(comp);
+    const connected = (comp.connections || []).length || components.some(other => (other.connections || []).some(conn => conn.target === comp.id));
+    return !linked || !connected || comp.reviewStatus === 'assumed';
+  }
+  const category = getCategory(comp);
+  if (diagramFilterMode === 'protection') return isProtectionComponent(comp);
+  if (diagramFilterMode === 'loads') return category === 'load';
+  if (diagramFilterMode === 'equipment') return category === 'equipment' || category === 'panel' || isBusComponent(comp);
+  return true;
+}
+
+function syncDatablockFormatControl() {
+  const select = document.getElementById('datablock-format-select');
+  if (select) select.value = datablockFormatMode;
+}
+
+function setDatablockFormatMode(mode) {
+  const nextMode = Object.prototype.hasOwnProperty.call(datablockFormatLabels, mode) ? mode : 'off';
+  datablockFormatMode = nextMode;
+  setItem(datablockFormatStorageKey, datablockFormatMode);
+  if (nextMode !== 'custom') {
+    const preset = datablockFormatPresets[nextMode] || [];
+    const persisted = sanitizeViewAttributeList(preset);
+    viewAttributes = new Set(persisted);
+    setItem(viewAttributeStorageKey, persisted);
+  }
+  updateViewButtonLabel();
+  syncDatablockFormatControl();
+  render();
+}
+
+function markDatablockFormatCustom() {
+  if (datablockFormatMode === 'custom') return;
+  datablockFormatMode = 'custom';
+  setItem(datablockFormatStorageKey, datablockFormatMode);
+  syncDatablockFormatControl();
+}
+
+function syncDatablockDensityControl() {
+  const select = document.getElementById('datablock-density-select');
+  if (select) select.value = datablockDensityMode;
+}
+
+function setDatablockDensityMode(mode) {
+  datablockDensityMode = Object.prototype.hasOwnProperty.call(datablockDensityLabels, mode) ? mode : 'compact';
+  setItem(datablockDensityStorageKey, datablockDensityMode);
+  syncDatablockDensityControl();
+  render();
+}
+
+function syncDataStateOverlayControl() {
+  const select = document.getElementById('data-state-overlay-select');
+  if (select) select.value = dataStateOverlayMode;
+}
+
+function setDataStateOverlayMode(mode) {
+  dataStateOverlayMode = Object.prototype.hasOwnProperty.call(dataStateOverlayLabels, mode) ? mode : 'none';
+  setItem(dataStateOverlayStorageKey, dataStateOverlayMode);
+  syncDataStateOverlayControl();
+  render();
+}
+
+function syncOperatingStateControl() {
+  const select = document.getElementById('operating-state-select');
+  if (select) select.value = activeOperatingState;
+}
+
+function setActiveOperatingState(state) {
+  activeOperatingState = Object.prototype.hasOwnProperty.call(operatingStateLabels, state) ? state : 'normal';
+  setItem(operatingStateStorageKey, activeOperatingState);
+  showEnergizedState = true;
+  const toggle = document.getElementById('toggle-energized');
+  if (toggle) toggle.checked = true;
+  syncOperatingStateControl();
+  render();
+}
+
+function getOperatingStateOverride(comp, state = activeOperatingState) {
+  if (!comp || !state || !comp.operatingStates || typeof comp.operatingStates !== 'object') return null;
+  const override = comp.operatingStates[state];
+  return override && typeof override === 'object' ? override : null;
+}
+
+function getComponentOperatingStatus(comp, state = activeOperatingState) {
+  const override = getOperatingStateOverride(comp, state);
+  const value = override?.state || comp?.props?.state || comp?.state || comp?.service_status || comp?.props?.service_status || 'closed';
+  const normalized = String(value || '').trim().toLowerCase();
+  if (['open', 'off', 'de-energized', 'deenergized', 'out_of_service', 'out-of-service'].includes(normalized)) return 'open';
+  if (['closed', 'on', 'energized', 'in_service', 'in-service', 'normal'].includes(normalized)) return 'closed';
+  return normalized || 'closed';
+}
+
+function isComponentOpenForOperatingState(comp, state = activeOperatingState) {
+  return getComponentOperatingStatus(comp, state) === 'open';
+}
+
+function setComponentOperatingStatus(comp, status) {
+  if (!comp) return false;
+  const compId = comp.id;
+  const normalized = String(status || '').trim().toLowerCase();
+  if (!comp.operatingStates || typeof comp.operatingStates !== 'object') comp.operatingStates = {};
+  if (!normalized || normalized === 'normal') {
+    delete comp.operatingStates[activeOperatingState];
+  } else {
+    comp.operatingStates[activeOperatingState] = {
+      state: normalized === 'open' ? 'open' : 'closed',
+      updatedAt: new Date().toISOString()
+    };
+  }
+  if (!Object.keys(comp.operatingStates).length) delete comp.operatingStates;
+  selected = comp;
+  selection = [comp];
+  selectedConnection = null;
+  pushHistory();
+  render();
+  save(false);
+  const savedComp = components.find(item => item.id === compId);
+  if (savedComp) {
+    selected = savedComp;
+    selection = [savedComp];
+    selectedConnection = null;
+    renderRightRail();
+  }
+  showToast(`${comp.label || comp.tag || comp.id} marked ${normalized || 'normal'} for ${operatingStateLabels[activeOperatingState]}`);
+  return true;
+}
+
+function validationIssuesForComponent(comp) {
+  if (!comp) return [];
+  return validationIssues.filter(issue => {
+    if (!issue) return false;
+    if (issue.component === comp || issue.component?.id === comp.id) return true;
+    if (issue.target === comp || issue.target?.id === comp.id) return true;
+    if (issue.source === comp || issue.source?.id === comp.id) return true;
+    if (issue.targetId === comp.id || issue.sourceId === comp.id || issue.componentId === comp.id) return true;
+    return false;
+  });
+}
+
+function componentHasAnyConnection(comp) {
+  if (!comp) return false;
+  return Boolean((comp.connections || []).length || components.some(other => (other.connections || []).some(conn => conn.target === comp.id)));
+}
+
+function getComponentReviewState(comp) {
+  if (!comp) return { key: 'incomplete', label: 'Incomplete', color: '#ef4444' };
+  if (validationIssuesForComponent(comp).length) return { key: 'incomplete', label: 'Validation issue', color: '#ef4444' };
+  if (comp.reviewStatus === 'assumed' || (Array.isArray(comp.assumptions) && comp.assumptions.length)) {
+    return { key: 'estimated', label: 'Estimated / assumption', color: '#f59e0b' };
+  }
+  if (!hasResolvedScheduleLink(comp)) return { key: 'incomplete', label: 'Schedule link missing', color: '#ef4444' };
+  if (!componentHasAnyConnection(comp) && !isSourceComponent(comp)) return { key: 'incomplete', label: 'Unconnected', color: '#ef4444' };
+  if (comp.reviewStatus === 'approved' || comp.reviewStatus === 'verified') {
+    return { key: 'verified', label: 'Verified', color: '#2563eb' };
+  }
+  return { key: 'complete', label: 'Complete', color: '#16a34a' };
+}
+
+function getComponentStudyState(comp) {
+  if (!comp) return { key: 'none', label: 'No study result', color: '#94a3b8' };
+  const voltageMagnitudes = getFiniteVoltageMagnitudes(comp.voltage_mag);
+  if (voltageMagnitudes.length) {
+    const maxDev = voltageMagnitudes.reduce((max, mag) => Math.max(max, Math.abs(mag - 1) * 100), 0);
+    if (maxDev > 10) return { key: 'fail', label: 'Voltage deviation > 10%', color: '#dc2626' };
+    if (maxDev > 5) return { key: 'warn', label: 'Voltage deviation 5-10%', color: '#f59e0b' };
+  }
+  const sc = cachedStudyResults?.shortCircuit?.[comp.id] || comp.shortCircuit;
+  if (sc?.warnings?.length) return { key: 'warn', label: 'Short-circuit warnings', color: '#f59e0b' };
+  const af = cachedStudyResults?.arcFlash?.[comp.id] || comp.arcFlash;
+  if (af && Number.isFinite(Number(af.incidentEnergy))) {
+    const incidentEnergy = Number(af.incidentEnergy);
+    if (incidentEnergy >= 40) return { key: 'fail', label: 'Arc flash danger', color: '#dc2626' };
+    if (incidentEnergy >= 8) return { key: 'warn', label: 'Arc flash warning', color: '#f59e0b' };
+  }
+  if (voltageMagnitudes.length || sc || af) return { key: 'pass', label: 'Study result OK', color: '#16a34a' };
+  return { key: 'none', label: 'No study result', color: '#94a3b8' };
+}
+
+function getComponentArcFlashState(comp) {
+  const af = comp ? (cachedStudyResults?.arcFlash?.[comp.id] || comp.arcFlash) : null;
+  if (!af || !Number.isFinite(Number(af.incidentEnergy))) {
+    return { key: 'none', label: 'No arc flash result', color: '#94a3b8' };
+  }
+  const incidentEnergy = Number(af.incidentEnergy);
+  if (incidentEnergy >= 40) return { key: 'danger', label: 'Danger >= 40 cal/cm2', color: '#dc2626' };
+  if (incidentEnergy >= 8) return { key: 'high', label: 'High incident energy', color: '#f97316' };
+  if (incidentEnergy >= 1.2) return { key: 'warning', label: 'Arc flash warning', color: '#f59e0b' };
+  return { key: 'low', label: 'Low incident energy', color: '#16a34a' };
+}
+
+function getComponentValidationState(comp) {
+  const issues = validationIssuesForComponent(comp);
+  if (issues.length) return { key: 'fail', label: `${issues.length} validation issue${issues.length === 1 ? '' : 's'}`, color: '#dc2626' };
+  return { key: 'pass', label: 'Validation clear', color: '#16a34a' };
+}
+
+function getComponentColorInfo(comp) {
+  if (dataStateOverlayMode === 'review') return getComponentReviewState(comp);
+  if (dataStateOverlayMode === 'validation') return getComponentValidationState(comp);
+  if (dataStateOverlayMode === 'studies') return getComponentStudyState(comp);
+  if (dataStateOverlayMode === 'arcFlash') return getComponentArcFlashState(comp);
+  return null;
+}
+
+function createCommandMenu(label, options = {}) {
+  const details = document.createElement('details');
+  details.className = ['command-menu', options.align === 'right' ? 'command-menu-right' : ''].filter(Boolean).join(' ');
+  const summary = document.createElement('summary');
+  summary.className = 'btn command-menu-trigger';
+  summary.textContent = label;
+  const panel = document.createElement('div');
+  panel.className = ['command-menu-panel', options.wide ? 'command-menu-panel-wide' : '', options.icons ? 'command-menu-panel-icons' : ''].filter(Boolean).join(' ');
+  details.append(summary, panel);
+  return { details, summary, panel };
+}
+
+function normalizeCommandButton(button, label) {
+  if (!(button instanceof HTMLElement)) return null;
+  button.className = 'command-menu-item';
+  button.type = 'button';
+  if (label) {
+    button.textContent = label;
+  } else if (!button.textContent.trim()) {
+    button.textContent = button.getAttribute('aria-label') || button.getAttribute('title') || 'Command';
+  }
+  return button;
+}
+
+function normalizePrimaryButton(button, label) {
+  if (!(button instanceof HTMLElement)) return null;
+  button.className = 'btn primary-command-btn';
+  button.type = 'button';
+  if (label) button.textContent = label;
+  return button;
+}
+
+function normalizeMenuLabel(label) {
+  if (!(label instanceof HTMLElement)) return null;
+  label.classList.remove('icon-button');
+  label.classList.add('command-menu-check');
+  label.querySelector('img')?.remove();
+  label.querySelector('input')?.classList.remove('hidden-input');
+  return label;
+}
+
+function appendIfPresent(parent, node) {
+  if (parent && node) parent.appendChild(node);
+}
+
+function refineOneLineCommandSurface() {
+  const sheetControls = document.querySelector('.sheet-controls');
+  const toolbar = document.querySelector('.toolbar');
+  if (!sheetControls || !toolbar || sheetControls.dataset.commandUi === 'refined') return;
+  sheetControls.dataset.commandUi = 'refined';
+  sheetControls.classList.add('oneline-command-header');
+  toolbar.classList.add('refined-toolbar');
+
+  const scenarioControls = document.querySelector('.scenario-controls');
+  if (scenarioControls) scenarioControls.classList.add('command-context');
+
+  const sheetTabs = document.getElementById('sheet-tabs');
+  const sheetActions = document.querySelector('.sheet-action-group');
+  if (sheetTabs) {
+    const sheetSwitcher = document.createElement('div');
+    sheetSwitcher.className = 'sheet-switcher';
+    const label = document.createElement('span');
+    label.className = 'command-label';
+    label.textContent = 'Sheet';
+    const sheetMenu = createCommandMenu('Sheet');
+    appendIfPresent(sheetMenu.panel, normalizeCommandButton(document.getElementById('add-sheet-btn'), 'Add Sheet'));
+    appendIfPresent(sheetMenu.panel, normalizeCommandButton(document.getElementById('rename-sheet-btn'), 'Rename Sheet'));
+    appendIfPresent(sheetMenu.panel, normalizeCommandButton(document.getElementById('delete-sheet-btn'), 'Delete Sheet'));
+    sheetSwitcher.append(label, sheetTabs, sheetMenu.details);
+    sheetControls.insertBefore(sheetSwitcher, sheetActions || scenarioControls?.nextSibling || null);
+  }
+
+  const primaryActions = document.createElement('div');
+  primaryActions.className = 'primary-action-group';
+  appendIfPresent(primaryActions, normalizePrimaryButton(document.getElementById('auto-build-oneline-btn'), 'Auto-Build'));
+  appendIfPresent(primaryActions, normalizePrimaryButton(document.getElementById('validate-btn'), 'Validate'));
+  appendIfPresent(primaryActions, normalizePrimaryButton(document.getElementById('history-sidebar-toggle'), 'Inspector'));
+  const reviewMenu = createCommandMenu('Review', { align: 'right' });
+  appendIfPresent(reviewMenu.panel, normalizeCommandButton(document.getElementById('scenario-duplicate-btn'), 'Duplicate Scenario'));
+  appendIfPresent(reviewMenu.panel, normalizeCommandButton(document.getElementById('scenario-diff-btn'), 'Scenario Diff'));
+  appendIfPresent(reviewMenu.panel, normalizeCommandButton(document.getElementById('scenario-compare-btn'), 'Compare Scenarios'));
+  appendIfPresent(reviewMenu.panel, normalizeCommandButton(document.getElementById('revision-btn'), 'Revisions'));
+  appendIfPresent(reviewMenu.panel, normalizeCommandButton(document.getElementById('studies-panel-btn'), 'Studies'));
+  appendIfPresent(reviewMenu.panel, normalizeCommandButton(document.getElementById('tour-btn'), 'Tour'));
+  primaryActions.appendChild(reviewMenu.details);
+  sheetControls.appendChild(primaryActions);
+
+  const editGroup = toolbar.querySelector('.toolbar-group[aria-label="Edit"]');
+  if (editGroup) {
+    editGroup.classList.add('compact-tool-group');
+    const label = editGroup.querySelector('.toolbar-group-label');
+    if (label) label.textContent = 'Tools';
+  }
+
+  const buildMenu = createCommandMenu('Build');
+  appendIfPresent(buildMenu.panel, normalizeCommandButton(document.getElementById('sample-diagram-btn'), 'Load Sample'));
+  appendIfPresent(buildMenu.panel, normalizeCommandButton(document.getElementById('auto-arrange-btn'), 'Auto Arrange'));
+  appendIfPresent(buildMenu.panel, normalizeCommandButton(document.getElementById('reconcile-schedules-btn'), 'Reconcile Schedules'));
+
+  const insertMenu = createCommandMenu('Insert');
+  appendIfPresent(insertMenu.panel, normalizeCommandButton(document.getElementById('add-shape-btn'), 'Add Shape'));
+  appendIfPresent(insertMenu.panel, normalizeCommandButton(document.getElementById('layers-panel-toggle'), 'Layers Panel'));
+  appendIfPresent(insertMenu.panel, normalizeCommandButton(document.getElementById('protection-zones-panel-toggle'), 'Protection Zones'));
+
+  const arrangeMenu = createCommandMenu('Arrange', { icons: true });
+  ['align-left-btn', 'align-right-btn', 'align-top-btn', 'align-bottom-btn', 'distribute-h-btn', 'distribute-v-btn'].forEach(id => {
+    appendIfPresent(arrangeMenu.panel, document.getElementById(id));
+  });
+  appendIfPresent(arrangeMenu.panel, normalizeCommandButton(document.getElementById('auto-space-equipment-btn'), 'Auto Space Equipment'));
+
+  const viewMenu = createCommandMenu('View', { wide: true });
+  appendIfPresent(viewMenu.panel, normalizeCommandButton(document.getElementById('view-menu-btn'), 'Component Fields'));
+  appendIfPresent(viewMenu.panel, document.getElementById('datablock-format-select')?.closest('label'));
+  appendIfPresent(viewMenu.panel, document.getElementById('datablock-density-select')?.closest('label'));
+  appendIfPresent(viewMenu.panel, document.getElementById('data-state-overlay-select')?.closest('label'));
+  appendIfPresent(viewMenu.panel, document.getElementById('diagram-filter-select')?.closest('label'));
+  appendIfPresent(viewMenu.panel, normalizeMenuLabel(document.getElementById('minimap-toggle')?.closest('label')));
+  appendIfPresent(viewMenu.panel, normalizeMenuLabel(document.getElementById('toggle-energized')?.closest('label')));
+  appendIfPresent(viewMenu.panel, normalizeMenuLabel(document.getElementById('toggle-protection-zones')?.closest('label')));
+  appendIfPresent(viewMenu.panel, document.getElementById('bg-image-input'));
+  appendIfPresent(viewMenu.panel, normalizeCommandButton(document.getElementById('bg-image-btn'), 'Background Image'));
+
+  const gridMenu = createCommandMenu('Grid');
+  appendIfPresent(gridMenu.panel, normalizeMenuLabel(document.getElementById('grid-toggle')?.closest('label')));
+  const gridSizeLabel = document.getElementById('grid-size')?.closest('label');
+  if (gridSizeLabel) {
+    gridSizeLabel.classList.remove('icon-button');
+    gridSizeLabel.classList.add('command-menu-field');
+    gridSizeLabel.querySelector('img')?.remove();
+    const text = document.createElement('span');
+    text.textContent = 'Grid Size';
+    gridSizeLabel.prepend(text);
+    gridMenu.panel.appendChild(gridSizeLabel);
+  }
+  appendIfPresent(gridMenu.panel, normalizeMenuLabel(document.getElementById('orthogonal-routing-toggle')?.closest('label')));
+
+  const zoomMenu = createCommandMenu('Zoom', { wide: true });
+  const zoomDisplay = document.getElementById('zoom-display');
+  if (zoomDisplay) {
+    zoomMenu.summary.textContent = 'Zoom ';
+    zoomMenu.summary.appendChild(zoomDisplay);
+  }
+  appendIfPresent(zoomMenu.panel, document.querySelector('.zoom-controls'));
+  appendIfPresent(zoomMenu.panel, document.querySelector('.pan-controls'));
+
+  const fileMenu = createCommandMenu('File');
+  appendIfPresent(fileMenu.panel, document.querySelector('.export-group'));
+  appendIfPresent(fileMenu.panel, document.getElementById('import-input'));
+  appendIfPresent(fileMenu.panel, normalizeCommandButton(document.getElementById('import-btn'), 'Import Drawing'));
+  appendIfPresent(fileMenu.panel, normalizeCommandButton(document.getElementById('diagram-export-btn'), 'Export JSON'));
+  appendIfPresent(fileMenu.panel, document.getElementById('diagram-import-input'));
+  appendIfPresent(fileMenu.panel, normalizeCommandButton(document.getElementById('diagram-import-btn'), 'Import JSON'));
+  appendIfPresent(fileMenu.panel, normalizeCommandButton(document.getElementById('diagram-share-btn'), 'Share'));
+  appendIfPresent(fileMenu.panel, normalizeCommandButton(document.getElementById('export-oneline-data-btn'), 'Export One-Line Data'));
+  appendIfPresent(fileMenu.panel, normalizeCommandButton(document.getElementById('title-block-btn'), 'Title Block'));
+
+  const findGroup = toolbar.querySelector('.toolbar-group[aria-label="Find devices"]');
+  if (findGroup) {
+    findGroup.classList.add('find-toolbar-group');
+    findGroup.querySelector('.toolbar-group-label')?.remove();
+  }
+
+  if (editGroup) {
+    editGroup.after(buildMenu.details, insertMenu.details, arrangeMenu.details, viewMenu.details, gridMenu.details, zoomMenu.details, fileMenu.details);
+  } else {
+    toolbar.prepend(buildMenu.details, insertMenu.details, arrangeMenu.details, viewMenu.details, gridMenu.details, zoomMenu.details, fileMenu.details);
+  }
+  if (findGroup) toolbar.appendChild(findGroup);
+
+  [sheetActions, document.querySelector('.scenario-action-group')].forEach(group => {
+    if (group && !group.querySelector('button, input, select, form, details')) group.remove();
+  });
+  toolbar.querySelectorAll('.toolbar-group').forEach(group => {
+    if (!group.querySelector('button, input, select, form, details')) group.remove();
+  });
+}
+
+function setupToolbarMenus() {
+  const menus = Array.from(document.querySelectorAll('.command-menu'));
+  menus.forEach(menu => { menu.open = false; });
+  menus.forEach(menu => {
+    menu.addEventListener('toggle', () => {
+      if (!menu.open) return;
+      closeCommandMenus(menu);
+    });
+    menu.querySelectorAll('.command-menu-panel button').forEach(button => {
+      button.addEventListener('click', () => {
+        if (button.id !== 'export-btn') menu.open = false;
+      });
+    });
+  });
+  document.addEventListener('click', event => {
+    if (event.target instanceof Element && event.target.closest('.command-menu')) return;
+    closeCommandMenus();
+  });
+  document.addEventListener('keydown', event => {
+    if (event.key !== 'Escape') return;
+    closeCommandMenus();
+  });
+  window.setTimeout(() => closeCommandMenus(), 0);
+  window.setTimeout(() => closeCommandMenus(), 150);
+}
+
+function closeCommandMenus(except = null) {
+  document.querySelectorAll('.command-menu[open]').forEach(menu => {
+    if (menu !== except) menu.open = false;
+  });
+}
+
+function getDataStateLegendItems() {
+  if (dataStateOverlayMode === 'review') {
+    return [
+      { key: 'complete', label: 'Complete', color: '#16a34a' },
+      { key: 'verified', label: 'Verified', color: '#2563eb' },
+      { key: 'estimated', label: 'Estimated / assumption', color: '#f59e0b' },
+      { key: 'incomplete', label: 'Incomplete', color: '#ef4444' }
+    ];
+  }
+  if (dataStateOverlayMode === 'validation') {
+    return [
+      { key: 'pass', label: 'Validation clear', color: '#16a34a' },
+      { key: 'fail', label: 'Validation issue', color: '#dc2626' }
+    ];
+  }
+  if (dataStateOverlayMode === 'studies') {
+    return [
+      { key: 'pass', label: 'Study result OK', color: '#16a34a' },
+      { key: 'warn', label: 'Study warning', color: '#f59e0b' },
+      { key: 'fail', label: 'Study fail', color: '#dc2626' },
+      { key: 'none', label: 'No study result', color: '#94a3b8' }
+    ];
+  }
+  if (dataStateOverlayMode === 'arcFlash') {
+    return [
+      { key: 'low', label: 'Low incident energy', color: '#16a34a' },
+      { key: 'warning', label: 'Warning', color: '#f59e0b' },
+      { key: 'high', label: 'High', color: '#f97316' },
+      { key: 'danger', label: 'Danger', color: '#dc2626' },
+      { key: 'none', label: 'No result', color: '#94a3b8' }
+    ];
+  }
+  return [];
+}
+
 function highlightFoundComponent(componentId) {
   if (!componentId) return;
   findHighlightId = componentId;
@@ -3028,6 +4486,7 @@ function highlightFoundComponent(componentId) {
 
 function focusComponentElement(comp) {
   if (!comp) return;
+  if (zoomToComponentNeighborhood(comp, { maxZoom: 1.25, pad: 110 })) return;
   const svg = document.getElementById('diagram');
   if (!svg) return;
   const target = svg.querySelector(`g.component[data-id="${comp.id}"]`);
@@ -3741,6 +5200,469 @@ function renderHistorySidebar() {
   }
 }
 
+function setRightRailTab(tab) {
+  const allowed = new Set(['properties', 'validation', 'history']);
+  rightRailActiveTab = allowed.has(tab) ? tab : 'properties';
+  document.querySelectorAll('[data-right-rail-tab]').forEach(button => {
+    const active = button.dataset.rightRailTab === rightRailActiveTab;
+    button.classList.toggle('is-active', active);
+    button.setAttribute('aria-selected', String(active));
+    button.tabIndex = active ? 0 : -1;
+  });
+  document.querySelectorAll('[data-right-rail-panel]').forEach(panel => {
+    panel.classList.toggle('hidden', panel.dataset.rightRailPanel !== rightRailActiveTab);
+  });
+}
+
+function getConnectionCount() {
+  return components.reduce((sum, comp) => sum + (Array.isArray(comp.connections) ? comp.connections.length : 0), 0);
+}
+
+function computeOneLineReadiness() {
+  const drawable = components.filter(comp => comp.type !== 'dimension' && comp.type !== 'annotation');
+  const connectionCount = getConnectionCount();
+  const unconnected = drawable.filter(comp => {
+    if (comp.type === 'sheet_link') return false;
+    return !(comp.connections || []).length && !components.some(other => (other.connections || []).some(conn => conn.target === comp.id));
+  });
+  const missingLinks = drawable.filter(comp => {
+    const key = scheduleKeyForComponent(comp);
+    return key && !hasResolvedScheduleLink(comp);
+  });
+  const provisionalConnections = [];
+  components.forEach(source => {
+    (source.connections || []).forEach(conn => {
+      if (conn.cable?.provisional || !conn.cable?.tag) provisionalConnections.push({ source, conn });
+    });
+  });
+  const checks = [
+    { label: 'Source present', ok: components.some(isSourceComponent) },
+    { label: 'Devices placed', ok: drawable.length > 0 },
+    { label: 'Connections drawn', ok: connectionCount > 0 },
+    { label: 'All devices connected', ok: unconnected.length === 0, count: unconnected.length },
+    { label: 'Schedule links complete', ok: missingLinks.length === 0, count: missingLinks.length },
+    { label: 'Cable details reviewed', ok: provisionalConnections.length === 0, count: provisionalConnections.length },
+    { label: 'Validation clear', ok: validationIssues.length === 0, count: validationIssues.length }
+  ];
+  const passed = checks.filter(check => check.ok).length;
+  return {
+    checks,
+    score: Math.round((passed / checks.length) * 100),
+    unconnected,
+    missingLinks,
+    provisionalConnections
+  };
+}
+
+function appendReadinessPanel(root) {
+  const readiness = computeOneLineReadiness();
+  const panel = document.createElement('section');
+  panel.className = 'right-rail-card readiness-card';
+  const header = document.createElement('div');
+  header.className = 'readiness-header';
+  const title = document.createElement('h4');
+  title.textContent = 'Readiness';
+  const score = document.createElement('strong');
+  score.textContent = `${readiness.score}%`;
+  header.append(title, score);
+  const list = document.createElement('ul');
+  list.className = 'readiness-list';
+  readiness.checks.forEach(check => {
+    const item = document.createElement('li');
+    item.className = check.ok ? 'is-ok' : 'needs-review';
+    const text = document.createElement('span');
+    text.textContent = check.count ? `${check.label} (${check.count})` : check.label;
+    item.appendChild(text);
+    list.appendChild(item);
+  });
+  const actions = document.createElement('div');
+  actions.className = 'right-rail-actions';
+  const validateBtn = document.createElement('button');
+  validateBtn.type = 'button';
+  validateBtn.className = 'btn';
+  validateBtn.textContent = 'Validate';
+  validateBtn.addEventListener('click', () => {
+    setRightRailTab('validation');
+    validateDiagram({ revealPanel: false });
+  });
+  const buildBtn = document.createElement('button');
+  buildBtn.type = 'button';
+  buildBtn.className = 'btn';
+  buildBtn.textContent = 'Auto-Build';
+  buildBtn.addEventListener('click', openAutoBuildModal);
+  actions.append(validateBtn, buildBtn);
+  panel.append(header, list, actions);
+  root.appendChild(panel);
+}
+
+function createHandoffLink(label, href) {
+  const link = document.createElement('a');
+  link.className = 'right-rail-link';
+  link.href = href;
+  link.textContent = label;
+  return link;
+}
+
+function appendHandoffLinks(root, comp) {
+  if (!comp) return;
+  const tag = encodeURIComponent(getComponentTag(comp) || comp.ref || comp.id || '');
+  const section = document.createElement('section');
+  section.className = 'right-rail-card';
+  const heading = document.createElement('h4');
+  heading.textContent = 'Handoff';
+  const links = document.createElement('div');
+  links.className = 'right-rail-link-grid';
+  links.append(
+    createHandoffLink('Equipment', `equipmentlist.html?tag=${tag}`),
+    createHandoffLink('Loads', `loadlist.html?tag=${tag}`),
+    createHandoffLink('Cables', `cableschedule.html?tag=${tag}`),
+    createHandoffLink('Raceways', `racewayschedule.html?tag=${tag}`),
+    createHandoffLink('Routing', `optimalRoute.html?tag=${tag}`)
+  );
+  if (isProtectionComponent(comp)) {
+    links.appendChild(createHandoffLink('TCC Curve', `tcc.html?component=${encodeURIComponent(comp.id)}`));
+  }
+  section.append(heading, links);
+  root.appendChild(section);
+}
+
+function appendConnectionInspector(root, context) {
+  const { source, target, conn } = context;
+  const section = document.createElement('section');
+  section.className = 'right-rail-card connection-inspector';
+  const heading = document.createElement('h4');
+  heading.textContent = 'Connection';
+  const summary = document.createElement('p');
+  summary.className = 'right-rail-muted';
+  summary.textContent = `${getComponentTag(source) || source.id} -> ${getComponentTag(target) || target?.id || conn.target}`;
+  const form = document.createElement('form');
+  form.className = 'connection-inspector-form';
+  const fields = [
+    ['tag', 'Cable tag', connectionTag(source, target, conn)],
+    ['cable_type', 'Type', conn.cable?.cable_type || ''],
+    ['phases', 'Phases', formatCablePhases(conn.phases || conn.cable || source)],
+    ['conductors', 'Conductors', conn.conductors || conn.cable?.conductors || '']
+  ];
+  fields.forEach(([name, labelText, value]) => {
+    const label = document.createElement('label');
+    label.textContent = labelText;
+    const input = document.createElement('input');
+    input.name = name;
+    input.value = value || '';
+    label.appendChild(input);
+    form.appendChild(label);
+  });
+  const actions = document.createElement('div');
+  actions.className = 'right-rail-actions';
+  const saveBtn = document.createElement('button');
+  saveBtn.type = 'submit';
+  saveBtn.className = 'btn';
+  saveBtn.textContent = 'Save Cable';
+  const chooseBtn = document.createElement('button');
+  chooseBtn.type = 'button';
+  chooseBtn.className = 'btn';
+  chooseBtn.textContent = 'Open Cable Modal';
+  chooseBtn.addEventListener('click', async () => {
+    if (!target) return;
+    const result = await chooseCable(source, target, conn);
+    if (result && applyCableResultToConnection(conn, result)) {
+      pushHistory();
+      render();
+      save();
+      markScheduleReconcilePending();
+    }
+  });
+  actions.append(saveBtn, chooseBtn);
+  form.appendChild(actions);
+  form.addEventListener('submit', event => {
+    event.preventDefault();
+    const data = new FormData(form);
+    const fields = {
+      tag: data.get('tag') || '',
+      cable_type: data.get('cable_type') || '',
+      phases: data.get('phases') || '',
+      conductors: data.get('conductors') || ''
+    };
+    conn.phases = normalizeCablePhases(fields.phases);
+    conn.conductors = fields.conductors;
+    upsertCableScheduleRecordForConnection(source, target, conn, fields);
+    pushHistory();
+    render();
+    save();
+    markScheduleReconcilePending();
+    showToast('Connection cable details saved');
+  });
+  const handoff = document.createElement('div');
+  handoff.className = 'right-rail-link-grid';
+  const tag = encodeURIComponent(connectionTag(source, target, conn));
+  handoff.append(
+    createHandoffLink('Cable Schedule', `cableschedule.html?tag=${tag}`),
+    createHandoffLink('Raceway Schedule', `racewayschedule.html?tag=${tag}`),
+    createHandoffLink('Routing', `optimalRoute.html?tag=${tag}`)
+  );
+  section.append(heading, summary, form, handoff);
+  root.appendChild(section);
+}
+
+function appendOperatingStatePanel(root, comp) {
+  if (!root || !comp) return;
+  const section = document.createElement('section');
+  section.className = 'right-rail-card operating-state-card';
+  const heading = document.createElement('h4');
+  heading.textContent = 'Operating State';
+  const status = getComponentOperatingStatus(comp);
+  const override = getOperatingStateOverride(comp);
+  const summary = document.createElement('p');
+  summary.className = 'right-rail-muted operating-state-summary';
+  summary.textContent = `${operatingStateLabels[activeOperatingState]}: ${status === 'open' ? 'Open' : 'Closed'}${override ? ' override' : ' from base state'}`;
+  const actions = document.createElement('div');
+  actions.className = 'operating-state-buttons';
+  [
+    { value: 'closed', label: 'Closed' },
+    { value: 'open', label: 'Open' },
+    { value: 'normal', label: 'Use Base' }
+  ].forEach(option => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'operating-state-btn';
+    btn.textContent = option.label;
+    const active = option.value === 'normal' ? !override : override?.state === option.value;
+    btn.classList.toggle('is-active', active);
+    btn.setAttribute('aria-pressed', String(active));
+    btn.addEventListener('click', () => setComponentOperatingStatus(comp, option.value));
+    actions.appendChild(btn);
+  });
+  const note = document.createElement('p');
+  note.className = 'right-rail-muted operating-state-note';
+  note.textContent = 'Open devices stop energized-state tracing for the selected operating profile.';
+  section.append(heading, summary, actions, note);
+  root.appendChild(section);
+}
+
+function renderRightRailProperties() {
+  const root = document.getElementById('right-rail-properties');
+  if (!root) return;
+  root.innerHTML = '';
+  appendReadinessPanel(root);
+  const connectionContext = selectedConnectionContext();
+  if (connectionContext) {
+    appendConnectionInspector(root, connectionContext);
+    return;
+  }
+  const selectedComp = selected && components.includes(selected)
+    ? selected
+    : selection.length === 1 && components.includes(selection[0])
+      ? selection[0]
+      : null;
+  if (!selectedComp) {
+    const empty = document.createElement('div');
+    empty.className = 'right-rail-empty';
+    const heading = document.createElement('h4');
+    heading.textContent = 'Start Drawing';
+    const copy = document.createElement('p');
+    copy.textContent = 'Select a component to inspect it, or load the sample to see a complete source-to-load one-line.';
+    const actions = document.createElement('div');
+    actions.className = 'right-rail-actions';
+    const sampleBtn = document.createElement('button');
+    sampleBtn.type = 'button';
+    sampleBtn.className = 'btn';
+    sampleBtn.textContent = 'Load Sample';
+    sampleBtn.addEventListener('click', loadSampleDiagram);
+    const autoBuildBtn = document.createElement('button');
+    autoBuildBtn.type = 'button';
+    autoBuildBtn.className = 'btn';
+    autoBuildBtn.textContent = 'Auto-Build';
+    autoBuildBtn.addEventListener('click', openAutoBuildModal);
+    const connectBtn = document.createElement('button');
+    connectBtn.type = 'button';
+    connectBtn.className = 'btn';
+    connectBtn.textContent = 'Connect';
+    connectBtn.addEventListener('click', () => {
+      connectMode = true;
+      connectSource = null;
+      document.getElementById('connect-btn')?.classList.add('active');
+      updateStatusBar();
+      showToast('Connect mode: click a device, then click the next device.');
+    });
+    actions.append(autoBuildBtn, sampleBtn, connectBtn);
+    empty.append(heading, copy, actions);
+    root.appendChild(empty);
+    return;
+  }
+
+  const title = document.createElement('h4');
+  title.textContent = selectedComp.label || selectedComp.ref || selectedComp.subtype || selectedComp.id;
+  const grid = document.createElement('dl');
+  grid.className = 'right-rail-property-grid';
+  [
+    ['Type', selectedComp.type || ''],
+    ['Subtype', selectedComp.subtype || ''],
+    ['Voltage', selectedComp.voltage || selectedComp.volts || selectedComp.props?.voltage || selectedComp.props?.volts || ''],
+    ['Rating', selectedComp.rating || selectedComp.amp_rating || selectedComp.props?.rating || ''],
+    ['Connections', `${(selectedComp.connections || []).length} out / ${components.filter(c => (c.connections || []).some(conn => conn.target === selectedComp.id)).length} in`]
+  ].forEach(([label, value]) => {
+    const dt = document.createElement('dt');
+    dt.textContent = label;
+    const dd = document.createElement('dd');
+    dd.textContent = value === '' ? 'Not set' : String(value);
+    grid.append(dt, dd);
+  });
+  const actions = document.createElement('div');
+  actions.className = 'right-rail-actions';
+  const editBtn = document.createElement('button');
+  editBtn.type = 'button';
+  editBtn.className = 'btn';
+  editBtn.textContent = 'Edit Properties';
+  editBtn.addEventListener('click', () => selectComponent(selectedComp.id));
+  const connectedBtn = document.createElement('button');
+  connectedBtn.type = 'button';
+  connectedBtn.className = 'btn';
+  connectedBtn.textContent = 'Select Connected';
+  connectedBtn.addEventListener('click', () => selectConnected(selectedComp.id));
+  const approveBtn = document.createElement('button');
+  approveBtn.type = 'button';
+  approveBtn.className = 'btn';
+  approveBtn.textContent = 'Approve Assumption';
+  approveBtn.addEventListener('click', () => {
+    selectedComp.reviewStatus = 'reviewed';
+    selectedComp.assumptionsReviewedAt = new Date().toISOString();
+    render();
+    save();
+    showToast('Assumption marked reviewed');
+  });
+  actions.append(editBtn, connectedBtn, approveBtn);
+  root.append(title, grid, actions);
+  appendOperatingStatePanel(root, selectedComp);
+  appendHandoffLinks(root, selectedComp);
+}
+
+function validationQuickFixLabel(issue) {
+  if (!issue || !issue.code) return '';
+  if (issue.code === 'voltage-mismatch') return 'Assign upstream voltage';
+  if (issue.code === 'provisional-cable') return 'Create cable row';
+  if (issue.code === 'missing-schedule-link') return 'Link schedule row';
+  if (issue.code === 'unconnected') return 'Mark assumption';
+  return '';
+}
+
+function assignVoltageFromNeighbor(componentId) {
+  const comp = components.find(item => item.id === componentId);
+  if (!comp) return false;
+  const inbound = components.find(item => (item.connections || []).some(conn => conn.target === comp.id));
+  const inboundConn = inbound?.connections?.find(conn => conn.target === comp.id);
+  const outboundConn = (comp.connections || []).find(conn => components.some(item => item.id === conn.target));
+  const outboundTarget = outboundConn ? components.find(item => item.id === outboundConn.target) : null;
+  const sourceVoltage = inbound
+    ? resolveConnectionVoltageVolts(inbound, inboundConn, 'source')
+    : outboundTarget
+      ? resolveConnectionVoltageVolts(outboundTarget, outboundConn, 'target')
+      : null;
+  if (!Number.isFinite(sourceVoltage) || sourceVoltage <= 0) return false;
+  assignInheritedVoltage(comp, sourceVoltage, inboundConn || outboundConn, sourceVoltage);
+  return true;
+}
+
+function applyValidationQuickFix(issue) {
+  if (!issue) return false;
+  if (issue.code === 'voltage-mismatch') {
+    const fixed = assignVoltageFromNeighbor(issue.component);
+    if (!fixed) {
+      showToast('No upstream voltage found for this device');
+      return false;
+    }
+  } else if (issue.code === 'provisional-cable') {
+    const source = components.find(comp => comp.id === issue.component);
+    const conn = source?.connections?.[issue.connectionIndex];
+    const target = conn ? components.find(comp => comp.id === conn.target) : null;
+    if (!source || !target || !conn) {
+      showToast('Connection not found');
+      return false;
+    }
+    upsertCableScheduleRecordForConnection(source, target, conn);
+  } else if (issue.code === 'missing-schedule-link') {
+    const comp = components.find(item => item.id === issue.component);
+    if (!comp || !autoLinkComponentToSchedule(comp, { createIfMissing: true })) {
+      showToast('Could not link schedule row');
+      return false;
+    }
+  } else if (issue.code === 'unconnected') {
+    const comp = components.find(item => item.id === issue.component);
+    if (!markComponentAssumption(comp, 'Component intentionally left unconnected for user review.')) return false;
+  } else {
+    return false;
+  }
+  pushHistory();
+  render();
+  save();
+  validateDiagram({ notify: false, revealPanel: false });
+  markScheduleReconcilePending();
+  showToast('Validation quick fix applied');
+  return true;
+}
+
+function renderRightRailValidation() {
+  const root = document.getElementById('right-rail-validation');
+  if (!root) return;
+  root.innerHTML = '';
+  const header = document.createElement('div');
+  header.className = 'right-rail-validation-header';
+  const count = document.createElement('strong');
+  count.textContent = validationIssues.length
+    ? `${validationIssues.length} issue${validationIssues.length === 1 ? '' : 's'}`
+    : 'No validation issues';
+  const validateBtn = document.createElement('button');
+  validateBtn.type = 'button';
+  validateBtn.className = 'btn';
+  validateBtn.textContent = 'Validate';
+  validateBtn.addEventListener('click', () => validateDiagram({ revealPanel: false }));
+  header.append(count, validateBtn);
+  root.appendChild(header);
+  if (!validationIssues.length) {
+    const empty = document.createElement('p');
+    empty.className = 'right-rail-empty';
+    empty.textContent = 'Run Validate after drawing or editing to refresh code and connectivity checks.';
+    root.appendChild(empty);
+    return;
+  }
+  const list = document.createElement('ul');
+  list.className = 'right-rail-list';
+  validationIssues.slice(0, 12).forEach(issue => {
+    const li = document.createElement('li');
+    li.className = 'right-rail-validation-item';
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = issue.message;
+    button.addEventListener('click', () => focusComponent(issue.component));
+    li.appendChild(button);
+    const quickFix = validationQuickFixLabel(issue);
+    if (quickFix) {
+      const fixBtn = document.createElement('button');
+      fixBtn.type = 'button';
+      fixBtn.className = 'right-rail-fix-btn';
+      fixBtn.textContent = quickFix;
+      fixBtn.addEventListener('click', event => {
+        event.stopPropagation();
+        applyValidationQuickFix(issue);
+      });
+      li.appendChild(fixBtn);
+    }
+    list.appendChild(li);
+  });
+  root.appendChild(list);
+  if (validationIssues.length > 12) {
+    const more = document.createElement('p');
+    more.className = 'right-rail-muted';
+    more.textContent = `${validationIssues.length - 12} more issue(s). Use Validate for the full Fix-it list.`;
+    root.appendChild(more);
+  }
+}
+
+function renderRightRail() {
+  renderRightRailProperties();
+  renderRightRailValidation();
+  setRightRailTab(rightRailActiveTab);
+}
+
 async function promptCheckpointName(defaultValue = '') {
   const result = await openModal({
     title: 'Create checkpoint',
@@ -3758,7 +5680,7 @@ async function promptCheckpointName(defaultValue = '') {
       if (assistive) assistive.setError('');
       return value;
     },
-    render: ({ body }) => {
+    render: body => {
       const label = document.createElement('label');
       label.className = 'modal-form-field';
       label.textContent = 'Checkpoint name';
@@ -3829,6 +5751,9 @@ function bindHistorySidebarControls() {
   const sidebar = document.getElementById('history-sidebar');
   const workspace = document.querySelector('.workspace');
   const addCheckpointBtn = document.getElementById('add-checkpoint-btn');
+  document.querySelectorAll('[data-right-rail-tab]').forEach(button => {
+    button.addEventListener('click', () => setRightRailTab(button.dataset.rightRailTab));
+  });
   if (toggleBtn && sidebar && workspace) {
     toggleBtn.addEventListener('click', () => {
       const expanded = toggleBtn.getAttribute('aria-expanded') === 'true';
@@ -3929,7 +5854,7 @@ function renderTemplates() {
 }
 
 function addTemplateComponent(data) {
-  const id = 'n' + Date.now();
+  const id = createDiagramEntityId('n');
   const insertionPoint = getDefaultInsertionPoint();
   let x = insertionPoint.x;
   let y = insertionPoint.y;
@@ -4047,19 +5972,20 @@ function updateLegend(ranges) {
   const legend = document.getElementById('voltage-legend');
   if (!legend) return;
   legend.innerHTML = '';
+  const appendLegendItem = ({ color, label }) => {
+    const item = document.createElement('div');
+    item.className = 'legend-item';
+    const swatch = document.createElement('span');
+    swatch.className = 'legend-color';
+    swatch.style.background = color;
+    item.appendChild(swatch);
+    const lbl = document.createElement('span');
+    lbl.textContent = label;
+    item.appendChild(lbl);
+    legend.appendChild(item);
+  };
   voltageColors.forEach(r => {
-    if (ranges.has(r)) {
-      const item = document.createElement('div');
-      item.className = 'legend-item';
-      const swatch = document.createElement('span');
-      swatch.className = 'legend-color';
-      swatch.style.background = r.color;
-      item.appendChild(swatch);
-      const lbl = document.createElement('span');
-      lbl.textContent = r.label;
-      item.appendChild(lbl);
-      legend.appendChild(item);
-    }
+    if (ranges.has(r)) appendLegendItem(r);
   });
   if (showOverlays) {
     const items = [
@@ -4067,20 +5993,17 @@ function updateLegend(ranges) {
       { color: '#ffeb3b', label: '5-10% dev' },
       { color: '#f44336', label: '>10% dev' }
     ];
-    items.forEach(i => {
-      const item = document.createElement('div');
-      item.className = 'legend-item';
-      const swatch = document.createElement('span');
-      swatch.className = 'legend-color';
-      swatch.style.background = i.color;
-      item.appendChild(swatch);
-      const lbl = document.createElement('span');
-      lbl.textContent = i.label;
-      item.appendChild(lbl);
-      legend.appendChild(item);
-    });
+    items.forEach(appendLegendItem);
   }
-  legend.style.display = ranges.size || showOverlays ? 'block' : 'none';
+  const dataStateItems = getDataStateLegendItems();
+  if (dataStateItems.length) {
+    appendLegendItem({
+      color: 'transparent',
+      label: dataStateOverlayLabels[dataStateOverlayMode] || 'Color overlay'
+    });
+    dataStateItems.forEach(appendLegendItem);
+  }
+  legend.style.display = ranges.size || showOverlays || dataStateItems.length ? 'block' : 'none';
   if (!legendUserMoved && legend.style.display === 'block') {
     const host = legend.offsetParent instanceof HTMLElement ? legend.offsetParent : legend.parentElement;
     const parentWidth = host instanceof HTMLElement ? host.clientWidth : (legend.parentElement?.clientWidth || window.innerWidth);
@@ -4354,6 +6277,211 @@ function getComponentAttributeLines(comp) {
   return lines;
 }
 
+function rectsOverlap(a, b, pad = 0) {
+  if (!a || !b) return false;
+  return !(
+    a.x + a.width + pad < b.x ||
+    b.x + b.width + pad < a.x ||
+    a.y + a.height + pad < b.y ||
+    b.y + b.height + pad < a.y
+  );
+}
+
+function expandRect(rect, pad = 0) {
+  return {
+    x: rect.x - pad,
+    y: rect.y - pad,
+    width: rect.width + pad * 2,
+    height: rect.height + pad * 2
+  };
+}
+
+function rectFromComponentBounds(bounds) {
+  return {
+    x: bounds.left,
+    y: bounds.top,
+    width: Math.max(1, bounds.right - bounds.left),
+    height: Math.max(1, bounds.bottom - bounds.top)
+  };
+}
+
+function createDatablockLayout(items = components) {
+  const occupied = [];
+  const content = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
+  items.forEach(comp => {
+    if (!comp || comp.type === 'dimension') return;
+    const bounds = componentBounds(comp);
+    const rect = rectFromComponentBounds(bounds);
+    occupied.push(expandRect(rect, 12));
+    content.minX = Math.min(content.minX, bounds.left);
+    content.minY = Math.min(content.minY, bounds.top);
+    content.maxX = Math.max(content.maxX, bounds.right);
+    content.maxY = Math.max(content.maxY, bounds.bottom);
+  });
+  if (!Number.isFinite(content.minX)) {
+    content.minX = STATIC_VIEWPORT_BOUNDS.minX;
+    content.minY = STATIC_VIEWPORT_BOUNDS.minY;
+    content.maxX = STATIC_VIEWPORT_BOUNDS.minX + STATIC_VIEWPORT_BOUNDS.width;
+    content.maxY = STATIC_VIEWPORT_BOUNDS.minY + STATIC_VIEWPORT_BOUNDS.height;
+  }
+  return {
+    content,
+    occupied,
+    reserve(rect) {
+      occupied.push(expandRect(rect, 10));
+    }
+  };
+}
+
+function chooseDatablockPlacement(bounds, width, height, layout) {
+  const centerX = (bounds.left + bounds.right) / 2;
+  const centerY = (bounds.top + bounds.bottom) / 2;
+  const margin = 14;
+  const rightCrowded = bounds.right + width > layout.content.maxX + 140;
+  const leftCrowded = bounds.left - width < layout.content.minX - 140;
+  let sideOrder = ['right', 'left', 'bottom', 'top'];
+  if (rightCrowded && !leftCrowded) sideOrder = ['left', 'bottom', 'top', 'right'];
+  if (leftCrowded && !rightCrowded) sideOrder = ['right', 'bottom', 'top', 'left'];
+  const offsets = [0, 28, -28, 58, -58, 92, -92, 126, -126];
+  const makeCandidate = (side, offset) => {
+    if (side === 'right') return { side, x: bounds.right + margin, y: bounds.top + offset };
+    if (side === 'left') return { side, x: bounds.left - width - margin, y: bounds.top + offset };
+    if (side === 'bottom') return { side, x: centerX - width / 2 + offset, y: bounds.bottom + margin };
+    return { side, x: centerX - width / 2 + offset, y: bounds.top - height - margin };
+  };
+  for (const side of sideOrder) {
+    for (const offset of offsets) {
+      const candidate = makeCandidate(side, offset);
+      const rect = { x: candidate.x, y: candidate.y, width, height };
+      if (!layout.occupied.some(existing => rectsOverlap(rect, existing, 4))) return candidate;
+    }
+  }
+  return makeCandidate(sideOrder[0], offsets[offsets.length - 1]);
+}
+
+function truncateDatablockLine(line, limit = 38) {
+  const text = String(line || '').trim();
+  if (text.length <= limit) return text;
+  return `${text.slice(0, Math.max(0, limit - 3)).trimEnd()}...`;
+}
+
+function renderComponentDatablock(svg, comp, lines, includePoint, layout = createDatablockLayout()) {
+  if (!svg || !comp || !Array.isArray(lines) || !lines.length) return;
+  const bounds = componentBounds(comp);
+  const compact = datablockDensityMode === 'compact';
+  const lineLimit = compact ? 30 : 38;
+  const visibleLineLimit = compact ? 3 : 6;
+  const visibleLines = lines.slice(0, visibleLineLimit).map(line => truncateDatablockLine(line, lineLimit));
+  if (lines.length > visibleLines.length) {
+    visibleLines.push(`+${lines.length - visibleLines.length} more`);
+  }
+  const longest = visibleLines.reduce((max, line) => Math.max(max, line.length), 0);
+  const width = compact
+    ? Math.max(104, Math.min(184, longest * 5.8 + 18))
+    : Math.max(112, Math.min(248, longest * 6.2 + 18));
+  const lineHeight = compact ? 12 : 13;
+  const height = visibleLines.length * lineHeight + 10;
+  const placement = chooseDatablockPlacement(bounds, width, height, layout);
+  const x = placement.x;
+  const y = placement.y;
+  const g = document.createElementNS(svgNS, 'g');
+  g.classList.add('component-datablock');
+  if (compact) g.classList.add('component-datablock-compact');
+  g.dataset.side = placement.side;
+  g.dataset.id = comp.id;
+  g.setAttribute('tabindex', '0');
+  g.setAttribute('role', 'button');
+  g.setAttribute('aria-label', `Data block for ${comp.label || comp.tag || comp.id}`);
+
+  const title = document.createElementNS(svgNS, 'title');
+  title.textContent = lines.join('\n');
+  const leaderStart = {
+    x: placement.side === 'left' ? bounds.left : placement.side === 'right' ? bounds.right : (bounds.left + bounds.right) / 2,
+    y: placement.side === 'top' ? bounds.top : placement.side === 'bottom' ? bounds.bottom : (bounds.top + bounds.bottom) / 2
+  };
+  const leaderEnd = {
+    x: placement.side === 'left' ? x + width : placement.side === 'right' ? x : Math.min(Math.max(leaderStart.x, x), x + width),
+    y: placement.side === 'top' ? y + height : placement.side === 'bottom' ? y : Math.min(Math.max(leaderStart.y, y), y + height)
+  };
+  const leader = document.createElementNS(svgNS, 'line');
+  leader.setAttribute('x1', leaderStart.x);
+  leader.setAttribute('y1', leaderStart.y);
+  leader.setAttribute('x2', leaderEnd.x);
+  leader.setAttribute('y2', leaderEnd.y);
+  leader.classList.add('component-datablock-leader');
+  const rect = document.createElementNS(svgNS, 'rect');
+  rect.setAttribute('x', x);
+  rect.setAttribute('y', y);
+  rect.setAttribute('width', width);
+  rect.setAttribute('height', height);
+  rect.setAttribute('rx', 4);
+  rect.setAttribute('ry', 4);
+  g.append(title, leader, rect);
+  visibleLines.forEach((line, idx) => {
+    const text = document.createElementNS(svgNS, 'text');
+    text.setAttribute('x', x + 8);
+    text.setAttribute('y', y + 15 + idx * lineHeight);
+    text.textContent = line;
+    g.appendChild(text);
+  });
+  g.addEventListener('click', event => {
+    event.stopPropagation();
+    selection = [comp];
+    selected = comp;
+    selectedConnection = null;
+    setRightRailTab('properties');
+    render();
+  });
+  g.addEventListener('dblclick', event => {
+    event.stopPropagation();
+    cancelPendingClickSelection();
+    selectComponent(comp);
+  });
+  g.addEventListener('keydown', event => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    selection = [comp];
+    selected = comp;
+    selectedConnection = null;
+    setRightRailTab('properties');
+    render();
+  });
+  includePoint(x, y);
+  includePoint(x + width, y + height);
+  layout.reserve({ x, y, width, height });
+  svg.appendChild(g);
+}
+
+function renderOperatingStateBadge(svg, comp, status, includePoint) {
+  if (!svg || !comp || status !== 'open') return;
+  const bounds = componentBounds(comp);
+  const width = 42;
+  const height = 16;
+  const x = (bounds.left + bounds.right) / 2 - width / 2;
+  const y = bounds.top - height - 4;
+  const badge = document.createElementNS(svgNS, 'g');
+  badge.classList.add('operating-state-badge');
+  badge.dataset.id = comp.id;
+  const title = document.createElementNS(svgNS, 'title');
+  title.textContent = `${comp.label || comp.tag || comp.id} is open in ${operatingStateLabels[activeOperatingState]}`;
+  const rect = document.createElementNS(svgNS, 'rect');
+  rect.setAttribute('x', x);
+  rect.setAttribute('y', y);
+  rect.setAttribute('width', width);
+  rect.setAttribute('height', height);
+  rect.setAttribute('rx', 4);
+  rect.setAttribute('ry', 4);
+  const text = document.createElementNS(svgNS, 'text');
+  text.setAttribute('x', x + width / 2);
+  text.setAttribute('y', y + 11);
+  text.setAttribute('text-anchor', 'middle');
+  text.textContent = 'OPEN';
+  badge.append(title, rect, text);
+  includePoint(x, y);
+  includePoint(x + width, y + height);
+  svg.appendChild(badge);
+}
+
 function getComponentDisplayLabel(key) {
   if (!key) return 'Component';
   if (key === '__other__') return 'Other Attributes';
@@ -4441,6 +6569,7 @@ function openViewModal() {
 
       function toggleAttribute(option, checked) {
         if (!option) return;
+        markDatablockFormatCustom();
         if (checked) {
           viewAttributes.add(option.key);
         } else {
@@ -5263,6 +7392,72 @@ function computeComponentOperatingVoltage(component) {
   return nominal;
 }
 
+function syncSourceVoltageFields(component, preferredDriver = null) {
+  if (!isSourceComponent(component)) return false;
+  const driverNames = [
+    'source_voltage_base',
+    'volts',
+    'voltage',
+    'voltage_primary',
+    'voltage_secondary',
+    'nominalVoltage',
+    'nominal_voltage',
+    'baseKV',
+    'kV',
+    'kv',
+    'prefault_voltage'
+  ];
+  const orderedDrivers = preferredDriver && driverNames.includes(preferredDriver)
+    ? [preferredDriver, ...driverNames.filter(name => name !== preferredDriver)]
+    : driverNames;
+  const readValue = name => {
+    if (component && Object.prototype.hasOwnProperty.call(component, name)) return component[name];
+    if (component?.props && Object.prototype.hasOwnProperty.call(component.props, name)) return component.props[name];
+    return null;
+  };
+  let baseKv = null;
+  for (const name of orderedDrivers) {
+    const raw = readValue(name);
+    if (raw === null || raw === undefined || raw === '') continue;
+    const kv = toBaseKV(raw);
+    if (Number.isFinite(kv) && kv > 0) {
+      baseKv = kv;
+      break;
+    }
+  }
+  if (!Number.isFinite(baseKv) || baseKv <= 0) return false;
+  const kv = Number(baseKv.toFixed(6));
+  const volts = Number((kv * 1000).toFixed(3));
+  const formattedVolts = formatVoltageString(volts);
+  let changed = false;
+  const assign = (holder, key, value) => {
+    if (!holder || typeof holder !== 'object') return;
+    if (holder[key] === value) return;
+    holder[key] = value;
+    changed = true;
+  };
+  if (!component.props || typeof component.props !== 'object') component.props = {};
+  assign(component, 'voltage', formattedVolts);
+  assign(component, 'volts', volts);
+  assign(component, 'baseKV', kv);
+  assign(component, 'kV', kv);
+  assign(component, 'kv', kv);
+  assign(component, 'prefault_voltage', kv);
+  assign(component.props, 'voltage', formattedVolts);
+  assign(component.props, 'volts', volts);
+  assign(component.props, 'baseKV', kv);
+  assign(component.props, 'kV', kv);
+  assign(component.props, 'kv', kv);
+  assign(component.props, 'prefault_voltage', kv);
+  if (Object.prototype.hasOwnProperty.call(component, 'source_voltage_base')) {
+    assign(component, 'source_voltage_base', kv);
+  }
+  if (Object.prototype.hasOwnProperty.call(component.props, 'source_voltage_base')) {
+    assign(component.props, 'source_voltage_base', kv);
+  }
+  return changed;
+}
+
 function formatOperatingVoltage(value) {
   if (value === null || value === undefined || value === '') return '';
   const num = Number(value);
@@ -5565,6 +7760,164 @@ function nearestPortToPoint(x, y, exclude) {
   return best;
 }
 
+function nearestConnectPortForComponent(comp, point = null, skipConn = null) {
+  if (!comp) return null;
+  const meta = componentMeta[comp.subtype] || {};
+  const ports = comp.ports || meta.ports || [];
+  const portCount = ports.length ? ports.length : 1;
+  let best = null;
+  for (let idx = 0; idx < portCount; idx += 1) {
+    const pos = portPosition(comp, idx);
+    if (!Number.isFinite(pos.x) || !Number.isFinite(pos.y)) continue;
+    const dist = point && Number.isFinite(point.x) && Number.isFinite(point.y)
+      ? Math.hypot(pos.x - point.x, pos.y - point.y)
+      : 0;
+    const occupiedPenalty = portInUse(comp, idx, skipConn) ? 100000 : 0;
+    const score = dist + occupiedPenalty;
+    if (!best || score < best.score) {
+      best = { component: comp, port: idx, pos, score };
+    }
+  }
+  return best ? { component: best.component, port: best.port, pos: best.pos } : null;
+}
+
+function getConnectionCandidateFromEvent(event, x, y) {
+  const target = event?.target instanceof Element ? event.target : null;
+  if (!target) return null;
+  if (target.classList.contains('port')) {
+    const comp = components.find(c => c.id === target.dataset.id);
+    if (!comp) return null;
+    const port = normalizePortIndex(target.dataset.port);
+    return { component: comp, port, pos: portPosition(comp, port) };
+  }
+  const componentEl = target.closest('.component');
+  const compId = componentEl?.dataset.id || target.dataset.id || null;
+  const comp = compId ? components.find(c => c.id === compId) : null;
+  return nearestConnectPortForComponent(comp, { x, y });
+}
+
+function createConnectionPreviewLine(source) {
+  if (!source?.component) return null;
+  const start = portPosition(source.component, source.port);
+  const svg = document.getElementById('diagram');
+  if (!svg) return null;
+  const line = document.createElementNS(svgNS, 'line');
+  line.setAttribute('x1', start.x);
+  line.setAttribute('y1', start.y);
+  line.setAttribute('x2', start.x);
+  line.setAttribute('y2', start.y);
+  line.classList.add('connection');
+  line.classList.add('temp');
+  svg.appendChild(line);
+  return line;
+}
+
+function resetConnectInteraction({ keepMode = false } = {}) {
+  if (tempConnection) {
+    tempConnection.remove();
+    tempConnection = null;
+  }
+  connectSource = null;
+  hoverPort = null;
+  if (!keepMode) {
+    connectMode = false;
+    document.getElementById('connect-btn')?.classList.remove('active');
+  }
+}
+
+function createProvisionalCableResult(source, target) {
+  const sourceTag = getComponentTag(source) || source?.id || 'FROM';
+  const targetTag = getComponentTag(target) || target?.id || 'TO';
+  const baseTag = `CBL-${sourceTag}-${targetTag}`
+    .replace(/[^A-Za-z0-9_-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 48) || `CBL-${Date.now()}`;
+  const usedTags = new Set();
+  components.forEach(comp => {
+    (comp.connections || []).forEach(conn => {
+      if (conn?.cable?.tag) usedTags.add(String(conn.cable.tag));
+    });
+    if (comp?.cable?.tag) usedTags.add(String(comp.cable.tag));
+  });
+  getCables().forEach(cable => {
+    if (cable?.tag) usedTags.add(String(cable.tag));
+  });
+  let tag = baseTag;
+  let suffix = 2;
+  while (usedTags.has(tag)) {
+    tag = `${baseTag}-${suffix}`;
+    suffix += 1;
+  }
+  const sourcePhases = parseCablePhases(source?.phases || source?.props?.phases || source);
+  const targetPhases = parseCablePhases(target?.phases || target?.props?.phases || target);
+  const phases = sourcePhases.length ? sourcePhases : targetPhases.length ? targetPhases : ['A', 'B', 'C'];
+  const conductors = phases.length || 3;
+  return {
+    cable: {
+      tag,
+      cable_type: 'TBD',
+      conductor_size: 'TBD',
+      conductor_material: 'TBD',
+      length: '',
+      phases: phases.slice(),
+      provisional: true,
+      from_tag: sourceTag,
+      to_tag: targetTag
+    },
+    phases: phases.slice(),
+    conductors,
+    impedance: { r: 0, x: 0 }
+  };
+}
+
+function applyCableResultToConnection(conn, result) {
+  if (!conn || !result?.cable) return false;
+  const updatedCable = { ...result.cable };
+  if (hasImpedance(result.cable)) updatedCable.impedance = { ...result.cable.impedance };
+  const resolvedPhases = parseCablePhases(result.phases ?? updatedCable);
+  updatedCable.phases = resolvedPhases.slice();
+  conn.cable = updatedCable;
+  conn.phases = resolvedPhases.slice();
+  conn.conductors = result.conductors;
+  if (result.impedance && typeof result.impedance === 'object') {
+    conn.impedance = { ...result.impedance };
+  } else if (hasImpedance(updatedCable)) {
+    conn.impedance = { ...updatedCable.impedance };
+  } else {
+    delete conn.impedance;
+  }
+  return true;
+}
+
+function finishConnectionToCandidate(candidate, { provisional = true } = {}) {
+  if (!connectSource?.component || !candidate?.component || candidate.component === connectSource.component) {
+    return false;
+  }
+  const fromComp = connectSource.component;
+  const toComp = candidate.component;
+  const fromPort = connectSource.port;
+  const toPort = candidate.port;
+  const created = ensureDirectConnection(fromComp, toComp, fromPort, toPort);
+  const createdConn = (fromComp.connections || []).find(conn =>
+    conn.target === toComp.id
+    && normalizePortIndex(conn.sourcePort) === normalizePortIndex(fromPort)
+    && normalizePortIndex(conn.targetPort) === normalizePortIndex(toPort)
+  );
+  if (!createdConn) return false;
+  if (created && provisional) {
+    applyCableResultToConnection(createdConn, createProvisionalCableResult(fromComp, toComp));
+    showToast('Provisional connection created. Edit the connection or Cable Schedule when details are ready.');
+  } else if (!created) {
+    showToast('Those devices are already connected.');
+    return false;
+  }
+  pushHistory();
+  render();
+  save();
+  markScheduleReconcilePending();
+  return true;
+}
+
 function componentsAreLinked(a, b) {
   if (!a || !b) return false;
   const forward = Array.isArray(a.connections) && a.connections.some(conn => conn?.target === b.id);
@@ -5684,6 +8037,356 @@ function applyBusBaseKV(bus, baseKV) {
   bus.props.kV = kv;
   bus.props.volts = volts;
   bus.props.prefault_voltage = kv;
+}
+
+function ensureDirectConnection(fromComp, toComp, fromPort, toPort) {
+  if (!fromComp || !toComp) return false;
+  fromComp.connections = fromComp.connections || [];
+  const fromIdx = normalizePortIndex(fromPort);
+  const toIdx = normalizePortIndex(toPort);
+  const existingConn = fromComp.connections.find(conn => conn.target === toComp.id) || null;
+  if (existingConn && normalizePortIndex(existingConn.sourcePort) === fromIdx && normalizePortIndex(existingConn.targetPort) === toIdx) {
+    return false;
+  }
+  if (portInUse(fromComp, fromIdx, existingConn)) return false;
+  if (portInUse(toComp, toIdx, existingConn)) return false;
+  if (existingConn) {
+    existingConn.sourcePort = fromIdx;
+    existingConn.targetPort = toIdx;
+    delete existingConn.mid;
+    delete existingConn.dir;
+    return true;
+  }
+  const newConn = {
+    target: toComp.id,
+    sourcePort: fromIdx,
+    targetPort: toIdx,
+    cable: null,
+    phases: [],
+    conductors: 0,
+    impedance: { r: 0, x: 0 },
+    rating: null
+  };
+  fromComp.connections.push(newConn);
+  try {
+    const fromTag = getComponentTag(fromComp) || fromComp?.id || '';
+    const toTag = getComponentTag(toComp) || toComp?.id || '';
+    addRaceway({ conduit_id: `${fromTag}-${toTag}`, from_tag: fromTag, to_tag: toTag });
+  } catch (err) {
+    console.error('Failed to record connection', err);
+  }
+  return true;
+}
+
+function chooseBuildSubtype({ category = '', record = null, preferred = [] } = {}) {
+  const recordText = [
+    record?.category,
+    record?.subCategory,
+    record?.type,
+    record?.loadType,
+    record?.description,
+    record?.tag,
+    record?.id,
+    ...preferred
+  ].filter(Boolean).join(' ').toLowerCase();
+  const entries = Object.entries(componentMeta);
+  const match = entries.find(([, meta]) => {
+    const metaCategory = meta?.category || categoryForType(meta?.type);
+    if (category && metaCategory !== category) return false;
+    const label = `${meta?.label || ''} ${meta?.type || ''}`.toLowerCase();
+    return preferred.some(term => label.includes(String(term).toLowerCase()))
+      || (recordText && label.split(/\s+/).some(part => part && recordText.includes(part)));
+  });
+  if (match) return match[0];
+  if (category === 'sources') return entries.find(([, meta]) => meta?.category === 'sources')?.[0] || 'bus_Utility';
+  if (category === 'load') {
+    if (recordText.includes('motor')) return componentMeta.motor ? 'motor' : 'motor_load';
+    return componentMeta.static_load ? 'static_load' : 'Equipment';
+  }
+  if (category === 'protection') return entries.find(([, meta]) => meta?.category === 'protection')?.[0] || 'Equipment';
+  if (category === 'bus') return entries.find(([, meta]) => meta?.type === 'bus' || meta?.category === 'bus')?.[0] || 'Bus';
+  return componentMeta.Panel ? 'Panel' : componentMeta.Equipment ? 'Equipment' : entries[0]?.[0];
+}
+
+function applyScheduleRecordToComponent(comp, record = {}, linkKey = scheduleKeyForComponent(comp)) {
+  if (!comp || !record) return;
+  const tag = normalizeTagValue(record.tag || record.id || record.ref || comp.id);
+  const description = normalizeTagValue(record.description || record.name || '');
+  comp.ref = comp.ref || record.id || record.ref || '';
+  comp.tag = tag || comp.tag || '';
+  comp.label = tag || description || comp.label || record.id || comp.subtype;
+  comp.description = description || comp.description || '';
+  comp.voltage = comp.voltage || record.voltage || '';
+  comp.phases = comp.phases || record.phases || '';
+  comp.manufacturer = comp.manufacturer || record.manufacturer || '';
+  comp.model = comp.model || record.model || '';
+  comp.generated = true;
+  comp.reviewStatus = comp.reviewStatus || 'assumed';
+  comp.autoBuildSource = linkKey;
+  if (!Array.isArray(comp.assumptions)) comp.assumptions = [];
+  if (!comp.assumptions.some(item => item && item.source === 'Auto-Build Workflow')) {
+    comp.assumptions.push({
+      source: 'Auto-Build Workflow',
+      note: 'Generated from schedule data; verify placement, upstream source, and settings.',
+      createdAt: new Date().toISOString()
+    });
+  }
+  if (!comp.props || typeof comp.props !== 'object') comp.props = {};
+  ['tag', 'description', 'voltage', 'phases', 'manufacturer', 'model'].forEach(key => {
+    if (comp[key] !== undefined && comp[key] !== '') comp.props[key] = comp[key];
+  });
+  setComponentScheduleLink(comp, linkKey, record.id || record.tag || record.ref || tag);
+  if (linkKey === 'load') {
+    comp.kw = comp.kw || record.kw || record.load_kw || '';
+    comp.source = comp.source || record.source || record.panelId || '';
+  }
+}
+
+function findComponentForScheduleRecord(record, key) {
+  const identity = normalizeScheduleIdentity(record?.id || record?.tag || record?.ref || record?.description);
+  if (!identity) return null;
+  return components.find(comp => {
+    const compKey = scheduleKeyForComponent(comp);
+    if (compKey !== key && !(key === 'equipment' && compKey === 'panel')) return false;
+    const values = [
+      comp.scheduleLinks?.[key],
+      comp[`${key}Ref`],
+      comp.ref,
+      comp.tag,
+      comp.label,
+      comp.id
+    ].map(normalizeScheduleIdentity).filter(Boolean);
+    return values.includes(identity);
+  }) || null;
+}
+
+function buildAutoBuildPlan() {
+  const hasContent = record => record && Object.values(record).some(value => String(value ?? '').trim());
+  const equipment = getEquipment().filter(hasContent);
+  const loads = getLoads().filter(hasContent);
+  const missingEquipment = equipment.filter(record => !findComponentForScheduleRecord(record, 'equipment'));
+  const missingLoads = loads.filter(record => !findComponentForScheduleRecord(record, 'load'));
+  const hasSource = components.some(isSourceComponent);
+  return {
+    equipment,
+    loads,
+    missingEquipment,
+    missingLoads,
+    createsSource: !hasSource,
+    estimatedConnections: Math.max(0, missingEquipment.length + missingLoads.length + (hasSource ? 0 : 1) - 1)
+  };
+}
+
+function addAutoBuiltComponent({ subtype, type, x, y, record, linkKey }) {
+  const comp = addComponent({ subtype, type, x, y, skipHistory: true });
+  if (!comp) return null;
+  applyScheduleRecordToComponent(comp, record, linkKey);
+  return comp;
+}
+
+function runAutoBuildWorkflow() {
+  const plan = buildAutoBuildPlan();
+  if (!plan.createsSource && !plan.missingEquipment.length && !plan.missingLoads.length) {
+    showToast('One-line already includes current equipment and loads');
+    return false;
+  }
+
+  const existingSource = components.find(isSourceComponent) || null;
+  const x = 220;
+  let y = 120;
+  const created = [];
+  let source = existingSource;
+  if (!source) {
+    const subtype = chooseBuildSubtype({ category: 'sources', preferred: ['utility', 'source'] });
+    source = addAutoBuiltComponent({
+      subtype,
+      type: componentMeta[subtype]?.type || 'utility_source',
+      x,
+      y,
+      record: { id: 'UTILITY', tag: 'UTILITY', description: 'Utility Source', voltage: '480' },
+      linkKey: 'equipment'
+    });
+    if (source) created.push(source);
+    if (source) autoLinkComponentToSchedule(source, { createIfMissing: true });
+    y += 140;
+  }
+
+  const equipmentByIdentity = new Map();
+  components.forEach(comp => {
+    const key = normalizeScheduleIdentity(comp.scheduleLinks?.equipment || comp.equipmentRef || comp.ref || comp.tag || getComponentTag(comp));
+    if (key) equipmentByIdentity.set(key, comp);
+  });
+
+  let previous = source;
+  plan.missingEquipment.forEach(record => {
+    const recordText = `${record.category || ''} ${record.subCategory || ''} ${record.description || ''}`.toLowerCase();
+    const subtype = recordText.includes('transformer')
+      ? chooseBuildSubtype({ category: 'equipment', record, preferred: ['xfmr', 'transformer'] })
+      : chooseBuildSubtype({ category: 'equipment', record, preferred: ['switchboard', 'panel', 'mcc', 'equipment'] });
+    const comp = addAutoBuiltComponent({
+      subtype,
+      type: componentMeta[subtype]?.type || 'equipment',
+      x,
+      y,
+      record,
+      linkKey: 'equipment'
+    });
+    if (!comp) return;
+    created.push(comp);
+    const key = normalizeScheduleIdentity(record.id || record.tag || record.ref);
+    if (key) equipmentByIdentity.set(key, comp);
+    if (previous) {
+      ensureDirectConnection(previous, comp, 1, 0);
+      const conn = previous.connections?.find(item => item.target === comp.id);
+      if (conn) {
+        applyCableResultToConnection(conn, createProvisionalCableResult(previous, comp));
+        conn.reviewStatus = 'assumed';
+      }
+    }
+    previous = comp;
+    y += 140;
+  });
+
+  if (!previous) previous = source || components.find(comp => getCategory(comp) === 'equipment' || getCategory(comp) === 'panel') || null;
+
+  let loadIndex = 0;
+  plan.missingLoads.forEach(record => {
+    const sourceKey = normalizeScheduleIdentity(record.source || record.panelId || record.equipmentRef || '');
+    const upstream = (sourceKey ? equipmentByIdentity.get(sourceKey) : null) || previous || source;
+    const loadX = x + (loadIndex % 3) * 180;
+    const loadY = y + Math.floor(loadIndex / 3) * 130;
+    const subtype = chooseBuildSubtype({ category: 'load', record, preferred: [record.loadType || '', 'motor', 'load'] });
+    const comp = addAutoBuiltComponent({
+      subtype,
+      type: componentMeta[subtype]?.type || 'static_load',
+      x: loadX,
+      y: loadY,
+      record,
+      linkKey: 'load'
+    });
+    if (!comp) return;
+    created.push(comp);
+    if (upstream) {
+      ensureDirectConnection(upstream, comp, 1, 0);
+      const conn = upstream.connections?.find(item => item.target === comp.id);
+      if (conn) {
+        applyCableResultToConnection(conn, createProvisionalCableResult(upstream, comp));
+        conn.reviewStatus = 'assumed';
+      }
+    }
+    loadIndex += 1;
+  });
+
+  if (!created.length) return false;
+  selection = created;
+  selected = created[0];
+  selectedConnection = null;
+  pushHistory();
+  arrangeSourceToLoad({ silent: true, componentsToArrange: components });
+  render();
+  zoomToComponents(created, { pad: 120, maxZoom: 1.15 });
+  save();
+  markScheduleReconcilePending();
+  showToast(`Auto-built ${created.length} one-line item${created.length === 1 ? '' : 's'}`);
+  return true;
+}
+
+function openAutoBuildModal() {
+  const plan = buildAutoBuildPlan();
+  return openModal({
+    title: 'Auto-Build One-Line',
+    description: 'Create missing source, equipment, load, and provisional cable links from current project schedules.',
+    primaryText: 'Build One-Line',
+    secondaryText: 'Cancel',
+    onSubmit: () => {
+      runAutoBuildWorkflow();
+      return true;
+    },
+    render: body => {
+      const summary = document.createElement('div');
+      summary.className = 'auto-build-summary';
+      [
+        ['Schedule equipment found', plan.equipment.length],
+        ['Missing equipment components', plan.missingEquipment.length],
+        ['Schedule loads found', plan.loads.length],
+        ['Missing load components', plan.missingLoads.length],
+        ['Utility/source component needed', plan.createsSource ? 'Yes' : 'No'],
+        ['Estimated provisional cable links', plan.estimatedConnections]
+      ].forEach(([label, value]) => {
+        const row = document.createElement('div');
+        row.className = 'auto-build-summary-row';
+        const name = document.createElement('span');
+        name.textContent = label;
+        const count = document.createElement('strong');
+        count.textContent = String(value);
+        row.append(name, count);
+        summary.appendChild(row);
+      });
+      const note = document.createElement('p');
+      note.className = 'modal-note';
+      note.textContent = 'Generated items are marked as assumptions and can be approved, edited, or re-linked after placement.';
+      body.append(summary, note);
+    }
+  });
+}
+
+function buildTopologyLevels(items = components) {
+  const scope = new Set(items.map(comp => comp.id));
+  const byId = new Map(items.map(comp => [comp.id, comp]));
+  const level = new Map();
+  const seeds = items.filter(comp => isSourceComponent(comp) || !items.some(other => (other.connections || []).some(conn => conn.target === comp.id)));
+  const queue = seeds.map(comp => {
+    level.set(comp.id, 0);
+    return comp.id;
+  });
+  while (queue.length) {
+    const id = queue.shift();
+    const current = byId.get(id);
+    const currentLevel = level.get(id) || 0;
+    (current?.connections || []).forEach(conn => {
+      if (!scope.has(conn.target)) return;
+      const nextLevel = currentLevel + 1;
+      if (!level.has(conn.target) || nextLevel > level.get(conn.target)) {
+        level.set(conn.target, nextLevel);
+        queue.push(conn.target);
+      }
+    });
+  }
+  items.forEach((comp, idx) => {
+    if (!level.has(comp.id)) level.set(comp.id, Math.floor(idx / 4));
+  });
+  return level;
+}
+
+function arrangeSourceToLoad({ silent = false, componentsToArrange = null } = {}) {
+  const targets = (componentsToArrange || (selection.length > 1 ? selection : components))
+    .filter(comp => comp && comp.type !== 'dimension' && comp.type !== 'annotation');
+  if (!targets.length) {
+    if (!silent) showToast('No devices to arrange');
+    return false;
+  }
+  const level = buildTopologyLevels(targets);
+  const groups = new Map();
+  targets.forEach(comp => {
+    const rank = level.get(comp.id) || 0;
+    if (!groups.has(rank)) groups.set(rank, []);
+    groups.get(rank).push(comp);
+  });
+  [...groups.entries()].sort((a, b) => a[0] - b[0]).forEach(([rank, group]) => {
+    group.sort((a, b) => (getComponentTag(a) || a.id).localeCompare(getComponentTag(b) || b.id));
+    group.forEach((comp, idx) => {
+      const x = 180 + idx * 190;
+      const y = 120 + rank * 140;
+      comp.rotation = defaultRotationForComponent(comp);
+      alignComponentBoundsToTopLeft(comp, x, y);
+      comp.labelOffset = comp.labelOffset || { x: 0, y: 0 };
+    });
+  });
+  pushHistory();
+  render();
+  save();
+  if (!silent) showToast(`Arranged ${targets.length} item${targets.length === 1 ? '' : 's'} from source to load`);
+  return true;
 }
 
 function ensureConnection(fromComp, toComp, fromPort, toPort) {
@@ -5903,9 +8606,10 @@ function updateCableOperatingVoltages(comps = components) {
 }
 
 function normalizeComponent(c) {
+  const meta = componentMeta[c?.subtype] || {};
   const nc = {
     ...c,
-    rotation: c.rotation ?? c.rot ?? 0,
+    rotation: normalizeRotation(c.rotation ?? c.rot ?? meta.defaultRotation ?? defaultRotationForType(c?.type, meta.category)),
     flipped: c.flipped || false,
     connections: (c.connections || []).map(conn =>
       typeof conn === 'string' ? { target: conn } : conn
@@ -5921,7 +8625,6 @@ function normalizeComponent(c) {
     };
   }
   if (nc.type === 'annotation') {
-    const meta = componentMeta[nc.subtype] || {};
     const fallbackWidth = Number.isFinite(Number(meta.width)) ? Number(meta.width) : compWidth;
     const fallbackHeight = Number.isFinite(Number(meta.height)) ? Number(meta.height) : compHeight;
     nc.width = Number(nc.width) || fallbackWidth;
@@ -5933,8 +8636,8 @@ function normalizeComponent(c) {
       ? componentMeta[nc.subtype].ports
       : nc.ports;
     nc.ports = normalizePortsForCategory('load', basePorts, nc.type, nc.subtype).map(port => ({
-      x: coerceNumber(port?.x, compWidth),
-      y: coerceNumber(port?.y, compHeight / 2)
+      x: coerceNumber(port?.x, compWidth / 2),
+      y: coerceNumber(port?.y, 0)
     }));
   }
   applyDefaults(nc);
@@ -5981,6 +8684,19 @@ function componentBounds(comp) {
     right: Math.max(...xs),
     bottom: Math.max(...ys)
   };
+}
+
+function alignComponentBoundsToTopLeft(comp, x, y) {
+  if (!comp || !Number.isFinite(x) || !Number.isFinite(y)) return;
+  comp.x = x;
+  comp.y = y;
+  const bounds = componentBounds(comp);
+  const dx = bounds.left - x;
+  const dy = bounds.top - y;
+  if (Math.abs(dx) > 0.01 || Math.abs(dy) > 0.01) {
+    comp.x -= dx;
+    comp.y -= dy;
+  }
 }
 
 function computeDragConnections(selectedComponents) {
@@ -6130,15 +8846,10 @@ function computeEnergizedSet(comps, conns) {
   const queue = [];
   // Seed from sources (utility, generator, inverter)
   (comps || []).forEach(c => {
-    if (c.type === 'sources' || c.subtype === 'bus_Utility' || c.subtype === 'bus_Generator') {
+    if (isSourceComponent(c) || c.type === 'sources' || c.subtype === 'bus_Utility' || c.subtype === 'bus_Generator') {
       queue.push(c.id);
     }
   });
-  const isOpen = (c) => {
-    if (!c) return false;
-    const state = (c.props && c.props.state) || c.state;
-    return state === 'open' || state === 'Open';
-  };
   const visited = new Set();
   while (queue.length) {
     const id = queue.shift();
@@ -6148,7 +8859,7 @@ function computeEnergizedSet(comps, conns) {
     if (!comp) continue;
     energized.add(id);
     // Don't traverse through open breakers/switches
-    if (isOpen(comp)) continue;
+    if (isComponentOpenForOperatingState(comp)) continue;
     // Follow outbound component-level connections
     (comp.connections || []).forEach(conn => {
       if (conn.target && !visited.has(conn.target)) queue.push(conn.target);
@@ -6509,7 +9220,7 @@ function render() {
   applyTransformerVoltages();
   propagateSourceVoltagesToBuses(components);
   const svg = document.getElementById('diagram');
-  svg.querySelectorAll('g.component, .connection, .conn-label, .port, .bus-handle, .annotation-handle, .issue-badge, .component-label, .component-attribute, .selection-marquee, .transformer-port-label').forEach(el => el.remove());
+  svg.querySelectorAll('g.component, .connection, .conn-label, .port, .bus-handle, .annotation-handle, .issue-badge, .component-label, .component-attribute, .component-datablock, .operating-state-badge, .selection-marquee, .transformer-port-label').forEach(el => el.remove());
 
   // Gap #52: re-insert background image underlay (positioned later by applyDiagramZoom)
   const existingBgUnderlay = svg.querySelector('#bg-underlay');
@@ -6547,6 +9258,7 @@ function render() {
       c.y = Math.round(c.y / gridSize) * gridSize;
     });
   }
+  const datablockLayout = createDatablockLayout(components);
 
   /**
    * Gap #47 – Orthogonal Connection Routing.
@@ -6844,6 +9556,8 @@ function render() {
       poly.style.pointerEvents = 'stroke';
       poly.style.cursor = 'move';
       poly.classList.add('connection');
+      if (selectedConnection?.component === c && selectedConnection.index === idx) poly.classList.add('selected-connection');
+      if (!componentMatchesDiagramFilter(c) || !componentMatchesDiagramFilter(target)) poly.classList.add('diagram-filter-dimmed');
       poly.dataset.comp = c.id;
       poly.dataset.index = idx;
       const vdLimit = parseFloat(target.maxVoltageDrop) || 3;
@@ -6854,6 +9568,8 @@ function render() {
         selected = null;
         selection = [];
         selectedConnection = { component: c, index: idx };
+        setRightRailTab('properties');
+        renderRightRail();
       });
       poly.addEventListener('dblclick', async e => {
         e.stopPropagation();
@@ -6900,6 +9616,8 @@ function render() {
       }
       label.textContent = lblText;
       label.classList.add('conn-label');
+      if (conn.cable?.provisional || conn.reviewStatus === 'assumed') label.classList.add('conn-label-assumed');
+      if (!componentMatchesDiagramFilter(c) || !componentMatchesDiagramFilter(target)) label.classList.add('diagram-filter-dimmed');
       if (cableInfo?.sizing_warning) label.classList.add('sizing-violation');
       if (parseFloat(cableInfo?.voltage_drop_pct) > vdLimit) label.classList.add('voltage-exceed');
       label.style.pointerEvents = 'auto';
@@ -6909,6 +9627,8 @@ function render() {
         selected = null;
         selection = [];
         selectedConnection = { component: c, index: idx };
+        setRightRailTab('properties');
+        renderRightRail();
       });
       label.addEventListener('dblclick', async e => {
         e.stopPropagation();
@@ -6930,6 +9650,10 @@ function render() {
     const g = document.createElementNS(svgNS, 'g');
     g.dataset.id = c.id;
     g.classList.add('component');
+    if (!componentMatchesDiagramFilter(c)) g.classList.add('diagram-filter-dimmed');
+    const dataStateInfo = getComponentColorInfo(c);
+    const operatingStatus = getComponentOperatingStatus(c);
+    if (operatingStatus === 'open') g.classList.add('operating-open');
     // Gap #51: suppress pointer events for components on locked layers
     if (isLockedByLayer(c)) {
       g.setAttribute('pointer-events', 'none');
@@ -6948,6 +9672,8 @@ function render() {
     if (c.label) tooltipParts.push(`Label: ${c.label}`);
     if (c.voltage) tooltipParts.push(`Voltage: ${c.voltage}`);
     if (c.rating) tooltipParts.push(`Rating: ${c.rating}`);
+    if (dataStateInfo) tooltipParts.push(`${dataStateOverlayLabels[dataStateOverlayMode]}: ${dataStateInfo.label}`);
+    if (operatingStatus === 'open') tooltipParts.push(`Operating state: Open in ${operatingStateLabels[activeOperatingState]}`);
     // Gap #48 – Off-page connector tooltip
     if (c.type === 'sheet_link') {
       const badge = getSheetLinkBadgeText(c, sheets);
@@ -7013,6 +9739,20 @@ function render() {
       }
       txt.textContent = parts.join(' / ');
       g.appendChild(txt);
+    }
+    if (dataStateInfo) {
+      const dataFill = document.createElementNS(svgNS, 'rect');
+      dataFill.setAttribute('x', c.x);
+      dataFill.setAttribute('y', c.y);
+      dataFill.setAttribute('width', w);
+      dataFill.setAttribute('height', h);
+      dataFill.setAttribute('fill', dataStateInfo.color);
+      dataFill.setAttribute('opacity', '0.22');
+      dataFill.classList.add('data-state-fill', `data-state-${dataStateInfo.key}`);
+      const title = document.createElementNS(svgNS, 'title');
+      title.textContent = dataStateInfo.label;
+      dataFill.appendChild(title);
+      g.appendChild(dataFill);
     }
     const transforms = [];
     if (c.flipped) transforms.push(`translate(${cx}, ${cy}) scale(-1,1) translate(${-cx}, ${-cy})`);
@@ -7162,6 +9902,19 @@ function render() {
         selectComponent(c);
       });
       g.appendChild(img);
+      if (dataStateInfo) {
+        const outline = document.createElementNS(svgNS, 'rect');
+        outline.setAttribute('x', c.x - 1.5);
+        outline.setAttribute('y', c.y - 1.5);
+        outline.setAttribute('width', w + 3);
+        outline.setAttribute('height', h + 3);
+        outline.setAttribute('fill', 'none');
+        outline.setAttribute('stroke', dataStateInfo.color);
+        outline.setAttribute('stroke-width', 2);
+        outline.classList.add('data-state-outline', `data-state-${dataStateInfo.key}`);
+        outline.style.pointerEvents = 'none';
+        g.appendChild(outline);
+      }
       if (c.subtype === 'motor' || c.subtype === 'motor_load') {
         const letter = document.createElementNS(svgNS, 'text');
         letter.setAttribute('x', cx);
@@ -7219,6 +9972,25 @@ function render() {
       g.appendChild(lockEl);
     }
     // Gap #40 – Group outline for group components
+    getComponentReviewBadges(c).slice(0, 3).forEach((badgeInfo, badgeIdx) => {
+      const badge = document.createElementNS(svgNS, 'g');
+      badge.setAttribute('class', `review-badge review-badge-${badgeInfo.className}`);
+      const bx = c.x + w - 8 - badgeIdx * 18;
+      const by = c.y + 8;
+      const circ = document.createElementNS(svgNS, 'circle');
+      circ.setAttribute('cx', bx);
+      circ.setAttribute('cy', by);
+      circ.setAttribute('r', 7);
+      const txt = document.createElementNS(svgNS, 'text');
+      txt.setAttribute('x', bx);
+      txt.setAttribute('y', by + 3);
+      txt.setAttribute('text-anchor', 'middle');
+      txt.textContent = badgeInfo.text;
+      const title = document.createElementNS(svgNS, 'title');
+      title.textContent = badgeInfo.label;
+      badge.append(title, circ, txt);
+      g.appendChild(badge);
+    });
     if (c.type === 'group') {
       const outline = document.createElementNS(svgNS, 'rect');
       outline.setAttribute('x', c.x);
@@ -7235,6 +10007,7 @@ function render() {
       g.appendChild(glabel);
     }
     svg.appendChild(g);
+    renderOperatingStateBadge(svg, c, operatingStatus, includePoint);
     if (c.type === 'annotation' && selection.includes(c)) {
       const handle = document.createElementNS(svgNS, 'rect');
       handle.setAttribute('x', c.x + w - 5);
@@ -7261,17 +10034,7 @@ function render() {
       svg.appendChild(labelEl);
       const attrLines = getComponentAttributeLines(c);
       if (attrLines.length) {
-        attrLines.forEach((line, idx) => {
-          const attrEl = document.createElementNS(svgNS, 'text');
-          attrEl.classList.add('component-attribute');
-          attrEl.dataset.id = c.id;
-          attrEl.setAttribute('x', labelPos.x);
-          attrEl.setAttribute('y', labelPos.y + attributeLineHeight * (idx + 1));
-          attrEl.setAttribute('text-anchor', getLabelAlignment(c));
-          attrEl.textContent = line;
-          attachLabelInteractions(attrEl, c);
-          svg.appendChild(attrEl);
-        });
+        renderComponentDatablock(svg, c, attrLines, includePoint, datablockLayout);
       }
       if (c.type === 'transformer') {
         const ports = c.ports || componentMeta[c.subtype]?.ports || [];
@@ -7336,8 +10099,14 @@ function render() {
           const circ = document.createElementNS(svgNS, 'circle');
           circ.setAttribute('cx', pos.x);
           circ.setAttribute('cy', pos.y);
-          circ.setAttribute('r', 3);
+          circ.setAttribute('r', 8);
           circ.classList.add('port');
+          if (connectSource?.component === c && normalizePortIndex(connectSource.port) === idx) {
+            circ.classList.add('port-active');
+          }
+          if (portInUse(c, idx)) {
+            circ.classList.add('port-used');
+          }
           circ.dataset.id = c.id;
           circ.dataset.port = idx;
           svg.appendChild(circ);
@@ -7390,7 +10159,9 @@ function render() {
   if (lengthsChanged) {
     markScheduleReconcilePending();
     render();
+    return;
   }
+  renderRightRail();
 }
 
 export function toggleGrid() {
@@ -8115,9 +10886,9 @@ function renderSheetTabs() {
   });
 }
 
-function loadSheet(idx) {
+function loadSheet(idx, { skipCurrentSave = false } = {}) {
   if (idx < 0 || idx >= sheets.length) return;
-  save(false);
+  if (!skipCurrentSave) save(false);
   activeSheet = idx;
   components = sheets[activeSheet].components;
   connections = sheets[activeSheet].connections;
@@ -8338,7 +11109,7 @@ function save(notify = true) {
   }
   setOneLine({ activeSheet, sheets: sheetData });
   setItem('diagramScale', normalizeDiagramScale(diagramScale));
-  const issues = validateDiagram();
+  const issues = validateDiagram({ notify: false, revealPanel: false });
   if (issues.length === 0) {
     markScheduleReconcilePending();
     if (notify) showToast('One-line saved. Use Reconcile Schedules to update linked schedules.');
@@ -8375,6 +11146,50 @@ function getDefaultInsertionPoint() {
   return getStaticViewportCenter();
 }
 
+function overlapsExistingComponent(x, y, width, height) {
+  const test = {
+    left: x - gridSize,
+    top: y - gridSize,
+    right: x + width + gridSize,
+    bottom: y + height + gridSize
+  };
+  return components.some(comp => {
+    const bounds = componentBounds(comp);
+    return test.left < bounds.right
+      && test.right > bounds.left
+      && test.top < bounds.bottom
+      && test.bottom > bounds.top;
+  });
+}
+
+function getGuidedInsertionPoint(meta) {
+  const center = getViewportCenter() || getStaticViewportCenter();
+  const baseWidth = Number.isFinite(meta?.width) ? meta.width : compWidth;
+  const baseHeight = Number.isFinite(meta?.height) ? meta.height : compHeight;
+  const visualSize = visualSizeForRotation(baseWidth, baseHeight, defaultRotationForMeta(meta, meta?.type));
+  const { width, height } = visualSize;
+  if (!components.length) {
+    return {
+      x: center.x - width / 2,
+      y: Math.max(gridSize * 3, center.y - height / 2)
+    };
+  }
+  const anchor = selected && components.includes(selected) ? selected : components[components.length - 1];
+  const anchorBounds = componentBounds(anchor);
+  const category = meta?.category || categoryForType(meta?.type);
+  let x = anchorBounds.left + (anchorBounds.right - anchorBounds.left - width) / 2;
+  let y = anchorBounds.bottom + Math.max(70, gridSize * 4);
+  if (category === 'sources' && !hasForwardConnection(anchor, selected)) {
+    y = anchorBounds.top - height - Math.max(70, gridSize * 4);
+  }
+  let attempts = 0;
+  while (attempts < 20 && overlapsExistingComponent(x, y, width, height)) {
+    y += Math.max(70, gridSize * 4);
+    attempts += 1;
+  }
+  return { x, y };
+}
+
 function addComponent(cfg) {
   let subtype;
   let type;
@@ -8395,7 +11210,9 @@ function addComponent(cfg) {
   } else {
     return;
   }
-  const insertionPoint = placeAtCenter ? (getViewportCenter() || getStaticViewportCenter()) : getDefaultInsertionPoint();
+  const meta = componentMeta[subtype];
+  if (!meta) return;
+  const insertionPoint = placeAtCenter ? getGuidedInsertionPoint(meta) : getDefaultInsertionPoint();
   let x = explicitX !== undefined ? explicitX : insertionPoint.x;
   let y = explicitY !== undefined ? explicitY : insertionPoint.y;
   if (Number.isFinite(x) === false || Number.isFinite(y) === false) {
@@ -8403,16 +11220,14 @@ function addComponent(cfg) {
     if (Number.isFinite(x) === false) x = fallback.x;
     if (Number.isFinite(y) === false) y = fallback.y;
   }
-  const meta = componentMeta[subtype];
-  if (!meta) return;
   if (gridEnabled) {
     x = Math.round(x / gridSize) * gridSize;
     y = Math.round(y / gridSize) * gridSize;
   }
   const resolvedType = type || meta.type || meta.category;
-  const defaultRotation = normalizeRotation(meta.defaultRotation ?? defaultRotationForType(resolvedType, meta.category));
+  const defaultRotation = defaultRotationForMeta(meta, resolvedType);
   const comp = {
-    id: 'n' + Date.now(),
+    id: createDiagramEntityId('n'),
     type: resolvedType,
     subtype,
     x,
@@ -8429,15 +11244,7 @@ function addComponent(cfg) {
   };
   if (Number.isFinite(meta.width)) comp.width = meta.width;
   if (Number.isFinite(meta.height)) comp.height = meta.height;
-  if (defaultRotation) {
-    const bounds = componentBounds(comp);
-    const dx = bounds.left - x;
-    const dy = bounds.top - y;
-    if (Math.abs(dx) > 0.01 || Math.abs(dy) > 0.01) {
-      comp.x -= dx;
-      comp.y -= dy;
-    }
-  }
+  if (defaultRotation) alignComponentBoundsToTopLeft(comp, x, y);
   Object.entries(meta.props || {}).forEach(([k, v]) => {
     comp[k] = typeof v === 'object' ? JSON.parse(JSON.stringify(v)) : v;
   });
@@ -8454,6 +11261,7 @@ function addComponent(cfg) {
   ensureGeneratorStudyFieldsOnComponent(comp, meta);
   ensureMccFieldsOnComponent(comp, meta);
   ensurePtVtFieldsOnComponent(comp, meta);
+  ensureStudyInputFieldsOnComponent(comp, meta);
   ensureShapeDefaults(comp);
   if (comp.type === 'transformer') {
     syncTransformerDefaults(comp, { forceBase: true });
@@ -8575,7 +11383,88 @@ function distributeSelection(axis) {
   save();
 }
 
+function isAutoSpaceEquipmentTarget(comp) {
+  if (!comp || comp.isVirtualNode || comp.type === 'dimension' || comp.type === 'annotation') return false;
+  const category = resolveComponentCategory(comp);
+  return category === 'sources' || category === 'equipment' || category === 'protection' || category === 'load';
+}
+
+function getAutoSpaceEquipmentTargets() {
+  const selectedTargets = selection.filter(isAutoSpaceEquipmentTarget);
+  if (selectedTargets.length >= 2) return selectedTargets;
+  return components.filter(isAutoSpaceEquipmentTarget);
+}
+
+function groupAutoSpaceRows(targets) {
+  const rows = [];
+  targets
+    .map(comp => {
+      const bounds = componentBounds(comp);
+      return {
+        comp,
+        bounds,
+        centerX: (bounds.left + bounds.right) / 2,
+        centerY: (bounds.top + bounds.bottom) / 2
+      };
+    })
+    .sort((a, b) => a.centerY - b.centerY || a.centerX - b.centerX)
+    .forEach(entry => {
+      let row = rows.find(candidate => Math.abs(candidate.centerY - entry.centerY) <= equipmentAutoSpaceRowTolerance);
+      if (!row) {
+        row = { centerY: entry.centerY, items: [] };
+        rows.push(row);
+      }
+      row.items.push(entry);
+      row.centerY = row.items.reduce((sum, item) => sum + item.centerY, 0) / row.items.length;
+    });
+  return rows;
+}
+
+function autoSpaceEquipment({ silent = false } = {}) {
+  const targets = getAutoSpaceEquipmentTargets();
+  if (targets.length < 2) {
+    if (!silent) showToast('Add or select at least two equipment items to auto-space');
+    return false;
+  }
+  const rows = groupAutoSpaceRows(targets).filter(row => row.items.length > 1);
+  if (!rows.length) {
+    if (!silent) showToast('No equipment rows need horizontal spacing');
+    return false;
+  }
+  let moved = 0;
+  rows.forEach(row => {
+    const sorted = row.items.sort((a, b) => a.centerX - b.centerX);
+    const minCenter = Math.min(...sorted.map(item => item.centerX));
+    const maxCenter = Math.max(...sorted.map(item => item.centerX));
+    const rowCenter = (minCenter + maxCenter) / 2;
+    const firstCenter = rowCenter - ((sorted.length - 1) * equipmentHorizontalAutoSpace) / 2;
+    sorted.forEach((item, index) => {
+      const width = Math.max(1, item.bounds.right - item.bounds.left);
+      const desiredCenter = firstCenter + index * equipmentHorizontalAutoSpace;
+      let desiredLeft = desiredCenter - width / 2;
+      const desiredTop = item.bounds.top;
+      if (gridEnabled) desiredLeft = Math.round(desiredLeft / gridSize) * gridSize;
+      alignComponentBoundsToTopLeft(item.comp, desiredLeft, desiredTop);
+      const nextBounds = componentBounds(item.comp);
+      if (Math.abs(nextBounds.left - item.bounds.left) > 0.01 || Math.abs(nextBounds.top - item.bounds.top) > 0.01) {
+        moved += 1;
+      }
+    });
+  });
+  if (!moved) {
+    if (!silent) showToast('Equipment horizontal spacing already matches the standard');
+    return false;
+  }
+  pushHistory();
+  render();
+  save();
+  closeCommandMenus();
+  if (!silent) showToast(`Auto-spaced ${moved} equipment item${moved === 1 ? '' : 's'}`);
+  return true;
+}
+
 function selectComponent(compOrId) {
+  closeCommandMenus();
   const nodeComponents = buildVirtualNodeEntries(components, connections);
   const baseComponents = [...components];
   const deviceComponents = [...baseComponents, ...nodeComponents];
@@ -8851,7 +11740,15 @@ function selectComponent(compOrId) {
 
     propertyHeading.textContent = `${getComponentListLabel(targetComp)} Properties`;
 
-    const isMotorComponent = targetComp.subtype === 'motor_load' || targetComp.subtype === 'motor';
+    const normalizedTargetType = `${targetComp.type || ''}`.toLowerCase();
+    const normalizedTargetSubtype = `${targetComp.subtype || ''}`.toLowerCase();
+    const isMotorComponent = normalizedTargetSubtype === 'motor_load' || normalizedTargetSubtype === 'motor' || normalizedTargetType === 'motor_load' || normalizedTargetType === 'motor';
+    const isMotorStudyComponent = isMotorComponent
+      || normalizedTargetType === 'motor_controller'
+      || normalizedTargetType === 'motor_starter'
+      || normalizedTargetSubtype.includes('starter')
+      || normalizedTargetSubtype === 'vfd'
+      || normalizedTargetSubtype === 'soft_starter';
     const isStaticLoadComponent = targetComp.subtype === 'static_load';
     const isTransformerComponent = targetComp.type === 'transformer';
     const isSourceCategoryComponent = isSourceComponent(targetComp);
@@ -8928,18 +11825,66 @@ function selectComponent(compOrId) {
       rawSchemaFieldNames.has(name)
     );
     const shouldApplyMotorDerivations =
-      isMotorComponent
+      isMotorStudyComponent
       || hasMotorHorsepowerIndicator;
 
     const generalLabelOverrides = {
       hp: 'Horsepower',
       pf: 'Power Factor',
       service_factor: 'Service Factor',
+      full_load_amps: 'Full-Load Amps (A)',
+      rated_current: 'Rated Current (A)',
+      rated_current_a: 'Rated Current (A)',
+      lr_current_pu: 'Locked-Rotor Current (x FLA)',
+      current_limit_pu: 'Current Limit (x FLA)',
+      vfd_current_limit_pu: 'VFD Current Limit (x FLA)',
+      initial_voltage_pu: 'Initial Voltage (pu)',
+      ramp_time_s: 'Ramp Time (s)',
+      start_time_s: 'Start Time (s)',
+      stall_time: 'Stall Time (s)',
+      synchronous_speed_rpm: 'Synchronous Speed (rpm)',
       inrushMultiple: 'Inrush Multiple (× FLA)',
       thevenin_r: 'Thevenin R (Ω)',
       thevenin_x: 'Thevenin X (Ω)',
       inertia: 'Inertia (kg·m²)',
       load_torque_curve: 'Load Torque Curve (speed%:torque%)',
+      mtbf: 'MTBF (hr)',
+      mttr: 'MTTR (hr)',
+      clearing_time: 'Clearing Time (s)',
+      gap: 'Electrode Gap (mm)',
+      working_distance: 'Working Distance (mm)',
+      enclosure_height: 'Enclosure Height (mm)',
+      enclosure_width: 'Enclosure Width (mm)',
+      enclosure_depth: 'Enclosure Depth (mm)',
+      inrush_multiple: 'Transformer Inrush Multiple (x FLA)',
+      inrush_duration: 'Transformer Inrush Duration (s)',
+      harmonicSource: 'Harmonic Source',
+      harmonicProfileId: {
+        label: 'Harmonic Profile',
+        type: 'select',
+        options: () => getHarmonicProfileOptions(),
+        help: 'Select a library profile or save the current spectrum as a custom profile.'
+      },
+      harmonic_profile_id: {
+        label: 'Harmonic Profile',
+        type: 'select',
+        options: () => getHarmonicProfileOptions(),
+        help: 'Select a library profile or save the current spectrum as a custom profile.'
+      },
+      harmonics: {
+        label: 'Harmonic Spectrum (order:pct)',
+        placeholder: '5:35 7:25 11:12 13:8',
+        help: 'Populated by the harmonic profile library; custom spectra use order:pct pairs separated by spaces or commas.'
+      },
+      harmonicsA: 'Phase A Harmonics (order:pct)',
+      harmonicsB: 'Phase B Harmonics (order:pct)',
+      harmonicsC: 'Phase C Harmonics (order:pct)',
+      scMVA: 'Short-Circuit Strength at Bus (MVA)',
+      electrode_config: {
+        label: 'Electrode Configuration',
+        type: 'select',
+        options: ['VCB', 'VCBB', 'HCB', 'VOA', 'HOA']
+      },
       primary_connection: 'Primary Connection',
       secondary_connection: 'Secondary Connection',
       tertiary_connection: 'Tertiary Connection',
@@ -9056,7 +12001,7 @@ function selectComponent(compOrId) {
         ) {
           return { ...f, type: 'select', options: transformerConnectionOptions };
         }
-        if ((targetComp.subtype === 'motor_load' || targetComp.subtype === 'motor') && f.name === 'load_torque_curve') {
+        if (isMotorStudyComponent && f.name === 'load_torque_curve') {
           return {
             ...f,
             type: 'textarea',
@@ -9097,7 +12042,7 @@ function selectComponent(compOrId) {
       schema = schema.filter(f => !['cable_cable_rating', 'cable_impedance_r', 'cable_impedance_x'].includes(f.name));
     }
 
-    if (targetComp.subtype === 'motor_load' || targetComp.subtype === 'motor') {
+    if (isMotorStudyComponent) {
       schema = schema.filter(
         f => !['conductor_type', 'cable_assembly', 'breaker_frame', 'conductor_assembly'].includes(f.name)
       );
@@ -9231,13 +12176,25 @@ function selectComponent(compOrId) {
       baseFields = [
         { name: 'label', label: 'Label', type: 'text' },
         { name: 'ref', label: 'Ref ID', type: 'text' },
-        { name: 'enclosure', label: 'Enclosure', type: 'select', options: ['NEMA 1', 'NEMA 3R', 'NEMA 4', 'NEMA 4X'] },
-        { name: 'gap', label: 'Gap (mm)', type: 'number' },
+        {
+          name: 'enclosure',
+          label: 'Enclosure',
+          type: 'select',
+          options: [
+            { value: 'box', label: 'Box / enclosed' },
+            { value: 'open', label: 'Open air' },
+            { value: 'NEMA 1', label: 'NEMA 1' },
+            { value: 'NEMA 3R', label: 'NEMA 3R' },
+            { value: 'NEMA 4', label: 'NEMA 4' },
+            { value: 'NEMA 4X', label: 'NEMA 4X' }
+          ]
+        },
+        { name: 'gap', label: 'Electrode Gap (mm)', type: 'number' },
         { name: 'working_distance', label: 'Working Distance (mm)', type: 'number' },
         { name: 'clearing_time', label: 'Clearing Time (s)', type: 'number' }
       ];
 
-      if (targetComp.subtype === 'motor_load' || targetComp.subtype === 'motor') {
+      if (isMotorStudyComponent) {
         baseFields = baseFields.filter(
           f => !['conductor_type', 'cable_assembly', 'breaker_frame', 'conductor_assembly'].includes(f.name)
         );
@@ -9266,6 +12223,8 @@ function selectComponent(compOrId) {
     let manufacturerInput = null;
     let modelInput = null;
     let tccInput = null;
+    let harmonicProfileInput = null;
+    let harmonicSpectrumInput = null;
 
     const form = document.createElement('form');
     form.id = 'prop-form';
@@ -9300,7 +12259,8 @@ function selectComponent(compOrId) {
       }
       if (f.type === 'select') {
         input = document.createElement('select');
-        (f.options || []).forEach(opt => {
+        const selectOptions = typeof f.options === 'function' ? f.options(targetComp, f) : f.options;
+        (selectOptions || []).forEach(opt => {
           const optionValue = typeof opt === 'object' ? opt.value ?? opt.label ?? '' : opt;
           const optionLabel = typeof opt === 'object' ? opt.label ?? opt.value ?? '' : opt;
           const o = document.createElement('option');
@@ -9334,6 +12294,8 @@ function selectComponent(compOrId) {
       if (f.name === 'manufacturer') manufacturerInput = input;
       if (f.name === 'model') modelInput = input;
       if (f.name === 'tccId') tccInput = input;
+      if (f.name === 'harmonicProfileId' || f.name === 'harmonic_profile_id') harmonicProfileInput = input;
+      if (f.name === 'harmonics' || f.name === 'harmonic_spectrum') harmonicSpectrumInput = input;
       if (shouldApplyMotorDerivations) {
         motorInputMap.set(f.name, input);
       }
@@ -9444,7 +12406,7 @@ function selectComponent(compOrId) {
       seenFieldNames.add(field.name);
       return true;
     });
-    if (targetComp.subtype === 'motor_load' || targetComp.subtype === 'motor') {
+    if (isMotorStudyComponent) {
       fields = fields.filter(
         f => !['conductor_type', 'cable_assembly', 'breaker_frame', 'conductor_assembly'].includes(f.name)
       );
@@ -9536,6 +12498,7 @@ function selectComponent(compOrId) {
     const scheduleLinkFieldNames = new Set(scheduleLinkFieldDefs.map(field => field.name));
 
     const hasTccField = fields.some(f => f.name === 'tccId');
+    let lastSourceVoltageDriver = null;
 
     const applyChanges = () => {
       if (hasApplied) return;
@@ -9547,6 +12510,9 @@ function selectComponent(compOrId) {
       ensureShapeDefaults(targetComp);
       if (hasTccField) {
         targetComp.tccId = fd.get('tccId') || '';
+      }
+      if (isSourceCategoryComponent) {
+        syncSourceVoltageFields(targetComp, lastSourceVoltageDriver);
       }
       pushHistory();
       render();
@@ -9561,20 +12527,25 @@ function selectComponent(compOrId) {
     const electricalFields = [];
     const motorStartFields = [];
     const physicalFields = [];
+    const studyFields = [];
     const scheduleLinkFields = [];
     const generalFields = [];
     const motorStartFieldNames = [
       'inrushMultiple', 'lr_current_pu', 'thevenin_r', 'thevenin_x', 'inertia', 'load_torque_curve',
       'starter_type', 'vfd_current_limit_pu', 'initial_voltage_pu', 'ramp_time_s',
       'wye_delta_switch_time_s', 'autotransformer_tap', 'synchronous_speed_rpm',
+      'full_load_amps', 'locked_rotor_current', 'locked_rotor_multiple', 'current_limit_pu',
+      'start_time_s', 'stall_time', 'pf', 'power_factor', 'efficiency', 'full_load_efficiency_pct'
     ];
     fields.forEach(f => {
       if (scheduleLinkFieldNames.has(f.name)) {
         scheduleLinkFields.push(f);
-      } else if (isMotorComponent && motorStartFieldNames.includes(f.name)) {
+      } else if (isMotorStudyComponent && motorStartFieldNames.includes(f.name)) {
         motorStartFields.push(f);
       } else if (impedanceFieldNameSet.has(f.name)) {
         electricalFields.push(f);
+      } else if (studyInputFieldNameSet.has(f.name)) {
+        studyFields.push(f);
       } else if (isPhysicalPropertyField(f)) {
         physicalFields.push(f);
       } else if (['manufacturer', 'model'].includes(f.name)) manufacturerFields.push(f);
@@ -9596,7 +12567,7 @@ function selectComponent(compOrId) {
       return fieldArr;
     };
 
-    [generalFields, electricalFields, physicalFields, motorStartFields].forEach(moveMotorCalculatedToEnd);
+    [generalFields, electricalFields, physicalFields, studyFields, motorStartFields].forEach(moveMotorCalculatedToEnd);
 
     const createFieldset = (legendText, fieldArr) => {
       const fs = document.createElement('fieldset');
@@ -9684,6 +12655,7 @@ function selectComponent(compOrId) {
     createTabSection('general', 'General', 'General', generalFields);
     createTabSection('links', 'Links', 'Schedule Links', scheduleLinkFields);
     createTabSection('electrical', 'Electrical', 'Electrical', electricalFields);
+    createTabSection('studies', 'Studies', 'Study Inputs', studyFields);
     createTabSection('physical', 'Physical', 'Physical', physicalFields);
     createTabSection('motor', 'Motor Start', 'Motor Start', motorStartFields);
     createTabSection('manufacturer', 'Manufacturer', 'Manufacturer', manufacturerFields);
@@ -10071,6 +13043,20 @@ function selectComponent(compOrId) {
 
     if (isSourceCategoryComponent && sourceInputMap) {
       const baseFieldNames = ['baseKV', 'kV', 'kv', 'prefault_voltage'];
+      const sourceVoltageDriverNames = [
+        'source_voltage_base',
+        'voltage',
+        'volts',
+        'voltage_primary',
+        'voltage_secondary',
+        'nominalVoltage',
+        'nominal_voltage'
+      ];
+      const orderedSourceVoltageDrivers = preferredDriver => (
+        preferredDriver && sourceVoltageDriverNames.includes(preferredDriver)
+          ? [preferredDriver, ...sourceVoltageDriverNames.filter(name => name !== preferredDriver)]
+          : sourceVoltageDriverNames
+      );
 
       const setCustomIndicator = (name, active) => {
         if (!sourceCustomBadges) return;
@@ -10124,20 +13110,12 @@ function selectComponent(compOrId) {
         return null;
       };
 
-      const resolveAutoBaseKV = ({ includeOverrides = false } = {}) => {
+      const resolveAutoBaseKV = ({ includeOverrides = false, preferredDriver = null } = {}) => {
         if (includeOverrides) {
           const fromOverrides = getKvFromOverrideInputs(baseFieldNames);
           if (Number.isFinite(fromOverrides) && fromOverrides > 0) return fromOverrides;
         }
-        const driverInputs = [
-          'source_voltage_base',
-          'voltage',
-          'volts',
-          'voltage_primary',
-          'voltage_secondary',
-          'nominalVoltage',
-          'nominal_voltage'
-        ];
+        const driverInputs = orderedSourceVoltageDrivers(preferredDriver);
         const fromInputs = getKvFromInputs(driverInputs);
         if (Number.isFinite(fromInputs) && fromInputs > 0) return fromInputs;
         const fromComponentDrivers = getKvFromComponent(driverInputs);
@@ -10149,6 +13127,22 @@ function selectComponent(compOrId) {
         const fromBase = getKvFromComponent(baseFieldNames);
         if (Number.isFinite(fromBase) && fromBase > 0) return fromBase;
         return null;
+      };
+
+      const syncSourceVoltageInputs = preferredDriver => {
+        const autoKv = resolveAutoBaseKV({ preferredDriver });
+        if (!Number.isFinite(autoKv) || autoKv <= 0) return;
+        const formattedKv = formatNumber(autoKv, 6);
+        const formattedVolts = formatNumber(autoKv * 1000, 3);
+        [
+          { name: 'source_voltage_base', value: formattedKv },
+          { name: 'voltage', value: formattedVolts },
+          { name: 'volts', value: formattedVolts }
+        ].forEach(({ name, value }) => {
+          if (name === preferredDriver) return;
+          const input = sourceInputMap.get(name);
+          if (input) input.value = value;
+        });
       };
 
       const parseShortCircuitCapacity = raw => {
@@ -10175,8 +13169,8 @@ function selectComponent(compOrId) {
         return parseShortCircuitCapacity(readComponentValue('short_circuit_capacity'));
       };
 
-      const updateSourceBaseFields = () => {
-        const autoKv = resolveAutoBaseKV();
+      const updateSourceBaseFields = (options = {}) => {
+        const autoKv = resolveAutoBaseKV(options);
         const tolerance = 1e-6;
         baseFieldNames.forEach(name => {
           const entry = sourceCustomBadges?.get(name);
@@ -10218,7 +13212,7 @@ function selectComponent(compOrId) {
         const sc = getShortCircuitCapacity();
         if (sc) {
           if (sc.unit === 'ka') {
-            const baseKv = resolveAutoBaseKV({ includeOverrides: true });
+            const baseKv = resolveAutoBaseKV({ includeOverrides: true, preferredDriver: lastSourceVoltageDriver });
             if (Number.isFinite(baseKv) && baseKv > 0) {
               theveninMva = Math.sqrt(3) * baseKv * sc.value;
             }
@@ -10241,7 +13235,9 @@ function selectComponent(compOrId) {
         const input = sourceInputMap.get(name);
         if (!input) return;
         const handler = () => {
-          updateSourceBaseFields();
+          lastSourceVoltageDriver = name;
+          syncSourceVoltageInputs(name);
+          updateSourceBaseFields({ preferredDriver: name });
           updateSourceDerivedFields();
         };
         input.addEventListener('input', handler);
@@ -10509,6 +13505,487 @@ function selectComponent(compOrId) {
     }
 
     const getTabPanel = id => tabMap.get(id)?.panel || tabs[0]?.panel || null;
+
+    if (harmonicProfileInput && harmonicSpectrumInput) {
+      const studiesPanel = getTabPanel('studies');
+      const studiesFieldset = studiesPanel?.querySelector('fieldset');
+      const helper = document.createElement('div');
+      helper.className = 'harmonic-profile-helper';
+
+      const selectedInfo = document.createElement('div');
+      selectedInfo.className = 'harmonic-profile-selected';
+      const selectedTitle = document.createElement('strong');
+      selectedTitle.textContent = 'Profile spectrum';
+      const selectedText = document.createElement('span');
+      selectedInfo.appendChild(selectedTitle);
+      selectedInfo.appendChild(selectedText);
+
+      const chartActionRow = document.createElement('div');
+      chartActionRow.className = 'harmonic-profile-action-row';
+      const viewChartsButton = document.createElement('button');
+      viewChartsButton.type = 'button';
+      viewChartsButton.className = 'btn harmonic-profile-chart-btn';
+      viewChartsButton.textContent = 'View Profile Charts';
+      chartActionRow.appendChild(viewChartsButton);
+
+      const saveRow = document.createElement('div');
+      saveRow.className = 'harmonic-profile-save-row';
+      const customName = document.createElement('input');
+      customName.type = 'text';
+      customName.placeholder = 'Custom profile name';
+      customName.autocomplete = 'off';
+      const saveProfileButton = document.createElement('button');
+      saveProfileButton.type = 'button';
+      saveProfileButton.className = 'btn harmonic-profile-save-btn';
+      saveProfileButton.textContent = 'Save Current Spectrum';
+      saveRow.appendChild(customName);
+      saveRow.appendChild(saveProfileButton);
+
+      helper.appendChild(selectedInfo);
+      helper.appendChild(chartActionRow);
+      helper.appendChild(saveRow);
+      if (studiesFieldset) studiesFieldset.appendChild(helper);
+
+      const getNamedFormElement = name => {
+        const element = form.elements.namedItem(name);
+        if (!element) return null;
+        if (typeof Element !== 'undefined' && element instanceof Element) return element;
+        return element[0] || null;
+      };
+
+      const readFormOrComponentValue = name => {
+        const element = getNamedFormElement(name);
+        if (element) {
+          if (element.type === 'checkbox') return element.checked;
+          if (element.value !== undefined && element.value !== '') return element.value;
+        }
+        return readComponentValue(name);
+      };
+
+      const getPreviewNumeric = names => {
+        for (const name of names) {
+          const parsed = parseNumericValue(readFormOrComponentValue(name));
+          if (parsed !== null) return parsed;
+        }
+        return null;
+      };
+
+      const getPreviewVoltage = () => {
+        const voltageNames = [
+          'voltage',
+          'volts',
+          'rated_voltage',
+          'rated_voltage_v',
+          'nominal_voltage',
+          'nominalVoltage',
+          'baseKV',
+          'kV',
+          'kv',
+          'prefault_voltage'
+        ];
+        for (const name of voltageNames) {
+          const volts = normalizeVoltageToVolts(readFormOrComponentValue(name));
+          if (Number.isFinite(volts) && volts > 0) return volts;
+        }
+        const fallback = normalizeVoltageToVolts(targetComp);
+        return Number.isFinite(fallback) && fallback > 0 ? fallback : null;
+      };
+
+      const getPreviewLoadKw = () => {
+        const loadValue = readComponentValue('load');
+        if (loadValue && typeof loadValue === 'object') {
+          const nestedKw = parseNumericValue(loadValue.kw ?? loadValue.kW ?? loadValue.P);
+          if (nestedKw !== null) return nestedKw;
+        }
+        const kw = getPreviewNumeric(['load_kw', 'kw', 'kW', 'rated_kw', 'output_kw']);
+        if (kw !== null) return kw;
+        const hp = getPreviewNumeric(['hp', 'horsepower']);
+        return hp !== null ? hp * 0.746 : null;
+      };
+
+      const makeSvgElement = (tagName, attrs = {}) => {
+        const el = document.createElementNS('http://www.w3.org/2000/svg', tagName);
+        Object.entries(attrs).forEach(([key, value]) => {
+          el.setAttribute(key, String(value));
+        });
+        return el;
+      };
+
+      const createChartPanel = (chartGrid, title, unitLabel, emptyText, className) => {
+        const panel = document.createElement('div');
+        panel.className = 'harmonic-profile-chart-panel';
+        const header = document.createElement('div');
+        header.className = 'harmonic-profile-chart-header';
+        const heading = document.createElement('strong');
+        heading.textContent = title;
+        const summary = document.createElement('span');
+        header.appendChild(heading);
+        header.appendChild(summary);
+        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.setAttribute('viewBox', '0 0 320 170');
+        svg.setAttribute('role', 'img');
+        svg.setAttribute('aria-label', `${title} chart`);
+        svg.classList.add('harmonic-profile-chart', className);
+        const empty = document.createElement('p');
+        empty.className = 'harmonic-profile-chart-empty';
+        empty.textContent = emptyText;
+        panel.appendChild(header);
+        panel.appendChild(svg);
+        panel.appendChild(empty);
+        chartGrid.appendChild(panel);
+        return { svg, summary, empty, emptyText, unitLabel };
+      };
+
+      let chartModalState = null;
+
+      const ensureHarmonicChartModal = () => {
+        if (chartModalState) return chartModalState;
+        const chartModalEl = document.createElement('div');
+        chartModalEl.className = 'harmonic-profile-chart-modal';
+        chartModalEl.hidden = true;
+        chartModalEl.setAttribute('role', 'dialog');
+        chartModalEl.setAttribute('aria-modal', 'true');
+        chartModalEl.setAttribute('aria-labelledby', 'harmonic-profile-chart-title');
+
+        const panel = document.createElement('div');
+        panel.className = 'harmonic-profile-chart-modal-panel';
+
+        const header = document.createElement('div');
+        header.className = 'harmonic-profile-chart-modal-header';
+        const title = document.createElement('h3');
+        title.id = 'harmonic-profile-chart-title';
+        title.textContent = 'Harmonic Profile Charts';
+        const closeButton = document.createElement('button');
+        closeButton.type = 'button';
+        closeButton.className = 'harmonic-profile-chart-close';
+        closeButton.setAttribute('aria-label', 'Close harmonic profile charts');
+        closeButton.textContent = 'x';
+        header.appendChild(title);
+        header.appendChild(closeButton);
+
+        const profileSummary = document.createElement('p');
+        profileSummary.className = 'harmonic-profile-chart-summary';
+
+        const chartGrid = document.createElement('div');
+        chartGrid.className = 'harmonic-profile-chart-grid';
+        const currentChart = createChartPanel(
+          chartGrid,
+          'Current Harmonics',
+          '% I1',
+          'No harmonic orders are defined for this profile.',
+          'harmonic-profile-current-chart'
+        );
+        const voltageChart = createChartPanel(
+          chartGrid,
+          'Voltage Harmonics',
+          '% V1 est.',
+          'Voltage estimate needs load, voltage, and short-circuit MVA.',
+          'harmonic-profile-voltage-chart'
+        );
+
+        const basisText = document.createElement('p');
+        basisText.className = 'harmonic-profile-basis';
+
+        const actions = document.createElement('div');
+        actions.className = 'harmonic-profile-chart-modal-actions';
+        const doneButton = document.createElement('button');
+        doneButton.type = 'button';
+        doneButton.className = 'btn';
+        doneButton.textContent = 'Done';
+        actions.appendChild(doneButton);
+
+        panel.appendChild(header);
+        panel.appendChild(profileSummary);
+        panel.appendChild(chartGrid);
+        panel.appendChild(basisText);
+        panel.appendChild(actions);
+        chartModalEl.appendChild(panel);
+        document.body.appendChild(chartModalEl);
+
+        const closeChartModal = () => {
+          const lastFocused = chartModalState?.lastFocused;
+          chartModalEl.hidden = true;
+          chartModalEl.classList.remove('show');
+          chartModalEl.remove();
+          document.removeEventListener('keydown', keyHandler);
+          chartModalState = null;
+          lastFocused?.focus?.();
+        };
+        closeButton.addEventListener('click', closeChartModal);
+        doneButton.addEventListener('click', closeChartModal);
+        chartModalEl.addEventListener('click', e => {
+          if (e.target === chartModalEl) closeChartModal();
+        });
+        const keyHandler = e => {
+          if (chartModalEl.hidden || e.key !== 'Escape') return;
+          e.preventDefault();
+          closeChartModal();
+        };
+        document.addEventListener('keydown', keyHandler);
+
+        chartModalState = {
+          modal: chartModalEl,
+          closeButton,
+          profileSummary,
+          currentChart,
+          voltageChart,
+          basisText,
+          lastFocused: null
+        };
+        return chartModalState;
+      };
+
+      const renderBarChart = (chart, points, { summaryLabel, emptyText } = {}) => {
+        const svg = chart.svg;
+        svg.textContent = '';
+        const validPoints = (Array.isArray(points) ? points : [])
+          .filter(point => Number.isFinite(point.order) && Number.isFinite(point.pct) && point.order > 1 && point.pct >= 0);
+        if (!validPoints.length) {
+          chart.empty.hidden = false;
+          chart.empty.textContent = emptyText || chart.emptyText;
+          chart.summary.textContent = '';
+          return;
+        }
+
+        chart.empty.hidden = true;
+        chart.empty.textContent = emptyText || chart.emptyText;
+        const width = 320;
+        const height = 170;
+        const margin = { top: 18, right: 16, bottom: 34, left: 42 };
+        const plotWidth = width - margin.left - margin.right;
+        const plotHeight = height - margin.top - margin.bottom;
+        const maxPct = Math.max(1, ...validPoints.map(point => point.pct)) * 1.18;
+        const barGap = 8;
+        const barWidth = Math.max(12, (plotWidth - barGap * (validPoints.length - 1)) / validPoints.length);
+
+        const yAxis = makeSvgElement('line', {
+          x1: margin.left,
+          y1: margin.top,
+          x2: margin.left,
+          y2: margin.top + plotHeight,
+          class: 'harmonic-profile-chart-axis'
+        });
+        const xAxis = makeSvgElement('line', {
+          x1: margin.left,
+          y1: margin.top + plotHeight,
+          x2: margin.left + plotWidth,
+          y2: margin.top + plotHeight,
+          class: 'harmonic-profile-chart-axis'
+        });
+        svg.appendChild(yAxis);
+        svg.appendChild(xAxis);
+
+        [0.5, 1].forEach(ratio => {
+          const y = margin.top + plotHeight - ratio * plotHeight;
+          svg.appendChild(makeSvgElement('line', {
+            x1: margin.left,
+            y1: y,
+            x2: margin.left + plotWidth,
+            y2: y,
+            class: 'harmonic-profile-chart-gridline'
+          }));
+          const tick = makeSvgElement('text', {
+            x: margin.left - 8,
+            y: y + 4,
+            'text-anchor': 'end',
+            class: 'harmonic-profile-chart-text'
+          });
+          tick.textContent = formatHarmonicMetric(maxPct * ratio, 1);
+          svg.appendChild(tick);
+        });
+
+        validPoints.forEach((point, index) => {
+          const x = margin.left + index * (barWidth + barGap);
+          const barHeight = maxPct ? (point.pct / maxPct) * plotHeight : 0;
+          const y = margin.top + plotHeight - barHeight;
+          const rect = makeSvgElement('rect', {
+            x,
+            y,
+            width: barWidth,
+            height: Math.max(1, barHeight),
+            rx: 2,
+            class: 'harmonic-profile-chart-bar'
+          });
+          const title = makeSvgElement('title');
+          title.textContent = `${point.order}th harmonic: ${formatHarmonicMetric(point.pct, 2)} ${chart.unitLabel}`;
+          rect.appendChild(title);
+          svg.appendChild(rect);
+
+          const orderLabel = makeSvgElement('text', {
+            x: x + barWidth / 2,
+            y: margin.top + plotHeight + 18,
+            'text-anchor': 'middle',
+            class: 'harmonic-profile-chart-text'
+          });
+          orderLabel.textContent = String(point.order);
+          svg.appendChild(orderLabel);
+
+          const valueLabel = makeSvgElement('text', {
+            x: x + barWidth / 2,
+            y: Math.max(margin.top + 10, y - 5),
+            'text-anchor': 'middle',
+            class: 'harmonic-profile-chart-value'
+          });
+          valueLabel.textContent = formatHarmonicMetric(point.pct, point.pct < 1 ? 2 : 1);
+          svg.appendChild(valueLabel);
+        });
+
+        const xLabel = makeSvgElement('text', {
+          x: margin.left + plotWidth / 2,
+          y: height - 4,
+          'text-anchor': 'middle',
+          class: 'harmonic-profile-chart-text'
+        });
+        xLabel.textContent = 'Harmonic order';
+        svg.appendChild(xLabel);
+
+        const yLabel = makeSvgElement('text', {
+          x: 12,
+          y: margin.top + plotHeight / 2,
+          transform: `rotate(-90 12 ${margin.top + plotHeight / 2})`,
+          'text-anchor': 'middle',
+          class: 'harmonic-profile-chart-text'
+        });
+        yLabel.textContent = chart.unitLabel;
+        svg.appendChild(yLabel);
+
+        const thd = harmonicThdPercent(validPoints);
+        chart.summary.textContent = `${summaryLabel}: ${formatHarmonicMetric(thd, thd < 1 ? 2 : 1)}%`;
+      };
+
+      const renderHarmonicPreview = () => {
+        const state = chartModalState;
+        if (!state || state.modal.hidden) return;
+        const activeProfile = findHarmonicProfileById(harmonicProfileInput.value);
+        const spectrumText = String(harmonicSpectrumInput.value || '').trim();
+        state.profileSummary.textContent = activeProfile && activeProfile.id !== manualHarmonicProfileId
+          ? `${activeProfile.label}: ${spectrumText || activeProfile.spectrum || 'No spectrum defined'}`
+          : `Manual spectrum: ${spectrumText || 'No spectrum defined'}`;
+        const currentPoints = parseHarmonicSpectrumPoints(harmonicSpectrumInput.value);
+        renderBarChart(state.currentChart, currentPoints, { summaryLabel: 'ITHD' });
+
+        const voltage = getPreviewVoltage();
+        const loadKw = getPreviewLoadKw();
+        const scMVA = getPreviewNumeric(['scMVA', 'short_circuit_mva', 'thevenin_mva']);
+        const voltagePoints = estimateVoltageHarmonicPoints(currentPoints, { voltage, loadKw, scMVA });
+        const missing = [];
+        if (!Number.isFinite(voltage) || voltage <= 0) missing.push('voltage');
+        if (!Number.isFinite(loadKw) || loadKw <= 0) missing.push('load kW or HP');
+        if (!Number.isFinite(scMVA) || scMVA <= 0) missing.push('short-circuit MVA');
+        const voltageEmptyText = missing.length
+          ? `Voltage estimate needs ${missing.join(', ')}.`
+          : 'No voltage harmonic estimate is available for this profile.';
+        renderBarChart(state.voltageChart, voltagePoints, {
+          summaryLabel: 'VTHD est.',
+          emptyText: voltageEmptyText
+        });
+        state.basisText.textContent = voltagePoints.length
+          ? `Voltage estimate uses ${formatHarmonicMetric(loadKw, 1)} kW, ${formatHarmonicMetric(voltage, 0)} V, and ${formatHarmonicMetric(scMVA, 1)} MVA short-circuit strength.`
+          : voltageEmptyText;
+      };
+
+      viewChartsButton.addEventListener('click', () => {
+        const state = ensureHarmonicChartModal();
+        state.lastFocused = document.activeElement;
+        state.modal.hidden = false;
+        state.modal.classList.add('show');
+        renderHarmonicPreview();
+        state.closeButton.focus();
+      });
+
+      const refreshProfileOptions = selectedId => {
+        const nextValue = selectedId || harmonicProfileInput.value || manualHarmonicProfileId;
+        harmonicProfileInput.innerHTML = '';
+        getHarmonicProfileOptions().forEach(opt => {
+          const option = document.createElement('option');
+          option.value = opt.value;
+          option.textContent = opt.label;
+          harmonicProfileInput.appendChild(option);
+        });
+        harmonicProfileInput.value = findHarmonicProfileById(nextValue) ? nextValue : manualHarmonicProfileId;
+      };
+
+      const updateSelectedInfo = profile => {
+        const activeProfile = profile || findHarmonicProfileById(harmonicProfileInput.value);
+        if (!activeProfile || activeProfile.id === manualHarmonicProfileId) {
+          selectedText.textContent = 'Manual spectrum';
+          renderHarmonicPreview();
+          return;
+        }
+        selectedText.textContent = activeProfile.spectrum
+          ? `${activeProfile.label}: ${activeProfile.spectrum}`
+          : activeProfile.label;
+        renderHarmonicPreview();
+      };
+
+      const syncProfileFromSpectrum = () => {
+        const match = findHarmonicProfileBySpectrum(harmonicSpectrumInput.value);
+        harmonicProfileInput.value = match ? match.id : manualHarmonicProfileId;
+        updateSelectedInfo(match);
+      };
+
+      const applySelectedProfile = ({ force = false } = {}) => {
+        const profile = findHarmonicProfileById(harmonicProfileInput.value);
+        if (!profile) {
+          harmonicProfileInput.value = manualHarmonicProfileId;
+          updateSelectedInfo(null);
+          return;
+        }
+        if (profile.id !== manualHarmonicProfileId && profile.spectrum && (force || !harmonicSpectrumInput.value.trim())) {
+          harmonicSpectrumInput.value = profile.spectrum;
+        }
+        updateSelectedInfo(profile);
+      };
+
+      const initialSpectrum = String(harmonicSpectrumInput.value || '').trim();
+      const matchingProfile = findHarmonicProfileBySpectrum(initialSpectrum);
+      refreshProfileOptions(harmonicProfileInput.value || matchingProfile?.id || defaultHarmonicProfileId(targetComp));
+      if (!initialSpectrum) applySelectedProfile({ force: false });
+      else if (matchingProfile && !harmonicProfileInput.value) harmonicProfileInput.value = matchingProfile.id;
+      updateSelectedInfo(findHarmonicProfileById(harmonicProfileInput.value));
+
+      harmonicProfileInput.addEventListener('change', () => applySelectedProfile({ force: true }));
+      harmonicSpectrumInput.addEventListener('input', syncProfileFromSpectrum);
+      const previewDriverNames = new Set([
+        'voltage',
+        'volts',
+        'rated_voltage',
+        'rated_voltage_v',
+        'nominal_voltage',
+        'nominalVoltage',
+        'baseKV',
+        'kV',
+        'kv',
+        'prefault_voltage',
+        'load_kw',
+        'kw',
+        'kW',
+        'rated_kw',
+        'output_kw',
+        'hp',
+        'horsepower',
+        'scMVA',
+        'short_circuit_mva',
+        'thevenin_mva'
+      ]);
+      Array.from(form.elements).forEach(element => {
+        if (!element?.name || !previewDriverNames.has(element.name)) return;
+        element.addEventListener('input', renderHarmonicPreview);
+        element.addEventListener('change', renderHarmonicPreview);
+      });
+      saveProfileButton.addEventListener('click', () => {
+        const profile = saveCustomHarmonicProfile(customName.value, harmonicSpectrumInput.value);
+        if (!profile) {
+          showToast('Enter a custom profile name and harmonic spectrum');
+          return;
+        }
+        refreshProfileOptions(profile.id);
+        harmonicProfileInput.value = profile.id;
+        customName.value = '';
+        updateSelectedInfo(profile);
+        showToast('Harmonic profile saved');
+      });
+    }
 
     const connectionCount = Array.isArray(targetComp.connections) ? targetComp.connections.length : 0;
     if (connectionCount > 0) {
@@ -11696,6 +15173,7 @@ async function init() {
       ensureGeneratorStudyFieldsOnComponent(c, componentMeta[c.subtype]);
       ensureMccFieldsOnComponent(c, componentMeta[c.subtype]);
       ensurePtVtFieldsOnComponent(c, componentMeta[c.subtype]);
+      ensureStudyInputFieldsOnComponent(c, componentMeta[c.subtype]);
     });
   });
   rebuildComponentMaps();
@@ -11706,6 +15184,7 @@ async function init() {
   ensureGeneratorStudyMetadata();
   ensureMccMetadata();
   ensurePtVtMetadata();
+  ensureStudyInputMetadata();
   sheets.forEach(s => {
     s.components.forEach(c => {
       (c.connections || []).forEach(conn => {
@@ -11753,7 +15232,7 @@ async function init() {
   render();
   renderLayerPanel();
   renderBgPanel();
-  const initIssues = validateDiagram();
+  const initIssues = validateDiagram({ notify: false, revealPanel: false });
   if (!initIssues.length) markScheduleReconcilePending();
 
   const prefixBtn = document.getElementById('prefix-settings-btn');
@@ -11782,7 +15261,7 @@ async function init() {
   if (connectBtn) {
     connectBtn.addEventListener('click', () => {
       connectMode = !connectMode;
-      connectSource = null;
+      resetConnectInteraction({ keepMode: connectMode });
       connectBtn.classList.toggle('active', connectMode);
       render();
     });
@@ -11914,6 +15393,8 @@ async function init() {
   document.getElementById('align-bottom-btn').addEventListener('click', () => alignSelection('bottom'));
   document.getElementById('distribute-h-btn').addEventListener('click', () => distributeSelection('h'));
   document.getElementById('distribute-v-btn').addEventListener('click', () => distributeSelection('v'));
+  const autoSpaceEquipmentBtn = document.getElementById('auto-space-equipment-btn');
+  if (autoSpaceEquipmentBtn) autoSpaceEquipmentBtn.addEventListener('click', () => autoSpaceEquipment());
   const exportBtn = document.getElementById('export-btn');
   const exportMenu = document.getElementById('export-menu');
   if (exportBtn && exportMenu) {
@@ -11952,6 +15433,34 @@ async function init() {
     });
     updateViewButtonLabel();
   }
+  const datablockFormatSelect = document.getElementById('datablock-format-select');
+  if (datablockFormatSelect) {
+    syncDatablockFormatControl();
+    datablockFormatSelect.addEventListener('change', event => {
+      setDatablockFormatMode(event.target.value);
+    });
+  }
+  const datablockDensitySelect = document.getElementById('datablock-density-select');
+  if (datablockDensitySelect) {
+    syncDatablockDensityControl();
+    datablockDensitySelect.addEventListener('change', event => {
+      setDatablockDensityMode(event.target.value);
+    });
+  }
+  const dataStateOverlaySelect = document.getElementById('data-state-overlay-select');
+  if (dataStateOverlaySelect) {
+    syncDataStateOverlayControl();
+    dataStateOverlaySelect.addEventListener('change', event => {
+      setDataStateOverlayMode(event.target.value);
+    });
+  }
+  const operatingStateSelect = document.getElementById('operating-state-select');
+  if (operatingStateSelect) {
+    syncOperatingStateControl();
+    operatingStateSelect.addEventListener('change', event => {
+      setActiveOperatingState(event.target.value);
+    });
+  }
   const importBtn = document.getElementById('import-btn');
   if (importBtn) importBtn.addEventListener('click', () => document.getElementById('import-input').click());
   const importInput = document.getElementById('import-input');
@@ -11966,6 +15475,10 @@ async function init() {
   if (shareBtn) shareBtn.addEventListener('click', shareDiagram);
   const sampleBtn = document.getElementById('sample-diagram-btn');
   if (sampleBtn) sampleBtn.addEventListener('click', loadSampleDiagram);
+  const autoBuildBtn = document.getElementById('auto-build-oneline-btn');
+  if (autoBuildBtn) autoBuildBtn.addEventListener('click', openAutoBuildModal);
+  const autoArrangeBtn = document.getElementById('auto-arrange-btn');
+  if (autoArrangeBtn) autoArrangeBtn.addEventListener('click', () => arrangeSourceToLoad());
   const reconcileBtn = document.getElementById('reconcile-schedules-btn');
   if (reconcileBtn) reconcileBtn.addEventListener('click', openScheduleReconcileModal);
   updateScheduleReconcileButtonState();
@@ -11974,7 +15487,7 @@ async function init() {
   document.getElementById('add-sheet-btn').addEventListener('click', () => addSheet());
   document.getElementById('rename-sheet-btn').addEventListener('click', () => renameSheet());
   document.getElementById('delete-sheet-btn').addEventListener('click', () => deleteSheet());
-  document.getElementById('validate-btn').addEventListener('click', validateDiagram);
+  document.getElementById('validate-btn').addEventListener('click', () => validateDiagram({ revealPanel: true }));
 
   updateZoomDisplay();
   applyDiagramZoom();
@@ -12061,6 +15574,15 @@ async function init() {
 
   const findForm = document.getElementById('find-device-form');
   const findInput = document.getElementById('find-device-input');
+  const diagramFilterSelect = document.getElementById('diagram-filter-select');
+  if (diagramFilterSelect) {
+    diagramFilterSelect.value = diagramFilterMode;
+    diagramFilterSelect.addEventListener('change', event => {
+      diagramFilterMode = event.target.value || 'all';
+      setItem('oneLineDiagramFilterMode', diagramFilterMode);
+      render();
+    });
+  }
   if (findForm && findInput) {
     findForm.addEventListener('submit', e => {
       e.preventDefault();
@@ -12188,11 +15710,12 @@ async function init() {
   paletteToggle?.addEventListener('click', () => {
     if (!workspaceEl) return;
     const show = !workspaceEl.classList.contains('show-palette');
+    const narrow = window.matchMedia?.('(max-width: 600px)')?.matches === true;
     workspaceEl.classList.toggle('show-palette', show);
     paletteToggle.setAttribute('aria-expanded', show);
     if (show) {
       workspaceEl.style.setProperty('--palette-width', `${paletteWidth}px`);
-      workspaceEl.style.gridTemplateColumns = `${paletteWidth}px 1fr`;
+      workspaceEl.style.gridTemplateColumns = narrow ? '1fr' : `${paletteWidth}px 1fr`;
       if (splitter) splitter.style.left = `${paletteWidth}px`;
     } else {
       workspaceEl.style.gridTemplateColumns = '1fr';
@@ -12280,22 +15803,31 @@ async function init() {
       const coords = toDiagramCoords(e);
       const pointerX = coords.x;
       const pointerY = coords.y;
-      if (connectMode && e.target.classList.contains('port')) {
-        const comp = components.find(c => c.id === e.target.dataset.id);
-        const port = Number(e.target.dataset.port);
-        if (comp) {
-          pointerDownComponentId = comp.id;
-          connectSource = { component: comp, port };
-          const start = portPosition(comp, port);
-          tempConnection = document.createElementNS(svgNS, 'line');
-          tempConnection.setAttribute('x1', start.x);
-          tempConnection.setAttribute('y1', start.y);
-          tempConnection.setAttribute('x2', start.x);
-          tempConnection.setAttribute('y2', start.y);
-          tempConnection.classList.add('connection');
-          tempConnection.classList.add('temp');
-          svg.appendChild(tempConnection);
+      if (connectMode) {
+        const candidate = getConnectionCandidateFromEvent(e, pointerX, pointerY);
+        if (candidate) {
+          e.preventDefault();
+          pointerDownComponentId = null;
+          if (!connectSource) {
+            connectSource = candidate;
+            selected = candidate.component;
+            selection = [candidate.component];
+            selectedConnection = null;
+            if (tempConnection) {
+              tempConnection.remove();
+              tempConnection = null;
+            }
+            render();
+            showToast('Select the next device to complete the connection.');
+          } else {
+            finishConnectionToCandidate(candidate, { provisional: true });
+            resetConnectInteraction({ keepMode: false });
+            render();
+          }
+          updateStatusBar();
+          return;
         }
+        showToast('Click a device body, label, or visible port to connect.');
         return;
       }
       if (e.target.classList.contains('annotation-handle')) {
@@ -12436,7 +15968,11 @@ async function init() {
         render();
         return;
       }
-      if (connectSource && tempConnection) {
+      if (connectSource) {
+        if (!tempConnection) {
+          tempConnection = createConnectionPreviewLine(connectSource);
+        }
+        if (!tempConnection) return;
         const nearest = nearestPortToPoint(pointerX, pointerY, connectSource);
         let end = { x: pointerX, y: pointerY };
         hoverPort = null;
@@ -12577,49 +16113,13 @@ async function init() {
         tempConnection.remove();
         tempConnection = null;
         if (hoverPort && hoverPort.component !== connectSource.component) {
-          const fromComp = connectSource.component;
-          const toComp = hoverPort.component;
-          const fromPort = connectSource.port;
-          const toPort = hoverPort.port;
-          const created = ensureConnection(fromComp, toComp, fromPort, toPort);
-          if (created) {
-            const createdConn = (fromComp.connections || []).find(conn =>
-              conn.target === toComp.id
-              && normalizePortIndex(conn.sourcePort) === normalizePortIndex(fromPort)
-              && normalizePortIndex(conn.targetPort) === normalizePortIndex(toPort)
-            );
-            const result = createdConn ? await chooseCable(fromComp, toComp, createdConn) : null;
-            if (!result) {
-              fromComp.connections = (fromComp.connections || []).filter(conn => conn !== createdConn);
-              render();
-              save();
-            } else if (createdConn) {
-              const updatedCable = { ...result.cable };
-              if (hasImpedance(result.cable)) updatedCable.impedance = { ...result.cable.impedance };
-              const resolvedPhases = parseCablePhases(result.phases ?? updatedCable);
-              updatedCable.phases = resolvedPhases.slice();
-              createdConn.cable = updatedCable;
-              createdConn.phases = resolvedPhases.slice();
-              createdConn.conductors = result.conductors;
-              if (result.impedance && typeof result.impedance === 'object') {
-                createdConn.impedance = { ...result.impedance };
-              } else if (hasImpedance(updatedCable)) {
-                createdConn.impedance = { ...updatedCable.impedance };
-              } else {
-                delete createdConn.impedance;
-              }
-              pushHistory();
-              render();
-              save();
-              markScheduleReconcilePending();
-            }
-          }
+          finishConnectionToCandidate(hoverPort, { provisional: true });
+          resetConnectInteraction({ keepMode: false });
+        } else {
+          hoverPort = null;
+          render();
+          updateStatusBar();
         }
-        connectSource = null;
-        hoverPort = null;
-        connectMode = false;
-        connectBtn?.classList.remove('active');
-        render();
         lastPointerUp = { id: null, time: 0 };
         return;
       }
@@ -12808,7 +16308,13 @@ async function init() {
         if (cableComp) {
           await editCableComponent(cableComp);
         } else {
-          showToast('No conductor segment on this connection');
+          const result = target ? await chooseCable(component, target, conn) : null;
+          if (result && applyCableResultToConnection(conn, result)) {
+            pushHistory();
+            render();
+            save();
+            markScheduleReconcilePending();
+          }
         }
       } else if (action === 'delete') {
         component.connections.splice(index, 1);
@@ -13143,10 +16649,7 @@ async function init() {
       const anyModalOpen = document.querySelector('.prop-modal.show');
       if (!anyModalOpen) {
         if (connectMode) {
-          connectMode = false;
-          connectSource = null;
-          const connectBtn = document.getElementById('connect-btn');
-          if (connectBtn) connectBtn.classList.remove('active');
+          resetConnectInteraction({ keepMode: false });
         }
         selection = [];
         selected = null;
@@ -13199,15 +16702,15 @@ async function init() {
   }
 
   const params = new URLSearchParams(window.location.search);
-  const focus = params.get('component');
+  const probeTarget = resolveInitialCrossProbe(params);
   const shouldOpenComponentModal = params.has('componentModal');
-  if (focus) {
-    const comp = components.find(c => c.id === focus);
-    if (comp) {
-      selectComponent(comp);
-    } else if (shouldOpenComponentModal) {
-      selectComponent();
-    }
+  if (probeTarget) {
+    const probeLabel = params.get('probe') || params.get('component') || probeTarget.matchValue || '';
+    focusCrossProbeTarget(probeTarget, { componentModal: shouldOpenComponentModal, label: probeLabel });
+  } else if (params.get('component') || params.get('probe')) {
+    const probeLabel = params.get('probe') || params.get('component') || 'that item';
+    showToast(`No one-line component found for ${probeLabel}.`);
+    if (shouldOpenComponentModal) selectComponent();
   } else if (shouldOpenComponentModal) {
     selectComponent();
   }
@@ -13370,13 +16873,7 @@ async function init() {
   // ----------------------------------------------------------------
   // Gap #46 – Datablock config: hook into the existing Views button
   // ----------------------------------------------------------------
-  const datablockViewMenuBtn = document.getElementById('view-menu-btn');
-  if (datablockViewMenuBtn) {
-    diagramDatablockConfig = getItem('diagramDatablockConfig') || {};
-    datablockViewMenuBtn.addEventListener('click', () => {
-      openDatablocksModal();
-    });
-  }
+  diagramDatablockConfig = getItem('diagramDatablockConfig') || {};
 
   // Show/hide context menu items based on selection state
   const ctxGroupItem = document.getElementById('ctx-group-selection');
@@ -13386,6 +16883,8 @@ async function init() {
     ctxMenu.addEventListener('contextmenu', e => e.preventDefault());
     // Update group/ungroup visibility just before menu is shown (handled in contextmenu event)
   }
+  refineOneLineCommandSurface();
+  setupToolbarMenus();
 }
 
 function getCategory(c) {
@@ -13559,7 +17058,9 @@ function resolveConnectionVoltageVolts(component, connection, role) {
   return resolveComponentVoltageVolts(component);
 }
 
-function validateDiagram() {
+function validateDiagram(options = {}) {
+  const revealPanel = options.revealPanel === true || options.reveal === true;
+  const notify = options.notify !== false;
   validationIssues = [];
   const svg = document.getElementById('diagram');
   if (!svg) return validationIssues;
@@ -13623,10 +17124,14 @@ function validateDiagram() {
             const tgtLabel = formatVoltage(tgtVolt);
             validationIssues.push({
               component: c.id,
+              target: target.id,
+              code: 'voltage-mismatch',
               message: `Voltage mismatch with ${target.label || target.subtype || target.id} (${srcLabel} vs ${tgtLabel})`
             });
             validationIssues.push({
               component: target.id,
+              target: c.id,
+              code: 'voltage-mismatch',
               message: `Voltage mismatch with ${c.label || c.subtype || c.id} (${tgtLabel} vs ${srcLabel})`
             });
           }
@@ -13640,25 +17145,43 @@ function validateDiagram() {
           if (srcPh.length && !connPh.every(p => srcPh.includes(p))) {
             validationIssues.push({
               component: c.id,
+              target: target.id,
+              code: 'phase-mismatch',
               message: `Phase mismatch with ${target.label || target.subtype || target.id}`
             });
           }
           if (tgtPh.length && !connPh.every(p => tgtPh.includes(p))) {
             validationIssues.push({
               component: target.id,
+              target: c.id,
+              code: 'phase-mismatch',
               message: `Phase mismatch with ${c.label || c.subtype || c.id}`
             });
           }
         } else if (srcPh.length && tgtPh.length && !tgtPh.every(p => srcPh.includes(p))) {
           validationIssues.push({
             component: c.id,
+            target: target.id,
+            code: 'phase-mismatch',
             message: `Phase mismatch with ${target.label || target.subtype || target.id}`
           });
           validationIssues.push({
             component: target.id,
+            target: c.id,
+            code: 'phase-mismatch',
             message: `Phase mismatch with ${c.label || c.subtype || c.id}`
           });
         }
+      }
+      const cableInfo = getCableForConnection(c, target, conn);
+      if (target && (!cableInfo?.tag || cableInfo?.provisional || conn.reviewStatus === 'assumed')) {
+        validationIssues.push({
+          component: c.id,
+          target: target.id,
+          connectionIndex: (c.connections || []).indexOf(conn),
+          code: 'provisional-cable',
+          message: `Cable details need review for ${getComponentTag(c) || c.id} to ${getComponentTag(target) || target.id}`
+        });
       }
     });
   });
@@ -13667,7 +17190,11 @@ function validateDiagram() {
     // Gap #48: sheet_link components are intentional terminators; exclude from unconnected check
     if (c.type === 'dimension' || c.type === 'annotation' || c.type === 'sheet_link') return;
     if ((c.connections || []).length + (inbound.get(c.id) || 0) === 0) {
-      validationIssues.push({ component: c.id, message: 'Unconnected component' });
+      validationIssues.push({ component: c.id, code: 'unconnected', message: 'Unconnected component' });
+    }
+    const key = scheduleKeyForComponent(c);
+    if (key && !hasResolvedScheduleLink(c)) {
+      validationIssues.push({ component: c.id, code: 'missing-schedule-link', message: 'Missing schedule link' });
     }
   });
 
@@ -13677,7 +17204,7 @@ function validateDiagram() {
       const target = components.find(t => t.id === conn.target);
       const cableInfo = getCableForConnection(c, target, conn);
       if (cableInfo && cableInfo.sizing_warning) {
-        validationIssues.push({ component: c.id, message: cableInfo.sizing_warning });
+        validationIssues.push({ component: c.id, code: 'sizing-warning', message: cableInfo.sizing_warning });
       }
     });
   });
@@ -13685,7 +17212,7 @@ function validateDiagram() {
   idMap.forEach((count, id) => {
     if (count > 1) {
       components.filter(c => c.id === id).forEach(c => {
-        validationIssues.push({ component: c.id, message: `Duplicate ID "${id}"` });
+        validationIssues.push({ component: c.id, code: 'duplicate-id', message: `Duplicate ID "${id}"` });
       });
     }
   });
@@ -13736,20 +17263,34 @@ function validateDiagram() {
     g.appendChild(badge);
   });
 
-  lintList.innerHTML = '';
-  if (validationIssues.length) {
-    validationIssues.forEach(issue => {
-      const li = document.createElement('li');
-      li.textContent = issue.message;
-      li.addEventListener('click', () => focusComponent(issue.component));
-      lintList.appendChild(li);
-    });
-    lintPanel.classList.remove('hidden');
-  } else {
-    lintPanel.classList.add('hidden');
+  if (lintList && lintPanel) {
+    lintList.innerHTML = '';
+    if (validationIssues.length) {
+      validationIssues.forEach(issue => {
+        const li = document.createElement('li');
+        const message = document.createElement('span');
+        message.textContent = issue.message;
+        const showBtn = document.createElement('button');
+        showBtn.type = 'button';
+        showBtn.className = 'cross-probe-link';
+        showBtn.textContent = 'Show';
+        showBtn.setAttribute('aria-label', `Show ${issue.component || 'issue'} on the one-line`);
+        showBtn.addEventListener('click', () => focusComponent(issue.component));
+        li.append(message, showBtn);
+        lintList.appendChild(li);
+      });
+      if (revealPanel) {
+        lintPanel.classList.remove('hidden');
+      }
+    } else {
+      lintPanel.classList.add('hidden');
+    }
   }
 
-  showToast(validationIssues.length ? `Validation found ${validationIssues.length} issue${validationIssues.length === 1 ? '' : 's'}` : 'Diagram valid');
+  renderRightRail();
+  if (notify) {
+    showToast(validationIssues.length ? `Validation found ${validationIssues.length} issue${validationIssues.length === 1 ? '' : 's'}` : 'Diagram valid');
+  }
   return validationIssues;
 }
 
@@ -13760,9 +17301,86 @@ function focusComponent(id) {
   selected = comp;
   selectedConnection = null;
   render();
+  if (!zoomToComponentNeighborhood(comp, { maxZoom: 1.25, pad: 110 })) {
+    const svg = document.getElementById('diagram');
+    const g = svg.querySelector(`g.component[data-id="${id}"]`);
+    if (g && g.scrollIntoView) g.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+  }
+}
+
+function focusConnection(sourceId, index) {
+  const source = components.find(c => c.id === sourceId);
+  const normalizedIndex = Number(index);
+  if (!source || !Number.isInteger(normalizedIndex) || normalizedIndex < 0) return false;
+  if (!Array.isArray(source.connections) || !source.connections[normalizedIndex]) return false;
+  selection = [];
+  selected = null;
+  selectedConnection = { component: source, index: normalizedIndex };
+  setRightRailTab('properties');
+  render();
+  const target = components.find(c => c.id === source.connections[normalizedIndex]?.target);
+  zoomToComponents([source, target].filter(Boolean), { pad: 120, maxZoom: 1.25 });
   const svg = document.getElementById('diagram');
-  const g = svg.querySelector(`g.component[data-id="${id}"]`);
-  if (g && g.scrollIntoView) g.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+  const escapedSourceId = typeof CSS !== 'undefined' && typeof CSS.escape === 'function'
+    ? CSS.escape(sourceId)
+    : String(sourceId).replace(/"/g, '\\"');
+  const link = svg?.querySelector(`.connection[data-comp="${escapedSourceId}"][data-index="${normalizedIndex}"]`);
+  if (link && link.scrollIntoView) {
+    link.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+  } else {
+    focusComponent(sourceId);
+    selected = null;
+    selection = [];
+    selectedConnection = { component: source, index: normalizedIndex };
+    renderRightRail();
+  }
+  return true;
+}
+
+function focusCrossProbeTarget(target, { componentModal = false, label = '' } = {}) {
+  if (!target?.componentId) return false;
+  if (Number.isInteger(target.sheetIndex) && target.sheetIndex !== activeSheet) {
+    loadSheet(target.sheetIndex);
+  }
+  if (Number.isInteger(target.connectionIndex)) {
+    const focused = focusConnection(target.componentId, target.connectionIndex);
+    if (focused) {
+      const suffix = label ? ` for ${label}` : '';
+      showToast(`Showing linked cable${suffix} on the one-line.`);
+      return true;
+    }
+  }
+  focusComponent(target.componentId);
+  if (componentModal) setRightRailTab('properties');
+  const suffix = label ? ` for ${label}` : '';
+  showToast(`Showing one-line component${suffix}.`);
+  return true;
+}
+
+function resolveInitialCrossProbe(params) {
+  const componentId = params.get('component') || '';
+  const connectionSource = params.get('connectionSource') || '';
+  const connectionIndex = params.has('connectionIndex') ? Number(params.get('connectionIndex')) : null;
+  const sheetIndex = params.has('sheet') ? Number(params.get('sheet')) : null;
+  if (connectionSource && Number.isInteger(connectionIndex)) {
+    const target = resolveOneLineProbe({ componentId: connectionSource }, { activeSheet, sheets });
+    if (target) {
+      return {
+        ...target,
+        componentId: connectionSource,
+        connectionIndex,
+        sheetIndex: Number.isInteger(sheetIndex) ? sheetIndex : target.sheetIndex,
+        matchKind: 'connection'
+      };
+    }
+  }
+  const probe = params.get('probe') || componentId;
+  if (!probe) return null;
+  return resolveOneLineProbe({
+    componentId,
+    probe,
+    probeType: params.get('probeType') || ''
+  }, { activeSheet, sheets });
 }
 
 function updateComponent(id, fields = {}) {
@@ -14433,7 +18051,7 @@ async function importDiagram(data) {
     ...(s.backgroundImage ? { backgroundImage: s.backgroundImage } : {})
   }));
   if (sheets.length) {
-    loadSheet(0);
+    loadSheet(0, { skipCurrentSave: true });
     renderSheetTabs();
     save();
   }
@@ -14445,6 +18063,8 @@ async function loadSampleDiagram() {
     if (!res.ok) throw new Error(res.statusText);
     const data = await res.json();
     await importDiagram(data);
+    arrangeSourceToLoad({ silent: true, componentsToArrange: components });
+    zoomToFit({ maxZoom: 1.15, pad: 120 });
   } catch (err) {
     console.error('Failed to load sample diagram', err);
     showToast('Failed to load sample diagram');

@@ -68,6 +68,88 @@
   color: var(--color-warning, #b45309);
 }
 
+/* ---- Design basis wizard ---- */
+.modal-body .design-basis-form {
+  display: grid;
+  gap: 1rem;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  overflow-x: visible;
+}
+
+.design-basis-modal-body {
+  overflow-x: hidden;
+}
+
+.design-basis-section {
+  border-top: 1px solid var(--color-border, #e5e7eb);
+  padding-top: 1rem;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.design-basis-section:first-of-type {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.design-basis-section h3 {
+  margin: 0 0 .65rem;
+  font-size: 1rem;
+}
+
+.design-basis-checklist {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: .55rem .9rem;
+  min-width: 0;
+}
+
+.design-basis-checklist label {
+  display: flex;
+  align-items: flex-start;
+  gap: .45rem;
+  margin: 0;
+  color: var(--color-text, #111827);
+  font-size: .9rem;
+  line-height: 1.35;
+}
+
+.design-basis-checklist input {
+  margin-top: .15rem;
+}
+
+.design-basis-form .modal-field-grid .modal-form-field {
+  grid-template-columns: minmax(0, 1fr);
+  align-items: stretch;
+  min-width: 0;
+}
+
+.design-basis-form .modal-field-grid {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  grid-template-columns: repeat(auto-fit, minmax(min(18rem, 100%), 1fr));
+}
+
+.design-basis-form .modal-field-grid .modal-form-field label {
+  align-items: flex-start;
+}
+
+.design-basis-form .modal-field-grid .modal-form-field label + *,
+.design-basis-form input,
+.design-basis-form select {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.design-basis-reviewer-grid {
+  margin-top: .75rem;
+}
+
 @media (min-width: 768px) {
   .dashboard-grid {
     grid-template-columns: 1fr 1fr;

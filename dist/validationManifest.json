@@ -1,8 +1,8 @@
 {
-  "generatedAt": "2026-05-19T16:38:36.051Z",
+  "generatedAt": "2026-05-21T19:50:45.454Z",
   "summary": {
     "testSuiteCount": 160,
-    "totalAssertions": 6481,
+    "totalAssertions": 6551,
     "benchmarkCount": 6,
     "standardCount": 13,
     "necComplianceCount": 8
@@ -596,6 +596,7 @@
       "file": "tests/harmonics.test.mjs",
       "groups": [
         "limitForVoltage — IEEE 519",
+        "runHarmonics - one-line component fields",
         "parseSpectrum — array format",
         "parseSpectrum — string format",
         "currentTHD",
@@ -608,7 +609,7 @@
         "HS-05 frequencyScan — resonance at h≈4.6 → caution",
         "combined harmonic flow — illustrative scenario"
       ],
-      "assertionCount": 70
+      "assertionCount": 72
     },
     {
       "file": "tests/hazAreaClassification.test.mjs",
@@ -1023,7 +1024,7 @@
     {
       "file": "tests/projectWorkflowCore.test.mjs",
       "groups": [],
-      "assertionCount": 11
+      "assertionCount": 69
     },
     {
       "file": "tests/ptVtMetadata.test.mjs",
@@ -1119,7 +1120,7 @@
         "runReliability - expectedOutage",
         "runReliability - result structure"
       ],
-      "assertionCount": 23
+      "assertionCount": 25
     },
     {
       "file": "tests/reporting.test.cjs",
@@ -1182,12 +1183,13 @@
         "migrateSampleProject()",
         "sampleProjectToImportPayload()",
         "Sample JSON files",
+        "Workflow sample design basis",
         "Coordination sample one-line",
         "Sample thumbnail files",
         "samplegallery.html",
         "guidedChecklist step pages are within pagesUsed"
       ],
-      "assertionCount": 62
+      "assertionCount": 65
     },
     {
       "file": "tests/sampleLinks.test.cjs",
@@ -1274,7 +1276,7 @@
       "groups": [
         "Short-circuit per-km cable impedance"
       ],
-      "assertionCount": 4
+      "assertionCount": 7
     },
     {
       "file": "tests/shortcircuit/shortCircuit.test.cjs",
@@ -1330,7 +1332,7 @@
       "groups": [
         "initStudyBasisPanel — basic rendering"
       ],
-      "assertionCount": 21
+      "assertionCount": 23
     },
     {
       "file": "tests/supportSpan.test.mjs",

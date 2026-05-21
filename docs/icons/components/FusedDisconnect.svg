@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="80" height="40" viewBox="0 0 80 40">
+  <g fill="none" stroke="#333" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="2" y1="20" x2="18" y2="20"/>
+    <circle cx="22" cy="20" r="4" fill="#fff"/>
+    <line x1="26" y1="20" x2="44" y2="10"/>
+    <circle cx="48" cy="20" r="4" fill="#fff"/>
+    <rect x="54" y="12" width="12" height="16" fill="#fff"/>
+    <line x1="66" y1="20" x2="78" y2="20"/>
+  </g>
+  <text x="60" y="21" text-anchor="middle" dominant-baseline="middle" font-family="Arial, Helvetica, sans-serif" font-size="8" font-weight="700" fill="#333">F</text>
+</svg>

@@ -257,6 +257,25 @@ describe('Sample JSON files', () => {
   });
 });
 
+describe('Workflow sample design basis', () => {
+  [
+    'project-workflow-core',
+    'commercial-office-fitout',
+    'water-treatment-pump-station',
+    'ev-charging-depot',
+  ].forEach(id => {
+    it(`${id} includes design basis and gate approvals`, () => {
+      const sample = getSampleById(id);
+      const filePath = path.join(ROOT, sample.projectFile);
+      const parsed = migrateSampleProject(JSON.parse(fs.readFileSync(filePath, 'utf8')));
+      const payload = sampleProjectToImportPayload(parsed);
+      assert.ok(payload.settings.designBasis && typeof payload.settings.designBasis === 'object', `${id} should include settings.designBasis`);
+      assert.strictEqual(payload.settings.designBasis.codeBasis.primaryCode, 'NEC');
+      assert.ok(payload.settings.designGateApprovals && typeof payload.settings.designGateApprovals === 'object', `${id} should include settings.designGateApprovals`);
+    });
+  });
+});
+
 describe('Coordination sample one-line', () => {
   it('maps flat sample links to rendered one-line connections', () => {
     const filePath = path.join(ROOT, 'samples/coordination-study.json');

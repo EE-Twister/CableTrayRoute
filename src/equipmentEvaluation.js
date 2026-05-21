@@ -19,6 +19,7 @@ import {
   getOneLine,
 } from '../dataStore.mjs';
 import protectiveDevices from '../data/protectiveDevices.mjs';
+import { createCrossProbeLink } from './crossProbe.js';
 
 document.addEventListener('DOMContentLoaded', () => {
   initSettings();
@@ -136,6 +137,12 @@ document.addEventListener('DOMContentLoaded', () => {
         <td>${esc(marginStr)}</td>
         <td class="equip-notes">${esc(notes)}</td>
       `;
+      const probeCell = document.createElement('td');
+      probeCell.appendChild(createCrossProbeLink(
+        { componentId: entry.id, tag: entry.label, probeType: 'study' },
+        { probeType: 'study', label: 'Show' }
+      ));
+      tr.appendChild(probeCell);
       tbody.appendChild(tr);
     }
   }
@@ -152,7 +159,17 @@ function flattenComponents(oneLine) {
 }
 
 function entryTypeGroup(type) {
-  if (type === 'breaker' || type === 'fuse' || type === 'relay' || type === 'disconnect' || type === 'recloser') return 'breaker';
+  if (
+    type === 'breaker'
+    || type === 'fuse'
+    || type === 'relay'
+    || type === 'disconnect'
+    || type === 'recloser'
+    || type === 'switch'
+    || type === 'contactor'
+    || type === 'motor_starter'
+    || type === 'motor_controller'
+  ) return 'breaker';
   if (type === 'switchboard' || type === 'panel' || type === 'mcc' || type === 'busway' || type === 'dc_bus') return 'switchboard';
   if (type === 'cable') return 'cable';
   return 'other';

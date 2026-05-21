@@ -308,10 +308,10 @@ function interpolateTime(curve = [], currentA) {
 }
 
 function clearingTime(comp, Ibf, devices, protectiveComp, scResults, protectiveDevice) {
-  const compClearing = parseNumeric(comp?.clearing_time);
+  const compClearing = parseNumeric(pickValue(comp, 'clearing_time'));
   if (compClearing !== null) return compClearing;
   if (protectiveComp && protectiveComp !== comp) {
-    const protectiveClearing = parseNumeric(protectiveComp.clearing_time);
+    const protectiveClearing = parseNumeric(pickValue(protectiveComp, 'clearing_time'));
     if (protectiveClearing !== null) return protectiveClearing;
   }
   const deviceComp = protectiveComp || comp;
@@ -400,27 +400,27 @@ export async function runArcFlash(options = {}) {
     const protectiveDevice = protectiveComp && isProtectiveComponent(protectiveComp)
       ? devices.find(d => d.id === protectiveComp.tccId)
       : null;
-    const compClearing = parseNumeric(comp?.clearing_time);
+    const compClearing = parseNumeric(pickValue(comp, 'clearing_time'));
     const upstreamClearing = protectiveComp && protectiveComp !== comp
-      ? parseNumeric(protectiveComp?.clearing_time)
+      ? parseNumeric(pickValue(protectiveComp, 'clearing_time'))
       : null;
-    const enclosure = (comp.enclosure || 'box').toLowerCase();
+    const enclosure = (pickValue(comp, 'enclosure') || 'box').toLowerCase();
     const Cf = enclosure === 'open' ? 1 : 1.5;
-    const gapRaw = parseNumeric(comp.gap);
+    const gapRaw = parseNumeric(pickValue(comp, 'gap'));
     const gap = Number.isFinite(gapRaw) && gapRaw > 0 ? gapRaw : 25;
-    const workingDistanceRaw = parseNumeric(comp.working_distance);
+    const workingDistanceRaw = parseNumeric(pickValue(comp, 'working_distance'));
     const dist = Number.isFinite(workingDistanceRaw) && workingDistanceRaw > 0 ? workingDistanceRaw : 455;
-    const heightRaw = firstParsedNumeric(comp.enclosure_height, comp.box_height);
-    const widthRaw = firstParsedNumeric(comp.enclosure_width, comp.box_width);
-    const depthRaw = firstParsedNumeric(comp.enclosure_depth, comp.box_depth);
+    const heightRaw = firstParsedNumeric(pickValue(comp, 'enclosure_height'), pickValue(comp, 'box_height'));
+    const widthRaw = firstParsedNumeric(pickValue(comp, 'enclosure_width'), pickValue(comp, 'box_width'));
+    const depthRaw = firstParsedNumeric(pickValue(comp, 'enclosure_depth'), pickValue(comp, 'box_depth'));
     const h = Number.isFinite(heightRaw) && heightRaw > 0 ? heightRaw : 508;
     const w = Number.isFinite(widthRaw) && widthRaw > 0 ? widthRaw : 508;
     const de = Number.isFinite(depthRaw) && depthRaw > 0 ? depthRaw : 508;
     const sizeFactor = Math.cbrt((h * w * de) / (508 * 508 * 508)) || 1;
     const time = clearingTime(comp, Ibf, devices, protectiveComp, sc, protectiveDevice);
-    const cfgCandidate = comp.electrode_config ?? 'VCB';
+    const cfgCandidate = pickValue(comp, 'electrode_config') ?? pickValue(comp, 'electrode_configuration') ?? 'VCB';
     const cfg = typeof cfgCandidate === 'string' ? cfgCandidate.toUpperCase() : 'VCB';
-    const voltageSettingRaw = firstParsedNumeric(comp.kV, comp.baseKV, comp.prefault_voltage);
+    const voltageSettingRaw = firstParsedNumeric(pickValue(comp, 'kV'), pickValue(comp, 'baseKV'), pickValue(comp, 'prefault_voltage'));
     const V = Number.isFinite(voltageSettingRaw) && voltageSettingRaw > 0 ? voltageSettingRaw : 0.48;
     const rawIa = Ibf > 0 && time > 0
       ? arcingCurrent(Ibf, V, gap, cfg, enclosure)

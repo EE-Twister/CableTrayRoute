@@ -11,12 +11,13 @@ import './workflowStatus.js';
 import '../site.js';
 import {
   getCables, getTrays, getConduits, getDuctbanks,
-  getStudies, getStudyApprovals,
+  getStudies, getStudyApprovals, getEquipment, getOneLine,
   getReportSnapshots, setReportSnapshot, deleteReportSnapshot,
   getLifecyclePackages,
-  getItem,
+  getDesignBasis, getDesignGateApprovals, getItem,
 } from '../dataStore.mjs';
 import { getProjectState } from '../projectStorage.js';
+import { buildDesignBasisReview } from '../analysis/designBasis.mjs';
 import { buildDeliverableReadinessDiagnostics } from '../analysis/deliverableWorkflow.mjs';
 import { runDRC } from '../analysis/designRuleChecker.mjs';
 import { generateProjectReport } from '../analysis/projectReport.mjs';
@@ -171,6 +172,21 @@ function readRevisionRows() {
   return rows;
 }
 
+function buildDesignBasisAssumptionText(review) {
+  if (!review) return '';
+  const lines = [
+    'Project Design Basis:',
+    ...review.assumptions.map(item => `- ${item.label}: ${item.detail}`)
+  ];
+  if (review.gates.length) {
+    lines.push('Review Gates:');
+    review.gates.forEach(gate => {
+      lines.push(`- [${gate.status}] ${gate.label}: ${gate.detail}`);
+    });
+  }
+  return lines.join('\n');
+}
+
 function escAttr(s) {
   return String(s ?? '').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
@@ -220,8 +236,13 @@ function loadProjectData() {
     trays,
     conduits,
     ductbanks: getDuctbanks(),
+    equipment: getEquipment(),
+    oneLine: getOneLine(),
     studies:   getStudies(),
     approvals: getStudyApprovals(),
+    designBasis: getDesignBasis(),
+    designGateApprovals: getDesignGateApprovals(),
+    tccSettings: getItem('tccSettings', null),
     drcResults: Array.isArray(drcRun?.findings) ? drcRun.findings : [],
   };
 }
@@ -231,11 +252,13 @@ function loadProjectData() {
 // ---------------------------------------------------------------------------
 
 function buildPackageConfig() {
+  const manualAssumptions = document.getElementById('rpt-assumptions')?.value?.trim() || '';
+  const designBasisAssumptions = buildDesignBasisAssumptionText(currentDesignBasisReview());
   return {
     sections:       getSelectedSections(),
     coverSheet:     readCoverFields(),
     revisions:      readRevisionRows(),
-    assumptions:    document.getElementById('rpt-assumptions')?.value?.trim() || '',
+    assumptions:    [manualAssumptions, designBasisAssumptions].filter(Boolean).join('\n\n'),
   };
 }
 
@@ -575,8 +598,13 @@ function loadProjectDataWithPackage() {
     trays:     Array.isArray(snap.trays)   ? snap.trays   : [],
     conduits:  [],
     ductbanks: [],
+    equipment: Array.isArray(snap.equipment) ? snap.equipment : getEquipment(),
+    oneLine: snap.oneLine || getOneLine(),
     studies:   snap.studies   || {},
     approvals: snap.approvals || {},
+    designBasis: snap.designBasis || getDesignBasis(),
+    designGateApprovals: snap.designGateApprovals || getDesignGateApprovals(),
+    tccSettings: snap.tccSettings || getItem('tccSettings', null),
     drcResults: [],
   };
 }
@@ -585,18 +613,53 @@ function currentReportReadinessDiagnostics() {
   const projectData = loadProjectDataWithPackage();
   const snap = activeLifecyclePkg?.projectSnapshot || {};
   return buildDeliverableReadinessDiagnostics({
+    equipment: projectData.equipment,
+    oneLine: projectData.oneLine,
     cables: projectData.cables,
     trays: projectData.trays,
     conduits: projectData.conduits,
     ductbanks: projectData.ductbanks,
     studies: projectData.studies,
+    studyApprovals: projectData.approvals,
     drcResults: projectData.drcResults,
     routeResults: activeLifecyclePkg
       ? snap.latestRouteResults || snap.routeResults || []
       : getItem('latestRouteResults', null),
     reportSnapshots: activeLifecyclePkg ? snap.reportSnapshots || {} : getReportSnapshots(),
     lifecyclePackages: getLifecyclePackages(),
+    designBasis: projectData.designBasis,
+    designGateApprovals: projectData.designGateApprovals,
+    tccSettings: projectData.tccSettings,
+    enforceDesignBasis: true,
   });
+}
+
+function currentDesignBasisReview() {
+  const projectData = loadProjectDataWithPackage();
+  const snap = activeLifecyclePkg?.projectSnapshot || {};
+  return buildDesignBasisReview({
+    designBasis: projectData.designBasis,
+    designGateApprovals: projectData.designGateApprovals,
+    equipment: projectData.equipment,
+    oneLine: projectData.oneLine,
+    cables: projectData.cables,
+    trays: projectData.trays,
+    conduits: projectData.conduits,
+    ductbanks: projectData.ductbanks,
+    studies: projectData.studies,
+    studyApprovals: projectData.approvals,
+    routeResults: activeLifecyclePkg ? snap.latestRouteResults || snap.routeResults || [] : getItem('latestRouteResults', null),
+    tccSettings: projectData.tccSettings,
+  });
+}
+
+function ensureDeliverableGates(actionLabel) {
+  const review = currentDesignBasisReview();
+  if (!review.deliverableBlockers.length) return true;
+  const gate = review.deliverableBlockers[0];
+  setStatus(`${actionLabel} blocked: ${gate.label}. Resolve ${review.deliverableBlockers.length} design basis gate(s) before issuing deliverables.`, 'warn');
+  renderReportReadiness();
+  return false;
 }
 
 function renderReportReadiness() {
@@ -604,6 +667,7 @@ function renderReportReadiness() {
   if (!el) return;
   const diagnostics = currentReportReadinessDiagnostics();
   const action = diagnostics.nextAction;
+  const designReview = diagnostics.designReview || currentDesignBasisReview();
   const routeCount = diagnostics.health.routeResults;
   const snapshotCount = diagnostics.health.reportSnapshots;
   const packageCount = diagnostics.health.lifecyclePackages;
@@ -613,6 +677,7 @@ function renderReportReadiness() {
     <div>
       <strong>Report readiness: ${diagnostics.health.reportSections} section(s) available.</strong>
       <p>${routeCount} route result(s), ${diagnostics.health.pullGroups} pull group(s), ${diagnostics.health.spoolCount} spool(s), ${snapshotCount} saved snapshot(s), and ${packageCount} release package(s).</p>
+      <p>${designReview.openGateCount} design basis gate(s) open; ${designReview.deliverableBlockers.length} block issuing exports or snapshots.</p>
     </div>
     <span class="workflow-next-action__meta">${escAttr(action.label)}</span>
     <div class="workflow-next-action__actions">
@@ -727,30 +792,35 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // ── Print / PDF ──
   document.getElementById('rpt-print-btn')?.addEventListener('click', () => {
+    if (!ensureDeliverableGates('Print / PDF')) return;
     generatePreview();
     setTimeout(() => window.print(), 300);
   });
 
   // ── Export XLSX ──
   document.getElementById('rpt-xlsx-btn')?.addEventListener('click', () => {
+    if (!ensureDeliverableGates('XLSX export')) return;
     if (!lastPkg) { generatePreview(); }
     if (lastPkg) exportXLSX(lastPkg, lastBaseReport);
   });
 
   // ── Export HTML ──
   document.getElementById('rpt-html-btn')?.addEventListener('click', () => {
+    if (!ensureDeliverableGates('HTML export')) return;
     if (!lastPkg) { generatePreview(); }
     if (lastPkg) exportHTML(lastPkg, lastBaseReport);
   });
 
   // ── Export JSON ──
   document.getElementById('rpt-json-btn')?.addEventListener('click', () => {
+    if (!ensureDeliverableGates('JSON export')) return;
     if (!lastPkg) { generatePreview(); }
     if (lastPkg) exportJSON(lastPkg);
   });
 
   // ── Save snapshot ──
   document.getElementById('rpt-snapshot-btn')?.addEventListener('click', () => {
+    if (!ensureDeliverableGates('Snapshot')) return;
     if (!lastPkg) generatePreview();
     if (!lastPkg) return;
     const snap = snapshotPackage(lastPkg);

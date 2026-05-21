@@ -94,4 +94,48 @@ describe('Short-circuit per-km cable impedance', () => {
     assert(!bus.warnings, 'Cable-derived impedance should suppress low-impedance warnings');
     assert(bus.threePhaseKA > 0.1, 'Three-phase fault current should be computed from derived impedance');
   });
+
+  it('derives impedance directly from nested per-km cable fields when no impedance object is stored', () => {
+    setOneLine({
+      activeSheet: 0,
+      sheets: [
+        {
+          name: 'Nested Cable Fault Study',
+          components: [
+            {
+              id: 'source',
+              type: 'utility_source',
+              voltage: 480,
+              thevenin_mva: 50,
+              connections: [{ target: 'cable_sc', sourcePort: 0, targetPort: 0 }]
+            },
+            {
+              id: 'cable_sc',
+              type: 'cable',
+              cable: {
+                tag: 'SC-2',
+                resistance_per_km: 0.4,
+                reactance_per_km: 0.35,
+                length: 200,
+                manual_length: true
+              },
+              connections: [{ target: 'load_bus', sourcePort: 1 }]
+            },
+            {
+              id: 'load_bus',
+              type: 'bus',
+              subtype: 'Bus',
+              kV: 0.48
+            }
+          ]
+        }
+      ]
+    });
+
+    const results = runShortCircuit();
+    const bus = results.load_bus;
+    assert(bus, 'Downstream bus results should be present');
+    assert(!bus.warnings, 'Nested per-km fields should suppress missing-impedance warnings');
+    assert(bus.threePhaseKA > 0.1, 'Fault current should be computed from derived per-km cable impedance');
+  });
 });
