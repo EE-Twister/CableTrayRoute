@@ -1,8 +1,8 @@
 {
-  "generatedAt": "2026-05-22T04:25:53.056Z",
+  "generatedAt": "2026-05-22T19:13:52.591Z",
   "summary": {
-    "testSuiteCount": 161,
-    "totalAssertions": 6527,
+    "testSuiteCount": 163,
+    "totalAssertions": 6633,
     "benchmarkCount": 6,
     "standardCount": 13,
     "necComplianceCount": 8
@@ -979,6 +979,16 @@
       "assertionCount": 49
     },
     {
+      "file": "tests/pageContractAudit.test.mjs",
+      "groups": [],
+      "assertionCount": 43
+    },
+    {
+      "file": "tests/pageContracts.test.mjs",
+      "groups": [],
+      "assertionCount": 40
+    },
+    {
       "file": "tests/pageNavigation.test.cjs",
       "groups": [
         "page navigation"
@@ -1585,7 +1595,7 @@
     {
       "file": "tests/workflowStatus.test.mjs",
       "groups": [],
-      "assertionCount": 11
+      "assertionCount": 34
     },
     {
       "file": "analysis/loadFlow.idealTie.test.mjs",

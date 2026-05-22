@@ -110,6 +110,8 @@ const EXTRA_KEYS = {
   mccLineups: 'mccLineups',
 };
 
+const LEGACY_STUDIES_SETTING_KEY = 'studies';
+
 export const STORAGE_KEYS = { ...KEYS, ...EXTRA_KEYS };
 
 const listeners = {};
@@ -730,6 +732,23 @@ export const removeItem = (key, scenario = getCurrentScenarioNameState()) => {
   }
 };
 
+export function migrateLegacyItem(legacyKey, targetKey, fallback = null) {
+  const missing = Symbol('missing');
+  const current = getItem(targetKey, missing);
+  if (current !== missing && current !== null) return current;
+  if (typeof localStorage === 'undefined') return fallback;
+  try {
+    const raw = localStorage.getItem(legacyKey);
+    if (raw === null || raw === undefined) return fallback;
+    const value = JSON.parse(raw);
+    setItem(targetKey, value);
+    localStorage.removeItem(legacyKey);
+    return value;
+  } catch {
+    return fallback;
+  }
+}
+
 
 export const keys = (scenario = getCurrentScenarioNameState()) => {
   try {
@@ -926,11 +945,15 @@ export function exportProject() {
     mccLineups: getMccLineups(),
     settings: {}
   };
-  const reserved = new Set([...Object.values(KEYS), EXTRA_KEYS.mccLineups, REVISION_KEY, 'CTR_PROJECT_V1']);
+  const reserved = new Set([...Object.values(KEYS), EXTRA_KEYS.mccLineups, REVISION_KEY, 'CTR_PROJECT_V1', LEGACY_STUDIES_SETTING_KEY]);
   for (const key of keys()) {
     if (!reserved.has(key)) {
       project.settings[key] = getItem(key);
     }
+  }
+  const studyResults = getStudies();
+  if (studyResults && typeof studyResults === 'object' && !Array.isArray(studyResults) && Object.keys(studyResults).length) {
+    project.settings.studyResults = studyResults;
   }
   const meta = { version: 1, scenario: getCurrentScenarioNameState(), scenarios: listScenarios() };
   return { meta, ...project };
@@ -1068,9 +1091,16 @@ export function importProject(obj) {
   } else {
     setOneLine({ activeSheet: 0, sheets: [] });
   }
+  const importedStudies = data.settings?.studyResults ?? data.settings?.[LEGACY_STUDIES_SETTING_KEY] ?? {};
+  if (importedStudies && typeof importedStudies === 'object' && !Array.isArray(importedStudies)) {
+    setStudies(importedStudies);
+  } else {
+    setStudies({});
+  }
+  removeItem(LEGACY_STUDIES_SETTING_KEY);
   removeItem(REVISION_KEY);
 
-  const reserved = new Set([...Object.values(KEYS), EXTRA_KEYS.mccLineups, REVISION_KEY, 'CTR_PROJECT_V1']);
+  const reserved = new Set([...Object.values(KEYS), EXTRA_KEYS.mccLineups, REVISION_KEY, 'CTR_PROJECT_V1', LEGACY_STUDIES_SETTING_KEY]);
   for (const key of keys()) {
     if (!reserved.has(key) && !(data.settings && key in data.settings)) {
       removeItem(key);
@@ -1136,6 +1166,7 @@ if (typeof window !== 'undefined') {
     getItem,
     setItem,
     removeItem,
+    migrateLegacyItem,
     listScenarios,
     getCurrentScenario,
     switchScenario,

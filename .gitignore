@@ -1,3 +1,8 @@
 node_modules/
 server_data/
 .claude/
+
+# Generated build output is validated by CI and committed only in release/static-hosting updates.
+dist/
+docs/asset-manifest.json
+data/protectiveDevices.mjs

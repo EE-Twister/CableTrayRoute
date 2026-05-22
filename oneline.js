@@ -70,7 +70,7 @@ function forceShowResumeIfE2E() {
 
 window.E2E = E2E;
 
-import { getOneLine, setOneLine, getEquipment, setEquipment, getPanels, setPanels, getLoads, setLoads, getCables, setCables, addRaceway, getItem, setItem, getStudies, setStudies, on, getCurrentScenario, switchScenario, STORAGE_KEYS, loadProject, saveProject } from './dataStore.mjs';
+import { getOneLine, setOneLine, getEquipment, setEquipment, getPanels, setPanels, getLoads, setLoads, getCables, setCables, addRaceway, getItem, setItem, migrateLegacyItem, getStudies, setStudies, on, getCurrentScenario, switchScenario, STORAGE_KEYS, loadProject, saveProject } from './dataStore.mjs';
 import { previewScheduleReconcile, applyScheduleReconcilePreview } from './analysis/scheduleReconcile.mjs';
 import { runLoadFlow } from './analysis/loadFlow.js';
 import { renderLoadFlowResultsHtml } from './analysis/loadFlowResultsRenderer.js';
@@ -87,6 +87,10 @@ import { exportPDF } from './exporters/pdf.js';
 import { exportDXF, exportDWG } from './exporters/dxf.js';
 import { ensureFieldAssistiveText, openModal, showAlertModal } from './src/components/modal.js';
 import { resolveOneLineProbe } from './src/crossProbe.js';
+import {
+  READINESS_VOCABULARY,
+  getContractReadinessCopy
+} from './src/workflowStatus.js';
 import { normalizeVoltageToVolts, toBaseKV } from './utils/voltage.js';
 import { calculateTransformerImpedance } from './utils/transformerImpedance.js';
 import { computeImpedanceFromPerKm } from './utils/cableImpedance.js';
@@ -100,6 +104,8 @@ import {
   syncTransformerDefaults
 } from './utils/transformerProperties.js';
 import './site.js';
+
+const ONE_LINE_READINESS_COPY = getContractReadinessCopy('oneline.html');
 
 let componentMeta = {};
 
@@ -5683,10 +5689,17 @@ function appendReadinessPanel(root) {
   const header = document.createElement('div');
   header.className = 'readiness-header';
   const title = document.createElement('h4');
-  title.textContent = 'Readiness';
+  title.textContent = readiness.score === 100
+    ? READINESS_VOCABULARY.ready
+    : READINESS_VOCABULARY.missingInputs;
   const score = document.createElement('strong');
   score.textContent = `${readiness.score}%`;
   header.append(title, score);
+  const summary = document.createElement('p');
+  summary.className = 'field-hint';
+  summary.textContent = readiness.score === 100
+    ? (ONE_LINE_READINESS_COPY?.messages.ready || `${READINESS_VOCABULARY.ready}: one-line handoff is complete.`)
+    : (ONE_LINE_READINESS_COPY?.messages.missingInputs || `${READINESS_VOCABULARY.missingInputs}: complete diagram links and validation before handoff.`);
   const list = document.createElement('ul');
   list.className = 'readiness-list';
   readiness.checks.forEach(check => {
@@ -5713,7 +5726,7 @@ function appendReadinessPanel(root) {
   buildBtn.textContent = 'Auto-Build';
   buildBtn.addEventListener('click', openAutoBuildModal);
   actions.append(validateBtn, buildBtn);
-  panel.append(header, list, actions);
+  panel.append(header, summary, list, actions);
   root.appendChild(panel);
 }
 
@@ -6244,14 +6257,15 @@ function redo() {
 
 function loadTemplates() {
   try {
-    templates = JSON.parse(localStorage.getItem('onelineTemplates')) || [];
+    const storedTemplates = migrateLegacyItem('onelineTemplates', 'onelineTemplates', []);
+    templates = Array.isArray(storedTemplates) ? storedTemplates : [];
   } catch {
     templates = [];
   }
 }
 
 function saveTemplates() {
-  localStorage.setItem('onelineTemplates', JSON.stringify(templates));
+  setItem('onelineTemplates', templates);
 }
 
 function renderTemplates() {

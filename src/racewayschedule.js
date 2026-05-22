@@ -1,4 +1,7 @@
-import "./workflowStatus.js";
+import {
+  READINESS_VOCABULARY,
+  getContractReadinessCopy
+} from "./workflowStatus.js";
 import { fetchDataFile } from "./fetchUtils.mjs";
 import "../site.js";
 import "../tableUtils.mjs";
@@ -30,6 +33,8 @@ import {
   sampleTrays,
   sampleConduits
 } from "../racewaySampleData.mjs";
+
+const RACEWAY_READINESS_COPY = getContractReadinessCopy('racewayschedule.html');
 
 // ---- Inline E2E helpers (no external import) ----
 const E2E = new URLSearchParams(location.search).has('e2e');
@@ -112,12 +117,7 @@ function createDirtyTracker(win = (typeof window !== 'undefined' ? window : unde
 
 function suppressResumeIfE2E() {
   if (!E2E) return;
-  // Do NOT clear storage by default; only when ?e2e_reset=1 is present.
-  const qs = new URLSearchParams(location.search);
-  const shouldClear = qs.has('e2e_reset');
-  if (shouldClear) {
-    try { localStorage.clear(); sessionStorage.clear(); } catch {}
-  }
+  // Never clear browser project storage from URL-controlled flags.
   // Do NOT auto-click resume buttons. Let tests click #resume-no-btn.
 }
 
@@ -1129,47 +1129,47 @@ document.addEventListener('DOMContentLoaded', async () => {
   function updateRacewayNextAction(summary){
     const host = document.getElementById('raceway-next-action');
     if(!host) return;
-    let title = 'Continue to fill and routing checks';
-    let detail = 'Raceway records have IDs, geometry, and dimensions for downstream routing tools.';
+    let title = `${READINESS_VOCABULARY.downstreamHandoff}: Continue to fill and routing checks`;
+    let detail = `${READINESS_VOCABULARY.ready}: ${RACEWAY_READINESS_COPY?.readyWhen || 'At least one tray, conduit, or ductbank record exists.'} Raceway records have IDs, geometry, and dimensions for downstream routing tools.`;
     let primaryHref = 'cabletrayfill.html';
     let primaryText = 'Open Tray Fill';
     let secondaryHref = 'cableschedule.html';
     let secondaryText = 'Review Cable Assignments';
 
     if(summary.total === 0){
-      title = 'Add raceway records';
-      detail = 'Create trays, conduits, or ductbanks so schedule-ready cables have routing destinations.';
+      title = `${READINESS_VOCABULARY.missingInputs}: Add raceway records`;
+      detail = RACEWAY_READINESS_COPY?.blockers?.[0] || 'Create trays, conduits, or ductbanks so schedule-ready cables have routing destinations.';
       primaryHref = '#ductbank-section';
       primaryText = 'Start Raceway Schedule';
       secondaryHref = 'cableschedule.html';
       secondaryText = 'Open Cable Schedule';
     }else if(summary.missingIds > 0 || summary.duplicateIds > 0){
-      title = 'Resolve raceway ID issues';
+      title = `${READINESS_VOCABULARY.missingInputs}: Resolve raceway ID issues`;
       detail = `${summary.missingIds} raceway${summary.missingIds === 1 ? '' : 's'} are missing IDs and ${summary.duplicateIds} duplicate ID row${summary.duplicateIds === 1 ? '' : 's'} need review.`;
       primaryHref = '#raceway-summary-panel';
       primaryText = 'Review IDs';
     }else if(summary.missingGeometry > 0){
-      title = 'Complete raceway geometry';
+      title = `${READINESS_VOCABULARY.missingInputs}: Complete raceway geometry`;
       detail = `${summary.missingGeometry} raceway${summary.missingGeometry === 1 ? '' : 's'} need start/end coordinates before routing and BIM export.`;
       primaryHref = '#raceway-summary-panel';
       primaryText = 'Review Geometry';
     }else if(summary.missingDimensions > 0){
-      title = 'Complete fill dimensions';
+      title = `${READINESS_VOCABULARY.missingInputs}: Complete fill dimensions`;
       detail = `${summary.missingDimensions} raceway${summary.missingDimensions === 1 ? '' : 's'} need tray dimensions or conduit type and trade size.`;
       primaryHref = '#raceway-summary-panel';
       primaryText = 'Review Dimensions';
     }else if(summary.assignedRaceways === 0 && summary.assignedCableRefs > 0){
-      title = 'Connect cable assignments to raceway IDs';
+      title = `${READINESS_VOCABULARY.downstreamHandoff}: Connect cable assignments to raceway IDs`;
       detail = 'Cable assignments exist, but none match the current raceway IDs.';
       primaryHref = 'cableschedule.html';
       primaryText = 'Fix Cable Assignments';
     }else if(summary.assignedRaceways === 0){
-      title = 'Assign cables to raceways';
+      title = `${READINESS_VOCABULARY.downstreamHandoff}: Assign cables to raceways`;
       detail = 'Raceways are defined. Assign schedule-ready cables before running fill and route checks.';
       primaryHref = 'cableschedule.html';
       primaryText = 'Open Cable Schedule';
     }else{
-      detail = `${summary.assignedRaceways} raceway${summary.assignedRaceways === 1 ? '' : 's'} are assigned to cables. Continue into fill or routing checks.`;
+      detail = `${READINESS_VOCABULARY.ready}: ${summary.assignedRaceways} raceway${summary.assignedRaceways === 1 ? '' : 's'} are assigned to cables. Continue into fill or routing checks.`;
     }
 
     host.innerHTML = `

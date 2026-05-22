@@ -88,7 +88,8 @@
       "to_tag": "MCC-101",
       "cable_type": "Power",
       "conductors": 3,
-      "conductor_size": "3-500 kcmil CU",
+      "conductor_size": "500 kcmil",
+      "conductor_material": "Copper",
       "length": 145,
       "length_ft": 145,
       "raceway_ids": ["TR-PWR-101"],
@@ -106,7 +107,8 @@
       "to_tag": "PMP-101",
       "cable_type": "Power",
       "conductors": 3,
-      "conductor_size": "3-#4 CU",
+      "conductor_size": "#4 AWG",
+      "conductor_material": "Copper",
       "length": 95,
       "length_ft": 95,
       "raceway_ids": ["CND-PMP-101"],
@@ -124,7 +126,8 @@
       "to_tag": "XFMR-101",
       "cable_type": "Power",
       "conductors": 3,
-      "conductor_size": "3-#1 CU",
+      "conductor_size": "#1 AWG",
+      "conductor_material": "Copper",
       "length": 62,
       "length_ft": 62,
       "raceway_ids": ["TR-PWR-101"],
@@ -142,7 +145,8 @@
       "to_tag": "LP-101",
       "cable_type": "Power",
       "conductors": 4,
-      "conductor_size": "4-#2 CU",
+      "conductor_size": "#2 AWG",
+      "conductor_material": "Copper",
       "length": 35,
       "length_ft": 35,
       "raceway_ids": ["TR-PWR-101"],
@@ -292,8 +296,8 @@
             "equipmentRef": "SWBD-101",
             "scheduleLinks": { "equipment": "SWBD-101" },
             "connections": [
-              { "target": "comp-mcc-101", "cable": { "tag": "CBL-SWBD-MCC-101", "conductor_size": "3-500 kcmil CU", "length": 145 } },
-              { "target": "comp-xfmr-101", "cable": { "tag": "CBL-SWBD-XFMR-101", "conductor_size": "3-#1 CU", "length": 62 } }
+              { "target": "comp-mcc-101", "cable": { "tag": "CBL-SWBD-MCC-101", "conductor_size": "500 kcmil", "length": 145 } },
+              { "target": "comp-xfmr-101", "cable": { "tag": "CBL-SWBD-XFMR-101", "conductor_size": "#1 AWG", "length": 62 } }
             ]
           },
           {
@@ -307,7 +311,7 @@
             "equipmentRef": "MCC-101",
             "scheduleLinks": { "equipment": "MCC-101" },
             "connections": [
-              { "target": "comp-pmp-101", "cable": { "tag": "CBL-MCC-PMP-101", "conductor_size": "3-#4 CU", "length": 95 } }
+              { "target": "comp-pmp-101", "cable": { "tag": "CBL-MCC-PMP-101", "conductor_size": "#4 AWG", "length": 95 } }
             ]
           },
           {
@@ -333,7 +337,7 @@
             "equipmentRef": "XFMR-101",
             "scheduleLinks": { "equipment": "XFMR-101" },
             "connections": [
-              { "target": "comp-lp-101", "cable": { "tag": "CBL-XFMR-LP-101", "conductor_size": "4-#2 CU", "length": 35 } }
+              { "target": "comp-lp-101", "cable": { "tag": "CBL-XFMR-LP-101", "conductor_size": "#2 AWG", "length": 35 } }
             ]
           },
           {

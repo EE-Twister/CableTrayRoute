@@ -30,7 +30,8 @@ import {
   getWorkflowStepForPage,
   getStepStatus,
   getCableReadiness,
-  countOneLineComponents
+  countOneLineComponents,
+  getWorkflowPageModeContext
 } from "./src/workflowStatus.js";
 import { runValidation } from "./validation/rules.js";
 import {
@@ -2164,6 +2165,136 @@ function initWorkflowStepNav(){
 }
 
 globalThis.document?.addEventListener('DOMContentLoaded',initWorkflowStepNav);
+
+function makeWorkflowModeTag(text, tone = 'neutral') {
+  const tag = document.createElement('span');
+  tag.className = `workflow-mode-tag workflow-mode-tag--${tone}`;
+  tag.textContent = text;
+  return tag;
+}
+
+function makeWorkflowModeCard(modeName, mode, options = {}) {
+  const card = document.createElement('article');
+  card.className = `workflow-mode-card workflow-mode-card--${options.tone || 'neutral'}`;
+  card.dataset.workflowMode = modeName;
+
+  const header = document.createElement('div');
+  header.className = 'workflow-mode-card__header';
+  const label = document.createElement('span');
+  label.className = 'workflow-mode-card__label';
+  label.textContent = mode.label;
+  const status = makeWorkflowModeTag(mode.status, options.tone || 'neutral');
+  header.append(label, status);
+
+  const detail = document.createElement('p');
+  detail.className = 'workflow-mode-card__detail';
+  detail.textContent = mode.detail;
+
+  card.append(header, detail);
+
+  if (mode.readiness) {
+    const readiness = document.createElement('dl');
+    readiness.className = 'workflow-mode-card__readiness';
+
+    const addItem = (labelText, valueText) => {
+      const term = document.createElement('dt');
+      term.textContent = labelText;
+      const value = document.createElement('dd');
+      value.textContent = valueText;
+      readiness.append(term, value);
+    };
+
+    addItem(mode.readiness.terms.ready, mode.readiness.readyWhen);
+    addItem(mode.readiness.terms.missingInputs, mode.readiness.blockers.join('; '));
+    addItem(mode.readiness.terms.downstreamHandoff, mode.readiness.downstreamText);
+    card.appendChild(readiness);
+  }
+
+  if (Array.isArray(options.actions) && options.actions.length) {
+    const actions = document.createElement('div');
+    actions.className = 'workflow-mode-card__actions';
+    options.actions.forEach(action => {
+      const link = document.createElement('a');
+      link.className = action.primary ? 'btn btn-sm primary-btn' : 'btn btn-sm';
+      link.href = action.href;
+      link.textContent = action.label;
+      actions.appendChild(link);
+    });
+    card.appendChild(actions);
+  }
+
+  return card;
+}
+
+function renderWorkflowModePanel(panel, page) {
+  const context = getWorkflowPageModeContext(page);
+  if (!context) {
+    panel.remove();
+    return;
+  }
+
+  panel.replaceChildren();
+  panel.dataset.workflowPage = context.pageName;
+  panel.dataset.workflowStep = context.project.step?.key || (context.isDashboard ? 'dashboard' : '');
+  panel.classList.toggle('workflow-mode-panel--ready', context.project.tone === 'ready');
+
+  const title = document.createElement('div');
+  title.className = 'workflow-mode-panel__title';
+
+  const heading = document.createElement('strong');
+  heading.textContent = context.isDashboard
+    ? 'Workflow modes'
+    : `${context.project.step.label.replace(/^\d+\.\s*/, '')} modes`;
+
+  const progress = document.createElement('span');
+  progress.textContent = `${context.completeCount}/${context.totalSteps} workflow steps ready`;
+
+  title.append(heading, progress);
+
+  const grid = document.createElement('div');
+  grid.className = 'workflow-mode-panel__grid';
+  grid.appendChild(makeWorkflowModeCard('standalone', context.standalone, {
+    tone: 'ready'
+  }));
+  grid.appendChild(makeWorkflowModeCard('project', context.project, {
+    tone: context.project.tone,
+    actions: [
+      { href: context.project.dashboardHref, label: 'Dashboard' },
+      { href: context.project.primaryHref, label: context.project.primaryLabel, primary: true }
+    ]
+  }));
+
+  panel.append(title, grid);
+}
+
+function initWorkflowModePanel() {
+  if (typeof document === 'undefined') return;
+  const main = document.getElementById('main-content');
+  if (!main || main.querySelector('[data-workflow-mode-panel]')) return;
+
+  const page = window.location.pathname.split('/').pop() || 'index.html';
+  if (!getWorkflowPageModeContext(page)) return;
+
+  const panel = document.createElement('section');
+  panel.className = 'workflow-mode-panel';
+  panel.dataset.workflowModePanel = 'true';
+  panel.setAttribute('aria-label', 'Workflow mode status');
+  panel.setAttribute('data-no-print', '');
+
+  const stepNav = main.querySelector(':scope > .workflow-step-nav');
+  if (stepNav) {
+    stepNav.insertAdjacentElement('afterend', panel);
+  } else {
+    const firstSection = main.querySelector(':scope > section, :scope > header');
+    if (firstSection) main.insertBefore(panel, firstSection);
+    else main.prepend(panel);
+  }
+
+  renderWorkflowModePanel(panel, page);
+  onProjectChange(() => renderWorkflowModePanel(panel, page));
+}
+
+globalThis.document?.addEventListener('DOMContentLoaded', initWorkflowModePanel);
 
 function persistConduits(data){
   try{

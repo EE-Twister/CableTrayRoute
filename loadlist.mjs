@@ -8,11 +8,12 @@ import {
   summarizeLoadValidation
 } from './analysis/loadWorkflow.mjs';
 import { openOneLineProbe } from './src/crossProbe.js';
+import {
+  READINESS_VOCABULARY,
+  getContractReadinessCopy
+} from './src/workflowStatus.js';
 
-const E2E = typeof location !== 'undefined' && new URLSearchParams(location.search).has('e2e');
-if (E2E && typeof localStorage !== 'undefined' && new URLSearchParams(location.search).has('e2e_reset')) {
-  try { localStorage.clear(); sessionStorage.clear(); } catch {}
-}
+const LOAD_READINESS_COPY = getContractReadinessCopy('loadlist.html');
 
 class ContextMenu {
   constructor(items = []) {
@@ -527,8 +528,8 @@ if (typeof window !== 'undefined') {
     if (!validation.total) {
       nextActionEl.innerHTML = `
         <div>
-          <strong>Next action: Add loads</strong>
-          <p>Use equipment tags as sources so the one-line and cable schedule can reconcile cleanly.</p>
+          <strong>${READINESS_VOCABULARY.missingInputs}: Add loads</strong>
+          <p>${LOAD_READINESS_COPY?.blockers?.[0] || 'Use equipment tags as sources so the one-line and cable schedule can reconcile cleanly.'}</p>
         </div>
         <a class="btn primary-btn" href="equipmentlist.html">Review Equipment</a>
       `;
@@ -538,7 +539,7 @@ if (typeof window !== 'undefined') {
       const blockerFilter = validation.missingSource ? 'missingSource' : 'missingElectrical';
       nextActionEl.innerHTML = `
         <div>
-          <strong>Next action: Complete load readiness</strong>
+          <strong>${READINESS_VOCABULARY.missingInputs}: Complete load readiness</strong>
           <p>${validation.incomplete} load${validation.incomplete === 1 ? '' : 's'} still need source, kW, voltage, power factor, or phases.</p>
         </div>
         <button class="btn primary-btn" type="button" data-filter="${blockerFilter}">Show Blockers</button>
@@ -552,8 +553,8 @@ if (typeof window !== 'undefined') {
     }
     nextActionEl.innerHTML = `
       <div>
-        <strong>Next action: Continue to One-Line</strong>
-        <p>${validation.complete} load${validation.complete === 1 ? '' : 's'} are ready for diagram reconciliation, demand review, or cable schedule work.</p>
+        <strong>${READINESS_VOCABULARY.downstreamHandoff}: Continue to One-Line</strong>
+        <p>${READINESS_VOCABULARY.ready}: ${LOAD_READINESS_COPY?.readyWhen || 'At least one meaningful load row exists.'} ${validation.complete} load${validation.complete === 1 ? '' : 's'} can feed diagram reconciliation, demand review, or cable schedule work.</p>
       </div>
       <span>
         <a class="btn primary-btn" href="oneline.html">Continue to One-Line</a>

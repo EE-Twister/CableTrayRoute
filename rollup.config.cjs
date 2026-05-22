@@ -115,7 +115,8 @@ function manualChunks(id) {
 
 module.exports = {
   input: entries,
-  maxParallelFileOps: 64,
+  // Keep writes serial so synced Windows workspaces do not intermittently lock dist files.
+  maxParallelFileOps: 1,
   output: {
     dir: 'dist',
     format: 'es',

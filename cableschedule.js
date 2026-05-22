@@ -50,7 +50,12 @@ import {
   summarizeCableWorkflow
 } from './analysis/scheduleWorkflow.mjs';
 import { openOneLineProbe } from './src/crossProbe.js';
+import {
+  READINESS_VOCABULARY,
+  getContractReadinessCopy
+} from './src/workflowStatus.js';
 const { sizeToArea } = ampacity;
+const CABLE_READINESS_COPY = getContractReadinessCopy('cableschedule.html');
 
 const CABLE_TOUR_STEPS = [
   { selector: '#add-row-btn',            message: 'Click "Add Cable" to create your first cable entry. Each cable needs a Tag, source/destination endpoints, conductor size, and voltage rating.' },
@@ -2230,28 +2235,29 @@ async function initCableSchedule() {
     let secondaryText = 'View Dashboard';
 
     if (summary.total === 0) {
-      title = 'Add cable schedule rows';
-      detail = 'Create cables manually, import a schedule, or reconcile from the one-line before routing.';
+      title = `${READINESS_VOCABULARY.missingInputs}: Add cable schedule rows`;
+      detail = CABLE_READINESS_COPY?.blockers?.[0] || 'Create cables manually, import a schedule, or reconcile from the one-line before routing.';
       primaryHref = '#cableScheduleTable';
       primaryText = 'Start Cable Schedule';
       secondaryHref = 'oneline.html';
       secondaryText = 'Open One-Line';
     } else if (summary.missingSchedule > 0 || summary.duplicateTags > 0) {
-      title = 'Finish schedule-ready cable fields';
+      title = `${READINESS_VOCABULARY.missingInputs}: Finish schedule-ready cable fields`;
       detail = summary.missingSchedule > 0
         ? `${summary.missingSchedule} cable${summary.missingSchedule === 1 ? '' : 's'} need tag, From/To, conductor size, or length before routing.`
         : `${summary.duplicateTags} cable tag row${summary.duplicateTags === 1 ? '' : 's'} are duplicated and need review before routing.`;
       primaryHref = '#cableScheduleTable';
       primaryText = 'Review Cable Rows';
     } else if (summary.missingRaceway > 0) {
-      title = 'Assign raceways for routing';
+      title = `${READINESS_VOCABULARY.downstreamHandoff}: Assign raceways for routing`;
       detail = `${summary.missingRaceway} schedule-ready cable${summary.missingRaceway === 1 ? '' : 's'} still need raceway assignments.`;
       primaryHref = 'racewayschedule.html';
       primaryText = 'Open Raceway Schedule';
       secondaryHref = '#open-batch-edit-btn';
       secondaryText = 'Batch Assign';
     } else {
-      detail = `${summary.routingReady} cable${summary.routingReady === 1 ? '' : 's'} are routing-ready. Continue to fill checks or review the dashboard.`;
+      title = `${READINESS_VOCABULARY.downstreamHandoff}: Continue to Raceway Schedule`;
+      detail = `${READINESS_VOCABULARY.ready}: ${CABLE_READINESS_COPY?.readyWhen || 'Every workflow cable row has tag, from/to, conductor size, and length.'} ${summary.routingReady} cable${summary.routingReady === 1 ? '' : 's'} are routing-ready.`;
       primaryHref = 'cabletrayfill.html';
       primaryText = 'Run Fill Check';
     }

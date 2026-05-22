@@ -42,6 +42,8 @@ The build copy pipeline (`scripts/copyAssets.js`) now emits fingerprinted copies
 
 For rollout safety, keep older fingerprinted files available until all clients have refreshed to the new HTML references.
 
+Feature PRs should not commit generated build output. CI builds and uploads `dist/` as an artifact, while `dist/`, generated asset manifests, and generated module wrappers are committed only in release/static-hosting updates. See [Dist Review Policy](docs/dist-review-policy.md).
+
 ## Landing Page and Workflow
 
 The landing page (`index.html`) links to every tool in the suite and outlines

@@ -7,7 +7,10 @@
  *   - analysis/projectReport.mjs  (section builders, renderPackageHTML)
  */
 
-import './workflowStatus.js';
+import {
+  READINESS_VOCABULARY,
+  getContractReadinessCopy
+} from './workflowStatus.js';
 import '../site.js';
 import {
   getCables, getTrays, getConduits, getDuctbanks,
@@ -44,6 +47,8 @@ import {
 // ---------------------------------------------------------------------------
 // DOM references (resolved after DOMContentLoaded)
 // ---------------------------------------------------------------------------
+
+const REPORT_READINESS_COPY = getContractReadinessCopy('projectreport.html');
 
 let previewEl, statusEl;
 
@@ -671,15 +676,22 @@ function renderReportReadiness() {
   const routeCount = diagnostics.health.routeResults;
   const snapshotCount = diagnostics.health.reportSnapshots;
   const packageCount = diagnostics.health.lifecyclePackages;
+  const readinessLabel = diagnostics.ready.projectReport && routeCount > 0
+    ? READINESS_VOCABULARY.ready
+    : READINESS_VOCABULARY.missingInputs;
+  const actionLabel = action.severity === 'warning' || action.severity === 'critical'
+    ? `${READINESS_VOCABULARY.missingInputs}: ${action.label}`
+    : `${READINESS_VOCABULARY.downstreamHandoff}: ${action.label}`;
   el.classList.toggle('is-warning', action.severity === 'warning' || action.severity === 'critical');
   el.classList.toggle('is-ready', diagnostics.ready.projectReport && routeCount > 0);
   el.innerHTML = `
     <div>
-      <strong>Report readiness: ${diagnostics.health.reportSections} section(s) available.</strong>
+      <strong>${readinessLabel}: Report readiness: ${diagnostics.health.reportSections} section(s) available.</strong>
+      <p>${REPORT_READINESS_COPY?.readyWhen || 'Ready when selected report sections have source data and required review gates are complete.'}</p>
       <p>${routeCount} route result(s), ${diagnostics.health.pullGroups} pull group(s), ${diagnostics.health.spoolCount} spool(s), ${snapshotCount} saved snapshot(s), and ${packageCount} release package(s).</p>
       <p>${designReview.openGateCount} design basis gate(s) open; ${designReview.deliverableBlockers.length} block issuing exports or snapshots.</p>
     </div>
-    <span class="workflow-next-action__meta">${escAttr(action.label)}</span>
+    <span class="workflow-next-action__meta">${escAttr(actionLabel)}</span>
     <div class="workflow-next-action__actions">
       <button type="button" class="btn primary-btn" data-action="generate-report-preview">Generate Preview</button>
       <a class="btn secondary-btn" href="pullcards.html">Pull Cards</a>

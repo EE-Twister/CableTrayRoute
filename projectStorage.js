@@ -576,12 +576,14 @@ function loadSavedProjectsBlob() {
 function migrateLegacySavedProjects() {
   const legacyRecords = new Map();
   const suffixes = new Set(SAVED_PROJECT_SUFFIXES);
+  const scenarioNames = new Set(scenarioListCache);
   for (const key of getAllStorageKeys()) {
     const idx = key.indexOf(':');
     if (idx <= 0) continue;
     const suffix = key.slice(idx + 1);
     if (!suffixes.has(suffix)) continue;
     const name = key.slice(0, idx);
+    if (scenarioNames.has(name)) continue;
     let entry = legacyRecords.get(name);
     if (!entry) {
       entry = { data: {}, suffixes: new Set(), keys: [] };

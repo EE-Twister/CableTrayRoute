@@ -1,4 +1,11 @@
-import { workflowOrder, getStepStatus, getCableReadiness, countOneLineComponents } from './workflowStatus.js';
+import {
+  READINESS_VOCABULARY,
+  workflowOrder,
+  getStepStatus,
+  getCableReadiness,
+  countOneLineComponents,
+  getContractReadinessCopy
+} from './workflowStatus.js';
 import { openModal } from './components/modal.js';
 import {
   getEquipment, getLoads, getCables, getTrays, getConduits, getDuctbanks, getStudies,
@@ -36,6 +43,7 @@ const STUDY_DEFINITIONS = [
   { key: 'lighting',               label: 'Egress Lighting',         href: 'lighting.html' },
   { key: 'trustCenter',            label: 'Trust Center',            href: 'trustcenter.html' },
 ];
+const DASHBOARD_READINESS_COPY = getContractReadinessCopy('workflowdashboard.html');
 
 function getStatusMeta({ complete, label, hint, forStudy = false }) {
   if (complete) {
@@ -406,7 +414,7 @@ function renderKpiStrip(container) {
     {
       label: 'Next required step',
       value: nextRequiredStep ? nextRequiredStep.step.label : 'Done',
-      helper: nextRequiredStep ? 'Recommended next action in the workflow.' : 'All required workflow steps are complete.',
+      helper: nextRequiredStep ? `${READINESS_VOCABULARY.missingInputs}: Recommended next action in the workflow.` : `${READINESS_VOCABULARY.ready}: All required workflow steps are complete.`,
       href: nextRequiredStep ? nextRequiredStep.step.href : 'projectreport.html',
     },
     {
@@ -491,13 +499,13 @@ function renderWorkflowSteps(container) {
   const nextStepEl = document.getElementById('workflow-next-step');
   if (nextStepEl) {
     if (nextRequiredStep) {
-      nextStepEl.textContent = 'Next recommended step: ';
+      nextStepEl.textContent = `${READINESS_VOCABULARY.missingInputs}: Next recommended step: `;
       const link = document.createElement('a');
       link.href = nextRequiredStep.step.href;
       link.textContent = nextRequiredStep.step.label;
       nextStepEl.appendChild(link);
     } else {
-      nextStepEl.textContent = 'All workflow steps are complete. You are ready to generate reports.';
+      nextStepEl.textContent = `${READINESS_VOCABULARY.ready}: All workflow steps are complete. You are ready to generate reports.`;
     }
   }
 
@@ -959,7 +967,7 @@ function renderGuidedWorkflowRunner() {
         <a class="btn btn-sm" href="${esc(prompt.href)}">${esc(prompt.actionLabel)}</a>
       </li>
     `).join('')
-    : '<li class="missing-info-item missing-info-item--pass"><div><strong>No missing required inputs</strong><span>The core workflow has enough information to continue. Review assumptions before issuing.</span></div></li>';
+    : `<li class="missing-info-item missing-info-item--pass"><div><strong>${READINESS_VOCABULARY.ready}: No missing required inputs</strong><span>The core workflow has enough information to continue. Review assumptions before issuing.</span></div></li>`;
 
   el.innerHTML = `
     <div class="guided-workflow-current guided-workflow-current--${esc(current.status)}">
@@ -1042,10 +1050,14 @@ function renderWorkflowCoreDiagnostics() {
     const designReview = diagnostics.designReview || currentDesignBasisReview();
     const basisStatus = designBasisStatusText(designBasis);
     const basisClass = designBasis.complete && designReview.blockingGateCount === 0 ? 'is-complete' : 'is-warning';
+    const actionTerm = action.severity === 'success'
+      ? READINESS_VOCABULARY.downstreamHandoff
+      : READINESS_VOCABULARY.missingInputs;
     nextEl.innerHTML = `
       <div>
-        <strong>Next action: ${esc(action.label)}</strong>
+        <strong>${esc(actionTerm)}: Next action: ${esc(action.label)}</strong>
         <p>${esc(action.detail)}</p>
+        <p class="workflow-next-action__meta">${esc(DASHBOARD_READINESS_COPY?.messages?.[action.severity === 'success' ? 'downstreamHandoff' : 'missingInputs'] || action.detail)}</p>
         <div class="workflow-design-basis-status ${esc(basisClass)}">
           <span>Design basis: <strong>${esc(basisStatus)}</strong></span>
           <span>${esc(designBasis.configured ? designBasis.codeLabel : 'Save wizard defaults before relying on generated records.')}</span>
@@ -1067,7 +1079,7 @@ function renderWorkflowCoreDiagnostics() {
   if (blockersEl) {
     const actionable = diagnostics.blockers.filter(item => item.severity !== 'info');
     if (!actionable.length) {
-      blockersEl.innerHTML = '<p class="text-muted">No critical workflow blockers found. Review studies and deliverables next.</p>';
+      blockersEl.innerHTML = `<p class="text-muted">${READINESS_VOCABULARY.ready}: No critical workflow blockers found. Review studies and deliverables next.</p>`;
     } else {
       blockersEl.innerHTML = `
         <ul class="dashboard-blocker-list">

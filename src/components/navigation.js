@@ -1,4 +1,4 @@
-const NAV_ROUTES = [
+export const NAV_ROUTES = [
   { href: 'index.html', label: 'Home', section: 'Home', icon: 'icons/route.svg' },
   { href: 'workflowdashboard.html', label: 'Project Dashboard', section: 'Workflow', group: 'Planning', icon: 'icons/toolbar/grid.svg' },
   { href: 'scenarios.html', label: 'Scenario Comparison', section: 'Workflow', group: 'Planning', icon: 'icons/toolbar/copy.svg' },
@@ -269,7 +269,19 @@ function buildBrand() {
   return brand;
 }
 
+function hasNavigationDomApi() {
+  return typeof document !== 'undefined'
+    && typeof document.querySelector === 'function'
+    && typeof document.createElement === 'function'
+    && typeof document.addEventListener === 'function';
+}
+
+function canMountPersistentNavigation() {
+  return hasNavigationDomApi() && document.body;
+}
+
 function mountPersistentNavigation() {
+  if (!canMountPersistentNavigation()) return;
   if (document.body?.dataset.navMounted === 'true') return;
   const topNav = document.querySelector('.top-nav');
   if (!topNav) return;
@@ -436,7 +448,7 @@ function mountPersistentNavigation() {
   document.body.dataset.navMounted = 'true';
 }
 
-if (typeof window !== 'undefined') {
+if (typeof window !== 'undefined' && hasNavigationDomApi()) {
   window.addEventListener('DOMContentLoaded', () => {
     mountPersistentNavigation();
     mountPageTransitions();

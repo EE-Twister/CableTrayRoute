@@ -12,6 +12,13 @@ import {
   getItem
 } from '../dataStore.mjs';
 import { normalizeRouteResults } from '../analysis/deliverableWorkflow.mjs';
+import {
+  READINESS_VOCABULARY,
+  getPageContractReadiness,
+  getPageContractReadinessMessages
+} from './pageContracts.js';
+
+export { READINESS_VOCABULARY };
 
 export const workflowOrder = [
   {
@@ -19,35 +26,40 @@ export const workflowOrder = [
     label: '1. Equipment List',
     short: '1. Equipment',
     href: 'equipmentlist.html',
-    hint: 'Start with major equipment tags, ratings, and locations.'
+    hint: 'Start with major equipment tags, ratings, and locations.',
+    standaloneHint: 'Equipment register ready for direct entry, imports, and exports.'
   },
   {
     key: 'loadList',
     label: '2. Load List',
     short: '2. Loads',
     href: 'loadlist.html',
-    hint: 'Capture loads and connect them to source equipment or panels.'
+    hint: 'Capture loads and connect them to source equipment or panels.',
+    standaloneHint: 'Load schedule ready for direct entry, imports, and exports.'
   },
   {
     key: 'oneLineDiagram',
     label: '3. One-Line',
     short: '3. One-Line',
     href: 'oneline.html',
-    hint: 'Model the electrical relationships, then reconcile schedules explicitly.'
+    hint: 'Model the electrical relationships, then reconcile schedules explicitly.',
+    standaloneHint: 'Diagram editor ready for independent drawing, import, and export.'
   },
   {
     key: 'cableSchedule',
     label: '4. Cable Schedule',
     short: '4. Cables',
     href: 'cableschedule.html',
-    hint: 'Complete tags, endpoints, conductor size, and length before routing.'
+    hint: 'Complete tags, endpoints, conductor size, and length before routing.',
+    standaloneHint: 'Cable schedule ready for direct row editing, templates, imports, and exports.'
   },
   {
     key: 'racewaySchedule',
     label: '5. Raceway Schedule',
     short: '5. Raceways',
     href: 'racewayschedule.html',
-    hint: 'Define trays, conduits, and ductbanks available for routing.'
+    hint: 'Define trays, conduits, and ductbanks available for routing.',
+    standaloneHint: 'Raceway schedule ready for direct tray, conduit, ductbank, and CAD workflows.'
   },
   {
     key: 'fillRouting',
@@ -55,6 +67,7 @@ export const workflowOrder = [
     short: '6. Fill / Routing',
     href: 'cabletrayfill.html',
     hint: 'Run tray fill, conduit fill, ductbank checks, and route assignments.',
+    standaloneHint: 'Fill and routing tools ready for direct studies or imported schedules.',
     aliases: ['conduitfill.html', 'ductbankroute.html', 'optimalRoute.html']
   },
   {
@@ -63,6 +76,7 @@ export const workflowOrder = [
     short: '7. Studies',
     href: 'demandschedule.html',
     hint: 'Run power system studies after the model is coordinated.',
+    standaloneHint: 'Study pages ready for direct calculations and report exports.',
     aliases: ['shortCircuit.html', 'arcFlash.html', 'loadFlow.html', 'tcc.html', 'harmonics.html', 'motorStart.html']
   },
   {
@@ -71,6 +85,7 @@ export const workflowOrder = [
     short: '8. Deliverables',
     href: 'projectreport.html',
     hint: 'Publish reports, pull cards, procurement, cost, and release packages.',
+    standaloneHint: 'Deliverable tools ready for imported route data or direct report assembly.',
     aliases: ['spoolsheets.html', 'pullcards.html', 'procurementschedule.html', 'costestimate.html', 'submittal.html']
   }
 ];
@@ -211,6 +226,105 @@ export function getWorkflowStepForPage(pageName) {
   return workflowOrder.find(step => step.href === normalized || (step.aliases || []).includes(normalized)) || null;
 }
 
+function normalizePageName(pageName) {
+  return String(pageName || '').split('/').pop() || 'index.html';
+}
+
+function getWorkflowStepIndex(step) {
+  return step ? workflowOrder.findIndex(item => item.key === step.key) : -1;
+}
+
+export function getContractReadinessCopy(pageName) {
+  const readiness = getPageContractReadiness(pageName);
+  const messages = getPageContractReadinessMessages(pageName);
+  if (!readiness || !messages) return null;
+  return { ...readiness, messages };
+}
+
+function firstContractBlocker(readiness) {
+  return readiness?.blockers?.find(Boolean) || null;
+}
+
+function buildContractStatusDetail(status, readiness) {
+  if (!status) return 'Open the guided workflow when project-level status is needed.';
+  if (status.complete) {
+    const readyWhen = readiness?.readyWhen || status.label;
+    return `${READINESS_VOCABULARY.ready}: ${status.label}. ${readyWhen}`;
+  }
+  const blocker = status.hint || firstContractBlocker(readiness) || status.label;
+  return `${READINESS_VOCABULARY.missingInputs}: ${blocker}`;
+}
+
+function buildModeStatus(status, readiness) {
+  if (!status) return { tone: 'neutral', label: 'Available', detail: 'Open the guided workflow when project-level status is needed.' };
+  return {
+    tone: status.complete ? 'ready' : 'attention',
+    label: status.complete ? status.label : READINESS_VOCABULARY.missingInputs,
+    detail: buildContractStatusDetail(status, readiness),
+    readiness
+  };
+}
+
+export function getWorkflowPageModeContext(pageName, overrides = {}) {
+  const normalized = normalizePageName(pageName);
+  const isDashboard = normalized === 'workflowdashboard.html';
+  const step = isDashboard ? null : getWorkflowStepForPage(normalized);
+  if (!isDashboard && !step) return null;
+
+  const statuses = workflowOrder.map(item => ({
+    step: item,
+    status: getStepStatus(item.key, overrides)
+  }));
+  const completeCount = statuses.filter(item => item.status.complete).length;
+  const nextRequired = statuses.find(item => !item.status.complete) || null;
+  const idx = getWorkflowStepIndex(step);
+  const currentStatus = step ? getStepStatus(step.key, overrides) : null;
+  const contractReadiness = getContractReadinessCopy(isDashboard ? normalized : step?.href);
+  const projectStatus = buildModeStatus(currentStatus, contractReadiness);
+  const prev = idx > 0 ? workflowOrder[idx - 1] : null;
+  const next = idx >= 0 ? workflowOrder[idx + 1] || null : (nextRequired?.step || null);
+
+  return {
+    pageName: normalized,
+    isDashboard,
+    completeCount,
+    totalSteps: workflowOrder.length,
+    nextRequiredStep: nextRequired?.step || null,
+    nextRequiredStatus: nextRequired?.status || null,
+    standalone: {
+      available: true,
+      label: isDashboard ? 'Independent Pages' : 'Standalone',
+      status: 'Ready',
+      detail: isDashboard
+        ? `${READINESS_VOCABULARY.ready}: Core pages remain available as independent tools.`
+        : `${READINESS_VOCABULARY.ready}: ${step.standaloneHint || 'This page is ready for independent use.'}`
+    },
+    project: {
+      available: true,
+      label: 'Project Workflow',
+      status: isDashboard ? `${completeCount} of ${workflowOrder.length} ready` : projectStatus.label,
+      tone: isDashboard
+        ? (completeCount === workflowOrder.length ? 'ready' : 'attention')
+        : projectStatus.tone,
+      detail: isDashboard
+        ? (nextRequired
+            ? `${READINESS_VOCABULARY.missingInputs}: ${nextRequired.step.label}: ${nextRequired.status.hint || firstContractBlocker(getContractReadinessCopy(nextRequired.step.href)) || nextRequired.status.label}`
+            : `${READINESS_VOCABULARY.ready}: All workflow steps are complete.`)
+        : projectStatus.detail,
+      readiness: contractReadiness,
+      step,
+      stepIndex: idx,
+      previousStep: prev,
+      nextStep: next,
+      dashboardHref: 'workflowdashboard.html',
+      primaryHref: isDashboard ? (nextRequired?.step.href || 'projectreport.html') : (currentStatus?.complete && next ? next.href : step.href),
+      primaryLabel: isDashboard
+        ? (nextRequired ? `Open ${nextRequired.step.short.replace(/^\d+\.\s*/, '')}` : 'Open Deliverables')
+        : (currentStatus?.complete && next ? `Next: ${next.short.replace(/^\d+\.\s*/, '')}` : `Open ${step.short.replace(/^\d+\.\s*/, '')}`)
+    }
+  };
+}
+
 export function getStepStatus(key, overrides = {}) {
   const canonicalKey = legacyKeyMap[key] || key;
 
@@ -312,8 +426,16 @@ export function getStepStatus(key, overrides = {}) {
   return { complete: false, label: 'Not started', hint: null };
 }
 
-if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+function canRenderWorkflowStatusDom() {
+  return typeof document !== 'undefined'
+    && typeof document.querySelectorAll === 'function'
+    && typeof document.getElementById === 'function'
+    && typeof document.createElement === 'function';
+}
+
+if (typeof window !== 'undefined' && canRenderWorkflowStatusDom()) {
   window.addEventListener('DOMContentLoaded', () => {
+    if (!canRenderWorkflowStatusDom()) return;
     const cards = document.querySelectorAll('.workflow-grid .workflow-card');
     let completeCount = 0;
 
@@ -362,13 +484,13 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') {
     const nextStepEl = document.getElementById('workflow-next-step');
     if (nextStepEl) {
       if (nextStep) {
-        nextStepEl.textContent = 'Next recommended step: ';
+        nextStepEl.textContent = `${READINESS_VOCABULARY.missingInputs}: Next recommended step: `;
         const link = document.createElement('a');
         link.href = nextStep.href;
         link.textContent = nextStep.label;
         nextStepEl.appendChild(link);
       } else {
-        nextStepEl.textContent = 'All workflow steps are complete. You are ready to generate reports.';
+        nextStepEl.textContent = `${READINESS_VOCABULARY.ready}: All workflow steps are complete. You are ready to generate reports.`;
       }
     }
   });

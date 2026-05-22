@@ -31,6 +31,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Reject generated dist changes in feature PRs
+        if: github.event_name == 'pull_request' && !startsWith(github.head_ref, 'release/')
+        run: |
+          git fetch origin ${{ github.base_ref }} --depth=1
+          npm run check:dist-review -- FETCH_HEAD
+
       - name: ESLint
         # Treat any warning as a failure so warnings don't accumulate.
         run: npx eslint . --max-warnings=0 --ignore-pattern dist/ --ignore-pattern node_modules/

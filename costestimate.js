@@ -7,11 +7,10 @@ import {
   parsePricingCSV,
   exportPricingCSV,
 } from './analysis/costEstimate.mjs';
-import { getCables, getTrays, getConduits, getStudies } from './dataStore.mjs';
+import { getCables, getTrays, getConduits, getStudies, migrateLegacyItem, setItem, removeItem } from './dataStore.mjs';
 import { showAlertModal } from './src/components/modal.js';
 
-// Intentionally unscoped — custom pricing is a user preference, not scenario-specific data.
-const STORAGE_KEY = 'ctr-custom-prices';
+const CUSTOM_PRICING_KEY = 'customPricing';
 
 document.addEventListener('DOMContentLoaded', () => {
   initSettings();
@@ -24,17 +23,14 @@ document.addEventListener('DOMContentLoaded', () => {
   let customPrices = null;          // null = use DEFAULT_PRICES
   let customPricingMeta = { source: '', date: '', rowCount: 0 };
 
-  // Restore persisted custom pricing from localStorage
+  // Restore persisted custom pricing from project settings.
   try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      if (parsed && parsed.prices && typeof parsed.prices === 'object') {
-        customPrices = parsed.prices;
-        customPricingMeta = parsed.meta || {};
-      }
+    const parsed = migrateLegacyItem('ctr-custom-prices', CUSTOM_PRICING_KEY, null);
+    if (parsed && parsed.prices && typeof parsed.prices === 'object') {
+      customPrices = parsed.prices;
+      customPricingMeta = parsed.meta || {};
     }
-  } catch { /* ignore corrupt storage */ }
+  } catch { /* ignore corrupt project settings */ }
 
   renderPricingBasis();
 
@@ -53,7 +49,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('reset-pricing-btn').addEventListener('click', () => {
     customPrices = null;
     customPricingMeta = { source: '', date: '', rowCount: 0 };
-    try { localStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ }
+    removeItem(CUSTOM_PRICING_KEY);
     renderPricingBasis();
     showAlertModal('Pricing Reset', 'Unit prices have been reset to default RS Means 2024 mid-range values.');
   });
@@ -91,8 +87,8 @@ document.addEventListener('DOMContentLoaded', () => {
       customPrices     = prices;
       customPricingMeta = meta;
       try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify({ prices, meta }));
-      } catch { /* storage quota — non-fatal */ }
+        setItem(CUSTOM_PRICING_KEY, { prices, meta });
+      } catch { /* project storage quota is handled centrally */ }
       renderPricingBasis();
       let msg = `Loaded ${meta.rowCount} pricing entries.`;
       if (meta.source) msg += `\nSource: ${meta.source}`;
