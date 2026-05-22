@@ -2,8 +2,7 @@ import { test, expect } from '@playwright/test';
 import fs from 'fs/promises';
 import os from 'os';
 import path from 'path';
-import { execFile } from 'child_process';
-import { promisify } from 'util';
+import XLSX from 'xlsx';
 import {
   navigateForE2E,
   applyCostEstimatorFixture,
@@ -22,8 +21,6 @@ import {
   getEmfRmsMicroTesla,
 } from './nextFeatures.helpers.js';
 
-const execFileAsync = promisify(execFile);
-
 async function assertExportDownload(download, expectedName) {
   const downloadName = download.suggestedFilename();
   expect(downloadName).toBe(expectedName);
@@ -37,72 +34,12 @@ async function assertExportDownload(download, expectedName) {
   return tempPath;
 }
 
-function escPy(str) {
-  return str.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-}
-
 async function readWorkbookRows(filePath) {
-  const pythonScript = `
-import json
-import zipfile
-import xml.etree.ElementTree as ET
-
-path = '${escPy(filePath)}'
-ns = {'m': 'http://schemas.openxmlformats.org/spreadsheetml/2006/main'}
-rels_ns = {'r': 'http://schemas.openxmlformats.org/package/2006/relationships'}
-
-def col_key(cell_ref):
-    letters = ''.join([ch for ch in cell_ref if ch.isalpha()])
-    value = 0
-    for ch in letters:
-        value = value * 26 + (ord(ch) - 64)
-    return value
-
-with zipfile.ZipFile(path, 'r') as zf:
-    shared = []
-    if 'xl/sharedStrings.xml' in zf.namelist():
-        root = ET.fromstring(zf.read('xl/sharedStrings.xml'))
-        for si in root.findall('m:si', ns):
-            txt = ''.join(t.text or '' for t in si.findall('.//m:t', ns))
-            shared.append(txt)
-
-    workbook = ET.fromstring(zf.read('xl/workbook.xml'))
-    wb_rels = ET.fromstring(zf.read('xl/_rels/workbook.xml.rels'))
-    rel_map = {rel.attrib['Id']: rel.attrib['Target'] for rel in wb_rels.findall('r:Relationship', rels_ns)}
-
-    by_name = {}
-    for sheet in workbook.findall('m:sheets/m:sheet', ns):
-        name = sheet.attrib.get('name', '')
-        rel_id = sheet.attrib.get('{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id')
-        target = rel_map.get(rel_id, '')
-        if target and not target.startswith('xl/'):
-            target = f"xl/{target}"
-
-        sheet_root = ET.fromstring(zf.read(target))
-        rows = []
-        for row in sheet_root.findall('m:sheetData/m:row', ns):
-            values = []
-            for c in sorted(row.findall('m:c', ns), key=lambda cell: col_key(cell.attrib.get('r', 'A1'))):
-                ctype = c.attrib.get('t')
-                v = c.find('m:v', ns)
-                if ctype == 's' and v is not None and v.text is not None:
-                    idx = int(v.text)
-                    values.append(shared[idx] if idx < len(shared) else '')
-                elif ctype == 'inlineStr':
-                    t = c.find('m:is/m:t', ns)
-                    values.append((t.text if t is not None else '') or '')
-                elif v is not None and v.text is not None:
-                    values.append(v.text)
-                else:
-                    values.append('')
-            rows.append(values)
-        by_name[name] = rows
-
-print(json.dumps(by_name))
-`;
-
-  const { stdout } = await execFileAsync('python3', ['-c', pythonScript], { maxBuffer: 1024 * 1024 * 5 });
-  return JSON.parse(stdout);
+  const workbook = XLSX.readFile(filePath);
+  return Object.fromEntries(workbook.SheetNames.map(sheetName => {
+    const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1, defval: '', raw: false });
+    return [sheetName, rows.map(row => row.map(value => String(value ?? '')))];
+  }));
 }
 
 test.describe('next features integration: cost estimator scenarios and exports', () => {
@@ -123,13 +60,13 @@ test.describe('next features integration: cost estimator scenarios and exports',
     await expect(results.locator('tr:has(th:has-text("Subtotal")) td strong')).toHaveText(
       `$${COST_ESTIMATOR_CANONICAL_FIXTURE.expected.subtotal.toLocaleString()}`,
     );
-    await expect(results.locator('tr:has(th:has-text("Contingency")) td').last()).toHaveText(
+    await expect(results.locator('.summary-contingency td').last()).toHaveText(
       `$${COST_ESTIMATOR_CANONICAL_FIXTURE.expected.contingencyAmountRounded.toLocaleString()}`,
     );
     await expect(results.locator('.summary-grand-total td strong')).toHaveText(
       `$${COST_ESTIMATOR_CANONICAL_FIXTURE.expected.totalRounded.toLocaleString()}`,
     );
-    await expect(results.locator('tr:has(th:has-text("Contingency")) td').last()).toHaveText(/^\$[\d,]+$/);
+    await expect(results.locator('.summary-contingency td').last()).toHaveText(/^\$[\d,]+$/);
     await expect(results.locator('.summary-grand-total td strong')).toHaveText(/^\$[\d,]+$/);
   });
 
@@ -141,14 +78,14 @@ test.describe('next features integration: cost estimator scenarios and exports',
     await fillCEInputs(page, { contingencyPct: String(expected.contingencyFloorPct) });
     await runCEEstimate(page);
     const results = page.locator('#results');
-    await expect(results.locator('tr:has(th:has-text("Contingency")) th')).toHaveText('Contingency (0%)');
-    await expect(results.locator('tr:has(th:has-text("Contingency")) td').last()).toHaveText('$0');
+    await expect(results.locator('.summary-contingency th')).toHaveText('Contingency (0%)');
+    await expect(results.locator('.summary-contingency td').last()).toHaveText('$0');
     await expect(results.locator('tr:has(th:has-text("Subtotal")) td strong')).toHaveText(subtotalFormatted);
     await expect(results.locator('.summary-grand-total td strong')).toHaveText(subtotalFormatted);
 
     await fillCEInputs(page, { contingencyPct: String(expected.contingencyCeilingPct) });
     await runCEEstimate(page);
-    await expect(results.locator('tr:has(th:has-text("Contingency")) th')).toHaveText('Contingency (100%)');
+    await expect(results.locator('.summary-contingency th')).toHaveText('Contingency (100%)');
     await expect(results.locator('tr:has(th:has-text("Subtotal")) td strong')).toHaveText(subtotalFormatted);
     await expect(results.locator('.summary-grand-total td strong')).toHaveText(`$${(expected.subtotal * 2).toLocaleString()}`);
     await expect(results.locator('.summary-grand-total td strong')).toHaveText(/^\$[\d,]+$/);
@@ -177,16 +114,16 @@ test.describe('next features integration: cost estimator scenarios and exports',
     const guardrailDialog = page.getByRole('dialog');
     await expect(guardrailDialog).toContainText('No Data');
     await expect(guardrailDialog).toContainText('Run the estimate first before exporting.');
-    await guardrailDialog.getByRole('button', { name: 'Close' }).click();
+    await guardrailDialog.getByRole('button', { name: 'Close', exact: true }).click();
 
     const expected = COST_ESTIMATOR_CANONICAL_FIXTURE.expected;
     await fillCEInputs(page, { contingencyPct: String(expected.contingencyPct) });
     await runCEEstimate(page);
     const results = page.locator('#results');
 
-    const uiContingencyLabel = (await results.locator('tr:has(th:has-text("Contingency")) th').innerText()).trim();
+    const uiContingencyLabel = (await results.locator('.summary-contingency th').innerText()).trim();
     const uiSubtotal = (await results.locator('tr:has(th:has-text("Subtotal")) td strong').innerText()).trim();
-    const uiContingency = (await results.locator('tr:has(th:has-text("Contingency")) td').last().innerText()).trim();
+    const uiContingency = (await results.locator('.summary-contingency td').last().innerText()).trim();
     const uiGrandTotal = (await results.locator('.summary-grand-total td strong').innerText()).trim();
 
     expect(uiContingencyLabel).toBe(`Contingency (${expected.contingencyPct}%)`);
@@ -349,7 +286,7 @@ test.describe('next features integration: emf acceptance cases', () => {
     const inputErrorDialog = page.getByRole('dialog');
     await expect(inputErrorDialog).toContainText('Input Error');
     await expect(inputErrorDialog).toContainText('Load current must be greater than zero.');
-    await inputErrorDialog.getByRole('button', { name: 'Close' }).click();
+    await inputErrorDialog.getByRole('button', { name: 'Close', exact: true }).click();
     await expect(page.locator('#results')).toContainText('RMS Flux Density');
     const zeroAttemptResultsHtml = await page.locator('#results').innerHTML();
     expect(zeroAttemptResultsHtml).toBe(priorResultsHtml);
@@ -359,7 +296,7 @@ test.describe('next features integration: emf acceptance cases', () => {
     const negativeValueDialog = page.getByRole('dialog');
     await expect(negativeValueDialog).toContainText('Input Error');
     await expect(negativeValueDialog).toContainText('Load current must be greater than zero.');
-    await negativeValueDialog.getByRole('button', { name: 'Close' }).click();
+    await negativeValueDialog.getByRole('button', { name: 'Close', exact: true }).click();
     await expect(page.locator('#results')).toContainText('RMS Flux Density');
     const negativeAttemptResultsHtml = await page.locator('#results').innerHTML();
     expect(negativeAttemptResultsHtml).toBe(priorResultsHtml);

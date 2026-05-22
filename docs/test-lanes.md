@@ -38,14 +38,15 @@ This preserves current behavior while adding explicit lane names for teams that 
 
 ## Next-features phased lane sequence
 
-For Cost Estimator + EMF acceptance hardening, run lanes in this order and gate merge at each step:
+For Cost Estimator, EMF, and Heat Trace acceptance hardening, run lanes in this order and gate merge at each step:
 
 1. Fixture/acceptance definition
 2. Test-structure refactor
 3. Cost Estimator deterministic integration tests
 4. EMF deterministic integration tests
 5. Export validation
-6. CI lane split and docs updates
+6. Heat Trace Sizing acceptance
+7. CI lane split and docs updates
 
 Phase-oriented commands:
 
@@ -53,6 +54,9 @@ Phase-oriented commands:
 - `npm run e2e:next-features-cost`
 - `npm run e2e:next-features-emf`
 - `npm run e2e:next-features-export`
+- `npm run e2e:heat-trace`
+- `npm run e2e:heat-trace-dashboard`
+- `npm run e2e:heat-trace-export`
 
 Current command mappings:
 
@@ -60,6 +64,10 @@ Current command mappings:
 - `npm run e2e:next-features-cost` → deterministic Cost Estimator acceptance set (`AT-CE-01` through `AT-CE-04`)
 - `npm run e2e:next-features-emf` → deterministic EMF acceptance set (`AT-EMF-01` through `AT-EMF-04`)
 - `npm run e2e:next-features-export` → export-specific validations (`AT-CE-04` and submittal XLSX download integration)
+
+- `npm run e2e:heat-trace` -> full Heat Trace acceptance lane (`AT-HT-01` through `AT-HT-06`)
+- `npm run e2e:heat-trace-dashboard` -> Heat Trace controls, deterministic sizing, persistence, dashboard, charts, warnings, sensitivity, and units (`AT-HT-01` through `AT-HT-05`)
+- `npm run e2e:heat-trace-export` -> Heat Trace branch/report/XLSX package validation (`AT-HT-06`)
 
 ## Week 1 rollout gate criteria (required pass conditions)
 
@@ -69,19 +77,23 @@ For the first seven calendar days after rollout, merge gates for next-feature ch
    - `npm run e2e:next-features-cost` must pass with no test retries consumed.
    - `npm run e2e:next-features-emf` must pass with no test retries consumed.
    - `npm run e2e:next-features-export` must pass before merging export-related changes.
+   - `npm run e2e:heat-trace` must pass before merging Heat Trace sizing, report, dashboard, sensitivity, or export changes.
 2. **Deterministic acceptance requirement**
    - Any PR that modifies Cost Estimator logic/fixtures must include a passing CE acceptance lane run in PR evidence.
    - Any PR that modifies EMF logic/fixtures must include a passing EMF acceptance lane run in PR evidence.
+   - Any PR that modifies Heat Trace logic/fixtures must include a passing Heat Trace acceptance lane run in PR evidence.
 3. **Baseline lane protection**
    - `npm run test:critical` and `npm run e2e:critical` remain required and cannot be waived during Week 1.
 
 ## PR checklist additions for related changes
 
-Add the following checklist items to PR descriptions when touching Cost Estimator, EMF, or export flows:
+Add the following checklist items to PR descriptions when touching Cost Estimator, EMF, Heat Trace, or export flows:
 
 - [ ] Deterministic CE acceptance lane passed (`npm run e2e:next-features-cost`) when CE code, fixtures, or selectors changed.
 - [ ] Deterministic EMF acceptance lane passed (`npm run e2e:next-features-emf`) when EMF code, fixtures, or selectors changed.
 - [ ] Export validation lane passed (`npm run e2e:next-features-export`) when CE export or submittal export behavior changed.
+- [ ] Heat Trace acceptance lane passed (`npm run e2e:heat-trace`) when Heat Trace sizing, persistence, dashboard, sensitivity, report, or export behavior changed.
+- [ ] Heat Trace export lane passed (`npm run e2e:heat-trace-export`) when Heat Trace branch schedule, report, or XLSX package behavior changed.
 - [ ] Attached CI/local artifact bundle for any retry used (trace, video/screenshot, and stdout log excerpt).
 
 ## Week 1 flake triage protocol

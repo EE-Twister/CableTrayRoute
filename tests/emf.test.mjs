@@ -137,6 +137,13 @@ describe('fieldFromConductorArray', () => {
     const bSingle = fieldFromSingleConductor(100, 1);
     assert.ok(result3ph.bRms_uT < bSingle * 3, `3ph: ${result3ph.bRms_uT}, single*3: ${bSingle * 3}`);
   });
+
+  it('3-phase tray layout produces consistent peak and RMS fields', () => {
+    const conductors = buildThreePhaseConductors(100, 1, 0.3048, 0.0254);
+    const result = fieldFromConductorArray(conductors, { x: 1.0668, y: 0.6096 });
+    assert.ok(result.bRms_uT > 0, `RMS: ${result.bRms_uT}`);
+    assert.ok(result.bPeak_uT >= result.bRms_uT, `Peak: ${result.bPeak_uT}, RMS: ${result.bRms_uT}`);
+  });
 });
 
 // ---------------------------------------------------------------------------

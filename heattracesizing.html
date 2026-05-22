@@ -18,6 +18,15 @@
   <meta name="color-scheme" content="light dark">
   <link rel="stylesheet" href="style.css" />
   <script type="module" src="dirtyTracker.js"></script>
+  <script src="dist/vendor/xlsx.full.min.js" defer></script>
+  <script src="cdnFallback.js" defer></script>
+  <script>
+    window.addEventListener('load', function () {
+      if (typeof initCdnFallback === 'function') {
+        initCdnFallback([{ global: 'XLSX', label: 'Heat trace package export (XLSX)' }]);
+      }
+    });
+  </script>
   <script type="module" src="dist/heattracesizing.js?v=heat-trace-comments-2"></script>
 </head>
 <body class="heattracesizing-page" data-report-title="Heat Trace Sizing">

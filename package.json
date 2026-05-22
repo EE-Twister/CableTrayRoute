@@ -17,6 +17,9 @@
     "e2e:next-features-cost": "playwright test --config playwright.config.cjs playwright-tests/nextFeatures.integration.spec.js --grep \"AT-CE-0[1-4]\"",
     "e2e:next-features-emf": "playwright test --config playwright.config.cjs playwright-tests/nextFeatures.integration.spec.js --grep \"AT-EMF-0[1-4]\"",
     "e2e:next-features-export": "playwright test --config playwright.config.cjs playwright-tests/nextFeatures.integration.spec.js --grep \"AT-CE-04|submittal xlsx export downloads expected file\"",
+    "e2e:heat-trace": "playwright test --config playwright.config.cjs playwright-tests/heatTrace.acceptance.spec.js",
+    "e2e:heat-trace-dashboard": "playwright test --config playwright.config.cjs playwright-tests/heatTrace.acceptance.spec.js --grep \"AT-HT-0[1-5]\"",
+    "e2e:heat-trace-export": "playwright test --config playwright.config.cjs playwright-tests/heatTrace.acceptance.spec.js --grep \"AT-HT-06\"",
     "audit:components": "node scripts/componentCoverageAudit.mjs"
   },
   "devDependencies": {

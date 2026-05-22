@@ -1,8 +1,8 @@
 {
-  "generatedAt": "2026-05-22T00:14:26.361Z",
+  "generatedAt": "2026-05-22T01:44:46.991Z",
   "summary": {
     "testSuiteCount": 160,
-    "totalAssertions": 6551,
+    "totalAssertions": 6553,
     "benchmarkCount": 6,
     "standardCount": 13,
     "necComplianceCount": 8
@@ -468,7 +468,7 @@
         "fieldProfile",
         "checkCompliance"
       ],
-      "assertionCount": 32
+      "assertionCount": 34
     },
     {
       "file": "tests/equipmentArrangementsPage.test.cjs",

@@ -59,11 +59,7 @@ export function fieldFromSingleConductor(currentA, distanceM) {
  * @returns {{ bPeak_uT: number, bRms_uT: number }} Peak and RMS flux density in µT
  */
 export function fieldFromConductorArray(conductors, measurePoint) {
-  // Compute time-domain peak by sampling phase from 0 to 2π
-  // Each conductor contributes a sinusoidal field component
-  let bxMax = 0, byMax = 0;
-  let bxRmsSum = 0, byRmsSum = 0;
-
+  // Each conductor contributes a sinusoidal field component.
   // Vector superposition at the measurement point
   // For each conductor i: Bx_i(t) = B_i × cos(θ_i + ωt) × (dy_i/d_i)
   //                        By_i(t) = B_i × cos(θ_i + ωt) × (-dx_i/d_i)
@@ -80,29 +76,22 @@ export function fieldFromConductorArray(conductors, measurePoint) {
     return { Bmag, theta, ux, uy };
   }).filter(Boolean);
 
-  // Compute peak field by scanning one cycle (360 samples)
+  // Compute peak and RMS fields from the same sampled time-domain waveform.
   let peakB = 0;
-  let bxRss = 0, byRss = 0;
+  let sumSquaredB = 0;
   for (let s = 0; s < 360; s++) {
     const wt = (s / 360) * 2 * Math.PI;
     let bx = 0, by = 0;
     components.forEach(c => {
-      const inst = c.Bmag * Math.cos(c.theta + wt);
+      const inst = c.Bmag * Math.SQRT2 * Math.cos(c.theta + wt);
       bx += inst * c.ux;
       by += inst * c.uy;
     });
     const b = Math.sqrt(bx * bx + by * by);
     if (b > peakB) peakB = b;
+    sumSquaredB += b * b;
   }
-
-  // RMS: for each component, B_rms = B_mag / sqrt(2)
-  // Total B_rms = RSS of all component RMS values (approximate for uncorrelated phases)
-  components.forEach(c => {
-    const bRmsComp = c.Bmag / Math.SQRT2;
-    bxRss += bRmsComp * bRmsComp * c.ux * c.ux;
-    byRss += bRmsComp * bRmsComp * c.uy * c.uy;
-  });
-  const bRms = Math.sqrt(bxRss + byRss);
+  const bRms = Math.sqrt(sumSquaredB / 360);
 
   return { bPeak_uT: peakB, bRms_uT: bRms };
 }
@@ -121,13 +110,18 @@ export function fieldFromConductorArray(conductors, measurePoint) {
  */
 export function buildThreePhaseConductors(currentA, nCables, trayWidthM, cableOdM) {
   const conductors = [];
-  const spacingM = nCables > 1 ? (trayWidthM - cableOdM) / (nCables - 1) : 0;
-  for (let i = 0; i < nCables; i++) {
-    const xBase = nCables > 1 ? -trayWidthM / 2 + cableOdM / 2 + i * spacingM : 0;
-    // Three phases for each cable set
-    conductors.push({ x: xBase, y: 0, currentA, phaseAngleDeg: 0 });    // Phase A
-    conductors.push({ x: xBase, y: 0, currentA, phaseAngleDeg: 120 });  // Phase B
-    conductors.push({ x: xBase, y: 0, currentA, phaseAngleDeg: 240 });  // Phase C
+  const setCount = Math.max(1, parseInt(nCables, 10) || 1);
+  const totalConductors = setCount * 3;
+  const spacingM = totalConductors > 1 ? trayWidthM / (totalConductors + 1) : 0;
+  const phaseAngles = [0, 120, 240];
+  for (let i = 0; i < totalConductors; i++) {
+    const x = totalConductors > 1 ? -trayWidthM / 2 + spacingM * (i + 1) : 0;
+    conductors.push({
+      x,
+      y: cableOdM / 2,
+      currentA,
+      phaseAngleDeg: phaseAngles[i % phaseAngles.length],
+    });
   }
   return conductors;
 }

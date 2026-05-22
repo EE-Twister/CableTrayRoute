@@ -8,6 +8,7 @@ import {
   exportPricingCSV,
 } from './analysis/costEstimate.mjs';
 import { getCables, getTrays, getConduits, getStudies } from './dataStore.mjs';
+import { showAlertModal } from './src/components/modal.js';
 
 // Intentionally unscoped — custom pricing is a user preference, not scenario-specific data.
 const STORAGE_KEY = 'ctr-custom-prices';
@@ -261,7 +262,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <td>${fmt(summary.grandLabor)}</td>
             <td><strong>${fmt(summary.grandTotal)}</strong></td>
           </tr>
-          <tr>
+          <tr class="summary-contingency">
             <th scope="row">Contingency (${(contingencyPct * 100).toFixed(0)}%)</th>
             <td colspan="2"></td>
             <td>${fmt(contingencyAmt)}</td>

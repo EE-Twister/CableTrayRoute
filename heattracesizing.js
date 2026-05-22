@@ -172,12 +172,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const saved = getStudies().heatTraceSizing;
   if (saved) {
     const savedUnitSystem = saved.unitSystem || 'imperial';
-    if (unitSystemSelect) {
-      unitSystemSelect.value = savedUnitSystem;
-      activeUnitSystem = savedUnitSystem;
-    }
-    applyUnitSystem(activeUnitSystem, { convertExistingValues: false });
-    const liveResult = getLiveAnalysisResult();
+    writeInputsToForm(saved, savedUnitSystem);
+    const liveResult = getLiveAnalysisResult() || saved;
+    if (!liveResult.unitSystem) liveResult.unitSystem = savedUnitSystem;
     renderResults(liveResult);
     renderSystemOverview(liveResult);
     renderWorkspaceCharts(liveResult);
@@ -1573,6 +1570,9 @@ document.addEventListener('DOMContentLoaded', () => {
       inputs: readInputs(),
       result,
     };
+    if (sensitivityControls) {
+      sensitivityControls.innerHTML = '';
+    }
     renderSensitivityModule();
   }
 
@@ -2619,7 +2619,7 @@ function initSaveAction() {
 
 function roundForDisplay(value, fieldId) {
   const precisionByField = {
-    'insulation-thickness-in': 1,
+    'insulation-thickness-in': 2,
     'line-length-ft': 1,
     'ambient-temp-c': 0,
     'wind-speed-mph': 0,

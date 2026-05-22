@@ -1,32 +1,33 @@
-# Next Features Acceptance Plan: Cost Estimator + EMF Analysis
+# Next Features Acceptance Plan: Cost Estimator + EMF Analysis + Heat Trace Sizing
 
 This document upgrades existing Playwright smoke checks into stronger acceptance targets for:
 
 - `costestimate.html`
 - `emf.html`
+- `heattracesizing.html`
 
-Source smoke coverage reference: `playwright-tests/nextFeatures.spec.js` under describe blocks **"Cost Estimator"** and **"EMF Analysis"**.
+Source smoke coverage reference: `playwright-tests/nextFeatures.spec.js` under describe blocks **"Cost Estimator"** and **"EMF Analysis"**, plus the dedicated Heat Trace acceptance lane in `playwright-tests/heatTrace.acceptance.spec.js`.
 
 ---
 
 ## Heat Trace Sizing — Minimum Acceptance Checklist
 
-- [ ] User can select at least **4 pipe materials**.
-- [ ] User can select at least **4 environment classes**.
-- [ ] Output includes required **W/ft** (or **W/m**), **total watts**, and a **recommended cable rating**.
-- [ ] Changing selected material or environment updates the result **deterministically** for the same inputs.
-- [ ] Results persist and reload via `studyResults.heatTraceSizing`.
-- [ ] Heat Trace Sizing appears in top navigation, command palette, and workflow dashboard summaries.
+- [x] User can select at least **4 pipe materials**.
+- [x] User can select at least **4 environment classes**.
+- [x] Output includes required **W/ft** (or **W/m**), **total watts**, and a **recommended cable rating**.
+- [x] Changing selected material or environment updates the result **deterministically** for the same inputs.
+- [x] Results persist and reload via `studyResults.heatTraceSizing`.
+- [x] Heat Trace Sizing appears in top navigation, command palette, and workflow dashboard summaries.
 
 ### Heat Trace dashboard acceptance checks (expanded)
 
-- [ ] **Overview section** renders KPI cards for base heat loss, required heat input, recommended watt density, and circuit check.
-- [ ] **Heat Loss section** renders thermal-resistance outputs (`insulationKmPerW`, `externalKmPerW`, `totalKmPerW`) and applied multipliers.
-- [ ] **Circuit Sizing section** renders utilization/length compliance indicators and recommendation state.
-- [ ] **Temperature Profile section** renders a non-empty chart path after valid calculation inputs.
-- [ ] **Sensitivity section** renders baseline delta values, ranked insights, and Quick Apply controls.
-- [ ] Severity warnings (info/warning/error) appear for undersized cable, circuit-length exceedance, or low thermal headroom conditions.
-- [ ] Unit conversion (Imperial/Metric) keeps KPI values, chart labels, and warning thresholds numerically consistent (within conversion tolerance) when toggling units.
+- [x] **Overview section** renders KPI cards for base heat loss, required heat input, recommended watt density, and circuit check.
+- [x] **Heat Loss section** renders thermal-resistance outputs (`insulationKmPerW`, `externalKmPerW`, `totalKmPerW`) and applied multipliers.
+- [x] **Circuit Sizing section** renders utilization/length compliance indicators and recommendation state.
+- [x] **Temperature Profile section** renders a non-empty chart path after valid calculation inputs.
+- [x] **Sensitivity section** renders baseline delta values, ranked insights, and Quick Apply controls.
+- [x] Severity warnings (info/warning/error) appear for undersized cable, circuit-length exceedance, or low thermal headroom conditions.
+- [x] Unit conversion (Imperial/Metric) keeps KPI values, chart labels, and warning thresholds numerically consistent (within conversion tolerance) when toggling units.
 
 ---
 
@@ -34,11 +35,82 @@ Source smoke coverage reference: `playwright-tests/nextFeatures.spec.js` under d
 
 The following checks validate the new analysis outputs and recommendation insight workflow:
 
-- [ ] Analysis output panel includes thermal resistance terms, multipliers, and sizing diagnostics after each successful run.
-- [ ] Recommendation insights are derived from baseline one-variable perturbations and are sorted by greatest reduction in required heat input.
-- [ ] Quick Apply updates the associated input control, triggers recalculation, and refreshes KPI + chart outputs without stale values.
-- [ ] Resetting baseline updates subsequent delta computations so insight rankings match the new baseline context.
-- [ ] Documentation and UI language clearly state this tool is for screening-level design and requires final vendor verification before procurement.
+- [x] Analysis output panel includes thermal resistance terms, multipliers, and sizing diagnostics after each successful run.
+- [x] Recommendation insights are derived from baseline one-variable perturbations and are sorted by greatest reduction in required heat input.
+- [x] Quick Apply updates the associated input control, triggers recalculation, and refreshes KPI + chart outputs without stale values.
+- [x] Resetting baseline updates subsequent delta computations so insight rankings match the new baseline context.
+- [x] Documentation and UI language clearly state this tool is for screening-level design and requires final vendor verification before procurement.
+
+---
+
+## Heat Trace Sizing executable acceptance IDs
+
+The dedicated lane is `npm run e2e:heat-trace`.
+
+- `AT-HT-01`: Controls, navigation, command palette, workflow dashboard entry, and catalog breadth.
+- `AT-HT-02`: Deterministic sizing outputs for baseline and windy/stainless material/environment changes.
+- `AT-HT-03`: Persistence through `studyResults.heatTraceSizing`, reload rendering, and dashboard completion state.
+- `AT-HT-04`: KPI cards, thermal/circuit details, non-empty SVG charts, and severe warning cases.
+- `AT-HT-05`: Sensitivity rows, ranked Quick Apply, baseline reset, and imperial/metric parity.
+- `AT-HT-06`: Branch case persistence, calculation report language, and XLSX construction package sheet contract.
+
+### HT-Normal-01 (baseline indoor carbon steel)
+
+**Inputs:** NPS `2`, carbon steel, indoor still, mineral wool, `150 ft`, `1 in` insulation, maintain `60 C`, ambient `20 C`, wind `0 mph`, margin `10%`, `120 V`, self-regulating, `1` trace run, `300 ft` max circuit.
+
+**Expected outputs:**
+
+- Required output = **5.07 W/ft** (**16.63 W/m**)
+- Total required heat load = **759.9 W**
+- Recommended cable rating = **8 W/ft** (**26.2 W/m**)
+- Installed output = **8 W/ft**
+- Installed connected load = **1200 W**
+- Total resistance = **2.9121 K-m/W**
+- Warnings = **0**
+
+### HT-Change-01 (windy stainless)
+
+**Inputs:** same as HT-Normal-01 except stainless steel, outdoor windy, ambient `-10 C`, wind `15 mph`.
+
+**Expected outputs:**
+
+- Required output = **9.52 W/ft**
+- Total required heat load = **1427.9 W**
+- Recommended cable rating = **10 W/ft**
+- Total resistance = **2.5888 K-m/W**
+
+### HT-Warning-01 (severe environment and length review)
+
+**Inputs:** NPS `2`, copper, outdoor windy, mineral wool, `550 ft`, `0.5 in` insulation, maintain `80 C`, ambient `-35 C`, wind `25 mph`, margin `20%`, `120 V`, self-regulating, `1` trace run, `300 ft` max circuit.
+
+**Expected outputs and behavior:**
+
+- Required output = **27.13 W/ft**
+- Total required heat load = **14920.5 W**
+- Recommended cable rating = **30 W/ft**
+- Effective trace length = **550 ft**
+- Circuit check renders **Review**
+- Warning text includes very low ambient, long circuit length, and high wind speed.
+
+### HT-Sensitivity-01 (one-step improvement)
+
+Using HT-Normal-01 as the baseline, the top ranked Quick Apply recommendation increases insulation thickness from `1 in` to `1.25 in`.
+
+**Expected outputs after Quick Apply:**
+
+- Insulation input = **1.25 in**
+- Required heat load = approximately **672 W**
+- Required output = approximately **4.48 W/ft**
+- Set Baseline resets subsequent deltas to approximately **0.00 W/ft**
+
+### HT-Export-01 (construction package)
+
+After saving branch `HT-A101`, `Export Package (.xlsx)` downloads a workbook named `heat-trace-package-YYYY-MM-DD.xlsx` with sheets:
+
+- `Line List`
+- `BOM`
+- `Controller Schedule`
+- `Assumptions`
 
 ---
 
@@ -140,12 +212,12 @@ The following checks validate the new analysis outputs and recommendation insigh
 
 **Expected deterministic outputs (from pricing + labor formulas):**
 
-- Cable subtotal = **$2,486**
-- Tray subtotal = **$980**
+- Cable subtotal = **$1,515**
+- Tray subtotal = **$830**
 - Conduit subtotal = **$756**
-- Grand subtotal (pre-contingency) = **$4,222**
-- Contingency @ 15% = **$633** (display rounds from 633.3)
-- Grand total incl. contingency = **$4,855** (display rounds from 4,855.3)
+- Grand subtotal (pre-contingency) = **$3,101**
+- Contingency @ 15% = **$465** (display rounds from 465.15)
+- Grand total incl. contingency = **$3,566** (display rounds from 3,566.15)
 
 ### CE-Boundary-01 (contingency floor)
 
@@ -201,8 +273,8 @@ The following checks validate the new analysis outputs and recommendation insigh
 
 **Expected outputs/ranges:**
 
-- B_rms displays approximately **1.970 µT**
-- B_peak displays approximately **2.786 µT**
+- B_rms displays approximately **1.771 µT**
+- B_peak displays approximately **2.504 µT**
 - ICNIRP Occupational: PASS
 - ICNIRP General Public: PASS
 
@@ -210,14 +282,14 @@ The following checks validate the new analysis outputs and recommendation insigh
 
 Using same geometry and frequency as EMF-Normal-01, vary only current.
 
-- At **~10,150 A** current, expected B_rms is near **200 µT** (boundary band)
-- At **10,500 A**, expected General Public = FAIL, Occupational = PASS
+- At **~11,292 A** current, expected B_rms is near **200 µT** (boundary band)
+- At **11,500 A**, expected General Public = FAIL, Occupational = PASS
 
 ### EMF-Boundary-02 (occupational threshold crossing)
 
 Using same geometry and frequency:
 
-- At **~50,750 A**, expected B_rms is near **1000 µT** (boundary band)
+- At **~56,461 A**, expected B_rms is near **1000 µT** (boundary band)
 - Above this, both Occupational and General Public should be FAIL
 
 ### EMF-Invalid-01 (zero current)
@@ -269,6 +341,25 @@ Because EMF uses trigonometric scanning over 360 samples, use tolerance bands:
 
 - Computed values outside tolerance bands.
 - PASS/FAIL label inconsistent with calculated utilization and threshold.
+
+### 3.3 Heat Trace numeric policy
+
+Use fixture-level deterministic assertions on stored `studyResults.heatTraceSizing` and display-level assertions for the rendered dashboard:
+
+- Required output: `+/-0.01 W/ft` for imperial fixture outputs.
+- Required output metric conversion: `+/-0.30 W/m` after UI conversion/rounding.
+- Total watts: `+/-0.1 W`.
+- Thermal resistance: `+/-0.0001 K-m/W`.
+- Recommended cable rating: exact catalog rating in W/ft.
+- Reload behavior: stored output and rendered detail values must remain tied to the saved input basis, not default form values.
+
+**Fail criteria:**
+
+- Any deterministic fixture deviates beyond tolerance.
+- Material/environment changes do not produce the documented changed output.
+- Reload renders default or stale values instead of the saved Heat Trace result.
+- Sensitivity Quick Apply leaves stale KPI/detail/chart output.
+- XLSX export is blocked by a missing `XLSX` runtime or missing required package sheets.
 
 ---
 
@@ -335,15 +426,21 @@ This table maps each existing smoke test in the two targeted describe blocks to 
 - `AT-EMF-02`: ICNIRP boundary crossing labels
 - `AT-EMF-03`: Profile chart domain render
 - `AT-EMF-04`: Invalid-current modal contract
+- `AT-HT-01`: Heat Trace controls, navigation, and catalog breadth
+- `AT-HT-02`: Heat Trace deterministic sizing outputs
+- `AT-HT-03`: Heat Trace persistence, reload, and workflow dashboard completion
+- `AT-HT-04`: Heat Trace dashboard details, charts, and warnings
+- `AT-HT-05`: Heat Trace sensitivity and unit conversion parity
+- `AT-HT-06`: Heat Trace branch cases, report, and XLSX package export
 
-These IDs should be used as traceable links from future `playwright-tests/nextFeatures.spec.js` upgrades.
+These IDs should be used as traceable links from future `playwright-tests/nextFeatures.spec.js` upgrades and from the dedicated Heat Trace acceptance lane.
 
 
 ---
 
 ## 7) Workflow Documentation Snapshot (Post-Integration Tests)
 
-The integration tests in `playwright-tests/nextFeatures.spec.js` now act as executable contracts. Keep user-facing docs aligned with the assumptions below so manual workflows and automated checks stay in sync.
+The integration tests in `playwright-tests/nextFeatures.spec.js` and `playwright-tests/heatTrace.acceptance.spec.js` now act as executable contracts. Keep user-facing docs aligned with the assumptions below so manual workflows and automated checks stay in sync.
 
 ### 7.1 Cost Estimator workflow contract
 
@@ -386,7 +483,25 @@ The integration tests in `playwright-tests/nextFeatures.spec.js` now act as exec
 - EMF workflow currently emphasizes on-screen analytical validation; no dedicated file export is required by the integration contract in this plan.
 - If downstream reporting captures EMF results, values should be sourced from the same computed result state validated by `AT-EMF-*` scenarios.
 
-### 7.3 Concise troubleshooting (validation-aligned)
+### 7.3 Heat Trace workflow contract
+
+**Input assumptions**
+- Imperial UI temperature entries are Fahrenheit and are normalized to Celsius before analysis.
+- Metric UI entries keep temperature in Celsius and convert length, insulation, wind, and circuit limits to the internal imperial basis where needed.
+- `studyResults.heatTraceSizing` is the persisted active result, and `studyResults.heatTraceSizingCircuits` is the persisted branch schedule.
+
+**Expected outputs**
+- Dashboard KPI cards render heat loss, required heat input, installed connected load, and circuit check.
+- Detail panels expose thermal resistance, multipliers, selected output, installed load, current, utilization, and warning count.
+- Temperature and heat-loss charts render non-empty SVG paths after valid inputs.
+- Sensitivity Quick Apply recalculates the live dashboard and Set Baseline resets deltas.
+
+**Export behavior**
+- `Export Package (.xlsx)` requires at least one saved branch case.
+- Exported workbook sheet names are `Line List`, `BOM`, `Controller Schedule`, and `Assumptions`.
+- Assumptions/report language must identify the calculation as screening-level and require manufacturer verification before final design/procurement.
+
+### 7.4 Concise troubleshooting (validation-aligned)
 
 | Symptom seen by user/test | Likely cause | Recommended fix |
 |---|---|---|
@@ -396,6 +511,9 @@ The integration tests in `playwright-tests/nextFeatures.spec.js` now act as exec
 | EMF calculation opens Input Error modal | Load current is `0` or negative | Enter current `> 0` and rerun **Calculate Field** or **Field Profile**. |
 | EMF compliance badge seems unexpected near limit | Value is near threshold and within tolerance band | Re-run with the same fixture, inspect computed `B_rms`, and compare against Section 3.2 boundary tolerance guidance. |
 | Field profile area stays hidden/empty | Invalid numeric input prevented profile generation | Correct invalid fields (especially current), then run **Field Profile (0–120 in)** again. |
+| Heat Trace reload shows unexpected values | Saved inputs were not restored before recalculation | Confirm `studyResults.heatTraceSizing` exists and rerun `AT-HT-03`. |
+| Heat Trace package export shows Library Error | XLSX runtime did not load | Refresh the page and verify the local SheetJS bundle is loaded before rerunning `AT-HT-06`. |
+| Heat Trace Quick Apply does not change output | Sensitivity baseline/control state is stale | Run analysis again, apply the top insight, then use Set Baseline to reset deltas. |
 
 
 ---
@@ -409,7 +527,8 @@ Roll out acceptance expansion in the following **strict order**:
 3. **Cost Estimator deterministic integration tests**
 4. **EMF deterministic integration tests**
 5. **Export validation**
-6. **CI lane split and docs updates**
+6. **Heat Trace Sizing acceptance lane**
+7. **CI lane split and docs updates**
 
 ### 8.1 Required merge gate for each phase
 
@@ -426,7 +545,8 @@ Roll out acceptance expansion in the following **strict order**:
 | 3. Cost Estimator deterministic integration tests | `npm run e2e:next-features-cost` |
 | 4. EMF deterministic integration tests | `npm run e2e:next-features-emf` |
 | 5. Export validation | `npm run e2e:next-features-export` |
-| 6. CI lane split and docs updates | `npm run test:critical`, `npm run e2e:critical`, `npm test`, `npm run e2e` |
+| 6. Heat Trace Sizing acceptance lane | `npm run e2e:heat-trace` |
+| 7. CI lane split and docs updates | `npm run test:critical`, `npm run e2e:critical`, `npm test`, `npm run e2e` |
 
 ### 8.3 One-week flaky-test monitoring policy
 

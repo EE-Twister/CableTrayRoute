@@ -1,4 +1,5 @@
 import { getCables, getTrays, getConduits, getEquipment, getDuctbanks } from './dataStore.mjs';
+import { showAlertModal } from './src/components/modal.js';
 
 document.addEventListener('DOMContentLoaded', () => {
   initSettings();

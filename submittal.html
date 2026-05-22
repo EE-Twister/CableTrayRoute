@@ -18,6 +18,15 @@
   <meta name="color-scheme" content="light dark">
   <link rel="stylesheet" href="style.css" />
   <script type="module" src="dirtyTracker.js"></script>
+  <script src="dist/vendor/xlsx.full.min.js" defer></script>
+  <script src="cdnFallback.js" defer></script>
+  <script>
+    window.addEventListener('load', function () {
+      if (typeof initCdnFallback === 'function') {
+        initCdnFallback([{ global: 'XLSX', label: 'Excel export (XLSX)' }]);
+      }
+    });
+  </script>
   <script type="module" src="dist/submittal.js" defer></script>
 </head>
 <body class="submittal-page" data-report-title="Submittal Package">

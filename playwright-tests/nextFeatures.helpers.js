@@ -29,13 +29,13 @@ export const COST_ESTIMATOR_CANONICAL_FIXTURE = {
     },
   },
   expected: {
-    cableSubtotal: 2486,
-    traySubtotal: 980,
+    cableSubtotal: 1515,
+    traySubtotal: 830,
     conduitSubtotal: 756,
-    subtotal: 4222,
+    subtotal: 3101,
     contingencyPct: 15,
-    contingencyAmountRounded: 633,
-    totalRounded: 4855,
+    contingencyAmountRounded: 465,
+    totalRounded: 3566,
     contingencyFloorPct: 0,
     contingencyCeilingPct: 100,
   },
@@ -57,13 +57,13 @@ export const EMF_CANONICAL_FIXTURE = {
     measDistance: '36',
   },
   boundaryCurrents: {
-    nearGeneralPublicBoundary: '10150',
-    overGeneralPublicBoundary: '10500',
-    nearOccupationalBoundary: '50750',
+    nearGeneralPublicBoundary: '11292',
+    overGeneralPublicBoundary: '11500',
+    nearOccupationalBoundary: '56461',
   },
   expected: {
-    normalBrmsMicroTesla: 1.97,
-    normalBpeakMicroTesla: 2.786,
+    normalBrmsMicroTesla: 1.771,
+    normalBpeakMicroTesla: 2.504,
   },
   tolerances: {
     brmsLowCurrentAbs: 0.02,
@@ -95,6 +95,14 @@ export const COST_ESTIMATOR_FIXTURES = {
 };
 
 export async function navigateForE2E(page, file) {
+  await page.addInitScript(() => {
+    if (new URLSearchParams(window.location.search).has('e2e_reset')) {
+      try {
+        localStorage.clear();
+        sessionStorage.clear();
+      } catch {}
+    }
+  });
   await page.goto(pageUrl(file));
   await page.waitForLoadState('networkidle');
 }
@@ -113,11 +121,11 @@ export async function applyCostEstimatorFixture(page, fixture) {
 
 export async function fillCostEstimatorForm(page, overrides = {}) {
   const values = {
-    contingencyPct: '10',
-    laborCableRate: '68',
-    laborTrayRate: '61',
-    laborConduitRate: '58',
-    fittingPrice: '72',
+    contingencyPct: '15',
+    laborCableRate: '',
+    laborTrayRate: '',
+    laborConduitRate: '',
+    fittingPrice: '',
     ...overrides,
   };
 
@@ -164,23 +172,23 @@ export async function setupEMFPage(page) {
 
 export async function fillCEInputs(page, overrides = {}) {
   const values = {
-    contingencyPct: '10',
-    laborCableRate: '68',
-    laborTrayRate: '61',
-    laborConduitRate: '58',
-    fittingPrice: '72',
+    contingencyPct: '15',
+    laborCableRate: '',
+    laborTrayRate: '',
+    laborConduitRate: '',
+    fittingPrice: '',
     ...overrides,
   };
 
-  await page.getByLabel('Contingency (%)').fill(values.contingencyPct);
   const details = page.locator('#price-overrides');
   if (!(await details.evaluate(el => el.hasAttribute('open')))) {
     await details.locator('summary').click();
   }
-  await page.getByLabel('Labor ($/ft, cable)').fill(values.laborCableRate);
-  await page.getByLabel('Labor ($/ft, tray)').fill(values.laborTrayRate);
-  await page.getByLabel('Labor ($/ft, conduit)').fill(values.laborConduitRate);
-  await page.getByLabel('Tray fitting unit price ($)').fill(values.fittingPrice);
+  await fillInputValue(page, '#contingency-pct', values.contingencyPct);
+  await fillInputValue(page, '#labor-cable-rate', values.laborCableRate);
+  await fillInputValue(page, '#labor-tray-rate', values.laborTrayRate);
+  await fillInputValue(page, '#labor-conduit-rate', values.laborConduitRate);
+  await fillInputValue(page, '#fitting-price', values.fittingPrice);
 }
 
 export async function runCEEstimate(page) {
@@ -210,12 +218,27 @@ export async function fillEMFInputs(page, overrides = {}) {
     ...overrides,
   };
 
-  await page.getByLabel('Frequency (Hz)').selectOption(values.frequency);
-  await page.getByLabel('Load Current per Phase (A)').fill(values.loadCurrent);
-  await page.getByLabel('Number of Parallel Cable Sets').fill(values.nCables);
-  await page.getByLabel('Tray Width (in)').fill(values.trayWidth);
-  await page.getByLabel('Cable O.D. (in)').fill(values.cableOd);
-  await page.getByLabel('Measurement Distance from Tray Edge (in)').fill(values.measDistance);
+  await page.locator('#frequency').selectOption(values.frequency);
+  await fillInputValue(page, '#load-current', values.loadCurrent);
+  await fillInputValue(page, '#n-cables', values.nCables);
+  await fillInputValue(page, '#tray-width', values.trayWidth);
+  await fillInputValue(page, '#cable-od', values.cableOd);
+  await fillInputValue(page, '#meas-distance', values.measDistance);
+}
+
+async function fillInputValue(page, selector, value) {
+  const normalized = String(value ?? '');
+  const input = page.locator(selector);
+  await input.waitFor({ state: 'visible' });
+  if (normalized === '' || Number.isFinite(Number(normalized))) {
+    await input.fill(normalized);
+    return;
+  }
+  await input.evaluate((el) => {
+    el.value = '';
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  });
 }
 
 export async function runEMFCalculate(page) {
@@ -248,7 +271,7 @@ export async function getCostEstimateGrandTotal(page) {
 }
 
 export async function getCostEstimateContingencyAmount(page) {
-  const contingencyText = await page.locator('tr:has(th:has-text("Contingency")) td').last().innerText();
+  const contingencyText = await page.locator('.summary-contingency td').last().innerText();
   return parseCurrency(contingencyText);
 }
 

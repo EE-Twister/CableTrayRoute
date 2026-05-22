@@ -5,6 +5,7 @@ import {
   checkCompliance,
   ICNIRP_LIMITS,
 } from './analysis/emf.mjs';
+import { showAlertModal } from './src/components/modal.js';
 
 document.addEventListener('DOMContentLoaded', () => {
   initSettings();
@@ -64,7 +65,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const compRows = Object.values(compliance).map(c => {
       const cls = c.pass ? 'result-ok' : 'result-fail';
       return `<tr class="${cls}">
-        <td>${esc(c.label)}</td>
+        <th scope="row">${esc(c.label)}</th>
         <td>${esc(c.limit)} µT</td>
         <td>${result.bRms_uT.toFixed(3)} µT</td>
         <td>${(c.ratio * 100).toFixed(1)}%</td>
@@ -121,7 +122,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <p>Conductors modelled as infinite parallel lines. Measurement point at
           ${esc(inp.measDistanceIn)} in from tray edge, 24 in above tray floor.</p>
           <p>Formula: B = (µ₀/2π) × (I/d), with vector superposition across all ${esc(inp.nCables * 3)}
-          conductors (${esc(inp.nCables)} cable set(s) × 3 phases). Peak field found by scanning 360 phase samples.</p>
+          conductors (${esc(inp.nCables)} cable set(s) × 3 phases). Peak and RMS fields found by scanning 360 phase samples.</p>
         </details>
       </div>`;
 
