@@ -1,11 +1,11 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 @import "./src/styles/tokens.css";
-@import "./src/styles/oneline.css";
+@import "./src/styles/oneline.css?v=one-line-datablock-contrast-v1";
 @import "./src/styles/base.css";
 @import "./src/styles/navigation.css";
 @import "./src/styles/auth.css";
 @import "./src/styles/layout.css";
-@import "./src/styles/forms.css";
+@import "./src/styles/forms.css?v=dark-palette-icons";
 @import "./src/styles/modals.css";
 @import "./src/styles/tables.css";
 @import "./src/styles/messages.css";

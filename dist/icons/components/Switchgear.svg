@@ -1,6 +1,11 @@
-<svg id="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 40">
-  <line x1="0" y1="20" x2="20" y2="20" stroke="#333" stroke-width="2"/>
-  <rect x="20" y="10" width="40" height="20" fill="#e0e0e0" stroke="#333" stroke-width="2"/>
-  <line x1="60" y1="20" x2="80" y2="20" stroke="#333" stroke-width="2"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 70 82">
+  <g fill="none" stroke="#111827" stroke-width="3" stroke-linecap="square" stroke-linejoin="miter">
+    <rect x="16" y="10" width="38" height="58"/>
+    <path d="M35 0v10"/>
+    <path d="M35 68v14"/>
+    <path d="M24 22h22"/>
+    <rect x="27" y="31" width="16" height="18"/>
+    <path d="M28 34l14 12"/>
+    <path d="M24 57h22"/>
+  </g>
 </svg>
-

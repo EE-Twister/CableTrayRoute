@@ -1,4 +1,11 @@
-<svg id="icon" xmlns="http://www.w3.org/2000/svg" width="80" height="40" viewBox="0 0 80 40">
-  <rect x="5" y="5" width="70" height="30" fill="none" stroke="black"/>
-  <line x1="40" y1="5" x2="40" y2="35" stroke="black"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 70 82">
+  <g fill="none" stroke="#111827" stroke-width="3" stroke-linecap="square" stroke-linejoin="miter">
+    <rect x="18" y="10" width="34" height="58"/>
+    <path d="M35 0v10"/>
+    <path d="M35 68v14"/>
+    <path d="M26 20h18"/>
+    <path d="M26 32h18"/>
+    <path d="M26 44h18"/>
+    <path d="M26 56h18"/>
+  </g>
 </svg>

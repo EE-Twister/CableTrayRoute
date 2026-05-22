@@ -685,9 +685,19 @@
   content: '';
   width: 24px;
   height: 24px;
+  box-sizing: border-box;
   background-size: contain;
+  background-position: center;
   background-repeat: no-repeat;
   flex-shrink: 0;
+}
+
+body.dark-mode .palette-section summary::before {
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  background-color: #f8fafc;
+  background-size: 18px 18px;
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(0, 0, 0, 0.28);
 }
 
 .palette-section summary::after {
@@ -1417,6 +1427,42 @@ body.oneline-page .oneline-editor {
   overflow: hidden;
 }
 
+body.oneline-page.engineering-print-mode .sheet-controls {
+  display: none;
+}
+
+body.oneline-page.engineering-print-mode .toolbar.refined-toolbar {
+  padding: 0.25rem 0.45rem;
+  background: color-mix(in srgb, var(--ol-card-bg, #fff) 84%, transparent);
+  border: 1px solid var(--ol-border-color);
+  border-radius: var(--ol-radius);
+}
+
+body.oneline-page.engineering-print-mode .toolbar.refined-toolbar .compact-tool-group,
+body.oneline-page.engineering-print-mode .toolbar.refined-toolbar .command-menu:not(.drawing-mode-menu):not(.drawing-mode-zoom-menu),
+body.oneline-page.engineering-print-mode .toolbar.refined-toolbar .find-toolbar-group {
+  display: none;
+}
+
+body.oneline-page.engineering-print-mode .workspace {
+  grid-template-columns: 1fr;
+}
+
+body.oneline-page.engineering-print-mode #palette,
+body.oneline-page.engineering-print-mode .splitter,
+body.oneline-page.engineering-print-mode #history-sidebar,
+body.oneline-page.engineering-print-mode #palette-toggle,
+body.oneline-page.engineering-print-mode .diagram-status-bar,
+body.oneline-page.engineering-print-mode .voltage-legend,
+body.oneline-page.engineering-print-mode .minimap-container {
+  display: none !important;
+}
+
+body.oneline-page.engineering-print-mode .oneline-canvas-scroll #diagram {
+  border-color: color-mix(in srgb, var(--ol-border-color) 65%, transparent);
+  border-radius: 0;
+}
+
 .diagram-status-bar {
   display: flex;
   align-items: center;
@@ -1474,6 +1520,8 @@ body.oneline-page .oneline-editor {
 
 body.oneline-page .oneline-canvas-scroll #diagram {
   height: 100%;
+  background: var(--ol-canvas-bg, #ffffff);
+  color: var(--ol-canvas-text, #111827);
 }
 
 body.oneline-page #component-buttons {
@@ -1810,6 +1858,23 @@ body.oneline-page .palette-scroll {
   filter: drop-shadow(0 0 3px rgba(37, 99, 235, 0.6));
 }
 
+#diagram .connection {
+  stroke-linecap: square;
+  stroke-linejoin: miter;
+}
+
+#diagram .connection-main {
+  stroke-width: 2.8;
+}
+
+#diagram .connection-device {
+  stroke-width: 2.1;
+}
+
+#diagram .connection-branch {
+  stroke-width: 1.65;
+}
+
 .conn-label-assumed {
   font-style: italic;
   paint-order: stroke;
@@ -1852,11 +1917,26 @@ body.oneline-page .palette-scroll {
   filter: drop-shadow(0 2px 3px rgba(15, 23, 42, 0.12));
 }
 
+.component-datablock-engineering rect {
+  fill: rgba(255, 255, 255, 0.98);
+  stroke: rgba(17, 24, 39, 0.42);
+  filter: none;
+}
+
 .component-datablock text {
   fill: var(--text-color, #111827);
   font-family: var(--ol-font, Helvetica, Arial, sans-serif);
   font-size: 10px;
   pointer-events: none;
+}
+
+.component-datablock-engineering text {
+  fill: #111827;
+  font-weight: 650;
+  paint-order: stroke;
+  stroke: rgba(255, 255, 255, 0.92);
+  stroke-width: 1.8px;
+  stroke-linejoin: round;
 }
 
 .component-datablock-compact text {
@@ -1870,9 +1950,56 @@ body.oneline-page .palette-scroll {
   pointer-events: none;
 }
 
+body.oneline-page.engineering-print-mode .component-datablock rect {
+  fill: transparent;
+  stroke: transparent;
+  filter: none;
+}
+
+body.oneline-page.engineering-print-mode .component-datablock-engineering rect {
+  fill: rgba(255, 255, 255, 0.9);
+  stroke: rgba(17, 24, 39, 0.28);
+  stroke-width: 0.75;
+}
+
+body.oneline-page.engineering-print-mode .component-datablock text {
+  fill: var(--ol-canvas-text, #111827);
+  font-size: 9.5px;
+  font-weight: 600;
+  paint-order: stroke;
+  stroke: var(--ol-canvas-bg, #ffffff);
+  stroke-width: 2.5px;
+  stroke-linejoin: round;
+}
+
+body.oneline-page.engineering-print-mode #diagram .component-label {
+  fill: #1d4ed8 !important;
+  font-size: 12px;
+  font-weight: 700;
+  stroke-width: 2.5px;
+}
+
+body.oneline-page.engineering-print-mode .component-datablock-leader {
+  stroke: rgba(17, 24, 39, 0.36);
+  stroke-dasharray: none;
+  stroke-width: 0.8;
+}
+
 .data-state-fill,
-.data-state-outline {
+.data-state-outline,
+.data-state-badge,
+.connection-junction {
   pointer-events: none;
+}
+
+.data-state-badge circle {
+  stroke: var(--ol-canvas-bg, #ffffff);
+  stroke-width: 1.5;
+  filter: drop-shadow(0 1px 1px rgba(15, 23, 42, 0.18));
+}
+
+.connection-junction {
+  filter: drop-shadow(0 0 1px rgba(15, 23, 42, 0.18));
 }
 
 .operating-open {
@@ -1961,6 +2088,26 @@ body.oneline-page .palette-scroll {
   height: 100%;
 }
 
+body.oneline-page {
+  --ol-canvas-bg: #ffffff;
+  --ol-canvas-text: #111827;
+  --ol-grid-line: rgba(148, 163, 184, 0.22);
+}
+
+body.dark-mode.oneline-page {
+  --ol-canvas-bg: #f8fafc;
+  --ol-canvas-text: #0f172a;
+  --ol-grid-line: rgba(100, 116, 139, 0.2);
+}
+
+body.oneline-page.engineering-print-mode {
+  --ol-grid-line: rgba(148, 163, 184, 0.14);
+}
+
+#diagram .grid-line {
+  stroke: var(--ol-grid-line, rgba(148, 163, 184, 0.32));
+}
+
 .oneline-editor.panning,
 .oneline-editor.panning .oneline-canvas-scroll,
 .oneline-editor.panning .oneline-canvas-scroll #diagram,
@@ -1993,6 +2140,8 @@ body.oneline-page .palette-scroll {
   display: none;
   align-items: center;
   justify-content: center;
+  padding: clamp(0.75rem, 2vw, 1.25rem);
+  box-sizing: border-box;
   opacity: 0;
   transition: opacity 0.3s ease;
   font-family: var(--ol-font);
@@ -2021,41 +2170,43 @@ body.oneline-page .palette-scroll {
   border: 1px solid var(--ol-border-color);
   border-radius: var(--ol-radius);
   box-shadow: var(--ol-shadow);
-  max-height: 90%;
+  box-sizing: border-box;
+  width: min(92vw, 70rem);
+  height: min(78dvh, 48rem);
+  max-height: calc(100dvh - 2rem);
   max-width: min(100vw - 2rem, 1200px);
-  width: min(90vw, 960px);
   display: flex;
   flex-direction: column;
   gap: var(--ol-spacing);
-  min-width: 320px;
-  min-height: 320px;
+  min-width: min(42rem, calc(100vw - 2rem));
+  min-height: min(38rem, calc(100dvh - 2rem));
   resize: both;
-  overflow: auto;
+  overflow: hidden;
 }
 
 .prop-modal-layout {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: minmax(16rem, 0.85fr) minmax(28rem, 1.5fr);
   gap: var(--ol-spacing);
-  overflow: auto;
+  overflow: hidden;
   flex: 1 1 auto;
   min-height: 0;
-  align-items: stretch;
 }
 
 .prop-modal-column {
-  flex: 1 1 260px;
-  min-width: 220px;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
   min-height: 0;
+  overflow: hidden;
 }
 
 .prop-modal-heading {
   margin: 0;
   font-size: 1rem;
   font-weight: 600;
+  overflow-wrap: anywhere;
 }
 
 .prop-category-list,
@@ -2070,12 +2221,16 @@ body.oneline-page .palette-scroll {
 }
 
 .prop-category-list {
+  flex: 0 1 auto;
+  max-height: min(18rem, 42%);
   overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .prop-component-list {
   flex: 1 1 0;
   overflow-y: auto;
+  overflow-x: hidden;
   min-height: 0;
 }
 
@@ -2090,6 +2245,8 @@ body.oneline-page .palette-scroll {
   font: inherit;
   cursor: pointer;
   transition: background-color 0.2s, border-color 0.2s, color 0.2s;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .prop-category-option:hover,
@@ -2112,12 +2269,16 @@ body.oneline-page .palette-scroll {
   border-radius: var(--ol-radius);
   background: var(--ol-card-bg);
   padding: var(--ol-spacing);
-  flex: 1 1 320px;
-  min-height: 12rem;
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: var(--ol-spacing);
+}
+
+.prop-property-container-form {
+  overflow: hidden;
 }
 
 .prop-modal .prop-detail-form {
@@ -2131,6 +2292,9 @@ body.oneline-page .palette-scroll {
   display: flex;
   flex-direction: column;
   gap: var(--ol-spacing);
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
 }
 
 .prop-tabs {
@@ -2138,6 +2302,7 @@ body.oneline-page .palette-scroll {
   flex-wrap: wrap;
   gap: 0.5rem;
   margin-bottom: 0.25rem;
+  flex: 0 0 auto;
 }
 
 .prop-tab {
@@ -2166,12 +2331,19 @@ body.oneline-page .palette-scroll {
   display: flex;
   flex-direction: column;
   gap: var(--ol-spacing);
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding-right: 0.35rem;
+  scrollbar-gutter: stable;
 }
 
 .prop-tab-panel {
   display: flex;
   flex-direction: column;
   gap: var(--ol-spacing);
+  min-height: 0;
 }
 
 .prop-tab-panel[hidden] {
@@ -2182,7 +2354,12 @@ body.oneline-page .palette-scroll {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
-  margin-top: 0.5rem;
+  margin-top: auto;
+  flex: 0 0 auto;
+  position: static;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--ol-border-color);
+  background: var(--ol-card-bg);
 }
 
 .prop-property-empty {
@@ -2210,34 +2387,51 @@ body.oneline-page .palette-scroll {
 
 .prop-modal form fieldset {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: var(--ol-spacing);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
+  gap: 0.9rem 0.85rem;
+  margin: 0;
+  min-width: 0;
 }
 
 .prop-modal form fieldset label {
   display: flex;
   flex-direction: column;
+  min-width: 0;
 }
 
 .prop-modal form fieldset label .prop-field-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.3rem;
+  flex-wrap: wrap;
   margin-bottom: 0.35rem;
+  min-height: 2.15rem;
+  color: var(--text-muted, #94a3b8);
+  font-size: 0.82rem;
+  font-weight: 650;
+  line-height: 1.22;
+}
+
+.prop-field-name {
+  flex: 1 1 8rem;
+  min-width: 0;
+  overflow-wrap: break-word;
 }
 
 .prop-field-badge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.65rem;
+  flex: 0 0 auto;
+  font-size: 0.56rem;
   letter-spacing: 0.05em;
   text-transform: uppercase;
   border-radius: 999px;
-  padding: 0.1rem 0.4rem;
+  padding: 0.08rem 0.32rem;
   border: 1px solid transparent;
   line-height: 1;
   font-weight: 600;
+  margin-top: 0.1rem;
 }
 
 .prop-field-badge-calculated {
@@ -2265,9 +2459,20 @@ body.oneline-page .palette-scroll {
 }
 
 .prop-field-badge-optional {
-  background: rgba(40, 167, 69, 0.12);
-  color: #1f7a35;
-  border-color: rgba(40, 167, 69, 0.35);
+  display: none;
+}
+
+.prop-modal form fieldset label input:not([type="checkbox"]),
+.prop-modal form fieldset label select,
+.prop-modal form fieldset label textarea {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.prop-modal form fieldset label input[type="checkbox"] {
+  align-self: flex-start;
+  margin-top: 0.35rem;
 }
 
 .prop-modal form fieldset label input.prop-input-custom {
@@ -2489,6 +2694,7 @@ body.oneline-page .palette-scroll {
   width: 1.25rem;
   height: 1.25rem;
   min-width: 1.25rem;
+  flex: 0 0 auto;
   border-radius: 50%;
   border: 1px solid var(--ol-border-color);
   background: var(--ol-card-bg);
@@ -2579,8 +2785,8 @@ body.oneline-page .palette-scroll {
 
 
 
-.component.invalid text {
-  fill: #c00;
+.component.invalid image {
+  filter: drop-shadow(0 0 1.5px rgba(217, 119, 6, 0.45));
 }
 
 g.component.scenario-diff > * {
@@ -2590,6 +2796,40 @@ g.component.scenario-diff > * {
 
 .issue-badge {
   pointer-events: none;
+}
+
+.issue-badge circle {
+  fill: #f59e0b;
+  stroke: #ffffff;
+  stroke-width: 1.5;
+}
+
+.issue-badge text {
+  fill: #111827;
+  font-size: 8px;
+  font-weight: 700;
+  font-family: var(--ol-font, Helvetica, Arial, sans-serif);
+  stroke: none;
+}
+
+body.oneline-page #diagram .component-label,
+body.oneline-page #diagram .transformer-port-label {
+  fill: var(--ol-canvas-text, #111827) !important;
+  font-family: var(--ol-font, Helvetica, Arial, sans-serif);
+  font-size: 13px;
+  font-weight: 700;
+  paint-order: stroke;
+  stroke: var(--ol-canvas-bg, #ffffff);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+  pointer-events: auto;
+}
+
+.conn-label {
+  paint-order: stroke;
+  stroke: var(--ol-canvas-bg, #ffffff);
+  stroke-width: 3px;
+  stroke-linejoin: round;
 }
 
 .voltage-legend {
@@ -2666,6 +2906,32 @@ g.component.scenario-diff > * {
 
   .nav-progress-bar {
     animation: navProgressIn 0.5s ease-out forwards;
+  }
+}
+
+@media (max-width: 760px) {
+  .prop-modal {
+    padding: 0.5rem;
+    align-items: stretch;
+  }
+
+  .prop-modal-panel {
+    width: calc(100vw - 1rem);
+    height: calc(100dvh - 1rem);
+    max-height: calc(100dvh - 1rem);
+    max-width: calc(100vw - 1rem);
+    min-width: 0;
+    min-height: 0;
+    resize: none;
+  }
+
+  .prop-modal-layout {
+    grid-template-columns: 1fr;
+    overflow-y: auto;
+  }
+
+  .prop-modal-column {
+    min-height: min(22rem, 45dvh);
   }
 }
 
@@ -2854,8 +3120,13 @@ body.oneline-page #lint-list .cross-probe-link {
    Gap #36 – Energized / de-energized operating-state display
    ============================================================ */
 .component.de-energized {
-  opacity: 0.35;
-  filter: grayscale(80%);
+  opacity: 0.42;
+  filter: grayscale(100%);
+}
+
+body.oneline-page.engineering-print-mode .component.de-energized {
+  opacity: 0.48;
+  filter: grayscale(100%);
 }
 
 .de-energized-overlay {

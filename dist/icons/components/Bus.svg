@@ -1,3 +1,3 @@
-<svg id="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 20">
-  <rect x="0" y="0" width="200" height="20" fill="none" stroke="black" stroke-width="2"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 260 20" preserveAspectRatio="none">
+  <path d="M0 10h260" fill="none" stroke="#111827" stroke-width="6" stroke-linecap="square"/>
 </svg>

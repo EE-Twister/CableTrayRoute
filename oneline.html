@@ -18,7 +18,7 @@
   <link rel="canonical" href="oneline.html">
   <link rel="dns-prefetch" href="https://fonts.gstatic.com">
   <meta name="color-scheme" content="light dark">
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=one-line-datablock-contrast-v1">
   <script src="dist/vendor/handlebars.min.js"></script>
   <script>
     (function loadVersionedModules() {
@@ -216,10 +216,18 @@
             <span class="toolbar-group-label">View</span>
               <div class="view-group">
                 <button id="view-menu-btn" type="button" class="btn" aria-haspopup="dialog" aria-expanded="false">Views</button>
+                <label class="view-select-field" title="Choose the one-line drawing mode">
+                  <span>Mode</span>
+                  <select id="drawing-mode-select" aria-label="Drawing mode">
+                    <option value="edit">Edit</option>
+                    <option value="engineeringPrint">Engineering Print</option>
+                  </select>
+                </label>
                 <label class="view-select-field" title="Choose a drawing datablock format">
                   <span>Data</span>
                   <select id="datablock-format-select" aria-label="Datablock format">
                     <option value="off">Off</option>
+                    <option value="engineering">Engineering Labels</option>
                     <option value="nameplate">Nameplate</option>
                     <option value="study">Studies</option>
                     <option value="protection">Protection</option>
@@ -398,11 +406,8 @@
               <svg id="diagram" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
                 <defs>
                   <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
-                    <path d="M20 0 L0 0 0 20" fill="none" stroke="#ccc" stroke-width="0.5" />
+                    <path class="grid-line" d="M20 0 L0 0 0 20" fill="none" stroke="var(--ol-grid-line, #e5e7eb)" stroke-width="0.45" />
                   </pattern>
-                  <marker id="connection-x" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto" markerUnits="strokeWidth">
-                    <path d="M0,0 L10,10 M0,10 L10,0" fill="none" stroke="context-stroke" stroke-width="2" />
-                  </marker>
                 </defs>
                 <rect id="grid-bg" width="100%" height="100%" fill="url(#grid)" />
               </svg>
@@ -520,7 +525,7 @@
         <button id="run-motorstart-btn" type="button">Motor Start</button>
         <button id="run-reliability-btn" type="button">Reliability</button>
         <button id="study-settings-btn" type="button" class="btn" aria-expanded="false">Settings</button>
-        <label class="d-block mt-1"><input type="checkbox" id="toggle-overlays" checked> Show Result Overlays</label>
+        <label class="d-block mt-1"><input type="checkbox" id="toggle-overlays"> Show Result Overlays</label>
       </div>
       <form id="study-settings-menu" class="study-settings hidden" aria-label="Study settings">
         <fieldset>

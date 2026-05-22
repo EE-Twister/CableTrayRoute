@@ -149,6 +149,19 @@ button:focus-visible, .primary-btn:focus-visible {
     padding: 0.25rem;
     box-sizing: border-box;
 }
+body.dark-mode #palette button .palette-icon {
+    background: linear-gradient(180deg, #ffffff 0%, #e2e8f0 100%);
+    border: 1px solid #cbd5e1;
+    box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(0, 0, 0, 0.28);
+}
+body.dark-mode #palette button:hover {
+    background-color: rgba(255, 255, 255, 0.08);
+}
+body.dark-mode #palette button:hover .palette-icon,
+body.dark-mode #palette button:focus-visible .palette-icon {
+    border-color: #93c5fd;
+    box-shadow: 0 0 0 2px rgba(147, 197, 253, 0.25), 0 1px 2px rgba(0, 0, 0, 0.28);
+}
 #palette button .palette-icon img {
     width: 100%;
     height: auto;

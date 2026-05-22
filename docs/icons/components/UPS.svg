@@ -1,8 +1,10 @@
-<svg id="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 40">
-  <line x1="0" y1="20" x2="20" y2="20" stroke="#333" stroke-width="2"/>
-  <rect x="20" y="10" width="40" height="20" fill="none" stroke="#333" stroke-width="2"/>
-  <line x1="26" y1="20" x2="34" y2="20" stroke="#333" stroke-width="2"/>
-  <line x1="30" y1="16" x2="30" y2="24" stroke="#333" stroke-width="2"/>
-  <line x1="46" y1="20" x2="54" y2="20" stroke="#333" stroke-width="2"/>
-  <line x1="60" y1="20" x2="80" y2="20" stroke="#333" stroke-width="2"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 82">
+  <g fill="none" stroke="#111827" stroke-width="3" stroke-linecap="square" stroke-linejoin="miter">
+    <rect x="20" y="10" width="32" height="54"/>
+    <path d="M36 0v10"/>
+    <path d="M36 64v18"/>
+    <path d="M26 26c4-8 8-8 10 0s6 8 10 0"/>
+    <path d="M27 43h18"/>
+    <path d="M27 51h18"/>
+  </g>
 </svg>

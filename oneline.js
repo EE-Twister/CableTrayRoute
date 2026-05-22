@@ -145,13 +145,22 @@ if (projectId) {
   });
 }
 
+const oneLineSymbolAssetVersion = 'professional-symbols-v2';
+
 const typeIcons = {
-  panel: asset('icons/equipment.svg'),
+  panel: asset(`icons/components/MLO.svg?v=${oneLineSymbolAssetVersion}`),
   equipment: asset('icons/equipment.svg'),
   load: asset('icons/load.svg'),
-  bus: asset('icons/Bus.svg'),
+  bus: asset(`icons/Bus.svg?v=${oneLineSymbolAssetVersion}`),
   cable: asset('icons/oneline.svg'),
   busway: asset('icons/components/Busway.svg'),
+  utility_source: asset(`icons/components/Utility.svg?v=${oneLineSymbolAssetVersion}`),
+  ups: asset(`icons/components/UPS.svg?v=${oneLineSymbolAssetVersion}`),
+  motor: asset(`icons/components/Motor.svg?v=${oneLineSymbolAssetVersion}`),
+  motor_load: asset(`icons/components/Motor.svg?v=${oneLineSymbolAssetVersion}`),
+  static_load: asset(`icons/components/Load.svg?v=${oneLineSymbolAssetVersion}`),
+  shunt_capacitor_bank: asset(`icons/components/CapacitorBank.svg?v=${oneLineSymbolAssetVersion}`),
+  reactor: asset(`icons/components/Reactor.svg?v=${oneLineSymbolAssetVersion}`),
   sources: asset('icons/sources.svg'),
   links: asset('icons/links.svg'),
   annotations: asset('icons/annotation.svg')
@@ -339,9 +348,12 @@ const equipmentHorizontalAutoSpace = 190;
 const equipmentAutoSpaceRowTolerance = 70;
 const attributeLineHeight = 12;
 const viewAttributeStorageKey = 'diagramViewAttributes';
+const drawingModeStorageKey = 'oneLineDrawingMode';
 const datablockFormatStorageKey = 'oneLineDatablockFormat';
 const datablockDensityStorageKey = 'oneLineDatablockDensity';
+const datablockDefaultVersionStorageKey = 'oneLineDatablockDefaultVersion';
 const dataStateOverlayStorageKey = 'oneLineDataStateOverlay';
+const dataStateOverlayDefaultVersionStorageKey = 'oneLineDataStateOverlayDefaultVersion';
 const operatingStateStorageKey = 'oneLineOperatingState';
 const paletteFilterStorageKey = 'oneLinePaletteFilter';
 const maxViewAttributeCount = 250;
@@ -444,6 +456,7 @@ const attributeIgnoreKeys = new Set([
   'x',
   'y',
   'rotation',
+  'rotationManual',
   'flipped',
   'connections',
   'label',
@@ -519,6 +532,29 @@ let selectedViewComponent = getItem(viewComponentStorageKey, null);
 
 const datablockFormatPresets = Object.freeze({
   off: [],
+  engineering: [
+    'voltage',
+    'volts',
+    'rated_voltage_kv',
+    'baseKV',
+    'kV',
+    'bus_rating_a',
+    'rating_a',
+    'frame_a',
+    'rated_kva',
+    'kva',
+    'rated_hp',
+    'hp',
+    'kw',
+    'kvar',
+    'load.kw',
+    'load.kvar',
+    'percent_z',
+    'impedance_z_percent',
+    'tap_percent',
+    'shortCircuit.threePhaseKA',
+    'voltage_mag'
+  ],
   nameplate: ['voltage', 'volts', 'rating_a', 'kva', 'hp', 'percent_z', 'manufacturer', 'model'],
   study: ['voltage_mag', 'shortCircuit.threePhaseKA', 'shortCircuit.asymKA', 'arcFlash.incidentEnergy', 'arcFlash.ppeCategory', 'reliability.availability'],
   protection: ['rating_a', 'frame_a', 'interrupt_rating_ka', 'short_circuit_rating_ka', 'clearing_time', 'shortCircuit.threePhaseKA', 'arcFlash.incidentEnergy'],
@@ -526,6 +562,7 @@ const datablockFormatPresets = Object.freeze({
 });
 const datablockFormatLabels = Object.freeze({
   off: 'Off',
+  engineering: 'Engineering Labels',
   nameplate: 'Nameplate',
   study: 'Studies',
   protection: 'Protection',
@@ -536,9 +573,24 @@ const datablockDensityLabels = Object.freeze({
   compact: 'Compact',
   expanded: 'Expanded'
 });
+const drawingModeLabels = Object.freeze({
+  edit: 'Edit',
+  engineeringPrint: 'Engineering Print'
+});
+let oneLineDrawingMode = getItem(drawingModeStorageKey, 'edit');
+if (!Object.prototype.hasOwnProperty.call(drawingModeLabels, oneLineDrawingMode)) {
+  oneLineDrawingMode = 'edit';
+}
 let datablockFormatMode = getItem(datablockFormatStorageKey, viewAttributes.size ? 'custom' : 'off');
 if (!Object.prototype.hasOwnProperty.call(datablockFormatLabels, datablockFormatMode)) {
   datablockFormatMode = viewAttributes.size ? 'custom' : 'off';
+}
+if (getItem(datablockDefaultVersionStorageKey, '') !== 'clean-canvas-v1' && datablockFormatMode !== 'custom') {
+  datablockFormatMode = 'off';
+  viewAttributes = new Set();
+  setItem(datablockFormatStorageKey, datablockFormatMode);
+  setItem(viewAttributeStorageKey, []);
+  setItem(datablockDefaultVersionStorageKey, 'clean-canvas-v1');
 }
 let datablockDensityMode = getItem(datablockDensityStorageKey, 'compact');
 if (!Object.prototype.hasOwnProperty.call(datablockDensityLabels, datablockDensityMode)) {
@@ -555,6 +607,11 @@ const dataStateOverlayLabels = Object.freeze({
 let dataStateOverlayMode = getItem(dataStateOverlayStorageKey, 'none');
 if (!Object.prototype.hasOwnProperty.call(dataStateOverlayLabels, dataStateOverlayMode)) {
   dataStateOverlayMode = 'none';
+}
+if (getItem(dataStateOverlayDefaultVersionStorageKey, '') !== 'clean-canvas-v1') {
+  dataStateOverlayMode = 'none';
+  setItem(dataStateOverlayStorageKey, dataStateOverlayMode);
+  setItem(dataStateOverlayDefaultVersionStorageKey, 'clean-canvas-v1');
 }
 
 const operatingStateLabels = Object.freeze({
@@ -587,6 +644,41 @@ function compKey(type, subtype) {
   return subtype ? `${type}_${subtype}` : type;
 }
 
+function resolveComponentMetaKey(comp) {
+  if (!comp) return '';
+  const subtype = typeof comp === 'string' ? comp : (comp.subtype || '');
+  const type = typeof comp === 'string' ? '' : (comp.type || '');
+  const legacyAliases = [
+    ['panel_Panel', 'panel_panel'],
+    ['ups', 'ups_ups'],
+    ['utility', 'utility_source_utility'],
+    ['static_load', 'static_load_static_load']
+  ];
+  const alias = legacyAliases.find(([legacy]) => legacy === subtype)?.[1];
+  if (alias && componentMeta[alias]) return alias;
+  if (subtype && componentMeta[subtype]) return subtype;
+  const candidates = [
+    type && subtype ? compKey(type, subtype) : '',
+    type ? compKey(type, type) : '',
+    subtype ? compKey(subtype, subtype) : ''
+  ].filter(Boolean);
+  const directCandidate = candidates.find(candidate => componentMeta[candidate]);
+  if (directCandidate) return directCandidate;
+  if (type && subtype) {
+    const match = Object.entries(componentMeta).find(([, meta]) => (
+      meta
+      && String(meta.type || '').toLowerCase() === String(type).toLowerCase()
+      && String(meta.subtype || '').toLowerCase() === String(subtype).toLowerCase()
+    ));
+    if (match) return match[0];
+  }
+  return subtype;
+}
+
+function resolveComponentMeta(comp) {
+  return componentMeta[resolveComponentMetaKey(comp)] || componentMeta[comp?.subtype] || {};
+}
+
 function normalizeRotation(angle) {
   if (!Number.isFinite(angle)) return 0;
   const normalized = angle % 360;
@@ -594,11 +686,7 @@ function normalizeRotation(angle) {
 }
 
 function defaultRotationForType(type, category) {
-  const resolved = String(type || category || '').toLowerCase();
-  const resolvedCategory = String(category || categoryForType(resolved) || '').toLowerCase();
-  if (resolved === 'bus' || resolved === 'annotation' || resolved === 'dimension' || resolved === 'group') return 0;
-  if (resolvedCategory === 'bus' || resolvedCategory === 'load' || resolvedCategory === 'annotations' || resolvedCategory === 'links') return 0;
-  return 90;
+  return 0;
 }
 
 function defaultRotationForMeta(meta, type = null) {
@@ -664,7 +752,7 @@ const PALETTE_CATEGORIES = new Set([
 
 function isProtectionComponent(comp) {
   if (!comp || typeof comp !== 'object') return false;
-  const subtypeMeta = componentMeta[comp.subtype];
+  const subtypeMeta = resolveComponentMeta(comp);
   if (subtypeMeta?.category === 'protection') return true;
   if (subtypeMeta?.type && categoryForType(subtypeMeta.type) === 'protection') return true;
   if (comp.category === 'protection') return true;
@@ -743,7 +831,7 @@ function setNestedComponentValue(comp, path = [], rawValue, type) {
 function inferSchemaFromProps(props, path = []) {
   const schema = [];
   const reservedTopLevelFieldNames = new Set([
-    'id', 'type', 'subtype', 'x', 'y', 'width', 'height', 'rotation', 'flipped', 'label',
+    'id', 'type', 'subtype', 'x', 'y', 'width', 'height', 'rotation', 'rotationManual', 'flipped', 'label',
     'ports', 'connections', 'meta', 'svg', 'icon', 'scheduleLinks', 'props'
   ]);
   Object.entries(props || {}).forEach(([key, value]) => {
@@ -777,7 +865,7 @@ function inferSchemaFromProps(props, path = []) {
 }
 
 function isBusComponent(c) {
-  return componentMeta[c.subtype]?.type === 'bus' || c.type === 'bus' || c.subtype === 'Bus';
+  return resolveComponentMeta(c)?.type === 'bus' || c.type === 'bus' || c.subtype === 'Bus';
 }
 
 function isSourceComponent(comp) {
@@ -792,15 +880,192 @@ function isSourceComponent(comp) {
 function defaultPorts(type, subtype) {
   if (type === 'transformer' && subtype === 'three_winding') {
     return [
-      { x: 0, y: 20 },
-      { x: 80, y: 10 },
-      { x: 80, y: 30 }
+      { x: compWidth / 2, y: 0 },
+      { x: compWidth * 0.3, y: compHeight },
+      { x: compWidth * 0.7, y: compHeight }
     ];
   }
   return [
-    { x: 0, y: 20 },
-    { x: 80, y: 20 }
+    { x: compWidth / 2, y: 0 },
+    { x: compWidth / 2, y: compHeight }
   ];
+}
+
+function getIndustrySymbolProfile(comp, meta = resolveComponentMeta(comp)) {
+  const type = String(meta?.type || comp?.type || '').toLowerCase();
+  const subtype = String(meta?.subtype || comp?.subtype || '').toLowerCase();
+  const label = String(meta?.label || comp?.label || '').toLowerCase();
+  const signature = `${type} ${subtype} ${label}`;
+  if (type === 'utility_source' || signature.includes('utility')) return 'utility';
+  if (type === 'bus') return 'bus';
+  if (type === 'busway') return 'busway';
+  if (type === 'generator') return 'generator';
+  if (type === 'transformer') return subtype === 'three_winding' ? 'transformer3' : 'transformer';
+  if (type === 'ups' || signature.includes('ups')) return 'ups';
+  if (type === 'panel' || signature.includes('panel')) return 'panel';
+  if (['vfd', 'soft_starter', 'motor_starter', 'combination_starter'].includes(type) || signature.includes('vfd') || signature.includes('starter')) return 'controller';
+  if (['switchboard', 'switchgear', 'mcc', 'equipment'].includes(type)) return 'equipment';
+  if (['breaker', 'fuse', 'switch', 'disconnect', 'relay', 'recloser', 'contactor', 'meter', 'current_transformer', 'voltage_transformer'].includes(type)) return 'inlineDevice';
+  if (signature.includes('breaker') || signature.includes('fuse') || signature.includes('disconnect') || signature.includes('switch') || signature.includes('relay') || signature.includes('meter')) return 'inlineDevice';
+  if (['motor', 'motor_load'].includes(type) || subtype.includes('motor')) return 'motor';
+  if (type === 'static_load' || subtype.includes('static_load')) return 'load';
+  if (type === 'shunt_capacitor_bank' || subtype.includes('capacitor') || subtype.includes('cap')) return 'capacitor';
+  if (type === 'reactor') return 'reactor';
+  return '';
+}
+
+function industrySymbolGeometry(profile) {
+  if (profile === 'utility') {
+    return {
+      width: 64,
+      height: 64,
+      ports: [{ x: 32, y: 64 }]
+    };
+  }
+  if (profile === 'ups') {
+    return {
+      width: 72,
+      height: 82,
+      ports: [
+        { x: 36, y: 0 },
+        { x: 36, y: 82 }
+      ]
+    };
+  }
+  if (profile === 'panel') {
+    return {
+      width: 64,
+      height: 76,
+      ports: [
+        { x: 32, y: 0 },
+        { x: 32, y: 76 }
+      ]
+    };
+  }
+  if (profile === 'equipment') {
+    return {
+      width: 70,
+      height: 82,
+      ports: [
+        { x: 35, y: 0 },
+        { x: 35, y: 82 }
+      ]
+    };
+  }
+  if (profile === 'controller') {
+    return {
+      width: 64,
+      height: 78,
+      ports: [
+        { x: 32, y: 0 },
+        { x: 32, y: 78 }
+      ]
+    };
+  }
+  if (profile === 'inlineDevice') {
+    return {
+      width: 56,
+      height: 72,
+      ports: [
+        { x: 28, y: 0 },
+        { x: 28, y: 72 }
+      ]
+    };
+  }
+  if (profile === 'transformer') {
+    return {
+      width: 76,
+      height: 84,
+      ports: [
+        { x: 38, y: 0 },
+        { x: 38, y: 84 }
+      ]
+    };
+  }
+  if (profile === 'transformer3') {
+    return {
+      width: 86,
+      height: 92,
+      ports: [
+        { x: 43, y: 0 },
+        { x: 26, y: 92 },
+        { x: 60, y: 92 }
+      ]
+    };
+  }
+  if (profile === 'generator') {
+    return {
+      width: 68,
+      height: 68,
+      ports: [{ x: 34, y: 68 }]
+    };
+  }
+  if (profile === 'motor' || profile === 'load' || profile === 'capacitor' || profile === 'reactor') {
+    return {
+      width: 64,
+      height: 64,
+      ports: [{ x: 32, y: 0 }]
+    };
+  }
+  if (profile === 'busway') {
+    return {
+      width: 160,
+      height: 22,
+      ports: [
+        { x: 0, y: 11 },
+        { x: 160, y: 11 }
+      ]
+    };
+  }
+  if (profile === 'bus') {
+    return {
+      width: 260,
+      height: 20,
+      ports: [
+        { x: 0, y: 10 },
+        { x: 260, y: 10 }
+      ]
+    };
+  }
+  return null;
+}
+
+function isLegacyDefaultComponentSize(comp) {
+  const hasWidth = Number.isFinite(Number(comp?.width));
+  const hasHeight = Number.isFinite(Number(comp?.height));
+  if (!hasWidth && !hasHeight) return true;
+  const width = hasWidth ? Number(comp.width) : compWidth;
+  const height = hasHeight ? Number(comp.height) : compHeight;
+  return Math.abs(width - compWidth) <= 0.5 && Math.abs(height - compHeight) <= 0.5;
+}
+
+function applyIndustrySymbolGeometry(comp, meta = resolveComponentMeta(comp), { preserveCenter = true, force = false } = {}) {
+  const geometry = industrySymbolGeometry(getIndustrySymbolProfile(comp, meta));
+  if (!geometry) return false;
+  const oldWidth = Number(comp.width) || compWidth;
+  const oldHeight = Number(comp.height) || compHeight;
+  const shouldResize = force || isLegacyDefaultComponentSize(comp);
+  if (shouldResize) {
+    const centerX = Number(comp.x) + oldWidth / 2;
+    const centerY = Number(comp.y) + oldHeight / 2;
+    comp.width = geometry.width;
+    comp.height = geometry.height;
+    if (preserveCenter) {
+      comp.x = centerX - geometry.width / 2;
+      comp.y = centerY - geometry.height / 2;
+    }
+  }
+  const portsNeedSync = !Array.isArray(comp.ports)
+    || comp.ports.length !== geometry.ports.length
+    || comp.ports.some((port, idx) => {
+      const expected = geometry.ports[idx];
+      return Math.abs(Number(port?.x) - expected.x) > 0.5
+        || Math.abs(Number(port?.y) - expected.y) > 0.5;
+    });
+  if (force || shouldResize || portsNeedSync) {
+    comp.ports = geometry.ports.map(port => ({ ...port }));
+  }
+  return true;
 }
 
 function coerceNumber(value, fallback) {
@@ -808,11 +1073,59 @@ function coerceNumber(value, fallback) {
   return Number.isFinite(num) ? num : fallback;
 }
 
-function normalizePortsForCategory(category, ports, type, subtype) {
+function shouldUseVerticalOneLinePorts(category, type) {
+  const resolvedCategory = String(category || '').toLowerCase();
+  const resolvedType = String(type || '').toLowerCase();
+  if (resolvedCategory === 'bus' || resolvedCategory === 'load' || resolvedCategory === 'cable' || resolvedCategory === 'busway' || resolvedCategory === 'annotations' || resolvedCategory === 'links') return false;
+  if (resolvedType === 'bus' || resolvedType === 'cable' || resolvedType === 'busway' || resolvedType === 'annotation' || resolvedType === 'dimension' || resolvedType === 'sheet_link') return false;
+  return true;
+}
+
+function remapPortsForVerticalOneLineFlow(ports, category, type, width = compWidth, height = compHeight) {
+  const normalized = (Array.isArray(ports) ? ports : [])
+    .filter(port => port && typeof port === 'object')
+    .map(port => ({
+      x: coerceNumber(port.x, width / 2),
+      y: coerceNumber(port.y, height / 2)
+    }));
+  if (!normalized.length) {
+    return String(category || '').toLowerCase() === 'sources'
+      ? [{ x: width / 2, y: height }]
+      : [{ x: width / 2, y: 0 }];
+  }
+  if (!shouldUseVerticalOneLinePorts(category, type)) return normalized;
+  if (normalized.length === 1) {
+    return [{
+      x: width / 2,
+      y: String(category || '').toLowerCase() === 'sources' ? height : 0
+    }];
+  }
+  const xs = normalized.map(port => port.x);
+  const ys = normalized.map(port => port.y);
+  const horizontalSpan = Math.max(...xs) - Math.min(...xs);
+  const verticalSpan = Math.max(...ys) - Math.min(...ys);
+  if (verticalSpan >= horizontalSpan) return normalized;
+  if (normalized.length === 2) {
+    return [
+      { x: width / 2, y: 0 },
+      { x: width / 2, y: height }
+    ];
+  }
+  return normalized.map((_, idx) => {
+    if (idx === 0) return { x: width / 2, y: 0 };
+    const slots = normalized.length - 1;
+    return {
+      x: width * (idx / (slots + 1)),
+      y: height
+    };
+  });
+}
+
+function normalizePortsForCategory(category, ports, type, subtype, width = compWidth, height = compHeight) {
   const hasDefinedPorts = Array.isArray(ports) && ports.length > 0;
   const base = hasDefinedPorts ? ports : defaultPorts(type, subtype);
   if (category === 'load') {
-    const defaultX = compWidth / 2;
+    const defaultX = width / 2;
     const defaultY = 0;
     if (!hasDefinedPorts || !base.length) {
       return [{ x: defaultX, y: defaultY }];
@@ -828,10 +1141,11 @@ function normalizePortsForCategory(category, ports, type, subtype) {
       y: coerceNumber(port?.y, defaultY)
     }));
   }
-  return base.map(port => ({
-    x: coerceNumber(port?.x, compWidth / 2),
-    y: coerceNumber(port?.y, compHeight / 2)
+  const normalized = base.map(port => ({
+    x: coerceNumber(port?.x, width / 2),
+    y: coerceNumber(port?.y, height / 2)
   }));
+  return remapPortsForVerticalOneLineFlow(normalized, category, type, width, height);
 }
 
 const defaultBusProps = {
@@ -894,7 +1208,7 @@ function normalizeLowerChoice(value, fallback, allowed, aliases = {}) {
 function ensureShapeDefaults(comp) {
   if (!comp || comp.subtype !== 'annotation_custom_shape') return;
   if (!comp.props || typeof comp.props !== 'object') comp.props = {};
-  const meta = componentMeta[comp.subtype] || {};
+  const meta = resolveComponentMeta(comp);
   const defaults = { ...defaultShapeProps, ...(meta.props || {}) };
   shapePropKeys.forEach(key => {
     const current = comp[key];
@@ -979,12 +1293,14 @@ const builtinComponents = [
   {
     subtype: 'Panel',
     label: 'Panel',
-    icon: typeIcons.panel || placeholderIcon,
+    icon: asset('icons/components/MLO.svg?v=industry-symbols-v1'),
     category: 'equipment',
     type: 'panel',
+    width: 64,
+    height: 76,
     ports: [
-      { x: 0, y: 20 },
-      { x: 80, y: 20 }
+      { x: 32, y: 0 },
+      { x: 32, y: 76 }
     ]
   },
   {
@@ -1006,7 +1322,7 @@ const builtinComponents = [
     type: 'motor_load',
     defaultRotation: 0,
     ports: [
-      { x: 40, y: 0 }
+      { x: 32, y: 0 }
     ],
     props: {
       hp: 150,
@@ -1032,7 +1348,7 @@ const builtinComponents = [
     type: 'motor',
     defaultRotation: 0,
     ports: [
-      { x: 40, y: 0 }
+      { x: 32, y: 0 }
     ],
     props: {
       tag: '',
@@ -1074,7 +1390,7 @@ const builtinComponents = [
     type: 'static_load',
     defaultRotation: 0,
     ports: [
-      { x: 40, y: 0 }
+      { x: 32, y: 0 }
     ],
     props: {
       watts: 300000,
@@ -1088,6 +1404,31 @@ const builtinComponents = [
       load: {
         kw: 300.0,
         kvar: 0
+      }
+    }
+  },
+  {
+    subtype: 'CapacitorBank',
+    label: 'Capacitor Bank',
+    icon: asset(`icons/components/CapacitorBank.svg?v=${oneLineSymbolAssetVersion}`),
+    category: 'load',
+    type: 'shunt_capacitor_bank',
+    defaultRotation: 0,
+    width: 64,
+    height: 64,
+    ports: [
+      { x: 32, y: 0 }
+    ],
+    props: {
+      rated_kv: 0.48,
+      rated_kvar: 150,
+      volts: 480,
+      kvar: 150,
+      baseKV: 0.48,
+      kV: 0.48,
+      prefault_voltage: 0.48,
+      shunt: {
+        kvar: 150
       }
     }
   },
@@ -2126,7 +2467,10 @@ function resolveIconSource(iconPath, fallbackSymbol) {
     if (trimmed.startsWith('data:') || /^https?:/i.test(trimmed)) {
       return trimmed;
     }
-    return asset(trimmed);
+    const resolved = asset(trimmed);
+    return /icons\/components\/[^?#]+\.svg$/i.test(trimmed)
+      ? `${resolved}?v=${oneLineSymbolAssetVersion}`
+      : resolved;
   }
   if (fallbackSymbol) {
     return asset(`icons/components/${fallbackSymbol}.svg`);
@@ -2220,9 +2564,32 @@ async function loadComponentLibrary() {
       ? requestedCategory
       : categoryForType(resolvedType);
     const icon = resolveIconSource(definition.icon, definition.symbol);
-    const ports = normalizePortsForCategory(category, definition.ports, resolvedType, subtype);
     const defaultRotation = normalizeRotation(
       definition.defaultRotation ?? defaultRotationForType(resolvedType, category)
+    );
+    const widthVal = Number(definition.width);
+    const heightVal = Number(definition.height);
+    const profileGeometry = industrySymbolGeometry(getIndustrySymbolProfile({
+      type: resolvedType,
+      subtype,
+      label: definition.label || ''
+    }, {
+      type: resolvedType,
+      subtype,
+      label: definition.label || ''
+    }));
+    const resolvedWidth = Number.isFinite(widthVal) ? widthVal : profileGeometry?.width;
+    const resolvedHeight = Number.isFinite(heightVal) ? heightVal : profileGeometry?.height;
+    const rawPorts = Array.isArray(definition.ports) && definition.ports.length
+      ? definition.ports
+      : profileGeometry?.ports;
+    const ports = normalizePortsForCategory(
+      category,
+      rawPorts,
+      resolvedType,
+      subtype,
+      resolvedWidth || compWidth,
+      resolvedHeight || compHeight
     );
     const rawSource = typeof definition.source === 'string' ? definition.source.trim() : '';
     const derivedSource = rawSource || (definition.isCustom ? 'custom' : '');
@@ -2255,10 +2622,8 @@ async function loadComponentLibrary() {
       isCustom
     };
     if (definition.hidden) meta.hidden = true;
-    const widthVal = Number(definition.width);
-    const heightVal = Number(definition.height);
-    if (Number.isFinite(widthVal)) meta.width = widthVal;
-    if (Number.isFinite(heightVal)) meta.height = heightVal;
+    if (Number.isFinite(resolvedWidth)) meta.width = resolvedWidth;
+    if (Number.isFinite(resolvedHeight)) meta.height = resolvedHeight;
     componentMeta[key] = meta;
     subtypeCategory[key] = category;
     if (!componentTypes[category]) componentTypes[category] = [];
@@ -2786,6 +3151,7 @@ const PROPERTY_CLIPBOARD_EXCLUDE_KEYS = new Set([
   'width',
   'height',
   'rotation',
+  'rotationManual',
   'flipped',
   'labelOffset',
   'category',
@@ -3008,7 +3374,7 @@ let cursorPos = { x: 20, y: 20 };
 let cursorPosValid = false;
 let needsInitialViewportCenter = true;
 let pendingInitialCenter = null;
-let showOverlays = true;
+let showOverlays = false;
 let showEnergizedState = false;    // Gap #36
 let showProtectionZones = false;   // Gap #50
 let activeZoneId = null;           // Gap #50 – zone currently in component-assignment mode
@@ -3481,7 +3847,7 @@ function getComponentCollectionBounds(items = []) {
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   items.forEach(comp => {
     if (!comp || comp.type === 'dimension') return;
-    const b = componentBounds(comp);
+    const b = componentVisualBounds(comp);
     minX = Math.min(minX, b.left);
     minY = Math.min(minY, b.top);
     maxX = Math.max(maxX, b.right);
@@ -3575,7 +3941,7 @@ function zoomToFit(options = {}) {
   if (!(editor instanceof HTMLElement)) return;
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   components.forEach(comp => {
-    const b = componentBounds(comp);
+    const b = componentVisualBounds(comp);
     minX = Math.min(minX, b.left);
     minY = Math.min(minY, b.top);
     maxX = Math.max(maxX, b.right);
@@ -3613,7 +3979,7 @@ function zoomToSelection(options = {}) {
   if (!(editor instanceof HTMLElement)) return;
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   targets.forEach(comp => {
-    const b = componentBounds(comp);
+    const b = componentVisualBounds(comp);
     minX = Math.min(minX, b.left);
     minY = Math.min(minY, b.top);
     maxX = Math.max(maxX, b.right);
@@ -4032,9 +4398,62 @@ function componentMatchesDiagramFilter(comp) {
   return true;
 }
 
+function classifyConnectionRole(source, target) {
+  if (isBusComponent(source) || isBusComponent(target)) return 'connection-main';
+  if (isSourceComponent(source) || isSourceComponent(target)) return 'connection-main';
+  if (isProtectionComponent(source) || isProtectionComponent(target)) return 'connection-device';
+  return 'connection-branch';
+}
+
 function syncDatablockFormatControl() {
   const select = document.getElementById('datablock-format-select');
   if (select) select.value = datablockFormatMode;
+}
+
+function isEngineeringPrintMode() {
+  return oneLineDrawingMode === 'engineeringPrint';
+}
+
+function syncDrawingModeControl() {
+  const select = document.getElementById('drawing-mode-select');
+  if (select) select.value = oneLineDrawingMode;
+}
+
+function applyDrawingModeClass() {
+  const active = isEngineeringPrintMode();
+  document.body.classList.toggle('engineering-print-mode', active);
+  document.querySelector('.workspace')?.classList.toggle('engineering-print-mode', active);
+}
+
+function scheduleEngineeringPrintFit() {
+  if (!isEngineeringPrintMode() || typeof window === 'undefined') return;
+  window.requestAnimationFrame(() => {
+    window.requestAnimationFrame(() => {
+      if (isEngineeringPrintMode()) zoomToFit({ maxZoom: 1.15, pad: 80 });
+    });
+  });
+}
+
+function setDrawingMode(mode) {
+  const nextMode = Object.prototype.hasOwnProperty.call(drawingModeLabels, mode) ? mode : 'edit';
+  oneLineDrawingMode = nextMode;
+  setItem(drawingModeStorageKey, oneLineDrawingMode);
+  syncDrawingModeControl();
+  applyDrawingModeClass();
+  if (isEngineeringPrintMode()) {
+    if (dataStateOverlayMode !== 'none') {
+      dataStateOverlayMode = 'none';
+      setItem(dataStateOverlayStorageKey, dataStateOverlayMode);
+      syncDataStateOverlayControl();
+    }
+    if (datablockFormatMode === 'off') {
+      setDatablockFormatMode('engineering');
+      scheduleEngineeringPrintFit();
+      return;
+    }
+  }
+  render();
+  scheduleEngineeringPrintFit();
 }
 
 function setDatablockFormatMode(mode) {
@@ -4336,7 +4755,9 @@ function refineOneLineCommandSurface() {
   appendIfPresent(arrangeMenu.panel, normalizeCommandButton(document.getElementById('auto-space-equipment-btn'), 'Auto Space Equipment'));
 
   const viewMenu = createCommandMenu('View', { wide: true });
+  viewMenu.details.classList.add('drawing-mode-menu');
   appendIfPresent(viewMenu.panel, normalizeCommandButton(document.getElementById('view-menu-btn'), 'Component Fields'));
+  appendIfPresent(viewMenu.panel, document.getElementById('drawing-mode-select')?.closest('label'));
   appendIfPresent(viewMenu.panel, document.getElementById('datablock-format-select')?.closest('label'));
   appendIfPresent(viewMenu.panel, document.getElementById('datablock-density-select')?.closest('label'));
   appendIfPresent(viewMenu.panel, document.getElementById('data-state-overlay-select')?.closest('label'));
@@ -4362,6 +4783,7 @@ function refineOneLineCommandSurface() {
   appendIfPresent(gridMenu.panel, normalizeMenuLabel(document.getElementById('orthogonal-routing-toggle')?.closest('label')));
 
   const zoomMenu = createCommandMenu('Zoom', { wide: true });
+  zoomMenu.details.classList.add('drawing-mode-zoom-menu');
   const zoomDisplay = document.getElementById('zoom-display');
   if (zoomDisplay) {
     zoomMenu.summary.textContent = 'Zoom ';
@@ -6021,14 +6443,15 @@ function updateLegend(ranges) {
 
 function resolveComponentCategory(comp) {
   if (!comp) return '';
-  const meta = componentMeta[comp.subtype];
+  const metaKey = resolveComponentMetaKey(comp);
+  const meta = componentMeta[metaKey];
   const metaCategory = normalizeCategoryValue(meta?.category);
   if (metaCategory) return metaCategory;
   if (meta?.type) {
     const typeCategory = categoryForType(meta.type);
     if (typeCategory) return typeCategory;
   }
-  const storedCategory = normalizeCategoryValue(subtypeCategory[comp.subtype]);
+  const storedCategory = normalizeCategoryValue(subtypeCategory[metaKey] || subtypeCategory[comp.subtype]);
   if (storedCategory) return storedCategory;
   const compCategory = normalizeCategoryValue(comp.category);
   if (compCategory) return compCategory;
@@ -6039,15 +6462,15 @@ function resolveComponentCategory(comp) {
 function defaultLabelAnchor(comp) {
   const category = resolveComponentCategory(comp);
   const bounds = componentBounds(comp);
-  if (category === 'load') {
+  if (category === 'bus' || category === 'sources') {
     return {
       x: (bounds.left + bounds.right) / 2,
-      y: bounds.bottom + 15
+      y: bounds.top - 10
     };
   }
   return {
-    x: bounds.right + 15,
-    y: (bounds.top + bounds.bottom) / 2
+    x: (bounds.left + bounds.right) / 2,
+    y: bounds.bottom + 12
   };
 }
 
@@ -6061,7 +6484,51 @@ function getLabelPosition(comp) {
 }
 
 function getLabelAlignment(comp) {
-  return resolveComponentCategory(comp) === 'load' ? 'middle' : 'start';
+  return 'middle';
+}
+
+function getLabelBaseline(comp) {
+  const category = resolveComponentCategory(comp);
+  return category === 'bus' || category === 'sources' ? 'baseline' : 'hanging';
+}
+
+function getComponentLabelText(comp, meta = componentMeta[comp?.subtype] || {}) {
+  return comp?.label || meta.label || comp?.subtype || comp?.type || '';
+}
+
+function estimateTextWidth(text, fontSize = 12) {
+  const normalized = String(text || '').trim();
+  if (!normalized) return 0;
+  return Math.max(24, normalized.length * fontSize * 0.58);
+}
+
+function componentLabelBounds(comp) {
+  if (!comp || comp.type === 'annotation') return null;
+  const text = getComponentLabelText(comp);
+  if (!text) return null;
+  const pos = getLabelPosition(comp);
+  const width = estimateTextWidth(text, 13);
+  const height = 17;
+  const baseline = getLabelBaseline(comp);
+  const top = baseline === 'hanging' ? pos.y - 2 : pos.y - height + 2;
+  return {
+    left: pos.x - width / 2,
+    top,
+    right: pos.x + width / 2,
+    bottom: top + height
+  };
+}
+
+function componentVisualBounds(comp) {
+  const bounds = componentBounds(comp);
+  const labelBounds = componentLabelBounds(comp);
+  if (!labelBounds) return bounds;
+  return {
+    left: Math.min(bounds.left, labelBounds.left),
+    top: Math.min(bounds.top, labelBounds.top),
+    right: Math.max(bounds.right, labelBounds.right),
+    bottom: Math.max(bounds.bottom, labelBounds.bottom)
+  };
 }
 
 function attachLabelInteractions(el, comp) {
@@ -6250,7 +6717,103 @@ function resolveComponentAttribute(comp, key) {
   return undefined;
 }
 
+function coalesceComponentAttribute(comp, keys = []) {
+  for (const key of keys) {
+    const value = resolveComponentAttribute(comp, key);
+    if (value !== undefined && value !== null && value !== '') return value;
+  }
+  return undefined;
+}
+
+function formatEngineeringNumber(value, maxDigits = 3) {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return String(value ?? '').trim();
+  if (Math.abs(num) >= 100) return num.toFixed(num % 1 === 0 ? 0 : 1);
+  if (Math.abs(num) >= 10) return num.toFixed(num % 1 === 0 ? 0 : 2).replace(/\.?0+$/, '');
+  return num.toPrecision(maxDigits).replace(/\.?0+$/, '');
+}
+
+function formatEngineeringVoltage(value, sourceKey = '') {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return String(value ?? '').trim();
+  const key = String(sourceKey || '').toLowerCase();
+  if (key.includes('kv') || key === 'basekv' || (num > 0 && num <= 35 && !Number.isInteger(num))) {
+    return `${formatEngineeringNumber(num)} kV`;
+  }
+  if (Math.abs(num) >= 1000) return `${formatEngineeringNumber(num / 1000)} kV`;
+  return `${formatEngineeringNumber(num)} V`;
+}
+
+function formatEngineeringValueWithUnit(value, unit, precision = 3) {
+  if (value === undefined || value === null || value === '') return '';
+  return `${formatEngineeringNumber(value, precision)} ${unit}`.trim();
+}
+
+function getEngineeringLabelLines(comp) {
+  if (!comp) return [];
+  const type = String(comp.type || '').toLowerCase();
+  const subtype = String(comp.subtype || '').toLowerCase();
+  const category = getCategory(comp);
+  const lines = [];
+  const seen = new Set();
+  const add = text => {
+    const normalized = String(text || '').trim();
+    if (!normalized || seen.has(normalized)) return;
+    seen.add(normalized);
+    lines.push(normalized);
+  };
+  const voltageKeys = ['voltage', 'volts', 'rated_voltage_kv', 'rated_kv', 'baseKV', 'kV'];
+  for (const key of voltageKeys) {
+    const value = coalesceComponentAttribute(comp, [key]);
+    if (value !== undefined && value !== null && value !== '') {
+      add(formatEngineeringVoltage(value, key));
+      break;
+    }
+  }
+  if (isBusComponent(comp)) {
+    add(formatEngineeringValueWithUnit(coalesceComponentAttribute(comp, ['bus_rating_a', 'rating_a', 'max_continuous_current_a']), 'A'));
+    const vm = coalesceComponentAttribute(comp, ['Vm', 'voltage_mag']);
+    const va = coalesceComponentAttribute(comp, ['Va', 'phase_angle']);
+    if (vm !== undefined || va !== undefined) {
+      const vmText = vm !== undefined ? `${formatEngineeringNumber(vm, 4)} pu` : '';
+      const vaText = va !== undefined ? `${formatEngineeringNumber(va)} deg` : '';
+      add([vmText, vaText].filter(Boolean).join(' / '));
+    }
+  } else if (type === 'transformer') {
+    add(formatEngineeringValueWithUnit(coalesceComponentAttribute(comp, ['kva', 'rated_kva', 'kva_hv', 'mva']), 'kVA'));
+    add(formatEngineeringValueWithUnit(coalesceComponentAttribute(comp, ['percent_z', 'impedance_z_percent', 'z_hv_lv_percent']), '%Z'));
+    const tap = coalesceComponentAttribute(comp, ['tap_percent', 'tap', 'tap_position']);
+    if (tap !== undefined) add(`Tap ${formatEngineeringNumber(tap)}${String(tap).includes('%') ? '' : '%'}`);
+  } else if (type === 'utility_source') {
+    add(formatEngineeringValueWithUnit(coalesceComponentAttribute(comp, ['thevenin_mva', 'short_circuit_capacity']), 'MVA'));
+    add(formatEngineeringValueWithUnit(coalesceComponentAttribute(comp, ['xr_ratio']), 'X/R'));
+  } else if (type === 'generator') {
+    add(formatEngineeringValueWithUnit(coalesceComponentAttribute(comp, ['kw', 'rated_kw', 'max_kw']), 'kW'));
+    add(formatEngineeringValueWithUnit(coalesceComponentAttribute(comp, ['kva', 'rated_kva']), 'kVA'));
+  } else if (type === 'motor' || subtype.includes('motor')) {
+    add(formatEngineeringValueWithUnit(coalesceComponentAttribute(comp, ['hp', 'rated_hp']), 'HP'));
+    add(formatEngineeringValueWithUnit(coalesceComponentAttribute(comp, ['kw', 'load.kw']), 'kW'));
+  } else if (type === 'static_load') {
+    add(formatEngineeringValueWithUnit(coalesceComponentAttribute(comp, ['kw', 'load.kw', 'watts']), 'kW'));
+    add(formatEngineeringValueWithUnit(coalesceComponentAttribute(comp, ['kvar', 'load.kvar']), 'kVAR'));
+  } else if (type === 'shunt_capacitor_bank' || type === 'reactor') {
+    add(formatEngineeringValueWithUnit(coalesceComponentAttribute(comp, ['rated_kvar', 'kvar', 'shunt.kvar', 'kvar_absorb']), 'kVAR'));
+  } else if (type === 'ups') {
+    add(formatEngineeringValueWithUnit(coalesceComponentAttribute(comp, ['rated_kva', 'kva']), 'kVA'));
+    add(formatEngineeringValueWithUnit(coalesceComponentAttribute(comp, ['battery_runtime_min', 'runtime_min']), 'min'));
+  } else if (category === 'equipment' || type === 'panel' || type === 'switchboard' || type === 'switchgear' || type === 'mcc') {
+    add(formatEngineeringValueWithUnit(coalesceComponentAttribute(comp, ['bus_rating_a', 'rating_a']), 'A'));
+    add(formatEngineeringValueWithUnit(coalesceComponentAttribute(comp, ['interrupting_ka', 'main_interrupting_ka', 'withstand_1s_ka']), 'kA'));
+  } else if (isProtectionComponent(comp)) {
+    add(formatEngineeringValueWithUnit(coalesceComponentAttribute(comp, ['rating_a', 'frame_a', 'pickup_amps']), 'A'));
+    add(formatEngineeringValueWithUnit(coalesceComponentAttribute(comp, ['interrupt_rating_ka', 'interrupting_rating_ka', 'short_circuit_rating_ka']), 'kA'));
+  }
+  add(formatEngineeringValueWithUnit(coalesceComponentAttribute(comp, ['shortCircuit.threePhaseKA']), 'kA fault'));
+  return lines.slice(0, datablockDensityMode === 'expanded' ? 6 : 4);
+}
+
 function getComponentAttributeLines(comp) {
+  if (datablockFormatMode === 'engineering') return getEngineeringLabelLines(comp);
   if (!viewAttributes.size) return [];
   const keys = Array.from(viewAttributes);
   keys.sort((a, b) => {
@@ -6359,6 +6922,30 @@ function chooseDatablockPlacement(bounds, width, height, layout) {
   return makeCandidate(sideOrder[0], offsets[offsets.length - 1]);
 }
 
+function chooseEngineeringDatablockPlacement(comp, bounds, width, height, layout) {
+  const centerX = (bounds.left + bounds.right) / 2;
+  const centerY = (bounds.top + bounds.bottom) / 2;
+  const margin = isBusComponent(comp) ? 18 : 10;
+  const preferred = isBusComponent(comp) || resolveComponentCategory(comp) === 'sources'
+    ? ['right', 'bottom', 'left', 'top']
+    : ['bottom', 'right', 'left', 'top'];
+  const offsets = [0, 22, -22, 44, -44, 72, -72, 100, -100];
+  const makeCandidate = (side, offset) => {
+    if (side === 'right') return { side, x: bounds.right + margin, y: centerY - height / 2 + offset };
+    if (side === 'left') return { side, x: bounds.left - width - margin, y: centerY - height / 2 + offset };
+    if (side === 'bottom') return { side, x: centerX - width / 2 + offset, y: bounds.bottom + margin };
+    return { side, x: centerX - width / 2 + offset, y: bounds.top - height - margin };
+  };
+  for (const side of preferred) {
+    for (const offset of offsets) {
+      const candidate = makeCandidate(side, offset);
+      const rect = { x: candidate.x, y: candidate.y, width, height };
+      if (!layout.occupied.some(existing => rectsOverlap(rect, existing, 4))) return candidate;
+    }
+  }
+  return makeCandidate(preferred[0], offsets[offsets.length - 1]);
+}
+
 function truncateDatablockLine(line, limit = 38) {
   const text = String(line || '').trim();
   if (text.length <= limit) return text;
@@ -6367,7 +6954,8 @@ function truncateDatablockLine(line, limit = 38) {
 
 function renderComponentDatablock(svg, comp, lines, includePoint, layout = createDatablockLayout()) {
   if (!svg || !comp || !Array.isArray(lines) || !lines.length) return;
-  const bounds = componentBounds(comp);
+  const engineeringLabel = datablockFormatMode === 'engineering';
+  const bounds = engineeringLabel ? componentVisualBounds(comp) : componentBounds(comp);
   const compact = datablockDensityMode === 'compact';
   const lineLimit = compact ? 30 : 38;
   const visibleLineLimit = compact ? 3 : 6;
@@ -6381,11 +6969,16 @@ function renderComponentDatablock(svg, comp, lines, includePoint, layout = creat
     : Math.max(112, Math.min(248, longest * 6.2 + 18));
   const lineHeight = compact ? 12 : 13;
   const height = visibleLines.length * lineHeight + 10;
-  const placement = chooseDatablockPlacement(bounds, width, height, layout);
+  const placement = engineeringLabel
+    ? chooseEngineeringDatablockPlacement(comp, bounds, width, height, layout)
+    : chooseDatablockPlacement(bounds, width, height, layout);
   const x = placement.x;
   const y = placement.y;
+  includePoint(x, y);
+  includePoint(x + width, y + height);
   const g = document.createElementNS(svgNS, 'g');
   g.classList.add('component-datablock');
+  if (engineeringLabel) g.classList.add('component-datablock-engineering');
   if (compact) g.classList.add('component-datablock-compact');
   g.dataset.side = placement.side;
   g.dataset.id = comp.id;
@@ -6403,19 +6996,21 @@ function renderComponentDatablock(svg, comp, lines, includePoint, layout = creat
     x: placement.side === 'left' ? x + width : placement.side === 'right' ? x : Math.min(Math.max(leaderStart.x, x), x + width),
     y: placement.side === 'top' ? y + height : placement.side === 'bottom' ? y : Math.min(Math.max(leaderStart.y, y), y + height)
   };
-  const leader = document.createElementNS(svgNS, 'line');
-  leader.setAttribute('x1', leaderStart.x);
-  leader.setAttribute('y1', leaderStart.y);
-  leader.setAttribute('x2', leaderEnd.x);
-  leader.setAttribute('y2', leaderEnd.y);
+  const leaderPoints = placement.side === 'left' || placement.side === 'right'
+    ? [leaderStart, { x: leaderEnd.x, y: leaderStart.y }, leaderEnd]
+    : [leaderStart, { x: leaderStart.x, y: leaderEnd.y }, leaderEnd];
+  leaderPoints.forEach(point => includePoint(point.x, point.y));
+  const leader = document.createElementNS(svgNS, 'polyline');
+  leader.setAttribute('points', leaderPoints.map(point => `${point.x},${point.y}`).join(' '));
+  leader.setAttribute('fill', 'none');
   leader.classList.add('component-datablock-leader');
   const rect = document.createElementNS(svgNS, 'rect');
   rect.setAttribute('x', x);
   rect.setAttribute('y', y);
   rect.setAttribute('width', width);
   rect.setAttribute('height', height);
-  rect.setAttribute('rx', 4);
-  rect.setAttribute('ry', 4);
+  rect.setAttribute('rx', engineeringLabel ? 1 : 4);
+  rect.setAttribute('ry', engineeringLabel ? 1 : 4);
   g.append(title, leader, rect);
   visibleLines.forEach((line, idx) => {
     const text = document.createElementNS(svgNS, 'text');
@@ -6479,6 +7074,29 @@ function renderOperatingStateBadge(svg, comp, status, includePoint) {
   badge.append(title, rect, text);
   includePoint(x, y);
   includePoint(x + width, y + height);
+  svg.appendChild(badge);
+}
+
+function renderDataStateBadge(svg, comp, dataStateInfo, mode, includePoint) {
+  if (!svg || !comp || !dataStateInfo) return;
+  const bounds = componentBounds(comp);
+  const x = bounds.left + 7;
+  const y = bounds.top + 7;
+  const badge = document.createElementNS(svgNS, 'g');
+  badge.classList.add('data-state-badge', `data-state-${dataStateInfo.key}`);
+  badge.dataset.id = comp.id;
+  badge.dataset.mode = mode || '';
+  const title = document.createElementNS(svgNS, 'title');
+  const modeLabel = dataStateOverlayLabels[mode] || 'Status';
+  title.textContent = `${modeLabel}: ${dataStateInfo.label}`;
+  const circle = document.createElementNS(svgNS, 'circle');
+  circle.setAttribute('cx', x);
+  circle.setAttribute('cy', y);
+  circle.setAttribute('r', 5);
+  circle.setAttribute('fill', dataStateInfo.color);
+  badge.append(title, circle);
+  includePoint(x - 5, y - 5);
+  includePoint(x + 5, y + 5);
   svg.appendChild(badge);
 }
 
@@ -7161,7 +7779,7 @@ function refreshAttributeOptions() {
 }
 
 function portPosition(c, portIndex) {
-  const meta = componentMeta[c.subtype] || {};
+  const meta = resolveComponentMeta(c);
   const w = c.width || compWidth;
   const h = c.height || compHeight;
   const ports = c.ports || meta.ports;
@@ -7745,7 +8363,7 @@ function nearestPortToPoint(x, y, exclude) {
   let best = null;
   components.forEach(c => {
     if (exclude && c === exclude.component) return;
-    const ports = c.ports || componentMeta[c.subtype]?.ports || [];
+    const ports = c.ports || resolveComponentMeta(c)?.ports || [];
     ports.forEach((p, idx) => {
       const pos = portPosition(c, idx);
       const dx = pos.x - x;
@@ -7762,7 +8380,7 @@ function nearestPortToPoint(x, y, exclude) {
 
 function nearestConnectPortForComponent(comp, point = null, skipConn = null) {
   if (!comp) return null;
-  const meta = componentMeta[comp.subtype] || {};
+  const meta = resolveComponentMeta(comp);
   const ports = comp.ports || meta.ports || [];
   const portCount = ports.length ? ports.length : 1;
   let best = null;
@@ -7958,7 +8576,7 @@ function getDefaultBusSubtype() {
 
 function nearestPortIndexForPoint(comp, point) {
   if (!comp) return 0;
-  const meta = componentMeta[comp.subtype] || {};
+  const meta = resolveComponentMeta(comp);
   const ports = comp.ports || meta.ports || [];
   if (!ports.length) return 0;
   const target = point && Number.isFinite(point.x) && Number.isFinite(point.y) ? point : null;
@@ -8284,7 +8902,7 @@ function runAutoBuildWorkflow() {
   pushHistory();
   arrangeSourceToLoad({ silent: true, componentsToArrange: components });
   render();
-  zoomToComponents(created, { pad: 120, maxZoom: 1.15 });
+  zoomToFit({ pad: 140, maxZoom: 1.15 });
   save();
   markScheduleReconcilePending();
   showToast(`Auto-built ${created.length} one-line item${created.length === 1 ? '' : 's'}`);
@@ -8358,6 +8976,92 @@ function buildTopologyLevels(items = components) {
   return level;
 }
 
+function applyBusCentricAutoLayout(targets) {
+  const buses = targets.filter(comp => isBusComponent(comp));
+  if (!buses.length) return false;
+  const byId = new Map(targets.map(comp => [comp.id, comp]));
+  const degree = bus => {
+    const outbound = (bus.connections || []).filter(conn => byId.has(conn.target)).length;
+    const inbound = targets.filter(comp => (comp.connections || []).some(conn => conn.target === bus.id)).length;
+    return outbound + inbound;
+  };
+  const mainBus = [...buses].sort((a, b) => degree(b) - degree(a))[0];
+  if (!mainBus) return false;
+  const branchSpacing = 150;
+  const levelSpacing = 118;
+  const topY = 72;
+  const busY = topY + levelSpacing;
+  const busChildren = (mainBus.connections || [])
+    .map(conn => byId.get(conn.target))
+    .filter(comp => comp && !isBusComponent(comp));
+  const upstream = targets
+    .filter(comp => comp !== mainBus && (comp.connections || []).some(conn => conn.target === mainBus.id))
+    .sort((a, b) => {
+      const sourceDelta = Number(isSourceComponent(b)) - Number(isSourceComponent(a));
+      return sourceDelta || (getComponentTag(a) || a.id).localeCompare(getComponentTag(b) || b.id);
+    });
+  const branchCount = Math.max(busChildren.length, upstream.length, 2);
+  const busWidth = Math.max(360, branchCount * branchSpacing + 80);
+  const busX = 140;
+  mainBus.rotation = defaultRotationForComponent(mainBus);
+  mainBus.rotationManual = false;
+  mainBus.width = busWidth;
+  mainBus.height = Number(mainBus.height) > 0 ? mainBus.height : 20;
+  alignComponentBoundsToTopLeft(mainBus, busX, busY);
+  updateBusPorts(mainBus);
+  const positioned = new Set([mainBus.id]);
+  const placeAtCenter = (comp, centerX, y) => {
+    if (!comp) return;
+    comp.rotation = defaultRotationForComponent(comp);
+    comp.rotationManual = false;
+    alignComponentBoundsToTopLeft(comp, centerX - ((Number(comp.width) || compWidth) / 2), y);
+    comp.labelOffset = comp.labelOffset || { x: 0, y: 0 };
+    positioned.add(comp.id);
+  };
+  upstream.forEach((comp, idx) => {
+    const centerX = busX + busWidth * ((idx + 1) / (upstream.length + 1));
+    placeAtCenter(comp, centerX, topY - (Number(comp.height) || compHeight));
+  });
+  busChildren.forEach((comp, idx) => {
+    const centerX = busX + busWidth * ((idx + 1) / (busChildren.length + 1));
+    placeAtCenter(comp, centerX, busY + levelSpacing);
+  });
+  const outgoingBySource = new Map();
+  targets.forEach(comp => {
+    (comp.connections || []).forEach(conn => {
+      const target = byId.get(conn.target);
+      if (!target || target === mainBus || isBusComponent(target)) return;
+      if (!outgoingBySource.has(comp.id)) outgoingBySource.set(comp.id, []);
+      outgoingBySource.get(comp.id).push(target);
+    });
+  });
+  for (let depth = 0; depth < targets.length; depth++) {
+    let moved = false;
+    targets.forEach(parent => {
+      if (!positioned.has(parent.id)) return;
+      const children = (outgoingBySource.get(parent.id) || []).filter(child => !positioned.has(child.id));
+      if (!children.length) return;
+      const parentCenterX = Number(parent.x) + (Number(parent.width) || compWidth) / 2;
+      const spread = Math.max(1, children.length - 1) * 100;
+      children.forEach((child, idx) => {
+        const offset = children.length === 1 ? 0 : idx * 100 - spread / 2;
+        placeAtCenter(child, parentCenterX + offset, Number(parent.y) + (Number(parent.height) || compHeight) + levelSpacing);
+        moved = true;
+      });
+    });
+    if (!moved) break;
+  }
+  targets
+    .filter(comp => !positioned.has(comp.id))
+    .sort((a, b) => (getComponentTag(a) || a.id).localeCompare(getComponentTag(b) || b.id))
+    .forEach((comp, idx) => {
+      const centerX = busX + busWidth + 170 + (idx % 3) * branchSpacing;
+      const y = busY + Math.floor(idx / 3) * levelSpacing;
+      placeAtCenter(comp, centerX, y);
+    });
+  return true;
+}
+
 function arrangeSourceToLoad({ silent = false, componentsToArrange = null } = {}) {
   const targets = (componentsToArrange || (selection.length > 1 ? selection : components))
     .filter(comp => comp && comp.type !== 'dimension' && comp.type !== 'annotation');
@@ -8365,6 +9069,7 @@ function arrangeSourceToLoad({ silent = false, componentsToArrange = null } = {}
     if (!silent) showToast('No devices to arrange');
     return false;
   }
+  targets.forEach(comp => applyIndustrySymbolGeometry(comp, resolveComponentMeta(comp)));
   const level = buildTopologyLevels(targets);
   const groups = new Map();
   targets.forEach(comp => {
@@ -8378,8 +9083,21 @@ function arrangeSourceToLoad({ silent = false, componentsToArrange = null } = {}
       const x = 180 + idx * 190;
       const y = 120 + rank * 140;
       comp.rotation = defaultRotationForComponent(comp);
+      comp.rotationManual = false;
       alignComponentBoundsToTopLeft(comp, x, y);
       comp.labelOffset = comp.labelOffset || { x: 0, y: 0 };
+    });
+  });
+  applyBusCentricAutoLayout(targets);
+  targets.forEach(comp => {
+    (comp.connections || []).forEach(conn => {
+      const target = targets.find(item => item.id === conn.target) || components.find(item => item.id === conn.target);
+      if (!target) return;
+      const [sourcePort, targetPort] = nearestPorts(comp, target);
+      conn.sourcePort = sourcePort;
+      conn.targetPort = targetPort;
+      delete conn.dir;
+      delete conn.mid;
     });
   });
   pushHistory();
@@ -8497,13 +9215,13 @@ function ensureConnection(fromComp, toComp, fromPort, toPort) {
 
 function autoAttachComponent(comp, exclude = new Set()) {
   if (!comp) return false;
-  const meta = componentMeta[comp.subtype] || {};
+  const meta = resolveComponentMeta(comp);
   const ports = comp.ports || meta.ports;
   if (!ports || !ports.length) return false;
   let best = null;
   components.forEach(other => {
     if (other === comp || exclude.has(other)) return;
-    const otherMeta = componentMeta[other.subtype] || {};
+    const otherMeta = resolveComponentMeta(other);
     const otherPorts = other.ports || otherMeta.ports;
     if (!otherPorts || !otherPorts.length) return;
     ports.forEach((_, portIdx) => {
@@ -8548,13 +9266,13 @@ function autoAttachComponent(comp, exclude = new Set()) {
  */
 function snapToNearestBus(comp, snapRadius = 30) {
   if (!comp || isBusComponent(comp)) return false;
-  const meta = componentMeta[comp.subtype] || {};
+  const meta = resolveComponentMeta(comp);
   const ports = comp.ports || meta.ports || [];
   if (!ports.length) return false;
   let best = null;
   components.forEach(bus => {
     if (!isBusComponent(bus) || bus === comp) return;
-    const busMeta = componentMeta[bus.subtype] || {};
+    const busMeta = resolveComponentMeta(bus);
     const busPorts = bus.ports || busMeta.ports || [];
     ports.forEach((_, portIdx) => {
       const compPos = portPosition(comp, portIdx);
@@ -8606,9 +9324,11 @@ function updateCableOperatingVoltages(comps = components) {
 }
 
 function normalizeComponent(c) {
-  const meta = componentMeta[c?.subtype] || {};
+  const metaKey = resolveComponentMetaKey(c);
+  const meta = componentMeta[metaKey] || {};
   const nc = {
     ...c,
+    subtype: metaKey || c?.subtype,
     rotation: normalizeRotation(c.rotation ?? c.rot ?? meta.defaultRotation ?? defaultRotationForType(c?.type, meta.category)),
     flipped: c.flipped || false,
     connections: (c.connections || []).map(conn =>
@@ -8631,14 +9351,29 @@ function normalizeComponent(c) {
     nc.height = Number(nc.height) || fallbackHeight;
     ensureShapeDefaults(nc);
   }
-  if (resolveComponentCategory(nc) === 'load') {
-    const basePorts = componentMeta[nc.subtype]?.ports?.length
-      ? componentMeta[nc.subtype].ports
-      : nc.ports;
-    nc.ports = normalizePortsForCategory('load', basePorts, nc.type, nc.subtype).map(port => ({
-      x: coerceNumber(port?.x, compWidth / 2),
+  const normalizedCategory = resolveComponentCategory(nc);
+  if (normalizedCategory === 'bus' || isBusComponent(nc)) {
+    nc.width = Number(nc.width) || Number(meta.width) || 200;
+    nc.height = Number(nc.height) || Number(meta.height) || 20;
+    updateBusPorts(nc);
+  }
+  applyIndustrySymbolGeometry(nc, meta);
+  if (!nc.rotationManual && nc.rotation && shouldUseVerticalOneLinePorts(normalizedCategory, nc.type)) {
+    nc.rotation = 0;
+  }
+  if (normalizedCategory === 'load') {
+    const profileGeometry = industrySymbolGeometry(getIndustrySymbolProfile(nc, meta));
+    const basePorts = profileGeometry?.ports?.length
+      ? profileGeometry.ports
+      : componentMeta[nc.subtype]?.ports?.length
+        ? componentMeta[nc.subtype].ports
+        : nc.ports;
+    nc.ports = normalizePortsForCategory('load', basePorts, nc.type, nc.subtype, nc.width || compWidth, nc.height || compHeight).map(port => ({
+      x: coerceNumber(port?.x, (nc.width || compWidth) / 2),
       y: coerceNumber(port?.y, 0)
     }));
+  } else if (Array.isArray(nc.ports) && shouldUseVerticalOneLinePorts(normalizedCategory, nc.type)) {
+    nc.ports = normalizePortsForCategory(normalizedCategory, nc.ports, nc.type, nc.subtype, nc.width || compWidth, nc.height || compHeight);
   }
   applyDefaults(nc);
   ensureBaselineFieldsOnComponent(nc, componentMeta[nc.subtype]);
@@ -9219,8 +9954,10 @@ function renderBgPanel() {
 function render() {
   applyTransformerVoltages();
   propagateSourceVoltagesToBuses(components);
+  applyDrawingModeClass();
+  const engineeringPrint = isEngineeringPrintMode();
   const svg = document.getElementById('diagram');
-  svg.querySelectorAll('g.component, .connection, .conn-label, .port, .bus-handle, .annotation-handle, .issue-badge, .component-label, .component-attribute, .component-datablock, .operating-state-badge, .selection-marquee, .transformer-port-label').forEach(el => el.remove());
+  svg.querySelectorAll('g.component, .connection, .conn-label, .port, .bus-handle, .annotation-handle, .issue-badge, .component-label, .component-attribute, .component-datablock, .operating-state-badge, .data-state-badge, .connection-junction, .selection-marquee, .transformer-port-label').forEach(el => el.remove());
 
   // Gap #52: re-insert background image underlay (positioned later by applyDiagramZoom)
   const existingBgUnderlay = svg.querySelector('#bg-underlay');
@@ -9247,7 +9984,7 @@ function render() {
   };
   const includeComponentBounds = comp => {
     if (!comp) return;
-    const bounds = componentBounds(comp);
+    const bounds = componentVisualBounds(comp);
     includePoint(bounds.left, bounds.top);
     includePoint(bounds.right, bounds.bottom);
   };
@@ -9292,13 +10029,40 @@ function render() {
     }
   }
 
+  function routeBusTapPath(src, tgt, start, end) {
+    const sourceIsBus = isBusComponent(src);
+    const targetIsBus = isBusComponent(tgt);
+    if (sourceIsBus === targetIsBus) return null;
+    const bus = sourceIsBus ? src : tgt;
+    const otherPoint = sourceIsBus ? end : start;
+    const busWidth = Number(bus.width) || compWidth;
+    const busHeight = Number(bus.height) || compHeight;
+    const busLeft = Number(bus.x) || 0;
+    const busRight = busLeft + busWidth;
+    const busTop = Number(bus.y) || 0;
+    const busMidY = busTop + busHeight / 2;
+    const tapX = Math.min(Math.max(otherPoint.x, busLeft), busRight);
+    const tapY = busMidY;
+    const busPoint = { x: tapX, y: tapY };
+    const aligned = Math.abs(otherPoint.x - busPoint.x) < 0.5;
+    if (sourceIsBus) {
+      return aligned
+        ? [busPoint, end]
+        : [busPoint, { x: end.x, y: busPoint.y }, end];
+    }
+    return aligned
+      ? [start, busPoint]
+      : [start, { x: start.x, y: busPoint.y }, busPoint];
+  }
+
   function routeConnection(src, tgt, conn) {
     const start = portPosition(src, conn?.sourcePort);
     const end = portPosition(tgt, conn?.targetPort);
     const sDir = portDirection(src, conn?.sourcePort);
     const tDir = portDirection(tgt, conn?.targetPort);
     let path;
-    if (conn && conn.dir) {
+    let busTapPath = false;
+    if (conn && conn.dir && !isBusComponent(src) && !isBusComponent(tgt)) {
       const mid = conn.mid ?? (conn.dir === 'h' ? (start.x + end.x) / 2 : (start.y + end.y) / 2);
       if (conn.dir === 'h') {
         path = [start, { x: mid, y: start.y }, { x: mid, y: end.y }, end];
@@ -9425,7 +10189,12 @@ function render() {
     }
 
     if (!path) {
-      if (orthogonalRouting) {
+      const busPath = routeBusTapPath(src, tgt, start, end);
+      if (busPath) {
+        path = busPath;
+        busTapPath = true;
+        if (conn) { delete conn.dir; delete conn.mid; }
+      } else if (orthogonalRouting) {
         // Gap #47 – use simple single-elbow orthogonal path; suppress mid-handle
         path = computeOrthogonalPath(start, end);
         if (conn) { delete conn.dir; delete conn.mid; }
@@ -9450,11 +10219,13 @@ function render() {
         }
       }
     }
-    const pen = path[path.length - 2];
-    if (tDir === 'top' || tDir === 'bottom') {
-      if (pen.x !== end.x) path.splice(path.length - 1, 0, { x: end.x, y: pen.y });
-    } else if (tDir === 'left' || tDir === 'right') {
-      if (pen.y !== end.y) path.splice(path.length - 1, 0, { x: pen.x, y: end.y });
+    if (!busTapPath) {
+      const pen = path[path.length - 2];
+      if (tDir === 'top' || tDir === 'bottom') {
+        if (pen.x !== end.x) path.splice(path.length - 1, 0, { x: end.x, y: pen.y });
+      } else if (tDir === 'left' || tDir === 'right') {
+        if (pen.y !== end.y) path.splice(path.length - 1, 0, { x: pen.x, y: end.y });
+      }
     }
     const approx = (a, b) => Math.abs(a - b) < 0.01;
     const samePoint = (a, b) => approx(a.x, b.x) && approx(a.y, b.y);
@@ -9525,6 +10296,19 @@ function render() {
     const l = comp.layer ? layers.find(ly => ly.id === comp.layer) : null;
     return l ? l.locked : false;
   };
+  const inboundConnectionCount = new Map();
+  components.forEach(source => {
+    (source.connections || []).forEach(conn => {
+      if (!conn?.target) return;
+      inboundConnectionCount.set(conn.target, (inboundConnectionCount.get(conn.target) || 0) + 1);
+    });
+  });
+  const junctionPoints = new Map();
+  const rememberJunctionPoint = (point, color = '#111827') => {
+    if (!point || !Number.isFinite(point.x) || !Number.isFinite(point.y)) return;
+    const key = `${Math.round(point.x * 10) / 10}:${Math.round(point.y * 10) / 10}`;
+    if (!junctionPoints.has(key)) junctionPoints.set(key, { x: point.x, y: point.y, color });
+  };
 
   // draw connections
   components.forEach(c => {
@@ -9547,15 +10331,16 @@ function render() {
       const rawPhases = connPhaseList.length ? connPhaseList : parseCablePhases(cableInfo);
       const phaseKey = rawPhases.join('');
       const phaseColor = phaseColors[phaseKey];
-      const stroke = phaseColor || vRange?.color || cableColors[cableInfo?.cable_type] || cableInfo?.color || '#000';
+      const stroke = !engineeringPrint && showOverlays
+        ? (phaseColor || vRange?.color || cableColors[cableInfo?.cable_type] || cableInfo?.color || '#000')
+        : '#111827';
+      const connectionRole = classifyConnectionRole(c, target);
       poly.setAttribute('stroke', stroke);
       poly.setAttribute('fill', 'none');
-      poly.setAttribute('marker-start', 'url(#connection-x)');
-      poly.setAttribute('marker-end', 'url(#connection-x)');
-      poly.setAttribute('stroke-width', '2');
+      poly.setAttribute('stroke-width', connectionRole === 'connection-main' ? '2.8' : connectionRole === 'connection-device' ? '2.1' : '1.65');
       poly.style.pointerEvents = 'stroke';
       poly.style.cursor = 'move';
-      poly.classList.add('connection');
+      poly.classList.add('connection', connectionRole);
       if (selectedConnection?.component === c && selectedConnection.index === idx) poly.classList.add('selected-connection');
       if (!componentMatchesDiagramFilter(c) || !componentMatchesDiagramFilter(target)) poly.classList.add('diagram-filter-dimmed');
       poly.dataset.comp = c.id;
@@ -9590,6 +10375,20 @@ function render() {
         };
       });
       svg.appendChild(poly);
+      const startPoint = pts[0];
+      const endPoint = pts[pts.length - 1];
+      const sourceNeedsJunction = isBusComponent(c)
+        ? !engineeringPrint
+        : (c.connections || []).length > 1;
+      const targetNeedsJunction = isBusComponent(target)
+        ? !engineeringPrint
+        : (inboundConnectionCount.get(target.id) || 0) > 1;
+      if (sourceNeedsJunction) {
+        rememberJunctionPoint(startPoint, stroke);
+      }
+      if (targetNeedsJunction) {
+        rememberJunctionPoint(endPoint, stroke);
+      }
 
       const label = document.createElementNS(svgNS, 'text');
       const mid = midpoint(pts);
@@ -9599,7 +10398,7 @@ function render() {
       label.setAttribute('dominant-baseline', 'middle');
       label.setAttribute('fill', stroke);
       let lblText = cableInfo?.tag || cableInfo?.cable_type || '';
-      if (showOverlays) {
+      if (!engineeringPrint && showOverlays) {
         const overlays = [];
         if (conn.faultKA != null) {
           const faultText = formatOverlayMetric(conn.faultKA, 'kA', 2);
@@ -9651,7 +10450,7 @@ function render() {
     g.dataset.id = c.id;
     g.classList.add('component');
     if (!componentMatchesDiagramFilter(c)) g.classList.add('diagram-filter-dimmed');
-    const dataStateInfo = getComponentColorInfo(c);
+    const dataStateInfo = engineeringPrint ? null : getComponentColorInfo(c);
     const operatingStatus = getComponentOperatingStatus(c);
     if (operatingStatus === 'open') g.classList.add('operating-open');
     // Gap #51: suppress pointer events for components on locked layers
@@ -9699,7 +10498,7 @@ function render() {
     const cx = c.x + w / 2;
     const cy = c.y + h / 2;
     const voltageMagnitudes = getFiniteVoltageMagnitudes(c.voltage_mag);
-    if (showOverlays && voltageMagnitudes.length) {
+    if (!engineeringPrint && showOverlays && voltageMagnitudes.length) {
       let dev = 0;
       for (const mag of voltageMagnitudes) {
         const magDev = Math.abs(mag - 1) * 100;
@@ -9718,7 +10517,7 @@ function render() {
       g.appendChild(overlay);
     }
     const voltageMagnitudeEntries = getVoltageMagnitudeEntries(c.voltage_mag);
-    if (showOverlays && (voltageMagnitudeEntries.length || c.shortCircuit?.threePhaseKA !== undefined)) {
+    if (!engineeringPrint && showOverlays && (voltageMagnitudeEntries.length || c.shortCircuit?.threePhaseKA !== undefined)) {
       const txt = document.createElementNS(svgNS, 'text');
       txt.setAttribute('x', cx);
       txt.setAttribute('y', cy - (h / 2) - 4);
@@ -9740,14 +10539,15 @@ function render() {
       txt.textContent = parts.join(' / ');
       g.appendChild(txt);
     }
-    if (dataStateInfo) {
+    const useCompactDataState = dataStateOverlayMode === 'validation' || dataStateOverlayMode === 'review';
+    if (dataStateInfo && !useCompactDataState) {
       const dataFill = document.createElementNS(svgNS, 'rect');
       dataFill.setAttribute('x', c.x);
       dataFill.setAttribute('y', c.y);
       dataFill.setAttribute('width', w);
       dataFill.setAttribute('height', h);
       dataFill.setAttribute('fill', dataStateInfo.color);
-      dataFill.setAttribute('opacity', '0.22');
+      dataFill.setAttribute('opacity', '0.14');
       dataFill.classList.add('data-state-fill', `data-state-${dataStateInfo.key}`);
       const title = document.createElementNS(svgNS, 'title');
       title.textContent = dataStateInfo.label;
@@ -9758,7 +10558,7 @@ function render() {
     if (c.flipped) transforms.push(`translate(${cx}, ${cy}) scale(-1,1) translate(${-cx}, ${-cy})`);
     if (c.rotation) transforms.push(`rotate(${c.rotation}, ${cx}, ${cy})`);
     if (transforms.length) g.setAttribute('transform', transforms.join(' '));
-    const vRange = (!showOverlays || c.voltage_mag === undefined) ? getVoltageRange(c.voltage) : null;
+    const vRange = !engineeringPrint && showOverlays && c.voltage_mag === undefined ? getVoltageRange(c.voltage) : null;
     if (vRange) {
       usedVoltageRanges.add(vRange);
       const bg = document.createElementNS(svgNS, 'rect');
@@ -9778,7 +10578,7 @@ function render() {
       }
       g.appendChild(bg);
     }
-    const meta = componentMeta[c.subtype] || {};
+    const meta = resolveComponentMeta(c);
     if (c.type === 'annotation') {
       if (c.subtype === 'annotation_text_box') {
         const rect = document.createElementNS(svgNS, 'rect');
@@ -9903,17 +10703,22 @@ function render() {
       });
       g.appendChild(img);
       if (dataStateInfo) {
-        const outline = document.createElementNS(svgNS, 'rect');
-        outline.setAttribute('x', c.x - 1.5);
-        outline.setAttribute('y', c.y - 1.5);
-        outline.setAttribute('width', w + 3);
-        outline.setAttribute('height', h + 3);
-        outline.setAttribute('fill', 'none');
-        outline.setAttribute('stroke', dataStateInfo.color);
-        outline.setAttribute('stroke-width', 2);
-        outline.classList.add('data-state-outline', `data-state-${dataStateInfo.key}`);
-        outline.style.pointerEvents = 'none';
-        g.appendChild(outline);
+        if (useCompactDataState) {
+          renderDataStateBadge(svg, c, dataStateInfo, dataStateOverlayMode, includePoint);
+        } else {
+          const outline = document.createElementNS(svgNS, 'rect');
+          outline.setAttribute('x', c.x - 1.5);
+          outline.setAttribute('y', c.y - 1.5);
+          outline.setAttribute('width', w + 3);
+          outline.setAttribute('height', h + 3);
+          outline.setAttribute('fill', 'none');
+          outline.setAttribute('stroke', dataStateInfo.color);
+          outline.setAttribute('stroke-width', 1.5);
+          outline.setAttribute('opacity', 0.82);
+          outline.classList.add('data-state-outline', `data-state-${dataStateInfo.key}`);
+          outline.style.pointerEvents = 'none';
+          g.appendChild(outline);
+        }
       }
       if (c.subtype === 'motor' || c.subtype === 'motor_load') {
         const letter = document.createElementNS(svgNS, 'text');
@@ -9946,7 +10751,7 @@ function render() {
         g.style.cursor = 'pointer';
       }
     }
-    if (selection.includes(c)) {
+    if (!engineeringPrint && selection.includes(c)) {
       const rect = document.createElementNS(svgNS, 'rect');
       rect.setAttribute('x', c.x - 2);
       rect.setAttribute('y', c.y - 2);
@@ -9959,7 +10764,7 @@ function render() {
       g.appendChild(rect);
     }
     // Gap #41 – Locked component indicator
-    if (c.locked) {
+    if (!engineeringPrint && c.locked) {
       const lockEl = document.createElementNS(svgNS, 'text');
       lockEl.setAttribute('x', c.x + w - 2);
       lockEl.setAttribute('y', c.y + 12);
@@ -9972,7 +10777,7 @@ function render() {
       g.appendChild(lockEl);
     }
     // Gap #40 – Group outline for group components
-    getComponentReviewBadges(c).slice(0, 3).forEach((badgeInfo, badgeIdx) => {
+    if (!engineeringPrint) getComponentReviewBadges(c).slice(0, 3).forEach((badgeInfo, badgeIdx) => {
       const badge = document.createElementNS(svgNS, 'g');
       badge.setAttribute('class', `review-badge review-badge-${badgeInfo.className}`);
       const bx = c.x + w - 8 - badgeIdx * 18;
@@ -10007,8 +10812,8 @@ function render() {
       g.appendChild(glabel);
     }
     svg.appendChild(g);
-    renderOperatingStateBadge(svg, c, operatingStatus, includePoint);
-    if (c.type === 'annotation' && selection.includes(c)) {
+    if (!engineeringPrint) renderOperatingStateBadge(svg, c, operatingStatus, includePoint);
+    if (!engineeringPrint && c.type === 'annotation' && selection.includes(c)) {
       const handle = document.createElementNS(svgNS, 'rect');
       handle.setAttribute('x', c.x + w - 5);
       handle.setAttribute('y', c.y + h - 5);
@@ -10023,21 +10828,28 @@ function render() {
     }
     if (c.type !== 'annotation') {
       const labelPos = getLabelPosition(c);
+      const labelText = getComponentLabelText(c, meta);
       const labelEl = document.createElementNS(svgNS, 'text');
       labelEl.classList.add('component-label');
       labelEl.dataset.id = c.id;
       labelEl.setAttribute('x', labelPos.x);
       labelEl.setAttribute('y', labelPos.y);
       labelEl.setAttribute('text-anchor', getLabelAlignment(c));
-      labelEl.textContent = c.label || meta.label || c.subtype || c.type;
+      labelEl.setAttribute('dominant-baseline', getLabelBaseline(c));
+      labelEl.textContent = labelText;
       attachLabelInteractions(labelEl, c);
       svg.appendChild(labelEl);
+      const labelBounds = componentLabelBounds(c);
+      if (labelBounds) {
+        includePoint(labelBounds.left, labelBounds.top);
+        includePoint(labelBounds.right, labelBounds.bottom);
+      }
       const attrLines = getComponentAttributeLines(c);
       if (attrLines.length) {
         renderComponentDatablock(svg, c, attrLines, includePoint, datablockLayout);
       }
       if (c.type === 'transformer') {
-        const ports = c.ports || componentMeta[c.subtype]?.ports || [];
+        const ports = c.ports || resolveComponentMeta(c)?.ports || [];
         ports.forEach((_, portIdx) => {
           const labelText = buildTransformerPortLabel(c, portIdx);
           if (!labelText) return;
@@ -10073,7 +10885,7 @@ function render() {
         });
       }
     }
-    if (isBusComponent(c) && selection.includes(c)) {
+    if (!engineeringPrint && isBusComponent(c) && selection.includes(c)) {
       const handleRight = document.createElementNS(svgNS, 'rect');
       handleRight.setAttribute('x', c.x + c.width - 5);
       handleRight.setAttribute('y', c.y + (c.height / 2) - 5);
@@ -10093,7 +10905,7 @@ function render() {
       handleLeft.dataset.side = 'left';
       svg.appendChild(handleLeft);
     }
-      if (connectMode) {
+      if (!engineeringPrint && connectMode) {
         (c.ports || meta.ports || []).forEach((p, idx) => {
           const pos = portPosition(c, idx);
           const circ = document.createElementNS(svgNS, 'circle');
@@ -10114,7 +10926,22 @@ function render() {
       }
   });
 
-  if (marquee && marquee.active) {
+  junctionPoints.forEach(point => {
+    const dot = document.createElementNS(svgNS, 'circle');
+    dot.setAttribute('cx', point.x);
+    dot.setAttribute('cy', point.y);
+    dot.setAttribute('r', 3.2);
+    dot.setAttribute('fill', point.color || '#111827');
+    dot.setAttribute('stroke', 'var(--ol-canvas-bg, #ffffff)');
+    dot.setAttribute('stroke-width', 1.2);
+    dot.classList.add('connection-junction');
+    dot.style.pointerEvents = 'none';
+    svg.appendChild(dot);
+  });
+
+  if (!engineeringPrint) applyValidationIssueMarkers(svg);
+
+  if (!engineeringPrint && marquee && marquee.active) {
     const rect = document.createElementNS(svgNS, 'rect');
     const x = Math.min(marquee.x1, marquee.x2);
     const y = Math.min(marquee.y1, marquee.y2);
@@ -10139,22 +10966,26 @@ function render() {
   updateStatusBar();
 
   // Gap #50 – Protection zone overlay (rendered first, beneath all other overlays)
-  if (showProtectionZones) renderProtectionZones(svg);
+  if (!engineeringPrint && showProtectionZones) renderProtectionZones(svg);
 
   // Gap #94 – Hazardous area classification overlay
-  if (showHazAreaOverlay) renderHazAreaOverlay(svg);
+  if (!engineeringPrint && showHazAreaOverlay) renderHazAreaOverlay(svg);
 
   // Gap #36 – Energized / de-energized operating-state overlay
   renderEnergizedState(svg);
 
   // Gap #45 – Animated power-flow indicators (when overlays are active)
-  if (showOverlays) renderFlowAnimations(svg);
+  if (!engineeringPrint && showOverlays) renderFlowAnimations(svg);
 
   // Gap #39 – Minimap
-  renderMinimap();
+  if (engineeringPrint) {
+    document.querySelector('.minimap-container')?.classList.add('hidden');
+  } else {
+    renderMinimap();
+  }
 
   // Gap #49 – Arc Flash label badge overlays
-  if (arcFlashLabelMode) renderArcFlashLabelOverlays(svg);
+  if (!engineeringPrint && arcFlashLabelMode) renderArcFlashLabelOverlays(svg);
 
   if (lengthsChanged) {
     markScheduleReconcilePending();
@@ -10185,6 +11016,7 @@ function renderEnergizedState(svg) {
     if (!g) return;
     if (!energized.has(c.id)) {
       g.classList.add('de-energized');
+      if (isEngineeringPrintMode()) return;
       const w = c.width || compWidth;
       const h = c.height || compHeight;
       const overlay = document.createElementNS(svgNS, 'rect');
@@ -11236,6 +12068,7 @@ function addComponent(cfg) {
     ref: '',
     labelOffset: { x: 0, y: 0 },
     rotation: defaultRotation,
+    rotationManual: false,
     flipped: false,
     impedance: { r: 0, x: 0 },
     rating: null,
@@ -11255,6 +12088,8 @@ function addComponent(cfg) {
   } else if (comp.type === 'annotation') {
     comp.width = comp.width || 120;
     comp.height = comp.height || 60;
+  } else {
+    applyIndustrySymbolGeometry(comp, meta, { preserveCenter: false, force: true });
   }
   applyDefaults(comp);
   ensureBaselineFieldsOnComponent(comp, meta);
@@ -11719,6 +12554,7 @@ function selectComponent(compOrId) {
 
   function renderPropertiesFor(targetComp) {
     propertyContainer.innerHTML = '';
+    propertyContainer.classList.remove('prop-property-container-form');
     modal._applyChanges = null;
     if (!targetComp) {
       propertyHeading.textContent = 'Properties';
@@ -11811,7 +12647,7 @@ function selectComponent(compOrId) {
 
     let rawSchema = propSchemas[targetComp.subtype] || [];
     if (!rawSchema.length) {
-      const metaProps = componentMeta[targetComp.subtype]?.props || {};
+      const metaProps = resolveComponentMeta(targetComp)?.props || {};
       rawSchema = inferSchemaFromProps({ ...metaProps, ...(targetComp.props || {}) });
     }
 
@@ -12231,11 +13067,58 @@ function selectComponent(compOrId) {
     form.className = 'prop-detail-form';
     let hasApplied = false;
 
+    const formatPropertyFieldLabel = (label, fieldName = '') => {
+      const raw = String(label || formatAttributeLabel(fieldName) || fieldName || '')
+        .replace(/[_-]+/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+      if (!raw) return '';
+      const acronymMap = new Map([
+        ['a', 'A'],
+        ['ac', 'AC'],
+        ['dc', 'DC'],
+        ['fla', 'FLA'],
+        ['hp', 'HP'],
+        ['id', 'ID'],
+        ['ka', 'kA'],
+        ['kv', 'kV'],
+        ['kva', 'kVA'],
+        ['kvar', 'kVAR'],
+        ['kw', 'kW'],
+        ['mva', 'MVA'],
+        ['mw', 'MW'],
+        ['pf', 'PF'],
+        ['pt', 'PT'],
+        ['pu', 'pu'],
+        ['tcc', 'TCC'],
+        ['ups', 'UPS'],
+        ['v', 'V'],
+        ['vt', 'VT'],
+        ['xr', 'X/R']
+      ]);
+      const formatToken = token => token.replace(/[A-Za-z0-9/]+/g, match => {
+        const mapped = acronymMap.get(match.toLowerCase());
+        if (mapped) return mapped;
+        if (match.length <= 1 && match === match.toUpperCase()) return match;
+        return match.charAt(0).toUpperCase() + match.slice(1).toLowerCase();
+      });
+      return raw.split(' ').map(formatToken).join(' ')
+        .replace(/\bVoltage Volts\b/g, 'Voltage (V)')
+        .replace(/\bDC V\b/g, 'DC Voltage')
+        .replace(/\bPct\b/g, '(%)')
+        .replace(/\bRuntime Min\b/g, 'Runtime (min)')
+        .replace(/\bDuration S\b/g, 'Duration (s)')
+        .replace(/\bTime S\b/g, 'Time (s)');
+    };
+
     const buildField = (f, container) => {
       const lbl = document.createElement('label');
       const labelHeader = document.createElement('span');
       labelHeader.className = 'prop-field-label';
-      labelHeader.textContent = f.label;
+      const labelName = document.createElement('span');
+      labelName.className = 'prop-field-name';
+      labelName.textContent = formatPropertyFieldLabel(f.label, f.name);
+      labelHeader.appendChild(labelName);
       const requiredBadge = document.createElement('span');
       requiredBadge.className = `prop-field-badge ${f.required ? 'prop-field-badge-required' : 'prop-field-badge-optional'}`;
       requiredBadge.textContent = f.required ? 'Required' : 'Optional';
@@ -12361,7 +13244,7 @@ function selectComponent(compOrId) {
 
     const applyFieldFromForm = (target, field, formData) => {
       const reservedTopLevelFieldNames = new Set([
-        'id', 'type', 'subtype', 'x', 'y', 'width', 'height', 'rotation', 'flipped', 'label',
+        'id', 'type', 'subtype', 'x', 'y', 'width', 'height', 'rotation', 'rotationManual', 'flipped', 'label',
         'ports', 'connections', 'meta', 'svg', 'icon', 'scheduleLinks', 'props'
       ]);
       if (reservedTopLevelFieldNames.has(field.name) && typeof field.setValue !== 'function') return;
@@ -12516,6 +13399,7 @@ function selectComponent(compOrId) {
       }
       pushHistory();
       render();
+      zoomToComponentNeighborhood(comp, { pad: 110, maxZoom: 1.2 });
       save();
       markScheduleReconcilePending();
     };
@@ -14217,6 +15101,7 @@ function selectComponent(compOrId) {
       closeModal();
     });
 
+    propertyContainer.classList.add('prop-property-container-form');
     propertyContainer.appendChild(form);
     propertyContainer.scrollTop = 0;
 
@@ -15148,6 +16033,10 @@ async function init() {
   sheets.forEach(s => {
     s.components.forEach(c => {
       if (c.type === 'dimension') return;
+      const resolvedMetaKey = resolveComponentMetaKey(c);
+      if (resolvedMetaKey && resolvedMetaKey !== c.subtype && componentMeta[resolvedMetaKey]) {
+        c.subtype = resolvedMetaKey;
+      }
       if (!componentMeta[c.subtype]) {
         const icon = typeIcons[c.type] || asset('icons/equipment.svg');
         const category = categoryForType(c.type);
@@ -15156,11 +16045,11 @@ async function init() {
           label: c.subtype,
           category,
           type: c.type,
-          ports: normalizePortsForCategory(category, c.ports, c.type, c.subtype)
+          ports: normalizePortsForCategory(category, c.ports, c.type, c.subtype, c.width || compWidth, c.height || compHeight)
         };
       }
       if (!propSchemas[c.subtype]) {
-        const skip = new Set(['id', 'type', 'subtype', 'x', 'y', 'rotation', 'flipped', 'connections', 'label', 'ref', 'props']);
+        const skip = new Set(['id', 'type', 'subtype', 'x', 'y', 'rotation', 'rotationManual', 'flipped', 'connections', 'label', 'ref', 'props']);
         const raw = {};
         Object.entries(c).forEach(([k, v]) => {
           if (skip.has(k)) return;
@@ -15169,11 +16058,12 @@ async function init() {
         });
         propSchemas[c.subtype] = inferSchemaFromProps(raw);
       }
-      ensureBaselineFieldsOnComponent(c, componentMeta[c.subtype]);
-      ensureGeneratorStudyFieldsOnComponent(c, componentMeta[c.subtype]);
-      ensureMccFieldsOnComponent(c, componentMeta[c.subtype]);
-      ensurePtVtFieldsOnComponent(c, componentMeta[c.subtype]);
-      ensureStudyInputFieldsOnComponent(c, componentMeta[c.subtype]);
+      const currentMeta = resolveComponentMeta(c);
+      ensureBaselineFieldsOnComponent(c, currentMeta);
+      ensureGeneratorStudyFieldsOnComponent(c, currentMeta);
+      ensureMccFieldsOnComponent(c, currentMeta);
+      ensurePtVtFieldsOnComponent(c, currentMeta);
+      ensureStudyInputFieldsOnComponent(c, currentMeta);
     });
   });
   rebuildComponentMaps();
@@ -15229,6 +16119,7 @@ async function init() {
   recordHistoryEvent('init', 'History initialized');
   refreshAttributeOptions();
   renderSheetTabs();
+  applyDrawingModeClass();
   render();
   renderLayerPanel();
   renderBgPanel();
@@ -15432,6 +16323,13 @@ async function init() {
       openViewModal();
     });
     updateViewButtonLabel();
+  }
+  const drawingModeSelect = document.getElementById('drawing-mode-select');
+  if (drawingModeSelect) {
+    syncDrawingModeControl();
+    drawingModeSelect.addEventListener('change', event => {
+      setDrawingMode(event.target.value);
+    });
   }
   const datablockFormatSelect = document.getElementById('datablock-format-select');
   if (datablockFormatSelect) {
@@ -16467,6 +17365,7 @@ async function init() {
       if (!targets.length) return;
       targets.forEach(comp => {
         comp.rotation = ((comp.rotation || 0) + 90) % 360;
+        comp.rotationManual = true;
       });
       selectedConnection = null;
       pushHistory();
@@ -16625,7 +17524,10 @@ async function init() {
         if (e.shiftKey) {
           targets.forEach(c => { c.flipped = !c.flipped; });
         } else {
-          targets.forEach(c => { c.rotation = ((c.rotation || 0) + 90) % 360; });
+          targets.forEach(c => {
+            c.rotation = ((c.rotation || 0) + 90) % 360;
+            c.rotationManual = true;
+          });
         }
         pushHistory();
         render();
@@ -16889,7 +17791,8 @@ async function init() {
 
 function getCategory(c) {
   if (c?.type === 'panel') return 'panel';
-  return subtypeCategory[c.subtype] || c.type;
+  const metaKey = resolveComponentMetaKey(c);
+  return subtypeCategory[metaKey] || subtypeCategory[c.subtype] || c.type;
 }
 
 function formatLoadFlowCurrentValue(value) {
@@ -17058,13 +17961,8 @@ function resolveConnectionVoltageVolts(component, connection, role) {
   return resolveComponentVoltageVolts(component);
 }
 
-function validateDiagram(options = {}) {
-  const revealPanel = options.revealPanel === true || options.reveal === true;
-  const notify = options.notify !== false;
-  validationIssues = [];
-  const svg = document.getElementById('diagram');
-  if (!svg) return validationIssues;
-  // reset any previous markers
+function resetValidationIssueMarkers(svg) {
+  if (!svg) return;
   svg.querySelectorAll('g.component').forEach(g => {
     g.classList.remove('invalid');
     g.querySelectorAll('.issue-badge').forEach(b => b.remove());
@@ -17081,6 +17979,58 @@ function validateDiagram(options = {}) {
     if (comp.rating) tip.push(`Rating: ${comp.rating}`);
     g.setAttribute('data-tooltip', tip.join('\n'));
   });
+}
+
+function applyValidationIssueMarkers(svg) {
+  if (!svg) return;
+  resetValidationIssueMarkers(svg);
+  if (!validationIssues.length) return;
+
+  const byComp = {};
+  validationIssues.forEach(issue => {
+    if (!byComp[issue.component]) byComp[issue.component] = [];
+    byComp[issue.component].push(issue.message);
+  });
+
+  Object.entries(byComp).forEach(([id, msgs]) => {
+    const g = svg.querySelector(`g.component[data-id="${id}"]`);
+    if (!g) return;
+    g.classList.add('invalid');
+    const existing = g.getAttribute('data-tooltip');
+    const tip = existing ? existing + '\n' + msgs.join('\n') : msgs.join('\n');
+    g.setAttribute('data-tooltip', tip);
+    const badge = document.createElementNS(svgNS, 'g');
+    badge.setAttribute('class', 'issue-badge');
+    badge.dataset.issueCount = String(msgs.length);
+    const comp = components.find(c => c.id === id) || {};
+    const bounds = componentBounds(comp);
+    const bx = bounds.right - 7;
+    const by = bounds.top + 7;
+    const title = document.createElementNS(svgNS, 'title');
+    title.textContent = msgs.join('\n');
+    const circ = document.createElementNS(svgNS, 'circle');
+    circ.setAttribute('cx', bx);
+    circ.setAttribute('cy', by);
+    circ.setAttribute('r', 6);
+    const txt = document.createElementNS(svgNS, 'text');
+    txt.setAttribute('x', bx);
+    txt.setAttribute('y', by + 2.5);
+    txt.setAttribute('text-anchor', 'middle');
+    txt.setAttribute('dominant-baseline', 'middle');
+    txt.textContent = msgs.length > 1 ? String(Math.min(msgs.length, 9)) : '!';
+    badge.appendChild(title);
+    badge.appendChild(circ);
+    badge.appendChild(txt);
+    g.appendChild(badge);
+  });
+}
+
+function validateDiagram(options = {}) {
+  const revealPanel = options.revealPanel === true || options.reveal === true;
+  const notify = options.notify !== false;
+  validationIssues = [];
+  const svg = document.getElementById('diagram');
+  if (!svg) return validationIssues;
 
   const idMap = new Map();
   const inbound = new Map();
@@ -17227,41 +18177,11 @@ function validateDiagram(options = {}) {
   // Run additional validation rules
   validationIssues.push(...runValidation(components, getStudies()));
 
-  const byComp = {};
-  validationIssues.forEach(issue => {
-    if (!byComp[issue.component]) byComp[issue.component] = [];
-    byComp[issue.component].push(issue.message);
-  });
-
-  Object.entries(byComp).forEach(([id, msgs]) => {
-    const g = svg.querySelector(`g.component[data-id="${id}"]`);
-    if (!g) return;
-    g.classList.add('invalid');
-    const existing = g.getAttribute('data-tooltip');
-    const tip = existing ? existing + '\n' + msgs.join('\n') : msgs.join('\n');
-    g.setAttribute('data-tooltip', tip);
-    const badge = document.createElementNS(svgNS, 'g');
-    badge.setAttribute('class', 'issue-badge');
-    const comp = components.find(c => c.id === id) || {};
-    const w = comp.width || compWidth;
-    const x0 = comp.x || 0;
-    const y0 = comp.y || 0;
-    const circ = document.createElementNS(svgNS, 'circle');
-    circ.setAttribute('cx', x0 + w - 8);
-    circ.setAttribute('cy', y0 + 8);
-    circ.setAttribute('r', 8);
-    circ.setAttribute('fill', '#c00');
-    const txt = document.createElementNS(svgNS, 'text');
-    txt.setAttribute('x', x0 + w - 8);
-    txt.setAttribute('y', y0 + 11);
-    txt.setAttribute('text-anchor', 'middle');
-    txt.setAttribute('font-size', '12');
-    txt.setAttribute('fill', '#fff');
-    txt.textContent = '!';
-    badge.appendChild(circ);
-    badge.appendChild(txt);
-    g.appendChild(badge);
-  });
+  if (isEngineeringPrintMode()) {
+    resetValidationIssueMarkers(svg);
+  } else {
+    applyValidationIssueMarkers(svg);
+  }
 
   if (lintList && lintPanel) {
     lintList.innerHTML = '';
@@ -18059,11 +18979,13 @@ async function importDiagram(data) {
 
 async function loadSampleDiagram() {
   try {
-    const res = await fetch(asset('examples/sample_oneline.json'));
+    const res = await fetch(`${asset('examples/sample_oneline.json')}?v=${Date.now()}`);
     if (!res.ok) throw new Error(res.statusText);
     const data = await res.json();
     await importDiagram(data);
     arrangeSourceToLoad({ silent: true, componentsToArrange: components });
+    setDatablockDensityMode('compact');
+    setDatablockFormatMode('engineering');
     zoomToFit({ maxZoom: 1.15, pad: 120 });
   } catch (err) {
     console.error('Failed to load sample diagram', err);

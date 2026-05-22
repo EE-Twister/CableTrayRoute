@@ -59,6 +59,18 @@
       "label": "Panel",
       "icon": "icons/components/MLO.svg",
       "iconIEC": "icons/components/iec/IEC_Switch.svg",
+      "width": 64,
+      "height": 76,
+      "ports": [
+        {
+          "x": 32,
+          "y": 0
+        },
+        {
+          "x": 32,
+          "y": 76
+        }
+      ],
       "props": {
         "tag": "",
         "description": "",
@@ -118,14 +130,16 @@
       "subtype": "busway",
       "label": "Busway Segment",
       "icon": "icons/components/Busway.svg",
+      "width": 160,
+      "height": 22,
       "ports": [
         {
           "x": 0,
-          "y": 20
+          "y": 11
         },
         {
-          "x": 80,
-          "y": 20
+          "x": 160,
+          "y": 11
         }
       ],
       "props": {
@@ -149,10 +163,12 @@
       "subtype": "utility",
       "label": "Utility",
       "icon": "icons/components/Utility.svg",
+      "width": 64,
+      "height": 64,
       "ports": [
         {
-          "x": 80,
-          "y": 20
+          "x": 32,
+          "y": 64
         }
       ],
       "props": {
@@ -1175,8 +1191,18 @@
       "label": "Fuse",
       "icon": "icons/components/Fuse.svg",
       "iconIEC": "icons/components/iec/IEC_Fuse.svg",
-      "width": 80,
-      "height": 40,
+      "width": 56,
+      "height": 72,
+      "ports": [
+        {
+          "x": 28,
+          "y": 0
+        },
+        {
+          "x": 28,
+          "y": 72
+        }
+      ],
       "props": {
         "class": "RK1",
         "rating_a": 400,
@@ -1517,7 +1543,7 @@
     {
       "type": "reactor",
       "label": "Shunt Reactor",
-      "icon": "icons/placeholder.svg",
+      "icon": "icons/components/Reactor.svg",
       "props": {
         "rated_kv": 13.8,
         "rated_kvar": 600,
@@ -2043,6 +2069,18 @@
       "type": "ups",
       "label": "UPS",
       "icon": "icons/components/UPS.svg",
+      "width": 72,
+      "height": 82,
+      "ports": [
+        {
+          "x": 36,
+          "y": 0
+        },
+        {
+          "x": 36,
+          "y": 82
+        }
+      ],
       "props": {
         "tag": "",
         "description": "",
@@ -2409,10 +2447,12 @@
       "label": "Motor Load",
       "icon": "icons/components/Motor.svg",
       "iconIEC": "icons/components/iec/IEC_Motor.svg",
+      "width": 64,
+      "height": 64,
       "defaultRotation": 0,
       "ports": [
         {
-          "x": 40,
+          "x": 32,
           "y": 0
         }
       ],
@@ -2585,7 +2625,15 @@
       "subtype": "static_load",
       "label": "Non-Motor Load",
       "icon": "icons/components/Load.svg",
+      "width": 64,
+      "height": 64,
       "defaultRotation": 0,
+      "ports": [
+        {
+          "x": 32,
+          "y": 0
+        }
+      ],
       "props": {
         "watts": 300000,
         "kva": 300,
@@ -2755,7 +2803,7 @@
       "type": "relay",
       "subtype": "relay_87",
       "label": "Differential Relay (87)",
-      "icon": "icons/placeholder.svg",
+      "icon": "icons/components/Relay.svg",
       "props": {
         "tag": "87R-1",
         "description": "Differential protection relay",
@@ -2823,7 +2871,7 @@
     {
       "type": "relay",
       "label": "Relay",
-      "icon": "icons/placeholder.svg",
+      "icon": "icons/components/Relay.svg",
       "props": {
         "function": "50/51",
         "curve": "IEC_VeryInverse",
