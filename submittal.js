@@ -1,5 +1,6 @@
 import { getCables, getTrays, getConduits, getEquipment, getDuctbanks } from './dataStore.mjs';
 import { showAlertModal } from './src/components/modal.js';
+import { buildBomCatalogFields, buildCatalogWarnings } from './analysis/manufacturerCatalog.mjs';
 
 document.addEventListener('DOMContentLoaded', () => {
   initSettings();
@@ -45,6 +46,15 @@ function esc(s) {
     .replace(/>/g, '&gt;');
 }
 
+function catalogFields(record) {
+  return buildBomCatalogFields(record || {});
+}
+
+function approvalLabel(record) {
+  const fields = catalogFields(record);
+  return fields.approvedPart ? 'Approved' : (fields.approvalStatus || 'unreviewed');
+}
+
 function generatePreview() {
   const info = getProjectInfo();
   const cables = getCables();
@@ -57,6 +67,11 @@ function generatePreview() {
 
   // Cover page
   html += buildCoverPage(info);
+
+  const catalogWarnings = buildCatalogWarnings([...equipment, ...cables, ...trays, ...conduits]);
+  if (catalogWarnings.length) {
+    html += buildCatalogWarningsSection(catalogWarnings);
+  }
 
   // Equipment Schedule
   if (sectionEnabled('sec-equipment')) {
@@ -113,6 +128,30 @@ function buildCoverPage(info) {
     </section>`;
 }
 
+function buildCatalogWarningsSection(warnings) {
+  const rows = warnings.map(warning => `
+    <tr>
+      <td>${esc(warning.id)}</td>
+      <td>${esc(warning.code)}</td>
+      <td>${esc(warning.message)}</td>
+    </tr>`).join('');
+  return `
+    <section class="submittal-section" aria-label="Catalog governance warnings">
+      <h2>Catalog Governance Warnings</h2>
+      <p class="field-hint">Resolve these before procurement issue or final construction submittal.</p>
+      <table class="result-table submittal-table" aria-label="Catalog governance warnings">
+        <thead>
+          <tr>
+            <th scope="col">Item</th>
+            <th scope="col">Warning</th>
+            <th scope="col">Message</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </section>`;
+}
+
 function buildEquipmentSection(equipment) {
   if (!equipment.length) {
     return `<section class="submittal-section" aria-label="Equipment schedule">
@@ -125,6 +164,9 @@ function buildEquipmentSection(equipment) {
     <tr>
       <td>${esc(e.tag || e.id)}</td>
       <td>${esc(e.description || e.name)}</td>
+      <td>${esc(catalogFields(e).manufacturer)}</td>
+      <td>${esc(catalogFields(e).catalogNumber)}</td>
+      <td>${esc(approvalLabel(e))}</td>
       <td>${esc(e.voltage || '—')}</td>
       <td>${esc(e.kva || e.kw || '—')}</td>
       <td>${esc(e.phase || '—')}</td>
@@ -139,6 +181,9 @@ function buildEquipmentSection(equipment) {
           <tr>
             <th scope="col">Tag</th>
             <th scope="col">Description</th>
+            <th scope="col">Manufacturer</th>
+            <th scope="col">Catalog No.</th>
+            <th scope="col">Approval</th>
             <th scope="col">Voltage (V)</th>
             <th scope="col">Rating (kVA/kW)</th>
             <th scope="col">Phase</th>
@@ -163,6 +208,9 @@ function buildCableSection(cables) {
       <td>${esc(c.cable_tag || c.tag)}</td>
       <td>${esc(c.from_device || c.from)}</td>
       <td>${esc(c.to_device || c.to)}</td>
+      <td>${esc(catalogFields(c).manufacturer)}</td>
+      <td>${esc(catalogFields(c).catalogNumber)}</td>
+      <td>${esc(approvalLabel(c))}</td>
       <td>${esc(c.voltage_rating || c.voltage || '—')}</td>
       <td>${esc(c.conductors)}</td>
       <td>${esc(c.conductor_size || c.size || '—')}</td>
@@ -179,6 +227,9 @@ function buildCableSection(cables) {
             <th scope="col">Tag</th>
             <th scope="col">From</th>
             <th scope="col">To</th>
+            <th scope="col">Manufacturer</th>
+            <th scope="col">Catalog No.</th>
+            <th scope="col">Approval</th>
             <th scope="col">Voltage (V)</th>
             <th scope="col">Conductors</th>
             <th scope="col">Size</th>
@@ -202,6 +253,9 @@ function buildRacewaySection(trays, conduits, ductbanks) {
         <td>${esc(t.inside_width || '—')}</td>
         <td>${esc(t.depth || '—')}</td>
         <td>${esc(t.material || '—')}</td>
+        <td>${esc(catalogFields(t).manufacturer)}</td>
+        <td>${esc(catalogFields(t).catalogNumber)}</td>
+        <td>${esc(approvalLabel(t))}</td>
         <td>${esc(t.length_ft || '—')}</td>
       </tr>`).join('');
     html += `
@@ -214,6 +268,9 @@ function buildRacewaySection(trays, conduits, ductbanks) {
             <th scope="col">Width (in)</th>
             <th scope="col">Depth (in)</th>
             <th scope="col">Material</th>
+            <th scope="col">Manufacturer</th>
+            <th scope="col">Catalog No.</th>
+            <th scope="col">Approval</th>
             <th scope="col">Length (ft)</th>
           </tr>
         </thead>
@@ -227,6 +284,9 @@ function buildRacewaySection(trays, conduits, ductbanks) {
         <td>${esc(c.conduit_id)}</td>
         <td>${esc(c.conduit_type || '—')}</td>
         <td>${esc(c.trade_size || c.diameter || '—')}</td>
+        <td>${esc(catalogFields(c).manufacturer)}</td>
+        <td>${esc(catalogFields(c).catalogNumber)}</td>
+        <td>${esc(approvalLabel(c))}</td>
         <td>${esc(c.length_ft || '—')}</td>
       </tr>`).join('');
     html += `
@@ -237,6 +297,9 @@ function buildRacewaySection(trays, conduits, ductbanks) {
             <th scope="col">Conduit ID</th>
             <th scope="col">Type</th>
             <th scope="col">Trade Size (in)</th>
+            <th scope="col">Manufacturer</th>
+            <th scope="col">Catalog No.</th>
+            <th scope="col">Approval</th>
             <th scope="col">Length (ft)</th>
           </tr>
         </thead>
@@ -424,9 +487,12 @@ function exportXlsx() {
 
   // Equipment
   if (equipment.length) {
-    const rows = [['Tag', 'Description', 'Voltage (V)', 'Rating (kVA/kW)', 'Phase', 'Location']];
+    const rows = [['Tag', 'Description', 'Manufacturer', 'Catalog No.', 'Approval', 'Voltage (V)', 'Rating (kVA/kW)', 'Phase', 'Location']];
     equipment.forEach(e => rows.push([
       e.tag || e.id || '', e.description || e.name || '',
+      catalogFields(e).manufacturer || '',
+      catalogFields(e).catalogNumber || '',
+      approvalLabel(e),
       e.voltage || '', e.kva || e.kw || '', e.phase || '', e.location || '',
     ]));
     addSheet('Equipment', rows);
@@ -434,10 +500,14 @@ function exportXlsx() {
 
   // Cables
   if (cables.length) {
-    const rows = [['Tag', 'From', 'To', 'Voltage (V)', 'Conductors', 'Size', 'Insulation', 'Group']];
+    const rows = [['Tag', 'From', 'To', 'Manufacturer', 'Catalog No.', 'Approval', 'Voltage (V)', 'Conductors', 'Size', 'Insulation', 'Group']];
     cables.forEach(c => rows.push([
       c.cable_tag || c.tag || '', c.from_device || c.from || '',
-      c.to_device || c.to || '', c.voltage_rating || c.voltage || '',
+      c.to_device || c.to || '',
+      catalogFields(c).manufacturer || '',
+      catalogFields(c).catalogNumber || '',
+      approvalLabel(c),
+      c.voltage_rating || c.voltage || '',
       c.conductors || '', c.conductor_size || c.size || '',
       c.insulation || '', c.cable_group || c.group || '',
     ]));
@@ -446,21 +516,37 @@ function exportXlsx() {
 
   // Trays
   if (trays.length) {
-    const rows = [['Tray ID', 'Type', 'Width (in)', 'Depth (in)', 'Material', 'Length (ft)']];
+    const rows = [['Tray ID', 'Type', 'Width (in)', 'Depth (in)', 'Material', 'Manufacturer', 'Catalog No.', 'Approval', 'Length (ft)']];
     trays.forEach(t => rows.push([
       t.tray_id || '', t.tray_type || '', t.inside_width || '',
-      t.depth || '', t.material || '', t.length_ft || '',
+      t.depth || '', t.material || '',
+      catalogFields(t).manufacturer || '',
+      catalogFields(t).catalogNumber || '',
+      approvalLabel(t),
+      t.length_ft || '',
     ]));
     addSheet('Trays', rows);
   }
 
   // Conduits
   if (conduits.length) {
-    const rows = [['Conduit ID', 'Type', 'Trade Size (in)', 'Length (ft)']];
+    const rows = [['Conduit ID', 'Type', 'Trade Size (in)', 'Manufacturer', 'Catalog No.', 'Approval', 'Length (ft)']];
     conduits.forEach(c => rows.push([
-      c.conduit_id || '', c.conduit_type || '', c.trade_size || c.diameter || '', c.length_ft || '',
+      c.conduit_id || '', c.conduit_type || '', c.trade_size || c.diameter || '',
+      catalogFields(c).manufacturer || '',
+      catalogFields(c).catalogNumber || '',
+      approvalLabel(c),
+      c.length_ft || '',
     ]));
     addSheet('Conduits', rows);
+  }
+
+  const catalogWarnings = buildCatalogWarnings([...equipment, ...cables, ...trays, ...conduits]);
+  if (catalogWarnings.length) {
+    addSheet('Catalog Warnings', [
+      ['Item', 'Code', 'Severity', 'Message'],
+      ...catalogWarnings.map(warning => [warning.id, warning.code, warning.severity, warning.message])
+    ]);
   }
 
   const filename = `submittal_${info.projectNumber.replace(/[^a-zA-Z0-9_-]/g, '_')}_Rev${info.revision}.xlsx`;

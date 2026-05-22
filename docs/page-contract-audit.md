@@ -4,7 +4,7 @@
 
 This report compares the Workflow and Studies page contracts against statically detected storage access in page source files.
 
-The audit is intentionally conservative: it reports drift for review, but the test gate only verifies that the scanner and report stay current.
+The audit is intentionally conservative: `--check` fails on actionable drift and reports declared-but-unread inputs as warnings for review.
 
 ## Summary
 
@@ -13,13 +13,15 @@ The audit is intentionally conservative: it reports drift for review, but the te
 - Missing contracts: 0
 - Extra contracts: 0
 - Routes without source files: 0
-- Routes with undocumented reads: 36
-- Routes with undocumented writes: 33
-- Routes with declared inputs not statically read: 69
-- Routes with declared outputs not statically written: 9
+- Routes with undocumented reads: 0
+- Routes with undocumented writes: 0
+- Routes with declared inputs not statically read: 68
+- Routes with declared outputs not statically written: 0
 - Direct browser storage hits: 15
 - Unclassified direct browser storage hits: 0
 - Direct browser storage classifications: session-handoff=4, page-preference=11
+- Actionable failures: 0
+- Warnings: 170
 
 ## Findings
 
@@ -30,23 +32,13 @@ The audit is intentionally conservative: it reports drift for review, but the te
 - Source files: `ampacity.mjs`, `analysis/autoSize.mjs`, `analysis/conduitFill.mjs`, `analysis/deliverableWorkflow.mjs`, `analysis/designBasis.mjs`, `analysis/designCoach.mjs`, `analysis/designRuleChecker.mjs`, `analysis/equipmentEvaluation.mjs`, `analysis/equipmentWorkflow.mjs`, `analysis/lifecyclePackage.mjs`, `analysis/loadWorkflow.mjs`, `analysis/projectWorkflowCore.mjs`, `analysis/pullCards.mjs`, `analysis/reportPackage.mjs`, `analysis/scheduleWorkflow.mjs`, `analysis/spoolSheetVisualModel.mjs`, `analysis/spoolSheets.mjs`, `analysis/voltageDropStudy.mjs`, `analysis/workflowAutomation.mjs`, `conductorProperties.mjs`, `conductorPropertiesData.mjs`, `data/conductor_properties.js`, `data/protectiveDevices.mjs`, `src/pullCalc.js`, `src/voltageDrop.js`, `src/workflowDashboard.js`
 
 **Undocumented Reads**
-- `settings.studyApprovals`
-- `settings.reportSnapshots`
-- `settings.lifecyclePackages`
-- `settings.tccSettings`
-- `settings.oneLineScheduleReconcilePending`
+- None
 
 **Undocumented Writes**
-- `oneLineDiagram`
-- `cableSchedule`
-- `traySchedule`
-- `conduitSchedule`
-- `ductbankSchedule`
-- `settings.lifecyclePackages`
-- `settings.oneLineScheduleReconcilePending`
+- None
 
 **Declared Inputs Not Statically Read**
-- `panelSchedule`
+- `panelSchedule` - No static read/write evidence was detected for this declared input.
 
 **Declared Outputs Not Statically Written**
 - None
@@ -181,24 +173,25 @@ The audit is intentionally conservative: it reports drift for review, but the te
 
 - Section: Workflow
 - Group: Planning
-- Source files: `analysis/autoSize.mjs`, `analysis/conduitFill.mjs`, `analysis/designRuleChecker.mjs`, `src/components/fillGauge.js`, `src/scenarioComparison.js`, `src/scenarios.js`
+- Source files: `analysis/autoSize.mjs`, `analysis/conduitFill.mjs`, `analysis/designRuleChecker.mjs`, `src/components/fillGauge.js`, `src/scenarioComparison.js`
 
 **Undocumented Reads**
 - None
 
 **Undocumented Writes**
-- `oneLineDiagram`
+- None
 
 **Declared Inputs Not Statically Read**
-- `equipment`
-- `loadList`
-- `panelSchedule`
-- `ductbankSchedule`
-- `studyResults`
-- `settings.designBasis`
+- `equipment` - No static read/write evidence was detected for this declared input.
+- `loadList` - No static read/write evidence was detected for this declared input.
+- `oneLineDiagram` - No static read/write evidence was detected for this declared input.
+- `panelSchedule` - No static read/write evidence was detected for this declared input.
+- `ductbankSchedule` - No static read/write evidence was detected for this declared input.
+- `studyResults` - No static read/write evidence was detected for this declared input.
+- `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
-- `settings.scenarios`
+- None
 
 **Direct Browser Storage**
 - None
@@ -208,36 +201,32 @@ The audit is intentionally conservative: it reports drift for review, but the te
   - analysis/designRuleChecker.mjs:1059 getCables()
 - `conduitSchedule`
   - analysis/designRuleChecker.mjs:1058 getConduits()
-- `oneLineDiagram`
-  - src/scenarios.js:30 getOneLine()
-  - src/scenarios.js:31 getOneLine()
+- `settings.scenarios`
+  - src/scenarioComparison.js:286 listScenarios()
+  - src/scenarioComparison.js:63 listScenarios()
 - `traySchedule`
   - analysis/designRuleChecker.mjs:1057 getTrays()
 
 **Detected Writes**
-- `oneLineDiagram`
-  - src/scenarios.js:240 restoreRevision()
+- None
 
 ### Equipment List (`equipmentlist.html`)
 
 - Section: Workflow
 - Group: Planning
-- Source files: `analysis/equipmentWorkflow.mjs`, `equipmentlist.js`, `src/crossProbe.js`, `src/equipmentlist.js`, `src/index.js`, `src/scenarios.js`, `tableUtils.mjs`
+- Source files: `analysis/equipmentWorkflow.mjs`, `equipmentlist.js`, `src/crossProbe.js`, `src/equipmentlist.js`, `src/index.js`, `tableUtils.mjs`
 
 **Undocumented Reads**
-- `settings.equipmentFilterPresets`
-- `oneLineDiagram`
+- None
 
 **Undocumented Writes**
-- `settings.equipmentFilterPresets`
-- `oneLineDiagram`
+- None
 
 **Declared Inputs Not Statically Read**
-- `settings.designBasis`
+- `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
-- `equipment`
-- `settings.equipmentColumns`
+- None
 
 **Direct Browser Storage**
 - None
@@ -245,114 +234,23 @@ The audit is intentionally conservative: it reports drift for review, but the te
 **Detected Reads**
 - `equipment`
   - equipmentlist.js:47 getEquipment()
+  - equipmentlist.js:62 TableUtils.createTable(equipment)
 - `oneLineDiagram`
   - src/crossProbe.js:139 getOneLine()
   - src/crossProbe.js:152 getOneLine()
   - src/crossProbe.js:201 getOneLine()
-  - src/scenarios.js:30 getOneLine()
-  - src/scenarios.js:31 getOneLine()
+- `settings.equipmentColumns`
+  - equipmentlist.js:62 TableUtils.createTable(settings.equipmentColumns)
 - `settings.equipmentFilterPresets`
   - equipmentlist.js:108 getEquipmentFilterPresets()
 
 **Detected Writes**
-- `oneLineDiagram`
-  - src/scenarios.js:240 restoreRevision()
+- `equipment`
+  - equipmentlist.js:62 TableUtils.createTable(equipment)
+- `settings.equipmentColumns`
+  - equipmentlist.js:62 TableUtils.createTable(settings.equipmentColumns)
 - `settings.equipmentFilterPresets`
   - equipmentlist.js:643 setEquipmentFilterPresets()
-
-### Equipment Arrangements (`equipmentarrangements.html`)
-
-- Section: Workflow
-- Group: Planning
-- Source files: `equipmentarrangements.js`, `src/equipmentarrangements.js`, `src/index.js`, `src/mccLineupModel.mjs`, `src/scenarios.js`
-
-**Undocumented Reads**
-- `oneLineDiagram`
-
-**Undocumented Writes**
-- `equipment`
-- `oneLineDiagram`
-
-**Declared Inputs Not Statically Read**
-- None
-
-**Declared Outputs Not Statically Written**
-- None
-
-**Direct Browser Storage**
-- None
-
-**Detected Reads**
-- `equipment`
-  - equipmentarrangements.js:2224 getEquipment()
-  - equipmentarrangements.js:2241 getEquipment()
-  - equipmentarrangements.js:2414 getEquipment()
-  - equipmentarrangements.js:2454 getEquipment()
-  - equipmentarrangements.js:2537 getEquipment()
-  - ... 3 more
-- `mccLineups`
-  - equipmentarrangements.js:1514 getMccLineups()
-  - equipmentarrangements.js:2465 getMccLineups()
-  - equipmentarrangements.js:528 getMccLineups()
-  - equipmentarrangements.js:547 getMccLineups()
-- `oneLineDiagram`
-  - src/scenarios.js:30 getOneLine()
-  - src/scenarios.js:31 getOneLine()
-- `settings.equipmentArrangements`
-  - equipmentarrangements.js:258 getItem(equipmentArrangements)
-
-**Detected Writes**
-- `equipment`
-  - equipmentarrangements.js:2436 addEquipment()
-  - equipmentarrangements.js:2540 updateEquipment()
-- `oneLineDiagram`
-  - src/scenarios.js:240 restoreRevision()
-- `settings.equipmentArrangements`
-  - equipmentarrangements.js:217 setItem(equipmentArrangements)
-
-### MCC Lineups (`mcclineup.html`)
-
-- Section: Workflow
-- Group: Planning
-- Source files: `src/index.js`, `src/mccLineupModel.mjs`, `src/mccLineupPage.js`, `src/mcclineup.js`, `src/scenarios.js`
-
-**Undocumented Reads**
-- `oneLineDiagram`
-- `settings.mccLineupActiveId`
-
-**Undocumented Writes**
-- `oneLineDiagram`
-- `settings.mccLineupActiveId`
-
-**Declared Inputs Not Statically Read**
-- None
-
-**Declared Outputs Not Statically Written**
-- None
-
-**Direct Browser Storage**
-- None
-
-**Detected Reads**
-- `equipment`
-  - src/mccLineupPage.js:1316 getEquipment()
-- `mccLineups`
-  - src/mccLineupPage.js:169 getMccLineups()
-- `oneLineDiagram`
-  - src/scenarios.js:30 getOneLine()
-  - src/scenarios.js:31 getOneLine()
-- `settings.mccLineupActiveId`
-  - src/mccLineupPage.js:171 getItem(mccLineupActiveId)
-
-**Detected Writes**
-- `equipment`
-  - src/mccLineupPage.js:1319 setEquipment()
-- `mccLineups`
-  - src/mccLineupPage.js:186 setMccLineups()
-- `oneLineDiagram`
-  - src/scenarios.js:240 restoreRevision()
-- `settings.mccLineupActiveId`
-  - src/mccLineupPage.js:187 setItem(mccLineupActiveId)
 
 ### Load List (`loadlist.html`)
 
@@ -361,17 +259,17 @@ The audit is intentionally conservative: it reports drift for review, but the te
 - Source files: `analysis/loadWorkflow.mjs`, `loadlist.mjs`, `src/crossProbe.js`, `src/htmlUtils.mjs`, `src/loadlist.js`
 
 **Undocumented Reads**
-- `oneLineDiagram`
+- None
 
 **Undocumented Writes**
 - None
 
 **Declared Inputs Not Statically Read**
-- `panelSchedule`
-- `settings.designBasis`
+- `panelSchedule` - No static read/write evidence was detected for this declared input.
+- `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
-- `settings.loadListViewPreset`
+- None
 
 **Direct Browser Storage**
 - None
@@ -390,6 +288,8 @@ The audit is intentionally conservative: it reports drift for review, but the te
   - src/crossProbe.js:139 getOneLine()
   - src/crossProbe.js:152 getOneLine()
   - src/crossProbe.js:201 getOneLine()
+- `settings.loadListViewPreset`
+  - loadlist.mjs:132 getItem(settings.loadListViewPreset)
 
 **Detected Writes**
 - `loadList`
@@ -399,6 +299,8 @@ The audit is intentionally conservative: it reports drift for review, but the te
   - loadlist.mjs:1550 setLoads()
   - loadlist.mjs:1561 setLoads()
   - ... 11 more
+- `settings.loadListViewPreset`
+  - loadlist.mjs:1661 setItem(settings.loadListViewPreset)
 
 ### One-Line (`oneline.html`)
 
@@ -407,83 +309,42 @@ The audit is intentionally conservative: it reports drift for review, but the te
 - Source files: `ampacity.mjs`, `analysis/arcFlash.mjs`, `analysis/ctMetadata.mjs`, `analysis/harmonics.js`, `analysis/ibrModeling.mjs`, `analysis/iec60909.mjs`, `analysis/iecRelayCurves.mjs`, `analysis/loadFlow.js`, `analysis/loadFlowModel.js`, `analysis/loadFlowResultsRenderer.js`, `analysis/motorStart.js`, `analysis/ptVtMetadata.mjs`, `analysis/reliability.js`, `analysis/scheduleReconcile.mjs`, `analysis/shortCircuit.mjs`, `analysis/tccUtils.js`, `codes/iecTables.js`, `codes/necTables.js`, `componentLibrary.json`, `conductorProperties.mjs`, `conductorPropertiesData.mjs`, `data/conductor_properties.js`, `data/protectiveDevices.mjs`, `exporters/dxf.js`, `exporters/pdf.js`, `exporters/simpleDxf.js`, `oneline.js`, `reports/arcFlashReport.mjs`, `reports/exportAll.mjs`, `reports/labels.mjs`, `reports/reporting.mjs`, `sizing.js`, `src/crossProbe.js`, `src/voltageDrop.js`, `utils/cableImpedance.js`, `utils/cablePhases.js`, `utils/componentLabels.js`, `utils/transformerImpedance.js`, `utils/transformerProperties.js`, `utils/voltage.js`, `validation/rules.js`
 
 **Undocumented Reads**
-- `settings.manufacturerDefaults`
-- `settings.oneLineDiagramFilterMode`
-- `settings.diagramScale`
-- `settings.diagramZoom`
-- `settings.studySettings`
-- `settings.gridSize`
-- `settings.gridEnabled`
-- `settings.labelPrefixes`
-- `settings.labelCounters`
-- `settings.layersPanelOpen`
-- `settings.orthogonalRouting`
-- `settings.symbolStandard`
-- `settings.diagramTitleBlock`
-- `settings.diagramDatablockConfig`
-- `settings.gistToken`
+- None
 
 **Undocumented Writes**
-- `loadList`
-- `panelSchedule`
-- `equipment`
-- `studyResults`
-- `traySchedule`
-- `conduitSchedule`
-- `settings.studySettings`
-- `settings.diagramZoom`
-- `settings.labelCounters`
-- `settings.labelPrefixes`
-- `settings.manufacturerDefaults`
-- `settings.gridEnabled`
-- `settings.diagramDatablockConfig`
-- `settings.diagramScale`
-- `settings.layersPanelOpen`
-- `settings.gridSize`
-- `settings.oneLineDiagramFilterMode`
-- `settings.orthogonalRouting`
-- `settings.symbolStandard`
-- `settings.diagramTitleBlock`
-- `settings.gistToken`
-- `studyResults.loadFlow`
-- `studyResults.shortCircuit`
-- `studyResults.arcFlash`
-- `studyResults.harmonics`
-- `studyResults.motorStart`
-- `studyResults.reliability`
-- `studyResults.duty`
+- None
 
 **Declared Inputs Not Statically Read**
-- `settings.designBasis`
+- None
 
 **Declared Outputs Not Statically Written**
 - None
 
 **Direct Browser Storage**
-- oneline.js:2786 sessionStorage.setItem(<dynamic>) - session-handoff: Temporary custom component editor prefill; not durable project state.
-- oneline.js:17616 localStorage.setItem(onelineTourDone) - page-preference: Per-browser tour completion state; not exported with project data.
-- oneline.js:17618 localStorage.getItem(onelineTourDone) - page-preference: Per-browser tour completion state; not exported with project data.
-- oneline.js:17620 localStorage.setItem(onelineTourDone) - page-preference: Per-browser tour completion state; not exported with project data.
+- oneline.js:2792 sessionStorage.setItem(<dynamic>) - session-handoff: Temporary custom component editor prefill; not durable project state.
+- oneline.js:17622 localStorage.setItem(onelineTourDone) - page-preference: Per-browser tour completion state; not exported with project data.
+- oneline.js:17624 localStorage.getItem(onelineTourDone) - page-preference: Per-browser tour completion state; not exported with project data.
+- oneline.js:17626 localStorage.setItem(onelineTourDone) - page-preference: Per-browser tour completion state; not exported with project data.
 
 **Detected Reads**
 - `cableSchedule`
-  - oneline.js:13392 getCables()
-  - oneline.js:15306 getCables()
-  - oneline.js:18626 getCables()
-  - oneline.js:4221 getCables()
-  - oneline.js:4338 getCables()
+  - oneline.js:13398 getCables()
+  - oneline.js:15312 getCables()
+  - oneline.js:18632 getCables()
+  - oneline.js:4227 getCables()
+  - oneline.js:4344 getCables()
   - ... 2 more
 - `equipment`
-  - oneline.js:13368 getEquipment()
-  - oneline.js:18623 getEquipment()
-  - oneline.js:4222 getEquipment()
-  - oneline.js:8797 getEquipment()
+  - oneline.js:13374 getEquipment()
+  - oneline.js:18629 getEquipment()
+  - oneline.js:4228 getEquipment()
+  - oneline.js:8803 getEquipment()
   - reports/exportAll.mjs:293 getEquipment()
 - `loadList`
-  - oneline.js:13376 getLoads()
-  - oneline.js:18625 getLoads()
-  - oneline.js:4219 getLoads()
-  - oneline.js:8798 getLoads()
+  - oneline.js:13382 getLoads()
+  - oneline.js:18631 getLoads()
+  - oneline.js:4225 getLoads()
+  - oneline.js:8804 getLoads()
 - `oneLineDiagram`
   - analysis/arcFlash.mjs:389 getOneLine()
   - analysis/harmonics.js:181 getOneLine()
@@ -492,57 +353,57 @@ The audit is intentionally conservative: it reports drift for review, but the te
   - analysis/motorStart.js:82 getOneLine()
   - ... 11 more
 - `panelSchedule`
-  - oneline.js:13384 getPanels()
-  - oneline.js:18624 getPanels()
-  - oneline.js:4220 getPanels()
+  - oneline.js:13390 getPanels()
+  - oneline.js:18630 getPanels()
+  - oneline.js:4226 getPanels()
   - reports/exportAll.mjs:294 getPanels()
 - `settings.diagramDatablockConfig`
-  - oneline.js:17795 getItem(diagramDatablockConfig)
+  - oneline.js:17801 getItem(diagramDatablockConfig)
 - `settings.diagramScale`
-  - oneline.js:3317 getItem(diagramScale)
+  - oneline.js:3323 getItem(diagramScale)
 - `settings.diagramTitleBlock`
-  - oneline.js:17742 getItem(diagramTitleBlock)
+  - oneline.js:17748 getItem(diagramTitleBlock)
 - `settings.diagramZoom`
-  - oneline.js:3338 getItem(diagramZoom)
+  - oneline.js:3344 getItem(diagramZoom)
 - `settings.gistToken`
-  - oneline.js:18868 getItem(gistToken)
+  - oneline.js:18874 getItem(gistToken)
 - `settings.gridEnabled`
-  - oneline.js:3367 getItem(gridEnabled)
+  - oneline.js:3373 getItem(gridEnabled)
 - `settings.gridSize`
-  - oneline.js:3366 getItem(gridSize)
+  - oneline.js:3372 getItem(gridSize)
 - `settings.labelCounters`
-  - oneline.js:16109 getItem(labelCounters)
-  - oneline.js:5249 getItem(labelCounters)
+  - oneline.js:16115 getItem(labelCounters)
+  - oneline.js:5255 getItem(labelCounters)
 - `settings.labelPrefixes`
-  - oneline.js:5248 getItem(labelPrefixes)
+  - oneline.js:5254 getItem(labelPrefixes)
 - `settings.layersPanelOpen`
-  - oneline.js:16195 getItem(layersPanelOpen)
+  - oneline.js:16201 getItem(layersPanelOpen)
 - `settings.manufacturerDefaults`
-  - oneline.js:2682 getItem(manufacturerDefaults)
+  - oneline.js:2688 getItem(manufacturerDefaults)
 - `settings.oneLineDiagramFilterMode`
-  - oneline.js:3302 getItem(oneLineDiagramFilterMode)
+  - oneline.js:3308 getItem(oneLineDiagramFilterMode)
 - `settings.oneLineScheduleReconcilePending`
-  - oneline.js:3404 getItem(oneLineScheduleReconcilePending)
+  - oneline.js:3410 getItem(oneLineScheduleReconcilePending)
 - `settings.onelineTemplates`
-  - oneline.js:6260 migrateLegacyItem(..., onelineTemplates)
+  - oneline.js:6266 migrateLegacyItem(..., onelineTemplates)
 - `settings.orthogonalRouting`
-  - oneline.js:17719 getItem(orthogonalRouting)
+  - oneline.js:17725 getItem(orthogonalRouting)
 - `settings.studySettings`
-  - oneline.js:3362 getItem(studySettings)
+  - oneline.js:3368 getItem(studySettings)
 - `settings.symbolStandard`
-  - oneline.js:17728 getItem(symbolStandard)
+  - oneline.js:17734 getItem(symbolStandard)
 - `settings.tccSettings`
   - analysis/arcFlash.mjs:321 getItem(tccSettings)
   - analysis/shortCircuit.mjs:492 getItem(tccSettings)
 - `studyResults`
   - analysis/harmonics.js:416 getStudies()
   - analysis/motorStart.js:209 getStudies()
-  - oneline.js:18195 getStudies()
-  - oneline.js:18842 getStudies()
-  - oneline.js:3422 getStudies()
+  - oneline.js:18201 getStudies()
+  - oneline.js:18848 getStudies()
+  - oneline.js:3428 getStudies()
   - ... 12 more
 - `studyResults.arcFlash`
-  - oneline.js:5098 getStudies().arcFlash
+  - oneline.js:5104 getStudies().arcFlash
   - reports/exportAll.mjs:297 getStudies().arcFlash
 - `studyResults.duty`
   - validation/rules.js:666 studies.duty
@@ -554,95 +415,97 @@ The audit is intentionally conservative: it reports drift for review, but the te
 
 **Detected Writes**
 - `cableSchedule`
-  - oneline.js:18642 setCables()
-  - oneline.js:4240 setCables()
-  - oneline.js:4348 setCables()
+  - oneline.js:18648 setCables()
+  - oneline.js:4246 setCables()
+  - oneline.js:4354 setCables()
 - `conduitSchedule`
-  - oneline.js:8706 addRaceway()
-  - oneline.js:9223 addRaceway()
+  - oneline.js:8712 addRaceway()
+  - oneline.js:9229 addRaceway()
 - `equipment`
-  - oneline.js:18639 setEquipment()
-  - oneline.js:4242 setEquipment()
+  - oneline.js:18645 setEquipment()
+  - oneline.js:4248 setEquipment()
 - `loadList`
-  - oneline.js:18641 setLoads()
-  - oneline.js:4236 setLoads()
+  - oneline.js:18647 setLoads()
+  - oneline.js:4242 setLoads()
 - `oneLineDiagram`
-  - oneline.js:11767 setOneLine()
-  - oneline.js:11959 setOneLine()
-  - oneline.js:5040 setOneLine()
-  - oneline.js:5067 setOneLine()
-  - oneline.js:5087 setOneLine()
+  - oneline.js:11773 setOneLine()
+  - oneline.js:11965 setOneLine()
+  - oneline.js:5046 setOneLine()
+  - oneline.js:5073 setOneLine()
+  - oneline.js:5093 setOneLine()
 - `panelSchedule`
-  - oneline.js:18640 setPanels()
-  - oneline.js:4238 setPanels()
+  - oneline.js:18646 setPanels()
+  - oneline.js:4244 setPanels()
 - `settings.diagramDatablockConfig`
-  - oneline.js:11697 setItem(diagramDatablockConfig)
+  - oneline.js:11703 setItem(diagramDatablockConfig)
 - `settings.diagramScale`
-  - oneline.js:11960 setItem(diagramScale)
-  - oneline.js:18977 setItem(diagramScale)
+  - oneline.js:11966 setItem(diagramScale)
+  - oneline.js:18983 setItem(diagramScale)
 - `settings.diagramTitleBlock`
-  - oneline.js:17777 setItem(diagramTitleBlock)
+  - oneline.js:17783 setItem(diagramTitleBlock)
 - `settings.diagramZoom`
-  - oneline.js:3842 setItem(diagramZoom)
-  - oneline.js:3880 setItem(diagramZoom)
-  - oneline.js:3966 setItem(diagramZoom)
-  - oneline.js:4004 setItem(diagramZoom)
+  - oneline.js:3848 setItem(diagramZoom)
+  - oneline.js:3886 setItem(diagramZoom)
+  - oneline.js:3972 setItem(diagramZoom)
+  - oneline.js:4010 setItem(diagramZoom)
 - `settings.gistToken`
-  - oneline.js:18870 setItem(gistToken)
+  - oneline.js:18876 setItem(gistToken)
 - `settings.gridEnabled`
-  - oneline.js:11015 setItem(gridEnabled)
+  - oneline.js:11021 setItem(gridEnabled)
 - `settings.gridSize`
-  - oneline.js:16486 setItem(gridSize)
+  - oneline.js:16492 setItem(gridSize)
 - `settings.labelCounters`
-  - oneline.js:16121 setItem(labelCounters)
-  - oneline.js:5258 setItem(labelCounters)
+  - oneline.js:16127 setItem(labelCounters)
+  - oneline.js:5264 setItem(labelCounters)
 - `settings.labelPrefixes`
-  - oneline.js:5444 setItem(labelPrefixes)
+  - oneline.js:5450 setItem(labelPrefixes)
 - `settings.layersPanelOpen`
-  - oneline.js:16201 setItem(layersPanelOpen)
-  - oneline.js:16208 setItem(layersPanelOpen)
+  - oneline.js:16207 setItem(layersPanelOpen)
+  - oneline.js:16214 setItem(layersPanelOpen)
 - `settings.manufacturerDefaults`
-  - oneline.js:5513 setItem(manufacturerDefaults)
+  - oneline.js:5519 setItem(manufacturerDefaults)
 - `settings.oneLineDiagramFilterMode`
-  - oneline.js:16497 setItem(oneLineDiagramFilterMode)
+  - oneline.js:16503 setItem(oneLineDiagramFilterMode)
 - `settings.oneLineScheduleReconcilePending`
-  - oneline.js:18471 setItem(oneLineScheduleReconcilePending)
+  - oneline.js:18477 setItem(oneLineScheduleReconcilePending)
 - `settings.onelineTemplates`
-  - oneline.js:6260 migrateLegacyItem(..., onelineTemplates)
-  - oneline.js:6268 setItem(onelineTemplates)
+  - oneline.js:6266 migrateLegacyItem(..., onelineTemplates)
+  - oneline.js:6274 setItem(onelineTemplates)
 - `settings.orthogonalRouting`
-  - oneline.js:17712 setItem(orthogonalRouting)
+  - oneline.js:17718 setItem(orthogonalRouting)
+- `settings.scenarios`
+  - oneline.js:18979 switchScenario()
 - `settings.studySettings`
-  - oneline.js:3459 setItem(studySettings)
+  - oneline.js:3465 setItem(studySettings)
 - `settings.symbolStandard`
-  - oneline.js:17732 setItem(symbolStandard)
+  - oneline.js:17738 setItem(symbolStandard)
 - `studyResults`
   - analysis/harmonics.js:419 setStudies()
   - analysis/motorStart.js:212 setStudies()
-  - oneline.js:5043 setStudies()
-  - oneline.js:5070 setStudies()
-  - oneline.js:5091 setStudies()
+  - oneline.js:5049 setStudies()
+  - oneline.js:5076 setStudies()
+  - oneline.js:5097 setStudies()
   - ... 3 more
 - `studyResults.arcFlash`
-  - oneline.js:5090 studies.arcFlash
+  - oneline.js:5096 studies.arcFlash
 - `studyResults.duty`
   - validation/rules.js:666 studies.duty
 - `studyResults.harmonics`
   - analysis/harmonics.js:418 studies.harmonics
-  - oneline.js:5108 studies.harmonics
+  - oneline.js:5114 studies.harmonics
 - `studyResults.loadFlow`
-  - oneline.js:5042 studies.loadFlow
+  - oneline.js:5048 studies.loadFlow
 - `studyResults.motorStart`
   - analysis/motorStart.js:211 studies.motorStart
-  - oneline.js:5116 studies.motorStart
+  - oneline.js:5122 studies.motorStart
 - `studyResults.reliability`
-  - oneline.js:5126 studies.reliability
+  - oneline.js:5132 studies.reliability
 - `studyResults.shortCircuit`
-  - oneline.js:5069 studies.shortCircuit
-  - oneline.js:5089 studies.shortCircuit
+  - oneline.js:5075 studies.shortCircuit
+  - oneline.js:5095 studies.shortCircuit
 - `traySchedule`
-  - oneline.js:8706 addRaceway()
-  - oneline.js:9223 addRaceway()
+  - oneline.js:8712 addRaceway()
+  - oneline.js:9229 addRaceway()
 
 ### Demand Schedule (`demandschedule.html`)
 
@@ -657,9 +520,9 @@ The audit is intentionally conservative: it reports drift for review, but the te
 - None
 
 **Declared Inputs Not Statically Read**
-- `equipment`
-- `panelSchedule`
-- `settings.designBasis`
+- `equipment` - No static read/write evidence was detected for this declared input.
+- `panelSchedule` - No static read/write evidence was detected for this declared input.
+- `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
 - None
@@ -681,22 +544,16 @@ The audit is intentionally conservative: it reports drift for review, but the te
 - Source files: `ampacity.mjs`, `analysis/scheduleWorkflow.mjs`, `cableschedule.js`, `codes/iecTables.js`, `codes/necTables.js`, `conductorProperties.mjs`, `conductorPropertiesData.mjs`, `data/conductor_properties.js`, `sizing.js`, `src/cableschedule.js`, `src/crossProbe.js`, `src/voltageDrop.js`, `tableUtils.mjs`, `tour.js`, `utils/cablePhases.js`
 
 **Undocumented Reads**
-- `traySchedule`
-- `conduitSchedule`
-- `ductbankSchedule`
-- `settings.cableTagSettings`
-- `settings.cableChangeLog`
+- None
 
 **Undocumented Writes**
-- `settings.cableTagSettings`
-- `settings.cableChangeLog`
+- None
 
 **Declared Inputs Not Statically Read**
-- `cableTypicals`
-- `settings.designBasis`
+- `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
-- `cableTypicals`
+- None
 
 **Direct Browser Storage**
 - tour.js:19 localStorage.getItem(<dynamic>) - page-preference: Per-browser tour completion state; not exported with project data.
@@ -722,8 +579,10 @@ The audit is intentionally conservative: it reports drift for review, but the te
   - cableschedule.js:146 getPanels()
 - `settings.cableChangeLog`
   - cableschedule.js:777 getCableChangeLog()
+  - cableschedule.js:778 getItem(settings.cableChangeLog)
 - `settings.cableTagSettings`
   - cableschedule.js:704 getCableTagSettings()
+  - cableschedule.js:705 getItem(settings.cableTagSettings)
 - `settings.cableTemplates`
   - cableschedule.js:1457 getCableTemplates()
   - cableschedule.js:1700 getCableTemplates()
@@ -739,8 +598,10 @@ The audit is intentionally conservative: it reports drift for review, but the te
   - cableschedule.js:2452 setCables()
 - `settings.cableChangeLog`
   - cableschedule.js:784 setCableChangeLog()
+  - cableschedule.js:786 setItem(settings.cableChangeLog)
 - `settings.cableTagSettings`
   - cableschedule.js:711 setCableTagSettings()
+  - cableschedule.js:713 setItem(settings.cableTagSettings)
 - `settings.cableTemplates`
   - cableschedule.js:1205 setCableTemplates()
   - cableschedule.js:1248 setCableTemplates()
@@ -759,10 +620,10 @@ The audit is intentionally conservative: it reports drift for review, but the te
 - None
 
 **Undocumented Writes**
-- `equipment`
+- None
 
 **Declared Inputs Not Statically Read**
-- `settings.designBasis`
+- `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
 - None
@@ -816,19 +677,16 @@ The audit is intentionally conservative: it reports drift for review, but the te
 
 - Section: Workflow
 - Group: Raceway
-- Source files: `analysis/scheduleWorkflow.mjs`, `ductbankTable.js`, `e2e-helpers.js`, `exporters/revit.mjs`, `racewaySampleData.mjs`, `racewayschedule.js`, `src/fetchUtils.mjs`, `src/racewayschedule.js`, `tableUtils.mjs`, `tour.js`, `utils/safeEvents.mjs`
+- Source files: `analysis/manufacturerCatalog.mjs`, `analysis/scheduleWorkflow.mjs`, `ductbankTable.js`, `e2e-helpers.js`, `exporters/revit.mjs`, `racewaySampleData.mjs`, `racewayschedule.js`, `src/fetchUtils.mjs`, `src/racewayschedule.js`, `tableUtils.mjs`, `tour.js`, `utils/safeEvents.mjs`
 
 **Undocumented Reads**
 - None
 
 **Undocumented Writes**
-- `settings.trayFillData`
-- `settings.conduitFillData`
-- `cableSchedule`
-- `settings.ductbankSession`
+- None
 
 **Declared Inputs Not Statically Read**
-- `settings.designBasis`
+- `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
 - None
@@ -843,19 +701,21 @@ The audit is intentionally conservative: it reports drift for review, but the te
   - src/racewayschedule.js:1980 getCables()
   - src/racewayschedule.js:456 getCables()
 - `conduitSchedule`
-  - exporters/revit.mjs:24 getConduits()
+  - exporters/revit.mjs:26 getConduits()
   - src/racewayschedule.js:1979 getConduits()
   - src/racewayschedule.js:2031 getConduits()
   - src/racewayschedule.js:434 getConduits()
+  - src/racewayschedule.js:675 TableUtils.createTable(conduitSchedule)
 - `ductbankSchedule`
   - ductbankTable.js:1025 getDuctbanks()
   - src/racewayschedule.js:2029 getDuctbanks()
   - src/racewayschedule.js:810 getDuctbanks()
 - `traySchedule`
-  - exporters/revit.mjs:23 getTrays()
+  - exporters/revit.mjs:25 getTrays()
   - src/racewayschedule.js:1978 getTrays()
   - src/racewayschedule.js:2030 getTrays()
   - src/racewayschedule.js:433 getTrays()
+  - src/racewayschedule.js:606 TableUtils.createTable(traySchedule)
 
 **Detected Writes**
 - `cableSchedule`
@@ -863,6 +723,7 @@ The audit is intentionally conservative: it reports drift for review, but the te
 - `conduitSchedule`
   - src/racewayschedule.js:367 setConduits()
   - src/racewayschedule.js:551 importFromCad()
+  - src/racewayschedule.js:675 TableUtils.createTable(conduitSchedule)
   - src/racewayschedule.js:766 setConduits()
   - src/racewayschedule.js:841 setConduits()
 - `ductbankSchedule`
@@ -879,6 +740,7 @@ The audit is intentionally conservative: it reports drift for review, but the te
 - `traySchedule`
   - src/racewayschedule.js:366 setTrays()
   - src/racewayschedule.js:551 importFromCad()
+  - src/racewayschedule.js:606 TableUtils.createTable(traySchedule)
 
 ### Ductbank (`ductbankroute.html`)
 
@@ -887,22 +749,18 @@ The audit is intentionally conservative: it reports drift for review, but the te
 - Source files: `conductorProperties.mjs`, `conductorPropertiesData.mjs`, `data/conductor_properties.js`, `ductbankroute.js`, `soilResistivityConfig.js`, `src/ductbankroute.js`
 
 **Undocumented Reads**
-- `settings.ductbankPanZoom`
-- `settings.ductbankSession`
-- `settings.ductbankRouteData`
+- None
 
 **Undocumented Writes**
-- `settings.ductbankPanZoom`
-- `settings.ductbankSession`
-- `settings.ductbankRouteData`
+- None
 
 **Declared Inputs Not Statically Read**
-- `conduitSchedule`
-- `ductbankSchedule`
-- `settings.designBasis`
+- `conduitSchedule` - No static read/write evidence was detected for this declared input.
+- `ductbankSchedule` - No static read/write evidence was detected for this declared input.
+- `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
-- `studyResults.ductbankRoute`
+- None
 
 **Direct Browser Storage**
 - None
@@ -939,9 +797,9 @@ The audit is intentionally conservative: it reports drift for review, but the te
 - None
 
 **Declared Inputs Not Statically Read**
-- `cableSchedule`
-- `traySchedule`
-- `settings.designBasis`
+- `cableSchedule` - No static read/write evidence was detected for this declared input.
+- `traySchedule` - No static read/write evidence was detected for this declared input.
+- `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
 - None
@@ -971,9 +829,9 @@ The audit is intentionally conservative: it reports drift for review, but the te
 - None
 
 **Declared Inputs Not Statically Read**
-- `cableSchedule`
-- `conduitSchedule`
-- `settings.designBasis`
+- `cableSchedule` - No static read/write evidence was detected for this declared input.
+- `conduitSchedule` - No static read/write evidence was detected for this declared input.
+- `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
 - None
@@ -996,15 +854,15 @@ The audit is intentionally conservative: it reports drift for review, but the te
 - Source files: `analysis/conduitBendSchedule.mjs`, `analysis/conduitBendVisualModel.mjs`, `analysis/pullBoxSizing.mjs`, `conduitbend.js`, `src/components/studyApproval.js`, `src/conduitbend.js`, `src/htmlUtils.mjs`, `src/utils/isometricSvg.js`
 
 **Undocumented Reads**
-- `settings.studyApprovals`
+- None
 
 **Undocumented Writes**
-- `settings.studyApprovals`
+- None
 
 **Declared Inputs Not Statically Read**
-- `conduitSchedule`
-- `cableSchedule`
-- `settings.designBasis`
+- `conduitSchedule` - No static read/write evidence was detected for this declared input.
+- `cableSchedule` - No static read/write evidence was detected for this declared input.
+- `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
 - None
@@ -1045,7 +903,7 @@ The audit is intentionally conservative: it reports drift for review, but the te
 - None
 
 **Declared Inputs Not Statically Read**
-- `settings.designBasis`
+- `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
 - None
@@ -1069,14 +927,14 @@ The audit is intentionally conservative: it reports drift for review, but the te
 - Source files: `analysis/seismicBracing.mjs`, `analysis/supportSpan.mjs`, `seismicBracing.js`, `src/seismicBracing.js`
 
 **Undocumented Reads**
-- `cableSchedule`
+- None
 
 **Undocumented Writes**
 - None
 
 **Declared Inputs Not Statically Read**
-- `equipment`
-- `settings.designBasis`
+- `equipment` - No static read/write evidence was detected for this declared input.
+- `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
 - None
@@ -1106,8 +964,8 @@ The audit is intentionally conservative: it reports drift for review, but the te
 - None
 
 **Declared Inputs Not Statically Read**
-- `studyResults.shortCircuit`
-- `settings.designBasis`
+- `studyResults.shortCircuit` - No static read/write evidence was detected for this declared input.
+- `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
 - None
@@ -1126,7 +984,7 @@ The audit is intentionally conservative: it reports drift for review, but the te
 
 - Section: Workflow
 - Group: Raceway
-- Source files: `analysis/pullCards.mjs`, `analysis/supportSpan.mjs`, `analysis/trayHardware.mjs`, `src/catalogBrowser.js`, `src/pullCalc.js`, `src/trayhardwarebom.js`
+- Source files: `analysis/manufacturerCatalog.mjs`, `analysis/pullCards.mjs`, `analysis/supportSpan.mjs`, `analysis/trayHardware.mjs`, `src/catalogBrowser.js`, `src/pullCalc.js`, `src/trayhardwarebom.js`
 
 **Undocumented Reads**
 - None
@@ -1135,8 +993,8 @@ The audit is intentionally conservative: it reports drift for review, but the te
 - None
 
 **Declared Inputs Not Statically Read**
-- `cableSchedule`
-- `settings.designBasis`
+- `cableSchedule` - No static read/write evidence was detected for this declared input.
+- `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
 - None
@@ -1146,13 +1004,13 @@ The audit is intentionally conservative: it reports drift for review, but the te
 
 **Detected Reads**
 - `settings.trayHardwareCatalogCustomProducts`
-  - src/catalogBrowser.js:33 getTrayHardwareCatalogCustomProducts()
+  - src/catalogBrowser.js:34 getTrayHardwareCatalogCustomProducts()
 - `traySchedule`
   - src/trayhardwarebom.js:36 getTrays()
 
 **Detected Writes**
 - `settings.trayHardwareCatalogCustomProducts`
-  - src/catalogBrowser.js:42 setTrayHardwareCatalogCustomProducts()
+  - src/catalogBrowser.js:43 setTrayHardwareCatalogCustomProducts()
 
 ### Clash Detection (`clashdetect.html`)
 
@@ -1167,10 +1025,10 @@ The audit is intentionally conservative: it reports drift for review, but the te
 - None
 
 **Declared Inputs Not Statically Read**
-- `equipment`
-- `conduitSchedule`
-- `ductbankSchedule`
-- `settings.designBasis`
+- `equipment` - No static read/write evidence was detected for this declared input.
+- `conduitSchedule` - No static read/write evidence was detected for this declared input.
+- `ductbankSchedule` - No static read/write evidence was detected for this declared input.
+- `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
 - None
@@ -1192,16 +1050,16 @@ The audit is intentionally conservative: it reports drift for review, but the te
 - Source files: `analysis/autoSize.mjs`, `analysis/conduitFill.mjs`, `analysis/designRuleChecker.mjs`, `designrulechecker.js`, `src/crossProbe.js`, `src/designrulechecker.js`
 
 **Undocumented Reads**
-- `settings.latestRouteResults`
+- None
 
 **Undocumented Writes**
 - None
 
 **Declared Inputs Not Statically Read**
-- `equipment`
-- `ductbankSchedule`
-- `studyResults`
-- `settings.designBasis`
+- `equipment` - No static read/write evidence was detected for this declared input.
+- `ductbankSchedule` - No static read/write evidence was detected for this declared input.
+- `studyResults` - No static read/write evidence was detected for this declared input.
+- `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
 - None
@@ -1247,9 +1105,9 @@ The audit is intentionally conservative: it reports drift for review, but the te
 - None
 
 **Declared Inputs Not Statically Read**
-- `equipment`
-- `ductbankSchedule`
-- `settings.designBasis`
+- `equipment` - No static read/write evidence was detected for this declared input.
+- `ductbankSchedule` - No static read/write evidence was detected for this declared input.
+- `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
 - None
@@ -1311,17 +1169,13 @@ The audit is intentionally conservative: it reports drift for review, but the te
 - Source files: `analysis/deliverableWorkflow.mjs`, `analysis/designBasis.mjs`, `analysis/pullCards.mjs`, `analysis/reportPackage.mjs`, `analysis/scheduleWorkflow.mjs`, `analysis/spoolSheetVisualModel.mjs`, `analysis/spoolSheets.mjs`, `spoolsheets.js`, `src/pullCalc.js`, `src/spoolsheets.js`
 
 **Undocumented Reads**
-- `conduitSchedule`
-- `ductbankSchedule`
-- `studyResults`
-- `settings.reportSnapshots`
-- `settings.lifecyclePackages`
+- None
 
 **Undocumented Writes**
 - None
 
 **Declared Inputs Not Statically Read**
-- `settings.designBasis`
+- `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
 - None
@@ -1366,7 +1220,7 @@ The audit is intentionally conservative: it reports drift for review, but the te
 - None
 
 **Declared Inputs Not Statically Read**
-- `settings.designBasis`
+- `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
 - None
@@ -1396,10 +1250,10 @@ The audit is intentionally conservative: it reports drift for review, but the te
 - None
 
 **Declared Inputs Not Statically Read**
-- `equipment`
-- `traySchedule`
-- `studyResults.windLoad`
-- `settings.designBasis`
+- `equipment` - No static read/write evidence was detected for this declared input.
+- `traySchedule` - No static read/write evidence was detected for this declared input.
+- `studyResults.windLoad` - No static read/write evidence was detected for this declared input.
+- `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
 - None
@@ -1420,14 +1274,14 @@ The audit is intentionally conservative: it reports drift for review, but the te
 - Source files: `analysis/loadCombinations.mjs`, `analysis/seismicBracing.mjs`, `analysis/seismicWindCombined.mjs`, `analysis/supportSpan.mjs`, `analysis/windLoad.mjs`, `src/seismicwindcombined.js`
 
 **Undocumented Reads**
-- `cableSchedule`
+- None
 
 **Undocumented Writes**
 - None
 
 **Declared Inputs Not Statically Read**
-- `equipment`
-- `settings.designBasis`
+- `equipment` - No static read/write evidence was detected for this declared input.
+- `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
 - None
@@ -1457,9 +1311,9 @@ The audit is intentionally conservative: it reports drift for review, but the te
 - None
 
 **Declared Inputs Not Statically Read**
-- `equipment`
-- `traySchedule`
-- `settings.designBasis`
+- `equipment` - No static read/write evidence was detected for this declared input.
+- `traySchedule` - No static read/write evidence was detected for this declared input.
+- `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
 - None
@@ -1477,7 +1331,7 @@ The audit is intentionally conservative: it reports drift for review, but the te
 
 - Section: Workflow
 - Group: Optimization
-- Source files: `ampacity.mjs`, `conductorProperties.mjs`, `conductorPropertiesData.mjs`, `data/conductor_properties.js`, `optimalRoute.js`, `src/optimalRoute.js`, `src/voltageDrop.js`, `tour.js`
+- Source files: `ampacity.mjs`, `analysis/scheduleWorkflow.mjs`, `app.mjs`, `bimExport.mjs`, `conductorProperties.mjs`, `conductorPropertiesData.mjs`, `data/conductor_properties.js`, `e2e-helpers.js`, `exporters/simpleDxf.js`, `optimalRoute.js`, `resultsExport.mjs`, `src/exporters/gltf2.mjs`, `src/fetchUtils.mjs`, `src/optimalRoute.js`, `src/voltageDrop.js`, `tableUtils.mjs`, `tour.js`, `utils/safeEvents.mjs`
 
 **Undocumented Reads**
 - None
@@ -1486,14 +1340,10 @@ The audit is intentionally conservative: it reports drift for review, but the te
 - None
 
 **Declared Inputs Not Statically Read**
-- `cableSchedule`
-- `traySchedule`
-- `conduitSchedule`
-- `ductbankSchedule`
-- `settings.designBasis`
+- `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
-- `settings.latestRouteResults`
+- None
 
 **Direct Browser Storage**
 - optimalRoute.js:71 sessionStorage.setItem(resume:choice) - session-handoff: E2E resume modal choice for the current tab only.
@@ -1502,10 +1352,33 @@ The audit is intentionally conservative: it reports drift for review, but the te
 - tour.js:82 localStorage.setItem(<dynamic>) - page-preference: Per-browser tour completion state; not exported with project data.
 
 **Detected Reads**
-- None
+- `cableSchedule`
+  - app.mjs:724 getCables()
+- `conduitSchedule`
+  - app.mjs:786 getConduits()
+- `ductbankSchedule`
+  - app.mjs:785 getDuctbanks()
+- `settings.ctrSession`
+  - app.mjs:375 getItem(ctrSession)
+  - app.mjs:670 getItem(ctrSession)
+- `traySchedule`
+  - app.mjs:723 getTrays()
 
 **Detected Writes**
-- None
+- `cableSchedule`
+  - app.mjs:4120 setCables()
+- `settings.conduitFillData`
+  - app.mjs:2438 setItem(conduitFillData)
+- `settings.ctrSession`
+  - app.mjs:384 setItem(ctrSession)
+  - app.mjs:659 setItem(ctrSession)
+- `settings.ductbankRouteData`
+  - app.mjs:2451 setItem(ductbankRouteData)
+- `settings.latestRouteResults`
+  - app.mjs:226 setItem(latestRouteResults)
+- `settings.trayFillData`
+  - app.mjs:2413 setItem(trayFillData)
+  - app.mjs:3729 setItem(trayFillData)
 
 ### Pull Cards (`pullcards.html`)
 
@@ -1514,18 +1387,13 @@ The audit is intentionally conservative: it reports drift for review, but the te
 - Source files: `analysis/deliverableWorkflow.mjs`, `analysis/designBasis.mjs`, `analysis/pullCardRouteImport.mjs`, `analysis/pullCardVisualModel.mjs`, `analysis/pullCards.mjs`, `analysis/reportPackage.mjs`, `analysis/scheduleWorkflow.mjs`, `analysis/spoolSheetVisualModel.mjs`, `analysis/spoolSheets.mjs`, `pullcards.js`, `src/pullCalc.js`, `src/pullcards.js`, `src/utils/isometricSvg.js`
 
 **Undocumented Reads**
-- `traySchedule`
-- `conduitSchedule`
-- `ductbankSchedule`
-- `studyResults`
-- `settings.reportSnapshots`
-- `settings.lifecyclePackages`
+- None
 
 **Undocumented Writes**
 - None
 
 **Declared Inputs Not Statically Read**
-- `settings.designBasis`
+- `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
 - None
@@ -1574,8 +1442,8 @@ The audit is intentionally conservative: it reports drift for review, but the te
 - None
 
 **Declared Inputs Not Statically Read**
-- `settings.latestRouteResults`
-- `settings.designBasis`
+- `settings.latestRouteResults` - No static read/write evidence was detected for this declared input.
+- `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
 - None
@@ -1594,19 +1462,18 @@ The audit is intentionally conservative: it reports drift for review, but the te
 
 - Section: Workflow
 - Group: Deliverables
-- Source files: `analysis/costEstimate.mjs`, `costestimate.js`, `src/costestimate.js`
+- Source files: `analysis/costEstimate.mjs`, `analysis/manufacturerCatalog.mjs`, `costestimate.js`, `src/costestimate.js`
 
 **Undocumented Reads**
-- `studyResults`
-- `studyResults.routeResults`
+- None
 
 **Undocumented Writes**
 - None
 
 **Declared Inputs Not Statically Read**
-- `ductbankSchedule`
-- `settings.latestRouteResults`
-- `settings.designBasis`
+- `ductbankSchedule` - No static read/write evidence was detected for this declared input.
+- `settings.latestRouteResults` - No static read/write evidence was detected for this declared input.
+- `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
 - None
@@ -1638,7 +1505,7 @@ The audit is intentionally conservative: it reports drift for review, but the te
 
 - Section: Workflow
 - Group: Deliverables
-- Source files: `src/submittal.js`, `submittal.js`
+- Source files: `analysis/manufacturerCatalog.mjs`, `src/submittal.js`, `submittal.js`
 
 **Undocumented Reads**
 - None
@@ -1647,36 +1514,36 @@ The audit is intentionally conservative: it reports drift for review, but the te
 - None
 
 **Declared Inputs Not Statically Read**
-- `loadList`
-- `oneLineDiagram`
-- `panelSchedule`
-- `studyResults`
-- `settings.latestRouteResults`
-- `settings.designBasis`
-- `settings.designGateApprovals`
-- `settings.studyApprovals`
+- `loadList` - No static read/write evidence was detected for this declared input.
+- `oneLineDiagram` - No static read/write evidence was detected for this declared input.
+- `panelSchedule` - No static read/write evidence was detected for this declared input.
+- `studyResults` - No static read/write evidence was detected for this declared input.
+- `settings.latestRouteResults` - No static read/write evidence was detected for this declared input.
+- `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
+- `settings.designGateApprovals` - No static read/write evidence was detected for this declared input.
+- `settings.studyApprovals` - No static read/write evidence was detected for this declared input.
 
 **Declared Outputs Not Statically Written**
-- `settings.lifecyclePackages`
+- None
 
 **Direct Browser Storage**
 - None
 
 **Detected Reads**
 - `cableSchedule`
-  - submittal.js:388 getCables()
-  - submittal.js:50 getCables()
+  - submittal.js:451 getCables()
+  - submittal.js:60 getCables()
 - `conduitSchedule`
-  - submittal.js:390 getConduits()
-  - submittal.js:52 getConduits()
+  - submittal.js:453 getConduits()
+  - submittal.js:62 getConduits()
 - `ductbankSchedule`
-  - submittal.js:54 getDuctbanks()
+  - submittal.js:64 getDuctbanks()
 - `equipment`
-  - submittal.js:391 getEquipment()
-  - submittal.js:53 getEquipment()
+  - submittal.js:454 getEquipment()
+  - submittal.js:63 getEquipment()
 - `traySchedule`
-  - submittal.js:389 getTrays()
-  - submittal.js:51 getTrays()
+  - submittal.js:452 getTrays()
+  - submittal.js:61 getTrays()
 
 **Detected Writes**
 - None
@@ -1688,17 +1555,17 @@ The audit is intentionally conservative: it reports drift for review, but the te
 - Source files: `analysis/autoSize.mjs`, `analysis/clashDetect.mjs`, `analysis/conduitFill.mjs`, `analysis/deliverableWorkflow.mjs`, `analysis/designBasis.mjs`, `analysis/designRuleChecker.mjs`, `analysis/heatTraceReport.mjs`, `analysis/heatTraceSizing.mjs`, `analysis/projectReport.mjs`, `analysis/pullCards.mjs`, `analysis/reportPackage.mjs`, `analysis/scheduleWorkflow.mjs`, `analysis/spoolSheetVisualModel.mjs`, `analysis/spoolSheets.mjs`, `src/projectreport.js`, `src/pullCalc.js`
 
 **Undocumented Reads**
-- `settings.tccSettings`
+- None
 
 **Undocumented Writes**
 - None
 
 **Declared Inputs Not Statically Read**
-- `loadList`
-- `panelSchedule`
+- `loadList` - No static read/write evidence was detected for this declared input.
+- `panelSchedule` - No static read/write evidence was detected for this declared input.
 
 **Declared Outputs Not Statically Written**
-- `settings.lifecyclePackages`
+- None
 
 **Direct Browser Storage**
 - None
@@ -1784,9 +1651,9 @@ The audit is intentionally conservative: it reports drift for review, but the te
 - None
 
 **Declared Inputs Not Statically Read**
-- `cableSchedule`
-- `traySchedule`
-- `settings.designBasis`
+- `cableSchedule` - No static read/write evidence was detected for this declared input.
+- `traySchedule` - No static read/write evidence was detected for this declared input.
+- `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
 - None
@@ -1813,9 +1680,9 @@ The audit is intentionally conservative: it reports drift for review, but the te
 - None
 
 **Declared Inputs Not Statically Read**
-- `cableSchedule`
-- `loadList`
-- `settings.designBasis`
+- `cableSchedule` - No static read/write evidence was detected for this declared input.
+- `loadList` - No static read/write evidence was detected for this declared input.
+- `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
 - None
@@ -1836,13 +1703,13 @@ The audit is intentionally conservative: it reports drift for review, but the te
 - Source files: `analysis/designBasis.mjs`, `analysis/iec60287.mjs`, `iec60287.js`, `src/components/studyApproval.js`, `src/components/studyBasis.js`, `src/iec60287.js`
 
 **Undocumented Reads**
-- `settings.studyApprovals`
+- None
 
 **Undocumented Writes**
-- `settings.studyApprovals`
+- None
 
 **Declared Inputs Not Statically Read**
-- `cableSchedule`
+- `cableSchedule` - No static read/write evidence was detected for this declared input.
 
 **Declared Outputs Not Statically Written**
 - None
@@ -1880,10 +1747,10 @@ The audit is intentionally conservative: it reports drift for review, but the te
 - None
 
 **Undocumented Writes**
-- `oneLineDiagram`
+- None
 
 **Declared Inputs Not Statically Read**
-- `equipment`
+- `equipment` - No static read/write evidence was detected for this declared input.
 
 **Declared Outputs Not Statically Written**
 - None
@@ -1950,8 +1817,8 @@ The audit is intentionally conservative: it reports drift for review, but the te
 - None
 
 **Declared Inputs Not Statically Read**
-- `equipment`
-- `settings.designBasis`
+- `equipment` - No static read/write evidence was detected for this declared input.
+- `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
 - None
@@ -1979,14 +1846,14 @@ The audit is intentionally conservative: it reports drift for review, but the te
 - Source files: `analysis/capacitorBank.mjs`, `capacitorbank.js`, `src/capacitorbank.js`, `src/components/studyApproval.js`
 
 **Undocumented Reads**
-- `settings.studyApprovals`
+- None
 
 **Undocumented Writes**
-- `settings.studyApprovals`
+- None
 
 **Declared Inputs Not Statically Read**
-- `loadList`
-- `settings.designBasis`
+- `loadList` - No static read/write evidence was detected for this declared input.
+- `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
 - None
@@ -2019,13 +1886,13 @@ The audit is intentionally conservative: it reports drift for review, but the te
 - Source files: `analysis/frequencyScan.mjs`, `frequencyscan.js`, `src/components/studyApproval.js`, `src/frequencyscan.js`, `src/htmlUtils.mjs`
 
 **Undocumented Reads**
-- `settings.studyApprovals`
+- None
 
 **Undocumented Writes**
-- `settings.studyApprovals`
+- None
 
 **Declared Inputs Not Statically Read**
-- `settings.designBasis`
+- `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
 - None
@@ -2058,13 +1925,13 @@ The audit is intentionally conservative: it reports drift for review, but the te
 - Source files: `analysis/designBasis.mjs`, `analysis/voltageFlicker.mjs`, `src/components/studyApproval.js`, `src/components/studyBasis.js`, `src/htmlUtils.mjs`, `src/voltageflicker.js`, `voltageflicker.js`
 
 **Undocumented Reads**
-- `settings.studyApprovals`
+- None
 
 **Undocumented Writes**
-- `settings.studyApprovals`
+- None
 
 **Declared Inputs Not Statically Read**
-- `loadList`
+- `loadList` - No static read/write evidence was detected for this declared input.
 
 **Declared Outputs Not Statically Written**
 - None
@@ -2099,15 +1966,15 @@ The audit is intentionally conservative: it reports drift for review, but the te
 - Source files: `analysis/busDuctSizing.mjs`, `busdust.js`, `src/busDuct.js`, `src/components/studyApproval.js`, `src/htmlUtils.mjs`
 
 **Undocumented Reads**
-- `settings.studyApprovals`
+- None
 
 **Undocumented Writes**
-- `settings.studyApprovals`
+- None
 
 **Declared Inputs Not Statically Read**
-- `equipment`
-- `loadList`
-- `settings.designBasis`
+- `equipment` - No static read/write evidence was detected for this declared input.
+- `loadList` - No static read/write evidence was detected for this declared input.
+- `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
 - None
@@ -2146,14 +2013,13 @@ The audit is intentionally conservative: it reports drift for review, but the te
 - Source files: `analysis/sustainabilityFootprint.mjs`, `src/components/studyApproval.js`, `src/htmlUtils.mjs`, `src/sustainability.js`, `sustainability.js`
 
 **Undocumented Reads**
-- `studyResults.iec60287`
-- `settings.studyApprovals`
+- None
 
 **Undocumented Writes**
-- `settings.studyApprovals`
+- None
 
 **Declared Inputs Not Statically Read**
-- `settings.designBasis`
+- `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
 - None
@@ -2195,15 +2061,15 @@ The audit is intentionally conservative: it reports drift for review, but the te
 - Source files: `analysis/batteryRackLayout.mjs`, `analysis/batterySizing.mjs`, `battery.js`, `src/battery.js`, `src/components/studyApproval.js`
 
 **Undocumented Reads**
-- `settings.studyApprovals`
+- None
 
 **Undocumented Writes**
-- `settings.studyApprovals`
+- None
 
 **Declared Inputs Not Statically Read**
-- `loadList`
-- `equipment`
-- `settings.designBasis`
+- `loadList` - No static read/write evidence was detected for this declared input.
+- `equipment` - No static read/write evidence was detected for this declared input.
+- `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
 - None
@@ -2236,15 +2102,15 @@ The audit is intentionally conservative: it reports drift for review, but the te
 - Source files: `analysis/generatorSizing.mjs`, `generatorsizing.js`, `src/components/studyApproval.js`, `src/generatorsizing.js`
 
 **Undocumented Reads**
-- `settings.studyApprovals`
+- None
 
 **Undocumented Writes**
-- `settings.studyApprovals`
+- None
 
 **Declared Inputs Not Statically Read**
-- `loadList`
-- `equipment`
-- `settings.designBasis`
+- `loadList` - No static read/write evidence was detected for this declared input.
+- `equipment` - No static read/write evidence was detected for this declared input.
+- `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
 - None
@@ -2277,19 +2143,15 @@ The audit is intentionally conservative: it reports drift for review, but the te
 - Source files: `analysis/ibrModeling.mjs`, `ibr.js`, `src/components/studyApproval.js`, `src/ibr.js`
 
 **Undocumented Reads**
-- `studyResults.pvResult`
-- `studyResults.bessResult`
-- `studyResults.faultResult`
-- `studyResults.voltVarResult`
-- `settings.studyApprovals`
+- None
 
 **Undocumented Writes**
-- `settings.studyApprovals`
+- None
 
 **Declared Inputs Not Statically Read**
-- `equipment`
-- `oneLineDiagram`
-- `settings.designBasis`
+- `equipment` - No static read/write evidence was detected for this declared input.
+- `oneLineDiagram` - No static read/write evidence was detected for this declared input.
+- `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
 - None
@@ -2349,15 +2211,15 @@ The audit is intentionally conservative: it reports drift for review, but the te
 - Source files: `analysis/derInterconnect.mjs`, `derinterconnect.js`, `src/components/studyApproval.js`, `src/derinterconnect.js`
 
 **Undocumented Reads**
-- `settings.studyApprovals`
+- None
 
 **Undocumented Writes**
-- `settings.studyApprovals`
+- None
 
 **Declared Inputs Not Statically Read**
-- `equipment`
-- `oneLineDiagram`
-- `settings.designBasis`
+- `equipment` - No static read/write evidence was detected for this declared input.
+- `oneLineDiagram` - No static read/write evidence was detected for this declared input.
+- `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
 - None
@@ -2401,9 +2263,9 @@ The audit is intentionally conservative: it reports drift for review, but the te
 - None
 
 **Declared Inputs Not Statically Read**
-- `equipment`
-- `loadList`
-- `settings.designBasis`
+- `equipment` - No static read/write evidence was detected for this declared input.
+- `loadList` - No static read/write evidence was detected for this declared input.
+- `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
 - None
@@ -2436,10 +2298,10 @@ The audit is intentionally conservative: it reports drift for review, but the te
 - None
 
 **Declared Inputs Not Statically Read**
-- `equipment`
-- `loadList`
-- `cableSchedule`
-- `settings.designBasis`
+- `equipment` - No static read/write evidence was detected for this declared input.
+- `loadList` - No static read/write evidence was detected for this declared input.
+- `cableSchedule` - No static read/write evidence was detected for this declared input.
+- `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
 - None
@@ -2467,13 +2329,13 @@ The audit is intentionally conservative: it reports drift for review, but the te
 - Source files: `analysis/designBasis.mjs`, `analysis/ibrModeling.mjs`, `analysis/loadFlow.js`, `analysis/loadFlowModel.js`, `analysis/quasiDynamic.mjs`, `componentLibrary.json`, `quasidynamic.js`, `src/components/studyApproval.js`, `src/components/studyBasis.js`, `src/htmlUtils.mjs`, `src/quasiDynamic.js`, `utils/transformerImpedance.js`, `utils/voltage.js`
 
 **Undocumented Reads**
-- `settings.studyApprovals`
+- None
 
 **Undocumented Writes**
-- `settings.studyApprovals`
+- None
 
 **Declared Inputs Not Statically Read**
-- `loadList`
+- `loadList` - No static read/write evidence was detected for this declared input.
 
 **Declared Outputs Not Statically Written**
 - None
@@ -2513,15 +2375,15 @@ The audit is intentionally conservative: it reports drift for review, but the te
 - Source files: `analysis/voltageStability.mjs`, `src/components/studyApproval.js`, `src/htmlUtils.mjs`, `src/voltageStability.js`, `voltagestability.js`
 
 **Undocumented Reads**
-- `settings.studyApprovals`
+- None
 
 **Undocumented Writes**
-- `settings.studyApprovals`
+- None
 
 **Declared Inputs Not Statically Read**
-- `oneLineDiagram`
-- `loadList`
-- `settings.designBasis`
+- `oneLineDiagram` - No static read/write evidence was detected for this declared input.
+- `loadList` - No static read/write evidence was detected for this declared input.
+- `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
 - None
@@ -2562,9 +2424,9 @@ The audit is intentionally conservative: it reports drift for review, but the te
 - None
 
 **Declared Inputs Not Statically Read**
-- `equipment`
-- `cableSchedule`
-- `settings.designBasis`
+- `equipment` - No static read/write evidence was detected for this declared input.
+- `cableSchedule` - No static read/write evidence was detected for this declared input.
+- `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
 - None
@@ -2594,15 +2456,14 @@ The audit is intentionally conservative: it reports drift for review, but the te
 - Source files: `analysis/ctMetadata.mjs`, `analysis/designBasis.mjs`, `analysis/ibrModeling.mjs`, `analysis/iec60909.mjs`, `analysis/iecRelayCurves.mjs`, `analysis/ptVtMetadata.mjs`, `analysis/shortCircuit.mjs`, `analysis/tccUtils.js`, `data/protectiveDevices.mjs`, `iec60909.js`, `reports/reporting.mjs`, `src/components/studyApproval.js`, `src/components/studyBasis.js`, `src/iec60909.js`, `utils/cableImpedance.js`, `utils/transformerImpedance.js`, `utils/voltage.js`
 
 **Undocumented Reads**
-- `settings.studyApprovals`
-- `settings.tccSettings`
+- None
 
 **Undocumented Writes**
-- `settings.studyApprovals`
+- None
 
 **Declared Inputs Not Statically Read**
-- `equipment`
-- `cableSchedule`
+- `equipment` - No static read/write evidence was detected for this declared input.
+- `cableSchedule` - No static read/write evidence was detected for this declared input.
 
 **Declared Outputs Not Statically Written**
 - None
@@ -2645,9 +2506,9 @@ The audit is intentionally conservative: it reports drift for review, but the te
 - None
 
 **Declared Inputs Not Statically Read**
-- `equipment`
-- `cableSchedule`
-- `settings.designBasis`
+- `equipment` - No static read/write evidence was detected for this declared input.
+- `cableSchedule` - No static read/write evidence was detected for this declared input.
+- `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
 - None
@@ -2678,15 +2539,15 @@ The audit is intentionally conservative: it reports drift for review, but the te
 - Source files: `analysis/dcShortCircuit.mjs`, `dcshortcircuit.js`, `src/components/studyApproval.js`, `src/dcshortcircuit.js`
 
 **Undocumented Reads**
-- `settings.studyApprovals`
+- None
 
 **Undocumented Writes**
-- `settings.studyApprovals`
+- None
 
 **Declared Inputs Not Statically Read**
-- `equipment`
-- `cableSchedule`
-- `settings.designBasis`
+- `equipment` - No static read/write evidence was detected for this declared input.
+- `cableSchedule` - No static read/write evidence was detected for this declared input.
+- `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
 - None
@@ -2719,15 +2580,15 @@ The audit is intentionally conservative: it reports drift for review, but the te
 - Source files: `analysis/differentialProtection.mjs`, `differentialprotection.js`, `reports/reporting.mjs`, `src/components/studyApproval.js`, `src/differentialProtection.js`
 
 **Undocumented Reads**
-- `settings.studyApprovals`
+- None
 
 **Undocumented Writes**
-- `settings.studyApprovals`
+- None
 
 **Declared Inputs Not Statically Read**
-- `oneLineDiagram`
-- `equipment`
-- `settings.designBasis`
+- `oneLineDiagram` - No static read/write evidence was detected for this declared input.
+- `equipment` - No static read/write evidence was detected for this declared input.
+- `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
 - None
@@ -2763,14 +2624,14 @@ The audit is intentionally conservative: it reports drift for review, but the te
 - Source files: `analysis/equipmentEvaluation.mjs`, `data/protectiveDevices.mjs`, `src/crossProbe.js`, `src/equipmentEvaluation.js`
 
 **Undocumented Reads**
-- `oneLineDiagram`
+- None
 
 **Undocumented Writes**
 - None
 
 **Declared Inputs Not Statically Read**
-- `equipment`
-- `settings.tccSettings`
+- `equipment` - No static read/write evidence was detected for this declared input.
+- `settings.tccSettings` - No static read/write evidence was detected for this declared input.
 
 **Declared Outputs Not Statically Written**
 - None
@@ -2804,14 +2665,14 @@ The audit is intentionally conservative: it reports drift for review, but the te
 - Source files: `analysis/bessHazard.mjs`, `bessHazard.js`, `src/bessHazard.js`, `src/components/studyApproval.js`, `src/htmlUtils.mjs`
 
 **Undocumented Reads**
-- `settings.studyApprovals`
+- None
 
 **Undocumented Writes**
-- `settings.studyApprovals`
+- None
 
 **Declared Inputs Not Statically Read**
-- `equipment`
-- `settings.designBasis`
+- `equipment` - No static read/write evidence was detected for this declared input.
+- `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
 - None
@@ -2846,14 +2707,14 @@ The audit is intentionally conservative: it reports drift for review, but the te
 - Source files: `analysis/hazAreaClassification.mjs`, `hazareaclassification.js`, `src/components/studyApproval.js`, `src/hazareaclassification.js`, `src/htmlUtils.mjs`
 
 **Undocumented Reads**
-- `settings.studyApprovals`
+- None
 
 **Undocumented Writes**
-- `settings.studyApprovals`
+- None
 
 **Declared Inputs Not Statically Read**
-- `equipment`
-- `settings.designBasis`
+- `equipment` - No static read/write evidence was detected for this declared input.
+- `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
 - None
@@ -2886,14 +2747,14 @@ The audit is intentionally conservative: it reports drift for review, but the te
 - Source files: `analysis/designBasis.mjs`, `analysis/insulationCoordination.mjs`, `insulationcoordination.js`, `src/components/studyApproval.js`, `src/components/studyBasis.js`, `src/htmlUtils.mjs`, `src/insulationcoordination.js`
 
 **Undocumented Reads**
-- `settings.studyApprovals`
+- None
 
 **Undocumented Writes**
-- `settings.studyApprovals`
+- None
 
 **Declared Inputs Not Statically Read**
-- `equipment`
-- `oneLineDiagram`
+- `equipment` - No static read/write evidence was detected for this declared input.
+- `oneLineDiagram` - No static read/write evidence was detected for this declared input.
 
 **Declared Outputs Not Statically Written**
 - None
@@ -2928,15 +2789,15 @@ The audit is intentionally conservative: it reports drift for review, but the te
 - Source files: `analysis/lighting.mjs`, `lighting.js`, `src/components/studyApproval.js`, `src/htmlUtils.mjs`, `src/lighting.js`
 
 **Undocumented Reads**
-- `settings.studyApprovals`
+- None
 
 **Undocumented Writes**
-- `settings.studyApprovals`
+- None
 
 **Declared Inputs Not Statically Read**
-- `equipment`
-- `loadList`
-- `settings.designBasis`
+- `equipment` - No static read/write evidence was detected for this declared input.
+- `loadList` - No static read/write evidence was detected for this declared input.
+- `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
 - None
@@ -2977,12 +2838,11 @@ The audit is intentionally conservative: it reports drift for review, but the te
 - None
 
 **Declared Inputs Not Statically Read**
-- `equipment`
-- `studyResults.shortCircuit`
+- `equipment` - No static read/write evidence was detected for this declared input.
+- `studyResults.shortCircuit` - No static read/write evidence was detected for this declared input.
 
 **Declared Outputs Not Statically Written**
-- `settings.groundGridSoilMeasurements`
-- `settings.groundGridRiskPoints`
+- None
 
 **Direct Browser Storage**
 - None
@@ -3004,11 +2864,11 @@ The audit is intentionally conservative: it reports drift for review, but the te
 - None
 
 **Undocumented Writes**
-- `settings.studyApprovals`
+- None
 
 **Declared Inputs Not Statically Read**
-- `equipment`
-- `settings.designBasis`
+- `equipment` - No static read/write evidence was detected for this declared input.
+- `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
 - None
@@ -3069,8 +2929,8 @@ The audit is intentionally conservative: it reports drift for review, but the te
 - None
 
 **Declared Inputs Not Statically Read**
-- `equipment`
-- `settings.designBasis`
+- `equipment` - No static read/write evidence was detected for this declared input.
+- `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
 - None
@@ -3104,9 +2964,9 @@ The audit is intentionally conservative: it reports drift for review, but the te
 - None
 
 **Declared Inputs Not Statically Read**
-- `loadList`
-- `cableSchedule`
-- `settings.designBasis`
+- `loadList` - No static read/write evidence was detected for this declared input.
+- `cableSchedule` - No static read/write evidence was detected for this declared input.
+- `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
 - None
@@ -3130,11 +2990,11 @@ The audit is intentionally conservative: it reports drift for review, but the te
 - None
 
 **Undocumented Writes**
-- `settings.studyApprovals`
+- None
 
 **Declared Inputs Not Statically Read**
-- `loadList`
-- `equipment`
+- `loadList` - No static read/write evidence was detected for this declared input.
+- `equipment` - No static read/write evidence was detected for this declared input.
 
 **Declared Outputs Not Statically Written**
 - None
@@ -3191,8 +3051,8 @@ The audit is intentionally conservative: it reports drift for review, but the te
 - None
 
 **Declared Inputs Not Statically Read**
-- `equipment`
-- `settings.designBasis`
+- `equipment` - No static read/write evidence was detected for this declared input.
+- `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
 - None
@@ -3225,11 +3085,11 @@ The audit is intentionally conservative: it reports drift for review, but the te
 - None
 
 **Declared Inputs Not Statically Read**
-- `cableSchedule`
-- `traySchedule`
-- `conduitSchedule`
-- `studyResults.loadFlow`
-- `settings.designBasis`
+- `cableSchedule` - No static read/write evidence was detected for this declared input.
+- `traySchedule` - No static read/write evidence was detected for this declared input.
+- `conduitSchedule` - No static read/write evidence was detected for this declared input.
+- `studyResults.loadFlow` - No static read/write evidence was detected for this declared input.
+- `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
 - None
@@ -3256,11 +3116,11 @@ The audit is intentionally conservative: it reports drift for review, but the te
 - None
 
 **Declared Inputs Not Statically Read**
-- `oneLineDiagram`
-- `equipment`
-- `studyResults.loadFlow`
-- `studyResults.shortCircuit`
-- `settings.designBasis`
+- `oneLineDiagram` - No static read/write evidence was detected for this declared input.
+- `equipment` - No static read/write evidence was detected for this declared input.
+- `studyResults.loadFlow` - No static read/write evidence was detected for this declared input.
+- `studyResults.shortCircuit` - No static read/write evidence was detected for this declared input.
+- `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
 - None
@@ -3287,9 +3147,9 @@ The audit is intentionally conservative: it reports drift for review, but the te
 - None
 
 **Declared Inputs Not Statically Read**
-- `equipment`
-- `cableSchedule`
-- `settings.designBasis`
+- `equipment` - No static read/write evidence was detected for this declared input.
+- `cableSchedule` - No static read/write evidence was detected for this declared input.
+- `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
 - None
@@ -3323,9 +3183,9 @@ The audit is intentionally conservative: it reports drift for review, but the te
 - None
 
 **Declared Inputs Not Statically Read**
-- `loadList`
-- `studyResults.loadFlow`
-- `settings.designBasis`
+- `loadList` - No static read/write evidence was detected for this declared input.
+- `studyResults.loadFlow` - No static read/write evidence was detected for this declared input.
+- `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
 - None

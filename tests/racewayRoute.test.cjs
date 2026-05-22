@@ -347,6 +347,12 @@ describe("_racewayRoute", () => {
       localStorage: storage,
       rebuildTrayData: () => {},
       globalThis: {
+        dataStore: {
+          getTrays: () => JSON.parse(storage.getItem("tray") || "[]"),
+          getCables: () => JSON.parse(storage.getItem("cable") || "[]"),
+          getDuctbanks: () => JSON.parse(storage.getItem("db") || "[]"),
+          getConduits: () => JSON.parse(storage.getItem("cond") || "[]"),
+        },
         TableUtils: {
           STORAGE_KEYS: { ductbankSchedule: "db", conduitSchedule: "cond" },
         },

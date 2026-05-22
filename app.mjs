@@ -713,12 +713,11 @@ async function initializeApp() {
     };
 
     const loadSchedulesIntoSession = async () => {
-        const ks = globalThis.TableUtils?.STORAGE_KEYS || {};
         const store = globalThis.dataStore || {
-            getTrays: () => { try { return JSON.parse(localStorage.getItem(ks.traySchedule || 'traySchedule')||'[]'); } catch { return []; } },
-            getCables: () => { try { return JSON.parse(localStorage.getItem(ks.cableSchedule || 'cableSchedule')||'[]'); } catch { return []; } },
-            getDuctbanks: () => { try { return JSON.parse(localStorage.getItem(ks.ductbankSchedule || 'ductbankSchedule')||'[]'); } catch { return []; } },
-            getConduits: () => { try { return JSON.parse(localStorage.getItem(ks.conduitSchedule || 'conduitSchedule')||'[]'); } catch { return []; } }
+            getTrays,
+            getCables,
+            getDuctbanks,
+            getConduits
         };
 
         let trays = store.getTrays();

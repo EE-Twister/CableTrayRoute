@@ -14,6 +14,8 @@
  * re-import without loss.
  */
 
+import { buildBomCatalogFields } from '../analysis/manufacturerCatalog.mjs';
+
 const VERSION = '1.0';
 
 /**
@@ -80,6 +82,7 @@ function num(v) {
 }
 
 function trayToRevit(t) {
+  const catalog = revitCatalogFields(t);
   return {
     // Identity
     TrayID: t.id ?? t.tray_id ?? t.tag ?? '',
@@ -98,6 +101,7 @@ function trayToRevit(t) {
     // Fill data (informational for Revit)
     FillPercent: num(t.fill_percent ?? t.fill) ?? null,
     Material: t.material ?? '',
+    ...catalog.exportFields,
     // CableTrayRoute-specific extras preserved for round-trip fidelity
     _ctr: {
       id: t.id,
@@ -108,11 +112,13 @@ function trayToRevit(t) {
       depth: t.depth,
       allowed_groups: t.allowed_groups,
       notes: t.notes,
+      catalog: catalog.ctrFields,
     },
   };
 }
 
 function conduitToRevit(c) {
+  const catalog = revitCatalogFields(c);
   return {
     ConduitID: c.conduit_id ?? c.id ?? c.tag ?? '',
     Tag: c.tag ?? c.conduit_id ?? '',
@@ -126,17 +132,20 @@ function conduitToRevit(c) {
     EndZ: num(c.end_z) ?? 0,
     FillPercent: num(c.fill_percent ?? c.fill) ?? null,
     Material: c.material ?? '',
+    ...catalog.exportFields,
     _ctr: {
       conduit_id: c.conduit_id,
       type: c.type,
       material: c.material,
       trade_size: c.trade_size,
       capacity: c.capacity,
+      catalog: catalog.ctrFields,
     },
   };
 }
 
 function cableToRevit(cable) {
+  const catalog = revitCatalogFields(cable);
   return {
     CableTag: cable.tag ?? cable.cable_tag ?? cable.Tag ?? '',
     CableType: cable.cable_type ?? cable.type ?? '',
@@ -147,12 +156,35 @@ function cableToRevit(cable) {
     NumConductors: cable.num_conductors ?? cable.conductors ?? null,
     RouteTrays: Array.isArray(cable.route) ? cable.route.join(', ') : (cable.route ?? ''),
     Length: num(cable.length ?? cable.route_length) ?? null,
+    ...catalog.exportFields,
     _ctr: {
       tag: cable.tag,
       cable_type: cable.cable_type,
       from: cable.from,
       to: cable.to,
       route: cable.route,
+      catalog: catalog.ctrFields,
     },
+  };
+}
+
+function revitCatalogFields(record) {
+  const fields = buildBomCatalogFields(record);
+  const bimRef = fields.bimRef && Object.keys(fields.bimRef).length
+    ? JSON.stringify(fields.bimRef)
+    : '';
+  return {
+    exportFields: {
+      Manufacturer: fields.manufacturer || '',
+      CatalogNumber: fields.catalogNumber || '',
+      Model: fields.model || '',
+      ApprovedPart: Boolean(fields.approvedPart),
+      ApprovalStatus: fields.approvalStatus || 'unreviewed',
+      CatalogSource: fields.source || '',
+      CatalogLastVerified: fields.lastVerified || '',
+      DatasheetUrl: fields.datasheetUrl || '',
+      BimRef: bimRef,
+    },
+    ctrFields: fields
   };
 }

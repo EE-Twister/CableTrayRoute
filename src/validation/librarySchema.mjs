@@ -1,3 +1,5 @@
+import { validateCatalogProduct } from '../../analysis/manufacturerCatalog.mjs';
+
 function buildError(path, message, severity = 'error') {
   return { path, message, severity };
 }
@@ -171,6 +173,7 @@ function validateComponent(component, index, categoriesSet, subtypeMap, errors) 
 
   validateMccComponent(component, index, errors);
   validateMotorComponent(component, index, errors);
+  validateCatalogMetadata(component, index, errors);
 
   if (isNonEmptyString(component.subtype)) {
     const normalizedSubtype = component.subtype.trim();
@@ -186,6 +189,48 @@ function validateComponent(component, index, categoriesSet, subtypeMap, errors) 
       );
     }
   }
+}
+
+function validateCatalogMetadata(component, index, errors) {
+  if (!isPlainObject(component.props)) return;
+  const props = component.props;
+  const approved = props.approved_part === true || props.catalog_approved === true;
+  const hasCatalogFields = approved
+    || isNonEmptyString(props.catalog_number)
+    || isNonEmptyString(props.catalogNumber)
+    || isNonEmptyString(props.catalog_source)
+    || isNonEmptyString(props.catalog_last_verified)
+    || isNonEmptyString(props.datasheet_url);
+  if (!hasCatalogFields) return;
+
+  const result = validateCatalogProduct({
+    id: props.catalog_number || props.catalogNumber || component.subtype || component.label,
+    manufacturer: props.manufacturer,
+    catalogNumber: props.catalog_number || props.catalogNumber,
+    category: component.category || component.type,
+    description: props.description || component.label,
+    unit: props.catalog_unit || 'EA',
+    approved,
+    source: props.catalog_source,
+    lastVerified: props.catalog_last_verified,
+    datasheetUrl: props.datasheet_url,
+    standards: props.standards
+  }, { requireApprovalAuthority: false });
+
+  result.errors.forEach((error) => {
+    errors.push(buildError(
+      `components[${index}].props.${error.path}`,
+      `catalog metadata: ${error.message}`
+    ));
+  });
+
+  result.warnings.forEach((warning) => {
+    errors.push(buildError(
+      `components[${index}].props.${warning.path}`,
+      `catalog metadata: ${warning.message}`,
+      'warning'
+    ));
+  });
 }
 
 /**

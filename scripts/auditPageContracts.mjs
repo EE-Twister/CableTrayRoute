@@ -16,11 +16,15 @@ const ignoredSourceFiles = new Set([
   'cdnFallback.js',
   'src/workflowStatus.js',
   'src/projectManager.js',
+  'src/scenarios.js',
   'src/components/navigation.js',
   'src/components/modal.js'
 ]);
 
 const dataStoreCalls = {
+  listScenarios: ['read', 'settings.scenarios'],
+  switchScenario: ['write', 'settings.scenarios'],
+  cloneScenario: ['write', 'settings.scenarios'],
   getTrays: ['read', 'traySchedule'],
   setTrays: ['write', 'traySchedule'],
   getCables: ['read', 'cableSchedule'],
@@ -92,6 +96,46 @@ const dataStoreCalls = {
   applyRemoteSnapshot: ['write', 'project-snapshot']
 };
 
+const storageKeyAliases = {
+  trays: 'traySchedule',
+  cables: 'cableSchedule',
+  cableTypicals: 'cableTypicals',
+  ductbanks: 'ductbankSchedule',
+  conduits: 'conduitSchedule',
+  panels: 'panelSchedule',
+  loads: 'loadList',
+  equipment: 'equipment',
+  oneLine: 'oneLineDiagram',
+  studies: 'studyResults',
+  traySchedule: 'traySchedule',
+  cableSchedule: 'cableSchedule',
+  ductbankSchedule: 'ductbankSchedule',
+  conduitSchedule: 'conduitSchedule',
+  panelSchedule: 'panelSchedule',
+  loadList: 'loadList',
+  equipmentList: 'equipment',
+  oneLineDiagram: 'oneLineDiagram',
+  equipmentColumns: 'settings.equipmentColumns',
+  cableSchedulePreset: 'settings.cableSchedulePreset',
+  cableTemplates: 'settings.cableTemplates',
+  cableTagSettings: 'settings.cableTagSettings',
+  cableChangeLog: 'settings.cableChangeLog',
+  loadListViewPreset: 'settings.loadListViewPreset',
+  racewayScheduleViewPreset: 'settings.racewayScheduleViewPreset',
+  equipmentFilterPresets: 'settings.equipmentFilterPresets',
+  trayHardwareCatalogCustomProducts: 'settings.trayHardwareCatalogCustomProducts',
+  drcAcceptedFindings: 'settings.drcAcceptedFindings',
+  studyApprovals: 'settings.studyApprovals',
+  reportSnapshots: 'settings.reportSnapshots',
+  lifecyclePackages: 'settings.lifecyclePackages',
+  designBasis: 'settings.designBasis',
+  designGateApprovals: 'settings.designGateApprovals',
+  coachAuditTrail: 'settings.coachAuditTrail',
+  groundGridSoilMeasurements: 'settings.groundGridSoilMeasurements',
+  groundGridRiskPoints: 'settings.groundGridRiskPoints',
+  mccLineups: 'mccLineups'
+};
+
 function toPosix(filePath) {
   return filePath.split(path.sep).join('/');
 }
@@ -157,6 +201,8 @@ function resolveLiteralArg(rawArg, constants) {
   const trimmed = rawArg.trim();
   const literal = trimmed.match(/^['"]([^'"]+)['"]$/);
   if (literal) return literal[1];
+  const storageKey = trimmed.match(/^dataStore\.STORAGE_KEYS\.([A-Za-z0-9_]+)$/);
+  if (storageKey) return storageKeyAliases[storageKey[1]] || null;
   if (constants.has(trimmed)) return constants.get(trimmed);
   return null;
 }
@@ -215,6 +261,19 @@ function scanSourceFile(filePath, text) {
       const evidence = `${rel}:${lineForIndex(text, match.index)} ${name}()`;
       if (mode === 'read') addEvidence(reads, key, evidence);
       if (mode === 'write') addEvidence(writes, key, evidence);
+    }
+  }
+
+  const tablePattern = /TableUtils\.createTable\s*\(\s*\{([\s\S]*?)\}\s*\)/g;
+  for (const match of text.matchAll(tablePattern)) {
+    const body = match[1];
+    const tableKeys = [
+      ...body.matchAll(/\b(?:storageKey|columnsKey)\s*:\s*TableUtils\.STORAGE_KEYS\.([A-Za-z0-9_]+)/g)
+    ].map(item => storageKeyAliases[item[1]]).filter(Boolean);
+    for (const key of tableKeys) {
+      const evidence = `${rel}:${lineForIndex(text, match.index)} TableUtils.createTable(${key})`;
+      addEvidence(reads, key, evidence);
+      addEvidence(writes, key, evidence);
     }
   }
 
@@ -350,7 +409,9 @@ async function collectSources(entryFiles) {
 function htmlScriptSources(html) {
   const sources = [];
   const scriptPattern = /<script[^>]+src=["']([^"']+)["']/g;
+  const scriptLoaderPattern = /\bsrc:\s*['"]([^'"]+)['"]/g;
   for (const match of html.matchAll(scriptPattern)) sources.push(match[1]);
+  for (const match of html.matchAll(scriptLoaderPattern)) sources.push(match[1]);
   const dynamicPattern = /\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
   for (const match of html.matchAll(dynamicPattern)) sources.push(match[1]);
   return sources;
@@ -423,12 +484,20 @@ function compareRoute(route, pageContract, reads, writes) {
   const declaredKeys = uniqueSorted([...inputKeys, ...outputKeys]);
   const readKeys = [...reads.keys()];
   const writeKeys = [...writes.keys()];
+  const unreadInputs = pageContract.projectInputs.filter(item => !keyCoveredBy(item.key, readKeys) && !keyCoveredBy(item.key, writeKeys));
+  const declaredOutputsNotWritten = outputKeys.filter(key => !keyCoveredBy(key, writeKeys));
+  const undocumentedReads = readKeys.filter(key => !keyCoveredBy(key, declaredKeys));
+  const undocumentedWrites = writeKeys.filter(key => !keyCoveredBy(key, outputKeys));
 
   return {
-    declaredInputsNotRead: inputKeys.filter(key => !keyCoveredBy(key, readKeys) && !keyCoveredBy(key, writeKeys)),
-    declaredOutputsNotWritten: outputKeys.filter(key => !keyCoveredBy(key, writeKeys)),
-    undocumentedReads: readKeys.filter(key => !keyCoveredBy(key, declaredKeys)),
-    undocumentedWrites: writeKeys.filter(key => !keyCoveredBy(key, outputKeys)),
+    declaredInputsNotRead: unreadInputs.map(item => item.key),
+    declaredInputWarnings: unreadInputs.map(item => ({
+      key: item.key,
+      reason: item.audit?.reason || 'No static read/write evidence was detected for this declared input.'
+    })),
+    declaredOutputsNotWritten,
+    undocumentedReads,
+    undocumentedWrites,
     declaredKeys
   };
 }
@@ -462,9 +531,10 @@ export async function buildPageContractAudit() {
     const comparison = pageContract
       ? compareRoute(route, pageContract, reads, writes)
       : {
-          declaredInputsNotRead: [],
-          declaredOutputsNotWritten: [],
-          undocumentedReads: [],
+        declaredInputsNotRead: [],
+        declaredInputWarnings: [],
+        declaredOutputsNotWritten: [],
+        undocumentedReads: [],
           undocumentedWrites: [],
           declaredKeys: []
         };
@@ -502,7 +572,15 @@ export async function buildPageContractAudit() {
         counts[item.classification] = (counts[item.classification] || 0) + 1;
       }
       return counts;
-    }, {})
+    }, {}),
+    actionableFailures: routes.reduce((sum, route) => (
+      sum
+      + route.undocumentedReads.length
+      + route.undocumentedWrites.length
+      + route.declaredOutputsNotWritten.length
+      + route.directStorage.filter(item => item.classification === 'unclassified').length
+    ), 0),
+    warningCount: routes.reduce((sum, route) => sum + route.declaredInputsNotRead.length, 0)
   };
 
   return { generatedAt: new Date(0).toISOString(), summary, routes };
@@ -511,6 +589,11 @@ export async function buildPageContractAudit() {
 function formatKeyList(items) {
   if (!items.length) return '- None';
   return items.map(item => `- \`${item}\``).join('\n');
+}
+
+function formatInputWarnings(items) {
+  if (!items.length) return '- None';
+  return items.map(item => `- \`${item.key}\` - ${item.reason}`).join('\n');
 }
 
 function formatEvidence(title, object) {
@@ -553,7 +636,7 @@ export function renderPageContractAuditMarkdown(audit) {
     '',
     'This report compares the Workflow and Studies page contracts against statically detected storage access in page source files.',
     '',
-    'The audit is intentionally conservative: it reports drift for review, but the test gate only verifies that the scanner and report stay current.',
+    'The audit is intentionally conservative: `--check` fails on actionable drift and reports declared-but-unread inputs as warnings for review.',
     '',
     '## Summary',
     '',
@@ -569,6 +652,8 @@ export function renderPageContractAuditMarkdown(audit) {
     `- Direct browser storage hits: ${audit.summary.directStorageHits}`,
     `- Unclassified direct browser storage hits: ${audit.summary.unclassifiedDirectStorageHits}`,
     `- Direct browser storage classifications: ${Object.entries(audit.summary.directStorageClassifications).map(([key, count]) => `${key}=${count}`).join(', ') || 'none'}`,
+    `- Actionable failures: ${audit.summary.actionableFailures}`,
+    `- Warnings: ${audit.summary.warningCount}`,
     '',
     '## Findings',
     ''
@@ -592,7 +677,7 @@ export function renderPageContractAuditMarkdown(audit) {
     lines.push(formatKeyList(route.undocumentedWrites));
     lines.push('');
     lines.push('**Declared Inputs Not Statically Read**');
-    lines.push(formatKeyList(route.declaredInputsNotRead));
+    lines.push(formatInputWarnings(route.declaredInputWarnings || []));
     lines.push('');
     lines.push('**Declared Outputs Not Statically Written**');
     lines.push(formatKeyList(route.declaredOutputsNotWritten));
@@ -617,6 +702,9 @@ async function main() {
   }
   if (process.argv.includes('--check')) {
     const current = await fs.readFile(outputPath, 'utf8').catch(() => '');
+    if (audit.summary.actionableFailures > 0) {
+      throw new Error(`Page contract audit has ${audit.summary.actionableFailures} actionable failure(s). Run node scripts/auditPageContracts.mjs and reconcile contracts/storage access.`);
+    }
     if (current !== markdown) {
       throw new Error('docs/page-contract-audit.md is out of date. Run node scripts/auditPageContracts.mjs.');
     }

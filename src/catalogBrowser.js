@@ -2,6 +2,13 @@ import {
   getTrayHardwareCatalogCustomProducts,
   setTrayHardwareCatalogCustomProducts
 } from '../dataStore.mjs';
+import {
+  filterCatalogProducts,
+  getCatalogOptionsFromProducts,
+  mergeCatalogProducts,
+  normalizeCatalogProduct,
+  validateCatalogProduct
+} from '../analysis/manufacturerCatalog.mjs';
 
 /**
  * Manufacturer Catalog Browser
@@ -20,13 +27,7 @@ const CATALOG_URL = 'data/manufacturer_catalog.json';
 let catalogCache = null;
 
 function normalizeCustomProduct(product) {
-  if (!product || typeof product !== 'object') return null;
-  const id = String(product.id || '').trim();
-  if (!id) return null;
-  return {
-    ...product,
-    id,
-  };
+  return normalizeCatalogProduct(product, { source: 'Project custom catalog' });
 }
 
 function getCustomProducts() {
@@ -42,21 +43,14 @@ function setCustomProducts(products) {
   setTrayHardwareCatalogCustomProducts(normalized);
 }
 
-function mergeCatalogProducts(base, custom) {
-  const byId = new Map();
-  for (const product of base) byId.set(product.id, product);
-  for (const product of custom) {
-    if (!byId.has(product.id)) byId.set(product.id, product);
-  }
-  return [...byId.values()];
-}
-
 async function loadBaseCatalog() {
   if (catalogCache) return catalogCache;
   const res = await fetch(CATALOG_URL);
   if (!res.ok) throw new Error(`Failed to load catalog: HTTP ${res.status}`);
   const data = await res.json();
-  catalogCache = Array.isArray(data.products) ? data.products : [];
+  catalogCache = Array.isArray(data.products)
+    ? data.products.map(product => normalizeCatalogProduct(product, { source: data._description || 'Manufacturer catalog' })).filter(Boolean)
+    : [];
   return catalogCache;
 }
 
@@ -84,20 +78,7 @@ export async function loadCatalog() {
  */
 export async function filterProducts(filters = {}) {
   const all = await loadCatalog();
-  return all.filter(p => {
-    if (filters.category && p.category !== filters.category) return false;
-    if (filters.subcategory && p.subcategory !== filters.subcategory) return false;
-    if (filters.manufacturer && !p.manufacturer?.toLowerCase().includes(filters.manufacturer.toLowerCase())) return false;
-    if (filters.widthIn != null && p.width_in !== filters.widthIn) return false;
-    if (filters.depthIn != null && p.depth_in !== filters.depthIn) return false;
-    if (filters.material && p.material !== filters.material) return false;
-    if (filters.search) {
-      const q = filters.search.toLowerCase();
-      const searchable = `${p.id} ${p.description} ${p.series} ${p.manufacturer}`.toLowerCase();
-      if (!searchable.includes(q)) return false;
-    }
-    return true;
-  });
+  return filterCatalogProducts(all, filters);
 }
 
 /**
@@ -117,7 +98,7 @@ export async function getCatalogProduct(id) {
  */
 export async function getCatalogOptions(field) {
   const all = await loadCatalog();
-  return [...new Set(all.map(p => p[field]).filter(Boolean))].sort();
+  return getCatalogOptionsFromProducts(all, field);
 }
 
 // ---------------------------------------------------------------------------
@@ -157,12 +138,14 @@ export function renderCatalogTable(container, products, { onSelect } = {}) {
   const columns = [
     { key: 'id', label: 'Part Number' },
     { key: 'manufacturer', label: 'Manufacturer' },
+    { key: 'catalogNumber', label: 'Catalog No.' },
     { key: 'description', label: 'Description' },
-    { key: 'width_in', label: 'Width (in)' },
-    { key: 'depth_in', label: 'Depth (in)' },
+    { key: 'dimensions.widthIn', label: 'Width (in)' },
+    { key: 'dimensions.depthIn', label: 'Depth (in)' },
     { key: 'material', label: 'Material' },
     { key: 'unit', label: 'Unit' },
-    { key: 'list_price_usd', label: 'List Price' },
+    { key: 'commercial.listPriceUsd', label: 'List Price' },
+    { key: 'approval.status', label: 'Approval' },
   ];
   for (const col of columns) {
     const th = document.createElement('th');
@@ -183,8 +166,8 @@ export function renderCatalogTable(container, products, { onSelect } = {}) {
 
     for (const col of columns) {
       const td = document.createElement('td');
-      const val = product[col.key];
-      if (col.key === 'list_price_usd') {
+      const val = col.key.split('.').reduce((value, key) => value?.[key], product);
+      if (col.key === 'commercial.listPriceUsd') {
         td.textContent = val != null ? `$${Number(val).toFixed(2)}` : '—';
       } else {
         td.textContent = val != null ? String(val) : '—';
@@ -253,6 +236,7 @@ export async function mountCatalogBrowser(container, { onSelect } = {}) {
   const catFilter = makeSelect('Category', getDistinctOptions('category'));
   const mfrFilter = makeSelect('Manufacturer', getDistinctOptions('manufacturer'));
   const matFilter = makeSelect('Material', getDistinctOptions('material'));
+  const approvalFilter = makeSelect('Approval', ['', 'approved', 'conditional', 'rejected', 'unreviewed']);
 
   const searchLabel = document.createElement('label');
   searchLabel.className = 'catalog-filter-label';
@@ -266,6 +250,7 @@ export async function mountCatalogBrowser(container, { onSelect } = {}) {
   filterBar.appendChild(catFilter.label);
   filterBar.appendChild(mfrFilter.label);
   filterBar.appendChild(matFilter.label);
+  filterBar.appendChild(approvalFilter.label);
   filterBar.appendChild(searchLabel);
 
   const resultsDiv = document.createElement('div');
@@ -290,6 +275,9 @@ export async function mountCatalogBrowser(container, { onSelect } = {}) {
     </label>
     <label class="catalog-filter-label">Description <input class="catalog-filter-input" name="description" required></label>
     <label class="catalog-filter-label">Material <input class="catalog-filter-input" name="material" placeholder="steel"></label>
+    <label class="catalog-filter-label">Source <input class="catalog-filter-input" name="source" placeholder="approved list, quote, or datasheet"></label>
+    <label class="catalog-filter-label">Last Verified <input class="catalog-filter-input" name="lastVerified" type="date"></label>
+    <label class="catalog-filter-label">Approved <input name="approved" type="checkbox"></label>
     <label class="catalog-filter-label">Unit
       <select class="catalog-filter-select" name="unit">
         <option value="EA">EA</option>
@@ -323,18 +311,23 @@ export async function mountCatalogBrowser(container, { onSelect } = {}) {
   }
 
   async function refresh() {
-    const filtered = await filterProducts({
+    let filtered = await filterProducts({
       category: catFilter.select.value || undefined,
       manufacturer: mfrFilter.select.value || undefined,
       material: matFilter.select.value || undefined,
+      approvedOnly: approvalFilter.select.value === 'approved',
       search: searchInput.value.trim() || undefined,
     });
+    if (approvalFilter.select.value && approvalFilter.select.value !== 'approved') {
+      filtered = filtered.filter(product => product.approval?.status === approvalFilter.select.value);
+    }
     renderCatalogTable(resultsDiv, filtered, { onSelect });
   }
 
   catFilter.select.addEventListener('change', refresh);
   mfrFilter.select.addEventListener('change', refresh);
   matFilter.select.addEventListener('change', refresh);
+  approvalFilter.select.addEventListener('change', refresh);
   searchInput.addEventListener('input', refresh);
   addForm.addEventListener('submit', async e => {
     e.preventDefault();
@@ -348,6 +341,7 @@ export async function mountCatalogBrowser(container, { onSelect } = {}) {
     }
     const nextProduct = {
       id: productId,
+      catalogNumber: productId,
       manufacturer: String(formData.get('manufacturer') || '').trim(),
       series: 'Custom',
       category: String(formData.get('category') || 'accessory').trim(),
@@ -365,9 +359,17 @@ export async function mountCatalogBrowser(container, { onSelect } = {}) {
       nec_listed: false,
       ul_classified: false,
       url: null,
+      approved: formData.get('approved') === 'on',
+      source: String(formData.get('source') || '').trim(),
+      lastVerified: String(formData.get('lastVerified') || '').trim(),
     };
+    const validation = validateCatalogProduct(nextProduct, { requireApprovalAuthority: false });
+    if (!validation.valid) {
+      addStatus.textContent = validation.errors.map(error => error.message).join(' ');
+      return;
+    }
     const custom = getCustomProducts();
-    custom.push(nextProduct);
+    custom.push(validation.product);
     setCustomProducts(custom);
     allProducts = await loadCatalog();
     repopulateSelect(catFilter.select, getDistinctOptions('category'));

@@ -22,6 +22,7 @@ Minimum useful columns:
 - `icon` (recommended; required by validator if saving)
 - `ports` (optional number)
 - `schema` (optional JSON object string)
+- `catalog_number`, `approved_part`, `catalog_source`, `catalog_last_verified`, `datasheet_url`, and `bim_ref` (optional governed catalog fields)
 
 Example rows:
 
@@ -29,6 +30,8 @@ Example rows:
 |---|---|---|---|---:|---|
 | `MCC` | Motor Control Center | equipment | icons/components/MCC.svg | 2 | `{"voltage":{"label":"Voltage","type":"number"}}` |
 | `UPS` | UPS | equipment | icons/components/UPS.svg | 2 | `{"kva":{"label":"kVA","type":"number"}}` |
+
+Approved catalog rows must include both `catalog_source` and `catalog_last_verified` (`YYYY-MM-DD`). The validator rejects `approved_part=true` when that governance evidence is missing.
 
 ## `Categories` Sheet
 

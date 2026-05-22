@@ -155,7 +155,7 @@ Each browser profile and device maintains its own pricing book. For team use, ex
 
 ## XLSX Export
 
-When exporting the estimate to XLSX, the **Summary** sheet includes a "Pricing basis" row identifying whether default or custom pricing was used, along with the source name and date. This provides an audit trail in the delivered estimate document.
+When exporting the estimate to XLSX, the **Summary** sheet includes a "Pricing basis" row identifying whether default or custom pricing was used, along with the source name and date. The **Line Items** sheet also carries manufacturer, catalog number, and approval status fields when schedule rows include governed catalog metadata. This provides an audit trail in the delivered estimate document.
 
 
 ---

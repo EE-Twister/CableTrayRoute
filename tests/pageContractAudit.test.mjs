@@ -63,6 +63,8 @@ assert.equal(audit.routes.length, scopedRoutes.length);
 assert.deepStrictEqual(audit.summary.missingContracts, []);
 assert.deepStrictEqual(audit.summary.extraContracts, []);
 assert.deepStrictEqual(audit.summary.routesWithoutSources, []);
+assert.equal(audit.summary.actionableFailures, 0);
+assert.ok(audit.summary.warningCount >= 0);
 assert.equal(audit.summary.unclassifiedDirectStorageHits, 0);
 
 for (const href of scopedHrefs) {
@@ -92,6 +94,12 @@ for (const route of audit.routes) {
   assertDetectedKeyObject(route.detectedReads, `${route.href}.detectedReads`);
   assertDetectedKeyObject(route.detectedWrites, `${route.href}.detectedWrites`);
   route.declaredInputsNotRead.forEach(assertStorageKey);
+  assert.ok(Array.isArray(route.declaredInputWarnings), `${route.href} declaredInputWarnings must be an array`);
+  route.declaredInputWarnings.forEach(item => {
+    assertStorageKey(item.key);
+    assert.equal(typeof item.reason, 'string', `${route.href} declared input warning reason must be a string`);
+    assert.ok(item.reason.trim(), `${route.href} declared input warning reason must not be empty`);
+  });
   route.declaredOutputsNotWritten.forEach(assertStorageKey);
   route.undocumentedReads.forEach(assertStorageKey);
   route.undocumentedWrites.forEach(assertStorageKey);

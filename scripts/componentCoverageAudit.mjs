@@ -30,7 +30,22 @@ const COMMON_COMPONENT_TYPES = [
 ];
 
 const ATTRIBUTE_BASELINE = {
-  all: ['tag', 'description', 'manufacturer', 'model', 'phases', 'commissioning_state', 'service_status', 'notes'],
+  all: [
+    'tag',
+    'description',
+    'manufacturer',
+    'model',
+    'catalog_number',
+    'approved_part',
+    'catalog_source',
+    'catalog_last_verified',
+    'datasheet_url',
+    'bim_ref',
+    'phases',
+    'commissioning_state',
+    'service_status',
+    'notes'
+  ],
   source: ['short_circuit_capacity', 'xr_ratio', 'frequency_hz'],
   transformer: ['kva', 'percent_z', 'primary_connection', 'secondary_connection'],
   protective: ['pickup_amps', 'time_dial', 'interrupting_rating_ka'],
@@ -118,6 +133,24 @@ function getPropKeys(component) {
   return Object.keys(props).map((key) => normalizeType(key));
 }
 
+function isDiagramAssetComponent(component) {
+  const type = normalizeType(component?.type);
+  const subtype = normalizeType(component?.subtype);
+  const label = normalizeType(component?.label);
+  if (type === 'annotation' || type === 'sheet_link') return false;
+  if (subtype === 'text_box' || subtype === 'link_source' || subtype === 'link_target') return false;
+  if (label === 'text box' || label.startsWith('sheet link')) return false;
+  return true;
+}
+
+function runtimeBaselineProps(component, canonical) {
+  if (!isDiagramAssetComponent(component)) return [];
+  return [
+    ...ATTRIBUTE_BASELINE.all,
+    resolveVoltageBaselineKey(canonical)
+  ].map((key) => normalizeType(key));
+}
+
 function formatList(items) {
   return items.length ? items.join(', ') : '—';
 }
@@ -128,13 +161,19 @@ async function main() {
 
   const discoveredTypes = new Set();
   const typeToProps = new Map();
+  const typeToAsset = new Map();
 
   components.forEach((component) => {
     const type = canonicalType(component?.subtype || component?.type || component?.label);
     if (!type) return;
     discoveredTypes.add(type);
+    typeToAsset.set(type, Boolean(typeToAsset.get(type)) || isDiagramAssetComponent(component));
     const existingProps = typeToProps.get(type) || [];
-    const mergedProps = Array.from(new Set([...existingProps, ...getPropKeys(component)]));
+    const mergedProps = Array.from(new Set([
+      ...existingProps,
+      ...getPropKeys(component),
+      ...runtimeBaselineProps(component, type)
+    ]));
     typeToProps.set(type, mergedProps);
   });
 
@@ -146,11 +185,13 @@ async function main() {
   const attributeRows = Array.from(typeToProps.entries())
     .map(([type, props]) => {
       const classKey = classifyType(type);
-      const expected = Array.from(new Set([
-        ...ATTRIBUTE_BASELINE.all,
-        resolveVoltageBaselineKey(type),
-        ...(ATTRIBUTE_BASELINE[classKey] || [])
-      ])).map((item) => normalizeType(item));
+      const expected = !typeToAsset.get(type)
+        ? []
+        : Array.from(new Set([
+            ...ATTRIBUTE_BASELINE.all,
+            resolveVoltageBaselineKey(type),
+            ...(ATTRIBUTE_BASELINE[classKey] || [])
+          ])).map((item) => normalizeType(item));
       const missing = expected.filter((key) => !props.includes(key));
       return {
         type,
@@ -181,6 +222,7 @@ async function main() {
     '## Notes',
     '',
     '- Baseline attributes are derived from common fields found in peer one-line/power-system design tools.',
+    '- Product-bearing one-line components receive runtime baseline manufacturer, catalog approval, source, verification, datasheet, BIM, lifecycle, and voltage fields even when a legacy library row omits them.',
     '- This report is a heuristic gap check and should be reviewed before schema enforcement.'
   ];
 

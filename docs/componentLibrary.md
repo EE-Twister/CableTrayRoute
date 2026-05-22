@@ -58,6 +58,22 @@ At runtime each placed component also carries these standard properties on its s
 
 Add new objects to the JSON array and provide matching icons to extend the palette without modifying JavaScript code.
 
+## Governed Manufacturer Catalog Fields
+
+Product-bearing components also receive a shared catalog metadata baseline in the one-line editor:
+
+| Field | Purpose |
+|-------|---------|
+| `manufacturer` / `model` | Human-readable manufacturer and model identity. |
+| `catalog_number` | Approved manufacturer catalog number used by BOM, submittal, cost, and BIM export flows. |
+| `approved_part` | Marks a selected part as approved for project use. |
+| `catalog_source` | Source for the approval, such as an owner approved list, vendor quote, or datasheet reference. |
+| `catalog_last_verified` | Last verification date in `YYYY-MM-DD` format. |
+| `datasheet_url` | Link to the manufacturer datasheet or product page. |
+| `bim_ref` | BIM family/type/shared-parameter reference. |
+
+Library validation rejects approved parts that do not include `catalog_source` and `catalog_last_verified`. This keeps manufacturer selections traceable before they feed equipment evaluation, estimates, BIM export, reports, and submittals.
+
 ## Default Motor Control and Disconnect Symbols
 
 The shipped one-line palette includes dedicated motor-control entries for VFD, soft starter, FVNR starter, FVR starter, and combination starter. These components carry starter type, current limit/ramp, SCCR, voltage, phase, enclosure, and commissioning fields so they can be reviewed separately from the driven motor.

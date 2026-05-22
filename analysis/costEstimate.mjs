@@ -6,6 +6,8 @@
  * References: RS Means Electrical Cost Data (typical ranges), NEC Article 300.
  */
 
+import { buildBomCatalogFields } from './manufacturerCatalog.mjs';
+
 /**
  * Default unit prices (USD).
  * Prices are mid-range estimates; override via the priceOverrides parameter.
@@ -128,6 +130,7 @@ export function estimateCableCosts(cables = [], routeResults = [], prices = {}) 
       category: 'Cable',
       id: tag,
       description: `${conductors}C-${size}`,
+      ...buildBomCatalogFields(c),
       quantity: lengthFt,
       unit: 'ft',
       unitPrice,
@@ -167,6 +170,7 @@ export function estimateTrayCosts(trays = [], prices = {}) {
       category: 'Tray',
       id,
       description: `${t.tray_type || 'Ladder'} ${width}"`,
+      ...buildBomCatalogFields(t),
       quantity: lengthFt,
       unit: 'ft',
       unitPrice,
@@ -204,6 +208,7 @@ export function estimateConduitCosts(conduits = [], prices = {}) {
       category: 'Conduit',
       id,
       description: `${c.conduit_type || 'EMT'} ${tradeSize}"`,
+      ...buildBomCatalogFields(c),
       quantity: lengthFt,
       unit: 'ft',
       unitPrice,

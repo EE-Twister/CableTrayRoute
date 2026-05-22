@@ -109,6 +109,35 @@ describe('exportRevit - raceway material', () => {
     assert.strictEqual(result.conduits[0].Material, 'PVC');
     assert.strictEqual(result.conduits[0]._ctr.material, 'PVC');
   });
+
+  it('exports governed catalog metadata for BIM shared parameters', () => {
+    const result = exportRevit({
+      trays: [{
+        tray_id: 'T-CAT',
+        manufacturer: 'Eaton B-Line',
+        catalogNumber: 'BL-VCT-12-4',
+        approved_part: true,
+        catalog_source: 'Approved list',
+        catalog_last_verified: '2026-05-22',
+        datasheet_url: 'https://example.com/bl-vct-12-4'
+      }],
+      conduits: [],
+      cables: [{
+        tag: 'CBL-1',
+        manufacturer: 'Prysmian',
+        catalog_number: 'XHHW-500',
+        approved_part: false
+      }]
+    });
+    assert.strictEqual(result.trays[0].Manufacturer, 'Eaton B-Line');
+    assert.strictEqual(result.trays[0].CatalogNumber, 'BL-VCT-12-4');
+    assert.strictEqual(result.trays[0].ApprovedPart, true);
+    assert.strictEqual(result.trays[0].CatalogLastVerified, '2026-05-22');
+    assert.strictEqual(result.trays[0]._ctr.catalog.source, 'Approved list');
+    assert.strictEqual(result.cables[0].Manufacturer, 'Prysmian');
+    assert.strictEqual(result.cables[0].CatalogNumber, 'XHHW-500');
+    assert.strictEqual(result.cables[0].ApprovalStatus, 'unreviewed');
+  });
 });
 
 describe('parseRevit - JSON string input', () => {

@@ -61,7 +61,7 @@ const scopedRoutes = NAV_ROUTES.filter(route => route.section === 'Workflow' || 
 const routeHrefs = new Set(NAV_ROUTES.map(route => route.href));
 const coverage = getPageContractCoverage(NAV_ROUTES);
 
-assert.equal(PAGE_CONTRACT_SCHEMA_VERSION, 1);
+assert.equal(PAGE_CONTRACT_SCHEMA_VERSION, 2);
 assert.deepStrictEqual(READINESS_VOCABULARY, {
   ready: 'Ready',
   missingInputs: 'Missing inputs',
@@ -90,6 +90,12 @@ for (const route of scopedRoutes) {
     assert.ok(kinds.has(item.kind), `${route.href} projectInputs[${index}] has invalid kind`);
     assert.equal(typeof item.required, 'boolean', `${route.href} projectInputs[${index}].required must be boolean`);
     assertText(item.purpose, `${route.href} projectInputs[${index}].purpose`);
+    if (item.audit !== undefined) {
+      assert.ok(item.audit && typeof item.audit === 'object' && !Array.isArray(item.audit), `${route.href} projectInputs[${index}].audit must be an object`);
+      if (item.audit.expectRead === false) {
+        assertText(item.audit.reason, `${route.href} projectInputs[${index}].audit.reason`);
+      }
+    }
   });
 
   assert.ok(Array.isArray(pageContract.outputs), `${route.href} outputs must be an array`);

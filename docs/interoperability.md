@@ -36,3 +36,21 @@ import { importEquipmentCSV, importEquipmentXML } from './src/importers/equipmen
 
 These helpers return arrays of normalized equipment objects that can then be
 passed to `dataStore.setEquipment()`.
+
+## Manufacturer Catalog Metadata
+
+Schedule and component rows can carry governed catalog fields:
+
+- `manufacturer`
+- `catalog_number` / `catalogNumber`
+- `approved_part`
+- `catalog_source`
+- `catalog_last_verified`
+- `datasheet_url`
+- `bim_ref`
+
+Cost estimate line items, submittal preview/XLSX output, and Revit-compatible
+JSON export preserve these fields so downstream estimating, procurement,
+submittal, and BIM workflows can distinguish approved manufacturer parts from
+generic or unreviewed placeholders. Approved rows must include source and
+last-verified metadata.

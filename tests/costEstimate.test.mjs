@@ -84,6 +84,24 @@ describe('estimateCableCosts', () => {
     assert.ok(items[0].totalCost > 0);
   });
 
+  it('carries manufacturer catalog fields into line items', () => {
+    const items = estimateCableCosts([
+      {
+        cable_tag: 'C-CAT',
+        conductor_size: '4 AWG',
+        conductors: 3,
+        manufacturer: 'Prysmian',
+        catalog_number: 'XHHW-4',
+        approved_part: true,
+        catalog_source: 'Approved list',
+        catalog_last_verified: '2026-05-22'
+      }
+    ], [{ cable: 'C-CAT', total_length: '10' }]);
+    assert.strictEqual(items[0].manufacturer, 'Prysmian');
+    assert.strictEqual(items[0].catalogNumber, 'XHHW-4');
+    assert.strictEqual(items[0].approvedPart, true);
+  });
+
   it('falls back to default price for unknown size', () => {
     const unknownCable = [{ cable_tag: 'X-1', conductor_size: 'UNKNOWN', conductors: 1 }];
     const unknownRoute = [{ cable: 'X-1', total_length: '100' }];

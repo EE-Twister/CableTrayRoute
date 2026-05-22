@@ -232,6 +232,9 @@ document.addEventListener('DOMContentLoaded', () => {
         <td>${esc(item.category)}</td>
         <td>${esc(item.id)}</td>
         <td>${esc(item.description)}</td>
+        <td>${esc(item.manufacturer || '')}</td>
+        <td>${esc(item.catalogNumber || '')}</td>
+        <td>${item.approvedPart ? 'Approved' : 'Unreviewed'}</td>
         <td>${(item.quantity || 0).toFixed(0)} ${esc(item.unit)}</td>
         <td>${fmt(item.unitPrice)}</td>
         <td>${fmt(item.materialCost)}</td>
@@ -279,6 +282,9 @@ document.addEventListener('DOMContentLoaded', () => {
               <th scope="col">Category</th>
               <th scope="col">ID</th>
               <th scope="col">Description</th>
+              <th scope="col">Manufacturer</th>
+              <th scope="col">Catalog No.</th>
+              <th scope="col">Approval</th>
               <th scope="col">Quantity</th>
               <th scope="col">Unit Price</th>
               <th scope="col">Material</th>
@@ -340,9 +346,12 @@ document.addEventListener('DOMContentLoaded', () => {
     addSheet('Summary', summaryData);
 
     const detailData = [
-      ['Category', 'ID', 'Description', 'Quantity', 'Unit', 'Unit Price ($)', 'Material ($)', 'Labor ($)', 'Total ($)'],
+      ['Category', 'ID', 'Description', 'Manufacturer', 'Catalog No.', 'Approval', 'Quantity', 'Unit', 'Unit Price ($)', 'Material ($)', 'Labor ($)', 'Total ($)'],
       ...lastLineItems.map(i => [
         i.category, i.id, i.description,
+        i.manufacturer || '',
+        i.catalogNumber || '',
+        i.approvedPart ? 'Approved' : 'Unreviewed',
         (i.quantity || 0).toFixed(0), i.unit,
         (i.unitPrice || 0).toFixed(2),
         (i.materialCost || 0).toFixed(0),

@@ -1255,7 +1255,7 @@ The strongest market pattern is that competing tools sell more than formulas. Th
 - Add warnings when reports use generic/unapproved parts.
 - Tests: catalog import validation, duplicate catalog-number merge behavior, approved/unapproved filtering, and report warning output.
 
-**Status:** Partially implemented via custom pricing/library features; product-grade catalog governance not implemented.
+**Status:** Partial, advanced 2026-05-22. `analysis/manufacturerCatalog.mjs` now provides governed catalog normalization, approval evidence validation, manufacturer/catalog-number duplicate merging, approved-only filtering, BOM/submittal metadata extraction, and warnings for missing, unknown, or unapproved catalog selections. `data/manufacturer_catalog.json` is schema v2 with approval/source/last-verified metadata on seed rows. Tray Hardware BOM catalog browsing now supports approval filtering and project custom catalog governance fields. Cost line items, submittal schedules/XLSX exports, and Revit/BIM JSON exports now carry manufacturer, catalog number, approval, source, verification, datasheet, and BIM reference fields. Remaining work: CSV/XLSX catalog import templates across trays, conduits, fittings, heat-trace components, protective devices, and cable types; approved-catalog filtering in routing, heat trace, and TCC selectors.
 
 ---
 
