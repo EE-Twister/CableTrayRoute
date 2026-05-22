@@ -97,7 +97,7 @@ function whenPresent(selector, cb, timeoutMs = 5000) {
 import { getItem, setItem, removeItem, getTrays, getCables, getDuctbanks, getConduits, exportProject, importProject, setCables } from './dataStore.mjs';
 import { buildSegmentRows, buildSummaryRows, buildBOM, buildTrayHardwareBOM } from './resultsExport.mjs';
 import './site.js';
-import { getProjectState, setProjectState } from './projectStorage.js';
+import { clearConduitCache, getProjectState, setProjectState } from './projectStorage.js';
 import { calculateVoltageDrop } from './src/voltageDrop.js';
 import { exportRoutesDXF } from './bimExport.mjs';
 import { exportToGLTF2 } from './src/exporters/gltf2.mjs';
@@ -337,6 +337,11 @@ async function initializeApp() {
         ['tray_depth','height'],
         'tray_type','current_fill','num_slots','slot_groups','allowed_cable_group','shape'
     ];
+    const trayImportRequiredHeaders=[
+        'tray_id','start_x','start_y','start_z','end_x','end_y','end_z',
+        ['inside_width','width'],
+        ['tray_depth','height']
+    ];
     const cableTemplateHeaders=[
         'tag',
         ['from_tag','start_tag'],
@@ -345,6 +350,12 @@ async function initializeApp() {
         ['cable_od','diameter'],
         ['weight','weight_lb_ft'],
         'allowed_cable_group','start_x','start_y','start_z','end_x','end_y','end_z'
+    ];
+    const cableImportRequiredHeaders=[
+        'tag',
+        ['from_tag','start_tag'],
+        ['to_tag','end_tag'],
+        'cable_type','conductors','conductor_size'
     ];
 
     const debug = {
@@ -717,30 +728,72 @@ async function initializeApp() {
 
         state.ductbanksWithoutConduits = [];
 
-        let loaded;
-        if(typeof loadConduits==='function'){
-            loaded=loadConduits();
-        }else{
-            let rawDb=store.getDuctbanks();
-            let rawCond=store.getConduits();
+        const normalizeConduitAlias = value => String(value || '').trim().toUpperCase();
+        const conduitAliases = (conduit = {}, ductbankTag = '') => {
+            const dbTag = normalizeConduitAlias(conduit.ductbankTag || conduit.ductbank_tag || conduit.ductbank || ductbankTag);
+            const ids = [
+                conduit.conduit_id,
+                conduit.id,
+                conduit.tag,
+                conduit.tray_id
+            ].map(normalizeConduitAlias).filter(Boolean);
+            const aliases = new Set();
+            ids.forEach(id => {
+                aliases.add(`${dbTag}:${id}`);
+                if (dbTag && !id.startsWith(`${dbTag}-`)) aliases.add(`${dbTag}:${dbTag}-${id}`);
+                if (dbTag && id.startsWith(`${dbTag}-`)) aliases.add(`${dbTag}:${id.slice(dbTag.length + 1)}`);
+            });
+            return [...aliases];
+        };
+        const addUniqueConduit = (target, conduit, seenAliases) => {
+            const aliases = conduitAliases(conduit);
+            if (aliases.some(alias => seenAliases.has(alias))) return;
+            aliases.forEach(alias => seenAliases.add(alias));
+            target.push(conduit);
+        };
+        const expandScheduledRaceways = (rawDb = [], rawCond = []) => {
             const flat=[];
-            rawDb=rawDb.map(db=>{
-                (db.conduits||[]).forEach(c=>{
-                    flat.push({
-                        ductbankTag:db.tag,
-                        conduit_id:c.conduit_id,
-                        tray_id:`${db.tag}-${c.conduit_id}`,
-                        type:c.type,
+            const rawConduits=Array.isArray(rawCond)?rawCond:[];
+            const rawAliases=new Set();
+            rawConduits.forEach(conduit => conduitAliases(conduit).forEach(alias => rawAliases.add(alias)));
+            const normalizedDuctbanks=(Array.isArray(rawDb)?rawDb:[]).map(db=>{
+                (Array.isArray(db.conduits)?db.conduits:[]).forEach(c=>{
+                    const dbTag = db.tag || db.id || db.ductbank_id;
+                    const nestedConduit = {
+                        ductbankTag:dbTag,
+                        conduit_id:c.conduit_id || c.id || c.tag,
+                        tray_id:c.tray_id || c.tag || (dbTag && c.conduit_id ? `${dbTag}-${c.conduit_id}` : c.conduit_id),
+                        type:c.type || c.conduit_type,
                         trade_size:c.trade_size,
                         start_x:c.start_x,start_y:c.start_y,start_z:c.start_z,
                         end_x:c.end_x,end_y:c.end_y,end_z:c.end_z,
                         allowed_cable_group:c.allowed_cable_group
-                    });
+                    };
+                    if (!conduitAliases(nestedConduit, dbTag).some(alias => rawAliases.has(alias))) {
+                        flat.push(nestedConduit);
+                    }
                 });
                 const {conduits:_,...rest}=db;
                 return rest;
             });
-            loaded={ductbanks:rawDb,conduits:[...flat,...rawCond]};
+            const uniqueConduits = [];
+            const seenAliases = new Set();
+            rawConduits.forEach(conduit => addUniqueConduit(uniqueConduits, conduit, seenAliases));
+            flat.forEach(conduit => addUniqueConduit(uniqueConduits, conduit, seenAliases));
+            return {ductbanks:normalizedDuctbanks,conduits:uniqueConduits};
+        };
+
+        const scheduledDuctbanks = store.getDuctbanks();
+        const scheduledConduits = store.getConduits();
+        const hasScheduledRaceways = (Array.isArray(scheduledDuctbanks) && scheduledDuctbanks.length > 0) ||
+            (Array.isArray(scheduledConduits) && scheduledConduits.length > 0);
+        let loaded;
+        if(hasScheduledRaceways){
+            loaded=expandScheduledRaceways(scheduledDuctbanks, scheduledConduits);
+        }else if(typeof loadConduits==='function'){
+            loaded=loadConduits();
+        }else{
+            loaded=expandScheduledRaceways(scheduledDuctbanks, scheduledConduits);
         }
         ductbanks=loaded.ductbanks||[];
         conduits=loaded.conduits||[];
@@ -2714,7 +2767,7 @@ const openDuctbankRoute = (dbId, conduitId) => {
     const importManualTrays = () => {
         const file = elements.importTraysFile.files[0];
         if(!file)return;
-        handleImport(file,trayTemplateHeaders,rows=>{
+        handleImport(file,trayImportRequiredHeaders,rows=>{
             const newTrays=rows.map(t=>({
                 tray_id:t.tray_id,
                 start_x:parseFloat(t.start_x)||0,
@@ -2778,7 +2831,7 @@ const openDuctbankRoute = (dbId, conduitId) => {
     const importCableOptions = () => {
         const file=elements.importCablesFile.files[0];
         if(!file)return;
-        handleImport(file,cableTemplateHeaders,rows=>{
+        handleImport(file,cableImportRequiredHeaders,rows=>{
             const newCables=rows.map(t=>({
                 name:t.tag||'',
                 start_tag:t.from_tag||t.start_tag||'',
@@ -4887,7 +4940,16 @@ Plotly.newPlot(document.getElementById('plot'), data, layout, {responsive: true}
     const hadSession = state.manualTrays.length > 0 || state.cableList.length > 0;
     const trayKey = globalThis.TableUtils?.STORAGE_KEYS?.traySchedule || 'traySchedule';
     const cableKey = globalThis.TableUtils?.STORAGE_KEYS?.cableSchedule || 'cableSchedule';
-    const hasSaved = hadSession || getItem(trayKey) || getItem(cableKey);
+    const ductbankKey = globalThis.TableUtils?.STORAGE_KEYS?.ductbankSchedule || 'ductbankSchedule';
+    const conduitKey = globalThis.TableUtils?.STORAGE_KEYS?.conduitSchedule || 'conduitSchedule';
+    const hasStoredRows = value => {
+        if (Array.isArray(value)) return value.length > 0;
+        if (value && typeof value === 'object') return Object.keys(value).length > 0;
+        return Boolean(value);
+    };
+    const hasSaved = hadSession || hasStoredRows(getItem(trayKey)) ||
+        hasStoredRows(getItem(cableKey)) || hasStoredRows(getItem(ductbankKey)) ||
+        hasStoredRows(getItem(conduitKey));
 
     const finalizeLoad = async () => {
         renderManualTrayTable();
@@ -4932,6 +4994,9 @@ Plotly.newPlot(document.getElementById('plot'), data, layout, {responsive: true}
                 saveSession();
                 removeItem(trayKey);
                 removeItem(cableKey);
+                removeItem(ductbankKey);
+                removeItem(conduitKey);
+                clearConduitCache();
                 await finalizeLoad();
             }, { once: true });
         } else {

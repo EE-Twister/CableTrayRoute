@@ -104,6 +104,10 @@
     margin-bottom: 2rem;
 }
 
+.help-content h3 {
+    color: var(--color-text, #0f172a);
+}
+
 .help-workflow-diagram {
     margin-top: 1rem;
     padding: var(--space-4);

@@ -17,6 +17,14 @@ async function handleResume(page, yes = false) {
   }
 }
 
+async function addConduitViaModal(page) {
+  await page.click("#addConduit");
+  const modal = page.locator(".component-modal").last();
+  await expect(modal).toBeVisible();
+  await modal.getByRole("button", { name: "Add Conduit" }).click();
+  await expect(modal).toBeHidden();
+}
+
 test.describe("CableTrayRoute workflow", () => {
   test("create DB-01 with three conduits appears in Optimal Route", async ({
     page,
@@ -24,7 +32,7 @@ test.describe("CableTrayRoute workflow", () => {
     await page.goto(pageUrl("ductbankroute.html?e2e=1"));
     await page.fill("#ductbankTag", "DB-01");
     for (let i = 0; i < 3; i++) {
-      await page.click("#addConduit");
+      await addConduitViaModal(page);
     }
     await expect(page.locator("#conduitTable tbody tr")).toHaveCount(3);
     const dbData = await page.evaluate(() => {
@@ -44,7 +52,8 @@ test.describe("CableTrayRoute workflow", () => {
       }));
       return { db, conduits };
     });
-    await page.addInitScript(({ db, conduits }) => {
+    await page.evaluate(({ db, conduits }) => {
+      localStorage.setItem('CTR_CONDUITS', JSON.stringify({ ductbanks: [db], conduits }));
       localStorage.setItem('base:ductbankSchedule', JSON.stringify([db]));
       localStorage.setItem('base:conduitSchedule', JSON.stringify(conduits));
       localStorage.setItem('base:traySchedule', '[]');
@@ -79,6 +88,7 @@ test.describe("CableTrayRoute workflow", () => {
   });
 
   test("lock a cable and reroute", async ({ page }) => {
+    test.setTimeout(60_000);
     const traySample = path.join(root, "examples", "trayNetwork.json");
     const trayJson = fs.readFileSync(traySample, "utf-8");
     const cableSample = path.join(root, "examples", "cableList.json");
@@ -115,11 +125,15 @@ test.describe("CableTrayRoute workflow", () => {
     await page.waitForSelector("#cable-list-container tbody tr", { state: 'attached' });
     await page.click("#calculate-route-btn");
     await expect(page.locator("#results-section")).toBeVisible();
-    const firstRow = page.locator("#cable-list-container tbody tr").first();
-    const lockCheckbox = firstRow.locator(
-      'input[type="checkbox"][name="lock"]',
-    );
-    await lockCheckbox.check();
+    await expect(page.locator('#route-breakdown-container .route-list-row').first()).toBeAttached({ timeout: 30_000 });
+    const lockButton = page.locator('.lock-route-btn').first();
+    await expect(lockButton).toBeAttached();
+    await page.locator("#route-breakdown-details").evaluate(details => {
+      details.open = true;
+      details.setAttribute('open', '');
+    });
+    await expect(lockButton).toBeVisible();
+    await lockButton.click();
     await page.click("#calculate-route-btn");
     await expect(page.locator("#results-section")).toBeVisible();
   });

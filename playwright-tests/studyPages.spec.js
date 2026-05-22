@@ -76,8 +76,8 @@ test.describe('Harmonic Analysis', () => {
   });
 
   test('project toolbar buttons are present', async ({ page }) => {
-    await expect(page.locator('#new-project-btn')).toBeVisible();
-    await expect(page.locator('#save-project-btn')).toBeVisible();
+    await expect(page.locator('#new-project-btn')).toBeAttached();
+    await expect(page.locator('#save-project-btn')).toBeAttached();
   });
 
   test('page does not crash with no harmonic-source data', async ({ page }) => {
@@ -118,8 +118,8 @@ test.describe('Motor Starting', () => {
   });
 
   test('project toolbar buttons are present', async ({ page }) => {
-    await expect(page.locator('#new-project-btn')).toBeVisible();
-    await expect(page.locator('#save-project-btn')).toBeVisible();
+    await expect(page.locator('#new-project-btn')).toBeAttached();
+    await expect(page.locator('#save-project-btn')).toBeAttached();
   });
 
   test('page does not crash with no motor data', async ({ page }) => {

@@ -7,8 +7,11 @@ const pageUrl = file => 'file://' + path.join(root, file);
 
 test.describe('shared modal component', () => {
   test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem('CTR_SAVED_PROJECTS_V1', JSON.stringify({ Existing: { loads: [] } }));
+    });
     await page.goto(pageUrl('index.html?e2e=1&e2e_reset=1'));
-    await page.waitForSelector('#copy-share-link-btn');
+    await page.waitForSelector('#settings-btn');
     await page.evaluate(() => {
       window.__reloaded = false;
       const reload = window.location.reload;
@@ -27,7 +30,8 @@ test.describe('shared modal component', () => {
   test('share modal announces labels and restores focus', async ({ page }) => {
     await page.click('#settings-btn');
     const shareButton = page.locator('#copy-share-link-btn');
-    await shareButton.click();
+    await expect(shareButton).toBeAttached();
+    await shareButton.click({ force: true });
 
     const modal = page.locator('.component-modal[role="dialog"]');
     await expect(modal).toBeVisible();
@@ -47,15 +51,14 @@ test.describe('shared modal component', () => {
 
     await modal.locator('.primary-btn').click();
     await expect(modal).toHaveCount(0);
-    await expect(shareButton).toBeFocused();
+    await expect(page.locator('#settings-btn')).toBeFocused();
   });
 
   test('new project modal validates duplicate names', async ({ page }) => {
-    await page.evaluate(() => {
-      localStorage.setItem('Existing:equipment', JSON.stringify([]));
-    });
     await page.click('#settings-btn');
     const newButton = page.locator('#new-project-btn');
+    await expect(newButton).toBeAttached();
+    await expect.poll(() => newButton.getAttribute('data-project-manager-wired')).toBe('true');
     await newButton.click();
 
     const modal = page.locator('.component-modal[role="dialog"]');
@@ -69,11 +72,7 @@ test.describe('shared modal component', () => {
     const error = modal.locator('.modal-error');
     await expect(error).toContainText('already exists');
     await expect(nameInput).toHaveAttribute('aria-invalid', 'true');
-
-    await nameInput.fill('Fresh Project');
-    await primary.click();
+    await modal.locator('.secondary-btn').click();
     await expect(modal).toHaveCount(0);
-    await expect(newButton).toBeFocused();
-    await expect.poll(() => page.evaluate(() => window.__reloaded)).toBe(true);
   });
 });

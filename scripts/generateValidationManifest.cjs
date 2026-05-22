@@ -17,8 +17,10 @@ const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..');
 const TESTS_DIR = path.join(ROOT, 'tests');
+const ANALYSIS_DIR = path.join(ROOT, 'analysis');
 const BENCHMARKS_FILE = path.join(ROOT, 'data', 'validationBenchmarks.json');
 const OUTPUT_FILE = path.join(ROOT, 'dist', 'validationManifest.json');
+const TEST_FILE_RE = /\.(?:test|spec)\.(?:mjs|cjs|js)$/;
 
 // ---------------------------------------------------------------------------
 // Parse test files for group names and assertion counts
@@ -49,17 +51,17 @@ function extractGroups(src) {
 function collectTestSuites() {
   const suites = [];
 
-  if (!fs.existsSync(TESTS_DIR)) {
-    console.warn('[manifest] tests/ directory not found — skipping suite collection');
+  if (!fs.existsSync(TESTS_DIR) && !fs.existsSync(ANALYSIS_DIR)) {
+    console.warn('[manifest] no Node test roots found — skipping suite collection');
     return suites;
   }
 
-  // Recursively collect .test.mjs and .test.cjs files
+  // Recursively collect Node test files from the same roots used by test:full.
   function walk(dir) {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
       if (entry.isDirectory()) {
         walk(path.join(dir, entry.name));
-      } else if (/\.test\.(mjs|cjs)$/.test(entry.name)) {
+      } else if (TEST_FILE_RE.test(entry.name)) {
         const filePath = path.join(dir, entry.name);
         const src = fs.readFileSync(filePath, 'utf8');
         suites.push({
@@ -71,22 +73,12 @@ function collectTestSuites() {
     }
   }
 
-  walk(TESTS_DIR);
+  if (fs.existsSync(TESTS_DIR)) {
+    walk(TESTS_DIR);
+  }
 
-  // Also collect analysis-level tests sitting in analysis/ directory
-  const analysisDir = path.join(ROOT, 'analysis');
-  if (fs.existsSync(analysisDir)) {
-    for (const entry of fs.readdirSync(analysisDir)) {
-      if (/\.test\.(mjs|cjs)$/.test(entry)) {
-        const filePath = path.join(analysisDir, entry);
-        const src = fs.readFileSync(filePath, 'utf8');
-        suites.push({
-          file: path.relative(ROOT, filePath).replace(/\\/g, '/'),
-          groups: extractGroups(src),
-          assertionCount: countAssertions(src),
-        });
-      }
-    }
+  if (fs.existsSync(ANALYSIS_DIR)) {
+    walk(ANALYSIS_DIR);
   }
 
   return suites;

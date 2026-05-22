@@ -1,8 +1,8 @@
 {
-  "generatedAt": "2026-05-22T01:44:46.991Z",
+  "generatedAt": "2026-05-22T04:25:53.056Z",
   "summary": {
-    "testSuiteCount": 160,
-    "totalAssertions": 6553,
+    "testSuiteCount": 161,
+    "totalAssertions": 6527,
     "benchmarkCount": 6,
     "standardCount": 13,
     "necComplianceCount": 8
@@ -475,7 +475,7 @@
       "groups": [
         "equipment arrangements page"
       ],
-      "assertionCount": 137
+      "assertionCount": 105
     },
     {
       "file": "tests/equipmentColumns.test.cjs",
@@ -1448,6 +1448,13 @@
         "tcc utilities"
       ],
       "assertionCount": 11
+    },
+    {
+      "file": "tests/testGateCoverage.test.mjs",
+      "groups": [
+        "Node test gate coverage"
+      ],
+      "assertionCount": 6
     },
     {
       "file": "tests/transformerProperties.test.mjs",

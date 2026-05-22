@@ -50,7 +50,7 @@
         &.active,
         &[aria-current="page"] {
             font-weight: 600;
-            color: var(--color-primary);
+            color: #1e40af;
             text-decoration: none;
             background: color-mix(in srgb, var(--color-primary) 14%, transparent);
         }
@@ -523,7 +523,7 @@
     gap: 1rem;
 
     & a {
-        color: var(--primary-color);
+        color: #1e40af;
         text-decoration: none;
         padding: var(--space-2) var(--space-3);
         border: 1px solid var(--color-border);
@@ -541,6 +541,12 @@
 
 .step-nav-next {
     margin-left: auto;
+}
+
+.step-nav-prev,
+.step-nav-link,
+.step-nav-next {
+    color: #1e40af;
 }
 
 /* --- Workflow Step Navigator --- */

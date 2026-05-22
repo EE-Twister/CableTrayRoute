@@ -31,6 +31,8 @@ test('raceway samples roundtrip and route', async ({ page }) => {
   }, { racewayJson, cableJson });
   await page.goto(pageUrl('cableschedule.html?e2e=1'));
   await page.click('#load-sample-cables-btn');
+  await page.waitForSelector('#cableScheduleTable tbody tr', { state: 'attached' });
+  await expect.poll(() => page.evaluate(() => window.dataStore?.getCables?.().length || 0)).toBeGreaterThan(0);
 
   await page.goto(pageUrl('racewayschedule.html?e2e=1'));
   await page.waitForSelector('[data-raceway-ready="1"]');
@@ -84,6 +86,8 @@ test('raceway samples roundtrip and route', async ({ page }) => {
     const dataStore = await import('./dataStore.mjs');
     dataStore.importProject(project);
   }, projectData);
+  await page.click('#import-schedules-btn');
+  await expect(page.locator('#cable-list-container tbody tr')).not.toHaveCount(0);
   await page.click('#calculate-route-btn');
   await expect(page.locator('#ductbank-no-conduits-warning')).toBeHidden();
   await expect(page.locator('#results-section')).toBeVisible();

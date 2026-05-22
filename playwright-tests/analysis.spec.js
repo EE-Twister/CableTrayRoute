@@ -73,7 +73,32 @@ test.describe('Arc Flash', () => {
 // ---------------------------------------------------------------------------
 test.describe('Short Circuit', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto(pageUrl('shortCircuit.html?e2e=1&e2e_reset=1'));
+    await page.addInitScript(() => {
+      const oneLine = {
+        activeSheet: 0,
+        sheets: [
+          {
+            name: 'Short Circuit Fixture',
+            components: [
+              {
+                id: 'BUS-1',
+                label: 'BUS-1',
+                type: 'bus',
+                subtype: 'Bus',
+                prefault_voltage: 0.48,
+                z1: { r: 0.012, x: 0.045 },
+                z2: { r: 0.012, x: 0.045 },
+                z0: { r: 0.03, x: 0.09 },
+                xr_ratio: 3
+              }
+            ]
+          }
+        ]
+      };
+
+      localStorage.setItem('base:oneLineDiagram', JSON.stringify(oneLine));
+    });
+    await page.goto(pageUrl('shortCircuit.html?e2e=1'));
     await page.waitForLoadState('networkidle');
   });
 

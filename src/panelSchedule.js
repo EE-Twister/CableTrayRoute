@@ -2259,6 +2259,7 @@ function createBranchDeviceIcon(detail, poleCount, startCircuit, system, phaseLa
   const labelPoles = Number.isFinite(options.labelPoles) && options.labelPoles > 0 ? options.labelPoles : poles;
   const icon = document.createElement("div");
   icon.className = `panel-device panel-device--${type}`;
+  icon.setAttribute("role", "img");
   icon.dataset.breaker = String(startCircuit);
   icon.dataset.poles = String(poles);
   icon.dataset.deviceType = type;

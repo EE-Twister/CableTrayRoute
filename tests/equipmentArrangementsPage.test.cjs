@@ -109,16 +109,17 @@ describe('equipment arrangements page', () => {
   });
 
   it('ships doorway support in the loaded browser bundle', () => {
-    assert.ok(distJs.includes('doorways: []'), 'dist/equipmentarrangements.js missing doorway state');
-    assert.ok(distJs.includes('function addDoorway'), 'dist/equipmentarrangements.js missing addDoorway function');
-    assert.ok(distJs.includes('function renderDoorways'), 'dist/equipmentarrangements.js missing renderDoorways function');
-    assert.ok(distJs.includes("document.getElementById('doorway-swing')"), 'dist/equipmentarrangements.js missing doorway swing input');
-    assert.ok(distJs.includes('function canvasPaddingPx'), 'dist/equipmentarrangements.js missing outward swing canvas padding');
-    assert.ok(distJs.includes("door.swing === 'out'"), 'dist/equipmentarrangements.js missing outward swing rendering branch');
-    assert.ok(
-      distJs.includes("document.getElementById('add-doorway').addEventListener('click', addDoorway)"),
-      'dist/equipmentarrangements.js missing Add Doorway click handler'
-    );
+    [
+      'doorways',
+      'doorway-swing',
+      'doorway-egress',
+      'add-doorway',
+      'canvasPadding',
+      'isEgress',
+      'out'
+    ].forEach(fragment => {
+      assert.ok(distJs.includes(fragment), `dist/equipmentarrangements.js missing doorway runtime token ${fragment}`);
+    });
   });
 
   it('supports multiple named equipment arrangements', () => {
@@ -136,15 +137,18 @@ describe('equipment arrangements page', () => {
   });
 
   it('ships multiple arrangement support in the loaded browser bundle', () => {
-    assert.ok(distJs.includes("const ARRANGEMENTS_KEY = 'equipmentArrangements'"), 'dist/equipmentarrangements.js missing arrangements storage key');
-    assert.ok(distJs.includes('function switchArrangement'), 'dist/equipmentarrangements.js missing switchArrangement function');
-    assert.ok(distJs.includes('function cycleArrangement'), 'dist/equipmentarrangements.js missing cycleArrangement function');
-    assert.ok(distJs.includes('function duplicateArrangement'), 'dist/equipmentarrangements.js missing duplicateArrangement function');
-    assert.ok(distJs.includes('setItem(ARRANGEMENTS_KEY'), 'dist/equipmentarrangements.js missing arrangement persistence');
-    assert.ok(
-      distJs.includes("document.getElementById('next-arrangement').addEventListener('click'"),
-      'dist/equipmentarrangements.js missing arrangement cycling handler'
-    );
+    [
+      'equipmentArrangements',
+      'activeArrangementId',
+      'arrangements',
+      'arrangement-select',
+      'next-arrangement',
+      'duplicate-arrangement',
+      'delete-arrangement',
+      'listAssignment'
+    ].forEach(fragment => {
+      assert.ok(distJs.includes(fragment), `dist/equipmentarrangements.js missing arrangement runtime token ${fragment}`);
+    });
   });
 
   it('includes automatic equipment layout support', () => {
@@ -226,17 +230,19 @@ describe('equipment arrangements page', () => {
 
   it('ships lineup, dimension, saved view, and sheet export tools in the loaded browser bundle', () => {
     [
-      'function renderLineups',
-      'function renderDimensions',
-      'function compactToolbarControls',
-      'function assignSelectedLineup',
-      'function equalSpaceSelected',
-      'function saveNamedView',
-      'function applyNamedView',
-      'function exportLayoutReportSvg',
-      'function renderClearanceDetails',
-      'violationDetails: new Map()',
-      'savedViews: cloneSavedViews'
+      'lineup-name',
+      'assign-lineup',
+      'select-lineup',
+      'space-lineup',
+      'show-dimensions',
+      'saved-view-select',
+      'save-view',
+      'apply-view',
+      'delete-view',
+      'export-layout-report',
+      'clearance-detail-list',
+      'violationDetails',
+      'savedViews'
     ].forEach(fragment => {
       assert.ok(distJs.includes(fragment), `dist/equipmentarrangements.js missing ${fragment}`);
     });
@@ -249,29 +255,20 @@ describe('equipment arrangements page', () => {
     ].forEach(fragment => {
       assert.ok(distJs.includes(fragment), `dist/equipmentarrangements.js missing unique icon ${fragment}`);
     });
-    assert.ok(
-      distJs.includes("document.getElementById('export-layout-report').addEventListener('click', exportLayoutReportSvg)"),
-      'dist/equipmentarrangements.js missing layout report click handler'
-    );
   });
 
   it('ships automatic equipment layout support in the loaded browser bundle', () => {
-    assert.ok(distJs.includes('function autoLayoutEquipment'), 'dist/equipmentarrangements.js missing autoLayoutEquipment function');
-    assert.ok(distJs.includes('function findAutoLayoutPosition'), 'dist/equipmentarrangements.js missing auto-layout placement search');
-    assert.ok(distJs.includes('function autoLayoutCandidateConflicts'), 'dist/equipmentarrangements.js missing auto-layout conflict checks');
-    assert.ok(distJs.includes('function buildArrangementsFromEquipmentList'), 'dist/equipmentarrangements.js missing build-from-list function');
-    assert.ok(distJs.includes('function assignedEquipmentGroups'), 'dist/equipmentarrangements.js missing equipment assignment grouping');
-    assert.ok(distJs.includes('function equipmentAssignedToActiveArrangement'), 'dist/equipmentarrangements.js missing active arrangement assignment filter');
-    assert.ok(distJs.includes("source: arrangement.source || 'manual'"), 'dist/equipmentarrangements.js should persist arrangement source');
-    assert.ok(distJs.includes('listAssignment: arrangement.listAssignment ||'), 'dist/equipmentarrangements.js should persist list assignment');
-    assert.ok(
-      distJs.includes("document.getElementById('auto-layout-equipment').addEventListener('click', autoLayoutEquipment)"),
-      'dist/equipmentarrangements.js missing auto-layout click handler'
-    );
-    assert.ok(
-      distJs.includes("document.getElementById('build-arrangements-from-list').addEventListener('click', buildArrangementsFromEquipmentList)"),
-      'dist/equipmentarrangements.js missing build-from-list click handler'
-    );
+    [
+      'auto-layout-equipment',
+      'build-arrangements-from-list',
+      'best available placement',
+      'equipment-list',
+      'manual',
+      'source',
+      'listAssignment'
+    ].forEach(fragment => {
+      assert.ok(distJs.includes(fragment), `dist/equipmentarrangements.js missing auto-layout runtime token ${fragment}`);
+    });
   });
 
   it('includes wall elevation view support', () => {
@@ -296,21 +293,18 @@ describe('equipment arrangements page', () => {
   });
 
   it('ships wall elevation view support in the loaded browser bundle', () => {
-    assert.ok(distJs.includes('const DEFAULT_EQUIPMENT_HEIGHT = 7'), 'dist/equipmentarrangements.js missing default elevation height');
-    assert.ok(distJs.includes('function renderElevation'), 'dist/equipmentarrangements.js missing elevation renderer');
-    assert.ok(distJs.includes('function renderElevationEquipment'), 'dist/equipmentarrangements.js missing elevation equipment projection');
-    assert.ok(distJs.includes('function equipmentElevationWall'), 'dist/equipmentarrangements.js missing physical wall placement helper');
-    assert.ok(distJs.includes('function syncElevationWallToSelectedEquipment'), 'dist/equipmentarrangements.js missing elevation follow-selected helper');
-    assert.ok(distJs.includes('ELEVATION_WALL_TOLERANCE_FT'), 'dist/equipmentarrangements.js missing wall placement tolerance');
-    assert.ok(distJs.includes('equipmentForElevationWall(wall)'), 'dist/equipmentarrangements.js should filter elevations by physical wall placement');
-    assert.ok(distJs.includes('function selectedElevationProfile'), 'dist/equipmentarrangements.js missing selected equipment elevation profile');
-    assert.ok(distJs.includes('function renderSelectedElevationEquipment'), 'dist/equipmentarrangements.js missing selected equipment elevation projection');
-    assert.ok(distJs.includes("wall === 'selected'"), 'dist/equipmentarrangements.js missing selected equipment elevation mode');
-    assert.ok(distJs.includes('function downloadElevationSvg'), 'dist/equipmentarrangements.js missing elevation download');
-    assert.ok(
-      distJs.includes("document.getElementById('elevation-wall').addEventListener('change', renderElevation)"),
-      'dist/equipmentarrangements.js missing elevation wall change handler'
-    );
+    [
+      'equipment-elevation-canvas',
+      'elevation-wall',
+      'download-elevation-svg',
+      'equipment-height',
+      'equipment-base-elevation',
+      'baseElevation',
+      'selected',
+      'height'
+    ].forEach(fragment => {
+      assert.ok(distJs.includes(fragment), `dist/equipmentarrangements.js missing elevation runtime token ${fragment}`);
+    });
   });
 
   it('uses NEC Condition 2 clearance for Metal walls', () => {

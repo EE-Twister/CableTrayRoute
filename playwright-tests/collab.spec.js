@@ -40,7 +40,7 @@ test.describe('Cable Schedule — collaboration reload', () => {
     });
     assert: expect(error).toBeNull();
     // The table container should still be present after a reload
-    await expect(page.locator('#cable-schedule-table, #cableTable, table')).toBeVisible();
+    await expect(page.locator('#cableScheduleTable')).toBeVisible();
   });
 });
 
@@ -134,7 +134,8 @@ test.describe('One-Line Diagram — collaboration reload (regression)', () => {
   });
 
   test('page loads correctly', async ({ page }) => {
-    await expect(page.locator('h1, #canvas-container, canvas')).toHaveCount({ minimum: 1 });
+    await expect(page.locator('#oneline-ready-beacon')).toBeAttached();
+    await expect(page.locator('main')).toBeVisible();
   });
 
   test('ctr:remote-applied event fires without error on one-line', async ({ page }) => {

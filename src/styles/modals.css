@@ -166,6 +166,11 @@
     box-sizing: border-box;
 }
 
+.modal[aria-hidden="true"] {
+    display: none !important;
+    pointer-events: none;
+}
+
 .component-modal {
     display: flex;
     align-items: center;

@@ -119,6 +119,7 @@ body.dark .route-mode-badge { background: #1e293b; color: #94a3b8; }
 
 .optimal-route-sidebar header h2 {
   margin-bottom: var(--space-2, 0.5rem);
+  color: #0f172a;
 }
 
 .sidebar-note,
@@ -157,6 +158,13 @@ body.dark .route-mode-badge { background: #1e293b; color: #94a3b8; }
   padding: var(--space-2, 0.5rem) 0;
   border-top: 1px solid var(--color-border, #e2e8f0);
   border-bottom: 1px solid var(--color-border, #e2e8f0);
+}
+
+.advanced-routing-settings > summary,
+.method-panel > summary,
+.route-control-panel h3,
+.route-visual-header h3 {
+  color: #0f172a;
 }
 
 .route-context {

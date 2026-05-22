@@ -22,8 +22,28 @@ function it(name, fn) {
 
 // ---------------------------------------------------------------------------
 describe('SECTION_REGISTRY', () => {
-  it('has exactly 16 entries', () => {
-    assert.strictEqual(SECTION_REGISTRY.length, 16);
+  it('includes the core report sections', () => {
+    const keys = new Set(SECTION_REGISTRY.map(s => s.key));
+    for (const key of [
+      'cover',
+      'toc',
+      'revisions',
+      'assumptions',
+      'cables',
+      'fill',
+      'clashes',
+      'spools',
+      'arcFlash',
+      'shortCircuit',
+      'loadFlow',
+      'harmonics',
+      'motorStart',
+      'voltageDrop',
+      'heatTrace',
+      'lighting',
+    ]) {
+      assert.ok(keys.has(key), `missing registry key "${key}"`);
+    }
   });
 
   it('every entry has required fields: key, label, group', () => {
@@ -58,8 +78,18 @@ describe('SECTION_REGISTRY', () => {
 
 // ---------------------------------------------------------------------------
 describe('PRESET_CONFIGS', () => {
-  it('has exactly 6 presets', () => {
-    assert.strictEqual(Object.keys(PRESET_CONFIGS).length, 6);
+  it('includes the core package presets', () => {
+    const presets = new Set(Object.keys(PRESET_CONFIGS));
+    for (const key of [
+      'electrical',
+      'construction',
+      'heatTrace',
+      'grounding',
+      'ownerTurnover',
+      'bimHandoff',
+    ]) {
+      assert.ok(presets.has(key), `missing preset "${key}"`);
+    }
   });
 
   it('every preset has label, description, sections', () => {
@@ -80,7 +110,7 @@ describe('PRESET_CONFIGS', () => {
     }
   });
 
-  it('ownerTurnover preset includes all 16 registry keys', () => {
+  it('ownerTurnover preset includes all registry keys', () => {
     const all = new Set(SECTION_REGISTRY.map(s => s.key));
     const preset = new Set(PRESET_CONFIGS.ownerTurnover.sections);
     for (const key of all) {

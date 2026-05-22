@@ -6,6 +6,20 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.join(__dirname, '..');
 const pageUrl = `file://${path.join(root, 'library.html')}`;
 
+const validMccProps = {
+  tag: 'MCC-1',
+  description: 'Main motor control center',
+  manufacturer: 'Generic',
+  model: 'MCC-200',
+  main_device_type: 'Main breaker',
+  form_type: 'Form 3',
+  rated_voltage_kv: 0.48,
+  bus_rating_a: 800,
+  sccr_ka: 42,
+  bucket_count: 6,
+  spare_bucket_count: 1,
+};
+
 function withAuth(page) {
   return page.addInitScript(() => {
     localStorage.setItem('authToken', 'test-token');
@@ -13,6 +27,44 @@ function withAuth(page) {
     localStorage.setItem('authExpiresAt', String(Date.now() + 60_000));
     localStorage.setItem('authUser', JSON.stringify({ username: 'playwright' }));
   });
+}
+
+async function installLibraryApiMock(page, { initialState, latestState = null, conflictBaseVersion = null }) {
+  await page.addInitScript(({ initialState, latestState, conflictBaseVersion }) => {
+    const clone = value => JSON.parse(JSON.stringify(value));
+    const api = {
+      state: clone(initialState),
+      latest: latestState ? clone(latestState) : null,
+      getCount: 0,
+      mergedPayload: null,
+    };
+    window.__libraryApiMock = api;
+    const originalFetch = window.fetch.bind(window);
+    window.fetch = async (input, init = {}) => {
+      const url = typeof input === 'string' ? input : input?.url || '';
+      if (String(url).endsWith('/api/v1/library')) {
+        const method = String(init?.method || 'GET').toUpperCase();
+        if (method === 'GET') {
+          api.getCount += 1;
+          const body = api.latest && api.getCount > 1 ? api.latest : api.state;
+          return new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        }
+        if (method === 'PUT') {
+          const payload = JSON.parse(init?.body || '{}');
+          if (conflictBaseVersion && payload.baseVersion === conflictBaseVersion) {
+            return new Response(JSON.stringify({ currentVersion: api.latest?.version || 'v2' }), { status: 409, headers: { 'Content-Type': 'application/json' } });
+          }
+          api.mergedPayload = payload.data;
+          const currentVersion = String(api.state.version || 'v1');
+          const nextVersionNumber = Number(currentVersion.replace(/^v/, '')) + 1 || 2;
+          api.state = { version: `v${nextVersionNumber}`, data: payload.data };
+          api.latest = null;
+          return new Response(JSON.stringify({ ok: true, version: api.state.version, unchanged: false }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        }
+      }
+      return originalFetch(input, init);
+    };
+  }, { initialState, latestState, conflictBaseVersion });
 }
 
 test.describe('Component Library structured workflows', () => {
@@ -24,32 +76,16 @@ test.describe('Component Library structured workflows', () => {
       data: {
         categories: ['equipment'],
         components: [
-          { subtype: 'MCC', label: 'Motor Control Center', category: 'equipment', icon: 'icons/components/MCC.svg', ports: 2, schema: {} },
+          { subtype: 'MCC', label: 'Motor Control Center', category: 'equipment', icon: 'icons/components/MCC.svg', ports: 2, schema: {}, props: validMccProps },
         ],
         icons: { 'icons/components/MCC.svg': 'icons/components/MCC.svg' },
       },
     };
 
-    await page.route('**/api/v1/library', async (route, request) => {
-      if (request.method() === 'GET') {
-        await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(serverState) });
-        return;
-      }
-      if (request.method() === 'PUT') {
-        const body = JSON.parse(request.postData() || '{}');
-        serverState.data = body.data;
-        serverState.version = `v${Number(serverState.version.slice(1)) + 1}`;
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ ok: true, version: serverState.version, unchanged: false }),
-        });
-        return;
-      }
-      await route.fallback();
-    });
+    await installLibraryApiMock(page, { initialState: serverState });
 
     await page.goto(pageUrl);
+    await expect(page.locator('#sync-badge')).toContainText('Synced');
     await expect(page.locator('[data-kind="component-label"]').first()).toHaveValue('Motor Control Center');
 
     await page.click('#add-component-row');
@@ -63,12 +99,12 @@ test.describe('Component Library structured workflows', () => {
 
     await page.click('#cloud-save-btn');
     await expect(page.getByText('Saved to Cloud')).toBeVisible();
-    await page.getByRole('button', { name: 'Close' }).click();
+    await page.getByRole('button', { name: 'Close', exact: true }).click();
 
     await row.locator('[data-kind="component-label"]').fill('Temporary value');
     await page.click('#cloud-load-btn');
     await expect(page.getByText('Loaded from Cloud')).toBeVisible();
-    await page.getByRole('button', { name: 'Close' }).click();
+    await page.getByRole('button', { name: 'Close', exact: true }).click();
 
     await expect(row.locator('[data-kind="component-label"]')).toHaveValue('Backup UPS');
   });
@@ -106,7 +142,7 @@ test.describe('Component Library structured workflows', () => {
       data: {
         categories: ['equipment'],
         components: [
-          { subtype: 'MCC', label: 'Cloud MCC', category: 'equipment', icon: 'icons/components/MCC.svg', ports: 2, schema: {} },
+          { subtype: 'MCC', label: 'Cloud MCC', category: 'equipment', icon: 'icons/components/MCC.svg', ports: 2, schema: {}, props: validMccProps },
         ],
         icons: { 'icons/components/MCC.svg': 'icons/components/MCC.svg' },
       },
@@ -116,7 +152,7 @@ test.describe('Component Library structured workflows', () => {
       data: {
         categories: ['equipment'],
         components: [
-          { subtype: 'MCC', label: 'Cloud MCC', category: 'equipment', icon: 'icons/components/MCC.svg', ports: 2, schema: {} },
+          { subtype: 'MCC', label: 'Cloud MCC', category: 'equipment', icon: 'icons/components/MCC.svg', ports: 2, schema: {}, props: validMccProps },
           { subtype: 'GEN', label: 'Cloud Generator', category: 'equipment', icon: 'icons/components/Generator.svg', ports: 2, schema: {} },
         ],
         icons: {
@@ -126,29 +162,10 @@ test.describe('Component Library structured workflows', () => {
       },
     };
 
-    let getCount = 0;
-    let mergedPayload;
-    await page.route('**/api/v1/library', async (route, request) => {
-      if (request.method() === 'GET') {
-        getCount += 1;
-        const body = getCount === 1 ? initialCloud : latestCloud;
-        await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
-        return;
-      }
-      if (request.method() === 'PUT') {
-        const payload = JSON.parse(request.postData() || '{}');
-        if (payload.baseVersion === 'v1') {
-          await route.fulfill({ status: 409, contentType: 'application/json', body: JSON.stringify({ currentVersion: 'v2' }) });
-          return;
-        }
-        mergedPayload = payload.data;
-        await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, version: 'v3' }) });
-        return;
-      }
-      await route.fallback();
-    });
+    await installLibraryApiMock(page, { initialState: initialCloud, latestState: latestCloud, conflictBaseVersion: 'v1' });
 
     await page.goto(pageUrl);
+    await expect(page.locator('#sync-badge')).toContainText('Synced');
 
     await page.click('#add-component-row');
     const localRow = page.locator('#components-grid-body tr').last();
@@ -163,6 +180,7 @@ test.describe('Component Library structured workflows', () => {
     await page.getByRole('button', { name: 'Merge non-conflicting changes' }).click();
     await expect(page.getByText('Saved to Cloud')).toBeVisible();
 
+    const mergedPayload = await page.evaluate(() => window.__libraryApiMock?.mergedPayload || null);
     expect(mergedPayload.components.some((entry) => entry.subtype === 'UPS')).toBeTruthy();
     expect(mergedPayload.components.some((entry) => entry.subtype === 'GEN')).toBeTruthy();
   });

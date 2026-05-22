@@ -644,6 +644,20 @@ document.addEventListener('DOMContentLoaded', async () => {
   trayTable.getDataCount=function(){return this.getData().length;};
   tables.trays=trayTable;
 
+  function downloadTrayTemplate(){
+    if(typeof XLSX === 'undefined' || !XLSX?.utils?.aoa_to_sheet || !XLSX?.writeFile){
+      showAlertModal('Template Export Unavailable', 'Spreadsheet template generation needs XLSX runtime. Use the visible tray table headers as the import guide for now.');
+      return;
+    }
+    const headers = trayColumns.map(column => column.key);
+    const workbook = XLSX.utils.book_new();
+    const worksheet = XLSX.utils.aoa_to_sheet([headers]);
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Trays');
+    XLSX.writeFile(workbook, 'tray-schedule-template.xlsx');
+  }
+
+  document.getElementById('download-trays-template-btn')?.addEventListener('click', downloadTrayTemplate);
+
   const conduitColumns=[
     {key:'conduit_id',label:'Conduit ID',type:'text',validate:['required']},
     {key:'type',label:'Type',type:'select',options:CONDUIT_TYPES,default:CONDUIT_TYPES[0],validate:['required'],onChange:(el,tr)=>{const sizeSel=tr.querySelector('select[name="trade_size"]');if(sizeSel){const opts=tradeSizeOptions(el.value);sizeSel.innerHTML='';opts.forEach(sz=>{const o=document.createElement('option');o.value=sz;o.textContent=sz;sizeSel.appendChild(o);});}}},

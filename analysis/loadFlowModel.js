@@ -952,6 +952,12 @@ function registerConnection(map, from, to) {
   map.get(from).add(to);
 }
 
+function connectionEndpointId(endpoint) {
+  if (typeof endpoint === 'string') return endpoint;
+  if (!endpoint || typeof endpoint !== 'object') return null;
+  return endpoint.component || endpoint.componentId || endpoint.id || null;
+}
+
 export function buildLoadFlowModel(oneLine = {}) {
   const { sheets } = oneLine;
   const { components, connections } = normalizeSheets(sheets);
@@ -968,8 +974,10 @@ export function buildLoadFlowModel(oneLine = {}) {
   });
   connections.forEach(link => {
     if (!link) return;
-    registerConnection(adjacency, link.from, link.to);
-    registerConnection(adjacency, link.to, link.from);
+    const from = connectionEndpointId(link.from);
+    const to = connectionEndpointId(link.to);
+    registerConnection(adjacency, from, to);
+    registerConnection(adjacency, to, from);
   });
 
   let buses = components.filter(isBusComponent).map(cloneBusComponent);

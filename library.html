@@ -856,8 +856,7 @@
 
     function parseCsvRows(text) {
       const lines = text
-        .split(/?
-/)
+        .split(/\r?\n/)
         .map((line) => line.trim())
         .filter((line) => line.length > 0);
       if (!lines.length) return [];

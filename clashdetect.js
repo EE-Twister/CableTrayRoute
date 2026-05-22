@@ -16,6 +16,7 @@ document.addEventListener('DOMContentLoaded', () => {
   runBtn.addEventListener('click', () => {
     const trays = getTrays();
     if (!trays || trays.length === 0) {
+      resultsDiv.innerHTML = '<p class="field-hint" role="status">No trays found in the Raceway Schedule. Add trays with 3D coordinates first.</p>';
       showAlertModal('No Data', 'No trays found in the Raceway Schedule. Add trays with 3D coordinates first.');
       return;
     }

@@ -1,7 +1,14 @@
 const VISUAL_TYPES = new Set(['dimension', 'annotation']);
+const CONNECTOR_TYPE_KEYWORDS = ['link', 'cable', 'feeder', 'conductor', 'tap', 'splice'];
 
 function isVisualComponent(comp) {
   return comp ? VISUAL_TYPES.has(comp.type) : false;
+}
+
+function isConnectorComponent(comp) {
+  if (!comp) return false;
+  const type = `${comp.type || ''}`.toLowerCase();
+  return CONNECTOR_TYPE_KEYWORDS.some(keyword => type.includes(keyword));
 }
 
 function pickValue(comp, key) {
@@ -49,9 +56,10 @@ function findConnected(startIds = [], adj = new Map()) {
 }
 
 export function runReliability(components = []) {
-  // Filter out non-operational components like dimensions or annotations
-  const ops = components.filter(c => !isVisualComponent(c));
-  const eligible = ops;
+  // Keep connectors in the graph as pass-through nodes, but do not treat them
+  // as MTBF/MTTR reliability candidates.
+  const diagram = components.filter(c => !isVisualComponent(c));
+  const eligible = diagram.filter(c => !isConnectorComponent(c));
   // Compute component availability and expected downtime per year
   const componentStats = {};
   const availMap = {};
@@ -77,14 +85,14 @@ export function runReliability(components = []) {
   const n2Impacts = [];
   const n1FailureDetails = {};
 
-  const diagram = ops.filter(c => c && c.id);
-  const busIds = diagram.filter(c => c.type === 'bus').map(c => c.id);
-  const sourceIds = diagram
+  const diagramComponents = diagram.filter(c => c && c.id);
+  const busIds = diagramComponents.filter(c => c.type === 'bus').map(c => c.id);
+  const sourceIds = diagramComponents
     .filter(c => ['source', 'utility', 'generator', 'swing'].includes(`${c.type || ''}`.toLowerCase()))
     .map(c => c.id);
-  const baselineAdj = buildAdjacency(diagram);
+  const baselineAdj = buildAdjacency(diagramComponents);
   const baselineInbound = new Map(busIds.map(id => [id, 0]));
-  diagram.forEach(c => (c.connections || []).forEach(conn => {
+  diagramComponents.forEach(c => (c.connections || []).forEach(conn => {
     if (baselineInbound.has(conn?.target)) baselineInbound.set(conn.target, (baselineInbound.get(conn.target) || 0) + 1);
   }));
   const implicitSources = busIds.filter(id => (baselineInbound.get(id) || 0) === 0 && (baselineAdj.get(id)?.size || 0) > 0);
@@ -95,8 +103,8 @@ export function runReliability(components = []) {
     eligible.forEach(component => {
       const failedId = component.id;
       if (startIds.includes(failedId)) return;
-      const connected = findConnected(startIds.filter(id => id !== failedId), buildAdjacency(diagram, new Set([failedId])));
-      const impactedLoads = diagram
+      const connected = findConnected(startIds.filter(id => id !== failedId), buildAdjacency(diagramComponents, new Set([failedId])));
+      const impactedLoads = diagramComponents
         .filter(c => c.type === 'bus' && c.id !== failedId && !connected.has(c.id) && (baselineAdj.get(c.id)?.size || 0) > 0)
         .map(c => c.id);
       if (!impactedLoads.length) return;

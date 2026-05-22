@@ -271,7 +271,7 @@
                     <div class="table-import-export">
                         <button id="export-trays-btn">Export Trays CSV</button>
                         <button id="download-trays-template-btn">Download Sample</button>
-                        <input type="file" id="import-trays-file" accept=".csv,.xlsx">
+                        <input type="file" id="import-trays-file" accept=".csv,.xlsx" aria-label="Import trays file">
                         <button id="import-trays-btn">Import Trays</button>
                         <button id="clear-trays-btn">Clear All Trays</button>
                     </div>
@@ -291,7 +291,7 @@
                              <input type="number" id="t-w" placeholder="Width (in)" min="0" step="0.1">
                              <input type="number" id="t-h" placeholder="Height (in)" min="0" step="0.1">
                              <input type="number" id="t-fill" placeholder="Current Fill (in²)" min="0" step="0.1">
-                             <select id="t-shape">
+                             <select id="t-shape" aria-label="Tray shape">
                                  <option value="STR">Straight</option>
                                  <option value="90B">90° Bend</option>
                                  <option value="45B">45° Bend</option>
@@ -344,7 +344,7 @@
                         <div class="table-import-export">
                             <button id="export-cables-btn">Export Cables CSV</button>
                             <button id="download-cables-template-btn">Download Sample</button>
-                            <input type="file" id="import-cables-file" accept=".csv,.xlsx">
+                            <input type="file" id="import-cables-file" accept=".csv,.xlsx" aria-label="Import cables file">
                             <button id="import-cables-btn">Import Cables</button>
                         </div>
                         <button id="clear-cables-btn">Clear Cable List</button>

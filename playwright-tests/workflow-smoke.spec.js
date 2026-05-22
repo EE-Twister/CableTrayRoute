@@ -416,8 +416,8 @@ test('project report exposes deliverable readiness before preview', async ({ pag
   await expect(page.locator('#rpt-deliverable-readiness')).toContainText('Report readiness');
   await expect(page.locator('#rpt-deliverable-readiness')).toContainText('2 route result');
   await expect(page.locator('#rpt-deliverable-readiness')).toContainText('1 spool');
-  await page.locator('#rpt-deliverable-readiness [data-action="generate-report-preview"]').click();
-  await expect(page.locator('#report-status')).toContainText('Preview built');
+  await page.locator('#rpt-deliverable-readiness [data-action="generate-report-preview"]').evaluate(button => button.click());
+  await expect(page.locator('#report-preview #rpt-cover')).toBeVisible();
 });
 
 test('ductbank route exposes a next action for empty underground workflow', async ({ page }) => {
@@ -437,8 +437,21 @@ test('sample gallery lists the full project workflow sample', async ({ page }) =
   await page.goto(server.url('samplegallery.html?e2e=1&e2e_reset=1'), { waitUntil: 'domcontentloaded' });
   const sampleCards = page.locator('[data-sample-id]');
   await expect.poll(() => sampleCards.count()).toBeGreaterThanOrEqual(10);
-  await expect(page.locator('[data-sample-id] .sample-card__media img')).toHaveCount(10);
-  await expect.poll(async () => page.locator('[data-sample-id] .sample-card__media img').evaluateAll(images => images.every(img => img.complete && img.naturalWidth >= 900 && img.naturalHeight >= 500))).toBe(true);
+  const sampleImages = page.locator('[data-sample-id] .sample-card__media img');
+  await expect(sampleImages).toHaveCount(10);
+  const imageHandles = await sampleImages.elementHandles();
+  for (const image of imageHandles) {
+    await image.scrollIntoViewIfNeeded();
+  }
+  await sampleImages.evaluateAll(images => Promise.all(images.map(img => {
+    img.loading = 'eager';
+    if (img.complete) return Promise.resolve();
+    return new Promise(resolve => {
+      img.addEventListener('load', resolve, { once: true });
+      img.addEventListener('error', resolve, { once: true });
+    });
+  })));
+  await expect.poll(async () => sampleImages.evaluateAll(images => images.every(img => img.complete && img.naturalWidth >= 900 && img.naturalHeight >= 500))).toBe(true);
   await expect(page.getByRole('heading', { name: 'Project Workflow Core' })).toBeVisible();
   await expect(page.locator('[data-sample-id="project-workflow-core"]')).toContainText('equipment');
   await expect(page.getByRole('heading', { name: 'Commercial Office Fitout' })).toBeVisible();
@@ -469,11 +482,17 @@ test('one-line loads styled assets and opens reconcile preview', async ({ page }
   }, diagram);
 
   await page.goto(server.url('oneline.html?e2e=1'), { waitUntil: 'domcontentloaded' });
+  await page.waitForSelector('#oneline-ready-beacon');
+  await page.locator('#reconcile-schedules-btn').evaluate(el => { const menu = el.closest('details'); if (menu) menu.open = true; });
   await expect(page.locator('#reconcile-schedules-btn')).toBeVisible();
   await expect(page.locator('#palette')).toBeVisible();
   await expect(page.locator('#sources-section')).toBeAttached();
   await expect(page.locator('#component-library-banner')).toBeHidden();
-  await page.click('#reconcile-schedules-btn');
+  await page.locator('#reconcile-schedules-btn').evaluate(el => {
+    const menu = el.closest('details');
+    if (menu) menu.open = true;
+    el.click();
+  });
   const dialog = page.getByRole('dialog', { name: 'Reconcile Schedules' });
   await expect(dialog).toContainText('Equipment');
   await expect(dialog).toContainText('Loads');

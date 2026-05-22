@@ -11713,6 +11713,9 @@ function renderSheetTabs() {
     const tab = document.createElement('button');
     tab.textContent = s.name || `Sheet ${i + 1}`;
     tab.className = 'sheet-tab' + (i === activeSheet ? ' active' : '');
+    tab.setAttribute('role', 'tab');
+    tab.setAttribute('aria-selected', String(i === activeSheet));
+    tab.tabIndex = i === activeSheet ? 0 : -1;
     tab.addEventListener('click', () => loadSheet(i));
     tabs.appendChild(tab);
   });
@@ -13399,7 +13402,7 @@ function selectComponent(compOrId) {
       }
       pushHistory();
       render();
-      zoomToComponentNeighborhood(comp, { pad: 110, maxZoom: 1.2 });
+      zoomToComponentNeighborhood(targetComp, { pad: 110, maxZoom: 1.2 });
       save();
       markScheduleReconcilePending();
     };

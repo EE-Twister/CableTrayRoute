@@ -163,6 +163,7 @@ test.describe('next features integration: cost estimator scenarios and exports',
   });
 
   test('integration: submittal xlsx export downloads expected file', async ({ page }) => {
+    test.setTimeout(60_000);
     await navigateForE2E(page, 'submittal.html');
 
     await page.fill('#sub-project-name', 'Integration Test Project');

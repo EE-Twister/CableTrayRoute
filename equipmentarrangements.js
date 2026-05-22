@@ -56,6 +56,16 @@ let clearanceDetailsEl;
 let mccPreviewPanel;
 let contextMenu = null;
 
+function showArrangementAlert(message, title = 'Action Required') {
+  openModal({
+    title,
+    message,
+    primaryText: 'Close',
+    secondaryText: null,
+    variant: 'warning'
+  });
+}
+
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
@@ -1901,7 +1911,7 @@ function resolveLineupName() {
 function assignSelectedLineup() {
   const items = selectedEquipment();
   if (!items.length) {
-    alert('Select equipment before assigning a lineup.');
+    showArrangementAlert('Select equipment before assigning a lineup.');
     return;
   }
   const name = resolveLineupName();
@@ -1912,7 +1922,7 @@ function selectLineup() {
   const name = resolveLineupName().toLowerCase();
   const matches = state.equipment.filter(eq => String(eq.lineup || '').trim().toLowerCase() === name);
   if (!matches.length) {
-    alert('No equipment is assigned to that lineup.');
+    showArrangementAlert('No equipment is assigned to that lineup.');
     return;
   }
   state.selectedIds = new Set(matches.map(eq => eq.id));
@@ -1924,7 +1934,7 @@ function spaceLineup() {
   const matches = state.equipment.filter(eq => String(eq.lineup || '').trim().toLowerCase() === name);
   const targets = matches.length ? matches : selectedEquipment();
   if (!targets.length) {
-    alert('Select equipment or enter a lineup name before spacing a lineup.');
+    showArrangementAlert('Select equipment or enter a lineup name before spacing a lineup.');
     return;
   }
   state.selectedIds = new Set(targets.map(eq => eq.id));
@@ -2356,7 +2366,7 @@ function findListArrangement(name) {
 function buildArrangementsFromEquipmentList() {
   const groups = assignedEquipmentGroups();
   if (!groups.size) {
-    alert('Assign equipment to an Arrangement on the Equipment List page before building arrangements from the list.');
+    showArrangementAlert('Assign equipment to an Arrangement on the Equipment List page before building arrangements from the list.');
     return;
   }
 
@@ -2405,7 +2415,7 @@ function autoLayoutEquipment() {
     : state.equipment.map(eq => ({ ...eq }));
 
   if (!sourceEquipment.length) {
-    alert('Add equipment to the Equipment List or place custom equipment on the canvas before running Auto Layout.');
+    showArrangementAlert('Add equipment to the Equipment List or place custom equipment on the canvas before running Auto Layout.');
     return;
   }
 
@@ -2447,8 +2457,7 @@ function addEquipment() {
     listTag = item.tag || null;
     lineup = String(item.lineup || '').trim();
     if (listTag && state.equipment.some(e => e.listTag === listTag)) {
-      // eslint-disable-next-line no-alert
-      alert(`"${name}" is already on the canvas. Each equipment item can only be placed once.`);
+      showArrangementAlert(`"${name}" is already on the canvas. Each equipment item can only be placed once.`);
       return;
     }
   } else if (source === 'mcc-lineup') {

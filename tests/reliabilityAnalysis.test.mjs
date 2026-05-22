@@ -40,24 +40,24 @@ describe('runReliability - component filtering', () => {
     assert.ok(!('dim-1' in result.componentStats));
   });
 
-  it('includes cable-type connectors in componentStats', () => {
+  it('excludes cable-type connectors from componentStats', () => {
     const connectorTypes = ['cable', 'link', 'feeder', 'conductor', 'tap', 'splice'];
     for (const type of connectorTypes) {
       const components = [{ id: `conn-${type}`, type, mtbf: 1000, mttr: 10 }];
       const result = runReliability(components);
-      assert.ok((`conn-${type}` in result.componentStats),
-        `Expected ${type} to be included in componentStats`);
+      assert.ok(!(`conn-${type}` in result.componentStats),
+        `Expected ${type} to be excluded from componentStats`);
     }
   });
 
-  it('includes connector types with mixed casing', () => {
+  it('excludes connector types with mixed casing', () => {
     const components = [
       { id: 'cable-upper', type: 'CABLE', mtbf: 1000, mttr: 10 },
       { id: 'feeder-mixed', type: 'PowerFeeder', mtbf: 1000, mttr: 10 }
     ];
     const result = runReliability(components);
-    assert.ok('cable-upper' in result.componentStats);
-    assert.ok('feeder-mixed' in result.componentStats);
+    assert.ok(!('cable-upper' in result.componentStats));
+    assert.ok(!('feeder-mixed' in result.componentStats));
   });
 
   it('includes bus and breaker components in componentStats', () => {

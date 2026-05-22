@@ -111,10 +111,10 @@ test.describe("MCC Lineups", () => {
     const verticalWirewayInput = page.locator('[data-section-field="verticalWirewayWidthIn"]').first();
     await verticalWirewayInput.fill("5");
     await verticalWirewayInput.evaluate(node => node.dispatchEvent(new Event("change", { bubbles: true })));
-    const mainDeviceSelect = page.locator('[data-bucket-field="mainDevice"]').first();
-    await expect(mainDeviceSelect).toBeEnabled();
-    await mainDeviceSelect.selectOption("mlo");
-    await expect(mainDeviceSelect).toHaveValue("mlo");
+    const bucketTypeSelect = page.locator('[data-bucket-field="type"]').first();
+    await expect(bucketTypeSelect).toBeEnabled();
+    await bucketTypeSelect.selectOption("main-mlo");
+    await expect(bucketTypeSelect).toHaveValue("main-mlo");
     const firstEquipmentTag = page.locator('[data-bucket-field="equipmentTag"]').first();
     const firstEquipmentDescription = page.locator('[data-bucket-field="equipmentDescription"]').first();
     await expect(page.locator(".mcc-bucket-table").first().locator("thead")).toContainText("Equipment Tag");

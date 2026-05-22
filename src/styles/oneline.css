@@ -573,7 +573,7 @@
   border: 1px solid var(--ol-border-color);
   border-radius: var(--ol-radius);
   background: var(--secondary-color);
-  color: var(--text-color);
+  color: #111827;
   padding: 0.25rem 0.5rem;
   font-size: 0.78rem;
   font-weight: 600;
@@ -581,9 +581,9 @@
 }
 
 #palette .palette-filter.active {
-  background: var(--primary-color);
-  border-color: var(--primary-color);
-  color: var(--secondary-color);
+  background: #1e40af;
+  border-color: #1e40af;
+  color: #ffffff;
 }
 
 .palette-pinned {
@@ -949,7 +949,7 @@ body.compact-mode .palette-section .section-buttons {
 }
 
 .command-label {
-  color: var(--text-muted, #667085);
+  color: #344054;
   font-size: 0.75rem;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -1021,6 +1021,8 @@ body.compact-mode .palette-section .section-buttons {
   gap: 0.35rem;
   min-height: 2.15rem;
   white-space: nowrap;
+  color: #111827 !important;
+  background: #ffffff !important;
 }
 
 .command-menu-trigger::after {
@@ -1034,8 +1036,8 @@ body.compact-mode .palette-section .section-buttons {
 }
 
 .command-menu[open] > .command-menu-trigger {
-  background-color: var(--secondary-color);
-  color: var(--primary-color);
+  background-color: #eef2ff !important;
+  color: #1e40af !important;
 }
 
 .command-menu-panel {
@@ -1247,12 +1249,12 @@ body.compact-mode .palette-section .section-buttons {
   border: 1px solid var(--border-color);
   background: var(--ol-card-bg);
   cursor: pointer;
-  color: var(--text-color);
+  color: #111827;
 }
 
 .sheet-tab.active {
-  background: var(--primary-color);
-  color: var(--secondary-color);
+  background: #1e40af;
+  color: #ffffff;
   font-weight: bold;
 }
 
@@ -1343,6 +1345,7 @@ body.compact-mode .palette-section .section-buttons {
   min-width: 3rem;
   text-align: center;
   font-variant-numeric: tabular-nums;
+  color: #111827 !important;
 }
 
 .workspace {
@@ -1516,6 +1519,7 @@ body.oneline-page.engineering-print-mode .oneline-canvas-scroll #diagram {
   min-height: 0;
   overflow: auto;
   scrollbar-gutter: stable both-edges;
+  outline-offset: 2px;
 }
 
 body.oneline-page .oneline-canvas-scroll #diagram {
@@ -1571,7 +1575,7 @@ body.oneline-page .palette-scroll {
 .right-rail-tab {
   border: 1px solid var(--ol-border-color);
   background: var(--secondary-color);
-  color: var(--text-color);
+  color: #111827;
   border-radius: var(--ol-radius);
   padding: 0.35rem 0.45rem;
   cursor: pointer;
@@ -1580,9 +1584,9 @@ body.oneline-page .palette-scroll {
 }
 
 .right-rail-tab.is-active {
-  background: var(--primary-color);
-  border-color: var(--primary-color);
-  color: var(--secondary-color);
+  background: #1e40af;
+  border-color: #1e40af;
+  color: #ffffff;
   font-weight: 600;
 }
 

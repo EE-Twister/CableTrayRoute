@@ -247,11 +247,12 @@ test.describe('Product Configurator', () => {
   test('performs a calculation without crashing', async ({ page }) => {
     await page.fill('#cable-weight', '10');
     await page.fill('#span', '8');
+    await page.fill('#cable-csa', '12');
 
-    const btn = page.locator('button[type="submit"]').first();
+    const btn = page.locator('#configure-btn, button[type="submit"], #calc-btn, button:has-text("Configur"), button:has-text("Select")').first();
     await btn.click();
 
-    await expect(page.locator('body')).toBeVisible();
+    await expect(page.locator('#results')).not.toBeEmpty();
   });
 });
 
@@ -335,6 +336,11 @@ test.describe('Pull Cards', () => {
         { name: 'PC-1', cable_type: 'Power', diameter: 0.75, weight: 0.5 },
         { name: 'PC-2', cable_type: 'Control', diameter: 0.45, weight: 0.2 }
       ]));
+      localStorage.setItem('base:traySchedule', JSON.stringify([
+        { tray_id: 'T1' },
+        { tray_id: 'T2' },
+        { tray_id: 'T3' }
+      ]));
       sessionStorage.setItem('base:routeCache', JSON.stringify({
         batchResults: [
           {
@@ -376,6 +382,9 @@ test.describe('Pull Cards', () => {
     await page.evaluate(() => {
       localStorage.setItem('base:cableSchedule', JSON.stringify([
         { name: 'LEGACY-1', cable_type: 'Power', diameter: 0.75, weight: 0.5 }
+      ]));
+      localStorage.setItem('base:traySchedule', JSON.stringify([
+        { tray_id: 'T1' }
       ]));
       sessionStorage.setItem('base:routeCache', JSON.stringify({
         batchResults: [{
@@ -665,16 +674,18 @@ test.describe('Spool Sheets', () => {
     await dismissOnboarding(page);
 
     await page.click('#add-tray-btn');
-    const row = page.locator('#trayTable tbody tr').last();
-    await row.locator('[name="tray_id"]').fill('AUTO-SP-1');
-    await row.locator('[name="start_x"]').fill('0');
-    await row.locator('[name="start_y"]').fill('0');
-    await row.locator('[name="start_z"]').fill('8');
-    await row.locator('[name="end_x"]').fill('24');
-    await row.locator('[name="end_y"]').fill('0');
-    await row.locator('[name="end_z"]').fill('8');
-    await row.locator('[name="inside_width"]').selectOption('12');
-    await row.locator('[name="tray_depth"]').selectOption('4');
+    const dialog = page.getByRole('dialog', { name: 'Add Tray' });
+    await expect(dialog).toBeVisible();
+    await dialog.locator('[name="tray_id"]').fill('AUTO-SP-1');
+    await dialog.locator('[name="start_x"]').fill('0');
+    await dialog.locator('[name="start_y"]').fill('0');
+    await dialog.locator('[name="start_z"]').fill('8');
+    await dialog.locator('[name="end_x"]').fill('24');
+    await dialog.locator('[name="end_y"]').fill('0');
+    await dialog.locator('[name="end_z"]').fill('8');
+    await dialog.locator('[name="inside_width"]').selectOption('12');
+    await dialog.locator('[name="tray_depth"]').selectOption('4');
+    await dialog.getByRole('button', { name: 'Add Tray' }).click();
 
     await expect.poll(() => page.evaluate(() => {
       const rows = JSON.parse(localStorage.getItem('base:traySchedule') || '[]');

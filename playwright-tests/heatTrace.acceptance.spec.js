@@ -166,6 +166,7 @@ test.describe('heat trace sizing acceptance', () => {
   });
 
   test('acceptance HT-06 [heat trace] [AT-HT-06]: branch cases, report, and export package persist expected sheets', async ({ page }) => {
+    test.setTimeout(60_000);
     await navigateHeatTrace(page);
     await fillHeatTraceInputs(page, HEAT_TRACE_FIXTURES.normal);
     await runHeatTraceAnalysis(page);

@@ -678,34 +678,41 @@ async function refreshSession() {
   }
 }
 
-if (typeof window !== 'undefined') {
-  window.projectManager = { listProjects, newProject, renameProject, saveProject, loadProject };
-  window.addEventListener('DOMContentLoaded', () => {
-    document.getElementById('new-project-btn')?.addEventListener('click', () => { newProject().catch(console.error); });
-    document.getElementById('save-project-btn')?.addEventListener('click', () => { saveProject().catch(console.error); });
-    document.getElementById('load-project-btn')?.addEventListener('click', () => { loadProject().catch(console.error); });
-    mountShareControls();
+function initProjectManagerControls() {
+  const wireButton = (id, handler) => {
+    const btn = document.getElementById(id);
+    if (!btn || btn.dataset.projectManagerWired === 'true') return;
+    btn.dataset.projectManagerWired = 'true';
+    btn.addEventListener('click', () => { handler().catch(console.error); });
+  };
 
-    // Add login/logout button
-    const menu = document.getElementById('settings-menu');
-    if (menu) {
-      const btn = document.createElement('button');
-      function updateLabel() {
-        btn.textContent = getAuthContext() ? 'Logout' : 'Login';
-      }
-      updateLabel();
-      btn.addEventListener('click', () => {
-        if (getAuthContext()) {
-          clearAuthContext();
-          updateLabel();
-        } else {
-          location.href = 'login.html';
-        }
-      });
-      menu.appendChild(btn);
+  wireButton('new-project-btn', newProject);
+  wireButton('save-project-btn', saveProject);
+  wireButton('load-project-btn', loadProject);
+  mountShareControls();
+
+  // Add login/logout button
+  const menu = document.getElementById('settings-menu');
+  if (menu && !document.getElementById('auth-session-btn')) {
+    const btn = document.createElement('button');
+    btn.id = 'auth-session-btn';
+    function updateLabel() {
+      btn.textContent = getAuthContext() ? 'Logout' : 'Login';
     }
+    updateLabel();
+    btn.addEventListener('click', () => {
+      if (getAuthContext()) {
+        clearAuthContext();
+        updateLabel();
+      } else {
+        location.href = 'login.html';
+      }
+    });
+    menu.appendChild(btn);
+  }
 
-    // Session expiry warning banner
+  if (!window.__projectManagerSessionListenersWired) {
+    window.__projectManagerSessionListenersWired = true;
     window.addEventListener('session-expiring', () => {
       showSessionBanner('Your session expires in 5 minutes. Unsaved server changes may be lost.', [
         {
@@ -732,5 +739,14 @@ if (typeof window !== 'undefined') {
         { label: 'Dismiss', onClick: dismissSessionBanner }
       ]);
     });
-  });
+  }
+}
+
+if (typeof window !== 'undefined') {
+  window.projectManager = { listProjects, newProject, renameProject, saveProject, loadProject };
+  if (document.readyState === 'loading') {
+    window.addEventListener('DOMContentLoaded', initProjectManagerControls, { once: true });
+  } else {
+    initProjectManagerControls();
+  }
 }

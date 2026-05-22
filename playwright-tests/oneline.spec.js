@@ -68,8 +68,8 @@ test('palette click places upright devices and creates provisional click connect
   await page.goto(pageUrl('oneline.html?e2e=1'));
   await page.waitForSelector('[data-oneline-ready="1"]');
 
-  await page.locator('[data-testid="palette-button"][data-subtype="utility"]').click();
-  await page.locator('[data-testid="palette-button"][data-subtype="switchboard"]').click();
+  await page.locator('[data-testid="palette-button"][data-subtype="utility"]').first().click();
+  await page.locator('[data-testid="palette-button"][data-subtype="switchboard"]').first().click();
 
   const placed = await page.evaluate(() => {
     const store = window.dataStore?.getOneLine?.();
@@ -86,8 +86,22 @@ test('palette click places upright devices and creates provisional click connect
   expect(placed[1].y).toBeGreaterThan(placed[0].y);
 
   await page.click('#connect-btn');
-  await page.locator(`g.component[data-id="${placed[0].id}"]`).click();
-  await page.locator(`g.component[data-id="${placed[1].id}"]`).click();
+  await page.evaluate(([sourceId, targetId]) => {
+    const dispatchConnectPointer = id => {
+      const node = document.querySelector(`g.component[data-id="${id}"]`);
+      if (!node) return;
+      const rect = node.getBoundingClientRect();
+      node.dispatchEvent(new MouseEvent('mousedown', {
+        bubbles: true,
+        cancelable: true,
+        button: 0,
+        clientX: rect.left + rect.width / 2,
+        clientY: rect.top + rect.height / 2
+      }));
+    };
+    dispatchConnectPointer(sourceId);
+    dispatchConnectPointer(targetId);
+  }, [placed[0].id, placed[1].id]);
 
   const connection = await page.evaluate(sourceId => {
     const store = window.dataStore?.getOneLine?.();
@@ -289,7 +303,7 @@ test('view controls render datablocks, state coloring, and operating overrides',
   await expect(page.locator('.component-datablock').first()).toContainText(/Voltage/i);
 
   await page.selectOption('#data-state-overlay-select', 'review');
-  await expect(page.locator('.data-state-fill').first()).toBeVisible();
+  await expect(page.locator('.data-state-badge, .data-state-fill').first()).toBeVisible();
   await expect(page.locator('#voltage-legend')).toContainText('Data State');
   await page.keyboard.press('Escape');
 

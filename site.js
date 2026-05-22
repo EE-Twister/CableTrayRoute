@@ -665,27 +665,31 @@ function base64ToBytes(b64){
 
 async function compressString(str){
   try{
-    const cs=new CompressionStream('gzip');
-    const writer=cs.writable.getWriter();
-    await writer.write(new TextEncoder().encode(str));
-    await writer.close();
-    const buffer=await new Response(cs.readable).arrayBuffer();
-    return new Uint8Array(buffer);
-  }catch{
+    if(typeof CompressionStream==='function'&&typeof Blob==='function'){
+      const stream=new Blob([str],{type:'application/json'}).stream().pipeThrough(new CompressionStream('gzip'));
+      const buffer=await new Response(stream).arrayBuffer();
+      return new Uint8Array(buffer);
+    }
+  }catch{}
+  try{
     return new TextEncoder().encode(str);
+  }catch{
+    return new Uint8Array();
   }
 }
 
 async function decompressBytes(bytes){
   try{
-    const ds=new DecompressionStream('gzip');
-    const writer=ds.writable.getWriter();
-    await writer.write(bytes);
-    await writer.close();
-    const buffer=await new Response(ds.readable).arrayBuffer();
-    return new TextDecoder().decode(buffer);
-  }catch{
+    if(typeof DecompressionStream==='function'&&typeof Blob==='function'){
+      const stream=new Blob([bytes],{type:'application/octet-stream'}).stream().pipeThrough(new DecompressionStream('gzip'));
+      const buffer=await new Response(stream).arrayBuffer();
+      return new TextDecoder().decode(buffer);
+    }
+  }catch{}
+  try{
     return new TextDecoder().decode(bytes);
+  }catch{
+    return '';
   }
 }
 
@@ -1935,6 +1939,8 @@ function initShortcutsOverlay(){
   overlay.setAttribute('aria-modal','true');
   overlay.setAttribute('aria-labelledby','shortcuts-overlay-title');
   overlay.setAttribute('aria-hidden','true');
+  overlay.inert = true;
+  overlay.hidden = true;
 
   const panel=document.createElement('div');
   panel.className='shortcuts-overlay-panel';
@@ -1942,6 +1948,7 @@ function initShortcutsOverlay(){
   const closeBtn=document.createElement('button');
   closeBtn.className='close-btn';
   closeBtn.setAttribute('aria-label','Close keyboard shortcuts');
+  closeBtn.tabIndex = -1;
   closeBtn.textContent='\u00D7';
 
   const title=document.createElement('h2');
@@ -1997,13 +2004,19 @@ function initShortcutsOverlay(){
   document.body.appendChild(overlay);
 
   function open(){
+    overlay.inert = false;
+    overlay.hidden = false;
     overlay.classList.add('is-open');
     overlay.setAttribute('aria-hidden','false');
+    closeBtn.tabIndex = 0;
     closeBtn.focus();
   }
   function close(){
     overlay.classList.remove('is-open');
     overlay.setAttribute('aria-hidden','true');
+    overlay.inert = true;
+    closeBtn.tabIndex = -1;
+    overlay.hidden = true;
   }
 
   closeBtn.addEventListener('click',close);

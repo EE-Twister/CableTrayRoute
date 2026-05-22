@@ -88,6 +88,10 @@ test.describe('loadlist experience', () => {
     await dialog.getByRole('button', { name: 'Import Loads' }).click();
 
     await expect(dialog).toHaveCount(0);
+    const preview = page.getByRole('dialog', { name: 'Preview Load Import' });
+    await expect(preview).toBeVisible();
+    await preview.getByRole('button', { name: 'Replace Existing' }).click();
+    await expect(preview).toHaveCount(0);
     await expect(page.locator('#load-table tbody tr')).toHaveCount(1);
     await expect(page.locator('#load-table tbody tr:first-child input[name="description"]')).toHaveValue('Imported exhaust fan');
     await expect(page.locator('#load-table tbody tr:first-child input[name="kw"]')).toHaveValue('7.5');

@@ -496,6 +496,7 @@ function solvePhase(buses, baseMVA, options = {}) {
       const shuntFromLossKW = ViPrimeMag2 * (yShFrom.re || 0) * scale;
       const shuntToLossKW = VjMag2 * (yShTo.re || 0) * scale;
       flows.push({
+        id: conn.componentId || conn.id || `${bus.id}->${working[j].id}`,
         from: bus.id,
         fromLabel: getBusDisplayLabel(bus.id),
         to: working[j].id,

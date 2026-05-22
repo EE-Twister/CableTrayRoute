@@ -26,6 +26,8 @@ Use the full-regression commands for comprehensive coverage:
 
 This lane is intended for nightly/scheduled runs and release hardening.
 
+`npm run test:full` uses `scripts/runNodeTests.mjs` to discover every active Node test file matching `*.test.*` or `*.spec.*` under `tests/` and `analysis/`. There are no intentional Node-test exclusions in the full lane; browser Playwright specs stay in the `e2e:*` lanes.
+
 ## CI compatibility policy
 
 To remain compatible with existing CI workflows that invoke `npm test` and `npm run e2e`:
@@ -34,6 +36,13 @@ To remain compatible with existing CI workflows that invoke `npm test` and `npm 
 - `npm run e2e` is retained and maps to `npm run e2e:full`
 
 This preserves current behavior while adding explicit lane names for teams that want to split pre-merge and nightly pipelines.
+
+Current command mappings:
+
+- `npm run test:critical` -> curated fast Node lane for core workflow, security, validation, and study-basis checks
+- `npm run test:full` -> discovered Node full regression lane via `scripts/runNodeTests.mjs`
+- `npm run e2e:critical` -> curated Playwright smoke lane for high-risk browser journeys
+- `npm run e2e:full` -> full Playwright browser lane
 
 
 ## Next-features phased lane sequence

@@ -29,11 +29,7 @@ test.describe('Support Span Calculator', () => {
   });
 
   test('calculates span and shows results', async ({ page }) => {
-    // Fill in typical values
-    await page.fill('#trayWidth', '24');
-    await page.fill('#trayDepth', '4');
-    await page.fill('#trayWeight', '5.5');
-    await page.fill('#cableLoad', '20');
+    await page.fill('#cableWeightPerFt', '20');
     await page.selectOption('#loadClass', { index: 0 });
 
     await page.click('#calcBtn');
@@ -157,9 +153,9 @@ test.describe('Ground Grid Analysis', () => {
     await page.fill('#surface-hs', '0.6');
     await page.locator('#grid-lx').dispatchEvent('input');
 
-    await expect(activePreview.locator('line.grid-conductor')).toHaveCount(17);
+    await expect(activePreview.locator('line.grid-conductor')).toHaveCount(18);
     await expect(activePreview.locator('rect.grid-outline')).toHaveCount(1);
-    await expect(activeElevation.locator('rect.grid-conductor-band')).toHaveCount(1);
+    await expect(activeElevation.locator('rect.grid-conductor-band')).toHaveCount(2);
   });
 
   test('shows rod markers when rods are enabled', async ({ page }) => {

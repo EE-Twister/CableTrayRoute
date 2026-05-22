@@ -24,7 +24,7 @@ const PAGES = [
 
 for (const page of PAGES) {
   test(`WCAG 2.1 AA: ${page}`, async ({ page: pw }) => {
-    await pw.goto(page);
+    await pw.goto(`${page}?e2e=1`);
     // Wait for the page shell to settle (scripts may inject nav etc.)
     await pw.waitForLoadState('domcontentloaded');
 

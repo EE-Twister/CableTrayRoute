@@ -52,6 +52,10 @@ test.describe('Cable Schedule export', () => {
 // ---------------------------------------------------------------------------
 test.describe('Optimal Route tray CSV export', () => {
   test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => {
+      localStorage.clear();
+      sessionStorage.clear();
+    });
     await page.goto(pageUrl('optimalRoute.html?e2e=1&e2e_reset=1'));
     await page.waitForLoadState('networkidle');
   });
@@ -99,7 +103,8 @@ test.describe('Raceway Schedule export', () => {
   });
 
   test('download template button is available', async ({ page }) => {
-    const btn = page.locator('#download-trays-template-btn, [id*="template"]').first();
+    const btn = page.locator('#download-trays-template-btn');
+    await btn.evaluate(el => { const menu = el.closest('details'); if (menu) menu.open = true; });
     await expect(btn).toBeVisible();
   });
 });
