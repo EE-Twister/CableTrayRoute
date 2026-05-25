@@ -8,6 +8,7 @@
     "test": "npm run test:full",
     "e2e": "npm run e2e:full",
     "server": "node server.mjs",
+    "lint": "node node_modules/.bin/eslint --config eslint.config.cjs \"**/*.{js,mjs}\" --ignore-pattern \"dist/**\" --ignore-pattern \"node_modules/**\"",
     "test:critical": "node tests/ampacity.test.mjs && node tests/racewayRoute.test.cjs && node tests/analysis.test.cjs && node tests/serverSecurity.test.mjs && node tests/collaborationServer.test.mjs && node tests/projectDisplayScheduler.test.mjs && node tests/revitImporter.test.mjs && node tests/validation.test.mjs && node tests/validationManifest.test.mjs && node tests/studyBasis.test.mjs",
     "test:full": "node scripts/runNodeTests.mjs",
     "test:enterprise-auth": "node tests/auditLog.test.mjs && node tests/rbac.test.mjs && node tests/oidc.test.mjs",
@@ -29,6 +30,7 @@
     "@playwright/test": "^1.41.1",
     "@rollup/plugin-json": "^6.1.0",
     "@rollup/plugin-terser": "^1.0.0",
+    "eslint": "^10.4.0",
     "rollup": "^3.30.0"
   },
   "dependencies": {

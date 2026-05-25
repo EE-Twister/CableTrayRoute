@@ -6,6 +6,7 @@
  *   start(steps, 'myPageKey');       // run tour; marks key done on finish/skip
  *   if (!hasDoneTour('myPageKey')) { start(steps, 'myPageKey'); } // auto-trigger once
  */
+import { readAppSetting, writeAppSetting } from './projectStorage.js';
 
 /**
  * Returns true if the user has previously completed or skipped the tour for
@@ -16,7 +17,7 @@
 export function hasDoneTour(tourKey) {
   if (!tourKey) return false;
   try {
-    return !!localStorage.getItem('tour_done_' + tourKey);
+    return !!readAppSetting('tour_done_' + tourKey);
   } catch {
     return false;
   }
@@ -79,7 +80,7 @@ export function start(steps, tourKey = null) {
 
   function markDone() {
     if (tourKey) {
-      try { localStorage.setItem('tour_done_' + tourKey, '1'); } catch { /* storage unavailable */ }
+      try { writeAppSetting('tour_done_' + tourKey, '1'); } catch { /* storage unavailable */ }
     }
   }
 

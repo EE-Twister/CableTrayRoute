@@ -7,6 +7,7 @@ const AUTH_TOKEN_KEY = 'authToken';
 const AUTH_CSRF_KEY = 'authCsrfToken';
 const AUTH_EXPIRES_KEY = 'authExpiresAt';
 const AUTH_USER_KEY = 'authUser';
+const AUTH_ROLE_KEY = 'ctr-user-role';
 const FAST_JSON_PATCH_URL = (() => {
   if (typeof document !== 'undefined' && document.baseURI) {
     return new URL('dist/vendor/fast-json-patch.mjs', document.baseURI).href;
@@ -839,7 +840,8 @@ export function getAuthContextState() {
     return null;
   }
   const user = readRawStorage(AUTH_USER_KEY);
-  return { token, csrfToken, expiresAt, user: user || null };
+  const role = readRawStorage(AUTH_ROLE_KEY);
+  return { token, csrfToken, expiresAt, user: user || null, role: role || null };
 }
 
 const SESSION_WARNING_MS = 5 * 60 * 1000; // warn 5 minutes before expiry
@@ -880,7 +882,7 @@ function scheduleSessionTimers(expiresAt) {
   }, msUntilExpiry);
 }
 
-export function setAuthContextState({ token, csrfToken, expiresAt, user }) {
+export function setAuthContextState({ token, csrfToken, expiresAt, user, role }) {
   if (!token || !csrfToken) return;
   const expiresValue = Number(expiresAt);
   if (!Number.isFinite(expiresValue)) return;
@@ -892,6 +894,11 @@ export function setAuthContextState({ token, csrfToken, expiresAt, user }) {
   } else {
     writeRawStorage(AUTH_USER_KEY, String(user));
   }
+  if (role === undefined || role === null) {
+    writeRawStorage(AUTH_ROLE_KEY, null);
+  } else {
+    writeRawStorage(AUTH_ROLE_KEY, String(role));
+  }
   scheduleSessionTimers(expiresValue);
 }
 
@@ -901,6 +908,19 @@ export function clearAuthContextState() {
   writeRawStorage(AUTH_CSRF_KEY, null);
   writeRawStorage(AUTH_EXPIRES_KEY, null);
   writeRawStorage(AUTH_USER_KEY, null);
+  writeRawStorage(AUTH_ROLE_KEY, null);
+}
+
+export function getAuthRole() {
+  return readRawStorage(AUTH_ROLE_KEY) || null;
+}
+
+export function readAppSetting(key) {
+  return readRawStorage(key);
+}
+
+export function writeAppSetting(key, value) {
+  writeRawStorage(key, value);
 }
 
 function getStorage() {

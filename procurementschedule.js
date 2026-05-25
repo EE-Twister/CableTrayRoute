@@ -39,6 +39,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function loadRouteResults() {
     // Check sessionStorage first, then localStorage — same pattern as pullcards.js
+    // TODO(Phase 4): expose a listAppSettingKeys(prefix) helper from projectStorage.js
+    // eslint-disable-next-line no-restricted-globals
     for (const storage of [sessionStorage, localStorage]) {
       for (const key of Object.keys(storage)) {
         if (key.endsWith('routeCache') || key.includes('routeCache')) {

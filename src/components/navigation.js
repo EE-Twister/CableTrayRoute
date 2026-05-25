@@ -1,3 +1,5 @@
+import { getAuthRole } from '../../projectStorage.js';
+
 export const NAV_ROUTES = [
   { href: 'index.html', label: 'Home', section: 'Home', icon: 'icons/route.svg' },
   { href: 'workflowdashboard.html', label: 'Project Dashboard', section: 'Workflow', group: 'Planning', icon: 'icons/toolbar/grid.svg' },
@@ -303,7 +305,7 @@ function mountPersistentNavigation() {
   const navLinks = document.createElement('div');
   navLinks.id = 'nav-links';
   navLinks.className = 'nav-links';
-  const isAdmin = typeof localStorage !== 'undefined' && localStorage.getItem('ctr-user-role') === 'admin';
+  const isAdmin = getAuthRole() === 'admin';
   const visibleRoutes = NAV_ROUTES.filter(r => !r.adminOnly || isAdmin);
   const navSections = [...new Set(visibleRoutes.map(r => r.section))];
   navSections.forEach(section => {

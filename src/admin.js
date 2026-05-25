@@ -1,4 +1,4 @@
-import { getAuthContextState, clearAuthContextState } from '../projectStorage.js';
+import { getAuthContextState, getAuthRole, clearAuthContextState } from '../projectStorage.js';
 import { mountPersistentNavigation } from './components/navigation.js';
 
 const ROLE_OPTIONS = ['read-only', 'reviewer', 'engineer', 'admin'];
@@ -236,7 +236,7 @@ async function init() {
     return;
   }
 
-  const role = localStorage.getItem('ctr-user-role');
+  const role = getAuthRole();
   if (role !== 'admin') {
     accessCheck.innerHTML = '<p class="table-error">Admin role required. Your current role is: ' + escapeHtml(role ?? 'unknown') + '</p>';
     return;

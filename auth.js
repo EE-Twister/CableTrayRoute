@@ -95,8 +95,7 @@ async function login(e) {
     });
     if (res.ok) {
       const { token, csrfToken, expiresAt, role } = await res.json();
-      setAuthContextState({ token, csrfToken, expiresAt, user: username });
-      if (role) localStorage.setItem('ctr-user-role', role);
+      setAuthContextState({ token, csrfToken, expiresAt, user: username, role: role || null });
       window.location.href = 'index.html';
       return;
     }
