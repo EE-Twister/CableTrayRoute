@@ -17,6 +17,14 @@ import {
   READINESS_VOCABULARY,
   getContractReadinessCopy
 } from './src/workflowStatus.js';
+import {
+  isXlsxExportAvailable,
+  isXlsxImportAvailable,
+  readFirstSheet,
+  todayStamp,
+  writeAoaWorkbook
+} from './src/cable-schedule/io.js';
+import { renderCablePrintReport as renderCablePrintReportTo } from './src/cable-schedule/printReport.js';
 const { sizeToArea } = ampacity;
 const CABLE_READINESS_COPY = getContractReadinessCopy('cableschedule.html');
 
@@ -1453,29 +1461,24 @@ async function initCableSchedule() {
       const templatesForExport = this.templates.map(tpl =>
         filterTemplateFields(tpl, { keepLabel: true, keepTypicalId: true })
       );
-      if (typeof XLSX !== 'undefined' && XLSX && typeof XLSX.utils?.aoa_to_sheet === 'function') {
-        try {
-          const headerConfig = this.headerConfig;
-          const headerRow = headerConfig.map(cfg => cfg.header);
-          const rows = templatesForExport.map(tpl =>
-            headerConfig.map(({ key }) => {
-              if (key === 'label') return sanitizeTemplateFieldValue(tpl.label);
-              if (key === 'template_id') return sanitizeTemplateFieldValue(tpl.template_id);
-              return sanitizeTemplateFieldValue(tpl[key]);
-            })
-          );
-          const sheetData = [headerRow, ...rows];
-          const sheet = XLSX.utils.aoa_to_sheet(sheetData);
-          const workbook = XLSX.utils.book_new();
-          XLSX.utils.book_append_sheet(workbook, sheet, 'Cable Typicals');
-          const stamp = new Date().toISOString().split('T')[0];
-          XLSX.writeFile(workbook, `cable-typicals-${stamp}.xlsx`);
-          return;
-        } catch (err) {
-          console.error('Failed to export cable typicals to Excel', err);
-          showAlertModal('Export Error', 'Unable to export cable typicals to Excel.');
-          return;
-        }
+      if (isXlsxExportAvailable()) {
+        const headerConfig = this.headerConfig;
+        const headerRow = headerConfig.map(cfg => cfg.header);
+        const rows = templatesForExport.map(tpl =>
+          headerConfig.map(({ key }) => {
+            if (key === 'label') return sanitizeTemplateFieldValue(tpl.label);
+            if (key === 'template_id') return sanitizeTemplateFieldValue(tpl.template_id);
+            return sanitizeTemplateFieldValue(tpl[key]);
+          })
+        );
+        const result = writeAoaWorkbook([headerRow, ...rows], {
+          sheetName: 'Cable Typicals',
+          filename: `cable-typicals-${todayStamp()}.xlsx`
+        });
+        if (result.ok) return;
+        console.error('Failed to export cable typicals to Excel', result.error);
+        showAlertModal('Export Error', 'Unable to export cable typicals to Excel.');
+        return;
       }
       const payload = {
         version: 1,
@@ -1534,36 +1537,30 @@ async function initCableSchedule() {
         const isExcel = name.endsWith('.xlsx') || type.includes('spreadsheet');
         let candidates;
         if (isExcel) {
-          if (typeof XLSX === 'undefined' || !XLSX || typeof XLSX.read !== 'function' || !XLSX.utils || typeof XLSX.utils.sheet_to_json !== 'function') {
+          if (!isXlsxImportAvailable()) {
             console.error('Excel import requested but XLSX library is unavailable');
             showAlertModal('Import Error', 'Excel import is not supported in this environment.');
             resetInput();
             return;
           }
-          let workbook;
-          try {
-            const buffer = await file.arrayBuffer();
-            workbook = XLSX.read(buffer, { type: 'array' });
-          } catch (err) {
-            console.error('Failed to read cable typical Excel file', err);
-            showAlertModal('Import Error', 'Unable to import cable typicals. The Excel file could not be read.');
+          const buffer = await file.arrayBuffer();
+          const result = readFirstSheet(buffer);
+          if (!result.ok) {
+            if (result.code === 'no-sheets') {
+              showAlertModal('Import Error', 'No sheets were found in the selected file.');
+            } else {
+              if (result.error) console.error('Failed to read cable typical Excel file', result.error);
+              showAlertModal('Import Error', 'Unable to import cable typicals. The Excel file could not be read.');
+            }
             resetInput();
             return;
           }
-          const sheetName = workbook.SheetNames && workbook.SheetNames[0];
-          if (!sheetName) {
-            showAlertModal('Import Error', 'No sheets were found in the selected file.');
-            resetInput();
-            return;
-          }
-          const sheet = workbook.Sheets[sheetName];
-          const rows = XLSX.utils.sheet_to_json(sheet, { defval: '', raw: true });
-          if (!Array.isArray(rows) || rows.length === 0) {
+          if (!result.rows.length) {
             showAlertModal('Import Error', 'No cable typicals found in the selected file.');
             resetInput();
             return;
           }
-          candidates = rows
+          candidates = result.rows
             .map(row => this.normalizeExcelRow(row))
             .filter(Boolean);
         } else {
@@ -3069,25 +3066,24 @@ async function initCableSchedule() {
   };
   table.importXlsx = async function(file) {
     if (!file) return;
-    if (typeof XLSX === 'undefined' || !XLSX?.read || !XLSX?.utils?.sheet_to_json) {
+    if (!isXlsxImportAvailable()) {
       showAlertModal('Import Error', 'Excel import is not available in this environment.');
       return;
     }
-    let rows = [];
-    try {
-      const buffer = await file.arrayBuffer();
-      const workbook = XLSX.read(buffer, { type: 'array' });
-      const sheetName = workbook.SheetNames && workbook.SheetNames[0];
-      if (!sheetName) {
+    const buffer = await file.arrayBuffer();
+    const result = readFirstSheet(buffer);
+    if (!result.ok) {
+      if (result.code === 'unavailable') {
+        showAlertModal('Import Error', 'Excel import is not available in this environment.');
+      } else if (result.code === 'no-sheets') {
         showAlertModal('Import Error', 'No sheets were found in the selected file.');
-        return;
+      } else {
+        console.error('Failed to read cable import file', result.error);
+        showAlertModal('Import Error', 'Unable to read the selected Excel file.');
       }
-      rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { defval: '', raw: true });
-    } catch (err) {
-      console.error('Failed to read cable import file', err);
-      showAlertModal('Import Error', 'Unable to read the selected Excel file.');
       return;
     }
+    const rows = result.rows;
     if (!rows.length) {
       showAlertModal('Import Error', 'No cable rows were found in the selected file.');
       return;
@@ -3252,7 +3248,7 @@ async function initCableSchedule() {
     return value == null ? '' : value;
   };
   const exportCableReport = mode => {
-    if (typeof XLSX === 'undefined' || !XLSX?.utils) {
+    if (!isXlsxExportAvailable()) {
       showAlertModal('Export Error', 'Excel export is not available in this environment.');
       return;
     }
@@ -3263,52 +3259,26 @@ async function initCableSchedule() {
       reportColumns.map(col => col.label),
       ...reportRows.map(row => reportColumns.map(col => formatReportValue(row[col.key])))
     ];
-    const workbook = XLSX.utils.book_new();
-    const sheet = XLSX.utils.aoa_to_sheet(sheetData);
-    XLSX.utils.book_append_sheet(workbook, sheet, REPORT_MODE_LABELS[reportMode].slice(0, 31));
-    const stamp = new Date().toISOString().split('T')[0];
     const suffix = reportMode.replace(/[^a-z0-9]+/gi, '-').toLowerCase();
-    XLSX.writeFile(workbook, `cable-schedule-${suffix}-${stamp}.xlsx`);
+    const result = writeAoaWorkbook(sheetData, {
+      sheetName: REPORT_MODE_LABELS[reportMode],
+      filename: `cable-schedule-${suffix}-${todayStamp()}.xlsx`
+    });
+    if (!result.ok) {
+      showAlertModal('Export Error', 'Excel export is not available in this environment.');
+    }
   };
   const renderCablePrintReport = mode => {
     const host = document.getElementById('cable-print-report');
     if (!host) return;
     const reportMode = REPORT_MODE_LABELS[mode] ? mode : 'visible';
-    const reportColumns = getReportColumns(reportMode);
-    const reportRows = getReportRows(reportMode);
-    host.innerHTML = '';
-    host.removeAttribute('aria-hidden');
-    const meta = document.createElement('div');
-    meta.className = 'print-report-meta';
-    const title = document.createElement('strong');
-    title.textContent = `Cable Schedule - ${REPORT_MODE_LABELS[reportMode]}`;
-    const generated = document.createElement('span');
-    generated.textContent = `Generated ${formatDateTime(new Date())}`;
-    meta.append(title, generated);
-    const tableEl = document.createElement('table');
-    tableEl.className = 'cable-print-table';
-    const thead = tableEl.createTHead();
-    const header = thead.insertRow();
-    reportColumns.forEach(col => {
-      const th = document.createElement('th');
-      th.textContent = col.label;
-      header.appendChild(th);
+    renderCablePrintReportTo(host, {
+      columns: getReportColumns(reportMode),
+      rows: getReportRows(reportMode),
+      modeLabel: REPORT_MODE_LABELS[reportMode],
+      formatValue: formatReportValue,
+      formatDateTime
     });
-    const tbody = tableEl.createTBody();
-    reportRows.forEach(row => {
-      const tr = tbody.insertRow();
-      reportColumns.forEach(col => {
-        const td = tr.insertCell();
-        td.textContent = formatReportValue(row[col.key]);
-      });
-    });
-    if (!reportRows.length) {
-      const tr = tbody.insertRow();
-      const td = tr.insertCell();
-      td.colSpan = Math.max(1, reportColumns.length);
-      td.textContent = 'No cable rows match this report.';
-    }
-    host.append(meta, tableEl);
   };
   const printCableReport = mode => {
     renderCablePrintReport(mode);
