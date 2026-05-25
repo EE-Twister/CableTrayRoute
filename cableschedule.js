@@ -1,41 +1,4 @@
-// ---- Inline E2E helpers (no external import) ----
-const E2E = new URLSearchParams(location.search).has('e2e');
-
-function markReady(flagName) {
-  try {
-    document.documentElement.setAttribute(flagName, '1');
-    // also expose to window for debugging
-    window[flagName.replace(/-([a-z])/g, (_, c) => c.toUpperCase())] = true;
-  } catch {}
-}
-
-function suppressResumeIfE2E() {
-  if (!E2E) return;
-  // Never clear browser storage from URL parameters.
-  // Do NOT auto-click resume buttons. Let tests click #resume-no-btn.
-}
-
-// Show resume modal in E2E so tests can click the No button
-function forceShowResumeIfE2E() {
-  const E2E = new URLSearchParams(location.search).has('e2e');
-  if (!E2E) return;
-  const modal = document.getElementById('resume-modal');
-  const noBtn = document.getElementById('resume-no-btn');
-  if (modal) {
-    modal.removeAttribute('hidden');
-    modal.classList.remove('hidden', 'is-hidden', 'invisible');
-    modal.style.display = 'block';
-    modal.style.visibility = 'visible';
-    modal.style.opacity = '1';
-  }
-  if (noBtn) {
-    noBtn.style.display = 'inline-block';
-    noBtn.disabled = false;
-  }
-}
-
-window.E2E = E2E;
-
+import { bootstrapPage } from './src/lifecycle/pageBootstrap.js';
 import './site.js';
 import * as dataStore from './dataStore.mjs';
 import { sizeConductor } from './sizing.js';
@@ -64,13 +27,6 @@ const CABLE_TOUR_STEPS = [
   { selector: '#auto-route-all-btn',     message: 'Once cables and raceways are defined, use "Route All" to send every cable to the Optimal Route tool automatically.' },
   { selector: '#export-xlsx-btn',        message: 'Export to Excel at any time to share your cable schedule or back it up offline.' }
 ];
-
-suppressResumeIfE2E();
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', forceShowResumeIfE2E, { once: true });
-} else {
-  forceShowResumeIfE2E();
-}
 
 // Initialize Cable Schedule page logic
 // This file mirrors the inline script previously embedded in
@@ -3466,16 +3422,13 @@ async function initCableSchedule() {
   if (tourBtn) {
     tourBtn.addEventListener('click', () => startTour(CABLE_TOUR_STEPS, 'cableSchedule'));
   }
-
-  window.dispatchEvent(new Event('cableschedule-ready'));
-  window.__CableScheduleInitOK = true;
 }
 
-if (document.readyState === 'loading') {
-  window.addEventListener('DOMContentLoaded', initCableSchedule, { once: true });
-} else {
-  initCableSchedule();
-}
+bootstrapPage({
+  readyEvent: 'cableschedule-ready',
+  initFlag: '__CableScheduleInitOK',
+  onReady: initCableSchedule,
+});
 
 // Reload the schedule whenever a remote collaborator's patch is applied
 document.addEventListener('ctr:remote-applied', () => { initCableSchedule(); });

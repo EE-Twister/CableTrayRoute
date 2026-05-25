@@ -1,3 +1,4 @@
+import { bootstrapPage } from './src/lifecycle/pageBootstrap.js';
 import { getStudies, getStudyApprovals, setStudies } from './dataStore.mjs';
 import { initStudyApprovalPanel } from './src/components/studyApproval.js';
 import {
@@ -815,8 +816,8 @@ function createComplianceRecord(result, previousStudy = null, approval = null) {
   return { compliance, complianceHistory };
 }
 
-if (typeof document !== 'undefined') {
-  document.addEventListener('DOMContentLoaded', () => {
+bootstrapPage({
+  onReady: () => {
   initSettings();
   initDarkMode();
   initCompactMode();
@@ -1270,8 +1271,8 @@ if (typeof document !== 'undefined') {
       showModal('Input Error', `<p>${escapeHtml(message)}</p>`, 'error');
     }
   });
-  });
-}
+  },
+});
 
 function readFormInputs() {
   const getValue = id => document.getElementById(id).value;
