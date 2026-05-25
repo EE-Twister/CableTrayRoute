@@ -1,5 +1,4 @@
-// ---- Inline E2E helpers (no external import) ----
-const E2E = new URLSearchParams(location.search).has('e2e');
+import { bootstrapPage } from './src/lifecycle/pageBootstrap.js';
 
 function escapeHtml(value) {
   if (value === null || value === undefined) return '';
@@ -10,65 +9,6 @@ function escapeHtml(value) {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
 }
-
-function e2eOpenDetails() {
-  if (!new URLSearchParams(location.search).has('e2e')) return;
-  document.querySelectorAll('details').forEach(d => { d.open = true; });
-}
-
-function ensureReadyBeacon(attrName, id) {
-  let el = document.getElementById(id);
-  if (!el) {
-    el = document.createElement('div');
-    el.id = id;
-    el.style.cssText = 'position:fixed;left:0;bottom:0;width:1px;height:1px;opacity:0.01;z-index:2147483647;';
-    document.body.appendChild(el);
-  }
-  el.setAttribute(attrName, '1');
-}
-
-function setReadyWhen(selector, attrName, id, timeoutMs = 25000) {
-  const start = performance.now();
-  const poll = () => {
-    const el = document.querySelector(selector);
-    const visible = !!el && !!(el.offsetParent || el.getClientRects().length);
-    if (visible) return ensureReadyBeacon(attrName, id);
-    if (performance.now() - start > timeoutMs) return;
-    setTimeout(poll, 50);
-  };
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', poll, { once: true });
-  } else {
-    poll();
-  }
-}
-
-function suppressResumeIfE2E() {
-  if (!E2E) return;
-  // Never clear user storage from URL-controlled flags on production pages.
-  // Do NOT auto-click resume buttons. Let tests click #resume-no-btn.
-}
-
-// Show resume modal in E2E so tests can click the No button
-function forceShowResumeIfE2E() {
-  const E2E = new URLSearchParams(location.search).has('e2e');
-  if (!E2E) return;
-  const modal = document.getElementById('resume-modal');
-  const noBtn = document.getElementById('resume-no-btn');
-  if (modal) {
-    modal.removeAttribute('hidden');
-    modal.classList.remove('hidden', 'is-hidden', 'invisible');
-    modal.style.display = 'block';
-    modal.style.visibility = 'visible';
-    modal.style.opacity = '1';
-  }
-  if (noBtn) {
-    noBtn.style.display = 'inline-block';
-    noBtn.disabled = false;
-  }
-}
-
-window.E2E = E2E;
 
 import { getOneLine, setOneLine, getEquipment, setEquipment, getPanels, setPanels, getLoads, setLoads, getCables, setCables, addRaceway, getItem, setItem, migrateLegacyItem, getStudies, setStudies, on, getCurrentScenario, switchScenario, STORAGE_KEYS, loadProject, saveProject } from './dataStore.mjs';
 import { previewScheduleReconcile, applyScheduleReconcilePreview } from './analysis/scheduleReconcile.mjs';
@@ -17622,7 +17562,7 @@ async function init() {
     startTour();
     writeAppSetting('onelineTourDone', 'true');
   });
-  if (!E2E && !readAppSetting('onelineTourDone')) {
+  if (!window.E2E && !readAppSetting('onelineTourDone')) {
     startTour();
     writeAppSetting('onelineTourDone', 'true');
   }
@@ -19024,8 +18964,6 @@ if (typeof window !== 'undefined') {
 }
 
 async function __oneline_init() {
-  suppressResumeIfE2E();
-
   buildPalette();
 
   // Load libraries
@@ -19051,20 +18989,15 @@ async function __oneline_init() {
     renderSheetTabs();
     render();
   });
-
-  document.body.dataset.onelineReady = '1';
-
-  e2eOpenDetails();
-  setReadyWhen('[data-testid="palette-button"]', 'data-oneline-ready', 'oneline-ready-beacon');
 }
 
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', __oneline_init, { once: true });
-} else {
-  __oneline_init();
-}
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', forceShowResumeIfE2E, { once: true });
-} else {
-  forceShowResumeIfE2E();
-}
+bootstrapPage({
+  bodyReadyDataset: 'onelineReady',
+  openDetailsInE2E: true,
+  beacon: {
+    id: 'oneline-ready-beacon',
+    attr: 'data-oneline-ready',
+    waitFor: '[data-testid="palette-button"]',
+  },
+  onReady: __oneline_init,
+});
