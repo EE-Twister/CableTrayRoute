@@ -826,10 +826,12 @@ export function clearConduitCache() {
 }
 
 export function getAuthContextState() {
-  const token = readRawStorage(AUTH_TOKEN_KEY);
   const csrfToken = readRawStorage(AUTH_CSRF_KEY);
   const expiresRaw = readRawStorage(AUTH_EXPIRES_KEY);
-  if (!token || !csrfToken || !expiresRaw) return null;
+  // The bearer token is no longer stored client-side — it lives in the
+  // HttpOnly ctr_auth cookie. Auth context is defined by having a fresh CSRF
+  // secret and a non-expired session.
+  if (!csrfToken || !expiresRaw) return null;
   const expiresAt = Number.parseInt(expiresRaw, 10);
   if (!Number.isFinite(expiresAt)) {
     clearAuthContextState();
@@ -841,7 +843,7 @@ export function getAuthContextState() {
   }
   const user = readRawStorage(AUTH_USER_KEY);
   const role = readRawStorage(AUTH_ROLE_KEY);
-  return { token, csrfToken, expiresAt, user: user || null, role: role || null };
+  return { csrfToken, expiresAt, user: user || null, role: role || null };
 }
 
 const SESSION_WARNING_MS = 5 * 60 * 1000; // warn 5 minutes before expiry
@@ -882,11 +884,13 @@ function scheduleSessionTimers(expiresAt) {
   }, msUntilExpiry);
 }
 
-export function setAuthContextState({ token, csrfToken, expiresAt, user, role }) {
-  if (!token || !csrfToken) return;
+export function setAuthContextState({ csrfToken, expiresAt, user, role } = {}) {
+  if (!csrfToken) return;
   const expiresValue = Number(expiresAt);
   if (!Number.isFinite(expiresValue)) return;
-  writeRawStorage(AUTH_TOKEN_KEY, token);
+  // AUTH_TOKEN_KEY is intentionally cleared: the session token now lives in
+  // an HttpOnly cookie and must not be readable from JS-accessible storage.
+  writeRawStorage(AUTH_TOKEN_KEY, null);
   writeRawStorage(AUTH_CSRF_KEY, csrfToken);
   writeRawStorage(AUTH_EXPIRES_KEY, String(expiresValue));
   if (user === undefined || user === null) {

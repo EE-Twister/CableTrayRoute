@@ -25,21 +25,29 @@ const WS_URL = (() => {
   return `${proto}//${location.host}/ws/collab`;
 })();
 
-function buildWsProtocols() {
-  if (typeof TextEncoder === 'undefined') return ['ctr-collab'];
-  const auth = getAuthContextState();
-  const authToken = auth?.token || '';
-  const csrfToken = auth?.csrfToken || '';
+/**
+ * Request a short-lived single-use ticket from the server. Cookies cannot be
+ * sent through the WebSocket subprotocol header, so we trade the cookie-backed
+ * session for a ticket that the server validates on upgrade.
+ *
+ * @returns {Promise<string[]>} subprotocols including the ticket, or just
+ *   ['ctr-collab'] if no auth context is available.
+ */
+async function buildWsProtocols() {
   const protocols = ['ctr-collab'];
-
-  if (authToken) {
-    const encoded = btoa(String.fromCharCode(...new TextEncoder().encode(authToken)))
-      .replace(/\+/g, '-')
-      .replace(/\//g, '_')
-      .replace(/=+$/g, '');
-    protocols.push(`auth.${encoded}`);
+  const auth = getAuthContextState();
+  if (!auth?.csrfToken) return protocols;
+  try {
+    const res = await fetch('/ws/ticket', {
+      method: 'POST',
+      headers: { 'X-CSRF-Token': auth.csrfToken },
+    });
+    if (!res.ok) return protocols;
+    const { ticket } = await res.json();
+    if (ticket && /^[0-9a-fA-F]+$/.test(ticket)) protocols.push(`ticket.${ticket}`);
+  } catch {
+    // network failure — fall back to unauthenticated protocol; server will reject
   }
-  if (csrfToken) protocols.push(`csrf.${csrfToken}`);
   return protocols;
 }
 
@@ -68,13 +76,18 @@ export class CollabClient extends EventTarget {
   }
 
   /** Connect (or reconnect) to the collaboration server. */
-  connect() {
+  async connect() {
     if (this.#ws && this.#ws.readyState <= WebSocket.OPEN) return; // already connecting/open
     if (!WS_URL) return;
 
     this.#intentionalClose = false;
     this.#lastSeq = 0;
-    this.#ws = new WebSocket(WS_URL, buildWsProtocols());
+    const protocols = await buildWsProtocols();
+    // A second concurrent connect() may have raced ahead while we were
+    // fetching the ticket; bail if so.
+    if (this.#ws && this.#ws.readyState <= WebSocket.OPEN) return;
+    if (this.#intentionalClose) return;
+    this.#ws = new WebSocket(WS_URL, protocols);
 
     this.#ws.addEventListener('open', () => {
       this.#reconnectAttempt = 0;

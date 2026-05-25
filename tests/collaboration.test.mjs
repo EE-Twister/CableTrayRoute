@@ -61,6 +61,9 @@ globalThis.location = { protocol: 'http:', host: 'localhost:3000' };
 globalThis.WebSocket = MockWebSocket;
 globalThis.setInterval = () => 0;
 globalThis.clearInterval = () => {};
+// No auth context in tests → buildWsProtocols() never calls fetch. Stubbing
+// fetch defensively in case the implementation changes.
+globalThis.fetch = async () => ({ ok: false, json: async () => ({}) });
 
 // Import AFTER stubs are in place
 const { CollabClient, renderPresenceBar } = await import('../src/collaboration.js');
@@ -69,7 +72,7 @@ const { CollabClient, renderPresenceBar } = await import('../src/collaboration.j
 // Helpers
 // ---------------------------------------------------------------------------
 
-function describe(name, fn) { console.log(name); fn(); }
+async function describe(name, fn) { console.log(name); await fn(); }
 function it(name, fn) {
   try { fn(); console.log('  \u2713', name); }
   catch (err) { console.error('  \u2717', name, err.message || err); process.exitCode = 1; }
@@ -88,38 +91,38 @@ function makeClient(opts = {}) {
   return new CollabClient({ projectId: opts.projectId || 'proj-1', username: opts.username || 'alice' });
 }
 
-function connectAndOpen(client) {
-  client.connect();
+async function connectAndOpen(client) {
+  await client.connect();
   const ws = MockWebSocket._instances.at(-1);
   ws._emit('open');
   return ws;
 }
 
 // ---------------------------------------------------------------------------
-describe('CollabClient — connect & join', () => {
-  it('creates a WebSocket and sends join on open', () => {
+await describe('CollabClient — connect & join', async () => {
+  await itAsync('creates a WebSocket and sends join on open', async () => {
     reset();
     const client = makeClient();
-    const ws = connectAndOpen(client);
+    const ws = await connectAndOpen(client);
     assert.ok(ws, 'WebSocket instance must exist');
     assert.ok(ws.sent.some(m => m.type === 'join' && m.projectId === 'proj-1' && m.username === 'alice'));
   });
 
-  it('second connect() call is a no-op while already open', () => {
+  await itAsync('second connect() call is a no-op while already open', async () => {
     reset();
     const client = makeClient();
-    connectAndOpen(client);
-    client.connect(); // should not create a second socket
+    await connectAndOpen(client);
+    await client.connect(); // should not create a second socket
     assert.strictEqual(MockWebSocket._instances.length, 1);
   });
 });
 
 // ---------------------------------------------------------------------------
-describe('CollabClient — presence', () => {
-  it('fires presence event with the user list from server', () => {
+await describe('CollabClient — presence', async () => {
+  await itAsync('fires presence event with the user list from server', async () => {
     reset();
     const client = makeClient();
-    const ws = connectAndOpen(client);
+    const ws = await connectAndOpen(client);
 
     let received = null;
     client.onPresence(users => { received = users; });
@@ -130,11 +133,11 @@ describe('CollabClient — presence', () => {
 });
 
 // ---------------------------------------------------------------------------
-describe('CollabClient — remote patch', () => {
-  it('fires remotePatch with sender and patch payload', () => {
+await describe('CollabClient — remote patch', async () => {
+  await itAsync('fires remotePatch with sender and patch payload', async () => {
     reset();
     const client = makeClient();
-    const ws = connectAndOpen(client);
+    const ws = await connectAndOpen(client);
 
     let detail = null;
     client.onRemotePatch(d => { detail = d; });
@@ -147,11 +150,11 @@ describe('CollabClient — remote patch', () => {
 });
 
 // ---------------------------------------------------------------------------
-describe('CollabClient — sendPatch', () => {
-  it('sends a patch message when connected', () => {
+await describe('CollabClient — sendPatch', async () => {
+  await itAsync('sends a patch message when connected', async () => {
     reset();
     const client = makeClient();
-    const ws = connectAndOpen(client);
+    const ws = await connectAndOpen(client);
     client.sendPatch({ cables: [{ id: 'C1' }] });
     const msg = ws.sent.find(m => m.type === 'patch');
     assert.ok(msg, 'patch message must be sent');
@@ -167,11 +170,11 @@ describe('CollabClient — sendPatch', () => {
 });
 
 // ---------------------------------------------------------------------------
-describe('CollabClient — disconnect', () => {
-  it('sends leave message and closes the socket', () => {
+await describe('CollabClient — disconnect', async () => {
+  await itAsync('sends leave message and closes the socket', async () => {
     reset();
     const client = makeClient();
-    const ws = connectAndOpen(client);
+    const ws = await connectAndOpen(client);
     client.disconnect();
     assert.ok(ws.sent.some(m => m.type === 'leave'), 'leave message must be sent');
     assert.strictEqual(ws.readyState, WS_CLOSED);
@@ -179,25 +182,25 @@ describe('CollabClient — disconnect', () => {
 });
 
 // ---------------------------------------------------------------------------
-describe('CollabClient — connected getter', () => {
-  it('returns true when socket is open', () => {
+await describe('CollabClient — connected getter', async () => {
+  await itAsync('returns true when socket is open', async () => {
     reset();
     const client = makeClient();
-    connectAndOpen(client);
+    await connectAndOpen(client);
     assert.strictEqual(client.connected, true);
   });
 
-  it('returns false after disconnect', () => {
+  await itAsync('returns false after disconnect', async () => {
     reset();
     const client = makeClient();
-    connectAndOpen(client);
+    await connectAndOpen(client);
     client.disconnect();
     assert.strictEqual(client.connected, false);
   });
 });
 
 // ---------------------------------------------------------------------------
-describe('renderPresenceBar', () => {
+await describe('renderPresenceBar', async () => {
   // Minimal element factory
   function makeEl() {
     const el = { textContent: '', className: '', _attrs: {} };
@@ -252,11 +255,11 @@ describe('renderPresenceBar', () => {
 });
 
 // ---------------------------------------------------------------------------
-describe('CollabClient — sequence numbers & conflict detection', () => {
-  it('includes baseSeq in sendPatch message', () => {
+await describe('CollabClient — sequence numbers & conflict detection', async () => {
+  await itAsync('includes baseSeq in sendPatch message', async () => {
     reset();
     const client = makeClient();
-    const ws = connectAndOpen(client);
+    const ws = await connectAndOpen(client);
     // Simulate server sync on join
     ws._message({ type: 'sync', seq: 5 });
     client.sendPatch({ cables: [] });
@@ -265,10 +268,10 @@ describe('CollabClient — sequence numbers & conflict detection', () => {
     assert.strictEqual(patchMsg.baseSeq, 5, 'baseSeq must reflect last known seq');
   });
 
-  it('updates lastSeq on sync message', () => {
+  await itAsync('updates lastSeq on sync message', async () => {
     reset();
     const client = makeClient();
-    const ws = connectAndOpen(client);
+    const ws = await connectAndOpen(client);
     ws._message({ type: 'sync', seq: 10 });
     // Send a patch — baseSeq should now be 10
     client.sendPatch({ foo: 1 });
@@ -276,20 +279,20 @@ describe('CollabClient — sequence numbers & conflict detection', () => {
     assert.strictEqual(patchMsg.baseSeq, 10);
   });
 
-  it('updates lastSeq on ack message', () => {
+  await itAsync('updates lastSeq on ack message', async () => {
     reset();
     const client = makeClient();
-    const ws = connectAndOpen(client);
+    const ws = await connectAndOpen(client);
     ws._message({ type: 'ack', seq: 3 });
     client.sendPatch({ bar: 2 });
     const patchMsg = ws.sent.find(m => m.type === 'patch');
     assert.strictEqual(patchMsg.baseSeq, 3);
   });
 
-  it('fires conflict event when incoming seq has a gap', () => {
+  await itAsync('fires conflict event when incoming seq has a gap', async () => {
     reset();
     const client = makeClient();
-    const ws = connectAndOpen(client);
+    const ws = await connectAndOpen(client);
     // Start at seq 2
     ws._message({ type: 'sync', seq: 2 });
 
@@ -303,10 +306,10 @@ describe('CollabClient — sequence numbers & conflict detection', () => {
     assert.strictEqual(conflict.gap, 2);
   });
 
-  it('does not fire conflict when seq is consecutive', () => {
+  await itAsync('does not fire conflict when seq is consecutive', async () => {
     reset();
     const client = makeClient();
-    const ws = connectAndOpen(client);
+    const ws = await connectAndOpen(client);
     ws._message({ type: 'sync', seq: 0 });
 
     let conflict = null;
@@ -316,10 +319,10 @@ describe('CollabClient — sequence numbers & conflict detection', () => {
     assert.strictEqual(conflict, null, 'no conflict for consecutive seq');
   });
 
-  it('includes seq in remotePatch event detail', () => {
+  await itAsync('includes seq in remotePatch event detail', async () => {
     reset();
     const client = makeClient();
-    const ws = connectAndOpen(client);
+    const ws = await connectAndOpen(client);
     ws._message({ type: 'sync', seq: 0 });
 
     let detail = null;

@@ -51,17 +51,15 @@ function init() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${auth.token}`,
           'X-CSRF-Token': auth.csrfToken
         },
         body: JSON.stringify({ currentPassword, newPassword })
       });
       const body = await res.json().catch(() => ({}));
       if (res.ok) {
-        if (body.token && body.csrfToken && body.expiresAt) {
+        if (body.csrfToken && body.expiresAt) {
           auth = {
             ...auth,
-            token: body.token,
             csrfToken: body.csrfToken,
             expiresAt: body.expiresAt,
           };

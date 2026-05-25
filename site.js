@@ -2798,17 +2798,17 @@ globalThis.showSelfCheckModal=showSelfCheckModal;
       if (!auth) return; // only start when logged in
       if (window.localStorage?.getItem('ctrEnableCollaboration') !== 'true') return;
       const projectId = (window.currentProjectId || '').trim();
+      // The CollabClient reads the cookie-backed session via the ticket endpoint,
+      // so we only pass the projectId/username here.
       initCollaboration({
         projectId,
         username: auth.user,
-        authToken: auth.token,
-        csrfToken: auth.csrfToken,
       });
     }
     startCollab();
     // Re-init when project changes (project manager fires storage events)
     window.addEventListener('storage', (e) => {
-      if (e.key === 'currentProjectId' || e.key === 'authToken') {
+      if (e.key === 'currentProjectId' || e.key === 'authCsrfToken') {
         stopCollaboration();
         startCollab();
       }

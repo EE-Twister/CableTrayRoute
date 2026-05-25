@@ -706,6 +706,13 @@ class FileSessionStore {
     if (changed) await this.#persist();
   }
 
+  async revokeSession(token) {
+    if (!this.sessions.has(token)) return false;
+    this.sessions.delete(token);
+    await this.#persist();
+    return true;
+  }
+
   async get(token) {
     await this.#pruneExpired();
     const session = this.sessions.get(token);
@@ -837,6 +844,23 @@ export async function createApp(options = {}) {
   const oidcStateStore = new Map();
   const OIDC_STATE_TTL_MS = 10 * 60 * 1000;
   let oidcDiscoveryCache = null;
+
+  // Session cookie used by browser clients. The Authorization header is still
+  // accepted during a deprecation window so scripted API consumers and legacy
+  // browser builds keep working.
+  const AUTH_COOKIE_NAME = 'ctr_auth';
+
+  // WebSocket upgrade tickets — short-lived, single-use, bound to a session.
+  // Issued via POST /ws/ticket (authenticated + CSRF protected). Used because
+  // cookies cannot be transmitted through the WebSocket subprotocol header.
+  const WS_TICKET_TTL_MS = 30_000;
+  const wsTicketStore = new Map(); // ticket -> { sessionToken, username, expiresAt }
+  function pruneWsTickets() {
+    const now = Date.now();
+    for (const [t, entry] of wsTicketStore) {
+      if (!entry || entry.expiresAt <= now) wsTicketStore.delete(t);
+    }
+  }
 
   let users = {};
   try {
@@ -1042,6 +1066,53 @@ export async function createApp(options = {}) {
 
   // Stricter rate limit for auth endpoints to prevent brute-force attacks.
   const authRateLimiter = createRateLimiter({ windowMs: rateLimitWindowMs, max: 20 });
+  // Cookie helpers (shared by auth, refresh, logout, OIDC). Defined here so the
+  // /login handler and the auth middleware below can use them.
+  function serializeCookie(name, value, attrs = {}) {
+    const parts = [`${name}=${encodeURIComponent(value)}`];
+    if (attrs.maxAge !== undefined) parts.push(`Max-Age=${Math.floor(Number(attrs.maxAge))}`);
+    if (attrs.path) parts.push(`Path=${attrs.path}`);
+    if (attrs.httpOnly) parts.push('HttpOnly');
+    if (attrs.secure) parts.push('Secure');
+    if (attrs.sameSite) parts.push(`SameSite=${attrs.sameSite}`);
+    return parts.join('; ');
+  }
+  function getCookieValue(req, cookieName) {
+    const header = req.headers.cookie;
+    if (!header || typeof header !== 'string') return null;
+    for (const entry of header.split(';')) {
+      const [rawName, ...rest] = entry.trim().split('=');
+      if (rawName !== cookieName) continue;
+      try {
+        return decodeURIComponent(rest.join('='));
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  }
+  function isRequestSecure(req) {
+    return Boolean(req.secure || req.headers['x-forwarded-proto'] === 'https');
+  }
+  function setAuthCookie(req, res, token, ttlMs) {
+    res.setHeader('Set-Cookie', serializeCookie(AUTH_COOKIE_NAME, token, {
+      path: '/',
+      maxAge: Math.floor((ttlMs || sessionStore.ttlMs) / 1000),
+      httpOnly: true,
+      secure: isRequestSecure(req),
+      sameSite: 'Lax',
+    }));
+  }
+  function clearAuthCookie(req, res) {
+    res.setHeader('Set-Cookie', serializeCookie(AUTH_COOKIE_NAME, '', {
+      path: '/',
+      maxAge: 0,
+      httpOnly: true,
+      secure: isRequestSecure(req),
+      sameSite: 'Lax',
+    }));
+  }
+
   app.use('/login', authRateLimiter);
   app.use('/signup', authRateLimiter);
   app.use('/session/refresh', authRateLimiter);
@@ -1116,15 +1187,23 @@ export async function createApp(options = {}) {
       await saveUsers();
 
       const session = await sessionStore.createSession(trimmedUser);
+      setAuthCookie(req, res, session.token, sessionStore.ttlMs);
       appendAuditEntry(auditLogFile, { actor: trimmedUser, action: 'LOGIN', entityType: 'session' }).catch(() => {});
       res.json({ ...session, role: getUserRole(trimmedUser) });
     })
   );
 
+  // Authentication: accept the HttpOnly ctr_auth cookie first, falling back to
+  // the legacy Authorization: Bearer header during the deprecation window for
+  // scripted API consumers.
   const auth = asyncHandler(async (req, res, next) => {
-    const header = req.headers.authorization || '';
-    const [scheme, token] = header.split(' ');
-    if (scheme !== 'Bearer' || !token) {
+    let token = getCookieValue(req, AUTH_COOKIE_NAME);
+    if (!token) {
+      const header = req.headers.authorization || '';
+      const [scheme, headerToken] = header.split(' ');
+      if (scheme === 'Bearer' && headerToken) token = headerToken;
+    }
+    if (!token) {
       res.status(401).json({ error: 'Unauthorized' });
       return;
     }
@@ -1207,10 +1286,44 @@ export async function createApp(options = {}) {
     asyncHandler(async (req, res) => {
       const newSession = await sessionStore.refreshSession(req.authToken);
       if (!newSession) {
+        clearAuthCookie(req, res);
         res.status(401).json({ error: 'Session not eligible for refresh' });
         return;
       }
+      setAuthCookie(req, res, newSession.token, sessionStore.ttlMs);
       res.json(newSession);
+    })
+  );
+
+  // Local-account logout: revoke this session and clear the auth cookie.
+  app.post(
+    '/logout',
+    auth,
+    csrfProtection,
+    asyncHandler(async (req, res) => {
+      await sessionStore.revokeSession(req.authToken);
+      clearAuthCookie(req, res);
+      appendAuditEntry(auditLogFile, { actor: req.username, action: 'LOGOUT', entityType: 'session' }).catch(() => {});
+      res.json({ loggedOut: true });
+    })
+  );
+
+  // Mint a single-use, short-lived ticket the browser can pass through the
+  // WebSocket subprotocol header (cookies cannot be sent that way).
+  app.post(
+    '/ws/ticket',
+    auth,
+    csrfProtection,
+    asyncHandler(async (req, res) => {
+      pruneWsTickets();
+      const ticket = crypto.randomBytes(32).toString('hex');
+      const expiresAt = Date.now() + WS_TICKET_TTL_MS;
+      wsTicketStore.set(ticket, {
+        sessionToken: req.authToken,
+        username: req.username,
+        expiresAt,
+      });
+      res.json({ ticket, expiresAt });
     })
   );
 
@@ -1298,6 +1411,7 @@ export async function createApp(options = {}) {
       users[req.username].password = await hashPassword(newPassword);
       await saveUsers();
       const session = await sessionStore.createSession(req.username);
+      setAuthCookie(req, res, session.token, sessionStore.ttlMs);
       res.json({ message: 'Password changed successfully.', ...session });
     })
   );
@@ -1865,29 +1979,6 @@ When answering queries:
   function base64urlEncode(buf) {
     return buf.toString('base64').replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
   }
-  function serializeCookie(name, value, attrs = {}) {
-    const parts = [`${name}=${encodeURIComponent(value)}`];
-    if (attrs.maxAge !== undefined) parts.push(`Max-Age=${Math.floor(Number(attrs.maxAge))}`);
-    if (attrs.path) parts.push(`Path=${attrs.path}`);
-    if (attrs.httpOnly) parts.push('HttpOnly');
-    if (attrs.secure) parts.push('Secure');
-    if (attrs.sameSite) parts.push(`SameSite=${attrs.sameSite}`);
-    return parts.join('; ');
-  }
-  function getCookieValue(req, cookieName) {
-    const header = req.headers.cookie;
-    if (!header || typeof header !== 'string') return null;
-    for (const entry of header.split(';')) {
-      const [rawName, ...rest] = entry.trim().split('=');
-      if (rawName !== cookieName) continue;
-      try {
-        return decodeURIComponent(rest.join('='));
-      } catch {
-        return null;
-      }
-    }
-    return null;
-  }
 
   async function getOidcDiscovery(issuer) {
     if (oidcDiscoveryCache) return oidcDiscoveryCache;
@@ -2067,11 +2158,13 @@ When answering queries:
       await saveUsers();
 
       const session = await sessionStore.createSession(username);
+      setAuthCookie(req, res, session.token, sessionStore.ttlMs);
       appendAuditEntry(auditLogFile, { actor: username, action: 'LOGIN', entityType: 'session' }).catch(() => {});
 
-      // Relay token to the browser via a minimal HTML page that saves to localStorage.
+      // Relay the non-secret session metadata (csrfToken, expiresAt, user, role)
+      // through a minimal HTML page. The session token itself rides in the
+      // HttpOnly cookie set above, so it never enters the URL.
       const relayParams = new URLSearchParams({
-        token: session.token,
         csrfToken: session.csrfToken,
         expiresAt: String(session.expiresAt),
         user: username,
@@ -2088,6 +2181,7 @@ When answering queries:
     asyncHandler(async (req, res) => {
       appendAuditEntry(auditLogFile, { actor: req.username, action: 'LOGOUT', entityType: 'session' }).catch(() => {});
       await sessionStore.revokeUserSessions(req.username);
+      clearAuthCookie(req, res);
       res.json({ loggedOut: true });
     })
   );
@@ -2120,6 +2214,24 @@ When answering queries:
     if (typeof protocolHeader !== 'string') return false;
 
     const protocols = protocolHeader.split(',').map((value) => value.trim()).filter(Boolean);
+
+    // Preferred path: single-use ticket minted via POST /ws/ticket. Cookies
+    // cannot be sent through the subprotocol header, so browsers exchange the
+    // cookie session for a short-lived ticket here.
+    const ticketProtocol = protocols.find((value) => value.startsWith('ticket.')) || '';
+    if (ticketProtocol) {
+      pruneWsTickets();
+      const ticket = ticketProtocol.slice('ticket.'.length);
+      if (!ticket || !/^[0-9a-fA-F]+$/.test(ticket)) return false;
+      const entry = wsTicketStore.get(ticket);
+      if (!entry) return false;
+      wsTicketStore.delete(ticket); // single-use
+      if (entry.expiresAt <= Date.now()) return false;
+      const session = await sessionStore.get(entry.sessionToken);
+      return Boolean(session);
+    }
+
+    // Legacy path (deprecated): auth.<base64-token> + csrf.<hex>.
     const authProtocol = protocols.find((value) => value.startsWith('auth.')) || '';
     const csrfProtocol = protocols.find((value) => value.startsWith('csrf.')) || '';
     if (!authProtocol || !csrfProtocol) return false;
