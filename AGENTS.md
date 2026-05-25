@@ -28,8 +28,9 @@ This repository uses this file for all developer tasks. The rules below apply to
 - Preserve the undo/redo stacks maintained by `pushUndo`, `undoProjectChange`, and `redoProjectChange`. Ensure new mutations capture diffs through these helpers so change history stays accurate.
 
 ## Backend Security Requirements
-- Server authentication in `server.mjs` relies on scrypt password hashing (`hashPassword` / `verifyPassword`), `FileSessionStore` persistence, and session records containing both bearer tokens and CSRF tokens. Retain these mechanisms when modifying auth flows.
-- Authenticated routes must continue to require a `Bearer` token header and enforce the `x-csrf-token` timing-safe comparison before mutating state.
+- Server authentication in `server.mjs` relies on scrypt password hashing (`hashPassword` / `verifyPassword`), `FileSessionStore` persistence, and session records containing both session tokens and CSRF tokens. Retain these mechanisms when modifying auth flows.
+- Authenticated routes accept either the HttpOnly `ctr_auth` cookie (preferred for browser clients) or a legacy `Authorization: Bearer` header during the deprecation window. Either path must still enforce the `x-csrf-token` timing-safe comparison before mutating state.
+- WebSocket upgrades cannot carry cookies, so browsers exchange the cookie session for a short-lived single-use ticket via `POST /ws/ticket` and pass `ticket.<hex>` in the `Sec-WebSocket-Protocol` header. Preserve this flow when changing the collaboration server.
 - The `/projects` endpoints are guarded by rate limiting. Keep rate limiting active for any new persistence routes.
 - HTTPS enforcement (via the `enforceHttps` option) is required in production deployments. New middleware must not bypass or weaken this redirect.
 

@@ -334,7 +334,6 @@ async function serverSaveProject(name) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${auth.token}`,
       'X-CSRF-Token': auth.csrfToken
     },
     body: JSON.stringify(exportProject())
@@ -348,7 +347,6 @@ async function serverLoadProject(name) {
   if (!auth) return false;
   const res = await fetch(`/projects/${encodeURIComponent(name)}`, {
     headers: {
-      'Authorization': `Bearer ${auth.token}`,
       'X-CSRF-Token': auth.csrfToken
     }
   });
@@ -466,7 +464,6 @@ async function requestSnapshotList(projectName) {
   if (!auth) throw new Error('Login required to manage snapshots.');
   const res = await fetch(`/projects/${encodeURIComponent(projectName)}/snapshots`, {
     headers: {
-      'Authorization': `Bearer ${auth.token}`,
       'X-CSRF-Token': auth.csrfToken
     }
   });
@@ -483,7 +480,6 @@ async function createSnapshot(projectName, mode) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${auth.token}`,
       'X-CSRF-Token': auth.csrfToken
     },
     body: JSON.stringify({ mode })
@@ -499,7 +495,6 @@ async function revokeSnapshot(projectName, snapshotId) {
   const res = await fetch(`/projects/${encodeURIComponent(projectName)}/snapshots/${encodeURIComponent(snapshotId)}`, {
     method: 'DELETE',
     headers: {
-      'Authorization': `Bearer ${auth.token}`,
       'X-CSRF-Token': auth.csrfToken
     }
   });
@@ -664,13 +659,12 @@ async function refreshSession() {
     const res = await fetch('/session/refresh', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${auth.token}`,
         'X-CSRF-Token': auth.csrfToken
       }
     });
     if (!res.ok) return false;
-    const { token, csrfToken, expiresAt } = await res.json();
-    setAuthContextState({ token, csrfToken, expiresAt, user: auth.user });
+    const { csrfToken, expiresAt } = await res.json();
+    setAuthContextState({ csrfToken, expiresAt, user: auth.user, role: auth.role });
     return true;
   } catch (err) {
     console.warn('[projectManager] Auth token refresh failed:', err.message || err);
@@ -700,8 +694,17 @@ function initProjectManagerControls() {
       btn.textContent = getAuthContext() ? 'Logout' : 'Login';
     }
     updateLabel();
-    btn.addEventListener('click', () => {
-      if (getAuthContext()) {
+    btn.addEventListener('click', async () => {
+      const auth = getAuthContext();
+      if (auth) {
+        try {
+          await fetch('/logout', {
+            method: 'POST',
+            headers: { 'X-CSRF-Token': auth.csrfToken }
+          });
+        } catch (err) {
+          console.warn('[projectManager] Logout request failed:', err?.message || err);
+        }
         clearAuthContext();
         updateLabel();
       } else {

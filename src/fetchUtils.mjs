@@ -38,11 +38,11 @@ export async function fetchJson(url, options = {}, timeoutMs = DEFAULT_TIMEOUT_M
 }
 
 /**
- * Fetch a URL with Bearer + CSRF auth headers and return the parsed JSON body.
- * Callers should pass the auth context object from getAuthContext().
+ * Fetch a URL using the HttpOnly session cookie for authentication and the
+ * caller-supplied CSRF token for the double-submit check.
  *
  * @param {string} url
- * @param {{ token: string, csrfToken: string }} auth
+ * @param {{ csrfToken: string }} auth
  * @param {RequestInit} [options]
  * @param {number} [timeoutMs]
  * @returns {Promise<unknown>}
@@ -51,7 +51,6 @@ export async function fetchAuthJson(url, auth, options = {}, timeoutMs = DEFAULT
     const { method = 'GET', body, ...rest } = options;
     const headers = {
         ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
-        'Authorization': `Bearer ${auth.token}`,
         'X-CSRF-Token': auth.csrfToken,
         ...rest.headers,
     };

@@ -143,6 +143,16 @@ function getCookieHeaderFromSetCookie(setCookieHeader) {
   return setCookieHeader.split(';')[0];
 }
 
+function getSetCookieValue(headers, cookieName) {
+  const list = typeof headers.getSetCookie === 'function' ? headers.getSetCookie() : [];
+  for (const entry of list) {
+    const first = entry.split(';')[0];
+    const [name, ...rest] = first.split('=');
+    if (name === cookieName) return decodeURIComponent(rest.join('='));
+  }
+  return null;
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -210,10 +220,11 @@ await check('/auth/oidc/callback with valid code provisions user and redirects t
   const location = r.headers.get('location');
   assert.ok(location.includes('oidc-relay.html'), `expected relay redirect, got ${location}`);
   const relayUrlObj = new URL(location, appBase);
-  assert.ok(relayUrlObj.searchParams.get('token'), 'token in relay URL');
+  assert.ok(!relayUrlObj.searchParams.get('token'), 'session token must not be relayed via URL');
   assert.ok(relayUrlObj.searchParams.get('csrfToken'), 'csrfToken in relay URL');
   assert.ok(relayUrlObj.searchParams.get('user'), 'user in relay URL');
   assert.equal(relayUrlObj.searchParams.get('role'), 'reviewer', 'JIT user defaults to reviewer role');
+  assert.ok(getSetCookieValue(r.headers, 'ctr_auth'), 'ctr_auth cookie set on callback');
   relayUrl = location;
 });
 
@@ -266,11 +277,11 @@ await check('JIT-provisioned user appears in admin users list', async () => {
   const r2 = await fetchNoFollow(`http://127.0.0.1:${p2}/auth/oidc/callback?code=stub_auth_code_abc123&state=${st}`, {
     headers: { Cookie: cookie },
   });
-  const relayParams = new URL(r2.headers.get('location'), `http://127.0.0.1:${p2}`).searchParams;
-  const token = relayParams.get('token');
+  const authCookieValue = getSetCookieValue(r2.headers, 'ctr_auth');
+  assert.ok(authCookieValue, 'ctr_auth cookie issued on callback');
 
   const adminR = await fetch(`http://127.0.0.1:${p2}/api/v1/admin/users`, {
-    headers: { Authorization: `Bearer ${token}` },
+    headers: { Cookie: `ctr_auth=${authCookieValue}` },
   });
   assert.equal(adminR.status, 200);
   const body = await adminR.json();

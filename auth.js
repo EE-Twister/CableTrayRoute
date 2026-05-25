@@ -94,8 +94,10 @@ async function login(e) {
       body: JSON.stringify({ username, password })
     });
     if (res.ok) {
-      const { token, csrfToken, expiresAt, role } = await res.json();
-      setAuthContextState({ token, csrfToken, expiresAt, user: username, role: role || null });
+      const { csrfToken, expiresAt, role } = await res.json();
+      // The session token rides in the HttpOnly ctr_auth cookie set by the
+      // server; we only persist the CSRF secret and metadata for the UI.
+      setAuthContextState({ csrfToken, expiresAt, user: username, role: role || null });
       window.location.href = 'index.html';
       return;
     }

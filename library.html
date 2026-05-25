@@ -206,9 +206,7 @@
     async function cloudGet() {
       const auth = authState();
       if (!auth) return null;
-      const res = await fetch('/api/v1/library', {
-        headers: { 'Authorization': `Bearer ${auth.token}` },
-      });
+      const res = await fetch('/api/v1/library');
       if (res.status === 404) return { notFound: true };
       if (!res.ok) return null;
       return res.json();
@@ -224,7 +222,6 @@
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${auth.token}`,
           'X-Csrf-Token': auth.csrfToken,
         },
         body: JSON.stringify(body),
@@ -398,7 +395,6 @@
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${auth.token}`,
           'X-Csrf-Token': auth.csrfToken,
         },
         body: '{}',

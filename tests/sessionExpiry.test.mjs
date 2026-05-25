@@ -60,13 +60,17 @@ async function checkAsync(name, fn) {
 
 console.log('session expiry - timer and event dispatch');
 
-check('setAuthContextState persists token data', () => {
+check('setAuthContextState persists session metadata', () => {
   storage.clear();
-  setAuthContextState({ token: 'tok1', csrfToken: 'csrf1', expiresAt: Date.now() + 10000, user: 'alice' });
+  setAuthContextState({ csrfToken: 'csrf1', expiresAt: Date.now() + 10000, user: 'alice' });
   const state = getAuthContextState();
-  assert.strictEqual(state.token, 'tok1');
+  assert.ok(state, 'auth context present');
   assert.strictEqual(state.csrfToken, 'csrf1');
   assert.strictEqual(state.user, 'alice');
+  // The session token itself lives in the HttpOnly ctr_auth cookie, not
+  // in JS-accessible storage.
+  assert.strictEqual(state.token, undefined);
+  assert.strictEqual(storage.has('authToken'), false);
 });
 
 check('clearAuthContextState removes all auth keys', () => {
@@ -74,10 +78,10 @@ check('clearAuthContextState removes all auth keys', () => {
   assert.strictEqual(getAuthContextState(), null);
 });
 
-check('getAuthContextState returns null when token is expired', () => {
+check('getAuthContextState returns null when session is expired', () => {
   storage.clear();
-  setAuthContextState({ token: 'old', csrfToken: 'cs', expiresAt: Date.now() - 1, user: 'bob' });
-  // Clear timers immediately since we set an already-expired token
+  setAuthContextState({ csrfToken: 'cs', expiresAt: Date.now() - 1, user: 'bob' });
+  // Clear timers immediately since we set an already-expired session
   clearAuthContextState();
   const state = getAuthContextState();
   assert.strictEqual(state, null);
@@ -88,7 +92,7 @@ await checkAsync('fires session-expiring event when within warning window', asyn
   dispatched.length = 0;
   // expiresAt less than SESSION_WARNING_MS (5 min) away → warning fires immediately
   const expiresAt = Date.now() + 2000;
-  setAuthContextState({ token: 'tok2', csrfToken: 'csrf2', expiresAt, user: 'carol' });
+  setAuthContextState({ csrfToken: 'csrf2', expiresAt, user: 'carol' });
   // The warning should dispatch immediately (since we're within the 5-min window)
   await sleep(10);
   const warningEvent = dispatched.find(e => e.type === 'session-expiring');
@@ -102,7 +106,7 @@ await checkAsync('fires session-expired event when token TTL elapses', async () 
   storage.clear();
   dispatched.length = 0;
   const expiresAt = Date.now() + 80;
-  setAuthContextState({ token: 'tok3', csrfToken: 'csrf3', expiresAt, user: 'dave' });
+  setAuthContextState({ csrfToken: 'csrf3', expiresAt, user: 'dave' });
   await sleep(120);
   const expiredEvent = dispatched.find(e => e.type === 'session-expired');
   assert.ok(expiredEvent, 'session-expired event should be dispatched after TTL');
@@ -115,7 +119,7 @@ await checkAsync('clearAuthContextState cancels pending timers', async () => {
   storage.clear();
   dispatched.length = 0;
   const expiresAt = Date.now() + 80;
-  setAuthContextState({ token: 'tok4', csrfToken: 'csrf4', expiresAt, user: 'eve' });
+  setAuthContextState({ csrfToken: 'csrf4', expiresAt, user: 'eve' });
   // Immediately clear to cancel timers
   clearAuthContextState();
   await sleep(120);

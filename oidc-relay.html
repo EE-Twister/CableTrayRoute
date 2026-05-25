@@ -18,7 +18,6 @@
     import { setAuthContextState } from './projectStorage.js';
 
     const params = new URLSearchParams(window.location.search);
-    const token = params.get('token');
     const csrfToken = params.get('csrfToken');
     const expiresAt = Number(params.get('expiresAt'));
     const user = params.get('user');
@@ -26,11 +25,14 @@
 
     const statusMsg = document.getElementById('status-msg');
 
-    if (!token || !csrfToken || !Number.isFinite(expiresAt)) {
+    // The session bearer token is delivered via the HttpOnly ctr_auth cookie
+    // set on the OIDC callback response — it is intentionally absent from the
+    // URL. Only non-secret metadata is relayed through query parameters.
+    if (!csrfToken || !Number.isFinite(expiresAt)) {
       statusMsg.textContent = 'Sign-in failed: missing session parameters. Redirecting to login…';
       setTimeout(() => { window.location.href = 'login.html?error=oidc_relay_invalid'; }, 2000);
     } else {
-      setAuthContextState({ token, csrfToken, expiresAt, user });
+      setAuthContextState({ csrfToken, expiresAt, user });
       if (role) {
         localStorage.setItem('ctr-user-role', role);
       }

@@ -13,7 +13,7 @@ async function startServer(options) {
   return new Promise(resolve => {
     const server = app.listen(0, () => {
       const address = server.address();
-      resolve({ server, port: address.port });
+      resolve({ server, port: address.port, app });
     });
   });
 }
@@ -581,10 +581,229 @@ async function httpsRedirectScenario() {
   }
 }
 
+function getSetCookieValue(headers, cookieName) {
+  const list = typeof headers.getSetCookie === 'function' ? headers.getSetCookie() : [];
+  for (const entry of list) {
+    const first = entry.split(';')[0];
+    const [name, ...rest] = first.split('=');
+    if (name === cookieName) return decodeURIComponent(rest.join('='));
+  }
+  return null;
+}
+
+function getSetCookieAttributes(headers, cookieName) {
+  const list = typeof headers.getSetCookie === 'function' ? headers.getSetCookie() : [];
+  for (const entry of list) {
+    const [first, ...attrs] = entry.split(';').map(s => s.trim());
+    const [name] = first.split('=');
+    if (name === cookieName) return attrs.map(a => a.toLowerCase());
+  }
+  return null;
+}
+
+async function cookieAuthScenario() {
+  console.log('server security - HttpOnly auth cookie');
+  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ctr-cookie-'));
+  const { server, port } = await startServer({
+    dataDir: tmpDir,
+    tokenTtlMs: 60_000,
+    rateLimit: { windowMs: 60000, max: 100 },
+    enforceHttps: false,
+  });
+  const baseUrl = `http://127.0.0.1:${port}`;
+
+  try {
+    const username = 'cookieuser';
+    const password = 'C00kieMonster!';
+
+    await fetch(`${baseUrl}/signup`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+    });
+
+    let session;
+    let authCookie;
+    await check('/login sets HttpOnly ctr_auth cookie', async () => {
+      const res = await fetch(`${baseUrl}/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+      });
+      assert.strictEqual(res.status, 200);
+      session = await res.json();
+      authCookie = getSetCookieValue(res.headers, 'ctr_auth');
+      assert(authCookie, 'ctr_auth cookie set');
+      assert.strictEqual(authCookie, session.token, 'cookie carries the session token');
+      const attrs = getSetCookieAttributes(res.headers, 'ctr_auth');
+      assert(attrs.includes('httponly'), 'HttpOnly flag set');
+      assert(attrs.some(a => a === 'samesite=lax'), 'SameSite=Lax set');
+      assert(attrs.some(a => a.startsWith('path=/')), 'Path=/ set');
+    });
+
+    await check('cookie auth grants access without Authorization header', async () => {
+      const res = await fetch(`${baseUrl}/projects/cookieproj`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: `ctr_auth=${authCookie}`,
+          'X-CSRF-Token': session.csrfToken,
+        },
+        body: JSON.stringify({ data: { v: 1 } }),
+      });
+      assert.strictEqual(res.status, 200, 'cookie-authenticated write succeeds');
+    });
+
+    await check('cookie auth still requires CSRF token on writes', async () => {
+      const res = await fetch(`${baseUrl}/projects/cookieproj`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: `ctr_auth=${authCookie}`,
+        },
+        body: JSON.stringify({ data: { v: 2 } }),
+      });
+      assert.strictEqual(res.status, 403, 'missing CSRF rejected even with cookie');
+    });
+
+    await check('Authorization header still works during deprecation window', async () => {
+      const res = await fetch(`${baseUrl}/projects/cookieproj`, {
+        headers: {
+          Authorization: `Bearer ${session.token}`,
+        },
+      });
+      assert.strictEqual(res.status, 200, 'bearer header still accepted');
+    });
+
+    await check('/logout revokes session and clears cookie', async () => {
+      const res = await fetch(`${baseUrl}/logout`, {
+        method: 'POST',
+        headers: {
+          Cookie: `ctr_auth=${authCookie}`,
+          'X-CSRF-Token': session.csrfToken,
+        },
+      });
+      assert.strictEqual(res.status, 200);
+      const cleared = getSetCookieAttributes(res.headers, 'ctr_auth');
+      assert(cleared, 'cookie cleared on logout');
+      assert(cleared.some(a => a === 'max-age=0'), 'cookie cleared with Max-Age=0');
+
+      const followUp = await fetch(`${baseUrl}/projects/cookieproj`, {
+        headers: { Cookie: `ctr_auth=${authCookie}` },
+      });
+      assert.strictEqual(followUp.status, 401, 'revoked session rejected');
+
+      const headerFollowUp = await fetch(`${baseUrl}/projects/cookieproj`, {
+        headers: { Authorization: `Bearer ${session.token}` },
+      });
+      assert.strictEqual(headerFollowUp.status, 401, 'header path also rejected after logout');
+    });
+  } finally {
+    await closeServer(server);
+  }
+}
+
+async function wsTicketScenario() {
+  console.log('server security - WebSocket ticket endpoint');
+  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ctr-wsticket-'));
+  const { server, port, app } = await startServer({
+    dataDir: tmpDir,
+    tokenTtlMs: 60_000,
+    rateLimit: { windowMs: 60000, max: 100 },
+    enforceHttps: false,
+  });
+  const baseUrl = `http://127.0.0.1:${port}`;
+
+  try {
+    const username = 'wsuser';
+    const password = 'WsTicket!42';
+
+    await fetch(`${baseUrl}/signup`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+    });
+    const loginRes = await fetch(`${baseUrl}/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+    });
+    const session = await loginRes.json();
+    const authCookie = getSetCookieValue(loginRes.headers, 'ctr_auth');
+
+    await check('/ws/ticket requires authentication', async () => {
+      const res = await fetch(`${baseUrl}/ws/ticket`, { method: 'POST' });
+      assert.strictEqual(res.status, 401);
+    });
+
+    await check('/ws/ticket requires CSRF token', async () => {
+      const res = await fetch(`${baseUrl}/ws/ticket`, {
+        method: 'POST',
+        headers: { Cookie: `ctr_auth=${authCookie}` },
+      });
+      assert.strictEqual(res.status, 403);
+    });
+
+    let ticket;
+    await check('/ws/ticket issues a short-lived ticket', async () => {
+      const res = await fetch(`${baseUrl}/ws/ticket`, {
+        method: 'POST',
+        headers: {
+          Cookie: `ctr_auth=${authCookie}`,
+          'X-CSRF-Token': session.csrfToken,
+        },
+      });
+      assert.strictEqual(res.status, 200);
+      const body = await res.json();
+      assert(body.ticket && /^[0-9a-f]+$/.test(body.ticket), 'ticket is hex-encoded');
+      assert(body.expiresAt > Date.now(), 'ticket has future expiry');
+      assert(body.expiresAt < Date.now() + 60_000, 'ticket TTL is short (< 60s)');
+      ticket = body.ticket;
+    });
+
+    await check('upgrade validator accepts ticket subprotocol (single-use)', async () => {
+      const validate = app.get('collabUpgradeValidator');
+      assert(typeof validate === 'function', 'validator registered');
+      const ok = await validate({
+        headers: {
+          origin: baseUrl,
+          host: `127.0.0.1:${port}`,
+          'sec-websocket-protocol': `ctr-collab, ticket.${ticket}`,
+        },
+      });
+      assert.strictEqual(ok, true, 'first use accepted');
+      const replay = await validate({
+        headers: {
+          origin: baseUrl,
+          host: `127.0.0.1:${port}`,
+          'sec-websocket-protocol': `ctr-collab, ticket.${ticket}`,
+        },
+      });
+      assert.strictEqual(replay, false, 'ticket is single-use');
+    });
+
+    await check('upgrade validator rejects bogus ticket', async () => {
+      const validate = app.get('collabUpgradeValidator');
+      const ok = await validate({
+        headers: {
+          origin: baseUrl,
+          host: `127.0.0.1:${port}`,
+          'sec-websocket-protocol': 'ctr-collab, ticket.deadbeefdeadbeef',
+        },
+      });
+      assert.strictEqual(ok, false);
+    });
+  } finally {
+    await closeServer(server);
+  }
+}
+
 (async () => {
   await authScenario();
   await rateLimitScenario();
   await sessionRefreshScenario();
   await passwordChangeScenario();
   await httpsRedirectScenario();
+  await cookieAuthScenario();
+  await wsTicketScenario();
 })();

@@ -4,9 +4,8 @@ import { mountPersistentNavigation } from './components/navigation.js';
 const ROLE_OPTIONS = ['read-only', 'reviewer', 'engineer', 'admin'];
 
 function authHeaders() {
-  const { token, csrfToken } = getAuthContextState() ?? {};
+  const { csrfToken } = getAuthContextState() ?? {};
   return {
-    Authorization: `Bearer ${token}`,
     'X-CSRF-Token': csrfToken,
     'Content-Type': 'application/json',
   };
@@ -29,9 +28,7 @@ async function loadUsers() {
   const tbody = document.getElementById('users-tbody');
   tbody.innerHTML = '<tr><td colspan="7" class="table-empty">Loading…</td></tr>';
   try {
-    const res = await fetch('/api/v1/admin/users', {
-      headers: { Authorization: authHeaders().Authorization },
-    });
+    const res = await fetch('/api/v1/admin/users');
     if (res.status === 403) {
       tbody.innerHTML = '<tr><td colspan="7" class="table-empty table-error">Access denied. Admin role required.</td></tr>';
       return;
@@ -130,9 +127,7 @@ async function loadAuditLog() {
   params.set('limit', String(Math.min(limit, 500)));
 
   try {
-    const res = await fetch(`/api/v1/admin/audit-log?${params}`, {
-      headers: { Authorization: authHeaders().Authorization },
-    });
+    const res = await fetch(`/api/v1/admin/audit-log?${params}`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const { entries, total } = await res.json();
     lastAuditEntries = entries;
@@ -231,7 +226,7 @@ async function init() {
   const accessCheck = document.getElementById('admin-access-check');
   const adminContent = document.getElementById('admin-content');
 
-  if (!authState?.token) {
+  if (!authState) {
     accessCheck.innerHTML = '<p class="table-error">You must be signed in to access the admin panel. <a href="login.html">Sign in</a></p>';
     return;
   }
