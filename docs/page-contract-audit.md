@@ -306,7 +306,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 
 - Section: Workflow
 - Group: Planning
-- Source files: `ampacity.mjs`, `analysis/arcFlash.mjs`, `analysis/ctMetadata.mjs`, `analysis/harmonics.js`, `analysis/ibrModeling.mjs`, `analysis/iec60909.mjs`, `analysis/iecRelayCurves.mjs`, `analysis/loadFlow.js`, `analysis/loadFlowModel.js`, `analysis/loadFlowResultsRenderer.js`, `analysis/motorStart.js`, `analysis/ptVtMetadata.mjs`, `analysis/reliability.js`, `analysis/scheduleReconcile.mjs`, `analysis/shortCircuit.mjs`, `analysis/tccUtils.js`, `codes/iecTables.js`, `codes/necTables.js`, `componentLibrary.json`, `conductorProperties.mjs`, `conductorPropertiesData.mjs`, `data/conductor_properties.js`, `data/protectiveDevices.mjs`, `exporters/dxf.js`, `exporters/pdf.js`, `exporters/simpleDxf.js`, `oneline.js`, `reports/arcFlashReport.mjs`, `reports/exportAll.mjs`, `reports/labels.mjs`, `reports/reporting.mjs`, `sizing.js`, `src/crossProbe.js`, `src/lifecycle/pageBootstrap.js`, `src/voltageDrop.js`, `utils/cableImpedance.js`, `utils/cablePhases.js`, `utils/componentLabels.js`, `utils/transformerImpedance.js`, `utils/transformerProperties.js`, `utils/voltage.js`, `validation/rules.js`
+- Source files: `ampacity.mjs`, `analysis/arcFlash.mjs`, `analysis/ctMetadata.mjs`, `analysis/harmonics.js`, `analysis/ibrModeling.mjs`, `analysis/iec60909.mjs`, `analysis/iecRelayCurves.mjs`, `analysis/loadFlow.js`, `analysis/loadFlowModel.js`, `analysis/loadFlowResultsRenderer.js`, `analysis/motorStart.js`, `analysis/ptVtMetadata.mjs`, `analysis/reliability.js`, `analysis/scheduleReconcile.mjs`, `analysis/shortCircuit.mjs`, `analysis/tccUtils.js`, `codes/iecTables.js`, `codes/necTables.js`, `componentLibrary.json`, `conductorProperties.mjs`, `conductorPropertiesData.mjs`, `data/conductor_properties.js`, `data/protectiveDevices.mjs`, `exporters/dxf.js`, `exporters/pdf.js`, `exporters/simpleDxf.js`, `oneline.js`, `reports/arcFlashReport.mjs`, `reports/exportAll.mjs`, `reports/labels.mjs`, `reports/reporting.mjs`, `sizing.js`, `src/crossProbe.js`, `src/lifecycle/pageBootstrap.js`, `src/one-line/validation.js`, `src/voltageDrop.js`, `utils/cableImpedance.js`, `utils/cablePhases.js`, `utils/componentLabels.js`, `utils/transformerImpedance.js`, `utils/transformerProperties.js`, `utils/voltage.js`, `validation/rules.js`
 
 **Undocumented Reads**
 - None
@@ -321,27 +321,27 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 - None
 
 **Direct Browser Storage**
-- oneline.js:2733 sessionStorage.setItem(<dynamic>) - session-handoff: Temporary custom component editor prefill; not durable project state.
+- oneline.js:2734 sessionStorage.setItem(<dynamic>) - session-handoff: Temporary custom component editor prefill; not durable project state.
 
 **Detected Reads**
 - `cableSchedule`
-  - oneline.js:13339 getCables()
-  - oneline.js:15253 getCables()
-  - oneline.js:18573 getCables()
-  - oneline.js:4168 getCables()
-  - oneline.js:4285 getCables()
+  - oneline.js:13340 getCables()
+  - oneline.js:15254 getCables()
+  - oneline.js:18448 getCables()
+  - oneline.js:4169 getCables()
+  - oneline.js:4286 getCables()
   - ... 2 more
 - `equipment`
-  - oneline.js:13315 getEquipment()
-  - oneline.js:18570 getEquipment()
-  - oneline.js:4169 getEquipment()
-  - oneline.js:8744 getEquipment()
+  - oneline.js:13316 getEquipment()
+  - oneline.js:18445 getEquipment()
+  - oneline.js:4170 getEquipment()
+  - oneline.js:8745 getEquipment()
   - reports/exportAll.mjs:293 getEquipment()
 - `loadList`
-  - oneline.js:13323 getLoads()
-  - oneline.js:18572 getLoads()
-  - oneline.js:4166 getLoads()
-  - oneline.js:8745 getLoads()
+  - oneline.js:13324 getLoads()
+  - oneline.js:18447 getLoads()
+  - oneline.js:4167 getLoads()
+  - oneline.js:8746 getLoads()
 - `oneLineDiagram`
   - analysis/arcFlash.mjs:389 getOneLine()
   - analysis/harmonics.js:181 getOneLine()
@@ -350,57 +350,57 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
   - analysis/motorStart.js:82 getOneLine()
   - ... 11 more
 - `panelSchedule`
-  - oneline.js:13331 getPanels()
-  - oneline.js:18571 getPanels()
-  - oneline.js:4167 getPanels()
+  - oneline.js:13332 getPanels()
+  - oneline.js:18446 getPanels()
+  - oneline.js:4168 getPanels()
   - reports/exportAll.mjs:294 getPanels()
 - `settings.diagramDatablockConfig`
-  - oneline.js:17742 getItem(diagramDatablockConfig)
+  - oneline.js:17743 getItem(diagramDatablockConfig)
 - `settings.diagramScale`
-  - oneline.js:3264 getItem(diagramScale)
+  - oneline.js:3265 getItem(diagramScale)
 - `settings.diagramTitleBlock`
-  - oneline.js:17689 getItem(diagramTitleBlock)
+  - oneline.js:17690 getItem(diagramTitleBlock)
 - `settings.diagramZoom`
-  - oneline.js:3285 getItem(diagramZoom)
+  - oneline.js:3286 getItem(diagramZoom)
 - `settings.gistToken`
-  - oneline.js:18815 getItem(gistToken)
+  - oneline.js:18690 getItem(gistToken)
 - `settings.gridEnabled`
-  - oneline.js:3314 getItem(gridEnabled)
+  - oneline.js:3315 getItem(gridEnabled)
 - `settings.gridSize`
-  - oneline.js:3313 getItem(gridSize)
+  - oneline.js:3314 getItem(gridSize)
 - `settings.labelCounters`
-  - oneline.js:16056 getItem(labelCounters)
-  - oneline.js:5196 getItem(labelCounters)
+  - oneline.js:16057 getItem(labelCounters)
+  - oneline.js:5197 getItem(labelCounters)
 - `settings.labelPrefixes`
-  - oneline.js:5195 getItem(labelPrefixes)
+  - oneline.js:5196 getItem(labelPrefixes)
 - `settings.layersPanelOpen`
-  - oneline.js:16142 getItem(layersPanelOpen)
+  - oneline.js:16143 getItem(layersPanelOpen)
 - `settings.manufacturerDefaults`
-  - oneline.js:2629 getItem(manufacturerDefaults)
+  - oneline.js:2630 getItem(manufacturerDefaults)
 - `settings.oneLineDiagramFilterMode`
-  - oneline.js:3249 getItem(oneLineDiagramFilterMode)
+  - oneline.js:3250 getItem(oneLineDiagramFilterMode)
 - `settings.oneLineScheduleReconcilePending`
-  - oneline.js:3351 getItem(oneLineScheduleReconcilePending)
+  - oneline.js:3352 getItem(oneLineScheduleReconcilePending)
 - `settings.onelineTemplates`
-  - oneline.js:6207 migrateLegacyItem(..., onelineTemplates)
+  - oneline.js:6208 migrateLegacyItem(..., onelineTemplates)
 - `settings.orthogonalRouting`
-  - oneline.js:17666 getItem(orthogonalRouting)
+  - oneline.js:17667 getItem(orthogonalRouting)
 - `settings.studySettings`
-  - oneline.js:3309 getItem(studySettings)
+  - oneline.js:3310 getItem(studySettings)
 - `settings.symbolStandard`
-  - oneline.js:17675 getItem(symbolStandard)
+  - oneline.js:17676 getItem(symbolStandard)
 - `settings.tccSettings`
   - analysis/arcFlash.mjs:321 getItem(tccSettings)
   - analysis/shortCircuit.mjs:492 getItem(tccSettings)
 - `studyResults`
   - analysis/harmonics.js:416 getStudies()
   - analysis/motorStart.js:209 getStudies()
-  - oneline.js:18142 getStudies()
-  - oneline.js:18789 getStudies()
-  - oneline.js:3369 getStudies()
+  - oneline.js:18017 getStudies()
+  - oneline.js:18664 getStudies()
+  - oneline.js:3370 getStudies()
   - ... 12 more
 - `studyResults.arcFlash`
-  - oneline.js:5045 getStudies().arcFlash
+  - oneline.js:5046 getStudies().arcFlash
   - reports/exportAll.mjs:297 getStudies().arcFlash
 - `studyResults.duty`
   - validation/rules.js:666 studies.duty
@@ -412,97 +412,97 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 
 **Detected Writes**
 - `cableSchedule`
-  - oneline.js:18589 setCables()
-  - oneline.js:4187 setCables()
-  - oneline.js:4295 setCables()
+  - oneline.js:18464 setCables()
+  - oneline.js:4188 setCables()
+  - oneline.js:4296 setCables()
 - `conduitSchedule`
-  - oneline.js:8653 addRaceway()
-  - oneline.js:9170 addRaceway()
+  - oneline.js:8654 addRaceway()
+  - oneline.js:9171 addRaceway()
 - `equipment`
-  - oneline.js:18586 setEquipment()
-  - oneline.js:4189 setEquipment()
+  - oneline.js:18461 setEquipment()
+  - oneline.js:4190 setEquipment()
 - `loadList`
-  - oneline.js:18588 setLoads()
-  - oneline.js:4183 setLoads()
+  - oneline.js:18463 setLoads()
+  - oneline.js:4184 setLoads()
 - `oneLineDiagram`
-  - oneline.js:11714 setOneLine()
-  - oneline.js:11906 setOneLine()
-  - oneline.js:4987 setOneLine()
-  - oneline.js:5014 setOneLine()
-  - oneline.js:5034 setOneLine()
+  - oneline.js:11715 setOneLine()
+  - oneline.js:11907 setOneLine()
+  - oneline.js:4988 setOneLine()
+  - oneline.js:5015 setOneLine()
+  - oneline.js:5035 setOneLine()
 - `panelSchedule`
-  - oneline.js:18587 setPanels()
-  - oneline.js:4185 setPanels()
+  - oneline.js:18462 setPanels()
+  - oneline.js:4186 setPanels()
 - `settings.diagramDatablockConfig`
-  - oneline.js:11644 setItem(diagramDatablockConfig)
+  - oneline.js:11645 setItem(diagramDatablockConfig)
 - `settings.diagramScale`
-  - oneline.js:11907 setItem(diagramScale)
-  - oneline.js:18924 setItem(diagramScale)
+  - oneline.js:11908 setItem(diagramScale)
+  - oneline.js:18799 setItem(diagramScale)
 - `settings.diagramTitleBlock`
-  - oneline.js:17724 setItem(diagramTitleBlock)
+  - oneline.js:17725 setItem(diagramTitleBlock)
 - `settings.diagramZoom`
-  - oneline.js:3789 setItem(diagramZoom)
-  - oneline.js:3827 setItem(diagramZoom)
-  - oneline.js:3913 setItem(diagramZoom)
-  - oneline.js:3951 setItem(diagramZoom)
+  - oneline.js:3790 setItem(diagramZoom)
+  - oneline.js:3828 setItem(diagramZoom)
+  - oneline.js:3914 setItem(diagramZoom)
+  - oneline.js:3952 setItem(diagramZoom)
 - `settings.gistToken`
-  - oneline.js:18817 setItem(gistToken)
+  - oneline.js:18692 setItem(gistToken)
 - `settings.gridEnabled`
-  - oneline.js:10962 setItem(gridEnabled)
+  - oneline.js:10963 setItem(gridEnabled)
 - `settings.gridSize`
-  - oneline.js:16433 setItem(gridSize)
+  - oneline.js:16434 setItem(gridSize)
 - `settings.labelCounters`
-  - oneline.js:16068 setItem(labelCounters)
-  - oneline.js:5205 setItem(labelCounters)
+  - oneline.js:16069 setItem(labelCounters)
+  - oneline.js:5206 setItem(labelCounters)
 - `settings.labelPrefixes`
-  - oneline.js:5391 setItem(labelPrefixes)
+  - oneline.js:5392 setItem(labelPrefixes)
 - `settings.layersPanelOpen`
-  - oneline.js:16148 setItem(layersPanelOpen)
-  - oneline.js:16155 setItem(layersPanelOpen)
+  - oneline.js:16149 setItem(layersPanelOpen)
+  - oneline.js:16156 setItem(layersPanelOpen)
 - `settings.manufacturerDefaults`
-  - oneline.js:5460 setItem(manufacturerDefaults)
+  - oneline.js:5461 setItem(manufacturerDefaults)
 - `settings.oneLineDiagramFilterMode`
-  - oneline.js:16444 setItem(oneLineDiagramFilterMode)
+  - oneline.js:16445 setItem(oneLineDiagramFilterMode)
 - `settings.oneLineScheduleReconcilePending`
-  - oneline.js:18418 setItem(oneLineScheduleReconcilePending)
+  - oneline.js:18293 setItem(oneLineScheduleReconcilePending)
 - `settings.onelineTemplates`
-  - oneline.js:6207 migrateLegacyItem(..., onelineTemplates)
-  - oneline.js:6215 setItem(onelineTemplates)
+  - oneline.js:6208 migrateLegacyItem(..., onelineTemplates)
+  - oneline.js:6216 setItem(onelineTemplates)
 - `settings.orthogonalRouting`
-  - oneline.js:17659 setItem(orthogonalRouting)
+  - oneline.js:17660 setItem(orthogonalRouting)
 - `settings.scenarios`
-  - oneline.js:18920 switchScenario()
+  - oneline.js:18795 switchScenario()
 - `settings.studySettings`
-  - oneline.js:3406 setItem(studySettings)
+  - oneline.js:3407 setItem(studySettings)
 - `settings.symbolStandard`
-  - oneline.js:17679 setItem(symbolStandard)
+  - oneline.js:17680 setItem(symbolStandard)
 - `studyResults`
   - analysis/harmonics.js:419 setStudies()
   - analysis/motorStart.js:212 setStudies()
-  - oneline.js:4990 setStudies()
-  - oneline.js:5017 setStudies()
-  - oneline.js:5038 setStudies()
+  - oneline.js:4991 setStudies()
+  - oneline.js:5018 setStudies()
+  - oneline.js:5039 setStudies()
   - ... 3 more
 - `studyResults.arcFlash`
-  - oneline.js:5037 studies.arcFlash
+  - oneline.js:5038 studies.arcFlash
 - `studyResults.duty`
   - validation/rules.js:666 studies.duty
 - `studyResults.harmonics`
   - analysis/harmonics.js:418 studies.harmonics
-  - oneline.js:5055 studies.harmonics
+  - oneline.js:5056 studies.harmonics
 - `studyResults.loadFlow`
-  - oneline.js:4989 studies.loadFlow
+  - oneline.js:4990 studies.loadFlow
 - `studyResults.motorStart`
   - analysis/motorStart.js:211 studies.motorStart
-  - oneline.js:5063 studies.motorStart
+  - oneline.js:5064 studies.motorStart
 - `studyResults.reliability`
-  - oneline.js:5073 studies.reliability
+  - oneline.js:5074 studies.reliability
 - `studyResults.shortCircuit`
-  - oneline.js:5016 studies.shortCircuit
-  - oneline.js:5036 studies.shortCircuit
+  - oneline.js:5017 studies.shortCircuit
+  - oneline.js:5037 studies.shortCircuit
 - `traySchedule`
-  - oneline.js:8653 addRaceway()
-  - oneline.js:9170 addRaceway()
+  - oneline.js:8654 addRaceway()
+  - oneline.js:9171 addRaceway()
 
 ### Demand Schedule (`demandschedule.html`)
 
@@ -538,7 +538,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 
 - Section: Workflow
 - Group: Cable
-- Source files: `ampacity.mjs`, `analysis/scheduleWorkflow.mjs`, `cableschedule.js`, `codes/iecTables.js`, `codes/necTables.js`, `conductorProperties.mjs`, `conductorPropertiesData.mjs`, `data/conductor_properties.js`, `sizing.js`, `src/cableschedule.js`, `src/crossProbe.js`, `src/lifecycle/pageBootstrap.js`, `src/voltageDrop.js`, `tableUtils.mjs`, `tour.js`, `utils/cablePhases.js`
+- Source files: `ampacity.mjs`, `analysis/scheduleWorkflow.mjs`, `cableschedule.js`, `codes/iecTables.js`, `codes/necTables.js`, `conductorProperties.mjs`, `conductorPropertiesData.mjs`, `data/conductor_properties.js`, `sizing.js`, `src/cable-schedule/io.js`, `src/cable-schedule/printReport.js`, `src/cableschedule.js`, `src/crossProbe.js`, `src/lifecycle/pageBootstrap.js`, `src/voltageDrop.js`, `tableUtils.mjs`, `tour.js`, `utils/cablePhases.js`
 
 **Undocumented Reads**
 - None
@@ -557,53 +557,53 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 
 **Detected Reads**
 - `cableSchedule`
-  - cableschedule.js:2046 getCables()
+  - cableschedule.js:2043 getCables()
 - `conduitSchedule`
-  - cableschedule.js:71 getConduits()
+  - cableschedule.js:79 getConduits()
 - `ductbankSchedule`
-  - cableschedule.js:75 getDuctbanks()
+  - cableschedule.js:83 getDuctbanks()
 - `equipment`
-  - cableschedule.js:96 getEquipment()
+  - cableschedule.js:104 getEquipment()
 - `loadList`
-  - cableschedule.js:99 getLoads()
+  - cableschedule.js:107 getLoads()
 - `oneLineDiagram`
   - src/crossProbe.js:139 getOneLine()
   - src/crossProbe.js:152 getOneLine()
   - src/crossProbe.js:201 getOneLine()
 - `panelSchedule`
-  - cableschedule.js:102 getPanels()
-  - cableschedule.js:87 getPanels()
+  - cableschedule.js:110 getPanels()
+  - cableschedule.js:95 getPanels()
 - `settings.cableChangeLog`
-  - cableschedule.js:733 getCableChangeLog()
-  - cableschedule.js:734 getItem(settings.cableChangeLog)
+  - cableschedule.js:741 getCableChangeLog()
+  - cableschedule.js:742 getItem(settings.cableChangeLog)
 - `settings.cableTagSettings`
-  - cableschedule.js:660 getCableTagSettings()
-  - cableschedule.js:661 getItem(settings.cableTagSettings)
+  - cableschedule.js:668 getCableTagSettings()
+  - cableschedule.js:669 getItem(settings.cableTagSettings)
 - `settings.cableTemplates`
-  - cableschedule.js:1413 getCableTemplates()
-  - cableschedule.js:1656 getCableTemplates()
-  - cableschedule.js:633 getCableTemplates()
+  - cableschedule.js:1421 getCableTemplates()
+  - cableschedule.js:1653 getCableTemplates()
+  - cableschedule.js:641 getCableTemplates()
 - `traySchedule`
-  - cableschedule.js:70 getTrays()
+  - cableschedule.js:78 getTrays()
 
 **Detected Writes**
 - `cableSchedule`
-  - cableschedule.js:2359 setCables()
-  - cableschedule.js:2371 setCables()
-  - cableschedule.js:2385 setCables()
-  - cableschedule.js:2408 setCables()
+  - cableschedule.js:2356 setCables()
+  - cableschedule.js:2368 setCables()
+  - cableschedule.js:2382 setCables()
+  - cableschedule.js:2405 setCables()
 - `settings.cableChangeLog`
-  - cableschedule.js:740 setCableChangeLog()
-  - cableschedule.js:742 setItem(settings.cableChangeLog)
+  - cableschedule.js:748 setCableChangeLog()
+  - cableschedule.js:750 setItem(settings.cableChangeLog)
 - `settings.cableTagSettings`
-  - cableschedule.js:667 setCableTagSettings()
-  - cableschedule.js:669 setItem(settings.cableTagSettings)
+  - cableschedule.js:675 setCableTagSettings()
+  - cableschedule.js:677 setItem(settings.cableTagSettings)
 - `settings.cableTemplates`
-  - cableschedule.js:1161 setCableTemplates()
-  - cableschedule.js:1204 setCableTemplates()
-  - cableschedule.js:1423 setCableTemplates()
-  - cableschedule.js:1442 setCableTemplates()
-  - cableschedule.js:1613 setCableTemplates()
+  - cableschedule.js:1169 setCableTemplates()
+  - cableschedule.js:1212 setCableTemplates()
+  - cableschedule.js:1431 setCableTemplates()
+  - cableschedule.js:1450 setCableTemplates()
+  - cableschedule.js:1610 setCableTemplates()
   - ... 4 more
 
 ### Panel Schedule (`panelschedule.html`)

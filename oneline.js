@@ -23,6 +23,7 @@ import { generateArcFlashReport, openLabelPrintWindow } from './reports/arcFlash
 import { exportAllReports } from './reports/exportAll.mjs';
 import { sizeConductor } from './sizing.js';
 import { runValidation } from './validation/rules.js';
+import { runDiagramValidationPasses } from './src/one-line/validation.js';
 import { exportPDF } from './exporters/pdf.js';
 import { exportDXF, exportDWG } from './exporters/dxf.js';
 import { ensureFieldAssistiveText, openModal, showAlertModal } from './src/components/modal.js';
@@ -17996,140 +17997,14 @@ function validateDiagram(options = {}) {
   const svg = document.getElementById('diagram');
   if (!svg) return validationIssues;
 
-  const idMap = new Map();
-  const inbound = new Map();
-  components.forEach(c => {
-    if (c.type === 'dimension') return;
-    idMap.set(c.id, (idMap.get(c.id) || 0) + 1);
-    inbound.set(c.id, 0);
-  });
-
-  function phaseSet(val) {
-    if (Array.isArray(val)) return val.map(p => String(p).toUpperCase());
-    if (typeof val === 'number') {
-      if (val === 3) return ['A', 'B', 'C'];
-      if (val === 2) return ['A', 'B'];
-      if (val === 1) return ['A'];
-      return [];
-    }
-    if (typeof val === 'string') {
-      if (/^\d+$/.test(val.trim())) return phaseSet(parseInt(val, 10));
-      return val
-        .split(/[\s,]+/)
-        .map(p => p.trim().toUpperCase())
-        .filter(Boolean);
-    }
-    return [];
-  }
-
-  components.forEach(c => {
-    if (c.type === 'dimension') return;
-    (c.connections || []).forEach(conn => {
-      inbound.set(conn.target, (inbound.get(conn.target) || 0) + 1);
-      const target = components.find(t => t.id === conn.target);
-      if (target) {
-        const srcVolt = resolveConnectionVoltageVolts(c, conn, 'source');
-        const tgtVolt = resolveConnectionVoltageVolts(target, conn, 'target');
-        if (srcVolt !== null && tgtVolt !== null) {
-          const diff = Math.abs(srcVolt - tgtVolt);
-          const tolerance = Math.max(1, Math.min(srcVolt, tgtVolt) * 0.005);
-          if (diff > tolerance) {
-            const srcLabel = formatVoltage(srcVolt);
-            const tgtLabel = formatVoltage(tgtVolt);
-            validationIssues.push({
-              component: c.id,
-              target: target.id,
-              code: 'voltage-mismatch',
-              message: `Voltage mismatch with ${target.label || target.subtype || target.id} (${srcLabel} vs ${tgtLabel})`
-            });
-            validationIssues.push({
-              component: target.id,
-              target: c.id,
-              code: 'voltage-mismatch',
-              message: `Voltage mismatch with ${c.label || c.subtype || c.id} (${tgtLabel} vs ${srcLabel})`
-            });
-          }
-        }
-      }
-      if (target) {
-        const srcPh = phaseSet(c.phases);
-        const tgtPh = phaseSet(target.phases);
-        const connPh = conn.phases ? phaseSet(conn.phases) : null;
-        if (connPh && connPh.length) {
-          if (srcPh.length && !connPh.every(p => srcPh.includes(p))) {
-            validationIssues.push({
-              component: c.id,
-              target: target.id,
-              code: 'phase-mismatch',
-              message: `Phase mismatch with ${target.label || target.subtype || target.id}`
-            });
-          }
-          if (tgtPh.length && !connPh.every(p => tgtPh.includes(p))) {
-            validationIssues.push({
-              component: target.id,
-              target: c.id,
-              code: 'phase-mismatch',
-              message: `Phase mismatch with ${c.label || c.subtype || c.id}`
-            });
-          }
-        } else if (srcPh.length && tgtPh.length && !tgtPh.every(p => srcPh.includes(p))) {
-          validationIssues.push({
-            component: c.id,
-            target: target.id,
-            code: 'phase-mismatch',
-            message: `Phase mismatch with ${target.label || target.subtype || target.id}`
-          });
-          validationIssues.push({
-            component: target.id,
-            target: c.id,
-            code: 'phase-mismatch',
-            message: `Phase mismatch with ${c.label || c.subtype || c.id}`
-          });
-        }
-      }
-      const cableInfo = getCableForConnection(c, target, conn);
-      if (target && (!cableInfo?.tag || cableInfo?.provisional || conn.reviewStatus === 'assumed')) {
-        validationIssues.push({
-          component: c.id,
-          target: target.id,
-          connectionIndex: (c.connections || []).indexOf(conn),
-          code: 'provisional-cable',
-          message: `Cable details need review for ${getComponentTag(c) || c.id} to ${getComponentTag(target) || target.id}`
-        });
-      }
-    });
-  });
-
-  components.forEach(c => {
-    // Gap #48: sheet_link components are intentional terminators; exclude from unconnected check
-    if (c.type === 'dimension' || c.type === 'annotation' || c.type === 'sheet_link') return;
-    if ((c.connections || []).length + (inbound.get(c.id) || 0) === 0) {
-      validationIssues.push({ component: c.id, code: 'unconnected', message: 'Unconnected component' });
-    }
-    const key = scheduleKeyForComponent(c);
-    if (key && !hasResolvedScheduleLink(c)) {
-      validationIssues.push({ component: c.id, code: 'missing-schedule-link', message: 'Missing schedule link' });
-    }
-  });
-
-  components.forEach(c => {
-    if (c.type === 'dimension') return;
-    (c.connections || []).forEach(conn => {
-      const target = components.find(t => t.id === conn.target);
-      const cableInfo = getCableForConnection(c, target, conn);
-      if (cableInfo && cableInfo.sizing_warning) {
-        validationIssues.push({ component: c.id, code: 'sizing-warning', message: cableInfo.sizing_warning });
-      }
-    });
-  });
-
-  idMap.forEach((count, id) => {
-    if (count > 1) {
-      components.filter(c => c.id === id).forEach(c => {
-        validationIssues.push({ component: c.id, code: 'duplicate-id', message: `Duplicate ID "${id}"` });
-      });
-    }
-  });
+  validationIssues.push(...runDiagramValidationPasses(components, {
+    resolveConnectionVoltageVolts,
+    formatVoltage,
+    getCableForConnection,
+    getComponentTag,
+    scheduleKeyForComponent,
+    hasResolvedScheduleLink
+  }));
 
   // Gap #48 – Cross-sheet connector pairing validation (active sheet only)
   validateSheetLinks(sheets).forEach(issue => {
