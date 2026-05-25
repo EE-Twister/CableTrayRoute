@@ -104,6 +104,7 @@ import {
   syncTransformerDefaults
 } from './utils/transformerProperties.js';
 import './site.js';
+import { readAppSetting, writeAppSetting } from './projectStorage.js';
 
 const ONE_LINE_READINESS_COPY = getContractReadinessCopy('oneline.html');
 
@@ -17619,11 +17620,11 @@ async function init() {
   const tourBtn = document.getElementById('tour-btn');
   if (tourBtn) tourBtn.addEventListener('click', () => {
     startTour();
-    localStorage.setItem('onelineTourDone', 'true');
+    writeAppSetting('onelineTourDone', 'true');
   });
-  if (!E2E && !localStorage.getItem('onelineTourDone')) {
+  if (!E2E && !readAppSetting('onelineTourDone')) {
     startTour();
-    localStorage.setItem('onelineTourDone', 'true');
+    writeAppSetting('onelineTourDone', 'true');
   }
 
   const params = new URLSearchParams(window.location.search);

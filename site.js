@@ -48,7 +48,9 @@ import {
   setThemePreference,
   setConduitCache,
   getConduitCache,
-  getAuthContextState
+  getAuthContextState,
+  readAppSetting,
+  writeAppSetting
 } from "./projectStorage.js";
 import { openModal, showAlertModal } from "./src/components/modal.js";
 import { createDomWriteBatcher, createElementCache, createHandlerProfiler } from "./src/utils/domLifecycle.js";
@@ -715,7 +717,7 @@ async function saveCheckpoint(){
       await showAlertModal('Checkpoint Too Large', 'The checkpoint exceeds the 2MB limit. Reduce project data before saving again.');
       return;
     }
-    localStorage?.setItem(CHECKPOINT_KEY,bytesToBase64(bytes));
+    writeAppSetting(CHECKPOINT_KEY,bytesToBase64(bytes));
     await save(proj,{flush:true,reason:'checkpoint'});
   }catch(e){
     console.error('Checkpoint save failed',e);
@@ -2314,7 +2316,7 @@ function loadConduits(){
   }catch(e){ console.warn('loadConduits: cache read failed', e); }
   let ductbanks=[];let conduits=[];
   try{
-    const raw=localStorage?.getItem('ductbankSchedule');
+    const raw=readAppSetting('ductbankSchedule');
     if(raw!=null){
       const parsed=JSON.parse(raw);
       ductbanks=Array.isArray(parsed)?parsed:[];
@@ -2323,7 +2325,7 @@ function loadConduits(){
     }
   }catch(e){ console.warn('loadConduits: ductbankSchedule read failed', e); }
   try{
-    const raw=localStorage?.getItem('conduitSchedule');
+    const raw=readAppSetting('conduitSchedule');
     if(raw!=null){
       const parsed=JSON.parse(raw);
       conduits=Array.isArray(parsed)?parsed:[];

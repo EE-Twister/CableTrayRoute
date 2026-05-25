@@ -4,6 +4,7 @@
  * Each helper validates a single value and returns a safe result.
  * Prefer these over raw parseFloat/parseInt in business logic.
  */
+import { readAppSetting } from '../projectStorage.js';
 
 /**
  * Parse and validate a numeric value.
@@ -105,7 +106,7 @@ export function safeParseJson(text, fallback = null) {
  */
 export function localStorageGetJson(key, fallback = null) {
     try {
-        const raw = localStorage.getItem(key);
+        const raw = readAppSetting(key);
         if (raw === null) return fallback;
         return JSON.parse(raw);
     } catch (err) {

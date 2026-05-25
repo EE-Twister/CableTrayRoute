@@ -1,6 +1,7 @@
 import './workflowStatus.js';
 import '../site.js';
 import { importProject, saveProject } from '../dataStore.mjs';
+import { readAppSetting, writeAppSetting } from '../projectStorage.js';
 import { SAMPLE_REGISTRY, getSamplesByTag, validateSampleProject, migrateSampleProject, sampleProjectToImportPayload } from '../analysis/sampleGallery.mjs';
 
 const PROGRESS_KEY_PREFIX = 'ctr_sample_progress_';
@@ -49,7 +50,7 @@ function progressKey(id) {
 
 function loadProgress(id) {
   try {
-    return JSON.parse(localStorage.getItem(progressKey(id)) || '{}');
+    return JSON.parse(readAppSetting(progressKey(id)) || '{}');
   } catch {
     return {};
   }
@@ -57,7 +58,7 @@ function loadProgress(id) {
 
 function saveProgress(id, progress) {
   try {
-    localStorage.setItem(progressKey(id), JSON.stringify(progress));
+    writeAppSetting(progressKey(id), JSON.stringify(progress));
   } catch { /* quota */ }
 }
 

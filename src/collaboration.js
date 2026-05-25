@@ -17,6 +17,8 @@
  *   collab.disconnect();
  */
 
+import { getAuthContextState } from '../projectStorage.js';
+
 const WS_URL = (() => {
   if (typeof window === 'undefined') return null;
   const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -24,9 +26,10 @@ const WS_URL = (() => {
 })();
 
 function buildWsProtocols() {
-  if (typeof localStorage === 'undefined' || typeof TextEncoder === 'undefined') return ['ctr-collab'];
-  const authToken = localStorage.getItem('authToken') || '';
-  const csrfToken = localStorage.getItem('authCsrfToken') || '';
+  if (typeof TextEncoder === 'undefined') return ['ctr-collab'];
+  const auth = getAuthContextState();
+  const authToken = auth?.token || '';
+  const csrfToken = auth?.csrfToken || '';
   const protocols = ['ctr-collab'];
 
   if (authToken) {
