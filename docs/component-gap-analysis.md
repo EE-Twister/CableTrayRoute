@@ -1,10 +1,10 @@
 # Component & Attribute Gap Analysis
 
-Generated on 2026-05-22 from `componentLibrary.json`.
+Generated on 2026-05-26 from `componentLibrary.json`.
 
 ## Missing Common Component Types
 
-- pv_array
+- None from the baseline list.
 
 ## Attribute Coverage by Existing Component Type
 
@@ -30,6 +30,7 @@ Generated on 2026-05-22 from `componentLibrary.json`.
 | inverter | — |
 | meter | — |
 | pt_vt | — |
+| pv_array | — |
 | reactor | — |
 | relay | — |
 | single_throw | — |

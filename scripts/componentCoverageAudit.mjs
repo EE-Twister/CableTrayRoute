@@ -57,7 +57,8 @@ const ATTRIBUTE_BASELINE = {
 const DC_COMPONENT_TYPES = new Set([
   'battery',
   'dc_bus',
-  'rectifier'
+  'rectifier',
+  'pv_array'
 ]);
 
 function normalizeType(value) {

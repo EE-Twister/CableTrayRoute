@@ -674,6 +674,7 @@ function categoryForType(t) {
     case 'utility_source':
     case 'generator':
     case 'pv_inverter':
+    case 'pv_array':
       return 'sources';
     case 'sheet_link':
       return 'links';

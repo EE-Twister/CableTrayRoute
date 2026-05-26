@@ -2022,6 +2022,34 @@
       "subtype": "pv_inverter"
     },
     {
+      "type": "pv_array",
+      "subtype": "pv_array",
+      "label": "PV Array",
+      "icon": "icons/components/PVArray.svg",
+      "props": {
+        "tag": "",
+        "description": "",
+        "manufacturer": "",
+        "model": "",
+        "nominal_voltage_vdc": 1000,
+        "stc_dc_kw": 1000,
+        "module_count": 2500,
+        "modules_in_series": 25,
+        "strings_in_parallel": 100,
+        "module_voc_v": 49.5,
+        "module_vmp_v": 41.3,
+        "module_isc_a": 10.2,
+        "module_imp_a": 9.7,
+        "module_temp_coeff_pct_per_c": -0.35,
+        "design_irradiance_w_m2": 1000,
+        "design_module_temp_c": 25,
+        "tilt_deg": 25,
+        "azimuth_deg": 180,
+        "tracking_type": "fixed",
+        "array_area_m2": 5000
+      }
+    },
+    {
       "type": "bess_inverter",
       "subtype": "bess_inverter",
       "label": "BESS Inverter",

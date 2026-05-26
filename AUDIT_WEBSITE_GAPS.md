@@ -101,7 +101,7 @@ Per `docs/component-gap-analysis.md` (2026-05-22 snapshot), `componentLibrary.js
 
 ### Missing component type
 
-- **`pv_array`** — required for DER / IBR study fidelity. The CTR-COMP-001…012 backlog is closed but this gap remains open.
+- ~~`pv_array`~~ — ✅ Closed 2026-05-26. Added as DC source in `componentLibrary.json` with STC rating, module geometry, temperature coefficient, and design-irradiance fields. Wired into `oneline.js` palette category map (`sources`) and `scripts/componentCoverageAudit.mjs` DC-baseline set.
 
 ### Attribute coverage holes (baseline schema)
 
@@ -151,9 +151,8 @@ Unchanged from the previous audit — all strengths preserved. Minor items remai
 
 ### P1 — Important
 
-1. **Add `pv_array` component** to `componentLibrary.json` with study-ready attributes (rated_kw, rated_kva, dc_voltage_v, modules_in_series, strings_in_parallel, etc.) and palette/icon wiring on the one-line.
-2. **Add missing pages to `sitemap.xml`**: `samplegallery.html`, `trustcenter.html`. Decide whether `admin.html` should be listed or excluded.
-3. **Complete acceptance phase 7**: CI lane split + docs updates per `docs/next-features-acceptance.md` §8.
+1. **Add missing pages to `sitemap.xml`**: `samplegallery.html`, `trustcenter.html`. Decide whether `admin.html` should be listed or excluded.
+2. **Complete acceptance phase 7**: CI lane split + docs updates per `docs/next-features-acceptance.md` §8.
 
 ### P2 — Improvement
 
