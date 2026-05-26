@@ -134,7 +134,68 @@ jobs:
           retention-days: 14
 
   # ─────────────────────────────────────────────
-  # 5. Security audit
+  # 5. Acceptance lanes (Playwright)
+  # ─────────────────────────────────────────────
+  # Phase 7 of docs/next-features-acceptance.md: these deterministic
+  # acceptance suites must pass on PRs that touch Cost Estimator, EMF,
+  # export flows, or Heat Trace sizing. We run them on every PR as a
+  # parallel job to e2e-critical so coverage is enforced automatically
+  # instead of relying on manual PR-checklist evidence.
+  acceptance-lanes:
+    name: Acceptance Lanes
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Download dist artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Cost Estimator acceptance lane
+        run: npm run e2e:next-features-cost
+        env:
+          CI: true
+
+      - name: EMF acceptance lane
+        run: npm run e2e:next-features-emf
+        env:
+          CI: true
+
+      - name: Export validation lane
+        run: npm run e2e:next-features-export
+        env:
+          CI: true
+
+      - name: Heat Trace acceptance lane
+        run: npm run e2e:heat-trace
+        env:
+          CI: true
+
+      - name: Upload Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: acceptance-lanes-report
+          path: playwright-report/
+          retention-days: 14
+
+  # ─────────────────────────────────────────────
+  # 6. Security audit
   # ─────────────────────────────────────────────
   audit:
     name: Security Audit

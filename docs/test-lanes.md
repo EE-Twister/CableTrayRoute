@@ -45,6 +45,30 @@ Current command mappings:
 - `npm run e2e:full` -> full Playwright browser lane
 
 
+## CI workflow mapping
+
+Each lane runs in a specific GitHub Actions workflow. Pre-merge lanes block
+merge on every PR; the full lane runs nightly.
+
+| Lane | Workflow file | Job | Trigger |
+|---|---|---|---|
+| `npm run test:critical` | `.github/workflows/ci.yml` | `unit-tests` | push / PR (main, master, claude/**) |
+| `npm run e2e:critical` | `.github/workflows/ci.yml` | `e2e` | push / PR (main, master, claude/**) |
+| `npm run e2e:next-features-cost` | `.github/workflows/ci.yml` | `acceptance-lanes` | push / PR (main, master, claude/**) |
+| `npm run e2e:next-features-emf` | `.github/workflows/ci.yml` | `acceptance-lanes` | push / PR (main, master, claude/**) |
+| `npm run e2e:next-features-export` | `.github/workflows/ci.yml` | `acceptance-lanes` | push / PR (main, master, claude/**) |
+| `npm run e2e:heat-trace` | `.github/workflows/ci.yml` | `acceptance-lanes` | push / PR (main, master, claude/**) |
+| `npm test` (full) | `.github/workflows/nightly-full-regression.yml` | `full-regression` | cron `0 6 * * *` + manual |
+| `npm run e2e` (full) | `.github/workflows/nightly-full-regression.yml` | `full-regression` | cron `0 6 * * *` + manual |
+
+The `acceptance-lanes` job depends on `build` and downloads the same `dist`
+artifact used by `e2e`, so the deterministic acceptance suites and the
+critical-lane E2E run against identical bundles.
+
+To run a single acceptance lane on demand outside CI, use any of the
+`npm run e2e:next-features-*` or `npm run e2e:heat-trace*` commands listed
+in the next section.
+
 ## Next-features phased lane sequence
 
 For Cost Estimator, EMF, and Heat Trace acceptance hardening, run lanes in this order and gate merge at each step:

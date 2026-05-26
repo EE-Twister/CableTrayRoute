@@ -120,12 +120,15 @@ These are heuristic gaps from `scripts/componentCoverageAudit.mjs`. Each should 
 
 ## 6. Acceptance Testing
 
-`docs/next-features-acceptance.md` rollout is through phase 6. **Phase 7** (CI lane split + docs updates) is still open. Required suites for phase-7 merge:
+`docs/next-features-acceptance.md` rollout is complete through phase 7.
 
-- `npm run test:critical`
-- `npm run e2e:critical`
-- `npm test`
-- `npm run e2e`
+Phase 7 closed 2026-05-26: a new `acceptance-lanes` job in
+`.github/workflows/ci.yml` runs the four next-features acceptance commands
+(`e2e:next-features-cost`, `e2e:next-features-emf`,
+`e2e:next-features-export`, `e2e:heat-trace`) on every push / PR after
+build, using the same `dist` artifact as the critical E2E lane.
+`docs/test-lanes.md` was extended with a CI workflow mapping table so the
+lane-to-workflow relationship is documented in one place.
 
 ---
 
@@ -149,15 +152,16 @@ Unchanged from the previous audit — all strengths preserved. Minor items remai
 
 ### P1 — Important
 
-1. **Complete acceptance phase 7**: CI lane split + docs updates per `docs/next-features-acceptance.md` §8.
+_None remaining._ All P1 items from the 2026-03-16 audit and the
+follow-up refresh are closed.
 
 ### P2 — Improvement
 
-4. **Document silent `catch {}` blocks** — add one-line comment per case, or migrate to a shared `swallow(reason)` helper exported from `utils/safeEvents.mjs`.
-5. **Fill component baseline attribute gaps** (cable / mcc / motor / panel / switchboard / generator / load / breaker / fuse / recloser). Cross-check against `analysis/componentBaseline.mjs` before edits.
-6. **Parameterize `robots.txt` sitemap URL** for non–GitHub-Pages deployments, or document the canonical deploy as the only supported target.
+1. **Document silent `catch {}` blocks** — add one-line comment per case, or migrate to a shared `swallow(reason)` helper exported from `utils/safeEvents.mjs`.
+2. **Fill component baseline attribute gaps** (cable / mcc / motor / panel / switchboard / generator / load / breaker / fuse / recloser). Cross-check against `analysis/componentBaseline.mjs` before edits.
+3. **Parameterize `robots.txt` sitemap URL** for non–GitHub-Pages deployments, or document the canonical deploy as the only supported target.
 
 ### P3 — Polish
 
-7. Standardize form label pattern across pages to explicit `<label for="id">`.
-8. Add `aria-pressed` to help-icon toggle controls.
+4. Standardize form label pattern across pages to explicit `<label for="id">`.
+5. Add `aria-pressed` to help-icon toggle controls.
