@@ -21,10 +21,10 @@
   <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
   <link rel="dns-prefetch" href="https://fonts.gstatic.com">
   <meta name="color-scheme" content="light dark">
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="dist/style.a80a3d387a5b.css">
   <link rel="stylesheet" href="src/styles/routing.css?v=optimal-route-workspace">
     <script src="https://cdn.plot.ly/plotly-2.27.0.min.js" crossorigin="anonymous" defer></script>
-    <script src="dist/vendor/xlsx.full.min.js" defer></script>
+    <script src="dist/vendor/xlsx.full.min.c9506197caf8.js" defer></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"
             integrity="sha512-dfX5uYVXzyU8+KHqj8bjo7UkOdg18PaOtpa48djpNbZHwExddghZ+ZmzWT06R5v6NSk3ZUfsH6FNEDepLx9hPQ=="
             crossorigin="anonymous" referrerpolicy="no-referrer" defer></script>
@@ -41,29 +41,11 @@
       });
     </script>
     <script type="module" src="dirtyTracker.js"></script>
-    <script>
-      (function loadVersionedModules() {
-        const rawVersion = '{{COMMIT_SHA}}';
-        const version = typeof rawVersion === 'string' && !rawVersion.includes('{{')
-          ? rawVersion.trim() || Date.now().toString(36)
-          : Date.now().toString(36);
-        const modules = [
-          { src: 'site.js', defer: false },
-          { src: 'tableUtils.mjs', defer: true },
-          { src: 'e2e-helpers.js', defer: false },
-          { src: 'app.mjs', defer: false },
-          { src: './optimalRoute.js', defer: true }
-        ];
-        modules.forEach(entry => {
-          const script = document.createElement('script');
-          script.type = 'module';
-          if (entry.defer) script.defer = true;
-          script.async = false;
-          script.src = `${entry.src}?v=${version}`;
-          document.head.appendChild(script);
-        });
-      })();
-    </script>
+    <script type="module" src="site.js"></script>
+    <script type="module" src="tableUtils.mjs"></script>
+    <script type="module" src="e2e-helpers.js"></script>
+    <script type="module" src="app.mjs"></script>
+    <script type="module" src="./dist/optimalRoute.9583cbcdd02b.js"></script>
 </head>
 <body class="optimal-route-page" data-page-visual="routing" data-report-title="Optimal Cable Route">
     <a href="#main-content" class="skip-link">Skip to main content</a>
@@ -473,6 +455,6 @@
         <summary>Debug Console</summary>
         <pre id="debug-log"></pre>
     </details>
-  <script type="module" src="dist/projectManager.js"></script>
+  <script type="module" src="dist/projectManager.375f1ec8050c.js"></script>
 </body>
 </html>
