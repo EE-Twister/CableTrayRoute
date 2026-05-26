@@ -5190,7 +5190,7 @@ function startTour() {
   showTourStep();
   try {
     tourModal.focus();
-  } catch {}
+  } catch { /* element may have been detached between render and focus; tour still works without focus ring */ }
 }
 
 // Prefix settings and counters for component labels

@@ -39,7 +39,7 @@ All 88 root-level HTML pages either:
 
 ### Minor gaps
 
-- `robots.txt` still hardcodes the GitHub Pages sitemap URL: `https://ee-twister.github.io/CableTrayRoute/sitemap.xml`. Fine for the canonical deploy, but breaks self-hosted mirrors.
+- `robots.txt` `Sitemap:` directive is the GitHub Pages canonical URL. Per the sitemaps.org protocol the URL must be absolute, so it cannot be parameterized at runtime. A comment in `robots.txt` documents this and tells forks/mirrors to update it (added 2026-05-26).
 
 ---
 
@@ -69,19 +69,18 @@ Minor observations (no action required):
 
 ### Silent `catch {}` blocks (single-line)
 
-Seven remaining single-line silent catches across non-test, non-dist code:
+All seven previously-silent single-line catches now carry a one-line
+comment documenting why suppression is intentional (closed 2026-05-26):
 
-| File | Line | Notes |
+| File | Line | Reason documented |
 |---|---|---|
-| `app.mjs` | 9 | Startup probe; intentional. |
-| `ductbankroute.js` | 19 | Session-storage probe. |
-| `optimalRoute.js` | 94 | Session-storage probe. |
-| `oneline.js` | 5192 | Worker availability probe. |
-| `projectStorage.js` | 960 | Legacy mirror cleanup. |
-| `reports/labels.mjs` | 36 | Optional PDF library load. |
-| `utils/safeEvents.mjs` | 7 | Intentional — utility's whole purpose. |
-
-**Recommendation:** Either add a one-line comment documenting intent, or replace with a shared `swallow()` helper in `utils/safeEvents.mjs` so the suppression is explicit.
+| `app.mjs` | 9 | DOM/window unavailable in test sandboxes; readiness flag is best-effort. |
+| `ductbankroute.js` | 19 | Same as `app.mjs`. |
+| `optimalRoute.js` | 94 | `sessionStorage` may throw in sandboxed/private contexts. |
+| `oneline.js` | 5192 | Tour modal may detach between render and focus; tour still works without focus ring. |
+| `projectStorage.js` | 960 | Already inside quota-recovery branch; failure means storage is fully unavailable. |
+| `reports/labels.mjs` | 36 | Template fetch optional; inline default is the fallback. |
+| `utils/safeEvents.mjs` | 7 | Defensive event dispatch — callers cannot act on dispatch failure in non-DOM contexts. |
 
 ### Multi-line catch blocks
 
@@ -157,9 +156,7 @@ follow-up refresh are closed.
 
 ### P2 — Improvement
 
-1. **Document silent `catch {}` blocks** — add one-line comment per case, or migrate to a shared `swallow(reason)` helper exported from `utils/safeEvents.mjs`.
-2. **Fill component baseline attribute gaps** (cable / mcc / motor / panel / switchboard / generator / load / breaker / fuse / recloser). Cross-check against `analysis/componentBaseline.mjs` before edits.
-3. **Parameterize `robots.txt` sitemap URL** for non–GitHub-Pages deployments, or document the canonical deploy as the only supported target.
+1. **Fill component baseline attribute gaps** (cable / mcc / motor / panel / switchboard / generator / load / breaker / fuse / recloser). Cross-check against `analysis/componentBaseline.mjs` before edits.
 
 ### P3 — Polish
 

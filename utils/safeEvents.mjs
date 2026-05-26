@@ -4,7 +4,7 @@ export function emitAsync(name) {
       if (typeof document !== 'undefined' && document?.dispatchEvent) {
         document.dispatchEvent(new Event(name));
       }
-    } catch {}
+    } catch { /* defensive: callers cannot act on dispatch failure in non-DOM contexts */ }
   };
   if (typeof requestAnimationFrame === 'function') {
     requestAnimationFrame(() => requestAnimationFrame(fire));

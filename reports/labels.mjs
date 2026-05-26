@@ -33,7 +33,7 @@ try {
   if (res.ok) {
     template = await res.text();
   }
-} catch {}
+} catch { /* template fetch optional; the inline default above is used as fallback */ }
 
 function escapeXml(value) {
   return String(value ?? '')
