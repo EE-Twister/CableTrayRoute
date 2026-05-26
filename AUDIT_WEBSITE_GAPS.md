@@ -102,18 +102,35 @@ Per `docs/component-gap-analysis.md` (2026-05-22 snapshot), `componentLibrary.js
 
 ### Attribute coverage holes (baseline schema)
 
-| Component type | Missing common attributes |
-|---|---|
-| `cable` | `size`, `insulation`, `ampacity`, `length` |
-| `mcc` | `kw`, `efficiency`, `power_factor` |
-| `motor` | `kw`, `efficiency`, `power_factor` |
-| `panel` | `kw`, `kvar`, `demand_factor` |
-| `switchboard` | `kw`, `kvar`, `demand_factor` |
-| `generator` | `efficiency`, `power_factor` |
-| `load` | `kw`, `demand_factor` |
-| `breaker` / `fuse` / `recloser` | `time_dial` |
+✅ Closed 2026-05-26. The original gap table was mostly false positives —
+the canonical schemas in `src/validation/librarySchema.mjs` and existing
+library entries use different (richer) attribute names than the audit's
+heuristic baseline (e.g., `full_load_pf` vs `power_factor`,
+`time_dial_or_tms` vs `time_dial`, `size_awg_kcmil` vs `size`).
 
-These are heuristic gaps from `scripts/componentCoverageAudit.mjs`. Each should be confirmed against the canonical schema in `analysis/componentBaseline.mjs` before bulk-filling.
+Resolution:
+
+1. `scripts/componentCoverageAudit.mjs` learned an `ATTRIBUTE_ALIASES`
+   map so canonical names satisfy the baseline (e.g., `kw` is satisfied
+   by `hp`, `rated_kva`, `kva`, `mva`, etc.).
+2. The classifier was corrected so `panel` / `switchboard` / `mcc` are
+   treated as bus equipment (their own `rated_voltage_kv` /
+   `bus_rating_a` baseline) rather than as load aggregates — those
+   roll-up fields belong on child loads, not on the equipment template.
+3. Cable `ampacity` was removed from the baseline because it is
+   computed at runtime via `analysis/ampacity.mjs` and storing it would
+   only invite drift.
+4. Real defaults were added where the gap was genuine:
+   - `generator/synchronous` and `generator/asynchronous`:
+     `full_load_efficiency_pct` (96.5 and 95.5).
+   - `motor_controller/vfd` and `motor_controller/soft_starter`:
+     `full_load_pf` and `full_load_efficiency_pct` (typical drive
+     values).
+   - `static_load`: `demand_factor: 1.0` (conservative default).
+
+After these changes the regenerated `docs/component-gap-analysis.md`
+shows zero missing attributes across all 29 discovered component
+types.
 
 ---
 
@@ -156,7 +173,7 @@ follow-up refresh are closed.
 
 ### P2 — Improvement
 
-1. **Fill component baseline attribute gaps** (cable / mcc / motor / panel / switchboard / generator / load / breaker / fuse / recloser). Cross-check against `analysis/componentBaseline.mjs` before edits.
+_None remaining._ All P2 items are closed.
 
 ### P3 — Polish
 
