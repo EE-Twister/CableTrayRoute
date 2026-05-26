@@ -1,4 +1,4 @@
-import { analyzeGroundGrid, analyzeGroundGridWithSoil, analyzeIrregularGrid } from './analysis/groundGrid.mjs';
+import { analyzeGroundGrid, analyzeIrregularGrid } from './src/workers/groundGridClient.js';
 import { normalizePreviewGeometry } from './src/groundgridPreviewGeometry.js';
 import {
   buildGroundGridRecommendations,
@@ -698,7 +698,7 @@ document.addEventListener('DOMContentLoaded', () => {
     updateRodLayoutHint();
   }
 
-  function calculate() {
+  async function calculate() {
     resultsDiv.innerHTML = '';
 
     const imperial = getUnits() === 'imperial';
@@ -737,7 +737,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let r;
     try {
-      r = analyzeGroundGrid({
+      r = await analyzeGroundGrid({
         rho,
         gridLx,
         gridLy,
@@ -884,7 +884,12 @@ document.addEventListener('DOMContentLoaded', () => {
   if (form) {
     form.addEventListener('submit', e => {
       e.preventDefault();
-      calculate();
+      calculate().catch(err => {
+        console.error('[groundgrid] calculate failed', err);
+        if (resultsDiv) {
+          resultsDiv.innerHTML = `<p class="alert-error" role="alert">Error: ${err.message || err}</p>`;
+        }
+      });
     });
 
     form.addEventListener('input', handleFormStateChange);
@@ -1202,7 +1207,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById(id)?.addEventListener('change', updatePolygonPreview);
   });
 
-  document.getElementById('irregular-analyze-btn')?.addEventListener('click', () => {
+  document.getElementById('irregular-analyze-btn')?.addEventListener('click', async () => {
     syncPolygonFromTable();
     if (polygonVertices.length < 3) {
       const { showAlertModal } = window;
@@ -1221,7 +1226,7 @@ document.addEventListener('DOMContentLoaded', () => {
         tf: parseFloat(document.getElementById('irr-tf')?.value) || 0.5,
         bw: parseInt(document.getElementById('irr-bw')?.value, 10) || 70,
       };
-      irregularGridResult = analyzeIrregularGrid(params, soilFitResult);
+      irregularGridResult = await analyzeIrregularGrid(params, soilFitResult);
       latestAnalysisResult = irregularGridResult;
       renderIrrResults(irregularGridResult);
     } catch (err) {
