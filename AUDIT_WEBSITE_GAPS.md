@@ -1,169 +1,167 @@
 # Website Gaps & Missing Functionality Audit
 
-**Date:** 2026-03-16
-**Scope:** Full website audit covering navigation, forms, accessibility, SEO, and code quality
+**Date:** 2026-05-26 (refresh of 2026-03-16 audit)
+**Scope:** Full website audit covering navigation, forms, accessibility, SEO, error handling, component library, and code quality
 
 ---
 
 ## Executive Summary
 
-The CableTrayRoute website is a mature, feature-complete electrical design platform. Accessibility and SEO are strong (9/10). The main gaps are: **inconsistent navigation across pages**, **missing signup password confirmation**, **excessive use of `alert()` for error handling**, and **silent error swallowing** in several modules.
+The CableTrayRoute website has matured significantly since the previous audit. The Phase 0–6 refactors (PRs #1776–#1781) plus subsequent UX work closed every P0 and P1 item from the 2026-03-16 audit. Accessibility and SEO remain strong (9/10).
+
+The remaining gaps are smaller in scope: a handful of silent `catch {}` blocks, a partial sitemap, one missing component type (`pv_array`), attribute holes in the component library, and the final acceptance-test rollout phase.
 
 ---
 
-## 1. Navigation Inconsistencies
+## What was fixed since 2026-03-16
 
-### CRITICAL: Pages missing the Studies section in navigation
-
-The dynamic navigation component (`src/components/navigation.js`) defines 21 routes across 5 sections, but several pages use hardcoded nav HTML that is out of sync:
-
-| Page | Missing Links |
-|------|--------------|
-| `index.html` | TCC, Harmonics, Motor Start, Load Flow, Short Circuit, Arc Flash, Custom Components, Account |
-| `help.html` | TCC, Harmonics, Motor Start, Load Flow, Short Circuit, Arc Flash, Custom Components, Account |
-| `404.html` | TCC, Harmonics, Motor Start, Load Flow, Short Circuit, Arc Flash, Custom Components, Account |
-| `500.html` | TCC, Harmonics, Motor Start, Load Flow, Short Circuit, Arc Flash, Custom Components, Account |
-
-**Root cause:** These pages have manually-written nav HTML instead of using the shared `navigation.js` component. The 6 Studies pages and Custom Components are entirely absent from their nav bars.
-
-### Medium: Orphaned / unlinked pages
-
-- **`library.html`** - Exists and is in `sitemap.xml` but is NOT linked from any navigation menu
-- **`account.html`** - In navigation.js but missing from `sitemap.xml`
-- **`forgot-password.html`** and **`reset-password.html`** - Not in `sitemap.xml`
-
-### Minor: Manifest / deployment path issues
-
-- `manifest.json` uses absolute `start_url: "/index.html"` which may break in subdirectory deployments
-- `robots.txt` sitemap URL hardcoded to `https://ee-twister.github.io/CableTrayRoute/sitemap.xml`
+| Previous audit item | Status | Evidence |
+|---|---|---|
+| P0 — Nav inconsistencies on `index.html` / `help.html` / `404.html` / `500.html` | ✅ Fixed | All four use the dynamic `<div id="nav-links">` placeholder populated by `src/components/navigation.js` via the `dist/index.*.js` bundle. |
+| P0 — Signup form missing password confirmation | ✅ Fixed | `login.html:61-67` adds confirm field; `auth.js:18-34` validates match. |
+| P1 — Submit buttons not disabled during auth | ✅ Fixed | `auth.js:62,79,89,112` disable in `try` / re-enable in `finally`. |
+| P1 — Missing `pattern` attribute on username inputs | ✅ Fixed | `login.html:50,79` add `pattern="[a-zA-Z0-9_\-]{1,100}"`. |
+| P1 — `account.html` missing from `sitemap.xml` | ✅ Fixed | `sitemap.xml:61`. |
+| P1 — 50+ `alert()` calls in `cabletrayfill.js` / `src/panelSchedule.js` | ✅ Fixed | 0 `alert()` calls remain in either file. Only 1 occurrence in non-dist code, and it is a string literal (`ductbankroute.js:3154`) not a function call. |
+| P2 — `manifest.json` used absolute `start_url` | ✅ Fixed | Now `./index.html`. |
+| P2 — `library.html` not linked in nav | ✅ Fixed | `src/components/navigation.js:77` (Library section). |
 
 ---
 
-## 2. Forms & Authentication Gaps
+## 1. Navigation
 
-### CRITICAL: Signup form missing password confirmation
+### State
+All 88 root-level HTML pages either:
+- Use the shared `<nav class="top-nav">` placeholder hydrated by `src/components/navigation.js`, OR
+- Are intentionally standalone (`login.html`, `forgot-password.html`, `reset-password.html`, `oidc-relay.html`, `offline.html`).
 
-**File:** `login.html` (lines 45-61)
-The signup form has username and password fields but **no confirm-password field**. Users could mistype their password and be locked out. Compare with `account.html` and `reset-password.html` which both correctly include password confirmation.
+`navigation.js` defines 85 routes across 6 sections (Home, Workflow, Studies, Library, Support) plus the admin-only `admin.html`.
 
-### Medium: Login/signup buttons not disabled during submission
+### Minor gaps
 
-**File:** `auth.js`
-The signup and login form handlers do not disable the submit button during the fetch request, allowing duplicate submissions. Compare with `account.js` (line 45) and `forgot-password.html` (line 89) which properly disable buttons during requests.
-
-### Medium: No client-side username format validation
-
-**File:** `login.html`
-Username inputs lack an HTML `pattern` attribute. The server enforces `/^[a-zA-Z0-9_-]{1,100}$/` (`server.mjs` line 28), but users get a server error instead of immediate client feedback.
+- `robots.txt` still hardcodes the GitHub Pages sitemap URL: `https://ee-twister.github.io/CableTrayRoute/sitemap.xml`. Fine for the canonical deploy, but breaks self-hosted mirrors.
 
 ---
 
-## 3. Error Handling Issues
+## 2. Sitemap Coverage
 
-### Alert-based error handling (should use modal dialogs)
+`sitemap.xml` contains 62 `<loc>` entries. Missing pages that exist and are user-reachable:
 
-Over **50 instances** of `alert()` used for error messages instead of the existing modal component:
+| Page | Reason it should be indexed |
+|---|---|
+| `samplegallery.html` | In nav (Support section), publicly browsable. |
+| `trustcenter.html` | In nav (Support section), linked from footer. |
+| `admin.html` | In nav (admin-only). Optional — could intentionally stay out of public sitemap. |
 
-| File | Count | Examples |
-|------|-------|---------|
-| `cabletrayfill.js` | 40+ | Various validation and routing errors |
-| `src/panelSchedule.js` | 13 | Breaker configuration, circuit errors |
-| `src/racewayschedule.js` | 1 | "Raceway tables not initialized" |
-| `src/scenarios.js` | 1 | "No revisions" |
-| `src/projectManager.js` | 1 | Generic error fallback |
+Pages correctly excluded: `login.html`, `forgot-password.html`, `reset-password.html`, `oidc-relay.html`, `offline.html`, `500.html`.
 
-### Silent error swallowing (empty catch blocks)
+---
 
-Multiple locations silently discard errors with `catch {}` or `catch(e) {}`:
+## 3. Forms & Authentication
 
-| File | Count | Notes |
-|------|-------|-------|
-| `tableUtils.mjs` | 7 | Various parse/format operations |
-| `src/projectManager.js` | 2 | Project state retrieval |
-| `src/panelSchedule.js` | 1 | URL update |
-| `src/racewayschedule.js` | 1 | E2E test cleanup (intentional) |
-| `cableschedule.js` | ~5 | Session storage operations |
-| `ductbankroute.js` | 2 | Session save/load |
+All previous P0/P1 form items are resolved. No outstanding gaps detected in the auth flow.
+
+Minor observations (no action required):
+- `forgot-password.html` and `reset-password.html` already use submit-button disable patterns.
+- `account.html` requires the current password before changing it (`account.js:45`).
+
+---
+
+## 4. Error Handling
+
+### Silent `catch {}` blocks (single-line)
+
+Seven remaining single-line silent catches across non-test, non-dist code:
+
+| File | Line | Notes |
+|---|---|---|
+| `app.mjs` | 9 | Startup probe; intentional. |
+| `ductbankroute.js` | 19 | Session-storage probe. |
+| `optimalRoute.js` | 94 | Session-storage probe. |
+| `oneline.js` | 5192 | Worker availability probe. |
+| `projectStorage.js` | 960 | Legacy mirror cleanup. |
+| `reports/labels.mjs` | 36 | Optional PDF library load. |
+| `utils/safeEvents.mjs` | 7 | Intentional — utility's whole purpose. |
+
+**Recommendation:** Either add a one-line comment documenting intent, or replace with a shared `swallow()` helper in `utils/safeEvents.mjs` so the suppression is explicit.
+
+### Multi-line catch blocks
+
+~284 multi-line catch blocks across the non-test codebase. Most include `console.error` logging or user-facing modal messages; spot checks show no systemic silent-swallow pattern. Worth a targeted re-audit only if a specific incident traces back to one.
 
 ### Console-only error reporting
 
-Several modules log errors to `console.error()` without any user-facing feedback:
-
-- `ductbankroute.js` - Session save/load failures, data loading errors
-- `analysis/tcc.js` - Device data loading failures
-- `exportPanelSchedule.js` - XLSX library not loaded
+`console.error()` is widely used as the secondary log path with user-facing modals as the primary signal. No new console-only-with-no-UI-signal cases detected since the previous audit's `ductbankroute.js` / `analysis/tcc.js` callouts were resolved.
 
 ---
 
-## 4. Accessibility & SEO (Score: 9/10)
+## 5. Component Library Gaps
 
-### Strengths (well-implemented)
+Per `docs/component-gap-analysis.md` (2026-05-22 snapshot), `componentLibrary.json` covers 31 component types.
 
-- Skip-to-content links on all pages
-- Proper `<label>` and `aria-describedby` on forms
-- Single `<h1>` per page with logical heading hierarchy
-- `role="dialog"`, `aria-modal`, `aria-labelledby` on modals
-- `role="progressbar"` with proper value attributes
-- `:focus-visible` with blue ring + box-shadow on buttons
-- `@media (prefers-reduced-motion: reduce)` disables all animations
-- High-contrast theme with 21:1 ratio and gold focus rings
-- `.visually-hidden` / `.sr-only` classes properly implemented
-- 44px minimum touch targets on coarse pointer devices
-- Dark mode respects `prefers-color-scheme` + manual override
-- Comprehensive Open Graph, Twitter cards, canonical URLs, JSON-LD structured data
-- Proper `<html lang="en">`, `<meta charset>`, `<meta viewport>`
+### Missing component type
 
-### Minor issues
+- **`pv_array`** — required for DER / IBR study fidelity. The CTR-COMP-001…012 backlog is closed but this gap remains open.
 
-- Form label patterns vary (some use wrapping `<label>`, others use `for` attribute) - should standardize on explicit `for` pattern
-- `og:image` uses relative paths that may not resolve correctly in all sharing contexts
-- Help icon tooltips could add `aria-pressed` for toggle state indication
+### Attribute coverage holes (baseline schema)
 
----
+| Component type | Missing common attributes |
+|---|---|
+| `cable` | `size`, `insulation`, `ampacity`, `length` |
+| `mcc` | `kw`, `efficiency`, `power_factor` |
+| `motor` | `kw`, `efficiency`, `power_factor` |
+| `panel` | `kw`, `kvar`, `demand_factor` |
+| `switchboard` | `kw`, `kvar`, `demand_factor` |
+| `generator` | `efficiency`, `power_factor` |
+| `load` | `kw`, `demand_factor` |
+| `breaker` / `fuse` / `recloser` | `time_dial` |
 
-## 5. Feature Completeness
-
-### All core modules fully implemented
-
-- `src/panelSchedule.js` - Full implementation (2900+ lines)
-- `src/racewayschedule.js` - Full implementation
-- `src/conduitfill.js` - Wrapper delegating to main module (functional)
-- `src/voltageDrop.js` - Full calculation logic
-- `src/pullCalc.js` - Full cable tension calculations
-
-### Intentional stubs (documented)
-
-- `site.js:744` `initHistory()` - Empty no-op, retained to preserve external references. History/autosave removed to avoid localStorage quota issues (documented in comments).
-
-### No TODO/FIXME markers found in `src/` files
+These are heuristic gaps from `scripts/componentCoverageAudit.mjs`. Each should be confirmed against the canonical schema in `analysis/componentBaseline.mjs` before bulk-filling.
 
 ---
 
-## 6. Service Worker & PWA
+## 6. Acceptance Testing
 
-- `sw.js` properly configured with network-first HTML strategy, API bypass, and offline fallback
-- Precache list is minimal but covers critical shell assets
-- `manifest.json` is comprehensive with shortcuts and maskable icons
+`docs/next-features-acceptance.md` rollout is through phase 6. **Phase 7** (CI lane split + docs updates) is still open. Required suites for phase-7 merge:
+
+- `npm run test:critical`
+- `npm run e2e:critical`
+- `npm test`
+- `npm run e2e`
+
+---
+
+## 7. Accessibility & SEO (Score: 9/10)
+
+Unchanged from the previous audit — all strengths preserved. Minor items remain:
+
+- Form label patterns vary (some wrap, some use `for`). Not a regression.
+- `og:image` uses absolute `https://cabletrayroute.com/icons/og-preview.png` consistently across pages — the previous audit's "relative paths" concern no longer applies.
+- Help icon tooltips could add `aria-pressed` for toggle state.
+
+---
+
+## 8. Service Worker & PWA
+
+`sw.js` and `manifest.json` configuration is unchanged and still correct. `manifest.json` now uses relative `start_url: "./index.html"`, addressing the previous deployment-path concern.
 
 ---
 
 ## Prioritized Recommendations
 
-### P0 - Critical
+### P1 — Important
 
-1. **Sync navigation across all pages** - Either render nav from `navigation.js` on all pages, or update hardcoded nav HTML in `index.html`, `help.html`, `404.html`, `500.html` to include Studies section and all 21 routes
-2. **Add password confirmation to signup form** in `login.html` with matching validation in `auth.js`
+1. **Add `pv_array` component** to `componentLibrary.json` with study-ready attributes (rated_kw, rated_kva, dc_voltage_v, modules_in_series, strings_in_parallel, etc.) and palette/icon wiring on the one-line.
+2. **Add missing pages to `sitemap.xml`**: `samplegallery.html`, `trustcenter.html`. Decide whether `admin.html` should be listed or excluded.
+3. **Complete acceptance phase 7**: CI lane split + docs updates per `docs/next-features-acceptance.md` §8.
 
-### P1 - Important
+### P2 — Improvement
 
-3. **Disable submit buttons during auth requests** in `auth.js` to prevent duplicate submissions
-4. **Add `pattern` attribute** to username inputs: `pattern="[a-zA-Z0-9_-]{1,100}"`
-5. **Add `account.html` to `sitemap.xml`**
-6. **Replace `alert()` calls with modal dialogs** in `cabletrayfill.js` and `src/panelSchedule.js` (50+ instances)
+4. **Document silent `catch {}` blocks** — add one-line comment per case, or migrate to a shared `swallow(reason)` helper exported from `utils/safeEvents.mjs`.
+5. **Fill component baseline attribute gaps** (cable / mcc / motor / panel / switchboard / generator / load / breaker / fuse / recloser). Cross-check against `analysis/componentBaseline.mjs` before edits.
+6. **Parameterize `robots.txt` sitemap URL** for non–GitHub-Pages deployments, or document the canonical deploy as the only supported target.
 
-### P2 - Improvement
+### P3 — Polish
 
-7. **Add logging to silent catch blocks** or document why they're intentionally empty
-8. **Link `library.html`** from navigation or remove from sitemap
-9. **Use relative paths** in `manifest.json` start_url for subdirectory deployment support
-10. **Standardize form label pattern** to explicit `<label for="id">` across all pages
+7. Standardize form label pattern across pages to explicit `<label for="id">`.
+8. Add `aria-pressed` to help-icon toggle controls.
