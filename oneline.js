@@ -674,6 +674,7 @@ function categoryForType(t) {
     case 'utility_source':
     case 'generator':
     case 'pv_inverter':
+    case 'pv_array':
       return 'sources';
     case 'sheet_link':
       return 'links';
@@ -5189,7 +5190,7 @@ function startTour() {
   showTourStep();
   try {
     tourModal.focus();
-  } catch {}
+  } catch { /* element may have been detached between render and focus; tour still works without focus ring */ }
 }
 
 // Prefix settings and counters for component labels

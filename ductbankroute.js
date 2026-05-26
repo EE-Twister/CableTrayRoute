@@ -16,7 +16,7 @@ function markReady(flagName) {
     document.documentElement.setAttribute(flagName, '1');
     // also expose to window for debugging
     window[flagName.replace(/-([a-z])/g, (_, c) => c.toUpperCase())] = true;
-  } catch {}
+  } catch { /* DOM/window unavailable in test sandboxes; readiness flag is best-effort */ }
 }
 
 function suppressResumeIfE2E() {

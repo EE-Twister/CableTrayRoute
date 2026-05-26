@@ -91,7 +91,7 @@ function showResumeModalForE2E() {
   if (!searchParams.has('showResume')) return;
   try {
     if (sessionStorage.getItem('resume:choice')) return;
-  } catch {}
+  } catch { /* sessionStorage may throw in sandboxed/private contexts; treat as no prior choice */ }
   const modal = document.getElementById('resume-modal');
   if (!modal) return;
   modal.classList.remove('hidden', 'is-hidden', 'invisible');

@@ -50,14 +50,38 @@ const ATTRIBUTE_BASELINE = {
   transformer: ['kva', 'percent_z', 'primary_connection', 'secondary_connection'],
   protective: ['pickup_amps', 'time_dial', 'interrupting_rating_ka'],
   rotating: ['kw', 'efficiency', 'power_factor'],
+  equipment: ['rated_voltage_kv', 'bus_rating_a'],
   load: ['kw', 'kvar', 'demand_factor'],
-  cable: ['size', 'material', 'insulation', 'ampacity', 'length']
+  // Ampacity is computed at runtime from size/material/insulation/temp via
+  // analysis/ampacity.mjs and is intentionally NOT stored on the library
+  // template. Keep it out of the baseline so the audit doesn't ask for a
+  // value that would only invite drift between the stored and computed value.
+  cable: ['size', 'material', 'insulation', 'length']
 };
+
+// Accept canonical/equivalent attribute names from the live library
+// schemas as fulfilling the heuristic baseline. Keys are baseline names;
+// values are the names actually used in componentLibrary.json or by the
+// validators in src/validation/librarySchema.mjs.
+const ATTRIBUTE_ALIASES = new Map([
+  ['kw', ['hp', 'rated_kw', 'rated_hp', 'rated_kva', 'kva', 'watts', 'mva', 'rated_mva']],
+  ['efficiency', ['efficiency_pct', 'full_load_efficiency_pct']],
+  ['power_factor', ['pf', 'full_load_pf']],
+  ['demand_factor', ['diversity_factor', 'load_diversity']],
+  ['size', ['size_awg_kcmil', 'awg', 'kcmil', 'trade_size']],
+  ['insulation', ['insulation_type']],
+  ['length', ['length_ft', 'length_m']],
+  ['ampacity', ['rated_ampacity_a', 'rated_current_a', 'rated_current']],
+  ['time_dial', ['time_dial_or_tms', 'tms']],
+  ['interrupting_rating_ka', ['interrupt_rating_ka', 'ka']],
+  ['pickup_amps', ['pickup_a', 'pickup_pu']]
+]);
 
 const DC_COMPONENT_TYPES = new Set([
   'battery',
   'dc_bus',
-  'rectifier'
+  'rectifier',
+  'pv_array'
 ]);
 
 function normalizeType(value) {
@@ -118,10 +142,22 @@ function classifyType(type) {
   if (/utility|source|grid/.test(type)) return 'source';
   if (/transformer/.test(type)) return 'transformer';
   if (/breaker|fuse|relay|protection|recloser/.test(type)) return 'protective';
-  if (/motor|generator|mcc/.test(type)) return 'rotating';
-  if (/load|panel|switchboard/.test(type)) return 'load';
+  // panel / switchboard / mcc are bus equipment with their own canonical
+  // schema (rated_voltage_kv, bus_rating_a, etc.), not load-aggregate or
+  // rotating-machine templates. Roll-up kw/kvar/demand_factor belong on
+  // child loads, not on the equipment template.
+  if (/mcc|panel|switchboard/.test(type)) return 'equipment';
+  if (/motor|generator/.test(type)) return 'rotating';
+  if (/load/.test(type)) return 'load';
   if (/cable|tray|conduit|duct/.test(type)) return 'cable';
   return 'all';
+}
+
+function isAttributeSatisfied(baselineKey, propKeys) {
+  if (propKeys.includes(baselineKey)) return true;
+  const aliases = ATTRIBUTE_ALIASES.get(baselineKey);
+  if (!aliases) return false;
+  return aliases.some((alias) => propKeys.includes(normalizeType(alias)));
 }
 
 function resolveVoltageBaselineKey(type) {
@@ -192,7 +228,7 @@ async function main() {
             resolveVoltageBaselineKey(type),
             ...(ATTRIBUTE_BASELINE[classKey] || [])
           ])).map((item) => normalizeType(item));
-      const missing = expected.filter((key) => !props.includes(key));
+      const missing = expected.filter((key) => !isAttributeSatisfied(key, props));
       return {
         type,
         expected,
@@ -223,6 +259,8 @@ async function main() {
     '',
     '- Baseline attributes are derived from common fields found in peer one-line/power-system design tools.',
     '- Product-bearing one-line components receive runtime baseline manufacturer, catalog approval, source, verification, datasheet, BIM, lifecycle, and voltage fields even when a legacy library row omits them.',
+    '- An attribute is considered present if it appears under its canonical name or any documented alias (e.g., `kw` is satisfied by `hp`, `rated_kva`, `kva`, etc.). See `ATTRIBUTE_ALIASES` in `scripts/componentCoverageAudit.mjs`.',
+    '- `src/validation/librarySchema.mjs` is the canonical schema for MCC and Motor entries; the heuristic baseline here is intentionally looser so it surfaces gaps without duplicating the validator.',
     '- This report is a heuristic gap check and should be reviewed before schema enforcement.'
   ];
 

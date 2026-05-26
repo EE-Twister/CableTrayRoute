@@ -957,7 +957,7 @@ function handleStorageWriteError(prefix, keyOrError, maybeError) {
       try {
         const storage = getStorage();
         if (storage) storage.removeItem(key);
-      } catch {}
+      } catch { /* already in quota-recovery branch; removeItem failure means storage is fully unavailable */ }
       memoryStorage.delete(key);
       storageWriteBlocked = false;
       quotaWarningShown = false;
