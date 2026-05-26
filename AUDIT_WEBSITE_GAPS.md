@@ -45,15 +45,13 @@ All 88 root-level HTML pages either:
 
 ## 2. Sitemap Coverage
 
-`sitemap.xml` contains 62 `<loc>` entries. Missing pages that exist and are user-reachable:
+`sitemap.xml` contains 64 `<loc>` entries. All publicly reachable pages are now indexed.
 
-| Page | Reason it should be indexed |
-|---|---|
-| `samplegallery.html` | In nav (Support section), publicly browsable. |
-| `trustcenter.html` | In nav (Support section), linked from footer. |
-| `admin.html` | In nav (admin-only). Optional — could intentionally stay out of public sitemap. |
+Intentionally excluded:
+- `admin.html` — admin-only (gated by `adminOnly: true` in `src/components/navigation.js:84`). Excluding from the public sitemap avoids advertising the admin surface to crawlers.
+- `login.html` is listed (entry point) but `forgot-password.html` / `reset-password.html` are kept at low priority (0.2) since they are transient flows.
 
-Pages correctly excluded: `login.html`, `forgot-password.html`, `reset-password.html`, `oidc-relay.html`, `offline.html`, `500.html`.
+Other correctly excluded pages: `oidc-relay.html`, `offline.html`, `500.html`.
 
 ---
 
@@ -151,8 +149,7 @@ Unchanged from the previous audit — all strengths preserved. Minor items remai
 
 ### P1 — Important
 
-1. **Add missing pages to `sitemap.xml`**: `samplegallery.html`, `trustcenter.html`. Decide whether `admin.html` should be listed or excluded.
-2. **Complete acceptance phase 7**: CI lane split + docs updates per `docs/next-features-acceptance.md` §8.
+1. **Complete acceptance phase 7**: CI lane split + docs updates per `docs/next-features-acceptance.md` §8.
 
 ### P2 — Improvement
 
