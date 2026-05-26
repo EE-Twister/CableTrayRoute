@@ -18,28 +18,11 @@
   <link rel="canonical" href="oneline.html">
   <link rel="dns-prefetch" href="https://fonts.gstatic.com">
   <meta name="color-scheme" content="light dark">
-  <link rel="stylesheet" href="style.css?v=one-line-datablock-contrast-v1">
-  <script src="dist/vendor/handlebars.min.js"></script>
-  <script>
-    (function loadVersionedModules() {
-      const rawVersion = '{{COMMIT_SHA}}';
-      const version = typeof rawVersion === 'string' && !rawVersion.includes('{{')
-        ? rawVersion.trim() || Date.now().toString(36)
-        : Date.now().toString(36);
-      const modules = [
-        './dataStore.mjs',
-        './oneline.js',
-        './dist/scenarios.js'
-      ];
-      modules.forEach(src => {
-        const script = document.createElement('script');
-        script.type = 'module';
-        script.defer = true;
-        script.src = `${src}?v=${version}`;
-        document.head.appendChild(script);
-      });
-    })();
-  </script>
+  <link rel="stylesheet" href="dist/style.a80a3d387a5b.css">
+  <script src="dist/vendor/handlebars.min.0e5416f145e7.js"></script>
+  <script type="module" src="./dataStore.mjs"></script>
+  <script type="module" src="./oneline.js"></script>
+  <script type="module" src="./dist/scenarios.9163aaf6e26f.js"></script>
 </head>
 <body class="oneline-page" data-report-title="One-Line Diagram">
   <a href="#main-content" class="skip-link">Skip to main content</a>
@@ -571,6 +554,6 @@
   <ul id="palette-context-menu" class="context-menu" role="menu">
     <li data-action="edit" role="menuitem">Edit Component</li>
   </ul>
-  <script type="module" src="./dist/projectManager.js"></script>
+  <script type="module" src="./dist/projectManager.375f1ec8050c.js"></script>
 </body>
 </html>

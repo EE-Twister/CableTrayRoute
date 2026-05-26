@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "build": "node scripts/buildFastJsonPatch.cjs && rollup -c rollup.config.cjs && node scripts/copyAssets.cjs && node scripts/generateValidationManifest.cjs",
+    "build": "node scripts/buildFastJsonPatch.cjs && rollup -c rollup.config.cjs && node scripts/copyAssets.cjs && node scripts/rewriteHtmlForManifest.cjs && node scripts/generateValidationManifest.cjs",
     "build:manifest": "node scripts/generateValidationManifest.cjs",
     "test": "npm run test:full",
     "e2e": "npm run e2e:full",
