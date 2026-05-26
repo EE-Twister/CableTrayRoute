@@ -7,9 +7,16 @@
 
 ## Executive Summary
 
-The CableTrayRoute website has matured significantly since the previous audit. The Phase 0–6 refactors (PRs #1776–#1781) plus subsequent UX work closed every P0 and P1 item from the 2026-03-16 audit. Accessibility and SEO remain strong (9/10).
+The CableTrayRoute website has matured significantly since the previous
+audit. The Phase 0–6 refactors (PRs #1776–#1781) plus subsequent UX
+work closed every P0 and P1 item from the 2026-03-16 audit, and the
+2026-05-26 refresh cycle (this branch) closed every remaining P2/P3
+item. Accessibility and SEO remain strong (9/10).
 
-The remaining gaps are smaller in scope: a handful of silent `catch {}` blocks, a partial sitemap, one missing component type (`pv_array`), attribute holes in the component library, and the final acceptance-test rollout phase.
+**Status: no outstanding audit items.** The Prioritized Recommendations
+section below is empty across P1/P2/P3; sections 1–8 document what was
+closed and how. Future audits should regenerate this report from
+fresh inspection rather than continuing to amend this one.
 
 ---
 
@@ -150,11 +157,32 @@ lane-to-workflow relationship is documented in one place.
 
 ## 7. Accessibility & SEO (Score: 9/10)
 
-Unchanged from the previous audit — all strengths preserved. Minor items remain:
+Unchanged from the previous audit — all strengths preserved. Minor items
+addressed 2026-05-26:
 
-- Form label patterns vary (some wrap, some use `for`). Not a regression.
-- `og:image` uses absolute `https://cabletrayroute.com/icons/og-preview.png` consistently across pages — the previous audit's "relative paths" concern no longer applies.
-- Help icon tooltips could add `aria-pressed` for toggle state.
+- ✅ **Form label pattern standardization.** The previous audit flagged
+  inconsistent label patterns. On inspection, 109 of the wrapping cases
+  were on checkboxes/radios where the wrapping pattern is idiomatic and
+  W3C-recommended. The remaining 21 wrapping labels on text/number
+  inputs (across `panelschedule.html`, `ductbankroute.html`,
+  `equipmentlist.html`, `library.html`, `loadFlow.html`) now carry an
+  explicit `for` attribute that points at the wrapped input's `id`.
+  This satisfies both the implicit (DOM-nesting) and explicit
+  (`for`/`id`) ARIA association paths without restructuring the DOM,
+  so layout is unaffected. `loadFlow.html` Base MVA gained an `id` so
+  it could be referenced.
+- ✅ **Help-icon ARIA semantics confirmed correct.** The previous
+  audit suggested adding `aria-pressed` to help-icon toggles. After
+  review this would be incorrect: help icons are disclosure widgets
+  that reveal tooltip content, not toggle buttons that hold an on/off
+  state. The W3C ARIA pattern for disclosure widgets is
+  `aria-expanded`, which `app.mjs:484-494` and `ductbankroute.js:4380`
+  already wire up correctly. `aria-pressed` would create conflicting
+  semantics on the same element.
+
+Remaining (non-blocking): `og:image` uses an absolute hosted URL
+(`https://cabletrayroute.com/icons/og-preview.png`), which works
+across share contexts. No outstanding accessibility action items.
 
 ---
 
@@ -177,5 +205,8 @@ _None remaining._ All P2 items are closed.
 
 ### P3 — Polish
 
-4. Standardize form label pattern across pages to explicit `<label for="id">`.
-5. Add `aria-pressed` to help-icon toggle controls.
+_None remaining._ Form label patterns are standardized via explicit
+`for` association on the 21 text-input wrapping cases. The
+`aria-pressed` recommendation from the previous audit was reviewed and
+declined — help icons are disclosure widgets and the existing
+`aria-expanded` is the correct ARIA pattern.
