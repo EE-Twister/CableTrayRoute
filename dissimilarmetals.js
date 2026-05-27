@@ -1,5 +1,14 @@
 import { getStudies, setStudies } from './dataStore.mjs';
 import { escapeHtml } from './src/htmlUtils.mjs';
+// Worker-routed entry points for user-initiated calculate / export actions.
+// Hot paths (the corrosion-timeline slider's `input` handler and per-row
+// renderMitigationComparison helpers inside renderResults) still call the
+// sync exports above so per-event latency is not gated on postMessage.
+import {
+  estimateDissimilarMetalsRisk as estimateDissimilarMetalsRiskOffMain,
+  buildResultSummary as buildResultSummaryOffMain,
+  buildResultExportPayload as buildResultExportPayloadOffMain,
+} from './src/workers/dissimilarMetalsClient.js';
 
 const MM_PER_YEAR_TO_MPY = 39.3701;
 
@@ -738,21 +747,23 @@ if (typeof document !== 'undefined') {
 
     form.addEventListener('submit', (event) => {
       event.preventDefault();
-      try {
-        const result = estimateDissimilarMetalsRisk(readFormInput());
-        const studies = getStudies();
-        studies.dissimilarMetals = result;
-        setStudies(studies);
-        errorsEl.hidden = true;
-        errorsEl.textContent = '';
-        renderResults(result, resultsEl);
-      } catch (error) {
+      runSubmitCalculation().catch(error => {
         const message = error instanceof Error ? error.message : 'Unable to evaluate galvanic corrosion risk.';
         errorsEl.hidden = false;
         errorsEl.textContent = message;
         showModal('Input Error', `<p>${escapeHtml(message)}</p>`, 'error');
-      }
+      });
     });
+
+    async function runSubmitCalculation() {
+      const result = await estimateDissimilarMetalsRiskOffMain(readFormInput());
+      const studies = getStudies();
+      studies.dissimilarMetals = result;
+      setStudies(studies);
+      errorsEl.hidden = true;
+      errorsEl.textContent = '';
+      renderResults(result, resultsEl);
+    }
   });
 }
 
@@ -1137,7 +1148,8 @@ function initResultActions(container, result) {
 
   copyButton?.addEventListener('click', async () => {
     try {
-      await copyTextToClipboard(buildResultSummary(result));
+      const summary = await buildResultSummaryOffMain(result);
+      await copyTextToClipboard(summary);
       setActionStatus(status, 'Summary copied.');
     } catch {
       setActionStatus(status, 'Copy failed. Download the JSON instead.');
@@ -1145,8 +1157,9 @@ function initResultActions(container, result) {
   });
 
   downloadButton?.addEventListener('click', () => {
-    downloadResultJson(result);
-    setActionStatus(status, 'JSON downloaded.');
+    downloadResultJson(result)
+      .then(() => setActionStatus(status, 'JSON downloaded.'))
+      .catch(() => setActionStatus(status, 'Download failed.'));
   });
 }
 
@@ -1170,8 +1183,8 @@ async function copyTextToClipboard(text) {
   }
 }
 
-function downloadResultJson(result) {
-  const payload = buildResultExportPayload(result);
+async function downloadResultJson(result) {
+  const payload = await buildResultExportPayloadOffMain(result);
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');

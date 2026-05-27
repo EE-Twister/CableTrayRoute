@@ -11,6 +11,16 @@ import { computeDistributionBySegment, parseZoneResistivityValues } from './src/
 import { evaluateCriteriaChecks } from './src/studies/cp/criteriaChecks.js';
 import { evaluateInterferenceAssessment, parseMitigationActions } from './src/studies/cp/interferenceAssessment.js';
 import { COATING_MODEL_TYPES, parseConditionFactorValues, resolveCoatingModel } from './src/studies/cp/coatingModel.js';
+// Worker-routed entry points for the user-initiated calculate action.
+// Hot paths (normalizeSavedStudy recomputes triggered by mouse/keyboard handlers
+// and comparison toggles) still use the sync imports above so per-event latency
+// is not gated on postMessage.
+import {
+  computeDistributionBySegment as computeDistributionBySegmentOffMain,
+  resolveCoatingModel as resolveCoatingModelOffMain,
+  evaluateCriteriaChecks as evaluateCriteriaChecksOffMain,
+  evaluateInterferenceAssessment as evaluateInterferenceAssessmentOffMain,
+} from './src/workers/cathodicProtectionClient.js';
 import { initCpLayoutCanvas } from './src/cpLayoutCanvas.js';
 import { initCpProfiles } from './src/cpProfiles.js';
 
@@ -191,18 +201,8 @@ export function calculatePredictedDesignLife(installedMassKg, anodeCapacityAhPer
   return (installedMassKg * anodeCapacityAhPerKg * utilizationFactor * designFactor) / (requiredCurrentA * 8760);
 }
 
-export function runCathodicProtectionAnalysis(input) {
-  const validationErrors = validateInputs(input);
-  if (validationErrors.length) {
-    throw new Error(validationErrors.join(' '));
-  }
-
-  const designCurrentDensityMaM2 = input.currentDensityMethod === 'manual'
-    ? input.manualCurrentDensityMaM2
-    : lookupCurrentDensity(input.assetType, input.moistureCategory, input.soilResistivityOhmM, input.soilPh, input.pipeMaterial);
-
-  const designCurrentDensityAperM2 = designCurrentDensityMaM2 / 1000;
-  const distributionModel = computeDistributionBySegment({
+function buildDistributionInput(input) {
+  return {
     anodeTypeSystem: input.anodeTypeSystem,
     numberOfAnodes: input.numberOfAnodes,
     anodeSpacingM: input.anodeSpacingM,
@@ -210,8 +210,18 @@ export function runCathodicProtectionAnalysis(input) {
     anodeBurialDepthM: input.anodeBurialDepthM,
     soilResistivityOhmM: input.soilResistivityOhmM,
     zoneResistivityOhmM: input.zoneResistivityOhmM
-  });
-  const coatingModel = resolveCoatingModel(input, { segmentCount: distributionModel.segments.length });
+  };
+}
+
+function composeCpAnalysisResult({
+  input,
+  designCurrentDensityMaM2,
+  distributionModel,
+  coatingModel,
+  criteriaCheckEvidence,
+  interferenceAssessment
+}) {
+  const designCurrentDensityAperM2 = designCurrentDensityMaM2 / 1000;
   const exposedAreaM2 = input.surfaceAreaM2 * coatingModel.effectiveFactor;
   const areaBasedRequiredCurrentA = calculateRequiredCurrent(exposedAreaM2, designCurrentDensityAperM2);
   const distributionAdjustedCurrentA = areaBasedRequiredCurrentA * distributionModel.globalAttenuationFactor;
@@ -233,8 +243,6 @@ export function runCathodicProtectionAnalysis(input) {
     input.designFactor,
     adjustedRequiredCurrentA
   );
-  const criteriaCheckEvidence = evaluateCriteriaChecks(input, CP_STANDARDS_PROFILE);
-  const interferenceAssessment = evaluateInterferenceAssessment(input);
   const measurementMetadataWarnings = Array.isArray(criteriaCheckEvidence?.measurementCorrections?.warnings)
     ? criteriaCheckEvidence.measurementCorrections.warnings
     : [];
@@ -282,6 +290,58 @@ export function runCathodicProtectionAnalysis(input) {
       distributionModel
     })
   };
+}
+
+export function runCathodicProtectionAnalysis(input) {
+  const validationErrors = validateInputs(input);
+  if (validationErrors.length) {
+    throw new Error(validationErrors.join(' '));
+  }
+
+  const designCurrentDensityMaM2 = input.currentDensityMethod === 'manual'
+    ? input.manualCurrentDensityMaM2
+    : lookupCurrentDensity(input.assetType, input.moistureCategory, input.soilResistivityOhmM, input.soilPh, input.pipeMaterial);
+
+  const distributionModel = computeDistributionBySegment(buildDistributionInput(input));
+  const coatingModel = resolveCoatingModel(input, { segmentCount: distributionModel.segments.length });
+  const criteriaCheckEvidence = evaluateCriteriaChecks(input, CP_STANDARDS_PROFILE);
+  const interferenceAssessment = evaluateInterferenceAssessment(input);
+
+  return composeCpAnalysisResult({
+    input,
+    designCurrentDensityMaM2,
+    distributionModel,
+    coatingModel,
+    criteriaCheckEvidence,
+    interferenceAssessment
+  });
+}
+
+async function runCathodicProtectionAnalysisOffMain(input) {
+  const validationErrors = validateInputs(input);
+  if (validationErrors.length) {
+    throw new Error(validationErrors.join(' '));
+  }
+
+  const designCurrentDensityMaM2 = input.currentDensityMethod === 'manual'
+    ? input.manualCurrentDensityMaM2
+    : lookupCurrentDensity(input.assetType, input.moistureCategory, input.soilResistivityOhmM, input.soilPh, input.pipeMaterial);
+
+  const distributionModel = await computeDistributionBySegmentOffMain(buildDistributionInput(input));
+  const coatingModel = await resolveCoatingModelOffMain(input, { segmentCount: distributionModel.segments.length });
+  const [criteriaCheckEvidence, interferenceAssessment] = await Promise.all([
+    evaluateCriteriaChecksOffMain(input, CP_STANDARDS_PROFILE),
+    evaluateInterferenceAssessmentOffMain(input),
+  ]);
+
+  return composeCpAnalysisResult({
+    input,
+    designCurrentDensityMaM2,
+    distributionModel,
+    coatingModel,
+    criteriaCheckEvidence,
+    interferenceAssessment
+  });
 }
 
 function buildCpProfileData({ input, adjustedRequiredCurrentA, distributionModel, measuredInstantOffPotentialMv, baseCoatingFactor }) {
@@ -1237,40 +1297,41 @@ bootstrapPage({
     event.preventDefault();
     const input = readFormInputs();
     if (!input) return;
-
-    try {
-      const result = runCathodicProtectionAnalysis(input);
-      errorsDiv.hidden = true;
-      errorsDiv.textContent = '';
-      const studies = getStudies();
-      const previousStudy = normalizeSavedStudy(studies.cathodicProtection);
-      const approval = getStudyApprovals().cathodicProtection || null;
-      const complianceRecord = createComplianceRecord(result, previousStudy, approval);
-      studies.cathodicProtection = {
-        ...result,
-        reportExport: buildReportExportData(result, approval),
-        cpLayout: cpLayoutCanvasController?.getState() || cpLayoutState,
-        timelineState: cpTimelineState,
-        compliance: complianceRecord.compliance,
-        complianceHistory: complianceRecord.complianceHistory
-      };
-      setStudies(studies);
-      renderResults(studies.cathodicProtection, resultsDiv);
-      cpLayoutCanvasController?.setAssessmentData(buildLayoutAssessmentPayload(studies.cathodicProtection));
-      renderComplianceStatusPanel(
-        compliancePanelEl,
-        studies.cathodicProtection.compliance.requiredChecks,
-        studies.cathodicProtection.compliance.lastEvaluatedAt,
-        studies.cathodicProtection.compliance
-      );
-      renderTimelinePanel(timelinePanelEl, studies.cathodicProtection, cpTimelineState);
-    } catch (error) {
+    runSubmitCalculation(input).catch(error => {
       const message = error instanceof Error ? error.message : 'Invalid cathodic protection inputs.';
       errorsDiv.hidden = false;
       errorsDiv.innerHTML = `<strong>Input validation error:</strong> ${escapeHtml(message)}`;
       showModal('Input Error', `<p>${escapeHtml(message)}</p>`, 'error');
-    }
+    });
   });
+
+  async function runSubmitCalculation(input) {
+    const result = await runCathodicProtectionAnalysisOffMain(input);
+    errorsDiv.hidden = true;
+    errorsDiv.textContent = '';
+    const studies = getStudies();
+    const previousStudy = normalizeSavedStudy(studies.cathodicProtection);
+    const approval = getStudyApprovals().cathodicProtection || null;
+    const complianceRecord = createComplianceRecord(result, previousStudy, approval);
+    studies.cathodicProtection = {
+      ...result,
+      reportExport: buildReportExportData(result, approval),
+      cpLayout: cpLayoutCanvasController?.getState() || cpLayoutState,
+      timelineState: cpTimelineState,
+      compliance: complianceRecord.compliance,
+      complianceHistory: complianceRecord.complianceHistory
+    };
+    setStudies(studies);
+    renderResults(studies.cathodicProtection, resultsDiv);
+    cpLayoutCanvasController?.setAssessmentData(buildLayoutAssessmentPayload(studies.cathodicProtection));
+    renderComplianceStatusPanel(
+      compliancePanelEl,
+      studies.cathodicProtection.compliance.requiredChecks,
+      studies.cathodicProtection.compliance.lastEvaluatedAt,
+      studies.cathodicProtection.compliance
+    );
+    renderTimelinePanel(timelinePanelEl, studies.cathodicProtection, cpTimelineState);
+  }
   },
 });
 
