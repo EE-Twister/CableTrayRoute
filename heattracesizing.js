@@ -13,6 +13,15 @@ import {
   buildHeatTraceReport,
   renderHeatTraceReportHTML,
 } from './analysis/heatTraceReport.mjs';
+// Worker-routed entry points for user-initiated calculate / export actions.
+// Hot paths (live input recalc, sensitivity perturbation loops) still use the
+// sync imports above so per-keystroke latency is not gated on postMessage.
+import {
+  runHeatTraceSizingAnalysis as runHeatTraceSizingAnalysisOffMain,
+  buildLineList as buildLineListOffMain,
+  buildHeatTraceBOM as buildHeatTraceBOMOffMain,
+  buildControllerSchedule as buildControllerScheduleOffMain,
+} from './src/workers/heatTraceClient.js';
 import { getStudies, getStudyApprovals, setStudies } from './dataStore.mjs';
 import { getProjectState } from './projectStorage.js';
 import { initStudyApprovalPanel } from './src/components/studyApproval.js';
@@ -213,10 +222,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
   form.addEventListener('submit', e => {
     e.preventDefault();
+    runSubmitCalculation().catch(err => {
+      console.error('[heattracesizing] calculate failed', err);
+      showModal('Calculation Error', `<p>${escHtml(err.message || String(err))}</p>`, 'error');
+    });
+  });
 
+  async function runSubmitCalculation() {
     let result;
     try {
-      result = runHeatTraceSizingAnalysis(readInputs());
+      result = await runHeatTraceSizingAnalysisOffMain(readInputs());
     } catch (err) {
       showModal('Input Error', `<p>${escHtml(err.message)}</p>`, 'error');
       return;
@@ -234,7 +249,7 @@ document.addEventListener('DOMContentLoaded', () => {
     renderSystemOverview(result);
     renderWorkspaceCharts(result);
     captureSensitivityBaseline(result);
-  });
+  }
 
   sensitivitySetBaselineButton?.addEventListener('click', () => {
     captureSensitivityBaseline(getLiveAnalysisResult() || getStudies().heatTraceSizing || null);
@@ -2493,7 +2508,7 @@ document.addEventListener('DOMContentLoaded', () => {
     downloadCsvData(headers, schedule, `heat-trace-controller-schedule-${new Date().toISOString().slice(0,10)}.csv`);
   }
 
-  function exportPackageXlsx() {
+  async function exportPackageXlsx() {
     if (typeof XLSX === 'undefined') {
       showModal('Library Error', '<p>XLSX library not loaded. Ensure the page is fully loaded and try again.</p>', 'error');
       return;
@@ -2501,9 +2516,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const circuits = getNormalizedCircuits();
     if (!circuits.length) { showModal('No Data', '<p>Add branch cases before exporting the package.</p>', 'info'); return; }
     const catalog = Array.isArray(heatTraceProductCatalog) ? heatTraceProductCatalog : [];
-    const lineRows = buildLineList(circuits, catalog);
-    const bom = buildHeatTraceBOM(lineRows);
-    const controllerSched = buildControllerSchedule(lineRows);
+    const lineRows = await buildLineListOffMain(circuits, catalog);
+    const bom = await buildHeatTraceBOMOffMain(lineRows);
+    const controllerSched = await buildControllerScheduleOffMain(lineRows);
     const wb = XLSX.utils.book_new();
 
     // Line List sheet
@@ -2547,7 +2562,12 @@ document.addEventListener('DOMContentLoaded', () => {
     exportLineListCsvButton?.addEventListener('click', exportLineListCsv);
     exportBomCsvButton?.addEventListener('click', exportBomCsv);
     exportControllerCsvButton?.addEventListener('click', exportControllerCsv);
-    exportPackageButton?.addEventListener('click', exportPackageXlsx);
+    exportPackageButton?.addEventListener('click', () => {
+      exportPackageXlsx().catch(err => {
+        console.error('[heattracesizing] package export failed', err);
+        showModal('Export Error', `<p>${escHtml(err.message || String(err))}</p>`, 'error');
+      });
+    });
     [productFilterType, productFilterVoltage, productFilterHazardous].forEach(el => {
       el?.addEventListener('change', renderCatalogTable);
     });
