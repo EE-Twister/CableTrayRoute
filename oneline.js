@@ -19,6 +19,16 @@ import { runArcFlash } from './analysis/arcFlash.mjs';
 import { runHarmonics } from './analysis/harmonics.js';
 import { runMotorStart } from './analysis/motorStart.js';
 import { runReliability } from './analysis/reliability.js';
+// Worker-routed entry points for user-initiated study buttons (load flow,
+// short circuit, reliability). The sync imports above remain in scope for
+// programmatic callers and tests that drive the same analyses without an
+// async boundary; the OffMain wrappers post the active diagram to
+// onelineWorker.js so the calculation never blocks paint on large models.
+import {
+  runLoadFlow as runLoadFlowOffMain,
+  runShortCircuit as runShortCircuitOffMain,
+  runReliability as runReliabilityOffMain,
+} from './src/workers/onelineClient.js';
 import { generateArcFlashReport, openLabelPrintWindow } from './reports/arcFlashReport.mjs';
 import { exportAllReports } from './reports/exportAll.mjs';
 import { sizeConductor } from './sizing.js';
@@ -4897,12 +4907,20 @@ if (studiesResizeHandle && studiesPanel) {
   });
 }
 if (runLFBtn) runLFBtn.addEventListener('click', () => {
-  const res = runLoadFlow({
+  runLoadFlowFromButton().catch(err => {
+    console.error('[oneline] load flow failed', err);
+    showAlertModal('Load Flow Error', err?.message || String(err));
+  });
+});
+
+async function runLoadFlowFromButton() {
+  const oneLineData = getOneLine();
+  const res = await runLoadFlowOffMain(oneLineData, {
     baseMVA: studySettings.loadFlow.baseMVA,
     balanced: studySettings.loadFlow.balanced,
     maxIterations: studySettings.loadFlow.maxIterations
   });
-  const { sheets } = getOneLine();
+  const { sheets } = oneLineData;
   const diagram = sheets.flatMap(s => s.components);
   diagram.forEach(comp => {
     (comp.connections || []).forEach(conn => {
@@ -4994,7 +5012,7 @@ if (runLFBtn) runLFBtn.addEventListener('click', () => {
   renderStudyResults();
   renderLoadFlowResults(res);
   render();
-});
+}
 
 function renderLoadFlowResults(res) {
   if (!loadFlowResultsEl) return;
@@ -5004,8 +5022,16 @@ function renderLoadFlowResults(res) {
 
 export { renderLoadFlowResults };
 if (runSCBtn) runSCBtn.addEventListener('click', () => {
-  const res = runShortCircuit({ method: studySettings.shortCircuit.method });
-  const { sheets } = getOneLine();
+  runShortCircuitFromButton().catch(err => {
+    console.error('[oneline] short circuit failed', err);
+    showAlertModal('Short Circuit Error', err?.message || String(err));
+  });
+});
+
+async function runShortCircuitFromButton() {
+  const oneLineData = getOneLine();
+  const res = await runShortCircuitOffMain(oneLineData, { method: studySettings.shortCircuit.method });
+  const { sheets } = oneLineData;
   const diagram = sheets.flatMap(s => s.components);
   diagram.forEach(c => {
     c.shortCircuit = res[c.id];
@@ -5019,7 +5045,7 @@ if (runSCBtn) runSCBtn.addEventListener('click', () => {
   setStudies(studies);
   renderStudyResults();
   render();
-});
+}
 if (runAFBtn) runAFBtn.addEventListener('click', async () => {
   const shortCircuitOpts = { method: studySettings.shortCircuit.method };
   const sc = runShortCircuit(shortCircuitOpts);
@@ -5068,15 +5094,22 @@ if (runMSBtn) runMSBtn.addEventListener('click', () => {
   window.open('motorStart.html', '_blank');
 });
 if (runRelBtn) runRelBtn.addEventListener('click', () => {
+  runReliabilityFromButton().catch(err => {
+    console.error('[oneline] reliability failed', err);
+    showAlertModal('Reliability Error', err?.message || String(err));
+  });
+});
+
+async function runReliabilityFromButton() {
   const { sheets } = getOneLine();
   const diagram = sheets.flatMap(s => s.components);
-  const res = runReliability(diagram);
+  const res = await runReliabilityOffMain(diagram);
   const studies = getStudies();
   studies.reliability = res;
   setStudies(studies);
   highlightSPF(res.n1Failures);
   renderStudyResults();
-});
+}
 
 // Guided tour steps
 const tourSteps = [
