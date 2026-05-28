@@ -144,6 +144,34 @@
       },
       "reference": "IEEE 835-1994 Table B-75; ETAP Underground Raceway Systems validation",
       "sampleFile": "samples/benchmark-ductbank-thermal.json"
+    },
+    {
+      "id": "cable-thermal-env-unified",
+      "title": "Unified Cable Thermal Environment — 95 mm² Cu XLPE four-installation comparison",
+      "studyPage": "cablethermalenv.html",
+      "standard": "IEC 60287-1-1 + NEC 310",
+      "clause": "Composite — tray, conduit, duct bank, direct burial",
+      "description": "Same 95 mm² Cu XLPE 3-core cable run through tray (air ambient 30 °C), buried conduit, 2×3 duct bank at 200 mm spacing, and direct burial (soil ρ 1.0 K·m/W, 20 °C). Verifies that the orchestrator produces consistent ampacity across the four IEC 60287 install methods and that the derating waterfall identifies the limiting factor.",
+      "inputs": {
+        "cable": { "sizeMm2": 95, "material": "Cu", "insulation": "XLPE", "nCores": 3 },
+        "ambient": { "tempC": 30, "soilTempC": 20 },
+        "grouping": { "nCables": 1, "arrangement": "flat" },
+        "installations": {
+          "tray":            { "included": true },
+          "conduit":         { "included": true, "conduitOD_mm": 100, "burialDepthMm": 800 },
+          "duct-bank":       { "included": true, "ductCount": 6, "rows": 2, "cols": 3, "spacingMm": 200 },
+          "direct-burial":   { "included": true, "burialDepthMm": 800, "soilResistivity": 1.0 }
+        }
+      },
+      "expectedOutputs": {
+        "trayAmpacityA":         { "value": 247, "tolerance": 30 },
+        "directBurialAmpacityA": { "value": 316, "tolerance": 35 },
+        "conduitAmpacityA":      { "value": 326, "tolerance": 35 },
+        "ductBankAmpacityA":     { "value": 226, "tolerance": 30 },
+        "ductBankLimitingFactorContains": { "value": "Grouping", "tolerance": 0 }
+      },
+      "reference": "IEC 60287-2-1 Tables 1–8; NEC Table 310.16; cross-check against iec60287-cable-rating benchmark",
+      "sampleFile": "samples/benchmark-cable-thermal-env.json"
     }
   ],
   "standards": [

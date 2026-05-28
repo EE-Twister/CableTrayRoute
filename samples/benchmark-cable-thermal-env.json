@@ -1,0 +1,48 @@
+{
+  "meta": { "version": 1, "benchmark": "cable-thermal-env-unified", "scenario": "default", "scenarios": [] },
+  "ductbanks": [],
+  "conduits": [],
+  "trays": [],
+  "cables": [
+    {
+      "id": "BM-CTENV-C1",
+      "from": "Source",
+      "to": "Load",
+      "conductor_size": "95 mm²",
+      "conductor_material": "copper",
+      "insulation_type": "XLPE",
+      "voltage_rating": "0.6/1kV",
+      "length": 100,
+      "notes": "Cable Thermal Environment benchmark — same cable evaluated across tray, conduit, duct bank, and direct burial."
+    }
+  ],
+  "cableTypicals": [],
+  "panels": [],
+  "equipment": [],
+  "loads": [],
+  "oneLine": { "components": [], "connections": [], "revision": 0 },
+  "settings": {
+    "studyResults": {
+      "cableThermalEnvironment": {
+        "inputs": {
+          "cable": {
+            "sizeMm2": 95,
+            "material": "Cu",
+            "insulation": "XLPE",
+            "nCores": 3,
+            "voltageClass": "0.6/1kV"
+          },
+          "ambient": { "tempC": 30, "soilTempC": 20, "frequencyHz": 60 },
+          "grouping": { "nCables": 1, "arrangement": "flat" },
+          "installations": {
+            "tray":            { "included": true },
+            "conduit":         { "included": true, "conduitOD_mm": 100, "burialDepthMm": 800 },
+            "duct-bank":       { "included": true, "ductCount": 6, "rows": 2, "cols": 3, "spacingMm": 200, "conduitOD_mm": 100, "burialDepthMm": 900 },
+            "direct-burial":   { "included": true, "burialDepthMm": 800, "soilResistivity": 1.0 }
+          }
+        },
+        "_benchmark": "Unified cable thermal environment — XLPE 95 mm² Cu, ambient 30 °C / soil 20 °C. Expected ordering: tray > direct-burial > conduit > duct bank with limiting factor identified per case."
+      }
+    }
+  }
+}

@@ -12,6 +12,7 @@ import { NEC_AMPACITY_TABLE } from './autoSize.mjs';
 import { runVoltageDropStudy, NEC_LIMITS } from './voltageDropStudy.mjs';
 import { trayFillPercent } from './designRuleChecker.mjs';
 import { evaluateEquipment, EVAL_STATUS } from './equipmentEvaluation.mjs';
+import { extractThermalEnvRecs } from './cableThermalEnvironment.mjs';
 
 /**
  * @typedef {{
@@ -479,6 +480,7 @@ export function runDesignCoach(projectData = {}) {
     ...extractGroundGridRecs(studies.groundGrid),
     ...extractLoadFlowRecs(studies.loadFlow),
     ...extractEquipmentEvalRecs(components, cables, studies, deviceCatalog),
+    ...extractThermalEnvRecs(studies.cableThermalEnvironment),
   ];
 
   const unique = suppressDuplicates(all);

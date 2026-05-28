@@ -45,6 +45,7 @@
   <url><loc>docs/load_calculation_formulas.html</loc><priority>0.4</priority></url>
   <url><loc>docs/troubleshooting.html</loc><priority>0.4</priority></url>
   <url><loc>intlCableSize.html</loc><priority>0.6</priority></url>
+  <url><loc>cablethermalenv.html</loc><priority>0.7</priority></url>
   <url><loc>groundgrid.html</loc><priority>0.6</priority></url>
   <url><loc>cathodicprotection.html</loc><priority>0.6</priority></url>
   <url><loc>dissimilarmetals.html</loc><priority>0.6</priority></url>

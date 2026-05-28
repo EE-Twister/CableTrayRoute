@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Cable Thermal Environment — unified ampacity comparison across tray, conduit, duct bank, and direct burial installations with derating waterfall and load-profile timeline." />
+  <title>Cable Thermal Environment — CableTrayRoute</title>
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/favicon.svg">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Cable Thermal Environment — CableTrayRoute">
+  <meta property="og:description" content="Unified cable ampacity comparison across four installation methods with derating waterfall and load-profile timeline.">
+  <meta property="og:image" content="https://cabletrayroute.com/icons/og-preview.png">
+  <meta property="og:site_name" content="CableTrayRoute">
+  <meta property="og:url" content="cablethermalenv.html">
+  <link rel="canonical" href="cablethermalenv.html">
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+  <meta name="color-scheme" content="light dark">
+  <link rel="stylesheet" href="dist/style.a80a3d387a5b.css" />
+  <script type="module" src="dirtyTracker.js"></script>
+  <script type="module" src="dist/cablethermalenv.js" defer></script>
+  <style>
+    .ctenv-kpi-grid { display: flex; flex-wrap: wrap; gap: 0.75rem; list-style: none; margin: 0 0 1.25rem; padding: 0; }
+    .ctenv-kpi-card {
+      flex: 1 1 140px;
+      border-radius: 6px;
+      padding: 0.75rem 1rem;
+      background: var(--surface-2, #f4f4f4);
+      border-left: 4px solid var(--color-border, #ccc);
+      min-width: 120px;
+    }
+    .ctenv-kpi-card--base    { border-left-color: #0277bd; }
+    .ctenv-kpi-card--derated { border-left-color: #2e7d32; }
+    .ctenv-kpi-card--limit   { border-left-color: #f57c00; }
+    .ctenv-kpi-card--temp    { border-left-color: #c62828; }
+    .ctenv-kpi-label { display: block; font-size: 0.78rem; color: var(--color-muted, #666); margin-bottom: 0.25rem; }
+    .ctenv-kpi-value { display: block; font-size: 1.4rem; font-weight: 700; line-height: 1.2; word-break: break-word; }
+
+    .ctenv-controls { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin-bottom: 1rem; }
+
+    #ctenv-compare-wrap { overflow-x: auto; }
+    #ctenv-compare { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+    #ctenv-compare th, #ctenv-compare td { padding: 0.45rem 0.6rem; text-align: left; border-bottom: 1px solid var(--color-border, #ddd); white-space: nowrap; }
+    #ctenv-compare th { background: var(--surface-2, #f4f4f4); font-weight: 600; }
+    #ctenv-compare tr.ctenv-row--best td { background: rgba(46, 125, 50, 0.12); }
+    #ctenv-compare tr.ctenv-row--worst td { background: rgba(198, 40, 40, 0.10); }
+
+    .ctenv-waterfall { margin-top: 1rem; padding: 0.75rem; background: var(--surface-2, #f9f9f9); border-radius: 6px; }
+    .ctenv-waterfall h3 { margin: 0 0 0.5rem; font-size: 1rem; }
+    .ctenv-step { display: grid; grid-template-columns: 1fr auto auto; gap: 0.5rem; align-items: center; padding: 0.25rem 0; border-bottom: 1px dashed var(--color-border, #ddd); }
+    .ctenv-step-label { font-size: 0.85rem; }
+    .ctenv-step-source { display: block; font-size: 0.72rem; color: var(--color-muted, #666); margin-top: 2px; }
+    .ctenv-step-bar { height: 18px; background: linear-gradient(to right, #2e7d32 0%, #2e7d32 var(--bar-pct, 100%), transparent var(--bar-pct, 100%)); border: 1px solid var(--color-border, #ccc); width: 160px; border-radius: 3px; }
+    .ctenv-step--limit .ctenv-step-bar { background: linear-gradient(to right, #c62828 0%, #c62828 var(--bar-pct, 100%), transparent var(--bar-pct, 100%)); }
+    .ctenv-step--warn  .ctenv-step-bar { background: linear-gradient(to right, #f57c00 0%, #f57c00 var(--bar-pct, 100%), transparent var(--bar-pct, 100%)); }
+    .ctenv-step-numbers { font-variant-numeric: tabular-nums; font-size: 0.85rem; min-width: 120px; text-align: right; }
+
+    .ctenv-timeline { margin-top: 1rem; padding: 0.75rem; background: var(--surface-2, #f9f9f9); border-radius: 6px; }
+    .ctenv-timeline svg { display: block; max-width: 100%; height: auto; }
+
+    .ctenv-empty { text-align: center; padding: 2rem; color: var(--color-muted, #666); }
+
+    @media (max-width: 600px) { .ctenv-controls { flex-direction: column; align-items: stretch; } }
+  </style>
+</head>
+<body class="ctenv-page" data-report-title="Cable Thermal Environment">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <nav class="top-nav" aria-label="Primary">
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
+      <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+    <div id="nav-links" class="nav-links" role="list">
+      <!-- Populated dynamically by navigation.js -->
+    </div>
+    <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+  </nav>
+
+  <div id="settings-menu" class="settings-menu">
+    <label for="theme-select">Theme
+      <select id="theme-select">
+        <option value="system">System</option>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+        <option value="high-contrast">High Contrast</option>
+      </select>
+    </label>
+    <label><input type="checkbox" id="compact-toggle" aria-label="Enable compact table mode"> Compact Mode</label>
+    <button id="save-project-btn" title="Save current project">
+      <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Save Project</span>
+    </button>
+    <button id="load-project-btn" title="Load an existing project">
+      <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Load Project</span>
+    </button>
+  </div>
+
+  <div class="container">
+    <main id="main-content" class="main-content">
+      <nav aria-label="Breadcrumb">
+        <ol class="breadcrumb-trail">
+          <li><a href="index.html">Home</a></li>
+          <li>Studies</li>
+          <li>Cable</li>
+          <li aria-current="page">Thermal Environment</li>
+        </ol>
+      </nav>
+
+      <header class="page-header">
+        <h1>Cable Thermal Environment</h1>
+        <p>Compare cable ampacity across tray, conduit, duct bank, and direct burial installations from one set of inputs. Each case shows a derating waterfall and the limiting factor.</p>
+      </header>
+
+      <details class="method-panel" open>
+        <summary>About This Study</summary>
+        <p>This page orchestrates the existing IEC 60287-1-1 ampacity engine and the NEC 310 derating factors. It does not introduce new thermal physics — it runs each enabled installation method through the same cable + environment inputs so they can be compared directly.</p>
+        <dl class="drc-rule-list">
+          <dt>IEC 60287-1-1:2023</dt><dd>Steady-state thermal-circuit current rating; supplies the base ampacity for every case.</dd>
+          <dt>IEC 60287-2-1</dt><dd>External thermal resistance T4 (soil, conduit, free air) and grouping derating tables.</dd>
+          <dt>NEC 310.15(B)(1)(a)</dt><dd>Ambient temperature correction factor shown in the waterfall.</dd>
+          <dt>NEC 392.80(A)</dt><dd>Tray fill correction for single-layer touching cables.</dd>
+        </dl>
+      </details>
+
+      <!-- KPI strip -->
+      <section class="card" aria-label="Cable thermal environment summary" aria-live="polite">
+        <ul class="ctenv-kpi-grid" id="ctenv-kpi-grid" role="list">
+          <li class="ctenv-kpi-card ctenv-kpi-card--base">
+            <span class="ctenv-kpi-label">Base ampacity (best)</span>
+            <span class="ctenv-kpi-value" id="kpi-base">—</span>
+          </li>
+          <li class="ctenv-kpi-card ctenv-kpi-card--derated">
+            <span class="ctenv-kpi-label">Derated ampacity (best)</span>
+            <span class="ctenv-kpi-value" id="kpi-derated">—</span>
+          </li>
+          <li class="ctenv-kpi-card ctenv-kpi-card--limit">
+            <span class="ctenv-kpi-label">Limiting factor</span>
+            <span class="ctenv-kpi-value" id="kpi-limit">—</span>
+          </li>
+          <li class="ctenv-kpi-card ctenv-kpi-card--temp">
+            <span class="ctenv-kpi-label">Max θ_conductor</span>
+            <span class="ctenv-kpi-value" id="kpi-temp">—</span>
+          </li>
+        </ul>
+      </section>
+
+      <!-- Inputs form -->
+      <section class="card">
+        <form id="ctenv-form" autocomplete="off">
+          <details open>
+            <summary><strong>Cable</strong></summary>
+            <div class="field-row">
+              <label for="ct-size">Conductor cross-section (mm²)</label>
+              <input id="ct-size" type="number" min="1.5" max="1000" step="0.1" value="95" required>
+            </div>
+            <div class="field-row">
+              <label for="ct-material">Conductor material</label>
+              <select id="ct-material">
+                <option value="Cu" selected>Copper</option>
+                <option value="Al">Aluminium</option>
+              </select>
+            </div>
+            <div class="field-row">
+              <label for="ct-insulation">Insulation</label>
+              <select id="ct-insulation">
+                <option value="XLPE" selected>XLPE (90 °C)</option>
+                <option value="EPR">EPR (90 °C)</option>
+                <option value="PVC">PVC (70 °C)</option>
+                <option value="LSZH">LSZH (70 °C)</option>
+              </select>
+            </div>
+            <div class="field-row">
+              <label for="ct-cores">Number of cores</label>
+              <select id="ct-cores">
+                <option value="1">1 (single-core)</option>
+                <option value="3" selected>3 (three-phase)</option>
+              </select>
+            </div>
+            <div class="field-row">
+              <label for="ct-voltageclass">Voltage class</label>
+              <select id="ct-voltageclass">
+                <option value="0.6/1kV" selected>0.6/1 kV</option>
+                <option value="3.6/6kV">3.6/6 kV</option>
+                <option value="6/10kV">6/10 kV</option>
+                <option value="8.7/15kV">8.7/15 kV</option>
+                <option value="12/20kV">12/20 kV</option>
+              </select>
+            </div>
+            <div class="field-row">
+              <label for="ct-design-current">Design current (A) — optional</label>
+              <input id="ct-design-current" type="number" min="0" step="1" placeholder="for margin column">
+            </div>
+          </details>
+
+          <details open>
+            <summary><strong>Environment &amp; Grouping</strong></summary>
+            <div class="field-row">
+              <label for="ct-ambient-air">Air ambient temperature (°C)</label>
+              <input id="ct-ambient-air" type="number" min="-10" max="80" step="1" value="30">
+            </div>
+            <div class="field-row">
+              <label for="ct-ambient-soil">Soil ambient temperature (°C)</label>
+              <input id="ct-ambient-soil" type="number" min="-10" max="50" step="1" value="20">
+            </div>
+            <div class="field-row">
+              <label for="ct-frequency">System frequency (Hz)</label>
+              <select id="ct-frequency"><option value="60" selected>60</option><option value="50">50</option></select>
+            </div>
+            <div class="field-row">
+              <label for="ct-ncables">Number of cables in group</label>
+              <input id="ct-ncables" type="number" min="1" max="50" step="1" value="1">
+            </div>
+            <div class="field-row">
+              <label for="ct-arrangement">Group arrangement</label>
+              <select id="ct-arrangement">
+                <option value="flat" selected>Flat (spaced)</option>
+                <option value="trefoil">Trefoil (touching)</option>
+                <option value="flat-touching">Flat (touching)</option>
+              </select>
+            </div>
+
+            <fieldset>
+              <legend>Installations to compare</legend>
+              <label><input type="checkbox" id="ct-inst-tray" checked> Cable tray (in air)</label>
+              <label><input type="checkbox" id="ct-inst-conduit" checked> Conduit (buried)</label>
+              <label><input type="checkbox" id="ct-inst-duct" checked> Duct bank</label>
+              <label><input type="checkbox" id="ct-inst-burial" checked> Direct burial</label>
+            </fieldset>
+
+            <div class="field-row">
+              <label for="ct-soil-rho">Soil thermal resistivity (K·m/W)</label>
+              <input id="ct-soil-rho" type="number" min="0.5" max="5.0" step="0.1" value="1.0">
+            </div>
+            <div class="field-row">
+              <label for="ct-burial-depth">Burial depth (mm)</label>
+              <input id="ct-burial-depth" type="number" min="200" max="3000" step="50" value="800">
+            </div>
+            <div class="field-row">
+              <label for="ct-conduit-od">Conduit OD (mm)</label>
+              <input id="ct-conduit-od" type="number" min="20" max="500" step="5" value="100">
+            </div>
+            <div class="field-row">
+              <label for="ct-duct-count">Duct bank circuit count</label>
+              <input id="ct-duct-count" type="number" min="2" max="36" step="1" value="6">
+            </div>
+            <div class="field-row">
+              <label for="ct-duct-spacing">Duct bank spacing (mm)</label>
+              <input id="ct-duct-spacing" type="number" min="50" max="500" step="10" value="200">
+            </div>
+          </details>
+
+          <details>
+            <summary><strong>Load Profile (optional, 24 hourly samples)</strong></summary>
+            <div class="field-row">
+              <label for="ct-profile-preset">Preset</label>
+              <select id="ct-profile-preset">
+                <option value="">— none —</option>
+                <option value="flat">Flat (100%)</option>
+                <option value="daily-peak">Daily peak (50%/100%/50%)</option>
+                <option value="industrial">Industrial cyclic</option>
+              </select>
+            </div>
+            <div class="field-row">
+              <label for="ct-profile-basis">Basis</label>
+              <select id="ct-profile-basis">
+                <option value="per-unit" selected>Per-unit of peak</option>
+                <option value="absolute-A">Absolute A</option>
+              </select>
+            </div>
+            <div class="field-row">
+              <label for="ct-profile-hourly">Hourly values (comma-separated, 24 entries)</label>
+              <input id="ct-profile-hourly" type="text" placeholder="e.g. 0.5,0.5,...,1.0,1.0,...,0.5,0.5">
+            </div>
+            <div class="field-row">
+              <label for="ct-profile-peak">Peak amps (used for per-unit basis)</label>
+              <input id="ct-profile-peak" type="number" min="1" step="1">
+            </div>
+          </details>
+        </form>
+      </section>
+
+      <!-- Controls -->
+      <div class="ctenv-controls">
+        <button id="ctenv-run-btn" class="primary-btn" type="button">Run Analysis</button>
+        <button id="ctenv-export-csv-btn" class="btn" type="button">Export CSV</button>
+        <button id="ctenv-reset-btn" class="btn" type="button">Reset</button>
+      </div>
+
+      <!-- Comparison table -->
+      <section class="card" aria-label="Installation comparison" aria-live="polite">
+        <h2>Installation Comparison</h2>
+        <div id="ctenv-compare-wrap">
+          <p class="ctenv-empty" id="ctenv-empty-msg">Run the analysis to see results.</p>
+          <table id="ctenv-compare" hidden>
+            <thead>
+              <tr>
+                <th scope="col">Installation</th>
+                <th scope="col">Base A</th>
+                <th scope="col">Derated A</th>
+                <th scope="col">Limiting Factor</th>
+                <th scope="col">θ_conductor (°C)</th>
+                <th scope="col">Margin (A)</th>
+              </tr>
+            </thead>
+            <tbody id="ctenv-compare-body"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Waterfall cards -->
+      <section id="ctenv-waterfalls" aria-label="Derating waterfalls"></section>
+
+      <!-- Load profile timeline -->
+      <section id="ctenv-timeline-section" hidden>
+        <div class="ctenv-timeline">
+          <h2>Conductor Temperature Timeline</h2>
+          <p id="ctenv-timeline-summary"></p>
+          <div id="ctenv-timeline-chart"></div>
+        </div>
+      </section>
+
+      <!-- Study basis -->
+      <section id="study-basis-container" class="card"></section>
+
+      <!-- Approval -->
+      <section id="study-approval-container" class="card"></section>
+
+    </main>
+  </div>
+
+</body>
+</html>
