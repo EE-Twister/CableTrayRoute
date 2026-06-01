@@ -41,6 +41,34 @@ global.localStorage = {
       assert(Math.abs(b.asymKA - 45.86) < 0.1);
     });
 
+    it('preserves bus short-circuit results when a malformed model repeats a bus id on a later non-bus component', () => {
+      const res = runShortCircuit([
+        {
+          id: 'BUS-1',
+          type: 'bus',
+          subtype: 'Bus',
+          kV: 0.48,
+          z1: { r: 0, x: 0.01 },
+          z2: { r: 0, x: 0.01 },
+          z0: { r: 0, x: 0.01 }
+        },
+        {
+          id: 'BUS-1',
+          type: 'panel',
+          kV: 0.48,
+          z1: { r: 1000000, x: 1000000 },
+          z2: { r: 1000000, x: 1000000 },
+          z0: { r: 1000000, x: 1000000 }
+        }
+      ]);
+
+      const bus = res['BUS-1'];
+      assert(bus, 'duplicate id should still produce the bus result');
+      assert.strictEqual(Object.keys(res).length, 1, 'duplicate id should not create additional results');
+      assert(bus.threePhaseKA > 25, 'later duplicate non-bus component should not overwrite bus fault current');
+      assert(!bus.warnings, 'bus result should not inherit duplicate non-bus warnings');
+    });
+
     it('propagates transformer impedance from secondary data fields', () => {
       setOneLine({
         activeSheet: 0,
