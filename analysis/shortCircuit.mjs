@@ -744,19 +744,19 @@ export function runShortCircuit(modelOrOpts = {}, maybeOpts = {}) {
       if ((isConductorMissing || isTargetOfMissingCable) && comp?.id) {
         defaultedLowImpedanceComponents.set(
           comp.id,
-          `${comp?.type === 'busway' ? 'Busway' : 'Cable'} impedance incomplete; results defaulted to high resistance until impedance data is provided.`
+          `${comp?.type === 'busway' ? 'Busway' : 'Cable'} impedance incomplete; results defaulted to low impedance until impedance data is provided.`
         );
-        return { r: 1e6, x: 1e6 };
+        return { r: 1e-6, x: 1e-6 };
       }
       if (isProtectionComponent(comp) && comp?.id) {
         defaultedLowImpedanceComponents.set(
           comp.id,
-          'Protective device properties incomplete; results defaulted to high resistance until data is provided.'
+          'Protective device properties incomplete; results defaulted to low impedance until data is provided.'
         );
-        return { r: 1e6, x: 1e6 };
+        return { r: 1e-6, x: 1e-6 };
       }
       if (comp?.id) missingImpedanceComponents.add(comp.id);
-      return { r: 1e6, x: 1e6 };
+      return { r: 1e-6, x: 1e-6 };
     }
     return { r, x };
   };
@@ -832,7 +832,7 @@ export function runShortCircuit(modelOrOpts = {}, maybeOpts = {}) {
     if (lowImpedanceWarning) {
       entry.warnings = [lowImpedanceWarning];
     } else if (missingImpedanceComponents.has(comp.id)) {
-      entry.warnings = ['Impedance data missing; results defaulted to high resistance until data is provided.'];
+      entry.warnings = ['Impedance data missing; results defaulted to low impedance until data is provided.'];
     }
 
     limitFaultByProtection(entry, comp, comps, compMap, protectiveLookupCache, scaledDeviceCache, tccSettings);
