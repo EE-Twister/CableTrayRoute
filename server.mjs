@@ -854,11 +854,23 @@ export async function createApp(options = {}) {
   // Issued via POST /ws/ticket (authenticated + CSRF protected). Used because
   // cookies cannot be transmitted through the WebSocket subprotocol header.
   const WS_TICKET_TTL_MS = 30_000;
+  const WS_TICKET_MAX_PER_SESSION = 5;
   const wsTicketStore = new Map(); // ticket -> { sessionToken, username, expiresAt }
-  function pruneWsTickets() {
-    const now = Date.now();
+  function pruneWsTickets(now = Date.now()) {
     for (const [t, entry] of wsTicketStore) {
       if (!entry || entry.expiresAt <= now) wsTicketStore.delete(t);
+    }
+  }
+  function enforceWsTicketSessionLimit(sessionToken) {
+    const sessionTickets = [];
+    for (const [ticket, entry] of wsTicketStore) {
+      if (entry?.sessionToken === sessionToken) sessionTickets.push([ticket, entry.expiresAt]);
+    }
+    if (sessionTickets.length < WS_TICKET_MAX_PER_SESSION) return;
+    sessionTickets.sort((a, b) => a[1] - b[1]);
+    const ticketsToRemove = sessionTickets.length - WS_TICKET_MAX_PER_SESSION + 1;
+    for (const [ticket] of sessionTickets.slice(0, ticketsToRemove)) {
+      wsTicketStore.delete(ticket);
     }
   }
 
@@ -1066,6 +1078,10 @@ export async function createApp(options = {}) {
 
   // Stricter rate limit for auth endpoints to prevent brute-force attacks.
   const authRateLimiter = createRateLimiter({ windowMs: rateLimitWindowMs, max: 20 });
+  const wsTicketRateLimiter = createRateLimiter({
+    windowMs: rateLimitWindowMs,
+    max: Math.min(Math.max(1, rateLimitMax), 20),
+  });
   // Cookie helpers (shared by auth, refresh, logout, OIDC). Defined here so the
   // /login handler and the auth middleware below can use them.
   function serializeCookie(name, value, attrs = {}) {
@@ -1118,6 +1134,7 @@ export async function createApp(options = {}) {
   app.use('/session/refresh', authRateLimiter);
   app.use('/forgot-password', authRateLimiter);
   app.use('/reset-password', authRateLimiter);
+  app.use('/ws/ticket', wsTicketRateLimiter);
 
   app.post(
     '/signup',
@@ -1316,6 +1333,7 @@ export async function createApp(options = {}) {
     csrfProtection,
     asyncHandler(async (req, res) => {
       pruneWsTickets();
+      enforceWsTicketSessionLimit(req.authToken);
       const ticket = crypto.randomBytes(32).toString('hex');
       const expiresAt = Date.now() + WS_TICKET_TTL_MS;
       wsTicketStore.set(ticket, {

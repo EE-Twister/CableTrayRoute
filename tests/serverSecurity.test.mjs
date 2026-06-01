@@ -349,6 +349,19 @@ async function rateLimitScenario() {
       const limited = await fetch(`${baseUrl}/projects/demo`, { headers });
       assert.strictEqual(limited.status, 429);
     });
+
+    await check('rate limits WebSocket ticket minting', async () => {
+      const headers = {
+        Authorization: `Bearer ${session.token}`,
+        'X-CSRF-Token': session.csrfToken,
+      };
+      const first = await fetch(`${baseUrl}/ws/ticket`, { method: 'POST', headers });
+      const second = await fetch(`${baseUrl}/ws/ticket`, { method: 'POST', headers });
+      assert.strictEqual(first.status, 200);
+      assert.strictEqual(second.status, 200);
+      const limited = await fetch(`${baseUrl}/ws/ticket`, { method: 'POST', headers });
+      assert.strictEqual(limited.status, 429);
+    });
   } finally {
     await closeServer(server);
   }
@@ -792,6 +805,40 @@ async function wsTicketScenario() {
         },
       });
       assert.strictEqual(ok, false);
+    });
+
+    await check('/ws/ticket caps outstanding tickets per session', async () => {
+      const issued = [];
+      for (let i = 0; i < 6; i += 1) {
+        const res = await fetch(`${baseUrl}/ws/ticket`, {
+          method: 'POST',
+          headers: {
+            Cookie: `ctr_auth=${authCookie}`,
+            'X-CSRF-Token': session.csrfToken,
+          },
+        });
+        assert.strictEqual(res.status, 200);
+        const body = await res.json();
+        issued.push(body.ticket);
+      }
+
+      const validate = app.get('collabUpgradeValidator');
+      const oldest = await validate({
+        headers: {
+          origin: baseUrl,
+          host: `127.0.0.1:${port}`,
+          'sec-websocket-protocol': `ctr-collab, ticket.${issued[0]}`,
+        },
+      });
+      const newest = await validate({
+        headers: {
+          origin: baseUrl,
+          host: `127.0.0.1:${port}`,
+          'sec-websocket-protocol': `ctr-collab, ticket.${issued.at(-1)}`,
+        },
+      });
+      assert.strictEqual(oldest, false, 'oldest outstanding ticket was evicted');
+      assert.strictEqual(newest, true, 'newer ticket remains usable');
     });
   } finally {
     await closeServer(server);
