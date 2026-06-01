@@ -448,7 +448,7 @@ export function buildDesignBasisReview(project = {}) {
   }
 
   const openGates = gates.filter(gate => gate.status !== 'reviewed');
-  const deliverableBlockers = openGates.filter(gate => gate.enforceOnDeliverables && (gate.blocking || gate.severity === 'critical'));
+  const deliverableBlockers = openGates.filter(gate => gate.enforceOnDeliverables);
 
   return {
     summary,

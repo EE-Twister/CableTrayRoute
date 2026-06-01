@@ -307,12 +307,21 @@ const customReview = buildDesignBasisReview({
 assert(customReview.openGateCount > 0);
 assert(customReview.gates.some(gate => gate.id === 'protective-device-settings'));
 assert(customReview.gates.some(gate => gate.id === 'generated-record-review'));
+assert(customReview.gates.some(gate => gate.id === 'generated-record-review' && gate.enforceOnDeliverables && !gate.blocking));
+assert(customReview.gates.some(gate => gate.id === 'route-result-review' && gate.enforceOnDeliverables && !gate.blocking));
+assert(customReview.gates.some(gate => gate.id === 'study-result-review' && gate.enforceOnDeliverables && !gate.blocking));
+assert(customReview.deliverableBlockers.some(gate => gate.id === 'generated-record-review'));
+assert(customReview.deliverableBlockers.some(gate => gate.id === 'route-result-review'));
+assert(customReview.deliverableBlockers.some(gate => gate.id === 'study-result-review'));
 assert(customReview.deliverableBlockers.length > 0);
 
 const reviewedCustomReview = buildDesignBasisReview({
   designBasis: customDesignBasis,
   designGateApprovals: {
-    'protective-device-settings': { status: 'reviewed', reviewedBy: 'Electrical Lead', approvedAt: '2026-05-20T00:00:00.000Z' }
+    'protective-device-settings': { status: 'reviewed', reviewedBy: 'Electrical Lead', approvedAt: '2026-05-20T00:00:00.000Z' },
+    'generated-record-review': { status: 'reviewed', reviewedBy: 'Electrical Lead', approvedAt: '2026-05-20T00:00:00.000Z' },
+    'route-result-review': { status: 'reviewed', reviewedBy: 'Electrical Lead', approvedAt: '2026-05-20T00:00:00.000Z' },
+    'study-result-review': { status: 'reviewed', reviewedBy: 'Electrical Lead', approvedAt: '2026-05-20T00:00:00.000Z' }
   },
   equipment: [
     { tag: 'SWBD-201', voltage: '480', x: 0, y: 0 },
@@ -329,7 +338,7 @@ const reviewedCustomReview = buildDesignBasisReview({
 });
 
 assert.equal(reviewedCustomReview.deliverableBlockers.length, 0);
-assert(reviewedCustomReview.openGateCount > 0);
+assert.equal(reviewedCustomReview.openGateCount, 0);
 
 const flaggedCustomReview = buildDesignBasisReview({
   designBasis: customDesignBasis,
