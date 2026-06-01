@@ -11,6 +11,13 @@ export function normalizeVoltageToVolts(raw) {
       const keys = [
         'voltage',
         'volts',
+        'voltage_v',
+        'voltage_kv',
+        'operating_voltage',
+        'rated_voltage',
+        'rated_volts',
+        'rated_voltage_kv',
+        'voltage_rating',
         'kv',
         'kV',
         'baseKV',
