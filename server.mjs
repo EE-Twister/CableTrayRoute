@@ -1359,8 +1359,8 @@ export async function createApp(options = {}) {
         res.json({ message: 'If that account exists, a reset token has been generated.' });
         return;
       }
-      const resetToken = resetTokenStore.create(trimmedUser);
-      console.error(`[password-reset] Reset requested for "${trimmedUser}". Share token securely with the user: ${resetToken}`);
+      resetTokenStore.create(trimmedUser);
+      console.error(`[password-reset] Reset requested for "${trimmedUser}".`);
       res.json({ message: 'If that account exists, a reset token has been generated.' });
     })
   );
