@@ -148,3 +148,10 @@ const approxEqual = (a, b, tolerance = 1e-9) => {
   approxEqual(impedanceSci.r, impedanceNumeric.r, 1e-12);
   approxEqual(impedanceSci.x, impedanceNumeric.x, 1e-12);
 }
+
+// Unit-bearing voltage field names must guide numeric normalization.
+{
+  approxEqual(normalizeVoltageToVolts({ voltage_kv: 115 }), 115000, 1e-9);
+  approxEqual(normalizeVoltageToVolts({ voltage_v: 13.8 }), 13.8, 1e-9);
+  approxEqual(normalizeVoltageToVolts({ volts: 13.8 }), 13.8, 1e-9);
+}
