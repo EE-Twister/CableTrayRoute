@@ -8776,9 +8776,8 @@ function inferVoltage(comp) {
   const keys = ['voltage', 'volts', 'volts_secondary', 'volts_lv', 'volts_primary', 'volts_hv', 'prefault_voltage', 'baseKV', 'kV'];
   for (const key of keys) {
     const raw = getComponentValue(comp, key);
-    const num = parseNumeric(raw);
+    const num = parseVoltageValue(raw, key.toLowerCase().includes('kv'));
     if (!Number.isFinite(num) || num <= 0) continue;
-    if (key.toLowerCase().includes('kv')) return num * 1000;
     return num;
   }
   return null;
@@ -8939,8 +8938,11 @@ function resolveTransformerOperatingPoint(transformer, referenceVoltage, refPhas
     const kva = getNumericValue(transformer, ['kva', 'kva_base']);
     let volts = getNumericValue(transformer, ['volts_secondary', 'volts_primary', 'voltage', 'volts']);
     if (!Number.isFinite(volts)) {
-      const baseKv = getNumericValue(transformer, ['baseKV', 'kV']);
-      if (Number.isFinite(baseKv)) volts = baseKv * 1000;
+      const baseKv = getComponentValue(transformer, 'baseKV');
+      const kv = getComponentValue(transformer, 'kV');
+      const baseKvVolts = parseVoltageValue(baseKv, true);
+      const kvVolts = parseVoltageValue(kv, true);
+      volts = Number.isFinite(baseKvVolts) ? baseKvVolts : kvVolts;
     }
     if (Number.isFinite(kva) && Number.isFinite(volts)) {
       sides.push({ kva, volts, label: 'Secondary' });
@@ -9194,6 +9196,15 @@ function parseNumeric(value) {
   if (suffix === 'kv') return numeric * 1000;
   if (suffix === 'v') return numeric;
   return numeric;
+}
+
+
+function parseVoltageValue(value, isKilovoltField = false) {
+  const numeric = parseNumeric(value);
+  if (!Number.isFinite(numeric)) return null;
+  if (!isKilovoltField) return numeric;
+  if (typeof value === 'string' && /\bkv\b/i.test(value)) return numeric;
+  return numeric * 1000;
 }
 
 function getNumericValue(comp, keys) {
