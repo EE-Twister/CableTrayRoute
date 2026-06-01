@@ -193,6 +193,17 @@ describe('attachCollaborationServer — join', () => {
     assert.ok(newPresence[0].users.includes('bob'), 'presence should include bob');
     assert.ok(newPresence[0].users.includes('alice'), 'presence should still include alice');
   });
+
+  it('rejects project IDs longer than 200 characters', () => {
+    const { httpServer, wss } = setupServer();
+    const ws = connectClient(httpServer, wss);
+    const tooLongProjectId = `${'p'.repeat(200)}suffix`;
+    ws._receive({ type: 'join', projectId: tooLongProjectId, username: 'alice' });
+    const errors = ws.sentOfType('error');
+    assert.ok(errors.length >= 1, 'should receive error message for long project IDs');
+    assert.strictEqual(errors[errors.length - 1].message, 'Project ID too long');
+    assert.strictEqual(ws.sentOfType('sync').length, 0, 'should not join or receive sync');
+  });
 });
 
 describe('attachCollaborationServer — patch broadcast', () => {
