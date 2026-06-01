@@ -6715,12 +6715,6 @@ function resolveComponentAttribute(comp, key) {
     return value;
   }
   const segments = key.split('.');
-  let value = getNestedValue(comp, segments);
-  if (value !== undefined) return value;
-  if (comp.props && typeof comp.props === 'object') {
-    value = getNestedValue(comp.props, segments);
-    if (value !== undefined) return value;
-  }
   const resolver = studyAttributeResolvers[segments[0]];
   if (resolver) {
     const base = resolver(comp);
@@ -6728,6 +6722,12 @@ function resolveComponentAttribute(comp, key) {
       const studyValue = getNestedValue(base, segments.slice(1));
       if (studyValue !== undefined) return studyValue;
     }
+  }
+  let value = getNestedValue(comp, segments);
+  if (value !== undefined) return value;
+  if (comp.props && typeof comp.props === 'object') {
+    value = getNestedValue(comp.props, segments);
+    if (value !== undefined) return value;
   }
   return undefined;
 }
