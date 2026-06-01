@@ -107,7 +107,14 @@ export function attachCollaborationServer(httpServer, wss, options = {}) {
 
       if (msg.type === 'join') {
         removeFromRoom();
-        currentProjectId = String(msg.projectId || '').slice(0, 200);
+        const requestedProjectId = String(msg.projectId || '');
+        if (requestedProjectId.length > 200) {
+          currentProjectId = null;
+          currentUsername = null;
+          ws.send(JSON.stringify({ type: 'error', message: 'Project ID too long' }));
+          return;
+        }
+        currentProjectId = requestedProjectId;
         currentUsername = String(msg.username || 'Anonymous').slice(0, 100);
         if (!rooms.has(currentProjectId)) rooms.set(currentProjectId, new Set());
         if (!seqCounters.has(currentProjectId)) seqCounters.set(currentProjectId, 0);
