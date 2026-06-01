@@ -4906,6 +4906,18 @@ if (studiesResizeHandle && studiesPanel) {
     e.preventDefault();
   });
 }
+function getOneLineSheetsRevision(oneLineData) {
+  return JSON.stringify(Array.isArray(oneLineData?.sheets) ? oneLineData.sheets : []);
+}
+
+function assertOneLineSheetsUnchanged(expectedRevision, studyName) {
+  const currentOneLineData = getOneLine();
+  if (getOneLineSheetsRevision(currentOneLineData) !== expectedRevision) {
+    throw new Error(`${studyName} results were discarded because the one-line diagram changed while the study was running. Please rerun the study on the current diagram.`);
+  }
+  return currentOneLineData;
+}
+
 if (runLFBtn) runLFBtn.addEventListener('click', () => {
   runLoadFlowFromButton().catch(err => {
     console.error('[oneline] load flow failed', err);
@@ -4915,11 +4927,13 @@ if (runLFBtn) runLFBtn.addEventListener('click', () => {
 
 async function runLoadFlowFromButton() {
   const oneLineData = getOneLine();
+  const oneLineRevision = getOneLineSheetsRevision(oneLineData);
   const res = await runLoadFlowOffMain(oneLineData, {
     baseMVA: studySettings.loadFlow.baseMVA,
     balanced: studySettings.loadFlow.balanced,
     maxIterations: studySettings.loadFlow.maxIterations
   });
+  const currentOneLineData = assertOneLineSheetsUnchanged(oneLineRevision, 'Load flow');
   const { sheets } = oneLineData;
   const diagram = sheets.flatMap(s => s.components);
   diagram.forEach(comp => {
@@ -5004,7 +5018,7 @@ async function runLoadFlowFromButton() {
     if (typeof l.toKV === 'number') conn.voltage_to_v = formatVolts(l.toKV * 1000);
   });
   updateCableOperatingVoltages(diagram);
-  setOneLine({ activeSheet, sheets });
+  setOneLine({ activeSheet: currentOneLineData.activeSheet, sheets });
   const studies = getStudies();
   studies.loadFlow = res;
   setStudies(studies);
@@ -5030,7 +5044,9 @@ if (runSCBtn) runSCBtn.addEventListener('click', () => {
 
 async function runShortCircuitFromButton() {
   const oneLineData = getOneLine();
+  const oneLineRevision = getOneLineSheetsRevision(oneLineData);
   const res = await runShortCircuitOffMain(oneLineData, { method: studySettings.shortCircuit.method });
+  const currentOneLineData = assertOneLineSheetsUnchanged(oneLineRevision, 'Short circuit');
   const { sheets } = oneLineData;
   const diagram = sheets.flatMap(s => s.components);
   diagram.forEach(c => {
@@ -5039,7 +5055,7 @@ async function runShortCircuitFromButton() {
       conn.faultKA = res[conn.target]?.threePhaseKA;
     });
   });
-  setOneLine({ activeSheet, sheets });
+  setOneLine({ activeSheet: currentOneLineData.activeSheet, sheets });
   const studies = getStudies();
   studies.shortCircuit = res;
   setStudies(studies);
@@ -5101,9 +5117,12 @@ if (runRelBtn) runRelBtn.addEventListener('click', () => {
 });
 
 async function runReliabilityFromButton() {
-  const { sheets } = getOneLine();
+  const oneLineData = getOneLine();
+  const oneLineRevision = getOneLineSheetsRevision(oneLineData);
+  const { sheets } = oneLineData;
   const diagram = sheets.flatMap(s => s.components);
   const res = await runReliabilityOffMain(diagram);
+  assertOneLineSheetsUnchanged(oneLineRevision, 'Reliability');
   const studies = getStudies();
   studies.reliability = res;
   setStudies(studies);
