@@ -379,7 +379,7 @@ export function buildBomCatalogFields(record = {}) {
     manufacturer: product.manufacturer || cleanText(record.manufacturer),
     catalogNumber: product.catalogNumber || cleanText(record.catalogNumber ?? record.catalog_number ?? record.part_number ?? record.model),
     model: cleanText(record.model ?? product.model),
-    approvedPart: Boolean(product.approved || record.approved_part || record.catalog_approved),
+    approvedPart: product.approved === true,
     approvalStatus: product.approval?.status || cleanText(record.approvalStatus ?? record.approval_status) || 'unreviewed',
     source: product.source || cleanText(record.catalog_source),
     lastVerified: product.lastVerified || cleanText(record.catalog_last_verified),

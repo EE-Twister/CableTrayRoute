@@ -138,6 +138,22 @@ describe('exportRevit - raceway material', () => {
     assert.strictEqual(result.cables[0].CatalogNumber, 'XHHW-500');
     assert.strictEqual(result.cables[0].ApprovalStatus, 'unreviewed');
   });
+
+  it('exports string false catalog approvals as unapproved BIM fields', () => {
+    const result = exportRevit({
+      trays: [{
+        tray_id: 'T-REJECTED',
+        manufacturer: 'Eaton B-Line',
+        catalogNumber: 'BL-VCT-12-4-R',
+        approved_part: 'false',
+        approval_status: 'rejected'
+      }],
+      conduits: [],
+      cables: []
+    });
+    assert.strictEqual(result.trays[0].ApprovedPart, false);
+    assert.strictEqual(result.trays[0].ApprovalStatus, 'rejected');
+  });
 });
 
 describe('parseRevit - JSON string input', () => {

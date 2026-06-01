@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="900" viewBox="0 0 1440 900">
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#f7fafc"/>
+      <stop offset="1" stop-color="#e6f0ff"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="10" stdDeviation="14" flood-color="#1f2937" flood-opacity="0.16"/>
+    </filter>
+  </defs>
+  <rect width="1440" height="900" fill="url(#bg)"/>
+  <rect x="90" y="80" width="1260" height="740" rx="22" fill="#ffffff" filter="url(#shadow)"/>
+  <rect x="90" y="80" width="1260" height="78" rx="22" fill="#1f4e79"/>
+  <rect x="90" y="136" width="1260" height="22" fill="#1f4e79"/>
+  <text x="132" y="130" font-family="Inter, Arial, sans-serif" font-size="30" font-weight="700" fill="#fff">CableTrayRoute — Cost Estimate Approval Preview</text>
+  <text x="132" y="205" font-family="Inter, Arial, sans-serif" font-size="22" font-weight="700" fill="#1f2937">Catalog approval status now follows normalized boolean parsing</text>
+  <text x="132" y="240" font-family="Inter, Arial, sans-serif" font-size="17" fill="#4b5563">Rows imported with approved_part: &quot;false&quot;, &quot;no&quot;, &quot;0&quot;, &quot;rejected&quot;, or &quot;unreviewed&quot; remain unapproved in BOM, estimating, submittal, and BIM export data.</text>
+  <rect x="132" y="288" width="1176" height="390" rx="12" fill="#f9fafb" stroke="#d1d5db"/>
+  <rect x="132" y="288" width="1176" height="54" rx="12" fill="#e5eef9"/>
+  <text x="160" y="322" font-family="Inter, Arial, sans-serif" font-size="15" font-weight="700" fill="#243b53">Category</text>
+  <text x="330" y="322" font-family="Inter, Arial, sans-serif" font-size="15" font-weight="700" fill="#243b53">ID</text>
+  <text x="500" y="322" font-family="Inter, Arial, sans-serif" font-size="15" font-weight="700" fill="#243b53">Manufacturer</text>
+  <text x="750" y="322" font-family="Inter, Arial, sans-serif" font-size="15" font-weight="700" fill="#243b53">Catalog No.</text>
+  <text x="1010" y="322" font-family="Inter, Arial, sans-serif" font-size="15" font-weight="700" fill="#243b53">Approval</text>
+  <line x1="132" y1="342" x2="1308" y2="342" stroke="#d1d5db"/>
+  <text x="160" y="390" font-family="Inter, Arial, sans-serif" font-size="18" fill="#111827">Cable</text>
+  <text x="330" y="390" font-family="Inter, Arial, sans-serif" font-size="18" fill="#111827">C-CAT-FALSE</text>
+  <text x="500" y="390" font-family="Inter, Arial, sans-serif" font-size="18" fill="#111827">Prysmian</text>
+  <text x="750" y="390" font-family="Inter, Arial, sans-serif" font-size="18" fill="#111827">XHHW-4-FALSE</text>
+  <rect x="1005" y="365" width="154" height="36" rx="18" fill="#fee2e2" stroke="#fca5a5"/>
+  <text x="1032" y="389" font-family="Inter, Arial, sans-serif" font-size="16" font-weight="700" fill="#991b1b">Rejected</text>
+  <line x1="132" y1="424" x2="1308" y2="424" stroke="#e5e7eb"/>
+  <text x="160" y="472" font-family="Inter, Arial, sans-serif" font-size="18" fill="#111827">Tray</text>
+  <text x="330" y="472" font-family="Inter, Arial, sans-serif" font-size="18" fill="#111827">T-CAT</text>
+  <text x="500" y="472" font-family="Inter, Arial, sans-serif" font-size="18" fill="#111827">Eaton B-Line</text>
+  <text x="750" y="472" font-family="Inter, Arial, sans-serif" font-size="18" fill="#111827">BL-VCT-12-4</text>
+  <rect x="1005" y="447" width="154" height="36" rx="18" fill="#dcfce7" stroke="#86efac"/>
+  <text x="1030" y="471" font-family="Inter, Arial, sans-serif" font-size="16" font-weight="700" fill="#166534">Approved</text>
+  <rect x="160" y="545" width="1096" height="88" rx="10" fill="#eff6ff" stroke="#bfdbfe"/>
+  <text x="190" y="582" font-family="Inter, Arial, sans-serif" font-size="20" font-weight="700" fill="#1e3a8a">Security fix</text>
+  <text x="190" y="615" font-family="Inter, Arial, sans-serif" font-size="17" fill="#1e40af">Raw string approval fields no longer override normalizeCatalogProduct(); only normalized approved === true becomes ApprovedPart.</text>
+  <text x="132" y="734" font-family="Inter, Arial, sans-serif" font-size="15" fill="#6b7280">Generated preview artifact: artifacts/catalog-approval-fix-preview.svg</text>
+</svg>

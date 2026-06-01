@@ -164,6 +164,19 @@ describe('catalog warnings and downstream fields', () => {
     assert.equal(fields.approvedPart, true);
     assert.equal(fields.lastVerified, '2026-05-22');
   });
+
+  it('does not treat string false approval fields as approved BOM fields', () => {
+    ['false', 'no', '0', 'rejected', 'unreviewed'].forEach((approved_part) => {
+      const fields = buildBomCatalogFields({
+        manufacturer: 'ACME',
+        catalog_number: `P-${approved_part}`,
+        approved_part,
+        approval_status: approved_part === 'rejected' ? 'rejected' : 'unreviewed'
+      });
+      assert.equal(fields.approvedPart, false);
+      assert.notEqual(fields.approvalStatus, 'approved');
+    });
+  });
 });
 
 describe('component library catalog validation', () => {

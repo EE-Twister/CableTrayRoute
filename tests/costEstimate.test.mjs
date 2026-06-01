@@ -102,6 +102,22 @@ describe('estimateCableCosts', () => {
     assert.strictEqual(items[0].approvedPart, true);
   });
 
+  it('keeps string false catalog approvals unapproved in line items', () => {
+    const items = estimateCableCosts([
+      {
+        cable_tag: 'C-CAT-FALSE',
+        conductor_size: '4 AWG',
+        conductors: 3,
+        manufacturer: 'Prysmian',
+        catalog_number: 'XHHW-4-FALSE',
+        approved_part: 'false',
+        approval_status: 'rejected'
+      }
+    ], [{ cable: 'C-CAT-FALSE', total_length: '10' }]);
+    assert.strictEqual(items[0].approvedPart, false);
+    assert.strictEqual(items[0].approvalStatus, 'rejected');
+  });
+
   it('falls back to default price for unknown size', () => {
     const unknownCable = [{ cable_tag: 'X-1', conductor_size: 'UNKNOWN', conductors: 1 }];
     const unknownRoute = [{ cable: 'X-1', total_length: '100' }];
