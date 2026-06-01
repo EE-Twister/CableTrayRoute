@@ -199,13 +199,14 @@ function renderAll(study) {
 }
 
 function renderKpis(study) {
-  const best = study.cases.find(c => c.installation === study.comparison.bestCase);
+  const cases = Array.isArray(study.cases) ? study.cases : [];
+  const best = cases.find(c => c.installation === study.comparison?.bestCase);
   const setText = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
   if (best) {
-    setText('kpi-base',    `${best.baseAmpacity_A} A`);
-    setText('kpi-derated', `${best.deratedAmpacity_A} A`);
-    setText('kpi-limit',   best.waterfall.limitingFactor || '—');
-    setText('kpi-temp',    best.maxConductorTempC != null ? `${best.maxConductorTempC} °C` : '—');
+    setText('kpi-base',    `${formatNumber(best.baseAmpacity_A)} A`);
+    setText('kpi-derated', `${formatNumber(best.deratedAmpacity_A)} A`);
+    setText('kpi-limit',   best.waterfall?.limitingFactor || '—');
+    setText('kpi-temp',    best.maxConductorTempC != null ? `${formatNumber(best.maxConductorTempC)} °C` : '—');
   } else {
     setText('kpi-base', '—'); setText('kpi-derated', '—'); setText('kpi-limit', '—'); setText('kpi-temp', '—');
   }
@@ -216,7 +217,8 @@ function renderComparison(study) {
   const body  = document.getElementById('ctenv-compare-body');
   const empty = document.getElementById('ctenv-empty-msg');
   body.innerHTML = '';
-  if (!study.cases.length) {
+  const cases = Array.isArray(study.cases) ? study.cases : [];
+  if (!cases.length) {
     table.hidden = true;
     empty.hidden = false;
     return;
@@ -224,19 +226,21 @@ function renderComparison(study) {
   table.hidden = false;
   empty.hidden = true;
 
-  for (const c of study.cases) {
+  for (const c of cases) {
     const tr = document.createElement('tr');
-    if (c.installation === study.comparison.bestCase)  tr.classList.add('ctenv-row--best');
-    if (c.installation === study.comparison.worstCase) tr.classList.add('ctenv-row--worst');
-    const margin = study.inputs.designCurrentA != null && c.deratedAmpacity_A != null
-      ? (c.deratedAmpacity_A - study.inputs.designCurrentA).toFixed(0)
+    if (c.installation === study.comparison?.bestCase)  tr.classList.add('ctenv-row--best');
+    if (c.installation === study.comparison?.worstCase) tr.classList.add('ctenv-row--worst');
+    const designCurrentA = safeNumber(study.inputs?.designCurrentA);
+    const deratedAmpacityA = safeNumber(c.deratedAmpacity_A);
+    const margin = designCurrentA != null && deratedAmpacityA != null
+      ? (deratedAmpacityA - designCurrentA).toFixed(0)
       : '—';
     tr.innerHTML = `
       <td>${escapeHtml(c.label)}</td>
-      <td>${c.baseAmpacity_A ?? '—'}</td>
-      <td><strong>${c.deratedAmpacity_A ?? '—'}</strong></td>
-      <td>${escapeHtml(c.waterfall.limitingFactor || '—')}</td>
-      <td>${c.maxConductorTempC ?? '—'}</td>
+      <td>${formatNumber(c.baseAmpacity_A)}</td>
+      <td><strong>${formatNumber(c.deratedAmpacity_A)}</strong></td>
+      <td>${escapeHtml(c.waterfall?.limitingFactor || '—')}</td>
+      <td>${formatNumber(c.maxConductorTempC)}</td>
       <td>${margin}</td>
     `;
     body.appendChild(tr);
@@ -246,24 +250,26 @@ function renderComparison(study) {
 function renderWaterfalls(study) {
   const container = document.getElementById('ctenv-waterfalls');
   container.innerHTML = '';
-  for (const c of study.cases) {
-    if (!c.waterfall || !c.waterfall.steps.length) continue;
+  const cases = Array.isArray(study.cases) ? study.cases : [];
+  for (const c of cases) {
+    if (!c.waterfall || !Array.isArray(c.waterfall.steps) || !c.waterfall.steps.length) continue;
     const card = document.createElement('div');
     card.className = 'ctenv-waterfall card';
     const limit = c.waterfall.limitingFactor;
     const stepsHtml = c.waterfall.steps.map(step => {
-      const pct = Math.round(step.factor * 100);
+      const factor = safeNumber(step.factor);
+      const pct = factor == null ? 0 : Math.max(0, Math.min(100, Math.round(factor * 100)));
       let cls = 'ctenv-step';
       if (step.label === limit)            cls += ' ctenv-step--limit';
-      else if (step.factor < 0.85)          cls += ' ctenv-step--warn';
+      else if (factor != null && factor < 0.85) cls += ' ctenv-step--warn';
       return `
         <div class="${cls}" style="--bar-pct:${pct}%">
           <div>
             <span class="ctenv-step-label">${escapeHtml(step.label)}</span>
             <span class="ctenv-step-source">${escapeHtml(step.source || '')}</span>
           </div>
-          <div class="ctenv-step-bar" aria-label="factor ${step.factor}"></div>
-          <div class="ctenv-step-numbers">${step.factor.toFixed(3)} → ${step.value} A</div>
+          <div class="ctenv-step-bar" aria-label="factor ${escapeHtml(formatNumber(factor, 3))}"></div>
+          <div class="ctenv-step-numbers">${formatNumber(factor, 3)} → ${formatNumber(step.value)} A</div>
         </div>`;
     }).join('');
     card.innerHTML = `
@@ -278,25 +284,33 @@ function renderTimeline(study) {
   const section = document.getElementById('ctenv-timeline-section');
   const summary = document.getElementById('ctenv-timeline-summary');
   const chart   = document.getElementById('ctenv-timeline-chart');
-  if (!study.loadProfile) {
+  if (!study.loadProfile || !Array.isArray(study.loadProfile.timeline)) {
+    section.hidden = true;
+    return;
+  }
+  const { timeline, maxTempC, hottestHour, thetaMax, headroomC } = study.loadProfile;
+  const safeTimeline = timeline
+    .map((p, i) => ({ hour: safeNumber(p?.hour) ?? i, tempC: safeNumber(p?.tempC) }))
+    .filter(p => p.tempC != null);
+  const safeThetaMax = safeNumber(thetaMax);
+  if (!safeTimeline.length || safeThetaMax == null) {
     section.hidden = true;
     return;
   }
   section.hidden = false;
-  const { timeline, maxTempC, hottestHour, thetaMax, headroomC } = study.loadProfile;
 
   summary.textContent =
-    `Max θ_conductor ${maxTempC} °C (hour ${hottestHour}); θ_max ${thetaMax} °C; headroom ${headroomC} °C.`;
+    `Max θ_conductor ${formatNumber(maxTempC)} °C (hour ${formatNumber(hottestHour)}); θ_max ${formatNumber(safeThetaMax)} °C; headroom ${formatNumber(headroomC)} °C.`;
 
   // Build simple SVG line chart
   const w = 720, h = 240, padL = 50, padR = 16, padT = 16, padB = 32;
   const xs = i => padL + (i / 23) * (w - padL - padR);
-  const yMin = Math.min(...timeline.map(p => p.tempC), 0);
-  const yMax = Math.max(thetaMax + 5, ...timeline.map(p => p.tempC));
+  const yMin = Math.min(...safeTimeline.map(p => p.tempC), 0);
+  const yMax = Math.max(safeThetaMax + 5, ...safeTimeline.map(p => p.tempC));
   const ys = v => padT + (1 - (v - yMin) / (yMax - yMin)) * (h - padT - padB);
 
-  const linePath = timeline.map((p, i) => `${i === 0 ? 'M' : 'L'}${xs(i).toFixed(1)},${ys(p.tempC).toFixed(1)}`).join(' ');
-  const thetaMaxY = ys(thetaMax);
+  const linePath = safeTimeline.map((p, i) => `${i === 0 ? 'M' : 'L'}${xs(i).toFixed(1)},${ys(p.tempC).toFixed(1)}`).join(' ');
+  const thetaMaxY = ys(safeThetaMax);
 
   const xTicks = [0, 6, 12, 18, 23].map(h => `<g><line x1="${xs(h)}" x2="${xs(h)}" y1="${padT}" y2="${h === 23 ? 240 - padB : 240 - padB}" stroke="#ddd" stroke-dasharray="2,2"/><text x="${xs(h)}" y="${240 - padB + 14}" font-size="10" text-anchor="middle">${h}h</text></g>`).join('');
 
@@ -305,7 +319,7 @@ function renderTimeline(study) {
       <rect x="${padL}" y="${padT}" width="${w - padL - padR}" height="${h - padT - padB}" fill="#fff" stroke="#ccc"/>
       ${xTicks}
       <line x1="${padL}" x2="${w - padR}" y1="${thetaMaxY}" y2="${thetaMaxY}" stroke="#c62828" stroke-dasharray="6,4"/>
-      <text x="${w - padR - 4}" y="${thetaMaxY - 4}" text-anchor="end" font-size="10" fill="#c62828">θ_max ${thetaMax} °C</text>
+      <text x="${w - padR - 4}" y="${thetaMaxY - 4}" text-anchor="end" font-size="10" fill="#c62828">θ_max ${formatNumber(safeThetaMax)} °C</text>
       <path d="${linePath}" fill="none" stroke="#0277bd" stroke-width="2"/>
       <text x="${padL}" y="${padT - 4}" font-size="11" fill="#666">Temperature (°C)</text>
       <text x="${w / 2}" y="${h - 4}" font-size="11" fill="#666" text-anchor="middle">Hour of day</text>
@@ -344,6 +358,17 @@ function downloadCsv(study) {
   const a    = Object.assign(document.createElement('a'), { href: url, download: 'cable-thermal-environment.csv' });
   a.click();
   URL.revokeObjectURL(url);
+}
+
+function safeNumber(value) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+function formatNumber(value, digits = null) {
+  const n = safeNumber(value);
+  if (n == null) return '—';
+  return digits == null ? String(n) : n.toFixed(digits);
 }
 
 function escapeHtml(s) {
