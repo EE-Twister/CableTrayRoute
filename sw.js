@@ -8,42 +8,47 @@
  *  - API requests bypass the cache entirely.
  */
 
-const CACHE_NAME = 'ctr-shell-v3';
+const CACHE_NAME = 'ctr-shell-v4';
 
 // Core shell assets to pre-cache on install.
 // Includes all icons referenced by navigation.js so the sidebar renders correctly offline,
 // plus manifest.json so the PWA manifest is available when the device goes offline.
-const PRECACHE_URLS = [
-  '/offline.html',
-  '/style.css',
-  '/manifest.json',
-  '/icons/favicon.svg',
+const PRECACHE_PATHS = [
+  'offline.html',
+  'style.css',
+  'manifest.json',
+  'icons/favicon.svg',
   // Workflow section icons
-  '/icons/route.svg',
-  '/icons/cable.svg',
-  '/icons/raceway.svg',
-  '/icons/ductbank.svg',
-  '/icons/tray.svg',
-  '/icons/conduit.svg',
-  '/icons/oneline.svg',
-  '/icons/equipment.svg',
-  '/icons/panel.svg',
+  'icons/route.svg',
+  'icons/cable.svg',
+  'icons/raceway.svg',
+  'icons/ductbank.svg',
+  'icons/tray.svg',
+  'icons/conduit.svg',
+  'icons/oneline.svg',
+  'icons/equipment.svg',
+  'icons/panel.svg',
   // Studies section icons
-  '/icons/Motor.svg',
-  '/icons/load.svg',
-  '/icons/components/Breaker.svg',
-  '/icons/components/TextBox.svg',
-  '/icons/components/MCC.svg',
+  'icons/Motor.svg',
+  'icons/load.svg',
+  'icons/components/Breaker.svg',
+  'icons/components/TextBox.svg',
+  'icons/components/MCC.svg',
   // Toolbar icons used in navigation and settings
-  '/icons/toolbar/validate.svg',
-  '/icons/toolbar/grid.svg',
-  '/icons/toolbar/grid-size.svg',
-  '/icons/toolbar/copy.svg',
-  '/icons/toolbar/connect.svg',
-  '/icons/toolbar/dimension.svg',
-  '/icons/toolbar/export.svg',
-  '/icons/toolbar/import.svg',
+  'icons/toolbar/validate.svg',
+  'icons/toolbar/grid.svg',
+  'icons/toolbar/grid-size.svg',
+  'icons/toolbar/copy.svg',
+  'icons/toolbar/connect.svg',
+  'icons/toolbar/dimension.svg',
+  'icons/toolbar/export.svg',
+  'icons/toolbar/import.svg',
 ];
+const PRECACHE_URLS = PRECACHE_PATHS.map(path => new URL(path, self.registration.scope).href);
+const PRECACHE_PATH_SET = new Set(
+  PRECACHE_PATHS.map(path => new URL(path, self.registration.scope).pathname)
+);
+const OFFLINE_URL = new URL('offline.html', self.registration.scope).href;
 
 // Install: cache shell assets.
 self.addEventListener('install', event => {
@@ -75,16 +80,16 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // Navigation requests: network-first, fall back to /offline.html.
+  // Navigation requests: network-first, fall back to offline.html in this scope.
   if (request.mode === 'navigate') {
     event.respondWith(
-      fetch(request).catch(() => caches.match('/offline.html'))
+      fetch(request).catch(() => caches.match(OFFLINE_URL))
     );
     return;
   }
 
   // Shell assets: cache-first.
-  if (PRECACHE_URLS.includes(url.pathname)) {
+  if (PRECACHE_PATH_SET.has(url.pathname)) {
     event.respondWith(
       caches.match(request).then(cached => cached || fetch(request))
     );

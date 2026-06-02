@@ -28,7 +28,8 @@ function it(name, fn) {
 
 describe('HTML asset reference audit', () => {
   it('maps fingerprinted dist assets back to logical source references', () => {
-    assert.equal(logicalAssetUrl('dist/style.aaaaaaaaaaaa.css'), 'dist/style.css');
+    assert.equal(logicalAssetUrl('dist/style.aaaaaaaaaaaa.css'), 'style.css');
+    assert.equal(logicalAssetUrl('dist/style.css'), 'style.css');
     assert.equal(logicalAssetUrl('./dist/scenarios.bbbbbbbbbbbb.js?debug=1'), './dist/scenarios.js?debug=1');
     assert.equal(logicalAssetUrl('dist/vendor/handlebars.min.dddddddddddd.js'), 'dist/vendor/handlebars.min.js');
   });
@@ -48,7 +49,7 @@ describe('HTML asset reference audit', () => {
     ].join('\n');
     const { content, changed } = normalizeHtmlAssetReferences(input);
     assert.equal(changed, true);
-    assert.ok(content.includes('href="dist/style.css"'), content);
+    assert.ok(content.includes('href="style.css"'), content);
     assert.ok(content.includes('src="dist/samplegallery.js"'), content);
     assert.ok(content.includes('src="dirtyTracker.js"'), content);
   });

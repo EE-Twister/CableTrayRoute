@@ -39,10 +39,17 @@ it('returns the original URL when no manifest entry matches', () => {
   assert.strictEqual(rewriteUrl('cdnFallback.js', manifest), 'cdnFallback.js');
 });
 
-it('rewrites a bare root asset to its fingerprinted dist path', () => {
+it('leaves root-scoped CSS at the root so its imports resolve', () => {
   assert.strictEqual(
     rewriteUrl('style.css?v=one-line-datablock-contrast-v1', manifest),
-    'dist/style.aaaaaaaaaaaa.css'
+    'style.css'
+  );
+});
+
+it('rewrites a bare root script asset to its fingerprinted dist path', () => {
+  assert.strictEqual(
+    rewriteUrl('oneline.js?v=abc', manifest),
+    'dist/oneline.cccccccccccc.js'
   );
 });
 
@@ -89,7 +96,7 @@ it('rewrites multiple <link> and <script> attributes in one pass', () => {
   ].join('\n');
   const { content, changed } = rewriteHtml(input, manifest);
   assert.strictEqual(changed, true);
-  assert.ok(content.includes('href="dist/style.aaaaaaaaaaaa.css"'), content);
+  assert.ok(content.includes('href="style.css"'), content);
   assert.ok(content.includes('src="dist/vendor/handlebars.min.dddddddddddd.js"'), content);
   assert.ok(content.includes('src="./dist/oneline.cccccccccccc.js"'), content);
   // Bare root asset with no manifest entry is left alone.
@@ -97,7 +104,7 @@ it('rewrites multiple <link> and <script> attributes in one pass', () => {
 });
 
 it('reports no change when HTML already uses current fingerprints', () => {
-  const input = '<link rel="stylesheet" href="dist/style.aaaaaaaaaaaa.css">';
+  const input = '<script type="module" src="dist/oneline.cccccccccccc.js"></script>';
   const { changed } = rewriteHtml(input, manifest);
   assert.strictEqual(changed, false);
 });

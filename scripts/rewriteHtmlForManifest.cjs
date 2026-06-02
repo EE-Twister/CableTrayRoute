@@ -22,6 +22,7 @@ const MANIFEST_FILE = path.join(DIST, 'asset-manifest.json');
 
 const FINGERPRINT_RE = /\.[0-9a-f]{8,}(\.[A-Za-z0-9]+)$/;
 const ATTR_RE = /\b(src|href)\s*=\s*(['"])([^'"]+)\2/gi;
+const ROOT_SCOPED_ASSETS = new Set(['style.css']);
 
 function loadManifest() {
   if (!fs.existsSync(MANIFEST_FILE)) {
@@ -78,6 +79,10 @@ function rewriteUrl(rawUrl, manifest) {
   const dir = lastSlash >= 0 ? workPath.slice(0, lastSlash + 1) : '';
   const base = lastSlash >= 0 ? workPath.slice(lastSlash + 1) : workPath;
   const logicalKey = dir + stripFingerprintFromBasename(base);
+
+  if (!distPrefix && ROOT_SCOPED_ASSETS.has(logicalKey)) {
+    return logicalKey + dropVersionParam(query) + tailHash;
+  }
 
   if (!Object.prototype.hasOwnProperty.call(manifest, logicalKey)) {
     return rawUrl;

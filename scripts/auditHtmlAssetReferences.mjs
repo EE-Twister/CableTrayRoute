@@ -7,6 +7,9 @@ const ROOT = path.resolve(__dirname, '..');
 
 const ATTR_RE = /\b(src|href)\s*=\s*(['"])([^'"]+)\2/gi;
 const FINGERPRINT_RE = /\.[0-9a-f]{8,}(\.[A-Za-z0-9]+)$/;
+const ROOT_SCOPED_DIST_ASSETS = new Map([
+  ['style.css', 'style.css']
+]);
 
 function toPosixPath(value) {
   return value.replace(/\\/g, '/');
@@ -43,6 +46,14 @@ export function logicalAssetUrl(value) {
   const dirname = path.posix.dirname(normalizedPathname);
   const basename = path.posix.basename(normalizedPathname);
   const logicalBasename = stripFingerprint(basename);
+  const distRelativeLogicalPath = dirname === 'dist'
+    ? logicalBasename
+    : `${dirname.slice('dist/'.length)}/${logicalBasename}`;
+  const rootScopedUrl = ROOT_SCOPED_DIST_ASSETS.get(distRelativeLogicalPath);
+  if (rootScopedUrl) {
+    return `${leadingDot}${rootScopedUrl}${query}${hash}`;
+  }
+
   if (logicalBasename === basename) return value;
 
   const logicalPath = dirname === '.'
@@ -67,9 +78,14 @@ function classifyReference(value, root) {
   const logicalUrl = logicalAssetUrl(value);
   if (logicalUrl !== value) {
     const target = path.join(root, toPosixPath(normalizedPathname));
+    const code = logicalUrl.replace(/^\.\//, '') === 'style.css'
+      ? 'root-scoped-style-asset'
+      : 'fingerprinted-root-asset';
     return {
-      code: 'fingerprinted-root-asset',
-      message: 'Root HTML source should reference logical dist assets; build output applies fingerprints.',
+      code,
+      message: code === 'root-scoped-style-asset'
+        ? 'Root HTML source should reference style.css from the repository root so its imports resolve on static hosts.'
+        : 'Root HTML source should reference logical dist assets; build output applies fingerprints.',
       logicalUrl,
       targetExists: fs.existsSync(target)
     };

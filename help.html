@@ -22,7 +22,7 @@
   <link rel="canonical" href="help.html">
   <link rel="dns-prefetch" href="https://fonts.gstatic.com">
   <meta name="color-scheme" content="light dark">
-  <link rel="stylesheet" href="dist/style.css">
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <a href="#main-content" class="skip-link">Skip to main content</a>
@@ -199,13 +199,24 @@
     </nav>
   </footer>
   <script type="module" src="dist/index.js" defer></script>
-  <script>
-    window.addEventListener('DOMContentLoaded', () => {
+  <script type="module">
+    import { initSettings, initDarkMode, initCompactMode, initNavToggle } from './site.js';
+
+    const initSharedShell = () => {
       initSettings();
       initDarkMode();
       initCompactMode();
       initNavToggle();
+    };
 
+    if (document.readyState === 'loading') {
+      window.addEventListener('DOMContentLoaded', initSharedShell, { once: true });
+    } else {
+      initSharedShell();
+    }
+  </script>
+  <script>
+    window.addEventListener('DOMContentLoaded', () => {
       const setLink = async (id, statusId, file, name) => {
         const link = document.getElementById(id);
         const status = document.getElementById(statusId);
