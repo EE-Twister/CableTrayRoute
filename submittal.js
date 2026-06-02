@@ -1,6 +1,6 @@
 import { getCables, getTrays, getConduits, getEquipment, getDuctbanks } from './dataStore.mjs';
 import { showAlertModal } from './src/components/modal.js';
-import { buildBomCatalogFields, buildCatalogWarnings } from './analysis/manufacturerCatalog.mjs';
+import { buildBomCatalogFields, buildCatalogTraceabilityReport, buildCatalogWarnings } from './analysis/manufacturerCatalog.mjs';
 
 document.addEventListener('DOMContentLoaded', () => {
   initSettings();
@@ -55,6 +55,17 @@ function approvalLabel(record) {
   return fields.approvedPart ? 'Approved' : (fields.approvalStatus || 'unreviewed');
 }
 
+function formatBimRef(value) {
+  if (!value || typeof value !== 'object') return '';
+  return [value.familyName, value.typeName, value.classification, value.url]
+    .filter(Boolean)
+    .join(' / ');
+}
+
+function buildCatalogTraceability(records, date) {
+  return buildCatalogTraceabilityReport(records, [], { today: date });
+}
+
 function generatePreview() {
   const info = getProjectInfo();
   const cables = getCables();
@@ -72,6 +83,8 @@ function generatePreview() {
   if (catalogWarnings.length) {
     html += buildCatalogWarningsSection(catalogWarnings);
   }
+
+  html += buildCatalogTraceabilitySection(buildCatalogTraceability([...equipment, ...cables, ...trays, ...conduits], info.date));
 
   // Equipment Schedule
   if (sectionEnabled('sec-equipment')) {
@@ -148,6 +161,39 @@ function buildCatalogWarningsSection(warnings) {
           </tr>
         </thead>
         <tbody>${rows}</tbody>
+      </table>
+    </section>`;
+}
+
+function buildCatalogTraceabilitySection(report) {
+  const summary = report.summary || {};
+  const rows = (report.rows || []).filter(row => row.manufacturer || row.catalogNumber || row.confidence?.status !== 'incomplete');
+  if (!rows.length) return '';
+  const rowHtml = rows.slice(0, 20).map(row => `
+    <tr>
+      <td>${esc(row.id)}</td>
+      <td>${esc(row.manufacturer)}</td>
+      <td>${esc(row.catalogNumber)}</td>
+      <td>${esc(row.approvalStatus)}</td>
+      <td>${esc(row.confidence?.status)} (${esc(row.confidence?.score)})</td>
+      <td>${esc((row.confidence?.missingEvidence || []).join(', ') || 'None')}</td>
+    </tr>`).join('');
+  return `
+    <section class="submittal-section" aria-label="Catalog traceability summary">
+      <h2>Catalog Traceability Summary</h2>
+      <p class="field-hint">Approved: ${esc(summary.approved || 0)} / ${esc(summary.total || 0)}. Confidence: ${esc(summary.byConfidence?.complete || 0)} complete, ${esc(summary.byConfidence?.review || 0)} review, ${esc(summary.byConfidence?.incomplete || 0)} incomplete.</p>
+      <table class="result-table submittal-table" aria-label="Catalog traceability summary">
+        <thead>
+          <tr>
+            <th scope="col">Item</th>
+            <th scope="col">Manufacturer</th>
+            <th scope="col">Catalog No.</th>
+            <th scope="col">Approval</th>
+            <th scope="col">Confidence</th>
+            <th scope="col">Missing Evidence</th>
+          </tr>
+        </thead>
+        <tbody>${rowHtml}</tbody>
       </table>
     </section>`;
 }
@@ -546,6 +592,32 @@ function exportXlsx() {
     addSheet('Catalog Warnings', [
       ['Item', 'Code', 'Severity', 'Message'],
       ...catalogWarnings.map(warning => [warning.id, warning.code, warning.severity, warning.message])
+    ]);
+  }
+
+  const traceability = buildCatalogTraceability([...equipment, ...cables, ...trays, ...conduits], info.date);
+  if (traceability.rows.length) {
+    addSheet('Catalog Traceability', [
+      ['Item', 'Matched Catalog ID', 'Manufacturer', 'Catalog No.', 'Approval', 'Confidence Status', 'Confidence Score', 'Missing Evidence', 'Stale Evidence', 'Source', 'Last Verified', 'Datasheet URL', 'BIM Reference', 'Standards', 'CO2e kg/unit', 'EPD Source', 'EPD Valid Until'],
+      ...traceability.rows.map(row => [
+        row.id,
+        row.matchedCatalogId,
+        row.manufacturer,
+        row.catalogNumber,
+        row.approvalStatus,
+        row.confidence.status,
+        row.confidence.score,
+        row.confidence.missingEvidence.join('; '),
+        row.confidence.staleEvidence.join('; '),
+        row.source,
+        row.lastVerified,
+        row.datasheetUrl,
+        formatBimRef(row.bimRef),
+        row.standards.join('; '),
+        row.co2eKgPerUnit ?? '',
+        row.epdSource,
+        row.epdValidUntil
+      ])
     ]);
   }
 

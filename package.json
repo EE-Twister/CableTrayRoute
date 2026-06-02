@@ -23,6 +23,7 @@
     "e2e:heat-trace-export": "playwright test --config playwright.config.cjs playwright-tests/heatTrace.acceptance.spec.js --grep \"AT-HT-06\"",
     "audit:components": "node scripts/componentCoverageAudit.mjs",
     "audit:page-contracts": "node scripts/auditPageContracts.mjs",
+    "check:html-assets": "node scripts/auditHtmlAssetReferences.mjs",
     "check:dist-review": "node scripts/checkDistReviewNoise.mjs"
   },
   "devDependencies": {

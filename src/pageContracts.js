@@ -553,6 +553,18 @@ export const PAGE_CONTRACTS_BY_HREF = {
     readiness: ready('Ready when cable thermal inputs and installation conditions are valid.', ['Missing conductor data, thermal resistivity, ambient values, or installation geometry.']),
     downstream: ['projectreport.html']
   }),
+  'cablethermalenv.html': contract({
+    workflowStep: 'studies',
+    standaloneInputs: ['Cable construction, ambient conditions, grouping, installation type, and optional load profile inputs.'],
+    projectInputs: [designBasis, approvals],
+    outputs: [
+      output('studyResults.cableThermalEnvironment', 'study-result', 'Saved unified cable thermal environment comparison and load-profile result.', ['designcoach.html', 'projectreport.html']),
+      studyApprovalOutput,
+      exportOnly('Cable thermal environment comparison tables and CSV exports.', ['projectreport.html'])
+    ],
+    readiness: ready('Ready when cable, ambient, grouping, and at least one installation condition are valid.', ['Missing cable size, invalid ambient values, no selected installation, or malformed load profile data.']),
+    downstream: ['designcoach.html', 'projectreport.html']
+  }),
   'tcc.html': contract({
     workflowStep: 'studies',
     standaloneInputs: ['Protective device library selections, relay settings, annotations, chart ranges, and selected references.'],

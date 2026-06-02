@@ -1,8 +1,12 @@
 import assert from 'assert';
 import fs from 'node:fs';
 import {
+  buildCatalogConfidence,
+  buildCatalogTraceabilityReport,
   buildBomCatalogFields,
   buildCatalogWarnings,
+  CATALOG_CONFIDENCE_STATUS,
+  findCatalogProductForRecord,
   filterCatalogProducts,
   mergeCatalogProducts,
   normalizeCatalogProduct,
@@ -49,6 +53,29 @@ describe('manufacturer catalog normalization', () => {
     assert.equal(row.commercial.listPriceUsd, 142);
     assert.equal(row.approval.status, 'approved');
     assert.ok(row.standards.includes('UL classified'));
+  });
+
+  it('normalizes BIM and EPD evidence fields', () => {
+    const row = normalizeCatalogProduct({
+      id: 'EPD-1',
+      manufacturer: 'ACME',
+      catalogNumber: 'EPD-1',
+      category: 'tray',
+      description: 'Tray with evidence',
+      approved: true,
+      source: 'Approved list',
+      lastVerified: '2026-05-22',
+      datasheet_url: 'https://example.com/datasheet.pdf',
+      bim_ref: { familyName: 'ACME Tray', typeName: 'EPD-1' },
+      co2eKgPerUnit: 4.2,
+      epdSource: 'ACME EPD 2026',
+      epdValidUntil: '2027-12-31'
+    });
+    assert.equal(row.datasheetUrl, 'https://example.com/datasheet.pdf');
+    assert.equal(row.bimRef.familyName, 'ACME Tray');
+    assert.equal(row.co2eKgPerUnit, 4.2);
+    assert.equal(row.epd.source, 'ACME EPD 2026');
+    assert.equal(row.epdValidUntil, '2027-12-31');
   });
 
   it('requires evidence for approved catalog rows', () => {
@@ -157,12 +184,22 @@ describe('catalog warnings and downstream fields', () => {
       catalog_number: 'P-100',
       approved_part: true,
       catalog_source: 'Approved list',
-      catalog_last_verified: '2026-05-22'
+      catalog_last_verified: '2026-05-22',
+      datasheet_url: 'https://example.com/p-100.pdf',
+      bim_ref: { familyName: 'ACME Part', typeName: 'P-100' },
+      co2eKgPerUnit: 2.5,
+      epdSource: 'ACME EPD',
+      epdValidUntil: '2027-01-01'
     });
     assert.equal(fields.manufacturer, 'ACME');
     assert.equal(fields.catalogNumber, 'P-100');
     assert.equal(fields.approvedPart, true);
     assert.equal(fields.lastVerified, '2026-05-22');
+    assert.equal(fields.datasheetUrl, 'https://example.com/p-100.pdf');
+    assert.equal(fields.bimRef.familyName, 'ACME Part');
+    assert.equal(fields.co2eKgPerUnit, 2.5);
+    assert.equal(fields.epdSource, 'ACME EPD');
+    assert.equal(fields.catalogConfidenceStatus, CATALOG_CONFIDENCE_STATUS.complete);
   });
 
   it('does not treat string false approval fields as approved BOM fields', () => {
@@ -176,6 +213,90 @@ describe('catalog warnings and downstream fields', () => {
       assert.equal(fields.approvedPart, false);
       assert.notEqual(fields.approvalStatus, 'approved');
     });
+  });
+});
+
+describe('catalog confidence and traceability', () => {
+  const approvedProduct = {
+    id: 'TRAY-100',
+    manufacturer: 'ACME',
+    catalogNumber: 'TRAY-100',
+    category: 'tray',
+    description: 'Approved tray',
+    approved: true,
+    source: 'Owner approved list',
+    lastVerified: '2026-05-22',
+    datasheetUrl: 'https://example.com/tray-100.pdf',
+    bimRef: { familyName: 'ACME Tray', typeName: 'TRAY-100', classification: 'tray' },
+    standards: ['NEMA VE 1', 'UL classified'],
+    co2eKgPerUnit: 3.4,
+    epdSource: 'ACME EPD 2026',
+    epdValidUntil: '2027-12-31'
+  };
+
+  it('scores complete governed catalog evidence', () => {
+    const confidence = buildCatalogConfidence(approvedProduct, { today: '2026-06-02' });
+    assert.equal(confidence.score, 100);
+    assert.equal(confidence.status, CATALOG_CONFIDENCE_STATUS.complete);
+    assert.deepEqual(confidence.missingEvidence, []);
+    assert.deepEqual(confidence.staleEvidence, []);
+  });
+
+  it('marks generic or incomplete catalog evidence for review', () => {
+    const confidence = buildCatalogConfidence({
+      tag: 'EQ-1',
+      manufacturer: 'Generic',
+      catalogNumber: '',
+      approved_part: false
+    }, { today: '2026-06-02' });
+    assert.equal(confidence.status, CATALOG_CONFIDENCE_STATUS.incomplete);
+    assert.ok(confidence.missingEvidence.includes('manufacturer/catalog identity'));
+    assert.ok(confidence.missingEvidence.includes('approved part status'));
+  });
+
+  it('warns for stricter datasheet, BIM, EPD, and stale verification checks', () => {
+    const warnings = buildCatalogWarnings([{
+      tag: 'TRAY-OLD',
+      manufacturer: 'ACME',
+      catalogNumber: 'TRAY-OLD',
+      approved_part: true,
+      catalog_source: 'Owner list',
+      catalog_last_verified: '2024-01-01'
+    }], [], {
+      requireDatasheet: true,
+      requireBimRef: true,
+      requireEpd: true,
+      today: '2026-06-02',
+      verificationMaxAgeDays: 365
+    });
+    assert.ok(warnings.some(warning => warning.code === 'stale-catalog-verification'));
+    assert.ok(warnings.some(warning => warning.code === 'missing-datasheet'));
+    assert.ok(warnings.some(warning => warning.code === 'missing-bim-reference'));
+    assert.ok(warnings.some(warning => warning.code === 'missing-epd-metadata'));
+  });
+
+  it('matches schedule records to catalog products and summarizes confidence', () => {
+    const record = { tag: 'T-1', manufacturer: 'ACME', catalog_number: 'TRAY-100' };
+    const matched = findCatalogProductForRecord(record, [approvedProduct]);
+    assert.equal(matched.id, 'TRAY-100');
+
+    const report = buildCatalogTraceabilityReport([
+      record,
+      { tag: 'T-2', manufacturer: 'Generic', catalog_number: '' }
+    ], [approvedProduct], {
+      today: '2026-06-02',
+      requireDatasheet: true,
+      requireBimRef: true,
+      requireEpd: true
+    });
+    assert.equal(report.summary.total, 2);
+    assert.equal(report.summary.matched, 1);
+    assert.equal(report.summary.approved, 1);
+    assert.equal(report.summary.byConfidence.complete, 1);
+    assert.equal(report.summary.byConfidence.incomplete, 1);
+    assert.equal(report.rows[0].matchedCatalogId, 'TRAY-100');
+    assert.equal(report.rows[0].confidence.status, CATALOG_CONFIDENCE_STATUS.complete);
+    assert.ok(report.rows[1].warnings.some(warning => warning.code === 'missing-catalog-selection'));
   });
 });
 

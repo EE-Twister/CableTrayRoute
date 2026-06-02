@@ -71,8 +71,12 @@ Product-bearing components also receive a shared catalog metadata baseline in th
 | `catalog_last_verified` | Last verification date in `YYYY-MM-DD` format. |
 | `datasheet_url` | Link to the manufacturer datasheet or product page. |
 | `bim_ref` | BIM family/type/shared-parameter reference. |
+| `co2eKgPerUnit` | Item-level embodied carbon factor used by sustainability reports. |
+| `epdSource` / `epdValidUntil` | EPD reference and validity date for sustainability traceability. |
 
 Library validation rejects approved parts that do not include `catalog_source` and `catalog_last_verified`. This keeps manufacturer selections traceable before they feed equipment evaluation, estimates, BIM export, reports, and submittals.
+
+Catalog confidence is calculated from the same metadata. Complete records include manufacturer/catalog identity, approved status, source/date, datasheet URL, BIM reference, standards/listing metadata, and EPD/CO2e evidence. Submittal exports include a traceability worksheet that lists each row's confidence status and missing evidence.
 
 ## Default Motor Control and Disconnect Symbols
 

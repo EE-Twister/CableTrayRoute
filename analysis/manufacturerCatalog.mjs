@@ -15,6 +15,12 @@ export const APPROVAL_STATUSES = new Set([
   'unreviewed'
 ]);
 
+export const CATALOG_CONFIDENCE_STATUS = Object.freeze({
+  complete: 'complete',
+  review: 'review',
+  incomplete: 'incomplete'
+});
+
 const GENERIC_MANUFACTURERS = new Set([
   '',
   'generic',
@@ -33,6 +39,10 @@ function cleanText(value) {
 function cleanDate(value) {
   const text = cleanText(value);
   return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : '';
+}
+
+function cleanUrl(value) {
+  return cleanText(value);
 }
 
 function toNumberOrNull(value) {
@@ -61,6 +71,18 @@ function normalizeArray(value) {
 
 function normalizeObject(value) {
   return value && typeof value === 'object' && !Array.isArray(value) ? { ...value } : {};
+}
+
+function hasObjectValues(value) {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    && Object.values(value).some(item => cleanText(item) !== '');
+}
+
+function hasBimEvidence(bimRef, catalogNumber = '') {
+  if (!hasObjectValues(bimRef)) return false;
+  if (cleanText(bimRef.familyName) || cleanText(bimRef.classification) || cleanText(bimRef.url)) return true;
+  const typeName = cleanText(bimRef.typeName);
+  return !!typeName && typeName.toLowerCase() !== cleanText(catalogNumber).toLowerCase();
 }
 
 function normalizeStatus(product, approved) {
@@ -160,10 +182,21 @@ export function normalizeCatalogProduct(product, options = {}) {
     ...normalizeObject(product.bimRef ?? product.bim_ref),
     familyName: cleanText(product.bimRef?.familyName ?? product.bim_ref?.familyName ?? product.bim_family ?? product.bimFamily),
     typeName: cleanText(product.bimRef?.typeName ?? product.bim_ref?.typeName ?? product.bim_type ?? product.bimType ?? catalogNumber),
-    classification: cleanText(product.bimRef?.classification ?? product.bim_ref?.classification ?? product.classification)
+    classification: cleanText(product.bimRef?.classification ?? product.bim_ref?.classification ?? product.classification),
+    url: cleanUrl(product.bimRef?.url ?? product.bim_ref?.url ?? product.bim_url ?? product.bimUrl)
   };
   Object.keys(bimRef).forEach((key) => {
     if (bimRef[key] === '') delete bimRef[key];
+  });
+
+  const epd = {
+    ...normalizeObject(product.epd),
+    source: cleanText(product.epd?.source ?? product.epdSource ?? product.epd_source),
+    validUntil: cleanDate(product.epd?.validUntil ?? product.epdValidUntil ?? product.epd_valid_until),
+    co2eKgPerUnit: toNumberOrNull(product.epd?.co2eKgPerUnit ?? product.co2eKgPerUnit ?? product.co2e_kg_per_unit)
+  };
+  Object.keys(epd).forEach((key) => {
+    if (epd[key] === null || epd[key] === undefined || epd[key] === '') delete epd[key];
   });
 
   const lastVerified = cleanDate(
@@ -195,7 +228,11 @@ export function normalizeCatalogProduct(product, options = {}) {
     dimensions,
     commercial,
     bimRef,
-    datasheetUrl: cleanText(product.datasheetUrl ?? product.datasheet_url ?? product.url),
+    datasheetUrl: cleanUrl(product.datasheetUrl ?? product.datasheet_url ?? product.url),
+    epd,
+    epdSource: epd.source || '',
+    epdValidUntil: epd.validUntil || '',
+    co2eKgPerUnit: epd.co2eKgPerUnit,
     approved: approvalStatus === 'approved',
     approved_part: approvalStatus === 'approved',
     approval: {
@@ -250,8 +287,16 @@ export function validateCatalogProduct(product, options = {}) {
     warnings.push({ path: 'datasheetUrl', message: 'datasheetUrl should be an absolute HTTP(S) URL.' });
   }
 
+  if (normalized.bimRef?.url && !/^https?:\/\//i.test(normalized.bimRef.url)) {
+    warnings.push({ path: 'bimRef.url', message: 'bimRef.url should be an absolute HTTP(S) URL.' });
+  }
+
   if (normalized.standards.length === 0) {
     warnings.push({ path: 'standards', message: 'Catalog row has no standards/listing metadata.' });
+  }
+
+  if (normalized.co2eKgPerUnit != null && normalized.co2eKgPerUnit < 0) {
+    errors.push({ path: 'co2eKgPerUnit', message: 'co2eKgPerUnit must be non-negative when provided.' });
   }
 
   return {
@@ -304,6 +349,7 @@ function mergeProduct(existing, next) {
     dimensions: { ...(existing.dimensions || {}), ...(next.dimensions || {}) },
     commercial: { ...(existing.commercial || {}), ...(next.commercial || {}) },
     bimRef: { ...(existing.bimRef || {}), ...(next.bimRef || {}) },
+    epd: { ...(existing.epd || {}), ...(next.epd || {}) },
     approval: { ...(existing.approval || {}), ...(next.approval || {}) }
   });
   return merged || next || existing;
@@ -375,6 +421,7 @@ export function getCatalogOptionsFromProducts(products = [], field) {
 
 export function buildBomCatalogFields(record = {}) {
   const product = normalizeCatalogProduct(record) || {};
+  const confidence = buildCatalogConfidence(record);
   return {
     manufacturer: product.manufacturer || cleanText(record.manufacturer),
     catalogNumber: product.catalogNumber || cleanText(record.catalogNumber ?? record.catalog_number ?? record.part_number ?? record.model),
@@ -385,7 +432,138 @@ export function buildBomCatalogFields(record = {}) {
     lastVerified: product.lastVerified || cleanText(record.catalog_last_verified),
     datasheetUrl: product.datasheetUrl || cleanText(record.datasheet_url ?? record.url),
     bimRef: product.bimRef && Object.keys(product.bimRef).length ? product.bimRef : normalizeObject(record.bimRef ?? record.bim_ref),
-    standards: Array.isArray(product.standards) ? product.standards : []
+    standards: Array.isArray(product.standards) ? product.standards : [],
+    co2eKgPerUnit: product.co2eKgPerUnit ?? toNumberOrNull(record.co2eKgPerUnit ?? record.co2e_kg_per_unit),
+    epdSource: product.epdSource || cleanText(record.epdSource ?? record.epd_source ?? record.epd?.source),
+    epdValidUntil: product.epdValidUntil || cleanDate(record.epdValidUntil ?? record.epd_valid_until ?? record.epd?.validUntil),
+    catalogConfidenceScore: confidence.score,
+    catalogConfidenceStatus: confidence.status,
+    catalogMissingEvidence: confidence.missingEvidence
+  };
+}
+
+function parseDateOnly(value) {
+  const date = cleanDate(value);
+  if (!date) return null;
+  const parsed = new Date(`${date}T00:00:00.000Z`);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function dateAgeDays(dateValue, todayValue) {
+  const date = parseDateOnly(dateValue);
+  const today = parseDateOnly(todayValue);
+  if (!date || !today) return null;
+  return Math.floor((today.getTime() - date.getTime()) / 86400000);
+}
+
+function isDateExpired(dateValue, todayValue) {
+  const date = parseDateOnly(dateValue);
+  const today = parseDateOnly(todayValue);
+  if (!date || !today) return false;
+  return date.getTime() < today.getTime();
+}
+
+function catalogEvidenceFields(record = {}) {
+  const product = normalizeCatalogProduct(record) || {};
+  const approval = product.approval || normalizeObject(record.approval);
+  const bimRef = product.bimRef && Object.keys(product.bimRef).length
+    ? product.bimRef
+    : normalizeObject(record.bimRef ?? record.bim_ref);
+  const standards = Array.isArray(product.standards) ? product.standards : normalizeArray(record.standards);
+  const epdSource = product.epdSource || cleanText(record.epdSource ?? record.epd_source ?? record.epd?.source);
+  const epdValidUntil = product.epdValidUntil || cleanDate(record.epdValidUntil ?? record.epd_valid_until ?? record.epd?.validUntil);
+  return {
+    product,
+    manufacturer: product.manufacturer || cleanText(record.manufacturer),
+    catalogNumber: product.catalogNumber || cleanText(record.catalogNumber ?? record.catalog_number ?? record.partNumber ?? record.part_number ?? record.model),
+    approvedPart: product.approved === true || toBoolean(record.approved_part ?? record.approved),
+    approvalStatus: product.approval?.status || cleanText(record.approvalStatus ?? record.approval_status ?? approval.status) || 'unreviewed',
+    source: product.source || cleanText(record.catalog_source ?? record.source),
+    lastVerified: product.lastVerified || cleanDate(record.catalog_last_verified ?? record.lastVerified ?? record.last_verified),
+    datasheetUrl: product.datasheetUrl || cleanUrl(record.datasheet_url ?? record.datasheetUrl ?? record.url),
+    bimRef,
+    standards,
+    co2eKgPerUnit: product.co2eKgPerUnit ?? toNumberOrNull(record.co2eKgPerUnit ?? record.co2e_kg_per_unit),
+    epdSource,
+    epdValidUntil
+  };
+}
+
+export function buildCatalogConfidence(record = {}, options = {}) {
+  const fields = catalogEvidenceFields(record);
+  const today = cleanDate(options.today) || cleanDate(new Date().toISOString().slice(0, 10));
+  const verificationMaxAgeDays = Number.isFinite(Number(options.verificationMaxAgeDays))
+    ? Number(options.verificationMaxAgeDays)
+    : 365;
+  const missingEvidence = [];
+  const staleEvidence = [];
+  let score = 0;
+
+  const hasIdentity = !hasGenericManufacturer(fields.manufacturer) && !!fields.catalogNumber;
+  if (hasIdentity) score += 20;
+  else missingEvidence.push('manufacturer/catalog identity');
+
+  if (fields.approvedPart && fields.approvalStatus === 'approved') score += 20;
+  else missingEvidence.push('approved part status');
+
+  if (fields.source) score += 10;
+  else missingEvidence.push('approval source');
+
+  if (fields.lastVerified) {
+    score += 10;
+    const ageDays = dateAgeDays(fields.lastVerified, today);
+    if (ageDays != null && ageDays > verificationMaxAgeDays) {
+      staleEvidence.push('catalog verification date');
+    }
+  } else {
+    missingEvidence.push('last verified date');
+  }
+
+  if (fields.datasheetUrl) score += 15;
+  else missingEvidence.push('datasheet URL');
+
+  if (hasBimEvidence(fields.bimRef, fields.catalogNumber)) score += 10;
+  else missingEvidence.push('BIM reference');
+
+  if (fields.standards.length > 0) score += 10;
+  else missingEvidence.push('standards/listing metadata');
+
+  if (fields.epdSource || fields.epdValidUntil || fields.co2eKgPerUnit != null) {
+    if (fields.epdSource && fields.epdValidUntil && fields.co2eKgPerUnit != null) score += 5;
+    else missingEvidence.push('complete EPD/CO2e metadata');
+    if (fields.epdValidUntil && isDateExpired(fields.epdValidUntil, today)) {
+      staleEvidence.push('EPD validity date');
+    }
+  } else {
+    missingEvidence.push('EPD/CO2e metadata');
+  }
+
+  let status = CATALOG_CONFIDENCE_STATUS.incomplete;
+  if (score >= 80 && missingEvidence.length <= 1 && staleEvidence.length === 0) {
+    status = CATALOG_CONFIDENCE_STATUS.complete;
+  } else if (score >= 50) {
+    status = CATALOG_CONFIDENCE_STATUS.review;
+  }
+
+  return {
+    score,
+    status,
+    missingEvidence,
+    staleEvidence,
+    evidence: {
+      manufacturer: fields.manufacturer,
+      catalogNumber: fields.catalogNumber,
+      approvalStatus: fields.approvalStatus,
+      approvedPart: fields.approvedPart,
+      source: fields.source,
+      lastVerified: fields.lastVerified,
+      datasheetUrl: fields.datasheetUrl,
+      bimRef: fields.bimRef,
+      standards: fields.standards,
+      co2eKgPerUnit: fields.co2eKgPerUnit,
+      epdSource: fields.epdSource,
+      epdValidUntil: fields.epdValidUntil
+    }
   };
 }
 
@@ -406,13 +584,34 @@ function hasGenericManufacturer(manufacturer) {
   return GENERIC_MANUFACTURERS.has(cleanText(manufacturer).toLowerCase());
 }
 
-export function buildCatalogWarnings(records = [], catalogProducts = [], options = {}) {
+function normalizedCatalogIndexes(catalogProducts = []) {
   const catalog = Array.isArray(catalogProducts)
     ? catalogProducts.map(product => normalizeCatalogProduct(product)).filter(Boolean)
     : [];
-  const catalogByIdentity = new Map(catalog.map(product => [catalogIdentity(product), product]));
-  const catalogById = new Map(catalog.map(product => [cleanText(product.id).toLowerCase(), product]));
+  return {
+    catalog,
+    byIdentity: new Map(catalog.map(product => [catalogIdentity(product), product])),
+    byId: new Map(catalog.map(product => [cleanText(product.id).toLowerCase(), product]))
+  };
+}
+
+export function findCatalogProductForRecord(record = {}, catalogProducts = []) {
+  const fields = buildBomCatalogFields(record);
+  const { byIdentity, byId } = normalizedCatalogIndexes(catalogProducts);
+  const identity = buildIdentity(fields.manufacturer, fields.catalogNumber, fields.catalogNumber);
+  return byIdentity.get(identity)
+    || byId.get(cleanText(fields.catalogNumber).toLowerCase())
+    || byId.get(cleanText(record.id).toLowerCase())
+    || null;
+}
+
+export function buildCatalogWarnings(records = [], catalogProducts = [], options = {}) {
+  const { catalog, byIdentity: catalogByIdentity, byId: catalogById } = normalizedCatalogIndexes(catalogProducts);
   const shouldCheckUnknownCatalog = catalog.length > 0 || options.checkUnknownCatalog === true;
+  const today = cleanDate(options.today) || cleanDate(new Date().toISOString().slice(0, 10));
+  const verificationMaxAgeDays = Number.isFinite(Number(options.verificationMaxAgeDays))
+    ? Number(options.verificationMaxAgeDays)
+    : 365;
 
   return (Array.isArray(records) ? records : []).flatMap((record, index) => {
     const fields = buildBomCatalogFields(record);
@@ -466,6 +665,114 @@ export function buildCatalogWarnings(records = [], catalogProducts = [], options
       });
     }
 
+    const verificationAgeDays = dateAgeDays(product?.lastVerified || fields.lastVerified, today);
+    if (verificationAgeDays != null && verificationAgeDays > verificationMaxAgeDays) {
+      warnings.push({
+        index,
+        id,
+        code: 'stale-catalog-verification',
+        severity: 'warning',
+        message: `${id} catalog verification is ${verificationAgeDays} days old.`
+      });
+    }
+
+    const datasheetUrl = product?.datasheetUrl || fields.datasheetUrl;
+    if (options.requireDatasheet && !datasheetUrl) {
+      warnings.push({
+        index,
+        id,
+        code: 'missing-datasheet',
+        severity: 'warning',
+        message: `${id} is missing a manufacturer datasheet URL.`
+      });
+    }
+
+    const bimRef = product?.bimRef || fields.bimRef;
+    if (options.requireBimRef && !hasBimEvidence(bimRef, fields.catalogNumber)) {
+      warnings.push({
+        index,
+        id,
+        code: 'missing-bim-reference',
+        severity: 'warning',
+        message: `${id} is missing BIM family/type reference metadata.`
+      });
+    }
+
+    const epdSource = product?.epdSource || fields.epdSource;
+    const epdValidUntil = product?.epdValidUntil || fields.epdValidUntil;
+    const co2eKgPerUnit = product?.co2eKgPerUnit ?? fields.co2eKgPerUnit;
+    if (options.requireEpd && (!epdSource || !epdValidUntil || co2eKgPerUnit == null)) {
+      warnings.push({
+        index,
+        id,
+        code: 'missing-epd-metadata',
+        severity: 'warning',
+        message: `${id} is missing complete EPD source, validity, or CO2e metadata.`
+      });
+    }
+    if (epdValidUntil && isDateExpired(epdValidUntil, today)) {
+      warnings.push({
+        index,
+        id,
+        code: 'expired-epd',
+        severity: 'warning',
+        message: `${id} EPD metadata expired on ${epdValidUntil}.`
+      });
+    }
+
     return warnings;
   });
+}
+
+export function buildCatalogTraceabilityReport(records = [], catalogProducts = [], options = {}) {
+  const rows = (Array.isArray(records) ? records : []).map((record, index) => {
+    const matchedProduct = findCatalogProductForRecord(record, catalogProducts);
+    const basis = matchedProduct
+      ? { ...record, ...matchedProduct, tag: record.tag, id: record.id ?? matchedProduct.id }
+      : record;
+    const fields = buildBomCatalogFields(basis);
+    const confidence = buildCatalogConfidence(basis, options);
+    const warnings = buildCatalogWarnings([record], catalogProducts, { ...options, checkUnknownCatalog: options.checkUnknownCatalog ?? true })
+      .map(warning => ({ ...warning, index }));
+    return {
+      index,
+      id: recordIdentity(record),
+      matchedCatalogId: matchedProduct?.id || '',
+      manufacturer: fields.manufacturer,
+      catalogNumber: fields.catalogNumber,
+      approvalStatus: fields.approvalStatus,
+      approvedPart: fields.approvedPart,
+      source: fields.source,
+      lastVerified: fields.lastVerified,
+      datasheetUrl: fields.datasheetUrl,
+      bimRef: fields.bimRef,
+      standards: fields.standards,
+      co2eKgPerUnit: fields.co2eKgPerUnit,
+      epdSource: fields.epdSource,
+      epdValidUntil: fields.epdValidUntil,
+      confidence,
+      warnings
+    };
+  });
+
+  const summary = rows.reduce((acc, row) => {
+    acc.total += 1;
+    if (row.matchedCatalogId) acc.matched += 1;
+    if (row.approvedPart && row.approvalStatus === 'approved') acc.approved += 1;
+    acc.byConfidence[row.confidence.status] = (acc.byConfidence[row.confidence.status] || 0) + 1;
+    acc.warningCount += row.warnings.length;
+    return acc;
+  }, {
+    total: 0,
+    matched: 0,
+    approved: 0,
+    warningCount: 0,
+    byConfidence: {
+      [CATALOG_CONFIDENCE_STATUS.complete]: 0,
+      [CATALOG_CONFIDENCE_STATUS.review]: 0,
+      [CATALOG_CONFIDENCE_STATUS.incomplete]: 0
+    }
+  });
+
+  return { summary, rows };
 }

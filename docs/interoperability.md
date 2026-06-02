@@ -48,9 +48,18 @@ Schedule and component rows can carry governed catalog fields:
 - `catalog_last_verified`
 - `datasheet_url`
 - `bim_ref`
+- `co2eKgPerUnit`
+- `epdSource`
+- `epdValidUntil`
 
 Cost estimate line items, submittal preview/XLSX output, and Revit-compatible
 JSON export preserve these fields so downstream estimating, procurement,
 submittal, and BIM workflows can distinguish approved manufacturer parts from
 generic or unreviewed placeholders. Approved rows must include source and
 last-verified metadata.
+
+The manufacturer catalog helper also calculates a catalog confidence status and
+score from identity, approval, source/date, datasheet, BIM, standards/listing,
+and EPD/CO2e evidence. Submittal XLSX exports include a **Catalog Traceability**
+sheet with the confidence score, missing evidence list, datasheet URL, BIM
+reference, standards, and EPD metadata for each schedule row.

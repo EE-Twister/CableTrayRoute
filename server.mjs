@@ -25,6 +25,7 @@ const DEFAULT_RATE_LIMIT_MAX = Number.parseInt(process.env.PROJECT_RATE_LIMIT_MA
 const PASSWORD_ALGORITHM = 'scrypt';
 const PASSWORD_KEYLEN = 64;
 const FINGERPRINTED_ASSET_PATTERN = /\.[0-9a-f]{8,}\.[^.]+$/i;
+const DIST_FINGERPRINTED_ASSET_PATTERN = /^\/dist\/(.+)\.[0-9a-f]{8,}(\.[^./]+)$/i;
 
 function formatDurationMs(startNs, endNs = process.hrtime.bigint()) {
   return Number(endNs - startNs) / 1e6;
@@ -59,6 +60,12 @@ function setStaticCacheHeaders(res, filePath) {
     return;
   }
   res.setHeader('Cache-Control', 'public, max-age=600, must-revalidate');
+}
+
+function logicalDistAssetPathForRequest(requestPath) {
+  const match = DIST_FINGERPRINTED_ASSET_PATTERN.exec(requestPath);
+  if (!match) return null;
+  return `/dist/${match[1]}${match[2]}`;
 }
 
 function applyMergePatch(target, patch) {
@@ -1033,6 +1040,43 @@ export async function createApp(options = {}) {
       setHeaders: setStaticCacheHeaders
     })
   );
+  app.use(async (req, res, next) => {
+    if (req.method !== 'GET' && req.method !== 'HEAD') {
+      next();
+      return;
+    }
+
+    let decodedPath;
+    try {
+      decodedPath = decodeURIComponent(req.path);
+    } catch {
+      res.status(400).end();
+      return;
+    }
+
+    const logicalAssetPath = logicalDistAssetPathForRequest(decodedPath);
+    if (!logicalAssetPath) {
+      next();
+      return;
+    }
+
+    const requestedPath = path.resolve(staticRoot, `.${decodedPath}`);
+    const fallbackPath = path.resolve(staticRoot, `.${logicalAssetPath}`);
+    if (!isSubPath(staticRoot, requestedPath) || !isSubPath(staticRoot, fallbackPath)) {
+      res.status(404).end();
+      return;
+    }
+
+    try {
+      await fs.access(fallbackPath);
+    } catch {
+      next();
+      return;
+    }
+
+    setStaticCacheHeaders(res, fallbackPath);
+    res.sendFile(fallbackPath);
+  });
 
   const rateLimiter = createRateLimiter({ windowMs: rateLimitWindowMs, max: rateLimitMax });
   app.use('/projects', rateLimiter);

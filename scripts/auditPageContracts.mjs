@@ -8,6 +8,9 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, '..');
 const outputPath = path.join(root, 'docs', 'page-contract-audit.md');
 const contractSections = new Set(['Workflow', 'Studies']);
+const routeEntryAliases = new Map([
+  ['scenarios.html', ['src/scenarioComparison.js']]
+]);
 const ignoredSourceFiles = new Set([
   'site.js',
   'dataStore.mjs',
@@ -244,18 +247,82 @@ function classifyDirectStorageHit(item) {
   };
 }
 
+function maskJavaScriptComments(text) {
+  let out = '';
+  let state = 'code';
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    const next = text[i + 1];
+
+    if (state === 'lineComment') {
+      if (ch === '\n' || ch === '\r') {
+        out += ch;
+        state = 'code';
+      } else {
+        out += ' ';
+      }
+      continue;
+    }
+
+    if (state === 'blockComment') {
+      if (ch === '*' && next === '/') {
+        out += '  ';
+        i++;
+        state = 'code';
+      } else {
+        out += ch === '\n' || ch === '\r' ? ch : ' ';
+      }
+      continue;
+    }
+
+    if (state === 'singleQuote' || state === 'doubleQuote' || state === 'template') {
+      out += ch;
+      if (ch === '\\') {
+        if (i + 1 < text.length) {
+          out += text[i + 1];
+          i++;
+        }
+        continue;
+      }
+      if (state === 'singleQuote' && ch === "'") state = 'code';
+      if (state === 'doubleQuote' && ch === '"') state = 'code';
+      if (state === 'template' && ch === '`') state = 'code';
+      continue;
+    }
+
+    if (ch === '/' && next === '/') {
+      out += '  ';
+      i++;
+      state = 'lineComment';
+      continue;
+    }
+    if (ch === '/' && next === '*') {
+      out += '  ';
+      i++;
+      state = 'blockComment';
+      continue;
+    }
+    if (ch === "'") state = 'singleQuote';
+    else if (ch === '"') state = 'doubleQuote';
+    else if (ch === '`') state = 'template';
+    out += ch;
+  }
+  return out;
+}
+
 function scanSourceFile(filePath, text) {
+  const scanText = maskJavaScriptComments(text);
   const rel = relativePath(filePath);
   const reads = new Map();
   const writes = new Map();
   const directStorage = [];
-  const constants = literalConstants(text);
+  const constants = literalConstants(scanText);
   const callNames = Object.keys(dataStoreCalls).join('|');
   const callPattern = new RegExp(`(?:^|[^\\w.])(${callNames})\\s*\\(`, 'g');
   const objectCallPattern = new RegExp(`(?:dataStore|window\\.dataStore|globalThis\\.dataStore|store)\\.(${callNames})\\s*\\(`, 'g');
 
   for (const pattern of [callPattern, objectCallPattern]) {
-    for (const match of text.matchAll(pattern)) {
+    for (const match of scanText.matchAll(pattern)) {
       const name = match[1];
       const [mode, key] = dataStoreCalls[name];
       const evidence = `${rel}:${lineForIndex(text, match.index)} ${name}()`;
@@ -265,7 +332,7 @@ function scanSourceFile(filePath, text) {
   }
 
   const tablePattern = /TableUtils\.createTable\s*\(\s*\{([\s\S]*?)\}\s*\)/g;
-  for (const match of text.matchAll(tablePattern)) {
+  for (const match of scanText.matchAll(tablePattern)) {
     const body = match[1];
     const tableKeys = [
       ...body.matchAll(/\b(?:storageKey|columnsKey)\s*:\s*TableUtils\.STORAGE_KEYS\.([A-Za-z0-9_]+)/g)
@@ -278,7 +345,7 @@ function scanSourceFile(filePath, text) {
   }
 
   const genericPattern = /(?:^|[^\w.])((?:dataStore|window\.dataStore|globalThis\.dataStore|store)\.)?(getItem|setItem|removeItem)\s*\(([^,\n\r)]+)/g;
-  for (const match of text.matchAll(genericPattern)) {
+  for (const match of scanText.matchAll(genericPattern)) {
     const rawKey = resolveLiteralArg(match[3], constants);
     if (!rawKey) continue;
     const key = settingKey(rawKey);
@@ -288,7 +355,7 @@ function scanSourceFile(filePath, text) {
   }
 
   const legacyMigrationPattern = /\bmigrateLegacyItem\s*\([^,\n\r]+,\s*([^,\n\r)]+)/g;
-  for (const match of text.matchAll(legacyMigrationPattern)) {
+  for (const match of scanText.matchAll(legacyMigrationPattern)) {
     const rawKey = resolveLiteralArg(match[1], constants);
     if (!rawKey) continue;
     const key = settingKey(rawKey);
@@ -298,7 +365,7 @@ function scanSourceFile(filePath, text) {
   }
 
   const directStoragePattern = /\b(localStorage|sessionStorage)\.(getItem|setItem|removeItem)\s*\(([^,\n\r)]+)/g;
-  for (const match of text.matchAll(directStoragePattern)) {
+  for (const match of scanText.matchAll(directStoragePattern)) {
     const rawKey = resolveLiteralArg(match[3], constants);
     const item = {
       file: rel,
@@ -310,7 +377,7 @@ function scanSourceFile(filePath, text) {
     directStorage.push({ ...item, ...classifyDirectStorageHit(item) });
   }
   const directClearPattern = /\b(localStorage|sessionStorage)\.clear\s*\(/g;
-  for (const match of text.matchAll(directClearPattern)) {
+  for (const match of scanText.matchAll(directClearPattern)) {
     const item = {
       file: rel,
       line: lineForIndex(text, match.index),
@@ -322,13 +389,13 @@ function scanSourceFile(filePath, text) {
   }
 
   const studyReadPattern = /\bgetStudies\(\)\??\.([A-Za-z0-9_]+)/g;
-  for (const match of text.matchAll(studyReadPattern)) {
+  for (const match of scanText.matchAll(studyReadPattern)) {
     addEvidence(reads, `studyResults.${match[1]}`, `${rel}:${lineForIndex(text, match.index)} getStudies().${match[1]}`);
   }
 
   const studyPropertyPattern = /\bstudies\??\.([A-Za-z0-9_]+)\b/g;
-  for (const match of text.matchAll(studyPropertyPattern)) {
-    const after = text.slice(match.index + match[0].length).match(/^\s*(=|:)/);
+  for (const match of scanText.matchAll(studyPropertyPattern)) {
+    const after = scanText.slice(match.index + match[0].length).match(/^\s*(=|:)/);
     const key = `studyResults.${match[1]}`;
     const evidence = `${rel}:${lineForIndex(text, match.index)} ${match[0]}`;
     if (after?.[1] === '=') addEvidence(writes, key, evidence);
@@ -336,7 +403,7 @@ function scanSourceFile(filePath, text) {
   }
 
   const setStudiesObjectPattern = /\bsetStudies\s*\(\s*\{[^)]*?\b([A-Za-z0-9_]+)\s*:/gs;
-  for (const match of text.matchAll(setStudiesObjectPattern)) {
+  for (const match of scanText.matchAll(setStudiesObjectPattern)) {
     addEvidence(writes, `studyResults.${match[1]}`, `${rel}:${lineForIndex(text, match.index)} setStudies({ ${match[1]}: ... })`);
   }
 
@@ -425,6 +492,7 @@ async function routeEntryFiles(route, rollupEntries) {
 
   if (rollupEntries.has(stem)) entries.add(rollupEntries.get(stem));
   if (lowerEntries.has(stem.toLowerCase())) entries.add(lowerEntries.get(stem.toLowerCase()));
+  for (const alias of routeEntryAliases.get(href) || []) entries.add(alias);
 
   const htmlPath = path.join(root, href);
   const html = await readText(htmlPath).catch(() => '');

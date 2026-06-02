@@ -72,6 +72,11 @@ for (const href of scopedHrefs) {
   assert.ok(routesByHref.has(href), `${href} must have an audit entry`);
 }
 
+assert.ok(
+  routesByHref.get('scenarios.html')?.sourceFiles.includes('src/scenarioComparison.js'),
+  'scenarios.html must audit the dedicated scenario comparison page entry'
+);
+
 for (const route of audit.routes) {
   assert.ok(scopedHrefs.has(route.href), `${route.href} must be a Workflow or Studies route`);
   assert.equal(typeof route.label, 'string', `${route.href} label must be a string`);

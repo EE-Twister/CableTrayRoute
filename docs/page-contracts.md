@@ -8,7 +8,7 @@ This document defines handoff-level inputs, outputs, readiness rules, and downst
 
 Standard readiness vocabulary: Ready, Missing inputs, Downstream handoff.
 
-Coverage: 71 contracts for 71 navigation routes.
+Coverage: 72 contracts for 72 navigation routes.
 
 ## Workflow
 
@@ -1391,6 +1391,35 @@ Coverage: 71 contracts for 71 navigation routes.
 - Blockers: Missing conductor data, thermal resistivity, ambient values, or installation geometry.
 
 **Downstream Pages**
+- `projectreport.html`
+
+**Notes**
+- None.
+
+#### Cable Thermal Environment (`cablethermalenv.html`)
+
+- Section: Studies
+- Group: Cable
+- Workflow step: studies
+
+**Standalone Inputs**
+- Cable construction, ambient conditions, grouping, installation type, and optional load profile inputs.
+
+**Project Inputs**
+- `settings.designBasis` (setting, optional): Project code basis, sizing defaults, routing defaults, and study prerequisites.
+- `settings.studyApprovals` (setting, optional): Engineer review records for study outputs.
+
+**Outputs**
+- `studyResults.cableThermalEnvironment` (study-result): Saved unified cable thermal environment comparison and load-profile result. Consumers: `designcoach.html`, `projectreport.html`.
+- `settings.studyApprovals` (setting): Engineer approval records written by the shared study approval panel. Consumers: `projectreport.html`.
+- `export-only` (export): Cable thermal environment comparison tables and CSV exports. Consumers: `projectreport.html`.
+
+**Readiness**
+- Ready when: Ready when cable, ambient, grouping, and at least one installation condition are valid.
+- Blockers: Missing cable size, invalid ambient values, no selected installation, or malformed load profile data.
+
+**Downstream Pages**
+- `designcoach.html`
 - `projectreport.html`
 
 **Notes**
