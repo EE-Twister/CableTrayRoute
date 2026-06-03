@@ -1,8 +1,8 @@
 {
-  "generatedAt": "2026-06-03T17:49:54.996Z",
+  "generatedAt": "2026-06-03T23:10:12.608Z",
   "summary": {
-    "testSuiteCount": 172,
-    "totalAssertions": 6901,
+    "testSuiteCount": 174,
+    "totalAssertions": 6920,
     "benchmarkCount": 7,
     "standardCount": 13,
     "necComplianceCount": 8
@@ -44,6 +44,16 @@
       "file": "tests/auditLog.test.mjs",
       "groups": [],
       "assertionCount": 35
+    },
+    {
+      "file": "tests/authMessages.test.mjs",
+      "groups": [],
+      "assertionCount": 5
+    },
+    {
+      "file": "tests/authProfile.test.mjs",
+      "groups": [],
+      "assertionCount": 9
     },
     {
       "file": "tests/autoSaveScheduler.test.mjs",
@@ -1400,7 +1410,7 @@
     {
       "file": "tests/supabaseBackend.test.mjs",
       "groups": [],
-      "assertionCount": 17
+      "assertionCount": 22
     },
     {
       "file": "tests/supportSpan.test.mjs",
