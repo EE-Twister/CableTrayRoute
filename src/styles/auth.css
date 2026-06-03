@@ -154,6 +154,10 @@ body.dark-mode .auth-description {
     margin-top: 0.5rem;
 }
 
+.auth-form .auth-field[hidden] {
+    display: none;
+}
+
 .auth-field {
     display: flex;
     flex-direction: column;
@@ -233,9 +237,187 @@ body.dark-mode .auth-note {
     text-decoration: underline;
 }
 
+.account-main {
+    align-items: flex-start;
+}
+
+.account-card {
+    width: min(1120px, 100%);
+}
+
+.account-header {
+    max-width: none;
+    width: 100%;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    text-align: left;
+}
+
+.account-identity {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    min-width: 0;
+}
+
+.account-avatar {
+    --avatar-bg: #2563eb;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 4rem;
+    height: 4rem;
+    flex: 0 0 auto;
+    border-radius: 999px;
+    background:
+        radial-gradient(circle at 32% 28%, rgba(255,255,255,0.34), transparent 34%),
+        linear-gradient(135deg, color-mix(in srgb, var(--avatar-bg) 78%, #ffffff 22%), var(--avatar-bg));
+    color: #ffffff;
+    font-size: 1.2rem;
+    font-weight: 800;
+    letter-spacing: 0;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.32), 0 0 0 4px color-mix(in srgb, var(--color-primary) 12%, transparent);
+}
+
+.account-eyebrow {
+    margin: 0 0 0.25rem;
+    color: var(--color-primary);
+    font-size: 0.78rem;
+    font-weight: 750;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.account-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.account-header-link,
+.account-action-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 2.35rem;
+    padding: 0.55rem 0.85rem;
+    border: 1px solid var(--color-border);
+    border-radius: 0.45rem;
+    background: var(--color-surface-strong);
+    color: var(--color-text);
+    font: inherit;
+    font-size: 0.9rem;
+    font-weight: 650;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.account-header-link:hover,
+.account-header-link:focus-visible,
+.account-action-link:hover,
+.account-action-link:focus-visible {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+    text-decoration: none;
+}
+
+.account-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1rem;
+}
+
+.account-summary-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    min-width: 0;
+    padding: 1rem;
+    border: 1px solid var(--color-border);
+    border-radius: 0.55rem;
+    background: color-mix(in srgb, var(--color-surface-strong) 88%, var(--color-primary) 5%);
+}
+
+.account-summary-label {
+    color: var(--color-text-muted);
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.account-summary-item strong {
+    overflow: hidden;
+    color: var(--color-text);
+    font-size: 1.05rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.account-panels {
+    grid-template-columns: repeat(2, minmax(280px, 1fr));
+}
+
+.account-detail-list {
+    display: grid;
+    gap: 0.85rem;
+    margin: 0;
+}
+
+.account-detail-list div {
+    display: grid;
+    grid-template-columns: minmax(7.5rem, 0.42fr) minmax(0, 1fr);
+    gap: 1rem;
+    align-items: baseline;
+    min-width: 0;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid color-mix(in srgb, var(--color-border) 75%, transparent);
+}
+
+.account-detail-list div:last-child {
+    border-bottom: 0;
+    padding-bottom: 0;
+}
+
+.account-detail-list dt {
+    color: var(--color-text-muted);
+    font-size: 0.82rem;
+    font-weight: 700;
+}
+
+.account-detail-list dd {
+    min-width: 0;
+    margin: 0;
+    overflow-wrap: anywhere;
+    color: var(--color-text);
+    font-weight: 600;
+}
+
+.account-action-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-top: auto;
+}
+
 @media (max-width: 900px) {
     .auth-card {
         padding: 2rem;
+    }
+
+    .account-header {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .account-summary-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .account-panels {
+        grid-template-columns: 1fr;
     }
 }
 
@@ -255,6 +437,11 @@ body.dark-mode .auth-note {
     .auth-panels {
         gap: 1.5rem;
     }
+
+    .account-detail-list div {
+        grid-template-columns: 1fr;
+        gap: 0.25rem;
+    }
 }
 
 @media (max-width: 500px) {
@@ -265,6 +452,26 @@ body.dark-mode .auth-note {
     }
     .auth-card {
         padding: 1.75rem 1.25rem;
+    }
+
+    .account-identity {
+        align-items: flex-start;
+    }
+
+    .account-avatar {
+        width: 3.25rem;
+        height: 3.25rem;
+        font-size: 1rem;
+    }
+
+    .account-header-actions,
+    .account-action-row {
+        width: 100%;
+    }
+
+    .account-header-link,
+    .account-action-link {
+        flex: 1 1 9rem;
     }
 }
 

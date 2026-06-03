@@ -217,6 +217,18 @@ export async function supabaseSignOut(auth) {
   }
 }
 
+export async function supabaseUpdatePassword(auth, password) {
+  const config = await getSupabaseConfig();
+  requireConfigured(config);
+  if (!auth?.accessToken) throw new Error('Supabase login required.');
+  const res = await fetch(authUrl(config, '/user'), {
+    method: 'PUT',
+    headers: authHeaders(config, auth.accessToken),
+    body: JSON.stringify({ password })
+  });
+  return parseSupabaseResponse(res);
+}
+
 function requireProjectAuth(auth) {
   if (!isSupabaseAuthContext(auth) || !auth.userId) {
     throw new Error('Supabase login required.');
