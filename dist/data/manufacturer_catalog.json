@@ -1,27 +1,27 @@
 {
-  "_version": "1.0",
-  "_description": "Manufacturer product catalog for cable trays, fittings, conduit, and accessories. Used by the Tray Hardware BOM wizard and submittal package generator.",
+  "_version": "2.0",
+  "_description": "Governed manufacturer product catalog for cable trays, fittings, conduit, and accessories. Used by the Tray Hardware BOM wizard, estimates, BIM export, and submittal package generator.",
   "_schema": {
+    "version": 2,
     "products": [
       {
-        "id": "string (unique SKU/part number)",
+        "id": "string (unique row id/SKU)",
         "manufacturer": "string",
+        "catalogNumber": "string (approved manufacturer catalog number)",
         "series": "string (product line)",
         "category": "tray | fitting | conduit | accessory",
-        "subcategory": "string (elbow | tee | reducer | cover | coupling | hanger | splice | end-cap | cross | straight | channel | wireway)",
+        "subcategory": "string",
         "description": "string",
-        "width_in": "number | null (tray width inches)",
-        "depth_in": "number | null (tray depth inches)",
-        "angle_deg": "number | null (elbow/bend angle)",
-        "material": "steel | aluminum | stainless | fiberglass | PVC | GRC",
-        "finish": "string (HDG | paint | none | powder-coat)",
-        "load_class": "string (NEC class: 8A | 12A | 16A | 20A | 24A | 8B | 12B | 16B | 20B | 24B | 8C | 12C | 16C | 20C | 24C | null)",
-        "unit": "EA | FT | LF",
-        "list_price_usd": "number",
-        "weight_lb": "number | null",
-        "nec_listed": "boolean",
-        "ul_classified": "boolean",
-        "url": "string | null (manufacturer product page)"
+        "standards": "string[]",
+        "ratings": "object (loadClass, necListed, ulClassified, ampacity, withstand, etc.)",
+        "dimensions": "object (widthIn, depthIn, angleDeg, weightLb, etc.)",
+        "commercial": "object (unit, listPriceUsd)",
+        "bimRef": "object (familyName, typeName, classification, url)",
+        "datasheetUrl": "string | null",
+        "approved": "boolean",
+        "approval": "object (status, authority, approvedBy, approvedAt, notes)",
+        "source": "string (catalog, datasheet, quote, or approved-list reference)",
+        "lastVerified": "YYYY-MM-DD"
       }
     ]
   },
@@ -40,11 +40,48 @@
       "finish": "HDG",
       "load_class": "20A",
       "unit": "EA",
-      "list_price_usd": 142.00,
+      "list_price_usd": 142,
       "weight_lb": 24.5,
       "nec_listed": true,
       "ul_classified": true,
-      "url": null
+      "url": null,
+      "catalogNumber": "BL-VCT-12-4",
+      "catalog_number": "BL-VCT-12-4",
+      "standards": [
+        "NEMA VE 1",
+        "NEC listed",
+        "UL classified"
+      ],
+      "ratings": {
+        "loadClass": "20A",
+        "necListed": true,
+        "ulClassified": true
+      },
+      "dimensions": {
+        "widthIn": 12,
+        "depthIn": 4,
+        "weightLb": 24.5
+      },
+      "commercial": {
+        "unit": "EA",
+        "listPriceUsd": 142
+      },
+      "bimRef": {
+        "typeName": "BL-VCT-12-4",
+        "classification": "tray"
+      },
+      "datasheetUrl": null,
+      "approved": true,
+      "approved_part": true,
+      "approval": {
+        "status": "approved",
+        "authority": "CableTrayRoute seed catalog",
+        "approvedBy": "Default catalog",
+        "approvedAt": "2026-05-22",
+        "notes": "Seed governed catalog row for approved-part workflows."
+      },
+      "source": "CableTrayRoute seed manufacturer catalog",
+      "lastVerified": "2026-05-22"
     },
     {
       "id": "BL-VCT-18-4",
@@ -60,11 +97,48 @@
       "finish": "HDG",
       "load_class": "20A",
       "unit": "EA",
-      "list_price_usd": 185.00,
-      "weight_lb": 32.0,
+      "list_price_usd": 185,
+      "weight_lb": 32,
       "nec_listed": true,
       "ul_classified": true,
-      "url": null
+      "url": null,
+      "catalogNumber": "BL-VCT-18-4",
+      "catalog_number": "BL-VCT-18-4",
+      "standards": [
+        "NEMA VE 1",
+        "NEC listed",
+        "UL classified"
+      ],
+      "ratings": {
+        "loadClass": "20A",
+        "necListed": true,
+        "ulClassified": true
+      },
+      "dimensions": {
+        "widthIn": 18,
+        "depthIn": 4,
+        "weightLb": 32
+      },
+      "commercial": {
+        "unit": "EA",
+        "listPriceUsd": 185
+      },
+      "bimRef": {
+        "typeName": "BL-VCT-18-4",
+        "classification": "tray"
+      },
+      "datasheetUrl": null,
+      "approved": true,
+      "approved_part": true,
+      "approval": {
+        "status": "approved",
+        "authority": "CableTrayRoute seed catalog",
+        "approvedBy": "Default catalog",
+        "approvedAt": "2026-05-22",
+        "notes": "Seed governed catalog row for approved-part workflows."
+      },
+      "source": "CableTrayRoute seed manufacturer catalog",
+      "lastVerified": "2026-05-22"
     },
     {
       "id": "BL-VCT-24-4",
@@ -80,11 +154,48 @@
       "finish": "HDG",
       "load_class": "20A",
       "unit": "EA",
-      "list_price_usd": 228.00,
-      "weight_lb": 41.0,
+      "list_price_usd": 228,
+      "weight_lb": 41,
       "nec_listed": true,
       "ul_classified": true,
-      "url": null
+      "url": null,
+      "catalogNumber": "BL-VCT-24-4",
+      "catalog_number": "BL-VCT-24-4",
+      "standards": [
+        "NEMA VE 1",
+        "NEC listed",
+        "UL classified"
+      ],
+      "ratings": {
+        "loadClass": "20A",
+        "necListed": true,
+        "ulClassified": true
+      },
+      "dimensions": {
+        "widthIn": 24,
+        "depthIn": 4,
+        "weightLb": 41
+      },
+      "commercial": {
+        "unit": "EA",
+        "listPriceUsd": 228
+      },
+      "bimRef": {
+        "typeName": "BL-VCT-24-4",
+        "classification": "tray"
+      },
+      "datasheetUrl": null,
+      "approved": true,
+      "approved_part": true,
+      "approval": {
+        "status": "approved",
+        "authority": "CableTrayRoute seed catalog",
+        "approvedBy": "Default catalog",
+        "approvedAt": "2026-05-22",
+        "notes": "Seed governed catalog row for approved-part workflows."
+      },
+      "source": "CableTrayRoute seed manufacturer catalog",
+      "lastVerified": "2026-05-22"
     },
     {
       "id": "BL-VCT-36-6",
@@ -100,11 +211,48 @@
       "finish": "HDG",
       "load_class": "20A",
       "unit": "EA",
-      "list_price_usd": 378.00,
-      "weight_lb": 62.0,
+      "list_price_usd": 378,
+      "weight_lb": 62,
       "nec_listed": true,
       "ul_classified": true,
-      "url": null
+      "url": null,
+      "catalogNumber": "BL-VCT-36-6",
+      "catalog_number": "BL-VCT-36-6",
+      "standards": [
+        "NEMA VE 1",
+        "NEC listed",
+        "UL classified"
+      ],
+      "ratings": {
+        "loadClass": "20A",
+        "necListed": true,
+        "ulClassified": true
+      },
+      "dimensions": {
+        "widthIn": 36,
+        "depthIn": 6,
+        "weightLb": 62
+      },
+      "commercial": {
+        "unit": "EA",
+        "listPriceUsd": 378
+      },
+      "bimRef": {
+        "typeName": "BL-VCT-36-6",
+        "classification": "tray"
+      },
+      "datasheetUrl": null,
+      "approved": true,
+      "approved_part": true,
+      "approval": {
+        "status": "approved",
+        "authority": "CableTrayRoute seed catalog",
+        "approvedBy": "Default catalog",
+        "approvedAt": "2026-05-22",
+        "notes": "Seed governed catalog row for approved-part workflows."
+      },
+      "source": "CableTrayRoute seed manufacturer catalog",
+      "lastVerified": "2026-05-22"
     },
     {
       "id": "BL-HE-12-4-90",
@@ -120,11 +268,48 @@
       "finish": "HDG",
       "load_class": null,
       "unit": "EA",
-      "list_price_usd": 98.00,
+      "list_price_usd": 98,
       "weight_lb": 8.5,
       "nec_listed": true,
       "ul_classified": true,
-      "url": null
+      "url": null,
+      "catalogNumber": "BL-HE-12-4-90",
+      "catalog_number": "BL-HE-12-4-90",
+      "standards": [
+        "NEMA VE 1",
+        "NEC listed",
+        "UL classified"
+      ],
+      "ratings": {
+        "necListed": true,
+        "ulClassified": true
+      },
+      "dimensions": {
+        "widthIn": 12,
+        "depthIn": 4,
+        "angleDeg": 90,
+        "weightLb": 8.5
+      },
+      "commercial": {
+        "unit": "EA",
+        "listPriceUsd": 98
+      },
+      "bimRef": {
+        "typeName": "BL-HE-12-4-90",
+        "classification": "fitting"
+      },
+      "datasheetUrl": null,
+      "approved": true,
+      "approved_part": true,
+      "approval": {
+        "status": "approved",
+        "authority": "CableTrayRoute seed catalog",
+        "approvedBy": "Default catalog",
+        "approvedAt": "2026-05-22",
+        "notes": "Seed governed catalog row for approved-part workflows."
+      },
+      "source": "CableTrayRoute seed manufacturer catalog",
+      "lastVerified": "2026-05-22"
     },
     {
       "id": "BL-HE-24-4-90",
@@ -140,11 +325,48 @@
       "finish": "HDG",
       "load_class": null,
       "unit": "EA",
-      "list_price_usd": 145.00,
+      "list_price_usd": 145,
       "weight_lb": 14.2,
       "nec_listed": true,
       "ul_classified": true,
-      "url": null
+      "url": null,
+      "catalogNumber": "BL-HE-24-4-90",
+      "catalog_number": "BL-HE-24-4-90",
+      "standards": [
+        "NEMA VE 1",
+        "NEC listed",
+        "UL classified"
+      ],
+      "ratings": {
+        "necListed": true,
+        "ulClassified": true
+      },
+      "dimensions": {
+        "widthIn": 24,
+        "depthIn": 4,
+        "angleDeg": 90,
+        "weightLb": 14.2
+      },
+      "commercial": {
+        "unit": "EA",
+        "listPriceUsd": 145
+      },
+      "bimRef": {
+        "typeName": "BL-HE-24-4-90",
+        "classification": "fitting"
+      },
+      "datasheetUrl": null,
+      "approved": true,
+      "approved_part": true,
+      "approval": {
+        "status": "approved",
+        "authority": "CableTrayRoute seed catalog",
+        "approvedBy": "Default catalog",
+        "approvedAt": "2026-05-22",
+        "notes": "Seed governed catalog row for approved-part workflows."
+      },
+      "source": "CableTrayRoute seed manufacturer catalog",
+      "lastVerified": "2026-05-22"
     },
     {
       "id": "BL-HT-12-4",
@@ -160,11 +382,47 @@
       "finish": "HDG",
       "load_class": null,
       "unit": "EA",
-      "list_price_usd": 124.00,
+      "list_price_usd": 124,
       "weight_lb": 11.8,
       "nec_listed": true,
       "ul_classified": true,
-      "url": null
+      "url": null,
+      "catalogNumber": "BL-HT-12-4",
+      "catalog_number": "BL-HT-12-4",
+      "standards": [
+        "NEMA VE 1",
+        "NEC listed",
+        "UL classified"
+      ],
+      "ratings": {
+        "necListed": true,
+        "ulClassified": true
+      },
+      "dimensions": {
+        "widthIn": 12,
+        "depthIn": 4,
+        "weightLb": 11.8
+      },
+      "commercial": {
+        "unit": "EA",
+        "listPriceUsd": 124
+      },
+      "bimRef": {
+        "typeName": "BL-HT-12-4",
+        "classification": "fitting"
+      },
+      "datasheetUrl": null,
+      "approved": true,
+      "approved_part": true,
+      "approval": {
+        "status": "approved",
+        "authority": "CableTrayRoute seed catalog",
+        "approvedBy": "Default catalog",
+        "approvedAt": "2026-05-22",
+        "notes": "Seed governed catalog row for approved-part workflows."
+      },
+      "source": "CableTrayRoute seed manufacturer catalog",
+      "lastVerified": "2026-05-22"
     },
     {
       "id": "BL-HT-24-4",
@@ -180,11 +438,47 @@
       "finish": "HDG",
       "load_class": null,
       "unit": "EA",
-      "list_price_usd": 192.00,
+      "list_price_usd": 192,
       "weight_lb": 19.5,
       "nec_listed": true,
       "ul_classified": true,
-      "url": null
+      "url": null,
+      "catalogNumber": "BL-HT-24-4",
+      "catalog_number": "BL-HT-24-4",
+      "standards": [
+        "NEMA VE 1",
+        "NEC listed",
+        "UL classified"
+      ],
+      "ratings": {
+        "necListed": true,
+        "ulClassified": true
+      },
+      "dimensions": {
+        "widthIn": 24,
+        "depthIn": 4,
+        "weightLb": 19.5
+      },
+      "commercial": {
+        "unit": "EA",
+        "listPriceUsd": 192
+      },
+      "bimRef": {
+        "typeName": "BL-HT-24-4",
+        "classification": "fitting"
+      },
+      "datasheetUrl": null,
+      "approved": true,
+      "approved_part": true,
+      "approval": {
+        "status": "approved",
+        "authority": "CableTrayRoute seed catalog",
+        "approvedBy": "Default catalog",
+        "approvedAt": "2026-05-22",
+        "notes": "Seed governed catalog row for approved-part workflows."
+      },
+      "source": "CableTrayRoute seed manufacturer catalog",
+      "lastVerified": "2026-05-22"
     },
     {
       "id": "BL-VE-12-4-90",
@@ -200,11 +494,48 @@
       "finish": "HDG",
       "load_class": null,
       "unit": "EA",
-      "list_price_usd": 88.00,
+      "list_price_usd": 88,
       "weight_lb": 7.8,
       "nec_listed": true,
       "ul_classified": true,
-      "url": null
+      "url": null,
+      "catalogNumber": "BL-VE-12-4-90",
+      "catalog_number": "BL-VE-12-4-90",
+      "standards": [
+        "NEMA VE 1",
+        "NEC listed",
+        "UL classified"
+      ],
+      "ratings": {
+        "necListed": true,
+        "ulClassified": true
+      },
+      "dimensions": {
+        "widthIn": 12,
+        "depthIn": 4,
+        "angleDeg": 90,
+        "weightLb": 7.8
+      },
+      "commercial": {
+        "unit": "EA",
+        "listPriceUsd": 88
+      },
+      "bimRef": {
+        "typeName": "BL-VE-12-4-90",
+        "classification": "fitting"
+      },
+      "datasheetUrl": null,
+      "approved": true,
+      "approved_part": true,
+      "approval": {
+        "status": "approved",
+        "authority": "CableTrayRoute seed catalog",
+        "approvedBy": "Default catalog",
+        "approvedAt": "2026-05-22",
+        "notes": "Seed governed catalog row for approved-part workflows."
+      },
+      "source": "CableTrayRoute seed manufacturer catalog",
+      "lastVerified": "2026-05-22"
     },
     {
       "id": "BL-COVER-12-12",
@@ -220,11 +551,44 @@
       "finish": "HDG",
       "load_class": null,
       "unit": "EA",
-      "list_price_usd": 62.00,
+      "list_price_usd": 62,
       "weight_lb": 8.2,
       "nec_listed": false,
       "ul_classified": false,
-      "url": null
+      "url": null,
+      "catalogNumber": "BL-COVER-12-12",
+      "catalog_number": "BL-COVER-12-12",
+      "standards": [
+        "NEMA VE 1"
+      ],
+      "ratings": {
+        "necListed": false,
+        "ulClassified": false
+      },
+      "dimensions": {
+        "widthIn": 12,
+        "weightLb": 8.2
+      },
+      "commercial": {
+        "unit": "EA",
+        "listPriceUsd": 62
+      },
+      "bimRef": {
+        "typeName": "BL-COVER-12-12",
+        "classification": "accessory"
+      },
+      "datasheetUrl": null,
+      "approved": true,
+      "approved_part": true,
+      "approval": {
+        "status": "approved",
+        "authority": "CableTrayRoute seed catalog",
+        "approvedBy": "Default catalog",
+        "approvedAt": "2026-05-22",
+        "notes": "Seed governed catalog row for approved-part workflows."
+      },
+      "source": "CableTrayRoute seed manufacturer catalog",
+      "lastVerified": "2026-05-22"
     },
     {
       "id": "BL-COVER-24-12",
@@ -240,11 +604,44 @@
       "finish": "HDG",
       "load_class": null,
       "unit": "EA",
-      "list_price_usd": 98.00,
+      "list_price_usd": 98,
       "weight_lb": 14.5,
       "nec_listed": false,
       "ul_classified": false,
-      "url": null
+      "url": null,
+      "catalogNumber": "BL-COVER-24-12",
+      "catalog_number": "BL-COVER-24-12",
+      "standards": [
+        "NEMA VE 1"
+      ],
+      "ratings": {
+        "necListed": false,
+        "ulClassified": false
+      },
+      "dimensions": {
+        "widthIn": 24,
+        "weightLb": 14.5
+      },
+      "commercial": {
+        "unit": "EA",
+        "listPriceUsd": 98
+      },
+      "bimRef": {
+        "typeName": "BL-COVER-24-12",
+        "classification": "accessory"
+      },
+      "datasheetUrl": null,
+      "approved": true,
+      "approved_part": true,
+      "approval": {
+        "status": "approved",
+        "authority": "CableTrayRoute seed catalog",
+        "approvedBy": "Default catalog",
+        "approvedAt": "2026-05-22",
+        "notes": "Seed governed catalog row for approved-part workflows."
+      },
+      "source": "CableTrayRoute seed manufacturer catalog",
+      "lastVerified": "2026-05-22"
     },
     {
       "id": "BL-HANGER-12",
@@ -260,11 +657,44 @@
       "finish": "HDG",
       "load_class": null,
       "unit": "EA",
-      "list_price_usd": 34.00,
+      "list_price_usd": 34,
       "weight_lb": 3.2,
       "nec_listed": false,
       "ul_classified": false,
-      "url": null
+      "url": null,
+      "catalogNumber": "BL-HANGER-12",
+      "catalog_number": "BL-HANGER-12",
+      "standards": [
+        "NEMA VE 1"
+      ],
+      "ratings": {
+        "necListed": false,
+        "ulClassified": false
+      },
+      "dimensions": {
+        "widthIn": 12,
+        "weightLb": 3.2
+      },
+      "commercial": {
+        "unit": "EA",
+        "listPriceUsd": 34
+      },
+      "bimRef": {
+        "typeName": "BL-HANGER-12",
+        "classification": "accessory"
+      },
+      "datasheetUrl": null,
+      "approved": true,
+      "approved_part": true,
+      "approval": {
+        "status": "approved",
+        "authority": "CableTrayRoute seed catalog",
+        "approvedBy": "Default catalog",
+        "approvedAt": "2026-05-22",
+        "notes": "Seed governed catalog row for approved-part workflows."
+      },
+      "source": "CableTrayRoute seed manufacturer catalog",
+      "lastVerified": "2026-05-22"
     },
     {
       "id": "BL-HANGER-24",
@@ -280,11 +710,44 @@
       "finish": "HDG",
       "load_class": null,
       "unit": "EA",
-      "list_price_usd": 48.00,
+      "list_price_usd": 48,
       "weight_lb": 5.6,
       "nec_listed": false,
       "ul_classified": false,
-      "url": null
+      "url": null,
+      "catalogNumber": "BL-HANGER-24",
+      "catalog_number": "BL-HANGER-24",
+      "standards": [
+        "NEMA VE 1"
+      ],
+      "ratings": {
+        "necListed": false,
+        "ulClassified": false
+      },
+      "dimensions": {
+        "widthIn": 24,
+        "weightLb": 5.6
+      },
+      "commercial": {
+        "unit": "EA",
+        "listPriceUsd": 48
+      },
+      "bimRef": {
+        "typeName": "BL-HANGER-24",
+        "classification": "accessory"
+      },
+      "datasheetUrl": null,
+      "approved": true,
+      "approved_part": true,
+      "approval": {
+        "status": "approved",
+        "authority": "CableTrayRoute seed catalog",
+        "approvedBy": "Default catalog",
+        "approvedAt": "2026-05-22",
+        "notes": "Seed governed catalog row for approved-part workflows."
+      },
+      "source": "CableTrayRoute seed manufacturer catalog",
+      "lastVerified": "2026-05-22"
     },
     {
       "id": "LG-CF54-12-4",
@@ -300,11 +763,48 @@
       "finish": "zinc-plated",
       "load_class": "12A",
       "unit": "EA",
-      "list_price_usd": 88.00,
+      "list_price_usd": 88,
       "weight_lb": 9.2,
       "nec_listed": true,
       "ul_classified": true,
-      "url": null
+      "url": null,
+      "catalogNumber": "LG-CF54-12-4",
+      "catalog_number": "LG-CF54-12-4",
+      "standards": [
+        "NEMA VE 1",
+        "NEC listed",
+        "UL classified"
+      ],
+      "ratings": {
+        "loadClass": "12A",
+        "necListed": true,
+        "ulClassified": true
+      },
+      "dimensions": {
+        "widthIn": 12,
+        "depthIn": 4,
+        "weightLb": 9.2
+      },
+      "commercial": {
+        "unit": "EA",
+        "listPriceUsd": 88
+      },
+      "bimRef": {
+        "typeName": "LG-CF54-12-4",
+        "classification": "tray"
+      },
+      "datasheetUrl": null,
+      "approved": true,
+      "approved_part": true,
+      "approval": {
+        "status": "approved",
+        "authority": "CableTrayRoute seed catalog",
+        "approvedBy": "Default catalog",
+        "approvedAt": "2026-05-22",
+        "notes": "Seed governed catalog row for approved-part workflows."
+      },
+      "source": "CableTrayRoute seed manufacturer catalog",
+      "lastVerified": "2026-05-22"
     },
     {
       "id": "LG-CF54-24-4",
@@ -320,11 +820,48 @@
       "finish": "zinc-plated",
       "load_class": "12A",
       "unit": "EA",
-      "list_price_usd": 138.00,
+      "list_price_usd": 138,
       "weight_lb": 15.4,
       "nec_listed": true,
       "ul_classified": true,
-      "url": null
+      "url": null,
+      "catalogNumber": "LG-CF54-24-4",
+      "catalog_number": "LG-CF54-24-4",
+      "standards": [
+        "NEMA VE 1",
+        "NEC listed",
+        "UL classified"
+      ],
+      "ratings": {
+        "loadClass": "12A",
+        "necListed": true,
+        "ulClassified": true
+      },
+      "dimensions": {
+        "widthIn": 24,
+        "depthIn": 4,
+        "weightLb": 15.4
+      },
+      "commercial": {
+        "unit": "EA",
+        "listPriceUsd": 138
+      },
+      "bimRef": {
+        "typeName": "LG-CF54-24-4",
+        "classification": "tray"
+      },
+      "datasheetUrl": null,
+      "approved": true,
+      "approved_part": true,
+      "approval": {
+        "status": "approved",
+        "authority": "CableTrayRoute seed catalog",
+        "approvedBy": "Default catalog",
+        "approvedAt": "2026-05-22",
+        "notes": "Seed governed catalog row for approved-part workflows."
+      },
+      "source": "CableTrayRoute seed manufacturer catalog",
+      "lastVerified": "2026-05-22"
     },
     {
       "id": "LG-CFHE-12-90",
@@ -340,11 +877,47 @@
       "finish": "zinc-plated",
       "load_class": null,
       "unit": "EA",
-      "list_price_usd": 52.00,
+      "list_price_usd": 52,
       "weight_lb": 3.8,
       "nec_listed": true,
       "ul_classified": true,
-      "url": null
+      "url": null,
+      "catalogNumber": "LG-CFHE-12-90",
+      "catalog_number": "LG-CFHE-12-90",
+      "standards": [
+        "NEMA VE 1",
+        "NEC listed",
+        "UL classified"
+      ],
+      "ratings": {
+        "necListed": true,
+        "ulClassified": true
+      },
+      "dimensions": {
+        "widthIn": 12,
+        "angleDeg": 90,
+        "weightLb": 3.8
+      },
+      "commercial": {
+        "unit": "EA",
+        "listPriceUsd": 52
+      },
+      "bimRef": {
+        "typeName": "LG-CFHE-12-90",
+        "classification": "fitting"
+      },
+      "datasheetUrl": null,
+      "approved": true,
+      "approved_part": true,
+      "approval": {
+        "status": "approved",
+        "authority": "CableTrayRoute seed catalog",
+        "approvedBy": "Default catalog",
+        "approvedAt": "2026-05-22",
+        "notes": "Seed governed catalog row for approved-part workflows."
+      },
+      "source": "CableTrayRoute seed manufacturer catalog",
+      "lastVerified": "2026-05-22"
     },
     {
       "id": "RMC-3-4-10",
@@ -360,11 +933,45 @@
       "finish": "HDG",
       "load_class": null,
       "unit": "EA",
-      "list_price_usd": 22.00,
+      "list_price_usd": 22,
       "weight_lb": 7.5,
       "nec_listed": true,
       "ul_classified": true,
-      "url": null
+      "url": null,
+      "catalogNumber": "RMC-3-4-10",
+      "catalog_number": "RMC-3-4-10",
+      "standards": [
+        "NEC raceway article",
+        "NEC listed",
+        "UL classified"
+      ],
+      "ratings": {
+        "necListed": true,
+        "ulClassified": true
+      },
+      "dimensions": {
+        "weightLb": 7.5
+      },
+      "commercial": {
+        "unit": "EA",
+        "listPriceUsd": 22
+      },
+      "bimRef": {
+        "typeName": "RMC-3-4-10",
+        "classification": "conduit"
+      },
+      "datasheetUrl": null,
+      "approved": true,
+      "approved_part": true,
+      "approval": {
+        "status": "approved",
+        "authority": "CableTrayRoute seed catalog",
+        "approvedBy": "Default catalog",
+        "approvedAt": "2026-05-22",
+        "notes": "Seed governed catalog row for approved-part workflows."
+      },
+      "source": "CableTrayRoute seed manufacturer catalog",
+      "lastVerified": "2026-05-22"
     },
     {
       "id": "RMC-1-10",
@@ -380,11 +987,45 @@
       "finish": "HDG",
       "load_class": null,
       "unit": "EA",
-      "list_price_usd": 34.00,
+      "list_price_usd": 34,
       "weight_lb": 10.8,
       "nec_listed": true,
       "ul_classified": true,
-      "url": null
+      "url": null,
+      "catalogNumber": "RMC-1-10",
+      "catalog_number": "RMC-1-10",
+      "standards": [
+        "NEC raceway article",
+        "NEC listed",
+        "UL classified"
+      ],
+      "ratings": {
+        "necListed": true,
+        "ulClassified": true
+      },
+      "dimensions": {
+        "weightLb": 10.8
+      },
+      "commercial": {
+        "unit": "EA",
+        "listPriceUsd": 34
+      },
+      "bimRef": {
+        "typeName": "RMC-1-10",
+        "classification": "conduit"
+      },
+      "datasheetUrl": null,
+      "approved": true,
+      "approved_part": true,
+      "approval": {
+        "status": "approved",
+        "authority": "CableTrayRoute seed catalog",
+        "approvedBy": "Default catalog",
+        "approvedAt": "2026-05-22",
+        "notes": "Seed governed catalog row for approved-part workflows."
+      },
+      "source": "CableTrayRoute seed manufacturer catalog",
+      "lastVerified": "2026-05-22"
     },
     {
       "id": "EMT-3-4-10",
@@ -400,11 +1041,45 @@
       "finish": "zinc-plated",
       "load_class": null,
       "unit": "EA",
-      "list_price_usd": 11.50,
+      "list_price_usd": 11.5,
       "weight_lb": 4.2,
       "nec_listed": true,
       "ul_classified": true,
-      "url": null
+      "url": null,
+      "catalogNumber": "EMT-3-4-10",
+      "catalog_number": "EMT-3-4-10",
+      "standards": [
+        "NEC raceway article",
+        "NEC listed",
+        "UL classified"
+      ],
+      "ratings": {
+        "necListed": true,
+        "ulClassified": true
+      },
+      "dimensions": {
+        "weightLb": 4.2
+      },
+      "commercial": {
+        "unit": "EA",
+        "listPriceUsd": 11.5
+      },
+      "bimRef": {
+        "typeName": "EMT-3-4-10",
+        "classification": "conduit"
+      },
+      "datasheetUrl": null,
+      "approved": true,
+      "approved_part": true,
+      "approval": {
+        "status": "approved",
+        "authority": "CableTrayRoute seed catalog",
+        "approvedBy": "Default catalog",
+        "approvedAt": "2026-05-22",
+        "notes": "Seed governed catalog row for approved-part workflows."
+      },
+      "source": "CableTrayRoute seed manufacturer catalog",
+      "lastVerified": "2026-05-22"
     },
     {
       "id": "EMT-1-10",
@@ -420,11 +1095,45 @@
       "finish": "zinc-plated",
       "load_class": null,
       "unit": "EA",
-      "list_price_usd": 17.00,
+      "list_price_usd": 17,
       "weight_lb": 6.1,
       "nec_listed": true,
       "ul_classified": true,
-      "url": null
+      "url": null,
+      "catalogNumber": "EMT-1-10",
+      "catalog_number": "EMT-1-10",
+      "standards": [
+        "NEC raceway article",
+        "NEC listed",
+        "UL classified"
+      ],
+      "ratings": {
+        "necListed": true,
+        "ulClassified": true
+      },
+      "dimensions": {
+        "weightLb": 6.1
+      },
+      "commercial": {
+        "unit": "EA",
+        "listPriceUsd": 17
+      },
+      "bimRef": {
+        "typeName": "EMT-1-10",
+        "classification": "conduit"
+      },
+      "datasheetUrl": null,
+      "approved": true,
+      "approved_part": true,
+      "approval": {
+        "status": "approved",
+        "authority": "CableTrayRoute seed catalog",
+        "approvedBy": "Default catalog",
+        "approvedAt": "2026-05-22",
+        "notes": "Seed governed catalog row for approved-part workflows."
+      },
+      "source": "CableTrayRoute seed manufacturer catalog",
+      "lastVerified": "2026-05-22"
     }
   ]
 }

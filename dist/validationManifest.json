@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-05-22T19:13:52.591Z",
+  "generatedAt": "2026-06-03T17:49:54.996Z",
   "summary": {
-    "testSuiteCount": 163,
-    "totalAssertions": 6633,
-    "benchmarkCount": 6,
+    "testSuiteCount": 172,
+    "totalAssertions": 6901,
+    "benchmarkCount": 7,
     "standardCount": 13,
     "necComplianceCount": 8
   },
@@ -163,6 +163,21 @@
       "assertionCount": 61
     },
     {
+      "file": "tests/cableThermalEnvironment.test.mjs",
+      "groups": [
+        "normalizeEnvironment",
+        "buildDeratingWaterfall — stacking order",
+        "Four-installation comparison",
+        "Mutual-heating duct bank",
+        "IEC 60287 regression",
+        "Load profile timeline",
+        "Limiting factor identification",
+        "extractThermalEnvRecs",
+        "simulateLoadProfile direct call"
+      ],
+      "assertionCount": 34
+    },
+    {
       "file": "tests/capacitorBank.test.mjs",
       "groups": [
         "requiredKvar — PFC sizing formula",
@@ -230,7 +245,7 @@
         "attachCollaborationServer — close event",
         "attachCollaborationServer — invalid JSON"
       ],
-      "assertionCount": 28
+      "assertionCount": 31
     },
     {
       "file": "tests/conduitBendSchedule.test.mjs",
@@ -292,7 +307,7 @@
         "parsePricingCSV — malformed input",
         "exportPricingCSV — roundtrip"
       ],
-      "assertionCount": 79
+      "assertionCount": 84
     },
     {
       "file": "tests/cp/coatingModel.test.mjs",
@@ -657,6 +672,13 @@
       "assertionCount": 87
     },
     {
+      "file": "tests/htmlAssetReferences.test.mjs",
+      "groups": [
+        "HTML asset reference audit"
+      ],
+      "assertionCount": 14
+    },
+    {
       "file": "tests/ibrModeling.test.mjs",
       "groups": [
         "pvArrayOutput()",
@@ -891,6 +913,17 @@
       "assertionCount": 14
     },
     {
+      "file": "tests/manufacturerCatalog.test.mjs",
+      "groups": [
+        "manufacturer catalog normalization",
+        "manufacturer catalog merge and filters",
+        "catalog warnings and downstream fields",
+        "catalog confidence and traceability",
+        "component library catalog validation"
+      ],
+      "assertionCount": 61
+    },
+    {
       "file": "tests/mccLineup.test.mjs",
       "groups": [],
       "assertionCount": 132
@@ -942,7 +975,7 @@
     {
       "file": "tests/oidc.test.mjs",
       "groups": [],
-      "assertionCount": 28
+      "assertionCount": 30
     },
     {
       "file": "tests/onelineBackgroundImage.test.mjs",
@@ -974,6 +1007,11 @@
       "assertionCount": 5
     },
     {
+      "file": "tests/onelineStudyStaleResultGuards.test.mjs",
+      "groups": [],
+      "assertionCount": 12
+    },
+    {
       "file": "tests/onelineUIFeatures.test.mjs",
       "groups": [],
       "assertionCount": 49
@@ -981,12 +1019,12 @@
     {
       "file": "tests/pageContractAudit.test.mjs",
       "groups": [],
-      "assertionCount": 43
+      "assertionCount": 49
     },
     {
       "file": "tests/pageContracts.test.mjs",
       "groups": [],
-      "assertionCount": 40
+      "assertionCount": 41
     },
     {
       "file": "tests/pageNavigation.test.cjs",
@@ -1034,7 +1072,7 @@
     {
       "file": "tests/projectWorkflowCore.test.mjs",
       "groups": [],
-      "assertionCount": 69
+      "assertionCount": 75
     },
     {
       "file": "tests/ptVtMetadata.test.mjs",
@@ -1181,7 +1219,12 @@
         "exportToIFC4 — output content",
         "IFC4 round-trip: export → parseRevit"
       ],
-      "assertionCount": 119
+      "assertionCount": 129
+    },
+    {
+      "file": "tests/rewriteHtmlForManifest.test.cjs",
+      "groups": [],
+      "assertionCount": 19
     },
     {
       "file": "tests/sampleGallery.test.mjs",
@@ -1274,12 +1317,17 @@
     {
       "file": "tests/serverSecurity.test.mjs",
       "groups": [],
-      "assertionCount": 79
+      "assertionCount": 109
+    },
+    {
+      "file": "tests/serviceWorkerScope.test.mjs",
+      "groups": [],
+      "assertionCount": 5
     },
     {
       "file": "tests/sessionExpiry.test.mjs",
       "groups": [],
-      "assertionCount": 10
+      "assertionCount": 20
     },
     {
       "file": "tests/shortcircuit/cablePerKmImpedance.test.mjs",
@@ -1293,7 +1341,7 @@
       "groups": [
         "short circuit engine"
       ],
-      "assertionCount": 52
+      "assertionCount": 56
     },
     {
       "file": "tests/spoolSheets.test.mjs",
@@ -1313,6 +1361,11 @@
         "summarizeSpoolImpact"
       ],
       "assertionCount": 25
+    },
+    {
+      "file": "tests/staticAssetFallback.test.mjs",
+      "groups": [],
+      "assertionCount": 9
     },
     {
       "file": "tests/structuralLoadCombinations.test.mjs",
@@ -1343,6 +1396,11 @@
         "initStudyBasisPanel — basic rendering"
       ],
       "assertionCount": 23
+    },
+    {
+      "file": "tests/supabaseBackend.test.mjs",
+      "groups": [],
+      "assertionCount": 17
     },
     {
       "file": "tests/supportSpan.test.mjs",
@@ -1588,6 +1646,14 @@
       "assertionCount": 55
     },
     {
+      "file": "tests/workerClient.test.mjs",
+      "groups": [
+        "createWorkerClient — id-correlated promises",
+        "handleWorkerMessage — worker-side dispatcher"
+      ],
+      "assertionCount": 20
+    },
+    {
       "file": "tests/workflowCoreSample.test.mjs",
       "groups": [],
       "assertionCount": 20
@@ -1801,6 +1867,76 @@
       },
       "reference": "IEEE 835-1994 Table B-75; ETAP Underground Raceway Systems validation",
       "sampleFile": "samples/benchmark-ductbank-thermal.json"
+    },
+    {
+      "id": "cable-thermal-env-unified",
+      "title": "Unified Cable Thermal Environment — 95 mm² Cu XLPE four-installation comparison",
+      "studyPage": "cablethermalenv.html",
+      "standard": "IEC 60287-1-1 + NEC 310",
+      "clause": "Composite — tray, conduit, duct bank, direct burial",
+      "description": "Same 95 mm² Cu XLPE 3-core cable run through tray (air ambient 30 °C), buried conduit, 2×3 duct bank at 200 mm spacing, and direct burial (soil ρ 1.0 K·m/W, 20 °C). Verifies that the orchestrator produces consistent ampacity across the four IEC 60287 install methods and that the derating waterfall identifies the limiting factor.",
+      "inputs": {
+        "cable": {
+          "sizeMm2": 95,
+          "material": "Cu",
+          "insulation": "XLPE",
+          "nCores": 3
+        },
+        "ambient": {
+          "tempC": 30,
+          "soilTempC": 20
+        },
+        "grouping": {
+          "nCables": 1,
+          "arrangement": "flat"
+        },
+        "installations": {
+          "tray": {
+            "included": true
+          },
+          "conduit": {
+            "included": true,
+            "conduitOD_mm": 100,
+            "burialDepthMm": 800
+          },
+          "duct-bank": {
+            "included": true,
+            "ductCount": 6,
+            "rows": 2,
+            "cols": 3,
+            "spacingMm": 200
+          },
+          "direct-burial": {
+            "included": true,
+            "burialDepthMm": 800,
+            "soilResistivity": 1
+          }
+        }
+      },
+      "expectedOutputs": {
+        "trayAmpacityA": {
+          "value": 247,
+          "tolerance": 30
+        },
+        "directBurialAmpacityA": {
+          "value": 316,
+          "tolerance": 35
+        },
+        "conduitAmpacityA": {
+          "value": 326,
+          "tolerance": 35
+        },
+        "ductBankAmpacityA": {
+          "value": 226,
+          "tolerance": 30
+        },
+        "ductBankLimitingFactorContains": {
+          "value": "Grouping",
+          "tolerance": 0
+        }
+      },
+      "reference": "IEC 60287-2-1 Tables 1–8; NEC Table 310.16; cross-check against iec60287-cable-rating benchmark",
+      "sampleFile": "samples/benchmark-cable-thermal-env.json"
     }
   ],
   "standards": [
