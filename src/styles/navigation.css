@@ -16,8 +16,15 @@
         flex: 1;
     }
 
-    & > .settings-btn {
+    & .nav-actions {
+        display: flex;
+        align-items: center;
+        gap: var(--space-3);
         margin-left: auto;
+        flex-shrink: 0;
+    }
+
+    & .nav-actions .settings-btn {
         flex-shrink: 0;
     }
 
@@ -83,9 +90,13 @@
             }
         }
 
-        & > .settings-btn {
+        & .nav-actions {
             order: 2;
             margin-left: auto;
+            gap: var(--space-1);
+        }
+
+        & .nav-actions .settings-btn {
             min-width: 44px;
             min-height: 44px;
         }
@@ -256,7 +267,7 @@
         align-items: center;
         justify-content: center;
         order: 2;
-        margin-left: auto;
+        margin-left: var(--space-1);
         background: none;
         border: none;
         font-size: 1.4rem;
@@ -269,7 +280,6 @@
 
 .auth-profile-control {
     position: relative;
-    margin-left: var(--space-2);
     flex-shrink: 0;
 }
 
@@ -399,7 +409,6 @@
 @media (max-width: 700px) {
     .auth-profile-control {
         order: 2;
-        margin-left: var(--space-1);
     }
 
     .auth-profile-trigger {

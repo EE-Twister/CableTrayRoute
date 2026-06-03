@@ -731,12 +731,10 @@ async function updateProjectDisplay(snapshot){
     const hash=await sha256Hex(canonicalJSONString(proj));
     let span=document.getElementById('project-display');
     if(!span){
-      const nav=document.querySelector('.top-nav .nav-links');
+      const nav=document.querySelector('.top-nav .nav-actions')||document.querySelector('.top-nav .nav-links');
       if(nav){
         span=document.createElement('span');
         span.id='project-display';
-        span.style.marginLeft='auto';
-        span.style.marginRight='var(--space-4)';
         const currentSettingsBtn=document.getElementById('settings-btn');
         if(currentSettingsBtn&&currentSettingsBtn.parentElement===nav&&nav.contains(currentSettingsBtn)){
           try{

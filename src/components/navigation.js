@@ -1,4 +1,5 @@
 import { getAuthRole } from '../../projectStorage.js';
+import { mountProfileControl } from '../authProfileControl.js';
 
 export const NAV_ROUTES = [
   { href: 'index.html', label: 'Home', section: 'Home', icon: 'icons/route.svg' },
@@ -303,9 +304,12 @@ function mountPersistentNavigation() {
   }
 
   const existingSettingsBtn = document.getElementById('settings-btn');
+  const existingProjectDisplay = document.getElementById('project-display');
   const navLinks = document.createElement('div');
   navLinks.id = 'nav-links';
   navLinks.className = 'nav-links';
+  const navActions = document.createElement('div');
+  navActions.className = 'nav-actions';
   const isAdmin = getAuthRole() === 'admin';
   const visibleRoutes = NAV_ROUTES.filter(r => !r.adminOnly || isAdmin);
   const navSections = [...new Set(visibleRoutes.map(r => r.section))];
@@ -318,12 +322,19 @@ function mountPersistentNavigation() {
     }
   });
 
+  if (existingProjectDisplay) {
+    navActions.appendChild(existingProjectDisplay);
+  }
+
   if (existingSettingsBtn) {
-    navLinks.appendChild(existingSettingsBtn);
+    navActions.appendChild(existingSettingsBtn);
   }
 
   topNav.querySelectorAll('.nav-links').forEach(node => node.remove());
+  topNav.querySelectorAll('.nav-actions').forEach(node => node.remove());
   topNav.appendChild(navLinks);
+  topNav.appendChild(navActions);
+  mountProfileControl();
 
   // Add a search button visible only on mobile (Ctrl+K is unavailable on touch devices)
   if (!topNav.querySelector('.nav-search-btn')) {
