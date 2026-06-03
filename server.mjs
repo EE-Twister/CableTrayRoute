@@ -2053,6 +2053,12 @@ When answering queries:
   const authRateLimiterOidc = createRateLimiter({ windowMs: rateLimitWindowMs, max: 20 });
   app.use('/auth/oidc', authRateLimiterOidc);
 
+  app.get('/auth/oidc/status', (req, res) => {
+    res.json({
+      configured: Boolean(process.env.OIDC_ISSUER && process.env.OIDC_CLIENT_ID)
+    });
+  });
+
   app.get(
     '/auth/oidc/login',
     asyncHandler(async (req, res) => {

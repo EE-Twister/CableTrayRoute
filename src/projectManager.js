@@ -14,9 +14,37 @@ import {
   removeSavedProject
 } from '../projectStorage.js';
 import { openModal, showAlertModal, ensureFieldAssistiveText } from './components/modal.js';
+import {
+  createAuthContextFromSupabaseSession,
+  isSupabaseAuthContext,
+  supabaseDeleteProject,
+  supabaseListProjects,
+  supabaseLoadProject,
+  supabaseRefreshSession,
+  supabaseSaveProject,
+  supabaseSignOut
+} from './supabaseBackend.js';
 
 function listProjects() {
   return listSavedProjectsStorage();
+}
+
+function sortProjectNames(names) {
+  return [...new Set(names.filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+}
+
+async function listAvailableProjects() {
+  const localProjects = listProjects();
+  const auth = getAuthContext();
+  if (!isSupabaseAuthContext(auth)) return localProjects;
+  try {
+    const cloudProjects = await supabaseListProjects(auth);
+    return sortProjectNames([...localProjects, ...cloudProjects]);
+  } catch (err) {
+    console.warn('[projectManager] Supabase project list failed:', err?.message || err);
+    return localProjects;
+  }
 }
 
 function normalizeProjectName(name) {
@@ -314,6 +342,12 @@ function renameProject(name) {
         writeSavedProject(trimmed, record);
         removeSavedProject(current);
       }
+      const auth = getAuthContext();
+      if (isSupabaseAuthContext(auth)) {
+        supabaseDeleteProject(auth, current).catch(err => {
+          console.warn('[projectManager] Supabase old project removal failed:', err?.message || err);
+        });
+      }
     } catch (e) {
       console.error('Project rename persistence failed', e);
       // Fire-and-forget: renameProject is synchronous so we don't await the modal
@@ -330,6 +364,10 @@ async function serverSaveProject(name) {
   if (!auth) {
     return { attempted: false, ok: false };
   }
+  if (isSupabaseAuthContext(auth)) {
+    await supabaseSaveProject(auth, name, exportProject());
+    return { attempted: true, ok: true };
+  }
   const res = await fetch(`/projects/${encodeURIComponent(name)}`, {
     method: 'POST',
     headers: {
@@ -345,6 +383,12 @@ async function serverSaveProject(name) {
 async function serverLoadProject(name) {
   const auth = getAuthContext();
   if (!auth) return false;
+  if (isSupabaseAuthContext(auth)) {
+    const data = await supabaseLoadProject(auth, name);
+    if (!data) return false;
+    importProject(data);
+    return true;
+  }
   const res = await fetch(`/projects/${encodeURIComponent(name)}`, {
     headers: {
       'X-CSRF-Token': auth.csrfToken
@@ -428,7 +472,7 @@ async function saveProject(options = {}) {
 }
 
 async function loadProject() {
-  const projects = listProjects();
+  const projects = await listAvailableProjects();
   const storageError = getSavedProjectsError();
   if (storageError) {
     const message = storageError.message || 'Saved projects could not be read. Clear saved data in Settings and try again.';
@@ -552,6 +596,10 @@ async function openShareModal() {
     await showAlertModal('Login Required', 'Login to create and manage share links.');
     return;
   }
+  if (isSupabaseAuthContext(getAuthContext())) {
+    await showAlertModal('Share Links Unavailable', 'Share links currently require the Express collaboration server. Supabase-hosted projects can still be saved and loaded from your account.');
+    return;
+  }
 
   let listContainer;
   let infoText;
@@ -655,6 +703,16 @@ function dismissSessionBanner() {
 async function refreshSession() {
   const auth = getAuthContext();
   if (!auth) return false;
+  if (isSupabaseAuthContext(auth)) {
+    try {
+      const session = await supabaseRefreshSession(auth);
+      setAuthContextState(createAuthContextFromSupabaseSession(session));
+      return true;
+    } catch (err) {
+      console.warn('[projectManager] Supabase session refresh failed:', err.message || err);
+      return false;
+    }
+  }
   try {
     const res = await fetch('/session/refresh', {
       method: 'POST',
@@ -698,10 +756,14 @@ function initProjectManagerControls() {
       const auth = getAuthContext();
       if (auth) {
         try {
-          await fetch('/logout', {
-            method: 'POST',
-            headers: { 'X-CSRF-Token': auth.csrfToken }
-          });
+          if (isSupabaseAuthContext(auth)) {
+            await supabaseSignOut(auth);
+          } else {
+            await fetch('/logout', {
+              method: 'POST',
+              headers: { 'X-CSRF-Token': auth.csrfToken }
+            });
+          }
         } catch (err) {
           console.warn('[projectManager] Logout request failed:', err?.message || err);
         }

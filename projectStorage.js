@@ -8,6 +8,10 @@ const AUTH_CSRF_KEY = 'authCsrfToken';
 const AUTH_EXPIRES_KEY = 'authExpiresAt';
 const AUTH_USER_KEY = 'authUser';
 const AUTH_ROLE_KEY = 'ctr-user-role';
+const AUTH_PROVIDER_KEY = 'ctr-auth-provider';
+const AUTH_USER_ID_KEY = 'ctr-auth-user-id';
+const AUTH_SUPABASE_ACCESS_KEY = 'ctr-supabase-access-token';
+const AUTH_SUPABASE_REFRESH_KEY = 'ctr-supabase-refresh-token';
 const FAST_JSON_PATCH_URL = (() => {
   if (typeof document !== 'undefined' && document.baseURI) {
     return new URL('dist/vendor/fast-json-patch.mjs', document.baseURI).href;
@@ -826,13 +830,31 @@ export function clearConduitCache() {
 }
 
 export function getAuthContextState() {
+  const provider = readRawStorage(AUTH_PROVIDER_KEY) || '';
   const csrfToken = readRawStorage(AUTH_CSRF_KEY);
   const expiresRaw = readRawStorage(AUTH_EXPIRES_KEY);
+  const expiresAt = Number.parseInt(expiresRaw, 10);
+  if (provider === 'supabase') {
+    const accessToken = readRawStorage(AUTH_SUPABASE_ACCESS_KEY);
+    const refreshToken = readRawStorage(AUTH_SUPABASE_REFRESH_KEY);
+    if (!accessToken || !refreshToken || !expiresRaw) return null;
+    if (!Number.isFinite(expiresAt)) {
+      clearAuthContextState();
+      return null;
+    }
+    if (Date.now() >= expiresAt) {
+      clearAuthContextState();
+      return null;
+    }
+    const user = readRawStorage(AUTH_USER_KEY);
+    const userId = readRawStorage(AUTH_USER_ID_KEY);
+    const role = readRawStorage(AUTH_ROLE_KEY);
+    return { provider: 'supabase', accessToken, refreshToken, expiresAt, user: user || null, userId: userId || null, role: role || null };
+  }
   // The bearer token is no longer stored client-side — it lives in the
   // HttpOnly ctr_auth cookie. Auth context is defined by having a fresh CSRF
   // secret and a non-expired session.
   if (!csrfToken || !expiresRaw) return null;
-  const expiresAt = Number.parseInt(expiresRaw, 10);
   if (!Number.isFinite(expiresAt)) {
     clearAuthContextState();
     return null;
@@ -843,7 +865,7 @@ export function getAuthContextState() {
   }
   const user = readRawStorage(AUTH_USER_KEY);
   const role = readRawStorage(AUTH_ROLE_KEY);
-  return { csrfToken, expiresAt, user: user || null, role: role || null };
+  return { provider: 'server', csrfToken, expiresAt, user: user || null, role: role || null };
 }
 
 const SESSION_WARNING_MS = 5 * 60 * 1000; // warn 5 minutes before expiry
@@ -884,14 +906,44 @@ function scheduleSessionTimers(expiresAt) {
   }, msUntilExpiry);
 }
 
-export function setAuthContextState({ csrfToken, expiresAt, user, role } = {}) {
-  if (!csrfToken) return;
+export function setAuthContextState({ provider = 'server', csrfToken, accessToken, refreshToken, expiresAt, user, userId, role } = {}) {
   const expiresValue = Number(expiresAt);
   if (!Number.isFinite(expiresValue)) return;
+  if (provider === 'supabase') {
+    if (!accessToken || !refreshToken) return;
+    writeRawStorage(AUTH_PROVIDER_KEY, 'supabase');
+    writeRawStorage(AUTH_TOKEN_KEY, null);
+    writeRawStorage(AUTH_CSRF_KEY, null);
+    writeRawStorage(AUTH_SUPABASE_ACCESS_KEY, accessToken);
+    writeRawStorage(AUTH_SUPABASE_REFRESH_KEY, refreshToken);
+    writeRawStorage(AUTH_EXPIRES_KEY, String(expiresValue));
+    if (user === undefined || user === null) {
+      writeRawStorage(AUTH_USER_KEY, null);
+    } else {
+      writeRawStorage(AUTH_USER_KEY, String(user));
+    }
+    if (userId === undefined || userId === null) {
+      writeRawStorage(AUTH_USER_ID_KEY, null);
+    } else {
+      writeRawStorage(AUTH_USER_ID_KEY, String(userId));
+    }
+    if (role === undefined || role === null) {
+      writeRawStorage(AUTH_ROLE_KEY, null);
+    } else {
+      writeRawStorage(AUTH_ROLE_KEY, String(role));
+    }
+    scheduleSessionTimers(expiresValue);
+    return;
+  }
+  if (!csrfToken) return;
   // AUTH_TOKEN_KEY is intentionally cleared: the session token now lives in
   // an HttpOnly cookie and must not be readable from JS-accessible storage.
+  writeRawStorage(AUTH_PROVIDER_KEY, 'server');
   writeRawStorage(AUTH_TOKEN_KEY, null);
   writeRawStorage(AUTH_CSRF_KEY, csrfToken);
+  writeRawStorage(AUTH_SUPABASE_ACCESS_KEY, null);
+  writeRawStorage(AUTH_SUPABASE_REFRESH_KEY, null);
+  writeRawStorage(AUTH_USER_ID_KEY, null);
   writeRawStorage(AUTH_EXPIRES_KEY, String(expiresValue));
   if (user === undefined || user === null) {
     writeRawStorage(AUTH_USER_KEY, null);
@@ -913,6 +965,10 @@ export function clearAuthContextState() {
   writeRawStorage(AUTH_EXPIRES_KEY, null);
   writeRawStorage(AUTH_USER_KEY, null);
   writeRawStorage(AUTH_ROLE_KEY, null);
+  writeRawStorage(AUTH_PROVIDER_KEY, null);
+  writeRawStorage(AUTH_USER_ID_KEY, null);
+  writeRawStorage(AUTH_SUPABASE_ACCESS_KEY, null);
+  writeRawStorage(AUTH_SUPABASE_REFRESH_KEY, null);
 }
 
 export function getAuthRole() {

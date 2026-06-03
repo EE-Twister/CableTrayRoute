@@ -7,11 +7,18 @@ For a step-by-step overview of the workflow, see the [Project Workflow](docs/pro
 
 ## Secure Authentication & API Hardening
 
-The bundled Express server now persists credentials and sessions securely:
+The app supports two authentication modes:
+
+- **Express server mode** for local/self-hosted deployments.
+- **Supabase mode** for low-cost static hosting on Cloudflare Pages.
+
+For the Cloudflare Pages + Supabase path, see [docs/supabase-cloudflare.md](docs/supabase-cloudflare.md).
+
+The bundled Express server persists credentials and sessions securely:
 
 - Passwords supplied during `/signup` are salted and hashed with Node's `crypto.scrypt` algorithm before being written to `server_data/users.json`.
 - `/login` verifies hashes, rotates any existing sessions for the account, and stores bearer tokens with CSRF secrets and expiry timestamps in `server_data/sessions.json`.
-- Client code stores the issued bearer token, CSRF token, and expiry. Authenticated project requests must supply both the `Authorization: Bearer <token>` header and the matching `X-CSRF-Token` header for state-changing calls.
+- Browser clients use the HttpOnly `ctr_auth` cookie plus the matching `X-CSRF-Token` header for state-changing calls. The legacy `Authorization: Bearer <token>` header remains available for API clients during the deprecation window.
 - `/projects` endpoints are guarded by a lightweight rate limiter and will return HTTP `429` if the per-IP ceiling defined by `PROJECT_RATE_LIMIT_MAX` within `PROJECT_RATE_LIMIT_WINDOW_MS` is exceeded.
 - `POST /projects/:project` supports full saves (`{ data }`) and incremental merge-patch updates (`{ patch, baseVersion }`). Matching payloads are de-duplicated server-side to avoid unnecessary version writes.
 - Persistence routes emit `Server-Timing` metrics (`project.read`, `project.parse`, `project.merge`, `project.write`, and `project.total`) for backend observability.
@@ -27,6 +34,8 @@ Environment variables let you tune behaviour without code changes:
 | `PROJECT_RATE_LIMIT_MAX` | Maximum requests per window | `100` |
 
 Existing installs that contain plaintext passwords will be migrated automatically: the first successful login rehashes the credential using the secure format.
+
+For static hosting, set Cloudflare Pages to run `npm run build:cloudflare` and provide `SUPABASE_URL` plus `SUPABASE_ANON_KEY`. When `supabase-config.json` contains those values, the login page switches to Supabase email/password auth and project saves sync to the Supabase `projects` table.
 
 
 ## Static Asset Caching & Compression

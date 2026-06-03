@@ -73,6 +73,29 @@ check('setAuthContextState persists session metadata', () => {
   assert.strictEqual(storage.has('authToken'), false);
 });
 
+check('setAuthContextState persists Supabase session metadata', () => {
+  storage.clear();
+  setAuthContextState({
+    provider: 'supabase',
+    accessToken: 'sb-access',
+    refreshToken: 'sb-refresh',
+    expiresAt: Date.now() + 10000,
+    user: 'ada@example.com',
+    userId: 'user-123',
+    role: 'engineer'
+  });
+  const state = getAuthContextState();
+  assert.ok(state, 'auth context present');
+  assert.strictEqual(state.provider, 'supabase');
+  assert.strictEqual(state.accessToken, 'sb-access');
+  assert.strictEqual(state.refreshToken, 'sb-refresh');
+  assert.strictEqual(state.user, 'ada@example.com');
+  assert.strictEqual(state.userId, 'user-123');
+  assert.strictEqual(state.role, 'engineer');
+  assert.strictEqual(storage.has('authToken'), false);
+  clearAuthContextState();
+});
+
 check('clearAuthContextState removes all auth keys', () => {
   clearAuthContextState();
   assert.strictEqual(getAuthContextState(), null);

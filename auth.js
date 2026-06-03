@@ -1,6 +1,14 @@
 import { setAuthContextState, clearAuthContextState } from './projectStorage.js';
+import {
+  createAuthContextFromSupabaseSession,
+  getSupabaseConfig,
+  supabaseSignIn,
+  supabaseSignUp
+} from './src/supabaseBackend.js';
 
 const MIN_PASSWORD_LENGTH = 8;
+let supabaseAuthEnabled = false;
+let authModeReady = Promise.resolve();
 
 function showStatus(formEl, message, isError) {
   let statusEl = formEl.querySelector('.auth-status');
@@ -33,8 +41,37 @@ function validateSignupPasswords(form, showMessage = false) {
   return true;
 }
 
+function configureSupabaseAuthFields() {
+  supabaseAuthEnabled = true;
+  const signupUser = document.getElementById('signup-user');
+  const loginUser = document.getElementById('login-user');
+  const signupLabel = document.querySelector('label[for="signup-user"]');
+  const loginLabel = document.querySelector('label[for="login-user"]');
+  const signupHint = document.getElementById('signup-user-hint');
+  const loginHint = document.getElementById('login-user-hint');
+
+  signupUser.type = 'email';
+  signupUser.autocomplete = 'email';
+  signupUser.placeholder = 'you@example.com';
+  signupUser.removeAttribute('pattern');
+  signupUser.title = 'Enter a valid email address.';
+
+  loginUser.type = 'email';
+  loginUser.autocomplete = 'email';
+  loginUser.placeholder = 'you@example.com';
+  loginUser.removeAttribute('pattern');
+  loginUser.title = 'Enter a valid email address.';
+
+  if (signupLabel) signupLabel.textContent = 'Email';
+  if (loginLabel) loginLabel.textContent = 'Email';
+  if (signupHint) signupHint.textContent = 'Use the email address for your Supabase account.';
+  if (loginHint) loginHint.textContent = 'Enter your email address.';
+  document.getElementById('sso-section')?.classList.add('hidden');
+}
+
 async function signup(e) {
   e.preventDefault();
+  await authModeReady;
   const form = e.currentTarget;
   const submitBtn = form.querySelector('button[type="submit"]');
   const username = document.getElementById('signup-user').value.trim();
@@ -45,8 +82,8 @@ async function signup(e) {
     return;
   }
 
-  if (!/^[a-zA-Z0-9_-]{1,100}$/.test(username)) {
-    showStatus(form, 'Username may only contain letters, numbers, underscores, and hyphens (1–100 characters).', true);
+  if (!supabaseAuthEnabled && !/^[a-zA-Z0-9_-]{1,100}$/.test(username)) {
+    showStatus(form, 'Username may only contain letters, numbers, underscores, and hyphens (1-100 characters).', true);
     return;
   }
 
@@ -61,6 +98,17 @@ async function signup(e) {
 
   submitBtn.disabled = true;
   try {
+    if (supabaseAuthEnabled) {
+      const result = await supabaseSignUp({ email: username, password });
+      if (result.session?.access_token) {
+        setAuthContextState(createAuthContextFromSupabaseSession(result.session));
+        window.location.href = 'index.html';
+        return;
+      }
+      showStatus(form, 'Account created. Check your email to confirm the account, then sign in.', false);
+      return;
+    }
+
     const res = await fetch('/signup', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -82,12 +130,20 @@ async function signup(e) {
 
 async function login(e) {
   e.preventDefault();
+  await authModeReady;
   const form = e.currentTarget;
   const submitBtn = form.querySelector('button[type="submit"]');
   const username = document.getElementById('login-user').value.trim();
   const password = document.getElementById('login-pass').value;
   submitBtn.disabled = true;
   try {
+    if (supabaseAuthEnabled) {
+      const session = await supabaseSignIn({ email: username, password });
+      setAuthContextState(createAuthContextFromSupabaseSession(session));
+      window.location.href = 'index.html';
+      return;
+    }
+
     const res = await fetch('/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -117,6 +173,14 @@ const signupForm = document.getElementById('signup-form');
 const signupPasswordInput = document.getElementById('signup-pass');
 const signupConfirmInput = document.getElementById('signup-pass-confirm');
 
+authModeReady = getSupabaseConfig()
+  .then(config => {
+    if (config.enabled) configureSupabaseAuthFields();
+  })
+  .catch(err => {
+    console.warn('Supabase auth configuration failed', err);
+  });
+
 signupPasswordInput.addEventListener('input', () => {
   validateSignupPasswords(signupForm);
 });
@@ -128,17 +192,23 @@ signupConfirmInput.addEventListener('input', () => {
 signupForm.addEventListener('submit', signup);
 document.getElementById('login-form').addEventListener('submit', login);
 
-// Show the SSO button only when OIDC is configured on the server.
-// A 503 from /auth/oidc/login means OIDC is not set up.
-fetch('/auth/oidc/login', { method: 'GET', redirect: 'manual' })
-  .then(res => {
-    if (res.status !== 503) {
-      document.getElementById('sso-section')?.classList.remove('hidden');
-    }
-  })
-  .catch(() => {/* network error — leave SSO hidden */});
+// Show the SSO button only when OIDC is configured on the Express server.
+authModeReady.then(() => {
+  if (supabaseAuthEnabled) return;
+  fetch('/auth/oidc/status')
+    .then(res => {
+      if (!res.ok) return null;
+      return res.json().catch(() => null);
+    })
+    .then(status => {
+      if (status?.configured) {
+        document.getElementById('sso-section')?.classList.remove('hidden');
+      }
+    })
+    .catch(() => {/* network error - leave SSO hidden */});
+}).catch(() => {/* auth mode probe failed - leave SSO hidden */});
 
-// Show login error from OIDC callback redirect if present
+// Show login error from OIDC callback redirect if present.
 const urlError = new URLSearchParams(window.location.search).get('error');
 if (urlError) {
   const messages = {
