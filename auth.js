@@ -1,4 +1,5 @@
 import { setAuthContextState, clearAuthContextState } from './projectStorage.js';
+import { authFailureMessage } from './src/authMessages.js';
 import {
   createAuthContextFromSupabaseSession,
   getSupabaseConfig,
@@ -43,20 +44,6 @@ function validateSignupPasswords(form, showMessage = false) {
   return true;
 }
 
-function authFailureMessage(err, fallback) {
-  if (err instanceof SupabaseRequestError && err.status === 429) {
-    const retry = err.retryAfterSeconds;
-    if (Number.isFinite(retry) && retry > 0) {
-      return `Supabase is rate limiting signup requests. Wait ${retry} seconds, then try again.`;
-    }
-    return 'Supabase is rate limiting signup requests. Wait about a minute, then try again.';
-  }
-  if (err instanceof SupabaseRequestError && err.status >= 400 && err.status < 500 && err.message) {
-    return err.message;
-  }
-  return fallback;
-}
-
 function getSignupCooldown(email) {
   const retryAt = signupCooldowns.get(email.toLowerCase());
   if (!retryAt) return 0;
@@ -74,6 +61,14 @@ function rememberSignupCooldown(email, err) {
     ? err.retryAfterSeconds
     : 60;
   signupCooldowns.set(email.toLowerCase(), Date.now() + retry * 1000);
+}
+
+function lockSuccessfulSignup(form, submitBtn) {
+  Array.from(form.elements).forEach(element => {
+    element.disabled = true;
+  });
+  submitBtn.textContent = 'Check your email';
+  submitBtn.setAttribute('aria-disabled', 'true');
 }
 
 function configureSupabaseAuthFields() {
@@ -139,6 +134,7 @@ async function signup(e) {
     }
   }
 
+  let keepSubmitDisabled = false;
   submitBtn.disabled = true;
   try {
     if (supabaseAuthEnabled) {
@@ -149,6 +145,8 @@ async function signup(e) {
         return;
       }
       showStatus(form, 'Account created. Check your email to confirm the account, then sign in.', false);
+      keepSubmitDisabled = true;
+      lockSuccessfulSignup(form, submitBtn);
       return;
     }
 
@@ -159,6 +157,8 @@ async function signup(e) {
     });
     if (res.ok) {
       showStatus(form, 'Account created. You may now sign in.', false);
+      keepSubmitDisabled = true;
+      lockSuccessfulSignup(form, submitBtn);
     } else {
       const body = await res.json().catch(() => ({}));
       showStatus(form, body.error || 'Signup failed. Please try again.', true);
@@ -167,7 +167,9 @@ async function signup(e) {
     rememberSignupCooldown(username, err);
     showStatus(form, authFailureMessage(err, 'Signup failed. Check your connection and try again.'), true);
   } finally {
-    submitBtn.disabled = false;
+    if (!keepSubmitDisabled) {
+      submitBtn.disabled = false;
+    }
   }
 }
 

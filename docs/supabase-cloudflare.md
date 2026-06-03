@@ -54,6 +54,11 @@ create policy "Users can delete their projects"
 Supabase rate-limits repeated signup requests. A `429` response from `/auth/v1/signup`
 with a message like "you can only request this after 54 seconds" means the user should
 wait for the displayed cooldown before requesting another signup or confirmation email.
+When Supabase returns an explicit "user already registered" error, the signup form
+shows that the account already exists. With email confirmations enabled, Supabase can
+also return a neutral success response for existing confirmed addresses to avoid
+revealing which emails are registered; in that case the form keeps the standard
+"check your email" confirmation message.
 
 ## Cloudflare Pages Setup
 
