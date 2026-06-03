@@ -11,7 +11,7 @@ function jsonResponse(body, { ok = true, status = 200 } = {}) {
   return {
     ok,
     status,
-    headers: { get: () => 'application/json' },
+    headers: { get: name => name.toLowerCase() === 'content-type' ? 'application/json' : null },
     json: async () => body
   };
 }
@@ -43,6 +43,11 @@ globalThis.fetch = async (url, options = {}) => {
       }
     });
   }
+  if (call.url.includes('/auth/v1/signup')) {
+    return jsonResponse({
+      message: 'For security purposes, you can only request this after 54 seconds.'
+    }, { ok: false, status: 429 });
+  }
   if (call.url.includes('/rest/v1/projects') && call.options.method === 'POST') {
     return jsonResponse({}, { status: 201 });
   }
@@ -57,11 +62,13 @@ globalThis.fetch = async (url, options = {}) => {
 
 const {
   createAuthContextFromSupabaseSession,
+  SupabaseRequestError,
   supabaseListProjects,
   supabaseLoadProject,
   supabaseRefreshSession,
   supabaseSaveProject,
-  supabaseSignIn
+  supabaseSignIn,
+  supabaseSignUp
 } = await import('../src/supabaseBackend.js');
 
 function check(name, fn) {
@@ -133,4 +140,17 @@ await checkAsync('refreshes a Supabase session with refresh token', async () => 
   const refreshed = createAuthContextFromSupabaseSession(session);
   assert.equal(refreshed.accessToken, 'access-token-2');
   assert.equal(refreshed.refreshToken, 'refresh-token-2');
+});
+
+await checkAsync('preserves Supabase signup rate-limit metadata', async () => {
+  await assert.rejects(
+    () => supabaseSignUp({ email: 'rate-limited@example.com', password: 'TestPass123!' }),
+    err => {
+      assert.ok(err instanceof SupabaseRequestError);
+      assert.equal(err.status, 429);
+      assert.equal(err.retryAfterSeconds, 54);
+      assert.match(err.message, /only request this after 54 seconds/i);
+      return true;
+    }
+  );
 });

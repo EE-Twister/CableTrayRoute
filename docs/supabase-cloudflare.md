@@ -51,6 +51,10 @@ create policy "Users can delete their projects"
   using (auth.uid() = user_id);
 ```
 
+Supabase rate-limits repeated signup requests. A `429` response from `/auth/v1/signup`
+with a message like "you can only request this after 54 seconds" means the user should
+wait for the displayed cooldown before requesting another signup or confirmation email.
+
 ## Cloudflare Pages Setup
 
 Use these build settings:

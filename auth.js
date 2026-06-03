@@ -2,11 +2,13 @@ import { setAuthContextState, clearAuthContextState } from './projectStorage.js'
 import {
   createAuthContextFromSupabaseSession,
   getSupabaseConfig,
+  SupabaseRequestError,
   supabaseSignIn,
   supabaseSignUp
 } from './src/supabaseBackend.js';
 
 const MIN_PASSWORD_LENGTH = 8;
+const signupCooldowns = new Map();
 let supabaseAuthEnabled = false;
 let authModeReady = Promise.resolve();
 
@@ -39,6 +41,39 @@ function validateSignupPasswords(form, showMessage = false) {
 
   confirmInput.setCustomValidity('');
   return true;
+}
+
+function authFailureMessage(err, fallback) {
+  if (err instanceof SupabaseRequestError && err.status === 429) {
+    const retry = err.retryAfterSeconds;
+    if (Number.isFinite(retry) && retry > 0) {
+      return `Supabase is rate limiting signup requests. Wait ${retry} seconds, then try again.`;
+    }
+    return 'Supabase is rate limiting signup requests. Wait about a minute, then try again.';
+  }
+  if (err instanceof SupabaseRequestError && err.status >= 400 && err.status < 500 && err.message) {
+    return err.message;
+  }
+  return fallback;
+}
+
+function getSignupCooldown(email) {
+  const retryAt = signupCooldowns.get(email.toLowerCase());
+  if (!retryAt) return 0;
+  const remaining = Math.ceil((retryAt - Date.now()) / 1000);
+  if (remaining <= 0) {
+    signupCooldowns.delete(email.toLowerCase());
+    return 0;
+  }
+  return remaining;
+}
+
+function rememberSignupCooldown(email, err) {
+  if (!(err instanceof SupabaseRequestError) || err.status !== 429) return;
+  const retry = Number.isFinite(err.retryAfterSeconds) && err.retryAfterSeconds > 0
+    ? err.retryAfterSeconds
+    : 60;
+  signupCooldowns.set(email.toLowerCase(), Date.now() + retry * 1000);
 }
 
 function configureSupabaseAuthFields() {
@@ -96,6 +131,14 @@ async function signup(e) {
     return;
   }
 
+  if (supabaseAuthEnabled) {
+    const cooldown = getSignupCooldown(username);
+    if (cooldown > 0) {
+      showStatus(form, `Supabase is rate limiting signup requests. Wait ${cooldown} seconds, then try again.`, true);
+      return;
+    }
+  }
+
   submitBtn.disabled = true;
   try {
     if (supabaseAuthEnabled) {
@@ -121,8 +164,8 @@ async function signup(e) {
       showStatus(form, body.error || 'Signup failed. Please try again.', true);
     }
   } catch (err) {
-    console.error('Signup request failed', err);
-    showStatus(form, 'Signup failed. Check your connection and try again.', true);
+    rememberSignupCooldown(username, err);
+    showStatus(form, authFailureMessage(err, 'Signup failed. Check your connection and try again.'), true);
   } finally {
     submitBtn.disabled = false;
   }
@@ -161,9 +204,8 @@ async function login(e) {
     const body = await res.json().catch(() => ({}));
     showStatus(form, body.error || 'Login failed. Check your credentials.', true);
   } catch (err) {
-    console.error('Login request failed', err);
     clearAuthContextState();
-    showStatus(form, 'Login failed. Check your connection and try again.', true);
+    showStatus(form, authFailureMessage(err, 'Login failed. Check your connection and try again.'), true);
   } finally {
     submitBtn.disabled = false;
   }

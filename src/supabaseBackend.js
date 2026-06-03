@@ -2,6 +2,16 @@ const CONFIG_PATH = 'supabase-config.json';
 
 let configPromise = null;
 
+export class SupabaseRequestError extends Error {
+  constructor(message, { status = 0, retryAfterSeconds = null, body = null } = {}) {
+    super(message);
+    this.name = 'SupabaseRequestError';
+    this.status = status;
+    this.retryAfterSeconds = retryAfterSeconds;
+    this.body = body;
+  }
+}
+
 function normalizeSupabaseUrl(value) {
   if (typeof value !== 'string') return '';
   return value.trim().replace(/\/+$/, '');
@@ -105,9 +115,25 @@ async function parseSupabaseResponse(res) {
   const body = await res.json().catch(() => ({}));
   if (!res.ok) {
     const message = body.error_description || body.msg || body.message || body.error || `Supabase request failed (${res.status})`;
-    throw new Error(message);
+    const retryAfter = Number.parseInt(res.headers?.get?.('retry-after') || '', 10);
+    const retryAfterSeconds = Number.isFinite(retryAfter)
+      ? retryAfter
+      : parseRetryAfterSeconds(message);
+    throw new SupabaseRequestError(message, {
+      status: res.status,
+      retryAfterSeconds,
+      body
+    });
   }
   return body;
+}
+
+function parseRetryAfterSeconds(message) {
+  if (typeof message !== 'string') return null;
+  const match = message.match(/after\s+(\d+)\s+seconds?/i);
+  if (!match) return null;
+  const seconds = Number.parseInt(match[1], 10);
+  return Number.isFinite(seconds) ? seconds : null;
 }
 
 function authUrl(config, path) {
