@@ -99,6 +99,12 @@ globalThis.fetch = async (url, options = {}) => {
   if (call.url.includes('/rest/v1/projects') && call.options.method === 'POST') {
     return jsonResponse({}, { status: 201 });
   }
+  if (call.url.includes('/rest/v1/projects') && call.url.includes('select=name%2Ccreated_at%2Cupdated_at')) {
+    return jsonResponse([
+      { name: 'Beta', created_at: '2026-06-03T12:00:00.000Z', updated_at: '2026-06-04T12:00:00.000Z' },
+      { name: 'Alpha', created_at: '2026-06-01T12:00:00.000Z', updated_at: '2026-06-02T12:00:00.000Z' }
+    ]);
+  }
   if (call.url.includes('/rest/v1/projects') && call.url.includes('select=name')) {
     return jsonResponse([{ name: 'Alpha' }, { name: 'Beta' }]);
   }
@@ -114,7 +120,9 @@ const {
   supabaseAdminListAccountDeletionRequests,
   supabaseAdminUpdateAccountDeletionRequest,
   supabaseListAccountDeletionRequests,
+  supabaseDeleteProject,
   supabaseListProjects,
+  supabaseListProjectSummaries,
   supabaseLoadProject,
   supabaseRefreshSession,
   supabaseResendEmailConfirmation,
@@ -184,11 +192,49 @@ await checkAsync('upserts project rows with user_id conflict target', async () =
 await checkAsync('lists project names from Supabase REST', async () => {
   const names = await supabaseListProjects(auth);
   assert.deepEqual(names, ['Alpha', 'Beta']);
+  const listCall = calls.find(call => call.url.includes('/rest/v1/projects') && call.url.includes('select=name') && call.url.includes('order=name.asc'));
+  const params = new URL(listCall.url).searchParams;
+  assert.equal(params.get('user_id'), 'eq.user-1');
+  assert.equal(params.get('select'), 'name');
+});
+
+await checkAsync('lists project summaries scoped to the signed-in user', async () => {
+  const summaries = await supabaseListProjectSummaries(auth);
+  assert.deepEqual(summaries, [
+    {
+      name: 'Beta',
+      createdAt: '2026-06-03T12:00:00.000Z',
+      updatedAt: '2026-06-04T12:00:00.000Z',
+      source: 'cloud'
+    },
+    {
+      name: 'Alpha',
+      createdAt: '2026-06-01T12:00:00.000Z',
+      updatedAt: '2026-06-02T12:00:00.000Z',
+      source: 'cloud'
+    }
+  ]);
+  const summaryCall = calls.find(call => call.url.includes('/rest/v1/projects') && call.url.includes('select=name%2Ccreated_at%2Cupdated_at'));
+  const params = new URL(summaryCall.url).searchParams;
+  assert.equal(params.get('user_id'), 'eq.user-1');
+  assert.equal(params.get('order'), 'updated_at.desc');
 });
 
 await checkAsync('loads a project data payload by name', async () => {
   const data = await supabaseLoadProject(auth, 'Alpha');
   assert.deepEqual(data, { meta: { version: 1 }, cables: [] });
+  const loadCall = calls.find(call => call.url.includes('/rest/v1/projects') && call.url.includes('select=data'));
+  const params = new URL(loadCall.url).searchParams;
+  assert.equal(params.get('name'), 'eq.Alpha');
+  assert.equal(params.get('user_id'), 'eq.user-1');
+});
+
+await checkAsync('deletes projects with the signed-in user filter', async () => {
+  await supabaseDeleteProject(auth, 'Alpha');
+  const deleteCall = calls.find(call => call.url.includes('/rest/v1/projects') && call.options.method === 'DELETE');
+  const params = new URL(deleteCall.url).searchParams;
+  assert.equal(params.get('name'), 'eq.Alpha');
+  assert.equal(params.get('user_id'), 'eq.user-1');
 });
 
 await checkAsync('refreshes a Supabase session with refresh token', async () => {

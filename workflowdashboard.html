@@ -99,6 +99,19 @@
         </div>
       </section>
 
+      <section class="card dash-full-width" aria-labelledby="dashboard-projects-title">
+        <div class="dashboard-projects-header">
+          <div>
+            <h2 id="dashboard-projects-title">My Projects</h2>
+            <p class="text-muted">Open saved projects, create a new project, or confirm whether your current workspace is local or cloud-backed.</p>
+          </div>
+          <button type="button" class="btn" data-project-action="save">Save Current Project</button>
+        </div>
+        <div id="dashboard-projects-panel" class="project-workspace-panel" data-project-workspace aria-live="polite">
+          <p class="text-muted">Loading saved projects...</p>
+        </div>
+      </section>
+
       <section id="dashboard-next-action-strip" class="workflow-next-action dash-full-width" aria-live="polite" aria-label="Recommended next action"></section>
 
       <section class="card dash-full-width" aria-label="Guided workflow runner">

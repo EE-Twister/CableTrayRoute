@@ -68,6 +68,15 @@
   color: var(--color-warning, #b45309);
 }
 
+.dashboard-projects-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.85rem;
+}
+
 /* ---- Design basis wizard ---- */
 .modal-body .design-basis-form {
   display: grid;

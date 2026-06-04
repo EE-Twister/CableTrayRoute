@@ -20,6 +20,7 @@ import {
   isSupabaseAuthContext,
   supabaseDeleteProject,
   supabaseListProjects,
+  supabaseListProjectSummaries,
   supabaseLoadProject,
   supabaseRefreshSession,
   supabaseSaveProject
@@ -44,6 +45,108 @@ async function listAvailableProjects() {
   } catch (err) {
     console.warn('[projectManager] Supabase project list failed:', err?.message || err);
     return localProjects;
+  }
+}
+
+function dispatchProjectSyncStatus({ label, state = 'local', detail = '' } = {}) {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new CustomEvent('ctr:project-sync-status', {
+    detail: {
+      label: label || 'Local',
+      state,
+      detail
+    }
+  }));
+}
+
+function countArray(value) {
+  return Array.isArray(value) ? value.length : 0;
+}
+
+function countOneLineComponentsFromRecord(record = {}) {
+  const oneLine = record.oneLine;
+  if (Array.isArray(oneLine)) return oneLine.length;
+  if (!oneLine || typeof oneLine !== 'object') return 0;
+  const sheets = Array.isArray(oneLine.sheets) ? oneLine.sheets : [];
+  return sheets.reduce((sum, sheet) => sum + countArray(sheet?.components), 0);
+}
+
+function summarizeSavedProjectRecord(name, record = {}) {
+  const raceways = record.raceways && typeof record.raceways === 'object' ? record.raceways : {};
+  const meta = record.__meta && typeof record.__meta === 'object' ? record.__meta : {};
+  return {
+    name,
+    source: 'local',
+    sources: ['local'],
+    createdAt: typeof meta.createdAt === 'string' ? meta.createdAt : null,
+    updatedAt: typeof meta.updatedAt === 'string' ? meta.updatedAt : null,
+    counts: {
+      equipment: countArray(record.equipment),
+      loads: countArray(record.loads),
+      cables: countArray(record.cables),
+      raceways: countArray(raceways.trays) + countArray(raceways.conduits) + countArray(raceways.ductbanks),
+      oneLineComponents: countOneLineComponentsFromRecord(record)
+    }
+  };
+}
+
+function mergeProjectSummaries(localSummaries, cloudSummaries) {
+  const byName = new Map();
+  const merge = summary => {
+    const name = normalizeProjectName(summary?.name);
+    if (!name) return;
+    const existing = byName.get(name) || {
+      name,
+      source: '',
+      sources: [],
+      createdAt: null,
+      updatedAt: null,
+      counts: {
+        equipment: 0,
+        loads: 0,
+        cables: 0,
+        raceways: 0,
+        oneLineComponents: 0
+      }
+    };
+    const sources = new Set([...(existing.sources || []), ...(summary.sources || [summary.source]).filter(Boolean)]);
+    const nextUpdated = summary.updatedAt || existing.updatedAt;
+    const existingTime = existing.updatedAt ? Date.parse(existing.updatedAt) : 0;
+    const nextTime = nextUpdated ? Date.parse(nextUpdated) : 0;
+    byName.set(name, {
+      ...existing,
+      ...summary,
+      name,
+      sources: [...sources],
+      source: sources.has('local') && sources.has('cloud') ? 'local+cloud' : [...sources][0] || 'local',
+      createdAt: existing.createdAt || summary.createdAt || null,
+      updatedAt: nextTime >= existingTime ? nextUpdated : existing.updatedAt,
+      counts: {
+        ...existing.counts,
+        ...(summary.counts || {})
+      }
+    });
+  };
+  localSummaries.forEach(merge);
+  cloudSummaries.forEach(merge);
+  return [...byName.values()].sort((a, b) => {
+    const aTime = a.updatedAt ? Date.parse(a.updatedAt) : 0;
+    const bTime = b.updatedAt ? Date.parse(b.updatedAt) : 0;
+    if (aTime !== bTime) return bTime - aTime;
+    return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+  });
+}
+
+async function listProjectSummaries() {
+  const localSummaries = listProjects().map(name => summarizeSavedProjectRecord(name, readSavedProject(name) || {}));
+  const auth = getAuthContext();
+  if (!isSupabaseAuthContext(auth)) return localSummaries;
+  try {
+    const cloudSummaries = await supabaseListProjectSummaries(auth);
+    return mergeProjectSummaries(localSummaries, cloudSummaries);
+  } catch (err) {
+    console.warn('[projectManager] Supabase project summaries failed:', err?.message || err);
+    return localSummaries;
   }
 }
 
@@ -90,6 +193,26 @@ function createEmptyProjectSections() {
 function clearAuthContext() {
   clearAuthContextState();
   updateAuthSessionControls();
+}
+
+function formatProjectDate(value) {
+  if (!value) return 'Not saved yet';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Not saved yet';
+  return date.toLocaleString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit'
+  });
+}
+
+function formatProjectSource(summary) {
+  const sources = new Set(summary?.sources || [summary?.source].filter(Boolean));
+  if (sources.has('local') && sources.has('cloud')) return 'Local + cloud';
+  if (sources.has('cloud')) return 'Cloud';
+  return 'Local';
 }
 
 function getAuthContext() {
@@ -464,10 +587,13 @@ async function saveProject(options = {}) {
   let message;
   if (serverError || (attempted && !ok)) {
     message = `Project "${name}" saved locally. Server sync failed.`;
+    dispatchProjectSyncStatus({ label: 'Sync failed', state: 'error', detail: message });
   } else if (!attempted) {
     message = `Project "${name}" saved locally.`;
+    dispatchProjectSyncStatus({ label: 'Local', state: 'local', detail: message });
   } else {
     message = `Project "${name}" successfully saved.`;
+    dispatchProjectSyncStatus({ label: 'Saved', state: 'saved', detail: message });
   }
   await showAlertModal('Project Saved', message);
 }
@@ -500,6 +626,199 @@ async function loadProject() {
     return;
   }
   location.reload();
+}
+
+async function openProjectByName(name) {
+  const trimmed = normalizeProjectName(name);
+  if (!trimmed) return false;
+  setProjectHash(trimmed);
+  let loaded = false;
+  try { loaded = await serverLoadProject(trimmed); } catch (e) { console.error(e); }
+  if (!loaded) loaded = dsLoadProject(trimmed);
+  if (!loaded) {
+    await showAlertModal('Project Not Found', `Project "${trimmed}" could not be loaded from your saved projects.`);
+    return false;
+  }
+  location.reload();
+  return true;
+}
+
+async function deleteProject(name) {
+  const trimmed = normalizeProjectName(name);
+  if (!trimmed) return false;
+  const confirmed = typeof window === 'undefined' || typeof window.confirm !== 'function'
+    ? true
+    : window.confirm(`Delete "${trimmed}" from your saved projects? This cannot be undone.`);
+  if (!confirmed) return false;
+  let cloudFailed = false;
+  try {
+    removeSavedProject(trimmed);
+  } catch (err) {
+    await showAlertModal('Delete Failed', err?.message || 'The local project could not be deleted.');
+    return false;
+  }
+  const auth = getAuthContext();
+  if (isSupabaseAuthContext(auth)) {
+    try {
+      await supabaseDeleteProject(auth, trimmed);
+    } catch (err) {
+      cloudFailed = true;
+      console.warn('[projectManager] Supabase project delete failed:', err?.message || err);
+    }
+  }
+  await showAlertModal(
+    cloudFailed ? 'Local Project Deleted' : 'Project Deleted',
+    cloudFailed
+      ? `Project "${trimmed}" was deleted locally, but cloud deletion failed. Try again after reconnecting.`
+      : `Project "${trimmed}" was deleted.`
+  );
+  return true;
+}
+
+function currentProjectSummary() {
+  const state = getProjectState();
+  const settings = state.settings && typeof state.settings === 'object' ? state.settings : {};
+  return {
+    name: currentProjectName() || normalizeProjectName(state.name) || 'Untitled Project',
+    counts: {
+      equipment: countArray(settings.equipment),
+      loads: countArray(settings.loadList),
+      cables: countArray(state.cables),
+      raceways: countArray(state.trays) + countArray(state.conduits) + countArray(state.ductbanks),
+      oneLineComponents: countOneLineComponentsFromRecord({ oneLine: settings.oneLineDiagram })
+    }
+  };
+}
+
+function renderProjectEmptyState(container) {
+  const current = currentProjectSummary();
+  container.innerHTML = `
+    <div class="project-workspace-empty">
+      <div>
+        <span class="project-workspace-eyebrow">First project</span>
+        <h3>Create or open a project</h3>
+        <p>Start a named project, open saved work, or use a sample project to explore the workflow.</p>
+      </div>
+      <div class="project-workspace-actions">
+        <button type="button" class="btn primary-btn" data-project-action="new">Create New Project</button>
+        <button type="button" class="btn" data-project-action="load">Open Existing Project</button>
+        <a class="btn" href="samplegallery.html">Try a Sample Project</a>
+      </div>
+      <dl class="project-workspace-current">
+        <div><dt>Current workspace</dt><dd>${escapeHtml(current.name)}</dd></div>
+        <div><dt>Records</dt><dd>${escapeHtml(current.counts.equipment + current.counts.loads + current.counts.cables)}</dd></div>
+        <div><dt>Raceways</dt><dd>${escapeHtml(current.counts.raceways)}</dd></div>
+      </dl>
+    </div>
+  `;
+}
+
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function renderProjectRows(container, summaries) {
+  const current = currentProjectName();
+  container.innerHTML = `
+    <div class="project-workspace-list" role="list">
+      ${summaries.map(summary => {
+        const counts = summary.counts || {};
+        const isCurrent = current && summary.name === current;
+        return `
+          <article class="project-workspace-row${isCurrent ? ' is-current' : ''}" role="listitem">
+            <div class="project-workspace-row__main">
+              <strong>${escapeHtml(summary.name)}</strong>
+              <span>${escapeHtml(formatProjectSource(summary))} - ${escapeHtml(formatProjectDate(summary.updatedAt))}</span>
+            </div>
+            <div class="project-workspace-row__metrics" aria-label="Project record counts">
+              <span>${escapeHtml(counts.equipment || 0)} equipment</span>
+              <span>${escapeHtml(counts.loads || 0)} loads</span>
+              <span>${escapeHtml(counts.cables || 0)} cables</span>
+              <span>${escapeHtml(counts.raceways || 0)} raceways</span>
+            </div>
+            <div class="project-workspace-row__actions">
+              <button type="button" class="btn btn-sm" data-project-open="${escapeHtml(summary.name)}">${isCurrent ? 'Reload' : 'Open'}</button>
+              <button type="button" class="btn btn-sm btn-danger" data-project-delete="${escapeHtml(summary.name)}">Delete</button>
+            </div>
+          </article>
+        `;
+      }).join('')}
+    </div>
+  `;
+}
+
+async function refreshProjectWorkspace(container) {
+  container.setAttribute('aria-busy', 'true');
+  try {
+    const summaries = await listProjectSummaries();
+    if (!summaries.length) {
+      renderProjectEmptyState(container);
+    } else {
+      renderProjectRows(container, summaries);
+    }
+  } catch (err) {
+    console.error(err);
+    container.innerHTML = '<p class="text-muted">Saved projects could not be loaded. Try again after reconnecting.</p>';
+  } finally {
+    container.setAttribute('aria-busy', 'false');
+  }
+}
+
+function mountProjectWorkspace() {
+  const containers = document.querySelectorAll('[data-project-workspace]');
+  if (!containers.length) return;
+  if (!document.body.dataset.projectGlobalActionsMounted) {
+    document.body.dataset.projectGlobalActionsMounted = 'true';
+    document.addEventListener('click', event => {
+      const target = event.target instanceof Element ? event.target : null;
+      const actionButton = target?.closest('[data-project-action]');
+      if (!actionButton) return;
+      if (actionButton.closest('[data-project-workspace]')) return;
+      const action = actionButton.getAttribute('data-project-action');
+      if (action === 'new') newProject().catch(console.error);
+      if (action === 'load') loadProject().catch(console.error);
+      if (action === 'save') {
+        saveProject()
+          .then(() => {
+            document.querySelectorAll('[data-project-workspace]').forEach(container => {
+              refreshProjectWorkspace(container).catch(console.error);
+            });
+          })
+          .catch(console.error);
+      }
+    });
+  }
+  containers.forEach(container => {
+    if (container.dataset.projectWorkspaceMounted === 'true') return;
+    container.dataset.projectWorkspaceMounted = 'true';
+    container.addEventListener('click', event => {
+      const target = event.target instanceof Element ? event.target : null;
+      const openButton = target?.closest('[data-project-open]');
+      const deleteButton = target?.closest('[data-project-delete]');
+      const actionButton = target?.closest('[data-project-action]');
+      if (openButton) {
+        openProjectByName(openButton.getAttribute('data-project-open')).catch(console.error);
+        return;
+      }
+      if (deleteButton) {
+        deleteProject(deleteButton.getAttribute('data-project-delete'))
+          .then(changed => {
+            if (changed) refreshProjectWorkspace(container).catch(console.error);
+          })
+          .catch(console.error);
+        return;
+      }
+      const action = actionButton?.getAttribute('data-project-action');
+      if (action === 'new') newProject().catch(console.error);
+      if (action === 'load') loadProject().catch(console.error);
+      if (action === 'save') saveProject().then(() => refreshProjectWorkspace(container)).catch(console.error);
+    });
+    refreshProjectWorkspace(container).catch(console.error);
+  });
 }
 
 
@@ -746,6 +1065,14 @@ function initProjectManagerControls() {
   wireButton('load-project-btn', loadProject);
   mountShareControls();
   mountProfileControl();
+  mountProjectWorkspace();
+  dispatchProjectSyncStatus({
+    label: isSupabaseAuthContext(getAuthContext()) ? 'Cloud ready' : 'Local',
+    state: isSupabaseAuthContext(getAuthContext()) ? 'ready' : 'local',
+    detail: isSupabaseAuthContext(getAuthContext())
+      ? 'Project saves can sync to your account.'
+      : 'Project saves are local until you log in.'
+  });
 
   // Add login/logout button
   const menu = document.getElementById('settings-menu');
@@ -790,7 +1117,21 @@ function initProjectManagerControls() {
 }
 
 if (typeof window !== 'undefined') {
-  window.projectManager = { listProjects, newProject, renameProject, saveProject, loadProject };
+  window.projectManager = {
+    listProjects,
+    listProjectSummaries,
+    newProject,
+    renameProject,
+    saveProject,
+    loadProject,
+    openProjectByName,
+    deleteProject,
+    refreshProjectWorkspace: () => {
+      document.querySelectorAll('[data-project-workspace]').forEach(container => {
+        refreshProjectWorkspace(container).catch(console.error);
+      });
+    }
+  };
   if (document.readyState === 'loading') {
     window.addEventListener('DOMContentLoaded', initProjectManagerControls, { once: true });
   } else {

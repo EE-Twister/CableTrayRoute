@@ -363,11 +363,19 @@ function projectFilterUrl(config, name = '') {
   return url;
 }
 
+function addProjectOwnerFilter(url, auth) {
+  if (auth?.userId) {
+    url.searchParams.set('user_id', `eq.${auth.userId}`);
+  }
+  return url;
+}
+
 export async function supabaseListProjects(auth) {
   const config = await getSupabaseConfig();
   requireConfigured(config);
   requireProjectAuth(auth);
   const url = restUrl(config, '/projects');
+  addProjectOwnerFilter(url, auth);
   url.searchParams.set('select', 'name');
   url.searchParams.set('order', 'name.asc');
   const res = await fetch(url.href, {
@@ -379,6 +387,30 @@ export async function supabaseListProjects(auth) {
     : [];
 }
 
+export async function supabaseListProjectSummaries(auth) {
+  const config = await getSupabaseConfig();
+  requireConfigured(config);
+  requireProjectAuth(auth);
+  const url = restUrl(config, '/projects');
+  addProjectOwnerFilter(url, auth);
+  url.searchParams.set('select', 'name,created_at,updated_at');
+  url.searchParams.set('order', 'updated_at.desc');
+  const res = await fetch(url.href, {
+    headers: authHeaders(config, auth.accessToken)
+  });
+  const rows = await parseSupabaseResponse(res);
+  return Array.isArray(rows)
+    ? rows
+      .filter(row => typeof row?.name === 'string' && row.name.trim())
+      .map(row => ({
+        name: row.name.trim(),
+        createdAt: row.created_at || null,
+        updatedAt: row.updated_at || null,
+        source: 'cloud'
+      }))
+    : [];
+}
+
 export async function supabaseLoadProject(auth, name) {
   const projectName = typeof name === 'string' ? name.trim() : '';
   if (!projectName) return null;
@@ -386,6 +418,7 @@ export async function supabaseLoadProject(auth, name) {
   requireConfigured(config);
   requireProjectAuth(auth);
   const url = projectFilterUrl(config, projectName);
+  addProjectOwnerFilter(url, auth);
   url.searchParams.set('select', 'data');
   url.searchParams.set('limit', '1');
   const res = await fetch(url.href, {
@@ -428,6 +461,7 @@ export async function supabaseDeleteProject(auth, name) {
   requireConfigured(config);
   requireProjectAuth(auth);
   const url = projectFilterUrl(config, projectName);
+  addProjectOwnerFilter(url, auth);
   const res = await fetch(url.href, {
     method: 'DELETE',
     headers: authHeaders(config, auth.accessToken)

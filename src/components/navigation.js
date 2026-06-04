@@ -312,7 +312,12 @@ function buildProjectActionsControl(existingProjectDisplay) {
     display.textContent = 'Project: Untitled';
   }
 
-  trigger.append(icon, display);
+  const syncStatus = document.createElement('span');
+  syncStatus.id = 'project-sync-status';
+  syncStatus.className = 'project-sync-status project-sync-status--local';
+  syncStatus.textContent = 'Local';
+
+  trigger.append(icon, display, syncStatus);
 
   const panel = document.createElement('div');
   panel.className = 'project-actions-panel';
@@ -376,6 +381,19 @@ function buildProjectActionsControl(existingProjectDisplay) {
   });
 
   return wrapper;
+}
+
+function updateProjectSyncStatus(detail = {}) {
+  const status = document.getElementById('project-sync-status');
+  if (!status) return;
+  const state = detail.state || 'local';
+  status.className = `project-sync-status project-sync-status--${state}`;
+  status.textContent = detail.label || 'Local';
+  if (detail.detail) {
+    status.title = detail.detail;
+  } else {
+    status.removeAttribute('title');
+  }
 }
 
 function hasNavigationDomApi() {
@@ -566,6 +584,13 @@ function mountPersistentNavigation() {
       });
     }
   });
+
+  if (!window.__projectSyncStatusListenerWired) {
+    window.__projectSyncStatusListenerWired = true;
+    window.addEventListener('ctr:project-sync-status', event => {
+      updateProjectSyncStatus(event.detail || {});
+    });
+  }
 
   document.body.dataset.navMounted = 'true';
 }

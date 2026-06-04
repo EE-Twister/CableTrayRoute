@@ -60,9 +60,29 @@ describe('page navigation', () => {
   it('persistent navigation exposes project actions', () => {
     const src = fs.readFileSync(path.join(root, 'src/components/navigation.js'), 'utf8');
     assert.ok(src.includes('project-actions-control'), 'navigation.js missing project actions control');
+    assert.ok(src.includes('project-sync-status'), 'navigation.js missing project sync status badge');
     assert.ok(src.includes('New Project'), 'navigation.js missing New Project action');
     assert.ok(src.includes('Save Project'), 'navigation.js missing Save Project action');
     assert.ok(src.includes('Load Project'), 'navigation.js missing Load Project action');
     assert.ok(src.includes("import('../projectManager.js')"), 'navigation.js should lazy-load project manager actions');
+  });
+
+  it('home and dashboard expose the My Projects workspace', () => {
+    const home = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+    const dashboard = fs.readFileSync(path.join(root, 'workflowdashboard.html'), 'utf8');
+    assert.ok(home.includes('id="home-projects-panel"'), 'index.html missing My Projects panel');
+    assert.ok(home.includes('data-project-workspace'), 'index.html missing project workspace mount point');
+    assert.ok(dashboard.includes('id="dashboard-projects-panel"'), 'workflowdashboard.html missing My Projects panel');
+    assert.ok(dashboard.includes('data-project-workspace'), 'workflowdashboard.html missing project workspace mount point');
+  });
+
+  it('project workspace modules are loaded on project pages', () => {
+    const indexSrc = fs.readFileSync(path.join(root, 'src/index.js'), 'utf8');
+    const dashboardSrc = fs.readFileSync(path.join(root, 'src/workflowDashboard.js'), 'utf8');
+    const managerSrc = fs.readFileSync(path.join(root, 'src/projectManager.js'), 'utf8');
+    assert.ok(indexSrc.includes('data-project-workspace'), 'index.js should load project manager for workspace panels');
+    assert.ok(dashboardSrc.includes("import './projectManager.js'"), 'workflowDashboard.js should mount project manager workspace');
+    assert.ok(managerSrc.includes('listProjectSummaries'), 'projectManager.js missing project summary API');
+    assert.ok(managerSrc.includes('deleteProject'), 'projectManager.js missing delete project handler');
   });
 });

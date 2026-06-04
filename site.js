@@ -61,7 +61,7 @@ const CHECKPOINT_KEY='CTR_CHECKPOINT';
 const MAX_CHECKPOINT_SIZE=2*1024*1024; // ~2MB
 const AUTO_SAVE_INTERVAL_MS=5*60*1000;
 const ONBOARDING_STATE_KEY='onboarding';
-const ONBOARDING_VERSION='2026.03';
+const ONBOARDING_VERSION='2026.06';
 let cachedProjectFileHandle=null;
 let autoSaveSchedulerInstance=null;
 let dirtyTrackerInstance=null;
@@ -221,7 +221,7 @@ async function runOnboardingFlow({force=false,source='auto'}={}){
     {
       title:'Welcome to CableTrayRoute',
       description:'This quick onboarding walks you through the project workflow in under a minute.',
-      details:`${stepIndicator(0)}\n\nCableTrayRoute modules can be used independently, but the integrated path is Equipment List -> Load List -> One-Line -> Cable Schedule -> Raceway Schedule -> Fill / Routing -> Studies -> Deliverables.\n\nThe One-Line no longer overwrites schedules automatically. Use Reconcile Schedules when you want to preview and apply schedule updates.`
+      details:`${stepIndicator(0)}\n\nCableTrayRoute modules can be used independently, but the integrated path is Equipment List -> Load List -> One-Line -> Cable Schedule -> Raceway Schedule -> Fill / Routing -> Studies -> Deliverables.\n\nUse My Projects on Home or the Project Dashboard to create, open, save, and review saved work. The One-Line no longer overwrites schedules automatically. Use Reconcile Schedules when you want to preview and apply schedule updates.`
     },
     {
       title:'Load a sample project in one click',
@@ -254,9 +254,9 @@ async function runOnboardingFlow({force=false,source='auto'}={}){
       ]
     },
     {
-      title:'Settings, help, and collaboration',
-      description:'Find everything you need from the settings menu.',
-      details:`${stepIndicator(5)}\n\nAfter the model is coordinated, run fill/routing pages, studies, and deliverables from the workflow navigation.\n\nUse Settings > Site Help for reference documentation. Save and load projects using the project buttons in Settings. Reopen this tour at any time from Settings > Reopen Onboarding.`,
+      title:'Projects, help, and collaboration',
+      description:'Find project controls in the top navigation and reference material in Settings.',
+      details:`${stepIndicator(5)}\n\nAfter the model is coordinated, run fill/routing pages, studies, and deliverables from the workflow navigation.\n\nUse the Project menu in the top navigation to create, save, load, or jump to the Project Dashboard. The sync badge shows whether the current workspace is local, unsaved, saved, or ready for cloud saves. Use Settings > Site Help for reference documentation and Settings > Reopen Onboarding to restart this tour.`,
       links:[
         {href:'cabletrayfill.html',label:'Tray Fill'},
         {href:'optimalRoute.html',label:'Optimal Route'},
@@ -619,9 +619,15 @@ function updateLastSavedIndicator(){
   }
 }
 
+function dispatchProjectSyncStatus(detail){
+  if(typeof window==='undefined'||typeof window.dispatchEvent!=='function'||typeof CustomEvent!=='function') return;
+  window.dispatchEvent(new CustomEvent('ctr:project-sync-status',{detail}));
+}
+
 function recordSave(){
   lastSavedAt=new Date();
   updateLastSavedIndicator();
+  dispatchProjectSyncStatus({label:'Saved',state:'saved',detail:'Project backup was written.'});
   // Refresh "X ago" text every 30 seconds while the page is open
   if(lastSavedIndicatorTimer) clearInterval(lastSavedIndicatorTimer);
   lastSavedIndicatorTimer=setInterval(updateLastSavedIndicator,30000);
@@ -895,6 +901,9 @@ function createProjectDisplayScheduler(){
 const projectDisplayScheduler=createProjectDisplayScheduler();
 
 function save(snapshot,options={}){
+  if(options.reason!=='initial-render'&&options.reason!=='settings-init'){
+    dispatchProjectSyncStatus({label:'Unsaved changes',state:'dirty',detail:'Project changes are saved in this browser. Use Save Project to sync or back up this project.'});
+  }
   if(options.flush){
     return projectDisplayScheduler.flush(snapshot,options);
   }

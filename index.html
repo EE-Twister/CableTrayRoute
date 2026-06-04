@@ -161,6 +161,19 @@
   </header>
   <div class="container">
     <main id="main-content" class="main-content">
+      <section class="home-section home-section--projects" aria-labelledby="home-projects-title">
+        <div class="home-section__header">
+          <div>
+            <h2 id="home-projects-title">My Projects</h2>
+            <p>Create your first project, open saved work, or start from a sample project.</p>
+          </div>
+          <button type="button" class="home-section__link btn" data-project-action="save">Save Current Project</button>
+        </div>
+        <div id="home-projects-panel" class="project-workspace-panel" data-project-workspace aria-live="polite">
+          <p class="text-muted">Loading saved projects...</p>
+        </div>
+      </section>
+
       <section class="home-section home-section--workflow" aria-labelledby="home-workflow-title">
         <div class="home-section__header">
           <div>

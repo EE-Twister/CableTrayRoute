@@ -176,7 +176,7 @@ Add these Cloudflare Pages environment variables:
 | `SUPABASE_URL` | Your Supabase project URL |
 | `SUPABASE_ANON_KEY` | Your Supabase anon public key |
 
-The build command writes `supabase-config.json` from those variables. The anon key is public by design; Row-Level Security protects project data.
+The build command writes `supabase-config.json` from those variables. The anon key is public by design; Row-Level Security protects project data. Browser project list, summary, load, and delete requests also include the signed-in `user_id` as an explicit REST filter, while Supabase RLS remains the enforcement layer for account ownership.
 
 Generated build output under `dist/` is ignored by Git. Cloudflare Pages runs the build command during deployment, so feature work should not commit generated `dist` artifacts. Use `npm run check:dist-review` before opening review if you want to verify the working tree is free of generated build noise.
 
@@ -203,7 +203,8 @@ The static Supabase path supports:
   links, username/email edits, password updates, account data export,
   confirmation-email resend, active-session display, account deletion request
   tracking, and sign-out controls for the active account.
-- Cloud project save/load through Supabase Postgres.
+- Cloud project save/load through Supabase Postgres, with My Projects summary
+  cards on Home and the Project Dashboard.
 - Local browser storage fallback when logged out.
 
 These Express-only features are not migrated yet:

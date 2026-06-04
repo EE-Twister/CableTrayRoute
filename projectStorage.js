@@ -700,7 +700,9 @@ export function writeSavedProject(projectId, sections = {}) {
   const entries = sections && typeof sections === 'object' ? Object.entries(sections) : [];
   if (!entries.length) return;
   const current = isPlainObject(savedProjectsCache[name]) ? { ...savedProjectsCache[name] } : {};
+  const previousMeta = isPlainObject(current.__meta) ? current.__meta : {};
   for (const [key, value] of entries) {
+    if (key === '__meta') continue;
     const cloned = cloneSavedProjectValue(value);
     if (cloned === undefined) {
       delete current[key];
@@ -708,9 +710,15 @@ export function writeSavedProject(projectId, sections = {}) {
       current[key] = cloned;
     }
   }
-  if (Object.keys(current).length === 0) {
+  const dataKeys = Object.keys(current).filter(key => key !== '__meta');
+  if (!dataKeys.length) {
     delete savedProjectsCache[name];
   } else {
+    const now = new Date().toISOString();
+    current.__meta = {
+      createdAt: typeof previousMeta.createdAt === 'string' ? previousMeta.createdAt : now,
+      updatedAt: now
+    };
     savedProjectsCache[name] = current;
   }
   migratedSavedProjects.delete(name);

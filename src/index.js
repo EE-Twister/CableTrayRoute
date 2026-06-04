@@ -60,6 +60,12 @@ function initDeferredWorkflowModuleLoading() {
     workflowGrid.addEventListener("pointerenter", navIntentHandler, { once: true, capture: true });
     workflowGrid.addEventListener("focusin", navIntentHandler, { once: true, capture: true });
   }
+
+  if (document.querySelector("[data-project-workspace]")) {
+    loadProjectManagerModule().catch(err => {
+      console.error("Project workspace module load failed", err);
+    });
+  }
 }
 
 if (typeof document !== "undefined") {

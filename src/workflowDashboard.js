@@ -23,6 +23,7 @@ import { buildMinimalDesignAutomation } from '../analysis/workflowAutomation.mjs
 import { buildDesignBasisReview, normalizeDesignBasis, summarizeDesignBasis } from '../analysis/designBasis.mjs';
 import protectiveDevices from '../data/protectiveDevices.mjs';
 import '../site.js';
+import './projectManager.js';
 
 // Studies tracked in the dashboard with display labels and their storage keys
 const STUDY_DEFINITIONS = [
