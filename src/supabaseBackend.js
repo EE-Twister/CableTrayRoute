@@ -230,6 +230,21 @@ export async function supabaseUpdatePassword(auth, password) {
   return parseSupabaseResponse(res);
 }
 
+export async function supabaseUpdateProfile(auth, { username, email } = {}) {
+  const config = await getSupabaseConfig();
+  requireConfigured(config);
+  if (!auth?.accessToken) throw new Error('Login required.');
+  const body = {};
+  if (typeof email === 'string' && email.trim()) body.email = email.trim();
+  if (typeof username === 'string' && username.trim()) body.data = { username: username.trim() };
+  const res = await fetch(authUrl(config, '/user'), {
+    method: 'PUT',
+    headers: authHeaders(config, auth.accessToken),
+    body: JSON.stringify(body)
+  });
+  return parseSupabaseResponse(res);
+}
+
 function requireProjectAuth(auth) {
   if (!isSupabaseAuthContext(auth) || !auth.userId) {
     throw new Error('Supabase login required.');

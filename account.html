@@ -83,6 +83,20 @@
               <dd id="account-type">...</dd>
             </div>
           </dl>
+          <form id="profile-details-form" class="auth-form account-edit-form">
+            <div class="auth-field">
+              <label for="profile-username">Username</label>
+              <input id="profile-username" name="profile-username" type="text" autocomplete="username"
+                     pattern="[a-zA-Z0-9_\-]{1,100}" placeholder="Username" required>
+            </div>
+            <div class="auth-field">
+              <label for="profile-email">Email</label>
+              <input id="profile-email" name="profile-email" type="email" autocomplete="email"
+                     placeholder="you@example.com" required>
+            </div>
+            <p id="profile-edit-note" class="auth-description"></p>
+            <button type="submit" class="primary-btn">Save Profile</button>
+          </form>
         </section>
 
         <section class="auth-pane account-pane" aria-labelledby="session-title">

@@ -99,7 +99,7 @@ The static Supabase path supports:
 - A top navigation account avatar after login, generated from the signed-in
   username or email. The avatar menu links to Account and Logout.
 - Account settings with profile, session, workspace summary, quick project
-  links, and password updates for the active Supabase session.
+  links, username/email edits, and password updates for the active account.
 - Cloud project save/load through Supabase Postgres.
 - Local browser storage fallback when logged out.
 

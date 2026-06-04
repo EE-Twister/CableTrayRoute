@@ -49,6 +49,17 @@ globalThis.fetch = async (url, options = {}) => {
       message: 'For security purposes, you can only request this after 54 seconds.'
     }, { ok: false, status: 429 });
   }
+  if (call.url.includes('/auth/v1/user')) {
+    const body = JSON.parse(call.options.body || '{}');
+    if (body.password) {
+      return jsonResponse({ user: { id: 'user-1' } });
+    }
+    return jsonResponse({
+      id: 'user-1',
+      email: body.email || 'test@example.com',
+      user_metadata: body.data || {}
+    });
+  }
   if (call.url.includes('/rest/v1/projects') && call.options.method === 'POST') {
     return jsonResponse({}, { status: 201 });
   }
@@ -69,7 +80,8 @@ const {
   supabaseRefreshSession,
   supabaseSaveProject,
   supabaseSignIn,
-  supabaseSignUp
+  supabaseSignUp,
+  supabaseUpdateProfile
 } = await import('../src/supabaseBackend.js');
 
 function check(name, fn) {
@@ -142,6 +154,20 @@ await checkAsync('refreshes a Supabase session with refresh token', async () => 
   const refreshed = createAuthContextFromSupabaseSession(session);
   assert.equal(refreshed.accessToken, 'access-token-2');
   assert.equal(refreshed.refreshToken, 'refresh-token-2');
+});
+
+await checkAsync('updates profile username and email through signed-in user endpoint', async () => {
+  const result = await supabaseUpdateProfile(auth, {
+    username: 'lead_designer',
+    email: 'lead@example.com'
+  });
+  const updateCall = calls.find(call => call.url.includes('/auth/v1/user') && call.options.method === 'PUT');
+  assert.equal(updateCall.options.headers.Authorization, 'Bearer access-token');
+  const body = JSON.parse(updateCall.options.body);
+  assert.equal(body.email, 'lead@example.com');
+  assert.equal(body.data.username, 'lead_designer');
+  assert.equal(result.email, 'lead@example.com');
+  assert.equal(result.user_metadata.username, 'lead_designer');
 });
 
 await checkAsync('preserves Supabase signup rate-limit metadata', async () => {

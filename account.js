@@ -9,10 +9,11 @@ import {
   setAuthContextState
 } from './projectStorage.js';
 import { authProviderLabel, avatarColorForUser, initialsForUser } from './src/authProfile.js';
-import { signOutCurrentUser } from './src/authProfileControl.js';
-import { isSupabaseAuthContext, supabaseUpdatePassword } from './src/supabaseBackend.js';
+import { signOutCurrentUser, updateAuthSessionControls } from './src/authProfileControl.js';
+import { isSupabaseAuthContext, supabaseUpdatePassword, supabaseUpdateProfile } from './src/supabaseBackend.js';
 
 const MIN_PASSWORD_LENGTH = 8;
+const USERNAME_PATTERN = /^[a-zA-Z0-9_-]{1,100}$/;
 
 function setText(id, value) {
   const node = document.getElementById(id);
@@ -108,6 +109,11 @@ function renderAccount(auth) {
   setText('account-local-projects', workspace.savedProjectCount);
   setText('account-display-prefs', workspace.displayPrefs);
 
+  const usernameInput = document.getElementById('profile-username');
+  if (usernameInput) usernameInput.value = user === 'Signed in user' ? '' : user;
+  const emailInput = document.getElementById('profile-email');
+  if (emailInput) emailInput.value = email === 'Not available' ? '' : email;
+
   const avatar = document.getElementById('account-avatar');
   if (avatar) {
     avatar.textContent = initialsForUser(auth.user);
@@ -129,6 +135,78 @@ function renderAccount(auth) {
     if (currentField) currentField.hidden = false;
     if (currentInput) currentInput.required = true;
   }
+
+  const profileNote = document.getElementById('profile-edit-note');
+  const profileForm = document.getElementById('profile-details-form');
+  if (profileNote) {
+    profileNote.textContent = isSupabaseAuthContext(auth)
+      ? 'Changes may require email confirmation before the new sign-in email becomes active.'
+      : 'This account is managed by your deployment administrator.';
+  }
+  if (profileForm) {
+    const disabled = !isSupabaseAuthContext(auth);
+    profileForm.querySelectorAll('input, button').forEach(control => {
+      control.disabled = disabled;
+    });
+  }
+}
+
+function mergeSupabaseProfile(auth, result, requested) {
+  const user = result?.user && typeof result.user === 'object' ? result.user : result || {};
+  const metadata = user.user_metadata && typeof user.user_metadata === 'object' ? user.user_metadata : {};
+  return {
+    ...auth,
+    user: metadata.username || requested.username || auth.user,
+    email: user.email || requested.email || auth.email
+  };
+}
+
+function initProfileForm(auth) {
+  const form = document.getElementById('profile-details-form');
+  if (!form) return;
+  let currentAuth = auth;
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (!isSupabaseAuthContext(currentAuth)) {
+      showStatus(form, 'Contact your deployment administrator to change this account profile.', true);
+      return;
+    }
+
+    const username = document.getElementById('profile-username')?.value.trim() || '';
+    const email = document.getElementById('profile-email')?.value.trim() || '';
+    const btn = form.querySelector('button[type="submit"]');
+
+    if (!USERNAME_PATTERN.test(username)) {
+      showStatus(form, 'Username may only contain letters, numbers, underscores, and hyphens (1-100 characters).', true);
+      return;
+    }
+    if (!email) {
+      showStatus(form, 'Email is required.', true);
+      return;
+    }
+    if (username === currentAuth.user && email === currentAuth.email) {
+      showStatus(form, 'No profile changes to save.', false);
+      return;
+    }
+
+    if (btn) btn.disabled = true;
+    showStatus(form, 'Saving profile...', false);
+
+    try {
+      const result = await supabaseUpdateProfile(currentAuth, { username, email });
+      const nextAuth = mergeSupabaseProfile(currentAuth, result, { username, email });
+      setAuthContextState(nextAuth);
+      currentAuth = nextAuth;
+      renderAccount(nextAuth);
+      updateAuthSessionControls();
+      showStatus(form, 'Profile updated. If you changed your email, check that address for a confirmation message.', false);
+    } catch (err) {
+      console.error('[account] profile update request failed:', err);
+      showStatus(form, err?.message || 'Profile update failed. Check your connection and try again.', true);
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  });
 }
 
 async function changeSupabasePassword(auth, newPassword) {
@@ -207,6 +285,7 @@ function init() {
   }
 
   renderAccount(auth);
+  initProfileForm(auth);
   initPasswordForm(auth);
   document.getElementById('account-logout-btn')?.addEventListener('click', () => {
     signOutCurrentUser().catch(err => console.error('[account] logout failed:', err));
