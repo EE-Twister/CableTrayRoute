@@ -7,6 +7,7 @@ const AUTH_TOKEN_KEY = 'authToken';
 const AUTH_CSRF_KEY = 'authCsrfToken';
 const AUTH_EXPIRES_KEY = 'authExpiresAt';
 const AUTH_USER_KEY = 'authUser';
+const AUTH_EMAIL_KEY = 'ctr-auth-email';
 const AUTH_ROLE_KEY = 'ctr-user-role';
 const AUTH_PROVIDER_KEY = 'ctr-auth-provider';
 const AUTH_USER_ID_KEY = 'ctr-auth-user-id';
@@ -848,8 +849,9 @@ export function getAuthContextState() {
     }
     const user = readRawStorage(AUTH_USER_KEY);
     const userId = readRawStorage(AUTH_USER_ID_KEY);
+    const email = readRawStorage(AUTH_EMAIL_KEY);
     const role = readRawStorage(AUTH_ROLE_KEY);
-    return { provider: 'supabase', accessToken, refreshToken, expiresAt, user: user || null, userId: userId || null, role: role || null };
+    return { provider: 'supabase', accessToken, refreshToken, expiresAt, user: user || null, email: email || null, userId: userId || null, role: role || null };
   }
   // The bearer token is no longer stored client-side — it lives in the
   // HttpOnly ctr_auth cookie. Auth context is defined by having a fresh CSRF
@@ -864,8 +866,9 @@ export function getAuthContextState() {
     return null;
   }
   const user = readRawStorage(AUTH_USER_KEY);
+  const email = readRawStorage(AUTH_EMAIL_KEY);
   const role = readRawStorage(AUTH_ROLE_KEY);
-  return { provider: 'server', csrfToken, expiresAt, user: user || null, role: role || null };
+  return { provider: 'server', csrfToken, expiresAt, user: user || null, email: email || null, role: role || null };
 }
 
 const SESSION_WARNING_MS = 5 * 60 * 1000; // warn 5 minutes before expiry
@@ -906,7 +909,7 @@ function scheduleSessionTimers(expiresAt) {
   }, msUntilExpiry);
 }
 
-export function setAuthContextState({ provider = 'server', csrfToken, accessToken, refreshToken, expiresAt, user, userId, role } = {}) {
+export function setAuthContextState({ provider = 'server', csrfToken, accessToken, refreshToken, expiresAt, user, email, userId, role } = {}) {
   const expiresValue = Number(expiresAt);
   if (!Number.isFinite(expiresValue)) return;
   if (provider === 'supabase') {
@@ -921,6 +924,11 @@ export function setAuthContextState({ provider = 'server', csrfToken, accessToke
       writeRawStorage(AUTH_USER_KEY, null);
     } else {
       writeRawStorage(AUTH_USER_KEY, String(user));
+    }
+    if (email === undefined || email === null) {
+      writeRawStorage(AUTH_EMAIL_KEY, null);
+    } else {
+      writeRawStorage(AUTH_EMAIL_KEY, String(email));
     }
     if (userId === undefined || userId === null) {
       writeRawStorage(AUTH_USER_ID_KEY, null);
@@ -950,6 +958,11 @@ export function setAuthContextState({ provider = 'server', csrfToken, accessToke
   } else {
     writeRawStorage(AUTH_USER_KEY, String(user));
   }
+  if (email === undefined || email === null) {
+    writeRawStorage(AUTH_EMAIL_KEY, null);
+  } else {
+    writeRawStorage(AUTH_EMAIL_KEY, String(email));
+  }
   if (role === undefined || role === null) {
     writeRawStorage(AUTH_ROLE_KEY, null);
   } else {
@@ -964,6 +977,7 @@ export function clearAuthContextState() {
   writeRawStorage(AUTH_CSRF_KEY, null);
   writeRawStorage(AUTH_EXPIRES_KEY, null);
   writeRawStorage(AUTH_USER_KEY, null);
+  writeRawStorage(AUTH_EMAIL_KEY, null);
   writeRawStorage(AUTH_ROLE_KEY, null);
   writeRawStorage(AUTH_PROVIDER_KEY, null);
   writeRawStorage(AUTH_USER_ID_KEY, null);

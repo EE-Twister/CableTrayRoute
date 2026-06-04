@@ -22,5 +22,5 @@ export function avatarColorForUser(user = '') {
 
 export function authProviderLabel(auth) {
   if (!auth) return 'Signed out';
-  return auth.provider === 'supabase' ? 'Supabase account' : 'Server account';
+  return 'CableTrayRoute account';
 }

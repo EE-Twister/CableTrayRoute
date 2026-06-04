@@ -9,6 +9,7 @@ import {
 } from './src/supabaseBackend.js';
 
 const MIN_PASSWORD_LENGTH = 8;
+const USERNAME_PATTERN = /^[a-zA-Z0-9_-]{1,100}$/;
 const signupCooldowns = new Map();
 let supabaseAuthEnabled = false;
 let authModeReady = Promise.resolve();
@@ -74,17 +75,25 @@ function lockSuccessfulSignup(form, submitBtn) {
 function configureSupabaseAuthFields() {
   supabaseAuthEnabled = true;
   const signupUser = document.getElementById('signup-user');
+  const signupEmailField = document.getElementById('signup-email-field');
+  const signupEmail = document.getElementById('signup-email');
   const loginUser = document.getElementById('login-user');
   const signupLabel = document.querySelector('label[for="signup-user"]');
   const loginLabel = document.querySelector('label[for="login-user"]');
   const signupHint = document.getElementById('signup-user-hint');
   const loginHint = document.getElementById('login-user-hint');
 
-  signupUser.type = 'email';
-  signupUser.autocomplete = 'email';
-  signupUser.placeholder = 'you@example.com';
-  signupUser.removeAttribute('pattern');
-  signupUser.title = 'Enter a valid email address.';
+  signupUser.type = 'text';
+  signupUser.autocomplete = 'username';
+  signupUser.placeholder = 'Username';
+  signupUser.pattern = '[a-zA-Z0-9_\\-]{1,100}';
+  signupUser.title = 'Letters, numbers, underscores, and hyphens only (1-100 characters).';
+
+  if (signupEmailField) signupEmailField.classList.remove('hidden');
+  if (signupEmail) {
+    signupEmail.required = true;
+    signupEmail.setAttribute('aria-required', 'true');
+  }
 
   loginUser.type = 'email';
   loginUser.autocomplete = 'email';
@@ -92,9 +101,9 @@ function configureSupabaseAuthFields() {
   loginUser.removeAttribute('pattern');
   loginUser.title = 'Enter a valid email address.';
 
-  if (signupLabel) signupLabel.textContent = 'Email';
+  if (signupLabel) signupLabel.textContent = 'Username';
   if (loginLabel) loginLabel.textContent = 'Email';
-  if (signupHint) signupHint.textContent = 'Use the email address for your Supabase account.';
+  if (signupHint) signupHint.textContent = 'Choose the name shown in CableTrayRoute.';
   if (loginHint) loginHint.textContent = 'Enter your email address.';
   document.getElementById('sso-section')?.classList.add('hidden');
 }
@@ -105,6 +114,7 @@ async function signup(e) {
   const form = e.currentTarget;
   const submitBtn = form.querySelector('button[type="submit"]');
   const username = document.getElementById('signup-user').value.trim();
+  const email = document.getElementById('signup-email')?.value.trim() || username;
   const password = document.getElementById('signup-pass').value;
   const passwordsMatch = validateSignupPasswords(form, true);
 
@@ -112,7 +122,7 @@ async function signup(e) {
     return;
   }
 
-  if (!supabaseAuthEnabled && !/^[a-zA-Z0-9_-]{1,100}$/.test(username)) {
+  if (!USERNAME_PATTERN.test(username)) {
     showStatus(form, 'Username may only contain letters, numbers, underscores, and hyphens (1-100 characters).', true);
     return;
   }
@@ -127,9 +137,9 @@ async function signup(e) {
   }
 
   if (supabaseAuthEnabled) {
-    const cooldown = getSignupCooldown(username);
+    const cooldown = getSignupCooldown(email);
     if (cooldown > 0) {
-      showStatus(form, `Supabase is rate limiting signup requests. Wait ${cooldown} seconds, then try again.`, true);
+      showStatus(form, `Signup requests are temporarily rate limited. Wait ${cooldown} seconds, then try again.`, true);
       return;
     }
   }
@@ -138,7 +148,7 @@ async function signup(e) {
   submitBtn.disabled = true;
   try {
     if (supabaseAuthEnabled) {
-      const result = await supabaseSignUp({ email: username, password });
+      const result = await supabaseSignUp({ email, password, username });
       if (result.session?.access_token) {
         setAuthContextState(createAuthContextFromSupabaseSession(result.session));
         window.location.href = 'index.html';
@@ -164,7 +174,7 @@ async function signup(e) {
       showStatus(form, body.error || 'Signup failed. Please try again.', true);
     }
   } catch (err) {
-    rememberSignupCooldown(username, err);
+    rememberSignupCooldown(email, err);
     showStatus(form, authFailureMessage(err, 'Signup failed. Check your connection and try again.'), true);
   } finally {
     if (!keepSubmitDisabled) {

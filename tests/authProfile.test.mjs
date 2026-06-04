@@ -31,6 +31,6 @@ check('uses stable avatar colors for the same user', () => {
 
 check('labels supported auth providers', () => {
   assert.equal(authProviderLabel(null), 'Signed out');
-  assert.equal(authProviderLabel({ provider: 'supabase' }), 'Supabase account');
-  assert.equal(authProviderLabel({ provider: 'server' }), 'Server account');
+  assert.equal(authProviderLabel({ provider: 'supabase' }), 'CableTrayRoute account');
+  assert.equal(authProviderLabel({ provider: 'server' }), 'CableTrayRoute account');
 });

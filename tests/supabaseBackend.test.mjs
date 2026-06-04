@@ -27,6 +27,7 @@ globalThis.fetch = async (url, options = {}) => {
       user: {
         id: 'user-1',
         email: 'test@example.com',
+        user_metadata: { username: 'designer01' },
         app_metadata: { role: 'engineer' }
       }
     });
@@ -103,7 +104,8 @@ await checkAsync('signs in with Supabase password grant and normalizes session c
   assert.equal(auth.provider, 'supabase');
   assert.equal(auth.accessToken, 'access-token');
   assert.equal(auth.refreshToken, 'refresh-token');
-  assert.equal(auth.user, 'test@example.com');
+  assert.equal(auth.user, 'designer01');
+  assert.equal(auth.email, 'test@example.com');
   assert.equal(auth.userId, 'user-1');
   assert.equal(auth.role, 'engineer');
 });
@@ -144,7 +146,7 @@ await checkAsync('refreshes a Supabase session with refresh token', async () => 
 
 await checkAsync('preserves Supabase signup rate-limit metadata', async () => {
   await assert.rejects(
-    () => supabaseSignUp({ email: 'rate-limited@example.com', password: 'TestPass123!' }),
+    () => supabaseSignUp({ email: 'rate-limited@example.com', password: 'TestPass123!', username: 'designer01' }),
     err => {
       assert.ok(err instanceof SupabaseRequestError);
       assert.equal(err.status, 429);
@@ -153,4 +155,7 @@ await checkAsync('preserves Supabase signup rate-limit metadata', async () => {
       return true;
     }
   );
+  const signupCall = calls.find(call => call.url.includes('/auth/v1/signup'));
+  const body = JSON.parse(signupCall.options.body);
+  assert.equal(body.data.username, 'designer01');
 });

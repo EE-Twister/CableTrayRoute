@@ -89,18 +89,20 @@ function readWorkspaceSummary() {
 function renderAccount(auth) {
   const providerLabel = authProviderLabel(auth);
   const user = displayValue(auth.user, 'Signed in user');
+  const email = displayValue(auth.email, auth.user?.includes('@') ? auth.user : 'Not available');
   const role = displayValue(auth.role, 'Engineer');
   const workspace = readWorkspaceSummary();
 
   setText('display-username', user);
-  setText('account-provider', providerLabel.replace(' account', ''));
+  setText('account-provider', 'CableTrayRoute');
   setText('account-role', role);
   setText('account-session-state', 'Active');
-  setText('account-email', user);
+  setText('account-username', user);
+  setText('account-email', email);
   setText('account-user-id', displayValue(auth.userId));
   setText('account-type', providerLabel);
   setText('account-expires', formatSessionExpiry(auth.expiresAt));
-  setText('account-auth-detail', isSupabaseAuthContext(auth) ? 'Supabase email login' : 'Server session cookie');
+  setText('account-auth-detail', isSupabaseAuthContext(auth) ? 'Email and password' : 'Username and password');
   setText('account-sync-mode', isSupabaseAuthContext(auth) ? 'Cloud projects enabled' : 'Server projects enabled');
   setText('account-current-project', workspace.currentProject);
   setText('account-local-projects', workspace.savedProjectCount);
@@ -116,14 +118,14 @@ function renderAccount(auth) {
   const currentField = document.getElementById('current-pass-field');
   const currentInput = document.getElementById('current-pass');
   if (isSupabaseAuthContext(auth)) {
-    if (note) note.textContent = 'Supabase accounts can update the active account password from this session.';
+    if (note) note.textContent = 'Update the password for the account you are currently signed into.';
     if (currentField) currentField.hidden = true;
     if (currentInput) {
       currentInput.required = false;
       currentInput.value = '';
     }
   } else {
-    if (note) note.textContent = 'Server accounts require the current password before setting a new one.';
+    if (note) note.textContent = 'Enter your current password before setting a new one.';
     if (currentField) currentField.hidden = false;
     if (currentInput) currentInput.required = true;
   }

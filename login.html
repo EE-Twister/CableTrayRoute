@@ -51,6 +51,13 @@
                      aria-describedby="signup-user-hint" aria-required="true">
               <span id="signup-user-hint" class="field-hint">Choose a unique username for your account.</span>
             </div>
+            <div id="signup-email-field" class="auth-field hidden">
+              <label for="signup-email">Email</label>
+              <input id="signup-email" name="signup-email" type="email" autocomplete="email"
+                     placeholder="you@example.com"
+                     aria-describedby="signup-email-hint">
+              <span id="signup-email-hint" class="field-hint">Use this email to sign in and recover your account.</span>
+            </div>
             <div class="auth-field">
               <label for="signup-pass">Password</label>
               <input id="signup-pass" name="signup-pass" type="password" autocomplete="new-password"

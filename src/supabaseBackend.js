@@ -160,13 +160,14 @@ export function createAuthContextFromSupabaseSession(session) {
     accessToken: session?.access_token || '',
     refreshToken: session?.refresh_token || '',
     expiresAt,
-    user: user.email || userMetadata.username || user.id || null,
+    user: userMetadata.username || user.email || user.id || null,
+    email: user.email || null,
     userId: user.id || null,
     role: appMetadata.role || userMetadata.role || 'engineer'
   };
 }
 
-export async function supabaseSignUp({ email, password }) {
+export async function supabaseSignUp({ email, password, username }) {
   const config = await getSupabaseConfig();
   requireConfigured(config);
   const res = await fetch(authUrl(config, '/signup'), {
@@ -175,7 +176,7 @@ export async function supabaseSignUp({ email, password }) {
     body: JSON.stringify({
       email,
       password,
-      data: { username: email }
+      data: { username }
     })
   });
   return parseSupabaseResponse(res);

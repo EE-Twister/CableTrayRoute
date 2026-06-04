@@ -95,7 +95,7 @@ npm run build:cloudflare
 
 The static Supabase path supports:
 
-- Email/password signup and login.
+- Username creation with email/password signup and login.
 - A top navigation account avatar after login, generated from the signed-in
   username or email. The avatar menu links to Account and Logout.
 - Account settings with profile, session, workspace summary, quick project
