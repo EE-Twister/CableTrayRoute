@@ -78,7 +78,35 @@ create policy "Users can create deletion requests"
   on public.account_deletion_requests
   for insert
   with check (auth.uid() = user_id and status = 'requested');
+
+drop policy if exists "Admins can read deletion requests" on public.account_deletion_requests;
+create policy "Admins can read deletion requests"
+  on public.account_deletion_requests
+  for select
+  using ((auth.jwt() -> 'app_metadata' ->> 'role') = 'admin');
+
+drop policy if exists "Admins can update deletion requests" on public.account_deletion_requests;
+create policy "Admins can update deletion requests"
+  on public.account_deletion_requests
+  for update
+  using ((auth.jwt() -> 'app_metadata' ->> 'role') = 'admin')
+  with check (
+    (auth.jwt() -> 'app_metadata' ->> 'role') = 'admin'
+    and status in ('requested', 'reviewing', 'completed', 'denied')
+  );
 ```
+
+Hosted Admin access uses the Supabase user's `app_metadata.role`. In
+**Authentication > Users**, set an administrator's raw app metadata to:
+
+```json
+{ "role": "admin" }
+```
+
+The hosted Admin page can then review `account_deletion_requests` and move a
+request through `requested`, `reviewing`, `completed`, or `denied`. Completing a
+request marks workflow status only; delete the Supabase Auth user and associated
+records separately after any required export/retention review.
 
 Supabase rate-limits repeated signup requests. A `429` response from `/auth/v1/signup`
 with a message like "you can only request this after 54 seconds" means the user should
@@ -88,6 +116,22 @@ shows that the account already exists. With email confirmations enabled, Supabas
 also return a neutral success response for existing confirmed addresses to avoid
 revealing which emails are registered; in that case the form keeps the standard
 "check your email" confirmation message.
+
+### Branded Authentication Emails
+
+In **Authentication > Emails**, keep the sender and subject lines branded as
+CableTrayRoute. Recommended subjects:
+
+| Template | Subject |
+| --- | --- |
+| Confirm signup | Confirm your CableTrayRoute account |
+| Reset password | Reset your CableTrayRoute password |
+| Change email address | Confirm your new CableTrayRoute email |
+| Magic Link | Sign in to CableTrayRoute |
+
+Use copy that says "CableTrayRoute account" rather than "Supabase account" and
+keeps the action button text direct, such as "Confirm account", "Reset password",
+or "Confirm email change".
 
 ## Cloudflare Pages Setup
 

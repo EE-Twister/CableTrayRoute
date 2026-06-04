@@ -2072,6 +2072,60 @@ When answering queries:
     })
   );
 
+  app.get(
+    '/api/v1/admin/account-deletion-requests',
+    auth,
+    requireRole('admin'),
+    asyncHandler(async (req, res) => {
+      const { status, limit } = req.query;
+      const parsedLimit = Math.min(Math.max(Number(limit) || 100, 1), 500);
+      const requestsByUser = await readAccountDeletionRequests();
+      const requests = Object.values(requestsByUser)
+        .filter(request => !status || request.status === status)
+        .sort((a, b) => String(b.requestedAt || '').localeCompare(String(a.requestedAt || '')))
+        .slice(0, parsedLimit);
+      res.json({ requests, total: requests.length });
+    })
+  );
+
+  app.patch(
+    '/api/v1/admin/account-deletion-requests/:username/status',
+    auth,
+    csrfProtection,
+    requireRole('admin'),
+    asyncHandler(async (req, res) => {
+      const VALID_STATUSES = ['requested', 'reviewing', 'completed', 'denied'];
+      const { status } = req.body || {};
+      if (!VALID_STATUSES.includes(status)) {
+        res.status(400).json({ error: 'Invalid status. Must be one of: ' + VALID_STATUSES.join(', ') });
+        return;
+      }
+      const target = req.params.username;
+      const requests = await readAccountDeletionRequests();
+      const existing = requests[target];
+      if (!existing) {
+        res.status(404).json({ error: 'Deletion request not found' });
+        return;
+      }
+      const previousStatus = existing.status || 'requested';
+      const request = {
+        ...existing,
+        status,
+        updatedAt: new Date().toISOString()
+      };
+      requests[target] = request;
+      await saveAccountDeletionRequests(requests);
+      appendAuditEntry(auditLogFile, {
+        actor: req.username,
+        action: 'UPDATE',
+        entityType: 'account_deletion_request',
+        entityId: target,
+        diff: [{ op: 'replace', path: '/status', from: previousStatus, value: status }],
+      }).catch(() => {});
+      res.json({ request });
+    })
+  );
+
   app.patch(
     '/api/v1/admin/users/:username/role',
     auth,

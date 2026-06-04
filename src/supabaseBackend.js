@@ -301,9 +301,59 @@ export async function supabaseRequestAccountDeletion(auth, { reason = '' } = {})
   return Array.isArray(rows) && rows.length ? rows[0] : rows;
 }
 
+export async function supabaseAdminListAccountDeletionRequests(auth, { status = '', limit = 100 } = {}) {
+  const config = await getSupabaseConfig();
+  requireConfigured(config);
+  requireSupabaseAdminAuth(auth);
+  const url = restUrl(config, '/account_deletion_requests');
+  url.searchParams.set('select', 'id,user_id,email,reason,status,requested_at,updated_at');
+  url.searchParams.set('order', 'requested_at.desc');
+  url.searchParams.set('limit', String(Math.min(Math.max(Number(limit) || 100, 1), 500)));
+  if (status) url.searchParams.set('status', `eq.${status}`);
+  const res = await fetch(url.href, {
+    headers: authHeaders(config, auth.accessToken)
+  });
+  const rows = await parseSupabaseResponse(res);
+  return Array.isArray(rows) ? rows : [];
+}
+
+export async function supabaseAdminUpdateAccountDeletionRequest(auth, id, status) {
+  const config = await getSupabaseConfig();
+  requireConfigured(config);
+  requireSupabaseAdminAuth(auth);
+  const requestId = typeof id === 'string' ? id.trim() : '';
+  if (!requestId) throw new Error('Deletion request id is required.');
+  const nextStatus = typeof status === 'string' ? status.trim() : '';
+  if (!['requested', 'reviewing', 'completed', 'denied'].includes(nextStatus)) {
+    throw new Error('Invalid deletion request status.');
+  }
+  const url = restUrl(config, '/account_deletion_requests');
+  url.searchParams.set('id', `eq.${requestId}`);
+  const res = await fetch(url.href, {
+    method: 'PATCH',
+    headers: {
+      ...authHeaders(config, auth.accessToken),
+      Prefer: 'return=representation'
+    },
+    body: JSON.stringify({
+      status: nextStatus,
+      updated_at: new Date().toISOString()
+    })
+  });
+  const rows = await parseSupabaseResponse(res);
+  return Array.isArray(rows) && rows.length ? rows[0] : null;
+}
+
 function requireProjectAuth(auth) {
   if (!isSupabaseAuthContext(auth) || !auth.userId) {
     throw new Error('Supabase login required.');
+  }
+}
+
+function requireSupabaseAdminAuth(auth) {
+  requireProjectAuth(auth);
+  if (auth.role !== 'admin') {
+    throw new Error('Admin role required.');
   }
 }
 

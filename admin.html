@@ -94,7 +94,48 @@
           </div>
         </section>
 
-        <!-- ── Audit Log ── -->
+        <!-- Account deletion requests -->
+        <section class="study-card" aria-labelledby="deletion-requests-heading">
+          <h2 id="deletion-requests-heading">Account Deletion Requests</h2>
+          <p class="section-description">Review user-submitted account deletion requests and track their processing status.</p>
+
+          <div class="table-toolbar">
+            <label>
+              Status
+              <select id="deletion-status-filter" class="input-sm">
+                <option value="">All</option>
+                <option value="requested">Requested</option>
+                <option value="reviewing">Reviewing</option>
+                <option value="completed">Completed</option>
+                <option value="denied">Denied</option>
+              </select>
+            </label>
+            <button id="refresh-deletion-requests-btn" class="btn" type="button">Refresh</button>
+          </div>
+
+          <div class="table-scroll-wrapper" role="region" aria-label="Account deletion requests table" tabindex="0">
+            <table id="deletion-requests-table" class="data-table">
+              <caption class="sr-only">Account deletion requests</caption>
+              <thead>
+                <tr>
+                  <th scope="col">User</th>
+                  <th scope="col">Email</th>
+                  <th scope="col">Status</th>
+                  <th scope="col">Requested</th>
+                  <th scope="col">Updated</th>
+                  <th scope="col">Reason</th>
+                  <th scope="col">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="deletion-requests-tbody">
+                <tr><td colspan="7" class="table-empty">Loading...</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p id="deletion-requests-count" class="table-meta" aria-live="polite"></p>
+        </section>
+
+        <!-- Audit Log -->
         <section class="study-card" aria-labelledby="audit-heading">
           <h2 id="audit-heading">Audit Log</h2>
           <p class="section-description">Tamper-evident log of all CRUD operations, logins, and role changes.</p>

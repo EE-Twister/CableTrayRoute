@@ -597,6 +597,33 @@ async function httpsRedirectScenario() {
 async function accountLifecycleScenario() {
   console.log('server security - account lifecycle endpoints');
   const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ctr-account-life-'));
+  const usersFile = path.join(tmpDir, 'users.json');
+  const username = 'lifecycle';
+  const adminUsername = 'life_admin';
+  const password = 'LifeCycle!123';
+
+  {
+    const { server, port } = await startServer({
+      dataDir: tmpDir,
+      tokenTtlMs: 5000,
+      rateLimit: { windowMs: 60000, max: 100 },
+      enforceHttps: false
+    });
+    const baseUrl = `http://127.0.0.1:${port}`;
+    for (const user of [username, adminUsername]) {
+      await fetch(`${baseUrl}/signup`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: user, password })
+      });
+    }
+    await closeServer(server);
+  }
+
+  const rawUsers = JSON.parse(await fs.readFile(usersFile, 'utf-8'));
+  rawUsers[adminUsername].role = 'admin';
+  await fs.writeFile(usersFile, JSON.stringify(rawUsers, null, 2));
+
   const { server, port } = await startServer({
     dataDir: tmpDir,
     tokenTtlMs: 5000,
@@ -606,19 +633,18 @@ async function accountLifecycleScenario() {
   const baseUrl = `http://127.0.0.1:${port}`;
 
   try {
-    const username = 'lifecycle';
-    const password = 'LifeCycle!123';
-    await fetch(`${baseUrl}/signup`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password })
-    });
     const loginRes = await fetch(`${baseUrl}/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, password })
     });
     const session = await loginRes.json();
+    const adminLoginRes = await fetch(`${baseUrl}/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: adminUsername, password })
+    });
+    const adminSession = await adminLoginRes.json();
 
     await check('lists current account sessions without exposing tokens', async () => {
       const res = await fetch(`${baseUrl}/account/sessions`, {
@@ -668,6 +694,44 @@ async function accountLifecycleScenario() {
       const body = await res.json();
       assert.strictEqual(body.request.username, username);
       assert.strictEqual(body.request.status, 'requested');
+    });
+
+    await check('admin can list account deletion requests', async () => {
+      const res = await fetch(`${baseUrl}/api/v1/admin/account-deletion-requests`, {
+        headers: { Authorization: `Bearer ${adminSession.token}` }
+      });
+      assert.strictEqual(res.status, 200);
+      const body = await res.json();
+      assert.strictEqual(body.requests.length, 1);
+      assert.strictEqual(body.requests[0].username, username);
+      assert.strictEqual(body.requests[0].status, 'requested');
+    });
+
+    await check('admin deletion request status update requires CSRF', async () => {
+      const res = await fetch(`${baseUrl}/api/v1/admin/account-deletion-requests/${username}/status`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${adminSession.token}`
+        },
+        body: JSON.stringify({ status: 'reviewing' })
+      });
+      assert.strictEqual(res.status, 403);
+    });
+
+    await check('admin can update account deletion request status', async () => {
+      const res = await fetch(`${baseUrl}/api/v1/admin/account-deletion-requests/${username}/status`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${adminSession.token}`,
+          'X-CSRF-Token': adminSession.csrfToken
+        },
+        body: JSON.stringify({ status: 'reviewing' })
+      });
+      assert.strictEqual(res.status, 200);
+      const body = await res.json();
+      assert.strictEqual(body.request.status, 'reviewing');
     });
 
     await check('signs out all local account sessions', async () => {

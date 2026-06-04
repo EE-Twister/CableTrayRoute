@@ -1,7 +1,13 @@
 import { getAuthContextState, getAuthRole, clearAuthContextState } from '../projectStorage.js';
 import { mountPersistentNavigation } from './components/navigation.js';
+import {
+  isSupabaseAuthContext,
+  supabaseAdminListAccountDeletionRequests,
+  supabaseAdminUpdateAccountDeletionRequest
+} from './supabaseBackend.js';
 
 const ROLE_OPTIONS = ['read-only', 'reviewer', 'engineer', 'admin'];
+const DELETION_STATUS_OPTIONS = ['requested', 'reviewing', 'completed', 'denied'];
 
 function authHeaders() {
   const { csrfToken } = getAuthContextState() ?? {};
@@ -23,6 +29,139 @@ function shortHash(hash) {
 }
 
 // ── Users table ────────────────────────────────────────────────────────────
+
+function normalizeDeletionRequest(row) {
+  return {
+    id: row.id || row.username || '',
+    username: row.username || row.user || row.user_id || row.userId || 'Hosted user',
+    userId: row.user_id || row.userId || '',
+    email: row.email || null,
+    reason: row.reason || '',
+    status: row.status || 'requested',
+    requestedAt: row.requested_at || row.requestedAt || null,
+    updatedAt: row.updated_at || row.updatedAt || null
+  };
+}
+
+function deletionStatusBadge(status) {
+  const safeStatus = DELETION_STATUS_OPTIONS.includes(status) ? status : 'requested';
+  const className = safeStatus === 'completed'
+    ? 'badge-ok'
+    : safeStatus === 'denied'
+      ? 'badge-error'
+      : safeStatus === 'reviewing'
+        ? 'badge-info'
+        : 'badge-warn';
+  return `<span class="badge ${className}">${escapeHtml(safeStatus)}</span>`;
+}
+
+async function fetchDeletionRequests(authState) {
+  const status = document.getElementById('deletion-status-filter')?.value || '';
+  if (isSupabaseAuthContext(authState)) {
+    return supabaseAdminListAccountDeletionRequests(authState, { status, limit: 100 });
+  }
+  const params = new URLSearchParams();
+  if (status) params.set('status', status);
+  params.set('limit', '100');
+  const res = await fetch(`/api/v1/admin/account-deletion-requests?${params}`);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const body = await res.json();
+  return body.requests || [];
+}
+
+async function updateDeletionRequestStatus(authState, request, status) {
+  if (isSupabaseAuthContext(authState)) {
+    return supabaseAdminUpdateAccountDeletionRequest(authState, request.id, status);
+  }
+  const res = await fetch(`/api/v1/admin/account-deletion-requests/${encodeURIComponent(request.username)}/status`, {
+    method: 'PATCH',
+    headers: authHeaders(),
+    body: JSON.stringify({ status })
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error || `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
+async function loadDeletionRequests(authState = getAuthContextState()) {
+  const tbody = document.getElementById('deletion-requests-tbody');
+  const countEl = document.getElementById('deletion-requests-count');
+  if (!tbody || !countEl) return;
+  tbody.innerHTML = '<tr><td colspan="7" class="table-empty">Loading...</td></tr>';
+  countEl.textContent = '';
+  try {
+    const rows = await fetchDeletionRequests(authState);
+    const requests = rows.map(normalizeDeletionRequest);
+    renderDeletionRequestsTable(authState, requests);
+    countEl.textContent = `Showing ${requests.length} request${requests.length === 1 ? '' : 's'}`;
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="7" class="table-empty table-error">Failed to load deletion requests: ${escapeHtml(err.message)}</td></tr>`;
+  }
+}
+
+function renderDeletionRequestsTable(authState, requests) {
+  const tbody = document.getElementById('deletion-requests-tbody');
+  if (!requests.length) {
+    tbody.innerHTML = '<tr><td colspan="7" class="table-empty">No account deletion requests match the current filter.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = '';
+  for (const request of requests) {
+    const tr = document.createElement('tr');
+
+    const statusSelect = document.createElement('select');
+    statusSelect.className = 'input-sm';
+    statusSelect.setAttribute('aria-label', `Status for ${request.username}`);
+    for (const status of DELETION_STATUS_OPTIONS) {
+      const opt = document.createElement('option');
+      opt.value = status;
+      opt.textContent = status;
+      if (status === request.status) opt.selected = true;
+      statusSelect.appendChild(opt);
+    }
+
+    const saveBtn = document.createElement('button');
+    saveBtn.className = 'btn btn-sm';
+    saveBtn.textContent = 'Save';
+    saveBtn.type = 'button';
+    saveBtn.addEventListener('click', () => confirmDeletionStatusChange(authState, request, statusSelect.value));
+
+    const userLabel = request.email
+      ? request.username
+      : request.userId
+        ? request.userId.slice(0, 12) + '...'
+        : request.username;
+
+    tr.innerHTML = `
+      <td title="${escapeHtml(request.userId || request.username)}">${escapeHtml(userLabel)}</td>
+      <td>${escapeHtml(request.email || '—')}</td>
+      <td>${deletionStatusBadge(request.status)}</td>
+      <td>${escapeHtml(formatDate(request.requestedAt))}</td>
+      <td>${escapeHtml(formatDate(request.updatedAt))}</td>
+      <td>${escapeHtml(request.reason || '—')}</td>
+      <td class="actions-cell"></td>
+    `;
+    tr.querySelector('.actions-cell').append(statusSelect, saveBtn);
+    tbody.appendChild(tr);
+  }
+}
+
+async function confirmDeletionStatusChange(authState, request, status) {
+  if (status === request.status) return;
+  const confirmed = await showModal(
+    'Update Deletion Request',
+    `Set ${request.email || request.username}'s deletion request to "${status}"?`
+  );
+  if (!confirmed) return;
+  try {
+    await updateDeletionRequestStatus(authState, request, status);
+    await loadDeletionRequests(authState);
+  } catch (err) {
+    showError(`Failed to update deletion request: ${err.message}`);
+  }
+}
 
 async function loadUsers() {
   const tbody = document.getElementById('users-tbody');
@@ -240,11 +379,26 @@ async function init() {
   accessCheck.classList.add('hidden');
   adminContent.classList.remove('hidden');
 
-  document.getElementById('refresh-users-btn').addEventListener('click', loadUsers);
-  document.getElementById('load-audit-btn').addEventListener('click', loadAuditLog);
-  document.getElementById('export-audit-btn').addEventListener('click', exportAuditCsv);
+  document.getElementById('refresh-deletion-requests-btn')?.addEventListener('click', () => loadDeletionRequests(authState));
+  document.getElementById('deletion-status-filter')?.addEventListener('change', () => loadDeletionRequests(authState));
 
-  await loadUsers();
+  if (isSupabaseAuthContext(authState)) {
+    document.getElementById('users-tbody').innerHTML =
+      '<tr><td colspan="7" class="table-empty">Hosted users and roles are managed in Supabase Authentication. Use app metadata role=admin for administrators.</td></tr>';
+    document.getElementById('audit-tbody').innerHTML =
+      '<tr><td colspan="7" class="table-empty">The audit log is available on self-hosted deployments. Hosted account deletion requests are tracked above.</td></tr>';
+    document.getElementById('audit-count').textContent = '';
+    document.getElementById('refresh-users-btn').disabled = true;
+    document.getElementById('load-audit-btn').disabled = true;
+    document.getElementById('export-audit-btn').disabled = true;
+  } else {
+    document.getElementById('refresh-users-btn').addEventListener('click', loadUsers);
+    document.getElementById('load-audit-btn').addEventListener('click', loadAuditLog);
+    document.getElementById('export-audit-btn').addEventListener('click', exportAuditCsv);
+    await loadUsers();
+  }
+
+  await loadDeletionRequests(authState);
 }
 
 init();

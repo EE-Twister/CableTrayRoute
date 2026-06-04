@@ -75,9 +75,21 @@ globalThis.fetch = async (url, options = {}) => {
       requested_at: body.requested_at
     }]);
   }
+  if (call.url.includes('/rest/v1/account_deletion_requests') && call.options.method === 'PATCH') {
+    const body = JSON.parse(call.options.body || '{}');
+    return jsonResponse([{
+      id: 'delete-request-1',
+      user_id: 'user-1',
+      email: 'test@example.com',
+      status: body.status,
+      updated_at: body.updated_at
+    }]);
+  }
   if (call.url.includes('/rest/v1/account_deletion_requests') && call.url.includes('select=')) {
     return jsonResponse([{
       id: 'delete-request-1',
+      user_id: 'user-1',
+      email: 'test@example.com',
       status: 'requested',
       reason: null,
       requested_at: '2026-06-04T12:00:00.000Z',
@@ -99,6 +111,8 @@ globalThis.fetch = async (url, options = {}) => {
 const {
   createAuthContextFromSupabaseSession,
   SupabaseRequestError,
+  supabaseAdminListAccountDeletionRequests,
+  supabaseAdminUpdateAccountDeletionRequest,
   supabaseListAccountDeletionRequests,
   supabaseListProjects,
   supabaseLoadProject,
@@ -230,6 +244,37 @@ await checkAsync('submits and reads account deletion requests through RLS table'
   const listCall = calls.find(call => call.url.includes('/rest/v1/account_deletion_requests') && call.url.includes('select='));
   assert.equal(listCall.options.headers.Authorization, 'Bearer access-token');
   assert.equal(latest.status, 'requested');
+});
+
+await checkAsync('allows hosted admins to review and update deletion requests', async () => {
+  const adminAuth = { ...auth, role: 'admin' };
+  const requests = await supabaseAdminListAccountDeletionRequests(adminAuth, { status: 'requested', limit: 25 });
+  const adminListCall = calls.find(call =>
+    call.url.includes('/rest/v1/account_deletion_requests') &&
+    call.url.includes('status=eq.requested') &&
+    call.url.includes('limit=25')
+  );
+  assert.equal(adminListCall.options.headers.Authorization, 'Bearer access-token');
+  assert.equal(requests[0].email, 'test@example.com');
+
+  const updated = await supabaseAdminUpdateAccountDeletionRequest(adminAuth, 'delete-request-1', 'reviewing');
+  const adminUpdateCall = calls.find(call =>
+    call.url.includes('/rest/v1/account_deletion_requests') &&
+    call.options.method === 'PATCH'
+  );
+  assert.equal(adminUpdateCall.options.headers.Authorization, 'Bearer access-token');
+  assert.equal(adminUpdateCall.options.headers.Prefer, 'return=representation');
+  assert.ok(adminUpdateCall.url.includes('id=eq.delete-request-1'));
+  const body = JSON.parse(adminUpdateCall.options.body);
+  assert.equal(body.status, 'reviewing');
+  assert.equal(updated.status, 'reviewing');
+});
+
+await checkAsync('blocks non-admin deletion request review helpers before REST calls', async () => {
+  await assert.rejects(
+    () => supabaseAdminListAccountDeletionRequests(auth),
+    /Admin role required/
+  );
 });
 
 await checkAsync('preserves Supabase signup rate-limit metadata', async () => {
