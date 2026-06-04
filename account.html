@@ -63,36 +63,26 @@
       </div>
 
       <div class="auth-panels account-panels">
-        <section class="auth-pane account-pane" aria-labelledby="profile-title">
-          <h2 id="profile-title">Profile</h2>
-          <dl class="account-detail-list">
+        <section class="auth-pane account-pane account-pane--primary" aria-labelledby="profile-title">
+          <div class="account-pane-header">
             <div>
-              <dt>Username</dt>
-              <dd id="account-username">...</dd>
+              <h2 id="profile-title">Profile</h2>
+              <p class="auth-description">Manage how your name and email appear across CableTrayRoute.</p>
             </div>
-            <div>
-              <dt>Email</dt>
-              <dd id="account-email">...</dd>
-            </div>
-            <div>
-              <dt>User ID</dt>
-              <dd id="account-user-id">Not available</dd>
-            </div>
-            <div>
-              <dt>Account type</dt>
-              <dd id="account-type">...</dd>
-            </div>
-          </dl>
+            <span id="account-type" class="account-badge">...</span>
+          </div>
           <form id="profile-details-form" class="auth-form account-edit-form">
-            <div class="auth-field">
-              <label for="profile-username">Username</label>
-              <input id="profile-username" name="profile-username" type="text" autocomplete="username"
-                     pattern="[a-zA-Z0-9_\-]{1,100}" placeholder="Username" required>
-            </div>
-            <div class="auth-field">
-              <label for="profile-email">Email</label>
-              <input id="profile-email" name="profile-email" type="email" autocomplete="email"
-                     placeholder="you@example.com" required>
+            <div class="account-form-grid">
+              <div class="auth-field">
+                <label for="profile-username">Username</label>
+                <input id="profile-username" name="profile-username" type="text" autocomplete="username"
+                       pattern="[a-zA-Z0-9_\-]{1,100}" placeholder="Username" required>
+              </div>
+              <div class="auth-field">
+                <label for="profile-email">Email</label>
+                <input id="profile-email" name="profile-email" type="email" autocomplete="email"
+                       placeholder="you@example.com" required>
+              </div>
             </div>
             <p id="profile-edit-note" class="auth-description"></p>
             <button type="submit" class="primary-btn">Save Profile</button>
@@ -115,6 +105,15 @@
               <dd id="account-sync-mode">...</dd>
             </div>
           </dl>
+          <details class="account-advanced">
+            <summary>Advanced details</summary>
+            <dl class="account-detail-list account-detail-list--compact">
+              <div>
+                <dt>User ID</dt>
+                <dd id="account-user-id">Not available</dd>
+              </div>
+            </dl>
+          </details>
         </section>
 
         <section class="auth-pane account-pane" aria-labelledby="workspace-title">
@@ -145,18 +144,41 @@
           <form id="change-pass-form" class="auth-form">
             <div id="current-pass-field" class="auth-field">
               <label for="current-pass">Current Password</label>
-              <input id="current-pass" name="current-pass" type="password" autocomplete="current-password" placeholder="Current password" required>
+              <div class="password-input-wrap">
+                <input id="current-pass" name="current-pass" type="password" autocomplete="current-password" placeholder="Current password" required>
+                <button type="button" class="password-toggle" data-password-toggle="current-pass" aria-label="Show current password">Show</button>
+              </div>
             </div>
             <div class="auth-field">
               <label for="new-pass">New Password</label>
-              <input id="new-pass" name="new-pass" type="password" autocomplete="new-password" placeholder="New password (min 8 characters)" required minlength="8">
+              <div class="password-input-wrap">
+                <input id="new-pass" name="new-pass" type="password" autocomplete="new-password" placeholder="New password (min 8 characters)" required minlength="8">
+                <button type="button" class="password-toggle" data-password-toggle="new-pass" aria-label="Show new password">Show</button>
+              </div>
+              <p id="password-strength" class="password-strength" aria-live="polite">Use at least 8 characters with letters and numbers.</p>
             </div>
             <div class="auth-field">
               <label for="new-pass-confirm">Confirm New Password</label>
-              <input id="new-pass-confirm" name="new-pass-confirm" type="password" autocomplete="new-password" placeholder="Confirm new password" required minlength="8">
+              <div class="password-input-wrap">
+                <input id="new-pass-confirm" name="new-pass-confirm" type="password" autocomplete="new-password" placeholder="Confirm new password" required minlength="8">
+                <button type="button" class="password-toggle" data-password-toggle="new-pass-confirm" aria-label="Show confirmed password">Show</button>
+              </div>
+              <p id="password-match" class="password-strength" aria-live="polite"></p>
             </div>
             <button type="submit" class="primary-btn">Change Password</button>
           </form>
+        </section>
+
+        <section class="auth-pane account-pane account-pane--actions" aria-labelledby="account-actions-title">
+          <h2 id="account-actions-title">Account Actions</h2>
+          <p class="auth-description">Keep your account portable, verified, and under your control.</p>
+          <div class="account-action-stack">
+            <button id="resend-confirmation-btn" type="button" class="secondary-btn account-action-link">Resend confirmation email</button>
+            <button id="export-account-data-btn" type="button" class="secondary-btn account-action-link">Export account data</button>
+            <button id="signout-all-btn" type="button" class="secondary-btn account-action-link">Sign out all sessions</button>
+            <button id="delete-request-btn" type="button" class="secondary-btn account-action-link account-action-link--danger">Request account deletion</button>
+          </div>
+          <p id="account-actions-status" class="auth-description" role="status" aria-live="polite"></p>
         </section>
       </div>
     </section>

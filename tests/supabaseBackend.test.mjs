@@ -49,6 +49,12 @@ globalThis.fetch = async (url, options = {}) => {
       message: 'For security purposes, you can only request this after 54 seconds.'
     }, { ok: false, status: 429 });
   }
+  if (call.url.includes('/auth/v1/resend')) {
+    return jsonResponse({ message: 'Confirmation email sent.' });
+  }
+  if (call.url.includes('/auth/v1/logout')) {
+    return jsonResponse({});
+  }
   if (call.url.includes('/auth/v1/user')) {
     const body = JSON.parse(call.options.body || '{}');
     if (body.password) {
@@ -78,8 +84,10 @@ const {
   supabaseListProjects,
   supabaseLoadProject,
   supabaseRefreshSession,
+  supabaseResendEmailConfirmation,
   supabaseSaveProject,
   supabaseSignIn,
+  supabaseSignOut,
   supabaseSignUp,
   supabaseUpdateProfile
 } = await import('../src/supabaseBackend.js');
@@ -168,6 +176,23 @@ await checkAsync('updates profile username and email through signed-in user endp
   assert.equal(body.data.username, 'lead_designer');
   assert.equal(result.email, 'lead@example.com');
   assert.equal(result.user_metadata.username, 'lead_designer');
+});
+
+await checkAsync('resends hosted account confirmation by email', async () => {
+  await supabaseResendEmailConfirmation('lead@example.com');
+  const resendCall = calls.find(call => call.url.includes('/auth/v1/resend'));
+  assert.equal(resendCall.options.method, 'POST');
+  assert.equal(resendCall.options.headers.apikey, 'anon-key');
+  const body = JSON.parse(resendCall.options.body);
+  assert.equal(body.type, 'signup');
+  assert.equal(body.email, 'lead@example.com');
+});
+
+await checkAsync('supports global Supabase logout scope', async () => {
+  await supabaseSignOut(auth, { scope: 'global' });
+  const logoutCall = calls.find(call => call.url.includes('/auth/v1/logout?scope=global'));
+  assert.equal(logoutCall.options.method, 'POST');
+  assert.equal(logoutCall.options.headers.Authorization, 'Bearer access-token');
 });
 
 await checkAsync('preserves Supabase signup rate-limit metadata', async () => {

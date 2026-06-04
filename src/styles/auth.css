@@ -209,6 +209,57 @@ body.dark-mode .auth-form input:focus {
     font-weight: 600;
 }
 
+.auth-status {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    margin: 0.25rem 0 0;
+    padding: 0.7rem 0.8rem;
+    border: 1px solid color-mix(in srgb, var(--color-primary) 22%, var(--color-border));
+    border-radius: 0.45rem;
+    background: color-mix(in srgb, var(--color-primary) 7%, var(--color-surface-strong));
+    color: var(--color-text);
+    font-size: 0.9rem;
+    line-height: 1.45;
+}
+
+.auth-status::before {
+    content: "";
+    width: 0.55rem;
+    height: 0.55rem;
+    flex: 0 0 auto;
+    margin-top: 0.3rem;
+    border-radius: 999px;
+    background: var(--color-primary);
+}
+
+.auth-status[data-variant="success"] {
+    border-color: color-mix(in srgb, var(--success-text) 35%, var(--color-border));
+    background: color-mix(in srgb, var(--success-bg) 42%, var(--color-surface-strong));
+}
+
+.auth-status[data-variant="success"]::before {
+    background: var(--success-text);
+}
+
+.auth-status[data-variant="error"] {
+    border-color: color-mix(in srgb, var(--danger-text, #842029) 36%, var(--color-border));
+    background: color-mix(in srgb, var(--danger-bg, #f8d7da) 42%, var(--color-surface-strong));
+}
+
+.auth-status[data-variant="error"]::before {
+    background: var(--danger-text, #842029);
+}
+
+.auth-status[data-variant="loading"]::before {
+    width: 0.7rem;
+    height: 0.7rem;
+    border: 2px solid color-mix(in srgb, var(--color-primary) 35%, transparent);
+    border-top-color: var(--color-primary);
+    background: transparent;
+    animation: account-spin 0.8s linear infinite;
+}
+
 .auth-note {
     margin: 0;
     font-size: 0.95rem;
@@ -243,6 +294,10 @@ body.dark-mode .auth-note {
 
 .account-card {
     width: min(1120px, 100%);
+    padding: 2rem;
+    gap: 1.5rem;
+    border-radius: 0.75rem;
+    box-shadow: 0 20px 48px -38px rgba(15, 23, 42, 0.55);
 }
 
 .account-header {
@@ -357,7 +412,62 @@ body.dark-mode .auth-note {
 }
 
 .account-panels {
-    grid-template-columns: repeat(2, minmax(280px, 1fr));
+    gap: 1.25rem;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+.account-pane {
+    grid-column: span 3;
+    gap: 1rem;
+    min-width: 0;
+    border-radius: 0.55rem;
+    box-shadow: none;
+}
+
+.account-pane--primary {
+    grid-column: 1 / -1;
+    padding: 1.5rem;
+    border-color: color-mix(in srgb, var(--color-primary) 22%, var(--color-border));
+    background: color-mix(in srgb, var(--color-surface-strong) 96%, var(--color-primary) 4%);
+}
+
+.account-pane--actions {
+    grid-column: span 3;
+}
+
+.account-pane-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.account-pane-header h2 {
+    margin: 0 0 0.35rem;
+}
+
+.account-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 2rem;
+    max-width: 100%;
+    padding: 0.35rem 0.65rem;
+    border: 1px solid color-mix(in srgb, var(--color-primary) 24%, var(--color-border));
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--color-primary) 8%, var(--color-surface-strong));
+    color: var(--color-primary);
+    font-size: 0.82rem;
+    font-weight: 700;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.account-form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
 }
 
 .account-detail-list {
@@ -402,6 +512,119 @@ body.dark-mode .auth-note {
     margin-top: auto;
 }
 
+.account-advanced {
+    margin-top: auto;
+    border-top: 1px solid color-mix(in srgb, var(--color-border) 75%, transparent);
+    padding-top: 0.75rem;
+}
+
+.account-advanced summary {
+    cursor: pointer;
+    color: var(--color-text-muted);
+    font-size: 0.88rem;
+    font-weight: 700;
+}
+
+.account-detail-list--compact {
+    margin-top: 0.75rem;
+}
+
+.account-action-stack {
+    display: grid;
+    gap: 0.75rem;
+}
+
+.account-action-stack .account-action-link {
+    width: 100%;
+    justify-content: flex-start;
+}
+
+.account-action-link--danger {
+    border-color: color-mix(in srgb, var(--danger-text, #842029) 26%, var(--color-border));
+    color: var(--danger-text, #842029);
+}
+
+.account-action-link--danger:hover,
+.account-action-link--danger:focus-visible {
+    border-color: var(--danger-text, #842029);
+    color: var(--danger-text, #842029);
+    background: color-mix(in srgb, var(--danger-bg, #f8d7da) 30%, var(--color-surface-strong));
+}
+
+#account-actions-status {
+    min-height: 1.4rem;
+}
+
+#account-actions-status:empty {
+    display: none;
+}
+
+#account-actions-status[data-variant="success"] {
+    color: var(--success-text);
+}
+
+#account-actions-status[data-variant="warning"] {
+    color: #8a5a00;
+}
+
+#account-actions-status[data-variant="error"] {
+    color: var(--danger-text, #842029);
+}
+
+.password-input-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.password-input-wrap input {
+    width: 100%;
+    padding-right: 4.5rem;
+}
+
+.password-toggle {
+    position: absolute;
+    right: 0.4rem;
+    min-height: 2rem;
+    padding: 0 0.65rem;
+    border: 0;
+    border-radius: 0.35rem;
+    background: transparent;
+    color: var(--color-primary);
+    font-size: 0.82rem;
+    font-weight: 700;
+}
+
+.password-toggle:hover,
+.password-toggle:focus-visible {
+    background: color-mix(in srgb, var(--color-primary) 9%, transparent);
+}
+
+.password-strength {
+    margin: -0.1rem 0 0;
+    color: var(--color-text-muted);
+    font-size: 0.84rem;
+    line-height: 1.35;
+}
+
+.password-strength[data-variant="success"] {
+    color: var(--success-text);
+}
+
+.password-strength[data-variant="warning"] {
+    color: #8a5a00;
+}
+
+.password-strength[data-variant="error"] {
+    color: var(--danger-text, #842029);
+}
+
+@keyframes account-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
 @media (max-width: 900px) {
     .auth-card {
         padding: 2rem;
@@ -417,6 +640,16 @@ body.dark-mode .auth-note {
     }
 
     .account-panels {
+        grid-template-columns: 1fr;
+    }
+
+    .account-pane,
+    .account-pane--actions,
+    .account-pane--primary {
+        grid-column: 1;
+    }
+
+    .account-form-grid {
         grid-template-columns: 1fr;
     }
 }
@@ -465,8 +698,10 @@ body.dark-mode .auth-note {
     }
 
     .account-header-actions,
-    .account-action-row {
+    .account-action-row,
+    .account-pane-header {
         width: 100%;
+        flex-direction: column;
     }
 
     .account-header-link,

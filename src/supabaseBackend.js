@@ -205,11 +205,12 @@ export async function supabaseRefreshSession(auth) {
   return parseSupabaseResponse(res);
 }
 
-export async function supabaseSignOut(auth) {
+export async function supabaseSignOut(auth, { scope = '' } = {}) {
   const config = await getSupabaseConfig();
   requireConfigured(config);
   if (!auth?.accessToken) return;
-  const res = await fetch(authUrl(config, '/logout'), {
+  const path = scope ? `/logout?scope=${encodeURIComponent(scope)}` : '/logout';
+  const res = await fetch(authUrl(config, path), {
     method: 'POST',
     headers: authHeaders(config, auth.accessToken)
   });
@@ -226,6 +227,22 @@ export async function supabaseUpdatePassword(auth, password) {
     method: 'PUT',
     headers: authHeaders(config, auth.accessToken),
     body: JSON.stringify({ password })
+  });
+  return parseSupabaseResponse(res);
+}
+
+export async function supabaseResendEmailConfirmation(email) {
+  const config = await getSupabaseConfig();
+  requireConfigured(config);
+  const normalizedEmail = typeof email === 'string' ? email.trim() : '';
+  if (!normalizedEmail) throw new Error('Email is required.');
+  const res = await fetch(authUrl(config, '/resend'), {
+    method: 'POST',
+    headers: authHeaders(config),
+    body: JSON.stringify({
+      type: 'signup',
+      email: normalizedEmail
+    })
   });
   return parseSupabaseResponse(res);
 }
