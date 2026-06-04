@@ -720,6 +720,21 @@ class FileSessionStore {
     return true;
   }
 
+  async listUserSessions(username, currentToken = '') {
+    await this.#pruneExpired();
+    const rows = [];
+    for (const [token, session] of this.sessions.entries()) {
+      if (session.username !== username) continue;
+      rows.push({
+        id: crypto.createHash('sha256').update(token).digest('hex').slice(0, 12),
+        current: token === currentToken,
+        issuedAt: session.issuedAt,
+        expiresAt: session.expiresAt
+      });
+    }
+    return rows.sort((a, b) => Number(b.current) - Number(a.current) || b.issuedAt - a.issuedAt);
+  }
+
   async get(token) {
     await this.#pruneExpired();
     const session = this.sessions.get(token);
@@ -844,6 +859,7 @@ export async function createApp(options = {}) {
   const sessionsFile = path.join(dataDir, 'sessions.json');
   const snapshotsFile = path.join(dataDir, 'snapshots.json');
   const librarySharesFile = path.join(dataDir, 'library-shares.json');
+  const accountDeletionRequestsFile = path.join(dataDir, 'account-deletion-requests.json');
   const auditLogFile = path.join(dataDir, 'auditLog.ndjson');
 
   // In-memory store for OIDC authorization code flows (state → flow data).
@@ -901,6 +917,20 @@ export async function createApp(options = {}) {
 
   async function saveUsers() {
     await fs.writeFile(usersFile, JSON.stringify(users, null, 2));
+  }
+
+  async function readAccountDeletionRequests() {
+    try {
+      const data = JSON.parse(await fs.readFile(accountDeletionRequestsFile, 'utf-8'));
+      return data && typeof data === 'object' && !Array.isArray(data) ? data : {};
+    } catch (err) {
+      if (err.code !== 'ENOENT') throw err;
+      return {};
+    }
+  }
+
+  async function saveAccountDeletionRequests(requests) {
+    await fs.writeFile(accountDeletionRequestsFile, JSON.stringify(requests, null, 2));
   }
 
   const app = express();
@@ -1369,6 +1399,18 @@ export async function createApp(options = {}) {
     })
   );
 
+  app.post(
+    '/account/signout-all',
+    auth,
+    csrfProtection,
+    asyncHandler(async (req, res) => {
+      await sessionStore.revokeUserSessions(req.username);
+      clearAuthCookie(req, res);
+      appendAuditEntry(auditLogFile, { actor: req.username, action: 'LOGOUT', entityType: 'session' }).catch(() => {});
+      res.json({ loggedOut: true });
+    })
+  );
+
   // Mint a single-use, short-lived ticket the browser can pass through the
   // WebSocket subprotocol header (cookies cannot be sent that way).
   app.post(
@@ -1475,6 +1517,52 @@ export async function createApp(options = {}) {
       const session = await sessionStore.createSession(req.username);
       setAuthCookie(req, res, session.token, sessionStore.ttlMs);
       res.json({ message: 'Password changed successfully.', ...session });
+    })
+  );
+
+  app.get(
+    '/account/sessions',
+    auth,
+    asyncHandler(async (req, res) => {
+      const sessions = await sessionStore.listUserSessions(req.username, req.authToken);
+      res.json({ sessions });
+    })
+  );
+
+  app.get(
+    '/account/deletion-request',
+    auth,
+    asyncHandler(async (req, res) => {
+      const requests = await readAccountDeletionRequests();
+      res.json({ request: requests[req.username] || null });
+    })
+  );
+
+  app.post(
+    '/account/deletion-request',
+    auth,
+    csrfProtection,
+    asyncHandler(async (req, res) => {
+      const { confirmation } = req.body || {};
+      if (confirmation !== 'DELETE') {
+        res.status(400).json({ error: 'Deletion confirmation is required' });
+        return;
+      }
+      const now = new Date().toISOString();
+      const requests = await readAccountDeletionRequests();
+      const existing = requests[req.username] || {};
+      const request = {
+        ...existing,
+        username: req.username,
+        email: users[req.username]?.email || null,
+        status: existing.status && existing.status !== 'completed' ? existing.status : 'requested',
+        requestedAt: existing.requestedAt || now,
+        updatedAt: now
+      };
+      requests[req.username] = request;
+      await saveAccountDeletionRequests(requests);
+      appendAuditEntry(auditLogFile, { actor: req.username, action: 'CREATE', entityType: 'account_deletion_request', entityId: req.username }).catch(() => {});
+      res.status(201).json({ request });
     })
   );
 

@@ -85,6 +85,7 @@
               </div>
             </div>
             <p id="profile-edit-note" class="auth-description"></p>
+            <div id="email-confirmation-status" class="account-inline-status" hidden></div>
             <button type="submit" class="primary-btn">Save Profile</button>
           </form>
         </section>
@@ -105,6 +106,15 @@
               <dd id="account-sync-mode">...</dd>
             </div>
           </dl>
+          <div class="account-session-list" aria-labelledby="active-sessions-title">
+            <h3 id="active-sessions-title">Active sessions</h3>
+            <div id="account-session-list" class="account-session-items">
+              <article class="account-session-item">
+                <strong>Current browser</strong>
+                <span>Loading session details...</span>
+              </article>
+            </div>
+          </div>
           <details class="account-advanced">
             <summary>Advanced details</summary>
             <dl class="account-detail-list account-detail-list--compact">
@@ -177,6 +187,13 @@
             <button id="export-account-data-btn" type="button" class="secondary-btn account-action-link">Export account data</button>
             <button id="signout-all-btn" type="button" class="secondary-btn account-action-link">Sign out all sessions</button>
             <button id="delete-request-btn" type="button" class="secondary-btn account-action-link account-action-link--danger">Request account deletion</button>
+          </div>
+          <div id="delete-confirmation" class="account-delete-confirmation" hidden>
+            <label for="delete-confirmation-input">Type DELETE to request account deletion</label>
+            <div class="account-delete-row">
+              <input id="delete-confirmation-input" type="text" autocomplete="off" inputmode="text" placeholder="DELETE">
+              <button id="submit-delete-request-btn" type="button" class="secondary-btn account-action-link account-action-link--danger">Submit request</button>
+            </div>
           </div>
           <p id="account-actions-status" class="auth-description" role="status" aria-live="polite"></p>
         </section>

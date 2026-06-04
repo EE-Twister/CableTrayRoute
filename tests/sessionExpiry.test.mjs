@@ -81,6 +81,8 @@ check('setAuthContextState persists Supabase session metadata', () => {
     refreshToken: 'sb-refresh',
     expiresAt: Date.now() + 10000,
     user: 'ada@example.com',
+    email: 'ada@example.com',
+    pendingEmail: 'ada@new.example',
     userId: 'user-123',
     role: 'engineer'
   });
@@ -90,6 +92,8 @@ check('setAuthContextState persists Supabase session metadata', () => {
   assert.strictEqual(state.accessToken, 'sb-access');
   assert.strictEqual(state.refreshToken, 'sb-refresh');
   assert.strictEqual(state.user, 'ada@example.com');
+  assert.strictEqual(state.email, 'ada@example.com');
+  assert.strictEqual(state.pendingEmail, 'ada@new.example');
   assert.strictEqual(state.userId, 'user-123');
   assert.strictEqual(state.role, 'engineer');
   assert.strictEqual(storage.has('authToken'), false);

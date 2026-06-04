@@ -262,6 +262,45 @@ export async function supabaseUpdateProfile(auth, { username, email } = {}) {
   return parseSupabaseResponse(res);
 }
 
+export async function supabaseListAccountDeletionRequests(auth) {
+  const config = await getSupabaseConfig();
+  requireConfigured(config);
+  requireProjectAuth(auth);
+  const url = restUrl(config, '/account_deletion_requests');
+  url.searchParams.set('select', 'id,status,reason,requested_at,updated_at');
+  url.searchParams.set('order', 'requested_at.desc');
+  url.searchParams.set('limit', '1');
+  const res = await fetch(url.href, {
+    headers: authHeaders(config, auth.accessToken)
+  });
+  const rows = await parseSupabaseResponse(res);
+  return Array.isArray(rows) && rows.length ? rows[0] : null;
+}
+
+export async function supabaseRequestAccountDeletion(auth, { reason = '' } = {}) {
+  const config = await getSupabaseConfig();
+  requireConfigured(config);
+  requireProjectAuth(auth);
+  const url = restUrl(config, '/account_deletion_requests');
+  const now = new Date().toISOString();
+  const res = await fetch(url.href, {
+    method: 'POST',
+    headers: {
+      ...authHeaders(config, auth.accessToken),
+      Prefer: 'return=representation'
+    },
+    body: JSON.stringify({
+      user_id: auth.userId,
+      email: auth.email || null,
+      reason: typeof reason === 'string' && reason.trim() ? reason.trim() : null,
+      status: 'requested',
+      requested_at: now
+    })
+  });
+  const rows = await parseSupabaseResponse(res);
+  return Array.isArray(rows) && rows.length ? rows[0] : rows;
+}
+
 function requireProjectAuth(auth) {
   if (!isSupabaseAuthContext(auth) || !auth.userId) {
     throw new Error('Supabase login required.');

@@ -66,6 +66,24 @@ globalThis.fetch = async (url, options = {}) => {
       user_metadata: body.data || {}
     });
   }
+  if (call.url.includes('/rest/v1/account_deletion_requests') && call.options.method === 'POST') {
+    const body = JSON.parse(call.options.body || '{}');
+    return jsonResponse([{
+      id: 'delete-request-1',
+      user_id: body.user_id,
+      status: body.status,
+      requested_at: body.requested_at
+    }]);
+  }
+  if (call.url.includes('/rest/v1/account_deletion_requests') && call.url.includes('select=')) {
+    return jsonResponse([{
+      id: 'delete-request-1',
+      status: 'requested',
+      reason: null,
+      requested_at: '2026-06-04T12:00:00.000Z',
+      updated_at: '2026-06-04T12:00:00.000Z'
+    }]);
+  }
   if (call.url.includes('/rest/v1/projects') && call.options.method === 'POST') {
     return jsonResponse({}, { status: 201 });
   }
@@ -81,10 +99,12 @@ globalThis.fetch = async (url, options = {}) => {
 const {
   createAuthContextFromSupabaseSession,
   SupabaseRequestError,
+  supabaseListAccountDeletionRequests,
   supabaseListProjects,
   supabaseLoadProject,
   supabaseRefreshSession,
   supabaseResendEmailConfirmation,
+  supabaseRequestAccountDeletion,
   supabaseSaveProject,
   supabaseSignIn,
   supabaseSignOut,
@@ -193,6 +213,23 @@ await checkAsync('supports global Supabase logout scope', async () => {
   const logoutCall = calls.find(call => call.url.includes('/auth/v1/logout?scope=global'));
   assert.equal(logoutCall.options.method, 'POST');
   assert.equal(logoutCall.options.headers.Authorization, 'Bearer access-token');
+});
+
+await checkAsync('submits and reads account deletion requests through RLS table', async () => {
+  const request = await supabaseRequestAccountDeletion(auth);
+  const requestCall = calls.find(call => call.url.includes('/rest/v1/account_deletion_requests') && call.options.method === 'POST');
+  assert.equal(requestCall.options.headers.Authorization, 'Bearer access-token');
+  assert.equal(requestCall.options.headers.Prefer, 'return=representation');
+  const body = JSON.parse(requestCall.options.body);
+  assert.equal(body.user_id, 'user-1');
+  assert.equal(body.email, 'test@example.com');
+  assert.equal(body.status, 'requested');
+  assert.equal(request.status, 'requested');
+
+  const latest = await supabaseListAccountDeletionRequests(auth);
+  const listCall = calls.find(call => call.url.includes('/rest/v1/account_deletion_requests') && call.url.includes('select='));
+  assert.equal(listCall.options.headers.Authorization, 'Bearer access-token');
+  assert.equal(latest.status, 'requested');
 });
 
 await checkAsync('preserves Supabase signup rate-limit metadata', async () => {

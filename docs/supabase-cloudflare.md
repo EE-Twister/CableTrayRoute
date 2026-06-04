@@ -49,6 +49,35 @@ create policy "Users can delete their projects"
   on public.projects
   for delete
   using (auth.uid() = user_id);
+
+create table if not exists public.account_deletion_requests (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  email text,
+  reason text,
+  status text not null default 'requested'
+    check (status in ('requested', 'reviewing', 'completed', 'denied')),
+  requested_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (user_id)
+);
+
+create index if not exists account_deletion_requests_status_idx
+  on public.account_deletion_requests (status, requested_at desc);
+
+alter table public.account_deletion_requests enable row level security;
+
+drop policy if exists "Users can read their deletion requests" on public.account_deletion_requests;
+create policy "Users can read their deletion requests"
+  on public.account_deletion_requests
+  for select
+  using (auth.uid() = user_id);
+
+drop policy if exists "Users can create deletion requests" on public.account_deletion_requests;
+create policy "Users can create deletion requests"
+  on public.account_deletion_requests
+  for insert
+  with check (auth.uid() = user_id and status = 'requested');
 ```
 
 Supabase rate-limits repeated signup requests. A `429` response from `/auth/v1/signup`
@@ -79,6 +108,8 @@ Add these Cloudflare Pages environment variables:
 
 The build command writes `supabase-config.json` from those variables. The anon key is public by design; Row-Level Security protects project data.
 
+Generated build output under `dist/` is ignored by Git. Cloudflare Pages runs the build command during deployment, so feature work should not commit generated `dist` artifacts. Use `npm run check:dist-review` before opening review if you want to verify the working tree is free of generated build noise.
+
 ## Local Development
 
 By default, `supabase-config.json` is empty, so the app continues to use the bundled Express server auth flow.
@@ -100,7 +131,8 @@ The static Supabase path supports:
   username or email. The avatar menu links to Account and Logout.
 - Account settings with profile, session, workspace summary, quick project
   links, username/email edits, password updates, account data export,
-  confirmation-email resend, and sign-out controls for the active account.
+  confirmation-email resend, active-session display, account deletion request
+  tracking, and sign-out controls for the active account.
 - Cloud project save/load through Supabase Postgres.
 - Local browser storage fallback when logged out.
 

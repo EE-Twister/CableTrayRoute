@@ -13,7 +13,9 @@ import { authProviderLabel, avatarColorForUser, initialsForUser } from './src/au
 import { signOutCurrentUser, updateAuthSessionControls } from './src/authProfileControl.js';
 import {
   isSupabaseAuthContext,
+  supabaseListAccountDeletionRequests,
   supabaseResendEmailConfirmation,
+  supabaseRequestAccountDeletion,
   supabaseSignOut,
   supabaseUpdatePassword,
   supabaseUpdateProfile
@@ -21,6 +23,7 @@ import {
 
 const MIN_PASSWORD_LENGTH = 8;
 const USERNAME_PATTERN = /^[a-zA-Z0-9_-]{1,100}$/;
+const DELETE_CONFIRMATION_TEXT = 'DELETE';
 
 function setText(id, value) {
   const node = document.getElementById(id);
@@ -73,6 +76,13 @@ function setInlineStatus(id, message, variant = 'info') {
   node.dataset.variant = variant;
 }
 
+function setElementStatus(node, message, variant = 'info') {
+  if (!node) return;
+  node.textContent = message;
+  node.dataset.variant = variant;
+  node.hidden = !message;
+}
+
 function setButtonLoading(button, isLoading, loadingText) {
   if (!button) return;
   if (!button.dataset.defaultText) button.dataset.defaultText = button.textContent;
@@ -109,6 +119,69 @@ function readWorkspaceSummary() {
   };
 }
 
+function renderEmailConfirmationStatus(auth) {
+  const node = document.getElementById('email-confirmation-status');
+  if (!node) return;
+  if (auth.pendingEmail && auth.pendingEmail !== auth.email) {
+    setElementStatus(
+      node,
+      `Email change pending: confirm ${auth.pendingEmail} before it becomes your sign-in email. Current email: ${auth.email || 'Not available'}.`,
+      'warning'
+    );
+    return;
+  }
+  setElementStatus(node, '', 'info');
+}
+
+function buildSessionItems(auth, sessions = null) {
+  if (Array.isArray(sessions) && sessions.length) {
+    return sessions.map(session => ({
+      title: session.current ? 'Current browser' : 'Signed-in browser',
+      meta: [
+        session.issuedAt ? `Started ${formatSessionExpiry(session.issuedAt, Date.now()).replace(/^Expired /, '')}` : '',
+        session.expiresAt ? `Expires ${formatSessionExpiry(session.expiresAt)}` : ''
+      ].filter(Boolean).join(' · ') || 'Active session',
+      current: Boolean(session.current)
+    }));
+  }
+  return [{
+    title: 'Current browser',
+    meta: `${isSupabaseAuthContext(auth) ? 'Hosted email session' : 'Local account session'} · Expires ${formatSessionExpiry(auth.expiresAt)}`,
+    current: true
+  }];
+}
+
+function renderSessionList(auth, sessions = null) {
+  const list = document.getElementById('account-session-list');
+  if (!list) return;
+  list.replaceChildren(...buildSessionItems(auth, sessions).map(session => {
+    const item = document.createElement('article');
+    item.className = 'account-session-item';
+    if (session.current) item.classList.add('is-current');
+    const title = document.createElement('strong');
+    title.textContent = session.title;
+    const meta = document.createElement('span');
+    meta.textContent = session.meta;
+    item.append(title, meta);
+    return item;
+  }));
+}
+
+async function initSessionList(auth) {
+  renderSessionList(auth);
+  if (isSupabaseAuthContext(auth)) return;
+  try {
+    const res = await fetch('/account/sessions', { headers: { 'X-CSRF-Token': auth.csrfToken } });
+    if (!res.ok) return;
+    const body = await res.json().catch(() => ({}));
+    if (Array.isArray(body.sessions)) {
+      renderSessionList(auth, body.sessions);
+    }
+  } catch (err) {
+    console.warn('[account] session list unavailable:', err?.message || err);
+  }
+}
+
 function renderAccount(auth) {
   const providerLabel = authProviderLabel(auth);
   const user = displayValue(auth.user, 'Signed in user');
@@ -132,7 +205,8 @@ function renderAccount(auth) {
   const usernameInput = document.getElementById('profile-username');
   if (usernameInput) usernameInput.value = user === 'Signed in user' ? '' : user;
   const emailInput = document.getElementById('profile-email');
-  if (emailInput) emailInput.value = email === 'Not available' ? '' : email;
+  if (emailInput) emailInput.value = auth.pendingEmail || (email === 'Not available' ? '' : email);
+  renderEmailConfirmationStatus(auth);
 
   const avatar = document.getElementById('account-avatar');
   if (avatar) {
@@ -179,10 +253,13 @@ function renderAccount(auth) {
 function mergeSupabaseProfile(auth, result, requested) {
   const user = result?.user && typeof result.user === 'object' ? result.user : result || {};
   const metadata = user.user_metadata && typeof user.user_metadata === 'object' ? user.user_metadata : {};
+  const confirmedEmail = user.email || auth.email;
+  const pendingEmail = requested.email && requested.email !== confirmedEmail ? requested.email : null;
   return {
     ...auth,
     user: metadata.username || requested.username || auth.user,
-    email: user.email || requested.email || auth.email
+    email: confirmedEmail || requested.email || auth.email,
+    pendingEmail
   };
 }
 
@@ -224,7 +301,10 @@ function initProfileForm(auth) {
       currentAuth = nextAuth;
       renderAccount(nextAuth);
       updateAuthSessionControls();
-      showStatus(form, 'Profile updated. If you changed your email, check that address for a confirmation message.', false);
+      const message = nextAuth.pendingEmail
+        ? `Profile updated. Confirm ${nextAuth.pendingEmail} before it becomes your sign-in email.`
+        : 'Profile updated.';
+      showStatus(form, message, false);
     } catch (err) {
       console.error('[account] profile update request failed:', err);
       showStatus(form, err?.message || 'Profile update failed. Check your connection and try again.', true);
@@ -232,6 +312,56 @@ function initProfileForm(auth) {
       setButtonLoading(btn, false);
     }
   });
+}
+
+async function loadDeletionRequest(auth) {
+  try {
+    if (isSupabaseAuthContext(auth)) {
+      return await supabaseListAccountDeletionRequests(auth);
+    }
+    const res = await fetch('/account/deletion-request', { headers: { 'X-CSRF-Token': auth.csrfToken } });
+    if (!res.ok) return null;
+    const body = await res.json().catch(() => ({}));
+    return body.request || null;
+  } catch (err) {
+    console.warn('[account] deletion request status unavailable:', err?.message || err);
+    return null;
+  }
+}
+
+async function requestAccountDeletion(auth) {
+  if (isSupabaseAuthContext(auth)) {
+    return supabaseRequestAccountDeletion(auth);
+  }
+  const res = await fetch('/account/deletion-request', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRF-Token': auth.csrfToken
+    },
+    body: JSON.stringify({ confirmation: DELETE_CONFIRMATION_TEXT })
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(body.error || 'Could not submit deletion request.');
+  }
+  return body.request;
+}
+
+function describeDeletionRequest(request) {
+  if (!request) return '';
+  const status = request.status || 'requested';
+  const requestedAt = request.requested_at || request.requestedAt;
+  const when = requestedAt ? ` on ${new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(requestedAt))}` : '';
+  if (status === 'requested') return `Account deletion request submitted${when}.`;
+  return `Account deletion request status: ${status}${when}.`;
+}
+
+async function initDeletionStatus(auth) {
+  const request = await loadDeletionRequest(auth);
+  if (request) {
+    setInlineStatus('account-actions-status', describeDeletionRequest(request), request.status === 'completed' ? 'success' : 'warning');
+  }
 }
 
 function passwordScore(password) {
@@ -428,7 +558,7 @@ function initAccountActions(auth) {
       if (isSupabaseAuthContext(auth)) {
         await supabaseSignOut(auth, { scope: 'global' });
       } else {
-        await fetch('/logout', {
+        await fetch('/account/signout-all', {
           method: 'POST',
           headers: { 'X-CSRF-Token': auth.csrfToken }
         });
@@ -442,12 +572,37 @@ function initAccountActions(auth) {
   });
 
   document.getElementById('delete-request-btn')?.addEventListener('click', () => {
-    setInlineStatus(
-      'account-actions-status',
-      'Account deletion requires an administrator review so project ownership and audit history are handled correctly.',
-      'warning'
-    );
+    const panel = document.getElementById('delete-confirmation');
+    if (panel) {
+      panel.hidden = !panel.hidden;
+      if (!panel.hidden) document.getElementById('delete-confirmation-input')?.focus();
+    }
+    setInlineStatus('account-actions-status', 'Deletion requests are reviewed before project ownership and audit history are removed.', 'warning');
   });
+
+  document.getElementById('submit-delete-request-btn')?.addEventListener('click', async (event) => {
+    const confirmation = document.getElementById('delete-confirmation-input')?.value.trim() || '';
+    if (confirmation !== DELETE_CONFIRMATION_TEXT) {
+      setInlineStatus('account-actions-status', 'Type DELETE to confirm this account deletion request.', 'error');
+      return;
+    }
+    const btn = event.currentTarget;
+    setButtonLoading(btn, true, 'Submitting...');
+    setInlineStatus('account-actions-status', 'Submitting deletion request...', 'loading');
+    try {
+      const request = await requestAccountDeletion(auth);
+      setInlineStatus('account-actions-status', describeDeletionRequest(request) || 'Account deletion request submitted.', 'success');
+      document.getElementById('delete-confirmation-input').value = '';
+      document.getElementById('delete-confirmation').hidden = true;
+    } catch (err) {
+      console.error('[account] deletion request failed:', err);
+      setInlineStatus('account-actions-status', err?.message || 'Could not submit deletion request.', 'error');
+    } finally {
+      setButtonLoading(btn, false);
+    }
+  });
+
+  initDeletionStatus(auth);
 }
 
 function init() {
@@ -458,6 +613,7 @@ function init() {
   }
 
   renderAccount(auth);
+  initSessionList(auth);
   initProfileForm(auth);
   initPasswordToggles();
   initPasswordForm(auth);

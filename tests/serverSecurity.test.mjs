@@ -594,6 +594,101 @@ async function httpsRedirectScenario() {
   }
 }
 
+async function accountLifecycleScenario() {
+  console.log('server security - account lifecycle endpoints');
+  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ctr-account-life-'));
+  const { server, port } = await startServer({
+    dataDir: tmpDir,
+    tokenTtlMs: 5000,
+    rateLimit: { windowMs: 60000, max: 100 },
+    enforceHttps: false
+  });
+  const baseUrl = `http://127.0.0.1:${port}`;
+
+  try {
+    const username = 'lifecycle';
+    const password = 'LifeCycle!123';
+    await fetch(`${baseUrl}/signup`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password })
+    });
+    const loginRes = await fetch(`${baseUrl}/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password })
+    });
+    const session = await loginRes.json();
+
+    await check('lists current account sessions without exposing tokens', async () => {
+      const res = await fetch(`${baseUrl}/account/sessions`, {
+        headers: { Authorization: `Bearer ${session.token}` }
+      });
+      assert.strictEqual(res.status, 200);
+      const body = await res.json();
+      assert.strictEqual(body.sessions.length, 1);
+      assert.strictEqual(body.sessions[0].current, true);
+      assert.ok(body.sessions[0].id, 'hashed session id missing');
+      assert.strictEqual(body.sessions[0].token, undefined);
+    });
+
+    await check('requires CSRF before submitting account deletion request', async () => {
+      const res = await fetch(`${baseUrl}/account/deletion-request`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.token}`
+        },
+        body: JSON.stringify({ confirmation: 'DELETE' })
+      });
+      assert.strictEqual(res.status, 403);
+    });
+
+    await check('persists account deletion request after confirmation', async () => {
+      const res = await fetch(`${baseUrl}/account/deletion-request`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.token}`,
+          'X-CSRF-Token': session.csrfToken
+        },
+        body: JSON.stringify({ confirmation: 'DELETE' })
+      });
+      assert.strictEqual(res.status, 201);
+      const body = await res.json();
+      assert.strictEqual(body.request.username, username);
+      assert.strictEqual(body.request.status, 'requested');
+    });
+
+    await check('returns account deletion request status', async () => {
+      const res = await fetch(`${baseUrl}/account/deletion-request`, {
+        headers: { Authorization: `Bearer ${session.token}` }
+      });
+      assert.strictEqual(res.status, 200);
+      const body = await res.json();
+      assert.strictEqual(body.request.username, username);
+      assert.strictEqual(body.request.status, 'requested');
+    });
+
+    await check('signs out all local account sessions', async () => {
+      const res = await fetch(`${baseUrl}/account/signout-all`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${session.token}`,
+          'X-CSRF-Token': session.csrfToken
+        }
+      });
+      assert.strictEqual(res.status, 200);
+      const followUp = await fetch(`${baseUrl}/account/sessions`, {
+        headers: { Authorization: `Bearer ${session.token}` }
+      });
+      assert.strictEqual(followUp.status, 401);
+    });
+  } finally {
+    await closeServer(server);
+  }
+}
+
 function getSetCookieValue(headers, cookieName) {
   const list = typeof headers.getSetCookie === 'function' ? headers.getSetCookie() : [];
   for (const entry of list) {
@@ -850,6 +945,7 @@ async function wsTicketScenario() {
   await rateLimitScenario();
   await sessionRefreshScenario();
   await passwordChangeScenario();
+  await accountLifecycleScenario();
   await httpsRedirectScenario();
   await cookieAuthScenario();
   await wsTicketScenario();
