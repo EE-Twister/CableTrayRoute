@@ -273,6 +273,111 @@ function buildBrand() {
   return brand;
 }
 
+async function runProjectAction(actionName) {
+  if (!globalThis.projectManager) {
+    await import('../projectManager.js');
+  }
+  const action = globalThis.projectManager?.[actionName];
+  if (typeof action !== 'function') {
+    throw new Error('Project manager is not available.');
+  }
+  return action();
+}
+
+function buildProjectActionsControl(existingProjectDisplay) {
+  const wrapper = document.createElement('div');
+  wrapper.id = 'project-actions-control';
+  wrapper.className = 'project-actions-control';
+
+  const trigger = document.createElement('button');
+  trigger.type = 'button';
+  trigger.className = 'project-actions-trigger';
+  trigger.setAttribute('aria-haspopup', 'true');
+  trigger.setAttribute('aria-expanded', 'false');
+  trigger.setAttribute('aria-label', 'Project actions');
+  trigger.setAttribute('title', 'Project actions');
+
+  const icon = document.createElement('img');
+  icon.src = 'icons/toolbar/grid.svg';
+  icon.alt = '';
+  icon.setAttribute('aria-hidden', 'true');
+  icon.className = 'project-actions-icon';
+  icon.loading = 'lazy';
+  icon.decoding = 'async';
+
+  const display = existingProjectDisplay || document.createElement('span');
+  display.id = 'project-display';
+  display.classList.add('project-display-chip');
+  if (!display.textContent.trim()) {
+    display.textContent = 'Project: Untitled';
+  }
+
+  trigger.append(icon, display);
+
+  const panel = document.createElement('div');
+  panel.className = 'project-actions-panel';
+  panel.setAttribute('role', 'menu');
+
+  const actions = [
+    { label: 'New Project', action: 'newProject' },
+    { label: 'Save Project', action: 'saveProject' },
+    { label: 'Load Project', action: 'loadProject' }
+  ];
+
+  for (const item of actions) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'project-actions-item';
+    button.setAttribute('role', 'menuitem');
+    button.textContent = item.label;
+    button.addEventListener('click', async () => {
+      wrapper.classList.remove('open');
+      trigger.setAttribute('aria-expanded', 'false');
+      try {
+        await runProjectAction(item.action);
+      } catch (err) {
+        console.error(err);
+      }
+    });
+    panel.appendChild(button);
+  }
+
+  const dashboardLink = document.createElement('a');
+  dashboardLink.href = 'workflowdashboard.html';
+  dashboardLink.className = 'project-actions-item';
+  dashboardLink.setAttribute('role', 'menuitem');
+  dashboardLink.textContent = 'Project Dashboard';
+  dashboardLink.addEventListener('click', () => {
+    wrapper.classList.remove('open');
+    trigger.setAttribute('aria-expanded', 'false');
+  });
+  panel.appendChild(dashboardLink);
+
+  wrapper.append(trigger, panel);
+
+  trigger.addEventListener('click', (event) => {
+    event.stopPropagation();
+    const isOpen = wrapper.classList.toggle('open');
+    trigger.setAttribute('aria-expanded', String(isOpen));
+  });
+
+  document.addEventListener('click', (event) => {
+    if (!wrapper.contains(event.target)) {
+      wrapper.classList.remove('open');
+      trigger.setAttribute('aria-expanded', 'false');
+    }
+  });
+
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+      wrapper.classList.remove('open');
+      trigger.setAttribute('aria-expanded', 'false');
+    }
+  });
+
+  return wrapper;
+}
+
 function hasNavigationDomApi() {
   return typeof document !== 'undefined'
     && typeof document.querySelector === 'function'
@@ -305,6 +410,7 @@ function mountPersistentNavigation() {
 
   const existingSettingsBtn = document.getElementById('settings-btn');
   const existingProjectDisplay = document.getElementById('project-display');
+  const existingProjectActions = document.getElementById('project-actions-control');
   const navLinks = document.createElement('div');
   navLinks.id = 'nav-links';
   navLinks.className = 'nav-links';
@@ -322,8 +428,10 @@ function mountPersistentNavigation() {
     }
   });
 
-  if (existingProjectDisplay) {
-    navActions.appendChild(existingProjectDisplay);
+  if (existingProjectActions) {
+    navActions.appendChild(existingProjectActions);
+  } else {
+    navActions.appendChild(buildProjectActionsControl(existingProjectDisplay));
   }
 
   if (existingSettingsBtn) {

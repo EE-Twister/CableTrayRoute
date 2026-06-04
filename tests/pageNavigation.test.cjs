@@ -56,4 +56,13 @@ describe('page navigation', () => {
     const src = fs.readFileSync(path.join(root, 'src/components/navigation.js'), 'utf8');
     assert.ok(src.includes("href: 'mcclineup.html'"), 'navigation.js missing mcclineup.html route');
   });
+
+  it('persistent navigation exposes project actions', () => {
+    const src = fs.readFileSync(path.join(root, 'src/components/navigation.js'), 'utf8');
+    assert.ok(src.includes('project-actions-control'), 'navigation.js missing project actions control');
+    assert.ok(src.includes('New Project'), 'navigation.js missing New Project action');
+    assert.ok(src.includes('Save Project'), 'navigation.js missing Save Project action');
+    assert.ok(src.includes('Load Project'), 'navigation.js missing Load Project action');
+    assert.ok(src.includes("import('../projectManager.js')"), 'navigation.js should lazy-load project manager actions');
+  });
 });

@@ -140,9 +140,12 @@ export function mountProfileControl() {
   });
 
   const projectDisplay = document.getElementById('project-display');
+  const projectActions = document.getElementById('project-actions-control');
   const settingsBtn = document.getElementById('settings-btn');
   const navActions = topNav.querySelector('.nav-actions');
-  if (projectDisplay?.parentElement) {
+  if (projectActions?.parentElement) {
+    projectActions.parentElement.insertBefore(wrapper, projectActions);
+  } else if (projectDisplay?.parentElement) {
     projectDisplay.parentElement.insertBefore(wrapper, projectDisplay);
   } else if (settingsBtn?.parentElement) {
     settingsBtn.parentElement.insertBefore(wrapper, settingsBtn);
