@@ -30,12 +30,10 @@ describe('MCC lineup page', () => {
   const baseCss = fs.readFileSync(path.join(root, 'src', 'styles', 'base.css'), 'utf8');
   const distJs = fs.readFileSync(path.join(root, 'dist', 'mcclineup.js'), 'utf8');
   const distArrangementJs = fs.readFileSync(path.join(root, 'dist', 'equipmentarrangements.js'), 'utf8');
-  const distChunkDir = path.join(root, 'dist', 'chunks');
-  const mccModelChunks = fs.readdirSync(distChunkDir)
-    .filter(name => name.startsWith('mccLineupModel-') && name.endsWith('.js'));
-  const distModelJs = mccModelChunks
-    .map(name => fs.readFileSync(path.join(distChunkDir, name), 'utf8'))
-    .join('\n');
+  // The bundler inlines dynamic imports (rollup `inlineDynamicImports: true`),
+  // so mccLineupModel.mjs is emitted into dist/mcclineup.js rather than a
+  // separate dist/chunks/ file. Assert against the inlined bundle.
+  const distModelJs = distJs;
 
   it('adds a dedicated MCC Lineups page shell', () => {
     assert.ok(html.includes('<h1>MCC Lineups</h1>'), 'mcclineup.html missing page header');
@@ -310,7 +308,7 @@ describe('MCC lineup page', () => {
   });
 
   it('ships MCC page and arrangement preview in dist bundles', () => {
-    assert.ok(mccModelChunks.length, 'dist/chunks missing MCC model bundle');
+    assert.ok(distModelJs.includes('mccLineupId'), 'dist/mcclineup.js missing inlined MCC model bundle');
     assert.ok(distJs.includes('mcc-lineup-select'), 'dist/mcclineup.js missing MCC page wiring');
     assert.ok(distJs.includes('sync-mcc-equipment'), 'dist/mcclineup.js missing equipment sync control');
     assert.ok(distJs.includes('export-mcc-lineup-pdf'), 'dist/mcclineup.js missing PDF report export control');
