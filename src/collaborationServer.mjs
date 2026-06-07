@@ -24,6 +24,9 @@
  */
 export function attachCollaborationServer(httpServer, wss, options = {}) {
   const validateUpgrade = typeof options.validateUpgrade === 'function' ? options.validateUpgrade : null;
+  // Cap incoming frame size so an authenticated client cannot exhaust memory
+  // (or amplify a broadcast) with an oversized patch payload.
+  const maxMessageBytes = Number(options.maxMessageBytes) > 0 ? Number(options.maxMessageBytes) : 64 * 1024;
   // projectId → Set of { ws, username }
   const rooms = new Map();
   // projectId → monotonically increasing sequence counter
@@ -92,6 +95,11 @@ export function attachCollaborationServer(httpServer, wss, options = {}) {
     }
 
     ws.on('message', (data) => {
+      const size = typeof data === 'string' ? Buffer.byteLength(data) : (data?.length ?? 0);
+      if (size > maxMessageBytes) {
+        ws.send(JSON.stringify({ type: 'error', message: 'Message too large' }));
+        return;
+      }
       let msg;
       try {
         msg = JSON.parse(data.toString());
