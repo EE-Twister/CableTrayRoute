@@ -2486,6 +2486,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.a
     const { WebSocketServer } = await import('ws');
     attachCollaborationServer(server, new WebSocketServer({ noServer: true }), {
       validateUpgrade: app.get('collabUpgradeValidator'),
+      maxMessageBytes: 64 * 1024,
     });
   } catch {
     // ws not installed — collaboration disabled; app still works fine

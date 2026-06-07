@@ -298,6 +298,39 @@ describe('attachCollaborationServer — close event', () => {
   });
 });
 
+describe('attachCollaborationServer — message size cap', () => {
+  it('rejects frames larger than maxMessageBytes without broadcasting', () => {
+    const httpServer = new MockHttpServer();
+    const wss = new MockWss();
+    attachCollaborationServer(httpServer, wss, { maxMessageBytes: 50 });
+
+    const alice = connectClient(httpServer, wss);
+    alice._receive({ type: 'join', projectId: 'proj1', username: 'alice' });
+    const bob = connectClient(httpServer, wss);
+    bob._receive({ type: 'join', projectId: 'proj1', username: 'bob' });
+
+    const bobPrevCount = bob.sent.length;
+    // Oversized patch: comfortably exceeds the 50-byte cap.
+    alice._emit('message', Buffer.from(JSON.stringify({
+      type: 'patch', projectId: 'proj1', username: 'alice', patch: { blob: 'x'.repeat(200) }
+    })));
+
+    const errors = alice.sentOfType('error');
+    assert.strictEqual(errors[errors.length - 1].message, 'Message too large');
+    const bobPatches = bob.sent.slice(bobPrevCount).filter(m => m.type === 'patch');
+    assert.strictEqual(bobPatches.length, 0, 'oversized patch should not be broadcast');
+  });
+
+  it('allows frames within maxMessageBytes', () => {
+    const httpServer = new MockHttpServer();
+    const wss = new MockWss();
+    attachCollaborationServer(httpServer, wss, { maxMessageBytes: 64 * 1024 });
+    const ws = connectClient(httpServer, wss);
+    ws._receive({ type: 'ping' });
+    assert.deepStrictEqual(ws.lastSent(), { type: 'pong' });
+  });
+});
+
 describe('attachCollaborationServer — invalid JSON', () => {
   it('sends error for malformed JSON', () => {
     const { httpServer, wss } = setupServer();
