@@ -14,6 +14,8 @@ import {
   buildLineList,
   buildHeatTraceBOM,
   buildControllerSchedule,
+  filterHeatTraceProducts,
+  isHeatTraceProductApproved,
 } from '../analysis/heatTraceSizing.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -381,6 +383,55 @@ describe('heatTraceProducts.json catalog schema', () => {
       assert.ok(typeof p.hazardousAreaRating === 'string' && p.hazardousAreaRating.length > 0,
         `hazardous product ${p.id} must have hazardousAreaRating string`);
     });
+  });
+
+  it('every product carries an approval block with a known status', () => {
+    const knownStatuses = new Set(['approved', 'conditional', 'rejected', 'unreviewed']);
+    heatTraceProductCatalog.forEach(p => {
+      assert.ok(p.approval && typeof p.approval === 'object',
+        `product ${p.id} missing approval block`);
+      assert.ok(knownStatuses.has(p.approval.status),
+        `product ${p.id} has unknown approval.status: ${p.approval.status}`);
+    });
+  });
+
+  it('approved seed entries have source and lastVerified metadata', () => {
+    heatTraceProductCatalog
+      .filter(p => p.approval?.status === 'approved')
+      .forEach(p => {
+        assert.ok(typeof p.source === 'string' && p.source.length > 0,
+          `approved product ${p.id} must declare a source`);
+        assert.ok(/^\d{4}-\d{2}-\d{2}$/.test(p.lastVerified || ''),
+          `approved product ${p.id} must declare lastVerified as YYYY-MM-DD`);
+      });
+  });
+});
+
+describe('filterHeatTraceProducts', () => {
+  it('returns a shallow copy when approvedOnly is not requested', () => {
+    const all = filterHeatTraceProducts(heatTraceProductCatalog);
+    assert.equal(all.length, heatTraceProductCatalog.length);
+    assert.notStrictEqual(all, heatTraceProductCatalog);
+  });
+
+  it('returns only approved entries when approvedOnly is true', () => {
+    const approved = filterHeatTraceProducts(heatTraceProductCatalog, { approvedOnly: true });
+    assert.ok(approved.length > 0, 'expected at least one approved seed product');
+    assert.ok(approved.length < heatTraceProductCatalog.length,
+      'expected approvedOnly to actually narrow the catalog');
+    approved.forEach(p => assert.equal(p.approval.status, 'approved'));
+  });
+
+  it('isHeatTraceProductApproved recognizes the approval block', () => {
+    assert.equal(isHeatTraceProductApproved({ approval: { status: 'approved' } }), true);
+    assert.equal(isHeatTraceProductApproved({ approval: { status: 'unreviewed' } }), false);
+    assert.equal(isHeatTraceProductApproved({ approved: true }), true);
+    assert.equal(isHeatTraceProductApproved(null), false);
+  });
+
+  it('handles non-array catalogs by returning []', () => {
+    assert.deepEqual(filterHeatTraceProducts(null, { approvedOnly: true }), []);
+    assert.deepEqual(filterHeatTraceProducts(undefined), []);
   });
 });
 

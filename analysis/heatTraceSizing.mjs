@@ -430,6 +430,27 @@ function isHazardousArea(environment) {
  * @param {object[]} catalog  Array of product objects from heatTraceProducts.json
  * @returns {{ product: object, circuitLengthOk: boolean, candidates: object[] }}
  */
+export function isHeatTraceProductApproved(product) {
+  if (!product || typeof product !== 'object') return false;
+  if (product.approval && typeof product.approval === 'object') {
+    return product.approval.status === 'approved';
+  }
+  return product.approved === true;
+}
+
+/**
+ * Filter a heat-trace product catalog to entries with an approved governance
+ * status. Mirrors `filterCatalogProducts({ approvedOnly })` from
+ * `manufacturerCatalog.mjs` so the same approved-only semantics apply across
+ * the app. Pass `approvedOnly: false` (or omit) to get the full catalog
+ * shallow-copied.
+ */
+export function filterHeatTraceProducts(catalog, { approvedOnly = false } = {}) {
+  if (!Array.isArray(catalog)) return [];
+  if (!approvedOnly) return catalog.slice();
+  return catalog.filter(isHeatTraceProductApproved);
+}
+
 export function selectHeatTraceProduct(circuit, catalog) {
   if (!circuit || typeof circuit !== 'object') throw new Error('circuit must be an object');
   if (!Array.isArray(catalog)) throw new Error('catalog must be an array');
