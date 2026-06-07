@@ -52,6 +52,10 @@ function readGlobalConfig() {
 
 function readStorageConfig() {
   try {
+    // Bootstrap-only read of the Supabase URL/key before projectStorage.js is
+    // available — this selects the persistence backend itself, so it cannot
+    // route through projectStorage helpers.
+    // eslint-disable-next-line no-restricted-globals
     const storage = typeof localStorage !== 'undefined' ? localStorage : null;
     if (!storage) return null;
     const supabaseUrl = storage.getItem('CTR_SUPABASE_URL') || '';
