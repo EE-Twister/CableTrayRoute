@@ -9,6 +9,13 @@ import {
   validateCatalog,
   validateCatalogProduct
 } from '../analysis/manufacturerCatalog.mjs';
+import {
+  CATALOG_IMPORT_COLUMNS,
+  buildCatalogTemplateCsv,
+  buildCatalogTemplateRows,
+  importCatalogRows,
+  parseCatalogCsv
+} from '../analysis/catalogImport.mjs';
 import { validateLibraryPayload } from '../src/validation/librarySchema.mjs';
 
 function describe(name, fn) {
@@ -211,5 +218,109 @@ describe('component library catalog validation', () => {
       catalog_last_verified: '2026-05-22'
     }));
     assert.equal(result.valid, true);
+  });
+});
+
+describe('catalog import: templates and CSV parsing', () => {
+  it('exposes a column spec with required headers', () => {
+    const required = CATALOG_IMPORT_COLUMNS.filter(col => col.required).map(col => col.key);
+    ['id', 'manufacturer', 'catalogNumber', 'category', 'description'].forEach(field => {
+      assert.ok(required.includes(field), `${field} must be a required template column`);
+    });
+  });
+
+  it('template rows cover every CATALOG_IMPORT_COLUMNS header', () => {
+    const rows = buildCatalogTemplateRows();
+    assert.ok(rows.length >= 1);
+    const headerSet = new Set(CATALOG_IMPORT_COLUMNS.map(col => col.header));
+    for (const row of rows) {
+      Object.keys(row).forEach(key => assert.ok(headerSet.has(key), `unexpected header ${key} in template row`));
+    }
+  });
+
+  it('template CSV round-trips through parseCatalogCsv to approved governed rows', () => {
+    const csv = buildCatalogTemplateCsv();
+    const { products, errors } = parseCatalogCsv(csv);
+    assert.equal(errors.length, 0, `unexpected parse errors: ${JSON.stringify(errors)}`);
+    assert.ok(products.length >= 1);
+    const approved = products.filter(p => p.approved);
+    assert.ok(approved.length >= 1, 'expected at least one approved example in the template');
+    approved.forEach(p => {
+      assert.ok(p.source, `approved row ${p.id} should round-trip a source`);
+      assert.ok(p.lastVerified, `approved row ${p.id} should round-trip lastVerified`);
+    });
+  });
+
+  it('reports row-numbered errors for approved rows missing source/lastVerified', () => {
+    const csv = [
+      'Part Number,Manufacturer,Catalog No.,Category,Description,Approved',
+      'X-1,ACME,X-1,tray,Bad approved row,TRUE'
+    ].join('\r\n');
+    const { products, errors } = parseCatalogCsv(csv);
+    assert.equal(products.length, 0);
+    assert.ok(errors.some(err => err.row === 2 && /source/i.test(err.message)));
+    assert.ok(errors.some(err => err.row === 2 && /lastVerified/i.test(err.message)));
+  });
+
+  it('rejects rows with invalid category enums', () => {
+    const csv = [
+      'Part Number,Manufacturer,Catalog No.,Category,Description',
+      'X-2,ACME,X-2,not-a-category,Some row'
+    ].join('\r\n');
+    const { errors } = parseCatalogCsv(csv);
+    assert.ok(errors.some(err => err.row === 2 && /Category/i.test(err.column)));
+  });
+
+  it('importCatalogRows splits incoming products into accepted vs duplicate by manufacturer/catalogNumber', () => {
+    const existing = [
+      normalizeCatalogProduct({
+        id: 'OLD',
+        manufacturer: 'ACME',
+        catalogNumber: 'TRAY-12',
+        category: 'tray',
+        description: 'Old',
+        approved: true,
+        source: 'Approved list',
+        lastVerified: '2026-05-22'
+      })
+    ];
+    const incoming = [
+      normalizeCatalogProduct({
+        id: 'NEW',
+        manufacturer: 'ACME',
+        catalogNumber: 'TRAY-24',
+        category: 'tray',
+        description: 'New approved tray',
+        approved: true,
+        source: 'Approved list',
+        lastVerified: '2026-05-22'
+      }),
+      normalizeCatalogProduct({
+        id: 'DUP',
+        manufacturer: 'ACME',
+        catalogNumber: 'TRAY-12',
+        category: 'tray',
+        description: 'Same identity, will overwrite OLD',
+        approved: true,
+        source: 'Approved list rev B',
+        lastVerified: '2026-05-22'
+      })
+    ];
+    const { accepted, duplicates } = importCatalogRows(incoming, existing);
+    assert.deepEqual(accepted.map(p => p.id), ['NEW']);
+    assert.equal(duplicates.length, 1);
+    assert.equal(duplicates[0].existing.id, 'OLD');
+  });
+
+  it('skips fully blank CSV rows', () => {
+    const csv = [
+      'Part Number,Manufacturer,Catalog No.,Category,Description',
+      ',,,,',
+      'X-3,ACME,X-3,tray,Real row'
+    ].join('\r\n');
+    const { products, errors } = parseCatalogCsv(csv);
+    assert.equal(errors.length, 0);
+    assert.equal(products.length, 1);
+    assert.equal(products[0].id, 'X-3');
   });
 });

@@ -6,6 +6,7 @@ import {
   buildLineList,
   buildHeatTraceBOM,
   buildControllerSchedule,
+  filterHeatTraceProducts,
 } from './analysis/heatTraceSizing.mjs';
 import heatTraceProductCatalog from './data/heatTraceProducts.json';
 import {
@@ -88,6 +89,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const productFilterType = document.getElementById('product-filter-type');
   const productFilterVoltage = document.getElementById('product-filter-voltage');
   const productFilterHazardous = document.getElementById('product-filter-hazardous');
+  const productFilterApproved = document.getElementById('product-filter-approved');
   let activeUnitSystem = unitSystemSelect?.value || 'imperial';
   let sensitivityBaseline = null;
   let sensitivityRecommendations = [];
@@ -2241,8 +2243,22 @@ document.addEventListener('DOMContentLoaded', () => {
   // Line List, BOM, Controller Schedule, Installation Notes
   // -------------------------------------------------------------------------
 
+  function getApprovedOnly() {
+    return productFilterApproved?.checked || false;
+  }
+
+  /**
+   * Catalog used for circuit auto-selection (line list, BOM, controller,
+   * exports). Honors the Approved-only toggle so unapproved products do not
+   * silently propagate into deliverables.
+   */
+  function getSelectionCatalog() {
+    const catalog = Array.isArray(heatTraceProductCatalog) ? heatTraceProductCatalog : [];
+    return filterHeatTraceProducts(catalog, { approvedOnly: getApprovedOnly() });
+  }
+
   function getFilteredCatalog() {
-    let catalog = Array.isArray(heatTraceProductCatalog) ? heatTraceProductCatalog : [];
+    let catalog = getSelectionCatalog();
     const typeFilter = productFilterType?.value || '';
     const voltageFilter = productFilterVoltage?.value ? Number(productFilterVoltage.value) : null;
     const hazFilter = productFilterHazardous?.checked || false;
@@ -2266,7 +2282,7 @@ document.addEventListener('DOMContentLoaded', () => {
       lineListTableDiv.innerHTML = '';
       return;
     }
-    const catalog = Array.isArray(heatTraceProductCatalog) ? heatTraceProductCatalog : [];
+    const catalog = getSelectionCatalog();
     const rows = buildLineList(circuits, catalog);
     if (lineListStatus) lineListStatus.textContent = `${rows.length} circuit${rows.length === 1 ? '' : 's'} in line list.`;
     const checkClass = row => {
@@ -2326,17 +2342,19 @@ document.addEventListener('DOMContentLoaded', () => {
       <div class="report-scroll">
         <table class="report-table">
           <thead>
-            <tr><th>ID</th><th>Family</th><th>Type</th><th>W/ft</th><th>Voltages</th><th>Hazardous</th><th>Max Exp. °C</th><th>Description</th></tr>
+            <tr><th>ID</th><th>Manufacturer</th><th>Family</th><th>Type</th><th>W/ft</th><th>Voltages</th><th>Hazardous</th><th>Max Exp. °C</th><th>Approval</th><th>Description</th></tr>
           </thead>
           <tbody>
             ${catalog.map(p => `<tr>
               <td>${escHtml(p.id)}</td>
+              <td>${escHtml(p.manufacturer || '—')}</td>
               <td>${escHtml(p.family)}</td>
               <td>${escHtml(typeLabel[p.type] || p.type)}</td>
               <td>${escHtml(p.nominalWPerFt)}</td>
               <td>${escHtml((p.voltages || []).join(', '))}</td>
               <td>${p.hazardousAreaRating ? escHtml(p.hazardousAreaRating) : '—'}</td>
               <td>${escHtml(p.maxExposureTempC)}</td>
+              <td>${escHtml(p.approval?.status || 'unreviewed')}</td>
               <td>${escHtml(p.description || '')}</td>
             </tr>`).join('')}
           </tbody>
@@ -2351,7 +2369,7 @@ document.addEventListener('DOMContentLoaded', () => {
       bomTableDiv.innerHTML = '<p class="field-hint">Add branch cases to generate the BOM.</p>';
       return;
     }
-    const catalog = Array.isArray(heatTraceProductCatalog) ? heatTraceProductCatalog : [];
+    const catalog = getSelectionCatalog();
     const lineRows = buildLineList(circuits, catalog);
     const bom = buildHeatTraceBOM(lineRows);
     bomTableDiv.innerHTML = `
@@ -2379,7 +2397,7 @@ document.addEventListener('DOMContentLoaded', () => {
       controllerTableDiv.innerHTML = '<p class="field-hint">Add branch cases to generate the controller schedule.</p>';
       return;
     }
-    const catalog = Array.isArray(heatTraceProductCatalog) ? heatTraceProductCatalog : [];
+    const catalog = getSelectionCatalog();
     const lineRows = buildLineList(circuits, catalog);
     const schedule = buildControllerSchedule(lineRows);
     controllerTableDiv.innerHTML = `
@@ -2407,7 +2425,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function renderInstallationNotes() {
     if (!installationNotesDiv) return;
     const circuits = getNormalizedCircuits();
-    const catalog = Array.isArray(heatTraceProductCatalog) ? heatTraceProductCatalog : [];
+    const catalog = getSelectionCatalog();
     const productTypes = new Set();
     const hasHazardous = circuits.some(c => (c.inputs?.environment || '') === 'hazardous-area');
     const hasHighTemp = circuits.some(c => Number(c.inputs?.maintainTempC) > 120);
@@ -2482,7 +2500,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function exportLineListCsv() {
     const circuits = getNormalizedCircuits();
     if (!circuits.length) { showModal('No Data', '<p>Add branch cases before exporting.</p>', 'info'); return; }
-    const catalog = Array.isArray(heatTraceProductCatalog) ? heatTraceProductCatalog : [];
+    const catalog = getSelectionCatalog();
     const rows = buildLineList(circuits, catalog);
     const headers = ['lineNum','circuitTag','service','areaClassification','maintainTempC','ambientDesignTempC','effectiveLengthFt','productFamily','nominalWPerFt','requiredWPerFt','circuitKw','circuitAmps','startupCurrentA','maxCircuitLengthFt','circuitLengthCheck','controllerTag','panelSource'];
     downloadCsvData(headers, rows, `heat-trace-line-list-${new Date().toISOString().slice(0,10)}.csv`);
@@ -2491,7 +2509,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function exportBomCsv() {
     const circuits = getNormalizedCircuits();
     if (!circuits.length) { showModal('No Data', '<p>Add branch cases before exporting.</p>', 'info'); return; }
-    const catalog = Array.isArray(heatTraceProductCatalog) ? heatTraceProductCatalog : [];
+    const catalog = getSelectionCatalog();
     const lineRows = buildLineList(circuits, catalog);
     const bom = buildHeatTraceBOM(lineRows);
     const headers = ['item','description','quantity','unit'];
@@ -2501,7 +2519,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function exportControllerCsv() {
     const circuits = getNormalizedCircuits();
     if (!circuits.length) { showModal('No Data', '<p>Add branch cases before exporting.</p>', 'info'); return; }
-    const catalog = Array.isArray(heatTraceProductCatalog) ? heatTraceProductCatalog : [];
+    const catalog = getSelectionCatalog();
     const lineRows = buildLineList(circuits, catalog);
     const schedule = buildControllerSchedule(lineRows);
     const headers = ['controllerTag','panelSource','voltageV','circuitCount','circuitTags','totalKw','totalAmps','monitoringType'];
@@ -2515,7 +2533,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     const circuits = getNormalizedCircuits();
     if (!circuits.length) { showModal('No Data', '<p>Add branch cases before exporting the package.</p>', 'info'); return; }
-    const catalog = Array.isArray(heatTraceProductCatalog) ? heatTraceProductCatalog : [];
+    const catalog = getSelectionCatalog();
     const lineRows = await buildLineListOffMain(circuits, catalog);
     const bom = await buildHeatTraceBOMOffMain(lineRows);
     const controllerSched = await buildControllerScheduleOffMain(lineRows);
@@ -2570,6 +2588,13 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     [productFilterType, productFilterVoltage, productFilterHazardous].forEach(el => {
       el?.addEventListener('change', renderCatalogTable);
+    });
+    // Approved-only flows into the line-list / BOM / controller auto-pick.
+    productFilterApproved?.addEventListener('change', () => {
+      renderCatalogTable();
+      renderLineListTable();
+      renderBomTable();
+      renderControllerTable();
     });
     document.getElementById('heattrace-tab-linelist')?.addEventListener('click', () => {
       renderLineListTable();

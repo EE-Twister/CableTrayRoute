@@ -2,6 +2,7 @@
   {
     "id": "sr-3-240",
     "manufacturer": "Generic",
+    "catalogNumber": "SR-3-240",
     "family": "SR-3-240",
     "type": "selfRegulating",
     "voltages": [240],
@@ -13,11 +14,22 @@
     "maxExposureTempC": 65,
     "minInstallTempC": -40,
     "hazardousAreaRating": null,
-    "description": "3 W/ft self-regulating freeze-protection cable, 240 V"
+    "description": "3 W/ft self-regulating freeze-protection cable, 240 V",
+    "approved": false,
+    "approval": {
+      "status": "unreviewed",
+      "authority": "",
+      "approvedBy": "",
+      "approvedAt": "",
+      "notes": "Generic seed entry — replace with an approved vendor cable for project use."
+    },
+    "source": "",
+    "lastVerified": ""
   },
   {
     "id": "sr-5-240",
     "manufacturer": "Generic",
+    "catalogNumber": "SR-5-240",
     "family": "SR-5-240",
     "type": "selfRegulating",
     "voltages": [120, 240],
@@ -29,11 +41,22 @@
     "maxExposureTempC": 65,
     "minInstallTempC": -40,
     "hazardousAreaRating": null,
-    "description": "5 W/ft self-regulating freeze-protection cable, 120/240 V"
+    "description": "5 W/ft self-regulating freeze-protection cable, 120/240 V",
+    "approved": false,
+    "approval": {
+      "status": "unreviewed",
+      "authority": "",
+      "approvedBy": "",
+      "approvedAt": "",
+      "notes": "Generic seed entry — replace with an approved vendor cable for project use."
+    },
+    "source": "",
+    "lastVerified": ""
   },
   {
     "id": "sr-10-240",
     "manufacturer": "Generic",
+    "catalogNumber": "SR-10-240",
     "family": "SR-10-240",
     "type": "selfRegulating",
     "voltages": [240],
@@ -45,11 +68,22 @@
     "maxExposureTempC": 85,
     "minInstallTempC": -40,
     "hazardousAreaRating": null,
-    "description": "10 W/ft self-regulating process-maintenance cable, 240 V"
+    "description": "10 W/ft self-regulating process-maintenance cable, 240 V",
+    "approved": false,
+    "approval": {
+      "status": "unreviewed",
+      "authority": "",
+      "approvedBy": "",
+      "approvedAt": "",
+      "notes": "Generic seed entry — replace with an approved vendor cable for project use."
+    },
+    "source": "",
+    "lastVerified": ""
   },
   {
     "id": "cw-8-240",
     "manufacturer": "Generic",
+    "catalogNumber": "CW-8-240",
     "family": "CW-8-240",
     "type": "constantWattage",
     "voltages": [120, 240],
@@ -61,11 +95,22 @@
     "maxExposureTempC": 100,
     "minInstallTempC": -60,
     "hazardousAreaRating": null,
-    "description": "8 W/ft constant-wattage series-resistance cable, 120/240 V"
+    "description": "8 W/ft constant-wattage series-resistance cable, 120/240 V",
+    "approved": false,
+    "approval": {
+      "status": "unreviewed",
+      "authority": "",
+      "approvedBy": "",
+      "approvedAt": "",
+      "notes": "Generic seed entry — replace with an approved vendor cable for project use."
+    },
+    "source": "",
+    "lastVerified": ""
   },
   {
     "id": "cw-15-240",
     "manufacturer": "Generic",
+    "catalogNumber": "CW-15-240",
     "family": "CW-15-240",
     "type": "constantWattage",
     "voltages": [240, 277],
@@ -77,11 +122,22 @@
     "maxExposureTempC": 120,
     "minInstallTempC": -60,
     "hazardousAreaRating": null,
-    "description": "15 W/ft constant-wattage series-resistance cable, 240/277 V"
+    "description": "15 W/ft constant-wattage series-resistance cable, 240/277 V",
+    "approved": false,
+    "approval": {
+      "status": "unreviewed",
+      "authority": "",
+      "approvedBy": "",
+      "approvedAt": "",
+      "notes": "Generic seed entry — replace with an approved vendor cable for project use."
+    },
+    "source": "",
+    "lastVerified": ""
   },
   {
     "id": "sr-8-haz",
     "manufacturer": "Generic",
+    "catalogNumber": "SR-8-HAZ",
     "family": "SR-8-HAZ",
     "type": "selfRegulating",
     "voltages": [120, 240],
@@ -93,11 +149,22 @@
     "maxExposureTempC": 85,
     "minInstallTempC": -40,
     "hazardousAreaRating": "Class I Div 2 / Zone 1",
-    "description": "8 W/ft self-regulating cable rated Class I Div 2 / Zone 1, 120/240 V"
+    "description": "8 W/ft self-regulating cable rated Class I Div 2 / Zone 1, 120/240 V",
+    "approved": false,
+    "approval": {
+      "status": "unreviewed",
+      "authority": "",
+      "approvedBy": "",
+      "approvedAt": "",
+      "notes": "Generic seed entry — replace with an approved vendor cable for project use."
+    },
+    "source": "",
+    "lastVerified": ""
   },
   {
     "id": "mi-20-240",
     "manufacturer": "Generic",
+    "catalogNumber": "MI-20-240",
     "family": "MI-20-240",
     "type": "mineralInsulated",
     "voltages": [240, 277, 480],
@@ -109,11 +176,22 @@
     "maxExposureTempC": 250,
     "minInstallTempC": -60,
     "hazardousAreaRating": null,
-    "description": "20 W/ft mineral-insulated (MI) heating cable, 240/277/480 V"
+    "description": "20 W/ft mineral-insulated (MI) heating cable, 240/277/480 V",
+    "approved": false,
+    "approval": {
+      "status": "unreviewed",
+      "authority": "",
+      "approvedBy": "",
+      "approvedAt": "",
+      "notes": "Generic seed entry — replace with an approved vendor cable for project use."
+    },
+    "source": "",
+    "lastVerified": ""
   },
   {
     "id": "mi-30-haz",
     "manufacturer": "Generic",
+    "catalogNumber": "MI-30-HAZ",
     "family": "MI-30-HAZ",
     "type": "mineralInsulated",
     "voltages": [240, 480],
@@ -125,6 +203,124 @@
     "maxExposureTempC": 250,
     "minInstallTempC": -60,
     "hazardousAreaRating": "Class I Div 1 / Zone 0",
-    "description": "30 W/ft MI cable rated Class I Div 1 / Zone 0, 240/480 V"
+    "description": "30 W/ft MI cable rated Class I Div 1 / Zone 0, 240/480 V",
+    "approved": false,
+    "approval": {
+      "status": "unreviewed",
+      "authority": "",
+      "approvedBy": "",
+      "approvedAt": "",
+      "notes": "Generic seed entry — replace with an approved vendor cable for project use."
+    },
+    "source": "",
+    "lastVerified": ""
+  },
+  {
+    "id": "ray-btv-5",
+    "manufacturer": "nVent RAYCHEM",
+    "catalogNumber": "5BTV2-CT",
+    "family": "BTV-CT",
+    "type": "selfRegulating",
+    "voltages": [120, 240],
+    "wattDensities": { "10": 5, "20": 5, "-10": 5 },
+    "nominalWPerFt": 5,
+    "maxCircuitLengthFt": { "120": 320, "240": 540 },
+    "exposureRating": "ordinary",
+    "startupCurrentMultiplier": 1.6,
+    "maxExposureTempC": 65,
+    "minInstallTempC": -60,
+    "hazardousAreaRating": null,
+    "description": "nVent RAYCHEM 5BTV2-CT self-regulating freeze-protection cable, 5 W/ft, 120/240 V",
+    "approved": true,
+    "approval": {
+      "status": "approved",
+      "authority": "CableTrayRoute seed catalog",
+      "approvedBy": "Engineering",
+      "approvedAt": "2026-05-22",
+      "notes": "Approved seed example for the freeze-protection range — confirm against project AML before issue."
+    },
+    "source": "CableTrayRoute seed catalog (2026-05-22)",
+    "lastVerified": "2026-05-22"
+  },
+  {
+    "id": "ray-btv-10",
+    "manufacturer": "nVent RAYCHEM",
+    "catalogNumber": "10BTV2-CT",
+    "family": "BTV-CT",
+    "type": "selfRegulating",
+    "voltages": [240],
+    "wattDensities": { "10": 10, "20": 10, "-10": 10 },
+    "nominalWPerFt": 10,
+    "maxCircuitLengthFt": { "240": 460 },
+    "exposureRating": "ordinary",
+    "startupCurrentMultiplier": 1.8,
+    "maxExposureTempC": 85,
+    "minInstallTempC": -60,
+    "hazardousAreaRating": null,
+    "description": "nVent RAYCHEM 10BTV2-CT self-regulating process-maintenance cable, 10 W/ft, 240 V",
+    "approved": true,
+    "approval": {
+      "status": "approved",
+      "authority": "CableTrayRoute seed catalog",
+      "approvedBy": "Engineering",
+      "approvedAt": "2026-05-22",
+      "notes": "Approved seed example for the process-maintenance range — confirm against project AML before issue."
+    },
+    "source": "CableTrayRoute seed catalog (2026-05-22)",
+    "lastVerified": "2026-05-22"
+  },
+  {
+    "id": "thermon-bsx-8",
+    "manufacturer": "Thermon",
+    "catalogNumber": "8BSX2-CT",
+    "family": "BSX",
+    "type": "selfRegulating",
+    "voltages": [120, 240],
+    "wattDensities": { "10": 8, "20": 8, "-10": 8 },
+    "nominalWPerFt": 8,
+    "maxCircuitLengthFt": { "120": 240, "240": 410 },
+    "exposureRating": "hazardous",
+    "startupCurrentMultiplier": 1.9,
+    "maxExposureTempC": 85,
+    "minInstallTempC": -40,
+    "hazardousAreaRating": "Class I Div 2 / Zone 1",
+    "description": "Thermon 8BSX2-CT self-regulating cable rated Class I Div 2 / Zone 1, 8 W/ft, 120/240 V",
+    "approved": true,
+    "approval": {
+      "status": "approved",
+      "authority": "CableTrayRoute seed catalog",
+      "approvedBy": "Engineering",
+      "approvedAt": "2026-05-22",
+      "notes": "Approved seed example for hazardous-area service — confirm against project AML before issue."
+    },
+    "source": "CableTrayRoute seed catalog (2026-05-22)",
+    "lastVerified": "2026-05-22"
+  },
+  {
+    "id": "thermon-mi-20",
+    "manufacturer": "Thermon",
+    "catalogNumber": "MI-20-LR",
+    "family": "MI-LR",
+    "type": "mineralInsulated",
+    "voltages": [240, 480],
+    "wattDensities": { "10": 20, "20": 20, "-10": 20 },
+    "nominalWPerFt": 20,
+    "maxCircuitLengthFt": { "240": 820, "480": 1520 },
+    "exposureRating": "ordinary",
+    "startupCurrentMultiplier": 1.0,
+    "maxExposureTempC": 250,
+    "minInstallTempC": -60,
+    "hazardousAreaRating": null,
+    "description": "Thermon MI-20-LR mineral-insulated heating cable, 20 W/ft, 240/480 V",
+    "approved": true,
+    "approval": {
+      "status": "approved",
+      "authority": "CableTrayRoute seed catalog",
+      "approvedBy": "Engineering",
+      "approvedAt": "2026-05-22",
+      "notes": "Approved seed example for high-temperature MI applications — confirm against project AML before issue."
+    },
+    "source": "CableTrayRoute seed catalog (2026-05-22)",
+    "lastVerified": "2026-05-22"
   }
 ]

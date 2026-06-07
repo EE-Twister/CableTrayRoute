@@ -9,6 +9,13 @@ import {
   normalizeCatalogProduct,
   validateCatalogProduct
 } from '../analysis/manufacturerCatalog.mjs';
+import {
+  buildCatalogTemplateCsv,
+  buildCatalogTemplateWorkbook,
+  parseCatalogCsv,
+  parseCatalogWorkbook,
+  importCatalogRows
+} from '../analysis/catalogImport.mjs';
 
 /**
  * Manufacturer Catalog Browser
@@ -293,10 +300,166 @@ export async function mountCatalogBrowser(container, { onSelect } = {}) {
   addSection.appendChild(addForm);
   addSection.appendChild(addStatus);
 
+  const importSection = document.createElement('section');
+  importSection.className = 'catalog-import';
+  importSection.innerHTML = `
+    <h3>Bulk Import (CSV / XLSX)</h3>
+    <p class="catalog-add-help">Download a template, fill it in with project-approved catalog items, and import. Imports save to this project's custom catalog.</p>
+    <div class="catalog-import-actions">
+      <button type="button" class="catalog-import-template-csv">Download CSV Template</button>
+      <button type="button" class="catalog-import-template-xlsx">Download XLSX Template</button>
+      <label class="catalog-filter-label">
+        Import file
+        <input type="file" class="catalog-import-file" accept=".csv,.xlsx" />
+      </label>
+    </div>
+    <div class="catalog-import-preview" aria-live="polite"></div>
+    <div class="catalog-import-confirm" hidden>
+      <button type="button" class="catalog-import-save">Save to Project Catalog</button>
+      <button type="button" class="catalog-import-cancel">Discard</button>
+    </div>
+    <p class="catalog-import-status" aria-live="polite"></p>
+  `;
+  const importTemplateCsvBtn = importSection.querySelector('.catalog-import-template-csv');
+  const importTemplateXlsxBtn = importSection.querySelector('.catalog-import-template-xlsx');
+  const importFileInput = importSection.querySelector('.catalog-import-file');
+  const importPreviewDiv = importSection.querySelector('.catalog-import-preview');
+  const importConfirmDiv = importSection.querySelector('.catalog-import-confirm');
+  const importSaveBtn = importSection.querySelector('.catalog-import-save');
+  const importCancelBtn = importSection.querySelector('.catalog-import-cancel');
+  const importStatusEl = importSection.querySelector('.catalog-import-status');
+
   container.innerHTML = '';
   container.appendChild(addSection);
+  container.appendChild(importSection);
   container.appendChild(filterBar);
   container.appendChild(resultsDiv);
+
+  let pendingImport = null;
+
+  function downloadBlob(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  function getXlsx() {
+    const xlsx = typeof window !== 'undefined' ? window.XLSX : undefined;
+    if (!xlsx) throw new Error('XLSX library is not loaded on this page.');
+    return xlsx;
+  }
+
+  function clearPreview() {
+    importPreviewDiv.innerHTML = '';
+    importConfirmDiv.hidden = true;
+    pendingImport = null;
+  }
+
+  function renderPreview(parseResult) {
+    const { products, errors, warnings } = parseResult;
+    const { accepted, duplicates } = importCatalogRows(products, allProducts);
+
+    const summary = document.createElement('p');
+    summary.className = 'catalog-import-summary';
+    summary.textContent = `${accepted.length} new, ${duplicates.length} duplicate(s), ${errors.length} error(s), ${warnings.length} warning(s).`;
+    importPreviewDiv.innerHTML = '';
+    importPreviewDiv.appendChild(summary);
+
+    if (errors.length) {
+      const list = document.createElement('ul');
+      list.className = 'catalog-import-errors';
+      errors.slice(0, 50).forEach(err => {
+        const li = document.createElement('li');
+        li.textContent = `Row ${err.row}${err.column ? ` (${err.column})` : ''}: ${err.message}`;
+        list.appendChild(li);
+      });
+      importPreviewDiv.appendChild(list);
+    }
+    if (duplicates.length) {
+      const dupHeader = document.createElement('p');
+      dupHeader.className = 'catalog-import-dups';
+      dupHeader.textContent = `Will overwrite ${duplicates.length} existing product(s) with the same manufacturer/catalog number on save.`;
+      importPreviewDiv.appendChild(dupHeader);
+    }
+
+    pendingImport = {
+      accepted,
+      duplicates,
+      mergeRows: products
+    };
+    importConfirmDiv.hidden = !(accepted.length || duplicates.length);
+  }
+
+  async function handleImportFile(file) {
+    clearPreview();
+    importStatusEl.textContent = `Parsing ${file.name}…`;
+    try {
+      let parseResult;
+      if (/\.csv$/i.test(file.name)) {
+        const text = await file.text();
+        parseResult = parseCatalogCsv(text);
+      } else {
+        const xlsx = getXlsx();
+        const buf = await file.arrayBuffer();
+        parseResult = parseCatalogWorkbook(xlsx, buf);
+      }
+      renderPreview(parseResult);
+      importStatusEl.textContent = `Parsed ${file.name}.`;
+    } catch (err) {
+      importStatusEl.textContent = `Import failed: ${err.message || String(err)}`;
+    }
+  }
+
+  importTemplateCsvBtn?.addEventListener('click', () => {
+    const csv = buildCatalogTemplateCsv();
+    downloadBlob(new Blob([csv], { type: 'text/csv;charset=utf-8' }), 'manufacturer-catalog-template.csv');
+  });
+
+  importTemplateXlsxBtn?.addEventListener('click', () => {
+    try {
+      const xlsx = getXlsx();
+      const wb = buildCatalogTemplateWorkbook(xlsx);
+      const out = xlsx.write(wb, { type: 'array', bookType: 'xlsx' });
+      downloadBlob(
+        new Blob([out], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }),
+        'manufacturer-catalog-template.xlsx'
+      );
+    } catch (err) {
+      importStatusEl.textContent = err.message || String(err);
+    }
+  });
+
+  importFileInput?.addEventListener('change', () => {
+    const file = importFileInput.files?.[0];
+    if (file) handleImportFile(file);
+  });
+
+  importCancelBtn?.addEventListener('click', () => {
+    clearPreview();
+    if (importFileInput) importFileInput.value = '';
+    importStatusEl.textContent = '';
+  });
+
+  importSaveBtn?.addEventListener('click', async () => {
+    if (!pendingImport) return;
+    const incoming = pendingImport.mergeRows;
+    const current = getCustomProducts();
+    const merged = mergeCatalogProducts(current, incoming);
+    setCustomProducts(merged);
+    allProducts = await loadCatalog();
+    repopulateSelect(catFilter.select, getDistinctOptions('category'));
+    repopulateSelect(mfrFilter.select, getDistinctOptions('manufacturer'));
+    repopulateSelect(matFilter.select, getDistinctOptions('material'));
+    importStatusEl.textContent = `Saved ${pendingImport.accepted.length} new and updated ${pendingImport.duplicates.length} existing product(s).`;
+    clearPreview();
+    if (importFileInput) importFileInput.value = '';
+    await refresh();
+  });
 
   function repopulateSelect(select, options) {
     const previous = select.value;
