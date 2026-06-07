@@ -10060,21 +10060,35 @@ function renderOneLinePreview(componentId) {
     HARD_MAX_PREVIEW_COMPONENTS,
     Math.max(20, neighborCount, sameSheetSelections.length + 5)
   );
-  const addUnique = (list, id) => {
+  // Bound how much of the neighbor set we traverse so a pathological
+  // high-degree node cannot freeze the preview render. Anything beyond the
+  // bound could never be displayed (maxComponents is the hard ceiling).
+  const MAX_PREVIEW_NEIGHBORS = Math.max(maxComponents * 3, sameSheetSelections.length + 5);
+  const boundedNeighbors = [];
+  for (const id of neighborSet) {
+    if (!componentMap.has(id)) continue;
+    boundedNeighbors.push(id);
+    if (boundedNeighbors.length >= MAX_PREVIEW_NEIGHBORS) break;
+  }
+
+  const addUnique = (list, seen, id) => {
     if (!id) return;
     if (!componentMap.has(id)) return;
-    if (list.includes(id)) return;
+    if (seen.has(id)) return;
+    seen.add(id);
     list.push(id);
   };
 
   const orderedTargets = [];
-  addUnique(orderedTargets, componentId);
-  neighborSet.forEach(id => addUnique(orderedTargets, id));
+  const orderedTargetSet = new Set();
+  addUnique(orderedTargets, orderedTargetSet, componentId);
+  boundedNeighbors.forEach(id => addUnique(orderedTargets, orderedTargetSet, id));
 
   const prioritizedTargets = [];
-  addUnique(prioritizedTargets, componentId);
-  neighborSet.forEach(id => addUnique(prioritizedTargets, id));
-  sameSheetSelections.forEach(id => addUnique(prioritizedTargets, id));
+  const prioritizedTargetSet = new Set();
+  addUnique(prioritizedTargets, prioritizedTargetSet, componentId);
+  boundedNeighbors.forEach(id => addUnique(prioritizedTargets, prioritizedTargetSet, id));
+  sameSheetSelections.forEach(id => addUnique(prioritizedTargets, prioritizedTargetSet, id));
 
   const availableTargets = prioritizedTargets.length ? prioritizedTargets : orderedTargets;
   if (!availableTargets.length) {
@@ -10847,10 +10861,12 @@ function inferVoltage(comp) {
   const keys = ['voltage', 'volts', 'volts_secondary', 'volts_lv', 'volts_primary', 'volts_hv', 'prefault_voltage', 'baseKV', 'kV'];
   for (const key of keys) {
     const raw = getComponentValue(comp, key);
-    const num = parseNumeric(raw);
-    if (!Number.isFinite(num) || num <= 0) continue;
-    if (key.toLowerCase().includes('kv')) return num * 1000;
-    return num;
+    // parseVoltageFieldValue scales kV-keyed fields to volts once, but skips
+    // the scaling when the raw value already carries a kV/V unit suffix —
+    // avoiding the 1000× double-conversion on inputs like "13.8 kV".
+    const volts = parseVoltageFieldValue(raw, key);
+    if (!Number.isFinite(volts) || volts <= 0) continue;
+    return volts;
   }
   return null;
 }

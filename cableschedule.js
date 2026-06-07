@@ -561,6 +561,20 @@ async function initCableSchedule() {
   };
 
   const cloneTemplates = templates => (Array.isArray(templates) ? templates.map(t => JSON.parse(JSON.stringify(t))) : []);
+  // Bounds for cable-typical imports to keep a hostile/oversized file from
+  // exhausting memory or freezing the UI during parsing/merge.
+  const MAX_TEMPLATE_IMPORT_FILE_BYTES = 5 * 1024 * 1024;
+  const MAX_TEMPLATE_IMPORT_COUNT = 5000;
+  const MAX_TEMPLATE_IMPORT_FIELD_LENGTH = 2048;
+  const truncateImportedTemplateValues = (input = {}) => {
+    const out = {};
+    Object.entries(input || {}).forEach(([key, value]) => {
+      out[key] = typeof value === 'string'
+        ? value.slice(0, MAX_TEMPLATE_IMPORT_FIELD_LENGTH)
+        : value;
+    });
+    return out;
+  };
   const sanitizeTemplateFieldValue = value => {
     if (value == null) return '';
     if (Array.isArray(value)) {
@@ -1532,6 +1546,11 @@ async function initCableSchedule() {
           resetInput();
           return;
         }
+        if (typeof file.size === 'number' && file.size > MAX_TEMPLATE_IMPORT_FILE_BYTES) {
+          showAlertModal('Import Error', 'The selected file is too large to import. Please choose a file smaller than 5 MB.');
+          resetInput();
+          return;
+        }
         const name = (file.name || '').toLowerCase();
         const type = (file.type || '').toLowerCase();
         const isExcel = name.endsWith('.xlsx') || type.includes('spreadsheet');
@@ -1565,6 +1584,11 @@ async function initCableSchedule() {
             .filter(Boolean);
         } else {
           const text = await file.text();
+          if (text.length > MAX_TEMPLATE_IMPORT_FILE_BYTES) {
+            showAlertModal('Import Error', 'The selected file is too large to import. Please choose a file smaller than 5 MB.');
+            resetInput();
+            return;
+          }
           let parsed;
           try {
             parsed = JSON.parse(text);
@@ -1583,6 +1607,11 @@ async function initCableSchedule() {
           resetInput();
           return;
         }
+        if (candidates.length > MAX_TEMPLATE_IMPORT_COUNT) {
+          showAlertModal('Import Error', `The selected file contains too many cable typicals to import (limit ${MAX_TEMPLATE_IMPORT_COUNT}).`);
+          resetInput();
+          return;
+        }
         const existingIds = new Set(
           (this.templates || [])
             .map(tpl => tpl && tpl.template_id)
@@ -1590,6 +1619,7 @@ async function initCableSchedule() {
         );
         const imported = candidates
           .map(tpl => filterTemplateFields(tpl, { keepLabel: true, keepTypicalId: true }))
+          .map(tpl => truncateImportedTemplateValues(tpl))
           .map(tpl => {
             const copy = { ...tpl };
             copy.template_id = copy.template_id || generateTemplateId();
