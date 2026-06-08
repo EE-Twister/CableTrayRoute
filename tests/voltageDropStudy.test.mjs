@@ -113,7 +113,7 @@ describe('evaluateCable', () => {
     const result = evaluateCable(cable);
     assert.strictEqual(result.circuitType, 'feeder');
     assert.strictEqual(result.limit, NEC_LIMITS.feeder);
-    assert.strictEqual(result.basis, 'NEC 2023 voltage-drop informational-note recommendation');
+    assert.ok(result.basis.startsWith('NEC 2023 voltage-drop informational-note recommendation'));
   });
 
   it('applies branch limit for branch circuits', () => {

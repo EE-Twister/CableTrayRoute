@@ -619,20 +619,22 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
         12:14.0,
         18:21.0,
         24:28.0,
-        30:32.5,
-        36:39.0
+        30:35.0,
+        36:42.0
       };
       const standardWidths = [6, 9, 12, 18, 24, 30, 36];
 
-      // NFPA 70 Table 392.22(A) "Column 2a" for Ladder (in²)
+      // NFPA 70 Table 392.22(A) "Column 2" for Ladder/ventilated trough (in²),
+      // multiconductor cables 4/0 AWG and smaller. Values are linear at
+      // width × 7/6 (6→7.0 … 30→35.0, 36→42.0).
       const nfpaLadder = {
         6:  7.0,
         9: 10.5,
         12:14.0,
         18:21.0,
         24:28.0,
-        30:32.5,
-        36:39.0
+        30:35.0,
+        36:42.0
       };
       // NFPA 70 Table 392.22(A) "Column 4a" for Solid Bottom (in²)
       const nfpaSolid = {

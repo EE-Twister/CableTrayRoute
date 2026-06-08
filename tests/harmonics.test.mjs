@@ -30,11 +30,13 @@ function approxEqual(a, b, tol = 1e-6) {
 // Formula helpers extracted from analysis/harmonics.js
 // ---------------------------------------------------------------------------
 
-/** IEEE 519 Table 11.1 — voltage THD limit (%) by bus voltage. */
+/** IEEE 519-2022 Table 1 — voltage THD limit (%) by bus voltage.
+ *  Mirrors limitForVoltage() in analysis/harmonics.js. */
 function limitForVoltage(kv) {
-  if (kv < 69)  return 5;
-  if (kv < 161) return 8;
-  return 12;
+  if (kv <= 1.0) return 8.0;
+  if (kv <= 69)  return 5.0;
+  if (kv <= 161) return 2.5;
+  return 1.5;
 }
 
 /**
@@ -86,30 +88,29 @@ function singleHarmonicVTHD(Ih, y, V) {
 }
 
 // ---------------------------------------------------------------------------
-describe('limitForVoltage — IEEE 519', () => {
-  it('below 69 kV → 5%', () => {
-    assert.strictEqual(limitForVoltage(0.48),  5);
-    assert.strictEqual(limitForVoltage(4.16),  5);
-    assert.strictEqual(limitForVoltage(13.8),  5);
-    assert.strictEqual(limitForVoltage(34.5),  5);
-    assert.strictEqual(limitForVoltage(68.9),  5);
+describe('limitForVoltage — IEEE 519-2022 Table 1', () => {
+  it('≤ 1 kV → 8%', () => {
+    assert.strictEqual(limitForVoltage(0.48),  8.0);
+    assert.strictEqual(limitForVoltage(1.0),   8.0);
   });
 
-  it('69 kV → boundary, still 5% (< 69 is false)', () => {
-    // kv=69: not < 69, but < 161 → 8%
-    assert.strictEqual(limitForVoltage(69),  8);
+  it('1 – 69 kV → 5%', () => {
+    assert.strictEqual(limitForVoltage(4.16),  5.0);
+    assert.strictEqual(limitForVoltage(13.8),  5.0);
+    assert.strictEqual(limitForVoltage(34.5),  5.0);
+    assert.strictEqual(limitForVoltage(68.9),  5.0);
+    assert.strictEqual(limitForVoltage(69),    5.0);
   });
 
-  it('69 – 160 kV → 8%', () => {
-    assert.strictEqual(limitForVoltage(115), 8);
-    assert.strictEqual(limitForVoltage(138), 8);
-    assert.strictEqual(limitForVoltage(160.9), 8);
+  it('69 – 161 kV → 2.5%', () => {
+    assert.strictEqual(limitForVoltage(115),   2.5);
+    assert.strictEqual(limitForVoltage(138),   2.5);
+    assert.strictEqual(limitForVoltage(161),   2.5);
   });
 
-  it('≥ 161 kV → 12%', () => {
-    assert.strictEqual(limitForVoltage(161), 12);
-    assert.strictEqual(limitForVoltage(230), 12);
-    assert.strictEqual(limitForVoltage(500), 12);
+  it('> 161 kV → 1.5%', () => {
+    assert.strictEqual(limitForVoltage(230),   1.5);
+    assert.strictEqual(limitForVoltage(500),   1.5);
   });
 });
 

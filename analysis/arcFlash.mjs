@@ -351,7 +351,14 @@ function clearingTime(comp, Ibf, devices, protectiveComp, scResults, protectiveD
   return interpolateTime(clearingCurve, effectiveKA * 1000);
 }
 
-// IEEE 1584‑2018 arcing current model
+// Simplified arcing-current estimate.
+//
+// NOTE: This is an IEEE 1584-2002-style log-linear approximation, NOT a
+// standard-conformant IEEE 1584-2018 implementation. It does not use the
+// 2018 k1..k13 coefficient tables, the three-current voltage interpolation,
+// or the enclosure-size correction polynomials. Treat the result as a
+// screening estimate; a full IEEE 1584-2018 study is required for final
+// PPE/label determination.
 function arcingCurrent(Ibf, V, gap, cfg, enclosure) {
   const configK = {
     VCB: -0.153,
@@ -368,11 +375,24 @@ function arcingCurrent(Ibf, V, gap, cfg, enclosure) {
 }
 
 /**
- * Compute incident energy using IEEE 1584-2018 style equations.
- * Considers enclosure size, gap, working distance and protective device
- * clearing time. Returns a map id ->
- * { incidentEnergy, boundary, ppeCategory, clearingTime } where energy is
- * in cal/cm^2 and boundary in millimeters.
+ * Compute incident energy using a SIMPLIFIED arc-flash model (IEEE 1584-2002
+ * functional form with engineering approximations), NOT a full IEEE 1584-2018
+ * implementation.
+ *
+ * Key assumptions / hardcoded defaults (each surfaced in the per-result
+ * `notes`/`requiredInputs` when an input is missing):
+ *   - electrode gap:           25 mm when not provided
+ *   - working distance:        455 mm (18 in) when not provided
+ *   - enclosure size:          508 mm cube when dimensions are not provided
+ *   - system voltage:          0.48 kV when not provided
+ *   - clearing time:           0.2 s when no protective-device curve is linked
+ *   - distance exponent:       fixed at 2 (the real exponent is equipment-class
+ *                              and voltage dependent, ~0.97–2.0)
+ *   - Cf (open/box):           1.0 / 1.5
+ *
+ * Returns a map id -> { incidentEnergy, boundary, ppeCategory, clearingTime }
+ * where energy is in cal/cm^2 and boundary in millimeters. Use a full
+ * IEEE 1584-2018 study for final PPE selection and arc-flash labeling.
  */
 export async function runArcFlash(options = {}) {
   const devices = await loadDevices();
@@ -430,12 +450,15 @@ export async function runArcFlash(options = {}) {
       ? 1.6 * Cf * sizeFactor * Math.pow(Ia, 1.2) * time * (gap / 25) * Math.pow(610 / dist, 2)
       : 0;
     const boundary = energy > 0 && dist > 0 ? dist * Math.sqrt(energy / 1.2) : 0;
+    // NFPA 70E arc-flash PPE categories (Table 130.7(C)(15)(c)). The highest
+    // defined category is 4 (≤ 40 cal/cm²); above 40 cal/cm² there is NO PPE
+    // category — energized work is prohibited, surfaced via the >40 note and
+    // the "DANGER" label signal word. (There is no Category 5.)
     let ppe = 0;
     if (energy > 1.2) ppe = 1;
     if (energy > 4) ppe = 2;
     if (energy > 8) ppe = 3;
     if (energy > 25) ppe = 4;
-    if (energy > 40) ppe = 5;
     const voltage = resolveVoltage(comp);
     const approaches = computeApproachDistances(voltage);
     const notes = [];
@@ -532,8 +555,9 @@ export async function runArcFlash(options = {}) {
  * Generate a "constant incident energy" limit curve for overlay on a TCC chart.
  *
  * For each fault current in currentRangeKA, computes the maximum clearing time
- * that keeps incident energy at or below thresholdCalCm2 using the IEEE 1584-2018
- * simplified model (same formulas as runArcFlash). Returns an array of
+ * that keeps incident energy at or below thresholdCalCm2 using the simplified
+ * arc-flash model (same formulas as runArcFlash; see its note — this is an
+ * IEEE 1584-2002-style estimate, not a 2018 implementation). Returns an array of
  * { current, time } points where current is in Amps (for TCC chart axes).
  *
  * @param {object} params
