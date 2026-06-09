@@ -160,7 +160,7 @@ export function detuningRecommendation(harmonicOrder, riskLevel) {
     detuningPct = 7;
     tunedToOrder = 3.78;
     rationale = `Resonance order ${harmonicOrder} is near the 7th harmonic. ` +
-      `Specify a 7% detuned reactor (h_tune = 3.78) to shift resonance below h=5.`;
+      `Specify a 7% detuned reactor (h_tune = 3.78) to shift resonance below h=7.`;
   } else {
     // Higher order — 5.67% is sufficient for most practical cases above 9th harmonic
     detuningPct = 5.67;

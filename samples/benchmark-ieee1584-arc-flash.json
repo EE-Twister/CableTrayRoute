@@ -13,14 +13,18 @@
     "studyResults": {
       "arcFlash": {
         "inputs": {
-          "systemVoltageKV": 15,
-          "boltedFaultKA": 10,
-          "gapMm": 153,
-          "workingDistanceMm": 457,
-          "equipmentConfig": "open_air",
-          "conductorConfig": "VCB"
+          "systemVoltageKV": 4.16,
+          "boltedFaultKA": 15,
+          "gapMm": 104,
+          "workingDistanceMm": 914.4,
+          "equipmentConfig": "enclosed",
+          "conductorConfig": "VCB",
+          "enclosureHeightMm": 1143,
+          "enclosureWidthMm": 762,
+          "enclosureDepthMm": 508,
+          "arcDurationS": 0.197
         },
-        "_benchmark": "IEEE 1584-2018 Annex D Example D.2 — MV open-air bus. Expected: I_af ≈ 8.65 kA, E ≈ 19.8 cal/cm²."
+        "_benchmark": "IEEE 1584-2018 Annex D.1 — MV enclosed VCB switchgear. Expected: I_af ≈ 12.98 kA, E ≈ 2.9 cal/cm², AFB ≈ 1606 mm."
       }
     }
   }

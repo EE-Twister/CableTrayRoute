@@ -298,11 +298,20 @@ checkPrereqs([{key:'conduitSchedule',page:'racewayschedule.html',label:'Raceway 
         const cables = [];
         for(const row of rows){
           const tag = row.children[0].querySelector('input').value.trim();
+          // Count input is the third column (index 2); defaults to 1.
+          const countRaw = parseInt(row.children[2].querySelector('input').value, 10);
+          const count = Number.isFinite(countRaw) && countRaw > 0 ? countRaw : 1;
           // OD input is in the fifth column (index 4) of each row
           const od = parseFloat(row.children[4].querySelector('input').value);
           if(!tag){ showAlertModal('Validation Error', 'Each cable requires a Tag.'); return; }
           if(isNaN(od)){ showAlertModal('Validation Error', 'Each cable requires an OD.'); return; }
-          cables.push({tag,r:od/2});
+          // Expand each row into `count` identical conductors so the fill area,
+          // the 1/2/over-2 conductor fill limit (NEC Chapter 9 Table 1), the
+          // circle packing, and the jam-ratio check all see the true conductor
+          // count rather than the number of table rows.
+          for(let i = 0; i < count; i++){
+            cables.push({tag,r:od/2});
+          }
         }
         if(cables.length===0){ showAlertModal('Validation Error', 'Add at least one cable.'); return; }
         const placed = packCircles(cables,R);

@@ -1,10 +1,15 @@
 /**
  * Cable Tray Seismic Bracing Calculator
- * Per ASCE 7-22 Chapter 13 — Seismic Design Requirements for Nonstructural Components
- * and IBC 2021 §1613
+ * Nonstructural component seismic force — ASCE 7 Chapter 13 and IBC §1613.
+ *
+ * IMPORTANT — edition: The component force equation implemented here is the
+ * ASCE 7-16 §13.3.1 form (the equation used in ASCE 7-05/-10/-16). ASCE 7-22
+ * §13.3.1 replaced it with a revised equation that introduces Hf, Rμ, Car and
+ * Rpo and drops ap/Rp; that 2022 equation is NOT implemented here. Results
+ * therefore reflect ASCE 7-16, which remains widely adopted by jurisdictions.
  *
  * Methodology:
- *   The design seismic force for a nonstructural component (ASCE 7-22 §13.3.1):
+ *   The design seismic force for a nonstructural component (ASCE 7-16 §13.3.1):
  *
  *     Fp = (0.4 × ap × SDS × Wp) / (Rp / Ip) × (1 + 2z/h)
  *
@@ -12,31 +17,33 @@
  *     Fp_min = 0.3 × SDS × Ip × Wp
  *     Fp_max = 1.6 × SDS × Ip × Wp
  *
- *   For cable trays (ASCE 7-22 Table 13.6-1, Architectural Components — Mechanical/
- *   Electrical Components — Electrical / Communications Conduits and Trays):
+ *   For cable trays (ASCE 7-16 Table 13.6-1, Electrical components):
  *     ap = 1.0  (component amplification factor)
  *     Rp = 2.5  (component response modification factor)
  *
  *   Brace forces:
  *     Lateral (transverse):    Fp_lateral    = Fp × Wp
- *     Longitudinal:            Fp_long       = 0.4 × Fp × Wp   (per ASCE 7-22 §13.5.6.1)
- *     Vertical:                Fv            = ±0.2 × SDS × Wp
+ *     Longitudinal:            Fp_long       = 0.4 × Fp × Wp   (ASCE 7 §13.5.6.1)
+ *     Vertical:                Fv            = ±0.2 × SDS × Wp  (ASCE 7 §12.4.2.2,
+ *                                                                no Ip on Ev)
  *
- *   Maximum brace spacing per ASCE 7-22 §13.5.6.1:
+ *   Maximum brace spacing:
  *     SDC A/B: bracing not required
- *     SDC C:   lateral at ≤ 12 ft,  longitudinal at ≤ 40 ft
- *     SDC D-F: lateral at ≤ 12 ft,  longitudinal at ≤ 40 ft
- *             (12-ft lateral limit applies for trays > 6 in wide with Wp > 100 lb/lft)
+ *     SDC C–F: lateral at ≤ 12 ft, longitudinal at ≤ 40 ft
+ *     NOTE: The 12 ft / 40 ft spacings are NEMA VE 2 trapeze-support guidance
+ *     values, not literal ASCE 7 §13.5.6.1 limits. ASCE 7 prescribes the design
+ *     force and connection requirements; verify spacing with the support
+ *     manufacturer and the AHJ.
  *
  * References:
- *   ASCE 7-22 — Minimum Design Loads and Associated Criteria for Buildings and Other
- *               Structures, Chapter 13
+ *   ASCE 7-16 — Minimum Design Loads and Associated Criteria for Buildings and
+ *               Other Structures, Chapter 13 (force equation implemented here)
  *   IBC 2021  — §1613 Earthquake Loads
- *   NEMA VE 2-2006 — Cable Tray Installation Guidelines (seismic section)
+ *   NEMA VE 2  — Cable Tray Installation Guidelines (seismic / spacing guidance)
  */
 
 /**
- * Seismic design category (SDC) table per ASCE 7-22 Tables 11.6-1 & 11.6-2.
+ * Seismic design category (SDC) table per ASCE 7-16 Tables 11.6-1 & 11.6-2.
  *
  * Occupancy (Risk) Category mapping to SDC for a given SDS (short-period) value.
  * Returns the more severe of the two tables (SDS and SD1 results combined by caller).
@@ -59,6 +66,17 @@ export function sdcFromSds(sds, riskCategory) {
 }
 
 /**
+ * Seismic Design Category from SD1 (ASCE 7 Table 11.6-2), with a conservative
+ * extension to E/F.
+ *
+ * ASSUMPTION: ASCE 7 Table 11.6-2 only assigns categories A–D (its top band is
+ * SD1 ≥ 0.20 → D). Categories E and F are formally triggered by §11.6 when the
+ * mapped 1-second spectral acceleration S1 ≥ 0.75 (E for Risk I–III, F for Risk
+ * IV). This tool collects SD1 but not S1, so it uses the conservative SD1
+ * thresholds below (≥ 0.30 → E, ≥ 0.50 → F) as a stand-in for the S1 rule. This
+ * errs toward requiring bracing; for a code-of-record determination, evaluate
+ * S1 directly per §11.6.
+ *
  * @param {number} sd1   – Design spectral acceleration at 1-second period (g)
  * @param {'I'|'II'|'III'|'IV'} riskCategory
  * @returns {'A'|'B'|'C'|'D'|'E'|'F'}
@@ -68,16 +86,16 @@ export function sdcFromSd1(sd1, riskCategory) {
     if (sd1 < 0.067) return 'A';
     if (sd1 < 0.133) return 'B';
     if (sd1 < 0.20)  return 'C';
-    if (sd1 < 0.30)  return 'D';
-    if (sd1 < 0.50)  return 'E';
-    return 'F';
+    if (sd1 < 0.30)  return 'D';   // Table 11.6-2 tops out at D (SD1 ≥ 0.20)
+    if (sd1 < 0.50)  return 'E';   // conservative proxy for S1 ≥ 0.75 (§11.6)
+    return 'F';                    // conservative proxy for very high seismicity
   }
   // Risk Category IV
   if (sd1 < 0.067) return 'A';
   if (sd1 < 0.133) return 'C';
   if (sd1 < 0.20)  return 'D';
   if (sd1 < 0.30)  return 'D';
-  if (sd1 < 0.50)  return 'E'; // conservative for Cat IV
+  if (sd1 < 0.50)  return 'E'; // conservative proxy for S1 ≥ 0.75 (§11.6)
   return 'F';
 }
 
@@ -85,7 +103,7 @@ const SDC_ORDER = ['A', 'B', 'C', 'D', 'E', 'F'];
 
 /**
  * Determine the governing Seismic Design Category as the more severe of the
- * SDS-based and SD1-based categories (ASCE 7-22 §11.6).
+ * SDS-based and SD1-based categories (ASCE 7-16 §11.6).
  *
  * @param {number} sds
  * @param {number} sd1
@@ -99,7 +117,7 @@ export function calcSeismicDesignCategory(sds, sd1, riskCategory) {
 }
 
 /**
- * Maximum lateral and longitudinal brace spacing per ASCE 7-22 §13.5.6.1.
+ * Maximum lateral and longitudinal brace spacing per ASCE 7-16 §13.5.6.1.
  *
  * @param {'A'|'B'|'C'|'D'|'E'|'F'} sdc
  * @returns {{ lateral: number|null, longitudinal: number|null, required: boolean }}
@@ -114,7 +132,7 @@ export function maxBraceSpacing(sdc) {
 }
 
 /**
- * ASCE 7-22 §13.3.1 component seismic force.
+ * ASCE 7-16 §13.3.1 component seismic force.
  *
  * @param {object} params
  * @param {number} params.sds        – Design spectral acceleration at short period (g)
@@ -212,14 +230,17 @@ export function calcBraceForces(params) {
   const { fp } = calcComponentForceFactor({ sds, z, h, ap: params.ap, rp: params.rp, ip });
   const lateralForce      = Math.round(fp * wp * 100) / 100;    // lbs/ft
   const longitudinalForce = Math.round(0.4 * fp * wp * 100) / 100;  // ASCE 7 §13.5.6.1
-  const verticalForce     = Math.round(0.2 * sds * ip * wp * 100) / 100;
+  // Vertical seismic load effect Ev = 0.2·SDS·D (ASCE 7 §12.4.2.2). The
+  // importance factor Ip is NOT applied to Ev — it only scales the horizontal
+  // component force Fp. Matches the no-bracing branch above.
+  const verticalForce     = Math.round(0.2 * sds * wp * 100) / 100;
 
   const rec =
     `SDC ${sdc}: Lateral bracing required at ≤ ${spacing.lateral} ft, ` +
     `longitudinal at ≤ ${spacing.longitudinal} ft. ` +
     `Lateral force = ${lateralForce.toFixed(2)} lbs/ft, ` +
     `longitudinal = ${longitudinalForce.toFixed(2)} lbs/ft, ` +
-    `vertical = ±${verticalForce.toFixed(2)} lbs/ft (per ASCE 7-22 §13.3.1 & §13.5.6).`;
+    `vertical = ±${verticalForce.toFixed(2)} lbs/ft (per ASCE 7-16 §13.3.1 & §13.5.6).`;
 
   return {
     sdc,

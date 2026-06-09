@@ -3,25 +3,29 @@
   "benchmarks": [
     {
       "id": "ieee1584-arc-flash",
-      "title": "IEEE 1584-2018 Arc Flash — Example 1 (MV Open Air)",
+      "title": "IEEE 1584-2018 Arc Flash — Annex D.1 (MV, enclosed VCB)",
       "studyPage": "arcFlash.html",
       "standard": "IEEE 1584-2018",
       "clause": "§4.4 — Arcing Current and Incident Energy",
-      "description": "Medium-voltage open-air bus, bolted fault 10 kA, 15 kV, 18-inch working distance.",
+      "description": "Annex D.1 medium-voltage worked example: 4.16 kV switchgear, 15 kA bolted fault, 104 mm gap, 914.4 mm working distance, VCB electrodes in a 1143 x 762 x 508 mm enclosure, 0.197 s arc duration (maximum arcing-current case).",
       "inputs": {
-        "systemVoltageKV": 15,
-        "boltedFaultKA": 10,
-        "gapMm": 153,
-        "workingDistanceMm": 457,
-        "equipmentConfig": "open_air",
-        "conductorConfig": "VCB"
+        "systemVoltageKV": 4.16,
+        "boltedFaultKA": 15,
+        "gapMm": 104,
+        "workingDistanceMm": 914.4,
+        "equipmentConfig": "enclosed",
+        "conductorConfig": "VCB",
+        "enclosureHeightMm": 1143,
+        "enclosureWidthMm": 762,
+        "enclosureDepthMm": 508,
+        "arcDurationS": 0.197
       },
       "expectedOutputs": {
-        "arcingCurrentKA": { "value": 8.65, "tolerance": 0.15 },
-        "incidentEnergyCalCm2": { "value": 19.8, "tolerance": 2.0 },
-        "arcFlashBoundaryMm": { "value": 2830, "tolerance": 200 }
+        "arcingCurrentKA": { "value": 12.98, "tolerance": 0.1 },
+        "incidentEnergyCalCm2": { "value": 2.9, "tolerance": 0.1 },
+        "arcFlashBoundaryMm": { "value": 1606, "tolerance": 20 }
       },
-      "reference": "IEEE 1584-2018 Annex D, Example D.2",
+      "reference": "IEEE 1584-2018 Annex D.1 (steps D.9, D.17, D.32, D.42)",
       "sampleFile": "samples/benchmark-ieee1584-arc-flash.json"
     },
     {

@@ -25,10 +25,14 @@ export function parseSpectrum(spec) {
   return map;
 }
 
+// IEEE 519-2022 Table 1 — voltage total harmonic distortion (THD) limits (%)
+// keyed by bus nominal voltage. Note the limits get TIGHTER (not looser) as
+// voltage rises, because distortion propagates further on transmission systems.
 function limitForVoltage(kv) {
-  if (kv < 69) return 5;
-  if (kv < 161) return 8;
-  return 12;
+  if (kv <= 1.0) return 8.0;   // V ≤ 1 kV
+  if (kv <= 69) return 5.0;    // 1 kV < V ≤ 69 kV
+  if (kv <= 161) return 2.5;   // 69 kV < V ≤ 161 kV
+  return 1.5;                  // V > 161 kV
 }
 
 function pickValue(comp, key) {

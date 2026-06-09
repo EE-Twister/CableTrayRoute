@@ -368,8 +368,11 @@ describe('Ip=1.5 importance factor', () => {
 describe('nec citation structure', () => {
   const r = calcSeismicWindCombined(BASE);
 
-  it('nec.seismic.rule contains "ASCE 7-22"', () => {
-    assert.ok(r.nec.seismic.rule.includes('ASCE 7-22'), 'nec.seismic.rule must reference ASCE 7-22');
+  it('nec.seismic.rule references ASCE 7 Chapter 13', () => {
+    // The implemented §13.3.1 component-force equation is the ASCE 7-16 form;
+    // the revised ASCE 7-22 equation is intentionally not used.
+    assert.ok(r.nec.seismic.rule.includes('ASCE 7-16'), 'nec.seismic.rule must reference ASCE 7-16');
+    assert.ok(r.nec.seismic.rule.includes('Chapter 13'), 'nec.seismic.rule must reference Chapter 13');
   });
 
   it('nec.seismic.section is a non-empty string', () => {

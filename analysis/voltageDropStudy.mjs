@@ -105,7 +105,8 @@ export function evaluateCable(cable, lengthFt) {
     limit,
     status,
     evaluated,
-    basis: 'NEC 2023 voltage-drop informational-note recommendation',
+    basis: 'NEC 2023 voltage-drop informational-note recommendation '
+      + '(AC R+X from NEC Ch. 9 Table 9, load power factor applied)',
   };
 }
 

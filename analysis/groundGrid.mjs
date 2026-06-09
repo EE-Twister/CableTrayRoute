@@ -80,17 +80,23 @@ export function effectiveN(L, Lp, A) {
 /**
  * Compute the mesh spacing correction factor Km (IEEE 80-2013 Eq. 81).
  *
- * For grids without ground rods (Kii = 1), or grids with rods at corners only.
+ * The corner weighting factor Kii (Eq. 82) depends on rod placement:
+ *   - Grids WITH ground rods along the perimeter, in the corners, or
+ *     throughout the area:                    Kii = 1
+ *   - Grids with NO ground rods, or only a few rods none of which are at the
+ *     corners or perimeter:                   Kii = 1 / (2n)^(2/n)
  *
  * @param {number} D    Mesh spacing (m) — assumes uniform square mesh
  * @param {number} h    Burial depth (m)
  * @param {number} d    Conductor diameter (m)
  * @param {number} n    Effective number of parallel conductors
- * @param {boolean} hasRods  Whether perimeter rods are present
+ * @param {boolean} hasRods  Whether perimeter/corner rods are present
  * @returns {number} Km — geometric mesh factor (dimensionless)
  */
 export function meshFactor(D, h, d, n, hasRods) {
-  const Kii = hasRods ? 1 / (Math.pow(2 * n, 2 / n)) : 1;
+  // IEEE 80-2013 Eq. 82: Kii = 1 when rods are on the perimeter/corners,
+  // otherwise Kii = 1/(2n)^(2/n).
+  const Kii = hasRods ? 1 : 1 / Math.pow(2 * n, 2 / n);
   const Kh = Math.sqrt(1 + h / 1.0); // h0 = 1 m reference
   const term1 = Math.log((D * D) / (16 * h * d) + (D + 2 * h) * (D + 2 * h) / (8 * D * d) - h / (4 * d));
   const term2 = (Kii / Kh) * Math.log(8 / (Math.PI * (2 * n - 1)));

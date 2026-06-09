@@ -4,9 +4,14 @@
  * Orchestrates the three individual analysis modules to produce a unified
  * combined-scenario result for cable tray structural support design:
  *
- *   1. Seismic brace forces    — ASCE 7-22 Chapter 13, §13.3.1
+ *   1. Seismic brace forces    — ASCE 7-16 Chapter 13, §13.3.1 (see note below)
  *   2. Wind forces             — ASCE 7-22 Chapters 26 and 29, §29.4
  *   3. LRFD load combinations  — ASCE 7-22 §2.3.2 (four-combination model)
+ *
+ *   NOTE: The seismic component-force equation (§13.3.1) implemented here is the
+ *   ASCE 7-16 form (delegated to seismicBracing.mjs); the revised ASCE 7-22
+ *   §13.3.1 equation is not implemented. Wind and load combinations follow
+ *   ASCE 7-22 (unchanged from 7-16 for these provisions).
  *
  * This module uses the §2.3.2 four-combination LRFD model (LC-W1 through LC-S2)
  * from `loadCombinations.mjs`. It is complementary to `structuralLoadCombinations.mjs`,
@@ -16,7 +21,7 @@
  *
  * Key references:
  *   ASCE 7-22 §2.3.2    — Basic LRFD load combinations
- *   ASCE 7-22 §13.3.1   — Seismic design force for nonstructural components (Fp)
+ *   ASCE 7-16 §13.3.1   — Seismic design force for nonstructural components (Fp)
  *   ASCE 7-22 §13.5.6.1 — Cable tray brace spacing and force distribution
  *   ASCE 7-22 Chapter 26 — Wind loads: general requirements
  *   ASCE 7-22 §29.4     — Wind loads on other structures (open signs, lattice frames)
@@ -231,12 +236,15 @@ export function calcSeismicWindCombined(params) {
     envelope,
     nec: {
       seismic: {
-        rule:        'ASCE 7-22 Chapter 13',
+        rule:        'ASCE 7-16 Chapter 13',
         section:     '§13.3.1, §13.5.6',
-        description: 'Seismic design force for nonstructural components: ' +
+        description: 'Seismic design force for nonstructural components ' +
+                     '(ASCE 7-16 §13.3.1 form; the revised ASCE 7-22 equation is ' +
+                     'not implemented): ' +
                      'Fp = (0.4·ap·SDS·Wp / (Rp/Ip)) × (1 + 2z/h), ' +
                      'subject to Fp_min = 0.3·SDS·Ip·Wp and Fp_max = 1.6·SDS·Ip·Wp. ' +
-                     'Longitudinal force = 0.4 × lateral; vertical = ±0.2·SDS·Ip·Wp.',
+                     'Longitudinal force = 0.4 × lateral; vertical Ev = ±0.2·SDS·Wp ' +
+                     '(ASCE 7 §12.4.2.2 — no Ip on the vertical term).',
       },
       wind: {
         rule:        'ASCE 7-22 Chapters 26 and 29',
