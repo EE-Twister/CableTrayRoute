@@ -1,21 +1,26 @@
 import ampacity from "../ampacity.mjs";
+import { table9Impedance } from "./necTable9.mjs";
 
 /**
- * Approximate conductor voltage drop (percent of supply voltage).
+ * Conductor voltage drop (percent of supply voltage), including conductor
+ * reactance and load power factor:
  *
- * SIMPLIFYING ASSUMPTIONS (the result is a resistive, unity-power-factor
- * estimate and is therefore NON-conservative for reactive loads):
- *   - Conductor REACTANCE is neglected: Vd = factor·I·R·L only. The full
- *     formula is Vd = factor·I·L·(R·cosθ + X·sinθ); with X omitted and an
- *     implied cosθ = 1, drop is understated for low-PF circuits and for large
- *     conductors where X is comparable to R.
- *   - Resistance is DC resistance temperature-corrected to the conductor's
- *     insulation_rating (e.g. 90 °C), or 20 °C when that field is absent.
- *   - factor = 2 for single-phase (both conductors), √3 for three-phase
- *     (line-to-line %VD), with R taken as one-conductor resistance per length.
+ *   Vd = factor · I · L · (R·cosθ + X·sinθ)
  *
- * For a code-of-record check, use AC resistance and reactance from NEC
- * Chapter 9 Table 9 with the actual load power factor.
+ * where factor = 2 for single-phase (both conductors) or √3 for three-phase
+ * (line-to-line %VD), and R, X are the per-conductor resistance and reactance
+ * per unit length.
+ *
+ * Data sources / assumptions:
+ *   - R and X are taken from NEC Chapter 9, Table 9 (AC resistance and reactance
+ *     at 75 °C, 60 Hz, three single conductors in conduit) when the conductor
+ *     size is listed. Conduit material selects the reactance/resistance column:
+ *     steel/IMC/RMC/EMT are treated as magnetic; PVC/aluminum as non-magnetic
+ *     (default when `cable.conduit_material` is not given).
+ *   - When the size is not in Table 9, R falls back to the DC resistance
+ *     temperature-corrected to `cable.insulation_rating` (or 75 °C), and X = 0.
+ *   - Load power factor comes from `cable.power_factor`; when absent it defaults
+ *     to 0.9 lagging — document the actual PF for accurate results.
  *
  * @param {Object} cable   Cable schedule row
  * @param {number} length  Run length (feet)
@@ -27,15 +32,31 @@ export function calculateVoltageDrop(cable = {}, length = 0, phase = 3) {
   const current = parseFloat(cable.est_load) || 0;
   const voltage =
     parseFloat(cable.operating_voltage) || parseFloat(cable.cable_rating) || 0;
-  const temp = parseFloat(cable.insulation_rating) || 20;
-  const RperMeter = dcResistance(
-    cable.conductor_size,
-    cable.conductor_material,
-    temp,
-  );
+  const material = cable.conductor_material;
+  const conduit = cable.conduit_material || cable.raceway_material || cable.conduit_type;
+
+  // Prefer NEC Table 9 AC resistance + reactance; fall back to temperature-
+  // corrected DC resistance (and X = 0) when the size is not tabulated.
+  const z = table9Impedance(cable.conductor_size, material, conduit);
+  let RperMeter;
+  let XperMeter;
+  if (z) {
+    RperMeter = z.R;
+    XperMeter = z.X;
+  } else {
+    const temp = parseFloat(cable.insulation_rating) || 75;
+    RperMeter = dcResistance(cable.conductor_size, material, temp);
+    XperMeter = 0;
+  }
+
+  // Load power factor (lagging). Defaults to 0.9 when not provided.
+  const pfRaw = parseFloat(cable.power_factor);
+  const pf = Number.isFinite(pfRaw) && pfRaw > 0 && pfRaw <= 1 ? pfRaw : 0.9;
+  const sinTheta = Math.sqrt(Math.max(0, 1 - pf * pf));
+
   const lengthMeters = (parseFloat(length) || 0) * 0.3048;
   const factor = phase === 1 ? 2 : Math.sqrt(3);
-  const dropVolts = factor * current * RperMeter * lengthMeters;
+  const dropVolts = factor * current * lengthMeters * (RperMeter * pf + XperMeter * sinTheta);
   const percent = voltage ? (dropVolts / voltage) * 100 : 0;
   return percent;
 }

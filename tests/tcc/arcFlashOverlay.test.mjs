@@ -12,14 +12,12 @@ function it(name, fn) {
   catch (err) { console.log('  \u2717', name); console.error(err); process.exitCode = 1; }
 }
 
-// Standard 480 V box-enclosed switchgear parameters (typical MCC)
+// Standard 480 V box-enclosed switchgear parameters (typical MCC), IEEE 1584-2018
 const stdParams = {
-  Cf: 1.5,
-  sizeFactor: 1,
-  gap: 32,
-  dist: 455,
-  V: 0.48,
-  cfg: 'VCB',
+  EC: 'VCB',
+  Voc_kV: 0.48,
+  G_mm: 32,
+  D_mm: 455,
   enclosure: 'box'
 };
 
@@ -112,9 +110,9 @@ describe('incidentEnergyLimitCurve – threshold scaling', () => {
 });
 
 // ──────────────────────────────────────────────────────────────────────────────
-describe('incidentEnergyLimitCurve – enclosure effect', () => {
-  it('open-air (Cf=1) allows longer clearing times than enclosed (Cf=1.5) for same threshold', () => {
-    const openParams = { ...stdParams, Cf: 1, enclosure: 'open' };
+describe('incidentEnergyLimitCurve – electrode configuration effect', () => {
+  it('open-air (VOA) allows longer clearing times than enclosed (VCB) for same threshold', () => {
+    const openParams = { ...stdParams, EC: 'VOA', enclosure: 'open' };
     const curveOpen = incidentEnergyLimitCurve(openParams, 8, currentRangeKA);
     const curveBox = incidentEnergyLimitCurve(stdParams, 8, currentRangeKA);
     assert.ok(curveOpen.length > 0 && curveBox.length > 0);
@@ -154,7 +152,7 @@ describe('incidentEnergyLimitCurve – edge cases', () => {
   });
 
   it('handles very small working distance without throwing', () => {
-    const smallDistParams = { ...stdParams, dist: 10 };
+    const smallDistParams = { ...stdParams, D_mm: 10 };
     assert.doesNotThrow(() => incidentEnergyLimitCurve(smallDistParams, 8, currentRangeKA));
   });
 
@@ -168,12 +166,12 @@ describe('incidentEnergyLimitCurve – edge cases', () => {
 
 // ──────────────────────────────────────────────────────────────────────────────
 describe('incidentEnergyLimitCurve – IEEE 1584 spot-check', () => {
-  it('at 5 kA bolted fault, 8 cal/cm² limit gives clearing time < 0.5 s for typical MCC', () => {
-    // At 5 kA, incident energy accumulates rapidly — clearing must be fast
+  it('at 5 kA bolted fault, 8 cal/cm² limit gives clearing time ≈ 0.94 s for typical MCC', () => {
+    // IEEE 1584-2018: at 480 V, 5 kA, the constant-8-cal/cm² boundary is ~0.94 s.
     const result = incidentEnergyLimitCurve(stdParams, 8, [5]);
     assert.ok(result.length === 1, 'should produce one point');
-    assert.ok(result[0].time < 0.5,
-      `expected clearing time < 0.5 s at 5 kA for 8 cal/cm², got ${result[0].time.toFixed(4)} s`);
+    assert.ok(result[0].time > 0.5 && result[0].time < 1.5,
+      `expected clearing time ~0.94 s at 5 kA for 8 cal/cm², got ${result[0].time.toFixed(4)} s`);
   });
 
   it('at 1 kA bolted fault, 40 cal/cm² limit gives clearing time > 0.1 s', () => {

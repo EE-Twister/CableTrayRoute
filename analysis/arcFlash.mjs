@@ -2,6 +2,12 @@ import { runShortCircuit } from './shortCircuit.mjs';
 import { scaleCurve } from './tccUtils.js';
 import { getOneLine, getItem } from '../dataStore.mjs';
 import { showAlertModal } from '../src/components/modal.js';
+import {
+  arcingCurrents,
+  incidentEnergy,
+  withinModelRange,
+  ELECTRODE_CONFIGS,
+} from './ieee1584.mjs';
 
 let deviceCache = null;
 
@@ -307,7 +313,10 @@ function interpolateTime(curve = [], currentA) {
   return curve[curve.length - 1].time;
 }
 
-function clearingTime(comp, Ibf, devices, protectiveComp, scResults, protectiveDevice) {
+// Determine the protective device clearing time. Per IEEE 1584-2018 the device
+// is evaluated at the ARCING current (evalKA), not the bolted fault current —
+// the arc current is lower, so it generally clears more slowly.
+function clearingTime(comp, evalKA, devices, protectiveComp, scResults, protectiveDevice) {
   const compClearing = parseNumeric(pickValue(comp, 'clearing_time'));
   if (compClearing !== null) return compClearing;
   if (protectiveComp && protectiveComp !== comp) {
@@ -327,8 +336,8 @@ function clearingTime(comp, Ibf, devices, protectiveComp, scResults, protectiveD
   const overrides = { ...deviceOverride, ...componentOverride, ...inlineOverride };
   const scaled = scaleCurve(dev, overrides);
   const settings = scaled.settings || {};
-  const downstreamKA = Number.isFinite(Ibf) && Ibf > 0
-    ? Ibf
+  const downstreamKA = Number.isFinite(evalKA) && evalKA > 0
+    ? evalKA
     : Number.isFinite(scResults?.[comp.id]?.threePhaseKA) && scResults[comp.id].threePhaseKA > 0
       ? scResults[comp.id].threePhaseKA
       : 0;
@@ -351,48 +360,27 @@ function clearingTime(comp, Ibf, devices, protectiveComp, scResults, protectiveD
   return interpolateTime(clearingCurve, effectiveKA * 1000);
 }
 
-// Simplified arcing-current estimate.
-//
-// NOTE: This is an IEEE 1584-2002-style log-linear approximation, NOT a
-// standard-conformant IEEE 1584-2018 implementation. It does not use the
-// 2018 k1..k13 coefficient tables, the three-current voltage interpolation,
-// or the enclosure-size correction polynomials. Treat the result as a
-// screening estimate; a full IEEE 1584-2018 study is required for final
-// PPE/label determination.
-function arcingCurrent(Ibf, V, gap, cfg, enclosure) {
-  const configK = {
-    VCB: -0.153,
-    VCBB: -0.097,
-    HCB: -0.113,
-    VOA: -0.180,
-    HOA: -0.290
-  };
-  const k = configK[cfg] || configK.VCB;
-  const eAdj = enclosure === 'open' ? -0.113 : 0;
-  const logIa = k + eAdj + 0.662 * Math.log10(Ibf || 0.001) +
-    0.0966 * V + 0.000526 * gap + 0.5588 * V * Math.log10(Ibf || 0.001);
-  return Math.pow(10, logIa);
-}
-
 /**
- * Compute incident energy using a SIMPLIFIED arc-flash model (IEEE 1584-2002
- * functional form with engineering approximations), NOT a full IEEE 1584-2018
- * implementation.
+ * Compute incident energy and the arc-flash boundary using the full
+ * IEEE 1584-2018 model (analysis/ieee1584.mjs — validated against the
+ * standard's Annex D.1 and D.2 worked examples).
  *
- * Key assumptions / hardcoded defaults (each surfaced in the per-result
- * `notes`/`requiredInputs` when an input is missing):
+ * For each equipment location the maximum (full) and minimum (reduced)
+ * arcing-current scenarios are both evaluated — each with its own
+ * protective-device clearing time, determined at the ARCING current — and the
+ * worst-case incident energy is reported, per the standard.
+ *
+ * Inputs and their defaults (each surfaced in the per-result
+ * `notes`/`requiredInputs` when missing):
+ *   - electrode configuration: VCB (box) / VOA (open air) when not provided
  *   - electrode gap:           25 mm when not provided
  *   - working distance:        455 mm (18 in) when not provided
  *   - enclosure size:          508 mm cube when dimensions are not provided
  *   - system voltage:          0.48 kV when not provided
  *   - clearing time:           0.2 s when no protective-device curve is linked
- *   - distance exponent:       fixed at 2 (the real exponent is equipment-class
- *                              and voltage dependent, ~0.97–2.0)
- *   - Cf (open/box):           1.0 / 1.5
  *
  * Returns a map id -> { incidentEnergy, boundary, ppeCategory, clearingTime }
- * where energy is in cal/cm^2 and boundary in millimeters. Use a full
- * IEEE 1584-2018 study for final PPE selection and arc-flash labeling.
+ * where energy is in cal/cm^2 and boundary in millimeters.
  */
 export async function runArcFlash(options = {}) {
   const devices = await loadDevices();
@@ -425,7 +413,6 @@ export async function runArcFlash(options = {}) {
       ? parseNumeric(pickValue(protectiveComp, 'clearing_time'))
       : null;
     const enclosure = (pickValue(comp, 'enclosure') || 'box').toLowerCase();
-    const Cf = enclosure === 'open' ? 1 : 1.5;
     const gapRaw = parseNumeric(pickValue(comp, 'gap'));
     const gap = Number.isFinite(gapRaw) && gapRaw > 0 ? gapRaw : 25;
     const workingDistanceRaw = parseNumeric(pickValue(comp, 'working_distance'));
@@ -436,20 +423,47 @@ export async function runArcFlash(options = {}) {
     const h = Number.isFinite(heightRaw) && heightRaw > 0 ? heightRaw : 508;
     const w = Number.isFinite(widthRaw) && widthRaw > 0 ? widthRaw : 508;
     const de = Number.isFinite(depthRaw) && depthRaw > 0 ? depthRaw : 508;
-    const sizeFactor = Math.cbrt((h * w * de) / (508 * 508 * 508)) || 1;
-    const time = clearingTime(comp, Ibf, devices, protectiveComp, sc, protectiveDevice);
-    const cfgCandidate = pickValue(comp, 'electrode_config') ?? pickValue(comp, 'electrode_configuration') ?? 'VCB';
-    const cfg = typeof cfgCandidate === 'string' ? cfgCandidate.toUpperCase() : 'VCB';
+    const cfgCandidate = pickValue(comp, 'electrode_config') ?? pickValue(comp, 'electrode_configuration') ?? null;
+    const cfgRaw = typeof cfgCandidate === 'string' ? cfgCandidate.toUpperCase() : null;
+    const cfg = ELECTRODE_CONFIGS.includes(cfgRaw) ? cfgRaw : (enclosure === 'open' ? 'VOA' : 'VCB');
     const voltageSettingRaw = firstParsedNumeric(pickValue(comp, 'kV'), pickValue(comp, 'baseKV'), pickValue(comp, 'prefault_voltage'));
     const V = Number.isFinite(voltageSettingRaw) && voltageSettingRaw > 0 ? voltageSettingRaw : 0.48;
-    const rawIa = Ibf > 0 && time > 0
-      ? arcingCurrent(Ibf, V, gap, cfg, enclosure)
-      : 0;
-    const Ia = Number.isFinite(rawIa) && rawIa > 0 ? Math.min(rawIa, Ibf) : 0;
-    const energy = Ia > 0 && time > 0 && dist > 0
-      ? 1.6 * Cf * sizeFactor * Math.pow(Ia, 1.2) * time * (gap / 25) * Math.pow(610 / dist, 2)
-      : 0;
-    const boundary = energy > 0 && dist > 0 ? dist * Math.sqrt(energy / 1.2) : 0;
+
+    // IEEE 1584-2018 incident-energy model. Evaluate BOTH the maximum (full)
+    // and minimum (reduced) arcing-current scenarios — each with its own
+    // clearing time evaluated at the arcing current — and report the worst-case
+    // energy, as the standard requires (a lower arcing current can clear more
+    // slowly and yield higher energy).
+    const afParams = { EC: cfg, Voc_kV: V, Ibf_kA: Ibf, G_mm: gap, D_mm: dist };
+    const modelRange = withinModelRange(afParams);
+    let energy = 0;        // worst-case incident energy, cal/cm²
+    let boundary = 0;      // worst-case arc-flash boundary, mm
+    let time = 0;          // clearing time of the governing case, s
+    let Ia = 0;            // arcing current of the governing case, kA
+    let modelCF = 1;       // enclosure size correction factor
+    let modelEES = null;   // equivalent enclosure size, inches
+    let governingCase = null;
+    let afError = null;
+    if (Ibf > 0) {
+      try {
+        const ac = arcingCurrents({ ...afParams, height_mm: h, width_mm: w, depth_mm: de });
+        modelCF = ac.CF;
+        modelEES = ac.EES;
+        const tFull = clearingTime(comp, ac.full.iArc, devices, protectiveComp, sc, protectiveDevice);
+        const tReduced = clearingTime(comp, ac.reduced.iArc, devices, protectiveComp, sc, protectiveDevice);
+        const eFull = incidentEnergy(afParams, ac, 'full', tFull);
+        const eReduced = incidentEnergy(afParams, ac, 'reduced', tReduced);
+        const reducedGoverns = Number.isFinite(eReduced.E_cal) && eReduced.E_cal > eFull.E_cal;
+        const worst = reducedGoverns ? eReduced : eFull;
+        governingCase = reducedGoverns ? 'reduced (minimum arcing current)' : 'full (maximum arcing current)';
+        time = reducedGoverns ? tReduced : tFull;
+        Ia = Number.isFinite(worst.iArc_kA) ? worst.iArc_kA : 0;
+        energy = Number.isFinite(worst.E_cal) && worst.E_cal > 0 ? worst.E_cal : 0;
+        boundary = Number.isFinite(worst.AFB_mm) && worst.AFB_mm > 0 ? worst.AFB_mm : 0;
+      } catch (e) {
+        afError = e;
+      }
+    }
     // NFPA 70E arc-flash PPE categories (Table 130.7(C)(15)(c)). The highest
     // defined category is 4 (≤ 40 cal/cm²); above 40 cal/cm² there is NO PPE
     // category — energized work is prohibited, surfaced via the >40 note and
@@ -512,10 +526,20 @@ export async function runArcFlash(options = {}) {
       addNote('No nominal voltage provided; defaulted to 0.48 kV for the energy model.');
     }
     if (energy > 40) {
-      addNote('Incident energy exceeds 40 cal/cm²; verify protective coordination and consider mitigation.');
+      addNote('Incident energy exceeds 40 cal/cm²; no arc-rated PPE category applies (energized work prohibited). Verify protective coordination and consider mitigation.');
     }
     if (boundary > 20000) {
       addNote('Arc flash boundary exceeds 20 m; confirm the clearing time and working distance inputs.');
+    }
+    if (Ibf > 0 && !modelRange.ok) {
+      addNote(`Inputs fall outside the IEEE 1584-2018 model validity range (${modelRange.reasons.join('; ')}); the incident energy is an extrapolation and may be inaccurate.`);
+      addRequired('Bring voltage, bolted fault current, gap, and working distance within the IEEE 1584-2018 range, or use an alternative method.');
+    }
+    if (afError) {
+      addNote('Incident energy could not be evaluated with the IEEE 1584-2018 model for this equipment; check the input parameters.');
+    }
+    if (governingCase) {
+      addNote(`Worst-case incident energy governed by the ${governingCase} scenario per IEEE 1584-2018.`);
     }
     const upstreamDeviceName = formatProtectiveDeviceName(protectiveComp, protectiveDevice);
     const entry = {
@@ -531,16 +555,22 @@ export async function runArcFlash(options = {}) {
       upstreamDevice: upstreamDeviceName,
       studyDate,
       calculationInputs: {
+        model: 'IEEE 1584-2018',
         boltedFaultCurrentKA: Number(Math.max(Ibf, 0).toFixed(2)),
         arcingCurrentKA: Number(Ia.toFixed(2)),
         clearingTimeSeconds: Number(time.toFixed(3)),
+        governingScenario: governingCase || 'n/a',
         electrodeConfiguration: cfg,
         enclosureType: enclosure,
-        enclosureSizeFactor: Number(sizeFactor.toFixed(3)),
+        enclosureCorrectionFactor: Number(modelCF.toFixed(3)),
+        equivalentEnclosureSizeIn: modelEES === null ? null : Number(modelEES.toFixed(2)),
         gapMM: Number(gap.toFixed(1)),
         workingDistanceMM: Number(dist.toFixed(1)),
-        correctionFactor: Number(Cf.toFixed(1)),
+        boxHeightMM: Number(h.toFixed(1)),
+        boxWidthMM: Number(w.toFixed(1)),
+        boxDepthMM: Number(de.toFixed(1)),
         voltageKVUsed: Number(V.toFixed(3)),
+        withinModelRange: modelRange.ok,
         faultCurrentSource: shortCircuitAvailable ? 'shortCircuitStudy' : 'assumed'
       }
     };
@@ -552,44 +582,55 @@ export async function runArcFlash(options = {}) {
 }
 
 /**
- * Generate a "constant incident energy" limit curve for overlay on a TCC chart.
+ * Generate a "constant incident energy" limit curve for overlay on a TCC chart,
+ * using the full IEEE 1584-2018 model (analysis/ieee1584.mjs).
  *
- * For each fault current in currentRangeKA, computes the maximum clearing time
- * that keeps incident energy at or below thresholdCalCm2 using the simplified
- * arc-flash model (same formulas as runArcFlash; see its note — this is an
- * IEEE 1584-2002-style estimate, not a 2018 implementation). Returns an array of
- * { current, time } points where current is in Amps (for TCC chart axes).
+ * For each bolted fault current in currentRangeKA, computes the maximum clearing
+ * time that keeps incident energy at or below thresholdCalCm2. Because incident
+ * energy is linear in clearing time, the time is solved directly:
+ *   E(T) = E(1 s) · T  ⟹  T = E_threshold / E(1 s)
+ * evaluated for the maximum (full) arcing-current scenario.
  *
  * @param {object} params
- * @param {number} params.Cf           - 1.0 for open air, 1.5 for enclosed equipment
- * @param {number} params.sizeFactor   - enclosure size factor (cube-root of volume ratio)
- * @param {number} params.gap          - conductor gap in mm
- * @param {number} params.dist         - working distance in mm
- * @param {number} params.V            - system voltage in kV
- * @param {string} params.cfg          - electrode configuration (VCB, VCBB, HCB, VOA, HOA)
- * @param {string} params.enclosure    - 'open' or 'box'
- * @param {number} thresholdCalCm2     - incident energy limit in cal/cm²
- * @param {number[]} currentRangeKA    - array of bolted fault current values in kA to sweep
+ * @param {string} params.cfg|EC        - electrode configuration (VCB, VCBB, HCB, VOA, HOA)
+ * @param {number} params.V|Voc_kV      - system voltage in kV
+ * @param {number} params.gap|G_mm      - conductor gap in mm
+ * @param {number} params.dist|D_mm     - working distance in mm
+ * @param {string} params.enclosure     - 'open' or 'box' (selects default config)
+ * @param {number} [params.height_mm|width_mm|depth_mm] - enclosure dimensions (default 508 mm cube)
+ * @param {number} thresholdCalCm2      - incident energy limit in cal/cm²
+ * @param {number[]} currentRangeKA     - bolted fault currents (kA) to sweep
  * @returns {{ current: number, time: number }[]} sorted by ascending current
  */
 export function incidentEnergyLimitCurve(params, thresholdCalCm2, currentRangeKA) {
-  const { Cf = 1.5, sizeFactor = 1, gap = 25, dist = 455, V = 0.48, cfg = 'VCB', enclosure = 'box' } = params || {};
+  const p = params || {};
+  const enclosure = (p.enclosure || 'box').toLowerCase();
+  const cfgRaw = typeof (p.EC ?? p.cfg) === 'string' ? (p.EC ?? p.cfg).toUpperCase() : null;
+  const EC = ELECTRODE_CONFIGS.includes(cfgRaw) ? cfgRaw : (enclosure === 'open' ? 'VOA' : 'VCB');
+  const Voc_kV = p.Voc_kV ?? p.V ?? 0.48;
+  const G_mm = p.G_mm ?? p.gap ?? 25;
+  const D_mm = p.D_mm ?? p.dist ?? 455;
+  const height_mm = p.height_mm ?? 508;
+  const width_mm = p.width_mm ?? 508;
+  const depth_mm = p.depth_mm ?? 508;
+
   const E = thresholdCalCm2;
   if (!(E > 0) || !Array.isArray(currentRangeKA) || currentRangeKA.length === 0) return [];
-
-  const denomBase = 1.6 * Cf * sizeFactor * (gap / 25) * Math.pow(610 / dist, 2);
-  if (!(denomBase > 0)) return [];
+  const E_threshold_J = E * 4.184;
 
   const points = [];
   for (const Ibf of currentRangeKA) {
     if (!(Ibf > 0)) continue;
-    const Ia = arcingCurrent(Ibf, V, gap, cfg, enclosure);
-    if (!(Ia > 0)) continue;
-    const Ia12 = Math.pow(Math.min(Ia, Ibf), 1.2);
-    if (!(Ia12 > 0)) continue;
-    const t = E / (denomBase * Ia12);
-    if (t > 0 && t <= 100) {
-      points.push({ current: Ibf * 1000, time: t });
+    const afParams = { EC, Voc_kV, Ibf_kA: Ibf, G_mm, D_mm };
+    if (!withinModelRange(afParams).ok) continue;
+    try {
+      const ac = arcingCurrents({ ...afParams, height_mm, width_mm, depth_mm });
+      const eAt1s = incidentEnergy(afParams, ac, 'full', 1).E_J; // J/cm² at T = 1 s
+      if (!(eAt1s > 0)) continue;
+      const t = E_threshold_J / eAt1s; // seconds (energy is linear in time)
+      if (t > 0 && t <= 100) points.push({ current: Ibf * 1000, time: t });
+    } catch {
+      // Skip currents that fall outside the model's numeric domain.
     }
   }
   points.sort((a, b) => a.current - b.current);

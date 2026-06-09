@@ -8584,13 +8584,13 @@ function plot() {
     if (afEntry?.calculationInputs) {
       const ci = afEntry.calculationInputs;
       const enclosure = ci.enclosureType || 'box';
-      const Cf = enclosure === 'open' ? 1 : 1.5;
-      const sizeFactor = Number.isFinite(ci.enclosureSizeFactor) && ci.enclosureSizeFactor > 0
-        ? ci.enclosureSizeFactor : 1;
       const gap = Number.isFinite(ci.gapMM) && ci.gapMM > 0 ? ci.gapMM : 25;
       const dist = Number.isFinite(ci.workingDistanceMM) && ci.workingDistanceMM > 0 ? ci.workingDistanceMM : 455;
       const V = Number.isFinite(ci.voltageKVUsed) && ci.voltageKVUsed > 0 ? ci.voltageKVUsed : 0.48;
       const cfg = ci.electrodeConfiguration || 'VCB';
+      const boxHeight = Number.isFinite(ci.boxHeightMM) && ci.boxHeightMM > 0 ? ci.boxHeightMM : 508;
+      const boxWidth = Number.isFinite(ci.boxWidthMM) && ci.boxWidthMM > 0 ? ci.boxWidthMM : 508;
+      const boxDepth = Number.isFinite(ci.boxDepthMM) && ci.boxDepthMM > 0 ? ci.boxDepthMM : 508;
       // Sweep 200 points log-spaced across the current domain
       const domainMinKA = (d3.min(allCurrents) || 100) / 1000 / 2;
       const domainMaxKA = (d3.max(allCurrents) || 10000) / 1000 * 2;
@@ -8600,7 +8600,8 @@ function plot() {
       const currentRangeKA = Array.from({ length: nPts }, (_, i) =>
         Math.pow(10, logMin + (logMax - logMin) * i / (nPts - 1)));
       const limitPoints = incidentEnergyLimitCurve(
-        { Cf, sizeFactor, gap, dist, V, cfg, enclosure },
+        { EC: cfg, Voc_kV: V, G_mm: gap, D_mm: dist, enclosure,
+          height_mm: boxHeight, width_mm: boxWidth, depth_mm: boxDepth },
         arcFlashOverlayThreshold,
         currentRangeKA
       );

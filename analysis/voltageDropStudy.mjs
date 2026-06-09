@@ -106,7 +106,7 @@ export function evaluateCable(cable, lengthFt) {
     status,
     evaluated,
     basis: 'NEC 2023 voltage-drop informational-note recommendation '
-      + '(resistive/unity-PF estimate; conductor reactance neglected)',
+      + '(AC R+X from NEC Ch. 9 Table 9, load power factor applied)',
   };
 }
 

@@ -18,13 +18,20 @@ documented so users are not misled).
 | `analysis/arcFlash.mjs` | PPE banding assigned a non-existent **"Category 5"** above 40 cal/cm². NFPA 70E defines categories 1–4; above 40 cal/cm² energized work is prohibited (no category). | Capped at Category 4; > 40 cal/cm² is communicated via the existing note and the "DANGER" label signal word. |
 | `analysis/capacitorBank.mjs` | 7th-harmonic detuning rationale text said "shift resonance below h=5" (copy/paste from the 5th-harmonic branch). | Corrected to "below h=7". |
 
+## Major rework: full standard implementations
+
+| Module | What was done |
+| --- | --- |
+| `analysis/arcFlash.mjs` + new `analysis/ieee1584.mjs` | Replaced the previous IEEE 1584-2002-style heuristic with a **faithful IEEE 1584-2018 implementation**: the full coefficient tables (Tables 1–7), the intermediate average arcing current, the arcing-current variation correction factor, the enclosure-size correction (equivalent enclosure size + Table 7 polynomials), the voltage interpolation between the 600/2700/14 300 V models, and the incident-energy and arc-flash-boundary equations. `runArcFlash` now evaluates **both the maximum (full) and minimum (reduced) arcing-current scenarios** — each with its clearing time determined at the arcing current, not the bolted fault — and reports the worst-case energy, as the standard requires. Validated to the standard's **Annex D.1 (MV) and D.2 (LV) worked examples** in `tests/ieee1584.test.mjs` (I_arc, E, and AFB all within rounding). Out-of-range inputs are flagged. The TCC arc-flash limit-curve overlay and the `ieee1584-arc-flash` validation benchmark were updated to the 2018 model. |
+| `src/voltageDrop.js` + new `src/necTable9.mjs` | Voltage drop now uses the **full AC formula** `Vd = factor·I·L·(R·cosθ + X·sinθ)` with **NEC Chapter 9 Table 9 AC resistance and reactance** (75 °C, magnetic vs non-magnetic conduit) and the **load power factor** (`cable.power_factor`, default 0.9). Reactance is no longer neglected, so the result is correct for low-PF and large-conductor circuits. Falls back to temperature-corrected DC resistance (X = 0) when a size is not tabulated. Validated against a hand calculation in `tests/voltageDropReactance.test.mjs`. |
+
 ## Clarified assumptions (no numeric change)
 
 | Module | Assumption now documented |
 | --- | --- |
-| `analysis/arcFlash.mjs` | The model is an **IEEE 1584-2002-style screening estimate, not a standard-conformant IEEE 1584-2018 implementation**. It does not use the 2018 coefficient tables, the three-current voltage interpolation, or the enclosure-size correction polynomials, and the distance exponent is fixed at 2 (the real exponent is equipment/voltage dependent). Hardcoded defaults (gap 25 mm, working distance 455 mm, 508 mm cube enclosure, 0.48 kV, 0.2 s clearing time) are listed in the docstring and surfaced per-result when an input is missing. A full IEEE 1584-2018 study is required for final PPE/labeling. |
+| `analysis/arcFlash.mjs` | Input defaults (electrode config VCB/VOA, gap 25 mm, working distance 455 mm, 508 mm cube enclosure, 0.48 kV, 0.2 s clearing time) are listed in the docstring and surfaced per-result when an input is missing. |
 | `analysis/seismicBracing.mjs` & `analysis/seismicWindCombined.mjs` | The component-force equation is the **ASCE 7-16 §13.3.1 form** (`Fp = 0.4·ap·SDS·Wp·(1+2z/h)/(Rp/Ip)`); the revised ASCE 7-22 §13.3.1 equation (Hf, Rμ, Car, Rpo) is **not** implemented. The 12 ft / 40 ft brace spacings are NEMA VE 2 guidance values, not literal ASCE 7 limits. SDC E/F are derived from conservative SD1 thresholds as a stand-in for the §11.6 `S1 ≥ 0.75` rule, because the tool collects SD1 but not S1. |
-| `src/voltageDrop.js` & `analysis/voltageDropStudy.mjs` | Voltage drop is a **resistive, unity-power-factor estimate**: `Vd = factor·I·R·L`, conductor **reactance neglected** (full form is `R·cosθ + X·sinθ`). This is non-conservative for low-PF loads and large conductors. Resistance is DC resistance corrected to the insulation rating (or 20 °C when absent). |
+| `src/voltageDrop.js` | Power factor defaults to 0.9 lagging when `cable.power_factor` is absent; conduit material defaults to non-magnetic (PVC/aluminum) for the Table 9 column selection. |
 
 ## Verified correct (audited, no change needed)
 
