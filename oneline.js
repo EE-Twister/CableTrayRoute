@@ -6133,6 +6133,44 @@ async function promptCheckpointName(defaultValue = '') {
   return typeof result === 'string' ? result.trim() : '';
 }
 
+async function promptDialog(title, label, defaultValue = '', { helperText = '' } = {}) {
+  const result = await openModal({
+    title,
+    primaryText: 'OK',
+    secondaryText: 'Cancel',
+    onSubmit: controller => {
+      const input = controller.body.querySelector('input[name="promptDialogValue"]');
+      const assistive = input ? ensureFieldAssistiveText(input) : null;
+      const value = input ? input.value.trim() : '';
+      if (!value) {
+        if (assistive) assistive.setError('This field is required.');
+        return false;
+      }
+      if (assistive) assistive.setError('');
+      return value;
+    },
+    render: body => {
+      const lbl = document.createElement('label');
+      lbl.className = 'modal-form-field';
+      lbl.textContent = label;
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.name = 'promptDialogValue';
+      input.value = defaultValue;
+      if (helperText) ensureFieldAssistiveText(input, { helperText });
+      lbl.appendChild(input);
+      body.appendChild(lbl);
+      return { initialFocus: input };
+    }
+  });
+  return typeof result === 'string' ? result : null;
+}
+
+async function confirmDialog(title, description = '', { primaryText = 'Confirm' } = {}) {
+  const result = await openModal({ title, description, primaryText, secondaryText: 'Cancel' });
+  return !!result;
+}
+
 async function addCheckpoint() {
   if (historyIndex < 0 || historyIndex >= history.length) {
     showToast('No history state available for checkpoint');
@@ -11768,8 +11806,8 @@ function loadSheet(idx, { skipCurrentSave = false } = {}) {
   setOneLine({ activeSheet, sheets });
 }
 
-function addSheet(name) {
-  const sheetName = name || prompt('Sheet name', `Sheet ${sheets.length + 1}`);
+async function addSheet(name) {
+  const sheetName = name || await promptDialog('Add Sheet', 'Sheet name', `Sheet ${sheets.length + 1}`);
   if (!sheetName) return;
   sheets.push({ name: sheetName, components: [], connections: [], layers: [] });
   loadSheet(sheets.length - 1);
@@ -11892,21 +11930,22 @@ function navigateToLinkedSheet(comp) {
   }
 }
 
-function renameSheet(id, newName) {
+async function renameSheet(id, newName) {
   const idx = id ?? activeSheet;
   if (idx < 0 || idx >= sheets.length) return;
-  const sheetName = newName || prompt('Sheet name', sheets[idx].name);
+  const sheetName = newName || await promptDialog('Rename Sheet', 'Sheet name', sheets[idx].name);
   if (!sheetName) return;
   sheets[idx].name = sheetName;
   renderSheetTabs();
   save();
 }
 
-function deleteSheet(id) {
+async function deleteSheet(id) {
   if (sheets.length <= 1) return;
   const idx = id ?? activeSheet;
   if (idx < 0 || idx >= sheets.length) return;
-  if (!confirm('Delete current sheet?')) return;
+  const ok = await confirmDialog('Delete Sheet', `Delete "${sheets[idx].name}"? This cannot be undone.`, { primaryText: 'Delete' });
+  if (!ok) return;
   sheets.splice(idx, 1);
   activeSheet = Math.max(0, idx - 1);
   components = sheets[activeSheet].components;
@@ -15065,8 +15104,8 @@ function selectComponent(compOrId) {
     templateBtn.type = 'button';
     templateBtn.textContent = 'Save as Template';
     templateBtn.classList.add('btn');
-    templateBtn.addEventListener('click', () => {
-      const name = prompt('Template name', targetComp.label || targetComp.subtype);
+    templateBtn.addEventListener('click', async () => {
+      const name = await promptDialog('Save Template', 'Template name', targetComp.label || targetComp.subtype);
       if (!name) return;
       const fd = new FormData(form);
       const data = {
@@ -16210,8 +16249,8 @@ async function init() {
     });
   }
   if (addLayerBtn) {
-    addLayerBtn.addEventListener('click', () => {
-      const name = prompt('Layer name', `Layer ${layers.length + 1}`);
+    addLayerBtn.addEventListener('click', async () => {
+      const name = await promptDialog('Add Layer', 'Layer name', `Layer ${layers.length + 1}`);
       if (name) createLayer(name);
     });
   }
@@ -16453,18 +16492,29 @@ async function init() {
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
       if (tag === 'BUTTON' || tag === 'A' || tag === 'OPTION') return;
     }
-    if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      panDiagram('up', canvasScroll);
-    } else if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      panDiagram('down', canvasScroll);
-    } else if (e.key === 'ArrowLeft') {
-      e.preventDefault();
-      panDiagram('left', canvasScroll);
-    } else if (e.key === 'ArrowRight') {
-      e.preventDefault();
-      panDiagram('right', canvasScroll);
+    const isArrow = e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight';
+    if (!isArrow) return;
+    e.preventDefault();
+    const nudgeTargets = selection.length ? selection : selected ? [selected] : [];
+    if (nudgeTargets.length) {
+      const step = e.shiftKey ? (gridSize || 20) * 4 : (gridSize || 20);
+      let moved = false;
+      nudgeTargets.forEach(c => {
+        if (c.locked) return;
+        if (e.key === 'ArrowUp') c.y -= step;
+        else if (e.key === 'ArrowDown') c.y += step;
+        else if (e.key === 'ArrowLeft') c.x -= step;
+        else if (e.key === 'ArrowRight') c.x += step;
+        moved = true;
+      });
+      if (moved) {
+        pushHistory();
+        render();
+        save();
+      }
+    } else {
+      const dir = e.key === 'ArrowUp' ? 'up' : e.key === 'ArrowDown' ? 'down' : e.key === 'ArrowLeft' ? 'left' : 'right';
+      panDiagram(dir, canvasScroll);
     }
   });
 
@@ -17188,6 +17238,11 @@ async function init() {
     const ungroupItem = menu.querySelector('[data-action="ungroup"]');
     if (groupItem) groupItem.style.display = (isComponentContext && selection.length >= 2 && !selection.every(c => c.type === 'group')) ? 'block' : 'none';
     if (ungroupItem) ungroupItem.style.display = (isComponentContext && contextTarget?.type === 'group') ? 'block' : 'none';
+    const inMultiSelection = isComponentContext && selection.length >= 2 && selection.includes(contextTarget);
+    menu.querySelectorAll('[data-context="multi"]').forEach(li => {
+      const needsThree = li.dataset.action === 'distribute-h' || li.dataset.action === 'distribute-v';
+      li.style.display = (needsThree ? (selection.length >= 3 && inMultiSelection) : inMultiSelection) ? 'block' : 'none';
+    });
     const rect = canvasScroll?.getBoundingClientRect();
     if (rect) {
       const scrollLeft = canvasScroll?.scrollLeft ?? 0;
@@ -17248,24 +17303,19 @@ async function init() {
       const targets = getContextTargets(contextTarget);
       if (!targets.length) return;
       const current = contextTarget.label || '';
-      const next = prompt('Component label', current);
+      const next = await promptDialog('Rename Component', 'Component label', current);
       if (next !== null) {
-        const trimmed = next.trim();
-        if (!trimmed) {
-          showToast('Label cannot be empty');
-        } else {
-          let changed = false;
-          targets.forEach(comp => {
-            if ((comp.label || '') !== trimmed) {
-              comp.label = trimmed;
-              changed = true;
-            }
-          });
-          if (changed) {
-            pushHistory();
-            render();
-            save();
+        let changed = false;
+        targets.forEach(comp => {
+          if ((comp.label || '') !== next) {
+            comp.label = next;
+            changed = true;
           }
+        });
+        if (changed) {
+          pushHistory();
+          render();
+          save();
         }
       }
     } else if (action === 'copy-properties' && contextTarget && !contextTarget.connection) {
@@ -17434,6 +17484,42 @@ async function init() {
     // Gap #40 – Ungroup
     } else if (action === 'ungroup' && contextTarget) {
       if (contextTarget.type === 'group') ungroupComponent(contextTarget.id);
+    } else if (action === 'bring-to-front' && contextTarget && !contextTarget.connection) {
+      const targets = getContextTargets(contextTarget);
+      targets.forEach(comp => {
+        const idx = components.indexOf(comp);
+        if (idx !== -1 && idx < components.length - 1) {
+          components.splice(idx, 1);
+          components.push(comp);
+        }
+      });
+      pushHistory();
+      render();
+      save();
+    } else if (action === 'send-to-back' && contextTarget && !contextTarget.connection) {
+      const targets = getContextTargets(contextTarget);
+      [...targets].reverse().forEach(comp => {
+        const idx = components.indexOf(comp);
+        if (idx !== -1 && idx > 0) {
+          components.splice(idx, 1);
+          components.unshift(comp);
+        }
+      });
+      pushHistory();
+      render();
+      save();
+    } else if (action === 'align-left') {
+      alignSelection('left');
+    } else if (action === 'align-right') {
+      alignSelection('right');
+    } else if (action === 'align-top') {
+      alignSelection('top');
+    } else if (action === 'align-bottom') {
+      alignSelection('bottom');
+    } else if (action === 'distribute-h') {
+      distributeSelection('h');
+    } else if (action === 'distribute-v') {
+      distributeSelection('v');
     }
     menu.style.display = 'none';
   });
@@ -17558,6 +17644,17 @@ async function init() {
       selectedConnection = null;
       render();
       updateStatusBar();
+    } else if (mod && key === 'g' && !e.shiftKey) {
+      e.preventDefault();
+      if (selection.length >= 2) groupSelection();
+    } else if (mod && key === 'g' && e.shiftKey) {
+      e.preventDefault();
+      const grp = selection.find(c => c.type === 'group') || (selected?.type === 'group' ? selected : null);
+      if (grp) ungroupComponent(grp.id);
+    } else if (mod && key === 'l') {
+      e.preventDefault();
+      const lockTargets = selection.length ? selection : selected ? [selected] : [];
+      lockTargets.forEach(c => toggleLock(c));
     } else if (!mod && key === 'f' && !e.shiftKey) {
       e.preventDefault();
       zoomToFit();
@@ -18735,12 +18832,12 @@ function exportOneLineDiagnostics() {
 }
 
 async function shareDiagram() {
-  const tokenPrompt = [
-    'Enter a GitHub personal access token with the "gist" scope.',
-    'Create one at https://github.com/settings/tokens (classic).',
-    'The token is stored locally and used only to publish the shared diagram as a Gist.'
-  ].join('\n\n');
-  const token = prompt(tokenPrompt, getItem('gistToken', ''));
+  const token = await promptDialog(
+    'Share Diagram',
+    'GitHub personal access token (gist scope)',
+    getItem('gistToken', ''),
+    { helperText: 'Create a classic token at github.com/settings/tokens with the gist scope. Stored locally.' }
+  );
   if (!token) return;
   setItem('gistToken', token);
   const body = {

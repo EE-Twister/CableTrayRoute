@@ -35,7 +35,7 @@
     </div>
 
       <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">
-      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <img src="icons/toolbar/settings.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
     </button>
   </nav>
   <div id="settings-menu" class="settings-menu">
@@ -273,7 +273,7 @@
             </label>
           </div>
         </div>
-        <button id="palette-toggle" class="palette-toggle" aria-label="Toggle palette" aria-controls="palette" aria-expanded="false" title="Toggle navigation">
+        <button id="palette-toggle" class="palette-toggle" aria-label="Toggle palette" aria-controls="palette" aria-expanded="false" title="Toggle palette">
       <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
     </button>
         <div class="workspace">
@@ -383,7 +383,7 @@
               <span id="status-selection" class="status-selection"></span>
               <span class="status-divider"></span>
               <span id="status-mode" class="status-mode"></span>
-              <span class="status-shortcuts">Del: delete &nbsp;·&nbsp; R: rotate &nbsp;·&nbsp; F: fit all &nbsp;·&nbsp; Shift+F: fit selection &nbsp;·&nbsp; Ctrl+A: select all &nbsp;·&nbsp; Ctrl+C/V: copy/paste</span>
+              <span class="status-shortcuts">Del: delete &nbsp;·&nbsp; R: rotate &nbsp;·&nbsp; ↑↓←→: nudge (Shift: ×4) &nbsp;·&nbsp; F: fit &nbsp;·&nbsp; Shift+F: fit selection &nbsp;·&nbsp; Ctrl+A: select all &nbsp;·&nbsp; Ctrl+C/V: copy/paste &nbsp;·&nbsp; Ctrl+G: group &nbsp;·&nbsp; Ctrl+L: lock</span>
             </div>
             <div class="oneline-canvas-scroll" role="region" tabindex="0" aria-label="One-line diagram canvas viewport">
               <svg id="diagram" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
@@ -411,10 +411,18 @@
                 <li data-action="duplicate" data-context="component">Duplicate</li>
                 <li data-action="rotate" data-context="component">Rotate</li>
                 <li data-action="toggle-lock" data-context="component">Lock / Unlock</li>
+                <li data-action="bring-to-front" data-context="component">Bring to Front</li>
+                <li data-action="send-to-back" data-context="component">Send to Back</li>
                 <li data-action="select-connected" data-context="component">Select Connected</li>
                 <li data-action="select-by-type" data-context="component">Select All of This Type</li>
                 <li data-action="group-selection" data-context="component" id="ctx-group-selection">Group Selection</li>
                 <li data-action="ungroup" data-context="component" id="ctx-ungroup">Ungroup</li>
+                <li data-action="align-left" data-context="multi">Align Left</li>
+                <li data-action="align-right" data-context="multi">Align Right</li>
+                <li data-action="align-top" data-context="multi">Align Top</li>
+                <li data-action="align-bottom" data-context="multi">Align Bottom</li>
+                <li data-action="distribute-h" data-context="multi">Distribute Horizontal</li>
+                <li data-action="distribute-v" data-context="multi">Distribute Vertical</li>
                 <li data-action="delete" data-context="component">Delete</li>
                 <li data-action="edit" data-context="connection">Edit Connection</li>
                 <li data-action="delete" data-context="connection">Delete Connection</li>
