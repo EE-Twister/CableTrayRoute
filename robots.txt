@@ -3,7 +3,8 @@ Allow: /
 Disallow: /api/
 Disallow: /server_data/
 
-# Canonical deployment is GitHub Pages at ee-twister.github.io/CableTrayRoute.
-# Forks or mirrors should update the Sitemap URL below to match their host,
-# since robots.txt requires an absolute URL per the sitemaps.org protocol.
-Sitemap: https://ee-twister.github.io/CableTrayRoute/sitemap.xml
+# Canonical public host is cabletrayroute.com (matches the og:image and
+# canonical link tags across the site). Forks or mirrors should update the
+# Sitemap URL below to match their host, since robots.txt requires an
+# absolute URL per the sitemaps.org protocol.
+Sitemap: https://cabletrayroute.com/sitemap.xml

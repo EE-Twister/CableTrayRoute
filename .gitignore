@@ -6,3 +6,9 @@ server_data/
 dist/
 docs/asset-manifest.json
 data/protectiveDevices.mjs
+
+# Local run output — never ship logs, test state, or scratch files on the public site.
+*.log
+tmp/
+test-results/
+.playwright-mcp/

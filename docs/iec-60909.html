@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IEC 60909 Short-Circuit Study — CableTrayRoute</title>
+  <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <nav class="top-nav">
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
+      <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+    <div id="nav-links" class="nav-links">
+      <a href="../index.html">Home</a>
+      <a href="../cableschedule.html">Cable Schedule</a>
+      <a href="../racewayschedule.html">Raceway Schedule</a>
+      <a href="../ductbankroute.html">Ductbank</a>
+      <a href="../cabletrayfill.html">Tray Fill</a>
+      <a href="../conduitfill.html">Conduit Fill</a>
+      <a href="../optimalRoute.html">Optimal Route</a>
+      <a href="index.html" class="active" aria-current="page">Docs</a>
+    </div>
+  </nav>
+  <header class="hero">
+    <h1>IEC 60909 Short-Circuit Study</h1>
+    <p>Equivalent voltage source method per IEC 60909-0:2016.</p>
+  </header>
+<div class="doc-content">
+  <nav id="doc-nav" class="doc-nav"></nav>
+  <main id="main-content" class="doc-main">
+    <p><strong>Page:</strong> <a href="../iec60909.html"><code>iec60909.html</code></a><br>
+    <strong>Module:</strong> <code>analysis/iec60909.mjs</code><br>
+    <strong>Standard:</strong> IEC 60909-0:2016 — Short-circuit currents in three-phase AC systems</p>
+
+    <h2>What IEC 60909 is and when to use it</h2>
+    <p>IEC 60909-0:2016 defines the <em>equivalent voltage source method</em> for calculating short-circuit currents in three-phase AC power systems. It is the international standard used throughout Europe, Asia-Pacific, the Middle East, and any project requiring IEC compliance.</p>
+    <p><strong>Use IEC 60909 when:</strong></p>
+    <ul>
+      <li>The project specification, authority having jurisdiction (AHJ), or client requires IEC standards</li>
+      <li>The installation is in a country that has adopted IEC 60909 (most non-North American markets)</li>
+      <li>You need to compare protective device breaking capacity to the IEC standard fault current quantities (ip, Ib, Ith)</li>
+      <li>The equipment nameplate data is expressed in IEC notation (Icw, Icu, Ics)</li>
+    </ul>
+    <p><strong>Use ANSI/IEEE C37 (the other available method) when:</strong></p>
+    <ul>
+      <li>The project is in North America under NEC/NFPA jurisdiction</li>
+      <li>Equipment is rated to ANSI standards (kA interrupting capacity at a defined X/R ratio)</li>
+    </ul>
+
+    <h2>Voltage factor c (IEC 60909-0:2016 Table 1)</h2>
+    <p>The core of IEC 60909 is the <em>equivalent voltage source</em> c × Un / √3, where c accounts for pre-fault voltage variations and possible transformer tap deviations. Use <strong>c_max</strong> to determine the highest possible fault current (equipment rating checks). Use <strong>c_min</strong> to determine the lowest possible fault current (protection sensitivity checks).</p>
+    <table>
+      <thead><tr><th>Nominal Voltage Un</th><th>c_max</th><th>c_min</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td>LV: 100 V – 1000 V (tolerance ≥ 6 %)</td><td><strong>1.10</strong></td><td>0.95</td><td>Most 230/400 V IEC distribution systems</td></tr>
+        <tr><td>LV: 100 V – 1000 V (tolerance &lt; 6 %)</td><td><strong>1.05</strong></td><td>0.95</td><td>Tightly regulated LV networks</td></tr>
+        <tr><td>MV: &gt; 1 kV – 35 kV</td><td><strong>1.10</strong></td><td>1.00</td><td>Standard medium-voltage distribution</td></tr>
+        <tr><td>HV: &gt; 35 kV</td><td><strong>1.10</strong></td><td>1.00</td><td>Transmission and sub-transmission</td></tr>
+      </tbody>
+    </table>
+    <blockquote><p>The LV tolerance distinction applies only when the system voltage tolerance is specified. If in doubt, use ≥ 6 % (c_max = 1.10) for conservative maximum fault calculations.</p></blockquote>
+
+    <h2>Result quantities</h2>
+    <p>IEC 60909-0:2016 defines four primary short-circuit current quantities. All values are in kA (RMS unless noted).</p>
+
+    <h3>I"k — Initial symmetrical short-circuit current</h3>
+    <p>The RMS value of the AC symmetrical component of the short-circuit current at the instant of the fault. This is the primary quantity; all other quantities are derived from it.</p>
+    <table>
+      <thead><tr><th>Fault type</th><th>Symbol</th><th>Formula</th></tr></thead>
+      <tbody>
+        <tr><td>Three-phase</td><td>I"k3</td><td>c × Un / (√3 × |Z1|)</td></tr>
+        <tr><td>Line-to-line</td><td>I"k2</td><td>(√3/2) × I"k3 ≈ 0.866 × I"k3</td></tr>
+        <tr><td>Line-to-earth</td><td>I"k1</td><td>√3 × c × Un / |2Z1 + Z0|</td></tr>
+        <tr><td>Two-phase-to-earth</td><td>I"k2E</td><td>3 × c × Un / (√3 × |Z1 + Z2||Z0|)</td></tr>
+      </tbody>
+    </table>
+    <p>where Z1, Z2, Z0 are the positive-, negative-, and zero-sequence impedances at the fault point.</p>
+
+    <h3>ip — Peak short-circuit current</h3>
+    <p>The maximum instantaneous value of the short-circuit current, occurring approximately one half-cycle after fault inception. Used for checking mechanical withstand of busbars, cable trays, and equipment supports.</p>
+    <pre><code>ip = κ × √2 × I"k3</code></pre>
+
+    <h3>κ — Peak factor (IEC 60909-0 §4.3.1.1, Equation 14)</h3>
+    <pre><code>κ = 1.02 + 0.98 × e^(−3 × R/X)</code></pre>
+    <table>
+      <thead><tr><th>X/R ratio</th><th>κ</th><th>ip / (√2 × I"k3)</th></tr></thead>
+      <tbody>
+        <tr><td>1 (resistive)</td><td>1.07</td><td>1.07</td></tr>
+        <tr><td>5</td><td>1.37</td><td>1.37</td></tr>
+        <tr><td>10</td><td>1.75</td><td>1.75</td></tr>
+        <tr><td>20</td><td>1.91</td><td>1.91</td></tr>
+        <tr><td>50</td><td>1.99</td><td>1.99</td></tr>
+        <tr><td>∞ (inductive)</td><td>2.00</td><td>2.00</td></tr>
+      </tbody>
+    </table>
+    <blockquote><p><strong>Note:</strong> IEC uses κ = 1.02 + 0.98 × e^(−3/XR), which is different from the ANSI approximation. For the same X/R, IEC's ip is slightly higher than ANSI.</p></blockquote>
+
+    <h3>Ib — Symmetrical short-circuit breaking current</h3>
+    <p>The RMS value of the symmetrical AC component at the time of contact separation in the circuit breaker. Used to verify the <strong>rated symmetrical short-circuit breaking current Ics</strong> of a circuit breaker.</p>
+    <p>For <strong>far-from-generator</strong> short circuits (the most common case in distribution systems without local generators contributing to the fault):</p>
+    <pre><code>Ib = I"k3     (μ = 1.0, no decay of AC component)</code></pre>
+    <p>For near-to-generator faults, μ &lt; 1.0 and Ib &lt; I"k3. Near-to-generator correction is not yet implemented (see Limitations).</p>
+
+    <h3>Ith — Thermal equivalent short-circuit current</h3>
+    <p>The RMS value of an equivalent constant current producing the same thermal effect (I²t) as the actual short-circuit current over the fault duration Tk. Used to check thermal withstand ratings of cables, busbars, and transformers.</p>
+    <pre><code>Ith = I"k3 × √(m + n)</code></pre>
+    <p>where:</p>
+    <ul>
+      <li><strong>n = 1.0</strong> — AC component heating factor (= 1.0 for far-from-generator)</li>
+      <li><strong>m</strong> — DC component heating factor, from IEC 60909-0:2016 Fig. 22 (function of κ and Tk)</li>
+    </ul>
+    <p>The DC heating factor m decreases as fault duration Tk increases (DC component decays faster for short fault durations relative to the AC component). For long fault durations (Tk &gt; 3 s), m → 0 and Ith → I"k3.</p>
+
+    <h2>Step-by-step workflow</h2>
+
+    <h3>Step 1 — Set up your one-line diagram</h3>
+    <p>Open <a href="../oneline.html"><code>oneline.html</code></a> and ensure the following properties are set for each bus:</p>
+    <ul>
+      <li><code>kV</code> — nominal voltage (determines c-factor automatically)</li>
+      <li><code>z1</code>, <code>z2</code>, <code>z0</code> — sequence impedances, OR connect a <code>utility_source</code> / transformer upstream to derive them automatically</li>
+      <li><code>xr_ratio</code> — X/R ratio at the bus; if not set, derived from the impedance angle</li>
+    </ul>
+
+    <h3>Step 2 — Choose the calculation mode</h3>
+    <table>
+      <thead><tr><th>Goal</th><th>Mode</th><th>c used</th></tr></thead>
+      <tbody>
+        <tr><td>Check circuit breaker interrupt ratings</td><td><strong>Maximum (c_max)</strong></td><td>1.10 (MV/HV and LV ≥ 6%)</td></tr>
+        <tr><td>Set protection relay pickup levels</td><td><strong>Minimum (c_min)</strong></td><td>1.00 (MV/HV) or 0.95 (LV)</td></tr>
+        <tr><td>Check busbar and cable thermal ratings</td><td><strong>Maximum (c_max)</strong></td><td>1.10</td></tr>
+        <tr><td>Check mechanical withstand of supports</td><td><strong>Maximum (c_max)</strong></td><td>1.10</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Step 3 — Set the fault duration Tk</h3>
+    <p>Tk is used only to calculate Ith. Set it to the <strong>clearing time</strong> of the primary protection:</p>
+    <table>
+      <thead><tr><th>Protection type</th><th>Typical Tk</th></tr></thead>
+      <tbody>
+        <tr><td>Current-limiting fuse</td><td>0.02 – 0.1 s</td></tr>
+        <tr><td>Molded case circuit breaker (MCCB)</td><td>0.05 – 0.1 s</td></tr>
+        <tr><td>Air circuit breaker (ACB) with instantaneous trip</td><td>0.1 – 0.2 s</td></tr>
+        <tr><td>Relay + circuit breaker (zone protection)</td><td>0.3 – 0.5 s</td></tr>
+        <tr><td>Bus bar / transformer rated withstand</td><td>1.0 – 3.0 s</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Step 4 — Run the study</h3>
+    <p>Click <strong>Run IEC 60909 Study</strong>. Results appear in the table below. The study is also saved as <code>studies.iec60909</code> in the project.</p>
+
+    <h3>Step 5 — Verify protective device ratings</h3>
+    <p>For each bus, confirm:</p>
+    <ul>
+      <li><strong>ip ≤ equipment rated peak withstand current</strong> (Ipk or Icw peak on nameplate)</li>
+      <li><strong>I"k3 ≤ circuit breaker rated symmetrical breaking current (Ics)</strong></li>
+      <li><strong>Ith ≤ cable / busbar thermal withstand</strong> (I²t rating ÷ Tk)</li>
+    </ul>
+
+    <h3>Step 6 — Export</h3>
+    <p>Use <strong>Download PDF</strong> for submittal packages or <strong>Download CSV</strong> for integration with spreadsheet calculations.</p>
+
+    <h2>Integration with other studies</h2>
+    <table>
+      <thead><tr><th>Study</th><th>Relationship</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Arc Flash</strong> (<a href="../arcFlash.html"><code>arcFlash.html</code></a>)</td><td>Uses I"k3 from IEC 60909 as the fault current. Run IEC 60909 first, then arc flash will pick up the saved results automatically.</td></tr>
+        <tr><td><strong>TCC Coordination</strong> (<a href="../tcc.html"><code>tcc.html</code></a>)</td><td>Use Ib (breaking current) to verify the circuit breaker's Ics rating at the coordination point.</td></tr>
+        <tr><td><strong>Short Circuit</strong> (<a href="../shortCircuit.html"><code>shortCircuit.html</code></a>)</td><td>The IEC method is also available in this page by selecting IEC in the method dropdown. The <code>iec60909.html</code> page provides the extended result columns (ip, Ib, Ith).</td></tr>
+        <tr><td><strong>Load Flow</strong> (<a href="../loadFlow.html"><code>loadFlow.html</code></a>)</td><td>Load flow determines pre-fault operating voltages; the IEC method assumes c × Un regardless of actual operating voltage.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Limitations and assumptions</h2>
+    <table>
+      <thead><tr><th>Assumption</th><th>Detail</th></tr></thead>
+      <tbody>
+        <tr><td>Far-from-generator</td><td>Ib = I"k3 (μ = 1.0). For systems with large synchronous generators contributing to the fault, Ib may be lower. Generator impedance correction factor K_G is not applied.</td></tr>
+        <tr><td>Transformer K_T not yet applied</td><td>The standard impedance correction K_T = 0.95 × c_max / (1 + 0.6 × xT) for network transformers (IEC 60909-0 §3.3.3) is defined in <code>analysis/iec60909.mjs</code> as <code>transformerCorrectionKT()</code> but not yet applied in the batch runner.</td></tr>
+        <tr><td>Balanced three-phase system</td><td>No provision for unbalanced pre-fault conditions.</td></tr>
+        <tr><td>Frequency</td><td>m factor computation assumes constant AC frequency (50 or 60 Hz).</td></tr>
+        <tr><td>Motor contributions</td><td>Asynchronous motor back-EMF contributions are not modeled separately; include them as equivalent impedance sources if needed.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Module reference</h2>
+
+    <h3><code>analysis/iec60909.mjs</code> exports</h3>
+    <table>
+      <thead><tr><th>Export</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><code>cFactor(kV, mode, lvTolerancePct)</code></td><td>IEC 60909-0:2016 Table 1 voltage factor c</td></tr>
+        <tr><td><code>kappaIEC(xr)</code></td><td>Peak factor κ = 1.02 + 0.98 × e^(−3/XR) per §4.3.1.1</td></tr>
+        <tr><td><code>thermalMFactor(kappa, faultDurationS, freqHz)</code></td><td>DC heating factor m for Ith calculation per §4.8.1</td></tr>
+        <tr><td><code>transformerCorrectionKT(xTPu, cMax)</code></td><td>Transformer impedance correction K_T per §3.3.3</td></tr>
+        <tr><td><code>computeIEC60909Bus(params)</code></td><td>Single-bus IEC 60909 calculation — returns I"k3, I"k2, I"k1, I"k2E, ip, Ib, Ith, κ, c</td></tr>
+        <tr><td><code>runIEC60909Batch(busData, opts)</code></td><td>Batch IEC 60909 study; called by <code>runShortCircuit()</code> when method=IEC</td></tr>
+      </tbody>
+    </table>
+
+    <h3><code>runShortCircuit()</code> opts for IEC 60909</h3>
+    <p>When calling <code>runShortCircuit(model, opts)</code> with <code>opts.method = 'IEC'</code>, the following additional options are available:</p>
+    <table>
+      <thead><tr><th>Option</th><th>Default</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>opts.cMode</code></td><td><code>'max'</code></td><td><code>'max'</code> for c_max (equipment ratings) or <code>'min'</code> for c_min (protection settings)</td></tr>
+        <tr><td><code>opts.lvTolerancePct</code></td><td><code>10</code></td><td>LV voltage tolerance %; ≥ 6 → c_max = 1.10; &lt; 6 → c_max = 1.05</td></tr>
+        <tr><td><code>opts.faultDurationS</code></td><td><code>1.0</code></td><td>Fault duration Tk in seconds, for Ith calculation</td></tr>
+        <tr><td><code>opts.freqHz</code></td><td><code>50</code></td><td>System frequency in Hz (50 or 60)</td></tr>
+      </tbody>
+    </table>
+
+    <h3>IEC 60909 result fields (additional vs ANSI)</h3>
+    <p>When <code>method === 'IEC'</code>, each bus result object includes:</p>
+    <table>
+      <thead><tr><th>Field</th><th>Unit</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>threePhaseKA</code></td><td>kA</td><td>I"k3 — initial three-phase short-circuit current</td></tr>
+        <tr><td><code>lineToGroundKA</code></td><td>kA</td><td>I"k1 — initial line-to-earth short-circuit current</td></tr>
+        <tr><td><code>lineToLineKA</code></td><td>kA</td><td>I"k2 — initial line-to-line short-circuit current</td></tr>
+        <tr><td><code>doubleLineGroundKA</code></td><td>kA</td><td>I"k2E — initial two-phase-to-earth short-circuit current</td></tr>
+        <tr><td><code>ip</code></td><td>kA</td><td>Peak short-circuit current (= κ × √2 × I"k3)</td></tr>
+        <tr><td><code>Ib</code></td><td>kA</td><td>Symmetrical short-circuit breaking current (= I"k3 for far-from-generator)</td></tr>
+        <tr><td><code>Ith</code></td><td>kA</td><td>Thermal equivalent short-circuit current</td></tr>
+        <tr><td><code>kappa</code></td><td>—</td><td>Peak factor κ</td></tr>
+        <tr><td><code>cFactor</code></td><td>—</td><td>Voltage factor c applied</td></tr>
+        <tr><td><code>asymKA</code></td><td>kA</td><td>Alias for ip (for compatibility with arc flash / TCC consumers)</td></tr>
+      </tbody>
+    </table>
+  </main>
+</div>
+  <footer class="site-footer">
+    <div class="footer-left">
+      <img src="../icons/route.svg" alt="CableTrayRoute logo" class="footer-logo" loading="lazy" decoding="async">
+      <span>CableTrayRoute</span>
+    </div>
+    <nav class="footer-links" aria-label="Footer">
+      <a href="../README.md">README</a>
+      <a href="quickstart.html">Quick Start</a>
+      <a href="index.html">Docs</a>
+      <a href="mailto:contact@example.com">Contact</a>
+    </nav>
+  </footer>
+  <script src="docs.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const toggle = document.getElementById('nav-toggle');
+      const navLinks = document.getElementById(toggle.getAttribute('aria-controls'));
+      function closeMenu() {
+        toggle.setAttribute('aria-expanded', 'false');
+        navLinks.classList.remove('open');
+      }
+      toggle.addEventListener('click', () => {
+        const expanded = toggle.getAttribute('aria-expanded') === 'true';
+        toggle.setAttribute('aria-expanded', String(!expanded));
+        navLinks.classList.toggle('open', !expanded);
+      });
+      document.addEventListener('keydown', e => {
+        if (e.key === 'Escape') closeMenu();
+      });
+    });
+  </script>
+</body>
+</html>

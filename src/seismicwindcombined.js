@@ -2,6 +2,8 @@ import { calcSeismicWindCombined, evaluateTraysCombined } from '../analysis/seis
 import { calcSeismicDesignCategory, maxBraceSpacing } from '../analysis/seismicBracing.mjs';
 import { getTrays, getCables } from '../dataStore.mjs';
 import { CABLE_WEIGHT_LB_FT } from '../analysis/supportSpan.mjs';
+import { initSettings, initDarkMode, initCompactMode, initHelpModal, initNavToggle } from '../site.js';
+import { showAlertModal } from './components/modal.js';
 
 document.addEventListener('DOMContentLoaded', () => {
   initSettings();
@@ -103,35 +105,35 @@ document.addEventListener('DOMContentLoaded', () => {
     const params = readParams();
 
     if (!Number.isFinite(params.sds) || params.sds < 0) {
-      showAlertModal('Enter a valid S\u1D05\u209B value (≥ 0 g).');
+      showAlertModal('Invalid Input', 'Enter a valid S\u1D05\u209B value (≥ 0 g).');
       return;
     }
     if (!Number.isFinite(params.sd1) || params.sd1 < 0) {
-      showAlertModal('Enter a valid S\u1D05\u2081 value (≥ 0 g).');
+      showAlertModal('Invalid Input', 'Enter a valid S\u1D05\u2081 value (≥ 0 g).');
       return;
     }
     if (!Number.isFinite(params.z_ft) || params.z_ft < 0) {
-      showAlertModal('Tray attachment height z must be ≥ 0 ft.');
+      showAlertModal('Invalid Input', 'Tray attachment height z must be ≥ 0 ft.');
       return;
     }
     if (!Number.isFinite(params.h_ft) || params.h_ft <= 0) {
-      showAlertModal('Average roof height h must be a positive number.');
+      showAlertModal('Invalid Input', 'Average roof height h must be a positive number.');
       return;
     }
     if (params.z_ft > params.h_ft) {
-      showAlertModal('Tray attachment height z cannot exceed roof height h.');
+      showAlertModal('Invalid Input', 'Tray attachment height z cannot exceed roof height h.');
       return;
     }
     if (!Number.isFinite(params.wp_lbs_ft) || params.wp_lbs_ft <= 0) {
-      showAlertModal('Enter a positive tray + cable weight per foot (lbs/ft).');
+      showAlertModal('Invalid Input', 'Enter a positive tray + cable weight per foot (lbs/ft).');
       return;
     }
     if (!Number.isFinite(params.spanLength_ft) || params.spanLength_ft <= 0) {
-      showAlertModal('Enter a positive span length (ft).');
+      showAlertModal('Invalid Input', 'Enter a positive span length (ft).');
       return;
     }
     if (!Number.isFinite(params.trayWidth_in) || params.trayWidth_in <= 0) {
-      showAlertModal('Enter a positive tray width (in).');
+      showAlertModal('Invalid Input', 'Enter a positive tray width (in).');
       return;
     }
 
@@ -139,7 +141,7 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       result = calcSeismicWindCombined(params);
     } catch (err) {
-      showAlertModal(`Calculation error: ${err.message}`);
+      showAlertModal('Calculation Error', `Calculation error: ${err.message}`);
       return;
     }
 
@@ -279,22 +281,22 @@ LC-S1 horizontal = 1.0 × ${s.lateralForce.toFixed(2)} = ${r.combinations.LC_S1.
     const cables = getCables();
 
     if (!trays.length) {
-      showAlertModal('No trays found in the Raceway Schedule. Please add trays first.');
+      showAlertModal('Invalid Input', 'No trays found in the Raceway Schedule. Please add trays first.');
       return;
     }
 
     const siteParams = readParams();
 
     if (!Number.isFinite(siteParams.sds) || !Number.isFinite(siteParams.sd1)) {
-      showAlertModal('Please fill in valid S\u1D05\u209B and S\u1D05\u2081 values.');
+      showAlertModal('Invalid Input', 'Please fill in valid S\u1D05\u209B and S\u1D05\u2081 values.');
       return;
     }
     if (!Number.isFinite(siteParams.z_ft) || !Number.isFinite(siteParams.h_ft) || siteParams.h_ft <= 0) {
-      showAlertModal('Please fill in valid height parameters.');
+      showAlertModal('Invalid Input', 'Please fill in valid height parameters.');
       return;
     }
     if (siteParams.z_ft > siteParams.h_ft) {
-      showAlertModal('Tray attachment height z cannot exceed roof height h.');
+      showAlertModal('Invalid Input', 'Tray attachment height z cannot exceed roof height h.');
       return;
     }
 
@@ -327,7 +329,7 @@ LC-S1 horizontal = 1.0 × ${s.lateralForce.toFixed(2)} = ${r.combinations.LC_S1.
     try {
       rows = evaluateTraysCombined(trayEntries, siteParams);
     } catch (err) {
-      showAlertModal(`Calculation error: ${err.message}`);
+      showAlertModal('Calculation Error', `Calculation error: ${err.message}`);
       return;
     }
 

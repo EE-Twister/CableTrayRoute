@@ -2,6 +2,7 @@ import { buildTrayHardwareBOM, enrichTrayBOMWithQR } from '../analysis/trayHardw
 import { getTrays } from '../dataStore.mjs';
 import { showAlertModal } from './components/modal.js';
 import { mountCatalogBrowser } from './catalogBrowser.js';
+import { initSettings, initDarkMode, initCompactMode, initHelpModal, initNavToggle } from '../site.js';
 
 document.addEventListener('DOMContentLoaded', () => {
   initSettings();
