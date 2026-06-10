@@ -319,23 +319,23 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 
 **Detected Reads**
 - `cableSchedule`
-  - oneline.js:13393 getCables()
-  - oneline.js:15307 getCables()
-  - oneline.js:18501 getCables()
+  - oneline.js:13432 getCables()
+  - oneline.js:15346 getCables()
+  - oneline.js:18598 getCables()
   - oneline.js:4180 getCables()
   - oneline.js:4297 getCables()
   - ... 2 more
 - `equipment`
-  - oneline.js:13369 getEquipment()
-  - oneline.js:18498 getEquipment()
+  - oneline.js:13408 getEquipment()
+  - oneline.js:18595 getEquipment()
   - oneline.js:4181 getEquipment()
-  - oneline.js:8798 getEquipment()
+  - oneline.js:8836 getEquipment()
   - reports/exportAll.mjs:293 getEquipment()
 - `loadList`
-  - oneline.js:13377 getLoads()
-  - oneline.js:18500 getLoads()
+  - oneline.js:13416 getLoads()
+  - oneline.js:18597 getLoads()
   - oneline.js:4178 getLoads()
-  - oneline.js:8799 getLoads()
+  - oneline.js:8837 getLoads()
 - `oneLineDiagram`
   - analysis/arcFlash.mjs:397 getOneLine()
   - analysis/harmonics.js:185 getOneLine()
@@ -344,31 +344,31 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
   - analysis/motorStart.js:82 getOneLine()
   - ... 12 more
 - `panelSchedule`
-  - oneline.js:13385 getPanels()
-  - oneline.js:18499 getPanels()
+  - oneline.js:13424 getPanels()
+  - oneline.js:18596 getPanels()
   - oneline.js:4179 getPanels()
   - reports/exportAll.mjs:294 getPanels()
 - `settings.diagramDatablockConfig`
-  - oneline.js:17796 getItem(diagramDatablockConfig)
+  - oneline.js:17893 getItem(diagramDatablockConfig)
 - `settings.diagramScale`
   - oneline.js:3276 getItem(diagramScale)
 - `settings.diagramTitleBlock`
-  - oneline.js:17743 getItem(diagramTitleBlock)
+  - oneline.js:17840 getItem(diagramTitleBlock)
 - `settings.diagramZoom`
   - oneline.js:3297 getItem(diagramZoom)
 - `settings.gistToken`
-  - oneline.js:18743 getItem(gistToken)
+  - oneline.js:18838 getItem(gistToken)
 - `settings.gridEnabled`
   - oneline.js:3326 getItem(gridEnabled)
 - `settings.gridSize`
   - oneline.js:3325 getItem(gridSize)
 - `settings.labelCounters`
-  - oneline.js:16110 getItem(labelCounters)
+  - oneline.js:16149 getItem(labelCounters)
   - oneline.js:5250 getItem(labelCounters)
 - `settings.labelPrefixes`
   - oneline.js:5249 getItem(labelPrefixes)
 - `settings.layersPanelOpen`
-  - oneline.js:16196 getItem(layersPanelOpen)
+  - oneline.js:16235 getItem(layersPanelOpen)
 - `settings.manufacturerDefaults`
   - oneline.js:2641 getItem(manufacturerDefaults)
 - `settings.oneLineDiagramFilterMode`
@@ -376,21 +376,21 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 - `settings.oneLineScheduleReconcilePending`
   - oneline.js:3363 getItem(oneLineScheduleReconcilePending)
 - `settings.onelineTemplates`
-  - oneline.js:6261 migrateLegacyItem(..., onelineTemplates)
+  - oneline.js:6299 migrateLegacyItem(..., onelineTemplates)
 - `settings.orthogonalRouting`
-  - oneline.js:17720 getItem(orthogonalRouting)
+  - oneline.js:17817 getItem(orthogonalRouting)
 - `settings.studySettings`
   - oneline.js:3321 getItem(studySettings)
 - `settings.symbolStandard`
-  - oneline.js:17729 getItem(symbolStandard)
+  - oneline.js:17826 getItem(symbolStandard)
 - `settings.tccSettings`
   - analysis/arcFlash.mjs:330 getItem(tccSettings)
   - analysis/shortCircuit.mjs:496 getItem(tccSettings)
 - `studyResults`
   - analysis/harmonics.js:420 getStudies()
   - analysis/motorStart.js:209 getStudies()
-  - oneline.js:18070 getStudies()
-  - oneline.js:18717 getStudies()
+  - oneline.js:18167 getStudies()
+  - oneline.js:18814 getStudies()
   - oneline.js:3381 getStudies()
   - ... 12 more
 - `studyResults.arcFlash`
@@ -406,70 +406,70 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 
 **Detected Writes**
 - `cableSchedule`
-  - oneline.js:18517 setCables()
+  - oneline.js:18614 setCables()
   - oneline.js:4199 setCables()
   - oneline.js:4307 setCables()
 - `conduitSchedule`
-  - oneline.js:8707 addRaceway()
-  - oneline.js:9224 addRaceway()
+  - oneline.js:8745 addRaceway()
+  - oneline.js:9262 addRaceway()
 - `equipment`
-  - oneline.js:18514 setEquipment()
+  - oneline.js:18611 setEquipment()
   - oneline.js:4201 setEquipment()
 - `loadList`
-  - oneline.js:18516 setLoads()
+  - oneline.js:18613 setLoads()
   - oneline.js:4195 setLoads()
 - `oneLineDiagram`
-  - oneline.js:11768 setOneLine()
-  - oneline.js:11960 setOneLine()
+  - oneline.js:11806 setOneLine()
+  - oneline.js:11999 setOneLine()
   - oneline.js:5021 setOneLine()
   - oneline.js:5058 setOneLine()
   - oneline.js:5078 setOneLine()
 - `panelSchedule`
-  - oneline.js:18515 setPanels()
+  - oneline.js:18612 setPanels()
   - oneline.js:4197 setPanels()
 - `settings.diagramDatablockConfig`
-  - oneline.js:11698 setItem(diagramDatablockConfig)
+  - oneline.js:11736 setItem(diagramDatablockConfig)
 - `settings.diagramScale`
-  - oneline.js:11961 setItem(diagramScale)
-  - oneline.js:18852 setItem(diagramScale)
+  - oneline.js:12000 setItem(diagramScale)
+  - oneline.js:18949 setItem(diagramScale)
 - `settings.diagramTitleBlock`
-  - oneline.js:17778 setItem(diagramTitleBlock)
+  - oneline.js:17875 setItem(diagramTitleBlock)
 - `settings.diagramZoom`
   - oneline.js:3801 setItem(diagramZoom)
   - oneline.js:3839 setItem(diagramZoom)
   - oneline.js:3925 setItem(diagramZoom)
   - oneline.js:3963 setItem(diagramZoom)
 - `settings.gistToken`
-  - oneline.js:18745 setItem(gistToken)
+  - oneline.js:18842 setItem(gistToken)
 - `settings.gridEnabled`
-  - oneline.js:11016 setItem(gridEnabled)
+  - oneline.js:11054 setItem(gridEnabled)
 - `settings.gridSize`
-  - oneline.js:16487 setItem(gridSize)
+  - oneline.js:16537 setItem(gridSize)
 - `settings.labelCounters`
-  - oneline.js:16122 setItem(labelCounters)
+  - oneline.js:16161 setItem(labelCounters)
   - oneline.js:5259 setItem(labelCounters)
 - `settings.labelPrefixes`
   - oneline.js:5445 setItem(labelPrefixes)
 - `settings.layersPanelOpen`
-  - oneline.js:16202 setItem(layersPanelOpen)
-  - oneline.js:16209 setItem(layersPanelOpen)
+  - oneline.js:16241 setItem(layersPanelOpen)
+  - oneline.js:16248 setItem(layersPanelOpen)
 - `settings.manufacturerDefaults`
   - oneline.js:5514 setItem(manufacturerDefaults)
 - `settings.oneLineDiagramFilterMode`
-  - oneline.js:16498 setItem(oneLineDiagramFilterMode)
+  - oneline.js:16548 setItem(oneLineDiagramFilterMode)
 - `settings.oneLineScheduleReconcilePending`
-  - oneline.js:18346 setItem(oneLineScheduleReconcilePending)
+  - oneline.js:18443 setItem(oneLineScheduleReconcilePending)
 - `settings.onelineTemplates`
-  - oneline.js:6261 migrateLegacyItem(..., onelineTemplates)
-  - oneline.js:6269 setItem(onelineTemplates)
+  - oneline.js:6299 migrateLegacyItem(..., onelineTemplates)
+  - oneline.js:6307 setItem(onelineTemplates)
 - `settings.orthogonalRouting`
-  - oneline.js:17713 setItem(orthogonalRouting)
+  - oneline.js:17810 setItem(orthogonalRouting)
 - `settings.scenarios`
-  - oneline.js:18848 switchScenario()
+  - oneline.js:18945 switchScenario()
 - `settings.studySettings`
   - oneline.js:3418 setItem(studySettings)
 - `settings.symbolStandard`
-  - oneline.js:17733 setItem(symbolStandard)
+  - oneline.js:17830 setItem(symbolStandard)
 - `studyResults`
   - analysis/harmonics.js:423 setStudies()
   - analysis/motorStart.js:212 setStudies()
@@ -495,8 +495,8 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
   - oneline.js:5060 studies.shortCircuit
   - oneline.js:5080 studies.shortCircuit
 - `traySchedule`
-  - oneline.js:8707 addRaceway()
-  - oneline.js:9224 addRaceway()
+  - oneline.js:8745 addRaceway()
+  - oneline.js:9262 addRaceway()
 
 ### Demand Schedule (`demandschedule.html`)
 
