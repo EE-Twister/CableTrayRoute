@@ -41,6 +41,7 @@
   <url><loc>https://cabletrayroute.com/docs/cable_fill_rules.html</loc><priority>0.5</priority></url>
   <url><loc>https://cabletrayroute.com/docs/routing_assumptions.html</loc><priority>0.5</priority></url>
   <url><loc>https://cabletrayroute.com/docs/standards.html</loc><priority>0.5</priority></url>
+  <url><loc>https://cabletrayroute.com/docs/iec-60909.html</loc><priority>0.5</priority></url>
   <url><loc>https://cabletrayroute.com/docs/geometry-fields.html</loc><priority>0.4</priority></url>
   <url><loc>https://cabletrayroute.com/docs/load_calculation_formulas.html</loc><priority>0.4</priority></url>
   <url><loc>https://cabletrayroute.com/docs/troubleshooting.html</loc><priority>0.4</priority></url>
