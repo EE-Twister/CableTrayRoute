@@ -1013,16 +1013,61 @@ export function getAuthRole() {
 }
 
 export function readAppSetting(key) {
-  return readRawStorage(key);
+  const value = readRawStorage(key);
+  if (value !== null && value !== undefined) return value;
+  // Some cross-page payloads (e.g. per-scenario routeCache entries) are written
+  // to sessionStorage by the routing flow. Fall back to it so callers do not
+  // have to reach into storage globals directly.
+  const session = getSessionStorage();
+  if (session) {
+    const sessionValue = safeGet(session, key);
+    if (sessionValue !== null && sessionValue !== undefined) return sessionValue;
+  }
+  return value;
 }
 
 export function writeAppSetting(key, value) {
   writeRawStorage(key, value);
 }
 
+// Enumerate the full keys (optionally limited to those starting with `prefix`)
+// that are visible to readAppSetting — across session, local, and in-memory
+// storage. Session keys are listed first so callers that prefer the live tab's
+// values encounter them ahead of persisted localStorage entries. Duplicate keys
+// present in more than one storage are returned once.
+export function listAppSettingKeys(prefix = '') {
+  const wanted = typeof prefix === 'string' ? prefix : String(prefix ?? '');
+  const keys = new Set();
+  const collect = storage => {
+    if (!storage) return;
+    try {
+      for (let i = 0; i < storage.length; i++) {
+        const key = storage.key(i);
+        if (key && key.startsWith(wanted)) keys.add(key);
+      }
+    } catch (e) {
+      console.warn('app setting enumerate failed', e);
+    }
+  };
+  collect(getSessionStorage());
+  collect(getStorage());
+  for (const key of memoryStorage.keys()) {
+    if (key.startsWith(wanted)) keys.add(key);
+  }
+  return [...keys];
+}
+
 function getStorage() {
   try {
     return typeof localStorage !== 'undefined' ? localStorage : null;
+  } catch {
+    return null;
+  }
+}
+
+function getSessionStorage() {
+  try {
+    return typeof sessionStorage !== 'undefined' ? sessionStorage : null;
   } catch {
     return null;
   }
@@ -1612,6 +1657,9 @@ const api = {
   updateSessionPreferences,
   getThemePreference,
   setThemePreference,
+  readAppSetting,
+  writeAppSetting,
+  listAppSettingKeys,
   getConduitCache,
   setConduitCache,
   clearConduitCache,
