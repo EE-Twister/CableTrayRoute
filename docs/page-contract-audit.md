@@ -992,7 +992,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 - `settings.trayHardwareCatalogCustomProducts`
   - src/catalogBrowser.js:41 getTrayHardwareCatalogCustomProducts()
 - `traySchedule`
-  - src/trayhardwarebom.js:36 getTrays()
+  - src/trayhardwarebom.js:37 getTrays()
 
 **Detected Writes**
 - `settings.trayHardwareCatalogCustomProducts`
@@ -1263,9 +1263,9 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 
 **Detected Reads**
 - `cableSchedule`
-  - src/seismicwindcombined.js:279 getCables()
+  - src/seismicwindcombined.js:281 getCables()
 - `traySchedule`
-  - src/seismicwindcombined.js:278 getTrays()
+  - src/seismicwindcombined.js:280 getTrays()
 
 **Detected Writes**
 - None
@@ -1423,7 +1423,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 
 **Detected Reads**
 - `cableSchedule`
-  - procurementschedule.js:149 getCables()
+  - procurementschedule.js:147 getCables()
 
 **Detected Writes**
 - None

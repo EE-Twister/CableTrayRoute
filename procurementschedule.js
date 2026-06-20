@@ -1,5 +1,6 @@
 import { calculateProcurement, exportProcurementCSV, STANDARD_REEL_SIZES } from './analysis/cableProcurement.mjs';
 import { getCables } from './dataStore.mjs';
+import { listAppSettingKeys, readAppSetting } from './projectStorage.js';
 
 document.addEventListener('DOMContentLoaded', () => {
   initSettings();
@@ -38,20 +39,17 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function loadRouteResults() {
-    // Check sessionStorage first, then localStorage — same pattern as pullcards.js
-    // TODO(Phase 4): expose a listAppSettingKeys(prefix) helper from projectStorage.js
-    // eslint-disable-next-line no-restricted-globals
-    for (const storage of [sessionStorage, localStorage]) {
-      for (const key of Object.keys(storage)) {
-        if (key.endsWith('routeCache') || key.includes('routeCache')) {
-          try {
-            const cached = JSON.parse(storage.getItem(key));
-            if (cached && Array.isArray(cached.batchResults) && cached.batchResults.length > 0) {
-              return cached.batchResults;
-            }
-          } catch { /* skip malformed entries */ }
+    // Route caches are written per-scenario (e.g. "base:routeCache") and may
+    // live in either session or local storage; listAppSettingKeys enumerates
+    // both (session first), so we no longer reach into storage globals directly.
+    for (const key of listAppSettingKeys()) {
+      if (!key.includes('routeCache')) continue;
+      try {
+        const cached = JSON.parse(readAppSetting(key));
+        if (cached && Array.isArray(cached.batchResults) && cached.batchResults.length > 0) {
+          return cached.batchResults;
         }
-      }
+      } catch { /* skip malformed entries */ }
     }
     return null;
   }
