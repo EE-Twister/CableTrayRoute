@@ -896,6 +896,7 @@ async function initCableSchedule() {
 
   const initTableSearch = () => {
     const searchInput = document.getElementById('table-search');
+    const searchStatus = document.getElementById('cable-search-status');
     if (!searchInput || !tableInstance || typeof tableInstance.setCustomFilter !== 'function') return;
     const getRowMatchesTerm = (tr, term) => {
       if (!tr || !tableInstance || !Array.isArray(tableInstance.columns)) return false;
@@ -917,16 +918,55 @@ async function initCableSchedule() {
       });
     };
 
+    const updateSearchStatus = term => {
+      if (!searchStatus) return;
+      const rows = tableInstance.tbody ? Array.from(tableInstance.tbody.rows) : [];
+      const total = rows.length;
+      if (!term || !total) {
+        searchStatus.hidden = true;
+        searchStatus.textContent = '';
+        searchStatus.classList.remove('is-empty');
+        return;
+      }
+      const shown = rows.filter(tr => tr.style.display !== 'none').length;
+      searchStatus.hidden = false;
+      if (shown === 0) {
+        searchStatus.textContent = `No cables match “${searchInput.value.trim()}”.`;
+        searchStatus.classList.add('is-empty');
+      } else {
+        searchStatus.textContent = `Showing ${shown} of ${total} cable${total === 1 ? '' : 's'}.`;
+        searchStatus.classList.remove('is-empty');
+      }
+    };
+
     const applySearch = () => {
       const term = searchInput.value.trim().toLowerCase();
       if (!term) {
         tableInstance.setCustomFilter('table-search', null);
+        updateSearchStatus(term);
         return;
       }
       tableInstance.setCustomFilter('table-search', tr => getRowMatchesTerm(tr, term));
+      updateSearchStatus(term);
     };
     searchInput.addEventListener('input', applySearch);
     applySearch();
+  };
+
+  // Show a friendly empty-state prompt when the schedule has no cables. The
+  // prompt lives outside <tbody> so row-count assertions stay accurate, and the
+  // table itself stays in the DOM so its header keeps documenting the columns.
+  const initEmptyState = tbl => {
+    const emptyState = document.getElementById('cable-empty-state');
+    if (!emptyState || !tbl || !tbl.tbody) return;
+    const sync = () => {
+      emptyState.hidden = tbl.tbody.rows.length > 0;
+    };
+    const delegate = id => () => document.getElementById(id)?.click();
+    document.getElementById('empty-add-cable-btn')?.addEventListener('click', delegate('add-row-btn'));
+    document.getElementById('empty-load-sample-btn')?.addEventListener('click', delegate('load-sample-cables-btn'));
+    new MutationObserver(sync).observe(tbl.tbody, { childList: true });
+    sync();
   };
 
   const buildGroupMapForColumns = cols => {
@@ -2441,6 +2481,7 @@ async function initCableSchedule() {
   decorateCableCrossProbeActions(table);
   window.cableScheduleTable = table;
   initTableSearch();
+  initEmptyState(table);
   validateAllRows();
 
   const pendingEditedTags = new Set();
