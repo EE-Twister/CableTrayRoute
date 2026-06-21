@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Overhead Conductor Sag-Tension — catenary/parabolic geometry, ruling-span averaging, NESC ice/wind loading, thermal change-of-state, and a contractor stringing table per IEEE 524." />
+  <title>Conductor Sag-Tension — CableTrayRoute</title>
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/favicon.svg">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Conductor Sag-Tension — CableTrayRoute">
+  <meta property="og:description" content="Overhead-line sag-tension: catenary geometry, ruling span, NESC ice/wind loading, change-of-state, and a stringing table.">
+  <meta property="og:image" content="https://cabletrayroute.com/icons/og-preview.png">
+  <meta property="og:site_name" content="CableTrayRoute">
+  <meta property="og:url" content="sagtension.html">
+  <link rel="canonical" href="https://cabletrayroute.com/sagtension.html">
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+  <meta name="color-scheme" content="light dark">
+  <link rel="stylesheet" href="style.css" />
+  <script type="module" src="dirtyTracker.js"></script>
+  <script type="module" src="dist/sagtension.js" defer></script>
+</head>
+<body class="sagtension-page" data-report-title="Conductor Sag-Tension">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <nav class="top-nav" aria-label="Primary">
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
+      <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+    <div id="nav-links" class="nav-links" role="list">
+      <!-- Populated dynamically by navigation.js -->
+    </div>
+    <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+  </nav>
+
+  <div id="settings-menu" class="settings-menu">
+    <label for="theme-select">Theme
+      <select id="theme-select">
+        <option value="system">System</option>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+        <option value="high-contrast">High Contrast</option>
+      </select>
+    </label>
+    <label><input type="checkbox" id="compact-toggle" aria-label="Enable compact table mode"> Compact Mode</label>
+    <button id="help-btn" class="btn" aria-expanded="false" title="Show help">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Site Help</span>
+    </button>
+    <button id="new-project-btn" title="Start a new project">
+      <img src="icons/toolbar/copy.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>New Project</span>
+    </button>
+    <button id="save-project-btn" title="Save current project">
+      <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Save Project</span>
+    </button>
+    <button id="load-project-btn" title="Load an existing project">
+      <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Load Project</span>
+    </button>
+    <button id="export-project-btn" title="Export project data">
+      <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Export Project</span>
+    </button>
+    <button id="import-project-btn" title="Import project data">
+      <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Import Project</span>
+    </button>
+    <input type="file" id="import-project-input" accept=".ctr.json" class="hidden" title="Select project file">
+  </div>
+
+  <div class="container">
+    <main id="main-content" class="main-content">
+      <header class="page-header">
+        <h1>Overhead Conductor Sag-Tension</h1>
+      </header>
+
+      <details class="method-panel">
+        <summary>Method &amp; Assumptions</summary>
+        <p>This study computes the sag and tension of an overhead conductor across a line section using the ruling-span method, NESC loading districts, and the elastic/thermal change-of-state equation. It produces a contractor stringing table for the bare conductor over a temperature range.</p>
+        <p><strong>Geometry:</strong></p>
+        <pre>Ruling span  RS = √(Σ Sᵢ³ / Σ Sᵢ)
+Parabolic sag D = w·S² / (8·H)
+Catenary sag  D = (H/w)·(cosh(w·S / 2H) − 1)</pre>
+        <p><strong>NESC loading (IEEE C2 §250):</strong> radial ice (57 lb/ft³) plus transverse wind pressure combine into a resultant unit load, with a district constant added: Heavy (0.50 in ice, 4 psf, K=0.30, 0 °F), Medium (0.25 in, 4 psf, K=0.20, 15 °F), Light (0 in, 9 psf, K=0.05, 30 °F).</p>
+        <p><strong>Change of state</strong> relates the horizontal tension at two conditions:</p>
+        <pre>H₂²·[H₂ − H₁ + αEA(t₂−t₁) + EA·w₁²S²/24H₁²] = EA·w₂²S²/24</pre>
+        <p>The design (limiting) tension is set as a percentage of the conductor's rated strength (UTS) at the selected loading district, and the stringing table is back-calculated for the bare conductor at each installation temperature.</p>
+        <p><strong>References:</strong> IEEE Std 524; NESC (IEEE C2) §250; ASCE Manual 74.</p>
+      </details>
+
+      <form id="st-form" novalidate>
+
+        <fieldset>
+          <legend><strong>Conductor</strong></legend>
+          <div class="field-row">
+            <label for="conductor">Conductor</label>
+            <select id="conductor" aria-describedby="conductor-hint"></select>
+            <p id="conductor-hint" class="field-hint">Representative library values — verify against the manufacturer datasheet for final design.</p>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend><strong>Span Geometry</strong></legend>
+          <div class="field-row">
+            <label for="spans">Spans</label>
+            <input type="text" id="spans" value="500, 600, 550" placeholder="comma-separated, ft" required aria-describedby="spans-hint">
+            <span class="field-unit">ft</span>
+            <p id="spans-hint" class="field-hint">Enter each span length in the section. The ruling span is computed automatically. For a single span, enter one value.</p>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend><strong>Design Condition</strong></legend>
+          <div class="field-row">
+            <label for="district">NESC loading district</label>
+            <select id="district">
+              <option value="heavy" selected>Heavy (0.50 in ice, 4 psf, 0 °F)</option>
+              <option value="medium">Medium (0.25 in ice, 4 psf, 15 °F)</option>
+              <option value="light">Light (no ice, 9 psf, 30 °F)</option>
+            </select>
+          </div>
+          <div class="field-row">
+            <label for="design-pct">Design tension</label>
+            <input type="number" id="design-pct" min="1" max="99" step="any" value="33.3" required aria-describedby="design-hint">
+            <span class="field-unit">% UTS</span>
+            <p id="design-hint" class="field-hint">Maximum tension as a percentage of rated strength at the loaded condition (NESC final tension limit is typically 60% loaded / 35% unloaded).</p>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend><strong>Stringing Temperature Range</strong></legend>
+          <div class="field-row">
+            <label for="temp-min">Min</label>
+            <input type="number" id="temp-min" step="any" value="0">
+            <span class="field-unit">°F</span>
+            <label for="temp-max">Max</label>
+            <input type="number" id="temp-max" step="any" value="120">
+            <span class="field-unit">°F</span>
+            <label for="temp-step">Step</label>
+            <input type="number" id="temp-step" min="1" step="any" value="20">
+            <span class="field-unit">°F</span>
+          </div>
+        </fieldset>
+
+        <div class="form-actions">
+          <button type="submit" id="run-btn" class="btn btn-primary">Run Sag-Tension</button>
+          <button type="button" id="export-csv-btn" class="btn" hidden>Export Results (CSV)</button>
+        </div>
+      </form>
+
+      <div id="calc-errors" class="result-fail" hidden aria-live="polite"></div>
+
+      <div id="results" aria-live="polite"></div>
+
+      <section class="card">
+        <div id="study-basis-panel"></div>
+      </section>
+
+      <section class="card">
+        <div id="study-approval-panel"></div>
+      </section>
+
+      <nav class="step-nav" aria-label="Workflow navigation">
+        <a href="windload.html" class="step-nav-prev">← Wind Load</a>
+        <a href="supportspan.html" class="step-nav-next">Support Span →</a>
+      </nav>
+
+    </main>
+  </div>
+
+  <div id="help-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="help-modal-title" hidden>
+    <div class="modal-content">
+      <button id="close-help-btn" class="modal-close" aria-label="Close help">×</button>
+      <h2 id="help-modal-title">Conductor Sag-Tension Help</h2>
+      <p>This study sizes the sag and tension of overhead conductors for substation yard tie-ins, distribution getaways, and short transmission sections.</p>
+      <h3>When to use</h3>
+      <ul>
+        <li>Substation yard bus and shield-wire stringing.</li>
+        <li>Overhead distribution getaways and yard lighting tie-ins.</li>
+        <li>Ground-clearance checks under maximum-sag (hot or iced) conditions.</li>
+        <li>Producing a contractor stringing table at the day's installation temperature.</li>
+      </ul>
+      <h3>Inputs</h3>
+      <ul>
+        <li><strong>Conductor</strong> — select an ACSR/AAC/AAAC from the library; values are representative and should be confirmed against the datasheet.</li>
+        <li><strong>Spans</strong> — list every span in the section; the ruling span (the tension-governing equivalent span) is computed for you.</li>
+        <li><strong>NESC district</strong> — the ice/wind/temperature loading case used to set the limiting tension.</li>
+        <li><strong>Design tension</strong> — the maximum tension as a percentage of rated strength (UTS).</li>
+      </ul>
+      <h3>Interpreting results</h3>
+      <ul>
+        <li><strong>Design sag</strong> — the sag at the loaded design condition; use it for clearance checks.</li>
+        <li><strong>Loading cases</strong> — tension and sag at each NESC district, with the percentage of UTS used.</li>
+        <li><strong>Stringing table</strong> — the bare-conductor horizontal tension and sag at each installation temperature, for the line crew.</li>
+      </ul>
+      <h3>Limitations</h3>
+      <ul>
+        <li>Level spans and final-modulus behaviour (no separate initial/creep curve).</li>
+        <li>No galloping, aeolian vibration, or inclined-span correction.</li>
+        <li>Screening-level — verify against a manufacturer sag-tension chart before construction.</li>
+      </ul>
+    </div>
+  </div>
+
+  <footer class="site-footer">
+    <div class="footer-left">
+      <img src="icons/route.svg" alt="CableTrayRoute logo" class="footer-logo" loading="lazy" decoding="async">
+      <span>CableTrayRoute</span>
+    </div>
+    <nav class="footer-links" aria-label="Footer">
+      <a href="docs/index.html">Docs</a>
+      <a href="docs/quickstart.html">Quick Start</a>
+      <a href="index.html">Home</a>
+    </nav>
+  </footer>
+
+</body>
+</html>

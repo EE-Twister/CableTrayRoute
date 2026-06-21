@@ -8,7 +8,7 @@ This document defines handoff-level inputs, outputs, readiness rules, and downst
 
 Standard readiness vocabulary: Ready, Missing inputs, Downstream handoff.
 
-Coverage: 74 contracts for 74 navigation routes.
+Coverage: 75 contracts for 75 navigation routes.
 
 ## Workflow
 
@@ -2294,6 +2294,36 @@ Coverage: 74 contracts for 74 navigation routes.
 **Readiness**
 - Ready when: Ready when a connected model and at least one contingency case are available.
 - Blockers: No connected model, no outage candidates, or missing base operating point.
+
+**Downstream Pages**
+- `projectreport.html`
+
+**Notes**
+- None.
+
+### Structural
+
+#### Conductor Sag-Tension (`sagtension.html`)
+
+- Section: Studies
+- Group: Structural
+- Workflow step: studies
+
+**Standalone Inputs**
+- Conductor selection, span lengths, NESC loading district, design tension % UTS, and stringing temperature range.
+
+**Project Inputs**
+- `settings.designBasis` (setting, optional): Project code basis, sizing defaults, routing defaults, and study prerequisites.
+- `settings.studyApprovals` (setting, optional): Engineer review records for study outputs.
+
+**Outputs**
+- `studyResults.sagTension` (study-result): Saved ruling span, design sag-tension, loading cases, and stringing table. Consumers: `projectreport.html`.
+- `settings.studyApprovals` (setting): Engineer approval records written by the shared study approval panel. Consumers: `projectreport.html`.
+- `export-only` (export): Sag-tension loading cases and stringing-table CSV exports. Consumers: `projectreport.html`.
+
+**Readiness**
+- Ready when: Ready when a conductor and at least one span are entered.
+- Blockers: No conductor selected or no valid span lengths.
 
 **Downstream Pages**
 - `projectreport.html`

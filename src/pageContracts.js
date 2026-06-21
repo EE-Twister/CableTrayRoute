@@ -755,6 +755,18 @@ export const PAGE_CONTRACTS_BY_HREF = {
     readiness: ready('Ready when a base model and valid input distributions are available.', ['Missing base load-flow context or invalid distribution/sampling inputs.']),
     downstream: ['projectreport.html']
   }),
+  'sagtension.html': contract({
+    workflowStep: 'studies',
+    standaloneInputs: ['Conductor selection, span lengths, NESC loading district, design tension % UTS, and stringing temperature range.'],
+    projectInputs: [designBasis, approvals],
+    outputs: [
+      output('studyResults.sagTension', 'study-result', 'Saved ruling span, design sag-tension, loading cases, and stringing table.', ['projectreport.html']),
+      studyApprovalOutput,
+      exportOnly('Sag-tension loading cases and stringing-table CSV exports.', ['projectreport.html'])
+    ],
+    readiness: ready('Ready when a conductor and at least one span are entered.', ['No conductor selected or no valid span lengths.']),
+    downstream: ['projectreport.html']
+  }),
   'voltagestability.html': contract({
     workflowStep: 'studies',
     standaloneInputs: ['PV/QV curve inputs, selected bus, load scaling, and solver settings.'],

@@ -56,6 +56,7 @@ export const NAV_ROUTES = [
   { href: 'quasidynamic.html', label: 'Quasi-Dynamic Load Flow', section: 'Studies', group: 'Power System', icon: 'icons/load.svg' },
   { href: 'optimalpowerflow.html', label: 'Optimal Power Flow / Economic Dispatch', section: 'Studies', group: 'Power System', icon: 'icons/load.svg' },
   { href: 'probabilisticloadflow.html', label: 'Probabilistic / Monte Carlo Load Flow', section: 'Studies', group: 'Power System', icon: 'icons/load.svg' },
+  { href: 'sagtension.html', label: 'Conductor Sag-Tension', section: 'Studies', group: 'Structural', icon: 'icons/toolbar/validate.svg' },
   { href: 'voltagestability.html', label: 'Voltage Stability', section: 'Studies', group: 'Power System', icon: 'icons/toolbar/validate.svg' },
   { href: 'shortCircuit.html', label: 'Short Circuit', section: 'Studies', group: 'Protection', icon: 'icons/components/Breaker.svg' },
   { href: 'iec60909.html', label: 'IEC 60909 Short-Circuit', section: 'Studies', group: 'Protection', icon: 'icons/components/Breaker.svg' },

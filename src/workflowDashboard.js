@@ -44,6 +44,7 @@ const STUDY_DEFINITIONS = [
   { key: 'cableThermalEnvironment', label: 'Cable Thermal Environment', href: 'cablethermalenv.html' },
   { key: 'optimalPowerFlow', label: 'Optimal Power Flow', href: 'optimalpowerflow.html' },
   { key: 'probabilisticLoadFlow', label: 'Probabilistic Load Flow', href: 'probabilisticloadflow.html' },
+  { key: 'sagTension', label: 'Conductor Sag-Tension', href: 'sagtension.html' },
   { key: 'lighting',               label: 'Egress Lighting',         href: 'lighting.html' },
   { key: 'trustCenter',            label: 'Trust Center',            href: 'trustcenter.html' },
 ];
