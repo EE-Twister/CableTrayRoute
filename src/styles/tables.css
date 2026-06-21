@@ -229,7 +229,7 @@ body.dark-mode .table-row-focusable:focus-within::after {
 
 .table-search {
     width: 100%;
-    margin-bottom: 4px;
+    margin-bottom: 0;
     box-sizing: border-box;
 }
 
@@ -241,6 +241,74 @@ body.dark-mode .table-row-focusable:focus-within::after {
     display: block;
     font-weight: 600;
     margin-bottom: 0.25rem;
+}
+
+.table-search-field {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.table-search-icon {
+    position: absolute;
+    left: 0.65rem;
+    width: 1rem;
+    height: 1rem;
+    color: var(--color-text-muted);
+    pointer-events: none;
+}
+
+.table-search-field .table-search {
+    padding-left: 2.1rem;
+}
+
+.table-search-status {
+    margin: 0.35rem 0 0;
+    color: var(--color-text-muted);
+    font-size: var(--font-size-sm);
+}
+
+.table-search-status.is-empty {
+    color: var(--warning-text);
+    font-weight: 600;
+}
+
+/* Mirrors .equipment-empty-guide / .load-empty-guide for a consistent
+   empty-state banner across the core workflow table pages. */
+.cable-empty-state,
+.cable-empty-state__actions,
+.raceway-empty-state,
+.raceway-empty-state__actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.cable-empty-state,
+.raceway-empty-state {
+    justify-content: space-between;
+    margin-top: var(--space-3);
+    padding: var(--space-4);
+    border: 1px dashed var(--color-border);
+    border-radius: var(--radius-md);
+    background: color-mix(in srgb, var(--color-surface-strong) 90%, var(--color-surface));
+}
+
+.cable-empty-state[hidden],
+.raceway-empty-state[hidden] {
+    display: none;
+}
+
+/* Avoid the duplicate "No cables yet" line while the empty state banner shows. */
+.cable-empty-state:not([hidden]) ~ .cable-validation-summary {
+    display: none;
+}
+
+.cable-empty-state p,
+.raceway-empty-state p {
+    margin: var(--space-1) 0 0;
+    color: var(--color-text-muted);
 }
 
 .load-list-card {

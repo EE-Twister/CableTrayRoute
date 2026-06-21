@@ -332,7 +332,13 @@
         <div id="cable-workflow-next-action" class="workflow-next-action" aria-live="polite" data-no-print></div>
         <div class="table-search-container">
           <label for="table-search">Search cables</label>
-          <input type="search" id="table-search" class="table-search" placeholder="Search all columns" aria-label="Search cable schedule">
+          <div class="table-search-field">
+            <svg class="table-search-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+              <path fill="currentColor" d="M6.75 1.5a5.25 5.25 0 0 1 4.158 8.448l3.572 3.572a.75.75 0 0 1-1.06 1.06l-3.572-3.571A5.25 5.25 0 1 1 6.75 1.5Zm0 1.5a3.75 3.75 0 1 0 0 7.5 3.75 3.75 0 0 0 0-7.5Z"/>
+            </svg>
+            <input type="search" id="table-search" class="table-search" placeholder="Search all columns" aria-label="Search cable schedule" aria-describedby="cable-search-status">
+          </div>
+          <p id="cable-search-status" class="table-search-status" aria-live="polite" hidden></p>
         </div>
         <div class="overflow-x-auto table-viewport">
           <table id="cableScheduleTable" class="sticky-table">
@@ -340,6 +346,16 @@
             <thead></thead>
             <tbody></tbody>
           </table>
+        </div>
+        <div id="cable-empty-state" class="cable-empty-state" hidden>
+          <div>
+            <strong>No cables yet.</strong>
+            <p>Add your first cable, or load a sample set to explore the schedule with example data.</p>
+          </div>
+          <div class="cable-empty-state__actions">
+            <button type="button" id="empty-add-cable-btn" class="btn primary-btn">Add Cable</button>
+            <button type="button" id="empty-load-sample-btn" class="btn">Load Sample Cables</button>
+          </div>
         </div>
         <div id="cable-print-report" class="print-only cable-print-report" aria-hidden="true"></div>
         <p id="cable-validation-summary" class="cable-validation-summary" aria-live="polite"></p>
