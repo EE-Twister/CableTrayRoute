@@ -181,8 +181,31 @@ function wireRacewayHandlersOnce() {
   _wiredRacewayHandlers = true;
   // move existing handler wiring here and ensure not duplicated
 }
+// Toggle per-section empty-state banners when a raceway table has no rows.
+// Banners live outside <tbody>, so row-count assertions stay accurate, and the
+// tables stay in the DOM so their headers keep documenting the columns.
+function wireRacewayEmptyStates() {
+  const specs = [
+    ['#ductbankTable tbody', 'ductbank-empty-state'],
+    ['#trayTable tbody', 'tray-empty-state'],
+    ['#conduitTable tbody', 'conduit-empty-state']
+  ];
+  specs.forEach(([tbodySel, stateId]) => {
+    const tbody = document.querySelector(tbodySel);
+    const state = document.getElementById(stateId);
+    if (!tbody || !state) return;
+    const sync = () => { state.hidden = tbody.rows.length > 0; };
+    new MutationObserver(sync).observe(tbody, { childList: true });
+    sync();
+  });
+  document.querySelectorAll('.raceway-empty-state [data-empty-add]').forEach(btn => {
+    btn.addEventListener('click', () => document.getElementById(btn.dataset.emptyAdd)?.click());
+  });
+}
+
 suppressResumeIfE2E();
 document.addEventListener('DOMContentLoaded', forceShowResumeIfE2E);
+document.addEventListener('DOMContentLoaded', wireRacewayEmptyStates);
 
 checkPrereqs([{key:'cableSchedule',page:'cableschedule.html',label:'Cable Schedule'}]);
 

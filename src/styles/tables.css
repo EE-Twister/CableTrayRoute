@@ -276,14 +276,17 @@ body.dark-mode .table-row-focusable:focus-within::after {
 /* Mirrors .equipment-empty-guide / .load-empty-guide for a consistent
    empty-state banner across the core workflow table pages. */
 .cable-empty-state,
-.cable-empty-state__actions {
+.cable-empty-state__actions,
+.raceway-empty-state,
+.raceway-empty-state__actions {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: var(--space-2);
 }
 
-.cable-empty-state {
+.cable-empty-state,
+.raceway-empty-state {
     justify-content: space-between;
     margin-top: var(--space-3);
     padding: var(--space-4);
@@ -292,7 +295,8 @@ body.dark-mode .table-row-focusable:focus-within::after {
     background: color-mix(in srgb, var(--color-surface-strong) 90%, var(--color-surface));
 }
 
-.cable-empty-state[hidden] {
+.cable-empty-state[hidden],
+.raceway-empty-state[hidden] {
     display: none;
 }
 
@@ -301,7 +305,8 @@ body.dark-mode .table-row-focusable:focus-within::after {
     display: none;
 }
 
-.cable-empty-state p {
+.cable-empty-state p,
+.raceway-empty-state p {
     margin: var(--space-1) 0 0;
     color: var(--color-text-muted);
 }
