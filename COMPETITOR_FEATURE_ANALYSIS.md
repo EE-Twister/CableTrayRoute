@@ -26,9 +26,11 @@ A separate **2026-04-11 extension** to the Cost Estimation module added **custom
 
 A **2026-04-26 website/product competitiveness refresh** compared CableTrayRoute against current positioning and features from ETAP, EasyPower, SKM, Bentley Raceway and Cable Management, MagiCAD/Revit, Eplan Data Portal/eBuild, nVent TraceCalc, Thermon CompuTrace, Chromalox ChromaTrace, SES CDEGS, XGSLab, CYMCAP, Cableizer, and related engineering tools. This revealed **12 additional gaps** (**Gaps #71-#82**) across lifecycle model governance, manufacturer data, heat-trace deliverables, grounding fidelity, cable thermal/pulling workflows, BIM round-trip, field data capture, benchmark/audit confidence, design automation, and public onboarding.
 
-**Current status: 73 of 83 prior identified gaps implemented (Gap #96 Bus Duct Sizing implemented 2026-05-05). 1 deferred (native BIM/CAD plugin). Live pricing gap extended with custom CSV pricing book. 10 prior open gaps remain: advanced power study #65 (OPF) plus website/product competitiveness gaps #72, #74-#77, #81 (excluding #71, #73, #78, #79, #80, #82 now implemented). Gap #64 (Voltage Stability) was implemented and is corrected in the roadmap table below. Gap #68 (IEC 60909) implemented 2026-05-04. Gap #70 (Voltage Flicker IEC 61000-4-15) implemented 2026-05-04.**
+**Current status: 73 of 83 prior identified gaps implemented (Gap #96 Bus Duct Sizing implemented 2026-05-05). 1 deferred (native BIM/CAD plugin). Live pricing gap extended with custom CSV pricing book. Open from this set (reconciled 2026-06-21): advanced power study #65 (OPF) plus website/product competitiveness gaps #72, #76, #77 — #74, #75, and #81 are now implemented (see their per-gap sections), and #71, #73, #78, #79, #80, #82 were already implemented. Gap #64 (Voltage Stability) was implemented and is corrected in the roadmap table below. Gap #68 (IEC 60909) implemented 2026-05-04. Gap #70 (Voltage Flicker IEC 61000-4-15) implemented 2026-05-04.**
 
-A **2026-05-04 refresh** benchmarked against ETAP 2024/2025, EasyPower 2025, SKM PowerTools, DIgSILENT PowerFactory 2024, Siemens PSS SINCAL, PLS-CADD, AGI32/Visual/ElumTools, Eplan Platform, AutoCAD Plant 3D / SmartPlant Electrical, Aeries CARS / Trimble MEP, NFPA 855 BESS hazard tools (DNV / ESRG), and vendor relay platforms (SEL AcSELerator, GE EnerVista, ABB PCM600). It identified **17 new gaps (#83–#99)** across four themes: operations & live data, compliance & risk, construction & MEP, and enterprise & reporting. **Gap #96 (Bus Duct Sizing) implemented 2026-05-05. Gap #85 (Embodied Carbon) implemented 2026-05-05. Gap #97 (Vendor Relay-Settings Export) implemented 2026-05-05. Gap #88 (Quasi-Dynamic Load Flow) implemented 2026-05-06. Gap #91 (NFPA 855 BESS Hazard) implemented 2026-05-06. Gap #94 (Hazardous Area Classification) implemented 2026-05-06. Gap #92 (Demand & Diversity Estimator) implemented 2026-05-04. Gap #93 (Conduit Bend Schedule) implemented 2026-05-04. Gap #99 (Audit Log + SSO + Enterprise Auth) implemented 2026-05-06; 9 remain open.** Combined open gap count across all passes: **22 of 100**.
+A **2026-05-04 refresh** benchmarked against ETAP 2024/2025, EasyPower 2025, SKM PowerTools, DIgSILENT PowerFactory 2024, Siemens PSS SINCAL, PLS-CADD, AGI32/Visual/ElumTools, Eplan Platform, AutoCAD Plant 3D / SmartPlant Electrical, Aeries CARS / Trimble MEP, NFPA 855 BESS hazard tools (DNV / ESRG), and vendor relay platforms (SEL AcSELerator, GE EnerVista, ABB PCM600). It identified **17 new gaps (#83–#99)** across four themes: operations & live data, compliance & risk, construction & MEP, and enterprise & reporting. **Gap #96 (Bus Duct Sizing) implemented 2026-05-05. Gap #85 (Embodied Carbon) implemented 2026-05-05. Gap #97 (Vendor Relay-Settings Export) implemented 2026-05-05. Gap #88 (Quasi-Dynamic Load Flow) implemented 2026-05-06. Gap #91 (NFPA 855 BESS Hazard) implemented 2026-05-06. Gap #94 (Hazardous Area Classification) implemented 2026-05-06. Gap #92 (Demand & Diversity Estimator) implemented 2026-05-04. Gap #93 (Conduit Bend Schedule) implemented 2026-05-04. Gap #99 (Audit Log + SSO + Enterprise Auth) implemented 2026-05-06.** Open from this pass (reconciled 2026-06-21): #83, #84, #86, #89, #90, #98 — #87 (Insulation Coordination) and #95 (Photometric/Egress Lighting) are now implemented (see their per-gap sections).
+
+> **Reconciliation note (2026-06-21).** A codebase sweep found several gap sections were stale relative to shipped code. Now-implemented (evidence in each gap's Status line): **#74** advanced grounding, **#75** unified cable thermal environment, **#81** sample gallery, **#87** insulation coordination, **#95** photometric/egress lighting. Verified **still-open** gaps across all passes: **#65** Optimal Power Flow / Economic Dispatch, **#72** manufacturer data portal (commercial data), **#76** BIM round-trip / issue markup (IFC export only today), **#77** field data collection / commissioning, **#83** SCADA / telemetry live view (infrastructure), **#84** cybersecurity compliance audit, **#86** lightning & surge protection coordination, **#89** substation physical layout generator, **#90** conductor sag/tension, **#98** Monte Carlo / probabilistic load flow. That is **10 open of 100** (plus the long-deferred native BIM/CAD plugin and live manufacturer pricing feed, both commercial-partnership dependent). The pure-engineering, buildable-now subset is **#65, #77, #84, #86, #89, #90, #98**.
 
 ---
 
@@ -1313,7 +1315,7 @@ The strongest market pattern is that competing tools sell more than formulas. Th
 - Add conductor temperature timeline for cyclic/daily load profiles.
 - Tests: environment normalization, mutual-heating cases, derating waterfall consistency, and regression examples against existing IEC 60287 tests.
 
-**Status:** Individual calculators partially implemented; unified thermal environment not implemented.
+**Status:** ✅ **Implemented** (reconciled 2026-06-21). `analysis/cableThermalEnvironment.mjs` normalizes cable/raceway/soil/ambient/grouping inputs and computes ampacity across four installation methods. `cablethermalenv.html` / `cablethermalenv.js` — unified page comparing tray vs. conduit vs. duct bank vs. direct burial from one input set, with per-case derating waterfall, limiting-factor KPI, and installation comparison table. Navigation: `Cable Thermal Environment` in Studies → Cable. Rollup entry: `cablethermalenv`. Tests: `tests/cableThermalEnvironment.test.mjs` (58 assertions).
 
 ---
 
@@ -1448,7 +1450,7 @@ The strongest market pattern is that competing tools sell more than formulas. Th
 | **P2** | 81 | ~~**Sample Project Gallery / Guided Demos**~~ | Curated sample JSON projects and launch cards | Low | ✅ Implemented 2026-05-03 |
 | **P2** | 80 | ~~**Equipment Evaluation / Compliance Inventory**~~ | Join ratings with short-circuit/arc-flash/TCC results | Medium | ✅ Implemented 2026-05-03 |
 | **P2** | 74 | **Advanced Grounding Fidelity** | Soil data fitting and risk-point table | High | Implemented 2026-05-03 |
-| **P3** | 75 | **Cable Thermal Environment Modeling** | Unified environment model over existing calculators | High | Not implemented |
+| **P3** | 75 | ~~**Cable Thermal Environment Modeling**~~ | Unified environment model over existing calculators | High | ✅ Implemented |
 | **P3** | 72 | **Manufacturer Data Portal / Product Catalogs** | Approved catalog schema and imports | Medium | Partial |
 | **P3** | 77 | **Field Data Collection / Commissioning** | Field observations and offline queue | Medium | Not implemented |
 | **P4** | 76 | **BIM Round-Trip / Issue Markup** | IFC import, quantity reconciliation, BCF-like issues | High | Not implemented |
@@ -1544,7 +1546,7 @@ CableTrayRoute's calculation breadth is now strong, but several **operations**, 
 - Add a study page that accepts equipment voltage class, surge-arrester rating, and expected overvoltages and produces protective-margin and risk-of-failure metrics.
 - Tests: standard-table lookups, Ka correction, statistical integration accuracy, and arrester margin calculation.
 
-**Status:** Not implemented.
+**Status:** ✅ **Implemented** (reconciled 2026-06-21). `analysis/insulationCoordination.mjs` — IEC 60071-1 standard insulation level tables (Range I/II), atmospheric correction (Ka = e^(m·H/8150)), surge-arrester protective margin, and Gaussian statistical risk-of-failure. `insulationcoordination.html` / `insulationcoordination.js` — deterministic + simplified-statistical study page with BIL/SIL coordination, arrester margins, and a toggleable statistical risk panel. Navigation: `Insulation Coordination (BIL/SIL)` in Studies → Protection. Rollup entry: `insulationcoordination`. Tests: `tests/insulationCoordination.test.mjs` (104 assertions).
 
 ---
 
@@ -1672,7 +1674,7 @@ CableTrayRoute's calculation breadth is now strong, but several **operations**, 
 - Add a study page that places fixtures on a 2D plan and generates an isolux contour and pass/fail egress line.
 - Tests: IES parser, lumen-method spot check vs. published example, and egress 1 fc / 0.1 fc rule application.
 
-**Status:** Not implemented.
+**Status:** ✅ **Implemented** (reconciled 2026-06-21). `analysis/lighting.mjs` — IES (LM-63) candela-table parser, lumen-method average illuminance (room cavity ratio / coefficient of utilization), and point-by-point egress-path grid. `lighting.html` / `lighting.js` — study page with IES file upload (auto-fills lumens/watts), rectangular-room photometrics, and NFPA 101 §7.9 egress compliance (1 fc average / 0.1 fc minimum). Navigation: `Egress Lighting` in Studies → Safety & Compliance. Rollup entry: `lighting`. Tests: `tests/lighting.test.mjs` (163 assertions).
 
 ---
 
@@ -1756,9 +1758,9 @@ CableTrayRoute's calculation breadth is now strong, but several **operations**, 
 | **P3** | 83 | **Real-Time SCADA / Telemetry Live View** | Generic tag adapter + Live mode on one-line | High | Not implemented |
 | **P3** | 84 | **Cybersecurity Compliance Audit (NERC CIP / IEC 62443)** | Cyber-asset metadata + compliance matrix study | High | Not implemented |
 | **P3** | 86 | **Lightning & Surge Protection (IEEE 998 / IEC 62305)** | Rolling-sphere + IEC 62305 risk index + arrester selection | High | Not implemented |
-| **P3** | 87 | **Insulation Coordination (IEC 60071)** | Standard-table lookup + statistical risk-of-failure | Medium | Not implemented |
+| **P3** | 87 | ~~**Insulation Coordination (IEC 60071)**~~ | Standard-table lookup + statistical risk-of-failure | Medium | ✅ Implemented |
 | **P3** | 89 | **Substation Physical Layout Generator** | Footprint library + auto-layout from one-line topology | High | Not implemented |
-| **P3** | 95 | **Photometric / Egress Lighting** | LM-63 parser + lumen method + egress check | Medium | Not implemented |
+| **P3** | 95 | ~~**Photometric / Egress Lighting**~~ | LM-63 parser + lumen method + egress check | Medium | ✅ Implemented |
 | **P3** | 98 | **Probabilistic / Monte Carlo Load Flow** | Distribution sampler over existing load flow | High | Not implemented |
 | **P4** | 90 | **Conductor Sag/Tension (Overhead Lines)** | Catenary + ruling span + stringing table | Medium | Not implemented |
 
