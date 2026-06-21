@@ -8,7 +8,7 @@ This document defines handoff-level inputs, outputs, readiness rules, and downst
 
 Standard readiness vocabulary: Ready, Missing inputs, Downstream handoff.
 
-Coverage: 76 contracts for 76 navigation routes.
+Coverage: 77 contracts for 77 navigation routes.
 
 ## Workflow
 
@@ -2326,6 +2326,36 @@ Coverage: 76 contracts for 76 navigation routes.
 - Blockers: No conductor selected or no valid span lengths.
 
 **Downstream Pages**
+- `projectreport.html`
+
+**Notes**
+- None.
+
+#### Substation Layout Generator (`substationlayout.html`)
+
+- Section: Studies
+- Group: Structural
+- Workflow step: studies
+
+**Standalone Inputs**
+- Equipment list (tag, type, voltage) entered manually, loaded from the sample yard, or imported from the one-line.
+
+**Project Inputs**
+- `oneLineDiagram` (model, required): One-line components, connections, sheets, layers, and linked schedule references.
+- `settings.designBasis` (setting, optional): Project code basis, sizing defaults, routing defaults, and study prerequisites.
+- `settings.studyApprovals` (setting, optional): Engineer review records for study outputs.
+
+**Outputs**
+- `studyResults.substationLayout` (study-result): Saved equipment placement, fenced area, and ground-grid perimeter. Consumers: `groundgrid.html`, `projectreport.html`.
+- `settings.studyApprovals` (setting): Engineer approval records written by the shared study approval panel. Consumers: `projectreport.html`.
+- `export-only` (export): Substation layout placement CSV exports. Consumers: `projectreport.html`.
+
+**Readiness**
+- Ready when: Ready when at least one piece of placeable equipment is defined.
+- Blockers: No equipment entered or imported from the one-line.
+
+**Downstream Pages**
+- `groundgrid.html`
 - `projectreport.html`
 
 **Notes**

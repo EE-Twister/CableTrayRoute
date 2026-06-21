@@ -85,6 +85,7 @@ const entries = {
   probabilisticloadflow: 'src/probabilisticLoadFlow.js',
   sagtension: 'src/sagTension.js',
   lightningprotection: 'src/lightningProtection.js',
+  substationlayout: 'src/substationLayout.js',
   bessHazard: 'src/bessHazard.js',
   hazareaclassification: 'src/hazareaclassification.js',
   admin: 'src/admin.js',

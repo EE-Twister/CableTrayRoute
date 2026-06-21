@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Substation Layout Generator — auto-arrange equipment footprints from the one-line topology into voltage lanes with IEEE 1119 / NESC working clearances, a security fence, and a ground-grid perimeter." />
+  <title>Substation Layout Generator — CableTrayRoute</title>
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/favicon.svg">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Substation Layout Generator — CableTrayRoute">
+  <meta property="og:description" content="Auto-generate a 2D substation arrangement from the one-line: equipment footprints, working clearances, fence, and ground-grid perimeter.">
+  <meta property="og:image" content="https://cabletrayroute.com/icons/og-preview.png">
+  <meta property="og:site_name" content="CableTrayRoute">
+  <meta property="og:url" content="substationlayout.html">
+  <link rel="canonical" href="https://cabletrayroute.com/substationlayout.html">
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+  <meta name="color-scheme" content="light dark">
+  <link rel="stylesheet" href="style.css" />
+  <script type="module" src="dirtyTracker.js"></script>
+  <script type="module" src="dist/substationlayout.js" defer></script>
+</head>
+<body class="substationlayout-page" data-report-title="Substation Layout Generator">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <nav class="top-nav" aria-label="Primary">
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
+      <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+    <div id="nav-links" class="nav-links" role="list">
+      <!-- Populated dynamically by navigation.js -->
+    </div>
+    <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+  </nav>
+
+  <div id="settings-menu" class="settings-menu">
+    <label for="theme-select">Theme
+      <select id="theme-select">
+        <option value="system">System</option>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+        <option value="high-contrast">High Contrast</option>
+      </select>
+    </label>
+    <label><input type="checkbox" id="compact-toggle" aria-label="Enable compact table mode"> Compact Mode</label>
+    <button id="help-btn" class="btn" aria-expanded="false" title="Show help">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Site Help</span>
+    </button>
+    <button id="new-project-btn" title="Start a new project">
+      <img src="icons/toolbar/copy.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>New Project</span>
+    </button>
+    <button id="save-project-btn" title="Save current project">
+      <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Save Project</span>
+    </button>
+    <button id="load-project-btn" title="Load an existing project">
+      <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Load Project</span>
+    </button>
+    <button id="export-project-btn" title="Export project data">
+      <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Export Project</span>
+    </button>
+    <button id="import-project-btn" title="Import project data">
+      <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Import Project</span>
+    </button>
+    <input type="file" id="import-project-input" accept=".ctr.json" class="hidden" title="Select project file">
+  </div>
+
+  <div class="container">
+    <main id="main-content" class="main-content">
+      <header class="page-header">
+        <h1>Substation Layout Generator</h1>
+      </header>
+
+      <details class="method-panel">
+        <summary>Method &amp; Assumptions</summary>
+        <p>This study auto-generates a screening-level 2D physical arrangement from the one-line topology. Equipment is grouped into lanes by voltage level (highest at the top), each item is placed left-to-right with an electrical working-clearance envelope, and a security fence and ground-grid perimeter are computed around the whole yard.</p>
+        <p><strong>Clearance envelope:</strong></p>
+        <pre>Envelope = footprint + 2 × clearance(voltage)</pre>
+        <p>Working clearances follow IEEE 1119 / NESC §124 by maximum system voltage (e.g. 13.8 kV → 3 ft, 138 kV → 9 ft, 230 kV → 13 ft). The fence is offset from the equipment bounding box by the highest-voltage clearance plus 10 ft, and the ground-grid perimeter extends 3 ft beyond the fence — these dimensions seed the <a href="groundgrid.html">Ground Grid</a> study.</p>
+        <p><strong>Inputs:</strong> build the equipment list manually, load the sample yard, or import the placeable apparatus directly from the project one-line diagram.</p>
+        <p><strong>References:</strong> IEEE Std 1119; NESC (IEEE C2) §124; IEEE Std 605.</p>
+      </details>
+
+      <form id="sl-form" novalidate>
+
+        <fieldset>
+          <legend><strong>Equipment</strong></legend>
+          <p class="field-hint">Each item needs a tag, an equipment type, and a voltage (kV). Voltage groups equipment into lanes and sets the working clearance.</p>
+          <div class="table-scroll">
+            <table class="data-table" id="equipment-table" aria-label="Substation equipment">
+              <thead>
+                <tr><th>Tag</th><th>Type</th><th>Voltage (kV)</th><th><span class="visually-hidden">Remove</span></th></tr>
+              </thead>
+              <tbody id="equipment-rows"></tbody>
+            </table>
+          </div>
+          <div class="form-actions">
+            <button type="button" id="add-row-btn" class="btn btn-small">+ Add Equipment</button>
+            <button type="button" id="load-sample-btn" class="btn btn-small">Load Sample Yard</button>
+            <button type="button" id="load-oneline-btn" class="btn btn-small">Import from One-Line</button>
+          </div>
+        </fieldset>
+
+        <div class="form-actions">
+          <button type="submit" id="run-btn" class="btn btn-primary">Generate Layout</button>
+          <button type="button" id="export-csv-btn" class="btn" hidden>Export Results (CSV)</button>
+        </div>
+      </form>
+
+      <div id="calc-errors" class="result-fail" hidden aria-live="polite"></div>
+
+      <div id="results" aria-live="polite"></div>
+
+      <section class="card">
+        <div id="study-basis-panel"></div>
+      </section>
+
+      <section class="card">
+        <div id="study-approval-panel"></div>
+      </section>
+
+      <nav class="step-nav" aria-label="Workflow navigation">
+        <a href="oneline.html" class="step-nav-prev">← One-Line</a>
+        <a href="groundgrid.html" class="step-nav-next">Ground Grid →</a>
+      </nav>
+
+    </main>
+  </div>
+
+  <div id="help-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="help-modal-title" hidden>
+    <div class="modal-content">
+      <button id="close-help-btn" class="modal-close" aria-label="Close help">×</button>
+      <h2 id="help-modal-title">Substation Layout Generator Help</h2>
+      <p>This tool stamps a first-pass physical arrangement from the electrical one-line, so civil, structural, and grounding design can start from a coherent footprint.</p>
+      <h3>When to use</h3>
+      <ul>
+        <li>Concept-stage substation and switchyard sizing.</li>
+        <li>Estimating fenced area and land take for a given equipment list.</li>
+        <li>Seeding the ground-grid perimeter from the physical extent.</li>
+      </ul>
+      <h3>Building the equipment list</h3>
+      <ul>
+        <li><strong>Import from One-Line</strong> — pulls transformers, breakers, switchgear, and other apparatus from the project diagram (buses and cables are excluded).</li>
+        <li><strong>Load Sample Yard</strong> — a 138/13.8 kV demonstration substation.</li>
+        <li>Or add rows manually with a tag, type, and voltage.</li>
+      </ul>
+      <h3>Interpreting results</h3>
+      <ul>
+        <li><strong>Plan view</strong> — footprints (coloured by voltage) inside dashed working-clearance envelopes, the security fence (orange), and the ground-grid perimeter (green).</li>
+        <li><strong>Fenced area</strong> — overall yard size and approximate land take in acres.</li>
+        <li><strong>Ground grid</strong> — the perimeter dimensions to carry into the Ground Grid study.</li>
+      </ul>
+      <h3>Limitations</h3>
+      <ul>
+        <li>Single row per voltage level; multi-row yards need manual arrangement.</li>
+        <li>No bay-internal phase spacing, road/crane access, or oil-containment sizing.</li>
+        <li>A concept starting point, not a final general-arrangement drawing.</li>
+      </ul>
+    </div>
+  </div>
+
+  <footer class="site-footer">
+    <div class="footer-left">
+      <img src="icons/route.svg" alt="CableTrayRoute logo" class="footer-logo" loading="lazy" decoding="async">
+      <span>CableTrayRoute</span>
+    </div>
+    <nav class="footer-links" aria-label="Footer">
+      <a href="docs/index.html">Docs</a>
+      <a href="docs/quickstart.html">Quick Start</a>
+      <a href="index.html">Home</a>
+    </nav>
+  </footer>
+
+</body>
+</html>

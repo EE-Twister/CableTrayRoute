@@ -779,6 +779,18 @@ export const PAGE_CONTRACTS_BY_HREF = {
     readiness: ready('Ready when structure geometry and a flash-density input are valid.', ['Missing structure dimensions or ground flash density / thunderstorm-day input.']),
     downstream: ['projectreport.html']
   }),
+  'substationlayout.html': contract({
+    workflowStep: 'studies',
+    standaloneInputs: ['Equipment list (tag, type, voltage) entered manually, loaded from the sample yard, or imported from the one-line.'],
+    projectInputs: [oneLine, designBasis, approvals],
+    outputs: [
+      output('studyResults.substationLayout', 'study-result', 'Saved equipment placement, fenced area, and ground-grid perimeter.', ['groundgrid.html', 'projectreport.html']),
+      studyApprovalOutput,
+      exportOnly('Substation layout placement CSV exports.', ['projectreport.html'])
+    ],
+    readiness: ready('Ready when at least one piece of placeable equipment is defined.', ['No equipment entered or imported from the one-line.']),
+    downstream: ['groundgrid.html', 'projectreport.html']
+  }),
   'voltagestability.html': contract({
     workflowStep: 'studies',
     standaloneInputs: ['PV/QV curve inputs, selected bus, load scaling, and solver settings.'],
