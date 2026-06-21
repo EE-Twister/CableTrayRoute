@@ -731,6 +731,18 @@ export const PAGE_CONTRACTS_BY_HREF = {
     readiness: ready('Ready when a base model and time-series profile are valid.', ['Missing base load-flow context or invalid time-series data.']),
     downstream: ['projectreport.html']
   }),
+  'optimalpowerflow.html': contract({
+    workflowStep: 'studies',
+    standaloneInputs: ['Generator fleet (Pmin/Pmax and quadratic cost curves), system demand, and transmission loss allowance.'],
+    projectInputs: [designBasis, approvals],
+    outputs: [
+      output('studyResults.optimalPowerFlow', 'study-result', 'Saved economic dispatch schedule, system lambda, and cost summary.', ['projectreport.html']),
+      studyApprovalOutput,
+      exportOnly('Economic dispatch schedule and fleet CSV exports.', ['projectreport.html'])
+    ],
+    readiness: ready('Ready when at least one generator and a valid demand are entered.', ['No generators defined or invalid demand/cost inputs.']),
+    downstream: ['projectreport.html']
+  }),
   'voltagestability.html': contract({
     workflowStep: 'studies',
     standaloneInputs: ['PV/QV curve inputs, selected bus, load scaling, and solver settings.'],

@@ -54,6 +54,7 @@ export const NAV_ROUTES = [
   { href: 'motorStart.html', label: 'Motor Start', section: 'Studies', group: 'Motor', icon: 'icons/Motor.svg' },
   { href: 'loadFlow.html', label: 'Load Flow', section: 'Studies', group: 'Power System', icon: 'icons/load.svg' },
   { href: 'quasidynamic.html', label: 'Quasi-Dynamic Load Flow', section: 'Studies', group: 'Power System', icon: 'icons/load.svg' },
+  { href: 'optimalpowerflow.html', label: 'Optimal Power Flow / Economic Dispatch', section: 'Studies', group: 'Power System', icon: 'icons/load.svg' },
   { href: 'voltagestability.html', label: 'Voltage Stability', section: 'Studies', group: 'Power System', icon: 'icons/toolbar/validate.svg' },
   { href: 'shortCircuit.html', label: 'Short Circuit', section: 'Studies', group: 'Protection', icon: 'icons/components/Breaker.svg' },
   { href: 'iec60909.html', label: 'IEC 60909 Short-Circuit', section: 'Studies', group: 'Protection', icon: 'icons/components/Breaker.svg' },

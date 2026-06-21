@@ -8,7 +8,7 @@ This document defines handoff-level inputs, outputs, readiness rules, and downst
 
 Standard readiness vocabulary: Ready, Missing inputs, Downstream handoff.
 
-Coverage: 72 contracts for 72 navigation routes.
+Coverage: 73 contracts for 73 navigation routes.
 
 ## Workflow
 
@@ -2086,6 +2086,34 @@ Coverage: 72 contracts for 72 navigation routes.
 **Readiness**
 - Ready when: Ready when a base model and time-series profile are valid.
 - Blockers: Missing base load-flow context or invalid time-series data.
+
+**Downstream Pages**
+- `projectreport.html`
+
+**Notes**
+- None.
+
+#### Optimal Power Flow / Economic Dispatch (`optimalpowerflow.html`)
+
+- Section: Studies
+- Group: Power System
+- Workflow step: studies
+
+**Standalone Inputs**
+- Generator fleet (Pmin/Pmax and quadratic cost curves), system demand, and transmission loss allowance.
+
+**Project Inputs**
+- `settings.designBasis` (setting, optional): Project code basis, sizing defaults, routing defaults, and study prerequisites.
+- `settings.studyApprovals` (setting, optional): Engineer review records for study outputs.
+
+**Outputs**
+- `studyResults.optimalPowerFlow` (study-result): Saved economic dispatch schedule, system lambda, and cost summary. Consumers: `projectreport.html`.
+- `settings.studyApprovals` (setting): Engineer approval records written by the shared study approval panel. Consumers: `projectreport.html`.
+- `export-only` (export): Economic dispatch schedule and fleet CSV exports. Consumers: `projectreport.html`.
+
+**Readiness**
+- Ready when: Ready when at least one generator and a valid demand are entered.
+- Blockers: No generators defined or invalid demand/cost inputs.
 
 **Downstream Pages**
 - `projectreport.html`

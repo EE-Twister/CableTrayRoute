@@ -81,6 +81,7 @@ const entries = {
   busdust: 'src/busDuct.js',
   sustainability: 'src/sustainability.js',
   quasidynamic: 'src/quasiDynamic.js',
+  optimalpowerflow: 'src/optimalPowerFlow.js',
   bessHazard: 'src/bessHazard.js',
   hazareaclassification: 'src/hazareaclassification.js',
   admin: 'src/admin.js',

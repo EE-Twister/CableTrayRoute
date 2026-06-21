@@ -8,8 +8,8 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 
 ## Summary
 
-- Routes audited: 72
-- Contracts: 72
+- Routes audited: 73
+- Contracts: 73
 - Missing contracts: 0
 - Extra contracts: 0
 - Routes without source files: 0
@@ -48,78 +48,78 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 
 **Detected Reads**
 - `cableSchedule`
-  - src/workflowDashboard.js:118 getCables()
-  - src/workflowDashboard.js:1279 getCables()
-  - src/workflowDashboard.js:131 getCables()
-  - src/workflowDashboard.js:148 getCables()
-  - src/workflowDashboard.js:567 getCables()
+  - src/workflowDashboard.js:119 getCables()
+  - src/workflowDashboard.js:1280 getCables()
+  - src/workflowDashboard.js:132 getCables()
+  - src/workflowDashboard.js:149 getCables()
+  - src/workflowDashboard.js:568 getCables()
   - ... 2 more
 - `conduitSchedule`
-  - src/workflowDashboard.js:150 getConduits()
-  - src/workflowDashboard.js:571 getConduits()
-  - src/workflowDashboard.js:697 getConduits()
-  - src/workflowDashboard.js:727 getConduits()
+  - src/workflowDashboard.js:151 getConduits()
+  - src/workflowDashboard.js:572 getConduits()
+  - src/workflowDashboard.js:698 getConduits()
+  - src/workflowDashboard.js:728 getConduits()
 - `ductbankSchedule`
-  - src/workflowDashboard.js:151 getDuctbanks()
-  - src/workflowDashboard.js:572 getDuctbanks()
-  - src/workflowDashboard.js:698 getDuctbanks()
-  - src/workflowDashboard.js:728 getDuctbanks()
+  - src/workflowDashboard.js:152 getDuctbanks()
+  - src/workflowDashboard.js:573 getDuctbanks()
+  - src/workflowDashboard.js:699 getDuctbanks()
+  - src/workflowDashboard.js:729 getDuctbanks()
 - `equipment`
-  - src/workflowDashboard.js:1281 getEquipment()
-  - src/workflowDashboard.js:146 getEquipment()
-  - src/workflowDashboard.js:565 getEquipment()
-  - src/workflowDashboard.js:692 getEquipment()
-  - src/workflowDashboard.js:722 getEquipment()
+  - src/workflowDashboard.js:1282 getEquipment()
+  - src/workflowDashboard.js:147 getEquipment()
+  - src/workflowDashboard.js:566 getEquipment()
+  - src/workflowDashboard.js:693 getEquipment()
+  - src/workflowDashboard.js:723 getEquipment()
   - ... 1 more
 - `loadList`
-  - src/workflowDashboard.js:566 getLoads()
-  - src/workflowDashboard.js:693 getLoads()
-  - src/workflowDashboard.js:723 getLoads()
-  - src/workflowDashboard.js:749 getLoads()
+  - src/workflowDashboard.js:567 getLoads()
+  - src/workflowDashboard.js:694 getLoads()
+  - src/workflowDashboard.js:724 getLoads()
+  - src/workflowDashboard.js:750 getLoads()
 - `oneLineDiagram`
-  - src/workflowDashboard.js:1287 getOneLine()
-  - src/workflowDashboard.js:130 getOneLine()
-  - src/workflowDashboard.js:147 getOneLine()
-  - src/workflowDashboard.js:569 getOneLine()
-  - src/workflowDashboard.js:694 getOneLine()
+  - src/workflowDashboard.js:1288 getOneLine()
+  - src/workflowDashboard.js:131 getOneLine()
+  - src/workflowDashboard.js:148 getOneLine()
+  - src/workflowDashboard.js:570 getOneLine()
+  - src/workflowDashboard.js:695 getOneLine()
   - ... 1 more
 - `settings.designBasis`
-  - src/workflowDashboard.js:1284 getDesignBasis()
-  - src/workflowDashboard.js:139 getDesignBasis()
-  - src/workflowDashboard.js:144 getDesignBasis()
-  - src/workflowDashboard.js:375 getDesignBasis()
-  - src/workflowDashboard.js:705 getDesignBasis()
+  - src/workflowDashboard.js:1285 getDesignBasis()
+  - src/workflowDashboard.js:140 getDesignBasis()
+  - src/workflowDashboard.js:145 getDesignBasis()
+  - src/workflowDashboard.js:376 getDesignBasis()
+  - src/workflowDashboard.js:706 getDesignBasis()
   - ... 1 more
 - `settings.designGateApprovals`
-  - src/workflowDashboard.js:1285 getDesignGateApprovals()
-  - src/workflowDashboard.js:145 getDesignGateApprovals()
-  - src/workflowDashboard.js:706 getDesignGateApprovals()
-  - src/workflowDashboard.js:796 getDesignGateApprovals()
+  - src/workflowDashboard.js:1286 getDesignGateApprovals()
+  - src/workflowDashboard.js:146 getDesignGateApprovals()
+  - src/workflowDashboard.js:707 getDesignGateApprovals()
+  - src/workflowDashboard.js:797 getDesignGateApprovals()
 - `settings.latestRouteResults`
-  - src/workflowDashboard.js:154 getItem(latestRouteResults)
-  - src/workflowDashboard.js:690 getItem(latestRouteResults)
-  - src/workflowDashboard.js:729 getItem(latestRouteResults)
+  - src/workflowDashboard.js:155 getItem(latestRouteResults)
+  - src/workflowDashboard.js:691 getItem(latestRouteResults)
+  - src/workflowDashboard.js:730 getItem(latestRouteResults)
 - `settings.lifecyclePackages`
-  - src/workflowDashboard.js:1188 getLifecyclePackages()
-  - src/workflowDashboard.js:702 getLifecyclePackages()
+  - src/workflowDashboard.js:1189 getLifecyclePackages()
+  - src/workflowDashboard.js:703 getLifecyclePackages()
 - `settings.oneLineScheduleReconcilePending`
-  - src/workflowDashboard.js:708 getItem(oneLineScheduleReconcilePending)
+  - src/workflowDashboard.js:709 getItem(oneLineScheduleReconcilePending)
 - `settings.reportSnapshots`
-  - src/workflowDashboard.js:701 getReportSnapshots()
+  - src/workflowDashboard.js:702 getReportSnapshots()
 - `settings.studyApprovals`
-  - src/workflowDashboard.js:1283 getStudyApprovals()
-  - src/workflowDashboard.js:153 getStudyApprovals()
-  - src/workflowDashboard.js:700 getStudyApprovals()
+  - src/workflowDashboard.js:1284 getStudyApprovals()
+  - src/workflowDashboard.js:154 getStudyApprovals()
+  - src/workflowDashboard.js:701 getStudyApprovals()
 - `settings.tccSettings`
-  - src/workflowDashboard.js:1286 getItem(tccSettings)
-  - src/workflowDashboard.js:155 getItem(tccSettings)
-  - src/workflowDashboard.js:707 getItem(tccSettings)
+  - src/workflowDashboard.js:1287 getItem(tccSettings)
+  - src/workflowDashboard.js:156 getItem(tccSettings)
+  - src/workflowDashboard.js:708 getItem(tccSettings)
 - `studyResults`
-  - src/workflowDashboard.js:111 getStudies()
-  - src/workflowDashboard.js:1139 getStudies()
-  - src/workflowDashboard.js:120 getStudies()
-  - src/workflowDashboard.js:1282 getStudies()
-  - src/workflowDashboard.js:131 getStudies()
+  - src/workflowDashboard.js:112 getStudies()
+  - src/workflowDashboard.js:1140 getStudies()
+  - src/workflowDashboard.js:121 getStudies()
+  - src/workflowDashboard.js:1283 getStudies()
+  - src/workflowDashboard.js:132 getStudies()
   - ... 2 more
 - `studyResults.arcFlash`
   - analysis/designCoach.mjs:476 studies.arcFlash
@@ -136,35 +136,35 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
   - analysis/designCoach.mjs:477 studies.shortCircuit
   - analysis/equipmentEvaluation.mjs:235 studies?.shortCircuit
 - `traySchedule`
-  - src/workflowDashboard.js:104 getTrays()
-  - src/workflowDashboard.js:119 getTrays()
-  - src/workflowDashboard.js:1280 getTrays()
-  - src/workflowDashboard.js:149 getTrays()
-  - src/workflowDashboard.js:570 getTrays()
+  - src/workflowDashboard.js:105 getTrays()
+  - src/workflowDashboard.js:120 getTrays()
+  - src/workflowDashboard.js:1281 getTrays()
+  - src/workflowDashboard.js:150 getTrays()
+  - src/workflowDashboard.js:571 getTrays()
   - ... 2 more
 
 **Detected Writes**
 - `cableSchedule`
-  - src/workflowDashboard.js:777 setCables()
+  - src/workflowDashboard.js:778 setCables()
 - `conduitSchedule`
-  - src/workflowDashboard.js:779 setConduits()
+  - src/workflowDashboard.js:780 setConduits()
 - `ductbankSchedule`
-  - src/workflowDashboard.js:780 setDuctbanks()
+  - src/workflowDashboard.js:781 setDuctbanks()
 - `oneLineDiagram`
-  - src/workflowDashboard.js:776 setOneLine()
+  - src/workflowDashboard.js:777 setOneLine()
 - `settings.designBasis`
-  - src/workflowDashboard.js:390 setDesignBasis()
+  - src/workflowDashboard.js:391 setDesignBasis()
 - `settings.designGateApprovals`
-  - src/workflowDashboard.js:860 setDesignGateApprovals()
+  - src/workflowDashboard.js:861 setDesignGateApprovals()
 - `settings.latestRouteResults`
-  - src/workflowDashboard.js:781 setItem(latestRouteResults)
+  - src/workflowDashboard.js:782 setItem(latestRouteResults)
 - `settings.lifecyclePackages`
-  - src/workflowDashboard.js:1237 deleteLifecyclePackage()
-  - src/workflowDashboard.js:1293 addLifecyclePackage()
+  - src/workflowDashboard.js:1238 deleteLifecyclePackage()
+  - src/workflowDashboard.js:1294 addLifecyclePackage()
 - `settings.oneLineScheduleReconcilePending`
-  - src/workflowDashboard.js:782 setItem(oneLineScheduleReconcilePending)
+  - src/workflowDashboard.js:783 setItem(oneLineScheduleReconcilePending)
 - `traySchedule`
-  - src/workflowDashboard.js:778 setTrays()
+  - src/workflowDashboard.js:779 setTrays()
 
 ### Scenario Comparison (`scenarios.html`)
 
@@ -551,7 +551,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 
 **Detected Reads**
 - `cableSchedule`
-  - cableschedule.js:2073 getCables()
+  - cableschedule.js:2113 getCables()
 - `conduitSchedule`
   - cableschedule.js:79 getConduits()
 - `ductbankSchedule`
@@ -574,18 +574,18 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
   - cableschedule.js:682 getCableTagSettings()
   - cableschedule.js:683 getItem(settings.cableTagSettings)
 - `settings.cableTemplates`
-  - cableschedule.js:1435 getCableTemplates()
-  - cableschedule.js:1683 getCableTemplates()
+  - cableschedule.js:1475 getCableTemplates()
+  - cableschedule.js:1723 getCableTemplates()
   - cableschedule.js:655 getCableTemplates()
 - `traySchedule`
   - cableschedule.js:78 getTrays()
 
 **Detected Writes**
 - `cableSchedule`
-  - cableschedule.js:2386 setCables()
-  - cableschedule.js:2398 setCables()
-  - cableschedule.js:2412 setCables()
-  - cableschedule.js:2435 setCables()
+  - cableschedule.js:2426 setCables()
+  - cableschedule.js:2438 setCables()
+  - cableschedule.js:2452 setCables()
+  - cableschedule.js:2475 setCables()
 - `settings.cableChangeLog`
   - cableschedule.js:762 setCableChangeLog()
   - cableschedule.js:764 setItem(settings.cableChangeLog)
@@ -593,11 +593,11 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
   - cableschedule.js:689 setCableTagSettings()
   - cableschedule.js:691 setItem(settings.cableTagSettings)
 - `settings.cableTemplates`
-  - cableschedule.js:1183 setCableTemplates()
-  - cableschedule.js:1226 setCableTemplates()
-  - cableschedule.js:1445 setCableTemplates()
-  - cableschedule.js:1464 setCableTemplates()
-  - cableschedule.js:1640 setCableTemplates()
+  - cableschedule.js:1223 setCableTemplates()
+  - cableschedule.js:1266 setCableTemplates()
+  - cableschedule.js:1485 setCableTemplates()
+  - cableschedule.js:1504 setCableTemplates()
+  - cableschedule.js:1680 setCableTemplates()
   - ... 4 more
 
 ### Panel Schedule (`panelschedule.html`)
@@ -686,48 +686,48 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 
 **Detected Reads**
 - `cableSchedule`
-  - src/racewayschedule.js:1038 getCables()
-  - src/racewayschedule.js:1980 getCables()
-  - src/racewayschedule.js:456 getCables()
+  - src/racewayschedule.js:1061 getCables()
+  - src/racewayschedule.js:2003 getCables()
+  - src/racewayschedule.js:479 getCables()
 - `conduitSchedule`
-  - src/racewayschedule.js:1979 getConduits()
-  - src/racewayschedule.js:2031 getConduits()
-  - src/racewayschedule.js:434 getConduits()
-  - src/racewayschedule.js:675 TableUtils.createTable(conduitSchedule)
+  - src/racewayschedule.js:2002 getConduits()
+  - src/racewayschedule.js:2054 getConduits()
+  - src/racewayschedule.js:457 getConduits()
+  - src/racewayschedule.js:698 TableUtils.createTable(conduitSchedule)
 - `ductbankSchedule`
   - ductbankTable.js:1025 getDuctbanks()
-  - src/racewayschedule.js:2029 getDuctbanks()
-  - src/racewayschedule.js:810 getDuctbanks()
+  - src/racewayschedule.js:2052 getDuctbanks()
+  - src/racewayschedule.js:833 getDuctbanks()
 - `traySchedule`
-  - src/racewayschedule.js:1978 getTrays()
-  - src/racewayschedule.js:2030 getTrays()
-  - src/racewayschedule.js:433 getTrays()
-  - src/racewayschedule.js:606 TableUtils.createTable(traySchedule)
+  - src/racewayschedule.js:2001 getTrays()
+  - src/racewayschedule.js:2053 getTrays()
+  - src/racewayschedule.js:456 getTrays()
+  - src/racewayschedule.js:629 TableUtils.createTable(traySchedule)
 
 **Detected Writes**
 - `cableSchedule`
   - ductbankTable.js:1124 addCable()
 - `conduitSchedule`
-  - src/racewayschedule.js:367 setConduits()
-  - src/racewayschedule.js:551 importFromCad()
-  - src/racewayschedule.js:675 TableUtils.createTable(conduitSchedule)
-  - src/racewayschedule.js:766 setConduits()
-  - src/racewayschedule.js:841 setConduits()
+  - src/racewayschedule.js:390 setConduits()
+  - src/racewayschedule.js:574 importFromCad()
+  - src/racewayschedule.js:698 TableUtils.createTable(conduitSchedule)
+  - src/racewayschedule.js:789 setConduits()
+  - src/racewayschedule.js:864 setConduits()
 - `ductbankSchedule`
   - ductbankTable.js:632 setDuctbanks()
-  - src/racewayschedule.js:365 setDuctbanks()
-  - src/racewayschedule.js:571 setDuctbanks()
-  - src/racewayschedule.js:762 setDuctbanks()
+  - src/racewayschedule.js:388 setDuctbanks()
+  - src/racewayschedule.js:594 setDuctbanks()
+  - src/racewayschedule.js:785 setDuctbanks()
 - `settings.conduitFillData`
-  - src/racewayschedule.js:698 setItem(conduitFillData)
+  - src/racewayschedule.js:721 setItem(conduitFillData)
 - `settings.ductbankSession`
   - ductbankTable.js:598 setItem(ductbankSession)
 - `settings.trayFillData`
-  - src/racewayschedule.js:631 setItem(trayFillData)
+  - src/racewayschedule.js:654 setItem(trayFillData)
 - `traySchedule`
-  - src/racewayschedule.js:366 setTrays()
-  - src/racewayschedule.js:551 importFromCad()
-  - src/racewayschedule.js:606 TableUtils.createTable(traySchedule)
+  - src/racewayschedule.js:389 setTrays()
+  - src/racewayschedule.js:574 importFromCad()
+  - src/racewayschedule.js:629 TableUtils.createTable(traySchedule)
 
 ### Ductbank (`ductbankroute.html`)
 

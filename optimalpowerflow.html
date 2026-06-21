@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Optimal Power Flow / Economic Dispatch — find the least-cost generation schedule that meets demand within each unit's limits using equal-incremental-cost (lambda) dispatch of quadratic fuel-cost curves." />
+  <title>Optimal Power Flow / Economic Dispatch — CableTrayRoute</title>
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/favicon.svg">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Optimal Power Flow / Economic Dispatch — CableTrayRoute">
+  <meta property="og:description" content="Least-cost generator dispatch via equal-incremental-cost lambda iteration with unit min/max limits, losses, and savings versus naive dispatch.">
+  <meta property="og:image" content="https://cabletrayroute.com/icons/og-preview.png">
+  <meta property="og:site_name" content="CableTrayRoute">
+  <meta property="og:url" content="optimalpowerflow.html">
+  <link rel="canonical" href="https://cabletrayroute.com/optimalpowerflow.html">
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+  <meta name="color-scheme" content="light dark">
+  <link rel="stylesheet" href="style.css" />
+  <script type="module" src="dirtyTracker.js"></script>
+  <script type="module" src="dist/optimalpowerflow.js" defer></script>
+</head>
+<body class="optimalpowerflow-page" data-report-title="Optimal Power Flow / Economic Dispatch">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <nav class="top-nav" aria-label="Primary">
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
+      <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+    <div id="nav-links" class="nav-links" role="list">
+      <!-- Populated dynamically by navigation.js -->
+    </div>
+    <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+  </nav>
+
+  <div id="settings-menu" class="settings-menu">
+    <label for="theme-select">Theme
+      <select id="theme-select">
+        <option value="system">System</option>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+        <option value="high-contrast">High Contrast</option>
+      </select>
+    </label>
+    <label><input type="checkbox" id="compact-toggle" aria-label="Enable compact table mode"> Compact Mode</label>
+    <button id="help-btn" class="btn" aria-expanded="false" title="Show help">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Site Help</span>
+    </button>
+    <button id="new-project-btn" title="Start a new project">
+      <img src="icons/toolbar/copy.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>New Project</span>
+    </button>
+    <button id="save-project-btn" title="Save current project">
+      <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Save Project</span>
+    </button>
+    <button id="load-project-btn" title="Load an existing project">
+      <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Load Project</span>
+    </button>
+    <button id="export-project-btn" title="Export project data">
+      <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Export Project</span>
+    </button>
+    <button id="import-project-btn" title="Import project data">
+      <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Import Project</span>
+    </button>
+    <input type="file" id="import-project-input" accept=".ctr.json" class="hidden" title="Select project file">
+  </div>
+
+  <div class="container">
+    <main id="main-content" class="main-content">
+      <header class="page-header">
+        <h1>Optimal Power Flow / Economic Dispatch</h1>
+      </header>
+
+      <details class="method-panel">
+        <summary>Method &amp; Assumptions</summary>
+        <p>Economic dispatch finds the generation schedule that meets system demand at least total fuel cost, subject to each unit's minimum and maximum output limits. Each unit's fuel cost is a convex quadratic curve, and the optimum is found by the classic equal-incremental-cost (lambda) condition.</p>
+        <p><strong>Cost model:</strong></p>
+        <pre>C_i(P) = a_i + b_i·P + c_i·P²      [$/h]
+IC_i(P) = b_i + 2·c_i·P            [$/MWh]</pre>
+        <p>At the optimum, every unit operating between its limits runs at the same system incremental cost <em>λ</em>. Units whose incremental cost would exceed λ at Pmin are held at Pmin; units that reach λ only beyond Pmax are capped at Pmax. The system λ that satisfies Σ P<sub>i</sub> = demand + losses is found by bisection.</p>
+        <p><strong>Losses:</strong> modelled at screening level as a flat percentage of demand. Required generation = demand × (1 + loss% / 100).</p>
+        <p><strong>Savings:</strong> total cost is compared against a naive capacity-proportional dispatch to quantify the value of cost-aware scheduling.</p>
+        <p><strong>References:</strong> Wood, Wollenberg &amp; Sheblé, <em>Power Generation, Operation, and Control</em>, 3rd ed., §3; IEEE Std 399-1997 §3.</p>
+      </details>
+
+      <form id="opf-form" novalidate>
+
+        <fieldset>
+          <legend><strong>Generator Fleet</strong></legend>
+          <p class="field-hint">Each generator has minimum/maximum output (MW) and a quadratic fuel-cost curve C = a + b·P + c·P². Use the demonstration fleet, edit the table, or import a CSV (columns: id, name, pmin, pmax, a, b, c).</p>
+          <div class="table-scroll">
+            <table class="data-table" id="fleet-table" aria-label="Generator fleet">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Pmin (MW)</th>
+                  <th>Pmax (MW)</th>
+                  <th>a ($/h)</th>
+                  <th>b ($/MWh)</th>
+                  <th>c ($/MWh²)</th>
+                  <th><span class="visually-hidden">Remove</span></th>
+                </tr>
+              </thead>
+              <tbody id="fleet-rows"></tbody>
+            </table>
+          </div>
+          <div class="form-actions">
+            <button type="button" id="add-unit-btn" class="btn btn-small">+ Add Unit</button>
+            <button type="button" id="load-default-btn" class="btn btn-small">Load Demonstration Fleet</button>
+            <label for="fleet-file" class="btn btn-small">Import CSV<input type="file" id="fleet-file" accept=".csv,.txt" class="hidden"></label>
+            <button type="button" id="export-fleet-btn" class="btn btn-small">Export Fleet CSV</button>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend><strong>System</strong></legend>
+          <div class="field-row">
+            <label for="demand-mw">System demand</label>
+            <input type="number" id="demand-mw" min="0" step="any" value="850" required aria-describedby="demand-hint">
+            <span class="field-unit">MW</span>
+            <p id="demand-hint" class="field-hint">Total real-power load to be served by the fleet.</p>
+          </div>
+          <div class="field-row">
+            <label for="loss-pct">Transmission losses</label>
+            <input type="number" id="loss-pct" min="0" max="99" step="any" value="0" aria-describedby="loss-hint">
+            <span class="field-unit">%</span>
+            <p id="loss-hint" class="field-hint">Flat loss allowance as a percentage of demand (screening level). Generation must cover demand + losses.</p>
+          </div>
+        </fieldset>
+
+        <div class="form-actions">
+          <button type="submit" id="run-btn" class="btn btn-primary">Run Economic Dispatch</button>
+          <button type="button" id="export-csv-btn" class="btn" hidden>Export Results (CSV)</button>
+        </div>
+      </form>
+
+      <div id="calc-errors" class="result-fail" hidden aria-live="polite"></div>
+
+      <div id="results" aria-live="polite"></div>
+
+      <section class="card">
+        <div id="study-basis-panel"></div>
+      </section>
+
+      <section class="card">
+        <div id="study-approval-panel"></div>
+      </section>
+
+      <nav class="step-nav" aria-label="Workflow navigation">
+        <a href="quasidynamic.html" class="step-nav-prev">← Quasi-Dynamic Load Flow</a>
+        <a href="voltagestability.html" class="step-nav-next">Voltage Stability →</a>
+      </nav>
+
+    </main>
+  </div>
+
+  <div id="help-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="help-modal-title" hidden>
+    <div class="modal-content">
+      <button id="close-help-btn" class="modal-close" aria-label="Close help">×</button>
+      <h2 id="help-modal-title">Optimal Power Flow / Economic Dispatch Help</h2>
+      <p>This study schedules a fleet of dispatchable generators to meet a system demand at the lowest total fuel cost, respecting each unit's output limits.</p>
+      <h3>When to use</h3>
+      <ul>
+        <li>Microgrid and on-site generation planning — how should engines/turbines share a load to minimise fuel cost?</li>
+        <li>Multi-generator standby plants — find the most economical loading split.</li>
+        <li>Estimating the marginal (incremental) cost of energy for a given demand.</li>
+        <li>Quantifying the savings of cost-aware dispatch versus running every unit proportionally.</li>
+      </ul>
+      <h3>Entering generators</h3>
+      <ul>
+        <li><strong>Pmin / Pmax</strong>: the stable operating range of the unit in MW.</li>
+        <li><strong>a, b, c</strong>: fuel-cost curve coefficients for C = a + b·P + c·P² ($/h). b is the linear ($/MWh) term and c the quadratic ($/MWh²) term; c must be ≥ 0 (convex).</li>
+        <li>Use <em>Load Demonstration Fleet</em> for the textbook 3-unit example (850 MW → λ ≈ 9.15 $/MWh, ≈ $8,194/h).</li>
+        <li>Import a CSV exported from a spreadsheet with columns id, name, pmin, pmax, a, b, c.</li>
+      </ul>
+      <h3>Interpreting results</h3>
+      <ul>
+        <li><strong>System lambda</strong>: the marginal cost of serving one more MW — the incremental cost shared by all units operating between their limits.</li>
+        <li><strong>Status</strong>: a unit "At max" has no upward reserve; a unit "At min" is too expensive to load further; "Marginal" units set the system lambda.</li>
+        <li><strong>Savings vs. naive</strong>: how much the economic schedule beats loading every unit proportionally to capacity.</li>
+      </ul>
+      <h3>Limitations</h3>
+      <ul>
+        <li>Single-period dispatch — no ramp limits, start-up costs, or unit commitment.</li>
+        <li>Losses are a flat percentage; there is no network B-matrix or transmission line limit.</li>
+        <li>Real-power only — no reactive dispatch or voltage optimisation. For network constraints, pair with the Load Flow and Contingency studies.</li>
+      </ul>
+    </div>
+  </div>
+
+  <footer class="site-footer">
+    <div class="footer-left">
+      <img src="icons/route.svg" alt="CableTrayRoute logo" class="footer-logo" loading="lazy" decoding="async">
+      <span>CableTrayRoute</span>
+    </div>
+    <nav class="footer-links" aria-label="Footer">
+      <a href="docs/index.html">Docs</a>
+      <a href="docs/quickstart.html">Quick Start</a>
+      <a href="index.html">Home</a>
+    </nav>
+  </footer>
+
+</body>
+</html>
