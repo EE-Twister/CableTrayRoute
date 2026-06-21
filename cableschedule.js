@@ -934,7 +934,7 @@ async function initCableSchedule() {
         searchStatus.textContent = `No cables match “${searchInput.value.trim()}”.`;
         searchStatus.classList.add('is-empty');
       } else {
-        searchStatus.textContent = `Showing ${shown} of ${total} cable${total === 1 ? '' : 's'}.`;
+        searchStatus.textContent = `${shown} of ${total} cable${total === 1 ? '' : 's'} shown`;
         searchStatus.classList.remove('is-empty');
       }
     };

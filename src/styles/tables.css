@@ -273,56 +273,37 @@ body.dark-mode .table-row-focusable:focus-within::after {
     font-weight: 600;
 }
 
-.cable-empty-state {
+/* Mirrors .equipment-empty-guide / .load-empty-guide for a consistent
+   empty-state banner across the core workflow table pages. */
+.cable-empty-state,
+.cable-empty-state__actions {
     display: flex;
-    flex-direction: column;
+    flex-wrap: wrap;
     align-items: center;
     gap: var(--space-2);
+}
+
+.cable-empty-state {
+    justify-content: space-between;
     margin-top: var(--space-3);
-    padding: var(--space-6) var(--space-4);
+    padding: var(--space-4);
     border: 1px dashed var(--color-border);
     border-radius: var(--radius-md);
     background: color-mix(in srgb, var(--color-surface-strong) 90%, var(--color-surface));
-    text-align: center;
 }
 
 .cable-empty-state[hidden] {
     display: none;
 }
 
-/* Avoid the duplicate "No cables yet" line while the rich empty state shows. */
+/* Avoid the duplicate "No cables yet" line while the empty state banner shows. */
 .cable-empty-state:not([hidden]) ~ .cable-validation-summary {
     display: none;
 }
 
-.cable-empty-state__icon {
-    width: 2.75rem;
-    height: 2.75rem;
-    opacity: 0.6;
-}
-
-body.dark-mode .cable-empty-state__icon {
-    filter: brightness(0) invert(1);
-    opacity: 0.7;
-}
-
-.cable-empty-state__title {
-    margin: 0;
-    font-size: var(--font-size-lg);
-}
-
-.cable-empty-state__text {
-    max-width: 32rem;
-    margin: 0;
+.cable-empty-state p {
+    margin: var(--space-1) 0 0;
     color: var(--color-text-muted);
-}
-
-.cable-empty-state__actions {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: var(--space-2);
-    margin-top: var(--space-1);
 }
 
 .load-list-card {
