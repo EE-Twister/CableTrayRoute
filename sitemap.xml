@@ -28,6 +28,11 @@
   <url><loc>https://cabletrayroute.com/harmonics.html</loc><priority>0.5</priority></url>
   <url><loc>https://cabletrayroute.com/loadFlow.html</loc><priority>0.5</priority></url>
   <url><loc>https://cabletrayroute.com/quasidynamic.html</loc><priority>0.5</priority></url>
+  <url><loc>https://cabletrayroute.com/optimalpowerflow.html</loc><priority>0.5</priority></url>
+  <url><loc>https://cabletrayroute.com/probabilisticloadflow.html</loc><priority>0.5</priority></url>
+  <url><loc>https://cabletrayroute.com/sagtension.html</loc><priority>0.5</priority></url>
+  <url><loc>https://cabletrayroute.com/lightningprotection.html</loc><priority>0.5</priority></url>
+  <url><loc>https://cabletrayroute.com/substationlayout.html</loc><priority>0.5</priority></url>
   <url><loc>https://cabletrayroute.com/bessHazard.html</loc><priority>0.5</priority></url>
   <url><loc>https://cabletrayroute.com/insulationcoordination.html</loc><priority>0.5</priority></url>
   <url><loc>https://cabletrayroute.com/help.html</loc><priority>0.5</priority></url>

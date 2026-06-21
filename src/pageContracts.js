@@ -731,6 +731,66 @@ export const PAGE_CONTRACTS_BY_HREF = {
     readiness: ready('Ready when a base model and time-series profile are valid.', ['Missing base load-flow context or invalid time-series data.']),
     downstream: ['projectreport.html']
   }),
+  'optimalpowerflow.html': contract({
+    workflowStep: 'studies',
+    standaloneInputs: ['Generator fleet (Pmin/Pmax and quadratic cost curves), system demand, and transmission loss allowance.'],
+    projectInputs: [designBasis, approvals],
+    outputs: [
+      output('studyResults.optimalPowerFlow', 'study-result', 'Saved economic dispatch schedule, system lambda, and cost summary.', ['projectreport.html']),
+      studyApprovalOutput,
+      exportOnly('Economic dispatch schedule and fleet CSV exports.', ['projectreport.html'])
+    ],
+    readiness: ready('Ready when at least one generator and a valid demand are entered.', ['No generators defined or invalid demand/cost inputs.']),
+    downstream: ['projectreport.html']
+  }),
+  'probabilisticloadflow.html': contract({
+    workflowStep: 'studies',
+    standaloneInputs: ['Load and generation multiplier distributions, scenario count, and random seed.'],
+    projectInputs: [oneLine, loads, projectInput('studyResults.loadFlow', 'study-result', false, 'Base load flow model and operating point.'), designBasis, approvals],
+    outputs: [
+      output('studyResults.probabilisticLoadFlow', 'study-result', 'Saved Monte Carlo voltage/loss statistics and per-bus violation probabilities.', ['projectreport.html']),
+      studyApprovalOutput,
+      exportOnly('Probabilistic load flow histograms and CSV exports.', ['projectreport.html'])
+    ],
+    readiness: ready('Ready when a base model and valid input distributions are available.', ['Missing base load-flow context or invalid distribution/sampling inputs.']),
+    downstream: ['projectreport.html']
+  }),
+  'sagtension.html': contract({
+    workflowStep: 'studies',
+    standaloneInputs: ['Conductor selection, span lengths, NESC loading district, design tension % UTS, and stringing temperature range.'],
+    projectInputs: [designBasis, approvals],
+    outputs: [
+      output('studyResults.sagTension', 'study-result', 'Saved ruling span, design sag-tension, loading cases, and stringing table.', ['projectreport.html']),
+      studyApprovalOutput,
+      exportOnly('Sag-tension loading cases and stringing-table CSV exports.', ['projectreport.html'])
+    ],
+    readiness: ready('Ready when a conductor and at least one span are entered.', ['No conductor selected or no valid span lengths.']),
+    downstream: ['projectreport.html']
+  }),
+  'lightningprotection.html': contract({
+    workflowStep: 'studies',
+    standaloneInputs: ['Keraunic level or ground flash density, location factor, structure geometry, tolerable strike frequency, and optional system voltage/grounding.'],
+    projectInputs: [designBasis, approvals],
+    outputs: [
+      output('studyResults.lightningProtection', 'study-result', 'Saved lightning risk, recommended LPL, rolling-sphere sizing, and arrester MCOV.', ['projectreport.html']),
+      studyApprovalOutput,
+      exportOnly('Lightning protection assessment CSV exports.', ['projectreport.html'])
+    ],
+    readiness: ready('Ready when structure geometry and a flash-density input are valid.', ['Missing structure dimensions or ground flash density / thunderstorm-day input.']),
+    downstream: ['projectreport.html']
+  }),
+  'substationlayout.html': contract({
+    workflowStep: 'studies',
+    standaloneInputs: ['Equipment list (tag, type, voltage) entered manually, loaded from the sample yard, or imported from the one-line.'],
+    projectInputs: [oneLine, designBasis, approvals],
+    outputs: [
+      output('studyResults.substationLayout', 'study-result', 'Saved equipment placement, fenced area, and ground-grid perimeter.', ['groundgrid.html', 'projectreport.html']),
+      studyApprovalOutput,
+      exportOnly('Substation layout placement CSV exports.', ['projectreport.html'])
+    ],
+    readiness: ready('Ready when at least one piece of placeable equipment is defined.', ['No equipment entered or imported from the one-line.']),
+    downstream: ['groundgrid.html', 'projectreport.html']
+  }),
   'voltagestability.html': contract({
     workflowStep: 'studies',
     standaloneInputs: ['PV/QV curve inputs, selected bus, load scaling, and solver settings.'],

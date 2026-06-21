@@ -26,9 +26,11 @@ A separate **2026-04-11 extension** to the Cost Estimation module added **custom
 
 A **2026-04-26 website/product competitiveness refresh** compared CableTrayRoute against current positioning and features from ETAP, EasyPower, SKM, Bentley Raceway and Cable Management, MagiCAD/Revit, Eplan Data Portal/eBuild, nVent TraceCalc, Thermon CompuTrace, Chromalox ChromaTrace, SES CDEGS, XGSLab, CYMCAP, Cableizer, and related engineering tools. This revealed **12 additional gaps** (**Gaps #71-#82**) across lifecycle model governance, manufacturer data, heat-trace deliverables, grounding fidelity, cable thermal/pulling workflows, BIM round-trip, field data capture, benchmark/audit confidence, design automation, and public onboarding.
 
-**Current status: 73 of 83 prior identified gaps implemented (Gap #96 Bus Duct Sizing implemented 2026-05-05). 1 deferred (native BIM/CAD plugin). Live pricing gap extended with custom CSV pricing book. 10 prior open gaps remain: advanced power study #65 (OPF) plus website/product competitiveness gaps #72, #74-#77, #81 (excluding #71, #73, #78, #79, #80, #82 now implemented). Gap #64 (Voltage Stability) was implemented and is corrected in the roadmap table below. Gap #68 (IEC 60909) implemented 2026-05-04. Gap #70 (Voltage Flicker IEC 61000-4-15) implemented 2026-05-04.**
+**Current status: 73 of 83 prior identified gaps implemented (Gap #96 Bus Duct Sizing implemented 2026-05-05). 1 deferred (native BIM/CAD plugin). Live pricing gap extended with custom CSV pricing book. Open from this set (reconciled 2026-06-21): website/product competitiveness gaps #72, #76, #77 — #65 (OPF / Economic Dispatch) was implemented 2026-06-21, #74, #75, and #81 are now implemented (see their per-gap sections), and #71, #73, #78, #79, #80, #82 were already implemented. Gap #64 (Voltage Stability) was implemented and is corrected in the roadmap table below. Gap #68 (IEC 60909) implemented 2026-05-04. Gap #70 (Voltage Flicker IEC 61000-4-15) implemented 2026-05-04.**
 
-A **2026-05-04 refresh** benchmarked against ETAP 2024/2025, EasyPower 2025, SKM PowerTools, DIgSILENT PowerFactory 2024, Siemens PSS SINCAL, PLS-CADD, AGI32/Visual/ElumTools, Eplan Platform, AutoCAD Plant 3D / SmartPlant Electrical, Aeries CARS / Trimble MEP, NFPA 855 BESS hazard tools (DNV / ESRG), and vendor relay platforms (SEL AcSELerator, GE EnerVista, ABB PCM600). It identified **17 new gaps (#83–#99)** across four themes: operations & live data, compliance & risk, construction & MEP, and enterprise & reporting. **Gap #96 (Bus Duct Sizing) implemented 2026-05-05. Gap #85 (Embodied Carbon) implemented 2026-05-05. Gap #97 (Vendor Relay-Settings Export) implemented 2026-05-05. Gap #88 (Quasi-Dynamic Load Flow) implemented 2026-05-06. Gap #91 (NFPA 855 BESS Hazard) implemented 2026-05-06. Gap #94 (Hazardous Area Classification) implemented 2026-05-06. Gap #92 (Demand & Diversity Estimator) implemented 2026-05-04. Gap #93 (Conduit Bend Schedule) implemented 2026-05-04. Gap #99 (Audit Log + SSO + Enterprise Auth) implemented 2026-05-06; 9 remain open.** Combined open gap count across all passes: **22 of 100**.
+A **2026-05-04 refresh** benchmarked against ETAP 2024/2025, EasyPower 2025, SKM PowerTools, DIgSILENT PowerFactory 2024, Siemens PSS SINCAL, PLS-CADD, AGI32/Visual/ElumTools, Eplan Platform, AutoCAD Plant 3D / SmartPlant Electrical, Aeries CARS / Trimble MEP, NFPA 855 BESS hazard tools (DNV / ESRG), and vendor relay platforms (SEL AcSELerator, GE EnerVista, ABB PCM600). It identified **17 new gaps (#83–#99)** across four themes: operations & live data, compliance & risk, construction & MEP, and enterprise & reporting. **Gap #96 (Bus Duct Sizing) implemented 2026-05-05. Gap #85 (Embodied Carbon) implemented 2026-05-05. Gap #97 (Vendor Relay-Settings Export) implemented 2026-05-05. Gap #88 (Quasi-Dynamic Load Flow) implemented 2026-05-06. Gap #91 (NFPA 855 BESS Hazard) implemented 2026-05-06. Gap #94 (Hazardous Area Classification) implemented 2026-05-06. Gap #92 (Demand & Diversity Estimator) implemented 2026-05-04. Gap #93 (Conduit Bend Schedule) implemented 2026-05-04. Gap #99 (Audit Log + SSO + Enterprise Auth) implemented 2026-05-06.** Open from this pass (reconciled 2026-06-21): #83, #84, #86, #89, #90, #98 — #87 (Insulation Coordination) and #95 (Photometric/Egress Lighting) are now implemented (see their per-gap sections).
+
+> **Reconciliation note (2026-06-21).** A codebase sweep found several gap sections were stale relative to shipped code. Now-implemented (evidence in each gap's Status line): **#74** advanced grounding, **#75** unified cable thermal environment, **#81** sample gallery, **#87** insulation coordination, **#95** photometric/egress lighting. Verified **still-open** gaps across all passes: **#72** manufacturer data portal (commercial data), **#76** BIM round-trip / issue markup (IFC export only today), **#77** field data collection / commissioning, **#83** SCADA / telemetry live view (infrastructure), **#84** cybersecurity compliance audit. That is **5 open of 100** (plus the long-deferred native BIM/CAD plugin and live manufacturer pricing feed, both commercial-partnership dependent). **#65** Optimal Power Flow / Economic Dispatch, **#98** Probabilistic / Monte Carlo Load Flow, **#90** Conductor Sag/Tension, **#86** Lightning & Surge Protection, and **#89** Substation Physical Layout Generator were implemented 2026-06-21. The pure-engineering, buildable-now subset is **#77, #84**.
 
 ---
 
@@ -386,7 +388,7 @@ Study page `capacitorbank.html` / `capacitorbank.js` provides form inputs for bu
 |---|---|---|
 | **Loss minimization and generation cost optimization** | ETAP Optimal Power Flow, PowerWorld Simulator OPF, DIgSILENT PowerFactory, PSS/E OPF | Optimal power flow (OPF) extends load flow by optimizing generator dispatch, transformer tap positions, and capacitor switching to minimize an objective function (total generation cost, system losses, or voltage deviation) subject to bus voltage limits, branch thermal limits, and generator capability constraints. Economic dispatch — a simplified OPF — determines least-cost generator loading for a given total demand. This is standard for utility operations, industrial facilities with cogeneration, and microgrid dispatch optimization. CableTrayRoute's `analysis/loadFlow.js` solves a conventional Newton-Raphson power flow with fixed generator setpoints; it has no optimization layer, no cost function, no constraint enforcement on branch flows, and no automatic tap/capacitor adjustment. |
 
-**Status:** Not implemented.
+**Status:** ✅ **Implemented 2026-06-21.** `analysis/optimalPowerFlow.mjs` — `economicDispatch()` solves the equal-incremental-cost (lambda) dispatch by bisection over convex quadratic fuel-cost curves with per-unit Pmin/Pmax limits (interior, clamped, and linear-cost units; infeasible high/low demand handled). `runOptimalPowerFlow()` adds flat-percentage transmission losses, per-unit loading/marginal-cost/at-limit status, savings versus a naive capacity-proportional baseline, and actionable warnings; `parseFleetCsv()`/`fleetToCsv()` import/export the fleet. Validated against the canonical Wood & Wollenberg 3-unit example (850 MW → λ ≈ 9.148 $/MWh, ≈ $8,194/h). `optimalpowerflow.html` / `optimalpowerflow.js` — editable generator-fleet table, CSV import/export, demand/loss inputs, KPI cards (system lambda, total cost, generation, savings), dispatch table, SVG output chart, and result CSV export; result persisted under `studyResults.optimalPowerFlow`. Navigation: `Optimal Power Flow / Economic Dispatch` in Studies → Power System; rollup entry `optimalpowerflow`; sitemap, workflow dashboard, and page contract registered. Tests: `tests/optimalPowerFlow.test.mjs`. Docs: `docs/optimal-power-flow.md`. **Scope:** screening-level economic dispatch (the cost core of OPF); transmission line limits, security (N-1), and reactive/voltage optimisation remain future work.
 
 ---
 
@@ -1313,7 +1315,7 @@ The strongest market pattern is that competing tools sell more than formulas. Th
 - Add conductor temperature timeline for cyclic/daily load profiles.
 - Tests: environment normalization, mutual-heating cases, derating waterfall consistency, and regression examples against existing IEC 60287 tests.
 
-**Status:** Individual calculators partially implemented; unified thermal environment not implemented.
+**Status:** ✅ **Implemented** (reconciled 2026-06-21). `analysis/cableThermalEnvironment.mjs` normalizes cable/raceway/soil/ambient/grouping inputs and computes ampacity across four installation methods. `cablethermalenv.html` / `cablethermalenv.js` — unified page comparing tray vs. conduit vs. duct bank vs. direct burial from one input set, with per-case derating waterfall, limiting-factor KPI, and installation comparison table. Navigation: `Cable Thermal Environment` in Studies → Cable. Rollup entry: `cablethermalenv`. Tests: `tests/cableThermalEnvironment.test.mjs` (58 assertions).
 
 ---
 
@@ -1448,7 +1450,7 @@ The strongest market pattern is that competing tools sell more than formulas. Th
 | **P2** | 81 | ~~**Sample Project Gallery / Guided Demos**~~ | Curated sample JSON projects and launch cards | Low | ✅ Implemented 2026-05-03 |
 | **P2** | 80 | ~~**Equipment Evaluation / Compliance Inventory**~~ | Join ratings with short-circuit/arc-flash/TCC results | Medium | ✅ Implemented 2026-05-03 |
 | **P2** | 74 | **Advanced Grounding Fidelity** | Soil data fitting and risk-point table | High | Implemented 2026-05-03 |
-| **P3** | 75 | **Cable Thermal Environment Modeling** | Unified environment model over existing calculators | High | Not implemented |
+| **P3** | 75 | ~~**Cable Thermal Environment Modeling**~~ | Unified environment model over existing calculators | High | ✅ Implemented |
 | **P3** | 72 | **Manufacturer Data Portal / Product Catalogs** | Approved catalog schema and imports | Medium | Partial |
 | **P3** | 77 | **Field Data Collection / Commissioning** | Field observations and offline queue | Medium | Not implemented |
 | **P4** | 76 | **BIM Round-Trip / Issue Markup** | IFC import, quantity reconciliation, BCF-like issues | High | Not implemented |
@@ -1529,7 +1531,7 @@ CableTrayRoute's calculation breadth is now strong, but several **operations**, 
 - Tie the result into the report package builder as a Lightning Protection appendix.
 - Tests: rolling-sphere geometry, R1–R4 risk index, arrester selection, and report appendix output.
 
-**Status:** Not implemented.
+**Status:** ✅ **Implemented 2026-06-21.** `analysis/lightningProtection.mjs` — `groundFlashDensity()` (Ng = 0.04·Td^1.25), `collectionArea()`/`expectedStrikes()` (IEC 62305-2 Annex A collection area and direct-strike frequency Nd with location factor Cd), `recommendLPL()` (protection-efficiency table E = 1 − Nc/Nd → LPL I/II/III/IV), `strikingDistance()`/`singleMastRadius()` (rolling-sphere / electrogeometric protective radius), `downConductorCount()` with IEC 62305-3 minimum cross-sections, and `arresterMCOV()`/`recommendArrester()` (MCOV for solid/ungrounded systems, nearest standard duty-cycle rating). `runLightningProtection()` ties it together with warnings. `lightningprotection.html` / `lightningprotection.js` — keraunic/direct flash-density toggle, location factor, structure geometry, tolerable frequency, protected-equipment height, down-conductor material, and optional system voltage/grounding; KPI cards, air-termination/down-conductor table, surge-arrester table, and result CSV export; result persisted under `studyResults.lightningProtection`. Navigation: `Lightning & Surge Protection` in Studies → Grounding; rollup entry `lightningprotection`; sitemap, workflow dashboard, and page contract registered. Tests: `tests/lightningProtection.test.mjs`. Docs: `docs/lightning-protection.md`. **Scope:** screening-level single-component risk and single-mast protection (not the full IEC 62305-2 R1–R4 assessment or multi-mast/shield-wire optimisation); the 2D rolling-sphere plan canvas remains future enhancement.
 
 ---
 
@@ -1544,7 +1546,7 @@ CableTrayRoute's calculation breadth is now strong, but several **operations**, 
 - Add a study page that accepts equipment voltage class, surge-arrester rating, and expected overvoltages and produces protective-margin and risk-of-failure metrics.
 - Tests: standard-table lookups, Ka correction, statistical integration accuracy, and arrester margin calculation.
 
-**Status:** Not implemented.
+**Status:** ✅ **Implemented** (reconciled 2026-06-21). `analysis/insulationCoordination.mjs` — IEC 60071-1 standard insulation level tables (Range I/II), atmospheric correction (Ka = e^(m·H/8150)), surge-arrester protective margin, and Gaussian statistical risk-of-failure. `insulationcoordination.html` / `insulationcoordination.js` — deterministic + simplified-statistical study page with BIL/SIL coordination, arrester margins, and a toggleable statistical risk panel. Navigation: `Insulation Coordination (BIL/SIL)` in Studies → Protection. Rollup entry: `insulationcoordination`. Tests: `tests/insulationCoordination.test.mjs` (104 assertions).
 
 ---
 
@@ -1576,7 +1578,7 @@ CableTrayRoute's calculation breadth is now strong, but several **operations**, 
 - Add a 2D editor view that round-trips edits back to component metadata.
 - Tests: clearance rule enforcement, deterministic layout from a fixture topology, and integration with ground-grid polygon import.
 
-**Status:** Not implemented.
+**Status:** ✅ **Implemented 2026-06-21.** `analysis/substationLayout.mjs` — `EQUIPMENT_FOOTPRINTS` library with `classifyEquipment()`/`footprintFor()` mapping one-line subtypes to footprint classes; `CLEARANCE_TABLE_FT` + `clearanceForVoltage()` for IEEE 1119 / NESC working clearances by maximum system voltage; `extractEquipment()` flattens a one-line model to placeable apparatus (buses/cables excluded, voltage parsed via `toBaseKV`); `generateLayout()` produces a deterministic voltage-lane arrangement with non-overlapping clearance envelopes, an equipment bounding box, a security fence, and a ground-grid polygon; `runSubstationLayout()` runs from explicit equipment or a one-line model. `substationlayout.html` / `substationlayout.js` — editable equipment table, Load Sample Yard, Import from One-Line, KPI cards (equipment, fenced area/acreage, max voltage, ground-grid perimeter), a scaled SVG plan view (footprints coloured by voltage, clearance envelopes, fence, ground grid), placement table, and result CSV export; result persisted under `studyResults.substationLayout`. Navigation: `Substation Layout Generator` in Studies → Structural; rollup entry `substationlayout`; sitemap, workflow dashboard, and page contract (downstream `groundgrid.html`) registered. Tests: `tests/substationLayout.test.mjs`. Docs: `docs/substation-layout.md`. **Scope:** single-row-per-voltage screening arrangement (no bay-internal phase spacing, road/crane access, or multi-row optimisation); the interactive drag-edit round-trip remains future enhancement.
 
 ---
 
@@ -1592,7 +1594,7 @@ CableTrayRoute's calculation breadth is now strong, but several **operations**, 
 - Add a printable stringing-tension chart appendix for the report builder.
 - Tests: catenary vs. parabolic agreement at small sag/span, ruling-span averaging, NESC load case selection, and stringing-table monotonicity.
 
-**Status:** Not implemented.
+**Status:** ✅ **Implemented 2026-06-21.** `analysis/sagTension.mjs` — `catenarySag`/`parabolicSag`, `catenaryLength`/`parabolicLength`, `supportTension`; `rulingSpan()` (√(Σ Sᵢ³/Σ Sᵢ)); `iceWeight`/`windLoad`/`resultantWeight`/`districtLoad` for NESC radial-ice (57 lb/ft³) + wind resultant with the district constant K; `changeOfStateTension()` cubic solver (Newton with bisection fallback) for the parabolic elastic/thermal change-of-state equation; `stringingTable()` and `runSagTension()` set the design tension as a % of UTS at a chosen NESC district, report per-district loading cases, and generate a bare-conductor stringing table over a temperature range. Representative ACSR/AAC/AAAC conductor library. `sagtension.html` / `sagtension.js` — conductor select, span list (ruling span derived), NESC district, design-tension % UTS, and stringing temperature range; KPI cards, loading-case table, stringing table with a sag-vs-temperature SVG chart, and result CSV export; result persisted under `studyResults.sagTension`. Navigation: `Conductor Sag-Tension` in Studies → Structural; rollup entry `sagtension`; sitemap, workflow dashboard, and page contract registered. Tests: `tests/sagTension.test.mjs`. Docs: `docs/sag-tension.md`. **Scope:** screening-level level-span sag-tension (no inclined spans, creep/initial curve, galloping, or aeolian-vibration limits).
 
 ---
 
@@ -1672,7 +1674,7 @@ CableTrayRoute's calculation breadth is now strong, but several **operations**, 
 - Add a study page that places fixtures on a 2D plan and generates an isolux contour and pass/fail egress line.
 - Tests: IES parser, lumen-method spot check vs. published example, and egress 1 fc / 0.1 fc rule application.
 
-**Status:** Not implemented.
+**Status:** ✅ **Implemented** (reconciled 2026-06-21). `analysis/lighting.mjs` — IES (LM-63) candela-table parser, lumen-method average illuminance (room cavity ratio / coefficient of utilization), and point-by-point egress-path grid. `lighting.html` / `lighting.js` — study page with IES file upload (auto-fills lumens/watts), rectangular-room photometrics, and NFPA 101 §7.9 egress compliance (1 fc average / 0.1 fc minimum). Navigation: `Egress Lighting` in Studies → Safety & Compliance. Rollup entry: `lighting`. Tests: `tests/lighting.test.mjs` (163 assertions).
 
 ---
 
@@ -1720,7 +1722,7 @@ CableTrayRoute's calculation breadth is now strong, but several **operations**, 
 - Add probability-of-violation badges (e.g., P(V<0.95) = 4%) on the one-line.
 - Tests: deterministic seed reproducibility, distribution sampling correctness, and percentile aggregation accuracy.
 
-**Status:** Not implemented.
+**Status:** ✅ **Implemented 2026-06-21.** `analysis/probabilisticLoadFlow.mjs` — seeded `mulberry32` RNG (`makeRng`) for reproducible runs; normal (Box–Muller), uniform, triangular, beta (Marsaglia–Tsang gamma ratio), and empirical-bootstrap samplers behind a `sampleDistribution()` dispatcher with optional clamp bounds; `percentile()`/`summarizeStats()`/`histogram()` aggregation helpers; `runMonteCarloLoadFlow()` scales each scenario's load/generation, solves a single AC load flow, and aggregates loss and minimum-voltage percentiles + histograms, per-bus `P(V<0.95)`/`P(V>1.05)`, overall probability of violation, and warnings. `probabilisticloadflow.html` / `probabilisticloadflow.js` — load and generation distribution editors (type-driven field show/hide), scenario-count and seed controls, KPI cards, loss and min-voltage SVG histograms with a limit marker, per-bus statistics table, and result CSV export; result persisted under `studyResults.probabilisticLoadFlow`. Navigation: `Probabilistic / Monte Carlo Load Flow` in Studies → Power System; rollup entry `probabilisticloadflow`; sitemap, workflow dashboard, and page contract registered. Tests: `tests/probabilisticLoadFlow.test.mjs` (seed reproducibility, sampler mean/variance correctness, percentile accuracy, end-to-end 3-bus runs, violation probability). Docs: `docs/probabilistic-load-flow.md`. **Scope:** system-wide uniform load/generation multipliers (no per-bus input distributions or load–generation correlation).
 
 ---
 
@@ -1755,12 +1757,12 @@ CableTrayRoute's calculation breadth is now strong, but several **operations**, 
 | **P2** | 97 | ~~**Vendor Relay-Settings File Export**~~ | SEL/GE/ABB/Siemens adapters from existing TCC settings | Medium | ✅ Implemented 2026-05-05 |
 | **P3** | 83 | **Real-Time SCADA / Telemetry Live View** | Generic tag adapter + Live mode on one-line | High | Not implemented |
 | **P3** | 84 | **Cybersecurity Compliance Audit (NERC CIP / IEC 62443)** | Cyber-asset metadata + compliance matrix study | High | Not implemented |
-| **P3** | 86 | **Lightning & Surge Protection (IEEE 998 / IEC 62305)** | Rolling-sphere + IEC 62305 risk index + arrester selection | High | Not implemented |
-| **P3** | 87 | **Insulation Coordination (IEC 60071)** | Standard-table lookup + statistical risk-of-failure | Medium | Not implemented |
-| **P3** | 89 | **Substation Physical Layout Generator** | Footprint library + auto-layout from one-line topology | High | Not implemented |
-| **P3** | 95 | **Photometric / Egress Lighting** | LM-63 parser + lumen method + egress check | Medium | Not implemented |
-| **P3** | 98 | **Probabilistic / Monte Carlo Load Flow** | Distribution sampler over existing load flow | High | Not implemented |
-| **P4** | 90 | **Conductor Sag/Tension (Overhead Lines)** | Catenary + ruling span + stringing table | Medium | Not implemented |
+| **P3** | 86 | ~~**Lightning & Surge Protection (IEEE 998 / IEC 62305)**~~ | Rolling-sphere + IEC 62305 risk index + arrester selection | High | ✅ Implemented 2026-06-21 |
+| **P3** | 87 | ~~**Insulation Coordination (IEC 60071)**~~ | Standard-table lookup + statistical risk-of-failure | Medium | ✅ Implemented |
+| **P3** | 89 | ~~**Substation Physical Layout Generator**~~ | Footprint library + auto-layout from one-line topology | High | ✅ Implemented 2026-06-21 |
+| **P3** | 95 | ~~**Photometric / Egress Lighting**~~ | LM-63 parser + lumen method + egress check | Medium | ✅ Implemented |
+| **P3** | 98 | ~~**Probabilistic / Monte Carlo Load Flow**~~ | Distribution sampler over existing load flow | High | ✅ Implemented 2026-06-21 |
+| **P4** | 90 | ~~**Conductor Sag/Tension (Overhead Lines)**~~ | Catenary + ruling span + stringing table | Medium | ✅ Implemented 2026-06-21 |
 
 ---
 
@@ -2006,6 +2008,6 @@ Full IEC 60909-0:2016 equivalent voltage source method implemented in `analysis/
 | **P2** | 66 | ~~**Generator Sizing (NFPA 110)**~~ | `analysis/generatorSizing.mjs` | Medium | ✅ Implemented 2026-04-12 |
 | **P2** | 67 | ~~**Differential Protection (87B/T/G)**~~ | `analysis/differentialProtection.mjs`, `data/protectiveDevices.json` | Medium | ✅ Implemented 2026-04-19 |
 | **P3** | 64 | ~~**Voltage Stability (P-V / Q-V)**~~ | `analysis/voltageStability.mjs` | High | ✅ Implemented 2026-04-20 |
-| **P3** | 65 | **Optimal Power Flow / Economic Dispatch** | `analysis/optimalPowerFlow.mjs` | High | Not implemented |
+| **P3** | 65 | ~~**Optimal Power Flow / Economic Dispatch**~~ | `analysis/optimalPowerFlow.mjs` | High | ✅ Implemented 2026-06-21 |
 
 | **P3** | 70 | ~~**Voltage Flicker (Pst/Plt)**~~ | `analysis/voltageFlicker.mjs` | Medium | ✅ Implemented 2026-04-19 |

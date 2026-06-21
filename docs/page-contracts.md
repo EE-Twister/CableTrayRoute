@@ -8,7 +8,7 @@ This document defines handoff-level inputs, outputs, readiness rules, and downst
 
 Standard readiness vocabulary: Ready, Missing inputs, Downstream handoff.
 
-Coverage: 72 contracts for 72 navigation routes.
+Coverage: 77 contracts for 77 navigation routes.
 
 ## Workflow
 
@@ -2093,6 +2093,65 @@ Coverage: 72 contracts for 72 navigation routes.
 **Notes**
 - None.
 
+#### Optimal Power Flow / Economic Dispatch (`optimalpowerflow.html`)
+
+- Section: Studies
+- Group: Power System
+- Workflow step: studies
+
+**Standalone Inputs**
+- Generator fleet (Pmin/Pmax and quadratic cost curves), system demand, and transmission loss allowance.
+
+**Project Inputs**
+- `settings.designBasis` (setting, optional): Project code basis, sizing defaults, routing defaults, and study prerequisites.
+- `settings.studyApprovals` (setting, optional): Engineer review records for study outputs.
+
+**Outputs**
+- `studyResults.optimalPowerFlow` (study-result): Saved economic dispatch schedule, system lambda, and cost summary. Consumers: `projectreport.html`.
+- `settings.studyApprovals` (setting): Engineer approval records written by the shared study approval panel. Consumers: `projectreport.html`.
+- `export-only` (export): Economic dispatch schedule and fleet CSV exports. Consumers: `projectreport.html`.
+
+**Readiness**
+- Ready when: Ready when at least one generator and a valid demand are entered.
+- Blockers: No generators defined or invalid demand/cost inputs.
+
+**Downstream Pages**
+- `projectreport.html`
+
+**Notes**
+- None.
+
+#### Probabilistic / Monte Carlo Load Flow (`probabilisticloadflow.html`)
+
+- Section: Studies
+- Group: Power System
+- Workflow step: studies
+
+**Standalone Inputs**
+- Load and generation multiplier distributions, scenario count, and random seed.
+
+**Project Inputs**
+- `oneLineDiagram` (model, required): One-line components, connections, sheets, layers, and linked schedule references.
+- `loadList` (schedule, required): Load tags, source relationships, demand values, and operating metadata.
+- `studyResults.loadFlow` (study-result, optional): Base load flow model and operating point.
+- `settings.designBasis` (setting, optional): Project code basis, sizing defaults, routing defaults, and study prerequisites.
+- `settings.studyApprovals` (setting, optional): Engineer review records for study outputs.
+
+**Outputs**
+- `studyResults.probabilisticLoadFlow` (study-result): Saved Monte Carlo voltage/loss statistics and per-bus violation probabilities. Consumers: `projectreport.html`.
+- `settings.studyApprovals` (setting): Engineer approval records written by the shared study approval panel. Consumers: `projectreport.html`.
+- `export-only` (export): Probabilistic load flow histograms and CSV exports. Consumers: `projectreport.html`.
+
+**Readiness**
+- Ready when: Ready when a base model and valid input distributions are available.
+- Blockers: Missing base load-flow context or invalid distribution/sampling inputs.
+
+**Downstream Pages**
+- `projectreport.html`
+
+**Notes**
+- None.
+
 #### Voltage Stability (`voltagestability.html`)
 
 - Section: Studies
@@ -2242,6 +2301,66 @@ Coverage: 72 contracts for 72 navigation routes.
 **Notes**
 - None.
 
+### Structural
+
+#### Conductor Sag-Tension (`sagtension.html`)
+
+- Section: Studies
+- Group: Structural
+- Workflow step: studies
+
+**Standalone Inputs**
+- Conductor selection, span lengths, NESC loading district, design tension % UTS, and stringing temperature range.
+
+**Project Inputs**
+- `settings.designBasis` (setting, optional): Project code basis, sizing defaults, routing defaults, and study prerequisites.
+- `settings.studyApprovals` (setting, optional): Engineer review records for study outputs.
+
+**Outputs**
+- `studyResults.sagTension` (study-result): Saved ruling span, design sag-tension, loading cases, and stringing table. Consumers: `projectreport.html`.
+- `settings.studyApprovals` (setting): Engineer approval records written by the shared study approval panel. Consumers: `projectreport.html`.
+- `export-only` (export): Sag-tension loading cases and stringing-table CSV exports. Consumers: `projectreport.html`.
+
+**Readiness**
+- Ready when: Ready when a conductor and at least one span are entered.
+- Blockers: No conductor selected or no valid span lengths.
+
+**Downstream Pages**
+- `projectreport.html`
+
+**Notes**
+- None.
+
+#### Substation Layout Generator (`substationlayout.html`)
+
+- Section: Studies
+- Group: Structural
+- Workflow step: studies
+
+**Standalone Inputs**
+- Equipment list (tag, type, voltage) entered manually, loaded from the sample yard, or imported from the one-line.
+
+**Project Inputs**
+- `oneLineDiagram` (model, required): One-line components, connections, sheets, layers, and linked schedule references.
+- `settings.designBasis` (setting, optional): Project code basis, sizing defaults, routing defaults, and study prerequisites.
+- `settings.studyApprovals` (setting, optional): Engineer review records for study outputs.
+
+**Outputs**
+- `studyResults.substationLayout` (study-result): Saved equipment placement, fenced area, and ground-grid perimeter. Consumers: `groundgrid.html`, `projectreport.html`.
+- `settings.studyApprovals` (setting): Engineer approval records written by the shared study approval panel. Consumers: `projectreport.html`.
+- `export-only` (export): Substation layout placement CSV exports. Consumers: `projectreport.html`.
+
+**Readiness**
+- Ready when: Ready when at least one piece of placeable equipment is defined.
+- Blockers: No equipment entered or imported from the one-line.
+
+**Downstream Pages**
+- `groundgrid.html`
+- `projectreport.html`
+
+**Notes**
+- None.
+
 ### Safety & Compliance
 
 #### Egress Lighting (`lighting.html`)
@@ -2296,6 +2415,34 @@ Coverage: 72 contracts for 72 navigation routes.
 **Readiness**
 - Ready when: Ready when grid geometry, soil model, and fault clearing inputs are valid.
 - Blockers: Missing grid dimensions, soil data, fault current, or clearing time.
+
+**Downstream Pages**
+- `projectreport.html`
+
+**Notes**
+- None.
+
+#### Lightning & Surge Protection (`lightningprotection.html`)
+
+- Section: Studies
+- Group: Grounding
+- Workflow step: studies
+
+**Standalone Inputs**
+- Keraunic level or ground flash density, location factor, structure geometry, tolerable strike frequency, and optional system voltage/grounding.
+
+**Project Inputs**
+- `settings.designBasis` (setting, optional): Project code basis, sizing defaults, routing defaults, and study prerequisites.
+- `settings.studyApprovals` (setting, optional): Engineer review records for study outputs.
+
+**Outputs**
+- `studyResults.lightningProtection` (study-result): Saved lightning risk, recommended LPL, rolling-sphere sizing, and arrester MCOV. Consumers: `projectreport.html`.
+- `settings.studyApprovals` (setting): Engineer approval records written by the shared study approval panel. Consumers: `projectreport.html`.
+- `export-only` (export): Lightning protection assessment CSV exports. Consumers: `projectreport.html`.
+
+**Readiness**
+- Ready when: Ready when structure geometry and a flash-density input are valid.
+- Blockers: Missing structure dimensions or ground flash density / thunderstorm-day input.
 
 **Downstream Pages**
 - `projectreport.html`
