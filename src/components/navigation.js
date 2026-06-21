@@ -69,6 +69,7 @@ export const NAV_ROUTES = [
   { href: 'insulationcoordination.html', label: 'Insulation Coordination (BIL/SIL)', section: 'Studies', group: 'Protection', icon: 'icons/toolbar/validate.svg' },
   { href: 'lighting.html', label: 'Egress Lighting', section: 'Studies', group: 'Safety & Compliance', icon: 'icons/toolbar/validate.svg' },
   { href: 'groundgrid.html', label: 'Ground Grid', section: 'Studies', group: 'Grounding', icon: 'icons/toolbar/validate.svg' },
+  { href: 'lightningprotection.html', label: 'Lightning & Surge Protection', section: 'Studies', group: 'Grounding', icon: 'icons/toolbar/validate.svg' },
   { href: 'cathodicprotection.html', label: 'Cathodic Protection', section: 'Studies', group: 'Corrosion Control', icon: 'icons/toolbar/validate.svg' },
   { href: 'dissimilarmetals.html', label: 'Dissimilar Metals', section: 'Studies', group: 'Corrosion Control', icon: 'icons/toolbar/validate.svg' },
   { href: 'autosize.html', label: 'Auto-Size', section: 'Studies', group: 'Cable', icon: 'icons/toolbar/grid-size.svg' },

@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Lightning & Surge Protection — IEC 62305 / IEEE 998 risk assessment, rolling-sphere protective radius, down-conductor sizing, and surge-arrester MCOV selection for substations and structures." />
+  <title>Lightning &amp; Surge Protection — CableTrayRoute</title>
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/favicon.svg">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Lightning &amp; Surge Protection — CableTrayRoute">
+  <meta property="og:description" content="IEC 62305 / IEEE 998 lightning risk assessment, rolling-sphere protective radius, down-conductor sizing, and surge-arrester MCOV.">
+  <meta property="og:image" content="https://cabletrayroute.com/icons/og-preview.png">
+  <meta property="og:site_name" content="CableTrayRoute">
+  <meta property="og:url" content="lightningprotection.html">
+  <link rel="canonical" href="https://cabletrayroute.com/lightningprotection.html">
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+  <meta name="color-scheme" content="light dark">
+  <link rel="stylesheet" href="style.css" />
+  <script type="module" src="dirtyTracker.js"></script>
+  <script type="module" src="dist/lightningprotection.js" defer></script>
+</head>
+<body class="lightningprotection-page" data-report-title="Lightning &amp; Surge Protection">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <nav class="top-nav" aria-label="Primary">
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
+      <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+    <div id="nav-links" class="nav-links" role="list">
+      <!-- Populated dynamically by navigation.js -->
+    </div>
+    <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+  </nav>
+
+  <div id="settings-menu" class="settings-menu">
+    <label for="theme-select">Theme
+      <select id="theme-select">
+        <option value="system">System</option>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+        <option value="high-contrast">High Contrast</option>
+      </select>
+    </label>
+    <label><input type="checkbox" id="compact-toggle" aria-label="Enable compact table mode"> Compact Mode</label>
+    <button id="help-btn" class="btn" aria-expanded="false" title="Show help">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Site Help</span>
+    </button>
+    <button id="new-project-btn" title="Start a new project">
+      <img src="icons/toolbar/copy.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>New Project</span>
+    </button>
+    <button id="save-project-btn" title="Save current project">
+      <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Save Project</span>
+    </button>
+    <button id="load-project-btn" title="Load an existing project">
+      <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Load Project</span>
+    </button>
+    <button id="export-project-btn" title="Export project data">
+      <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Export Project</span>
+    </button>
+    <button id="import-project-btn" title="Import project data">
+      <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Import Project</span>
+    </button>
+    <input type="file" id="import-project-input" accept=".ctr.json" class="hidden" title="Select project file">
+  </div>
+
+  <div class="container">
+    <main id="main-content" class="main-content">
+      <header class="page-header">
+        <h1>Lightning &amp; Surge Protection</h1>
+      </header>
+
+      <details class="method-panel">
+        <summary>Method &amp; Assumptions</summary>
+        <p>This study performs a screening-level lightning protection assessment per IEC 62305 (structural LPS) and IEEE 998 (substation shielding), and recommends a surge-arrester continuous operating voltage per IEEE C62.22 / IEC 60099-5.</p>
+        <p><strong>Risk:</strong></p>
+        <pre>Ng = 0.04 · Td^1.25                  (flashes/km²/yr)
+Ad = L·W + 2·(3H)(L+W) + π·(3H)²     (collection area, m²)
+Nd = Ng · Ad · Cd · 1e-6             (direct strikes/yr)
+E  = 1 − Nc/Nd  →  LPL I / II / III / IV</pre>
+        <p>The required Lightning Protection Level (LPL) comes from the protection-efficiency table: E&gt;0.98 → I, &gt;0.95 → II, &gt;0.90 → III, &gt;0.80 → IV.</p>
+        <p><strong>Rolling sphere (electrogeometric model):</strong> each LPL has a sphere radius R (I=20 m, II=30 m, III=45 m, IV=60 m). A single mast of height h protects an object of height hx out to a radius:</p>
+        <pre>rp = √(h(2R − h)) − √(hx(2R − hx))</pre>
+        <p><strong>Surge arrester:</strong> minimum MCOV Uc ≥ 1.05·V<sub>LL</sub>/√3 (effectively grounded) or 1.05·V<sub>LL</sub> (ungrounded); rated voltage ≈ MCOV/0.8.</p>
+        <p><strong>References:</strong> IEC 62305-1/-2/-3; IEEE Std 998; IEEE C62.22 / IEC 60099-5.</p>
+      </details>
+
+      <form id="lp-form" novalidate>
+
+        <fieldset>
+          <legend><strong>Lightning Exposure</strong></legend>
+          <div class="field-row">
+            <label for="ng-mode">Flash density input</label>
+            <select id="ng-mode">
+              <option value="td" selected>Thunderstorm days (keraunic level)</option>
+              <option value="direct">Ground flash density (direct)</option>
+            </select>
+          </div>
+          <div class="field-row" id="row-td">
+            <label for="td">Thunderstorm days</label>
+            <input type="number" id="td" min="0" step="any" value="40" aria-describedby="td-hint">
+            <span class="field-unit">days/yr</span>
+            <p id="td-hint" class="field-hint">Annual keraunic level for the site (isokeraunic map). Ng = 0.04·Td^1.25.</p>
+          </div>
+          <div class="field-row" id="row-ng" hidden>
+            <label for="ng">Ground flash density</label>
+            <input type="number" id="ng" min="0" step="any" value="3.0">
+            <span class="field-unit">/km²/yr</span>
+          </div>
+          <div class="field-row">
+            <label for="location">Location factor (Cd)</label>
+            <select id="location">
+              <option value="surroundedTaller">Surrounded by taller objects (0.25)</option>
+              <option value="surroundedEqual">Surrounded by equal/shorter objects (0.5)</option>
+              <option value="isolated" selected>Isolated, no nearby objects (1.0)</option>
+              <option value="hilltop">Isolated on a hilltop (2.0)</option>
+            </select>
+          </div>
+          <div class="field-row">
+            <label for="nc">Tolerable strike frequency (Nc)</label>
+            <input type="number" id="nc" min="0" step="any" value="0.001" aria-describedby="nc-hint">
+            <span class="field-unit">/yr</span>
+            <p id="nc-hint" class="field-hint">Acceptable annual direct-strike frequency used to set the required protection efficiency.</p>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend><strong>Structure Geometry</strong></legend>
+          <div class="field-row">
+            <label for="length">Length</label>
+            <input type="number" id="length" min="0.1" step="any" value="60" required>
+            <span class="field-unit">m</span>
+            <label for="width">Width</label>
+            <input type="number" id="width" min="0.1" step="any" value="40" required>
+            <span class="field-unit">m</span>
+            <label for="height">Height</label>
+            <input type="number" id="height" min="0.1" step="any" value="25" required>
+            <span class="field-unit">m</span>
+          </div>
+          <div class="field-row">
+            <label for="protected-height">Protected equipment height</label>
+            <input type="number" id="protected-height" min="0" step="any" value="3" aria-describedby="ph-hint">
+            <span class="field-unit">m</span>
+            <p id="ph-hint" class="field-hint">Height of the equipment to be protected, used for the single-mast protective radius.</p>
+          </div>
+          <div class="field-row">
+            <label for="down-material">Down-conductor material</label>
+            <select id="down-material">
+              <option value="copper" selected>Copper (min 16 mm²)</option>
+              <option value="aluminum">Aluminum (min 25 mm²)</option>
+              <option value="steel">Steel (min 50 mm²)</option>
+            </select>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend><strong>Surge Arrester (optional)</strong></legend>
+          <div class="field-row">
+            <label for="system-kv">System voltage (L-L)</label>
+            <input type="number" id="system-kv" min="0" step="any" value="138" aria-describedby="kv-hint">
+            <span class="field-unit">kV</span>
+            <p id="kv-hint" class="field-hint">Leave blank to skip surge-arrester selection.</p>
+          </div>
+          <div class="field-row">
+            <label for="grounding">System grounding</label>
+            <select id="grounding">
+              <option value="solid" selected>Effectively / solidly grounded</option>
+              <option value="ungrounded">Ungrounded / resonant-grounded</option>
+            </select>
+          </div>
+        </fieldset>
+
+        <div class="form-actions">
+          <button type="submit" id="run-btn" class="btn btn-primary">Run Lightning Assessment</button>
+          <button type="button" id="export-csv-btn" class="btn" hidden>Export Results (CSV)</button>
+        </div>
+      </form>
+
+      <div id="calc-errors" class="result-fail" hidden aria-live="polite"></div>
+
+      <div id="results" aria-live="polite"></div>
+
+      <section class="card">
+        <div id="study-basis-panel"></div>
+      </section>
+
+      <section class="card">
+        <div id="study-approval-panel"></div>
+      </section>
+
+      <nav class="step-nav" aria-label="Workflow navigation">
+        <a href="groundgrid.html" class="step-nav-prev">← Ground Grid</a>
+        <a href="emf.html" class="step-nav-next">EMF Analysis →</a>
+      </nav>
+
+    </main>
+  </div>
+
+  <div id="help-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="help-modal-title" hidden>
+    <div class="modal-content">
+      <button id="close-help-btn" class="modal-close" aria-label="Close help">×</button>
+      <h2 id="help-modal-title">Lightning &amp; Surge Protection Help</h2>
+      <p>This study estimates lightning strike risk to a structure, recommends a Lightning Protection Level, sizes the rolling-sphere air termination and down-conductors, and selects a surge-arrester rating.</p>
+      <h3>When to use</h3>
+      <ul>
+        <li>Utility substation direct-stroke shielding (IEEE 998).</li>
+        <li>Structural lightning protection for control buildings, telecom huts, and BESS enclosures (IEC 62305).</li>
+        <li>Surge-arrester MCOV selection for incoming line protection.</li>
+      </ul>
+      <h3>Inputs</h3>
+      <ul>
+        <li><strong>Thunderstorm days</strong> — the site keraunic level from an isokeraunic map, or enter the ground flash density directly.</li>
+        <li><strong>Location factor</strong> — accounts for nearby taller objects that intercept strikes.</li>
+        <li><strong>Structure geometry</strong> — sets the equivalent collection area.</li>
+        <li><strong>System voltage / grounding</strong> — drives the surge-arrester MCOV.</li>
+      </ul>
+      <h3>Interpreting results</h3>
+      <ul>
+        <li><strong>Required LPL</strong> — the protection class that brings the residual strike frequency below the tolerable value.</li>
+        <li><strong>Rolling-sphere radius</strong> and <strong>single-mast protective radius</strong> size the air termination.</li>
+        <li><strong>Down-conductors</strong> — count and minimum cross-section per the class spacing.</li>
+        <li><strong>Surge arrester</strong> — minimum MCOV and the nearest standard duty-cycle rating.</li>
+      </ul>
+      <h3>Limitations</h3>
+      <ul>
+        <li>Screening-level — a simplified single-component risk, not the full IEC 62305-2 R1–R4 assessment.</li>
+        <li>Single-mast protection only; multi-mast and shield-wire layouts need a dedicated study.</li>
+        <li>Verify against a full risk assessment before final design.</li>
+      </ul>
+    </div>
+  </div>
+
+  <footer class="site-footer">
+    <div class="footer-left">
+      <img src="icons/route.svg" alt="CableTrayRoute logo" class="footer-logo" loading="lazy" decoding="async">
+      <span>CableTrayRoute</span>
+    </div>
+    <nav class="footer-links" aria-label="Footer">
+      <a href="docs/index.html">Docs</a>
+      <a href="docs/quickstart.html">Quick Start</a>
+      <a href="index.html">Home</a>
+    </nav>
+  </footer>
+
+</body>
+</html>

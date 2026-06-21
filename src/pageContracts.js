@@ -767,6 +767,18 @@ export const PAGE_CONTRACTS_BY_HREF = {
     readiness: ready('Ready when a conductor and at least one span are entered.', ['No conductor selected or no valid span lengths.']),
     downstream: ['projectreport.html']
   }),
+  'lightningprotection.html': contract({
+    workflowStep: 'studies',
+    standaloneInputs: ['Keraunic level or ground flash density, location factor, structure geometry, tolerable strike frequency, and optional system voltage/grounding.'],
+    projectInputs: [designBasis, approvals],
+    outputs: [
+      output('studyResults.lightningProtection', 'study-result', 'Saved lightning risk, recommended LPL, rolling-sphere sizing, and arrester MCOV.', ['projectreport.html']),
+      studyApprovalOutput,
+      exportOnly('Lightning protection assessment CSV exports.', ['projectreport.html'])
+    ],
+    readiness: ready('Ready when structure geometry and a flash-density input are valid.', ['Missing structure dimensions or ground flash density / thunderstorm-day input.']),
+    downstream: ['projectreport.html']
+  }),
   'voltagestability.html': contract({
     workflowStep: 'studies',
     standaloneInputs: ['PV/QV curve inputs, selected bus, load scaling, and solver settings.'],

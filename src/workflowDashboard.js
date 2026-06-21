@@ -45,6 +45,7 @@ const STUDY_DEFINITIONS = [
   { key: 'optimalPowerFlow', label: 'Optimal Power Flow', href: 'optimalpowerflow.html' },
   { key: 'probabilisticLoadFlow', label: 'Probabilistic Load Flow', href: 'probabilisticloadflow.html' },
   { key: 'sagTension', label: 'Conductor Sag-Tension', href: 'sagtension.html' },
+  { key: 'lightningProtection', label: 'Lightning Protection', href: 'lightningprotection.html' },
   { key: 'lighting',               label: 'Egress Lighting',         href: 'lighting.html' },
   { key: 'trustCenter',            label: 'Trust Center',            href: 'trustcenter.html' },
 ];

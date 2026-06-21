@@ -8,7 +8,7 @@ This document defines handoff-level inputs, outputs, readiness rules, and downst
 
 Standard readiness vocabulary: Ready, Missing inputs, Downstream handoff.
 
-Coverage: 75 contracts for 75 navigation routes.
+Coverage: 76 contracts for 76 navigation routes.
 
 ## Workflow
 
@@ -2385,6 +2385,34 @@ Coverage: 75 contracts for 75 navigation routes.
 **Readiness**
 - Ready when: Ready when grid geometry, soil model, and fault clearing inputs are valid.
 - Blockers: Missing grid dimensions, soil data, fault current, or clearing time.
+
+**Downstream Pages**
+- `projectreport.html`
+
+**Notes**
+- None.
+
+#### Lightning & Surge Protection (`lightningprotection.html`)
+
+- Section: Studies
+- Group: Grounding
+- Workflow step: studies
+
+**Standalone Inputs**
+- Keraunic level or ground flash density, location factor, structure geometry, tolerable strike frequency, and optional system voltage/grounding.
+
+**Project Inputs**
+- `settings.designBasis` (setting, optional): Project code basis, sizing defaults, routing defaults, and study prerequisites.
+- `settings.studyApprovals` (setting, optional): Engineer review records for study outputs.
+
+**Outputs**
+- `studyResults.lightningProtection` (study-result): Saved lightning risk, recommended LPL, rolling-sphere sizing, and arrester MCOV. Consumers: `projectreport.html`.
+- `settings.studyApprovals` (setting): Engineer approval records written by the shared study approval panel. Consumers: `projectreport.html`.
+- `export-only` (export): Lightning protection assessment CSV exports. Consumers: `projectreport.html`.
+
+**Readiness**
+- Ready when: Ready when structure geometry and a flash-density input are valid.
+- Blockers: Missing structure dimensions or ground flash density / thunderstorm-day input.
 
 **Downstream Pages**
 - `projectreport.html`

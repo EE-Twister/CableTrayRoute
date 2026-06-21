@@ -84,6 +84,7 @@ const entries = {
   optimalpowerflow: 'src/optimalPowerFlow.js',
   probabilisticloadflow: 'src/probabilisticLoadFlow.js',
   sagtension: 'src/sagTension.js',
+  lightningprotection: 'src/lightningProtection.js',
   bessHazard: 'src/bessHazard.js',
   hazareaclassification: 'src/hazareaclassification.js',
   admin: 'src/admin.js',

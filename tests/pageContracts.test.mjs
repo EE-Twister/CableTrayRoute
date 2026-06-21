@@ -67,7 +67,7 @@ assert.deepStrictEqual(READINESS_VOCABULARY, {
   missingInputs: 'Missing inputs',
   downstreamHandoff: 'Downstream handoff'
 });
-assert.equal(scopedRoutes.length, 75);
+assert.equal(scopedRoutes.length, 76);
 assert.equal(coverage.totalRoutes, scopedRoutes.length);
 assert.equal(coverage.totalContracts, scopedRoutes.length);
 assert.deepStrictEqual(coverage.missing, []);
