@@ -43,6 +43,7 @@ const STUDY_DEFINITIONS = [
   { key: 'insulationCoordination', label: 'Insulation Coordination', href: 'insulationcoordination.html' },
   { key: 'cableThermalEnvironment', label: 'Cable Thermal Environment', href: 'cablethermalenv.html' },
   { key: 'optimalPowerFlow', label: 'Optimal Power Flow', href: 'optimalpowerflow.html' },
+  { key: 'probabilisticLoadFlow', label: 'Probabilistic Load Flow', href: 'probabilisticloadflow.html' },
   { key: 'lighting',               label: 'Egress Lighting',         href: 'lighting.html' },
   { key: 'trustCenter',            label: 'Trust Center',            href: 'trustcenter.html' },
 ];

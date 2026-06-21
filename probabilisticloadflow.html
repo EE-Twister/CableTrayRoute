@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Probabilistic / Monte Carlo Load Flow — sample stochastic load and renewable-generation distributions across many AC load-flow runs to produce voltage and loss probability statistics and the probability of a voltage-limit violation." />
+  <title>Probabilistic / Monte Carlo Load Flow — CableTrayRoute</title>
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/favicon.svg">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Probabilistic / Monte Carlo Load Flow — CableTrayRoute">
+  <meta property="og:description" content="Monte Carlo load flow over stochastic load and renewable generation. Voltage/loss percentiles, histograms, and probability-of-violation per bus.">
+  <meta property="og:image" content="https://cabletrayroute.com/icons/og-preview.png">
+  <meta property="og:site_name" content="CableTrayRoute">
+  <meta property="og:url" content="probabilisticloadflow.html">
+  <link rel="canonical" href="https://cabletrayroute.com/probabilisticloadflow.html">
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+  <meta name="color-scheme" content="light dark">
+  <link rel="stylesheet" href="style.css" />
+  <script type="module" src="dirtyTracker.js"></script>
+  <script type="module" src="dist/probabilisticloadflow.js" defer></script>
+</head>
+<body class="probabilisticloadflow-page" data-report-title="Probabilistic / Monte Carlo Load Flow">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <nav class="top-nav" aria-label="Primary">
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
+      <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+    <div id="nav-links" class="nav-links" role="list">
+      <!-- Populated dynamically by navigation.js -->
+    </div>
+    <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+  </nav>
+
+  <div id="settings-menu" class="settings-menu">
+    <label for="theme-select">Theme
+      <select id="theme-select">
+        <option value="system">System</option>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+        <option value="high-contrast">High Contrast</option>
+      </select>
+    </label>
+    <label><input type="checkbox" id="compact-toggle" aria-label="Enable compact table mode"> Compact Mode</label>
+    <button id="help-btn" class="btn" aria-expanded="false" title="Show help">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Site Help</span>
+    </button>
+    <button id="new-project-btn" title="Start a new project">
+      <img src="icons/toolbar/copy.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>New Project</span>
+    </button>
+    <button id="save-project-btn" title="Save current project">
+      <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Save Project</span>
+    </button>
+    <button id="load-project-btn" title="Load an existing project">
+      <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Load Project</span>
+    </button>
+    <button id="export-project-btn" title="Export project data">
+      <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Export Project</span>
+    </button>
+    <button id="import-project-btn" title="Import project data">
+      <img src="icons/toolbar/import.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+      <span>Import Project</span>
+    </button>
+    <input type="file" id="import-project-input" accept=".ctr.json" class="hidden" title="Select project file">
+  </div>
+
+  <div class="container">
+    <main id="main-content" class="main-content">
+      <header class="page-header">
+        <h1>Probabilistic / Monte Carlo Load Flow</h1>
+      </header>
+
+      <details class="method-panel">
+        <summary>Method &amp; Assumptions</summary>
+        <p>The probabilistic load flow runs the AC Newton-Raphson solver across many randomly sampled scenarios. Each scenario draws a system load multiplier and a generation multiplier from the distributions you define, then solves a single load flow. Aggregating the results produces probability statistics for bus voltages and system losses.</p>
+        <p><strong>Per-scenario model:</strong></p>
+        <pre>loadScale ~ loadDist     Pd = Pd_base × loadScale
+genScale  ~ genDist      Pg = Pg_base × genScale</pre>
+        <p>The base case is taken from the current project's one-line diagram (draw it on the <a href="oneline.html">One-Line</a> page). A seeded random number generator makes every run fully reproducible: the same seed always yields identical results.</p>
+        <p><strong>Distributions supported:</strong> constant, normal (mean, sd), uniform (min, max), triangular (min, mode, max), beta (α, β on [0,1] — ideal for renewable capacity factor), and empirical (bootstrap from a sample list). Optional clamp bounds keep multipliers physical (e.g. load ≥ 0).</p>
+        <p><strong>Voltage limits (ANSI C84.1 Range A):</strong> a scenario is counted as a violation if any bus falls outside 0.95–1.05 pu. The probability of violation is reported overall and per bus.</p>
+        <p><strong>References:</strong> IEEE Std 399-1997 §14; Borkowska (1974), "Probabilistic Load Flow", IEEE Trans. PAS-93.</p>
+      </details>
+
+      <form id="mc-form" novalidate>
+
+        <fieldset>
+          <legend><strong>Base Case</strong></legend>
+          <p class="field-hint">Loads and generation are read from the project one-line diagram and scaled per scenario by the distributions below.</p>
+          <div class="field-row">
+            <label for="base-mva">System base MVA</label>
+            <input type="number" id="base-mva" min="0.001" step="any" value="100" required>
+            <span class="field-unit">MVA</span>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend><strong>Load Multiplier Distribution</strong></legend>
+          <div class="field-row">
+            <label for="load-type">Distribution</label>
+            <select id="load-type">
+              <option value="normal" selected>Normal (mean, sd)</option>
+              <option value="uniform">Uniform (min, max)</option>
+              <option value="triangular">Triangular (min, mode, max)</option>
+              <option value="beta">Beta (α, β)</option>
+              <option value="empirical">Empirical (sample list)</option>
+              <option value="constant">Constant</option>
+            </select>
+          </div>
+          <div class="field-row" data-dist="load" data-for="constant normal">
+            <label for="load-mean">Mean / value</label>
+            <input type="number" id="load-mean" step="any" value="1.0">
+          </div>
+          <div class="field-row" data-dist="load" data-for="normal">
+            <label for="load-sd">Std deviation</label>
+            <input type="number" id="load-sd" step="any" min="0" value="0.1">
+          </div>
+          <div class="field-row" data-dist="load" data-for="uniform triangular">
+            <label for="load-min">Min</label>
+            <input type="number" id="load-min" step="any" value="0.8">
+          </div>
+          <div class="field-row" data-dist="load" data-for="triangular">
+            <label for="load-mode">Mode</label>
+            <input type="number" id="load-mode" step="any" value="1.0">
+          </div>
+          <div class="field-row" data-dist="load" data-for="uniform triangular">
+            <label for="load-max">Max</label>
+            <input type="number" id="load-max" step="any" value="1.2">
+          </div>
+          <div class="field-row" data-dist="load" data-for="beta">
+            <label for="load-alpha">Alpha (α)</label>
+            <input type="number" id="load-alpha" step="any" min="0" value="2">
+          </div>
+          <div class="field-row" data-dist="load" data-for="beta">
+            <label for="load-beta">Beta (β)</label>
+            <input type="number" id="load-beta" step="any" min="0" value="2">
+          </div>
+          <div class="field-row" data-dist="load" data-for="empirical">
+            <label for="load-values">Sample values</label>
+            <input type="text" id="load-values" value="0.8, 0.9, 1.0, 1.1, 1.2" placeholder="comma-separated">
+          </div>
+          <div class="field-row">
+            <label for="load-clampmin">Clamp min</label>
+            <input type="number" id="load-clampmin" step="any" value="0" aria-describedby="load-clamp-hint">
+            <label for="load-clampmax">Clamp max</label>
+            <input type="number" id="load-clampmax" step="any" value="">
+            <p id="load-clamp-hint" class="field-hint">Optional bounds applied after sampling (leave max blank for none).</p>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend><strong>Generation Multiplier Distribution</strong></legend>
+          <p class="field-hint">For renewable-rich feeders, set this to Beta (α, β) to model PV/wind capacity factor on [0, 1]. Leave as Constant 1.0 for fixed dispatch.</p>
+          <div class="field-row">
+            <label for="gen-type">Distribution</label>
+            <select id="gen-type">
+              <option value="constant" selected>Constant</option>
+              <option value="normal">Normal (mean, sd)</option>
+              <option value="uniform">Uniform (min, max)</option>
+              <option value="triangular">Triangular (min, mode, max)</option>
+              <option value="beta">Beta (α, β)</option>
+              <option value="empirical">Empirical (sample list)</option>
+            </select>
+          </div>
+          <div class="field-row" data-dist="gen" data-for="constant normal">
+            <label for="gen-mean">Mean / value</label>
+            <input type="number" id="gen-mean" step="any" value="1.0">
+          </div>
+          <div class="field-row" data-dist="gen" data-for="normal">
+            <label for="gen-sd">Std deviation</label>
+            <input type="number" id="gen-sd" step="any" min="0" value="0.2">
+          </div>
+          <div class="field-row" data-dist="gen" data-for="uniform triangular">
+            <label for="gen-min">Min</label>
+            <input type="number" id="gen-min" step="any" value="0">
+          </div>
+          <div class="field-row" data-dist="gen" data-for="triangular">
+            <label for="gen-mode">Mode</label>
+            <input type="number" id="gen-mode" step="any" value="0.5">
+          </div>
+          <div class="field-row" data-dist="gen" data-for="uniform triangular">
+            <label for="gen-max">Max</label>
+            <input type="number" id="gen-max" step="any" value="1.0">
+          </div>
+          <div class="field-row" data-dist="gen" data-for="beta">
+            <label for="gen-alpha">Alpha (α)</label>
+            <input type="number" id="gen-alpha" step="any" min="0" value="2">
+          </div>
+          <div class="field-row" data-dist="gen" data-for="beta">
+            <label for="gen-beta">Beta (β)</label>
+            <input type="number" id="gen-beta" step="any" min="0" value="5">
+          </div>
+          <div class="field-row" data-dist="gen" data-for="empirical">
+            <label for="gen-values">Sample values</label>
+            <input type="text" id="gen-values" value="0, 0.25, 0.5, 0.75, 1.0" placeholder="comma-separated">
+          </div>
+          <div class="field-row">
+            <label for="gen-clampmin">Clamp min</label>
+            <input type="number" id="gen-clampmin" step="any" value="0">
+            <label for="gen-clampmax">Clamp max</label>
+            <input type="number" id="gen-clampmax" step="any" value="">
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend><strong>Sampling</strong></legend>
+          <div class="field-row">
+            <label for="samples">Scenarios</label>
+            <input type="number" id="samples" min="1" max="20000" step="1" value="1000" required aria-describedby="samples-hint">
+            <p id="samples-hint" class="field-hint">Number of Monte Carlo runs (1–20000). More scenarios give smoother distributions but take longer.</p>
+          </div>
+          <div class="field-row">
+            <label for="seed">Random seed</label>
+            <input type="number" id="seed" step="1" value="12345" required aria-describedby="seed-hint">
+            <p id="seed-hint" class="field-hint">Integer seed for reproducibility — the same seed always produces identical results.</p>
+          </div>
+        </fieldset>
+
+        <div class="form-actions">
+          <button type="submit" id="run-btn" class="btn btn-primary">Run Monte Carlo</button>
+          <button type="button" id="export-csv-btn" class="btn" hidden>Export Results (CSV)</button>
+        </div>
+      </form>
+
+      <div id="calc-errors" class="result-fail" hidden aria-live="polite"></div>
+
+      <div id="results" aria-live="polite"></div>
+
+      <section class="card">
+        <div id="study-basis-panel"></div>
+      </section>
+
+      <section class="card">
+        <div id="study-approval-panel"></div>
+      </section>
+
+      <nav class="step-nav" aria-label="Workflow navigation">
+        <a href="quasidynamic.html" class="step-nav-prev">← Quasi-Dynamic Load Flow</a>
+        <a href="optimalpowerflow.html" class="step-nav-next">Optimal Power Flow →</a>
+      </nav>
+
+    </main>
+  </div>
+
+  <div id="help-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="help-modal-title" hidden>
+    <div class="modal-content">
+      <button id="close-help-btn" class="modal-close" aria-label="Close help">×</button>
+      <h2 id="help-modal-title">Probabilistic / Monte Carlo Load Flow Help</h2>
+      <p>This study quantifies how uncertain load and renewable generation affect bus voltages and system losses by running thousands of randomized load-flow scenarios.</p>
+      <h3>When to use</h3>
+      <ul>
+        <li>Renewable-rich or EV-rich feeders where a single deterministic load flow is not representative.</li>
+        <li>Hosting-capacity studies — what is the probability that PV back-feed pushes a bus above 1.05 pu?</li>
+        <li>Risk-based planning — report P(undervoltage) instead of a single worst case.</li>
+        <li>Loss estimation with confidence bands (P5–P95) rather than a point value.</li>
+      </ul>
+      <h3>Choosing distributions</h3>
+      <ul>
+        <li><strong>Normal</strong> — symmetric load uncertainty around an expected multiplier.</li>
+        <li><strong>Beta (α, β)</strong> — bounded on [0, 1]; the standard choice for renewable capacity factor (e.g. α=2, β=5 skews toward lower output).</li>
+        <li><strong>Triangular</strong> — when only a min, most-likely, and max are known.</li>
+        <li><strong>Empirical</strong> — bootstrap directly from measured meter or SCADA samples.</li>
+      </ul>
+      <h3>Interpreting results</h3>
+      <ul>
+        <li><strong>P(voltage violation)</strong> — fraction of converged scenarios with any bus outside 0.95–1.05 pu.</li>
+        <li><strong>Histograms</strong> — the probability distribution of system loss and minimum bus voltage; the dashed line marks the voltage limit.</li>
+        <li><strong>Per-bus risk</strong> — the probability that each bus violates its under- or over-voltage limit.</li>
+      </ul>
+      <h3>Limitations</h3>
+      <ul>
+        <li>Uniform scaling — all loads share one multiplier; all generators share another. For per-bus profiles, provide a custom model via the API.</li>
+        <li>No correlation between the load and generation distributions.</li>
+        <li>Diverged scenarios are excluded from the statistics and reported in the warnings.</li>
+      </ul>
+    </div>
+  </div>
+
+  <footer class="site-footer">
+    <div class="footer-left">
+      <img src="icons/route.svg" alt="CableTrayRoute logo" class="footer-logo" loading="lazy" decoding="async">
+      <span>CableTrayRoute</span>
+    </div>
+    <nav class="footer-links" aria-label="Footer">
+      <a href="docs/index.html">Docs</a>
+      <a href="docs/quickstart.html">Quick Start</a>
+      <a href="index.html">Home</a>
+    </nav>
+  </footer>
+
+</body>
+</html>

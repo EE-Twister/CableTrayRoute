@@ -743,6 +743,18 @@ export const PAGE_CONTRACTS_BY_HREF = {
     readiness: ready('Ready when at least one generator and a valid demand are entered.', ['No generators defined or invalid demand/cost inputs.']),
     downstream: ['projectreport.html']
   }),
+  'probabilisticloadflow.html': contract({
+    workflowStep: 'studies',
+    standaloneInputs: ['Load and generation multiplier distributions, scenario count, and random seed.'],
+    projectInputs: [oneLine, loads, projectInput('studyResults.loadFlow', 'study-result', false, 'Base load flow model and operating point.'), designBasis, approvals],
+    outputs: [
+      output('studyResults.probabilisticLoadFlow', 'study-result', 'Saved Monte Carlo voltage/loss statistics and per-bus violation probabilities.', ['projectreport.html']),
+      studyApprovalOutput,
+      exportOnly('Probabilistic load flow histograms and CSV exports.', ['projectreport.html'])
+    ],
+    readiness: ready('Ready when a base model and valid input distributions are available.', ['Missing base load-flow context or invalid distribution/sampling inputs.']),
+    downstream: ['projectreport.html']
+  }),
   'voltagestability.html': contract({
     workflowStep: 'studies',
     standaloneInputs: ['PV/QV curve inputs, selected bus, load scaling, and solver settings.'],

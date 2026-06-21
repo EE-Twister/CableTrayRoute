@@ -82,6 +82,7 @@ const entries = {
   sustainability: 'src/sustainability.js',
   quasidynamic: 'src/quasiDynamic.js',
   optimalpowerflow: 'src/optimalPowerFlow.js',
+  probabilisticloadflow: 'src/probabilisticLoadFlow.js',
   bessHazard: 'src/bessHazard.js',
   hazareaclassification: 'src/hazareaclassification.js',
   admin: 'src/admin.js',

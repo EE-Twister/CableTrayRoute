@@ -8,7 +8,7 @@ This document defines handoff-level inputs, outputs, readiness rules, and downst
 
 Standard readiness vocabulary: Ready, Missing inputs, Downstream handoff.
 
-Coverage: 73 contracts for 73 navigation routes.
+Coverage: 74 contracts for 74 navigation routes.
 
 ## Workflow
 
@@ -2114,6 +2114,37 @@ Coverage: 73 contracts for 73 navigation routes.
 **Readiness**
 - Ready when: Ready when at least one generator and a valid demand are entered.
 - Blockers: No generators defined or invalid demand/cost inputs.
+
+**Downstream Pages**
+- `projectreport.html`
+
+**Notes**
+- None.
+
+#### Probabilistic / Monte Carlo Load Flow (`probabilisticloadflow.html`)
+
+- Section: Studies
+- Group: Power System
+- Workflow step: studies
+
+**Standalone Inputs**
+- Load and generation multiplier distributions, scenario count, and random seed.
+
+**Project Inputs**
+- `oneLineDiagram` (model, required): One-line components, connections, sheets, layers, and linked schedule references.
+- `loadList` (schedule, required): Load tags, source relationships, demand values, and operating metadata.
+- `studyResults.loadFlow` (study-result, optional): Base load flow model and operating point.
+- `settings.designBasis` (setting, optional): Project code basis, sizing defaults, routing defaults, and study prerequisites.
+- `settings.studyApprovals` (setting, optional): Engineer review records for study outputs.
+
+**Outputs**
+- `studyResults.probabilisticLoadFlow` (study-result): Saved Monte Carlo voltage/loss statistics and per-bus violation probabilities. Consumers: `projectreport.html`.
+- `settings.studyApprovals` (setting): Engineer approval records written by the shared study approval panel. Consumers: `projectreport.html`.
+- `export-only` (export): Probabilistic load flow histograms and CSV exports. Consumers: `projectreport.html`.
+
+**Readiness**
+- Ready when: Ready when a base model and valid input distributions are available.
+- Blockers: Missing base load-flow context or invalid distribution/sampling inputs.
 
 **Downstream Pages**
 - `projectreport.html`
