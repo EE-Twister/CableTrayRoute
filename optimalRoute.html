@@ -182,9 +182,6 @@
             <header class="page-header">
                 <h1>Optimal Route Planner</h1>
                 <p>Validate routing inputs, calculate cable paths, and review why each route was selected.</p>
-                <button id="import-cad-btn" onclick="document.getElementById('import-cad-input').click()">Import CAD</button>
-                <input type="file" id="import-cad-input" accept=".json,.ifc" style="display:none;" onchange="dataStore.importFromCad(this.files[0])">
-                <button id="export-cad-btn" onclick="dataStore.exportToCad('json')">Export CAD</button>
             </header>
             <details class="method-panel">
                 <summary>Method &amp; Assumptions</summary>
@@ -240,6 +237,13 @@
           <span>Source Data</span>
           <small>Raceway network, cable list, imports, and manual overrides</small>
         </summary>
+        <div class="table-controls route-cad-controls">
+            <div class="table-import-export">
+                <button id="import-cad-btn" onclick="document.getElementById('import-cad-input').click()">Import CAD</button>
+                <input type="file" id="import-cad-input" accept=".json,.ifc" style="display:none;" onchange="dataStore.importFromCad(this.files[0])">
+                <button id="export-cad-btn" onclick="dataStore.exportToCad('json')">Export CAD</button>
+            </div>
+        </div>
         <div class="route-source-data-grid">
       <section class="route-data-card">
                 <div class="route-card-heading">
