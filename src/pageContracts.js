@@ -384,7 +384,7 @@ export const PAGE_CONTRACTS_BY_HREF = {
   }),
   'designcoach.html': contract({
     workflowStep: 'studies',
-    standaloneInputs: ['Manual coaching run selections and recommendation review notes.'],
+    standaloneInputs: ['Manual coaching run selections, severity/status filters, open-item queue toggle, and recommendation review notes.'],
     projectInputs: [equipment, oneLine, cables, trays, conduits, ductbanks, studies, designBasis],
     outputs: [
       output('settings.coachAuditTrail', 'setting', 'Design coach recommendation audit records.', ['projectreport.html']),

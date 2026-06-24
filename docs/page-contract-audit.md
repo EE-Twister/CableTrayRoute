@@ -1101,15 +1101,15 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 
 **Detected Reads**
 - `cableSchedule`
-  - src/designCoach.js:155 getCables()
+  - src/designCoach.js:158 getCables()
 - `oneLineDiagram`
   - src/crossProbe.js:139 getOneLine()
   - src/crossProbe.js:152 getOneLine()
   - src/crossProbe.js:201 getOneLine()
 - `settings.coachAuditTrail`
-  - src/designCoach.js:34 getCoachAuditTrail()
+  - src/designCoach.js:36 getCoachAuditTrail()
 - `studyResults`
-  - src/designCoach.js:157 getStudies()
+  - src/designCoach.js:160 getStudies()
 - `studyResults.arcFlash`
   - analysis/designCoach.mjs:476 studies.arcFlash
   - analysis/equipmentEvaluation.mjs:236 studies?.arcFlash
@@ -1125,14 +1125,14 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
   - analysis/designCoach.mjs:477 studies.shortCircuit
   - analysis/equipmentEvaluation.mjs:235 studies?.shortCircuit
 - `traySchedule`
-  - src/designCoach.js:156 getTrays()
+  - src/designCoach.js:159 getTrays()
 
 **Detected Writes**
 - `settings.coachAuditTrail`
-  - src/designCoach.js:142 setCoachAuditTrail()
-  - src/designCoach.js:149 setCoachAuditTrail()
-  - src/designCoach.js:54 setCoachAuditTrail()
-  - src/designCoach.js:73 setCoachAuditTrail()
+  - src/designCoach.js:145 setCoachAuditTrail()
+  - src/designCoach.js:152 setCoachAuditTrail()
+  - src/designCoach.js:57 setCoachAuditTrail()
+  - src/designCoach.js:76 setCoachAuditTrail()
 
 ### Spool Sheets (`spoolsheets.html`)
 
