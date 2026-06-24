@@ -846,7 +846,7 @@ Coverage: 77 contracts for 77 navigation routes.
 - Workflow step: studies
 
 **Standalone Inputs**
-- Manual coaching run selections and recommendation review notes.
+- Manual coaching run selections, severity/status filters, open-item queue toggle, and recommendation review notes.
 
 **Project Inputs**
 - `equipment` (schedule, required): Equipment tags, ratings, locations, and physical metadata.

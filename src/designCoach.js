@@ -28,6 +28,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const runBtn            = document.getElementById('coach-run-btn');
   const severityFilter    = document.getElementById('coach-severity-filter');
   const clearDismissedBtn = document.getElementById('coach-clear-dismissed-btn');
+  const openOnlyToggle    = document.getElementById('coach-open-only');
+  const statusSummary     = document.getElementById('coach-status-summary');
   const resultsSection    = document.getElementById('coach-results');
 
   let lastResult   = null;
@@ -35,6 +37,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   runBtn.addEventListener('click', runAndRender);
   severityFilter.addEventListener('change', () => { if (lastResult) renderResults(lastResult); });
+  openOnlyToggle.addEventListener('change', () => { if (lastResult) renderResults(lastResult); });
   clearDismissedBtn.addEventListener('click', async () => {
     const dismissed = auditTrail.filter(e => e.action === 'dismiss');
     if (!dismissed.length) return;
@@ -172,9 +175,22 @@ document.addEventListener('DOMContentLoaded', () => {
     const filterVal   = severityFilter.value;
     const auditMap    = new Map(auditTrail.map(e => [e.id, e]));
 
-    const filtered = filterVal === 'all'
-      ? recommendations
-      : recommendations.filter(r => r.severity === filterVal);
+    const counts = recommendations.reduce((acc, rec) => {
+      const action = auditMap.get(rec.id)?.action;
+      if (action === 'accept') acc.accepted += 1;
+      else if (action === 'dismiss') acc.dismissed += 1;
+      else acc.open += 1;
+      return acc;
+    }, { open: 0, accepted: 0, dismissed: 0 });
+
+    const filtered = recommendations.filter(rec => {
+      if (filterVal !== 'all' && rec.severity !== filterVal) return false;
+      if (openOnlyToggle.checked && auditMap.has(rec.id)) return false;
+      return true;
+    });
+
+    statusSummary.textContent = `${counts.open} open, ${counts.accepted} accepted, ${counts.dismissed} dismissed recommendation${recommendations.length === 1 ? '' : 's'}. Showing ${filtered.length}.`;
+    clearDismissedBtn.disabled = counts.dismissed === 0;
 
     resultsSection.innerHTML = '';
 
@@ -182,7 +198,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const div = document.createElement('div');
       div.className = 'coach-empty';
       div.textContent = recommendations.length
-        ? 'No recommendations match the current filter.'
+        ? 'No recommendations match the current filter. Turn off Open items only to review accepted or dismissed recommendations.'
         : 'No recommendations found. Run studies and refresh to check your project.';
       resultsSection.appendChild(div);
       return;

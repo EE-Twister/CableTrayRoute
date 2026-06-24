@@ -36,7 +36,9 @@
     .coach-kpi-card--missing  { border-left-color: #616161; }
     .coach-kpi-label { display: block; font-size: 0.78rem; color: var(--color-muted, #666); margin-bottom: 0.25rem; }
     .coach-kpi-value { display: block; font-size: 1.6rem; font-weight: 700; line-height: 1; }
-    .coach-controls { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin-bottom: 1rem; }
+    .coach-controls { display: flex; flex-wrap: wrap; gap: 0.5rem 0.75rem; align-items: center; margin-bottom: 1rem; }
+    .coach-status-summary { margin: -0.35rem 0 1rem; color: var(--color-muted, #666); font-size: 0.9rem; }
+    .coach-filter-check { display: inline-flex; align-items: center; gap: 0.35rem; }
     .coach-rec {
       border: 1px solid var(--color-border, #ddd);
       border-radius: 6px;
@@ -187,8 +189,12 @@
             <option value="missing_data">Missing Data only</option>
           </select>
         </label>
+        <label class="coach-filter-check" for="coach-open-only">
+          <input id="coach-open-only" type="checkbox" checked> Open items only
+        </label>
         <button id="coach-clear-dismissed-btn" class="btn">Clear Dismissed</button>
       </div>
+      <p id="coach-status-summary" class="coach-status-summary" role="status">Run the coach to see open, accepted, and dismissed recommendation counts.</p>
 
       <!-- Results -->
       <section id="coach-results" aria-live="polite" aria-atomic="false"></section>
@@ -207,6 +213,8 @@
       <p><strong>Accept / Dismiss:</strong> Use Accept to document an engineering basis for
       allowing a known violation. Use Dismiss to hide a recommendation you are not addressing
       in this project. Accepted records include reviewer name, date, and engineering note.</p>
+      <p><strong>Open items only:</strong> Keep this filter enabled to focus the action queue on
+      recommendations that still need a decision, or turn it off to review accepted and dismissed history.</p>
       <button id="close-help-btn" class="btn">Close</button>
     </div>
   </div>
