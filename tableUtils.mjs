@@ -173,6 +173,8 @@ class TableManager {
     this.pendingStickyColumnUpdate = false;
     this.headerResizeObserver = null;
     this.stickyRowLimit = 1;
+    this.hiddenGroups = new Set();
+    this.hiddenColumnKeys = new Set();
     if (typeof ResizeObserver !== 'undefined') {
       this.headerResizeObserver = new ResizeObserver(() => this.queueStickyHeaderUpdate());
     }
@@ -185,7 +187,6 @@ class TableManager {
     this.load();
     if (this.enableContextMenu) this.initContextMenu();
     if (this.enableHeaderContextMenu) this.initHeaderContextMenu();
-    this.hiddenGroups = new Set();
     this.loadGroupState();
     this.updateRowCount();
   }
@@ -334,6 +335,7 @@ class TableManager {
       th.style.position = 'relative';
       th.draggable = true;
       th.dataset.index = idx;
+      th.dataset.columnKey = col.key;
       if (col.sticky === 'left') {
         th.classList.add('sticky-col');
         th.dataset.stickyKey = col.key;
@@ -736,12 +738,9 @@ class TableManager {
         if (row.cells[i + offset]) row.cells[i + offset].classList.toggle('group-hidden', hide);
       });
     });
-    if (this.groupThs[name]) {
-      this.groupThs[name].classList.toggle('group-collapsed', hide);
-      this.groupThs[name].colSpan = hide ? 1 : indices.length;
-    }
     if (this.groupToggles[name]) this.groupToggles[name].textContent = hide ? '+' : '-';
     if (hide) this.hiddenGroups.add(name); else this.hiddenGroups.delete(name);
+    this.syncGroupHeader(name);
     this.syncGroupBlankWidth();
     this.queueStickyHeaderUpdate();
     this.queueStickyColumnUpdate();
@@ -751,6 +750,45 @@ class TableManager {
     const hide = !this.hiddenGroups.has(name);
     this.setGroupVisibility(name, hide);
     this.saveGroupState();
+  }
+
+  syncGroupHeader(name) {
+    const groupTh = this.groupThs[name];
+    if (!groupTh) return;
+    const offset = this.colOffset;
+    const isGroupHidden = this.hiddenGroups.has(name);
+    const visibleCount = (this.groupCols[name] || []).filter(index => {
+      const headerCell = this.headerRow?.cells[index + offset];
+      return headerCell
+        && !headerCell.classList.contains('group-hidden')
+        && !headerCell.classList.contains('column-hidden');
+    }).length;
+    groupTh.classList.toggle('group-collapsed', isGroupHidden);
+    groupTh.style.display = !isGroupHidden && visibleCount === 0 ? 'none' : '';
+    groupTh.colSpan = isGroupHidden ? 1 : Math.max(1, visibleCount);
+  }
+
+  syncGroupHeaders() {
+    Object.keys(this.groupCols || {}).forEach(name => this.syncGroupHeader(name));
+  }
+
+  setVisibleColumns(keys = null) {
+    const visibleKeys = Array.isArray(keys) ? new Set(keys) : null;
+    const offset = this.colOffset;
+    this.columns.forEach((col, index) => {
+      const hide = Boolean(visibleKeys && !visibleKeys.has(col.key));
+      if (hide) this.hiddenColumnKeys.add(col.key); else this.hiddenColumnKeys.delete(col.key);
+      const headerCell = this.headerRow?.cells[index + offset];
+      if (headerCell) headerCell.classList.toggle('column-hidden', hide);
+      Array.from(this.tbody.rows).forEach(row => {
+        const cell = row.cells[index + offset];
+        if (cell) cell.classList.toggle('column-hidden', hide);
+      });
+    });
+    this.syncGroupHeaders();
+    this.syncGroupBlankWidth();
+    this.queueStickyHeaderUpdate();
+    this.queueStickyColumnUpdate();
   }
 
   saveGroupState() {
@@ -862,7 +900,7 @@ class TableManager {
       if (col.sticky !== 'left') return;
       const cellIndex = idx + this.colOffset;
       const headerCell = this.headerRow.cells[cellIndex];
-      if (!headerCell || headerCell.classList.contains('group-hidden')) return;
+      if (!headerCell || headerCell.classList.contains('group-hidden') || headerCell.classList.contains('column-hidden')) return;
       assignLeft(headerCell, left);
       Array.from(this.tbody.rows).forEach(row => {
         const cell = row.cells[cellIndex];
@@ -1167,6 +1205,7 @@ class TableManager {
     }
     this.columns.forEach((col, idx) => {
       const td = tr.insertCell();
+      td.dataset.columnKey = col.key;
       if (col.sticky === 'left') {
         td.classList.add('sticky-col');
         td.dataset.stickyKey = col.key;
@@ -1176,6 +1215,9 @@ class TableManager {
       }
       if (col.group && idx === this.groupLastIndex[col.group]) {
         td.classList.add('category-separator-right');
+      }
+      if (this.hiddenColumnKeys.has(col.key)) {
+        td.classList.add('column-hidden');
       }
       let el;
       if (col.type === 'select') {
@@ -1197,6 +1239,12 @@ class TableManager {
           };
         } else {
           el = document.createElement('select');
+          if (col.allowEmpty) {
+            const emptyOption = document.createElement('option');
+            emptyOption.value = '';
+            emptyOption.textContent = col.emptyLabel || '';
+            el.appendChild(emptyOption);
+          }
           opts.forEach(opt => {
             const o = document.createElement('option');
             o.value = opt;

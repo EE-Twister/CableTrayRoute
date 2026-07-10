@@ -62,12 +62,20 @@ const MAX_CHECKPOINT_SIZE=2*1024*1024; // ~2MB
 const AUTO_SAVE_INTERVAL_MS=5*60*1000;
 const ONBOARDING_STATE_KEY='onboarding';
 const ONBOARDING_VERSION='2026.06';
+const SHARED_SHELL_INIT_KEY='__ctrSharedShellFeatures';
 let cachedProjectFileHandle=null;
 let autoSaveSchedulerInstance=null;
 let dirtyTrackerInstance=null;
 let operationToastTimer=null;
 let lastSavedAt=null;
 let lastSavedIndicatorTimer=null;
+
+function claimSharedShellFeature(feature){
+  const state=globalThis[SHARED_SHELL_INIT_KEY]||(globalThis[SHARED_SHELL_INIT_KEY]={});
+  if(state[feature]) return false;
+  state[feature]=true;
+  return true;
+}
 
 const ONBOARDING_SAMPLE_PROJECT={
   name:'Sample Project - Getting Started',
@@ -1405,6 +1413,7 @@ async function generateTechnicalReport(format='pdf'){
 }
 
 function initSettings(){
+  if(!claimSharedShellFeature('settings')) return;
   const settingsBtn=document.getElementById('settings-btn');
   const settingsMenu=document.getElementById('settings-menu');
   const operationStatusHost=initOperationStatusHost(settingsMenu);
@@ -1658,6 +1667,7 @@ function initSettings(){
 }
 
 function initDarkMode(){
+  if(!claimSharedShellFeature('theme')) return;
   const elementCache=createElementCache(document);
   const settingsMenu=elementCache.getById('settings-menu');
   const darkToggle=elementCache.getById('dark-toggle');
@@ -1753,6 +1763,7 @@ function initDarkMode(){
 }
 
 function initCompactMode(){
+  if(!claimSharedShellFeature('compact-mode')) return;
   const elementCache=createElementCache(document);
   const compactToggle=elementCache.getById('compact-toggle');
   const domBatcher=createDomWriteBatcher();
@@ -1792,6 +1803,8 @@ function initHelpModal(btnId='help-btn',modalId='help-modal',closeId){
   const btn=document.getElementById(btnId);
   const modal=document.getElementById(modalId);
   const closeBtn=closeId?document.getElementById(closeId):(modal?modal.querySelector('.close-btn'):null);
+  if(!btn||!modal||!closeBtn) return;
+  if(!claimSharedShellFeature(`help:${btnId}:${modalId}:${closeId||''}`)) return;
   if(btn&&modal&&closeBtn){
     modal.setAttribute('role','dialog');
     modal.setAttribute('aria-modal','true');
@@ -1858,6 +1871,7 @@ function initNavToggle(){
   if(!toggle) return;
   const target=elementCache.getById(toggle.getAttribute('aria-controls'));
   if(!target) return;
+  if(!claimSharedShellFeature('nav-toggle')) return;
   const profileHandler=createHandlerProfiler('initNavToggle');
 
   function closeMenu(){
@@ -2788,7 +2802,29 @@ globalThis.initCompactMode=initCompactMode;
 globalThis.initHelpModal=initHelpModal;
 globalThis.initNavToggle=initNavToggle;
 
-export { initSettings, initDarkMode, initCompactMode, initHelpModal, initNavToggle };
+function initSharedShell(){
+  if(typeof document==='undefined') return;
+  initSettings();
+  initDarkMode();
+  initCompactMode();
+  initHelpModal('help-btn','help-modal','close-help-btn');
+  initNavToggle();
+}
+
+function scheduleSharedShellInitialization(){
+  if(typeof document==='undefined' || typeof window==='undefined' || typeof window.requestAnimationFrame!=='function') return;
+  if(document.readyState==='loading'){
+    document.addEventListener('DOMContentLoaded',initSharedShell,{once:true});
+  }else{
+    initSharedShell();
+  }
+}
+
+scheduleSharedShellInitialization();
+
+globalThis.initSharedShell=initSharedShell;
+
+export { initSettings, initDarkMode, initCompactMode, initHelpModal, initNavToggle, initSharedShell };
 globalThis.checkPrereqs=checkPrereqs;
 globalThis.persistConduits=persistConduits;
 globalThis.loadConduits=loadConduits;

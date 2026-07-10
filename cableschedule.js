@@ -216,8 +216,8 @@ async function initCableSchedule() {
     {key:'conductors',label:'Conductors',type:'number',group:'Cable Construction',tooltip:'Number of conductors within the cable'},
     {key:'conductor_size',label:'Conductor Size',type:'select',options:conductorSizes,group:'Cable Construction',tooltip:'Size of each conductor'},
     {key:'conductor_material',label:'Conductor Material',type:'select',options:conductorMaterials,group:'Cable Construction',tooltip:'Material of the conductors'},
-    {key:'ground_size',label:'EGC Size',type:'select',options:conductorSizes,group:'Cable Construction',tooltip:'Equipment grounding conductor size used for NEC 250.122 screening'},
-    {key:'ground_material',label:'EGC Material',type:'select',options:conductorMaterials,group:'Cable Construction',tooltip:'Equipment grounding conductor material. The DRC currently screens selected copper EGC sizes.'},
+    {key:'ground_size',label:'EGC Size',type:'select',options:conductorSizes,allowEmpty:true,emptyLabel:'Select EGC size',group:'Cable Construction',tooltip:'Equipment grounding conductor size used for NEC 250.122 screening'},
+    {key:'ground_material',label:'EGC Material',type:'select',options:conductorMaterials,allowEmpty:true,emptyLabel:'Select EGC material',group:'Cable Construction',tooltip:'Equipment grounding conductor material. The DRC currently screens selected copper EGC sizes.'},
     {key:'install_method',label:'Install Method',type:'select',options:installMethods,group:'Cable Construction',tooltip:'Installation method'},
     {key:'insulation_type',label:'Insulation Type',type:'select',options:Object.keys(INSULATION_TEMP_LIMIT),group:'Cable Construction',tooltip:'Insulation material type'},
     {key:'insulation_rating',label:'Insul Rating (°C)',type:'select',options:insulationRatings,group:'Cable Construction',tooltip:'Maximum temperature rating of insulation'},
@@ -326,13 +326,18 @@ async function initCableSchedule() {
     'notes'
   ]);
   const PRESETS = {
-    entry: { label: 'Basic Entry', groups: ['Identification', 'Terminations', 'Cable Construction', 'Electrical Entry', 'Notes'] },
+    entry: {
+      label: 'Basic Entry',
+      groups: groupNames,
+      keys: ['tag', 'from_tag', 'to_tag', 'raceway_ids', 'cable_type', 'conductors', 'conductor_size', 'ground_size', 'ocpd_rating', 'length']
+    },
     full: { label: 'Full Detail', groups: groupNames },
     routing: { label: 'Routing Focus', groups: ['Identification', 'Terminations', 'Routing Details', 'Notes'] },
     electrical: { label: 'Electrical Focus', groups: ['Identification', 'Cable Construction', 'Electrical Entry', 'Calculations', 'Notes'] },
     construction: { label: 'Construction Specs', groups: ['Identification', 'Cable Construction', 'Manufacturer Details', 'Notes'] }
   };
   const DEFAULT_PRESET = 'entry';
+  const MOBILE_ENTRY_KEYS = ['tag', 'from_tag', 'to_tag', 'conductor_size', 'length'];
   const FIELD_HELP_TEXT = {
     tag: 'Use the project cable numbering standard. Auto tag settings can prefill this value.',
     raceway_ids: 'Required before routing. Options come from the Raceway Schedule.',
@@ -1015,6 +1020,12 @@ async function initCableSchedule() {
         field.multiple = true;
         if (col.size) field.size = col.size;
         field.classList.add('modal-select');
+      }
+      if (col.allowEmpty && !col.multiple) {
+        const emptyOption = document.createElement('option');
+        emptyOption.value = '';
+        emptyOption.textContent = col.emptyLabel || '';
+        field.appendChild(emptyOption);
       }
       opts.forEach(opt => {
         const option = document.createElement('option');
@@ -2176,6 +2187,7 @@ async function initCableSchedule() {
   }
 
   const REQUIRED_FIELD_KEYS = new Set(['tag', 'from_tag', 'to_tag', 'conductor_size', 'length']);
+  const POWER_SAFETY_FIELD_KEYS = new Set(['ground_size', 'ocpd_rating']);
   const ROUTING_FIELD_KEYS = new Set(['raceway_ids']);
   const touchedRequiredFields = new WeakSet();
   const validationSummary = document.getElementById('cable-validation-summary');
@@ -2204,6 +2216,27 @@ async function initCableSchedule() {
     const value = `${row[key] ?? ''}`.trim();
     if (key === 'length') return value !== '' && Number.isFinite(Number(value)) && Number(value) > 0;
     return value !== '';
+  }
+
+  function isPowerCable(row = {}) {
+    return `${row.cable_type ?? ''}`.trim().toLowerCase() === 'power';
+  }
+
+  function requiredFieldKeysForRow(tr) {
+    const keys = new Set(REQUIRED_FIELD_KEYS);
+    const cableType = tr?.querySelector('[name="cable_type"]')?.value;
+    if (`${cableType ?? ''}`.trim().toLowerCase() === 'power') {
+      POWER_SAFETY_FIELD_KEYS.forEach(key => keys.add(key));
+    }
+    return keys;
+  }
+
+  function requiredFieldKeysForData(row = {}) {
+    const keys = new Set(REQUIRED_FIELD_KEYS);
+    if (isPowerCable(row)) {
+      POWER_SAFETY_FIELD_KEYS.forEach(key => keys.add(key));
+    }
+    return keys;
   }
 
   function getReadinessSummary(data = []){
@@ -2309,7 +2342,7 @@ async function initCableSchedule() {
       return;
     }
     if (invalidRows) {
-      validationSummary.textContent = `${invalidRows} cable${invalidRows === 1 ? '' : 's'} need required fields before saving or exporting.`;
+      validationSummary.textContent = `${invalidRows} cable${invalidRows === 1 ? '' : 's'} need required fields before saving or exporting. Power cables also require EGC size and OCPD rating.`;
       validationSummary.classList.add('is-warning');
     } else {
       validationSummary.textContent = 'Required fields are complete.';
@@ -2320,7 +2353,7 @@ async function initCableSchedule() {
   function validateRow(tr, options = {}){
     const showAll = options.showAll === true;
     let valid = true;
-    REQUIRED_FIELD_KEYS.forEach(key => {
+    requiredFieldKeysForRow(tr).forEach(key => {
       const el = tr.querySelector(`[name="${key}"]`);
       if (!el) return;
       const ok = isRequiredFieldValid(key, el);
@@ -2466,7 +2499,7 @@ async function initCableSchedule() {
     onSave:() => {
       validationActive = true;
       if (!validateAllRows({ showAll: true })) {
-        showAlertModal('Schedule Fields Missing', 'Complete Tag, From Tag, To Tag, Conductor Size, and Length before saving. Raceway assignments can be completed later for routing-ready status.');
+        showAlertModal('Schedule Fields Missing', 'Complete Tag, From Tag, To Tag, Conductor Size, and Length before saving. Power cables also need an EGC Size and OCPD Rating. Raceway assignments can be completed later for routing.');
         markUnsaved();
         return;
       }
@@ -2522,10 +2555,10 @@ async function initCableSchedule() {
   }
 
   const markRequiredFieldTouched = target => {
-    if (!target || !REQUIRED_FIELD_KEYS.has(target.name)) return;
+    const row = target?.closest?.('tr');
+    if (!target || !row || !requiredFieldKeysForRow(row).has(target.name)) return;
     touchedRequiredFields.add(target);
-    const row = target.closest('tr');
-    if (row) validateRow(row, { showAll: validationActive });
+    validateRow(row, { showAll: validationActive });
     validateAllRows({ showAll: validationActive });
   };
 
@@ -2541,7 +2574,7 @@ async function initCableSchedule() {
       if (!validateAllRows({ showAll: true })) {
         e.preventDefault();
         e.stopImmediatePropagation();
-        showAlertModal('Required Fields Missing', 'Complete Tag, Conductor Size, Length, and Raceway(s) before saving.');
+        showAlertModal('Required Fields Missing', 'Complete Tag, From/To, Conductor Size, and Length before saving. Power cables also need an EGC Size and OCPD Rating. Raceway assignments can be completed later for routing.');
       }
     }, { capture: true });
   }
@@ -2998,13 +3031,20 @@ async function initCableSchedule() {
     }
     return PRESETS[stored] ? stored : DEFAULT_PRESET;
   };
+  let activePreset = DEFAULT_PRESET;
+  const narrowScheduleView = window.matchMedia?.('(max-width: 760px)');
   const applyPreset = (name, persist = true) => {
     const presetName = PRESETS[name] ? name : DEFAULT_PRESET;
+    activePreset = presetName;
     const visibleGroups = new Set(PRESETS[presetName].groups);
     groupNames.forEach(groupName => {
       const hide = !visibleGroups.has(groupName);
       table.setGroupVisibility(groupName, hide);
     });
+    const visibleColumns = narrowScheduleView?.matches
+      ? MOBILE_ENTRY_KEYS
+      : (PRESETS[presetName].keys || null);
+    table.setVisibleColumns(visibleColumns);
     if (persist) {
       try {
         dataStore.setItem(presetStorageKey, presetName);
@@ -3024,6 +3064,9 @@ async function initCableSchedule() {
     presetSelect.addEventListener('change', e => {
       applyPreset(e.target.value);
     });
+  }
+  if (narrowScheduleView) {
+    narrowScheduleView.addEventListener('change', () => applyPreset(activePreset, false));
   }
   const initialPreset = readStoredPreset();
   applyPreset(initialPreset, false);
@@ -3288,7 +3331,7 @@ async function initCableSchedule() {
     return counts;
   };
   const rowHasMissingData = (row, duplicateLookup = null) => {
-    const missingRequired = Array.from(REQUIRED_FIELD_KEYS).some(key => !isRequiredValueValid(key, row));
+    const missingRequired = Array.from(requiredFieldKeysForData(row)).some(key => !isRequiredValueValid(key, row));
     const missingRouting = Array.from(ROUTING_FIELD_KEYS).some(key => !isRequiredValueValid(key, row));
     const tag = `${row?.tag || ''}`.trim().toLowerCase();
     const duplicate = tag && duplicateLookup && duplicateLookup.get(tag) > 1;
@@ -3299,14 +3342,14 @@ async function initCableSchedule() {
     const offset = table.colOffset || 0;
     return columns.filter((col, idx) => {
       const headerCell = table.headerRow?.cells[idx + offset];
-      return !headerCell || !headerCell.classList.contains('group-hidden');
+      return !headerCell || (!headerCell.classList.contains('group-hidden') && !headerCell.classList.contains('column-hidden'));
     });
   };
   const getReportRows = mode => {
     const data = table.getData();
     const duplicateLookup = getDuplicateTagLookup(data);
     if (mode === 'routing-ready') {
-      return data.filter(row => Array.from(REQUIRED_FIELD_KEYS).every(key => isRequiredValueValid(key, row))
+      return data.filter(row => Array.from(requiredFieldKeysForData(row)).every(key => isRequiredValueValid(key, row))
         && Array.from(ROUTING_FIELD_KEYS).every(key => isRequiredValueValid(key, row)));
     }
     if (mode === 'missing-data') {
@@ -3410,7 +3453,7 @@ async function initCableSchedule() {
     validationActive = true;
     const mode = getReportMode();
     if(mode !== 'missing-data' && !validateAllRows({ showAll: true })){
-      showAlertModal('Required Fields Missing', 'Complete Tag, Conductor Size, Length, and Raceway(s) before exporting.');
+      showAlertModal('Required Fields Missing', 'Complete Tag, From/To, Conductor Size, and Length before exporting. Power cables also need an EGC Size and OCPD Rating. Assign raceways before exporting a routing-ready report.');
       return;
     }
     exportCableReport(mode);

@@ -28,7 +28,8 @@ const emptyOverrides = {
   ductbanks: [],
   studies: {},
   lifecyclePackages: [],
-  reportSnapshots: {}
+  reportSnapshots: {},
+  latestRouteResults: null
 };
 
 assert.deepStrictEqual(
@@ -52,28 +53,59 @@ assert.deepStrictEqual(getCableReadiness([partialCable]), {
   total: 1,
   scheduleReady: 1,
   routingReady: 0,
+  coordinateReady: 0,
   missingSchedule: 0,
-  missingRaceway: 1
+  missingRaceway: 1,
+  missingCoordinates: 0
 });
 assert.equal(getStepStatus('cableSchedule', { ...emptyOverrides, cables: [partialCable] }).complete, true);
 assert.equal(getStepStatus('fillRouting', { ...emptyOverrides, cables: [partialCable], trays: [{ tray_id: 'TR-1' }] }).complete, false);
+
+const assignedCable = { ...partialCable, raceway_id: 'TR-1' };
+const assignedRoutingStatus = getStepStatus('fillRouting', { ...emptyOverrides, cables: [assignedCable], trays: [{ tray_id: 'TR-1' }] });
+assert.equal(assignedRoutingStatus.complete, false);
+assert.equal(assignedRoutingStatus.label, '0 of 1 coordinate-ready');
 
 const completeOverrides = {
   equipment: [{ id: 'MCC-1' }],
   loads: [{ id: 'MTR-1', kw: 25 }],
   oneLine: { activeSheet: 0, sheets: [{ name: 'S1', components: [{ id: 'mcc-1' }] }] },
-  cables: [{ ...partialCable, raceway_id: 'TR-1' }],
+  cables: [{ ...assignedCable, start_x: 0, start_y: 0, start_z: 0, end_x: 25, end_y: 0, end_z: 0 }],
   trays: [{ tray_id: 'TR-1' }],
   conduits: [],
   ductbanks: [],
-  studies: { loadFlow: { buses: [] } },
+  studies: {
+    loadFlow: { buses: [] },
+    shortCircuit: { faultCurrent: 10000 },
+    arcFlash: { incidentEnergy: 4.2 }
+  },
   lifecyclePackages: [{ id: 'pkg-1' }],
-  reportSnapshots: {}
+  reportSnapshots: {},
+  latestRouteResults: { batchResults: [{ cable: 'C-101', status: 'Routed' }] }
 };
 
 workflowOrder.forEach(step => {
   assert.equal(getStepStatus(step.key, completeOverrides).complete, true, `${step.key} should be complete`);
 });
+
+const incompleteStudies = getStepStatus('studies', {
+  ...emptyOverrides,
+  studies: { loadFlow: { buses: [] } }
+});
+assert.equal(incompleteStudies.complete, false);
+assert.match(incompleteStudies.hint, /short-circuit and arc-flash/);
+
+const scopedStudies = getStepStatus('studies', {
+  ...emptyOverrides,
+  designBasis: {
+    studyPrerequisites: {
+      requireUtilityFault: false,
+      requireArcFlashInputs: false
+    }
+  },
+  studies: { loadFlow: { buses: [] } }
+});
+assert.equal(scopedStudies.complete, true);
 assert.equal(getWorkflowStepForPage('optimalRoute.html').key, 'fillRouting');
 assert.equal(getWorkflowStepForPage('projectreport.html').key, 'deliverables');
 

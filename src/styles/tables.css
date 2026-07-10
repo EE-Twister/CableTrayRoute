@@ -77,7 +77,8 @@ th {
     margin-left: 0.25rem;
 }
 
-.group-hidden {
+.group-hidden,
+.column-hidden {
     display: none;
 }
 
@@ -715,6 +716,36 @@ body.dark-mode .table-row-focusable:focus-within::after {
     justify-content: center;
     gap: var(--space-1);
     white-space: nowrap;
+}
+
+@media (max-width: 760px) {
+    #cableScheduleTable {
+        font-size: 0.82rem;
+    }
+
+    #cableScheduleTable th,
+    #cableScheduleTable td {
+        padding: 0.38rem;
+    }
+
+    #cableScheduleTable input[type="text"],
+    #cableScheduleTable input[type="number"],
+    #cableScheduleTable select {
+        min-width: 0;
+        width: 7rem;
+    }
+
+    #cableScheduleTable [data-column-key="tag"] input {
+        width: 6.5rem;
+    }
+
+    #cableScheduleTable .sticky-action-col {
+        min-width: 0;
+    }
+
+    #cableScheduleTable .row-action-group {
+        gap: 0.2rem;
+    }
 }
 
 .cross-probe-link {
