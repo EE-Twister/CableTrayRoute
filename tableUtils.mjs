@@ -148,6 +148,7 @@ class TableManager {
     this.showActionColumn = opts.showActionColumn !== false;
     this.actionButtonIcons = opts.actionButtonIcons || null;
     this.actionButtonLabels = opts.actionButtonLabels || {};
+    this.compactActionMenu = opts.compactActionMenu === true;
     this.contextMenuViewLabel = opts.contextMenuViewLabel || 'View / Edit Row';
     this.customFilters = new Map();
     this.sortColumnIndex = null;
@@ -1426,11 +1427,43 @@ class TableManager {
       const actTd = tr.insertCell();
       actTd.classList.add('sticky-action-col');
       let actionTarget = actTd;
-      if (this.actionButtonIcons) {
+      if (this.actionButtonIcons || this.compactActionMenu) {
         actTd.classList.add('icon-action-cell');
         actionTarget = document.createElement('div');
         actionTarget.className = 'row-action-group';
         actTd.appendChild(actionTarget);
+      }
+      if (this.compactActionMenu) {
+        const actionGroup = actionTarget;
+        const toggleBtn = document.createElement('button');
+        toggleBtn.type = 'button';
+        toggleBtn.className = 'row-action-menu-toggle';
+        toggleBtn.textContent = '⋯';
+        toggleBtn.title = 'Row actions';
+        toggleBtn.setAttribute('aria-label', 'Row actions');
+        const panel = document.createElement('div');
+        panel.className = 'row-action-menu-panel';
+        toggleBtn.addEventListener('click', e => {
+          e.stopPropagation();
+          document.querySelectorAll('.row-action-menu-panel.is-floating').forEach(openPanel => openPanel.remove());
+          const rect = toggleBtn.getBoundingClientRect();
+          panel.classList.add('is-floating');
+          panel.style.top = `${Math.max(8, Math.min(rect.bottom + 4, window.innerHeight - 180))}px`;
+          panel.style.right = `${Math.max(8, window.innerWidth - rect.right)}px`;
+          document.body.appendChild(panel);
+        });
+        actionGroup.addEventListener('keydown', e => {
+          if (e.key !== 'Escape') return;
+          toggleBtn.blur();
+        });
+        panel.addEventListener('keydown', e => {
+          if (e.key === 'Escape') panel.remove();
+        });
+        panel.addEventListener('click', () => {
+          if (panel.classList.contains('is-floating')) panel.remove();
+        });
+        actionGroup.append(toggleBtn, panel);
+        actionTarget = panel;
       }
       const actIdx = this.columns.length + this.colOffset;
       if (this.headerRow && this.headerRow.cells[actIdx] && this.headerRow.cells[actIdx].style.width) {

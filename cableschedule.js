@@ -2437,6 +2437,19 @@ async function initCableSchedule() {
     selectable:true,
     enableContextMenu:true,
     showActionColumn:true,
+    actionButtonIcons:{
+      viewBtn:'icons/toolbar/grid.svg',
+      insertBelowBtn:'icons/toolbar/add-arrangement.svg',
+      duplicateBtn:'icons/toolbar/copy.svg',
+      removeBtn:'icons/toolbar/trash.svg'
+    },
+    actionButtonLabels:{
+      viewBtn:'Edit row',
+      insertBelowBtn:'Insert row below',
+      duplicateBtn:'Duplicate row',
+      removeBtn:'Delete row'
+    },
+    compactActionMenu:true,
     columns,
     onView:(row,tr)=>openEditor(row,tr,table),
     onDuplicateRowData: row => {

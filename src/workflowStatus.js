@@ -412,10 +412,14 @@ export function getStepStatus(key, overrides = {}) {
     const raceways = trays + conduits + ductbanks;
     const routeResults = normalizeRouteResults(readData(overrides, 'latestRouteResults', () => getItem('latestRouteResults', null), null));
     if (readiness.routingReady > 0 && routeResults.length >= readiness.routingReady) {
-      const rerunHint = readiness.missingCoordinates > 0
-        ? `${readiness.missingCoordinates} routed cable${readiness.missingCoordinates === 1 ? '' : 's'} still need endpoint coordinates before recalculation.`
-        : null;
-      return { complete: true, label: pluralize(routeResults.length, 'route result', 'route results'), hint: rerunHint };
+      if (readiness.missingCoordinates > 0) {
+        return {
+          complete: false,
+          label: `${pluralize(routeResults.length, 'saved route result', 'saved route results')}; inputs incomplete`,
+          hint: `${readiness.missingCoordinates} routed cable${readiness.missingCoordinates === 1 ? '' : 's'} need endpoint coordinates before the results can be reproduced.`
+        };
+      }
+      return { complete: true, label: pluralize(routeResults.length, 'route result', 'route results'), hint: null };
     }
     if (readiness.scheduleReady === 0) {
       return { complete: false, label: 'Needs schedule-ready cables', hint: 'Complete Cable Schedule before fill and routing.' };

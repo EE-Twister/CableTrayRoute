@@ -66,6 +66,15 @@ const assignedRoutingStatus = getStepStatus('fillRouting', { ...emptyOverrides, 
 assert.equal(assignedRoutingStatus.complete, false);
 assert.equal(assignedRoutingStatus.label, '0 of 1 coordinate-ready');
 
+const nonReproducibleRouteStatus = getStepStatus('fillRouting', {
+  ...emptyOverrides,
+  cables: [assignedCable],
+  trays: [{ tray_id: 'TR-1' }],
+  latestRouteResults: { batchResults: [{ cable: 'C-101', status: 'Routed' }] }
+});
+assert.equal(nonReproducibleRouteStatus.complete, false);
+assert.match(nonReproducibleRouteStatus.label, /inputs incomplete/);
+
 const completeOverrides = {
   equipment: [{ id: 'MCC-1' }],
   loads: [{ id: 'MTR-1', kw: 25 }],

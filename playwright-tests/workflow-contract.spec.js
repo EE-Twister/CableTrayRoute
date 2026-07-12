@@ -221,14 +221,6 @@ test('sample project satisfies contract handoffs from equipment through delivera
   expect([...raceways.trayIds, ...raceways.conduitIds]).toEqual(expect.arrayContaining(cables.cableRacewayIds));
 
   await gotoWorkflowPage(page, server, 'optimalRoute.html');
-  const resumeModal = page.locator('#resume-modal');
-  await resumeModal.waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
-  if (await resumeModal.isVisible().catch(() => false)) {
-    await page.locator('#resume-yes-btn').click();
-    await expect(resumeModal).toBeHidden();
-  } else if (await page.locator('#import-schedules-btn').isVisible().catch(() => false)) {
-    await page.locator('#import-schedules-btn').click({ force: true });
-  }
   await expect(page.locator('#route-readiness-panel')).toContainText('Schedule-ready');
   await expect(page.locator('#route-readiness-panel')).toContainText('Routing-ready');
   const routing = await readWorkflowSnapshot(page);

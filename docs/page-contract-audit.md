@@ -17,9 +17,9 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 - Routes with undocumented writes: 0
 - Routes with declared inputs not statically read: 69
 - Routes with declared outputs not statically written: 0
-- Direct browser storage hits: 4
+- Direct browser storage hits: 2
 - Unclassified direct browser storage hits: 0
-- Direct browser storage classifications: session-handoff=4
+- Direct browser storage classifications: session-handoff=2
 - Actionable failures: 0
 - Warnings: 175
 
@@ -582,10 +582,10 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 
 **Detected Writes**
 - `cableSchedule`
-  - cableschedule.js:2459 setCables()
-  - cableschedule.js:2471 setCables()
-  - cableschedule.js:2485 setCables()
-  - cableschedule.js:2508 setCables()
+  - cableschedule.js:2472 setCables()
+  - cableschedule.js:2484 setCables()
+  - cableschedule.js:2498 setCables()
+  - cableschedule.js:2521 setCables()
 - `settings.cableChangeLog`
   - cableschedule.js:767 setCableChangeLog()
   - cableschedule.js:769 setItem(settings.cableChangeLog)
@@ -1263,9 +1263,9 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 
 **Detected Reads**
 - `cableSchedule`
-  - src/seismicwindcombined.js:281 getCables()
+  - src/seismicwindcombined.js:283 getCables()
 - `traySchedule`
-  - src/seismicwindcombined.js:280 getTrays()
+  - src/seismicwindcombined.js:282 getTrays()
 
 **Detected Writes**
 - None
@@ -1318,37 +1318,36 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 - None
 
 **Direct Browser Storage**
-- optimalRoute.js:71 sessionStorage.setItem(resume:choice) - session-handoff: E2E resume modal choice for the current tab only.
-- optimalRoute.js:93 sessionStorage.getItem(resume:choice) - session-handoff: E2E resume modal choice for the current tab only.
+- None
 
 **Detected Reads**
 - `cableSchedule`
-  - app.mjs:724 getCables()
+  - app.mjs:721 getCables()
 - `conduitSchedule`
-  - app.mjs:786 getConduits()
+  - app.mjs:783 getConduits()
 - `ductbankSchedule`
-  - app.mjs:785 getDuctbanks()
+  - app.mjs:782 getDuctbanks()
 - `settings.ctrSession`
-  - app.mjs:375 getItem(ctrSession)
-  - app.mjs:670 getItem(ctrSession)
+  - app.mjs:372 getItem(ctrSession)
+  - app.mjs:667 getItem(ctrSession)
 - `traySchedule`
-  - app.mjs:723 getTrays()
+  - app.mjs:720 getTrays()
 
 **Detected Writes**
 - `cableSchedule`
-  - app.mjs:4120 setCables()
+  - app.mjs:4117 setCables()
 - `settings.conduitFillData`
-  - app.mjs:2438 setItem(conduitFillData)
+  - app.mjs:2435 setItem(conduitFillData)
 - `settings.ctrSession`
-  - app.mjs:384 setItem(ctrSession)
-  - app.mjs:659 setItem(ctrSession)
+  - app.mjs:381 setItem(ctrSession)
+  - app.mjs:656 setItem(ctrSession)
 - `settings.ductbankRouteData`
-  - app.mjs:2451 setItem(ductbankRouteData)
+  - app.mjs:2448 setItem(ductbankRouteData)
 - `settings.latestRouteResults`
   - app.mjs:226 setItem(latestRouteResults)
 - `settings.trayFillData`
-  - app.mjs:2413 setItem(trayFillData)
-  - app.mjs:3729 setItem(trayFillData)
+  - app.mjs:2410 setItem(trayFillData)
+  - app.mjs:3726 setItem(trayFillData)
 
 ### Pull Cards (`pullcards.html`)
 

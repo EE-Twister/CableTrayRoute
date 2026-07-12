@@ -7,7 +7,7 @@
 @import "./src/styles/layout.css";
 @import "./src/styles/forms.css?v=dark-palette-icons";
 @import "./src/styles/modals.css";
-@import "./src/styles/tables.css";
+@import "./src/styles/tables.css?v=mobile-row-actions-v2";
 @import "./src/styles/messages.css";
 @import "./src/styles/ductbank.css";
 @import "./src/styles/tray-fill.css";

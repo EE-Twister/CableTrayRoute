@@ -117,7 +117,7 @@ function findNextAction(blockers) {
     label: 'Generate deliverables',
     detail: 'Core workflow data is ready for report and release-package review.',
     href: 'projectreport.html',
-    severity: 'complete'
+    severity: 'success'
   };
 }
 
@@ -297,9 +297,13 @@ export function buildComplianceMatrix(project = {}, diagnostics = buildWorkflowC
       ),
       matrixItem(
         'route-results-current',
-        cables.routingReady > 0 && health.routeResults >= cables.routingReady ? 'pass' : 'warn',
-        'Route results available for routed cables',
-        cables.routingReady > 0 && health.routeResults >= cables.routingReady ? `${health.routeResults} route result(s) found.` : 'Run or refresh Optimal Route before deliverables.',
+        cables.routingReady > 0 && cables.missingCoordinates === 0 && health.routeResults >= cables.routingReady ? 'pass' : 'warn',
+        'Route results reproducible from current inputs',
+        cables.routingReady > 0 && cables.missingCoordinates === 0 && health.routeResults >= cables.routingReady
+          ? `${health.routeResults} route result(s) found with complete endpoint coordinates.`
+          : (cables.missingCoordinates > 0
+              ? `${cables.missingCoordinates} routed cable(s) need endpoint coordinates before recalculation.`
+              : 'Run or refresh Optimal Route before deliverables.'),
         'optimalRoute.html'
       )
     ]),
@@ -435,8 +439,12 @@ export function buildGuidedWorkflowRunner(project = {}) {
       'fillRouting',
       workflowOrder.find(step => step.key === 'fillRouting')?.short || 'Fill / Routing',
       'optimalRoute.html',
-      cables.routingReady > 0 && health.routeResults >= cables.routingReady ? 'pass' : 'warn',
-      cables.routingReady > 0 && health.routeResults >= cables.routingReady ? `${health.routeResults} route result(s) are available.` : 'Assign raceways and run routing before deliverables.'
+      cables.routingReady > 0 && cables.missingCoordinates === 0 && health.routeResults >= cables.routingReady ? 'pass' : 'warn',
+      cables.routingReady > 0 && cables.missingCoordinates === 0 && health.routeResults >= cables.routingReady
+        ? `${health.routeResults} route result(s) are available and reproducible.`
+        : (cables.missingCoordinates > 0
+            ? `${cables.missingCoordinates} cable row(s) need endpoint coordinates before routing can be reproduced.`
+            : 'Assign raceways and run routing before deliverables.')
     ),
     makeRunnerStep(
       'studies',
@@ -561,7 +569,9 @@ export function buildWorkflowCoreDiagnostics(project = {}) {
   if (cableReadiness.scheduleReady > 0 && cableReadiness.routingReady === 0) {
     blockers.push(makeBlocker('Fill / Routing', 'warning', 'Assign raceways to cables', `${cableReadiness.scheduleReady} schedule-ready cables still need raceway assignments.`, 'cableschedule.html'));
   }
-  if (cableReadiness.routingReady > 0 && deliverableDiagnostics.health.routeResults === 0) {
+  if (cableReadiness.routingReady > 0 && cableReadiness.missingCoordinates > 0) {
+    blockers.push(makeBlocker('Fill / Routing', 'warning', 'Complete routing coordinates', `${cableReadiness.missingCoordinates} routed cable(s) need start and end XYZ coordinates before route results can be reproduced.`, 'cableschedule.html'));
+  } else if (cableReadiness.routingReady > 0 && deliverableDiagnostics.health.routeResults === 0) {
     blockers.push(makeBlocker('Fill / Routing', 'warning', 'Run routing for deliverables', 'Pull cards and procurement need route results from Optimal Route.', 'optimalRoute.html'));
   } else if (deliverableDiagnostics.missingRouteResultTags.length > 0) {
     blockers.push(makeBlocker('Fill / Routing', 'warning', 'Refresh route results', `${deliverableDiagnostics.missingRouteResultTags.length} schedule-ready cables do not have matching route results.`, 'optimalRoute.html'));

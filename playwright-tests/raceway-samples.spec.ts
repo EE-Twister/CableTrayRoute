@@ -81,7 +81,6 @@ test('raceway samples roundtrip and route', async ({ page }) => {
 
   await page.goto(pageUrl('optimalRoute.html?e2e=1'));
   await page.evaluate(() => document.getElementById('tour-overlay')?.remove());
-  await page.click('#resume-no-btn');
   await page.evaluate(async project => {
     const dataStore = await import('./dataStore.mjs');
     dataStore.importProject(project);

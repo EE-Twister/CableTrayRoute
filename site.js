@@ -740,7 +740,10 @@ async function saveCheckpoint(){
 
 async function updateProjectDisplay(snapshot){
   const proj=snapshot||getProjectState();
-  const name=displayProjectName(proj.name);
+  const activeProjectId=typeof window.currentProjectId==='string'&&window.currentProjectId!=='default'
+    ? window.currentProjectId.trim()
+    : '';
+  const name=displayProjectName(proj.name||activeProjectId);
   try{
     const hash=await sha256Hex(canonicalJSONString(proj));
     let span=document.getElementById('project-display');

@@ -38,6 +38,7 @@ const DOC_NAV = [
     children: [
       { href: "standards.html", title: "Engineering References" },
       { href: "nec_reference.html", title: "NEC Reference Tables" },
+      { href: "iec-60909.html", title: "IEC 60909 Short-Circuit" },
       { href: "heat-trace-sizing.md", title: "Heat Trace Sizing (IEEE 515 Context)" },
       { href: "cathodic_protection.md", title: "Cathodic Protection Sizing (AMPP/NACE/ISO Context)" },
     ],

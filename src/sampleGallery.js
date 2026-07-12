@@ -1,8 +1,8 @@
 import './workflowStatus.js';
 import '../site.js';
 import { importProject, saveProject } from '../dataStore.mjs';
-import { readAppSetting, writeAppSetting } from '../projectStorage.js';
-import { SAMPLE_REGISTRY, getSamplesByTag, validateSampleProject, migrateSampleProject, sampleProjectToImportPayload } from '../analysis/sampleGallery.mjs';
+import { getProjectState, listSavedProjects, readAppSetting, setProjectState, writeAppSetting } from '../projectStorage.js';
+import { SAMPLE_REGISTRY, getSampleProjectCopyName, getSamplesByTag, validateSampleProject, migrateSampleProject, sampleProjectToImportPayload } from '../analysis/sampleGallery.mjs';
 
 const PROGRESS_KEY_PREFIX = 'ctr_sample_progress_';
 
@@ -219,9 +219,13 @@ async function openSample(sample) {
       showToast('Sample import was cancelled or could not be applied.', 'error');
       return;
     }
-    const projectId = (window.currentProjectId && window.currentProjectId.trim()) || 'default';
+    const projectId = getSampleProjectCopyName(sample.title, listSavedProjects());
+    setProjectState({ ...getProjectState(), name: projectId });
     window.currentProjectId = projectId;
+    history.replaceState(null, '', `${location.pathname}${location.search}#${encodeURIComponent(projectId)}`);
+    globalThis.applyProjectHash?.();
     saveProject(projectId);
+    await globalThis.updateProjectDisplay?.({ name: projectId });
   } catch {
     showToast('Could not save sample to project storage (storage full?)', 'error');
     return;

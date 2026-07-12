@@ -218,10 +218,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 <td>Input</td></tr>
             <tr><td>Seismic lateral E</td>
                 <td>${s.lateralForce.toFixed(2)} lbs/ft</td>
-                <td>ASCE 7-22 §13.3.1 (SDC ${esc(s.sdc)})</td></tr>
+                <td>ASCE 7-16 §13.3.1 (SDC ${esc(s.sdc)})</td></tr>
             <tr><td>Seismic vertical E<sub>v</sub></td>
                 <td>±${s.verticalForce.toFixed(2)} lbs/ft</td>
-                <td>ASCE 7-22 §12.4.2</td></tr>
+                <td>ASCE 7-16 §12.4.2</td></tr>
             <tr><td>Wind lateral W</td>
                 <td>${w.windForce_per_ft.toFixed(2)} lbs/ft</td>
                 <td>ASCE 7-22 §29.4 (K<sub>z</sub>${w.Kz.toFixed(3)}, C<sub>f</sub>${w.Cf.toFixed(1)}, G${w.G.toFixed(2)})</td></tr>
@@ -256,7 +256,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
       <details class="method-note">
         <summary>Calculation detail</summary>
-        <p><strong>Seismic (ASCE 7-22 §13.3.1):</strong></p>
+        <p class="alert warning"><strong>Edition notice:</strong> Seismic forces use the ASCE 7-16
+        equation. The revised ASCE 7-22 seismic equation is not implemented.</p>
+        <p><strong>Seismic (ASCE 7-16 §13.3.1):</strong></p>
         <pre>Fp = (0.4 × ap × SDS × Wp) / (Rp / Ip) × (1 + 2z/h)
    = (0.4 × 1.0 × ${params.sds.toFixed(3)} × ${r.wp_lbs_ft.toFixed(2)}) / (2.5 / ${params.ip ?? 1.0}) × (1 + 2×${params.z_ft}/${params.h_ft})
 E_lat = ${s.lateralForce.toFixed(2)} lbs/ft
