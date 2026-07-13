@@ -3,12 +3,13 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "build": "node scripts/buildFastJsonPatch.cjs && rollup -c rollup.config.cjs && node scripts/copyAssets.cjs && node scripts/rewriteHtmlForManifest.cjs && node scripts/generateValidationManifest.cjs",
+    "build": "node scripts/buildFastJsonPatch.cjs && rollup -c rollup.config.cjs && node scripts/copyAssets.cjs && node scripts/rewriteHtmlForManifest.cjs && node scripts/generateValidationManifest.cjs && node scripts/auditHtmlAssetReferences.mjs --fix",
     "build:cloudflare": "node scripts/generateSupabaseConfig.mjs && npm run build",
     "build:manifest": "node scripts/generateValidationManifest.cjs",
     "test": "npm run test:full",
     "e2e": "npm run e2e:full",
-    "server": "node server.mjs",
+    "server": "npm run build && node server.mjs",
+    "server:fast": "node server.mjs",
     "lint": "node node_modules/.bin/eslint . --max-warnings=0 --ignore-pattern \"dist/**\" --ignore-pattern \"node_modules/**\"",
     "test:critical": "node tests/ampacity.test.mjs && node tests/racewayRoute.test.cjs && node tests/analysis.test.cjs && node tests/serverSecurity.test.mjs && node tests/collaborationServer.test.mjs && node tests/projectDisplayScheduler.test.mjs && node tests/revitImporter.test.mjs && node tests/validation.test.mjs && node tests/validationManifest.test.mjs && node tests/studyBasis.test.mjs",
     "test:full": "node scripts/runNodeTests.mjs",
@@ -36,18 +37,18 @@
     "rollup": "^3.30.0"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.80.0",
+    "@anthropic-ai/sdk": "^0.91.1",
     "d3": "^7.9.0",
     "docx": "^8.5.0",
     "express": "^4.19.2",
     "fast-json-patch": "^3.1.0",
     "handlebars": "^4.7.8",
     "jspdf": "^4.2.1",
-    "pdfjs-dist": "^3.7.107",
+    "pdfjs-dist": "^4.10.38",
     "pdfkit": "^0.13.0",
     "qrcode": "^1.5.4",
     "svg2pdf.js": "^2.7.0",
     "ws": "^8.16.0",
-    "xlsx": "^0.18.5"
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   }
 }

@@ -12,6 +12,8 @@ import {
   importProject,
   getOneLine,
   getStudies,
+  getStudyProvenance,
+  getProjectInputFingerprint,
   loadProject,
   saveProject,
   getDuctbanks,
@@ -22,9 +24,14 @@ import {
   getTrays,
   getLifecyclePackages,
   getReportSnapshots,
+  getProjectMeta,
+  getDesignBasis,
   getItem,
   applyRemoteSnapshot
 } from "./dataStore.mjs";
+import { getPageContract } from "./src/pageContracts.js";
+import { normalizeProjectMeta } from "./analysis/projectIntegration.mjs";
+import { applyLinkedValue, attachProjectSourceBadge } from "./src/components/projectInputBinding.js";
 import {
   workflowOrder as PROJECT_WORKFLOW_STEPS,
   getWorkflowStepForPage,
@@ -62,12 +69,20 @@ const MAX_CHECKPOINT_SIZE=2*1024*1024; // ~2MB
 const AUTO_SAVE_INTERVAL_MS=5*60*1000;
 const ONBOARDING_STATE_KEY='onboarding';
 const ONBOARDING_VERSION='2026.06';
+const SHARED_SHELL_INIT_KEY='__ctrSharedShellFeatures';
 let cachedProjectFileHandle=null;
 let autoSaveSchedulerInstance=null;
 let dirtyTrackerInstance=null;
 let operationToastTimer=null;
 let lastSavedAt=null;
 let lastSavedIndicatorTimer=null;
+
+function claimSharedShellFeature(feature){
+  const state=globalThis[SHARED_SHELL_INIT_KEY]||(globalThis[SHARED_SHELL_INIT_KEY]={});
+  if(state[feature]) return false;
+  state[feature]=true;
+  return true;
+}
 
 const ONBOARDING_SAMPLE_PROJECT={
   name:'Sample Project - Getting Started',
@@ -732,7 +747,10 @@ async function saveCheckpoint(){
 
 async function updateProjectDisplay(snapshot){
   const proj=snapshot||getProjectState();
-  const name=displayProjectName(proj.name);
+  const activeProjectId=typeof window.currentProjectId==='string'&&window.currentProjectId!=='default'
+    ? window.currentProjectId.trim()
+    : '';
+  const name=displayProjectName(proj.name||activeProjectId);
   try{
     const hash=await sha256Hex(canonicalJSONString(proj));
     let span=document.getElementById('project-display');
@@ -1405,6 +1423,7 @@ async function generateTechnicalReport(format='pdf'){
 }
 
 function initSettings(){
+  if(!claimSharedShellFeature('settings')) return;
   const settingsBtn=document.getElementById('settings-btn');
   const settingsMenu=document.getElementById('settings-menu');
   const operationStatusHost=initOperationStatusHost(settingsMenu);
@@ -1658,6 +1677,7 @@ function initSettings(){
 }
 
 function initDarkMode(){
+  if(!claimSharedShellFeature('theme')) return;
   const elementCache=createElementCache(document);
   const settingsMenu=elementCache.getById('settings-menu');
   const darkToggle=elementCache.getById('dark-toggle');
@@ -1753,6 +1773,7 @@ function initDarkMode(){
 }
 
 function initCompactMode(){
+  if(!claimSharedShellFeature('compact-mode')) return;
   const elementCache=createElementCache(document);
   const compactToggle=elementCache.getById('compact-toggle');
   const domBatcher=createDomWriteBatcher();
@@ -1792,6 +1813,8 @@ function initHelpModal(btnId='help-btn',modalId='help-modal',closeId){
   const btn=document.getElementById(btnId);
   const modal=document.getElementById(modalId);
   const closeBtn=closeId?document.getElementById(closeId):(modal?modal.querySelector('.close-btn'):null);
+  if(!btn||!modal||!closeBtn) return;
+  if(!claimSharedShellFeature(`help:${btnId}:${modalId}:${closeId||''}`)) return;
   if(btn&&modal&&closeBtn){
     modal.setAttribute('role','dialog');
     modal.setAttribute('aria-modal','true');
@@ -1858,6 +1881,7 @@ function initNavToggle(){
   if(!toggle) return;
   const target=elementCache.getById(toggle.getAttribute('aria-controls'));
   if(!target) return;
+  if(!claimSharedShellFeature('nav-toggle')) return;
   const profileHandler=createHandlerProfiler('initNavToggle');
 
   function closeMenu(){
@@ -2174,6 +2198,73 @@ function initWorkflowStepNav(){
 }
 
 globalThis.document?.addEventListener('DOMContentLoaded',initWorkflowStepNav);
+
+function initStudyFreshnessBanner(){
+  if(typeof document==='undefined') return;
+  const pageName=(location.pathname.split('/').pop()||'index.html').toLowerCase();
+  if(pageName==='battery.html'||pageName==='generatorsizing.html') return;
+  const contract=getPageContract(pageName);
+  const studyOutput=(contract?.outputs||[]).find(item=>/^studyResults\.[^.]+$/.test(item.key));
+  if(!studyOutput) return;
+  const studyKey=studyOutput.key.slice('studyResults.'.length);
+  const result=getStudies()?.[studyKey];
+  if(!result) return;
+  const provenance=getStudyProvenance()?.[studyKey];
+  const currentHash=getProjectInputFingerprint();
+  const stale=Boolean(provenance?.inputHash&&provenance.inputHash!==currentHash);
+  const banner=document.createElement('section');
+  banner.className=`study-global-freshness ${stale?'study-global-freshness--stale':'study-global-freshness--current'}`;
+  banner.setAttribute('role','status');
+  banner.style.cssText=`border:1px solid ${stale?'#d97706':'#16803c'};border-left-width:4px;border-radius:7px;padding:.65rem .8rem;margin:.75rem 0;background:${stale?'rgba(245,158,11,.1)':'rgba(22,128,60,.08)'}`;
+  if(!provenance?.inputHash){
+    banner.textContent='Saved result provenance is unavailable. Re-run this study to link it to the current project inputs.';
+  }else if(stale){
+    banner.textContent='Project data changed since this study was run. Re-run the study before relying on or issuing this result.';
+  }else{
+    const when=provenance.capturedAt?new Date(provenance.capturedAt).toLocaleString():'';
+    banner.textContent=`Result is current with the linked project inputs${when?` (run ${when})`:''}.`;
+  }
+  const main=document.querySelector('main');
+  const header=main?.querySelector('.page-header,h1');
+  if(header?.parentElement) header.parentElement.insertAdjacentElement('afterend',banner);
+  else main?.prepend(banner);
+}
+
+globalThis.document?.addEventListener('DOMContentLoaded',initStudyFreshnessBanner);
+
+function initCommonProjectFieldBindings(){
+  if(typeof document==='undefined') return;
+  const pageName=(location.pathname.split('/').pop()||'index.html').toLowerCase();
+  if(['battery.html','generatorsizing.html','projectreport.html'].includes(pageName)) return;
+  const contract=getPageContract(pageName);
+  const studyOutput=(contract?.outputs||[]).find(item=>/^studyResults\.[^.]+$/.test(item.key));
+  if(studyOutput&&getStudies()?.[studyOutput.key.slice('studyResults.'.length)]) return;
+  const state=getProjectState();
+  const meta=normalizeProjectMeta(getProjectMeta(),state?.name||'');
+  const basis=getDesignBasis()||{};
+  const minAmbient=meta.minAmbientTempC;
+  const maxAmbient=meta.maxAmbientTempC;
+  const ambientValue=pageName==='heattracesizing.html'?minAmbient:maxAmbient;
+  const bindings=[
+    {ids:['sub-project-name','project-label','project-name'],value:meta.name,sourcePath:'projectMeta.name',label:'Project metadata'},
+    {ids:['system-label'],value:meta.site||meta.name,sourcePath:meta.site?'projectMeta.site':'projectMeta.name',label:'Project metadata'},
+    {ids:['altitude-ft'],value:meta.altitudeFt,sourcePath:'projectMeta.altitudeFt',label:'Site altitude'},
+    {ids:['altitude-m'],value:Number((meta.altitudeFt*0.3048).toFixed(1)),sourcePath:'projectMeta.altitudeFt',label:'Site altitude'},
+    {ids:['feeder-ambient','motor-ambient','ambient-c','ambient-temp-c','ambientTemp','ct-ambient-air'],value:ambientValue,sourcePath:pageName==='heattracesizing.html'?'projectMeta.minAmbientTempC':'projectMeta.maxAmbientTempC',label:pageName==='heattracesizing.html'?'Minimum ambient':'Maximum ambient'},
+    {ids:['jurisdiction'],value:basis.codeBasis?.jurisdiction,sourcePath:'designBasis.codeBasis.jurisdiction',label:'Design Basis'},
+    {ids:['ahj'],value:basis.codeBasis?.ahj,sourcePath:'designBasis.codeBasis.ahj',label:'Design Basis'},
+  ];
+  const overrides=new Set();
+  bindings.forEach(binding=>binding.ids.forEach(id=>{
+    const element=document.getElementById(id);
+    if(!element||binding.value===null||binding.value===undefined||binding.value==='') return;
+    const source={sourcePath:binding.sourcePath,sourceLabel:binding.label};
+    applyLinkedValue(element,binding.value,overrides,id,source);
+    attachProjectSourceBadge(element,binding.label);
+  }));
+}
+
+globalThis.document?.addEventListener('DOMContentLoaded',initCommonProjectFieldBindings);
 
 function makeWorkflowModeTag(text, tone = 'neutral') {
   const tag = document.createElement('span');
@@ -2788,7 +2879,29 @@ globalThis.initCompactMode=initCompactMode;
 globalThis.initHelpModal=initHelpModal;
 globalThis.initNavToggle=initNavToggle;
 
-export { initSettings, initDarkMode, initCompactMode, initHelpModal, initNavToggle };
+function initSharedShell(){
+  if(typeof document==='undefined') return;
+  initSettings();
+  initDarkMode();
+  initCompactMode();
+  initHelpModal('help-btn','help-modal','close-help-btn');
+  initNavToggle();
+}
+
+function scheduleSharedShellInitialization(){
+  if(typeof document==='undefined' || typeof window==='undefined' || typeof window.requestAnimationFrame!=='function') return;
+  if(document.readyState==='loading'){
+    document.addEventListener('DOMContentLoaded',initSharedShell,{once:true});
+  }else{
+    initSharedShell();
+  }
+}
+
+scheduleSharedShellInitialization();
+
+globalThis.initSharedShell=initSharedShell;
+
+export { initSettings, initDarkMode, initCompactMode, initHelpModal, initNavToggle, initSharedShell };
 globalThis.checkPrereqs=checkPrereqs;
 globalThis.persistConduits=persistConduits;
 globalThis.loadConduits=loadConduits;

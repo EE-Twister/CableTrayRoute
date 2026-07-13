@@ -27,6 +27,7 @@ import './projectManager.js';
 
 // Studies tracked in the dashboard with display labels and their storage keys
 const STUDY_DEFINITIONS = [
+  { key: 'demandSchedule', label: 'Demand Schedule', href: 'demandschedule.html' },
   { key: 'arcFlash',     label: 'Arc Flash',           href: 'arcFlash.html' },
   { key: 'shortCircuit', label: 'Short Circuit',        href: 'shortCircuit.html' },
   { key: 'loadFlow',     label: 'Load Flow',            href: 'loadFlow.html' },

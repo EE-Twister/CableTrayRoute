@@ -41,7 +41,7 @@ function ensureReadyBeacon(attrName, id) {
   if (!el) {
     el = document.createElement('div');
     el.id = id;
-    el.style.cssText = 'position:fixed;left:0;bottom:0;width:1px;height:1px;opacity:0.01;z-index:2147483647;';
+    el.style.cssText = 'position:fixed;left:0;bottom:0;width:1px;height:1px;opacity:0.01;pointer-events:none;z-index:2147483647;';
     document.body.appendChild(el);
   }
   el.setAttribute(attrName, '1');
@@ -66,44 +66,6 @@ function setReadyWhen(selector, attrName, id, timeoutMs = 25000) {
   }
 }
 
-function storeResumeChoice(choice) {
-  try {
-    sessionStorage.setItem('resume:choice', choice);
-  } catch (e) {
-    console.warn('Failed to store resume choice in sessionStorage', e);
-  }
-}
-
-let wiredResumeTracking = false;
-function wireResumeTracking() {
-  if (wiredResumeTracking) return;
-  wiredResumeTracking = true;
-  const yesBtn = document.getElementById('resume-yes-btn');
-  const noBtn = document.getElementById('resume-no-btn');
-  if (yesBtn && yesBtn.getAttribute('type') !== 'button') yesBtn.setAttribute('type', 'button');
-  if (noBtn && noBtn.getAttribute('type') !== 'button') noBtn.setAttribute('type', 'button');
-  if (yesBtn) yesBtn.addEventListener('click', () => storeResumeChoice('yes'));
-  if (noBtn) noBtn.addEventListener('click', () => storeResumeChoice('no'));
-}
-
-function showResumeModalForE2E() {
-  if (!E2E) return;
-  if (!searchParams.has('showResume')) return;
-  try {
-    if (sessionStorage.getItem('resume:choice')) return;
-  } catch { /* sessionStorage may throw in sandboxed/private contexts; treat as no prior choice */ }
-  const modal = document.getElementById('resume-modal');
-  if (!modal) return;
-  modal.classList.remove('hidden', 'is-hidden', 'invisible');
-  modal.removeAttribute('hidden');
-  Object.assign(modal.style, {
-    display: 'flex',
-    visibility: 'visible',
-    opacity: '1',
-    pointerEvents: 'auto'
-  });
-}
-
 document.addEventListener('exclusions-found', () => {
   const details = document.getElementById('route-breakdown-details');
   if (details) details.classList.add('has-alerts');
@@ -112,26 +74,17 @@ document.addEventListener('exclusions-found', () => {
 /**
  * When navigated from the Cable Schedule with ?autoRoute=1, automatically
  * trigger the "Calculate Optimal Route" button once the page is ready.
- * The trigger waits for the calculate button to become available and for
- * any resume-session modal to be dismissed (by simulating a "Yes" click).
+ * The trigger waits for the calculate button to become available after the
+ * project schedules have been hydrated into the route workspace.
  */
 function autoTriggerRouteIfRequested() {
   const params = new URLSearchParams(location.search);
   if (!params.has('autoRoute')) return;
 
-  // Auto-dismiss the resume modal by clicking "Yes" to load saved data
-  const tryResumeYes = () => {
-    const yesBtn = document.getElementById('resume-yes-btn');
-    if (yesBtn && !yesBtn.disabled && yesBtn.offsetParent !== null) {
-      yesBtn.click();
-    }
-  };
-
   // Poll until the calculate button is present and enabled, then click it
   const startMs = performance.now();
   const MAX_WAIT_MS = 15000;
   const poll = () => {
-    tryResumeYes();
     const btn = document.getElementById('calculate-route-btn');
     if (btn && !btn.disabled) {
       btn.click();
@@ -150,8 +103,6 @@ function autoTriggerRouteIfRequested() {
 
 function initializePage() {
   e2eOpenDetailsAndControls();
-  wireResumeTracking();
-  showResumeModalForE2E();
   setReadyWhen('#settings-btn', 'data-optimal-ready', 'optimal-ready-beacon');
   if (typeof globalThis.checkPrereqs === 'function') {
     globalThis.checkPrereqs([

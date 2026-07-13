@@ -729,7 +729,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const unit = result?.unitSystem === 'metric' ? '&deg;C' : '&deg;F';
       const utilizationRatio = Number.isFinite(result?.circuitUtilizationRatio)
         ? result.circuitUtilizationRatio
-        : result.lineLengthFt / getEffectiveMaxCircuitLengthFt(result);
+        : (result ? result.lineLengthFt / getEffectiveMaxCircuitLengthFt(result) : 0);
       temperatureDetailPanel.innerHTML = !result ? '' : `
         ${renderDetailItem('Maintain target', `${maintainTemp.toFixed(1)} ${unit}`)}
         ${renderDetailItem('Ambient baseline', `${ambientTemp.toFixed(1)} ${unit}`)}
@@ -2608,6 +2608,7 @@ document.addEventListener('DOMContentLoaded', () => {
   attachPackageHandlers();
   initStudyApprovalPanel('heatTraceSizing', 'study-review-panel-linelist');
   renderCatalogTable();
+  document.documentElement.dataset.heatTraceReady = '1';
 
 });
 

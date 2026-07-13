@@ -153,6 +153,8 @@ function monitorPage(page, origin) {
   page.on('console', message => {
     if (message.type() !== 'error') return;
     if (/Failed to load resource/i.test(message.text())) return;
+    if (/downloadable font: download failed/i.test(message.text())
+      && /fonts\.gstatic\.com/i.test(message.text())) return;
     errors.push(message.text());
   });
   page.on('response', response => {
@@ -344,19 +346,13 @@ test('optimal route explains routing readiness and invalid assignments', async (
     ]));
   });
   await page.goto(server.url('optimalRoute.html?e2e=1'), { waitUntil: 'domcontentloaded' });
-  const resumeModal = page.locator('#resume-modal');
-  await resumeModal.waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
-  if (await resumeModal.isVisible().catch(() => false)) {
-    await page.locator('#resume-yes-btn').click();
-    await expect(resumeModal).toBeHidden();
-  } else {
-    await page.locator('#import-schedules-btn').click({ force: true });
-  }
   await expect(page.locator('#route-readiness-panel')).toContainText('Schedule-ready');
   await expect(page.locator('#route-readiness-panel')).toContainText('Routing-ready');
   await expect(page.locator('#route-readiness-panel')).toContainText('Invalid assignments');
   await expect(page.locator('#route-readiness-actions')).toContainText('Resolve missing raceway references');
   await expect(page.locator('#route-readiness-actions')).toContainText('CBL-2 references MISSING');
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('base:cableSchedule') || '[]').length)).toBe(2);
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('base:traySchedule') || '[]').length)).toBe(1);
 });
 
 test('fill pages show project handoff context', async ({ page }) => {

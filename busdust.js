@@ -3,9 +3,23 @@ import {
   STANDARD_BUSWAY_RATINGS,
   BUSWAY_LIBRARY,
 } from './analysis/busDuctSizing.mjs';
-import { getStudies, setStudies } from './dataStore.mjs';
+import { getStudies, setStudies, getLoads, getEquipment, getCables, getProjectMeta } from './dataStore.mjs';
 import { initStudyApprovalPanel } from './src/components/studyApproval.js';
 import { escapeHtml } from './src/htmlUtils.mjs';
+import {
+  buildBusDuctProjectInputs,
+  buildProjectScopeOptions,
+  createStudyInputSnapshot,
+  resolveProjectScope,
+  withStudyProvenance,
+} from './analysis/projectIntegration.mjs';
+import {
+  applyLinkedValue,
+  attachProjectSourceBadge,
+  bindProjectField,
+  renderProjectInputPanel,
+  renderProjectScopeSelector,
+} from './src/components/projectInputBinding.js';
 
 document.addEventListener('DOMContentLoaded', () => {
   initSettings();
@@ -17,20 +31,61 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const calculateBtn = document.getElementById('calculate-btn');
   const exportBtn    = document.getElementById('export-btn');
+  const projectOverrides = new Set();
+  const projectData = () => ({
+    equipment: getEquipment(), loads: getLoads(), cables: getCables(), studies: getStudies(),
+  });
+  const scopeOptions = buildProjectScopeOptions(projectData(), ['load', 'circuit']);
+  let selectedScopeValue = getStudies().busDuctSizing?.projectLink?.scopeValue || scopeOptions[0]?.value || '';
+  let projectInputModel = null;
 
   calculateBtn.addEventListener('click', calculate);
   exportBtn.addEventListener('click', exportCsv);
 
+  function applyProjectScope(scopeValue = selectedScopeValue, { force = false } = {}) {
+    selectedScopeValue = scopeValue;
+    const scope = resolveProjectScope(scopeValue, projectData());
+    projectInputModel = buildBusDuctProjectInputs(scope, getProjectMeta());
+    const fieldIds = {
+      label: 'run-label', phases: 'phases', systemVoltageV: 'system-voltage',
+      currentA: 'current-a', lengthFt: 'length-ft', ambientC: 'ambient-c', faultCurrentKA: 'fault-ka',
+    };
+    Object.entries(fieldIds).forEach(([fieldName, id]) => {
+      const element = document.getElementById(id);
+      const binding = projectInputModel.bindings[fieldName];
+      bindProjectField(element, binding, projectOverrides, fieldName);
+      if (applyLinkedValue(element, projectInputModel.inputs[fieldName], projectOverrides, fieldName, binding, { force })) {
+        attachProjectSourceBadge(element, binding.sourceLabel);
+      }
+    });
+  }
+
+  const inputSection = calculateBtn.closest('section') || calculateBtn.parentElement;
+  renderProjectScopeSelector({
+    container: inputSection,
+    title: 'Bus duct project scope',
+    options: scopeOptions,
+    selectedValue: selectedScopeValue,
+    onSelect: applyProjectScope,
+  });
+
   // Restore previously saved state
   const saved = getStudies().busDuctSizing;
   if (saved && saved._inputs) {
+    (saved.projectLink?.overrides || []).forEach(field => projectOverrides.add(field));
     restoreInputs(saved._inputs);
     const restoredResult = runBusDuctStudy(saved._inputs);
-    const studies = getStudies();
-    studies.busDuctSizing = { ...restoredResult, _inputs: saved._inputs };
-    setStudies(studies);
-    renderResults(studies.busDuctSizing);
+    projectInputModel = buildBusDuctProjectInputs(resolveProjectScope(selectedScopeValue, projectData()), getProjectMeta());
+    renderResults({ ...saved, ...restoredResult, _inputs: saved._inputs });
     exportBtn.disabled = !restoredResult.valid;
+  } else if (selectedScopeValue) {
+    applyProjectScope(selectedScopeValue);
+  } else {
+    renderProjectInputPanel({
+      container: inputSection,
+      title: 'Project data unavailable',
+      missing: ['Add a load or cable record to link this study.'],
+    });
   }
 
   // -------------------------------------------------------------------
@@ -41,7 +96,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const inputs = readInputs();
     const result = runBusDuctStudy(inputs);
 
-    const toStore = { ...result, _inputs: inputs };
+    const snapshot = createStudyInputSnapshot('busDuctSizing', inputs, projectInputModel?.bindings || {}, projectOverrides);
+    snapshot.scopeValue = selectedScopeValue;
+    const toStore = withStudyProvenance({ ...result, _inputs: inputs }, snapshot);
     const studies = getStudies();
     studies.busDuctSizing = toStore;
     setStudies(studies);

@@ -5,6 +5,15 @@
 
 export const SCHEMA_VERSION = 1;
 
+export function getSampleProjectCopyName(title, existingNames = []) {
+  const base = `${String(title || 'Untitled').trim() || 'Untitled'} — Sample`;
+  const used = new Set((existingNames || []).map(name => String(name).trim().toLocaleLowerCase()));
+  if (!used.has(base.toLocaleLowerCase())) return base;
+  let copyNumber = 2;
+  while (used.has(`${base} (${copyNumber})`.toLocaleLowerCase())) copyNumber += 1;
+  return `${base} (${copyNumber})`;
+}
+
 export const SAMPLE_REGISTRY = [
   {
     id: 'project-workflow-core',

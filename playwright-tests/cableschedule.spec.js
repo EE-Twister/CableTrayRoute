@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import * as XLSX from 'xlsx';
@@ -26,6 +27,7 @@ async function addCable(page, {
   await page.fill('#cable-editor-tag', tag);
   await page.fill('#cable-editor-from_tag', fromTag);
   await page.fill('#cable-editor-to_tag', toTag);
+  await page.selectOption('#cable-editor-cable_type', 'Control');
   await page.selectOption('#cable-editor-conductor_size', { label: conductorSize });
   await page.fill('#cable-editor-length', length);
   await page.selectOption('#cable-editor-raceway_ids', raceway);
@@ -40,7 +42,7 @@ async function openToolbarMenu(page, label) {
   }
 }
 
-function writeCableImportFixture(filePath) {
+async function writeCableImportFixture(filePath) {
   const workbook = XLSX.utils.book_new();
   const sheet = XLSX.utils.json_to_sheet([
     {
@@ -53,7 +55,8 @@ function writeCableImportFixture(filePath) {
     }
   ]);
   XLSX.utils.book_append_sheet(workbook, sheet, 'Cables');
-  XLSX.writeFile(workbook, filePath);
+  const data = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+  await fs.writeFile(filePath, data);
 }
 
 test.describe('cableschedule buttons', () => {
@@ -187,7 +190,7 @@ test.describe('cableschedule buttons', () => {
   test('import mapping wizard imports non-matching spreadsheet headers', async ({ page }, testInfo) => {
     await seedRaceway(page, 'R1');
     const filePath = testInfo.outputPath('mapped-cables.xlsx');
-    writeCableImportFixture(filePath);
+    await writeCableImportFixture(filePath);
 
     await page.setInputFiles('#import-xlsx-input', filePath);
     await expect(page.getByRole('heading', { name: 'Map Cable Import' })).toBeVisible();

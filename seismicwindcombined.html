@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="Combined seismic and wind load scenario for cable tray supports per ASCE 7-22. Evaluates all four LRFD load combinations (LC-W1 through LC-S2) and identifies the governing demand." />
+  <meta name="description" content="Combined cable tray support scenario using an ASCE 7-16 seismic equation with ASCE 7-22 wind and LRFD combinations." />
   <title>Seismic + Wind Combined — CableTrayRoute</title>
   <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icons/favicon.svg">
   <!-- Open Graph / Social sharing -->
   <meta property="og:type" content="website">
   <meta property="og:title" content="Seismic + Wind Combined — CableTrayRoute">
-  <meta property="og:description" content="Combined seismic and wind load scenario for cable tray supports per ASCE 7-22 §2.3.2.">
+  <meta property="og:description" content="Combined ASCE 7-16 seismic and ASCE 7-22 wind/load-combination scenario for cable tray supports.">
   <meta property="og:image" content="https://cabletrayroute.com/icons/og-preview.png">
   <meta property="og:site_name" content="CableTrayRoute">
   <meta property="og:url" content="seismicwindcombined.html">
@@ -88,10 +88,10 @@
 
       <details class="method-panel">
         <summary>Method &amp; Assumptions</summary>
-        <p>This tool orchestrates three ASCE 7-22 analysis modules to produce a unified
-        combined-scenario result for cable tray structural support design:</p>
+        <p>This tool combines an ASCE 7-16 seismic component-force calculation with
+        ASCE 7-22 wind and load-combination calculations for cable tray support design:</p>
         <ol>
-          <li><strong>Seismic brace forces</strong> per <strong>ASCE 7-22 §13.3.1</strong>:
+          <li><strong>Seismic brace forces</strong> per <strong>ASCE 7-16 §13.3.1</strong>:
             <pre>Fp = (0.4·ap·SDS·Wp / (Rp/Ip)) × (1 + 2z/h)</pre>
             Lateral force E = Fp × Wp; vertical E<sub>v</sub> = ±0.2·SDS·Ip·Wp.
           </li>
@@ -107,6 +107,9 @@ LC-S2: 0.9D + 1.0E      (seismic + minimum gravity)</pre>
             The governing (envelope) combination is identified by maximum resultant force.
           </li>
         </ol>
+        <p class="alert warning"><strong>Edition notice:</strong> The seismic module uses the
+        ASCE 7-16 component-force equation shown above. The revised ASCE 7-22 seismic
+        equation is not implemented; do not treat this result as an ASCE 7-22 seismic design.</p>
         <p><em>Note:</em> This page uses the §2.3.2 four-combination model.
         For LRFD/ASD toggle with six combinations and capacity utilization checks,
         see the <a href="structuralcombinations.html">Combined Loads (§2.3.1)</a> page.

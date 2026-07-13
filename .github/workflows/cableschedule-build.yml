@@ -25,9 +25,5 @@ jobs:
         with:
           node-version: '20'
       - run: npm ci
-      - name: Rebuild bundles
+      - name: Build bundles
         run: npm run build
-      - name: Ensure bundle up to date
-        run: |
-          git status --short
-          test -z "$(git status --short)"

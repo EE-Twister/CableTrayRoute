@@ -62,5 +62,17 @@ describe('HTML asset reference audit', () => {
   it('exposes a package script for local checks', () => {
     const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
     assert.equal(pkg.scripts['check:html-assets'], 'node scripts/auditHtmlAssetReferences.mjs');
+    assert.match(pkg.scripts.server, /^npm run build && node server\.mjs$/);
+  });
+
+  it('does not bootstrap the shared shell twice on pages with bundled entries', () => {
+    for (const page of ['index.html', 'help.html', '404.html']) {
+      const html = fs.readFileSync(path.join(ROOT, page), 'utf8');
+      assert.doesNotMatch(html, /from ['"]\.\/site\.js['"]/);
+    }
+    const routePage = fs.readFileSync(path.join(ROOT, 'optimalRoute.html'), 'utf8');
+    const routeModule = fs.readFileSync(path.join(ROOT, 'src', 'optimalRoute.js'), 'utf8');
+    assert.doesNotMatch(routePage, /src=["']site\.js["']/);
+    assert.doesNotMatch(routeModule, /import ['"]\.\.\/site\.js['"];/);
   });
 });

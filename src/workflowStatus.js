@@ -7,11 +7,14 @@ import {
   getConduits,
   getDuctbanks,
   getStudies,
+  getDesignBasis,
   getLifecyclePackages,
   getReportSnapshots,
   getItem
 } from '../dataStore.mjs';
 import { normalizeRouteResults } from '../analysis/deliverableWorkflow.mjs';
+import { cableHasRoutingCoordinates } from '../analysis/scheduleWorkflow.mjs';
+import { normalizeDesignBasis } from '../analysis/designBasis.mjs';
 import {
   READINESS_VOCABULARY,
   getPageContractReadiness,
@@ -189,12 +192,15 @@ export function getCableReadiness(cables = getCables()) {
   const rows = meaningfulRecords(cables);
   const scheduleReadyRows = rows.filter(isCableScheduleReady);
   const routingReadyRows = scheduleReadyRows.filter(hasRacewayAssignment);
+  const coordinateReadyRows = routingReadyRows.filter(cableHasRoutingCoordinates);
   return {
     total: rows.length,
     scheduleReady: scheduleReadyRows.length,
     routingReady: routingReadyRows.length,
+    coordinateReady: coordinateReadyRows.length,
     missingSchedule: rows.length - scheduleReadyRows.length,
-    missingRaceway: scheduleReadyRows.length - routingReadyRows.length
+    missingRaceway: scheduleReadyRows.length - routingReadyRows.length,
+    missingCoordinates: routingReadyRows.length - coordinateReadyRows.length
   };
 }
 
@@ -213,6 +219,24 @@ function countStudies(studies = getStudies()) {
     if (value && typeof value === 'object') return Object.keys(value).length > 0;
     return hasValue(value);
   }).length;
+}
+
+function studyHasResults(study) {
+  if (Array.isArray(study)) return study.length > 0;
+  if (study && typeof study === 'object') return Object.keys(study).length > 0;
+  return hasValue(study);
+}
+
+function requiredStudyKeys(designBasis) {
+  const prerequisites = normalizeDesignBasis(designBasis).studyPrerequisites;
+  const required = [];
+  if (prerequisites.requireUtilityFault) required.push('shortCircuit');
+  if (prerequisites.requireArcFlashInputs) required.push('arcFlash');
+  return required;
+}
+
+function studyLabel(key) {
+  return ({ shortCircuit: 'short-circuit', arcFlash: 'arc-flash' })[key] || key;
 }
 
 function countReportSnapshots(snapshots = getReportSnapshots()) {
@@ -386,8 +410,16 @@ export function getStepStatus(key, overrides = {}) {
     const conduits = meaningfulRecords(readData(overrides, 'conduits', getConduits, [])).length;
     const ductbanks = meaningfulRecords(readData(overrides, 'ductbanks', getDuctbanks, [])).length;
     const raceways = trays + conduits + ductbanks;
-    if (readiness.routingReady > 0 && raceways > 0) {
-      return { complete: true, label: pluralize(readiness.routingReady, 'routing-ready cable', 'routing-ready cables') };
+    const routeResults = normalizeRouteResults(readData(overrides, 'latestRouteResults', () => getItem('latestRouteResults', null), null));
+    if (readiness.routingReady > 0 && routeResults.length >= readiness.routingReady) {
+      if (readiness.missingCoordinates > 0) {
+        return {
+          complete: false,
+          label: `${pluralize(routeResults.length, 'saved route result', 'saved route results')}; inputs incomplete`,
+          hint: `${readiness.missingCoordinates} routed cable${readiness.missingCoordinates === 1 ? '' : 's'} need endpoint coordinates before the results can be reproduced.`
+        };
+      }
+      return { complete: true, label: pluralize(routeResults.length, 'route result', 'route results'), hint: null };
     }
     if (readiness.scheduleReady === 0) {
       return { complete: false, label: 'Needs schedule-ready cables', hint: 'Complete Cable Schedule before fill and routing.' };
@@ -395,11 +427,36 @@ export function getStepStatus(key, overrides = {}) {
     if (raceways === 0) {
       return { complete: false, label: 'Needs raceways', hint: 'Add raceways before fill and routing.' };
     }
+    if (readiness.routingReady > 0 && readiness.missingCoordinates > 0) {
+      return {
+        complete: false,
+        label: `${readiness.coordinateReady} of ${readiness.routingReady} coordinate-ready`,
+        hint: 'Add start and end XYZ coordinates to every assigned cable before running Optimal Route.'
+      };
+    }
+    if (readiness.routingReady > 0) {
+      return {
+        complete: false,
+        label: 'Run routing',
+        hint: 'Assigned cable rows have coordinates, but no route results have been saved yet.'
+      };
+    }
     return { complete: false, label: 'Assign raceways', hint: 'Cable rows are schedule-ready but need raceway assignments for routing.' };
   }
 
   if (canonicalKey === 'studies') {
-    const count = countStudies(readData(overrides, 'studies', getStudies, {}));
+    const studies = readData(overrides, 'studies', getStudies, {});
+    const count = countStudies(studies);
+    const required = requiredStudyKeys(readData(overrides, 'designBasis', getDesignBasis, null));
+    const missing = required.filter(key => !studyHasResults(studies?.[key]));
+    if (missing.length > 0) {
+      const missingLabels = missing.map(studyLabel).join(' and ');
+      return {
+        complete: false,
+        label: `${pluralize(count, 'study result', 'study results')} saved`,
+        hint: `Run the required ${missingLabels} study${missing.length === 1 ? '' : ' studies'} from the Design Basis.`
+      };
+    }
     if (count > 0) return { complete: true, label: pluralize(count, 'study result', 'study results') };
     return { complete: false, label: 'No studies saved', hint: 'Run demand, load flow, short-circuit, arc flash, or other studies.' };
   }

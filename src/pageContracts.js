@@ -60,6 +60,7 @@ const trays = projectInput('traySchedule', 'schedule', true, 'Tray IDs, dimensio
 const conduits = projectInput('conduitSchedule', 'schedule', true, 'Conduit IDs, trade sizes, fill limits, material, and route geometry.');
 const ductbanks = projectInput('ductbankSchedule', 'schedule', false, 'Ductbank segments, conduit groups, geometry, and underground routing metadata.');
 const studies = projectInput('studyResults', 'study-result', false, 'Saved study results available for reports, cross-checks, and downstream studies.');
+const projectMeta = projectInput('settings.projectMeta', 'setting', false, 'Canonical project identity, client, site, engineer, revision, and environmental context.');
 const designBasis = projectInput('settings.designBasis', 'setting', false, 'Project code basis, sizing defaults, routing defaults, and study prerequisites.', { audit: { expectRead: false, reason: 'Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.' } });
 const designGates = projectInput('settings.designGateApprovals', 'setting', false, 'Review gate status used before deliverable release.');
 const tccSettings = projectInput('settings.tccSettings', 'setting', false, 'Protective device selections, relay settings, chart options, and coordination context.');
@@ -503,8 +504,9 @@ export const PAGE_CONTRACTS_BY_HREF = {
   'projectreport.html': contract({
     workflowStep: 'deliverables',
     standaloneInputs: ['Report package selections, cover sheet data, revision rows, and manual assumptions.'],
-    projectInputs: [...deliverableInputs, lifecyclePackages, tccSettings],
+    projectInputs: [...deliverableInputs, lifecyclePackages, tccSettings, projectMeta],
     outputs: [
+      output('settings.projectMeta', 'setting', 'Shared project and report metadata edited from the report builder.', ['battery.html', 'generatorsizing.html', 'projectreport.html']),
       output('settings.reportSnapshots', 'setting', 'Saved report package snapshots.', ['workflowdashboard.html', 'projectreport.html']),
       exportOnly('Project report previews, PDF/print output, and report spreadsheets.')
     ],
@@ -544,7 +546,7 @@ export const PAGE_CONTRACTS_BY_HREF = {
   'iec60287.html': contract({
     workflowStep: 'studies',
     standaloneInputs: ['IEC 60287 thermal inputs, soil/ambient conditions, conductor data, and installation method.'],
-    projectInputs: [cables, designBasis, approvals],
+    projectInputs: [cables, equipment, loads, trays, conduits, projectMeta, designBasis, approvals],
     outputs: [
       output('studyResults.iec60287', 'study-result', 'Saved IEC 60287 ampacity result and input snapshot.', ['projectreport.html']),
       studyApprovalOutput,
@@ -616,7 +618,7 @@ export const PAGE_CONTRACTS_BY_HREF = {
   'voltageflicker.html': contract({
     workflowStep: 'studies',
     standaloneInputs: ['Load step, source impedance, repetition rate, and flicker criteria inputs.'],
-    projectInputs: [loads, projectInput('studyResults.shortCircuit', 'study-result', false, 'Source strength used to estimate voltage change.'), designBasis, approvals],
+    projectInputs: [loads, equipment, cables, projectInput('studyResults.shortCircuit', 'study-result', false, 'Source strength used to estimate voltage change.'), designBasis, approvals],
     outputs: [
       output('studyResults.voltageFlicker', 'study-result', 'Saved flicker screening result and compliance status.', ['projectreport.html']),
       studyApprovalOutput,
@@ -628,7 +630,7 @@ export const PAGE_CONTRACTS_BY_HREF = {
   'busdust.html': contract({
     workflowStep: 'studies',
     standaloneInputs: ['Bus duct load, length, material, orientation, ambient, and fault stress inputs.'],
-    projectInputs: [equipment, loads, projectInput('studyResults.shortCircuit', 'study-result', false, 'Fault current used for bus stress screening.'), designBasis, approvals],
+    projectInputs: [equipment, loads, cables, projectMeta, projectInput('studyResults.shortCircuit', 'study-result', false, 'Fault current used for bus stress screening.'), designBasis, approvals],
     outputs: [
       output('studyResults.busDuctSizing', 'study-result', 'Saved bus duct sizing, voltage drop, derating, and fault stress result.', ['projectreport.html']),
       studyApprovalOutput,
@@ -652,7 +654,7 @@ export const PAGE_CONTRACTS_BY_HREF = {
   'battery.html': contract({
     workflowStep: 'studies',
     standaloneInputs: ['Duty cycle, chemistry, runtime, UPS power, temperature, margin, and rack layout inputs.'],
-    projectInputs: [loads, equipment, designBasis, approvals],
+    projectInputs: [loads, projectInput('studyResults.motorStart', 'study-result', false, 'Motor starting results used to seed peak UPS load.'), projectMeta, designBasis, approvals],
     outputs: [
       output('studyResults.batterySizing', 'study-result', 'Saved battery/UPS sizing, runtime, and rack layout result.', ['bessHazard.html', 'projectreport.html']),
       studyApprovalOutput,
@@ -664,7 +666,7 @@ export const PAGE_CONTRACTS_BY_HREF = {
   'generatorsizing.html': contract({
     workflowStep: 'studies',
     standaloneInputs: ['Load profile, starting method, power factor, voltage, and generator margin inputs.'],
-    projectInputs: [loads, equipment, projectInput('studyResults.motorStart', 'study-result', false, 'Motor starting results used for starting kVA context.'), designBasis, approvals],
+    projectInputs: [loads, equipment, projectMeta, projectInput('studyResults.motorStart', 'study-result', false, 'Motor starting results used for starting kVA context.'), designBasis, approvals],
     outputs: [
       output('studyResults.generatorSizing', 'study-result', 'Saved generator sizing and starting capacity result.', ['projectreport.html']),
       studyApprovalOutput,
@@ -874,7 +876,7 @@ export const PAGE_CONTRACTS_BY_HREF = {
   'bessHazard.html': contract({
     workflowStep: 'studies',
     standaloneInputs: ['Chemistry, rated energy, room volume, separation distances, venting, and propagation assumptions.'],
-    projectInputs: [equipment, projectInput('studyResults.batterySizing', 'study-result', false, 'Battery sizing result used to seed energy and chemistry.'), designBasis, approvals],
+    projectInputs: [equipment, projectMeta, projectInput('studyResults.batterySizing', 'study-result', false, 'Battery sizing result used to seed energy and chemistry.'), designBasis, approvals],
     outputs: [
       output('studyResults.bessHazard', 'study-result', 'Saved BESS hazard, separation, propagation, and deflagration venting result.', ['projectreport.html']),
       studyApprovalOutput,
@@ -898,7 +900,7 @@ export const PAGE_CONTRACTS_BY_HREF = {
   'insulationcoordination.html': contract({
     workflowStep: 'studies',
     standaloneInputs: ['BIL/SIL levels, arrester ratings, altitude, voltage class, and surge assumptions.'],
-    projectInputs: [equipment, oneLine, projectInput('studyResults.shortCircuit', 'study-result', false, 'System strength and voltage context.'), designBasis, approvals],
+    projectInputs: [equipment, loads, cables, oneLine, projectMeta, projectInput('studyResults.shortCircuit', 'study-result', false, 'System strength and voltage context.'), designBasis, approvals],
     outputs: [
       output('studyResults.insulationCoordination', 'study-result', 'Saved insulation coordination and protective margin result.', ['projectreport.html']),
       studyApprovalOutput,

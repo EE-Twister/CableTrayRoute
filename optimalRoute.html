@@ -41,7 +41,6 @@
       });
     </script>
     <script type="module" src="dirtyTracker.js"></script>
-    <script type="module" src="site.js"></script>
     <script type="module" src="tableUtils.mjs"></script>
     <script type="module" src="e2e-helpers.js"></script>
     <script type="module" src="app.mjs"></script>
@@ -225,11 +224,14 @@
             <button id="load-sample-network-btn" class="btn primary-btn">
               Load Sample Network
             </button>
-            <button id="import-schedules-btn" class="btn">Import From Schedules</button>
             <a class="btn" href="racewayschedule.html">Go to Raceway Schedule</a>
             <a class="btn" href="cableschedule.html">Go to Cable Schedule</a>
           </div>
         </div>
+      </div>
+
+      <div class="route-page-actions">
+        <button id="import-schedules-btn" class="btn">Import From Schedules</button>
       </div>
 
       <details class="card route-source-data-panel">
@@ -443,15 +445,6 @@
                 <li>The <strong>Tray Fill Tool</strong> visualizes cable placement after routing.</li>
                 <li>Tray fill calculations reference the <em>NEC 40% rule</em>.</li>
             </ul>
-        </div>
-    </div>
-    <div id="resume-modal" class="modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="resume-title">
-        <div class="modal-content">
-            <p id="resume-title">A saved project was detected. Would you like to load the previous tray network and cable list?</p>
-            <div class="modal-actions">
-                <button id="resume-yes-btn" class="primary-btn">Yes</button>
-                <button id="resume-no-btn">No</button>
-            </div>
         </div>
     </div>
     <div id="toast" class="toast" role="status" aria-live="polite"></div>

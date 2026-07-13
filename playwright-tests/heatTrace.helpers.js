@@ -124,6 +124,7 @@ export async function navigateWithHeatTraceStorage(page, file, seedStudies = nul
 export async function navigateHeatTrace(page, seedStudies = null) {
   await navigateWithHeatTraceStorage(page, 'heattracesizing.html', seedStudies);
   await expect(page.getByRole('heading', { level: 1, name: 'Heat Trace Sizing' })).toBeVisible();
+  await expect(page.locator('html[data-heat-trace-ready="1"]')).toBeAttached();
 }
 
 export async function navigateWorkflowDashboard(page, seedStudies = null) {
@@ -159,7 +160,17 @@ export async function fillHeatTraceInputs(page, fixtureOrInputs, options = {}) {
 }
 
 export async function runHeatTraceAnalysis(page) {
+  const previousResult = await page.evaluate(() => {
+    const scenario = localStorage.getItem('ctr_current_scenario_v1') || 'base';
+    const studies = JSON.parse(localStorage.getItem(`${scenario}:studyResults`) || '{}');
+    return JSON.stringify(studies.heatTraceSizing || null);
+  });
   await page.getByRole('button', { name: 'Run Analysis' }).click();
+  await page.waitForFunction(previous => {
+    const scenario = localStorage.getItem('ctr_current_scenario_v1') || 'base';
+    const studies = JSON.parse(localStorage.getItem(`${scenario}:studyResults`) || '{}');
+    return JSON.stringify(studies.heatTraceSizing || null) !== previous;
+  }, previousResult);
   await expect(page.locator('#results .heattrace-status-banner')).toBeVisible();
 }
 
@@ -214,7 +225,7 @@ export async function saveWorkbookDownload(download, expectedNamePattern) {
   const stats = await fs.stat(tempPath);
   expect(stats.size).toBeGreaterThan(0);
 
-  const workbook = XLSX.readFile(tempPath);
+  const workbook = XLSX.read(await fs.readFile(tempPath), { type: 'buffer' });
   const rowsBySheet = Object.fromEntries(workbook.SheetNames.map(sheetName => {
     const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1, defval: '', raw: false });
     return [sheetName, rows.map(row => row.map(value => String(value ?? '')))];

@@ -1064,8 +1064,10 @@ Coverage: 77 contracts for 77 navigation routes.
 - `settings.studyApprovals` (setting, optional): Engineer review records for study outputs.
 - `settings.lifecyclePackages` (setting, optional): Release package records and lifecycle package history.
 - `settings.tccSettings` (setting, optional): Protective device selections, relay settings, chart options, and coordination context.
+- `settings.projectMeta` (setting, optional): Canonical project identity, client, site, engineer, revision, and environmental context.
 
 **Outputs**
+- `settings.projectMeta` (setting): Shared project and report metadata edited from the report builder. Consumers: `battery.html`, `generatorsizing.html`, `projectreport.html`.
 - `settings.reportSnapshots` (setting): Saved report package snapshots. Consumers: `workflowdashboard.html`, `projectreport.html`.
 - `export-only` (export): Project report previews, PDF/print output, and report spreadsheets.
 
@@ -1193,6 +1195,8 @@ Coverage: 77 contracts for 77 navigation routes.
 **Project Inputs**
 - `equipment` (schedule, required): Equipment tags, ratings, locations, and physical metadata.
 - `loadList` (schedule, required): Load tags, source relationships, demand values, and operating metadata.
+- `cableSchedule` (schedule, required): Cable tags, endpoints, conductor details, lengths, and raceway assignments.
+- `settings.projectMeta` (setting, optional): Canonical project identity, client, site, engineer, revision, and environmental context.
 - `studyResults.shortCircuit` (study-result, optional): Fault current used for bus stress screening.
 - `settings.designBasis` (setting, optional): Project code basis, sizing defaults, routing defaults, and study prerequisites.
 - `settings.studyApprovals` (setting, optional): Engineer review records for study outputs.
@@ -1255,7 +1259,8 @@ Coverage: 77 contracts for 77 navigation routes.
 
 **Project Inputs**
 - `loadList` (schedule, required): Load tags, source relationships, demand values, and operating metadata.
-- `equipment` (schedule, required): Equipment tags, ratings, locations, and physical metadata.
+- `studyResults.motorStart` (study-result, optional): Motor starting results used to seed peak UPS load.
+- `settings.projectMeta` (setting, optional): Canonical project identity, client, site, engineer, revision, and environmental context.
 - `settings.designBasis` (setting, optional): Project code basis, sizing defaults, routing defaults, and study prerequisites.
 - `settings.studyApprovals` (setting, optional): Engineer review records for study outputs.
 
@@ -1287,6 +1292,7 @@ Coverage: 77 contracts for 77 navigation routes.
 **Project Inputs**
 - `loadList` (schedule, required): Load tags, source relationships, demand values, and operating metadata.
 - `equipment` (schedule, required): Equipment tags, ratings, locations, and physical metadata.
+- `settings.projectMeta` (setting, optional): Canonical project identity, client, site, engineer, revision, and environmental context.
 - `studyResults.motorStart` (study-result, optional): Motor starting results used for starting kVA context.
 - `settings.designBasis` (setting, optional): Project code basis, sizing defaults, routing defaults, and study prerequisites.
 - `settings.studyApprovals` (setting, optional): Engineer review records for study outputs.
@@ -1378,6 +1384,11 @@ Coverage: 77 contracts for 77 navigation routes.
 
 **Project Inputs**
 - `cableSchedule` (schedule, required): Cable tags, endpoints, conductor details, lengths, and raceway assignments.
+- `equipment` (schedule, required): Equipment tags, ratings, locations, and physical metadata.
+- `loadList` (schedule, required): Load tags, source relationships, demand values, and operating metadata.
+- `traySchedule` (schedule, required): Tray IDs, dimensions, fill limits, material, and route geometry.
+- `conduitSchedule` (schedule, required): Conduit IDs, trade sizes, fill limits, material, and route geometry.
+- `settings.projectMeta` (setting, optional): Canonical project identity, client, site, engineer, revision, and environmental context.
 - `settings.designBasis` (setting, optional): Project code basis, sizing defaults, routing defaults, and study prerequisites.
 - `settings.studyApprovals` (setting, optional): Engineer review records for study outputs.
 
@@ -1721,6 +1732,7 @@ Coverage: 77 contracts for 77 navigation routes.
 
 **Project Inputs**
 - `equipment` (schedule, required): Equipment tags, ratings, locations, and physical metadata.
+- `settings.projectMeta` (setting, optional): Canonical project identity, client, site, engineer, revision, and environmental context.
 - `studyResults.batterySizing` (study-result, optional): Battery sizing result used to seed energy and chemistry.
 - `settings.designBasis` (setting, optional): Project code basis, sizing defaults, routing defaults, and study prerequisites.
 - `settings.studyApprovals` (setting, optional): Engineer review records for study outputs.
@@ -1780,7 +1792,10 @@ Coverage: 77 contracts for 77 navigation routes.
 
 **Project Inputs**
 - `equipment` (schedule, required): Equipment tags, ratings, locations, and physical metadata.
+- `loadList` (schedule, required): Load tags, source relationships, demand values, and operating metadata.
+- `cableSchedule` (schedule, required): Cable tags, endpoints, conductor details, lengths, and raceway assignments.
 - `oneLineDiagram` (model, required): One-line components, connections, sheets, layers, and linked schedule references.
+- `settings.projectMeta` (setting, optional): Canonical project identity, client, site, engineer, revision, and environmental context.
 - `studyResults.shortCircuit` (study-result, optional): System strength and voltage context.
 - `settings.designBasis` (setting, optional): Project code basis, sizing defaults, routing defaults, and study prerequisites.
 - `settings.studyApprovals` (setting, optional): Engineer review records for study outputs.
@@ -1906,6 +1921,8 @@ Coverage: 77 contracts for 77 navigation routes.
 
 **Project Inputs**
 - `loadList` (schedule, required): Load tags, source relationships, demand values, and operating metadata.
+- `equipment` (schedule, required): Equipment tags, ratings, locations, and physical metadata.
+- `cableSchedule` (schedule, required): Cable tags, endpoints, conductor details, lengths, and raceway assignments.
 - `studyResults.shortCircuit` (study-result, optional): Source strength used to estimate voltage change.
 - `settings.designBasis` (setting, optional): Project code basis, sizing defaults, routing defaults, and study prerequisites.
 - `settings.studyApprovals` (setting, optional): Engineer review records for study outputs.

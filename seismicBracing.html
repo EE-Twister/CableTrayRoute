@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="Cable tray seismic bracing calculator per ASCE 7-22 Chapter 13 and IBC 2021. Determine lateral and longitudinal brace forces and maximum brace spacing." />
+  <meta name="description" content="Cable tray seismic bracing calculator implementing the ASCE 7-16 Chapter 13 component-force equation. Determine lateral and longitudinal brace forces and maximum brace spacing." />
   <title>Seismic Bracing — CableTrayRoute</title>
   <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icons/favicon.svg">
   <!-- Open Graph / Social sharing -->
   <meta property="og:type" content="website">
   <meta property="og:title" content="Seismic Bracing Calculator — CableTrayRoute">
-  <meta property="og:description" content="Calculate cable tray seismic brace forces and spacing per ASCE 7-22 and IBC 2021.">
+  <meta property="og:description" content="Calculate cable tray seismic brace forces and spacing using the implemented ASCE 7-16 equation.">
   <meta property="og:image" content="https://cabletrayroute.com/icons/og-preview.png">
   <meta property="og:site_name" content="CableTrayRoute">
   <meta property="og:url" content="seismicBracing.html">
@@ -88,16 +88,20 @@
 
       <details class="method-panel">
         <summary>Method &amp; Assumptions</summary>
-        <p>Seismic brace forces are computed per <strong>ASCE 7-22 §13.3.1</strong>
+        <p>Seismic brace forces are computed per <strong>ASCE 7-16 §13.3.1</strong>
         (Nonstructural Component Seismic Force) and brace spacing limits from
-        <strong>ASCE 7-22 §13.5.6</strong> (Cable Tray and Conduit Installation).</p>
+        <strong>ASCE 7-16 §13.5.6</strong> (Cable Tray and Conduit Installation).</p>
+
+        <p class="alert warning"><strong>Edition notice:</strong> This calculator implements
+        the ASCE 7-16 component-force equation. The revised ASCE 7-22 seismic equation is
+        not implemented; do not use this output as an ASCE 7-22 seismic design.</p>
 
         <p>Design seismic force:</p>
         <pre>Fp = (0.4 × ap × SDS × Wp) / (Rp / Ip) × (1 + 2z/h)</pre>
         <p>Subject to:</p>
         <pre>Fp_min = 0.3 × SDS × Ip × Wp
 Fp_max = 1.6 × SDS × Ip × Wp</pre>
-        <p>Cable tray component factors from ASCE 7-22 Table 13.6-1:</p>
+        <p>Cable tray component factors from ASCE 7-16 Table 13.6-1:</p>
         <ul>
           <li><strong>ap = 1.0</strong> — component amplification factor</li>
           <li><strong>Rp = 2.5</strong> — component response modification factor</li>
@@ -111,7 +115,7 @@ Fp_max = 1.6 × SDS × Ip × Wp</pre>
         <p>Maximum brace spacing (SDC C–F): lateral ≤ 12 ft, longitudinal ≤ 40 ft.
         No bracing required for SDC A and B.</p>
         <p>Citations:
-          <a href="docs/standards.html">ASCE 7-22 §13.3.1 and §13.5.6</a>,
+          <a href="docs/standards.html">ASCE 7-16 §13.3.1 and §13.5.6</a>,
           IBC 2021 §1613, NEMA VE 2-2006.
         </p>
         <p>See also:
@@ -177,7 +181,7 @@ Fp_max = 1.6 × SDS × Ip × Wp</pre>
           <p id="ipHint" class="field-hint">
             Use 1.5 for components required for continued operation of Risk Category IV
             facilities, or when component failure could pose a life-safety hazard
-            (ASCE 7-22 §13.1.3).
+            (ASCE 7-16 §13.1.3).
           </p>
         </div>
       </fieldset>
@@ -272,7 +276,7 @@ Fp_max = 1.6 × SDS × Ip × Wp</pre>
       <button id="close-help-btn" class="close-btn" aria-label="Close Help">&times;</button>
       <h2 id="help-title">Seismic Bracing Help</h2>
       <p>This tool calculates cable tray seismic brace forces and maximum brace
-      spacing per ASCE 7-22 §13.3.1 and §13.5.6.</p>
+      spacing using the implemented ASCE 7-16 §13.3.1 and §13.5.6 method.</p>
       <p><strong>Single tray mode:</strong> enter site parameters and tray weight,
       then click <em>Calculate Brace Forces</em>.</p>
       <p><strong>Schedule mode:</strong> reads trays and cables from the current

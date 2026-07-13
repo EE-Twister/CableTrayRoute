@@ -2466,6 +2466,7 @@ body.dark-mode .tcc-oneline-preview {
 .tcc-oneline-preview h2 {
     margin: 0 0 0.25rem;
     font-size: 1.1rem;
+    color: var(--text-color);
 }
 
 .tcc-oneline-preview svg {

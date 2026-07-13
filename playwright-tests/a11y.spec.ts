@@ -24,8 +24,15 @@ const PAGES = [
 
 for (const page of PAGES) {
   test(`WCAG 2.1 AA: ${page}`, async ({ page: pw }) => {
+    await pw.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
+    await pw.addInitScript(() => {
+      localStorage.clear();
+      sessionStorage.clear();
+    });
     await pw.goto(`${page}?e2e=1`);
-    // Wait for the page shell to settle (scripts may inject nav etc.)
+    // Wait for the page shell to settle (scripts may inject nav etc.). The
+    // suite fixes the media scheme above so browser defaults cannot change
+    // the theme while computed colors are being measured.
     await pw.waitForLoadState('domcontentloaded');
 
     const results = await new AxeBuilder({ page: pw })

@@ -3,10 +3,21 @@ import {
   PST_LIMIT,
   PST_PASS_THRESHOLD,
 } from './analysis/voltageFlicker.mjs';
-import { getStudies, setStudies } from './dataStore.mjs';
+import { getStudies, setStudies, getLoads, getEquipment, getCables } from './dataStore.mjs';
 import { initStudyApprovalPanel } from './src/components/studyApproval.js';
 import { initStudyBasisPanel } from './src/components/studyBasis.js';
 import { escapeHtml } from './src/htmlUtils.mjs';
+import {
+  buildVoltageFlickerProjectInputs,
+  createStudyInputSnapshot,
+  withStudyProvenance,
+} from './analysis/projectIntegration.mjs';
+import {
+  applyLinkedValue,
+  attachProjectSourceBadge,
+  bindProjectField,
+  renderProjectInputPanel,
+} from './src/components/projectInputBinding.js';
 
 document.addEventListener('DOMContentLoaded', () => {
   initSettings();
@@ -40,23 +51,74 @@ document.addEventListener('DOMContentLoaded', () => {
   const form = document.getElementById('flicker-form');
   const resultsDiv = document.getElementById('results');
   const errorsDiv = document.getElementById('calc-errors');
+  const projectOverrides = new Set();
+  let projectInputModel = null;
+
+  function readProjectInputModel() {
+    return buildVoltageFlickerProjectInputs({
+      loads: getLoads(), equipment: getEquipment(), cables: getCables(), studies: getStudies(),
+    });
+  }
+
+  function bindLoadStepRow(row) {
+    if (!projectInputModel) return;
+    row.querySelectorAll('input,select').forEach(element => {
+      bindProjectField(element, projectInputModel.bindings.loadSteps, projectOverrides, 'loadSteps');
+    });
+  }
+
+  function applyProjectInputs(force = false) {
+    projectInputModel = readProjectInputModel();
+    const fields = {
+      systemKva: 'system-kva', xrRatio: 'xr-ratio', nominalVoltageKv: 'nominal-kv',
+    };
+    Object.entries(fields).forEach(([fieldName, id]) => {
+      const element = document.getElementById(id);
+      const binding = projectInputModel.bindings[fieldName];
+      bindProjectField(element, binding, projectOverrides, fieldName);
+      if (applyLinkedValue(element, projectInputModel.inputs[fieldName], projectOverrides, fieldName, binding, { force })) {
+        attachProjectSourceBadge(element, binding.sourceLabel);
+      }
+    });
+    if ((!projectOverrides.has('loadSteps') || force) && projectInputModel.inputs.loadSteps.length) {
+      if (force) projectOverrides.delete('loadSteps');
+      document.getElementById('load-steps-list').innerHTML = '';
+      projectInputModel.inputs.loadSteps.forEach(step => addLoadStepRow(step.label, step.loadKw, step.repetitionsPerHour, step.type));
+    }
+  }
+
+  projectInputModel = readProjectInputModel();
+  renderProjectInputPanel({
+    container: form,
+    title: 'Flicker inputs linked to this project',
+    bindings: projectInputModel.bindings,
+    missing: projectInputModel.missing,
+    onRefresh: () => applyProjectInputs(true),
+  });
 
   document.getElementById('add-load-step-btn').addEventListener('click', () => addLoadStepRow());
 
   // Restore saved result or add a default row
   const saved = getStudies().voltageFlicker;
   if (saved) {
+    (saved.projectLink?.overrides || []).forEach(field => projectOverrides.add(field));
     restoreForm(saved.inputs);
     renderResults(saved);
+    applyProjectInputs(false);
+  } else if (projectInputModel.inputs.loadSteps.length) {
+    applyProjectInputs(false);
   } else {
-    addLoadStepRow('Arc Furnace', 5000, 120, 'Arc Furnace');
+    addLoadStepRow('', 1000, 10, 'Other');
   }
 
   form.addEventListener('submit', e => {
     e.preventDefault();
     let result;
     try {
-      result = runVoltageFlickerStudy(readInputs());
+      const inputs = readInputs();
+      result = runVoltageFlickerStudy(inputs);
+      const snapshot = createStudyInputSnapshot('voltageFlicker', inputs, projectInputModel.bindings, projectOverrides);
+      result = withStudyProvenance(result, snapshot);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Unable to run flicker study.';
       errorsDiv.hidden = false;
@@ -89,6 +151,7 @@ document.addEventListener('DOMContentLoaded', () => {
           label: row.querySelector('.load-label').value.trim() || 'Load Step',
           loadKw: parseFloat(row.querySelector('.load-kw').value),
           repetitionsPerHour: parseFloat(row.querySelector('.load-rph').value),
+          type: row.querySelector('.load-type-select')?.value || 'Other',
         });
       } catch (_) { /* skip malformed row */ }
     });
@@ -141,6 +204,7 @@ document.addEventListener('DOMContentLoaded', () => {
     `;
     row.querySelector('.remove-row-btn').addEventListener('click', () => row.remove());
     container.appendChild(row);
+    bindLoadStepRow(row);
   }
 
   // -----------------------------------------------------------------------
@@ -156,7 +220,7 @@ document.addEventListener('DOMContentLoaded', () => {
       set('pst-series', inputs.pstSeriesForPlt.join(', '));
     }
     document.getElementById('load-steps-list').innerHTML = '';
-    (inputs.loadSteps || []).forEach(s => addLoadStepRow(s.label, s.loadKw, s.repetitionsPerHour));
+    (inputs.loadSteps || []).forEach(s => addLoadStepRow(s.label, s.loadKw, s.repetitionsPerHour, s.type || 'Other'));
   }
 
   // -----------------------------------------------------------------------

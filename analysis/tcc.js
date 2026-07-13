@@ -305,7 +305,7 @@ function ensurePdfJs() {
       throw new Error('PDF.js library is not loaded.');
     }
     if (module.GlobalWorkerOptions) {
-      module.GlobalWorkerOptions.workerSrc = 'dist/vendor/pdf.worker.min.js';
+      module.GlobalWorkerOptions.workerSrc = 'dist/vendor/pdf.worker.min.mjs';
     }
     return module;
   }).catch(err => {

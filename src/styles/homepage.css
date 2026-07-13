@@ -352,6 +352,10 @@
     text-decoration: underline;
 }
 
+button.home-section__link {
+    color: var(--button-text);
+}
+
 .workflow-grid {
     display: grid;
     grid-template-columns: repeat(8, minmax(0, 1fr));

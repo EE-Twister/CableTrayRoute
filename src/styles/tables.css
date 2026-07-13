@@ -77,7 +77,8 @@ th {
     margin-left: 0.25rem;
 }
 
-.group-hidden {
+.group-hidden,
+.column-hidden {
     display: none;
 }
 
@@ -715,6 +716,100 @@ body.dark-mode .table-row-focusable:focus-within::after {
     justify-content: center;
     gap: var(--space-1);
     white-space: nowrap;
+}
+
+.row-action-menu-toggle {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    padding: 0;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface-strong);
+    color: var(--color-text);
+    cursor: pointer;
+    font: inherit;
+    font-size: 1.15rem;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.row-action-menu-panel {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+}
+
+.row-action-menu-panel.is-floating {
+    position: fixed;
+    z-index: 120;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.2rem;
+    padding: 0.35rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface-strong);
+    box-shadow: var(--shadow-lg);
+}
+
+@media (max-width: 760px) {
+    #cableScheduleTable {
+        font-size: 0.82rem;
+    }
+
+    #cableScheduleTable th,
+    #cableScheduleTable td {
+        padding: 0.38rem;
+    }
+
+    #cableScheduleTable input[type="text"],
+    #cableScheduleTable input[type="number"],
+    #cableScheduleTable select {
+        min-width: 0;
+        width: 7rem;
+    }
+
+    #cableScheduleTable [data-column-key="tag"] input {
+        width: 6.5rem;
+    }
+
+    #cableScheduleTable .sticky-action-col {
+        width: 2.8rem !important;
+        min-width: 2.8rem;
+        max-width: 2.8rem;
+        padding-left: 0.3rem;
+        padding-right: 0.3rem;
+        overflow: visible;
+    }
+
+    #cableScheduleTable thead tr:first-child > th:last-child {
+        width: 2.8rem !important;
+        min-width: 2.8rem;
+        max-width: 2.8rem;
+    }
+
+    #cableScheduleTable .row-action-group {
+        gap: 0.2rem;
+    }
+
+    #cableScheduleTable .row-action-menu-toggle {
+        display: inline-flex;
+    }
+
+    #cableScheduleTable .row-action-menu-panel {
+        display: none;
+        flex-direction: column;
+        gap: 0.2rem;
+    }
+
+    #cableScheduleTable .row-action-group:hover .row-action-menu-panel,
+    #cableScheduleTable .row-action-group:focus-within .row-action-menu-panel {
+        display: flex;
+    }
 }
 
 .cross-probe-link {

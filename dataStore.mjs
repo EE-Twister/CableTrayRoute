@@ -18,6 +18,7 @@
 // directly. Import it with a named import so it works consistently in
 // both the browser and Node test environments.
 import { parseRevit } from './src/importers/revit.mjs';
+import { buildOneLineProjectView, hashProjectInputs, normalizeOneLineReferences, normalizeProjectEntities } from './analysis/projectIntegration.mjs';
 import {
   getScenarioListState,
   setScenarioListState,
@@ -100,8 +101,10 @@ const EXTRA_KEYS = {
   trayHardwareCatalogCustomProducts: 'trayHardwareCatalogCustomProducts',
   drcAcceptedFindings: 'drcAcceptedFindings',
   studyApprovals: 'studyApprovals',
+  studyProvenance: 'studyProvenance',
   reportSnapshots: 'reportSnapshots',
   lifecyclePackages: 'lifecyclePackages',
+  projectMeta: 'projectMeta',
   designBasis: 'designBasis',
   designGateApprovals: 'designGateApprovals',
   coachAuditTrail: 'coachAuditTrail',
@@ -196,11 +199,24 @@ export const setTrays = trays => write(KEYS.trays, trays);
 /**
  * @returns {Cable[]}
  */
-export const getCables = () => read(KEYS.cables, []);
+export const getCables = () => {
+  const raw = read(KEYS.cables, []);
+  const normalized = normalizeProjectEntities({
+    equipment: getEquipment(),
+    loads: getLoads(),
+    cables: raw,
+  }).cables;
+  if (JSON.stringify(raw) !== JSON.stringify(normalized)) write(KEYS.cables, normalized);
+  return normalized;
+};
 /**
  * @param {Cable[]} cables
  */
-export const setCables = cables => write(KEYS.cables, cables);
+export const setCables = cables => write(KEYS.cables, normalizeProjectEntities({
+  equipment: getEquipment(),
+  loads: getLoads(),
+  cables,
+}).cables);
 
 /**
  * Read the cable schedule for a specific named scenario without switching the
@@ -336,6 +352,15 @@ export const deleteLifecyclePackage = id => {
   write(EXTRA_KEYS.lifecyclePackages, list);
 };
 
+// Canonical project identity and site context. Keep this separate from the
+// display-only project name so every calculator and deliverable can bind to
+// the same client, location, engineer, revision, and environmental values.
+export const getProjectMeta = () => read(EXTRA_KEYS.projectMeta, {});
+export const setProjectMeta = meta => write(
+  EXTRA_KEYS.projectMeta,
+  meta && typeof meta === 'object' && !Array.isArray(meta) ? meta : {}
+);
+
 // Project-level design basis wizard settings
 export const getDesignBasis = () => read(EXTRA_KEYS.designBasis, null);
 export const setDesignBasis = basis => write(EXTRA_KEYS.designBasis, basis);
@@ -453,7 +478,13 @@ export const setPanels = panels => write(KEYS.panels, panels.map(ensurePanelFiel
 /**
  * @returns {GenericRecord[]}
  */
-export const getEquipment = () => read(KEYS.equipment, []);
+export const getEquipment = () => {
+  const raw = read(KEYS.equipment, []);
+  const withFields = raw.map(ensureEquipmentFields);
+  const normalized = normalizeProjectEntities({ equipment: withFields }).equipment;
+  if (JSON.stringify(raw) !== JSON.stringify(normalized)) write(KEYS.equipment, normalized);
+  return normalized;
+};
 /**
  * @param {GenericRecord[]} equipment
  */
@@ -483,7 +514,10 @@ function ensureEquipmentFields(eq) {
   };
 }
 
-export const setEquipment = list => write(KEYS.equipment, list.map(ensureEquipmentFields));
+export const setEquipment = list => write(
+  KEYS.equipment,
+  normalizeProjectEntities({ equipment: list.map(ensureEquipmentFields) }).equipment
+);
 
 export const addEquipment = item => {
   const list = getEquipment();
@@ -543,10 +577,14 @@ export const getOneLine = (scenario = getCurrentScenarioNameState()) => {
   const data = read(KEYS.oneLine, {}, scenario);
   if (Array.isArray(data)) {
     // legacy array of components
-    return { activeSheet: 0, sheets: [{ name: 'Sheet 1', components: data, connections: [], layers: [] }] };
+    const normalized = normalizeOneLineReferences(
+      { activeSheet: 0, sheets: [{ name: 'Sheet 1', components: data, connections: [], layers: [] }] },
+      { equipment: getEquipment(), loads: getLoads(), cables: getCables() }
+    );
+    return buildOneLineProjectView(normalized, { equipment: getEquipment(), loads: getLoads(), cables: getCables() });
   }
   if (data && Array.isArray(data.sheets)) {
-    return {
+    const normalized = normalizeOneLineReferences({
       activeSheet: normalizeActiveSheet(data.activeSheet),
       sheets: data.sheets.map(s => ({
         name: s.name,
@@ -558,7 +596,9 @@ export const getOneLine = (scenario = getCurrentScenarioNameState()) => {
         // Gap #50: preserve protection zone definitions per sheet
         ...(Array.isArray(s.protectionZones) ? { protectionZones: s.protectionZones } : {})
       }))
-    };
+    }, { equipment: getEquipment(), loads: getLoads(), cables: getCables() });
+    if (JSON.stringify(data) !== JSON.stringify(normalized)) write(KEYS.oneLine, normalized, scenario);
+    return buildOneLineProjectView(normalized, { equipment: getEquipment(), loads: getLoads(), cables: getCables() });
   }
   return { activeSheet: 0, sheets: [] };
 };
@@ -628,15 +668,50 @@ export const getStudies = () => read(KEYS.studies, {});
  * Store study results.
  * @param {Object} results
  */
-export const setStudies = results => write(KEYS.studies, results);
+export const setStudies = results => {
+  const previous = getStudies();
+  write(KEYS.studies, results);
+  const next = results && typeof results === 'object' && !Array.isArray(results) ? results : {};
+  const provenance = getStudyProvenance();
+  const inputHash = getProjectInputFingerprint();
+  const capturedAt = new Date().toISOString();
+  [...new Set([...Object.keys(previous || {}), ...Object.keys(next)])].forEach(studyKey => {
+    if (!(studyKey in next)) {
+      delete provenance[studyKey];
+      return;
+    }
+    if (JSON.stringify(previous?.[studyKey]) !== JSON.stringify(next[studyKey])) {
+      provenance[studyKey] = { schemaVersion: 1, inputHash, capturedAt };
+    }
+  });
+  write(EXTRA_KEYS.studyProvenance, provenance);
+};
+
+export const getStudyProvenance = () => read(EXTRA_KEYS.studyProvenance, {});
+export const getProjectInputSnapshot = () => ({
+  projectMeta: getProjectMeta(),
+  designBasis: getDesignBasis(),
+  equipment: getEquipment(),
+  loads: getLoads(),
+  cables: getCables(),
+  trays: getTrays(),
+  conduits: getConduits(),
+  ductbanks: getDuctbanks(),
+  panels: getPanels(),
+  oneLine: getOneLine(),
+});
+export const getProjectInputFingerprint = () => hashProjectInputs(getProjectInputSnapshot());
 
 /**
  * @returns {GenericRecord[]}
  */
 export const getLoads = () => {
   const raw = read(KEYS.loads, []);
-  const loads = raw.map(ensureLoadFields);
-  if (raw.some(l => l && typeof l === 'object' && !('source' in l))) {
+  const loads = normalizeProjectEntities({
+    equipment: getEquipment(),
+    loads: raw.map(ensureLoadFields),
+  }).loads;
+  if (JSON.stringify(raw) !== JSON.stringify(loads)) {
     write(KEYS.loads, loads);
   }
   return loads;
@@ -685,7 +760,10 @@ function isEmptyLoad(load) {
 }
 
 export const setLoads = loads => {
-  const list = (loads.length ? loads : [{}]).map(ensureLoadFields);
+  const list = normalizeProjectEntities({
+    equipment: getEquipment(),
+    loads: (loads.length ? loads : [{}]).map(ensureLoadFields),
+  }).loads;
   write(KEYS.loads, list);
 };
 
@@ -1166,6 +1244,10 @@ if (typeof window !== 'undefined') {
     restoreRevision,
     getStudies,
     setStudies,
+    getStudyProvenance,
+    getProjectInputFingerprint,
+    getProjectMeta,
+    setProjectMeta,
     getDesignBasis,
     setDesignBasis,
     getDesignGateApprovals,

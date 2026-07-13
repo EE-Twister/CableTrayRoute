@@ -318,9 +318,6 @@ async function initializeApp() {
         conduitType: document.getElementById('conduit-type'),
         sidebar: document.querySelector('.sidebar'),
         sidebarToggle: document.getElementById('sidebar-toggle'),
-        resumeModal: document.getElementById('resume-modal'),
-        resumeYesBtn: document.getElementById('resume-yes-btn'),
-        resumeNoBtn: document.getElementById('resume-no-btn'),
     };
 
     document.querySelectorAll('input, select, textarea').forEach(el=>{if(!el.classList.contains('table-search')&&!el.classList.contains('no-dirty')){el.addEventListener('input',markUnsaved);el.addEventListener('change',markUnsaved);}});
@@ -4936,7 +4933,6 @@ Plotly.newPlot(document.getElementById('plot'), data, layout, {responsive: true}
     });
     // Initial setup
     loadSession();
-    const hadSession = state.manualTrays.length > 0 || state.cableList.length > 0;
     const trayKey = globalThis.TableUtils?.STORAGE_KEYS?.traySchedule || 'traySchedule';
     const cableKey = globalThis.TableUtils?.STORAGE_KEYS?.cableSchedule || 'cableSchedule';
     const ductbankKey = globalThis.TableUtils?.STORAGE_KEYS?.ductbankSchedule || 'ductbankSchedule';
@@ -4946,7 +4942,7 @@ Plotly.newPlot(document.getElementById('plot'), data, layout, {responsive: true}
         if (value && typeof value === 'object') return Object.keys(value).length > 0;
         return Boolean(value);
     };
-    const hasSaved = hadSession || hasStoredRows(getItem(trayKey)) ||
+    const hasProjectSchedules = hasStoredRows(getItem(trayKey)) ||
         hasStoredRows(getItem(cableKey)) || hasStoredRows(getItem(ductbankKey)) ||
         hasStoredRows(getItem(conduitKey));
 
@@ -4964,49 +4960,12 @@ Plotly.newPlot(document.getElementById('plot'), data, layout, {responsive: true}
         }
     };
 
-    if (hasSaved) {
-        const modal = elements.resumeModal;
-        const yesBtn = elements.resumeYesBtn;
-        const noBtn = elements.resumeNoBtn;
-        if (modal && yesBtn && noBtn) {
-            modal.style.display = 'flex';
-            modal.setAttribute('aria-hidden', 'false');
-            yesBtn.focus();
-            const close = () => {
-                modal.style.display = 'none';
-                modal.setAttribute('aria-hidden', 'true');
-                if (modal.contains(document.activeElement)) {
-                    document.activeElement.blur();
-                }
-            };
-            yesBtn.addEventListener('click', async () => {
-                close();
-                await loadSchedulesIntoSession();
-                rebuildTrayData();
-                displayConduitCount(state.trayData.filter(t => t.raceway_type === 'conduit').length, true);
-                await finalizeLoad();
-            }, { once: true });
-            noBtn.addEventListener('click', async () => {
-                close();
-                state.manualTrays = [];
-                state.cableList = [];
-                saveSession();
-                removeItem(trayKey);
-                removeItem(cableKey);
-                removeItem(ductbankKey);
-                removeItem(conduitKey);
-                clearConduitCache();
-                await finalizeLoad();
-            }, { once: true });
-        } else {
-            await loadSchedulesIntoSession();
-            rebuildTrayData();
-            displayConduitCount(state.trayData.filter(t => t.raceway_type === 'conduit').length, true);
-            await finalizeLoad();
-        }
-    } else {
-        await finalizeLoad();
+    if (hasProjectSchedules) {
+        await loadSchedulesIntoSession();
+        rebuildTrayData();
+        displayConduitCount(state.trayData.filter(t => t.raceway_type === 'conduit').length, true);
     }
+    await finalizeLoad();
 
     updateRoutingReadiness();
 

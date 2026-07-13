@@ -1,6 +1,18 @@
 import { runGeneratorSizingAnalysis, NFPA110_TYPES } from './analysis/generatorSizing.mjs';
-import { getStudies, setStudies } from './dataStore.mjs';
+import { getStudies, setStudies, getLoads, getEquipment, getProjectMeta } from './dataStore.mjs';
 import { initStudyApprovalPanel } from './src/components/studyApproval.js';
+import {
+  buildGeneratorProjectInputs,
+  createStudyInputSnapshot,
+  getStudyStaleness,
+  withStudyProvenance,
+} from './analysis/projectIntegration.mjs';
+import {
+  applyLinkedValue,
+  bindProjectField,
+  renderProjectInputPanel,
+  renderStudyStaleBanner,
+} from './src/components/projectInputBinding.js';
 
 document.addEventListener('DOMContentLoaded', () => {
   initSettings();
@@ -13,14 +25,71 @@ document.addEventListener('DOMContentLoaded', () => {
   const resultsDiv = document.getElementById('results');
   const loadTableBody = document.getElementById('load-table-body');
   const addLoadBtn = document.getElementById('add-load-btn');
+  const projectOverrides = new Set();
+  let projectInputModel = null;
 
   initStudyApprovalPanel('generatorSizing');
+
+  function readProjectInputModel() {
+    return buildGeneratorProjectInputs({
+      loads: getLoads(),
+      equipment: getEquipment(),
+      projectMeta: getProjectMeta(),
+    });
+  }
+
+  function bindLoadRow(row) {
+    row.querySelectorAll('input').forEach(input => {
+      bindProjectField(input, projectInputModel.bindings.loads, projectOverrides, 'loads');
+    });
+  }
+
+  function applyProjectInputs(force = false) {
+    projectInputModel = readProjectInputModel();
+    const fieldIds = {
+      projectLabel: 'project-label',
+      altitudeFt: 'altitude-ft',
+      ambientC: 'ambient-c',
+      motorHp: 'motor-hp',
+      motorPf: 'motor-pf',
+      motorEff: 'motor-eff',
+    };
+    Object.entries(fieldIds).forEach(([fieldName, id]) => {
+      const element = document.getElementById(id);
+      const binding = projectInputModel.bindings[fieldName];
+      bindProjectField(element, binding, projectOverrides, fieldName);
+      applyLinkedValue(element, projectInputModel.inputs[fieldName], projectOverrides, fieldName, binding, { force });
+    });
+    if ((!projectOverrides.has('loads') || force) && projectInputModel.inputs.loads.length) {
+      if (force) projectOverrides.delete('loads');
+      loadTableBody.innerHTML = '';
+      projectInputModel.inputs.loads.forEach(load => addLoadRow(load.label, load.kw, load.demandFactor));
+    }
+  }
+
+  projectInputModel = readProjectInputModel();
+  renderProjectInputPanel({
+    container: form,
+    title: 'Generator inputs linked to this project',
+    bindings: projectInputModel.bindings,
+    missing: projectInputModel.missing,
+    onRefresh: () => applyProjectInputs(true),
+  });
 
   // --- Restore previous results ---
   const saved = getStudies().generatorSizing;
   if (saved) {
+    (saved.projectLink?.overrides || []).forEach(field => projectOverrides.add(field));
     restoreForm(saved);
+    applyProjectInputs(false);
     renderResults(saved);
+    const currentInputs = readFormInputs();
+    if (currentInputs) {
+      const currentSnapshot = createStudyInputSnapshot('generatorSizing', currentInputs, projectInputModel.bindings, projectOverrides);
+      renderStudyStaleBanner(resultsDiv, getStudyStaleness(saved, currentSnapshot), () => applyProjectInputs(true));
+    }
+  } else {
+    applyProjectInputs(false);
   }
 
   // --- Add / remove load rows ---
@@ -37,10 +106,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // Start with one empty load row if table is empty
+  // Keep a single blank row only when the project has no usable load records.
   if (loadTableBody.querySelectorAll('tr').length === 0) {
-    addLoadRow('Emergency Lighting', 20, 1.0);
-    addLoadRow('HVAC (critical)', 75, 0.8);
+    addLoadRow();
   }
 
   // --- Form submission ---
@@ -52,6 +120,11 @@ document.addEventListener('DOMContentLoaded', () => {
     let result;
     try {
       result = runGeneratorSizingAnalysis(inputs);
+      result.motorHp = inputs.motorHp;
+      result.motorPf = inputs.motorPf;
+      result.motorEff = inputs.motorEff;
+      const snapshot = createStudyInputSnapshot('generatorSizing', inputs, projectInputModel.bindings, projectOverrides);
+      result = withStudyProvenance(result, snapshot);
     } catch (err) {
       showModal('Analysis Error', `<p>${err.message}</p>`, 'error');
       return;
@@ -78,6 +151,7 @@ document.addEventListener('DOMContentLoaded', () => {
       <td><button type="button" class="remove-load-btn btn-icon"
           aria-label="Remove row" title="Remove row">×</button></td>`;
     loadTableBody.appendChild(tr);
+    bindLoadRow(tr);
   }
 
   function readFormInputs() {
@@ -146,9 +220,9 @@ document.addEventListener('DOMContentLoaded', () => {
     set('ambient-c', r.ambientC);
     set('aspiration', r.aspiration);
     set('nfpa110-type', r.nfpa110Type);
-    if (r.stepLoad) {
-      set('motor-hp', r.stepLoad ? Math.round((r.stepLoad.startingKva / (r.lrcMultiplier || 6)) * 0.1) : '');
-    }
+    set('motor-hp', r.motorHp);
+    set('motor-pf', r.motorPf);
+    set('motor-eff', r.motorEff);
     set('fuel-cap-gal', r.fuelCapGal || '');
 
     // Restore load rows

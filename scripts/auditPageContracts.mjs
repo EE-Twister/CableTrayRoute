@@ -16,6 +16,7 @@ const ignoredSourceFiles = new Set([
   'dataStore.mjs',
   'projectStorage.js',
   'dirtyTracker.js',
+  'analysis/projectIntegration.mjs',
   'cdnFallback.js',
   'src/workflowStatus.js',
   'src/projectManager.js',
@@ -50,12 +51,15 @@ const dataStoreCalls = {
   getStudyApprovals: ['read', 'settings.studyApprovals'],
   setStudyApproval: ['write', 'settings.studyApprovals'],
   clearStudyApproval: ['write', 'settings.studyApprovals'],
+  getStudyProvenance: ['read', 'settings.studyProvenance'],
   getReportSnapshots: ['read', 'settings.reportSnapshots'],
   setReportSnapshot: ['write', 'settings.reportSnapshots'],
   deleteReportSnapshot: ['write', 'settings.reportSnapshots'],
   getLifecyclePackages: ['read', 'settings.lifecyclePackages'],
   addLifecyclePackage: ['write', 'settings.lifecyclePackages'],
   deleteLifecyclePackage: ['write', 'settings.lifecyclePackages'],
+  getProjectMeta: ['read', 'settings.projectMeta'],
+  setProjectMeta: ['write', 'settings.projectMeta'],
   getDesignBasis: ['read', 'settings.designBasis'],
   setDesignBasis: ['write', 'settings.designBasis'],
   getDesignGateApprovals: ['read', 'settings.designGateApprovals'],
@@ -167,6 +171,15 @@ async function fileExists(filePath) {
   } catch {
     return false;
   }
+}
+
+async function resolveFileCaseInsensitive(filePath) {
+  if (await fileExists(filePath)) return filePath;
+  const directory = path.dirname(filePath);
+  const expected = path.basename(filePath).toLowerCase();
+  const entries = await fs.readdir(directory, { withFileTypes: true }).catch(() => []);
+  const match = entries.find(entry => entry.isFile() && entry.name.toLowerCase() === expected);
+  return match ? path.join(directory, match.name) : null;
 }
 
 async function parseRollupEntries() {
@@ -516,7 +529,8 @@ async function routeEntryFiles(route, rollupEntries) {
     `analysis/${stem}.mjs`
   ];
   for (const candidate of candidates) {
-    if (await fileExists(path.join(root, candidate))) entries.add(candidate);
+    const resolved = await resolveFileCaseInsensitive(path.join(root, candidate));
+    if (resolved) entries.add(relativePath(resolved));
   }
 
   const normalized = new Map();
@@ -773,7 +787,8 @@ async function main() {
     if (audit.summary.actionableFailures > 0) {
       throw new Error(`Page contract audit has ${audit.summary.actionableFailures} actionable failure(s). Run node scripts/auditPageContracts.mjs and reconcile contracts/storage access.`);
     }
-    if (current !== markdown) {
+    const normalizedCurrent = current.replace(/\r\n?/g, '\n');
+    if (normalizedCurrent !== markdown) {
       throw new Error('docs/page-contract-audit.md is out of date. Run node scripts/auditPageContracts.mjs.');
     }
     console.log('[page-contract-audit] docs/page-contract-audit.md is current.');

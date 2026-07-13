@@ -563,23 +563,6 @@
     </div>
   </noscript>
   <script type="module" src="dist/index.js" defer></script>
-  <script type="module">
-    import { initSettings, initDarkMode, initCompactMode, initHelpModal, initNavToggle } from './site.js';
-
-    const initSharedShell = () => {
-      initSettings();
-      initDarkMode();
-      initCompactMode();
-      initHelpModal('help-btn','help-modal','close-help-btn');
-      initNavToggle();
-    };
-
-    if (document.readyState === 'loading') {
-      window.addEventListener('DOMContentLoaded', initSharedShell, { once: true });
-    } else {
-      initSharedShell();
-    }
-  </script>
   <script>
     // Register service worker for offline support.
     if ('serviceWorker' in navigator) {

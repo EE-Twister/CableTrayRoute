@@ -3,9 +3,26 @@ import {
   defaultInsulThickMm,
   MAX_TEMP_C,
 } from './analysis/iec60287.mjs';
-import { getStudies, setStudies } from './dataStore.mjs';
+import {
+  getStudies, setStudies, getCables, getEquipment, getLoads, getTrays, getConduits,
+  getDesignBasis, getProjectMeta,
+} from './dataStore.mjs';
 import { initStudyApprovalPanel } from './src/components/studyApproval.js';
 import { initStudyBasisPanel } from './src/components/studyBasis.js';
+import {
+  buildCableThermalProjectInputs,
+  buildProjectScopeOptions,
+  createStudyInputSnapshot,
+  resolveProjectScope,
+  withStudyProvenance,
+} from './analysis/projectIntegration.mjs';
+import {
+  applyLinkedValue,
+  attachProjectSourceBadge,
+  bindProjectField,
+  renderProjectInputPanel,
+  renderProjectScopeSelector,
+} from './src/components/projectInputBinding.js';
 
 document.addEventListener('DOMContentLoaded', () => {
   initSettings();
@@ -23,6 +40,14 @@ document.addEventListener('DOMContentLoaded', () => {
   const voltageClassSel = document.getElementById('voltage-class');
   const sizeMm2Sel = document.getElementById('size-mm2');
   const insulThickInput = document.getElementById('insul-thick-mm');
+  const projectOverrides = new Set();
+  const projectData = () => ({
+    cables: getCables(), equipment: getEquipment(), loads: getLoads(), trays: getTrays(), conduits: getConduits(),
+    designBasis: getDesignBasis(), projectMeta: getProjectMeta(), studies: getStudies(),
+  });
+  const scopeOptions = buildProjectScopeOptions(projectData(), ['circuit']);
+  let selectedScopeValue = getStudies().iec60287?.projectLink?.scopeValue || scopeOptions[0]?.value || '';
+  let projectInputModel = null;
 
   initStudyBasisPanel('iec60287', {
     standard: 'IEC 60287-1-1:2023',
@@ -46,11 +71,48 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   initStudyApprovalPanel('iec60287');
 
+  function applyProjectScope(scopeValue = selectedScopeValue, { force = false } = {}) {
+    selectedScopeValue = scopeValue;
+    projectInputModel = buildCableThermalProjectInputs(resolveProjectScope(scopeValue, projectData()), projectData());
+    const fields = {
+      sizeMm2: 'size-mm2', material: 'material', insulation: 'insulation', nCores: 'n-cores',
+      installMethod: 'install-method', ambientTempC: 'ambient-temp-c', U0_kV: 'u0-kv',
+    };
+    Object.entries(fields).forEach(([fieldName, id]) => {
+      const element = document.getElementById(id);
+      const binding = projectInputModel.bindings[fieldName];
+      bindProjectField(element, binding, projectOverrides, fieldName);
+      if (applyLinkedValue(element, projectInputModel.inputs[fieldName], projectOverrides, fieldName, binding, { force })) {
+        attachProjectSourceBadge(element, binding.sourceLabel);
+      }
+    });
+    tryUpdateDefaultThickness();
+    updateInstallFields();
+  }
+
+  renderProjectScopeSelector({
+    container: form,
+    title: 'Cable project scope',
+    options: scopeOptions,
+    selectedValue: selectedScopeValue,
+    onSelect: applyProjectScope,
+  });
+
   // --- Restore previous results ---
   const saved = getStudies().iec60287;
   if (saved) {
+    (saved.projectLink?.overrides || []).forEach(field => projectOverrides.add(field));
     restoreForm(saved);
     renderResults(saved);
+    projectInputModel = buildCableThermalProjectInputs(resolveProjectScope(selectedScopeValue, projectData()), projectData());
+  } else if (selectedScopeValue) {
+    applyProjectScope(selectedScopeValue);
+  } else {
+    renderProjectInputPanel({
+      container: form,
+      title: 'Cable Schedule input required',
+      missing: ['Add a cable record before running a project-linked IEC 60287 study.'],
+    });
   }
 
   // --- Show/hide burial / conduit fields based on installation method ---
@@ -95,6 +157,9 @@ document.addEventListener('DOMContentLoaded', () => {
     let result;
     try {
       result = calcAmpacity(inputs);
+      const snapshot = createStudyInputSnapshot('iec60287', inputs, projectInputModel?.bindings || {}, projectOverrides);
+      snapshot.scopeValue = selectedScopeValue;
+      result = withStudyProvenance(result, snapshot);
     } catch (err) {
       showModal('Calculation Error', `<p>${escHtml(err.message)}</p>`, 'error');
       return;

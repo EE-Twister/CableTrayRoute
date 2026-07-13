@@ -1,5 +1,4 @@
 import "./workflowStatus.js";
-import "../site.js";
 import "../optimalRoute.js";
 import { calculateVoltageDrop } from "./voltageDrop.js";
 

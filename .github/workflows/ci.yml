@@ -164,7 +164,7 @@ jobs:
           path: dist/
 
       - name: Install Playwright browsers
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install --with-deps chromium firefox
 
       - name: Cost Estimator acceptance lane
         run: npm run e2e:next-features-cost

@@ -8,10 +8,24 @@ import {
   SAFETY_FACTOR_DETERMINISTIC,
   SAFETY_FACTOR_STATISTICAL,
 } from './analysis/insulationCoordination.mjs';
-import { getStudies, setStudies } from './dataStore.mjs';
+import { getStudies, setStudies, getEquipment, getLoads, getCables, getProjectMeta } from './dataStore.mjs';
 import { initStudyApprovalPanel } from './src/components/studyApproval.js';
 import { initStudyBasisPanel } from './src/components/studyBasis.js';
 import { escapeHtml } from './src/htmlUtils.mjs';
+import {
+  buildInsulationCoordinationProjectInputs,
+  buildProjectScopeOptions,
+  createStudyInputSnapshot,
+  resolveProjectScope,
+  withStudyProvenance,
+} from './analysis/projectIntegration.mjs';
+import {
+  applyLinkedValue,
+  attachProjectSourceBadge,
+  bindProjectField,
+  renderProjectInputPanel,
+  renderProjectScopeSelector,
+} from './src/components/projectInputBinding.js';
 
 document.addEventListener('DOMContentLoaded', () => {
   initSettings();
@@ -50,17 +64,57 @@ document.addEventListener('DOMContentLoaded', () => {
   const form = document.getElementById('inscoord-form');
   const resultsDiv = document.getElementById('results');
   const errorsDiv = document.getElementById('calc-errors');
+  const projectOverrides = new Set();
+  const projectData = () => ({ equipment: getEquipment(), loads: getLoads(), cables: getCables(), studies: getStudies() });
+  const scopeOptions = buildProjectScopeOptions(projectData(), ['equipment', 'circuit']);
+  let selectedScopeValue = getStudies().insulationCoordination?.projectLink?.scopeValue || scopeOptions[0]?.value || '';
+  let projectInputModel = null;
+
+  function applyProjectScope(scopeValue = selectedScopeValue, { force = false } = {}) {
+    selectedScopeValue = scopeValue;
+    projectInputModel = buildInsulationCoordinationProjectInputs(resolveProjectScope(scopeValue, projectData()), getProjectMeta());
+    const fields = {
+      studyLabel: 'study-label', nominalVoltageKv: 'nominal-kv', umKv: 'um-select',
+      altitudeM: 'altitude-m', surgeArresterMcovKv: 'arrester-mcov',
+    };
+    Object.entries(fields).forEach(([fieldName, id]) => {
+      const element = document.getElementById(id);
+      const binding = projectInputModel.bindings[fieldName];
+      bindProjectField(element, binding, projectOverrides, fieldName);
+      if (applyLinkedValue(element, projectInputModel.inputs[fieldName], projectOverrides, fieldName, binding, { force })) {
+        attachProjectSourceBadge(element, binding.sourceLabel);
+      }
+    });
+  }
+
+  renderProjectScopeSelector({
+    container: form,
+    title: 'Insulation coordination project scope',
+    options: scopeOptions,
+    selectedValue: selectedScopeValue,
+    onSelect: applyProjectScope,
+  });
 
   // Restore from saved state or set defaults
   const saved = getStudies().insulationCoordination;
   if (saved) {
+    (saved.projectLink?.overrides || []).forEach(field => projectOverrides.add(field));
     restoreForm(saved.inputs);
+    projectInputModel = buildInsulationCoordinationProjectInputs(resolveProjectScope(selectedScopeValue, projectData()), getProjectMeta());
     try {
       const restoredResult = runInsulationCoordinationStudy(readInputs());
       renderResults(restoredResult);
     } catch {
       // Ignore invalid/malformed persisted data and wait for a fresh user submission.
     }
+  } else if (selectedScopeValue) {
+    applyProjectScope(selectedScopeValue);
+  } else {
+    renderProjectInputPanel({
+      container: form,
+      title: 'Equipment input required',
+      missing: ['Add equipment or a circuit with a nominal voltage.'],
+    });
   }
 
   // Toggle statistical panel visibility
@@ -71,7 +125,11 @@ document.addEventListener('DOMContentLoaded', () => {
     e.preventDefault();
     let result;
     try {
-      result = runInsulationCoordinationStudy(readInputs());
+      const inputs = readInputs();
+      result = runInsulationCoordinationStudy(inputs);
+      const snapshot = createStudyInputSnapshot('insulationCoordination', inputs, projectInputModel?.bindings || {}, projectOverrides);
+      snapshot.scopeValue = selectedScopeValue;
+      result = withStudyProvenance(result, snapshot);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Unable to run insulation coordination study.';
       errorsDiv.hidden = false;

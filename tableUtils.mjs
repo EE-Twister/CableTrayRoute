@@ -148,6 +148,7 @@ class TableManager {
     this.showActionColumn = opts.showActionColumn !== false;
     this.actionButtonIcons = opts.actionButtonIcons || null;
     this.actionButtonLabels = opts.actionButtonLabels || {};
+    this.compactActionMenu = opts.compactActionMenu === true;
     this.contextMenuViewLabel = opts.contextMenuViewLabel || 'View / Edit Row';
     this.customFilters = new Map();
     this.sortColumnIndex = null;
@@ -173,6 +174,8 @@ class TableManager {
     this.pendingStickyColumnUpdate = false;
     this.headerResizeObserver = null;
     this.stickyRowLimit = 1;
+    this.hiddenGroups = new Set();
+    this.hiddenColumnKeys = new Set();
     if (typeof ResizeObserver !== 'undefined') {
       this.headerResizeObserver = new ResizeObserver(() => this.queueStickyHeaderUpdate());
     }
@@ -185,7 +188,6 @@ class TableManager {
     this.load();
     if (this.enableContextMenu) this.initContextMenu();
     if (this.enableHeaderContextMenu) this.initHeaderContextMenu();
-    this.hiddenGroups = new Set();
     this.loadGroupState();
     this.updateRowCount();
   }
@@ -334,6 +336,7 @@ class TableManager {
       th.style.position = 'relative';
       th.draggable = true;
       th.dataset.index = idx;
+      th.dataset.columnKey = col.key;
       if (col.sticky === 'left') {
         th.classList.add('sticky-col');
         th.dataset.stickyKey = col.key;
@@ -736,12 +739,9 @@ class TableManager {
         if (row.cells[i + offset]) row.cells[i + offset].classList.toggle('group-hidden', hide);
       });
     });
-    if (this.groupThs[name]) {
-      this.groupThs[name].classList.toggle('group-collapsed', hide);
-      this.groupThs[name].colSpan = hide ? 1 : indices.length;
-    }
     if (this.groupToggles[name]) this.groupToggles[name].textContent = hide ? '+' : '-';
     if (hide) this.hiddenGroups.add(name); else this.hiddenGroups.delete(name);
+    this.syncGroupHeader(name);
     this.syncGroupBlankWidth();
     this.queueStickyHeaderUpdate();
     this.queueStickyColumnUpdate();
@@ -751,6 +751,45 @@ class TableManager {
     const hide = !this.hiddenGroups.has(name);
     this.setGroupVisibility(name, hide);
     this.saveGroupState();
+  }
+
+  syncGroupHeader(name) {
+    const groupTh = this.groupThs[name];
+    if (!groupTh) return;
+    const offset = this.colOffset;
+    const isGroupHidden = this.hiddenGroups.has(name);
+    const visibleCount = (this.groupCols[name] || []).filter(index => {
+      const headerCell = this.headerRow?.cells[index + offset];
+      return headerCell
+        && !headerCell.classList.contains('group-hidden')
+        && !headerCell.classList.contains('column-hidden');
+    }).length;
+    groupTh.classList.toggle('group-collapsed', isGroupHidden);
+    groupTh.style.display = !isGroupHidden && visibleCount === 0 ? 'none' : '';
+    groupTh.colSpan = isGroupHidden ? 1 : Math.max(1, visibleCount);
+  }
+
+  syncGroupHeaders() {
+    Object.keys(this.groupCols || {}).forEach(name => this.syncGroupHeader(name));
+  }
+
+  setVisibleColumns(keys = null) {
+    const visibleKeys = Array.isArray(keys) ? new Set(keys) : null;
+    const offset = this.colOffset;
+    this.columns.forEach((col, index) => {
+      const hide = Boolean(visibleKeys && !visibleKeys.has(col.key));
+      if (hide) this.hiddenColumnKeys.add(col.key); else this.hiddenColumnKeys.delete(col.key);
+      const headerCell = this.headerRow?.cells[index + offset];
+      if (headerCell) headerCell.classList.toggle('column-hidden', hide);
+      Array.from(this.tbody.rows).forEach(row => {
+        const cell = row.cells[index + offset];
+        if (cell) cell.classList.toggle('column-hidden', hide);
+      });
+    });
+    this.syncGroupHeaders();
+    this.syncGroupBlankWidth();
+    this.queueStickyHeaderUpdate();
+    this.queueStickyColumnUpdate();
   }
 
   saveGroupState() {
@@ -862,7 +901,7 @@ class TableManager {
       if (col.sticky !== 'left') return;
       const cellIndex = idx + this.colOffset;
       const headerCell = this.headerRow.cells[cellIndex];
-      if (!headerCell || headerCell.classList.contains('group-hidden')) return;
+      if (!headerCell || headerCell.classList.contains('group-hidden') || headerCell.classList.contains('column-hidden')) return;
       assignLeft(headerCell, left);
       Array.from(this.tbody.rows).forEach(row => {
         const cell = row.cells[cellIndex];
@@ -1167,6 +1206,7 @@ class TableManager {
     }
     this.columns.forEach((col, idx) => {
       const td = tr.insertCell();
+      td.dataset.columnKey = col.key;
       if (col.sticky === 'left') {
         td.classList.add('sticky-col');
         td.dataset.stickyKey = col.key;
@@ -1176,6 +1216,9 @@ class TableManager {
       }
       if (col.group && idx === this.groupLastIndex[col.group]) {
         td.classList.add('category-separator-right');
+      }
+      if (this.hiddenColumnKeys.has(col.key)) {
+        td.classList.add('column-hidden');
       }
       let el;
       if (col.type === 'select') {
@@ -1197,6 +1240,12 @@ class TableManager {
           };
         } else {
           el = document.createElement('select');
+          if (col.allowEmpty) {
+            const emptyOption = document.createElement('option');
+            emptyOption.value = '';
+            emptyOption.textContent = col.emptyLabel || '';
+            el.appendChild(emptyOption);
+          }
           opts.forEach(opt => {
             const o = document.createElement('option');
             o.value = opt;
@@ -1378,11 +1427,43 @@ class TableManager {
       const actTd = tr.insertCell();
       actTd.classList.add('sticky-action-col');
       let actionTarget = actTd;
-      if (this.actionButtonIcons) {
+      if (this.actionButtonIcons || this.compactActionMenu) {
         actTd.classList.add('icon-action-cell');
         actionTarget = document.createElement('div');
         actionTarget.className = 'row-action-group';
         actTd.appendChild(actionTarget);
+      }
+      if (this.compactActionMenu) {
+        const actionGroup = actionTarget;
+        const toggleBtn = document.createElement('button');
+        toggleBtn.type = 'button';
+        toggleBtn.className = 'row-action-menu-toggle';
+        toggleBtn.textContent = '⋯';
+        toggleBtn.title = 'Row actions';
+        toggleBtn.setAttribute('aria-label', 'Row actions');
+        const panel = document.createElement('div');
+        panel.className = 'row-action-menu-panel';
+        toggleBtn.addEventListener('click', e => {
+          e.stopPropagation();
+          document.querySelectorAll('.row-action-menu-panel.is-floating').forEach(openPanel => openPanel.remove());
+          const rect = toggleBtn.getBoundingClientRect();
+          panel.classList.add('is-floating');
+          panel.style.top = `${Math.max(8, Math.min(rect.bottom + 4, window.innerHeight - 180))}px`;
+          panel.style.right = `${Math.max(8, window.innerWidth - rect.right)}px`;
+          document.body.appendChild(panel);
+        });
+        actionGroup.addEventListener('keydown', e => {
+          if (e.key !== 'Escape') return;
+          toggleBtn.blur();
+        });
+        panel.addEventListener('keydown', e => {
+          if (e.key === 'Escape') panel.remove();
+        });
+        panel.addEventListener('click', () => {
+          if (panel.classList.contains('is-floating')) panel.remove();
+        });
+        actionGroup.append(toggleBtn, panel);
+        actionTarget = panel;
       }
       const actIdx = this.columns.length + this.colOffset;
       if (this.headerRow && this.headerRow.cells[actIdx] && this.headerRow.cells[actIdx].style.width) {

@@ -249,6 +249,7 @@ document.getElementById('login-form').addEventListener('submit', login);
 // Show the SSO button only when OIDC is configured on the Express server.
 authModeReady.then(() => {
   if (supabaseAuthEnabled) return;
+  if (new URLSearchParams(window.location.search).has('e2e')) return;
   fetch('/auth/oidc/status')
     .then(res => {
       if (!res.ok) return null;

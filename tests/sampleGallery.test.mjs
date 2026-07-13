@@ -13,6 +13,7 @@ import { fileURLToPath } from 'url';
 import {
   SCHEMA_VERSION,
   SAMPLE_REGISTRY,
+  getSampleProjectCopyName,
   getSamplesByTag,
   getSampleById,
   validateSampleProject,
@@ -22,6 +23,16 @@ import {
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
+
+describe('getSampleProjectCopyName()', () => {
+  it('creates a named copy without colliding with saved projects', () => {
+    assert.equal(getSampleProjectCopyName('Project Workflow Core', []), 'Project Workflow Core — Sample');
+    assert.equal(
+      getSampleProjectCopyName('Project Workflow Core', ['project workflow core — sample', 'Project Workflow Core — Sample (2)']),
+      'Project Workflow Core — Sample (3)'
+    );
+  });
+});
 
 function describe(name, fn) { console.log(name); fn(); }
 function it(name, fn) {

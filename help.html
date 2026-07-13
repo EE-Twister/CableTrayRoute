@@ -199,22 +199,6 @@
     </nav>
   </footer>
   <script type="module" src="dist/index.js" defer></script>
-  <script type="module">
-    import { initSettings, initDarkMode, initCompactMode, initNavToggle } from './site.js';
-
-    const initSharedShell = () => {
-      initSettings();
-      initDarkMode();
-      initCompactMode();
-      initNavToggle();
-    };
-
-    if (document.readyState === 'loading') {
-      window.addEventListener('DOMContentLoaded', initSharedShell, { once: true });
-    } else {
-      initSharedShell();
-    }
-  </script>
   <script>
     window.addEventListener('DOMContentLoaded', () => {
       const setLink = async (id, statusId, file, name) => {

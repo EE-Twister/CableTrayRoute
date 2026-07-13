@@ -1,7 +1,7 @@
 /**
  * Tests for analysis/seismicBracing.mjs
  *
- * Verifies the ASCE 7-22 §13.3.1 component seismic force calculations,
+ * Verifies the implemented ASCE 7-16 §13.3.1 component seismic force calculations,
  * SDC determination, and brace force outputs against hand-calculated values.
  */
 import assert from 'assert';
@@ -138,7 +138,7 @@ describe('maxBraceSpacing', () => {
 });
 
 // ---------------------------------------------------------------------------
-// calcComponentForceFactor — ASCE 7-22 §13.3.1
+// calcComponentForceFactor — implemented ASCE 7-16 §13.3.1 equation
 // Hand calculations:
 //   ap=1.0, Rp=2.5, Ip=1.0, SDS=0.5, z=10, h=20
 //   heightFactor = 1 + 2*(10/20) = 2.0
