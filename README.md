@@ -12,6 +12,8 @@ The app supports two authentication modes:
 - **Express server mode** for local/self-hosted deployments.
 - **Supabase mode** for low-cost static hosting on Cloudflare Pages.
 
+The profile control remains visible in the shared navigation. Signed-out users can use it to reach Login, while authenticated users receive account and logout actions.
+
 For the Cloudflare Pages + Supabase path, see [docs/supabase-cloudflare.md](docs/supabase-cloudflare.md).
 
 The bundled Express server persists credentials and sessions securely:

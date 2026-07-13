@@ -33,7 +33,7 @@ export function updateAuthSessionControls() {
 
   const avatar = document.getElementById('auth-profile-control');
   if (!avatar) return;
-  avatar.hidden = !auth;
+  avatar.hidden = false;
   avatar.classList.toggle('is-authenticated', Boolean(auth));
   avatar.querySelectorAll('.auth-profile-avatar').forEach(node => {
     node.style.setProperty('--avatar-bg', avatarColorForUser(auth?.user));
@@ -42,7 +42,7 @@ export function updateAuthSessionControls() {
     node.textContent = initialsForUser(auth?.user);
   });
   const name = avatar.querySelector('.auth-profile-name');
-  if (name) name.textContent = auth?.user || 'Signed in user';
+  if (name) name.textContent = auth?.user || 'Guest user';
   const meta = avatar.querySelector('.auth-profile-meta');
   if (meta) {
     const role = auth?.role ? ` · ${auth.role}` : '';
@@ -50,10 +50,17 @@ export function updateAuthSessionControls() {
   }
   const trigger = avatar.querySelector('.auth-profile-trigger');
   if (trigger) {
-    const label = auth?.user ? `Account profile for ${auth.user}` : 'Account profile';
+    const label = auth?.user ? `Account profile for ${auth.user}` : 'Sign in or view account';
     trigger.setAttribute('aria-label', label);
     trigger.setAttribute('title', label);
   }
+  const accountLink = avatar.querySelector('.auth-profile-account-link');
+  if (accountLink) {
+    accountLink.href = auth ? 'account.html' : 'login.html';
+    accountLink.textContent = auth ? 'View account' : 'Sign in';
+  }
+  const logoutBtn = avatar.querySelector('.auth-profile-logout');
+  if (logoutBtn) logoutBtn.hidden = !auth;
 }
 
 export function mountProfileControl() {
@@ -105,13 +112,13 @@ export function mountProfileControl() {
 
   const accountLink = document.createElement('a');
   accountLink.href = 'account.html';
-  accountLink.className = 'auth-profile-action';
+  accountLink.className = 'auth-profile-action auth-profile-account-link';
   accountLink.setAttribute('role', 'menuitem');
   accountLink.textContent = 'View account';
 
   const logoutBtn = document.createElement('button');
   logoutBtn.type = 'button';
-  logoutBtn.className = 'auth-profile-action';
+  logoutBtn.className = 'auth-profile-action auth-profile-logout';
   logoutBtn.setAttribute('role', 'menuitem');
   logoutBtn.textContent = 'Logout';
   logoutBtn.addEventListener('click', signOutCurrentUser);
