@@ -476,6 +476,190 @@ function applySampleTccSettings(obj = {}, oneLine, settings) {
   };
 }
 
+const SAMPLE_STUDY_ALIASES = {
+  heatTrace: 'heatTraceSizing',
+  voltageDrop: 'voltageDropStudy',
+};
+
+function sampleOneLineComponents(oneLine = {}) {
+  return Array.isArray(oneLine.sheets)
+    ? oneLine.sheets.flatMap(sheet => Array.isArray(sheet.components) ? sheet.components : [])
+    : [];
+}
+
+function sampleOneLineConnections(oneLine = {}) {
+  if (!Array.isArray(oneLine.sheets)) return [];
+  const explicit = oneLine.sheets.flatMap(sheet => Array.isArray(sheet.connections) ? sheet.connections : []);
+  if (explicit.length) return explicit;
+  return oneLine.sheets.flatMap(sheet => (sheet.components || []).flatMap(component =>
+    (component.connections || []).map(connection => ({ from: component.id, to: connection.target || connection.to })),
+  ));
+}
+
+function sampleComponentLabel(component = {}) {
+  return String(component.description || component.label || component.name || component.id || 'Sample equipment')
+    .replace(/\s*\n\s*/g, ' â€” ')
+    .trim();
+}
+
+function sampleComponentVoltage(component = {}) {
+  const value = component.voltage ?? component.secondaryVoltage ?? component.primaryVoltage ?? component.baseKV ?? '';
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return String(value || '');
+  return numeric >= 1000 ? `${numeric / 1000} kV` : String(numeric);
+}
+
+function deriveSampleEquipment(oneLine = {}, cables = []) {
+  const excluded = new Set(['bus', 'utility_source', 'breaker', 'fuse', 'relay', 'annotation']);
+  const equipment = sampleOneLineComponents(oneLine)
+    .filter(component => component?.id && !excluded.has(normalizeSampleToken(component.type)))
+    .map(component => ({
+      tag: component.id,
+      description: sampleComponentLabel(component),
+      voltage: sampleComponentVoltage(component),
+      category: normalizeSampleToken(component.type).replace(/_/g, ' '),
+      subCategory: normalizeSampleToken(component.subtype || component.type).replace(/_/g, ' '),
+      arrangement: 'Sample project',
+      lineup: component.id,
+      manufacturer: 'Sample basis',
+      model: 'Demonstration record',
+      phases: '3',
+    }));
+  const knownTags = new Set(equipment.map(row => row.tag));
+  cables.flatMap(cable => [cable.from_tag || cable.from, cable.to_tag || cable.to]).filter(Boolean).forEach(tag => {
+    if (knownTags.has(tag)) return;
+    knownTags.add(tag);
+    equipment.push({
+      tag,
+      description: `${tag} cable endpoint`,
+      voltage: '',
+      category: 'Cable endpoint',
+      subCategory: 'Referenced equipment',
+      arrangement: 'Sample project',
+      lineup: tag,
+      manufacturer: 'Sample basis',
+      model: 'Demonstration record',
+      phases: '3',
+    });
+  });
+  return equipment;
+}
+
+function deriveSampleLoads(oneLine = {}) {
+  const components = sampleOneLineComponents(oneLine);
+  const incoming = new Map();
+  sampleOneLineConnections(oneLine).forEach(connection => {
+    const from = connection.from || connection.fromId || connection.source || connection.sourceId;
+    const to = connection.to || connection.toId || connection.target || connection.targetId;
+    if (from && to && !incoming.has(to)) incoming.set(to, from);
+  });
+  return components
+    .filter(component => ['motor_load', 'static_load'].includes(normalizeSampleToken(component.type)))
+    .map(component => {
+      const label = sampleComponentLabel(component);
+      const labelKw = Number(label.match(/([\d.]+)\s*kW/i)?.[1]);
+      const hp = Number(component.hp || label.match(/([\d.]+)\s*HP/i)?.[1]);
+      const kw = Number.isFinite(Number(component.kw))
+        ? Number(component.kw)
+        : (Number.isFinite(labelKw) ? labelKw : (Number.isFinite(hp) ? Number((hp * 0.746).toFixed(1)) : 10));
+      return {
+        source: incoming.get(component.id) || 'Sample source',
+        tag: component.id,
+        description: label,
+        quantity: '1',
+        voltage: sampleComponentVoltage(component) || '480',
+        loadType: normalizeSampleToken(component.type) === 'motor_load' ? 'Motor' : 'Process',
+        duty: 'Continuous',
+        kw: String(kw),
+        powerFactor: '0.90',
+        loadFactor: '100',
+        efficiency: '95',
+        demandFactor: '100',
+        phases: '3',
+        circuit: `${incoming.get(component.id) || 'SAMPLE'}-${component.id}`,
+      };
+    });
+}
+
+function deriveSamplePanels(oneLine = {}) {
+  return sampleOneLineComponents(oneLine)
+    .filter(component => normalizeSampleToken(component.type) === 'panelboard')
+    .map(component => ({
+      id: component.id,
+      name: component.id,
+      voltage: sampleComponentVoltage(component) || '480',
+      description: sampleComponentLabel(component),
+      circuits: [],
+    }));
+}
+
+function deriveSampleMccLineups(oneLine = {}) {
+  return sampleOneLineComponents(oneLine)
+    .filter(component => normalizeSampleToken(component.type) === 'mcc')
+    .map(component => ({
+      id: component.id,
+      tag: component.id,
+      name: component.id,
+      voltage: sampleComponentVoltage(component) || '480',
+      description: sampleComponentLabel(component),
+      sections: [],
+    }));
+}
+
+function seedSampleStudies(obj = {}, settings = {}) {
+  const existing = settings.studyResults && typeof settings.studyResults === 'object'
+    ? settings.studyResults
+    : (settings.studies && typeof settings.studies === 'object' ? settings.studies : {});
+  const studyResults = { ...existing };
+  Object.entries(existing).forEach(([rawKey, result]) => {
+    const key = SAMPLE_STUDY_ALIASES[rawKey];
+    if (key && !studyResults[key]) studyResults[key] = result;
+  });
+  const studyInputs = obj.studyInputs && typeof obj.studyInputs === 'object' ? obj.studyInputs : {};
+  Object.entries(studyInputs).forEach(([rawKey, inputs]) => {
+    if (rawKey === 'tcc' || !inputs || typeof inputs !== 'object') return;
+    const key = SAMPLE_STUDY_ALIASES[rawKey] || rawKey;
+    if (studyResults[key]) return;
+    studyResults[key] = {
+      ...inputs,
+      inputs: { ...inputs },
+      status: 'Sample inputs ready',
+      sample: true,
+    };
+  });
+  return {
+    ...settings,
+    sampleStudyInputs: { ...studyInputs },
+    studyResults,
+  };
+}
+
+function deriveSampleRouteResults(cables = [], settings = {}) {
+  if (settings.latestRouteResults?.batchResults?.length || !cables.length) return settings;
+  const batchResults = cables
+    .filter(cable => cable.route_preference || cable.raceway_ids?.length)
+    .map(cable => {
+      const racewayId = cable.route_preference || cable.raceway_ids[0];
+      const length = Number(cable.length_ft ?? cable.length ?? 0);
+      return {
+        cable: cable.tag || cable.id || cable.name,
+        status: 'Routed',
+        total_length: length,
+        breakdown: [{ raceway_id: racewayId, length }],
+        route_segments: [{ type: 'raceway', raceway_id: racewayId, length }],
+      };
+    });
+  if (!batchResults.length) return settings;
+  return {
+    ...settings,
+    latestRouteResults: {
+      source: 'sample',
+      updatedAt: '2026-05-01T12:00:00.000Z',
+      batchResults,
+    },
+  };
+}
+
 export function sampleProjectToImportPayload(obj = {}) {
   const raceways = obj.raceways || {};
   const oneLine = normalizeSampleOneLine(obj);
@@ -486,18 +670,88 @@ export function sampleProjectToImportPayload(obj = {}) {
     }
   });
   settings = applySampleTccSettings(obj, oneLine, settings);
+  settings = seedSampleStudies(obj, settings);
+  const cables = Array.isArray(obj.cables) ? obj.cables : [];
+  settings = deriveSampleRouteResults(cables, settings);
+  const equipment = Array.isArray(obj.equipment) && obj.equipment.length
+    ? obj.equipment
+    : deriveSampleEquipment(oneLine, cables);
+  const loads = Array.isArray(obj.loads) && obj.loads.length
+    ? obj.loads
+    : deriveSampleLoads(oneLine);
   return {
     meta: obj.meta || { version: 1, scenario: 'default', scenarios: ['default'] },
     ductbanks: Array.isArray(obj.ductbanks) ? obj.ductbanks : (Array.isArray(raceways.ductbanks) ? raceways.ductbanks : []),
     conduits: Array.isArray(obj.conduits) ? obj.conduits : (Array.isArray(raceways.conduits) ? raceways.conduits : []),
     trays: Array.isArray(obj.trays) ? obj.trays : (Array.isArray(raceways.trays) ? raceways.trays : []),
-    cables: Array.isArray(obj.cables) ? obj.cables : [],
+    cables,
     cableTypicals: Array.isArray(obj.cableTypicals) ? obj.cableTypicals : [],
-    panels: Array.isArray(obj.panels) ? obj.panels : [],
-    equipment: Array.isArray(obj.equipment) ? obj.equipment : [],
-    loads: Array.isArray(obj.loads) ? obj.loads : [],
+    panels: Array.isArray(obj.panels) && obj.panels.length ? obj.panels : deriveSamplePanels(oneLine),
+    equipment,
+    loads,
     oneLine,
-    mccLineups: Array.isArray(obj.mccLineups) ? obj.mccLineups : [],
+    mccLineups: Array.isArray(obj.mccLineups) && obj.mccLineups.length ? obj.mccLineups : deriveSampleMccLineups(oneLine),
     settings
   };
+}
+
+const SAMPLE_PAGE_STUDY_KEYS = {
+  'arcFlash.html': 'arcFlash',
+  'groundgrid.html': 'groundGrid',
+  'heattracesizing.html': 'heatTraceSizing',
+  'iec60287.html': 'iec60287',
+  'loadFlow.html': 'loadFlow',
+  'motorStart.html': 'motorStart',
+  'shortCircuit.html': 'shortCircuit',
+  'voltagedropstudy.html': 'voltageDropStudy',
+};
+
+export function auditSampleDemonstration(sample, obj = {}) {
+  const errors = [];
+  const payload = sampleProjectToImportPayload(obj);
+  const pages = new Set(sample?.pagesUsed || []);
+  const components = sampleOneLineComponents(payload.oneLine);
+  const connections = sampleOneLineConnections(payload.oneLine);
+  const studies = payload.settings.studyResults || {};
+  const racewayCount = payload.trays.length + payload.conduits.length + payload.ductbanks.length;
+  const equipmentTags = new Set([
+    ...payload.equipment.map(row => row.tag || row.id),
+    ...payload.loads.map(row => row.tag || row.id),
+  ].filter(Boolean));
+  const unresolvedEndpoints = payload.cables.flatMap(cable => [cable.from_tag || cable.from, cable.to_tag || cable.to])
+    .filter(tag => tag && !equipmentTags.has(tag));
+  const racewayIds = new Set([
+    ...payload.trays.map(row => row.tray_id || row.id),
+    ...payload.conduits.map(row => row.conduit_id || row.id),
+    ...payload.ductbanks.map(row => row.ductbank_id || row.id || row.tag),
+    ...payload.ductbanks.flatMap(row => (row.conduits || []).map(conduit => conduit.conduit_id || conduit.id)),
+  ].filter(Boolean));
+  const unresolvedRaceways = payload.cables
+    .map(cable => cable.route_preference || cable.raceway_ids?.[0])
+    .filter(id => id && !racewayIds.has(id));
+
+  if (payload.cables.length < 2) errors.push('needs at least two cable records');
+  if (unresolvedEndpoints.length) errors.push(`unresolved cable endpoints: ${[...new Set(unresolvedEndpoints)].join(', ')}`);
+  if (unresolvedRaceways.length) errors.push(`unresolved raceway references: ${[...new Set(unresolvedRaceways)].join(', ')}`);
+  if (pages.has('equipmentlist.html') && payload.equipment.length < 3) errors.push('Equipment List needs at least three records');
+  if (pages.has('loadlist.html') && payload.loads.length < 2) errors.push('Load List needs at least two records');
+  if (pages.has('oneline.html') && (components.length < 4 || connections.length < 3)) {
+    errors.push('One-Line needs at least four components and three connections');
+  }
+  if ([...pages].some(page => ['racewayschedule.html', 'cabletrayfill.html', 'conduitfill.html', 'ductbankroute.html'].includes(page)) && racewayCount < 1) {
+    errors.push('raceway demonstrations need at least one raceway');
+  }
+  if ([...pages].some(page => ['cabletrayfill.html', 'ductbankroute.html'].includes(page)) && !payload.settings.latestRouteResults?.batchResults?.length) {
+    errors.push('routing demonstrations need routed cable results');
+  }
+  Object.entries(SAMPLE_PAGE_STUDY_KEYS).forEach(([page, key]) => {
+    if (pages.has(page) && !studies[key]) errors.push(`${page} needs seeded ${key} data`);
+  });
+  if (pages.has('tcc.html') && (payload.settings.tccSettings?.devices?.length || 0) < 3) {
+    errors.push('TCC needs at least three linked protective devices');
+  }
+  if (pages.has('projectreport.html') && !Object.keys(payload.settings.reportSnapshots || {}).length) {
+    errors.push('Project Report needs at least one report snapshot');
+  }
+  return { adequate: errors.length === 0, errors, payload };
 }

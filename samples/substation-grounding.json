@@ -48,6 +48,14 @@
       "maxFaultCurrent": 10000,
       "systemVoltage": 115000
     },
-    "shortCircuit": { "utilityFaultMVA": 2000, "systemVoltage": 115000 }
+    "shortCircuit": { "utilityFaultMVA": 2000, "systemVoltage": 115000 },
+    "arcFlash": {
+      "method": "IEEE 1584-2018",
+      "equipmentTag": "SWGR-13KV",
+      "systemVoltage": 13800,
+      "boltedFaultCurrent": 10000,
+      "workingDistance": 36,
+      "clearingTime": 0.25
+    }
   }
 }

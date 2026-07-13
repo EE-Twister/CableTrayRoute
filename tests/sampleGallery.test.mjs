@@ -16,6 +16,7 @@ import {
   getSampleProjectCopyName,
   getSamplesByTag,
   getSampleById,
+  auditSampleDemonstration,
   validateSampleProject,
   migrateSampleProject,
   sampleProjectToImportPayload,
@@ -264,6 +265,29 @@ describe('Sample JSON files', () => {
       });
       assert.ok(payload.oneLine && Array.isArray(payload.oneLine.sheets), `${sample.id} payload oneLine must include sheets`);
       assert.ok(payload.settings && typeof payload.settings === 'object', `${sample.id} payload settings must be an object`);
+    });
+
+    it(`${sample.projectFile} contains adequate demonstration data`, () => {
+      const raw = fs.readFileSync(filePath, 'utf8');
+      const parsed = migrateSampleProject(JSON.parse(raw));
+      const audit = auditSampleDemonstration(sample, parsed);
+      assert.ok(audit.adequate, `${sample.id} demonstration gaps: ${audit.errors.join('; ')}`);
+    });
+  });
+});
+
+describe('Legacy specialist sample enrichment', () => {
+  ['industrial-plant', 'data-center', 'substation-grounding', 'heat-trace-pipe', 'ductbank-network', 'coordination-study'].forEach(id => {
+    it(`${id} imports equipment, loads, study seeds, and routed results`, () => {
+      const sample = getSampleById(id);
+      const parsed = JSON.parse(fs.readFileSync(path.join(ROOT, sample.projectFile), 'utf8'));
+      const payload = sampleProjectToImportPayload(parsed);
+      assert.ok(payload.equipment.length >= 2, `${id} should expose derived equipment records`);
+      if (sample.pagesUsed.includes('loadlist.html')) {
+        assert.ok(payload.loads.length >= 1, `${id} should expose derived load records`);
+      }
+      assert.ok(Object.keys(payload.settings.studyResults).length >= 1, `${id} should expose study data`);
+      assert.ok(payload.settings.latestRouteResults.batchResults.length >= 1, `${id} should expose route results`);
     });
   });
 });

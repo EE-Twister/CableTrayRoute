@@ -5,6 +5,8 @@ Designed to find the optimal cable route for your cable.
 
 For a step-by-step overview of the workflow, see the [Project Workflow](docs/project-workflow.md) guide. Each tool can run on its own, but following the eight-step project path provides a smoother integrated experience.
 
+The Sample Gallery includes workflow and specialist projects with populated equipment, loads, one-lines, raceways, routed cable results, and study seeds. Automated adequacy checks tie every sample to the pages in its guided checklist so a listed demonstration cannot ship with an empty supporting view.
+
 ## Secure Authentication & API Hardening
 
 The app supports two authentication modes:

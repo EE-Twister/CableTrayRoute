@@ -169,6 +169,29 @@ test.afterAll(async () => {
   await server.close();
 });
 
+test('legacy specialist sample hydrates every supporting project surface', async ({ page }) => {
+  await gotoWorkflowPage(page, server, 'samplegallery.html');
+  await page.locator('[data-sample-id="industrial-plant"] .primary-btn').click();
+  await expect(page.locator('#checklist-panel')).toContainText('Guided Workflow: Industrial Plant');
+
+  await waitForDataStore(page);
+  const imported = await page.evaluate(() => ({
+    equipmentTags: window.dataStore.getEquipment().map(row => row.tag || row.id).filter(Boolean),
+    loadTags: window.dataStore.getLoads().map(row => row.tag || row.id).filter(Boolean),
+    studyKeys: Object.keys(window.dataStore.getStudies() || {}),
+    routeResultCount: window.dataStore.getItem('latestRouteResults', {})?.batchResults?.length || 0,
+  }));
+  expect(imported.equipmentTags).toEqual(expect.arrayContaining(['XFMR-1', 'MCC-A', 'MOTOR-101']));
+  expect(imported.loadTags).toEqual(expect.arrayContaining(['MOTOR-101', 'MOTOR-102', 'MOTOR-103']));
+  expect(imported.studyKeys).toEqual(expect.arrayContaining(['arcFlash', 'shortCircuit']));
+  expect(imported.routeResultCount).toBe(10);
+
+  await gotoWorkflowPage(page, server, 'equipmentlist.html');
+  await expect(page.locator('#equipment-table tbody tr')).toHaveCount(imported.equipmentTags.length);
+  await gotoWorkflowPage(page, server, 'loadlist.html');
+  await expect(page.locator('#load-table tbody tr')).toHaveCount(3);
+});
+
 test('sample project satisfies contract handoffs from equipment through deliverables', async ({ page }) => {
   assertContractHandoffs();
   const monitor = monitorPage(page, server.origin);
