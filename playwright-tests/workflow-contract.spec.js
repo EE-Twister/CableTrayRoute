@@ -198,8 +198,31 @@ test('Underground Ductbank checklist loads the sample before opening its route t
   await card.getByRole('button', { name: 'Load Underground Ductbank and show its guided checklist' }).click();
   await expect(page.locator('#checklist-panel')).toContainText('Guided Workflow: Underground Ductbank');
 
-  await page.locator('#checklist-steps a[href="ductbankroute.html"]').click();
-  await page.waitForLoadState('networkidle', { timeout: 6000 }).catch(() => {});
+  await gotoWorkflowPage(page, server, 'equipmentlist.html');
+  await expect(page.locator('#equipment-table tbody tr')).toHaveCount(5);
+  await expect(page.locator('#equipment-table tbody tr').first().locator('input').nth(2)).toHaveValue('Substation SW-1 15 kV switchgear');
+
+  await gotoWorkflowPage(page, server, 'loadlist.html');
+  await expect(page.locator('#load-table tbody tr')).toHaveCount(3);
+  await expect(page.locator('#load-table tbody tr').first()).toContainText('317.08');
+
+  await gotoWorkflowPage(page, server, 'oneline.html');
+  await expect(page.locator('#diagram g.component')).toHaveCount(5);
+  await expect(page.locator('.readiness-card')).toContainText('100%');
+
+  await gotoWorkflowPage(page, server, 'cableschedule.html');
+  const firstCable = page.locator('#cableScheduleTable tbody tr').first();
+  await expect(firstCable.locator('[name="from_tag"]')).toHaveValue('SUBSTATION-SW1');
+  await expect(firstCable.locator('[name="to_tag"]')).toHaveValue('PAD-XFMR-T2');
+
+  await gotoWorkflowPage(page, server, 'racewayschedule.html');
+  const firstDuctbank = page.locator('#ductbankTable > tbody > tr:not(.conduit-container)').first();
+  await expect(firstDuctbank.locator('input').nth(0)).toHaveValue('DUCTBANK-DB-01');
+  await expect(firstDuctbank.locator('input').nth(1)).toHaveValue('SUBSTATION-SW1');
+  await expect(firstDuctbank.locator('input').nth(2)).toHaveValue('PAD-XFMR-T2 / PAD-XFMR-T3');
+  await expect(firstDuctbank.locator('input[type="checkbox"]')).toBeChecked();
+
+  await gotoWorkflowPage(page, server, 'ductbankroute.html');
 
   await expect(page.locator('#ductbankTag')).toHaveValue('DUCTBANK-DB-01');
   await expect(page.locator('#conduitTable tbody tr')).toHaveCount(4);

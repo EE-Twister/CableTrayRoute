@@ -86,11 +86,11 @@ function normalize(row, mapping){
 }
 
 export function normalizeDuctbankRow(row){
-  return normalize(row, {
-    tag:['tag','Tag','ductbankTag','ductbank'],
-    from:['from','From'],
-    to:['to','To'],
-    concrete_encasement:['concrete_encasement','Concrete Encasement'],
+  const normalized = normalize(row, {
+    tag:['tag','Tag','ductbankTag','ductbank','ductbank_id','ductbankId','id'],
+    from:['from','From','from_tag','fromTag','source'],
+    to:['to','To','to_tag','toTag','destination','target'],
+    concrete_encasement:['concrete_encasement','Concrete Encasement','concreteEncasement','encasement','encasement_type'],
     start_x:['start_x','Start X','startX'],
     start_y:['start_y','Start Y','startY'],
     start_z:['start_z','Start Z','startZ'],
@@ -98,6 +98,10 @@ export function normalizeDuctbankRow(row){
     end_y:['end_y','End Y','endY'],
     end_z:['end_z','End Z','endZ']
   });
+  const encasement = String(normalized.concrete_encasement ?? '').trim().toLowerCase();
+  normalized.concrete_encasement = normalized.concrete_encasement === true
+    || ['1', 'true', 'yes', 'concrete', 'concrete encased', 'concrete-encased'].includes(encasement);
+  return normalized;
 }
 
 export function normalizeConduitRow(row){

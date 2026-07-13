@@ -164,7 +164,7 @@ export const SAMPLE_REGISTRY = [
     image: 'assets/sample-projects/ductbank-network.jpg',
     imageAlt: 'Concrete-encased underground ductbank cutaway with conduits, cables, and soil layers.',
     projectFile: 'samples/ductbank-network.json',
-    pagesUsed: ['ductbankroute.html', 'conduitfill.html', 'iec60287.html'],
+    pagesUsed: ['equipmentlist.html', 'loadlist.html', 'oneline.html', 'cableschedule.html', 'racewayschedule.html', 'ductbankroute.html', 'conduitfill.html', 'iec60287.html'],
     guidedChecklist: [
       { step: 1, label: 'Open ductbank route', page: 'ductbankroute.html', hint: 'Review the ductbank geometry, conduit arrangement, and soil thermal resistivity.' },
       { step: 2, label: 'Check conduit fill', page: 'conduitfill.html', hint: 'Verify each conduit is within the NEC 40% fill limit.' },
@@ -498,8 +498,27 @@ function sampleOneLineConnections(oneLine = {}) {
 
 function sampleComponentLabel(component = {}) {
   return String(component.description || component.label || component.name || component.id || 'Sample equipment')
-    .replace(/\s*\n\s*/g, ' â€” ')
+    .replace(/\s*\n\s*/g, ' — ')
     .trim();
+}
+
+function normalizeSampleCable(cable = {}) {
+  const tag = cable.tag || cable.id || cable.name || '';
+  const fromTag = cable.from_tag || cable.fromTag || cable.from || cable.source || cable.source_tag || '';
+  const toTag = cable.to_tag || cable.toTag || cable.to || cable.destination || cable.target || cable.load_tag || '';
+  const explicitRaceways = Array.isArray(cable.raceway_ids)
+    ? cable.raceway_ids
+    : String(cable.raceway_ids || '').split(/[,;|>]+/).map(value => value.trim()).filter(Boolean);
+  const racewayIds = explicitRaceways.length
+    ? explicitRaceways
+    : [cable.route_preference || cable.raceway_id || cable.conduit_id].filter(Boolean);
+  return {
+    ...cable,
+    tag,
+    from_tag: fromTag,
+    to_tag: toTag,
+    raceway_ids: racewayIds,
+  };
 }
 
 function sampleComponentVoltage(component = {}) {
@@ -671,7 +690,7 @@ export function sampleProjectToImportPayload(obj = {}) {
   });
   settings = applySampleTccSettings(obj, oneLine, settings);
   settings = seedSampleStudies(obj, settings);
-  const cables = Array.isArray(obj.cables) ? obj.cables : [];
+  const cables = Array.isArray(obj.cables) ? obj.cables.map(normalizeSampleCable) : [];
   settings = deriveSampleRouteResults(cables, settings);
   const equipment = Array.isArray(obj.equipment) && obj.equipment.length
     ? obj.equipment

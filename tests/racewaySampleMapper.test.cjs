@@ -1,7 +1,7 @@
 const assert = require("assert");
 
 async function run() {
-  const { mapConduitRow, mapTrayRow } = await import("../racewaySampleData.mjs");
+  const { mapConduitRow, mapDuctbankRow, mapTrayRow } = await import("../racewaySampleData.mjs");
   const legacy1 = {
     "Conduit ID": "C-001",
     Type: "RMC",
@@ -34,6 +34,22 @@ async function run() {
   const tray = mapTrayRow({ "Tray ID": "T-001", "Tray Material": "Fiberglass", Cover: "Solid Cover" });
   assert.equal(tray.material, "Fiberglass");
   assert.equal(tray.cover_condition, "Solid Cover");
+  const ductbank = mapDuctbankRow({
+    ductbank_id: "DB-UG-01",
+    from_tag: "SW-1",
+    to_tag: "XFMR-1",
+    encasement: "concrete",
+    start_x: 0,
+    start_y: 10,
+    start_z: -4,
+    end_x: 100,
+    end_y: 10,
+    end_z: -4,
+  });
+  assert.equal(ductbank.tag, "DB-UG-01");
+  assert.equal(ductbank.from, "SW-1");
+  assert.equal(ductbank.to, "XFMR-1");
+  assert.equal(ductbank.concrete_encasement, true);
   console.log("racewaySampleMapper.test passed");
 }
 

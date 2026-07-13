@@ -176,6 +176,42 @@ describe('migrateSampleProject()', () => {
 });
 
 describe('sampleProjectToImportPayload()', () => {
+  it('normalizes legacy cable endpoints and raceway assignments for schedule pages', () => {
+    const payload = sampleProjectToImportPayload({
+      schemaVersion: 1,
+      cables: [
+        { id: 'CBL-1', from: 'SW-1', to: 'XFMR-1', route_preference: 'DB-1' },
+      ],
+      raceways: { trays: [], conduits: [], ductbanks: [] },
+    });
+    assert.deepStrictEqual(payload.cables[0], {
+      id: 'CBL-1',
+      tag: 'CBL-1',
+      from: 'SW-1',
+      from_tag: 'SW-1',
+      to: 'XFMR-1',
+      to_tag: 'XFMR-1',
+      route_preference: 'DB-1',
+      raceway_ids: ['DB-1'],
+    });
+  });
+
+  it('renders multiline component descriptions with a readable separator', () => {
+    const payload = sampleProjectToImportPayload({
+      schemaVersion: 1,
+      cables: [],
+      raceways: { trays: [], conduits: [], ductbanks: [] },
+      oneline: {
+        components: [
+          { id: 'SW-1', type: 'equipment', label: 'Substation\nSW-1 15 kV' },
+        ],
+        connections: [],
+      },
+    });
+    assert.strictEqual(payload.equipment[0].description, 'Substation — SW-1 15 kV');
+    assert.ok(!payload.equipment[0].description.includes('â'));
+  });
+
   it('hydrates flat one-line connections onto source components', () => {
     const payload = sampleProjectToImportPayload({
       schemaVersion: 1,
@@ -289,6 +325,31 @@ describe('Legacy specialist sample enrichment', () => {
       assert.ok(Object.keys(payload.settings.studyResults).length >= 1, `${id} should expose study data`);
       assert.ok(payload.settings.latestRouteResults.batchResults.length >= 1, `${id} should expose route results`);
     });
+  });
+
+  it('keeps the Underground Ductbank schedules and one-line tied to the same records', () => {
+    const sample = getSampleById('ductbank-network');
+    const parsed = JSON.parse(fs.readFileSync(path.join(ROOT, sample.projectFile), 'utf8'));
+    const payload = sampleProjectToImportPayload(parsed);
+    const equipmentTags = new Set(payload.equipment.map(row => row.tag));
+    const loadTags = new Set(payload.loads.map(row => row.tag));
+    const components = payload.oneLine.sheets.flatMap(sheet => sheet.components || []);
+
+    assert.strictEqual(payload.equipment.length, 5);
+    assert.strictEqual(payload.loads.length, 3);
+    assert.ok(payload.cables.every(cable => equipmentTags.has(cable.from_tag) && equipmentTags.has(cable.to_tag)));
+    assert.ok(payload.cables.every(cable => cable.est_load > 0 && cable.raceway_ids.length === 1));
+    assert.ok(payload.loads.every(load => equipmentTags.has(load.source)));
+    const loadsBySource = new Map(payload.loads.map(load => [load.source, load]));
+    payload.cables.forEach(cable => {
+      const load = loadsBySource.get(cable.to_tag);
+      const expectedCurrent = (Number(load.kw) * 1000)
+        / (Math.sqrt(3) * Number(load.voltage) * Number(load.powerFactor));
+      assert.ok(Math.abs(cable.est_load - expectedCurrent) < 1, `${cable.tag} current should match its Load List demand`);
+    });
+    assert.ok([...loadTags].every(tag => components.some(component => component.loadRef === tag)));
+    assert.ok(payload.ductbanks.every(row => row.tag && row.from && row.to && row.concrete_encasement));
+    assert.strictEqual(components.flatMap(component => component.connections || []).length, 3);
   });
 });
 
