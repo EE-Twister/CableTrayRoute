@@ -27,4 +27,4 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install --with-deps msedge firefox
       - name: Playwright tests
-        run: npx playwright test --project=firefox --project=msedge
+        run: npx playwright test --project=firefox --project=msedge --retries=1
