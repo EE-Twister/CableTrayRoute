@@ -160,7 +160,17 @@ export async function fillHeatTraceInputs(page, fixtureOrInputs, options = {}) {
 }
 
 export async function runHeatTraceAnalysis(page) {
+  const previousResult = await page.evaluate(() => {
+    const scenario = localStorage.getItem('ctr_current_scenario_v1') || 'base';
+    const studies = JSON.parse(localStorage.getItem(`${scenario}:studyResults`) || '{}');
+    return JSON.stringify(studies.heatTraceSizing || null);
+  });
   await page.getByRole('button', { name: 'Run Analysis' }).click();
+  await page.waitForFunction(previous => {
+    const scenario = localStorage.getItem('ctr_current_scenario_v1') || 'base';
+    const studies = JSON.parse(localStorage.getItem(`${scenario}:studyResults`) || '{}');
+    return JSON.stringify(studies.heatTraceSizing || null) !== previous;
+  }, previousResult);
   await expect(page.locator('#results .heattrace-status-banner')).toBeVisible();
 }
 
