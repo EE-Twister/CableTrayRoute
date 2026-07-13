@@ -37,18 +37,18 @@
     "rollup": "^3.30.0"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.80.0",
+    "@anthropic-ai/sdk": "^0.91.1",
     "d3": "^7.9.0",
     "docx": "^8.5.0",
     "express": "^4.19.2",
     "fast-json-patch": "^3.1.0",
     "handlebars": "^4.7.8",
     "jspdf": "^4.2.1",
-    "pdfjs-dist": "^3.7.107",
+    "pdfjs-dist": "^4.10.38",
     "pdfkit": "^0.13.0",
     "qrcode": "^1.5.4",
     "svg2pdf.js": "^2.7.0",
     "ws": "^8.16.0",
-    "xlsx": "^0.18.5"
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   }
 }

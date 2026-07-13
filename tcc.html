@@ -20,7 +20,10 @@
   <meta name="color-scheme" content="light dark">
   <link rel="stylesheet" href="style.css">
   <script src="dist/vendor/d3.min.js"></script>
-  <script src="dist/vendor/pdf.min.js"></script>
+  <script type="module">
+    import * as pdfjsLib from './dist/vendor/pdf.min.mjs';
+    globalThis.pdfjsLib = pdfjsLib;
+  </script>
   <!-- JSON-LD Breadcrumb -->
   <script type="application/ld+json">
   {

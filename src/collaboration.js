@@ -54,6 +54,15 @@ async function buildWsProtocols() {
 const RECONNECT_DELAYS_MS = [1000, 2000, 5000, 10000, 30000];
 const PING_INTERVAL_MS = 25000;
 
+function detailEvent(type, detail) {
+  if (typeof CustomEvent === 'function') {
+    return new CustomEvent(type, { detail });
+  }
+  const event = new Event(type);
+  Object.defineProperty(event, 'detail', { value: detail, enumerable: true });
+  return event;
+}
+
 export class CollabClient extends EventTarget {
   /** @type {WebSocket|null} */
   #ws = null;
@@ -93,7 +102,7 @@ export class CollabClient extends EventTarget {
       this.#reconnectAttempt = 0;
       this.#send({ type: 'join', projectId: this.#projectId, username: this.#username });
       this.#startPing();
-      this.dispatchEvent(new CustomEvent('connected'));
+      this.dispatchEvent(detailEvent('connected'));
     });
 
     this.#ws.addEventListener('message', (ev) => {
@@ -104,7 +113,7 @@ export class CollabClient extends EventTarget {
 
     this.#ws.addEventListener('close', () => {
       this.#stopPing();
-      this.dispatchEvent(new CustomEvent('disconnected'));
+      this.dispatchEvent(detailEvent('disconnected'));
       if (!this.#intentionalClose) this.#scheduleReconnect();
     });
 
@@ -181,7 +190,7 @@ export class CollabClient extends EventTarget {
     if (!msg || typeof msg.type !== 'string') return;
     switch (msg.type) {
       case 'presence':
-        this.dispatchEvent(new CustomEvent('presence', { detail: msg.users || [] }));
+        this.dispatchEvent(detailEvent('presence', msg.users || []));
         break;
       case 'patch': {
         const incomingSeq = typeof msg.seq === 'number' ? msg.seq : null;
@@ -190,14 +199,14 @@ export class CollabClient extends EventTarget {
           if (incomingSeq > expected) {
             // One or more patches were missed — signal a conflict so the UI
             // can warn the user that remote changes may have overwritten theirs.
-            this.dispatchEvent(new CustomEvent('conflict', {
-              detail: { username: msg.username, gap: incomingSeq - expected }
+            this.dispatchEvent(detailEvent('conflict', {
+              username: msg.username, gap: incomingSeq - expected
             }));
           }
           this.#lastSeq = incomingSeq;
         }
-        this.dispatchEvent(new CustomEvent('remotePatch', {
-          detail: { username: msg.username, patch: msg.patch, seq: incomingSeq }
+        this.dispatchEvent(detailEvent('remotePatch', {
+          username: msg.username, patch: msg.patch, seq: incomingSeq
         }));
         break;
       }

@@ -31,7 +31,10 @@ function isGeneratedBuildPath(file) {
 }
 
 function changedFilesAgainstBase(baseRef) {
-  const range = baseRef.includes('..') ? baseRef : `${baseRef}...HEAD`;
+  // CI fetches the base branch with --depth=1, so a merge base may not exist
+  // in the shallow checkout. A direct tree comparison is sufficient here:
+  // this guard only needs to know whether generated paths differ.
+  const range = baseRef.includes('..') ? baseRef : `${baseRef}..HEAD`;
   return runGit(['diff', '--name-only', '--diff-filter=ACDMRTUXB', range, '--']);
 }
 

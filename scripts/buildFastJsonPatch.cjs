@@ -11,8 +11,8 @@ async function build() {
     ['handlebars', 'dist', 'handlebars.min.js', 'handlebars.min.js'],
     ['d3', 'dist', 'd3.min.js', 'd3.min.js'],
   ['jspdf', 'dist', 'jspdf.umd.min.js', 'jspdf.umd.min.js'],
-  ['pdfjs-dist', 'build', 'pdf.min.js', 'pdf.min.js'],
-  ['pdfjs-dist', 'build', 'pdf.worker.min.js', 'pdf.worker.min.js'],
+  ['pdfjs-dist', 'build', 'pdf.min.mjs', 'pdf.min.mjs'],
+  ['pdfjs-dist', 'build', 'pdf.worker.min.mjs', 'pdf.worker.min.mjs'],
   ['svg2pdf.js', 'dist', 'svg2pdf.es.min.js', 'svg2pdf.es.min.js'],
 ];
 
