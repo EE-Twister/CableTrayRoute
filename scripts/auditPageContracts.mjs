@@ -777,7 +777,8 @@ async function main() {
     if (audit.summary.actionableFailures > 0) {
       throw new Error(`Page contract audit has ${audit.summary.actionableFailures} actionable failure(s). Run node scripts/auditPageContracts.mjs and reconcile contracts/storage access.`);
     }
-    if (current !== markdown) {
+    const normalizedCurrent = current.replace(/\r\n?/g, '\n');
+    if (normalizedCurrent !== markdown) {
       throw new Error('docs/page-contract-audit.md is out of date. Run node scripts/auditPageContracts.mjs.');
     }
     console.log('[page-contract-audit] docs/page-contract-audit.md is current.');
