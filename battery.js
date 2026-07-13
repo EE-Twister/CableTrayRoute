@@ -1,7 +1,19 @@
 import { runBatterySizingAnalysis } from './analysis/batterySizing.mjs';
 import { buildBatteryRackLayoutModel } from './analysis/batteryRackLayout.mjs';
-import { getStudies, setStudies } from './dataStore.mjs';
+import { getStudies, setStudies, getLoads, getDesignBasis, getProjectMeta } from './dataStore.mjs';
 import { initStudyApprovalPanel } from './src/components/studyApproval.js';
+import {
+  buildBatteryProjectInputs,
+  createStudyInputSnapshot,
+  getStudyStaleness,
+  withStudyProvenance,
+} from './analysis/projectIntegration.mjs';
+import {
+  applyLinkedValue,
+  bindProjectField,
+  renderProjectInputPanel,
+  renderStudyStaleBanner,
+} from './src/components/projectInputBinding.js';
 
 const CELL_VOLTAGE_DEFAULTS = {
   'lead-acid-agm': 2,
@@ -32,6 +44,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const resultsDiv = document.getElementById('results');
   const chemistrySelect = document.getElementById('chemistry');
   const cellVoltageInput = document.getElementById('rack-cell-voltage-v');
+  const projectOverrides = new Set();
+  let projectInputModel = null;
   let cellVoltageEdited = false;
 
   initStudyApprovalPanel('batterySizing');
@@ -47,10 +61,65 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  function readProjectInputModel() {
+    return buildBatteryProjectInputs({
+      loads: getLoads(),
+      studies: getStudies(),
+      designBasis: getDesignBasis(),
+      projectMeta: getProjectMeta(),
+    });
+  }
+
+  function applyProjectInputs(force = false) {
+    projectInputModel = readProjectInputModel();
+    const fieldIds = {
+      systemLabel: 'system-label',
+      averageLoadKw: 'avg-load-kw',
+      peakLoadKw: 'peak-load-kw',
+      runtimeHours: 'runtime-hours',
+      ambientTempC: 'ambient-temp-c',
+      upsPowerFactor: 'ups-pf',
+    };
+    Object.entries(fieldIds).forEach(([fieldName, id]) => {
+      const element = document.getElementById(id);
+      const binding = projectInputModel.bindings[fieldName];
+      bindProjectField(element, binding, projectOverrides, fieldName);
+      applyLinkedValue(element, projectInputModel.inputs[fieldName], projectOverrides, fieldName, binding, { force });
+    });
+  }
+
+  projectInputModel = readProjectInputModel();
+  renderProjectInputPanel({
+    container: form,
+    title: 'Battery inputs linked to this project',
+    bindings: projectInputModel.bindings,
+    missing: projectInputModel.missing,
+    onRefresh: () => applyProjectInputs(true),
+  });
+
   // --- Restore previous results from project store ---
   const saved = getStudies().batterySizing;
   if (saved) {
+    (saved.projectLink?.overrides || []).forEach(field => projectOverrides.add(field));
+    const savedFieldIds = {
+      systemLabel: 'system-label', averageLoadKw: 'avg-load-kw', peakLoadKw: 'peak-load-kw',
+      runtimeHours: 'runtime-hours', ambientTempC: 'ambient-temp-c', upsPowerFactor: 'ups-pf',
+    };
+    Object.entries(savedFieldIds).forEach(([fieldName, id]) => {
+      if (!projectOverrides.has(fieldName) || saved[fieldName] == null) return;
+      const element = document.getElementById(id);
+      element.value = saved[fieldName];
+      bindProjectField(element, projectInputModel.bindings[fieldName], projectOverrides, fieldName);
+    });
+    applyProjectInputs(false);
     renderResults(saved);
+    const currentInputs = readFormInputs();
+    if (currentInputs) {
+      const currentSnapshot = createStudyInputSnapshot('batterySizing', currentInputs, projectInputModel.bindings, projectOverrides);
+      renderStudyStaleBanner(resultsDiv, getStudyStaleness(saved, currentSnapshot), () => applyProjectInputs(true));
+    }
+  } else {
+    applyProjectInputs(false);
   }
 
   // --- Form submission ---
@@ -65,6 +134,8 @@ document.addEventListener('DOMContentLoaded', () => {
       const rackLayout = buildBatteryRackLayoutModel(result, inputs.rackLayoutInputs);
       result.rackLayoutInputs = rackLayout.inputs;
       result.rackLayoutSummary = rackLayout.summary;
+      const snapshot = createStudyInputSnapshot('batterySizing', inputs, projectInputModel.bindings, projectOverrides);
+      result = withStudyProvenance(result, snapshot);
     } catch (err) {
       showModal('Analysis Error', `<p>${err.message}</p>`, 'error');
       return;

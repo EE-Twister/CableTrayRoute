@@ -17,9 +17,11 @@ import {
   getStudies, getStudyApprovals, getEquipment, getOneLine,
   getReportSnapshots, setReportSnapshot, deleteReportSnapshot,
   getLifecyclePackages,
-  getDesignBasis, getDesignGateApprovals, getItem,
+  getDesignBasis, getDesignGateApprovals, getItem, getProjectMeta, setProjectMeta,
 } from '../dataStore.mjs';
 import { getProjectState } from '../projectStorage.js';
+import { normalizeProjectMeta } from '../analysis/projectIntegration.mjs';
+import { renderProjectInputPanel } from './components/projectInputBinding.js';
 import { buildDesignBasisReview } from '../analysis/designBasis.mjs';
 import { buildDeliverableReadinessDiagnostics } from '../analysis/deliverableWorkflow.mjs';
 import { runDRC } from '../analysis/designRuleChecker.mjs';
@@ -132,15 +134,77 @@ function applyPreset(presetId) {
 
 function readCoverFields() {
   const state = getProjectState();
+  const meta = normalizeProjectMeta(getProjectMeta(), state?.name || '');
   return {
-    projectName:    document.getElementById('rpt-project-name')?.value?.trim() || (state && state.name) || 'Untitled Project',
-    client:         document.getElementById('rpt-client')?.value?.trim()      || '',
-    engineer:       document.getElementById('rpt-engineer')?.value?.trim()    || '',
-    license:        document.getElementById('rpt-license')?.value?.trim()     || '',
-    date:           document.getElementById('rpt-date')?.value                || new Date().toISOString().slice(0, 10),
-    revisionNumber: document.getElementById('rpt-rev-number')?.value?.trim()  || '0',
-    notes:          document.getElementById('rpt-notes')?.value?.trim()       || '',
+    projectName:    document.getElementById('rpt-project-name')?.value?.trim() || meta.name || 'Untitled Project',
+    projectNumber:  document.getElementById('rpt-project-number')?.value?.trim() || meta.number,
+    client:         document.getElementById('rpt-client')?.value?.trim()      || meta.client,
+    site:           document.getElementById('rpt-site')?.value?.trim()        || meta.site,
+    location:       document.getElementById('rpt-location')?.value?.trim()    || meta.location,
+    engineer:       document.getElementById('rpt-engineer')?.value?.trim()    || meta.engineer,
+    license:        document.getElementById('rpt-license')?.value?.trim()     || meta.license,
+    date:           document.getElementById('rpt-date')?.value                || meta.issueDate || new Date().toISOString().slice(0, 10),
+    revisionNumber: document.getElementById('rpt-rev-number')?.value?.trim()  || meta.revision || '0',
+    notes:          document.getElementById('rpt-notes')?.value?.trim()       || meta.coverNotes,
+    altitudeFt:     Number.parseFloat(document.getElementById('rpt-altitude-ft')?.value) || meta.altitudeFt,
+    minAmbientTempC: Number.parseFloat(document.getElementById('rpt-min-ambient-temp-c')?.value) || meta.minAmbientTempC,
+    maxAmbientTempC: Number.parseFloat(document.getElementById('rpt-max-ambient-temp-c')?.value) || meta.maxAmbientTempC,
+    batteryRuntimeHours: Number.parseFloat(document.getElementById('rpt-battery-runtime-hours')?.value) || meta.batteryRuntimeHours,
   };
+}
+
+function hydrateProjectMetadata() {
+  const state = getProjectState();
+  const meta = normalizeProjectMeta(getProjectMeta(), state?.name || '');
+  const values = {
+    'rpt-project-name': meta.name,
+    'rpt-project-number': meta.number,
+    'rpt-client': meta.client,
+    'rpt-site': meta.site,
+    'rpt-location': meta.location,
+    'rpt-engineer': meta.engineer,
+    'rpt-license': meta.license,
+    'rpt-date': meta.issueDate || new Date().toISOString().slice(0, 10),
+    'rpt-rev-number': meta.revision,
+    'rpt-notes': meta.coverNotes,
+    'rpt-altitude-ft': meta.altitudeFt,
+    'rpt-min-ambient-temp-c': meta.minAmbientTempC,
+    'rpt-max-ambient-temp-c': meta.maxAmbientTempC,
+    'rpt-battery-runtime-hours': meta.batteryRuntimeHours,
+  };
+  Object.entries(values).forEach(([id, value]) => {
+    const element = document.getElementById(id);
+    if (!element) return;
+    if (value !== '') element.value = value;
+    element.dataset.projectSource = `projectMeta.${id.replace('rpt-', '')}`;
+    element.dataset.projectInputState = 'linked';
+    element.title = 'Shared project metadata; changes are reused by studies and deliverables.';
+  });
+}
+
+function persistProjectMetadata() {
+  const state = getProjectState();
+  const current = normalizeProjectMeta(getProjectMeta(), state?.name || '');
+  const cover = readCoverFields();
+  setProjectMeta(normalizeProjectMeta({
+    ...current,
+    name: cover.projectName,
+    number: cover.projectNumber,
+    client: cover.client,
+    site: cover.site,
+    location: cover.location,
+    engineer: cover.engineer,
+    license: cover.license,
+    issueDate: cover.date,
+    revision: cover.revisionNumber,
+    coverNotes: cover.notes,
+    altitudeFt: cover.altitudeFt,
+    minAmbientTempC: cover.minAmbientTempC,
+    maxAmbientTempC: cover.maxAmbientTempC,
+    ambientTempC: cover.maxAmbientTempC,
+    batteryRuntimeHours: cover.batteryRuntimeHours,
+    updatedAt: new Date().toISOString(),
+  }, state?.name || ''));
 }
 
 // ---------------------------------------------------------------------------
@@ -733,6 +797,16 @@ function generatePreview() {
 document.addEventListener('DOMContentLoaded', () => {
   previewEl = document.getElementById('report-preview');
   statusEl  = document.getElementById('report-status');
+
+  hydrateProjectMetadata();
+  renderProjectInputPanel({
+    container: document.querySelector('.rpt-config-panel'),
+    title: 'Shared project metadata',
+    summary: 'Edit these values once here; Battery, Generator Sizing, and report deliverables reuse them automatically.',
+    bindings: { metadata: { sourceLabel: 'Canonical project record', sourcePath: 'projectMeta' } },
+  });
+  ['rpt-project-name', 'rpt-project-number', 'rpt-client', 'rpt-site', 'rpt-location', 'rpt-engineer', 'rpt-license', 'rpt-date', 'rpt-rev-number', 'rpt-notes', 'rpt-altitude-ft', 'rpt-min-ambient-temp-c', 'rpt-max-ambient-temp-c', 'rpt-battery-runtime-hours']
+    .forEach(id => document.getElementById(id)?.addEventListener('change', persistProjectMetadata));
 
   // Set default date
   const dateEl = document.getElementById('rpt-date');

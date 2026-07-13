@@ -266,8 +266,17 @@
               <label class="field-label" for="rpt-project-name">Project Name
                 <input type="text" id="rpt-project-name" class="field-input" placeholder="Loaded from project if blank" autocomplete="off">
               </label>
+              <label class="field-label" for="rpt-project-number">Project Number
+                <input type="text" id="rpt-project-number" class="field-input" placeholder="Project / job number" autocomplete="off">
+              </label>
               <label class="field-label" for="rpt-client">Client
                 <input type="text" id="rpt-client" class="field-input" placeholder="Client / Owner" autocomplete="off">
+              </label>
+              <label class="field-label" for="rpt-site">Site / Facility
+                <input type="text" id="rpt-site" class="field-input" placeholder="Facility or area name" autocomplete="off">
+              </label>
+              <label class="field-label" for="rpt-location">Location
+                <input type="text" id="rpt-location" class="field-input" placeholder="City, state, or coordinates" autocomplete="off">
               </label>
               <label class="field-label" for="rpt-engineer">Engineer
                 <input type="text" id="rpt-engineer" class="field-input" placeholder="Responsible engineer" autocomplete="off">
@@ -284,6 +293,21 @@
               <label class="field-label" for="rpt-notes">Cover Notes
                 <textarea id="rpt-notes" class="field-input" rows="2" placeholder="Optional cover page notes"></textarea>
               </label>
+              <details>
+                <summary>Shared Site Conditions</summary>
+                <label class="field-label" for="rpt-altitude-ft">Altitude (ft MSL)
+                  <input type="number" id="rpt-altitude-ft" class="field-input" min="0" step="100">
+                </label>
+                <label class="field-label" for="rpt-min-ambient-temp-c">Minimum Design Ambient (°C)
+                  <input type="number" id="rpt-min-ambient-temp-c" class="field-input" step="1">
+                </label>
+                <label class="field-label" for="rpt-max-ambient-temp-c">Maximum Design Ambient (°C)
+                  <input type="number" id="rpt-max-ambient-temp-c" class="field-input" step="1">
+                </label>
+                <label class="field-label" for="rpt-battery-runtime-hours">Default Battery Runtime (hours)
+                  <input type="number" id="rpt-battery-runtime-hours" class="field-input" min="0.01" step="0.25">
+                </label>
+              </details>
             </div>
           </details>
 

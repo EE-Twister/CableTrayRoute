@@ -3,9 +3,20 @@ import {
   CHEMISTRY_PARAMS,
   EXPOSURE_TYPES,
 } from './analysis/bessHazard.mjs';
-import { getStudies, setStudies } from './dataStore.mjs';
+import { getStudies, setStudies, getEquipment, getProjectMeta } from './dataStore.mjs';
 import { initStudyApprovalPanel } from './src/components/studyApproval.js';
 import { escapeHtml } from './src/htmlUtils.mjs';
+import {
+  buildBessHazardProjectInputs,
+  createStudyInputSnapshot,
+  withStudyProvenance,
+} from './analysis/projectIntegration.mjs';
+import {
+  applyLinkedValue,
+  attachProjectSourceBadge,
+  bindProjectField,
+  renderProjectInputPanel,
+} from './src/components/projectInputBinding.js';
 
 document.addEventListener('DOMContentLoaded', () => {
   initSettings();
@@ -18,19 +29,54 @@ document.addEventListener('DOMContentLoaded', () => {
   const calculateBtn = document.getElementById('calculate-btn');
   const exportBtn    = document.getElementById('export-btn');
   const addExpBtn    = document.getElementById('add-exposure-btn');
+  const projectOverrides = new Set();
+  let projectInputModel = null;
   let exposureCount = 0;
 
   calculateBtn.addEventListener('click', calculate);
   exportBtn.addEventListener('click', exportCsv);
   addExpBtn.addEventListener('click', () => addExposureRow());
 
+  function readProjectInputModel() {
+    return buildBessHazardProjectInputs({
+      equipment: getEquipment(), studies: getStudies(), projectMeta: getProjectMeta(),
+    });
+  }
+
+  function applyProjectInputs(force = false) {
+    projectInputModel = readProjectInputModel();
+    const fields = {
+      ratedKwh: 'rated-kwh', chemistry: 'chemistry', cellsPerModule: 'cells-per-module',
+      modulesPerRack: 'modules-per-rack', ambientC: 'ambient-c',
+    };
+    Object.entries(fields).forEach(([fieldName, id]) => {
+      const element = document.getElementById(id);
+      const binding = projectInputModel.bindings[fieldName];
+      bindProjectField(element, binding, projectOverrides, fieldName);
+      if (applyLinkedValue(element, projectInputModel.inputs[fieldName], projectOverrides, fieldName, binding, { force })) {
+        attachProjectSourceBadge(element, binding.sourceLabel);
+      }
+    });
+  }
+
+  projectInputModel = readProjectInputModel();
+  renderProjectInputPanel({
+    container: calculateBtn.closest('section') || calculateBtn.parentElement,
+    title: 'BESS hazard inputs linked to this project',
+    bindings: projectInputModel.bindings,
+    missing: projectInputModel.missing,
+    onRefresh: () => applyProjectInputs(true),
+  });
+
   // Restore previously saved state
   const saved = getStudies().bessHazard;
   if (saved && saved._inputs) {
+    (saved.projectLink?.overrides || []).forEach(field => projectOverrides.add(field));
     restoreInputs(saved._inputs);
     renderResults(saved);
     exportBtn.disabled = false;
   } else {
+    applyProjectInputs(false);
     // Default: one occupied-building exposure row
     addExposureRow({ label: 'Occupied building', type: 'occupied_building', actualDistM: 3 });
   }
@@ -121,7 +167,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const inputs = readInputs();
     const result = runBessHazardStudy(inputs);
 
-    const toStore = { ...result, _inputs: inputs };
+    const snapshot = createStudyInputSnapshot('bessHazard', inputs, projectInputModel.bindings, projectOverrides);
+    const toStore = withStudyProvenance({ ...result, _inputs: inputs }, snapshot);
     const studies = getStudies();
     studies.bessHazard = toStore;
     setStudies(studies);

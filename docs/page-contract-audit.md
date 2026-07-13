@@ -15,13 +15,13 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 - Routes without source files: 0
 - Routes with undocumented reads: 0
 - Routes with undocumented writes: 0
-- Routes with declared inputs not statically read: 69
+- Routes with declared inputs not statically read: 66
 - Routes with declared outputs not statically written: 0
 - Direct browser storage hits: 2
 - Unclassified direct browser storage hits: 0
 - Direct browser storage classifications: session-handoff=2
 - Actionable failures: 0
-- Warnings: 175
+- Warnings: 164
 
 ## Findings
 
@@ -1521,7 +1521,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 
 - Section: Workflow
 - Group: Deliverables
-- Source files: `analysis/autoSize.mjs`, `analysis/clashDetect.mjs`, `analysis/conduitFill.mjs`, `analysis/deliverableWorkflow.mjs`, `analysis/designBasis.mjs`, `analysis/designRuleChecker.mjs`, `analysis/heatTraceReport.mjs`, `analysis/heatTraceSizing.mjs`, `analysis/projectReport.mjs`, `analysis/pullCards.mjs`, `analysis/reportPackage.mjs`, `analysis/scheduleWorkflow.mjs`, `analysis/spoolSheetVisualModel.mjs`, `analysis/spoolSheets.mjs`, `src/projectreport.js`, `src/pullCalc.js`
+- Source files: `analysis/autoSize.mjs`, `analysis/clashDetect.mjs`, `analysis/conduitFill.mjs`, `analysis/deliverableWorkflow.mjs`, `analysis/designBasis.mjs`, `analysis/designRuleChecker.mjs`, `analysis/heatTraceReport.mjs`, `analysis/heatTraceSizing.mjs`, `analysis/projectReport.mjs`, `analysis/pullCards.mjs`, `analysis/reportPackage.mjs`, `analysis/scheduleWorkflow.mjs`, `analysis/spoolSheetVisualModel.mjs`, `analysis/spoolSheets.mjs`, `src/components/projectInputBinding.js`, `src/projectreport.js`, `src/pullCalc.js`
 
 **Undocumented Reads**
 - None
@@ -1541,43 +1541,47 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 
 **Detected Reads**
 - `cableSchedule`
-  - src/projectreport.js:222 getCables()
+  - src/projectreport.js:286 getCables()
 - `conduitSchedule`
-  - src/projectreport.js:224 getConduits()
+  - src/projectreport.js:288 getConduits()
 - `ductbankSchedule`
-  - src/projectreport.js:243 getDuctbanks()
+  - src/projectreport.js:307 getDuctbanks()
 - `equipment`
-  - src/projectreport.js:244 getEquipment()
-  - src/projectreport.js:606 getEquipment()
+  - src/projectreport.js:308 getEquipment()
+  - src/projectreport.js:670 getEquipment()
 - `oneLineDiagram`
-  - src/projectreport.js:245 getOneLine()
-  - src/projectreport.js:607 getOneLine()
+  - src/projectreport.js:309 getOneLine()
+  - src/projectreport.js:671 getOneLine()
 - `settings.designBasis`
-  - src/projectreport.js:248 getDesignBasis()
-  - src/projectreport.js:610 getDesignBasis()
+  - src/projectreport.js:312 getDesignBasis()
+  - src/projectreport.js:674 getDesignBasis()
 - `settings.designGateApprovals`
-  - src/projectreport.js:249 getDesignGateApprovals()
-  - src/projectreport.js:611 getDesignGateApprovals()
+  - src/projectreport.js:313 getDesignGateApprovals()
+  - src/projectreport.js:675 getDesignGateApprovals()
 - `settings.latestRouteResults`
-  - src/projectreport.js:204 getItem(latestRouteResults)
-  - src/projectreport.js:632 getItem(latestRouteResults)
-  - src/projectreport.js:656 getItem(latestRouteResults)
+  - src/projectreport.js:268 getItem(latestRouteResults)
+  - src/projectreport.js:696 getItem(latestRouteResults)
+  - src/projectreport.js:720 getItem(latestRouteResults)
 - `settings.lifecyclePackages`
-  - src/projectreport.js:572 getLifecyclePackages()
-  - src/projectreport.js:634 getLifecyclePackages()
-  - src/projectreport.js:748 getLifecyclePackages()
-  - src/projectreport.js:762 getLifecyclePackages()
+  - src/projectreport.js:636 getLifecyclePackages()
+  - src/projectreport.js:698 getLifecyclePackages()
+  - src/projectreport.js:822 getLifecyclePackages()
+  - src/projectreport.js:836 getLifecyclePackages()
+- `settings.projectMeta`
+  - src/projectreport.js:137 getProjectMeta()
+  - src/projectreport.js:158 getProjectMeta()
+  - src/projectreport.js:187 getProjectMeta()
 - `settings.reportSnapshots`
-  - src/projectreport.js:480 getReportSnapshots()
-  - src/projectreport.js:515 getReportSnapshots()
-  - src/projectreport.js:633 getReportSnapshots()
+  - src/projectreport.js:544 getReportSnapshots()
+  - src/projectreport.js:579 getReportSnapshots()
+  - src/projectreport.js:697 getReportSnapshots()
 - `settings.studyApprovals`
-  - src/projectreport.js:247 getStudyApprovals()
+  - src/projectreport.js:311 getStudyApprovals()
 - `settings.tccSettings`
-  - src/projectreport.js:250 getItem(tccSettings)
-  - src/projectreport.js:612 getItem(tccSettings)
+  - src/projectreport.js:314 getItem(tccSettings)
+  - src/projectreport.js:676 getItem(tccSettings)
 - `studyResults`
-  - src/projectreport.js:246 getStudies()
+  - src/projectreport.js:310 getStudies()
 - `studyResults.arcFlash`
   - analysis/projectReport.mjs:440 studies.arcFlash
 - `studyResults.bessHazard`
@@ -1597,12 +1601,14 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 - `studyResults.voltageDropStudy`
   - analysis/projectReport.mjs:577 studies.voltageDropStudy
 - `traySchedule`
-  - src/projectreport.js:223 getTrays()
+  - src/projectreport.js:287 getTrays()
 
 **Detected Writes**
+- `settings.projectMeta`
+  - src/projectreport.js:189 setProjectMeta()
 - `settings.reportSnapshots`
-  - src/projectreport.js:508 deleteReportSnapshot()
-  - src/projectreport.js:839 setReportSnapshot()
+  - src/projectreport.js:572 deleteReportSnapshot()
+  - src/projectreport.js:913 setReportSnapshot()
 
 ### Product Configurator (`productconfig.html`)
 
@@ -1661,47 +1667,6 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 
 **Detected Writes**
 - None
-
-### IEC 60287 Ampacity (`iec60287.html`)
-
-- Section: Studies
-- Group: Cable
-- Source files: `analysis/designBasis.mjs`, `analysis/iec60287.mjs`, `iec60287.js`, `src/components/studyApproval.js`, `src/components/studyBasis.js`, `src/iec60287.js`
-
-**Undocumented Reads**
-- None
-
-**Undocumented Writes**
-- None
-
-**Declared Inputs Not Statically Read**
-- `cableSchedule` - No static read/write evidence was detected for this declared input.
-
-**Declared Outputs Not Statically Written**
-- None
-
-**Direct Browser Storage**
-- None
-
-**Detected Reads**
-- `settings.designBasis`
-  - src/components/studyBasis.js:37 getDesignBasis()
-- `settings.studyApprovals`
-  - src/components/studyApproval.js:213 getStudyApprovals()
-- `studyResults`
-  - iec60287.js:104 getStudies()
-  - iec60287.js:50 getStudies()
-- `studyResults.iec60287`
-  - iec60287.js:50 getStudies().iec60287
-
-**Detected Writes**
-- `settings.studyApprovals`
-  - src/components/studyApproval.js:235 setStudyApproval()
-  - src/components/studyApproval.js:243 clearStudyApproval()
-- `studyResults`
-  - iec60287.js:106 setStudies()
-- `studyResults.iec60287`
-  - iec60287.js:105 studies.iec60287
 
 ### TCC (`tcc.html`)
 
@@ -1884,52 +1849,11 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 - `studyResults.frequencyScan`
   - frequencyscan.js:50 studies.frequencyScan
 
-### Voltage Flicker (`voltageflicker.html`)
-
-- Section: Studies
-- Group: Power Quality
-- Source files: `analysis/designBasis.mjs`, `analysis/voltageFlicker.mjs`, `src/components/studyApproval.js`, `src/components/studyBasis.js`, `src/htmlUtils.mjs`, `src/voltageflicker.js`, `voltageflicker.js`
-
-**Undocumented Reads**
-- None
-
-**Undocumented Writes**
-- None
-
-**Declared Inputs Not Statically Read**
-- `loadList` - No static read/write evidence was detected for this declared input.
-
-**Declared Outputs Not Statically Written**
-- None
-
-**Direct Browser Storage**
-- None
-
-**Detected Reads**
-- `settings.designBasis`
-  - src/components/studyBasis.js:37 getDesignBasis()
-- `settings.studyApprovals`
-  - src/components/studyApproval.js:213 getStudyApprovals()
-- `studyResults`
-  - voltageflicker.js:47 getStudies()
-  - voltageflicker.js:70 getStudies()
-- `studyResults.voltageFlicker`
-  - voltageflicker.js:47 getStudies().voltageFlicker
-
-**Detected Writes**
-- `settings.studyApprovals`
-  - src/components/studyApproval.js:235 setStudyApproval()
-  - src/components/studyApproval.js:243 clearStudyApproval()
-- `studyResults`
-  - voltageflicker.js:72 setStudies()
-- `studyResults.voltageFlicker`
-  - voltageflicker.js:71 studies.voltageFlicker
-
 ### Bus Duct Sizing (`busdust.html`)
 
 - Section: Studies
 - Group: Equipment Sizing
-- Source files: `analysis/busDuctSizing.mjs`, `busdust.js`, `src/busDuct.js`, `src/components/studyApproval.js`, `src/htmlUtils.mjs`
+- Source files: `analysis/busDuctSizing.mjs`, `busdust.js`, `src/busDuct.js`, `src/components/projectInputBinding.js`, `src/components/studyApproval.js`, `src/htmlUtils.mjs`
 
 **Undocumented Reads**
 - None
@@ -1938,8 +1862,6 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 - None
 
 **Declared Inputs Not Statically Read**
-- `equipment` - No static read/write evidence was detected for this declared input.
-- `loadList` - No static read/write evidence was detected for this declared input.
 - `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
@@ -1949,28 +1871,36 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 - None
 
 **Detected Reads**
+- `cableSchedule`
+  - busdust.js:36 getCables()
+- `equipment`
+  - busdust.js:36 getEquipment()
+- `loadList`
+  - busdust.js:36 getLoads()
+- `settings.projectMeta`
+  - busdust.js:48 getProjectMeta()
+  - busdust.js:78 getProjectMeta()
 - `settings.studyApprovals`
   - src/components/studyApproval.js:213 getStudyApprovals()
 - `studyResults`
-  - busdust.js:204 getStudies()
-  - busdust.js:25 getStudies()
-  - busdust.js:29 getStudies()
-  - busdust.js:45 getStudies()
+  - busdust.js:102 getStudies()
+  - busdust.js:261 getStudies()
+  - busdust.js:36 getStudies()
+  - busdust.js:39 getStudies()
+  - busdust.js:73 getStudies()
 - `studyResults.busDuctSizing`
-  - busdust.js:204 getStudies().busDuctSizing
-  - busdust.js:25 getStudies().busDuctSizing
-  - busdust.js:32 studies.busDuctSizing
+  - busdust.js:261 getStudies().busDuctSizing
+  - busdust.js:39 getStudies().busDuctSizing
+  - busdust.js:73 getStudies().busDuctSizing
 
 **Detected Writes**
 - `settings.studyApprovals`
   - src/components/studyApproval.js:235 setStudyApproval()
   - src/components/studyApproval.js:243 clearStudyApproval()
 - `studyResults`
-  - busdust.js:31 setStudies()
-  - busdust.js:47 setStudies()
+  - busdust.js:104 setStudies()
 - `studyResults.busDuctSizing`
-  - busdust.js:30 studies.busDuctSizing
-  - busdust.js:46 studies.busDuctSizing
+  - busdust.js:103 studies.busDuctSizing
 
 ### Sustainability Footprint (`sustainability.html`)
 
@@ -2020,52 +1950,11 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 - `studyResults.sustainabilityFootprint`
   - sustainability.js:80 studies.sustainabilityFootprint
 
-### Battery / UPS Sizing (`battery.html`)
-
-- Section: Studies
-- Group: Equipment Sizing
-- Source files: `analysis/batteryRackLayout.mjs`, `analysis/batterySizing.mjs`, `battery.js`, `src/battery.js`, `src/components/studyApproval.js`
-
-**Undocumented Reads**
-- None
-
-**Undocumented Writes**
-- None
-
-**Declared Inputs Not Statically Read**
-- `loadList` - No static read/write evidence was detected for this declared input.
-- `equipment` - No static read/write evidence was detected for this declared input.
-- `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
-
-**Declared Outputs Not Statically Written**
-- None
-
-**Direct Browser Storage**
-- None
-
-**Detected Reads**
-- `settings.studyApprovals`
-  - src/components/studyApproval.js:213 getStudyApprovals()
-- `studyResults`
-  - battery.js:51 getStudies()
-  - battery.js:74 getStudies()
-- `studyResults.batterySizing`
-  - battery.js:51 getStudies().batterySizing
-
-**Detected Writes**
-- `settings.studyApprovals`
-  - src/components/studyApproval.js:235 setStudyApproval()
-  - src/components/studyApproval.js:243 clearStudyApproval()
-- `studyResults`
-  - battery.js:76 setStudies()
-- `studyResults.batterySizing`
-  - battery.js:75 studies.batterySizing
-
 ### Generator Sizing (`generatorsizing.html`)
 
 - Section: Studies
 - Group: Equipment Sizing
-- Source files: `analysis/generatorSizing.mjs`, `generatorsizing.js`, `src/components/studyApproval.js`, `src/generatorsizing.js`
+- Source files: `analysis/generatorSizing.mjs`, `generatorsizing.js`, `src/components/projectInputBinding.js`, `src/components/studyApproval.js`, `src/generatorsizing.js`
 
 **Undocumented Reads**
 - None
@@ -2074,8 +1963,6 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 - None
 
 **Declared Inputs Not Statically Read**
-- `loadList` - No static read/write evidence was detected for this declared input.
-- `equipment` - No static read/write evidence was detected for this declared input.
 - `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
@@ -2085,22 +1972,28 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 - None
 
 **Detected Reads**
+- `equipment`
+  - generatorsizing.js:36 getEquipment()
+- `loadList`
+  - generatorsizing.js:35 getLoads()
+- `settings.projectMeta`
+  - generatorsizing.js:37 getProjectMeta()
 - `settings.studyApprovals`
   - src/components/studyApproval.js:213 getStudyApprovals()
 - `studyResults`
-  - generatorsizing.js:20 getStudies()
-  - generatorsizing.js:60 getStudies()
+  - generatorsizing.js:133 getStudies()
+  - generatorsizing.js:80 getStudies()
 - `studyResults.generatorSizing`
-  - generatorsizing.js:20 getStudies().generatorSizing
+  - generatorsizing.js:80 getStudies().generatorSizing
 
 **Detected Writes**
 - `settings.studyApprovals`
   - src/components/studyApproval.js:235 setStudyApproval()
   - src/components/studyApproval.js:243 clearStudyApproval()
 - `studyResults`
-  - generatorsizing.js:62 setStudies()
+  - generatorsizing.js:135 setStudies()
 - `studyResults.generatorSizing`
-  - generatorsizing.js:61 studies.generatorSizing
+  - generatorsizing.js:134 studies.generatorSizing
 
 ### IBR Modeling (PV/BESS) (`ibr.html`)
 
@@ -2672,7 +2565,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 
 - Section: Studies
 - Group: Protection
-- Source files: `analysis/bessHazard.mjs`, `bessHazard.js`, `src/bessHazard.js`, `src/components/studyApproval.js`, `src/htmlUtils.mjs`
+- Source files: `analysis/bessHazard.mjs`, `bessHazard.js`, `src/bessHazard.js`, `src/components/projectInputBinding.js`, `src/components/studyApproval.js`, `src/htmlUtils.mjs`
 
 **Undocumented Reads**
 - None
@@ -2681,7 +2574,6 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 - None
 
 **Declared Inputs Not Statically Read**
-- `equipment` - No static read/write evidence was detected for this declared input.
 - `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
@@ -2691,24 +2583,29 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 - None
 
 **Detected Reads**
+- `equipment`
+  - bessHazard.js:42 getEquipment()
+- `settings.projectMeta`
+  - bessHazard.js:42 getProjectMeta()
 - `settings.studyApprovals`
   - src/components/studyApproval.js:213 getStudyApprovals()
 - `studyResults`
-  - bessHazard.js:125 getStudies()
-  - bessHazard.js:28 getStudies()
-  - bessHazard.js:325 getStudies()
+  - bessHazard.js:172 getStudies()
+  - bessHazard.js:372 getStudies()
+  - bessHazard.js:42 getStudies()
+  - bessHazard.js:72 getStudies()
 - `studyResults.bessHazard`
-  - bessHazard.js:28 getStudies().bessHazard
-  - bessHazard.js:325 getStudies().bessHazard
+  - bessHazard.js:372 getStudies().bessHazard
+  - bessHazard.js:72 getStudies().bessHazard
 
 **Detected Writes**
 - `settings.studyApprovals`
   - src/components/studyApproval.js:235 setStudyApproval()
   - src/components/studyApproval.js:243 clearStudyApproval()
 - `studyResults`
-  - bessHazard.js:127 setStudies()
+  - bessHazard.js:174 setStudies()
 - `studyResults.bessHazard`
-  - bessHazard.js:126 studies.bessHazard
+  - bessHazard.js:173 studies.bessHazard
 
 ### Hazardous Area Classification (`hazareaclassification.html`)
 
@@ -2754,7 +2651,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 
 - Section: Studies
 - Group: Protection
-- Source files: `analysis/designBasis.mjs`, `analysis/insulationCoordination.mjs`, `insulationcoordination.js`, `src/components/studyApproval.js`, `src/components/studyBasis.js`, `src/htmlUtils.mjs`, `src/insulationcoordination.js`
+- Source files: `analysis/designBasis.mjs`, `analysis/insulationCoordination.mjs`, `insulationcoordination.js`, `src/components/projectInputBinding.js`, `src/components/studyApproval.js`, `src/components/studyBasis.js`, `src/htmlUtils.mjs`, `src/insulationcoordination.js`
 
 **Undocumented Reads**
 - None
@@ -2763,7 +2660,6 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 - None
 
 **Declared Inputs Not Statically Read**
-- `equipment` - No static read/write evidence was detected for this declared input.
 - `oneLineDiagram` - No static read/write evidence was detected for this declared input.
 
 **Declared Outputs Not Statically Written**
@@ -2773,24 +2669,36 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 - None
 
 **Detected Reads**
+- `cableSchedule`
+  - insulationcoordination.js:68 getCables()
+- `equipment`
+  - insulationcoordination.js:68 getEquipment()
+- `loadList`
+  - insulationcoordination.js:68 getLoads()
 - `settings.designBasis`
   - src/components/studyBasis.js:37 getDesignBasis()
+- `settings.projectMeta`
+  - insulationcoordination.js:103 getProjectMeta()
+  - insulationcoordination.js:75 getProjectMeta()
 - `settings.studyApprovals`
   - src/components/studyApproval.js:213 getStudyApprovals()
 - `studyResults`
-  - insulationcoordination.js:55 getStudies()
-  - insulationcoordination.js:85 getStudies()
+  - insulationcoordination.js:143 getStudies()
+  - insulationcoordination.js:68 getStudies()
+  - insulationcoordination.js:70 getStudies()
+  - insulationcoordination.js:99 getStudies()
 - `studyResults.insulationCoordination`
-  - insulationcoordination.js:55 getStudies().insulationCoordination
+  - insulationcoordination.js:70 getStudies().insulationCoordination
+  - insulationcoordination.js:99 getStudies().insulationCoordination
 
 **Detected Writes**
 - `settings.studyApprovals`
   - src/components/studyApproval.js:235 setStudyApproval()
   - src/components/studyApproval.js:243 clearStudyApproval()
 - `studyResults`
-  - insulationcoordination.js:87 setStudies()
+  - insulationcoordination.js:145 setStudies()
 - `studyResults.insulationCoordination`
-  - insulationcoordination.js:86 studies.insulationCoordination
+  - insulationcoordination.js:144 studies.insulationCoordination
 
 ### Egress Lighting (`lighting.html`)
 
