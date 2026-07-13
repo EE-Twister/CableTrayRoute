@@ -37,6 +37,8 @@ Existing installs that contain plaintext passwords will be migrated automaticall
 
 For static hosting, set Cloudflare Pages to run `npm run build:cloudflare` and provide `SUPABASE_URL` plus `SUPABASE_ANON_KEY`. When `supabase-config.json` contains those values, the login page switches to Supabase email/password auth and project saves sync to the Supabase `projects` table.
 
+GitHub Pages deployments use `.github/workflows/deploy-pages.yml`. The workflow runs the production build and publishes the generated `dist/` bundles with the tracked static files; serving the repository root directly is unsupported because `dist/` is intentionally excluded from source control.
+
 
 ## Static Asset Caching & Compression
 
