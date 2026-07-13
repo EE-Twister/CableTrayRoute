@@ -427,6 +427,20 @@ test('workflow dashboard exposes next action, blockers, and health metrics', asy
   await expect(page.locator('#dashboard-next-action-strip')).toContainText('Next action');
   await expect(page.locator('#dashboard-blockers')).toContainText('Add equipment records');
   await expect(page.locator('#dashboard-health')).toContainText('Cable Schedule');
+  await expect(page.locator('[data-workflow-mode-panel]')).toHaveCount(0);
+});
+
+test('workflow guidance stays compact and subordinate to the page workspace', async ({ page }) => {
+  await page.goto(server.url('equipmentlist.html?e2e=1&e2e_reset=1'), { waitUntil: 'domcontentloaded' });
+
+  const workflowNav = page.locator('.workflow-step-nav');
+  await expect(workflowNav).toContainText('Step 1 of 8 · Equipment List');
+  await expect(workflowNav.locator('.workflow-step-nav-status')).toHaveAttribute('aria-label', 'Project status: Missing inputs');
+  await expect(workflowNav.getByRole('link', { name: 'Dashboard' })).toHaveAttribute('href', 'workflowdashboard.html');
+  await expect(page.locator('[data-workflow-mode-panel]')).toHaveCount(0);
+
+  const navHeight = await workflowNav.evaluate(element => element.getBoundingClientRect().height);
+  expect(navHeight).toBeLessThanOrEqual(72);
 });
 
 test('sample gallery lists the full project workflow sample', async ({ page }) => {

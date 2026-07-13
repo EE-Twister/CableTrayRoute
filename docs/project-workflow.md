@@ -18,14 +18,11 @@ CableTrayRoute supports two working modes:
 7. **Studies:** Run demand, load flow, short-circuit, arc flash, TCC, harmonics, motor start, and related engineering studies.
 8. **Deliverables:** Build project reports, pull cards, spool sheets, procurement schedules, estimates, submittals, and release packages.
 
-## Dual-Mode Page Contract
+## Workflow Context
 
-Core workflow pages expose a shared mode strip above the page workspace:
+Core workflow pages keep project guidance in a compact navigation row above the workspace. It identifies the current step, shows a small readiness status, and provides previous, dashboard, and next links without displacing the page's primary tools. Hovering the status exposes the current readiness explanation.
 
-- **Standalone** confirms the page remains usable as an independent calculator, table, diagram, or deliverable builder with its own direct entry/import/export path.
-- **Project Workflow** shows the current project readiness for that page's workflow step, links back to the dashboard, and advances to the next workflow action when the step is complete.
-
-The shared strip is driven by `src/workflowStatus.js`, so aliases such as Tray Fill, Conduit Fill, Ductbank, and Optimal Route report the same Fill / Routing workflow status while still preserving their independent page tools. Page-specific panels can still show deeper diagnostics, but they should use the same status vocabulary: standalone-ready, schedule-ready, routing-ready, route-results-ready, study-saved, and deliverable-ready.
+Each page remains usable as an independent calculator, table, diagram, or deliverable builder with its own direct entry, import, and export path. The shared status is driven by `src/workflowStatus.js`, so aliases such as Tray Fill, Conduit Fill, Ductbank, and Optimal Route report the same Fill / Routing readiness while preserving their specialized page tools. Page-specific panels can still show deeper diagnostics, but they should use the same status vocabulary: schedule-ready, routing-ready, route-results-ready, study-saved, and deliverable-ready.
 
 The handoff-level inputs, outputs, readiness rules, and downstream consumers for every Workflow and Studies navigation page are generated in [Workflow and Studies Page Contracts](page-contracts.md) from `src/pageContracts.js`. The static contract-to-code comparison is generated in [Page Contract Code Audit](page-contract-audit.md) from `scripts/auditPageContracts.mjs`.
 

@@ -878,6 +878,33 @@
     white-space: nowrap;
 }
 
+.workflow-step-nav-status {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-width: 0;
+    color: var(--color-text-muted);
+    font-size: var(--font-size-xs);
+    font-weight: 650;
+    white-space: nowrap;
+}
+
+.workflow-step-nav-status__dot {
+    width: 0.5rem;
+    height: 0.5rem;
+    flex: 0 0 auto;
+    border-radius: 999px;
+    background: var(--color-text-muted);
+}
+
+.workflow-step-nav-status.is-ready .workflow-step-nav-status__dot {
+    background: var(--success-color, #16a34a);
+}
+
+.workflow-step-nav-status.is-attention .workflow-step-nav-status__dot {
+    background: var(--warning-color, #d97706);
+}
+
 .workflow-step-nav-links {
     display: flex;
     align-items: center;
@@ -915,8 +942,26 @@ body.dark-mode .workflow-step-nav-label {
     color: #bfdbfe;
 }
 
+body.dark-mode .workflow-step-nav-status {
+    color: #cbd5e1;
+}
+
 body.dark-mode .workflow-step-nav-link {
     background: #2c3034;
+}
+
+@media (max-width: 720px) {
+    .workflow-step-nav {
+        align-items: flex-start;
+    }
+
+    .workflow-step-nav-links {
+        flex-basis: 100%;
+        flex-wrap: nowrap;
+        max-width: 100%;
+        overflow-x: auto;
+        padding-bottom: var(--space-1);
+    }
 }
 
 /* --- Footer --- */
