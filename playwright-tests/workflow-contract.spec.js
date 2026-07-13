@@ -192,6 +192,22 @@ test('legacy specialist sample hydrates every supporting project surface', async
   await expect(page.locator('#load-table tbody tr')).toHaveCount(3);
 });
 
+test('Underground Ductbank checklist loads the sample before opening its route tables', async ({ page }) => {
+  await gotoWorkflowPage(page, server, 'samplegallery.html');
+  const card = page.locator('[data-sample-id="ductbank-network"]');
+  await card.getByRole('button', { name: 'Load Underground Ductbank and show its guided checklist' }).click();
+  await expect(page.locator('#checklist-panel')).toContainText('Guided Workflow: Underground Ductbank');
+
+  await page.locator('#checklist-steps a[href="ductbankroute.html"]').click();
+  await page.waitForLoadState('networkidle', { timeout: 6000 }).catch(() => {});
+
+  await expect(page.locator('#ductbankTag')).toHaveValue('DUCTBANK-DB-01');
+  await expect(page.locator('#conduitTable tbody tr')).toHaveCount(4);
+  await expect(page.locator('#cableTable tbody tr')).toHaveCount(2);
+  await expect(page.locator('#cableTable tbody tr').first().locator('input[name="tag"]')).toHaveValue('UG-CBL-001');
+  await expect(page.locator('#cableTable tbody tr').first().locator('input[name="conduit_id"]')).toHaveValue('DB01-COND-1');
+});
+
 test('sample project satisfies contract handoffs from equipment through deliverables', async ({ page }) => {
   assertContractHandoffs();
   const monitor = monitorPage(page, server.origin);

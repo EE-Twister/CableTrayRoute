@@ -21,7 +21,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 - Unclassified direct browser storage hits: 0
 - Direct browser storage classifications: session-handoff=2
 - Actionable failures: 0
-- Warnings: 164
+- Warnings: 162
 
 ## Findings
 
@@ -733,7 +733,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 
 - Section: Workflow
 - Group: Raceway
-- Source files: `conductorProperties.mjs`, `conductorPropertiesData.mjs`, `data/conductor_properties.js`, `ductbankroute.js`, `soilResistivityConfig.js`, `src/ductbankroute.js`
+- Source files: `conductorProperties.mjs`, `conductorPropertiesData.mjs`, `data/conductor_properties.js`, `ductbankroute.js`, `soilResistivityConfig.js`, `src/ductbankProjectAdapter.mjs`, `src/ductbankroute.js`
 
 **Undocumented Reads**
 - None
@@ -742,8 +742,6 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 - None
 
 **Declared Inputs Not Statically Read**
-- `conduitSchedule` - No static read/write evidence was detected for this declared input.
-- `ductbankSchedule` - No static read/write evidence was detected for this declared input.
 - `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
@@ -754,22 +752,28 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 
 **Detected Reads**
 - `cableSchedule`
-  - ductbankroute.js:827 getCables()
+  - ductbankroute.js:4582 getCables()
+  - ductbankroute.js:828 getCables()
+- `conduitSchedule`
+  - ductbankroute.js:4581 getConduits()
+- `ductbankSchedule`
+  - ductbankroute.js:4580 getDuctbanks()
 - `settings.ductbankPanZoom`
-  - ductbankroute.js:86 getItem(ductbankPanZoom)
+  - ductbankroute.js:87 getItem(ductbankPanZoom)
 - `settings.ductbankRouteData`
-  - ductbankroute.js:4499 getItem(ductbankRouteData)
+  - ductbankroute.js:4574 getItem(ductbankRouteData)
 - `settings.ductbankSession`
-  - ductbankroute.js:775 getItem(ductbankSession)
+  - ductbankroute.js:4572 getItem(ductbankSession)
+  - ductbankroute.js:776 getItem(ductbankSession)
 
 **Detected Writes**
 - `settings.ductbankPanZoom`
-  - ductbankroute.js:97 setItem(ductbankPanZoom)
+  - ductbankroute.js:98 setItem(ductbankPanZoom)
 - `settings.ductbankRouteData`
-  - ductbankroute.js:4558 removeItem(ductbankRouteData)
+  - ductbankroute.js:4577 removeItem(ductbankRouteData)
 - `settings.ductbankSession`
-  - ductbankroute.js:4269 removeItem(ductbankSession)
-  - ductbankroute.js:771 setItem(ductbankSession)
+  - ductbankroute.js:4343 removeItem(ductbankSession)
+  - ductbankroute.js:772 setItem(ductbankSession)
 
 ### Tray Fill (`cabletrayfill.html`)
 

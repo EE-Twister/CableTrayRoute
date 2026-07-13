@@ -166,9 +166,12 @@ function buildCard(sample) {
 
   const guideBtn = document.createElement('button');
   guideBtn.className = 'btn';
-  guideBtn.textContent = 'View Checklist';
-  guideBtn.setAttribute('aria-label', `Show guided checklist for ${sample.title}`);
-  guideBtn.addEventListener('click', () => showChecklist(sample));
+  guideBtn.textContent = 'Load & View Checklist';
+  guideBtn.setAttribute('aria-label', `Load ${sample.title} and show its guided checklist`);
+  guideBtn.addEventListener('click', () => {
+    if (activeSampleId === sample.id) showChecklist(sample);
+    else openSample(sample);
+  });
 
   actions.appendChild(openBtn);
   actions.appendChild(dlLink);

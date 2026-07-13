@@ -46,8 +46,9 @@ function forceShowResumeIfE2E() {
 
 window.E2E = E2E;
 
-import { getItem, setItem, removeItem, getCables, getConduits } from './dataStore.mjs';
+import { getItem, setItem, removeItem, getCables, getConduits, getDuctbanks } from './dataStore.mjs';
 import { openModal, showAlertModal } from './src/components/modal.js';
+import { buildProjectDuctbankRoute, parseDuctbankRouteData } from './src/ductbankProjectAdapter.mjs';
 
 checkPrereqs([{key:'ductbankSchedule',page:'racewayschedule.html',label:'Raceway Schedule'}]);
 
@@ -853,6 +854,79 @@ function loadCablesFromSchedule(){
     updateAmpacityReport();
     saveDuctbankSession();
   }
+}
+
+function applyDuctbankRouteData(routeData){
+  if(!routeData || !routeData.ductbank) return false;
+  const {ductbank,cables=[],conduits,conduitId}=routeData;
+  const tag=ductbank.ductbank_id || ductbank.id || ductbank.tag || '';
+  const tagEl=document.getElementById('ductbankTag');
+  if(tagEl) tagEl.value=tag;
+  const encasement=document.getElementById('concreteEncasement');
+  if(encasement && ductbank.encasement!==undefined){
+    encasement.checked=String(ductbank.encasement).toLowerCase().includes('concrete') || ductbank.encasement===true;
+  }
+  const depth=document.getElementById('ductbankDepth');
+  if(depth && ductbank.coverDepth!==undefined) depth.value=ductbank.coverDepth;
+  const soil=document.getElementById('soilResistivity');
+  if(soil && ductbank.soilThermalResistivity!==undefined) soil.value=ductbank.soilThermalResistivity;
+
+  const conduitRows=Array.isArray(conduits) ? conduits : (Array.isArray(ductbank.conduits) ? ductbank.conduits : []);
+  const cbody=document.querySelector('#conduitTable tbody');
+  if(cbody && conduitRows.length){
+    cbody.innerHTML='';
+    conduitRows.forEach(cd=>{
+      addConduitRow({
+        conduit_id:cd.conduit_id || cd.id || cd.tag || '',
+        conduit_type:cd.conduit_type || cd.type || '',
+        trade_size:cd.trade_size || '',
+        x:cd.x ?? cd.offset_x ?? 0,
+        y:cd.y ?? cd.offset_y ?? 0
+      });
+    });
+  }
+  if(conduitId){
+    const searchInput=document.getElementById('conduit-search');
+    if(searchInput){
+      searchInput.value=conduitId;
+      filterTable(document.getElementById('conduitTable'),conduitId);
+    }
+  }
+
+  const tbody=document.querySelector('#cableTable tbody');
+  if(tbody && Array.isArray(cables) && cables.length){
+    tbody.innerHTML='';
+    cables.forEach(c=>{
+      addCableRow({
+        tag:c.tag || c.name || c.id || '',
+        cable_type:c.cable_type || '',
+        diameter:c.diameter ?? c.cable_od ?? '',
+        conductors:c.conductors ?? c.count ?? '',
+        conductor_size:c.conductor_size || c.size || '',
+        insulation_thickness:c.insulation_thickness ?? '',
+        weight:c.weight ?? '',
+        est_load:c.est_load ?? c.load_current ?? c.load ?? '',
+        conduit_id:c.conduit_id || c.conduit || '',
+        conductor_material:c.conductor_material || '',
+        insulation_type:c.insulation_type || '',
+        insulation_rating:c.insulation_rating || '',
+        voltage_rating:c.voltage_rating || '',
+        shielding_jacket:c.shielding_jacket || ''
+      },{defer:true});
+    });
+    updateInsulationOptions();
+    if(conduitId){
+      const cableSearch=document.getElementById('cable-search');
+      if(cableSearch){
+        cableSearch.value=conduitId;
+        filterTable(document.getElementById('cableTable'),conduitId);
+      }
+    }
+  }
+  drawGrid();
+  updateAmpacityReport();
+  saveDuctbankSession();
+  return true;
 }
 
 function autoPlaceConduits(){
@@ -4495,69 +4569,19 @@ loadConductorProperties().then(()=>{
   updateInsulationOptions();
   checkInsulationThickness();
   applyDuctbankDefaults({onlyBlank:true,silent:true,persist:false});
+  const storedSession=getItem('ductbankSession');
   loadDuctbankSession();
-  const storedRoute = getItem('ductbankRouteData');
-  if (storedRoute) {
-    try {
-      const { ductbank, cables, conduitId } = JSON.parse(storedRoute);
-      if (ductbank && ductbank.tag !== undefined) {
-        const tagEl = document.getElementById('ductbankTag');
-        if (tagEl) tagEl.value = ductbank.tag;
-      }
-      if (ductbank && Array.isArray(ductbank.conduits)) {
-        const cbody = document.querySelector('#conduitTable tbody');
-        if (cbody) {
-          cbody.innerHTML = '';
-          ductbank.conduits.forEach(cd => {
-            addConduitRow({
-              conduit_id: cd.conduit_id || cd.id || cd.tag || '',
-              conduit_type: cd.conduit_type || cd.type || '',
-              trade_size: cd.trade_size || '',
-              x: cd.x || cd.offset_x || 0,
-              y: cd.y || cd.offset_y || 0
-            });
-          });
-        }
-        if (conduitId) {
-          const searchInput = document.getElementById('conduit-search');
-          if (searchInput) {
-            searchInput.value = conduitId;
-            filterTable(document.getElementById('conduitTable'), conduitId);
-          }
-        }
-      }
-      if (Array.isArray(cables)) {
-        const tbody = document.querySelector('#cableTable tbody');
-        if (tbody) {
-          tbody.innerHTML = '';
-          cables.forEach(c => {
-            addCableRow({
-              tag: c.name || c.tag || '',
-              cable_type: c.cable_type || '',
-              diameter: c.diameter || '',
-              conductors: c.conductors || c.count || '',
-              conductor_size: c.conductor_size || c.size || '',
-              weight: c.weight || '',
-              est_load: c.est_load || c.load || '',
-              conduit_id: c.conduit_id || c.conduit || ''
-            }, { defer: true });
-          });
-          updateInsulationOptions();
-          if (conduitId) {
-            const cableSearch = document.getElementById('cable-search');
-            if (cableSearch) {
-              cableSearch.value = conduitId;
-              filterTable(document.getElementById('cableTable'), conduitId);
-            }
-          }
-        }
-      }
-    } catch (e) {
-      console.error('Failed to load ductbankRouteData', e);
-    }
+  const storedRoute=parseDuctbankRouteData(getItem('ductbankRouteData'));
+  if(storedRoute){
+    applyDuctbankRouteData(storedRoute);
     removeItem('ductbankRouteData');
-    drawGrid();
-    updateAmpacityReport();
+  }else if(!storedSession){
+    const projectRoute=buildProjectDuctbankRoute({
+      ductbanks:getDuctbanks(),
+      conduits:getConduits(),
+      cables:getCables()
+    });
+    applyDuctbankRouteData(projectRoute);
   }
   loadCablesFromSchedule();
 });
