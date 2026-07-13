@@ -208,7 +208,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 
 - Section: Workflow
 - Group: Planning
-- Source files: `analysis/equipmentWorkflow.mjs`, `equipmentlist.js`, `src/crossProbe.js`, `src/equipmentlist.js`, `src/index.js`, `tableUtils.mjs`
+- Source files: `analysis/equipmentWorkflow.mjs`, `equipmentlist.js`, `src/crossProbe.js`, `src/equipmentlist.js`, `tableUtils.mjs`
 
 **Undocumented Reads**
 - None
