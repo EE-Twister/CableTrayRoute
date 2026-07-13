@@ -20,6 +20,8 @@ jobs:
         run: |
           npx eslint . --max-warnings=0
           npx prettier --check '**/*.js'
+      - name: Build test assets
+        run: npm run build
       - name: Run tests
         run: npm test
       - name: Install Playwright browsers
