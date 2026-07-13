@@ -38,7 +38,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p _site
-          git ls-files -z | tar --null -T - -cf - | tar -xf - -C _site
+          git archive --format=tar HEAD | tar -xf - -C _site
           cp -R dist _site/dist
           touch _site/.nojekyll
 
