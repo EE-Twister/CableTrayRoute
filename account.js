@@ -608,7 +608,8 @@ function initAccountActions(auth) {
 function init() {
   const auth = getAuthContextState();
   if (!auth) {
-    window.location.href = 'login.html';
+    const e2e = new URLSearchParams(window.location.search).has('e2e');
+    window.location.href = e2e ? 'login.html?e2e=1' : 'login.html';
     return;
   }
 

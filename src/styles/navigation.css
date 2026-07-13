@@ -31,7 +31,7 @@
     & a {
         margin-right: var(--space-3);
         text-decoration: none;
-        color: var(--color-text-muted, #64748b);
+        color: var(--color-text);
         font-size: 0.875rem;
         font-weight: 500;
         padding: 0.3rem 0.45rem;
@@ -375,7 +375,7 @@
 
 .auth-profile-meta {
     margin-top: 0.15rem;
-    color: var(--color-text-muted, #64748b);
+    color: var(--color-text);
     font-size: 0.78rem;
     line-height: 1.25;
 }
@@ -654,7 +654,7 @@
     border: 1px solid color-mix(in srgb, var(--color-border) 82%, transparent);
     border-radius: 0.45rem;
     background: color-mix(in srgb, var(--color-surface-strong) 88%, var(--color-primary) 12%);
-    color: var(--color-text-muted);
+    color: var(--color-text);
     font: inherit;
     cursor: pointer;
 }
@@ -700,7 +700,7 @@
     padding: 0.13rem 0.35rem;
     border-radius: 999px;
     background: color-mix(in srgb, var(--color-border) 42%, transparent);
-    color: var(--color-text-muted);
+    color: var(--color-text);
     font-size: 0.68rem;
     font-weight: 800;
     line-height: 1.1;
@@ -922,7 +922,7 @@ body.dark-mode .workflow-step-nav-link {
 /* --- Footer --- */
 .site-footer {
     background: var(--color-surface-strong);
-    color: var(--color-text-muted, #64748b);
+    color: var(--color-text);
     border-top: 1px solid var(--color-border);
     padding: var(--space-5) var(--space-6);
     display: flex;
@@ -945,7 +945,7 @@ body.dark-mode .workflow-step-nav-link {
 .footer-copyright {
     font-size: 0.78rem;
     font-weight: 400;
-    color: var(--color-text-muted, #64748b);
+    color: var(--color-text);
 }
 
 .footer-logo {
@@ -961,7 +961,7 @@ body.dark-mode .workflow-step-nav-link {
     flex-wrap: wrap;
 
     & a {
-        color: var(--color-text-muted, #64748b);
+        color: var(--color-text);
         text-decoration: none;
         transition: color 0.15s ease;
 

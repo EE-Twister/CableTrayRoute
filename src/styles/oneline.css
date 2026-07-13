@@ -1,9 +1,9 @@
 /* --- One-line diagram styles (merged from oneline.css) --- */
 
-.btn {
-  background: var(--primary-color);
-  color: var(--secondary-color);
-  border: 1px solid var(--primary-color);
+.oneline-page .btn {
+  background: var(--button-bg, #0b5ed7);
+  color: #ffffff;
+  border: 1px solid var(--button-bg, #0b5ed7);
   border-radius: var(--ol-radius);
   padding: var(--spacing-base) calc(var(--spacing-base) * 2);
   cursor: pointer;
@@ -11,10 +11,10 @@
   font-family: var(--font-family-base);
 }
 
-.btn:hover,
-.btn:focus {
-  background-color: var(--secondary-color);
-  color: var(--primary-color);
+.oneline-page .btn:hover,
+.oneline-page .btn:focus {
+  background-color: var(--button-hover-bg, #084298);
+  color: #ffffff;
 }
 
 .icon-button {
@@ -1410,6 +1410,10 @@ body.oneline-page .workspace {
   align-items: stretch;
 }
 
+body.oneline-page .workspace > * {
+  min-width: 0;
+}
+
 body.oneline-page .palette {
   height: 100%;
   max-height: 100%;
@@ -1419,6 +1423,9 @@ body.oneline-page .palette {
   overflow-x: hidden;
   overflow-y: auto;
   padding-right: 0;
+  position: relative;
+  z-index: 2;
+  background: var(--ol-card-bg);
 }
 
 body.oneline-page .oneline-editor {
@@ -1428,6 +1435,23 @@ body.oneline-page .oneline-editor {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  min-width: 0;
+}
+
+@media (max-height: 760px) {
+  body.oneline-page {
+    height: auto;
+    overflow-y: auto;
+  }
+
+  body.oneline-page .container,
+  body.oneline-page .main-content {
+    overflow: visible;
+  }
+
+  body.oneline-page .oneline-card {
+    min-height: 42rem;
+  }
 }
 
 body.oneline-page.engineering-print-mode .sheet-controls {

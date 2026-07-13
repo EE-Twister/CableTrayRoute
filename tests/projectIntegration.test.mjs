@@ -92,6 +92,8 @@ assert.deepEqual(stale.changedFields, ['averageLoadKw']);
 
 const emptyBattery = buildBatteryProjectInputs({ loads: [] });
 assert.equal(emptyBattery.missing.length, 1);
+assert.equal(emptyBattery.inputs.averageLoadKw, null);
+assert.equal(emptyBattery.inputs.peakLoadKw, null);
 
 const entities = normalizeProjectEntities({
   equipment: [{ tag: 'PMP-101', description: 'Pump' }, { tag: 'MCC-101' }],

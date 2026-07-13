@@ -160,8 +160,10 @@ export function buildBatteryProjectInputs({ loads = [], studies = {}, designBasi
   const meta = normalizeProjectMeta(projectMeta);
   const inputs = {
     systemLabel: meta.site || meta.name,
-    averageLoadKw: Number(averageLoadKw.toFixed(3)),
-    peakLoadKw: Number(Math.max(averageLoadKw, peakFromStudy || 0).toFixed(3)),
+    averageLoadKw: linkedLoads.length ? Number(averageLoadKw.toFixed(3)) : null,
+    peakLoadKw: linkedLoads.length || peakFromStudy
+      ? Number(Math.max(averageLoadKw, peakFromStudy || 0).toFixed(3))
+      : null,
     runtimeHours: meta.batteryRuntimeHours,
     ambientTempC: finite(projectMeta?.batteryAmbientTempC, finite(projectMeta?.minAmbientTempC, finite(projectMeta?.ambientTempC, 25))),
     upsPowerFactor: Math.max(0.5, Math.min(1, finite(sizingDefaults.defaultPowerFactor, 0.9)))
