@@ -153,6 +153,8 @@ function monitorPage(page, origin) {
   page.on('console', message => {
     if (message.type() !== 'error') return;
     if (/Failed to load resource/i.test(message.text())) return;
+    if (/downloadable font: download failed/i.test(message.text())
+      && /fonts\.gstatic\.com/i.test(message.text())) return;
     errors.push(message.text());
   });
   page.on('response', response => {
