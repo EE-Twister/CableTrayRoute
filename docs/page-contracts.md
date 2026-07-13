@@ -294,6 +294,7 @@ Coverage: 77 contracts for 77 navigation routes.
 - `settings.diagramTitleBlock` (setting): One-line title block fields. Consumers: `oneline.html`.
 - `settings.gistToken` (setting): Gist import/export token setting. Consumers: `oneline.html`.
 - `settings.onelineTemplates` (setting): Reusable one-line component templates saved with project settings. Consumers: `oneline.html`.
+- `settings.activeSampleWorkflow` (setting): Sample workflow layout version saved after the diagram is arranged and fit. Consumers: `oneline.html`.
 - `settings.oneLineScheduleReconcilePending` (setting): Flag indicating that schedule reconciliation is available. Consumers: `workflowdashboard.html`.
 
 **Readiness**
@@ -426,6 +427,7 @@ Coverage: 77 contracts for 77 navigation routes.
 **Project Inputs**
 - `cableSchedule` (schedule, required): Cable tags, endpoints, conductor details, lengths, and raceway assignments.
 - `settings.designBasis` (setting, optional): Project code basis, sizing defaults, routing defaults, and study prerequisites.
+- `settings.activeSampleWorkflow` (setting, optional): Active sample context used to repair legacy underground ductbank parent rows.
 
 **Outputs**
 - `traySchedule` (schedule): Tray records with dimensions, material, capacity, and geometry. Consumers: `cabletrayfill.html`, `optimalRoute.html`, `trayhardwarebom.html`, `windload.html`.

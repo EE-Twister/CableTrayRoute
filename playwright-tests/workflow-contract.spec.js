@@ -214,7 +214,12 @@ test('Underground Ductbank checklist loads the sample before opening its route t
 
   await gotoWorkflowPage(page, server, 'equipmentlist.html');
   await expect(page.locator('#equipment-table tbody tr')).toHaveCount(5);
-  await expect(page.locator('#equipment-table tbody tr').first().locator('input').nth(2)).toHaveValue('Substation SW-1 15 kV switchgear');
+  const firstEquipmentRow = page.locator('#equipment-table tbody tr').first();
+  await expect(firstEquipmentRow.locator('input').nth(2)).toHaveValue('Substation SW-1 15 kV switchgear');
+  await expect(firstEquipmentRow.locator('.cross-probe-link')).toHaveCount(0);
+  await firstEquipmentRow.click({ button: 'right' });
+  await expect(page.locator('.context-menu:visible')).toContainText('View on One-Line');
+  await page.keyboard.press('Escape');
 
   await gotoWorkflowPage(page, server, 'loadlist.html');
   await expect(page.locator('#load-table tbody tr')).toHaveCount(3);
@@ -229,6 +234,24 @@ test('Underground Ductbank checklist loads the sample before opening its route t
   const diagramOverview = page.locator('#right-rail-properties > .right-rail-empty');
   await expect(diagramOverview).toContainText('Diagram Overview');
   await expect(diagramOverview).not.toContainText('Start Drawing');
+  const transformerLabelsOverlap = await page.evaluate(() => {
+    return Array.from(document.querySelectorAll('#diagram g.component')).filter(group => {
+      const id = group.dataset.id;
+      const oneLine = window.dataStore.getOneLine();
+      const component = oneLine.sheets[oneLine.activeSheet || 0].components.find(item => item.id === id);
+      return component?.type === 'transformer';
+    }).some(group => {
+      const id = group.dataset.id;
+      const tag = document.querySelector(`#diagram .component-label[data-id="${id}"]`);
+      const secondary = Array.from(document.querySelectorAll(`#diagram .transformer-port-label[data-component-id="${id}"]`))
+        .find(label => label.textContent.startsWith('Secondary'));
+      if (!tag || !secondary) return false;
+      const a = tag.getBBox();
+      const b = secondary.getBBox();
+      return a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
+    });
+  });
+  expect(transformerLabelsOverlap).toBe(false);
   const connectionGeometry = await page.evaluate(() => {
     const oneLine = window.dataStore.getOneLine();
     const components = oneLine.sheets[oneLine.activeSheet || 0].components;
@@ -262,6 +285,19 @@ test('Underground Ductbank checklist loads the sample before opening its route t
   const firstCable = page.locator('#cableScheduleTable tbody tr').first();
   await expect(firstCable.locator('[name="from_tag"]')).toHaveValue('SUBSTATION-SW1');
   await expect(firstCable.locator('[name="to_tag"]')).toHaveValue('PAD-XFMR-T2');
+
+  await page.evaluate(() => {
+    const ductbanks = window.dataStore.getDuctbanks();
+    const first = ductbanks[0];
+    first.tag = '';
+    first.id = '';
+    first.ductbank_id = '';
+    first.from = '';
+    first.to = '';
+    first.concrete_encasement = false;
+    first.conduits.forEach(conduit => { conduit.ductbankTag = ''; });
+    window.dataStore.setDuctbanks(ductbanks);
+  });
 
   await gotoWorkflowPage(page, server, 'racewayschedule.html');
   const firstDuctbank = page.locator('#ductbankTable > tbody > tr:not(.conduit-container)').first();

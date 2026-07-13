@@ -6541,6 +6541,12 @@ function defaultLabelAnchor(comp) {
       y: bounds.top - 10
     };
   }
+  if (comp?.type === 'transformer') {
+    return {
+      x: (bounds.left + bounds.right) / 2,
+      y: bounds.bottom + 32
+    };
+  }
   return {
     x: (bounds.left + bounds.right) / 2,
     y: bounds.bottom + 12
@@ -9135,6 +9141,76 @@ function applyBusCentricAutoLayout(targets) {
   return true;
 }
 
+function ductbankSampleIdentity(comp) {
+  return [
+    comp?.equipmentRef,
+    comp?.scheduleLinks?.equipment,
+    comp?.ref,
+    comp?.id,
+    comp?.label
+  ].map(value => String(value || '').toLowerCase().replace(/[^a-z0-9]/g, '')).join('|');
+}
+
+function arrangeDuctbankSampleLayout(items = components) {
+  const targets = items.filter(comp => comp && comp.type !== 'dimension' && comp.type !== 'annotation');
+  if (!targets.length) return false;
+  const placements = [
+    { tokens: ['substationsw1', 'sw1'], x: 250, y: 80 },
+    { tokens: ['padxfmrt2', 'xfmrt2', 't2'], x: 80, y: 360 },
+    { tokens: ['padxfmrt3', 'xfmrt3', 't3'], x: 400, y: 360 },
+    { tokens: ['substationsw2', 'sw2'], x: 880, y: 80 },
+    { tokens: ['bldgxfmrt1', 'xfmrt1', 'bldgmdp', 'mdp'], x: 880, y: 360 }
+  ];
+  const placed = new Set();
+  const useVerticalEdgePorts = comp => {
+    const width = Number(comp.width) || compWidth;
+    const height = Number(comp.height) || compHeight;
+    if (comp.type === 'utility_source') {
+      comp.ports = [{ x: width / 2, y: height }];
+    } else if (comp.type === 'transformer') {
+      comp.ports = [
+        { x: width / 2, y: 0 },
+        { x: width / 2, y: height }
+      ];
+    }
+  };
+  placements.forEach(placement => {
+    const comp = targets.find(candidate => {
+      if (placed.has(candidate)) return false;
+      const identity = ductbankSampleIdentity(candidate);
+      return placement.tokens.some(token => identity.includes(token));
+    });
+    if (!comp) return;
+    applyIndustrySymbolGeometry(comp, resolveComponentMeta(comp));
+    useVerticalEdgePorts(comp);
+    comp.rotation = defaultRotationForComponent(comp);
+    comp.rotationManual = false;
+    alignComponentBoundsToTopLeft(comp, placement.x, placement.y);
+    comp.labelOffset = { x: 0, y: 0 };
+    placed.add(comp);
+  });
+  targets.filter(comp => !placed.has(comp)).forEach((comp, index) => {
+    applyIndustrySymbolGeometry(comp, resolveComponentMeta(comp));
+    useVerticalEdgePorts(comp);
+    comp.rotation = defaultRotationForComponent(comp);
+    comp.rotationManual = false;
+    alignComponentBoundsToTopLeft(comp, 80 + index * 280, 640);
+    comp.labelOffset = { x: 0, y: 0 };
+  });
+  targets.forEach(comp => {
+    (comp.connections || []).forEach(conn => {
+      const target = targets.find(candidate => candidate.id === conn.target);
+      if (!target) return;
+      const [sourcePort, targetPort] = nearestPorts(comp, target);
+      conn.sourcePort = sourcePort;
+      conn.targetPort = targetPort;
+      delete conn.dir;
+      delete conn.mid;
+    });
+  });
+  return true;
+}
+
 function arrangeSourceToLoad({ silent = false, componentsToArrange = null } = {}) {
   const targets = (componentsToArrange || (selection.length > 1 ? selection : components))
     .filter(comp => comp && comp.type !== 'dimension' && comp.type !== 'annotation');
@@ -9784,10 +9860,6 @@ function deleteLayer(id) {
   pushHistory('Deleted layer');
   save();
   render();
-  const activeSampleWorkflow = getItem('activeSampleWorkflow');
-  if (activeSampleWorkflow?.id === 'ductbank-network' && components.length) {
-    requestAnimationFrame(() => requestAnimationFrame(() => zoomToFit({ pad: 100, maxZoom: 1.2 })));
-  }
   renderLayerPanel();
 }
 
@@ -17926,6 +17998,17 @@ async function init() {
   }
   refineOneLineCommandSurface();
   setupToolbarMenus();
+  const activeSampleWorkflow = getItem('activeSampleWorkflow');
+  if (activeSampleWorkflow?.id === 'ductbank-network' && components.length) {
+    const layoutVersion = Number(activeSampleWorkflow.layoutVersion || 0);
+    if (layoutVersion < 2 && arrangeDuctbankSampleLayout(components)) {
+      pushHistory();
+      render();
+      save();
+      setItem('activeSampleWorkflow', { ...activeSampleWorkflow, layoutVersion: 2 });
+    }
+    requestAnimationFrame(() => requestAnimationFrame(() => zoomToFit({ pad: 120, maxZoom: 1.1 })));
+  }
 }
 
 function getCategory(c) {

@@ -236,7 +236,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 - `settings.equipmentColumns`
   - equipmentlist.js:62 TableUtils.createTable(settings.equipmentColumns)
 - `settings.equipmentFilterPresets`
-  - equipmentlist.js:108 getEquipmentFilterPresets()
+  - equipmentlist.js:110 getEquipmentFilterPresets()
 
 **Detected Writes**
 - `equipment`
@@ -244,7 +244,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 - `settings.equipmentColumns`
   - equipmentlist.js:62 TableUtils.createTable(settings.equipmentColumns)
 - `settings.equipmentFilterPresets`
-  - equipmentlist.js:643 setEquipmentFilterPresets()
+  - equipmentlist.js:612 setEquipmentFilterPresets()
 
 ### Load List (`loadlist.html`)
 
@@ -319,23 +319,23 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 
 **Detected Reads**
 - `cableSchedule`
-  - oneline.js:13456 getCables()
-  - oneline.js:15370 getCables()
-  - oneline.js:18622 getCables()
+  - oneline.js:13528 getCables()
+  - oneline.js:15442 getCables()
+  - oneline.js:18705 getCables()
   - oneline.js:4183 getCables()
   - oneline.js:4300 getCables()
   - ... 2 more
 - `equipment`
-  - oneline.js:13432 getEquipment()
-  - oneline.js:18619 getEquipment()
+  - oneline.js:13504 getEquipment()
+  - oneline.js:18702 getEquipment()
   - oneline.js:4184 getEquipment()
-  - oneline.js:8856 getEquipment()
+  - oneline.js:8862 getEquipment()
   - reports/exportAll.mjs:293 getEquipment()
 - `loadList`
-  - oneline.js:13440 getLoads()
-  - oneline.js:18621 getLoads()
+  - oneline.js:13512 getLoads()
+  - oneline.js:18704 getLoads()
   - oneline.js:4181 getLoads()
-  - oneline.js:8857 getLoads()
+  - oneline.js:8863 getLoads()
 - `oneLineDiagram`
   - analysis/arcFlash.mjs:397 getOneLine()
   - analysis/harmonics.js:185 getOneLine()
@@ -344,33 +344,33 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
   - analysis/motorStart.js:82 getOneLine()
   - ... 12 more
 - `panelSchedule`
-  - oneline.js:13448 getPanels()
-  - oneline.js:18620 getPanels()
+  - oneline.js:13520 getPanels()
+  - oneline.js:18703 getPanels()
   - oneline.js:4182 getPanels()
   - reports/exportAll.mjs:294 getPanels()
 - `settings.activeSampleWorkflow`
-  - oneline.js:9787 getItem(activeSampleWorkflow)
+  - oneline.js:18001 getItem(activeSampleWorkflow)
 - `settings.diagramDatablockConfig`
-  - oneline.js:17917 getItem(diagramDatablockConfig)
+  - oneline.js:17989 getItem(diagramDatablockConfig)
 - `settings.diagramScale`
   - oneline.js:3279 getItem(diagramScale)
 - `settings.diagramTitleBlock`
-  - oneline.js:17864 getItem(diagramTitleBlock)
+  - oneline.js:17936 getItem(diagramTitleBlock)
 - `settings.diagramZoom`
   - oneline.js:3300 getItem(diagramZoom)
 - `settings.gistToken`
-  - oneline.js:18862 getItem(gistToken)
+  - oneline.js:18945 getItem(gistToken)
 - `settings.gridEnabled`
   - oneline.js:3329 getItem(gridEnabled)
 - `settings.gridSize`
   - oneline.js:3328 getItem(gridSize)
 - `settings.labelCounters`
-  - oneline.js:16173 getItem(labelCounters)
+  - oneline.js:16245 getItem(labelCounters)
   - oneline.js:5253 getItem(labelCounters)
 - `settings.labelPrefixes`
   - oneline.js:5252 getItem(labelPrefixes)
 - `settings.layersPanelOpen`
-  - oneline.js:16259 getItem(layersPanelOpen)
+  - oneline.js:16331 getItem(layersPanelOpen)
 - `settings.manufacturerDefaults`
   - oneline.js:2644 getItem(manufacturerDefaults)
 - `settings.oneLineDiagramFilterMode`
@@ -380,19 +380,19 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 - `settings.onelineTemplates`
   - oneline.js:6319 migrateLegacyItem(..., onelineTemplates)
 - `settings.orthogonalRouting`
-  - oneline.js:17841 getItem(orthogonalRouting)
+  - oneline.js:17913 getItem(orthogonalRouting)
 - `settings.studySettings`
   - oneline.js:3324 getItem(studySettings)
 - `settings.symbolStandard`
-  - oneline.js:17850 getItem(symbolStandard)
+  - oneline.js:17922 getItem(symbolStandard)
 - `settings.tccSettings`
   - analysis/arcFlash.mjs:330 getItem(tccSettings)
   - analysis/shortCircuit.mjs:496 getItem(tccSettings)
 - `studyResults`
   - analysis/harmonics.js:420 getStudies()
   - analysis/motorStart.js:209 getStudies()
-  - oneline.js:18191 getStudies()
-  - oneline.js:18838 getStudies()
+  - oneline.js:18274 getStudies()
+  - oneline.js:18921 getStudies()
   - oneline.js:3384 getStudies()
   - ... 12 more
 - `studyResults.arcFlash`
@@ -408,70 +408,72 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 
 **Detected Writes**
 - `cableSchedule`
-  - oneline.js:18638 setCables()
+  - oneline.js:18721 setCables()
   - oneline.js:4202 setCables()
   - oneline.js:4310 setCables()
 - `conduitSchedule`
-  - oneline.js:8765 addRaceway()
-  - oneline.js:9282 addRaceway()
+  - oneline.js:8771 addRaceway()
+  - oneline.js:9358 addRaceway()
 - `equipment`
-  - oneline.js:18635 setEquipment()
+  - oneline.js:18718 setEquipment()
   - oneline.js:4204 setEquipment()
 - `loadList`
-  - oneline.js:18637 setLoads()
+  - oneline.js:18720 setLoads()
   - oneline.js:4198 setLoads()
 - `oneLineDiagram`
-  - oneline.js:11830 setOneLine()
-  - oneline.js:12023 setOneLine()
+  - oneline.js:11902 setOneLine()
+  - oneline.js:12095 setOneLine()
   - oneline.js:5024 setOneLine()
   - oneline.js:5061 setOneLine()
   - oneline.js:5081 setOneLine()
 - `panelSchedule`
-  - oneline.js:18636 setPanels()
+  - oneline.js:18719 setPanels()
   - oneline.js:4200 setPanels()
+- `settings.activeSampleWorkflow`
+  - oneline.js:18008 setItem(activeSampleWorkflow)
 - `settings.diagramDatablockConfig`
-  - oneline.js:11760 setItem(diagramDatablockConfig)
+  - oneline.js:11832 setItem(diagramDatablockConfig)
 - `settings.diagramScale`
-  - oneline.js:12024 setItem(diagramScale)
-  - oneline.js:18973 setItem(diagramScale)
+  - oneline.js:12096 setItem(diagramScale)
+  - oneline.js:19056 setItem(diagramScale)
 - `settings.diagramTitleBlock`
-  - oneline.js:17899 setItem(diagramTitleBlock)
+  - oneline.js:17971 setItem(diagramTitleBlock)
 - `settings.diagramZoom`
   - oneline.js:3804 setItem(diagramZoom)
   - oneline.js:3842 setItem(diagramZoom)
   - oneline.js:3928 setItem(diagramZoom)
   - oneline.js:3966 setItem(diagramZoom)
 - `settings.gistToken`
-  - oneline.js:18866 setItem(gistToken)
+  - oneline.js:18949 setItem(gistToken)
 - `settings.gridEnabled`
-  - oneline.js:11078 setItem(gridEnabled)
+  - oneline.js:11150 setItem(gridEnabled)
 - `settings.gridSize`
-  - oneline.js:16561 setItem(gridSize)
+  - oneline.js:16633 setItem(gridSize)
 - `settings.labelCounters`
-  - oneline.js:16185 setItem(labelCounters)
+  - oneline.js:16257 setItem(labelCounters)
   - oneline.js:5262 setItem(labelCounters)
 - `settings.labelPrefixes`
   - oneline.js:5448 setItem(labelPrefixes)
 - `settings.layersPanelOpen`
-  - oneline.js:16265 setItem(layersPanelOpen)
-  - oneline.js:16272 setItem(layersPanelOpen)
+  - oneline.js:16337 setItem(layersPanelOpen)
+  - oneline.js:16344 setItem(layersPanelOpen)
 - `settings.manufacturerDefaults`
   - oneline.js:5517 setItem(manufacturerDefaults)
 - `settings.oneLineDiagramFilterMode`
-  - oneline.js:16572 setItem(oneLineDiagramFilterMode)
+  - oneline.js:16644 setItem(oneLineDiagramFilterMode)
 - `settings.oneLineScheduleReconcilePending`
-  - oneline.js:18467 setItem(oneLineScheduleReconcilePending)
+  - oneline.js:18550 setItem(oneLineScheduleReconcilePending)
 - `settings.onelineTemplates`
   - oneline.js:6319 migrateLegacyItem(..., onelineTemplates)
   - oneline.js:6327 setItem(onelineTemplates)
 - `settings.orthogonalRouting`
-  - oneline.js:17834 setItem(orthogonalRouting)
+  - oneline.js:17906 setItem(orthogonalRouting)
 - `settings.scenarios`
-  - oneline.js:18969 switchScenario()
+  - oneline.js:19052 switchScenario()
 - `settings.studySettings`
   - oneline.js:3421 setItem(studySettings)
 - `settings.symbolStandard`
-  - oneline.js:17854 setItem(symbolStandard)
+  - oneline.js:17926 setItem(symbolStandard)
 - `studyResults`
   - analysis/harmonics.js:423 setStudies()
   - analysis/motorStart.js:212 setStudies()
@@ -497,8 +499,8 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
   - oneline.js:5063 studies.shortCircuit
   - oneline.js:5083 studies.shortCircuit
 - `traySchedule`
-  - oneline.js:8765 addRaceway()
-  - oneline.js:9282 addRaceway()
+  - oneline.js:8771 addRaceway()
+  - oneline.js:9358 addRaceway()
 
 ### Demand Schedule (`demandschedule.html`)
 
@@ -697,9 +699,11 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
   - src/racewayschedule.js:457 getConduits()
   - src/racewayschedule.js:698 TableUtils.createTable(conduitSchedule)
 - `ductbankSchedule`
-  - ductbankTable.js:1025 getDuctbanks()
+  - ductbankTable.js:1092 getDuctbanks()
   - src/racewayschedule.js:2052 getDuctbanks()
   - src/racewayschedule.js:833 getDuctbanks()
+- `settings.activeSampleWorkflow`
+  - ductbankTable.js:88 getItem(activeSampleWorkflow)
 - `traySchedule`
   - src/racewayschedule.js:2001 getTrays()
   - src/racewayschedule.js:2053 getTrays()
@@ -708,7 +712,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 
 **Detected Writes**
 - `cableSchedule`
-  - ductbankTable.js:1124 addCable()
+  - ductbankTable.js:1191 addCable()
 - `conduitSchedule`
   - src/racewayschedule.js:390 setConduits()
   - src/racewayschedule.js:574 importFromCad()
@@ -716,14 +720,15 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
   - src/racewayschedule.js:789 setConduits()
   - src/racewayschedule.js:864 setConduits()
 - `ductbankSchedule`
-  - ductbankTable.js:632 setDuctbanks()
+  - ductbankTable.js:695 setDuctbanks()
+  - ductbankTable.js:721 setDuctbanks()
   - src/racewayschedule.js:388 setDuctbanks()
   - src/racewayschedule.js:594 setDuctbanks()
   - src/racewayschedule.js:785 setDuctbanks()
 - `settings.conduitFillData`
   - src/racewayschedule.js:721 setItem(conduitFillData)
 - `settings.ductbankSession`
-  - ductbankTable.js:598 setItem(ductbankSession)
+  - ductbankTable.js:661 setItem(ductbankSession)
 - `settings.trayFillData`
   - src/racewayschedule.js:654 setItem(trayFillData)
 - `traySchedule`

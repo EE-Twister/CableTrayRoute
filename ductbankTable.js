@@ -66,6 +66,69 @@ import { applyRecordImport, previewRecordImport } from './analysis/scheduleWorkf
     return /PVC|ENT|LFNC/i.test(String(type)) ? 'PVC' : 'Steel';
   }
 
+  function inferDuctbankParentTag(db, index, isDuctbankSample){
+    const candidates = [
+      db?.tag,
+      db?.ductbank_id,
+      typeof db?.id === 'string' ? db.id : '',
+      ...(Array.isArray(db?.conduits) ? db.conduits.map(conduit => conduit?.ductbankTag) : [])
+    ];
+    const explicit = candidates.find(value => String(value || '').trim());
+    if(explicit) return String(explicit).trim();
+
+    const conduitId = (db?.conduits || [])
+      .map(conduit => String(conduit?.conduit_id || ''))
+      .find(Boolean);
+    const match = conduitId.match(/^DB(\d+)-/i);
+    if(match) return `DUCTBANK-DB-${match[1].padStart(2, '0')}`;
+    return isDuctbankSample ? `DUCTBANK-DB-${String(index + 1).padStart(2, '0')}` : '';
+  }
+
+  function repairDuctbankParentRows(rows){
+    const workflow = getItem('activeSampleWorkflow');
+    const isDuctbankSample = workflow?.id === 'ductbank-network';
+    const sampleDefaults = {
+      'DUCTBANK-DB-01': { from: 'SUBSTATION-SW1', to: 'PAD-XFMR-T2 / PAD-XFMR-T3' },
+      'DUCTBANK-DB-02': { from: 'SUBSTATION-SW2', to: 'BLDG-XFMR-T1' }
+    };
+    let changed = false;
+    rows.forEach((db, index) => {
+      const tag = inferDuctbankParentTag(db, index, isDuctbankSample);
+      if(tag && db.tag !== tag){
+        db.tag = tag;
+        changed = true;
+      }
+      if(tag && !String(db.ductbank_id || '').trim()){
+        db.ductbank_id = tag;
+        changed = true;
+      }
+      if(tag && (db.id === undefined || db.id === null || db.id === '')){
+        db.id = tag;
+        changed = true;
+      }
+      const defaults = isDuctbankSample ? sampleDefaults[tag] : null;
+      if(defaults && !String(db.from || '').trim()){
+        db.from = defaults.from;
+        changed = true;
+      }
+      if(defaults && !String(db.to || '').trim()){
+        db.to = defaults.to;
+        changed = true;
+      }
+      if(defaults && db.concrete_encasement !== true){
+        db.concrete_encasement = true;
+        changed = true;
+      }
+      (db.conduits || []).forEach(conduit => {
+        if(tag && conduit.ductbankTag !== tag){
+          conduit.ductbankTag = tag;
+          changed = true;
+        }
+      });
+    });
+    return changed;
+  }
+
   function populateMaterialOptions(select, value){
     select.innerHTML = '';
     CONDUIT_MATERIAL_OPTIONS.forEach(material => {
@@ -641,6 +704,7 @@ import { applyRecordImport, previewRecordImport } from './analysis/scheduleWorkf
       if(!ductbankTbody) return;
     }
     try{ductbanks=readStoredDuctbanks();}catch(e){ductbanks=[];}
+    const repairedParents = repairDuctbankParentRows(ductbanks);
     ductbanks.forEach(db=>{
       if(db.expanded===undefined) db.expanded=false;
       if(!db.conduits) db.conduits=[];
@@ -653,6 +717,9 @@ import { applyRecordImport, previewRecordImport } from './analysis/scheduleWorkf
         if(c.material===undefined) c.material=defaultConduitMaterial(c.type);
       });
     });
+    if(repairedParents){
+      try{setDuctbanks(ductbanks);}catch(e){console.warn('Could not persist repaired ductbank parents', e);}
+    }
     renderDuctbanks();
     const rendered=getDuctbankRows().length;
     console.assert(rendered===ductbanks.length,`Rendered ${rendered} ductbanks, expected ${ductbanks.length}`);

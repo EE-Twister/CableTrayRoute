@@ -3,6 +3,7 @@ installErrorTracking();
 
 import { UndoRedoManager } from "./undoRedo.mjs";
 import { mountCopilot } from "./src/copilot.js";
+import { repairMojibake } from "./src/textEncoding.js";
 
 import "./src/components/navigation.js";
 import "./src/components/commandPalette.js";
@@ -2251,6 +2252,7 @@ function initActiveSampleWorkflowGuide(){
   const progress=document.createElement('div');
   progress.className='sample-workflow-guide__progress';
   progress.textContent=`${currentIndex+1} of ${steps.length} · ${current.label}`;
+  progress.textContent=repairMojibake(progress.textContent);
   progress.title=current.hint||current.label;
 
   const actions=document.createElement('nav');
@@ -2261,7 +2263,7 @@ function initActiveSampleWorkflowGuide(){
     const link=document.createElement('a');
     link.className='sample-workflow-guide__link';
     link.href=step.page;
-    link.textContent=label;
+    link.textContent=repairMojibake(label);
     actions.appendChild(link);
   };
   addLink(steps[currentIndex-1],'← Previous');

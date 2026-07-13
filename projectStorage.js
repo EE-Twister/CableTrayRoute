@@ -1,3 +1,5 @@
+import { repairMojibakeDeep } from './src/textEncoding.js';
+
 const PROJECT_KEY = 'CTR_PROJECT_V1';
 const SCENARIOS_KEY = 'ctr_scenarios_v1';
 const CURRENT_SCENARIO_KEY = 'ctr_current_scenario_v1';
@@ -241,25 +243,26 @@ function migrateSettingsPayload(settings = {}) {
   return next;
 }
 function migrateProject(old = {}) {
-  const settings = old.settings || {
-    session: old.session || old.ctrSession || {},
-    collapsedGroups: old.collapsedGroups || {}
+  const source = repairMojibakeDeep(old);
+  const settings = source.settings || {
+    session: source.session || source.ctrSession || {},
+    collapsedGroups: source.collapsedGroups || {}
   };
   if (!settings.units) settings.units = 'imperial';
   const sessionDarkMode = settings.session && typeof settings.session === 'object'
     ? settings.session.darkMode
     : undefined;
   settings.theme = normalizeThemePreference(settings.theme)
-    || normalizeThemePreference(old.themePreference)
+    || normalizeThemePreference(source.themePreference)
     || (typeof sessionDarkMode === 'boolean' ? (sessionDarkMode ? 'dark' : 'light') : 'system');
   const migratedSettings = migrateSettingsPayload(settings);
   return {
-    name: old.name || '',
-    ductbanks: old.ductbanks || old.ductbankSchedule || [],
-    conduits: old.conduits || old.conduitSchedule || [],
-    trays: old.trays || old.traySchedule || [],
-    cables: old.cables || old.cableSchedule || [],
-    cableTypicals: old.cableTypicals || [],
+    name: source.name || '',
+    ductbanks: source.ductbanks || source.ductbankSchedule || [],
+    conduits: source.conduits || source.conduitSchedule || [],
+    trays: source.trays || source.traySchedule || [],
+    cables: source.cables || source.cableSchedule || [],
+    cableTypicals: source.cableTypicals || [],
     settings: migratedSettings
   };
 }

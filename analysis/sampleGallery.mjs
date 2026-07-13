@@ -1,3 +1,5 @@
+import { repairMojibake, repairMojibakeDeep } from '../src/textEncoding.js';
+
 /**
  * Sample Project Gallery registry and utilities for Gap #81.
  * Pure ESM module — no DOM dependencies.
@@ -8,10 +10,11 @@ export const SCHEMA_VERSION = 1;
 export function getSampleProjectCopyName(title, existingNames = []) {
   const base = `${String(title || 'Untitled').trim() || 'Untitled'} — Sample`;
   const used = new Set((existingNames || []).map(name => String(name).trim().toLocaleLowerCase()));
-  if (!used.has(base.toLocaleLowerCase())) return base;
+  const sampleBase = repairMojibake(base);
+  if (!used.has(sampleBase.toLocaleLowerCase())) return sampleBase;
   let copyNumber = 2;
-  while (used.has(`${base} (${copyNumber})`.toLocaleLowerCase())) copyNumber += 1;
-  return `${base} (${copyNumber})`;
+  while (used.has(`${sampleBase} (${copyNumber})`.toLocaleLowerCase())) copyNumber += 1;
+  return `${sampleBase} (${copyNumber})`;
 }
 
 export const SAMPLE_REGISTRY = [
@@ -711,7 +714,7 @@ export function sampleProjectToImportPayload(obj = {}) {
     cables,
     cableTypicals: Array.isArray(obj.cableTypicals) ? obj.cableTypicals : [],
     panels: Array.isArray(obj.panels) && obj.panels.length ? obj.panels : deriveSamplePanels(oneLine),
-    equipment,
+    equipment: repairMojibakeDeep(equipment),
     loads,
     oneLine,
     mccLineups: Array.isArray(obj.mccLineups) && obj.mccLineups.length ? obj.mccLineups : deriveSampleMccLineups(oneLine),

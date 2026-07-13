@@ -1,5 +1,6 @@
 import './workflowStatus.js';
 import '../site.js';
+import { repairMojibake } from './textEncoding.js';
 import { importProject, saveProject, setItem } from '../dataStore.mjs';
 import { getProjectState, listSavedProjects, readAppSetting, setConduitCache, setProjectState, writeAppSetting } from '../projectStorage.js';
 import { SAMPLE_REGISTRY, getSampleProjectCopyName, getSamplesByTag, validateSampleProject, migrateSampleProject, sampleProjectToImportPayload } from '../analysis/sampleGallery.mjs';
@@ -34,7 +35,7 @@ function showToast(msg, kind = 'success') {
     toast.setAttribute('aria-live', 'polite');
     document.body.appendChild(toast);
   }
-  toast.textContent = msg;
+  toast.textContent = repairMojibake(msg);
   toast.classList.remove('toast-error', 'toast-success', 'show');
   toast.classList.add(kind === 'error' ? 'toast-error' : 'toast-success', 'show');
   toast.setAttribute('aria-live', kind === 'error' ? 'assertive' : 'polite');
@@ -267,6 +268,8 @@ function showChecklist(sample) {
     numSpan.setAttribute('aria-hidden', 'true');
     numSpan.textContent = done ? '✓' : step.step;
 
+    numSpan.textContent = repairMojibake(numSpan.textContent);
+
     const body = document.createElement('div');
     body.className = 'checklist-step__body';
 
@@ -283,6 +286,7 @@ function showChecklist(sample) {
     link.href = step.page;
     const pageLabel = step.page.split(/[?#]/)[0].replace('.html', '');
     link.textContent = `Go to ${pageLabel} →`;
+    link.textContent = repairMojibake(link.textContent);
     link.addEventListener('click', () => {
       markStepDone(sample.id, idx);
     });

@@ -228,6 +228,7 @@ export const PAGE_CONTRACTS_BY_HREF = {
       output('settings.diagramTitleBlock', 'setting', 'One-line title block fields.', ['oneline.html']),
       output('settings.gistToken', 'setting', 'Gist import/export token setting.', ['oneline.html']),
       output('settings.onelineTemplates', 'setting', 'Reusable one-line component templates saved with project settings.', ['oneline.html']),
+      output('settings.activeSampleWorkflow', 'setting', 'Sample workflow layout version saved after the diagram is arranged and fit.', ['oneline.html']),
       output('settings.oneLineScheduleReconcilePending', 'setting', 'Flag indicating that schedule reconciliation is available.', ['workflowdashboard.html'])
     ],
     readiness: ready('At least one one-line component exists and schedule reconciliation state is explicit.', ['Diagram is empty or schedule reconciliation issues remain unresolved.']),
@@ -262,7 +263,11 @@ export const PAGE_CONTRACTS_BY_HREF = {
   'racewayschedule.html': contract({
     workflowStep: 'racewaySchedule',
     standaloneInputs: ['Tray, conduit, ductbank, CAD import, geometry, and fill setup rows.'],
-    projectInputs: [cables, designBasis],
+    projectInputs: [
+      cables,
+      designBasis,
+      projectInput('settings.activeSampleWorkflow', 'setting', false, 'Active sample context used to repair legacy underground ductbank parent rows.')
+    ],
     outputs: [
       output('traySchedule', 'schedule', 'Tray records with dimensions, material, capacity, and geometry.', ['cabletrayfill.html', 'optimalRoute.html', 'trayhardwarebom.html', 'windload.html']),
       output('conduitSchedule', 'schedule', 'Conduit records with trade size, material, capacity, and geometry.', ['conduitfill.html', 'ductbankroute.html', 'optimalRoute.html']),
