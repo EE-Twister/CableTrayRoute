@@ -12,7 +12,7 @@ const pageUrl = file => 'file://' + path.join(root, file);
 test.describe('Optimal Route', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto(pageUrl('optimalRoute.html?e2e=1&e2e_reset=1'));
-    await page.waitForLoadState('networkidle');
+    await page.locator('#optimal-ready-beacon[data-optimal-ready="1"]').waitFor();
   });
 
   test('page loads with correct heading', async ({ page }) => {

@@ -41,7 +41,7 @@ function ensureReadyBeacon(attrName, id) {
   if (!el) {
     el = document.createElement('div');
     el.id = id;
-    el.style.cssText = 'position:fixed;left:0;bottom:0;width:1px;height:1px;opacity:0.01;z-index:2147483647;';
+    el.style.cssText = 'position:fixed;left:0;bottom:0;width:1px;height:1px;opacity:0.01;pointer-events:none;z-index:2147483647;';
     document.body.appendChild(el);
   }
   el.setAttribute(attrName, '1');

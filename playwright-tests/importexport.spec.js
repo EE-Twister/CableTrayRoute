@@ -57,7 +57,7 @@ test.describe('Optimal Route tray CSV export', () => {
       sessionStorage.clear();
     });
     await page.goto(pageUrl('optimalRoute.html?e2e=1&e2e_reset=1'));
-    await page.waitForLoadState('networkidle');
+    await page.locator('#optimal-ready-beacon[data-optimal-ready="1"]').waitFor();
   });
 
   test('loads sample trays and exports CSV', async ({ page }) => {
@@ -81,7 +81,7 @@ test.describe('Optimal Route tray CSV export', () => {
 
   test('cable export triggers download', async ({ page }) => {
     await page.click('#load-sample-cables-btn');
-    await page.waitForLoadState('networkidle');
+    await page.locator('#cable-list-container tbody tr').first().waitFor();
 
     const downloadPromise = page.waitForEvent('download');
     await page.click('#export-cables-btn');

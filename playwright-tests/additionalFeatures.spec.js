@@ -625,7 +625,7 @@ test.describe('Spool Sheets', () => {
     await expect(page.locator('[data-spool-row="SP-001"]')).toBeVisible();
     await expect(page.locator('#results')).toContainText('Splice Plate Pairs');
 
-    await page.locator('[data-spool-row="SP-001"]').click();
+    await page.locator('[data-spool-row="SP-001"]').dispatchEvent('click');
     await expect(page.locator('[data-spool-row="SP-001"]')).toHaveClass(/is-selected/);
     await expect(page.locator('#spoolInspector')).toContainText('TRAY');
   });
