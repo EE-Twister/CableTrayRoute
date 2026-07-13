@@ -61,14 +61,17 @@ const ONE_LINE_READINESS_COPY = getContractReadinessCopy('oneline.html');
 
 let componentMeta = {};
 
+document.querySelectorAll('.oneline-canvas-scroll > .prop-modal').forEach(modal => {
+  document.body.appendChild(modal);
+});
+
 function ensurePropModal() {
   let modal = document.getElementById('prop-modal');
   if (!modal) {
     modal = document.createElement('div');
     modal.id = 'prop-modal';
     modal.className = 'prop-modal';
-    const host = document.querySelector('.oneline-editor') || document.body;
-    host.appendChild(modal);
+    document.body.appendChild(modal);
   }
   return modal;
 }

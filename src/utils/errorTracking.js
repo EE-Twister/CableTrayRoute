@@ -65,9 +65,14 @@ function send(payload) {
   });
 
   // Prefer sendBeacon (fire-and-forget, survives navigation) when available.
-  if (typeof globalThis.navigator?.sendBeacon === 'function') {
-    globalThis.navigator.sendBeacon(ENDPOINT, new Blob([body], { type: 'application/json' }));
-    return;
+  if (typeof globalThis.navigator?.sendBeacon === 'function'
+    && /^https?:$/.test(globalThis.location?.protocol ?? '')) {
+    try {
+      globalThis.navigator.sendBeacon(ENDPOINT, new Blob([body], { type: 'application/json' }));
+      return;
+    } catch {
+      // Fall through to fetch when the browser rejects a beacon synchronously.
+    }
   }
 
   // Fall back to fetch (best-effort, no await — intentional).

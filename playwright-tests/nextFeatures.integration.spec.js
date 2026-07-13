@@ -35,7 +35,7 @@ async function assertExportDownload(download, expectedName) {
 }
 
 async function readWorkbookRows(filePath) {
-  const workbook = XLSX.readFile(filePath);
+  const workbook = XLSX.read(await fs.readFile(filePath), { type: 'buffer' });
   return Object.fromEntries(workbook.SheetNames.map(sheetName => {
     const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1, defval: '', raw: false });
     return [sheetName, rows.map(row => row.map(value => String(value ?? '')))];

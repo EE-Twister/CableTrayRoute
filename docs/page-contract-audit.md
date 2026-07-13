@@ -315,27 +315,27 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 - None
 
 **Direct Browser Storage**
-- oneline.js:2745 sessionStorage.setItem(<dynamic>) - session-handoff: Temporary custom component editor prefill; not durable project state.
+- oneline.js:2748 sessionStorage.setItem(<dynamic>) - session-handoff: Temporary custom component editor prefill; not durable project state.
 
 **Detected Reads**
 - `cableSchedule`
-  - oneline.js:13432 getCables()
-  - oneline.js:15346 getCables()
-  - oneline.js:18598 getCables()
-  - oneline.js:4180 getCables()
-  - oneline.js:4297 getCables()
+  - oneline.js:13435 getCables()
+  - oneline.js:15349 getCables()
+  - oneline.js:18601 getCables()
+  - oneline.js:4183 getCables()
+  - oneline.js:4300 getCables()
   - ... 2 more
 - `equipment`
-  - oneline.js:13408 getEquipment()
-  - oneline.js:18595 getEquipment()
-  - oneline.js:4181 getEquipment()
-  - oneline.js:8836 getEquipment()
+  - oneline.js:13411 getEquipment()
+  - oneline.js:18598 getEquipment()
+  - oneline.js:4184 getEquipment()
+  - oneline.js:8839 getEquipment()
   - reports/exportAll.mjs:293 getEquipment()
 - `loadList`
-  - oneline.js:13416 getLoads()
-  - oneline.js:18597 getLoads()
-  - oneline.js:4178 getLoads()
-  - oneline.js:8837 getLoads()
+  - oneline.js:13419 getLoads()
+  - oneline.js:18600 getLoads()
+  - oneline.js:4181 getLoads()
+  - oneline.js:8840 getLoads()
 - `oneLineDiagram`
   - analysis/arcFlash.mjs:397 getOneLine()
   - analysis/harmonics.js:185 getOneLine()
@@ -344,57 +344,57 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
   - analysis/motorStart.js:82 getOneLine()
   - ... 12 more
 - `panelSchedule`
-  - oneline.js:13424 getPanels()
-  - oneline.js:18596 getPanels()
-  - oneline.js:4179 getPanels()
+  - oneline.js:13427 getPanels()
+  - oneline.js:18599 getPanels()
+  - oneline.js:4182 getPanels()
   - reports/exportAll.mjs:294 getPanels()
 - `settings.diagramDatablockConfig`
-  - oneline.js:17893 getItem(diagramDatablockConfig)
+  - oneline.js:17896 getItem(diagramDatablockConfig)
 - `settings.diagramScale`
-  - oneline.js:3276 getItem(diagramScale)
+  - oneline.js:3279 getItem(diagramScale)
 - `settings.diagramTitleBlock`
-  - oneline.js:17840 getItem(diagramTitleBlock)
+  - oneline.js:17843 getItem(diagramTitleBlock)
 - `settings.diagramZoom`
-  - oneline.js:3297 getItem(diagramZoom)
+  - oneline.js:3300 getItem(diagramZoom)
 - `settings.gistToken`
-  - oneline.js:18838 getItem(gistToken)
+  - oneline.js:18841 getItem(gistToken)
 - `settings.gridEnabled`
-  - oneline.js:3326 getItem(gridEnabled)
+  - oneline.js:3329 getItem(gridEnabled)
 - `settings.gridSize`
-  - oneline.js:3325 getItem(gridSize)
+  - oneline.js:3328 getItem(gridSize)
 - `settings.labelCounters`
-  - oneline.js:16149 getItem(labelCounters)
-  - oneline.js:5250 getItem(labelCounters)
+  - oneline.js:16152 getItem(labelCounters)
+  - oneline.js:5253 getItem(labelCounters)
 - `settings.labelPrefixes`
-  - oneline.js:5249 getItem(labelPrefixes)
+  - oneline.js:5252 getItem(labelPrefixes)
 - `settings.layersPanelOpen`
-  - oneline.js:16235 getItem(layersPanelOpen)
+  - oneline.js:16238 getItem(layersPanelOpen)
 - `settings.manufacturerDefaults`
-  - oneline.js:2641 getItem(manufacturerDefaults)
+  - oneline.js:2644 getItem(manufacturerDefaults)
 - `settings.oneLineDiagramFilterMode`
-  - oneline.js:3261 getItem(oneLineDiagramFilterMode)
+  - oneline.js:3264 getItem(oneLineDiagramFilterMode)
 - `settings.oneLineScheduleReconcilePending`
-  - oneline.js:3363 getItem(oneLineScheduleReconcilePending)
+  - oneline.js:3366 getItem(oneLineScheduleReconcilePending)
 - `settings.onelineTemplates`
-  - oneline.js:6299 migrateLegacyItem(..., onelineTemplates)
+  - oneline.js:6302 migrateLegacyItem(..., onelineTemplates)
 - `settings.orthogonalRouting`
-  - oneline.js:17817 getItem(orthogonalRouting)
+  - oneline.js:17820 getItem(orthogonalRouting)
 - `settings.studySettings`
-  - oneline.js:3321 getItem(studySettings)
+  - oneline.js:3324 getItem(studySettings)
 - `settings.symbolStandard`
-  - oneline.js:17826 getItem(symbolStandard)
+  - oneline.js:17829 getItem(symbolStandard)
 - `settings.tccSettings`
   - analysis/arcFlash.mjs:330 getItem(tccSettings)
   - analysis/shortCircuit.mjs:496 getItem(tccSettings)
 - `studyResults`
   - analysis/harmonics.js:420 getStudies()
   - analysis/motorStart.js:209 getStudies()
-  - oneline.js:18167 getStudies()
-  - oneline.js:18814 getStudies()
-  - oneline.js:3381 getStudies()
+  - oneline.js:18170 getStudies()
+  - oneline.js:18817 getStudies()
+  - oneline.js:3384 getStudies()
   - ... 12 more
 - `studyResults.arcFlash`
-  - oneline.js:5089 getStudies().arcFlash
+  - oneline.js:5092 getStudies().arcFlash
   - reports/exportAll.mjs:297 getStudies().arcFlash
 - `studyResults.duty`
   - validation/rules.js:666 studies.duty
@@ -406,97 +406,97 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 
 **Detected Writes**
 - `cableSchedule`
-  - oneline.js:18614 setCables()
-  - oneline.js:4199 setCables()
-  - oneline.js:4307 setCables()
+  - oneline.js:18617 setCables()
+  - oneline.js:4202 setCables()
+  - oneline.js:4310 setCables()
 - `conduitSchedule`
-  - oneline.js:8745 addRaceway()
-  - oneline.js:9262 addRaceway()
+  - oneline.js:8748 addRaceway()
+  - oneline.js:9265 addRaceway()
 - `equipment`
-  - oneline.js:18611 setEquipment()
-  - oneline.js:4201 setEquipment()
+  - oneline.js:18614 setEquipment()
+  - oneline.js:4204 setEquipment()
 - `loadList`
-  - oneline.js:18613 setLoads()
-  - oneline.js:4195 setLoads()
+  - oneline.js:18616 setLoads()
+  - oneline.js:4198 setLoads()
 - `oneLineDiagram`
-  - oneline.js:11806 setOneLine()
-  - oneline.js:11999 setOneLine()
-  - oneline.js:5021 setOneLine()
-  - oneline.js:5058 setOneLine()
-  - oneline.js:5078 setOneLine()
+  - oneline.js:11809 setOneLine()
+  - oneline.js:12002 setOneLine()
+  - oneline.js:5024 setOneLine()
+  - oneline.js:5061 setOneLine()
+  - oneline.js:5081 setOneLine()
 - `panelSchedule`
-  - oneline.js:18612 setPanels()
-  - oneline.js:4197 setPanels()
+  - oneline.js:18615 setPanels()
+  - oneline.js:4200 setPanels()
 - `settings.diagramDatablockConfig`
-  - oneline.js:11736 setItem(diagramDatablockConfig)
+  - oneline.js:11739 setItem(diagramDatablockConfig)
 - `settings.diagramScale`
-  - oneline.js:12000 setItem(diagramScale)
-  - oneline.js:18949 setItem(diagramScale)
+  - oneline.js:12003 setItem(diagramScale)
+  - oneline.js:18952 setItem(diagramScale)
 - `settings.diagramTitleBlock`
-  - oneline.js:17875 setItem(diagramTitleBlock)
+  - oneline.js:17878 setItem(diagramTitleBlock)
 - `settings.diagramZoom`
-  - oneline.js:3801 setItem(diagramZoom)
-  - oneline.js:3839 setItem(diagramZoom)
-  - oneline.js:3925 setItem(diagramZoom)
-  - oneline.js:3963 setItem(diagramZoom)
+  - oneline.js:3804 setItem(diagramZoom)
+  - oneline.js:3842 setItem(diagramZoom)
+  - oneline.js:3928 setItem(diagramZoom)
+  - oneline.js:3966 setItem(diagramZoom)
 - `settings.gistToken`
-  - oneline.js:18842 setItem(gistToken)
+  - oneline.js:18845 setItem(gistToken)
 - `settings.gridEnabled`
-  - oneline.js:11054 setItem(gridEnabled)
+  - oneline.js:11057 setItem(gridEnabled)
 - `settings.gridSize`
-  - oneline.js:16537 setItem(gridSize)
+  - oneline.js:16540 setItem(gridSize)
 - `settings.labelCounters`
-  - oneline.js:16161 setItem(labelCounters)
-  - oneline.js:5259 setItem(labelCounters)
+  - oneline.js:16164 setItem(labelCounters)
+  - oneline.js:5262 setItem(labelCounters)
 - `settings.labelPrefixes`
-  - oneline.js:5445 setItem(labelPrefixes)
+  - oneline.js:5448 setItem(labelPrefixes)
 - `settings.layersPanelOpen`
-  - oneline.js:16241 setItem(layersPanelOpen)
-  - oneline.js:16248 setItem(layersPanelOpen)
+  - oneline.js:16244 setItem(layersPanelOpen)
+  - oneline.js:16251 setItem(layersPanelOpen)
 - `settings.manufacturerDefaults`
-  - oneline.js:5514 setItem(manufacturerDefaults)
+  - oneline.js:5517 setItem(manufacturerDefaults)
 - `settings.oneLineDiagramFilterMode`
-  - oneline.js:16548 setItem(oneLineDiagramFilterMode)
+  - oneline.js:16551 setItem(oneLineDiagramFilterMode)
 - `settings.oneLineScheduleReconcilePending`
-  - oneline.js:18443 setItem(oneLineScheduleReconcilePending)
+  - oneline.js:18446 setItem(oneLineScheduleReconcilePending)
 - `settings.onelineTemplates`
-  - oneline.js:6299 migrateLegacyItem(..., onelineTemplates)
-  - oneline.js:6307 setItem(onelineTemplates)
+  - oneline.js:6302 migrateLegacyItem(..., onelineTemplates)
+  - oneline.js:6310 setItem(onelineTemplates)
 - `settings.orthogonalRouting`
-  - oneline.js:17810 setItem(orthogonalRouting)
+  - oneline.js:17813 setItem(orthogonalRouting)
 - `settings.scenarios`
-  - oneline.js:18945 switchScenario()
+  - oneline.js:18948 switchScenario()
 - `settings.studySettings`
-  - oneline.js:3418 setItem(studySettings)
+  - oneline.js:3421 setItem(studySettings)
 - `settings.symbolStandard`
-  - oneline.js:17830 setItem(symbolStandard)
+  - oneline.js:17833 setItem(symbolStandard)
 - `studyResults`
   - analysis/harmonics.js:423 setStudies()
   - analysis/motorStart.js:212 setStudies()
-  - oneline.js:5024 setStudies()
-  - oneline.js:5061 setStudies()
-  - oneline.js:5082 setStudies()
+  - oneline.js:5027 setStudies()
+  - oneline.js:5064 setStudies()
+  - oneline.js:5085 setStudies()
   - ... 3 more
 - `studyResults.arcFlash`
-  - oneline.js:5081 studies.arcFlash
+  - oneline.js:5084 studies.arcFlash
 - `studyResults.duty`
   - validation/rules.js:666 studies.duty
 - `studyResults.harmonics`
   - analysis/harmonics.js:422 studies.harmonics
-  - oneline.js:5099 studies.harmonics
+  - oneline.js:5102 studies.harmonics
 - `studyResults.loadFlow`
-  - oneline.js:5023 studies.loadFlow
+  - oneline.js:5026 studies.loadFlow
 - `studyResults.motorStart`
   - analysis/motorStart.js:211 studies.motorStart
-  - oneline.js:5107 studies.motorStart
+  - oneline.js:5110 studies.motorStart
 - `studyResults.reliability`
-  - oneline.js:5127 studies.reliability
+  - oneline.js:5130 studies.reliability
 - `studyResults.shortCircuit`
-  - oneline.js:5060 studies.shortCircuit
-  - oneline.js:5080 studies.shortCircuit
+  - oneline.js:5063 studies.shortCircuit
+  - oneline.js:5083 studies.shortCircuit
 - `traySchedule`
-  - oneline.js:8745 addRaceway()
-  - oneline.js:9262 addRaceway()
+  - oneline.js:8748 addRaceway()
+  - oneline.js:9265 addRaceway()
 
 ### Demand Schedule (`demandschedule.html`)
 

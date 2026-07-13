@@ -2136,6 +2136,7 @@ body.oneline-page.engineering-print-mode {
 
 .prop-modal {
   position: fixed;
+  z-index: 11000;
   top: 0;
   left: 0;
   width: 100%;

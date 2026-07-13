@@ -377,7 +377,7 @@ test('editing a source voltage updates inherited props and connections', async (
   await page.goto(pageUrl('oneline.html?e2e=1'));
   await page.waitForSelector('[data-oneline-ready="1"]');
   await page.waitForSelector('g.component[data-id="source1"] image');
-  await page.dblclick('g.component[data-id="source1"] image');
+  await page.locator('g.component[data-id="source1"] image').dispatchEvent('dblclick');
   await page.getByRole('tab', { name: 'Electrical' }).click();
   const voltsInput = page.locator('#prop-modal input[name="volts"]');
   await voltsInput.waitFor();
