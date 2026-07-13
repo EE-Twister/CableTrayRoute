@@ -2,6 +2,7 @@ import { getItem, removeItem, getCables, getConduits, getDuctbanks } from './dat
 import { showAlertModal } from './src/components/modal.js';
 import { createFillGauge } from './src/components/fillGauge.js';
 import { summarizeCableWorkflow } from './analysis/scheduleWorkflow.mjs';
+import { buildProjectConduitFillContext, listProjectConduits } from './src/conduitFillProjectAdapter.mjs';
 
 checkPrereqs([{key:'conduitSchedule',page:'racewayschedule.html',label:'Raceway Schedule'}]);
 
@@ -25,10 +26,6 @@ checkPrereqs([{key:'conduitSchedule',page:'racewayschedule.html',label:'Raceway 
       }
     }
 
-    function countDuctbankConduits(ductbanks) {
-      return ductbanks.reduce((sum, ductbank) => sum + ((ductbank.conduits || []).length), 0);
-    }
-
     function renderConduitFillHandoff(context = {}) {
       const el = document.getElementById('conduit-fill-handoff');
       if (!el) return;
@@ -37,22 +34,29 @@ checkPrereqs([{key:'conduitSchedule',page:'racewayschedule.html',label:'Raceway 
       const ductbanks = readStoredList(getDuctbanks);
       const schedule = summarizeCableWorkflow(cables);
       const loadedCables = Array.isArray(context.cables) ? context.cables.length : 0;
-      const conduitCount = conduits.length + countDuctbankConduits(ductbanks);
+      const projectConduits = listProjectConduits({ conduits, ductbanks });
+      const conduitCount = projectConduits.length;
       const label = [context.type, context.tradeSize].filter(Boolean).join(' ');
       const title = loadedCables
-        ? `Reviewing ${label || 'selected conduit'}`
+        ? `Reviewing ${[context.conduitId, label].filter(Boolean).join(' · ') || 'selected conduit'}`
         : (conduitCount ? 'Select a conduit from Routing or Raceway Schedule' : 'Add conduits before project fill review');
       const detail = loadedCables
         ? `${loadedCables} cable(s) are loaded for this conduit fill check. ${schedule.routingReady} cable schedule row(s) are routing-ready.`
         : (conduitCount
             ? `${conduitCount} conduit record(s) are available. Open a routed conduit segment for a project-specific fill check.`
             : 'Conduit Fill still works standalone, but integrated workflow data starts in the Raceway Schedule and Cable Schedule.');
+      const conduitOptions = (context.availableConduits || []).map(conduit => `
+        <option value="${escapeHtml(conduit.id)}"${conduit.id === context.conduitId ? ' selected' : ''}>
+          ${escapeHtml([conduit.id, conduit.ductbankId, `${conduit.cableCount} cable(s)`].filter(Boolean).join(' · '))}
+        </option>
+      `).join('');
       el.innerHTML = `
         <div>
           <strong>${escapeHtml(title)}</strong>
           <p>${escapeHtml(detail)}</p>
         </div>
         <span>
+          ${conduitOptions ? `<label class="visually-hidden" for="conduit-fill-project-select">Project conduit</label><select id="conduit-fill-project-select" aria-label="Project conduit">${conduitOptions}</select>` : ''}
           <a class="btn" href="racewayschedule.html">Raceway Schedule</a>
           <a class="btn" href="cableschedule.html">Cable Schedule</a>
           <a class="btn" href="optimalRoute.html">Routing</a>
@@ -435,13 +439,17 @@ checkPrereqs([{key:'conduitSchedule',page:'racewayschedule.html',label:'Raceway 
       tableBody.addEventListener('click',e=>{if(e.target.tagName==='BUTTON') markUnsaved();});
       ['copyPngBtn','printBtn','copyBtn'].forEach(id=>{const el=document.getElementById(id);if(el)el.addEventListener('click',markSaved);});
 
-      let conduitHandoffContext = {};
-      renderConduitFillHandoff(conduitHandoffContext);
-      const stored = getItem('conduitFillData');
-      if (stored) {
+      const projectData = {
+        cables: readStoredList(getCables),
+        conduits: readStoredList(getConduits),
+        ductbanks: readStoredList(getDuctbanks),
+      };
+
+      function applyConduitHandoffContext(context) {
+        if (!context) return;
+        const { type, tradeSize, cables } = context;
+        const conduitHandoffContext = { ...context, cables: Array.isArray(cables) ? cables : [] };
         try {
-          const { type, tradeSize, cables } = stored;
-          conduitHandoffContext = { type, tradeSize, cables: Array.isArray(cables) ? cables : [] };
           if (type) {
             typeSel.value = type;
             populateSizes();
@@ -461,12 +469,41 @@ checkPrereqs([{key:'conduitSchedule',page:'racewayschedule.html',label:'Raceway 
                 row.children[4].querySelector('input').value = Number.isFinite(od) ? od.toFixed(2) : '';
               tableBody.appendChild(row);
             });
+            if (!cables.length) tableBody.appendChild(createCableRow());
           }
           document.getElementById('drawBtn').click();
           renderConduitFillHandoff(conduitHandoffContext);
+          const projectSelect = document.getElementById('conduit-fill-project-select');
+          projectSelect?.addEventListener('change', () => {
+            const next = buildProjectConduitFillContext({ ...projectData, selectedConduitId: projectSelect.value });
+            applyConduitHandoffContext(next);
+            const url = new URL(location.href);
+            url.searchParams.set('conduit', projectSelect.value);
+            history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
+          });
         } catch (e) {
           console.error('Failed to load conduitFillData', e);
         }
+      }
+
+      const requestedConduitId = new URLSearchParams(location.search).get('conduit') || '';
+      const stored = getItem('conduitFillData');
+      let conduitHandoffContext = null;
+      if (requestedConduitId || !stored) {
+        conduitHandoffContext = buildProjectConduitFillContext({ ...projectData, selectedConduitId: requestedConduitId });
+      } else if (stored) {
+        const { type, tradeSize, cables, conduitId } = stored;
+        conduitHandoffContext = {
+          type,
+          tradeSize,
+          conduitId,
+          cables: Array.isArray(cables) ? cables : [],
+          availableConduits: buildProjectConduitFillContext({ ...projectData, selectedConduitId: conduitId })?.availableConduits || [],
+        };
+      }
+      if (conduitHandoffContext) applyConduitHandoffContext(conduitHandoffContext);
+      else renderConduitFillHandoff({});
+      if (stored) {
         removeItem('conduitFillData');
       }
       document.querySelectorAll('.helpBtn').forEach(btn=>{

@@ -350,6 +350,18 @@ describe('Legacy specialist sample enrichment', () => {
     assert.ok([...loadTags].every(tag => components.some(component => component.loadRef === tag)));
     assert.ok(payload.ductbanks.every(row => row.tag && row.from && row.to && row.concrete_encasement));
     assert.strictEqual(components.flatMap(component => component.connections || []).length, 3);
+    const sources = components.filter(component => component.type === 'source');
+    sources.forEach(source => {
+      source.connections.forEach(connection => {
+        const target = components.find(component => component.id === connection.target);
+        assert.ok(target, `${source.id} connection target should exist`);
+        assert.strictEqual(connection.sourcePort, 0);
+        assert.strictEqual(connection.targetPort, 0);
+        assert.strictEqual(connection.dir, 'v');
+        assert.ok(source.y < target.y, `${source.id} should be above ${target.id} for vertical one-line orientation`);
+        assert.strictEqual(target.rotation, 0);
+      });
+    });
   });
 });
 

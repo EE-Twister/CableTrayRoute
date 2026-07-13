@@ -166,9 +166,14 @@ export const SAMPLE_REGISTRY = [
     projectFile: 'samples/ductbank-network.json',
     pagesUsed: ['equipmentlist.html', 'loadlist.html', 'oneline.html', 'cableschedule.html', 'racewayschedule.html', 'ductbankroute.html', 'conduitfill.html', 'iec60287.html'],
     guidedChecklist: [
-      { step: 1, label: 'Open ductbank route', page: 'ductbankroute.html', hint: 'Review the ductbank geometry, conduit arrangement, and soil thermal resistivity.' },
-      { step: 2, label: 'Check conduit fill', page: 'conduitfill.html', hint: 'Verify each conduit is within the NEC 40% fill limit.' },
-      { step: 3, label: 'Run IEC 60287 ampacity', page: 'iec60287.html', hint: 'Confirm derating for soil temperature and mutual heating.' },
+      { step: 1, label: 'Review equipment basis', page: 'equipmentlist.html', hint: 'Confirm the two sources and three transformer destinations used throughout the sample.' },
+      { step: 2, label: 'Review connected loads', page: 'loadlist.html', hint: 'Trace each diversified transformer demand into its feeder current.' },
+      { step: 3, label: 'Inspect the connected one-line', page: 'oneline.html', hint: 'Verify all three feeders connect from their source switchgear into the transformer primary ports.' },
+      { step: 4, label: 'Review cable assignments', page: 'cableschedule.html', hint: 'Confirm cable endpoints, sizes, loads, and assigned ductbanks.' },
+      { step: 5, label: 'Review ductbank schedule', page: 'racewayschedule.html', hint: 'Expand both ductbanks and review their parent data and conduit children.' },
+      { step: 6, label: 'Analyze the primary ductbank', page: 'ductbankroute.html?ductbank=DUCTBANK-DB-01', hint: 'Run fill and thermal checks for the two feeders in DUCTBANK-DB-01, then switch to DB-02 for the third circuit.' },
+      { step: 7, label: 'Check a populated conduit', page: 'conduitfill.html?conduit=DB01-COND-1', hint: 'Verify UG-CBL-001 is loaded into DB01-COND-1 and remains within the NEC fill limit.' },
+      { step: 8, label: 'Run linked IEC 60287 ampacity', page: 'iec60287.html?scope=circuit%3AUG-CBL-001', hint: 'Confirm the 15 kV cable, buried conduit, soil, depth, and grouping assumptions before calculating.' },
     ],
   },
   {

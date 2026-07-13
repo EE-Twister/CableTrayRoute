@@ -271,7 +271,7 @@ import { applyRecordImport, previewRecordImport } from './analysis/scheduleWorkf
       setWidth(sx,5);
       const sxInput=document.createElement('input');
       sxInput.type='number';
-      sxInput.value=db.start_x||'';
+      sxInput.value=db.start_x??'';
       const sxRules=['required','numeric'];
       sxInput.addEventListener('input',e=>{db.start_x=e.target.value;db.conduits.forEach(c=>c.start_x=db.start_x);TableUtils.applyValidation(sxInput,sxRules);saveDuctbanks();});
       TableUtils.applyValidation(sxInput,sxRules);
@@ -281,7 +281,7 @@ import { applyRecordImport, previewRecordImport } from './analysis/scheduleWorkf
       setWidth(sy,6);
       const syInput=document.createElement('input');
       syInput.type='number';
-      syInput.value=db.start_y||'';
+      syInput.value=db.start_y??'';
       const syRules=['required','numeric'];
       syInput.addEventListener('input',e=>{db.start_y=e.target.value;db.conduits.forEach(c=>c.start_y=db.start_y);TableUtils.applyValidation(syInput,syRules);saveDuctbanks();});
       TableUtils.applyValidation(syInput,syRules);
@@ -291,7 +291,7 @@ import { applyRecordImport, previewRecordImport } from './analysis/scheduleWorkf
       setWidth(sz,7);
       const szInput=document.createElement('input');
       szInput.type='number';
-      szInput.value=db.start_z||'';
+      szInput.value=db.start_z??'';
       const szRules=['required','numeric'];
       szInput.addEventListener('input',e=>{db.start_z=e.target.value;db.conduits.forEach(c=>c.start_z=db.start_z);TableUtils.applyValidation(szInput,szRules);saveDuctbanks();});
       TableUtils.applyValidation(szInput,szRules);
@@ -301,7 +301,7 @@ import { applyRecordImport, previewRecordImport } from './analysis/scheduleWorkf
       setWidth(ex,8);
       const exInput=document.createElement('input');
       exInput.type='number';
-      exInput.value=db.end_x||'';
+      exInput.value=db.end_x??'';
       const exRules=['required','numeric'];
       exInput.addEventListener('input',e=>{db.end_x=e.target.value;db.conduits.forEach(c=>c.end_x=db.end_x);TableUtils.applyValidation(exInput,exRules);saveDuctbanks();});
       TableUtils.applyValidation(exInput,exRules);
@@ -311,7 +311,7 @@ import { applyRecordImport, previewRecordImport } from './analysis/scheduleWorkf
       setWidth(ey,9);
       const eyInput=document.createElement('input');
       eyInput.type='number';
-      eyInput.value=db.end_y||'';
+      eyInput.value=db.end_y??'';
       const eyRules=['required','numeric'];
       eyInput.addEventListener('input',e=>{db.end_y=e.target.value;db.conduits.forEach(c=>c.end_y=db.end_y);TableUtils.applyValidation(eyInput,eyRules);saveDuctbanks();});
       TableUtils.applyValidation(eyInput,eyRules);
@@ -321,7 +321,7 @@ import { applyRecordImport, previewRecordImport } from './analysis/scheduleWorkf
       setWidth(ez,10);
       const ezInput=document.createElement('input');
       ezInput.type='number';
-      ezInput.value=db.end_z||'';
+      ezInput.value=db.end_z??'';
       const ezRules=['required','numeric'];
       ezInput.addEventListener('input',e=>{db.end_z=e.target.value;db.conduits.forEach(c=>c.end_z=db.end_z);TableUtils.applyValidation(ezInput,ezRules);saveDuctbanks();});
       TableUtils.applyValidation(ezInput,ezRules);

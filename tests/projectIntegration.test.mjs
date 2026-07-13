@@ -161,6 +161,33 @@ assert.equal(thermalInputs.inputs.insulation, 'PVC');
 assert.equal(thermalInputs.inputs.installMethod, 'tray');
 assert.equal(thermalInputs.inputs.ambientTempC, 45);
 
+const ductbankProject = {
+  equipment: [{ tag: 'SW-1', voltage: 13800 }, { tag: 'XFMR-1', voltage: 13800 }],
+  loads: [{ tag: 'LOAD-1', source: 'XFMR-1', voltage: 13800, kw: 7200, powerFactor: 0.95, phases: 3 }],
+  cables: [
+    { tag: 'UG-1', from: 'SW-1', to: 'XFMR-1', conductor_size: '500 kcmil', conductor_material: 'Copper', conductors: 3, operating_voltage: 13800, voltage_rating: 15000, raceway_ids: ['DB-1'], conduit_id: 'DB-1-C1' },
+    { tag: 'UG-2', from: 'SW-1', to: 'XFMR-1', conductor_size: '500 kcmil', conductor_material: 'Copper', conductors: 3, operating_voltage: 13800, voltage_rating: 15000, raceway_ids: ['DB-1'], conduit_id: 'DB-1-C2' },
+  ],
+  conduits: [],
+  ductbanks: [{ ductbank_id: 'DB-1', coverDepth: 36, soilThermalResistivity: 90, conduits: [
+    { conduit_id: 'DB-1-C1', type: 'PVC Sch 40', trade_size: '5' },
+    { conduit_id: 'DB-1-C2', type: 'PVC Sch 40', trade_size: '5' },
+  ] }],
+  trays: [],
+  sampleStudyInputs: { iec60287: { installationDepth: 1.05, soilThermalResistivity: 0.9, ambientSoilTemp: 20, frequencyHz: 60, voltageClass: '8.7/15kV' } },
+};
+const ductbankScope = resolveProjectScope('circuit:ug-1', ductbankProject);
+const ductbankThermalInputs = buildCableThermalProjectInputs(ductbankScope, ductbankProject);
+assert.equal(ductbankThermalInputs.inputs.sizeMm2, 300);
+assert.equal(ductbankThermalInputs.inputs.voltageClass, '8.7/15kV');
+assert.equal(ductbankThermalInputs.inputs.installMethod, 'conduit');
+assert.equal(ductbankThermalInputs.inputs.burialDepthMm, 1050);
+assert.equal(ductbankThermalInputs.inputs.soilResistivity, 0.9);
+assert.equal(ductbankThermalInputs.inputs.ambientTempC, 20);
+assert.equal(ductbankThermalInputs.inputs.frequencyHz, 60);
+assert.equal(ductbankThermalInputs.inputs.U0_kV, 7.967);
+assert.equal(ductbankThermalInputs.inputs.nCables, 2);
+
 const bessInputs = buildBessHazardProjectInputs({
   equipment: [],
   projectMeta: { maxAmbientTempC: 42 },

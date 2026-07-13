@@ -33,7 +33,8 @@ import {
   cloneScenarioStorage,
   writeSavedProject,
   readSavedProject,
-  wasSavedProjectMigrated
+  wasSavedProjectMigrated,
+  clearConduitCache
 } from './projectStorage.js';
 
 registerScenario(getCurrentScenarioNameState());
@@ -1162,6 +1163,7 @@ export function importProject(obj) {
 
   setDuctbanks(data.ductbanks);
   setConduits(data.conduits);
+  clearConduitCache();
   setTrays(data.trays);
   setCables(data.cables);
   setCableTypicals(Array.isArray(data.cableTypicals) ? data.cableTypicals : []);

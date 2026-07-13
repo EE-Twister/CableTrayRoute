@@ -4,7 +4,7 @@ import {
   MAX_TEMP_C,
 } from './analysis/iec60287.mjs';
 import {
-  getStudies, setStudies, getCables, getEquipment, getLoads, getTrays, getConduits,
+  getStudies, setStudies, getCables, getEquipment, getLoads, getTrays, getConduits, getDuctbanks, getItem,
   getDesignBasis, getProjectMeta,
 } from './dataStore.mjs';
 import { initStudyApprovalPanel } from './src/components/studyApproval.js';
@@ -23,6 +23,7 @@ import {
   renderProjectInputPanel,
   renderProjectScopeSelector,
 } from './src/components/projectInputBinding.js';
+import { escapeHtml as escHtml } from './src/htmlUtils.mjs';
 
 document.addEventListener('DOMContentLoaded', () => {
   initSettings();
@@ -42,11 +43,16 @@ document.addEventListener('DOMContentLoaded', () => {
   const insulThickInput = document.getElementById('insul-thick-mm');
   const projectOverrides = new Set();
   const projectData = () => ({
-    cables: getCables(), equipment: getEquipment(), loads: getLoads(), trays: getTrays(), conduits: getConduits(),
-    designBasis: getDesignBasis(), projectMeta: getProjectMeta(), studies: getStudies(),
+    cables: getCables(), equipment: getEquipment(), loads: getLoads(), trays: getTrays(), conduits: getConduits(), ductbanks: getDuctbanks(),
+    designBasis: getDesignBasis(), projectMeta: getProjectMeta(), studies: getStudies(), sampleStudyInputs: getItem('sampleStudyInputs', {}),
   });
   const scopeOptions = buildProjectScopeOptions(projectData(), ['circuit']);
-  let selectedScopeValue = getStudies().iec60287?.projectLink?.scopeValue || scopeOptions[0]?.value || '';
+  const saved = getStudies().iec60287;
+  const savedIsResult = Number.isFinite(Number(saved?.I_rated));
+  const requestedScope = new URLSearchParams(location.search).get('scope') || '';
+  let selectedScopeValue = scopeOptions.some(option => option.value === requestedScope)
+    ? requestedScope
+    : (savedIsResult ? saved?.projectLink?.scopeValue : '') || scopeOptions[0]?.value || '';
   let projectInputModel = null;
 
   initStudyBasisPanel('iec60287', {
@@ -76,7 +82,9 @@ document.addEventListener('DOMContentLoaded', () => {
     projectInputModel = buildCableThermalProjectInputs(resolveProjectScope(scopeValue, projectData()), projectData());
     const fields = {
       sizeMm2: 'size-mm2', material: 'material', insulation: 'insulation', nCores: 'n-cores',
-      installMethod: 'install-method', ambientTempC: 'ambient-temp-c', U0_kV: 'u0-kv',
+      voltageClass: 'voltage-class', installMethod: 'install-method', burialDepthMm: 'burial-depth-mm',
+      soilResistivity: 'soil-resistivity', conduitOD_mm: 'conduit-od-mm', ambientTempC: 'ambient-temp-c',
+      frequencyHz: 'frequency-hz', U0_kV: 'u0-kv', nCables: 'n-cables', groupArrangement: 'group-arrangement',
     };
     Object.entries(fields).forEach(([fieldName, id]) => {
       const element = document.getElementById(id);
@@ -99,14 +107,13 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // --- Restore previous results ---
-  const saved = getStudies().iec60287;
-  if (saved) {
+  if (savedIsResult) {
     (saved.projectLink?.overrides || []).forEach(field => projectOverrides.add(field));
     restoreForm(saved);
     renderResults(saved);
     projectInputModel = buildCableThermalProjectInputs(resolveProjectScope(selectedScopeValue, projectData()), projectData());
   } else if (selectedScopeValue) {
-    applyProjectScope(selectedScopeValue);
+    applyProjectScope(selectedScopeValue, { force: true });
   } else {
     renderProjectInputPanel({
       container: form,
@@ -283,6 +290,10 @@ document.addEventListener('DOMContentLoaded', () => {
       : '';
 
     const tr = r.thermalResistances;
+    const materialAlpha20 = r.material === 'Al' ? 0.00403 : 0.00393;
+    const dcResistance20 = Number.isFinite(Number(r.R_dc20))
+      ? Number(r.R_dc20)
+      : Number(r.R_dcTheta) / (1 + materialAlpha20 * (Number(r.thetaMax) - 20));
 
     resultsDiv.innerHTML = `
       <section class="results-panel" aria-labelledby="results-heading">
@@ -310,7 +321,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <h3>Conductor Properties</h3>
           <div class="result-row">
             <span class="result-label">DC resistance at 20 °C  R₂₀</span>
-            <span class="result-value">${(r.R_dc20 * 1000).toFixed(4)} mΩ/m</span>
+            <span class="result-value">${(dcResistance20 * 1000).toFixed(4)} mΩ/m</span>
           </div>
           <div class="result-row">
             <span class="result-label">DC resistance at ${r.thetaMax} °C  R_dc_θ</span>

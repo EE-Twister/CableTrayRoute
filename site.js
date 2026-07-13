@@ -27,6 +27,7 @@ import {
   getProjectMeta,
   getDesignBasis,
   getItem,
+  removeItem,
   applyRemoteSnapshot
 } from "./dataStore.mjs";
 import { getPageContract } from "./src/pageContracts.js";
@@ -2224,6 +2225,74 @@ function initWorkflowStepNav(){
 
 globalThis.document?.addEventListener('DOMContentLoaded',initWorkflowStepNav);
 
+function initActiveSampleWorkflowGuide(){
+  if(typeof document==='undefined') return;
+  const workflow=getItem('activeSampleWorkflow');
+  const steps=Array.isArray(workflow?.checklist)?workflow.checklist:[];
+  if(!workflow?.id||!steps.length) return;
+  const page=(location.pathname.split('/').pop()||'index.html').toLowerCase();
+  const currentIndex=steps.findIndex(step=>(String(step.page||'').split(/[?#]/)[0]||'').toLowerCase()===page);
+  if(currentIndex<0) return;
+
+  const current=steps[currentIndex];
+  const guide=document.createElement('aside');
+  guide.className='sample-workflow-guide';
+  guide.setAttribute('aria-label',`${workflow.title} sample workflow`);
+
+  const identity=document.createElement('div');
+  identity.className='sample-workflow-guide__identity';
+  const eyebrow=document.createElement('span');
+  eyebrow.className='sample-workflow-guide__eyebrow';
+  eyebrow.textContent='Sample workflow';
+  const title=document.createElement('strong');
+  title.textContent=workflow.title;
+  identity.append(eyebrow,title);
+
+  const progress=document.createElement('div');
+  progress.className='sample-workflow-guide__progress';
+  progress.textContent=`${currentIndex+1} of ${steps.length} · ${current.label}`;
+  progress.title=current.hint||current.label;
+
+  const actions=document.createElement('nav');
+  actions.className='sample-workflow-guide__actions';
+  actions.setAttribute('aria-label','Sample workflow navigation');
+  const addLink=(step,label)=>{
+    if(!step) return;
+    const link=document.createElement('a');
+    link.className='sample-workflow-guide__link';
+    link.href=step.page;
+    link.textContent=label;
+    actions.appendChild(link);
+  };
+  addLink(steps[currentIndex-1],'← Previous');
+  addLink(steps[currentIndex+1],'Next →');
+  const checklist=document.createElement('a');
+  checklist.className='sample-workflow-guide__link';
+  checklist.href=`samplegallery.html#${encodeURIComponent(workflow.title)}`;
+  checklist.textContent='Checklist';
+  actions.appendChild(checklist);
+  const close=document.createElement('button');
+  close.type='button';
+  close.className='sample-workflow-guide__close';
+  close.setAttribute('aria-label','Exit sample workflow');
+  close.textContent='Exit';
+  close.addEventListener('click',()=>{
+    removeItem('activeSampleWorkflow');
+    guide.remove();
+    showOperationToast('Sample workflow guide closed');
+  });
+  actions.appendChild(close);
+
+  guide.append(identity,progress,actions);
+  const main=document.getElementById('main-content')||document.querySelector('main');
+  if(!main) return;
+  const workflowNav=main.querySelector(':scope > .workflow-step-nav');
+  if(workflowNav) workflowNav.insertAdjacentElement('afterend',guide);
+  else main.prepend(guide);
+}
+
+globalThis.document?.addEventListener('DOMContentLoaded',initActiveSampleWorkflowGuide);
+
 function initStudyFreshnessBanner(){
   if(typeof document==='undefined') return;
   const pageName=(location.pathname.split('/').pop()||'index.html').toLowerCase();
@@ -2234,6 +2303,7 @@ function initStudyFreshnessBanner(){
   const studyKey=studyOutput.key.slice('studyResults.'.length);
   const result=getStudies()?.[studyKey];
   if(!result) return;
+  if(result.sample===true&&!Number.isFinite(Number(result.I_rated))&&!result.projectLink) return;
   const provenance=getStudyProvenance()?.[studyKey];
   const currentHash=getProjectInputFingerprint();
   const stale=Boolean(provenance?.inputHash&&provenance.inputHash!==currentHash);

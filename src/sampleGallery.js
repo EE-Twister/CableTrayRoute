@@ -1,7 +1,7 @@
 import './workflowStatus.js';
 import '../site.js';
-import { importProject, saveProject } from '../dataStore.mjs';
-import { getProjectState, listSavedProjects, readAppSetting, setProjectState, writeAppSetting } from '../projectStorage.js';
+import { importProject, saveProject, setItem } from '../dataStore.mjs';
+import { getProjectState, listSavedProjects, readAppSetting, setConduitCache, setProjectState, writeAppSetting } from '../projectStorage.js';
 import { SAMPLE_REGISTRY, getSampleProjectCopyName, getSamplesByTag, validateSampleProject, migrateSampleProject, sampleProjectToImportPayload } from '../analysis/sampleGallery.mjs';
 
 const PROGRESS_KEY_PREFIX = 'ctr_sample_progress_';
@@ -217,14 +217,22 @@ async function openSample(sample) {
   }
 
   try {
-    const imported = importProject(sampleProjectToImportPayload(migrated));
+    const payload = sampleProjectToImportPayload(migrated);
+    const imported = importProject(payload);
     if (!imported) {
       showToast('Sample import was cancelled or could not be applied.', 'error');
       return;
     }
+    setConduitCache({ ductbanks: payload.ductbanks, conduits: payload.conduits });
     const projectId = getSampleProjectCopyName(sample.title, listSavedProjects());
     setProjectState({ ...getProjectState(), name: projectId });
     window.currentProjectId = projectId;
+    setItem('activeSampleWorkflow', {
+      id: sample.id,
+      title: sample.title,
+      checklist: sample.guidedChecklist.map(step => ({ ...step })),
+      startedAt: new Date().toISOString(),
+    });
     history.replaceState(null, '', `${location.pathname}${location.search}#${encodeURIComponent(projectId)}`);
     globalThis.applyProjectHash?.();
     saveProject(projectId);

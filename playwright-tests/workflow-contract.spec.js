@@ -98,7 +98,8 @@ function monitorPage(page, origin) {
 }
 
 async function gotoWorkflowPage(page, server, file) {
-  await page.goto(server.url(`${file}?e2e=1`), { waitUntil: 'domcontentloaded' });
+  const separator = file.includes('?') ? '&' : '?';
+  await page.goto(server.url(`${file}${separator}e2e=1`), { waitUntil: 'domcontentloaded' });
   await page.waitForLoadState('networkidle', { timeout: 6000 }).catch(() => {});
   await page.locator('body').waitFor({ state: 'visible' });
 }
@@ -193,10 +194,23 @@ test('legacy specialist sample hydrates every supporting project surface', async
 });
 
 test('Underground Ductbank checklist loads the sample before opening its route tables', async ({ page }) => {
+  const monitor = monitorPage(page, server.origin);
   await gotoWorkflowPage(page, server, 'samplegallery.html');
+  const existingSample = page.locator('[data-sample-id="project-workflow-core"]');
+  await existingSample.getByRole('button', { name: 'Open Project Workflow Core sample project' }).click();
+  await expect(page.locator('#checklist-panel')).toContainText('Guided Workflow: Project Workflow Core');
+  await page.evaluate(() => {
+    window.projectStorage.setConduitCache({
+      ductbanks: [{ start_x: 0, start_y: 0, start_z: -3.5, end_x: 220, end_y: 0, end_z: -3.5, conduits: [] }],
+      conduits: []
+    });
+  });
   const card = page.locator('[data-sample-id="ductbank-network"]');
   await card.getByRole('button', { name: 'Load Underground Ductbank and show its guided checklist' }).click();
   await expect(page.locator('#checklist-panel')).toContainText('Guided Workflow: Underground Ductbank');
+  const importedConduitCache = await page.evaluate(() => JSON.parse(localStorage.getItem('CTR_CONDUITS') || '{}'));
+  expect(importedConduitCache.ductbanks?.[0]?.tag).toBe('DUCTBANK-DB-01');
+  expect(importedConduitCache.ductbanks?.[0]?.from).toBe('SUBSTATION-SW1');
 
   await gotoWorkflowPage(page, server, 'equipmentlist.html');
   await expect(page.locator('#equipment-table tbody tr')).toHaveCount(5);
@@ -208,7 +222,41 @@ test('Underground Ductbank checklist loads the sample before opening its route t
 
   await gotoWorkflowPage(page, server, 'oneline.html');
   await expect(page.locator('#diagram g.component')).toHaveCount(5);
+  await expect(page.locator('#diagram .connection')).toHaveCount(3);
   await expect(page.locator('.readiness-card')).toContainText('100%');
+  await expect(page.locator('.sample-workflow-guide')).toContainText('3 of 8');
+  await expect(page.locator('.sample-workflow-guide')).toHaveCSS('display', 'grid');
+  const diagramOverview = page.locator('#right-rail-properties > .right-rail-empty');
+  await expect(diagramOverview).toContainText('Diagram Overview');
+  await expect(diagramOverview).not.toContainText('Start Drawing');
+  const connectionGeometry = await page.evaluate(() => {
+    const oneLine = window.dataStore.getOneLine();
+    const components = oneLine.sheets[oneLine.activeSheet || 0].components;
+    return Array.from(document.querySelectorAll('#diagram .connection')).map(polyline => {
+      const source = components.find(component => component.id === polyline.dataset.comp);
+      const connection = source?.connections?.[Number(polyline.dataset.index)];
+      const sourceImage = document.querySelector(`#diagram g.component[data-id="${source?.id}"] image`);
+      const targetImage = document.querySelector(`#diagram g.component[data-id="${connection?.target}"] image`);
+      const points = polyline.getAttribute('points').trim().split(/\s+/).map(value => value.split(',').map(Number));
+      const [startX, startY] = points[0];
+      const [endX, endY] = points[points.length - 1];
+      const box = image => ({
+        x: Number(image?.getAttribute('x')),
+        y: Number(image?.getAttribute('y')),
+        width: Number(image?.getAttribute('width')),
+        height: Number(image?.getAttribute('height')),
+      });
+      return { startX, startY, endX, endY, source: box(sourceImage), target: box(targetImage) };
+    });
+  });
+  connectionGeometry.forEach(connection => {
+    expect(Math.abs(connection.startY - (connection.source.y + connection.source.height))).toBeLessThan(0.1);
+    expect(connection.startX).toBeGreaterThanOrEqual(connection.source.x);
+    expect(connection.startX).toBeLessThanOrEqual(connection.source.x + connection.source.width);
+    expect(Math.abs(connection.endY - connection.target.y)).toBeLessThan(0.1);
+    expect(connection.endX).toBeGreaterThanOrEqual(connection.target.x);
+    expect(connection.endX).toBeLessThanOrEqual(connection.target.x + connection.target.width);
+  });
 
   await gotoWorkflowPage(page, server, 'cableschedule.html');
   const firstCable = page.locator('#cableScheduleTable tbody tr').first();
@@ -221,14 +269,51 @@ test('Underground Ductbank checklist loads the sample before opening its route t
   await expect(firstDuctbank.locator('input').nth(1)).toHaveValue('SUBSTATION-SW1');
   await expect(firstDuctbank.locator('input').nth(2)).toHaveValue('PAD-XFMR-T2 / PAD-XFMR-T3');
   await expect(firstDuctbank.locator('input[type="checkbox"]')).toBeChecked();
+  const firstDuctbankGeometry = firstDuctbank.locator('input[type="number"]');
+  await expect(firstDuctbankGeometry.nth(0)).toHaveValue('0');
+  await expect(firstDuctbankGeometry.nth(1)).toHaveValue('0');
+  await expect(firstDuctbankGeometry.nth(2)).toHaveValue('-3.5');
+  await expect(firstDuctbankGeometry.nth(3)).toHaveValue('220');
+  await expect(firstDuctbankGeometry.nth(4)).toHaveValue('0');
+  await expect(firstDuctbankGeometry.nth(5)).toHaveValue('-3.5');
 
-  await gotoWorkflowPage(page, server, 'ductbankroute.html');
+  await gotoWorkflowPage(page, server, 'ductbankroute.html?ductbank=DUCTBANK-DB-01');
 
   await expect(page.locator('#ductbankTag')).toHaveValue('DUCTBANK-DB-01');
+  await expect(page.locator('#projectDuctbankSelect')).toHaveValue('DUCTBANK-DB-01');
   await expect(page.locator('#conduitTable tbody tr')).toHaveCount(4);
   await expect(page.locator('#cableTable tbody tr')).toHaveCount(2);
   await expect(page.locator('#cableTable tbody tr').first().locator('input[name="tag"]')).toHaveValue('UG-CBL-001');
   await expect(page.locator('#cableTable tbody tr').first().locator('input[name="conduit_id"]')).toHaveValue('DB01-COND-1');
+  await page.locator('#projectDuctbankSelect').selectOption('DUCTBANK-DB-02');
+  await expect(page.locator('#ductbankTag')).toHaveValue('DUCTBANK-DB-02');
+  await expect(page.locator('#conduitTable tbody tr')).toHaveCount(2);
+  await expect(page.locator('#cableTable tbody tr')).toHaveCount(1);
+  await expect(page.locator('#cableTable tbody tr').first().locator('input[name="tag"]')).toHaveValue('UG-CBL-003');
+
+  await gotoWorkflowPage(page, server, 'conduitfill.html?conduit=DB01-COND-1');
+  await expect(page.locator('#conduit-fill-handoff')).toContainText('DB01-COND-1');
+  await expect(page.locator('#conduitType')).toHaveValue('PVC Sch 40');
+  await expect(page.locator('#tradeSize')).toHaveValue('5');
+  await expect(page.locator('#cableTable tbody tr')).toHaveCount(1);
+  await expect(page.locator('#cableTable tbody tr').first().locator('input').nth(0)).toHaveValue('UG-CBL-001');
+
+  await gotoWorkflowPage(page, server, 'iec60287.html?scope=circuit%3AUG-CBL-001');
+  await expect(page.locator('#size-mm2')).toHaveValue('300');
+  await expect(page.locator('#voltage-class')).toHaveValue('8.7/15kV');
+  await expect(page.locator('#install-method')).toHaveValue('conduit');
+  await expect(page.locator('#burial-depth-mm')).toHaveValue('1050');
+  await expect(page.locator('#soil-resistivity')).toHaveValue('0.9');
+  await expect(page.locator('#ambient-temp-c')).toHaveValue('20');
+  await expect(page.locator('#frequency-hz')).toHaveValue('60');
+  await expect(page.locator('#u0-kv')).toHaveValue('7.967');
+  await expect(page.locator('#n-cables')).toHaveValue('2');
+  await page.getByRole('button', { name: 'Calculate Ampacity' }).click();
+  expect(monitor.errors).toEqual([]);
+  await expect(page.locator('#results')).toContainText('IEC 60287 Ampacity Results');
+  await expect(page.locator('#results')).toContainText('In conduit (buried)');
+  await expect(page.locator('#results')).toContainText('0.0600 mΩ/m');
+  await expect(page.locator('#results')).not.toContainText('NaN');
 });
 
 test('sample project satisfies contract handoffs from equipment through deliverables', async ({ page }) => {

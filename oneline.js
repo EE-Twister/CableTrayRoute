@@ -5897,16 +5897,14 @@ function renderRightRailProperties() {
     const empty = document.createElement('div');
     empty.className = 'right-rail-empty';
     const heading = document.createElement('h4');
-    heading.textContent = 'Start Drawing';
+    const hasDiagram = components.length > 0;
+    heading.textContent = hasDiagram ? 'Diagram Overview' : 'Start Drawing';
     const copy = document.createElement('p');
-    copy.textContent = 'Select a component to inspect it, or load the sample to see a complete source-to-load one-line.';
+    copy.textContent = hasDiagram
+      ? `${components.length} component(s) and ${getConnectionCount()} connection(s) are shown. Select a component or feeder to inspect its linked project data.`
+      : 'Select a component to inspect it, or load the sample to see a complete source-to-load one-line.';
     const actions = document.createElement('div');
     actions.className = 'right-rail-actions';
-    const sampleBtn = document.createElement('button');
-    sampleBtn.type = 'button';
-    sampleBtn.className = 'btn';
-    sampleBtn.textContent = 'Load Sample';
-    sampleBtn.addEventListener('click', loadSampleDiagram);
     const autoBuildBtn = document.createElement('button');
     autoBuildBtn.type = 'button';
     autoBuildBtn.className = 'btn';
@@ -5923,7 +5921,26 @@ function renderRightRailProperties() {
       updateStatusBar();
       showToast('Connect mode: click a device, then click the next device.');
     });
-    actions.append(autoBuildBtn, sampleBtn, connectBtn);
+    if (hasDiagram) {
+      const fitBtn = document.createElement('button');
+      fitBtn.type = 'button';
+      fitBtn.className = 'btn';
+      fitBtn.textContent = 'Fit Diagram';
+      fitBtn.addEventListener('click', () => zoomToFit({ pad: 100, maxZoom: 1.2 }));
+      const validateBtn = document.createElement('button');
+      validateBtn.type = 'button';
+      validateBtn.className = 'btn';
+      validateBtn.textContent = 'Validate';
+      validateBtn.addEventListener('click', () => validateDiagram());
+      actions.append(fitBtn, validateBtn);
+    } else {
+      const sampleBtn = document.createElement('button');
+      sampleBtn.type = 'button';
+      sampleBtn.className = 'btn';
+      sampleBtn.textContent = 'Load Sample';
+      sampleBtn.addEventListener('click', loadSampleDiagram);
+      actions.append(autoBuildBtn, sampleBtn, connectBtn);
+    }
     empty.append(heading, copy, actions);
     root.appendChild(empty);
     return;
@@ -9767,6 +9784,10 @@ function deleteLayer(id) {
   pushHistory('Deleted layer');
   save();
   render();
+  const activeSampleWorkflow = getItem('activeSampleWorkflow');
+  if (activeSampleWorkflow?.id === 'ductbank-network' && components.length) {
+    requestAnimationFrame(() => requestAnimationFrame(() => zoomToFit({ pad: 100, maxZoom: 1.2 })));
+  }
   renderLayerPanel();
 }
 

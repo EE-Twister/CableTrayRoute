@@ -192,6 +192,7 @@ export const PAGE_CONTRACTS_BY_HREF = {
       projectInput('settings.symbolStandard', 'setting', false, 'ANSI/IEC symbol standard selection.'),
       projectInput('settings.diagramTitleBlock', 'setting', false, 'One-line title block fields.'),
       projectInput('settings.diagramDatablockConfig', 'setting', false, 'One-line datablock display configuration.'),
+      projectInput('settings.activeSampleWorkflow', 'setting', false, 'Active sample context used to fit and guide the sample diagram.'),
       projectInput('settings.gistToken', 'setting', false, 'Gist import/export token setting.')
     ],
     outputs: [
@@ -546,7 +547,10 @@ export const PAGE_CONTRACTS_BY_HREF = {
   'iec60287.html': contract({
     workflowStep: 'studies',
     standaloneInputs: ['IEC 60287 thermal inputs, soil/ambient conditions, conductor data, and installation method.'],
-    projectInputs: [cables, equipment, loads, trays, conduits, projectMeta, designBasis, approvals],
+    projectInputs: [
+      cables, equipment, loads, trays, conduits, ductbanks, projectMeta, designBasis, approvals,
+      projectInput('settings.sampleStudyInputs', 'setting', false, 'Sample-specific IEC thermal assumptions used to seed a demonstration calculation.')
+    ],
     outputs: [
       output('studyResults.iec60287', 'study-result', 'Saved IEC 60287 ampacity result and input snapshot.', ['projectreport.html']),
       studyApprovalOutput,

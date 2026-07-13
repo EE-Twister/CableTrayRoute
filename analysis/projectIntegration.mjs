@@ -592,12 +592,59 @@ export function cableSizeMm2(value) {
   return numeric > 0 ? numeric : 0;
 }
 
+function cableRacewayAssignments(cable = {}) {
+  const values = [cable.conduit_id, cable.conduit, cable.raceway_id, cable.route_preference];
+  if (Array.isArray(cable.raceway_ids)) values.push(...cable.raceway_ids);
+  else if (cable.raceway_ids) values.push(...text(cable.raceway_ids).split(','));
+  return values.map(text).filter(Boolean);
+}
+
+function projectDuctbankId(ductbank = {}) {
+  return text(ductbank.ductbank_id || ductbank.id || ductbank.tag);
+}
+
+function projectConduitId(conduit = {}) {
+  return text(conduit.conduit_id || conduit.id || conduit.tag);
+}
+
+function cableVoltageClass(cable = {}, operatingVoltage = 0) {
+  const ratingV = voltageV(cable.voltage_rating || cable.cable_rating || cable.rating || operatingVoltage);
+  const ratingKv = ratingV / 1000;
+  if (ratingKv <= 1) return '0.6/1kV';
+  if (ratingKv <= 6) return '3.6/6kV';
+  if (ratingKv <= 10) return '6/10kV';
+  if (ratingKv <= 15) return '8.7/15kV';
+  if (ratingKv <= 20) return '12/20kV';
+  return '18/30kV';
+}
+
+function normalizedBurialDepthMm(value, fallback = 800) {
+  const parsed = finite(value, 0);
+  if (!parsed) return fallback;
+  return parsed <= 10 ? parsed * 1000 : parsed;
+}
+
+function normalizedSoilResistivity(value, fallback = 1) {
+  const parsed = finite(value, 0);
+  if (!parsed) return fallback;
+  return parsed > 10 ? parsed / 100 : parsed;
+}
+
 export function buildCableThermalProjectInputs(scope, project = {}) {
   const cable = scope.cable || {};
   const designBasis = project.designBasis || {};
-  const racewayIds = Array.isArray(cable.raceway_ids) ? cable.raceway_ids : [cable.raceway_id || cable.route_preference].filter(Boolean);
+  const racewayIds = cableRacewayAssignments(cable);
+  const ductbanks = Array.isArray(project.ductbanks) ? project.ductbanks : [];
+  const nestedConduits = ductbanks.flatMap(ductbank => (ductbank.conduits || []).map(conduit => ({ ...conduit, ductbank })));
+  const assignedConduit = [...(project.conduits || []), ...nestedConduits]
+    .find(conduit => racewayIds.includes(projectConduitId(conduit)));
+  const assignedDuctbank = ductbanks.find(ductbank => (
+    racewayIds.includes(projectDuctbankId(ductbank))
+    || (ductbank.conduits || []).some(conduit => racewayIds.includes(projectConduitId(conduit)))
+  )) || assignedConduit?.ductbank || null;
   const inTray = racewayIds.some(id => (project.trays || []).some(tray => [tray.id, tray.tray_id, tray.tag].includes(id)));
-  const inConduit = racewayIds.some(id => (project.conduits || []).some(conduit => [conduit.id, conduit.conduit_id, conduit.tag].includes(id)));
+  const inConduit = Boolean(assignedConduit || assignedDuctbank)
+    || racewayIds.some(id => (project.conduits || []).some(conduit => [conduit.id, conduit.conduit_id, conduit.tag].includes(id)));
   const voltage = scope.voltageV;
   const rawSizeMm2 = cableSizeMm2(cable.conductor_size || cable.size || cable.size_mm2);
   const standardSizesMm2 = [1.5, 2.5, 4, 6, 10, 16, 25, 35, 50, 70, 95, 120, 150, 185, 240, 300, 400, 500, 630, 800, 1000, 1200, 1600, 2000, 2500];
@@ -608,24 +655,50 @@ export function buildCableThermalProjectInputs(scope, project = {}) {
       : insulationText.includes('PAPER') ? 'Paper-MV'
         : insulationText.includes('PVC') || insulationText.includes('THW') ? 'PVC'
           : 'XLPE';
+  const sampleInputs = project.sampleStudyInputs?.iec60287 || project.studyInputs?.iec60287 || {};
+  const ductbankCables = assignedDuctbank ? (project.cables || []).filter(projectCable => {
+    const assignments = cableRacewayAssignments(projectCable);
+    return assignments.includes(projectDuctbankId(assignedDuctbank))
+      || (assignedDuctbank.conduits || []).some(conduit => assignments.includes(projectConduitId(conduit)));
+  }) : [];
+  const tradeSize = finite(assignedConduit?.trade_size || assignedConduit?.size || assignedDuctbank?.trade_size, 0);
+  const installMethod = inTray ? 'tray' : inConduit ? 'conduit' : text(designBasis.sizingDefaults?.installationType, 'air');
+  const buried = installMethod === 'conduit' || installMethod === 'direct-burial';
+  const ambientTempC = buried
+    ? finite(sampleInputs.ambientSoilTemp ?? sampleInputs.ambientTempC, 20)
+    : normalizeProjectMeta(project.projectMeta).maxAmbientTempC;
   return {
     inputs: {
       sizeMm2,
       material: /al/i.test(cable.conductor_material || cable.material || '') ? 'Al' : 'Cu',
       insulation,
       nCores: Math.max(1, Math.round(finite(cable.conductors || cable.conductors_count, 3))),
-      installMethod: inTray ? 'tray' : inConduit ? 'conduit' : text(designBasis.sizingDefaults?.installationType, 'air'),
-      ambientTempC: normalizeProjectMeta(project.projectMeta).maxAmbientTempC,
+      voltageClass: text(sampleInputs.voltageClass) || cableVoltageClass(cable, voltage),
+      installMethod,
+      burialDepthMm: normalizedBurialDepthMm(sampleInputs.installationDepth ?? sampleInputs.burialDepthMm, finite(assignedDuctbank?.coverDepth, 0) * 25.4 || 800),
+      soilResistivity: normalizedSoilResistivity(sampleInputs.soilThermalResistivity ?? sampleInputs.soilResistivity, normalizedSoilResistivity(assignedDuctbank?.soilThermalResistivity, 1)),
+      conduitOD_mm: finite(sampleInputs.conduitOD_mm, tradeSize ? tradeSize * 25.4 : 80),
+      ambientTempC,
+      frequencyHz: Math.round(finite(sampleInputs.frequencyHz || designBasis.system?.frequencyHz, 50)),
       U0_kV: voltage > 0 ? Number((voltage / Math.sqrt(3) / 1000).toFixed(3)) : 0,
+      nCables: Math.max(1, Math.round(finite(sampleInputs.nCables, ductbankCables.length || 1))),
+      groupArrangement: text(sampleInputs.groupArrangement, 'flat'),
     },
     bindings: {
       sizeMm2: { sourcePath: `${scope.scopeValue}.conductor_size`, sourceLabel: 'Cable Schedule' },
       material: { sourcePath: `${scope.scopeValue}.conductor_material`, sourceLabel: 'Cable Schedule' },
       insulation: { sourcePath: `${scope.scopeValue}.insulation`, sourceLabel: 'Cable / Design Basis' },
       nCores: { sourcePath: `${scope.scopeValue}.conductors`, sourceLabel: 'Cable Schedule' },
+      voltageClass: { sourcePath: `${scope.scopeValue}.voltage_rating`, sourceLabel: 'Cable Schedule' },
       installMethod: { sourcePath: `${scope.scopeValue}.raceway_ids`, sourceLabel: 'Raceway assignment' },
-      ambientTempC: { sourcePath: 'projectMeta.maxAmbientTempC', sourceLabel: 'Maximum ambient' },
+      burialDepthMm: { sourcePath: assignedDuctbank ? `ductbankSchedule.${projectDuctbankId(assignedDuctbank)}.coverDepth` : 'sampleStudyInputs.iec60287.installationDepth', sourceLabel: 'Ductbank / study basis' },
+      soilResistivity: { sourcePath: assignedDuctbank ? `ductbankSchedule.${projectDuctbankId(assignedDuctbank)}.soilThermalResistivity` : 'sampleStudyInputs.iec60287.soilThermalResistivity', sourceLabel: 'Ductbank / study basis' },
+      conduitOD_mm: { sourcePath: `${scope.scopeValue}.conduit`, sourceLabel: 'Raceway Schedule' },
+      ambientTempC: { sourcePath: buried ? 'sampleStudyInputs.iec60287.ambientSoilTemp' : 'projectMeta.maxAmbientTempC', sourceLabel: buried ? 'Underground study basis' : 'Maximum ambient' },
+      frequencyHz: { sourcePath: 'sampleStudyInputs.iec60287.frequencyHz', sourceLabel: 'Study basis' },
       U0_kV: { sourcePath: `${scope.scopeValue}.voltage`, sourceLabel: 'Cable Schedule' },
+      nCables: { sourcePath: assignedDuctbank ? `ductbankSchedule.${projectDuctbankId(assignedDuctbank)}` : `${scope.scopeValue}.raceway_ids`, sourceLabel: 'Ductbank cable grouping' },
+      groupArrangement: { sourcePath: 'sampleStudyInputs.iec60287.groupArrangement', sourceLabel: 'Study basis' },
     },
     missing: [
       ...(!rawSizeMm2 ? ['Cable conductor size is missing or unsupported.'] : []),

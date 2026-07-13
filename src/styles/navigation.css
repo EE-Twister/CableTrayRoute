@@ -950,6 +950,86 @@ body.dark-mode .workflow-step-nav-link {
     background: #2c3034;
 }
 
+.sample-workflow-guide {
+    display: grid;
+    grid-template-columns: minmax(10rem, auto) minmax(12rem, 1fr) auto;
+    align-items: center;
+    gap: 0.75rem 1rem;
+    margin: 0.55rem 1rem 0;
+    padding: 0.55rem 0.75rem;
+    border: 1px solid #bfdbfe;
+    border-left: 4px solid #2563eb;
+    border-radius: 0.55rem;
+    background: #eff6ff;
+    color: #172554;
+}
+
+.sample-workflow-guide__identity {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.15;
+}
+
+.sample-workflow-guide__eyebrow {
+    color: #1d4ed8;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.sample-workflow-guide__progress {
+    overflow: hidden;
+    color: #334155;
+    font-size: 0.84rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.sample-workflow-guide__actions {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.sample-workflow-guide__link,
+.sample-workflow-guide__close {
+    min-height: 2rem;
+    padding: 0.35rem 0.55rem;
+    border: 1px solid #93c5fd;
+    border-radius: 0.4rem;
+    background: #fff;
+    color: #1d4ed8;
+    font: inherit;
+    font-size: 0.78rem;
+    font-weight: 650;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.sample-workflow-guide__close {
+    cursor: pointer;
+}
+
+body.dark-mode .sample-workflow-guide {
+    border-color: #1e40af;
+    border-left-color: #60a5fa;
+    background: #172554;
+    color: #dbeafe;
+}
+
+body.dark-mode .sample-workflow-guide__eyebrow,
+body.dark-mode .sample-workflow-guide__progress {
+    color: #bfdbfe;
+}
+
+body.dark-mode .sample-workflow-guide__link,
+body.dark-mode .sample-workflow-guide__close {
+    border-color: #1d4ed8;
+    background: #1e3a8a;
+    color: #eff6ff;
+}
+
 @media (max-width: 720px) {
     .workflow-step-nav {
         align-items: flex-start;
@@ -961,6 +1041,19 @@ body.dark-mode .workflow-step-nav-link {
         max-width: 100%;
         overflow-x: auto;
         padding-bottom: var(--space-1);
+    }
+
+    .sample-workflow-guide {
+        grid-template-columns: 1fr;
+        margin-inline: 0.5rem;
+    }
+
+    .sample-workflow-guide__progress {
+        white-space: normal;
+    }
+
+    .sample-workflow-guide__actions {
+        flex-wrap: wrap;
     }
 }
 

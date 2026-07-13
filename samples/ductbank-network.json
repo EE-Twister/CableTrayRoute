@@ -83,16 +83,16 @@
         "id": "ductbank-network-main",
         "name": "Underground Feeder One-Line",
         "components": [
-          { "id": "comp-substation-sw1", "type": "source", "subtype": "utility_source", "label": "SUBSTATION-SW1", "ref": "SUBSTATION-SW1", "x": 120, "y": 160, "voltage": 13800, "rated_voltage_kv": 13.8, "equipmentRef": "SUBSTATION-SW1", "scheduleLinks": { "equipment": "SUBSTATION-SW1" }, "connections": [
-            { "target": "comp-pad-xfmr-t2", "targetPort": 0, "cable": { "tag": "UG-CBL-001", "conductor_size": "500 kcmil", "conductor_material": "Copper", "insulation_type": "XLPE", "voltage_rating": 15000, "length": 180 } },
-            { "target": "comp-pad-xfmr-t3", "targetPort": 0, "cable": { "tag": "UG-CBL-002", "conductor_size": "500 kcmil", "conductor_material": "Copper", "insulation_type": "XLPE", "voltage_rating": 15000, "length": 220 } }
+          { "id": "comp-substation-sw1", "type": "utility_source", "subtype": "utility", "label": "SUBSTATION-SW1", "ref": "SUBSTATION-SW1", "x": 260, "y": 80, "rotation": 0, "voltage": 13800, "rated_voltage_kv": 13.8, "equipmentRef": "SUBSTATION-SW1", "scheduleLinks": { "equipment": "SUBSTATION-SW1" }, "connections": [
+            { "target": "comp-pad-xfmr-t2", "sourcePort": 0, "targetPort": 0, "dir": "v", "cable": { "tag": "UG-CBL-001", "conductor_size": "500 kcmil", "conductor_material": "Copper", "insulation_type": "XLPE", "voltage_rating": 15000, "length": 180 } },
+            { "target": "comp-pad-xfmr-t3", "sourcePort": 0, "targetPort": 0, "dir": "v", "cable": { "tag": "UG-CBL-002", "conductor_size": "500 kcmil", "conductor_material": "Copper", "insulation_type": "XLPE", "voltage_rating": 15000, "length": 220 } }
           ] },
-          { "id": "comp-pad-xfmr-t2", "type": "transformer", "subtype": "two_winding_transformer", "label": "PAD-XFMR-T2", "ref": "PAD-XFMR-T2", "x": 520, "y": 90, "voltage": 13800, "volts_primary": 13800, "kva": 10000, "percent_z": 7.5, "primary_connection": "Delta", "secondary_connection": "Wye (Grounded)", "equipmentRef": "PAD-XFMR-T2", "loadRef": "T2-SECONDARY-DEMAND", "scheduleLinks": { "equipment": "PAD-XFMR-T2", "load": "T2-SECONDARY-DEMAND" } },
-          { "id": "comp-pad-xfmr-t3", "type": "transformer", "subtype": "two_winding_transformer", "label": "PAD-XFMR-T3", "ref": "PAD-XFMR-T3", "x": 520, "y": 260, "voltage": 13800, "volts_primary": 13800, "kva": 12500, "percent_z": 8, "primary_connection": "Delta", "secondary_connection": "Wye (Grounded)", "equipmentRef": "PAD-XFMR-T3", "loadRef": "T3-SECONDARY-DEMAND", "scheduleLinks": { "equipment": "PAD-XFMR-T3", "load": "T3-SECONDARY-DEMAND" } },
-          { "id": "comp-substation-sw2", "type": "source", "subtype": "utility_source", "label": "SUBSTATION-SW2", "ref": "SUBSTATION-SW2", "x": 120, "y": 500, "voltage": 13800, "rated_voltage_kv": 13.8, "equipmentRef": "SUBSTATION-SW2", "scheduleLinks": { "equipment": "SUBSTATION-SW2" }, "connections": [
-            { "target": "comp-bldg-xfmr-t1", "targetPort": 0, "cable": { "tag": "UG-CBL-003", "conductor_size": "350 kcmil", "conductor_material": "Copper", "insulation_type": "XLPE", "voltage_rating": 15000, "length": 150 } }
+          { "id": "comp-pad-xfmr-t2", "type": "transformer", "subtype": "two_winding", "label": "PAD-XFMR-T2", "ref": "PAD-XFMR-T2", "x": 140, "y": 300, "rotation": 0, "voltage": 13800, "volts_primary": 13800, "kva": 10000, "percent_z": 7.5, "primary_connection": "Delta", "secondary_connection": "Wye (Grounded)", "equipmentRef": "PAD-XFMR-T2", "loadRef": "T2-SECONDARY-DEMAND", "scheduleLinks": { "equipment": "PAD-XFMR-T2", "load": "T2-SECONDARY-DEMAND" } },
+          { "id": "comp-pad-xfmr-t3", "type": "transformer", "subtype": "two_winding", "label": "PAD-XFMR-T3", "ref": "PAD-XFMR-T3", "x": 380, "y": 300, "rotation": 0, "voltage": 13800, "volts_primary": 13800, "kva": 12500, "percent_z": 8, "primary_connection": "Delta", "secondary_connection": "Wye (Grounded)", "equipmentRef": "PAD-XFMR-T3", "loadRef": "T3-SECONDARY-DEMAND", "scheduleLinks": { "equipment": "PAD-XFMR-T3", "load": "T3-SECONDARY-DEMAND" } },
+          { "id": "comp-substation-sw2", "type": "utility_source", "subtype": "utility", "label": "SUBSTATION-SW2", "ref": "SUBSTATION-SW2", "x": 680, "y": 80, "rotation": 0, "voltage": 13800, "rated_voltage_kv": 13.8, "equipmentRef": "SUBSTATION-SW2", "scheduleLinks": { "equipment": "SUBSTATION-SW2" }, "connections": [
+            { "target": "comp-bldg-xfmr-t1", "sourcePort": 0, "targetPort": 0, "dir": "v", "cable": { "tag": "UG-CBL-003", "conductor_size": "350 kcmil", "conductor_material": "Copper", "insulation_type": "XLPE", "voltage_rating": 15000, "length": 150 } }
           ] },
-          { "id": "comp-bldg-xfmr-t1", "type": "transformer", "subtype": "two_winding_transformer", "label": "BLDG-XFMR-T1", "ref": "BLDG-XFMR-T1", "x": 520, "y": 500, "voltage": 13800, "volts_primary": 13800, "kva": 7500, "percent_z": 7, "primary_connection": "Delta", "secondary_connection": "Wye (Grounded)", "equipmentRef": "BLDG-XFMR-T1", "loadRef": "BLDG-SECONDARY-DEMAND", "scheduleLinks": { "equipment": "BLDG-XFMR-T1", "load": "BLDG-SECONDARY-DEMAND" } }
+          { "id": "comp-bldg-xfmr-t1", "type": "transformer", "subtype": "two_winding", "label": "BLDG-XFMR-T1", "ref": "BLDG-XFMR-T1", "x": 680, "y": 300, "rotation": 0, "voltage": 13800, "volts_primary": 13800, "kva": 7500, "percent_z": 7, "primary_connection": "Delta", "secondary_connection": "Wye (Grounded)", "equipmentRef": "BLDG-XFMR-T1", "loadRef": "BLDG-SECONDARY-DEMAND", "scheduleLinks": { "equipment": "BLDG-XFMR-T1", "load": "BLDG-SECONDARY-DEMAND" } }
         ],
         "connections": []
       }
@@ -103,7 +103,10 @@
       "soilThermalResistivity": 0.9,
       "ambientSoilTemp": 20,
       "installationDepth": 1.05,
-      "conductorTemp": 90
+      "conductorTemp": 90,
+      "frequencyHz": 60,
+      "voltageClass": "8.7/15kV",
+      "groupArrangement": "flat"
     }
   }
 }

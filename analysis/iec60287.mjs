@@ -432,7 +432,7 @@ export function calcAmpacity({
   const deltaTheta = thetaMax - ambientTempC; // temperature rise budget (K)
 
   // --- AC resistance at operating temperature ---
-  const { R_ac, R_dcTheta, ys, yp } = conductorAcResistance({
+  const { R_ac, R_dc20, R_dcTheta, ys, yp } = conductorAcResistance({
     sizeMm2, material, operatingTempC: thetaMax, frequencyHz,
   });
 
@@ -483,6 +483,7 @@ export function calcAmpacity({
     W_d: round6(W_d),
     // Conductor details
     R_ac: round6(R_ac),
+    R_dc20: round6(R_dc20),
     R_dcTheta: round6(R_dcTheta),
     ys, yp,
     // Geometry

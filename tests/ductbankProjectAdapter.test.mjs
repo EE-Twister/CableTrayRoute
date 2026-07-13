@@ -35,4 +35,18 @@ describe('ductbank project adapter', () => {
     assert.deepEqual(parseDuctbankRouteData(JSON.stringify(handoff)), handoff);
     assert.equal(parseDuctbankRouteData('{invalid'), null);
   });
+
+  it('selects a requested ductbank and its assigned circuit', () => {
+    const route = buildProjectDuctbankRoute({
+      ductbanks: sample.raceways.ductbanks,
+      conduits: sample.raceways.conduits,
+      cables: sample.cables,
+      selectedDuctbankId: 'DUCTBANK-DB-02',
+    });
+
+    assert.equal(route.ductbank.ductbank_id, 'DUCTBANK-DB-02');
+    assert.deepEqual(route.cables.map(cable => cable.tag), ['UG-CBL-003']);
+    assert.deepEqual(route.cables.map(cable => cable.conduit_id), ['DB02-COND-1']);
+    assert.equal(route.conduits.length, 2);
+  });
 });

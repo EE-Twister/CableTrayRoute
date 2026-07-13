@@ -258,6 +258,7 @@ Coverage: 77 contracts for 77 navigation routes.
 - `settings.symbolStandard` (setting, optional): ANSI/IEC symbol standard selection.
 - `settings.diagramTitleBlock` (setting, optional): One-line title block fields.
 - `settings.diagramDatablockConfig` (setting, optional): One-line datablock display configuration.
+- `settings.activeSampleWorkflow` (setting, optional): Active sample context used to fit and guide the sample diagram.
 - `settings.gistToken` (setting, optional): Gist import/export token setting.
 
 **Outputs**
@@ -1388,9 +1389,11 @@ Coverage: 77 contracts for 77 navigation routes.
 - `loadList` (schedule, required): Load tags, source relationships, demand values, and operating metadata.
 - `traySchedule` (schedule, required): Tray IDs, dimensions, fill limits, material, and route geometry.
 - `conduitSchedule` (schedule, required): Conduit IDs, trade sizes, fill limits, material, and route geometry.
+- `ductbankSchedule` (schedule, optional): Ductbank segments, conduit groups, geometry, and underground routing metadata.
 - `settings.projectMeta` (setting, optional): Canonical project identity, client, site, engineer, revision, and environmental context.
 - `settings.designBasis` (setting, optional): Project code basis, sizing defaults, routing defaults, and study prerequisites.
 - `settings.studyApprovals` (setting, optional): Engineer review records for study outputs.
+- `settings.sampleStudyInputs` (setting, optional): Sample-specific IEC thermal assumptions used to seed a demonstration calculation.
 
 **Outputs**
 - `studyResults.iec60287` (study-result): Saved IEC 60287 ampacity result and input snapshot. Consumers: `projectreport.html`.

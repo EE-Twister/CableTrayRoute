@@ -84,8 +84,11 @@ export function parseDuctbankRouteData(value) {
   }
 }
 
-export function buildProjectDuctbankRoute({ ductbanks = [], conduits = [], cables = [] } = {}) {
-  const ductbank = Array.isArray(ductbanks) ? ductbanks.find(Boolean) : null;
+export function buildProjectDuctbankRoute({ ductbanks = [], conduits = [], cables = [], selectedDuctbankId = '' } = {}) {
+  const requestedId = text(selectedDuctbankId);
+  const ductbank = Array.isArray(ductbanks)
+    ? (requestedId ? ductbanks.find(row => ductbankId(row) === requestedId) : null) || ductbanks.find(Boolean)
+    : null;
   if (!ductbank) return null;
 
   const id = ductbankId(ductbank);

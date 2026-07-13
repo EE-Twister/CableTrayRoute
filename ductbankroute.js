@@ -50,6 +50,36 @@ import { getItem, setItem, removeItem, getCables, getConduits, getDuctbanks } fr
 import { openModal, showAlertModal } from './src/components/modal.js';
 import { buildProjectDuctbankRoute, parseDuctbankRouteData } from './src/ductbankProjectAdapter.mjs';
 
+function projectDuctbankId(ductbank={}){
+ return String(ductbank.ductbank_id||ductbank.id||ductbank.tag||'').trim();
+}
+
+function initProjectDuctbankSelector({ductbanks=[],conduits=[],cables=[],selectedId=''}){
+ const select=document.getElementById('projectDuctbankSelect');
+ if(!select) return;
+ select.innerHTML='';
+ ductbanks.forEach(ductbank=>{
+  const id=projectDuctbankId(ductbank);
+  if(!id) return;
+  const option=document.createElement('option');
+  option.value=id;
+  const from=ductbank.from||ductbank.from_tag||'';
+  const to=ductbank.to||ductbank.to_tag||'';
+  option.textContent=[id,[from,to].filter(Boolean).join(' → ')].filter(Boolean).join(' · ');
+  select.appendChild(option);
+ });
+ if(selectedId&&Array.from(select.options).some(option=>option.value===selectedId)) select.value=selectedId;
+ select.disabled=select.options.length<2;
+ select.addEventListener('change',()=>{
+  const route=buildProjectDuctbankRoute({ductbanks,conduits,cables,selectedDuctbankId:select.value});
+  if(!applyDuctbankRouteData(route)) return;
+  const url=new URL(location.href);
+  url.searchParams.set('ductbank',select.value);
+  history.replaceState(null,'',`${url.pathname}${url.search}${url.hash}`);
+  showToast(`Loaded ${select.value}`);
+ });
+}
+
 checkPrereqs([{key:'ductbankSchedule',page:'racewayschedule.html',label:'Raceway Schedule'}]);
 
 suppressResumeIfE2E();
@@ -862,6 +892,8 @@ function applyDuctbankRouteData(routeData){
   const tag=ductbank.ductbank_id || ductbank.id || ductbank.tag || '';
   const tagEl=document.getElementById('ductbankTag');
   if(tagEl) tagEl.value=tag;
+  const projectSelect=document.getElementById('projectDuctbankSelect');
+  if(projectSelect&&Array.from(projectSelect.options).some(option=>option.value===tag)) projectSelect.value=tag;
   const encasement=document.getElementById('concreteEncasement');
   if(encasement && ductbank.encasement!==undefined){
     encasement.checked=String(ductbank.encasement).toLowerCase().includes('concrete') || ductbank.encasement===true;
@@ -873,7 +905,7 @@ function applyDuctbankRouteData(routeData){
 
   const conduitRows=Array.isArray(conduits) ? conduits : (Array.isArray(ductbank.conduits) ? ductbank.conduits : []);
   const cbody=document.querySelector('#conduitTable tbody');
-  if(cbody && conduitRows.length){
+  if(cbody){
     cbody.innerHTML='';
     conduitRows.forEach(cd=>{
       addConduitRow({
@@ -894,7 +926,7 @@ function applyDuctbankRouteData(routeData){
   }
 
   const tbody=document.querySelector('#cableTable tbody');
-  if(tbody && Array.isArray(cables) && cables.length){
+  if(tbody && Array.isArray(cables)){
     tbody.innerHTML='';
     cables.forEach(c=>{
       addCableRow({
@@ -4569,17 +4601,30 @@ loadConductorProperties().then(()=>{
   updateInsulationOptions();
   checkInsulationThickness();
   applyDuctbankDefaults({onlyBlank:true,silent:true,persist:false});
+  const projectDuctbanks=getDuctbanks();
+  const projectConduits=getConduits();
+  const projectCables=getCables();
+  const requestedDuctbankId=new URLSearchParams(location.search).get('ductbank')||'';
   const storedSession=getItem('ductbankSession');
   loadDuctbankSession();
+  const sessionDuctbankId=document.getElementById('ductbankTag')?.value||'';
+  const selectedDuctbankId=requestedDuctbankId||sessionDuctbankId||projectDuctbankId(projectDuctbanks[0]);
+  initProjectDuctbankSelector({
+    ductbanks:projectDuctbanks,
+    conduits:projectConduits,
+    cables:projectCables,
+    selectedId:selectedDuctbankId
+  });
   const storedRoute=parseDuctbankRouteData(getItem('ductbankRouteData'));
-  if(storedRoute){
+  if(storedRoute&&!requestedDuctbankId){
     applyDuctbankRouteData(storedRoute);
     removeItem('ductbankRouteData');
-  }else if(!storedSession){
+  }else if(requestedDuctbankId||!storedSession){
     const projectRoute=buildProjectDuctbankRoute({
-      ductbanks:getDuctbanks(),
-      conduits:getConduits(),
-      cables:getCables()
+      ductbanks:projectDuctbanks,
+      conduits:projectConduits,
+      cables:projectCables,
+      selectedDuctbankId
     });
     applyDuctbankRouteData(projectRoute);
   }

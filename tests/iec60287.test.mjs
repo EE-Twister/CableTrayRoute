@@ -260,6 +260,13 @@ describe('calcAmpacity — canonical fixture: 95 mm² Cu XLPE direct buried', ()
     assert.ok(r.thermalResistances.T4 > 0, 'T4 > 0');
   });
 
+  it('returns finite conductor resistance values for result displays', () => {
+    const r = calcAmpacity(BASE);
+    assert.ok(Number.isFinite(r.R_dc20), 'R_dc20 is finite');
+    assert.ok(Number.isFinite(r.R_dcTheta), 'R_dcTheta is finite');
+    assert.ok(Number.isFinite(r.R_ac), 'R_ac is finite');
+  });
+
   it('W_d ≈ 0 for LV cable (U0 = 0)', () => {
     const r = calcAmpacity(BASE);
     assert.strictEqual(r.W_d, 0, 'dielectric loss = 0 for LV cable');
