@@ -173,6 +173,15 @@ async function fileExists(filePath) {
   }
 }
 
+async function resolveFileCaseInsensitive(filePath) {
+  if (await fileExists(filePath)) return filePath;
+  const directory = path.dirname(filePath);
+  const expected = path.basename(filePath).toLowerCase();
+  const entries = await fs.readdir(directory, { withFileTypes: true }).catch(() => []);
+  const match = entries.find(entry => entry.isFile() && entry.name.toLowerCase() === expected);
+  return match ? path.join(directory, match.name) : null;
+}
+
 async function parseRollupEntries() {
   const config = await readText(path.join(root, 'rollup.config.cjs'));
   const entries = new Map();
@@ -520,7 +529,8 @@ async function routeEntryFiles(route, rollupEntries) {
     `analysis/${stem}.mjs`
   ];
   for (const candidate of candidates) {
-    if (await fileExists(path.join(root, candidate))) entries.add(candidate);
+    const resolved = await resolveFileCaseInsensitive(path.join(root, candidate));
+    if (resolved) entries.add(relativePath(resolved));
   }
 
   const normalized = new Map();
