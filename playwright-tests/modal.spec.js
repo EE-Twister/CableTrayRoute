@@ -54,6 +54,23 @@ test.describe('shared modal component', () => {
     await expect(page.locator('#settings-btn')).toBeFocused();
   });
 
+  test('profile control follows Settings and keeps its menu on screen', async ({ page }) => {
+    const actions = page.locator('.nav-actions');
+    const childIds = await actions.locator(':scope > *').evaluateAll(nodes => nodes.map(node => node.id));
+    const settingsIndex = childIds.indexOf('settings-btn');
+    expect(settingsIndex).toBeGreaterThanOrEqual(0);
+    expect(childIds[settingsIndex + 1]).toBe('auth-profile-control');
+
+    const profileTrigger = page.getByRole('button', { name: 'Sign in or view account' });
+    await profileTrigger.click();
+    const panel = page.locator('.auth-profile-panel');
+    await expect(panel).toBeVisible();
+    const panelBox = await panel.boundingBox();
+    const viewport = page.viewportSize();
+    expect(panelBox.x).toBeGreaterThanOrEqual(0);
+    expect(panelBox.x + panelBox.width).toBeLessThanOrEqual(viewport.width);
+  });
+
   test('new project modal validates duplicate names', async ({ page }) => {
     await page.click('#settings-btn');
     const newButton = page.locator('#new-project-btn');

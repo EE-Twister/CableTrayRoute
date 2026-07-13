@@ -67,6 +67,18 @@ describe('page navigation', () => {
     assert.ok(src.includes("import('../projectManager.js')"), 'navigation.js should lazy-load project manager actions');
   });
 
+  it('places the profile control immediately after Settings', () => {
+    const src = fs.readFileSync(path.join(root, 'src/authProfileControl.js'), 'utf8');
+    assert.ok(
+      src.includes('insertBefore(wrapper, settingsBtn.nextSibling)'),
+      'profile control should be inserted to the right of Settings'
+    );
+    assert.ok(
+      src.includes('placeProfileControl(existingControl, topNav)'),
+      'existing profile controls should be repositioned after navigation mounts'
+    );
+  });
+
   it('home and dashboard expose the My Projects workspace', () => {
     const home = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
     const dashboard = fs.readFileSync(path.join(root, 'workflowdashboard.html'), 'utf8');

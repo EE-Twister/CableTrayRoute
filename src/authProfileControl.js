@@ -63,9 +63,35 @@ export function updateAuthSessionControls() {
   if (logoutBtn) logoutBtn.hidden = !auth;
 }
 
+function placeProfileControl(wrapper, topNav) {
+  const settingsBtn = document.getElementById('settings-btn');
+  const navActions = topNav.querySelector('.nav-actions');
+  const projectDisplay = document.getElementById('project-display');
+  const projectActions = document.getElementById('project-actions-control');
+
+  if (settingsBtn?.parentElement) {
+    settingsBtn.parentElement.insertBefore(wrapper, settingsBtn.nextSibling);
+  } else if (navActions) {
+    navActions.appendChild(wrapper);
+  } else if (projectActions?.parentElement) {
+    projectActions.parentElement.insertBefore(wrapper, projectActions.nextSibling);
+  } else if (projectDisplay?.parentElement) {
+    projectDisplay.parentElement.insertBefore(wrapper, projectDisplay.nextSibling);
+  } else {
+    topNav.appendChild(wrapper);
+  }
+}
+
 export function mountProfileControl() {
   const topNav = document.querySelector('.top-nav');
-  if (!topNav || document.getElementById('auth-profile-control')) return;
+  if (!topNav) return;
+
+  const existingControl = document.getElementById('auth-profile-control');
+  if (existingControl) {
+    placeProfileControl(existingControl, topNav);
+    updateAuthSessionControls();
+    return;
+  }
 
   const wrapper = document.createElement('div');
   wrapper.id = 'auth-profile-control';
@@ -146,20 +172,6 @@ export function mountProfileControl() {
     }
   });
 
-  const projectDisplay = document.getElementById('project-display');
-  const projectActions = document.getElementById('project-actions-control');
-  const settingsBtn = document.getElementById('settings-btn');
-  const navActions = topNav.querySelector('.nav-actions');
-  if (projectActions?.parentElement) {
-    projectActions.parentElement.insertBefore(wrapper, projectActions);
-  } else if (projectDisplay?.parentElement) {
-    projectDisplay.parentElement.insertBefore(wrapper, projectDisplay);
-  } else if (settingsBtn?.parentElement) {
-    settingsBtn.parentElement.insertBefore(wrapper, settingsBtn);
-  } else if (navActions) {
-    navActions.prepend(wrapper);
-  } else {
-    topNav.appendChild(wrapper);
-  }
+  placeProfileControl(wrapper, topNav);
   updateAuthSessionControls();
 }
