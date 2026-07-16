@@ -379,7 +379,7 @@ function clearingTime(comp, evalKA, devices, protectiveComp, scResults, protecti
  *   - system voltage:          0.48 kV when not provided
  *   - clearing time:           0.2 s when no protective-device curve is linked
  *
- * Returns a map id -> { incidentEnergy, boundary, ppeCategory, clearingTime }
+ * Returns a map id -> { incidentEnergy, boundary, minimumArcRatingCalCm2, clearingTime }
  * where energy is in cal/cm^2 and boundary in millimeters.
  */
 export async function runArcFlash(options = {}) {
@@ -464,15 +464,10 @@ export async function runArcFlash(options = {}) {
         afError = e;
       }
     }
-    // NFPA 70E arc-flash PPE categories (Table 130.7(C)(15)(c)). The highest
-    // defined category is 4 (≤ 40 cal/cm²); above 40 cal/cm² there is NO PPE
-    // category — energized work is prohibited, surfaced via the >40 note and
-    // the "DANGER" label signal word. (There is no Category 5.)
-    let ppe = 0;
-    if (energy > 1.2) ppe = 1;
-    if (energy > 4) ppe = 2;
-    if (energy > 8) ppe = 3;
-    if (energy > 25) ppe = 4;
+    // This calculation uses the incident-energy analysis method. NFPA 70E's
+    // PPE-category tables are a separate selection method and must not be
+    // assigned by mapping calculated energy to category thresholds.
+    const minimumArcRating = energy > 1.2 ? Math.ceil(energy * 100) / 100 : 0;
     const voltage = resolveVoltage(comp);
     const approaches = computeApproachDistances(voltage);
     const notes = [];
@@ -526,7 +521,7 @@ export async function runArcFlash(options = {}) {
       addNote('No nominal voltage provided; defaulted to 0.48 kV for the energy model.');
     }
     if (energy > 40) {
-      addNote('Incident energy exceeds 40 cal/cm²; no arc-rated PPE category applies (energized work prohibited). Verify protective coordination and consider mitigation.');
+      addNote('Incident energy exceeds 40 cal/cm². Use the incident-energy method for PPE selection, verify protective coordination, and prioritize engineering mitigation.');
     }
     if (boundary > 20000) {
       addNote('Arc flash boundary exceeds 20 m; confirm the clearing time and working distance inputs.');
@@ -545,7 +540,9 @@ export async function runArcFlash(options = {}) {
     const entry = {
       incidentEnergy: Number(energy.toFixed(2)),
       boundary: Number(boundary.toFixed(1)),
-      ppeCategory: ppe,
+      ppeCategory: null,
+      ppeSelectionMethod: 'incident-energy',
+      minimumArcRatingCalCm2: minimumArcRating,
       clearingTime: Number(time.toFixed(3)),
       nominalVoltage: voltage,
       workingDistance: Number(dist.toFixed(1)),

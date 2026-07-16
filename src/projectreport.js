@@ -7,14 +7,11 @@
  *   - analysis/projectReport.mjs  (section builders, renderPackageHTML)
  */
 
-import {
-  READINESS_VOCABULARY,
-  getContractReadinessCopy
-} from './workflowStatus.js';
+import { READINESS_VOCABULARY } from './workflowStatus.js';
 import '../site.js';
 import {
   getCables, getTrays, getConduits, getDuctbanks,
-  getStudies, getStudyApprovals, getEquipment, getOneLine,
+  getStudies, getStudyApprovals, getEquipment, getLoads, getOneLine,
   getReportSnapshots, setReportSnapshot, deleteReportSnapshot,
   getLifecyclePackages,
   getDesignBasis, getDesignGateApprovals, getItem, getProjectMeta, setProjectMeta,
@@ -24,6 +21,8 @@ import { normalizeProjectMeta } from '../analysis/projectIntegration.mjs';
 import { renderProjectInputPanel } from './components/projectInputBinding.js';
 import { buildDesignBasisReview } from '../analysis/designBasis.mjs';
 import { buildDeliverableReadinessDiagnostics } from '../analysis/deliverableWorkflow.mjs';
+import { normalizeRouteResultState } from '../analysis/routeResults.mjs';
+import { buildWorkflowCoreDiagnostics } from '../analysis/projectWorkflowCore.mjs';
 import { runDRC } from '../analysis/designRuleChecker.mjs';
 import { generateProjectReport } from '../analysis/projectReport.mjs';
 import {
@@ -49,8 +48,6 @@ import {
 // ---------------------------------------------------------------------------
 // DOM references (resolved after DOMContentLoaded)
 // ---------------------------------------------------------------------------
-
-const REPORT_READINESS_COPY = getContractReadinessCopy('projectreport.html');
 
 let previewEl, statusEl;
 
@@ -89,13 +86,21 @@ function buildSectionChecks(availableSections) {
       cb.id    = `rpt-sec-${def.key}`;
       cb.name  = 'rpt-section';
       cb.value = def.key;
-      // Default: check sections that have data; uncheck those without
-      cb.checked = availableSections.has(def.key);
-      if (!availableSections.has(def.key)) {
+      const isAvailable = availableSections.has(def.key);
+      cb.dataset.available = String(isAvailable);
+      cb.checked = isAvailable;
+      cb.disabled = !isAvailable;
+      lbl.classList.toggle('rpt-section-unavailable', !isAvailable);
+      if (!isAvailable) {
         cb.title = 'No data available for this section';
       }
       lbl.appendChild(cb);
       lbl.appendChild(document.createTextNode(' ' + def.label));
+      if (!isAvailable) {
+        const note = document.createElement('small');
+        note.textContent = 'No project content';
+        lbl.appendChild(note);
+      }
       checks.appendChild(lbl);
     }
     groupEl.appendChild(checks);
@@ -119,13 +124,18 @@ function applyPreset(presetId) {
   // Uncheck all first
   document.querySelectorAll('input[name="rpt-section"]').forEach(cb => { cb.checked = false; });
 
-  // Check preset sections
+  let skipped = 0;
+  // Check preset sections that currently have project content
   for (const key of cfg.sections) {
     const cb = document.getElementById(`rpt-sec-${key}`);
-    if (cb) cb.checked = true;
+    if (cb && cb.dataset.available === 'true') {
+      cb.checked = true;
+    } else if (cb) {
+      skipped += 1;
+    }
   }
 
-  setStatus(`Preset applied: ${cfg.label}`, 'info');
+  setStatus(`Preset applied: ${cfg.label}${skipped ? `; ${skipped} empty section(s) excluded` : ''}.`, 'info');
 }
 
 // ---------------------------------------------------------------------------
@@ -265,21 +275,7 @@ function escAttr(s) {
 // ---------------------------------------------------------------------------
 
 function getLatestRouteCacheState() {
-  const latestState = getItem('latestRouteResults', {}) || {};
-
-  const trayCableMap = latestState && typeof latestState === 'object'
-    ? latestState.trayCableMap
-    : null;
-
-  if (!trayCableMap || typeof trayCableMap !== 'object' || Array.isArray(trayCableMap)) {
-    return {};
-  }
-
-  const entries = Object.entries(trayCableMap);
-  if (!entries.length) return {};
-  if (!entries.every(([, cables]) => Array.isArray(cables))) return {};
-
-  return latestState;
+  return normalizeRouteResultState(getItem('latestRouteResults', {}), { cables: getCables() });
 }
 
 function loadProjectData() {
@@ -289,9 +285,7 @@ function loadProjectData() {
   const routeState = getLatestRouteCacheState();
   const routedCableNames = Array.isArray(routeState.routedCableNames)
     ? routeState.routedCableNames
-    : (routeState.batchResults || [])
-    .filter(r => r.cable && r.status && r.status.includes('Routed'))
-    .map(r => r.cable);
+    : [];
   const drcRun = runDRC({
     trays,
     conduits,
@@ -306,6 +300,7 @@ function loadProjectData() {
     conduits,
     ductbanks: getDuctbanks(),
     equipment: getEquipment(),
+    loads: getLoads(),
     oneLine: getOneLine(),
     studies:   getStudies(),
     approvals: getStudyApprovals(),
@@ -428,7 +423,7 @@ function exportXLSX(pkg, baseReport) {
     { key: 'arcFlash',     headers: ['id', 'incidentEnergy', 'ppeCategory', 'boundary', 'clearingTime', 'voltage'],    sheetName: 'ArcFlash' },
     { key: 'shortCircuit', headers: ['id', 'i3ph_kA', 'iSlg_kA', 'iLL_kA', 'iDLG_kA', 'voltage'],                    sheetName: 'ShortCircuit' },
     { key: 'loadFlow',     headers: ['id', 'voltagePu', 'voltageKv', 'angleDeg', 'loadKW', 'loadKVAR'],               sheetName: 'LoadFlow-Buses', rowKey: 'busRows' },
-    { key: 'harmonics',    headers: ['id', 'ithd', 'vthd', 'limit', 'warning'],                                        sheetName: 'Harmonics' },
+    { key: 'harmonics',    headers: ['id', 'ithd', 'vthd', 'limit', 'warning', 'calculationStatus'],                   sheetName: 'Harmonics' },
     { key: 'motorStart',   headers: ['id', 'inrushKA', 'voltageSagPct', 'accelTime', 'method'],                        sheetName: 'MotorStart' },
     { key: 'voltageDrop',  headers: ['id', 'from', 'to', 'dropPct', 'dropV', 'limitPct', 'status'],                   sheetName: 'VoltageDrop' },
   ];
@@ -634,6 +629,8 @@ function renderLifecyclePkgSelector() {
   const select = document.getElementById('rpt-lifecycle-pkg-select');
   if (!select) return;
   const packages = getLifecyclePackages();
+  const sourceRow = document.getElementById('rpt-source-row');
+  if (sourceRow) sourceRow.hidden = packages.length === 0;
   select.innerHTML = '<option value="">— Live project data —</option>';
   for (const pkg of packages) {
     const date = pkg.createdAt ? pkg.createdAt.slice(0, 10) : '';
@@ -668,6 +665,7 @@ function loadProjectDataWithPackage() {
     conduits:  [],
     ductbanks: [],
     equipment: Array.isArray(snap.equipment) ? snap.equipment : getEquipment(),
+    loads: Array.isArray(snap.loads) ? snap.loads : getLoads(),
     oneLine: snap.oneLine || getOneLine(),
     studies:   snap.studies   || {},
     approvals: snap.approvals || {},
@@ -722,47 +720,76 @@ function currentDesignBasisReview() {
   });
 }
 
+function currentWorkflowDiagnostics() {
+  const projectData = loadProjectDataWithPackage();
+  const snap = activeLifecyclePkg?.projectSnapshot || {};
+  return buildWorkflowCoreDiagnostics({
+    ...projectData,
+    reportSnapshots: activeLifecyclePkg ? snap.reportSnapshots || {} : getReportSnapshots(),
+    deliverables: getLifecyclePackages(),
+    routeResults: activeLifecyclePkg
+      ? snap.latestRouteResults || snap.routeResults || []
+      : getItem('latestRouteResults', null),
+    reconcilePending: activeLifecyclePkg
+      ? Boolean(snap.oneLineScheduleReconcilePending)
+      : Boolean(getItem('oneLineScheduleReconcilePending', false))
+  });
+}
+
 function ensureDeliverableGates(actionLabel) {
-  const review = currentDesignBasisReview();
-  if (!review.deliverableBlockers.length) return true;
-  const gate = review.deliverableBlockers[0];
-  setStatus(`${actionLabel} blocked: ${gate.label}. Resolve ${review.deliverableBlockers.length} design basis gate(s) before issuing deliverables.`, 'warn');
+  const diagnostics = currentWorkflowDiagnostics();
+  if (diagnostics.readyForDeliverables) return true;
+  const blocker = diagnostics.issueBlockers[0] || diagnostics.designReview.deliverableBlockers[0];
+  setStatus(`${actionLabel} blocked: ${blocker?.label || 'workflow readiness is incomplete'}. Resolve ${diagnostics.issueBlockers.length} workflow blocker(s) and ${diagnostics.designReview.deliverableBlockers.length} design basis gate(s) before issuing deliverables.`, 'warn');
   renderReportReadiness();
   return false;
+}
+
+function setActiveReportPanel(panel) {
+  const layout = document.querySelector('.rpt-builder-layout');
+  const configTab = document.getElementById('rpt-config-tab');
+  const previewTab = document.getElementById('rpt-preview-tab');
+  const next = panel === 'preview' ? 'preview' : 'config';
+  if (layout) layout.dataset.activePanel = next;
+  document.body.classList.toggle('rpt-preview-mode', next === 'preview');
+  if (configTab) configTab.setAttribute('aria-selected', next === 'config' ? 'true' : 'false');
+  if (previewTab) previewTab.setAttribute('aria-selected', next === 'preview' ? 'true' : 'false');
 }
 
 function renderReportReadiness() {
   const el = document.getElementById('rpt-deliverable-readiness');
   if (!el) return;
   const diagnostics = currentReportReadinessDiagnostics();
+  const workflow = currentWorkflowDiagnostics();
   const action = diagnostics.nextAction;
-  const designReview = diagnostics.designReview || currentDesignBasisReview();
   const routeCount = diagnostics.health.routeResults;
   const snapshotCount = diagnostics.health.reportSnapshots;
   const packageCount = diagnostics.health.lifecyclePackages;
-  const readinessLabel = diagnostics.ready.projectReport && routeCount > 0
-    ? READINESS_VOCABULARY.ready
-    : READINESS_VOCABULARY.missingInputs;
+  const reportInputCount = diagnostics.health.reportSections;
+  const drcErrors = workflow.designRules?.errors || 0;
+  const drcWarnings = workflow.designRules?.warnings || 0;
+  const cableMissing = workflow.cableDeliverables?.missingFields || 0;
+  const reportContentLabel = reportInputCount > 0
+    ? `${reportInputCount} report section(s) have current project content.`
+    : 'No report sections have current project content yet.';
   const actionLabel = action.severity === 'warning' || action.severity === 'critical'
     ? `${READINESS_VOCABULARY.missingInputs}: ${action.label}`
     : `${READINESS_VOCABULARY.downstreamHandoff}: ${action.label}`;
   el.classList.toggle('is-warning', action.severity === 'warning' || action.severity === 'critical');
-  el.classList.toggle('is-ready', diagnostics.ready.projectReport && routeCount > 0);
+  el.classList.toggle('is-ready', workflow.readyForDeliverables && diagnostics.ready.projectReport && routeCount > 0);
   el.innerHTML = `
     <div>
-      <strong>${readinessLabel}: Report readiness: ${diagnostics.health.reportSections} section(s) available.</strong>
-      <p>${REPORT_READINESS_COPY?.readyWhen || 'Ready when selected report sections have source data and required review gates are complete.'}</p>
+      <strong>${reportContentLabel}</strong>
+      <p>Choose the sections to include, then generate a preview. Section availability is separate from issue readiness.</p>
       <p>${routeCount} route result(s), ${diagnostics.health.pullGroups} pull group(s), ${diagnostics.health.spoolCount} spool(s), ${snapshotCount} saved snapshot(s), and ${packageCount} release package(s).</p>
-      <p>${designReview.openGateCount} design basis gate(s) open; ${designReview.deliverableBlockers.length} block issuing exports or snapshots.</p>
+      <div class="report-readiness-tiers" aria-label="Report readiness tiers">
+        <span class="report-readiness-tier ${reportInputCount > 0 ? 'is-ready' : 'is-warning'}">Data package: ${reportInputCount > 0 ? 'available' : 'missing'}</span>
+        <span class="report-readiness-tier ${drcErrors === 0 ? 'is-ready' : 'is-warning'}">Validation: ${drcErrors} error(s), ${drcWarnings} warning(s)</span>
+        <span class="report-readiness-tier ${cableMissing === 0 ? 'is-ready' : 'is-warning'}">Cable fields: ${cableMissing === 0 ? 'complete' : `${cableMissing} missing`}</span>
+        <span class="report-readiness-tier ${workflow.readyForDeliverables ? 'is-ready' : 'is-warning'}">Issue readiness: ${workflow.readyForDeliverables ? 'ready' : 'blocked'}</span>
+      </div>
     </div>
-    <span class="workflow-next-action__meta">${escAttr(actionLabel)}</span>
-    <div class="workflow-next-action__actions">
-      <button type="button" class="btn primary-btn" data-action="generate-report-preview">Generate Preview</button>
-      <a class="btn secondary-btn" href="pullcards.html">Pull Cards</a>
-      <a class="btn secondary-btn" href="spoolsheets.html">Spool Sheets</a>
-      <a class="btn secondary-btn" href="workflowdashboard.html">Dashboard</a>
-    </div>`;
-  el.querySelector('[data-action="generate-report-preview"]')?.addEventListener('click', generatePreview);
+    <span class="workflow-next-action__meta">${escAttr(actionLabel)}</span>`;
 }
 
 function generatePreview() {
@@ -779,10 +806,23 @@ function generatePreview() {
     const html = renderPackageHTML(pkg, baseReport);
     if (previewEl) {
       previewEl.innerHTML = html || '<p class="field-hint">No sections selected.</p>';
+      previewEl.tabIndex = -1;
     }
 
-    const sectionCount = Object.keys(pkg.sections).length;
-    setStatus(`Preview built — ${sectionCount} section(s) included.`, 'success');
+    const selectedSectionCount = config.sections.length;
+    const availableSections = getAvailableSections({
+      studies: projectData.studies,
+      cables: projectData.cables,
+      trays: projectData.trays,
+      drcResults: projectData.drcResults,
+    });
+    const contentSectionCount = config.sections.filter(key => availableSections.has(key)).length;
+    setStatus(`Preview built — ${selectedSectionCount} section(s) selected; ${contentSectionCount} currently have project content.`, 'success');
+    const generateButton = document.getElementById('rpt-generate-btn');
+    if (generateButton) generateButton.textContent = 'Regenerate Preview';
+    setActiveReportPanel('preview');
+    document.querySelector('.rpt-view-tabs')?.scrollIntoView({ behavior: 'smooth', block: 'start', inline: 'nearest' });
+    requestAnimationFrame(() => previewEl?.focus({ preventScroll: true }));
     renderReportReadiness();
   } catch (err) {
     console.error('[projectreport] Generation failed:', err);
@@ -797,6 +837,8 @@ function generatePreview() {
 document.addEventListener('DOMContentLoaded', () => {
   previewEl = document.getElementById('report-preview');
   statusEl  = document.getElementById('report-status');
+  document.getElementById('rpt-config-tab')?.addEventListener('click', () => setActiveReportPanel('config'));
+  document.getElementById('rpt-preview-tab')?.addEventListener('click', () => setActiveReportPanel('preview'));
 
   hydrateProjectMetadata();
   renderProjectInputPanel({
@@ -865,6 +907,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const btn = e.target.closest('[data-preset]');
     if (btn) applyPreset(btn.dataset.preset);
   });
+  document.getElementById('rpt-select-available-btn')?.addEventListener('click', () => {
+    document.querySelectorAll('input[name="rpt-section"][data-available="true"]').forEach(cb => {
+      cb.checked = true;
+    });
+    setStatus('All sections with project content selected.', 'info');
+  });
+  document.getElementById('rpt-clear-sections-btn')?.addEventListener('click', () => {
+    document.querySelectorAll('input[name="rpt-section"]').forEach(cb => {
+      cb.checked = false;
+    });
+    setStatus('Report section selection cleared.', 'info');
+  });
 
   // ── Add revision row ──
   document.getElementById('rpt-add-rev-btn')?.addEventListener('click', () => {
@@ -875,6 +929,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // ── Generate preview ──
   document.getElementById('rpt-generate-btn')?.addEventListener('click', generatePreview);
+  document.getElementById('rpt-mobile-generate-btn')?.addEventListener('click', generatePreview);
+  document.getElementById('rpt-mobile-print-btn')?.addEventListener('click', () => document.getElementById('rpt-print-btn')?.click());
 
   // ── Print / PDF ──
   document.getElementById('rpt-print-btn')?.addEventListener('click', () => {

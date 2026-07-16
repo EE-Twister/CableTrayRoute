@@ -4,28 +4,31 @@
 **Module:** `analysis/generatorSizing.mjs`  
 **Standards:** NFPA 110-2022, NEC Articles 700/701/702, IEEE 446-1995, ISO 8528-1
 
+> **Screening limitation:** This workflow uses generic environmental factors,
+> a reduced motor-step model, and an estimated fuel-consumption rate. Final
+> selection requires manufacturer generator/alternator performance data and the
+> project-specific NFPA 110 Class, Type, load-acceptance, and ride-through basis.
+
 ---
 
 ## What generator sizing is and why it matters
 
 Facilities with life-safety, legally required standby, or optional standby systems must include a generator (or other on-site power source) sized to serve all connected loads without overloading or stalling. Undersizing causes voltage collapse or generator shutdown when critical loads are energized; oversizing wastes capital and results in wet-stacking (unburned fuel fouling) at light load.
 
-**Regulatory drivers:**
-
-- **NEC Article 700** — Emergency systems (egress lighting, fire pumps, hospital essential loads) require automatic transfer in ≤ 10 seconds — an NFPA 110 **Type 10** generator.
-- **NEC Article 701** — Legally required standby systems (HVAC, elevators, industrial processes) require automatic transfer in ≤ 60 seconds — **Type 60**.
-- **NEC Article 702** — Optional standby systems (data centers, commercial operations) use **Type 120** or a customer-specified transfer time.
-- **NFPA 110-2022** — Defines testing, maintenance, installation, and capacity requirements including a minimum runtime (§8.3.1) of 2 hours for Type 10 systems.
+NFPA 110 separates **Type** (restoration time), **Class** (minimum operating
+time), and **Level** (consequence of failure). The application code, owner, and
+AHJ establish the required combination; the Type alone does not determine the
+served application or fuel runtime.
 
 ---
 
 ## NFPA 110 Type Classification
 
-| Type | Max Transfer Time | NEC Article | Typical Applications |
-|---|---|---|---|
-| **Type 10** | 10 seconds | NEC 700 | Hospital essential, egress lighting, fire pumps, elevators in hospitals |
-| **Type 60** | 60 seconds | NEC 701 | HVAC, elevators, industrial processes, heating equipment |
-| **Type 120** | 120 seconds | NEC 702 | Data centers, commercial operations, optional comfort systems |
+| Type | Restoration time |
+|---|---|
+| **Type 10** | 10 seconds |
+| **Type 60** | 60 seconds |
+| **Type 120** | 120 seconds |
 
 > The Authority Having Jurisdiction (AHJ) may impose stricter transfer times regardless of the NFPA 110 type classification.
 
@@ -68,13 +71,17 @@ tempFactor = 1 − 0.01 × max(0, ambientC − 40)
 
 For a site with a design summer temperature of 50 °C: `tempFactor = 0.90` (10% derating).
 
-**Combined derating:** Apply altitude derating first, then apply temperature derating to the altitude-derated value:
+**Combined capacity factor:** The factors reduce the output available from a
+nameplate rating. Therefore, the required standard-condition nameplate is found
+by division—not by reducing the load:
 
 ```
-siteDeratedKw = continuousKw × altitudeFactor × tempFactor
+combinedFactor = altitudeFactor × tempFactor
+requiredNameplateKw = continuousKw / combinedFactor
 ```
 
-The generator must be sized so that its **site-derated output** meets or exceeds this value.
+For a selected generator, `availableSiteKw = nameplateKw × combinedFactor` must
+meet or exceed the site load.
 
 ### Step 4 — Check the largest motor step load
 
@@ -101,7 +108,10 @@ dip% = (startingKVA / genKVA) × X'd%
 
 where `genKVA = selectedKw / 0.80` (assuming 0.80 pf nameplate rating) and `X'd` is the generator's subtransient reactance (typically 20–30%).
 
-NFPA 110 Type 10 systems must keep voltage dip **≤ 35%** during the largest motor start. If the dip exceeds this limit, either:
+The default **35%** value is a preliminary, user-adjustable screen—not a
+universal NFPA 110 limit. Establish the acceptance threshold from connected
+contactor, relay, drive, and control ride-through requirements. If the dip
+exceeds that project threshold, either:
 - Select a larger generator (lowers `startingKVA / genKVA`)
 - Install a soft-starter or VFD on the motor (reduces `LRC_multiplier`)
 - Specify a generator with a lower X'd (higher short-circuit capacity)
@@ -111,11 +121,12 @@ NFPA 110 Type 10 systems must keep voltage dip **≤ 35%** during the largest mo
 The tool selects the smallest standard nameplate kW that is ≥ the site-derated required kW:
 
 ```
-requiredKw = max(siteDeratedContinuousKw, motorStepLoadRecommendedKw)
+requiredKw = max(continuousKw / combinedFactor,
+                 motorStepLoadRecommendedKw / combinedFactor)
 selectedKw = smallest standard size ≥ requiredKw
 ```
 
-Standard generator nameplate sizes (kW): 15, 20, 25, 30, 40, 50, 60, 75, 100, 125, 150, 175, 200, 250, 300, 350, 400, 500, 600, 750, 1000, 1250, 1500, 1750, 2000.
+Standard generator nameplate sizes (kW): 15, 20, 25, 30, 40, 50, 60, 75, 100, 125, 150, 175, 200, 250, 300, 350, 400, 500, 600, 750, 1000, 1250, 1500, 1750, 2000. Requirements above 2,000 kW return no selection instead of silently selecting an undersized unit.
 
 ### Step 6 — Calculate fuel runtime
 
@@ -126,9 +137,10 @@ runtime (hr)      = tankCapacity_gal / fuelRate
 
 Default SFC = **0.38 lb/hp-hr** (diesel, approximately 75% load, modern Tier 4 engine).
 
-**NFPA 110 minimum runtime requirements:**
-- Type 10 systems: minimum **2 hours** of fuel on-site (§8.3.1)
-- Many AHJs require 4–8 hours; hospitals and data centers typically specify 24–72 hours
+Compare the estimated runtime with the separately specified NFPA 110 **Class**,
+applicable NEC requirements, owner criteria, and AHJ requirements. Type 10
+describes restoration within 10 seconds; it does not itself specify two hours of
+runtime.
 
 ---
 
@@ -139,11 +151,12 @@ Default SFC = **0.38 lb/hp-hr** (diesel, approximately 75% load, modern Tier 4 e
 | Step | Value |
 |---|---|
 | Continuous loads | Emergency lighting: 50 kW × 1.0 = 50 kW<br>HVAC critical: 150 kW × 0.80 = 120 kW<br>Fire pump: 75 kW × 1.0 = 75 kW<br>**Total: 245 kW** |
-| Altitude derating | factor = 1 − 0.03 × 4.5 = **0.865** → 245 × 0.865 = 212.0 kW |
-| Temperature derating | factor = 1 − 0.01 × 5 = **0.95** → 212.0 × 0.95 = 201.4 kW |
-| Largest motor step load | 100 HP, LRC ×6, PF 0.85, eff 0.92: startingKVA ≈ 572 kVA → recommend 458 kW |
-| Required kW | max(201.4, 458) = **458 kW** |
-| Selected standard size | **500 kW** |
+| Environmental factors | altitude = **0.865**, temperature = **0.95**, combined = **0.82175** |
+| Continuous-load nameplate requirement | 245 / 0.82175 = **298.1 kW** |
+| Largest motor step load | 100 HP, LRC ×6, PF 0.85, eff 0.92: startingKVA ≈ 572 kVA → base recommendation 458 kW |
+| Site-adjusted motor screen | 458 / 0.82175 = **557.3 kW** |
+| Required kW | max(298.1, 557.3) = **557.3 kW** |
+| Selected standard size | **600 kW** |
 | Fuel runtime (500 gal, SFC 0.38) | fuelRate ≈ 30 gal/hr → runtime ≈ **16.7 hours** |
 
 ---

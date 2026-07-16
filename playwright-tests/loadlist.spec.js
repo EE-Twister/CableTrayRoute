@@ -18,7 +18,8 @@ async function openToolbarMenu(page, label) {
 test.describe('loadlist experience', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto(pageUrl('loadlist.html?e2e=1&e2e_reset=1'));
-    await expect(page.locator('#load-table')).toBeVisible();
+    await expect(page.locator('#load-empty-guide')).toBeVisible();
+    await expect(page.locator('#load-table')).toBeHidden();
     await expect(page.locator('#add-row-btn')).toBeVisible();
   });
 
@@ -51,6 +52,10 @@ test.describe('loadlist experience', () => {
   test('view presets and batch edit update selected loads', async ({ page }) => {
     await page.click('#load-sample-loads-btn');
     await openToolbarMenu(page, 'View');
+    await page.getByRole('button', { name: 'Demand', exact: true }).click();
+    const demandColumns = await page.locator('#load-table thead th:visible').evaluateAll(cells => cells.map(cell => cell.dataset.column));
+    expect(demandColumns.slice(0, 6)).toEqual(['select', 'source', 'tag', 'demandFactor', 'demandKva', 'demandKw']);
+    await openToolbarMenu(page, 'View');
     await page.getByRole('button', { name: 'Procurement' }).click();
     await expect(page.locator('th[data-column="manufacturer"]')).toBeVisible();
     await expect(page.locator('th[data-column="kw"]')).toBeHidden();
@@ -68,6 +73,26 @@ test.describe('loadlist experience', () => {
     await page.getByRole('button', { name: 'Basic Entry' }).click();
     await expect(page.locator('#load-table tbody tr').nth(0).locator('input[name="source"]')).toHaveValue('SWBD-BATCH');
     await expect(page.locator('#load-table tbody tr').nth(1).locator('input[name="source"]')).toHaveValue('SWBD-BATCH');
+  });
+
+  test('mobile view renders editable load cards without horizontal table overflow', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.click('#load-sample-loads-btn');
+    const firstRow = page.locator('#load-table tbody tr').first();
+    await expect(firstRow).toBeVisible();
+    await expect(firstRow.locator('td[data-column="source"]')).toHaveCSS('display', 'grid');
+    const geometry = await page.evaluate(() => ({
+      viewport: document.documentElement.clientWidth,
+      tableRight: document.querySelector('#load-table').getBoundingClientRect().right,
+      tableLeft: document.querySelector('#load-table').getBoundingClientRect().left,
+      searchHeight: document.querySelector('#load-search').getBoundingClientRect().height,
+      summaryWidth: document.querySelector('#load-summary-panel').scrollWidth,
+      summaryClientWidth: document.querySelector('#load-summary-panel').clientWidth
+    }));
+    expect(geometry.tableLeft).toBeGreaterThanOrEqual(0);
+    expect(geometry.tableRight).toBeLessThanOrEqual(geometry.viewport + 1);
+    expect(geometry.searchHeight).toBeLessThanOrEqual(60);
+    expect(geometry.summaryWidth).toBeLessThanOrEqual(geometry.summaryClientWidth + 1);
   });
 
   test('CSV import mapping accepts non-native headers', async ({ page }) => {

@@ -97,6 +97,7 @@ const EXTRA_KEYS = {
   cableTagSettings: 'cableTagSettings',
   cableChangeLog: 'cableChangeLog',
   loadListViewPreset: 'loadListViewPreset',
+  equipmentListViewPreset: 'equipmentListViewPreset',
   racewayScheduleViewPreset: 'racewayScheduleViewPreset',
   equipmentFilterPresets: 'equipmentFilterPresets',
   trayHardwareCatalogCustomProducts: 'trayHardwareCatalogCustomProducts',
@@ -598,7 +599,6 @@ export const getOneLine = (scenario = getCurrentScenarioNameState()) => {
         ...(Array.isArray(s.protectionZones) ? { protectionZones: s.protectionZones } : {})
       }))
     }, { equipment: getEquipment(), loads: getLoads(), cables: getCables() });
-    if (JSON.stringify(data) !== JSON.stringify(normalized)) write(KEYS.oneLine, normalized, scenario);
     return buildOneLineProjectView(normalized, { equipment: getEquipment(), loads: getLoads(), cables: getCables() });
   }
   return { activeSheet: 0, sheets: [] };

@@ -258,7 +258,7 @@ export function calcSeismicWindCombined(params) {
                      'LC-W1: 1.2D + 1.6W; ' +
                      'LC-W2: 0.9D + 1.0W; ' +
                      'LC-S1: 1.2D + 1.0E + 0.2S; ' +
-                     'LC-S2: 0.9D + 1.0E.',
+                     'LC-S2: 0.9D + E_h − E_v.',
       },
     },
   };

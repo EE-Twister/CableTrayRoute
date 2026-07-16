@@ -189,6 +189,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const motorEff = getFloat('motor-eff') || 0.92;
     const lrcMultiplier = getFloat('lrc-multiplier') || 6;
     const xdPrimePct = getFloat('xd-prime') || 25;
+    const voltageDipLimitPct = getFloat('voltage-dip-limit') || 35;
     const fuelCapGal = getFloat('fuel-cap-gal') || 0;
     const sfcLbPerHpHr = getFloat('sfc') || 0.38;
     const projectLabel = get('project-label').value.trim();
@@ -205,6 +206,7 @@ document.addEventListener('DOMContentLoaded', () => {
       motorEff,
       lrcMultiplier,
       xdPrimePct,
+      voltageDipLimitPct,
       fuelCapGal,
       sfcLbPerHpHr,
     };
@@ -223,6 +225,7 @@ document.addEventListener('DOMContentLoaded', () => {
     set('motor-hp', r.motorHp);
     set('motor-pf', r.motorPf);
     set('motor-eff', r.motorEff);
+    set('voltage-dip-limit', r.voltageDip?.limit);
     set('fuel-cap-gal', r.fuelCapGal || '');
 
     // Restore load rows
@@ -236,7 +239,9 @@ document.addEventListener('DOMContentLoaded', () => {
     resultsDiv.innerHTML = '';
 
     const safe = value => escHtml(String(value ?? '—'));
-    const num = value => Number.isFinite(Number(value)) ? String(Number(value)) : '—';
+    const num = value => value !== null && value !== '' && Number.isFinite(Number(value))
+      ? String(Number(value))
+      : '—';
 
     const dipHtml = r.voltageDip
       ? `<div class="result-badge ${r.voltageDip.acceptable ? 'result-badge--pass' : 'result-badge--fail'}" role="status">
@@ -264,6 +269,11 @@ document.addEventListener('DOMContentLoaded', () => {
          </ul>`
       : '';
 
+    const requiredInputsHtml = Array.isArray(r.requiredInputs) && r.requiredInputs.length
+      ? `<div class="alert warning"><strong>Required before final selection:</strong><ul>${r.requiredInputs
+          .map(item => `<li>${escHtml(item)}</li>`).join('')}</ul></div>`
+      : '';
+
     const loadRowsHtml = r.loads.map(l =>
       `<tr>
          <td>${escHtml(l.label || '—')}</td>
@@ -286,6 +296,7 @@ document.addEventListener('DOMContentLoaded', () => {
     resultsDiv.innerHTML = `
       <section class="results-panel" aria-labelledby="results-heading">
         <h2 id="results-heading">Generator Sizing Results</h2>
+        <div class="alert warning"><strong>Preliminary screening only.</strong> Confirm the selected package with manufacturer performance data and the project design basis.</div>
         ${r.projectLabel ? `<p class="field-hint">Project / Location: <strong>${escHtml(r.projectLabel)}</strong></p>` : ''}
         ${typeBadge ? `<p class="field-hint">${typeBadge}</p>` : ''}
 
@@ -316,7 +327,7 @@ document.addEventListener('DOMContentLoaded', () => {
           </div>
           <p class="field-hint">${escHtml(r.tempNote)}</p>
           <div class="result-row result-row--total">
-            <span class="result-label">Site-derated required output</span>
+            <span class="result-label">Required standard-condition nameplate for continuous load</span>
             <span class="result-value">${safe(num(r.siteDeratedKw))} kW</span>
           </div>
         </div>
@@ -329,8 +340,8 @@ document.addEventListener('DOMContentLoaded', () => {
             <span class="result-value">${safe(num(r.stepLoad.startingKva))} kVA / ${safe(num(r.stepLoad.startingKw))} kW</span>
           </div>
           <div class="result-row">
-            <span class="result-label">Generator kW needed for motor start</span>
-            <span class="result-value">${safe(num(r.stepLoad.recommendedGenKw))} kW</span>
+            <span class="result-label">Site-adjusted nameplate screen for motor start</span>
+            <span class="result-value">${safe(num(r.stepRequiredKw))} kW</span>
           </div>
           ${dipHtml}
         </div>` : ''}
@@ -343,7 +354,7 @@ document.addEventListener('DOMContentLoaded', () => {
           </div>
           <div class="result-row result-row--total">
             <span class="result-label">Selected standard size</span>
-            <span class="result-value">${safe(num(r.selectedSizeKw))} kW</span>
+            <span class="result-value">${r.selectedSizeKw === null ? 'Above built-in range' : `${safe(num(r.selectedSizeKw))} kW`}</span>
           </div>
           <p class="field-hint">Nearby standard sizes: ${sizeOptionsHtml}</p>
         </div>
@@ -354,6 +365,7 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
 
         ${warningsHtml}
+        ${requiredInputsHtml}
 
         <p class="field-hint result-timestamp">Analysis run: ${safe(new Date(r.timestamp).toLocaleString())}</p>
       </section>`;

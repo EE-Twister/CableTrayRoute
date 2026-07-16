@@ -26,3 +26,14 @@ Default force coefficient behavior:
 Schedule mode reads each tray's `tray_type` from the Raceway Schedule to infer construction. If the tray row includes `cover_condition`, the page uses it; otherwise it falls back to the Wind Load page default. Fill condition and any engineer override are applied from the Wind Load page defaults unless a tray row includes a specific wind fill value such as `wind_fill_level`, `fill_level`, or `current_fill`.
 
 Final design should still verify manufacturer tray data, cover attachment requirements, and any uplift or support-connection checks not covered by this simplified lateral wind-force calculation.
+
+The NEMA vertical-capacity screening normalizes a traditional class rating to
+the entered span using the same L/100 deflection relationship as the Support
+Span calculator. Since `δ = 5wL⁴/(384EI)` and `δ = L/100`, `wL³` is constant:
+
+```text
+w_at_span = w_rated × (L_rated / L_actual)³
+```
+
+This normalization is a screening approximation; the selected manufacturer's
+load table governs final capacity.

@@ -21,7 +21,16 @@ function it(name, fn){
       const data = {
         equipment: [{ id: 'E1', name: 'Motor' }],
         analyses: { loadFlow: [{ id: 'B1', Vm: 1 }] },
-        arcFlash: { BUS1: { incidentEnergy: 1, boundary: 2, equipmentTag: 'Main Switchboard' } }
+        arcFlash: { BUS1: {
+          incidentEnergy: 1,
+          boundary: 2,
+          equipmentTag: 'Main Switchboard',
+          nominalVoltage: 480,
+          workingDistance: 455,
+          clearingTime: 0.1,
+          upstreamDevice: 'CB-1',
+          requiredInputs: []
+        } }
       };
       const zip = buildReportZip(data);
       const files = Object.keys(zip.files);
@@ -34,7 +43,15 @@ function it(name, fn){
     it('sanitizes zip entry names derived from untrusted keys', async () => {
       const data = {
         analyses: { '../../analysis_escape': [{ id: 'B1', Vm: 1 }] },
-        arcFlash: { 'BUS/../../outside': { incidentEnergy: 1, boundary: 2 } }
+        arcFlash: { 'BUS/../../outside': {
+          incidentEnergy: 1,
+          boundary: 2,
+          nominalVoltage: 480,
+          workingDistance: 455,
+          clearingTime: 0.1,
+          upstreamDevice: 'CB-1',
+          requiredInputs: []
+        } }
       };
       const zip = buildReportZip(data);
       const files = Object.keys(zip.files);

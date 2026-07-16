@@ -77,6 +77,129 @@
   margin-bottom: 0.85rem;
 }
 
+.dashboard-projects-details {
+  padding: 0;
+}
+
+.dashboard-projects-details > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem;
+  padding: .9rem 1rem;
+  cursor: pointer;
+  font-weight: 700;
+  list-style: none;
+}
+
+.dashboard-projects-details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.dashboard-projects-details > summary::after {
+  content: '▾';
+  margin-left: .25rem;
+  color: var(--color-text-muted, #64748b);
+}
+
+.dashboard-projects-details[open] > summary::after {
+  transform: rotate(180deg);
+}
+
+.dashboard-projects-details > summary small {
+  margin-left: auto;
+  color: var(--color-text-muted, #64748b);
+  font-size: .8rem;
+  font-weight: 500;
+}
+
+.dashboard-projects-details__body {
+  padding: 0 1rem 1rem;
+  border-top: 1px solid var(--color-border, #e5e7eb);
+}
+
+.dashboard-detail-group {
+  padding: 0;
+}
+
+.dashboard-detail-group > summary {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  padding: .9rem 1rem;
+  cursor: pointer;
+  list-style: none;
+}
+
+.dashboard-detail-group > summary::-webkit-details-marker {
+  display: none;
+}
+
+.dashboard-detail-group > summary::after {
+  content: '▾';
+  margin-left: .25rem;
+  color: var(--color-text-muted, #64748b);
+}
+
+.dashboard-detail-group[open] > summary::after {
+  transform: rotate(180deg);
+}
+
+.dashboard-detail-group > summary span {
+  font-weight: 750;
+}
+
+.dashboard-detail-group > summary small {
+  margin-left: auto;
+  color: var(--color-text-muted, #64748b);
+  font-size: .8rem;
+  font-weight: 500;
+}
+
+.dashboard-detail-group__body {
+  padding: 1rem;
+  border-top: 1px solid var(--color-border, #e5e7eb);
+}
+
+.dashboard-detail-group__body > h2:not(:first-child) {
+  margin-top: 1.5rem;
+}
+
+.workflow-next-action__eyebrow {
+  display: block;
+  margin-bottom: 0.2rem;
+  color: var(--color-text-muted, #64748b);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.dashboard-guided-details {
+  margin-bottom: var(--space-4, 1rem);
+}
+
+@media (max-width: 560px) {
+  .dashboard-projects-details > summary {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .dashboard-projects-details > summary small {
+    margin-left: 0;
+  }
+
+  .dashboard-detail-group > summary {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .dashboard-detail-group > summary small {
+    flex-basis: calc(100% - 1.5rem);
+    margin-left: 0;
+  }
+}
+
 /* ---- Design basis wizard ---- */
 .modal-body .design-basis-form {
   display: grid;

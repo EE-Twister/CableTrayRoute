@@ -244,14 +244,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const { summary, pvCurve, qvCurve, warnings } = result;
 
     const convergedPoints = pvCurve.points.filter(p => p.converged);
-    const collapseFound = pvCurve.collapseFound;
-
-    const marginClass = summary.loadabilityMarginPct >= 5 ? 'result-ok' : 'result-fail';
-    const marginIcon = summary.loadabilityMarginPct >= 5 ? 'PASS' : 'CAUTION';
-
     let html = `
       <section class="result-section" aria-label="Voltage Stability Results">
         <h2>Results${summary.systemLabel ? ` — ${escapeHtml(summary.systemLabel)}` : ''}</h2>
+        <div class="result-warn" role="alert"><strong>Screening only.</strong> Sequential Newton-Raphson nonconvergence is a numerical boundary, not proof of a physical voltage-collapse nose. Use continuation power flow for final margins.</div>
 
         <table class="results-table" aria-label="Stability summary">
           <thead><tr><th>Parameter</th><th>Value</th><th>Status</th></tr></thead>
@@ -262,14 +258,14 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>—</td>
             </tr>
             <tr>
-              <td>Maximum Loadability</td>
+              <td>Last Converged Sample</td>
               <td>${summary.maxLoadMW.toFixed(3)} MW</td>
-              <td>${collapseFound ? 'Nose found' : 'Not found (increase λ<sub>max</sub>)'}</td>
+              <td>${summary.solverLimitEncountered ? 'Solver boundary follows' : 'Sweep limit reached'}</td>
             </tr>
             <tr>
-              <td>Loadability Margin</td>
+              <td>Sampled Converged Range</td>
               <td>${summary.loadabilityMarginMW.toFixed(3)} MW (${summary.loadabilityMarginPct.toFixed(1)}%)</td>
-              <td class="${marginClass}">${marginIcon}</td>
+              <td>Not a physical margin</td>
             </tr>
             <tr>
               <td>Critical Bus</td>
@@ -278,13 +274,13 @@ document.addEventListener('DOMContentLoaded', () => {
             </tr>
             <tr>
               <td>Reactive Margin (${escapeHtml(String(summary.targetBusId))})</td>
-              <td>${summary.reactiveMarginMvar != null ? summary.reactiveMarginMvar.toFixed(2) + ' MVAR' : '—'}</td>
-              <td>—</td>
+              <td>Not determined by this screen</td>
+              <td>CPF required</td>
             </tr>
             <tr>
-              <td>Collapse at λ</td>
-              <td>${summary.collapseLambda != null ? summary.collapseLambda.toFixed(3) : 'Not reached'}</td>
-              <td>—</td>
+              <td>Solver Boundary at λ</td>
+              <td>${summary.solverLimitLambda != null ? summary.solverLimitLambda.toFixed(3) : 'Not encountered'}</td>
+              <td>Numerical only</td>
             </tr>
           </tbody>
         </table>`;
@@ -305,7 +301,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     html += '</section>';
     html += `<section class="result-section" aria-label="P-V Curve">
-      <h2>P-V Curve (Nose Curve)</h2>
+      <h2>P-V Screening Sweep</h2>
       ${renderPVChart(pvCurve)}
     </section>`;
 
@@ -353,12 +349,13 @@ document.addEventListener('DOMContentLoaded', () => {
       paths += `<path d="${d}" fill="none" stroke="${colors[bi % colors.length]}" stroke-width="2"/>`;
     });
 
-    // Collapse marker
+    // Numerical solver-boundary marker. This is deliberately not labeled as a
+    // physical nose or collapse point.
     let collapseMarker = '';
-    if (pvCurve.collapseFound && xVals.length > 0) {
+    if (pvCurve.solverLimitEncountered && xVals.length > 0) {
       const lastX = mapX(xVals[xVals.length - 1], xMin, xMax);
       collapseMarker = `<line x1="${lastX.toFixed(1)}" y1="${PAD.t}" x2="${lastX.toFixed(1)}" y2="${PAD.t + CH}" stroke="#f44336" stroke-dasharray="4,3" stroke-width="1.5"/>
-        <text x="${(lastX + 3).toFixed(1)}" y="${(PAD.t + 10).toFixed(1)}" font-size="10" fill="#f44336">nose</text>`;
+        <text x="${(lastX + 3).toFixed(1)}" y="${(PAD.t + 10).toFixed(1)}" font-size="10" fill="#f44336">solver boundary</text>`;
     }
 
     // Axes
@@ -383,7 +380,7 @@ document.addEventListener('DOMContentLoaded', () => {
       <line x1="0" y1="0" x2="20" y2="0" stroke="${colors[i % colors.length]}" stroke-width="2"/>
       <text x="24" y="4" font-size="10">${escapeHtml(id)}</text></g>`).join('');
 
-    return `<svg viewBox="0 0 ${SVG_W} ${SVG_H}" width="100%" style="max-width:${SVG_W}px;font-family:inherit" aria-label="P-V nose curve">
+    return `<svg viewBox="0 0 ${SVG_W} ${SVG_H}" width="100%" style="max-width:${SVG_W}px;font-family:inherit" aria-label="P-V sequential load sweep">
       <rect x="${PAD.l}" y="${PAD.t}" width="${CW}" height="${CH}" fill="none" stroke="currentColor" stroke-width="1" opacity="0.3"/>
       ${paths}${collapseMarker}${xAxis}${yAxis}
       <text x="${PAD.l + CW / 2}" y="${SVG_H - 2}" text-anchor="middle" font-size="11">Total Load (MW)</text>
@@ -424,16 +421,10 @@ document.addEventListener('DOMContentLoaded', () => {
         <text x="${PAD.l - 6}" y="${cy.toFixed(1)}" dominant-baseline="middle" text-anchor="end" font-size="10">${v.toFixed(2)}</text>`;
     }
 
-    // Reactive margin annotation
-    let marginNote = '';
-    if (qvCurve.reactiveMarginMvar != null) {
-      marginNote = `<text x="${PAD.l + 5}" y="${PAD.t + 14}" font-size="10" fill="#2196f3">Reactive margin: ${qvCurve.reactiveMarginMvar.toFixed(2)} MVAR</text>`;
-    }
-
     return `<svg viewBox="0 0 ${SVG_W} ${SVG_H}" width="100%" style="max-width:${SVG_W}px;font-family:inherit" aria-label="Q-V curve">
       <rect x="${PAD.l}" y="${PAD.t}" width="${CW}" height="${CH}" fill="none" stroke="currentColor" stroke-width="1" opacity="0.3"/>
       <path d="${d}" fill="none" stroke="#2196f3" stroke-width="2"/>
-      ${marginNote}${xAxis}${yAxis}
+      ${xAxis}${yAxis}
       <text x="${PAD.l + CW / 2}" y="${SVG_H - 2}" text-anchor="middle" font-size="11">Q Injection (MVAR)</text>
       <text transform="rotate(-90)" x="${-(PAD.t + CH / 2)}" y="14" text-anchor="middle" font-size="11">Voltage (pu)</text>
     </svg>`;

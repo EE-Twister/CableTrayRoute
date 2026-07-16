@@ -121,19 +121,19 @@ import {
 })();
 
 // ---------------------------------------------------------------------------
-// protectiveMargin — Mp = (Ucw/Ures − 1) × 100
+// protectiveMargin — Mp = (selected withstand/Ures − 1) × 100
 // ---------------------------------------------------------------------------
 (function testProtectiveMargin() {
-  // Ucw = 478.4, Ures = 416 → Mp = (478.4/416 − 1) × 100 ≈ 14.98% → FAIL (< 20%)
-  const mp1 = protectiveMargin(478.4, 416, 'li');
-  assert.ok(mp1.marginPct > 14 && mp1.marginPct < 16, `Mp ≈ 15%, got ${mp1.marginPct}`);
-  assert.equal(mp1.pass, false, 'margin < 20% → FAIL for LI');
+  // Selected BIL = 550, Ures = 416 → Mp = 32.2% → PASS.
+  const mp1 = protectiveMargin(550, 416, 'li');
+  assert.ok(mp1.marginPct > 32 && mp1.marginPct < 33, `Mp ≈ 32.2%, got ${mp1.marginPct}`);
+  assert.equal(mp1.pass, true, 'equipment-to-arrester margin ≥ 20% → PASS for LI');
   assert.equal(mp1.minMarginPct, 20, 'LI min margin = 20%');
 
-  // Ucw = 478.4, Ures = 380 → Mp ≈ 25.9% → PASS (≥ 20%)
-  const mp2 = protectiveMargin(478.4, 380, 'li');
-  assert.ok(mp2.marginPct > 25, `Mp > 25%, got ${mp2.marginPct}`);
-  assert.equal(mp2.pass, true, 'margin ≥ 20% → PASS for LI');
+  // Same BIL with a 500 kV arrester protective level gives only 10% → FAIL.
+  const mp2 = protectiveMargin(550, 500, 'li');
+  assert.equal(mp2.marginPct, 10);
+  assert.equal(mp2.pass, false, 'margin < 20% → FAIL for LI');
 
   // Switching impulse — min margin = 15%
   const mp3 = protectiveMargin(900, 800, 'si');

@@ -353,6 +353,45 @@ body.compact-mode #palette button .palette-icon {
     padding-right: 0;
 }
 
+@media (min-width: 900px) and (max-height: 850px) {
+    body[data-report-title="Cable Schedule"] .page-header,
+    body[data-report-title="Raceway Schedule"] .page-header {
+        padding-block: var(--space-2);
+    }
+
+    body[data-report-title="Cable Schedule"] .page-header p,
+    body[data-report-title="Raceway Schedule"] .page-header p {
+        margin-top: 0;
+    }
+
+    .cable-schedule-card {
+        gap: var(--space-2);
+        padding: var(--space-3);
+    }
+
+    .cable-schedule-card .schedule-card-header .field-hint,
+    .cable-schedule-card .workflow-next-action p {
+        display: none;
+    }
+
+    .cable-schedule-card .compact-action-btn,
+    .cable-schedule-card .workflow-next-action .primary-btn,
+    .cable-schedule-card .workflow-next-action .btn {
+        min-height: 2rem;
+        padding-block: 0.35rem;
+    }
+
+    .cable-toolbar {
+        padding-block: var(--space-1);
+        row-gap: var(--space-1);
+    }
+
+    .cable-schedule-card .workflow-next-action {
+        margin-block: var(--space-1);
+        padding-block: var(--space-2);
+    }
+}
+
 .cable-toolbar .toolbar-group-label {
     align-self: center;
     color: var(--color-text-muted);
@@ -497,33 +536,41 @@ body.dark-mode .btn-accent.toolbar-btn .control-icon {
 }
 
 .routing-readiness-panel {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
-    gap: var(--space-2);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
 }
 
 .readiness-item {
+    display: inline-flex;
+    flex: 0 1 auto;
+    align-items: center;
+    gap: 0.4rem;
     min-width: 0;
-    padding: var(--space-3);
+    padding: 0.35rem 0.65rem;
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-sm);
+    border-radius: 999px;
     background: color-mix(in srgb, var(--color-surface-strong) 88%, var(--color-surface));
 }
 
+.readiness-item[hidden] {
+    display: none;
+}
+
 .readiness-value {
-    display: block;
+    display: inline;
     color: var(--color-text);
-    font-size: var(--font-size-lg);
+    font-size: 0.95rem;
     font-weight: 700;
     line-height: 1.2;
     overflow-wrap: anywhere;
 }
 
 .readiness-label {
-    display: block;
-    margin-top: var(--space-1);
+    display: inline;
+    margin: 0;
     color: var(--color-text-muted);
-    font-size: var(--font-size-xs);
+    font-size: 0.72rem;
     font-weight: 700;
     letter-spacing: 0;
     text-transform: uppercase;
@@ -538,7 +585,7 @@ body.dark-mode .btn-accent.toolbar-btn .control-icon {
 }
 
 .readiness-meta {
-    grid-column: span 2;
+    max-width: min(24rem, 100%);
 }
 
 .routing-readiness-panel.is-ready .readiness-ready {
@@ -635,7 +682,7 @@ body.dark-mode .btn-accent.toolbar-btn .control-icon {
     display: none;
 }
 
-@media (max-width: 700px) {
+@media (max-width: 560px) {
     .schedule-card-header {
         flex-direction: column;
     }
@@ -743,4 +790,115 @@ details > summary {
     textarea {
         min-height: 44px;
     }
+}
+.study-workspace {
+  display: grid;
+  gap: 1rem;
+}
+
+.study-workspace__heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.study-workspace__heading h2,
+.study-workspace__heading p {
+  margin-top: 0;
+}
+
+.study-workspace form {
+  display: flex;
+  align-items: end;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+}
+
+.study-workspace form label {
+  min-width: min(16rem, 100%);
+}
+
+.study-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.study-result-summary {
+  padding: 0.75rem 1rem;
+  border-left: 4px solid var(--primary-color, #1769e0);
+  border-radius: 0.25rem;
+  background: var(--surface-subtle, #f4f7fb);
+  font-weight: 600;
+}
+
+.study-freshness {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: var(--radius-sm, 6px);
+}
+
+.study-freshness[hidden] {
+  display: none;
+}
+
+.study-freshness strong {
+  flex: 0 0 auto;
+}
+
+.study-freshness span {
+  color: var(--color-text-muted, #64748b);
+}
+
+.study-freshness--current {
+  border-color: color-mix(in srgb, var(--success-text, #166534) 38%, var(--color-border, #e2e8f0));
+  background: color-mix(in srgb, var(--success-bg, #dcfce7) 45%, transparent);
+  color: var(--success-text, #166534);
+}
+
+.study-freshness--stale {
+  border-color: color-mix(in srgb, var(--warning-text, #9a3412) 42%, var(--color-border, #e2e8f0));
+  background: color-mix(in srgb, var(--warning-bg, #ffedd5) 52%, transparent);
+  color: var(--warning-text, #9a3412);
+}
+
+.study-history {
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: var(--radius-sm, 6px);
+}
+
+.study-history > summary {
+  cursor: pointer;
+  font-weight: 750;
+}
+
+.study-delta-up {
+  color: var(--warning-text, #9a3412);
+  font-weight: 750;
+}
+
+.study-delta-down {
+  color: var(--success-text, #166534);
+  font-weight: 750;
+}
+
+.study-results-table {
+  width: 100%;
+}
+
+.study-workspace details pre {
+  max-height: 24rem;
+  overflow: auto;
+  white-space: pre-wrap;
+}
+
+@media (max-width: 700px) {
+  .study-workspace__heading {
+    display: grid;
+  }
 }

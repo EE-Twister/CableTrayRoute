@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="NFPA 855 BESS Hazard / Thermal Runaway Modeling. Evaluate separation distances, thermal runaway propagation timing, and NFPA 68 deflagration vent sizing for battery energy storage systems." />
+  <meta name="description" content="Preliminary BESS hazard screening for separation, generic thermal-runaway sensitivity, and deflagration-vent inputs. Requires project-specific test data and engineering review." />
   <title>BESS Hazard / Thermal Runaway — CableTrayRoute</title>
   <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icons/favicon.svg">
   <meta property="og:type" content="website">
   <meta property="og:title" content="BESS Hazard / Thermal Runaway — CableTrayRoute">
-  <meta property="og:description" content="NFPA 855 separation checks, UL 9540A propagation timing, and NFPA 68 deflagration vent sizing for battery energy storage systems.">
+  <meta property="og:description" content="Preliminary BESS hazard screening with explicit engineering-review and project-test-data requirements.">
   <meta property="og:image" content="https://cabletrayroute.com/icons/og-preview.png">
   <meta property="og:site_name" content="CableTrayRoute">
   <meta property="og:url" content="bessHazard.html">
@@ -20,7 +20,7 @@
   <script type="module" src="dirtyTracker.js"></script>
   <script type="module" src="dist/bessHazard.js" defer></script>
 </head>
-<body class="besshazard-page" data-report-title="BESS Hazard / Thermal Runaway">
+<body class="besshazard-page" data-report-title="BESS Hazard / Thermal Runaway Screening">
   <a href="#main-content" class="skip-link">Skip to main content</a>
   <nav class="top-nav" aria-label="Primary">
     <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
@@ -65,14 +65,14 @@
       </nav>
 
       <header class="page-header">
-        <h1>BESS Hazard / Thermal Runaway Modeling</h1>
-        <p>Evaluate NFPA 855 §15.3 separation requirements, UL 9540A thermal runaway propagation timing, and NFPA 68 §7.4.3 deflagration vent area for battery energy storage systems.</p>
+        <h1>BESS Hazard / Thermal Runaway Screening</h1>
+        <p>Screen layout distances, generic thermal-runaway sensitivity, and preliminary deflagration-vent inputs before completing the project-specific code, test-report, and engineering review.</p>
       </header>
 
       <details class="method-panel">
         <summary>Method &amp; Standards</summary>
-        <p><strong>Separation distances (NFPA 855 §15.3):</strong> NFPA 855-2023 Table 15.3.2 specifies minimum clearances from ESS installations to property lines, occupied buildings, and ignition sources based on the total rated energy capacity (kWh):</p>
-        <table class="results-table" aria-label="NFPA 855 separation distances">
+        <p><strong>Advisory separation screening:</strong> The following built-in values are conservative review triggers only. They are not represented as NFPA 855 minimum clearances; the actual requirement depends on installation type, adopted code edition, listing, UL 9540A results, protection features, and AHJ decisions.</p>
+        <table class="results-table" aria-label="Advisory separation screening distances">
           <thead><tr><th>Exposure type</th><th>≤ 50 kWh system</th><th>&gt; 50 kWh system</th></tr></thead>
           <tbody>
             <tr><td>Property line</td><td>0.9 m (3 ft)</td><td>1.5 m (5 ft)</td></tr>
@@ -80,10 +80,10 @@
             <tr><td>Ignition / electrical source</td><td>0.9 m (3 ft)</td><td>0.9 m (3 ft)</td></tr>
           </tbody>
         </table>
-        <p><strong>Propagation timing (UL 9540A):</strong> A lumped thermal-mass model estimates cell-to-cell, module, and rack propagation times from published UL 9540A battery-chemistry test data. Ambient temperature correction uses an Arrhenius approximation (reaction rate doubles every 10°C above 25°C).</p>
-        <p><strong>Deflagration vent area (NFPA 68 §7.4.3):</strong> The Bartknecht correlation from NFPA 68-2018 §7.4.3.2 is used to calculate the minimum vent area for the room, based on enclosure volume, vent opening pressure P<sub>stat</sub>, and chemistry-specific deflagration index K<sub>G</sub>:</p>
+        <p><strong>Generic propagation estimate:</strong> A lumped thermal-mass sensitivity model estimates cell-to-cell, module, and rack timing. UL 9540A is a test method; this calculation is not a UL 9540A result and cannot predict a listed system's performance.</p>
+        <p><strong>Preliminary deflagration-vent screening:</strong> A Bartknecht-form equation estimates an area from enclosure volume, P<sub>stat</sub>, and generic chemistry-wide K<sub>G</sub> and P<sub>max</sub> assumptions:</p>
         <p style="font-family:monospace; margin-left:1rem">A<sub>v</sub> = (P<sub>stat</sub><sup>−0.5682</sup> × K<sub>G</sub><sup>0.5922</sup> × V<sup>0.6672</sup> × P<sub>max</sub><sup>0.1723</sup>) / 1640</p>
-        <p class="hint"><strong>Note:</strong> This module provides screening-level calculations. A final Hazard Mitigation Analysis per NFPA 855 §15.3 must be prepared by a qualified engineer and reviewed by the Authority Having Jurisdiction (AHJ).</p>
+        <p class="hint"><strong>Important:</strong> This screen cannot determine NFPA 855 or NFPA 68 compliance, approve an HMA, or replace UL 9540A and project-specific gas data. Final design requires the adopted code, listed-system reports, a qualified engineer, and AHJ review.</p>
       </details>
 
       <!-- ------------------------------------------------------------------ -->
@@ -99,7 +99,7 @@
           </label>
           <label for="chemistry">Battery chemistry
             <select id="chemistry" aria-label="Battery chemistry">
-              <option value="LFP" selected>LiFePO₄ (LFP) — safest</option>
+              <option value="LFP" selected>LiFePO₄ (LFP)</option>
               <option value="NMC">NMC (NiMnCo)</option>
               <option value="NCA">NCA (NiCoAl)</option>
               <option value="lead-acid">Lead-Acid (VRLA)</option>
@@ -140,7 +140,7 @@
 
       <section aria-label="Exposure objects" class="field-group">
         <h2>Exposure Objects</h2>
-        <p class="hint">Add nearby structures or hazard sources to check NFPA 855 §15.3 separation requirements. Leave blank to skip separation checks.</p>
+        <p class="hint">Add nearby structures or hazard sources to compare against advisory review distances. Leave blank to skip this screening.</p>
 
         <div id="exposures-container">
           <!-- Exposure rows are added dynamically by bessHazard.js -->
@@ -150,7 +150,7 @@
       </section>
 
       <div class="action-row" style="margin:1.5rem 0; display:flex; gap:.75rem; flex-wrap:wrap">
-        <button type="button" id="calculate-btn" class="btn btn--primary">Run HMA Check</button>
+        <button type="button" id="calculate-btn" class="btn btn--primary">Run Hazard Screening</button>
         <button type="button" id="export-btn" class="btn" disabled aria-disabled="true">Export CSV</button>
       </div>
 
@@ -162,7 +162,7 @@
       <!-- ------------------------------------------------------------------ -->
       <!-- Results                                                             -->
       <!-- ------------------------------------------------------------------ -->
-      <section id="results" hidden aria-label="HMA results"></section>
+      <section id="results" hidden aria-label="BESS hazard screening results"></section>
 
       <!-- ------------------------------------------------------------------ -->
       <!-- Engineer review / approval panel                                    -->
@@ -175,23 +175,23 @@
   <div id="help-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="help-title" hidden>
     <div class="modal-content">
       <h2 id="help-title">BESS Hazard / Thermal Runaway Help</h2>
-      <p>This study performs a screening-level Hazard Mitigation Analysis (HMA) for battery energy storage systems per NFPA 855-2023, Chapter 15.</p>
+      <p>This page performs preliminary BESS hazard screening. It does not complete or approve a Hazard Mitigation Analysis and does not determine code compliance.</p>
       <h3>Inputs</h3>
       <ul>
         <li><strong>Rated capacity (kWh):</strong> Total rated energy of the ESS installation (sum of all BESS units).</li>
-        <li><strong>Chemistry:</strong> Determines K<sub>G</sub>, P<sub>max</sub>, and propagation timing. LFP is the most thermally stable chemistry.</li>
-        <li><strong>Cells/modules per rack:</strong> Used for UL 9540A propagation timing through the rack.</li>
+        <li><strong>Chemistry:</strong> Selects generic K<sub>G</sub>, P<sub>max</sub>, and propagation assumptions for sensitivity screening only.</li>
+        <li><strong>Cells/modules per rack:</strong> Used by the generic propagation sensitivity model; enter the actual listed-system arrangement.</li>
         <li><strong>Room volume:</strong> Net internal volume of the ESS room used for deflagration vent sizing.</li>
         <li><strong>P<sub>stat</sub>:</strong> Vent panel opening (activation) pressure, typically 3–10 kPa for lightweight panels.</li>
         <li><strong>Installed vent area:</strong> Total area of explosion-relief panels. Set to 0 if none are provided.</li>
-        <li><strong>Exposures:</strong> Add property lines, occupied buildings, or ignition sources with measured distances to check NFPA 855 §15.3 clearances.</li>
+        <li><strong>Exposures:</strong> Add property lines, occupied buildings, or ignition sources for comparison with advisory review distances.</li>
       </ul>
       <h3>Results</h3>
       <ul>
-        <li><strong>Separation check:</strong> Pass if actual distance ≥ NFPA 855 §15.3 minimum for each exposure.</li>
-        <li><strong>Propagation timing:</strong> Estimated time for thermal runaway cascade from initial cell event to full rack involvement.</li>
-        <li><strong>Deflagration vent:</strong> Required vent area per NFPA 68 §7.4.3.2 Bartknecht correlation. Pass if installed area ≥ required.</li>
-        <li><strong>HMA status:</strong> Overall pass/warn/fail. Fail if any separation or vent check fails, or if propagation time &lt; 30 min without suppression.</li>
+        <li><strong>Separation screening:</strong> Flags distances below a generic advisory reference. It is not a code-compliance check.</li>
+        <li><strong>Propagation estimate:</strong> Shows generic sensitivity timing, not UL 9540A test performance.</li>
+        <li><strong>Deflagration-vent screening:</strong> Compares installed area with an equation result based on assumed gas properties; final NFPA 68 design needs project data.</li>
+        <li><strong>Status:</strong> Always requires engineering review. Screening alerts identify inputs that need prompt investigation, not code pass/fail decisions.</li>
       </ul>
       <button id="close-help-btn" class="btn">Close</button>
     </div>

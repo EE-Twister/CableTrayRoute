@@ -1,8 +1,11 @@
 import { summarizeEquipment } from './equipmentWorkflow.mjs';
 import { summarizeLoadValidation } from './loadWorkflow.mjs';
 import { buildDeliverableReadinessDiagnostics } from './deliverableWorkflow.mjs';
+import { normalizeRouteResultState } from './routeResults.mjs';
 import { buildDesignBasisReview } from './designBasis.mjs';
+import { runDRC } from './designRuleChecker.mjs';
 import { countOneLineComponents, getCableReadiness, workflowOrder } from '../src/workflowStatus.js';
+import { runValidation } from '../validation/rules.js';
 
 function hasValue(value) {
   if (Array.isArray(value)) return value.some(hasValue);
@@ -20,6 +23,82 @@ function countObjectRecords(value) {
   if (Array.isArray(value)) return value.length;
   if (value && typeof value === 'object') return Object.keys(value).length;
   return 0;
+}
+
+function cableDeliverableReadiness(cables = []) {
+  const rows = meaningfulRecords(cables);
+  const hasInsulation = row => hasValue(row.insulation_type || row.insulation || row.insulation_material);
+  const hasVoltage = row => hasValue(row.voltage_rating || row.cable_rating || row.operating_voltage || row.voltage || row.rated_voltage);
+  const missingInsulation = rows.filter(row => !hasInsulation(row)).length;
+  const missingVoltage = rows.filter(row => !hasVoltage(row)).length;
+  return {
+    total: rows.length,
+    ready: rows.filter(row => hasInsulation(row) && hasVoltage(row)).length,
+    missingInsulation,
+    missingVoltage,
+    missingFields: missingInsulation + missingVoltage
+  };
+}
+
+function designRuleSummary(project = {}) {
+  const routeState = normalizeRouteResultState(
+    project.routeResults || project.latestRouteResults || {},
+    { cables: project.cables || [] }
+  );
+  try {
+    return runDRC({
+      trays: project.trays || [],
+      conduits: project.conduits || [],
+      cables: project.cables || [],
+      trayCableMap: routeState.trayCableMap,
+      routedCableNames: new Set(routeState.routedCableNames)
+    }).summary;
+  } catch (_) {
+    return { errors: 0, warnings: 0, info: 0, accepted: 0, total: 0, passed: true, unavailable: true };
+  }
+}
+
+function flattenOneLineComponents(oneLine = {}) {
+  return (Array.isArray(oneLine?.sheets) ? oneLine.sheets : [])
+    .flatMap(sheet => Array.isArray(sheet?.components) ? sheet.components : []);
+}
+
+function racewayId(record = {}, type = '') {
+  const fields = type === 'ductbank'
+    ? ['tag', 'ductbank_id', 'ductbankId', 'id', 'ref']
+    : type === 'tray'
+      ? ['tray_id', 'trayId', 'tag', 'id', 'ref']
+      : ['conduit_id', 'conduitId', 'tag', 'id', 'ref'];
+  return fields.map(field => record?.[field]).find(hasValue) || '';
+}
+
+function buildRacewayIntegrity({ trays = [], conduits = [], ductbanks = [] } = {}) {
+  const records = [
+    ...meaningfulRecords(trays).map(row => ({ type: 'tray', row })),
+    ...meaningfulRecords(conduits).map(row => ({ type: 'conduit', row })),
+    ...meaningfulRecords(ductbanks).map(row => ({ type: 'ductbank', row })),
+    ...meaningfulRecords(ductbanks).flatMap(ductbank => meaningfulRecords(ductbank.conduits)
+      .map(row => ({ type: 'conduit', row })))
+  ];
+  const counts = new Map();
+  records.forEach(({ type, row }) => {
+    const id = String(racewayId(row, type)).trim().toLocaleLowerCase();
+    if (id) counts.set(id, (counts.get(id) || 0) + 1);
+  });
+  const duplicateIds = [...counts.values()].reduce((sum, count) => sum + (count > 1 ? count : 0), 0);
+  const missingIds = records.filter(({ type, row }) => !hasValue(racewayId(row, type))).length;
+  const missingDuctbankEndpoints = meaningfulRecords(ductbanks).filter(ductbank => {
+    const from = ductbank.from || ductbank.from_tag || ductbank.fromTag || ductbank.source;
+    const to = ductbank.to || ductbank.to_tag || ductbank.toTag || ductbank.destination;
+    return !hasValue(from) || !hasValue(to);
+  }).length;
+  return {
+    total: records.length,
+    duplicateIds,
+    missingIds,
+    missingDuctbankEndpoints,
+    issues: duplicateIds + missingIds + missingDuctbankEndpoints
+  };
 }
 
 function makeBlocker(step, severity, label, detail, href) {
@@ -107,6 +186,7 @@ function findNextAction(blockers) {
   const item = critical || warning;
   if (item) {
     return {
+      step: item.step,
       label: item.label,
       detail: item.detail,
       href: item.href,
@@ -114,6 +194,7 @@ function findNextAction(blockers) {
     };
   }
   return {
+    step: 'Deliverables',
     label: 'Generate deliverables',
     detail: 'Core workflow data is ready for report and release-package review.',
     href: 'projectreport.html',
@@ -266,6 +347,13 @@ export function buildComplianceMatrix(project = {}, diagnostics = buildWorkflowC
         'oneline.html'
       ),
       matrixItem(
+        'one-line-validation',
+        health.oneLineIssues > 0 ? 'fail' : 'pass',
+        'One-Line validation clear',
+        health.oneLineIssues > 0 ? `${health.oneLineIssues} one-line validation issue(s) remain.` : 'No one-line validation issues are open.',
+        'oneline.html'
+      ),
+      matrixItem(
         'cable-schedule-present',
         cables.total > 0 ? 'pass' : 'warn',
         'Cable schedule rows available',
@@ -286,6 +374,13 @@ export function buildComplianceMatrix(project = {}, diagnostics = buildWorkflowC
         health.raceways > 0 ? 'pass' : 'warn',
         'Raceway records available',
         health.raceways > 0 ? `${health.raceways} raceway record(s) found.` : 'No tray, conduit, or ductbank records are available for routing.',
+        'racewayschedule.html'
+      ),
+      matrixItem(
+        'raceway-integrity',
+        health.racewayIssues > 0 ? 'fail' : 'pass',
+        'Raceway IDs and ductbank parents complete',
+        health.racewayIssues > 0 ? `${health.racewayIssues} raceway integrity issue(s) remain.` : 'Raceway IDs are unique and ductbank parent endpoints are complete.',
         'racewayschedule.html'
       ),
       matrixItem(
@@ -333,9 +428,9 @@ export function buildComplianceMatrix(project = {}, diagnostics = buildWorkflowC
     matrixGroup('deliverables', 'Deliverables', [
       matrixItem(
         'deliverable-gates',
-        (designReview.deliverableBlockers || []).length > 0 ? 'fail' : 'pass',
+        diagnostics.readyForDeliverables ? 'pass' : 'fail',
         'Deliverable review gates resolved',
-        (designReview.deliverableBlockers || []).length > 0 ? `${designReview.deliverableBlockers.length} deliverable gate(s) block report export or release.` : 'No design-basis deliverable gates are blocking export.',
+        diagnostics.readyForDeliverables ? 'No workflow or design-basis gates are blocking export.' : `${diagnostics.issueBlockers?.length || 0} workflow blocker(s) and ${designReview.deliverableBlockers?.length || 0} design-basis deliverable gate(s) block export.`,
         'projectreport.html'
       ),
       matrixItem(
@@ -418,8 +513,8 @@ export function buildGuidedWorkflowRunner(project = {}) {
       'oneLineDiagram',
       workflowOrder.find(step => step.key === 'oneLineDiagram')?.short || 'One-Line',
       'oneline.html',
-      health.oneLineComponents > 0 && !health.reconcilePending ? 'pass' : 'warn',
-      health.oneLineComponents > 0 ? `${health.oneLineComponents} one-line component(s) found${health.reconcilePending ? '; reconcile is pending.' : '.'}` : 'No one-line components are present yet.'
+      health.oneLineComponents > 0 && !health.reconcilePending && health.oneLineIssues === 0 ? 'pass' : 'warn',
+      health.oneLineComponents > 0 ? `${health.oneLineComponents} one-line component(s) found; ${health.oneLineIssues} validation issue(s)${health.reconcilePending ? '; reconcile is pending.' : '.'}` : 'No one-line components are present yet.'
     ),
     makeRunnerStep(
       'cableSchedule',
@@ -432,8 +527,8 @@ export function buildGuidedWorkflowRunner(project = {}) {
       'racewaySchedule',
       workflowOrder.find(step => step.key === 'racewaySchedule')?.short || 'Raceways',
       'racewayschedule.html',
-      health.raceways > 0 ? 'pass' : 'warn',
-      health.raceways > 0 ? `${health.raceways} raceway record(s) available.` : 'No raceway records are available yet.'
+      health.raceways > 0 && health.racewayIssues === 0 ? 'pass' : 'warn',
+      health.raceways > 0 ? `${health.raceways} parent raceway record(s); ${health.racewayIssues} integrity issue(s).` : 'No raceway records are available yet.'
     ),
     makeRunnerStep(
       'fillRouting',
@@ -457,8 +552,8 @@ export function buildGuidedWorkflowRunner(project = {}) {
       'deliverables',
       workflowOrder.find(step => step.key === 'deliverables')?.short || 'Deliverables',
       'projectreport.html',
-      diagnostics.designReview.deliverableBlockers.length > 0 ? 'fail' : (health.deliverables > 0 ? 'pass' : 'warn'),
-      diagnostics.designReview.deliverableBlockers.length > 0 ? `${diagnostics.designReview.deliverableBlockers.length} deliverable gate(s) block export or release.` : 'Build reports, snapshots, and release packages from synchronized project data.'
+      !diagnostics.readyForDeliverables ? 'fail' : (health.deliverables > 0 ? 'pass' : 'warn'),
+      !diagnostics.readyForDeliverables ? `${diagnostics.issueBlockers.length} workflow blocker(s) and ${diagnostics.designReview.deliverableBlockers.length} design-basis gate(s) block export or release.` : 'Build reports, snapshots, and release packages from synchronized project data.'
     )
   ];
 
@@ -468,15 +563,16 @@ export function buildGuidedWorkflowRunner(project = {}) {
     || (autoBuildRecommended ? steps.find(step => step.id === 'autoBuild') : null)
     || steps.find(step => step.status === 'warn')
     || steps[steps.length - 1];
+  const workflowSteps = steps.filter(step => step.id !== 'designBasis' && step.id !== 'autoBuild');
 
   return {
     currentStep,
-    steps,
+    steps: workflowSteps,
     prompts,
     compliance,
     readyForAutoBuild,
     autoBuildRecommended,
-    readyForDeliverables: diagnostics.designReview.readyForDeliverables && compliance.summary.fail === 0,
+    readyForDeliverables: diagnostics.readyForDeliverables && compliance.summary.fail === 0,
     diagnostics
   };
 }
@@ -500,7 +596,15 @@ export function buildWorkflowCoreDiagnostics(project = {}) {
   const equipmentSummary = summarizeEquipment(project.equipment || []);
   const loadSummary = summarizeLoadValidation(project.loads || []);
   const cableReadiness = getCableReadiness(project.cables || []);
+  const cableDeliverables = cableDeliverableReadiness(project.cables || []);
+  const designRules = designRuleSummary(project);
   const oneLineComponents = countOneLineComponents(project.oneLine || {});
+  const oneLineValidationIssues = runValidation(flattenOneLineComponents(project.oneLine || {}), project.studies || {});
+  const racewayIntegrity = buildRacewayIntegrity({
+    trays: project.trays || [],
+    conduits: project.conduits || [],
+    ductbanks: project.ductbanks || []
+  });
   const raceways = meaningfulRecords(project.trays).length
     + meaningfulRecords(project.conduits).length
     + meaningfulRecords(project.ductbanks).length;
@@ -552,6 +656,14 @@ export function buildWorkflowCoreDiagnostics(project = {}) {
 
   if (oneLineComponents === 0) {
     blockers.push(makeBlocker('One-Line', 'warning', 'Build or reconcile the one-line', 'No one-line components are present for diagram coordination.', 'oneline.html'));
+  } else if (oneLineValidationIssues.length > 0) {
+    blockers.push(makeBlocker(
+      'One-Line',
+      'warning',
+      'Resolve one-line validation issues',
+      `${oneLineValidationIssues.length} one-line validation issue(s) must be resolved before deliverables can be issued.`,
+      'oneline.html'
+    ));
   }
   if (reconcilePending) {
     blockers.push(makeBlocker('One-Line', 'warning', 'Reconcile one-line schedule changes', 'One-Line changes are pending explicit schedule reconciliation.', 'oneline.html'));
@@ -562,9 +674,29 @@ export function buildWorkflowCoreDiagnostics(project = {}) {
   } else if (cableReadiness.missingSchedule > 0) {
     blockers.push(makeBlocker('Cable Schedule', 'warning', 'Finish schedule-ready cable fields', `${cableReadiness.missingSchedule} cables need tag, endpoints, conductor size, or length.`, 'cableschedule.html'));
   }
+  if (cableDeliverables.total > 0 && cableDeliverables.missingFields > 0) {
+    const missing = [
+      cableDeliverables.missingInsulation ? `${cableDeliverables.missingInsulation} missing insulation type` : '',
+      cableDeliverables.missingVoltage ? `${cableDeliverables.missingVoltage} missing cable voltage rating` : ''
+    ].filter(Boolean).join('; ');
+    blockers.push(makeBlocker('Cable Schedule', 'warning', 'Complete deliverable cable fields', `${missing}. These fields are required for an issue-ready cable schedule.`, 'cableschedule.html'));
+  }
 
   if (raceways === 0) {
     blockers.push(makeBlocker('Raceway Schedule', 'warning', 'Add raceway records', 'No trays, conduits, or ductbanks are available for routing.', 'racewayschedule.html'));
+  } else if (racewayIntegrity.issues > 0) {
+    const issueParts = [
+      racewayIntegrity.duplicateIds ? `${racewayIntegrity.duplicateIds} duplicate ID occurrence(s)` : '',
+      racewayIntegrity.missingIds ? `${racewayIntegrity.missingIds} missing ID(s)` : '',
+      racewayIntegrity.missingDuctbankEndpoints ? `${racewayIntegrity.missingDuctbankEndpoints} ductbank parent row(s) missing From/To` : ''
+    ].filter(Boolean);
+    blockers.push(makeBlocker(
+      'Raceway Schedule',
+      'warning',
+      'Resolve raceway schedule integrity issues',
+      `${issueParts.join(', ')}.`,
+      'racewayschedule.html'
+    ));
   }
   if (cableReadiness.scheduleReady > 0 && cableReadiness.routingReady === 0) {
     blockers.push(makeBlocker('Fill / Routing', 'warning', 'Assign raceways to cables', `${cableReadiness.scheduleReady} schedule-ready cables still need raceway assignments.`, 'cableschedule.html'));
@@ -580,9 +712,70 @@ export function buildWorkflowCoreDiagnostics(project = {}) {
   if (studies === 0) {
     blockers.push(makeBlocker('Studies', 'info', 'Run workflow studies', 'No saved study results are available yet.', 'demandschedule.html'));
   }
+  if (designRules.errors > 0) {
+    blockers.push(makeBlocker('Design Rule Check', 'critical', 'Resolve design-rule errors', `${designRules.errors} error(s) and ${designRules.warnings} warning(s) are active. Workflow data may be complete, but deliverables are not issue-ready.`, 'designrulechecker.html'));
+  } else if (designRules.warnings > 0) {
+    blockers.push(makeBlocker('Design Rule Check', 'info', 'Review design-rule warnings', `${designRules.warnings} warning(s) remain. Calculations can continue, but review them before issue.`, 'designrulechecker.html'));
+  }
   if (deliverables === 0) {
     blockers.push(makeBlocker('Deliverables', 'info', 'Create report snapshot', 'No report snapshots or release packages are saved yet.', 'projectreport.html'));
   }
+
+  const issueBlockers = blockers.filter(item => item.severity === 'critical' || item.severity === 'warning');
+  const readyForDeliverables = issueBlockers.length === 0 && designReview.readyForDeliverables;
+  const workflowSteps = [
+    {
+      key: 'equipmentList',
+      complete: equipmentSummary.total > 0 && equipmentSummary.missingTags === 0 && equipmentSummary.duplicateTags === 0,
+      label: `${equipmentSummary.total} equipment record(s)`,
+      hint: blockers.find(item => item.step === 'Equipment List')?.detail || null
+    },
+    {
+      key: 'loadList',
+      complete: loadSummary.total > 0 && loadSummary.incomplete === 0,
+      label: `${loadSummary.complete} of ${loadSummary.total} load record(s) complete`,
+      hint: blockers.find(item => item.step === 'Load List')?.detail || null
+    },
+    {
+      key: 'oneLineDiagram',
+      complete: oneLineComponents > 0 && oneLineValidationIssues.length === 0 && !reconcilePending,
+      label: `${oneLineComponents} component(s), ${oneLineValidationIssues.length} issue(s)`,
+      hint: blockers.find(item => item.step === 'One-Line')?.detail || null
+    },
+    {
+      key: 'cableSchedule',
+      complete: cableReadiness.total > 0 && cableReadiness.missingSchedule === 0,
+      label: `${cableReadiness.scheduleReady} of ${cableReadiness.total} schedule-ready`,
+      hint: blockers.find(item => item.step === 'Cable Schedule')?.detail || null
+    },
+    {
+      key: 'racewaySchedule',
+      complete: raceways > 0 && racewayIntegrity.issues === 0,
+      label: `${raceways} parent raceway record(s), ${racewayIntegrity.issues} issue(s)`,
+      hint: blockers.find(item => item.step === 'Raceway Schedule')?.detail || null
+    },
+    {
+      key: 'fillRouting',
+      complete: cableReadiness.routingReady > 0
+        && cableReadiness.missingCoordinates === 0
+        && deliverableDiagnostics.health.routeResults >= cableReadiness.routingReady
+        && deliverableDiagnostics.missingRouteResultTags.length === 0,
+      label: `${deliverableDiagnostics.health.routeResults} route result(s)`,
+      hint: blockers.find(item => item.step === 'Fill / Routing')?.detail || null
+    },
+    {
+      key: 'studies',
+      complete: studies > 0,
+      label: `${studies} study result set(s)`,
+      hint: blockers.find(item => item.step === 'Studies')?.detail || null
+    },
+    {
+      key: 'deliverables',
+      complete: readyForDeliverables && deliverables > 0,
+      label: readyForDeliverables ? `${deliverables} deliverable(s)` : `${issueBlockers.length} workflow blocker(s)`,
+      hint: readyForDeliverables ? null : issueBlockers[0]?.detail || 'Resolve workflow blockers before issuing deliverables.'
+    }
+  ];
 
   return {
     health: {
@@ -603,15 +796,28 @@ export function buildWorkflowCoreDiagnostics(project = {}) {
       deliverables,
       designBasis: designBasisSummary.complete ? 'Configured' : 'Needs review',
       designBasisReviewGates: designReview.openGateCount,
-      reconcilePending
+      drcErrors: designRules.errors,
+      drcWarnings: designRules.warnings,
+      cableDeliverableReady: cableDeliverables.ready,
+      cableDeliverableMissing: cableDeliverables.missingFields,
+      reconcilePending,
+      oneLineIssues: oneLineValidationIssues.length,
+      racewayIssues: racewayIntegrity.issues
     },
     designBasis: designBasisSummary,
     designReview,
     equipment: equipmentSummary,
     loads: loadSummary,
     cables: cableReadiness,
+    cableDeliverables,
+    designRules,
+    oneLineValidationIssues,
+    racewayIntegrity,
     deliverables: deliverableDiagnostics,
     blockers,
+    issueBlockers,
+    workflowSteps,
+    readyForDeliverables,
     nextAction: findNextAction(blockers)
   };
 }

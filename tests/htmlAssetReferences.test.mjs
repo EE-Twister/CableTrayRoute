@@ -75,4 +75,22 @@ describe('HTML asset reference audit', () => {
     assert.doesNotMatch(routePage, /src=["']site\.js["']/);
     assert.doesNotMatch(routeModule, /import ['"]\.\.\/site\.js['"];/);
   });
+
+  it('self-hosts Optimal Route runtime dependencies for the production CSP', () => {
+    const html = fs.readFileSync(path.join(ROOT, 'optimalRoute.html'), 'utf8');
+    const copyScript = fs.readFileSync(path.join(ROOT, 'scripts', 'copyAssets.cjs'), 'utf8');
+    assert.match(html, /src="dist\/vendor\/plotly\.min\.js"/);
+    assert.match(html, /src="dist\/vendor\/papaparse\.min\.js"/);
+    assert.doesNotMatch(html, /<script[^>]+https?:\/\//);
+    assert.match(copyScript, /plotly\.js-dist-min/);
+    assert.match(copyScript, /papaparse/);
+  });
+
+  it('loads the shared workflow shell on the Short Circuit page', () => {
+    const html = fs.readFileSync(path.join(ROOT, 'shortCircuit.html'), 'utf8');
+    const entry = fs.readFileSync(path.join(ROOT, 'src', 'shortCircuit.js'), 'utf8');
+    assert.match(html, /src="dist\/shortCircuit\.js"/);
+    assert.match(entry, /import ['"]\.\.\/site\.js['"]/);
+    assert.match(entry, /import ['"]\.\.\/studies\/shortCircuit\.js['"]/);
+  });
 });

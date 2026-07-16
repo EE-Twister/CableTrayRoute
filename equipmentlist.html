@@ -67,12 +67,44 @@
   <div class="container">
     <main id="main-content" class="main-content">
 
-      <header class="page-header">
-        <h1>Equipment List</h1>
-        <p>Build the project equipment basis that downstream loads, one-lines, schedules, and reports can reference.</p>
+      <header class="page-header equipment-page-header">
+        <div class="equipment-page-heading">
+          <h1>Equipment List</h1>
+          <p>Manage the equipment records referenced by loads, one-lines, schedules, and reports.</p>
+        </div>
       </header>
       <section class="card equipment-list-page">
         <div id="equipment-summary-cards" class="workflow-summary-grid equipment-summary-panel" aria-label="Equipment summary"></div>
+        <div class="equipment-action-bar" role="toolbar" aria-label="Equipment list actions">
+          <button id="add-row-btn" class="btn primary-btn add-row-btn" type="button" title="Add equipment with guided fields">Add Equipment</button>
+          <button id="load-starter-equipment-btn" class="btn" type="button" title="Load starter equipment records">Load Starter Equipment</button>
+          <button id="delete-selected-btn" class="btn" type="button" title="Delete selected rows">Delete Selected</button>
+          <div class="equipment-view-switcher" role="group" aria-label="Equipment column view">
+            <span>View</span>
+            <button type="button" class="btn" data-equipment-view="core" aria-pressed="false">Core</button>
+            <button type="button" class="btn" data-equipment-view="layout" aria-pressed="false">Layout</button>
+            <button type="button" class="btn" data-equipment-view="procurement" aria-pressed="false">Procurement</button>
+            <button type="button" class="btn" data-equipment-view="full" aria-pressed="false">Full</button>
+          </div>
+          <details class="equipment-actions-menu">
+            <summary class="btn">Customize</summary>
+            <div class="equipment-actions-menu__panel">
+              <button id="add-column-btn" class="btn" type="button" title="Add a new column">Add Column</button>
+            </div>
+          </details>
+          <details class="equipment-actions-menu">
+            <summary class="btn">Import / Export</summary>
+            <div class="equipment-actions-menu__panel">
+              <button id="export-xlsx-btn" class="btn" type="button" title="Export as Excel">Export XLSX</button>
+              <input type="file" id="import-xlsx-input" accept=".xlsx" class="hidden" title="Import from Excel">
+              <button id="import-xlsx-btn" class="btn" type="button" title="Import from Excel">Import XLSX</button>
+              <input type="file" id="import-csv-input" accept=".csv" class="hidden" title="Import from CSV">
+              <button id="import-csv-btn" class="btn" type="button" title="Import from CSV">Import CSV</button>
+              <input type="file" id="import-xml-input" accept=".xml" class="hidden" title="Import from XML">
+              <button id="import-xml-btn" class="btn" type="button" title="Import from XML">Import XML</button>
+            </div>
+          </details>
+        </div>
         <div id="equipment-empty-guide" class="equipment-empty-guide" hidden>
           <div>
             <strong>No equipment records yet.</strong>
@@ -84,20 +116,7 @@
             <button id="empty-starter-equipment-btn" class="btn" type="button">Load Starter Equipment</button>
           </div>
         </div>
-        <div class="equipment-action-bar mb-1">
-          <button id="add-row-btn" class="btn primary-btn add-row-btn" type="button" title="Add equipment with guided fields">Add Equipment</button>
-          <button id="load-starter-equipment-btn" class="btn" type="button" title="Load starter equipment records">Load Starter Equipment</button>
-          <button id="add-column-btn" class="btn" type="button" title="Add a new column">Add Column</button>
-          <button id="delete-selected-btn" class="btn" type="button" title="Delete selected rows">Delete Selected</button>
-          <button id="export-xlsx-btn" class="btn" type="button" title="Export as Excel">Export XLSX</button>
-          <input type="file" id="import-xlsx-input" accept=".xlsx" class="hidden" title="Import from Excel">
-          <button id="import-xlsx-btn" class="btn" type="button" title="Import from Excel">Import XLSX</button>
-          <input type="file" id="import-csv-input" accept=".csv" class="hidden" title="Import from CSV">
-          <button id="import-csv-btn" class="btn" type="button" title="Import from CSV">Import CSV</button>
-          <input type="file" id="import-xml-input" accept=".xml" class="hidden" title="Import from XML">
-          <button id="import-xml-btn" class="btn" type="button" title="Import from XML">Import XML</button>
-        </div>
-        <div class="equipment-toolbar mb-1">
+        <div class="equipment-toolbar" role="search" aria-label="Search and filter equipment">
           <input type="text" id="equipment-search" class="table-search" placeholder="Search tag, description, arrangement, lineup, manufacturer, category, or model" title="Search by equipment details">
           <select id="equipment-category-filter" class="table-filter-select" title="Filter by category">
             <option value="">All categories</option>
@@ -106,14 +125,21 @@
             <option value="">Filter preset...</option>
           </select>
           <button id="save-equipment-preset-btn" class="btn" type="button" title="Save current search and category as a preset">Save Preset</button>
-          <button id="bulk-category-btn" class="btn" type="button" title="Apply category to selected rows">Bulk Set Category</button>
-          <button id="bulk-arrangement-btn" class="btn" type="button" title="Assign selected rows to an equipment arrangement">Bulk Set Arrangement</button>
-          <button id="bulk-lineup-btn" class="btn" type="button" title="Assign selected rows to a lineup">Bulk Set Lineup</button>
           <button id="clear-equipment-filters-btn" class="btn" type="button" title="Clear search and category filter">Clear Filters</button>
+          <details class="equipment-actions-menu equipment-actions-menu--end">
+            <summary class="btn">Bulk Edit</summary>
+            <div class="equipment-actions-menu__panel">
+              <button id="bulk-category-btn" class="btn" type="button" title="Apply category to selected rows">Set Category</button>
+              <button id="bulk-arrangement-btn" class="btn" type="button" title="Assign selected rows to an equipment arrangement">Set Arrangement</button>
+              <button id="bulk-lineup-btn" class="btn" type="button" title="Assign selected rows to a lineup">Set Lineup</button>
+            </div>
+          </details>
           <p id="equipment-results-count" class="equipment-results-count" aria-live="polite"></p>
         </div>
-        <div id="equipment-quick-filters" class="equipment-quick-filters mb-1" aria-label="Quick filters"></div>
-        <p id="equipment-validation-summary" class="equipment-validation-summary mb-1" aria-live="polite"></p>
+        <div class="equipment-list-meta">
+          <div id="equipment-quick-filters" class="equipment-quick-filters" aria-label="Quick filters"></div>
+          <p id="equipment-validation-summary" class="equipment-validation-summary" aria-live="polite"></p>
+        </div>
         <div class="overflow-x-auto">
           <table id="equipment-table" class="sticky-table">
             <caption class="visually-hidden">Equipment list with tags, ratings, and specifications</caption>

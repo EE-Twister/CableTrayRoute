@@ -60,7 +60,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     if (spacing.required) {
       preview.textContent =
-        `SDC ${sdc}: Seismic bracing required — ` +
+        `SDC ${sdc}: Seismic bracing review required — NEMA VE 2 screening guidance: ` +
         `lateral ≤ ${spacing.lateral} ft, longitudinal ≤ ${spacing.longitudinal} ft.`;
       preview.dataset.sdc = sdc;
     } else {
@@ -155,14 +155,14 @@ document.addEventListener('DOMContentLoaded', () => {
         ${r.bracingRequired ? `
         <details class="method-note">
           <summary>How this was calculated</summary>
-          <p>Per ASCE 7-22 §13.3.1, the design seismic force is:</p>
+          <p>Per the implemented ASCE 7-16 §13.3.1 method, the design seismic force is:</p>
           <pre>Fp = (0.4 × ap × SDS × Wp) / (Rp / Ip) × (1 + 2z/h)
    = (0.4 × 1.0 × ${params.sds.toFixed(3)} × Wp) / (2.5 / ${params.ip ?? 1.0}) × (1 + 2×${params.z}/${params.h})
    = ${(r.fpFactor * 100).toFixed(3)}% × Wp lbs</pre>
           <p>Subject to: Fp_min = 0.3 × SDS × Ip × Wp, Fp_max = 1.6 × SDS × Ip × Wp</p>
           <p>Lateral force = Fp × Wp = ${r.lateralForce.toFixed(2)} lbs/ft</p>
           <p>Longitudinal force = 0.4 × Fp × Wp = ${r.longitudinalForce.toFixed(2)} lbs/ft (ASCE 7 §13.5.6.1)</p>
-          <p>Vertical force = ±0.2 × SDS × Ip × Wp = ±${r.verticalForce.toFixed(2)} lbs/ft</p>
+          <p>Vertical force = ±0.2 × SDS × Wp = ±${r.verticalForce.toFixed(2)} lbs/ft</p>
         </details>` : ''}
       </div>`;
   }
@@ -271,7 +271,7 @@ document.addEventListener('DOMContentLoaded', () => {
         </thead>
         <tbody>${tableRows}</tbody>
       </table>
-      <p class="method-note">Forces per ASCE 7-22 §13.3.1. W<sub>p</sub> includes
+      <p class="method-note">Forces use the ASCE 7-16 §13.3.1 equation; this is not an ASCE 7-22 design. W<sub>p</sub> includes
       estimated tray self-weight. Cable weights derived from conductor size where available.</p>`;
   }
 

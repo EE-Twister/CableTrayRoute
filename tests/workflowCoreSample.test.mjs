@@ -11,6 +11,7 @@ const sample = getSampleById('project-workflow-core');
 assert(sample, 'Project Workflow Core sample should be registered');
 assert(sample.pagesUsed.includes('equipmentlist.html'));
 assert(sample.pagesUsed.includes('workflowdashboard.html'));
+assert.equal(sample.guidedChecklist.length, 8);
 
 const raw = JSON.parse(await readFile(new URL('../samples/project-workflow-core.json', import.meta.url), 'utf8'));
 const migrated = migrateSampleProject(raw);
@@ -25,6 +26,18 @@ assert(Array.isArray(payload.trays));
 assert.equal(payload.settings.oneLineScheduleReconcilePending, false);
 assert(payload.settings.studies.demandSchedule);
 assert.equal(payload.settings.latestRouteResults.batchResults.length, 4);
+assert(payload.settings.latestRouteResults.batchResults.every(result => result.status === 'Routed'));
+assert(payload.settings.latestRouteResults.batchResults.every(result => result.segments_count > 0));
+assert.equal(payload.settings.latestRouteResults.routedCableNames.length, 4);
+assert.equal(payload.settings.latestRouteResults.trayCableMap['TR-PWR-101'].length, 3);
+const pumpCable = payload.cables.find(cable => cable.tag === 'CBL-MCC-PMP-101');
+const pumpConduit = payload.ductbanks.flatMap(ductbank => ductbank.conduits || [])
+  .find(conduit => conduit.conduit_id === 'CND-PMP-101');
+assert.deepEqual(
+  [pumpConduit.end_x, pumpConduit.end_y, pumpConduit.end_z],
+  [pumpCable.end_x, pumpCable.end_y, pumpCable.end_z],
+  'the pump cable endpoint must connect to its preferred conduit',
+);
 assert(payload.settings.reportSnapshots['workflow-core-report']);
 
 const store = {};
@@ -47,7 +60,9 @@ const diagnostics = buildWorkflowCoreDiagnostics({
   latestRouteResults: payload.settings.latestRouteResults,
   reportSnapshots: payload.settings.reportSnapshots,
   deliverables: payload.settings.lifecyclePackages,
-  reconcilePending: payload.settings.oneLineScheduleReconcilePending
+  reconcilePending: payload.settings.oneLineScheduleReconcilePending,
+  designBasis: payload.settings.designBasis,
+  designGateApprovals: payload.settings.designGateApprovals
 });
 
 assert.equal(diagnostics.health.equipment, 5);
@@ -57,6 +72,13 @@ assert.equal(diagnostics.health.routingReady, 4);
 assert.equal(diagnostics.health.routeResults, 4);
 assert(diagnostics.health.pullGroups > 0);
 assert(diagnostics.health.spoolSheets > 0);
-assert.equal(diagnostics.blockers.filter(item => item.severity === 'critical').length, 0);
+assert.equal(diagnostics.blockers.filter(item => item.severity === 'critical').length, 1);
+assert.equal(diagnostics.blockers.filter(item => item.severity === 'warning').length, 0);
+assert.equal(diagnostics.designRules.errors, 1);
+assert.equal(diagnostics.designRules.warnings, 3);
+assert.equal(diagnostics.cableDeliverables.ready, 4);
+assert.equal(diagnostics.readyForDeliverables, false);
+assert.equal(diagnostics.workflowSteps.length, 8);
+assert.equal(diagnostics.workflowSteps.filter(step => step.complete).length, 7);
 
 console.log('✓ workflow core sample');

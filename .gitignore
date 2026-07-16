@@ -12,3 +12,5 @@ data/protectiveDevices.mjs
 tmp/
 test-results/
 .playwright-mcp/
+.playwright-cli/
+output/

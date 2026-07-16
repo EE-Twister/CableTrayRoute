@@ -132,6 +132,7 @@ async function readWorkflowSnapshot(page) {
     const trays = readScenarioKey('traySchedule', ds.getTrays());
     const conduits = readScenarioKey('conduitSchedule', ds.getConduits());
     const ductbanks = readScenarioKey('ductbankSchedule', ds.getDuctbanks());
+    const nestedConduits = ductbanks.flatMap(ductbank => Array.isArray(ductbank.conduits) ? ductbank.conduits : []);
     const routeResults = readScenarioKey('latestRouteResults', null);
     const studies = readScenarioKey('studyResults', ds.getStudies());
     const components = (oneLine?.sheets || []).flatMap(sheet => Array.isArray(sheet.components) ? sheet.components : []);
@@ -150,13 +151,18 @@ async function readWorkflowSnapshot(page) {
       cableTags: cables.map(row => row.tag || row.name || '').filter(Boolean),
       cableRacewayIds: cables.flatMap(row => Array.isArray(row.raceway_ids) ? row.raceway_ids : [row.route_preference]).filter(Boolean),
       trayIds: trays.map(row => row.tray_id || row.id || '').filter(Boolean),
-      conduitIds: conduits.map(row => row.conduit_id || row.id || '').filter(Boolean),
+      conduitIds: [...new Set([...conduits, ...nestedConduits].map(row => row.conduit_id || row.id || '').filter(Boolean))],
       ductbankIds: ductbanks.map(row => row.ductbank_id || row.id || row.tag || '').filter(Boolean),
       routeResultCount: Array.isArray(routeResults?.batchResults) ? routeResults.batchResults.length : 0,
       routedCableTags: Array.isArray(routeResults?.batchResults) ? routeResults.batchResults.map(row => row.cable).filter(Boolean) : [],
       studyKeys: studies && typeof studies === 'object' ? Object.keys(studies) : []
     };
   });
+}
+
+async function readCanonicalProject(page) {
+  await page.waitForFunction(() => window.projectStorage?.getProjectState);
+  return page.evaluate(() => window.projectStorage.getProjectState());
 }
 
 test.describe.configure({ timeout: 120000 });
@@ -197,7 +203,7 @@ test('Underground Ductbank checklist loads the sample before opening its route t
   const monitor = monitorPage(page, server.origin);
   await gotoWorkflowPage(page, server, 'samplegallery.html');
   const existingSample = page.locator('[data-sample-id="project-workflow-core"]');
-  await existingSample.getByRole('button', { name: 'Open Project Workflow Core sample project' }).click();
+  await existingSample.getByRole('button', { name: 'Open guided Project Workflow Core sample project' }).click();
   await expect(page.locator('#checklist-panel')).toContainText('Guided Workflow: Project Workflow Core');
   await page.evaluate(() => {
     window.projectStorage.setConduitCache({
@@ -206,7 +212,7 @@ test('Underground Ductbank checklist loads the sample before opening its route t
     });
   });
   const card = page.locator('[data-sample-id="ductbank-network"]');
-  await card.getByRole('button', { name: 'Load Underground Ductbank and show its guided checklist' }).click();
+  await card.getByRole('button', { name: 'Open guided Underground Ductbank sample project' }).click();
   await expect(page.locator('#checklist-panel')).toContainText('Guided Workflow: Underground Ductbank');
   const importedConduitCache = await page.evaluate(() => JSON.parse(localStorage.getItem('CTR_CONDUITS') || '{}'));
   expect(importedConduitCache.ductbanks?.[0]?.tag).toBe('DUCTBANK-DB-01');
@@ -362,31 +368,51 @@ test('sample project satisfies contract handoffs from equipment through delivera
   await expect.poll(async () => (await readWorkflowSnapshot(page)).scenario).toBe('default');
 
   const imported = await readWorkflowSnapshot(page);
+  const importedProject = await readCanonicalProject(page);
   expect(imported.equipmentTags).toEqual(expect.arrayContaining(['SWBD-101', 'MCC-101', 'PMP-101']));
   expect(imported.loadTags).toEqual(expect.arrayContaining(['PMP-101', 'LTG-101', 'REC-101']));
   expect(imported.cableTags).toEqual(expect.arrayContaining(['CBL-SWBD-MCC-101', 'CBL-MCC-PMP-101']));
   expect(imported.studyKeys).toEqual(expect.arrayContaining(['demandSchedule', 'shortCircuit']));
 
   await gotoWorkflowPage(page, server, 'equipmentlist.html');
+  await expect(page.locator('.sample-workflow-guide')).toBeVisible();
+  expect(await readCanonicalProject(page)).toEqual(importedProject);
   await expect(page.locator('#equipment-table tbody tr')).toHaveCount(5);
   const equipment = await readWorkflowSnapshot(page);
   expect(equipment.equipmentTags).toEqual(expect.arrayContaining(['SWBD-101', 'MCC-101', 'XFMR-101', 'LP-101', 'PMP-101']));
 
   await gotoWorkflowPage(page, server, 'loadlist.html');
+  await expect(page.locator('.sample-workflow-guide')).toBeVisible();
+  expect(await readCanonicalProject(page)).toEqual(importedProject);
   await expect(page.locator('#load-source-list option[value="MCC-101"]')).toHaveCount(1);
-  await expect(page.locator('#load-next-action')).toContainText('Continue to One-Line');
+  await expect(page.locator('#load-next-action')).toContainText('Open One-Line');
   const loads = await readWorkflowSnapshot(page);
   expect(loads.loadSources).toEqual(expect.arrayContaining(['MCC-101', 'LP-101']));
   expect(loads.equipmentTags).toEqual(expect.arrayContaining([...new Set(loads.loadSources)]));
 
   await gotoWorkflowPage(page, server, 'oneline.html');
   await page.waitForSelector('#oneline-ready-beacon');
+  await expect(page.locator('.sample-workflow-guide')).toBeVisible();
+  expect(await readCanonicalProject(page)).toEqual(importedProject);
   const oneLine = await readWorkflowSnapshot(page);
   expect(oneLine.oneLineRefs).toEqual(expect.arrayContaining(['SWBD-101', 'MCC-101', 'PMP-101', 'XFMR-101', 'LP-101']));
   expect(oneLine.connectionCableTags).toEqual(expect.arrayContaining(['CBL-SWBD-MCC-101', 'CBL-MCC-PMP-101', 'CBL-SWBD-XFMR-101', 'CBL-XFMR-LP-101']));
   expect(oneLine.loadTags).toContain('PMP-101');
+  const labelOverlaps = await page.locator('#diagram').evaluate(svg => {
+    const componentLabels = Array.from(svg.querySelectorAll('.component-label'));
+    return Array.from(svg.querySelectorAll('.conn-label')).flatMap(connectionLabel => {
+      const a = connectionLabel.getBoundingClientRect();
+      return componentLabels.filter(componentLabel => {
+        const b = componentLabel.getBoundingClientRect();
+        return a.width > 0 && b.width > 0 && a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+      }).map(componentLabel => `${connectionLabel.textContent} / ${componentLabel.textContent}`);
+    });
+  });
+  expect(labelOverlaps).toEqual([]);
 
   await gotoWorkflowPage(page, server, 'cableschedule.html');
+  await expect(page.locator('.sample-workflow-guide')).toBeVisible();
+  expect(await readCanonicalProject(page)).toEqual(importedProject);
   await expect(page.locator('[data-metric="ready"]')).toContainText('4');
   await expect(page.locator('[data-metric="routing-ready"]')).toContainText('4');
   const cables = await readWorkflowSnapshot(page);
@@ -394,8 +420,10 @@ test('sample project satisfies contract handoffs from equipment through delivera
   expect(cables.cableRacewayIds).toEqual(expect.arrayContaining(['TR-PWR-101', 'CND-PMP-101']));
 
   await gotoWorkflowPage(page, server, 'racewayschedule.html');
-  await expect(page.locator('#raceway-total-count')).toContainText('4');
-  await expect(page.locator('#raceway-assigned-count')).toContainText('3');
+  await expect(page.locator('.sample-workflow-guide')).toBeVisible();
+  expect(await readCanonicalProject(page)).toEqual(importedProject);
+  await expect(page.locator('#raceway-total-count')).toContainText('3');
+  await expect(page.locator('#raceway-assigned-count')).toContainText('2');
   await expect(page.locator('#raceway-missing-geometry-count')).toContainText('0');
   const raceways = await readWorkflowSnapshot(page);
   expect(raceways.trayIds).toContain('TR-PWR-101');
@@ -404,24 +432,123 @@ test('sample project satisfies contract handoffs from equipment through delivera
   expect([...raceways.trayIds, ...raceways.conduitIds]).toEqual(expect.arrayContaining(cables.cableRacewayIds));
 
   await gotoWorkflowPage(page, server, 'optimalRoute.html');
+  await expect(page.locator('.sample-workflow-guide')).toBeVisible();
+  expect(await readCanonicalProject(page)).toEqual(importedProject);
   await expect(page.locator('#route-readiness-panel')).toContainText('Schedule-ready');
   await expect(page.locator('#route-readiness-panel')).toContainText('Routing-ready');
   const routing = await readWorkflowSnapshot(page);
   expect(routing.routeResultCount).toBe(4);
   expect(routing.routedCableTags).toEqual(expect.arrayContaining(cables.cableTags));
+  await expect(page.locator('#results-section')).toBeVisible();
+  await expect(page.locator('#route-breakdown-container .route-list-row')).toHaveCount(4);
+  await expect(page.locator('#route-breakdown-container')).not.toContainText('NaN');
+  await expect(page.locator('#route-summary-panel')).toContainText('4');
+  await expect(page.locator('#route-breakdown-details')).toHaveAttribute('open', '');
+  await expect(page.locator('body')).toHaveClass(/route-review-mode/);
+  await page.locator('#route-mode-toggle').click();
+  await expect(page.locator('.optimal-route-sidebar')).toBeVisible();
+  await page.getByRole('button', { name: 'Route 4 Cables' }).click();
+  await expect(page.locator('#route-summary-panel')).toContainText('4');
+  await expect(page.locator('#route-summary-panel')).toContainText('Routed');
+  await expect(page.locator('#route-summary-panel')).toContainText('0');
+  await expect(page.locator('#route-summary-panel')).toContainText('Failed');
+  await expect(page.locator('body')).toHaveClass(/route-review-mode/);
+  await expect(page.locator('.optimal-route-sidebar')).toBeHidden();
+  await expect(page.locator('#route-mode-toggle')).toHaveText('Edit routing setup');
 
   await gotoWorkflowPage(page, server, 'shortCircuit.html');
   await expect(page.locator('#shortcircuit-form')).toBeVisible();
+  await expect(page.locator('.sample-workflow-guide')).toBeVisible();
+  await expect(page.locator('#shortcircuit-summary')).toBeVisible();
+  await expect(page.locator('#shortcircuit-summary')).toContainText('5 location(s) calculated');
+  await expect(page.locator('#shortcircuit-freshness')).toContainText('Results are stale');
+  await expect(page.locator('#shortcircuit-results-table')).toBeVisible();
+  await expect(page.locator('#shortcircuit-results-table tbody tr')).toHaveCount(5);
+  await expect(page.locator('#shortcircuit-details')).toContainText('Calculation details and provenance');
+  await expect(page.locator('#shortcircuit-export-btn')).toBeEnabled();
+  await expect(page.locator('#shortcircuit-status')).toContainText('Saved study result loaded');
+  await page.getByRole('button', { name: 'Run Study' }).click();
+  await expect(page.locator('#shortcircuit-results-table')).toBeVisible();
+  await expect(page.locator('#shortcircuit-results-table tbody tr')).not.toHaveCount(0);
   const studies = await readWorkflowSnapshot(page);
   expect(studies.studyKeys).toEqual(expect.arrayContaining(['shortCircuit']));
 
+  await gotoWorkflowPage(page, server, 'designrulechecker.html');
+  await expect(page.getByRole('heading', { name: 'Design Rule Results' })).toBeVisible();
+  await expect(page.locator('.method-panel')).not.toHaveAttribute('open', '');
+  await expect(page.locator('#drc-summary')).toContainText('1 error');
+  await expect(page.locator('#drc-summary')).toContainText('3 warnings');
+  await expect(page.locator('#drc-results')).not.toContainText('has no assigned route');
+
+  await gotoWorkflowPage(page, server, 'workflowdashboard.html');
+  await expect(page.locator('#dashboard-kpi-strip')).toContainText('Design rule checks');
+  await expect(page.locator('#dashboard-kpi-strip')).toContainText('1 error');
+  await expect(page.locator('#dashboard-next-action-strip')).toContainText('Resolve design-rule errors');
+  await expect(page.locator('#dashboard-blockers')).not.toContainText('Resolve design-rule errors');
+  await expect(page.locator('#dashboard-auto-build-btn')).toHaveCount(0);
+  await expect(page.locator('#dashboard-sample-cta')).toBeHidden();
+  await expect(page.locator('#workflow-progress-text')).toContainText('7 of 8');
+
+  await gotoWorkflowPage(page, server, 'index.html');
+  await expect(page.locator('#home-project-card-meta')).toContainText('7 of 8');
+  await page.locator('.home-explore > summary').click();
+  await expect(page.locator('#home-readiness-list')).toContainText('1 error');
+  await expect(page.getByRole('heading', { name: 'Example One-Line Layout' })).toBeVisible();
+
   await gotoWorkflowPage(page, server, 'projectreport.html');
+  await expect(page.locator('.sample-workflow-guide')).toBeVisible();
   await expect(page.locator('#rpt-deliverable-readiness')).toContainText('4 route result');
+  await page.locator('#rpt-generate-btn').click();
+  await expect(page.locator('.rpt-builder-layout')).toHaveAttribute('data-active-panel', 'preview');
+  await expect(page.locator('#rpt-config-panel')).toBeHidden();
   await expect(page.locator('#rpt-deliverable-readiness')).toContainText('1 spool');
-  await page.locator('#rpt-deliverable-readiness [data-action="generate-report-preview"]').evaluate(button => button.click());
+  await expect(page.locator('#rpt-deliverable-readiness')).toContainText('Issue readiness: blocked');
+  await expect(page.locator('#rpt-deliverable-readiness')).toContainText('Validation: 1 error(s), 3 warning(s)');
+  await page.locator('#rpt-generate-btn').click();
   await expect(page.locator('#report-preview #rpt-shortCircuit')).toContainText('Short Circuit Analysis');
+  await expect(page.locator('#report-preview #rpt-shortCircuit')).toContainText('SWBD-101');
+  await expect(page.locator('#report-preview #rpt-shortCircuit')).toContainText('25.26');
   await expect(page.locator('#report-preview')).toContainText('Cable Schedule');
+  await expect(page.locator('#report-preview #rpt-cables')).toContainText('Issue-ready fields complete');
+  await expect(page.locator('#report-preview #rpt-drc .report-finding--error, #report-preview #rpt-drc .report-finding--warning')).toHaveCount(4);
+  await expect(page.locator('#report-preview #rpt-drc')).toContainText('CBL-SWBD-XFMR-101');
+  await expect(page.locator('#report-preview #rpt-cables')).not.toContainText('—');
+  const tocTargets = await page.locator('#report-preview .report-toc-list a').evaluateAll(links => links.map(link => link.getAttribute('href')));
+  for (const target of tocTargets) {
+    await expect(page.locator(`#report-preview ${target}`)).toHaveCount(1);
+  }
 
   expect(monitor.failedResponses).toEqual([]);
   expect(monitor.errors).toEqual([]);
+});
+
+test('mobile workflow shell keeps commands reachable without page-level horizontal scrolling', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await gotoWorkflowPage(page, server, 'samplegallery.html');
+  await page.locator('[data-sample-id="project-workflow-core"] .primary-btn').click();
+  await expect(page.locator('#checklist-panel')).toBeVisible();
+  await expect(page.locator('#checklist-title')).toContainText('Project Workflow Core');
+
+  await gotoWorkflowPage(page, server, 'oneline.html');
+  await page.waitForSelector('#oneline-ready-beacon');
+  await expect(page.locator('.workflow-step-nav-select')).toBeVisible();
+  await expect(page.locator('.workflow-step-nav-links')).toBeHidden();
+  await expect(page.locator('#auto-build-oneline-btn')).toBeVisible();
+  await expect(page.locator('#sources-buttons [data-testid="palette-button"]').filter({ hasText: /utility/i })).toHaveCount(1);
+  await page.locator('#palette-toggle').click();
+  await expect(page.locator('#palette')).toBeVisible();
+  await expect(page.locator('#palette')).toHaveCSS('position', 'fixed');
+  await expect(page.locator('#palette-toggle')).toHaveAttribute('aria-expanded', 'true');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
+
+  await gotoWorkflowPage(page, server, 'projectreport.html');
+  await expect(page.locator('#rpt-mobile-generate-btn')).toBeVisible();
+  await expect(page.locator('#rpt-deliverable-readiness p').first()).toBeHidden();
+  await page.locator('#rpt-mobile-generate-btn').click();
+  await expect(page.locator('#report-preview #rpt-cables')).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
+
+  await gotoWorkflowPage(page, server, 'index.html');
+  await expect(page.locator('[data-project-workspace]')).not.toContainText('future');
+  await expect(page.locator('[data-project-workspace]')).not.toContainText('emergency');
 });

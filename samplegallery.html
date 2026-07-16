@@ -32,6 +32,53 @@
       color: var(--color-muted, #666);
       margin-right: 0.25rem;
     }
+    .gallery-search {
+      min-width: min(100%, 17rem);
+      padding: .45rem .65rem;
+      border: 1px solid var(--color-border, #ccc);
+      border-radius: 6px;
+      background: var(--surface-1, #fff);
+      color: var(--color-text, #0f172a);
+      font: inherit;
+    }
+    .gallery-filter-group {
+      display: flex;
+      flex: 1 1 28rem;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: .4rem;
+      min-width: 0;
+    }
+    .gallery-filter-label,
+    .gallery-result-count {
+      color: var(--color-muted, #666);
+      font-size: .8rem;
+      white-space: nowrap;
+    }
+    .gallery-all-tags {
+      position: relative;
+    }
+    .gallery-all-tags > summary {
+      cursor: pointer;
+      color: var(--color-primary, #1565c0);
+      font-size: .82rem;
+      font-weight: 700;
+    }
+    .gallery-all-tags[open] > div {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .4rem;
+      position: absolute;
+      z-index: 2;
+      top: calc(100% + .35rem);
+      left: 0;
+      width: min(34rem, calc(100vw - 2rem));
+      padding: .65rem;
+      border: 1px solid var(--color-border, #ccc);
+      border-radius: 8px;
+      background: var(--surface-1, #fff);
+      box-shadow: 0 .5rem 1.25rem rgba(15, 23, 42, .16);
+    }
     .tag-chip {
       display: inline-flex;
       align-items: center;
@@ -285,9 +332,9 @@
         <h1>Sample Project Gallery</h1>
       </header>
 
-      <details class="method-panel" open>
+      <details class="method-panel">
         <summary>About This Gallery</summary>
-        <p>Each visual card represents a complete, ready-to-explore project. Click <strong>Open Sample</strong>
+        <p>Each visual card represents a complete, ready-to-explore project. Click <strong>Open Guided Sample</strong>
         to load it as your current project and follow the guided checklist to tour the relevant pages.
         Use <strong>Download JSON</strong> to save a copy for offline reference.</p>
         <p>Samples cover the most common electrical design workflows: commercial tenant power,
@@ -305,11 +352,22 @@
       </section>
 
       <!-- Filter bar -->
-      <div class="gallery-toolbar" role="toolbar" aria-label="Filter samples by tag">
-        <label>Filter by tag:</label>
-        <div id="tag-filter-bar" style="display:flex;flex-wrap:wrap;gap:0.4rem;" role="group" aria-label="Tag filters">
-          <!-- Chips rendered by JS -->
+      <div class="gallery-toolbar" role="search" aria-label="Find sample projects">
+        <label for="gallery-search">Search samples</label>
+        <input id="gallery-search" class="gallery-search" type="search" placeholder="Name, industry, workflow, or tag" autocomplete="off">
+        <div class="gallery-filter-group">
+          <span class="gallery-filter-label">Popular filters</span>
+          <div id="tag-filter-bar" style="display:flex;flex-wrap:wrap;gap:0.4rem;" role="group" aria-label="Popular tag filters">
+            <!-- Popular chips rendered by JS -->
+          </div>
+          <details class="gallery-all-tags">
+            <summary>All filters</summary>
+            <div id="all-tag-filter-bar" role="group" aria-label="All tag filters">
+              <!-- Remaining chips rendered by JS -->
+            </div>
+          </details>
         </div>
+        <span id="gallery-results-count" class="gallery-result-count" aria-live="polite"></span>
         <button id="gallery-clear-filter-btn" class="btn" style="margin-left:auto;">Clear Filter</button>
       </div>
 
@@ -326,7 +384,7 @@
   <div id="help-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="help-modal-title" hidden>
     <div class="modal-content">
       <h2 id="help-modal-title">Sample Gallery Help</h2>
-      <p><strong>Open Sample</strong> loads the sample into your current project workspace.
+      <p><strong>Open Guided Sample</strong> loads the sample into your current project workspace and opens its checklist.
       Your existing project data will be replaced — save first if needed.</p>
       <p><strong>Guided Checklist</strong> appears after opening a sample. Each step links
       directly to the page where you can explore that part of the workflow. Completed steps

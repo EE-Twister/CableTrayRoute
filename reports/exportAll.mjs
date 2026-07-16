@@ -1,6 +1,6 @@
 import { toCSV } from './reporting.mjs';
 import { generateArcFlashLabel } from './labels.mjs';
-import { buildArcFlashLabelData, getArcFlashLabelBaseName } from './arcFlashReport.mjs';
+import { buildArcFlashLabelData, getArcFlashLabelBaseName, isArcFlashLabelReady } from './arcFlashReport.mjs';
 import * as dataStore from '../dataStore.mjs';
 
 let jsPDF = null;
@@ -267,7 +267,7 @@ export function buildReportZip(data = {}) {
   const usedLabelNames = new Set();
   if (data.arcFlash) {
     Object.entries(data.arcFlash)
-      .filter(([key, value]) => key && typeof value === 'object' && value !== null && !key.startsWith('_'))
+      .filter(([key, value]) => key && typeof value === 'object' && value !== null && !key.startsWith('_') && isArcFlashLabelReady(value))
       .forEach(([id, info]) => {
         const svg = generateArcFlashLabel(buildArcFlashLabelData(id, info));
         const baseName = getArcFlashLabelBaseName(id, info);

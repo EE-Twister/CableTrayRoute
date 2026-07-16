@@ -39,6 +39,7 @@ Coverage: 77 contracts for 77 navigation routes.
 - `settings.lifecyclePackages` (setting, optional): Release package records and lifecycle package history.
 - `settings.tccSettings` (setting, optional): Protective device selections, relay settings, chart options, and coordination context.
 - `settings.oneLineScheduleReconcilePending` (setting, optional): Flag indicating one-line schedule reconciliation is available.
+- `settings.activeSampleWorkflow` (setting, optional): Active sample context used to suppress redundant sample-loading guidance.
 
 **Outputs**
 - `settings.designBasis` (setting): Design basis wizard decisions and project defaults. Consumers: `workflowdashboard.html`, `projectreport.html`.
@@ -50,6 +51,7 @@ Coverage: 77 contracts for 77 navigation routes.
 - `conduitSchedule` (schedule): Automation-seeded conduit schedule rows. Consumers: `racewayschedule.html`, `optimalRoute.html`.
 - `ductbankSchedule` (schedule): Automation-seeded ductbank schedule rows. Consumers: `ductbankroute.html`, `optimalRoute.html`.
 - `settings.lifecyclePackages` (setting): Lifecycle package records created from dashboard package actions. Consumers: `projectreport.html`.
+- `studyResults.duty` (study-result): Equipment-duty validation results evaluated while central workflow readiness is refreshed. Consumers: `equipmentevaluation.html`, `projectreport.html`.
 - `settings.oneLineScheduleReconcilePending` (setting): Workflow automation reconcile state for one-line and schedule handoff. Consumers: `oneline.html`.
 
 **Readiness**
@@ -245,17 +247,10 @@ Coverage: 77 contracts for 77 navigation routes.
 - `studyResults` (study-result, optional): Saved study results available for reports, cross-checks, and downstream studies.
 - `settings.tccSettings` (setting, optional): Protective device selections, relay settings, chart options, and coordination context.
 - `settings.manufacturerDefaults` (setting, optional): Manufacturer default selections for one-line component properties.
-- `settings.oneLineDiagramFilterMode` (setting, optional): One-line component filter mode.
 - `settings.diagramScale` (setting, optional): Diagram scale setting.
-- `settings.diagramZoom` (setting, optional): Diagram zoom state.
 - `settings.studySettings` (setting, optional): One-line embedded study settings.
-- `settings.gridSize` (setting, optional): Diagram grid size.
-- `settings.gridEnabled` (setting, optional): Diagram grid visibility.
 - `settings.labelPrefixes` (setting, optional): One-line label prefix settings.
 - `settings.labelCounters` (setting, optional): One-line label counter state.
-- `settings.layersPanelOpen` (setting, optional): Layer panel open/closed state.
-- `settings.orthogonalRouting` (setting, optional): Orthogonal connection routing preference.
-- `settings.symbolStandard` (setting, optional): ANSI/IEC symbol standard selection.
 - `settings.diagramTitleBlock` (setting, optional): One-line title block fields.
 - `settings.diagramDatablockConfig` (setting, optional): One-line datablock display configuration.
 - `settings.activeSampleWorkflow` (setting, optional): Active sample context used to fit and guide the sample diagram.
@@ -279,18 +274,11 @@ Coverage: 77 contracts for 77 navigation routes.
 - `studyResults.duty` (study-result): Embedded equipment-duty result generated from one-line validation. Consumers: `equipmentevaluation.html`, `projectreport.html`.
 - `settings.scenarios` (setting): Active scenario selection restored during one-line project import. Consumers: `scenarios.html`.
 - `settings.studySettings` (setting): One-line embedded study settings. Consumers: `oneline.html`.
-- `settings.diagramZoom` (setting): Diagram zoom state. Consumers: `oneline.html`.
 - `settings.labelCounters` (setting): One-line label counter state. Consumers: `oneline.html`.
 - `settings.labelPrefixes` (setting): One-line label prefix settings. Consumers: `oneline.html`.
 - `settings.manufacturerDefaults` (setting): Manufacturer default selections for one-line component properties. Consumers: `oneline.html`.
-- `settings.gridEnabled` (setting): Diagram grid visibility. Consumers: `oneline.html`.
 - `settings.diagramDatablockConfig` (setting): One-line datablock display configuration. Consumers: `oneline.html`.
 - `settings.diagramScale` (setting): Diagram scale setting. Consumers: `oneline.html`.
-- `settings.layersPanelOpen` (setting): Layer panel open/closed state. Consumers: `oneline.html`.
-- `settings.gridSize` (setting): Diagram grid size. Consumers: `oneline.html`.
-- `settings.oneLineDiagramFilterMode` (setting): One-line component filter mode. Consumers: `oneline.html`.
-- `settings.orthogonalRouting` (setting): Orthogonal connection routing preference. Consumers: `oneline.html`.
-- `settings.symbolStandard` (setting): ANSI/IEC symbol standard selection. Consumers: `oneline.html`.
 - `settings.diagramTitleBlock` (setting): One-line title block fields. Consumers: `oneline.html`.
 - `settings.gistToken` (setting): Gist import/export token setting. Consumers: `oneline.html`.
 - `settings.onelineTemplates` (setting): Reusable one-line component templates saved with project settings. Consumers: `oneline.html`.
@@ -1068,10 +1056,12 @@ Coverage: 77 contracts for 77 navigation routes.
 - `settings.lifecyclePackages` (setting, optional): Release package records and lifecycle package history.
 - `settings.tccSettings` (setting, optional): Protective device selections, relay settings, chart options, and coordination context.
 - `settings.projectMeta` (setting, optional): Canonical project identity, client, site, engineer, revision, and environmental context.
+- `settings.oneLineScheduleReconcilePending` (setting, optional): Flag indicating one-line schedule reconciliation is available.
 
 **Outputs**
 - `settings.projectMeta` (setting): Shared project and report metadata edited from the report builder. Consumers: `battery.html`, `generatorsizing.html`, `projectreport.html`.
 - `settings.reportSnapshots` (setting): Saved report package snapshots. Consumers: `workflowdashboard.html`, `projectreport.html`.
+- `studyResults.duty` (study-result): Equipment-duty validation results evaluated while report readiness is refreshed. Consumers: `equipmentevaluation.html`.
 - `export-only` (export): Project report previews, PDF/print output, and report spreadsheets.
 
 **Readiness**
@@ -1556,8 +1546,8 @@ Coverage: 77 contracts for 77 navigation routes.
 - `export-only` (export): Short-circuit reports and duty tables. Consumers: `projectreport.html`.
 
 **Readiness**
-- Ready when: Ready when the one-line has a source and faultable buses/devices.
-- Blockers: No source, missing impedance/fault data, or disconnected fault location.
+- Ready when: Ready when the one-line has a source and faultable buses/devices, and every referenced feeder can resolve its impedance from the canonical Cable Schedule or explicit component data.
+- Blockers: No source, missing cable size/material/length, an unresolved or ambiguous Cable Schedule link, missing impedance/fault data, or a disconnected fault location.
 
 **Downstream Pages**
 - `tcc.html`
@@ -1566,7 +1556,8 @@ Coverage: 77 contracts for 77 navigation routes.
 - `projectreport.html`
 
 **Notes**
-- None.
+- Equipment-to-equipment One-Line connections resolve cable tags and endpoints against cableSchedule. When explicit R/X is absent, conductor size, material, raceway material, length, and parallel sets are converted to series impedance using the NEC Chapter 9 Table 9 library.
+- Saved results include a source-to-fault impedance path with per-segment provenance. Any One-Line fallback or assumed raceway material remains visible as an input-quality warning.
 
 #### IEC 60909 Short-Circuit (`iec60909.html`)
 
@@ -2191,7 +2182,7 @@ Coverage: 77 contracts for 77 navigation routes.
 - `settings.studyApprovals` (setting, optional): Engineer review records for study outputs.
 
 **Outputs**
-- `studyResults.voltageStability` (study-result): Saved PV/QV curve results and stability margins. Consumers: `projectreport.html`.
+- `studyResults.voltageStability` (study-result): Saved sequential PV/QV screening sweeps and numerical solver-boundary context; no physical stability margin is established. Consumers: `projectreport.html`.
 - `settings.studyApprovals` (setting): Engineer approval records written by the shared study approval panel. Consumers: `projectreport.html`.
 - `export-only` (export): Voltage stability curve exports. Consumers: `projectreport.html`.
 

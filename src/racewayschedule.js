@@ -510,6 +510,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const markUnsaved = () => dirty.markDirty();
   const TABLE_AUTOSAVE_DELAY_MS = 150;
   let tableAutosaveTimer = null;
+  let tableAutosavePending = false;
 
   function canAutosaveTable(table) {
     if (!table?.tbody || !Array.isArray(table.columns)) return false;
@@ -518,10 +519,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function flushRacewayTableAutosave() {
+    if (!tableAutosavePending) return;
     if (tableAutosaveTimer) {
       clearTimeout(tableAutosaveTimer);
       tableAutosaveTimer = null;
     }
+    tableAutosavePending = false;
     try {
       if (canAutosaveTable(tables.trays)) {
         tables.trays.save();
@@ -538,6 +541,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   function scheduleRacewayTableAutosave() {
     if (tableAutosaveTimer) clearTimeout(tableAutosaveTimer);
+    tableAutosavePending = true;
     tableAutosaveTimer = setTimeout(flushRacewayTableAutosave, TABLE_AUTOSAVE_DELAY_MS);
   }
 
@@ -873,7 +877,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     return {ductbanks,trays:trayTable.getData(),conduits};
   }
   window.getRacewaySchedule=getRacewaySchedule;
-  persistAllConduits();
 
   function normalizeImportHeader(header) {
     return String(header || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '');
@@ -1114,9 +1117,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     return issues;
   }
 
-  function setText(id, value){
+  function setSummaryMetric(id, value, show = true){
     const el = document.getElementById(id);
-    if(el) el.textContent = value;
+    if(!el) return;
+    el.textContent = value;
+    const card = el.closest('.load-summary-card');
+    if(card) card.hidden = !show;
   }
 
   function updateRacewaySummary(){
@@ -1129,19 +1135,24 @@ document.addEventListener('DOMContentLoaded', async () => {
       conduits: snapshot.conduits,
       assignedIds
     });
-    setText('raceway-total-count', String(workflowSummary.total));
-    setText('raceway-ductbank-count', String(workflowSummary.ductbanks));
-    setText('raceway-tray-count', String(workflowSummary.trays));
-    setText('raceway-conduit-count', `${workflowSummary.conduits}`);
-    setText('raceway-issue-count', String(issues.length));
-    setText('raceway-assigned-count', String(workflowSummary.assignedRaceways));
-    setText('raceway-missing-id-count', String(workflowSummary.missingIds));
-    setText('raceway-missing-geometry-count', String(workflowSummary.missingGeometry));
-    setText('raceway-unused-count', String(workflowSummary.unusedRaceways));
+    setSummaryMetric('raceway-total-count', String(workflowSummary.total));
+    setSummaryMetric('raceway-ductbank-count', String(workflowSummary.ductbanks), workflowSummary.ductbanks > 0);
+    setSummaryMetric('raceway-tray-count', String(workflowSummary.trays), workflowSummary.trays > 0);
+    setSummaryMetric('raceway-conduit-count', `${workflowSummary.conduits}`, workflowSummary.conduits > 0);
+    setSummaryMetric('raceway-ductbank-conduit-count', String(snapshot.embeddedConduits.length), snapshot.embeddedConduits.length > 0);
+    setSummaryMetric('raceway-standalone-conduit-count', String(snapshot.standaloneConduits.length), snapshot.standaloneConduits.length > 0);
+    setSummaryMetric('raceway-issue-count', String(issues.length), issues.length > 0);
+    setSummaryMetric('raceway-assigned-count', String(workflowSummary.assignedRaceways), workflowSummary.assignedRaceways > 0);
+    setSummaryMetric('raceway-missing-id-count', String(workflowSummary.missingIds), workflowSummary.missingIds > 0);
+    setSummaryMetric('raceway-missing-geometry-count', String(workflowSummary.missingGeometry), workflowSummary.missingGeometry > 0);
+    setSummaryMetric('raceway-unused-count', String(workflowSummary.unusedRaceways), workflowSummary.unusedRaceways > 0);
     const summary = document.getElementById('raceway-validation-summary');
     if(summary){
-      summary.className = issues.length ? 'load-validation-summary is-warning' : 'load-validation-summary is-success';
-      summary.textContent = issues.length
+      const needsRecords = workflowSummary.total === 0;
+      summary.className = issues.length || needsRecords ? 'load-validation-summary is-warning' : 'load-validation-summary is-success';
+      summary.textContent = needsRecords
+        ? 'Add a ductbank, tray, or conduit record to begin the raceway schedule.'
+        : issues.length
         ? `${issues.length} schedule issue${issues.length === 1 ? '' : 's'} need review before routing or BIM export.`
         : 'Raceway schedules are ready for routing and export.';
     }
@@ -1193,6 +1204,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       primaryText = 'Open Cable Schedule';
     }else{
       detail = `${READINESS_VOCABULARY.ready}: ${summary.assignedRaceways} raceway${summary.assignedRaceways === 1 ? '' : 's'} are assigned to cables. Continue into fill or routing checks.`;
+      secondaryHref = 'optimalRoute.html';
+      secondaryText = 'Open Route Planner';
     }
 
     host.innerHTML = `

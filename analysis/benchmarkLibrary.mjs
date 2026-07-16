@@ -121,13 +121,13 @@ export const BENCHMARKS = [
   },
 
   // -------------------------------------------------------------------------
-  // Battery / UPS Sizing — IEEE 485-2010
+  // Battery / UPS preliminary screening arithmetic
   // -------------------------------------------------------------------------
   {
     id: 'BAT-001',
-    label: 'IEEE 485 duty-cycle energy summation',
+    label: 'Battery duty-cycle energy summation',
     studyType: 'Battery / UPS Sizing',
-    standardRef: 'IEEE 485-2010 §4',
+    standardRef: 'Arithmetic screening check (not an IEEE 485 cell-sizing test)',
     description:
       'Net energy for a two-period duty cycle: 10 kW × 2 h + 5 kW × 1 h = 25 kWh. ' +
       'Verifies the Σ(P_i × Δt_i) arithmetic.',
@@ -151,9 +151,9 @@ export const BENCHMARKS = [
 
   {
     id: 'BAT-002',
-    label: 'IEEE 485 Li-ion design capacity at 25 °C, 10 % margin',
+    label: 'Li-ion preliminary energy-capacity screen at 25 °C, 10 % margin',
     studyType: 'Battery / UPS Sizing',
-    standardRef: 'IEEE 485-2010 §5.2–5.4',
+    standardRef: 'Application screening heuristic (not within IEEE 485 scope)',
     description:
       'kWh_net = 10 kWh; Li-ion (η = 0.95, DoD = 0.90); T_amb = 25 °C → K_temp = 1.0; ' +
       'aging = 1.20; margin = 10 %. ' +

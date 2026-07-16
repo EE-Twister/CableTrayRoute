@@ -40,7 +40,7 @@
     "BUS1": {
       "incidentEnergy": 0.39,
       "boundary": 224.8,
-      "ppeCategory": 0,
+      "ppeCategory": null,
       "clearingTime": 0.01
     }
   }

@@ -226,19 +226,20 @@ test.afterAll(async () => {
 
 test('dashboard shows the real project workflow order', async ({ page }) => {
   await page.goto(server.url('workflowdashboard.html?e2e=1&e2e_reset=1'), { waitUntil: 'domcontentloaded' });
-  await page.waitForSelector('.dash-step-name');
-  const steps = await page.locator('.dash-step-name').allTextContents();
+  await page.waitForSelector('.guided-workflow-step a', { state: 'attached' });
+  await expect(page.locator('.dashboard-guided-details')).not.toHaveAttribute('open', '');
+  const steps = await page.locator('.guided-workflow-step a').allTextContents();
   expect(steps.slice(0, 8)).toEqual([
-    '1. Equipment List',
-    '2. Load List',
+    '1. Equipment',
+    '2. Loads',
     '3. One-Line',
-    '4. Cable Schedule',
-    '5. Raceway Schedule',
+    '4. Cables',
+    '5. Raceways',
     '6. Fill / Routing',
     '7. Studies',
     '8. Deliverables'
   ]);
-  await expect(page.locator('#workflow-next-step')).toContainText('1. Equipment List');
+  await expect(page.locator('#dashboard-next-action-strip')).toContainText('Add equipment records');
 });
 
 test('equipment list supports add modal, starter records, and workflow navigation', async ({ page }) => {
@@ -267,7 +268,7 @@ test('load list links source choices to equipment and points to one-line when re
   });
   await page.goto(server.url('loadlist.html?e2e=1'), { waitUntil: 'domcontentloaded' });
   await expect(page.locator('#load-source-list option[value="SWBD-101"]')).toHaveCount(1);
-  await expect(page.locator('#load-next-action')).toContainText('Continue to One-Line');
+  await expect(page.locator('#load-next-action')).toContainText('Open One-Line');
   await expect(page.locator('.step-nav')).toContainText('Equipment List');
 });
 
@@ -409,10 +410,10 @@ test('spool sheets show geometry handoff and generate output', async ({ page }) 
 test('project report exposes deliverable readiness before preview', async ({ page }) => {
   await page.addInitScript(seedDeliverableWorkflow);
   await page.goto(server.url('projectreport.html?e2e=1'), { waitUntil: 'domcontentloaded' });
-  await expect(page.locator('#rpt-deliverable-readiness')).toContainText('Report readiness');
+  await expect(page.locator('#rpt-deliverable-readiness')).toContainText('report section(s) have current project content');
   await expect(page.locator('#rpt-deliverable-readiness')).toContainText('2 route result');
   await expect(page.locator('#rpt-deliverable-readiness')).toContainText('1 spool');
-  await page.locator('#rpt-deliverable-readiness [data-action="generate-report-preview"]').evaluate(button => button.click());
+  await page.locator('#rpt-generate-btn').click();
   await expect(page.locator('#report-preview #rpt-cover')).toBeVisible();
 });
 
@@ -425,7 +426,8 @@ test('ductbank route exposes a next action for empty underground workflow', asyn
 test('workflow dashboard exposes next action, blockers, and health metrics', async ({ page }) => {
   await page.goto(server.url('workflowdashboard.html?e2e=1&e2e_reset=1'), { waitUntil: 'domcontentloaded' });
   await expect(page.locator('#dashboard-next-action-strip')).toContainText('Next action');
-  await expect(page.locator('#dashboard-blockers')).toContainText('Add equipment records');
+  await expect(page.locator('#dashboard-next-action-strip')).toContainText('Add equipment records');
+  await expect(page.locator('#dashboard-blockers')).not.toContainText('Add equipment records');
   await expect(page.locator('#dashboard-health')).toContainText('Cable Schedule');
   await expect(page.locator('[data-workflow-mode-panel]')).toHaveCount(0);
 });

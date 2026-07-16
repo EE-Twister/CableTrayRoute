@@ -207,14 +207,14 @@ export function necAmpacityDerating(baseAmpacity, opts = {}) {
 // ---------------------------------------------------------------------------
 
 /**
- * Calculate per-phase voltage drop along a busway run.
+ * Calculate voltage drop along a busway run.
  *
  * Formula (IEC / NEMA standard impedance method):
- *   VD = I × L × (R × cos φ + X × sin φ)  [single-phase, multiply by 2 for loop]
- *   VD = √3 × I × L × (R × cos φ + X × sin φ)  [three-phase line-to-neutral drop]
+ *   VD = 2 × I × L × (R × cos φ + X × sin φ)  [single-phase source-to-load loop]
+ *   VD_LL = √3 × I × L × (R × cos φ + X × sin φ)  [three-phase line-to-line]
  *
- * The function returns line-to-neutral VD in volts; multiply by √3 for
- * three-phase line-to-line drop.
+ * For three phase, the function also returns the corresponding per-phase
+ * line-to-neutral drop before the √3 conversion.
  *
  * @param {object} params
  * @param {number} params.currentA       Load current (A)
@@ -260,15 +260,17 @@ export function voltageDropBusDuct(params) {
   const zDrop  = rOhmTotal * PF + xOhmTotal * sinPhi;  // effective impedance (Ω)
 
   let vdLineToNeutralV;
+  let vdLineToLineV;
   if (phases === 1) {
     // Single-phase: two conductors carry the current (forward + return)
-    vdLineToNeutralV = round4(I * 2 * zDrop);
+    vdLineToLineV = round4(I * 2 * zDrop);
+    vdLineToNeutralV = vdLineToLineV;
   } else {
     // Three-phase: line-to-neutral drop
     vdLineToNeutralV = round4(I * zDrop);
+    vdLineToLineV = round4(vdLineToNeutralV * Math.sqrt(3));
   }
 
-  const vdLineToLineV = round4(vdLineToNeutralV * Math.sqrt(3));
   const vdPercent     = round4((vdLineToLineV / Vll) * 100);
 
   const NEC_VD_PCT = 3;  // NEC 215.2(A)(4) feeders: 3% recommendation
@@ -465,7 +467,9 @@ export function runBusDuctStudy(inputs) {
   } = inputs || {};
 
   const errors   = [];
-  const warnings = [];
+  const warnings = [
+    'PRELIMINARY SCREENING ONLY: impedance, orientation/stacking derating, and section-modulus values are generic. Manufacturer-certified ampacity, voltage-drop, short-circuit withstand, and support data govern final selection.',
+  ];
 
   // Input validation
   const I  = parseFloat(currentA)      || 0;
@@ -583,6 +587,12 @@ export function runBusDuctStudy(inputs) {
   return {
     label,
     valid: true,
+    calculationStatus: 'screening-only',
+    standardCompliance: null,
+    requiredInputs: [
+      'Selected manufacturer busway impedance and ambient/orientation derating data.',
+      'Manufacturer short-circuit withstand rating and certified support-spacing limits.',
+    ],
     errors,
     warnings,
     ampacity:      ampacityResult,

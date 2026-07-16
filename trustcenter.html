@@ -65,14 +65,14 @@
 
       <header class="page-header">
         <h1>Trust Center</h1>
-        <p>Verify that CableTrayRoute calculation engines produce results that match published industry benchmarks derived from IEEE, IEC, NEC, and NFPA standards. Each benchmark is a canonical known-answer problem with analytically-derived expected values.</p>
+        <p>Verify calculation arithmetic against published industry examples or independently derived known-answer checks. Screening-only studies are identified as such and are not presented as standards-compliance benchmarks.</p>
       </header>
 
       <details class="method-panel">
         <summary>About These Benchmarks</summary>
-        <p>Each benchmark specifies fixed inputs and an expected output derived analytically from a first-principles formula or a table in the governing standard — not from the code under test. A passing result means the engine matches the standard, not just that it is internally consistent.</p>
+        <p>Each benchmark specifies fixed inputs and an expected output derived independently from the code under test. A passing result confirms the tested arithmetic only; it does not by itself establish compliance or validate every input and boundary condition.</p>
         <p>Tolerances account for IEEE 754 floating-point rounding. Results outside tolerance indicate a potential regression in the calculation engine and should be investigated before relying on study outputs for design decisions.</p>
-        <p>Benchmarks currently cover: <strong>EMF Analysis</strong> (Biot-Savart law, ICNIRP 2010), <strong>Battery / UPS Sizing</strong> (IEEE 485-2010), and <strong>Voltage Drop</strong> (NEC 2023 Art. 210.19/215.2 informational-note recommendations).</p>
+        <p>Checks currently cover: <strong>EMF Analysis</strong> (Biot-Savart law and exposure-limit comparisons), <strong>Battery / UPS Sizing</strong> (preliminary screening arithmetic), and <strong>Voltage Drop</strong> (NEC informational-note recommendation comparisons).</p>
       </details>
 
       <!-- Summary card -->

@@ -30,14 +30,16 @@
 <div class="doc-content">
   <nav id="doc-nav" class="doc-nav"></nav>
   <main id="main-content" class="doc-main">
-    <p>This project evaluates electrical load using standard relationships.</p>
+    <p>This project evaluates balanced, steady-state electrical load using RMS voltage and current. Unless otherwise stated, three-phase voltage is line-to-line.</p>
     <ul>
-      <li><strong>Single-phase power</strong>: P = V × I</li>
-      <li><strong>Three-phase power</strong>: P = √3 × V × I</li>
-      <li><strong>Apparent power</strong>: S = V × I</li>
-      <li><strong>Demand load</strong>: P<sub>demand</sub> = Σ P × f<sub>demand</sub></li>
+      <li><strong>Single-phase real power</strong>: P = V × I × cosφ</li>
+      <li><strong>Three-phase real power</strong>: P = √3 × V<sub>LL</sub> × I × cosφ</li>
+      <li><strong>Single-phase apparent power</strong>: S = V × I</li>
+      <li><strong>Three-phase apparent power</strong>: S = √3 × V<sub>LL</sub> × I</li>
+      <li><strong>Reactive power</strong>: Q = S × sinφ, equivalently Q = P × tanφ</li>
+      <li><strong>Demand load</strong>: P<sub>demand</sub> = Σ P<sub>i</sub> × f<sub>demand,i</sub></li>
     </ul>
-    <p>Voltages are in volts, current in amperes, and power in watts. Balanced systems and steady-state conditions are assumed.</p>
+    <p>Here cosφ is power factor. Voltages are in volts, current in amperes, real power in watts, reactive power in vars, and apparent power in volt-amperes. For a mechanical-output load, electrical input also includes efficiency: P<sub>in</sub> = P<sub>out</sub> / η.</p>
   </main>
 </div>
   <footer class="site-footer">

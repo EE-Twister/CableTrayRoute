@@ -18,6 +18,7 @@ import {
   bucketHeightFromUnits,
   bucketUnitsFromHeight,
   createDefaultMccLineup,
+  createMccUniqueId,
   escapeXml,
   mccBucketPositionLabel,
   mccBusPlatingLabel,
@@ -134,10 +135,6 @@ const MCC_PROFILE_PRESETS = [
   }
 ];
 
-function uniqueId(prefix) {
-  return `${prefix}-${Date.now()}-${Math.round(Math.random() * 1000)}`;
-}
-
 function activeIndex() {
   return state.lineups.findIndex(lineup => lineup.id === state.activeId);
 }
@@ -153,14 +150,14 @@ function setActiveLineup(lineup) {
 
 function cloneLineup(lineup) {
   const clone = JSON.parse(JSON.stringify(lineup));
-  clone.id = uniqueId('mcc');
+  clone.id = createMccUniqueId('mcc');
   clone.tag = `${lineup.tag || 'MCC'}-COPY`;
   clone.name = `${lineup.name || lineup.tag || 'MCC Lineup'} Copy`;
   clone.equipmentTag = '';
   clone.sections = (clone.sections || []).map(section => ({
     ...section,
-    id: uniqueId('mcc-sec'),
-    buckets: (section.buckets || []).map(bucket => ({ ...bucket, id: uniqueId('mcc-bkt') }))
+    id: createMccUniqueId('mcc-sec'),
+    buckets: (section.buckets || []).map(bucket => ({ ...bucket, id: createMccUniqueId('mcc-bkt') }))
   }));
   return normalizeMccLineup(clone, state.lineups.length);
 }
@@ -878,7 +875,7 @@ function deleteLineup() {
 function createSpaceBucket(lineup, index, heightIn = 12) {
   const bucketHeightIn = Math.max(1, Math.min(heightIn, Number.parseFloat(lineup.usableBucketHeightIn) || heightIn));
   return {
-    id: uniqueId('mcc-bkt'),
+    id: createMccUniqueId('mcc-bkt'),
     label: `SPACE ${index + 1}`,
     type: 'space',
     mainDevice: '',
@@ -910,7 +907,7 @@ function addSection() {
   const lineup = activeLineup();
   if (!lineup) return;
   lineup.sections.push({
-    id: uniqueId('mcc-sec'),
+    id: createMccUniqueId('mcc-sec'),
     name: `Section ${lineup.sections.length + 1}`,
     widthIn: 20,
     verticalWirewayWidthIn: DEFAULT_MCC_VERTICAL_WIREWAY_WIDTH_IN,
@@ -923,9 +920,9 @@ function addSection() {
 
 function duplicateSection(context) {
   const copy = JSON.parse(JSON.stringify(context.section));
-  copy.id = uniqueId('mcc-sec');
+  copy.id = createMccUniqueId('mcc-sec');
   copy.name = `${context.section.name} Copy`;
-  copy.buckets = (copy.buckets || []).map(bucket => ({ ...bucket, id: uniqueId('mcc-bkt') }));
+  copy.buckets = (copy.buckets || []).map(bucket => ({ ...bucket, id: createMccUniqueId('mcc-bkt') }));
   context.lineup.sections.splice(context.sectionIndex + 1, 0, copy);
   state.lineups[activeIndex()] = normalizeMccLineup(context.lineup, activeIndex());
   persistLineups();
@@ -941,7 +938,7 @@ function deleteSection(context) {
 
 function addBucket(context) {
   context.section.buckets.push({
-    id: uniqueId('mcc-bkt'),
+    id: createMccUniqueId('mcc-bkt'),
     label: `B${context.section.buckets.length + 1}`,
     type: 'starter',
     mainDevice: '',

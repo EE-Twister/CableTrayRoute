@@ -78,19 +78,33 @@
         <h1>Arc Flash</h1>
         <p>Estimate incident energy per IEEE 1584.</p>
       </header>
-      <section class="card page-header-graphic page-visual-showcase" aria-label="Page visual overview">
-        <div class="page-visual-copy">
-          <p class="page-visual-kicker">Workspace Preview</p>
-          <h2>Arc Flash Evaluation</h2>
-          <p>Document incident energy inputs and publish safer labeling decisions faster.</p>
+      <section class="card study-workspace" aria-labelledby="arcflash-setup-heading">
+        <div class="study-workspace__heading">
+          <div>
+            <p class="page-visual-kicker">Project-connected study</p>
+            <h2 id="arcflash-setup-heading">Study setup</h2>
+            <p id="study-project-context">Loading the active project model...</p>
+          </div>
+          <a class="btn secondary-btn" href="shortCircuit.html">Review Short Circuit</a>
         </div>
-        <img src="icons/graphics/studies-visual.svg" alt="Illustration for arc flash evaluation" loading="lazy" decoding="async">
-      </section>
-      <section class="card">
         <form id="arcflash-form">
-          <button type="submit">Run Study</button>
+          <label for="arcflash-scope">Scope
+            <select id="arcflash-scope" name="scope"><option value="project">All modeled equipment</option></select>
+          </label>
+          <div class="study-actions">
+            <button type="submit" class="primary-btn">Run Study</button>
+            <button id="arcflash-export-btn" type="button" class="btn" disabled>Export Report &amp; Labels</button>
+          </div>
         </form>
-        <pre id="arcflash-output"></pre>
+        <p id="arcflash-status" class="field-hint" role="status" aria-live="polite">Run short circuit first for the best fault-current basis. Export is a separate action.</p>
+        <div id="arcflash-summary" class="study-result-summary" hidden></div>
+        <div class="table-scroll-container">
+          <table id="arcflash-results-table" class="study-results-table" hidden>
+            <thead><tr><th>Equipment</th><th>Incident energy</th><th>PPE selection</th><th>Boundary</th><th>Clearing time</th><th>Input quality</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <details id="arcflash-details" hidden><summary>Calculation details and provenance</summary><pre id="arcflash-output"></pre></details>
       </section>
       <section class="card">
         <div id="study-basis-panel"></div>

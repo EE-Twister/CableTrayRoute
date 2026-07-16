@@ -183,7 +183,13 @@ document.addEventListener('DOMContentLoaded', () => {
   // -------------------------------------------------------------------
 
   function statusBadge(status) {
-    const map = { pass: ['fill-ok', '✓ Pass'], warn: ['fill-warn', '⚠ Warning'], fail: ['fill-over', '✗ Fail'] };
+    const map = {
+      review: ['fill-warn', 'Engineering review'],
+      'screening-alert': ['fill-over', 'Screening alert'],
+      pass: ['fill-warn', 'Engineering review'],
+      warn: ['fill-warn', 'Engineering review'],
+      fail: ['fill-over', 'Screening alert'],
+    };
     const [cls, label] = map[status] || ['fill-warn', status];
     return `<span class="fill-badge ${cls}">${label}</span>`;
   }
@@ -201,15 +207,18 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const { summary, separationChecks, propagation, ventArea, providedVentAreaM2, chemistryName } = result;
-    const ventPass = providedVentAreaM2 >= ventArea.ventAreaM2;
     const ventProvided = providedVentAreaM2 > 0;
+    const ventStatus = providedVentAreaM2 < ventArea.ventAreaM2
+      ? 'screening-alert' : 'review';
+    const propagationMeetsScreening = summary.meetsScreeningPropagationThreshold
+      ?? propagation.moduleToRack_min >= 30;
+    const separationStatus = check => {
+      const meets = check.meetsScreeningDistance ?? check.actualDistM >= check.minDistM;
+      return meets ? 'review' : 'screening-alert';
+    };
 
-    // Overall HMA card
-    const overallCls = summary.status === 'pass' ? 'fill-ok'
-      : summary.status === 'warn' ? 'fill-warn' : 'fill-over';
-    const overallLabel = summary.status === 'pass' ? '✓ HMA: All checks pass'
-      : summary.status === 'warn' ? '⚠ HMA: Warnings present'
-      : '✗ HMA: One or more checks fail';
+    const overallCls = 'fill-warn';
+    const overallLabel = 'Engineering review required';
 
     // Separation rows
     const sepRows = separationChecks.length
@@ -219,31 +228,32 @@ document.addEventListener('DOMContentLoaded', () => {
             <td>${escapeHtml(c.type.replace('_', ' '))}</td>
             <td>${c.actualDistM} m (${c.actualDistFt} ft)</td>
             <td>${c.minDistM} m (${c.minDistFt} ft)</td>
-            <td>${statusBadge(c.status)}</td>
+            <td>${statusBadge(separationStatus(c))}</td>
           </tr>`).join('')
       : `<tr><td colspan="5" style="font-style:italic">No exposures entered — separation checks skipped.</td></tr>`;
 
     el.hidden = false;
     el.innerHTML = `
-      <!-- Overall HMA summary card -->
-      <section class="field-group" aria-label="HMA overall status" style="margin-bottom:1.5rem">
-        <h2>HMA Overall Status</h2>
+      <!-- Overall screening summary card -->
+      <section class="field-group" aria-label="BESS screening status" style="margin-bottom:1.5rem">
+        <h2>BESS Screening Status</h2>
         <p style="font-size:1.1rem">
           <span class="fill-badge ${overallCls}" style="font-size:1rem; padding:.4rem .9rem">${overallLabel}</span>
         </p>
-        <table class="results-table" aria-label="HMA check summary">
+        <p class="hint">This result is a preliminary screening only. It does not establish code compliance or approve a Hazard Mitigation Analysis.</p>
+        <table class="results-table" aria-label="BESS screening summary">
           <tbody>
             <tr>
-              <td>Separation checks</td>
-              <td>${statusBadge(summary.separationOk ? (separationChecks.some(c => c.status === 'warn') ? 'warn' : 'pass') : 'fail')}</td>
+              <td>Separation screening</td>
+              <td>${statusBadge(separationChecks.some(c => separationStatus(c) === 'screening-alert') ? 'screening-alert' : 'review')}</td>
             </tr>
             <tr>
-              <td>Deflagration vent</td>
-              <td>${statusBadge(!ventProvided ? 'warn' : ventPass ? 'pass' : 'fail')}</td>
+              <td>Deflagration-vent screening</td>
+              <td>${statusBadge(ventStatus)}</td>
             </tr>
             <tr>
-              <td>Propagation timing</td>
-              <td>${statusBadge(summary.propagationOk ? 'pass' : 'fail')}</td>
+              <td>Generic propagation estimate</td>
+              <td>${statusBadge(propagationMeetsScreening ? 'review' : 'screening-alert')}</td>
             </tr>
             <tr>
               <td>Chemistry</td>
@@ -257,21 +267,22 @@ document.addEventListener('DOMContentLoaded', () => {
         </table>
         ${summary.issues.length ? `
           <div class="warning-panel" role="alert" style="border-left:4px solid var(--color-warn,#e6a000);padding:.75rem 1rem;margin:1rem 0;background:var(--color-bg-warn,#fffbe6)">
-            <strong>Issues &amp; Warnings</strong>
+            <strong>Engineering Review Notes</strong>
             <ul>${summary.issues.map(i => `<li>${escapeHtml(i)}</li>`).join('')}</ul>
           </div>` : ''}
       </section>
 
       <!-- Separation checks -->
       <section class="field-group" aria-label="Separation distance results" style="margin-bottom:1.5rem">
-        <h2>Separation Checks (NFPA 855 §15.3)</h2>
-        <table class="results-table" aria-label="Separation distance check table">
+        <h2>Advisory Separation Screening</h2>
+        <p class="hint">These generic distances are review triggers, not NFPA 855 minimum clearances. Establish the required separation from the adopted code, listing, UL 9540A report, protection features, and AHJ decisions.</p>
+        <table class="results-table" aria-label="Advisory separation distance screening table">
           <thead>
             <tr>
               <th>Label</th>
               <th>Exposure type</th>
               <th>Actual distance</th>
-              <th>Required (NFPA 855)</th>
+              <th>Screening reference</th>
               <th>Status</th>
             </tr>
           </thead>
@@ -281,7 +292,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
       <!-- Propagation timing -->
       <section class="field-group" aria-label="Thermal runaway propagation results" style="margin-bottom:1.5rem">
-        <h2>Thermal Runaway Propagation (UL 9540A)</h2>
+        <h2>Generic Thermal Runaway Estimate</h2>
+        <p class="hint">This sensitivity model is not a UL 9540A test result and cannot predict the listed system's propagation performance.</p>
         <table class="results-table" aria-label="Propagation timing table">
           <tbody>
             <tr>
@@ -297,7 +309,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <tr>
               <td>Module → full rack (${result.modulesPerRack} modules)</td>
               <td><strong>${propagation.moduleToRack_min} min</strong></td>
-              <td>${statusBadge(summary.propagationOk ? 'pass' : 'fail')} ${!summary.propagationOk ? '&lt; 30 min — suppression recommended' : '≥ 30 min'}</td>
+              <td>${statusBadge(propagationMeetsScreening ? 'review' : 'screening-alert')} ${propagationMeetsScreening ? '≥ 30 min screening threshold' : '&lt; 30 min screening threshold'}</td>
             </tr>
             <tr>
               <td>Ambient temperature</td>
@@ -306,23 +318,24 @@ document.addEventListener('DOMContentLoaded', () => {
             </tr>
           </tbody>
         </table>
-        <p class="hint" style="font-size:.8em">NFPA 855 §15.9 recommends automatic suppression for installations where thermal runaway can propagate to the full rack in less than 30 minutes.</p>
+        <p class="hint" style="font-size:.8em">Use the listed system's UL 9540A report to evaluate propagation, suppression, barriers, gas release, and installation limitations.</p>
       </section>
 
       <!-- Deflagration vent -->
       <section class="field-group" aria-label="Deflagration vent sizing results" style="margin-bottom:1.5rem">
-        <h2>Deflagration Vent Sizing (NFPA 68 §7.4.3)</h2>
+        <h2>Preliminary Deflagration-Vent Screening</h2>
+        <p class="hint">The equation uses generic chemistry-wide K<sub>G</sub> and P<sub>max</sub> assumptions. Final NFPA 68 design requires project-specific gas data and engineering review.</p>
         <table class="results-table" aria-label="Vent area sizing table">
           <tbody>
             <tr>
-              <td>Required vent area (A<sub>v</sub>)</td>
+              <td>Screening vent area (A<sub>v</sub>)</td>
               <td><strong>${ventArea.ventAreaM2} m² (${ventArea.ventAreaFt2} ft²)</strong></td>
               <td></td>
             </tr>
             <tr>
               <td>Installed vent area</td>
               <td><strong>${providedVentAreaM2} m²</strong></td>
-              <td>${statusBadge(!ventProvided ? 'warn' : ventPass ? 'pass' : 'fail')}${!ventProvided ? ' No vent panels entered' : ''}</td>
+              <td>${statusBadge(ventStatus)}${!ventProvided ? ' No vent panels entered' : ''}</td>
             </tr>
             <tr>
               <td>Deflagration index K<sub>G</sub></td>
@@ -381,20 +394,21 @@ document.addEventListener('DOMContentLoaded', () => {
       ['System', 'Modules per rack', saved.modulesPerRack, '', ''],
       ['System', 'Ambient temperature', saved.ambientC, '°C', ''],
       ['System', 'Room volume', saved.volumeM3, 'm³', ''],
-      ['System', 'HMA overall status', summary.status.toUpperCase(), '', ''],
+      ['System', 'Screening status', summary.status.toUpperCase(), '', 'Engineering review required'],
     ];
 
     for (const c of separationChecks) {
-      rows.push(['Separation', c.label, c.actualDistM, 'm', c.status.toUpperCase()]);
-      rows.push(['Separation', `${c.label} — required`, c.minDistM, 'm', '']);
+      const meetsScreening = c.meetsScreeningDistance ?? c.actualDistM >= c.minDistM;
+      rows.push(['Separation', c.label, c.actualDistM, 'm', meetsScreening ? 'REVIEW' : 'SCREENING ALERT']);
+      rows.push(['Separation', `${c.label} — advisory screening reference`, c.minDistM, 'm', '']);
     }
 
     rows.push(
       ['Propagation', 'Cell-to-cell', propagation.cellToCell_min, 'min', ''],
       ['Propagation', 'Cell-to-module', propagation.cellToModule_min, 'min', ''],
-      ['Propagation', 'Module-to-rack', propagation.moduleToRack_min, 'min', summary.propagationOk ? 'PASS' : 'FAIL'],
-      ['Vent', 'Required vent area', ventArea.ventAreaM2, 'm²', ''],
-      ['Vent', 'Installed vent area', providedVentAreaM2, 'm²', (providedVentAreaM2 >= ventArea.ventAreaM2) ? 'PASS' : 'FAIL'],
+      ['Propagation', 'Module-to-rack', propagation.moduleToRack_min, 'min', (summary.meetsScreeningPropagationThreshold ?? propagation.moduleToRack_min >= 30) ? 'REVIEW' : 'SCREENING ALERT'],
+      ['Vent', 'Screening vent area', ventArea.ventAreaM2, 'm²', ''],
+      ['Vent', 'Installed vent area', providedVentAreaM2, 'm²', providedVentAreaM2 >= ventArea.ventAreaM2 ? 'REVIEW' : 'SCREENING ALERT'],
       ['Vent', 'K_G', ventArea.kG_barMs, 'bar·m/s', ''],
       ['Vent', 'P_max', ventArea.pMax_bar, 'bar', ''],
       ['Vent', 'P_stat', saved.pstatKpa, 'kPa', ''],
@@ -411,7 +425,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const blob = new Blob([csv], { type: 'text/csv' });
     const url  = URL.createObjectURL(blob);
     const a_el = Object.assign(document.createElement('a'), {
-      href: url, download: 'bess-hazard-hma.csv',
+      href: url, download: 'bess-hazard-screening.csv',
     });
     a_el.click();
     URL.revokeObjectURL(url);

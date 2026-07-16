@@ -86,12 +86,14 @@
         <h1>Generator Sizing — NFPA 110 / NEC 700–702</h1>
       </header>
 
+      <div class="alert warning"><strong>Preliminary screening only.</strong> Generic derating, motor-start, and fuel-consumption assumptions must be replaced with selected-manufacturer data before procurement or final design.</div>
+
       <details class="method-panel">
         <summary>Method &amp; Assumptions</summary>
-        <p>Generator sizing follows <strong>NFPA 110-2022</strong> (Emergency and Standby Power Systems),
+        <p>This preliminary workflow is informed by <strong>NFPA 110-2022</strong> (Emergency and Standby Power Systems),
         <strong>NEC Articles 700–702</strong>, and <strong>IEEE 446-1995</strong> (Recommended Practice
         for Emergency Power Systems). Site derating uses manufacturer-published correction curves as
-        codified in NFPA 110 Annex B and ISO 8528-1.</p>
+        and ISO 8528-1. The displayed generic factors are screening assumptions, not manufacturer curves.</p>
 
         <p><strong>Altitude derating</strong> (NFPA 110 Annex B):</p>
         <pre>altitudeFactor = 1 − 0.03 × max(0, (altitude_ft − 500) / 1000)   [naturally-aspirated]
@@ -99,13 +101,14 @@ altitudeFactor = 1 − 0.01 × max(0, (altitude_ft − 500) / 1000)   [turbochar
 
         <p><strong>Temperature derating</strong> (ISO 8528-1, standard rating point 40 °C):</p>
         <pre>tempFactor = 1 − 0.01 × max(0, ambientC − 40)</pre>
+        <pre>requiredNameplateKW = requiredSiteKW / (altitudeFactor × tempFactor)</pre>
 
         <p><strong>Motor start step load</strong> (IEEE 446 §5.3):</p>
         <pre>startingKVA = (HP × 0.746) / (PF × efficiency) × LRC_multiplier</pre>
 
         <p><strong>Transient voltage dip</strong> (IEEE 446 §5.4):</p>
         <pre>dip% = (stepLoadKVA / genKVA) × X'd%</pre>
-        <p>NFPA 110 Type 10 systems must keep voltage dip ≤ 35% during the largest motor start.</p>
+        <p>The default 35% voltage-dip threshold is a user-adjustable screening criterion. NFPA 110 requires performance suitable for the connected load; verify contactor, relay, drive, and control ride-through limits.</p>
 
         <p><strong>Fuel runtime:</strong></p>
         <pre>fuelRate (gal/hr) = loadKW × 1.341 × SFC_lb_per_hp_hr / 6.791
@@ -205,14 +208,13 @@ runtime (hr) = tankCapacity_gal / fuelRate</pre>
           <div class="field-row">
             <label for="nfpa110-type">NFPA 110 system type</label>
             <select id="nfpa110-type" aria-describedby="nfpa110-type-hint">
-              <option value="type-10">Type 10 — ≤ 10 s transfer (NEC Article 700 life safety)</option>
-              <option value="type-60">Type 60 — ≤ 60 s transfer (NEC Article 701 legally required standby)</option>
-              <option value="type-120">Type 120 — ≤ 120 s transfer (NEC Article 702 optional standby)</option>
+              <option value="type-10">Type 10 — power restored within 10 s</option>
+              <option value="type-60">Type 60 — power restored within 60 s</option>
+              <option value="type-120">Type 120 — power restored within 120 s</option>
             </select>
             <p id="nfpa110-type-hint" class="field-hint">
-              The NFPA 110 type determines the maximum allowable transfer time and minimum
-              runtime requirements. Type 10 is required for hospital essential electrical systems,
-              egress lighting, and fire protection. Consult the AHJ for classification.
+              NFPA 110 Type describes restoration time only. Runtime is specified separately by
+              NFPA 110 Class and by the applicable code, owner criteria, and AHJ.
             </p>
           </div>
         </fieldset>
@@ -277,6 +279,16 @@ runtime (hr) = tankCapacity_gal / fuelRate</pre>
               generator (smaller voltage dip). Obtain from the generator data sheet.
             </p>
           </div>
+
+          <div class="field-row">
+            <label for="voltage-dip-limit">Project voltage-dip screening limit (%)</label>
+            <input type="number" id="voltage-dip-limit" min="1" max="99" step="1" value="35"
+                   aria-describedby="voltage-dip-limit-hint">
+            <p id="voltage-dip-limit-hint" class="field-hint">
+              Enter the acceptance threshold established from connected-load ride-through requirements.
+              The 35% default is only a preliminary screen and is not a universal NFPA 110 limit.
+            </p>
+          </div>
         </fieldset>
 
         <!-- Fuel / Runtime -->
@@ -292,8 +304,8 @@ runtime (hr) = tankCapacity_gal / fuelRate</pre>
                    aria-describedby="fuel-hint">
             <p id="fuel-hint" class="field-hint">
               Usable capacity of the base tank or day tank. Leave at 0 to skip the fuel runtime
-              calculation. NFPA 110 §8.3.1 requires a minimum of 2 hours of fuel for Type 10 systems
-              (many AHJs require 4–8 hours; mission-critical facilities often specify 24–72 hours).
+              calculation. Compare the result with the separately specified NFPA 110 Class,
+              applicable NEC requirements, owner criteria, and AHJ requirements.
             </p>
           </div>
 

@@ -263,19 +263,20 @@ describe('extractTrayFillRecs()', () => {
 // DC-06 — extractHarmonicsRecs
 // ---------------------------------------------------------------------------
 describe('extractHarmonicsRecs()', () => {
-  it('emits compliance rec for bus with warning:true', () => {
+  it('requests a PCC study rather than declaring compliance for warning:true', () => {
     const results = { 'BUS-H1': { vthd: 6.2, limit: 5, warning: true } };
     const recs = extractHarmonicsRecs(results);
     assert.strictEqual(recs.length, 1);
-    assert.strictEqual(recs[0].severity, 'compliance');
+    assert.strictEqual(recs[0].severity, 'missing_data');
+    assert.match(recs[0].detail, /does not establish IEEE 519 compliance/);
     assert.strictEqual(recs[0].location, 'BUS-H1');
     assert.strictEqual(recs[0].sourceStudy, 'harmonics');
   });
 
-  it('emits compliance rec when vthd exceeds limit even without warning flag', () => {
+  it('requests missing PCC data when vthd exceeds the screening threshold', () => {
     const results = { 'BUS-H2': { vthd: 7.0, limit: 5 } };
     const recs = extractHarmonicsRecs(results);
-    assert.strictEqual(recs.filter(r => r.severity === 'compliance').length, 1);
+    assert.strictEqual(recs.filter(r => r.severity === 'missing_data').length, 1);
   });
 
   it('emits no rec for bus within limit', () => {

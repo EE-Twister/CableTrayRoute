@@ -40,10 +40,13 @@ global.localStorage = {
       const res = await runArcFlash();
       const af = res.BUS1;
       // IEEE 1584-2018 model: 480 V, 20.4 kA bolted / 15.2 kA arcing, 10 ms
-      // instantaneous clearing → very low incident energy (PPE 0).
+      // Instantaneous clearing produces very low incident energy. The incident-
+      // energy method does not assign a task-based PPE category.
       assert(Math.abs(af.incidentEnergy - 0.39) < 0.05, `incidentEnergy=${af.incidentEnergy}`);
       assert(Math.abs(af.boundary - 224.8) < 2, `boundary=${af.boundary}`);
-      assert.strictEqual(af.ppeCategory, 0);
+      assert.strictEqual(af.ppeCategory, null);
+      assert.strictEqual(af.ppeSelectionMethod, 'incident-energy');
+      assert.strictEqual(af.minimumArcRatingCalCm2, 0);
       assert(Math.abs(af.clearingTime - 0.01) < 0.001);
       assert.strictEqual(af.calculationInputs.model, 'IEEE 1584-2018');
       assert.strictEqual(af.nominalVoltage, 480);

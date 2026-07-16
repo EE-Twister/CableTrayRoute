@@ -458,6 +458,34 @@ body.dark-mode .table-row-focusable:focus-within::after {
     margin-top: var(--space-1);
 }
 
+@media (min-width: 900px) and (max-height: 850px) {
+    .raceway-overview {
+        gap: var(--space-1);
+        padding: var(--space-3);
+    }
+
+    .raceway-overview .load-validation-summary,
+    .raceway-overview .workflow-next-action p {
+        display: none;
+    }
+
+    .raceway-overview .workflow-next-action .primary-btn,
+    .raceway-overview .workflow-next-action .btn {
+        min-height: 2rem;
+        padding-block: 0.35rem;
+    }
+
+    .raceway-overview .workflow-next-action {
+        margin-block: var(--space-1);
+        padding-block: var(--space-2);
+    }
+
+    .raceway-filter-chips .loadlist-chip {
+        min-height: 2rem;
+        padding-block: var(--space-1);
+    }
+}
+
 .raceway-view-menu .toolbar-btn.active {
     background: color-mix(in srgb, var(--color-primary) 12%, var(--color-surface-strong));
     border-color: color-mix(in srgb, var(--color-primary) 50%, var(--color-border));
@@ -493,17 +521,25 @@ body.dark-mode .table-row-focusable:focus-within::after {
 }
 
 .load-summary-panel {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
-    gap: var(--space-2);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
 }
 
 .load-summary-card {
+    display: inline-flex;
+    flex: 0 1 auto;
+    align-items: center;
+    gap: 0.4rem;
     min-width: 0;
-    padding: var(--space-3);
+    padding: 0.35rem 0.65rem;
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-sm);
+    border-radius: 999px;
     background: var(--color-surface-strong);
+}
+
+.load-summary-card[hidden] {
+    display: none;
 }
 
 .load-summary-card.load-summary-warning {
@@ -511,18 +547,18 @@ body.dark-mode .table-row-focusable:focus-within::after {
 }
 
 .load-summary-value {
-    display: block;
+    display: inline;
     color: var(--color-text);
-    font-size: var(--font-size-lg);
+    font-size: 0.95rem;
     font-weight: 700;
     line-height: 1.1;
 }
 
 .load-summary-label {
-    display: block;
-    margin-top: var(--space-1);
+    display: inline;
+    margin: 0;
     color: var(--color-text-muted);
-    font-size: var(--font-size-xs);
+    font-size: 0.72rem;
     font-weight: 700;
     letter-spacing: 0;
     text-transform: uppercase;
@@ -533,6 +569,10 @@ body.dark-mode .table-row-focusable:focus-within::after {
     margin: 0;
     color: var(--color-text-muted);
     font-size: var(--font-size-sm);
+}
+
+.load-validation-summary:empty {
+    display: none;
 }
 
 .load-validation-summary.is-warning {
@@ -1022,8 +1062,27 @@ td.raceway-action-cell {
 }
 
 .equipment-toolbar .table-search {
-    flex: 1 1 320px;
-    margin-bottom: 0;
+  flex: 1 1 320px;
+  margin-bottom: 0;
+}
+
+.load-list-table[data-view-preset="basic"] { min-width: 108rem; }
+.load-list-table[data-view-preset="electrical"] { min-width: 96rem; }
+.load-list-table[data-view-preset="demand"] { min-width: 88rem; }
+.load-list-table[data-view-preset="procurement"] { min-width: 96rem; }
+.load-list-table[data-view-preset="demand"] .load-sticky-description {
+    position: static;
+}
+
+.equipment-list-page .equipment-toolbar .table-filter-select {
+  flex: 0 1 190px;
+  width: auto;
+  margin: 0;
+}
+
+.equipment-list-page .equipment-toolbar .btn,
+.equipment-list-page .equipment-toolbar .equipment-actions-menu {
+  flex: 0 0 auto;
 }
 
 .table-filter-select {
@@ -1065,6 +1124,7 @@ td.raceway-action-cell {
 }
 
 .equipment-validation-summary {
+    margin: 0;
     font-size: 0.9rem;
     color: var(--text-color);
 }
@@ -1166,7 +1226,7 @@ body.dark-mode .row-icon-btn .control-icon {
     filter: brightness(0) invert(1);
 }
 
-@media (max-width: 900px) {
+@media (max-width: 620px) {
     .load-list-header,
     .source-summary-header,
     .raceway-section-header {
@@ -1182,8 +1242,6 @@ body.dark-mode .row-icon-btn .control-icon {
     }
 
     .loadlist-action-bar,
-    .loadlist-action-bar .toolbar-group,
-    .loadlist-action-bar .toolbar-menu,
     .raceway-toolbar,
     .raceway-toolbar .toolbar-group,
     .raceway-toolbar .toolbar-menu {
@@ -1202,6 +1260,120 @@ body.dark-mode .row-icon-btn .control-icon {
     .raceway-toolbar .toolbar-menu > summary.toolbar-btn {
         width: 100%;
         justify-content: space-between;
+    }
+
+    .loadlist-action-bar {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.4rem;
+        padding: 0.45rem;
+    }
+
+    .loadlist-action-bar .toolbar-group,
+    .loadlist-action-bar .toolbar-menu {
+        width: auto;
+        min-width: 0;
+    }
+
+    .loadlist-action-bar .load-workflow-actions {
+        display: none;
+    }
+
+    .load-summary-panel {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        max-width: 100%;
+        overflow: visible;
+        gap: 0.35rem;
+    }
+
+    .load-summary-card {
+        flex-direction: column;
+        justify-content: center;
+        gap: 0.1rem;
+        padding: 0.4rem 0.25rem;
+        border-radius: var(--radius-sm);
+        text-align: center;
+    }
+
+    .loadlist-toolbar .table-search {
+        flex: 0 0 auto;
+        min-height: 2.5rem;
+    }
+
+    .loadlist-filter-chips {
+        flex-wrap: nowrap;
+        max-width: 100%;
+        overflow-x: auto;
+        padding-bottom: 0.2rem;
+    }
+
+    .loadlist-chip {
+        flex: 0 0 auto;
+    }
+
+    .load-list-table,
+    .load-list-table[data-view-preset] {
+        min-width: 0;
+        width: 100%;
+    }
+
+    .load-list-table thead {
+        display: none;
+    }
+
+    .load-list-table tbody,
+    .load-list-table tfoot,
+    .load-list-table tr,
+    .load-list-table td {
+        display: block;
+        width: 100%;
+    }
+
+    .load-list-table tbody tr {
+        margin-bottom: 0.75rem;
+        overflow: hidden;
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-sm);
+        background: var(--color-surface);
+        box-shadow: var(--shadow-sm);
+    }
+
+    .load-list-table td,
+    .load-list-table [class*="load-sticky-"] {
+        position: static !important;
+        display: grid;
+        grid-template-columns: minmax(6.5rem, 36%) minmax(0, 1fr);
+        align-items: center;
+        gap: 0.55rem;
+        min-width: 0;
+        width: 100%;
+        padding: 0.42rem 0.55rem;
+        border-right: 0;
+        border-bottom: 1px solid var(--color-border);
+    }
+
+    .load-list-table td[hidden] {
+        display: none !important;
+    }
+
+    .load-list-table td::before {
+        content: attr(data-label);
+        color: var(--color-text-muted);
+        font-size: var(--font-size-xs);
+        font-weight: 700;
+    }
+
+    .load-list-table td input,
+    .load-list-table td select,
+    .load-list-table td textarea {
+        min-width: 0;
+        width: 100%;
+    }
+
+    .load-list-table tfoot {
+        margin-top: 0.5rem;
+        border-top: 2px solid var(--color-border);
     }
 }
 

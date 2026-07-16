@@ -334,19 +334,29 @@ export function calcWindForce(params) {
  * and manufacturer. Use manufacturer load tables for design.
  *
  * Load class definitions (NEMA VE 1-2017 Table 1):
- *   8A  = 50 lbs/ft   at 12 ft span (light duty)
+ *   8A  = 50 lbs/ft   at 8 ft span
+ *   8B  = 75 lbs/ft   at 8 ft span
+ *   8C  = 100 lbs/ft  at 8 ft span
  *   12A = 50 lbs/ft   at 12 ft span
  *   12B = 75 lbs/ft   at 12 ft span
  *   12C = 100 lbs/ft  at 12 ft span
+ *   16A = 50 lbs/ft   at 16 ft span
+ *   16B = 75 lbs/ft   at 16 ft span
+ *   16C = 100 lbs/ft  at 16 ft span
  *   20A = 50 lbs/ft   at 20 ft span
  *   20B = 75 lbs/ft   at 20 ft span
  *   20C = 100 lbs/ft  at 20 ft span
  */
 export const NEMA_LOAD_CLASSES = {
   '8A':  { designLoad_lbs_ft: 50,  referenceSpan_ft: 8  },
+  '8B':  { designLoad_lbs_ft: 75,  referenceSpan_ft: 8  },
+  '8C':  { designLoad_lbs_ft: 100, referenceSpan_ft: 8  },
   '12A': { designLoad_lbs_ft: 50,  referenceSpan_ft: 12 },
   '12B': { designLoad_lbs_ft: 75,  referenceSpan_ft: 12 },
   '12C': { designLoad_lbs_ft: 100, referenceSpan_ft: 12 },
+  '16A': { designLoad_lbs_ft: 50,  referenceSpan_ft: 16 },
+  '16B': { designLoad_lbs_ft: 75,  referenceSpan_ft: 16 },
+  '16C': { designLoad_lbs_ft: 100, referenceSpan_ft: 16 },
   '20A': { designLoad_lbs_ft: 50,  referenceSpan_ft: 20 },
   '20B': { designLoad_lbs_ft: 75,  referenceSpan_ft: 20 },
   '20C': { designLoad_lbs_ft: 100, referenceSpan_ft: 20 },
@@ -385,9 +395,10 @@ export function checkNemaCapacity(params) {
     };
   }
 
-  // Scale capacity: if actual span differs from reference, capacity scales inversely
-  // This is a conservative linear approximation.
-  const scaledCapacity = cls.designLoad_lbs_ft * (cls.referenceSpan_ft / spanLength_ft);
+  // With the L/100 deflection limit, wL³ is constant. Normalize the class
+  // working load from its reference span to the entered span.
+  const spanRatio = cls.referenceSpan_ft / spanLength_ft;
+  const scaledCapacity = cls.designLoad_lbs_ft * Math.pow(spanRatio, 3);
   const utilization = cableWeight_lbs_ft / scaledCapacity;
 
   return {

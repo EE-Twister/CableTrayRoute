@@ -10,7 +10,11 @@
  */
 
 import assert from 'assert';
-import { buildArcFlashLabelData, buildLabelSheetHtml } from '../reports/arcFlashReport.mjs';
+import {
+  buildArcFlashLabelData,
+  buildLabelSheetHtml,
+  isArcFlashLabelReady,
+} from '../reports/arcFlashReport.mjs';
 import { generateArcFlashLabel } from '../reports/labels.mjs';
 
 function describe(name, fn) { console.log(name); fn(); }
@@ -23,26 +27,33 @@ function it(name, fn) {
 
 const warningInfo = {
   incidentEnergy: 8.5,
-  ppeCategory: 2,
+  ppeSelectionMethod: 'incident-energy',
+  minimumArcRatingCalCm2: 8.5,
   boundary: 1524,
   workingDistance: 455,
   nominalVoltage: 480,
   limitedApproach: 1200,
   restrictedApproach: 300,
   upstreamDevice: 'CB-1A',
+  clearingTime: 0.2,
+  requiredInputs: [],
   equipmentTag: 'MCC-1',
   studyDate: '2026-04-07'
 };
 
 const dangerInfo = {
   incidentEnergy: 52.3,
-  ppeCategory: 4,
+  ppeSelectionMethod: 'incident-energy',
+  minimumArcRatingCalCm2: 52.3,
   boundary: 4500,
   workingDistance: 610,
   nominalVoltage: 13800,
   limitedApproach: 3000,
   restrictedApproach: 600,
   upstreamDevice: 'GEN-BRKR',
+  clearingTime: 0.1,
+  requiredInputs: [],
+  signalWord: 'DANGER',
   equipmentTag: 'SWGR-HV',
   studyDate: '2026-04-07'
 };
@@ -55,7 +66,7 @@ describe('buildArcFlashLabelData', () => {
     assert.strictEqual(data.signalWord, 'WARNING');
   });
 
-  it('signal word is DANGER when incidentEnergy >= 40 cal/cm²', () => {
+  it('uses DANGER only when the hazard assessment explicitly supplies it', () => {
     const data = buildArcFlashLabelData('bus2', dangerInfo);
     assert.strictEqual(data.signalWord, 'DANGER');
   });
@@ -91,9 +102,21 @@ describe('buildArcFlashLabelData', () => {
     assert.strictEqual(data.upstreamDevice, 'Not Specified');
   });
 
-  it('ppeCategory is formatted as a string number', () => {
+  it('uses the incident-energy PPE-selection method', () => {
     const data = buildArcFlashLabelData('bus1', warningInfo);
-    assert.strictEqual(data.ppeCategory, '2');
+    assert.strictEqual(data.ppeCategory, 'Incident Energy');
+  });
+
+  it('does not infer DANGER from incident energy alone', () => {
+    const data = buildArcFlashLabelData('bus2', { ...dangerInfo, signalWord: undefined });
+    assert.strictEqual(data.signalWord, 'WARNING');
+  });
+
+  it('requires complete study inputs before a field label is generated', () => {
+    assert.strictEqual(isArcFlashLabelReady(warningInfo), true);
+    assert.strictEqual(isArcFlashLabelReady({ ...warningInfo, clearingTime: null }), false);
+    assert.strictEqual(isArcFlashLabelReady({ ...warningInfo, requiredInputs: ['clearingTime'] }), false);
+    assert.strictEqual(isArcFlashLabelReady({ ...warningInfo, upstreamDevice: '' }), false);
   });
 });
 
@@ -121,6 +144,13 @@ describe('buildLabelSheetHtml', () => {
     const html = buildLabelSheetHtml({});
     const cellCount = (html.match(/<div class="label-cell">/g) || []).length;
     assert.strictEqual(cellCount, 0, 'Expected no label cells for empty results');
+  });
+
+  it('omits incomplete results from the printable label sheet', () => {
+    const html = buildLabelSheetHtml({ complete: warningInfo, incomplete: { ...dangerInfo, clearingTime: null } });
+    const cellCount = (html.match(/<div class="label-cell">/g) || []).length;
+    assert.strictEqual(cellCount, 1, `Expected 1 complete label cell, got ${cellCount}`);
+    assert.ok(html.includes('1 incomplete result(s) withheld'));
   });
 
   it('includes the project name in the heading when provided', () => {
@@ -170,7 +200,7 @@ describe('generateArcFlashLabel', () => {
       limitedApproach: 'N/A',
       restrictedApproach: 'N/A',
       upstreamDevice: 'CB-1',
-      ppeCategory: '2',
+      ppeCategory: 'Incident Energy',
       studyDate: '2026-04-07'
     });
     assert.ok(svg.includes('&lt;/tspan&gt;&lt;script&gt;alert(1)&lt;/script&gt;'), 'Expected escaped injected markup');

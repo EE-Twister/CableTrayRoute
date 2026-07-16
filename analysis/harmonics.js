@@ -77,16 +77,113 @@ function readVoltage(comp) {
   return Number.isFinite(kv) && kv > 0 ? kv * 1000 : 0;
 }
 
+function readPowerFactor(comp) {
+  const value = Number(pickFirst(comp, ['power_factor', 'powerFactor', 'pf']));
+  return Number.isFinite(value) && value > 0 && value <= 1 ? value : 0.9;
+}
+
+function readFundamentalCurrent(comp, voltageV, loadKw) {
+  const direct = Number(pickFirst(comp, ['amps', 'current_a', 'currentA', 'full_load_amps', 'fla']));
+  if (Number.isFinite(direct) && direct > 0) return direct;
+  const pf = readPowerFactor(comp);
+  return voltageV > 0 ? loadKw * 1000 / (Math.sqrt(3) * voltageV * pf) : 0;
+}
+
 function readArray(comp, keys) {
   const value = pickFirst(comp, keys);
   return Array.isArray(value) ? value : [];
 }
 
 /**
+ * Estimate source-level current THD and screening voltage THD at one bus.
+ * Capacitor kVAR and line-line voltage are converted explicitly to siemens:
+ * B = Q_var / V_LL². This is not an IEEE 519 PCC compliance calculation; it
+ * does not aggregate multiple sources or calculate current TDD.
+ */
+export function estimateHarmonicDistortion({
+  lineVoltageV,
+  fundamentalCurrentA,
+  spectrum,
+  shortCircuitMva,
+  xrRatio = 10,
+  capacitorBanks = [],
+  filters = [],
+}) {
+  const V = Number(lineVoltageV);
+  const I1 = Number(fundamentalCurrentA);
+  if (!Number.isFinite(V) || V <= 0) throw new Error('lineVoltageV must be greater than zero');
+  if (!Number.isFinite(I1) || I1 < 0) throw new Error('fundamentalCurrentA must be non-negative');
+
+  const parsedSpectrum = spectrum && typeof spectrum === 'object' && !Array.isArray(spectrum)
+    ? spectrum
+    : parseSpectrum(spectrum);
+  let harmonicCurrentSquared = 0;
+  Object.entries(parsedSpectrum).forEach(([order, percent]) => {
+    if (Number(order) > 1) harmonicCurrentSquared += (I1 * Number(percent) / 100) ** 2;
+  });
+  const ithd = I1 > 0 ? Math.sqrt(harmonicCurrentSquared) / I1 * 100 : 0;
+
+  const scMva = Number(shortCircuitMva);
+  if (!Number.isFinite(scMva) || scMva <= 0) {
+    return {
+      ithd: Number(ithd.toFixed(2)),
+      vthd: null,
+      evaluable: false,
+      reason: 'Short-circuit MVA at the evaluation bus is required for voltage-distortion screening.',
+    };
+  }
+
+  const xr = Number.isFinite(Number(xrRatio)) && Number(xrRatio) > 0 ? Number(xrRatio) : 10;
+  const z1Magnitude = (V * V) / (scMva * 1e6);
+  const rSource = z1Magnitude / Math.sqrt(1 + xr * xr);
+  const xSource = xr * rSource;
+  const voltageSquared = V * V;
+  const capacitorB1 = capacitorBanks.reduce((sum, cap) => {
+    const kvar = Number(cap?.kvar) || 0;
+    return sum + (kvar * 1000) / voltageSquared;
+  }, 0);
+  const filterConductance = new Map();
+  filters.forEach(filter => {
+    const order = Number(filter?.order);
+    if (!Number.isFinite(order) || order <= 1) return;
+    const kvar = Number(filter?.kvar) || 0;
+    const q = Number(filter?.q) || 1;
+    const conductance = (kvar * 1000 / voltageSquared) * q;
+    filterConductance.set(order, (filterConductance.get(order) || 0) + conductance);
+  });
+
+  let harmonicVoltageSquared = 0;
+  Object.entries(parsedSpectrum).forEach(([orderText, percent]) => {
+    const h = Number(orderText);
+    if (h <= 1) return;
+    const ih = I1 * Number(percent) / 100;
+    const xh = h * xSource;
+    const sourceDenominator = rSource * rSource + xh * xh;
+    const gSource = rSource / sourceDenominator;
+    const bSource = -xh / sourceDenominator;
+    const gTotal = gSource + (filterConductance.get(h) || 0);
+    const bTotal = bSource + h * capacitorB1;
+    const yMagnitude = Math.hypot(gTotal, bTotal);
+    const zMagnitude = yMagnitude > 0 ? 1 / yMagnitude : Number.POSITIVE_INFINITY;
+    harmonicVoltageSquared += (ih * zMagnitude) ** 2;
+  });
+
+  const phaseVoltage = V / Math.sqrt(3);
+  const vthd = Math.sqrt(harmonicVoltageSquared) / phaseVoltage * 100;
+  return {
+    ithd: Number(ithd.toFixed(2)),
+    vthd: Number(vthd.toFixed(2)),
+    evaluable: Number.isFinite(vthd),
+    z1Ohm: Number(z1Magnitude.toFixed(6)),
+    capacitorSusceptanceS: Number(capacitorB1.toFixed(9)),
+  };
+}
+
+/**
  * Frequency‑domain harmonic study. For each component flagged as a harmonic
- * source, a rudimentary admittance aggregation is performed to estimate bus
- * voltage distortion per IEEE 519. Capacitor banks and tuned filters may be
- * provided as shunt admittances.
+ * source, a reduced Thevenin model estimates source-level current THD and bus
+ * voltage THD. IEEE 519 compliance requires aggregation at the PCC and current
+ * TDD, which are outside this function's scope.
  *
  * @returns {Object<string,{ithd:number,vthd:number,limit:number,warning:boolean}>}
  */
@@ -102,54 +199,37 @@ export function runHarmonics() {
     const spectrum = parseSpectrum(pickFirst(c, ['harmonics', 'harmonic_spectrum', 'spectrum']));
     const V = readVoltage(c);
     const P = readLoadKw(c);
-    const I1 = V ? P * 1000 / (Math.sqrt(3) * V) : 0;
-
-    // Base short‑circuit admittance if provided (scMVA) else assume 1 pu
+    const I1 = readFundamentalCurrent(c, V, P);
     const scMVA = Number(pickFirst(c, ['scMVA', 'short_circuit_mva', 'thevenin_mva'])) || 0;
-    const yBase = V ? (scMVA ? scMVA / ((V / 1000) ** 2) : 1) : 1;
-
-    // Shunt capacitor banks
-    const capB = readArray(c, ['capacitors', 'capacitorBanks']).reduce((sum, cap) => {
-      const kvar = Number(cap.kvar) || 0;
-      const kv = Number(cap.kv) || (V / 1000) || 1;
-      return sum + (kvar / (kv * kv));
-    }, 0);
-
-    // Tuned filters provide large admittance at a specific harmonic order
-    const filterMap = {};
-    readArray(c, ['filters', 'harmonicFilters']).forEach(f => {
-      const ord = Number(f.order);
-      if (!ord) return;
-      const kvar = Number(f.kvar) || 0;
-      const kv = Number(f.kv) || (V / 1000) || 1;
-      const q = Number(f.q) || 1; // quality factor approximation
-      const adm = (kvar / (kv * kv)) * q;
-      filterMap[ord] = (filterMap[ord] || 0) + adm;
-    });
-
-    let i2 = 0;
-    let v2 = 0;
-    Object.entries(spectrum).forEach(([ordStr, pct]) => {
-      const h = Number(ordStr);
-      if (h <= 1) return;
-      const Ih = I1 * (pct / 100);
-      i2 += Ih * Ih;
-      const y = yBase + capB * h + (filterMap[h] || 0);
-      const Vh = y ? Ih / y : 0;
-      const vPu = V ? Vh / V : 0;
-      v2 += vPu * vPu;
-    });
-
-    const ithd = I1 ? Math.sqrt(i2) / I1 * 100 : 0;
-    const vthd = Math.sqrt(v2) * 100;
+    const estimate = V > 0
+      ? estimateHarmonicDistortion({
+          lineVoltageV: V,
+          fundamentalCurrentA: I1,
+          spectrum,
+          shortCircuitMva: scMVA,
+          xrRatio: Number(pickFirst(c, ['xrRatio', 'x_r_ratio'])) || 10,
+          capacitorBanks: readArray(c, ['capacitors', 'capacitorBanks']),
+          filters: readArray(c, ['filters', 'harmonicFilters']),
+        })
+      : {
+          ithd: 0,
+          vthd: null,
+          evaluable: false,
+          reason: 'Line-line voltage at the evaluation bus is required for harmonic screening.',
+        };
     const limit = limitForVoltage(V / 1000);
     const ct = resolveCtForComponent(c, comps);
     results[c.id] = {
-      ithd: Number(ithd.toFixed(2)),
-      vthd: Number(vthd.toFixed(2)),
+      ithd: estimate.ithd,
+      vthd: estimate.vthd,
       limit,
-      warning: vthd > limit,
-      ct
+      warning: estimate.vthd === null ? null : estimate.vthd > limit,
+      ct,
+      calculationStatus: 'screening-only',
+      pccAggregated: false,
+      currentTddEvaluated: false,
+      requiredInputs: estimate.evaluable ? [] : [estimate.reason],
+      modelDetails: estimate,
     };
   });
 
@@ -193,7 +273,7 @@ export function runHarmonicsUnbalanced(phaseData = {}) {
 
     const V = readVoltage(c);
     const P = readLoadKw(c);
-    const I1 = V ? P * 1000 / (Math.sqrt(3) * V) : 0;
+    const I1 = readFundamentalCurrent(c, V, P);
     const kv = V / 1000;
 
     // Per-phase spectra — fall back to balanced single spectrum
@@ -208,39 +288,26 @@ export function runHarmonicsUnbalanced(phaseData = {}) {
     const balanced = !override.harmonicsA && !override.harmonicsB && !override.harmonicsC
       && !compHarmonicsA && !compHarmonicsB && !compHarmonicsC;
 
-    // Admittance network (same as runHarmonics)
     const scMVA = Number(pickFirst(c, ['scMVA', 'short_circuit_mva', 'thevenin_mva'])) || 0;
-    const yBase = V ? (scMVA ? scMVA / (kv ** 2) : 1) : 1;
-    const capB = readArray(c, ['capacitors', 'capacitorBanks']).reduce((sum, cap) => {
-      const kvar = Number(cap.kvar) || 0;
-      const cv = Number(cap.kv) || kv || 1;
-      return sum + (kvar / (cv * cv));
-    }, 0);
-    const filterMap = {};
-    readArray(c, ['filters', 'harmonicFilters']).forEach(f => {
-      const ord = Number(f.order);
-      if (!ord) return;
-      const kvar = Number(f.kvar) || 0;
-      const fv = Number(f.kv) || kv || 1;
-      const q = Number(f.q) || 1;
-      filterMap[ord] = (filterMap[ord] || 0) + (kvar / (fv * fv)) * q;
-    });
+    const capacitorBanks = readArray(c, ['capacitors', 'capacitorBanks']);
+    const filters = readArray(c, ['filters', 'harmonicFilters']);
+    const xrRatio = Number(pickFirst(c, ['xrRatio', 'x_r_ratio'])) || 10;
 
     // Compute ITHD and VTHD for a single phase spectrum
     function phaseResult(spectrum) {
-      let i2 = 0, v2 = 0;
-      Object.entries(spectrum).forEach(([ordStr, pct]) => {
-        const h = Number(ordStr);
-        if (h <= 1) return;
-        const Ih = I1 * (pct / 100);
-        i2 += Ih * Ih;
-        const y = yBase + capB * h + (filterMap[h] || 0);
-        const Vh = y ? Ih / y : 0;
-        v2 += (Vh / V) * (Vh / V);
+      if (!(V > 0)) {
+        return { ithd: 0, vthd: null };
+      }
+      const estimate = estimateHarmonicDistortion({
+        lineVoltageV: V,
+        fundamentalCurrentA: I1,
+        spectrum,
+        shortCircuitMva: scMVA,
+        xrRatio,
+        capacitorBanks,
+        filters,
       });
-      const ithd = I1 ? Math.sqrt(i2) / I1 * 100 : 0;
-      const vthd = V ? Math.sqrt(v2) * 100 : 0;
-      return { ithd: Number(ithd.toFixed(2)), vthd: Number(vthd.toFixed(2)) };
+      return { ithd: estimate.ithd, vthd: estimate.vthd };
     }
 
     const phaseA = phaseResult(specA);
@@ -271,7 +338,8 @@ export function runHarmonicsUnbalanced(phaseData = {}) {
     const ithdRange = Math.max(...ithdValues) - Math.min(...ithdValues);
 
     const limit = limitForVoltage(kv);
-    const worstVthd = Math.max(phaseA.vthd, phaseB.vthd, phaseC.vthd);
+    const voltageThdValues = [phaseA.vthd, phaseB.vthd, phaseC.vthd].filter(Number.isFinite);
+    const worstVthd = voltageThdValues.length ? Math.max(...voltageThdValues) : null;
 
     const ct = resolveCtForComponent(c, comps);
     results[c.id] = {
@@ -288,7 +356,15 @@ export function runHarmonicsUnbalanced(phaseData = {}) {
       balanced,
       phase_imbalance_flag: ithdRange > 10,
       limit,
-      warning: worstVthd > limit
+      warning: worstVthd === null ? null : worstVthd > limit,
+      calculationStatus: 'screening-only',
+      pccAggregated: false,
+      currentTddEvaluated: false,
+      requiredInputs: worstVthd === null
+        ? [V > 0
+            ? 'Short-circuit MVA at the evaluation bus is required for voltage-distortion screening.'
+            : 'Line-line voltage at the evaluation bus is required for harmonic screening.']
+        : [],
     };
   });
 
@@ -494,7 +570,9 @@ if (typeof document !== 'undefined') {
   const chartEl = document.getElementById('harmonics-chart');
   if (chartEl) {
     const results = ensureHarmonicResults();
-    const data = Object.entries(results).map(([id, r]) => ({ id, thd: r.vthd, limit: r.limit }));
+    const data = Object.entries(results)
+      .filter(([, result]) => Number.isFinite(result.vthd))
+      .map(([id, result]) => ({ id, thd: result.vthd, limit: result.limit }));
     renderChart(chartEl, data);
   }
 }

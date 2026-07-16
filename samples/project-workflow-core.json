@@ -10,7 +10,11 @@
   "ductbanks": [
     {
       "id": "DB-101",
+      "tag": "DB-101",
       "ductbank_id": "DB-101",
+      "from": "SWBD-101",
+      "to": "PMP-101",
+      "concrete_encasement": true,
       "description": "Underground feeder ductbank from utility service to electrical room",
       "conduit_count": 4,
       "trade_size": "4",
@@ -30,31 +34,14 @@
           "start_x": 0,
           "start_y": 32,
           "start_z": -4,
-          "end_x": 85,
-          "end_y": 32,
-          "end_z": -4
+          "end_x": 95,
+          "end_y": 0,
+          "end_z": 12
         }
       ]
     }
   ],
-  "conduits": [
-    {
-      "id": "CND-PMP-101",
-      "conduit_id": "CND-PMP-101",
-      "description": "Motor feeder conduit to cooling water pump",
-      "type": "RMC",
-      "trade_size": "2",
-      "material": "Steel",
-      "length": 85,
-      "length_ft": 85,
-      "start_x": 0,
-      "start_y": 32,
-      "start_z": -4,
-      "end_x": 85,
-      "end_y": 32,
-      "end_z": -4
-    }
-  ],
+  "conduits": [],
   "trays": [
     {
       "id": "TR-PWR-101",
@@ -90,6 +77,7 @@
       "conductors": 3,
       "conductor_size": "500 kcmil",
       "conductor_material": "Copper",
+      "raceway_material": "Aluminum",
       "ground_size": "#3 AWG",
       "ground_material": "Copper",
       "ocpd_rating": 400,
@@ -105,7 +93,9 @@
       "end_z": 12,
       "diameter": 2.1,
       "weight": 5.6,
-      "voltage": "480"
+      "voltage": "480",
+      "insulation_type": "THHN",
+      "cable_rating": 600
     },
     {
       "tag": "CBL-MCC-PMP-101",
@@ -118,6 +108,7 @@
       "conductors": 3,
       "conductor_size": "#4 AWG",
       "conductor_material": "Copper",
+      "raceway_material": "PVC",
       "ground_size": "#10 AWG",
       "ground_material": "Copper",
       "ocpd_rating": 50,
@@ -133,7 +124,9 @@
       "end_z": 12,
       "diameter": 0.75,
       "weight": 1.15,
-      "voltage": "480"
+      "voltage": "480",
+      "insulation_type": "THHN",
+      "cable_rating": 600
     },
     {
       "tag": "CBL-SWBD-XFMR-101",
@@ -146,6 +139,7 @@
       "conductors": 3,
       "conductor_size": "#1 AWG",
       "conductor_material": "Copper",
+      "raceway_material": "Aluminum",
       "ground_size": "#8 AWG",
       "ground_material": "Copper",
       "ocpd_rating": 125,
@@ -161,7 +155,9 @@
       "end_z": 12,
       "diameter": 0.95,
       "weight": 1.9,
-      "voltage": "480"
+      "voltage": "480",
+      "insulation_type": "THHN",
+      "cable_rating": 600
     },
     {
       "tag": "CBL-XFMR-LP-101",
@@ -174,6 +170,7 @@
       "conductors": 4,
       "conductor_size": "#2 AWG",
       "conductor_material": "Copper",
+      "raceway_material": "Aluminum",
       "ground_size": "#8 AWG",
       "ground_material": "Copper",
       "ocpd_rating": 100,
@@ -189,7 +186,9 @@
       "end_z": 12,
       "diameter": 1.05,
       "weight": 2.4,
-      "voltage": "208"
+      "voltage": "208",
+      "insulation_type": "THHN",
+      "cable_rating": 600
     }
   ],
   "cableTypicals": [],
@@ -213,7 +212,10 @@
       "lineup": "SWBD-101",
       "manufacturer": "Square D",
       "model": "Power-Style QED",
-      "phases": "3"
+      "phases": "3",
+      "x": 0,
+      "y": 0,
+      "z": 12
     },
     {
       "tag": "MCC-101",
@@ -225,7 +227,10 @@
       "lineup": "MCC-101",
       "manufacturer": "Allen-Bradley",
       "model": "CENTERLINE 2100",
-      "phases": "3"
+      "phases": "3",
+      "x": 145,
+      "y": 0,
+      "z": 12
     },
     {
       "tag": "XFMR-101",
@@ -237,7 +242,10 @@
       "lineup": "XFMR-101",
       "manufacturer": "Eaton",
       "model": "V48M28T75EE",
-      "phases": "3"
+      "phases": "3",
+      "x": 62,
+      "y": 0,
+      "z": 12
     },
     {
       "tag": "LP-101",
@@ -249,7 +257,10 @@
       "lineup": "LP-101",
       "manufacturer": "Square D",
       "model": "NF",
-      "phases": "3"
+      "phases": "3",
+      "x": 97,
+      "y": 0,
+      "z": 12
     },
     {
       "tag": "PMP-101",
@@ -261,7 +272,10 @@
       "lineup": "Process Pumps",
       "manufacturer": "Goulds",
       "model": "3196",
-      "phases": "3"
+      "phases": "3",
+      "x": 95,
+      "y": 0,
+      "z": 12
     }
   ],
   "loads": [
@@ -327,13 +341,18 @@
             "subtype": "utility_source",
             "label": "SWBD-101",
             "ref": "SWBD-101",
+            "labelOffset": { "x": 0, "y": -28 },
             "x": 120,
             "y": 120,
-            "equipmentRef": "SWBD-101",
+        "equipmentRef": "SWBD-101",
+        "voltage": 480,
+        "baseKV": 0.48,
+        "thevenin_mva": 20,
+        "xr_ratio": 10,
             "scheduleLinks": { "equipment": "SWBD-101" },
             "connections": [
               { "target": "comp-mcc-101", "cable": { "tag": "CBL-SWBD-MCC-101", "conductor_size": "500 kcmil", "length": 145 } },
-              { "target": "comp-xfmr-101", "cable": { "tag": "CBL-SWBD-XFMR-101", "conductor_size": "#1 AWG", "length": 62 } }
+              { "target": "comp-xfmr-101", "sourcePort": 1, "targetPort": 0, "phases": "A,B,C", "cable": { "tag": "CBL-SWBD-XFMR-101", "conductor_size": "#1 AWG", "length": 62 } }
             ]
           },
           {
@@ -345,6 +364,20 @@
             "x": 360,
             "y": 120,
             "equipmentRef": "MCC-101",
+            "voltage": 480,
+            "props": {
+              "tag": "MCC-101",
+              "description": "Process motor control center",
+              "manufacturer": "Allen-Bradley",
+              "model": "CENTERLINE 2100",
+              "rated_voltage_kv": 0.48,
+              "bus_rating_a": 800,
+              "main_device_type": "Main breaker",
+              "sccr_ka": 65,
+              "bucket_count": 12,
+              "spare_bucket_count": 3,
+              "form_type": "NEMA"
+            },
             "scheduleLinks": { "equipment": "MCC-101" },
             "connections": [
               { "target": "comp-pmp-101", "cable": { "tag": "CBL-MCC-PMP-101", "conductor_size": "#4 AWG", "length": 95 } }
@@ -360,20 +393,29 @@
             "y": 120,
             "loadRef": "PMP-101",
             "equipmentRef": "PMP-101",
+            "voltage": 480,
+            "kw": 18.6,
+            "powerFactor": 0.85,
             "scheduleLinks": { "load": "PMP-101", "equipment": "PMP-101" }
           },
           {
             "id": "comp-xfmr-101",
             "type": "transformer",
-            "subtype": "two_winding_transformer",
+            "subtype": "two_winding",
             "label": "XFMR-101",
             "ref": "XFMR-101",
             "x": 360,
             "y": 300,
             "equipmentRef": "XFMR-101",
+            "voltage": 480,
+            "volts_primary": 480,
+        "volts_secondary": 208,
+        "kva": 75,
+        "percent_z": 5.75,
+        "xr_ratio": 6,
             "scheduleLinks": { "equipment": "XFMR-101" },
             "connections": [
-              { "target": "comp-lp-101", "cable": { "tag": "CBL-XFMR-LP-101", "conductor_size": "#2 AWG", "length": 35 } }
+              { "target": "comp-lp-101", "sourcePort": 1, "targetPort": 0, "phases": "A,B,C", "cable": { "tag": "CBL-XFMR-LP-101", "conductor_size": "#2 AWG", "length": 35 } }
             ]
           },
           {
@@ -385,6 +427,20 @@
             "x": 600,
             "y": 300,
             "panelRef": "LP-101",
+            "voltage": 208,
+            "props": {
+              "tag": "LP-101",
+              "description": "Lighting and receptacle panel",
+              "manufacturer": "Square D",
+              "model": "NF",
+              "rated_voltage_kv": 0.208,
+              "phases": 3,
+              "bus_rating_a": 225,
+              "main_device_type": "Main breaker",
+              "main_interrupting_ka": 22,
+              "grounding_type": "Solidly grounded",
+              "service_type": "208Y/120 V"
+            },
             "scheduleLinks": { "panel": "LP-101", "equipment": "LP-101" }
           }
         ],
@@ -445,6 +501,12 @@
       "updatedAt": "2026-05-01T12:00:00.000Z"
     },
     "designGateApprovals": {
+      "generated-record-review": {
+        "status": "reviewed",
+        "reviewedBy": "Sample Engineer",
+        "approvedAt": "2026-05-01T12:25:00.000Z",
+        "note": "Sample generated records reviewed for workflow demonstration."
+      },
       "route-result-review": {
         "status": "reviewed",
         "reviewedBy": "Sample Engineer",
@@ -466,8 +528,103 @@
       },
       "shortCircuit": {
         "status": "Run",
-        "availableFaultKa": 22.4,
-        "updatedAt": "2026-05-01T12:05:00.000Z"
+        "availableFaultKa": 25.26,
+        "updatedAt": "2026-05-01T12:05:00.000Z",
+        "_meta": {
+          "schemaVersion": 1,
+          "method": "ANSI",
+          "updatedAt": "2026-05-01T12:05:00.000Z",
+          "inputFingerprint": "workflow-core-sample-v1",
+          "modelCounts": { "components": 5, "cables": 4 },
+          "history": []
+        },
+        "comp-swbd-101": {
+          "method": "ANSI",
+          "prefaultKV": 0.48,
+          "threePhaseKA": 25.26,
+          "lineToGroundKA": 25.26,
+          "lineToLineKA": 21.88,
+          "doubleLineGroundKA": 50.52,
+          "equipmentTag": "SWBD-101",
+          "impedanceProvenance": {
+            "totalR": 0.0011462828431219073,
+            "totalX": 0.011462828431219074,
+            "segments": [
+              { "type": "source", "tag": "SWBD-101", "source": "One-Line source data", "method": "thevenin", "rOhm": 0.0011462828431219073, "xOhm": 0.011462828431219074 }
+            ]
+          }
+        },
+        "comp-mcc-101": {
+          "method": "ANSI",
+          "prefaultKV": 0.48,
+          "threePhaseKA": 16.3,
+          "lineToGroundKA": 16.3,
+          "lineToLineKA": 14.12,
+          "doubleLineGroundKA": 32.6,
+          "equipmentTag": "MCC-101",
+          "impedanceProvenance": {
+            "totalR": 0.0050612828431219085,
+            "totalX": 0.017117828431219076,
+            "segments": [
+              { "type": "source", "tag": "SWBD-101", "source": "One-Line source data", "method": "thevenin", "rOhm": 0.0011462828431219073, "xOhm": 0.011462828431219074 },
+              { "type": "cable", "tag": "CBL-SWBD-MCC-101", "from": "SWBD-101", "to": "MCC-101", "source": "Cable Schedule", "method": "nec-table-9", "rOhm": 0.003915000000000001, "xOhm": 0.005655000000000001, "lengthFt": 145, "parallelCount": 1, "conductorSize": "500 kcmil", "conductorMaterial": "Copper", "racewayMaterial": "Aluminum" }
+            ]
+          }
+        },
+        "comp-pmp-101": {
+          "method": "ANSI",
+          "prefaultKV": 0.48,
+          "threePhaseKA": 7.14,
+          "lineToGroundKA": 7.14,
+          "lineToLineKA": 6.18,
+          "doubleLineGroundKA": 14.28,
+          "equipmentTag": "PMP-101",
+          "impedanceProvenance": {
+            "totalR": 0.03451128284312191,
+            "totalX": 0.021677828431219077,
+            "segments": [
+              { "type": "source", "tag": "SWBD-101", "source": "One-Line source data", "method": "thevenin", "rOhm": 0.0011462828431219073, "xOhm": 0.011462828431219074 },
+              { "type": "cable", "tag": "CBL-SWBD-MCC-101", "from": "SWBD-101", "to": "MCC-101", "source": "Cable Schedule", "method": "nec-table-9", "rOhm": 0.003915000000000001, "xOhm": 0.005655000000000001, "lengthFt": 145, "parallelCount": 1, "conductorSize": "500 kcmil", "conductorMaterial": "Copper", "racewayMaterial": "Aluminum" },
+              { "type": "cable", "tag": "CBL-MCC-PMP-101", "from": "MCC-101", "to": "PMP-101", "source": "Cable Schedule", "method": "nec-table-9", "rOhm": 0.029450000000000004, "xOhm": 0.004560000000000001, "lengthFt": 95, "parallelCount": 1, "conductorSize": "#4 AWG", "conductorMaterial": "Copper", "racewayMaterial": "PVC" }
+            ]
+          }
+        },
+        "comp-xfmr-101": {
+          "method": "ANSI",
+          "prefaultKV": 0.48,
+          "threePhaseKA": 16.42,
+          "lineToGroundKA": 16.42,
+          "lineToLineKA": 14.22,
+          "doubleLineGroundKA": 32.84,
+          "equipmentTag": "XFMR-101",
+          "impedanceProvenance": {
+            "totalR": 0.010446282843121909,
+            "totalX": 0.014314828431219074,
+            "segments": [
+              { "type": "source", "tag": "SWBD-101", "source": "One-Line source data", "method": "thevenin", "rOhm": 0.0011462828431219073, "xOhm": 0.011462828431219074 },
+              { "type": "cable", "tag": "CBL-SWBD-XFMR-101", "from": "SWBD-101", "to": "XFMR-101", "source": "Cable Schedule", "method": "nec-table-9", "rOhm": 0.009300000000000001, "xOhm": 0.002852, "lengthFt": 62, "parallelCount": 1, "conductorSize": "#1 AWG", "conductorMaterial": "Copper", "racewayMaterial": "Aluminum" }
+            ]
+          }
+        },
+        "comp-lp-101": {
+          "method": "ANSI",
+          "prefaultKV": 0.208,
+          "threePhaseKA": 2.35,
+          "lineToGroundKA": 2.35,
+          "lineToLineKA": 2.04,
+          "doubleLineGroundKA": 4.71,
+          "equipmentTag": "LP-101",
+          "impedanceProvenance": {
+            "totalR": 0.022549243812985793,
+            "totalX": 0.04860759425040238,
+            "segments": [
+              { "type": "source", "tag": "SWBD-101", "source": "One-Line source data", "method": "thevenin", "rOhm": 0.0011462828431219073, "xOhm": 0.011462828431219074 },
+              { "type": "cable", "tag": "CBL-SWBD-XFMR-101", "from": "SWBD-101", "to": "XFMR-101", "source": "Cable Schedule", "method": "nec-table-9", "rOhm": 0.009300000000000001, "xOhm": 0.002852, "lengthFt": 62, "parallelCount": 1, "conductorSize": "#1 AWG", "conductorMaterial": "Copper", "racewayMaterial": "Aluminum" },
+              { "type": "transformer", "tag": "XFMR-101", "source": "One-Line transformer data", "method": "percent-impedance", "rOhm": 0.005452960969863884, "xOhm": 0.03271776581918331 },
+              { "type": "cable", "tag": "CBL-XFMR-LP-101", "from": "XFMR-101", "to": "LP-101", "source": "Cable Schedule", "method": "nec-table-9", "rOhm": 0.0066500000000000005, "xOhm": 0.0015750000000000002, "lengthFt": 35, "parallelCount": 1, "conductorSize": "#2 AWG", "conductorMaterial": "Copper", "racewayMaterial": "Aluminum" }
+            ]
+          }
+        }
       }
     },
     "latestRouteResults": {
@@ -499,19 +656,13 @@
         {
           "cable": "CBL-MCC-PMP-101",
           "status": "Routed",
-          "total_length": 95,
+          "total_length": 101.51,
           "breakdown": [
             {
               "conduit_id": "CND-PMP-101",
               "ductbankTag": "DB-101",
-              "length": 85,
+              "length": 101.51,
               "start": [0, 32, -4],
-              "end": [85, 32, -4]
-            },
-            {
-              "tray_id": "TR-PWR-101",
-              "length": 10,
-              "start": [85, 32, -4],
               "end": [95, 0, 12]
             }
           ],
@@ -520,15 +671,8 @@
               "type": "conduit",
               "conduit_id": "CND-PMP-101",
               "ductbankTag": "DB-101",
-              "length": 85,
+              "length": 101.51,
               "start": [0, 32, -4],
-              "end": [85, 32, -4]
-            },
-            {
-              "type": "tray",
-              "tray_id": "TR-PWR-101",
-              "length": 10,
-              "start": [85, 32, -4],
               "end": [95, 0, 12]
             }
           ]

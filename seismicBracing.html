@@ -86,11 +86,15 @@
         <h1>Cable Tray Seismic Bracing Calculator</h1>
       </header>
 
+      <p class="alert warning"><strong>Preliminary screening only.</strong> The force equation is the
+      ASCE 7-16 method. ASCE 7-22 component-force provisions are not implemented, and the
+      12 ft / 40 ft spacing values are NEMA VE 2 installation guidance rather than literal ASCE 7 limits.</p>
+
       <details class="method-panel">
         <summary>Method &amp; Assumptions</summary>
         <p>Seismic brace forces are computed per <strong>ASCE 7-16 §13.3.1</strong>
-        (Nonstructural Component Seismic Force) and brace spacing limits from
-        <strong>ASCE 7-16 §13.5.6</strong> (Cable Tray and Conduit Installation).</p>
+        (Nonstructural Component Seismic Force). The displayed 12 ft lateral and
+        40 ft longitudinal spacing values are screening guidance from NEMA VE 2.</p>
 
         <p class="alert warning"><strong>Edition notice:</strong> This calculator implements
         the ASCE 7-16 component-force equation. The revised ASCE 7-22 seismic equation is
@@ -110,7 +114,7 @@ Fp_max = 1.6 × SDS × Ip × Wp</pre>
         <ul>
           <li><strong>Lateral</strong> (transverse): <code>Fp × Wp</code></li>
           <li><strong>Longitudinal</strong>: <code>0.4 × Fp × Wp</code> (ASCE 7 §13.5.6.1)</li>
-          <li><strong>Vertical</strong>: <code>±0.2 × SDS × Ip × Wp</code></li>
+          <li><strong>Vertical</strong>: <code>±0.2 × SDS × Wp</code> (I<sub>p</sub> does not multiply E<sub>v</sub>)</li>
         </ul>
         <p>Maximum brace spacing (SDC C–F): lateral ≤ 12 ft, longitudinal ≤ 40 ft.
         No bracing required for SDC A and B.</p>

@@ -270,7 +270,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     resultsDiv.innerHTML = `
       <section class="results-panel" aria-labelledby="results-heading">
-        <h2 id="results-heading">Battery / UPS Sizing Results</h2>
+        <h2 id="results-heading">Preliminary Battery / UPS Screening Results</h2>
+        <div class="alert-warn" role="alert"><strong>Screening only.</strong>
+          Do not issue this result as an IEEE 485/1115 cell selection or a final UPS schedule.
+          Manufacturer discharge data and the complete duty cycle are required.</div>
         ${r.systemLabel ? `<p class="field-hint">System: <strong>${escHtml(r.systemLabel)}</strong></p>` : ''}
         <p class="field-hint">Chemistry: <strong>${escHtml(r.chemistryLabel)}</strong>
           &nbsp;|&nbsp; DoD: ${r.dod * 100}%
@@ -279,7 +282,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         <!-- Energy chain -->
         <div class="result-group">
-          <h3>Energy Requirement (IEEE 485)</h3>
+          <h3>Generic Energy Requirement</h3>
           <div class="result-row">
             <span class="result-label">Net energy required</span>
             <span class="result-value">${r.kwhNet.toFixed(1)} kWh</span>
@@ -322,9 +325,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         <!-- Bank selection -->
         <div class="result-group">
-          <h3>Battery Bank Selection</h3>
+          <h3>Preliminary Battery Bank Range</h3>
           <div class="result-row">
-            <span class="result-label">Recommended bank size</span>
+            <span class="result-label">Screening bank size</span>
             <span class="result-value"><strong>${r.selectedBankKwh} kWh</strong></span>
           </div>
           ${r.nextLargerKwh
@@ -374,7 +377,7 @@ document.addEventListener('DOMContentLoaded', () => {
             kVA = ${r.peakLoadKw} kW / ${r.upsPowerFactor} PF = ${r.kvaRequired.toFixed(1)} kVA
           </p>
           <div class="result-row">
-            <span class="result-label">Recommended standard UPS size</span>
+            <span class="result-label">Screening standard UPS size</span>
             <span class="result-value"><strong>${r.standardKva} kVA</strong></span>
           </div>
         </div>

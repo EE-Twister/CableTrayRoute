@@ -15,8 +15,19 @@ documented so users are not misled).
 | `analysis/seismicBracing.mjs` | Vertical seismic force applied the importance factor `Ip` in the bracing-required branch (`0.2·SDS·Ip·Wp`) but not in the no-bracing branch. ASCE 7 §12.4.2.2 defines `Ev = 0.2·SDS·D` with **no Ip**. | Both branches now use `0.2·SDS·Wp`. |
 | `cabletrayfill.js` | NEC Table 392.22(A) **Column 2 ladder-tray allowable fill areas for 30″ and 36″ trays were wrong** (32.5 / 39.0 in², breaking the linear width × 7/6 progression), producing false "exceeds allowable" warnings. | 30″ → 35.0 in², 36″ → 42.0 in² (both lookup tables). |
 | `conduitfill.js` | The per-row **Count column was collected but ignored** — fill area and the 1/2/over-2 conductor fill limit (NEC Chapter 9 Table 1) were based on the number of table rows, not the number of conductors. A row with Count = 3 was treated as one conductor. | Each row is expanded into `count` conductors before area, limit selection, packing, and jam-ratio checks. |
-| `analysis/arcFlash.mjs` | PPE banding assigned a non-existent **"Category 5"** above 40 cal/cm². NFPA 70E defines categories 1–4; above 40 cal/cm² energized work is prohibited (no category). | Capped at Category 4; > 40 cal/cm² is communicated via the existing note and the "DANGER" label signal word. |
+| `analysis/arcFlash.mjs` and `analysis/dcShortCircuit.mjs` | Calculated incident energy was incorrectly converted into task-based PPE categories, including a non-existent "Category 5." The incident-energy and PPE-category-table methods are separate NFPA 70E selection methods. | Calculations now report the incident-energy method and a conservatively rounded-up minimum arc rating; they do not assign a PPE category. |
+| `analysis/dcShortCircuit.mjs` | The DC model used a nonstandard `2π`/calorie-factor expression, a fixed enclosure multiplier, and counted a one-way cable resistance only once. | Uses the Ammerman open-air `Earc/(4πd²)` and LV-switchgear enclosure `kEarc/(a²+d²)` equations, converts units explicitly, and uses `Rb + 2Rc(one-way) + Rbus`. |
+| `analysis/loadCombinations.mjs` | The seismic stability combination applied vertical earthquake load as `0.9D + Ev`, losing the downward/uplift sign reversal. | LC-S2 now uses `0.9D − Ev`, and the envelope retains minimum and maximum-absolute vertical demand for uplift checks. |
 | `analysis/capacitorBank.mjs` | 7th-harmonic detuning rationale text said "shift resonance below h=5" (copy/paste from the 5th-harmonic branch). | Corrected to "below h=7". |
+| `analysis/supportSpan.mjs` and `analysis/productConfig.mjs` | NEMA traditional load classes were decoded incorrectly (for example, `12A` was treated as 12 lb/ft at 12 ft). In the traditional designation, the number is the span in feet and A/B/C represents 50/75/100 lb/ft. | Replaced the class tables with the 8/12/16/20 ft × 50/75/100 lb/ft combinations. Product selection now checks both required span and actual cable weight without cubic load reinterpretation. |
+| `analysis/busDuctSizing.mjs` | Single-phase voltage drop applied a two-conductor loop and then an extra `√3`, overstating the drop by `√3`. | Single-phase now uses `2 I L (R cosφ + X sinφ)`; three-phase retains `√3 I L (R cosφ + X sinφ)`. |
+| `analysis/motorStartCalc.mjs` | Soft-starter input current was scaled by applied voltage squared. The square-law relationship applies to motor torque; supply current during voltage ramp is approximately proportional to voltage for the model used here. | Soft-starter current now scales as `I = I_LR × V_pu`; torque remains proportional to `V_pu²`. |
+| `analysis/windLoad.mjs` | NEMA tray capacity was scaled linearly with inverse span. For the stated L/100 deflection model, allowable uniform load scales with `1/L³`; the linear rule overstated capacity at spans longer than the class reference span. | Capacity normalization now uses `w_actual-span = w_rated × (L_rated/L_actual)³`, and the class table includes all 8/12/16/20 A/B/C combinations. |
+
+| `analysis/generatorSizing.mjs` | Altitude and ambient-temperature factors were multiplied into the load, which reduced the recommended nameplate rating at adverse sites. The built-in size selector also returned 2,000 kW even when the requirement exceeded that catalog ceiling, and NFPA 110 Type was described as a runtime/application class. | Required nameplate kW now divides site load and motor-step demand by the combined available-capacity factor. Above-range requirements return no selected size and a warning. NFPA 110 Type is limited to restoration time; runtime is identified as a separate Class/project requirement. |
+| `analysis/harmonics.js` and downstream report/coach consumers | Capacitor kVAR was used as if it were susceptance in siemens, making the shunt model 1,000 times too large. The calculation also inferred fundamental current without power factor and downstream UI/report logic presented a single-source screen as IEEE 519 compliance. | Capacitor susceptance now uses `B = kvar × 1000 / V_LL²`, source impedance is derived from three-phase short-circuit MVA with explicit X/R scaling, and current uses direct amperes or three-phase kW/voltage/power factor. Missing bus voltage or short-circuit MVA withholds VTHD. Results and recommendations are explicitly screening-only pending PCC aggregation and TDD evaluation. |
+| `analysis/voltageStability.mjs` | Q injection was clamped at zero net reactive load, flattening the Q-V sweep once injection exceeded the original demand. Sequential Newton-Raphson nonconvergence was labeled as a physical collapse/nose and converted into unsupported MW/MVAR stability margins. | Q injection can now produce net capacitive bus demand. Solver nonconvergence is reported only as a numerical boundary; physical P-V nose and reactive margins are withheld pending continuation power flow. UI, chart accessibility labels, contracts, and documentation use the same semantics. |
+| `analysis/insulationCoordination.mjs` | Protective margin was calculated from derived required withstand (`Ucw`) divided by arrester residual voltage, so selecting a higher BIL/SIL did not change the reported coordination margin. | Protective margin now uses the selected equipment withstand: `(selected BIL or SIL / arrester residual − 1) × 100`. The deterministic calculation remains a preliminary screen and identifies IEC 60071-2:2023 review and manufacturer insulation/arrester data as required for final coordination. |
 
 ## Major rework: full standard implementations
 
@@ -35,14 +46,14 @@ documented so users are not misled).
 
 ## Verified correct (audited, no change needed)
 
-`analysis/iec60909.mjs` (c-factors, κ, K_T, ip, Ik1/Ik2/Ik3), `analysis/dcShortCircuit.mjs`
-(Stokes-Oppenlander arc voltage, Lee/Ammerman DC incident energy, PPE bands),
+`analysis/iec60909.mjs` (c-factors, κ, K_T, ip, Ik1/Ik2/Ik3),
+`analysis/dcShortCircuit.mjs` (Stokes-Oppenlander arc voltage and corrected Ammerman/Wilkins energy-density models),
 `analysis/iec60287.mjs` (ampacity, thermal resistances, dielectric loss),
 `analysis/windLoad.mjs` (`qz = 0.00256·Kz·Kzt·Ke·V²`, Kz profile),
 `analysis/structuralLoadCombinations.mjs` / `loadCombinations.mjs` (ASCE 7 §2.3/§2.4 combos),
-`analysis/supportSpan.mjs` (5wL⁴/384EI span scaling),
+`analysis/supportSpan.mjs` (5wL⁴/384EI span scaling after the class-table correction),
 `analysis/cableFaultBracing.mjs` (single- and three-phase electromagnetic force),
 `analysis/conduitFill.mjs` (NEC Chapter 9 fill limits — correctly multiplies by conductor count),
 `analysis/intlCableSize.mjs` (IEC/AS-NZS ampacity tables and correction factors),
-`analysis/motorStartCalc.mjs` (FLA, reduced-voltage starter currents),
+`analysis/motorStartCalc.mjs` (FLA and reduced-voltage starter currents after the soft-starter correction),
 and the grounding tolerable touch/step voltage equations in `groundGrid.mjs`.

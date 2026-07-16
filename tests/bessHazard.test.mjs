@@ -2,10 +2,10 @@
  * Tests for analysis/bessHazard.mjs
  *
  * Covers: CHEMISTRY_PARAMS constants, separationDistance (boundary crossing,
- * all exposure types), checkSeparations (pass/warn/fail statuses),
+ * all exposure types), checkSeparations (review/screening-alert statuses),
  * propagationAmbientFactor (Arrhenius correction), propagationTiming
  * (structure, ordering, ambient effect), deflagrationVentArea (formula,
- * monotonicity, applicability warnings), hmaSummary (pass/warn/fail routing),
+ * monotonicity, applicability warnings), hmaSummary (mandatory review routing),
  * and runBessHazardStudy (integration, validation errors).
  */
 import assert from 'assert';
@@ -122,33 +122,41 @@ describe('separationDistance()', () => {
   it('throws for unknown exposure type', () => {
     assert.throws(() => separationDistance('roof', 50), /Unknown exposure type/);
   });
+
+  it('labels the value as an advisory screening default', () => {
+    const result = separationDistance('property_line', 20);
+    assert.strictEqual(result.basis, 'advisory-screening-default');
+    assert.strictEqual(result.requiresProjectSpecificBasis, true);
+  });
 });
 
 // ---------------------------------------------------------------------------
 describe('checkSeparations()', () => {
-  it('returns pass when actual > required', () => {
+  it('returns review, not pass, when actual exceeds the screening reference', () => {
     const results = checkSeparations(100, [
       { label: 'Building A', type: 'occupied_building', actualDistM: 5.0 },
     ]);
     assert.strictEqual(results.length, 1);
-    assert.strictEqual(results[0].pass, true);
-    assert.strictEqual(results[0].status, 'pass');
+    assert.strictEqual(results[0].pass, null);
+    assert.strictEqual(results[0].meetsScreeningDistance, true);
+    assert.strictEqual(results[0].status, 'review');
   });
 
-  it('returns fail when actual < required', () => {
+  it('returns a screening alert, not fail, when actual is below the reference', () => {
     const results = checkSeparations(100, [
       { label: 'Building A', type: 'occupied_building', actualDistM: 2.0 },
     ]);
-    assert.strictEqual(results[0].pass, false);
-    assert.strictEqual(results[0].status, 'fail');
+    assert.strictEqual(results[0].pass, null);
+    assert.strictEqual(results[0].meetsScreeningDistance, false);
+    assert.strictEqual(results[0].status, 'screening-alert');
   });
 
-  it('returns warn when actual is within 0.3 m of required', () => {
+  it('does not convert a small positive screening margin into a compliance result', () => {
     const results = checkSeparations(100, [
       { label: 'Boundary', type: 'property_line', actualDistM: 1.5 + 0.1 },
     ]);
-    // 1.6 m vs 1.5 m required → margin = 0.1 m < 0.3 → warn
-    assert.strictEqual(results[0].status, 'warn');
+    assert.strictEqual(results[0].status, 'review');
+    assert.strictEqual(results[0].pass, null);
   });
 
   it('handles multiple exposures independently', () => {
@@ -156,8 +164,8 @@ describe('checkSeparations()', () => {
       { label: 'Pass', type: 'ignition_source', actualDistM: 2.0 },
       { label: 'Fail', type: 'occupied_building', actualDistM: 1.0 },
     ]);
-    assert.strictEqual(results[0].pass, true);
-    assert.strictEqual(results[1].pass, false);
+    assert.strictEqual(results[0].meetsScreeningDistance, true);
+    assert.strictEqual(results[1].meetsScreeningDistance, false);
   });
 
   it('returns empty array for no exposures', () => {
@@ -197,6 +205,8 @@ describe('propagationTiming()', () => {
     assert.ok('cellToModule_min' in result);
     assert.ok('moduleToRack_min' in result);
     assert.ok('warnings' in result);
+    assert.strictEqual(result.requiresUl9540aData, true);
+    assert.strictEqual(result.basis, 'generic-screening-estimate');
   });
 
   it('cellToCell_min equals LFP propagBase_min at 25°C', () => {
@@ -242,6 +252,8 @@ describe('deflagrationVentArea()', () => {
     assert.ok('pMax_bar' in result);
     assert.ok('pStat_bar' in result);
     assert.ok('warnings' in result);
+    assert.strictEqual(result.requiresGasTestData, true);
+    assert.strictEqual(result.basis, 'generic-screening-estimate');
   });
 
   it('ventAreaM2 is positive for all chemistries', () => {
@@ -291,13 +303,13 @@ describe('deflagrationVentArea()', () => {
 
 // ---------------------------------------------------------------------------
 describe('hmaSummary()', () => {
-  const goodSep = [{ label: 'Bldg', type: 'occupied_building', actualDistM: 5, minDistM: 3.0, status: 'pass', margin: 2.0, pass: true }];
-  const badSep  = [{ label: 'Bldg', type: 'occupied_building', actualDistM: 1, minDistM: 3.0, status: 'fail', margin: -2.0, pass: false }];
+  const goodSep = [{ label: 'Bldg', type: 'occupied_building', actualDistM: 5, minDistM: 3.0, status: 'review', margin: 2.0, pass: null, meetsScreeningDistance: true }];
+  const badSep  = [{ label: 'Bldg', type: 'occupied_building', actualDistM: 1, minDistM: 3.0, status: 'screening-alert', margin: -2.0, pass: null, meetsScreeningDistance: false }];
   const goodProp = { cellToCell_min: 20, cellToModule_min: 224, moduleToRack_min: 896, warnings: [] };
   const fastProp = { cellToCell_min: 2,  cellToModule_min: 22,  moduleToRack_min: 20, warnings: [] };
   const goodVent = { ventAreaM2: 1.0, ventAreaFt2: 10.76, kG_barMs: 50, pMax_bar: 4.0, pStat_bar: 0.05, warnings: [] };
 
-  it('returns pass when all checks pass', () => {
+  it('requires engineering review even when all screening comparisons are met', () => {
     const result = hmaSummary({
       separationChecks: goodSep,
       propagation: goodProp,
@@ -306,13 +318,17 @@ describe('hmaSummary()', () => {
       ratedKwh: 200,
       chemistry: 'LFP',
     });
-    assert.strictEqual(result.status, 'pass');
-    assert.ok(result.separationOk);
-    assert.ok(result.ventOk);
-    assert.ok(result.propagationOk);
+    assert.strictEqual(result.status, 'review');
+    assert.strictEqual(result.requiresEngineeringReview, true);
+    assert.strictEqual(result.separationOk, null);
+    assert.strictEqual(result.ventOk, null);
+    assert.strictEqual(result.propagationOk, null);
+    assert.strictEqual(result.meetsScreeningSeparation, true);
+    assert.strictEqual(result.meetsScreeningVentArea, true);
+    assert.strictEqual(result.meetsScreeningPropagationThreshold, true);
   });
 
-  it('returns fail when separation fails', () => {
+  it('flags separation below the screening distance without issuing a compliance fail', () => {
     const result = hmaSummary({
       separationChecks: badSep,
       propagation: goodProp,
@@ -321,12 +337,13 @@ describe('hmaSummary()', () => {
       ratedKwh: 200,
       chemistry: 'LFP',
     });
-    assert.strictEqual(result.status, 'fail');
-    assert.strictEqual(result.separationOk, false);
+    assert.strictEqual(result.status, 'review');
+    assert.strictEqual(result.separationOk, null);
+    assert.strictEqual(result.meetsScreeningSeparation, false);
     assert.ok(result.issues.some(i => /Bldg/i.test(i)));
   });
 
-  it('returns fail when vent is insufficient', () => {
+  it('flags installed vent area below the preliminary equation result', () => {
     const result = hmaSummary({
       separationChecks: goodSep,
       propagation: goodProp,
@@ -335,11 +352,12 @@ describe('hmaSummary()', () => {
       ratedKwh: 200,
       chemistry: 'LFP',
     });
-    assert.strictEqual(result.status, 'fail');
-    assert.strictEqual(result.ventOk, false);
+    assert.strictEqual(result.status, 'review');
+    assert.strictEqual(result.ventOk, null);
+    assert.strictEqual(result.meetsScreeningVentArea, false);
   });
 
-  it('returns fail when propagation is too fast (< 30 min to rack)', () => {
+  it('flags propagation below the screening threshold without issuing a compliance fail', () => {
     const result = hmaSummary({
       separationChecks: goodSep,
       propagation: fastProp,
@@ -348,8 +366,9 @@ describe('hmaSummary()', () => {
       ratedKwh: 200,
       chemistry: 'NCA',
     });
-    assert.strictEqual(result.status, 'fail');
-    assert.strictEqual(result.propagationOk, false);
+    assert.strictEqual(result.status, 'review');
+    assert.strictEqual(result.propagationOk, null);
+    assert.strictEqual(result.meetsScreeningPropagationThreshold, false);
     assert.ok(result.issues.some(i => /30 min/i.test(i)));
   });
 
@@ -362,7 +381,7 @@ describe('hmaSummary()', () => {
       ratedKwh: 200,
       chemistry: 'LFP',
     });
-    assert.ok(result.ventOk, 'vent check should be skipped when area not provided');
+    assert.strictEqual(result.meetsScreeningVentArea, null, 'vent comparison should be skipped when area is not provided');
   });
 });
 
@@ -397,17 +416,19 @@ describe('runBessHazardStudy() integration', () => {
     assert.ok('chemistryName' in result);
   });
 
-  it('separation check for 200 kWh against occupied building at 5 m returns pass', () => {
+  it('separation check above the advisory reference still requires review', () => {
     const result = runBessHazardStudy(baseInputs);
-    assert.strictEqual(result.separationChecks[0].pass, true);
+    assert.strictEqual(result.separationChecks[0].pass, null);
+    assert.strictEqual(result.separationChecks[0].status, 'review');
   });
 
-  it('separation check for 200 kWh against occupied building at 2 m returns fail', () => {
+  it('separation check below the advisory reference returns a screening alert', () => {
     const result = runBessHazardStudy({
       ...baseInputs,
       exposures: [{ label: 'Building', type: 'occupied_building', actualDistM: 2.0 }],
     });
-    assert.strictEqual(result.separationChecks[0].pass, false);
+    assert.strictEqual(result.separationChecks[0].pass, null);
+    assert.strictEqual(result.separationChecks[0].status, 'screening-alert');
   });
 
   it('validates missing ratedKwh', () => {
@@ -439,11 +460,12 @@ describe('runBessHazardStudy() integration', () => {
     assert.strictEqual(result.valid, false);
   });
 
-  it('summary status is fail for insufficient separation', () => {
+  it('summary remains review for insufficient screening separation', () => {
     const result = runBessHazardStudy({
       ...baseInputs,
       exposures: [{ label: 'Building', type: 'occupied_building', actualDistM: 1.0 }],
     });
-    assert.strictEqual(result.summary.status, 'fail');
+    assert.strictEqual(result.summary.status, 'review');
+    assert.strictEqual(result.summary.meetsScreeningSeparation, false);
   });
 });

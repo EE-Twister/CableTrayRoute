@@ -10,7 +10,7 @@
  *   LC-W1:  1.2D + 1.6W             Wind dominant
  *   LC-W2:  0.9D + 1.0W             Wind + minimum gravity
  *   LC-S1:  1.2D + 1.0E + 0.2S     Seismic + snow (vertical E_v included in E)
- *   LC-S2:  0.9D + 1.0E             Seismic + minimum gravity (E_v included)
+ *   LC-S2:  0.9D + E_h - E_v         Seismic + minimum gravity (adverse E_v sign)
  *
  * where:
  *   D  = dead load (tray self-weight + cable weight), lbs/ft — always downward
@@ -22,8 +22,7 @@
  *
  * The seismic vertical force (E_v = ±0.2 × SDS × D per ASCE 7-22 §12.4.2) is
  * passed in as the magnitude already computed by seismicBracing.mjs (verticalForce).
- * It is added additively to the gravity term because the load combination already
- * incorporates the critical sign (additive for LC-S1/S2 worst case).
+ * The downward LC-S1 case adds E_v; the uplift LC-S2 case subtracts E_v.
  *
  * References:
  *   ASCE 7-22 — Minimum Design Loads, §2.3.2 (LRFD combinations)
@@ -181,15 +180,15 @@ export function calcLoadCombinations(inputs) {
     },
   };
 
-  // LC-S2: 0.9D + 1.0E
-  // Vertical: 0.9D + E_v
+  // LC-S2: 0.9D + E_h - E_v
+  // Vertical: 0.9D - E_v (adverse vertical seismic sign for uplift)
   // Horizontal: 1.0 × E_lat
-  const s2_v = round2(FACTORS.LC_S2.D * D + FACTORS.LC_S2.E * E_v);
+  const s2_v = round2(FACTORS.LC_S2.D * D - FACTORS.LC_S2.E * E_v);
   const s2_h = round2(FACTORS.LC_S2.E * E_l);
   const LC_S2 = {
     id:               'LC-S2',
-    label:            'Seismic + Minimum Gravity (0.9D + 1.0E)',
-    formula:          '0.9D + 1.0E',
+    label:            'Seismic + Minimum Gravity (0.9D + Eh − Ev)',
+    formula:          '0.9D + Eh − Ev',
     vertical_lbs_ft:  s2_v,
     horizontal_lbs_ft: s2_h,
     resultant_lbs_ft: resultant(s2_v, s2_h),
@@ -197,7 +196,7 @@ export function calcLoadCombinations(inputs) {
     nec: {
       rule:        'ASCE 7-22 Section 2.3.2',
       description: 'LRFD combination with minimum gravity and seismic. ' +
-                   'Minimum factored dead 0.9D plus seismic (lateral + vertical).',
+                   'Minimum factored dead 0.9D plus lateral seismic and the adverse subtractive vertical seismic effect.',
     },
   };
 
@@ -220,6 +219,8 @@ export function calcLoadCombinations(inputs) {
  *   controllingLabel:        string,
  *   maxResultant_lbs_ft:     number,
  *   maxVertical_lbs_ft:      number,
+ *   minVertical_lbs_ft:      number,
+ *   maxAbsVertical_lbs_ft:   number,
  *   maxHorizontal_lbs_ft:    number,
  *   recommendation:          string,
  * } | null}
@@ -241,6 +242,8 @@ export function findControllingCombination(combinations) {
 
   // Envelope vertical and horizontal across all applicable combinations
   const maxVertical   = Math.max(...applicable.map(c => c.vertical_lbs_ft));
+  const minVertical   = Math.min(...applicable.map(c => c.vertical_lbs_ft));
+  const maxAbsVertical = Math.max(...applicable.map(c => Math.abs(c.vertical_lbs_ft)));
   const maxHorizontal = Math.max(...applicable.map(c => c.horizontal_lbs_ft));
 
   return {
@@ -248,13 +251,17 @@ export function findControllingCombination(combinations) {
     controllingLabel:     controlling.label,
     maxResultant_lbs_ft:  controlling.resultant_lbs_ft,
     maxVertical_lbs_ft:   Math.round(maxVertical * 100) / 100,
+    minVertical_lbs_ft:   Math.round(minVertical * 100) / 100,
+    maxAbsVertical_lbs_ft: Math.round(maxAbsVertical * 100) / 100,
     maxHorizontal_lbs_ft: Math.round(maxHorizontal * 100) / 100,
     recommendation:
       `Controlling combination: ${controlling.id} — ${controlling.label}. ` +
       `Design resultant = ${controlling.resultant_lbs_ft.toFixed(2)} lbs/ft ` +
       `(vertical = ${controlling.vertical_lbs_ft.toFixed(2)} lbs/ft, ` +
       `horizontal = ${controlling.horizontal_lbs_ft.toFixed(2)} lbs/ft). ` +
-      `Envelope: max vertical = ${maxVertical.toFixed(2)} lbs/ft, ` +
+      `Envelope: downward vertical = ${maxVertical.toFixed(2)} lbs/ft, ` +
+      `minimum vertical = ${minVertical.toFixed(2)} lbs/ft ` +
+      `(downward positive; a negative value denotes uplift), ` +
       `max horizontal = ${maxHorizontal.toFixed(2)} lbs/ft. ` +
       `Per ASCE 7-22 §2.3.2.`,
   };

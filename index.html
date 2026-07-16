@@ -69,7 +69,7 @@
   }
   </script>
 </head>
-<body class="home-page">
+<body class="home-page" data-onboarding="manual">
   <a href="#main-content" class="skip-link">Skip to main content</a>
   <nav class="top-nav" aria-label="Primary">
     <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
@@ -113,8 +113,7 @@
       <div class="home-command__copy">
         <h1 class="hero-title">Project Workflow Command Center</h1>
         <p class="hero-tagline">Build the project from equipment and loads through one-line context, schedule reconciliation, routing, studies, and deliverables.</p>
-        <div class="hero-actions" aria-label="Primary actions">
-          <a class="hero-action-btn" href="equipmentlist.html"><img src="icons/equipment.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">Start Equipment List</a>
+        <div class="hero-actions" aria-label="Project resources">
           <a class="hero-action-btn secondary" href="workflowdashboard.html"><img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">Open Dashboard</a>
           <a class="hero-action-btn secondary" href="samplegallery.html"><img src="icons/toolbar/copy.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">Browse Samples</a>
         </div>
@@ -153,7 +152,6 @@
           <div class="workflow-progress-track" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="8" aria-labelledby="workflow-progress-text" id="workflow-progress-bar-track">
             <div class="workflow-progress-fill" id="workflow-progress-fill" style="width:0%"></div>
           </div>
-          <p id="workflow-next-step">Next recommended step: <a href="equipmentlist.html">Equipment List</a></p>
           <a class="home-command__dashboard-link" href="workflowdashboard.html">View full workflow dashboard</a>
         </section>
       </div>
@@ -174,6 +172,14 @@
         </div>
       </section>
 
+      <details class="home-explore">
+        <summary>
+          <span>
+            <strong>Explore Workflow &amp; Tools</strong>
+            <small>Open the eight-step path, workspace examples, and complete tool directory</small>
+          </span>
+        </summary>
+        <div class="home-explore__body">
       <section class="home-section home-section--workflow" aria-labelledby="home-workflow-title">
         <div class="home-section__header">
           <div>
@@ -235,11 +241,11 @@
         <div class="workspace-preview-grid">
           <article class="preview-panel preview-panel--diagram">
             <div class="preview-panel__header">
-              <h3>One-Line Preview</h3>
+              <h3>Example One-Line Layout</h3>
               <a href="oneline.html">Open One-Line</a>
             </div>
             <p class="preview-panel__summary" id="home-oneline-summary">No one-line components yet. Schedules can still be built independently.</p>
-            <svg class="mini-oneline" viewBox="0 0 520 260" role="img" aria-label="One-line diagram preview">
+            <svg class="mini-oneline" viewBox="0 0 520 260" role="img" aria-label="Illustrative one-line layout; not the active project diagram">
               <defs>
                 <marker id="home-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
                   <path d="M 0 0 L 10 5 L 0 10 z"></path>
@@ -447,6 +453,8 @@
           </section>
         </div>
       </section>
+        </div>
+      </details>
     </main>
   </div>
   <div id="help-modal" class="modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="help-title">

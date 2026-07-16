@@ -1,5 +1,6 @@
-import { getAuthRole } from '../../projectStorage.js';
+import { getAuthRole, getProjectState } from '../../projectStorage.js';
 import { mountProfileControl } from '../authProfileControl.js';
+import { observeMojibake, repairMojibakeDocument } from '../textEncoding.js';
 
 export const NAV_ROUTES = [
   { href: 'index.html', label: 'Home', section: 'Home', icon: 'icons/route.svg' },
@@ -314,7 +315,13 @@ function buildProjectActionsControl(existingProjectDisplay) {
   display.id = 'project-display';
   display.classList.add('project-display-chip');
   if (!display.textContent.trim()) {
-    display.textContent = 'Project: Untitled';
+    let projectName = '';
+    try {
+      projectName = String(getProjectState()?.name || '').trim();
+    } catch {
+      projectName = '';
+    }
+    display.textContent = `Project: ${projectName || 'Untitled'}`;
   }
 
   const syncStatus = document.createElement('span');
@@ -498,13 +505,34 @@ function mountPersistentNavigation() {
   heading.textContent = 'Navigate';
   sidebar.appendChild(heading);
 
-  const sections = [...new Set(NAV_ROUTES.map(r => r.section))];
+  const searchLabel = document.createElement('label');
+  searchLabel.className = 'sidebar-filter-label';
+  searchLabel.setAttribute('for', 'sidebar-route-filter');
+  searchLabel.textContent = 'Find a page';
+  const routeFilter = document.createElement('input');
+  routeFilter.id = 'sidebar-route-filter';
+  routeFilter.className = 'sidebar-route-filter';
+  routeFilter.type = 'search';
+  routeFilter.placeholder = 'Search navigation';
+  routeFilter.autocomplete = 'off';
+  searchLabel.appendChild(routeFilter);
+  sidebar.appendChild(searchLabel);
+
+  const scrollRegion = document.createElement('div');
+  scrollRegion.className = 'sidebar-nav-scroll';
+  sidebar.appendChild(scrollRegion);
+
+  const sections = [...new Set(visibleRoutes.map(r => r.section))];
   sections.forEach(section => {
-    const sectionRoutes = NAV_ROUTES.filter(r => r.section === section);
-    const sectionLabel = document.createElement('p');
+    const sectionRoutes = visibleRoutes.filter(r => r.section === section);
+    const sectionGroup = document.createElement('details');
+    sectionGroup.className = 'sidebar-section-group';
+    sectionGroup.dataset.defaultOpen = String(section === currentRoute?.section || section === 'Home');
+    sectionGroup.open = sectionGroup.dataset.defaultOpen === 'true';
+    const sectionLabel = document.createElement('summary');
     sectionLabel.className = 'sidebar-section-label';
     sectionLabel.textContent = section;
-    sidebar.appendChild(sectionLabel);
+    sectionGroup.appendChild(sectionLabel);
     const sectionList = document.createElement('ul');
     sectionList.className = 'sidebar-nav-list';
     sectionRoutes.forEach(route => {
@@ -512,8 +540,50 @@ function mountPersistentNavigation() {
       item.appendChild(buildLink(route, currentRoute));
       sectionList.appendChild(item);
     });
-    sidebar.appendChild(sectionList);
+    sectionGroup.appendChild(sectionList);
+    scrollRegion.appendChild(sectionGroup);
   });
+
+  routeFilter.addEventListener('input', () => {
+    const query = routeFilter.value.trim().toLowerCase();
+    scrollRegion.querySelectorAll('.sidebar-section-group').forEach(sectionGroup => {
+      let matches = 0;
+      sectionGroup.querySelectorAll('.sidebar-nav-list li').forEach(item => {
+        const isMatch = !query || item.textContent.toLowerCase().includes(query);
+        item.hidden = !isMatch;
+        if (isMatch) matches += 1;
+      });
+      sectionGroup.hidden = matches === 0;
+      sectionGroup.open = query ? matches > 0 : sectionGroup.dataset.defaultOpen === 'true';
+    });
+  });
+
+  const utilities = document.createElement('div');
+  utilities.className = 'sidebar-utility-actions';
+
+  const searchAction = document.createElement('button');
+  searchAction.type = 'button';
+  searchAction.className = 'sidebar-utility-action';
+  searchAction.textContent = 'Search commands';
+  searchAction.addEventListener('click', () => {
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true }));
+    closeSidebar();
+  });
+  utilities.appendChild(searchAction);
+
+  if (existingSettingsBtn) {
+    const settingsAction = document.createElement('button');
+    settingsAction.type = 'button';
+    settingsAction.className = 'sidebar-utility-action';
+    settingsAction.textContent = 'Settings';
+    settingsAction.addEventListener('click', () => {
+      existingSettingsBtn.click();
+      closeSidebar();
+    });
+    utilities.appendChild(settingsAction);
+  }
+
+  sidebar.appendChild(utilities);
 
   document.body.appendChild(sidebar);
 
@@ -598,6 +668,10 @@ function mountPersistentNavigation() {
   }
 
   document.body.dataset.navMounted = 'true';
+  repairMojibakeDocument(document);
+  if (!window.__mojibakeObserver) {
+    window.__mojibakeObserver = observeMojibake(document.body);
+  }
 }
 
 if (typeof window !== 'undefined' && hasNavigationDomApi()) {

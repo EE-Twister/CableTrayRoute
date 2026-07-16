@@ -95,7 +95,7 @@
         <strong>NFPA 70E-2024 Annex D.8.1</strong>.</p>
 
         <p><strong>Bolted DC fault current (IEEE 946):</strong></p>
-        <pre>I<sub>bf</sub> = V<sub>oc</sub> / R<sub>total</sub>   where  R<sub>total</sub> = R<sub>battery</sub> + R<sub>cable</sub> + R<sub>bus</sub></pre>
+        <pre>I<sub>bf</sub> = V<sub>oc</sub> / R<sub>total</sub>   where  R<sub>total</sub> = R<sub>battery</sub> + 2R<sub>cable, one-way</sub> + R<sub>bus</sub></pre>
 
         <p><strong>L/R time constant:</strong></p>
         <pre>&tau; (ms) = L<sub>total</sub> (mH) / R<sub>total</sub> (&Omega;)</pre>
@@ -110,13 +110,16 @@ I<sub>arc</sub> = (V<sub>oc</sub> &minus; V<sub>arc</sub>) / R<sub>total</sub>  
         "DC Arc Models and Incident Energy Calculations,"
         <em>IEEE Trans. Ind. Appl.</em> 46(5), 2010.</p>
 
-        <p><strong>Incident energy (NFPA 70E Annex D.8.1 — Lee/Ammerman method):</strong></p>
-        <pre>E = (4.184 &times; C<sub>f</sub> &times; P<sub>arc</sub> &times; t<sub>arc</sub>) / (2&pi; &times; D<sub>cm</sub><sup>2</sup>)   [cal/cm&sup2;]</pre>
-        <p>where P<sub>arc</sub> = V<sub>arc</sub> &times; I<sub>arc</sub> (W),
-        C<sub>f</sub> = 1.0 (open air) or 2.0 (enclosed box), and D is the working distance in cm.</p>
+        <p><strong>Incident energy (Ammerman/Wilkins method):</strong></p>
+        <pre>E<sub>arc</sub> = P<sub>arc</sub> &times; t<sub>arc</sub>   [J]
+Open air: E<sub>s</sub> = E<sub>arc</sub> / (4&pi;D<sub>mm</sub><sup>2</sup>)   [J/mm&sup2;]
+LV switchgear: E<sub>1</sub> = 0.312E<sub>arc</sub> / (400<sup>2</sup> + D<sub>mm</sub><sup>2</sup>)   [J/mm&sup2;]</pre>
+        <p>J/mm&sup2; is converted to cal/cm&sup2; by multiplying by 100 / 4.184.
+        The enclosed option represents the published 508 mm low-voltage-switchgear enclosure model.</p>
 
         <p><strong>Arc flash boundary</strong> (onset of second-degree burn, 1.2 cal/cm&sup2;):</p>
-        <pre>D<sub>af</sub> = &radic;((4.184 &times; C<sub>f</sub> &times; P<sub>arc</sub> &times; t<sub>arc</sub>) / (2&pi; &times; 1.2))   [cm &rarr; mm]</pre>
+        <pre>Open air: D<sub>af</sub> = &radic;(E<sub>arc</sub> / (4&pi;E<sub>threshold</sub>))
+LV switchgear: D<sub>af</sub> = &radic;(0.312E<sub>arc</sub> / E<sub>threshold</sub> &minus; 400<sup>2</sup>)</pre>
 
         <p>Citations: <a href="docs/dc-short-circuit.md">DC Short-Circuit &amp; Arc Flash Guide</a>.
         See also: <a href="battery.html">Battery / UPS Sizing</a>,
@@ -317,8 +320,9 @@ I<sub>arc</sub> = (V<sub>oc</sub> &minus; V<sub>arc</sub>) / R<sub>total</sub>  
                 <option value="enclosed_box">Enclosed box (panel, switchgear)</option>
               </select>
               <p id="enclosure-hint" class="field-hint">
-                Enclosed equipment concentrates arc energy (correction factor C<sub>f</sub> = 2.0).
-                Open buswork or outdoor equipment uses C<sub>f</sub> = 1.0.
+                The enclosed option uses the Ammerman/Wilkins low-voltage-switchgear constants
+                a = 400 mm and k = 0.312. Use open air for exposed buswork. Other enclosure
+                geometries require an engineering model appropriate to that equipment.
               </p>
             </div>
 

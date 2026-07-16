@@ -1,31 +1,26 @@
 /**
- * NFPA 855 BESS Hazard / Thermal Runaway Modeling — Gap #91
+ * BESS Hazard / Thermal Runaway Screening — Gap #91
  *
  * Pure calculation module. No DOM access; persistence is handled by the page
  * JS layer (bessHazard.js).
  *
- * Standards:
- *   NFPA 855-2023  Standard for the Installation of Stationary Energy Storage Systems
- *                  §15.3 — Separation from exposures (Table 15.3.2)
- *   NFPA 68-2018   Standard on Explosion Protection by Deflagration Venting
- *                  §7.4.3 — Vent area sizing (Bartknecht correlation)
- *   UL 9540A-2023  Test Method for Evaluating Thermal Runaway Fire Propagation in
- *                  Battery Energy Storage Systems
- *                  — Cell-to-cell, module-to-module timing (lumped thermal model)
- *   IFC 1207-2020  International Fire Code Section 1207 — Energy Storage Systems
- *   NFPA 70 Art. 706  National Electric Code — Energy Storage Systems
+ * References:
+ *   NFPA 855  Installation requirements and the project-specific HMA process
+ *   NFPA 68   Deflagration vent design methods and applicability limits
+ *   UL 9540A  Test method used to obtain installation-specific fire and gas data
  *
  * Module overview
  * ───────────────
- * 1. separationDistance()   — NFPA 855 §15.3 minimum separation by capacity and exposure type
- * 2. propagationTiming()    — UL 9540A lumped thermal-mass model for runaway cascade timing
- * 3. deflagrationVentArea() — NFPA 68 §7.4.3 Bartknecht correlation for required vent area
- * 4. hmaSummary()           — Aggregate HMA pass/warn/fail from exposures + vent check
+ * 1. separationDistance()   — advisory distance used to flag layouts for review
+ * 2. propagationTiming()    — generic sensitivity estimate, not a UL 9540A result
+ * 3. deflagrationVentArea() — preliminary equation screening using assumed gas data
+ * 4. hmaSummary()           — review flags; never a code-compliance determination
  * 5. runBessHazardStudy()   — Unified entry point; validates inputs, returns structured result
  *
- * Disclaimer: This module implements published engineering correlations for screening
- * purposes. A final Hazard Mitigation Analysis per NFPA 855 §15.3 must be prepared
- * by a qualified engineer and reviewed by the AHJ.
+ * Disclaimer: These generic assumptions cannot establish NFPA 855 compliance or
+ * replace UL 9540A test data. Final separation, propagation, gas, ventilation,
+ * deflagration, suppression, and HMA decisions require the listed system's test
+ * reports, the adopted code edition, a qualified engineer, and AHJ review.
  */
 
 // ---------------------------------------------------------------------------
@@ -36,13 +31,11 @@
  * Battery chemistry parameters for thermal-runaway and deflagration modeling.
  *
  * kG_barMs:       Deflagration index K_G [bar·m/s] for typical off-gas composition
- *                 from UL 9540A cell-level testing; LFP off-gas is CO₂/CO dominant
- *                 (lower K_G); NCA produces more volatile organics (higher K_G).
+ *                 used only as generic screening assumptions.
  * pMax_bar:       Maximum pressure in an unvented enclosure during deflagration [bar]
- *                 from NFPA 68 Annex B and literature (worst-case stoichiometric).
+ *                 used only as generic screening assumptions.
  * propagBase_min: Base cell-to-adjacent-cell thermal runaway propagation time [min]
- *                 at 25°C ambient, from published UL 9540A test data ranges.
- *                 Conservative (low) end of typical published ranges is used.
+ *                 at 25°C ambient, used only for sensitivity screening.
  */
 export const CHEMISTRY_PARAMS = Object.freeze({
   LFP:         { name: 'LiFePO₄ (LFP)',   kG_barMs: 50,  pMax_bar: 4.0, propagBase_min: 20 },
@@ -53,21 +46,24 @@ export const CHEMISTRY_PARAMS = Object.freeze({
 });
 
 // ---------------------------------------------------------------------------
-// NFPA 855 §15.3 separation distance table
+// Advisory separation screening defaults
 // ---------------------------------------------------------------------------
 
 /**
- * Minimum separation distances from NFPA 855-2023 §15.3 / Table 15.3.2.
+ * Advisory layout-screening distances. These are deliberately not represented
+ * as NFPA 855 minimums: required separation depends on the installation type,
+ * adopted code edition, listings, UL 9540A results, fire protection features,
+ * and AHJ-approved alternatives.
  *
  * Keyed by exposure type. Each array is evaluated in order; the first entry
  * whose maxKwh ≥ system rated capacity is used.
  *
- * Values in metres:
+ * Screening values in metres:
  *   property_line   : 0.9 m (3 ft) for ≤ 50 kWh; 1.5 m (5 ft) for > 50 kWh
  *   occupied_building: 1.5 m (5 ft) for ≤ 50 kWh; 3.0 m (10 ft) for > 50 kWh
- *   ignition_source : 0.9 m (3 ft) for all capacities (NFPA 855 §15.3.3)
+ *   ignition_source : 0.9 m (3 ft) for all capacities
  */
-export const SEPARATION_TABLE = Object.freeze({
+export const SCREENING_SEPARATION_DEFAULTS = Object.freeze({
   property_line: [
     { maxKwh: 50,       minDistM: 0.9 },
     { maxKwh: Infinity, minDistM: 1.5 },
@@ -81,6 +77,9 @@ export const SEPARATION_TABLE = Object.freeze({
   ],
 });
 
+// Backward-compatible export name for saved studies and external imports.
+export const SEPARATION_TABLE = SCREENING_SEPARATION_DEFAULTS;
+
 export const EXPOSURE_TYPES = Object.freeze([
   { value: 'property_line',    label: 'Property Line' },
   { value: 'occupied_building', label: 'Occupied Building' },
@@ -88,39 +87,42 @@ export const EXPOSURE_TYPES = Object.freeze([
 ]);
 
 // ---------------------------------------------------------------------------
-// 1. Separation distance — NFPA 855 §15.3
+// 1. Advisory separation-distance screening
 // ---------------------------------------------------------------------------
 
 /**
- * Return the NFPA 855 §15.3 minimum separation distance for a given exposure
- * type and system rated energy capacity.
+ * Return the advisory screening distance for a given exposure type and system
+ * rated energy capacity. The result is not a code-required clearance.
  *
  * @param {'property_line'|'occupied_building'|'ignition_source'} exposureType
  * @param {number} ratedKwh — total ESS rated energy capacity (kWh)
- * @returns {{ minDistM: number, minDistFt: number }} required clearance
+ * @returns {{ minDistM: number, minDistFt: number, basis: string, requiresProjectSpecificBasis: boolean }}
  */
 export function separationDistance(exposureType, ratedKwh) {
-  const table = SEPARATION_TABLE[exposureType];
+  const table = SCREENING_SEPARATION_DEFAULTS[exposureType];
   if (!table) throw new RangeError(`Unknown exposure type: ${exposureType}`);
   const entry = table.find(e => ratedKwh <= e.maxKwh);
   const minDistM = entry ? entry.minDistM : table[table.length - 1].minDistM;
   return {
     minDistM,
     minDistFt: +(minDistM * 3.28084).toFixed(1),
+    basis: 'advisory-screening-default',
+    requiresProjectSpecificBasis: true,
   };
 }
 
 /**
- * Check a list of exposure objects against NFPA 855 §15.3 separation requirements.
+ * Compare exposure distances with advisory screening defaults. A result never
+ * constitutes a compliance pass or fail.
  *
  * @param {number} ratedKwh — total system rated energy (kWh)
  * @param {Array<{label: string, type: string, actualDistM: number}>} exposures
- * @returns {Array<{label, type, actualDistM, actualDistFt, minDistM, minDistFt, pass, status}>}
+ * @returns {Array<{label, type, actualDistM, actualDistFt, minDistM, minDistFt, margin, pass, meetsScreeningDistance, status}>}
  */
 export function checkSeparations(ratedKwh, exposures = []) {
   return exposures.map(exp => {
     const { minDistM, minDistFt } = separationDistance(exp.type, ratedKwh);
-    const pass = exp.actualDistM >= minDistM;
+    const meetsScreeningDistance = exp.actualDistM >= minDistM;
     const margin = +(exp.actualDistM - minDistM).toFixed(2);
     return {
       label:       exp.label || exp.type,
@@ -130,14 +132,15 @@ export function checkSeparations(ratedKwh, exposures = []) {
       minDistM,
       minDistFt,
       margin,
-      pass,
-      status: pass ? (margin < 0.3 ? 'warn' : 'pass') : 'fail',
+      pass: null,
+      meetsScreeningDistance,
+      status: meetsScreeningDistance ? 'review' : 'screening-alert',
     };
   });
 }
 
 // ---------------------------------------------------------------------------
-// 2. Thermal runaway propagation — UL 9540A lumped thermal model
+// 2. Generic thermal-runaway propagation sensitivity estimate
 // ---------------------------------------------------------------------------
 
 /**
@@ -155,7 +158,8 @@ export function propagationAmbientFactor(ambientC) {
 
 /**
  * Estimate thermal runaway propagation timing through a BESS rack using a
- * simplified UL 9540A lumped thermal-mass model.
+ * simplified lumped thermal-mass model. UL 9540A is a test method; these
+ * calculated values are not UL 9540A test results.
  *
  * Returns timing milestones:
  *   cellToCell_min  : time for runaway to reach an adjacent cell
@@ -174,7 +178,9 @@ export function propagationTiming({ chemistry, cellsPerModule, modulesPerRack, a
   const params = CHEMISTRY_PARAMS[chemistry];
   if (!params) throw new RangeError(`Unknown chemistry: ${chemistry}`);
 
-  const warnings = [];
+  const warnings = [
+    'Generic propagation assumptions cannot replace UL 9540A test data for the listed cell, module, unit, and installation configuration.',
+  ];
   const tempFactor = propagationAmbientFactor(ambientC);
 
   const cellToCell_min = +(params.propagBase_min * tempFactor).toFixed(1);
@@ -190,13 +196,20 @@ export function propagationTiming({ chemistry, cellsPerModule, modulesPerRack, a
   const moduleToRack_min = +(cellToModule_min * modulesPerRack * 0.5).toFixed(1);
 
   if (ambientC > 40) {
-    warnings.push(`Ambient temperature ${ambientC}°C is above 40°C — verify cooling provisions per NFPA 855 §15.6.`);
+    warnings.push(`Ambient temperature ${ambientC}°C is above 40°C — verify the listed equipment temperature limits and project cooling design.`);
   }
   if (cellToCell_min < 5) {
-    warnings.push(`Very rapid cell-to-cell propagation (${cellToCell_min} min) for ${chemistry} chemistry — consider enhanced thermal barriers per UL 9540A §8.`);
+    warnings.push(`The generic model estimates rapid cell-to-cell propagation (${cellToCell_min} min) for ${chemistry}; review tested barriers and suppression performance.`);
   }
 
-  return { cellToCell_min, cellToModule_min, moduleToRack_min, warnings };
+  return {
+    cellToCell_min,
+    cellToModule_min,
+    moduleToRack_min,
+    basis: 'generic-screening-estimate',
+    requiresUl9540aData: true,
+    warnings,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -204,8 +217,8 @@ export function propagationTiming({ chemistry, cellsPerModule, modulesPerRack, a
 // ---------------------------------------------------------------------------
 
 /**
- * Calculate the required deflagration vent area for a BESS room using the
- * NFPA 68-2018 §7.4.3.2 Bartknecht correlation.
+ * Calculate a preliminary deflagration-vent screening area for a BESS room
+ * using a Bartknecht-form correlation.
  *
  * The correlation is derived from experimental data for compact enclosures
  * (length/width ≤ 3) with centrally-located ignition and uniform turbulence.
@@ -221,8 +234,8 @@ export function propagationTiming({ chemistry, cellsPerModule, modulesPerRack, a
  *   chemistry:  string,  — battery chemistry key (determines K_G and P_max)
  * }} room
  * @returns {{
- *   ventAreaM2:   number,  — required vent area [m²]
- *   ventAreaFt2:  number,  — required vent area [ft²]
+ *   ventAreaM2:   number,  — screening vent area [m²]
+ *   ventAreaFt2:  number,  — screening vent area [ft²]
  *   kG_barMs:     number,  — deflagration index used
  *   pMax_bar:     number,  — max unvented pressure used
  *   pStat_bar:    number,  — vent opening pressure [bar]
@@ -233,16 +246,18 @@ export function deflagrationVentArea({ volumeM3, pstatKpa = 5, chemistry = 'LFP'
   const params = CHEMISTRY_PARAMS[chemistry];
   if (!params) throw new RangeError(`Unknown chemistry: ${chemistry}`);
 
-  const warnings = [];
+  const warnings = [
+    'Chemistry-wide K_G and P_max values are screening assumptions; use project-specific gas test data and a qualified NFPA 68 design for final vent sizing.',
+  ];
   const pStat_bar = pstatKpa / 100;         // kPa → bar
   const kG = params.kG_barMs;
   const pMax = params.pMax_bar;
 
-  // Applicability range check (NFPA 68 §7.4.3.2 limits)
+  // Applicability range check for the screening correlation.
   if (pStat_bar > 0.1) warnings.push(`P_stat (${pstatKpa} kPa) exceeds the 10 kPa Bartknecht correlation applicability limit; result is extrapolated.`);
   if (kG > 550)        warnings.push(`K_G (${kG} bar·m/s) exceeds the 550 bar·m/s correlation limit.`);
 
-  // Bartknecht correlation — NFPA 68-2018 §7.4.3.2 Eq.
+  // Bartknecht-form screening correlation.
   const ventAreaM2 = (
     Math.pow(pStat_bar, -0.5682) *
     Math.pow(kG, 0.5922) *
@@ -258,21 +273,21 @@ export function deflagrationVentArea({ volumeM3, pstatKpa = 5, chemistry = 'LFP'
     kG_barMs:    kG,
     pMax_bar:    pMax,
     pStat_bar:   +pStat_bar.toFixed(4),
+    basis:       'generic-screening-estimate',
+    requiresGasTestData: true,
     warnings,
   };
 }
 
 // ---------------------------------------------------------------------------
-// 4. HMA summary
+// 4. Engineering-review summary
 // ---------------------------------------------------------------------------
 
 /**
- * Aggregate Hazard Mitigation Analysis (HMA) summary.
+ * Aggregate engineering-review summary.
  *
- * Produces an overall compliance status from:
- *   - Separation checks (any fail → overall fail)
- *   - Vent area check (providedVentAreaM2 vs. required; fail if insufficient)
- *   - Propagation timing (warn if moduleToRack_min < 30 min per NFPA 855 guidance)
+ * The diagnostic comparisons help prioritize review, but the function always
+ * returns `review`; it cannot approve an HMA or determine code compliance.
  *
  * @param {{
  *   separationChecks:  ReturnType<checkSeparations>,
@@ -283,46 +298,49 @@ export function deflagrationVentArea({ volumeM3, pstatKpa = 5, chemistry = 'LFP'
  *   chemistry:         string,
  * }} args
  * @returns {{
- *   status:        'pass'|'warn'|'fail',
- *   separationOk:  boolean,
- *   ventOk:        boolean,
- *   propagationOk: boolean,
+ *   status:        'review',
+ *   requiresEngineeringReview: true,
+ *   separationOk:  null,
+ *   ventOk:        null,
+ *   propagationOk: null,
  *   issues:        string[],
  * }}
  */
 export function hmaSummary({ separationChecks, propagation, ventArea, providedVentAreaM2, ratedKwh, chemistry }) {
   const issues = [];
-  let separationOk = true;
-  let ventOk = true;
-  let propagationOk = true;
+  let meetsScreeningSeparation = true;
+  let meetsScreeningVentArea = null;
+  const meetsScreeningPropagationThreshold = propagation.moduleToRack_min >= 30;
+
+  issues.push(
+    'Engineering review required: this screening does not establish NFPA 855 compliance, an approved HMA, or UL 9540A performance.'
+  );
 
   // Separation failures
   for (const check of separationChecks) {
-    if (check.status === 'fail') {
-      separationOk = false;
-      issues.push(`Separation to ${check.label}: ${check.actualDistM} m provided, ${check.minDistM} m required (NFPA 855 §15.3).`);
-    } else if (check.status === 'warn') {
-      issues.push(`Separation to ${check.label}: only ${check.margin} m margin above NFPA 855 §15.3 minimum — monitor for encroachment.`);
+    if (!check.meetsScreeningDistance) {
+      meetsScreeningSeparation = false;
+      issues.push(`Separation to ${check.label}: ${check.actualDistM} m is below the ${check.minDistM} m advisory screening distance; establish the project-specific requirement with the AHJ.`);
+    } else if (check.margin < 0.3) {
+      issues.push(`Separation to ${check.label}: only ${check.margin} m above the advisory screening distance; verify the project-specific clearance.`);
     }
   }
 
   // Vent area
   if (typeof providedVentAreaM2 === 'number' && providedVentAreaM2 >= 0) {
+    meetsScreeningVentArea = providedVentAreaM2 >= ventArea.ventAreaM2;
     if (providedVentAreaM2 < ventArea.ventAreaM2) {
-      ventOk = false;
       issues.push(
         `Deflagration vent: ${providedVentAreaM2.toFixed(2)} m² provided, ` +
-        `${ventArea.ventAreaM2} m² required per NFPA 68 §7.4.3 — add vent area.`
+        `${ventArea.ventAreaM2} m² from the preliminary screening equation. Obtain project gas data and complete the NFPA 68 design.`
       );
     }
   }
 
-  // Propagation timing (NFPA 855 §15.9 requires HMA to address propagation to adjacent units)
-  if (propagation.moduleToRack_min < 30) {
-    propagationOk = false;
+  if (!meetsScreeningPropagationThreshold) {
     issues.push(
       `Module-to-rack propagation time (${propagation.moduleToRack_min} min) is less than ` +
-      `30 min — consider automatic suppression or inter-module barriers per NFPA 855 §15.9.`
+      `the 30 min screening threshold; review UL 9540A results, suppression, and inter-module barriers.`
     );
   }
 
@@ -334,11 +352,17 @@ export function hmaSummary({ separationChecks, propagation, ventArea, providedVe
     if (!issues.includes(w)) issues.push(w);
   }
 
-  const status = (!separationOk || !ventOk || !propagationOk) ? 'fail'
-    : issues.length > 0 ? 'warn'
-    : 'pass';
-
-  return { status, separationOk, ventOk, propagationOk, issues };
+  return {
+    status: 'review',
+    requiresEngineeringReview: true,
+    separationOk: null,
+    ventOk: null,
+    propagationOk: null,
+    meetsScreeningSeparation,
+    meetsScreeningVentArea,
+    meetsScreeningPropagationThreshold,
+    issues,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -346,7 +370,7 @@ export function hmaSummary({ separationChecks, propagation, ventArea, providedVe
 // ---------------------------------------------------------------------------
 
 /**
- * Validate study inputs, run all HMA calculations, and return a structured result.
+ * Validate study inputs, run all screening calculations, and return a structured result.
  *
  * @param {{
  *   ratedKwh:           number,   — total ESS rated energy (kWh)

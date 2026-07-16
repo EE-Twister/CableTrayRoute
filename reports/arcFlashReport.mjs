@@ -70,11 +70,6 @@ function formatIncidentEnergy(energy, workingDistance) {
   return `${round(energy, 2).toFixed(2)} cal/cm² @ ${distance}`;
 }
 
-function formatPpeCategory(ppeCategory) {
-  if (!Number.isFinite(ppeCategory)) return 'N/A';
-  return ppeCategory.toString();
-}
-
 function resolveStudyDate(info) {
   if (info?.studyDate) return info.studyDate;
   return new Date().toISOString().split('T')[0];
@@ -84,6 +79,24 @@ function safeEntries(results = {}) {
   return Object.entries(results).filter(([key, value]) => {
     return key && typeof value === 'object' && value !== null && !key.startsWith('_');
   });
+}
+
+export function isArcFlashLabelReady(info = {}) {
+  const requiredInputs = Array.isArray(info.requiredInputs) ? info.requiredInputs : [];
+  return requiredInputs.length === 0
+    && Number.isFinite(info.incidentEnergy)
+    && info.incidentEnergy >= 0
+    && Number.isFinite(info.nominalVoltage)
+    && info.nominalVoltage > 0
+    && Number.isFinite(info.workingDistance)
+    && info.workingDistance > 0
+    && Number.isFinite(info.boundary)
+    && info.boundary >= 0
+    && Number.isFinite(info.clearingTime)
+    && info.clearingTime > 0
+    && typeof info.upstreamDevice === 'string'
+    && info.upstreamDevice.trim().length > 0
+    && info.upstreamDevice !== 'Not Specified';
 }
 
 function escapeHtml(value) {
@@ -114,8 +127,8 @@ export function getArcFlashLabelBaseName(id, info = {}) {
 }
 
 export function buildArcFlashLabelData(id, info = {}) {
-  const incidentEnergy = Number.isFinite(info.incidentEnergy) ? info.incidentEnergy : NaN;
-  const signalWord = incidentEnergy >= 40 ? 'DANGER' : 'WARNING';
+  const requestedSignalWord = String(info.signalWord || '').trim().toUpperCase();
+  const signalWord = requestedSignalWord === 'DANGER' ? 'DANGER' : 'WARNING';
   const signalColor = signalWord === 'DANGER' ? '#d32f2f' : '#f57c00';
   const equipmentTag = info.equipmentTag || id || 'Unnamed Equipment';
   const voltage = formatVoltage(info.nominalVoltage);
@@ -136,7 +149,7 @@ export function buildArcFlashLabelData(id, info = {}) {
     restrictedApproach: restricted,
     upstreamDevice: info.upstreamDevice || 'Not Specified',
     studyDate,
-    ppeCategory: formatPpeCategory(info.ppeCategory),
+    ppeCategory: 'Incident Energy',
     workingDistance: workingDistanceVerbose
   };
 }
@@ -149,7 +162,9 @@ export function buildArcFlashLabelData(id, info = {}) {
  * @returns {string} Full HTML document string
  */
 export function buildLabelSheetHtml(results = {}, projectName = '') {
-  const entries = safeEntries(results);
+  const allEntries = safeEntries(results);
+  const entries = allEntries.filter(([, info]) => isArcFlashLabelReady(info));
+  const omittedCount = allEntries.length - entries.length;
   const date = new Date().toISOString().split('T')[0];
   const heading = projectName ? `Arc Flash Warning Labels — ${projectName}` : 'Arc Flash Warning Labels';
   const safeHeading = escapeHtml(heading);
@@ -169,7 +184,7 @@ export function buildLabelSheetHtml(results = {}, projectName = '') {
 </head>
 <body>
 <h1>${safeHeading}</h1>
-<p class="meta">Generated: ${date} &nbsp;|&nbsp; ${entries.length} label(s)</p>
+<p class="meta">Generated: ${date} &nbsp;|&nbsp; ${entries.length} issue-ready label(s)${omittedCount ? ` &nbsp;|&nbsp; ${omittedCount} incomplete result(s) withheld` : ''}</p>
 <button class="no-print" onclick="window.print()">Print All Labels</button>
 <div class="label-grid">
 ${labelCells}
@@ -196,16 +211,18 @@ export function openLabelPrintWindow(results = {}, projectName = '') {
 
 /**
  * Generate CSV and PDF reports from arc flash analysis results.
- * @param {Object<string, {incidentEnergy:number, ppeCategory:number, boundary:number, clearingTime:number}>} results
+ * @param {Object<string, {incidentEnergy:number, minimumArcRatingCalCm2:number, boundary:number, clearingTime:number}>} results
  */
 export function generateArcFlashReport(results = {}) {
   const entries = safeEntries(results);
+  const labelEntries = entries.filter(([, info]) => isArcFlashLabelReady(info));
   const headers = [
     'bus',
     'equipmentTag',
     'nominalVoltage',
     'incidentEnergy',
-    'ppeCategory',
+    'ppeSelectionMethod',
+    'minimumArcRatingCalCm2',
     'boundary',
     'clearingTime',
     'workingDistance',
@@ -219,7 +236,8 @@ export function generateArcFlashReport(results = {}) {
     equipmentTag: data.equipmentTag || id,
     nominalVoltage: data.nominalVoltage ?? '',
     incidentEnergy: data.incidentEnergy,
-    ppeCategory: data.ppeCategory,
+    ppeSelectionMethod: data.ppeSelectionMethod || 'incident-energy',
+    minimumArcRatingCalCm2: data.minimumArcRatingCalCm2 ?? '',
     boundary: data.boundary,
     clearingTime: data.clearingTime,
     workingDistance: data.workingDistance ?? '',
@@ -228,11 +246,11 @@ export function generateArcFlashReport(results = {}) {
     upstreamDevice: data.upstreamDevice || '',
     studyDate: resolveStudyDate(data)
   }));
-  if (!rows.length) return;
+  if (!rows.length) return { reportCount: 0, labelCount: 0, omittedLabelCount: 0 };
   downloadCSV(headers, rows, 'arcflash.csv');
   downloadPDF('Arc Flash Report', headers, rows, 'arcflash.pdf');
   // export individual labels
-  entries.forEach(([id, info]) => {
+  labelEntries.forEach(([id, info]) => {
     const svg = generateArcFlashLabel(buildArcFlashLabelData(id, info));
     const baseName = getArcFlashLabelBaseName(id, info);
     const blob = new Blob([svg], { type: 'image/svg+xml' });
@@ -242,4 +260,9 @@ export function generateArcFlashReport(results = {}) {
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 0);
   });
+  return {
+    reportCount: entries.length,
+    labelCount: labelEntries.length,
+    omittedLabelCount: entries.length - labelEntries.length,
+  };
 }

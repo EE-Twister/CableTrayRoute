@@ -163,6 +163,50 @@ header h1, header h2 {
     margin-bottom: 0.25rem;
 }
 
+.page-header--compact,
+.page-header:has(> h1) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.2rem 1rem;
+    min-height: 0;
+    margin-bottom: var(--space-3);
+    padding: 0.7rem 1rem;
+}
+
+.page-header--compact.page-header-graphic::before,
+.page-header--compact.page-header-graphic::after,
+.page-header:has(> h1).page-header-graphic::before,
+.page-header:has(> h1).page-header-graphic::after {
+    display: none;
+}
+
+.page-header--compact > h1,
+.page-header--compact > h2,
+.page-header:has(> h1) > h1 {
+    grid-column: 1;
+    margin: 0;
+    font-size: clamp(1.4rem, 2vw, 1.8rem);
+    line-height: 1.12;
+}
+
+.page-header--compact > p,
+.page-header:has(> h1) > p {
+    grid-column: 1;
+    margin: 0;
+    color: var(--color-text-muted, #64748b);
+    font-size: 0.9rem;
+    line-height: 1.35;
+}
+
+.page-header--compact > #project-share-btn,
+.page-header:has(> h1) > #project-share-btn {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    align-self: center;
+    margin: 0;
+}
+
 body[data-page-visual='routing'] .page-header-graphic {
     background:
         linear-gradient(135deg, rgba(29, 78, 216, 0.14), rgba(56, 189, 248, 0.08) 42%, rgba(37, 99, 235, 0.03)),
@@ -208,13 +252,21 @@ body[data-page-visual='account'] .page-header-graphic {
 .page-visual-showcase {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
-    gap: var(--space-4);
+    gap: var(--space-3);
     align-items: center;
+    min-height: 0;
+    margin-top: var(--space-3);
+    padding: 0.7rem 1rem;
+}
+
+.main-content > .page-visual-showcase {
+    margin: var(--space-3) 0;
+    padding: 0.7rem 1rem;
 }
 
 .page-visual-copy {
     display: grid;
-    gap: var(--space-2);
+    gap: 0.15rem;
 }
 
 .page-visual-kicker {
@@ -228,28 +280,48 @@ body[data-page-visual='account'] .page-header-graphic {
 
 .page-visual-copy h2 {
     margin: 0;
-    font-size: 1.25rem;
+    font-size: 1.05rem;
 }
 
 .page-visual-copy p {
     margin: 0;
     color: color-mix(in srgb, var(--text-color) 75%, transparent);
     max-width: 54ch;
+    font-size: 0.86rem;
+    line-height: 1.35;
 }
 
 .page-visual-showcase img {
-    width: clamp(160px, 25vw, 260px);
+    width: clamp(96px, 12vw, 132px);
     max-width: 100%;
+    max-height: 72px;
     height: auto;
     filter: drop-shadow(0 10px 20px rgba(15, 23, 42, 0.18));
 }
 
 @media (max-width: 760px) {
     .page-visual-showcase {
-        grid-template-columns: 1fr;
+        grid-template-columns: minmax(0, 1fr) auto;
+        padding: var(--space-3);
     }
 
     .page-visual-showcase img {
-        justify-self: center;
+        width: 84px;
+        max-height: 60px;
+    }
+
+}
+
+@media (max-width: 520px) {
+    .page-header--compact,
+    .page-header:has(> h1) {
+        grid-template-columns: 1fr;
+    }
+
+    .page-header--compact > #project-share-btn,
+    .page-header:has(> h1) > #project-share-btn {
+        grid-column: 1;
+        grid-row: auto;
+        justify-self: start;
     }
 }

@@ -160,19 +160,11 @@
       </details>
 
       <!-- Ductbank / Conduit Hierarchy -->
-      <section class="card page-header-graphic page-visual-showcase" aria-label="Page visual overview">
-        <div class="page-visual-copy">
-          <p class="page-visual-kicker">Workspace Preview</p>
-          <h2>Raceway Capacity View</h2>
-          <p>Review raceway dimensions, grouping, and utilization before detailed fill checks.</p>
-        </div>
-        <img src="icons/graphics/fill-visual.svg" alt="Illustration for raceway capacity view" loading="lazy" decoding="async">
-      </section>
       <section class="raceway-overview card" aria-label="Raceway readiness summary">
         <div id="raceway-summary-panel" class="raceway-summary-panel load-summary-panel" aria-live="polite">
           <div class="load-summary-card">
             <span id="raceway-total-count" class="load-summary-value">0</span>
-            <span class="load-summary-label">Raceways</span>
+            <span class="load-summary-label">Total Records</span>
           </div>
           <div class="load-summary-card">
             <span id="raceway-ductbank-count" class="load-summary-value">0</span>
@@ -184,7 +176,15 @@
           </div>
           <div class="load-summary-card">
             <span id="raceway-conduit-count" class="load-summary-value">0</span>
-            <span class="load-summary-label">Conduits</span>
+            <span class="load-summary-label">All Conduits</span>
+          </div>
+          <div class="load-summary-card">
+            <span id="raceway-ductbank-conduit-count" class="load-summary-value">0</span>
+            <span class="load-summary-label">Ductbank Conduits</span>
+          </div>
+          <div class="load-summary-card">
+            <span id="raceway-standalone-conduit-count" class="load-summary-value">0</span>
+            <span class="load-summary-label">Standalone Conduits</span>
           </div>
           <div class="load-summary-card load-summary-warning">
             <span id="raceway-issue-count" class="load-summary-value">0</span>
@@ -490,8 +490,8 @@
         </div>
         <div id="conduit-empty-state" class="raceway-empty-state" hidden>
           <div>
-            <strong>No conduits yet.</strong>
-            <p>Add a conduit, or load sample raceways to explore the schedule with example data.</p>
+            <strong>No standalone conduits yet.</strong>
+            <p>Ductbank conduits are managed inside Ductbank Schedule rows. Add a conduit here only when it is outside a ductbank.</p>
           </div>
           <div class="raceway-empty-state__actions">
             <button type="button" class="btn primary-btn" data-empty-add="add-conduit-btn">Add Conduit</button>

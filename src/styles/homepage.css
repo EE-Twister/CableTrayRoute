@@ -316,6 +316,61 @@
     margin-top: 0;
 }
 
+.home-explore {
+    margin-top: var(--space-5);
+    overflow: hidden;
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    background: var(--color-surface-strong);
+    box-shadow: var(--elevation-sm);
+}
+
+.home-explore > summary {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-4) var(--space-5);
+    cursor: pointer;
+    list-style: none;
+}
+
+.home-explore > summary::-webkit-details-marker {
+    display: none;
+}
+
+.home-explore > summary::after {
+    content: '▾';
+    margin-left: auto;
+    color: var(--color-text-muted);
+    font-size: 1rem;
+}
+
+.home-explore[open] > summary::after {
+    transform: rotate(180deg);
+}
+
+.home-explore > summary span,
+.home-explore > summary strong,
+.home-explore > summary small {
+    display: block;
+}
+
+.home-explore > summary strong {
+    color: var(--color-text);
+    font-size: 1rem;
+}
+
+.home-explore > summary small {
+    margin-top: 0.2rem;
+    color: var(--color-text-muted);
+    font-size: 0.82rem;
+}
+
+.home-explore__body {
+    padding: 0 var(--space-5) var(--space-5);
+    border-top: 1px solid var(--color-border);
+}
+
 .home-section__header {
     display: flex;
     align-items: flex-end;
@@ -949,10 +1004,6 @@ body.dark-mode .workflow-card .status {
         min-height: 2.35rem;
         padding: 0.65rem 0.75rem;
         font-size: 0.88rem;
-    }
-
-    .hero-action-btn:first-child {
-        grid-column: 1 / -1;
     }
 
     .home-next-action {

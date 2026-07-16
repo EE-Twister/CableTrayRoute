@@ -8,6 +8,7 @@ import { runDRC, formatDrcReport, DRC_SEVERITY } from './analysis/designRuleChec
 import { getTrays, getConduits, getCables, getItem, getDrcAcceptedFindings, setDrcAcceptedFindings } from './dataStore.mjs';
 import { openModal } from './src/components/modal.js';
 import { buildOneLineProbeUrl } from './src/crossProbe.js';
+import { normalizeRouteResultState } from './analysis/routeResults.mjs';
 
 document.addEventListener('DOMContentLoaded', () => {
   initSettings();
@@ -153,23 +154,9 @@ document.addEventListener('DOMContentLoaded', () => {
     let trayCableMap = {};
     let routedCableNames = new Set();
     try {
-      const latestRouteResults = getItem('latestRouteResults', null);
-      const hasValidMap = latestRouteResults
-        && typeof latestRouteResults === 'object'
-        && latestRouteResults.trayCableMap
-        && typeof latestRouteResults.trayCableMap === 'object'
-        && !Array.isArray(latestRouteResults.trayCableMap);
-      const batchResults = Array.isArray(latestRouteResults?.batchResults)
-        ? latestRouteResults.batchResults
-        : [];
-      if (hasValidMap) {
-        trayCableMap = latestRouteResults.trayCableMap;
-        batchResults.forEach(r => {
-          if (r && typeof r === 'object' && r.cable && typeof r.status === 'string' && r.status.includes('Routed')) {
-            routedCableNames.add(r.cable);
-          }
-        });
-      }
+      const routeState = normalizeRouteResultState(getItem('latestRouteResults', null), { cables });
+      trayCableMap = routeState.trayCableMap;
+      routedCableNames = new Set(routeState.routedCableNames);
     } catch (e) {
       console.warn('DRC: could not read route cache', e);
     }
@@ -312,6 +299,8 @@ document.addEventListener('DOMContentLoaded', () => {
     a.click();
     setTimeout(() => URL.revokeObjectURL(url), 10000);
   }
+
+  runAndRender();
 });
 
 function escapeHtml(str) {

@@ -117,7 +117,8 @@ export function calcSeismicDesignCategory(sds, sd1, riskCategory) {
 }
 
 /**
- * Maximum lateral and longitudinal brace spacing per ASCE 7-16 §13.5.6.1.
+ * Screening brace-spacing guidance based on NEMA VE 2 installation practice.
+ * These values are not literal ASCE 7 maximum-spacing requirements.
  *
  * @param {'A'|'B'|'C'|'D'|'E'|'F'} sdc
  * @returns {{ lateral: number|null, longitudinal: number|null, required: boolean }}

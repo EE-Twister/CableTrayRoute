@@ -219,6 +219,16 @@ describe('voltageDropBusDuct()', () => {
       `1-phase VD (${r1.vdLineToNeutralV}) should exceed 3-phase (${r3.vdLineToNeutralV})`);
   });
 
+  it('single-phase drop uses the two-conductor loop without an extra √3 factor', () => {
+    const r = voltageDropBusDuct({ ...baseParams, phases: 1 });
+    const resistance = (baseParams.rMohmPerFt * baseParams.lengthFt) / 1000;
+    const reactance = (baseParams.xMohmPerFt * baseParams.lengthFt) / 1000;
+    const sinPhi = Math.sqrt(1 - baseParams.pf ** 2);
+    const expected = 2 * baseParams.currentA * (resistance * baseParams.pf + reactance * sinPhi);
+    assert.ok(Math.abs(r.vdLineToLineV - expected) < 0.001);
+    assert.ok(Math.abs(r.vdPercent - (expected / baseParams.systemVoltageV) * 100) < 0.001);
+  });
+
   it('VD scales linearly with length', () => {
     const r100 = voltageDropBusDuct({ ...baseParams, lengthFt: 100 });
     const r200 = voltageDropBusDuct({ ...baseParams, lengthFt: 200 });

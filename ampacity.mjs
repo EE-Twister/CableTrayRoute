@@ -158,7 +158,16 @@ function ampacity(cable, params = {}) {
   const dTd = dielectricRise(cable.voltage_rating || 600);
   const comps = calcRcaComponents(cable, params);
   const I = Math.sqrt((Tc - (Ta + dTd)) / (Rdc * (1 + Yc) * comps.Rca));
-  return { ampacity: I, components: comps };
+  return {
+    ampacity: I,
+    components: comps,
+    calculationStatus: 'screening-only',
+    standardCompliance: null,
+    requiredInputs: [
+      'Validate the installation against the applicable code ampacity table or a complete IEC 60287 study.',
+      'Confirm manufacturer cable construction, installation geometry, soil/duct thermal properties, and grouping effects.',
+    ],
+  };
 }
 
 function getModelParams() {

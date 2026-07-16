@@ -23,10 +23,14 @@
     /* ── Report package builder layout ── */
     .rpt-builder-layout {
       display: grid;
-      grid-template-columns: 320px 1fr;
+      grid-template-columns: 320px minmax(0, 1fr);
       gap: 1.5rem;
       align-items: start;
+      min-width: 0;
+      scroll-margin-top: 11rem;
     }
+    .rpt-builder-layout[data-active-panel="preview"] { grid-template-columns: minmax(0, 1fr); }
+    .rpt-builder-layout[data-active-panel="preview"] .rpt-config-panel { display: none; }
     @media (max-width: 900px) {
       .rpt-builder-layout { grid-template-columns: 1fr; }
     }
@@ -72,13 +76,38 @@
     }
     .rpt-section-checks { display: flex; flex-direction: column; gap: .2rem; }
     .rpt-section-checks label {
-      display: flex;
+      display: grid;
+      grid-template-columns: auto 1fr;
       align-items: center;
       gap: .4rem;
       font-size: .875rem;
       cursor: pointer;
     }
+    .rpt-view-tabs {
+      display: flex;
+      gap: .5rem;
+      width: max-content;
+      margin-bottom: 0;
+      padding: .35rem 0;
+      position: sticky;
+      top: 4.25rem;
+      z-index: 8;
+      background: var(--surface-1, #fff);
+      scroll-margin-top: 4.25rem;
+    }
+    .rpt-view-tab[aria-selected="true"] {
+      background: var(--color-primary, #2563eb);
+      border-color: var(--color-primary, #2563eb);
+      color: #fff;
+    }
+    .rpt-section-checks label small {
+      grid-column: 2;
+      color: var(--text-muted, #666);
+      font-size: .72rem;
+    }
+    .rpt-section-unavailable { opacity: .7; cursor: not-allowed !important; }
     .rpt-section-checks input[type="checkbox"] { width: 15px; height: 15px; }
+    .rpt-section-actions { display: flex; flex-wrap: wrap; gap: .4rem; margin-bottom: .65rem; }
 
     /* Preset buttons */
     .rpt-presets { display: flex; flex-wrap: wrap; gap: .4rem; }
@@ -88,6 +117,8 @@
       border-radius: 4px;
       border: 1px solid var(--border-color, #d0d0d0);
       background: var(--surface-1, #fff);
+      color: var(--color-text, var(--text-color, #111827));
+      font-family: inherit;
       cursor: pointer;
       white-space: nowrap;
     }
@@ -108,7 +139,15 @@
       border-top: 1px solid var(--border-color, #d0d0d0);
       border-bottom: 1px solid var(--border-color, #d0d0d0);
       margin-bottom: 1rem;
+      position: sticky;
+      top: 7.15rem;
+      z-index: 7;
+      background: var(--surface-1, #fff);
     }
+    .rpt-actions #rpt-generate-btn { width: auto; }
+    .rpt-mobile-primary-actions { display: none; }
+
+    #rpt-source-row[hidden] { display: none !important; }
 
     /* Snapshot list */
     .rpt-snapshot-list { display: flex; flex-direction: column; gap: .35rem; }
@@ -125,7 +164,82 @@
     .rpt-snapshot-item button { font-size: .75rem; padding: .1rem .4rem; }
 
     /* Report preview area */
-    .report-preview { min-height: 200px; }
+    .rpt-preview-col { min-width: 0; scroll-margin-top: 11rem; }
+    .report-preview {
+      box-sizing: border-box;
+      width: 100%;
+      max-width: 8.5in;
+      min-width: 0;
+      min-height: 200px;
+      margin-inline: auto;
+      padding: clamp(1rem, 4vw, .5in);
+      overflow: hidden;
+      border: 1px solid var(--border-color, #d0d0d0);
+      background: var(--surface-1, #fff);
+      box-shadow: 0 .4rem 1.4rem rgba(15, 23, 42, .12);
+    }
+    .report-preview .report-section { min-width: 0; }
+    .report-preview .report-scroll { max-width: 100%; overflow: visible; }
+    .report-preview .report-table { width: 100%; max-width: 100%; table-layout: fixed; font-size: clamp(.62rem, 1.1vw, .78rem); }
+    .report-preview .report-table th,
+    .report-preview .report-table td { padding: .28rem; overflow-wrap: anywhere; vertical-align: top; }
+    .report-assumptions { display: grid; gap: .75rem; color: var(--color-text, #111827); }
+    .report-assumptions p,
+    .report-assumptions ul { margin: 0; }
+    .report-assumption-group { padding: .7rem .8rem; border-left: 3px solid var(--color-primary, #2563eb); background: var(--surface-2, #f8fafc); }
+    .report-assumption-group h3 { margin: 0 0 .35rem; font-size: .9rem; }
+    .report-assumption-group ul { padding-left: 1.2rem; }
+    .report-readiness-note { padding: .45rem .6rem; border-radius: 4px; font-weight: 650; }
+    .report-readiness-note--ready { background: #ecfdf5; color: #166534; }
+    .report-readiness-note--warning { background: #fff7ed; color: #9a3412; }
+    .report-readiness-tiers { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .55rem; }
+    .report-readiness-tier { padding: .25rem .5rem; border: 1px solid var(--border-color, #d0d0d0); border-radius: 999px; font-size: .78rem; font-weight: 700; }
+    .report-readiness-tier.is-ready { border-color: #86efac; background: #f0fdf4; color: #166534; }
+    .report-readiness-tier.is-warning { border-color: #fdba74; background: #fff7ed; color: #9a3412; }
+    .report-summary-list { display: grid; gap: .5rem; margin: .75rem 0; }
+    .report-summary-list div { display: grid; grid-template-columns: minmax(10rem, 1fr) 2fr; gap: .75rem; }
+    .report-summary-list dt { font-weight: 700; }
+    .report-summary-list dd { margin: 0; }
+    .report-finding-list { display: grid; gap: .65rem; }
+    .report-finding { padding: .7rem .8rem; border: 1px solid var(--border-color, #d0d0d0); border-left: 4px solid #64748b; border-radius: 6px; break-inside: avoid; }
+    .report-finding--error { border-left-color: #dc2626; }
+    .report-finding--warning { border-left-color: #d97706; }
+    .report-finding--info { border-left-color: #2563eb; }
+    .report-finding header { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem .65rem; }
+    .report-finding header span:last-child { margin-left: auto; color: var(--text-muted, #666); font-weight: 650; }
+    .report-finding p { margin: .55rem 0; line-height: 1.45; }
+    .report-finding dl { display: grid; gap: .45rem; margin: 0; }
+    .report-finding dl div { display: grid; grid-template-columns: 7rem minmax(0, 1fr); gap: .6rem; }
+    .report-finding dt { font-weight: 700; }
+    .report-finding dd { margin: 0; overflow-wrap: anywhere; }
+    .report-preview:focus { outline: 2px solid var(--color-primary, #2563eb); outline-offset: .35rem; }
+
+    @media (max-width: 900px) {
+      .rpt-view-tabs { width: 100%; position: sticky; top: .25rem; z-index: 8; padding: .4rem; border: 1px solid var(--border-color, #d0d0d0); border-radius: 6px; background: var(--surface-1, #fff); }
+      .rpt-view-tabs .btn { flex: 1; }
+      .rpt-builder-layout[data-active-panel="config"] .rpt-preview-col { display: none; }
+      .rpt-builder-layout[data-active-panel="preview"] .rpt-config-panel { display: none; }
+      .rpt-config-panel { position: static; }
+      .rpt-actions { position: static; }
+    }
+    @media (max-width: 600px) {
+      .report-preview { padding: .75rem; }
+      .report-summary-list div { grid-template-columns: 1fr; gap: .15rem; }
+      .rpt-actions { position: sticky; bottom: 0; z-index: 7; padding: .5rem; background: var(--surface-1, #fff); }
+      .rpt-actions .btn:not(#rpt-generate-btn):not(#rpt-print-btn) { display: none; }
+      .rpt-mobile-primary-actions { display: flex; position: sticky; top: .25rem; z-index: 9; gap: .45rem; margin: .5rem 0; padding: .45rem; border: 1px solid var(--border-color, #d0d0d0); border-radius: 6px; background: var(--surface-1, #fff); }
+      .rpt-mobile-primary-actions .btn { flex: 1; }
+      .rpt-actions { display: none; }
+      .report-preview .report-table { font-size: .58rem; }
+      .projectreport-page .method-panel { display: none; }
+      #rpt-deliverable-readiness { padding: .55rem .65rem; }
+      #rpt-deliverable-readiness p,
+      #rpt-deliverable-readiness > .workflow-next-action__meta { display: none; }
+      .report-readiness-tiers { flex-wrap: nowrap; overflow-x: auto; padding-bottom: .2rem; }
+      .report-readiness-tier { flex: 0 0 auto; }
+      .report-finding header span:last-child { width: 100%; margin-left: 0; }
+      .report-finding dl div { grid-template-columns: 1fr; gap: .1rem; }
+    }
 
     /* Print styles */
     @media print {
@@ -199,6 +313,11 @@
         <h1>Report Package Builder</h1>
       </header>
 
+      <div class="rpt-mobile-primary-actions" role="toolbar" aria-label="Primary report actions">
+        <button id="rpt-mobile-generate-btn" type="button" class="btn primary-btn">Generate Preview</button>
+        <button id="rpt-mobile-print-btn" type="button" class="btn">Print / PDF</button>
+      </div>
+
       <details class="method-panel">
         <summary>About This Tool</summary>
         <p>Build a configurable engineering calculation book from your project data. Select sections, fill in the cover sheet and revision history, choose a preset, then export as PDF, XLSX, HTML, or JSON.</p>
@@ -206,7 +325,7 @@
       </details>
 
       <!-- Lifecycle package source (Gap #71) -->
-      <div class="rpt-source-row" style="display:flex;align-items:center;gap:.75rem;margin-bottom:.75rem;flex-wrap:wrap;">
+      <div id="rpt-source-row" class="rpt-source-row" style="display:flex;align-items:center;gap:.75rem;margin-bottom:.75rem;flex-wrap:wrap;" hidden>
         <label for="rpt-lifecycle-pkg-select" style="font-weight:600;white-space:nowrap;">Data Source:</label>
         <select id="rpt-lifecycle-pkg-select" class="form-control" style="min-width:260px;" aria-label="Select released package as data source">
           <option value="">— Live project data —</option>
@@ -220,6 +339,11 @@
       <!-- Status bar -->
       <div id="report-status" class="report-status" role="status" aria-live="polite"></div>
 
+      <div class="rpt-view-tabs" role="tablist" aria-label="Report builder view">
+        <button id="rpt-config-tab" class="btn rpt-view-tab" type="button" role="tab" aria-selected="true" aria-controls="rpt-config-panel">Configure</button>
+        <button id="rpt-preview-tab" class="btn rpt-view-tab" type="button" role="tab" aria-selected="false" aria-controls="report-preview">Preview</button>
+      </div>
+
       <!-- ── Actions ── -->
       <div class="rpt-actions" role="toolbar" aria-label="Report actions">
         <button id="rpt-generate-btn"  type="button" class="btn primary-btn">Generate Preview</button>
@@ -231,10 +355,10 @@
       </div>
 
       <!-- ── Two-column builder layout ── -->
-      <div class="rpt-builder-layout">
+      <div class="rpt-builder-layout" data-active-panel="config">
 
         <!-- Left: configuration panel -->
-        <aside class="rpt-config-panel" aria-label="Report configuration">
+        <aside id="rpt-config-panel" class="rpt-config-panel" aria-label="Report configuration">
 
           <!-- Presets -->
           <div class="rpt-config-section">
@@ -254,8 +378,14 @@
           <!-- Section selector -->
           <details class="rpt-config-section" open>
             <summary>Sections</summary>
-            <div class="rpt-config-body" id="rpt-section-checks">
-              <!-- Populated by JS from SECTION_REGISTRY -->
+            <div class="rpt-config-body">
+              <div class="rpt-section-actions" role="group" aria-label="Section selection actions">
+                <button id="rpt-select-available-btn" type="button" class="rpt-preset-btn">Select available</button>
+                <button id="rpt-clear-sections-btn" type="button" class="rpt-preset-btn">Clear</button>
+              </div>
+              <div id="rpt-section-checks">
+                <!-- Populated by JS from SECTION_REGISTRY -->
+              </div>
             </div>
           </details>
 

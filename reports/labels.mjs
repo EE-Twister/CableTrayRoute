@@ -22,7 +22,7 @@ let template = `<svg xmlns="http://www.w3.org/2000/svg" width="6in" height="4in"
     <text x="30" y="360">Upstream Protective Device: <tspan font-weight="bold">{{upstreamDevice}}</tspan></text>
   </g>
   <g font-family="Helvetica, Arial, sans-serif" font-size="22" fill="#000000">
-    <text x="30" y="390">PPE Category: <tspan font-weight="bold">{{ppeCategory}}</tspan></text>
+    <text x="30" y="390">PPE Method: <tspan font-weight="bold">{{ppeCategory}}</tspan></text>
     <text x="320" y="390">Study Date: <tspan font-weight="bold">{{studyDate}}</tspan></text>
   </g>
 </svg>`;

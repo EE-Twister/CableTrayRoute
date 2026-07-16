@@ -97,6 +97,7 @@ For Phase 1 palette rollout and regression tracking, use the shared checklist in
 - The one-line palette now includes a `cable` subtype for explicit inter-device cable segments.
 - Cable segment fields include `tag`, `description`, `manufacturer`, `model`, `length_ft`, `material`, `insulation_type`, `temp_rating_c`, `size_awg_kcmil`, `parallel_sets`, `r_ohm_per_kft`, and `x_ohm_per_kft`.
 - Validation flags cable segments missing required impedance and construction metadata so voltage-drop and short-circuit path calculations do not silently fall back to assumed values.
+- Equipment-to-equipment connections may instead reference a canonical Cable Schedule tag. Short Circuit resolves that row once, derives R/X from NEC Table 9 when explicit impedance is absent, and records the cable tag, endpoints, conductor data, length, and impedance in the result provenance.
 
 ## Busway segment component fields
 

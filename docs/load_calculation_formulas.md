@@ -1,10 +1,16 @@
 # Load Calculation Formulas
 
-This project evaluates electrical load using standard relationships.
+This project evaluates balanced, steady-state electrical load using RMS voltage
+and current. Unless otherwise stated, three-phase voltage is line-to-line.
 
-- **Single-phase power**: \( P = V \times I \)
-- **Three-phase power**: \( P = \sqrt{3} \times V \times I \)
-- **Apparent power**: \( S = V \times I \)
-- **Demand load**: \( P_{\text{demand}} = \sum P \times f_{\text{demand}} \)
+- **Single-phase real power**: \( P = V I \cos\phi \)
+- **Three-phase real power**: \( P = \sqrt{3}\,V_{LL} I \cos\phi \)
+- **Single-phase apparent power**: \( S = V I \)
+- **Three-phase apparent power**: \( S = \sqrt{3}\,V_{LL} I \)
+- **Reactive power**: \( Q = S\sin\phi \), equivalently \(Q = P\tan\phi\)
+- **Demand load**: \( P_{\text{demand}} = \sum_i P_i f_{\text{demand},i} \)
 
-Voltages are in volts, current in amperes, and power in watts. Balanced systems and steady-state conditions are assumed.
+Here \(\cos\phi\) is power factor. Voltages are in volts, current in amperes,
+real power in watts, reactive power in vars, and apparent power in volt-amperes.
+For motor or other mechanical-output loads, electrical input power also includes
+efficiency: \(P_{in}=P_{out}/\eta\).

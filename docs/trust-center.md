@@ -28,8 +28,8 @@ Results are shown in a table. Click any row or its **Details** button to expand 
 | EMF-001 | EMF Analysis | Biot-Savart law; IEC 62110:2009 | Magnetic flux density from a 100 A conductor at 1 m: B = µ₀I/(2πd) = 20.000 µT |
 | EMF-002 | EMF Analysis | ICNIRP 2010; IEC 62110:2009 | Compliance at 150 µT: below both GP (200 µT) and occupational (1000 µT) limits |
 | EMF-003 | EMF Analysis | ICNIRP 2010; IEC 62110:2009 | Compliance at 250 µT: GP limit exceeded, occupational limit not exceeded |
-| BAT-001 | Battery / UPS Sizing | IEEE 485-2010 §4 | Duty-cycle energy: 10 kW×2 h + 5 kW×1 h = 25 kWh |
-| BAT-002 | Battery / UPS Sizing | IEEE 485-2010 §5.2–5.4 | Li-ion design capacity at 25 °C, 10 % margin: 15.44 kWh |
+| BAT-001 | Battery / UPS Sizing | Arithmetic screening check (not an IEEE 485 cell-sizing test) | Duty-cycle energy: 10 kW×2 h + 5 kW×1 h = 25 kWh |
+| BAT-002 | Battery / UPS Sizing | Application screening heuristic (not within IEEE 485 scope) | Li-ion preliminary energy capacity at 25 °C, 10 % margin: 15.44 kWh |
 | VDROP-001 | Voltage Drop | NEC 2023 Art. 210.19(A)(1) Informational Note | #12 AWG Cu / 10 A / 30 ft -> below 3 % recommendation, status = pass |
 | VDROP-002 | Voltage Drop | NEC 2023 Art. 210.19(A)(1) Informational Note | #14 AWG Cu / 20 A / 150 ft -> above 3 % recommendation, status = warn or fail |
 

@@ -75,6 +75,8 @@ copy(path.join(root, 'icons'), path.join(docs, 'icons'));
 copy(path.join(root, 'assets'), path.join(docs, 'assets'));
 copy(path.join(root, 'reports', 'templates'), path.join(dist, 'templates'));
 copy(path.join(root, 'reports', 'templates'), path.join(docs, 'templates'));
+copy(path.join(root, 'node_modules', 'plotly.js-dist-min', 'plotly.min.js'), path.join(dist, 'vendor', 'plotly.min.js'));
+copy(path.join(root, 'node_modules', 'papaparse', 'papaparse.min.js'), path.join(dist, 'vendor', 'papaparse.min.js'));
 copy(path.join(dist, 'vendor'), path.join(docs, 'dist', 'vendor'));
 ['componentLibrary.json', 'manufacturerLibrary.json'].forEach(file => {
   const src = path.join(root, file);
