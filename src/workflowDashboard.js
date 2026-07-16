@@ -3,8 +3,7 @@ import {
   workflowOrder,
   getStepStatus,
   getCableReadiness,
-  countOneLineComponents,
-  getContractReadinessCopy
+  countOneLineComponents
 } from './workflowStatus.js';
 import { openModal } from './components/modal.js';
 import {
@@ -38,7 +37,7 @@ const STUDY_DEFINITIONS = [
   { key: 'busDuctSizing',          label: 'Bus Duct Sizing',        href: 'busdust.html' },
   { key: 'sustainabilityFootprint', label: 'Sustainability Footprint', href: 'sustainability.html' },
   { key: 'dissimilarMetals', label: 'Dissimilar Metals', href: 'dissimilarmetals.html' },
-  { key: 'bessHazard', label: 'BESS Hazard (HMA)', href: 'bessHazard.html' },
+  { key: 'bessHazard', label: 'BESS Hazard Screening', href: 'bessHazard.html' },
   { key: 'reliability',  label: 'Reliability / N-1',    href: 'reliability.html' },
   { key: 'contingency',  label: 'N-1 Contingency',      href: 'contingency.html' },
   { key: 'insulationCoordination', label: 'Insulation Coordination', href: 'insulationcoordination.html' },
@@ -51,8 +50,6 @@ const STUDY_DEFINITIONS = [
   { key: 'lighting',               label: 'Egress Lighting',         href: 'lighting.html' },
   { key: 'trustCenter',            label: 'Trust Center',            href: 'trustcenter.html' },
 ];
-const DASHBOARD_READINESS_COPY = getContractReadinessCopy('workflowdashboard.html');
-
 function getStatusMeta({ complete, label, hint, forStudy = false }) {
   if (complete) {
     return { text: forStudy ? 'Run' : 'Complete', icon: '✓', variant: 'success' };
@@ -93,10 +90,12 @@ function studyHasResults(studyResult) {
 }
 
 function getWorkflowMetrics() {
-  const steps = workflowOrder.map(step => {
-    const { complete, label, hint } = getStepStatus(step.key);
-    return { step, complete, label, hint };
-  });
+  const diagnostics = buildWorkflowCoreDiagnostics(currentDashboardProject());
+  const statusByKey = new Map(diagnostics.workflowSteps.map(status => [status.key, status]));
+  const steps = workflowOrder.map(step => ({
+    step,
+    ...(statusByKey.get(step.key) || getStepStatus(step.key))
+  }));
   const completedCount = steps.filter(({ complete }) => complete).length;
   const workflowCompletionPct = workflowOrder.length
     ? Math.round((completedCount / workflowOrder.length) * 100)
@@ -405,7 +404,8 @@ function openDesignBasisWizard() {
 function renderKpiStrip(container) {
   if (!container) return;
 
-  const { workflowCompletionPct, nextRequiredStep } = getWorkflowMetrics();
+  const { workflowCompletionPct } = getWorkflowMetrics();
+  const diagnostics = currentCoreDiagnostics();
   const trayViolations = getTrayViolationsCount();
   const studiesCompletedCount = getStudiesCompletedCount();
   const openCoachItems = getOpenCoachItemCount();
@@ -414,16 +414,10 @@ function renderKpiStrip(container) {
 
   const kpis = [
     {
-      label: 'Workflow complete',
+      label: 'Workflow steps complete',
       value: `${workflowCompletionPct}%`,
-      helper: `${workflowOrder.length} total workflow steps tracked.`,
+      helper: `${workflowOrder.length} workflow steps tracked. Validation and issue readiness are reported separately.`,
       href: '#workflow-progress-text',
-    },
-    {
-      label: 'Next required step',
-      value: nextRequiredStep ? nextRequiredStep.step.label : 'Done',
-      helper: nextRequiredStep ? `${READINESS_VOCABULARY.missingInputs}: Recommended next action in the workflow.` : `${READINESS_VOCABULARY.ready}: All required workflow steps are complete.`,
-      href: nextRequiredStep ? nextRequiredStep.step.href : 'projectreport.html',
     },
     {
       label: 'Tray fill warnings',
@@ -439,13 +433,26 @@ function renderKpiStrip(container) {
       href: 'demandschedule.html',
     },
     {
-      label: 'Design coach items',
+      label: 'Design coach recommendations',
       value: openCoachItems,
       helper: openCoachItems > 0
         ? `${openCoachItems} safety/compliance item(s) need attention.`
-        : 'No open safety or compliance recommendations.',
+        : 'No coach recommendations. Design-rule findings are tracked separately.',
       href: 'designcoach.html',
       warn: openCoachItems > 0,
+    },
+    {
+      label: 'Design rule checks',
+      value: diagnostics.health.drcErrors > 0
+        ? `${diagnostics.health.drcErrors} error${diagnostics.health.drcErrors === 1 ? '' : 's'}`
+        : `${diagnostics.health.drcWarnings} warning${diagnostics.health.drcWarnings === 1 ? '' : 's'}`,
+      helper: diagnostics.health.drcErrors > 0
+        ? `${diagnostics.health.drcErrors} blocking error(s) and ${diagnostics.health.drcWarnings} warning(s) are active.`
+        : diagnostics.health.drcWarnings > 0
+          ? 'No blocking errors; review warnings before issue.'
+          : 'No active design-rule errors or warnings.',
+      href: 'designrulechecker.html',
+      warn: diagnostics.health.drcErrors > 0 || diagnostics.health.drcWarnings > 0,
     },
     {
       label: 'Equipment failures',
@@ -762,8 +769,12 @@ function refreshDashboard() {
   renderGuidedWorkflowRunner();
   renderComplianceMatrix();
   renderDesignBasisReviewPanel();
-  renderWorkflowSteps(document.getElementById('workflow-step-grid'));
-  renderProjectSummary(document.getElementById('project-summary'));
+  const sampleCta = document.getElementById('dashboard-sample-cta');
+  if (sampleCta) {
+    const sampleActive = Boolean(getItem('activeSampleWorkflow'));
+    sampleCta.hidden = sampleActive;
+    sampleCta.style.display = sampleActive ? 'none' : 'flex';
+  }
 }
 
 function handleAutoBuildWorkflow() {
@@ -965,8 +976,14 @@ function renderGuidedWorkflowRunner() {
   const runner = currentGuidedWorkflow();
   const current = runner.currentStep;
   const completeCount = runner.steps.filter(step => step.status === 'pass').length;
-  const promptHtml = runner.prompts.length
-    ? runner.prompts.slice(0, 6).map(prompt => `
+  const blockerHrefs = new Set(
+    currentCoreDiagnostics().blockers
+      .filter(blocker => blocker.severity !== 'info')
+      .map(blocker => blocker.href)
+  );
+  const uniquePrompts = runner.prompts.filter(prompt => !blockerHrefs.has(prompt.href));
+  const promptHtml = uniquePrompts.length
+    ? uniquePrompts.slice(0, 6).map(prompt => `
       <li class="missing-info-item missing-info-item--${esc(prompt.severity)}">
         <div>
           <strong>${esc(prompt.label)}</strong>
@@ -975,12 +992,12 @@ function renderGuidedWorkflowRunner() {
         <a class="btn btn-sm" href="${esc(prompt.href)}">${esc(prompt.actionLabel)}</a>
       </li>
     `).join('')
-    : `<li class="missing-info-item missing-info-item--pass"><div><strong>${READINESS_VOCABULARY.ready}: No missing required inputs</strong><span>The core workflow has enough information to continue. Review assumptions before issuing.</span></div></li>`;
+    : '';
 
   el.innerHTML = `
     <div class="guided-workflow-current guided-workflow-current--${esc(current.status)}">
       <div>
-        <span class="guided-workflow-eyebrow">${esc(completeCount)} of ${esc(runner.steps.length)} workflow checks ready</span>
+        <span id="workflow-progress-text" class="guided-workflow-eyebrow">${esc(completeCount)} of ${esc(runner.steps.length)} workflow checks ready</span>
         <strong>${esc(current.label)}</strong>
         <p>${esc(current.detail)}</p>
         <span id="dashboard-guided-status" class="workflow-next-action__meta" aria-live="polite"></span>
@@ -998,10 +1015,10 @@ function renderGuidedWorkflowRunner() {
         </li>
       `).join('')}
     </ol>
-    <div class="missing-info-panel">
+    <div class="missing-info-panel"${uniquePrompts.length ? '' : ' hidden'}>
       <div>
         <h3>Missing Information Prompts</h3>
-        <p>${esc(runner.prompts.length ? `${runner.prompts.length} prompt(s) need user input or review.` : 'No blocking information prompts are currently open.')}</p>
+        <p>${esc(`${uniquePrompts.length} additional prompt(s) need user input or review.`)}</p>
       </div>
       <ul class="missing-info-list">${promptHtml}</ul>
     </div>
@@ -1054,29 +1071,24 @@ function renderWorkflowCoreDiagnostics() {
   if (nextEl) {
     const action = diagnostics.nextAction;
     const automationReady = canRunWorkflowAutomation();
-    const designBasis = diagnostics.designBasis || currentDesignBasisSummary();
-    const designReview = diagnostics.designReview || currentDesignBasisReview();
-    const basisStatus = designBasisStatusText(designBasis);
-    const basisClass = designBasis.complete && designReview.blockingGateCount === 0 ? 'is-complete' : 'is-warning';
+    const activeSampleWorkflow = Boolean(getItem('activeSampleWorkflow'));
+    const automationHasChanges = automationReady
+      && !activeSampleWorkflow
+      && buildMinimalDesignAutomation(currentProjectForAutomation()).changed;
     const actionTerm = action.severity === 'success'
       ? READINESS_VOCABULARY.downstreamHandoff
-      : READINESS_VOCABULARY.missingInputs;
+      : `Needs attention · ${action.step || 'Workflow'}`;
     nextEl.innerHTML = `
       <div>
-        <strong>${esc(actionTerm)}: Next action: ${esc(action.label)}</strong>
+        <span class="workflow-next-action__eyebrow">${esc(actionTerm)}</span>
+        <strong>Next action: ${esc(action.label)}</strong>
         <p>${esc(action.detail)}</p>
-        <p class="workflow-next-action__meta">${esc(DASHBOARD_READINESS_COPY?.messages?.[action.severity === 'success' ? 'downstreamHandoff' : 'missingInputs'] || action.detail)}</p>
-        <div class="workflow-design-basis-status ${esc(basisClass)}">
-          <span>Design basis: <strong>${esc(basisStatus)}</strong></span>
-          <span>${esc(designBasis.configured ? designBasis.codeLabel : 'Save wizard defaults before relying on generated records.')}</span>
-          <span>${esc(designReview.openGateCount)} review gate(s)</span>
-        </div>
         <span id="dashboard-auto-build-status" class="workflow-next-action__meta" aria-live="polite"></span>
       </div>
       <div class="workflow-next-action__actions">
         <a class="btn primary-btn" href="${esc(action.href)}">Open Step</a>
         <button id="dashboard-design-basis-btn" type="button" class="btn">Design Basis</button>
-        <button id="dashboard-auto-build-btn" type="button" class="btn"${automationReady ? '' : ' disabled'} title="${automationReady ? 'Create missing one-line, cable, starter raceway, and initial route-result records from current equipment and loads.' : 'Add equipment and loads before auto-building downstream workflow records.'}">Auto-Build Workflow</button>
+        ${automationHasChanges ? '<button id="dashboard-auto-build-btn" type="button" class="btn" title="Create missing one-line, cable, starter raceway, and initial route-result records from current equipment and loads.">Auto-Build Workflow</button>' : ''}
       </div>
     `;
     nextEl.querySelector('#dashboard-design-basis-btn')?.addEventListener('click', openDesignBasisWizard);
@@ -1085,9 +1097,19 @@ function renderWorkflowCoreDiagnostics() {
 
   const blockersEl = document.getElementById('dashboard-blockers');
   if (blockersEl) {
-    const actionable = diagnostics.blockers.filter(item => item.severity !== 'info');
+    const actionable = diagnostics.blockers.filter(item => (
+      item.severity !== 'info'
+      && !(item.label === diagnostics.nextAction.label && item.href === diagnostics.nextAction.href)
+    ));
+    const corePanels = blockersEl.closest('.dashboard-core-panels');
+    const blockersCard = blockersEl.closest('.card');
+    const blockersHeading = document.getElementById('dashboard-blockers-heading');
+    if (blockersHeading) blockersHeading.textContent = `Additional Blockers${actionable.length ? ` (${actionable.length})` : ''}`;
+    corePanels?.classList.toggle('dashboard-core-panels--clear', !actionable.length);
+    blockersCard?.classList.toggle('dashboard-blockers-card--clear', !actionable.length);
+    if (blockersCard) blockersCard.hidden = actionable.length === 0;
     if (!actionable.length) {
-      blockersEl.innerHTML = `<p class="text-muted">${READINESS_VOCABULARY.ready}: No critical workflow blockers found. Review studies and deliverables next.</p>`;
+      blockersEl.innerHTML = '';
     } else {
       blockersEl.innerHTML = `
         <ul class="dashboard-blocker-list">
@@ -1115,15 +1137,15 @@ function renderWorkflowCoreDiagnostics() {
       ['Cable Schedule', `${health.scheduleReady}/${health.cableRows} schedule-ready`],
       ['Routing', `${health.routingReady}/${health.cableRows} routing-ready`],
       ['Route Results', health.routeResults],
-      ['Design Basis', health.designBasis],
-      ['Review Gates', health.designBasisReviewGates],
       ['Pull Cards', `${health.pullGroups} pull group${health.pullGroups === 1 ? '' : 's'}`],
       ['Spool Sheets', `${health.spoolSheets} spool${health.spoolSheets === 1 ? '' : 's'}`],
       ['Raceways', health.raceways],
       ['Studies', health.studies],
       ['Report Snapshots', health.reportSnapshots],
       ['Release Packages', health.lifecyclePackages],
-      ['Deliverables', health.deliverables]
+      ['Deliverables', health.deliverables],
+      ['Cable Issue Readiness', `${health.cableDeliverableReady}/${health.cableRows} complete`],
+      ['Design Rule Check', `${health.drcErrors} error(s), ${health.drcWarnings} warning(s)`]
     ];
     healthEl.innerHTML = `
       <div class="dashboard-health-grid">
@@ -1313,13 +1335,7 @@ function initReleasePackageForm() {
 }
 
 window.addEventListener('DOMContentLoaded', () => {
-  renderKpiStrip(document.getElementById('dashboard-kpi-strip'));
-  renderWorkflowCoreDiagnostics();
-  renderGuidedWorkflowRunner();
-  renderComplianceMatrix();
-  renderDesignBasisReviewPanel();
-  renderWorkflowSteps(document.getElementById('workflow-step-grid'));
-  renderProjectSummary(document.getElementById('project-summary'));
+  refreshDashboard();
   renderStudiesSummary(document.getElementById('studies-summary'));
   initReleasePackageForm();
 });

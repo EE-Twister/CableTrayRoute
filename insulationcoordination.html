@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="Insulation coordination study per IEC 60071-1/2 and IEEE 1313. Select standard BIL and SIL levels, verify surge arrester protective margins, and estimate statistical risk of failure for HV equipment." />
+  <meta name="description" content="Preliminary insulation-coordination screening for BIL/SIL selection and surge-arrester review." />
   <title>Insulation Coordination — CableTrayRoute</title>
   <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icons/favicon.svg">
@@ -75,8 +75,9 @@
     <main id="main-content" class="main-content">
       <header class="page-header">
         <h1>Insulation Coordination</h1>
-        <p class="page-subtitle">IEC 60071-1/2 · IEEE 1313 — BIL/SIL selection, arrester protective margins, statistical risk of failure</p>
+        <p class="page-subtitle">Preliminary IEC 60071 / IEEE 1313 screening — BIL/SIL selection and arrester protective margins</p>
       </header>
+      <div class="alert warning"><strong>Screening only.</strong> This reduced workflow does not replace the IEC 60071-2:2023 detailed application and simulation process.</div>
 
       <details class="method-panel">
         <summary>Method &amp; Assumptions</summary>
@@ -89,7 +90,7 @@
         <p>H = altitude (m), m = 1.0 for lightning impulse self-restoring, 0.75 for power frequency non-self-restoring.</p>
         <p><strong>Step 3 — Standard BIL selection:</strong> Lowest standard LIWV ≥ Ucw from IEC 60071-1 Table 2 (Range I: Um ≤ 245 kV) or Table 3 (Range II: Um &gt; 245 kV).</p>
         <p><strong>Step 4 — Surge arrester protective margin (IEEE 1313.2 §6):</strong></p>
-        <pre>Mp (%) = (Ucw / Ures − 1) × 100</pre>
+        <pre>Mp (%) = (selected BIL or SIL / Ures − 1) × 100</pre>
         <p>Required: Mp ≥ 20% for lightning impulse, Mp ≥ 15% for switching impulse.</p>
         <p><strong>Step 5 — Statistical risk of failure (IEC 60071-2 Annex A, optional):</strong> Simplified Gaussian convolution of the overvoltage stress distribution against the insulation withstand characteristic. Target: R ≤ 10⁻⁴ per event (transmission) or 10⁻³ (distribution).</p>
       </details>

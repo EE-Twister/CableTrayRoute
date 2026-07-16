@@ -2265,6 +2265,11 @@ async function initCableSchedule() {
       const el = panel.querySelector(`[data-metric="${name}"]`);
       if (el) el.textContent = `${value}`;
     };
+    const setMetricVisibility = (name, show) => {
+      const el = panel.querySelector(`[data-metric="${name}"]`);
+      const item = el?.closest('.readiness-item');
+      if (item) item.hidden = !show;
+    };
     setMetric('total', summary.total);
     setMetric('ready', summary.scheduleReady);
     setMetric('routing-ready', summary.routingReady);
@@ -2275,6 +2280,14 @@ async function initCableSchedule() {
     const latestLog = readCableChangeLog()[0];
     const lastEdit = summary.latestEdit || latestLog?.at || '';
     setMetric('last-edit', lastEdit ? formatDateTime(lastEdit) : 'No edits yet');
+    setMetricVisibility('total', true);
+    setMetricVisibility('ready', summary.total > 0);
+    setMetricVisibility('routing-ready', summary.total > 0);
+    setMetricVisibility('missing-raceway', summary.missingRaceway > 0);
+    setMetricVisibility('missing-from-to', summary.missingFromTo > 0);
+    setMetricVisibility('missing-size', summary.missingSize > 0);
+    setMetricVisibility('duplicates', summary.duplicateTags > 0);
+    setMetricVisibility('last-edit', Boolean(lastEdit));
     panel.classList.toggle('is-ready', summary.total > 0 && summary.routingReady === summary.total && summary.duplicateTags === 0);
     panel.classList.toggle('has-warnings', summary.missingSchedule > 0 || summary.missingRaceway > 0 || summary.duplicateTags > 0);
     updateCableNextAction(summary);
@@ -2312,10 +2325,12 @@ async function initCableSchedule() {
       secondaryHref = '#open-batch-edit-btn';
       secondaryText = 'Batch Assign';
     } else {
-      title = `${READINESS_VOCABULARY.downstreamHandoff}: Continue to Raceway Schedule`;
-      detail = `${READINESS_VOCABULARY.ready}: ${CABLE_READINESS_COPY?.readyWhen || 'Every workflow cable row has tag, from/to, conductor size, and length.'} ${summary.routingReady} cable${summary.routingReady === 1 ? '' : 's'} are routing-ready.`;
-      primaryHref = 'cabletrayfill.html';
-      primaryText = 'Run Fill Check';
+      title = `${READINESS_VOCABULARY.downstreamHandoff}: Continue to fill and routing checks`;
+      detail = `${READINESS_VOCABULARY.ready}: ${CABLE_READINESS_COPY?.readyWhen || 'Every workflow cable row has tag, from/to, conductor size, and length.'} ${summary.routingReady} cable${summary.routingReady === 1 ? '' : 's'} are routing-ready. Review fill or restore/run optimal routes next.`;
+      primaryHref = 'optimalRoute.html';
+      primaryText = 'Open Route Planner';
+      secondaryHref = 'cabletrayfill.html';
+      secondaryText = 'Run Fill Check';
     }
 
     host.innerHTML = `

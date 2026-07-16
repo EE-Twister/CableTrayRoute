@@ -32,8 +32,8 @@ function it(name, fn) {
 // NEMA_LOAD_CLASSES data integrity
 // ---------------------------------------------------------------------------
 describe('NEMA_LOAD_CLASSES', () => {
-  it('defines all six standard classes', () => {
-    const expected = ['8A', '12A', '16A', '20A', '25A', '32A'];
+  it('defines the traditional span/load class combinations', () => {
+    const expected = ['8A', '8B', '8C', '12A', '12B', '12C', '16A', '16B', '16C', '20A', '20B', '20C'];
     expected.forEach(cls => {
       assert.ok(NEMA_LOAD_CLASSES[cls], `Class ${cls} should exist`);
     });
@@ -46,10 +46,10 @@ describe('NEMA_LOAD_CLASSES', () => {
     });
   });
 
-  it('ratedLoad matches the numeric portion of the class name', () => {
+  it('maps numeric prefixes to spans and letters to 50/75/100 lb/ft', () => {
     Object.entries(NEMA_LOAD_CLASSES).forEach(([cls, def]) => {
-      const expected = parseInt(cls, 10);
-      assert.strictEqual(def.ratedLoad, expected, `${cls}: ratedLoad should equal ${expected}`);
+      assert.strictEqual(def.ratedSpan, parseInt(cls, 10), `${cls}: numeric prefix should be the span`);
+      assert.strictEqual(def.ratedLoad, { A: 50, B: 75, C: 100 }[cls.at(-1)]);
     });
   });
 });
@@ -70,14 +70,14 @@ describe('calcMaxSpan — rated-load identity', () => {
 // ---------------------------------------------------------------------------
 // calcMaxSpan — reference values (hand-calculated)
 // Per NEMA VE 1: max_span = L_rated × (w_rated / w_actual)^(1/3)
-// Class 16A: ratedLoad=16, ratedSpan=12
-//   @ 8 lbs/ft  → 12 × (16/8)^(1/3) = 12 × 2^(1/3) ≈ 15.12 ft
-//   @ 32 lbs/ft → 12 × (16/32)^(1/3) = 12 × 0.5^(1/3) ≈ 9.52 ft
+// Class 16A: ratedLoad=50, ratedSpan=16
+//   @ 25 lbs/ft  → 16 × (50/25)^(1/3)
+//   @ 100 lbs/ft → 16 × (50/100)^(1/3)
 // ---------------------------------------------------------------------------
 describe('calcMaxSpan — hand-calculated reference values (Class 16A)', () => {
   it('half load → span increases by cbrt(2)', () => {
-    const result = calcMaxSpan(8, '16A');
-    const expected = 12 * Math.cbrt(16 / 8);
+    const result = calcMaxSpan(25, '16A');
+    const expected = 16 * Math.cbrt(50 / 25);
     assert.ok(
       Math.abs(result.maxSpan - Math.round(expected * 100) / 100) < 0.01,
       `Expected ≈${expected.toFixed(2)}, got ${result.maxSpan}`,
@@ -85,8 +85,8 @@ describe('calcMaxSpan — hand-calculated reference values (Class 16A)', () => {
   });
 
   it('double load → span decreases by cbrt(2)', () => {
-    const result = calcMaxSpan(32, '16A');
-    const expected = 12 * Math.cbrt(16 / 32);
+    const result = calcMaxSpan(100, '16A');
+    const expected = 16 * Math.cbrt(50 / 100);
     assert.ok(
       Math.abs(result.maxSpan - Math.round(expected * 100) / 100) < 0.01,
       `Expected ≈${expected.toFixed(2)}, got ${result.maxSpan}`,
@@ -94,17 +94,17 @@ describe('calcMaxSpan — hand-calculated reference values (Class 16A)', () => {
   });
 
   it('load > rated → status is OVERLOADED', () => {
-    const result = calcMaxSpan(20, '16A');
+    const result = calcMaxSpan(60, '16A');
     assert.strictEqual(result.status, 'OVERLOADED');
   });
 
   it('load ≤ rated → status is OK', () => {
-    const result = calcMaxSpan(16, '16A');
+    const result = calcMaxSpan(50, '16A');
     assert.strictEqual(result.status, 'OK');
   });
 
   it('load < rated → status is OK', () => {
-    const result = calcMaxSpan(10, '16A');
+    const result = calcMaxSpan(40, '16A');
     assert.strictEqual(result.status, 'OK');
   });
 });
@@ -114,17 +114,17 @@ describe('calcMaxSpan — hand-calculated reference values (Class 16A)', () => {
 // ---------------------------------------------------------------------------
 describe('calcMaxSpan — utilizationRatio', () => {
   it('equals 1.0 exactly at rated load', () => {
-    const { utilizationRatio } = calcMaxSpan(16, '16A');
+    const { utilizationRatio } = calcMaxSpan(50, '16A');
     assert.strictEqual(utilizationRatio, 1.0);
   });
 
   it('equals 0.5 at half rated load', () => {
-    const { utilizationRatio } = calcMaxSpan(8, '16A');
+    const { utilizationRatio } = calcMaxSpan(25, '16A');
     assert.strictEqual(utilizationRatio, 0.5);
   });
 
   it('equals 2.0 at double rated load', () => {
-    const { utilizationRatio } = calcMaxSpan(32, '16A');
+    const { utilizationRatio } = calcMaxSpan(100, '16A');
     assert.strictEqual(utilizationRatio, 2.0);
   });
 });
@@ -284,7 +284,7 @@ describe('evaluateTrays', () => {
     const trays = [{ tray_id: 'T1', inside_width: 12, cables: [] }];
     const [r] = evaluateTrays(trays, '16A');
     assert.strictEqual(r.result.status, 'OK');
-    assert.strictEqual(r.result.maxSpan, 12); // rated span
+    assert.strictEqual(r.result.maxSpan, 16); // rated span
     assert.strictEqual(r.loadPerFt, 0);
   });
 
@@ -303,7 +303,7 @@ describe('evaluateTrays', () => {
   });
 
   it('flags OVERLOADED when cables exceed load class', () => {
-    // 100 × 3C-4/0 cables should easily exceed Class 8A (8 lbs/ft)
+    // 100 × 3C-4/0 cables should easily exceed Class 8A (50 lbs/ft)
     const trays = [{
       tray_id: 'T1',
       inside_width: 24,

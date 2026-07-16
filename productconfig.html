@@ -108,14 +108,15 @@
         <p>This tool recommends cable tray type, NEMA load class, width, and material based on
         your project inputs.</p>
         <h3>Load Class Selection</h3>
-        <p>For a simple span, the equivalent uniform load at the design span scales from the
-        NEMA VE 1-2017 test span (12 ft) as:</p>
-        <pre>w_required = w_actual × (L_actual / 12)³</pre>
-        <p>The minimum NEMA class whose rated working load ≥ w_required is selected.</p>
+        <p>Traditional NEMA load classes encode both rated span and working load: the
+        numeric prefix is the span in feet, while A/B/C represents 50/75/100 lbs/ft.
+        The configurator conservatively selects the smallest class whose rated span is
+        at least the requested support span and whose rated load is at least the actual
+        cable weight. Verify the selected product against manufacturer load tables.</p>
         <h3>Width Selection</h3>
-        <p>Minimum inside width is chosen so that the allowed cable fill area (NEC 392.22(A),
-        default 50% of W × D) accommodates the total cable cross-sectional area.
-        Standard widths: 6, 9, 12, 18, 24, 30, 36 in.</p>
+        <p>The preliminary inside width uses a user-entered geometric fraction of W × D.
+        This does not implement the cable-size/type-specific rules in NEC 392.22. Complete the
+        final check in the Tray Fill calculator. Standard widths: 6, 9, 12, 18, 24, 30, 36 in.</p>
         <h3>Tray Type &amp; Material</h3>
         <p>Tray type and material are recommended based on application and installation
         environment, following NEMA VE 1-2017 and NEC Article 392 guidance.</p>
@@ -190,9 +191,9 @@
             <input type="number" id="fill-pct" min="1" max="100" step="1" value="50"
                    aria-describedby="fill-pct-hint">
             <p id="fill-pct-hint" class="field-hint">
-              NEC 392.22(A) limits cable cross-sectional area to 50% of the tray
-              cross-section for ladder and ventilated trays carrying power cables.
-              Use 40% for solid-bottom trays with control cables.
+              User-entered screening fraction only. NEC 392.22 requirements vary with cable
+              size, type, voltage, tray construction, and mixed-cable arrangements; use the
+              Tray Fill calculator for the final rule-specific check.
             </p>
           </div>
         </fieldset>

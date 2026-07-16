@@ -1,6 +1,6 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 @import "./src/styles/tokens.css";
-@import "./src/styles/oneline.css?v=one-line-datablock-contrast-v1";
+@import "./src/styles/oneline.css?v=mobile-workflow-drawer-v2";
 @import "./src/styles/base.css";
 @import "./src/styles/navigation.css";
 @import "./src/styles/auth.css";

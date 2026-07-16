@@ -1,5 +1,22 @@
 import { getItem, setItem, STORAGE_KEYS } from './dataStore.mjs';
 import { showAlertModal } from './src/components/modal.js';
+import { readAppSetting, writeAppSetting } from './projectStorage.js';
+
+const TABLE_VIEW_SETTING_PREFIX = 'ctr:table:view:';
+
+function readTableViewSetting(key, fallback) {
+  const raw = readAppSetting(`${TABLE_VIEW_SETTING_PREFIX}${key}`);
+  if (raw === null || raw === undefined) return fallback;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return fallback;
+  }
+}
+
+function writeTableViewSetting(key, value) {
+  writeAppSetting(`${TABLE_VIEW_SETTING_PREFIX}${key}`, JSON.stringify(value));
+}
 
 const FILTER_ICON_SVG = '<svg viewBox="0 0 16 16" aria-hidden="true" focusable="false" class="filter-icon"><path d="M1.5 2a.5.5 0 0 0-.4.8L6 8.667V13.5a.5.5 0 0 0 .757.429l2-1.2A.5.5 0 0 0 9 12.3V8.667L14.9 2.8A.5.5 0 0 0 14.5 2h-13z" fill="currentColor"/></svg>';
 
@@ -127,11 +144,9 @@ class TableManager {
     this.columns = opts.columns || [];
     if (this.columnsKey) {
       try {
-        const savedCols = getItem(this.columnsKey, null);
+        const savedCols = readTableViewSetting(this.columnsKey, null);
         if (Array.isArray(savedCols) && savedCols.length) {
           this.columns = savedCols;
-        } else {
-          setItem(this.columnsKey, this.columns);
         }
       } catch(e) { console.warn('Failed to restore column config from storage', e); }
     }
@@ -794,14 +809,14 @@ class TableManager {
 
   saveGroupState() {
     let all = {};
-    try { all = getItem(STORAGE_KEYS.collapsedGroups, {}); } catch(e) { console.warn('Failed to read group state from storage', e); }
+    try { all = readTableViewSetting(STORAGE_KEYS.collapsedGroups, {}); } catch(e) { console.warn('Failed to read group state from storage', e); }
     all[this.storageKey] = Array.from(this.hiddenGroups);
-    try { setItem(STORAGE_KEYS.collapsedGroups, all); } catch(e) { console.warn('Failed to save group state to storage', e); }
+    try { writeTableViewSetting(STORAGE_KEYS.collapsedGroups, all); } catch(e) { console.warn('Failed to save group state to storage', e); }
   }
 
   loadGroupState() {
     let all = {};
-    try { all = getItem(STORAGE_KEYS.collapsedGroups, {}); } catch(e) { console.warn('Failed to load group state from storage', e); }
+    try { all = readTableViewSetting(STORAGE_KEYS.collapsedGroups, {}); } catch(e) { console.warn('Failed to load group state from storage', e); }
     const hidden = all[this.storageKey] || [];
     hidden.forEach(g => this.setGroupVisibility(g, true));
   }
@@ -931,7 +946,7 @@ class TableManager {
 
   persistColumns() {
     if (this.columnsKey) {
-      try { setItem(this.columnsKey, this.columns); } catch(e) { console.warn('Failed to persist column config', e); }
+      try { writeTableViewSetting(this.columnsKey, this.columns); } catch(e) { console.warn('Failed to persist column config', e); }
     }
   }
 

@@ -17,8 +17,9 @@
  * 2. DC arcing current:      Iterative Stokes–Oppenlander arc voltage model
  *                             V_arc = 20 + 0.534 × gap_mm × I_arc^0.12
  *                             I_arc = (V_oc − V_arc) / R_total
- * 3. Incident energy:        Lee method adapted for DC (NFPA 70E D.8.1)
- *                             E = (4.184 × Cf × P_arc × t) / (2π × D_cm²)
+ * 3. Incident energy:        Ammerman/Wilkins DC energy-density models
+ *                             Open air: E = E_arc / (4πd²)
+ *                             Enclosed: E = kE_arc / (a² + d²)
  * 4. Protection check:       Fuse/CB interrupt rating vs. available fault current
  */
 
@@ -32,31 +33,52 @@ export const CELL_VOLTAGE = {
   'lithium-iron-phosphate': 3.2,
 };
 
-/** PPE categories per NFPA 70E-2024 Table 130.7(C)(15)(c) */
-export const PPE_CATEGORIES = [
-  { maxCalCm2: 1.2,  category: 0, label: 'No PPE required (below ignition threshold)' },
-  { maxCalCm2: 4,    category: 1, label: 'PPE Category 1 (min. 4 cal/cm² arc-rated clothing)' },
-  { maxCalCm2: 8,    category: 2, label: 'PPE Category 2 (min. 8 cal/cm² arc-rated clothing)' },
-  { maxCalCm2: 25,   category: 3, label: 'PPE Category 3 (min. 25 cal/cm² arc-rated clothing)' },
-  { maxCalCm2: 40,   category: 4, label: 'PPE Category 4 (min. 40 cal/cm² arc-rated clothing)' },
-  { maxCalCm2: Infinity, category: 5, label: 'Dangerous — incident energy exceeds 40 cal/cm²; special protection required' },
-];
+/**
+ * Incident-energy selections retained for display and validation only.
+ *
+ * NFPA 70E does not permit converting a calculated incident-energy result into
+ * a PPE category. The incident-energy analysis and PPE-category table methods
+ * are separate selection methods. Calculated results therefore report the
+ * required minimum arc rating directly and do not assign a category.
+ */
+export const PPE_CATEGORIES = Object.freeze([
+  { maxCalCm2: 1.2, category: null, label: 'Below the 1.2 cal/cm² arc-flash boundary threshold' },
+  { maxCalCm2: Infinity, category: null, label: 'Use the incident-energy method; arc rating must meet or exceed the calculated exposure' },
+]);
+
+const JOULES_PER_CALORIE = 4.184;
+const MM2_PER_CM2 = 100;
+const OPEN_AIR_SOLID_ANGLE = 4 * Math.PI;
+const LV_SWITCHGEAR_ENCLOSURE = Object.freeze({ aMm: 400, k: 0.312 });
 
 /** Standard DC bus voltages for validation hints */
 export const STANDARD_DC_VOLTAGES = [12, 24, 48, 125, 250, 480, 600];
 
 /**
- * Determine the PPE category for a given incident energy.
+ * Return incident-energy PPE-selection information without assigning a
+ * task-based PPE category. Arc-rating values are rounded upward so the
+ * displayed requirement never understates the calculated energy.
  * @param {number} incidentEnergyCalCm2
- * @returns {{ category: number, label: string }}
+ * @returns {{ category: null, minimumArcRatingCalCm2: number|null, label: string }}
  */
 export function ppeCategoryForEnergy(incidentEnergyCalCm2) {
   const E = Number(incidentEnergyCalCm2);
-  if (!Number.isFinite(E) || E < 0) return PPE_CATEGORIES[0];
-  for (const entry of PPE_CATEGORIES) {
-    if (E <= entry.maxCalCm2) return { category: entry.category, label: entry.label };
+  if (!Number.isFinite(E) || E < 0) {
+    return { category: null, minimumArcRatingCalCm2: null, label: 'Incident energy is unavailable.' };
   }
-  return PPE_CATEGORIES[PPE_CATEGORIES.length - 1];
+  if (E <= 1.2) {
+    return {
+      category: null,
+      minimumArcRatingCalCm2: 0,
+      label: 'Below the 1.2 cal/cm² arc-flash boundary threshold; no PPE category is assigned.',
+    };
+  }
+  const minimumArcRatingCalCm2 = Math.ceil(E * 100) / 100;
+  return {
+    category: null,
+    minimumArcRatingCalCm2,
+    label: `Incident-energy method: select arc-rated PPE with an arc rating of at least ${minimumArcRatingCalCm2.toFixed(2)} cal/cm².`,
+  };
 }
 
 /**
@@ -75,7 +97,10 @@ export function totalCircuitResistance({ batteryInternalResistanceOhm, cableResi
   if (!Number.isFinite(Rb) || Rb <= 0) throw new Error('batteryInternalResistanceOhm must be a positive number');
   if (!Number.isFinite(Rc) || Rc < 0) throw new Error('cableResistanceOhm must be ≥ 0');
   if (!Number.isFinite(Rbus) || Rbus < 0) throw new Error('busbarResistanceOhm must be ≥ 0');
-  return Rb + Rc + Rbus;
+  // The UI/API defines Rc as the one-way conductor resistance. A dc line-to-line
+  // fault current travels from the source to the fault and back on the return
+  // conductor, so the cable portion of the loop is 2 × Rc.
+  return Rb + 2 * Rc + Rbus;
 }
 
 /**
@@ -198,13 +223,20 @@ export function calcDcArcingCurrent(V_oc, R_total, I_bf, gapMm) {
 /**
  * Compute DC arc flash incident energy and arc flash boundary.
  *
- * Uses the Lee/Ammerman method adapted for DC systems per NFPA 70E-2024 Annex D.8.1.
+ * Uses the Ammerman open-air / arc-in-a-box energy-density method referenced by
+ * NFPA 70E Annex D.
  *
- * Incident energy:
- *   E = (4.184 × Cf × P_arc × t_arc) / (2π × D_cm²)   [cal/cm²]
+ * Arc energy:
+ *   E_arc = P_arc × t_arc                              [J]
  *
- * Arc flash boundary (for 1.2 cal/cm² onset of second-degree burn):
- *   D_af = sqrt((4.184 × Cf × P_arc × t_arc) / (2π × 1.2))  [cm → mm]
+ * Open-air incident energy density:
+ *   E_s = E_arc / (4π × d_mm²)                         [J/mm²]
+ *
+ * Low-voltage-switchgear enclosure model:
+ *   E_1 = k × E_arc / (a² + d_mm²)                     [J/mm²]
+ *   where a = 400 mm and k = 0.312.
+ *
+ * J/mm² is converted to cal/cm² by multiplying by 100 / 4.184.
  *
  * @param {object} p
  * @param {number} p.batteryVoltageV              — DC system voltage (V)
@@ -238,7 +270,6 @@ export function calcDcArcFlash({
 
   const gap = Math.max(Number(gapMm) || 25, 1);
   const t_s = t_ms / 1000;
-  const D_cm = D_mm / 10;
 
   const R_total = totalCircuitResistance({ batteryInternalResistanceOhm, cableResistanceOhm, busbarResistanceOhm });
   const I_bf = V_oc / R_total;
@@ -248,18 +279,29 @@ export function calcDcArcFlash({
   // Arc flash power (W)
   const P_arc = arcCurrentA * arcVoltageV;
 
-  // Enclosure correction factor: 1.0 open air, 2.0 enclosed box per Lee method
-  const Cf = enclosureType === 'enclosed_box' ? 2.0 : 1.0;
-
-  // Incident energy (cal/cm²)
-  const incidentEnergyCalCm2 = P_arc > 0
-    ? (4.184 * Cf * P_arc * t_s) / (2 * Math.PI * D_cm * D_cm)
+  const arcEnergyJ = P_arc * t_s;
+  const thresholdJPerMm2 = 1.2 * JOULES_PER_CALORIE / MM2_PER_CM2;
+  const openAirDensityJPerMm2 = arcEnergyJ > 0
+    ? arcEnergyJ / (OPEN_AIR_SOLID_ANGLE * D_mm * D_mm)
     : 0;
 
-  // Arc flash boundary for 1.2 cal/cm² threshold (mm)
-  const arcFlashBoundaryMm = P_arc > 0
-    ? Math.sqrt((4.184 * Cf * P_arc * t_s) / (2 * Math.PI * 1.2)) * 10
+  let densityJPerMm2 = openAirDensityJPerMm2;
+  let arcFlashBoundaryMm = arcEnergyJ > 0
+    ? Math.sqrt(arcEnergyJ / (OPEN_AIR_SOLID_ANGLE * thresholdJPerMm2))
     : 0;
+  let enclosureCorrectionFactor = 1;
+
+  if (enclosureType === 'enclosed_box' && arcEnergyJ > 0) {
+    const { aMm, k } = LV_SWITCHGEAR_ENCLOSURE;
+    densityJPerMm2 = k * arcEnergyJ / (aMm * aMm + D_mm * D_mm);
+    enclosureCorrectionFactor = openAirDensityJPerMm2 > 0
+      ? densityJPerMm2 / openAirDensityJPerMm2
+      : 1;
+    const boundarySquared = k * arcEnergyJ / thresholdJPerMm2 - aMm * aMm;
+    arcFlashBoundaryMm = boundarySquared > 0 ? Math.sqrt(boundarySquared) : 0;
+  }
+
+  const incidentEnergyCalCm2 = densityJPerMm2 * MM2_PER_CM2 / JOULES_PER_CALORIE;
 
   const ppeResult = ppeCategoryForEnergy(incidentEnergyCalCm2);
 
@@ -283,7 +325,12 @@ export function calcDcArcFlash({
     arcFlashBoundaryMm: Number(arcFlashBoundaryMm.toFixed(0)),
     ppeCategory: ppeResult.category,
     ppeCategoryLabel: ppeResult.label,
-    enclosureCorrectionFactor: Cf,
+    ppeSelectionMethod: 'incident-energy',
+    minimumArcRatingCalCm2: ppeResult.minimumArcRatingCalCm2,
+    enclosureCorrectionFactor: Number(enclosureCorrectionFactor.toFixed(4)),
+    energyModel: enclosureType === 'enclosed_box'
+      ? 'Ammerman/Wilkins low-voltage-switchgear enclosure'
+      : 'Ammerman open-air spherical energy density',
     arcDurationMs: Number(t_ms.toFixed(1)),
     workingDistanceMm: Number(D_mm.toFixed(0)),
     gapMm: Number(gap.toFixed(0)),

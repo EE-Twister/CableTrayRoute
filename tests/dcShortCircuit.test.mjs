@@ -5,8 +5,9 @@
  *
  * Golden path — 48 V lead-acid battery room:
  *   V_oc = 48 V, R_bat = 0.010 Ω, R_cable = 0.005 Ω, R_bus = 0.001 Ω
- *   R_total = 0.016 Ω
- *   I_bf = 48 / 0.016 = 3000 A
+ *   The cable resistance input is one-way, so R_total = R_bat + 2R_cable + R_bus.
+ *   R_total = 0.010 + 2(0.005) + 0.001 = 0.021 Ω
+ *   I_bf = 48 / 0.021 = 2285.7 A
  *
  *   Arc flash (gap = 25 mm, D = 455 mm, t = 50 ms, open_air):
  *   I_arc iteratively from Stokes–Oppenlander:
@@ -14,12 +15,13 @@
  *     I_arc ≈ (48 − 55.2) / 0.016 → clamped to ~0 (arc barely sustained at 48 V, 25 mm)
  *
  *   Higher-voltage golden path — 125 V DC station battery:
- *   V_oc = 125 V, R_total = 0.025 Ω → I_bf = 5000 A
+ *   V_oc = 125 V, R_total = 0.030 Ω → I_bf = 4166.7 A
  *   Arc: gap = 25 mm, D = 455 mm, t = 50 ms open_air
  *     V_arc ≈ 20 + 0.534×25×5000^0.12 ≈ 20 + 13.35×2.78 ≈ 57.1 V
  *     I_arc ≈ (125 − 57.1) / 0.025 ≈ 2716 A
  *     P_arc ≈ 2716 × 57.1 ≈ 155,083 W
- *     E = (4.184 × 1.0 × 155083 × 0.05) / (2π × 45.5²) ≈ 32,450 / 13,021 ≈ 2.49 cal/cm²
+ *   Incident energy is independently checked below using the Ammerman open-air
+ *   energy-density equation E = E_arc / (4πd²), followed by unit conversion.
  */
 
 import assert from 'assert';
@@ -71,7 +73,7 @@ describe('totalCircuitResistance', () => {
       cableResistanceOhm: 0.005,
       busbarResistanceOhm: 0.001,
     });
-    approx(R, 0.016, 0.001);
+    approx(R, 0.021, 0.001);
   });
 
   it('uses zero for omitted cable/bus resistance', () => {
@@ -123,34 +125,16 @@ describe('openCircuitVoltage', () => {
 // ppeCategoryForEnergy
 // ---------------------------------------------------------------------------
 describe('ppeCategoryForEnergy', () => {
-  it('returns category 0 below 1.2 cal/cm²', () => {
-    assert.strictEqual(ppeCategoryForEnergy(0.5).category, 0);
-    assert.strictEqual(ppeCategoryForEnergy(1.2).category, 0);
+  it('does not infer a task-based PPE category from incident energy', () => {
+    [0, 0.5, 1.2, 4, 8, 25, 40, 45].forEach(energy => {
+      assert.strictEqual(ppeCategoryForEnergy(energy).category, null);
+    });
   });
 
-  it('returns category 1 between 1.2 and 4 cal/cm²', () => {
-    assert.strictEqual(ppeCategoryForEnergy(2.0).category, 1);
-    assert.strictEqual(ppeCategoryForEnergy(4.0).category, 1);
-  });
-
-  it('returns category 2 between 4 and 8 cal/cm²', () => {
-    assert.strictEqual(ppeCategoryForEnergy(6.0).category, 2);
-  });
-
-  it('returns category 3 between 8 and 25 cal/cm²', () => {
-    assert.strictEqual(ppeCategoryForEnergy(15.0).category, 3);
-  });
-
-  it('returns category 4 between 25 and 40 cal/cm²', () => {
-    assert.strictEqual(ppeCategoryForEnergy(30.0).category, 4);
-  });
-
-  it('returns category 5 above 40 cal/cm²', () => {
-    assert.strictEqual(ppeCategoryForEnergy(45.0).category, 5);
-  });
-
-  it('handles zero energy gracefully', () => {
-    assert.strictEqual(ppeCategoryForEnergy(0).category, 0);
+  it('reports the calculated energy as the minimum arc-rating basis', () => {
+    assert.strictEqual(ppeCategoryForEnergy(0.5).minimumArcRatingCalCm2, 0);
+    assert.strictEqual(ppeCategoryForEnergy(2).minimumArcRatingCalCm2, 2);
+    assert.strictEqual(ppeCategoryForEnergy(45).minimumArcRatingCalCm2, 45);
   });
 });
 
@@ -165,9 +149,9 @@ describe('calcDcFaultCurrent', () => {
       cableResistanceOhm: 0.005,
       busbarResistanceOhm: 0.001,
     });
-    approx(r.boltedFaultCurrentA, 3000, 0.01);
+    approx(r.boltedFaultCurrentA, 48 / 0.021, 0.01);
     assert.strictEqual(r.openCircuitVoltageV, 48);
-    approx(r.totalResistanceOhm, 0.016, 0.001);
+    approx(r.totalResistanceOhm, 0.021, 0.001);
   });
 
   it('computes bolted fault current for 125 V station battery', () => {
@@ -176,7 +160,7 @@ describe('calcDcFaultCurrent', () => {
       batteryInternalResistanceOhm: 0.020,
       cableResistanceOhm: 0.005,
     });
-    approx(r.boltedFaultCurrentA, 5000, 0.02);
+    approx(r.boltedFaultCurrentA, 125 / 0.030, 0.02);
   });
 
   it('computes time constant when inductance is provided', () => {
@@ -275,7 +259,22 @@ describe('calcDcArcFlash', () => {
     assert.ok(Number.isFinite(r.incidentEnergyCalCm2), 'incidentEnergyCalCm2 must be finite');
     assert.ok(r.incidentEnergyCalCm2 >= 0, 'incident energy must be non-negative');
     assert.ok(r.arcFlashBoundaryMm >= 0, 'arc flash boundary must be non-negative');
-    assert.ok(typeof r.ppeCategory === 'number', 'ppeCategory must be a number');
+    assert.strictEqual(r.ppeCategory, null);
+    assert.strictEqual(r.ppeSelectionMethod, 'incident-energy');
+    assert.strictEqual(r.minimumArcRatingCalCm2, 0);
+  });
+
+  it('matches the Ammerman open-air energy-density equation', () => {
+    const r = calcDcArcFlash(baseParams);
+    const arcEnergyJ = r.arcPowerW * (baseParams.arcDurationMs / 1000);
+    const expectedCalCm2 = arcEnergyJ
+      / (4 * Math.PI * Math.pow(baseParams.workingDistanceMm, 2))
+      * 100 / 4.184;
+    const expectedBoundaryMm = Math.sqrt(
+      arcEnergyJ / (4 * Math.PI * (1.2 * 4.184 / 100))
+    );
+    approx(r.incidentEnergyCalCm2, expectedCalCm2, 0.005);
+    approx(r.arcFlashBoundaryMm, expectedBoundaryMm, 0.005);
   });
 
   it('longer arc duration increases incident energy', () => {
@@ -294,7 +293,18 @@ describe('calcDcArcFlash', () => {
     const open = calcDcArcFlash({ ...baseParams, enclosureType: 'open_air' });
     const enclosed = calcDcArcFlash({ ...baseParams, enclosureType: 'enclosed_box' });
     assert.ok(enclosed.incidentEnergyCalCm2 > open.incidentEnergyCalCm2);
-    assert.strictEqual(enclosed.enclosureCorrectionFactor, 2.0);
+    const expectedEnclosedCalCm2 = enclosed.arcPowerW
+      * (baseParams.arcDurationMs / 1000)
+      * 0.312
+      / (Math.pow(400, 2) + Math.pow(baseParams.workingDistanceMm, 2))
+      * 100 / 4.184;
+    approx(enclosed.incidentEnergyCalCm2, expectedEnclosedCalCm2, 0.005);
+    approx(
+      enclosed.enclosureCorrectionFactor,
+      0.312 * 4 * Math.PI * Math.pow(baseParams.workingDistanceMm, 2)
+        / (Math.pow(400, 2) + Math.pow(baseParams.workingDistanceMm, 2)),
+      0.005
+    );
     assert.strictEqual(open.enclosureCorrectionFactor, 1.0);
   });
 
@@ -312,7 +322,7 @@ describe('calcDcArcFlash', () => {
     }));
   });
 
-  it('returns PPE category consistent with energy level', () => {
+  it('returns incident-energy PPE-selection data without a category', () => {
     const r = calcDcArcFlash({
       ...baseParams,
       batteryVoltageV: 600,
@@ -320,8 +330,10 @@ describe('calcDcArcFlash', () => {
       arcDurationMs: 500,
       enclosureType: 'enclosed_box',
     });
-    const expectedPpe = ppeCategoryForEnergy(r.incidentEnergyCalCm2).category;
-    assert.strictEqual(r.ppeCategory, expectedPpe);
+    assert.strictEqual(r.ppeCategory, null);
+    assert.strictEqual(r.ppeSelectionMethod, 'incident-energy');
+    assert.ok(r.minimumArcRatingCalCm2 >= r.incidentEnergyCalCm2);
+    assert.ok(r.minimumArcRatingCalCm2 - r.incidentEnergyCalCm2 <= 0.01);
   });
 
   it('adds warning note when incident energy exceeds 40 cal/cm²', () => {
@@ -457,7 +469,7 @@ describe('runDcShortCircuitStudy', () => {
     assert.strictEqual(CELL_VOLTAGE['lithium-ion'], 3.6);
     assert.strictEqual(CELL_VOLTAGE['nickel-cadmium'], 1.2);
     assert.ok(Array.isArray(PPE_CATEGORIES));
-    assert.strictEqual(PPE_CATEGORIES.length, 6);
+    assert.strictEqual(PPE_CATEGORIES.length, 2);
     assert.ok(Array.isArray(STANDARD_DC_VOLTAGES));
     assert.ok(STANDARD_DC_VOLTAGES.includes(48));
   });

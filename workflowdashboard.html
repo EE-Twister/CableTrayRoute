@@ -99,69 +99,67 @@
         </div>
       </section>
 
-      <section class="card dash-full-width" aria-labelledby="dashboard-projects-title">
-        <div class="dashboard-projects-header">
-          <div>
-            <h2 id="dashboard-projects-title">My Projects</h2>
-            <p class="text-muted">Open saved projects, create a new project, or confirm whether your current workspace is local or cloud-backed.</p>
+      <details class="card dash-full-width dashboard-projects-details">
+        <summary>
+          <span>Project Workspace</span>
+          <small>Saved projects, cloud status, and project actions</small>
+        </summary>
+        <div class="dashboard-projects-details__body">
+          <div class="dashboard-projects-header">
+            <div>
+              <h2 id="dashboard-projects-title">My Projects</h2>
+              <p class="text-muted">Open saved projects, create a new project, or confirm whether your current workspace is local or cloud-backed.</p>
+            </div>
+            <button type="button" class="btn" data-project-action="save">Save Current Project</button>
           </div>
-          <button type="button" class="btn" data-project-action="save">Save Current Project</button>
+          <div id="dashboard-projects-panel" class="project-workspace-panel" data-project-workspace aria-live="polite">
+            <p class="text-muted">Loading saved projects...</p>
+          </div>
         </div>
-        <div id="dashboard-projects-panel" class="project-workspace-panel" data-project-workspace aria-live="polite">
-          <p class="text-muted">Loading saved projects...</p>
-        </div>
-      </section>
+      </details>
 
       <section id="dashboard-next-action-strip" class="workflow-next-action dash-full-width" aria-live="polite" aria-label="Recommended next action"></section>
 
-      <section class="card dash-full-width" aria-label="Guided workflow runner">
-        <h2>Guided Workflow</h2>
-        <div id="dashboard-guided-workflow" aria-live="polite">
-          <p class="text-muted">Loading guided workflow...</p>
+      <details class="card dash-full-width dashboard-detail-group dashboard-guided-details" aria-label="Guided workflow runner">
+        <summary><span>Guided Workflow</span><small>Open the full eight-step workflow checklist</small></summary>
+        <div class="dashboard-detail-group__body">
+          <div id="dashboard-guided-workflow" aria-live="polite">
+            <p class="text-muted">Loading guided workflow...</p>
+          </div>
         </div>
-      </section>
+      </details>
 
       <section class="dashboard-core-panels dash-full-width" aria-label="Project workflow health">
         <div class="card">
-          <h2>Workflow Blockers</h2>
+          <h2 id="dashboard-blockers-heading">Additional Blockers</h2>
           <div id="dashboard-blockers" aria-live="polite">
-            <p class="text-muted">Loading blockersâ€¦</p>
+            <p class="text-muted">Loading blockers…</p>
           </div>
         </div>
-        <div class="card">
-          <h2>Project Health</h2>
-          <div id="dashboard-health" aria-live="polite">
-            <p class="text-muted">Loading health metricsâ€¦</p>
+        <details class="card dashboard-detail-group dashboard-health-details">
+          <summary><span>Project Health</span><small>Detailed workflow counts</small></summary>
+          <div class="dashboard-detail-group__body" id="dashboard-health" aria-live="polite">
+            <p class="text-muted">Loading health metrics…</p>
+          </div>
+        </details>
+      </section>
+
+      <details class="card dash-full-width dashboard-detail-group" aria-label="Project quality details">
+        <summary><span>Quality Checks</span><small>Compliance matrix and recorded assumptions</small></summary>
+        <div class="dashboard-detail-group__body">
+          <h2>Code Compliance Matrix</h2>
+          <div id="dashboard-compliance-matrix" aria-live="polite">
+            <p class="text-muted">Loading compliance matrix...</p>
+          </div>
+          <h2>Assumptions / Review Gates</h2>
+          <div id="dashboard-review-gates" aria-live="polite">
+            <p class="text-muted">Loading review gates...</p>
           </div>
         </div>
-      </section>
-
-      <section class="card dash-full-width" aria-label="Code compliance matrix">
-        <h2>Code Compliance Matrix</h2>
-        <div id="dashboard-compliance-matrix" aria-live="polite">
-          <p class="text-muted">Loading compliance matrix...</p>
-        </div>
-      </section>
-
-      <section class="card dash-full-width" aria-label="Design assumptions and review gates">
-        <h2>Assumptions / Review Gates</h2>
-        <div id="dashboard-review-gates" aria-live="polite">
-          <p class="text-muted">Loading review gates...</p>
-        </div>
-      </section>
-
-      <!-- Progress overview -->
-      <section class="card workflow-summary dash-full-width" aria-live="polite" aria-label="Workflow progress overview">
-        <h2>Workflow Progress</h2>
-        <p id="workflow-progress-text">0 of 8 workflow steps complete.</p>
-        <div class="workflow-progress-track" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="8" aria-labelledby="workflow-progress-text" id="workflow-progress-bar-track">
-          <div class="workflow-progress-fill" id="workflow-progress-fill" style="width:0%"></div>
-        </div>
-        <p id="workflow-next-step"></p>
-      </section>
+      </details>
 
       <!-- Sample Gallery CTA -->
-      <section class="card dash-full-width" aria-label="Sample projects" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;padding:1rem 1.25rem;">
+      <section id="dashboard-sample-cta" class="card dash-full-width" aria-label="Sample projects" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;padding:1rem 1.25rem;">
         <div>
           <strong>New to CableTrayRoute?</strong>
           <span style="margin-left:0.5rem;color:var(--color-muted,#555);font-size:0.9rem;">Browse curated sample projects with guided walkthroughs for industrial, data center, substation, and more.</span>
@@ -169,35 +167,21 @@
         <a href="samplegallery.html" class="primary-btn" style="white-space:nowrap;">Try a Sample Project</a>
       </section>
 
-      <div class="dashboard-grid">
-        <!-- Workflow steps -->
-        <section class="card" aria-label="Workflow step status">
-          <h2>Workflow Steps</h2>
-          <div id="workflow-step-grid" aria-live="polite">
-            <p class="text-muted">Loading…</p>
-          </div>
-        </section>
-
-        <!-- Project summary stats -->
-        <section class="card" aria-label="Project summary statistics">
-          <h2>Project Summary</h2>
-          <div id="project-summary" aria-live="polite">
-            <p class="text-muted">Loading…</p>
-          </div>
-        </section>
-
-        <!-- Studies status -->
-        <section class="card dash-full-width" aria-label="Electrical studies status">
-          <h2>Electrical Studies</h2>
+      <!-- Studies status -->
+      <details class="card dash-full-width dashboard-detail-group" aria-label="Electrical studies status">
+        <summary><span>Electrical Studies</span><small>Saved results and study shortcuts</small></summary>
+        <div class="dashboard-detail-group__body">
           <p class="text-muted" style="margin-bottom:0.75rem">Studies with saved results are shown as complete. Open any study to run or refresh it.</p>
           <div id="studies-summary" aria-live="polite">
             <p class="text-muted">Loading…</p>
           </div>
-        </section>
+        </div>
+      </details>
 
-        <!-- Release Package (Gap #71) -->
-        <section class="card dash-full-width" aria-label="Release package">
-          <h2>Release Package</h2>
+      <!-- Release Package (Gap #71) -->
+      <details class="card dash-full-width dashboard-detail-group" aria-label="Release package">
+        <summary><span>Release Package</span><small>Create and review immutable project snapshots</small></summary>
+        <div class="dashboard-detail-group__body">
           <p class="text-muted" style="margin-bottom:0.75rem">Freeze the current project state into a named, immutable snapshot for design governance and traceability.</p>
 
           <form id="release-pkg-form" class="release-pkg-form" aria-label="Release package form" style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem 1rem;margin-bottom:1rem;" novalidate>
@@ -232,8 +216,8 @@
           <div id="pkg-history" aria-live="polite">
             <p class="text-muted">No packages released yet.</p>
           </div>
-        </section>
-      </div>
+        </div>
+      </details>
 
     </main>
   </div>

@@ -107,7 +107,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.getElementById('results').innerHTML = `
       <div class="result-card" role="status">
-        <h2>Tray Configuration Recommendation</h2>
+        <h2>Preliminary Tray Configuration</h2>
+        <div class="alert warning" role="alert"><strong>Screening only.</strong>
+          The width below uses a user-entered geometric area fraction. It is not an NEC 392.22
+          compliance result. Complete the cable-size/type-specific check in the Tray Fill calculator
+          and verify the selected product against manufacturer tables before issue.</div>
 
         <h3>Structural / Load Class</h3>
         <table class="result-table" aria-label="Load class results">
@@ -127,7 +131,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <table class="result-table" aria-label="Geometry results">
           <tbody>
             <tr>
-              <th scope="row">Minimum Inside Width</th>
+              <th scope="row">Screening Inside Width</th>
               <td>${widthStatus}</td>
             </tr>
             <tr>
@@ -135,7 +139,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>${geo.depthIn} in</td>
             </tr>
             <tr>
-              <th scope="row">Allowed Cable Fill Area</th>
+              <th scope="row">Screening Cable Fill Area</th>
               <td>${geo.allowedFillIn2} in² (${(geo.fillFraction * 100).toFixed(0)}% of ${geo.widthIn > 0 ? geo.widthIn : '–'} × ${geo.depthIn} in)</td>
             </tr>
             <tr>

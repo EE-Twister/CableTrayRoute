@@ -1,5 +1,12 @@
 # Ampacity Method
 
+> **Screening limitation:** This is a calibrated steady-state estimator, not a
+> complete Neher-McGrath, IEC 60287, or IEEE 835 compliance implementation.
+> Final ampacity requires actual cable construction, installation geometry,
+> mutual heating, soil/backfill properties, and an accepted engineering method
+> or manufacturer study. Calibration against a few reference cases does not
+> validate other conductor sizes or installation arrangements.
+
 The application estimates conductor ampacity using the Neher‑McGrath method. This approach was introduced in the 1957 paper *The Calculation of the Temperature Rise and Load Carrying Capability of Cable Systems* by J. H. Neher and M. H. McGrath. It forms the basis of ampacity guidance in **NEC 310‑15(C)** and the calculation procedures detailed in **IEEE Std 835**.
 
 ## Equation
@@ -59,7 +66,7 @@ Typical soil resistivity values per IEEE Std 835 Table 1:
 
 ## Calibration
 
-The resistance constants were tuned so that calculated ampacities match IEEE 835 tables.
+The resistance constants were tuned so that selected calculated ampacities approximate IEEE 835 table values; this is benchmark fitting, not general validation.
 
 The library now exposes a `calibrateAmpacityModel` function which performs a grid
 search over reasonable model parameters. The routine compares the calculated

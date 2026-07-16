@@ -93,7 +93,7 @@
         <ol>
           <li><strong>Seismic brace forces</strong> per <strong>ASCE 7-16 §13.3.1</strong>:
             <pre>Fp = (0.4·ap·SDS·Wp / (Rp/Ip)) × (1 + 2z/h)</pre>
-            Lateral force E = Fp × Wp; vertical E<sub>v</sub> = ±0.2·SDS·Ip·Wp.
+            Lateral force E = Fp × Wp; vertical E<sub>v</sub> = ±0.2·SDS·Wp.
           </li>
           <li><strong>Wind force</strong> per <strong>ASCE 7-22 §29.4</strong>:
             <pre>q_z = 0.00256·Kz·Kzt·Ke·V²   (lbs/ft²)
@@ -103,7 +103,7 @@ W = q_z·G·Cf·(width × span) / span   (lbs/ft)</pre>
             <pre>LC-W1: 1.2D + 1.6W      (wind dominant)
 LC-W2: 0.9D + 1.0W      (wind + minimum gravity)
 LC-S1: 1.2D + 1.0E + 0.2S  (seismic + snow)
-LC-S2: 0.9D + 1.0E      (seismic + minimum gravity)</pre>
+LC-S2: 0.9D + E_h − E_v  (negative net vertical demand denotes uplift)</pre>
             The governing (envelope) combination is identified by maximum resultant force.
           </li>
         </ol>

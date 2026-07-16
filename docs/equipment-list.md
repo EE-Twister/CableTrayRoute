@@ -2,10 +2,13 @@
 
 The Equipment List is the first project workflow step. It can still be used as a standalone equipment schedule, but integrated projects use equipment tags as references for loads, one-line components, panels, cables, and reports.
 
+The page keeps the editable schedule in the primary viewport. Project context is condensed into a short header and status chips, starter data stays available in the main action row, and column customization, import/export, and bulk-edit commands are grouped into menus. The empty-state guide only appears when the schedule has no equipment records.
+
 ## Entry And Review
 
 - Use **Add Equipment** for a focused form with tag, voltage, category, arrangement, lineup, manufacturer, model, phases, and notes.
 - Use **Load Starter Equipment** to seed a realistic switchboard, MCC, transformer, panel, and process equipment set.
+- Use **Core** for day-to-day tag, description, voltage, category, arrangement, lineup, and phase review. **Layout**, **Procurement**, and **Full** expose the corresponding specialist columns without forcing the full schedule into the default view.
 - Summary cards track total equipment, missing tags, duplicate tags, missing voltage, missing manufacturer, and assigned arrangements.
 - Empty projects show primary actions for adding equipment, importing equipment, or loading starter equipment.
 - Right-click an equipment row (or press Shift+F10 while the row is focused) and choose **View on One-Line**. The action is kept out of the tag cell so every row remains compact and editable.

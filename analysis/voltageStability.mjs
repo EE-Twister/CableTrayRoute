@@ -1,10 +1,12 @@
 /**
  * Voltage Stability Analysis — P-V / Q-V Curves and Loadability Margin
  *
- * Identifies voltage collapse proximity by sweeping a load scaling factor λ
- * through sequential Newton-Raphson power flows.  The last converged point
- * before divergence marks the nose of the P-V curve (maximum loadability).
- * A companion Q-V sweep on any bus yields the reactive power margin.
+ * Screens voltage-stability proximity by sweeping a load scaling factor λ
+ * through sequential Newton-Raphson power flows. Solver nonconvergence marks a
+ * numerical boundary only; it is not reported as a physical P-V nose or
+ * voltage-collapse point. A companion Q-V sweep shows voltage sensitivity to
+ * reactive injection but does not claim a reactive margin without continuation
+ * power flow or an independently established stability boundary.
  *
  * Bus model accepted by all exported functions:
  *   id       — unique string identifier
@@ -274,8 +276,8 @@ export function buildPVCurve(buses, opts = {}) {
 
   const warnings = [];
   const points = [];
-  let collapseFound = false;
-  let collapseLambda = null;
+  let solverLimitEncountered = false;
+  let solverLimitLambda = null;
   let lastConvergedLambda = lambdaStart;
 
   // Base-case operating point total load (MW)
@@ -292,8 +294,8 @@ export function buildPVCurve(buses, opts = {}) {
     if (converged) {
       lastConvergedLambda = lam;
     } else {
-      collapseFound = true;
-      collapseLambda = lam;
+      solverLimitEncountered = true;
+      solverLimitLambda = lam;
       break;
     }
   }
@@ -307,8 +309,13 @@ export function buildPVCurve(buses, opts = {}) {
     criticalBusId = minEntry.id !== slackId ? minEntry.id : (operatingPt.buses.find(b => b.id !== slackId) || operatingPt.buses[0]).id;
   }
 
-  if (!collapseFound) {
-    warnings.push(`System did not collapse within λ = ${lambdaMax.toFixed(2)}. Increase lambdaMax to find the nose point.`);
+  if (!solverLimitEncountered) {
+    warnings.push(`All sampled power flows converged through λ = ${lambdaMax.toFixed(2)}; no numerical solver boundary was encountered.`);
+  } else {
+    warnings.push(
+      `Newton-Raphson did not converge at λ = ${solverLimitLambda.toFixed(2)}. ` +
+      'This is a numerical solver boundary, not proof of a physical voltage-collapse nose.'
+    );
   }
 
   const operatingLoadMW = baseLoadMW * lambdaStart;
@@ -318,14 +325,17 @@ export function buildPVCurve(buses, opts = {}) {
 
   return {
     points,
-    collapseFound,
-    collapseLambda,
+    collapseFound: false,
+    collapseLambda: null,
+    solverLimitEncountered,
+    solverLimitLambda,
     criticalBusId,
     operatingLoadMW,
     maxLoadMW,
     loadabilityMarginMW,
     loadabilityMarginPct,
     warnings,
+    calculationStatus: 'screening-only',
   };
 }
 
@@ -369,7 +379,8 @@ export function buildQVCurve(buses, opts = {}) {
 
   const warnings = [];
   const points = [];
-  let collapseFound = false;
+  let solverLimitEncountered = false;
+  let qSolverBoundaryMvar = null;
 
   // Sweep from qMinMvar to qMaxMvar
   const steps = Math.ceil((qMaxMvar - qMinMvar) / qStepMvar) + 1;
@@ -378,36 +389,40 @@ export function buildQVCurve(buses, opts = {}) {
     // Inject by reducing the reactive load on the target bus
     const modBuses = buses.map((b, i) => {
       if (i !== targetIdx) return b;
-      return { ...b, Qd: Math.max(0, (b.Qd || 0) - qInj * 1000) };
+      return { ...b, Qd: (b.Qd || 0) - qInj * 1000 };
     });
 
     const { Vm, Va: _va, converged } = solveNR(modBuses, baseMVA);
     const voltage = Vm[targetIdx];
     points.push({ qInjMvar: qInj, voltage: Number.isFinite(voltage) ? voltage : 0, converged });
-    if (!converged) { collapseFound = true; }
+    if (!converged) {
+      solverLimitEncountered = true;
+      if (qSolverBoundaryMvar === null) qSolverBoundaryMvar = qInj;
+    }
   }
 
-  // Reactive margin: Q needed to bring voltage to 0.95 pu, or nose of the Q-V curve
-  // Identify the minimum voltage point and how much Q we have before collapse
+  // A simple sequential NR sweep cannot establish a Q-V nose or reactive
+  // margin. Preserve the points for sensitivity review, but do not assign the
+  // sweep endpoint as a physical nose.
   const convergedPoints = points.filter(p => p.converged);
-  let reactiveMarginMvar = null;
-  let qAtNose = null;
-
-  if (convergedPoints.length >= 2) {
-    // Nose of Q-V curve: minimum Q point (most negative Q injection at which system still converges)
-    // In the standard Q-V interpretation, reactive margin = Q injection at operating point vs. Q at nose
-    const operatingPt = convergedPoints.find(p => Math.abs(p.qInjMvar) < qStepMvar / 2);
-    const noseCandidate = convergedPoints.reduce((mn, p) => (p.qInjMvar < mn.qInjMvar ? p : mn), convergedPoints[0]);
-    qAtNose = noseCandidate.qInjMvar;
-    if (operatingPt) {
-      reactiveMarginMvar = operatingPt.qInjMvar - qAtNose;
-    }
-    if (!operatingPt) {
-      warnings.push('Operating point (Q_inj = 0) did not converge. Check bus loads and slack bus.');
-    }
+  const operatingPt = convergedPoints.find(p => Math.abs(p.qInjMvar) < qStepMvar / 2);
+  if (!operatingPt) {
+    warnings.push('Operating point (Q_inj = 0) did not converge. Check bus loads and slack bus.');
+  }
+  if (solverLimitEncountered) {
+    warnings.push('Q-V sweep encountered solver nonconvergence; continuation power flow is required before assigning a reactive margin or nose point.');
   }
 
-  return { points, reactiveMarginMvar, qAtNose, collapseFound, warnings };
+  return {
+    points,
+    reactiveMarginMvar: null,
+    qAtNose: null,
+    collapseFound: false,
+    solverLimitEncountered,
+    qSolverBoundaryMvar,
+    warnings,
+    calculationStatus: 'screening-only',
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -506,6 +521,8 @@ export function runVoltageStabilityStudy(inputs = {}) {
     criticalBusId: pvCurve.criticalBusId,
     collapseFound: pvCurve.collapseFound,
     collapseLambda: pvCurve.collapseLambda,
+    solverLimitEncountered: pvCurve.solverLimitEncountered,
+    solverLimitLambda: pvCurve.solverLimitLambda,
     reactiveMarginMvar: qvCurve.reactiveMarginMvar,
     targetBusId,
     voltageProfile,
@@ -520,5 +537,10 @@ export function runVoltageStabilityStudy(inputs = {}) {
     summary,
     inputs: { ...inputs, targetBusId },
     warnings: allWarnings,
+    calculationStatus: 'screening-only',
+    requiredInputs: [
+      'Use continuation power flow or an independently validated stability model before assigning a physical P-V/Q-V nose or margin.',
+      'Provide generator reactive limits, transformer taps, shunts, and contingency-specific dispatch for final study use.',
+    ],
   };
 }

@@ -12,6 +12,26 @@ async function openToolbarMenu(page, name) {
   await page.locator('summary.command-menu-trigger', { hasText: new RegExp(`^${name}`) }).first().click();
 }
 
+test('mobile layout keeps the canvas reachable and starts with the inspector collapsed', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.addInitScript(() => {
+    localStorage.clear();
+    sessionStorage.clear();
+    localStorage.setItem('onelineTourDone', 'true');
+  });
+  await page.goto(pageUrl('oneline.html?e2e=1'));
+  await page.waitForSelector('[data-oneline-ready="1"]');
+
+  const canvas = page.locator('.oneline-canvas-scroll');
+  await expect(canvas).toBeVisible();
+  await expect(page.locator('#history-sidebar')).toBeHidden();
+
+  const bounds = await canvas.boundingBox();
+  expect(bounds).toBeTruthy();
+  expect(bounds.y).toBeLessThan(844);
+  expect(bounds.height).toBeGreaterThan(140);
+});
+
 test('drag first library item onto canvas', async ({ page }) => {
   await page.addInitScript(() => {
     if (!location.search.includes('probe=')) {
@@ -22,6 +42,9 @@ test('drag first library item onto canvas', async ({ page }) => {
   });
   await page.goto(pageUrl('oneline.html?e2e=1'));
   await page.waitForSelector('[data-oneline-ready="1"]');
+  const paletteLabels = await page.locator('.palette-scroll [data-testid="palette-button"] .palette-label').allTextContents();
+  expect(new Set(paletteLabels).size).toBe(paletteLabels.length);
+  await expect(page.locator('.palette-card:visible .no-components')).toHaveCount(0);
   const firstBtn = page.locator('[data-testid="palette-button"]').first();
   await firstBtn.waitFor({ state: 'visible' });
   const before = await page.locator('g.component').count();

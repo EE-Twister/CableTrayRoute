@@ -112,8 +112,8 @@ describe('calcLoadCombinations — seismic only (W=0, S=0)', () => {
     assertClose(result.LC_S1.resultant_lbs_ft, expected, 0.02, 'LC-S1 resultant: ');
   });
 
-  it('LC-S2 vertical = 0.9×15 + 3 = 16.5 lbs/ft', () => {
-    assertClose(result.LC_S2.vertical_lbs_ft, 16.5, 0.01, 'LC-S2 vertical: ');
+  it('LC-S2 vertical = 0.9×15 − 3 = 10.5 lbs/ft', () => {
+    assertClose(result.LC_S2.vertical_lbs_ft, 10.5, 0.01, 'LC-S2 vertical: ');
   });
 
   it('LC-S2 horizontal = 1.0×6 = 6.0 lbs/ft', () => {
@@ -153,8 +153,8 @@ describe('calcLoadCombinations — combined (D=12, W=9, E_lat=5, E_v=2.4, S=3)',
     assertClose(result.LC_S1.resultant_lbs_ft, expected, 0.02, 'LC-S1 resultant: ');
   });
 
-  it('LC-S2 vertical = 0.9×12 + 2.4 = 13.2 lbs/ft', () => {
-    assertClose(result.LC_S2.vertical_lbs_ft, 13.2, 0.01, 'LC-S2 vertical: ');
+  it('LC-S2 vertical = 0.9×12 − 2.4 = 8.4 lbs/ft', () => {
+    assertClose(result.LC_S2.vertical_lbs_ft, 8.4, 0.01, 'LC-S2 vertical: ');
   });
 
   it('LC-W1 horizontal > LC-S1 horizontal when W > E_lat', () => {
@@ -206,6 +206,14 @@ describe('findControllingCombination — envelope selection', () => {
     const applicable = [combos.LC_W1, combos.LC_W2, combos.LC_S1, combos.LC_S2].filter(c => c.applicable);
     const expected = Math.max(...applicable.map(c => c.vertical_lbs_ft));
     assertClose(env.maxVertical_lbs_ft, expected, 0.01, 'maxVertical: ');
+  });
+
+  it('preserves uplift as a negative vertical demand in the envelope', () => {
+    const combos = calcLoadCombinations({ D_lbs_ft: 10, E_lat_lbs_ft: 5, E_v_lbs_ft: 12 });
+    const env = findControllingCombination(combos);
+    assertClose(combos.LC_S2.vertical_lbs_ft, -3, 0.01, 'LC-S2 uplift: ');
+    assertClose(env.minVertical_lbs_ft, -3, 0.01, 'minimum vertical: ');
+    assertClose(env.maxAbsVertical_lbs_ft, 24, 0.01, 'absolute vertical envelope: ');
   });
 
   it('envelope maxHorizontal is the highest horizontal across applicable combinations', () => {

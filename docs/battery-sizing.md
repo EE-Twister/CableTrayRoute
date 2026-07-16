@@ -2,10 +2,14 @@
 
 ## Overview
 
-The Battery / UPS Sizing study sizes a stationary battery bank and UPS unit to
-maintain power to critical loads for a required duration following a utility
-outage. The calculation follows **IEEE 485-2010** (lead-acid batteries) and
-**IEEE 1115-2000** (nickel-cadmium batteries).
+The Battery / UPS Sizing study provides a preliminary energy, budget, and space
+screen for a stationary battery bank and UPS unit.
+
+> **Screening only:** The calculation is not an IEEE 485 or IEEE 1115 cell-sizing
+> implementation and does not establish compliance or a final product selection.
+> Final sizing requires the complete dc duty cycle, minimum end voltage, and the
+> selected manufacturer's discharge-performance data. IEEE 485-2020 applies to
+> lead-acid batteries only; it does not apply to lithium-ion batteries.
 
 Correct battery sizing is required for:
 - Emergency lighting and life-safety systems (NEC Article 700)
@@ -24,7 +28,7 @@ Run this study when:
 - Specifying a new UPS system or replacing an existing battery bank
 - Evaluating runtime extension for an existing UPS
 - Sizing a standalone DC battery system (telecom, substation control)
-- Verifying compliance with NEC 700/701 minimum runtime requirements
+- Screening a requested NEC 700/701 runtime before a code and manufacturer review
 
 **Upstream inputs:**
 - Average and peak load demand — use the [Load List](../loadlist.html) or
@@ -33,7 +37,7 @@ Run this study when:
 
 ---
 
-## IEEE 485 Algorithm — Step by Step
+## Generic Energy-Screening Algorithm — Step by Step
 
 ### Step 1: Net Energy (kWh)
 
@@ -69,7 +73,7 @@ kWh_design = kWh_net / (η × DoD)
 **Example:** 100 kWh net, Lead-Acid AGM:
 `kWh_design = 100 / 0.680 = 147.1 kWh`
 
-### Step 3: Temperature Correction (IEEE 485 §5.2)
+### Step 3: Assumed Temperature Correction
 
 Battery capacity decreases at low ambient temperatures. The temperature
 correction factor K_temp scales the required bank size accordingly:
@@ -79,8 +83,8 @@ K_temp = min(1.0,  1 + coeff × (T_amb − 25°C))
 kWh_temp = kWh_design / K_temp
 ```
 
-K_temp is capped at 1.0: IEEE 485 does not credit extra capacity above 25 °C
-(elevated temperature shortens cycle life without increasing usable energy).
+K_temp is capped at 1.0 for conservative screening. Replace this generic linear
+coefficient with manufacturer data for the selected cell and discharge duration.
 
 **Temperature coefficients:**
 
@@ -100,11 +104,11 @@ K_temp is capped at 1.0: IEEE 485 does not credit extra capacity above 25 °C
 | −5          | 0.760  | ×1.316                   |
 | −15         | 0.680  | ×1.471                   |
 
-### Step 4: Aging Factor (IEEE 485 §5.3)
+### Step 4: Assumed Aging Factor
 
-Battery capacity degrades over its service life. IEEE 485 recommends sizing to
-maintain full runtime until the end of the battery's rated cycle life, typically
-when capacity falls to 80% of nameplate:
+Battery capacity degrades over its service life. The screening model applies a
+generic end-of-life multiplier; final criteria depend on the battery technology,
+project requirements, and selected standard:
 
 ```
 kWh_aged = kWh_temp × aging_factor
@@ -116,7 +120,7 @@ kWh_aged = kWh_temp × aging_factor
 | Lithium-Ion       | 1.20         | Replace at ~80% capacity          |
 | Nickel-Cadmium    | 1.20         | Replace at ~80% capacity          |
 
-### Step 5: Design Margin (IEEE 485 §5.4)
+### Step 5: User-Entered Design Margin
 
 An additional margin accounts for uncertainty in load growth, installation
 differences, and measurement error:
@@ -125,8 +129,8 @@ differences, and measurement error:
 kWh_final = kWh_aged × (1 + margin%)
 ```
 
-IEEE 485 recommends a **minimum 10% design margin** for general applications.
-Use 15–25% for life-safety and mission-critical systems.
+The default is **10%** for preliminary screening. Project criteria and the
+applicable battery standard govern the final margin.
 
 ---
 
@@ -139,7 +143,7 @@ Use 15–25% for life-safety and mission-critical systems.
 | Runtime (hours) | Required discharge duration | 0.25–8 h |
 | Chemistry | Lead-acid, lithium-ion, or NiCd | See table above |
 | Ambient temp (°C) | Battery room / enclosure temperature | −40 to +40 °C |
-| Design margin (%) | IEEE 485 §5.4 additional margin | 10–25% |
+| Design margin (%) | User-entered screening allowance | 10–25% |
 | UPS power factor | UPS output PF (typically 0.9 for modern units) | 0.8–1.0 |
 | DC bus voltage (V) | Nominal battery string / UPS DC bus voltage for rack layout | 125, 240, 480, 600 VDC |
 | Nominal cell voltage (V) | Cell voltage used to compute cells in series | 2.0 lead-acid, 3.2 Li-ion, 1.2 NiCd |
@@ -158,8 +162,8 @@ factor dominates the final requirement. A large gap between kWh_net and
 kWh_final in cold environments indicates that battery heating should be
 considered.
 
-**Recommended bank size** — the smallest standard rating (kWh) that meets the
-final requirement. Standard sizes: 10, 15, 20, 25, 30, 40, 50, 60, 75, 100,
+**Screening bank size** — the smallest generic kWh increment that meets the
+screening requirement. Generic increments: 10, 15, 20, 25, 30, 40, 50, 60, 75, 100,
 120, 150, 200, 250, 300, 400, 500, 600, 750, 1000 kWh.
 
 **Runtime curve** — available runtime at 25%, 50%, 75%, 100%, and 125% of the
@@ -197,7 +201,7 @@ field-verified terminal layouts.
 
 ## Standards References
 
-- **IEEE 485-2010** — IEEE Recommended Practice for Sizing Lead-Acid Batteries for
+- **IEEE 485-2020** — IEEE Recommended Practice for Sizing Lead-Acid Batteries for
   Stationary Applications
 - **IEEE 1115-2000** (revised 2014) — IEEE Recommended Practice for Sizing
   Nickel-Cadmium Batteries for Stationary Applications
@@ -235,9 +239,9 @@ All functions are exported from `analysis/batterySizing.mjs` with no DOM depende
 
 | Function | Purpose |
 |----------|---------|
-| `temperatureFactor(chemistry, tempC)` | IEEE 485 §5.2 K_temp factor |
+| `temperatureFactor(chemistry, tempC)` | Generic screening K_temp factor |
 | `requiredEnergyKwh(loadProfilePeriods)` | Net energy from duty cycle |
-| `designCapacityKwh(kwhNet, chemistry, tempC, margin)` | Full five-step sizing chain |
+| `designCapacityKwh(kwhNet, chemistry, tempC, margin)` | Generic five-step screening chain |
 | `standardBankSize(kwhRequired)` | Select nearest standard bank kWh |
 | `runtimeCurve(kwhSelected, loadKw, chemistry)` | Runtime at 25/50/75/100/125% load |
 | `upsKvaRequired(peakKw, upsPF)` | UPS kVA requirement and standard size |

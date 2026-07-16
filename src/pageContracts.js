@@ -99,7 +99,15 @@ const exportOnly = (purpose, consumers = []) => output('export-only', 'export', 
 export const PAGE_CONTRACTS_BY_HREF = {
   'workflowdashboard.html': contract({
     standaloneInputs: ['Manual project review, workflow navigation, and sample project loading.'],
-    projectInputs: [...coreProjectInputs, approvals, reportSnapshots, lifecyclePackages, tccSettings, oneLineReconcilePending],
+    projectInputs: [
+      ...coreProjectInputs,
+      approvals,
+      reportSnapshots,
+      lifecyclePackages,
+      tccSettings,
+      oneLineReconcilePending,
+      projectInput('settings.activeSampleWorkflow', 'setting', false, 'Active sample context used to suppress redundant sample-loading guidance.')
+    ],
     outputs: [
       output('settings.designBasis', 'setting', 'Design basis wizard decisions and project defaults.', ['workflowdashboard.html', 'projectreport.html']),
       output('settings.designGateApprovals', 'setting', 'Design gate approvals and flagged review decisions.', ['workflowdashboard.html', 'projectreport.html']),
@@ -110,6 +118,7 @@ export const PAGE_CONTRACTS_BY_HREF = {
       output('conduitSchedule', 'schedule', 'Automation-seeded conduit schedule rows.', ['racewayschedule.html', 'optimalRoute.html']),
       output('ductbankSchedule', 'schedule', 'Automation-seeded ductbank schedule rows.', ['ductbankroute.html', 'optimalRoute.html']),
       output('settings.lifecyclePackages', 'setting', 'Lifecycle package records created from dashboard package actions.', ['projectreport.html']),
+      output('studyResults.duty', 'study-result', 'Equipment-duty validation results evaluated while central workflow readiness is refreshed.', ['equipmentevaluation.html', 'projectreport.html']),
       output('settings.oneLineScheduleReconcilePending', 'setting', 'Workflow automation reconcile state for one-line and schedule handoff.', ['oneline.html'])
     ],
     readiness: ready('Dashboard is ready when it can summarize every workflow step and identify the next incomplete handoff.', ['Missing schedule data, unresolved review gates, pending studies, or no deliverables.']),
@@ -179,17 +188,10 @@ export const PAGE_CONTRACTS_BY_HREF = {
     projectInputs: [
       equipment, loads, panels, cables, trays, conduits, studies, tccSettings,
       projectInput('settings.manufacturerDefaults', 'setting', false, 'Manufacturer default selections for one-line component properties.'),
-      projectInput('settings.oneLineDiagramFilterMode', 'setting', false, 'One-line component filter mode.'),
       projectInput('settings.diagramScale', 'setting', false, 'Diagram scale setting.'),
-      projectInput('settings.diagramZoom', 'setting', false, 'Diagram zoom state.'),
       projectInput('settings.studySettings', 'setting', false, 'One-line embedded study settings.'),
-      projectInput('settings.gridSize', 'setting', false, 'Diagram grid size.'),
-      projectInput('settings.gridEnabled', 'setting', false, 'Diagram grid visibility.'),
       projectInput('settings.labelPrefixes', 'setting', false, 'One-line label prefix settings.'),
       projectInput('settings.labelCounters', 'setting', false, 'One-line label counter state.'),
-      projectInput('settings.layersPanelOpen', 'setting', false, 'Layer panel open/closed state.'),
-      projectInput('settings.orthogonalRouting', 'setting', false, 'Orthogonal connection routing preference.'),
-      projectInput('settings.symbolStandard', 'setting', false, 'ANSI/IEC symbol standard selection.'),
       projectInput('settings.diagramTitleBlock', 'setting', false, 'One-line title block fields.'),
       projectInput('settings.diagramDatablockConfig', 'setting', false, 'One-line datablock display configuration.'),
       projectInput('settings.activeSampleWorkflow', 'setting', false, 'Active sample context used to fit and guide the sample diagram.'),
@@ -213,18 +215,11 @@ export const PAGE_CONTRACTS_BY_HREF = {
       output('studyResults.duty', 'study-result', 'Embedded equipment-duty result generated from one-line validation.', ['equipmentevaluation.html', 'projectreport.html']),
       output('settings.scenarios', 'setting', 'Active scenario selection restored during one-line project import.', ['scenarios.html']),
       output('settings.studySettings', 'setting', 'One-line embedded study settings.', ['oneline.html']),
-      output('settings.diagramZoom', 'setting', 'Diagram zoom state.', ['oneline.html']),
       output('settings.labelCounters', 'setting', 'One-line label counter state.', ['oneline.html']),
       output('settings.labelPrefixes', 'setting', 'One-line label prefix settings.', ['oneline.html']),
       output('settings.manufacturerDefaults', 'setting', 'Manufacturer default selections for one-line component properties.', ['oneline.html']),
-      output('settings.gridEnabled', 'setting', 'Diagram grid visibility.', ['oneline.html']),
       output('settings.diagramDatablockConfig', 'setting', 'One-line datablock display configuration.', ['oneline.html']),
       output('settings.diagramScale', 'setting', 'Diagram scale setting.', ['oneline.html']),
-      output('settings.layersPanelOpen', 'setting', 'Layer panel open/closed state.', ['oneline.html']),
-      output('settings.gridSize', 'setting', 'Diagram grid size.', ['oneline.html']),
-      output('settings.oneLineDiagramFilterMode', 'setting', 'One-line component filter mode.', ['oneline.html']),
-      output('settings.orthogonalRouting', 'setting', 'Orthogonal connection routing preference.', ['oneline.html']),
-      output('settings.symbolStandard', 'setting', 'ANSI/IEC symbol standard selection.', ['oneline.html']),
       output('settings.diagramTitleBlock', 'setting', 'One-line title block fields.', ['oneline.html']),
       output('settings.gistToken', 'setting', 'Gist import/export token setting.', ['oneline.html']),
       output('settings.onelineTemplates', 'setting', 'Reusable one-line component templates saved with project settings.', ['oneline.html']),
@@ -510,10 +505,11 @@ export const PAGE_CONTRACTS_BY_HREF = {
   'projectreport.html': contract({
     workflowStep: 'deliverables',
     standaloneInputs: ['Report package selections, cover sheet data, revision rows, and manual assumptions.'],
-    projectInputs: [...deliverableInputs, lifecyclePackages, tccSettings, projectMeta],
+    projectInputs: [...deliverableInputs, lifecyclePackages, tccSettings, projectMeta, oneLineReconcilePending],
     outputs: [
       output('settings.projectMeta', 'setting', 'Shared project and report metadata edited from the report builder.', ['battery.html', 'generatorsizing.html', 'projectreport.html']),
       output('settings.reportSnapshots', 'setting', 'Saved report package snapshots.', ['workflowdashboard.html', 'projectreport.html']),
+      output('studyResults.duty', 'study-result', 'Equipment-duty validation results evaluated while report readiness is refreshed.', ['equipmentevaluation.html']),
       exportOnly('Project report previews, PDF/print output, and report spreadsheets.')
     ],
     readiness: ready('Ready when selected report sections have source data and required review gates are complete.', ['No reportable sections, open review gates, or missing cover/revision metadata.']),
@@ -807,7 +803,7 @@ export const PAGE_CONTRACTS_BY_HREF = {
     standaloneInputs: ['PV/QV curve inputs, selected bus, load scaling, and solver settings.'],
     projectInputs: [oneLine, loads, projectInput('studyResults.loadFlow', 'study-result', false, 'Base case load-flow solution.'), designBasis, approvals],
     outputs: [
-      output('studyResults.voltageStability', 'study-result', 'Saved PV/QV curve results and stability margins.', ['projectreport.html']),
+      output('studyResults.voltageStability', 'study-result', 'Saved sequential PV/QV screening sweeps and numerical solver-boundary context; no physical stability margin is established.', ['projectreport.html']),
       studyApprovalOutput,
       exportOnly('Voltage stability curve exports.', ['projectreport.html'])
     ],
@@ -822,8 +818,15 @@ export const PAGE_CONTRACTS_BY_HREF = {
       output('studyResults.shortCircuit', 'study-result', 'Saved short-circuit duty result by bus or device.', ['arcFlash.html', 'tcc.html', 'equipmentevaluation.html', 'projectreport.html']),
       exportOnly('Short-circuit reports and duty tables.', ['projectreport.html'])
     ],
-    readiness: ready('Ready when the one-line has a source and faultable buses/devices.', ['No source, missing impedance/fault data, or disconnected fault location.']),
-    downstream: ['tcc.html', 'arcFlash.html', 'equipmentevaluation.html', 'projectreport.html']
+    readiness: ready(
+      'Ready when the one-line has a source and faultable buses/devices, and every referenced feeder can resolve its impedance from the canonical Cable Schedule or explicit component data.',
+      ['No source, missing cable size/material/length, an unresolved or ambiguous Cable Schedule link, missing impedance/fault data, or a disconnected fault location.']
+    ),
+    downstream: ['tcc.html', 'arcFlash.html', 'equipmentevaluation.html', 'projectreport.html'],
+    notes: [
+      'Equipment-to-equipment One-Line connections resolve cable tags and endpoints against cableSchedule. When explicit R/X is absent, conductor size, material, raceway material, length, and parallel sets are converted to series impedance using the NEC Chapter 9 Table 9 library.',
+      'Saved results include a source-to-fault impedance path with per-segment provenance. Any One-Line fallback or assumed raceway material remains visible as an input-quality warning.'
+    ]
   }),
   'iec60909.html': contract({
     workflowStep: 'studies',

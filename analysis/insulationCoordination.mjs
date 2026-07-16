@@ -1,10 +1,11 @@
 /**
- * Insulation Coordination — IEC 60071-1/2 / IEEE 1313
+ * Preliminary Insulation Coordination Screening — IEC 60071-1/2 / IEEE 1313
  *
  * Implements the deterministic and simplified-statistical insulation
  * coordination procedure for AC systems per:
  *   IEC 60071-1:2006+AMD1:2010 — Definitions, standard insulation levels (Tables 2 & 3)
- *   IEC 60071-2:1996+AMD1:2012 — Application guide (atmospheric correction, safety factors)
+ *   IEC 60071-2:2023 — Current application guide; detailed simulation and
+ *                      project-specific stress studies are outside this screen
  *   IEEE 1313.2-1999 — Guide for the application of insulation coordination
  *
  * Procedure summary (IEC 60071-2 §2):
@@ -18,15 +19,14 @@
  *   4. Select the lowest standard insulation level from IEC 60071-1 Table 2/3 with
  *      BIL (LIWV) ≥ Ucw_LI and PFWV ≥ Ucw_TOV.
  *   5. Verify protective margins of the surge arrester:
- *        Mp_LI (%) = (Ucw_LI / Ures_LI − 1) × 100  ≥ 20 %
- *        Mp_SI (%) = (Ucw_SI / Ures_SI − 1) × 100  ≥ 15 %
+ *        Mp_LI (%) = (BIL_selected / Ures_LI − 1) × 100  ≥ 20 %
+ *        Mp_SI (%) = (SIL_selected / Ures_SI − 1) × 100  ≥ 15 %
  *   6. (Optional) Estimate statistical risk of failure per IEC 60071-2 Annex A using
  *      a simplified Gaussian convolution model.
  *
  * References:
  *   IEC 60071-1:2006+AMD1:2010 Table 2 (Range I: 1–245 kV) and Table 3 (Range II: >245 kV)
- *   IEC 60071-2:1996 §3.3 — Atmospheric correction (Ka)
- *   IEC 60071-2:1996 Annex A — Statistical risk of failure
+ *   IEC 60071-2:2023 — Current application guidance and detailed simulation
  *   IEEE 1313.2-1999 §6 — Protective margins
  */
 
@@ -171,25 +171,25 @@ export function coordinationWithstandVoltage(representativeKvPeak, safetyFactor,
 /**
  * Compute the protective margin of a surge arrester.
  *
- *   Mp (%) = (Ucw / Ures − 1) × 100
+ *   Mp (%) = (Uwithstand / Ures − 1) × 100
  *
  * A positive Mp means the insulation withstand exceeds the arrester protective level.
  * Required margins per IEEE 1313.2 §6:
  *   Lightning impulse: Mp ≥ 20 %
  *   Switching impulse: Mp ≥ 15 %
  *
- * @param {number} ucwKvPeak      Required coordination withstand voltage (kV peak)
+ * @param {number} withstandKvPeak Selected equipment BIL/SIL withstand voltage (kV peak)
  * @param {number} arresterResKvPeak  Arrester residual/protective level (kV peak)
  * @returns {{ marginPct: number, pass: boolean, stressClass: string }}
  */
-export function protectiveMargin(ucwKvPeak, arresterResKvPeak, stressClass = 'li') {
-  if (!Number.isFinite(ucwKvPeak) || ucwKvPeak <= 0) {
-    throw new Error('ucwKvPeak must be greater than zero');
+export function protectiveMargin(withstandKvPeak, arresterResKvPeak, stressClass = 'li') {
+  if (!Number.isFinite(withstandKvPeak) || withstandKvPeak <= 0) {
+    throw new Error('withstandKvPeak must be greater than zero');
   }
   if (!Number.isFinite(arresterResKvPeak) || arresterResKvPeak <= 0) {
     throw new Error('arresterResKvPeak must be greater than zero');
   }
-  const marginPct = round((ucwKvPeak / arresterResKvPeak - 1) * 100, 1);
+  const marginPct = round((withstandKvPeak / arresterResKvPeak - 1) * 100, 1);
   const minMargin = stressClass === 'si' ? MIN_PROTECTIVE_MARGIN_SI_PCT : MIN_PROTECTIVE_MARGIN_LI_PCT;
   return { marginPct, pass: marginPct >= minMargin, minMarginPct: minMargin };
 }
@@ -419,8 +419,8 @@ export function runInsulationCoordinationStudy(inputs) {
     const { selectedBilKv, availableBilKv } = selectStandardBil(umKv, ucwLI);
 
     let liMargin = null;
-    if (Number.isFinite(lightningImpulse.arresterResidualKvPeak)) {
-      liMargin = protectiveMargin(ucwLI, lightningImpulse.arresterResidualKvPeak, 'li');
+    if (selectedBilKv !== null && Number.isFinite(lightningImpulse.arresterResidualKvPeak)) {
+      liMargin = protectiveMargin(selectedBilKv, lightningImpulse.arresterResidualKvPeak, 'li');
       if (!liMargin.pass) {
         warnings.push(
           `Lightning impulse protective margin (${liMargin.marginPct}%) is below the required ${MIN_PROTECTIVE_MARGIN_LI_PCT}%. Consider a lower arrester protective level or higher BIL.`
@@ -462,20 +462,20 @@ export function runInsulationCoordinationStudy(inputs) {
   if (switchingImpulse && Number.isFinite(switchingImpulse.representativeKvPeak)) {
     const ucwSI = coordinationWithstandVoltage(switchingImpulse.representativeKvPeak, ks, kaLI);
 
+    // For Range II, check against standard siwv if available
+    const availableSiwv = standardRow.siwv ?? [];
+    const suitableSiwv = availableSiwv.filter(v => v >= ucwSI);
+    const selectedSilKv = suitableSiwv.length > 0 ? Math.min(...suitableSiwv) : null;
+
     let siMargin = null;
-    if (Number.isFinite(switchingImpulse.arresterResidualKvPeak)) {
-      siMargin = protectiveMargin(ucwSI, switchingImpulse.arresterResidualKvPeak, 'si');
+    if (selectedSilKv !== null && Number.isFinite(switchingImpulse.arresterResidualKvPeak)) {
+      siMargin = protectiveMargin(selectedSilKv, switchingImpulse.arresterResidualKvPeak, 'si');
       if (!siMargin.pass) {
         warnings.push(
           `Switching impulse protective margin (${siMargin.marginPct}%) is below the required ${MIN_PROTECTIVE_MARGIN_SI_PCT}%. Consider a lower arrester protective level or higher SIL.`
         );
       }
     }
-
-    // For Range II, check against standard siwv if available
-    const availableSiwv = standardRow.siwv ?? [];
-    const suitableSiwv = availableSiwv.filter(v => v >= ucwSI);
-    const selectedSilKv = suitableSiwv.length > 0 ? Math.min(...suitableSiwv) : null;
 
     if (availableSiwv.length > 0 && selectedSilKv === null) {
       warnings.push(
@@ -556,6 +556,12 @@ export function runInsulationCoordinationStudy(inputs) {
     siResult,
     allPassed,
     warnings,
+    calculationStatus: 'screening-only',
+    standardEdition: 'IEC 60071-2:2023 review required',
+    requiredInputs: [
+      'Confirm representative overvoltages, arrester protective levels, and selected withstand ratings against the project insulation-coordination study.',
+      'Review the result using IEC 60071-2:2023 detailed simulation and application guidance where applicable.',
+    ],
     timestamp: new Date().toISOString(),
   };
 }

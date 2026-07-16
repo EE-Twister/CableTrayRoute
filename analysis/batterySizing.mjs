@@ -1,32 +1,30 @@
 /**
- * Battery / UPS Sizing per IEEE 485-2010 / IEEE 1115-2000
+ * Preliminary Battery / UPS Energy Screening
  *
- * Standard stationary battery sizing workflow (IEEE 485-2010):
+ * Generic energy-screening workflow:
  *   1. Compute net energy from load profile:  kWh_net = Σ(P_i × Δt_i)
  *   2. Derate for efficiency and depth of discharge:
  *        kWh_design = kWh_net / (η × DoD)
- *   3. Apply temperature correction (IEEE 485 §5.2):
+ *   3. Apply an assumed linear temperature correction:
  *        K_temp = min(1.0, 1 + coeff × (T_amb − 25))
  *        kWh_temp = kWh_design / K_temp
- *   4. Apply aging factor (IEEE 485 §5.3):
+ *   4. Apply an assumed aging factor:
  *        kWh_aged = kWh_temp × aging_factor
- *   5. Apply design margin (IEEE 485 §5.4):
+ *   5. Apply a user-entered design margin:
  *        kWh_final = kWh_aged × (1 + margin% / 100)
  *
- * References:
- *   IEEE 485-2010  — Recommended Practice for Sizing Lead-Acid Batteries for
- *                    Stationary Applications
- *   IEEE 1115-2000 — Recommended Practice for Sizing Nickel-Cadmium Batteries
- *                    for Stationary Applications
- *   IEEE 1115-2014 — (revised) Nickel-Cadmium battery sizing
+ * This is not an IEEE 485 or IEEE 1115 cell-sizing implementation. Final sizing
+ * requires a defined dc duty cycle, end voltage, and manufacturer discharge
+ * performance data for the selected cell. IEEE 485-2020 applies to lead-acid
+ * batteries; it does not apply to lithium-ion batteries.
  */
 
 /**
  * Battery chemistry parameters.
  * η       — round-trip charge/discharge efficiency
  * dod     — usable depth of discharge (design limit, not absolute maximum)
- * coeff   — IEEE 485 §5.2 temperature coefficient per °C relative to 25 °C
- * agingFactor — IEEE 485 §5.3 capacity multiplier to account for end-of-life capacity
+ * coeff   — generic screening temperature coefficient per °C relative to 25 °C
+ * agingFactor — assumed capacity multiplier to account for end-of-life capacity
  *               (replace when capacity falls to ~80% of nameplate)
  */
 export const CHEMISTRY = {
@@ -73,13 +71,12 @@ export const STANDARD_UPS_KVA = [
 ];
 
 /**
- * IEEE 485 §5.2 temperature correction factor.
+ * Generic screening temperature correction factor.
  *
  * Battery capacity decreases at temperatures below 25 °C. K_temp < 1.0 in cold
  * environments means the installed bank must be oversized to compensate.
- * At temperatures above 25 °C the formula would give K_temp > 1.0, but IEEE 485
- * does not credit extra capacity (elevated temperature shortens cycle life);
- * therefore K_temp is capped at 1.0.
+ * At temperatures above 25 °C the formula would give K_temp > 1.0. Screening
+ * does not credit that increase because elevated temperature shortens life.
  *
  * K_temp = min(1.0,  1 + coeff × (T_amb − 25))
  *
@@ -130,8 +127,7 @@ export function requiredEnergyKwh(loadProfilePeriods) {
 }
 
 /**
- * Apply IEEE 485 sizing factors to the net energy requirement, producing the
- * final required battery bank capacity (kWh).
+ * Apply generic screening factors to the net energy requirement.
  *
  * Steps:
  *   kWh_design = kWh_net / (η × DoD)                      — efficiency + DoD
@@ -279,9 +275,9 @@ export function upsKvaRequired(peakKw, upsPowerFactor = 0.9) {
 }
 
 /**
- * Run a complete battery / UPS sizing analysis per IEEE 485-2010.
+ * Run a preliminary battery / UPS energy screening analysis.
  *
- * Applies all five IEEE 485 sizing steps and returns a unified result object.
+ * Applies generic energy factors and returns a unified screening result.
  * Does NOT read from or write to the data store — the caller (battery.js) is
  * responsible for persistence.
  *
@@ -326,6 +322,22 @@ export function runBatterySizingAnalysis(inputs) {
   }
 
   const warnings = [];
+  const requiredInputs = [
+    'Obtain manufacturer discharge-performance data for the selected cell at the required end voltage and discharge duration.',
+    'Validate the complete dc duty cycle, including momentary, noncontinuous, and random loads.',
+    'Confirm UPS overload, crest-factor, harmonic, phase-imbalance, efficiency, and redundancy requirements with the selected manufacturer.',
+  ];
+
+  warnings.push(
+    'PRELIMINARY SCREENING ONLY: this generic kWh model is not an IEEE 485/1115 cell-sizing calculation and must not be issued as a final battery or UPS selection.'
+  );
+  if (chemistry === 'lithium-ion') {
+    warnings.push('IEEE 485 does not apply to lithium-ion batteries; use manufacturer-specific lithium-ion sizing and the applicable project safety standards.');
+  } else if (chemistry === 'nickel-cadmium') {
+    warnings.push('Final nickel-cadmium sizing must follow IEEE 1115 using manufacturer discharge data.');
+  } else {
+    warnings.push('Final lead-acid sizing must follow IEEE 485-2020 using manufacturer discharge data and the project dc duty cycle.');
+  }
 
   // --- Step 1: Net energy ---
   let kwhNet;
@@ -430,6 +442,9 @@ export function runBatterySizingAnalysis(inputs) {
       ? { ...rackLayoutInputs }
       : undefined,
     // Metadata
+    calculationStatus: 'screening-only',
+    standardCompliance: null,
+    requiredInputs,
     warnings,
     timestamp: new Date().toISOString(),
   };

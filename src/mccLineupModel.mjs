@@ -150,8 +150,16 @@ export const MCC_MOTOR_PROTECTION_DEVICE_TYPES = [
   'magnetic'
 ];
 
-function uniqueId(prefix) {
-  return `${prefix}-${Date.now()}-${Math.round(Math.random() * 1000)}`;
+let mccIdSequence = 0;
+
+export function createMccUniqueId(prefix = 'mcc') {
+  mccIdSequence += 1;
+  const randomUuid = globalThis.crypto?.randomUUID?.();
+  if (randomUuid) return `${prefix}-${randomUuid}`;
+  const timePart = Date.now().toString(36);
+  const sequencePart = mccIdSequence.toString(36);
+  const randomPart = Math.round(Math.random() * 1_000_000_000).toString(36);
+  return `${prefix}-${timePart}-${sequencePart}-${randomPart}`;
 }
 
 function finiteNumber(value, fallback) {
@@ -412,7 +420,7 @@ export function mccSpecSummary(spec = {}) {
 export function createDefaultMccLineup(index = 0) {
   const number = index + 1;
   return normalizeMccLineup({
-    id: uniqueId('mcc'),
+    id: createMccUniqueId('mcc'),
     tag: `MCC-${number}`,
     name: `MCC Lineup ${number}`,
     equipmentTag: '',
@@ -430,24 +438,24 @@ export function createDefaultMccLineup(index = 0) {
     specRequirements: DEFAULT_MCC_SPEC_REQUIREMENTS,
     sections: [
       {
-        id: uniqueId('mcc-sec'),
+        id: createMccUniqueId('mcc-sec'),
         name: 'Main',
         widthIn: DEFAULT_MCC_SECTION_WIDTH_IN,
         verticalWirewayWidthIn: DEFAULT_MCC_VERTICAL_WIREWAY_WIDTH_IN,
         buckets: [
-          { id: uniqueId('mcc-bkt'), label: 'MAIN', type: 'main', status: 'active', mainDevice: 'breaker', sizeUnits: 3, equipmentTag: 'MAIN', equipmentDescription: 'Incoming Main', loadTag: 'MAIN', breakerA: 1600 },
-          { id: uniqueId('mcc-bkt'), label: 'SPARE', type: 'spare', status: 'spare', sizeUnits: 1 }
+          { id: createMccUniqueId('mcc-bkt'), label: 'MAIN', type: 'main', status: 'active', mainDevice: 'breaker', sizeUnits: 3, equipmentTag: 'MAIN', equipmentDescription: 'Incoming Main', loadTag: 'MAIN', breakerA: 1600 },
+          { id: createMccUniqueId('mcc-bkt'), label: 'SPARE', type: 'spare', status: 'spare', sizeUnits: 1 }
         ]
       },
       {
-        id: uniqueId('mcc-sec'),
+        id: createMccUniqueId('mcc-sec'),
         name: 'Section 2',
         widthIn: DEFAULT_MCC_SECTION_WIDTH_IN,
         verticalWirewayWidthIn: DEFAULT_MCC_VERTICAL_WIREWAY_WIDTH_IN,
         buckets: [
-          { id: uniqueId('mcc-bkt'), label: 'P-101', type: 'starter', status: 'active', sizeUnits: 1, equipmentTag: 'P-101', equipmentDescription: 'Process Pump P-101', loadTag: 'P-101', hp: 25, breakerA: 60, starterType: 'fvnr', starterSize: 'NEMA 2', motorSpaceHeaterRequired: true, motorSpaceHeaterVa: 250 },
-          { id: uniqueId('mcc-bkt'), label: 'FAN-102', type: 'starter', status: 'active', sizeUnits: 1, equipmentTag: 'FAN-102', equipmentDescription: 'Ventilation Fan 102', loadTag: 'FAN-102', hp: 15, breakerA: 40, starterType: 'fvr', starterSize: 'NEMA 1' },
-          { id: uniqueId('mcc-bkt'), label: 'SPACE', type: 'space', status: 'space', sizeUnits: 0.5 }
+          { id: createMccUniqueId('mcc-bkt'), label: 'P-101', type: 'starter', status: 'active', sizeUnits: 1, equipmentTag: 'P-101', equipmentDescription: 'Process Pump P-101', loadTag: 'P-101', hp: 25, breakerA: 60, starterType: 'fvnr', starterSize: 'NEMA 2', motorSpaceHeaterRequired: true, motorSpaceHeaterVa: 250 },
+          { id: createMccUniqueId('mcc-bkt'), label: 'FAN-102', type: 'starter', status: 'active', sizeUnits: 1, equipmentTag: 'FAN-102', equipmentDescription: 'Ventilation Fan 102', loadTag: 'FAN-102', hp: 15, breakerA: 40, starterType: 'fvr', starterSize: 'NEMA 1' },
+          { id: createMccUniqueId('mcc-bkt'), label: 'SPACE', type: 'space', status: 'space', sizeUnits: 0.5 }
         ]
       }
     ]
@@ -471,7 +479,7 @@ export function normalizeBucket(bucket = {}, unitHeightIn = DEFAULT_MCC_UNIT_HEI
   const motorSpaceHeaterRequired = booleanValue(bucket.motorSpaceHeaterRequired, false);
 
   return {
-    id: bucket.id || uniqueId('mcc-bkt'),
+    id: bucket.id || createMccUniqueId('mcc-bkt'),
     label: text(bucket.label, status === 'active' ? `Bucket ${index + 1}` : status.toUpperCase()),
     type,
     mainDevice: normalizeMainDevice(bucket, type, normalizedBucketType.mainDevice),
@@ -494,7 +502,7 @@ export function normalizeBucket(bucket = {}, unitHeightIn = DEFAULT_MCC_UNIT_HEI
 
 export function normalizeSection(section = {}, unitHeightIn = DEFAULT_MCC_UNIT_HEIGHT_IN, index = 0) {
   return {
-    id: section.id || uniqueId('mcc-sec'),
+    id: section.id || createMccUniqueId('mcc-sec'),
     name: text(section.name, `Section ${index + 1}`),
     widthIn: positiveNumber(section.widthIn, DEFAULT_MCC_SECTION_WIDTH_IN, 6),
     verticalWirewayWidthIn: nonNegativeNumber(section.verticalWirewayWidthIn, DEFAULT_MCC_VERTICAL_WIREWAY_WIDTH_IN),
@@ -533,7 +541,7 @@ export function normalizeMccLineup(lineup = {}, index = 0) {
     : [];
 
   return {
-    id: lineup.id || uniqueId('mcc'),
+    id: lineup.id || createMccUniqueId('mcc'),
     tag,
     name: text(lineup.name, tag),
     equipmentTag: hasEquipmentTag ? text(lineup.equipmentTag) : tag,

@@ -173,10 +173,13 @@ document.addEventListener('DOMContentLoaded', () => {
     el.hidden = false;
     el.innerHTML = `
       <h2>${escapeHtml(result.label)}</h2>
+      <div class="warning-panel" role="alert" style="border-left:4px solid var(--color-warn,#e6a000);padding:.75rem 1rem;margin:1rem 0;background:var(--color-bg-warn,#fffbe6)">
+        <strong>Screening only.</strong> Generic impedance, derating, and mechanical values cannot establish a final busway product selection. Manufacturer-certified data governs.
+      </div>
 
       <!-- Ampacity card -->
       <section class="field-group" aria-label="Ampacity results" style="margin-bottom:1.5rem">
-        <h3>Ampacity (NEC 368)</h3>
+        <h3>Preliminary Ampacity Screen</h3>
         <table class="results-table" aria-label="Ampacity summary">
           <tbody>
             <tr>
@@ -218,7 +221,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       <!-- Fault stress card -->
       <section class="field-group" aria-label="Fault stress results" style="margin-bottom:1.5rem">
-        <h3>Fault Stress (IEEE 605)</h3>
+        <h3>Preliminary Bare-Conductor Fault Stress</h3>
         <table class="results-table" aria-label="Fault stress summary">
           <tbody>
             <tr>

@@ -1,6 +1,11 @@
 # Insulation Coordination
 
-**Standard:** IEC 60071-1:2006+AMD1:2010 / IEC 60071-2:1996+AMD1:2012 / IEEE 1313.2-1999
+**Standard context:** IEC 60071-1 / IEC 60071-2:2023 / IEEE 1313.2
+
+> **Screening limitation:** This reduced workflow does not implement the full
+> IEC 60071-2:2023 application and detailed-simulation process. Final design
+> requires project-specific representative overvoltages, selected equipment
+> withstand ratings, and manufacturer arrester protective data.
 
 **Module:** `analysis/insulationCoordination.mjs`  
 **Study page:** `insulationcoordination.html`  
@@ -69,7 +74,7 @@ PFWV ≥ Ucw_TOV / √2  (Range I only)
 ### 6. Surge arrester protective margin (IEEE 1313.2 §6)
 
 ```
-Mp (%) = (Ucw / Ures − 1) × 100
+Mp (%) = (selected BIL or SIL / Ures − 1) × 100
 ```
 
 Required minimum margins:
@@ -174,7 +179,7 @@ const result = runInsulationCoordinationStudy({
 ## References
 
 - IEC 60071-1:2006+AMD1:2010 — Insulation coordination — Part 1: Definitions, principles and rules
-- IEC 60071-2:1996+AMD1:2012 — Insulation coordination — Part 2: Application guide
+- IEC 60071-2:2023 — Insulation co-ordination — Part 2: Application guidelines
 - IEEE 1313.2-1999 — Guide for the application of insulation coordination
 - IEC 60099-4:2014 — Metal-oxide surge arresters without gaps for AC systems
 - IEC 60099-5:2013 — Surge arresters — Part 5: Selection and application recommendations

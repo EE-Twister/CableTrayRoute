@@ -283,6 +283,13 @@ describe('buildReportPackage', () => {
     assert.ok(!entryKeys.includes('cover'));
   });
 
+  it('creates explicit placeholders for selected sections without built data', () => {
+    const pkg = buildReportPackage({ sections: ['toc', 'cables', 'lighting'] }, {});
+    assert.strictEqual(pkg.sections.cables.unavailable, true);
+    assert.strictEqual(pkg.sections.lighting.unavailable, true);
+    assert.deepStrictEqual(pkg.sections.toc.entries.map(entry => entry.key), ['cables', 'lighting']);
+  });
+
   it('includes revision section with sorted rows', () => {
     const pkg = buildReportPackage({
       sections: ['revisions'],
@@ -316,13 +323,18 @@ describe('buildReportPackage', () => {
     assert.strictEqual(pkg.sections.arcFlash, undefined);
   });
 
-  it('ownerTurnover-equivalent: all 16 keys can be requested without error', () => {
+  it('ownerTurnover-equivalent: every requested key has a concrete section', () => {
     const allKeys = SECTION_REGISTRY.map(s => s.key);
     const pkg = buildReportPackage({ sections: allKeys, coverSheet: { projectName: 'All' } }, {});
     assert.ok(pkg.sections.cover);
     assert.ok(pkg.sections.toc);
     assert.ok(pkg.sections.revisions);
     assert.ok(pkg.sections.assumptions);
+    assert.deepStrictEqual(Object.keys(pkg.sections), allKeys);
+    assert.deepStrictEqual(
+      pkg.sections.toc.entries.map(entry => entry.key),
+      allKeys.filter(key => key !== 'cover' && key !== 'toc'),
+    );
   });
 
   it('stores config with normalised coverSheet and revisions', () => {

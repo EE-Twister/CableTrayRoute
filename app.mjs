@@ -37,6 +37,7 @@ import {
     cableHasRoutingCoordinates,
     getCableAssignedRacewayIds
 } from './analysis/scheduleWorkflow.mjs';
+import { normalizeRouteResultState } from './analysis/routeResults.mjs';
 
 /**
  * Escape a string for safe insertion into HTML content or attributes.
@@ -223,13 +224,14 @@ async function initializeApp() {
             && typeof meta.trayCableMap === 'object'
             && !Array.isArray(meta.trayCableMap);
         try {
-            setItem('latestRouteResults', {
+            const nextState = normalizeRouteResultState({
                 batchResults: Array.isArray(batchResults) ? batchResults : [],
                 source: 'optimalRoute',
                 updatedAt: new Date().toISOString(),
                 ...(hasValidMap ? { trayCableMap: meta.trayCableMap } : {}),
                 ...meta
-            });
+            }, { cables: state.cableList });
+            setItem('latestRouteResults', nextState);
         } catch (error) {
             console.warn('Unable to store latest route results', error);
         }
@@ -318,7 +320,38 @@ async function initializeApp() {
         conduitType: document.getElementById('conduit-type'),
         sidebar: document.querySelector('.sidebar'),
         sidebarToggle: document.getElementById('sidebar-toggle'),
+        routeModeToggle: document.getElementById('route-mode-toggle'),
     };
+
+    const routeResultsAnchor = document.createComment('route-results-home');
+    elements.resultsSection?.before(routeResultsAnchor);
+
+    const setRouteReviewMode = enabled => {
+        const hasResults = Array.isArray(state.latestRouteData) && state.latestRouteData.length > 0;
+        const reviewMode = Boolean(enabled && hasResults);
+        document.body.classList.toggle('route-review-mode', reviewMode);
+        elements.sidebar?.classList.toggle('collapsed', reviewMode);
+        if (elements.routeModeToggle) {
+            elements.routeModeToggle.hidden = !hasResults;
+            elements.routeModeToggle.textContent = reviewMode ? 'Edit routing setup' : 'Review route results';
+            elements.routeModeToggle.setAttribute('aria-pressed', String(reviewMode));
+        }
+        if (elements.resultsSection) {
+            if (reviewMode) {
+                document.querySelector('.optimal-route-page .page-header')?.insertAdjacentElement('afterend', elements.resultsSection);
+            } else if (routeResultsAnchor.parentNode) {
+                routeResultsAnchor.parentNode.insertBefore(elements.resultsSection, routeResultsAnchor.nextSibling);
+            }
+        }
+    };
+
+    elements.routeModeToggle?.addEventListener('click', () => {
+        setRouteReviewMode(!document.body.classList.contains('route-review-mode'));
+        const target = document.body.classList.contains('route-review-mode')
+            ? elements.resultsSection
+            : elements.sidebar;
+        target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
 
     document.querySelectorAll('input, select, textarea').forEach(el=>{if(!el.classList.contains('table-search')&&!el.classList.contains('no-dirty')){el.addEventListener('input',markUnsaved);el.addEventListener('change',markUnsaved);}});
     ['addTrayBtn','clearTraysBtn','importTraysBtn','loadSampleTraysBtn','addCableBtn','clearCablesBtn','importCablesBtn','loadSampleCablesBtn'].forEach(k=>{const btn=elements[k];if(btn)btn.addEventListener('click',markUnsaved);});
@@ -626,9 +659,6 @@ async function initializeApp() {
         if (!('raceway_ids' in cable)) cable.raceway_ids = [];
         if (!('locked' in cable)) cable.locked = false;
         if (!Array.isArray(cable.route_segments)) cable.route_segments = [];
-        if (!cable.manual_path && Array.isArray(cable.raceway_ids) && cable.raceway_ids.length) {
-            cable.manual_path = cable.raceway_ids.join('>');
-        }
     };
 
     const setRacewayIds = (cable, ids) => {
@@ -1268,13 +1298,41 @@ async function initializeApp() {
             });
         });
         results.forEach(row => {
-            row.breakdown.forEach(b => {
+            (row.breakdown || []).forEach(b => {
                 if (b.type === 'field') {
                     b.raceway = getRacewayRecommendation(map.get(b.segment_key) || []);
                 }
             });
         });
         state.fieldSegmentCableMap = map;
+    };
+
+    const hydrateSavedRouteResults = () => {
+        const saved = getItem('latestRouteResults', null);
+        const normalizedState = normalizeRouteResultState(saved, { cables: state.cableList });
+        const rows = normalizedState.batchResults;
+        if (!rows.length) return false;
+
+        state.latestRouteData = structuredClone(rows);
+        state.trayCableMap = structuredClone(normalizedState.trayCableMap);
+        buildFieldSegmentCableMap(state.latestRouteData);
+        renderBatchResults(state.latestRouteData);
+        if (elements.resultsSection) elements.resultsSection.style.display = 'block';
+        if (elements.routeBreakdownDetails) elements.routeBreakdownDetails.open = true;
+        update3DPlot();
+
+        const updatedAt = saved?.updatedAt ? new Date(saved.updatedAt) : null;
+        const updatedLabel = updatedAt && !Number.isNaN(updatedAt.getTime())
+            ? ` from ${updatedAt.toLocaleString()}`
+            : '';
+        if (elements.routeSelectionStatus) {
+            elements.routeSelectionStatus.textContent = `${rows.length} saved route result${rows.length === 1 ? '' : 's'} loaded${updatedLabel}. Select a row to highlight it in the model.`;
+        }
+        if (elements.routeReadinessStatus) {
+            elements.routeReadinessStatus.textContent = `${rows.length} saved route${rows.length === 1 ? '' : 's'} ready to review`;
+            elements.routeReadinessStatus.className = 'route-readiness-status is-ready';
+        }
+        return true;
     };
 
     // --- CORE ROUTING LOGIC (JavaScript implementation of your Python backend) ---
@@ -3015,8 +3073,8 @@ const renderBatchResults = (results) => {
             if (isSuccess) routedCount++; else failedCount++;
             const lockBtn = state.cableList[idx]?.locked ? '' : `<button class="lock-route-btn" data-idx="${idx}">Lock</button>`;
             const rowClass = isSuccess ? 'route-success' : 'route-failed';
-            const totalLabel = isSuccess ? `${fmt(tl)}` : 'N/A';
-            const fieldLabel = isSuccess ? `${fmt(fl)} field` : '';
+            const totalLabel = isSuccess && Number.isFinite(tl) ? `${fmt(tl)}` : 'N/A';
+            const fieldLabel = isSuccess ? `${fmt(Number.isFinite(fl) ? fl : 0)} field` : '';
             const segsLabel = isSuccess ? `${res.segments_count || 0}` : '0';
             const issueParts = [];
             if (!isSuccess) issueParts.push('No route');
@@ -3177,6 +3235,7 @@ const renderBatchResults = (results) => {
             });
         });
         renderPullChecks(results);
+        if (results.length) setRouteReviewMode(true);
     };
     
     const updateCableListDisplay = () => {
@@ -3468,10 +3527,11 @@ const renderBatchResults = (results) => {
     };
 
     const scrollResultsIntoView = () => {
-        if (!elements.resultsSection) return;
-        requestAnimationFrame(() => {
-            elements.resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        });
+      if (!elements.resultsSection) return;
+      requestAnimationFrame(() => {
+            const decisionSummary = document.getElementById('route-summary-panel');
+            (decisionSummary || elements.resultsSection).scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
     };
 
     const exportRoutesJSON = () => {
@@ -4968,6 +5028,7 @@ Plotly.newPlot(document.getElementById('plot'), data, layout, {responsive: true}
     await finalizeLoad();
 
     updateRoutingReadiness();
+    hydrateSavedRouteResults();
 
     async function runSelfCheck(){
         const diag={};

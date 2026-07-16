@@ -234,23 +234,26 @@ export function buildReportPackage(config = {}, sectionData = {}) {
     if (key === 'cover') {
       builtSections.cover = { key: 'cover', title: 'Cover Sheet', data: cover };
     } else if (key === 'toc') {
-      builtSections.toc = {
-        key: 'toc',
-        title: 'Table of Contents',
-        entries: sections
-          .filter(k => k !== 'cover' && k !== 'toc')
-          .map(k => {
-            const d = getSectionDef(k);
-            return { key: k, label: d ? d.label : k };
-          }),
-      };
+      builtSections.toc = { key: 'toc', title: 'Table of Contents', entries: [] };
     } else if (key === 'revisions') {
       builtSections.revisions = { key: 'revisions', title: 'Revision History', rows: revTable };
     } else if (key === 'assumptions') {
       builtSections.assumptions = { key: 'assumptions', title: 'Assumptions / Basis of Design', text: String(assumptions) };
     } else if (sectionData[key]) {
       builtSections[key] = sectionData[key];
+    } else {
+      builtSections[key] = {
+        key,
+        title: def.label,
+        unavailable: true,
+      };
     }
+  }
+
+  if (builtSections.toc) {
+    builtSections.toc.entries = sections
+      .filter(key => key !== 'cover' && key !== 'toc' && builtSections[key])
+      .map(key => ({ key, label: getSectionDef(key)?.label || key }));
   }
 
   return {

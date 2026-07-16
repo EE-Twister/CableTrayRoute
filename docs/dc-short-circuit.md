@@ -37,7 +37,7 @@ I_bf = V_oc / R_total
 
 where:
 - `V_oc` = open-circuit (no-load) voltage of the DC source (V)
-- `R_total = R_battery + R_cable + R_bus` (Ω)
+- `R_total = R_battery + 2R_cable(one-way) + R_bus` (Ω)
 
 **Battery voltage by chemistry:**
 
@@ -74,40 +74,45 @@ I_arc = (V_oc − V_arc) / R_total
 
 These two equations are solved iteratively (25 Newton–Raphson steps, starting at `I_arc₀ = 0.85 × I_bf`). The arc current is bounded to [0, I_bf].
 
-### 4. Incident Energy (NFPA 70E Annex D.8.1 — Lee/Ammerman Method)
+### 4. Incident Energy (Ammerman/Wilkins Method)
 
 Arc flash power:
 ```
 P_arc = V_arc × I_arc   [W]
 ```
 
-Incident energy at the working distance D (cm):
+Arc energy:
 ```
-E = (4.184 × C_f × P_arc × t_arc) / (2π × D_cm²)   [cal/cm²]
+E_arc = P_arc × t_arc   [J]
 ```
 
-Enclosure correction factor:
-- `C_f = 1.0` — open air / open busbars
-- `C_f = 2.0` — enclosed box (panel, switchgear, UPS cabinet)
+Open-air energy density at distance `d` in millimeters:
+```
+E_s = E_arc / (4π × d²)   [J/mm²]
+```
+
+For the published 508 mm low-voltage-switchgear enclosure:
+```
+E_1 = 0.312 × E_arc / (400² + d²)   [J/mm²]
+```
+
+Convert J/mm² to cal/cm² by multiplying by `100 / 4.184`. Other enclosure
+geometries require a model appropriate to the actual equipment.
 
 ### 5. Arc Flash Boundary
 
 The distance at which incident energy equals 1.2 cal/cm² (onset of second-degree burn):
 
-```
-D_af = √((4.184 × C_f × P_arc × t_arc) / (2π × 1.2))   [cm → mm]
-```
+The boundary is solved from the applicable energy-density equation using
+`E_threshold = 1.2 × 4.184 / 100 J/mm²`.
 
-### 6. PPE Category (NFPA 70E-2024 Table 130.7(C)(15)(c))
+### 6. PPE Selection
 
-| Incident Energy | PPE Category |
-|----------------|--------------|
-| ≤ 1.2 cal/cm² | Category 0 (no PPE required) |
-| > 1.2 – ≤ 4 cal/cm² | Category 1 (4 cal/cm² minimum) |
-| > 4 – ≤ 8 cal/cm² | Category 2 (8 cal/cm² minimum) |
-| > 8 – ≤ 25 cal/cm² | Category 3 (25 cal/cm² minimum) |
-| > 25 – ≤ 40 cal/cm² | Category 4 (40 cal/cm² minimum) |
-| > 40 cal/cm² | Dangerous — special protection required |
+This calculation uses the incident-energy analysis method. It does not assign an
+NFPA 70E PPE category because the incident-energy and PPE-category table methods
+are separate selection methods. Above 1.2 cal/cm², select arc-rated PPE whose arc
+rating meets or exceeds the calculated incident energy and apply the project risk
+assessment and hierarchy of controls.
 
 ---
 
@@ -121,11 +126,11 @@ import { calcDcFaultCurrent } from './analysis/dcShortCircuit.mjs';
 const { boltedFaultCurrentA, timeConstantMs, totalResistanceOhm } = calcDcFaultCurrent({
   batteryVoltageV: 125,           // DC bus voltage (V)
   batteryInternalResistanceOhm: 0.020,  // battery string resistance (Ω)
-  cableResistanceOhm: 0.005,      // one-way cable resistance (Ω)
+  cableResistanceOhm: 0.005,      // one-way cable resistance (Ω); calculation uses 2×
   busbarResistanceOhm: 0.001,     // bus/bar resistance (Ω)
   inductanceMH: 0,                // circuit inductance (mH), default 0
 });
-// boltedFaultCurrentA ≈ 4808 A
+// boltedFaultCurrentA ≈ 4032 A
 ```
 
 ### `calcDcArcFlash(params)`
@@ -142,7 +147,7 @@ const result = calcDcArcFlash({
   arcDurationMs: 50,           // protection clearing time (ms)
   enclosureType: 'open_air',   // 'open_air' | 'enclosed_box'
 });
-// result.incidentEnergyCalCm2, result.ppeCategory, result.arcFlashBoundaryMm
+// result.incidentEnergyCalCm2, result.minimumArcRatingCalCm2, result.arcFlashBoundaryMm
 ```
 
 ### `selectDcProtection(params)`

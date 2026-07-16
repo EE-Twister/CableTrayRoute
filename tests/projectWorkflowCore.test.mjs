@@ -145,7 +145,7 @@ const complete = buildWorkflowCoreDiagnostics({
   equipment: [{ tag: 'SWBD-101', voltage: '480', manufacturer: 'Square D' }],
   loads: [{ source: 'SWBD-101', tag: 'PMP-101', kw: '18.6', voltage: '480', powerFactor: '0.85', phases: '3' }],
   oneLine: { activeSheet: 0, sheets: [{ components: [{ id: 'swbd' }] }] },
-  cables: [{ tag: 'CBL-1', from: 'SWBD-101', to: 'PMP-101', conductor_size: '3-#4 CU', length: 80, raceway_id: 'TR-1', start_x: 0, start_y: 0, start_z: 10, end_x: 80, end_y: 0, end_z: 10 }],
+  cables: [{ tag: 'CBL-1', from: 'SWBD-101', to: 'PMP-101', conductor_size: '3-#4 CU', insulation_type: 'THHN', cable_rating: 600, length: 80, raceway_id: 'TR-1', start_x: 0, start_y: 0, start_z: 10, end_x: 80, end_y: 0, end_z: 10 }],
   trays: [{ tray_id: 'TR-1', start_x: 0, start_y: 0, start_z: 10, end_x: 80, end_y: 0, end_z: 10, inside_width: 12, tray_depth: 4 }],
   conduits: [],
   ductbanks: [],

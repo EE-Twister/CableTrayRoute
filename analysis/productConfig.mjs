@@ -36,16 +36,23 @@ export const STANDARD_DEPTHS_IN = {
 };
 
 /**
- * NEMA load classes with their rated working load (lbs/ft) at a 12-ft span.
+ * Traditional NEMA classes: the numeric prefix is the support span in feet;
+ * A/B/C correspond to 50/75/100 lb/ft working-load families.
  * Source: NEMA VE 1-2017 §4.
  */
 export const NEMA_LOAD_CLASSES = {
-  '8A':  { ratedLoad: 8,  ratedSpan: 12, label: 'Class 8A  (8 lbs/ft @ 12 ft)'  },
-  '12A': { ratedLoad: 12, ratedSpan: 12, label: 'Class 12A (12 lbs/ft @ 12 ft)' },
-  '16A': { ratedLoad: 16, ratedSpan: 12, label: 'Class 16A (16 lbs/ft @ 12 ft)' },
-  '20A': { ratedLoad: 20, ratedSpan: 12, label: 'Class 20A (20 lbs/ft @ 12 ft)' },
-  '25A': { ratedLoad: 25, ratedSpan: 12, label: 'Class 25A (25 lbs/ft @ 12 ft)' },
-  '32A': { ratedLoad: 32, ratedSpan: 12, label: 'Class 32A (32 lbs/ft @ 12 ft)' },
+  '8A':  { ratedLoad: 50,  ratedSpan: 8,  label: 'Class 8A (50 lbs/ft @ 8 ft)' },
+  '8B':  { ratedLoad: 75,  ratedSpan: 8,  label: 'Class 8B (75 lbs/ft @ 8 ft)' },
+  '8C':  { ratedLoad: 100, ratedSpan: 8,  label: 'Class 8C (100 lbs/ft @ 8 ft)' },
+  '12A': { ratedLoad: 50,  ratedSpan: 12, label: 'Class 12A (50 lbs/ft @ 12 ft)' },
+  '12B': { ratedLoad: 75,  ratedSpan: 12, label: 'Class 12B (75 lbs/ft @ 12 ft)' },
+  '12C': { ratedLoad: 100, ratedSpan: 12, label: 'Class 12C (100 lbs/ft @ 12 ft)' },
+  '16A': { ratedLoad: 50,  ratedSpan: 16, label: 'Class 16A (50 lbs/ft @ 16 ft)' },
+  '16B': { ratedLoad: 75,  ratedSpan: 16, label: 'Class 16B (75 lbs/ft @ 16 ft)' },
+  '16C': { ratedLoad: 100, ratedSpan: 16, label: 'Class 16C (100 lbs/ft @ 16 ft)' },
+  '20A': { ratedLoad: 50,  ratedSpan: 20, label: 'Class 20A (50 lbs/ft @ 20 ft)' },
+  '20B': { ratedLoad: 75,  ratedSpan: 20, label: 'Class 20B (75 lbs/ft @ 20 ft)' },
+  '20C': { ratedLoad: 100, ratedSpan: 20, label: 'Class 20C (100 lbs/ft @ 20 ft)' },
 };
 
 /**
@@ -165,14 +172,10 @@ export const TRAY_TYPES = {
 // ---------------------------------------------------------------------------
 
 /**
- * Calculate the minimum effective load per foot on the tray for a given
- * cable weight and actual support span.
- *
- * For a simple span, the equivalent uniform load that produces the same
- * midpoint deflection as the rated test condition scales as:
- *   w_min ≤ w_rated × (L_rated / L_actual)³
- *
- * Rearranging: required w_rated ≥ w_actual × (L_actual / L_rated)³
+ * Return the working load that the selected class must carry at the requested
+ * support span. Class selection uses the published NEMA span/load pair rather
+ * than treating the class number as a load or extrapolating one class into a
+ * different certified span.
  *
  * @param {number} cableWeightLbFt  Total cable weight per linear foot (lbs/ft)
  * @param {number} spanFt           Required support span in feet
@@ -181,23 +184,24 @@ export const TRAY_TYPES = {
 export function requiredRatedLoad(cableWeightLbFt, spanFt) {
   if (cableWeightLbFt < 0) throw new Error('cableWeightLbFt must be ≥ 0');
   if (spanFt <= 0) throw new Error('spanFt must be positive');
-  // Use 12 ft as the reference span (all NEMA standard classes)
-  const L_rated = 12;
-  return cableWeightLbFt * Math.pow(spanFt / L_rated, 3);
+  return cableWeightLbFt;
 }
 
 /**
  * Select the minimum-sufficient NEMA load class for a given required rated load.
  *
  * @param {number} requiredLoad  Minimum rated load (lbs/ft) needed
+ * @param {number} requiredSpan  Minimum rated support span (ft) needed
  * @returns {{ classId: string, def: object }|null}  Matching class, or null if none sufficient
  */
-export function selectLoadClass(requiredLoad) {
+export function selectLoadClass(requiredLoad, requiredSpan = 12) {
   const classes = Object.entries(NEMA_LOAD_CLASSES).sort(
-    ([, a], [, b]) => a.ratedLoad - b.ratedLoad
+    ([, a], [, b]) => a.ratedSpan - b.ratedSpan || a.ratedLoad - b.ratedLoad
   );
   for (const [classId, def] of classes) {
-    if (def.ratedLoad >= requiredLoad) return { classId, def };
+    if (def.ratedSpan >= requiredSpan && def.ratedLoad >= requiredLoad) {
+      return { classId, def };
+    }
   }
   return null;  // exceeds max class — custom fabrication needed
 }
@@ -229,13 +233,16 @@ export function recommendTrayTypes(application) {
 /**
  * Select the minimum standard tray width to accommodate the total cable fill.
  *
- * Uses the simplified NEC 392.22(A) approach:
- *   Allowed fill = 50% of the tray cross-sectional area (single-layer cables)
+ * Uses a user-entered geometric screening fraction:
+ *   Screening fill = fraction × tray width × nominal depth
  *   Total cable cross-section = Σ (π/4 × OD²) per cable
+ *
+ * This does not implement the cable-size/type-specific rules in NEC 392.22 and
+ * must not be used as the final cable-tray fill compliance check.
  *
  * @param {number} totalCableCsaIn2   Sum of cable cross-sections (sq in)
  * @param {number} depthIn            Tray nominal depth (inches)
- * @param {number} [fillFraction=0.5] NEC fill fraction (default 50%)
+ * @param {number} [fillFraction=0.5] Screening fill fraction (default 50%)
  * @returns {number}  Minimum standard width in inches, or -1 if none sufficient
  */
 export function selectMinWidth(totalCableCsaIn2, depthIn, fillFraction = 0.5) {
@@ -286,15 +293,17 @@ export function configure(inputs) {
     throw new Error('spanFt must be a positive number');
   if (typeof totalCableCsaIn2 !== 'number' || totalCableCsaIn2 < 0)
     throw new Error('totalCableCsaIn2 must be a non-negative number');
-  if (!MATERIALS[environment] === undefined && !['indoorDry','indoorWet','outdoor','corrosive'].includes(environment))
+  if (!['indoorDry', 'indoorWet', 'outdoor', 'corrosive'].includes(environment))
     throw new Error(`Unknown environment: ${environment}`);
+  if (!['power', 'control', 'instrumentation', 'communication', 'data', 'mixed', 'corrosive'].includes(application))
+    throw new Error(`Unknown application: ${application}`);
 
   // 1. Load class
   const reqLoad = requiredRatedLoad(cableWeightLbFt, spanFt);
-  const loadClassResult = selectLoadClass(reqLoad);
+  const loadClassResult = selectLoadClass(reqLoad, spanFt);
   const loadClassExceeded = loadClassResult === null;
-  const loadClassId = loadClassResult ? loadClassResult.classId : '32A';
-  const loadClassDef = loadClassResult ? loadClassResult.def : NEMA_LOAD_CLASSES['32A'];
+  const loadClassId = loadClassResult ? loadClassResult.classId : '20C';
+  const loadClassDef = loadClassResult ? loadClassResult.def : NEMA_LOAD_CLASSES['20C'];
 
   // 2. Width
   const widthIn = selectMinWidth(totalCableCsaIn2, depthIn, fillFraction);
@@ -327,6 +336,13 @@ export function configure(inputs) {
   });
 
   return {
+    calculationStatus: 'screening-only',
+    standardCompliance: null,
+    requiredInputs: [
+      'Complete the cable-size/type-specific NEC 392.22 fill calculation.',
+      'Confirm the selected manufacturer tray load rating, support span, fittings, and environmental suitability.',
+    ],
+
     // Inputs echo
     inputs: { cableWeightLbFt, spanFt, totalCableCsaIn2, environment, application, depthIn, fillFraction },
 
@@ -345,6 +361,9 @@ export function configure(inputs) {
       depthIn,
       fillFraction,
       allowedFillIn2: widthIn > 0 ? Math.round(widthIn * depthIn * fillFraction * 100) / 100 : 0,
+      screeningOnly: true,
+      fillMethod: 'user-entered geometric area fraction',
+      requiresDetailedFillCheck: true,
     },
 
     // Recommendations
@@ -379,11 +398,11 @@ function buildSpecText({ trayKey, tray, materialKey, material, loadClassId, load
   }[finish] || finish;
 
   return [
-    `Cable tray shall be ${tray.label} type, ${widthIn}-inch inside width × ` +
+    `Preliminary cable tray configuration: ${tray.label} type, ${widthIn}-inch inside width × ` +
     `${depthIn}-inch depth, ${material.label}, ${finishLabel}.`,
     `NEMA load class: ${loadClassId} (${loadClassDef.ratedLoad} lbs/ft at ${loadClassDef.ratedSpan}-ft span).`,
     `Maximum support span: ${spanFt} ft.`,
-    `Cable tray system shall comply with NEMA VE 1-2017 and NEC Article 392.`,
+    `Verify cable fill separately for the actual cable types and sizes under NEC 392.22, and verify the selected product against manufacturer data before issue.`,
     material.notes ? `Material note: ${material.notes}` : '',
   ].filter(Boolean).join('  ');
 }

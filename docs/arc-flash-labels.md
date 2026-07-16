@@ -2,12 +2,12 @@
 
 ## Overview
 
-CableTrayRoute generates NFPA 70E–compliant arc flash warning labels directly from the one-line diagram after running an arc flash study. Labels can be:
+CableTrayRoute generates draft arc-flash warning labels from the one-line diagram after running an arc-flash study. The label format supports NFPA 70E field-marking review, but the software does not certify compliance. Labels are withheld whenever required study inputs remain unresolved.
 
 - **Printed as a label sheet** — a print-optimized page with all equipment labels arranged in a 2-column grid, ready to cut and apply to switchgear
-- **Viewed as overlay badges** on the one-line diagram — compact signal-color badges at each analyzed bus, showing PPE category and incident energy at a glance
+- **Viewed as overlay badges** on the one-line diagram — compact signal-color badges showing incident energy and study status at a glance
 
-This feature satisfies **NFPA 70E 2021 §130.5(H)**, which requires electrical equipment to be field-labeled with arc flash hazard information before energized work is performed.
+The project engineer and employer remain responsible for the risk assessment, study validation, label content, field application, and applicable NFPA 70E edition.
 
 ---
 
@@ -24,17 +24,18 @@ This feature satisfies **NFPA 70E 2021 §130.5(H)**, which requires electrical e
 | Nominal system voltage | `nominalVoltage` on bus component |
 | Arc flash boundary | Arc flash study `boundary` (mm) |
 | Incident energy at working distance | Arc flash study `incidentEnergy` (cal/cm²) |
-| Minimum arc rating of PPE | Derived from `ppeCategory` |
+| PPE selection method | Incident-energy method; required arc rating is the calculated incident energy |
 | Working distance | Arc flash study `workingDistance` (mm) |
 | Upstream protective device | `upstreamDevice` from arc flash study |
 | Date of study | `studyDate` from arc flash study |
 
 ### Signal Word Selection (ANSI Z535)
 
-| Incident Energy | Signal Word | Banner Color |
-|---|---|---|
-| < 40 cal/cm² | **WARNING** | Orange `#f57c00` |
-| ≥ 40 cal/cm² | **DANGER** | Red `#d32f2f` |
+The generated draft defaults to **WARNING** with an orange banner. It does not
+infer **DANGER** from a 40 cal/cm² threshold. If a project hazard assessment
+specifically determines that the DANGER signal word is appropriate, callers can
+provide `signalWord: 'DANGER'`; that determination is outside the incident-energy
+calculation.
 
 ---
 
@@ -48,10 +49,10 @@ This feature satisfies **NFPA 70E 2021 §130.5(H)**, which requires electrical e
 
 ### Step 2 – Print Labels
 
-After the arc flash study completes, the **Print Labels** button becomes enabled in the Studies panel.
+After the arc flash study completes, label export is available only for results with no unresolved `requiredInputs` and with complete voltage, working-distance, clearing-time, boundary, and upstream-device data.
 
 1. Click **Print Labels**
-2. A new browser window opens containing all NFPA 70E labels in a 2-column grid
+2. A new browser window opens containing the issue-ready draft labels in a 2-column grid; incomplete locations are omitted
 3. Click **Print All Labels** in that window — the browser print dialog opens
 4. Select your label stock (landscape, ½ in margins), print, cut, and apply to switchgear
 
@@ -63,7 +64,7 @@ Check **Show Label Overlays** in the Studies panel to toggle compact signal-colo
 
 - Signal color banner (orange = WARNING, red = DANGER)
 - Signal word
-- PPE category number
+- Incident-energy PPE selection method
 - Incident energy in cal/cm²
 
 Overlays are for visual reference only and are not printed when exporting the diagram.
@@ -87,7 +88,7 @@ Each label is a 6 in × 4 in SVG document. The default layout:
 │ Limited Approach:     Not Applicable   │
 │ Restricted Approach:  11.8 in (300 mm) │
 │ Upstream Device:      CB-1A            │
-│ PPE Category: 2       Study: 2026-04-07│
+│ PPE Method: Incident Energy  2026-04-07│
 └────────────────────────────────────────┘
 ```
 
@@ -124,7 +125,7 @@ Available placeholder tokens:
 | `{{limitedApproach}}` | Limited approach boundary |
 | `{{restrictedApproach}}` | Restricted approach boundary |
 | `{{upstreamDevice}}` | Upstream protective device name |
-| `{{ppeCategory}}` | PPE category number |
+| `{{ppeCategory}}` | PPE selection method (`Incident Energy`) |
 | `{{studyDate}}` | Date of arc flash study (YYYY-MM-DD) |
 
 ---

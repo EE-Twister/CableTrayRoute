@@ -1,10 +1,11 @@
-import { getOneLine, getItem } from '../dataStore.mjs';
+import { getOneLine, getItem, getCables } from '../dataStore.mjs';
 import { scaleCurve } from './tccUtils.js';
 import { resolveCtForComponent } from './ctMetadata.mjs';
 import { resolvePtVtForComponent } from './ptVtMetadata.mjs';
 import protectiveDevices from '../data/protectiveDevices.mjs';
 import { calculateTransformerImpedance } from '../utils/transformerImpedance.js';
 import { computeImpedanceFromPerKm } from '../utils/cableImpedance.js';
+import { table9Impedance } from '../src/necTable9.mjs';
 import { computeIEC60909Bus } from './iec60909.mjs';
 import { ibrFaultContribution, IBR_DEFAULTS } from './ibrModeling.mjs';
 
@@ -217,7 +218,222 @@ function normalizePortIndex(port) {
 }
 
 function isSourceComponent(comp) {
-  return ['utility_source', 'generator', 'pv_inverter', 'ups'].includes(comp?.type);
+  const type = `${comp?.type || ''}`.trim().toLowerCase();
+  const subtype = `${comp?.subtype || ''}`.trim().toLowerCase();
+  return ['utility_source', 'generator', 'pv_inverter', 'ups'].includes(type)
+    || ['utility_source', 'generator', 'pv_inverter', 'ups'].includes(subtype);
+}
+
+function hasImpedance(value) {
+  const impedance = toImpedance(value);
+  return Math.abs(impedance.r) >= 1e-9 || Math.abs(impedance.x) >= 1e-9;
+}
+
+function normalizedIdentity(value) {
+  return `${value ?? ''}`.trim().toLowerCase();
+}
+
+function firstIdentity(record, fields) {
+  for (const field of fields) {
+    const value = record?.[field];
+    if (`${value ?? ''}`.trim()) return `${value}`.trim();
+  }
+  return '';
+}
+
+function componentIdentity(component) {
+  return firstIdentity(component, ['equipmentRef', 'loadRef', 'panelRef', 'ref', 'label', 'tag', 'name', 'id'])
+    || firstIdentity(component?.props, ['tag', 'name', 'id']);
+}
+
+function cableIdentity(cable) {
+  return firstIdentity(cable, ['tag', 'cable_tag', 'cableTag', 'cable_id', 'cableId', 'name', 'id']);
+}
+
+function cableEndpoint(cable, side) {
+  const fields = side === 'from'
+    ? ['from_tag', 'fromTag', 'from', 'source', 'source_tag', 'sourceTag']
+    : ['to_tag', 'toTag', 'to', 'destination', 'destination_tag', 'destinationTag'];
+  return firstIdentity(cable, fields);
+}
+
+function positiveNumber(value) {
+  const number = Number(value);
+  return Number.isFinite(number) && number > 0 ? number : null;
+}
+
+function scheduledCableImpedance(cable) {
+  const explicit = extractComponentImpedance(cable);
+  if (hasImpedance(explicit)) {
+    return {
+      impedance: explicit,
+      method: 'schedule-explicit',
+      requiredInputs: [],
+      assumptions: []
+    };
+  }
+
+  const tag = cableIdentity(cable) || 'Cable Schedule row';
+  const size = firstIdentity(cable, ['conductor_size', 'conductorSize', 'size_awg_kcmil', 'size']);
+  const material = firstIdentity(cable, ['conductor_material', 'conductorMaterial', 'material']);
+  const racewayMaterial = firstIdentity(cable, ['conduit_material', 'conduitMaterial', 'raceway_material', 'racewayMaterial', 'conduit_type']);
+  const lengthFt = positiveNumber(cable?.length_ft ?? cable?.lengthFt ?? cable?.length);
+  const parallelCount = positiveNumber(
+    cable?.parallel_count
+      ?? cable?.parallel_sets
+      ?? cable?.parallelSets
+      ?? cable?.parallels
+      ?? cable?.parallel
+  ) || 1;
+  const requiredInputs = [];
+  const assumptions = [];
+
+  if (!size) requiredInputs.push(`${tag}: provide conductor size in the Cable Schedule.`);
+  if (!material) requiredInputs.push(`${tag}: provide conductor material in the Cable Schedule.`);
+  if (!lengthFt) requiredInputs.push(`${tag}: provide a positive cable length in the Cable Schedule.`);
+  if (!racewayMaterial) assumptions.push(`${tag}: raceway material is missing; NEC Table 9 nonmagnetic-raceway values were used.`);
+  if (requiredInputs.length) {
+    return { impedance: null, method: 'schedule-incomplete', requiredInputs, assumptions };
+  }
+
+  const perMeter = table9Impedance(size, material, racewayMaterial);
+  if (!perMeter) {
+    return {
+      impedance: null,
+      method: 'schedule-unsupported',
+      requiredInputs: [`${tag}: conductor size/material is not available in the NEC Table 9 impedance library.`],
+      assumptions
+    };
+  }
+  const lengthMeters = lengthFt * 0.3048;
+  return {
+    impedance: {
+      r: (perMeter.R * lengthMeters) / parallelCount,
+      x: (perMeter.X * lengthMeters) / parallelCount
+    },
+    method: 'nec-table-9',
+    requiredInputs,
+    assumptions,
+    lengthFt,
+    parallelCount,
+    size,
+    material,
+    racewayMaterial: racewayMaterial || 'Nonmagnetic (assumed)'
+  };
+}
+
+function createCableScheduleResolver(cables = []) {
+  const schedule = Array.isArray(cables) ? cables.filter(cable => cable && typeof cable === 'object') : [];
+  const byIdentity = new Map();
+  schedule.forEach(cable => {
+    const identity = normalizedIdentity(cableIdentity(cable));
+    if (identity && !byIdentity.has(identity)) byIdentity.set(identity, cable);
+  });
+
+  function endpointMatches(upstream, downstream) {
+    const from = normalizedIdentity(componentIdentity(upstream));
+    const to = normalizedIdentity(componentIdentity(downstream));
+    if (!from || !to) return [];
+    return schedule.filter(cable => {
+      const cableFrom = normalizedIdentity(cableEndpoint(cable, 'from'));
+      const cableTo = normalizedIdentity(cableEndpoint(cable, 'to'));
+      return cableFrom === from && cableTo === to;
+    });
+  }
+
+  function resolve(connection, upstream, downstream) {
+    const inlineCable = connection?.cable && typeof connection.cable === 'object' ? connection.cable : null;
+    const requestedIdentity = firstIdentity(connection, ['cableRef', 'cable_ref', 'cableTag', 'cable_tag', 'cableId', 'cable_id'])
+      || cableIdentity(inlineCable);
+    let scheduledCable = requestedIdentity ? byIdentity.get(normalizedIdentity(requestedIdentity)) : null;
+    let matches = [];
+    if (!scheduledCable) {
+      matches = endpointMatches(upstream, downstream);
+      if (matches.length === 1) scheduledCable = matches[0];
+    }
+
+    if (matches.length > 1 && !requestedIdentity) {
+      return {
+        impedance: null,
+        segment: null,
+        assumptions: [],
+        requiredInputs: [`Multiple Cable Schedule rows connect ${componentIdentity(upstream)} to ${componentIdentity(downstream)}; link the intended cable tag on the One-Line.`]
+      };
+    }
+
+    if (scheduledCable) {
+      const derived = scheduledCableImpedance(scheduledCable);
+      const tag = cableIdentity(scheduledCable) || requestedIdentity || 'Unidentified cable';
+      return {
+        impedance: derived.impedance,
+        assumptions: derived.assumptions,
+        requiredInputs: derived.requiredInputs,
+        segment: {
+          type: 'cable',
+          tag,
+          from: cableEndpoint(scheduledCable, 'from') || componentIdentity(upstream),
+          to: cableEndpoint(scheduledCable, 'to') || componentIdentity(downstream),
+          source: 'Cable Schedule',
+          method: derived.method,
+          rOhm: Number(derived.impedance?.r || 0),
+          xOhm: Number(derived.impedance?.x || 0),
+          ...(derived.lengthFt ? { lengthFt: derived.lengthFt } : {}),
+          ...(derived.parallelCount ? { parallelCount: derived.parallelCount } : {}),
+          ...(derived.size ? { conductorSize: derived.size } : {}),
+          ...(derived.material ? { conductorMaterial: derived.material } : {}),
+          ...(derived.racewayMaterial ? { racewayMaterial: derived.racewayMaterial } : {})
+        }
+      };
+    }
+
+    const hasCableIntent = Boolean(requestedIdentity || inlineCable);
+    if (hasCableIntent) {
+      const inlineDerived = inlineCable ? scheduledCableImpedance(inlineCable) : null;
+      const missingLink = requestedIdentity
+        ? `${requestedIdentity}: add the referenced cable to the Cable Schedule or correct the One-Line cable link.`
+        : `Link the cable from ${componentIdentity(upstream)} to ${componentIdentity(downstream)} to a Cable Schedule row.`;
+      return {
+        impedance: inlineDerived?.impedance || null,
+        assumptions: inlineDerived?.impedance
+          ? [`${requestedIdentity || 'One-Line cable'}: using duplicated One-Line cable data because no canonical Cable Schedule row was found.`, ...(inlineDerived.assumptions || [])]
+          : (inlineDerived?.assumptions || []),
+        requiredInputs: [missingLink, ...(inlineDerived?.requiredInputs || [])],
+        segment: inlineDerived?.impedance ? {
+          type: 'cable',
+          tag: requestedIdentity || 'One-Line cable',
+          from: componentIdentity(upstream),
+          to: componentIdentity(downstream),
+          source: 'One-Line fallback',
+          method: inlineDerived.method,
+          rOhm: inlineDerived.impedance.r,
+          xOhm: inlineDerived.impedance.x
+        } : null
+      };
+    }
+
+    if (hasImpedance(connection?.impedance)) {
+      const impedance = toImpedance(connection.impedance);
+      return {
+        impedance,
+        assumptions: [],
+        requiredInputs: [],
+        segment: {
+          type: 'connection',
+          tag: `${componentIdentity(upstream)} → ${componentIdentity(downstream)}`,
+          from: componentIdentity(upstream),
+          to: componentIdentity(downstream),
+          source: 'One-Line',
+          method: 'explicit',
+          rOhm: impedance.r,
+          xOhm: impedance.x
+        }
+      };
+    }
+
+    return { impedance: null, segment: null, assumptions: [], requiredInputs: [] };
+  }
+
+  return { resolve };
 }
 
 function getUpsStudyMetadata(comp) {
@@ -630,13 +846,13 @@ function combineParallel(base, addition) {
   return parallel(base, addition);
 }
 
-function resolveUpstreamImpedance(comp, comps, compMap, cache) {
+function resolveUpstreamImpedance(comp, comps, compMap, cache, cableResolver) {
   if (!comp?.id) return null;
   const visited = new Set();
   let current = comp;
   while (current?.id && !visited.has(current.id)) {
     visited.add(current.id);
-    const candidate = computeImpedance(current, comps, compMap, cache);
+    const candidate = computeImpedance(current, comps, compMap, cache, new Set(), cableResolver);
     if (candidate && (Math.abs(candidate.r) >= 1e-9 || Math.abs(candidate.x) >= 1e-9)) {
       return { r: candidate.r, x: candidate.x };
     }
@@ -646,7 +862,7 @@ function resolveUpstreamImpedance(comp, comps, compMap, cache) {
   return null;
 }
 
-function computeImpedance(comp, comps, compMap, cache, visited = new Set()) {
+function computeImpedance(comp, comps, compMap, cache, visited = new Set(), cableResolver = null) {
   if (!comp?.id) return { r: 0, x: 0 };
   if (cache.has(comp.id)) return cache.get(comp.id);
   if (visited.has(comp.id)) return { r: 0, x: 0 };
@@ -659,17 +875,74 @@ function computeImpedance(comp, comps, compMap, cache, visited = new Set()) {
   if (parent?.component) {
     const { component: upstream, connection, reversed } = parent;
     if (connection) {
-      total = add(total, toImpedance(connection.impedance));
+      const resolvedConnection = cableResolver?.resolve(connection, upstream, comp);
+      total = add(total, resolvedConnection?.impedance || toImpedance(connection.impedance));
       if (upstream.type === 'transformer') {
         const portIndex = normalizePortIndex(reversed ? connection?.targetPort : connection?.sourcePort);
         total = add(total, getTransformerImpedance(upstream, portIndex));
       }
     }
-    total = add(total, computeImpedance(upstream, comps, compMap, cache, visited));
+    total = add(total, computeImpedance(upstream, comps, compMap, cache, visited, cableResolver));
   }
   visited.delete(comp.id);
   cache.set(comp.id, total);
   return total;
+}
+
+function buildImpedancePath(comp, comps, compMap, cableResolver) {
+  const segments = [];
+  const assumptions = [];
+  const requiredInputs = [];
+  const visited = new Set();
+  let current = comp;
+
+  while (current?.id && !visited.has(current.id)) {
+    visited.add(current.id);
+    const parent = findParentInfo(current, comps, compMap, visited);
+    if (!parent?.component) break;
+    const { component: upstream, connection, reversed } = parent;
+    if (connection) {
+      const resolved = cableResolver?.resolve(connection, upstream, current);
+      if (resolved?.segment) segments.unshift(resolved.segment);
+      (resolved?.assumptions || []).forEach(message => {
+        if (message && !assumptions.includes(message)) assumptions.push(message);
+      });
+      (resolved?.requiredInputs || []).forEach(message => {
+        if (message && !requiredInputs.includes(message)) requiredInputs.push(message);
+      });
+      if (upstream.type === 'transformer') {
+        const portIndex = normalizePortIndex(reversed ? connection?.targetPort : connection?.sourcePort);
+        const impedance = getTransformerImpedance(upstream, portIndex);
+        if (hasImpedance(impedance)) {
+          segments.unshift({
+            type: 'transformer',
+            tag: componentIdentity(upstream),
+            source: 'One-Line transformer data',
+            method: 'percent-impedance',
+            rOhm: impedance.r,
+            xOhm: impedance.x
+          });
+        }
+      }
+    }
+    current = upstream;
+  }
+
+  if (current && isSourceComponent(current)) {
+    const impedance = getSourceImpedance(current);
+    if (hasImpedance(impedance)) {
+      segments.unshift({
+        type: 'source',
+        tag: componentIdentity(current),
+        source: 'One-Line source data',
+        method: 'thevenin',
+        rOhm: impedance.r,
+        xOhm: impedance.x
+      });
+    }
+  }
+
+  return { segments, assumptions, requiredInputs };
 }
 
 function computePrefaultKV(comp, comps, compMap, cache, visited = new Set()) {
@@ -745,13 +1018,17 @@ function computePrefaultKV(comp, comps, compMap, cache, visited = new Set()) {
  *   - `method` ('ANSI' or 'IEC')
  */
 export function runShortCircuit(modelOrOpts = {}, maybeOpts = {}) {
-  let comps, opts;
+  let comps, opts, cables;
   if (Array.isArray(modelOrOpts)) {
     comps = modelOrOpts.filter(c => c && c.type !== 'annotation' && c.type !== 'dimension');
     opts = maybeOpts || {};
+    cables = Array.isArray(opts.cables) ? opts.cables : [];
   } else if (modelOrOpts?.buses) {
     comps = modelOrOpts.buses.filter(c => c && c.type !== 'annotation' && c.type !== 'dimension');
     opts = maybeOpts || {};
+    cables = Array.isArray(modelOrOpts.cables)
+      ? modelOrOpts.cables
+      : (Array.isArray(opts.cables) ? opts.cables : []);
   } else {
     opts = modelOrOpts || {};
     const { sheets } = getOneLine();
@@ -759,6 +1036,7 @@ export function runShortCircuit(modelOrOpts = {}, maybeOpts = {}) {
       ? sheets.flatMap(s => s.components)
       : sheets;
     comps = comps.filter(c => c && c.type !== 'annotation' && c.type !== 'dimension');
+    cables = Array.isArray(opts.cables) ? opts.cables : getCables();
   }
   const isBusStudyNode = comp => comp?.subtype === 'Bus' || comp?.type === 'bus';
   const busNodes = comps.filter(isBusStudyNode);
@@ -772,6 +1050,7 @@ export function runShortCircuit(modelOrOpts = {}, maybeOpts = {}) {
     }
   });
   const impedanceCache = new Map();
+  const cableResolver = createCableScheduleResolver(cables);
   const voltageCache = new Map();
   const protectiveLookupCache = new Map();
   const scaledDeviceCache = new Map();
@@ -841,9 +1120,9 @@ export function runShortCircuit(modelOrOpts = {}, maybeOpts = {}) {
 
   comps.forEach(comp => {
     if (comp?.id && compMap.get(comp.id) !== comp) return;
-    const baseZ = computeImpedance(comp, comps, compMap, impedanceCache);
+    const baseZ = computeImpedance(comp, comps, compMap, impedanceCache, new Set(), cableResolver);
     const fallbackZ = (!hasBusNodes || isBusStudyNode(comp))
-      ? resolveUpstreamImpedance(comp, comps, compMap, impedanceCache)
+      ? resolveUpstreamImpedance(comp, comps, compMap, impedanceCache, cableResolver)
       : null;
     let z1 = comp.z1 ? toImpedance(comp.z1) : baseZ;
     let z2 = comp.z2 ? toImpedance(comp.z2) : z1;
@@ -915,6 +1194,20 @@ export function runShortCircuit(modelOrOpts = {}, maybeOpts = {}) {
       entry.warnings = [lowImpedanceWarning];
     } else if (missingImpedanceComponents.has(comp.id)) {
       entry.warnings = ['Impedance data missing; results defaulted to low impedance until data is provided.'];
+    }
+
+    const path = buildImpedancePath(comp, comps, compMap, cableResolver);
+    entry.equipmentTag = componentIdentity(comp) || comp.id;
+    entry.impedanceProvenance = {
+      totalR: Number(z1.r || 0),
+      totalX: Number(z1.x || 0),
+      segments: path.segments
+    };
+    if (path.assumptions.length) {
+      entry.warnings = [...new Set([...(entry.warnings || []), ...path.assumptions])];
+    }
+    if (path.requiredInputs.length) {
+      entry.requiredInputs = [...new Set([...(entry.requiredInputs || []), ...path.requiredInputs])];
     }
 
     limitFaultByProtection(entry, comp, comps, compMap, protectiveLookupCache, scaledDeviceCache, tccSettings);

@@ -84,15 +84,17 @@ function threeBusSys() {
 })();
 
 // ---------------------------------------------------------------------------
-// buildPVCurve — nose point / collapse detection
+// buildPVCurve — numerical solver-boundary detection
 // ---------------------------------------------------------------------------
-(function testPVCurveCollapseDetected() {
-  // Use a high-impedance line that will collapse at moderate loading
+(function testPVCurveSolverBoundaryDetected() {
+  // Use a high-impedance line that reaches an NR nonconvergence boundary.
   const buses = twoBusSys({ r: 2.0, x: 6.0, Pd: 4000, Qd: 2000 });
   const result = buildPVCurve(buses, { baseMVA: 100, lambdaMax: 5.0, lambdaStep: 0.05 });
-  assert.ok(result.collapseFound, 'collapse must be detected for high-impedance line');
-  assert.ok(result.collapseLambda !== null, 'collapseLambda must be set');
-  assert.ok(result.collapseLambda > 1.0, 'collapse must occur beyond the operating point');
+  assert.ok(result.solverLimitEncountered, 'solver boundary must be detected for high-impedance line');
+  assert.ok(result.solverLimitLambda !== null, 'solverLimitLambda must be set');
+  assert.ok(result.solverLimitLambda > 1.0, 'solver boundary must occur beyond the operating point');
+  assert.strictEqual(result.collapseFound, false, 'NR nonconvergence must not be labeled physical collapse');
+  assert.strictEqual(result.collapseLambda, null);
   assert.ok(result.maxLoadMW > 0, 'maxLoadMW must be positive');
   console.log('PASS: PV curve collapse detected');
 })();
@@ -187,15 +189,27 @@ function threeBusSys() {
 // ---------------------------------------------------------------------------
 // buildQVCurve — reactive margin is non-negative
 // ---------------------------------------------------------------------------
-(function testQVCurveReactiveMargin() {
+(function testQVCurveDoesNotInventReactiveMargin() {
   const buses = twoBusSys({ r: 1.0, x: 3.0, Pd: 4000, Qd: 1500 });
   const result = buildQVCurve(buses, {
     targetBusId: 'B2', baseMVA: 100, qMinMvar: -30, qMaxMvar: 30, qStepMvar: 2,
   });
-  if (result.reactiveMarginMvar !== null) {
-    assert.ok(result.reactiveMarginMvar >= 0, 'reactive margin must be non-negative');
-  }
-  console.log('PASS: QV curve reactive margin non-negative');
+  assert.strictEqual(result.reactiveMarginMvar, null);
+  assert.strictEqual(result.qAtNose, null);
+  console.log('PASS: QV curve withholds unsupported reactive margin');
+})();
+
+(function testQVCurveAllowsNetCapacitiveInjection() {
+  const buses = twoBusSys({ r: 0.1, x: 0.5, Pd: 1000, Qd: 1000 });
+  const result = buildQVCurve(buses, {
+    targetBusId: 'B2', baseMVA: 100, qMinMvar: 0, qMaxMvar: 3, qStepMvar: 1,
+  });
+  const atOne = result.points.find(p => p.qInjMvar === 1);
+  const atTwo = result.points.find(p => p.qInjMvar === 2);
+  assert.ok(atOne?.converged && atTwo?.converged);
+  assert.ok(atTwo.voltage > atOne.voltage,
+    'voltage must continue changing after injection exceeds the original 1 MVAR load');
+  console.log('PASS: QV curve permits net capacitive injection without zero-load clipping');
 })();
 
 // ---------------------------------------------------------------------------
@@ -299,15 +313,15 @@ function threeBusSys() {
 })();
 
 // ---------------------------------------------------------------------------
-// P-V curve — lambdaMax warning when no collapse found
+// P-V curve — sweep-limit warning when no solver boundary is encountered
 // ---------------------------------------------------------------------------
 (function testPVCurveLambdaMaxWarning() {
-  // Very low load → system won't collapse within lambdaMax=1.2
+  // Very low load → all sampled points converge through lambdaMax=1.2.
   const buses = twoBusSys({ r: 0.01, x: 0.05, Pd: 100, Qd: 50 });
   const result = buildPVCurve(buses, { baseMVA: 100, lambdaMax: 1.2, lambdaStep: 0.1 });
-  assert.ok(!result.collapseFound, 'should not collapse for low-load stiff system');
-  assert.ok(result.warnings.some(w => w.includes('did not collapse')), 'must warn when no collapse');
-  console.log('PASS: PV curve lambdaMax warning emitted');
+  assert.ok(!result.solverLimitEncountered, 'should not encounter a solver boundary');
+  assert.ok(result.warnings.some(w => w.includes('no numerical solver boundary')), 'must describe the sampled sweep limit');
+  console.log('PASS: PV curve sweep-limit warning emitted');
 })();
 
 // ---------------------------------------------------------------------------

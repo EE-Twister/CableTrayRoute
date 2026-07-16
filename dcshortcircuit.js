@@ -9,6 +9,7 @@ import {
 } from './analysis/dcShortCircuit.mjs';
 import { getStudies, setStudies } from './dataStore.mjs';
 import { initStudyApprovalPanel } from './src/components/studyApproval.js';
+import { escapeHtml as escHtml } from './src/htmlUtils.mjs';
 
 document.addEventListener('DOMContentLoaded', () => {
   initSettings();
@@ -220,7 +221,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Arc flash
     if (af) {
-      const ppeBadgeClass = af.ppeCategory >= 4 ? 'ppe-danger' : af.ppeCategory >= 3 ? 'ppe-high' : af.ppeCategory >= 2 ? 'ppe-medium' : af.ppeCategory >= 1 ? 'ppe-low' : 'ppe-none';
+      const ppeBadgeClass = af.incidentEnergyCalCm2 > 40 ? 'ppe-danger' : af.incidentEnergyCalCm2 > 1.2 ? 'ppe-high' : 'ppe-none';
       html += `<h3>DC Arc Flash (NFPA 70E Annex D.8.1 — Ammerman Method)</h3>`;
       html += `<table class="results-table">
         <tbody>
@@ -231,7 +232,8 @@ document.addEventListener('DOMContentLoaded', () => {
           <tr><th>Working Distance</th><td>${af.workingDistanceMm} mm (${(af.workingDistanceMm / 25.4).toFixed(1)} in)</td></tr>
           <tr><th>Incident Energy</th><td><strong>${af.incidentEnergyCalCm2.toFixed(2)} cal/cm²</strong></td></tr>
           <tr><th>Arc Flash Boundary</th><td>${af.arcFlashBoundaryMm.toFixed(0)} mm (${(af.arcFlashBoundaryMm / 25.4).toFixed(1)} in)</td></tr>
-          <tr><th>PPE Category</th><td><span class="ppe-badge ${ppeBadgeClass}">${af.ppeCategory === 5 ? 'Dangerous' : `Category ${af.ppeCategory}`}</span></td></tr>
+          <tr><th>PPE Selection Method</th><td><span class="ppe-badge ${ppeBadgeClass}">Incident Energy</span></td></tr>
+          <tr><th>Minimum Arc Rating</th><td>${af.minimumArcRatingCalCm2 > 0 ? `&ge; ${af.minimumArcRatingCalCm2.toFixed(2)} cal/cm&sup2;` : 'Below 1.2 cal/cm&sup2; threshold'}</td></tr>
           <tr><th>PPE Requirement</th><td>${escHtml(af.ppeCategoryLabel)}</td></tr>
         </tbody>
       </table>`;

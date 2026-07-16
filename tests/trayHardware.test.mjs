@@ -277,12 +277,13 @@ describe('buildTrayHardwareBOM — L-shaped route', () => {
   it('calculates support brackets for both trays', () => {
     const { supports } = buildTrayHardwareBOM(trays);
     assert.strictEqual(supports.length, 2);
-    // T1 is 40 ft, default max span 12 ft → ceil(40/12)=4 spans → 5 brackets
+    // Default Class 16A reference span is 16 ft.
+    // T1: ceil(40/16)=3 spans → 4 brackets.
     const t1 = supports.find(s => s.tray_id === 'T1');
-    assert.strictEqual(t1.bracket_qty, 5);
-    // T2 is 30 ft → ceil(30/12)=3 spans → 4 brackets
+    assert.strictEqual(t1.bracket_qty, 4);
+    // T2: ceil(30/16)=2 spans → 3 brackets.
     const t2 = supports.find(s => s.tray_id === 'T2');
-    assert.strictEqual(t2.bracket_qty, 4);
+    assert.strictEqual(t2.bracket_qty, 3);
   });
 
   it('calculates straight sections', () => {
@@ -301,7 +302,7 @@ describe('buildTrayHardwareBOM — L-shaped route', () => {
     assert.strictEqual(elbowItem.qty, 1);
     const bracketItem = summary.find(s => s.category === 'Support');
     assert.ok(bracketItem, 'summary should include Support brackets');
-    assert.strictEqual(bracketItem.qty, 9); // 5 + 4
+    assert.strictEqual(bracketItem.qty, 7); // 4 + 3
   });
 
   it('carries tray material into details and summary rows', () => {

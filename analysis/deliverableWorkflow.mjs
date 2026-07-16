@@ -3,6 +3,14 @@ import { buildSpoolSheetVisualModel } from './spoolSheetVisualModel.mjs';
 import { getAvailableSections } from './reportPackage.mjs';
 import { summarizeCableWorkflow } from './scheduleWorkflow.mjs';
 import { buildDesignBasisReview } from './designBasis.mjs';
+import {
+  normalizeRouteResults,
+  routeResultSucceeded,
+  routeResultTag,
+  routedCableNamesFromResults
+} from './routeResults.mjs';
+
+export { normalizeRouteResults, routedCableNamesFromResults } from './routeResults.mjs';
 
 function hasValue(value) {
   if (Array.isArray(value)) return value.some(hasValue);
@@ -45,21 +53,6 @@ function cableLength(cable) {
   return fieldValue(cable, ['length', 'length_ft', 'lengthFt', 'estimated_length', 'calculated_length', 'total_length']);
 }
 
-function routeResultTag(result) {
-  return fieldValue(result, ['cable', 'tag', 'name', 'id', 'cable_tag', 'cableId']);
-}
-
-function routeResultSucceeded(result) {
-  if (!result || typeof result !== 'object') return false;
-  const status = normalized(result.status);
-  if (/fail|error|not routed|x failed/i.test(status)) return false;
-  const totalLength = Number(result.total_length ?? result.totalLength ?? result.length);
-  return Number.isFinite(totalLength) && totalLength > 0
-    || Array.isArray(result.breakdown) && result.breakdown.length > 0
-    || Array.isArray(result.route_segments) && result.route_segments.length > 0
-    || status.toLowerCase().includes('routed');
-}
-
 function segmentLength(segment) {
   const direct = Number(segment?.length ?? segment?.length_ft ?? segment?.lengthFt);
   if (Number.isFinite(direct)) return direct;
@@ -97,16 +90,6 @@ function routeResultFromCable(cable) {
     breakdown,
     route_segments: routeSegments,
   };
-}
-
-export function normalizeRouteResults(source) {
-  if (Array.isArray(source)) return source.filter(row => row && typeof row === 'object');
-  if (!source || typeof source !== 'object') return [];
-  if (Array.isArray(source.batchResults)) return source.batchResults.filter(row => row && typeof row === 'object');
-  if (Array.isArray(source.routeResults)) return source.routeResults.filter(row => row && typeof row === 'object');
-  if (Array.isArray(source.latestRouteData)) return source.latestRouteData.filter(row => row && typeof row === 'object');
-  if (Array.isArray(source.results)) return source.results.filter(row => row && typeof row === 'object');
-  return [];
 }
 
 
@@ -153,9 +136,11 @@ function routeResultRacewayIds(result) {
 
 export function filterRouteResultsForProject(routeResults = [], { cables = [], trays = [], conduits = [], ductbanks = [] } = {}) {
   const cableTags = knownCableTags(cables);
+  const nestedConduits = meaningfulRecords(ductbanks).flatMap(ductbank => meaningfulRecords(ductbank.conduits));
   const racewayIds = new Set([
     ...collectRacewayIds(trays, ['tray_id', 'trayId', 'id', 'tag']),
     ...collectRacewayIds(conduits, ['conduit_id', 'conduitId', 'id', 'tag']),
+    ...collectRacewayIds(nestedConduits, ['conduit_id', 'conduitId', 'id', 'tag']),
     ...collectRacewayIds(ductbanks, ['tag', 'id', 'ductbankTag', 'ductbank_id']),
   ]);
 

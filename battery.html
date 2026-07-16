@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="Battery and UPS sizing study per IEEE 485-2010 / IEEE 1115-2000. Size a stationary battery bank for required runtime with temperature correction, aging factor, and design margin." />
+  <meta name="description" content="Preliminary battery and UPS energy screening with assumed temperature, aging, depth-of-discharge, and design-margin factors." />
   <title>Battery / UPS Sizing — CableTrayRoute</title>
   <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icons/favicon.svg">
   <!-- Open Graph / Social sharing -->
   <meta property="og:type" content="website">
   <meta property="og:title" content="Battery / UPS Sizing — CableTrayRoute">
-  <meta property="og:description" content="IEEE 485-2010 stationary battery sizing with temperature correction, aging factor, and runtime curve.">
+  <meta property="og:description" content="Preliminary stationary battery and UPS energy screening; manufacturer discharge data is required for final sizing.">
   <meta property="og:image" content="https://cabletrayroute.com/icons/og-preview.png">
   <meta property="og:site_name" content="CableTrayRoute">
   <meta property="og:url" content="battery.html">
@@ -88,9 +88,11 @@
 
       <details class="method-panel">
         <summary>Method &amp; Assumptions</summary>
-        <p>Battery sizing follows <strong>IEEE 485-2010</strong> (lead-acid) and
-        <strong>IEEE 1115-2000</strong> (nickel-cadmium). Five sequential de-rating factors are
-        applied to the net energy requirement.</p>
+        <p class="alert warning"><strong>Screening limitation:</strong> this page applies generic
+        energy factors. It is not an IEEE 485 or IEEE 1115 cell-sizing implementation and cannot
+        establish compliance or a final product selection. Final sizing requires the complete dc
+        duty cycle, end voltage, and manufacturer discharge-performance data. IEEE 485-2020 applies
+        only to lead-acid batteries.</p>
 
         <p><strong>Step 1 — Net energy:</strong></p>
         <pre>kWh_net = P_avg_kW &times; t_hours  &nbsp;[uniform load]
@@ -99,16 +101,16 @@ kWh_net = &Sigma;(P_i &times; &Delta;t_i)      &nbsp;[multi-period duty cycle]</
         <p><strong>Step 2 — Efficiency &amp; depth of discharge:</strong></p>
         <pre>kWh_design = kWh_net / (&eta; &times; DoD)</pre>
 
-        <p><strong>Step 3 — Temperature correction (IEEE 485 &sect;5.2):</strong></p>
+        <p><strong>Step 3 — Assumed temperature correction:</strong></p>
         <pre>K_temp = min(1.0,  1 + coeff &times; (T_amb &minus; 25&deg;C))
 kWh_temp = kWh_design / K_temp</pre>
-        <p>K_temp is capped at 1.0 above 25 &deg;C — IEEE 485 does not credit extra capacity
-        at elevated temperatures.</p>
+        <p>K_temp is capped at 1.0 above 25 &deg;C for conservative screening. Replace the
+        assumed coefficient with manufacturer data for final selection.</p>
 
-        <p><strong>Step 4 — Aging factor (IEEE 485 &sect;5.3):</strong></p>
+        <p><strong>Step 4 — Assumed aging factor:</strong></p>
         <pre>kWh_aged = kWh_temp &times; aging_factor  &nbsp;[1.25 lead-acid, 1.20 Li-ion/NiCd]</pre>
 
-        <p><strong>Step 5 — Design margin (IEEE 485 &sect;5.4):</strong></p>
+        <p><strong>Step 5 — User-entered design margin:</strong></p>
         <pre>kWh_final = kWh_aged &times; (1 + margin%)</pre>
 
         <p><strong>UPS kVA:</strong></p>
@@ -218,9 +220,9 @@ kWh_temp = kWh_design / K_temp</pre>
             <input type="number" id="ambient-temp-c" min="-40" max="60" step="1" value="25"
                    required aria-describedby="temp-hint">
             <p id="temp-hint" class="field-hint">
-              Battery room or enclosure operating temperature. IEEE 485 uses 25 &deg;C as the
-              reference; capacity decreases below this temperature (see IEEE 485 &sect;5.2).
-              Use the lowest expected ambient for worst-case sizing.
+              Battery room or enclosure operating temperature. The screening model uses 25 &deg;C
+              as its reference. Use the lowest expected ambient, then verify the correction against
+              the selected manufacturer's discharge data.
             </p>
           </div>
         </fieldset>
@@ -237,9 +239,9 @@ kWh_temp = kWh_design / K_temp</pre>
             <input type="number" id="design-margin-pct" min="0" max="50" step="1" value="10"
                    required aria-describedby="margin-hint">
             <p id="margin-hint" class="field-hint">
-              IEEE 485 &sect;5.4 recommends a minimum 10% design margin for general applications.
-              Use 15–25% for life-safety, mission-critical, or high-uncertainty loads.
-              This margin is applied after the aging factor.
+              User-entered allowance for load growth and uncertainty. Project criteria and the
+              selected battery standard govern the final margin. This value is applied after the
+              assumed aging factor.
             </p>
           </div>
 
@@ -399,8 +401,8 @@ kWh_temp = kWh_design / K_temp</pre>
     <div class="modal-content">
       <button id="close-help-btn" class="close-btn" aria-label="Close Help">&times;</button>
       <h2 id="help-title">Battery / UPS Sizing Help</h2>
-      <p>This tool sizes a stationary battery bank and UPS per <strong>IEEE 485-2010</strong>
-      (lead-acid) and <strong>IEEE 1115-2000</strong> (nickel-cadmium).</p>
+      <p>This tool provides a preliminary energy screen only. It does not perform the
+      manufacturer-data cell sizing required by IEEE 485 or IEEE 1115.</p>
       <h3>Workflow</h3>
       <ol>
         <li>Enter the average and peak load demand. The average load determines energy; the
@@ -409,8 +411,8 @@ kWh_temp = kWh_design / K_temp</pre>
         <li>Set the required runtime. NEC 700 emergency systems require at least 1.5 hours.</li>
         <li>Select battery chemistry. Lead-Acid AGM is most common. Lithium-Ion offers
           higher energy density. NiCd excels in extreme cold.</li>
-        <li>Enter the battery room ambient temperature. IEEE 485 de-rates capacity below 25 &deg;C.</li>
-        <li>Set the design margin (minimum 10% per IEEE 485 &sect;5.4) and UPS power factor.</li>
+        <li>Enter the battery room ambient temperature and later replace the generic correction with manufacturer data.</li>
+        <li>Set the project design margin and UPS power factor for preliminary screening.</li>
         <li>Confirm or override the rack layout assumptions for DC bus voltage, module grouping,
           physical rack size, and terminal side.</li>
         <li>Click <strong>Run Analysis</strong> to see the required bank size, UPS kVA, and rack
@@ -420,8 +422,7 @@ kWh_temp = kWh_design / K_temp</pre>
       <ul>
         <li><strong>Energy chain</strong> — each step showing how the net energy is de-rated
           to the final installed bank requirement.</li>
-        <li><strong>Recommended bank size</strong> — nearest standard kWh rating that meets
-          or exceeds the final requirement.</li>
+        <li><strong>Screening bank size</strong> — generic kWh increment for budgeting and space planning only.</li>
         <li><strong>Runtime curve</strong> — available runtime at 25%, 50%, 75%, 100%, and
           125% of the specified average load. Use this to evaluate load shedding strategies.</li>
         <li><strong>UPS kVA</strong> — minimum UPS inverter rating based on peak load and

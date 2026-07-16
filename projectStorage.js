@@ -552,6 +552,7 @@ export function cloneScenarioStorage(from, to) {
 
 const SAVED_PROJECT_SUFFIXES = ['equipment', 'panels', 'loads', 'cables', 'cableTypicals', 'mccLineups', 'raceways', 'oneLine'];
 const SAVED_PROJECT_PRIMARY_SUFFIXES = new Set(SAVED_PROJECT_SUFFIXES.filter(suffix => suffix !== 'equipment'));
+const DEFAULT_SCENARIO_NAMES = new Set(['base', 'future', 'emergency']);
 
 class SavedProjectMigrationError extends Error {
   constructor(message, cause) {
@@ -592,7 +593,7 @@ function loadSavedProjectsBlob() {
 function migrateLegacySavedProjects() {
   const legacyRecords = new Map();
   const suffixes = new Set(SAVED_PROJECT_SUFFIXES);
-  const scenarioNames = new Set(scenarioListCache);
+  const scenarioNames = new Set([...DEFAULT_SCENARIO_NAMES, ...scenarioListCache]);
   for (const key of getAllStorageKeys()) {
     const idx = key.indexOf(':');
     if (idx <= 0) continue;
@@ -669,12 +670,29 @@ function ensureSavedProjectsCache() {
         }
       }
       savedProjectsCache = { ...migration.records, ...existing };
+      const scenarioNames = new Set([...DEFAULT_SCENARIO_NAMES, ...scenarioListCache]);
+      Object.keys(savedProjectsCache).forEach(name => {
+        const record = savedProjectsCache[name];
+        const hasSavedProjectMetadata = isPlainObject(record?.__meta);
+        if (scenarioNames.has(name) && !hasSavedProjectMetadata) delete savedProjectsCache[name];
+      });
       persistSavedProjects();
       for (const key of migration.keysToRemove) {
         writeRawStorage(key, null);
       }
     } else {
       savedProjectsCache = existing;
+      const scenarioNames = new Set([...DEFAULT_SCENARIO_NAMES, ...scenarioListCache]);
+      let removedScenarioArtifact = false;
+      Object.keys(savedProjectsCache).forEach(name => {
+        const record = savedProjectsCache[name];
+        const hasSavedProjectMetadata = isPlainObject(record?.__meta);
+        if (scenarioNames.has(name) && !hasSavedProjectMetadata) {
+          delete savedProjectsCache[name];
+          removedScenarioArtifact = true;
+        }
+      });
+      if (removedScenarioArtifact) persistSavedProjects();
     }
   } catch (e) {
     const error = e instanceof Error ? e : new Error(String(e));

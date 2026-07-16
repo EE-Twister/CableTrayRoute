@@ -1,36 +1,40 @@
-# BESS Hazard / Thermal Runaway Modeling
+# BESS Hazard / Thermal Runaway Screening
 
-CableTrayRoute implements a screening-level Hazard Mitigation Analysis (HMA) for battery energy storage systems (BESS) in compliance with **NFPA 855-2023** (Standard for the Installation of Stationary Energy Storage Systems) and **NFPA 68-2018** (Standard on Explosion Protection by Deflagration Venting).
+CableTrayRoute provides preliminary engineering screening for battery energy
+storage system layouts, generic thermal-runaway sensitivity, and
+deflagration-vent inputs. It does **not** determine NFPA 855 or NFPA 68
+compliance, complete or approve a Hazard Mitigation Analysis (HMA), or replace
+UL 9540A and project-specific gas test data.
 
-## Standards referenced
+## References and limits
 
-| Standard | Scope |
+| Reference | How it applies |
 |---|---|
-| NFPA 855-2023 | ESS installation requirements; §15 — Indoor Stationary ESS |
-| NFPA 68-2018  | Deflagration venting; §7.4.3 — Bartknecht correlation |
-| UL 9540A-2023 | Thermal runaway propagation test method (cell → module → rack) |
-| IFC 1207-2020 | International Fire Code — Energy Storage Systems |
-| NFPA 70 Art. 706 | National Electrical Code — Energy Storage Systems |
+| NFPA 855 | Defines installation requirements and the project-specific HMA process. Required provisions depend on the adopted edition and installation. |
+| NFPA 68 | Governs final deflagration-vent design, including applicability, geometry, pressure, vent construction, and discharge. |
+| UL 9540A | Test method used to obtain system-specific fire-propagation and gas-release data. The app does not reproduce this test. |
+| Adopted fire/building/electrical codes | Must be identified for the project and coordinated with the Authority Having Jurisdiction (AHJ). |
 
 ## Study inputs
 
 | Input | Unit | Notes |
 |---|---|---|
-| Total rated capacity | kWh | Sum of all BESS units at the site |
-| Battery chemistry | — | LFP, NMC, NCA, lead-acid, NiCd |
-| Cells per module | — | Used for UL 9540A propagation cascade |
-| Modules per rack | — | Used for UL 9540A propagation cascade |
-| Ambient temperature | °C | Higher T → faster propagation |
-| Room volume | m³ | Net internal volume of ESS room |
-| Vent opening pressure P_stat | kPa | Explosion-relief panel activation pressure; typically 3–10 kPa |
-| Installed vent area | m² | Total explosion-relief panel area; 0 if none |
-| Exposures (table) | m | Label, type (property line / occupied building / ignition source), actual distance |
+| Total rated capacity | kWh | Used only to select a built-in advisory distance reference |
+| Battery chemistry | — | Selects generic screening assumptions for LFP, NMC, NCA, lead-acid, or NiCd |
+| Cells per module | — | Used by the generic propagation sensitivity model |
+| Modules per rack | — | Used by the generic propagation sensitivity model |
+| Ambient temperature | °C | Applies a simple temperature sensitivity factor |
+| Room volume | m³ | Input to the preliminary vent equation |
+| Vent opening pressure, P_stat | kPa | Assumed vent activation pressure |
+| Installed vent area | m² | Used for a diagnostic comparison only |
+| Exposures | m | Property line, occupied building, or ignition-source distances |
 
-## Calculations
+## Screening calculations
 
-### 1. Separation distances — NFPA 855 §15.3
+### 1. Advisory separation references
 
-NFPA 855-2023 Table 15.3.2 specifies minimum clearances by ESS rated energy:
+The application retains the following generic values to flag layouts for
+review. They are not labeled as NFPA 855 minimum distances:
 
 | Exposure type | ≤ 50 kWh | > 50 kWh |
 |---|---|---|
@@ -38,99 +42,63 @@ NFPA 855-2023 Table 15.3.2 specifies minimum clearances by ESS rated energy:
 | Occupied building | 1.5 m (5 ft) | 3.0 m (10 ft) |
 | Ignition / electrical source | 0.9 m (3 ft) | 0.9 m (3 ft) |
 
-The check compares each entered exposure distance against the table value. A **warn** is issued when the margin above the minimum is less than 0.3 m.
+An entered distance below its reference receives a **screening alert**. A
+distance at or above the reference still receives **engineering review**, not a
+compliance pass. Final separation must be established from the listed system,
+UL 9540A report, adopted code edition, fire-protection features, permitted
+alternatives, and AHJ decisions.
 
-### 2. Thermal runaway propagation — UL 9540A
+### 2. Generic thermal-runaway sensitivity
 
-A lumped thermal-mass model estimates propagation time through a rack:
+The model applies a chemistry-wide base time and an ambient-temperature factor,
+then scales by the entered cell and module counts:
 
-- **Cell-to-cell**: Chemistry-dependent base time corrected for ambient temperature using an Arrhenius approximation (reaction rate doubles every 10°C above 25°C reference).
-- **Cell-to-module**: Scales with cells per module (linear with 0.7 barrier-effectiveness factor).
-- **Module-to-rack**: Scales with modules per rack (linear with 0.5 factor for rack enclosure heat concentration).
-
-Chemistry propagation base times at 25°C ambient:
-
-| Chemistry | Cell-to-cell base [min] | K_G [bar·m/s] |
-|---|---|---|
-| LFP (LiFePO₄) | 20 | 50 |
-| NMC | 8 | 120 |
-| NCA | 4 | 200 |
-| NiCd | 15 | 400 |
-| Lead-acid (VRLA) | 30 | 450 |
-
-NFPA 855 §15.9 recommends automatic suppression when module-to-rack propagation time is less than 30 minutes.
-
-### 3. Deflagration vent area — NFPA 68 §7.4.3
-
-The Bartknecht correlation from NFPA 68-2018 §7.4.3.2 is applied:
-
+```text
+temperature factor = 2^(-(ambient °C - 25) / 10)
+cell-to-cell time = chemistry base time × temperature factor
+cell-to-module time = cell-to-cell time × cells per module × 0.7
+module-to-rack time = cell-to-module time × modules per rack × 0.5
 ```
+
+The 0.7 and 0.5 factors are generic assumptions, not validated thermal-barrier
+properties. The result is not a UL 9540A result and must not be used to claim
+propagation resistance, suppression effectiveness, or installation approval.
+
+### 3. Preliminary deflagration-vent equation
+
+The application evaluates this screening equation:
+
+```text
 A_v = (P_stat^(-0.5682) × K_G^0.5922 × V^0.6672 × P_max^0.1723) / 1640
 ```
 
-where:
-- `A_v` = required vent area [m²]
-- `P_stat` = vent opening pressure [bar]
-- `K_G` = deflagration index [bar·m/s] (chemistry-specific off-gas)
-- `V` = enclosure volume [m³]
-- `P_max` = maximum unvented explosion pressure [bar]
+where `P_stat` is in bar, `K_G` is in bar·m/s, `V` is in m³, and `P_max` is in
+bar. The chemistry-wide `K_G` and `P_max` values are assumptions. They cannot
+replace gas composition, concentration, burning velocity, maximum pressure,
+vent efficiency, duct, geometry, congestion, or other project data required by
+the final NFPA 68 design.
 
-The constant 1640 reconciles SI units. The correlation is applicable when P_stat ≤ 0.1 bar (10 kPa) and K_G ≤ 550 bar·m/s; a warning is issued for inputs outside this range.
+### 4. Review summary
 
-### 4. HMA summary
-
-The overall HMA status is:
-- **Pass**: all separation checks pass, installed vent ≥ required, module-to-rack ≥ 30 min
-- **Warn**: all checks pass but one or more margins are tight (< 0.3 m separation margin, or propagation warnings)
-- **Fail**: any separation check fails, installed vent < required, or module-to-rack < 30 min
-
-## Chemistry parameters
-
-| Chemistry | K_G [bar·m/s] | P_max [bar] | Notes |
-|---|---|---|---|
-| LFP | 50 | 4.0 | CO₂/CO dominant off-gas; most thermally stable |
-| NMC | 120 | 5.5 | Mixed CO₂/CO/H₂ off-gas |
-| NCA | 200 | 6.5 | More volatile organic off-gas |
-| NiCd | 400 | 6.5 | H₂ off-gas during overcharge |
-| Lead-acid | 450 | 6.9 | H₂ off-gas during charging |
-
-K_G values are representative of typical off-gas compositions from UL 9540A cell-level testing at near-stoichiometric conditions.
+The overall status is always **engineering review required**. Diagnostic fields
+record whether the inputs meet the built-in separation, 30-minute propagation,
+and vent-area screening references. These flags prioritize investigation; they
+are not pass/fail code determinations.
 
 ## Implementation
 
 | File | Purpose |
 |---|---|
-| `analysis/bessHazard.mjs` | Pure calculation module (no DOM) |
-| `bessHazard.html` | Study page |
-| `bessHazard.js` | Page entry point (DOM wiring) |
+| `analysis/bessHazard.mjs` | Pure screening calculations and review flags |
+| `bessHazard.html` | Study page and limitations |
+| `bessHazard.js` | Page rendering and CSV export |
 | `src/bessHazard.js` | Rollup bundle entry |
-| `tests/bessHazard.test.mjs` | Unit tests |
+| `tests/bessHazard.test.mjs` | Unit tests, including the no-compliance-pass invariant |
 
-## Exported functions
+## Required project review
 
-```javascript
-separationDistance(exposureType, ratedKwh)
-// → { minDistM, minDistFt }
-
-checkSeparations(ratedKwh, exposures[])
-// → Array<{ label, type, actualDistM, minDistM, margin, pass, status }>
-
-propagationAmbientFactor(ambientC)
-// → number  (Arrhenius correction; 1.0 at 25°C)
-
-propagationTiming({ chemistry, cellsPerModule, modulesPerRack, ambientC })
-// → { cellToCell_min, cellToModule_min, moduleToRack_min, warnings[] }
-
-deflagrationVentArea({ volumeM3, pstatKpa, chemistry })
-// → { ventAreaM2, ventAreaFt2, kG_barMs, pMax_bar, pStat_bar, warnings[] }
-
-hmaSummary({ separationChecks, propagation, ventArea, providedVentAreaM2, ratedKwh, chemistry })
-// → { status, separationOk, ventOk, propagationOk, issues[] }
-
-runBessHazardStudy(inputs)
-// → { valid, errors, separationChecks, propagation, ventArea, summary, ... }
-```
-
-## Disclaimer
-
-This module implements published engineering correlations for screening purposes only. A final Hazard Mitigation Analysis per NFPA 855 §15.3 must be prepared by a licensed professional engineer and reviewed and approved by the Authority Having Jurisdiction (AHJ) before any BESS installation. The K_G values and propagation times are representative of typical test conditions; actual values depend on specific cell design and configuration.
+Before design or permitting decisions, obtain the exact product listing and
+manufacturer documentation, applicable UL 9540A reports, project gas data,
+adopted code editions and amendments, fire-protection design, and AHJ criteria.
+A qualified engineer must evaluate those materials and complete the required
+HMA and deflagration analysis.

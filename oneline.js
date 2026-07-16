@@ -329,6 +329,22 @@ const customComponentScenarioKey = '__ctr_custom_components__';
 const customComponentPrefillStorageKey = 'ctrCustomComponentPrefill';
 const paletteContextMenu = document.getElementById('palette-context-menu');
 
+const oneLineViewSettingPrefix = 'ctr:oneline:view:';
+
+function getOneLineViewSetting(key, fallback = null) {
+  const raw = readAppSetting(`${oneLineViewSettingPrefix}${key}`);
+  if (raw === null || raw === undefined) return getItem(key, fallback);
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return fallback;
+  }
+}
+
+function setOneLineViewSetting(key, value) {
+  writeAppSetting(`${oneLineViewSettingPrefix}${key}`, JSON.stringify(value));
+}
+
 let paletteContextTarget = null;
 
 const attributeDisplayOverrides = {
@@ -397,7 +413,7 @@ const attributeDisplayOverrides = {
   voltage_mag_c: { label: 'Voltage C (p.u.)', unit: '' },
   'arcFlash.incidentEnergy': { label: 'Arc Flash Incident Energy', unit: 'cal/cm²' },
   'arcFlash.boundary': { label: 'Arc Flash Boundary', unit: 'mm' },
-  'arcFlash.ppeCategory': { label: 'Arc Flash PPE Category', unit: '' },
+  'arcFlash.minimumArcRatingCalCm2': { label: 'Minimum Arc Rating', unit: 'cal/cm²' },
   'arcFlash.clearingTime': { label: 'Arc Flash Clearing Time', unit: 's' },
   'shortCircuit.method': { label: 'Short-Circuit Method', unit: '' },
   'shortCircuit.prefaultKV': { label: 'Prefault Voltage', unit: 'kV' },
@@ -471,14 +487,14 @@ function sanitizeViewAttributeList(keys) {
   return normalized;
 }
 
-const storedViewAttributes = getItem(viewAttributeStorageKey, []);
+const storedViewAttributes = getOneLineViewSetting(viewAttributeStorageKey, []);
 const initialViewAttributes = sanitizeViewAttributeList(storedViewAttributes);
 if (Array.isArray(storedViewAttributes)) {
   const needsPersistedCleanup =
     storedViewAttributes.length !== initialViewAttributes.length ||
     storedViewAttributes.some((key, idx) => key !== initialViewAttributes[idx]);
   if (needsPersistedCleanup) {
-    setItem(viewAttributeStorageKey, initialViewAttributes);
+    setOneLineViewSetting(viewAttributeStorageKey, initialViewAttributes);
   }
 }
 let viewAttributes = new Set(initialViewAttributes);
@@ -489,7 +505,7 @@ let componentAttributeDisplayOverrides = new Map();
 let componentAttributeList = [];
 let componentAttributeLabelMap = new Map();
 const viewComponentStorageKey = 'diagramViewComponentSelection';
-let selectedViewComponent = getItem(viewComponentStorageKey, null);
+let selectedViewComponent = getOneLineViewSetting(viewComponentStorageKey, null);
 
 const datablockFormatPresets = Object.freeze({
   off: [],
@@ -538,22 +554,22 @@ const drawingModeLabels = Object.freeze({
   edit: 'Edit',
   engineeringPrint: 'Engineering Print'
 });
-let oneLineDrawingMode = getItem(drawingModeStorageKey, 'edit');
+let oneLineDrawingMode = getOneLineViewSetting(drawingModeStorageKey, 'edit');
 if (!Object.prototype.hasOwnProperty.call(drawingModeLabels, oneLineDrawingMode)) {
   oneLineDrawingMode = 'edit';
 }
-let datablockFormatMode = getItem(datablockFormatStorageKey, viewAttributes.size ? 'custom' : 'off');
+let datablockFormatMode = getOneLineViewSetting(datablockFormatStorageKey, viewAttributes.size ? 'custom' : 'off');
 if (!Object.prototype.hasOwnProperty.call(datablockFormatLabels, datablockFormatMode)) {
   datablockFormatMode = viewAttributes.size ? 'custom' : 'off';
 }
-if (getItem(datablockDefaultVersionStorageKey, '') !== 'clean-canvas-v1' && datablockFormatMode !== 'custom') {
+if (getOneLineViewSetting(datablockDefaultVersionStorageKey, '') !== 'clean-canvas-v1' && datablockFormatMode !== 'custom') {
   datablockFormatMode = 'off';
   viewAttributes = new Set();
-  setItem(datablockFormatStorageKey, datablockFormatMode);
-  setItem(viewAttributeStorageKey, []);
-  setItem(datablockDefaultVersionStorageKey, 'clean-canvas-v1');
+  setOneLineViewSetting(datablockFormatStorageKey, datablockFormatMode);
+  setOneLineViewSetting(viewAttributeStorageKey, []);
+  setOneLineViewSetting(datablockDefaultVersionStorageKey, 'clean-canvas-v1');
 }
-let datablockDensityMode = getItem(datablockDensityStorageKey, 'compact');
+let datablockDensityMode = getOneLineViewSetting(datablockDensityStorageKey, 'compact');
 if (!Object.prototype.hasOwnProperty.call(datablockDensityLabels, datablockDensityMode)) {
   datablockDensityMode = 'compact';
 }
@@ -565,14 +581,14 @@ const dataStateOverlayLabels = Object.freeze({
   studies: 'Studies',
   arcFlash: 'Arc Flash'
 });
-let dataStateOverlayMode = getItem(dataStateOverlayStorageKey, 'none');
+let dataStateOverlayMode = getOneLineViewSetting(dataStateOverlayStorageKey, 'none');
 if (!Object.prototype.hasOwnProperty.call(dataStateOverlayLabels, dataStateOverlayMode)) {
   dataStateOverlayMode = 'none';
 }
-if (getItem(dataStateOverlayDefaultVersionStorageKey, '') !== 'clean-canvas-v1') {
+if (getOneLineViewSetting(dataStateOverlayDefaultVersionStorageKey, '') !== 'clean-canvas-v1') {
   dataStateOverlayMode = 'none';
-  setItem(dataStateOverlayStorageKey, dataStateOverlayMode);
-  setItem(dataStateOverlayDefaultVersionStorageKey, 'clean-canvas-v1');
+  setOneLineViewSetting(dataStateOverlayStorageKey, dataStateOverlayMode);
+  setOneLineViewSetting(dataStateOverlayDefaultVersionStorageKey, 'clean-canvas-v1');
 }
 
 const operatingStateLabels = Object.freeze({
@@ -582,7 +598,7 @@ const operatingStateLabels = Object.freeze({
   switching: 'Switching',
   alternate: 'Alternate'
 });
-let activeOperatingState = getItem(operatingStateStorageKey, 'normal');
+let activeOperatingState = getOneLineViewSetting(operatingStateStorageKey, 'normal');
 if (!Object.prototype.hasOwnProperty.call(operatingStateLabels, activeOperatingState)) {
   activeOperatingState = 'normal';
 }
@@ -596,7 +612,7 @@ const paletteCategoryFilters = Object.freeze({
   cable: 'Cables',
   annotations: 'Annotations'
 });
-let activePaletteCategoryFilter = getItem(paletteFilterStorageKey, 'all');
+let activePaletteCategoryFilter = getOneLineViewSetting(paletteFilterStorageKey, 'all');
 if (!Object.prototype.hasOwnProperty.call(paletteCategoryFilters, activePaletteCategoryFilter)) {
   activePaletteCategoryFilter = 'all';
 }
@@ -1563,8 +1579,8 @@ let componentTypes = {};
 let manufacturerDefaults = {};
 let protectiveDevices = [];
 
-let paletteWidth = clampPaletteWidth(getItem(paletteWidthStorageKey, defaultPaletteWidth));
-const storedStudiesWidth = getItem(studiesWidthStorageKey, null);
+let paletteWidth = clampPaletteWidth(getOneLineViewSetting(paletteWidthStorageKey, defaultPaletteWidth));
+const storedStudiesWidth = getOneLineViewSetting(studiesWidthStorageKey, null);
 let studiesWidth = defaultStudiesWidth;
 let hasStoredStudiesWidth = false;
 if (storedStudiesWidth !== null && storedStudiesWidth !== undefined && storedStudiesWidth !== '') {
@@ -2787,31 +2803,6 @@ function buildPalette() {
     const matchesCategory = activeFilter === 'all' || category === activeFilter;
     return matchesText && matchesCategory;
   };
-  const frequentPattern = /\b(utility|source|switchboard|panel|transformer|xfmr|breaker|fuse|disconnect|vfd|motor|cable segment|busway)\b/i;
-  const frequentKeys = new Set([
-    'utility',
-    'source',
-    'switchboard',
-    'panel',
-    'xfmr',
-    'transformer',
-    'breaker',
-    'fuse',
-    'fused_disconnect',
-    'non_fused_disconnect',
-    'vfd',
-    'motor',
-    'motor_load',
-    'cable',
-    'busway'
-  ]);
-  const isFrequentPaletteComponent = (cat, subKey, meta) => {
-    const category = normalizePaletteFilterCategory(cat);
-    if (!['sources', 'equipment', 'protection', 'load', 'cable'].includes(category)) return false;
-    const key = String(subKey || meta?.subtype || meta?.type || '').toLowerCase();
-    const label = String(meta?.label || '').toLowerCase();
-    return frequentKeys.has(key) || frequentPattern.test(label);
-  };
   const createPaletteButton = (cat, subKey, meta, { pinned = false } = {}) => {
     const btn = btnTemplate ? btnTemplate.content.firstElementChild.cloneNode(true) : document.createElement('button');
     btn.draggable = true;
@@ -2905,7 +2896,7 @@ function buildPalette() {
       const buttons = Array.from(det.querySelectorAll('button[data-testid="palette-button"]'));
       const hasVisibleButton = buttons.some(btn => !btn.hidden);
       const card = det.closest('.palette-card');
-      if (card) card.hidden = !categoryVisible || (!hasVisibleButton && term);
+      if (card) card.hidden = buttons.length === 0 || !categoryVisible || (!hasVisibleButton && term);
       if (term && hasVisibleButton) det.open = true;
     });
     const pinned = document.getElementById('palette-pinned');
@@ -2936,37 +2927,48 @@ function buildPalette() {
     }
     label.textContent = cat.charAt(0).toUpperCase() + cat.slice(1);
   });
-  const pinnedKeys = new Set();
-  const pinnedLabels = new Set();
+  const renderedLabels = new Set();
+  const renderedComponentIdentities = new Set();
+  const paletteIdentity = (subKey, meta) => {
+    const type = String(meta.type || '').trim().toLowerCase();
+    const subtype = String(meta.subtype || subKey || '').trim().toLowerCase();
+    const label = String(meta.label || '').trim().toLowerCase();
+    if (type === 'utility_source' || subtype === 'utility_source' || subtype === 'utility' || label === 'utility_source') {
+      return 'sources:utility';
+    }
+    return `${normalizePaletteFilterCategory(meta.category)}:${type}:${subtype}`;
+  };
   Object.entries(componentTypes).forEach(([cat, subs]) => {
     const container = sectionContainers[cat] || (cat === 'busway' ? sectionContainers.equipment : null) || palette;
     subs.forEach(subKey => {
       const meta = componentMeta[subKey];
       if (!meta || meta.hidden) return;
+      const normalizedLabel = String(meta.label || meta.subtype || meta.type || subKey).trim().toLowerCase();
+      const identity = paletteIdentity(subKey, meta);
+      if (identity && renderedComponentIdentities.has(identity)) return;
+      if (normalizedLabel && renderedLabels.has(normalizedLabel)) return;
+      if (identity) renderedComponentIdentities.add(identity);
+      if (normalizedLabel) renderedLabels.add(normalizedLabel);
       const btn = createPaletteButton(cat, subKey, meta);
       container.appendChild(btn);
-      if (pinnedContainer && pinnedKeys.size < 10 && isFrequentPaletteComponent(cat, subKey, meta)) {
-        const key = `${cat}:${subKey}`;
-        const labelKey = String(meta.label || meta.subtype || meta.type || subKey || '').trim().toLowerCase();
-        if (!pinnedKeys.has(key) && !pinnedLabels.has(labelKey)) {
-          pinnedKeys.add(key);
-          pinnedLabels.add(labelKey);
-          pinnedContainer.appendChild(createPaletteButton(cat, subKey, meta, { pinned: true }));
-        }
-      }
+      // Keep one canonical palette control per component. Repeating hard-coded
+      // "frequent" controls made types such as Panel, Utility, Cable, and MCC
+      // appear to be separate duplicate definitions.
     });
   });
   document.querySelectorAll('#component-buttons details').forEach(det => {
     const key = `palette-${det.id}-open`;
     const container = det.querySelector('.section-buttons');
     const hasButtons = container && container.children.length > 0;
+    const card = det.closest('.palette-card');
+    if (card) card.hidden = !hasButtons;
     if (!hasButtons && container) {
       const placeholder = document.createElement('div');
       placeholder.className = 'no-components';
       placeholder.textContent = 'No components available';
       container.appendChild(placeholder);
     }
-    const stored = getItem(key, null);
+    const stored = getOneLineViewSetting(key, null);
     if (stored !== null) {
       det.open = stored === true || stored === 'true';
     } else if (!hasButtons) {
@@ -2974,7 +2976,7 @@ function buildPalette() {
     }
     if (!det.dataset.paletteToggleBound) {
       det.addEventListener('toggle', () => {
-        setItem(key, det.open);
+        setOneLineViewSetting(key, det.open);
       });
       det.dataset.paletteToggleBound = '1';
     }
@@ -2988,7 +2990,7 @@ function buildPalette() {
       if (e.key === 'Escape') {
         paletteSearch.value = '';
         activePaletteCategoryFilter = 'all';
-        setItem(paletteFilterStorageKey, activePaletteCategoryFilter);
+        setOneLineViewSetting(paletteFilterStorageKey, activePaletteCategoryFilter);
         applyPaletteFilters();
       }
     });
@@ -2999,7 +3001,7 @@ function buildPalette() {
     button.addEventListener('click', () => {
       const filter = button.dataset.paletteFilter || 'all';
       activePaletteCategoryFilter = Object.prototype.hasOwnProperty.call(paletteCategoryFilters, filter) ? filter : 'all';
-      setItem(paletteFilterStorageKey, activePaletteCategoryFilter);
+      setOneLineViewSetting(paletteFilterStorageKey, activePaletteCategoryFilter);
       applyPaletteFilters();
     });
     button.dataset.paletteFilterBound = '1';
@@ -3010,7 +3012,7 @@ function buildPalette() {
       const paletteSearchInput = document.getElementById('palette-search');
       if (paletteSearchInput) paletteSearchInput.value = '';
       activePaletteCategoryFilter = 'all';
-      setItem(paletteFilterStorageKey, activePaletteCategoryFilter);
+      setOneLineViewSetting(paletteFilterStorageKey, activePaletteCategoryFilter);
       applyPaletteFilters();
     });
     clearFilterBtn.dataset.paletteClearBound = '1';
@@ -3261,7 +3263,7 @@ let tempConnection = null;
 let hoverPort = null;
 let selectedConnection = null;
 let rightRailActiveTab = 'properties';
-let diagramFilterMode = getItem('oneLineDiagramFilterMode', 'all');
+let diagramFilterMode = getOneLineViewSetting('oneLineDiagramFilterMode', 'all');
 const DEFAULT_DIAGRAM_SCALE = Object.freeze({ unitPerPx: 1, unit: 'in' });
 const MIN_DIAGRAM_UNIT_PER_PX = 1e-6;
 const MAX_DIAGRAM_UNIT_PER_PX = 1e6;
@@ -3297,7 +3299,7 @@ const defaultStudySettings = {
   shortCircuit: { method: 'IEC' }
 };
 let diagramViewport = { ...STATIC_VIEWPORT_BOUNDS };
-let diagramZoom = clampZoom(getItem('diagramZoom', DEFAULT_DIAGRAM_ZOOM));
+let diagramZoom = clampZoom(getOneLineViewSetting('diagramZoom', DEFAULT_DIAGRAM_ZOOM));
 let resizingBus = null;
 let resizingAnnotation = null;
 let marquee = null;
@@ -3325,8 +3327,8 @@ let studySettings = normalizeStudySettings(getItem(STUDY_SETTINGS_KEY, defaultSt
 let marqueeSelectionMade = false;
 let legendDrag = null;
 let legendUserMoved = false;
-let gridSize = Number(getItem('gridSize', 20));
-let gridEnabled = getItem('gridEnabled', true);
+let gridSize = Number(getOneLineViewSetting('gridSize', 20));
+let gridEnabled = getOneLineViewSetting('gridEnabled', true);
 let snapIndicatorTimeout = null;
 let history = [];
 let historyIndex = -1;
@@ -3801,7 +3803,7 @@ function setDiagramZoom(nextZoom, { focusPoint } = {}) {
   const clamped = clampZoom(nextZoom, prev);
   if (clamped === diagramZoom) return;
   diagramZoom = clamped;
-  setItem('diagramZoom', Number(diagramZoom.toFixed(2)));
+  setOneLineViewSetting('diagramZoom', Number(diagramZoom.toFixed(2)));
   applyDiagramZoom({ adjustScroll: true, previousZoom: prev, focusPoint });
   updateZoomDisplay();
 }
@@ -3839,7 +3841,7 @@ function zoomToBounds(bounds, { pad = 80, maxZoom = 1.25 } = {}) {
   const fitZoom = clampZoom(Math.min(containerW / contentW, containerH / contentH, cappedMax));
   const prevZoom = diagramZoom || DEFAULT_DIAGRAM_ZOOM;
   diagramZoom = fitZoom;
-  setItem('diagramZoom', Number(diagramZoom.toFixed(2)));
+  setOneLineViewSetting('diagramZoom', Number(diagramZoom.toFixed(2)));
   applyDiagramZoom({ adjustScroll: false, previousZoom: prevZoom });
   const centerX = (bounds.minX + bounds.maxX) / 2;
   const centerY = (bounds.minY + bounds.maxY) / 2;
@@ -3925,7 +3927,7 @@ function zoomToFit(options = {}) {
   const fitZoom = clampZoom(Math.min(containerW / contentW, containerH / contentH));
   const prevZoom = diagramZoom || DEFAULT_DIAGRAM_ZOOM;
   diagramZoom = fitZoom;
-  setItem('diagramZoom', Number(diagramZoom.toFixed(2)));
+  setOneLineViewSetting('diagramZoom', Number(diagramZoom.toFixed(2)));
   applyDiagramZoom({ adjustScroll: false, previousZoom: prevZoom });
   const centerX = (minX + maxX) / 2;
   const centerY = (minY + maxY) / 2;
@@ -3963,7 +3965,7 @@ function zoomToSelection(options = {}) {
   const fitZoom = clampZoom(Math.min(containerW / contentW, containerH / contentH));
   const prevZoom = diagramZoom || DEFAULT_DIAGRAM_ZOOM;
   diagramZoom = fitZoom;
-  setItem('diagramZoom', Number(diagramZoom.toFixed(2)));
+  setOneLineViewSetting('diagramZoom', Number(diagramZoom.toFixed(2)));
   applyDiagramZoom({ adjustScroll: false, previousZoom: prevZoom });
   const centerX = (minX + maxX) / 2;
   const centerY = (minY + maxY) / 2;
@@ -4405,13 +4407,13 @@ function scheduleEngineeringPrintFit() {
 function setDrawingMode(mode) {
   const nextMode = Object.prototype.hasOwnProperty.call(drawingModeLabels, mode) ? mode : 'edit';
   oneLineDrawingMode = nextMode;
-  setItem(drawingModeStorageKey, oneLineDrawingMode);
+  setOneLineViewSetting(drawingModeStorageKey, oneLineDrawingMode);
   syncDrawingModeControl();
   applyDrawingModeClass();
   if (isEngineeringPrintMode()) {
     if (dataStateOverlayMode !== 'none') {
       dataStateOverlayMode = 'none';
-      setItem(dataStateOverlayStorageKey, dataStateOverlayMode);
+      setOneLineViewSetting(dataStateOverlayStorageKey, dataStateOverlayMode);
       syncDataStateOverlayControl();
     }
     if (datablockFormatMode === 'off') {
@@ -4427,12 +4429,12 @@ function setDrawingMode(mode) {
 function setDatablockFormatMode(mode) {
   const nextMode = Object.prototype.hasOwnProperty.call(datablockFormatLabels, mode) ? mode : 'off';
   datablockFormatMode = nextMode;
-  setItem(datablockFormatStorageKey, datablockFormatMode);
+  setOneLineViewSetting(datablockFormatStorageKey, datablockFormatMode);
   if (nextMode !== 'custom') {
     const preset = datablockFormatPresets[nextMode] || [];
     const persisted = sanitizeViewAttributeList(preset);
     viewAttributes = new Set(persisted);
-    setItem(viewAttributeStorageKey, persisted);
+    setOneLineViewSetting(viewAttributeStorageKey, persisted);
   }
   updateViewButtonLabel();
   syncDatablockFormatControl();
@@ -4442,7 +4444,7 @@ function setDatablockFormatMode(mode) {
 function markDatablockFormatCustom() {
   if (datablockFormatMode === 'custom') return;
   datablockFormatMode = 'custom';
-  setItem(datablockFormatStorageKey, datablockFormatMode);
+  setOneLineViewSetting(datablockFormatStorageKey, datablockFormatMode);
   syncDatablockFormatControl();
 }
 
@@ -4453,7 +4455,7 @@ function syncDatablockDensityControl() {
 
 function setDatablockDensityMode(mode) {
   datablockDensityMode = Object.prototype.hasOwnProperty.call(datablockDensityLabels, mode) ? mode : 'compact';
-  setItem(datablockDensityStorageKey, datablockDensityMode);
+  setOneLineViewSetting(datablockDensityStorageKey, datablockDensityMode);
   syncDatablockDensityControl();
   render();
 }
@@ -4465,7 +4467,7 @@ function syncDataStateOverlayControl() {
 
 function setDataStateOverlayMode(mode) {
   dataStateOverlayMode = Object.prototype.hasOwnProperty.call(dataStateOverlayLabels, mode) ? mode : 'none';
-  setItem(dataStateOverlayStorageKey, dataStateOverlayMode);
+  setOneLineViewSetting(dataStateOverlayStorageKey, dataStateOverlayMode);
   syncDataStateOverlayControl();
   render();
 }
@@ -4477,7 +4479,7 @@ function syncOperatingStateControl() {
 
 function setActiveOperatingState(state) {
   activeOperatingState = Object.prototype.hasOwnProperty.call(operatingStateLabels, state) ? state : 'normal';
-  setItem(operatingStateStorageKey, activeOperatingState);
+  setOneLineViewSetting(operatingStateStorageKey, activeOperatingState);
   showEnergizedState = true;
   const toggle = document.getElementById('toggle-energized');
   if (toggle) toggle.checked = true;
@@ -4579,7 +4581,7 @@ function getComponentStudyState(comp) {
   const af = cachedStudyResults?.arcFlash?.[comp.id] || comp.arcFlash;
   if (af && Number.isFinite(Number(af.incidentEnergy))) {
     const incidentEnergy = Number(af.incidentEnergy);
-    if (incidentEnergy >= 40) return { key: 'fail', label: 'Arc flash danger', color: '#dc2626' };
+    if (incidentEnergy >= 40) return { key: 'fail', label: 'Arc flash IE ≥ 40; review', color: '#dc2626' };
     if (incidentEnergy >= 8) return { key: 'warn', label: 'Arc flash warning', color: '#f59e0b' };
   }
   if (voltageMagnitudes.length || sc || af) return { key: 'pass', label: 'Study result OK', color: '#16a34a' };
@@ -4592,7 +4594,7 @@ function getComponentArcFlashState(comp) {
     return { key: 'none', label: 'No arc flash result', color: '#94a3b8' };
   }
   const incidentEnergy = Number(af.incidentEnergy);
-  if (incidentEnergy >= 40) return { key: 'danger', label: 'Danger >= 40 cal/cm2', color: '#dc2626' };
+  if (incidentEnergy >= 40) return { key: 'very-high', label: 'Very high incident energy', color: '#dc2626' };
   if (incidentEnergy >= 8) return { key: 'high', label: 'High incident energy', color: '#f97316' };
   if (incidentEnergy >= 1.2) return { key: 'warning', label: 'Arc flash warning', color: '#f59e0b' };
   return { key: 'low', label: 'Low incident energy', color: '#16a34a' };
@@ -4601,7 +4603,7 @@ function getComponentArcFlashState(comp) {
 function getComponentValidationState(comp) {
   const issues = validationIssuesForComponent(comp);
   if (issues.length) return { key: 'fail', label: `${issues.length} validation issue${issues.length === 1 ? '' : 's'}`, color: '#dc2626' };
-  return { key: 'pass', label: 'Validation clear', color: '#16a34a' };
+  return { key: 'pass', label: 'Diagram validation clear', color: '#16a34a' };
 }
 
 function getComponentColorInfo(comp) {
@@ -4686,7 +4688,13 @@ function refineOneLineCommandSurface() {
 
   const primaryActions = document.createElement('div');
   primaryActions.className = 'primary-action-group';
-  appendIfPresent(primaryActions, normalizePrimaryButton(document.getElementById('auto-build-oneline-btn'), 'Auto-Build'));
+  const autoBuildButton = document.getElementById('auto-build-oneline-btn');
+  const autoBuildPlan = buildAutoBuildPlan();
+  const autoBuildHasChanges = autoBuildPlan.createsSource
+    || autoBuildPlan.missingEquipment.length > 0
+    || autoBuildPlan.missingLoads.length > 0;
+  if (autoBuildButton) autoBuildButton.hidden = !autoBuildHasChanges;
+  if (autoBuildHasChanges) appendIfPresent(primaryActions, normalizePrimaryButton(autoBuildButton, 'Auto-Build'));
   appendIfPresent(primaryActions, normalizePrimaryButton(document.getElementById('validate-btn'), 'Validate'));
   appendIfPresent(primaryActions, normalizePrimaryButton(document.getElementById('history-sidebar-toggle'), 'Inspector'));
   const reviewMenu = createCommandMenu('Review', { align: 'right' });
@@ -4835,7 +4843,7 @@ function getDataStateLegendItems() {
   }
   if (dataStateOverlayMode === 'validation') {
     return [
-      { key: 'pass', label: 'Validation clear', color: '#16a34a' },
+      { key: 'pass', label: 'Diagram validation clear', color: '#16a34a' },
       { key: 'fail', label: 'Validation issue', color: '#dc2626' }
     ];
   }
@@ -5674,7 +5682,7 @@ function computeOneLineReadiness() {
     { label: 'All devices connected', ok: unconnected.length === 0, count: unconnected.length },
     { label: 'Schedule links complete', ok: missingLinks.length === 0, count: missingLinks.length },
     { label: 'Cable details reviewed', ok: provisionalConnections.length === 0, count: provisionalConnections.length },
-    { label: 'Validation clear', ok: validationIssues.length === 0, count: validationIssues.length }
+    { label: 'Diagram validation clear', ok: validationIssues.length === 0, count: validationIssues.length }
   ];
   const passed = checks.filter(check => check.ok).length;
   return {
@@ -6249,6 +6257,11 @@ function bindHistorySidebarControls() {
     button.addEventListener('click', () => setRightRailTab(button.dataset.rightRailTab));
   });
   if (toggleBtn && sidebar && workspace) {
+    if (window.matchMedia?.('(max-width: 600px)').matches) {
+      toggleBtn.setAttribute('aria-expanded', 'false');
+      sidebar.classList.add('hidden');
+      workspace.classList.add('history-collapsed');
+    }
     toggleBtn.addEventListener('click', () => {
       const expanded = toggleBtn.getAttribute('aria-expanded') === 'true';
       const nextExpanded = !expanded;
@@ -7247,7 +7260,7 @@ function openViewModal() {
       }
       if (activeKey !== selectedViewComponent) {
         selectedViewComponent = activeKey;
-        if (selectedViewComponent) setItem(viewComponentStorageKey, selectedViewComponent);
+        if (selectedViewComponent) setOneLineViewSetting(viewComponentStorageKey, selectedViewComponent);
       }
 
       function updateButtonStates() {
@@ -7274,7 +7287,7 @@ function openViewModal() {
         }
         const persisted = sanitizeViewAttributeList(Array.from(viewAttributes));
         viewAttributes = new Set(persisted);
-        setItem(viewAttributeStorageKey, persisted);
+        setOneLineViewSetting(viewAttributeStorageKey, persisted);
         updateViewButtonLabel();
         render();
         updateButtonStates();
@@ -7325,7 +7338,7 @@ function openViewModal() {
         if (!key || !componentAttributeOptions.has(key)) return;
         activeKey = key;
         selectedViewComponent = key;
-        setItem(viewComponentStorageKey, key);
+        setOneLineViewSetting(viewComponentStorageKey, key);
         updateButtonStates();
         renderProperties();
       }
@@ -7850,7 +7863,7 @@ function refreshAttributeOptions() {
   if (selectedViewComponent && !componentAttributeOptions.has(selectedViewComponent)) {
     selectedViewComponent = componentAttributeList[0]?.key || null;
     if (selectedViewComponent) {
-      setItem(viewComponentStorageKey, selectedViewComponent);
+      setOneLineViewSetting(viewComponentStorageKey, selectedViewComponent);
     }
   }
 
@@ -10434,6 +10447,27 @@ function render() {
     return last ? last.p2 : points[0];
   }
 
+  function connectionLabelPosition(points) {
+    if (!Array.isArray(points) || points.length < 2) {
+      return { ...midpoint(points), textAnchor: 'middle' };
+    }
+    const segments = [];
+    for (let i = 0; i < points.length - 1; i++) {
+      const p1 = points[i];
+      const p2 = points[i + 1];
+      const length = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+      if (Number.isFinite(length) && length > 0) segments.push({ p1, p2, length });
+    }
+    const segment = segments.sort((a, b) => b.length - a.length)[0];
+    if (!segment) return { ...midpoint(points), textAnchor: 'middle' };
+    const horizontal = Math.abs(segment.p2.x - segment.p1.x) >= Math.abs(segment.p2.y - segment.p1.y);
+    const x = (segment.p1.x + segment.p2.x) / 2;
+    const y = (segment.p1.y + segment.p2.y) / 2;
+    return horizontal
+      ? { x, y: y - 11, textAnchor: 'middle' }
+      : { x: x + 11, y, textAnchor: 'start' };
+  }
+
   // dimension tool removed
 
   // Gap #51: build a Set of hidden-layer component ids for O(1) lookup
@@ -10444,6 +10478,39 @@ function render() {
   const isLockedByLayer = comp => {
     const l = comp.layer ? layers.find(ly => ly.id === comp.layer) : null;
     return l ? l.locked : false;
+  };
+  const labelCollisionBoxes = components
+    .filter(comp => !isHiddenByLayer(comp))
+    .map(componentVisualBounds)
+    .filter(Boolean);
+  const boxesOverlap = (a, b, padding = 14) => !(
+    a.right + padding < b.left
+    || a.left - padding > b.right
+    || a.bottom + padding < b.top
+    || a.top - padding > b.bottom
+  );
+  const connectionLabelBox = (position, text) => {
+    const width = estimateTextWidth(text, 12);
+    const left = position.textAnchor === 'start'
+      ? position.x
+      : position.textAnchor === 'end'
+        ? position.x - width
+        : position.x - width / 2;
+    return { left, top: position.y - 9, right: left + width, bottom: position.y + 9 };
+  };
+  const resolveConnectionLabelPosition = (position, text) => {
+    const offsets = [0, -18, 18, -36, 36, -54, 54, -72, 72, -90, 90, -108, 108, -126, 126];
+    for (const offset of offsets) {
+      const candidate = { ...position, y: position.y + offset };
+      const box = connectionLabelBox(candidate, text);
+      if (!labelCollisionBoxes.some(existing => boxesOverlap(box, existing))) {
+        labelCollisionBoxes.push(box);
+        return candidate;
+      }
+    }
+    const fallback = { ...position, y: position.y - 144 };
+    labelCollisionBoxes.push(connectionLabelBox(fallback, text));
+    return fallback;
   };
   const inboundConnectionCount = new Map();
   components.forEach(source => {
@@ -10540,10 +10607,7 @@ function render() {
       }
 
       const label = document.createElementNS(svgNS, 'text');
-      const mid = midpoint(pts);
-      label.setAttribute('x', mid.x);
-      label.setAttribute('y', mid.y);
-      label.setAttribute('text-anchor', 'middle');
+      const labelPosition = connectionLabelPosition(pts);
       label.setAttribute('dominant-baseline', 'middle');
       label.setAttribute('fill', stroke);
       let lblText = cableInfo?.tag || cableInfo?.cable_type || '';
@@ -10563,6 +10627,10 @@ function render() {
         }
       }
       label.textContent = lblText;
+      const resolvedLabelPosition = resolveConnectionLabelPosition(labelPosition, lblText);
+      label.setAttribute('x', resolvedLabelPosition.x);
+      label.setAttribute('y', resolvedLabelPosition.y);
+      label.setAttribute('text-anchor', resolvedLabelPosition.textAnchor);
       label.classList.add('conn-label');
       if (conn.cable?.provisional || conn.reviewStatus === 'assumed') label.classList.add('conn-label-assumed');
       if (!componentMatchesDiagramFilter(c) || !componentMatchesDiagramFilter(target)) label.classList.add('diagram-filter-dimmed');
@@ -11137,7 +11205,6 @@ function render() {
   if (!engineeringPrint && arcFlashLabelMode) renderArcFlashLabelOverlays(svg);
 
   if (lengthsChanged) {
-    markScheduleReconcilePending();
     render();
     return;
   }
@@ -11147,7 +11214,7 @@ function render() {
 export function toggleGrid() {
   const toggle = document.getElementById('grid-toggle');
   gridEnabled = toggle?.checked;
-  setItem('gridEnabled', gridEnabled);
+  setOneLineViewSetting('gridEnabled', gridEnabled);
   document.getElementById('grid-bg').style.display = gridEnabled ? 'block' : 'none';
   render();
 }
@@ -11673,10 +11740,10 @@ function renderArcFlashLabelOverlays(svg) {
     const cy = bounds.top;
 
     const ie = af.incidentEnergy;
-    const isDanger = ie >= 40;
-    const bannerColor = isDanger ? '#d32f2f' : '#f57c00';
-    const signalWord = isDanger ? 'DANGER' : 'WARNING';
-    const ppeText = `PPE Cat: ${Number.isFinite(af.ppeCategory) ? af.ppeCategory : 'N/A'}`;
+    const bannerColor = '#f57c00';
+    const signalWord = 'WARNING';
+    const minArcRating = Number(af.minimumArcRatingCalCm2);
+    const ppeText = minArcRating > 0 ? `Arc rating ≥ ${minArcRating.toFixed(2)}` : 'IE method';
     const ieText = `IE: ${ie.toFixed(2)} cal/cm²`;
 
     const g = document.createElementNS(svgNS, 'g');
@@ -11708,7 +11775,7 @@ function renderArcFlashLabelOverlays(svg) {
     sigText.textContent = signalWord;
     g.appendChild(sigText);
 
-    // PPE Category line
+    // Incident-energy PPE-selection line
     const ppeLine = document.createElementNS(svgNS, 'text');
     ppeLine.setAttribute('x', 4); ppeLine.setAttribute('y', BANNER_H + 11);
     ppeLine.setAttribute('font-size', '9'); ppeLine.setAttribute('fill', '#000');
@@ -16254,8 +16321,6 @@ async function init() {
       }
     });
   });
-  setItem('labelCounters', labelCounters);
-
   const normalizedStoredActive = Number.isInteger(storedActive) ? storedActive : 0;
   activeSheet = Math.min(Math.max(normalizedStoredActive, 0), sheets.length - 1);
   components = sheets[activeSheet].components;
@@ -16277,7 +16342,7 @@ async function init() {
   renderLayerPanel();
   renderBgPanel();
   const initIssues = validateDiagram({ notify: false, revealPanel: false });
-  if (!initIssues.length) markScheduleReconcilePending();
+  if (!initIssues.length) updateScheduleReconcileButtonState();
 
   const prefixBtn = document.getElementById('prefix-settings-btn');
   if (prefixBtn) prefixBtn.addEventListener('click', editPrefixes);
@@ -16328,20 +16393,20 @@ async function init() {
   const layersCloseBtn = document.getElementById('layers-close-btn');
   const addLayerBtn = document.getElementById('add-layer-btn');
   if (layersToggleBtn && layersPanel) {
-    const layersPanelOpen = getItem('layersPanelOpen', false);
+    const layersPanelOpen = getOneLineViewSetting('layersPanelOpen', false);
     if (!layersPanelOpen) layersPanel.classList.add('hidden');
     layersToggleBtn.setAttribute('aria-expanded', String(!layersPanel.classList.contains('hidden')));
     layersToggleBtn.addEventListener('click', () => {
       const nowHidden = layersPanel.classList.toggle('hidden');
       layersToggleBtn.setAttribute('aria-expanded', String(!nowHidden));
-      setItem('layersPanelOpen', !nowHidden);
+      setOneLineViewSetting('layersPanelOpen', !nowHidden);
     });
   }
   if (layersCloseBtn && layersPanel) {
     layersCloseBtn.addEventListener('click', () => {
       layersPanel.classList.add('hidden');
       if (layersToggleBtn) layersToggleBtn.setAttribute('aria-expanded', 'false');
-      setItem('layersPanelOpen', false);
+      setOneLineViewSetting('layersPanelOpen', false);
     });
   }
   if (addLayerBtn) {
@@ -16630,7 +16695,7 @@ async function init() {
     gridPattern.setAttribute('width', gridSize);
     gridPattern.setAttribute('height', gridSize);
     gridPath.setAttribute('d', `M${gridSize} 0 L0 0 0 ${gridSize}`);
-    setItem('gridSize', gridSize);
+    setOneLineViewSetting('gridSize', gridSize);
     render();
   });
 
@@ -16641,7 +16706,7 @@ async function init() {
     diagramFilterSelect.value = diagramFilterMode;
     diagramFilterSelect.addEventListener('change', event => {
       diagramFilterMode = event.target.value || 'all';
-      setItem('oneLineDiagramFilterMode', diagramFilterMode);
+      setOneLineViewSetting('oneLineDiagramFilterMode', diagramFilterMode);
       render();
     });
   }
@@ -16720,13 +16785,13 @@ async function init() {
       if (workspaceEl) {
         workspaceEl.style.setProperty('--palette-width', `${paletteWidth}px`);
       }
-      setItem(paletteWidthStorageKey, Math.round(paletteWidth));
+      setOneLineViewSetting(paletteWidthStorageKey, Math.round(paletteWidth));
     }
     if (wasResizingStudies && studiesPanel) {
       studiesPanel.classList.remove('is-resizing');
       studiesPanel.style.setProperty('--studies-width', `${studiesWidth}px`);
       if (Number.isFinite(studiesWidth)) {
-        setItem(studiesWidthStorageKey, Math.round(studiesWidth));
+        setOneLineViewSetting(studiesWidthStorageKey, Math.round(studiesWidth));
       }
     } else if (studiesPanel) {
       studiesPanel.classList.remove('is-resizing');
@@ -16774,6 +16839,7 @@ async function init() {
     const show = !workspaceEl.classList.contains('show-palette');
     const narrow = window.matchMedia?.('(max-width: 600px)')?.matches === true;
     workspaceEl.classList.toggle('show-palette', show);
+    document.body.classList.toggle('palette-drawer-open', show && narrow);
     paletteToggle.setAttribute('aria-expanded', show);
     if (show) {
       workspaceEl.style.setProperty('--palette-width', `${paletteWidth}px`);
@@ -17809,10 +17875,6 @@ async function init() {
     startTour();
     writeAppSetting('onelineTourDone', 'true');
   });
-  if (!window.E2E && !readAppSetting('onelineTourDone')) {
-    startTour();
-    writeAppSetting('onelineTourDone', 'true');
-  }
 
   const params = new URLSearchParams(window.location.search);
   const probeTarget = resolveInitialCrossProbe(params);
@@ -17903,14 +17965,14 @@ async function init() {
     orthoToggle.checked = orthogonalRouting;
     orthoToggle.addEventListener('change', () => {
       orthogonalRouting = orthoToggle.checked;
-      setItem('orthogonalRouting', orthogonalRouting);
+      setOneLineViewSetting('orthogonalRouting', orthogonalRouting);
       // Clear cached dir/mid so routeConnection re-computes with the new mode
       components.forEach(c => (c.connections || []).forEach(conn => {
         delete conn.dir; delete conn.mid;
       }));
       render();
     });
-    orthogonalRouting = !!getItem('orthogonalRouting');
+    orthogonalRouting = !!getOneLineViewSetting('orthogonalRouting', false);
     orthoToggle.checked = orthogonalRouting;
   }
 
@@ -17919,11 +17981,11 @@ async function init() {
   // ----------------------------------------------------------------
   const symStdSelect = document.getElementById('symbol-standard-select');
   if (symStdSelect) {
-    symbolStandard = getItem('symbolStandard') || 'ANSI';
+    symbolStandard = getOneLineViewSetting('symbolStandard', 'ANSI') || 'ANSI';
     symStdSelect.value = symbolStandard;
     symStdSelect.addEventListener('change', () => {
       symbolStandard = symStdSelect.value;
-      setItem('symbolStandard', symbolStandard);
+      setOneLineViewSetting('symbolStandard', symbolStandard);
       render();
     });
   }
@@ -19129,7 +19191,7 @@ bootstrapPage({
   beacon: {
     id: 'oneline-ready-beacon',
     attr: 'data-oneline-ready',
-    waitFor: '[data-testid="palette-button"]',
+    waitFor: '#diagram',
   },
   onReady: __oneline_init,
 });

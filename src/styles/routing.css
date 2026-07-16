@@ -113,6 +113,27 @@ body.dark .route-mode-badge { background: #1e293b; color: #94a3b8; }
   max-width: 64ch;
 }
 
+.route-mode-toggle {
+  grid-column: 3;
+  grid-row: 1;
+  align-self: start;
+  margin: 0;
+  white-space: nowrap;
+}
+
+.route-mode-toggle[hidden] {
+  display: none;
+}
+
+.optimal-route-page.route-review-mode .main-content {
+  max-width: 1440px;
+  margin-inline: auto;
+}
+
+.optimal-route-page.route-review-mode .route-results-card {
+  margin-top: var(--space-3, 0.75rem);
+}
+
 .optimal-route-sidebar header {
   margin-bottom: var(--space-4, 1rem);
 }
@@ -612,9 +633,9 @@ body.dark-mode .route-detail-row > td {
   }
 }
 
-@media (min-width: 1700px) {
+@media (min-width: 1120px) {
   .route-results-workspace {
-    grid-template-columns: minmax(42rem, 1fr) minmax(18rem, 23rem);
+    grid-template-columns: minmax(18rem, 23rem) minmax(0, 1fr);
   }
 
   .route-review-sidebar {

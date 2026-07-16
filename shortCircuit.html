@@ -31,7 +31,7 @@
   }
   </script>
   <script type="module" src="dataStore.mjs" defer></script>
-  <script type="module" src="studies/shortCircuit.js" defer></script>
+  <script type="module" src="dist/shortCircuit.js" defer></script>
 </head>
 <body data-page-visual="analysis" data-report-title="Short Circuit Study">
   <a href="#main-content" class="skip-link">Skip to main content</a>
@@ -78,16 +78,21 @@
         <h1>Short Circuit</h1>
         <p>Compute fault currents using ANSI or IEC methods.</p>
       </header>
-      <section class="card page-header-graphic page-visual-showcase" aria-label="Page visual overview">
-        <div class="page-visual-copy">
-          <p class="page-visual-kicker">Workspace Preview</p>
-          <h2>Study Dashboard</h2>
-          <p>Capture assumptions and compare methods with a clear analysis-focused layout.</p>
+      <section class="card study-workspace" aria-labelledby="shortcircuit-setup-heading">
+        <div class="study-workspace__heading">
+          <div>
+            <p class="page-visual-kicker">Project-connected study</p>
+            <h2 id="shortcircuit-setup-heading">Study setup</h2>
+            <p id="study-project-context">Loading the active project model...</p>
+          </div>
+          <a class="btn secondary-btn" href="oneline.html">Review One-Line</a>
         </div>
-        <img src="icons/graphics/studies-visual.svg" alt="Illustration for study dashboard" loading="lazy" decoding="async">
-      </section>
-      <section class="card">
         <form id="shortcircuit-form" novalidate>
+          <label for="shortcircuit-scope">Scope
+            <select id="shortcircuit-scope" name="scope">
+              <option value="project">All modeled equipment</option>
+            </select>
+          </label>
           <label for="method">Method
             <select id="method" name="method" aria-describedby="method-hint">
               <option value="ANSI">ANSI</option>
@@ -95,10 +100,36 @@
             </select>
           </label>
           <span id="method-hint" class="field-hint">Choose ANSI or IEC calculation standard.</span>
-          <button type="submit">Run Study</button>
+          <div class="study-actions">
+            <button type="submit" class="primary-btn">Run Study</button>
+            <button id="shortcircuit-export-btn" type="button" class="btn" disabled>Export Results</button>
+          </div>
         </form>
-        <pre id="shortcircuit-output"></pre>
+        <p id="shortcircuit-status" class="field-hint" role="status" aria-live="polite">Run the study to create reviewable results. Export is a separate action.</p>
+        <div id="shortcircuit-freshness" class="study-freshness" role="status" aria-live="polite" hidden></div>
+        <div id="shortcircuit-summary" class="study-result-summary" hidden></div>
+        <div class="table-scroll-container">
+          <table id="shortcircuit-results-table" class="study-results-table" hidden>
+            <thead><tr><th>Equipment / Bus</th><th>Method</th><th>3-phase (kA)</th><th>Line-ground (kA)</th><th>Line-line (kA)</th><th>Input quality</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <details id="shortcircuit-history" class="study-history" hidden>
+          <summary>Compare with previous run</summary>
+          <p id="shortcircuit-history-summary" class="field-hint"></p>
+          <div class="table-scroll-container">
+            <table class="study-results-table" aria-label="Short circuit run comparison">
+              <thead><tr><th>Equipment / Bus</th><th>Previous 3-phase (kA)</th><th>Current 3-phase (kA)</th><th>Change (kA)</th></tr></thead>
+              <tbody id="shortcircuit-history-tbody"></tbody>
+            </table>
+          </div>
+        </details>
+        <details id="shortcircuit-details" hidden>
+          <summary>Calculation details and provenance</summary>
+          <pre id="shortcircuit-output"></pre>
+        </details>
       </section>
+      <section class="card"><div id="study-basis-panel"></div></section>
       <section class="card" aria-labelledby="study-review-panel-heading">
         <div id="study-review-panel"></div>
       </section>
@@ -119,7 +150,17 @@
   <script type="module" src="dist/projectManager.js"></script>
   <script type="module">
     import { initStudyApprovalPanel } from './src/components/studyApproval.js';
-    document.addEventListener('DOMContentLoaded', () => initStudyApprovalPanel('shortCircuit'));
+    import { initStudyBasisPanel } from './src/components/studyBasis.js';
+    document.addEventListener('DOMContentLoaded', () => {
+      initStudyBasisPanel('shortCircuit', {
+        standard: 'ANSI C37 / IEC 60909',
+        clause: 'Fault-current calculation at modeled buses',
+        assumptions: ['Uses the active project One-Line model', 'Results are saved to the active project', 'Export occurs only when explicitly requested'],
+        limitations: ['Missing source or impedance data produces assumed inputs that require review'],
+        benchmarkId: 'short-circuit-project-model'
+      });
+      initStudyApprovalPanel('shortCircuit');
+    });
   </script>
 </body>
 </html>

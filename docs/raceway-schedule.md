@@ -1,5 +1,9 @@
 # Raceway Schedule
 
+The readiness summary distinguishes all conduit records from conduits nested in ductbanks and standalone conduits. An empty Standalone Conduit section does not mean that a ductbank has no conduits.
+
+When assigned raceways are ready, the handoff presents both **Open Tray Fill** and **Open Route Planner** so fill review and route review remain equally discoverable.
+
 The Raceway Schedule manages ductbanks, cable trays, and standalone conduits.
 
 ## Entry workflow

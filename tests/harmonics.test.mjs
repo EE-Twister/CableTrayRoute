@@ -1,9 +1,8 @@
 /**
  * Tests for the harmonic study formulas used in analysis/harmonics.js.
  *
- * Because harmonics.js imports d3 from a CDN URL that is not resolvable in
- * Node.js, the pure mathematical functions are verified here in isolation.
- * The formulas are extracted verbatim from the module implementation.
+ * Includes independent hand-calculated checks of the exported Thevenin-bus
+ * screening model so unit conversions are not merely copied from the source.
  */
 import assert from 'assert';
 
@@ -126,7 +125,7 @@ global.localStorage = {
 };
 
 const { setOneLine } = await import('../dataStore.mjs');
-const { runHarmonics } = await import('../analysis/harmonics.js');
+const { runHarmonics, estimateHarmonicDistortion } = await import('../analysis/harmonics.js');
 
 describe('runHarmonics - one-line component fields', () => {
   it('reads harmonic source inputs from component props', () => {
@@ -155,6 +154,46 @@ describe('runHarmonics - one-line component fields', () => {
     const results = runHarmonics();
     assert.ok(results['vfd-1'], 'Expected harmonics result for props-only VFD');
     assert.ok(results['vfd-1'].ithd > 0, 'Expected ITHD to be calculated from props-only spectrum');
+  });
+});
+
+describe('estimateHarmonicDistortion — independent SI-unit benchmarks', () => {
+  it('converts 1000 kVAR at 13.8 kV to 0.005251 S', () => {
+    const result = estimateHarmonicDistortion({
+      lineVoltageV: 13800,
+      fundamentalCurrentA: 100,
+      spectrum: { 5: 20 },
+      shortCircuitMva: 100,
+      capacitorBanks: [{ kvar: 1000 }],
+    });
+    assert.ok(Math.abs(result.capacitorSusceptanceS - 0.005250998) < 1e-9,
+      `Expected 0.005250998 S, got ${result.capacitorSusceptanceS}`);
+  });
+
+  it('matches a hand-calculated 480 V Thevenin case without capacitors', () => {
+    const result = estimateHarmonicDistortion({
+      lineVoltageV: 480,
+      fundamentalCurrentA: 100,
+      spectrum: { 5: 20 },
+      shortCircuitMva: 50,
+      xrRatio: 10,
+    });
+    // Independent calculation: |Z1|=0.004608 Ω, R=0.0004585 Ω,
+    // X1=0.004585 Ω, |Z5|=0.02293 Ω, V5=0.4586 V phase,
+    // VTHD=0.4586/(480/√3)×100=0.1655%.
+    assert.ok(Math.abs(result.vthd - 0.17) <= 0.01, `Expected about 0.17%, got ${result.vthd}%`);
+    assert.strictEqual(result.ithd, 20);
+  });
+
+  it('withholds VTHD when short-circuit strength is missing', () => {
+    const result = estimateHarmonicDistortion({
+      lineVoltageV: 480,
+      fundamentalCurrentA: 100,
+      spectrum: { 5: 20 },
+      shortCircuitMva: 0,
+    });
+    assert.strictEqual(result.vthd, null);
+    assert.strictEqual(result.evaluable, false);
   });
 });
 

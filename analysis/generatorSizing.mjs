@@ -1,7 +1,7 @@
 /**
  * Standby / Emergency Generator Sizing
  *
- * Standard generator sizing workflow per NFPA 110 / NEC 700–702 / IEEE 446:
+ * Preliminary generator sizing workflow:
  *   1. Sum all continuous loads with demand factors → required kW
  *   2. Apply site altitude derating (NFPA 110 Annex B):
  *        3% per 1000 ft above 500 ft (naturally-aspirated diesel)
@@ -11,14 +11,14 @@
  *   4. Evaluate largest motor step load (IEEE 446 §5.3):
  *        startingKva = (HP × 0.746 / (PF × eff)) × LRC_multiplier
  *        Transient voltage dip: dip% = stepLoadKva / (genKva / X'd%)
- *   5. Select nearest standard generator size ≥ site-derated requirement
+ *   5. Divide the required site load by the combined capacity factor and
+ *      select the nearest standard generator nameplate size
  *   6. Calculate fuel runtime from tank capacity and specific fuel consumption
  *
  * References:
  *   NFPA 110-2022  — Standard for Emergency and Standby Power Systems
  *   NEC 700/701/702 — Emergency / Legally Required / Optional Standby Systems
  *   IEEE 446-1995  — Recommended Practice for Emergency Power Systems in Commercial Buildings
- *   IEEE 485-2010  — Battery sizing (used alongside generator for UPS/genset systems)
  */
 
 /** Standard generator nameplate kW ratings per EGSA / ISO 8528 commercial availability. */
@@ -35,17 +35,17 @@ export const NFPA110_TYPES = {
   'type-10': {
     label: 'Type 10',
     responseTimeSec: 10,
-    description: 'Life-safety / emergency systems (NEC Article 700)',
+    description: 'Power restored within 10 seconds. Application and runtime class are specified separately.',
   },
   'type-60': {
     label: 'Type 60',
     responseTimeSec: 60,
-    description: 'Legally required standby systems (NEC Article 701)',
+    description: 'Power restored within 60 seconds. Application and runtime class are specified separately.',
   },
   'type-120': {
     label: 'Type 120',
     responseTimeSec: 120,
-    description: 'Optional standby systems (NEC Article 702)',
+    description: 'Power restored within 120 seconds. Application and runtime class are specified separately.',
   },
 };
 
@@ -122,7 +122,7 @@ export function derateForTemperature(ratedKw, ambientC) {
  *
  * When a large motor starts across-the-line, its locked-rotor current (LRC) creates
  * a step kVA demand on the generator. The transient voltage dip produced by this
- * step load must stay within acceptable limits (typically ≤ 35% for NFPA 110 Type 10).
+ * step load must stay within the project-specific equipment ride-through limit.
  *
  * Starting kVA formula (IEEE 446 §5.3):
  *   startingKva = (HP × 0.746) / (PF × efficiency) × lrcMultiplier
@@ -164,24 +164,28 @@ export function largestMotorStepLoad({
  *   dip% = (stepLoadKva / genKva) × X'd%
  *
  * where X'd is the generator subtransient reactance (typically 20–30%).
- * NFPA 110 Type 10 systems typically require voltage dip ≤ 35% during largest motor start.
+ * The default 35% limit is a preliminary screening criterion, not an NFPA 110
+ * universal acceptance limit. Final acceptance must use the connected loads'
+ * contactor, relay, drive, and control ride-through requirements.
  *
  * @param {object} params
  * @param {number} params.stepLoadKva   Starting kVA of the largest motor (from largestMotorStepLoad)
  * @param {number} params.genKva        Generator nameplate kVA (genKw / 0.8 if 0.8 pf rated)
  * @param {number} params.xdPrimePct    Subtransient reactance X'd in % (default 25%)
+ * @param {number} [params.limitPct=35] Project voltage-dip screening limit (%)
  * @returns {{ dipPct: number, acceptable: boolean, limit: number }}
  */
-export function estimateVoltageDip({ stepLoadKva, genKva, xdPrimePct = 25 }) {
+export function estimateVoltageDip({ stepLoadKva, genKva, xdPrimePct = 25, limitPct = 35 }) {
   if (stepLoadKva < 0) throw new Error('stepLoadKva must be ≥ 0');
   if (genKva <= 0) throw new Error('genKva must be greater than zero');
   if (xdPrimePct <= 0 || xdPrimePct >= 100) throw new Error('xdPrimePct must be in (0, 100)');
+  if (limitPct <= 0 || limitPct >= 100) throw new Error('limitPct must be in (0, 100)');
 
   const dipPct = Math.round((stepLoadKva / genKva) * xdPrimePct * 10) / 10;
-  const limit = 35; // NFPA 110 §7.3.5 typical limit for emergency systems
+  const limit = limitPct;
   const acceptable = dipPct <= limit;
 
-  return { dipPct, acceptable, limit };
+  return { dipPct, acceptable, limit, limitBasis: 'project screening input' };
 }
 
 /**
@@ -247,18 +251,25 @@ export function fuelRuntime({ loadKw, fuelCapGal, sfcLbPerHpHr = DIESEL_SFC_LB_P
  * Select the smallest standard generator size that meets or exceeds the required kW.
  *
  * @param {number} requiredKw  Minimum site-derated kW the generator must deliver
- * @returns {{ selectedKw: number, options: number[] }}
+ * @returns {{ selectedKw: number|null, options: number[], exceedsCatalog: boolean }}
  */
 export function selectStandardSize(requiredKw) {
   if (requiredKw < 0) throw new Error('requiredKw must be ≥ 0');
 
-  const selected = STANDARD_GEN_SIZES_KW.find(s => s >= requiredKw)
-    ?? STANDARD_GEN_SIZES_KW[STANDARD_GEN_SIZES_KW.length - 1];
+  const selected = STANDARD_GEN_SIZES_KW.find(s => s >= requiredKw) ?? null;
+
+  if (selected === null) {
+    return {
+      selectedKw: null,
+      options: [STANDARD_GEN_SIZES_KW[STANDARD_GEN_SIZES_KW.length - 1]],
+      exceedsCatalog: true,
+    };
+  }
 
   const idx = STANDARD_GEN_SIZES_KW.indexOf(selected);
   const options = STANDARD_GEN_SIZES_KW.slice(Math.max(0, idx), Math.min(STANDARD_GEN_SIZES_KW.length, idx + 3));
 
-  return { selectedKw: selected, options };
+  return { selectedKw: selected, options, exceedsCatalog: false };
 }
 
 /**
@@ -279,6 +290,7 @@ export function selectStandardSize(requiredKw) {
  * @param {number}  [inputs.motorEff=0.92]        Largest motor full-load efficiency
  * @param {number}  [inputs.lrcMultiplier=6]      Motor locked-rotor current multiplier
  * @param {number}  [inputs.xdPrimePct=25]        Generator subtransient reactance X'd (%)
+ * @param {number}  [inputs.voltageDipLimitPct=35] Project-specific voltage-dip screening limit (%)
  * @param {number}  [inputs.fuelCapGal=0]         Fuel tank capacity (gal), 0 = skip
  * @param {number}  [inputs.sfcLbPerHpHr=0.38]   Specific fuel consumption
  * @returns {object} Complete analysis result
@@ -296,28 +308,36 @@ export function runGeneratorSizingAnalysis(inputs) {
     motorEff = 0.92,
     lrcMultiplier = 6,
     xdPrimePct = 25,
+    voltageDipLimitPct = 35,
     fuelCapGal = 0,
     sfcLbPerHpHr = DIESEL_SFC_LB_PER_HP_HR,
   } = inputs;
 
   const warnings = [];
+  const requiredInputs = [
+    'Confirm altitude and temperature capacity factors against the selected generator manufacturer data.',
+  ];
 
   // Step 1 — Continuous load sum
   const loadResult = continuousLoad(loads);
   const continuousKw = loadResult.totalKw;
 
-  // Step 2 — Altitude derating
+  // Steps 2 and 3 — Capacity factors describe how much of a generator's
+  // standard-condition nameplate rating remains available at the site. The
+  // required nameplate rating therefore DIVIDES the load by these factors.
   const altResult = derateForAltitude(continuousKw, altitudeFt, aspiration);
-
-  // Step 3 — Temperature derating (applied to altitude-derated value)
-  const tempResult = derateForTemperature(altResult.deratedKw, ambientC);
-  const siteDeratedKw = tempResult.deratedKw;
+  const tempResult = derateForTemperature(continuousKw, ambientC);
+  const siteCapacityFactor = altResult.altitudeFactor * tempResult.tempFactor;
+  const siteDeratedKw = Math.round((continuousKw / siteCapacityFactor) * 10) / 10;
 
   // Step 4 — Motor step load
   let stepLoad = null;
   let voltageDip = null;
 
   if (motorHp > 0) {
+    requiredInputs.push(
+      'Confirm motor-start performance with the selected generator, alternator, exciter, and voltage regulator.'
+    );
     stepLoad = largestMotorStepLoad({
       motorHp,
       powerFactor: motorPf,
@@ -326,46 +346,57 @@ export function runGeneratorSizingAnalysis(inputs) {
     });
 
     // Determine required kW accounting for motor start
-    const requiredFromStep = stepLoad.recommendedGenKw;
+    const requiredFromStep = stepLoad.recommendedGenKw / siteCapacityFactor;
 
     // Select a tentative standard size for voltage dip calculation
-    const tentativeSize = selectStandardSize(Math.max(siteDeratedKw, requiredFromStep));
-    const genKva = tentativeSize.selectedKw / 0.8; // assume 0.8 pf nameplate
+    const tentativeRequiredKw = Math.max(siteDeratedKw, requiredFromStep);
+    const tentativeSize = selectStandardSize(tentativeRequiredKw);
+    const tentativeNameplateKw = tentativeSize.selectedKw ?? tentativeRequiredKw;
+    const siteAvailableKva = tentativeNameplateKw * siteCapacityFactor / 0.8;
 
     voltageDip = estimateVoltageDip({
       stepLoadKva: stepLoad.startingKva,
-      genKva,
+      genKva: siteAvailableKva,
       xdPrimePct,
+      limitPct: voltageDipLimitPct,
     });
 
     if (!voltageDip.acceptable) {
       warnings.push(
         `Transient voltage dip of ${voltageDip.dipPct}% exceeds the ${voltageDip.limit}% ` +
-        `NFPA 110 limit during the largest motor start (${motorHp} HP, LRC ×${lrcMultiplier}). ` +
+        `project screening limit during the largest motor start (${motorHp} HP, LRC ×${lrcMultiplier}). ` +
         `Consider a larger generator or a soft-starter / VFD on the motor.`
       );
     }
   }
 
-  // Step 5 — Required kW (max of continuous site-derated and motor step-load recommendation)
-  const stepRequiredKw = stepLoad ? stepLoad.recommendedGenKw : 0;
+  // Step 5 — Required standard-condition nameplate kW. Both the continuous
+  // load and the step-load screen must be supported after site derating.
+  const stepRequiredKw = stepLoad
+    ? Math.round((stepLoad.recommendedGenKw / siteCapacityFactor) * 10) / 10
+    : 0;
   const requiredKw = Math.max(siteDeratedKw, stepRequiredKw);
 
   // Step 6 — Standard size selection
   const sizeResult = selectStandardSize(requiredKw);
+  if (sizeResult.exceedsCatalog) {
+    warnings.push(
+      `Required nameplate capacity ${requiredKw.toFixed(1)} kW exceeds the built-in 2,000 kW catalog range. ` +
+      'No generator size was selected; evaluate paralleled units or a manufacturer-specific package.'
+    );
+  }
 
   // Step 7 — Fuel runtime
   let fuelResult = null;
   if (fuelCapGal > 0) {
     fuelResult = fuelRuntime({ loadKw: continuousKw, fuelCapGal, sfcLbPerHpHr });
 
-    const typeInfo = NFPA110_TYPES[nfpa110Type];
-    if (typeInfo && typeInfo.responseTimeSec === 10 && fuelResult.runtimeHours < 2) {
-      warnings.push(
-        `Fuel runtime of ${fuelResult.runtimeHours} hours is below the NFPA 110 Type 10 ` +
-        `minimum of 2 hours (§8.3.1). Increase tank capacity.`
-      );
-    }
+    requiredInputs.push('Specify the required NFPA 110 Class or other project runtime requirement separately from the Type response time.');
+    warnings.push(
+      `Estimated fuel runtime is ${fuelResult.runtimeHours} hours. NFPA 110 Type ` +
+      `${NFPA110_TYPES[nfpa110Type]?.responseTimeSec ?? 'N/A'} describes restoration time, not runtime duration; ` +
+      'compare this result with the specified Class and applicable code.'
+    );
     if (fuelResult.runtimeHours < 0.5) {
       warnings.push(
         `Fuel runtime is very short (${fuelResult.runtimeHours} h). ` +
@@ -398,16 +429,21 @@ export function runGeneratorSizingAnalysis(inputs) {
     altitudeNote: altResult.note,
     tempFactor: tempResult.tempFactor,
     tempNote: tempResult.note,
+    siteCapacityFactor: Math.round(siteCapacityFactor * 10000) / 10000,
     siteDeratedKw,
     stepLoad,
+    stepRequiredKw,
     voltageDip,
     requiredKw: Math.round(requiredKw * 10) / 10,
     selectedSizeKw: sizeResult.selectedKw,
     standardSizeOptions: sizeResult.options,
+    exceedsCatalog: sizeResult.exceedsCatalog,
     nfpa110Type,
     nfpa110Info: NFPA110_TYPES[nfpa110Type] ?? null,
     fuelCapGal,
     fuelRuntime: fuelResult,
+    calculationStatus: 'screening-only',
+    requiredInputs,
     warnings,
     timestamp: new Date().toISOString(),
   };

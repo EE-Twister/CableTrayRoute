@@ -122,8 +122,8 @@ export function extractArcFlashRecs(arcFlashResults) {
         sourceStudy: 'arcFlash',
         severity: 'safety',
         title: `Reduce arc flash exposure at ${busId} (${ie.toFixed(1)} cal/cm²)`,
-        detail: `Incident energy ${ie.toFixed(1)} cal/cm² exceeds the IEEE 1584-2018 PPE Category 4 maximum of 40 cal/cm². ` +
-          `Options: add upstream current-limiting fuse, reduce clearing time of protective device, or install remote racking.`,
+        detail: `Incident energy ${ie.toFixed(1)} cal/cm² is a severe exposure that warrants engineering mitigation and a documented energized-work risk assessment. ` +
+          `Options include an upstream current-limiting fuse, reduced protective-device clearing time, remote operation, or other hierarchy-of-risk-control measures.`,
         location: busId,
         studyPage: 'arcflash.html',
         safe_to_apply: false,
@@ -214,7 +214,9 @@ export function extractTrayFillRecs(trays) {
 }
 
 /**
- * Harmonics recommendations.
+ * Harmonics screening recommendations. These results do not establish IEEE
+ * 519 compliance because the source-level model does not aggregate at the PCC
+ * or calculate current TDD against maximum demand current.
  * @param {object} harmonicsResults - value from getStudies().harmonics; keyed by bus id
  * @returns {Recommendation[]}
  */
@@ -223,20 +225,21 @@ export function extractHarmonicsRecs(harmonicsResults) {
   const recs = [];
 
   for (const [busId, entry] of Object.entries(harmonicsResults)) {
-    const warn = entry.warning ?? (entry.vthd > (entry.limit ?? 5));
-    if (warn) {
-      const vthd = Number(entry.vthd);
+    const vthd = Number(entry?.vthd);
+    const limit = Number(entry?.limit ?? 5);
+    const warn = entry?.warning ?? (Number.isFinite(vthd) && vthd > limit);
+    if (warn && Number.isFinite(vthd)) {
       recs.push({
         id: `harm:${busId}`,
         sourceStudy: 'harmonics',
-        severity: 'compliance',
-        title: `Harmonic distortion at ${busId} exceeds limit (${vthd.toFixed(1)}% VTHD)`,
-        detail: `Voltage THD ${vthd.toFixed(1)}% exceeds the IEEE 519 limit of ${entry.limit ?? 5}% at bus ${busId}. ` +
-          `Consider adding passive harmonic filters, derating equipment, or installing an active front-end drive.`,
+        severity: 'missing_data',
+        title: `Complete PCC harmonic study for ${busId} (${vthd.toFixed(1)}% screened VTHD)`,
+        detail: `The source-level screen is above its ${limit}% reference threshold, but it does not establish IEEE 519 compliance. ` +
+          'Aggregate harmonic sources at the PCC, enter utility short-circuit data and maximum demand current, and evaluate current TDD before selecting mitigation.',
         location: busId,
         studyPage: 'harmonics.html',
         safe_to_apply: false,
-        tradeoffs: 'Passive filters add capacitive reactive power and may cause resonance.',
+        tradeoffs: 'Filter selection before a PCC study can add reactive power or create resonance.',
       });
     }
   }

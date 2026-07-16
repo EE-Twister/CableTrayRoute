@@ -35,12 +35,12 @@ document.addEventListener('DOMContentLoaded', () => {
   initNavToggle();
 
   initStudyBasisPanel('insulationCoordination', {
-    standard: 'IEC 60071-1:2006+AMD1:2010 / IEC 60071-2:1996+AMD1:2012 / IEEE 1313.2-1999',
-    clause: 'Deterministic and simplified-statistical coordination procedure (IEC 60071-2 §2)',
+    standard: 'IEC 60071-1 / IEC 60071-2:2023 / IEEE 1313.2',
+    clause: 'Preliminary deterministic and simplified-statistical screening workflow',
     formulas: [
       'Ucw = Urp × Ks × Ka — coordination withstand voltage',
       'Ka = e^(m × H / 8150) — atmospheric correction (IEC 60071-2 §3.3)',
-      'Mp (%) = (Ucw / Ures − 1) × 100 — surge arrester protective margin',
+      'Mp (%) = (selected BIL or SIL / Ures − 1) × 100 — equipment-to-arrester protective margin',
       'R ≈ Φ((μs − U50) / √(σs² + σw²)) — statistical risk of failure (Gaussian convolution)',
     ],
     assumptions: [
@@ -53,6 +53,7 @@ document.addEventListener('DOMContentLoaded', () => {
       'Switching impulse PFWV not separately tabulated for Range II (governed by SIWV)',
       'Full statistical convolution integral requires site-measured overvoltage distributions',
       'Transferred overvoltages from transformer coupling not modeled',
+      'Detailed simulation and the complete IEC 60071-2:2023 application workflow are not implemented',
     ],
     benchmarkId: 'iec60071',
   });
@@ -327,6 +328,7 @@ document.addEventListener('DOMContentLoaded', () => {
     resultsDiv.innerHTML = `
       <section class="results-panel" aria-labelledby="results-heading">
         <h2 id="results-heading">Insulation Coordination Results</h2>
+        <div class="alert warning"><strong>Preliminary screening only.</strong> Confirm representative stresses, arrester data, and selected insulation levels using the current project insulation-coordination study.</div>
 
         <div class="result-group">
           <h3>Overall Result</h3>

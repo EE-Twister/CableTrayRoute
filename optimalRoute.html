@@ -16,18 +16,13 @@
   <meta property="og:url" content="optimalRoute.html">
   <!-- Canonical URL -->
   <link rel="canonical" href="https://cabletrayroute.com/optimalRoute.html">
-      <!-- Performance: early CDN connection -->
-  <link rel="preconnect" href="https://cdn.plot.ly" crossorigin>
-  <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
   <link rel="dns-prefetch" href="https://fonts.gstatic.com">
   <meta name="color-scheme" content="light dark">
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="src/styles/routing.css?v=optimal-route-workspace">
-    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js" crossorigin="anonymous" defer></script>
+    <script src="dist/vendor/plotly.min.js" defer></script>
     <script src="dist/vendor/xlsx.full.min.js" defer></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"
-            integrity="sha512-dfX5uYVXzyU8+KHqj8bjo7UkOdg18PaOtpa48djpNbZHwExddghZ+ZmzWT06R5v6NSk3ZUfsH6FNEDepLx9hPQ=="
-            crossorigin="anonymous" referrerpolicy="no-referrer" defer></script>
+    <script src="dist/vendor/papaparse.min.js" defer></script>
     <script src="cdnFallback.js" defer></script>
     <script>
       window.addEventListener('load', function () {
@@ -117,7 +112,7 @@
                     <span id="fill-limit-value">40%</span>
                  </div>
 
-                 <label for="conduit-type">Preferred Conduit Type</label>
+                 <label for="conduit-type">Preferred Conduit Type for New Field Routes</label>
                  <select id="conduit-type">
                     <option value="EMT">EMT</option>
                     <option value="ENT">ENT</option>
@@ -132,6 +127,7 @@
                     <option value="PVC Type A">PVC Type A</option>
                     <option value="PVC Type EB">PVC Type EB</option>
                  </select>
+                 <p class="field-hint">Used only when the router proposes a new field route. Existing tray and conduit records retain their recorded types.</p>
 
                  <details class="advanced-routing-settings">
                     <summary>Advanced routing settings</summary>
@@ -181,6 +177,7 @@
             <header class="page-header">
                 <h1>Optimal Route Planner</h1>
                 <p>Validate routing inputs, calculate cable paths, and review why each route was selected.</p>
+                <button id="route-mode-toggle" class="btn route-mode-toggle" type="button" hidden>Edit setup</button>
             </header>
             <details class="method-panel">
                 <summary>Method &amp; Assumptions</summary>
@@ -361,6 +358,20 @@
                 </div>
 
                 <div class="route-results-workspace">
+                    <aside class="route-review-sidebar" aria-label="Route review summary">
+                        <div id="route-summary-panel" class="route-summary-panel"></div>
+                        <div id="messages"></div>
+                        <div id="metrics" class="columns route-shared-routes"></div>
+                        <details id="mismatched-raceways-details" style="display:none;">
+                            <summary>Mismatched Raceway Segments</summary>
+                            <ul id="mismatched-raceways-list" class="exclusions-list"></ul>
+                        </details>
+                        <details id="pull-checks-details" style="display:none;">
+                            <summary>Cable Pull Checks</summary>
+                            <div id="pull-checks-container"></div>
+                        </details>
+                    </aside>
+
                     <div class="route-visual-shell">
                         <div class="route-visual-header">
                             <div>
@@ -386,19 +397,6 @@
                         </div>
                     </div>
 
-                    <aside class="route-review-sidebar" aria-label="Route review summary">
-                        <div id="route-summary-panel" class="route-summary-panel"></div>
-                        <div id="messages"></div>
-                        <div id="metrics" class="columns route-shared-routes"></div>
-                        <details id="mismatched-raceways-details" style="display:none;">
-                            <summary>Mismatched Raceway Segments</summary>
-                            <ul id="mismatched-raceways-list" class="exclusions-list"></ul>
-                        </details>
-                        <details id="pull-checks-details" style="display:none;">
-                            <summary>Cable Pull Checks</summary>
-                            <div id="pull-checks-container"></div>
-                        </details>
-                    </aside>
                 </div>
 
                 <details id="updated-utilization-details">

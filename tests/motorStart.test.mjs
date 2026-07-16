@@ -218,7 +218,7 @@ function effectiveInrush(Ilr, Ifl, profile, time) {
   if (profile.type === 'soft_starter') {
     const rampFrac = Math.min(time / profile.rampTimeSec, 1.0);
     const vRamp = profile.initialVoltagePu + (1.0 - profile.initialVoltagePu) * rampFrac;
-    return Ilr * vRamp * vRamp;
+    return Ilr * vRamp;
   }
   if (profile.type === 'wye_delta') {
     return time < profile.wyeDeltaSwitchTimeSec ? Ilr / 3 : Ilr;
@@ -264,12 +264,12 @@ describe('getStarterProfile — VFD', () => {
 
 // ---------------------------------------------------------------------------
 describe('getStarterProfile — Soft Starter', () => {
-  it('at t=0 inrush is initialVoltagePu² × Ilr', () => {
+  it('at t=0 inrush is initialVoltagePu × Ilr', () => {
     const Ilr = 600;
     const Ifl = 100;
     const profile = makeProfile('soft_starter', { initialVoltagePu: 0.3, rampTimeSec: 10 });
     const inrush0 = effectiveInrush(Ilr, Ifl, profile, 0);
-    const expected = Ilr * 0.3 * 0.3;
+    const expected = Ilr * 0.3;
     assert.ok(approxEqual(inrush0, expected, 0.01), `Got ${inrush0.toFixed(2)}, expected ${expected.toFixed(2)}`);
   });
 

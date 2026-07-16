@@ -24,16 +24,23 @@
  * ratedLoad  – working load in lbs per linear foot of tray
  * ratedSpan  – standard test span in feet
  *
- * All standard aluminum/steel classes use a 12-ft test span.
- * High-capacity classes (8C, 12C …) use the same span with heavier sections.
+ * In the traditional designation, the numeric prefix is the support span in
+ * feet and the letter is the load family: A = 50 lb/ft, B = 75 lb/ft,
+ * and C = 100 lb/ft.
  */
 export const NEMA_LOAD_CLASSES = {
-  '8A':  { ratedLoad:  8, ratedSpan: 12 },
-  '12A': { ratedLoad: 12, ratedSpan: 12 },
-  '16A': { ratedLoad: 16, ratedSpan: 12 },
-  '20A': { ratedLoad: 20, ratedSpan: 12 },
-  '25A': { ratedLoad: 25, ratedSpan: 12 },
-  '32A': { ratedLoad: 32, ratedSpan: 12 },
+  '8A':  { ratedLoad: 50,  ratedSpan: 8 },
+  '8B':  { ratedLoad: 75,  ratedSpan: 8 },
+  '8C':  { ratedLoad: 100, ratedSpan: 8 },
+  '12A': { ratedLoad: 50,  ratedSpan: 12 },
+  '12B': { ratedLoad: 75,  ratedSpan: 12 },
+  '12C': { ratedLoad: 100, ratedSpan: 12 },
+  '16A': { ratedLoad: 50,  ratedSpan: 16 },
+  '16B': { ratedLoad: 75,  ratedSpan: 16 },
+  '16C': { ratedLoad: 100, ratedSpan: 16 },
+  '20A': { ratedLoad: 50,  ratedSpan: 20 },
+  '20B': { ratedLoad: 75,  ratedSpan: 20 },
+  '20C': { ratedLoad: 100, ratedSpan: 20 },
 };
 
 /**

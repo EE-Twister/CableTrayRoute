@@ -518,23 +518,25 @@ if (typeof window !== 'undefined' && canRenderWorkflowStatusDom()) {
       }
     });
 
-    const progressSection = document.getElementById('workflow-summary-section');
-    if (progressSection) {
-      progressSection.removeAttribute('hidden');
-    }
+    if (!document.body?.classList?.contains('home-page')) {
+      const progressSection = document.getElementById('workflow-summary-section');
+      if (progressSection) {
+        progressSection.removeAttribute('hidden');
+      }
 
-    const progressText = document.getElementById('workflow-progress-text');
-    if (progressText) {
-      progressText.textContent = `${completeCount} of ${workflowOrder.length} workflow steps complete.`;
-    }
+      const progressText = document.getElementById('workflow-progress-text');
+      if (progressText) {
+        progressText.textContent = `${completeCount} of ${workflowOrder.length} workflow steps complete.`;
+      }
 
-    const progressTrack = document.getElementById('workflow-progress-bar-track');
-    const progressFill = document.getElementById('workflow-progress-fill');
-    if (progressTrack && progressFill) {
-      const pct = Math.round((completeCount / workflowOrder.length) * 100);
-      progressFill.style.width = `${pct}%`;
-      progressTrack.setAttribute('aria-valuenow', completeCount);
-      progressTrack.setAttribute('aria-valuemax', workflowOrder.length);
+      const progressTrack = document.getElementById('workflow-progress-bar-track');
+      const progressFill = document.getElementById('workflow-progress-fill');
+      if (progressTrack && progressFill) {
+        const pct = Math.round((completeCount / workflowOrder.length) * 100);
+        progressFill.style.width = `${pct}%`;
+        progressTrack.setAttribute('aria-valuenow', completeCount);
+        progressTrack.setAttribute('aria-valuemax', workflowOrder.length);
+      }
     }
 
     const nextStep = workflowOrder.find(step => !getStepStatus(step.key).complete);

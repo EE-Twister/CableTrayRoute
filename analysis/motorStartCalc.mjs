@@ -160,7 +160,9 @@ export function runMotorStart() {
       if (profile.type === 'soft_starter') {
         const rampFrac = Math.min(time / profile.rampTimeSec, 1.0);
         const vRamp = profile.initialVoltagePu + (1.0 - profile.initialVoltagePu) * rampFrac;
-        effectiveIlr = Ilr * vRamp * vRamp;
+        // Induction-motor starting current is approximately proportional to
+        // applied voltage. Starting torque is the quantity that scales with V².
+        effectiveIlr = Ilr * vRamp;
       } else if (profile.type === 'wye_delta') {
         effectiveIlr = time < profile.wyeDeltaSwitchTimeSec ? Ilr / 3 : Ilr;
       } else if (profile.type === 'autotransformer') {

@@ -83,14 +83,14 @@ function buildSummarySection(cables, trays, conduits, ductbanks, projectName) {
 function buildCableSection(cables) {
   const rows = cables.map(c => ({
     id:             c.id || c.tag || c.cable_id || '—',
-    from:           c.from || c.source || '—',
-    to:             c.to   || c.destination || '—',
+    from:           c.from || c.from_tag || c.source || '—',
+    to:             c.to || c.to_tag || c.destination || '—',
     size:           c.conductor_size || c.size || '—',
-    insulation:     c.insulation_type || '—',
-    voltage:        c.voltage_rating || '—',
+    insulation:     c.insulation_type || c.insulation || c.insulation_material || '—',
+    voltage:        c.voltage_rating || c.cable_rating || c.operating_voltage || c.voltage || c.rated_voltage || '—',
     lengthFt:       parseFloat(c.length || c.length_ft || 0),
-    raceway:        c.route_preference || c.raceway || '—',
-    routed:         Boolean(c.route_preference || c.raceway),
+    raceway:        c.route_preference || c.raceway || (Array.isArray(c.raceway_ids) ? c.raceway_ids.join(', ') : c.raceway_ids) || '—',
+    routed:         Boolean(c.route_preference || c.raceway || (Array.isArray(c.raceway_ids) ? c.raceway_ids.length : c.raceway_ids)),
   }));
 
   const routed   = rows.filter(r => r.routed).length;
@@ -100,7 +100,15 @@ function buildCableSection(cables) {
   return {
     title: 'Cable Schedule',
     rows,
-    summary: { total: rows.length, routed, unrouted, totalLengthFt: +totalFt.toFixed(1) },
+    summary: {
+      total: rows.length,
+      routed,
+      unrouted,
+      totalLengthFt: +totalFt.toFixed(1),
+      missingInsulation: rows.filter(row => row.insulation === '—').length,
+      missingVoltage: rows.filter(row => row.voltage === '—').length,
+      issueReady: rows.every(row => row.insulation !== '—' && row.voltage !== '—')
+    },
   };
 }
 
@@ -305,6 +313,7 @@ export function renderReportHTML(report) {
 
 <section class="report-section" id="rpt-cables">
   <h2>Cable Schedule</h2>
+  ${cables.summary.issueReady ? '<p class="report-readiness-note report-readiness-note--ready">Issue-ready fields complete.</p>' : `<p class="report-readiness-note report-readiness-note--warning">Not issue-ready: ${fmt(cables.summary.missingInsulation)} cable(s) need insulation type and ${fmt(cables.summary.missingVoltage)} cable(s) need voltage rating.</p>`}
   <p class="report-note">${fmt(cables.summary.routed)} routed &nbsp;·&nbsp; ${fmt(cables.summary.unrouted)} unrouted &nbsp;·&nbsp; ${fmt(cables.summary.totalLengthFt)} ft total</p>
   <div class="report-scroll">
   <table class="report-table">
@@ -451,7 +460,9 @@ export function buildArcFlashSection(studies = {}, approvals = {}) {
   const rows = entries.map(e => ({
     id:             e.id || e.busId || '—',
     incidentEnergy: e.incidentEnergy ?? e.incident_energy ?? '—',
-    ppeCategory:    e.ppeCategory    ?? e.ppe_category    ?? '—',
+    ppeSelection:   Number(e.minimumArcRatingCalCm2) > 0
+      ? `Arc rating ≥ ${e.minimumArcRatingCalCm2} cal/cm²`
+      : (Number(e.incidentEnergy ?? e.incident_energy) <= 1.2 ? 'Below 1.2 cal/cm² threshold' : '—'),
     boundary:       e.boundary       ?? e.arc_flash_boundary ?? '—',
     clearingTime:   e.clearingTime   ?? e.clearing_time   ?? '—',
     voltage:        e.voltage        ?? e.nominalVoltage   ?? '—',
@@ -468,22 +479,52 @@ export function buildShortCircuitSection(studies = {}, approvals = {}) {
   const approval = approvals.shortCircuit || null;
   if (!data) return { key: 'shortCircuit', title: 'Short Circuit Analysis', empty: true };
 
-  const raw = Array.isArray(data)
-    ? data
-    : (Array.isArray(data.results) ? data.results : Object.entries(data)
-        .filter(([k]) => !k.startsWith('_'))
-        .map(([id, v]) => (typeof v === 'object' && v !== null ? { id, ...v } : { id })));
+  const rowFields = [
+    'threePhaseKA', 'i3ph_kA', 'threePhase', 'symmetrical',
+    'lineToGroundKA', 'iSlg_kA', 'slg',
+    'lineToLineKA', 'iLL_kA', 'll',
+    'doubleLineGroundKA', 'iDLG_kA', 'dlg'
+  ];
+  const arrays = [data.results, data.buses, data.busResults].find(Array.isArray);
+  let raw = Array.isArray(data) ? data : (arrays || []);
+
+  if (!raw.length && typeof data === 'object') {
+    if (rowFields.some(field => data[field] != null)) {
+      raw = [data];
+    } else {
+      raw = Object.entries(data)
+        .filter(([key, value]) => !key.startsWith('_')
+          && value
+          && typeof value === 'object'
+          && rowFields.some(field => value[field] != null))
+        .map(([id, value]) => ({ id, ...value }));
+    }
+  }
 
   const rows = raw.map(e => ({
-    id:       e.id || e.busId || '—',
-    i3ph_kA:  e.i3ph_kA  ?? e.threePhase ?? e.symmetrical ?? '—',
-    iSlg_kA:  e.iSlg_kA  ?? e.slg        ?? '—',
-    iLL_kA:   e.iLL_kA   ?? e.ll         ?? '—',
-    iDLG_kA:  e.iDLG_kA  ?? e.dlg        ?? '—',
-    voltage:  e.voltage  ?? e.nominalVoltage ?? '—',
+    id:       e.equipmentTag || e.id || e.busId || '—',
+    i3ph_kA:  e.threePhaseKA ?? e.i3ph_kA ?? e.threePhase ?? e.symmetrical ?? '—',
+    iSlg_kA:  e.lineToGroundKA ?? e.iSlg_kA ?? e.slg ?? '—',
+    iLL_kA:   e.lineToLineKA ?? e.iLL_kA ?? e.ll ?? '—',
+    iDLG_kA:  e.doubleLineGroundKA ?? e.iDLG_kA ?? e.dlg ?? '—',
+    voltage:  e.prefaultKV ?? e.voltage ?? e.nominalVoltage ?? '—',
   }));
 
-  return { key: 'shortCircuit', title: 'Short Circuit Analysis', rows, approval };
+  const summary = {
+    status: data.status ?? null,
+    availableFaultKa: data.availableFaultKa ?? data.availableFaultKA ?? data.faultCurrentKA ?? data.faultKa ?? null,
+    updatedAt: data.updatedAt ?? data.generatedAt ?? null,
+  };
+  const hasSummary = Object.values(summary).some(value => value != null && value !== '');
+
+  return {
+    key: 'shortCircuit',
+    title: 'Short Circuit Analysis',
+    rows,
+    summary: hasSummary ? summary : null,
+    empty: rows.length === 0 && !hasSummary,
+    approval
+  };
 }
 
 /**
@@ -539,7 +580,10 @@ export function buildHarmonicsSection(studies = {}, approvals = {}) {
     ithd:    e.ithd    ?? e.ITHD    ?? '—',
     vthd:    e.vthd    ?? e.VTHD    ?? '—',
     limit:   e.limit   ?? '—',
-    warning: e.warning ?? (e.ithd > 5 || e.vthd > 5 ? 'Exceeds limit' : 'OK'),
+    warning: e.warning === true
+      ? 'Above screening threshold — PCC study required'
+      : (e.warning === false ? 'Within screening threshold — not a compliance result' : 'Not evaluated'),
+    calculationStatus: e.calculationStatus ?? 'screening-only',
   }));
 
   return { key: 'harmonics', title: 'Harmonics Analysis', rows, approval };
@@ -609,7 +653,7 @@ export function buildDRCSection(drcResults = []) {
   const rows = drcResults.map(f => ({
     rule:        f.rule        || f.ruleId     || '—',
     severity:    f.severity    || '—',
-    component:   f.component   || f.trayId     || f.id || '—',
+    component:   f.component   || f.location   || f.trayId || f.id || '—',
     message:     f.message     || '—',
     remediation: f.remediation || '—',
     accepted:    f.accepted    ? 'Yes' : 'No',
@@ -622,14 +666,14 @@ export function buildDRCSection(drcResults = []) {
 }
 
 /**
- * Build a BESS Hazard HMA section from study results.
+ * Build a BESS hazard-screening section from study results.
  * @param {object} studies
  * @param {object} approvals
  */
 export function buildBessHazardSection(studies = {}, approvals = {}) {
   const data = studies.bessHazard || null;
   const approval = approvals.bessHazard || null;
-  if (!data || !data.valid) return { key: 'bessHazard', title: 'BESS Hazard / Thermal Runaway (NFPA 855)', empty: true };
+  if (!data || !data.valid) return { key: 'bessHazard', title: 'BESS Hazard / Thermal Runaway Screening', empty: true };
 
   const { separationChecks = [], propagation = {}, ventArea = {}, summary = {}, providedVentAreaM2 } = data;
 
@@ -638,12 +682,12 @@ export function buildBessHazardSection(studies = {}, approvals = {}) {
     type:        c.type,
     actualDistM: c.actualDistM,
     minDistM:    c.minDistM,
-    status:      c.status,
+    status:      (c.meetsScreeningDistance ?? c.actualDistM >= c.minDistM) ? 'review' : 'screening-alert',
   }));
 
   return {
     key:      'bessHazard',
-    title:    'BESS Hazard / Thermal Runaway (NFPA 855)',
+    title:    'BESS Hazard / Thermal Runaway Screening',
     summary:  {
       overallStatus:         summary.status,
       ratedKwh:              data.ratedKwh,
@@ -651,9 +695,10 @@ export function buildBessHazardSection(studies = {}, approvals = {}) {
       cellToCell_min:        propagation.cellToCell_min,
       cellToModule_min:      propagation.cellToModule_min,
       moduleToRack_min:      propagation.moduleToRack_min,
-      requiredVentAreaM2:    ventArea.ventAreaM2,
+      screeningVentAreaM2:   ventArea.ventAreaM2,
       providedVentAreaM2,
-      ventPass:              providedVentAreaM2 >= ventArea.ventAreaM2,
+      meetsScreeningVentArea: summary.meetsScreeningVentArea,
+      requiresEngineeringReview: true,
       issues:                summary.issues || [],
     },
     separationRows,
@@ -691,6 +736,12 @@ export function renderPackageHTML(pkg, baseReport = {}) {
   const emptySection = (title) =>
     `<p class="report-empty">No ${title.toLowerCase()} results available for this project.</p>`;
 
+  const unavailableSection = (key, title) => `
+<section class="report-section" id="rpt-${esc(key)}">
+  <h2>${esc(title)}</h2>
+  <p class="report-empty">This section is not available from the current project data.</p>
+</section>`;
+
   const approvalBadgeHTML = (approval) => {
     if (!approval || !approval.status) return '';
     const cls = approval.status === 'approved' ? 'badge-ok' : approval.status === 'flagged' ? 'badge-error' : 'badge-warn';
@@ -701,6 +752,20 @@ export function renderPackageHTML(pkg, baseReport = {}) {
       ${approval.note ? `<br><em>${esc(approval.note)}</em>` : ''}
     </p>`;
   };
+
+  const assumptionsHTML = text => String(text || '')
+    .split(/\n{2,}/)
+    .map(block => block.split(/\r?\n/).map(line => line.trim()).filter(Boolean))
+    .filter(lines => lines.length)
+    .map(lines => {
+      if (lines.length === 1) return `<p>${esc(lines[0].replace(/^[-*]\s*/, ''))}</p>`;
+      const heading = lines[0].endsWith(':') ? lines.shift().slice(0, -1) : '';
+      return `<div class="report-assumption-group">
+        ${heading ? `<h3>${esc(heading)}</h3>` : ''}
+        <ul>${lines.map(line => `<li>${esc(line.replace(/^[-*]\s*/, ''))}</li>`).join('')}</ul>
+      </div>`;
+    })
+    .join('');
 
   const sections = pkg.sections;
   const cover    = sections.cover?.data || pkg.config?.coverSheet || {};
@@ -728,7 +793,7 @@ export function renderPackageHTML(pkg, baseReport = {}) {
 <nav class="report-section report-toc-section" id="rpt-toc" aria-label="Table of contents">
   <h2>Table of Contents</h2>
   <ol class="report-toc-list">
-    ${entries.map((e, i) => `<li><a href="#rpt-${esc(e.key)}">${i + 1}. ${esc(e.label)}</a></li>`).join('\n    ')}
+    ${entries.map(e => `<li><a href="#rpt-${esc(e.key)}">${esc(e.label)}</a></li>`).join('\n    ')}
   </ol>
 </nav>`;
   }
@@ -755,7 +820,7 @@ export function renderPackageHTML(pkg, baseReport = {}) {
     html += `
 <section class="report-section" id="rpt-assumptions">
   <h2>Assumptions / Basis of Design</h2>
-  ${text ? `<pre class="report-assumptions">${esc(text)}</pre>` : '<p class="report-empty">No assumptions recorded.</p>'}
+  ${text ? `<div class="report-assumptions">${assumptionsHTML(text)}</div>` : '<p class="report-empty">No assumptions recorded.</p>'}
 </section>`;
   }
 
@@ -767,6 +832,7 @@ export function renderPackageHTML(pkg, baseReport = {}) {
     html += `
 <section class="report-section" id="rpt-cables">
   <h2>Cable Schedule</h2>
+  ${cables.summary.issueReady ? '<p class="report-readiness-note report-readiness-note--ready">Issue-ready fields complete.</p>' : `<p class="report-readiness-note report-readiness-note--warning">Not issue-ready: ${fmt(cables.summary.missingInsulation)} cable(s) need insulation type and ${fmt(cables.summary.missingVoltage)} cable(s) need voltage rating.</p>`}
   <p class="report-note">${fmt(cables.summary.routed)} routed &nbsp;·&nbsp; ${fmt(cables.summary.unrouted)} unrouted &nbsp;·&nbsp; ${fmt(cables.summary.totalLengthFt)} ft total</p>
   <div class="report-scroll"><table class="report-table">
     <thead><tr><th>ID</th><th>From</th><th>To</th><th>Size</th><th>Insulation</th><th>Voltage</th><th>Length (ft)</th><th>Raceway</th></tr></thead>
@@ -777,6 +843,8 @@ export function renderPackageHTML(pkg, baseReport = {}) {
     </tr>`).join('')}</tbody>
   </table></div>
 </section>`;
+  } else if (sections.cables) {
+    html += unavailableSection('cables', sections.cables.title || 'Cable Schedule');
   }
 
   if (sections.fill && br.fill) {
@@ -797,6 +865,8 @@ export function renderPackageHTML(pkg, baseReport = {}) {
     </tbody>
   </table></div>
 </section>`;
+  } else if (sections.fill) {
+    html += unavailableSection('fill', sections.fill.title || 'Raceway Fill');
   }
 
   if (sections.clashes && br.clashes) {
@@ -814,6 +884,8 @@ export function renderPackageHTML(pkg, baseReport = {}) {
     </tr>`).join('')}</tbody>
   </table></div>`}
 </section>`;
+  } else if (sections.clashes) {
+    html += unavailableSection('clashes', sections.clashes.title || 'Clash Detection');
   }
 
   if (sections.spools && br.spools) {
@@ -832,23 +904,27 @@ export function renderPackageHTML(pkg, baseReport = {}) {
     </tr>`).join('')}</tbody>
   </table></div>
 </section>`;
+  } else if (sections.spools) {
+    html += unavailableSection('spools', sections.spools.title || 'Spool Sheets');
   }
 
-  if (sections.drc) {
+  if (sections.drc && !sections.drc.unavailable) {
     const { drc } = sections;
     html += `
 <section class="report-section" id="rpt-drc">
   <h2>Design Rule Check</h2>
   ${drc.pass ? '<p class="report-empty">No DRC errors — all rules passed.</p>' : `<p class="report-note">${fmt(drc.errors)} error(s) &nbsp;·&nbsp; ${fmt(drc.warnings)} warning(s)</p>`}
   ${drc.rows && drc.rows.length ? `
-  <div class="report-scroll"><table class="report-table">
-    <thead><tr><th>Rule</th><th>Severity</th><th>Component</th><th>Message</th><th>Remediation</th><th>Accepted</th></tr></thead>
-    <tbody>${drc.rows.map(r => `<tr>
-      <td>${esc(r.rule)}</td><td>${statusBadge(r.severity)}</td><td>${esc(r.component)}</td>
-      <td>${esc(r.message)}</td><td>${esc(r.remediation)}</td><td>${esc(r.accepted)}</td>
-    </tr>`).join('')}</tbody>
-  </table></div>` : ''}
+  <div class="report-finding-list">
+    ${drc.rows.map(r => `<article class="report-finding report-finding--${esc(r.severity)}">
+      <header><strong>${esc(r.rule)}</strong>${statusBadge(r.severity)}<span>${esc(r.component)}</span></header>
+      <p>${esc(r.message)}</p>
+      <dl><div><dt>Remediation</dt><dd>${esc(r.remediation)}</dd></div><div><dt>Accepted</dt><dd>${esc(r.accepted)}</dd></div></dl>
+    </article>`).join('')}
+  </div>` : ''}
 </section>`;
+  } else if (sections.drc) {
+    html += unavailableSection('drc', sections.drc.title || 'Design Rule Check');
   }
 
   // ── Study sections ────────────────────────────────────────────────────────
@@ -861,9 +937,9 @@ export function renderPackageHTML(pkg, baseReport = {}) {
   ${approvalBadgeHTML(s.approval)}
   ${s.empty ? emptySection('Arc Flash') : `
   <div class="report-scroll"><table class="report-table">
-    <thead><tr><th>Bus / Component</th><th>Incident Energy (cal/cm²)</th><th>PPE Category</th><th>Boundary (mm)</th><th>Clearing Time (s)</th><th>Voltage</th></tr></thead>
+    <thead><tr><th>Bus / Component</th><th>Incident Energy (cal/cm²)</th><th>PPE Selection</th><th>Boundary (mm)</th><th>Clearing Time (s)</th><th>Voltage</th></tr></thead>
     <tbody>${(s.rows || []).map(r => `<tr>
-      <td>${esc(r.id)}</td><td>${fmt(r.incidentEnergy)}</td><td>${esc(r.ppeCategory)}</td>
+      <td>${esc(r.id)}</td><td>${fmt(r.incidentEnergy)}</td><td>${esc(r.ppeSelection)}</td>
       <td>${fmt(r.boundary)}</td><td>${fmt(r.clearingTime)}</td><td>${fmt(r.voltage)}</td>
     </tr>`).join('')}</tbody>
   </table></div>`}
@@ -872,18 +948,25 @@ export function renderPackageHTML(pkg, baseReport = {}) {
 
   if (sections.shortCircuit) {
     const s = sections.shortCircuit;
+    const summaryHtml = s.summary ? `
+  <dl class="report-summary-list">
+    ${s.summary.status != null ? `<div><dt>Status</dt><dd>${esc(s.summary.status)}</dd></div>` : ''}
+    ${s.summary.availableFaultKa != null ? `<div><dt>Available fault current</dt><dd>${fmt(s.summary.availableFaultKa)} kA</dd></div>` : ''}
+    ${s.summary.updatedAt != null ? `<div><dt>Updated</dt><dd>${esc(s.summary.updatedAt)}</dd></div>` : ''}
+  </dl>` : '';
     html += `
 <section class="report-section" id="rpt-shortCircuit">
   <h2>Short Circuit Analysis</h2>
   ${approvalBadgeHTML(s.approval)}
-  ${s.empty ? emptySection('Short Circuit') : `
+  ${s.empty ? emptySection('Short Circuit') : `${summaryHtml}
+  ${(s.rows || []).length ? `
   <div class="report-scroll"><table class="report-table">
     <thead><tr><th>Bus</th><th>3-Phase (kA)</th><th>SLG (kA)</th><th>L-L (kA)</th><th>DLG (kA)</th><th>Voltage</th></tr></thead>
     <tbody>${(s.rows || []).map(r => `<tr>
       <td>${esc(r.id)}</td><td>${fmt(r.i3ph_kA)}</td><td>${fmt(r.iSlg_kA)}</td>
       <td>${fmt(r.iLL_kA)}</td><td>${fmt(r.iDLG_kA)}</td><td>${fmt(r.voltage)}</td>
     </tr>`).join('')}</tbody>
-  </table></div>`}
+  </table></div>` : ''}`}
 </section>`;
   }
 
@@ -922,10 +1005,10 @@ export function renderPackageHTML(pkg, baseReport = {}) {
   ${approvalBadgeHTML(s.approval)}
   ${s.empty ? emptySection('Harmonics') : `
   <div class="report-scroll"><table class="report-table">
-    <thead><tr><th>Component</th><th>ITHD (%)</th><th>VTHD (%)</th><th>Limit (%)</th><th>Status</th></tr></thead>
+    <thead><tr><th>Component</th><th>ITHD (%)</th><th>VTHD (%)</th><th>Reference threshold (%)</th><th>Status</th><th>Basis</th></tr></thead>
     <tbody>${(s.rows || []).map(r => `<tr>
       <td>${esc(r.id)}</td><td>${fmt(r.ithd)}</td><td>${fmt(r.vthd)}</td>
-      <td>${fmt(r.limit)}</td><td>${esc(r.warning)}</td>
+      <td>${fmt(r.limit)}</td><td>${esc(r.warning)}</td><td>${esc(r.calculationStatus)}</td>
     </tr>`).join('')}</tbody>
   </table></div>`}
 </section>`;
@@ -986,6 +1069,19 @@ export function renderPackageHTML(pkg, baseReport = {}) {
     </tr>`).join('')}</tbody>
   </table></div>
 </section>`;
+  } else if (sections.heatTrace) {
+    html += unavailableSection('heatTrace', sections.heatTrace.title || 'Heat Trace');
+  }
+
+  const dedicatedKeys = new Set([
+    'cover', 'toc', 'revisions', 'assumptions',
+    'cables', 'fill', 'clashes', 'spools', 'drc',
+    'arcFlash', 'shortCircuit', 'loadFlow', 'harmonics', 'motorStart', 'voltageDrop', 'heatTrace',
+  ]);
+  for (const key of orderedKeys) {
+    const section = sections[key];
+    if (!section || dedicatedKeys.has(key)) continue;
+    html += unavailableSection(key, section.title || key);
   }
 
   return html;

@@ -52,6 +52,7 @@ const entries = {
   autosize: 'src/autosize.js',
   submittal: 'src/submittal.js',
   projectreport: 'src/projectreport.js',
+  shortCircuit: 'src/shortCircuit.js',
   reliability: 'src/reliability.js',
   costestimate: 'src/costestimate.js',
   emf: 'src/emf.js',

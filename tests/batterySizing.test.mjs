@@ -3,7 +3,8 @@
  *
  * Run with:  node tests/batterySizing.test.mjs
  *
- * Reference calculations are hand-verified against IEEE 485-2010.
+ * Reference calculations hand-check the application's preliminary screening
+ * arithmetic. They are not IEEE 485 cell-sizing validation examples.
  */
 
 import assert from 'assert';

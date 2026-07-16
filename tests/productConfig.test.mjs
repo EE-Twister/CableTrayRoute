@@ -37,22 +37,17 @@ function it(name, fn) {
 // NEMA_LOAD_CLASSES
 // ---------------------------------------------------------------------------
 describe('NEMA_LOAD_CLASSES', () => {
-  it('defines all six standard classes', () => {
-    ['8A', '12A', '16A', '20A', '25A', '32A'].forEach(c =>
+  it('defines the traditional span/load class combinations', () => {
+    ['8A', '8B', '8C', '12A', '12B', '12C', '16A', '16B', '16C', '20A', '20B', '20C'].forEach(c =>
       assert.ok(NEMA_LOAD_CLASSES[c], `${c} must exist`)
     );
   });
 
-  it('ratedLoad matches numeric prefix', () => {
+  it('maps numeric prefixes to spans and letters to load families', () => {
     Object.entries(NEMA_LOAD_CLASSES).forEach(([id, def]) => {
-      assert.strictEqual(def.ratedLoad, parseInt(id, 10));
+      assert.strictEqual(def.ratedSpan, parseInt(id, 10));
+      assert.strictEqual(def.ratedLoad, { A: 50, B: 75, C: 100 }[id.at(-1)]);
     });
-  });
-
-  it('all classes have ratedSpan of 12', () => {
-    Object.values(NEMA_LOAD_CLASSES).forEach(def =>
-      assert.strictEqual(def.ratedSpan, 12)
-    );
   });
 });
 
@@ -64,12 +59,9 @@ describe('requiredRatedLoad', () => {
     assert.strictEqual(requiredRatedLoad(10, 12), 10);
   });
 
-  it('scales as cube of span ratio', () => {
-    // 12 → 24 ft doubles span → required load × 8
-    const base = requiredRatedLoad(10, 12);
-    const dbl  = requiredRatedLoad(10, 24);
-    assert.ok(Math.abs(dbl - base * 8) < 1e-9,
-      `Expected ${base * 8}, got ${dbl}`);
+  it('does not reinterpret span as load', () => {
+    assert.strictEqual(requiredRatedLoad(10, 8), 10);
+    assert.strictEqual(requiredRatedLoad(10, 20), 10);
   });
 
   it('throws for non-positive span', () => {
@@ -90,28 +82,28 @@ describe('requiredRatedLoad', () => {
 // selectLoadClass
 // ---------------------------------------------------------------------------
 describe('selectLoadClass', () => {
-  it('selects 8A for 0 required load', () => {
+  it('selects 12A for a default 12 ft span', () => {
     const r = selectLoadClass(0);
-    assert.strictEqual(r.classId, '8A');
+    assert.strictEqual(r.classId, '12A');
   });
 
   it('selects exact class when load matches rated exactly', () => {
-    const r = selectLoadClass(16);
-    assert.strictEqual(r.classId, '16A');
+    const r = selectLoadClass(50, 12);
+    assert.strictEqual(r.classId, '12A');
   });
 
   it('selects next class up when slightly over', () => {
-    const r = selectLoadClass(16.1);
-    assert.strictEqual(r.classId, '20A');
+    const r = selectLoadClass(50.1, 12);
+    assert.strictEqual(r.classId, '12B');
   });
 
-  it('returns 32A for 32 lbs/ft', () => {
-    const r = selectLoadClass(32);
-    assert.strictEqual(r.classId, '32A');
+  it('selects the requested span family', () => {
+    const r = selectLoadClass(40, 16);
+    assert.strictEqual(r.classId, '16A');
   });
 
   it('returns null when required load exceeds all classes', () => {
-    const r = selectLoadClass(100);
+    const r = selectLoadClass(101, 12);
     assert.strictEqual(r, null);
   });
 });
@@ -213,6 +205,9 @@ describe('configure — basic integration', () => {
 
   it('returns a structured result object', () => {
     const r = configure(baseInputs);
+    assert.strictEqual(r.calculationStatus, 'screening-only');
+    assert.strictEqual(r.standardCompliance, null);
+    assert.ok(r.requiredInputs.length >= 2);
     assert.ok(r.loadClass, 'missing loadClass');
     assert.ok(r.geometry,  'missing geometry');
     assert.ok(r.trayType,  'missing trayType');
@@ -222,7 +217,7 @@ describe('configure — basic integration', () => {
 
   it('selects a valid NEMA load class for moderate load at 10 ft span', () => {
     const r = configure(baseInputs);
-    // requiredRatedLoad(8, 10) = 8 × (10/12)³ ≈ 4.63 → 8A class
+    assert.strictEqual(r.loadClass.id, '12A');
     assert.ok(NEMA_LOAD_CLASSES[r.loadClass.id], 'loadClass.id must be a valid NEMA class');
     assert.ok(!r.loadClass.exceeded, 'should not exceed all classes');
   });
@@ -316,5 +311,19 @@ describe('configure — input validation', () => {
       cableWeightLbFt: 5, spanFt: 10, totalCableCsaIn2: -1,
       environment: 'indoorDry', application: 'power',
     }), /non-negative/);
+  });
+
+  it('throws for an unknown environment', () => {
+    assert.throws(() => configure({
+      cableWeightLbFt: 5, spanFt: 10, totalCableCsaIn2: 10,
+      environment: 'space', application: 'power',
+    }), /environment/i);
+  });
+
+  it('throws for an unknown application', () => {
+    assert.throws(() => configure({
+      cableWeightLbFt: 5, spanFt: 10, totalCableCsaIn2: 10,
+      environment: 'indoorDry', application: 'magic',
+    }), /application/i);
   });
 });

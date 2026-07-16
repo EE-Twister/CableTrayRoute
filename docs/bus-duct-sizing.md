@@ -1,5 +1,10 @@
 # Bus Duct / Cable Bus Sizing
 
+> **Screening limitation:** All selected ratings, impedances, derating factors,
+> and mechanical properties are generic. This calculation cannot establish a
+> final busway product selection or compliance result. Manufacturer-certified
+> ampacity, voltage-drop, short-circuit withstand, and support data govern.
+
 **Study page:** `busdust.html`  
 **Analysis module:** `analysis/busDuctSizing.mjs`  
 **Standards:** NEC 368, NEC 215.2(A), IEEE 605-2008

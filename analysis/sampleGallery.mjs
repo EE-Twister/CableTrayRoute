@@ -1,4 +1,5 @@
 import { repairMojibake, repairMojibakeDeep } from '../src/textEncoding.js';
+import { normalizeRouteResultState } from './routeResults.mjs';
 
 /**
  * Sample Project Gallery registry and utilities for Gap #81.
@@ -27,13 +28,16 @@ export const SAMPLE_REGISTRY = [
     image: 'assets/sample-projects/project-workflow-core.jpg',
     imageAlt: 'Integrated electrical workflow workspace with one-line, schedules, routing, and report visuals.',
     projectFile: 'samples/project-workflow-core.json',
-    pagesUsed: ['equipmentlist.html', 'loadlist.html', 'oneline.html', 'workflowdashboard.html', 'cableschedule.html', 'racewayschedule.html', 'projectreport.html'],
+    pagesUsed: ['equipmentlist.html', 'loadlist.html', 'oneline.html', 'cableschedule.html', 'racewayschedule.html', 'optimalRoute.html', 'shortCircuit.html', 'workflowdashboard.html', 'projectreport.html'],
     guidedChecklist: [
       { step: 1, label: 'Review equipment list', page: 'equipmentlist.html', hint: 'Confirm switchboard, MCC, transformer, panel, and process equipment tags.' },
       { step: 2, label: 'Review load list', page: 'loadlist.html', hint: 'Check source links back to equipment tags and confirm required electrical fields.' },
       { step: 3, label: 'Open one-line', page: 'oneline.html', hint: 'Review linked components and run Reconcile Schedules if pending.' },
-      { step: 4, label: 'Check dashboard', page: 'workflowdashboard.html', hint: 'Use blockers and project health to confirm the workflow path.' },
-      { step: 5, label: 'Review deliverables', page: 'projectreport.html', hint: 'Inspect the saved report snapshot and release package context.' },
+      { step: 4, label: 'Review cable schedule', page: 'cableschedule.html', hint: 'Confirm each cable has linked endpoints, conductor size, length, and a raceway assignment.' },
+      { step: 5, label: 'Review raceway schedule', page: 'racewayschedule.html', hint: 'Inspect the tray and ductbank parent row, then expand the bank to see its conduit.' },
+      { step: 6, label: 'Review routed cables', page: 'optimalRoute.html', hint: 'Confirm the four saved route results use the coordinated cable and raceway records.' },
+      { step: 7, label: 'Review short-circuit results', page: 'shortCircuit.html', hint: 'Inspect the saved project study basis and rerun the study to compare results.' },
+      { step: 8, label: 'Review deliverables', page: 'projectreport.html', hint: 'Confirm shared readiness is clear, then inspect the saved report snapshot and release package context.' },
     ],
   },
   {
@@ -520,13 +524,13 @@ function normalizeSampleCable(cable = {}) {
   const racewayIds = explicitRaceways.length
     ? explicitRaceways
     : [cable.route_preference || cable.raceway_id || cable.conduit_id].filter(Boolean);
-  return {
+  return repairMojibakeDeep({
     ...cable,
     tag,
     from_tag: fromTag,
     to_tag: toTag,
     raceway_ids: racewayIds,
-  };
+  });
 }
 
 function sampleComponentVoltage(component = {}) {
@@ -662,7 +666,13 @@ function seedSampleStudies(obj = {}, settings = {}) {
 }
 
 function deriveSampleRouteResults(cables = [], settings = {}) {
-  if (settings.latestRouteResults?.batchResults?.length || !cables.length) return settings;
+  if (settings.latestRouteResults?.batchResults?.length) {
+    return {
+      ...settings,
+      latestRouteResults: normalizeRouteResultState(settings.latestRouteResults, { cables })
+    };
+  }
+  if (!cables.length) return settings;
   const batchResults = cables
     .filter(cable => cable.route_preference || cable.raceway_ids?.length)
     .map(cable => {
@@ -671,19 +681,31 @@ function deriveSampleRouteResults(cables = [], settings = {}) {
       return {
         cable: cable.tag || cable.id || cable.name,
         status: 'Routed',
+        mode: 'Sample route',
         total_length: length,
-        breakdown: [{ raceway_id: racewayId, length }],
-        route_segments: [{ type: 'raceway', raceway_id: racewayId, length }],
+        breakdown: [{
+          raceway_id: racewayId,
+          length,
+          start: [cable.start_x, cable.start_y, cable.start_z],
+          end: [cable.end_x, cable.end_y, cable.end_z]
+        }],
+        route_segments: [{
+          type: 'raceway',
+          raceway_id: racewayId,
+          length,
+          start: [cable.start_x, cable.start_y, cable.start_z],
+          end: [cable.end_x, cable.end_y, cable.end_z]
+        }],
       };
     });
   if (!batchResults.length) return settings;
   return {
     ...settings,
-    latestRouteResults: {
+    latestRouteResults: normalizeRouteResultState({
       source: 'sample',
       updatedAt: '2026-05-01T12:00:00.000Z',
       batchResults,
-    },
+    }, { cables }),
   };
 }
 
@@ -706,7 +728,7 @@ export function sampleProjectToImportPayload(obj = {}) {
   const loads = Array.isArray(obj.loads) && obj.loads.length
     ? obj.loads
     : deriveSampleLoads(oneLine);
-  return {
+  return repairMojibakeDeep({
     meta: obj.meta || { version: 1, scenario: 'default', scenarios: ['default'] },
     ductbanks: Array.isArray(obj.ductbanks) ? obj.ductbanks : (Array.isArray(raceways.ductbanks) ? raceways.ductbanks : []),
     conduits: Array.isArray(obj.conduits) ? obj.conduits : (Array.isArray(raceways.conduits) ? raceways.conduits : []),
@@ -714,12 +736,12 @@ export function sampleProjectToImportPayload(obj = {}) {
     cables,
     cableTypicals: Array.isArray(obj.cableTypicals) ? obj.cableTypicals : [],
     panels: Array.isArray(obj.panels) && obj.panels.length ? obj.panels : deriveSamplePanels(oneLine),
-    equipment: repairMojibakeDeep(equipment),
+    equipment,
     loads,
     oneLine,
     mccLineups: Array.isArray(obj.mccLineups) && obj.mccLineups.length ? obj.mccLineups : deriveSampleMccLineups(oneLine),
     settings
-  };
+  });
 }
 
 const SAMPLE_PAGE_STUDY_KEYS = {

@@ -1,7 +1,7 @@
 import './workflowStatus.js';
 import '../site.js';
 import { repairMojibake } from './textEncoding.js';
-import { importProject, saveProject, setItem } from '../dataStore.mjs';
+import { getProjectInputFingerprint, getStudies, importProject, saveProject, setItem, setStudies } from '../dataStore.mjs';
 import { getProjectState, listSavedProjects, readAppSetting, setConduitCache, setProjectState, writeAppSetting } from '../projectStorage.js';
 import { SAMPLE_REGISTRY, getSampleProjectCopyName, getSamplesByTag, validateSampleProject, migrateSampleProject, sampleProjectToImportPayload } from '../analysis/sampleGallery.mjs';
 
@@ -11,12 +11,16 @@ const PROGRESS_KEY_PREFIX = 'ctr_sample_progress_';
 
 let activeTag = null;
 let activeSampleId = null;
+let searchTerm = '';
 
 // ── DOM refs ─────────────────────────────────────────────────────────────────
 
 const grid = document.getElementById('gallery-grid');
 const emptyMsg = document.getElementById('gallery-empty');
 const tagBar = document.getElementById('tag-filter-bar');
+const allTagBar = document.getElementById('all-tag-filter-bar');
+const searchInput = document.getElementById('gallery-search');
+const resultsCount = document.getElementById('gallery-results-count');
 const clearFilterBtn = document.getElementById('gallery-clear-filter-btn');
 const checklistPanel = document.getElementById('checklist-panel');
 const checklistTitle = document.getElementById('checklist-title');
@@ -72,9 +76,26 @@ function markStepDone(sampleId, stepIndex) {
 // ── Tag chips ─────────────────────────────────────────────────────────────────
 
 const allTags = [...new Set(SAMPLE_REGISTRY.flatMap(s => s.tags))].sort();
+const tagUsage = new Map(allTags.map(tag => [tag, SAMPLE_REGISTRY.filter(sample => sample.tags.includes(tag)).length]));
+const popularTags = [...allTags]
+  .sort((a, b) => tagUsage.get(b) - tagUsage.get(a) || a.localeCompare(b))
+  .slice(0, 6);
+
+function buildTagChip(tag) {
+  const chip = document.createElement('button');
+  chip.className = 'tag-chip';
+  chip.textContent = tag;
+  chip.setAttribute('aria-pressed', activeTag === tag ? 'true' : 'false');
+  chip.addEventListener('click', () => {
+    activeTag = activeTag === tag ? null : tag;
+    refresh();
+  });
+  return chip;
+}
 
 function renderTagChips() {
   tagBar.innerHTML = '';
+  allTagBar.innerHTML = '';
   const allChip = document.createElement('button');
   allChip.className = 'tag-chip';
   allChip.textContent = 'All';
@@ -82,17 +103,8 @@ function renderTagChips() {
   allChip.addEventListener('click', () => { activeTag = null; refresh(); });
   tagBar.appendChild(allChip);
 
-  allTags.forEach(tag => {
-    const chip = document.createElement('button');
-    chip.className = 'tag-chip';
-    chip.textContent = tag;
-    chip.setAttribute('aria-pressed', activeTag === tag ? 'true' : 'false');
-    chip.addEventListener('click', () => {
-      activeTag = (activeTag === tag) ? null : tag;
-      refresh();
-    });
-    tagBar.appendChild(chip);
-  });
+  popularTags.forEach(tag => tagBar.appendChild(buildTagChip(tag)));
+  allTags.filter(tag => !popularTags.includes(tag)).forEach(tag => allTagBar.appendChild(buildTagChip(tag)));
 }
 
 // ── Card rendering ────────────────────────────────────────────────────────────
@@ -154,8 +166,8 @@ function buildCard(sample) {
 
   const openBtn = document.createElement('button');
   openBtn.className = 'primary-btn';
-  openBtn.textContent = 'Open Sample';
-  openBtn.setAttribute('aria-label', `Open ${sample.title} sample project`);
+  openBtn.textContent = 'Open Guided Sample';
+  openBtn.setAttribute('aria-label', `Open guided ${sample.title} sample project`);
   openBtn.addEventListener('click', () => openSample(sample));
 
   const dlLink = document.createElement('a');
@@ -165,18 +177,8 @@ function buildCard(sample) {
   dlLink.textContent = 'Download JSON';
   dlLink.setAttribute('aria-label', `Download ${sample.title} project JSON`);
 
-  const guideBtn = document.createElement('button');
-  guideBtn.className = 'btn';
-  guideBtn.textContent = 'Load & View Checklist';
-  guideBtn.setAttribute('aria-label', `Load ${sample.title} and show its guided checklist`);
-  guideBtn.addEventListener('click', () => {
-    if (activeSampleId === sample.id) showChecklist(sample);
-    else openSample(sample);
-  });
-
   actions.appendChild(openBtn);
   actions.appendChild(dlLink);
-  actions.appendChild(guideBtn);
 
   body.appendChild(header);
   body.appendChild(desc);
@@ -187,9 +189,23 @@ function buildCard(sample) {
 }
 
 function renderGrid() {
-  const samples = activeTag ? getSamplesByTag(activeTag) : SAMPLE_REGISTRY;
+  const tagFilteredSamples = activeTag ? getSamplesByTag(activeTag) : SAMPLE_REGISTRY;
+  const normalizedSearch = searchTerm.trim().toLocaleLowerCase();
+  const samples = normalizedSearch
+    ? tagFilteredSamples.filter(sample => [sample.title, sample.industry, sample.description, ...sample.tags]
+      .join(' ')
+      .toLocaleLowerCase()
+      .includes(normalizedSearch))
+    : tagFilteredSamples;
   grid.innerHTML = '';
+  if (resultsCount) {
+    resultsCount.textContent = `Showing ${samples.length} of ${SAMPLE_REGISTRY.length}`;
+  }
   if (samples.length === 0) {
+    emptyMsg.hidden = false;
+    emptyMsg.textContent = normalizedSearch
+      ? 'No samples match that search and filter combination.'
+      : 'No samples match the selected filter.';
     emptyMsg.hidden = false;
     return;
   }
@@ -227,6 +243,17 @@ async function openSample(sample) {
     setConduitCache({ ductbanks: payload.ductbanks, conduits: payload.conduits });
     const projectId = getSampleProjectCopyName(sample.title, listSavedProjects());
     setProjectState({ ...getProjectState(), name: projectId });
+    const studies = getStudies();
+    if (studies.shortCircuit?._meta) {
+      studies.shortCircuit = {
+        ...studies.shortCircuit,
+        _meta: {
+          ...studies.shortCircuit._meta,
+          inputFingerprint: getProjectInputFingerprint(),
+        },
+      };
+      setStudies(studies);
+    }
     window.currentProjectId = projectId;
     setItem('activeSampleWorkflow', {
       id: sample.id,
@@ -305,7 +332,16 @@ function showChecklist(sample) {
 
 // ── Event wiring ──────────────────────────────────────────────────────────────
 
-clearFilterBtn.addEventListener('click', () => { activeTag = null; refresh(); });
+clearFilterBtn.addEventListener('click', () => {
+  activeTag = null;
+  searchTerm = '';
+  if (searchInput) searchInput.value = '';
+  refresh();
+});
+searchInput?.addEventListener('input', event => {
+  searchTerm = event.target.value || '';
+  refresh();
+});
 checklistCloseBtn.addEventListener('click', () => { checklistPanel.hidden = true; });
 
 function refresh() {

@@ -80,7 +80,7 @@
         <ul>
           <li><strong>w_actual</strong> — total cable weight per linear foot of tray (lbs/ft)</li>
           <li><strong>w_rated</strong> — NEMA load-class working load (lbs/ft)</li>
-          <li><strong>L_rated</strong> — class test span (12 ft for all standard classes)</li>
+          <li><strong>L_rated</strong> — class test span identified by the numeric class prefix</li>
         </ul>
         <p>Citations: <a href="docs/standards.html">NEMA VE 1-2017</a></p>
         <p>Applicability: aluminum and steel ladder trays, solid-bottom trays, and wire-mesh
@@ -102,7 +102,8 @@
         <select id="loadClass" aria-describedby="loadClassHint"></select>
         <p id="loadClassHint" class="field-hint">
           Select the load class stamped on the tray or specified by the manufacturer.
-          Class 16A (16 lbs/ft, 12 ft span) is typical for industrial installations.
+          In traditional NEMA classes, the number is the rated span and A/B/C
+          correspond to 50/75/100 lbs/ft. For example, 12A is 50 lbs/ft at 12 ft.
         </p>
       </fieldset>
 

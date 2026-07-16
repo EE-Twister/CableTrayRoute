@@ -158,7 +158,7 @@ if (typeof window !== 'undefined') {
     const viewPresets = {
       basic: ['select', 'source', 'tag', 'description', 'quantity', 'voltage', 'loadType', 'duty', 'kw', 'powerFactor', 'phases', 'circuit', 'kva', 'current', 'actions'],
       electrical: ['select', 'source', 'tag', 'description', 'quantity', 'voltage', 'kw', 'powerFactor', 'phases', 'kva', 'current', 'circuit', 'actions'],
-      demand: ['select', 'source', 'tag', 'description', 'loadType', 'duty', 'kw', 'loadFactor', 'demandFactor', 'demandKva', 'demandKw', 'actions'],
+      demand: ['select', 'source', 'tag', 'demandFactor', 'demandKva', 'demandKw', 'kw', 'loadFactor', 'description', 'loadType', 'duty', 'actions'],
       procurement: ['select', 'source', 'tag', 'description', 'manufacturer', 'model', 'quantity', 'voltage', 'loadType', 'notes', 'actions'],
       full: ['select', 'source', 'tag', 'description', 'manufacturer', 'model', 'quantity', 'voltage', 'loadType', 'duty', 'kw', 'powerFactor', 'loadFactor', 'efficiency', 'demandFactor', 'phases', 'circuit', 'notes', 'kva', 'current', 'demandKva', 'demandKw', 'actions']
     };
@@ -495,7 +495,13 @@ if (typeof window !== 'undefined') {
     };
     Object.entries(metrics).forEach(([name, value]) => {
       const el = summaryPanel.querySelector(`[data-load-metric="${name}"]`);
-      if (el) el.textContent = String(value);
+      if (!el) return;
+      el.textContent = String(value);
+      const card = el.closest('.load-summary-card');
+      if (!card) return;
+      const isCoreMetric = name === 'total' || name === 'connectedKw' || name === 'demandKva';
+      const showCoreMetric = name === 'total' || visibleLoads.length > 0;
+      card.hidden = isCoreMetric ? !showCoreMetric : Number(value) === 0;
     });
   }
 
@@ -553,13 +559,10 @@ if (typeof window !== 'undefined') {
     }
     nextActionEl.innerHTML = `
       <div>
-        <strong>${READINESS_VOCABULARY.downstreamHandoff}: Continue to One-Line</strong>
-        <p>${READINESS_VOCABULARY.ready}: ${LOAD_READINESS_COPY?.readyWhen || 'At least one meaningful load row exists.'} ${validation.complete} load${validation.complete === 1 ? '' : 's'} can feed diagram reconciliation, demand review, or cable schedule work.</p>
+        <strong>${READINESS_VOCABULARY.downstreamHandoff}: Build the One-Line</strong>
+        <p>${READINESS_VOCABULARY.ready}: ${validation.complete} load${validation.complete === 1 ? '' : 's'} are ready to use in the one-line. Cable Schedule remains available from the workflow navigation when you are ready to define conductors.</p>
       </div>
-      <span>
-        <a class="btn primary-btn" href="oneline.html">Continue to One-Line</a>
-        <a class="btn" href="cableschedule.html">Continue to Cable Schedule</a>
-      </span>
+      <a class="btn primary-btn" href="oneline.html">Open One-Line</a>
     `;
   }
 
@@ -583,9 +586,22 @@ if (typeof window !== 'undefined') {
   }
 
   function applyViewPreset() {
-    const columns = new Set(viewPresets[activeViewPreset] || viewPresets.basic);
+    const orderedColumns = viewPresets[activeViewPreset] || viewPresets.basic;
+    const columns = new Set(orderedColumns);
+    table.dataset.viewPreset = activeViewPreset;
+    table.querySelectorAll('tr').forEach(row => {
+      const cells = Array.from(row.children);
+      const cellsByColumn = new Map(cells.map(cell => [cell.dataset.column, cell]));
+      orderedColumns.forEach(column => {
+        const cell = cellsByColumn.get(column);
+        if (cell) row.appendChild(cell);
+      });
+      cells.filter(cell => !cell.dataset.column).forEach(cell => row.appendChild(cell));
+    });
     table.querySelectorAll('[data-column]').forEach(cell => {
       cell.hidden = !columns.has(cell.dataset.column);
+      const header = table.querySelector(`thead [data-column="${cell.dataset.column}"]`);
+      if (header && !cell.closest('thead')) cell.dataset.label = header.textContent.trim();
     });
     viewPresetButtons.forEach(btn => {
       const active = btn.dataset.loadView === activeViewPreset;
@@ -849,16 +865,14 @@ if (typeof window !== 'undefined') {
     rendering = true;
     try {
       tbody.innerHTML = '';
-      let loads = dataStore.getLoads();
+      const loads = dataStore.getLoads();
       const hasStoredLoads = loads.length > 0;
-      if (!hasStoredLoads) {
-        // Ensure at least one editable row renders even with no stored data
-        loads = [{}];
-      }
+      table.hidden = !hasStoredLoads;
+      if (tfoot) tfoot.hidden = !hasStoredLoads;
       // Recalculate derived fields for display without rewriting storage
-      loads = loads.map(l => ({ ...l, ...calculateDerived(l) }));
+      const displayLoads = loads.map(l => ({ ...l, ...calculateDerived(l) }));
 
-      const filtered = loads
+      const filtered = displayLoads
         .map((load, storeIndex) => ({ load, storeIndex }))
         .filter(entry => matchesLoadFilter(entry.load, filterQuery));
 
@@ -869,14 +883,14 @@ if (typeof window !== 'undefined') {
       }
 
       selectAll.checked = false;
-      recalculateTotals(loads);
-      updateSummary(loads);
-      updateLoadStatus(loads);
+      recalculateTotals(displayLoads);
+      updateSummary(displayLoads);
+      updateLoadStatus(displayLoads);
       applyViewPreset();
 
       if (resultsCount) {
         const resultCount = filtered.length;
-        const totalCount = hasStoredLoads ? getVisibleLoads(loads).length : 0;
+          const totalCount = hasStoredLoads ? getVisibleLoads(displayLoads).length : 0;
         if (!filterQuery && activeQuickFilter === 'all') {
           resultsCount.textContent = totalCount ? `${totalCount} load${totalCount === 1 ? '' : 's'}` : '';
         } else {

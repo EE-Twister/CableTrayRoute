@@ -7,15 +7,18 @@
  *   Continuous load: 400 kW
  *   Site: 5000 ft altitude (naturally-aspirated), 45 °C ambient
  *   Altitude factor: 1 - 0.03 × (5000-500)/1000 = 1 - 0.03 × 4.5 = 1 - 0.135 = 0.865
- *   After altitude: 400 × 0.865 = 346.0 kW
+ *   Available nameplate fraction after altitude: 0.865
  *   Temperature factor: 1 - 0.01 × (45-40) = 1 - 0.05 = 0.95
- *   After temperature: 346.0 × 0.95 = 328.7 kW
+ *   Combined site capacity factor: 0.865 × 0.95 = 0.82175
+ *   Continuous-load nameplate requirement: 400 / 0.82175 = 486.77 kW
  *
  *   Motor step load: 100 HP, PF 0.85, eff 0.92, LRC ×6
  *   startingKva = (100 × 0.746) / (0.85 × 0.92) × 6 = (74.6 / 0.782) × 6 = 95.396 × 6 ≈ 572.4 kVA
  *   recommendedGenKw = ceil(572.4 × 0.80) = ceil(457.9) = 458 kW
  *
- *   Required = max(328.7, 458) = 458 kW → selected standard size = 500 kW
+ * Environmental capacity factors reduce available generator output, so the
+ * required standard-condition nameplate rating is divided by the combined
+ * factor rather than multiplying the site load by it.
  */
 
 import assert from 'assert';
@@ -304,9 +307,10 @@ describe('selectStandardSize — standard generator kW selection', () => {
     assert.ok(r.options.includes(r.selectedKw), 'options should include selected size');
   });
 
-  it('requirement above all standard sizes → largest standard size returned', () => {
+  it('requirement above all standard sizes → no undersized selection is returned', () => {
     const r = selectStandardSize(9999);
-    assert.strictEqual(r.selectedKw, STANDARD_GEN_SIZES_KW[STANDARD_GEN_SIZES_KW.length - 1]);
+    assert.strictEqual(r.selectedKw, null);
+    assert.strictEqual(r.exceedsCatalog, true);
   });
 });
 
@@ -374,6 +378,19 @@ describe('runGeneratorSizingAnalysis — full integration', () => {
   it('altitude factor matches derateForAltitude', () => {
     const result = runGeneratorSizingAnalysis(baseInputs);
     approx(result.altitudeFactor, 0.865, 0.001);
+  });
+
+  it('divides load by the combined site-capacity factor', () => {
+    const result = runGeneratorSizingAnalysis({
+      loads: [{ label: 'Reference load', kw: 100, demandFactor: 1 }],
+      altitudeFt: 5000,
+      ambientC: 40,
+      aspiration: 'naturally-aspirated',
+    });
+    // 100 kW / 0.865 = 115.6069 kW, rounded to one decimal.
+    assert.strictEqual(result.siteDeratedKw, 115.6);
+    assert.strictEqual(result.selectedSizeKw, 125);
+    assert.ok(result.siteDeratedKw > result.continuousKw);
   });
 
   it('selected size is always ≥ required kW', () => {

@@ -30,6 +30,7 @@
 <div class="doc-content">
   <nav id="doc-nav" class="doc-nav"></nav>
   <main id="main-content" class="doc-main">
+    <p class="alert warning"><strong>Screening limitation:</strong> This is a calibrated steady-state estimator, not a complete Neher-McGrath, IEC 60287, or IEEE 835 compliance implementation. Final ampacity requires actual cable construction, installation geometry, mutual heating, soil/backfill properties, and an accepted engineering method or manufacturer study.</p>
     <p>The application estimates conductor ampacity using the Neher‑McGrath method. This approach was introduced in the 1957 paper <em>The Calculation of the Temperature Rise and Load Carrying Capability of Cable Systems</em> by J. H. Neher and M. H. McGrath. It forms the basis of ampacity guidance in <strong>NEC 310‑15(C)</strong> and the calculation procedures detailed in <strong>IEEE Std 835</strong>.</p>
 
     <h2 id="equation">Equation</h2>
@@ -68,7 +69,7 @@
     </ul>
 
     <h2 id="calibration">Calibration</h2>
-    <p>The resistance constants were tuned so that calculated ampacities match IEEE 835 tables.</p>
+    <p>The resistance constants were tuned so that selected calculated ampacities approximate IEEE 835 table values; this is benchmark fitting, not general validation.</p>
     <p>The library now exposes a <code>calibrateAmpacityModel</code> function which performs a grid search over reasonable model parameters. The routine compares the calculated ampacity of three common cables against their IEEE 835 free‑air ratings:</p>
     <ul>
       <li><strong>4/0 AWG Cu THHN (90 °C)</strong> – 260 A</li>

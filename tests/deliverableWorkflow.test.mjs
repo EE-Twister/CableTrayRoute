@@ -1,5 +1,9 @@
 import assert from 'node:assert/strict';
-import { buildDeliverableReadinessDiagnostics, normalizeRouteResults } from '../analysis/deliverableWorkflow.mjs';
+import {
+  buildDeliverableReadinessDiagnostics,
+  normalizeRouteResults,
+  routedCableNamesFromResults
+} from '../analysis/deliverableWorkflow.mjs';
 
 const cables = [
   {
@@ -70,6 +74,7 @@ const routeResults = {
 };
 
 assert.equal(normalizeRouteResults(routeResults).length, 1);
+assert.deepEqual(Array.from(routedCableNamesFromResults(routeResults)), ['CBL-101']);
 
 
 const forged = buildDeliverableReadinessDiagnostics({

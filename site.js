@@ -27,6 +27,8 @@ import {
   getReportSnapshots,
   getProjectMeta,
   getDesignBasis,
+  getDesignGateApprovals,
+  getStudyApprovals,
   getItem,
   removeItem,
   applyRemoteSnapshot
@@ -42,6 +44,7 @@ import {
   countOneLineComponents,
   getWorkflowPageModeContext
 } from "./src/workflowStatus.js";
+import { buildWorkflowCoreDiagnostics } from "./analysis/projectWorkflowCore.mjs";
 import { runValidation } from "./validation/rules.js";
 import {
   PROJECT_KEY,
@@ -162,6 +165,14 @@ function applyPageVisualIdentity(){
   document.querySelectorAll('.page-header').forEach((header,index)=>{
     if(!(header instanceof HTMLElement)) return;
     header.classList.add('page-header-graphic');
+    const directChildren=Array.from(header.children);
+    const hasDirectTitle=directChildren.some(child=>/^H[12]$/.test(child.tagName));
+    const hasSimpleContent=directChildren.every(child=>
+      /^H[12]$/.test(child.tagName)||child.tagName==='P'||child.id==='project-share-btn'
+    );
+    if(hasDirectTitle&&hasSimpleContent){
+      header.classList.add('page-header--compact');
+    }
     const title=header.querySelector('h1,h2');
     if(title&&title.id){
       header.setAttribute('aria-labelledby',title.id);
@@ -1164,23 +1175,33 @@ function collectHomepageSummary(){
   const lifecyclePackages=safeReadHomeData(getLifecyclePackages,[]);
   const reportSnapshots=safeReadHomeData(getReportSnapshots,{});
   const reconcilePending=Boolean(safeReadHomeData(()=>getItem('oneLineScheduleReconcilePending',false),false));
+  const routeResults=safeReadHomeData(()=>getItem('latestRouteResults',null),null);
   const cableReadiness=getCableReadiness(cables);
   const oneLineComponents=countOneLineComponents(oneLine);
   const raceways=trays.length+conduits.length+ductbanks.length;
+  const workflowDiagnostics=buildWorkflowCoreDiagnostics({
+    equipment,
+    loads,
+    oneLine,
+    cables,
+    trays,
+    conduits,
+    ductbanks,
+    studies,
+    routeResults,
+    latestRouteResults:routeResults,
+    lifecyclePackages,
+    deliverables:lifecyclePackages,
+    reportSnapshots,
+    designBasis:safeReadHomeData(getDesignBasis,{}),
+    designGateApprovals:safeReadHomeData(getDesignGateApprovals,{}),
+    studyApprovals:safeReadHomeData(getStudyApprovals,{}),
+    reconcilePending
+  });
+  const workflowStatusByKey=new Map(workflowDiagnostics.workflowSteps.map(status=>[status.key,status]));
   const stepStatuses=PROJECT_WORKFLOW_STEPS.map(step=>({
     ...step,
-    status:getStepStatus(step.key,{
-      equipment,
-      loads,
-      oneLine,
-      cables,
-      trays,
-      conduits,
-      ductbanks,
-      studies,
-      lifecyclePackages,
-      reportSnapshots
-    })
+    status:workflowStatusByKey.get(step.key)||getStepStatus(step.key)
   }));
   const completeCount=stepStatuses.filter(step=>step.status.complete).length;
   const nextStep=stepStatuses.find(step=>!step.status.complete)||stepStatuses[stepStatuses.length-1];
@@ -1210,6 +1231,7 @@ function collectHomepageSummary(){
       const pct=numericPercent(record,['fill_pct','fillPercent','percent_fill','percentFill','fill']);
       return Number.isFinite(pct)&&pct>40;
     }).length,
+    workflowDiagnostics,
     stepStatuses,
     completeCount,
     nextStep
@@ -1273,6 +1295,9 @@ function renderHomeReadiness(summary){
     ['Schedule reconcile',summary.reconcilePending?'Pending':'Manual'],
     ['Cable schedule',summary.cableReadiness.total?`${summary.cableReadiness.scheduleReady}/${summary.cableReadiness.total} ready`:'Not started'],
     ['Raceway model',summary.raceways?pluralHome(summary.raceways,'raceway','raceways'):'Not started'],
+    ['Design rule check',summary.workflowDiagnostics.designRules.errors
+      ? `${summary.workflowDiagnostics.designRules.errors} error(s)`
+      : `${summary.workflowDiagnostics.designRules.warnings} warning(s)`],
     ['Reports',summary.reportCount?pluralHome(summary.reportCount,'deliverable'):'Pending']
   ];
   list.replaceChildren();
@@ -1299,25 +1324,31 @@ function renderHomepageCommandCenter(){
   setHomeText('home-project-record-count',pluralHome(summary.equipment.length+summary.loads.length+summary.cables.length,'record'));
   setHomeText('home-project-route-count',pluralHome(summary.raceways,'raceway','raceways'));
 
-  if(summary.reconcilePending){
-    setHomeText('home-next-action-title','Reconcile One-Line');
-    setHomeText('home-next-action-detail','One-Line changes are pending schedule reconcile.');
-    setHomeLink('home-next-action-link','oneline.html','Open One-Line');
-  } else if(summary.nextStep){
-    const stepName=stripWorkflowNumber(summary.nextStep.label);
-    const actionPrefix=summary.completeCount?'Continue':'Start';
-    setHomeText('home-next-action-title',`${actionPrefix} ${stepName}`);
-    setHomeText('home-next-action-detail',summary.nextStep.status.hint||summary.nextStep.hint||summary.nextStep.status.label);
-    setHomeLink('home-next-action-link',summary.nextStep.href,`Open ${stepName}`);
+  const workflowProgressText=document.getElementById('workflow-progress-text');
+  const workflowProgressTrack=document.getElementById('workflow-progress-bar-track');
+  const workflowProgressFill=document.getElementById('workflow-progress-fill');
+  const workflowProgressPct=Math.round((summary.completeCount/PROJECT_WORKFLOW_STEPS.length)*100);
+  if(workflowProgressText){
+    workflowProgressText.textContent=`${summary.completeCount} of ${PROJECT_WORKFLOW_STEPS.length} workflow steps complete.`;
   }
+  if(workflowProgressTrack){
+    workflowProgressTrack.setAttribute('aria-valuenow',String(summary.completeCount));
+    workflowProgressTrack.setAttribute('aria-valuemax',String(PROJECT_WORKFLOW_STEPS.length));
+  }
+  if(workflowProgressFill) workflowProgressFill.style.width=`${workflowProgressPct}%`;
+
+  const nextAction=summary.workflowDiagnostics.nextAction;
+  setHomeText('home-next-action-title',nextAction?.label||'Continue Deliverables');
+  setHomeText('home-next-action-detail',nextAction?.detail||'Review the project report and package the current deliverables.');
+  setHomeLink('home-next-action-link',nextAction?.href||'projectreport.html','Open Step');
   setHomeText('home-next-action-metrics',`${pluralHome(summary.equipment.length,'equipment item')} / ${pluralHome(summary.loads.length,'load')} / ${pluralHome(summary.cableReadiness.total,'cable row')}`);
 
   const sheetCount=Array.isArray(summary.oneLine?.sheets)?summary.oneLine.sheets.length:0;
   setHomeText(
     'home-oneline-summary',
     summary.oneLineComponents
-      ? `${pluralHome(summary.oneLineComponents,'component')} across ${pluralHome(sheetCount,'sheet')}`
-      : 'No one-line components yet. Schedules can still be built independently.'
+      ? `Active project: ${pluralHome(summary.oneLineComponents,'component')} across ${pluralHome(sheetCount,'sheet')}. Layout below is illustrative.`
+      : 'Active project has no one-line components. Layout below is illustrative.'
   );
 
   renderHomeCablePreview(summary.cables);
@@ -1329,7 +1360,7 @@ function renderHomepageCommandCenter(){
   const total=Math.max(summary.cableReadiness.total,1);
   const schedulePct=Math.round((summary.cableReadiness.scheduleReady/total)*100);
   const routePct=Math.round((summary.cableReadiness.routingReady/total)*100);
-  const deliverablePct=Math.round((summary.completeCount/PROJECT_WORKFLOW_STEPS.length)*100);
+  const deliverablePct=summary.workflowDiagnostics.readyForDeliverables?100:0;
   const scheduleMeter=document.getElementById('home-schedule-ready-meter');
   const routeMeter=document.getElementById('home-routing-ready-meter');
   const deliverableMeter=document.getElementById('home-deliverable-ready-meter');
@@ -2189,6 +2220,24 @@ function initWorkflowStepNav(){
   const links=document.createElement('div');
   links.className='workflow-step-nav-links';
 
+  const mobileSelect=document.createElement('select');
+  mobileSelect.className='workflow-step-nav-select';
+  mobileSelect.setAttribute('aria-label','Go to workflow step');
+  WORKFLOW_STEPS.forEach((workflowStep,workflowIndex)=>{
+    const option=document.createElement('option');
+    option.value=workflowStep.href;
+    option.textContent=`${workflowIndex+1}. ${stripWorkflowNumber(workflowStep.label)}`;
+    option.selected=workflowIndex===idx;
+    mobileSelect.appendChild(option);
+  });
+  const dashboardOption=document.createElement('option');
+  dashboardOption.value='workflowdashboard.html';
+  dashboardOption.textContent='Project Dashboard';
+  mobileSelect.appendChild(dashboardOption);
+  mobileSelect.addEventListener('change',()=>{
+    if(mobileSelect.value) window.location.href=mobileSelect.value;
+  });
+
   function makeLink(target,text){
     const a=document.createElement('a');
     a.href=target.href;
@@ -2209,6 +2258,7 @@ function initWorkflowStepNav(){
 
   nav.appendChild(label);
   nav.appendChild(status);
+  nav.appendChild(mobileSelect);
   nav.appendChild(links);
   syncStatus();
   onProjectChange(syncStatus);
@@ -2258,18 +2308,20 @@ function initActiveSampleWorkflowGuide(){
   const actions=document.createElement('nav');
   actions.className='sample-workflow-guide__actions';
   actions.setAttribute('aria-label','Sample workflow navigation');
-  const addLink=(step,label)=>{
+  const addLink=(step,label,{secondary=false}={})=>{
     if(!step) return;
     const link=document.createElement('a');
     link.className='sample-workflow-guide__link';
+    if(secondary) link.classList.add('sample-workflow-guide__link--secondary');
     link.href=step.page;
     link.textContent=repairMojibake(label);
     actions.appendChild(link);
   };
-  addLink(steps[currentIndex-1],'← Previous');
+  addLink(steps[currentIndex-1],'← Previous',{secondary:true});
   addLink(steps[currentIndex+1],'Next →');
   const checklist=document.createElement('a');
   checklist.className='sample-workflow-guide__link';
+  checklist.classList.add('sample-workflow-guide__link--secondary');
   checklist.href=`samplegallery.html#${encodeURIComponent(workflow.title)}`;
   checklist.textContent='Checklist';
   actions.appendChild(checklist);
@@ -2759,7 +2811,7 @@ globalThis.addEventListener?.('DOMContentLoaded',initProjectIO);
 globalThis.addEventListener?.('DOMContentLoaded',()=>{
   const params = new URLSearchParams(window.location.search);
   if (params.has('e2e')) return;
-  if (document.body?.dataset.onboarding === 'manual') return;
+  if (document.body?.dataset.onboarding !== 'auto') return;
   runOnboardingFlow({source:'auto'}).catch(err=>console.error('Onboarding startup failed',err));
 });
 

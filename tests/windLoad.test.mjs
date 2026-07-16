@@ -235,10 +235,11 @@ describe('checkNemaCapacity', () => {
     assert.ok(r.verticalUtilization > 1.0);
   });
 
-  it('capacity scales inversely with span', () => {
+  it('capacity scales with the inverse cube of span for the L/100 deflection limit', () => {
     const r12 = checkNemaCapacity({ cableWeight_lbs_ft: 30, windForce_per_ft: 5, nemaClass: '12B', spanLength_ft: 12 });
     const r20 = checkNemaCapacity({ cableWeight_lbs_ft: 30, windForce_per_ft: 5, nemaClass: '12B', spanLength_ft: 20 });
-    assert.ok(r12.verticalCapacity_lbs_ft > r20.verticalCapacity_lbs_ft);
+    assert.strictEqual(r12.verticalCapacity_lbs_ft, 75);
+    assert.strictEqual(r20.verticalCapacity_lbs_ft, 16.2);
   });
 
   it('unknown nema class returns null capacity with note', () => {
@@ -256,8 +257,15 @@ describe('NEMA_LOAD_CLASSES', () => {
   });
 
   it('all expected classes present', () => {
-    ['8A','12A','12B','12C','20A','20B','20C'].forEach(cls => {
+    ['8A','8B','8C','12A','12B','12C','16A','16B','16C','20A','20B','20C'].forEach(cls => {
       assert.ok(cls in NEMA_LOAD_CLASSES, `Missing class ${cls}`);
+    });
+  });
+
+  it('maps numeric prefixes to spans and letters to 50/75/100 lbs/ft', () => {
+    Object.entries(NEMA_LOAD_CLASSES).forEach(([id, def]) => {
+      assert.strictEqual(def.referenceSpan_ft, Number.parseInt(id, 10));
+      assert.strictEqual(def.designLoad_lbs_ft, { A: 50, B: 75, C: 100 }[id.at(-1)]);
     });
   });
 });

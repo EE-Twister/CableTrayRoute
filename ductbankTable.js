@@ -703,8 +703,8 @@ import { applyRecordImport, previewRecordImport } from './analysis/scheduleWorkf
       console.assert(ductbankTbody, 'Ductbank table body not found');
       if(!ductbankTbody) return;
     }
-    try{ductbanks=readStoredDuctbanks();}catch(e){ductbanks=[];}
-    const repairedParents = repairDuctbankParentRows(ductbanks);
+    try{ductbanks=cloneData(readStoredDuctbanks());}catch(e){ductbanks=[];}
+    repairDuctbankParentRows(ductbanks);
     ductbanks.forEach(db=>{
       if(db.expanded===undefined) db.expanded=false;
       if(!db.conduits) db.conduits=[];
@@ -717,9 +717,6 @@ import { applyRecordImport, previewRecordImport } from './analysis/scheduleWorkf
         if(c.material===undefined) c.material=defaultConduitMaterial(c.type);
       });
     });
-    if(repairedParents){
-      try{setDuctbanks(ductbanks);}catch(e){console.warn('Could not persist repaired ductbank parents', e);}
-    }
     renderDuctbanks();
     const rendered=getDuctbankRows().length;
     console.assert(rendered===ductbanks.length,`Rendered ${rendered} ductbanks, expected ${ductbanks.length}`);

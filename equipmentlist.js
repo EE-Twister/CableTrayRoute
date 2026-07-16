@@ -106,6 +106,34 @@ if (typeof window !== 'undefined') {
     const addEquipmentBtn = document.getElementById('add-row-btn');
     const importXlsxBtn = document.getElementById('import-xlsx-btn');
     const importXlsxInput = document.getElementById('import-xlsx-input');
+    const equipmentViewButtons = Array.from(document.querySelectorAll('[data-equipment-view]'));
+    const equipmentViews = {
+      core: ['tag', 'description', 'voltage', 'category', 'arrangement', 'lineup'],
+      layout: ['tag', 'description', 'arrangement', 'width', 'depth', 'height', 'baseElevation', 'x', 'y', 'z'],
+      procurement: ['tag', 'description', 'category', 'manufacturer', 'model', 'voltage', 'phases', 'notes'],
+      full: null
+    };
+    let activeEquipmentView = dataStore.getItem(dataStore.STORAGE_KEYS.equipmentListViewPreset, 'core');
+    if (!(activeEquipmentView in equipmentViews)) activeEquipmentView = 'core';
+
+    const applyEquipmentView = (viewName, { persist = true } = {}) => {
+      const nextView = viewName in equipmentViews ? viewName : 'core';
+      activeEquipmentView = nextView;
+      table.setVisibleColumns(equipmentViews[nextView]);
+      equipmentViewButtons.forEach(button => {
+        const active = button.dataset.equipmentView === nextView;
+        button.classList.toggle('active', active);
+        button.setAttribute('aria-pressed', String(active));
+      });
+      if (persist) {
+        dataStore.setItem(dataStore.STORAGE_KEYS.equipmentListViewPreset, nextView);
+      }
+    };
+
+    equipmentViewButtons.forEach(button => {
+      button.addEventListener('click', () => applyEquipmentView(button.dataset.equipmentView));
+    });
+    applyEquipmentView(activeEquipmentView, { persist: false });
 
     const presets = Array.isArray(dataStore.getEquipmentFilterPresets()) ? dataStore.getEquipmentFilterPresets() : [];
 
@@ -128,16 +156,26 @@ if (typeof window !== 'undefined') {
     const renderEquipmentSummary = () => {
       if (!summaryCards) return;
       const summary = summarizeEquipment(table.getData());
-      const cards = [
-        { label: 'Equipment', value: summary.total },
+      const issueCards = [
         { label: 'Missing Tags', value: summary.missingTags, warn: summary.missingTags > 0 },
         { label: 'Duplicate Tags', value: summary.duplicateTags, warn: summary.duplicateTags > 0 },
         { label: 'Missing Voltage', value: summary.missingVoltage, warn: summary.missingVoltage > 0 },
-        { label: 'Missing Manufacturer', value: summary.missingManufacturer, warn: summary.missingManufacturer > 0 },
-        { label: 'Arrangements', value: summary.assignedArrangements }
+        { label: 'Missing Manufacturer', value: summary.missingManufacturer, warn: summary.missingManufacturer > 0 }
       ];
+      const cards = [
+        { label: 'Equipment', value: summary.total },
+        { label: 'Arrangements', value: summary.assignedArrangements },
+        ...issueCards.filter(card => card.value > 0)
+      ];
+      if (!issueCards.some(card => card.value > 0)) {
+        cards.push({
+          label: 'Data Quality',
+          value: summary.total ? 'Ready' : 'Not started',
+          ready: summary.total > 0
+        });
+      }
       summaryCards.innerHTML = cards.map(card => `
-        <article class="workflow-summary-card${card.warn ? ' workflow-summary-card--warn' : ''}">
+        <article class="workflow-summary-card${card.warn ? ' workflow-summary-card--warn' : ''}${card.ready ? ' workflow-summary-card--ready' : ''}">
           <span>${escapeHtml(card.label)}</span>
           <strong>${escapeHtml(card.value)}</strong>
         </article>

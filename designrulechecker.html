@@ -93,45 +93,25 @@
         <h1>Design Rule Checker</h1>
       </header>
 
-      <details class="method-panel" open>
-        <summary>Method &amp; Checks Performed</summary>
-        <p>The Design Rule Checker (DRC) validates your routing project against
-        NEC and IEEE requirements after routing has been completed in the
-        <a href="optimalRoute.html">Optimal Route</a> tool. Run the DRC after
-        every routing session to catch code violations early.</p>
+      <section class="drc-output card" aria-labelledby="drc-results-heading" aria-live="polite" aria-atomic="false">
+        <div class="drc-results-heading">
+          <div>
+            <p class="page-visual-kicker">Current project validation</p>
+            <h2 id="drc-results-heading">Design Rule Results</h2>
+            <p>Review active errors and warnings first. Calculation options and the check methodology remain available below.</p>
+          </div>
+          <a class="btn" href="optimalRoute.html">Review Routes</a>
+        </div>
+        <div id="drc-summary"></div>
+        <div id="drc-results"></div>
+      </section>
 
-        <dl class="drc-rule-list">
-          <dt>DRC-01 — Tray Fill (NEC 392.22(A))</dt>
-          <dd>Flags any tray whose cable fill exceeds the configured limit
-          (default 40 %). Reports a warning when fill is within 10 % of the
-          limit.</dd>
-
-          <dt>DRC-02 — Voltage Segregation (NEC 392.6(H))</dt>
-          <dd>Detects tray segments containing cables from different cable
-          groups (e.g., HV and LV cables sharing the same tray without a
-          physical barrier).</dd>
-
-          <dt>DRC-03 — Ampacity Derating (NEC 310.15)</dt>
-          <dd>Applies bundling derating factors based on the number of
-          current-carrying conductors in each tray section and flags cables
-          whose design current exceeds the derated ampacity.</dd>
-
-          <dt>DRC-04 — Grounding Conductor (NEC 250.122)</dt>
-          <dd>Warns when a power cable record does not include a grounding
-          (EGC) conductor size.</dd>
-
-          <dt>DRC-05 — Unrouted Cables</dt>
-          <dd>Lists cables present in the Cable Schedule that have no assigned
-          tray or field route after routing.</dd>
-          <dt>DRC-10 - Conduit Fill (NEC Chapter 9)</dt>
-          <dd>Screens assigned conduit/raceway cables against selected Chapter
-          9 Table 1 fill limits when conduit type, trade size, and cable OD or
-          area data are available.</dd>
-        </dl>
-      </details>
-
-      <section class="drc-controls card" aria-labelledby="drc-controls-heading">
-        <h2 id="drc-controls-heading">Run Options</h2>
+      <details class="drc-controls card">
+        <summary id="drc-controls-heading">
+          <span>Run Options</span>
+          <small>Tray-fill limit and optional check exclusions</small>
+        </summary>
+        <div class="drc-controls-body" aria-labelledby="drc-controls-heading">
         <div class="control-row">
           <label for="drc-fill-limit">
             Tray fill limit (%)
@@ -169,12 +149,45 @@
             Clear Accepted Risks
           </button>
         </div>
-      </section>
+        </div>
+      </details>
 
-      <section class="drc-output" aria-live="polite" aria-atomic="false">
-        <div id="drc-summary"></div>
-        <div id="drc-results"></div>
-      </section>
+      <details class="method-panel">
+        <summary>Method &amp; Checks Performed</summary>
+        <p>The Design Rule Checker (DRC) validates your routing project against
+        NEC and IEEE requirements after routing has been completed in the
+        <a href="optimalRoute.html">Optimal Route</a> tool. Run the DRC after
+        every routing session to catch code violations early.</p>
+
+        <dl class="drc-rule-list">
+          <dt>DRC-01 — Tray Fill (NEC 392.22(A))</dt>
+          <dd>Flags any tray whose cable fill exceeds the configured limit
+          (default 40 %). Reports a warning when fill is within 10 % of the
+          limit.</dd>
+
+          <dt>DRC-02 — Voltage Segregation (NEC 392.6(H))</dt>
+          <dd>Detects tray segments containing cables from different cable
+          groups (e.g., HV and LV cables sharing the same tray without a
+          physical barrier).</dd>
+
+          <dt>DRC-03 — Ampacity Derating (NEC 310.15)</dt>
+          <dd>Applies bundling derating factors based on the number of
+          current-carrying conductors in each tray section and flags cables
+          whose design current exceeds the derated ampacity.</dd>
+
+          <dt>DRC-04 — Grounding Conductor (NEC 250.122)</dt>
+          <dd>Warns when a power cable record does not include a grounding
+          (EGC) conductor size.</dd>
+
+          <dt>DRC-05 — Unrouted Cables</dt>
+          <dd>Lists cables present in the Cable Schedule that have no assigned
+          tray or field route after routing.</dd>
+          <dt>DRC-10 - Conduit Fill (NEC Chapter 9)</dt>
+          <dd>Screens assigned conduit/raceway cables against selected Chapter
+          9 Table 1 fill limits when conduit type, trade size, and cable OD or
+          area data are available.</dd>
+        </dl>
+      </details>
 
     </main>
   </div>
