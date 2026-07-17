@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 82" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="square" stroke-linejoin="miter">
+  <!-- IEC-style uninterruptible power supply. Terminal leads reach both declared ports. -->
+  <line x1="36" y1="0" x2="36" y2="10"/>
+  <rect x="16" y="10" width="40" height="56"/>
+  <path d="M23 29c4-8 8-8 12 0s8 8 14 0"/>
+  <line x1="22" y1="43" x2="50" y2="43"/>
+  <line x1="27" y1="52" x2="35" y2="52"/>
+  <line x1="31" y1="48" x2="31" y2="56"/>
+  <line x1="41" y1="52" x2="49" y2="52"/>
+  <line x1="36" y1="66" x2="36" y2="82"/>
+</svg>

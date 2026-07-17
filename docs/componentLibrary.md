@@ -20,9 +20,13 @@ The one-line editor loads component definitions from `componentLibrary.json`. Ea
 - `subtype` – unique identifier used in saved diagrams.
 - `label` – text shown in the palette.
 - `icon` – path to an SVG displayed on the palette button.
-- `category` – group such as `panel`, `equipment`, or `load`.
-- `ports` – array of connection points relative to an 80×40 component.
+- `category` – optional explicit palette group. When omitted, the one-line loader derives it from `type` using the canonical category map.
+- `ports` – either a numeric count used by Library Manager or an array of finite `{x, y}` coordinates used by the one-line renderer.
 - `schema` – optional property descriptors with `name`, `label`, and `type`.
+
+`subtype`, `label`, and `icon` are required and `subtype` must be unique. The
+bundled library is validated against this same contract in automated tests. Use
+`iconIEC` when an IEC 60617 rendering differs from the default ANSI/IEEE symbol.
 
 ## Guided Editing Workflow (No JSON Required)
 

@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 68 68" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="square" stroke-linejoin="miter">
+  <!-- IEC asynchronous generator with its output terminal at the declared bottom port. -->
+  <circle cx="34" cy="32" r="22"/>
+  <text x="34" y="36" text-anchor="middle" font-size="11" font-family="sans-serif" fill="currentColor" stroke="none">AG</text>
+  <line x1="34" y1="54" x2="34" y2="68"/>
+</svg>

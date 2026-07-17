@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 72">
+  <g fill="none" stroke="#111827" stroke-width="2.5" stroke-linecap="square">
+    <path d="M18 0v18M54 0v18M36 54v18"/><rect x="15" y="18" width="6" height="6" fill="#fff"/><rect x="51" y="18" width="6" height="6" fill="#fff"/><rect x="33" y="48" width="6" height="6" fill="#fff"/><path d="M36 48L21 24M36 48l15-24" stroke-dasharray="4 3"/>
+  </g>
+  <text x="36" y="38" fill="#111827" font-family="Arial,sans-serif" font-size="9" font-weight="700" text-anchor="middle">QTS</text>
+</svg>

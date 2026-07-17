@@ -1,8 +1,8 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 40" fill="none" stroke="currentColor" stroke-width="2">
-  <!-- IEC 60617-7: switch / disconnector — line with open gap indicated by angled arm -->
-  <line x1="40" y1="0" x2="40" y2="14"/>
-  <circle cx="40" cy="14" r="2" fill="currentColor"/>
-  <line x1="40" y1="14" x2="55" y2="24"/>
-  <circle cx="55" cy="26" r="2" fill="currentColor"/>
-  <line x1="55" y1="26" x2="55" y2="40"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 56 72" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="square" stroke-linejoin="miter">
+  <!-- IEC disconnector with terminal leads at both declared ports. -->
+  <line x1="28" y1="0" x2="28" y2="21"/>
+  <circle cx="28" cy="23" r="2" fill="currentColor" stroke="none"/>
+  <line x1="28" y1="49" x2="42" y2="27"/>
+  <circle cx="28" cy="49" r="2" fill="currentColor" stroke="none"/>
+  <line x1="28" y1="51" x2="28" y2="72"/>
 </svg>

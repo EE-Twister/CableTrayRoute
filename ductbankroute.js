@@ -895,13 +895,25 @@ function applyDuctbankRouteData(routeData){
   const projectSelect=document.getElementById('projectDuctbankSelect');
   if(projectSelect&&Array.from(projectSelect.options).some(option=>option.value===tag)) projectSelect.value=tag;
   const encasement=document.getElementById('concreteEncasement');
-  if(encasement && ductbank.encasement!==undefined){
-    encasement.checked=String(ductbank.encasement).toLowerCase().includes('concrete') || ductbank.encasement===true;
+  const encasementValue=ductbank.encasement ?? ductbank.concrete_encasement;
+  if(encasement && encasementValue!==undefined){
+    encasement.checked=String(encasementValue).toLowerCase().includes('concrete') || encasementValue===true;
   }
-  const depth=document.getElementById('ductbankDepth');
-  if(depth && ductbank.coverDepth!==undefined) depth.value=ductbank.coverDepth;
-  const soil=document.getElementById('soilResistivity');
-  if(soil && ductbank.soilThermalResistivity!==undefined) soil.value=ductbank.soilThermalResistivity;
+  const projectFieldMap={
+    ductbankDepth:'coverDepth',
+    soilResistivity:'soilThermalResistivity',
+    hSpacing:'hSpacing',
+    vSpacing:'vSpacing',
+    topPad:'topPad',
+    bottomPad:'bottomPad',
+    leftPad:'leftPad',
+    rightPad:'rightPad',
+    perRow:'perRow'
+  };
+  Object.entries(projectFieldMap).forEach(([elementId,projectKey])=>{
+    const element=document.getElementById(elementId);
+    if(element && ductbank[projectKey]!==undefined) element.value=ductbank[projectKey];
+  });
 
   const conduitRows=Array.isArray(conduits) ? conduits : (Array.isArray(ductbank.conduits) ? ductbank.conduits : []);
   const cbody=document.querySelector('#conduitTable tbody');
@@ -1646,8 +1658,8 @@ function drawDuctbankSoilContext(svg, defs, options){
    y:originY,
    width:ductWidth*scale,
    height:ductHeight*scale,
-   fill:'#f8fafc',
-   'fill-opacity':0.76,
+   fill:document.getElementById('concreteEncasement')?.checked ? '#d9dde3' : '#f8fafc',
+   'fill-opacity':document.getElementById('concreteEncasement')?.checked ? 0.92 : 0.76,
    class:'ductbank-envelope-fill'
  });
 }
@@ -1849,6 +1861,18 @@ svg.setAttribute('height',height);
  rect.setAttribute('stroke','#64748b');
  rect.setAttribute('stroke-dasharray','4 2');
  svg.appendChild(rect);
+
+ if(document.getElementById('concreteEncasement')?.checked){
+   const minimumCover=Math.min(topPad,bottomPad,leftPad,rightPad);
+   const coverLabel=document.createElementNS('http://www.w3.org/2000/svg','text');
+   coverLabel.setAttribute('x',originX+8);
+   coverLabel.setAttribute('y',originY+16);
+   coverLabel.setAttribute('font-size','10');
+   coverLabel.setAttribute('font-weight','700');
+   coverLabel.setAttribute('fill','#334155');
+   coverLabel.textContent=`CONCRETE ENCASEMENT - ${minimumCover.toFixed(2)}\" MIN COVER`;
+   svg.appendChild(coverLabel);
+ }
 
  // overall dimension lines
  const widthY=originY+ductHeight*scale+15;

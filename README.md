@@ -7,6 +7,8 @@ For a step-by-step overview of the workflow, see the [Project Workflow](docs/pro
 
 The Sample Gallery includes workflow and specialist projects with populated equipment, loads, one-lines, raceways, routed cable results, and study seeds. Opening a guided checklist first activates its sample project, and specialist pages such as Ductbank Route initialize directly from the shared schedules instead of requiring duplicate page-specific entry. The Underground Ductbank sample uses the same equipment tags, feeder terminations, demand currents, and parent ductbank records across Equipment List, Load List, One-Line, Cable List, Raceway Schedule, and thermal analysis. Automated adequacy checks tie every sample to the pages in its guided checklist so a listed demonstration cannot ship with an empty supporting view.
 
+The Project Workflow Core sample also drives a reproducible 20-sheet engineering demonstration package with expanded equipment and load lists, cable and raceway schedules, multiple ductbank and tray cross-sections, a multi-branch one-line, short-circuit and arc-flash results, arc-flash labels, and a TCC chart. Run `npm run sample:engineering-report` to create the single PDF described in [Engineering Sample Report Package](docs/engineering-sample-report.md).
+
 ## Secure Authentication & API Hardening
 
 The app supports two authentication modes:

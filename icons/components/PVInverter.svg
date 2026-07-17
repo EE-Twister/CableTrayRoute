@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 82">
+  <g fill="none" stroke="#111827" stroke-width="3" stroke-linejoin="round">
+    <path d="M36 0v10M36 68v14"/><rect x="14" y="10" width="44" height="58" rx="4"/><path d="M18 56L54 22M21 28h12M21 34h12M39 49c4-8 8-8 12 0"/>
+  </g>
+  <text x="36" y="64" fill="#111827" font-family="Arial,sans-serif" font-size="8" font-weight="700" text-anchor="middle">PV INV</text>
+</svg>

@@ -46,6 +46,8 @@ import { normalizeVoltageToVolts, toBaseKV } from './utils/voltage.js';
 import { calculateTransformerImpedance } from './utils/transformerImpedance.js';
 import { computeImpedanceFromPerKm } from './utils/cableImpedance.js';
 import { normalizeCablePhases, formatCablePhases } from './utils/cablePhases.js';
+import { compatibleProtectiveDevices, componentProtectionKind } from './src/one-line/protectiveDeviceCompatibility.mjs';
+import { normalizeComponentElectricalProperties } from './src/one-line/componentElectricalSchema.mjs';
 import {
   resolveTransformerKva,
   resolveTransformerPercentZ,
@@ -55,7 +57,7 @@ import {
   syncTransformerDefaults
 } from './utils/transformerProperties.js';
 import './site.js';
-import { readAppSetting, writeAppSetting } from './projectStorage.js';
+import { getProjectState, readAppSetting, writeAppSetting } from './projectStorage.js';
 
 const ONE_LINE_READINESS_COPY = getContractReadinessCopy('oneline.html');
 
@@ -576,12 +578,15 @@ if (!Object.prototype.hasOwnProperty.call(datablockDensityLabels, datablockDensi
 
 const dataStateOverlayLabels = Object.freeze({
   none: 'None',
-  review: 'Data State',
+  review: 'Data Quality',
   validation: 'Validation',
-  studies: 'Studies',
-  arcFlash: 'Arc Flash'
+  loadFlow: 'Load Flow',
+  faultDuty: 'Fault Duty',
+  arcFlash: 'Arc Flash',
+  operating: 'Operating State'
 });
 let dataStateOverlayMode = getOneLineViewSetting(dataStateOverlayStorageKey, 'none');
+if (dataStateOverlayMode === 'studies') dataStateOverlayMode = 'loadFlow';
 if (!Object.prototype.hasOwnProperty.call(dataStateOverlayLabels, dataStateOverlayMode)) {
   dataStateOverlayMode = 'none';
 }
@@ -704,6 +709,8 @@ function categoryForType(t) {
     case 'generator':
     case 'pv_inverter':
     case 'pv_array':
+    case 'bess_inverter':
+    case 'battery':
       return 'sources';
     case 'sheet_link':
       return 'links';
@@ -852,7 +859,12 @@ function isSourceComponent(comp) {
   if (type === 'transformer') return false;
   const category = resolveComponentCategory(comp);
   if (category === 'sources') return true;
-  return type === 'utility_source' || type === 'generator' || type === 'pv_inverter';
+  return type === 'utility_source'
+    || type === 'generator'
+    || type === 'pv_inverter'
+    || type === 'pv_array'
+    || type === 'bess_inverter'
+    || type === 'battery';
 }
 
 function defaultPorts(type, subtype) {
@@ -879,6 +891,7 @@ function getIndustrySymbolProfile(comp, meta = resolveComponentMeta(comp)) {
   if (type === 'busway') return 'busway';
   if (type === 'generator') return 'generator';
   if (type === 'transformer') return subtype === 'three_winding' ? 'transformer3' : 'transformer';
+  if (subtype === 'ats' || subtype === 'double_throw') return 'transferSwitch';
   if (type === 'ups' || signature.includes('ups')) return 'ups';
   if (type === 'panel' || signature.includes('panel')) return 'panel';
   if (['vfd', 'soft_starter', 'motor_starter', 'combination_starter'].includes(type) || signature.includes('vfd') || signature.includes('starter')) return 'controller';
@@ -2462,6 +2475,11 @@ function resolveIconSource(iconPath, fallbackSymbol) {
   return placeholderIcon;
 }
 
+function resolveAlternateIconSource(iconPath) {
+  if (typeof iconPath !== 'string' || !iconPath.trim()) return null;
+  return resolveIconSource(iconPath.trim(), null);
+}
+
 
 function ensureCapacitorReactorPropertyMetadata() {
   const targets = new Set(['CapacitorBank', 'shunt_capacitor_bank', 'reactor']);
@@ -2548,6 +2566,7 @@ async function loadComponentLibrary() {
       ? requestedCategory
       : categoryForType(resolvedType);
     const icon = resolveIconSource(definition.icon, definition.symbol);
+    const iconIEC = resolveAlternateIconSource(definition.iconIEC);
     const defaultRotation = normalizeRotation(
       definition.defaultRotation ?? defaultRotationForType(resolvedType, category)
     );
@@ -2595,6 +2614,7 @@ async function loadComponentLibrary() {
     });
     const meta = {
       icon,
+      ...(iconIEC ? { iconIEC } : {}),
       label: definition.label || key,
       category,
       ports,
@@ -2827,7 +2847,7 @@ function buildPalette() {
     iconWrapper.className = 'palette-icon';
     iconWrapper.dataset.rotation = String(rotation);
     const iconImg = document.createElement('img');
-    iconImg.src = meta.icon;
+    iconImg.src = symbolStandard === 'IEC' && meta.iconIEC ? meta.iconIEC : meta.icon;
     iconImg.alt = '';
     iconImg.setAttribute('aria-hidden', 'true');
     iconWrapper.appendChild(iconImg);
@@ -3349,6 +3369,7 @@ let showEnergizedState = false;    // Gap #36
 let showProtectionZones = false;   // Gap #50
 let activeZoneId = null;           // Gap #50 – zone currently in component-assignment mode
 let showHazAreaOverlay = false;    // Gap #94 – hazardous area classification overlay
+let operatingOverlayEnergizedSet = new Set();
 let orthogonalRouting = false;     // Gap #47
 let symbolStandard = 'ANSI';       // Gap #37 – 'ANSI' or 'IEC'
 let showTitleBlock = false;        // Gap #38
@@ -4568,24 +4589,95 @@ function getComponentReviewState(comp) {
   return { key: 'complete', label: 'Complete', color: '#16a34a' };
 }
 
-function getComponentStudyState(comp) {
-  if (!comp) return { key: 'none', label: 'No study result', color: '#94a3b8' };
-  const voltageMagnitudes = getFiniteVoltageMagnitudes(comp.voltage_mag);
-  if (voltageMagnitudes.length) {
-    const maxDev = voltageMagnitudes.reduce((max, mag) => Math.max(max, Math.abs(mag - 1) * 100), 0);
-    if (maxDev > 10) return { key: 'fail', label: 'Voltage deviation > 10%', color: '#dc2626' };
-    if (maxDev > 5) return { key: 'warn', label: 'Voltage deviation 5-10%', color: '#f59e0b' };
+const oneLineStudyMetaKey = '_oneLineMeta';
+
+function studyApprovalStatus(studyKey) {
+  const project = getProjectState() || {};
+  const approval = project.studyApprovals?.[studyKey]
+    || project.approvals?.[studyKey]
+    || project.settings?.studyApprovals?.[studyKey]
+    || null;
+  return String(approval?.status || 'pending').trim().toLowerCase();
+}
+
+function getStudyProvenance(studyKey) {
+  const result = cachedStudyResults?.[studyKey];
+  if (!result) return { status: 'none', scenario: getCurrentScenario() || 'default', approval: 'pending', runAt: null };
+  const meta = cachedStudyResults?.[oneLineStudyMetaKey]?.[studyKey] || null;
+  const currentScenario = getCurrentScenario() || 'default';
+  const approval = studyApprovalStatus(studyKey);
+  if (!meta) return { status: 'unknown', scenario: currentScenario, approval, runAt: null };
+  const scenarioMatches = !meta.scenario || meta.scenario === currentScenario;
+  const revisionMatches = !meta.oneLineRevision || meta.oneLineRevision === getOneLineSheetsRevision(getOneLine());
+  return {
+    status: scenarioMatches && revisionMatches ? 'current' : 'stale',
+    scenario: meta.scenario || currentScenario,
+    approval,
+    runAt: meta.runAt || null
+  };
+}
+
+function withStudyProvenance(state, studyKey) {
+  const provenance = getStudyProvenance(studyKey);
+  if (provenance.status === 'stale') {
+    return { key: 'stale', label: `${state.label} · stale result`, color: '#7c3aed', provenance };
   }
-  const sc = cachedStudyResults?.shortCircuit?.[comp.id] || comp.shortCircuit;
-  if (sc?.warnings?.length) return { key: 'warn', label: 'Short-circuit warnings', color: '#f59e0b' };
-  const af = cachedStudyResults?.arcFlash?.[comp.id] || comp.arcFlash;
-  if (af && Number.isFinite(Number(af.incidentEnergy))) {
-    const incidentEnergy = Number(af.incidentEnergy);
-    if (incidentEnergy >= 40) return { key: 'fail', label: 'Arc flash IE ≥ 40; review', color: '#dc2626' };
-    if (incidentEnergy >= 8) return { key: 'warn', label: 'Arc flash warning', color: '#f59e0b' };
+  if (profile === 'transferSwitch') {
+    return {
+      width: 72,
+      height: 72,
+      ports: [
+        { x: 18, y: 0 },
+        { x: 54, y: 0 },
+        { x: 36, y: 72 }
+      ]
+    };
   }
-  if (voltageMagnitudes.length || sc || af) return { key: 'pass', label: 'Study result OK', color: '#16a34a' };
-  return { key: 'none', label: 'No study result', color: '#94a3b8' };
+  if (provenance.status === 'unknown') {
+    return { key: 'unknown', label: `${state.label} · freshness unknown`, color: '#64748b', provenance };
+  }
+  return { ...state, provenance };
+}
+
+function getComponentLoadFlowState(comp) {
+  const voltageMagnitudes = getFiniteVoltageMagnitudes(comp?.voltage_mag);
+  if (!voltageMagnitudes.length) return { key: 'none', label: 'No load-flow result', color: '#94a3b8' };
+  const maxDev = voltageMagnitudes.reduce((max, mag) => Math.max(max, Math.abs(mag - 1) * 100), 0);
+  if (maxDev > 10) return withStudyProvenance({ key: 'fail', label: `Voltage deviation ${maxDev.toFixed(1)}%`, color: '#dc2626' }, 'loadFlow');
+  if (maxDev > 5) return withStudyProvenance({ key: 'warn', label: `Voltage deviation ${maxDev.toFixed(1)}%`, color: '#f59e0b' }, 'loadFlow');
+  return withStudyProvenance({ key: 'pass', label: `Voltage deviation ${maxDev.toFixed(1)}%`, color: '#16a34a' }, 'loadFlow');
+}
+
+function componentInterruptingRatingKA(comp) {
+  const candidates = [
+    comp?.interrupting_rating_ka,
+    comp?.props?.interrupting_rating_ka,
+    comp?.interrupt_rating_ka,
+    comp?.props?.interrupt_rating_ka,
+    comp?.main_interrupting_ka,
+    comp?.props?.main_interrupting_ka,
+    comp?.sccr_ka,
+    comp?.props?.sccr_ka
+  ];
+  const value = candidates.map(Number).find(Number.isFinite);
+  return Number.isFinite(value) && value > 0 ? value : null;
+}
+
+function getComponentFaultDutyState(comp) {
+  const sc = cachedStudyResults?.shortCircuit?.[comp?.id] || comp?.shortCircuit;
+  const faultKA = Number(sc?.threePhaseKA);
+  if (!Number.isFinite(faultKA)) return { key: 'none', label: 'No fault-duty result', color: '#94a3b8' };
+  if (Array.isArray(sc?.warnings) && sc.warnings.length) {
+    return withStudyProvenance({ key: 'warn', label: `${sc.warnings.length} short-circuit warning${sc.warnings.length === 1 ? '' : 's'}`, color: '#f59e0b' }, 'shortCircuit');
+  }
+  const ratingKA = componentInterruptingRatingKA(comp);
+  if (ratingKA !== null && faultKA > ratingKA) {
+    return withStudyProvenance({ key: 'fail', label: `${faultKA.toFixed(2)} kA exceeds ${ratingKA.toFixed(2)} kA rating`, color: '#dc2626' }, 'shortCircuit');
+  }
+  const label = ratingKA === null
+    ? `${faultKA.toFixed(2)} kA available; equipment rating not entered`
+    : `${faultKA.toFixed(2)} kA within ${ratingKA.toFixed(2)} kA rating`;
+  return withStudyProvenance({ key: ratingKA === null ? 'warn' : 'pass', label, color: ratingKA === null ? '#f59e0b' : '#16a34a' }, 'shortCircuit');
 }
 
 function getComponentArcFlashState(comp) {
@@ -4594,10 +4686,17 @@ function getComponentArcFlashState(comp) {
     return { key: 'none', label: 'No arc flash result', color: '#94a3b8' };
   }
   const incidentEnergy = Number(af.incidentEnergy);
-  if (incidentEnergy >= 40) return { key: 'very-high', label: 'Very high incident energy', color: '#dc2626' };
-  if (incidentEnergy >= 8) return { key: 'high', label: 'High incident energy', color: '#f97316' };
-  if (incidentEnergy >= 1.2) return { key: 'warning', label: 'Arc flash warning', color: '#f59e0b' };
-  return { key: 'low', label: 'Low incident energy', color: '#16a34a' };
+  if (incidentEnergy >= 40) return withStudyProvenance({ key: 'very-high', label: `Very high incident energy (${incidentEnergy.toFixed(2)} cal/cm²)`, color: '#dc2626' }, 'arcFlash');
+  if (incidentEnergy >= 8) return withStudyProvenance({ key: 'high', label: `High incident energy (${incidentEnergy.toFixed(2)} cal/cm²)`, color: '#f97316' }, 'arcFlash');
+  if (incidentEnergy >= 1.2) return withStudyProvenance({ key: 'warning', label: `Arc flash warning (${incidentEnergy.toFixed(2)} cal/cm²)`, color: '#f59e0b' }, 'arcFlash');
+  return withStudyProvenance({ key: 'low', label: `Below 1.2 cal/cm² (${incidentEnergy.toFixed(2)} cal/cm²)`, color: '#16a34a' }, 'arcFlash');
+}
+
+function getComponentOperatingOverlayState(comp) {
+  const status = getComponentOperatingStatus(comp);
+  if (status === 'open') return { key: 'open', label: `Open in ${operatingStateLabels[activeOperatingState]}`, color: '#f59e0b' };
+  if (operatingOverlayEnergizedSet.has(comp?.id)) return { key: 'energized', label: `Energized in ${operatingStateLabels[activeOperatingState]}`, color: '#16a34a' };
+  return { key: 'deenergized', label: `De-energized in ${operatingStateLabels[activeOperatingState]}`, color: '#64748b' };
 }
 
 function getComponentValidationState(comp) {
@@ -4609,8 +4708,10 @@ function getComponentValidationState(comp) {
 function getComponentColorInfo(comp) {
   if (dataStateOverlayMode === 'review') return getComponentReviewState(comp);
   if (dataStateOverlayMode === 'validation') return getComponentValidationState(comp);
-  if (dataStateOverlayMode === 'studies') return getComponentStudyState(comp);
+  if (dataStateOverlayMode === 'loadFlow') return getComponentLoadFlowState(comp);
+  if (dataStateOverlayMode === 'faultDuty') return getComponentFaultDutyState(comp);
   if (dataStateOverlayMode === 'arcFlash') return getComponentArcFlashState(comp);
+  if (dataStateOverlayMode === 'operating') return getComponentOperatingOverlayState(comp);
   return null;
 }
 
@@ -4741,6 +4842,7 @@ function refineOneLineCommandSurface() {
   appendIfPresent(viewMenu.panel, normalizeMenuLabel(document.getElementById('minimap-toggle')?.closest('label')));
   appendIfPresent(viewMenu.panel, normalizeMenuLabel(document.getElementById('toggle-energized')?.closest('label')));
   appendIfPresent(viewMenu.panel, normalizeMenuLabel(document.getElementById('toggle-protection-zones')?.closest('label')));
+  appendIfPresent(viewMenu.panel, normalizeMenuLabel(document.getElementById('toggle-haz-area')?.closest('label')));
   appendIfPresent(viewMenu.panel, document.getElementById('bg-image-input'));
   appendIfPresent(viewMenu.panel, normalizeCommandButton(document.getElementById('bg-image-btn'), 'Background Image'));
 
@@ -4847,12 +4949,24 @@ function getDataStateLegendItems() {
       { key: 'fail', label: 'Validation issue', color: '#dc2626' }
     ];
   }
-  if (dataStateOverlayMode === 'studies') {
+  if (dataStateOverlayMode === 'loadFlow') {
     return [
-      { key: 'pass', label: 'Study result OK', color: '#16a34a' },
-      { key: 'warn', label: 'Study warning', color: '#f59e0b' },
-      { key: 'fail', label: 'Study fail', color: '#dc2626' },
-      { key: 'none', label: 'No study result', color: '#94a3b8' }
+      { key: 'pass', label: 'Voltage deviation ≤ 5%', color: '#16a34a' },
+      { key: 'warn', label: 'Voltage deviation 5–10%', color: '#f59e0b' },
+      { key: 'fail', label: 'Voltage deviation > 10%', color: '#dc2626' },
+      { key: 'none', label: 'No load-flow result', color: '#94a3b8' },
+      { key: 'stale', label: 'Stale result', color: '#7c3aed' },
+      { key: 'unknown', label: 'Freshness unknown', color: '#64748b' }
+    ];
+  }
+  if (dataStateOverlayMode === 'faultDuty') {
+    return [
+      { key: 'pass', label: 'Available fault within rating', color: '#16a34a' },
+      { key: 'warn', label: 'Rating missing or study warning', color: '#f59e0b' },
+      { key: 'fail', label: 'Available fault exceeds rating', color: '#dc2626' },
+      { key: 'none', label: 'No fault-duty result', color: '#94a3b8' },
+      { key: 'stale', label: 'Stale result', color: '#7c3aed' },
+      { key: 'unknown', label: 'Freshness unknown', color: '#64748b' }
     ];
   }
   if (dataStateOverlayMode === 'arcFlash') {
@@ -4860,11 +4974,37 @@ function getDataStateLegendItems() {
       { key: 'low', label: 'Low incident energy', color: '#16a34a' },
       { key: 'warning', label: 'Warning', color: '#f59e0b' },
       { key: 'high', label: 'High', color: '#f97316' },
-      { key: 'danger', label: 'Danger', color: '#dc2626' },
-      { key: 'none', label: 'No result', color: '#94a3b8' }
+      { key: 'very-high', label: 'Very high (≥ 40 cal/cm²)', color: '#dc2626' },
+      { key: 'none', label: 'No result', color: '#94a3b8' },
+      { key: 'stale', label: 'Stale result', color: '#7c3aed' },
+      { key: 'unknown', label: 'Freshness unknown', color: '#64748b' }
+    ];
+  }
+  if (dataStateOverlayMode === 'operating') {
+    return [
+      { key: 'energized', label: 'Energized', color: '#16a34a' },
+      { key: 'deenergized', label: 'De-energized', color: '#64748b' },
+      { key: 'open', label: 'Open switching device', color: '#f59e0b' }
     ];
   }
   return [];
+}
+
+function overlayStudyKey() {
+  if (dataStateOverlayMode === 'loadFlow') return 'loadFlow';
+  if (dataStateOverlayMode === 'faultDuty') return 'shortCircuit';
+  if (dataStateOverlayMode === 'arcFlash') return 'arcFlash';
+  return null;
+}
+
+function overlayProvenanceLabel() {
+  const studyKey = overlayStudyKey();
+  if (!studyKey) return '';
+  const provenance = getStudyProvenance(studyKey);
+  const status = provenance.status === 'none' ? 'no result' : provenance.status;
+  const date = provenance.runAt ? new Date(provenance.runAt) : null;
+  const dateText = date && !Number.isNaN(date.getTime()) ? date.toLocaleString() : 'run date unknown';
+  return `Scenario ${provenance.scenario} · ${status} · ${provenance.approval} · ${dateText}`;
 }
 
 function highlightFoundComponent(componentId) {
@@ -4927,6 +5067,19 @@ function assertOneLineSheetsUnchanged(expectedRevision, studyName) {
     throw new Error(`${studyName} results were discarded because the one-line diagram changed while the study was running. Please rerun the study on the current diagram.`);
   }
   return currentOneLineData;
+}
+
+function recordOneLineStudyProvenance(studies, studyKey) {
+  if (!studies || typeof studies !== 'object' || !studyKey) return;
+  const meta = studies[oneLineStudyMetaKey] && typeof studies[oneLineStudyMetaKey] === 'object'
+    ? studies[oneLineStudyMetaKey]
+    : {};
+  meta[studyKey] = {
+    scenario: getCurrentScenario() || 'default',
+    runAt: new Date().toISOString(),
+    oneLineRevision: getOneLineSheetsRevision(getOneLine())
+  };
+  studies[oneLineStudyMetaKey] = meta;
 }
 
 if (runLFBtn) runLFBtn.addEventListener('click', () => {
@@ -5032,6 +5185,7 @@ async function runLoadFlowFromButton() {
   setOneLine({ activeSheet: currentOneLineData.activeSheet, sheets });
   const studies = getStudies();
   studies.loadFlow = res;
+  recordOneLineStudyProvenance(studies, 'loadFlow');
   setStudies(studies);
   markScheduleReconcilePending();
   renderStudyResults();
@@ -5069,6 +5223,7 @@ async function runShortCircuitFromButton() {
   setOneLine({ activeSheet: currentOneLineData.activeSheet, sheets });
   const studies = getStudies();
   studies.shortCircuit = res;
+  recordOneLineStudyProvenance(studies, 'shortCircuit');
   setStudies(studies);
   renderStudyResults();
   render();
@@ -5090,6 +5245,8 @@ if (runAFBtn) runAFBtn.addEventListener('click', async () => {
   const studies = getStudies();
   studies.shortCircuit = sc;
   studies.arcFlash = af;
+  recordOneLineStudyProvenance(studies, 'shortCircuit');
+  recordOneLineStudyProvenance(studies, 'arcFlash');
   setStudies(studies);
   generateArcFlashReport(af);
   if (printAFLabelsBtn) printAFLabelsBtn.disabled = false;
@@ -6503,6 +6660,13 @@ function updateLegend(ranges) {
     ];
     items.forEach(appendLegendItem);
   }
+  if (showHazAreaOverlay) {
+    [
+      { color: '#dc3232', label: 'Hazardous area: Zone 0/20 or failed compatibility' },
+      { color: '#e68c28', label: 'Hazardous area: Zone 1/21' },
+      { color: '#dcc832', label: 'Hazardous area: Zone 2/22' }
+    ].forEach(appendLegendItem);
+  }
   const dataStateItems = getDataStateLegendItems();
   if (dataStateItems.length) {
     appendLegendItem({
@@ -6510,8 +6674,10 @@ function updateLegend(ranges) {
       label: dataStateOverlayLabels[dataStateOverlayMode] || 'Color overlay'
     });
     dataStateItems.forEach(appendLegendItem);
+    const provenanceLabel = overlayProvenanceLabel();
+    if (provenanceLabel) appendLegendItem({ color: '#475569', label: provenanceLabel });
   }
-  legend.style.display = ranges.size || showOverlays || dataStateItems.length ? 'block' : 'none';
+  legend.style.display = ranges.size || showOverlays || showHazAreaOverlay || dataStateItems.length ? 'block' : 'none';
   if (!legendUserMoved && legend.style.display === 'block') {
     const host = legend.offsetParent instanceof HTMLElement ? legend.offsetParent : legend.parentElement;
     const parentWidth = host instanceof HTMLElement ? host.clientWidth : (legend.parentElement?.clientWidth || window.innerWidth);
@@ -9738,44 +9904,95 @@ function toggleLock(comp) {
 // Starts from source nodes; traverses through non-open breakers/switches.
 // Returns a Set<string> of energized component IDs.
 function computeEnergizedSet(comps, conns) {
-  const byId = new Map((comps || []).map(c => [c.id, c]));
+  const allComponents = Array.isArray(comps) ? comps.filter(c => c?.id) : [];
+  const byId = new Map(allComponents.map(c => [c.id, c]));
   const energized = new Set();
-  const queue = [];
-  // Seed from sources (utility, generator, inverter)
-  (comps || []).forEach(c => {
-    if (isSourceComponent(c) || c.type === 'sources' || c.subtype === 'bus_Utility' || c.subtype === 'bus_Generator') {
-      queue.push(c.id);
+  const endpointAdjacency = new Map();
+  const endpointKey = (id, port) => `${id}\u0000${Math.max(0, Number(port) || 0)}`;
+  const connectEndpoints = (a, b) => {
+    if (!endpointAdjacency.has(a)) endpointAdjacency.set(a, new Set());
+    if (!endpointAdjacency.has(b)) endpointAdjacency.set(b, new Set());
+    endpointAdjacency.get(a).add(b);
+    endpointAdjacency.get(b).add(a);
+  };
+  const portCount = comp => {
+    const ports = Array.isArray(comp?.ports) && comp.ports.length
+      ? comp.ports
+      : resolveComponentMeta(comp)?.ports;
+    return Math.max(1, Array.isArray(ports) ? ports.length : 1);
+  };
+  const sourceAvailable = comp => {
+    if (!comp || isComponentOpenForOperatingState(comp)) return false;
+    const values = [
+      comp.available,
+      comp.props?.available,
+      comp.enabled,
+      comp.props?.enabled
+    ];
+    if (values.some(value => value === false || value === 0 || value === 'false')) return false;
+    const status = String(
+      comp.service_status
+      || comp.props?.service_status
+      || comp.commissioning_state
+      || comp.props?.commissioning_state
+      || ''
+    ).trim().toLowerCase();
+    return !['off', 'offline', 'out_of_service', 'decommissioned', 'disabled', 'unavailable'].includes(status);
+  };
+
+  allComponents.forEach(comp => {
+    const count = portCount(comp);
+    if (isComponentOpenForOperatingState(comp)) return;
+    const subtype = String(comp.subtype || '').toLowerCase();
+    if ((subtype === 'ats' || subtype.endsWith('_ats')) && count >= 3) {
+      const selectedSource = String(comp.selected_source || comp.props?.selected_source || comp.source_priority || comp.props?.source_priority || 'normal').toLowerCase();
+      const selectedPort = selectedSource === 'emergency' || selectedSource === 'alternate' ? 1 : 0;
+      const availableKey = selectedPort === 1 ? 'emergency_source_available' : 'normal_source_available';
+      const selectedAvailable = comp[availableKey] ?? comp.props?.[availableKey] ?? true;
+      if (selectedAvailable !== false) connectEndpoints(endpointKey(comp.id, selectedPort), endpointKey(comp.id, 2));
+      return;
     }
+    for (let a = 0; a < count; a += 1) {
+      for (let b = a + 1; b < count; b += 1) connectEndpoints(endpointKey(comp.id, a), endpointKey(comp.id, b));
+    }
+  });
+
+  allComponents.forEach(source => {
+    (source.connections || []).forEach(connection => {
+      if (!connection?.target || !byId.has(connection.target)) return;
+      connectEndpoints(
+        endpointKey(source.id, connection.sourcePort ?? connection.fromPort ?? 0),
+        endpointKey(connection.target, connection.targetPort ?? connection.toPort ?? 0)
+      );
+    });
+  });
+  (Array.isArray(conns) ? conns : []).forEach(connection => {
+    const from = connection?.from || connection?.source;
+    const to = connection?.to || connection?.target;
+    if (!byId.has(from) || !byId.has(to)) return;
+    connectEndpoints(
+      endpointKey(from, connection.sourcePort ?? connection.fromPort ?? 0),
+      endpointKey(to, connection.targetPort ?? connection.toPort ?? 0)
+    );
+  });
+
+  const queue = [];
+  allComponents.forEach(comp => {
+    if (!(isSourceComponent(comp) || comp.type === 'sources' || comp.subtype === 'bus_Utility' || comp.subtype === 'bus_Generator')) return;
+    if (!sourceAvailable(comp)) return;
+    for (let port = 0; port < portCount(comp); port += 1) queue.push(endpointKey(comp.id, port));
   });
   const visited = new Set();
   while (queue.length) {
-    const id = queue.shift();
-    if (visited.has(id)) continue;
-    visited.add(id);
-    const comp = byId.get(id);
-    if (!comp) continue;
-    energized.add(id);
-    // Don't traverse through open breakers/switches
-    if (isComponentOpenForOperatingState(comp)) continue;
-    // Follow outbound component-level connections
-    (comp.connections || []).forEach(conn => {
-      if (conn.target && !visited.has(conn.target)) queue.push(conn.target);
+    const endpoint = queue.shift();
+    if (visited.has(endpoint)) continue;
+    visited.add(endpoint);
+    const separator = endpoint.indexOf('\u0000');
+    const id = separator >= 0 ? endpoint.slice(0, separator) : endpoint;
+    if (byId.has(id)) energized.add(id);
+    (endpointAdjacency.get(endpoint) || []).forEach(next => {
+      if (!visited.has(next)) queue.push(next);
     });
-    // Follow inbound connections (other comps targeting this one)
-    (comps || []).forEach(c => {
-      if (!visited.has(c.id)) {
-        (c.connections || []).forEach(conn => {
-          if (conn.target === id) queue.push(c.id);
-        });
-      }
-    });
-    // Sheet-level connections
-    if (Array.isArray(conns)) {
-      conns.forEach(conn => {
-        if (conn.from === id && !visited.has(conn.to)) queue.push(conn.to);
-        if (conn.to === id && !visited.has(conn.from)) queue.push(conn.from);
-      });
-    }
   }
   return energized;
 }
@@ -10118,6 +10335,9 @@ function render() {
   propagateSourceVoltagesToBuses(components);
   applyDrawingModeClass();
   const engineeringPrint = isEngineeringPrintMode();
+  operatingOverlayEnergizedSet = dataStateOverlayMode === 'operating' || showEnergizedState
+    ? computeEnergizedSet(components, connections)
+    : new Set();
   const svg = document.getElementById('diagram');
   svg.querySelectorAll('g.component, .connection, .conn-label, .port, .bus-handle, .annotation-handle, .issue-badge, .component-label, .component-attribute, .component-datablock, .operating-state-badge, .data-state-badge, .connection-junction, .selection-marquee, .transformer-port-label').forEach(el => el.remove());
 
@@ -10613,14 +10833,24 @@ function render() {
       let lblText = cableInfo?.tag || cableInfo?.cable_type || '';
       if (!engineeringPrint && showOverlays) {
         const overlays = [];
-        if (conn.faultKA != null) {
+        if (dataStateOverlayMode === 'faultDuty' && conn.faultKA != null) {
           const faultText = formatOverlayMetric(conn.faultKA, 'kA', 2);
           if (faultText) overlays.push(faultText);
-        } else {
+        } else if (dataStateOverlayMode === 'loadFlow') {
           const loadKw = formatOverlayMetric(conn.loading_kW, 'kW', 2);
           if (loadKw) overlays.push(loadKw);
           const loadAmps = formatOverlayMetric(conn.loading_amps, 'A', 1);
           if (loadAmps) overlays.push(loadAmps);
+        }
+        const provenanceKey = dataStateOverlayMode === 'faultDuty'
+          ? 'shortCircuit'
+          : dataStateOverlayMode === 'loadFlow'
+            ? 'loadFlow'
+            : null;
+        if (overlays.length && provenanceKey) {
+          const provenance = getStudyProvenance(provenanceKey);
+          if (provenance.status === 'stale') overlays.push('[stale]');
+          if (provenance.status === 'unknown') overlays.push('[freshness unknown]');
         }
         if (overlays.length) {
           lblText += ` ${overlays.join(' / ')}`;
@@ -10715,7 +10945,7 @@ function render() {
     const cx = c.x + w / 2;
     const cy = c.y + h / 2;
     const voltageMagnitudes = getFiniteVoltageMagnitudes(c.voltage_mag);
-    if (!engineeringPrint && showOverlays && voltageMagnitudes.length) {
+    if (!engineeringPrint && showOverlays && dataStateOverlayMode === 'loadFlow' && voltageMagnitudes.length) {
       let dev = 0;
       for (const mag of voltageMagnitudes) {
         const magDev = Math.abs(mag - 1) * 100;
@@ -10734,14 +10964,16 @@ function render() {
       g.appendChild(overlay);
     }
     const voltageMagnitudeEntries = getVoltageMagnitudeEntries(c.voltage_mag);
-    if (!engineeringPrint && showOverlays && (voltageMagnitudeEntries.length || c.shortCircuit?.threePhaseKA !== undefined)) {
+    const showLoadFlowValues = dataStateOverlayMode === 'loadFlow' && voltageMagnitudeEntries.length;
+    const showFaultDutyValues = dataStateOverlayMode === 'faultDuty' && c.shortCircuit?.threePhaseKA !== undefined;
+    if (!engineeringPrint && showOverlays && (showLoadFlowValues || showFaultDutyValues)) {
       const txt = document.createElementNS(svgNS, 'text');
       txt.setAttribute('x', cx);
       txt.setAttribute('y', cy - (h / 2) - 4);
       txt.setAttribute('text-anchor', 'middle');
       txt.setAttribute('class', 'overlay-label');
       const parts = [];
-      if (voltageMagnitudeEntries.length) {
+      if (showLoadFlowValues) {
         if (typeof c.voltage_mag === 'object') {
           parts.push(voltageMagnitudeEntries
             .map(([ph, v]) => `${ph}:${v.toFixed(3)} pu`)
@@ -10750,7 +10982,7 @@ function render() {
           parts.push(`${voltageMagnitudeEntries[0][1].toFixed(3)} pu`);
         }
       }
-      if (c.shortCircuit?.threePhaseKA !== undefined) {
+      if (showFaultDutyValues) {
         parts.push(`${Number(c.shortCircuit.threePhaseKA).toFixed(2)} kA`);
       }
       txt.textContent = parts.join(' / ');
@@ -11226,7 +11458,9 @@ function renderEnergizedState(svg) {
   // Remove previous de-energized overlays
   svg.querySelectorAll('.de-energized-overlay').forEach(el => el.remove());
   if (!showEnergizedState) return;
-  const energized = computeEnergizedSet(components, connections);
+  const energized = operatingOverlayEnergizedSet.size
+    ? operatingOverlayEnergizedSet
+    : computeEnergizedSet(components, connections);
   components.forEach(c => {
     const g = svg.querySelector(`g.component[data-id="${escapeHtml(c.id)}"]`);
     if (!g) return;
@@ -11321,7 +11555,7 @@ function renderProtectionZones(svg) {
 function renderHazAreaOverlay(svg) {
   svg.querySelectorAll('.haz-area-overlay, .haz-area-label, .haz-area-badge').forEach(el => el.remove());
 
-  const hazStudy = (window.__projectStudies && window.__projectStudies.hazAreaClassification) || null;
+  const hazStudy = cachedStudyResults?.hazAreaClassification || null;
   if (!hazStudy || !hazStudy.areas) return;
 
   // Zone color map — matches IEC severity (Zone 0 = red, Zone 1 = orange, Zone 2 = yellow)
@@ -11613,6 +11847,7 @@ function renderProtectionZonesPanel() {
 // ----------------------------------------------------------------
 function renderFlowAnimations(svg) {
   svg.querySelectorAll('.flow-arrow').forEach(el => el.remove());
+  if (dataStateOverlayMode !== 'loadFlow' || getStudyProvenance('loadFlow').status !== 'current') return;
   components.forEach(comp => {
     (comp.connections || []).forEach(conn => {
       const kw = conn.loading_kW;
@@ -11725,9 +11960,9 @@ function renderArcFlashLabelOverlays(svg) {
   const afResults = cachedStudyResults?.arcFlash;
   if (!afResults || typeof afResults !== 'object') return;
 
-  const BADGE_W = 90;
+  const BADGE_W = 124;
   const BANNER_H = 18;
-  const BODY_H = 28;
+  const BODY_H = 52;
   const BADGE_H = BANNER_H + BODY_H;
   const FONT = 'Helvetica, Arial, sans-serif';
 
@@ -11740,11 +11975,19 @@ function renderArcFlashLabelOverlays(svg) {
     const cy = bounds.top;
 
     const ie = af.incidentEnergy;
-    const bannerColor = '#f57c00';
-    const signalWord = 'WARNING';
+    const bannerColor = ie >= 40 ? '#b91c1c' : '#f57c00';
+    const signalWord = ie >= 40 ? 'DANGER' : 'WARNING';
     const minArcRating = Number(af.minimumArcRatingCalCm2);
     const ppeText = minArcRating > 0 ? `Arc rating ≥ ${minArcRating.toFixed(2)}` : 'IE method';
     const ieText = `IE: ${ie.toFixed(2)} cal/cm²`;
+    const boundary = Number(af.boundary);
+    const clearingTime = Number(af.clearingTime);
+    const workingDistance = Number(af.workingDistance);
+    const boundaryText = Number.isFinite(boundary) && boundary > 0 ? `AFB: ${Math.round(boundary)} mm` : 'AFB: not available';
+    const timingText = Number.isFinite(clearingTime) && clearingTime > 0
+      ? `Clear: ${clearingTime.toFixed(3)} s${Number.isFinite(workingDistance) ? ` @ ${Math.round(workingDistance)} mm` : ''}`
+      : 'Clearing time: not available';
+    const provenance = getStudyProvenance('arcFlash');
 
     const g = document.createElementNS(svgNS, 'g');
     g.setAttribute('class', 'af-label-badge');
@@ -11790,6 +12033,24 @@ function renderArcFlashLabelOverlays(svg) {
     ieLine.setAttribute('font-family', FONT);
     ieLine.textContent = ieText;
     g.appendChild(ieLine);
+
+    const boundaryLine = document.createElementNS(svgNS, 'text');
+    boundaryLine.setAttribute('x', 4); boundaryLine.setAttribute('y', BANNER_H + 34);
+    boundaryLine.setAttribute('font-size', '9'); boundaryLine.setAttribute('fill', '#000');
+    boundaryLine.setAttribute('font-family', FONT);
+    boundaryLine.textContent = boundaryText;
+    g.appendChild(boundaryLine);
+
+    const timingLine = document.createElementNS(svgNS, 'text');
+    timingLine.setAttribute('x', 4); timingLine.setAttribute('y', BANNER_H + 45);
+    timingLine.setAttribute('font-size', '8'); timingLine.setAttribute('fill', '#000');
+    timingLine.setAttribute('font-family', FONT);
+    timingLine.textContent = timingText;
+    g.appendChild(timingLine);
+
+    const statusTitle = document.createElementNS(svgNS, 'title');
+    statusTitle.textContent = `Arc-flash result: ${provenance.status}; ${provenance.approval}; scenario ${provenance.scenario}`;
+    g.appendChild(statusTitle);
 
     svg.appendChild(g);
   });
@@ -11942,6 +12203,7 @@ function loadSheet(idx, { skipCurrentSave = false } = {}) {
   if (!skipCurrentSave) save(false);
   activeSheet = idx;
   components = sheets[activeSheet].components;
+  components.forEach(normalizeComponentElectricalProperties);
   connections = sheets[activeSheet].connections;
   // Gap #51: load layers for this sheet
   layers = Array.isArray(sheets[activeSheet].layers) ? sheets[activeSheet].layers : [];
@@ -12317,6 +12579,7 @@ function addComponent(cfg) {
   ensureMccFieldsOnComponent(comp, meta);
   ensurePtVtFieldsOnComponent(comp, meta);
   ensureStudyInputFieldsOnComponent(comp, meta);
+  normalizeComponentElectricalProperties(comp);
   ensureShapeDefaults(comp);
   if (comp.type === 'transformer') {
     syncTransformerDefaults(comp, { forceBase: true });
@@ -13515,12 +13778,13 @@ function selectComponent(compOrId) {
       );
     }
 
-    const shouldShowTccField = targetComp.type !== 'cable' && isProtectionComponent(targetComp);
+    const compatibleTccDevices = compatibleProtectiveDevices(protectiveDevices, targetComp);
+    const shouldShowTccField = targetComp.type !== 'cable' && componentProtectionKind(targetComp) !== null;
 
     if (shouldShowTccField) {
       const tccOptions = [
         { value: '', label: '--Select Device--' },
-        ...protectiveDevices.map(dev => ({ value: dev.id, label: dev.name }))
+        ...compatibleTccDevices.map(dev => ({ value: dev.id, label: dev.name }))
       ];
       fields.push({
         name: 'tccId',
@@ -13530,7 +13794,10 @@ function selectComponent(compOrId) {
         getValue: comp => comp.tccId || '',
         setValue: (comp, value) => {
           comp.tccId = value || '';
-        }
+        },
+        help: compatibleTccDevices.length
+          ? 'Only device families compatible with this component type and voltage class are shown.'
+          : 'No compatible protective-device records are available for this component type and voltage class.'
       });
     }
 
@@ -13610,6 +13877,7 @@ function selectComponent(compOrId) {
       fields.forEach(f => {
         applyFieldFromForm(targetComp, f, fd);
       });
+      normalizeComponentElectricalProperties(targetComp);
       ensureShapeDefaults(targetComp);
       if (hasTccField) {
         targetComp.tccId = fd.get('tccId') || '';
@@ -16284,6 +16552,7 @@ async function init() {
       ensureMccFieldsOnComponent(c, currentMeta);
       ensurePtVtFieldsOnComponent(c, currentMeta);
       ensureStudyInputFieldsOnComponent(c, currentMeta);
+      normalizeComponentElectricalProperties(c);
     });
   });
   rebuildComponentMaps();
@@ -16446,6 +16715,16 @@ async function init() {
   if (pzOverlayToggle) {
     pzOverlayToggle.addEventListener('change', () => {
       showProtectionZones = pzOverlayToggle.checked;
+      render();
+    });
+  }
+  const hazAreaToggle = document.getElementById('toggle-haz-area');
+  if (hazAreaToggle) {
+    showHazAreaOverlay = Boolean(getOneLineViewSetting('showHazAreaOverlay', false));
+    hazAreaToggle.checked = showHazAreaOverlay;
+    hazAreaToggle.addEventListener('change', () => {
+      showHazAreaOverlay = hazAreaToggle.checked;
+      setOneLineViewSetting('showHazAreaOverlay', showHazAreaOverlay);
       render();
     });
   }
@@ -17986,6 +18265,7 @@ async function init() {
     symStdSelect.addEventListener('change', () => {
       symbolStandard = symStdSelect.value;
       setOneLineViewSetting('symbolStandard', symbolStandard);
+      buildPalette();
       render();
     });
   }

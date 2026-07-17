@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 82">
+  <g fill="none" stroke="#111827" stroke-width="2.5">
+    <path d="M36 0v8M36 74v8"/><rect x="8" y="8" width="56" height="66"/><path d="M8 74L64 8M15 25h15M18 20v10M42 52c4-8 8-8 13 0"/>
+  </g>
+  <text x="36" y="68" fill="#111827" font-family="Arial,sans-serif" font-size="8" font-weight="700" text-anchor="middle">BESS</text>
+</svg>

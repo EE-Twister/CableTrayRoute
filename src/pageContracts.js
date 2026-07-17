@@ -194,6 +194,7 @@ export const PAGE_CONTRACTS_BY_HREF = {
       projectInput('settings.labelCounters', 'setting', false, 'One-line label counter state.'),
       projectInput('settings.diagramTitleBlock', 'setting', false, 'One-line title block fields.'),
       projectInput('settings.diagramDatablockConfig', 'setting', false, 'One-line datablock display configuration.'),
+      projectInput('settings.studyProvenance', 'setting', false, 'Study scenario, revision, approval, and run metadata used to qualify one-line overlays.'),
       projectInput('settings.activeSampleWorkflow', 'setting', false, 'Active sample context used to fit and guide the sample diagram.'),
       projectInput('settings.gistToken', 'setting', false, 'Gist import/export token setting.')
     ],

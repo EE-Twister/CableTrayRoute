@@ -10,9 +10,12 @@
     "cable",
     "busway"
   ],
+  "icons": {},
   "components": [
     {
       "type": "bus",
+      "subtype": "bus",
+      "category": "bus",
       "label": "Bus",
       "icon": "icons/components/Bus.svg",
       "props": {
@@ -58,7 +61,7 @@
       "subtype": "panel",
       "label": "Panel",
       "icon": "icons/components/MLO.svg",
-      "iconIEC": "icons/components/iec/IEC_Switch.svg",
+      "iconIEC": "icons/components/iec/IEC_Panel.svg",
       "width": 64,
       "height": 76,
       "ports": [
@@ -90,7 +93,7 @@
       "subtype": "switchboard",
       "label": "Switchboard",
       "icon": "icons/components/Switchboard.svg",
-      "iconIEC": "icons/components/iec/IEC_Breaker.svg",
+      "iconIEC": "icons/components/iec/IEC_Switchboard.svg",
       "props": {
         "tag": "",
         "description": "",
@@ -460,7 +463,8 @@
       "type": "transformer",
       "subtype": "three_winding",
       "label": "XFMR 3W",
-      "icon": "icons/components/Transformer.svg",
+      "icon": "icons/components/Transformer3W.svg",
+      "iconIEC": "icons/components/iec/IEC_Transformer3W.svg",
       "props": {
         "kva_hv": 25000,
         "kva_lv": 10000,
@@ -1276,8 +1280,11 @@
     },
     {
       "type": "recloser",
+      "subtype": "recloser",
+      "category": "protection",
       "label": "Recloser",
-      "icon": "icons/components/Breaker.svg",
+      "icon": "icons/components/Recloser.svg",
+      "iconIEC": "icons/components/iec/IEC_Recloser.svg",
       "props": {
         "volts": 15000,
         "ka": 12.5,
@@ -1303,12 +1310,22 @@
       "type": "switch",
       "subtype": "ats",
       "label": "ATS",
-      "icon": "icons/components/Switch.svg",
-      "iconIEC": "icons/components/iec/IEC_Switch.svg",
+      "icon": "icons/components/ATS.svg",
+      "iconIEC": "icons/components/iec/IEC_ATS.svg",
+      "width": 72,
+      "height": 72,
+      "ports": [
+        { "x": 18, "y": 0, "role": "normal" },
+        { "x": 54, "y": 0, "role": "emergency" },
+        { "x": 36, "y": 72, "role": "load" }
+      ],
       "props": {
         "rating_a": 800,
         "transition": "open",
         "source_priority": "normal",
+        "selected_source": "normal",
+        "normal_source_available": true,
+        "emergency_source_available": true,
         "voltage": 480,
         "baseKV": 0.48,
         "kV": 0.48,
@@ -1323,8 +1340,8 @@
       "type": "switch",
       "subtype": "single_throw",
       "label": "ST Switch",
-      "icon": "icons/components/Switch.svg",
-      "iconIEC": "icons/components/iec/IEC_Switch.svg",
+      "icon": "icons/components/SingleThrowSwitch.svg",
+      "iconIEC": "icons/components/iec/IEC_SingleThrowSwitch.svg",
       "props": {
         "rating_a": 800,
         "transition": "open",
@@ -1342,7 +1359,27 @@
       "type": "switch",
       "subtype": "double_throw",
       "label": "DT Switch",
-      "icon": "icons/components/Switch.svg",
+      "icon": "icons/components/DoubleThrowSwitch.svg",
+      "iconIEC": "icons/components/iec/IEC_DoubleThrowSwitch.svg",
+      "width": 72,
+      "height": 72,
+      "ports": [
+        {
+          "x": 18,
+          "y": 0,
+          "role": "normal"
+        },
+        {
+          "x": 54,
+          "y": 0,
+          "role": "alternate"
+        },
+        {
+          "x": 36,
+          "y": 72,
+          "role": "load"
+        }
+      ],
       "props": {
         "rating_a": 800,
         "transition": "open",
@@ -1380,10 +1417,7 @@
         "kV": 0.48,
         "prefault_voltage": 0.48,
         "phases": 3,
-        "sccrKA": 100,
-        "interruptRatingKA": 100,
-        "withstandRatingKA": 65,
-        "withstandCycles": 30,
+        "sccr_ka": 100,
         "enclosure": "box",
         "gap": 32,
         "working_distance": 455,
@@ -1414,10 +1448,7 @@
         "kV": 0.48,
         "prefault_voltage": 0.48,
         "phases": 3,
-        "sccrKA": 65,
-        "interruptRatingKA": 65,
-        "withstandRatingKA": 65,
-        "withstandCycles": 30,
+        "sccr_ka": 65,
         "enclosure": "box",
         "gap": 32,
         "working_distance": 455,
@@ -1449,10 +1480,7 @@
         "kV": 13.8,
         "prefault_voltage": 13.8,
         "phases": 3,
-        "sccrKA": 40,
-        "interruptRatingKA": 40,
-        "withstandRatingKA": 40,
-        "withstandCycles": 30,
+        "sccr_ka": 40,
         "enclosure": "box",
         "gap": 102,
         "working_distance": 914,
@@ -1485,10 +1513,7 @@
         "kV": 0.48,
         "prefault_voltage": 0.48,
         "phases": 3,
-        "sccrKA": 65,
-        "interruptRatingKA": 65,
-        "withstandRatingKA": 65,
-        "withstandCycles": 30,
+        "sccr_ka": 65,
         "enclosure": "box",
         "gap": 32,
         "working_distance": 455,
@@ -1503,7 +1528,8 @@
       "subtype": "contactor",
       "category": "protection",
       "label": "Contactor",
-      "icon": "icons/components/Switch.svg",
+      "icon": "icons/components/Contactor.svg",
+      "iconIEC": "icons/components/iec/IEC_Contactor.svg",
       "props": {
         "rating_a": 100,
         "coil_v": 120,
@@ -1519,6 +1545,8 @@
     },
     {
       "type": "shunt_capacitor_bank",
+      "subtype": "shunt_capacitor_bank",
+      "category": "load",
       "label": "Shunt Cap",
       "icon": "icons/components/CapacitorBank.svg",
       "props": {
@@ -1542,6 +1570,8 @@
     },
     {
       "type": "reactor",
+      "subtype": "reactor",
+      "category": "load",
       "label": "Shunt Reactor",
       "icon": "icons/components/Reactor.svg",
       "props": {
@@ -1768,6 +1798,7 @@
       "subtype": "asynchronous",
       "label": "Asynchronous Gen",
       "icon": "icons/components/AsynchronousGenerator.svg",
+      "iconIEC": "icons/components/iec/IEC_AsynchronousGenerator.svg",
       "ports": [
         {
           "x": 80,
@@ -1928,7 +1959,8 @@
     {
       "type": "pv_inverter",
       "label": "PV Inverter",
-      "icon": "icons/components/PVArray.svg",
+      "icon": "icons/components/PVInverter.svg",
+      "iconIEC": "icons/components/iec/IEC_PVInverter.svg",
       "props": {
         "kva": 1000,
         "volts": 480,
@@ -2055,8 +2087,8 @@
       "type": "bess_inverter",
       "subtype": "bess_inverter",
       "label": "BESS Inverter",
-      "icon": "icons/components/UPS.svg",
-      "iconIEC": "icons/components/iec/IEC_Generator.svg",
+      "icon": "icons/components/BESSInverter.svg",
+      "iconIEC": "icons/components/iec/IEC_BESSInverter.svg",
       "props": {
         "tag": "",
         "description": "",
@@ -2077,8 +2109,8 @@
       "type": "rectifier",
       "subtype": "rectifier",
       "label": "Rectifier",
-      "icon": "icons/components/UPS.svg",
-      "iconIEC": "icons/components/iec/IEC_Transformer.svg",
+      "icon": "icons/components/Rectifier.svg",
+      "iconIEC": "icons/components/iec/IEC_Rectifier.svg",
       "props": {
         "tag": "",
         "description": "",
@@ -2153,13 +2185,14 @@
       },
       "subtype": "ups",
       "category": "equipment",
-      "iconIEC": "icons/components/iec/IEC_Generator.svg"
+      "iconIEC": "icons/components/iec/IEC_UPS.svg"
     },
     {
       "type": "battery",
       "subtype": "battery",
       "label": "Battery",
-      "icon": "icons/components/UPS.svg",
+      "icon": "icons/components/Battery.svg",
+      "iconIEC": "icons/components/iec/IEC_Battery.svg",
       "props": {
         "tag": "",
         "description": "",
@@ -2244,12 +2277,12 @@
       "subtype": "mcc",
       "label": "Motor Control Center",
       "icon": "icons/components/MCC.svg",
-      "iconIEC": "icons/components/iec/IEC_Switch.svg",
+      "iconIEC": "icons/components/iec/IEC_MCC.svg",
       "props": {
-        "tag": "",
-        "description": "",
-        "manufacturer": "",
-        "model": "",
+        "tag": "MCC-1",
+        "description": "Motor control center",
+        "manufacturer": "Generic",
+        "model": "MCC",
         "rated_voltage_kv": 0.48,
         "bus_rating_a": 1600,
         "main_device_type": "mccb",
@@ -2289,11 +2322,7 @@
         "line_reactor": "review_required",
         "output_filter": "none",
         "control_voltage_v": 120,
-        "sccrKA": 65,
         "sccr_ka": 65,
-        "interruptRatingKA": 65,
-        "withstandRatingKA": 65,
-        "withstandCycles": 30,
         "enclosure": "NEMA 1",
         "service_status": "normal",
         "commissioning_state": "design",
@@ -2329,11 +2358,7 @@
         "bypass_contactor": true,
         "overload_class": 10,
         "control_voltage_v": 120,
-        "sccrKA": 65,
         "sccr_ka": 65,
-        "interruptRatingKA": 65,
-        "withstandRatingKA": 65,
-        "withstandCycles": 30,
         "enclosure": "NEMA 1",
         "service_status": "normal",
         "commissioning_state": "design",
@@ -2345,7 +2370,8 @@
       "subtype": "fvnr_starter",
       "category": "equipment",
       "label": "FVNR Starter",
-      "icon": "icons/components/MotorStarter.svg",
+      "icon": "icons/components/FVNRStarter.svg",
+      "iconIEC": "icons/components/iec/IEC_FVNRStarter.svg",
       "props": {
         "tag": "",
         "description": "",
@@ -2366,11 +2392,7 @@
         "contactor_count": 1,
         "overload_class": 10,
         "control_voltage_v": 120,
-        "sccrKA": 65,
         "sccr_ka": 65,
-        "interruptRatingKA": 65,
-        "withstandRatingKA": 65,
-        "withstandCycles": 30,
         "enclosure": "NEMA 1",
         "service_status": "normal",
         "commissioning_state": "design",
@@ -2382,7 +2404,8 @@
       "subtype": "fvr_starter",
       "category": "equipment",
       "label": "FVR Starter",
-      "icon": "icons/components/MotorStarter.svg",
+      "icon": "icons/components/FVRStarter.svg",
+      "iconIEC": "icons/components/iec/IEC_FVRStarter.svg",
       "props": {
         "tag": "",
         "description": "",
@@ -2404,11 +2427,7 @@
         "mechanical_interlock": true,
         "overload_class": 10,
         "control_voltage_v": 120,
-        "sccrKA": 65,
         "sccr_ka": 65,
-        "interruptRatingKA": 65,
-        "withstandRatingKA": 65,
-        "withstandCycles": 30,
         "enclosure": "NEMA 1",
         "service_status": "normal",
         "commissioning_state": "design",
@@ -2442,11 +2461,7 @@
         "integral_ocpd": "mccb",
         "overload_class": 10,
         "control_voltage_v": 120,
-        "sccrKA": 65,
         "sccr_ka": 65,
-        "interruptRatingKA": 65,
-        "withstandRatingKA": 65,
-        "withstandCycles": 30,
         "enclosure": "NEMA 1",
         "service_status": "normal",
         "commissioning_state": "design",
@@ -2455,6 +2470,8 @@
     },
     {
       "type": "feeder",
+      "subtype": "feeder",
+      "category": "cable",
       "label": "Feeder",
       "icon": "icons/components/Feeder.svg",
       "props": {
@@ -2809,8 +2826,9 @@
     {
       "type": "vt",
       "label": "PT",
-      "icon": "icons/components/Transformer.svg",
-      "symbol": "icons/components/Transformer.svg",
+      "icon": "icons/components/PT.svg",
+      "iconIEC": "icons/components/iec/IEC_PT.svg",
+      "symbol": "icons/components/PT.svg",
       "props": {
         "tag": "PT-1",
         "primary_voltage": 12470,
@@ -2838,7 +2856,8 @@
       "type": "relay",
       "subtype": "relay_87",
       "label": "Differential Relay (87)",
-      "icon": "icons/components/Relay.svg",
+      "icon": "icons/components/DifferentialRelay.svg",
+      "iconIEC": "icons/components/iec/IEC_DifferentialRelay.svg",
       "props": {
         "tag": "87R-1",
         "description": "Differential protection relay",
@@ -2905,6 +2924,8 @@
     },
     {
       "type": "relay",
+      "subtype": "overcurrent_relay",
+      "category": "protection",
       "label": "Relay",
       "icon": "icons/components/Relay.svg",
       "props": {
@@ -2918,7 +2939,7 @@
         "model": "",
         "rated_voltage_kv": 15,
         "phases": 3,
-        "interrupting_rating_ka": 25,
+        "interrupting_rating_ka": null,
         "pickup_amps": 400,
         "time_dial_or_tms": 3.5,
         "curve_family": "IEC_VeryInverse",

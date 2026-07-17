@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 70 82" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="square" stroke-linejoin="miter">
+  <!-- IEC-style switchboard with terminal leads at both declared ports. -->
+  <line x1="35" y1="0" x2="35" y2="9"/>
+  <rect x="12" y="9" width="46" height="64"/>
+  <line x1="19" y1="22" x2="51" y2="22" stroke-width="4"/>
+  <line x1="25" y1="22" x2="25" y2="61"/>
+  <line x1="35" y1="22" x2="35" y2="61"/>
+  <line x1="45" y1="22" x2="45" y2="61"/>
+  <rect x="21" y="38" width="8" height="12"/>
+  <rect x="31" y="38" width="8" height="12"/>
+  <rect x="41" y="38" width="8" height="12"/>
+  <line x1="35" y1="73" x2="35" y2="82"/>
+</svg>

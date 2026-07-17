@@ -1,0 +1,597 @@
+{
+  "schemaVersion": 1,
+  "purpose": "Source-backed candidates for future promotion into data/protectiveDevices.json. This file is research inventory, not production calculation data.",
+  "researchedOn": "2026-07-16",
+  "evidenceStatuses": {
+    "curve-source-located": "Official product ratings and an official curve source were located; curve points still require controlled extraction and review.",
+    "ratings-verified": "Official ratings were located; an exact curve document still needs to be selected for the intended trip unit or catalog number.",
+    "formula-ready": "Official relay curve families and setting ranges were located; implementation should use the published equation family instead of digitized points."
+  },
+  "candidates": [
+    {
+      "id": "schneider_powerpact_b",
+      "type": "breaker",
+      "vendor": "Schneider Electric",
+      "series": "PowerPacT B",
+      "libraryGranularity": "split by frame, trip rating, poles, and D/G/J interrupt code",
+      "evidenceStatus": "curve-source-located",
+      "ratings": {
+        "currentRangeA": [15, 125],
+        "maxVoltageVac": 600,
+        "maxVoltageVdc": 250,
+        "interruptingRatings": [
+          { "voltageVac": 480, "codes": { "D": 18, "G": 35, "J": 65 }, "unit": "kA rms symmetrical" },
+          { "voltageVdc": 250, "codes": { "D": 10, "G": 20, "J": 50 }, "unit": "kA" }
+        ]
+      },
+      "tripUnits": ["fixed thermal-magnetic"],
+      "curveEvidence": {
+        "representation": "manufacturer TCC band",
+        "status": "curve source located; exact catalog/trip-rating curve must be selected",
+        "sourceUrl": "https://www.se.com/us/en/work/support/resources-and-tools/calculators-and-online-tools/time-current-curves/"
+      },
+      "standards": ["UL 489"],
+      "sources": ["https://www.se.com/us/en/product-range/63534-powerpact-bframe-molded-case-circuit-breakers/"],
+      "missingForProduction": ["exact catalog number", "curve document number and revision", "upper/lower curve points", "manufacturer tolerance basis"]
+    },
+    {
+      "id": "schneider_powerpact_j",
+      "type": "breaker",
+      "vendor": "Schneider Electric",
+      "series": "PowerPacT J",
+      "libraryGranularity": "split by trip unit, ampere rating, and D/G/J/L/R interrupt code",
+      "evidenceStatus": "curve-source-located",
+      "ratings": {
+        "currentRangeA": [70, 250],
+        "maxVoltageVac": 600,
+        "maxVoltageVdc": 250,
+        "interruptingRatings": [
+          { "voltageVac": 480, "codes": { "D": 18, "G": 35, "J": 65, "L": 100, "R": 200 }, "unit": "kA rms symmetrical" },
+          { "voltageVdc": 250, "value": 20, "unit": "kA" }
+        ]
+      },
+      "tripUnits": ["thermal-magnetic", "Micrologic electronic"],
+      "curveEvidence": {
+        "representation": "manufacturer TCC band",
+        "status": "curve source located; trip-unit-specific extraction required",
+        "sourceUrl": "https://www.se.com/us/en/work/support/resources-and-tools/calculators-and-online-tools/time-current-curves/"
+      },
+      "standards": ["UL 489", "CSA", "IEC"],
+      "sources": ["https://www.se.com/us/en/product-range/60183-powerpact-jframe-molded-case-circuit-breakers/"],
+      "missingForProduction": ["exact catalog number", "Micrologic model", "LSIG setting ranges", "curve document and points"]
+    },
+    {
+      "id": "schneider_powerpact_l",
+      "type": "breaker",
+      "vendor": "Schneider Electric",
+      "series": "PowerPacT L",
+      "libraryGranularity": "split by Micrologic model, sensor/rating plug, and interrupt code",
+      "evidenceStatus": "curve-source-located",
+      "ratings": {
+        "currentRangeA": [250, 600],
+        "maxVoltageVac": 600,
+        "maxVoltageVdc": 250,
+        "interruptingRatings": [
+          { "voltageVac": 480, "codes": { "D": 18, "G": 35, "J": 65, "L": 100 }, "unit": "kA rms symmetrical" },
+          { "voltageVdc": 250, "value": 20, "unit": "kA" }
+        ]
+      },
+      "tripUnits": ["Micrologic electronic"],
+      "curveEvidence": {
+        "representation": "manufacturer TCC band",
+        "status": "curve source located; trip-unit-specific extraction required",
+        "sourceUrl": "https://www.se.com/us/en/work/support/resources-and-tools/calculators-and-online-tools/time-current-curves/"
+      },
+      "standards": ["UL 489", "CSA", "NEMA", "IEC"],
+      "sources": ["https://www.se.com/us/en/product-range/61214-powerpact-lframe-molded-case-circuit-breakers/"],
+      "missingForProduction": ["exact catalog number", "Micrologic model", "rating plug", "LSIG settings", "curve points"]
+    },
+    {
+      "id": "schneider_powerpact_p",
+      "type": "breaker",
+      "vendor": "Schneider Electric",
+      "series": "PowerPacT P",
+      "libraryGranularity": "split by Micrologic model, sensor/rating plug, and interrupt code",
+      "evidenceStatus": "curve-source-located",
+      "ratings": {
+        "currentRangeA": [100, 1200],
+        "maxVoltageVac": 600,
+        "interruptingRatings": [
+          { "voltageVac": 480, "codes": { "G": 35, "J": 65, "K": 50, "L": 100 }, "unit": "kA rms symmetrical" }
+        ]
+      },
+      "tripUnits": ["Micrologic 2.0", "Micrologic 3.0", "Micrologic 5.0", "Micrologic 6.0"],
+      "features": ["short-time ZSI on Micrologic 5.0", "short-time and ground-fault ZSI on Micrologic 6.0"],
+      "curveEvidence": {
+        "representation": "manufacturer TCC band",
+        "status": "catalog and trip-curve document references located",
+        "sourceUrl": "https://www.se.com/us/en/faqs/FA346360/"
+      },
+      "standards": ["UL 489", "CSA", "IEC"],
+      "sources": ["https://www.se.com/us/en/product-range/1448-powerpact-pframe-molded-case-circuit-breakers/"],
+      "missingForProduction": ["exact catalog number", "sensor/rating plug", "LSIG setting matrix", "curve points and tolerance"]
+    },
+    {
+      "id": "schneider_powerpact_r",
+      "type": "breaker",
+      "vendor": "Schneider Electric",
+      "series": "PowerPacT R",
+      "libraryGranularity": "split by Micrologic model, sensor/rating plug, and interrupt code",
+      "evidenceStatus": "curve-source-located",
+      "ratings": {
+        "currentRangeA": [240, 3000],
+        "maxVoltageVac": 600,
+        "interruptingRatings": [
+          { "voltageVac": 480, "codes": { "G": 35, "J": 65, "K": 65, "L": 100 }, "unit": "kA rms symmetrical" }
+        ]
+      },
+      "tripUnits": ["Micrologic 2.0", "Micrologic 3.0", "Micrologic 5.0", "Micrologic 6.0"],
+      "features": ["short-time ZSI on Micrologic 5.0", "short-time and ground-fault ZSI on Micrologic 6.0"],
+      "curveEvidence": {
+        "representation": "manufacturer TCC band",
+        "status": "catalog and trip-curve document references located",
+        "sourceUrl": "https://www.se.com/us/en/faqs/FA346360/"
+      },
+      "standards": ["UL 489", "CSA", "IEC"],
+      "sources": ["https://www.se.com/us/en/product-range/1855-powerpact-rframe-molded-case-circuit-breakers/"],
+      "missingForProduction": ["exact catalog number", "sensor/rating plug", "LSIG setting matrix", "curve points and tolerance"]
+    },
+    {
+      "id": "eaton_power_defense_pd2_pxr20_100",
+      "type": "breaker",
+      "vendor": "Eaton",
+      "series": "Power Defense PD2",
+      "catalogNumber": "PDG23P0100E2MK",
+      "libraryGranularity": "exact catalog number and PXR trip configuration",
+      "evidenceStatus": "curve-source-located",
+      "ratings": {
+        "ratedCurrentA": 100,
+        "interruptingRatings": [{ "voltageVac": 480, "value": 100, "unit": "kA rms symmetrical" }]
+      },
+      "tripUnits": ["PXR20 LSI with Modbus RTU and relays"],
+      "curveEvidence": {
+        "representation": "manufacturer TCC band",
+        "status": "official Frame 2 TCC is linked from the SKU page",
+        "sourceUrl": "https://www.eaton.com/us/en-us/skuPage.PDG23P0100E2MK.html"
+      },
+      "sources": ["https://www.eaton.com/us/en-us/skuPage.PDG23P0100E2MK.html"],
+      "missingForProduction": ["PXR20 LSI setting ranges", "curve document revision", "curve points", "short-time withstand if applicable"]
+    },
+    {
+      "id": "eaton_power_defense_pd5_pxr20_1200",
+      "type": "breaker",
+      "vendor": "Eaton",
+      "series": "Power Defense PD5",
+      "catalogNumber": "PDF53M1200E2MN",
+      "libraryGranularity": "exact catalog number and PXR trip configuration",
+      "evidenceStatus": "curve-source-located",
+      "ratings": {
+        "ratedCurrentA": 1200,
+        "interruptingRatings": [{ "voltageVac": 480, "value": 65, "unit": "kA rms symmetrical" }]
+      },
+      "tripUnits": ["PXR20 LSI with Modbus RTU and relays"],
+      "curveEvidence": {
+        "representation": "manufacturer TCC band",
+        "status": "official Frame 5 TCC is linked from the SKU page",
+        "sourceUrl": "https://www.eaton.com/us/en-us/skuPage.PDF53M1200E2MN.html"
+      },
+      "sources": ["https://www.eaton.com/us/en-us/skuPage.PDF53M1200E2MN.html"],
+      "missingForProduction": ["PXR20 LSI setting ranges", "curve document revision", "curve points", "short-time withstand"]
+    },
+    {
+      "id": "abb_tmax_xt2v_100_ekip_m_liu",
+      "type": "breaker",
+      "vendor": "ABB",
+      "series": "SACE Tmax XT2",
+      "catalogNumber": "1SDA075102R1",
+      "libraryGranularity": "exact catalog number and Ekip trip configuration",
+      "evidenceStatus": "ratings-verified",
+      "ratings": {
+        "frameA": 125,
+        "ratedCurrentA": 100,
+        "interruptingRatings": [{ "voltageVac": 480, "value": 150, "unit": "kA rms symmetrical", "code": "V" }]
+      },
+      "tripUnits": ["Ekip M-LIU solid-state"],
+      "sources": [
+        "https://empower.abb.com/ecatalog/ec/EN_NA/p/1SDA075102R1",
+        "https://electrification.us.abb.com/products/circuit-breakers/tmax-xt"
+      ],
+      "missingForProduction": ["Ekip M-LIU setting ranges", "official TCC document", "curve points and tolerance", "voltage-specific rating matrix beyond 480 V"]
+    },
+    {
+      "id": "abb_tmax_xt5_family",
+      "type": "breaker",
+      "vendor": "ABB",
+      "series": "SACE Tmax XT5",
+      "libraryGranularity": "split by catalog number, Ekip trip unit, amp rating, and interrupt code",
+      "evidenceStatus": "ratings-verified",
+      "ratings": {
+        "frameA": 600,
+        "maxVoltageVac": 600,
+        "maxInterruptingRatings": [
+          { "voltageVac": 480, "value": 200, "unit": "kA rms symmetrical" },
+          { "voltageVac": 600, "value": 100, "unit": "kA rms symmetrical" }
+        ]
+      },
+      "tripUnits": ["thermal-magnetic", "MCS", "MCP", "Ekip electronic"],
+      "sources": ["https://electrification.us.abb.com/products/circuit-breakers/tmax-xt"],
+      "missingForProduction": ["exact catalog number", "trip unit and settings", "actual interrupt code", "official TCC document and curve points"]
+    },
+    {
+      "id": "siemens_3va5_80_tm240",
+      "type": "breaker",
+      "vendor": "Siemens",
+      "series": "SENTRON 3VA5",
+      "catalogNumber": "3VA5180-5EF31-0AA0",
+      "libraryGranularity": "exact catalog number",
+      "evidenceStatus": "curve-source-located",
+      "ratings": {
+        "frameA": 125,
+        "ratedCurrentA": 80,
+        "interruptingRatings": [{ "voltageVac": 480, "value": 35, "unit": "kA rms symmetrical", "class": "M" }]
+      },
+      "tripUnits": ["TM240 thermal-magnetic"],
+      "verifiedSettings": {
+        "longTimePickupA": { "min": 63, "max": 80 },
+        "instantaneousMultipleOfIn": { "min": 5, "max": 10 }
+      },
+      "curveEvidence": {
+        "representation": "manufacturer characteristic band",
+        "status": "3VA manual located; exact curve must be extracted for TM240 configuration",
+        "sourceUrl": "https://support.industry.siemens.com/cs/attachments/90318775/3VA_manual_molded_case_circuit_breakers_en_en-US.pdf"
+      },
+      "sources": ["https://mall.industry.siemens.com/mall/en/en/Catalog/product?mlfb=3VA5180-5EF31-0AA0"],
+      "missingForProduction": ["exact curve pages", "upper/lower curve points", "tolerance", "ratings at other system voltages"]
+    },
+    {
+      "id": "siemens_3va6_family",
+      "type": "breaker",
+      "vendor": "Siemens",
+      "series": "SENTRON 3VA6",
+      "libraryGranularity": "split by frame, ETU model, amp rating, and breaking-capacity class",
+      "evidenceStatus": "curve-source-located",
+      "ratings": {
+        "currentRangeA": [40, 2000],
+        "maxInterruptingRatings": [{ "voltageVac": 480, "value": 200, "unit": "kA rms symmetrical" }]
+      },
+      "tripUnits": ["electronic trip unit"],
+      "curveEvidence": {
+        "representation": "manufacturer characteristic band",
+        "status": "3VA manual located; exact ETU configuration required",
+        "sourceUrl": "https://support.industry.siemens.com/cs/attachments/90318775/3VA_manual_molded_case_circuit_breakers_en_en-US.pdf"
+      },
+      "sources": ["https://support.industry.siemens.com/cs/attachments/109989141/SIE_BR_3VA56-UL.pdf?download=true"],
+      "missingForProduction": ["exact catalog number", "ETU model", "LSIG setting ranges", "curve points", "voltage rating matrix"]
+    },
+    {
+      "id": "eaton_bussmann_lpj_sp",
+      "type": "fuse",
+      "vendor": "Eaton Bussmann",
+      "series": "Low-Peak LPJ-SP",
+      "fuseClass": "Class J",
+      "libraryGranularity": "split into manufacturer curve ampere groups or individual ratings",
+      "evidenceStatus": "curve-source-located",
+      "ratings": {
+        "currentRangeA": [1, 600],
+        "voltageVac": 600,
+        "voltageVdc": 300,
+        "interruptingRatings": [
+          { "voltageVac": 600, "value": 300, "unit": "kA rms symmetrical" },
+          { "voltageVdc": 300, "value": 100, "unit": "kA" }
+        ]
+      },
+      "characteristic": "dual-element time-delay, current-limiting; 10 seconds minimum at 500% rated current",
+      "curveEvidence": {
+        "representation": "minimum-melt TCC plus current-limitation curves",
+        "status": "official catalog curves located",
+        "sourceUrl": "https://www.eaton.com/content/dam/eaton/support/apac-support-assets/japan-cps-assets/products/bussmann/eaton-busmann-electrical-full-catalog-en-jp.pdf"
+      },
+      "standards": ["UL 248-8", "CSA C22.2 No. 248.8"],
+      "sources": ["https://www.eaton.com/us/en-us/skuPage.LPJ-600SP.html"],
+      "missingForProduction": ["total-clearing curve or clearing adder", "digitized curve points by amp rating", "peak let-through and clearing I2t matrices", "curve tolerance"]
+    },
+    {
+      "id": "eaton_bussmann_lps_rk_sp",
+      "type": "fuse",
+      "vendor": "Eaton Bussmann",
+      "series": "Low-Peak LPS-RK-SP",
+      "fuseClass": "Class RK1",
+      "libraryGranularity": "split into manufacturer curve ampere groups or individual ratings",
+      "evidenceStatus": "curve-source-located",
+      "ratings": {
+        "voltageVac": 600,
+        "voltageVdc": 300,
+        "interruptingRatings": [
+          { "voltageVac": 600, "value": 300, "unit": "kA rms symmetrical" },
+          { "voltageVdc": 300, "value": 100, "unit": "kA" }
+        ]
+      },
+      "characteristic": "dual-element time-delay, current-limiting; 10 seconds at 500% rated current for the referenced 1 A SKU",
+      "curveEvidence": {
+        "representation": "manufacturer TCC and current-limitation curves",
+        "status": "official data sheet link located",
+        "sourceUrl": "https://www.eaton.com/us/en-us/skuPage.LPS-RK-1SP.html"
+      },
+      "standards": ["UL 248-12"],
+      "sources": ["https://www.eaton.com/us/en-us/skuPage.LPS-RK-1SP.html"],
+      "missingForProduction": ["verified family ampere range from current datasheet", "curve points by amp group", "total-clearing curve", "let-through and I2t matrices"]
+    },
+    {
+      "id": "mersen_ajt",
+      "type": "fuse",
+      "vendor": "Mersen",
+      "series": "Amp-Trap 2000 AJT",
+      "fuseClass": "Class J",
+      "libraryGranularity": "split into published curve ampere groups or individual ratings",
+      "evidenceStatus": "curve-source-located",
+      "ratings": {
+        "voltageVac": 600,
+        "voltageVdc": 400,
+        "interruptingRatings": [{ "voltageVac": 600, "value": 200, "unit": "kA rms symmetrical" }]
+      },
+      "characteristic": "time-delay, current-limiting",
+      "curveEvidence": {
+        "representation": "manufacturer TCC curves 24351 and 28121",
+        "status": "official curve PDFs linked from product page",
+        "sourceUrl": "https://www.mersen.com/en/products/ajt-class-j-time-delay/ajt600"
+      },
+      "standards": ["UL 248-8"],
+      "sources": ["https://www.mersen.com/en/products/ajt-class-j-time-delay/ajt600"],
+      "missingForProduction": ["curve-to-amp-group mapping", "digitized minimum-melt and total-clearing points", "DC interrupt rating", "I2t and peak let-through matrices"]
+    },
+    {
+      "id": "mersen_a6d_r",
+      "type": "fuse",
+      "vendor": "Mersen",
+      "series": "Amp-Trap 2000 A6D-R",
+      "fuseClass": "Class RK1",
+      "libraryGranularity": "split into published curve ampere groups or individual ratings",
+      "evidenceStatus": "ratings-verified",
+      "ratings": {
+        "currentRangeA": [0.1, 600],
+        "voltageVac": 600,
+        "voltageVdc": 600,
+        "interruptingRatings": [{ "value": 300, "unit": "kA", "basis": "self-certified, UL-witnessed" }]
+      },
+      "characteristic": "time-delay, current-limiting",
+      "standards": ["UL 248-12", "CSA C22.2 No. 248.12"],
+      "sources": ["https://us.mersen.com/en/products/a6d-r-class-rk1-time-delay?page=1"],
+      "missingForProduction": ["official TCC document", "curve points by amp group", "minimum-melt versus total-clearing distinction", "I2t and peak let-through matrices"]
+    },
+    {
+      "id": "sandc_smu20_standard_speed",
+      "type": "fuse",
+      "vendor": "S&C Electric",
+      "series": "SMU-20 Standard Speed",
+      "application": "medium-voltage power fuse",
+      "libraryGranularity": "split by nominal voltage, speed family, and ampere rating",
+      "evidenceStatus": "curve-source-located",
+      "ratings": { "nominalVoltageKv": [14.4, 25, 34.5] },
+      "curveEvidence": {
+        "representation": "manufacturer minimum-melt and total-clearing curves with downloadable Excel data",
+        "status": "official PDF and Excel curve sets located",
+        "curveIdentifiers": ["153-2", "153-2-2", "153-2-4"],
+        "sourceUrl": "https://www.sandc.com/en/contact-us/time-current-characteristic-curves/"
+      },
+      "standards": ["IEEE C37.41"],
+      "sources": ["https://www.sandc.com/en/contact-us/time-current-characteristic-curves/"],
+      "missingForProduction": ["selected ampere ratings", "interrupting rating from specification bulletin", "normalized Excel import", "ambient and tolerance metadata per curve"]
+    },
+    {
+      "id": "sel_751_feeder",
+      "type": "relay",
+      "vendor": "SEL",
+      "series": "SEL-751",
+      "application": "feeder protection",
+      "libraryGranularity": "one parametric relay entry with selectable published curve family",
+      "evidenceStatus": "formula-ready",
+      "protectionFunctions": ["50P/G/Q/N", "51P/G/Q/N", "67P/G/Q", "breaker failure", "optional arc flash"],
+      "curveFamilies": [
+        "US moderately inverse", "US inverse", "US very inverse", "US extremely inverse", "US short-time inverse",
+        "IEC standard inverse", "IEC very inverse", "IEC extremely inverse", "IEC long-time inverse", "IEC short-time inverse",
+        "IEEE moderately inverse", "IEEE very inverse", "IEEE extremely inverse"
+      ],
+      "importantNote": "A relay has no interrupting rating; clearing duty belongs to the controlled breaker or recloser.",
+      "sources": [
+        "https://selinc.com/products/751/",
+        "https://selinc.com/api/download/10734/?lang=en"
+      ],
+      "missingForProduction": ["pickup and time-dial ranges/steps by element", "equation coefficients or verified curve generator mapping", "operate-time tolerance", "firmware/revision applicability"]
+    },
+    {
+      "id": "abb_ref615_feeder",
+      "type": "relay",
+      "vendor": "ABB",
+      "series": "Relion REF615",
+      "application": "feeder protection",
+      "libraryGranularity": "one parametric relay entry with selectable curve family and protection stage",
+      "evidenceStatus": "formula-ready",
+      "verifiedSettings": {
+        "lowSetPickupMultipleIn": { "min": 0.05, "max": 5, "step": 0.01 },
+        "highSetPickupMultipleIn": { "min": 0.1, "max": 40, "step": 0.01 },
+        "instantaneousPickupMultipleIn": { "min": 1, "max": 40, "step": 0.01 },
+        "timeMultiplier": { "min": 0.05, "max": 15, "step": 0.01 },
+        "definiteDelayMs": { "min": 40, "max": 200000, "step": 10 }
+      },
+      "curveFamilies": ["ANSI inverse families", "IEC inverse families", "definite time", "programmable", "RI", "RD"],
+      "timingTolerance": "inverse-time operate accuracy ±5% of theoretical value or ±20 ms",
+      "importantNote": "A relay has no interrupting rating; pair it with a breaker opening-time model.",
+      "sources": ["https://library.e.abb.com/public/94eba3ec6dde4261af4a510d76916e6d/REF615_pg_756379_ENu.pdf"],
+      "missingForProduction": ["curve-number to equation mapping", "default stage choice", "breaker mechanism time linkage", "product-version applicability"]
+    },
+    {
+      "id": "siemens_siprotec_7sj82",
+      "type": "relay",
+      "vendor": "Siemens",
+      "series": "SIPROTEC 5 7SJ82",
+      "application": "feeder and overcurrent protection",
+      "libraryGranularity": "one parametric relay entry with selectable standard and curve family",
+      "evidenceStatus": "formula-ready",
+      "curveFamilies": ["IEC inverse-time", "ANSI inverse-time", "logarithmic-inverse", "knee-point", "definite time"],
+      "importantNote": "A relay has no interrupting rating; final clearing time includes output, breaker relay, and mechanism time.",
+      "sources": [
+        "https://www.siemens.com/de-ch/products/siprotec/7sj82/",
+        "https://cache.industry.siemens.com/dl/files/384/109742384/att_1113120/v1/SIP5_7SJ82-85_V09.30_Manual_C017-H_en.pdf?download=true"
+      ],
+      "missingForProduction": ["pickup ranges and steps", "time-dial ranges", "equation coefficients", "operate-time tolerance", "firmware/version scope"]
+    },
+    {
+      "id": "ge_multilin_850",
+      "type": "relay",
+      "vendor": "GE Vernova",
+      "series": "Multilin 850",
+      "application": "feeder protection and bay control",
+      "libraryGranularity": "one parametric relay entry with selectable curve family",
+      "evidenceStatus": "formula-ready",
+      "verifiedSettings": {
+        "timeOvercurrentPickupMultipleCt": { "min": 0.05, "max": 30, "step": 0.001 },
+        "curveMultiplier": { "min": 0.05, "max": 600, "step": 0.01 },
+        "instantaneousPickupMultipleCt": { "min": 0.05, "max": 30, "step": 0.001 }
+      },
+      "curveFamilies": [
+        "IEEE extremely/very/moderately inverse", "ANSI extremely/very/normally/moderately inverse",
+        "IEC Curve A/B/C and short inverse", "IAC extremely/very/inverse/short inverse",
+        "FlexCurve A/B/C/D", "I2t", "I4t", "definite time"
+      ],
+      "timingTolerance": "±3% of operate time or ±1/2 cycle for inverse curves above 1.1 × pickup",
+      "importantNote": "A relay has no interrupting rating; pair it with the controlled breaker.",
+      "sources": [
+        "https://www.gevernova.com/grid-solutions/automation/protection-control-metering/feeder-protection/multilin-850",
+        "https://www.gevernova.com/grid-solutions/resources?prod=850&type=3"
+      ],
+      "missingForProduction": ["equation coefficients and curve aliases", "selected CT secondary basis", "breaker output and mechanism time", "manual revision pinning"]
+    },
+    {
+      "id": "schneider_powerlogic_p3",
+      "type": "relay",
+      "vendor": "Schneider Electric",
+      "series": "PowerLogic P3",
+      "application": "feeder, motor, transformer, and generator protection",
+      "libraryGranularity": "split by P3 model/application mode; parametric curve families",
+      "evidenceStatus": "ratings-verified",
+      "protectionFunctions": ["overcurrent", "ground fault", "directional overcurrent", "arc flash", "voltage", "frequency"],
+      "importantNote": "Feeder and motor modes use different scaling references; do not share one default pickup basis.",
+      "sources": [
+        "https://www.se.com/us/en/product-range/64884-powerlogic-p3-protection-relays/",
+        "https://www.se.com/us/en/download/document/26693827/"
+      ],
+      "missingForProduction": ["exact P3 model", "curve families and equation constants", "pickup/time ranges", "timing tolerance", "application-mode scaling"]
+    },
+    {
+      "id": "sel_787_transformer_differential",
+      "type": "relay",
+      "subtype": "relay_87t",
+      "vendor": "SEL",
+      "series": "SEL-787 family",
+      "application": "transformer differential and backup overcurrent protection",
+      "libraryGranularity": "split current SEL-787-2/-3/-4 configurations by winding count and CT/input options; retain the original SEL-787 only as legacy",
+      "evidenceStatus": "ratings-verified",
+      "differentialCharacteristic": {
+        "representation": "two-winding dual-slope percentage differential for the original SEL-787",
+        "features": ["harmonic blocking", "harmonic restraint", "phase differential", "restricted earth fault option"]
+      },
+      "importantNote": "SEL recommends the SEL-787-2/-3/-4 in place of the original SEL-787. Differential restraint characteristics require a dedicated schema and must not be stored as a time-current curve.",
+      "sources": [
+        "https://selinc.com/products/787/",
+        "https://selinc.com/products/787/docs/"
+      ],
+      "missingForProduction": ["exact current model and firmware revision", "winding and CT configuration", "pickup and slope setting ranges", "breakpoint settings", "harmonic restraint/blocking settings", "operate-time tolerance"]
+    },
+    {
+      "id": "sel_487b_bus_differential",
+      "type": "relay",
+      "subtype": "relay_87b",
+      "vendor": "SEL",
+      "series": "SEL-487B",
+      "application": "low-impedance bus differential and breaker-failure protection",
+      "libraryGranularity": "split conventional-input, TiDL, and sampled-values configurations; model protected zones and terminals separately",
+      "evidenceStatus": "ratings-verified",
+      "differentialCharacteristic": {
+        "representation": "low-impedance current differential with check-zone supervision",
+        "features": ["subcycle differential protection", "open-CT detection", "breaker failure", "up to ten backup overcurrent curves"]
+      },
+      "importantNote": "The differential element, backup overcurrent elements, and controlled breakers are separate calculation objects. The relay itself has no interrupting rating.",
+      "sources": [
+        "https://selinc.com/products/487B/",
+        "https://selinc.com/products/487b/docs"
+      ],
+      "missingForProduction": ["exact hardware/input configuration", "firmware and instruction-manual revision", "differential pickup and slope settings", "zone/check-zone model", "overcurrent curve equations and ranges", "breaker-failure timing"]
+    },
+    {
+      "id": "ge_multilin_t60_transformer_differential",
+      "type": "relay",
+      "subtype": "relay_87t",
+      "vendor": "GE Vernova",
+      "series": "Multilin T60",
+      "application": "transformer differential, restricted ground fault, and backup protection",
+      "libraryGranularity": "one relay-family definition plus exact order-code, firmware, winding, CT, and protection-setting configuration",
+      "evidenceStatus": "ratings-verified",
+      "differentialCharacteristic": {
+        "representation": "dual-slope, dual-breakpoint percentage differential",
+        "features": ["harmonic restraint", "restricted ground fault", "backup overcurrent", "transformer thermal protection"]
+      },
+      "importantNote": "Pin the current instruction-manual revision before transcribing settings; legacy Multilin T60 defaults must not be assumed valid for current firmware.",
+      "sources": [
+        "https://www.gevernova.com/grid-solutions/automation/protection-control-metering/transformer-protection/multilin-t60",
+        "https://www.gevernova.com/grid-solutions/resources?node_id=4444&prod=t60&type=3"
+      ],
+      "missingForProduction": ["exact order code and firmware", "manual revision", "differential pickup, slope, and breakpoint ranges", "harmonic restraint settings", "CT/winding compensation model", "operate-time tolerance"]
+    },
+    {
+      "id": "eaton_form6_recloser_control",
+      "type": "recloser",
+      "vendor": "Eaton Cooper Power",
+      "series": "Form 6",
+      "application": "distribution recloser control",
+      "libraryGranularity": "parametric control entry plus separate controlled-interrupter ratings",
+      "evidenceStatus": "curve-source-located",
+      "curveEvidence": {
+        "representation": "manufacturer recloser-control TCC families",
+        "status": "official curve document covering Form 4A/4C/4D/5/6/FX controls located",
+        "sourceUrl": "https://www.eaton.com/br/pt-br/catalog/medium-voltage-power-distribution-control-systems/form-6-recloser-control.technical.html"
+      },
+      "importantNote": "The control curve and the recloser interrupter ratings are separate records and must be linked.",
+      "sources": ["https://www.eaton.com/br/pt-br/catalog/medium-voltage-power-distribution-control-systems/form-6-recloser-control.technical.html"],
+      "missingForProduction": ["curve identifiers and coefficients", "pickup/time settings", "shot sequence", "controlled recloser model", "interrupting and continuous-current ratings"]
+    },
+    {
+      "id": "sel_651r_recloser_control",
+      "type": "recloser",
+      "vendor": "SEL",
+      "series": "SEL-651R",
+      "application": "distribution recloser control",
+      "libraryGranularity": "parametric control entry with selectable fast/delay curves and linked interrupter",
+      "evidenceStatus": "formula-ready",
+      "curveFamilies": [
+        "traditional A/B/C/D/E/F/G/H/J/KP/L/M/N/P/R/T/V/W/Y/Z and numbered curves",
+        "US moderately inverse/inverse/very inverse/extremely inverse/short-time inverse",
+        "IEC standard/very/extremely/long-time/short-time inverse"
+      ],
+      "verifiedSettings": {
+        "phasePickupPrimaryAAt1000to1Ct": { "minimum": 100 },
+        "groundPickupPrimaryAAt1000to1Ct": { "minimum": 5 }
+      },
+      "importantNote": "Pair the control with a compatible recloser model; control settings alone do not establish interrupting duty.",
+      "sources": [
+        "https://selinc.com/products/651r/docs/",
+        "https://cdn.selinc.com/assets/Literature/Product%20Literature/Data%20Sheets/651R_DS_20160715.pdf?v=20160815-105229"
+      ],
+      "missingForProduction": ["curve equations/coefficients", "time-dial range", "fast/delay sequence defaults", "controlled recloser model and ratings", "current product revision"]
+    },
+    {
+      "id": "sel_651ra_recloser_control",
+      "type": "recloser",
+      "vendor": "SEL",
+      "series": "SEL-651RA",
+      "application": "distribution recloser control",
+      "libraryGranularity": "parametric control entry with selectable curve and linked interrupter",
+      "evidenceStatus": "formula-ready",
+      "curveFamilies": ["10 US/IEEE and IEC curves", "38 traditional recloser curves"],
+      "curveModifiers": ["time adder", "vertical multiplier", "minimum response time"],
+      "features": ["four-shot reclosing", "eight settings groups", "phase-independent trip levels"],
+      "importantNote": "Pair the control with the specific compatible recloser and cable interface.",
+      "sources": ["https://selinc.com/products/651RA/?vidId=137863"],
+      "missingForProduction": ["curve names and coefficients", "setting ranges", "shot sequence schema", "controlled interrupter ratings", "compatibility link"]
+    }
+  ]
+}

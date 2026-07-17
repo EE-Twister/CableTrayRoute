@@ -2439,7 +2439,22 @@ function updatePanelStickySummary(panel, panelId, loads, circuitCount) {
     ? loads.filter(load => load?.panelId === panelId).length
     : 0;
   const totals = calculatePanelTotals(panelId);
-  summary.textContent = `${displayName} • ${assignedCount} Assigned Loads • ${circuitCount} Circuits • ${totals.connectedKva.toFixed(2)} kVA Connected`;
+  const items = [
+    { value: displayName, label: 'Panelboard' },
+    { value: circuitCount, label: 'Circuits' },
+    { value: assignedCount, label: 'Assigned Loads' },
+    { value: totals.connectedKva.toFixed(2), label: 'kVA Connected' }
+  ];
+  summary.replaceChildren(...items.map(item => {
+    const container = document.createElement('span');
+    container.className = 'panel-summary-item';
+    const value = document.createElement('strong');
+    value.textContent = String(item.value);
+    const label = document.createElement('span');
+    label.textContent = item.label;
+    container.append(value, label);
+    return container;
+  }));
 }
 
 function updateAssignmentStatus(panelId, loads, circuitCount) {
@@ -2958,16 +2973,16 @@ window.addEventListener("DOMContentLoaded", () => {
 
   const panelInfo = document.getElementById("panel-info");
   fieldAssistive.set('voltage', ensureFieldAssistiveText(voltageInput, {
-    helperText: 'Required for panel calculations and scheduling. Use a positive numeric value in volts.'
+    helperText: 'Positive volts; required for calculations.'
   }));
   fieldAssistive.set('circuitCount', ensureFieldAssistiveText(circuitInput, {
-    helperText: 'Set the total branch circuit positions available in this panel.'
+    helperText: 'Total available branch-circuit positions.'
   }));
   fieldAssistive.set('mainRating', ensureFieldAssistiveText(mainInput, {
-    helperText: 'Main device ampere rating used for checks against short-circuit capacity.'
+    helperText: 'Main ampere rating used for SCCR checks.'
   }));
   fieldAssistive.set('shortCircuitRating', ensureFieldAssistiveText(sccrInput, {
-    helperText: 'Panel SCCR in amperes. This should be greater than or equal to main rating.'
+    helperText: 'Panel SCCR must meet or exceed the main rating.'
   }));
   if (panelInfo) {
     panelInfo.addEventListener("input", () => validatePanelInputs());

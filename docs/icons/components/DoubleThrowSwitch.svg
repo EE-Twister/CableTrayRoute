@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 72">
+  <g fill="none" stroke="#111827" stroke-width="3" stroke-linecap="round">
+    <path d="M18 0v20M54 0v20M36 52v20"/><circle cx="18" cy="20" r="3" fill="#fff"/><circle cx="54" cy="20" r="3" fill="#fff"/><circle cx="36" cy="52" r="3" fill="#fff"/><path d="M36 52L18 20"/>
+  </g>
+  <text x="52" y="46" fill="#111827" font-family="Arial,sans-serif" font-size="9" font-weight="700">DT</text>
+</svg>

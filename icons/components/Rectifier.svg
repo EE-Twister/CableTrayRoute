@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 82">
+  <g fill="none" stroke="#111827" stroke-width="3" stroke-linejoin="round">
+    <path d="M36 0v10M36 68v14"/><rect x="14" y="10" width="44" height="58" rx="4"/><path d="M20 38h9M43 38h9M29 27v22l14-11zM43 27v22M23 56h10M39 56h10"/>
+  </g>
+  <text x="36" y="22" fill="#111827" font-family="Arial,sans-serif" font-size="8" font-weight="700" text-anchor="middle">AC/DC</text>
+</svg>

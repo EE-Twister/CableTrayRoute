@@ -23,6 +23,14 @@ function escapeHtml(value) {
   }[ch]));
 }
 
+function normalizeTrayCableType(value) {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (!normalized) return '';
+  if (normalized.includes('control')) return 'Control';
+  if (normalized.includes('signal') || normalized.includes('instrument') || normalized.includes('communication')) return 'Signal';
+  return 'Power';
+}
+
 function readStoredList(reader) {
   try {
     const value = reader();
@@ -405,7 +413,7 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
           o.textContent = optText;
           selCableType.appendChild(o);
         });
-        selCableType.value = data.cableType || data.cable_type || "";
+        selCableType.value = normalizeTrayCableType(data.cableType || data.cable_type);
         selCableType.addEventListener("change", e => { cables[idx].cableType = e.target.value; });
         tdCableType.appendChild(selCableType);
         tr.appendChild(tdCableType);
@@ -1342,20 +1350,34 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
 
       // ── Shared SVG builder for compartment-based tray cross-section ──────
       function buildCompartmentSvg(compLayouts, trayName, cableColor, scale, fillMap = {}) {
-        const nameRowPx    = trayName ? 24 : 0;
-        const perCompHeaderPx = 24;  // dimension label row per compartment
-        const compGapPx    = 8;      // vertical gap between compartments
-
-        // Compute SVG dimensions
-        let svgH = nameRowPx;
+        const nameRowPx = trayName ? 24 : 0;
+        const zoneHeaderPx = 34;
+        const maxDepth = Math.max(...compLayouts.map(cl => cl.compDepth));
+        const cableTags = [];
+        compLayouts.forEach(cl => cl.placed.forEach(placed => {
+          const members = placed.isGroup && Array.isArray(placed.members) ? placed.members : [placed];
+          members.forEach(member => {
+            const tag = String(member.tag || '').trim();
+            if (tag && !cableTags.includes(tag)) cableTags.push(tag);
+          });
+        }));
+        const markerByTag = new Map(cableTags.map((tag, index) => [tag, index + 1]));
+        const legendColumns = cableTags.length > 3 ? 2 : 1;
+        const legendRows = Math.ceil(cableTags.length / legendColumns);
+        const legendHeight = cableTags.length ? 24 + legendRows * 14 : 0;
+        const drawingTop = nameRowPx + zoneHeaderPx;
+        const svgW = compLayouts.reduce((sum, cl) => sum + cl.compWidth * scale, 0);
+        const svgH = drawingTop + maxDepth * scale + legendHeight + 8;
+        let xCursor = 0;
         const compPositions = compLayouts.map(cl => {
-          const headerY = svgH;
-          const rectY   = svgH + perCompHeaderPx;
-          svgH += perCompHeaderPx + cl.compDepth * scale + compGapPx;
-          return { headerY, rectY };
+          const position = {
+            x: xCursor,
+            headerY: nameRowPx,
+            rectY: drawingTop + (maxDepth - cl.compDepth) * scale
+          };
+          xCursor += cl.compWidth * scale;
+          return position;
         });
-        svgH = Math.max(svgH - compGapPx, nameRowPx + 10); // trim last gap
-        const svgW = Math.max(...compLayouts.map(cl => cl.compWidth)) * scale;
 
         let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${svgW.toFixed(0)}" height="${svgH.toFixed(0)}" style="background:#f9f9f9;border:1px solid #999;">`;
 
@@ -1366,59 +1388,79 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
 
         // Per-compartment elements
         compLayouts.forEach((cl, ci) => {
-          const { headerY, rectY } = compPositions[ci];
+          const { x: compX, headerY, rectY } = compPositions[ci];
           const compW = cl.compWidth * scale;
           const compH = cl.compDepth * scale;
-          const label = escapeHtml(cl.comp.label || `Compartment ${cl.comp.id}`);
-          const dimLineY = headerY + 12;
+          const label = escapeHtml(cl.comp.label || `Zone ${cl.comp.id}`);
+          const dimLineY = headerY + 22;
 
-          // Dimension line + label
-          svg += `<line x1="0" y1="${dimLineY}" x2="${compW.toFixed(2)}" y2="${dimLineY}" stroke="#000" stroke-width="1"/>`;
-          svg += `<line x1="0" y1="${dimLineY-4}" x2="0" y2="${dimLineY+4}" stroke="#000" stroke-width="1"/>`;
-          svg += `<line x1="${compW.toFixed(2)}" y1="${dimLineY-4}" x2="${compW.toFixed(2)}" y2="${dimLineY+4}" stroke="#000" stroke-width="1"/>`;
-          svg += `<text x="${(compW/2).toFixed(2)}" y="${dimLineY-4}" font-size="9px" text-anchor="middle" font-family="Arial,sans-serif">${label}</text>`;
-          svg += `<text x="${(compW/2).toFixed(2)}" y="${dimLineY+9}" font-size="9px" text-anchor="middle" font-family="Arial,sans-serif">${cl.compWidth.toFixed(1)}" × ${cl.compDepth.toFixed(1)}"</text>`;
+          // Dimension line + zone label
+          svg += `<line x1="${compX.toFixed(2)}" y1="${dimLineY}" x2="${(compX+compW).toFixed(2)}" y2="${dimLineY}" stroke="#000" stroke-width="1"/>`;
+          svg += `<line x1="${compX.toFixed(2)}" y1="${dimLineY-4}" x2="${compX.toFixed(2)}" y2="${dimLineY+4}" stroke="#000" stroke-width="1"/>`;
+          svg += `<line x1="${(compX+compW).toFixed(2)}" y1="${dimLineY-4}" x2="${(compX+compW).toFixed(2)}" y2="${dimLineY+4}" stroke="#000" stroke-width="1"/>`;
+          svg += `<text x="${(compX+compW/2).toFixed(2)}" y="${headerY+9}" font-size="9px" font-weight="700" text-anchor="middle" font-family="Arial,sans-serif">${label}</text>`;
+          svg += `<text x="${(compX+compW/2).toFixed(2)}" y="${dimLineY-4}" font-size="8px" text-anchor="middle" font-family="Arial,sans-serif">${cl.compWidth.toFixed(1)}" x ${cl.compDepth.toFixed(1)}"</text>`;
 
           // Compartment rectangle (heat-map background + border)
           const compFillPct = fillMap[cl.comp.id] || 0;
-          svg += `<rect x="0" y="${rectY}" width="${compW.toFixed(2)}" height="${compH.toFixed(2)}" fill="${svgFillColor(compFillPct)}"/>`;
-          svg += `<rect x="0" y="${rectY}" width="${compW.toFixed(2)}" height="${compH.toFixed(2)}" fill="none" stroke="#333" stroke-width="2"/>`;
+          svg += `<rect x="${compX.toFixed(2)}" y="${rectY}" width="${compW.toFixed(2)}" height="${compH.toFixed(2)}" fill="${svgFillColor(compFillPct)}"/>`;
+          svg += `<rect x="${compX.toFixed(2)}" y="${rectY}" width="${compW.toFixed(2)}" height="${compH.toFixed(2)}" fill="none" stroke="#333" stroke-width="2"/>`;
+
+          // Physical divider between adjacent tray zones.
+          if (ci > 0) {
+            svg += `<line x1="${compX.toFixed(2)}" y1="${drawingTop}" x2="${compX.toFixed(2)}" y2="${(drawingTop+maxDepth*scale).toFixed(2)}" stroke="#aa3300" stroke-width="4"/>`;
+            svg += `<text x="${compX.toFixed(2)}" y="${(drawingTop-3).toFixed(2)}" font-size="7px" font-weight="700" text-anchor="middle" fill="#aa3300" font-family="Arial,sans-serif">DIVIDER</text>`;
+          }
 
           // Inner barrier (stackable vs non-stackable divider)
           if (cl.largeCount > 0 && cl.smallCount > 0) {
-            const bxp = (cl.barrierX * scale).toFixed(2);
+            const bxp = (compX + cl.barrierX * scale).toFixed(2);
             svg += `<line x1="${bxp}" y1="${rectY}" x2="${bxp}" y2="${(rectY + compH).toFixed(2)}" stroke="#aa3300" stroke-width="2" stroke-dasharray="4 2"/>`;
           }
 
           // Cables in this compartment
           cl.placed.forEach(p => {
             if (p.isGroup && p.members && p.offsets) {
-              const gcx = (p.x * scale).toFixed(2);
+              const gcx = (compX + p.x * scale).toFixed(2);
               const gcy = (rectY + (cl.compDepth - p.y) * scale).toFixed(2);
               const gr  = (p.r * scale).toFixed(2);
               svg += `<circle cx="${gcx}" cy="${gcy}" r="${gr}" fill="none" stroke="#0066aa" stroke-width="1" stroke-dasharray="4 2"/>`;
               p.members.forEach((m, mi) => {
-                const mx = ((p.x + p.offsets[mi].x) * scale).toFixed(2);
+                const mx = (compX + (p.x + p.offsets[mi].x) * scale).toFixed(2);
                 const my = (rectY + (cl.compDepth - (p.y + p.offsets[mi].y)) * scale).toFixed(2);
                 const mr = ((m.OD / 2) * scale).toFixed(2);
-                m.tag = escapeHtml(m.tag);
-                m.cableType = escapeHtml(m.cableType);
-                m.count = escapeHtml(m.count);
-                m.size = escapeHtml(m.size);
-                svg += `<circle cx="${mx}" cy="${my}" r="${mr}" fill="${cableColor}" stroke="#0066aa" stroke-width="1"><title>Cable Tag: ${m.tag}\nCable Type: ${m.cableType}\nConductors: ${m.count}\nSize: ${m.size}\nOD: ${m.OD.toFixed(2)}″\nWt: ${m.weight.toFixed(2)} lbs/ft</title></circle>`;
+                const tag = String(m.tag || '').trim();
+                const marker = markerByTag.get(tag) || '';
+                svg += `<circle cx="${mx}" cy="${my}" r="${mr}" fill="${cableColor}" stroke="#0066aa" stroke-width="1"><title>Cable Tag: ${escapeHtml(tag)}\nCable Type: ${escapeHtml(m.cableType)}\nConductors: ${escapeHtml(m.count)}\nSize: ${escapeHtml(m.size)}\nOD: ${m.OD.toFixed(2)} in\nWt: ${m.weight.toFixed(2)} lbs/ft</title></circle>`;
+                svg += `<text x="${mx}" y="${my}" font-size="${Math.max(7,Math.min(11,Number(mr)*0.9)).toFixed(1)}px" font-weight="700" text-anchor="middle" dominant-baseline="middle" fill="#0f172a" font-family="Arial,sans-serif">${marker}</text>`;
               });
             } else {
-              const cx = (p.x * scale).toFixed(2);
+              const cx = (compX + p.x * scale).toFixed(2);
               const cy = (rectY + (cl.compDepth - p.y) * scale).toFixed(2);
               const r  = (p.r * scale).toFixed(2);
-              p.tag = escapeHtml(p.tag);
-              p.cableType = escapeHtml(p.cableType);
-              p.count = escapeHtml(p.count);
-              p.size = escapeHtml(p.size);
-              svg += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${cableColor}" stroke="#0066aa" stroke-width="1"><title>Cable Tag: ${p.tag}\nCable Type: ${p.cableType}\nConductors: ${p.count}\nSize: ${p.size}\nOD: ${p.OD.toFixed(2)}″\nWt: ${p.weight.toFixed(2)} lbs/ft</title></circle>`;
+              const tag = String(p.tag || '').trim();
+              const marker = markerByTag.get(tag) || '';
+              svg += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${cableColor}" stroke="#0066aa" stroke-width="1"><title>Cable Tag: ${escapeHtml(tag)}\nCable Type: ${escapeHtml(p.cableType)}\nConductors: ${escapeHtml(p.count)}\nSize: ${escapeHtml(p.size)}\nOD: ${p.OD.toFixed(2)} in\nWt: ${p.weight.toFixed(2)} lbs/ft</title></circle>`;
+              svg += `<text x="${cx}" y="${cy}" font-size="${Math.max(7,Math.min(11,Number(r)*0.9)).toFixed(1)}px" font-weight="700" text-anchor="middle" dominant-baseline="middle" fill="#0f172a" font-family="Arial,sans-serif">${marker}</text>`;
             }
           });
         });
+
+        if (cableTags.length) {
+          const legendTop = drawingTop + maxDepth * scale + 16;
+          const columnWidth = svgW / legendColumns;
+          svg += `<text x="4" y="${legendTop}" font-size="9px" font-weight="700" fill="#0f172a" font-family="Arial,sans-serif">CABLE IDENTIFICATION</text>`;
+          cableTags.forEach((tag, index) => {
+            const column = Math.floor(index / legendRows);
+            const row = index % legendRows;
+            const lx = column * columnWidth + 8;
+            const ly = legendTop + 14 + row * 14;
+            const marker = markerByTag.get(tag);
+            svg += `<circle cx="${lx+5}" cy="${ly-3}" r="5" fill="${cableColor}" stroke="#0066aa" stroke-width="1"/>`;
+            svg += `<text x="${lx+5}" y="${ly-3}" font-size="6px" font-weight="700" text-anchor="middle" dominant-baseline="middle" fill="#0f172a" font-family="Arial,sans-serif">${marker}</text>`;
+            svg += `<text x="${lx+14}" y="${ly}" font-size="8px" fill="#0f172a" font-family="Arial,sans-serif">${escapeHtml(tag)}</text>`;
+          });
+        }
 
         svg += '</svg>';
         return svg;

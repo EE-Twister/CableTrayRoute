@@ -15,6 +15,16 @@
       "from": "SWBD-101",
       "to": "PMP-101",
       "concrete_encasement": true,
+      "encasement": "Concrete encased",
+      "coverDepth": 36,
+      "soilThermalResistivity": 90,
+      "hSpacing": 3,
+      "vSpacing": 3,
+      "topPad": 3,
+      "bottomPad": 3,
+      "leftPad": 3,
+      "rightPad": 3,
+      "perRow": 2,
       "description": "Underground feeder ductbank from utility service to electrical room",
       "conduit_count": 4,
       "trade_size": "4",
@@ -30,13 +40,128 @@
         {
           "conduit_id": "CND-PMP-101",
           "type": "RMC",
-          "trade_size": "2",
+          "trade_size": "4",
           "start_x": 0,
           "start_y": 32,
           "start_z": -4,
           "end_x": 95,
           "end_y": 0,
-          "end_z": 12
+          "end_z": 12,
+          "row": 1,
+          "column": 1
+        },
+        {
+          "conduit_id": "CND-DB101-SPARE-1",
+          "type": "PVC Sch 40",
+          "trade_size": "4",
+          "spare": true,
+          "row": 1,
+          "column": 2
+        },
+        {
+          "conduit_id": "CND-DB101-SPARE-2",
+          "type": "PVC Sch 40",
+          "trade_size": "4",
+          "spare": true,
+          "row": 2,
+          "column": 1
+        },
+        {
+          "conduit_id": "CND-DB101-SPARE-3",
+          "type": "PVC Sch 40",
+          "trade_size": "4",
+          "spare": true,
+          "row": 2,
+          "column": 2
+        }
+      ]
+    },
+    {
+      "id": "DB-102",
+      "tag": "DB-102",
+      "ductbank_id": "DB-102",
+      "from": "SWBD-101",
+      "to": "MCC-102",
+      "concrete_encasement": true,
+      "encasement": "Concrete encased",
+      "coverDepth": 36,
+      "soilThermalResistivity": 90,
+      "hSpacing": 3,
+      "vSpacing": 3,
+      "topPad": 3,
+      "bottomPad": 3,
+      "leftPad": 3,
+      "rightPad": 3,
+      "perRow": 3,
+      "description": "Underground production-area feeder ductbank",
+      "conduit_count": 6,
+      "trade_size": "4",
+      "length": 210,
+      "length_ft": 210,
+      "start_x": 0,
+      "start_y": 56,
+      "start_z": -4,
+      "end_x": 210,
+      "end_y": 56,
+      "end_z": -4,
+      "conduits": [
+        {
+          "conduit_id": "CND-MCC-102",
+          "type": "PVC Sch 40",
+          "trade_size": "4",
+          "start_x": 0,
+          "start_y": 56,
+          "start_z": -4,
+          "end_x": 210,
+          "end_y": 56,
+          "end_z": -4,
+          "row": 1,
+          "column": 1
+        },
+        {
+          "conduit_id": "CND-CTRL-102",
+          "type": "PVC Sch 40",
+          "trade_size": "2",
+          "start_x": 0,
+          "start_y": 57,
+          "start_z": -4,
+          "end_x": 210,
+          "end_y": 57,
+          "end_z": -4,
+          "row": 1,
+          "column": 2
+        },
+        {
+          "conduit_id": "CND-DB102-SPARE-1",
+          "type": "PVC Sch 40",
+          "trade_size": "4",
+          "spare": true,
+          "row": 1,
+          "column": 3
+        },
+        {
+          "conduit_id": "CND-DB102-SPARE-2",
+          "type": "PVC Sch 40",
+          "trade_size": "4",
+          "spare": true,
+          "row": 2,
+          "column": 1
+        },
+        {
+          "conduit_id": "CND-DB102-SPARE-3",
+          "type": "PVC Sch 40",
+          "trade_size": "4",
+          "spare": true,
+          "row": 2,
+          "column": 2
+        },
+        {
+          "conduit_id": "CND-DB102-SPARE-4",
+          "type": "PVC Sch 40",
+          "trade_size": "4",
+          "spare": true,
+          "row": 2,
+          "column": 3
         }
       ]
     }
@@ -52,6 +177,9 @@
       "length": 160,
       "length_ft": 160,
       "material": "Aluminum",
+      "num_slots": 2,
+      "slot_groups": { "0": "Zone 1 - 480 V Feeders", "1": "Zone 2 - 208 V Feeders" },
+      "slotFills": [18, 10],
       "fill": 28,
       "inside_width": 24,
       "tray_depth": 6,
@@ -63,12 +191,60 @@
       "end_x": 160,
       "end_y": 0,
       "end_z": 12
+    },
+    {
+      "id": "TR-PWR-102",
+      "tray_id": "TR-PWR-102",
+      "description": "Production area power tray",
+      "width": 30,
+      "height": 6,
+      "length": 220,
+      "length_ft": 220,
+      "material": "Aluminum",
+      "num_slots": 1,
+      "slot_groups": { "0": "Zone 1 - Production Motors" },
+      "fill": 22,
+      "inside_width": 30,
+      "tray_depth": 6,
+      "tray_type": "Ladder",
+      "current_fill": 22,
+      "start_x": 210,
+      "start_y": 56,
+      "start_z": 14,
+      "end_x": 430,
+      "end_y": 56,
+      "end_z": 14
+    },
+    {
+      "id": "TR-PWR-103",
+      "tray_id": "TR-PWR-103",
+      "description": "Utilities and HVAC power tray",
+      "width": 18,
+      "height": 4,
+      "length": 140,
+      "length_ft": 140,
+      "material": "Hot-dip galvanized steel",
+      "num_slots": 2,
+      "slot_groups": { "0": "Zone 1 - VFD Input", "1": "Zone 2 - VFD Output" },
+      "slotFills": [9, 9],
+      "fill": 18,
+      "inside_width": 18,
+      "tray_depth": 4,
+      "tray_type": "Ladder",
+      "current_fill": 18,
+      "start_x": 145,
+      "start_y": 0,
+      "start_z": 16,
+      "end_x": 285,
+      "end_y": 0,
+      "end_z": 16
     }
   ],
   "cables": [
     {
       "tag": "CBL-SWBD-MCC-101",
       "name": "CBL-SWBD-MCC-101",
+      "zone": 1,
       "from": "SWBD-101",
       "from_tag": "SWBD-101",
       "to": "MCC-101",
@@ -131,6 +307,7 @@
     {
       "tag": "CBL-SWBD-XFMR-101",
       "name": "CBL-SWBD-XFMR-101",
+      "zone": 1,
       "from": "SWBD-101",
       "from_tag": "SWBD-101",
       "to": "XFMR-101",
@@ -162,6 +339,7 @@
     {
       "tag": "CBL-XFMR-LP-101",
       "name": "CBL-XFMR-LP-101",
+      "zone": 2,
       "from": "XFMR-101",
       "from_tag": "XFMR-101",
       "to": "LP-101",
@@ -189,6 +367,261 @@
       "voltage": "208",
       "insulation_type": "THHN",
       "cable_rating": 600
+    },
+    {
+      "tag": "CBL-SWBD-MCC-102",
+      "name": "CBL-SWBD-MCC-102",
+      "from": "SWBD-101",
+      "from_tag": "SWBD-101",
+      "to": "MCC-102",
+      "to_tag": "MCC-102",
+      "cable_type": "Power",
+      "conductors": 3,
+      "conductor_size": "350 kcmil",
+      "conductor_material": "Copper",
+      "raceway_material": "PVC",
+      "ground_size": "#3 AWG",
+      "ground_material": "Copper",
+      "ocpd_rating": 350,
+      "length": 210,
+      "length_ft": 210,
+      "raceway_ids": ["CND-MCC-102"],
+      "route_preference": "CND-MCC-102",
+      "start_x": 0,
+      "start_y": 56,
+      "start_z": -4,
+      "end_x": 210,
+      "end_y": 56,
+      "end_z": -4,
+      "diameter": 1.85,
+      "weight": 4.3,
+      "voltage": "480",
+      "insulation_type": "XHHW-2",
+      "cable_rating": 600
+    },
+    {
+      "tag": "CBL-MCC-VFD-101",
+      "name": "CBL-MCC-VFD-101",
+      "zone": 1,
+      "from": "MCC-101",
+      "from_tag": "MCC-101",
+      "to": "VFD-101",
+      "to_tag": "VFD-101",
+      "cable_type": "Power",
+      "conductors": 3,
+      "conductor_size": "#2 AWG",
+      "conductor_material": "Copper",
+      "raceway_material": "Aluminum",
+      "ground_size": "#8 AWG",
+      "ground_material": "Copper",
+      "ocpd_rating": 100,
+      "length": 88,
+      "length_ft": 88,
+      "raceway_ids": ["TR-PWR-103"],
+      "route_preference": "TR-PWR-103",
+      "start_x": 145,
+      "start_y": 0,
+      "start_z": 16,
+      "end_x": 233,
+      "end_y": 0,
+      "end_z": 16,
+      "diameter": 1.05,
+      "weight": 2.2,
+      "voltage": "480",
+      "insulation_type": "XHHW-2",
+      "cable_rating": 600
+    },
+    {
+      "tag": "CBL-VFD-PMP-102",
+      "name": "CBL-VFD-PMP-102",
+      "zone": 2,
+      "from": "VFD-101",
+      "from_tag": "VFD-101",
+      "to": "PMP-102",
+      "to_tag": "PMP-102",
+      "cable_type": "VFD Power",
+      "conductors": 3,
+      "conductor_size": "#2 AWG",
+      "conductor_material": "Copper",
+      "raceway_material": "Aluminum",
+      "ground_size": "#8 AWG",
+      "ground_material": "Copper",
+      "ocpd_rating": 100,
+      "length": 52,
+      "length_ft": 52,
+      "raceway_ids": ["TR-PWR-103"],
+      "route_preference": "TR-PWR-103",
+      "start_x": 233,
+      "start_y": 0,
+      "start_z": 16,
+      "end_x": 285,
+      "end_y": 0,
+      "end_z": 16,
+      "diameter": 1.25,
+      "weight": 2.8,
+      "voltage": "480",
+      "insulation_type": "VFD Cable XLPE",
+      "cable_rating": 1000
+    },
+    {
+      "tag": "CBL-MCC2-FAN-101",
+      "name": "CBL-MCC2-FAN-101",
+      "zone": 1,
+      "from": "MCC-102",
+      "from_tag": "MCC-102",
+      "to": "FAN-101",
+      "to_tag": "FAN-101",
+      "cable_type": "Power",
+      "conductors": 3,
+      "conductor_size": "#6 AWG",
+      "conductor_material": "Copper",
+      "raceway_material": "Aluminum",
+      "ground_size": "#10 AWG",
+      "ground_material": "Copper",
+      "ocpd_rating": 40,
+      "length": 120,
+      "length_ft": 120,
+      "raceway_ids": ["TR-PWR-102"],
+      "route_preference": "TR-PWR-102",
+      "start_x": 210,
+      "start_y": 56,
+      "start_z": 14,
+      "end_x": 330,
+      "end_y": 56,
+      "end_z": 14,
+      "diameter": 0.68,
+      "weight": 0.95,
+      "voltage": "480",
+      "insulation_type": "THHN",
+      "cable_rating": 600
+    },
+    {
+      "tag": "CBL-MCC2-AHU-101",
+      "name": "CBL-MCC2-AHU-101",
+      "zone": 1,
+      "from": "MCC-102",
+      "from_tag": "MCC-102",
+      "to": "AHU-101",
+      "to_tag": "AHU-101",
+      "cable_type": "Power",
+      "conductors": 3,
+      "conductor_size": "#4 AWG",
+      "conductor_material": "Copper",
+      "raceway_material": "Aluminum",
+      "ground_size": "#10 AWG",
+      "ground_material": "Copper",
+      "ocpd_rating": 60,
+      "length": 165,
+      "length_ft": 165,
+      "raceway_ids": ["TR-PWR-102"],
+      "route_preference": "TR-PWR-102",
+      "start_x": 210,
+      "start_y": 56,
+      "start_z": 14,
+      "end_x": 375,
+      "end_y": 56,
+      "end_z": 14,
+      "diameter": 0.78,
+      "weight": 1.2,
+      "voltage": "480",
+      "insulation_type": "THHN",
+      "cable_rating": 600
+    },
+    {
+      "tag": "CBL-MCC2-CMP-101",
+      "name": "CBL-MCC2-CMP-101",
+      "zone": 1,
+      "from": "MCC-102",
+      "from_tag": "MCC-102",
+      "to": "CMP-101",
+      "to_tag": "CMP-101",
+      "cable_type": "Power",
+      "conductors": 3,
+      "conductor_size": "1/0 AWG",
+      "conductor_material": "Copper",
+      "raceway_material": "Aluminum",
+      "ground_size": "#6 AWG",
+      "ground_material": "Copper",
+      "ocpd_rating": 150,
+      "length": 205,
+      "length_ft": 205,
+      "raceway_ids": ["TR-PWR-102"],
+      "route_preference": "TR-PWR-102",
+      "start_x": 210,
+      "start_y": 56,
+      "start_z": 14,
+      "end_x": 415,
+      "end_y": 56,
+      "end_z": 14,
+      "diameter": 1.18,
+      "weight": 2.7,
+      "voltage": "480",
+      "insulation_type": "XHHW-2",
+      "cable_rating": 600
+    },
+    {
+      "tag": "CBL-SWBD-XFMR-102",
+      "name": "CBL-SWBD-XFMR-102",
+      "zone": 1,
+      "from": "SWBD-101",
+      "from_tag": "SWBD-101",
+      "to": "XFMR-102",
+      "to_tag": "XFMR-102",
+      "cable_type": "Power",
+      "conductors": 3,
+      "conductor_size": "2/0 AWG",
+      "conductor_material": "Copper",
+      "raceway_material": "Aluminum",
+      "ground_size": "#6 AWG",
+      "ground_material": "Copper",
+      "ocpd_rating": 175,
+      "length": 118,
+      "length_ft": 118,
+      "raceway_ids": ["TR-PWR-101"],
+      "route_preference": "TR-PWR-101",
+      "start_x": 0,
+      "start_y": 0,
+      "start_z": 12,
+      "end_x": 118,
+      "end_y": 0,
+      "end_z": 12,
+      "diameter": 1.28,
+      "weight": 3.0,
+      "voltage": "480",
+      "insulation_type": "THHN",
+      "cable_rating": 600
+    },
+    {
+      "tag": "CBL-XFMR-LP-102",
+      "name": "CBL-XFMR-LP-102",
+      "zone": 2,
+      "from": "XFMR-102",
+      "from_tag": "XFMR-102",
+      "to": "LP-102",
+      "to_tag": "LP-102",
+      "cable_type": "Power",
+      "conductors": 4,
+      "conductor_size": "#1 AWG",
+      "conductor_material": "Copper",
+      "raceway_material": "Aluminum",
+      "ground_size": "#8 AWG",
+      "ground_material": "Copper",
+      "ocpd_rating": 125,
+      "length": 42,
+      "length_ft": 42,
+      "raceway_ids": ["TR-PWR-101"],
+      "route_preference": "TR-PWR-101",
+      "start_x": 118,
+      "start_y": 0,
+      "start_z": 12,
+      "end_x": 160,
+      "end_y": 0,
+      "end_z": 12,
+      "diameter": 1.18,
+      "weight": 2.6,
+      "voltage": "208",
+      "insulation_type": "THHN",
+      "cable_rating": 600
     }
   ],
   "cableTypicals": [],
@@ -198,6 +631,13 @@
       "description": "Lighting and receptacle panel",
       "voltage": "208/120",
       "source": "XFMR-101",
+      "busRating": "225"
+    },
+    {
+      "tag": "LP-102",
+      "description": "Warehouse lighting and receptacle panel",
+      "voltage": "208/120",
+      "source": "XFMR-102",
       "busRating": "225"
     }
   ],
@@ -214,6 +654,126 @@
       "model": "Power-Style QED",
       "phases": "3",
       "x": 0,
+      "y": 0,
+      "z": 12
+    },
+    {
+      "tag": "MCC-102",
+      "description": "Production motor control center",
+      "voltage": "480",
+      "category": "Distribution",
+      "subCategory": "MCC",
+      "arrangement": "Production Area",
+      "lineup": "MCC-102",
+      "manufacturer": "Allen-Bradley",
+      "model": "CENTERLINE 2100",
+      "phases": "3",
+      "x": 210,
+      "y": 56,
+      "z": 14
+    },
+    {
+      "tag": "VFD-101",
+      "description": "Secondary cooling pump variable frequency drive",
+      "voltage": "480",
+      "category": "Motor Control",
+      "subCategory": "VFD",
+      "arrangement": "Utilities Area",
+      "lineup": "VFD-101",
+      "manufacturer": "Rockwell Automation",
+      "model": "PowerFlex 755",
+      "phases": "3",
+      "x": 233,
+      "y": 0,
+      "z": 16
+    },
+    {
+      "tag": "PMP-102",
+      "description": "Secondary cooling water pump",
+      "voltage": "480",
+      "category": "Mechanical Load",
+      "subCategory": "Pump",
+      "arrangement": "Utilities Area",
+      "lineup": "Process Pumps",
+      "manufacturer": "Goulds",
+      "model": "3196",
+      "phases": "3",
+      "x": 285,
+      "y": 0,
+      "z": 16
+    },
+    {
+      "tag": "FAN-101",
+      "description": "Production exhaust fan",
+      "voltage": "480",
+      "category": "Mechanical Load",
+      "subCategory": "Fan",
+      "arrangement": "Production Area",
+      "lineup": "Ventilation",
+      "manufacturer": "Greenheck",
+      "model": "QEI",
+      "phases": "3",
+      "x": 330,
+      "y": 56,
+      "z": 14
+    },
+    {
+      "tag": "AHU-101",
+      "description": "Production air-handling unit",
+      "voltage": "480",
+      "category": "Mechanical Load",
+      "subCategory": "Air Handler",
+      "arrangement": "Production Area",
+      "lineup": "HVAC",
+      "manufacturer": "Trane",
+      "model": "Performance Climate Changer",
+      "phases": "3",
+      "x": 375,
+      "y": 56,
+      "z": 14
+    },
+    {
+      "tag": "CMP-101",
+      "description": "Plant instrument air compressor",
+      "voltage": "480",
+      "category": "Mechanical Load",
+      "subCategory": "Compressor",
+      "arrangement": "Production Area",
+      "lineup": "Compressed Air",
+      "manufacturer": "Ingersoll Rand",
+      "model": "R-Series",
+      "phases": "3",
+      "x": 415,
+      "y": 56,
+      "z": 14
+    },
+    {
+      "tag": "XFMR-102",
+      "description": "480-208/120 V warehouse transformer",
+      "voltage": "480/208",
+      "category": "Transformer",
+      "subCategory": "Dry Type",
+      "arrangement": "Electrical Room B",
+      "lineup": "XFMR-102",
+      "manufacturer": "Eaton",
+      "model": "V48M28T112",
+      "phases": "3",
+      "x": 118,
+      "y": 0,
+      "z": 12
+    },
+    {
+      "tag": "LP-102",
+      "description": "208/120 V warehouse panelboard",
+      "voltage": "208/120",
+      "category": "Panel",
+      "subCategory": "Lighting Panel",
+      "arrangement": "Electrical Room B",
+      "lineup": "LP-102",
+      "manufacturer": "Square D",
+      "model": "NF",
+      "phases": "3",
+      "x": 160,
       "y": 0,
       "z": 12
     },
@@ -326,6 +886,118 @@
       "demandFactor": "50",
       "phases": "1",
       "circuit": "LP-101-05"
+    },
+    {
+      "source": "VFD-101",
+      "tag": "PMP-102",
+      "description": "Secondary cooling water pump motor",
+      "quantity": "1",
+      "voltage": "480",
+      "loadType": "Motor",
+      "duty": "Continuous",
+      "kw": "37.3",
+      "powerFactor": "0.88",
+      "loadFactor": "90",
+      "efficiency": "94",
+      "demandFactor": "125",
+      "phases": "3",
+      "circuit": "MCC-101-03"
+    },
+    {
+      "source": "MCC-102",
+      "tag": "FAN-101",
+      "description": "Production exhaust fan motor",
+      "quantity": "1",
+      "voltage": "480",
+      "loadType": "Motor",
+      "duty": "Continuous",
+      "kw": "11.2",
+      "powerFactor": "0.84",
+      "loadFactor": "85",
+      "efficiency": "91",
+      "demandFactor": "125",
+      "phases": "3",
+      "circuit": "MCC-102-01"
+    },
+    {
+      "source": "MCC-102",
+      "tag": "AHU-101",
+      "description": "Air-handling unit supply fan",
+      "quantity": "1",
+      "voltage": "480",
+      "loadType": "Motor",
+      "duty": "Continuous",
+      "kw": "22.4",
+      "powerFactor": "0.86",
+      "loadFactor": "80",
+      "efficiency": "93",
+      "demandFactor": "125",
+      "phases": "3",
+      "circuit": "MCC-102-03"
+    },
+    {
+      "source": "MCC-102",
+      "tag": "CMP-101",
+      "description": "Instrument air compressor motor",
+      "quantity": "1",
+      "voltage": "480",
+      "loadType": "Motor",
+      "duty": "Intermittent",
+      "kw": "55.9",
+      "powerFactor": "0.87",
+      "loadFactor": "75",
+      "efficiency": "94",
+      "demandFactor": "100",
+      "phases": "3",
+      "circuit": "MCC-102-05"
+    },
+    {
+      "source": "LP-102",
+      "tag": "LTG-102",
+      "description": "Warehouse LED lighting",
+      "quantity": "1",
+      "voltage": "120",
+      "loadType": "Lighting",
+      "duty": "Continuous",
+      "kw": "6.8",
+      "powerFactor": "0.98",
+      "loadFactor": "100",
+      "efficiency": "100",
+      "demandFactor": "100",
+      "phases": "1",
+      "circuit": "LP-102-03"
+    },
+    {
+      "source": "LP-102",
+      "tag": "REC-102",
+      "description": "Warehouse general receptacles",
+      "quantity": "18",
+      "voltage": "120",
+      "loadType": "Receptacle",
+      "duty": "Intermittent",
+      "kw": "0.18",
+      "powerFactor": "0.90",
+      "loadFactor": "100",
+      "efficiency": "100",
+      "demandFactor": "50",
+      "phases": "1",
+      "circuit": "LP-102-05"
+    },
+    {
+      "source": "LP-102",
+      "tag": "DOOR-101",
+      "description": "Warehouse overhead door operators",
+      "quantity": "3",
+      "voltage": "208",
+      "loadType": "Motor",
+      "duty": "Intermittent",
+      "kw": "1.1",
+      "powerFactor": "0.82",
+      "loadFactor": "50",
+      "efficiency": "85",
+      "demandFactor": "75",
+      "phases": "3",
+      "circuit": "LP-102-09"
     }
   ],
   "oneLine": {
@@ -336,33 +1008,78 @@
         "name": "Main One-Line",
         "components": [
           {
-            "id": "comp-swbd-101",
+            "id": "comp-utility-1",
             "type": "source",
             "subtype": "utility_source",
+            "label": "UTILITY-1",
+            "x": 678,
+            "y": 20,
+            "voltage": 480,
+            "baseKV": 0.48,
+            "thevenin_mva": 20,
+            "xr_ratio": 10,
+            "connections": [
+              { "target": "comp-fuse-main", "sourcePort": 0, "targetPort": 0 }
+            ]
+          },
+          {
+            "id": "comp-fuse-main",
+            "type": "fuse",
+            "subtype": "class_rk1",
+            "label": "MAIN-SWBD-101",
+            "x": 682,
+            "y": 100,
+            "voltage": 480,
+            "props": { "tag": "MAIN-SWBD-101", "class": "L", "rating_a": 800, "interrupting_rating_ka": 200 },
+            "connections": [
+              { "target": "comp-swbd-101", "sourcePort": 1, "targetPort": 0 }
+            ]
+          },
+          {
+            "id": "comp-swbd-101",
+            "type": "bus",
+            "subtype": "Bus",
             "label": "SWBD-101",
             "ref": "SWBD-101",
-            "labelOffset": { "x": 0, "y": -28 },
-            "x": 120,
-            "y": 120,
+            "x": 180,
+            "y": 210,
+            "width": 1040,
+            "height": 20,
         "equipmentRef": "SWBD-101",
         "voltage": 480,
         "baseKV": 0.48,
-        "thevenin_mva": 20,
-        "xr_ratio": 10,
+        "props": { "tag": "SWBD-101", "rated_voltage_kv": 0.48, "bus_rating_a": 800, "short_circuit_rating_ka": 65 },
             "scheduleLinks": { "equipment": "SWBD-101" },
             "connections": [
-              { "target": "comp-mcc-101", "cable": { "tag": "CBL-SWBD-MCC-101", "conductor_size": "500 kcmil", "length": 145 } },
-              { "target": "comp-xfmr-101", "sourcePort": 1, "targetPort": 0, "phases": "A,B,C", "cable": { "tag": "CBL-SWBD-XFMR-101", "conductor_size": "#1 AWG", "length": 62 } }
+              { "target": "comp-fuse-mcc-101" },
+              { "target": "comp-xfmr-101", "targetPort": 0, "phases": "A,B,C", "cable": { "tag": "CBL-SWBD-XFMR-101", "conductor_size": "#1 AWG", "length": 62 } },
+              { "target": "comp-fuse-mcc-102" },
+              { "target": "comp-fuse-xfmr-102" }
+            ]
+          },
+          {
+            "id": "comp-fuse-mcc-101",
+            "type": "fuse",
+            "subtype": "class_rk1",
+            "label": "FDR-MCC-101",
+            "x": 322,
+            "y": 280,
+            "voltage": 480,
+            "props": { "tag": "FDR-MCC-101", "class": "J", "rating_a": 400, "interrupting_rating_ka": 200 },
+            "connections": [
+              { "target": "comp-mcc-101", "sourcePort": 1, "cable": { "tag": "CBL-SWBD-MCC-101", "conductor_size": "500 kcmil", "length": 145 } }
             ]
           },
           {
             "id": "comp-mcc-101",
-            "type": "equipment",
-            "subtype": "mcc",
+            "type": "bus",
+            "subtype": "Bus",
             "label": "MCC-101",
             "ref": "MCC-101",
-            "x": 360,
-            "y": 120,
+            "x": 230,
+            "y": 390,
+            "width": 440,
+            "height": 20,
             "equipmentRef": "MCC-101",
             "voltage": 480,
             "props": {
@@ -380,7 +1097,21 @@
             },
             "scheduleLinks": { "equipment": "MCC-101" },
             "connections": [
-              { "target": "comp-pmp-101", "cable": { "tag": "CBL-MCC-PMP-101", "conductor_size": "#4 AWG", "length": 95 } }
+              { "target": "comp-fuse-pmp-101" },
+              { "target": "comp-vfd-101", "cable": { "tag": "CBL-MCC-VFD-101", "conductor_size": "#2 AWG", "length": 88 } }
+            ]
+          },
+          {
+            "id": "comp-fuse-pmp-101",
+            "type": "fuse",
+            "subtype": "class_rk1",
+            "label": "MCP-PMP-101",
+            "x": 312,
+            "y": 455,
+            "voltage": 480,
+            "props": { "tag": "MCP-PMP-101", "class": "J", "rating_a": 60, "interrupting_rating_ka": 200 },
+            "connections": [
+              { "target": "comp-pmp-101", "sourcePort": 1, "targetPort": 0, "cable": { "tag": "CBL-MCC-PMP-101", "conductor_size": "#4 AWG", "length": 95 } }
             ]
           },
           {
@@ -389,8 +1120,8 @@
             "subtype": "motor_load",
             "label": "PMP-101",
             "ref": "PMP-101",
-            "x": 600,
-            "y": 120,
+            "x": 308,
+            "y": 555,
             "loadRef": "PMP-101",
             "equipmentRef": "PMP-101",
             "voltage": 480,
@@ -404,7 +1135,7 @@
             "subtype": "two_winding",
             "label": "XFMR-101",
             "ref": "XFMR-101",
-            "x": 360,
+            "x": 785,
             "y": 300,
             "equipmentRef": "XFMR-101",
             "voltage": 480,
@@ -424,8 +1155,8 @@
             "subtype": "panelboard",
             "label": "LP-101",
             "ref": "LP-101",
-            "x": 600,
-            "y": 300,
+            "x": 791,
+            "y": 445,
             "panelRef": "LP-101",
             "voltage": 208,
             "props": {
@@ -442,6 +1173,172 @@
               "service_type": "208Y/120 V"
             },
             "scheduleLinks": { "panel": "LP-101", "equipment": "LP-101" }
+          },
+          {
+            "id": "comp-vfd-101",
+            "type": "equipment",
+            "subtype": "vfd",
+            "label": "VFD-101",
+            "ref": "VFD-101",
+            "x": 535,
+            "y": 455,
+            "equipmentRef": "VFD-101",
+            "voltage": 480,
+            "props": { "rated_voltage_kv": 0.48, "rated_hp": 50, "sccr_ka": 65 },
+            "scheduleLinks": { "equipment": "VFD-101" },
+            "connections": [
+              { "target": "comp-pmp-102", "sourcePort": 1, "targetPort": 0, "cable": { "tag": "CBL-VFD-PMP-102", "conductor_size": "#2 AWG", "length": 52 } }
+            ]
+          },
+          {
+            "id": "comp-pmp-102",
+            "type": "load",
+            "subtype": "motor_load",
+            "label": "PMP-102",
+            "ref": "PMP-102",
+            "x": 535,
+            "y": 585,
+            "loadRef": "PMP-102",
+            "equipmentRef": "PMP-102",
+            "voltage": 480,
+            "kw": 37.3,
+            "powerFactor": 0.88,
+            "scheduleLinks": { "load": "PMP-102", "equipment": "PMP-102" }
+          },
+          {
+            "id": "comp-fuse-mcc-102",
+            "type": "fuse",
+            "subtype": "class_rk1",
+            "label": "FDR-MCC-102",
+            "x": 442,
+            "y": 690,
+            "voltage": 480,
+            "props": { "tag": "FDR-MCC-102", "class": "J", "rating_a": 400, "interrupting_rating_ka": 200 },
+            "connections": [
+              { "target": "comp-mcc-102", "sourcePort": 1, "cable": { "tag": "CBL-SWBD-MCC-102", "conductor_size": "350 kcmil", "length": 210 } }
+            ]
+          },
+          {
+            "id": "comp-mcc-102",
+            "type": "bus",
+            "subtype": "Bus",
+            "label": "MCC-102",
+            "ref": "MCC-102",
+            "x": 210,
+            "y": 800,
+            "width": 700,
+            "height": 20,
+            "equipmentRef": "MCC-102",
+            "voltage": 480,
+            "props": { "rated_voltage_kv": 0.48, "bus_rating_a": 600, "main_device_type": "Main breaker", "sccr_ka": 65, "bucket_count": 14, "spare_bucket_count": 4 },
+            "scheduleLinks": { "equipment": "MCC-102" },
+            "connections": [
+              { "target": "comp-fan-101", "cable": { "tag": "CBL-MCC2-FAN-101", "conductor_size": "#6 AWG", "length": 120 } },
+              { "target": "comp-ahu-101", "cable": { "tag": "CBL-MCC2-AHU-101", "conductor_size": "#4 AWG", "length": 165 } },
+              { "target": "comp-fuse-cmp-101" }
+            ]
+          },
+          {
+            "id": "comp-fan-101",
+            "type": "load",
+            "subtype": "motor_load",
+            "label": "FAN-101",
+            "ref": "FAN-101",
+            "x": 268,
+            "y": 900,
+            "loadRef": "FAN-101",
+            "equipmentRef": "FAN-101",
+            "voltage": 480,
+            "kw": 11.2,
+            "scheduleLinks": { "load": "FAN-101", "equipment": "FAN-101" }
+          },
+          {
+            "id": "comp-ahu-101",
+            "type": "load",
+            "subtype": "motor_load",
+            "label": "AHU-101",
+            "ref": "AHU-101",
+            "x": 498,
+            "y": 900,
+            "loadRef": "AHU-101",
+            "equipmentRef": "AHU-101",
+            "voltage": 480,
+            "kw": 22.4,
+            "scheduleLinks": { "load": "AHU-101", "equipment": "AHU-101" }
+          },
+          {
+            "id": "comp-fuse-cmp-101",
+            "type": "fuse",
+            "subtype": "class_rk1",
+            "label": "MCP-CMP-101",
+            "x": 732,
+            "y": 855,
+            "voltage": 480,
+            "props": { "tag": "MCP-CMP-101", "class": "J", "rating_a": 200, "interrupting_rating_ka": 200 },
+            "connections": [
+              { "target": "comp-cmp-101", "sourcePort": 1, "targetPort": 0, "cable": { "tag": "CBL-MCC2-CMP-101", "conductor_size": "1/0 AWG", "length": 205 } }
+            ]
+          },
+          {
+            "id": "comp-cmp-101",
+            "type": "load",
+            "subtype": "motor_load",
+            "label": "CMP-101",
+            "ref": "CMP-101",
+            "x": 728,
+            "y": 965,
+            "loadRef": "CMP-101",
+            "equipmentRef": "CMP-101",
+            "voltage": 480,
+            "kw": 55.9,
+            "scheduleLinks": { "load": "CMP-101", "equipment": "CMP-101" }
+          },
+          {
+            "id": "comp-fuse-xfmr-102",
+            "type": "fuse",
+            "subtype": "class_rk1",
+            "label": "FDR-XFMR-102",
+            "x": 1052,
+            "y": 690,
+            "voltage": 480,
+            "props": { "tag": "FDR-XFMR-102", "class": "J", "rating_a": 200, "interrupting_rating_ka": 200 },
+            "connections": [
+              { "target": "comp-xfmr-102", "sourcePort": 1, "targetPort": 0, "cable": { "tag": "CBL-SWBD-XFMR-102", "conductor_size": "2/0 AWG", "length": 118 } }
+            ]
+          },
+          {
+            "id": "comp-xfmr-102",
+            "type": "transformer",
+            "subtype": "two_winding",
+            "label": "XFMR-102",
+            "ref": "XFMR-102",
+            "x": 1042,
+            "y": 800,
+            "equipmentRef": "XFMR-102",
+            "voltage": 480,
+            "volts_primary": 480,
+            "volts_secondary": 208,
+            "kva": 112.5,
+            "percent_z": 5.5,
+            "xr_ratio": 6,
+            "scheduleLinks": { "equipment": "XFMR-102" },
+            "connections": [
+              { "target": "comp-lp-102", "sourcePort": 1, "targetPort": 0, "phases": "A,B,C", "cable": { "tag": "CBL-XFMR-LP-102", "conductor_size": "#1 AWG", "length": 42 } }
+            ]
+          },
+          {
+            "id": "comp-lp-102",
+            "type": "panel",
+            "subtype": "panelboard",
+            "label": "LP-102",
+            "ref": "LP-102",
+            "x": 1048,
+            "y": 950,
+            "panelRef": "LP-102",
+            "equipmentRef": "LP-102",
+            "voltage": 208,
+            "props": { "rated_voltage_kv": 0.208, "phases": 3, "bus_rating_a": 225, "main_device_type": "Main breaker", "main_interrupting_ka": 22, "grounding_type": "Solidly grounded", "service_type": "208Y/120 V" },
+            "scheduleLinks": { "panel": "LP-102", "equipment": "LP-102" }
           }
         ],
         "connections": []
@@ -455,9 +1352,29 @@
       "sections": [
         { "id": "SEC-1", "description": "Incoming and pump starter section" }
       ]
+    },
+    {
+      "id": "MCC-102",
+      "name": "MCC-102",
+      "sections": [
+        { "id": "SEC-1", "description": "Incoming main and metering" },
+        { "id": "SEC-2", "description": "Ventilation and air-handler starters" },
+        { "id": "SEC-3", "description": "Compressor starter and spares" }
+      ]
     }
   ],
   "settings": {
+    "projectMeta": {
+      "projectName": "Project Workflow Core - Engineering Package Demonstration",
+      "projectNumber": "CTR-DEMO-001",
+      "client": "CableTrayRoute Demonstration Owner",
+      "site": "Sample Industrial Site",
+      "location": "United States",
+      "engineer": "Sample Engineering Team",
+      "revision": "1",
+      "issueStatus": "Issued for Demonstration",
+      "date": "2026-07-17"
+    },
     "designBasis": {
       "schemaVersion": 1,
       "codeBasis": {
@@ -523,7 +1440,7 @@
     "studies": {
       "demandSchedule": {
         "status": "Run",
-        "totalDemandKva": 41.8,
+        "totalDemandKva": 205.6,
         "updatedAt": "2026-05-01T12:00:00.000Z"
       },
       "shortCircuit": {
@@ -624,12 +1541,306 @@
               { "type": "cable", "tag": "CBL-XFMR-LP-101", "from": "XFMR-101", "to": "LP-101", "source": "Cable Schedule", "method": "nec-table-9", "rOhm": 0.0066500000000000005, "xOhm": 0.0015750000000000002, "lengthFt": 35, "parallelCount": 1, "conductorSize": "#2 AWG", "conductorMaterial": "Copper", "racewayMaterial": "Aluminum" }
             ]
           }
+        },
+        "comp-mcc-102": {
+          "method": "ANSI",
+          "prefaultKV": 0.48,
+          "threePhaseKA": 11.82,
+          "lineToGroundKA": 10.96,
+          "lineToLineKA": 10.24,
+          "doubleLineGroundKA": 21.92,
+          "equipmentTag": "MCC-102"
+        },
+        "comp-vfd-101": {
+          "method": "ANSI",
+          "prefaultKV": 0.48,
+          "threePhaseKA": 9.46,
+          "lineToGroundKA": 8.72,
+          "lineToLineKA": 8.19,
+          "doubleLineGroundKA": 17.44,
+          "equipmentTag": "VFD-101"
+        },
+        "comp-xfmr-102": {
+          "method": "ANSI",
+          "prefaultKV": 0.48,
+          "threePhaseKA": 14.18,
+          "lineToGroundKA": 13.04,
+          "lineToLineKA": 12.28,
+          "doubleLineGroundKA": 26.08,
+          "equipmentTag": "XFMR-102"
+        },
+        "comp-lp-102": {
+          "method": "ANSI",
+          "prefaultKV": 0.208,
+          "threePhaseKA": 3.12,
+          "lineToGroundKA": 2.86,
+          "lineToLineKA": 2.70,
+          "doubleLineGroundKA": 5.72,
+          "equipmentTag": "LP-102"
         }
+      },
+      "arcFlash": {
+        "_meta": {
+          "schemaVersion": 1,
+          "method": "IEEE 1584-2018 screening model",
+          "status": "Sample",
+          "updatedAt": "2026-07-16T12:00:00.000Z",
+          "limitations": "Demonstration values require field-verified enclosure, electrode configuration, working distance, and protective-device clearing time before use."
+        },
+        "comp-swbd-101": {
+          "equipmentTag": "SWBD-101",
+          "nominalVoltage": 480,
+          "incidentEnergy": 3.8,
+          "minimumArcRatingCalCm2": 8,
+          "boundary": 42,
+          "boundaryUnit": "in",
+          "clearingTime": 0.10,
+          "workingDistanceIn": 18,
+          "boltedFaultCurrentKA": 25.26,
+          "arcingCurrentKA": 18.4
+        },
+        "comp-mcc-101": {
+          "equipmentTag": "MCC-101",
+          "nominalVoltage": 480,
+          "incidentEnergy": 2.1,
+          "minimumArcRatingCalCm2": 8,
+          "boundary": 30,
+          "boundaryUnit": "in",
+          "clearingTime": 0.08,
+          "workingDistanceIn": 18,
+          "boltedFaultCurrentKA": 16.30,
+          "arcingCurrentKA": 12.1
+        },
+        "comp-xfmr-101": {
+          "equipmentTag": "XFMR-101",
+          "nominalVoltage": 480,
+          "incidentEnergy": 1.6,
+          "minimumArcRatingCalCm2": 4,
+          "boundary": 23,
+          "boundaryUnit": "in",
+          "clearingTime": 0.07,
+          "workingDistanceIn": 18,
+          "boltedFaultCurrentKA": 16.42,
+          "arcingCurrentKA": 12.2
+        },
+        "comp-lp-101": {
+          "equipmentTag": "LP-101",
+          "nominalVoltage": 208,
+          "incidentEnergy": 0.7,
+          "minimumArcRatingCalCm2": 0,
+          "boundary": 12,
+          "boundaryUnit": "in",
+          "clearingTime": 0.05,
+          "workingDistanceIn": 18,
+          "boltedFaultCurrentKA": 2.35,
+          "arcingCurrentKA": 1.8
+        },
+        "comp-pmp-101": {
+          "equipmentTag": "PMP-101",
+          "nominalVoltage": 480,
+          "incidentEnergy": 0.9,
+          "minimumArcRatingCalCm2": 0,
+          "boundary": 14,
+          "boundaryUnit": "in",
+          "clearingTime": 0.04,
+          "workingDistanceIn": 18,
+          "boltedFaultCurrentKA": 7.14,
+          "arcingCurrentKA": 5.4
+        },
+        "comp-mcc-102": {
+          "equipmentTag": "MCC-102",
+          "nominalVoltage": 480,
+          "incidentEnergy": 2.6,
+          "minimumArcRatingCalCm2": 8,
+          "boundary": 34,
+          "boundaryUnit": "in",
+          "clearingTime": 0.09,
+          "workingDistanceIn": 18,
+          "boltedFaultCurrentKA": 11.82,
+          "arcingCurrentKA": 8.9
+        },
+        "comp-vfd-101": {
+          "equipmentTag": "VFD-101",
+          "nominalVoltage": 480,
+          "incidentEnergy": 1.3,
+          "minimumArcRatingCalCm2": 4,
+          "boundary": 20,
+          "boundaryUnit": "in",
+          "clearingTime": 0.06,
+          "workingDistanceIn": 18,
+          "boltedFaultCurrentKA": 9.46,
+          "arcingCurrentKA": 7.2
+        },
+        "comp-xfmr-102": {
+          "equipmentTag": "XFMR-102",
+          "nominalVoltage": 480,
+          "incidentEnergy": 1.8,
+          "minimumArcRatingCalCm2": 4,
+          "boundary": 25,
+          "boundaryUnit": "in",
+          "clearingTime": 0.07,
+          "workingDistanceIn": 18,
+          "boltedFaultCurrentKA": 14.18,
+          "arcingCurrentKA": 10.7
+        },
+        "comp-lp-102": {
+          "equipmentTag": "LP-102",
+          "nominalVoltage": 208,
+          "incidentEnergy": 0.8,
+          "minimumArcRatingCalCm2": 0,
+          "boundary": 13,
+          "boundaryUnit": "in",
+          "clearingTime": 0.05,
+          "workingDistanceIn": 18,
+          "boltedFaultCurrentKA": 3.12,
+          "arcingCurrentKA": 2.4
+        }
+      },
+      "tcc": {
+        "status": "Sample coordinated",
+        "method": "Log-log protective-device curve screening",
+        "updatedAt": "2026-07-16T12:00:00.000Z",
+        "minimumCoordinationIntervalSeconds": 0.30,
+        "pairs": [
+          { "upstream": "MAIN-SWBD-101", "downstream": "FDR-MCC-101", "faultCurrentKA": 16.30, "intervalSeconds": 0.36, "status": "Coordinated" },
+          { "upstream": "FDR-MCC-101", "downstream": "MCP-PMP-101", "faultCurrentKA": 7.14, "intervalSeconds": 0.32, "status": "Coordinated" },
+          { "upstream": "MAIN-SWBD-101", "downstream": "FDR-MCC-102", "faultCurrentKA": 11.82, "intervalSeconds": 0.38, "status": "Coordinated" },
+          { "upstream": "FDR-MCC-102", "downstream": "MCP-CMP-101", "faultCurrentKA": 6.48, "intervalSeconds": 0.33, "status": "Coordinated" },
+          { "upstream": "MAIN-SWBD-101", "downstream": "FDR-XFMR-102", "faultCurrentKA": 14.18, "intervalSeconds": 0.35, "status": "Coordinated" }
+        ]
       }
+    },
+    "studyApprovals": {
+      "shortCircuit": { "status": "reviewed", "reviewedBy": "Sample Engineer", "approvedAt": "2026-07-16", "note": "Demonstration result reviewed for internal consistency." },
+      "arcFlash": { "status": "reviewed", "reviewedBy": "Sample Engineer", "approvedAt": "2026-07-16", "note": "Sample-only values; field verification remains mandatory." },
+      "tcc": { "status": "reviewed", "reviewedBy": "Sample Engineer", "approvedAt": "2026-07-16", "note": "Coordination intervals screened for the demonstration package." }
+    },
+    "tccSettings": {
+      "devices": ["MAIN-SWBD-101", "FDR-MCC-101", "MCP-PMP-101", "FDR-MCC-102", "MCP-CMP-101", "FDR-XFMR-102"],
+      "settings": {
+        "MAIN-SWBD-101": { "type": "Fuse", "ratingA": 800, "fuseClass": "Class L", "curveFamily": "Time-delay current-limiting", "minimumMeltFactor": 1.60, "totalClearingFactor": 2.20 },
+        "FDR-MCC-101": { "type": "Fuse", "ratingA": 400, "fuseClass": "Class J", "curveFamily": "Time-delay current-limiting", "minimumMeltFactor": 1.55, "totalClearingFactor": 2.10 },
+        "MCP-PMP-101": { "type": "Fuse", "ratingA": 60, "fuseClass": "Class J", "curveFamily": "Time-delay motor branch", "minimumMeltFactor": 1.50, "totalClearingFactor": 2.00 },
+        "FDR-MCC-102": { "type": "Fuse", "ratingA": 400, "fuseClass": "Class J", "curveFamily": "Time-delay current-limiting", "minimumMeltFactor": 1.55, "totalClearingFactor": 2.10 },
+        "MCP-CMP-101": { "type": "Fuse", "ratingA": 200, "fuseClass": "Class J", "curveFamily": "Time-delay motor branch", "minimumMeltFactor": 1.50, "totalClearingFactor": 2.00 },
+        "FDR-XFMR-102": { "type": "Fuse", "ratingA": 200, "fuseClass": "Class J", "curveFamily": "Time-delay transformer feeder", "minimumMeltFactor": 1.55, "totalClearingFactor": 2.10 }
+      },
+      "componentOverrides": {},
+      "chart": { "minimumCurrentA": 10, "maximumCurrentA": 30000, "minimumTimeS": 0.01, "maximumTimeS": 1000 }
+    },
+    "engineeringPackage": {
+      "schemaVersion": 1,
+      "packageId": "CTR-DEMO-001-EPR-001",
+      "title": "Electrical Engineering Design and Study Package",
+      "issueStatus": "Sample - Not for Construction",
+      "preparedBy": "CableTrayRoute Sample Engineering Team",
+      "checkedBy": "Sample Engineer",
+      "applicableStandards": [
+        "NFPA 70 (NEC) 2023",
+        "IEEE 1584-2018",
+        "NFPA 70E-2024",
+        "IEEE 242 / IEEE 399 coordination practices",
+        "NEMA VE 1 / NEMA VE 2"
+      ],
+      "designNotes": [
+        "This package is a software demonstration, not a sealed engineering deliverable.",
+        "Series-connected fuse curves are represented by screening envelopes for report demonstration; manufacturer-published minimum-melt and total-clearing data remains required for final design.",
+        "Arc-flash results require field-verified enclosure and electrode data before operational use.",
+        "Raceway cross-sections are schematic and must be coordinated with civil and structural drawings."
+      ],
+      "ductbankCrossSections": [
+        {
+          "id": "DB-101-XSEC-A",
+          "ductbankId": "DB-101",
+          "widthIn": 17.05,
+          "heightIn": 17.05,
+          "concreteCoverIn": 3,
+          "rows": 2,
+          "columns": 2,
+          "conduitTradeSizeIn": 4,
+          "conduitSpacingIn": 7.5,
+          "circuits": ["CBL-MCC-PMP-101", "SPARE", "SPARE", "SPARE"]
+        },
+        {
+          "id": "DB-102-XSEC-A",
+          "ductbankId": "DB-102",
+          "widthIn": 23.99,
+          "heightIn": 17.00,
+          "concreteCoverIn": 3,
+          "rows": 2,
+          "columns": 3,
+          "conduitTradeSizeIn": 4,
+          "conduitSpacingIn": 7.5,
+          "circuits": ["CBL-SWBD-MCC-102", "SPARE", "SPARE", "SPARE", "SPARE", "SPARE"]
+        }
+      ],
+      "trayCrossSections": [
+        {
+          "id": "TR-PWR-101-XSEC-A",
+          "trayId": "TR-PWR-101",
+          "insideWidthIn": 24,
+          "usableDepthIn": 6,
+          "dividerZones": ["Zone 1 - 480 V Feeders", "Zone 2 - 208 V Feeders"],
+          "cables": ["CBL-SWBD-MCC-101", "CBL-SWBD-XFMR-101", "CBL-XFMR-LP-101", "CBL-SWBD-XFMR-102", "CBL-XFMR-LP-102"],
+          "separationNote": "Single-layer power arrangement shown; maintain project segregation requirements."
+        },
+        {
+          "id": "TR-PWR-102-XSEC-A",
+          "trayId": "TR-PWR-102",
+          "insideWidthIn": 30,
+          "usableDepthIn": 6,
+          "dividerZones": ["Zone 1 - Production Motors"],
+          "cables": ["CBL-MCC2-FAN-101", "CBL-MCC2-AHU-101", "CBL-MCC2-CMP-101"],
+          "separationNote": "Production motor feeders shown in a single layer with space reserved for future circuits."
+        },
+        {
+          "id": "TR-PWR-103-XSEC-A",
+          "trayId": "TR-PWR-103",
+          "insideWidthIn": 18,
+          "usableDepthIn": 4,
+          "dividerZones": ["Zone 1 - VFD Input", "Zone 2 - VFD Output"],
+          "cables": ["CBL-MCC-VFD-101", "CBL-VFD-PMP-102"],
+          "separationNote": "VFD input and output cables shown; maintain manufacturer-recommended EMC separation and grounding."
+        }
+      ],
+      "protectiveDevices": [
+        { "id": "MAIN-SWBD-101", "oneLineComponentId": "comp-fuse-main", "equipment": "SWBD-101", "manufacturer": "Eaton Bussmann", "family": "KRP-C", "type": "Fuse", "fuseClass": "Class L", "ratingA": 800, "interruptingKA": 200 },
+        { "id": "FDR-MCC-101", "oneLineComponentId": "comp-fuse-mcc-101", "equipment": "MCC-101", "manufacturer": "Eaton Bussmann", "family": "LPJ-SP", "type": "Fuse", "fuseClass": "Class J", "ratingA": 400, "interruptingKA": 300 },
+        { "id": "MCP-PMP-101", "oneLineComponentId": "comp-fuse-pmp-101", "equipment": "PMP-101", "manufacturer": "Eaton Bussmann", "family": "LPJ-SP", "type": "Fuse", "fuseClass": "Class J", "ratingA": 60, "interruptingKA": 300 },
+        { "id": "FDR-MCC-102", "oneLineComponentId": "comp-fuse-mcc-102", "equipment": "MCC-102", "manufacturer": "Eaton Bussmann", "family": "LPJ-SP", "type": "Fuse", "fuseClass": "Class J", "ratingA": 400, "interruptingKA": 300 },
+        { "id": "MCP-CMP-101", "oneLineComponentId": "comp-fuse-cmp-101", "equipment": "CMP-101", "manufacturer": "Eaton Bussmann", "family": "LPJ-SP", "type": "Fuse", "fuseClass": "Class J", "ratingA": 200, "interruptingKA": 300 },
+        { "id": "FDR-XFMR-102", "oneLineComponentId": "comp-fuse-xfmr-102", "equipment": "XFMR-102", "manufacturer": "Eaton Bussmann", "family": "LPJ-SP", "type": "Fuse", "fuseClass": "Class J", "ratingA": 200, "interruptingKA": 300 }
+      ],
+      "tccStudies": [
+        {
+          "id": "TCC-PROCESS-PUMP",
+          "title": "Process Pump Fuse Coordination",
+          "seriesPath": ["MAIN-SWBD-101", "FDR-MCC-101", "MCP-PMP-101"],
+          "faultCurrentKA": 7.14,
+          "protectedCable": { "tag": "CBL-MCC-PMP-101", "oneSecondDamageA": 6200 },
+          "motor": { "tag": "PMP-101", "fullLoadA": 28, "lockedRotorMultiple": 6.0, "accelerationTimeS": 4.0 }
+        },
+        {
+          "id": "TCC-PRODUCTION-COMPRESSOR",
+          "title": "Production Compressor Fuse Coordination",
+          "seriesPath": ["MAIN-SWBD-101", "FDR-MCC-102", "MCP-CMP-101"],
+          "faultCurrentKA": 6.48,
+          "protectedCable": { "tag": "CBL-MCC2-CMP-101", "oneSecondDamageA": 9800 },
+          "motor": { "tag": "CMP-101", "fullLoadA": 84, "lockedRotorMultiple": 6.2, "accelerationTimeS": 6.0 }
+        },
+        {
+          "id": "TCC-WAREHOUSE-TRANSFORMER",
+          "title": "Warehouse Transformer Fuse Coordination",
+          "seriesPath": ["MAIN-SWBD-101", "FDR-XFMR-102"],
+          "faultCurrentKA": 14.18,
+          "protectedCable": { "tag": "CBL-SWBD-XFMR-102", "oneSecondDamageA": 11800 },
+          "transformer": { "tag": "XFMR-102", "kva": 112.5, "primaryVoltageV": 480, "inrushMultiple": 12, "inrushTimeS": 0.10, "damageCurrentMultiple": 25 }
+        }
+      ]
     },
     "latestRouteResults": {
       "source": "sample",
-      "updatedAt": "2026-05-01T12:20:00.000Z",
+      "updatedAt": "2026-07-16T12:20:00.000Z",
       "batchResults": [
         {
           "cable": "CBL-SWBD-MCC-101",
@@ -720,6 +1931,62 @@
               "end": [97, 0, 12]
             }
           ]
+        },
+        {
+          "cable": "CBL-SWBD-MCC-102",
+          "status": "Routed",
+          "total_length": 210,
+          "breakdown": [{ "conduit_id": "CND-MCC-102", "ductbankTag": "DB-102", "length": 210, "start": [0, 56, -4], "end": [210, 56, -4] }],
+          "route_segments": [{ "type": "conduit", "conduit_id": "CND-MCC-102", "ductbankTag": "DB-102", "length": 210, "start": [0, 56, -4], "end": [210, 56, -4] }]
+        },
+        {
+          "cable": "CBL-MCC-VFD-101",
+          "status": "Routed",
+          "total_length": 88,
+          "breakdown": [{ "tray_id": "TR-PWR-103", "length": 88, "start": [145, 0, 16], "end": [233, 0, 16] }],
+          "route_segments": [{ "type": "tray", "tray_id": "TR-PWR-103", "length": 88, "start": [145, 0, 16], "end": [233, 0, 16] }]
+        },
+        {
+          "cable": "CBL-VFD-PMP-102",
+          "status": "Routed",
+          "total_length": 52,
+          "breakdown": [{ "tray_id": "TR-PWR-103", "length": 52, "start": [233, 0, 16], "end": [285, 0, 16] }],
+          "route_segments": [{ "type": "tray", "tray_id": "TR-PWR-103", "length": 52, "start": [233, 0, 16], "end": [285, 0, 16] }]
+        },
+        {
+          "cable": "CBL-MCC2-FAN-101",
+          "status": "Routed",
+          "total_length": 120,
+          "breakdown": [{ "tray_id": "TR-PWR-102", "length": 120, "start": [210, 56, 14], "end": [330, 56, 14] }],
+          "route_segments": [{ "type": "tray", "tray_id": "TR-PWR-102", "length": 120, "start": [210, 56, 14], "end": [330, 56, 14] }]
+        },
+        {
+          "cable": "CBL-MCC2-AHU-101",
+          "status": "Routed",
+          "total_length": 165,
+          "breakdown": [{ "tray_id": "TR-PWR-102", "length": 165, "start": [210, 56, 14], "end": [375, 56, 14] }],
+          "route_segments": [{ "type": "tray", "tray_id": "TR-PWR-102", "length": 165, "start": [210, 56, 14], "end": [375, 56, 14] }]
+        },
+        {
+          "cable": "CBL-MCC2-CMP-101",
+          "status": "Routed",
+          "total_length": 205,
+          "breakdown": [{ "tray_id": "TR-PWR-102", "length": 205, "start": [210, 56, 14], "end": [415, 56, 14] }],
+          "route_segments": [{ "type": "tray", "tray_id": "TR-PWR-102", "length": 205, "start": [210, 56, 14], "end": [415, 56, 14] }]
+        },
+        {
+          "cable": "CBL-SWBD-XFMR-102",
+          "status": "Routed",
+          "total_length": 118,
+          "breakdown": [{ "tray_id": "TR-PWR-101", "length": 118, "start": [0, 0, 12], "end": [118, 0, 12] }],
+          "route_segments": [{ "type": "tray", "tray_id": "TR-PWR-101", "length": 118, "start": [0, 0, 12], "end": [118, 0, 12] }]
+        },
+        {
+          "cable": "CBL-XFMR-LP-102",
+          "status": "Routed",
+          "total_length": 42,
+          "breakdown": [{ "tray_id": "TR-PWR-101", "length": 42, "start": [118, 0, 12], "end": [160, 0, 12] }],
+          "route_segments": [{ "type": "tray", "tray_id": "TR-PWR-101", "length": 42, "start": [118, 0, 12], "end": [160, 0, 12] }]
         }
       ]
     },
@@ -739,8 +2006,8 @@
         "status": "Issued for Review",
         "createdAt": "2026-05-01T12:35:00.000Z",
         "summary": {
-          "cableCount": 4,
-          "studyCount": 2
+          "cableCount": 12,
+          "studyCount": 4
         }
       }
     ],

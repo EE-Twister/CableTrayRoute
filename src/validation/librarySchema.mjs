@@ -144,7 +144,7 @@ function validateComponent(component, index, categoriesSet, subtypeMap, errors) 
     return;
   }
 
-  const requiredFields = ['subtype', 'label', 'icon', 'category'];
+  const requiredFields = ['subtype', 'label', 'icon'];
   requiredFields.forEach((field) => {
     if (!isNonEmptyString(component[field])) {
       errors.push(
@@ -153,15 +153,31 @@ function validateComponent(component, index, categoriesSet, subtypeMap, errors) 
     }
   });
 
-  if (component.ports !== undefined && !isFiniteNumber(component.ports)) {
-    errors.push(buildError(`components[${index}].ports`, 'ports must be a finite number.'));
+  if (
+    component.ports !== undefined
+    && !isFiniteNumber(component.ports)
+    && !(
+      Array.isArray(component.ports)
+      && component.ports.every(port => (
+        isPlainObject(port)
+        && isFiniteNumber(Number(port.x))
+        && isFiniteNumber(Number(port.y))
+      ))
+    )
+  ) {
+    errors.push(buildError(
+      `components[${index}].ports`,
+      'ports must be a finite count or an array of finite {x, y} coordinates.',
+    ));
   }
 
   if (component.schema !== undefined && !isPlainObject(component.schema)) {
     errors.push(buildError(`components[${index}].schema`, 'schema must be a JSON object.'));
   }
 
-  if (isNonEmptyString(component.category) && categoriesSet.size && !categoriesSet.has(component.category.trim())) {
+  if (component.category !== undefined && !isNonEmptyString(component.category)) {
+    errors.push(buildError(`components[${index}].category`, 'category must be a non-empty string when provided.'));
+  } else if (isNonEmptyString(component.category) && categoriesSet.size && !categoriesSet.has(component.category.trim())) {
     errors.push(
       buildError(
         `components[${index}].category`,

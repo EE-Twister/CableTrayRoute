@@ -69,68 +69,83 @@
         <h1>Panel Schedule</h1>
         <p>Assign loads from the load list to panel breakers.</p>
       </header>
-      <section class="card">
-          <div class="panel-switcher">
-            <label for="panel-select">Active Panelboard</label>
-            <div class="panel-switcher-controls">
-              <select id="panel-select" aria-label="Select a panelboard"></select>
-              <div class="panel-switcher-actions">
-                <button id="panel-add-btn" class="btn" type="button" title="Create a new panelboard">New</button>
-                <button id="panel-duplicate-btn" class="btn" type="button" title="Duplicate this panelboard">Duplicate</button>
-                <button id="panel-delete-btn" class="btn" type="button" title="Delete this panelboard">Delete</button>
-              </div>
-            </div>
-            <div class="panel-quick-actions" role="group" aria-label="Panel quick actions">
-              <button id="panel-jump-unassigned-btn" class="btn" type="button" title="Jump to the first unassigned circuit">Jump to First Unassigned</button>
-              <button id="panel-clear-assignments-btn" class="btn btn-secondary" type="button" title="Clear load assignments for this panelboard">Clear Assignments</button>
-            </div>
+      <section class="card panel-config-card" aria-label="Panelboard configuration">
+        <div class="panel-switcher">
+          <label class="panel-switcher-field" for="panel-select">
+            <span>Active Panelboard</span>
+            <select id="panel-select" aria-label="Select a panelboard"></select>
+          </label>
+          <div class="panel-switcher-actions" role="group" aria-label="Panelboard actions">
+            <button id="panel-add-btn" class="btn" type="button" title="Create a new panelboard">New</button>
+            <button id="panel-duplicate-btn" class="btn" type="button" title="Duplicate this panelboard">Duplicate</button>
+            <button id="panel-delete-btn" class="btn" type="button" title="Delete this panelboard">Delete</button>
           </div>
-          <div id="panel-info" class="mb-1">
-            <label for="panel-tag">Panelboard Tag <input id="panel-tag" type="text"></label>
-            <label for="panel-fed-from">Fed From <input id="panel-fed-from" type="text"></label>
-            <label class="panel-info-compact" for="panel-voltage">Voltage <input id="panel-voltage" type="text"></label>
-            <label for="panel-manufacturer">Manufacturer <input id="panel-manufacturer" type="text"></label>
-            <label for="panel-model">Model <input id="panel-model" type="text"></label>
-            <div class="panel-info-tight-group">
-              <label class="panel-info-compact">System Type
+          <div class="panel-quick-actions" role="group" aria-label="Panel quick actions">
+            <button id="panel-jump-unassigned-btn" class="btn" type="button" title="Jump to the first unassigned circuit">Jump to First Unassigned</button>
+            <button id="panel-clear-assignments-btn" class="btn btn-secondary" type="button" title="Clear load assignments for this panelboard">Clear Assignments</button>
+          </div>
+        </div>
+        <div id="panel-info">
+          <section class="panel-info-section" aria-labelledby="panel-identity-heading">
+            <h2 id="panel-identity-heading">Identity</h2>
+            <div class="panel-info-fields">
+              <label for="panel-tag">Panelboard Tag <input id="panel-tag" type="text"></label>
+              <label for="panel-fed-from">Fed From <input id="panel-fed-from" type="text"></label>
+              <label for="panel-manufacturer">Manufacturer <input id="panel-manufacturer" type="text"></label>
+              <label for="panel-model">Model <input id="panel-model" type="text"></label>
+            </div>
+          </section>
+          <section class="panel-info-section" aria-labelledby="panel-electrical-heading">
+            <h2 id="panel-electrical-heading">Electrical</h2>
+            <div class="panel-info-fields">
+              <label for="panel-voltage">Voltage <input id="panel-voltage" type="text" inputmode="decimal"></label>
+              <label for="panel-system-type">System Type
                 <select id="panel-system-type">
                   <option value="ac">AC</option>
                   <option value="dc">DC</option>
                 </select>
               </label>
-              <label class="panel-info-compact">Phases
+              <label for="panel-phases">Phases
                 <select id="panel-phases">
                   <option value="1">1</option>
                   <option value="3">3</option>
                 </select>
               </label>
-              <label class="panel-info-compact">Poles
+              <label for="panel-poles">Poles
                 <select id="panel-poles">
                   <option value="1">1</option>
                   <option value="2">2</option>
                   <option value="3">3</option>
                 </select>
               </label>
-              <label class="panel-info-compact" for="panel-sccr">Short-Circuit Rating (A) <input id="panel-sccr" type="number" min="0"></label>
-              <label class="panel-info-compact" for="panel-main-rating">Main Device Rating (A) <input id="panel-main-rating" type="number" min="0"></label>
             </div>
-            <div class="panel-info-tight-group panel-info-circuit-group">
+          </section>
+          <section class="panel-info-section" aria-labelledby="panel-ratings-heading">
+            <h2 id="panel-ratings-heading">Ratings &amp; Capacity</h2>
+            <div class="panel-info-fields">
+              <label for="panel-sccr">Short-Circuit Rating (A) <input id="panel-sccr" type="number" min="0"></label>
+              <label for="panel-main-rating">Main Device Rating (A) <input id="panel-main-rating" type="number" min="0"></label>
               <label for="panel-circuit-count">Number of Circuits <input id="panel-circuit-count" type="number" min="1" max="512"></label>
-              <label class="panel-info-compact">Branch Device Type
+              <label for="panel-branch-device-type">Branch Device Type
                 <select id="panel-branch-device-type">
                   <option value="breaker">Breakers</option>
                   <option value="fuse">Fuses</option>
                 </select>
               </label>
             </div>
-          </div>
+          </section>
+        </div>
         <div id="panel-sticky-summary" class="panel-sticky-summary" aria-live="polite"></div>
         <div id="panel-validation-hints" class="panel-validation-hints" aria-live="polite"></div>
+      </section>
+      <section class="card panel-schedule-card" aria-label="Panelboard circuit schedule">
         <div id="panel-container"></div>
         <div id="panel-totals" class="mt-1"></div>
         <div id="panel-assignment-status" class="panel-assignment-status" aria-live="polite"></div>
-        <button id="add-panel-to-equipment-btn" class="btn" type="button" title="Add this panelboard to the equipment list">Add to Equipment List</button>
-        <button id="export-panel-btn" class="btn" type="button" title="Export panel to Excel">Export to Excel</button>
+        <div class="panel-schedule-actions">
+          <button id="add-panel-to-equipment-btn" class="btn" type="button" title="Add this panelboard to the equipment list">Add to Equipment List</button>
+          <button id="export-panel-btn" class="btn" type="button" title="Export panel to Excel">Export to Excel</button>
+        </div>
       </section>
       <nav class="step-nav" aria-label="Workflow navigation">
         <a href="loadlist.html" class="step-nav-prev">&#8592; Load List</a>

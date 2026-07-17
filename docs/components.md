@@ -109,9 +109,24 @@ For Phase 1 palette rollout and regression tracking, use the shared checklist in
 
 ## Protective component normalized fields
 
-- Breakers, fuses, relays, and reclosers now share a common protection schema baseline for study ingestion.
+- Breakers, fuses, relays, and reclosers share identity, pickup, curve, and grounding fields, but their duty ratings remain type-specific.
 - Normalized fields include `tag`, `description`, `manufacturer`, `model`, `rated_voltage_kv`, `phases`, `interrupting_rating_ka`, `pickup_amps`, `time_dial_or_tms`, `curve_family`, `ground_fault_enabled`, `ground_pickup_a`, and `ground_time_delay_s`.
-- Legacy keys are retained for compatibility, and the normalized fields are pre-populated in the component defaults so existing TCC/short-circuit/arc-flash flows can consume a consistent property set.
+- `interrupting_rating_ka` is valid for breakers, fuses, and reclosers; relay records always normalize this field to `null` because the controlled interrupter clears the fault.
+- `short_time_withstand_ka` and `short_time_withstand_cycles` are populated only from explicit withstand fields and are never inferred from AIC/SCCR.
+- The TCC selector filters by component kind, differential/overcurrent subtype, and LV/MV voltage class. CTs, PTs, contactors, and non-fused switches do not receive an unrelated TCC selector.
+- Differential relay components use their restraint fields (`pickup_pu`, slopes, breakpoint, and harmonic supervision) rather than treating the 87 characteristic as an ordinary time-current curve.
+
+## One-line symbols and visualization overlays
+
+- Library definitions can provide separate `icon` and `iconIEC` assets. The symbol-standard switch preserves and renders both paths.
+- Reclosers, ATS/ST/DT switches, contactors, PV and BESS inverters, rectifiers, batteries, PTs, differential relays, and reversing/non-reversing starters use distinct symbols.
+- Every placeable ANSI and IEC symbol is checked by the terminal-continuity audit. Symbol artwork, declared ports, and renderer-generated conductor leads must meet without a visible gap; ATS and double-throw switches retain all three source/load terminals.
+- The **Color** menu separates **Data Quality**, **Validation**, **Load Flow**, **Fault Duty**, **Arc Flash**, and **Operating State**. Study overlays no longer combine unrelated results into one generic pass state.
+- Load-flow, fault-duty, and arc-flash legends show scenario, freshness, approval state, and run date. A diagram change or scenario mismatch marks the saved result stale.
+- Connection labels follow the selected overlay: load-flow mode shows kW/A, while fault-duty mode shows kA. Animated flow arrows appear only for a current load-flow result.
+- Arc-flash canvas labels include incident energy, minimum arc rating, arc-flash boundary, clearing time, working distance, and current/stale approval provenance.
+- Energization follows component ports and ATS source selection. Open devices and unavailable or decommissioned sources stop traversal.
+- The hazardous-area overlay reads the saved `hazAreaClassification` study, includes a View toggle, and shows a matching legend.
 
 ## UI consistency checklist
 

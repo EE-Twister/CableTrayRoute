@@ -81,6 +81,35 @@ test('drag first library item onto canvas', async ({ page }) => {
   await expect(page.locator('g.component')).toHaveCount(before + 1);
 });
 
+test('palette exposes the complete catalog and switches ANSI/IEC symbols', async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.clear();
+    sessionStorage.clear();
+    localStorage.setItem('onelineTourDone', 'true');
+  });
+  await page.goto(pageUrl('oneline.html?e2e=1'));
+  await page.waitForSelector('[data-oneline-ready="1"]');
+
+  for (const label of ['Recloser', 'Shunt Reactor', 'Feeder', 'Relay']) {
+    await expect(page.getByRole('button', { name: label, exact: true })).toBeVisible();
+  }
+  const paletteButtons = page.locator('[data-testid="palette-button"]');
+  expect(await paletteButtons.count()).toBeGreaterThanOrEqual(51);
+
+  const atsPaletteButton = page.locator('[data-testid="palette-button"][data-subtype="ats"]');
+  await atsPaletteButton.click();
+  const placedImage = page.locator('g.component image');
+  await expect(placedImage).toHaveCount(1);
+  await expect(placedImage).toHaveAttribute('href', /ATS\.svg/);
+  await page.evaluate(() => {
+    const select = document.getElementById('symbol-standard-select');
+    select.value = 'IEC';
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  await expect(placedImage).toHaveAttribute('href', /IEC_ATS\.svg/);
+  await expect(page.locator('[data-testid="palette-button"][data-subtype="ats"] img')).toHaveAttribute('src', /IEC_ATS\.svg/);
+});
+
 test('palette click places upright devices and creates provisional click connections', async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.clear();
@@ -327,7 +356,7 @@ test('view controls render datablocks, state coloring, and operating overrides',
 
   await page.selectOption('#data-state-overlay-select', 'review');
   await expect(page.locator('.data-state-badge, .data-state-fill').first()).toBeVisible();
-  await expect(page.locator('#voltage-legend')).toContainText('Data State');
+  await expect(page.locator('#voltage-legend')).toContainText('Data Quality');
   await page.keyboard.press('Escape');
 
   await page.selectOption('#operating-state-select', 'maintenance');
@@ -345,6 +374,109 @@ test('view controls render datablocks, state coloring, and operating overrides',
     return comp?.operatingStates?.maintenance?.state || '';
   }, targetId), { timeout: 5000 }).toBe('open');
   await expect(page.locator(`.operating-state-badge[data-id="${targetId}"]`)).toBeVisible();
+});
+
+test('study overlays separate result types and disclose stale provenance', async ({ page }) => {
+  const diagram = {
+    activeSheet: 0,
+    sheets: [{
+      name: 'Overlay Review',
+      components: [{
+        id: 'bus-overlay', type: 'bus', subtype: 'bus', label: 'BUS-OVERLAY', x: 220, y: 180,
+        width: 200, height: 20, voltage_mag: 0.94, interrupting_rating_ka: 25, hazAreaId: 'area-1',
+        shortCircuit: { threePhaseKA: 31 },
+        arcFlash: { incidentEnergy: 12.4, minimumArcRatingCalCm2: 20, boundary: 1675, clearingTime: 0.185, workingDistance: 455 },
+        props: { rated_voltage_kv: 0.48, interrupting_rating_ka: 25 }, ports: [{ x: 0, y: 10 }, { x: 200, y: 10 }], connections: []
+      }], connections: []
+    }]
+  };
+  const studies = {
+    loadFlow: { buses: [{ id: 'bus-overlay', Vm: 0.94 }] },
+    shortCircuit: { 'bus-overlay': { threePhaseKA: 31 } },
+    arcFlash: { 'bus-overlay': { incidentEnergy: 12.4, minimumArcRatingCalCm2: 20, boundary: 1675, clearingTime: 0.185, workingDistance: 455 } },
+    hazAreaClassification: {
+      areas: [{ id: 'area-1', label: 'Process Area', designation: 'Zone 2', iecZone: '2' }],
+      equipment: [{ areaId: 'area-1', pass: true }]
+    },
+    _oneLineMeta: {
+      loadFlow: { scenario: 'default', runAt: '2026-07-16T12:00:00.000Z', oneLineRevision: 'stale-revision' },
+      shortCircuit: { scenario: 'default', runAt: '2026-07-16T12:01:00.000Z', oneLineRevision: 'stale-revision' },
+      arcFlash: { scenario: 'default', runAt: '2026-07-16T12:02:00.000Z', oneLineRevision: 'stale-revision' }
+    }
+  };
+  await page.addInitScript(({ diagram, studies }) => {
+    localStorage.clear();
+    sessionStorage.clear();
+    localStorage.setItem('onelineTourDone', 'true');
+    localStorage.setItem('base:oneLineDiagram', JSON.stringify(diagram));
+    localStorage.setItem('base:studyResults', JSON.stringify(studies));
+  }, { diagram, studies });
+  await page.goto(pageUrl('oneline.html?e2e=1'));
+  await page.waitForSelector('[data-oneline-ready="1"]');
+
+  const setOverlay = value => page.evaluate(nextValue => {
+    const select = document.getElementById('data-state-overlay-select');
+    select.value = nextValue;
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+  }, value);
+  await setOverlay('loadFlow');
+  await expect(page.locator('#voltage-legend')).toContainText('Load Flow');
+  await expect(page.locator('#voltage-legend')).toContainText('stale');
+  await expect(page.locator('.data-state-fill.data-state-stale')).toBeVisible();
+
+  await setOverlay('faultDuty');
+  await expect(page.locator('#voltage-legend')).toContainText('Fault Duty');
+  await expect(page.locator('#voltage-legend')).toContainText('Available fault exceeds rating');
+
+  await setOverlay('arcFlash');
+  await page.evaluate(() => {
+    const toggle = document.getElementById('toggle-arcflash-label-mode');
+    toggle.checked = true;
+    toggle.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  await expect(page.locator('.af-label-badge')).toContainText('IE: 12.40 cal/cm²');
+  await expect(page.locator('.af-label-badge')).toContainText('AFB: 1675 mm');
+  await expect(page.locator('.af-label-badge')).toContainText('Clear: 0.185 s @ 455 mm');
+
+  await page.evaluate(() => {
+    const toggle = document.getElementById('toggle-haz-area');
+    toggle.checked = true;
+    toggle.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  await expect(page.locator('.haz-area-overlay')).toBeVisible();
+  await expect(page.locator('#voltage-legend')).toContainText('Hazardous area: Zone 2/22');
+});
+
+test('operating overlay respects ATS selected source and source availability', async ({ page }) => {
+  const component = (id, type, subtype, x, y, ports, props = {}) => ({
+    id, type, subtype, label: id.toUpperCase(), x, y, width: 72, height: 72,
+    rotation: 0, flipped: false, ports, props: { ...props }, ...props, connections: []
+  });
+  const normal = component('normal-source', 'utility_source', 'utility', 80, 60, [{ x: 36, y: 72 }], { rated_voltage_kv: 0.48 });
+  const emergency = component('emergency-source', 'utility_source', 'utility', 260, 60, [{ x: 36, y: 72 }], { rated_voltage_kv: 0.48 });
+  const ats = component('ats-device', 'switch', 'switch_ats', 160, 190, [
+    { x: 18, y: 0 }, { x: 54, y: 0 }, { x: 36, y: 72 }
+  ], { selected_source: 'emergency', emergency_source_available: false, normal_source_available: true });
+  const load = component('served-load', 'static_load', 'static_load_static_load', 165, 340, [{ x: 36, y: 0 }], { rated_voltage_kv: 0.48, kva: 100 });
+  normal.connections.push({ target: ats.id, sourcePort: 0, targetPort: 0 });
+  emergency.connections.push({ target: ats.id, sourcePort: 0, targetPort: 1 });
+  ats.connections.push({ target: load.id, sourcePort: 2, targetPort: 0 });
+  const diagram = { activeSheet: 0, sheets: [{ name: 'ATS', components: [normal, emergency, ats, load], connections: [] }] };
+  await page.addInitScript(seed => {
+    localStorage.clear();
+    sessionStorage.clear();
+    localStorage.setItem('onelineTourDone', 'true');
+    localStorage.setItem('base:oneLineDiagram', JSON.stringify(seed));
+  }, diagram);
+  await page.goto(pageUrl('oneline.html?e2e=1'));
+  await page.waitForSelector('[data-oneline-ready="1"]');
+  await page.evaluate(() => {
+    const select = document.getElementById('data-state-overlay-select');
+    select.value = 'operating';
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  await expect(page.locator('g.component[data-id="served-load"] .data-state-fill.data-state-deenergized')).toBeVisible();
+  await expect(page.locator('g.component[data-id="ats-device"] .data-state-fill.data-state-energized')).toBeVisible();
 });
 
 test('editing a source voltage updates inherited props and connections', async ({ page }) => {

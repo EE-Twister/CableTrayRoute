@@ -2,11 +2,12 @@ export default [
   {
     "id": "abb_tmax_160",
     "type": "breaker",
+    "voltageClass": "LV",
     "vendor": "ABB",
     "name": "ABB Tmax T3 160A",
     "interruptRating": 65,
-    "withstandRatingKA": 65,
-    "withstandCycles": 3,
+    "withstandRatingKA": null,
+    "withstandCycles": null,
     "settings": {
       "pickup": 160,
       "time": 0.2,
@@ -39,11 +40,12 @@ export default [
   {
     "id": "siemens_3va_125",
     "type": "breaker",
+    "voltageClass": "LV",
     "vendor": "Siemens",
     "name": "Siemens 3VA 125A",
     "interruptRating": 35,
-    "withstandRatingKA": 35,
-    "withstandCycles": 3,
+    "withstandRatingKA": null,
+    "withstandCycles": null,
     "settings": {
       "pickup": 125,
       "time": 0.25,
@@ -76,11 +78,12 @@ export default [
   {
     "id": "schneider_nsx100",
     "type": "breaker",
+    "voltageClass": "LV",
     "vendor": "Schneider",
     "name": "Schneider Compact NSX100",
     "interruptRating": 50,
-    "withstandRatingKA": 50,
-    "withstandCycles": 3,
+    "withstandRatingKA": null,
+    "withstandCycles": null,
     "settings": {
       "pickup": 100,
       "time": 0.3,
@@ -113,11 +116,12 @@ export default [
   {
     "id": "bussmann_lpsrksp_400",
     "type": "fuse",
+    "voltageClass": "LV",
     "vendor": "Eaton Bussmann",
     "name": "Bussmann LPS-RK-SP 400A",
     "interruptRating": 200,
-    "withstandRatingKA": 200,
-    "withstandCycles": 1,
+    "withstandRatingKA": null,
+    "withstandCycles": null,
     "settings": {
       "ampRating": 400
     },
@@ -138,11 +142,12 @@ export default [
   {
     "id": "mersen_trs200r",
     "type": "fuse",
+    "voltageClass": "LV",
     "vendor": "Mersen",
     "name": "Mersen TRS-R 200A",
     "interruptRating": 200,
-    "withstandRatingKA": 200,
-    "withstandCycles": 1,
+    "withstandRatingKA": null,
+    "withstandCycles": null,
     "settings": {
       "ampRating": 200
     },
@@ -166,11 +171,12 @@ export default [
   {
     "id": "sample_mv_breaker_1200",
     "type": "breaker",
+    "voltageClass": "MV",
     "vendor": "Sample Study",
     "name": "Sample MV Breaker 1200A",
     "interruptRating": 25,
-    "withstandRatingKA": 25,
-    "withstandCycles": 5,
+    "withstandRatingKA": null,
+    "withstandCycles": null,
     "settings": {
       "pickup": 1200,
       "time": 0.3,
@@ -195,11 +201,12 @@ export default [
   {
     "id": "mv_fuse_65e",
     "type": "fuse",
+    "voltageClass": "MV",
     "vendor": "Sample Study",
     "name": "65E MV Power Fuse",
     "interruptRating": 50,
-    "withstandRatingKA": 50,
-    "withstandCycles": 1,
+    "withstandRatingKA": null,
+    "withstandCycles": null,
     "settings": {
       "ampRating": 65
     },
@@ -223,7 +230,7 @@ export default [
     "type": "relay",
     "vendor": "GE",
     "name": "GE Multilin 750 Relay",
-    "interruptRating": 30,
+    "interruptRating": null,
     "settings": {
       "curveProfile": "IEC_VeryInverse",
       "longTimePickup": 150,
@@ -293,11 +300,12 @@ export default [
   {
     "id": "eaton_seriesC_100",
     "type": "breaker",
+    "voltageClass": "LV",
     "vendor": "Eaton",
     "name": "Eaton Series C 100A",
     "interruptRating": 25,
-    "withstandRatingKA": 25,
-    "withstandCycles": 3,
+    "withstandRatingKA": null,
+    "withstandCycles": null,
     "settings": {
       "pickup": 100,
       "time": 0.2,
@@ -330,11 +338,12 @@ export default [
   {
     "id": "mitsubishi_ws_225",
     "type": "breaker",
+    "voltageClass": "LV",
     "vendor": "Mitsubishi",
     "name": "Mitsubishi WS 225A",
     "interruptRating": 42,
-    "withstandRatingKA": 42,
-    "withstandCycles": 3,
+    "withstandRatingKA": null,
+    "withstandCycles": null,
     "settings": {
       "pickup": 225,
       "time": 0.3,
@@ -376,7 +385,7 @@ export default [
       "tms": [0.05, 0.1, 0.2, 0.3, 0.5, 0.7, 1.0, 1.5],
       "pickup": [50, 100, 200, 400, 800, 1600]
     },
-    "interruptRating": 50,
+    "interruptRating": null,
     "curve": []
   },
   {
@@ -391,7 +400,7 @@ export default [
       "tms": [0.05, 0.1, 0.2, 0.3, 0.5, 0.7, 1.0, 1.5],
       "pickup": [50, 100, 200, 400, 800, 1600]
     },
-    "interruptRating": 50,
+    "interruptRating": null,
     "curve": []
   },
   {
@@ -406,7 +415,7 @@ export default [
       "tms": [0.05, 0.1, 0.2, 0.3, 0.5, 0.7, 1.0, 1.5],
       "pickup": [50, 100, 200, 400, 800, 1600]
     },
-    "interruptRating": 50,
+    "interruptRating": null,
     "curve": []
   },
   {
@@ -421,7 +430,7 @@ export default [
       "tms": [0.05, 0.1, 0.2, 0.3, 0.5, 0.7, 1.0, 1.5],
       "pickup": [50, 100, 200, 400, 800, 1600]
     },
-    "interruptRating": 50,
+    "interruptRating": null,
     "curve": []
   },
   {
@@ -437,7 +446,7 @@ export default [
       "tms": [0.05, 0.1, 0.2, 0.3, 0.5, 0.7, 1.0, 1.5, 2.0],
       "pickup": [50, 100, 200, 400, 800, 1600]
     },
-    "interruptRating": 50,
+    "interruptRating": null,
     "curve": []
   },
   {
@@ -454,7 +463,7 @@ export default [
       "tms": [0.05, 0.1, 0.2, 0.3, 0.5, 0.7, 1.0, 1.5],
       "pickup": [5, 10, 20, 30, 50, 100, 200]
     },
-    "interruptRating": 50,
+    "interruptRating": null,
     "nec230_95": true,
     "curve": []
   },
@@ -472,7 +481,7 @@ export default [
       "tms": [0.05, 0.1, 0.2, 0.3, 0.5, 0.7, 1.0, 1.5],
       "pickup": [5, 10, 20, 30, 50, 100, 200]
     },
-    "interruptRating": 50,
+    "interruptRating": null,
     "nec230_95": true,
     "curve": []
   },
@@ -490,7 +499,7 @@ export default [
       "tms": [0.05, 0.1, 0.2, 0.3, 0.5, 0.7, 1.0, 1.5],
       "pickup": [5, 10, 20, 30, 50, 100, 200]
     },
-    "interruptRating": 50,
+    "interruptRating": null,
     "nec230_95": true,
     "curve": []
   },
@@ -508,7 +517,7 @@ export default [
       "tms": [0.05, 0.1, 0.2, 0.3, 0.5, 0.7, 1.0, 1.5],
       "pickup": [5, 10, 20, 30, 50, 100, 200]
     },
-    "interruptRating": 50,
+    "interruptRating": null,
     "nec230_95": true,
     "curve": []
   },
@@ -528,7 +537,7 @@ export default [
       "tms": [0.05, 0.1, 0.2, 0.3, 0.5, 0.7, 1.0, 1.5],
       "pickup": [5, 10, 20, 30, 50, 100, 200]
     },
-    "interruptRating": 50,
+    "interruptRating": null,
     "nec230_95": true,
     "curve": []
   },

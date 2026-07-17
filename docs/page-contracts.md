@@ -253,6 +253,7 @@ Coverage: 77 contracts for 77 navigation routes.
 - `settings.labelCounters` (setting, optional): One-line label counter state.
 - `settings.diagramTitleBlock` (setting, optional): One-line title block fields.
 - `settings.diagramDatablockConfig` (setting, optional): One-line datablock display configuration.
+- `settings.studyProvenance` (setting, optional): Study scenario, revision, approval, and run metadata used to qualify one-line overlays.
 - `settings.activeSampleWorkflow` (setting, optional): Active sample context used to fit and guide the sample diagram.
 - `settings.gistToken` (setting, optional): Gist import/export token setting.
 
