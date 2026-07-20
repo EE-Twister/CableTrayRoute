@@ -404,6 +404,8 @@ body.compact-mode #palette button .palette-icon {
 .toolbar-menu {
     position: relative;
     flex: 0 0 auto;
+    max-width: 100%;
+    box-sizing: border-box;
     margin-bottom: 0;
 }
 
@@ -438,6 +440,8 @@ body.compact-mode #palette button .palette-icon {
 .toolbar-menu > summary.btn {
     display: inline-flex;
     align-items: center;
+    max-width: 100%;
+    box-sizing: border-box;
     min-height: 2.15rem;
     color: var(--color-text);
     font-weight: 500;

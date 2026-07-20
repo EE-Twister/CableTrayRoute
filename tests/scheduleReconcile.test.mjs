@@ -50,4 +50,12 @@ assert.equal(applied.panels.length, 1);
 assert.equal(applied.loads[0].kw, 25);
 assert.equal(applied.cables[0].to, 'P-1');
 
+const normalizedPreview = previewScheduleReconcile(
+  { equipment: [{ id: 'MCC-01', tag: 'MCC-01', description: 'Main MCC' }] },
+  { equipment: [{ id: 'mcc-01', tag: 'mcc-01', description: 'Main MCC', x: 240, y: 180 }] }
+);
+assert.equal(normalizedPreview.totals.creates, 0, 'identity matching is case-insensitive');
+assert.equal(normalizedPreview.totals.conflicts, 0, 'case-only identities and canvas coordinates are ignored');
+assert.equal(normalizedPreview.totals.unchanged, 1);
+
 console.log('✓ schedule reconcile');

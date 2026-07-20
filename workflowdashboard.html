@@ -89,8 +89,17 @@
         </ol>
       </nav>
 
-      <header class="page-header">
-        <h1>Project Dashboard</h1>
+      <header class="page-header dashboard-page-header">
+        <div>
+          <h1>Project Dashboard</h1>
+          <p id="dashboard-focus-description">Routing blockers and handoffs are shown first.</p>
+        </div>
+        <label class="dashboard-focus-control" for="dashboard-focus-select">Dashboard focus
+          <select id="dashboard-focus-select">
+            <option value="routing">Cable routing</option>
+            <option value="full">Full engineering workflow</option>
+          </select>
+        </label>
       </header>
 
       <section class="dash-kpi-strip" aria-label="Dashboard key metrics">
@@ -120,7 +129,7 @@
 
       <section id="dashboard-next-action-strip" class="workflow-next-action dash-full-width" aria-live="polite" aria-label="Recommended next action"></section>
 
-      <details class="card dash-full-width dashboard-detail-group dashboard-guided-details" aria-label="Guided workflow runner">
+      <details class="card dash-full-width dashboard-detail-group dashboard-guided-details" aria-label="Guided workflow runner" data-dashboard-full-only>
         <summary><span>Guided Workflow</span><small>Open the full eight-step workflow checklist</small></summary>
         <div class="dashboard-detail-group__body">
           <div id="dashboard-guided-workflow" aria-live="polite">
@@ -144,7 +153,7 @@
         </details>
       </section>
 
-      <details class="card dash-full-width dashboard-detail-group" aria-label="Project quality details">
+      <details class="card dash-full-width dashboard-detail-group" aria-label="Project quality details" data-dashboard-full-only>
         <summary><span>Quality Checks</span><small>Compliance matrix and recorded assumptions</small></summary>
         <div class="dashboard-detail-group__body">
           <h2>Code Compliance Matrix</h2>
@@ -168,7 +177,7 @@
       </section>
 
       <!-- Studies status -->
-      <details class="card dash-full-width dashboard-detail-group" aria-label="Electrical studies status">
+      <details class="card dash-full-width dashboard-detail-group" aria-label="Electrical studies status" data-dashboard-full-only>
         <summary><span>Electrical Studies</span><small>Saved results and study shortcuts</small></summary>
         <div class="dashboard-detail-group__body">
           <p class="text-muted" style="margin-bottom:0.75rem">Studies with saved results are shown as complete. Open any study to run or refresh it.</p>
@@ -179,7 +188,7 @@
       </details>
 
       <!-- Release Package (Gap #71) -->
-      <details class="card dash-full-width dashboard-detail-group" aria-label="Release package">
+      <details class="card dash-full-width dashboard-detail-group" aria-label="Release package" data-dashboard-full-only>
         <summary><span>Release Package</span><small>Create and review immutable project snapshots</small></summary>
         <div class="dashboard-detail-group__body">
           <p class="text-muted" style="margin-bottom:0.75rem">Freeze the current project state into a named, immutable snapshot for design governance and traceability.</p>

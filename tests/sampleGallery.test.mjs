@@ -176,6 +176,46 @@ describe('migrateSampleProject()', () => {
 });
 
 describe('sampleProjectToImportPayload()', () => {
+  it('preserves a motor subtype when the generic component type is load', () => {
+    const payload = sampleProjectToImportPayload({
+      schemaVersion: 1,
+      cables: [],
+      raceways: { trays: [], conduits: [], ductbanks: [] },
+      oneLine: {
+        activeSheet: 0,
+        sheets: [{
+          name: 'Main',
+          components: [{ id: 'MTR-1', type: 'load', subtype: 'motor_load', label: 'MTR-1' }],
+          connections: [],
+        }],
+      },
+    });
+    const [motor] = payload.oneLine.sheets[0].components;
+    assert.strictEqual(motor.type, 'motor_load');
+    assert.strictEqual(motor.subtype, 'motor_load');
+    assert.strictEqual(motor.rotation, 0);
+  });
+
+  it('maps a VFD subtype to the specialized motor-controller component', () => {
+    const payload = sampleProjectToImportPayload({
+      schemaVersion: 1,
+      cables: [],
+      raceways: { trays: [], conduits: [], ductbanks: [] },
+      oneLine: {
+        activeSheet: 0,
+        sheets: [{
+          name: 'Main',
+          components: [{ id: 'VFD-1', type: 'equipment', subtype: 'vfd', label: 'VFD-1' }],
+          connections: [],
+        }],
+      },
+    });
+    const [vfd] = payload.oneLine.sheets[0].components;
+    assert.strictEqual(vfd.type, 'motor_controller');
+    assert.strictEqual(vfd.subtype, 'vfd');
+    assert.strictEqual(vfd.rotation, 0);
+  });
+
   it('normalizes legacy cable endpoints and raceway assignments for schedule pages', () => {
     const payload = sampleProjectToImportPayload({
       schemaVersion: 1,

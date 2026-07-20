@@ -208,16 +208,42 @@ def make_styles():
 
 
 def paragraph_cell(value, style):
+    if isinstance(value, Flowable):
+        return value
     value = text(value).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
     return Paragraph(value, style)
 
 
-def data_table(headers, rows, widths, styles, font_size=6.4, repeat_rows=1):
+def section_anchor_name(number_value):
+    return f"section-{str(number_value).strip().replace('.', '-')}"
+
+
+class PdfSectionAnchor(Flowable):
+    def __init__(self, number_value, title_value):
+        super().__init__()
+        self.number_value = str(number_value)
+        self.title_value = str(title_value)
+        self.width = 0
+        self.height = 0
+
+    def draw(self):
+        key = section_anchor_name(self.number_value)
+        title = f"{self.number_value}. {self.title_value}"
+        self.canv.bookmarkPage(key)
+        self.canv.addOutlineEntry(title, key, level=0, closed=False)
+
+
+def internal_link_cell(value, anchor, style):
+    label = text(value).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    return Paragraph(f'<link href="#{anchor}" color="#17365D"><u>{label}</u></link>', style)
+
+
+def data_table(headers, rows, widths, styles, font_size=6.4, repeat_rows=1, style_commands=None):
     cell_style = styles["CellSmall"] if font_size < 6.2 else styles["Cell"]
     body = [[paragraph_cell(header, styles["CellHead"]) for header in headers]]
     body.extend([[paragraph_cell(value, cell_style) for value in row] for row in rows])
     table = Table(body, colWidths=widths, repeatRows=repeat_rows, hAlign="LEFT")
-    table.setStyle(TableStyle([
+    commands = [
         ("BACKGROUND", (0, 0), (-1, 0), NAVY),
         ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
         ("GRID", (0, 0), (-1, -1), 0.35, colors.HexColor("#9EADBA")),
@@ -227,7 +253,10 @@ def data_table(headers, rows, widths, styles, font_size=6.4, repeat_rows=1):
         ("TOPPADDING", (0, 0), (-1, -1), 3),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
         ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, VERY_LIGHT_GRAY]),
-    ]))
+    ]
+    if style_commands:
+        commands.extend(style_commands)
+    table.setStyle(TableStyle(commands))
     return table
 
 
@@ -578,6 +607,47 @@ class SeriesFuseTccChart(Flowable):
             c.drawPath(path, fill=0, stroke=1)
             c.setDash()
 
+        def draw_fuse_band(minimum_melt, total_clear, color):
+            minimum_points = [(px(x), py(y)) for x, y in minimum_melt if x > 0 and y > 0]
+            clearing_points = [(px(x), py(y)) for x, y in total_clear if x > 0 and y > 0]
+            if len(minimum_points) < 2 or len(clearing_points) < 2:
+                return
+            band = c.beginPath()
+            band.moveTo(*clearing_points[0])
+            for point in clearing_points[1:]:
+                band.lineTo(*point)
+            for point in reversed(minimum_points):
+                band.lineTo(*point)
+            band.close()
+            c.saveState()
+            c.setFillColor(color)
+            if hasattr(c, "setFillAlpha"):
+                c.setFillAlpha(0.06)
+            c.drawPath(band, fill=1, stroke=0)
+            c.clipPath(band, stroke=0, fill=0)
+            c.setStrokeColor(color)
+            c.setLineWidth(0.45)
+            if hasattr(c, "setStrokeAlpha"):
+                c.setStrokeAlpha(0.36)
+            hatch_spacing = 7
+            offset = -plot_h
+            while offset <= plot_w:
+                c.line(left + offset, bottom, left + offset + plot_h, bottom + plot_h)
+                offset += hatch_spacing
+            c.restoreState()
+
+        def draw_tag_callout(x, y, label, color):
+            font_name = "Helvetica-Bold"
+            font_size = 5.5
+            label_width = c.stringWidth(label, font_name, font_size)
+            label_y = max(bottom + 4, min(bottom + plot_h - 7, y + 6))
+            c.setFillColor(color)
+            c.setFont(font_name, font_size)
+            if x + label_width + 7 <= left + plot_w:
+                c.drawString(x + 6, label_y, label)
+            else:
+                c.drawRightString(x - 6, label_y, label)
+
         def add_legend(y, color, label, dash=None):
             c.setStrokeColor(color)
             c.setLineWidth(1.8)
@@ -629,6 +699,7 @@ class SeriesFuseTccChart(Flowable):
                 minimum_melt.append((current, max(ymin, min(ymax, seconds))))
                 total_clear.append((current, max(ymin, min(ymax, seconds * clearing_factor))))
             color = palette[index % len(palette)]
+            draw_fuse_band(minimum_melt, total_clear, color)
             draw_curve(total_clear, color, 2.0)
             draw_curve(minimum_melt, color, 1.1, (3, 2))
             add_legend(legend_y, color, f"{device_id} total clear")
@@ -660,14 +731,16 @@ class SeriesFuseTccChart(Flowable):
             start_current = fla * float(motor["lockedRotorMultiple"])
             start_time = float(motor["accelerationTimeS"])
             c.setFillColor(motor_color)
-            c.circle(px(start_current), py(start_time), 3, fill=1, stroke=0)
+            start_x, start_y = px(start_current), py(start_time)
+            c.circle(start_x, start_y, 3, fill=1, stroke=0)
+            draw_tag_callout(start_x, start_y, f"{motor['tag']} start", motor_color)
             add_legend(legend_y, motor_color, f"{motor['tag']} cold limit")
             legend_y -= 12
             add_legend(legend_y, motor_color, f"{motor['tag']} hot limit", (3, 2))
             legend_y -= 12
             c.setFont("Helvetica", 5.4)
             c.setFillColor(motor_color)
-            c.drawString(legend_x, legend_y - 2, f"Start: {start_current:.0f} A / {start_time:.1f} s")
+            c.drawString(legend_x, legend_y - 2, f"{motor['tag']} start: {start_current:.0f} A / {start_time:.1f} s")
             legend_y -= 15
 
         transformer = self.study.get("transformer")
@@ -683,6 +756,7 @@ class SeriesFuseTccChart(Flowable):
             x, y = px(inrush_current), py(inrush_time)
             c.line(x - 4, y - 4, x + 4, y + 4)
             c.line(x - 4, y + 4, x + 4, y - 4)
+            draw_tag_callout(x, y, f"{transformer['tag']} inrush", transformer_color)
             damage_multiple = float(transformer.get("damageCurrentMultiple", 25))
             damage_points = []
             for multiple in [2, 3, 4, 6, 8, 10, 15, 20, damage_multiple]:
@@ -692,7 +766,7 @@ class SeriesFuseTccChart(Flowable):
             legend_y -= 12
             c.setFont("Helvetica", 5.4)
             c.setFillColor(transformer_color)
-            c.drawString(legend_x, legend_y - 2, f"Inrush: {inrush_current:.0f} A / {inrush_time:.2f} s")
+            c.drawString(legend_x, legend_y - 2, f"{transformer['tag']} inrush: {inrush_current:.0f} A / {inrush_time:.2f} s")
             legend_y -= 15
 
         fault_current = float(self.study.get("faultCurrentKA", 0)) * 1000
@@ -712,9 +786,10 @@ class SeriesFuseTccChart(Flowable):
 
 
 class ArcFlashLabels(Flowable):
-    def __init__(self, results):
+    def __init__(self, results, created_date):
         super().__init__()
         self.results = results
+        self.created_date = created_date
         self.width = 6.7 * inch
         self.height = 6.55 * inch
 
@@ -725,9 +800,23 @@ class ArcFlashLabels(Flowable):
         c.rect(x, y, w, h, fill=1, stroke=1)
         c.setFillColor(ORANGE)
         c.rect(x, y + h - 28, w, 28, fill=1, stroke=1)
+        # ANSI Z535.4 safety-alert symbol: equilateral triangle with exclamation mark.
+        symbol_cx = x + 22
+        symbol_top = y + h - 4
+        symbol_bottom = y + h - 24
+        symbol = c.beginPath()
+        symbol.moveTo(symbol_cx, symbol_top)
+        symbol.lineTo(symbol_cx - 12, symbol_bottom)
+        symbol.lineTo(symbol_cx + 12, symbol_bottom)
+        symbol.close()
+        c.setFillColor(colors.black)
+        c.drawPath(symbol, fill=1, stroke=0)
+        c.setFillColor(ORANGE)
+        c.setFont("Helvetica-Bold", 11)
+        c.drawCentredString(symbol_cx, symbol_bottom + 4, "!")
         c.setFillColor(colors.black)
         c.setFont("Helvetica-Bold", 11)
-        c.drawCentredString(x + w / 2, y + h - 18, "WARNING - ARC FLASH HAZARD")
+        c.drawCentredString(x + w / 2 + 8, y + h - 18, "WARNING - ARC FLASH HAZARD")
         c.setFont("Helvetica-Bold", 10)
         c.drawString(x + 10, y + h - 45, text(row.get("equipmentTag")))
         c.setFont("Helvetica-Bold", 19)
@@ -740,9 +829,10 @@ class ArcFlashLabels(Flowable):
             f"Arc flash boundary: {text(row.get('boundary'))} {text(row.get('boundaryUnit'), 'in')}",
             f"Working distance: {text(row.get('workingDistanceIn'))} in",
             f"Minimum arc rating: {text(row.get('minimumArcRatingCalCm2'), '0')} cal/cm2",
+            f"Label created: {text(self.created_date)}",
         ]
         for index, line in enumerate(lines):
-            c.drawString(x + 10, y + h - 88 - index * 11, line)
+            c.drawString(x + 10, y + h - 85 - index * 9, line)
         c.setFont("Helvetica-Bold", 6.5)
         c.drawString(x + 10, y + 9, "SAMPLE ONLY - NOT FOR FIELD APPLICATION")
 
@@ -783,7 +873,10 @@ def draw_page_frame(canvas, doc, meta, package):
 
 
 def section_title(number_value, title_value, styles, subtitle=None):
-    content = [Paragraph(f"{number_value}. {title_value}", styles["SheetTitle"])]
+    content = [
+        PdfSectionAnchor(number_value, title_value),
+        Paragraph(f"{number_value}. {title_value}", styles["SheetTitle"]),
+    ]
     if subtitle:
         content.append(Paragraph(subtitle, styles["Note"]))
     return content
@@ -878,23 +971,32 @@ def build_pdf(project: dict, output_path: Path, visuals: dict):
         ("Review state", "Internal sample review only; no professional seal or construction authorization."),
     ], styles))
     story.append(Spacer(1, 0.14 * inch))
-    contents = [
-        ("1", "Document Control and Contents", "2"),
-        ("2", "Executive Summary and Design Basis", "3"),
-        ("3", "Equipment List", "4"),
-        ("4", "Load List and Demand Summary", "5"),
-        ("5", "Cable Schedule", "6"),
-        ("6", "Raceway Schedule", "7"),
-        ("7", "Ductbank Cross-Section Views", "8-9"),
-        ("8", "Cable Tray Cross-Section Views", "10-12"),
-        ("9", "Electrical One-Line Diagram", "13"),
-        ("10", "Short-Circuit Study", "14"),
-        ("11", "Arc-Flash Study Summary", "15"),
-        ("12", "Arc-Flash Labels", "16-17"),
-        ("13", "Series-Fuse TCC Charts", "18-20"),
-        ("14", "Protective Device Settings and Coordination", "21"),
-        ("15", "Engineering Review Checklist and Limitations", "22"),
+    contents_data = [
+        ("1", "Document Control and Contents", "2", "section-1"),
+        ("2", "Executive Summary and Design Basis", "3", "section-2"),
+        ("3", "Equipment List", "4", "section-3"),
+        ("4", "Load List and Demand Summary", "5", "section-4"),
+        ("5", "Cable Schedule", "6", "section-5"),
+        ("6", "Raceway Schedule", "7", "section-6"),
+        ("7", "Ductbank Cross-Section Views", "8-9", "section-7-1"),
+        ("8", "Cable Tray Cross-Section Views", "10-12", "section-8-1"),
+        ("9", "Electrical One-Line Diagram", "13", "section-9"),
+        ("10", "Short-Circuit Study", "14", "section-10"),
+        ("11", "Arc-Flash Study Summary", "15", "section-11"),
+        ("12", "Arc-Flash Labels", "16-17", "section-12-1"),
+        ("13", "Series-Fuse TCC Charts", "18-20", "section-13-1"),
+        ("14", "Protective Device Settings and Coordination", "21", "section-14"),
+        ("15", "Engineering Review Checklist and Limitations", "22", "section-15"),
     ]
+    contents = [
+        [
+            internal_link_cell(number_value, anchor, styles["Cell"]),
+            internal_link_cell(title_value, anchor, styles["Cell"]),
+            internal_link_cell(page_value, anchor, styles["Cell"]),
+        ]
+        for number_value, title_value, page_value, anchor in contents_data
+    ]
+    story.append(Paragraph("Click any linked row to jump directly to that report section.", styles["Note"]))
     story.append(data_table(["Section", "Title", "Page"], contents, [0.65 * inch, 5.45 * inch, 0.6 * inch], styles))
     story.append(PageBreak())
 
@@ -951,12 +1053,12 @@ def build_pdf(project: dict, output_path: Path, visuals: dict):
         current = kw * 1000 / ((math.sqrt(3) if phases == 3 else 1) * voltage * pf) if voltage and pf else 0
         load_rows.append([
             row.get("tag"), row.get("source"), row.get("description"), int(qty), row.get("voltage"), phases,
-            row.get("loadType"), number(kw, 2), number(current, 1), row.get("demandFactor"), number(demand, 2), row.get("circuit"),
+            row.get("loadType"), number(kw, 2), number(pf, 2), number(current, 1), row.get("demandFactor"), number(demand, 2), row.get("circuit"),
         ])
     story.append(data_table(
-        ["Load", "Source", "Description", "Qty", "V", "Ph", "Type", "Connected kW", "FLA A", "Demand %", "Demand kW", "Circuit"],
+        ["Load", "Source", "Description", "Qty", "V", "Ph", "Type", "Connected kW", "PF", "FLA A", "Demand %", "Demand kW", "Circuit"],
         load_rows,
-        [0.55 * inch, 0.55 * inch, 1.15 * inch, 0.28 * inch, 0.34 * inch, 0.25 * inch, 0.55 * inch, 0.53 * inch, 0.4 * inch, 0.47 * inch, 0.5 * inch, 0.62 * inch],
+        [0.55 * inch, 0.55 * inch, 1.1 * inch, 0.28 * inch, 0.34 * inch, 0.25 * inch, 0.5 * inch, 0.5 * inch, 0.3 * inch, 0.38 * inch, 0.45 * inch, 0.48 * inch, 0.58 * inch],
         styles,
         font_size=5.7,
     ))
@@ -972,22 +1074,39 @@ def build_pdf(project: dict, output_path: Path, visuals: dict):
     # 6. Cable schedule
     story.extend(section_title("5", "Cable Schedule", styles, "Voltage drop values are screening calculations using conductor resistance and scheduled load."))
     cable_rows = []
-    for row in project["cables"]:
+    cable_vd_styles = []
+    for row_index, row in enumerate(project["cables"], start=1):
+        voltage_drop = cable_voltage_drop(row, project["loads"])
         cable_rows.append([
             row.get("tag"), row.get("from"), row.get("to"), row.get("cable_type"), row.get("conductors"),
             row.get("conductor_size"), row.get("conductor_material"), row.get("ground_size"), row.get("insulation_type"),
-            row.get("voltage"), row.get("ocpd_rating"), row.get("length_ft"), row.get("route_preference"),
-            f"{cable_voltage_drop(row, project['loads']):.2f}%",
+            row.get("voltage"), row.get("cable_rating"), row.get("ocpd_rating"), row.get("length_ft"), row.get("route_preference"),
+            f"{voltage_drop:.2f}%",
         ])
+        if voltage_drop > 5:
+            cable_vd_styles.extend([
+                ("BACKGROUND", (14, row_index), (14, row_index), colors.HexColor("#F4CCCC")),
+                ("TEXTCOLOR", (14, row_index), (14, row_index), colors.HexColor("#9C0006")),
+                ("FONTNAME", (14, row_index), (14, row_index), "Helvetica-Bold"),
+            ])
+        elif voltage_drop > 3:
+            cable_vd_styles.extend([
+                ("BACKGROUND", (14, row_index), (14, row_index), colors.HexColor("#FFF2CC")),
+                ("TEXTCOLOR", (14, row_index), (14, row_index), colors.HexColor("#7F6000")),
+                ("FONTNAME", (14, row_index), (14, row_index), "Helvetica-Bold"),
+            ])
     story.append(data_table(
-        ["Cable tag", "From", "To", "Service", "Cond", "Size", "Matl", "EGC", "Insul", "V", "OCPD A", "Length ft", "Raceway", "VD"],
+        ["Cable tag", "From", "To", "Service", "Cond", "Size", "Matl", "EGC", "Insul", "Operating V", "Cable rated V", "OCPD A", "Length ft", "Raceway", "VD"],
         cable_rows,
-        [0.87 * inch, 0.52 * inch, 0.52 * inch, 0.45 * inch, 0.28 * inch, 0.55 * inch, 0.36 * inch, 0.45 * inch, 0.42 * inch, 0.3 * inch, 0.4 * inch, 0.43 * inch, 0.72 * inch, 0.36 * inch],
+        [0.8 * inch, 0.46 * inch, 0.46 * inch, 0.42 * inch, 0.25 * inch, 0.48 * inch, 0.32 * inch, 0.39 * inch, 0.38 * inch, 0.41 * inch, 0.43 * inch, 0.36 * inch, 0.4 * inch, 0.65 * inch, 0.3 * inch],
         styles,
         font_size=5.7,
+        style_commands=cable_vd_styles,
     ))
     story.append(Spacer(1, 0.14 * inch))
-    story.append(Paragraph(f"Cable schedule QA: all {len(project['cables'])} rows have unique tags, source/destination equipment, conductor size, insulation, voltage rating, OCPD, length, and assigned raceway. Final ampacity requires complete adjustment/correction factors and terminal temperature verification.", styles["BodySmall"]))
+    story.append(Paragraph("Voltage-drop highlighting: yellow = greater than 3% and less than or equal to 5%; red = greater than 5%.", styles["BodySmall"]))
+    story.append(Spacer(1, 0.06 * inch))
+    story.append(Paragraph(f"Cable schedule QA: all {len(project['cables'])} rows have unique tags, source/destination equipment, conductor size, insulation, operating voltage, cable rated voltage, OCPD, length, and assigned raceway. Final ampacity requires complete adjustment/correction factors and terminal temperature verification.", styles["BodySmall"]))
     story.append(PageBreak())
 
     # 7. Raceway schedule
@@ -1026,12 +1145,24 @@ def build_pdf(project: dict, output_path: Path, visuals: dict):
     ductbank_map = {row["ductbank_id"]: row for row in project["ductbanks"]}
     for index, cross_section in enumerate(package["ductbankCrossSections"], start=1):
         ductbank = ductbank_map.get(cross_section["ductbankId"], {})
+        conduit_loading = []
+        for conduit in ductbank.get("conduits", []):
+            conduit_id = conduit.get("conduit_id")
+            assigned_tags = [
+                cable.get("tag") for cable in project["cables"]
+                if conduit_id == cable.get("route_preference")
+                or conduit_id in (cable.get("raceway_ids") or [])
+                or conduit_id == cable.get("conduit_id")
+            ]
+            if assigned_tags:
+                conduit_loading.append(f"{conduit_id}: {', '.join(assigned_tags)}")
         story.extend(section_title(f"7.{index}", "Ductbank Cross-Section View", styles, "Schematic cross-section; coordinate with civil details, structural reinforcement, drainage, and utility separation."))
         story.append(application_visual(visuals["ductbanks"][cross_section["ductbankId"]], max_height=5.0 * inch))
         story.append(key_value_table([
             ("Parent route", f"{cross_section['ductbankId']} - {text(ductbank.get('description'))}; scheduled length {text(ductbank.get('length_ft'))} ft."),
             ("Concrete envelope", f"{text(cross_section.get('widthIn'))} in W x {text(cross_section.get('heightIn'))} in H with {text(cross_section.get('concreteCoverIn'))} in minimum concrete beyond the conduit outside wall on every side."),
             ("Circuit assignment", "; ".join(f"C{circuit_index + 1} - {circuit}" for circuit_index, circuit in enumerate(cross_section["circuits"]))),
+            ("Conduit loading", "; ".join(conduit_loading) if conduit_loading else "All modeled conduits are spare."),
             ("Thermal basis", "Concrete encasement and conductor ampacity require project soil thermal resistivity, ambient earth temperature, burial depth, and loading profile."),
             ("Construction note", "Provide spacers, minimum cover, warning tape, grounding/bonding, and spare-conduit caps per project specifications."),
         ], styles))
@@ -1051,6 +1182,7 @@ def build_pdf(project: dict, output_path: Path, visuals: dict):
             ("Tray", f"{tray_section['trayId']} - {text(tray.get('material'))} {text(tray.get('tray_type')).lower()} tray, {tray_section['insideWidthIn']} in inside width x {tray_section['usableDepthIn']} in usable depth."),
             ("Divider zones", divider_text),
             ("Scheduled cables", ", ".join(tray_section["cables"])),
+            ("Drawing notation", "Solid orange line = physical divider; dotted orange line = stacking boundary between non-stackable large cables and stackable smaller cables, when shown."),
             ("Installation note", tray_section["separationNote"]),
             ("Support note", "Verify support span, concentrated loads, fittings, bonding jumpers, and environmental derating against vendor and project criteria."),
         ], styles))
@@ -1083,7 +1215,7 @@ def build_pdf(project: dict, output_path: Path, visuals: dict):
             rating, "PASS" if rating != "-" and float(rating) >= duty else "REVIEW", equipment.get("arrangement"),
         ])
     story.append(data_table(
-        ["Bus / equipment", "V", "3-phase kA", "SLG kA", "L-L kA", "DLG kA", "Rating kA", "Duty", "Location"],
+        ["Bus / equipment", "V", "3-phase kA", "SLG kA", "L-L kA", "DLG kA*", "Rating kA", "Duty", "Location"],
         short_rows,
         [0.85 * inch, 0.38 * inch, 0.62 * inch, 0.55 * inch, 0.52 * inch, 0.55 * inch, 0.56 * inch, 0.5 * inch, 1.1 * inch],
         styles,
@@ -1092,6 +1224,7 @@ def build_pdf(project: dict, output_path: Path, visuals: dict):
     story.append(key_value_table([
         ("Maximum calculated duty", f"{studies['shortCircuit']['availableFaultKa']:.2f} kA at SWBD-101."),
         ("Method", studies["shortCircuit"]["_meta"]["method"]),
+        ("Fault abbreviation", "DLG = double-line-to-ground fault (two phase conductors faulted to ground)."),
         ("Result statement", "Modeled interrupting ratings shown in this sample exceed the calculated three-phase symmetrical duty. Verify asymmetrical/peak ratings and manufacturer series combinations separately."),
     ], styles))
     story.append(PageBreak())
@@ -1123,7 +1256,7 @@ def build_pdf(project: dict, output_path: Path, visuals: dict):
     for index in range(0, len(arc_results), 6):
         page_number = index // 6 + 1
         story.extend(section_title(f"12.{page_number}", "Arc-Flash Labels", styles, "Label artwork is for report review only. Do not install these sample labels."))
-        story.append(ArcFlashLabels(arc_results[index:index + 6]))
+        story.append(ArcFlashLabels(arc_results[index:index + 6], package.get("labelCreatedDate", meta.get("date"))))
         story.append(PageBreak())
 
     # 14. TCC charts - one radial series-fuse path per sheet
@@ -1133,7 +1266,7 @@ def build_pdf(project: dict, output_path: Path, visuals: dict):
             f"13.{index}",
             tcc_study["title"],
             styles,
-            f"Only fuses on the connected radial path are plotted: {series_path}. Solid curves are total-clearing screening envelopes; dashed companion curves are minimum-melt envelopes.",
+            f"Only fuses on the connected radial path are plotted: {series_path}. Solid curves are total-clearing screening envelopes; dashed companion curves are minimum-melt envelopes; diagonal hatching identifies the fuse operating band between them.",
         ))
         story.append(SeriesFuseTccChart(tcc_study, tcc_settings))
         protected_assets = [tcc_study["protectedCable"]["tag"]]

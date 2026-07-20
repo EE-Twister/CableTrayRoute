@@ -63,7 +63,7 @@
         }
     }
 
-    @media (max-width: 700px) {
+    @media (max-width: 960px) {
         flex-wrap: wrap;
         align-items: center;
         padding: var(--space-2) var(--space-3);
@@ -243,7 +243,7 @@
 .nav-toggle {
     display: none;
 
-    @media (max-width: 700px) {
+    @media (max-width: 960px) {
         display: flex;
         align-items: center;
         justify-content: center;
@@ -260,21 +260,39 @@
 
 /* Search button shown only on mobile — opens command palette without Ctrl+K */
 .nav-search-btn {
-    display: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: .4rem;
+    margin-left: auto;
+    padding: .4rem .6rem;
+    border: 1px solid var(--color-border, #d1d5db);
+    border-radius: .4rem;
+    background: var(--color-surface, #fff);
+    color: var(--text-color);
+    font: inherit;
+    font-size: .82rem;
+    cursor: pointer;
 
-    @media (max-width: 700px) {
-        display: flex;
-        align-items: center;
-        justify-content: center;
+    kbd {
+        padding: .1rem .3rem;
+        border: 1px solid var(--color-border, #d1d5db);
+        border-radius: .25rem;
+        color: var(--color-text-muted, #64748b);
+        font-size: .7rem;
+    }
+
+    @media (max-width: 960px) {
         order: 2;
         margin-left: var(--space-1);
-        background: none;
-        border: none;
         font-size: 1.4rem;
-        cursor: pointer;
-        color: var(--text-color);
         min-width: 44px;
         min-height: 44px;
+
+        span:nth-child(2),
+        kbd {
+            display: none;
+        }
     }
 }
 
@@ -406,7 +424,7 @@
     text-decoration: none;
 }
 
-@media (max-width: 700px) {
+@media (max-width: 960px) {
     .auth-profile-control {
         order: 2;
     }
@@ -437,7 +455,7 @@
     background: rgba(0, 0, 0, 0.4);
     z-index: 199;
 
-    @media (max-width: 700px) {
+    @media (max-width: 960px) {
         &.sidebar-open {
             display: block;
         }
@@ -448,7 +466,7 @@
 .sidebar-toggle-btn {
     display: none;
 
-    @media (max-width: 700px) {
+    @media (max-width: 960px) {
         display: flex;
         align-items: center;
         justify-content: center;
@@ -473,7 +491,7 @@
     display: none;
 }
 
-@media (max-width: 700px) {
+@media (max-width: 960px) {
     .sidebar-toggle-label {
         display: inline;
         line-height: 1;
@@ -518,7 +536,7 @@
 }
 
 /* Mobile overrides — sidebar slides in from left on mobile only */
-@media (max-width: 700px) {
+@media (max-width: 960px) {
     .app-sidebar-nav {
         display: flex;
         flex-direction: column;
@@ -812,7 +830,51 @@
     }
 }
 
-@media (max-width: 700px) {
+@media (min-width: 961px) and (max-width: 1320px) {
+    .top-nav {
+        padding-inline: var(--space-2);
+    }
+
+    .top-nav .nav-actions {
+        gap: var(--space-1);
+    }
+
+    .top-nav .nav-links > a,
+    .top-nav .nav-dropdown-trigger {
+        margin-right: var(--space-1);
+        padding-inline: 0.35rem;
+    }
+
+    .project-actions-trigger {
+        min-width: 2.75rem;
+        min-height: 2.75rem;
+        max-width: 2.75rem;
+        justify-content: center;
+        padding: 0;
+    }
+
+    .project-actions-trigger::after,
+    .project-sync-status,
+    .project-display-chip {
+        display: none;
+    }
+
+    .nav-search-btn {
+        width: 2.75rem;
+        min-width: 2.75rem;
+        min-height: 2.75rem;
+        margin-left: var(--space-1);
+        padding: 0;
+        font-size: 1.2rem;
+    }
+
+    .nav-search-btn span:nth-child(2),
+    .nav-search-btn kbd {
+        display: none;
+    }
+}
+
+@media (max-width: 960px) {
     .top-nav {
         flex-wrap: nowrap;
         z-index: 201;
@@ -1147,7 +1209,7 @@ body.dark-mode .sample-workflow-guide__close {
     display: none;
 }
 
-@media (max-width: 700px) {
+@media (max-width: 960px) {
     .sidebar-utility-actions {
         display: grid;
         gap: .35rem;

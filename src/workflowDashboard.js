@@ -50,6 +50,26 @@ const STUDY_DEFINITIONS = [
   { key: 'lighting',               label: 'Egress Lighting',         href: 'lighting.html' },
   { key: 'trustCenter',            label: 'Trust Center',            href: 'trustcenter.html' },
 ];
+const DASHBOARD_FOCUS_KEY = 'workflowDashboardFocus';
+
+function getDashboardFocus() {
+  return getItem(DASHBOARD_FOCUS_KEY, 'routing') === 'full' ? 'full' : 'routing';
+}
+
+function applyDashboardFocus() {
+  const focus = getDashboardFocus();
+  document.querySelectorAll('[data-dashboard-full-only]').forEach(element => {
+    element.hidden = focus !== 'full';
+  });
+  const select = document.getElementById('dashboard-focus-select');
+  if (select) select.value = focus;
+  const description = document.getElementById('dashboard-focus-description');
+  if (description) {
+    description.textContent = focus === 'routing'
+      ? 'Routing blockers, tray fill, route results, and export handoffs are shown first.'
+      : 'The complete engineering workflow, studies, quality checks, and release readiness are shown.';
+  }
+}
 function getStatusMeta({ complete, label, hint, forStudy = false }) {
   if (complete) {
     return { text: forStudy ? 'Run' : 'Complete', icon: '✓', variant: 'success' };
@@ -404,15 +424,62 @@ function openDesignBasisWizard() {
 function renderKpiStrip(container) {
   if (!container) return;
 
-  const { workflowCompletionPct } = getWorkflowMetrics();
   const diagnostics = currentCoreDiagnostics();
   const trayViolations = getTrayViolationsCount();
-  const studiesCompletedCount = getStudiesCompletedCount();
-  const openCoachItems = getOpenCoachItemCount();
-  const equipFailCount = getEquipmentFailCount();
-  const totalStudies = STUDY_DEFINITIONS.length;
+  const focus = getDashboardFocus();
+  const { workflowCompletionPct } = getWorkflowMetrics();
+  const routeResultGap = Math.max(0, diagnostics.health.routingReady - diagnostics.health.routeResults);
 
-  const kpis = [
+  const routingKpis = [
+    {
+      label: 'Cable schedule',
+      value: diagnostics.health.cableRows,
+      helper: `${diagnostics.health.scheduleReady} cable row(s) have the fields required for routing.`,
+      href: 'cableschedule.html',
+      warn: diagnostics.health.scheduleReady < diagnostics.health.cableRows,
+    },
+    {
+      label: 'Raceway assigned',
+      value: `${diagnostics.health.routingReady}/${diagnostics.health.scheduleReady}`,
+      helper: diagnostics.cables.missingRaceway
+        ? `${diagnostics.cables.missingRaceway} schedule-ready cable(s) still need a raceway.`
+        : 'All schedule-ready cables have a raceway assignment.',
+      href: 'cableschedule.html',
+      warn: diagnostics.cables.missingRaceway > 0,
+    },
+    {
+      label: 'Missing coordinates',
+      value: diagnostics.cables.missingCoordinates,
+      helper: diagnostics.cables.missingCoordinates
+        ? 'Complete start and end XYZ coordinates before reproducing routes.'
+        : 'Assigned cables have complete endpoint coordinates.',
+      href: 'cableschedule.html',
+      warn: diagnostics.cables.missingCoordinates > 0,
+    },
+    {
+      label: 'Route results',
+      value: diagnostics.health.routeResults,
+      helper: routeResultGap ? `${routeResultGap} assigned cable(s) do not have a matching result.` : 'Saved results match the routing-ready cable count.',
+      href: 'optimalRoute.html',
+      warn: routeResultGap > 0,
+    },
+    {
+      label: 'Tray fill warnings',
+      value: trayViolations,
+      helper: trayViolations > 0 ? 'Trays currently over 80% fill.' : 'No tray fill warnings above 80%.',
+      href: 'cabletrayfill.html',
+      warn: trayViolations > 0,
+    },
+    {
+      label: 'Routing exports',
+      value: diagnostics.health.routeResults > 0 ? 'Available' : 'Not ready',
+      helper: diagnostics.health.routeResults > 0 ? 'Pull cards and routing deliverables can use saved results.' : 'Run routing before creating route-based exports.',
+      href: diagnostics.health.routeResults > 0 ? 'pullcards.html' : 'optimalRoute.html',
+      warn: diagnostics.health.routeResults === 0,
+    },
+  ];
+
+  const fullKpis = [
     {
       label: 'Workflow steps complete',
       value: `${workflowCompletionPct}%`,
@@ -428,18 +495,18 @@ function renderKpiStrip(container) {
     },
     {
       label: 'Studies completed',
-      value: studiesCompletedCount,
-      helper: `${studiesCompletedCount} of ${totalStudies} studies have saved results.`,
+      value: diagnostics.health.studies,
+      helper: `${diagnostics.health.studies} saved study result set(s).`,
       href: 'demandschedule.html',
     },
     {
       label: 'Design coach recommendations',
-      value: openCoachItems,
-      helper: openCoachItems > 0
-        ? `${openCoachItems} safety/compliance item(s) need attention.`
+      value: getOpenCoachItemCount(),
+      helper: getOpenCoachItemCount() > 0
+        ? `${getOpenCoachItemCount()} safety/compliance item(s) need attention.`
         : 'No coach recommendations. Design-rule findings are tracked separately.',
       href: 'designcoach.html',
-      warn: openCoachItems > 0,
+      warn: getOpenCoachItemCount() > 0,
     },
     {
       label: 'Design rule checks',
@@ -456,14 +523,15 @@ function renderKpiStrip(container) {
     },
     {
       label: 'Equipment failures',
-      value: equipFailCount,
-      helper: equipFailCount > 0
-        ? `${equipFailCount} equipment item(s) exceed their duty rating.`
+      value: getEquipmentFailCount(),
+      helper: getEquipmentFailCount() > 0
+        ? `${getEquipmentFailCount()} equipment item(s) exceed their duty rating.`
         : 'No equipment duty failures detected.',
       href: 'equipmentevaluation.html',
-      warn: equipFailCount > 0,
+      warn: getEquipmentFailCount() > 0,
     },
   ];
+  const kpis = focus === 'routing' ? routingKpis : fullKpis;
 
   container.innerHTML = '';
   const list = document.createElement('ul');
@@ -764,6 +832,7 @@ function canRunWorkflowAutomation() {
 }
 
 function refreshDashboard() {
+  applyDashboardFocus();
   renderKpiStrip(document.getElementById('dashboard-kpi-strip'));
   renderWorkflowCoreDiagnostics();
   renderGuidedWorkflowRunner();
@@ -1067,9 +1136,27 @@ function renderComplianceMatrix() {
 
 function renderWorkflowCoreDiagnostics() {
   const diagnostics = currentCoreDiagnostics();
+  const focus = getDashboardFocus();
+  const routingSteps = new Set(['Cable Schedule', 'Raceway Schedule', 'Fill / Routing']);
+  const focusedBlockers = focus === 'routing'
+    ? diagnostics.blockers.filter(item => (
+        routingSteps.has(item.step)
+        && item.label !== 'Complete deliverable cable fields'
+      ))
+    : diagnostics.blockers;
   const nextEl = document.getElementById('dashboard-next-action-strip');
   if (nextEl) {
-    const action = diagnostics.nextAction;
+    const action = focus === 'routing'
+      ? (focusedBlockers.find(item => item.severity !== 'info') || {
+          severity: 'success',
+          step: 'Fill / Routing',
+          label: diagnostics.health.routeResults > 0 ? 'Review tray fill and create routing exports' : 'Run cable routing',
+          detail: diagnostics.health.routeResults > 0
+            ? `${diagnostics.health.routeResults} saved route result(s) are available for tray fill, pull cards, and route-based exports.`
+            : 'Cable and raceway inputs are coordinated. Run Optimal Route to create reproducible route results.',
+          href: diagnostics.health.routeResults > 0 ? 'cabletrayfill.html' : 'optimalRoute.html'
+        })
+      : diagnostics.nextAction;
     const automationReady = canRunWorkflowAutomation();
     const activeSampleWorkflow = Boolean(getItem('activeSampleWorkflow'));
     const automationHasChanges = automationReady
@@ -1087,8 +1174,8 @@ function renderWorkflowCoreDiagnostics() {
       </div>
       <div class="workflow-next-action__actions">
         <a class="btn primary-btn" href="${esc(action.href)}">Open Step</a>
-        <button id="dashboard-design-basis-btn" type="button" class="btn">Design Basis</button>
-        ${automationHasChanges ? '<button id="dashboard-auto-build-btn" type="button" class="btn" title="Create missing one-line, cable, starter raceway, and initial route-result records from current equipment and loads.">Auto-Build Workflow</button>' : ''}
+        ${focus === 'full' ? '<button id="dashboard-design-basis-btn" type="button" class="btn">Design Basis</button>' : '<a class="btn" href="cabletrayfill.html">Tray Fill</a>'}
+        ${focus === 'full' && automationHasChanges ? '<button id="dashboard-auto-build-btn" type="button" class="btn" title="Create missing one-line, cable, starter raceway, and initial route-result records from current equipment and loads.">Auto-Build Workflow</button>' : ''}
       </div>
     `;
     nextEl.querySelector('#dashboard-design-basis-btn')?.addEventListener('click', openDesignBasisWizard);
@@ -1097,7 +1184,7 @@ function renderWorkflowCoreDiagnostics() {
 
   const blockersEl = document.getElementById('dashboard-blockers');
   if (blockersEl) {
-    const actionable = diagnostics.blockers.filter(item => (
+    const actionable = focusedBlockers.filter(item => (
       item.severity !== 'info'
       && !(item.label === diagnostics.nextAction.label && item.href === diagnostics.nextAction.href)
     ));
@@ -1130,7 +1217,16 @@ function renderWorkflowCoreDiagnostics() {
   const healthEl = document.getElementById('dashboard-health');
   if (healthEl) {
     const health = diagnostics.health;
-    const metrics = [
+    const metrics = focus === 'routing' ? [
+      ['Cable Rows', health.cableRows],
+      ['Schedule Ready', `${health.scheduleReady}/${health.cableRows}`],
+      ['Raceway Assigned', `${health.routingReady}/${health.scheduleReady}`],
+      ['Missing Coordinates', diagnostics.cables.missingCoordinates],
+      ['Route Results', health.routeResults],
+      ['Raceways', health.raceways],
+      ['Pull Groups', health.pullGroups],
+      ['Spool Sheets', health.spoolSheets]
+    ] : [
       ['Equipment', health.equipment],
       ['Loads', `${health.completeLoads}/${health.loads} complete`],
       ['One-Line', `${health.oneLineComponents} components`],
@@ -1335,6 +1431,11 @@ function initReleasePackageForm() {
 }
 
 window.addEventListener('DOMContentLoaded', () => {
+  const focusSelect = document.getElementById('dashboard-focus-select');
+  focusSelect?.addEventListener('change', () => {
+    setItem(DASHBOARD_FOCUS_KEY, focusSelect.value === 'full' ? 'full' : 'routing');
+    refreshDashboard();
+  });
   refreshDashboard();
   renderStudiesSummary(document.getElementById('studies-summary'));
   initReleasePackageForm();

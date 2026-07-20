@@ -40,6 +40,7 @@ Coverage: 77 contracts for 77 navigation routes.
 - `settings.tccSettings` (setting, optional): Protective device selections, relay settings, chart options, and coordination context.
 - `settings.oneLineScheduleReconcilePending` (setting, optional): Flag indicating one-line schedule reconciliation is available.
 - `settings.activeSampleWorkflow` (setting, optional): Active sample context used to suppress redundant sample-loading guidance.
+- `settings.workflowDashboardFocus` (setting, optional): Routing or full-engineering dashboard focus selected for this project.
 
 **Outputs**
 - `settings.designBasis` (setting): Design basis wizard decisions and project defaults. Consumers: `workflowdashboard.html`, `projectreport.html`.
@@ -53,6 +54,7 @@ Coverage: 77 contracts for 77 navigation routes.
 - `settings.lifecyclePackages` (setting): Lifecycle package records created from dashboard package actions. Consumers: `projectreport.html`.
 - `studyResults.duty` (study-result): Equipment-duty validation results evaluated while central workflow readiness is refreshed. Consumers: `equipmentevaluation.html`, `projectreport.html`.
 - `settings.oneLineScheduleReconcilePending` (setting): Workflow automation reconcile state for one-line and schedule handoff. Consumers: `oneline.html`.
+- `settings.workflowDashboardFocus` (setting): Routing or full-engineering dashboard focus selected by the user. Consumers: `workflowdashboard.html`.
 
 **Readiness**
 - Ready when: Dashboard is ready when it can summarize every workflow step and identify the next incomplete handoff.

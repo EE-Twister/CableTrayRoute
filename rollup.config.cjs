@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const terser = require('@rollup/plugin-terser');
 const json = require('@rollup/plugin-json');
+const { nodeResolve } = require('@rollup/plugin-node-resolve');
 
 // Auto-generate an ES module wrapper for JSON data so it can be imported in browsers
 const jsonPath = path.resolve(__dirname, 'data/protectiveDevices.json');
@@ -23,6 +24,7 @@ const entries = {
   cabletrayfill: 'src/cabletrayfill.js',
   conduitfill: 'src/conduitfill.js',
   optimalRoute: 'src/optimalRoute.js',
+  routeViewer3D: 'src/routing/viewer/routeViewerEntry.js',
   loadlist: 'src/loadlist.js',
   equipmentlist: 'src/equipmentlist.js',
   projectManager: 'src/projectManager.js',
@@ -106,7 +108,7 @@ function buildEntryConfig([name, input]) {
       sourcemap: false,
       inlineDynamicImports: true,
     },
-    plugins: [json(), terser()]
+    plugins: [nodeResolve({ browser: true }), json(), terser()]
   };
 }
 

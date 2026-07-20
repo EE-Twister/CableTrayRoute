@@ -156,10 +156,13 @@ function createPalette() {
   hint.className = "command-palette-hint";
   hint.textContent = "Type to search · ↑/↓ to move · Enter to run · Esc to close";
 
+  const resultsLabel = document.createElement("p");
+  resultsLabel.className = "command-palette-results-label";
+
   const list = document.createElement("ul");
   list.className = "command-palette-list";
 
-  panel.append(header, input, hint, list);
+  panel.append(header, input, hint, resultsLabel, list);
   overlay.appendChild(panel);
   document.body.appendChild(overlay);
 
@@ -180,6 +183,7 @@ function createPalette() {
 
   function render() {
     results = resolveResults(input.value);
+    resultsLabel.textContent = input.value.trim() ? "Matching tools" : (getRecentIds().length ? "Recent tools" : "All tools");
     if (activeIndex >= results.length) activeIndex = 0;
     list.replaceChildren();
 

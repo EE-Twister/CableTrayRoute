@@ -19,7 +19,7 @@
   <link rel="dns-prefetch" href="https://fonts.gstatic.com">
   <meta name="color-scheme" content="light dark">
   <link rel="stylesheet" href="style.css">
-  <link rel="stylesheet" href="src/styles/routing.css?v=optimal-route-workspace">
+    <link rel="stylesheet" href="src/styles/routing.css?v=optimal-route-workspace-13">
     <script src="dist/vendor/plotly.min.js" defer></script>
     <script src="dist/vendor/xlsx.full.min.js" defer></script>
     <script src="dist/vendor/papaparse.min.js" defer></script>
@@ -38,13 +38,16 @@
     <script type="module" src="dirtyTracker.js"></script>
     <script type="module" src="tableUtils.mjs"></script>
     <script type="module" src="e2e-helpers.js"></script>
-    <script type="module" src="app.mjs"></script>
+    <script type="module" src="app.mjs?v=optimal-route-three-viewer-35"></script>
     <script type="module" src="./dist/optimalRoute.js"></script>
 </head>
 <body class="optimal-route-page" data-page-visual="routing" data-report-title="Optimal Cable Route">
     <a href="#main-content" class="skip-link">Skip to main content</a>
     <nav class="top-nav" aria-label="Primary">
-        <button id="sidebar-toggle" class="sidebar-toggle" aria-label="Toggle Sidebar">☰</button>
+        <button id="sidebar-toggle" class="sidebar-toggle" aria-label="Toggle routing setup">
+          <span aria-hidden="true">☰</span>
+          <span class="route-sidebar-toggle-label">Setup</span>
+        </button>
         <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
       <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
     </button>
@@ -128,6 +131,80 @@
                     <option value="PVC Type EB">PVC Type EB</option>
                  </select>
                  <p class="field-hint">Used only when the router proposes a new field route. Existing tray and conduit records retain their recorded types.</p>
+
+                 <div class="pull-analysis-option">
+                    <label class="pull-analysis-toggle" for="perform-pull-checks">
+                        <input type="checkbox" id="perform-pull-checks">
+                        <span><strong>Perform cable pull checks</strong><small>Estimate tension, sidewall pressure, and reel setup locations.</small></span>
+                    </label>
+                    <div id="pull-check-options" class="pull-check-options" hidden>
+                        <span class="pull-check-options-heading">Pull strategy</span>
+                        <label for="pull-direction">Pull direction</label>
+                        <select id="pull-direction">
+                            <option value="auto" selected>Auto · compare both</option>
+                            <option value="forward">From → To</option>
+                            <option value="reverse">To → From</option>
+                        </select>
+
+                        <label class="pull-group-suggestion-toggle" for="pull-group-suggestions">
+                            <input type="checkbox" id="pull-group-suggestions" checked>
+                            <span><strong>Suggest multi-cable pull sets</strong><small>Compare complete routes and show which cables can or cannot be pulled together.</small></span>
+                        </label>
+
+                        <label for="pull-group-max-size">Maximum cables per suggested pull set</label>
+                        <input type="number" id="pull-group-max-size" value="4" min="2" max="12" step="1">
+
+                        <label for="pull-max-length">Max pull section length (ft)</label>
+                        <input type="number" id="pull-max-length" value="500" min="10" step="10">
+
+                        <label class="pull-group-suggestion-toggle pull-hand-pull-toggle" for="allow-hand-pulls">
+                            <input type="checkbox" id="allow-hand-pulls" checked>
+                            <span><strong>Allow short sections to be pulled by hand</strong><small>Replace the tugger with a hand-pull instruction only when both limits below are satisfied.</small></span>
+                        </label>
+
+                        <label for="hand-pull-max-length">Maximum hand-pull distance (ft)</label>
+                        <input type="number" id="hand-pull-max-length" value="25" min="1" step="5">
+
+                        <label for="hand-pull-max-tension">Maximum calculated hand-pull tension (lbf)</label>
+                        <input type="number" id="hand-pull-max-tension" value="200" min="1" step="25">
+                        <p class="field-hint pull-hand-pull-hint">A hand-pull recommendation is a planning instruction, not a crew-capacity certification. Confirm staffing, access, grip method, cable control, and site safety.</p>
+
+                        <label for="pull-max-tension">Default cable tension limit (lbf)</label>
+                        <input type="number" id="pull-max-tension" value="1000" min="1" step="50">
+
+                        <label for="pull-max-sidewall">Default allowable sidewall pressure (lbf/ft)</label>
+                        <input type="number" id="pull-max-sidewall" value="500" min="1" step="25">
+
+                        <label for="pull-friction">Coefficient of friction</label>
+                        <input type="number" id="pull-friction" value="0.35" min="0.05" max="1" step="0.05">
+
+                        <label for="pull-bend-radius">Default bend radius (ft)</label>
+                        <input type="number" id="pull-bend-radius" value="3" min="0.25" step="0.25">
+
+                        <label for="pull-incoming-tension">Reel payoff tension (lbf)</label>
+                        <input type="number" id="pull-incoming-tension" value="0" min="0" step="25">
+
+                        <span class="pull-check-options-heading">Field equipment working limits</span>
+                        <label for="pull-puller-capacity">Puller continuous rating (lbf)</label>
+                        <input type="number" id="pull-puller-capacity" value="3000" min="1" step="100">
+
+                        <label for="pull-rope-capacity">Pulling rope WLL (lbf)</label>
+                        <input type="number" id="pull-rope-capacity" value="5000" min="1" step="100">
+
+                        <label for="pull-grip-capacity">Grip / pulling eye rating (lbf)</label>
+                        <input type="number" id="pull-grip-capacity" value="1000" min="1" step="50">
+
+                        <label for="pull-anchorage-capacity">Anchorage rating (lbf)</label>
+                        <input type="number" id="pull-anchorage-capacity" value="3000" min="1" step="100">
+
+                        <label for="pull-sheave-capacity">Sheave support rating (lbf)</label>
+                        <input type="number" id="pull-sheave-capacity" value="4000" min="1" step="100">
+
+                        <label for="pull-roller-spacing">Max tray roller spacing (ft)</label>
+                        <input type="number" id="pull-roller-spacing" value="10" min="1" step="1">
+                        <p class="field-hint">Zero reel payoff tension uses a 25 × cable-weight estimate. The cable, puller, rope, grip, and anchorage are checked as a weakest-link system.</p>
+                    </div>
+                 </div>
 
                  <details class="advanced-routing-settings">
                     <summary>Advanced routing settings</summary>
@@ -357,46 +434,142 @@
                     </div>
                 </div>
 
+                <div id="route-summary-panel" class="route-summary-panel"></div>
+
                 <div class="route-results-workspace">
                     <aside class="route-review-sidebar" aria-label="Route review summary">
-                        <div id="route-summary-panel" class="route-summary-panel"></div>
+                        <section class="route-viewer-route-list-panel" aria-labelledby="route-viewer-route-list-title">
+                            <div class="route-viewer-panel-heading">
+                                <h3 id="route-viewer-route-list-title">Cable routes</h3>
+                                <span id="route-viewer-route-list-count">0</span>
+                            </div>
+                            <div id="route-viewer-route-list" class="route-viewer-route-list"></div>
+                        </section>
                         <div id="messages"></div>
                         <div id="metrics" class="columns route-shared-routes"></div>
-                        <details id="mismatched-raceways-details" style="display:none;">
-                            <summary>Mismatched Raceway Segments</summary>
-                            <ul id="mismatched-raceways-list" class="exclusions-list"></ul>
-                        </details>
-                        <details id="pull-checks-details" style="display:none;">
-                            <summary>Cable Pull Checks</summary>
-                            <div id="pull-checks-container"></div>
-                        </details>
                     </aside>
 
                     <div class="route-visual-shell">
                         <div class="route-visual-header">
-                            <div>
-                                <h3>3D Route Visualization</h3>
-                                <p id="route-selection-status" class="field-hint">Select a route or tray row to highlight it in the model.</p>
+                            <div class="route-visual-heading">
+                                <span class="route-visual-kicker">Interactive route model</span>
+                                <h3>3D Route Review</h3>
+                                <p id="route-selection-status" class="field-hint">Review the recommended path inside its plant and raceway context.</p>
+                                <div class="route-plot-summary" aria-label="Route model summary">
+                                    <span><strong id="route-plot-route-count">0</strong> routes</span>
+                                    <span><strong id="route-plot-raceway-count">0</strong> raceways</span>
+                                    <span><strong id="route-plot-field-count">0</strong> field jumps</span>
+                                    <span id="raceway-filter-summary" class="route-raceway-filter-summary" aria-live="polite">Showing compatible raceways</span>
+                                </div>
                             </div>
-                            <div class="route-plot-legend" aria-label="Visualization legend">
-                                <span><i class="legend-line legend-line-tray"></i>Tray route</span>
-                                <span><i class="legend-line legend-line-field"></i>Field route</span>
-                                <span><i class="legend-block legend-block-tray"></i>Tray network</span>
-                                <span><i class="legend-block legend-block-conduit"></i>Conduit</span>
-                                <span><i class="legend-dot legend-dot-start"></i>Start</span>
-                                <span><i class="legend-dot legend-dot-end"></i>End</span>
+                            <div class="route-plot-toolbar" aria-label="Route model controls">
+                                <div class="route-view-presets" role="group" aria-label="Model view">
+                                    <button type="button" data-route-view="isometric" aria-pressed="true">Isometric</button>
+                                    <button type="button" data-route-view="plan" aria-pressed="false">Plan</button>
+                                    <button type="button" data-route-view="front" aria-pressed="false">Front</button>
+                                    <button type="button" data-route-view="right" aria-pressed="false">Right</button>
+                                </div>
+                                <label class="route-context-density" for="context-density-select">Context
+                                    <select id="context-density-select">
+                                        <option value="low">Low</option>
+                                        <option value="medium" selected>Medium</option>
+                                        <option value="high">High</option>
+                                    </select>
+                                </label>
+                                <label class="route-raceway-filter" for="raceway-compatibility-filter">Eligible raceways
+                                    <select id="raceway-compatibility-filter">
+                                        <option value="compatible" selected>Selected cable class</option>
+                                        <option value="all">All cable classes</option>
+                                    </select>
+                                </label>
+                                <button type="button" id="reset-view-btn">Fit all</button>
+                                <button type="button" id="export-png-btn">Save PNG</button>
+                                <button type="button" id="popout-plot-btn">Full screen</button>
                             </div>
                         </div>
-                        <div id="plot-3d"></div>
-                        <div class="plot-controls">
-                            <button id="popout-plot-btn">Open Full Screen</button>
-                            <button id="reset-view-btn">Reset View</button>
-                            <button id="view-toggle-btn">2D View</button>
-                            <label><input type="checkbox" id="ductbank-toggle" checked> Show Ductbanks</label>
-                            <label><input type="checkbox" id="heatmap-toggle"> Utilization Heatmap</label>
+                        <div class="route-viewer-body">
+                            <div class="route-plot-stage">
+                            <div id="plot-3d" aria-label="Interactive three-dimensional cable route model"></div>
+                            <aside id="route-plot-selection-card" class="route-plot-selection-card" aria-live="polite" hidden>
+                                <span id="route-plot-selection-kicker">Selected route</span>
+                                <strong id="route-plot-selection-name">—</strong>
+                                <span id="route-plot-selection-detail">—</span>
+                            </aside>
+                            </div>
+                            <aside id="route-viewer-inspector" class="route-viewer-inspector" aria-live="polite">
+                                <span class="route-visual-kicker">Selected route</span>
+                                <h3 id="route-inspector-title">Select a cable route</h3>
+                                <span id="route-inspector-cable-class" class="route-inspector-cable-class">Cable class not assigned</span>
+                                <div class="route-inspector-total">
+                                    <strong id="route-inspector-total">—</strong>
+                                    <span>total route</span>
+                                </div>
+                                <div class="route-inspector-containment-bar" role="img" aria-label="Route length by containment">
+                                    <i data-containment="tray"></i>
+                                    <i data-containment="conduit"></i>
+                                    <i data-containment="ductbank"></i>
+                                    <i data-containment="field"></i>
+                                </div>
+                                <div id="route-inspector-breakdown" class="route-inspector-breakdown"></div>
+                                <div id="route-inspector-metrics" class="route-inspector-metrics"></div>
+                                <button type="button" id="route-inspector-pull-action" class="route-inspector-pull-action" disabled>Plan cable pull</button>
+                                <section class="route-inspector-rationale" aria-labelledby="route-inspector-rationale-title">
+                                    <h4 id="route-inspector-rationale-title">Why this route?</h4>
+                                    <ul id="route-inspector-rationale"></ul>
+                                </section>
+                                <section class="route-inspector-sequence" aria-labelledby="route-inspector-sequence-title">
+                                    <h4 id="route-inspector-sequence-title">Route sequence</h4>
+                                    <div id="route-inspector-timeline" class="route-inspector-timeline"></div>
+                                </section>
+                            </aside>
+                        </div>
+                        <div class="route-plot-footer">
+                            <div class="route-plot-legend" aria-label="Visualization legend">
+                                <span><i class="legend-line legend-line-tray"></i>Shared cable corridor</span>
+                                <span><i class="legend-line legend-line-density"></i>More cables</span>
+                                <span><i class="legend-line legend-line-field"></i>Field jump</span>
+                                <span id="route-cable-class-legend" class="route-cable-class-legend" aria-label="Raceway cable class colors"></span>
+                                <span><i class="legend-block legend-block-conduit"></i>Ductbank</span>
+                                <span><i class="legend-grade"></i>Grade · Z=0</span>
+                                <span><i class="legend-dot legend-dot-start"></i>Start</span>
+                                <span><i class="legend-dot legend-dot-end"></i>End</span>
+                                <span id="pull-setup-legend" hidden><i class="legend-reel"></i>Reel</span>
+                                <span id="pull-tugger-legend" hidden><i class="legend-tugger"></i>Tugger</span>
+                                <span id="pull-hand-legend" hidden><i class="legend-hand-pull"></i>Pull by hand</span>
+                                <span id="pull-sheave-legend" hidden><i class="legend-sheave"></i>Sheave</span>
+                                <span id="pull-roller-legend" hidden><i class="legend-roller"></i>Tray roller</span>
+                            </div>
+                            <div class="plot-controls">
+                                <label><input type="checkbox" id="ductbank-toggle" checked> Ductbanks</label>
+                                <label><input type="checkbox" id="conduit-toggle" checked> Conduits</label>
+                                <label><input type="checkbox" id="field-connections-toggle" checked> Field jumps</label>
+                                <label><input type="checkbox" id="labels-toggle" checked> Labels</label>
+                                <label><input type="checkbox" id="heatmap-toggle"> Utilization</label>
+                                <label><input type="checkbox" id="context-toggle" checked> Grade &amp; context</label>
+                                <label><input type="checkbox" id="pull-setups-toggle" disabled> Pull equipment</label>
+                            </div>
                         </div>
                     </div>
 
+                </div>
+
+                <section class="route-comparison-panel" aria-labelledby="route-comparison-title">
+                    <div class="route-comparison-heading">
+                        <h3 id="route-comparison-title">Route comparison</h3>
+                        <span>Calculated candidates</span>
+                    </div>
+                    <div id="route-comparison-cards" class="route-comparison-cards"></div>
+                </section>
+
+                <div class="route-secondary-review" aria-label="Secondary engineering review">
+                    <details id="mismatched-raceways-details" style="display:none;">
+                        <summary>Mismatched Raceway Segments</summary>
+                        <ul id="mismatched-raceways-list" class="exclusions-list"></ul>
+                    </details>
+                    <details id="pull-checks-details" style="display:none;">
+                        <summary>Cable Pull Plan</summary>
+                        <div id="pull-checks-container"></div>
+                    </details>
                 </div>
 
                 <details id="updated-utilization-details">
@@ -414,7 +587,6 @@
                         <h3>Export</h3>
                         <button id="export-csv-btn">Download Route Data (XLSX)</button>
                         <button id="export-routes-btn">Export Routes</button>
-                        <button id="export-png-btn">Export PNG</button>
                         <button id="export-gltf-btn">Export 3D Model (.glb)</button>
                     </div>
                     <div class="route-action-group">

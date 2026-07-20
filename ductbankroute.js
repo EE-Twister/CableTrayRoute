@@ -1802,6 +1802,22 @@ const { depthIn, showContext, gradeY, ductTopY, sideSoilPx, bottomSoilPx } = duc
 const originX=margin + sideSoilPx;
 const originY=ductTopY;
 const fillMap=fillResults();
+const cableLegendEntries=[];
+const seenCableTags=new Set();
+conduits.forEach(conduit=>{
+  const data=fillMap[conduit.conduit_id];
+  (data?.cables||[]).forEach(cable=>{
+    if(!cable?.tag || seenCableTags.has(cable.tag))return;
+    seenCableTags.add(cable.tag);
+    cableLegendEntries.push({
+      marker:cableLegendEntries.length+1,
+      tag:cable.tag,
+      diameter:Number(cable.diameter)||0,
+      conduitId:conduit.conduit_id
+    });
+  });
+});
+const cableMarkerByTag=new Map(cableLegendEntries.map(entry=>[entry.tag,entry.marker]));
 let maxX=0,maxY=0;
 conduits.forEach(c=>{
   const Rin=Math.sqrt(CONDUIT_SPECS[c.conduit_type][c.trade_size]/Math.PI);
@@ -1833,7 +1849,10 @@ if(document.getElementById('heatSources').checked){
 const rightContextPx=showContext ? sideSoilPx : 0;
 const bottomContextPx=showContext ? bottomSoilPx : margin;
 const width=Math.round(Math.max(overallMaxX*scale+originX+rightContextPx+margin+80,360));
-const height=Math.round(overallMaxY*scale+originY+bottomContextPx+(utilHeatmap?60:20));
+const cableLegendColumns=width>=620?2:1;
+const cableLegendRows=Math.ceil(cableLegendEntries.length/cableLegendColumns);
+const cableLegendHeight=cableLegendEntries.length?38+cableLegendRows*18:0;
+const height=Math.round(overallMaxY*scale+originY+bottomContextPx+(utilHeatmap?60:20)+cableLegendHeight);
 svg.setAttribute('width',width);
 svg.setAttribute('height',height);
 
@@ -1994,25 +2013,18 @@ heightText.textContent=ductHeight.toFixed(2)+'"';
        sc.classList.add('ductbank-cable-shape');
        cableGroup.appendChild(sc);
        if(p.tag){
-         const fs=Math.max(6,Math.min(p.r*scale,(2*p.r*scale*0.8)/(p.tag.length*0.6)));
+         const marker=String(cableMarkerByTag.get(p.tag)||'');
+         const fs=Math.max(8,Math.min(13,p.r*scale*1.15));
          const text=document.createElementNS('http://www.w3.org/2000/svg','text');
          text.setAttribute('x',cx+p.x*scale);
          text.setAttribute('y',cy+p.y*scale);
          text.setAttribute('font-size',fs);
+         text.setAttribute('font-weight','800');
          text.setAttribute('text-anchor','middle');
          text.setAttribute('dominant-baseline','middle');
          text.classList.add('ductbank-cable-label');
-         text.textContent=p.tag;
+         text.textContent=marker;
          cableGroup.appendChild(text);
-         const text2=document.createElementNS('http://www.w3.org/2000/svg','text');
-         text2.setAttribute('x',cx+p.x*scale);
-         text2.setAttribute('y',cy+p.y*scale+fs*0.8);
-         text2.setAttribute('font-size',Math.max(6,fs*0.7));
-         text2.setAttribute('text-anchor','middle');
-         text2.setAttribute('dominant-baseline','hanging');
-         text2.classList.add('ductbank-cable-label');
-         text2.textContent=(2*p.r).toFixed(2)+'"';
-         cableGroup.appendChild(text2);
        }
        svg.appendChild(cableGroup);
      });
@@ -2043,6 +2055,42 @@ heightText.textContent=ductHeight.toFixed(2)+'"';
   typeText.textContent=`${c.conduit_type} ${c.trade_size}\"`;
   svg.appendChild(typeText);
 });
+
+if(cableLegendEntries.length){
+  const legendX=originX;
+  const legendY=height-cableLegendHeight+8;
+  const legendWidth=Math.max(260,width-originX-margin);
+  const legendPanel=document.createElementNS('http://www.w3.org/2000/svg','rect');
+  legendPanel.setAttribute('x',legendX-6);
+  legendPanel.setAttribute('y',legendY-4);
+  legendPanel.setAttribute('width',legendWidth+6);
+  legendPanel.setAttribute('height',cableLegendHeight-8);
+  legendPanel.setAttribute('rx','4');
+  legendPanel.setAttribute('fill','#ffffff');
+  legendPanel.setAttribute('fill-opacity','0.96');
+  legendPanel.setAttribute('stroke','#94a3b8');
+  svg.appendChild(legendPanel);
+  const legendTitle=document.createElementNS('http://www.w3.org/2000/svg','text');
+  legendTitle.setAttribute('x',legendX);
+  legendTitle.setAttribute('y',legendY+10);
+  legendTitle.setAttribute('font-size','10');
+  legendTitle.setAttribute('font-weight','800');
+  legendTitle.setAttribute('fill','#0f172a');
+  legendTitle.textContent='CABLE IDENTIFICATION (marker - cable tag - outside diameter - conduit)';
+  svg.appendChild(legendTitle);
+  const columnWidth=legendWidth/cableLegendColumns;
+  cableLegendEntries.forEach((entry,index)=>{
+    const column=Math.floor(index/cableLegendRows);
+    const row=index%cableLegendRows;
+    const item=document.createElementNS('http://www.w3.org/2000/svg','text');
+    item.setAttribute('x',legendX+column*columnWidth);
+    item.setAttribute('y',legendY+29+row*18);
+    item.setAttribute('font-size','10');
+    item.setAttribute('fill','#0f172a');
+    item.textContent=`${entry.marker} - ${entry.tag} - ${entry.diameter.toFixed(2)}\" - ${entry.conduitId}`;
+    svg.appendChild(item);
+  });
+}
 
  if(document.getElementById('heatSources').checked){
    const heatSources=getAllHeatSources();

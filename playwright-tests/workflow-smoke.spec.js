@@ -382,6 +382,8 @@ test('fill pages show project handoff context', async ({ page }) => {
   });
   await page.goto(server.url('cabletrayfill.html?e2e=1'), { waitUntil: 'domcontentloaded' });
   await expect(page.locator('#tray-fill-handoff')).toContainText('Reviewing TR-1');
+  await expect(page.locator('#tray-fill-project-selector')).toHaveValue('TR-1');
+  await expect(page.locator('#trayName')).toHaveValue('TR-1');
   await expect(page.locator('#tray-fill-handoff')).toContainText('Cable Schedule');
   await page.goto(server.url('conduitfill.html?e2e=1'), { waitUntil: 'domcontentloaded' });
   await expect(page.locator('#conduit-fill-handoff')).toContainText('Reviewing RMC 2');
@@ -426,9 +428,13 @@ test('ductbank route exposes a next action for empty underground workflow', asyn
 test('workflow dashboard exposes next action, blockers, and health metrics', async ({ page }) => {
   await page.goto(server.url('workflowdashboard.html?e2e=1&e2e_reset=1'), { waitUntil: 'domcontentloaded' });
   await expect(page.locator('#dashboard-next-action-strip')).toContainText('Next action');
+  await expect(page.locator('#dashboard-focus-select')).toHaveValue('routing');
+  await expect(page.locator('#dashboard-next-action-strip')).toContainText('Add cable schedule rows');
+  await expect(page.locator('#dashboard-health')).toContainText('Schedule Ready');
+  await expect(page.locator('[data-dashboard-full-only]').first()).toBeHidden();
+  await page.locator('#dashboard-focus-select').selectOption('full');
   await expect(page.locator('#dashboard-next-action-strip')).toContainText('Add equipment records');
-  await expect(page.locator('#dashboard-blockers')).not.toContainText('Add equipment records');
-  await expect(page.locator('#dashboard-health')).toContainText('Cable Schedule');
+  await expect(page.locator('[data-dashboard-full-only]').first()).toBeVisible();
   await expect(page.locator('[data-workflow-mode-panel]')).toHaveCount(0);
 });
 

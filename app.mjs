@@ -38,6 +38,8 @@ import {
     getCableAssignedRacewayIds
 } from './analysis/scheduleWorkflow.mjs';
 import { normalizeRouteResultState } from './analysis/routeResults.mjs';
+import { buildCablePullPlan } from './analysis/cablePullPlan.mjs';
+import { buildPullGroupSuggestions } from './analysis/cablePullGroups.mjs';
 
 /**
  * Escape a string for safe insertion into HTML content or attributes.
@@ -102,6 +104,7 @@ import { clearConduitCache, getProjectState, setProjectState } from './projectSt
 import { calculateVoltageDrop } from './src/voltageDrop.js';
 import { exportRoutesDXF } from './bimExport.mjs';
 import { exportToGLTF2 } from './src/exporters/gltf2.mjs';
+import { buildRouteDecisionScore, buildRouteMetrics, buildRouteSceneModel } from './src/routing/routeSceneModel.mjs?v=3';
 
 // Filename: app.mjs
 // (This is an improved version that adds route segment consolidation)
@@ -202,6 +205,7 @@ async function initializeApp() {
         cableList: [],
         trayData: [],
         latestRouteData: [],
+        selectedRouteIndex: null,
         sharedFieldRoutes: [],
         trayCableMap: {},
         fieldSegmentCableMap: new Map(),
@@ -211,12 +215,21 @@ async function initializeApp() {
         ductbankData: null,
         ductbankTraceIndices: [],
         ductbankVisible: true,
-        is2D: false,
+        fieldConnectionsVisible: true,
+        plotView: 'isometric',
+        labelsVisible: true,
         conduitData: [],
         ductbanksWithoutConduits: [],
         includeDuctbankOutlines: false,
         geometryWarnings: { ductbanks: [], conduits: [] },
         heatmapEnabled: false,
+        pullChecksEnabled: false,
+        pullSetupsVisible: true,
+        pullGroupAnalysis: null,
+        pullGroupDecisions: {},
+        routeViewer: null,
+        routeViewerLoad: null,
+        routeViewerFailed: false,
     };
 
     const storeLatestRouteResults = (batchResults, meta = {}) => {
@@ -279,17 +292,69 @@ async function initializeApp() {
         routeBreakdownDetails: document.getElementById('route-breakdown-details'),
         pullChecksContainer: document.getElementById('pull-checks-container'),
         pullChecksDetails: document.getElementById('pull-checks-details'),
+        performPullChecks: document.getElementById('perform-pull-checks'),
+        pullCheckOptions: document.getElementById('pull-check-options'),
+        pullMaxLength: document.getElementById('pull-max-length'),
+        allowHandPulls: document.getElementById('allow-hand-pulls'),
+        handPullMaxLength: document.getElementById('hand-pull-max-length'),
+        handPullMaxTension: document.getElementById('hand-pull-max-tension'),
+        pullMaxTension: document.getElementById('pull-max-tension'),
+        pullMaxSidewall: document.getElementById('pull-max-sidewall'),
+        pullFriction: document.getElementById('pull-friction'),
+        pullBendRadius: document.getElementById('pull-bend-radius'),
+        pullDirection: document.getElementById('pull-direction'),
+        pullIncomingTension: document.getElementById('pull-incoming-tension'),
+        pullPullerCapacity: document.getElementById('pull-puller-capacity'),
+        pullRopeCapacity: document.getElementById('pull-rope-capacity'),
+        pullGripCapacity: document.getElementById('pull-grip-capacity'),
+        pullAnchorageCapacity: document.getElementById('pull-anchorage-capacity'),
+        pullSheaveCapacity: document.getElementById('pull-sheave-capacity'),
+        pullRollerSpacing: document.getElementById('pull-roller-spacing'),
+        pullGroupSuggestions: document.getElementById('pull-group-suggestions'),
+        pullGroupMaxSize: document.getElementById('pull-group-max-size'),
+        pullSetupsToggle: document.getElementById('pull-setups-toggle'),
+        pullSetupLegend: document.getElementById('pull-setup-legend'),
+        pullTuggerLegend: document.getElementById('pull-tugger-legend'),
+        pullHandLegend: document.getElementById('pull-hand-legend'),
+        pullSheaveLegend: document.getElementById('pull-sheave-legend'),
+        pullRollerLegend: document.getElementById('pull-roller-legend'),
+        routeInspectorPullAction: document.getElementById('route-inspector-pull-action'),
         mismatchedRacewaysDetails: document.getElementById('mismatched-raceways-details'),
         mismatchedRacewaysList: document.getElementById('mismatched-raceways-list'),
         plot3d: document.getElementById('plot-3d'),
         popoutPlotBtn: document.getElementById('popout-plot-btn'),
         resetViewBtn: document.getElementById('reset-view-btn'),
-        viewToggleBtn: document.getElementById('view-toggle-btn'),
+        routeViewButtons: Array.from(document.querySelectorAll('[data-route-view]')),
         exportPngBtn: document.getElementById('export-png-btn'),
         exportGltfBtn: document.getElementById('export-gltf-btn'),
         ductbankToggle: document.getElementById('ductbank-toggle'),
+        conduitToggle: document.getElementById('conduit-toggle'),
+        fieldConnectionsToggle: document.getElementById('field-connections-toggle'),
+        labelsToggle: document.getElementById('labels-toggle'),
         heatmapToggle: document.getElementById('heatmap-toggle'),
+        contextToggle: document.getElementById('context-toggle'),
+        contextDensitySelect: document.getElementById('context-density-select'),
+        racewayCompatibilityFilter: document.getElementById('raceway-compatibility-filter'),
+        racewayFilterSummary: document.getElementById('raceway-filter-summary'),
+        racewayClassLegend: document.getElementById('route-cable-class-legend'),
         routeSelectionStatus: document.getElementById('route-selection-status'),
+        plotRouteCount: document.getElementById('route-plot-route-count'),
+        plotRacewayCount: document.getElementById('route-plot-raceway-count'),
+        plotFieldCount: document.getElementById('route-plot-field-count'),
+        plotSelectionCard: document.getElementById('route-plot-selection-card'),
+        plotSelectionKicker: document.getElementById('route-plot-selection-kicker'),
+        plotSelectionName: document.getElementById('route-plot-selection-name'),
+        plotSelectionDetail: document.getElementById('route-plot-selection-detail'),
+        routeViewerRouteList: document.getElementById('route-viewer-route-list'),
+        routeViewerRouteListCount: document.getElementById('route-viewer-route-list-count'),
+        routeInspectorTitle: document.getElementById('route-inspector-title'),
+        routeInspectorCableClass: document.getElementById('route-inspector-cable-class'),
+        routeInspectorTotal: document.getElementById('route-inspector-total'),
+        routeInspectorBreakdown: document.getElementById('route-inspector-breakdown'),
+        routeInspectorMetrics: document.getElementById('route-inspector-metrics'),
+        routeInspectorRationale: document.getElementById('route-inspector-rationale'),
+        routeInspectorTimeline: document.getElementById('route-inspector-timeline'),
+        routeComparisonCards: document.getElementById('route-comparison-cards'),
         updatedUtilizationContainer: document.getElementById('updated-utilization-container'),
         updatedUtilizationDetails: document.getElementById('updated-utilization-details'),
         exportCsvBtn: document.getElementById('export-csv-btn'),
@@ -536,6 +601,8 @@ async function initializeApp() {
 
     const displayConduitCount = (count, hasSchedule) => {
         const el = typeof document !== 'undefined' && document.getElementById('conduit-count');
+        const messageHost = typeof elements !== 'undefined' ? elements.messages : null;
+        messageHost?.querySelectorAll('.conduit-geometry-warning').forEach(message => message.remove());
         if (el) {
             el.textContent = `Conduits added: ${count}`;
             if (count === 0 && hasSchedule) {
@@ -544,8 +611,8 @@ async function initializeApp() {
         }
         if (count === 0 && hasSchedule) {
             console.warn('No valid conduits were loaded. Check geometry fields or conduit IDs.');
-            if (typeof elements !== 'undefined' && elements.messages) {
-                elements.messages.innerHTML += '<div class="message warning">No valid conduits were loaded. Verify geometry fields or conduit identifiers.</div>';
+            if (messageHost) {
+                messageHost.innerHTML += '<div class="message warning conduit-geometry-warning">No valid conduits were loaded. Verify geometry fields or conduit identifiers.</div>';
             }
         }
         if (typeof document !== 'undefined') {
@@ -600,6 +667,19 @@ async function initializeApp() {
         }
     };
     initHelpIcons();
+    const compactRouteSidebar = globalThis.matchMedia?.('(max-width: 768px)');
+    const syncRouteSidebarForViewport = event => {
+        if (!elements.sidebar) return;
+        if (event.matches) {
+            elements.sidebar.classList.add('collapsed');
+        } else if (!document.body.classList.contains('route-review-mode')) {
+            elements.sidebar.classList.remove('collapsed');
+        }
+    };
+    if (compactRouteSidebar) {
+        syncRouteSidebarForViewport(compactRouteSidebar);
+        compactRouteSidebar.addEventListener?.('change', syncRouteSidebarForViewport);
+    }
     if (elements.sidebarToggle && elements.sidebar) {
         elements.sidebarToggle.addEventListener('click', () => {
             elements.sidebar.classList.toggle('collapsed');
@@ -667,6 +747,66 @@ async function initializeApp() {
         syncManualPath(cable);
     };
 
+    const getPullCheckOptions = () => ({
+        maxPullLengthFt: parseFloat(elements.pullMaxLength?.value) || 500,
+        allowHandPulls: elements.allowHandPulls?.checked !== false,
+        maxHandPullLengthFt: parseFloat(elements.handPullMaxLength?.value) || 25,
+        maxHandPullTensionLbf: parseFloat(elements.handPullMaxTension?.value) || 200,
+        allowableTension: parseFloat(elements.pullMaxTension?.value) || 1000,
+        allowableSidewallPressure: parseFloat(elements.pullMaxSidewall?.value) || 500,
+        coeffFriction: parseFloat(elements.pullFriction?.value) || 0.35,
+        defaultBendRadiusFt: parseFloat(elements.pullBendRadius?.value) || 3,
+        pullDirection: elements.pullDirection?.value || 'auto',
+        incomingTensionLbf: Math.max(0, parseFloat(elements.pullIncomingTension?.value) || 0),
+        pullerCapacityLbf: parseFloat(elements.pullPullerCapacity?.value) || 3000,
+        ropeCapacityLbf: parseFloat(elements.pullRopeCapacity?.value) || 5000,
+        gripCapacityLbf: parseFloat(elements.pullGripCapacity?.value) || 1000,
+        anchorageCapacityLbf: parseFloat(elements.pullAnchorageCapacity?.value) || 3000,
+        sheaveCapacityLbf: parseFloat(elements.pullSheaveCapacity?.value) || 4000,
+        maxRollerSpacingFt: parseFloat(elements.pullRollerSpacing?.value) || 10,
+        suggestPullGroups: elements.pullGroupSuggestions?.checked !== false,
+        maxPullGroupSize: Math.max(2, Math.min(12, parseInt(elements.pullGroupMaxSize?.value, 10) || 4))
+    });
+
+    const applyPullChecksToResults = (results = []) => {
+        const cableMap = new Map(state.cableList.map(cable => [cable.name, cable]));
+        return results.map(result => {
+            const routeResult = { ...result };
+            delete routeResult.pull_check;
+            if (!state.pullChecksEnabled || !isRoutedResult(result)) return routeResult;
+            const cable = cableMap.get(result.cable) || {};
+            return {
+                ...routeResult,
+                pull_check: buildCablePullPlan(result.route_segments || [], cable, getPullCheckOptions())
+            };
+        });
+    };
+
+    const syncPullAnalysisControls = () => {
+        if (elements.performPullChecks) elements.performPullChecks.checked = state.pullChecksEnabled;
+        if (elements.pullCheckOptions) elements.pullCheckOptions.hidden = !state.pullChecksEnabled;
+        if (elements.pullGroupMaxSize) {
+            elements.pullGroupMaxSize.disabled = !state.pullChecksEnabled || elements.pullGroupSuggestions?.checked === false;
+        }
+        const handPullInputsDisabled = !state.pullChecksEnabled || elements.allowHandPulls?.checked === false;
+        if (elements.handPullMaxLength) elements.handPullMaxLength.disabled = handPullInputsDisabled;
+        if (elements.handPullMaxTension) elements.handPullMaxTension.disabled = handPullInputsDisabled;
+        if (elements.pullSetupsToggle) {
+            elements.pullSetupsToggle.disabled = !state.pullChecksEnabled;
+            elements.pullSetupsToggle.checked = state.pullChecksEnabled && state.pullSetupsVisible;
+        }
+        if (elements.pullSetupLegend) elements.pullSetupLegend.hidden = !state.pullChecksEnabled;
+        if (elements.pullTuggerLegend) elements.pullTuggerLegend.hidden = !state.pullChecksEnabled;
+        if (elements.pullHandLegend) elements.pullHandLegend.hidden = !state.pullChecksEnabled;
+        if (elements.pullSheaveLegend) elements.pullSheaveLegend.hidden = !state.pullChecksEnabled;
+        if (elements.pullRollerLegend) elements.pullRollerLegend.hidden = !state.pullChecksEnabled;
+        if (elements.routeInspectorPullAction) {
+            elements.routeInspectorPullAction.textContent = state.pullChecksEnabled ? 'Recalculate pull plan' : 'Plan cable pull';
+            elements.routeInspectorPullAction.classList.toggle('is-active', state.pullChecksEnabled);
+        }
+        state.routeViewer?.setLayerVisibility('pullSetups', state.pullChecksEnabled && state.pullSetupsVisible);
+    };
+
     const saveSession = () => {
         try {
             state.cableList.forEach(syncManualPath);
@@ -681,7 +821,13 @@ async function initializeApp() {
                 maxFieldEdge: parseFloat(document.getElementById('max-field-edge')?.value) || 1000,
                 fieldPenalty: parseFloat(document.getElementById('field-route-penalty')?.value) || 3,
                 sharedPenalty: parseFloat(document.getElementById('shared-field-penalty')?.value) || 0.5,
+                pullChecksEnabled: state.pullChecksEnabled,
+                pullSetupsVisible: state.pullSetupsVisible,
+                pullGroupDecisions: state.pullGroupDecisions,
+                pullCheckOptions: getPullCheckOptions(),
                 includeDuctbankOutlines: state.includeDuctbankOutlines,
+                ductbankData: state.ductbankData,
+                conduitData: state.conduitData,
             };
             setItem('ctrSession', data);
             if (typeof updateRoutingReadiness === 'function') {
@@ -698,6 +844,8 @@ async function initializeApp() {
             if (data) {
                 state.manualTrays = (data.manualTrays || []).map(t => ({ ...t, raceway_type: t.raceway_type || 'tray' }));
                 state.cableList = data.cableList || [];
+                if (data.ductbankData?.ductbanks?.length) state.ductbankData = data.ductbankData;
+                if (Array.isArray(data.conduitData)) state.conduitData = data.conduitData;
                 state.cableList.forEach(syncManualPath);
                 if (data.darkMode) document.body.classList.add('dark-mode');
                 if (data.conduitType && elements.conduitType) {
@@ -726,6 +874,31 @@ async function initializeApp() {
                 if (sharedPenalty && data.sharedPenalty !== undefined) {
                     sharedPenalty.value = data.sharedPenalty;
                 }
+                state.pullChecksEnabled = Boolean(data.pullChecksEnabled);
+                state.pullSetupsVisible = data.pullSetupsVisible !== false;
+                state.pullGroupDecisions = data.pullGroupDecisions && typeof data.pullGroupDecisions === 'object'
+                    ? { ...data.pullGroupDecisions }
+                    : {};
+                const savedPullOptions = data.pullCheckOptions || {};
+                if (elements.pullMaxLength && savedPullOptions.maxPullLengthFt !== undefined) elements.pullMaxLength.value = savedPullOptions.maxPullLengthFt;
+                if (elements.allowHandPulls && savedPullOptions.allowHandPulls !== undefined) elements.allowHandPulls.checked = savedPullOptions.allowHandPulls !== false;
+                if (elements.handPullMaxLength && savedPullOptions.maxHandPullLengthFt !== undefined) elements.handPullMaxLength.value = savedPullOptions.maxHandPullLengthFt;
+                if (elements.handPullMaxTension && savedPullOptions.maxHandPullTensionLbf !== undefined) elements.handPullMaxTension.value = savedPullOptions.maxHandPullTensionLbf;
+                if (elements.pullMaxTension && savedPullOptions.allowableTension !== undefined) elements.pullMaxTension.value = savedPullOptions.allowableTension;
+                if (elements.pullMaxSidewall && savedPullOptions.allowableSidewallPressure !== undefined) elements.pullMaxSidewall.value = savedPullOptions.allowableSidewallPressure;
+                if (elements.pullFriction && savedPullOptions.coeffFriction !== undefined) elements.pullFriction.value = savedPullOptions.coeffFriction;
+                if (elements.pullBendRadius && savedPullOptions.defaultBendRadiusFt !== undefined) elements.pullBendRadius.value = savedPullOptions.defaultBendRadiusFt;
+                if (elements.pullDirection && savedPullOptions.pullDirection) elements.pullDirection.value = savedPullOptions.pullDirection;
+                if (elements.pullIncomingTension && savedPullOptions.incomingTensionLbf !== undefined) elements.pullIncomingTension.value = savedPullOptions.incomingTensionLbf;
+                if (elements.pullPullerCapacity && savedPullOptions.pullerCapacityLbf !== undefined) elements.pullPullerCapacity.value = savedPullOptions.pullerCapacityLbf;
+                if (elements.pullRopeCapacity && savedPullOptions.ropeCapacityLbf !== undefined) elements.pullRopeCapacity.value = savedPullOptions.ropeCapacityLbf;
+                if (elements.pullGripCapacity && savedPullOptions.gripCapacityLbf !== undefined) elements.pullGripCapacity.value = savedPullOptions.gripCapacityLbf;
+                if (elements.pullAnchorageCapacity && savedPullOptions.anchorageCapacityLbf !== undefined) elements.pullAnchorageCapacity.value = savedPullOptions.anchorageCapacityLbf;
+                if (elements.pullSheaveCapacity && savedPullOptions.sheaveCapacityLbf !== undefined) elements.pullSheaveCapacity.value = savedPullOptions.sheaveCapacityLbf;
+                if (elements.pullRollerSpacing && savedPullOptions.maxRollerSpacingFt !== undefined) elements.pullRollerSpacing.value = savedPullOptions.maxRollerSpacingFt;
+                if (elements.pullGroupSuggestions && savedPullOptions.suggestPullGroups !== undefined) elements.pullGroupSuggestions.checked = savedPullOptions.suggestPullGroups !== false;
+                if (elements.pullGroupMaxSize && savedPullOptions.maxPullGroupSize !== undefined) elements.pullGroupMaxSize.value = savedPullOptions.maxPullGroupSize;
+                syncPullAnalysisControls();
                 if (elements.routePresetDescription && elements.routePreset) {
                     const preset = ROUTE_PRESETS[elements.routePreset.value] || ROUTE_PRESETS.custom;
                     elements.routePresetDescription.textContent = preset.description;
@@ -791,6 +964,9 @@ async function initializeApp() {
                         tray_id:c.tray_id || c.tag || (dbTag && c.conduit_id ? `${dbTag}-${c.conduit_id}` : c.conduit_id),
                         type:c.type || c.conduit_type,
                         trade_size:c.trade_size,
+                        row:c.row,
+                        column:c.column ?? c.col,
+                        diameter:c.diameter,
                         start_x:c.start_x,start_y:c.start_y,start_z:c.start_z,
                         end_x:c.end_x,end_y:c.end_y,end_z:c.end_z,
                         allowed_cable_group:c.allowed_cable_group
@@ -940,6 +1116,9 @@ async function initializeApp() {
                     return {
                         id: dbId,
                         tag: dbTag,
+                        width: db.width ?? db.inside_width,
+                        height: db.height ?? db.depth,
+                        conduit_spacing: db.conduit_spacing ?? db.spacing,
                         outline: [
                             [parseFloat(db.start_x), parseFloat(db.start_y), parseFloat(db.start_z)],
                             [parseFloat(db.end_x), parseFloat(db.end_y), parseFloat(db.end_z)]
@@ -956,6 +1135,9 @@ async function initializeApp() {
                                 type: c.type,
                                 conduit_type: c.type,
                                 trade_size: c.trade_size,
+                                diameter: c.diameter,
+                                row: c.row,
+                                column: c.column ?? c.col,
                                 path: [
                                     [parseFloat(c.start_x), parseFloat(c.start_y), parseFloat(c.start_z)],
                                     [parseFloat(c.end_x), parseFloat(c.end_y), parseFloat(c.end_z)]
@@ -1045,7 +1227,7 @@ async function initializeApp() {
                     const area = (CONDUIT_SPECS[cond.type] || {})[cond.trade_size];
                     const dia = area ? Math.sqrt((4 * area) / Math.PI)
                                      : parseFloat(cond.diameter) || 0;
-                    const dbTag = cond.ductbankTag || db.tag;
+                    const dbTag = cond.ductbankTag || db.tag || db.id || db.ductbank_id;
                     const condId = cond.conduit_id || cond.id;
                     const trayId = `${dbTag}-${condId}`;
                     cond.tray_id = trayId;
@@ -1313,10 +1495,17 @@ async function initializeApp() {
         const rows = normalizedState.batchResults;
         if (!rows.length) return false;
 
-        state.latestRouteData = structuredClone(rows);
+        state.latestRouteData = applyPullChecksToResults(structuredClone(rows));
         state.trayCableMap = structuredClone(normalizedState.trayCableMap);
+        state.finalTrays = Array.isArray(saved?.finalTrays)
+            ? structuredClone(saved.finalTrays)
+            : [];
+        state.updatedUtilData = Array.isArray(saved?.updatedUtilData)
+            ? structuredClone(saved.updatedUtilData)
+            : [];
         buildFieldSegmentCableMap(state.latestRouteData);
         renderBatchResults(state.latestRouteData);
+        if (state.updatedUtilData.length) renderUpdatedUtilizationTable();
         if (elements.resultsSection) elements.resultsSection.style.display = 'block';
         if (elements.routeBreakdownDetails) elements.routeBreakdownDetails.open = true;
         update3DPlot();
@@ -1989,6 +2178,8 @@ async function initializeApp() {
     // --- EVENT HANDLERS & UI LOGIC (This part remains the same) ---
     
     const getSampleTrays = () => [
+        {"tray_id": "ENTRY-HV", "start_x": 0, "start_y": -12, "start_z": 10, "end_x": 0, "end_y": 0, "end_z": 10, "width": 16, "height": 3.94, "current_fill": 2.40, "allowed_cable_group": "HV", "shape": "STR"},
+        {"tray_id": "ENTRY-LV", "start_x": 40, "start_y": 12, "start_z": 30, "end_x": 40, "end_y": 0, "end_z": 30, "width": 12, "height": 3.15, "current_fill": 1.80, "allowed_cable_group": "LV", "shape": "STR"},
         {"tray_id": "H1-A", "start_x": 0, "start_y": 0, "start_z": 10, "end_x": 40, "end_y": 0, "end_z": 10, "width": 16, "height": 3.94, "current_fill": 9.30,"allowed_cable_group": "HV", "shape": "STR"},
         {"tray_id": "H1-B", "start_x": 40, "start_y": 0, "start_z": 10, "end_x": 80, "end_y": 0, "end_z": 10, "width": 16, "height": 3.94, "current_fill": 6.98,"allowed_cable_group": "HV", "shape": "STR"},
         {"tray_id": "H1-C", "start_x": 80, "start_y": 0, "start_z": 10, "end_x": 120, "end_y": 0, "end_z": 10, "width": 16, "height": 3.94, "current_fill": 12.71,"allowed_cable_group": "HV", "shape": "STR"},
@@ -2005,7 +2196,79 @@ async function initializeApp() {
         {"tray_id": "EQ1", "start_x": 20, "start_y": 0, "start_z": 10, "end_x": 20, "end_y": 15, "end_z": 5, "width": 4, "height": 1.57, "current_fill": 1.24,"allowed_cable_group": "HV", "shape": "STR"},
         {"tray_id": "EQ2", "start_x": 100, "start_y": 60, "start_z": 30, "end_x": 110, "end_y": 90, "end_z": 20, "width": 4, "height": 1.57, "current_fill": 0.93,"allowed_cable_group": "LV", "shape": "STR"},
         {"tray_id": "CONN1", "start_x": 120, "start_y": 0, "start_z": 10, "end_x": 120, "end_y": 20, "end_z": 25, "width": 8, "height": 2.95, "current_fill": 3.10,"allowed_cable_group": "HV", "shape": "STR"},
-        {"tray_id": "CONN2", "start_x": 120, "start_y": 20, "start_z": 25, "end_x": 120, "end_y": 20, "end_z": 50, "width": 8, "height": 2.95, "current_fill": 2.33,"allowed_cable_group": "HV", "shape": "STR"}
+        {"tray_id": "CONN2", "start_x": 120, "start_y": 20, "start_z": 25, "end_x": 120, "end_y": 20, "end_z": 50, "width": 8, "height": 2.95, "current_fill": 2.33,"allowed_cable_group": "HV", "shape": "STR"},
+        {"tray_id": "INST-ENTRY", "start_x": 0, "start_y": -40, "start_z": 20, "end_x": 0, "end_y": -20, "end_z": 20, "width": 6, "height": 2.00, "current_fill": 0.70, "allowed_cable_group": "INSTRUMENT", "shape": "STR"},
+        {"tray_id": "INST-A", "start_x": 0, "start_y": -20, "start_z": 20, "end_x": 60, "end_y": -20, "end_z": 20, "width": 6, "height": 2.00, "current_fill": 1.20, "allowed_cable_group": "INSTRUMENT", "shape": "STR"},
+        {"tray_id": "INST-B", "start_x": 60, "start_y": -20, "start_z": 20, "end_x": 60, "end_y": 70, "end_z": 20, "width": 6, "height": 2.00, "current_fill": 1.50, "allowed_cable_group": "INSTRUMENT", "shape": "STR"},
+        {"tray_id": "INST-C", "start_x": 60, "start_y": 70, "start_z": 20, "end_x": 110, "end_y": 70, "end_z": 20, "width": 6, "height": 2.00, "current_fill": 0.90, "allowed_cable_group": "INSTRUMENT", "shape": "STR"},
+        {"tray_id": "COMM-ENTRY", "start_x": 20, "start_y": 30, "start_z": 45, "end_x": 20, "end_y": 40, "end_z": 45, "width": 8, "height": 2.00, "current_fill": 0.80, "allowed_cable_group": "COMMUNICATION", "shape": "STR"},
+        {"tray_id": "COMM-A", "start_x": 20, "start_y": 40, "start_z": 45, "end_x": 70, "end_y": 40, "end_z": 45, "width": 8, "height": 2.00, "current_fill": 1.10, "allowed_cable_group": "COMMUNICATION", "shape": "STR"},
+        {"tray_id": "COMM-B", "start_x": 70, "start_y": 40, "start_z": 45, "end_x": 70, "end_y": 95, "end_z": 45, "width": 8, "height": 2.00, "current_fill": 1.30, "allowed_cable_group": "COMMUNICATION", "shape": "STR"},
+        {"tray_id": "COMM-C", "start_x": 70, "start_y": 95, "start_z": 45, "end_x": 120, "end_y": 95, "end_z": 45, "width": 8, "height": 2.00, "current_fill": 0.60, "allowed_cable_group": "COMMUNICATION", "shape": "STR"}
+    ];
+
+    const getSampleDuctbanks = () => ({
+        ductbanks: [
+            {
+                id: 'DB-HV-01',
+                tag: 'DB-HV-01',
+                width: 32,
+                height: 24,
+                conduit_spacing: 8,
+                outline: [[-60, -12, -8], [0, -12, -8]],
+                conduits: [
+                    { id: 'HV-C1', conduit_id: 'HV-C1', ductbankTag: 'DB-HV-01', type: 'PVC Sch 40', trade_size: '4', diameter: 4, row: 1, column: 1, path: [[-60, -12, -8], [0, -12, -8]], allowed_cable_group: 'HV' },
+                    { id: 'HV-C2', conduit_id: 'HV-C2', ductbankTag: 'DB-HV-01', type: 'PVC Sch 40', trade_size: '4', diameter: 4, row: 1, column: 2, path: [[-60, -12, -8], [0, -12, -8]], allowed_cable_group: 'HV' },
+                    { id: 'HV-C3', conduit_id: 'HV-C3', ductbankTag: 'DB-HV-01', type: 'PVC Sch 40', trade_size: '4', diameter: 4, row: 2, column: 1, path: [[-60, -12, -8], [0, -12, -8]], allowed_cable_group: 'HV' },
+                    { id: 'HV-C4', conduit_id: 'HV-C4', ductbankTag: 'DB-HV-01', type: 'PVC Sch 40', trade_size: '4', diameter: 4, row: 2, column: 2, path: [[-60, -12, -8], [0, -12, -8]], allowed_cable_group: 'HV' }
+                ]
+            },
+            {
+                id: 'DB-LV-01',
+                tag: 'DB-LV-01',
+                width: 32,
+                height: 24,
+                conduit_spacing: 8,
+                outline: [[-60, 12, -8], [40, 12, -8]],
+                conduits: [
+                    { id: 'LV-C1', conduit_id: 'LV-C1', ductbankTag: 'DB-LV-01', type: 'PVC Sch 40', trade_size: '4', diameter: 4, row: 1, column: 1, path: [[-60, 12, -8], [40, 12, -8]], allowed_cable_group: 'LV' },
+                    { id: 'LV-C2', conduit_id: 'LV-C2', ductbankTag: 'DB-LV-01', type: 'PVC Sch 40', trade_size: '4', diameter: 4, row: 1, column: 2, path: [[-60, 12, -8], [40, 12, -8]], allowed_cable_group: 'LV' },
+                    { id: 'LV-C3', conduit_id: 'LV-C3', ductbankTag: 'DB-LV-01', type: 'PVC Sch 40', trade_size: '4', diameter: 4, row: 2, column: 1, path: [[-60, 12, -8], [40, 12, -8]], allowed_cable_group: 'LV' },
+                    { id: 'LV-C4', conduit_id: 'LV-C4', ductbankTag: 'DB-LV-01', type: 'PVC Sch 40', trade_size: '4', diameter: 4, row: 2, column: 2, path: [[-60, 12, -8], [40, 12, -8]], allowed_cable_group: 'LV' }
+                ]
+            }
+        ]
+    });
+
+    const getSampleRiserConduits = () => [
+        {
+            conduit_id: 'RISER-HV-01',
+            tray_id: 'RISER-HV-01',
+            type: 'RMC',
+            trade_size: '4',
+            diameter: 4,
+            start_x: 0,
+            start_y: -12,
+            start_z: -8,
+            end_x: 0,
+            end_y: -12,
+            end_z: 10,
+            allowed_cable_group: 'HV'
+        },
+        {
+            conduit_id: 'RISER-LV-01',
+            tray_id: 'RISER-LV-01',
+            type: 'RMC',
+            trade_size: '4',
+            diameter: 4,
+            start_x: 40,
+            start_y: 12,
+            start_z: -8,
+            end_x: 40,
+            end_y: 12,
+            end_z: 30,
+            allowed_cable_group: 'LV'
+        }
     ];
     
     const getSampleCables = () => {
@@ -2038,17 +2301,17 @@ async function initializeApp() {
                 weight: 0.5,
                 start: [15, 5, 15],
                 end: [105, 85, 30],
-                allowed_cable_group: "LV"
+                allowed_cable_group: "INSTRUMENT"
             },
             {
-                cable_type: "Power",
-                conductors: 3,
-                conductor_size: '#12 AWG',
-                diameter: 1.10,
-                weight: 1.3,
+                cable_type: "Signal",
+                conductors: 12,
+                conductor_size: '#22 AWG',
+                diameter: 0.55,
+                weight: 0.4,
                 start: [20, 10, 8],
                 end: [115, 90, 35],
-                allowed_cable_group: "HV"
+                allowed_cable_group: "COMMUNICATION"
             },
             {
                 cable_type: "Control",
@@ -2082,6 +2345,48 @@ async function initializeApp() {
                 raceway_ids: []
             });
         }
+        Object.assign(cables[0], {
+            start: [-60, -12, -8],
+            end: [120, 0, 10],
+            start_tag: 'SWGR-UG-HV',
+            end_tag: 'MCC-HV-01',
+            allowed_cable_group: 'HV'
+        });
+        Object.assign(cables[1], {
+            start: [-60, 12, -8],
+            end: [100, 100, 30],
+            start_tag: 'SWGR-UG-LV',
+            end_tag: 'MCC-LV-01',
+            allowed_cable_group: 'LV'
+        });
+        Object.assign(cables[2], {
+            start: [0, -40, 20],
+            end: [110, 70, 20],
+            start_tag: 'PLC-IO-01',
+            end_tag: 'JB-INST-07',
+            allowed_cable_group: 'INSTRUMENT'
+        });
+        Object.assign(cables[3], {
+            start: [20, 30, 45],
+            end: [120, 95, 45],
+            start_tag: 'NET-RACK-01',
+            end_tag: 'IDF-02',
+            allowed_cable_group: 'COMMUNICATION'
+        });
+        [10, 20].forEach(index => Object.assign(cables[index], {
+            start: cables[0].start.slice(),
+            end: cables[0].end.slice(),
+            start_tag: 'SWGR-UG-HV',
+            end_tag: 'MCC-HV-01',
+            allowed_cable_group: 'HV'
+        }));
+        [7, 17].forEach(index => Object.assign(cables[index], {
+            start: cables[2].start.slice(),
+            end: cables[2].end.slice(),
+            start_tag: 'PLC-IO-01',
+            end_tag: 'JB-INST-07',
+            allowed_cable_group: 'INSTRUMENT'
+        }));
         return cables;
     };
 
@@ -2429,12 +2734,12 @@ async function initializeApp() {
                 summary.textContent = dbId;
                 details.appendChild(summary);
                 const div = document.createElement('div');
-                renderTable(div, headers, rows, utilizationStyle);
+                renderTable(div, headers, rows, utilizationStyle, { fill: value => value });
                 details.appendChild(div);
                 elements.trayUtilizationContainer.appendChild(details);
             } else {
                 const div = document.createElement('div');
-                renderTable(div, headers, rows, utilizationStyle);
+                renderTable(div, headers, rows, utilizationStyle, { fill: value => value });
                 elements.trayUtilizationContainer.appendChild(div);
             }
         });
@@ -2550,6 +2855,7 @@ const openDuctbankRoute = (dbId, conduitId) => {
          `;
      };
      const formatters = {
+         fill: value => value,
          before_pct: renderUtilBar,
          full_pct: renderUtilBar,
          delta_pct: (val) => {
@@ -3011,50 +3317,194 @@ const renderRouteSummaryPanel = (results = []) => {
     const failed = results.length - routed.length;
     const totalLength = routed.reduce((sum, row) => sum + (Number(row.total_length) || 0), 0);
     const fieldLength = routed.reduce((sum, row) => sum + (Number(row.field_length) || 0), 0);
-    const longest = routed.reduce((max, row) => Math.max(max, Number(row.total_length) || 0), 0);
     const overFillCount = (state.updatedUtilData || []).filter(row => Number(row.full_pct) > 80).length;
-    const reasonCounts = getRejectedReasonCounts(results);
-    const reasonText = Object.entries(reasonCounts)
-        .map(([reason, count]) => `${count} ${reason.replace(/_/g, ' ')}`)
-        .join('; ');
-    const nextActions = [];
-    if (failed) nextActions.push('Open failed cable rows in Route Breakdown and review the suggested fixes.');
-    if (overFillCount) nextActions.push('Review Updated Tray Utilization for trays above 80%.');
-    if (fieldLength > 0) nextActions.push('Check field-routed length and shared field route recommendations.');
-    if (!nextActions.length) nextActions.push('Review highlighted routes and export the route package when ready.');
+    const primary = routed[0] || {};
+    const primaryLength = Number(primary.total_length) || 0;
+    const primaryField = Number(primary.field_length) || 0;
+    const primaryContained = primaryLength > 0 ? Math.max(0, 100 - (primaryField / primaryLength) * 100) : 0;
     elements.routeSummaryPanel.innerHTML = `
-        <div class="route-kpi-grid">
-            <div class="route-kpi-card route-kpi-card--success"><span>${routed.length}</span><strong>Routed</strong></div>
-            <div class="route-kpi-card ${failed ? 'route-kpi-card--danger' : ''}"><span>${failed}</span><strong>Failed</strong></div>
-            <div class="route-kpi-card"><span>${escapeHtml(formatRouteDistance(totalLength))}</span><strong>Total length</strong></div>
-            <div class="route-kpi-card"><span>${escapeHtml(formatRouteDistance(fieldLength))}</span><strong>Field route</strong></div>
-            <div class="route-kpi-card"><span>${escapeHtml(formatRouteDistance(longest))}</span><strong>Longest cable</strong></div>
-            <div class="route-kpi-card ${overFillCount ? 'route-kpi-card--warning' : ''}"><span>${overFillCount}</span><strong>Fill warnings</strong></div>
+        <div class="route-review-kpis" aria-label="Recommended route summary">
+            <div class="route-review-kpi route-review-kpi--recommended"><i aria-hidden="true">✓</i><span><strong>Recommended</strong><small>${routed.length} routed${failed ? ` · ${failed} need review` : ''}</small></span></div>
+            <div class="route-review-kpi"><i aria-hidden="true">↔</i><span><strong id="selected-route-kpi-length">${escapeHtml(formatRouteDistance(primaryLength))}</strong><small>selected route</small></span></div>
+            <div class="route-review-kpi"><i aria-hidden="true">▦</i><span><strong id="selected-route-kpi-contained">${primaryContained.toFixed(0)}% contained</strong><small>${escapeHtml(formatRouteDistance(totalLength - fieldLength))} in raceway</small></span></div>
+            <div class="route-review-kpi ${overFillCount ? 'route-review-kpi--warning' : 'route-review-kpi--safe'}"><i aria-hidden="true">${overFillCount ? '!' : '◆'}</i><span><strong>${overFillCount} overloads</strong><small>${overFillCount ? 'capacity review required' : 'within review threshold'}</small></span></div>
         </div>
-        ${reasonText ? `<p class="route-rejection-summary"><strong>Rejected segments:</strong> ${escapeHtml(reasonText)}</p>` : ''}
-        <div class="route-next-actions"><strong>Next:</strong><ul>${nextActions.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul></div>
     `;
+};
+
+const renderPullGroupAnalysis = analysis => {
+    const groups = [...analysis.suggestions, ...analysis.reviewGroups];
+    const acceptedCount = analysis.suggestions.filter(group => state.pullGroupDecisions[group.id] === 'together').length;
+    let html = `<section class="pull-group-review" aria-label="Automatic pull set suggestions"><div class="pull-group-review-heading"><div><span>Automatic pull-set suggestions</span><h4>${analysis.summary.suggestedGroups} recommended pull set${analysis.summary.suggestedGroups === 1 ? '' : 's'}</h4><p>Only fully coextensive routes with matching circuit classes are suggested. Every cable remains a separate pull until you choose <strong>Plan together</strong>.</p></div><div class="pull-group-summary-badges"><span class="is-recommended">${analysis.summary.suggestedCables} eligible cables</span><span>${analysis.summary.separateCables} kept separate</span>${acceptedCount ? `<span class="is-selected">${acceptedCount} selected</span>` : ''}</div></div>`;
+    if (groups.length) {
+        html += '<div class="pull-group-card-grid">';
+        groups.forEach(group => {
+            const decision = state.pullGroupDecisions[group.id] || 'suggested';
+            const isReview = group.status === 'review';
+            const plan = group.plan || {};
+            const equipment = group.fieldEquipment || {};
+            const weakest = plan.equipment?.weakestLink;
+            const decisionLabel = isReview
+                ? 'Keep separate pending review'
+                : decision === 'together'
+                    ? 'Planned together'
+                    : decision === 'separate'
+                        ? 'Kept separate'
+                        : 'Suggested together';
+            html += `<article class="pull-group-card ${isReview ? 'is-review' : decision === 'together' ? 'is-together' : decision === 'separate' ? 'is-separate' : ''}" data-pull-group-card="${escapeAttr(group.id)}"><div class="pull-group-card-heading"><div><span>${escapeHtml(group.label)} · ${escapeHtml(group.className)}</span><h5>${group.cableCount} cables on one complete route</h5></div><span class="pull-group-status">${escapeHtml(decisionLabel)}</span></div>`;
+            html += `<div class="pull-group-cables">${group.cableNames.map(name => `<span>${escapeHtml(name)}</span>`).join('')}</div>`;
+            html += `<div class="pull-group-metrics"><span><strong>${Number(group.routeLengthFt).toFixed(0)} ft</strong>Shared route</span><span><strong>${Number(group.combinedWeightLbsFt).toFixed(2)} lb/ft</strong>Combined weight</span><span><strong>${Number(group.equivalentDiameterIn).toFixed(2)} in</strong>Equivalent bundle OD</span><span><strong>${plan.sections?.length || '—'}</strong>Pull sections</span><span><strong>${Number.isFinite(plan.maxTension) ? `${Number(plan.maxTension).toFixed(0)} lbf` : 'Review'}</strong>Maximum tension</span><span><strong>${escapeHtml(weakest?.label || 'Inputs')}</strong>Weakest link</span></div>`;
+            html += `<ul class="pull-group-reasons">${group.reasons.map(reason => `<li>${escapeHtml(reason)}</li>`).join('')}</ul>`;
+            if (!isReview) {
+                html += `<p class="pull-group-equipment-note">Group plan: ${equipment.payoffStations || 0} payoff station${equipment.payoffStations === 1 ? '' : 's'} · ${equipment.cableReels || 0} cable reels · ${equipment.tuggers || 0} tugger setup${equipment.tuggers === 1 ? '' : 's'} · ${equipment.handPulls || 0} hand pull${equipment.handPulls === 1 ? '' : 's'} · ${equipment.sheaves || 0} sheaves · ${equipment.rollers || 0} rollers.${group.equipmentSavings.pullOperations ? ` Avoids ${group.equipmentSavings.pullOperations} separate pull operation${group.equipmentSavings.pullOperations === 1 ? '' : 's'}.` : ' No pull-operation reduction; grouping is still physically feasible under the screening limits.'}</p>`;
+            }
+            html += '<div class="pull-group-actions">';
+            if (!isReview) {
+                html += `<button type="button" class="pull-group-decision ${decision === 'together' ? 'is-active' : ''}" data-pull-group-id="${escapeAttr(group.id)}" data-pull-group-decision="together">Plan together</button><button type="button" class="pull-group-decision ${decision === 'separate' ? 'is-active' : ''}" data-pull-group-id="${escapeAttr(group.id)}" data-pull-group-decision="separate">Keep separate</button>`;
+            } else {
+                html += `<button type="button" class="pull-group-decision is-active" data-pull-group-id="${escapeAttr(group.id)}" data-pull-group-decision="separate">Keep separate</button>`;
+            }
+            html += `<button type="button" class="pull-group-review-route" data-pull-group-id="${escapeAttr(group.id)}">Show common route</button></div></article>`;
+        });
+        html += '</div>';
+    } else {
+        html += '<div class="pull-group-empty"><strong>No complete-route pull sets found.</strong><span>Cables may share portions of a corridor, but no two currently share the same complete route and circuit class.</span></div>';
+    }
+    if (analysis.separate.length) {
+        html += `<details class="pull-group-separate"><summary>Why ${analysis.separate.length} cable${analysis.separate.length === 1 ? '' : 's'} stay separate</summary><div class="pull-group-separate-list">${analysis.separate.map(item => `<div><strong>${escapeHtml(item.cableName)}</strong><span>${escapeHtml(item.className)}</span><p>${escapeHtml(item.reason)}</p></div>`).join('')}</div></details>`;
+    }
+    html += '<p class="pull-group-assumption">Screening model: combined tension is distributed by cable weight and bundle OD is area-equivalent. Confirm pulling-head design, conduit jam ratio, manufacturer limits, and field conditions before construction.</p></section>';
+    return html;
 };
 
 const renderPullChecks = (results) => {
     if (!elements.pullChecksContainer || !elements.pullChecksDetails) return;
-    if (!results || results.length === 0) {
+    if (!state.pullChecksEnabled || !results || results.length === 0) {
+        state.pullGroupAnalysis = null;
         elements.pullChecksContainer.innerHTML = '';
         elements.pullChecksDetails.style.display = 'none';
+        elements.pullChecksDetails.open = false;
         return;
     }
-    let html = '<div class="table-scroll"><table class="sticky-table"><thead><tr><th>Cable</th><th>Tension</th><th>Allowable</th><th>Pressure</th><th>Allowable</th></tr></thead><tbody>';
-    results.forEach(r => {
-        const pc = r.pull_check || {};
-        const t = pc.maxTension;
-        const tAllow = pc.allowableTension;
-        const p = pc.maxSidewallPressure;
-        const pAllow = pc.allowableSidewallPressure;
-        html += `<tr><td>${escapeHtml(r.cable)}</td><td>${t !== undefined ? Number(t).toFixed(2) : 'N/A'}</td><td>${tAllow !== undefined && isFinite(tAllow) ? Number(tAllow).toFixed(2) : 'N/A'}</td><td>${p !== undefined ? Number(p).toFixed(2) : 'N/A'}</td><td>${pAllow !== undefined && isFinite(pAllow) ? Number(pAllow).toFixed(2) : 'N/A'}</td></tr>`;
+    const checks = results.map(result => result.pull_check).filter(Boolean);
+    const setupCount = checks.filter(check => check.status === 'setups-required').length;
+    const reviewCount = checks.filter(check => ['review-required', 'inputs-required'].includes(check.status)).length;
+    const formatCheck = (actual, allowable, unit) => Number.isFinite(actual) && Number.isFinite(allowable)
+        ? `${Number(actual).toFixed(1)} / ${Number(allowable).toFixed(0)} ${unit}`
+        : 'Inputs required';
+    const statusDetails = (check, sectionCount = 0) => {
+        if (!check) return { label: 'Not calculated', className: 'inputs' };
+        if (check.status === 'pass') return { label: '1 setup · within limits', className: 'pass' };
+        if (check.status === 'setups-required') {
+            const count = Math.max(2, sectionCount || 0);
+            return { label: `${count} setups required`, className: 'setup' };
+        }
+        if (check.status === 'review-required') return { label: 'Review required', className: 'review' };
+        return { label: 'Inputs missing', className: 'inputs' };
+    };
+    const pullOptions = getPullCheckOptions();
+    state.pullGroupAnalysis = pullOptions.suggestPullGroups
+        ? buildPullGroupSuggestions(results, state.cableList, pullOptions)
+        : null;
+    let html = `<div class="pull-check-summary"><strong>${checks.length} cable pull plans</strong><span>${setupCount} require multiple setups</span><span>${reviewCount} require input or equipment review</span><span>Auto direction compares both ends · weakest equipment rating governs</span></div>`;
+    if (state.pullGroupAnalysis) html += renderPullGroupAnalysis(state.pullGroupAnalysis);
+    html += '<div class="pull-check-guidance"><span aria-hidden="true">↗</span><div><strong>Setup locations are already calculated.</strong><p>The Pull plan pill describes the result; it is not a button. Choose <strong>Show setup locations</strong> to select that cable and display its reel, tugger or hand-pull receiving point, sheave, and roller locations on the 3D canvas.</p></div></div>';
+    html += '<div class="table-scroll"><table class="sticky-table"><thead><tr><th>Cable</th><th>Pull plan</th><th>3D locations</th><th>Pull direction</th><th>Sections</th><th>Max tension / weakest limit</th><th>Max pressure / limit</th><th>Field equipment</th></tr></thead><tbody>';
+    results.forEach((r, routeIndex) => {
+        const check = r.pull_check;
+        const sections = Array.isArray(check?.sections) ? check.sections : [];
+        const status = statusDetails(check, sections.length);
+        const equipment = check?.equipment || {};
+        const guidance = check?.status === 'inputs-required'
+            ? `Missing: ${(check.missingInputs || []).join(', ')}`
+            : check
+                ? `${equipment.counts?.reels || 0} reel · ${equipment.counts?.tuggers || 0} tugger · ${equipment.counts?.handPulls || 0} hand pull · ${equipment.counts?.sheaves || 0} sheave · ${equipment.counts?.rollers || 0} rollers`
+                : 'Run routing with pull planning enabled';
+        const canShowSetups = check && check.status !== 'inputs-required';
+        const setupLabel = sections.length === 1 ? 'Show setup location' : `Show ${sections.length} setup locations`;
+        const canvasAction = canShowSetups
+            ? `<button type="button" class="pull-check-view-setups" data-pull-route-index="${routeIndex}" aria-label="${escapeAttr(`${setupLabel} for ${r.cable} on the 3D canvas`)}">${escapeHtml(setupLabel)}</button>`
+            : '<span class="pull-check-canvas-unavailable">Complete inputs first</span>';
+        html += `<tr data-pull-route="${escapeAttr(r.cable)}"><td>${escapeHtml(r.cable)}</td><td><span class="pull-check-status pull-check-status--${status.className}">${status.label}</span></td><td>${canvasAction}</td><td>${escapeHtml(check?.directionLabel || '—')}</td><td>${sections.length || '—'}</td><td>${escapeHtml(formatCheck(check?.maxTension, check?.allowableTension, 'lbf'))}</td><td>${escapeHtml(formatCheck(check?.maxSidewallPressure, check?.allowableSidewallPressure, 'lbf/ft'))}</td><td>${escapeHtml(guidance)}</td></tr>`;
     });
     html += '</tbody></table></div>';
+
+    const selectedRoute = results[state.selectedRouteIndex] || results.find(result => result.pull_check);
+    const selected = selectedRoute?.pull_check;
+    if (selected && selected.status !== 'inputs-required') {
+        const equipment = selected.equipment || {};
+        const weakest = equipment.weakestLink;
+        const forward = selected.directionComparison?.forward;
+        const reverse = selected.directionComparison?.reverse;
+        const directionReason = selected.directionMode === 'auto' && forward && reverse
+            ? `Compared both directions: From → To ${forward.sections} section(s), ${Number(forward.maxTension).toFixed(0)} lbf; To → From ${reverse.sections} section(s), ${Number(reverse.maxTension).toFixed(0)} lbf.`
+            : 'Direction was fixed by the pull strategy setting.';
+        const handPullCount = equipment.counts?.handPulls || 0;
+        const handPullReason = handPullCount
+            ? ` ${handPullCount} short section${handPullCount === 1 ? '' : 's'} meet both hand-pull limits: ≤ ${Number(selected.assumptions?.maxHandPullLengthFt || 25).toFixed(0)} ft and ≤ ${Number(selected.assumptions?.maxHandPullTensionLbf || 200).toFixed(0)} lbf.`
+            : '';
+        html += `<section class="pull-field-plan" aria-label="Selected cable field pull plan"><div class="pull-field-plan-heading"><div><span>Selected cable field plan</span><h4>${escapeHtml(selectedRoute.cable)} · ${escapeHtml(selected.directionLabel)}</h4><p>${escapeHtml(directionReason + handPullReason)}</p></div><span class="pull-direction-badge">${escapeHtml(selected.direction === 'reverse' ? 'Reverse pull selected' : 'Forward pull selected')}</span></div>`;
+        html += `<div class="pull-equipment-kpis"><span><i class="legend-reel"></i><strong>${equipment.counts?.reels || 0}</strong>Reels</span><span><i class="legend-tugger"></i><strong>${equipment.counts?.tuggers || 0}</strong>Tuggers</span><span><i class="legend-hand-pull"></i><strong>${handPullCount}</strong>Hand pulls</span><span><i class="legend-sheave"></i><strong>${equipment.counts?.sheaves || 0}</strong>Sheaves</span><span><i class="legend-roller"></i><strong>${equipment.counts?.rollers || 0}</strong>Tray rollers</span><span><strong>${escapeHtml(weakest?.label || '—')}</strong>Weakest link · ${escapeHtml(weakest ? `${weakest.value.toFixed(0)} lbf` : '—')}</span></div>`;
+        html += '<div class="table-scroll"><table class="sticky-table pull-section-table"><thead><tr><th>Section</th><th>Reel / payoff</th><th>Receiving method / end</th><th>Length</th><th>Maximum tension</th><th>Sheaves</th><th>Tray rollers</th></tr></thead><tbody>';
+        selected.sections.forEach(section => {
+            const sheaveCount = (equipment.sheaves || []).filter(item => item.distanceFromPullStart >= section.startDistance - 0.01 && item.distanceFromPullStart <= section.endDistance + 0.01).length;
+            const rollerCount = (equipment.rollers || []).filter(item => item.distanceFromPullStart >= section.startDistance - 0.01 && item.distanceFromPullStart <= section.endDistance + 0.01).length;
+            const receivingMethod = section.pullMethod === 'hand'
+                ? `<span class="pull-method-hand">PULL BY HAND</span> @ ${escapeHtml(formatRouteDistance(section.endDistance))}`
+                : `Tugger ${section.index} @ ${escapeHtml(formatRouteDistance(section.endDistance))}`;
+            html += `<tr><td>Pull ${section.index}</td><td>Reel ${section.index} @ ${escapeHtml(formatRouteDistance(section.startDistance))}</td><td>${receivingMethod}</td><td>${escapeHtml(formatRouteDistance(section.length))}</td><td>${escapeHtml(`${Number(section.maxTension).toFixed(1)} lbf`)}</td><td>${sheaveCount}</td><td>${rollerCount}</td></tr>`;
+        });
+        html += '</tbody></table></div>';
+        if ((equipment.sheaves || []).length) {
+            html += '<div class="pull-sheave-strip"><strong>Sheave schedule</strong>';
+            equipment.sheaves.forEach(sheave => {
+                const transition = sheave.transition ? ` · ${sheave.transition}` : '';
+                html += `<span class="${sheave.pass ? '' : 'is-warning'}">S${sheave.index} @ ${escapeHtml(formatRouteDistance(sheave.distanceFromPullStart))} · ${Number(sheave.angleDeg).toFixed(0)}° · radius ≥ ${Number(sheave.recommendedRadiusFt).toFixed(2)} ft · support ${Number(sheave.reactionLbf).toFixed(0)} / ${Number(sheave.capacityLbf).toFixed(0)} lbf${escapeHtml(transition)}</span>`;
+            });
+            html += '</div>';
+        }
+        html += '</section>';
+    }
     elements.pullChecksContainer.innerHTML = html;
+    elements.pullChecksContainer.querySelectorAll('.pull-group-decision').forEach(button => {
+        button.addEventListener('click', () => {
+            state.pullGroupDecisions[button.dataset.pullGroupId] = button.dataset.pullGroupDecision;
+            renderPullChecks(results);
+            saveSession();
+        });
+    });
+    elements.pullChecksContainer.querySelectorAll('.pull-group-review-route').forEach(button => {
+        button.addEventListener('click', async () => {
+            const group = [...(state.pullGroupAnalysis?.suggestions || []), ...(state.pullGroupAnalysis?.reviewGroups || [])]
+                .find(candidate => candidate.id === button.dataset.pullGroupId);
+            const routeIndex = group?.routeIndices?.[0];
+            if (!Number.isFinite(routeIndex)) return;
+            await highlightCableRoute(routeIndex);
+            document.querySelector('.route-visual-shell')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+    });
+    elements.pullChecksContainer.querySelectorAll('.pull-check-view-setups').forEach(button => {
+        button.addEventListener('click', async () => {
+            const routeIndex = Number(button.dataset.pullRouteIndex);
+            if (!Number.isFinite(routeIndex) || !state.latestRouteData[routeIndex]) return;
+            state.pullSetupsVisible = true;
+            state.labelsVisible = true;
+            if (elements.pullSetupsToggle) elements.pullSetupsToggle.checked = true;
+            if (elements.labelsToggle) elements.labelsToggle.checked = true;
+            await highlightCableRoute(routeIndex);
+            state.routeViewer?.setLayerVisibility('labels', true);
+            state.routeViewer?.setLayerVisibility('pullSetups', true);
+            const route = state.latestRouteData[routeIndex];
+            const sectionCount = route.pull_check?.sections?.length || 1;
+            if (elements.routeSelectionStatus) {
+                elements.routeSelectionStatus.textContent = `${route.cable} is selected. ${sectionCount} calculated pull setup location${sectionCount === 1 ? ' is' : 's are'} displayed with reel, tugger or hand-pull, sheave, and roller markers.`;
+            }
+            saveSession();
+            document.querySelector('.route-visual-shell')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+    });
     elements.pullChecksDetails.style.display = '';
+    elements.pullChecksDetails.open = setupCount > 0 || reviewCount > 0;
 };
 
 const renderBatchResults = (results) => {
@@ -3232,6 +3682,8 @@ const renderBatchResults = (results) => {
                 }
                 updateCableListDisplay();
                 renderBatchResults(state.latestRouteData);
+                setRouteReviewMode(false);
+                elements.calculateBtn?.scrollIntoView({ behavior: 'smooth', block: 'center' });
             });
         });
         renderPullChecks(results);
@@ -3463,6 +3915,8 @@ const renderBatchResults = (results) => {
     };
 
     const loadSampleNetwork = () => {
+        state.ductbankData = getSampleDuctbanks();
+        state.conduitData = getSampleRiserConduits();
         loadSampleTrays();
         loadSampleCables();
         updateRoutingReadiness();
@@ -3564,18 +4018,27 @@ const renderBatchResults = (results) => {
     };
 
     const exportGLTF = () => {
-        const trays  = (state.finalTrays.length ? state.finalTrays : state.trayData) || [];
-        const cables = (state.latestRouteData || []).map(r => ({
-            label:    r.cable,
-            cable_id: r.cable,
-            from_tag: r.from_tag  || '',
-            to_tag:   r.to_tag    || '',
-            start_x:  r.startPoint?.[0] ?? (r.route_segments?.[0]?.start?.[0] ?? 0),
-            start_y:  r.startPoint?.[1] ?? (r.route_segments?.[0]?.start?.[1] ?? 0),
-            start_z:  r.startPoint?.[2] ?? (r.route_segments?.[0]?.start?.[2] ?? 0),
-            end_x:    r.endPoint?.[0]   ?? (r.route_segments?.at(-1)?.end?.[0] ?? 0),
-            end_y:    r.endPoint?.[1]   ?? (r.route_segments?.at(-1)?.end?.[1] ?? 0),
-            end_z:    r.endPoint?.[2]   ?? (r.route_segments?.at(-1)?.end?.[2] ?? 0),
+        const sceneModel = currentRouteSceneModel();
+        const trays = sceneModel.raceways.map(raceway => ({
+            tray_id: raceway.id,
+            raceway_type: raceway.kind,
+            conduit_id: raceway.kind === 'conduit' ? raceway.id : '',
+            ductbank_id: raceway.parentId || '',
+            width: raceway.kind === 'conduit' ? raceway.diameterIn : raceway.widthIn,
+            height: raceway.kind === 'conduit' ? raceway.diameterIn : raceway.heightIn,
+            path: raceway.path,
+            utilizationPct: raceway.utilizationPct,
+            current_fill: raceway.source.current_fill,
+            maxFill: raceway.source.maxFill,
+            numSlots: raceway.source.numSlots,
+            slotFills: raceway.source.slotFills
+        }));
+        const cables = sceneModel.routes.map(route => ({
+            label: route.label,
+            cable_id: route.id,
+            from_tag: route.startTag || route.from_tag || '',
+            to_tag: route.endTag || route.to_tag || '',
+            route_segments: route.segments
         }));
         if (trays.length === 0) {
             showAlertModal('Export Error', 'No tray geometry to export. Add trays and run routing first.');
@@ -4029,6 +4492,10 @@ const renderBatchResults = (results) => {
             maxFieldEdge: parseFloat(document.getElementById('max-field-edge').value),
             maxFieldNeighbors: 8,
             includeDuctbankOutlines: state.includeDuctbankOutlines,
+            pullAnalysis: {
+                enabled: state.pullChecksEnabled,
+                ...getPullCheckOptions()
+            },
         };
 
         // Deep copy tray data so original state isn't mutated during batch routing
@@ -4058,14 +4525,17 @@ const renderBatchResults = (results) => {
             const cacheKey = `route-${projectHash}`;
             const cache = getItem(cacheKey);
             if (cache) {
-                state.latestRouteData = cache.batchResults;
-                storeLatestRouteResults(cache.batchResults, {
+                const cachedBatchResults = applyPullChecksToResults(cache.batchResults || []);
+                state.latestRouteData = cachedBatchResults;
+                storeLatestRouteResults(cachedBatchResults, {
                     projectHash,
                     source: 'optimalRouteCache',
-                    trayCableMap: cache.trayCableMap || {}
+                    trayCableMap: cache.trayCableMap || {},
+                    finalTrays: cache.finalTrays || [],
+                    updatedUtilData: buildUtilizationRows(cache.utilization, trayDataForRun)
                 });
                 state.finalTrays = cache.finalTrays;
-                const resMap = new Map((cache.batchResults || []).map(r => [r.cable, r]));
+                const resMap = new Map(cachedBatchResults.map(r => [r.cable, r]));
                 state.cableList.forEach(c => {
                     const r = resMap.get(c.name);
                     c.route_segments = r ? r.route_segments || [] : [];
@@ -4073,9 +4543,9 @@ const renderBatchResults = (results) => {
                 const utilData = buildUtilizationRows(cache.utilization, trayDataForRun);
                 state.updatedUtilData = utilData;
                 renderUpdatedUtilizationTable();
-                buildFieldSegmentCableMap(cache.batchResults);
-                state.latestRouteData = cache.batchResults;
-                renderBatchResults(cache.batchResults);
+                buildFieldSegmentCableMap(cachedBatchResults);
+                state.latestRouteData = cachedBatchResults;
+                renderBatchResults(cachedBatchResults);
                 state.trayCableMap = cache.trayCableMap || {};
                 state.sharedFieldRoutes = cache.sharedRoutes || [];
                 elements.metrics.innerHTML = cache.metricsHtml || '<p>No common field routes detected.</p>';
@@ -4084,7 +4554,7 @@ const renderBatchResults = (results) => {
                 elements.progressLabel.textContent = `Complete (${(cache.wallTime/1000).toFixed(2)}s, cached)`;
                 elements.progressContainer.style.display = 'none';
                 elements.cancelRoutingBtn.style.display = 'none';
-                visualize(trayDataForRun, cache.allRoutes, "Batch Route Visualization");
+                visualize(state.finalTrays?.length ? state.finalTrays : trayDataForRun, viewerRoutes(), "Batch Route Visualization");
                 scrollResultsIntoView();
                 return;
             }
@@ -4140,6 +4610,9 @@ const renderBatchResults = (results) => {
                             vd = calculateVoltageDrop(cable, result.total_length, cable.phase);
                             cable.voltage_drop_pct = vd;
                         }
+                        const pullCheck = result.success && state.pullChecksEnabled
+                            ? buildCablePullPlan(result.route_segments || [], cable, getPullCheckOptions())
+                            : null;
                         return {
                             cable: cable.name,
                             status: result.success ? 'Routed' : 'Failed',
@@ -4152,6 +4625,7 @@ const renderBatchResults = (results) => {
                             tray_segments: result.success ? result.tray_segments : [],
                             route_segments: result.success ? result.route_segments : [],
                             voltage_drop_pct: result.success ? vd.toFixed(2) : 'N/A',
+                            ...(pullCheck ? { pull_check: pullCheck } : {}),
                             exclusions: result.exclusions || [],
                             breakdown: result.success ? result.route_segments.map((seg, i) => {
                                 let tray_id = seg.type === 'field' ? 'Field Route' : (seg.tray_id || 'N/A');
@@ -4193,7 +4667,6 @@ const renderBatchResults = (results) => {
                             }
                         });
                     });
-                    storeLatestRouteResults(batchResults, { projectHash, trayCableMap: state.trayCableMap });
                     const cableMapForArea = new Map(state.cableList.map(c => [c.name, c.diameter]));
                     const cableMapForObj = new Map(state.cableList.map(c => [c.name, c]));
                     const tempSystem = new CableRoutingSystem({});
@@ -4267,13 +4740,18 @@ const renderBatchResults = (results) => {
                     } else {
                         elements.metrics.innerHTML = '<p>No common field routes detected.</p>';
                     }
-                    visualize(trayDataForRun, allRoutesForPlotting, "Batch Route Visualization");
-
                     const finalUtilization = msg.utilization;
                     const utilData = buildUtilizationRows(finalUtilization, trayDataForRun);
                     state.finalTrays = msg.finalTrays;
                     state.updatedUtilData = utilData;
                     renderUpdatedUtilizationTable();
+                    storeLatestRouteResults(batchResults, {
+                        projectHash,
+                        trayCableMap: state.trayCableMap,
+                        finalTrays: state.finalTrays,
+                        updatedUtilData: state.updatedUtilData
+                    });
+                    visualize(state.finalTrays, viewerRoutes(), "Batch Route Visualization");
 
                     elements.progressLabel.textContent = `Complete (${(msg.wallTime/1000).toFixed(2)}s)`;
                     elements.progressContainer.style.display = 'none';
@@ -4366,6 +4844,9 @@ const renderBatchResults = (results) => {
                     segments_count: res.route_segments.length,
                     tray_segments: res.tray_segments,
                     route_segments: res.route_segments,
+                    ...(state.pullChecksEnabled ? {
+                        pull_check: buildCablePullPlan(res.route_segments || [], cable, getPullCheckOptions())
+                    } : {}),
                     breakdown: res.route_segments.map((seg, i) => {
                         let tray_id = seg.type === 'field' ? 'Field Route' : (seg.tray_id || 'N/A');
                         let type = getSegmentType(seg);
@@ -4418,13 +4899,17 @@ const renderBatchResults = (results) => {
             });
         });
 
-        storeLatestRouteResults(state.latestRouteData, { source: 'optimalRouteRebalance', trayCableMap: state.trayCableMap });
-
         const finalUtilization = routingSystem.getTrayUtilization();
         const utilData = buildUtilizationRows(finalUtilization, trayData);
 
         state.finalTrays = Array.from(routingSystem.trays.values()).map(t => ({ ...t }));
         state.updatedUtilData = utilData;
+        storeLatestRouteResults(state.latestRouteData, {
+            source: 'optimalRouteRebalance',
+            trayCableMap: state.trayCableMap,
+            finalTrays: state.finalTrays,
+            updatedUtilData: state.updatedUtilData
+        });
         renderBatchResults(state.latestRouteData);
         renderUpdatedUtilizationTable();
 
@@ -4437,279 +4922,1025 @@ const renderBatchResults = (results) => {
             endTag: cableMap.get(row.cable).end_tag,
             allowed_cable_group: cableMap.get(row.cable).allowed_cable_group
         }));
-        visualize(state.finalTrays, plotRoutes, 'Rebalanced Routes');
+        visualize(state.finalTrays, viewerRoutes(), 'Rebalanced Routes');
 
         elements.progressLabel.textContent = 'Complete';
         elements.progressContainer.style.display = 'none';
     };
     
     // --- VISUALIZATION ---
-    const visualize = (trays, routes, title) => {
-        if (!globalThis.Plotly) {
+    const ROUTE_COLORS = {
+        route: '#2563eb',
+        field: '#f59e0b',
+        selected: '#06b6d4',
+        raceway: '#64748b',
+        conduit: '#334155',
+        ductbank: '#9a6b44',
+        start: '#16a34a',
+        end: '#7c3aed'
+    };
+    const ROUTE_VIEW_PRESETS = {
+        isometric: {
+            camera: { up: { x: 0, y: 0, z: 1 }, eye: { x: 1.45, y: 1.45, z: 1.15 } },
+            projection: 'perspective'
+        },
+        plan: {
+            camera: { up: { x: 0, y: 1, z: 0 }, eye: { x: 0, y: 0, z: 2.5 } },
+            projection: 'orthographic'
+        },
+        front: {
+            camera: { up: { x: 0, y: 0, z: 1 }, eye: { x: 0, y: -2.5, z: 0.15 } },
+            projection: 'orthographic'
+        },
+        right: {
+            camera: { up: { x: 0, y: 0, z: 1 }, eye: { x: 2.5, y: 0, z: 0.15 } },
+            projection: 'orthographic'
+        }
+    };
+    const plotConfig = {
+        responsive: true,
+        scrollZoom: true,
+        displaylogo: false,
+        modeBarButtonsToRemove: ['toImage', 'sendDataToCloud', 'lasso3d', 'select2d']
+    };
+    const routeMetrics = route => {
+        const segments = route?.route_segments || route?.segments || [];
+        const segmentLength = segment => {
+            const explicitLength = Number(segment.length);
+            if (Number.isFinite(explicitLength)) return explicitLength;
+            if (!Array.isArray(segment.start) || !Array.isArray(segment.end)) return 0;
+            return Math.hypot(
+                Number(segment.end[0]) - Number(segment.start[0]),
+                Number(segment.end[1]) - Number(segment.start[1]),
+                Number(segment.end[2]) - Number(segment.start[2])
+            );
+        };
+        const total = segments.reduce((sum, segment) => sum + segmentLength(segment), 0);
+        const field = segments
+            .filter(segment => segment.type !== 'tray')
+            .reduce((sum, segment) => sum + segmentLength(segment), 0);
+        return { segments: segments.length, total, field };
+    };
+    const updatePlotSelectionCard = ({ kicker, name, detail } = {}) => {
+        if (!elements.plotSelectionCard) return;
+        elements.plotSelectionCard.hidden = !name;
+        if (!name) return;
+        elements.plotSelectionKicker.textContent = kicker || 'Selected route';
+        elements.plotSelectionName.textContent = name;
+        elements.plotSelectionDetail.textContent = detail || '';
+    };
+    const updatePlotSummary = (trays, routes) => {
+        const fieldCount = routes.reduce((count, route) => (
+            count + (route.segments || []).filter(segment => segment.type !== 'tray').length
+        ), 0);
+        const racewayCount = buildRouteSceneModel({
+            raceways: trays,
+            ductbanks: state.ductbankData?.ductbanks || []
+        }).raceways.length;
+        if (elements.plotRouteCount) elements.plotRouteCount.textContent = routes.length.toLocaleString();
+        if (elements.plotRacewayCount) elements.plotRacewayCount.textContent = racewayCount.toLocaleString();
+        if (elements.plotFieldCount) elements.plotFieldCount.textContent = fieldCount.toLocaleString();
+    };
+    const utilizationForTray = tray => {
+        const totalFill = Array.isArray(tray.slotFills)
+            ? tray.slotFills.reduce((sum, fill) => sum + (Number(fill) || 0), 0)
+            : (Number(tray.current_fill) || 0);
+        const totalMax = (Number(tray.maxFill) || 0) * (Number(tray.numSlots) || 1);
+        return totalMax ? Math.max(0, Math.min(100, (totalFill / totalMax) * 100)) : 0;
+    };
+    const heatColor = pct => {
+        if (pct < 50) return '#14b8a6';
+        if (pct < 80) return '#f59e0b';
+        return '#ef4444';
+    };
+    const currentViewDefinition = () => ROUTE_VIEW_PRESETS[state.plotView] || ROUTE_VIEW_PRESETS.isometric;
+    const graphTheme = () => {
+        const dark = document.body.classList.contains('dark-mode');
+        return {
+            surface: dark ? '#0f172a' : '#f4f7fb',
+            text: dark ? '#e5e7eb' : '#334155',
+            grid: dark ? 'rgba(148, 163, 184, 0.2)' : 'rgba(100, 116, 139, 0.2)',
+            axis: dark ? '#64748b' : '#94a3b8',
+            hover: dark ? '#0f172a' : '#ffffff',
+            floor: dark ? '#1e293b' : '#dbeafe'
+        };
+    };
+    const routePointKey = point => point.map(value => (Number(value) || 0).toFixed(3)).join(',');
+    const routeSegmentKey = segment => {
+        const endpoints = [routePointKey(segment.start), routePointKey(segment.end)].sort();
+        return `${segment.type === 'tray' ? 'tray' : 'field'}|${endpoints.join('|')}`;
+    };
+    const aggregateRouteSegments = routes => {
+        const segmentMap = new Map();
+        routes.forEach((route, routeIndex) => {
+            (route.segments || []).forEach(segment => {
+                if (!Array.isArray(segment.start) || !Array.isArray(segment.end)) return;
+                const key = routeSegmentKey(segment);
+                if (!segmentMap.has(key)) {
+                    segmentMap.set(key, {
+                        type: segment.type === 'tray' ? 'tray' : 'field',
+                        start: segment.start,
+                        end: segment.end,
+                        routeIndices: new Set(),
+                        cableLabels: new Set(),
+                        racewayIds: new Set()
+                    });
+                }
+                const aggregate = segmentMap.get(key);
+                aggregate.routeIndices.add(routeIndex);
+                aggregate.cableLabels.add(route.label || `Route ${routeIndex + 1}`);
+                const racewayId = segment.tray_id || segment.raceway_id || segment.conduit_id;
+                if (racewayId) aggregate.racewayIds.add(racewayId);
+            });
+        });
+        return Array.from(segmentMap.values()).map(segment => ({
+            ...segment,
+            routeIndices: Array.from(segment.routeIndices),
+            cableLabels: Array.from(segment.cableLabels),
+            racewayIds: Array.from(segment.racewayIds)
+        }));
+    };
+    const groupRouteEndpoints = (routes, endpoint) => {
+        const groups = [];
+        const clusterDistance = 7.5;
+        routes.forEach((route, routeIndex) => {
+            const point = endpoint === 'Start' ? route.startPoint : route.endPoint;
+            if (!Array.isArray(point)) return;
+            let group = groups.find(candidate => Math.hypot(
+                candidate.point[0] - point[0],
+                candidate.point[1] - point[1],
+                candidate.point[2] - point[2]
+            ) <= clusterDistance);
+            if (!group) {
+                group = { point: point.slice(), points: [], routeIndices: [], labels: [], tags: [] };
+                groups.push(group);
+            }
+            group.points.push(point);
+            group.routeIndices.push(routeIndex);
+            group.labels.push(route.label || `Route ${routeIndex + 1}`);
+            const tag = endpoint === 'Start' ? route.startTag : route.endTag;
+            if (tag && !group.tags.includes(tag)) group.tags.push(tag);
+            group.point = [0, 1, 2].map(coordinate => (
+                group.points.reduce((sum, candidate) => sum + Number(candidate[coordinate]), 0) / group.points.length
+            ));
+        });
+        return groups;
+    };
+
+    const viewerRaceways = () => state.finalTrays.length ? state.finalTrays : state.trayData;
+    const viewerRoutes = () => {
+        const cableMap = new Map(state.cableList.map(cable => [cable.name, cable]));
+        return (state.latestRouteData || []).map((result, index) => {
+            const cable = cableMap.get(result.cable) || {};
+            return {
+                ...result,
+                index,
+                label: result.cable || `Route ${index + 1}`,
+                segments: result.route_segments || [],
+                startPoint: cable.start,
+                endPoint: cable.end,
+                startTag: cable.start_tag,
+                endTag: cable.end_tag,
+                allowed_cable_group: cable.allowed_cable_group
+            };
+        });
+    };
+
+    const currentRouteSceneModel = () => buildRouteSceneModel({
+        raceways: viewerRaceways(),
+        ductbanks: state.ductbankData?.ductbanks || [],
+        routes: viewerRoutes()
+    });
+
+    const renderRacewayClassLegend = summary => {
+        if (!elements.racewayClassLegend) return;
+        elements.racewayClassLegend.replaceChildren();
+        Object.entries(summary?.classCounts || {}).forEach(([group, count]) => {
+            const item = document.createElement('span');
+            item.title = `${count} raceway${count === 1 ? '' : 's'} assigned to ${group === 'OPEN' ? 'the open class' : group}`;
+            const dot = document.createElement('i');
+            dot.className = 'legend-class-dot';
+            dot.style.background = summary.classColors?.[group] || '#64748b';
+            const label = document.createElement('small');
+            label.textContent = group === 'OPEN' ? 'Open class' : `${group} raceway`;
+            item.append(dot, label);
+            elements.racewayClassLegend.appendChild(item);
+        });
+    };
+
+    const updateRacewayFilterSummary = () => {
+        const summary = state.routeViewer?.getRacewayFilterSummary?.();
+        if (!summary) return;
+        if (elements.racewayFilterSummary) {
+            const selected = summary.selectedCableGroup || 'Unclassified cable';
+            elements.racewayFilterSummary.textContent = summary.mode === 'all'
+                ? `All classes · ${summary.totalCount} raceways`
+                : summary.mode.startsWith('group:')
+                    ? `${summary.mode.slice(6)} only · ${summary.visibleCount} of ${summary.totalCount}`
+                    : `${selected} compatible · ${summary.visibleCount} of ${summary.totalCount}`;
+        }
+        renderRacewayClassLegend(summary);
+    };
+
+    const syncRacewayCompatibilityFilter = cable => {
+        const cableGroup = String(cable?.allowed_cable_group || '').trim().toUpperCase();
+        const scene = currentRouteSceneModel();
+        const groups = [...new Set(scene.raceways.map(raceway => raceway.allowedGroup).filter(Boolean))].sort();
+        if (elements.racewayCompatibilityFilter) {
+            const previousValue = elements.racewayCompatibilityFilter.value || 'compatible';
+            elements.racewayCompatibilityFilter.replaceChildren();
+            const compatible = document.createElement('option');
+            compatible.value = 'compatible';
+            compatible.textContent = cableGroup ? `Compatible with ${cableGroup} cable` : 'Compatible with selected cable';
+            const all = document.createElement('option');
+            all.value = 'all';
+            all.textContent = 'All cable classes';
+            elements.racewayCompatibilityFilter.append(compatible, all);
+            groups.forEach(group => {
+                const option = document.createElement('option');
+                option.value = `group:${group}`;
+                option.textContent = `${group} raceways only`;
+                elements.racewayCompatibilityFilter.appendChild(option);
+            });
+            elements.racewayCompatibilityFilter.value = Array.from(elements.racewayCompatibilityFilter.options)
+                .some(option => option.value === previousValue)
+                ? previousValue
+                : 'compatible';
+        }
+        if (elements.routeInspectorCableClass) {
+            elements.routeInspectorCableClass.textContent = cableGroup
+                ? `Cable class · ${cableGroup}`
+                : 'Cable class · Unassigned';
+            elements.routeInspectorCableClass.title = cableGroup
+                ? `Only ${cableGroup} and open-class raceways are compatible with this cable.`
+                : 'Assign an allowed cable group to compare compatible raceways.';
+        }
+        state.routeViewer?.setSelectedCableGroup(cableGroup);
+        state.routeViewer?.setRacewayFilter(elements.racewayCompatibilityFilter?.value || 'compatible');
+        updateRacewayFilterSummary();
+    };
+
+    const renderRouteViewerList = (routes = state.latestRouteData || []) => {
+        if (!elements.routeViewerRouteList) return;
+        elements.routeViewerRouteList.replaceChildren();
+        if (elements.routeViewerRouteListCount) {
+            elements.routeViewerRouteListCount.textContent = routes.length.toLocaleString();
+        }
+        routes.forEach((route, index) => {
+            const cable = state.cableList.find(item => item.name === route.cable) || {};
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'route-viewer-route-button';
+            button.dataset.routeIndex = String(index);
+            button.classList.toggle('is-selected', index === state.selectedRouteIndex);
+            const name = document.createElement('strong');
+            name.textContent = route.cable || `Route ${index + 1}`;
+            const endpoints = document.createElement('span');
+            endpoints.textContent = [cable.start_tag, cable.end_tag].filter(Boolean).join(' → ') || 'Route endpoints';
+            const status = document.createElement('em');
+            status.textContent = isRoutedResult(route) ? 'ROUTED' : 'CHECK';
+            if (!isRoutedResult(route)) status.style.color = '#dc2626';
+            button.append(name, endpoints, status);
+            button.addEventListener('click', () => highlightCableRoute(index));
+            elements.routeViewerRouteList.appendChild(button);
+        });
+    };
+
+    const routeReviewMetrics = route => buildRouteMetrics(route, currentRouteSceneModel().raceways);
+
+    const updateRouteInspector = index => {
+        const route = state.latestRouteData[index];
+        if (!route || !elements.routeInspectorTitle) return;
+        const cable = state.cableList.find(item => item.name === route.cable) || {};
+        syncRacewayCompatibilityFilter(cable);
+        const metrics = routeReviewMetrics(route);
+        const decisionScore = buildRouteDecisionScore(route, currentRouteSceneModel().raceways);
+        const selectedLengthKpi = document.getElementById('selected-route-kpi-length');
+        const selectedContainedKpi = document.getElementById('selected-route-kpi-contained');
+        if (selectedLengthKpi) selectedLengthKpi.textContent = formatRouteDistance(metrics.total);
+        if (selectedContainedKpi) selectedContainedKpi.textContent = `${metrics.inRacewayPct.toFixed(0)}% contained`;
+        elements.routeInspectorTitle.textContent = [
+            route.cable || `Route ${index + 1}`,
+            [cable.start_tag, cable.end_tag].filter(Boolean).join(' → ')
+        ].filter(Boolean).join(' · ');
+        if (elements.routeInspectorTotal) elements.routeInspectorTotal.textContent = formatRouteDistance(metrics.total);
+        const containmentLabels = {
+            tray: 'Cable tray',
+            conduit: 'Conduit',
+            ductbank: 'Ductbank',
+            field: 'Field routing'
+        };
+        if (elements.routeInspectorBreakdown) {
+            elements.routeInspectorBreakdown.replaceChildren();
+            Object.entries(containmentLabels).forEach(([key, label]) => {
+                const item = document.createElement('span');
+                const value = document.createElement('strong');
+                value.textContent = formatRouteDistance(metrics[key]);
+                const caption = document.createElement('small');
+                caption.textContent = label;
+                item.append(value, caption);
+                elements.routeInspectorBreakdown.appendChild(item);
+            });
+        }
+        document.querySelectorAll('.route-inspector-containment-bar [data-containment]').forEach(segment => {
+            const key = segment.dataset.containment;
+            const width = metrics.total > 0 ? (metrics[key] / metrics.total) * 100 : 0;
+            segment.style.width = `${width}%`;
+            segment.title = `${containmentLabels[key]}: ${formatRouteDistance(metrics[key])}`;
+        });
+        const pullCheck = route.pull_check;
+        const pullSetupCount = Array.isArray(pullCheck?.sections) ? pullCheck.sections.length : 0;
+        const pullEquipmentCounts = pullCheck?.equipment?.counts || {};
+        const pullMetric = state.pullChecksEnabled
+            ? `<span><strong>${pullSetupCount || '—'}</strong>Pull section${pullSetupCount === 1 ? '' : 's'}</span><span><strong>${pullEquipmentCounts.reels || 0}/${pullEquipmentCounts.tuggers || 0}/${pullEquipmentCounts.handPulls || 0}/${pullEquipmentCounts.sheaves || 0}</strong>Reel / tugger / hand / sheave</span>`
+            : '';
+        if (elements.routeInspectorPullAction) {
+            elements.routeInspectorPullAction.disabled = !isRoutedResult(route);
+            elements.routeInspectorPullAction.textContent = state.pullChecksEnabled ? 'Recalculate pull plan' : 'Plan cable pull';
+            elements.routeInspectorPullAction.title = state.pullChecksEnabled && pullCheck?.directionLabel
+                ? `Selected pull direction: ${pullCheck.directionLabel}`
+                : 'Calculate pull direction, field equipment, tension, and sidewall pressure.';
+        }
+        if (elements.routeInspectorMetrics) {
+            elements.routeInspectorMetrics.innerHTML = `
+                <span class="route-score" title="Length ${decisionScore.length.toFixed(0)} · Containment ${decisionScore.containment.toFixed(0)} · Capacity ${decisionScore.capacity.toFixed(0)} · Bends ${decisionScore.bends.toFixed(0)}"><strong>${decisionScore.overall}</strong>${decisionScore.grade}</span>
+                <span><strong>${metrics.bends}</strong>Bends</span>
+                <span><strong>${metrics.maxUtilizationPct.toFixed(0)}%</strong>Max fill</span>
+                <span><strong>${metrics.racewayCount}</strong>Raceways</span>
+                <span><strong>${metrics.inRacewayPct.toFixed(0)}%</strong>Contained</span>
+                ${pullMetric}
+            `;
+        }
+        if (elements.routeInspectorRationale) {
+            const rationale = [];
+            rationale.push(`${decisionScore.grade} route score (${decisionScore.overall}/100) balances length, containment, available capacity, and bends.`);
+            rationale.push(`${metrics.inRacewayPct.toFixed(0)}% of the route stays inside mapped raceway.`);
+            if (metrics.maxUtilizationPct < 80) rationale.push('No selected raceway exceeds the 80% review threshold.');
+            else rationale.push(`The limiting raceway reaches ${metrics.maxUtilizationPct.toFixed(0)}% utilization.`);
+            if (metrics.ductbank > 0) rationale.push(`${formatRouteDistance(metrics.ductbank)} uses mapped ductbank conduit.`);
+            else if (metrics.conduit > 0) rationale.push(`${formatRouteDistance(metrics.conduit)} uses standalone conduit.`);
+            if (metrics.field > 0) rationale.push(`${formatRouteDistance(metrics.field)} remains as field routing for endpoints or network gaps.`);
+            else rationale.push('No field routing is required.');
+            if (state.pullChecksEnabled && pullCheck?.status === 'setups-required') {
+                rationale.push(`${pullSetupCount} pull sections use ${pullEquipmentCounts.reels || 0} reel, ${pullEquipmentCounts.tuggers || 0} tugger, and ${pullEquipmentCounts.handPulls || 0} hand-pull placements within the configured limits.`);
+            } else if (state.pullChecksEnabled && pullCheck?.status === 'pass') {
+                rationale.push('One continuous pull remains within the configured screening limits.');
+            } else if (state.pullChecksEnabled && pullCheck?.status === 'inputs-required') {
+                rationale.push(`Pull check needs ${pullCheck.missingInputs.join(', ')}.`);
+            }
+            if (state.pullChecksEnabled && pullCheck?.directionLabel) {
+                rationale.push(`${pullCheck.directionLabel} is the selected pull direction; ${pullCheck.equipment?.weakestLink?.label || 'the equipment chain'} governs at ${Number(pullCheck.allowableTension).toFixed(0)} lbf.`);
+            }
+            elements.routeInspectorRationale.replaceChildren();
+            rationale.slice(0, 7).forEach(text => {
+                const item = document.createElement('li');
+                item.textContent = text;
+                elements.routeInspectorRationale.appendChild(item);
+            });
+        }
+        if (elements.routeInspectorTimeline) {
+            const sequenceScene = currentRouteSceneModel();
+            const sequence = [{ label: cable.start_tag || 'Start', kind: 'endpoint' }];
+            (route.route_segments || []).forEach(segment => {
+                const containment = String(segment.containmentType || segment.containment || '').toLowerCase();
+                const racewayLabel = segment.racewayId || segment.tray_id || segment.trayId || segment.ductbankId || segment.conduitId || 'Raceway';
+                const isField = containment === 'field' || segment.isFieldRouting || /^field\b/i.test(racewayLabel);
+                const sceneRaceway = sequenceScene.racewayMap.get(String(racewayLabel));
+                const routeKind = isField
+                    ? 'field'
+                    : sceneRaceway?.kind === 'conduit' && sceneRaceway.parentId
+                        ? 'ductbank'
+                        : sceneRaceway?.kind || containment || 'raceway';
+                const label = isField ? 'Field jump' : routeKind === 'ductbank' ? sceneRaceway?.parentId || racewayLabel : racewayLabel;
+                const previous = sequence[sequence.length - 1];
+                if (previous?.label !== label) sequence.push({ label, kind: routeKind });
+            });
+            sequence.push({ label: cable.end_tag || 'End', kind: 'endpoint' });
+            const intermediates = sequence.slice(1, -1);
+            const firstIntermediate = intermediates[0];
+            const lastIntermediate = intermediates.at(-1);
+            const fieldIntermediate = intermediates.find(item => item.kind === 'field');
+            const containmentMilestones = ['ductbank', 'conduit', 'tray']
+                .map(kind => intermediates.find(item => item.kind === kind))
+                .filter(Boolean);
+            const milestoneCandidates = containmentMilestones.length >= 2
+                ? containmentMilestones
+                : [firstIntermediate, fieldIntermediate, lastIntermediate];
+            const visualIntermediates = milestoneCandidates
+                .filter((item, itemIndex, items) => item && items.findIndex(candidate => candidate?.label === item.label) === itemIndex);
+            const hiddenCount = Math.max(intermediates.length - visualIntermediates.length, 0);
+            if (hiddenCount > 0 && visualIntermediates.length < 3) {
+                visualIntermediates.splice(1, 0, { label: `+${hiddenCount} legs`, kind: 'more' });
+            }
+            const visualSequence = [sequence[0], ...visualIntermediates, sequence.at(-1)];
+            const compactSequence = visualSequence.length <= 5
+                ? visualSequence
+                : [visualSequence[0], visualSequence[1], { label: `+${intermediates.length - 2} legs`, kind: 'more' }, visualSequence.at(-2), visualSequence.at(-1)];
+            elements.routeInspectorTimeline.replaceChildren();
+            compactSequence.forEach((item, itemIndex) => {
+                if (itemIndex > 0) {
+                    const connector = document.createElement('i');
+                    connector.className = `route-timeline-link${item.kind === 'field' ? ' is-field' : ''}`;
+                    elements.routeInspectorTimeline.appendChild(connector);
+                }
+                const node = document.createElement('span');
+                node.className = `route-timeline-node is-${item.kind}`;
+                node.title = item.label;
+                const dot = document.createElement('i');
+                const text = document.createElement('small');
+                text.textContent = item.label;
+                node.append(dot, text);
+                elements.routeInspectorTimeline.appendChild(node);
+            });
+        }
+        if (elements.routeComparisonCards) {
+            elements.routeComparisonCards.replaceChildren();
+            const card = document.createElement('article');
+            card.className = 'route-comparison-card is-recommended';
+            const title = document.createElement('h4');
+            title.textContent = `Recommended · ${decisionScore.overall}`;
+            const comparisonRows = [
+                ['Length', formatRouteDistance(metrics.total), 100, 'route'],
+                ['Field routing', formatRouteDistance(metrics.field), metrics.total ? (metrics.field / metrics.total) * 100 : 0, 'field'],
+                ['Bends', String(metrics.bends), Math.min((metrics.bends / 12) * 100, 100), 'route'],
+                ['Max utilization', `${metrics.maxUtilizationPct.toFixed(0)}%`, metrics.maxUtilizationPct, 'route']
+            ];
+            card.appendChild(title);
+            comparisonRows.forEach(([label, value, width, kind]) => {
+                const row = document.createElement('div');
+                row.className = 'route-comparison-row';
+                const caption = document.createElement('span');
+                caption.textContent = label;
+                const metric = document.createElement('strong');
+                metric.textContent = value;
+                const bar = document.createElement('i');
+                bar.className = kind === 'field' ? 'is-field' : '';
+                bar.style.setProperty('--route-comparison-width', `${Math.max(3, Number(width) || 0)}%`);
+                row.append(caption, metric, bar);
+                card.appendChild(row);
+            });
+            const empty = document.createElement('div');
+            empty.className = 'route-comparison-empty';
+            const emptyTitle = document.createElement('strong');
+            emptyTitle.textContent = 'One candidate calculated';
+            const emptyText = document.createElement('span');
+            emptyText.textContent = 'Additional cards will appear when the routing engine returns scored alternative paths.';
+            empty.append(emptyTitle, emptyText);
+            elements.routeComparisonCards.append(card, empty);
+        }
+        elements.routeViewerRouteList?.querySelectorAll('[data-route-index]').forEach(button => {
+            button.classList.toggle('is-selected', Number(button.dataset.routeIndex) === index);
+        });
+    };
+
+    const ensureRouteViewer = () => {
+        if (state.routeViewer) return Promise.resolve(state.routeViewer);
+        if (state.routeViewerLoad) return state.routeViewerLoad;
+        state.routeViewerLoad = import('./dist/routeViewer3D.js?v=28').then(({ createRouteViewer3D }) => {
+            state.routeViewer = createRouteViewer3D({
+                container: elements.plot3d,
+                onSelect: selection => {
+                    if (selection.kind === 'route') highlightCableRoute(selection.routeIndex, { fromViewer: true });
+                    if (selection.kind === 'raceway') highlightTraySegment(selection.racewayId, { fromViewer: true });
+                }
+            });
+            state.routeViewer.setLayerVisibility('ductbank', state.ductbankVisible);
+            state.routeViewer.setLayerVisibility('conduit', elements.conduitToggle?.checked !== false);
+            state.routeViewer.setLayerVisibility('field', state.fieldConnectionsVisible);
+            state.routeViewer.setLayerVisibility('labels', state.labelsVisible);
+            state.routeViewer.setLayerVisibility('context', elements.contextToggle?.checked !== false);
+            state.routeViewer.setLayerVisibility('pullSetups', state.pullChecksEnabled && state.pullSetupsVisible);
+            state.routeViewer.setContextDensity(elements.contextDensitySelect?.value || 'medium');
+            state.routeViewer.setHeatmap(state.heatmapEnabled);
+            return state.routeViewer;
+        }).catch(error => {
+            state.routeViewerFailed = true;
+            state.routeViewerLoad = null;
+            console.warn('The professional 3D viewer could not be loaded; falling back to Plotly.', error);
+            throw error;
+        });
+        return state.routeViewerLoad;
+    };
+
+    const renderProfessionalViewer = (trays, routes) => {
+        if (state.selectedRouteIndex == null && routes.length) {
+            state.selectedRouteIndex = Math.max(0, state.latestRouteData.findIndex(isRoutedResult));
+        }
+        updatePlotSummary(trays, routes);
+        renderRouteViewerList(state.latestRouteData);
+        ensureRouteViewer().then(viewer => {
+            viewer.setData({
+                raceways: trays,
+                ductbanks: state.ductbankData?.ductbanks || [],
+                routes,
+                selectedRouteIndex: state.selectedRouteIndex
+            });
+            if (state.selectedRouteIndex != null) updateRouteInspector(state.selectedRouteIndex);
+            if (elements.routeSelectionStatus) {
+                elements.routeSelectionStatus.textContent = routes.length
+                    ? 'Select a cable, tray, conduit, or ductbank to inspect the route in 3D.'
+                    : 'Run routing to populate the interactive model.';
+            }
+        }).catch(error => {
+            state.routeViewerFailed = true;
+            console.warn('The 3D route model could not be rendered; falling back to Plotly.', error);
+            visualize(trays, routes, 'Optimal routes');
+        });
+    };
+
+    const visualize = (trays, routes = [], title = 'Optimal routes') => {
+        if (!state.routeViewerFailed) {
+            renderProfessionalViewer(trays, routes);
+            return;
+        }
+        if (!globalThis.Plotly || !elements.plot3d) {
             console.warn('Plotly is not loaded');
             return;
         }
         const traces = [];
+        const theme = graphTheme();
+        const view = currentViewDefinition();
+        state.ductbankTraceIndices = [];
+        state.selectedRouteIndex = null;
+        updatePlotSelectionCard();
+        updatePlotSummary(trays, routes);
 
-        const heatColor = (pct) => {
-            const p = Math.max(0, Math.min(100, pct));
-            if (p <= 50) {
-                const r = Math.round((p / 50) * 255);
-                return `rgb(${r},255,0)`;
-            } else {
-                const g = Math.round(255 - ((p - 50) / 50) * 255);
-                return `rgb(255,${g},0)`;
+        const geometryPoints = [];
+        trays.forEach(tray => {
+            geometryPoints.push(
+                [tray.start_x, tray.start_y, tray.start_z],
+                [tray.end_x, tray.end_y, tray.end_z]
+            );
+        });
+        routes.forEach(route => (route.segments || []).forEach(segment => {
+            if (Array.isArray(segment.start)) geometryPoints.push(segment.start);
+            if (Array.isArray(segment.end)) geometryPoints.push(segment.end);
+        }));
+        let facilityFloorZ = 0;
+        if (geometryPoints.length) {
+            const coordinates = index => geometryPoints.map(point => Number(point[index])).filter(Number.isFinite);
+            const xs = coordinates(0), ys = coordinates(1), zs = coordinates(2);
+            const minX = Math.min(...xs), maxX = Math.max(...xs);
+            const minY = Math.min(...ys), maxY = Math.max(...ys);
+            const minZ = Math.min(...zs);
+            const xPadding = Math.max((maxX - minX) * 0.08, 6);
+            const yPadding = Math.max((maxY - minY) * 0.08, 6);
+            const floorZ = minZ - Math.max((Math.max(...zs) - minZ) * 0.04, 2);
+            facilityFloorZ = floorZ;
+            traces.push({
+                type: 'surface',
+                x: [minX - xPadding, maxX + xPadding],
+                y: [minY - yPadding, maxY + yPadding],
+                z: [[floorZ, floorZ], [floorZ, floorZ]],
+                surfacecolor: [[0, 0], [0, 0]],
+                colorscale: [[0, theme.floor], [1, theme.floor]],
+                opacity: 0.34,
+                showscale: false,
+                hoverinfo: 'skip',
+                name: '__facility_floor__',
+                showlegend: false
+            });
+            const floorGrid = { x: [], y: [], z: [] };
+            const gridDivisions = 8;
+            for (let index = 0; index <= gridDivisions; index += 1) {
+                const x = minX - xPadding + ((maxX - minX + (2 * xPadding)) * index / gridDivisions);
+                const y = minY - yPadding + ((maxY - minY + (2 * yPadding)) * index / gridDivisions);
+                floorGrid.x.push(x, x, null, minX - xPadding, maxX + xPadding, null);
+                floorGrid.y.push(minY - yPadding, maxY + yPadding, null, y, y, null);
+                floorGrid.z.push(floorZ, floorZ, null, floorZ, floorZ, null);
             }
-        };
+            traces.push({
+                ...floorGrid,
+                type: 'scatter3d', mode: 'lines',
+                line: { color: theme.axis, width: 1 }, opacity: 0.24,
+                hoverinfo: 'skip', showlegend: false, name: '__facility_grid__'
+            });
+        }
 
-        const meshForSegment = (s, e, tray) => {
-            const w = tray.width / 12;
-            const h = tray.height / 12;
-            const sx = s[0], sy = s[1], sz = s[2];
-            const ex = e[0], ey = e[1], ez = e[2];
-            let verts;
+        const meshForSegment = (start, end, tray) => {
+            const actualWidth = (Number(tray.width) || 6) / 12;
+            const actualHeight = (Number(tray.height) || 4) / 12;
+            const width = Math.max(actualWidth, 1.25);
+            const height = Math.max(actualHeight, 0.65);
+            const [sx, sy, sz] = start;
+            const [ex, ey, ez] = end;
+            let vertices;
             if (sx !== ex) {
-                const y1 = sy - w / 2, y2 = sy + w / 2;
-                const z1 = sz - h / 2, z2 = sz + h / 2;
-                verts = [[sx,y1,z1],[sx,y2,z1],[sx,y2,z2],[sx,y1,z2],[ex,y1,z1],[ex,y2,z1],[ex,y2,z2],[ex,y1,z2]];
+                const y1 = sy - width / 2, y2 = sy + width / 2;
+                const z1 = sz - height / 2, z2 = sz + height / 2;
+                vertices = [[sx,y1,z1],[sx,y2,z1],[sx,y2,z2],[sx,y1,z2],[ex,y1,z1],[ex,y2,z1],[ex,y2,z2],[ex,y1,z2]];
             } else if (sy !== ey) {
-                const x1 = sx - w / 2, x2 = sx + w / 2;
-                const z1 = sz - h / 2, z2 = sz + h / 2;
-                verts = [[x1,sy,z1],[x2,sy,z1],[x2,sy,z2],[x1,sy,z2],[x1,ey,z1],[x2,ey,z1],[x2,ey,z2],[x1,ey,z2]];
+                const x1 = sx - width / 2, x2 = sx + width / 2;
+                const z1 = sz - height / 2, z2 = sz + height / 2;
+                vertices = [[x1,sy,z1],[x2,sy,z1],[x2,sy,z2],[x1,sy,z2],[x1,ey,z1],[x2,ey,z1],[x2,ey,z2],[x1,ey,z2]];
             } else {
-                const x1 = sx - w / 2, x2 = sx + w / 2;
-                const y1 = sy - h / 2, y2 = sy + h / 2;
-                verts = [[x1,y1,sz],[x2,y1,sz],[x2,y2,sz],[x1,y2,sz],[x1,y1,ez],[x2,y1,ez],[x2,y2,ez],[x1,y2,ez]];
+                const x1 = sx - width / 2, x2 = sx + width / 2;
+                const y1 = sy - height / 2, y2 = sy + height / 2;
+                vertices = [[x1,y1,sz],[x2,y1,sz],[x2,y2,sz],[x1,y2,sz],[x1,y1,ez],[x2,y1,ez],[x2,y2,ez],[x1,y2,ez]];
             }
-            const x = verts.map(v => v[0]);
-            const y = verts.map(v => v[1]);
-            const z = verts.map(v => v[2]);
-            const i = [0,0,4,4,3,3,0,0,0,0,1,1];
-            const j = [1,2,5,6,2,6,1,5,3,7,2,6];
-            const k = [2,3,6,7,6,7,5,4,7,4,6,5];
-            let color;
-            if (state.heatmapEnabled && tray.maxFill) {
-                const totalFill = Array.isArray(tray.slotFills)
-                    ? tray.slotFills.reduce((a, b) => a + b, 0)
-                    : (tray.current_fill || 0);
-                const totalMax = tray.maxFill * (tray.numSlots || 1);
-                const pct = totalMax ? (totalFill / totalMax) * 100 : 0;
-                color = heatColor(pct);
-            } else {
-                color = tray.raceway_type === 'conduit'
-                    ? 'black'
-                    : tray.raceway_type === 'ductbank'
-                        ? 'saddlebrown'
-                        : SHAPE_COLORS[tray.shape] || 'lightgrey';
-            }
-            const typeText = tray.raceway_type || tray.shape || 'STR';
-            const text = `${tray.tray_id} (${typeText})`;
-            return {type:'mesh3d', x, y, z, i, j, k, opacity: state.heatmapEnabled ? 0.8 : 0.3, color, name: tray.tray_id, hoverinfo:'text', text:[text]};
+            const racewayType = tray.raceway_type || 'tray';
+            const utilization = utilizationForTray(tray);
+            const color = state.heatmapEnabled
+                ? heatColor(utilization)
+                : racewayType === 'ductbank'
+                    ? ROUTE_COLORS.ductbank
+                    : racewayType === 'conduit'
+                        ? ROUTE_COLORS.conduit
+                        : ROUTE_COLORS.raceway;
+            return {
+                type: 'mesh3d',
+                x: vertices.map(vertex => vertex[0]),
+                y: vertices.map(vertex => vertex[1]),
+                z: vertices.map(vertex => vertex[2]),
+                i: [0,0,4,4,3,3,0,0,0,0,1,1],
+                j: [1,2,5,6,2,6,1,5,3,7,2,6],
+                k: [2,3,6,7,6,7,5,4,7,4,6,5],
+                color,
+                opacity: state.heatmapEnabled ? 0.8 : 0.42,
+                flatshading: true,
+                lighting: { ambient: 0.8, diffuse: 0.55, specular: 0.05, roughness: 0.9 },
+                name: tray.tray_id,
+                meta: { kind: 'raceway', trayId: tray.tray_id },
+                customdata: [[racewayType, tray.width, tray.height, utilization]],
+                hovertemplate: `<b>${tray.tray_id}</b><br>${racewayType}<br>${tray.width || '—'} in × ${tray.height || '—'} in<br>Utilization: ${utilization.toFixed(1)}%<extra></extra>`,
+                visible: racewayType === 'ductbank' ? state.ductbankVisible : true,
+                showlegend: false
+            };
         };
-
-        const trayMesh = (tray) => {
+        const traySegments = tray => {
             const start = [tray.start_x, tray.start_y, tray.start_z];
             const end = [tray.end_x, tray.end_y, tray.end_z];
             const segments = [];
-            let cur = start.slice();
-            if (cur[0] !== end[0]) { const n=[end[0],cur[1],cur[2]]; segments.push([cur,n]); cur=n; }
-            if (cur[1] !== end[1]) { const n=[cur[0],end[1],cur[2]]; segments.push([cur,n]); cur=n; }
-            if (cur[2] !== end[2]) { const n=[cur[0],cur[1],end[2]]; segments.push([cur,n]); cur=n; }
-            if (segments.length === 0) segments.push([start,end]);
-            return segments.map(seg => meshForSegment(seg[0], seg[1], tray));
+            let current = start.slice();
+            if (current[0] !== end[0]) { const next = [end[0], current[1], current[2]]; segments.push([current, next]); current = next; }
+            if (current[1] !== end[1]) { const next = [current[0], end[1], current[2]]; segments.push([current, next]); current = next; }
+            if (current[2] !== end[2]) { const next = [current[0], current[1], end[2]]; segments.push([current, next]); current = next; }
+            if (segments.length === 0) segments.push([start, end]);
+            return segments;
         };
 
-        // Combine all tray ID labels into one trace for much faster rendering
         const labelX = [], labelY = [], labelZ = [], labelText = [];
         trays.forEach(tray => {
-            trayMesh(tray).forEach(t => traces.push(t));
+            const segments = traySegments(tray);
+            segments.map(segment => meshForSegment(segment[0], segment[1], tray)).forEach(trace => {
+                const traceIndex = traces.length;
+                traces.push(trace);
+                if (tray.raceway_type === 'ductbank') state.ductbankTraceIndices.push(traceIndex);
+            });
+            const centerline = { x: [], y: [], z: [] };
+            segments.forEach(segment => {
+                centerline.x.push(segment[0][0], segment[1][0], null);
+                centerline.y.push(segment[0][1], segment[1][1], null);
+                centerline.z.push(segment[0][2], segment[1][2], null);
+            });
+            const racewayType = tray.raceway_type || 'tray';
+            const centerlineIndex = traces.length;
+            traces.push({
+                ...centerline,
+                type: 'scatter3d', mode: 'lines',
+                line: {
+                    color: racewayType === 'ductbank' ? '#795234' : racewayType === 'conduit' ? '#1e293b' : '#475569',
+                    width: racewayType === 'ductbank' ? 7 : 5
+                },
+                opacity: state.heatmapEnabled ? 0.45 : 0.62,
+                name: tray.tray_id,
+                meta: { kind: 'raceway', trayId: tray.tray_id },
+                hovertemplate: `<b>${tray.tray_id}</b><br>${racewayType}<br>Click to inspect<extra></extra>`,
+                visible: racewayType === 'ductbank' ? state.ductbankVisible : true,
+                showlegend: false
+            });
+            if (racewayType === 'ductbank') state.ductbankTraceIndices.push(centerlineIndex);
             labelX.push((tray.start_x + tray.end_x) / 2);
             labelY.push((tray.start_y + tray.end_y) / 2);
-            labelZ.push((tray.start_z + tray.end_z) / 2 + (tray.height / 12) / 2 + 0.5);
+            labelZ.push((tray.start_z + tray.end_z) / 2 + 0.75);
             labelText.push(tray.tray_id);
         });
-        if (labelX.length > 0) {
-            traces.push({type:'scatter3d', mode:'text', x:labelX, y:labelY, z:labelZ, text:labelText, showlegend:false, hoverinfo:'none'});
+        if (state.labelsVisible && labelX.length) {
+            traces.push({
+                type: 'scatter3d', mode: 'text', x: labelX, y: labelY, z: labelZ,
+                text: labelText, textfont: { size: 10, color: theme.text },
+                showlegend: false, hoverinfo: 'skip', meta: { kind: 'labels' }
+            });
         }
 
-        if (routes && routes.length > 0) {
-            // Sort routes alphanumerically by label so the legend order is predictable
-            routes = routes.slice().sort((a, b) => {
-                const la = a.label || '';
-                const lb = b.label || '';
-                return la.localeCompare(lb, undefined, { numeric: true, sensitivity: 'base' });
+        const aggregatedSegments = aggregateRouteSegments(routes);
+        aggregatedSegments.filter(segment => segment.type === 'tray').forEach(segment => {
+            const cableCount = segment.routeIndices.length;
+            const corridorWidth = 4 + Math.min(9, Math.log2(cableCount + 1) * 2.4);
+            const corridorColor = cableCount >= 12
+                ? '#1d4ed8'
+                : cableCount >= 5
+                    ? '#2563eb'
+                    : '#3b82f6';
+            const cablePreview = segment.cableLabels.slice(0, 5).join(', ');
+            const moreCables = Math.max(0, cableCount - 5);
+            const racewayText = segment.racewayIds.length ? `<br>Raceway: ${segment.racewayIds.join(', ')}` : '';
+            const hover = `<b>${cableCount} cable${cableCount === 1 ? '' : 's'} in this corridor</b>${racewayText}<br>${cablePreview}${moreCables ? ` +${moreCables} more` : ''}<extra>Click to inspect corridor</extra>`;
+            const linePoints = {
+                x: [segment.start[0], segment.end[0]],
+                y: [segment.start[1], segment.end[1]],
+                z: [segment.start[2], segment.end[2]]
+            };
+            traces.push({
+                ...linePoints, type: 'scatter3d', mode: 'lines',
+                line: { color: document.body.classList.contains('dark-mode') ? '#020617' : '#ffffff', width: corridorWidth + 5 },
+                opacity: 0.9, hoverinfo: 'skip', showlegend: false, name: '__corridor_halo__'
             });
-
-            const palette = ['blue', 'green', 'orange', 'purple', 'brown', 'cyan', 'magenta', 'olive'];
-            const seenTags = new Set();
-
-            routes.forEach((route, idx) => {
-                const color = palette[idx % palette.length];
-                const label = route.label || `Route ${idx+1}`;
-
-                // Placeholder trace to show legend entry without drawing a line
+            traces.push({
+                ...linePoints, type: 'scatter3d', mode: 'lines',
+                line: { color: corridorColor, width: corridorWidth },
+                opacity: 0.96,
+                name: `${cableCount} cable corridor`,
+                showlegend: false,
+                hovertemplate: hover,
+                meta: {
+                    kind: 'route-corridor',
+                    start: segment.start,
+                    end: segment.end,
+                    routeIndices: segment.routeIndices,
+                    cableLabels: segment.cableLabels,
+                    racewayIds: segment.racewayIds
+                }
+            });
+        });
+        if (state.fieldConnectionsVisible) {
+            aggregatedSegments.filter(segment => segment.type === 'field').forEach(segment => {
+                const cableCount = segment.routeIndices.length;
                 traces.push({
-                    x: [null], y: [null], z: [null],
-                    mode: 'lines', type: 'scatter3d',
-                    name: label, legendgroup: label, showlegend: true,
-                    line: { color, width: 5 }, hoverinfo: 'skip'
-                });
-
-                // Consolidate all tray segments into one trace and all field segments into
-                // another using null separators. This dramatically reduces trace count
-                // (from one trace per segment to two traces per route) for faster rendering.
-                const trayXs = [], trayYs = [], trayZs = [];
-                const fieldXs = [], fieldYs = [], fieldZs = [];
-                route.segments.forEach(seg => {
-                    const xs = seg.type === 'tray' ? trayXs : fieldXs;
-                    const ys = seg.type === 'tray' ? trayYs : fieldYs;
-                    const zs = seg.type === 'tray' ? trayZs : fieldZs;
-                    xs.push(seg.start[0], seg.end[0], null);
-                    ys.push(seg.start[1], seg.end[1], null);
-                    zs.push(seg.start[2], seg.end[2], null);
-                });
-                if (trayXs.length > 0) {
-                    traces.push({
-                        x: trayXs, y: trayYs, z: trayZs,
-                        mode: 'lines', type: 'scatter3d',
-                        name: label, legendgroup: label, showlegend: false,
-                        line: { color, width: 5 }, hoverinfo: 'skip'
-                    });
-                }
-                if (fieldXs.length > 0) {
-                    traces.push({
-                        x: fieldXs, y: fieldYs, z: fieldZs,
-                        mode: 'lines', type: 'scatter3d',
-                        name: label, legendgroup: label, showlegend: false,
-                        line: { color: 'red', width: 3, dash: 'dash' }, hoverinfo: 'skip'
-                    });
-                }
-
-                if (route.startPoint && route.endPoint) {
-                    traces.push({
-                        x: [route.startPoint[0]], y: [route.startPoint[1]], z: [route.startPoint[2]],
-                        mode: 'markers', type: 'scatter3d', showlegend: false,
-                        marker: { color: 'green', size: 8 }
-                    });
-                    traces.push({
-                        x: [route.endPoint[0]], y: [route.endPoint[1]], z: [route.endPoint[2]],
-                        mode: 'markers', type: 'scatter3d', showlegend: false,
-                        marker: { color: 'purple', size: 8 }
-                    });
-                    if (route.startTag && !seenTags.has(`s-${route.startTag}`)) {
-                        traces.push({type:'scatter3d', mode:'text', x:[route.startPoint[0]], y:[route.startPoint[1]], z:[route.startPoint[2]], text:[route.startTag], showlegend:false, hoverinfo:'none'});
-                        seenTags.add(`s-${route.startTag}`);
+                    x: [segment.start[0], segment.end[0]],
+                    y: [segment.start[1], segment.end[1]],
+                    z: [segment.start[2], segment.end[2]],
+                    type: 'scatter3d', mode: 'lines',
+                    line: { color: ROUTE_COLORS.field, width: 2 + Math.min(4, Math.sqrt(cableCount)), dash: 'dash' },
+                    opacity: 0.58,
+                    name: `${cableCount} cable field jump`,
+                    showlegend: false,
+                    hovertemplate: `<b>Field jump</b><br>${cableCount} cable${cableCount === 1 ? '' : 's'}<extra>Click to inspect</extra>`,
+                    meta: {
+                        kind: 'route-corridor',
+                        start: segment.start,
+                        end: segment.end,
+                        routeIndices: segment.routeIndices,
+                        cableLabels: segment.cableLabels,
+                        racewayIds: []
                     }
-                    if (route.endTag && !seenTags.has(`e-${route.endTag}`)) {
-                        traces.push({type:'scatter3d', mode:'text', x:[route.endPoint[0]], y:[route.endPoint[1]], z:[route.endPoint[2]], text:[route.endTag], showlegend:false, hoverinfo:'none'});
-                        seenTags.add(`e-${route.endTag}`);
-                    }
-                }
+                });
             });
+        }
+
+        const endpointTrace = (groups, color, endpoint) => ({
+            type: 'scatter3d', mode: state.labelsVisible ? 'markers+text' : 'markers',
+            x: groups.map(group => group.point[0]),
+            y: groups.map(group => group.point[1]),
+            z: groups.map(group => group.point[2]),
+            text: groups.map(group => group.tags.join(', ') || `${group.labels.length} ${endpoint.toLowerCase()}`),
+            textposition: 'top center',
+            textfont: { size: 10, color: theme.text },
+            marker: {
+                color,
+                size: groups.map(group => 7 + Math.min(6, Math.log2(group.routeIndices.length + 1) * 2)),
+                symbol: endpoint === 'Start' ? 'circle' : 'diamond',
+                opacity: 0.9,
+                line: { color: theme.hover, width: 2 }
+            },
+            customdata: groups.map(group => [group.routeIndices, group.routeIndices.length, group.labels.join(', ')]),
+            meta: { kind: 'route-endpoint-cluster', endpoint },
+            hovertemplate: `<b>%{text}</b><br>%{customdata[1]} cable${endpoint === 'Start' ? ' start' : ' end'}<br>%{customdata[2]}<extra>Click to inspect</extra>`,
+            showlegend: false
+        });
+        const startGroups = groupRouteEndpoints(routes, 'Start');
+        const endGroups = groupRouteEndpoints(routes, 'End');
+        const endpointStemTrace = (groups, color) => {
+            const stemPoints = { x: [], y: [], z: [] };
+            groups.forEach(group => {
+                stemPoints.x.push(group.point[0], group.point[0], null);
+                stemPoints.y.push(group.point[1], group.point[1], null);
+                stemPoints.z.push(facilityFloorZ, group.point[2], null);
+            });
+            return {
+                ...stemPoints, type: 'scatter3d', mode: 'lines',
+                line: { color, width: 2 }, opacity: 0.28,
+                hoverinfo: 'skip', showlegend: false, name: '__endpoint_stems__'
+            };
+        };
+        if (startGroups.length) {
+            traces.push(endpointStemTrace(startGroups, ROUTE_COLORS.start));
+            traces.push(endpointTrace(startGroups, ROUTE_COLORS.start, 'Start'));
+        }
+        if (endGroups.length) {
+            traces.push(endpointStemTrace(endGroups, ROUTE_COLORS.end));
+            traces.push(endpointTrace(endGroups, ROUTE_COLORS.end, 'End'));
         }
 
         if (state.heatmapEnabled) {
             traces.push({
-                x: [0], y: [0], z: [0],
-                mode: 'markers', type: 'scatter3d', showlegend: false, hoverinfo: 'none',
+                type: 'scatter3d', mode: 'markers', x: [null], y: [null], z: [null],
                 marker: {
-                    size: 0,
-                    color: [0],
-                    cmin: 0,
-                    cmax: 100,
-                    colorscale: [[0, 'green'], [0.5, 'yellow'], [1, 'red']],
-                    colorbar: { title: 'Fill %' },
+                    size: 0, color: [0], cmin: 0, cmax: 100,
+                    colorscale: [[0, '#14b8a6'], [0.5, '#f59e0b'], [1, '#ef4444']],
+                    colorbar: { title: { text: 'Fill %', side: 'right' }, thickness: 12, len: 0.55, x: 0.99 }
                 },
+                hoverinfo: 'skip', showlegend: false
             });
         }
 
-        // ductbank and conduit geometries are rendered as tray segments now
-
-    const layout = {
-        title: title,
-        scene: { aspectmode: 'data' },
-        legend: { x: 1, y: 0, xanchor: 'right', yanchor: 'bottom' },
-        autosize: true,
-        margin: { l: 0, r: 0, t: 0, b: 0 }
-    };
-    Plotly.newPlot(elements.plot3d, traces, layout, {responsive: true});
-    window.current3DPlot = { traces: traces, layout: layout };
-    // structuredClone is faster than JSON.parse(JSON.stringify()) for deep copies
-    window.base3DPlot = {
-        traces: structuredClone(traces),
-        layout: structuredClone(layout)
-    };
+        const axis = titleText => ({
+            title: { text: titleText, font: { size: 11 } },
+            showbackground: false,
+            showgrid: true,
+            gridcolor: theme.grid,
+            zeroline: false,
+            showline: true,
+            linecolor: theme.axis,
+            ticks: '',
+            color: theme.text,
+            showspikes: false
+        });
+        const layout = {
+            title: { text: '' },
+            autosize: true,
+            showlegend: false,
+            paper_bgcolor: 'rgba(0,0,0,0)',
+            plot_bgcolor: 'rgba(0,0,0,0)',
+            font: { family: 'Inter, ui-sans-serif, system-ui, sans-serif', color: theme.text },
+            hoverlabel: { bgcolor: theme.hover, bordercolor: theme.axis, font: { color: theme.text } },
+            margin: { l: 0, r: state.heatmapEnabled ? 54 : 0, t: 0, b: 0 },
+            scene: {
+                aspectmode: 'data',
+                bgcolor: theme.surface,
+                camera: { ...structuredClone(view.camera), projection: { type: view.projection } },
+                xaxis: axis('X'),
+                yaxis: axis('Y'),
+                zaxis: axis('Elevation')
+            },
+            uirevision: `optimal-route-${title}`
+        };
+        const render = elements.plot3d.data ? Plotly.react : Plotly.newPlot;
+        Promise.resolve(render(elements.plot3d, traces, layout, plotConfig)).then(() => {
+            if (!elements.plot3d.dataset.routePlotBound) {
+                elements.plot3d.on('plotly_click', event => {
+                    const point = event?.points?.[0];
+                    const kind = point?.data?.meta?.kind;
+                    if (kind === 'route') highlightCableRoute(Number(point.data.meta.routeIndex));
+                    if (kind === 'route-corridor') highlightRouteCorridor(point.data.meta);
+                    if (kind === 'route-endpoint-cluster') {
+                        const routeIndices = Array.isArray(point.customdata?.[0]) ? point.customdata[0] : [];
+                        if (routeIndices.length === 1) {
+                            highlightCableRoute(Number(routeIndices[0]));
+                        } else {
+                            highlightEndpointCluster({
+                                endpoint: point.data.meta.endpoint,
+                                point: [point.x, point.y, point.z],
+                                routeIndices,
+                                cableLabels: String(point.customdata?.[2] || '').split(', ').filter(Boolean)
+                            });
+                        }
+                    }
+                    if (kind === 'raceway') highlightTraySegment(point.data.meta.trayId);
+                });
+                elements.plot3d.dataset.routePlotBound = 'true';
+            }
+        });
+        window.current3DPlot = { traces, layout };
+        window.base3DPlot = { traces: structuredClone(traces), layout: structuredClone(layout) };
+        if (elements.routeSelectionStatus) {
+            elements.routeSelectionStatus.textContent = routes.length
+                ? 'Corridor width shows cable density. Click a corridor, equipment node, or raceway to inspect it.'
+                : 'Run routing to populate the interactive model.';
+        }
     };
 
     const update3DPlot = () => {
         const trays = state.finalTrays.length ? state.finalTrays : state.trayData;
-        let routes = [];
-        if (state.latestRouteData && state.latestRouteData.length) {
-            routes = state.latestRouteData.map(r => ({
-                label: r.cable,
-                segments: r.route_segments
-            }));
-        }
-        visualize(trays, routes, '3D View');
-        applyViewMode();
+        const cableMap = new Map(state.cableList.map(cable => [cable.name, cable]));
+        const routes = (state.latestRouteData || []).map(result => {
+            const cable = cableMap.get(result.cable) || {};
+            return {
+                label: result.cable,
+                segments: result.route_segments || [],
+                startPoint: cable.start,
+                endPoint: cable.end,
+                startTag: cable.start_tag,
+                endTag: cable.end_tag,
+                allowed_cable_group: cable.allowed_cable_group,
+                pull_check: result.pull_check
+            };
+        });
+        visualize(trays, routes, 'Optimal routes');
     };
 
-    const highlightSharedRoute = (idx) => {
-        if (!globalThis.Plotly) {
-            console.warn('Plotly is not loaded');
+    const focusPlotOnPoints = points => {
+        if (!points.length) return;
+        const rangeFor = coordinate => {
+            const values = points.map(point => Number(point[coordinate])).filter(Number.isFinite);
+            const min = Math.min(...values);
+            const max = Math.max(...values);
+            const padding = Math.max((max - min) * 0.18, 4);
+            return [min - padding, max + padding];
+        };
+        const ranges = {
+            'scene.xaxis.range': rangeFor(0),
+            'scene.yaxis.range': rangeFor(1),
+            'scene.zaxis.range': rangeFor(2)
+        };
+        Plotly.relayout(elements.plot3d, ranges);
+        Object.assign(window.current3DPlot.layout.scene.xaxis, { range: ranges['scene.xaxis.range'] });
+        Object.assign(window.current3DPlot.layout.scene.yaxis, { range: ranges['scene.yaxis.range'] });
+        Object.assign(window.current3DPlot.layout.scene.zaxis, { range: ranges['scene.zaxis.range'] });
+    };
+
+    const highlightRouteCorridor = async corridor => {
+        const routeIndices = Array.isArray(corridor?.routeIndices) ? corridor.routeIndices : [];
+        if (routeIndices.length === 1) {
+            await highlightCableRoute(Number(routeIndices[0]));
             return;
         }
-        if (!window.current3DPlot || !state.sharedFieldRoutes[idx]) return;
+        if (!corridor?.start || !corridor?.end) return;
+        await restoreBasePlot(false);
+        state.selectedRouteIndex = null;
+        const cableLabels = Array.isArray(corridor.cableLabels) ? corridor.cableLabels : [];
+        const racewayIds = Array.isArray(corridor.racewayIds) ? corridor.racewayIds : [];
+        const trace = {
+            x: [corridor.start[0], corridor.end[0]],
+            y: [corridor.start[1], corridor.end[1]],
+            z: [corridor.start[2], corridor.end[2]],
+            type: 'scatter3d', mode: 'lines',
+            line: { color: ROUTE_COLORS.selected, width: 15 },
+            showlegend: false,
+            hovertemplate: `<b>${routeIndices.length} cable corridor</b><extra>Selected corridor</extra>`
+        };
+        await Plotly.addTraces(elements.plot3d, [trace]);
+        window.current3DPlot.traces.push(trace);
+        focusPlotOnPoints([corridor.start, corridor.end]);
+        updatePlotSelectionCard({
+            kicker: 'Shared route corridor',
+            name: `${routeIndices.length} cables`,
+            detail: `${racewayIds.length ? `${racewayIds.join(', ')} · ` : ''}${cableLabels.slice(0, 4).join(', ')}${cableLabels.length > 4 ? ` +${cableLabels.length - 4} more` : ''}`
+        });
+        if (elements.routeSelectionStatus) {
+            elements.routeSelectionStatus.textContent = `${routeIndices.length} cables share the selected corridor.`;
+        }
+    };
+
+    const highlightEndpointCluster = async cluster => {
+        if (!cluster?.point) return;
+        await restoreBasePlot(false);
+        state.selectedRouteIndex = null;
+        const cableCount = cluster.routeIndices?.length || 0;
+        const trace = {
+            x: [cluster.point[0]], y: [cluster.point[1]], z: [cluster.point[2]],
+            type: 'scatter3d', mode: 'markers',
+            marker: {
+                color: cluster.endpoint === 'Start' ? ROUTE_COLORS.start : ROUTE_COLORS.end,
+                size: 16,
+                symbol: cluster.endpoint === 'Start' ? 'circle' : 'diamond',
+                line: { color: '#ffffff', width: 3 }
+            },
+            showlegend: false,
+            hovertemplate: `<b>${cableCount} cable ${String(cluster.endpoint || '').toLowerCase()}s</b><extra>Selected equipment node</extra>`
+        };
+        await Plotly.addTraces(elements.plot3d, [trace]);
+        window.current3DPlot.traces.push(trace);
+        focusPlotOnPoints([cluster.point]);
+        updatePlotSelectionCard({
+            kicker: `${cluster.endpoint || 'Route'} equipment node`,
+            name: `${cableCount} cables`,
+            detail: `${(cluster.cableLabels || []).slice(0, 5).join(', ')}${cluster.cableLabels?.length > 5 ? ` +${cluster.cableLabels.length - 5} more` : ''}`
+        });
+        if (elements.routeSelectionStatus) {
+            elements.routeSelectionStatus.textContent = `${cableCount} cables share the selected ${String(cluster.endpoint || 'route').toLowerCase()} point.`;
+        }
+    };
+
+    const highlightSharedRoute = async idx => {
+        if (!globalThis.Plotly || !window.current3DPlot || !state.sharedFieldRoutes[idx]) return;
         const route = state.sharedFieldRoutes[idx];
-        let traces = window.current3DPlot.traces.filter(t => t.name !== '__shared_highlight__');
-        traces.push({
+        await restoreBasePlot(false);
+        const trace = {
             x: [route.start[0], route.end[0]],
             y: [route.start[1], route.end[1]],
             z: [route.start[2], route.end[2]],
             mode: 'lines', type: 'scatter3d',
-            line: { color: 'hotpink', width: 15 },
-            name: '__shared_highlight__', showlegend: false
+            line: { color: '#ec4899', width: 12 },
+            name: '__shared_highlight__', showlegend: false,
+            hovertemplate: '<b>Shared field connection</b><extra></extra>'
+        };
+        await Plotly.addTraces(elements.plot3d, [trace]);
+        window.current3DPlot.traces.push(trace);
+        focusPlotOnPoints([route.start, route.end]);
+        updatePlotSelectionCard({
+            kicker: 'Shared field connection',
+            name: route.label || `Connection ${idx + 1}`,
+            detail: `${formatRouteDistance(route.length)} shared run`
         });
-        const layout = window.current3DPlot.layout;
-        const cx = (route.start[0] + route.end[0]) / 2;
-        const cy = (route.start[1] + route.end[1]) / 2;
-        const cz = (route.start[2] + route.end[2]) / 2;
-
-        const xr = layout.scene.xaxis ? layout.scene.xaxis.range : undefined;
-        const yr = layout.scene.yaxis ? layout.scene.yaxis.range : undefined;
-        const zr = layout.scene.zaxis ? layout.scene.zaxis.range : undefined;
-
-        const def = (a, b) => (Array.isArray(a) && a[0] != null && a[1] != null) ? a : b;
-
-        const dx = Math.abs(route.start[0] - route.end[0]);
-        const dy = Math.abs(route.start[1] - route.end[1]);
-        const dz = Math.abs(route.start[2] - route.end[2]);
-
-        const defaultX = [cx - Math.max(dx * 2, 10), cx + Math.max(dx * 2, 10)];
-        const defaultY = [cy - Math.max(dy * 2, 10), cy + Math.max(dy * 2, 10)];
-        const defaultZ = [cz - Math.max(dz * 2, 10), cz + Math.max(dz * 2, 10)];
-
-        const xrFinal = def(xr, defaultX);
-        const yrFinal = def(yr, defaultY);
-        const zrFinal = def(zr, defaultZ);
-
-        const xw = xrFinal[1] - xrFinal[0];
-        const yw = yrFinal[1] - yrFinal[0];
-        const zw = zrFinal[1] - zrFinal[0];
-
-        layout.scene.xaxis = layout.scene.xaxis || {};
-        layout.scene.yaxis = layout.scene.yaxis || {};
-        layout.scene.zaxis = layout.scene.zaxis || {};
-        layout.scene.xaxis.range = [cx - xw / 2, cx + xw / 2];
-        layout.scene.yaxis.range = [cy - yw / 2, cy + yw / 2];
-        layout.scene.zaxis.range = [cz - zw / 2, cz + zw / 2];
-
-        Plotly.react(elements.plot3d, traces, layout);
-        window.current3DPlot.traces = traces;
-        window.current3DPlot.layout = layout;
     };
 
     const updateDuctbankVisibility = (visible) => {
+        if (state.routeViewer) {
+            state.ductbankVisible = Boolean(visible);
+            state.routeViewer.setLayerVisibility('ductbank', visible);
+            return;
+        }
         if (!globalThis.Plotly) {
             console.warn('Plotly is not loaded');
             state.ductbankVisible = visible;
@@ -4719,7 +5950,7 @@ const renderBatchResults = (results) => {
             state.ductbankVisible = visible;
             return;
         }
-        const vis = visible ? true : false;
+        const vis = Boolean(visible);
         Plotly.restyle(elements.plot3d, { visible: vis }, state.ductbankTraceIndices);
         state.ductbankVisible = visible;
         state.ductbankTraceIndices.forEach(i => {
@@ -4729,150 +5960,263 @@ const renderBatchResults = (results) => {
         });
     };
 
-    const reset3DView = () => {
-        if (!globalThis.Plotly) {
-            console.warn('Plotly is not loaded');
-            return;
-        }
-        if (!window.base3DPlot) return;
+    const restoreBasePlot = async (clearSelection = true) => {
+        if (!globalThis.Plotly || !window.base3DPlot) return;
         const traces = structuredClone(window.base3DPlot.traces);
         const layout = structuredClone(window.base3DPlot.layout);
-        Plotly.react(elements.plot3d, traces, layout);
+        await Plotly.react(elements.plot3d, traces, layout, plotConfig);
         window.current3DPlot = { traces, layout };
         updateDuctbankVisibility(state.ductbankVisible);
-        applyViewMode();
+        if (clearSelection) {
+            state.selectedRouteIndex = null;
+            elements.routeBreakdownContainer?.querySelectorAll('[data-route-index]').forEach(row => row.classList.remove('is-selected'));
+            elements.updatedUtilizationContainer?.querySelectorAll('tbody tr').forEach(row => row.classList.remove('is-selected'));
+            updatePlotSelectionCard();
+            if (elements.routeSelectionStatus) {
+                elements.routeSelectionStatus.textContent = 'Corridor width shows cable density. Click a corridor, equipment node, or raceway to inspect it.';
+            }
+        }
     };
 
-    const highlightCableRoute = (idx) => {
-        if (!globalThis.Plotly) {
-            console.warn('Plotly is not loaded');
+    const reset3DView = () => {
+        if (state.routeViewer) {
+            state.routeViewer.fitAll();
             return;
         }
+        restoreBasePlot(true);
+    };
+
+    const highlightCableRoute = async (idx, { fromViewer = false } = {}) => {
+        if (state.routeViewer && state.latestRouteData[idx]) {
+            state.selectedRouteIndex = idx;
+            const route = state.latestRouteData[idx];
+            elements.routeBreakdownContainer?.querySelectorAll('[data-route-index]').forEach(row => {
+                row.classList.toggle('is-selected', Number(row.dataset.routeIndex) === idx);
+            });
+            renderRouteViewerList(state.latestRouteData);
+            updateRouteInspector(idx);
+            renderPullChecks(state.latestRouteData);
+            const metrics = routeReviewMetrics(route);
+            updatePlotSelectionCard({
+                kicker: 'Selected route',
+                name: route.cable,
+                detail: `${formatRouteDistance(metrics.total)} total · ${formatRouteDistance(metrics.field)} field · ${metrics.racewayCount} raceways`
+            });
+            if (elements.routeSelectionStatus) {
+                elements.routeSelectionStatus.textContent = `${route.cable} is selected. Orbit the model or choose Fit all to review the network.`;
+            }
+            if (!fromViewer) state.routeViewer.selectRoute(idx, { focus: true, emit: false });
+            return;
+        }
+        if (!globalThis.Plotly) return;
         if (!state.latestRouteData[idx]) return;
-        reset3DView();
+        await restoreBasePlot(false);
+        state.selectedRouteIndex = idx;
         const route = state.latestRouteData[idx];
         elements.routeBreakdownContainer?.querySelectorAll('[data-route-index]').forEach(row => {
             row.classList.toggle('is-selected', Number(row.dataset.routeIndex) === idx);
         });
         if (elements.routeSelectionStatus) {
-            elements.routeSelectionStatus.textContent = `Highlighted route: ${route.cable}`;
+            elements.routeSelectionStatus.textContent = `${route.cable} is selected. Use Fit all to return to the full network.`;
         }
-        const traces = [];
-        (route.route_segments || []).forEach(seg => {
-            const color = seg.ductbankTag ? 'saddlebrown' : 'blue';
-            traces.push({
-                x: [seg.start[0], seg.end[0]],
-                y: [seg.start[1], seg.end[1]],
-                z: [seg.start[2], seg.end[2]],
-                mode: 'lines', type: 'scatter3d',
-                line: { color, width: 10 },
-                showlegend: false
-            });
-            if (seg.ductbankTag && seg.conduit_id) {
-                const mx = (seg.start[0] + seg.end[0]) / 2;
-                const my = (seg.start[1] + seg.end[1]) / 2;
-                const mz = (seg.start[2] + seg.end[2]) / 2;
-                traces.push({
-                    x: [mx], y: [my], z: [mz],
-                    mode: 'text', type: 'scatter3d',
-                    text: [`${seg.ductbankTag}-${seg.conduit_id}`],
-                    showlegend: false, hoverinfo: 'none'
-                });
-            }
+        const metrics = routeMetrics(route);
+        updatePlotSelectionCard({
+            kicker: 'Selected route',
+            name: route.cable,
+            detail: `${formatRouteDistance(metrics.total)} total · ${formatRouteDistance(metrics.field)} field · ${metrics.segments} segments`
         });
-        Plotly.addTraces(elements.plot3d, traces);
+        const trayPoints = { x: [], y: [], z: [] };
+        const fieldPoints = { x: [], y: [], z: [] };
+        const focusPoints = [];
+        (route.route_segments || []).forEach(seg => {
+            const points = seg.type === 'tray' ? trayPoints : fieldPoints;
+            points.x.push(seg.start[0], seg.end[0], null);
+            points.y.push(seg.start[1], seg.end[1], null);
+            points.z.push(seg.start[2], seg.end[2], null);
+            focusPoints.push(seg.start, seg.end);
+        });
+        const selectedHover = `<b>${route.cable}</b><br>${formatRouteDistance(metrics.total)} total<extra>Selected route</extra>`;
+        const traces = [];
+        if (trayPoints.x.length) {
+            traces.push({
+                ...trayPoints, mode: 'lines', type: 'scatter3d',
+                line: { color: ROUTE_COLORS.selected, width: 10 },
+                name: `Selected ${route.cable}`, showlegend: false, hovertemplate: selectedHover
+            });
+        }
+        if (fieldPoints.x.length) {
+            traces.push({
+                ...fieldPoints, mode: 'lines', type: 'scatter3d',
+                line: { color: ROUTE_COLORS.field, width: 8, dash: 'dash' },
+                name: `Selected ${route.cable} field`, showlegend: false, hovertemplate: selectedHover
+            });
+        }
+        const cable = state.cableList.find(item => item.name === route.cable) || {};
+        if (cable.start && cable.end) {
+            traces.push({
+                x: [cable.start[0], cable.end[0]], y: [cable.start[1], cable.end[1]], z: [cable.start[2], cable.end[2]],
+                text: [cable.start_tag || 'Start', cable.end_tag || 'End'],
+                mode: 'markers+text', type: 'scatter3d', textposition: 'top center',
+                marker: { color: [ROUTE_COLORS.start, ROUTE_COLORS.end], size: 9, line: { color: '#ffffff', width: 2 } },
+                textfont: { size: 11, color: graphTheme().text }, showlegend: false,
+                hovertemplate: '<b>%{text}</b><extra></extra>'
+            });
+        }
+        await Plotly.addTraces(elements.plot3d, traces);
         window.current3DPlot.traces.push(...traces);
+        focusPlotOnPoints(focusPoints);
     };
 
-    const highlightTraySegment = (trayId) => {
-        if (!globalThis.Plotly) {
-            console.warn('Plotly is not loaded');
+    const highlightTraySegment = async (trayId, { fromViewer = false } = {}) => {
+        if (state.routeViewer) {
+            const sceneRaceway = currentRouteSceneModel().racewayMap.get(trayId);
+            if (!sceneRaceway) return;
+            state.selectedRouteIndex = null;
+            elements.updatedUtilizationContainer?.querySelectorAll('tbody tr').forEach(row => {
+                row.classList.toggle('is-selected', row.dataset.trayId === trayId);
+            });
+            updatePlotSelectionCard({
+                kicker: `Selected ${sceneRaceway.kind}`,
+                name: trayId,
+                detail: `${sceneRaceway.utilizationPct.toFixed(1)}% utilized · ${sceneRaceway.widthIn || '—'} in × ${sceneRaceway.heightIn || '—'} in`
+            });
+            if (elements.routeSelectionStatus) {
+                elements.routeSelectionStatus.textContent = `${trayId} is selected. Select a cable route to restore the full route explanation.`;
+            }
+            if (!fromViewer) state.routeViewer.selectRaceway(trayId, { focus: true, emit: false });
             return;
         }
+        if (!globalThis.Plotly) return;
         const trays = state.finalTrays.length ? state.finalTrays : state.trayData;
         const tray = trays.find(t => t.tray_id === trayId);
         if (!tray) return;
-        reset3DView();
+        await restoreBasePlot(false);
+        state.selectedRouteIndex = null;
         elements.updatedUtilizationContainer?.querySelectorAll('tbody tr').forEach(row => {
             row.classList.toggle('is-selected', row.dataset.trayId === trayId);
         });
         if (elements.routeSelectionStatus) {
-            elements.routeSelectionStatus.textContent = `Highlighted tray: ${trayId}`;
+            elements.routeSelectionStatus.textContent = `${trayId} is selected. Use Fit all to return to the full network.`;
         }
+        const utilization = utilizationForTray(tray);
+        updatePlotSelectionCard({
+            kicker: 'Selected raceway',
+            name: trayId,
+            detail: `${tray.raceway_type || 'tray'} · ${tray.width || '—'} in × ${tray.height || '—'} in · ${utilization.toFixed(1)}% utilized`
+        });
         const trace = {
             x: [tray.start_x, tray.end_x],
             y: [tray.start_y, tray.end_y],
             z: [tray.start_z, tray.end_z],
             mode: 'lines',
             type: 'scatter3d',
-            line: { color: '#0f766e', width: 14 },
+            line: { color: ROUTE_COLORS.selected, width: 12 },
             name: `Selected ${trayId}`,
             showlegend: false,
-            hoverinfo: 'text',
-            text: [`Selected tray ${trayId}`]
+            hovertemplate: `<b>${trayId}</b><br>${utilization.toFixed(1)}% utilized<extra>Selected raceway</extra>`
         };
-        Plotly.addTraces(elements.plot3d, [trace]);
+        await Plotly.addTraces(elements.plot3d, [trace]);
         window.current3DPlot.traces.push(trace);
+        focusPlotOnPoints([
+            [tray.start_x, tray.start_y, tray.start_z],
+            [tray.end_x, tray.end_y, tray.end_z]
+        ]);
     };
 
-    const applyViewMode = () => {
-        if (!globalThis.Plotly) {
-            console.warn('Plotly is not loaded');
+    const applyRouteView = viewName => {
+        if (state.routeViewer) {
+            state.plotView = ROUTE_VIEW_PRESETS[viewName] ? viewName : 'isometric';
+            state.routeViewer.setView(state.plotView);
+            elements.routeViewButtons.forEach(button => {
+                button.setAttribute('aria-pressed', String(button.dataset.routeView === state.plotView));
+            });
             return;
         }
+        if (!globalThis.Plotly) return;
         if (!window.current3DPlot) return;
-        const layout = window.current3DPlot.layout;
-        if (state.is2D) {
-            layout.scene.camera = { up: { x: 0, y: 0, z: 1 }, eye: { x: 0, y: 0, z: 2 } };
-            layout.scene.projection = { type: 'orthographic' };
-            if (elements.viewToggleBtn) elements.viewToggleBtn.textContent = '3D View';
-        } else {
-            layout.scene.camera = { up: { x: 0, y: 0, z: 1 }, eye: { x: 1.25, y: 1.25, z: 1.25 } };
-            layout.scene.projection = { type: 'perspective' };
-            if (elements.viewToggleBtn) elements.viewToggleBtn.textContent = '2D View';
-        }
-        Plotly.relayout(elements.plot3d, layout);
-        window.current3DPlot.layout = layout;
-        window.base3DPlot.layout = structuredClone(layout);
-    };
-
-    const toggle2D3D = () => {
-        state.is2D = !state.is2D;
-        applyViewMode();
+        state.plotView = ROUTE_VIEW_PRESETS[viewName] ? viewName : 'isometric';
+        const view = currentViewDefinition();
+        const camera = { ...structuredClone(view.camera), projection: { type: view.projection } };
+        const hiddenAxis = state.plotView === 'plan' ? 'z' : state.plotView === 'front' ? 'y' : state.plotView === 'right' ? 'x' : null;
+        const axisTitles = { x: 'X', y: 'Y', z: 'Elevation' };
+        const axisUpdates = {};
+        Object.entries(axisTitles).forEach(([axisName, axisTitle]) => {
+            const visible = axisName !== hiddenAxis;
+            axisUpdates[`scene.${axisName}axis.showticklabels`] = visible;
+            axisUpdates[`scene.${axisName}axis.title.text`] = visible ? axisTitle : '';
+            window.current3DPlot.layout.scene[`${axisName}axis`].showticklabels = visible;
+            window.current3DPlot.layout.scene[`${axisName}axis`].title.text = visible ? axisTitle : '';
+            window.base3DPlot.layout.scene[`${axisName}axis`].showticklabels = visible;
+            window.base3DPlot.layout.scene[`${axisName}axis`].title.text = visible ? axisTitle : '';
+        });
+        Plotly.relayout(elements.plot3d, {
+            'scene.camera.eye': camera.eye,
+            'scene.camera.up': camera.up,
+            'scene.camera.projection.type': view.projection,
+            ...axisUpdates
+        });
+        window.current3DPlot.layout.scene.camera = structuredClone(camera);
+        window.base3DPlot.layout.scene.camera = structuredClone(camera);
+        elements.routeViewButtons.forEach(button => {
+            button.setAttribute('aria-pressed', String(button.dataset.routeView === state.plotView));
+        });
     };
 
     const exportCurrentPlotPNG = () => {
-        if (!globalThis.Plotly) {
-            console.warn('Plotly is not loaded');
+        if (state.routeViewer) {
+            state.routeViewer.exportPNG('optimal-route-model.png');
             return;
         }
-        Plotly.toImage(elements.plot3d, { format: 'png' }).then(url => {
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'route.png';
-            a.click();
+        if (!globalThis.Plotly) return;
+        Plotly.downloadImage(elements.plot3d, {
+            format: 'png', width: 1800, height: 1100, scale: 1,
+            filename: 'optimal-route-model'
         });
     };
 
     const popOutPlot = () => {
+        if (state.routeViewer) {
+            state.routeViewer.openFullscreen().catch(error => console.warn('Unable to open the route viewer full screen.', error));
+            return;
+        }
         if (!window.current3DPlot) return;
-        // Escape </script> sequences in JSON to prevent script tag breakout
         const safeJson = val => JSON.stringify(val).replace(/<\/script/gi, '<\\/script');
+        const plotlyUrl = new URL('dist/vendor/plotly.min.js', location.href).href;
         const html = `<!DOCTYPE html>
-<html><head><title>3D Route Visualization</title>
+<html><head><title>Optimal Route Graph</title>
 <meta charset="UTF-8">
-<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"><\/script>
-<style>html,body{margin:0;height:100%;overflow:hidden;}#plot{width:100%;height:100%;}</style>
+<script src="${plotlyUrl}"><\/script>
+<style>html,body{margin:0;height:100%;overflow:hidden;background:#f8fafc;font-family:Inter,system-ui,sans-serif;}#plot{width:100%;height:100%;}</style>
 </head><body>
 <div id="plot"></div>
 <script>const data = ${safeJson(window.current3DPlot.traces)};
 const layout = ${safeJson(window.current3DPlot.layout)};
-Plotly.newPlot(document.getElementById('plot'), data, layout, {responsive: true});<\/script>
+Plotly.newPlot(document.getElementById('plot'), data, layout, ${safeJson(plotConfig)});<\/script>
 </body></html>`;
         const blob = new Blob([html], { type: 'text/html' });
         const url = URL.createObjectURL(blob);
         window.open(url, '_blank');
         setTimeout(() => URL.revokeObjectURL(url), 60000);
+    };
+
+    const refreshPullAnalysis = () => {
+        syncPullAnalysisControls();
+        if (!state.latestRouteData.length) {
+            renderPullChecks([]);
+            saveSession();
+            return;
+        }
+        state.latestRouteData = applyPullChecksToResults(state.latestRouteData);
+        renderBatchResults(state.latestRouteData);
+        storeLatestRouteResults(state.latestRouteData, {
+            source: 'optimalRoutePullAnalysis',
+            trayCableMap: state.trayCableMap,
+            finalTrays: state.finalTrays,
+            updatedUtilData: state.updatedUtilData
+        });
+        update3DPlot();
+        if (state.selectedRouteIndex != null) updateRouteInspector(state.selectedRouteIndex);
+        saveSession();
     };
     
     
@@ -4929,6 +6273,15 @@ Plotly.newPlot(document.getElementById('plot'), data, layout, {responsive: true}
     }
     if (elements.openFillBtn) {
         elements.openFillBtn.addEventListener('click', () => {
+            const selectedRoute = state.latestRouteData[state.selectedRouteIndex]
+                || (state.latestRouteData.length === 1 ? state.latestRouteData[0] : null);
+            const routedTrayId = (selectedRoute?.breakdown || [])
+                .map(segment => segment.raceway_id || segment.tray_id || segment.raceway)
+                .find(id => state.trayData.some(tray => tray.tray_id === id));
+            if (routedTrayId) {
+                openTrayFill(routedTrayId);
+                return;
+            }
             window.open('cabletrayfill.html', '_blank');
         });
     }
@@ -4942,15 +6295,99 @@ Plotly.newPlot(document.getElementById('plot'), data, layout, {responsive: true}
     if (elements.ductbankToggle) {
         elements.ductbankToggle.addEventListener('change', e => updateDuctbankVisibility(e.target.checked));
     }
+    if (elements.performPullChecks) {
+        elements.performPullChecks.addEventListener('change', event => {
+            state.pullChecksEnabled = event.target.checked;
+            refreshPullAnalysis();
+        });
+    }
+    [
+        elements.pullMaxLength,
+        elements.handPullMaxLength,
+        elements.handPullMaxTension,
+        elements.pullMaxTension,
+        elements.pullMaxSidewall,
+        elements.pullFriction,
+        elements.pullBendRadius,
+        elements.pullDirection,
+        elements.pullIncomingTension,
+        elements.pullPullerCapacity,
+        elements.pullRopeCapacity,
+        elements.pullGripCapacity,
+        elements.pullAnchorageCapacity,
+        elements.pullSheaveCapacity,
+        elements.pullRollerSpacing,
+        elements.pullGroupSuggestions,
+        elements.pullGroupMaxSize
+    ]
+        .filter(Boolean)
+        .forEach(input => input.addEventListener('change', refreshPullAnalysis));
+    if (elements.allowHandPulls) {
+        elements.allowHandPulls.addEventListener('change', () => {
+            syncPullAnalysisControls();
+            refreshPullAnalysis();
+        });
+    }
+    if (elements.routeInspectorPullAction) {
+        elements.routeInspectorPullAction.addEventListener('click', () => {
+            if (!state.pullChecksEnabled) state.pullChecksEnabled = true;
+            refreshPullAnalysis();
+            elements.pullChecksDetails?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+    }
+    if (elements.pullSetupsToggle) {
+        elements.pullSetupsToggle.addEventListener('change', event => {
+            state.pullSetupsVisible = event.target.checked;
+            state.routeViewer?.setLayerVisibility('pullSetups', state.pullChecksEnabled && state.pullSetupsVisible);
+            saveSession();
+        });
+    }
+    if (elements.conduitToggle) {
+        elements.conduitToggle.addEventListener('change', e => {
+            if (state.routeViewer) state.routeViewer.setLayerVisibility('conduit', e.target.checked);
+            else update3DPlot();
+        });
+    }
+    if (elements.fieldConnectionsToggle) {
+        elements.fieldConnectionsToggle.addEventListener('change', e => {
+            state.fieldConnectionsVisible = e.target.checked;
+            if (state.routeViewer) state.routeViewer.setLayerVisibility('field', e.target.checked);
+            else update3DPlot();
+        });
+    }
     if (elements.heatmapToggle) {
         elements.heatmapToggle.addEventListener('change', e => {
             state.heatmapEnabled = e.target.checked;
-            update3DPlot();
+            if (state.routeViewer) state.routeViewer.setHeatmap(e.target.checked);
+            else update3DPlot();
         });
     }
-    if (elements.viewToggleBtn) {
-        elements.viewToggleBtn.addEventListener('click', toggle2D3D);
+    if (elements.labelsToggle) {
+        elements.labelsToggle.addEventListener('change', e => {
+            state.labelsVisible = e.target.checked;
+            if (state.routeViewer) state.routeViewer.setLayerVisibility('labels', e.target.checked);
+            else update3DPlot();
+        });
     }
+    if (elements.contextToggle) {
+        elements.contextToggle.addEventListener('change', e => {
+            if (state.routeViewer) state.routeViewer.setLayerVisibility('context', e.target.checked);
+        });
+    }
+    if (elements.contextDensitySelect) {
+        elements.contextDensitySelect.addEventListener('change', event => {
+            state.routeViewer?.setContextDensity(event.target.value);
+        });
+    }
+    if (elements.racewayCompatibilityFilter) {
+        elements.racewayCompatibilityFilter.addEventListener('change', event => {
+            state.routeViewer?.setRacewayFilter(event.target.value);
+            updateRacewayFilterSummary();
+        });
+    }
+    elements.routeViewButtons.forEach(button => {
+        button.addEventListener('click', () => applyRouteView(button.dataset.routeView));
+    });
     if (elements.exportPngBtn) {
         elements.exportPngBtn.addEventListener('click', exportCurrentPlotPNG);
     }
@@ -4993,6 +6430,7 @@ Plotly.newPlot(document.getElementById('plot'), data, layout, {responsive: true}
     });
     // Initial setup
     loadSession();
+    syncPullAnalysisControls();
     const trayKey = globalThis.TableUtils?.STORAGE_KEYS?.traySchedule || 'traySchedule';
     const cableKey = globalThis.TableUtils?.STORAGE_KEYS?.cableSchedule || 'cableSchedule';
     const ductbankKey = globalThis.TableUtils?.STORAGE_KEYS?.ductbankSchedule || 'ductbankSchedule';

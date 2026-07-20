@@ -6,11 +6,11 @@ The page keeps the editable schedule in the primary viewport. Project context is
 
 ## Entry And Review
 
-- Use **Add Equipment** for a focused form with tag, voltage, category, arrangement, lineup, manufacturer, model, phases, and notes.
+- Use **Add Equipment** for four core fields: tag, description, voltage, and category. A collapsed **More details** section contains arrangement, lineup, manufacturer, model, phases, and notes. Select **Save and add another** when entering several records in sequence.
 - Use **Load Starter Equipment** to seed a realistic switchboard, MCC, transformer, panel, and process equipment set.
 - Use **Core** for day-to-day tag, description, voltage, category, arrangement, lineup, and phase review. **Layout**, **Procurement**, and **Full** expose the corresponding specialist columns without forcing the full schedule into the default view.
 - Summary cards track total equipment, missing tags, duplicate tags, missing voltage, missing manufacturer, and assigned arrangements.
-- Empty projects show primary actions for adding equipment, importing equipment, or loading starter equipment.
+- Empty projects show one focused start panel for adding equipment, importing an equipment list, or loading starter equipment. The populated-list toolbar, summary, filters, and empty table stay hidden until a record exists.
 - Right-click an equipment row (or press Shift+F10 while the row is focused) and choose **View on One-Line**. The action is kept out of the tag cell so every row remains compact and editable.
 
 ## Bulk Updates

@@ -474,13 +474,13 @@ function mountPersistentNavigation() {
   topNav.appendChild(navActions);
   mountProfileControl();
 
-  // Add a search button visible only on mobile (Ctrl+K is unavailable on touch devices)
+  // Keep tool search visible alongside the navigation; Ctrl+K remains the shortcut.
   if (!topNav.querySelector('.nav-search-btn')) {
     const searchBtn = document.createElement('button');
     searchBtn.className = 'nav-search-btn';
     searchBtn.setAttribute('aria-label', 'Search commands');
     searchBtn.setAttribute('title', 'Search commands');
-    searchBtn.innerHTML = '<img src="icons/toolbar/grid-size.svg" alt="" aria-hidden="true" class="control-icon">';
+    searchBtn.innerHTML = '<span aria-hidden="true">&#8981;</span><span>Search tools</span><kbd>Ctrl K</kbd>';
     searchBtn.addEventListener('click', () => {
       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true }));
     });

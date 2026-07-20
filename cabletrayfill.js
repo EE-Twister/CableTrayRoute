@@ -41,32 +41,59 @@ function readStoredList(reader) {
   }
 }
 
+function trayIdentity(tray) {
+  return String(tray?.tray_id || tray?.tag || tray?.id || '').trim();
+}
+
+function normalizeTrayForFill(tray = {}) {
+  const width = parseFloat(tray.width ?? tray.inside_width ?? tray.insideWidth);
+  const height = parseFloat(tray.height ?? tray.tray_depth ?? tray.load_depth ?? tray.depth);
+  return {
+    ...tray,
+    tray_id: trayIdentity(tray),
+    width: Number.isFinite(width) ? width : 12,
+    height: Number.isFinite(height) ? height : 3
+  };
+}
+
+function projectCablesForTray(trayId, projectCables = readStoredList(getCables)) {
+  const normalizedId = String(trayId || '').trim().toLowerCase();
+  return projectCables.filter(cable => getCableAssignedRacewayIds(cable)
+    .some(id => String(id || '').trim().toLowerCase() === normalizedId));
+}
+
 function renderTrayFillHandoff(context = {}) {
   const el = document.getElementById('tray-fill-handoff');
   if (!el) return;
   const trays = readStoredList(getTrays);
   const cables = readStoredList(getCables);
-  const selectedTray = context.tray || null;
+  const selectedTray = context.tray ? normalizeTrayForFill(context.tray) : null;
   const selectedCables = Array.isArray(context.cables) ? context.cables : [];
-  const trayId = selectedTray?.tray_id || selectedTray?.tag || selectedTray?.id || '';
+  const trayId = trayIdentity(selectedTray);
   const schedule = summarizeCableWorkflow(cables);
   const assignedToTray = trayId
-    ? cables.filter(cable => getCableAssignedRacewayIds(cable).some(id => id === trayId)).length
+    ? projectCablesForTray(trayId, cables).length
     : 0;
   const title = trayId
     ? `Reviewing ${trayId}`
-    : (trays.length ? 'Select a tray from the Raceway Schedule' : 'Add raceways before tray fill review');
+    : (trays.length ? 'Choose a project tray to load its assigned cables' : 'Add raceways before tray fill review');
   const detail = trayId
     ? `${selectedCables.length || assignedToTray} cable(s) are loaded for this tray. ${schedule.routingReady} cable schedule row(s) are routing-ready.`
     : (trays.length
-        ? `${trays.length} tray record(s) are available. Open a tray from Routing or the Raceway Schedule for a project-specific fill check.`
+        ? `${trays.length} tray record(s) are available. Selecting one loads its dimensions, compartments, and cable assignments.`
         : 'Tray Fill still works standalone, but the project workflow starts with tray geometry in the Raceway Schedule.');
+  const trayOptions = trays.map(tray => {
+    const id = trayIdentity(tray);
+    const selected = id && id.toLowerCase() === trayId.toLowerCase() ? ' selected' : '';
+    return `<option value="${escapeHtml(id)}"${selected}>${escapeHtml(id || 'Unnamed tray')}</option>`;
+  }).join('');
   el.innerHTML = `
     <div>
       <strong>${escapeHtml(title)}</strong>
       <p>${escapeHtml(detail)}</p>
     </div>
     <span>
+      ${trays.length ? `<label class="tray-fill-project-picker">Project tray<select id="tray-fill-project-selector"><option value="">Choose tray...</option>${trayOptions}</select></label>` : ''}
       <a class="btn" href="racewayschedule.html">Raceway Schedule</a>
       <a class="btn" href="cableschedule.html">Cable Schedule</a>
       <a class="btn" href="optimalRoute.html">Routing</a>
@@ -1412,10 +1439,11 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
             svg += `<text x="${compX.toFixed(2)}" y="${(drawingTop-3).toFixed(2)}" font-size="7px" font-weight="700" text-anchor="middle" fill="#aa3300" font-family="Arial,sans-serif">DIVIDER</text>`;
           }
 
-          // Inner barrier (stackable vs non-stackable divider)
+          // Algorithmic stacking boundary between large non-stackable and smaller stackable cables.
           if (cl.largeCount > 0 && cl.smallCount > 0) {
             const bxp = (compX + cl.barrierX * scale).toFixed(2);
             svg += `<line x1="${bxp}" y1="${rectY}" x2="${bxp}" y2="${(rectY + compH).toFixed(2)}" stroke="#aa3300" stroke-width="2" stroke-dasharray="4 2"/>`;
+            svg += `<text x="${(Number(bxp)+4).toFixed(2)}" y="${(rectY+10).toFixed(2)}" font-size="6px" font-weight="700" text-anchor="start" fill="#aa3300" font-family="Arial,sans-serif">DOTTED LINE - STACKING BOUNDARY</text>`;
           }
 
           // Cables in this compartment
@@ -1519,6 +1547,7 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
           if (cl.largeCount > 0 && cl.smallCount > 0) {
             const bxp = (cl.barrierX * bigScale).toFixed(2);
             bigSvg += `<line x1="${bxp}" y1="${rectY}" x2="${bxp}" y2="${(rectY+compH).toFixed(2)}" stroke="#aa3300" stroke-width="4" stroke-dasharray="12 6"/>`;
+            bigSvg += `<text x="${(Number(bxp)+10).toFixed(2)}" y="${(rectY+22).toFixed(2)}" font-size="13px" font-weight="700" text-anchor="start" fill="#aa3300" font-family="Arial,sans-serif">DOTTED LINE - STACKING BOUNDARY</text>`;
           }
 
           cl.placed.forEach(p => {
@@ -2057,62 +2086,99 @@ checkPrereqs([{key:'traySchedule',page:'racewayschedule.html',label:'Raceway Sch
       ['saveProfileBtn','loadProfileBtn','exportExcelBtn'].forEach(id=>{const el=document.getElementById(id);if(el) el.addEventListener('click',markSaved);});
 
       let trayHandoffContext = {};
-      renderTrayFillHandoff(trayHandoffContext);
+
+      const setSelectValue = (select, value) => {
+        if (!select) return;
+        const stringValue = String(value ?? '');
+        if (stringValue && !Array.from(select.options).some(option => option.value === stringValue)) {
+          const option = document.createElement('option');
+          option.value = stringValue;
+          option.textContent = stringValue;
+          select.appendChild(option);
+        }
+        select.value = stringValue;
+      };
+
+      const updateTrayHandoff = () => {
+        renderTrayFillHandoff(trayHandoffContext);
+        const selector = document.getElementById('tray-fill-project-selector');
+        if (!selector) return;
+        selector.addEventListener('change', () => {
+          const tray = readStoredList(getTrays).find(item => trayIdentity(item).toLowerCase() === selector.value.toLowerCase());
+          if (!tray) return;
+          applyTrayFillContext({ tray, cables: projectCablesForTray(selector.value) });
+        });
+      };
+
+      const applyTrayFillContext = context => {
+        const tray = normalizeTrayForFill(context?.tray || {});
+        const storedCables = Array.isArray(context?.cables) ? context.cables : projectCablesForTray(tray.tray_id);
+        if (!tray.tray_id) return;
+        trayHandoffContext = { tray, cables: storedCables };
+        setSelectValue(document.getElementById('trayWidth'), tray.width);
+        document.getElementById('trayDepth').value = tray.height;
+        document.getElementById('trayName').value = tray.tray_id;
+        setSelectValue(document.getElementById('trayType'), String(tray.tray_type || '').toLowerCase().includes('solid') ? 'solid' : 'ladder');
+
+        const numSlots = Math.max(1, parseInt(tray.num_slots) || 1);
+        if (numSlots > 1) {
+          let slotGroupMap = {};
+          if (tray.slot_groups) {
+            try {
+              slotGroupMap = typeof tray.slot_groups === 'string' ? JSON.parse(tray.slot_groups) : tray.slot_groups;
+            } catch { /* ignore malformed JSON */ }
+          }
+          const n = Math.min(5, numSlots);
+          const slotWidth = tray.width / n;
+          compartments = Array.from({ length: n }, (_, i) => ({
+            id: i + 1,
+            width: slotWidth,
+            depth: tray.height,
+            label: slotGroupMap[String(i)] || `Slot ${i + 1}`,
+          }));
+        } else {
+          compartments = [{ id: 1, width: tray.width, depth: tray.height, label: '' }];
+        }
+        renderCompartmentUI();
+        cables = storedCables.map(c => ({
+          tag: c.name || c.tag || c.id || '',
+          cableType: c.cable_type || c.cableType || '',
+          count: c.conductors || c.count || '',
+          size: c.conductor_size || c.size || '',
+          rating: c.rating || '',
+          voltage: c.voltage || '',
+          od: (() => { const dia = parseFloat(c.cable_od ?? c.diameter ?? c.OD ?? c.od); return Number.isFinite(dia) ? dia.toFixed(2) : ''; })(),
+          parallelCount: Math.max(1, parseInt(c.parallel_count) || 1),
+          weight: (parseFloat(c.weight) || '').toString(),
+          zone: c.zone || c.cable_zone || 1,
+          circuitGroup: c.circuitGroup || c.circuit_group || ''
+        }));
+        renderCableRows();
+        const canDrawImmediately = cables.length > 0 && cables.every(cable => (
+          cable.cableType
+          && cable.count
+          && cable.size
+          && Number.parseFloat(cable.od) > 0
+          && Number.parseFloat(cable.weight) > 0
+        ));
+        if (canDrawImmediately) document.getElementById('drawBtn').click();
+        updateTrayHandoff();
+      };
+
+      updateTrayHandoff();
       const stored = getItem('trayFillData');
-      if (stored) {
+      const requestedTrayId = new URLSearchParams(window.location.search).get('tray');
+      if (stored?.tray) {
         try {
-          const { tray, cables: storedCables } = stored;
-          trayHandoffContext = { tray, cables: Array.isArray(storedCables) ? storedCables : [] };
-          document.getElementById('trayWidth').value = tray.width;
-          document.getElementById('trayDepth').value = tray.height;
-          document.getElementById('trayName').value = tray.tray_id || '';
-          // Initialize compartments from num_slots/slot_groups when the tray is compartmented
-          const numSlots = Math.max(1, parseInt(tray.num_slots) || 1);
-          if (numSlots > 1) {
-            let slotGroupMap = {};
-            if (tray.slot_groups) {
-              try {
-                slotGroupMap = typeof tray.slot_groups === 'string'
-                  ? JSON.parse(tray.slot_groups)
-                  : tray.slot_groups;
-              } catch { /* ignore malformed JSON */ }
-            }
-            const n = Math.min(5, numSlots);
-            const slotWidth = (parseFloat(tray.width) || 12) / n;
-            compartments = Array.from({ length: n }, (_, i) => ({
-              id: i + 1,
-              width: slotWidth,
-              depth: parseFloat(tray.height) || 3,
-              label: slotGroupMap[String(i)] || `Slot ${i + 1}`,
-            }));
-          } else {
-            compartments = [{ id: 1, width: parseFloat(tray.width) || 12, depth: parseFloat(tray.height) || 3, label: '' }];
-          }
-          renderCompartmentUI();
-          if (Array.isArray(storedCables)) {
-            cables = storedCables.map(c => ({
-              tag: c.name || c.tag || '',
-              cableType: c.cable_type || '',
-              count: c.conductors || c.count || '',
-              size: c.conductor_size || c.size || '',
-              rating: c.rating || '',
-              voltage: c.voltage || '',
-              od: (() => { const dia = parseFloat(c.cable_od ?? c.diameter ?? c.OD ?? c.od); return Number.isFinite(dia) ? dia.toFixed(2) : ''; })(),
-              parallelCount: Math.max(1, parseInt(c.parallel_count) || 1),
-              weight: (parseFloat(c.weight) || '').toString(),
-              zone: c.zone || c.cable_zone || 1,
-              circuitGroup: c.circuitGroup || c.circuit_group || ''
-            }));
-          } else {
-            cables = [];
-          }
-          renderCableRows();
-          document.getElementById('drawBtn').click();
-          renderTrayFillHandoff(trayHandoffContext);
+          applyTrayFillContext(stored);
         } catch (e) {
           console.error('Failed to load trayFillData', e);
         }
         removeItem('trayFillData');
+      } else if (requestedTrayId) {
+        const requestedTray = readStoredList(getTrays)
+          .find(tray => trayIdentity(tray).toLowerCase() === requestedTrayId.toLowerCase());
+        if (requestedTray) applyTrayFillContext({ tray: requestedTray, cables: projectCablesForTray(requestedTrayId) });
       }
 
       // Attach help popups for table headers

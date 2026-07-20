@@ -28,8 +28,8 @@ This closes the gap with MagiCAD 2026 and Bentley Raceway 2024/2025, which both 
 4. The browser downloads `<project-name>.glb`.
 
 The export includes:
-- All cable tray segments as solid rectangular-prism meshes
-- All routed cable paths as 3D polylines (if routing has been run)
+- Cable trays, conduits, and ductbank envelopes as named solid 3D meshes
+- Every calculated cable-route segment as a 3D polyline (including field jumps)
 - Fill heat-map coloring based on current tray utilization
 
 ---
@@ -64,7 +64,7 @@ All materials use **PBR Metallic-Roughness** with semi-transparent alpha blendin
 
 ### Cable Routes
 
-Routed cables are exported as **GL_LINES** primitives (mode 1) — a direct line from the cable's start coordinate to its end coordinate. The glTF material `cable_route` renders these in blue.
+Routed cables are exported as **GL_LINES** primitives (mode 1), preserving every calculated segment and bend rather than replacing the path with a straight endpoint chord. The glTF material `cable_route` renders these in blue.
 
 Per-cable node extras: `cable_id`, `from_tag`, `to_tag`.
 

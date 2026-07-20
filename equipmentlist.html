@@ -74,8 +74,8 @@
         </div>
       </header>
       <section class="card equipment-list-page">
-        <div id="equipment-summary-cards" class="workflow-summary-grid equipment-summary-panel" aria-label="Equipment summary"></div>
-        <div class="equipment-action-bar" role="toolbar" aria-label="Equipment list actions">
+        <div id="equipment-summary-cards" class="workflow-summary-grid equipment-summary-panel" aria-label="Equipment summary" data-equipment-populated-only></div>
+        <div class="equipment-action-bar" role="toolbar" aria-label="Equipment list actions" data-equipment-populated-only>
           <button id="add-row-btn" class="btn primary-btn add-row-btn" type="button" title="Add equipment with guided fields">Add Equipment</button>
           <button id="load-starter-equipment-btn" class="btn" type="button" title="Load starter equipment records">Load Starter Equipment</button>
           <button id="delete-selected-btn" class="btn" type="button" title="Delete selected rows">Delete Selected</button>
@@ -108,15 +108,15 @@
         <div id="equipment-empty-guide" class="equipment-empty-guide" hidden>
           <div>
             <strong>No equipment records yet.</strong>
-            <p>Add equipment, import a list, or load starter records to establish the first workflow step.</p>
+            <p>Start with the four core fields, import an existing list, or load starter records.</p>
           </div>
           <div class="equipment-empty-guide__actions">
             <button id="empty-add-equipment-btn" class="btn primary-btn" type="button">Add Equipment</button>
-            <button id="empty-import-equipment-btn" class="btn" type="button">Import Equipment</button>
+            <button id="empty-import-equipment-btn" class="btn" type="button">Import Equipment List</button>
             <button id="empty-starter-equipment-btn" class="btn" type="button">Load Starter Equipment</button>
           </div>
         </div>
-        <div class="equipment-toolbar" role="search" aria-label="Search and filter equipment">
+        <div class="equipment-toolbar" role="search" aria-label="Search and filter equipment" data-equipment-populated-only>
           <input type="text" id="equipment-search" class="table-search" placeholder="Search tag, description, arrangement, lineup, manufacturer, category, or model" title="Search by equipment details">
           <select id="equipment-category-filter" class="table-filter-select" title="Filter by category">
             <option value="">All categories</option>
@@ -136,11 +136,11 @@
           </details>
           <p id="equipment-results-count" class="equipment-results-count" aria-live="polite"></p>
         </div>
-        <div class="equipment-list-meta">
+        <div class="equipment-list-meta" data-equipment-populated-only>
           <div id="equipment-quick-filters" class="equipment-quick-filters" aria-label="Quick filters"></div>
           <p id="equipment-validation-summary" class="equipment-validation-summary" aria-live="polite"></p>
         </div>
-        <div class="overflow-x-auto">
+        <div class="overflow-x-auto" data-equipment-populated-only>
           <table id="equipment-table" class="sticky-table">
             <caption class="visually-hidden">Equipment list with tags, ratings, and specifications</caption>
             <thead></thead>

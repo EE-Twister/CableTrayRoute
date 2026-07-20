@@ -25,10 +25,10 @@ assert(Array.isArray(payload.cables));
 assert(Array.isArray(payload.trays));
 assert.equal(payload.settings.oneLineScheduleReconcilePending, false);
 assert(payload.settings.studies.demandSchedule);
-assert.equal(payload.settings.latestRouteResults.batchResults.length, 12);
+assert.equal(payload.settings.latestRouteResults.batchResults.length, 14);
 assert(payload.settings.latestRouteResults.batchResults.every(result => result.status === 'Routed'));
 assert(payload.settings.latestRouteResults.batchResults.every(result => result.segments_count > 0));
-assert.equal(payload.settings.latestRouteResults.routedCableNames.length, 12);
+assert.equal(payload.settings.latestRouteResults.routedCableNames.length, 14);
 assert.equal(payload.settings.latestRouteResults.trayCableMap['TR-PWR-101'].length, 5);
 const pumpCable = payload.cables.find(cable => cable.tag === 'CBL-MCC-PMP-101');
 const pumpConduit = payload.ductbanks.flatMap(ductbank => ductbank.conduits || [])
@@ -67,16 +67,16 @@ const diagnostics = buildWorkflowCoreDiagnostics({
 
 assert.equal(diagnostics.health.equipment, 13);
 assert.equal(diagnostics.health.completeLoads, 10);
-assert.equal(diagnostics.health.scheduleReady, 12);
-assert.equal(diagnostics.health.routingReady, 12);
-assert.equal(diagnostics.health.routeResults, 12);
+assert.equal(diagnostics.health.scheduleReady, 14);
+assert.equal(diagnostics.health.routingReady, 14);
+assert.equal(diagnostics.health.routeResults, 14);
 assert(diagnostics.health.pullGroups > 0);
 assert(diagnostics.health.spoolSheets > 0);
 assert.equal(diagnostics.blockers.filter(item => item.severity === 'critical').length, 1);
 assert.equal(diagnostics.blockers.filter(item => item.severity === 'warning').length, 1);
 assert.equal(diagnostics.designRules.errors, 2);
 assert.equal(diagnostics.designRules.warnings, 8);
-assert.equal(diagnostics.cableDeliverables.ready, 12);
+assert.equal(diagnostics.cableDeliverables.ready, 14);
 assert.equal(diagnostics.readyForDeliverables, false);
 assert.equal(diagnostics.workflowSteps.length, 8);
 assert.equal(diagnostics.workflowSteps.filter(step => step.complete).length, 6);

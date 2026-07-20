@@ -9009,17 +9009,60 @@ function plot() {
       .attr('stroke', entry.color)
       .attr('stroke-width', 2);
     marker.append('text')
+      .attr('class', 'tcc-equipment-tag-callout')
+      .attr('data-equipment-tag', entry.sourceLabel || entry.sourceId || '')
       .attr('x', size + 4)
       .attr('y', labelY)
       .attr('fill', entry.color)
       .attr('font-size', 12)
-      .text(`Inrush - ${formatSettingValue(entry.current)} A @ ${formatSettingValue(duration)} s`);
+      .text(`${entry.sourceLabel || entry.sourceId || 'Transformer'} inrush`);
     entry.overlayMarker = marker;
   });
 
-  overlays.filter(entry => entry.kind === 'motorStart').forEach(entry => {
+  const motorStartEntries = overlays.filter(entry => entry.kind === 'motorStart');
+  const motorStartLabelYValues = motorStartEntries
+    .map(entry => y(entry.startTime))
+    .filter(Number.isFinite);
+  const motorStartLabelTop = motorStartLabelYValues.length
+    ? Math.max(14, Math.min(...motorStartLabelYValues) - (motorStartEntries.length * 14))
+    : 14;
+  motorStartEntries.forEach((entry, startIndex) => {
     const curve = motorStartCurves.get(entry) || entry.curve;
     appendEquipmentOverlayPath(entry, curve, '2,2');
+    const xPos = x(entry.lockedRotor);
+    const yPos = y(entry.startTime);
+    if (!Number.isFinite(xPos) || !Number.isFinite(yPos)) return;
+    const tag = entry.sourceLabel || entry.sourceId || 'Motor';
+    const marker = bindEquipmentOverlayTooltip(
+      overlayLayer.append('g')
+        .attr('class', 'tcc-overlay-marker tcc-motor-start-marker')
+        .attr('transform', `translate(${xPos},${yPos})`),
+      entry,
+      x,
+      margin
+    );
+    marker.append('circle')
+      .attr('class', 'tcc-overlay-marker-hit-target')
+      .attr('r', 12)
+      .attr('fill', 'transparent')
+      .style('pointer-events', 'all');
+    marker.append('circle')
+      .attr('r', 4)
+      .attr('fill', entry.color)
+      .attr('stroke', '#ffffff')
+      .attr('stroke-width', 1.25);
+    marker.append('text')
+      .attr('class', 'tcc-equipment-tag-callout')
+      .attr('data-equipment-tag', tag)
+      .attr('x', 7)
+      .attr('y', motorStartLabelTop + (startIndex * 14) - yPos)
+      .attr('fill', entry.color)
+      .attr('font-size', 12)
+      .attr('stroke', '#ffffff')
+      .attr('stroke-width', 3)
+      .attr('paint-order', 'stroke')
+      .text(`${tag} ${entry.startProfile || 'start'}`);
+    entry.overlayMarker = marker;
   });
 
   overlays.filter(entry => entry.kind === 'arcFlashLimit').forEach(entry => {
@@ -9032,15 +9075,37 @@ function plot() {
       .attr('d', entry.curve.length ? line(entry.curve) : null);
   });
 
-  const plotted = devicePlots.map(plotEntry => {
+  const plotted = devicePlots.map((plotEntry, plotIndex) => {
     const selection = plotEntry.selection;
     const scaled = plotEntry.scaled;
     const entry = { ...plotEntry, selection, scaled };
     const isSelectedContextDevice = entry.relationship?.role === 'selected';
+    entry.isFuse = normalizeProtectionType(selection?.baseDevice?.type || entry.deviceType) === 'fuse';
+    if (entry.isFuse) {
+      entry.fusePatternId = `${clipIdBase}-fuse-band-${plotIndex}`;
+      const pattern = defs.append('pattern')
+        .attr('id', entry.fusePatternId)
+        .attr('class', 'tcc-fuse-band-pattern')
+        .attr('patternUnits', 'userSpaceOnUse')
+        .attr('width', 8)
+        .attr('height', 8);
+      pattern.append('rect')
+        .attr('width', 8)
+        .attr('height', 8)
+        .attr('fill', entry.color)
+        .attr('fill-opacity', 0.07);
+      pattern.append('path')
+        .attr('d', 'M-2,2 L2,-2 M0,8 L8,0 M6,10 L10,6')
+        .attr('fill', 'none')
+        .attr('stroke', entry.color)
+        .attr('stroke-width', 0.8)
+        .attr('stroke-opacity', 0.5);
+    }
     entry.bandPath = deviceLayer.append('path')
       .datum(scaled.envelope || [])
-      .attr('fill', entry.color)
-      .attr('opacity', isSelectedContextDevice ? 0.2 : 0.12)
+      .attr('class', entry.isFuse ? 'tcc-tolerance-band tcc-fuse-tolerance-band' : 'tcc-tolerance-band')
+      .attr('fill', entry.isFuse ? `url(#${entry.fusePatternId})` : entry.color)
+      .attr('opacity', entry.isFuse ? 1 : (isSelectedContextDevice ? 0.2 : 0.12))
       .attr('stroke', 'none');
     entry.minPath = deviceLayer.append('path')
       .datum(scaled.minCurve || [])
@@ -9338,7 +9403,7 @@ function plot() {
       entry.bandPath
         .datum(envelope)
         .attr('d', envelope.length ? bandArea(envelope) : null)
-        .attr('fill', entry.color);
+        .attr('fill', entry.isFuse ? `url(#${entry.fusePatternId})` : entry.color);
       entry.minPath
         .datum(minCurve)
         .attr('d', minCurve.length ? line(minCurve) : null)

@@ -189,6 +189,7 @@ async function captureVisuals({ input, outputDir }) {
     browser = await launchCaptureBrowser();
     const context = await browser.newContext({
       deviceScaleFactor: 2,
+      serviceWorkers: 'block',
       viewport: { width: 1600, height: 1100 },
     });
     const page = await context.newPage();
@@ -212,10 +213,44 @@ async function captureVisuals({ input, outputDir }) {
       select.value = 'engineeringPrint';
       select.dispatchEvent(new Event('change', { bubbles: true }));
       const datablock = document.getElementById('datablock-format-select');
-      datablock.value = 'off';
+      datablock.value = 'report';
       datablock.dispatchEvent(new Event('change', { bubbles: true }));
+      const density = document.getElementById('datablock-density-select');
+      density.value = 'expanded';
+      density.dispatchEvent(new Event('change', { bubbles: true }));
     });
     await page.waitForFunction(() => document.body.classList.contains('engineering-print-mode'));
+    const reportAnnotations = project.oneLine.sheets[project.oneLine.activeSheet || 0].components
+      .map(component => {
+        if (component.props?.amp_trip) return { id: component.id, values: [component.props.amp_trip], type: 'protective' };
+        if (component.type === 'transformer') {
+          return {
+            id: component.id,
+            values: [component.voltage_ratio, component.winding].filter(Boolean),
+            type: 'transformer',
+          };
+        }
+        return null;
+      })
+      .filter(Boolean);
+    await page.waitForFunction(expected => (
+      document.querySelectorAll('#diagram g.component-datablock').length === expected
+    ), reportAnnotations.length);
+    const reportAnnotationAudit = await page.evaluate(expected => expected.map(annotation => {
+      const block = document.querySelector(`#diagram g.component-datablock[data-id="${CSS.escape(annotation.id)}"]`);
+      const label = block?.textContent || '';
+      return {
+        ...annotation,
+        rendered: Boolean(block),
+        missingValues: annotation.values.filter(value => !label.includes(value)),
+      };
+    }), reportAnnotations);
+    const incompleteReportAnnotations = reportAnnotationAudit.filter(annotation => (
+      !annotation.rendered || annotation.missingValues.length
+    ));
+    if (incompleteReportAnnotations.length) {
+      throw new Error(`One-line report annotations are incomplete: ${JSON.stringify(incompleteReportAnnotations)}`);
+    }
     await page.waitForTimeout(350);
     const oneLineConnectionAudit = await page.evaluate(sheet => {
       const byId = new Map(sheet.components.map(component => [component.id, component]));
@@ -246,6 +281,385 @@ async function captureVisuals({ input, outputDir }) {
     }, project.oneLine.sheets[project.oneLine.activeSheet || 0]);
     if (oneLineConnectionAudit.disconnected.length) {
       throw new Error(`One-line connections do not terminate on their target symbols: ${oneLineConnectionAudit.disconnected.join(', ')}`);
+    }
+    const oneLineSheet = project.oneLine.sheets[project.oneLine.activeSheet || 0];
+    const oneLineComponentById = new Map(oneLineSheet.components.map(component => [component.id, component]));
+    const bridgedComponentType = component => component
+      && component.type !== 'annotation'
+      && !['bus', 'busway', 'cable'].includes(String(component.type || '').toLowerCase());
+    const expectedTerminalBridgeKeys = new Set();
+    const expectedTerminalEndpoints = [];
+    oneLineSheet.components.forEach(source => {
+      (source.connections || []).forEach((connection, connectionIndex) => {
+        const target = oneLineComponentById.get(connection.target);
+        if (bridgedComponentType(source)) {
+          const portIndex = Number(connection.sourcePort || 0);
+          expectedTerminalBridgeKeys.add(`${source.id}:${portIndex}`);
+          expectedTerminalEndpoints.push({
+            componentId: source.id,
+            portIndex,
+            sourceId: source.id,
+            connectionIndex,
+            endpoint: 'start',
+          });
+        }
+        if (bridgedComponentType(target)) {
+          const portIndex = Number(connection.targetPort || 0);
+          expectedTerminalBridgeKeys.add(`${target.id}:${portIndex}`);
+          expectedTerminalEndpoints.push({
+            componentId: target.id,
+            portIndex,
+            sourceId: source.id,
+            connectionIndex,
+            endpoint: 'end',
+          });
+        }
+      });
+    });
+    const terminalBridgeAudit = await page.evaluate(expectedKeys => expectedKeys.map(key => {
+      const [componentId, portIndex] = key.split(':');
+      const bridge = document.querySelector(
+        `#diagram g.component[data-id="${CSS.escape(componentId)}"] .component-terminal-bridge[data-port-index="${CSS.escape(portIndex)}"]`
+      );
+      return {
+        key,
+        rendered: Boolean(bridge),
+        length: bridge && typeof bridge.getTotalLength === 'function' ? bridge.getTotalLength() : 0,
+        linecap: bridge?.getAttribute('stroke-linecap') || '',
+      };
+    }), [...expectedTerminalBridgeKeys]);
+    const discontinuousTerminals = terminalBridgeAudit.filter(terminal => (
+      !terminal.rendered || terminal.length < 16 || terminal.linecap !== 'square'
+    ));
+    if (discontinuousTerminals.length) {
+      throw new Error(`Connected component terminals must visibly overlap their connectors: ${JSON.stringify(discontinuousTerminals)}`);
+    }
+    const terminalMatingAudit = await page.evaluate(endpoints => {
+      const toScreenPoint = (element, x, y) => {
+        const matrix = element?.getScreenCTM();
+        return matrix ? new DOMPoint(x, y).matrixTransform(matrix) : null;
+      };
+      return endpoints.map(endpoint => {
+        const polyline = document.querySelector(
+          `#diagram polyline.connection[data-comp="${CSS.escape(endpoint.sourceId)}"][data-index="${endpoint.connectionIndex}"]`
+        );
+        const bridge = document.querySelector(
+          `#diagram g.component[data-id="${CSS.escape(endpoint.componentId)}"] .component-terminal-bridge[data-port-index="${endpoint.portIndex}"]`
+        );
+        const pointCount = polyline?.points?.numberOfItems || 0;
+        const connectionPoint = pointCount
+          ? polyline.points.getItem(endpoint.endpoint === 'start' ? 0 : pointCount - 1)
+          : null;
+        const connectionScreenPoint = connectionPoint
+          ? toScreenPoint(polyline, connectionPoint.x, connectionPoint.y)
+          : null;
+        const portX = Number(bridge?.dataset.portX);
+        const portY = Number(bridge?.dataset.portY);
+        const terminalScreenPoint = Number.isFinite(portX) && Number.isFinite(portY)
+          ? toScreenPoint(bridge, portX, portY)
+          : null;
+        return {
+          ...endpoint,
+          rendered: Boolean(polyline && bridge && connectionScreenPoint && terminalScreenPoint),
+          centerlineOffsetPx: connectionScreenPoint && terminalScreenPoint
+            ? Math.hypot(connectionScreenPoint.x - terminalScreenPoint.x, connectionScreenPoint.y - terminalScreenPoint.y)
+            : -1,
+          connectionStrokeWidthPx: polyline ? Number.parseFloat(getComputedStyle(polyline).strokeWidth) : -1,
+          terminalStrokeWidthPx: bridge ? Number.parseFloat(getComputedStyle(bridge).strokeWidth) : -1,
+        };
+      });
+    }, expectedTerminalEndpoints);
+    const imperfectTerminalMates = terminalMatingAudit.filter(endpoint => (
+      !endpoint.rendered
+      || endpoint.centerlineOffsetPx > 0.25
+      || Math.abs(endpoint.connectionStrokeWidthPx - endpoint.terminalStrokeWidthPx) > 0.01
+      || endpoint.connectionStrokeWidthPx !== 3
+    ));
+    if (imperfectTerminalMates.length) {
+      throw new Error(`Component terminals must share the exact connector centerline and stroke width: ${JSON.stringify(imperfectTerminalMates)}`);
+    }
+    const busComponents = project.oneLine.sheets[project.oneLine.activeSheet || 0].components
+      .filter(component => component.type === 'bus')
+      .map(component => ({
+        id: component.id,
+        label: component.label,
+        connectionCount: (component.connections || []).length,
+      }));
+    const busTapAudit = await page.evaluate(buses => buses.flatMap(bus => (
+      Array.from({ length: bus.connectionCount }, (_, index) => {
+        const polyline = document.querySelector(`#diagram polyline.connection[data-comp="${CSS.escape(bus.id)}"][data-index="${index}"]`);
+        const busImage = document.querySelector(`#diagram g.component[data-id="${CSS.escape(bus.id)}"] image`);
+        const points = polyline?.points
+          ? Array.from({ length: polyline.points.numberOfItems }, (_, pointIndex) => {
+              const point = polyline.points.getItem(pointIndex);
+              return { x: point.x, y: point.y };
+            })
+          : [];
+        const vertical = points.length >= 2 && points.every(point => Math.abs(point.x - points[0].x) < 0.5);
+        return { bus: bus.label, index, renderedWidth: Number(busImage?.getAttribute('width')), points, vertical };
+      })
+    )), busComponents);
+    const extendedBusConnections = busTapAudit.filter(connection => !connection.vertical);
+    if (extendedBusConnections.length) {
+      throw new Error(`Feeder connections must fall directly beneath their visible buses: ${JSON.stringify(extendedBusConnections)}`);
+    }
+    const adjacentBranchClearance = await page.evaluate(() => {
+      const bus = document.querySelector('#diagram g.component[data-id="comp-mcc-102"] image');
+      const transformer = document.querySelector('#diagram g.component[data-id="comp-xfmr-102"] image');
+      const busBounds = bus?.getBoundingClientRect();
+      const transformerBounds = transformer?.getBoundingClientRect();
+      return {
+        rendered: Boolean(busBounds && transformerBounds),
+        gapPx: busBounds && transformerBounds ? transformerBounds.left - busBounds.right : -1,
+      };
+    });
+    if (!adjacentBranchClearance.rendered || adjacentBranchClearance.gapPx < 20) {
+      throw new Error(`MCC-102 must maintain visible clearance from the XFMR-102 branch: ${JSON.stringify(adjacentBranchClearance)}`);
+    }
+    const transformerComponents = project.oneLine.sheets[project.oneLine.activeSheet || 0].components
+      .filter(component => component.type === 'transformer')
+      .map(transformer => {
+        const primaryConnected = project.oneLine.sheets[project.oneLine.activeSheet || 0].components
+          .some(component => (component.connections || []).some(connection => (
+            connection.target === transformer.id && Number(connection.targetPort || 0) === 0
+          )));
+        const secondaryConnected = (transformer.connections || [])
+          .some(connection => Number(connection.sourcePort || 0) === 1);
+        return { id: transformer.id, label: transformer.label, primaryConnected, secondaryConnected };
+      });
+    const transformerTerminalAudit = await page.evaluate(transformers => transformers.map(transformer => {
+      const component = document.querySelector(`#diagram g.component[data-id="${CSS.escape(transformer.id)}"]`);
+      const image = component?.querySelector('image');
+      const imageBounds = image?.getBoundingClientRect();
+      const terminalAxisX = imageBounds ? imageBounds.left + (imageBounds.width / 2) : null;
+      const fittedScale = imageBounds ? Math.min(imageBounds.width / 76, imageBounds.height / 84) : 0;
+      const fittedWidth = 76 * fittedScale;
+      const fittedHeight = 84 * fittedScale;
+      const expectedTop = imageBounds ? {
+        x: imageBounds.left + ((imageBounds.width - fittedWidth) / 2) + (38 * fittedScale),
+        y: imageBounds.top + ((imageBounds.height - fittedHeight) / 2),
+      } : null;
+      const expectedBottom = expectedTop ? {
+        x: expectedTop.x,
+        y: expectedTop.y + fittedHeight,
+      } : null;
+      const bridgeDetails = portIndex => {
+        const bridge = component?.querySelector(`.component-terminal-bridge[data-port-index="${portIndex}"]`);
+        const matrix = bridge?.getScreenCTM();
+        const portX = Number(bridge?.dataset.portX);
+        const portY = Number(bridge?.dataset.portY);
+        const point = matrix && Number.isFinite(portX) && Number.isFinite(portY)
+          ? new DOMPoint(portX, portY).matrixTransform(matrix)
+          : null;
+        return {
+          point,
+          length: bridge && typeof bridge.getTotalLength === 'function' ? bridge.getTotalLength() : -1,
+        };
+      };
+      const topBridge = bridgeDetails(0);
+      const bottomBridge = bridgeDetails(1);
+      const endpointOffset = (actual, expected) => actual && expected
+        ? Math.hypot(actual.x - expected.x, actual.y - expected.y)
+        : -1;
+      const labels = Array.from(document.querySelectorAll(
+        `#diagram .transformer-port-label[data-component-id="${CSS.escape(transformer.id)}"]`
+      )).map(label => {
+        const bounds = label.getBoundingClientRect();
+        const axisClearancePx = terminalAxisX === null
+          ? -1
+          : bounds.right <= terminalAxisX
+            ? terminalAxisX - bounds.right
+            : bounds.left >= terminalAxisX
+              ? bounds.left - terminalAxisX
+              : -1;
+        return { text: label.textContent || '', axisClearancePx };
+      });
+      return {
+        ...transformer,
+        rendered: Boolean(imageBounds),
+        labels,
+        topTerminalOffsetPx: endpointOffset(topBridge.point, expectedTop),
+        bottomTerminalOffsetPx: endpointOffset(bottomBridge.point, expectedBottom),
+        topBridgeLength: topBridge.length,
+        bottomBridgeLength: bottomBridge.length,
+      };
+    }), transformerComponents);
+    const obscuredTransformerTerminals = transformerTerminalAudit.filter(transformer => (
+      !transformer.rendered
+      || !transformer.primaryConnected
+      || !transformer.secondaryConnected
+      || transformer.labels.length !== 2
+      || transformer.labels.some(label => label.axisClearancePx < 4)
+      || transformer.topTerminalOffsetPx < 0
+      || transformer.bottomTerminalOffsetPx < 0
+      || transformer.topTerminalOffsetPx > 0.25
+      || transformer.bottomTerminalOffsetPx > 0.25
+      || transformer.topBridgeLength < 22
+      || transformer.bottomBridgeLength < 22
+    ));
+    if (obscuredTransformerTerminals.length) {
+      throw new Error(`Transformer winding terminals must be connected and remain visible on both sides: ${JSON.stringify(obscuredTransformerTerminals)}`);
+    }
+    const panelComponents = project.oneLine.sheets[project.oneLine.activeSheet || 0].components
+      .filter(component => component.type === 'panel')
+      .map(panel => ({
+        id: panel.id,
+        label: panel.label,
+        incomingConnected: project.oneLine.sheets[project.oneLine.activeSheet || 0].components
+          .some(component => (component.connections || []).some(connection => (
+            connection.target === panel.id && Number(connection.targetPort || 0) === 0
+          )))
+      }));
+    const panelTerminalAudit = await page.evaluate(panels => panels.map(panel => {
+      const component = document.querySelector(`#diagram g.component[data-id="${CSS.escape(panel.id)}"]`);
+      const image = component?.querySelector('image');
+      const imageBounds = image?.getBoundingClientRect();
+      const fittedScale = imageBounds ? Math.min(imageBounds.width / 64, imageBounds.height / 76) : 0;
+      const fittedWidth = 64 * fittedScale;
+      const expectedTop = imageBounds ? {
+        x: imageBounds.left + ((imageBounds.width - fittedWidth) / 2) + (32 * fittedScale),
+        y: imageBounds.top + ((imageBounds.height - (76 * fittedScale)) / 2),
+      } : null;
+      const bridge = component?.querySelector('.component-terminal-bridge[data-port-index="0"]');
+      const bottomBridge = component?.querySelector('.component-terminal-bridge[data-port-index="1"]');
+      const terminalBridgeCount = component?.querySelectorAll('.component-terminal-bridge').length || 0;
+      const matrix = bridge?.getScreenCTM();
+      const portX = Number(bridge?.dataset.portX);
+      const portY = Number(bridge?.dataset.portY);
+      const point = matrix && Number.isFinite(portX) && Number.isFinite(portY)
+        ? new DOMPoint(portX, portY).matrixTransform(matrix)
+        : null;
+      return {
+        ...panel,
+        rendered: Boolean(imageBounds),
+        terminalBridgeCount,
+        hasBottomBridge: Boolean(bottomBridge),
+        topTerminalOffsetPx: point && expectedTop
+          ? Math.hypot(point.x - expectedTop.x, point.y - expectedTop.y)
+          : -1,
+        topBridgeLength: bridge && typeof bridge.getTotalLength === 'function' ? bridge.getTotalLength() : -1,
+      };
+    }), panelComponents);
+    const misalignedPanelTerminals = panelTerminalAudit.filter(panel => (
+      !panel.rendered
+      || !panel.incomingConnected
+      || panel.terminalBridgeCount !== 1
+      || panel.hasBottomBridge
+      || panel.topTerminalOffsetPx < 0
+      || panel.topTerminalOffsetPx > 0.25
+      || panel.topBridgeLength < 22
+    ));
+    if (misalignedPanelTerminals.length) {
+      throw new Error(`Panel terminals must visibly mate with their incoming connectors: ${JSON.stringify(misalignedPanelTerminals)}`);
+    }
+    const motorComponents = project.oneLine.sheets[project.oneLine.activeSheet || 0].components
+      .filter(component => component.subtype === 'motor_load')
+      .map(component => ({ id: component.id, rotation: Number(component.rotation || 0) }));
+    const motorOrientationAudit = await page.evaluate(motors => motors.map(motor => {
+      const element = document.querySelector(`#diagram g.component[data-id="${CSS.escape(motor.id)}"]`);
+      const transform = element?.getAttribute('transform') || '';
+      const image = element?.querySelector('image');
+      const iconHref = image?.getAttribute('href')
+        || image?.getAttribute('xlink:href')
+        || '';
+      const imageBounds = image?.getBoundingClientRect();
+      const bridge = element?.querySelector('.component-terminal-bridge[data-port-index="0"]');
+      const bridgeMatrix = bridge?.getScreenCTM();
+      const portX = Number(bridge?.dataset.portX);
+      const portY = Number(bridge?.dataset.portY);
+      const portPoint = bridgeMatrix && Number.isFinite(portX) && Number.isFinite(portY)
+        ? new DOMPoint(portX, portY).matrixTransform(bridgeMatrix)
+        : null;
+      const storedComponent = window.dataStore.getOneLine().sheets
+        .flatMap(sheet => sheet.components || [])
+        .find(component => component.id === motor.id);
+      return {
+        ...motor,
+        transform,
+        rotated: transform.includes('rotate('),
+        iconHref,
+        storedType: storedComponent?.type,
+        storedSubtype: storedComponent?.subtype,
+        storedWidth: storedComponent?.width,
+        storedHeight: storedComponent?.height,
+        storedPorts: storedComponent?.ports,
+        visibleIconCenterlineOffsetPx: imageBounds && portPoint
+          ? Math.abs((imageBounds.left + (imageBounds.width / 2)) - portPoint.x)
+          : -1,
+      };
+    }), motorComponents);
+    const misorientedMotors = motorOrientationAudit.filter(row => (
+      row.rotation !== 0
+      || row.rotated
+      || !/\/Motor\.svg(?:\?|$)/.test(row.iconHref)
+      || row.visibleIconCenterlineOffsetPx > 0.25
+    ));
+    if (misorientedMotors.length) {
+      throw new Error(`One-line motor symbols must use the upright circle-M orientation: ${JSON.stringify(misorientedMotors)}`);
+    }
+    const vfdComponents = project.oneLine.sheets[project.oneLine.activeSheet || 0].components
+      .filter(component => component.subtype === 'vfd')
+      .map(component => ({ id: component.id, rotation: Number(component.rotation || 0) }));
+    const vfdSymbolAudit = await page.evaluate(vfds => vfds.map(vfd => {
+      const element = document.querySelector(`#diagram g.component[data-id="${CSS.escape(vfd.id)}"]`);
+      const transform = element?.getAttribute('transform') || '';
+      const image = element?.querySelector('image');
+      const iconHref = image?.getAttribute('href')
+        || image?.getAttribute('xlink:href')
+        || '';
+      const imageBounds = image?.getBoundingClientRect();
+      const fittedScale = imageBounds ? Math.min(imageBounds.width / 64, imageBounds.height / 78) : 0;
+      const fittedHeight = 78 * fittedScale;
+      const expectedTop = imageBounds ? {
+        x: imageBounds.left + (imageBounds.width / 2),
+        y: imageBounds.top + ((imageBounds.height - fittedHeight) / 2),
+      } : null;
+      const expectedBottom = expectedTop ? {
+        x: expectedTop.x,
+        y: expectedTop.y + fittedHeight,
+      } : null;
+      const bridgePortPoint = portIndex => {
+        const bridge = element?.querySelector(`.component-terminal-bridge[data-port-index="${portIndex}"]`);
+        const matrix = bridge?.getScreenCTM();
+        const portX = Number(bridge?.dataset.portX);
+        const portY = Number(bridge?.dataset.portY);
+        return matrix && Number.isFinite(portX) && Number.isFinite(portY)
+          ? new DOMPoint(portX, portY).matrixTransform(matrix)
+          : null;
+      };
+      const topPort = bridgePortPoint(0);
+      const bottomPort = bridgePortPoint(1);
+      const storedComponent = window.dataStore.getOneLine().sheets
+        .flatMap(sheet => sheet.components || [])
+        .find(component => component.id === vfd.id);
+      const endpointOffset = (actual, expected) => actual && expected
+        ? Math.hypot(actual.x - expected.x, actual.y - expected.y)
+        : -1;
+      return {
+        ...vfd,
+        transform,
+        rotated: transform.includes('rotate('),
+        iconHref,
+        storedType: storedComponent?.type,
+        storedSubtype: storedComponent?.subtype,
+        storedWidth: storedComponent?.width,
+        storedHeight: storedComponent?.height,
+        storedPorts: storedComponent?.ports,
+        topTerminalOffsetPx: endpointOffset(topPort, expectedTop),
+        bottomTerminalOffsetPx: endpointOffset(bottomPort, expectedBottom),
+      };
+    }), vfdComponents);
+    const invalidVfdSymbols = vfdSymbolAudit.filter(row => (
+      row.rotation !== 0
+      || row.rotated
+      || !/\/VFD\.svg(?:\?|$)/.test(row.iconHref)
+      || row.topTerminalOffsetPx < 0
+      || row.bottomTerminalOffsetPx < 0
+      || row.topTerminalOffsetPx > 0.25
+      || row.bottomTerminalOffsetPx > 0.25
+    ));
+    if (invalidVfdSymbols.length) {
+      throw new Error(`One-line VFD symbols must use the upright labeled enclosure: ${JSON.stringify(invalidVfdSymbols)}`);
     }
     const oneLineCaptureSelector = await createSvgCaptureSurface(page, '#diagram', { padding: 70, targetWidth: 1200 });
     const oneLinePath = join(outputDir, 'one-line-engineering-print.png');
@@ -292,6 +706,8 @@ async function captureVisuals({ input, outputDir }) {
       const trayAudit = await page.locator('#svgContainer svg').evaluate(svg => ({
         labels: svg.textContent || '',
         dividerCount: Array.from(svg.querySelectorAll('text')).filter(node => node.textContent === 'DIVIDER').length,
+        stackingBoundaryLineCount: svg.querySelectorAll('line[stroke-dasharray]').length,
+        stackingBoundaryLabelCount: Array.from(svg.querySelectorAll('text')).filter(node => node.textContent === 'DOTTED LINE - STACKING BOUNDARY').length,
       }));
       const missingCableLabels = cables.map(cable => cable.tag).filter(tag => !trayAudit.labels.includes(tag));
       if (missingCableLabels.length) throw new Error(`Tray ${section.trayId} is missing cable identification labels: ${missingCableLabels.join(', ')}`);
@@ -299,19 +715,35 @@ async function captureVisuals({ input, outputDir }) {
       if (trayAudit.dividerCount !== expectedDividers) {
         throw new Error(`Tray ${section.trayId} rendered ${trayAudit.dividerCount} dividers; expected ${expectedDividers}.`);
       }
+      if (trayAudit.stackingBoundaryLabelCount !== trayAudit.stackingBoundaryLineCount) {
+        throw new Error(`Tray ${section.trayId} has ${trayAudit.stackingBoundaryLineCount} dotted stacking boundaries but ${trayAudit.stackingBoundaryLabelCount} labels.`);
+      }
       trays.push({
         id: section.trayId,
         cableTags: cables.map(cable => cable.tag),
         material: tray.material,
         dividerCount: trayAudit.dividerCount,
+        stackingBoundaryCount: trayAudit.stackingBoundaryLineCount,
         page: 'cabletrayfill.html',
         ...(await captureLocator(page, '#svgContainer svg', path)),
       });
     }
 
     const ductbanks = [];
+    let sharedConduitExamples = 0;
     for (const section of ductbankSections) {
       const id = section.ductbankId;
+      const ductbank = project.ductbanks.find(row => row.ductbank_id === id || row.id === id || row.tag === id);
+      const conduitIds = new Set((ductbank?.conduits || []).map(conduit => String(conduit.conduit_id)));
+      const assignedCables = project.cables.filter(cable => assignedRacewayIds(cable).some(racewayId => conduitIds.has(racewayId)));
+      const cableCounts = assignedCables.reduce((counts, cable) => {
+        new Set(assignedRacewayIds(cable).filter(racewayId => conduitIds.has(racewayId))).forEach(racewayId => {
+          counts.set(racewayId, (counts.get(racewayId) || 0) + 1);
+        });
+        return counts;
+      }, new Map());
+      const maximumCablesInOneConduit = Math.max(0, ...cableCounts.values());
+      if (maximumCablesInOneConduit >= 2) sharedConduitExamples += 1;
       console.log(`Capturing application ductbank view ${id}...`);
       await page.goto(`${server.origin}/ductbankroute.html?ductbank=${encodeURIComponent(id)}`, { waitUntil: 'domcontentloaded' });
       await page.waitForFunction(expected => (
@@ -330,14 +762,23 @@ async function captureVisuals({ input, outputDir }) {
       if (!ductbankAudit.labels.includes('MIN COVER')) {
         throw new Error(`Ductbank ${id} does not identify its concrete sidewall cover.`);
       }
+      const missingCableLabels = assignedCables.map(cable => cable.tag).filter(tag => !ductbankAudit.labels.includes(tag));
+      if (missingCableLabels.length) {
+        throw new Error(`Ductbank ${id} is missing assigned cable labels: ${missingCableLabels.join(', ')}`);
+      }
       const path = join(outputDir, `ductbank-${safeFileName(id)}.png`);
       ductbanks.push({
         id,
         concreteCoverIn: section.concreteCoverIn,
         conduitCount: ductbankAudit.conduitCount,
+        assignedCableCount: assignedCables.length,
+        maximumCablesInOneConduit,
         page: `ductbankroute.html?ductbank=${encodeURIComponent(id)}`,
         ...(await captureLocator(page, '#grid', path)),
       });
+    }
+    if (!sharedConduitExamples) {
+      throw new Error('The engineering sample must include at least one ductbank conduit containing multiple cables.');
     }
 
     const makeRelative = capture => ({
@@ -355,9 +796,27 @@ async function captureVisuals({ input, outputDir }) {
           ...makeRelative(oneLine),
           page: 'oneline.html',
           mode: 'engineeringPrint',
-          datablockFormat: 'off',
+          datablockFormat: 'report',
+          datablockDensity: 'expanded',
           componentCount,
           renderedConnectionCount: oneLineConnectionAudit.renderedConnections,
+          connectedTerminalBridgeCount: terminalBridgeAudit.length,
+          perfectlyMatedTerminalEndpointCount: terminalMatingAudit.length,
+          connectionAndTerminalStrokeWidthPx: 3,
+          uprightMotorCount: motorOrientationAudit.length,
+          uprightVfdCount: vfdSymbolAudit.length,
+          perfectlyAlignedVfdTerminalCount: vfdSymbolAudit.length * 2,
+          verticallyAlignedBusConnectionCount: busTapAudit.length,
+          adjacentBranchClearancePx: Number(adjacentBranchClearance.gapPx.toFixed(1)),
+          visiblyConnectedTransformerCount: transformerTerminalAudit.length,
+          perfectlyAlignedTransformerTerminalCount: transformerTerminalAudit.length * 2,
+          transformerTerminalBridgeDepthPx: 20,
+          visiblyConnectedPanelCount: panelTerminalAudit.length,
+          perfectlyAlignedPanelTerminalCount: panelTerminalAudit.length,
+          singleConnectionPanelCount: panelTerminalAudit.length,
+          panelTerminalBridgeDepthPx: 20,
+          annotatedProtectiveDeviceCount: reportAnnotationAudit.filter(annotation => annotation.type === 'protective').length,
+          annotatedTransformerCount: reportAnnotationAudit.filter(annotation => annotation.type === 'transformer').length,
         },
         trays: trays.map(makeRelative),
         ductbanks: ductbanks.map(makeRelative),

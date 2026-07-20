@@ -63,8 +63,7 @@ const BOX_INDICES = new Uint16Array([
 const BOX_INDEX_COUNT = BOX_INDICES.length; // 36
 
 /**
- * Compute the 8 vertices of a rectangular prism for one axis-aligned segment.
- * Replicates meshForSegment() from app.mjs exactly.
+ * Compute the 8 vertices of an oriented rectangular prism for one 3D segment.
  *
  * @param {number[]} s     - [x, y, z] start point
  * @param {number[]} e     - [x, y, z] end point
@@ -72,28 +71,29 @@ const BOX_INDEX_COUNT = BOX_INDICES.length; // 36
  * @returns {Float32Array} 24 floats — 8 vertices × (x, y, z)
  */
 function boxVerts(s, e, tray) {
-  const w  = num(tray.width)  / 12;   // inches → feet
-  const h  = num(tray.height) / 12;
-  const [sx, sy, sz] = s;
-  const [ex, ey, ez] = e;
-  let v;
-  if (sx !== ex) {
-    const y1 = sy - w / 2, y2 = sy + w / 2;
-    const z1 = sz - h / 2, z2 = sz + h / 2;
-    v = [sx,y1,z1, sx,y2,z1, sx,y2,z2, sx,y1,z2,
-         ex,y1,z1, ex,y2,z1, ex,y2,z2, ex,y1,z2];
-  } else if (sy !== ey) {
-    const x1 = sx - w / 2, x2 = sx + w / 2;
-    const z1 = sz - h / 2, z2 = sz + h / 2;
-    v = [x1,sy,z1, x2,sy,z1, x2,sy,z2, x1,sy,z2,
-         x1,ey,z1, x2,ey,z1, x2,ey,z2, x1,ey,z2];
-  } else {
-    const x1 = sx - w / 2, x2 = sx + w / 2;
-    const y1 = sy - h / 2, y2 = sy + h / 2;
-    v = [x1,y1,sz, x2,y1,sz, x2,y2,sz, x1,y2,sz,
-         x1,y1,ez, x2,y1,ez, x2,y2,ez, x1,y2,ez];
-  }
-  return new Float32Array(v);
+  const w = Math.max(num(tray.width) / 12, 0.01);
+  const h = Math.max(num(tray.height) / 12, 0.01);
+  const subtract = (a, b) => a.map((value, index) => value - b[index]);
+  const cross = (a, b) => [
+    a[1] * b[2] - a[2] * b[1],
+    a[2] * b[0] - a[0] * b[2],
+    a[0] * b[1] - a[1] * b[0]
+  ];
+  const normalize = value => {
+    const length = Math.hypot(...value);
+    return length > 1e-9 ? value.map(component => component / length) : [1, 0, 0];
+  };
+  const direction = normalize(subtract(e, s));
+  const reference = Math.abs(direction[2]) > 0.95 ? [1, 0, 0] : [0, 0, 1];
+  const lateral = normalize(cross(direction, reference));
+  const vertical = normalize(cross(lateral, direction));
+  const corner = (point, lateralSign, verticalSign) => point.map((value, axis) => (
+    value + lateral[axis] * lateralSign * w / 2 + vertical[axis] * verticalSign * h / 2
+  ));
+  return new Float32Array([
+    ...corner(s, -1, -1), ...corner(s, 1, -1), ...corner(s, 1, 1), ...corner(s, -1, 1),
+    ...corner(e, -1, -1), ...corner(e, 1, -1), ...corner(e, 1, 1), ...corner(e, -1, 1)
+  ]);
 }
 
 /**
@@ -104,6 +104,9 @@ function boxVerts(s, e, tray) {
  * @returns {Array<[number[], number[]]>}
  */
 function traySubSegments(tray) {
+  if (Array.isArray(tray.path) && tray.path.length >= 2) {
+    return tray.path.slice(0, -1).map((point, index) => [point, tray.path[index + 1]]);
+  }
   const start = [num(tray.start_x), num(tray.start_y), num(tray.start_z)];
   const end   = [num(tray.end_x),   num(tray.end_y),   num(tray.end_z)];
   const segs  = [];
@@ -226,7 +229,26 @@ export function exportToGLTF2({
   });
 
   // ── 2. Compute per-cable geometry (GL_LINES) ─────────────────────────────
-  const cableItems = cables.map((cable, ci) => {
+  const cableItems = cables.map(cable => {
+    const segments = Array.isArray(cable.route_segments)
+      ? cable.route_segments.filter(segment => Array.isArray(segment.start) && Array.isArray(segment.end))
+      : Array.isArray(cable.segments)
+        ? cable.segments.filter(segment => Array.isArray(segment.start) && Array.isArray(segment.end))
+        : [];
+    if (segments.length) {
+      const vertices = [];
+      const indices = [];
+      segments.forEach(segment => {
+        const offset = vertices.length / 3;
+        vertices.push(...segment.start.slice(0, 3).map(num), ...segment.end.slice(0, 3).map(num));
+        indices.push(offset, offset + 1);
+      });
+      return {
+        cable,
+        verts: new Float32Array(vertices),
+        indices: new Uint16Array(indices)
+      };
+    }
     const sx = num(cable.start_x  ?? cable.startPoint?.[0]);
     const sy = num(cable.start_y  ?? cable.startPoint?.[1]);
     const sz = num(cable.start_z  ?? cable.startPoint?.[2]);
@@ -363,6 +385,9 @@ export function exportToGLTF2({
         cable_id: item.cable.cable_id || item.cable.label || '',
         from_tag: item.cable.from_tag || '',
         to_tag:   item.cable.to_tag   || '',
+        segment_count: Array.isArray(item.cable.route_segments)
+          ? item.cable.route_segments.length
+          : Array.isArray(item.cable.segments) ? item.cable.segments.length : 1,
       },
     });
   }

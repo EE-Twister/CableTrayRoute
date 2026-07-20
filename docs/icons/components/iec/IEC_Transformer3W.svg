@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 86 92" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="square" stroke-linejoin="miter">
   <!-- IEC three-winding transformer with terminal leads at all three declared ports. -->
-  <line x1="43" y1="0" x2="43" y2="14"/>
+  <line x1="43" y1="0" x2="43" y2="18"/>
   <circle cx="43" cy="30" r="16"/>
   <circle cx="43" cy="52" r="16"/>
-  <path d="M43 68v8M43 76H26M43 76H60M26 76v16M60 76v16"/>
+  <path d="M43 64v12M43 76H26M43 76H60M26 76v16M60 76v16"/>
 </svg>

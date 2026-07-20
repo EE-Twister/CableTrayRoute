@@ -1004,6 +1004,8 @@ body.compact-mode .palette-section .section-buttons {
 .command-menu {
   position: relative;
   display: inline-flex;
+  max-width: 100%;
+  box-sizing: border-box;
   min-width: 0;
 }
 
@@ -1018,6 +1020,8 @@ body.compact-mode .palette-section .section-buttons {
 .command-menu-trigger {
   display: inline-flex;
   align-items: center;
+  max-width: 100%;
+  box-sizing: border-box;
   gap: 0.35rem;
   min-height: 2.15rem;
   white-space: nowrap;
@@ -1892,15 +1896,47 @@ body.oneline-page .palette-scroll {
 }
 
 #diagram .connection-main {
-  stroke-width: 2.8;
+  stroke-width: 3;
+}
+
+.reconcile-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(7rem, 1fr));
+  gap: .65rem;
+  margin: .75rem 0 1rem;
+}
+
+.reconcile-summary-grid article {
+  display: flex;
+  flex-direction: column;
+  gap: .2rem;
+  padding: .7rem;
+  border: 1px solid var(--border-color, #d1d5db);
+  border-radius: 6px;
+  background: var(--surface-muted, #f8fafc);
+}
+
+.reconcile-summary-grid span {
+  color: var(--text-muted, #64748b);
+  font-size: .78rem;
+}
+
+.reconcile-summary-grid strong {
+  font-size: 1.35rem;
+}
+
+@media (max-width: 700px) {
+  .reconcile-summary-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 
 #diagram .connection-device {
-  stroke-width: 2.1;
+  stroke-width: 3;
 }
 
 #diagram .connection-branch {
-  stroke-width: 1.65;
+  stroke-width: 3;
 }
 
 .conn-label-assumed {
@@ -3058,6 +3094,48 @@ body.oneline-page #lint-list .cross-probe-link {
   font-size: 0.78rem;
 }
 
+@media (min-width: 601px) and (max-width: 900px) {
+  body.oneline-page .sheet-controls.oneline-command-header {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
+  }
+
+  body.oneline-page .sheet-controls.oneline-command-header .command-context {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+
+  body.oneline-page .sheet-controls.oneline-command-header .scenario-select-group,
+  body.oneline-page .sheet-controls.oneline-command-header .operating-state-group {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    min-width: 0;
+  }
+
+  body.oneline-page .sheet-controls.oneline-command-header select {
+    max-width: 100%;
+    width: 100%;
+  }
+
+  body.oneline-page .sheet-controls.oneline-command-header .sheet-switcher {
+    min-width: 0;
+  }
+
+  body.oneline-page .sheet-controls.oneline-command-header .primary-action-group {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    min-width: 0;
+  }
+
+  body.oneline-page .sheet-controls.oneline-command-header .primary-action-group > * {
+    width: 100%;
+    min-width: 0;
+    justify-content: center;
+  }
+}
+
 @media (max-width: 600px) {
   body.oneline-page .main-content {
     overflow: hidden;
@@ -3102,22 +3180,28 @@ body.oneline-page #lint-list .cross-probe-link {
     overflow-x: auto;
   }
   body.oneline-page .sheet-controls.oneline-command-header .sheet-switcher {
+    grid-column: 1 / -1;
     width: auto;
     min-width: 0;
     overflow: hidden;
   }
   body.oneline-page .sheet-controls.oneline-command-header .primary-action-group {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     grid-column: 1 / -1;
     width: 100%;
     min-width: 0;
     gap: 0.35rem;
     overflow: visible;
   }
+  body.oneline-page .sheet-controls.oneline-command-header .primary-action-group > * {
+    width: 100%;
+    min-width: 0;
+    justify-content: center;
+  }
   body.oneline-page .toolbar.refined-toolbar {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     flex: 0 0 auto;
     max-height: none;
     overflow: visible;
@@ -3135,6 +3219,9 @@ body.oneline-page #lint-list .cross-probe-link {
     width: 100%;
     justify-content: center;
     padding-inline: 0.25rem;
+  }
+  body.oneline-page .toolbar.refined-toolbar .drawing-mode-zoom-menu {
+    grid-column: span 2;
   }
   body.oneline-page .toolbar.refined-toolbar .find-toolbar-group {
     display: none;

@@ -622,6 +622,74 @@
       "voltage": "208",
       "insulation_type": "THHN",
       "cable_rating": 600
+    },
+    {
+      "tag": "CTL-MCC2-FAN-101",
+      "name": "CTL-MCC2-FAN-101",
+      "from": "MCC-102",
+      "from_tag": "MCC-102",
+      "to": "FAN-101",
+      "to_tag": "FAN-101",
+      "cable_type": "Control",
+      "conductors": 7,
+      "conductor_size": "#14 AWG",
+      "conductor_material": "Copper",
+      "raceway_material": "PVC",
+      "ground_size": "#14 AWG",
+      "ground_material": "Copper",
+      "ocpd_rating": 15,
+      "length": 210,
+      "length_ft": 210,
+      "conduit_id": "CND-CTRL-102",
+      "raceway_ids": ["CND-CTRL-102"],
+      "route_preference": "CND-CTRL-102",
+      "start_x": 0,
+      "start_y": 57,
+      "start_z": -4,
+      "end_x": 210,
+      "end_y": 57,
+      "end_z": -4,
+      "diameter": 0.48,
+      "weight": 0.32,
+      "est_load": 2.0,
+      "voltage": "120",
+      "insulation_type": "THHN",
+      "insulation_rating": "90",
+      "cable_rating": 600
+    },
+    {
+      "tag": "CTL-MCC2-AHU-101",
+      "name": "CTL-MCC2-AHU-101",
+      "from": "MCC-102",
+      "from_tag": "MCC-102",
+      "to": "AHU-101",
+      "to_tag": "AHU-101",
+      "cable_type": "Control",
+      "conductors": 7,
+      "conductor_size": "#14 AWG",
+      "conductor_material": "Copper",
+      "raceway_material": "PVC",
+      "ground_size": "#14 AWG",
+      "ground_material": "Copper",
+      "ocpd_rating": 15,
+      "length": 210,
+      "length_ft": 210,
+      "conduit_id": "CND-CTRL-102",
+      "raceway_ids": ["CND-CTRL-102"],
+      "route_preference": "CND-CTRL-102",
+      "start_x": 0,
+      "start_y": 57,
+      "start_z": -4,
+      "end_x": 210,
+      "end_y": 57,
+      "end_z": -4,
+      "diameter": 0.48,
+      "weight": 0.32,
+      "est_load": 1.5,
+      "voltage": "120",
+      "insulation_type": "THHN",
+      "insulation_rating": "90",
+      "cable_rating": 600
     }
   ],
   "cableTypicals": [],
@@ -1030,7 +1098,7 @@
             "x": 682,
             "y": 100,
             "voltage": 480,
-            "props": { "tag": "MAIN-SWBD-101", "class": "L", "rating_a": 800, "interrupting_rating_ka": 200 },
+            "props": { "tag": "MAIN-SWBD-101", "class": "L", "rating_a": 800, "amp_trip": "800 A", "interrupting_rating_ka": 200 },
             "connections": [
               { "target": "comp-swbd-101", "sourcePort": 1, "targetPort": 0 }
             ]
@@ -1065,7 +1133,7 @@
             "x": 322,
             "y": 280,
             "voltage": 480,
-            "props": { "tag": "FDR-MCC-101", "class": "J", "rating_a": 400, "interrupting_rating_ka": 200 },
+            "props": { "tag": "FDR-MCC-101", "class": "J", "rating_a": 400, "amp_trip": "400 A", "interrupting_rating_ka": 200 },
             "connections": [
               { "target": "comp-mcc-101", "sourcePort": 1, "cable": { "tag": "CBL-SWBD-MCC-101", "conductor_size": "500 kcmil", "length": 145 } }
             ]
@@ -1109,7 +1177,7 @@
             "x": 312,
             "y": 455,
             "voltage": 480,
-            "props": { "tag": "MCP-PMP-101", "class": "J", "rating_a": 60, "interrupting_rating_ka": 200 },
+            "props": { "tag": "MCP-PMP-101", "class": "J", "rating_a": 60, "amp_trip": "60 A", "interrupting_rating_ka": 200 },
             "connections": [
               { "target": "comp-pmp-101", "sourcePort": 1, "targetPort": 0, "cable": { "tag": "CBL-MCC-PMP-101", "conductor_size": "#4 AWG", "length": 95 } }
             ]
@@ -1122,6 +1190,8 @@
             "ref": "PMP-101",
             "x": 308,
             "y": 555,
+            "rotation": 0,
+            "rotationManual": true,
             "loadRef": "PMP-101",
             "equipmentRef": "PMP-101",
             "voltage": 480,
@@ -1141,6 +1211,10 @@
             "voltage": 480,
             "volts_primary": 480,
         "volts_secondary": 208,
+        "voltage_ratio": "480 - 208Y/120",
+        "winding": "Delta - Grounded Wye",
+        "primary_connection": "Delta",
+        "secondary_connection": "Grounded Wye",
         "kva": 75,
         "percent_z": 5.75,
         "xr_ratio": 6,
@@ -1176,12 +1250,14 @@
           },
           {
             "id": "comp-vfd-101",
-            "type": "equipment",
+            "type": "motor_controller",
             "subtype": "vfd",
             "label": "VFD-101",
             "ref": "VFD-101",
             "x": 535,
             "y": 455,
+            "rotation": 0,
+            "rotationManual": true,
             "equipmentRef": "VFD-101",
             "voltage": 480,
             "props": { "rated_voltage_kv": 0.48, "rated_hp": 50, "sccr_ka": 65 },
@@ -1198,6 +1274,8 @@
             "ref": "PMP-102",
             "x": 535,
             "y": 585,
+            "rotation": 0,
+            "rotationManual": true,
             "loadRef": "PMP-102",
             "equipmentRef": "PMP-102",
             "voltage": 480,
@@ -1213,7 +1291,7 @@
             "x": 442,
             "y": 690,
             "voltage": 480,
-            "props": { "tag": "FDR-MCC-102", "class": "J", "rating_a": 400, "interrupting_rating_ka": 200 },
+            "props": { "tag": "FDR-MCC-102", "class": "J", "rating_a": 400, "amp_trip": "400 A", "interrupting_rating_ka": 200 },
             "connections": [
               { "target": "comp-mcc-102", "sourcePort": 1, "cable": { "tag": "CBL-SWBD-MCC-102", "conductor_size": "350 kcmil", "length": 210 } }
             ]
@@ -1226,7 +1304,7 @@
             "ref": "MCC-102",
             "x": 210,
             "y": 800,
-            "width": 700,
+            "width": 775,
             "height": 20,
             "equipmentRef": "MCC-102",
             "voltage": 480,
@@ -1246,6 +1324,8 @@
             "ref": "FAN-101",
             "x": 268,
             "y": 900,
+            "rotation": 0,
+            "rotationManual": true,
             "loadRef": "FAN-101",
             "equipmentRef": "FAN-101",
             "voltage": 480,
@@ -1260,6 +1340,8 @@
             "ref": "AHU-101",
             "x": 498,
             "y": 900,
+            "rotation": 0,
+            "rotationManual": true,
             "loadRef": "AHU-101",
             "equipmentRef": "AHU-101",
             "voltage": 480,
@@ -1274,7 +1356,7 @@
             "x": 732,
             "y": 855,
             "voltage": 480,
-            "props": { "tag": "MCP-CMP-101", "class": "J", "rating_a": 200, "interrupting_rating_ka": 200 },
+            "props": { "tag": "MCP-CMP-101", "class": "J", "rating_a": 200, "amp_trip": "200 A", "interrupting_rating_ka": 200 },
             "connections": [
               { "target": "comp-cmp-101", "sourcePort": 1, "targetPort": 0, "cable": { "tag": "CBL-MCC2-CMP-101", "conductor_size": "1/0 AWG", "length": 205 } }
             ]
@@ -1287,6 +1369,8 @@
             "ref": "CMP-101",
             "x": 728,
             "y": 965,
+            "rotation": 0,
+            "rotationManual": true,
             "loadRef": "CMP-101",
             "equipmentRef": "CMP-101",
             "voltage": 480,
@@ -1301,7 +1385,7 @@
             "x": 1052,
             "y": 690,
             "voltage": 480,
-            "props": { "tag": "FDR-XFMR-102", "class": "J", "rating_a": 200, "interrupting_rating_ka": 200 },
+            "props": { "tag": "FDR-XFMR-102", "class": "J", "rating_a": 200, "amp_trip": "200 A", "interrupting_rating_ka": 200 },
             "connections": [
               { "target": "comp-xfmr-102", "sourcePort": 1, "targetPort": 0, "cable": { "tag": "CBL-SWBD-XFMR-102", "conductor_size": "2/0 AWG", "length": 118 } }
             ]
@@ -1318,6 +1402,10 @@
             "voltage": 480,
             "volts_primary": 480,
             "volts_secondary": 208,
+            "voltage_ratio": "480 - 208Y/120",
+            "winding": "Delta - Grounded Wye",
+            "primary_connection": "Delta",
+            "secondary_connection": "Grounded Wye",
             "kva": 112.5,
             "percent_z": 5.5,
             "xr_ratio": 6,
@@ -1371,7 +1459,7 @@
       "site": "Sample Industrial Site",
       "location": "United States",
       "engineer": "Sample Engineering Team",
-      "revision": "1",
+      "revision": "2",
       "issueStatus": "Issued for Demonstration",
       "date": "2026-07-17"
     },
@@ -1733,6 +1821,7 @@
       "packageId": "CTR-DEMO-001-EPR-001",
       "title": "Electrical Engineering Design and Study Package",
       "issueStatus": "Sample - Not for Construction",
+      "labelCreatedDate": "2026-07-17",
       "preparedBy": "CableTrayRoute Sample Engineering Team",
       "checkedBy": "Sample Engineer",
       "applicableStandards": [
@@ -1771,7 +1860,7 @@
           "columns": 3,
           "conduitTradeSizeIn": 4,
           "conduitSpacingIn": 7.5,
-          "circuits": ["CBL-SWBD-MCC-102", "SPARE", "SPARE", "SPARE", "SPARE", "SPARE"]
+          "circuits": ["CBL-SWBD-MCC-102", "CTL-MCC2-FAN-101 + CTL-MCC2-AHU-101", "SPARE", "SPARE", "SPARE", "SPARE"]
         }
       ],
       "trayCrossSections": [
@@ -1987,6 +2076,20 @@
           "total_length": 42,
           "breakdown": [{ "tray_id": "TR-PWR-101", "length": 42, "start": [118, 0, 12], "end": [160, 0, 12] }],
           "route_segments": [{ "type": "tray", "tray_id": "TR-PWR-101", "length": 42, "start": [118, 0, 12], "end": [160, 0, 12] }]
+        },
+        {
+          "cable": "CTL-MCC2-FAN-101",
+          "status": "Routed",
+          "total_length": 210,
+          "breakdown": [{ "conduit_id": "CND-CTRL-102", "ductbankTag": "DB-102", "length": 210, "start": [0, 57, -4], "end": [210, 57, -4] }],
+          "route_segments": [{ "type": "conduit", "conduit_id": "CND-CTRL-102", "ductbankTag": "DB-102", "length": 210, "start": [0, 57, -4], "end": [210, 57, -4] }]
+        },
+        {
+          "cable": "CTL-MCC2-AHU-101",
+          "status": "Routed",
+          "total_length": 210,
+          "breakdown": [{ "conduit_id": "CND-CTRL-102", "ductbankTag": "DB-102", "length": 210, "start": [0, 57, -4], "end": [210, 57, -4] }],
+          "route_segments": [{ "type": "conduit", "conduit_id": "CND-CTRL-102", "ductbankTag": "DB-102", "length": 210, "start": [0, 57, -4], "end": [210, 57, -4] }]
         }
       ]
     },
@@ -2006,7 +2109,7 @@
         "status": "Issued for Review",
         "createdAt": "2026-05-01T12:35:00.000Z",
         "summary": {
-          "cableCount": 12,
+          "cableCount": 14,
           "studyCount": 4
         }
       }

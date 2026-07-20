@@ -368,7 +368,11 @@ export function buildOneLineProjectView(oneLine = {}, project = {}) {
     entities.set(entity.id, { ...(entities.get(entity.id) || {}), ...entity });
   });
   const circuits = new Map(normalized.cables.filter(cable => cable?.id).map(cable => [cable.id, cable]));
-  const visualKeys = ['id', 'x', 'y', 'z', 'label', 'type', 'subtype', 'layer', 'ports', 'connections', 'scheduleLinks', 'equipmentRef', 'loadRef', 'panelRef', 'ref', 'props'];
+  const visualKeys = [
+    'id', 'x', 'y', 'z', 'width', 'height', 'rotation', 'rotationManual', 'flipped', 'labelOffset',
+    'label', 'type', 'subtype', 'layer', 'ports', 'connections', 'scheduleLinks',
+    'equipmentRef', 'loadRef', 'panelRef', 'ref', 'props'
+  ];
   return {
     ...oneLine,
     sheets: (Array.isArray(oneLine?.sheets) ? oneLine.sheets : []).map(sheet => ({

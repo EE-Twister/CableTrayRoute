@@ -69,6 +69,7 @@ export function calcSidewallPressure(bendRadius, tension) {
  * @param {number}  [cableProps.sizeKcmil]         - conductor size in kcmil (default 0 = no stiffness)
  * @param {number}  [cableProps.outerDiameterIn]   - cable OD in inches (default 0 = no stiffness)
  * @param {boolean} [cableProps.isInitialPull]     - true = apply static friction on first segment
+ * @param {number}  [cableProps.incomingTension]   - tension entering the first segment in lbf
  * @returns {Object} tension results plus diagnostic fields
  */
 export function calcPullTension(routeSegments = [], cableProps = {}) {
@@ -85,6 +86,7 @@ export function tracePullTension(routeSegments = [], cableProps = {}) {
   const sizeKcmil         = cableProps.sizeKcmil         ?? 0;
   const outerDiameterIn   = cableProps.outerDiameterIn   ?? 0;
   const isInitialPull     = cableProps.isInitialPull     ?? false;
+  const incomingTension   = Math.max(0, Number(cableProps.incomingTension) || 0);
 
   // --- Temperature-dependent friction ---
   const alpha  = JACKET_TEMP_ALPHA[jacketMaterial] ?? 0.004;
@@ -92,8 +94,8 @@ export function tracePullTension(routeSegments = [], cableProps = {}) {
     mu * (1 + alpha * (ambientTempC - 30))
   ));
 
-  let tension       = 0;
-  let maxTension    = 0;
+  let tension       = incomingTension;
+  let maxTension    = incomingTension;
   let maxSidewall   = 0;
   let stiffnessLbs  = 0;
   let staticApplied = false;
@@ -176,6 +178,7 @@ export function tracePullTension(routeSegments = [], cableProps = {}) {
     tempFrictionFactor: mu > 0 ? Math.round((muAdj / mu) * 10000) / 10000 : 1,
     stiffnessCorrectionLbs: Math.round(stiffnessLbs * 100) / 100,
     staticFrictionApplied: staticApplied,
+    incomingTension,
   };
   return { summary, segments };
 }

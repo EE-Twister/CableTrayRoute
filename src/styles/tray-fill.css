@@ -1,7 +1,7 @@
 /* --- Cable Tray Fill Page --- */
 body.cabletrayfill-page {
     margin: 0;
-    font-family: inherit;
+    font-family: var(--font-family-base);
 }
 body.cabletrayfill-page .page-header h1 {
     margin-bottom: var(--space-2);

@@ -108,7 +108,7 @@ if (projectId) {
   });
 }
 
-const oneLineSymbolAssetVersion = 'professional-symbols-v2';
+const oneLineSymbolAssetVersion = 'professional-symbols-v6';
 
 const typeIcons = {
   panel: asset(`icons/components/MLO.svg?v=${oneLineSymbolAssetVersion}`),
@@ -537,6 +537,7 @@ const datablockFormatPresets = Object.freeze({
   nameplate: ['voltage', 'volts', 'rating_a', 'kva', 'hp', 'percent_z', 'manufacturer', 'model'],
   study: ['voltage_mag', 'shortCircuit.threePhaseKA', 'shortCircuit.asymKA', 'arcFlash.incidentEnergy', 'arcFlash.ppeCategory', 'reliability.availability'],
   protection: ['rating_a', 'frame_a', 'interrupt_rating_ka', 'short_circuit_rating_ka', 'clearing_time', 'shortCircuit.threePhaseKA', 'arcFlash.incidentEnergy'],
+  report: ['amp_trip', 'voltage_ratio', 'winding'],
   cable: ['voltage', 'length', 'cable_type', 'conductor_size', 'conductor_material', 'short_circuit_rating_ka']
 });
 const datablockFormatLabels = Object.freeze({
@@ -545,6 +546,7 @@ const datablockFormatLabels = Object.freeze({
   nameplate: 'Nameplate',
   study: 'Studies',
   protection: 'Protection',
+  report: 'Report Annotations',
   cable: 'Cable',
   custom: 'Custom'
 });
@@ -927,10 +929,7 @@ function industrySymbolGeometry(profile) {
     return {
       width: 64,
       height: 76,
-      ports: [
-        { x: 32, y: 0 },
-        { x: 32, y: 76 }
-      ]
+      ports: [{ x: 32, y: 0 }]
     };
   }
   if (profile === 'equipment') {
@@ -1031,8 +1030,27 @@ function isLegacyDefaultComponentSize(comp) {
 }
 
 function applyIndustrySymbolGeometry(comp, meta = resolveComponentMeta(comp), { preserveCenter = true, force = false } = {}) {
-  const geometry = industrySymbolGeometry(getIndustrySymbolProfile(comp, meta));
+  const profile = getIndustrySymbolProfile(comp, meta);
+  const geometry = industrySymbolGeometry(profile);
   if (!geometry) return false;
+  if (profile === 'bus') {
+    const width = Number(comp.width);
+    const height = Number(comp.height);
+    comp.width = Number.isFinite(width) && width > 0 ? width : geometry.width;
+    comp.height = Number.isFinite(height) && height > 0 ? height : geometry.height;
+    const spacing = 20;
+    const ports = [];
+    for (let px = 0; px <= comp.width; px += spacing) {
+      ports.push({ x: px, y: 0 });
+      ports.push({ x: px, y: comp.height });
+    }
+    if (ports.at(-1)?.x !== comp.width) {
+      ports.push({ x: comp.width, y: 0 });
+      ports.push({ x: comp.width, y: comp.height });
+    }
+    comp.ports = ports;
+    return true;
+  }
   const oldWidth = Number(comp.width) || compWidth;
   const oldHeight = Number(comp.height) || compHeight;
   const shouldResize = force || isLegacyDefaultComponentSize(comp);
@@ -1046,15 +1064,34 @@ function applyIndustrySymbolGeometry(comp, meta = resolveComponentMeta(comp), { 
       comp.y = centerY - geometry.height / 2;
     }
   }
+  const fittedPorts = (() => {
+    // Legacy motor, VFD, transformer, and panel components can center their native
+    // symbols inside a differently sized component box. Match their ports to the same
+    // preserveAspectRatio="meet" fit used by the SVG image so every feeder
+    // lands on the corresponding visible terminal lead.
+    // Keep the established geometry for other profiles to avoid changing their
+    // existing connection routing and label placement.
+    const requiresRenderedPortFit = ['motor', 'controller', 'transformer', 'transformer3', 'panel'].includes(profile);
+    if (shouldResize || !requiresRenderedPortFit) return geometry.ports;
+    const renderedWidth = Number(comp.width) || oldWidth;
+    const renderedHeight = Number(comp.height) || oldHeight;
+    const scale = Math.min(renderedWidth / geometry.width, renderedHeight / geometry.height);
+    const offsetX = (renderedWidth - (geometry.width * scale)) / 2;
+    const offsetY = (renderedHeight - (geometry.height * scale)) / 2;
+    return geometry.ports.map(port => ({
+      x: offsetX + (port.x * scale),
+      y: offsetY + (port.y * scale)
+    }));
+  })();
   const portsNeedSync = !Array.isArray(comp.ports)
-    || comp.ports.length !== geometry.ports.length
+    || comp.ports.length !== fittedPorts.length
     || comp.ports.some((port, idx) => {
-      const expected = geometry.ports[idx];
+      const expected = fittedPorts[idx];
       return Math.abs(Number(port?.x) - expected.x) > 0.5
         || Math.abs(Number(port?.y) - expected.y) > 0.5;
     });
   if (force || shouldResize || portsNeedSync) {
-    comp.ports = geometry.ports.map(port => ({ ...port }));
+    comp.ports = fittedPorts.map(port => ({ ...port }));
   }
   return true;
 }
@@ -1284,15 +1321,12 @@ const builtinComponents = [
   {
     subtype: 'Panel',
     label: 'Panel',
-    icon: asset('icons/components/MLO.svg?v=industry-symbols-v1'),
+    icon: asset(`icons/components/MLO.svg?v=${oneLineSymbolAssetVersion}`),
     category: 'equipment',
     type: 'panel',
     width: 64,
     height: 76,
-    ports: [
-      { x: 32, y: 0 },
-      { x: 32, y: 76 }
-    ]
+    ports: [{ x: 32, y: 0 }]
   },
   {
     subtype: 'Equipment',
@@ -1308,7 +1342,7 @@ const builtinComponents = [
   {
     subtype: 'motor_load',
     label: 'Motor Load',
-    icon: asset('icons/components/Motor.svg'),
+    icon: asset(`icons/components/Motor.svg?v=${oneLineSymbolAssetVersion}`),
     category: 'load',
     type: 'motor_load',
     defaultRotation: 0,
@@ -1333,7 +1367,7 @@ const builtinComponents = [
   {
     subtype: 'motor',
     label: 'Motor',
-    icon: asset('icons/components/Motor.svg'),
+    icon: asset(`icons/components/Motor.svg?v=${oneLineSymbolAssetVersion}`),
     iconIEC: asset('icons/components/iec/IEC_Motor.svg'),
     category: 'load',
     type: 'motor',
@@ -4797,6 +4831,7 @@ function refineOneLineCommandSurface() {
   if (autoBuildButton) autoBuildButton.hidden = !autoBuildHasChanges;
   if (autoBuildHasChanges) appendIfPresent(primaryActions, normalizePrimaryButton(autoBuildButton, 'Auto-Build'));
   appendIfPresent(primaryActions, normalizePrimaryButton(document.getElementById('validate-btn'), 'Validate'));
+  appendIfPresent(primaryActions, normalizePrimaryButton(document.getElementById('reconcile-schedules-primary-btn'), 'Review Schedule Changes'));
   appendIfPresent(primaryActions, normalizePrimaryButton(document.getElementById('history-sidebar-toggle'), 'Inspector'));
   const reviewMenu = createCommandMenu('Review', { align: 'right' });
   appendIfPresent(reviewMenu.panel, normalizeCommandButton(document.getElementById('scenario-duplicate-btn'), 'Duplicate Scenario'));
@@ -8092,6 +8127,51 @@ function portInUse(component, portIndex, skipConn = null) {
   }));
 }
 
+function appendConnectedTerminalBridges(group, component, meta) {
+  if (!group || !component || component.type === 'annotation' || isBusComponent(component) || isConductorSegmentComponent(component)) return;
+  const width = Number(component.width) || compWidth;
+  const height = Number(component.height) || compHeight;
+  const ports = component.ports || meta?.ports || [];
+  const edgeTolerance = 0.75;
+  const outsideOverlap = 3;
+  const profile = getIndustrySymbolProfile(component, meta);
+  const insideOverlap = ['transformer', 'transformer3', 'panel'].includes(profile) ? 20 : 14;
+  ports.forEach((port, portIndex) => {
+    if (!port || !portInUse(component, portIndex)) return;
+    const px = Number(port.x);
+    const py = Number(port.y);
+    if (!Number.isFinite(px) || !Number.isFinite(py)) return;
+    let inwardX = 0;
+    let inwardY = 0;
+    if (Math.abs(py) <= edgeTolerance) inwardY = 1;
+    else if (Math.abs(py - height) <= edgeTolerance) inwardY = -1;
+    else if (Math.abs(px) <= edgeTolerance) inwardX = 1;
+    else if (Math.abs(px - width) <= edgeTolerance) inwardX = -1;
+    else {
+      const dx = (width / 2) - px;
+      const dy = (height / 2) - py;
+      const distance = Math.hypot(dx, dy);
+      if (!distance) return;
+      inwardX = dx / distance;
+      inwardY = dy / distance;
+    }
+    const bridge = document.createElementNS(svgNS, 'line');
+    bridge.setAttribute('x1', component.x + px - (inwardX * outsideOverlap));
+    bridge.setAttribute('y1', component.y + py - (inwardY * outsideOverlap));
+    bridge.setAttribute('x2', component.x + px + (inwardX * insideOverlap));
+    bridge.setAttribute('y2', component.y + py + (inwardY * insideOverlap));
+    bridge.setAttribute('stroke', '#111827');
+    bridge.setAttribute('stroke-width', '3');
+    bridge.setAttribute('stroke-linecap', 'square');
+    bridge.setAttribute('pointer-events', 'none');
+    bridge.classList.add('component-terminal-bridge');
+    bridge.dataset.portIndex = String(portIndex);
+    bridge.dataset.portX = String(component.x + px);
+    bridge.dataset.portY = String(component.y + py);
+    group.appendChild(bridge);
+  });
+}
+
 const transformerVoltageKeyMap = {
   two_winding: ['volts_primary', 'volts_secondary'],
   auto_transformer: ['volts_primary', 'volts_secondary'],
@@ -9691,9 +9771,11 @@ function normalizeComponent(c) {
   }
   if (normalizedCategory === 'load') {
     const profileGeometry = industrySymbolGeometry(getIndustrySymbolProfile(nc, meta));
-    const basePorts = profileGeometry?.ports?.length
-      ? profileGeometry.ports
-      : componentMeta[nc.subtype]?.ports?.length
+    const basePorts = nc.ports?.length
+      ? nc.ports
+      : profileGeometry?.ports?.length
+        ? profileGeometry.ports
+        : componentMeta[nc.subtype]?.ports?.length
         ? componentMeta[nc.subtype].ports
         : nc.ports;
     nc.ports = normalizePortsForCategory('load', basePorts, nc.type, nc.subtype, nc.width || compWidth, nc.height || compHeight).map(port => ({
@@ -10773,7 +10855,7 @@ function render() {
       const connectionRole = classifyConnectionRole(c, target);
       poly.setAttribute('stroke', stroke);
       poly.setAttribute('fill', 'none');
-      poly.setAttribute('stroke-width', connectionRole === 'connection-main' ? '2.8' : connectionRole === 'connection-device' ? '2.1' : '1.65');
+      poly.setAttribute('stroke-width', '3');
       poly.style.pointerEvents = 'stroke';
       poly.style.cursor = 'move';
       poly.classList.add('connection', connectionRole);
@@ -10828,6 +10910,13 @@ function render() {
 
       const label = document.createElementNS(svgNS, 'text');
       const labelPosition = connectionLabelPosition(pts);
+      const transformerOutputRole = c.type === 'transformer'
+        ? getTransformerPortRole(c, conn.sourcePort)
+        : null;
+      if (transformerOutputRole === 'secondary' || transformerOutputRole === 'tertiary') {
+        labelPosition.x -= 75;
+        labelPosition.textAnchor = 'end';
+      }
       label.setAttribute('dominant-baseline', 'middle');
       label.setAttribute('fill', stroke);
       let lblText = cableInfo?.tag || cableInfo?.cable_type || '';
@@ -11151,6 +11240,7 @@ function render() {
         selectComponent(c);
       });
       g.appendChild(img);
+      appendConnectedTerminalBridges(g, c, meta);
       if (dataStateInfo) {
         if (useCompactDataState) {
           renderDataStateBadge(svg, c, dataStateInfo, dataStateOverlayMode, includePoint);
@@ -11168,18 +11258,6 @@ function render() {
           outline.style.pointerEvents = 'none';
           g.appendChild(outline);
         }
-      }
-      if (c.subtype === 'motor' || c.subtype === 'motor_load') {
-        const letter = document.createElementNS(svgNS, 'text');
-        letter.setAttribute('x', cx);
-        letter.setAttribute('y', cy + 4);
-        letter.setAttribute('text-anchor', 'middle');
-        letter.setAttribute('dominant-baseline', 'middle');
-        letter.textContent = 'M';
-        if (c.rotation) {
-          letter.setAttribute('transform', `rotate(${-c.rotation}, ${cx}, ${cy})`);
-        }
-        g.appendChild(letter);
       }
       // Gap #48 – Off-page connector sheet badge
       if (c.type === 'sheet_link') {
@@ -11316,10 +11394,14 @@ function render() {
             x += 6;
             anchor = 'start';
           } else if (dir === 'bottom') {
+            x -= 10;
             y += 10;
+            anchor = 'end';
             baseline = 'hanging';
           } else {
+            x -= 10;
             y -= 6;
+            anchor = 'end';
             baseline = 'baseline';
           }
           const textEl = document.createElementNS(svgNS, 'text');
@@ -16876,6 +16958,8 @@ async function init() {
   if (autoArrangeBtn) autoArrangeBtn.addEventListener('click', () => arrangeSourceToLoad());
   const reconcileBtn = document.getElementById('reconcile-schedules-btn');
   if (reconcileBtn) reconcileBtn.addEventListener('click', openScheduleReconcileModal);
+  const primaryReconcileBtn = document.getElementById('reconcile-schedules-primary-btn');
+  if (primaryReconcileBtn) primaryReconcileBtn.addEventListener('click', openScheduleReconcileModal);
   updateScheduleReconcileButtonState();
   const onelineExportBtn = document.getElementById('export-oneline-data-btn');
   if (onelineExportBtn) onelineExportBtn.addEventListener('click', exportOneLineDiagnostics);
@@ -18880,11 +18964,14 @@ function buildScheduleDataFromDiagram() {
 
 function updateScheduleReconcileButtonState() {
   const btn = document.getElementById('reconcile-schedules-btn');
-  if (!btn) return;
-  btn.dataset.pending = scheduleReconcilePending ? 'true' : 'false';
-  btn.title = scheduleReconcilePending
-    ? 'Preview pending schedule updates from this one-line'
-    : 'Preview schedule updates from this one-line';
+  if (btn) {
+    btn.dataset.pending = scheduleReconcilePending ? 'true' : 'false';
+    btn.title = scheduleReconcilePending
+      ? 'Preview pending schedule updates from this one-line'
+      : 'Preview schedule updates from this one-line';
+  }
+  const primaryBtn = document.getElementById('reconcile-schedules-primary-btn');
+  if (primaryBtn) primaryBtn.hidden = !scheduleReconcilePending;
 }
 
 function markScheduleReconcilePending(pending = true) {
@@ -18903,13 +18990,31 @@ function collectionLabel(name) {
 }
 
 function appendReconcileTable(container, preview) {
+  const cards = document.createElement('div');
+  cards.className = 'reconcile-summary-grid';
+  [
+    ['Safe updates', preview.totals.updates],
+    ['New records', preview.totals.creates],
+    ['Needs decision', preview.totals.conflictRecords],
+    ['Unchanged', preview.totals.unchanged]
+  ].forEach(([label, value]) => {
+    const card = document.createElement('article');
+    const cardLabel = document.createElement('span');
+    const cardValue = document.createElement('strong');
+    cardLabel.textContent = label;
+    cardValue.textContent = String(value || 0);
+    card.append(cardLabel, cardValue);
+    cards.appendChild(card);
+  });
+  container.appendChild(cards);
+
   const table = document.createElement('table');
   table.className = 'data-table';
   table.setAttribute('aria-label', 'Schedule reconcile preview');
 
   const thead = document.createElement('thead');
   const headerRow = document.createElement('tr');
-  ['Schedule', 'Create', 'Update', 'Conflicts', 'Unchanged'].forEach(label => {
+  ['Schedule', 'New', 'Safe updates', 'Decision fields', 'Unchanged'].forEach(label => {
     const th = document.createElement('th');
     th.textContent = label;
     headerRow.appendChild(th);
@@ -18959,16 +19064,12 @@ function appendReconcileTable(container, preview) {
         fields: (item.fields || []).map(field => `${field.field}: schedule "${field.currentValue}" preserved over one-line "${field.incomingValue}"`)
       });
     });
-    (collectionPreview.unchanged || []).forEach(item => {
-      affectedRows.push({ collection, action: 'Unchanged', identity: item.identity, fields: [] });
-    });
   });
   if (!affectedRows.length) return;
 
   const details = document.createElement('details');
-  details.open = true;
   const summary = document.createElement('summary');
-  summary.textContent = 'Affected records';
+  summary.textContent = `${affectedRows.length} affected record(s)`;
   details.appendChild(summary);
 
   const affectedTable = document.createElement('table');
@@ -19017,9 +19118,8 @@ function appendConflictSummary(container, preview) {
   if (!conflicts.length) return;
 
   const details = document.createElement('details');
-  details.open = true;
   const summary = document.createElement('summary');
-  summary.textContent = 'Conflicts preserve existing schedule values';
+  summary.textContent = `${preview.totals.conflictRecords} record(s) need a decision (${preview.totals.conflicts} field(s))`;
   details.appendChild(summary);
 
   const list = document.createElement('ul');
@@ -19050,8 +19150,8 @@ function openScheduleReconcileModal() {
 
   return openModal({
     title: 'Reconcile Schedules',
-    description: 'Preview one-line updates before applying them to schedules. Existing non-empty schedule values are preserved when conflicts are found.',
-    primaryText: hasChanges ? 'Apply Reconcile' : 'Close',
+    description: 'Apply safe additions now. Existing schedule values remain unchanged wherever the one-line disagrees.',
+    primaryText: hasChanges ? 'Apply Safe Changes' : 'Close',
     secondaryText: hasChanges ? 'Cancel' : null,
     defaultWidth: 'wide',
     onSubmit() {
@@ -19063,14 +19163,14 @@ function openScheduleReconcileModal() {
       setCables(next.cables);
       markScheduleReconcilePending(false);
       if (projectId) saveProject(projectId);
-      showToast(`Schedules reconciled: ${preview.totals.creates} create(s), ${preview.totals.updates} update(s), ${preview.totals.conflicts} conflict(s) preserved`);
+      showToast(`Schedules updated: ${preview.totals.creates} new record(s), ${preview.totals.updates} safe update(s), ${preview.totals.conflictRecords} record(s) still need a decision`);
       return true;
     },
     render(container) {
       const summary = document.createElement('p');
       summary.textContent = hasChanges
-        ? `${preview.totals.creates} create(s), ${preview.totals.updates} update(s), ${preview.totals.conflicts} conflict field(s), ${preview.totals.unchanged} unchanged record(s).`
-        : `No schedule changes detected. ${preview.totals.conflicts} conflict field(s) would be preserved.`;
+        ? 'Safe updates can be applied without overwriting populated schedule fields. Open the affected-record details only when you need field-level context.'
+        : `No automatic schedule changes are available. ${preview.totals.conflictRecords} record(s) still need a decision.`;
       container.appendChild(summary);
       appendReconcileTable(container, preview);
       appendConflictSummary(container, preview);

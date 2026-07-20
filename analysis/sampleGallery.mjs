@@ -35,7 +35,7 @@ export const SAMPLE_REGISTRY = [
       { step: 3, label: 'Open one-line', page: 'oneline.html', hint: 'Review linked components and run Reconcile Schedules if pending.' },
       { step: 4, label: 'Review cable schedule', page: 'cableschedule.html', hint: 'Confirm each cable has linked endpoints, conductor size, length, and a raceway assignment.' },
       { step: 5, label: 'Review raceway schedule', page: 'racewayschedule.html', hint: 'Inspect the tray and ductbank parent row, then expand the bank to see its conduit.' },
-      { step: 6, label: 'Review routed cables', page: 'optimalRoute.html', hint: 'Confirm the four saved route results use the coordinated cable and raceway records.' },
+      { step: 6, label: 'Review routed cables', page: 'optimalRoute.html', hint: 'Confirm the saved route results use the coordinated cable and raceway records.' },
       { step: 7, label: 'Review short-circuit results', page: 'shortCircuit.html', hint: 'Inspect the saved project study basis and rerun the study to compare results.' },
       { step: 8, label: 'Review deliverables', page: 'projectreport.html', hint: 'Confirm shared readiness is clear, then inspect the saved report snapshot and release package context.' },
     ],
@@ -272,7 +272,10 @@ const SAMPLE_COMPONENT_TYPE_ALIASES = {
   transformer: { type: 'transformer', subtype: 'two_winding' },
   mcc: { type: 'mcc', subtype: 'mcc' },
   motor: { type: 'motor_load', subtype: 'motor_load' },
+  motor_load: { type: 'motor_load', subtype: 'motor_load' },
+  vfd: { type: 'motor_controller', subtype: 'vfd' },
   load: { type: 'static_load', subtype: 'static_load' },
+  static_load: { type: 'static_load', subtype: 'static_load' },
 };
 
 function normalizeSampleToken(value) {
@@ -285,8 +288,9 @@ function normalizeSampleToken(value) {
 function sampleDefaultRotationForType(type) {
   const normalized = normalizeSampleToken(type);
   if (normalized === 'bus' || normalized === 'annotation') return 0;
-  if (normalized === 'static_load' || normalized === 'motor_load' || normalized === 'load' || normalized.endsWith('_load')) {
-    return 270;
+  if (normalized === 'static_load' || normalized === 'motor_load' || normalized === 'load'
+    || normalized === 'motor_controller' || normalized === 'vfd' || normalized.endsWith('_load')) {
+    return 0;
   }
   return 90;
 }
@@ -307,7 +311,7 @@ function isMediumVoltageSampleComponent(component = {}) {
 function normalizeSampleOneLineComponent(component = {}) {
   const rawType = normalizeSampleToken(component.type || component.category || component.subtype);
   const rawSubtype = normalizeSampleToken(component.subtype);
-  const alias = SAMPLE_COMPONENT_TYPE_ALIASES[rawType] || SAMPLE_COMPONENT_TYPE_ALIASES[rawSubtype] || null;
+  const alias = SAMPLE_COMPONENT_TYPE_ALIASES[rawSubtype] || SAMPLE_COMPONENT_TYPE_ALIASES[rawType] || null;
   const type = alias?.type || rawType || rawSubtype || 'equipment';
   let subtype = rawSubtype || alias?.subtype || type;
   if (type === 'breaker' && !rawSubtype && isMediumVoltageSampleComponent(component)) {

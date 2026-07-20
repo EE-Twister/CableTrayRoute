@@ -1,5 +1,10 @@
 # UI Refinement Log
 
+## 2026-07-18
+
+- Modernized the Optimal Route graph into an interactive desktop review surface with isometric, plan, front, and right view presets; direct route, endpoint, and raceway selection; focused selection metrics; optional labels; utilization coloring; a compact semantic legend; and self-hosted full-screen and PNG output. Removed the per-cable Plotly legend and default labels that previously obscured dense route models.
+- Reframed the graph's default presentation as a network-flow model: shared tray segments are consolidated into cable-density corridors, nearby endpoints are grouped into equipment nodes with floor stems, raceway geometry is visually exaggerated at facility scale, and detailed field jumps are opt-in while remaining visible for a selected cable.
+
 ## 2026-07-15
 
 - Reordered the desktop DRC and Optimal Route workspaces around current results: DRC findings now precede options and methodology, while saved routes open in a dedicated review mode with routing setup available from an explicit toggle.

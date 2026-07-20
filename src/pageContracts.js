@@ -106,7 +106,8 @@ export const PAGE_CONTRACTS_BY_HREF = {
       lifecyclePackages,
       tccSettings,
       oneLineReconcilePending,
-      projectInput('settings.activeSampleWorkflow', 'setting', false, 'Active sample context used to suppress redundant sample-loading guidance.')
+      projectInput('settings.activeSampleWorkflow', 'setting', false, 'Active sample context used to suppress redundant sample-loading guidance.'),
+      projectInput('settings.workflowDashboardFocus', 'setting', false, 'Routing or full-engineering dashboard focus selected for this project.')
     ],
     outputs: [
       output('settings.designBasis', 'setting', 'Design basis wizard decisions and project defaults.', ['workflowdashboard.html', 'projectreport.html']),
@@ -119,7 +120,8 @@ export const PAGE_CONTRACTS_BY_HREF = {
       output('ductbankSchedule', 'schedule', 'Automation-seeded ductbank schedule rows.', ['ductbankroute.html', 'optimalRoute.html']),
       output('settings.lifecyclePackages', 'setting', 'Lifecycle package records created from dashboard package actions.', ['projectreport.html']),
       output('studyResults.duty', 'study-result', 'Equipment-duty validation results evaluated while central workflow readiness is refreshed.', ['equipmentevaluation.html', 'projectreport.html']),
-      output('settings.oneLineScheduleReconcilePending', 'setting', 'Workflow automation reconcile state for one-line and schedule handoff.', ['oneline.html'])
+      output('settings.oneLineScheduleReconcilePending', 'setting', 'Workflow automation reconcile state for one-line and schedule handoff.', ['oneline.html']),
+      output('settings.workflowDashboardFocus', 'setting', 'Routing or full-engineering dashboard focus selected by the user.', ['workflowdashboard.html'])
     ],
     readiness: ready('Dashboard is ready when it can summarize every workflow step and identify the next incomplete handoff.', ['Missing schedule data, unresolved review gates, pending studies, or no deliverables.']),
     downstream: ['equipmentlist.html', 'loadlist.html', 'oneline.html', 'cableschedule.html', 'racewayschedule.html', 'projectreport.html'],

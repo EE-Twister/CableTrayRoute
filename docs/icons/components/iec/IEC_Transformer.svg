@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 76 84" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="square" stroke-linejoin="miter">
   <!-- IEC two-winding transformer with terminal leads at both declared ports. -->
-  <line x1="38" y1="0" x2="38" y2="14"/>
+  <line x1="38" y1="0" x2="38" y2="18"/>
   <circle cx="38" cy="30" r="16"/>
   <circle cx="38" cy="54" r="16"/>
-  <line x1="38" y1="70" x2="38" y2="84"/>
+  <line x1="38" y1="66" x2="38" y2="84"/>
 </svg>

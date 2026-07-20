@@ -30,6 +30,52 @@ check('bundled component library passes its canonical validator', () => {
   assert.equal(result.valid, true, JSON.stringify(result.errors, null, 2));
 });
 
+check('ANSI motor symbol uses a circle, integral M, and top feeder lead', () => {
+  const svg = fs.readFileSync(path.join(root, 'icons', 'components', 'Motor.svg'), 'utf8');
+  assert.match(svg, /<circle\b[^>]*cx="32"[^>]*cy="36"[^>]*r="22"/);
+  assert.match(svg, /<path\b[^>]*d="M32 0v14"/);
+  assert.match(svg, /<path\b[^>]*d="M21 46V26l11 14 11-14v20"/);
+});
+
+check('ANSI VFD symbol uses a labeled enclosure with top and bottom feeder leads', () => {
+  const svg = fs.readFileSync(path.join(root, 'icons', 'components', 'VFD.svg'), 'utf8');
+  assert.match(svg, /<rect\b[^>]*x="8"[^>]*y="12"[^>]*width="48"[^>]*height="54"/);
+  assert.match(svg, /<path\b[^>]*d="M32 0v12"/);
+  assert.match(svg, /<path\b[^>]*d="M32 66v12"/);
+  assert.match(svg, />VFD<\/text>/);
+});
+
+check('ANSI and IEC panel symbols expose one incoming terminal and no bottom leader', () => {
+  const ansiPanel = fs.readFileSync(path.join(root, 'icons', 'components', 'MLO.svg'), 'utf8');
+  assert.match(ansiPanel, /<path\b[^>]*d="M32 0v14"/);
+  assert.doesNotMatch(ansiPanel, /M32 58v18/);
+
+  const iecPanel = fs.readFileSync(path.join(root, 'icons', 'components', 'iec', 'IEC_Panel.svg'), 'utf8');
+  assert.match(iecPanel, /<line\b[^>]*x1="32"[^>]*y1="0"[^>]*x2="32"[^>]*y2="14"/);
+  assert.doesNotMatch(iecPanel, /y1="60"[^>]*y2="76"/);
+
+  const panel = library.components.find(component => component.type === 'panel' && component.subtype === 'panel');
+  assert.deepEqual(panel.ports, [{ x: 32, y: 0 }]);
+});
+
+check('ANSI transformer symbols overlap their winding boundaries at every feeder terminal', () => {
+  const twoWinding = fs.readFileSync(path.join(root, 'icons', 'components', 'Transformer.svg'), 'utf8');
+  assert.match(twoWinding, /<path\b[^>]*d="M38 0v20"/);
+  assert.match(twoWinding, /<path\b[^>]*d="M38 64v20"/);
+
+  const threeWinding = fs.readFileSync(path.join(root, 'icons', 'components', 'Transformer3W.svg'), 'utf8');
+  assert.match(threeWinding, /<path\b[^>]*d="M43 0v18"/);
+  assert.match(threeWinding, /<path\b[^>]*d="M43 64v12M43 76H26M43 76H60M26 76v16M60 76v16"/);
+
+  const iecTwoWinding = fs.readFileSync(path.join(root, 'icons', 'components', 'iec', 'IEC_Transformer.svg'), 'utf8');
+  assert.match(iecTwoWinding, /<line\b[^>]*x1="38"[^>]*y1="0"[^>]*x2="38"[^>]*y2="18"/);
+  assert.match(iecTwoWinding, /<line\b[^>]*x1="38"[^>]*y1="66"[^>]*x2="38"[^>]*y2="84"/);
+
+  const iecThreeWinding = fs.readFileSync(path.join(root, 'icons', 'components', 'iec', 'IEC_Transformer3W.svg'), 'utf8');
+  assert.match(iecThreeWinding, /<line\b[^>]*x1="43"[^>]*y1="0"[^>]*x2="43"[^>]*y2="18"/);
+  assert.match(iecThreeWinding, /<path\b[^>]*d="M43 64v12M43 76H26M43 76H60M26 76v16M60 76v16"/);
+});
+
 check('every bundled component has a unique subtype and loadable icon assets', () => {
   const subtypes = new Set();
   library.components.forEach(component => {

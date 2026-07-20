@@ -1269,6 +1269,15 @@ body.dark-mode .row-icon-btn .control-icon {
         padding: 0.45rem;
     }
 
+    .raceway-action-bar .toolbar-group {
+        display: contents;
+    }
+
+    .raceway-action-bar .toolbar-menu {
+        width: auto;
+        min-width: 0;
+    }
+
     .loadlist-action-bar .toolbar-group,
     .loadlist-action-bar .toolbar-menu {
         width: auto;

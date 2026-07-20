@@ -250,6 +250,19 @@ describe('exportToGLTF2 — cable route geometry', () => {
     assert.strictEqual(posAcc.count, 2);
   });
 
+  it('exports every calculated route segment instead of a straight endpoint chord', () => {
+    const cable = makeCable('SEGMENTED');
+    cable.route_segments = [
+      { type: 'tray', start: [0, 0, 0], end: [10, 0, 0] },
+      { type: 'field', start: [10, 0, 0], end: [10, 5, 3] }
+    ];
+    const json = readGLBJson(exportToGLTF2({ cables: [cable] }));
+    const node = json.nodes.find(n => n.name === 'SEGMENTED');
+    const posAcc = json.accessors[json.meshes[node.mesh].primitives[0].attributes.POSITION];
+    assert.strictEqual(posAcc.count, 4);
+    assert.strictEqual(node.extras.segment_count, 2);
+  });
+
 });
 
 describe('exportToGLTF2 — large project', () => {

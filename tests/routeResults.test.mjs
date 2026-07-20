@@ -12,6 +12,8 @@ const cables = [
 
 const legacy = {
   source: 'sample',
+  finalTrays: [{ tray_id: 'TR-1', maxFill: 100, current_fill: 25 }],
+  updatedUtilData: [{ tray_id: 'TR-1', full_pct: 25 }],
   batchResults: [
     {
       cable: 'CBL-1',
@@ -44,5 +46,7 @@ const state = normalizeRouteResultState(legacy, { cables });
 assert.deepEqual(state.routedCableNames, ['CBL-1', 'CBL-2']);
 assert.equal(state.trayCableMap['TR-1'].length, 1);
 assert.equal(state.trayCableMap['TR-1'][0].diameter, 0.75);
+assert.equal(state.finalTrays[0].current_fill, 25);
+assert.equal(state.updatedUtilData[0].full_pct, 25);
 
 console.log('route result normalization');

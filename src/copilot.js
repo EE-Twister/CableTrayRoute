@@ -5,6 +5,14 @@ import { getCables, getTrays } from '../dataStore.mjs';
 let panel = null;
 let isOpen = false;
 
+function attachTriggerToNavigation(btn) {
+  const navActions = document.querySelector('.top-nav .nav-actions');
+  if (!navActions) return false;
+  btn.classList.remove('copilot-trigger--floating');
+  navActions.appendChild(btn);
+  return true;
+}
+
 function getCopilotEndpoint() {
   const metaEndpoint = document.querySelector('meta[name="copilot-endpoint"]')?.content?.trim();
   if (metaEndpoint) return metaEndpoint;
@@ -95,14 +103,21 @@ async function submitQuery(query) {
 }
 
 export function mountCopilot() {
-  // Floating trigger button
   const btn = document.createElement('button');
   btn.id = 'copilot-trigger';
   btn.className = 'copilot-trigger';
   btn.setAttribute('aria-label', 'Open AI Copilot');
   btn.setAttribute('title', 'AI Copilot');
   btn.textContent = '✦';
-  document.body.appendChild(btn);
+  if (!attachTriggerToNavigation(btn)) {
+    btn.classList.add('copilot-trigger--floating');
+    document.body.appendChild(btn);
+    const navObserver = new MutationObserver(() => {
+      if (!attachTriggerToNavigation(btn)) return;
+      navObserver.disconnect();
+    });
+    navObserver.observe(document.body, { childList: true, subtree: true });
+  }
 
   panel = createPanel();
   panel.style.display = 'none';

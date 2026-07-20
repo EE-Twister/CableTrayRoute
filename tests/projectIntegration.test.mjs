@@ -123,6 +123,14 @@ assert.equal(projectedOneLine.sheets[0].components[0].projectEntity.description,
 assert.equal(projectedOneLine.sheets[0].connections[0].cable.length, 120);
 assert.equal(projectedOneLine.sheets[0].connections[0].cable.conductor_size, '#2 AWG');
 
+const projectedBus = buildOneLineProjectView({
+  sheets: [{ components: [{ id: 'visual-mcc', entityId: 'mcc-101', type: 'bus', width: 900, height: 20 }], connections: [] }],
+}, {
+  equipment: [{ id: 'mcc-101', tag: 'MCC-101', width: '', height: '' }],
+});
+assert.equal(projectedBus.sheets[0].components[0].width, 900);
+assert.equal(projectedBus.sheets[0].components[0].height, 20);
+
 const scopedProject = {
   equipment: [{ tag: 'MCC-101', voltage: 480 }, { tag: 'PMP-101', description: 'Cooling pump', voltage: 480, subCategory: 'Pump' }],
   loads: [{ tag: 'PMP-101', description: 'Cooling pump motor', loadType: 'Motor', kw: 18.6, powerFactor: 85, efficiency: 92, phases: 3, startsPerHour: 6 }],

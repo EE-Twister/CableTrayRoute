@@ -1,5 +1,10 @@
 const DEFAULT_IDENTITY_FIELDS = ['ref', 'id', 'tag'];
 
+const CANVAS_ONLY_FIELDS = new Set([
+  'x', 'y', 'z', 'width', 'height', 'rotation', 'ports', 'position',
+  'selected', 'dragging', 'layerId'
+]);
+
 const COLLECTION_IDENTITY_FIELDS = {
   equipment: ['ref', 'id', 'tag'],
   panels: ['ref', 'id', 'tag'],
@@ -19,8 +24,11 @@ function isEmptyValue(value) {
   return value === null || value === undefined || String(value).trim() === '';
 }
 
-function sameValue(a, b) {
+function sameValue(a, b, field = '') {
   if (isEmptyValue(a) && isEmptyValue(b)) return true;
+  if (DEFAULT_IDENTITY_FIELDS.includes(field) && typeof a === 'string' && typeof b === 'string') {
+    return normalizedIdentity(a) === normalizedIdentity(b);
+  }
   return JSON.stringify(a) === JSON.stringify(b);
 }
 
@@ -91,7 +99,7 @@ export function previewReconcileRecords(currentRecords = [], incomingRecords = [
           changedFields.push(field);
           return;
         }
-        if (!sameValue(existingValue, value)) {
+        if (!sameValue(existingValue, value, field)) {
           conflictFields.push({
             field,
             currentValue: existingValue,
@@ -121,6 +129,7 @@ export function previewReconcileRecords(currentRecords = [], incomingRecords = [
       creates: creates.length,
       updates: updates.length,
       conflicts: conflicts.reduce((sum, item) => sum + item.fields.length, 0),
+      conflictRecords: conflicts.length,
       unchanged: unchanged.length
     }
   };
@@ -133,7 +142,10 @@ export function previewScheduleReconcile(current = {}, incoming = {}) {
     preview[collection] = previewReconcileRecords(
       current[collection] || [],
       incoming[collection] || [],
-      { identityFields: COLLECTION_IDENTITY_FIELDS[collection] || DEFAULT_IDENTITY_FIELDS }
+      {
+        identityFields: COLLECTION_IDENTITY_FIELDS[collection] || DEFAULT_IDENTITY_FIELDS,
+        fieldFilter: field => !CANVAS_ONLY_FIELDS.has(field)
+      }
     );
   });
   preview.totals = collections.reduce((totals, collection) => {
@@ -141,9 +153,10 @@ export function previewScheduleReconcile(current = {}, incoming = {}) {
     totals.creates += counts.creates;
     totals.updates += counts.updates;
     totals.conflicts += counts.conflicts;
+    totals.conflictRecords += counts.conflictRecords;
     totals.unchanged += counts.unchanged;
     return totals;
-  }, { creates: 0, updates: 0, conflicts: 0, unchanged: 0 });
+  }, { creates: 0, updates: 0, conflicts: 0, conflictRecords: 0, unchanged: 0 });
   return preview;
 }
 

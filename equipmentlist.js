@@ -181,6 +181,9 @@ if (typeof window !== 'undefined') {
         </article>
       `).join('');
       if (emptyGuide) emptyGuide.hidden = summary.total > 0;
+      document.querySelectorAll('[data-equipment-populated-only]').forEach(element => {
+        element.hidden = summary.total === 0;
+      });
     };
 
     const updateResultSummary = () => {
@@ -352,7 +355,7 @@ if (typeof window !== 'undefined') {
     const openEquipmentModal = async () => {
       const result = await openModal({
         title: 'Add Equipment',
-        description: 'Capture the fields downstream modules need for load source links and one-line references.',
+        description: 'Enter the core fields first. Procurement and layout details can be added now or later.',
         primaryText: 'Add Equipment',
         secondaryText: 'Cancel',
         defaultWidth: 'medium',
@@ -363,14 +366,28 @@ if (typeof window !== 'undefined') {
             <label>Equipment Tag<input name="tag" type="text" placeholder="SWBD-101" required></label>
             <label>Description<input name="description" type="text" placeholder="480 V main switchboard"></label>
             <label>Voltage<input name="voltage" type="text" placeholder="480/277" required></label>
-            <label>Category<input name="category" type="text" placeholder="Distribution"></label>
-            <label>Sub-Category<input name="subCategory" type="text" placeholder="Switchboard"></label>
-            <label>Arrangement<input name="arrangement" type="text" placeholder="Electrical Room A"></label>
-            <label>Lineup<input name="lineup" type="text" placeholder="SWBD-101"></label>
-            <label>Manufacturer<input name="manufacturer" type="text" placeholder="Square D"></label>
-            <label>Model<input name="model" type="text" placeholder="Power-Style QED"></label>
-            <label>Phases<input name="phases" type="text" placeholder="3"></label>
-            <label class="modal-form-field--full">Notes<input name="notes" type="text" placeholder="Main service equipment"></label>
+            <label>Category<input name="category" type="text" list="equipment-category-options" placeholder="Distribution"></label>
+            <datalist id="equipment-category-options">
+              <option value="Distribution"></option>
+              <option value="Motor Control"></option>
+              <option value="Transformer"></option>
+              <option value="Load"></option>
+              <option value="Source"></option>
+              <option value="Controls"></option>
+            </datalist>
+            <details class="equipment-modal-details modal-form-field--full">
+              <summary>More details</summary>
+              <div class="equipment-modal-details__grid">
+                <label>Sub-Category<input name="subCategory" type="text" placeholder="Switchboard"></label>
+                <label>Arrangement<input name="arrangement" type="text" placeholder="Electrical Room A"></label>
+                <label>Lineup<input name="lineup" type="text" placeholder="SWBD-101"></label>
+                <label>Manufacturer<input name="manufacturer" type="text" placeholder="Square D"></label>
+                <label>Model<input name="model" type="text" placeholder="Power-Style QED"></label>
+                <label>Phases<input name="phases" type="text" placeholder="3"></label>
+                <label class="modal-form-field--full">Notes<input name="notes" type="text" placeholder="Main service equipment"></label>
+              </div>
+            </details>
+            <label class="equipment-add-another modal-form-field--full"><input name="addAnother" type="checkbox"> Save and add another equipment record</label>
           `;
           body.appendChild(form);
           controller.registerForm(form);
@@ -383,13 +400,18 @@ if (typeof window !== 'undefined') {
             form.querySelector('[name="tag"]').focus();
             return false;
           }
+          data._addAnother = data.addAnother === 'on';
+          delete data.addAnother;
           return data;
         }
       });
       if (!result) return;
+      const addAnother = result._addAnother;
+      delete result._addAnother;
       table.addRow(result);
       table.save();
       if (table.onChange) table.onChange();
+      if (addAnother) await openEquipmentModal();
     };
 
     const getSelectedIndexes = () => Array.from(table.tbody.rows)

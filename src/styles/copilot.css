@@ -1,21 +1,25 @@
 /* src/styles/copilot.css */
 .copilot-trigger {
-  position: fixed;
-  bottom: 1.5rem;
-  right: 1.5rem;
-  z-index: 900;
-  width: 3rem;
-  height: 3rem;
+  position: static;
+  flex: 0 0 auto;
+  width: 2.5rem;
+  height: 2.5rem;
   border-radius: 50%;
   background: var(--color-accent, #f0a500);
   color: #000;
-  font-size: 1.25rem;
+  font-size: 1.1rem;
   border: none;
   cursor: pointer;
-  box-shadow: 0 2px 8px rgba(0,0,0,.4);
+  box-shadow: 0 1px 4px rgba(0,0,0,.24);
   display: flex;
   align-items: center;
   justify-content: center;
+}
+.copilot-trigger--floating {
+  position: fixed;
+  right: 1.5rem;
+  bottom: 1.5rem;
+  z-index: 900;
 }
 .copilot-trigger:focus-visible {
   outline: 3px solid var(--color-focus, #4d90fe);
