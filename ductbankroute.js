@@ -49,6 +49,7 @@ window.E2E = E2E;
 import { getItem, setItem, removeItem, getCables, getConduits, getDuctbanks } from './dataStore.mjs';
 import { openModal, showAlertModal } from './src/components/modal.js';
 import { buildProjectDuctbankRoute, parseDuctbankRouteData } from './src/ductbankProjectAdapter.mjs';
+import { buildDuctbankBOM, DEFAULT_DUCTBANK_BOM_ASSUMPTIONS, DEFAULT_DUCTBANK_BOM_OPTIONAL_MATERIALS } from './analysis/ductbankBom.mjs';
 
 function projectDuctbankId(ductbank={}){
  return String(ductbank.ductbank_id||ductbank.id||ductbank.tag||'').trim();
@@ -326,6 +327,7 @@ const DUCTBANK_ROW_ACTION_ICONS = {
 };
 
 const DUCTBANK_DEFAULTS = Object.freeze({
+  ductbankLength: '',
   ductbankDepth: '36',
   earthTemp: '68',
   airTemp: '86',
@@ -340,8 +342,23 @@ const DUCTBANK_DEFAULTS = Object.freeze({
   perRow: '4',
   conductorRating: '90',
   gridRes: '20',
-  ductThermRes: '0.0'
+  ductThermRes: '0.0',
+  bomConduitWaste: String(DEFAULT_DUCTBANK_BOM_ASSUMPTIONS.conduitWastePct),
+  bomConcreteWaste: String(DEFAULT_DUCTBANK_BOM_ASSUMPTIONS.concreteWastePct),
+  bomSpacerSpacing: String(DEFAULT_DUCTBANK_BOM_ASSUMPTIONS.spacerSpacingFt),
+  bomWorkingClearance: String(DEFAULT_DUCTBANK_BOM_ASSUMPTIONS.workingClearanceIn),
+  bomBeddingDepth: String(DEFAULT_DUCTBANK_BOM_ASSUMPTIONS.beddingDepthIn),
+  bomConduitStickLength: String(DEFAULT_DUCTBANK_BOM_ASSUMPTIONS.conduitStickLengthFt)
 });
+
+const DUCTBANK_BOM_OPTION_DEFAULTS=Object.freeze({
+  includeGroundWire:DEFAULT_DUCTBANK_BOM_OPTIONAL_MATERIALS.groundWire,
+  groundWireCount:DEFAULT_DUCTBANK_BOM_OPTIONAL_MATERIALS.groundWireCount,
+  groundWireWastePct:DEFAULT_DUCTBANK_BOM_ASSUMPTIONS.groundWireWastePct,
+  includeRedDye:DEFAULT_DUCTBANK_BOM_OPTIONAL_MATERIALS.redWarningDye,
+  includeShoring:DEFAULT_DUCTBANK_BOM_OPTIONAL_MATERIALS.excavationShoring
+});
+let ductbankBomOptionState={...DUCTBANK_BOM_OPTION_DEFAULTS};
 
 const DEFAULT_CABLE_ENTRY = Object.freeze({
   cable_type: 'Power',
@@ -362,6 +379,11 @@ const DUCTBANK_CABLE_TEMPLATE_HEADERS = [
   'weight','est_load','conduit_id','conductor_material','insulation_type',
   'insulation_rating','voltage_rating','shielding_jacket'
 ];
+const DUCTBANK_DECIMAL_CABLE_FIELDS = new Set([
+  'diameter',
+  'insulation_thickness',
+  'weight'
+]);
 
 function createButton(text,cls,label,handler){
  const b=document.createElement('button');
@@ -574,7 +596,10 @@ function addCableRow(data={}, opts={}){
   }else{
     inp=document.createElement('input');
     inp.name=c;
-    if(c==='diameter'||c==='weight'||c==='est_load'||c==='insulation_thickness') inp.type='number';
+    if(c==='diameter'||c==='weight'||c==='est_load'||c==='insulation_thickness'){
+      inp.type='number';
+      if(DUCTBANK_DECIMAL_CABLE_FIELDS.has(c)) inp.step='any';
+    }
     else if(c==='conductors') inp.type='number';
     else inp.type='text';
     if(c==='conductor_size') inp.setAttribute('list','sizeList');
@@ -760,6 +785,9 @@ function setDuctbankFieldDefault(id, value, onlyBlank){
 
 function applyDuctbankDefaults({ onlyBlank = true, silent = false, persist = true } = {}){
  Object.entries(DUCTBANK_DEFAULTS).forEach(([id,value])=>setDuctbankFieldDefault(id,value,onlyBlank));
+ if(!onlyBlank){
+  ductbankBomOptionState={...DUCTBANK_BOM_OPTION_DEFAULTS};
+ }
  const earthContextToggle=document.getElementById('showEarthContext');
  if(earthContextToggle && !onlyBlank) earthContextToggle.checked=true;
  updateInsulationOptions();
@@ -776,6 +804,7 @@ function applyDuctbankDefaults({ onlyBlank = true, silent = false, persist = tru
 function saveDuctbankSession(){
  const session={
   ductbankTag:document.getElementById('ductbankTag').value,
+  ductbankLength:document.getElementById('ductbankLength').value,
   concreteEncasement:document.getElementById('concreteEncasement').checked,
   ductbankDepth:document.getElementById('ductbankDepth').value,
   earthTemp:document.getElementById('earthTemp').value,
@@ -794,6 +823,17 @@ function saveDuctbankSession(){
   perRow:document.getElementById('perRow').value,
   gridRes:document.getElementById('gridRes').value,
   ductThermRes:document.getElementById('ductThermRes').value,
+  bomConduitWaste:document.getElementById('bomConduitWaste').value,
+  bomConcreteWaste:document.getElementById('bomConcreteWaste').value,
+  bomSpacerSpacing:document.getElementById('bomSpacerSpacing').value,
+  bomWorkingClearance:document.getElementById('bomWorkingClearance').value,
+  bomBeddingDepth:document.getElementById('bomBeddingDepth').value,
+  bomConduitStickLength:document.getElementById('bomConduitStickLength').value,
+  bomGroundWireWaste:String(ductbankBomOptionState.groundWireWastePct),
+  bomIncludeGroundWire:ductbankBomOptionState.includeGroundWire,
+  bomGroundWireCount:String(ductbankBomOptionState.groundWireCount),
+  bomIncludeRedDye:ductbankBomOptionState.includeRedDye,
+  bomIncludeShoring:ductbankBomOptionState.includeShoring,
   conduits:getAllConduits(),
   cables:getAllCables(),
   conductorRating:document.getElementById('conductorRating').value,
@@ -808,6 +848,7 @@ function loadDuctbankSession(){
  try{
   const s=stored;
   if(s.ductbankTag!==undefined)document.getElementById('ductbankTag').value=s.ductbankTag;
+  if(s.ductbankLength!==undefined)document.getElementById('ductbankLength').value=s.ductbankLength;
   if(s.concreteEncasement!==undefined)document.getElementById('concreteEncasement').checked=s.concreteEncasement;
   if(s.ductbankDepth!==undefined)document.getElementById('ductbankDepth').value=s.ductbankDepth;
   if(s.earthTemp!==undefined)document.getElementById('earthTemp').value=s.earthTemp;
@@ -830,6 +871,16 @@ function loadDuctbankSession(){
   if(s.perRow!==undefined)document.getElementById('perRow').value=s.perRow;
   if(s.gridRes!==undefined)document.getElementById('gridRes').value=s.gridRes;
   if(s.ductThermRes!==undefined)document.getElementById('ductThermRes').value=s.ductThermRes;
+  ['bomConduitWaste','bomConcreteWaste','bomSpacerSpacing','bomWorkingClearance','bomBeddingDepth','bomConduitStickLength'].forEach(id=>{
+    if(s[id]!==undefined) document.getElementById(id).value=s[id];
+  });
+  ductbankBomOptionState={
+    includeGroundWire:s.bomIncludeGroundWire===undefined ? DUCTBANK_BOM_OPTION_DEFAULTS.includeGroundWire : Boolean(s.bomIncludeGroundWire),
+    groundWireCount:Math.min(2,Math.max(1,parseInt(s.bomGroundWireCount,10)||DUCTBANK_BOM_OPTION_DEFAULTS.groundWireCount)),
+    groundWireWastePct:Number.isFinite(Number(s.bomGroundWireWaste)) ? Math.max(0,Number(s.bomGroundWireWaste)) : DUCTBANK_BOM_OPTION_DEFAULTS.groundWireWastePct,
+    includeRedDye:s.bomIncludeRedDye===undefined ? DUCTBANK_BOM_OPTION_DEFAULTS.includeRedDye : Boolean(s.bomIncludeRedDye),
+    includeShoring:s.bomIncludeShoring===undefined ? DUCTBANK_BOM_OPTION_DEFAULTS.includeShoring : Boolean(s.bomIncludeShoring)
+  };
   if(Array.isArray(s.conduits)){
     document.querySelector('#conduitTable tbody').innerHTML='';
     s.conduits.forEach(addConduitRow);
@@ -889,9 +940,25 @@ function loadCablesFromSchedule(){
 function applyDuctbankRouteData(routeData){
   if(!routeData || !routeData.ductbank) return false;
   const {ductbank,cables=[],conduits,conduitId}=routeData;
+  selectedDuctbankConduitId=normalizeDuctbankId(conduitId);
+  activeDuctbankFilter='all';
   const tag=ductbank.ductbank_id || ductbank.id || ductbank.tag || '';
   const tagEl=document.getElementById('ductbankTag');
   if(tagEl) tagEl.value=tag;
+  const lengthEl=document.getElementById('ductbankLength');
+  if(lengthEl){
+    let routeLength=ductbank.length_ft ?? ductbank.route_length_ft ?? ductbank.length;
+    if(routeLength===undefined){
+      const coordinates=['x','y','z'].map(axis=>[
+        Number(ductbank[`start_${axis}`] ?? ductbank[`from_${axis}`]),
+        Number(ductbank[`end_${axis}`] ?? ductbank[`to_${axis}`])
+      ]);
+      if(coordinates.every(pair=>pair.every(Number.isFinite))){
+        routeLength=Math.sqrt(coordinates.reduce((sum,[start,end])=>sum+(end-start)**2,0));
+      }
+    }
+    if(Number.isFinite(Number(routeLength)) && Number(routeLength) > 0) lengthEl.value=Number(routeLength).toFixed(2);
+  }
   const projectSelect=document.getElementById('projectDuctbankSelect');
   if(projectSelect&&Array.from(projectSelect.options).some(option=>option.value===tag)) projectSelect.value=tag;
   const encasement=document.getElementById('concreteEncasement');
@@ -929,13 +996,8 @@ function applyDuctbankRouteData(routeData){
       });
     });
   }
-  if(conduitId){
-    const searchInput=document.getElementById('conduit-search');
-    if(searchInput){
-      searchInput.value=conduitId;
-      filterTable(document.getElementById('conduitTable'),conduitId);
-    }
-  }
+  const conduitSearch=document.getElementById('conduit-search');
+  if(conduitSearch) conduitSearch.value='';
 
   const tbody=document.querySelector('#cableTable tbody');
   if(tbody && Array.isArray(cables)){
@@ -959,15 +1021,17 @@ function applyDuctbankRouteData(routeData){
       },{defer:true});
     });
     updateInsulationOptions();
-    if(conduitId){
-      const cableSearch=document.getElementById('cable-search');
-      if(cableSearch){
-        cableSearch.value=conduitId;
-        filterTable(document.getElementById('cableTable'),conduitId);
-      }
-    }
   }
+  const cableSearch=document.getElementById('cable-search');
+  if(cableSearch) cableSearch.value='';
+  updateDuctbankRouteFocus({
+    conduitId:selectedDuctbankConduitId,
+    conduitCount:conduitRows.length,
+    cableCount:Array.isArray(cables)?cables.length:0
+  });
+  updateDuctbankExperience();
   drawGrid();
+  requestAnimationFrame(()=>requestAnimationFrame(centerDuctbankRouteConduit));
   updateAmpacityReport();
   saveDuctbankSession();
   return true;
@@ -1407,6 +1471,53 @@ function cablePopoverStatus(status){
  return `<div class="ductbank-cable-popover-status ductbank-cable-popover-status--${escapeHtml(status.tone)}"><strong>${escapeHtml(status.label)}</strong><span>${escapeHtml(status.detail)}</span></div>`;
 }
 
+function renderDuctbankCableKey(entries=[]){
+ const panel=document.getElementById('ductbankCableKey');
+ const body=panel?.querySelector('[data-ductbank-cable-key-body]');
+ const count=panel?.querySelector('[data-ductbank-cable-key-count]');
+ if(!panel || !body || !count) return;
+ if(!entries.length){
+  panel.hidden=true;
+  body.innerHTML='';
+  count.textContent='No assigned cables';
+  return;
+ }
+
+ const groups=new Map();
+ entries.forEach(entry=>{
+  const conduitId=normalizeDuctbankId(entry.conduitId) || 'Unassigned';
+  if(!groups.has(conduitId)) groups.set(conduitId,[]);
+  groups.get(conduitId).push(entry);
+ });
+ const orderedGroups=Array.from(groups.entries()).sort(([left],[right])=>{
+  if(left===selectedDuctbankConduitId) return -1;
+  if(right===selectedDuctbankConduitId) return 1;
+  return left.localeCompare(right,undefined,{numeric:true,sensitivity:'base'});
+ });
+ count.textContent=`${entries.length} cable${entries.length===1?'':'s'} across ${groups.size} conduit${groups.size===1?'':'s'}`;
+ body.innerHTML=orderedGroups.map(([conduitId,cables],groupIndex)=>{
+  const isFocus=Boolean(selectedDuctbankConduitId) && conduitId===selectedDuctbankConduitId;
+  const open=isFocus || (!selectedDuctbankConduitId && groupIndex===0) || entries.length<=12;
+  const items=cables.map(entry=>`
+   <button type="button" class="ductbank-cable-key-item" data-ductbank-cable-key-tag="${escapeHtml(entry.tag)}" aria-pressed="false">
+    <span class="ductbank-cable-key-marker" aria-hidden="true">${entry.marker}</span>
+    <span class="ductbank-cable-key-name">${escapeHtml(entry.tag)}</span>
+    <span class="ductbank-cable-key-size">${Number(entry.diameter).toFixed(2)} in</span>
+   </button>
+  `).join('');
+  return `
+   <details class="ductbank-cable-key-group${isFocus?' is-route-focus':''}" data-ductbank-cable-key-group="${escapeHtml(conduitId)}"${open?' open':''}>
+    <summary>
+     <span>${escapeHtml(conduitId)}</span>
+     <small>${cables.length} cable${cables.length===1?'':'s'}</small>
+    </summary>
+    <div class="ductbank-cable-key-items">${items}</div>
+   </details>
+  `;
+ }).join('');
+ panel.hidden=false;
+}
+
 function positionDuctbankCablePopover(popover, point){
  const wrapper=document.getElementById('gridWrapper');
  if(!wrapper) return;
@@ -1464,6 +1575,11 @@ function syncDuctbankCableSelection(){
    marker.setAttribute('aria-pressed',String(Boolean(selected)));
    if(selected) found=true;
  });
+ document.querySelectorAll('[data-ductbank-cable-key-tag]').forEach(item=>{
+  const selected=normalizeDuctbankId(item.dataset.ductbankCableKeyTag)===tag && tag;
+  item.classList.toggle('is-selected',Boolean(selected));
+  item.setAttribute('aria-pressed',String(Boolean(selected)));
+ });
  if(tag && !found) hideDuctbankCablePopover();
 }
 
@@ -1491,6 +1607,7 @@ function hideDuctbankCablePopover({ clearSelection = true } = {}){
 function focusDuctbankCableRow(tag){
  const row=ductbankCableRowByTag(tag);
  if(!row) return;
+ setDuctbankCableTableExpanded(true);
  clearDuctbankFilters('all');
  document.querySelectorAll('#cableTable tbody tr').forEach(tr=>tr.classList.remove('ductbank-row-selected'));
  row.classList.add('ductbank-row-selected');
@@ -1506,6 +1623,7 @@ function focusDuctbankCableRow(tag){
 function initDuctbankCablePopover(){
  const svg=document.getElementById('grid');
  const popover=document.getElementById('ductbank-cable-popover');
+ const key=document.getElementById('ductbankCableKey');
  if(!svg || !popover) return;
  svg.addEventListener('click',event=>{
    const marker=event.target.closest('[data-ductbank-cable-tag]');
@@ -1532,8 +1650,18 @@ function initDuctbankCablePopover(){
      hideDuctbankCablePopover({clearSelection:false});
    }
  });
+ key?.addEventListener('click',event=>{
+  const item=event.target.closest('[data-ductbank-cable-key-tag]');
+  if(!item || !key.contains(item)) return;
+  const tag=item.dataset.ductbankCableKeyTag;
+  const marker=Array.from(svg.querySelectorAll('[data-ductbank-cable-tag]')).find(candidate=>normalizeDuctbankId(candidate.dataset.ductbankCableTag)===normalizeDuctbankId(tag));
+  if(!marker) return;
+  marker.scrollIntoView({behavior:'smooth',block:'center',inline:'center'});
+  const rect=marker.getBoundingClientRect();
+  selectDuctbankCable(tag,{clientX:rect.left+rect.width/2,clientY:rect.top+rect.height/2});
+ });
  document.addEventListener('click',event=>{
-   if(event.target.closest('#ductbank-cable-popover,[data-ductbank-cable-tag]')) return;
+   if(event.target.closest('#ductbank-cable-popover,[data-ductbank-cable-tag],[data-ductbank-cable-key-tag]')) return;
    hideDuctbankCablePopover();
  });
  document.addEventListener('keydown',event=>{
@@ -1544,6 +1672,9 @@ function initDuctbankCablePopover(){
 const DUCTBANK_DRAWING_MARGIN=20;
 const DUCTBANK_DRAWING_SCALE=40;
 const DUCTBANK_SKY_HEIGHT=64;
+const DUCTBANK_MAX_COVER_PIXELS=220;
+const DUCTBANK_SIDE_CONTEXT_PIXELS=44;
+const DUCTBANK_BOTTOM_CONTEXT_PIXELS=44;
 
 function appendDuctbankSvgElement(parent, tag, attrs={}, text=''){
  const el=document.createElementNS('http://www.w3.org/2000/svg',tag);
@@ -1570,9 +1701,22 @@ function ductbankDrawingContext(scale=DUCTBANK_DRAWING_SCALE){
  const showContext=showDuctbankEarthContext();
  const skyHeight=showContext ? DUCTBANK_SKY_HEIGHT : 0;
  const gradeY=skyHeight;
- const soilPad=showContext ? depthIn * scale : 0;
- const ductTopY=showContext ? gradeY + soilPad : DUCTBANK_DRAWING_MARGIN;
- return { depthIn, showContext, skyHeight, gradeY, soilPad, sideSoilPx:soilPad, bottomSoilPx:soilPad, ductTopY };
+ const actualCoverPx=showContext ? depthIn * scale : 0;
+ const visualCoverPx=showContext ? Math.min(actualCoverPx,DUCTBANK_MAX_COVER_PIXELS) : 0;
+ const coverCompressed=actualCoverPx>visualCoverPx;
+ const ductTopY=showContext ? gradeY + visualCoverPx : DUCTBANK_DRAWING_MARGIN;
+ return {
+  depthIn,
+  showContext,
+  skyHeight,
+  gradeY,
+  actualCoverPx,
+  visualCoverPx,
+  coverCompressed,
+  sideSoilPx:showContext ? DUCTBANK_SIDE_CONTEXT_PIXELS : 0,
+  bottomSoilPx:showContext ? DUCTBANK_BOTTOM_CONTEXT_PIXELS : 0,
+  ductTopY
+ };
 }
 
 function drawDuctbankSoilContext(svg, defs, options){
@@ -1674,6 +1818,7 @@ function drawDuctbankGradeCallout(svg, options){
    ductWidth,
    scale,
    depthIn,
+   coverCompressed=false,
    utilHeatmap: showLegend=false
  } = options;
  const group=appendDuctbankSvgElement(svg,'g',{class:'ductbank-grade-callout-layer'});
@@ -1717,6 +1862,16 @@ function drawDuctbankGradeCallout(svg, options){
    'marker-start':'url(#ductbank-dim-arrow)',
    'marker-end':'url(#ductbank-dim-arrow)'
  });
+ if(coverCompressed){
+  const breakY=gradeY+Math.max(34,coverPx*0.52);
+  appendDuctbankSvgElement(group,'path',{
+   d:`M${dimX - 6} ${breakY - 9} L${dimX + 6} ${breakY - 3} L${dimX - 6} ${breakY + 3} L${dimX + 6} ${breakY + 9}`,
+   class:'ductbank-dimension-break',
+   stroke:'#334155',
+   'stroke-width':2,
+   fill:'none'
+  });
+ }
  appendDuctbankSvgElement(group,'line',{
    x1:dimX-5,
    x2:originX,
@@ -1736,7 +1891,7 @@ function drawDuctbankGradeCallout(svg, options){
    'stroke-width':1.4
  });
 
- const labelWidth=190;
+ const labelWidth=coverCompressed ? 238 : 190;
  const labelX=Math.max(originX + 44, Math.min(width-labelWidth-12, originX + Math.max(120, ductWidth*scale*0.18)));
  const labelY=coverPx >= 90
    ? Math.min(ductTopY - 20, gradeY + Math.max(58, coverPx*0.08))
@@ -1752,7 +1907,7 @@ function drawDuctbankGradeCallout(svg, options){
    x:labelX - 8,
    y:labelY - 18,
    width:labelWidth + 14,
-   height:28,
+   height:coverCompressed ? 44 : 28,
    rx:5,
    class:'ductbank-depth-callout-bg',
    fill:'#ffffff',
@@ -1767,6 +1922,16 @@ function drawDuctbankGradeCallout(svg, options){
    'font-size':13,
    'font-weight':800
  },`Elevation to grade: ${formatDuctbankDepthCallout(depthIn)}`);
+ if(coverCompressed){
+  appendDuctbankSvgElement(group,'text',{
+   x:labelX,
+   y:labelY+15,
+   class:'ductbank-depth-scale-note',
+   fill:'#64748b',
+   'font-size':10,
+   'font-weight':700
+  },'Depth compressed for drawing clarity');
+ }
  appendDuctbankSvgElement(group,'text',{
    x:Math.max(originX, width - 118),
    y:Math.min(height - (showLegend ? 72 : 12), gradeY + 28),
@@ -1789,6 +1954,7 @@ function drawGrid(){
  autoPlaceConduits();
  const conduits=getAllConduits();
  if(conduits.length===0){
+  renderDuctbankCableKey([]);
   hideDuctbankCablePopover();
   return;
  }
@@ -1798,7 +1964,7 @@ function drawGrid(){
  const rightPad=parseFloat(document.getElementById('rightPad').value)||0;
 const margin=DUCTBANK_DRAWING_MARGIN;
 const scale=DUCTBANK_DRAWING_SCALE; // pixels per inch
-const { depthIn, showContext, gradeY, ductTopY, sideSoilPx, bottomSoilPx } = ductbankDrawingContext(scale);
+const { depthIn, showContext, gradeY, ductTopY, sideSoilPx, bottomSoilPx, coverCompressed } = ductbankDrawingContext(scale);
 const originX=margin + sideSoilPx;
 const originY=ductTopY;
 const fillMap=fillResults();
@@ -1849,10 +2015,7 @@ if(document.getElementById('heatSources').checked){
 const rightContextPx=showContext ? sideSoilPx : 0;
 const bottomContextPx=showContext ? bottomSoilPx : margin;
 const width=Math.round(Math.max(overallMaxX*scale+originX+rightContextPx+margin+80,360));
-const cableLegendColumns=width>=620?2:1;
-const cableLegendRows=Math.ceil(cableLegendEntries.length/cableLegendColumns);
-const cableLegendHeight=cableLegendEntries.length?38+cableLegendRows*18:0;
-const height=Math.round(overallMaxY*scale+originY+bottomContextPx+(utilHeatmap?60:20)+cableLegendHeight);
+const height=Math.round(overallMaxY*scale+originY+bottomContextPx+(utilHeatmap?60:20));
 svg.setAttribute('width',width);
 svg.setAttribute('height',height);
 
@@ -1973,6 +2136,7 @@ heightText.textContent=ductHeight.toFixed(2)+'"';
    const R=Rin*scale;
    const cx=c.x*scale+R+originX;
    const cy=c.y*scale+R+originY;
+  const isRouteFocus=Boolean(selectedDuctbankConduitId) && normalizeDuctbankId(c.conduit_id)===selectedDuctbankConduitId;
   const data=fillMap[c.conduit_id];
   let color=utilHeatmap?'green':'lightgray';
   if(utilHeatmap && data){
@@ -1987,6 +2151,18 @@ heightText.textContent=ductHeight.toFixed(2)+'"';
    clipCircle.setAttribute('cx',cx);clipCircle.setAttribute('cy',cy);clipCircle.setAttribute('r',R);
    clip.appendChild(clipCircle);
    defs.appendChild(clip);
+   if(isRouteFocus){
+    const focusHalo=document.createElementNS('http://www.w3.org/2000/svg','circle');
+    focusHalo.setAttribute('cx',cx);
+    focusHalo.setAttribute('cy',cy);
+    focusHalo.setAttribute('r',R+8);
+    focusHalo.setAttribute('class','ductbank-route-focus-halo');
+    focusHalo.setAttribute('data-ductbank-conduit-focus',c.conduit_id);
+    const focusTitle=document.createElementNS('http://www.w3.org/2000/svg','title');
+    focusTitle.textContent=`Selected from Routing Results: ${c.conduit_id}`;
+    focusHalo.appendChild(focusTitle);
+    svg.appendChild(focusHalo);
+   }
    if(data){
      const placed=packCircles(data.cables.map(cb=>({tag:cb.tag,r:cb.diameter/2})),Rin);
     placed.forEach(p=>{
@@ -2034,6 +2210,7 @@ heightText.textContent=ductHeight.toFixed(2)+'"';
   circle.setAttribute('fill',color);
   circle.setAttribute('fill-opacity',utilHeatmap?'0.4':'0.0');
    circle.setAttribute('stroke','black');
+  if(isRouteFocus) circle.setAttribute('class','ductbank-route-focus-conduit');
   circle.setAttribute('pointer-events','stroke');
   if(data){
     const names=data.cables.map(c=>c.tag).join(', ');
@@ -2044,6 +2221,7 @@ heightText.textContent=ductHeight.toFixed(2)+'"';
   cidText.setAttribute('x',cx);
   cidText.setAttribute('y',cy-R-22);
   cidText.setAttribute('font-size','10');
+  if(isRouteFocus) cidText.setAttribute('class','ductbank-route-focus-label');
   cidText.setAttribute('text-anchor','middle');
   cidText.textContent=c.conduit_id;
   svg.appendChild(cidText);
@@ -2055,42 +2233,6 @@ heightText.textContent=ductHeight.toFixed(2)+'"';
   typeText.textContent=`${c.conduit_type} ${c.trade_size}\"`;
   svg.appendChild(typeText);
 });
-
-if(cableLegendEntries.length){
-  const legendX=originX;
-  const legendY=height-cableLegendHeight+8;
-  const legendWidth=Math.max(260,width-originX-margin);
-  const legendPanel=document.createElementNS('http://www.w3.org/2000/svg','rect');
-  legendPanel.setAttribute('x',legendX-6);
-  legendPanel.setAttribute('y',legendY-4);
-  legendPanel.setAttribute('width',legendWidth+6);
-  legendPanel.setAttribute('height',cableLegendHeight-8);
-  legendPanel.setAttribute('rx','4');
-  legendPanel.setAttribute('fill','#ffffff');
-  legendPanel.setAttribute('fill-opacity','0.96');
-  legendPanel.setAttribute('stroke','#94a3b8');
-  svg.appendChild(legendPanel);
-  const legendTitle=document.createElementNS('http://www.w3.org/2000/svg','text');
-  legendTitle.setAttribute('x',legendX);
-  legendTitle.setAttribute('y',legendY+10);
-  legendTitle.setAttribute('font-size','10');
-  legendTitle.setAttribute('font-weight','800');
-  legendTitle.setAttribute('fill','#0f172a');
-  legendTitle.textContent='CABLE IDENTIFICATION (marker - cable tag - outside diameter - conduit)';
-  svg.appendChild(legendTitle);
-  const columnWidth=legendWidth/cableLegendColumns;
-  cableLegendEntries.forEach((entry,index)=>{
-    const column=Math.floor(index/cableLegendRows);
-    const row=index%cableLegendRows;
-    const item=document.createElementNS('http://www.w3.org/2000/svg','text');
-    item.setAttribute('x',legendX+column*columnWidth);
-    item.setAttribute('y',legendY+29+row*18);
-    item.setAttribute('font-size','10');
-    item.setAttribute('fill','#0f172a');
-    item.textContent=`${entry.marker} - ${entry.tag} - ${entry.diameter.toFixed(2)}\" - ${entry.conduitId}`;
-    svg.appendChild(item);
-  });
-}
 
  if(document.getElementById('heatSources').checked){
    const heatSources=getAllHeatSources();
@@ -2250,6 +2392,7 @@ if(cableLegendEntries.length){
      ductWidth,
      scale,
      depthIn,
+     coverCompressed,
      utilHeatmap
    });
  }
@@ -2276,6 +2419,7 @@ if(heatVisible && window.lastHeatGrid && heatMeta.width===width && heatMeta.heig
   if(heat) heat.style.display='none';
   if(overlay) overlay.style.display='none';
 }
+renderDuctbankCableKey(cableLegendEntries);
 syncDuctbankCableSelection();
 }
 
@@ -2908,6 +3052,36 @@ function importCSV(file,callback){
 let activeDuctbankFilter = 'all';
 let ductbankExperienceRaf = 0;
 let selectedDuctbankCableTag = '';
+let selectedDuctbankConduitId = '';
+
+function updateDuctbankRouteFocus({conduitId='',conduitCount=0,cableCount=0}={}){
+ const banner=document.getElementById('ductbank-route-focus');
+ if(!banner) return;
+ const normalized=normalizeDuctbankId(conduitId);
+ banner.hidden=!normalized;
+ const title=banner.querySelector('[data-ductbank-route-focus-title]');
+ const detail=banner.querySelector('[data-ductbank-route-focus-detail]');
+ if(title) title.textContent=normalized ? `${conduitId} highlighted` : '';
+ if(detail){
+   detail.textContent=normalized
+     ? `Showing the complete ductbank: ${conduitCount} conduits and ${cableCount} assigned cables remain visible.`
+     : '';
+ }
+}
+
+function centerDuctbankRouteConduit(){
+ if(!selectedDuctbankConduitId) return;
+ const wrapper=document.getElementById('gridWrapper');
+ const container=document.getElementById('gridContainer');
+ const focus=document.querySelector('[data-ductbank-conduit-focus]');
+ if(!wrapper || !container || !focus) return;
+ const wrapperRect=wrapper.getBoundingClientRect();
+ const horizontalScroller=container.scrollWidth>container.clientWidth ? container : wrapper;
+ const horizontalRect=horizontalScroller.getBoundingClientRect();
+ const focusRect=focus.getBoundingClientRect();
+ horizontalScroller.scrollLeft=Math.max(0,horizontalScroller.scrollLeft+focusRect.left+focusRect.width/2-horizontalRect.left-horizontalScroller.clientWidth/2);
+ wrapper.scrollTop=Math.max(0,wrapper.scrollTop+focusRect.top+focusRect.height/2-wrapperRect.top-wrapper.clientHeight/2);
+}
 
 function setDuctbankText(id, value){
  const el=document.getElementById(id);
@@ -3107,6 +3281,7 @@ function applyDuctbankQuickFilter(context){
    row.classList.toggle('ductbank-row-fill-warning', hasIssueCode(visibleIssues,['fill']));
    row.classList.toggle('ductbank-row-thermal-warning', ductbankIssueCodeMatchesFilter('thermal') && context.thermalConduits.has(normalizeDuctbankId(data.conduit_id)));
    row.classList.toggle('ductbank-row-ampacity-warning', ductbankIssueCodeMatchesFilter('ampacity') && context.ampacityConduits.has(normalizeDuctbankId(data.conduit_id)));
+   row.classList.toggle('ductbank-route-focus-row', Boolean(selectedDuctbankConduitId) && normalizeDuctbankId(data.conduit_id)===selectedDuctbankConduitId);
  });
  const cableQuery=(document.getElementById('cable-search')?.value || '').toLowerCase();
  document.querySelectorAll('#cableTable tbody tr').forEach((row,index)=>{
@@ -3138,6 +3313,27 @@ function applyDuctbankQuickFilter(context){
 
 function visibleDuctbankRowCount(selector){
  return Array.from(document.querySelectorAll(selector)).filter(row=>row.style.display !== 'none').length;
+}
+
+function setDuctbankCableTableExpanded(expanded, { focusToggle = false } = {}){
+ const toggle=document.getElementById('toggleCableTableBtn');
+ const content=document.getElementById('cable-section-content');
+ if(!toggle || !content) return;
+ const isExpanded=Boolean(expanded);
+ content.hidden=!isExpanded;
+ toggle.setAttribute('aria-expanded',String(isExpanded));
+ const label=toggle.querySelector('[data-cable-table-toggle-label]');
+ if(label) label.textContent=isExpanded ? 'Hide table' : 'Show table';
+ if(focusToggle) toggle.focus();
+}
+
+function initDuctbankCableTableDisclosure(){
+ const toggle=document.getElementById('toggleCableTableBtn');
+ if(!toggle) return;
+ toggle.addEventListener('click',()=>{
+   setDuctbankCableTableExpanded(toggle.getAttribute('aria-expanded') !== 'true');
+ });
+ setDuctbankCableTableExpanded(false);
 }
 
 function setDuctbankEmptyState(id, { hidden, title, message, filtered = false }){
@@ -3174,6 +3370,15 @@ function updateDuctbankTableState(context){
    cableCount.textContent=cableFiltered
      ? `Showing ${cableVisible} of ${context.cables.length} cable${context.cables.length === 1 ? '' : 's'}`
      : `${context.cables.length} cable${context.cables.length === 1 ? '' : 's'}`;
+ }
+ const cableSectionSummary=document.getElementById('cable-section-summary');
+ if(cableSectionSummary){
+   const total=context.cables.length;
+   const assigned=context.cables.filter(cable=>context.conduitIds.has(normalizeDuctbankId(cable.conduit_id))).length;
+   const unassigned=total-assigned;
+   cableSectionSummary.textContent=total
+     ? `${total} cable${total === 1 ? '' : 's'} \u00B7 ${assigned} assigned${unassigned ? ` \u00B7 ${unassigned} unassigned` : ''}`
+     : 'No cables';
  }
  const clearConduit=document.getElementById('clearConduitFiltersBtn');
  const clearCable=document.getElementById('clearCableFiltersBtn');
@@ -3372,6 +3577,7 @@ function focusDuctbankIssue(issue){
  const tableId=issue.table==='conduit' ? 'conduitTable' : 'cableTable';
  const row=document.querySelectorAll(`#${tableId} tbody tr`)[issue.row];
  if(!row) return;
+ if(issue.table==='cable') setDuctbankCableTableExpanded(true);
  activeDuctbankFilter=issue.code==='thermal' ? 'thermal' : issue.code==='ampacity' ? 'ampacity' : issue.code==='fill' ? 'fill' : 'missing';
  updateDuctbankExperience();
  const field=issue.field ? row.querySelector(`[name="${issue.field}"]`) : row.querySelector('input,select,button');
@@ -3447,6 +3653,7 @@ function collectDuctbankAmpacityOverEntries(context){
 
 function focusDuctbankAmpacityOverEntry(entry){
  if(!entry) return;
+ setDuctbankCableTableExpanded(true);
  activeDuctbankFilter='ampacity';
  updateDuctbankExperience();
  const row=document.querySelectorAll('#cableTable tbody tr')[entry.row] || ductbankCableRowByTag(entry.tag);
@@ -3622,6 +3829,7 @@ function updateDuctbankExperience(){
  applyDuctbankQuickFilter(context);
  decorateDuctbankActionButtons();
  refreshDuctbankTables();
+ renderDuctbankBom();
 }
 
 function validateDuctbankInputs({ focusFirst = false, scrollToWarnings = true } = {}){
@@ -3928,6 +4136,7 @@ async function openCableEntryModal(){
      }
      applyCableEntryDefaults(form);
      addCableRow({...values,tag,conduit_id:conduitId},{defer:true});
+     setDuctbankCableTableExpanded(true);
      updateInsulationOptions();
      checkInsulationThickness();
      drawGrid();
@@ -3989,6 +4198,10 @@ async function loadCompleteDuctbankExample(){
  applyDuctbankDefaults({onlyBlank:false,silent:true,persist:false});
  const tagEl=document.getElementById('ductbankTag');
  if(tagEl) tagEl.value='DB-01';
+ const lengthEl=document.getElementById('ductbankLength');
+ if(lengthEl) lengthEl.value='100';
+ const encasementEl=document.getElementById('concreteEncasement');
+ if(encasementEl) encasementEl.checked=true;
  loadSampleConduits({silent:true});
  document.querySelectorAll('#conduitTable tbody tr').forEach(row=>{
    const size=row.querySelector('[name="trade_size"]');
@@ -4047,6 +4260,7 @@ document.getElementById('exportBtn').addEventListener('click',()=>{
  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(cables),'cables');
  const compliance=Object.keys(fill).map(k=>{const f=fill[k];return{conduit_id:k,fill_pct:f.fillPct.toFixed(2),cable_count:f.cables.length};});
  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(compliance),'fill');
+ appendDuctbankBomSheets(wb);
  XLSX.writeFile(wb,'ductbank_data.xlsx');
  exportCalcData(conduits,cables);
 });
@@ -4139,9 +4353,172 @@ function exportCables(){
  exportCSV('ductbank_cables.csv',headers,rows,meta);
 }
 
+function ductbankBomInput(){
+ return {
+  tag:document.getElementById('ductbankTag').value,
+  lengthFt:parseFloat(document.getElementById('ductbankLength').value)||0,
+  depthIn:parseFloat(document.getElementById('ductbankDepth').value)||0,
+  concreteEncasement:document.getElementById('concreteEncasement').checked,
+  conduits:getAllConduits(),
+  layout:{
+   topPad:parseFloat(document.getElementById('topPad').value)||0,
+   bottomPad:parseFloat(document.getElementById('bottomPad').value)||0,
+   leftPad:parseFloat(document.getElementById('leftPad').value)||0,
+   rightPad:parseFloat(document.getElementById('rightPad').value)||0
+  },
+  assumptions:{
+   conduitWastePct:parseFloat(document.getElementById('bomConduitWaste').value),
+   concreteWastePct:parseFloat(document.getElementById('bomConcreteWaste').value),
+   spacerSpacingFt:parseFloat(document.getElementById('bomSpacerSpacing').value),
+   workingClearanceIn:parseFloat(document.getElementById('bomWorkingClearance').value),
+   beddingDepthIn:parseFloat(document.getElementById('bomBeddingDepth').value),
+   conduitStickLengthFt:parseFloat(document.getElementById('bomConduitStickLength').value),
+   groundWireWastePct:ductbankBomOptionState.groundWireWastePct
+  },
+  optionalMaterials:{
+   groundWire:ductbankBomOptionState.includeGroundWire,
+   groundWireCount:ductbankBomOptionState.groundWireCount,
+   redWarningDye:ductbankBomOptionState.includeRedDye,
+   excavationShoring:ductbankBomOptionState.includeShoring
+  }
+ };
+}
+
+function currentDuctbankBOM(){
+ return buildDuctbankBOM(ductbankBomInput());
+}
+
+function formatDuctbankBomQuantity(value, maximumFractionDigits=2){
+ const number=Number(value);
+ return Number.isFinite(number)
+  ? number.toLocaleString(undefined,{maximumFractionDigits})
+  : '0';
+}
+
+function ductbankBomOptionIncluded(optionKey){
+ if(optionKey==='groundWire') return ductbankBomOptionState.includeGroundWire;
+ if(optionKey==='redWarningDye') return ductbankBomOptionState.includeRedDye;
+ if(optionKey==='excavationShoring') return ductbankBomOptionState.includeShoring;
+ return false;
+}
+
+function ductbankBomIncludeCell(row){
+ if(!row.optional) return '<span class="ductbank-bom-required">Included</span>';
+ const checked=ductbankBomOptionIncluded(row.optionKey);
+ return `<label class="ductbank-bom-table-toggle">
+  <input type="checkbox" data-bom-option-toggle="${escapeHtml(row.optionKey)}" aria-label="Include ${escapeHtml(row.item)}" ${checked ? 'checked' : ''}>
+  <span>${checked ? 'Included' : 'Include'}</span>
+ </label>`;
+}
+
+function ductbankBomSpecificationCell(row){
+ if(row.optionKey!=='groundWire') return escapeHtml(row.specification);
+ const disabled=ductbankBomOptionState.includeGroundWire ? '' : 'disabled';
+ return `<div class="ductbank-bom-inline-inputs">
+  <label>Runs
+   <select data-bom-option-input="groundWireCount" aria-label="Ground wire runs" ${disabled}>
+    <option value="1" ${ductbankBomOptionState.groundWireCount===1 ? 'selected' : ''}>1</option>
+    <option value="2" ${ductbankBomOptionState.groundWireCount===2 ? 'selected' : ''}>2</option>
+   </select>
+  </label>
+  <label>Allowance (%)
+   <input type="number" min="0" step="0.5" value="${escapeHtml(ductbankBomOptionState.groundWireWastePct)}" data-bom-option-input="groundWireWastePct" aria-label="Ground wire allowance percent" ${disabled}>
+  </label>
+ </div>`;
+}
+
+function renderDuctbankBom(){
+ const body=document.getElementById('ductbank-bom-body');
+ if(!body) return;
+ const bom=currentDuctbankBOM();
+ const summary=bom.summary;
+ document.getElementById('ductbank-bom-route-length').textContent=`${formatDuctbankBomQuantity(summary.routeLengthFt)} ft`;
+ document.getElementById('ductbank-bom-conduit-length').textContent=`${formatDuctbankBomQuantity(summary.conduitLengthFt)} LF`;
+ document.getElementById('ductbank-bom-concrete').textContent=`${formatDuctbankBomQuantity(summary.concreteCubicYards)} CY`;
+ document.getElementById('ductbank-bom-excavation').textContent=`${formatDuctbankBomQuantity(summary.excavationCubicYards)} CY`;
+ const status=document.getElementById('ductbank-bom-status');
+ status.classList.toggle('is-ready',bom.ready);
+ status.classList.toggle('is-warning',bom.warnings.length > 0);
+ status.innerHTML=bom.ready
+  ? `<strong>${escapeHtml(bom.tag || 'Current ductbank')}</strong><span>${bom.rows.length} line items · ${bom.summary.optionalLineItems} optional selected · Screening takeoff ready for review${bom.warnings.length ? ` · ${bom.warnings.length} note${bom.warnings.length === 1 ? '' : 's'}` : ''}</span>`
+  : `<strong>BOM needs input</strong><span>${escapeHtml(bom.warnings.join(' '))}</span>`;
+ const displayRows=[...bom.rows.filter(row=>!row.optional),...bom.optionalRows];
+ body.innerHTML=displayRows.map(row=>`
+  <tr${row.optional ? ` class="ductbank-bom-row--optional ${row.included ? 'is-included' : 'is-excluded'}"` : ''}>
+   <td class="ductbank-bom-include">${ductbankBomIncludeCell(row)}</td>
+   <td><span class="ductbank-bom-category">${escapeHtml(row.category)}</span></td>
+   <td>${escapeHtml(row.item)}</td>
+   <td>${ductbankBomSpecificationCell(row)}</td>
+   <td class="ductbank-bom-quantity">${escapeHtml(formatDuctbankBomQuantity(row.quantity))}</td>
+   <td>${escapeHtml(row.unit)}</td>
+   <td class="ductbank-bom-basis">${escapeHtml(row.basis)}</td>
+  </tr>`).join('');
+ const empty=document.getElementById('ductbank-bom-empty');
+ const tableWrap=document.getElementById('ductbankBomTable')?.closest('.ductbank-table-wrap');
+ if(empty) empty.hidden=bom.ready;
+ if(tableWrap) tableWrap.hidden=!bom.ready;
+ const notes=document.getElementById('ductbank-bom-notes');
+ if(notes){
+  notes.innerHTML=[...bom.warnings,...bom.exclusions].map(note=>`<li>${escapeHtml(note)}</li>`).join('');
+ }
+ setDuctbankButtonEnabled('exportDuctbankBomBtn',bom.ready,'Enter a route length and add conduits before exporting the BOM.');
+ setDuctbankButtonEnabled('exportBomBtn',bom.ready,'Enter a route length and add conduits before exporting the BOM.');
+ return bom;
+}
+
+function appendDuctbankBomSheets(workbook, bom=currentDuctbankBOM()){
+ const rows=bom.rows.map(row=>({
+  Category:row.category,
+  Item:row.item,
+  Specification:row.specification,
+  Quantity:row.quantity,
+  Unit:row.unit,
+  Basis:row.basis
+ }));
+ const sheet=XLSX.utils.json_to_sheet(rows);
+ sheet['!cols']=[{wch:14},{wch:28},{wch:34},{wch:12},{wch:10},{wch:54}];
+ XLSX.utils.book_append_sheet(workbook,sheet,'Ductbank BOM');
+ const assumptionRows=[
+  ['Ductbank',bom.tag || 'Not provided'],
+  ['Route length (ft)',bom.summary.routeLengthFt],
+  ['Conduit waste (%)',bom.assumptions.conduitWastePct],
+  ['Concrete waste (%)',bom.assumptions.concreteWastePct],
+  ['Spacer spacing (ft)',bom.assumptions.spacerSpacingFt],
+  ['Side working clearance (in)',bom.assumptions.workingClearanceIn],
+  ['Bedding depth (in)',bom.assumptions.beddingDepthIn],
+  ['Conduit stock length (ft)',bom.assumptions.conduitStickLengthFt],
+  ['Ground wire allowance (%)',bom.assumptions.groundWireWastePct],
+  [],
+  ['Optional materials'],
+  ['#4/0 grounding conductor',bom.optionalMaterials.groundWire ? `${bom.optionalMaterials.groundWireCount} run(s)` : 'Not included'],
+  ['Red warning dye / pigment',bom.optionalMaterials.redWarningDye ? 'Included' : 'Not included'],
+  ['Excavation shoring allowance',bom.optionalMaterials.excavationShoring ? 'Included' : 'Not included'],
+  [],
+  ['Scope notes'],
+  ...[...bom.warnings,...bom.exclusions].map(note=>[note])
+ ];
+ const assumptionsSheet=XLSX.utils.aoa_to_sheet([['Takeoff assumption','Value'],...assumptionRows]);
+ assumptionsSheet['!cols']=[{wch:58},{wch:22}];
+ XLSX.utils.book_append_sheet(workbook,assumptionsSheet,'BOM Assumptions');
+}
+
+function exportDuctbankBom(){
+ const bom=currentDuctbankBOM();
+ if(!bom.ready){
+  showAlertModal('BOM Inputs Required','Enter a route length and add at least one conduit before exporting the ductbank BOM.');
+  return;
+ }
+ const workbook=XLSX.utils.book_new();
+ appendDuctbankBomSheets(workbook,bom);
+ const fileTag=(bom.tag || 'ductbank').replace(/[^a-z0-9_-]+/gi,'-');
+ XLSX.writeFile(workbook,`${fileTag}_BOM.xlsx`);
+ showToast(`Exported ${bom.rows.length} BOM line items`);
+}
+
 function gatherInputParams(){
  return {
   ductbankTag:document.getElementById('ductbankTag').value,
+  ductbankLength:parseFloat(document.getElementById('ductbankLength').value)||0,
   concreteEncasement:document.getElementById('concreteEncasement').checked,
   ductbankDepth:parseFloat(document.getElementById('ductbankDepth').value)||0,
   earthTemp:parseFloat(document.getElementById('earthTemp').value)||0,
@@ -4508,6 +4885,14 @@ async function toggleHeatMap(){
 
 document.getElementById('exportConduitsBtn').addEventListener('click',exportConduits);
 document.getElementById('exportCablesBtn').addEventListener('click',exportCables);
+document.getElementById('exportBomBtn').addEventListener('click',exportDuctbankBom);
+document.getElementById('exportDuctbankBomBtn').addEventListener('click',exportDuctbankBom);
+document.getElementById('refreshDuctbankBomBtn').addEventListener('click',()=>{
+  autoPlaceConduits();
+  renderDuctbankBom();
+  saveDuctbankSession();
+  showToast('Refreshed ductbank BOM');
+});
 document.getElementById('exportImgBtn').addEventListener('click',exportImage);
 document.getElementById('exportThermalBtn').addEventListener('click',downloadThermalData);
 document.getElementById('exportCanvasDataBtn').addEventListener('click',downloadCanvasData);
@@ -4591,11 +4976,15 @@ document.addEventListener('keydown',e=>{
  }
 });
 
-['ductbankTag','concreteEncasement','ductbankDepth','earthTemp','airTemp','soilResistivity','moistureContent','heatSources','showEarthContext','hSpacing','vSpacing','topPad','bottomPad','leftPad','rightPad','perRow','conductorRating','gridRes','ductThermRes'].forEach(id=>{
+['ductbankTag','ductbankLength','concreteEncasement','ductbankDepth','earthTemp','airTemp','soilResistivity','moistureContent','heatSources','showEarthContext','hSpacing','vSpacing','topPad','bottomPad','leftPad','rightPad','perRow','conductorRating','gridRes','ductThermRes','bomConduitWaste','bomConcreteWaste','bomSpacerSpacing','bomWorkingClearance','bomBeddingDepth','bomConduitStickLength'].forEach(id=>{
  const el=document.getElementById(id);
  if(el){
   el.addEventListener('input',saveDuctbankSession);
   el.addEventListener('change',saveDuctbankSession);
+  if(['ductbankLength','ductbankDepth','concreteEncasement','topPad','bottomPad','leftPad','rightPad'].includes(id) || id.startsWith('bom')){
+   el.addEventListener('input',scheduleDuctbankExperienceUpdate);
+   el.addEventListener('change',scheduleDuctbankExperienceUpdate);
+  }
  }
 });
 document.querySelector('#conduitTable').addEventListener('input',saveDuctbankSession);
@@ -4605,7 +4994,23 @@ window.addEventListener('beforeunload',saveDuctbankSession);
 const dirty = createDirtyTracker();
 const markSaved = () => dirty.markClean();
 const markUnsaved = () => dirty.markDirty();
-['ductbankTag','concreteEncasement','ductbankDepth','earthTemp','airTemp','soilResistivity','moistureContent','heatSources','showEarthContext','hSpacing','vSpacing','topPad','bottomPad','leftPad','rightPad','perRow','conductorRating','gridRes','ductThermRes'].forEach(id=>{const el=document.getElementById(id);if(el){el.addEventListener('input',markUnsaved);el.addEventListener('change',markUnsaved);}});
+['ductbankTag','ductbankLength','concreteEncasement','ductbankDepth','earthTemp','airTemp','soilResistivity','moistureContent','heatSources','showEarthContext','hSpacing','vSpacing','topPad','bottomPad','leftPad','rightPad','perRow','conductorRating','gridRes','ductThermRes','bomConduitWaste','bomConcreteWaste','bomSpacerSpacing','bomWorkingClearance','bomBeddingDepth','bomConduitStickLength'].forEach(id=>{const el=document.getElementById(id);if(el){el.addEventListener('input',markUnsaved);el.addEventListener('change',markUnsaved);}});
+const ductbankBomTable=document.getElementById('ductbankBomTable');
+if(ductbankBomTable){
+ ductbankBomTable.addEventListener('change',event=>{
+  const toggle=event.target.dataset.bomOptionToggle;
+  const input=event.target.dataset.bomOptionInput;
+  if(toggle==='groundWire') ductbankBomOptionState.includeGroundWire=event.target.checked;
+  if(toggle==='redWarningDye') ductbankBomOptionState.includeRedDye=event.target.checked;
+  if(toggle==='excavationShoring') ductbankBomOptionState.includeShoring=event.target.checked;
+  if(input==='groundWireCount') ductbankBomOptionState.groundWireCount=Math.min(2,Math.max(1,parseInt(event.target.value,10)||1));
+  if(input==='groundWireWastePct') ductbankBomOptionState.groundWireWastePct=Math.max(0,parseFloat(event.target.value)||0);
+  if(!toggle&&!input) return;
+  markUnsaved();
+  saveDuctbankSession();
+  updateDuctbankExperience();
+ });
+}
 document.getElementById('conduitTable').addEventListener('input',markUnsaved);
 document.getElementById('cableTable').addEventListener('input',markUnsaved);
 document.getElementById('heatSourceTable').addEventListener('input',markUnsaved);
@@ -4614,7 +5019,7 @@ const impC=document.getElementById('importConduits'); if(impC) impC.addEventList
 const impCb=document.getElementById('importCables'); if(impCb) impCb.addEventListener('change',markUnsaved);
 document.getElementById('conduitTable').addEventListener('click',e=>{if(e.target.tagName==='BUTTON') markUnsaved();});
 document.getElementById('cableTable').addEventListener('click',e=>{if(e.target.tagName==='BUTTON') markUnsaved();});
-['exportConduitsBtn','exportCablesBtn','exportImgBtn','exportBtn','exportThermalBtn','exportCanvasDataBtn','downloadCalcReportBtn'].forEach(id=>{const el=document.getElementById(id);if(el)el.addEventListener('click',markSaved);});
+['exportConduitsBtn','exportCablesBtn','exportImgBtn','exportBtn','exportBomBtn','exportDuctbankBomBtn','exportThermalBtn','exportCanvasDataBtn','downloadCalcReportBtn'].forEach(id=>{const el=document.getElementById(id);if(el)el.addEventListener('click',markSaved);});
 const conduitSearch=document.getElementById('conduit-search');
 if(conduitSearch){
  conduitSearch.addEventListener('input',()=>{
@@ -4666,6 +5071,7 @@ function populateSoilReferences(data){
 }
 updateHeatSourceVisibility();
 initDuctbankCablePopover();
+initDuctbankCableTableDisclosure();
 initDuctbankExperience();
 loadConductorProperties().then(()=>{
   // sync local copy used by inline functions

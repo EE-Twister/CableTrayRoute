@@ -280,13 +280,13 @@ export const PAGE_CONTRACTS_BY_HREF = {
   }),
   'ductbankroute.html': contract({
     workflowStep: 'fillRouting',
-    standaloneInputs: ['Ductbank segment geometry, conduit assignments, cable selections, and thermal report options.'],
+    standaloneInputs: ['Ductbank route length and segment geometry, conduit assignments, cable selections, thermal report options, and material takeoff allowances.'],
     projectInputs: [cables, conduits, ductbanks, ductbankPanZoom, ductbankSession, ductbankRouteData, designBasis],
     outputs: [
       output('settings.ductbankPanZoom', 'setting', 'Ductbank canvas pan and zoom state.', ['ductbankroute.html']),
       output('settings.ductbankSession', 'setting', 'Ductbank page session state.', ['ductbankroute.html']),
       output('settings.ductbankRouteData', 'setting', 'Selected ductbank route handoff data.', ['ductbankroute.html']),
-      exportOnly('Ductbank calculation reports and route exports.', ['projectreport.html'])
+      exportOnly('Ductbank calculation reports, route exports, and assumption-backed BOM workbooks.', ['projectreport.html'])
     ],
     readiness: ready('Ready when ductbanks or conduits exist and selected cables can be assigned to underground routes.', ['No underground raceways, missing conduit group geometry, or no assignable cables.']),
     downstream: ['optimalRoute.html', 'projectreport.html']

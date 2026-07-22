@@ -20,7 +20,16 @@ globalThis.document = { baseURI: 'http://localhost/index.html' };
 globalThis.location = { href: 'http://localhost/index.html' };
 globalThis.window = {};
 
-const { listAppSettingKeys, readAppSetting, writeAppSetting } = await import('../projectStorage.js');
+const {
+  getProjectState,
+  listAppSettingKeys,
+  readAppSetting,
+  readScenarioValue,
+  setProjectKey,
+  writeAppSetting,
+  writeScenarioSessionValue,
+  writeScenarioValue
+} = await import('../projectStorage.js');
 
 function check(name, fn) {
   try {
@@ -75,6 +84,32 @@ check('readAppSetting prefers localStorage over sessionStorage', () => {
 
 check('readAppSetting returns null for missing keys', () => {
   assert.equal(readAppSetting('does-not-exist'), null);
+});
+
+check('session-backed scenario values avoid duplicate local-storage copies', () => {
+  localStorage.setItem('base:latestRouteResults', JSON.stringify({ stale: true }));
+  localStorage.setItem('latestRouteResults', JSON.stringify({ stale: true }));
+  const routeState = { batchResults: [{ cable: 'C-200', status: 'Routed' }] };
+
+  writeScenarioSessionValue('latestRouteResults', routeState, 'base');
+
+  assert.equal(localStorage.getItem('base:latestRouteResults'), null);
+  assert.equal(localStorage.getItem('latestRouteResults'), null);
+  assert.deepEqual(readScenarioValue('latestRouteResults', null, 'base'), routeState);
+  assert.deepEqual(getProjectState().settings.latestRouteResults, routeState);
+  assert.ok(sessionStorage.getItem('base:latestRouteResults'));
+  assert.ok(sessionStorage.getItem('latestRouteResults'));
+
+  setProjectKey('smallSetting', JSON.stringify({ saved: true }));
+  const persistedProject = JSON.parse(localStorage.getItem('CTR_PROJECT_V1'));
+  assert.equal(persistedProject.settings.latestRouteResults, undefined);
+  assert.deepEqual(persistedProject.settings.smallSetting, { saved: true });
+
+  const compactRouteState = { batchResults: [{ cable: 'C-1', status: 'Routed' }] };
+  writeScenarioValue('latestRouteResults', compactRouteState, 'base');
+  assert.equal(sessionStorage.getItem('base:latestRouteResults'), null);
+  assert.equal(sessionStorage.getItem('latestRouteResults'), null);
+  assert.deepEqual(readScenarioValue('latestRouteResults', null, 'base'), compactRouteState);
 });
 
 console.log('✓ listAppSettingKeys helper exposed from projectStorage');

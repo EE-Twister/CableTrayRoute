@@ -754,7 +754,7 @@ async function captureVisuals({ input, outputDir }) {
       await page.waitForFunction(() => Number(document.querySelector('#grid')?.getAttribute('width')) < 1200);
       await page.waitForTimeout(200);
       const ductbankAudit = await page.locator('#grid').evaluate(svg => ({
-        labels: svg.textContent || '',
+        labels: `${svg.textContent || ''} ${document.querySelector('#ductbankCableKey')?.textContent || ''}`,
         width: Number(svg.getAttribute('width')),
         height: Number(svg.getAttribute('height')),
         conduitCount: svg.querySelectorAll('circle[title]').length,
@@ -774,7 +774,7 @@ async function captureVisuals({ input, outputDir }) {
         assignedCableCount: assignedCables.length,
         maximumCablesInOneConduit,
         page: `ductbankroute.html?ductbank=${encodeURIComponent(id)}`,
-        ...(await captureLocator(page, '#grid', path)),
+        ...(await captureLocator(page, '.ductbank-drawing-layout', path)),
       });
     }
     if (!sharedConduitExamples) {

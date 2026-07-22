@@ -334,7 +334,7 @@ export function buildRouteSceneModel({ raceways = [], ductbanks = [], routes = [
           displayEnd: end.map((value, axis) => value + offset[axis])
         };
       })
-      .filter(Boolean);
+      .filter(segment => segment && segment.length > 0.000001);
     const normalizedRoute = {
       ...route,
       index: routeIndex,

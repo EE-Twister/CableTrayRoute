@@ -72,6 +72,35 @@ function normalizeCable(cable = {}, assignedConduitId = '') {
   };
 }
 
+function normalizedAssignmentId(value) {
+  return text(value).toLowerCase().replace(/[^a-z0-9]+/g, '');
+}
+
+function cableId(cable = {}) {
+  return text(cable.tag || cable.name || cable.id);
+}
+
+function conduitAssignmentAliases(ductbankIdentifier, conduit = {}) {
+  const ids = [conduitId(conduit), conduit.tray_id, conduit.raceway_id].map(text).filter(Boolean);
+  const aliases = new Set();
+  ids.forEach(id => {
+    aliases.add(normalizedAssignmentId(id));
+    if (ductbankIdentifier) {
+      aliases.add(normalizedAssignmentId(`${ductbankIdentifier}-${id}`));
+      aliases.add(normalizedAssignmentId(`${ductbankIdentifier}:${id}`));
+    }
+  });
+  return aliases;
+}
+
+function resolveAssignedCable(value, catalogById) {
+  if (value && typeof value === 'object') {
+    const catalogCable = catalogById.get(normalizedAssignmentId(cableId(value)));
+    return catalogCable ? { ...catalogCable, ...value } : value;
+  }
+  return catalogById.get(normalizedAssignmentId(value)) || null;
+}
+
 export function parseDuctbankRouteData(value) {
   if (!value) return null;
   if (typeof value === 'object') return value;
@@ -117,5 +146,62 @@ export function buildProjectDuctbankRoute({ ductbanks = [], conduits = [], cable
     cables: normalizedCables,
     conduits: normalizedConduits,
     conduitId: '',
+  };
+}
+
+export function buildDuctbankRouteHandoff({
+  ductbank = null,
+  trayCableMap = {},
+  cableCatalog = [],
+  selectedConduitId = '',
+} = {}) {
+  if (!ductbank) return null;
+  const id = ductbankId(ductbank);
+  const sourceConduits = Array.isArray(ductbank.conduits) ? ductbank.conduits : [];
+  const normalizedConduits = sourceConduits.map(normalizeConduit).filter(conduit => conduit.conduit_id);
+  const catalogById = new Map((Array.isArray(cableCatalog) ? cableCatalog : []).flatMap(cable => {
+    const idValue = normalizedAssignmentId(cableId(cable));
+    return idValue ? [[idValue, cable]] : [];
+  }));
+  const assignmentEntries = trayCableMap && typeof trayCableMap === 'object' && !Array.isArray(trayCableMap)
+    ? Object.entries(trayCableMap)
+    : [];
+  const seenCables = new Set();
+  const assignedCables = [];
+
+  normalizedConduits.forEach((conduit, index) => {
+    const sourceConduit = sourceConduits[index] || conduit;
+    const aliases = conduitAssignmentAliases(id, sourceConduit);
+    const assignedValues = assignmentEntries.flatMap(([racewayId, values]) => (
+      aliases.has(normalizedAssignmentId(racewayId)) && Array.isArray(values) ? values : []
+    ));
+    assignedValues.forEach(value => {
+      const cable = resolveAssignedCable(value, catalogById);
+      if (!cable) return;
+      const tag = cableId(cable);
+      const key = normalizedAssignmentId(tag);
+      if (!key || seenCables.has(key)) return;
+      seenCables.add(key);
+      assignedCables.push(normalizeCable(cable, conduit.conduit_id));
+    });
+  });
+
+  if (!assignedCables.length) {
+    const projectRoute = buildProjectDuctbankRoute({
+      ductbanks: [ductbank],
+      conduits: sourceConduits,
+      cables: cableCatalog,
+      selectedDuctbankId: id,
+    });
+    if (projectRoute) {
+      return { ...projectRoute, conduitId: text(selectedConduitId) };
+    }
+  }
+
+  return {
+    ductbank,
+    conduits: normalizedConduits,
+    cables: assignedCables,
+    conduitId: text(selectedConduitId),
   };
 }

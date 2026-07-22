@@ -278,6 +278,7 @@ const listeners = new Set();
 const memoryStorage = new Map();
 let storageWriteBlocked = false;
 let quotaWarningShown = false;
+const sessionOnlyProjectKeys = new Set();
 const MAX_SCENARIO_ENTRY_SIZE = 2.5 * 1024 * 1024;
 const scenarioSizeWarnings = new Set();
 let scenarioListCache = ['base'];
@@ -345,7 +346,32 @@ function readRawStorage(key) {
     const value = safeGet(storage, key);
     if (value !== null && value !== undefined) return value;
   }
+  const session = getSessionStorage();
+  if (session) {
+    const value = safeGet(session, key);
+    if (value !== null && value !== undefined) return value;
+  }
   return memoryStorage.has(key) ? memoryStorage.get(key) : null;
+}
+
+function writeSessionStorage(key, value) {
+  if (value === null || value === undefined) {
+    memoryStorage.delete(key);
+  } else {
+    memoryStorage.set(key, value);
+  }
+  const storage = getStorage();
+  if (storage) {
+    try { storage.removeItem(key); } catch {}
+  }
+  const session = getSessionStorage();
+  if (!session) return;
+  try {
+    if (value === null || value === undefined) session.removeItem(key);
+    else session.setItem(key, value);
+  } catch (error) {
+    console.warn('session storage write failed', key, error);
+  }
 }
 
 function writeRawStorage(key, value, options = {}) {
@@ -354,6 +380,10 @@ function writeRawStorage(key, value, options = {}) {
     memoryStorage.delete(key);
   } else {
     memoryStorage.set(key, value);
+  }
+  const session = getSessionStorage();
+  if (session) {
+    try { session.removeItem(key); } catch {}
   }
   const storage = getStorage();
   if (!storage || storageWriteBlocked) return;
@@ -381,6 +411,18 @@ function listPrefixedKeys(prefix) {
       }
     } catch (e) {
       console.warn('project storage enumerate failed', e);
+    }
+  }
+  const session = getSessionStorage();
+  if (session) {
+    try {
+      for (let i = 0; i < session.length; i++) {
+        const key = session.key(i);
+        if (!key || !key.startsWith(prefix)) continue;
+        keys.add(key.slice(prefix.length));
+      }
+    } catch (e) {
+      console.warn('session storage enumerate failed', e);
     }
   }
   for (const key of memoryStorage.keys()) {
@@ -519,6 +561,20 @@ export function writeScenarioValue(key, value, scenario = currentScenarioName) {
     }
   } catch (e) {
     console.error('scenario write failed', key, e);
+  }
+}
+
+export function writeScenarioSessionValue(key, value, scenario = currentScenarioName) {
+  const target = sanitizeScenarioName(scenario) || currentScenarioName;
+  try {
+    const serialized = JSON.stringify(value);
+    writeSessionStorage(scenarioStorageKey(target, key), serialized);
+    if (target === currentScenarioName) {
+      writeSessionStorage(key, serialized);
+      setProjectKey(key, serialized, { skipLocalStorage: true, sessionOnly: true });
+    }
+  } catch (error) {
+    console.error('scenario session write failed', key, error);
   }
 }
 
@@ -1262,7 +1318,11 @@ function syncDerivedStorage(storage, changeSet = null) {
 
   if (hasChange(changeSet, 'settings:other')) {
     const settings = project.settings && typeof project.settings === 'object' ? project.settings : {};
-    const filteredKeys = Object.keys(settings).filter(k => k !== 'session' && k !== 'collapsedGroups');
+    const filteredKeys = Object.keys(settings).filter(k => (
+      k !== 'session'
+      && k !== 'collapsedGroups'
+      && !sessionOnlyProjectKeys.has(k)
+    ));
 
     for (const key of trackedSettingsKeys) {
       if (!filteredKeys.includes(key)) {
@@ -1286,7 +1346,13 @@ function persistProject({ notify = true, changeSet = null, mutationType = 'persi
   if (storage && !storageWriteBlocked) {
     syncStats = syncDerivedStorage(storage, changeSet) || syncStats;
     if (!storageWriteBlocked) {
-      try { storage.setItem(PROJECT_KEY, JSON.stringify(project)); }
+      try {
+        const persistedProject = sessionOnlyProjectKeys.size ? cloneProject() : project;
+        sessionOnlyProjectKeys.forEach(key => {
+          if (persistedProject.settings) delete persistedProject.settings[key];
+        });
+        storage.setItem(PROJECT_KEY, JSON.stringify(persistedProject));
+      }
       catch (e) { handleStorageWriteError('project save failed', e); }
     }
   }
@@ -1483,6 +1549,14 @@ export function setProjectKey(key, value, options = {}) {
     return;
   }
   const oldProject = cloneProject();
+  if (options.sessionOnly) sessionOnlyProjectKeys.add(key);
+  else {
+    sessionOnlyProjectKeys.delete(key);
+    const session = getSessionStorage();
+    if (session) {
+      try { session.removeItem(key); } catch {}
+    }
+  }
   if (key === 'cableSchedule') {
     project.cables = safeParse(value, []);
   } else if (key === 'traySchedule') {
@@ -1523,6 +1597,10 @@ export function setProjectKey(key, value, options = {}) {
                 ? createChangeSet(['settings:session'])
                 : createChangeSet(['settings:other']);
   pushUndo(oldProject, { coalesceKey: `setProjectKey:${key}`, allowCoalesce: true });
+  if (options.sessionOnly) {
+    notifyChange();
+    return;
+  }
   if (!options.skipLocalStorage) {
     const storage = getStorage();
     trySetStorage(storage, key, value);
@@ -1532,6 +1610,11 @@ export function setProjectKey(key, value, options = {}) {
 
 export function removeProjectKey(key, options = {}) {
   if (!key) return;
+  sessionOnlyProjectKeys.delete(key);
+  const session = getSessionStorage();
+  if (session) {
+    try { session.removeItem(key); } catch {}
+  }
   if (key === PROJECT_KEY) {
     if (!options.skipLocalStorage) {
       const storage = getStorage();

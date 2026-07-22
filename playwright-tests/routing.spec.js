@@ -145,11 +145,50 @@ test.describe('Optimal Route', () => {
     await expect(page.locator('.pull-group-review')).toBeVisible();
     await expect(page.locator('.pull-group-review')).toContainText('Automatic pull-set suggestions');
     await expect(page.locator('.pull-group-card')).toHaveCount(2);
+    for (const width of [1366, 1280]) {
+      await page.setViewportSize({ width, height: 900 });
+      const pullGroupOverflow = await page.locator('.pull-group-review').evaluate(review => {
+        const grid = review.querySelector('.pull-group-card-grid');
+        const cards = Array.from(review.querySelectorAll('.pull-group-card'));
+        const reviewRect = review.getBoundingClientRect();
+        const viewportWidth = document.documentElement.clientWidth;
+        return {
+          reviewLeft: reviewRect.left,
+          reviewRight: reviewRect.right,
+          viewportWidth,
+          pageOverflows: document.documentElement.scrollWidth > viewportWidth + 1,
+          reviewOutsideViewport: reviewRect.left < -1 || reviewRect.right > viewportWidth + 1,
+          gridOverflows: Boolean(grid && grid.scrollWidth > grid.clientWidth + 1),
+          cardContentOverflows: cards.some(card => {
+            const cardRect = card.getBoundingClientRect();
+            return Array.from(card.querySelectorAll('.pull-group-card-summary, .pull-group-actions'))
+              .some(element => {
+                const rect = element.getBoundingClientRect();
+                return rect.left < cardRect.left - 1 || rect.right > cardRect.right + 1;
+              });
+          })
+        };
+      });
+      expect(pullGroupOverflow.pageOverflows, `page should not scroll horizontally at ${width}px`).toBe(false);
+      expect(pullGroupOverflow.reviewOutsideViewport, `pull-set panel bounds at ${width}px: ${JSON.stringify(pullGroupOverflow)}`).toBe(false);
+      expect(pullGroupOverflow.gridOverflows, `pull-set list should not scroll horizontally at ${width}px`).toBe(false);
+      expect(pullGroupOverflow.cardContentOverflows, `pull-set controls should stay inside each row at ${width}px`).toBe(false);
+    }
     const instrumentPullGroup = page.locator('.pull-group-card').filter({ hasText: 'Instrument' });
     await expect(instrumentPullGroup).toContainText('Cable 03');
     await expect(instrumentPullGroup).toContainText('Cable 08');
     await expect(instrumentPullGroup).toContainText('Cable 18');
+    await expect(instrumentPullGroup.locator('.pull-group-card-toggle')).toHaveAttribute('aria-expanded', 'false');
+    await expect(instrumentPullGroup.locator('.pull-group-card-detail')).toBeHidden();
+    await expect(instrumentPullGroup.getByRole('button', { name: 'Plan together' })).toBeVisible();
+    await instrumentPullGroup.locator('.pull-group-card-toggle').click();
+    await expect(instrumentPullGroup.locator('.pull-group-card-detail')).toBeVisible();
     await expect(instrumentPullGroup).toContainText('9 cable reels');
+    await page.getByRole('button', { name: 'Expand all' }).click();
+    await expect(page.locator('.pull-group-card-detail:visible')).toHaveCount(2);
+    await page.getByRole('button', { name: 'Collapse all' }).click();
+    await expect(page.locator('.pull-group-card-detail:visible')).toHaveCount(0);
+    await expect.poll(() => page.locator('.pull-group-card-grid').evaluate(element => getComputedStyle(element).overflowY)).toBe('auto');
     await instrumentPullGroup.getByRole('button', { name: 'Plan together' }).click();
     await expect(page.locator('.pull-group-card').filter({ hasText: 'Instrument' })).toContainText('Planned together');
     await expect(page.locator('.pull-group-summary-badges')).toContainText('1 selected');
@@ -228,6 +267,22 @@ test.describe('Optimal Route', () => {
     await expect(page.locator('.route-viewer-label--hand')).toHaveCount(1);
     await expect(page.locator('.pull-field-plan')).toContainText('Weakest link');
     await expect(page.locator('.pull-sheave-strip')).toContainText('Sheave schedule');
+    await page.locator('#route-breakdown-details > summary').click();
+    await expect(page.locator('.route-list-table > thead')).toContainText('Candidates not used');
+    await expect(page.locator('#route-screening-column-help')).toContainText('does not mean the selected route failed');
+    const screeningToggle = page.locator('.route-screening-toggle').first();
+    await expect(screeningToggle).toContainText('candidates not used');
+    await expect(screeningToggle).toContainText('View reasons');
+    const screeningCount = Number.parseInt(await screeningToggle.locator('strong').innerText(), 10);
+    expect(screeningCount).toBeGreaterThan(0);
+    await screeningToggle.click();
+    const screeningReview = page.locator('.route-detail-row').first().locator('.route-screening-review');
+    await expect(screeningReview).toBeVisible();
+    await expect(screeningReview).toContainText(`Why ${screeningCount} candidates were not used`);
+    await expect(screeningReview).toContainText('Selected route remains valid');
+    await expect(screeningReview.locator('.route-screening-reason')).not.toHaveCount(0);
+    await screeningReview.locator('.route-screening-records > summary').click();
+    await expect(screeningReview.locator('.route-screening-records li')).toHaveCount(screeningCount);
     await page.locator('#pull-setups-toggle').uncheck();
     await expect.poll(() => page.evaluate(() => window.__routeViewerDebug?.pullSetups?.visible)).toBe(false);
     await expect.poll(() => page.evaluate(() => window.__routeViewerDebug?.pullSetups?.count)).toBe(0);

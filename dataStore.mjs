@@ -28,6 +28,7 @@ import {
   isValidScenarioName,
   readScenarioValue,
   writeScenarioValue,
+  writeScenarioSessionValue,
   removeScenarioValue,
   listScenarioKeysState,
   cloneScenarioStorage,
@@ -809,6 +810,10 @@ export const removeLoad = deleteLoad;
 // generic access for other values so pages never touch localStorage directly
 export const getItem = (key, fallback = null, scenario) => read(key, fallback, scenario);
 export const setItem = (key, value, scenario) => write(key, value, scenario);
+export const setSessionItem = (key, value, scenario = getCurrentScenarioNameState()) => {
+  writeScenarioSessionValue(key, value, scenario);
+  emit(key, value);
+};
 export const removeItem = (key, scenario = getCurrentScenarioNameState()) => {
   try {
     removeScenarioValue(key, scenario);

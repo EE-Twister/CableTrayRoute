@@ -449,7 +449,7 @@ Coverage: 77 contracts for 77 navigation routes.
 - Workflow step: fillRouting
 
 **Standalone Inputs**
-- Ductbank segment geometry, conduit assignments, cable selections, and thermal report options.
+- Ductbank route length and segment geometry, conduit assignments, cable selections, thermal report options, and material takeoff allowances.
 
 **Project Inputs**
 - `cableSchedule` (schedule, required): Cable tags, endpoints, conductor details, lengths, and raceway assignments.
@@ -464,7 +464,7 @@ Coverage: 77 contracts for 77 navigation routes.
 - `settings.ductbankPanZoom` (setting): Ductbank canvas pan and zoom state. Consumers: `ductbankroute.html`.
 - `settings.ductbankSession` (setting): Ductbank page session state. Consumers: `ductbankroute.html`.
 - `settings.ductbankRouteData` (setting): Selected ductbank route handoff data. Consumers: `ductbankroute.html`.
-- `export-only` (export): Ductbank calculation reports and route exports. Consumers: `projectreport.html`.
+- `export-only` (export): Ductbank calculation reports, route exports, and assumption-backed BOM workbooks. Consumers: `projectreport.html`.
 
 **Readiness**
 - Ready when: Ready when ductbanks or conduits exist and selected cables can be assigned to underground routes.

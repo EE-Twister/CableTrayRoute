@@ -98,4 +98,18 @@ describe('route scene model', () => {
     assert.equal(score.containment, 100);
     assert.equal(score.capacity, 60);
   });
+
+  it('omits zero-length endpoint connectors from the visual route', () => {
+    const model = buildRouteSceneModel({
+      routes: [{
+        cable: 'CABLE-1',
+        route_segments: [
+          { type: 'field', start: [0, 0, 0], end: [0, 0, 0], length: 0 },
+          { type: 'tray', tray_id: 'TR-1', start: [0, 0, 0], end: [10, 0, 0], length: 10 }
+        ]
+      }]
+    });
+    assert.equal(model.routes[0].segments.length, 1);
+    assert.equal(model.routes[0].segments[0].type, 'tray');
+  });
 });

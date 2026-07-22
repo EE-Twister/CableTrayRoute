@@ -18,6 +18,12 @@ When ductbank conduits share only an envelope centerline, the viewer uses the sc
 
 The built-in sample network includes separate HV and LV ductbanks below grade, plus dedicated above-grade Instrument and Communication tray networks. Each ductbank contains four conduits and terminates at a dedicated vertical RMC riser. The risers cross the Z=0 grade datum and connect directly to the first above-grade tray segment, so the selected power cables demonstrate a continuous ductbank → conduit → cable-tray route instead of an open-field jump. Cable 03 and Cable 04 demonstrate fully connected Instrument and Communication tray routes. Cables 03, 08, and 18 share an Instrument route, while Cables 11 and 21 share an HV route, so the sample also demonstrates automatic pull-set suggestions.
 
+## Large facility performance sample
+
+Choose **Load Large Facility Test** above Source Data to load a deterministic 200-cable, 75-raceway routing model. The model contains 47 above-grade cable-tray segments, 20 conduits grouped into four underground ductbanks, four vertical riser conduits, and four visible ductbank envelopes. Its cables are divided evenly among HV, LV, Instrument, and Communication classes and terminate on multiple main-corridor and branch endpoints. Loading the sample replaces the current routing inputs and clears stale route results; run routing normally after reviewing the 200-cable and 71-routable-segment readiness counts. The 3D model reports all 75 modeled raceways, including the four ductbank envelopes.
+
+Large route results are compacted before browser persistence. Batches above 100 cables use session-backed project storage so they remain available after reloading the same tab without consuming several duplicate local-storage copies or displacing unrelated saved projects. The active in-memory project still includes the results when using **Save Project** or export. Saved route records omit derived duplicate tables and encode repeated candidate-screening records once without changing calculated route geometry or screening counts.
+
 ## Desktop review workflow
 
 1. Load or import raceways and cables, then calculate routes.
@@ -29,6 +35,10 @@ The built-in sample network includes separate HV and LV ductbanks below grade, p
 7. Toggle ductbanks, conduits, field jumps, labels, utilization coloring, or plant context to reduce visual noise. Use **Context density** to choose low, medium, or high facility detail.
 8. Use **Eligible raceways** to show only raceways compatible with the selected cable, every class, or one class in isolation. Compatibility includes raceways assigned to the cable's class plus open-class raceways; the cyan selected route remains visible for comparison.
 9. Save a PNG for a review package or export the complete scene to GLB for BIM coordination.
+
+## Understanding candidates not used
+
+The Route List column **Candidates not used** reports raceway segments that the routing search considered but removed before selecting the continuous path. It is not a count of defects in the selected route. Select the count to open a grouped explanation of capacity limits, cable-class mismatches, endpoint proximity limits, missing raceway records, and any other screening rules, followed by the affected raceway IDs. Duplicate mismatch records are consolidated so each candidate and reason is counted once.
 
 ## Optional cable pull planning
 
@@ -48,7 +58,11 @@ Keep **Suggest multi-cable pull sets** enabled to compare routed cables after th
 
 The group calculation uses combined cable weight, an area-equivalent bundle diameter, the most conservative friction coefficient, and weight-proportional sharing of the total tension and sidewall pressure. The group card reports the number of payoff stations, physical cable reels, tugger setups, sheaves, rollers, and avoided separate pull operations. The **Maximum cables per suggested pull set** setting limits automatic group size from 2 through 12 cables.
 
-Recommendations are advisory and default to separate pulls. **Plan together** records the selected pull-set decision in the routing session; **Keep separate** records the opposite decision. **Show common route** selects a representative cable in the 3D viewer because every recommended member follows the same complete route. The expandable **Why cables stay separate** list explains the closest shared-path percentage or circuit-class conflict for excluded cables.
+Pull-set recommendations use compact rows by default. Each row keeps the circuit class, cable count, route length, section count, maximum tension, recommendation status, and decision actions visible. Expand an individual row for cable tags, complete metrics, screening reasons, and field-equipment quantities, or use **Expand all** and **Collapse all**. The recommendation list has a capped desktop height and its own scroll region so large facilities do not extend the full page by dozens of cards. Rows adapt to the recommendation panel's available width, switching to a two-row or stacked layout before controls can overflow the panel.
+
+Updated Raceway Utilization includes cable trays, standalone conduits, and conduits inside ductbanks. When capacity exceeds the 80% review threshold, the **overloads** summary is an action: select it to open this section, filter the table to affected raceways, and focus the first overloaded row. **Show all raceways** clears the focused view. The **Review** action opens the matching workflow: Cable Tray Fill for trays, Conduit Fill for standalone conduits, or Ductbank for an underground conduit. A ductbank handoff loads every conduit and every assigned cable in the parent ductbank, then highlights the selected conduit in the drawing and conduit table without filtering the other records. The Ductbank page keeps the cable key beside the cross-section, groups cable tags by conduit, and uses a labeled scale break for deep installations so the actual elevation remains explicit without creating excessive drawing whitespace.
+
+Recommendations are advisory and default to separate pulls. **Plan together** records the selected pull-set decision in the routing session; **Keep separate** records the opposite decision. **Show route** selects a representative cable in the 3D viewer because every recommended member follows the same complete route. The expandable **Why cables stay separate** list explains the closest shared-path percentage or circuit-class conflict for excluded cables.
 
 The group model does not certify a pulling-head assembly or conduit jam clearance. Before construction, verify the pulling eye or basket-grip arrangement for every cable, reel synchronization and braking, conduit fill and jam ratio, manufacturer tension limits, bend packing, communications/instrument segregation requirements, and the crew's ability to control all payoff reels simultaneously.
 

@@ -19,7 +19,7 @@
   <link rel="dns-prefetch" href="https://fonts.gstatic.com">
   <meta name="color-scheme" content="light dark">
   <link rel="stylesheet" href="style.css">
-    <link rel="stylesheet" href="src/styles/routing.css?v=optimal-route-workspace-13">
+    <link rel="stylesheet" href="src/styles/routing.css?v=optimal-route-workspace-19">
     <script src="dist/vendor/plotly.min.js" defer></script>
     <script src="dist/vendor/xlsx.full.min.js" defer></script>
     <script src="dist/vendor/papaparse.min.js" defer></script>
@@ -38,7 +38,7 @@
     <script type="module" src="dirtyTracker.js"></script>
     <script type="module" src="tableUtils.mjs"></script>
     <script type="module" src="e2e-helpers.js"></script>
-    <script type="module" src="app.mjs?v=optimal-route-three-viewer-35"></script>
+    <script type="module" src="app.mjs?v=optimal-route-three-viewer-45"></script>
     <script type="module" src="./dist/optimalRoute.js"></script>
 </head>
 <body class="optimal-route-page" data-page-visual="routing" data-report-title="Optimal Cable Route">
@@ -306,6 +306,8 @@
 
       <div class="route-page-actions">
         <button id="import-schedules-btn" class="btn">Import From Schedules</button>
+        <button id="load-large-facility-btn" class="btn large-facility-sample-btn">Load Large Facility Test</button>
+        <span class="route-page-action-note">200 cables · 75 modeled raceways (71 routable segments + 4 ductbanks)</span>
       </div>
 
       <details class="card route-source-data-panel">
@@ -430,7 +432,7 @@
                 <div class="route-card-heading">
                     <div>
                         <h2>Routing Results</h2>
-                        <p class="field-hint">Start with the decision summary, then drill into route details, pull checks, and tray utilization.</p>
+                        <p class="field-hint">Start with the decision summary, then drill into route details, pull checks, and raceway utilization.</p>
                     </div>
                 </div>
 
@@ -573,7 +575,7 @@
                 </div>
 
                 <details id="updated-utilization-details">
-                    <summary>Updated Tray Utilization</summary>
+                    <summary>Updated Raceway Utilization</summary>
                     <div id="updated-utilization-container"></div>
                 </details>
 

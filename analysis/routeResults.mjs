@@ -198,8 +198,28 @@ export function buildTrayCableMapFromRouteResults(source, cables = [], existingM
 
 export function normalizeRouteResultState(source, { cables = [] } = {}) {
   const record = source && typeof source === 'object' && !Array.isArray(source) ? source : {};
-  const batchResults = normalizeRouteResults(source);
-  const trayCableMap = buildTrayCableMapFromRouteResults(source, cables, record.trayCableMap);
+  const screeningCatalog = record.screeningCatalog && typeof record.screeningCatalog === 'object'
+    ? record.screeningCatalog
+    : {};
+  const screeningRecords = record.screeningRecords && typeof record.screeningRecords === 'object'
+    ? record.screeningRecords
+    : {};
+  const hydratedSource = {
+    ...record,
+    batchResults: routeRows(source).map(result => {
+      const screeningEntries = screeningCatalog[result?.screening_ref];
+      const exclusions = Array.isArray(screeningEntries)
+        ? screeningEntries.map(entry => (
+          typeof entry === 'string' ? screeningRecords[entry] : entry
+        )).filter(Boolean)
+        : null;
+      return exclusions
+        ? { ...result, exclusions }
+        : result;
+    })
+  };
+  const batchResults = normalizeRouteResults(hydratedSource);
+  const trayCableMap = buildTrayCableMapFromRouteResults(hydratedSource, cables, record.trayCableMap);
   return {
     ...record,
     schemaVersion: finiteNumber(record.schemaVersion, 1),

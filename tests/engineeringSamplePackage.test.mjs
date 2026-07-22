@@ -17,6 +17,17 @@ const tccScript = await readFile(new URL('../analysis/tcc.js', import.meta.url),
 const trayScript = await readFile(new URL('../cabletrayfill.js', import.meta.url), 'utf8');
 const ductbankScript = await readFile(new URL('../ductbankroute.js', import.meta.url), 'utf8');
 
+assert.match(
+  ductbankScript,
+  /const DUCTBANK_DECIMAL_CABLE_FIELDS = new Set\(\[\s*'diameter',\s*'insulation_thickness',\s*'weight'\s*\]\);/,
+  'ductbank cable measurement fields must declare decimal-compatible inputs',
+);
+assert.match(
+  ductbankScript,
+  /if\(DUCTBANK_DECIMAL_CABLE_FIELDS\.has\(c\)\) inp\.step='any';/,
+  'ductbank cable measurement inputs must opt out of the browser integer step default',
+);
+
 assert.equal(settings.projectMeta.projectNumber, 'CTR-DEMO-001');
 assert.equal(engineeringPackage.issueStatus, 'Sample - Not for Construction');
 assert.equal(engineeringPackage.labelCreatedDate, settings.projectMeta.date);
@@ -195,8 +206,10 @@ assert.match(reportScript, /Label created:/);
 assert.match(reportScript, /double-line-to-ground/);
 assert.match(reportScript, /ANSI Z535\.4 safety-alert symbol/);
 assert.match(trayScript, /DOTTED LINE - STACKING BOUNDARY/);
-assert.match(ductbankScript, /CABLE IDENTIFICATION \(marker - cable tag - outside diameter - conduit\)/);
+assert.match(ductbankScript, /function renderDuctbankCableKey/);
+assert.match(ductbankScript, /data-ductbank-cable-key-group/);
 assert.match(ductbankScript, /cableMarkerByTag/);
+assert.match(captureScript, /\.ductbank-drawing-layout/);
 assert.match(captureScript, /datablock\.value = 'report'/);
 assert.match(captureScript, /perfectlyAlignedTransformerTerminalCount/);
 assert.match(captureScript, /transformerTerminalBridgeDepthPx: 20/);

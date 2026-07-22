@@ -109,6 +109,10 @@
     <img src="icons/toolbar/download.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
     Workbook
    </button>
+   <button id="exportBomBtn" class="btn toolbar-btn" type="button" title="Download the ductbank bill of materials workbook">
+    <img src="icons/toolbar/download.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    BOM Workbook
+   </button>
    <button id="exportConduitsBtn" class="btn toolbar-btn" type="button" title="Export ductbank conduits as CSV">
     <img src="icons/toolbar/export.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
     Conduits CSV
@@ -223,14 +227,15 @@
  <div class="ductbank-section-header">
   <div>
    <h2 id="ductbank-info-heading">Ductbank Setup</h2>
-   <p class="field-hint">Set the route tag, burial depth, and encasement assumptions used by the drawing and thermal checks.</p>
+   <p class="field-hint">Set the route tag, length, burial depth, and encasement assumptions used by the drawing, thermal checks, and material takeoff.</p>
   </div>
  </div>
  <div class="ductbank-field-grid ductbank-field-grid--compact">
   <label for="projectDuctbankSelect">Project Ductbank<select id="projectDuctbankSelect" aria-describedby="project-ductbank-hint"></select><span id="project-ductbank-hint" class="field-hint">Switch between ductbanks without losing the project context.</span></label>
   <label for="ductbankTag">Ductbank Tag<input type="text" id="ductbankTag"></label>
+  <label for="ductbankLength">Route Length (ft)<input type="number" id="ductbankLength" min="0" step="0.1" placeholder="Required for BOM"><span class="field-hint">Centerline length for this ductbank segment.</span></label>
   <label class="ductbank-toggle-field"><span>Concrete Encasement</span><input type="checkbox" id="concreteEncasement"></label>
-  <label for="ductbankDepth">Ductbank Depth (in)<input type="number" id="ductbankDepth" min="0" step="1"></label>
+  <label for="ductbankDepth">Cover Depth (in)<input type="number" id="ductbankDepth" min="0" step="1"><span class="field-hint">Finished grade to the top of the ductbank envelope.</span></label>
  </div>
 </section>
 
@@ -307,13 +312,19 @@
    <h2 id="ductbank-cable-heading">Cables</h2>
    <p class="field-hint">Assign each cable to a ductbank conduit and provide the fields needed for fill and ampacity checks.</p>
   </div>
-  <div class="schedule-primary-actions">
+  <div class="schedule-primary-actions ductbank-section-actions">
+   <span id="cable-section-summary" class="ductbank-cable-section-summary" aria-live="polite">No cables</span>
+   <button type="button" id="toggleCableTableBtn" class="btn secondary-btn compact-action-btn ductbank-collapse-btn" aria-expanded="false" aria-controls="cable-section-content">
+    <span data-cable-table-toggle-label>Show table</span>
+    <span class="ductbank-disclosure-icon" aria-hidden="true">&#9662;</span>
+   </button>
    <button type="button" id="addCable" class="btn primary-btn compact-action-btn" title="Add cable">
     <img src="icons/cable.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
     Add Cable
    </button>
   </div>
  </div>
+ <div id="cable-section-content" class="ductbank-collapsible-content" hidden>
  <div class="ductbank-toolbar cable-toolbar mb-1" role="toolbar" aria-label="Ductbank cable actions" data-no-print>
   <div class="toolbar-group">
    <label class="btn toolbar-btn file-toolbar-btn" for="importCables" title="Import ductbank cables from CSV">
@@ -397,6 +408,7 @@
   <option value="750 kcmil"></option>
   <option value="1000 kcmil"></option>
  </datalist>
+ </div>
 </section>
 <details id="paramSection" open class="ductbank-section-card card ductbank-details">
  <summary>
@@ -543,14 +555,32 @@
   <label class="ductbank-toggle-field"><input type="checkbox" id="utilHeatmapToggle"> <span>Utilization Heatmap</span></label>
   <label class="ductbank-toggle-field"><input type="checkbox" id="showEarthContext" checked> <span>Earth/Sky Context</span></label>
  </div>
+ <div id="ductbank-route-focus" class="ductbank-route-focus" role="status" hidden>
+  <span>Routing Results focus</span>
+  <strong data-ductbank-route-focus-title></strong>
+  <small data-ductbank-route-focus-detail></small>
+ </div>
  <div id="warning-area" class="ductbank-warning-area" style="display:none;"></div>
- <div id="gridWrapper" class="ductbank-grid-wrapper">
-  <div id="gridContainer" class="ductbank-grid-container">
-   <svg id="grid" width="500" height="500" xmlns="http://www.w3.org/2000/svg"></svg>
-   <canvas id="tempCanvas" width="500" height="500" class="ductbank-temp-canvas"></canvas>
-   <canvas id="tempOverlay" width="500" height="500" class="ductbank-temp-overlay"></canvas>
+ <div class="ductbank-drawing-layout">
+  <div id="gridWrapper" class="ductbank-grid-wrapper">
+   <div id="gridContainer" class="ductbank-grid-container">
+    <svg id="grid" width="500" height="500" xmlns="http://www.w3.org/2000/svg"></svg>
+    <canvas id="tempCanvas" width="500" height="500" class="ductbank-temp-canvas"></canvas>
+    <canvas id="tempOverlay" width="500" height="500" class="ductbank-temp-overlay"></canvas>
+   </div>
+   <div id="ductbank-cable-popover" class="ductbank-cable-popover" role="dialog" aria-label="Cable quick properties" hidden data-no-print></div>
   </div>
-  <div id="ductbank-cable-popover" class="ductbank-cable-popover" role="dialog" aria-label="Cable quick properties" hidden data-no-print></div>
+  <aside id="ductbankCableKey" class="ductbank-cable-key" aria-labelledby="ductbank-cable-key-title" hidden>
+   <div class="ductbank-cable-key-header">
+    <div>
+     <span>Cable identification</span>
+     <h3 id="ductbank-cable-key-title">Cable key</h3>
+    </div>
+    <strong data-ductbank-cable-key-count></strong>
+   </div>
+   <p>Select a numbered cable to inspect it in the drawing. Cables are grouped by conduit.</p>
+   <div class="ductbank-cable-key-body" data-ductbank-cable-key-body></div>
+  </aside>
  </div>
  <details id="ampacityDetails" open class="ductbank-subdetails ductbank-ampacity-details">
   <summary><strong>Ampacity Estimates</strong></summary>
@@ -560,6 +590,54 @@
   <img src="icons/toolbar/arrow-up.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
   Scroll to Top
  </button>
+</section>
+
+<section id="ductbankBomSection" class="ductbank-section-card card ductbank-bom-card" aria-labelledby="ductbank-bom-heading">
+ <div class="ductbank-section-header">
+  <div>
+   <p class="page-visual-kicker">Material Takeoff</p>
+   <h2 id="ductbank-bom-heading">Ductbank Bill of Materials</h2>
+   <p class="field-hint">Screening quantities generated from the route length, conduit layout, civil envelope, and the selected project options below. Cable remains on the cable schedule.</p>
+  </div>
+  <div class="ductbank-section-actions schedule-primary-actions" data-no-print>
+   <button type="button" id="refreshDuctbankBomBtn" class="btn secondary-btn compact-action-btn">Refresh BOM</button>
+   <button type="button" id="exportDuctbankBomBtn" class="btn primary-btn compact-action-btn" title="Download the ductbank bill of materials workbook">Export BOM</button>
+  </div>
+ </div>
+ <div id="ductbank-bom-status" class="ductbank-bom-status" role="status" aria-live="polite"></div>
+ <div id="ductbank-bom-summary" class="ductbank-bom-summary" aria-label="Ductbank BOM summary">
+  <div class="ductbank-bom-metric"><span>Route</span><strong id="ductbank-bom-route-length">0 ft</strong></div>
+  <div class="ductbank-bom-metric"><span>Conduit</span><strong id="ductbank-bom-conduit-length">0 LF</strong></div>
+  <div class="ductbank-bom-metric"><span>Concrete</span><strong id="ductbank-bom-concrete">0 CY</strong></div>
+  <div class="ductbank-bom-metric"><span>Excavation</span><strong id="ductbank-bom-excavation">0 CY</strong></div>
+ </div>
+ <div id="ductbank-bom-empty" class="ductbank-bom-empty" hidden>
+  <strong>Complete the takeoff inputs</strong>
+  <span>Enter a route length and add conduits to calculate the BOM.</span>
+ </div>
+ <div class="ductbank-table-wrap table-scroll-x" tabindex="0" aria-label="Ductbank bill of materials table">
+  <table id="ductbankBomTable" class="db-table ductbank-bom-table">
+   <caption class="visually-hidden">Calculated ductbank bill of materials</caption>
+   <thead><tr><th>Include</th><th>Category</th><th>Item</th><th>Specification / Inputs</th><th>Quantity</th><th>Unit</th><th>Basis</th></tr></thead>
+   <tbody id="ductbank-bom-body"></tbody>
+  </table>
+ </div>
+ <p class="ductbank-bom-safety-note"><strong>Excavation safety:</strong> Shoring is only one protective-system option. Applicability and system selection must be determined for actual site conditions by a competent person. See <a href="https://www.osha.gov/laws-regs/regulations/standardnumber/1926/1926.652" target="_blank" rel="noopener noreferrer">OSHA 29 CFR 1926.652</a>.</p>
+ <details class="ductbank-subdetails ductbank-bom-assumptions">
+  <summary><strong>Takeoff assumptions</strong><span>Adjust allowances before procurement review.</span></summary>
+  <div class="ductbank-field-grid ductbank-field-grid--compact">
+   <label for="bomConduitWaste">Conduit Waste (%)<input type="number" id="bomConduitWaste" min="0" step="0.5" value="5"></label>
+   <label for="bomConcreteWaste">Concrete Waste (%)<input type="number" id="bomConcreteWaste" min="0" step="0.5" value="10"></label>
+   <label for="bomSpacerSpacing">Spacer Spacing (ft)<input type="number" id="bomSpacerSpacing" min="0.5" step="0.5" value="5"></label>
+   <label for="bomWorkingClearance">Side Working Clearance (in)<input type="number" id="bomWorkingClearance" min="0" step="1" value="12"></label>
+   <label for="bomBeddingDepth">Bedding Depth (in)<input type="number" id="bomBeddingDepth" min="0" step="1" value="6"></label>
+   <label for="bomConduitStickLength">Conduit Stock Length (ft)<input type="number" id="bomConduitStickLength" min="1" step="1" value="10"><span class="field-hint">Used to estimate coupling quantities.</span></label>
+  </div>
+  <div class="ductbank-bom-exclusions">
+   <strong>Scope notes</strong>
+   <ul id="ductbank-bom-notes"></ul>
+  </div>
+ </details>
 </section>
 
 <div id="analysis-progress-container" style="display:none;">
@@ -585,6 +663,7 @@
   <p>Click <em>Add Conduit</em> or <em>Add Cable</em> to enter the key fields in a guided dialog, or use <em>Import&nbsp;CSV</em> to load your own files. <em>Complete Example</em> fills the page with a ready-to-review ductbank.</p>
   <p>Use <em>Validate</em> before exporting. Actionable warnings identify missing data, duplicate IDs, fill concerns, and thermal alerts; selecting a warning jumps to the row that needs attention.</p>
   <p>After entering data, press <strong>Calculate Fill</strong> to draw the ductbank. Conduits are colored by fill percentage and display individual cable circles. Select a cable in the drawing to view quick properties and jump to its table row.</p>
+  <p>The <strong>Ductbank Bill of Materials</strong> uses the route length and current cross-section to estimate conduit, fittings, spacers, pull rope, concrete, excavation, and backfill. Cable remains on the cable schedule. Optional selectors can add #4/0 grounding conductors, red warning dye application area, and a trench shoring allowance.</p>
   <p>The <strong>Download Ductbank Data</strong> button exports all conduits, cables and fill results to an XLSX file.</p>
   <p><strong>Export Ductbank Conduits</strong> and <strong>Export Ductbank Cables</strong> create CSV files compatible with the import buttons.</p>
   <h3>Reporting and Export</h3>

@@ -729,7 +729,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 
 - Section: Workflow
 - Group: Raceway
-- Source files: `conductorProperties.mjs`, `conductorPropertiesData.mjs`, `data/conductor_properties.js`, `ductbankroute.js`, `soilResistivityConfig.js`, `src/ductbankProjectAdapter.mjs`, `src/ductbankroute.js`
+- Source files: `analysis/ductbankBom.mjs`, `conductorProperties.mjs`, `conductorPropertiesData.mjs`, `data/conductor_properties.js`, `ductbankroute.js`, `soilResistivityConfig.js`, `src/ductbankProjectAdapter.mjs`, `src/ductbankroute.js`
 
 **Undocumented Reads**
 - None
@@ -748,28 +748,28 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 
 **Detected Reads**
 - `cableSchedule`
-  - ductbankroute.js:4678 getCables()
-  - ductbankroute.js:858 getCables()
+  - ductbankroute.js:5084 getCables()
+  - ductbankroute.js:909 getCables()
 - `conduitSchedule`
-  - ductbankroute.js:4677 getConduits()
+  - ductbankroute.js:5083 getConduits()
 - `ductbankSchedule`
-  - ductbankroute.js:4676 getDuctbanks()
+  - ductbankroute.js:5082 getDuctbanks()
 - `settings.ductbankPanZoom`
-  - ductbankroute.js:117 getItem(ductbankPanZoom)
+  - ductbankroute.js:118 getItem(ductbankPanZoom)
 - `settings.ductbankRouteData`
-  - ductbankroute.js:4690 getItem(ductbankRouteData)
+  - ductbankroute.js:5096 getItem(ductbankRouteData)
 - `settings.ductbankSession`
-  - ductbankroute.js:4680 getItem(ductbankSession)
-  - ductbankroute.js:806 getItem(ductbankSession)
+  - ductbankroute.js:5086 getItem(ductbankSession)
+  - ductbankroute.js:846 getItem(ductbankSession)
 
 **Detected Writes**
 - `settings.ductbankPanZoom`
-  - ductbankroute.js:128 setItem(ductbankPanZoom)
+  - ductbankroute.js:129 setItem(ductbankPanZoom)
 - `settings.ductbankRouteData`
-  - ductbankroute.js:4693 removeItem(ductbankRouteData)
+  - ductbankroute.js:5099 removeItem(ductbankRouteData)
 - `settings.ductbankSession`
-  - ductbankroute.js:4447 removeItem(ductbankSession)
-  - ductbankroute.js:802 setItem(ductbankSession)
+  - ductbankroute.js:4824 removeItem(ductbankSession)
+  - ductbankroute.js:842 setItem(ductbankSession)
 
 ### Tray Fill (`cabletrayfill.html`)
 
@@ -1303,7 +1303,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 
 - Section: Workflow
 - Group: Optimization
-- Source files: `ampacity.mjs`, `analysis/cablePullGroups.mjs`, `analysis/cablePullPlan.mjs`, `analysis/routeResults.mjs`, `analysis/scheduleWorkflow.mjs`, `app.mjs`, `bimExport.mjs`, `conductorProperties.mjs`, `conductorPropertiesData.mjs`, `data/conductor_properties.js`, `e2e-helpers.js`, `exporters/simpleDxf.js`, `optimalRoute.js`, `resultsExport.mjs`, `src/exporters/gltf2.mjs`, `src/fetchUtils.mjs`, `src/necTable9.mjs`, `src/optimalRoute.js`, `src/pullCalc.js`, `src/voltageDrop.js`, `tableUtils.mjs`, `tour.js`, `utils/safeEvents.mjs`
+- Source files: `ampacity.mjs`, `analysis/cablePullGroups.mjs`, `analysis/cablePullPlan.mjs`, `analysis/largeFacilityRoutingSample.mjs`, `analysis/racewayReviewTarget.mjs`, `analysis/routeResults.mjs`, `analysis/routeScreeningSummary.mjs`, `analysis/routeStorageCompaction.mjs`, `analysis/scheduleWorkflow.mjs`, `app.mjs`, `bimExport.mjs`, `conductorProperties.mjs`, `conductorPropertiesData.mjs`, `data/conductor_properties.js`, `e2e-helpers.js`, `exporters/simpleDxf.js`, `optimalRoute.js`, `resultsExport.mjs`, `src/ductbankProjectAdapter.mjs`, `src/exporters/gltf2.mjs`, `src/fetchUtils.mjs`, `src/necTable9.mjs`, `src/optimalRoute.js`, `src/pullCalc.js`, `src/voltageDrop.js`, `tableUtils.mjs`, `tour.js`, `utils/safeEvents.mjs`
 
 **Undocumented Reads**
 - None
@@ -1322,34 +1322,35 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 
 **Detected Reads**
 - `cableSchedule`
-  - app.mjs:924 getCables()
+  - app.mjs:950 getCables()
 - `conduitSchedule`
-  - app.mjs:989 getConduits()
+  - app.mjs:1015 getConduits()
 - `ductbankSchedule`
-  - app.mjs:988 getDuctbanks()
+  - app.mjs:1014 getDuctbanks()
 - `settings.ctrSession`
-  - app.mjs:470 getItem(ctrSession)
-  - app.mjs:843 getItem(ctrSession)
+  - app.mjs:494 getItem(ctrSession)
+  - app.mjs:868 getItem(ctrSession)
 - `settings.latestRouteResults`
-  - app.mjs:1493 getItem(latestRouteResults)
+  - app.mjs:1519 getItem(latestRouteResults)
 - `traySchedule`
-  - app.mjs:923 getTrays()
+  - app.mjs:949 getTrays()
 
 **Detected Writes**
 - `cableSchedule`
-  - app.mjs:4651 setCables()
+  - app.mjs:4899 setCables()
 - `settings.conduitFillData`
-  - app.mjs:2798 setItem(conduitFillData)
+  - app.mjs:2824 setItem(conduitFillData)
+  - app.mjs:2858 setItem(conduitFillData)
 - `settings.ctrSession`
-  - app.mjs:479 setItem(ctrSession)
-  - app.mjs:832 setItem(ctrSession)
+  - app.mjs:503 setItem(ctrSession)
+  - app.mjs:857 setItem(ctrSession)
 - `settings.ductbankRouteData`
-  - app.mjs:2811 setItem(ductbankRouteData)
+  - app.mjs:2842 setItem(ductbankRouteData)
 - `settings.latestRouteResults`
-  - app.mjs:247 setItem(latestRouteResults)
+  - app.mjs:268 setItem(latestRouteResults)
 - `settings.trayFillData`
-  - app.mjs:2773 setItem(trayFillData)
-  - app.mjs:4249 setItem(trayFillData)
+  - app.mjs:2799 setItem(trayFillData)
+  - app.mjs:4497 setItem(trayFillData)
 
 ### Pull Cards (`pullcards.html`)
 

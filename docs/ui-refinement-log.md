@@ -1,5 +1,17 @@
 # UI Refinement Log
 
+## 2026-07-22
+
+- Condensed Ductbank optional materials into persistent BOM table rows with an Include checkbox column and inline ground-wire run and allowance inputs; unchecked options remain visible for discovery but are omitted from exports and included-line totals.
+- Removed cable and cable identification tags from the Ductbank BOM so conductor procurement remains governed by the cable schedule.
+- Added customer-selectable Ductbank BOM options for one or two #4/0 bare copper grounding conductors, red warning dye application area, and excavation shoring wall area, including persisted selections, exported assumptions, and OSHA protective-system guidance.
+
+## 2026-07-21
+
+- Added an assumption-driven Ductbank Bill of Materials with route-length input, grouped conduit quantities, couplings, end fittings, spacers, pull rope, warning tape, concrete, excavation, bedding, backfill, editable allowances, scope exclusions, and a dedicated XLSX export.
+- Corrected the Ductbank Route cable table so outside diameter, insulation thickness, and cable weight accept decimal measurements without triggering the browser's whole-number validation warning.
+- Collapsed the Ductbank Route cable table by default while keeping cable and assignment counts plus Add Cable visible; drawing selections and validation targets automatically reopen the table when row-level editing is needed.
+
 ## 2026-07-18
 
 - Modernized the Optimal Route graph into an interactive desktop review surface with isometric, plan, front, and right view presets; direct route, endpoint, and raceway selection; focused selection metrics; optional labels; utilization coloring; a compact semantic legend; and self-hosted full-screen and PNG output. Removed the per-cable Plotly legend and default labels that previously obscured dense route models.

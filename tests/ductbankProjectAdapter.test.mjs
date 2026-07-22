@@ -2,7 +2,7 @@ import assert from 'assert';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { buildProjectDuctbankRoute, parseDuctbankRouteData } from '../src/ductbankProjectAdapter.mjs';
+import { buildDuctbankRouteHandoff, buildProjectDuctbankRoute, parseDuctbankRouteData } from '../src/ductbankProjectAdapter.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const sample = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'samples', 'ductbank-network.json'), 'utf8'));
@@ -48,5 +48,34 @@ describe('ductbank project adapter', () => {
     assert.deepEqual(route.cables.map(cable => cable.tag), ['UG-CBL-003']);
     assert.deepEqual(route.cables.map(cable => cable.conduit_id), ['DB02-COND-1']);
     assert.equal(route.conduits.length, 2);
+  });
+
+  it('keeps every conduit cable while preserving the selected conduit as focus metadata', () => {
+    const ductbank = {
+      ductbank_id: 'DB-HV-01',
+      conduits: [
+        { conduit_id: 'HV-C01', conduit_type: 'PVC Sch 40', trade_size: '4', row: 1, column: 1 },
+        { conduit_id: 'HV-C04', conduit_type: 'PVC Sch 40', trade_size: '4', row: 1, column: 2 },
+      ],
+    };
+    const cableCatalog = [
+      { name: 'HV-001', diameter: 1.1, conductor_size: '500 kcmil' },
+      { name: 'HV-002', diameter: 1.2, conductor_size: '500 kcmil' },
+      { name: 'HV-003', diameter: 1.0, conductor_size: '350 kcmil' },
+    ];
+    const route = buildDuctbankRouteHandoff({
+      ductbank,
+      cableCatalog,
+      selectedConduitId: 'HV-C04',
+      trayCableMap: {
+        'DB-HV-01-HV-C01': [cableCatalog[0], cableCatalog[1]],
+        'DB-HV-01 - HV-C04': [{ name: 'HV-003' }],
+      },
+    });
+
+    assert.equal(route.conduitId, 'HV-C04');
+    assert.equal(route.conduits.length, 2);
+    assert.deepEqual(route.cables.map(cable => cable.tag), ['HV-001', 'HV-002', 'HV-003']);
+    assert.deepEqual(route.cables.map(cable => cable.conduit_id), ['HV-C01', 'HV-C01', 'HV-C04']);
   });
 });

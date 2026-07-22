@@ -61,6 +61,61 @@ body.dark-mode .db-table td {
     overflow: hidden;
 }
 
+.ductbank-route-focus {
+    display: grid;
+    grid-template-columns: auto auto minmax(0, 1fr);
+    align-items: center;
+    gap: 0.45rem 0.75rem;
+    margin-top: var(--space-3, 0.75rem);
+    padding: 0.75rem 0.9rem;
+    border: 1px solid color-mix(in srgb, var(--color-primary, #2563eb) 38%, #f59e0b);
+    border-radius: var(--radius-sm, 6px);
+    background: color-mix(in srgb, var(--color-primary, #2563eb) 7%, var(--color-surface, #fff));
+    color: var(--color-text, #0f172a);
+}
+
+.ductbank-route-focus[hidden] {
+    display: none;
+}
+
+.ductbank-route-focus > span {
+    padding: 0.2rem 0.45rem;
+    border-radius: 999px;
+    background: var(--color-primary, #2563eb);
+    color: #fff;
+    font-size: var(--font-size-xs, 0.75rem);
+    font-weight: 800;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+}
+
+.ductbank-route-focus > strong {
+    color: var(--color-primary, #1d4ed8);
+}
+
+.ductbank-route-focus > small {
+    color: var(--color-text-muted, #64748b);
+}
+
+.ductbank-route-focus-halo {
+    fill: none;
+    stroke: #f59e0b;
+    stroke-width: 6;
+    stroke-dasharray: 8 4;
+    pointer-events: none;
+    filter: drop-shadow(0 2px 3px rgba(15, 23, 42, 0.28));
+}
+
+.ductbank-route-focus-conduit {
+    stroke: var(--color-primary, #1d4ed8) !important;
+    stroke-width: 4 !important;
+}
+
+.ductbank-route-focus-label {
+    fill: var(--color-primary, #1d4ed8);
+    font-weight: 900;
+}
+
 .db-button-panel {
     margin-top: 8px;
     display: flex;
@@ -533,6 +588,258 @@ body.ductbank-page h1 {
     margin: var(--space-1, 0.25rem) 0 0;
 }
 
+.ductbank-section-actions {
+    align-items: center;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.ductbank-section-actions .compact-action-btn {
+    width: auto;
+    padding: 0.55rem 0.75rem;
+    font-size: 0.9rem;
+}
+
+.ductbank-bom-card {
+    overflow: hidden;
+}
+
+.ductbank-bom-status {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3, 1rem);
+    min-height: 2.75rem;
+    padding: 0.7rem 0.85rem;
+    border: 1px solid var(--color-border, #cbd5e1);
+    border-radius: var(--radius-sm, 6px);
+    background: var(--color-surface-strong, #f8fafc);
+    color: var(--color-text-muted, #64748b);
+}
+
+.ductbank-bom-status strong {
+    color: var(--color-text, #0f172a);
+}
+
+.ductbank-bom-status.is-ready {
+    border-color: color-mix(in srgb, var(--success-text, #166534) 32%, var(--color-border, #cbd5e1));
+    background: color-mix(in srgb, var(--success-bg, #dcfce7) 44%, var(--color-surface, #fff));
+}
+
+.ductbank-bom-status.is-warning {
+    border-color: color-mix(in srgb, var(--warning-text, #92400e) 32%, var(--color-border, #cbd5e1));
+}
+
+.ductbank-bom-summary {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: var(--space-2, 0.75rem);
+}
+
+.ductbank-bom-safety-note {
+    margin: 0;
+    padding: 0.7rem 0.8rem;
+    border: 1px solid color-mix(in srgb, var(--warning-text, #92400e) 30%, var(--color-border, #cbd5e1));
+    border-radius: var(--radius-sm, 6px);
+    background: color-mix(in srgb, var(--warning-bg, #fef3c7) 42%, var(--color-surface, #fff));
+    color: var(--warning-text, #92400e) !important;
+}
+
+.ductbank-bom-row--optional td {
+    background: color-mix(in srgb, var(--color-primary, #2563eb) 4%, var(--color-surface, #fff));
+}
+
+.ductbank-bom-row--optional.is-excluded td:not(:first-child) {
+    opacity: 0.58;
+}
+
+.ductbank-bom-row--optional .ductbank-bom-category {
+    background: color-mix(in srgb, #7c3aed 12%, var(--color-surface-strong, #f8fafc));
+    color: #6d28d9;
+}
+
+.ductbank-bom-metric {
+    display: grid;
+    gap: 0.2rem;
+    padding: 0.8rem 0.9rem;
+    border: 1px solid var(--color-border, #cbd5e1);
+    border-radius: var(--radius-sm, 6px);
+    background: var(--color-surface, #fff);
+}
+
+.ductbank-bom-metric span {
+    color: var(--color-text-muted, #64748b);
+    font-size: var(--font-size-xs, 0.75rem);
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.ductbank-bom-metric strong {
+    font-size: var(--font-size-xl, 1.4rem);
+    font-variant-numeric: tabular-nums;
+}
+
+.ductbank-bom-empty {
+    display: grid;
+    gap: var(--space-1, 0.25rem);
+    justify-items: center;
+    padding: var(--space-6, 2.5rem);
+    border: 1px dashed var(--color-border, #cbd5e1);
+    border-radius: var(--radius-sm, 6px);
+    color: var(--color-text-muted, #64748b);
+    text-align: center;
+}
+
+.ductbank-bom-empty[hidden] {
+    display: none;
+}
+
+.ductbank-bom-table {
+    min-width: 1180px;
+}
+
+.ductbank-bom-table th:nth-child(5),
+.ductbank-bom-table td:nth-child(5),
+.ductbank-bom-table th:nth-child(6),
+.ductbank-bom-table td:nth-child(6) {
+    white-space: nowrap;
+}
+
+.ductbank-bom-include {
+    width: 7.25rem;
+    text-align: center;
+}
+
+.ductbank-bom-required {
+    color: var(--color-text-muted, #64748b);
+    font-size: var(--font-size-xs, 0.75rem);
+    font-weight: 700;
+}
+
+.ductbank-bom-table-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    cursor: pointer;
+    font-size: var(--font-size-sm, 0.875rem);
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+.ductbank-bom-table-toggle input {
+    width: auto;
+    margin: 0;
+}
+
+.ductbank-bom-inline-inputs {
+    display: grid;
+    grid-template-columns: minmax(5rem, 0.65fr) minmax(8rem, 1fr);
+    gap: var(--space-2, 0.75rem);
+    min-width: 14rem;
+}
+
+.ductbank-bom-inline-inputs label {
+    display: grid;
+    gap: 0.2rem;
+    color: var(--color-text-muted, #64748b);
+    font-size: var(--font-size-xs, 0.75rem);
+    font-weight: 700;
+}
+
+.ductbank-bom-inline-inputs input,
+.ductbank-bom-inline-inputs select {
+    min-width: 0;
+    width: 100%;
+    padding: 0.35rem 0.45rem;
+    font-size: var(--font-size-sm, 0.875rem);
+}
+
+.ductbank-bom-quantity {
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+}
+
+.ductbank-bom-category {
+    display: inline-flex;
+    padding: 0.2rem 0.5rem;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--color-primary, #2563eb) 10%, var(--color-surface-strong, #f8fafc));
+    color: var(--color-primary, #2563eb);
+    font-size: var(--font-size-xs, 0.75rem);
+    font-weight: 800;
+}
+
+.ductbank-bom-basis {
+    max-width: 32rem;
+    color: var(--color-text-muted, #64748b);
+}
+
+.ductbank-bom-assumptions > summary {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--space-2, 0.75rem);
+}
+
+.ductbank-bom-assumptions > summary span {
+    color: var(--color-text-muted, #64748b);
+    font-size: var(--font-size-sm, 0.875rem);
+}
+
+.ductbank-bom-exclusions {
+    margin-top: var(--space-3, 1rem);
+    padding: var(--space-3, 1rem);
+    border-left: 3px solid var(--color-border-strong, #94a3b8);
+    background: var(--color-surface-strong, #f8fafc);
+}
+
+.ductbank-bom-exclusions ul {
+    margin: var(--space-2, 0.75rem) 0 0;
+    padding-left: 1.2rem;
+    color: var(--color-text-muted, #64748b);
+}
+
+.ductbank-cable-section-summary {
+    padding: 0.4rem 0.65rem;
+    border: 1px solid var(--color-border, var(--border-color));
+    border-radius: 999px;
+    background: var(--color-surface-strong, #f8fafc);
+    color: var(--color-text-muted, #64748b);
+    font-size: var(--font-size-sm, 0.875rem);
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.ductbank-collapse-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1, 0.25rem);
+}
+
+.ductbank-disclosure-icon {
+    display: inline-block;
+    font-size: 0.9rem;
+    line-height: 1;
+    transition: transform 0.15s ease;
+}
+
+.ductbank-collapse-btn[aria-expanded="true"] .ductbank-disclosure-icon {
+    transform: rotate(180deg);
+}
+
+.ductbank-collapsible-content {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: var(--space-3, 1rem);
+}
+
+.ductbank-collapsible-content[hidden] {
+    display: none;
+}
+
 .ductbank-summary-panel {
     margin: 0;
 }
@@ -959,6 +1266,16 @@ body.ductbank-page .toolbar-btn[aria-disabled="true"] {
     background: color-mix(in srgb, var(--color-primary, #2563eb) 4%, var(--color-surface, #fff));
 }
 
+.ductbank-page .db-table tbody tr.ductbank-route-focus-row td,
+.ductbank-page .db-table tbody tr.ductbank-route-focus-row:hover td {
+    background: color-mix(in srgb, #f59e0b 16%, var(--color-surface, #fff));
+    box-shadow: inset 0 2px #f59e0b, inset 0 -2px #f59e0b;
+}
+
+.ductbank-page .db-table tbody tr.ductbank-route-focus-row td:first-child {
+    box-shadow: inset 3px 0 #f59e0b, inset 0 2px #f59e0b, inset 0 -2px #f59e0b, 1px 0 0 var(--color-border, var(--border-color));
+}
+
 .ductbank-page #conduitTable th:first-child,
 .ductbank-page #conduitTable td:first-child,
 .ductbank-page #cableTable th:first-child,
@@ -1043,9 +1360,19 @@ body.ductbank-page .toolbar-btn[aria-disabled="true"] {
     margin: 0;
 }
 
+.ductbank-drawing-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(19rem, 23rem);
+    align-items: start;
+    gap: var(--space-3, 1rem);
+    margin-top: var(--space-3, 1rem);
+}
+
 .ductbank-grid-wrapper {
     position: relative;
+    min-width: 0;
     width: 100%;
+    max-height: min(72vh, 50rem);
     overflow: auto;
     border: 1px solid var(--color-border, var(--border-color));
     border-radius: var(--radius-sm, 6px);
@@ -1056,6 +1383,185 @@ body.ductbank-page .toolbar-btn[aria-disabled="true"] {
         var(--color-surface, #fff) 10px,
         var(--color-surface, #fff) 20px
     );
+}
+
+.ductbank-cable-key {
+    max-height: min(72vh, 50rem);
+    overflow: auto;
+    border: 1px solid var(--color-border, var(--border-color));
+    border-radius: var(--radius-sm, 6px);
+    background: var(--color-surface, #fff);
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+}
+
+.ductbank-cable-key[hidden] {
+    display: none;
+}
+
+.ductbank-cable-key-header {
+    position: sticky;
+    z-index: 2;
+    top: 0;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--space-3, 1rem);
+    padding: 0.9rem 1rem 0.75rem;
+    border-bottom: 1px solid var(--color-border, #d7dee8);
+    background: color-mix(in srgb, var(--color-surface, #fff) 92%, var(--color-primary, #2563eb));
+}
+
+.ductbank-cable-key-header span {
+    display: block;
+    margin-bottom: 0.15rem;
+    color: var(--color-primary, #1d4ed8);
+    font-size: var(--font-size-xs, 0.75rem);
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.ductbank-cable-key-header h3 {
+    margin: 0;
+    font-size: 1rem;
+}
+
+.ductbank-cable-key-header > strong {
+    max-width: 9rem;
+    color: var(--color-text-muted, #64748b);
+    font-size: var(--font-size-xs, 0.75rem);
+    font-weight: 700;
+    line-height: 1.35;
+    text-align: right;
+}
+
+.ductbank-cable-key > p {
+    margin: 0;
+    padding: 0.7rem 1rem;
+    border-bottom: 1px solid var(--color-border, #d7dee8);
+    color: var(--color-text-muted, #64748b);
+    font-size: var(--font-size-xs, 0.75rem);
+    line-height: 1.45;
+}
+
+.ductbank-cable-key-body {
+    padding: 0.55rem;
+}
+
+.ductbank-cable-key-group {
+    overflow: hidden;
+    margin-bottom: 0.45rem;
+    border: 1px solid var(--color-border, #d7dee8);
+    border-radius: 6px;
+    background: color-mix(in srgb, var(--color-surface, #fff) 88%, #f1f5f9);
+}
+
+.ductbank-cable-key-group:last-child {
+    margin-bottom: 0;
+}
+
+.ductbank-cable-key-group.is-route-focus {
+    border-color: #f59e0b;
+    box-shadow: inset 3px 0 0 #f59e0b;
+}
+
+.ductbank-cable-key-group > summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.65rem 0.75rem;
+    cursor: pointer;
+    list-style: none;
+    color: var(--color-text, #0f172a);
+    font-weight: 800;
+}
+
+.ductbank-cable-key-group > summary::-webkit-details-marker {
+    display: none;
+}
+
+.ductbank-cable-key-group > summary::before {
+    content: '\25B8';
+    color: var(--color-text-muted, #64748b);
+    transition: transform 0.15s ease;
+}
+
+.ductbank-cable-key-group[open] > summary::before {
+    transform: rotate(90deg);
+}
+
+.ductbank-cable-key-group > summary > span {
+    flex: 1;
+}
+
+.ductbank-cable-key-group > summary small {
+    color: var(--color-text-muted, #64748b);
+    font-weight: 700;
+}
+
+.ductbank-cable-key-items {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1px;
+    padding: 1px;
+    border-top: 1px solid var(--color-border, #d7dee8);
+    background: var(--color-border, #d7dee8);
+}
+
+.ductbank-cable-key-item {
+    display: grid;
+    grid-template-columns: 1.55rem minmax(0, 1fr);
+    grid-template-areas:
+        'marker name'
+        'marker size';
+    align-items: center;
+    gap: 0 0.45rem;
+    min-width: 0;
+    padding: 0.5rem;
+    border: 0;
+    background: var(--color-surface, #fff);
+    color: var(--color-text, #0f172a);
+    text-align: left;
+    cursor: pointer;
+}
+
+.ductbank-cable-key-item:hover,
+.ductbank-cable-key-item:focus-visible,
+.ductbank-cable-key-item.is-selected {
+    position: relative;
+    z-index: 1;
+    background: color-mix(in srgb, var(--color-primary, #2563eb) 10%, var(--color-surface, #fff));
+    outline: 2px solid color-mix(in srgb, var(--color-primary, #2563eb) 58%, transparent);
+    outline-offset: -2px;
+}
+
+.ductbank-cable-key-marker {
+    grid-area: marker;
+    display: inline-grid;
+    width: 1.55rem;
+    height: 1.55rem;
+    place-items: center;
+    border: 1px solid #0f172a;
+    border-radius: 50%;
+    background: #bae6fd;
+    font-size: 0.68rem;
+    font-weight: 900;
+}
+
+.ductbank-cable-key-name {
+    grid-area: name;
+    overflow: hidden;
+    font-size: 0.76rem;
+    font-weight: 800;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ductbank-cable-key-size {
+    grid-area: size;
+    color: var(--color-text-muted, #64748b);
+    font-size: 0.68rem;
 }
 
 .ductbank-grid-container {
@@ -1125,6 +1631,16 @@ body.ductbank-page .toolbar-btn[aria-disabled="true"] {
 .ductbank-depth-callout {
     font-size: 13px;
     font-weight: 800;
+}
+
+.ductbank-depth-scale-note {
+    letter-spacing: 0.01em;
+}
+
+.ductbank-dimension-break {
+    paint-order: stroke;
+    stroke-linecap: square;
+    stroke-linejoin: miter;
 }
 
 .ductbank-depth-callout-bg {
@@ -1346,6 +1862,21 @@ body.dark-mode.ductbank-page .ductbank-row-warning td {
     background: color-mix(in srgb, var(--warning-bg) 24%, var(--color-surface, #2c3034)) !important;
 }
 
+@media (max-width: 1180px) {
+    .ductbank-drawing-layout {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .ductbank-cable-key {
+        max-height: 30rem;
+    }
+
+    .ductbank-bom-summary {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+}
+
 @media (max-width: 760px) {
     .ductbank-section-header,
     .ductbank-page-header {
@@ -1355,6 +1886,10 @@ body.dark-mode.ductbank-page .ductbank-row-warning td {
 
     .ductbank-field-grid,
     .ductbank-field-grid--compact {
+        grid-template-columns: 1fr;
+    }
+
+    .ductbank-bom-summary {
         grid-template-columns: 1fr;
     }
 
