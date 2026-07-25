@@ -1,4 +1,6 @@
 import fs from 'node:fs/promises';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 const SOURCE_FILE = 'componentLibrary.json';
 const OUTPUT_FILE = 'docs/component-gap-analysis.md';
@@ -49,6 +51,12 @@ const ATTRIBUTE_BASELINE = {
   source: ['short_circuit_capacity', 'xr_ratio', 'frequency_hz'],
   transformer: ['kva', 'percent_z', 'primary_connection', 'secondary_connection'],
   protective: ['pickup_amps', 'time_dial', 'interrupting_rating_ka'],
+  // A differential (87) element is a percentage-slope sensing device. It has
+  // no time dial and no interrupting rating — the breaker it trips carries
+  // the interrupting duty — so holding it to the time-overcurrent baseline
+  // reports gaps that cannot legitimately be filled. Check the restraint
+  // characteristic and protected-zone metadata instead.
+  differential: ['pickup_amps', 'slope1_pct', 'protected_zone_type'],
   rotating: ['kw', 'efficiency', 'power_factor'],
   equipment: ['rated_voltage_kv', 'bus_rating_a'],
   load: ['kw', 'kvar', 'demand_factor'],
@@ -102,7 +110,10 @@ const TYPE_ALIASES = new Map([
   ['feeder', 'load'],
   ['link_source', 'utility'],
   ['link_target', 'bus'],
-  ['relay_87', 'relay'],
+  // `relay_87` is intentionally NOT aliased to `relay`. The library carries two
+  // distinct relay subtypes (`overcurrent_relay` and `relay_87`) whose schemas
+  // differ by protective function. Collapsing them into one row merges their
+  // props, so a field missing from one is masked by the other.
   ['class_rk1', 'fuse'],
   ['lv_cb', 'breaker'],
   ['mv_cb', 'breaker'],
@@ -141,6 +152,9 @@ function canonicalType(type) {
 function classifyType(type) {
   if (/utility|source|grid/.test(type)) return 'source';
   if (/transformer/.test(type)) return 'transformer';
+  // Differential elements must be matched before the generic protective test,
+  // which would otherwise claim them via the `relay` substring.
+  if (/relay_87|differential/.test(type)) return 'differential';
   if (/breaker|fuse|relay|protection|recloser/.test(type)) return 'protective';
   // panel / switchboard / mcc are bus equipment with their own canonical
   // schema (rated_voltage_kv, bus_rating_a, etc.), not load-aggregate or
@@ -191,9 +205,8 @@ function formatList(items) {
   return items.length ? items.join(', ') : '—';
 }
 
-async function main() {
-  const library = JSON.parse(await fs.readFile(SOURCE_FILE, 'utf8'));
-  const components = Array.isArray(library.components) ? library.components : [];
+export function computeCoverage(library) {
+  const components = Array.isArray(library?.components) ? library.components : [];
 
   const discoveredTypes = new Set();
   const typeToProps = new Map();
@@ -237,12 +250,13 @@ async function main() {
     })
     .sort((a, b) => b.missing.length - a.missing.length || a.type.localeCompare(b.type));
 
-  const today = new Date().toISOString().slice(0, 10);
-  const lines = [
-    '# Component & Attribute Gap Analysis',
-    '',
-    `Generated on ${today} from \`${SOURCE_FILE}\`.`,
-    '',
+  return { missingComponents, attributeRows };
+}
+
+// The `Generated on` line is the only date-dependent content, so it is emitted
+// separately from the report body. Freshness checks compare the body alone.
+export function buildReportBody({ missingComponents, attributeRows }) {
+  return [
     '## Missing Common Component Types',
     '',
     missingComponents.length
@@ -263,12 +277,32 @@ async function main() {
     '- `src/validation/librarySchema.mjs` is the canonical schema for MCC and Motor entries; the heuristic baseline here is intentionally looser so it surfaces gaps without duplicating the validator.',
     '- This report is a heuristic gap check and should be reviewed before schema enforcement.'
   ];
+}
 
-  await fs.writeFile(OUTPUT_FILE, `${lines.join('\n')}\n`);
+export function buildReport(library, { date = new Date().toISOString().slice(0, 10) } = {}) {
+  const coverage = computeCoverage(library);
+  const lines = [
+    '# Component & Attribute Gap Analysis',
+    '',
+    `Generated on ${date} from \`${SOURCE_FILE}\`.`,
+    '',
+    ...buildReportBody(coverage)
+  ];
+  return `${lines.join('\n')}\n`;
+}
+
+async function main() {
+  const library = JSON.parse(await fs.readFile(SOURCE_FILE, 'utf8'));
+  await fs.writeFile(OUTPUT_FILE, buildReport(library));
   console.log(`Wrote ${OUTPUT_FILE}`);
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exitCode = 1;
-});
+const invokedDirectly = process.argv[1]
+  && pathToFileURL(path.resolve(process.argv[1])).href === import.meta.url;
+
+if (invokedDirectly) {
+  main().catch((error) => {
+    console.error(error);
+    process.exitCode = 1;
+  });
+}
