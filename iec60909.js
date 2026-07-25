@@ -11,16 +11,23 @@ document.addEventListener('DOMContentLoaded', () => {
     formulas: [
       'I″k3 = c × Un / (√3 × Zk) — initial symmetrical fault current',
       'ip = κ × √2 × I″k3 — peak current; κ = 1.02 + 0.98 e^(−3/(X/R))',
+      'Ib = μ × I″kG + (I″k − I″kG) — symmetrical breaking current (§8)',
+      'μ = a + b e^(−k · I″kG/I_rG) — decay factor, tabulated by t_min (§8.1.5.2)',
+      'K_G = (Un/U_rG) · c_max / (1 + x″d · sin φ_rG) — generator correction (§6.6.1)',
+      'K_T = 0.95 · c_max / (1 + 0.6 · x_T) — transformer correction (§6.3.3)',
       'Ith = I″k3 × √(m + n) — thermal equivalent short-time current',
     ],
     assumptions: [
       'Equivalent voltage source at fault location (no pre-fault load currents)',
       'Voltage factor c applied to nominal voltage per IEC 60909-0 Table 1',
-      'Far-from-generator assumption (Ib = I″k3); near-to-generator μ factor not applied',
+      'K_G and K_T correct each element impedance before the cascade; they apply only when the IEC method is selected',
+      'μ decays the synchronous-machine share of I″k; other infeed is carried through undecayed',
+      'Minimum time delay t_min defaults to 0.05 s and is interpolated between the tabulated μ curves',
     ],
     limitations: [
-      'K_G (generator) and K_T (transformer) impedance correction factors not batch-applied',
-      'Near-to-generator breaking current decay (μ factor) not implemented',
+      'Radial cascade: for a bus fed only by a synchronous machine the whole I″k is treated as the generator contribution. Meshed networks with several machines are not apportioned per source, so μ = 1 (conservative) unless one terminal machine dominates',
+      'K_G assumes a generator connected without a unit transformer (no K_S / K_SO power-station-unit correction)',
+      'Asynchronous (induction) generators are left uncorrected',
       'Unbalanced faults use simplified symmetrical-component method',
     ],
     benchmarkId: 'iec60909-short-circuit',
@@ -72,6 +79,7 @@ function renderResults(res) {
       r.lineToGroundKA,
       r.lineToLineKA,
       r.ip,
+      r.mu == null ? '' : r.mu,
       r.Ib,
       r.Ith,
     ];
@@ -95,6 +103,7 @@ form.addEventListener('submit', ev => {
       lvTolerancePct: Number(form.lvTolerancePct.value),
       faultDurationS: Number(form.faultDurationS.value),
       freqHz: Number(form.freqHz.value),
+      minTimeDelayS: Number(form.minTimeDelayS.value),
     };
     const model = buildModel();
     const res = runShortCircuit(model, opts);
@@ -112,11 +121,11 @@ pdfBtn.addEventListener('click', () => {
   if (!lastResults) return;
   const headers = ['bus', 'prefaultKV', 'cFactor', 'kappa',
                    'threePhaseKA', 'lineToGroundKA', 'lineToLineKA',
-                   'ip', 'Ib', 'Ith'];
+                   'ip', 'mu', 'Ib', 'Ith'];
   const rows = Object.entries(lastResults).map(([id, r]) => ({
     bus: id, prefaultKV: r.prefaultKV, cFactor: r.cFactor, kappa: r.kappa,
     threePhaseKA: r.threePhaseKA, lineToGroundKA: r.lineToGroundKA,
-    lineToLineKA: r.lineToLineKA, ip: r.ip, Ib: r.Ib, Ith: r.Ith,
+    lineToLineKA: r.lineToLineKA, ip: r.ip, mu: r.mu, Ib: r.Ib, Ith: r.Ith,
   }));
   downloadPDF('IEC 60909-0:2016 Short-Circuit Report', headers, rows, 'iec60909.pdf');
 });
@@ -125,12 +134,12 @@ csvBtn.addEventListener('click', () => {
   if (!lastResults) return;
   const cols = ['bus', 'prefaultKV', 'cFactor', 'kappa',
                 'threePhaseKA_kA', 'lineToGroundKA_kA', 'lineToLineKA_kA',
-                'ip_kA', 'Ib_kA', 'Ith_kA'];
+                'ip_kA', 'mu', 'Ib_kA', 'Ith_kA'];
   const lines = [cols.join(',')];
   for (const [id, r] of Object.entries(lastResults)) {
     lines.push([id, r.prefaultKV, r.cFactor, r.kappa,
                 r.threePhaseKA, r.lineToGroundKA, r.lineToLineKA,
-                r.ip, r.Ib, r.Ith].join(','));
+                r.ip, r.mu, r.Ib, r.Ith].join(','));
   }
   const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
   const a = document.createElement('a');

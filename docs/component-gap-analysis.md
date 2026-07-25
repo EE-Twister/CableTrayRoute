@@ -1,6 +1,6 @@
 # Component & Attribute Gap Analysis
 
-Generated on 2026-05-26 from `componentLibrary.json`.
+Generated on 2026-07-25 from `componentLibrary.json`.
 
 ## Missing Common Component Types
 
@@ -26,12 +26,13 @@ Generated on 2026-05-26 from `componentLibrary.json`.
 | mcc | — |
 | meter | — |
 | motor | — |
+| overcurrent_relay | — |
 | panel | — |
 | pt_vt | — |
 | pv_array | — |
 | reactor | — |
 | recloser | — |
-| relay | — |
+| relay_87 | — |
 | single_throw | — |
 | switch | — |
 | switchboard | — |

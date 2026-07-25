@@ -6,7 +6,12 @@ import protectiveDevices from '../data/protectiveDevices.mjs';
 import { calculateTransformerImpedance } from '../utils/transformerImpedance.js';
 import { computeImpedanceFromPerKm } from '../utils/cableImpedance.js';
 import { table9Impedance } from '../src/necTable9.mjs';
-import { computeIEC60909Bus } from './iec60909.mjs';
+import {
+  computeIEC60909Bus,
+  cFactor as iecCFactor,
+  generatorCorrectionKG,
+  transformerCorrectionKT
+} from './iec60909.mjs';
 import { ibrFaultContribution, IBR_DEFAULTS } from './ibrModeling.mjs';
 
 // Basic complex math utilities
@@ -634,7 +639,32 @@ function getTransformerPercentForPort(xfmr, portIndex) {
   return getNumericFromKeys(xfmr, percentFallbacks);
 }
 
-function getTransformerImpedance(xfmr, portIndex) {
+// ---------------------------------------------------------------------------
+// IEC 60909-0:2016 impedance correction context
+// ---------------------------------------------------------------------------
+
+/**
+ * Builds the correction context for a run. K_T (§6.3.3) and K_G (§6.6.1) are
+ * IEC-specific, so they are only applied when the caller explicitly asked for
+ * the IEC method — never on an ANSI/IEEE run, and never on an auto-selected
+ * per-bus method, where mixing corrected and uncorrected impedances into one
+ * shared cascade cache would make results depend on bus iteration order.
+ */
+function createIecCorrectionContext(opts = {}) {
+  const requested = String(opts.method || '').toUpperCase();
+  if (requested !== 'IEC') return null;
+  return {
+    cMode: opts.cMode || 'max',
+    lvTolerancePct: opts.lvTolerancePct ?? 10
+  };
+}
+
+function scaleImpedance(z, k) {
+  if (!Number.isFinite(k) || k <= 0) return z;
+  return { r: (z.r || 0) * k, x: (z.x || 0) * k };
+}
+
+function getTransformerImpedance(xfmr, portIndex, corrections = null) {
   if (!xfmr || xfmr.type !== 'transformer') return { r: 0, x: 0 };
   const percent = getTransformerPercentForPort(xfmr, portIndex);
   const kva = getTransformerKvaForPort(xfmr, portIndex);
@@ -642,14 +672,25 @@ function getTransformerImpedance(xfmr, portIndex) {
   const kv = toKV(voltage ?? pickValue(xfmr, 'voltage') ?? pickValue(xfmr, 'baseKV'));
   const xr = parseNumeric(pickValue(xfmr, 'xr_ratio') ?? pickValue(xfmr, 'xr'));
   const impedance = calculateTransformerImpedance({ kva, percentZ: percent, voltageKV: kv, xrRatio: xr });
-  if (impedance && Number.isFinite(impedance.r) && Number.isFinite(impedance.x)) return impedance;
+  if (impedance && Number.isFinite(impedance.r) && Number.isFinite(impedance.x)) {
+    if (!corrections) return impedance;
+    // Z_TK = K_T × Z_T (IEC 60909-0:2016 §6.3.3). K_T needs x_T per unit on the
+    // transformer's own rating, so convert the ohmic reactance back onto that base.
+    const mva = Number.isFinite(kva) && kva > 0 ? kva / 1000 : null;
+    if (!mva || !Number.isFinite(kv) || kv <= 0) return impedance;
+    const zBase = (kv * kv) / mva;
+    if (!Number.isFinite(zBase) || zBase <= 0) return impedance;
+    const xTPu = Math.abs(impedance.x) / zBase;
+    const cMax = iecCFactor(kv, 'max', corrections.lvTolerancePct);
+    return scaleImpedance(impedance, transformerCorrectionKT(xTPu, cMax));
+  }
   const direct = pickValue(xfmr, 'transformer_impedance');
   const fallback = toImpedance(direct);
   if (Math.abs(fallback.r) > 0 || Math.abs(fallback.x) > 0) return fallback;
   return { r: 0, x: 0 };
 }
 
-function getSourceImpedance(comp) {
+function getSourceImpedance(comp, corrections = null) {
   const mva = parseNumeric(
     pickValue(comp, 'thevenin_mva')
     ?? pickValue(comp, 'mva')
@@ -676,6 +717,19 @@ function getSourceImpedance(comp) {
     );
     if (xdpp && xdpp > 0) {
       zMag *= xdpp;
+    }
+    // Z_GK = K_G × Z_G (IEC 60909-0:2016 §6.6.1). K_G is defined for
+    // synchronous machines; induction (asynchronous) generators have their own
+    // treatment in the standard and are left uncorrected here.
+    if (corrections && comp.subtype !== 'asynchronous') {
+      const kG = generatorCorrectionKG({
+        unKV: kv,
+        urgKV: toKV(pickValue(comp, 'rated_kv') ?? pickValue(comp, 'volts')) || kv,
+        xdppPu: xdpp,
+        ratedPF: parseNumeric(pickValue(comp, 'pf') ?? pickValue(comp, 'full_load_pf')),
+        cMax: iecCFactor(kv, 'max', corrections.lvTolerancePct)
+      });
+      if (kG !== null) zMag *= kG;
     }
   }
   const xr = parseNumeric(pickValue(comp, 'xr_ratio'));
@@ -846,13 +900,13 @@ function combineParallel(base, addition) {
   return parallel(base, addition);
 }
 
-function resolveUpstreamImpedance(comp, comps, compMap, cache, cableResolver) {
+function resolveUpstreamImpedance(comp, comps, compMap, cache, cableResolver, corrections = null) {
   if (!comp?.id) return null;
   const visited = new Set();
   let current = comp;
   while (current?.id && !visited.has(current.id)) {
     visited.add(current.id);
-    const candidate = computeImpedance(current, comps, compMap, cache, new Set(), cableResolver);
+    const candidate = computeImpedance(current, comps, compMap, cache, new Set(), cableResolver, corrections);
     if (candidate && (Math.abs(candidate.r) >= 1e-9 || Math.abs(candidate.x) >= 1e-9)) {
       return { r: candidate.r, x: candidate.x };
     }
@@ -862,14 +916,14 @@ function resolveUpstreamImpedance(comp, comps, compMap, cache, cableResolver) {
   return null;
 }
 
-function computeImpedance(comp, comps, compMap, cache, visited = new Set(), cableResolver = null) {
+function computeImpedance(comp, comps, compMap, cache, visited = new Set(), cableResolver = null, corrections = null) {
   if (!comp?.id) return { r: 0, x: 0 };
   if (cache.has(comp.id)) return cache.get(comp.id);
   if (visited.has(comp.id)) return { r: 0, x: 0 };
   visited.add(comp.id);
   let total = extractComponentImpedance(comp);
   if (isSourceComponent(comp)) {
-    total = add(total, getSourceImpedance(comp));
+    total = add(total, getSourceImpedance(comp, corrections));
   }
   const parent = findParentInfo(comp, comps, compMap, visited);
   if (parent?.component) {
@@ -879,17 +933,61 @@ function computeImpedance(comp, comps, compMap, cache, visited = new Set(), cabl
       total = add(total, resolvedConnection?.impedance || toImpedance(connection.impedance));
       if (upstream.type === 'transformer') {
         const portIndex = normalizePortIndex(reversed ? connection?.targetPort : connection?.sourcePort);
-        total = add(total, getTransformerImpedance(upstream, portIndex));
+        total = add(total, getTransformerImpedance(upstream, portIndex, corrections));
       }
     }
-    total = add(total, computeImpedance(upstream, comps, compMap, cache, visited, cableResolver));
+    total = add(total, computeImpedance(upstream, comps, compMap, cache, visited, cableResolver, corrections));
   }
   visited.delete(comp.id);
   cache.set(comp.id, total);
   return total;
 }
 
-function buildImpedancePath(comp, comps, compMap, cableResolver) {
+/**
+ * Walks the upstream chain to the terminal source feeding a bus.
+ *
+ * The impedance cascade in this module is radial — each component has at most
+ * one parent — so the terminal source is the sole infeed for the bus. That is
+ * what lets the IEC μ factor treat the whole initial current at the bus as the
+ * generator contribution when that terminal source is a synchronous machine.
+ */
+function findTerminalSource(comp, comps, compMap) {
+  const visited = new Set();
+  let current = comp;
+  while (current?.id && !visited.has(current.id)) {
+    visited.add(current.id);
+    if (isSourceComponent(current)) return current;
+    const parent = findParentInfo(current, comps, compMap, visited);
+    if (!parent?.component) return null;
+    current = parent.component;
+  }
+  return null;
+}
+
+/**
+ * Rated current I_rG of a synchronous generator in kA.
+ *
+ *   I_rG = S_rG / (√3 × U_rG)
+ *
+ * Returns null for anything that is not a synchronous generator with usable
+ * rating data, which makes the caller fall back to μ = 1.
+ */
+function generatorRatedCurrentKA(comp) {
+  if (comp?.type !== 'generator' || comp?.subtype === 'asynchronous') return null;
+  const mva = parseNumeric(pickValue(comp, 'rated_mva') ?? pickValue(comp, 'mva'));
+  const kva = parseNumeric(pickValue(comp, 'rated_kva') ?? pickValue(comp, 'kva'));
+  const mvaRating = mva || (kva ? kva / 1000 : null);
+  const kv = toKV(
+    pickValue(comp, 'rated_kv')
+    ?? pickValue(comp, 'volts')
+    ?? pickValue(comp, 'voltage')
+    ?? pickValue(comp, 'baseKV')
+  );
+  if (!mvaRating || mvaRating <= 0 || !kv || kv <= 0) return null;
+  return mvaRating / (Math.sqrt(3) * kv);
+}
+
+function buildImpedancePath(comp, comps, compMap, cableResolver, corrections = null) {
   const segments = [];
   const assumptions = [];
   const requiredInputs = [];
@@ -912,7 +1010,7 @@ function buildImpedancePath(comp, comps, compMap, cableResolver) {
       });
       if (upstream.type === 'transformer') {
         const portIndex = normalizePortIndex(reversed ? connection?.targetPort : connection?.sourcePort);
-        const impedance = getTransformerImpedance(upstream, portIndex);
+        const impedance = getTransformerImpedance(upstream, portIndex, corrections);
         if (hasImpedance(impedance)) {
           segments.unshift({
             type: 'transformer',
@@ -929,7 +1027,7 @@ function buildImpedancePath(comp, comps, compMap, cableResolver) {
   }
 
   if (current && isSourceComponent(current)) {
-    const impedance = getSourceImpedance(current);
+    const impedance = getSourceImpedance(current, corrections);
     if (hasImpedance(impedance)) {
       segments.unshift({
         type: 'source',
@@ -1050,6 +1148,7 @@ export function runShortCircuit(modelOrOpts = {}, maybeOpts = {}) {
     }
   });
   const impedanceCache = new Map();
+  const iecCorrections = createIecCorrectionContext(opts);
   const cableResolver = createCableScheduleResolver(cables);
   const voltageCache = new Map();
   const protectiveLookupCache = new Map();
@@ -1120,9 +1219,9 @@ export function runShortCircuit(modelOrOpts = {}, maybeOpts = {}) {
 
   comps.forEach(comp => {
     if (comp?.id && compMap.get(comp.id) !== comp) return;
-    const baseZ = computeImpedance(comp, comps, compMap, impedanceCache, new Set(), cableResolver);
+    const baseZ = computeImpedance(comp, comps, compMap, impedanceCache, new Set(), cableResolver, iecCorrections);
     const fallbackZ = (!hasBusNodes || isBusStudyNode(comp))
-      ? resolveUpstreamImpedance(comp, comps, compMap, impedanceCache, cableResolver)
+      ? resolveUpstreamImpedance(comp, comps, compMap, impedanceCache, cableResolver, iecCorrections)
       : null;
     let z1 = comp.z1 ? toImpedance(comp.z1) : baseZ;
     let z2 = comp.z2 ? toImpedance(comp.z2) : z1;
@@ -1147,6 +1246,15 @@ export function runShortCircuit(modelOrOpts = {}, maybeOpts = {}) {
 
     let entry;
     if (method === 'IEC') {
+      // Near-to-generator decay (IEC 60909-0 §8): when the terminal infeed is a
+      // synchronous machine it supplies the whole initial current at this bus, so
+      // I"kG = I"k3 and μ applies to all of it. Any other source type leaves
+      // generatorRatedCurrentKA null, which yields μ = 1.
+      const terminalSource = findTerminalSource(comp, comps, compMap);
+      const iRatedKA = generatorRatedCurrentKA(terminalSource);
+      const c = iecCFactor(prefaultKV, opts.cMode || 'max', opts.lvTolerancePct ?? 10);
+      const ikTotalKA = ((prefaultKV * c) / Math.sqrt(3)) / mag(z1);
+
       // Delegate to the full IEC 60909-0:2016 engine
       const iecFields = computeIEC60909Bus({
         z1,
@@ -1157,7 +1265,10 @@ export function runShortCircuit(modelOrOpts = {}, maybeOpts = {}) {
         lvTolerancePct: opts.lvTolerancePct ?? 10,
         faultDurationS: opts.faultDurationS ?? 1.0,
         freqHz: opts.freqHz ?? 50,
-        xrOverride: Math.abs(comp.xr_ratio || 0) > 0 ? Math.abs(comp.xr_ratio) : null
+        xrOverride: Math.abs(comp.xr_ratio || 0) > 0 ? Math.abs(comp.xr_ratio) : null,
+        generatorContributionKA: iRatedKA === null ? null : ikTotalKA,
+        generatorRatedCurrentKA: iRatedKA,
+        minTimeDelayS: opts.minTimeDelayS ?? 0.05
       });
       entry = {
         method: 'IEC',
@@ -1196,7 +1307,7 @@ export function runShortCircuit(modelOrOpts = {}, maybeOpts = {}) {
       entry.warnings = ['Impedance data missing; results defaulted to low impedance until data is provided.'];
     }
 
-    const path = buildImpedancePath(comp, comps, compMap, cableResolver);
+    const path = buildImpedancePath(comp, comps, compMap, cableResolver, iecCorrections);
     entry.equipmentTag = componentIdentity(comp) || comp.id;
     entry.impedanceProvenance = {
       totalR: Number(z1.r || 0),

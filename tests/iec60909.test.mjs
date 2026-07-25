@@ -16,6 +16,9 @@ import {
   kappaIEC,
   thermalMFactor,
   transformerCorrectionKT,
+  generatorCorrectionKG,
+  muFactor,
+  breakingCurrent,
   computeIEC60909Bus,
   runIEC60909Batch,
 } from '../analysis/iec60909.mjs';
@@ -262,5 +265,266 @@ describe('runIEC60909Batch — batch runner', () => {
     for (const key of ['threePhaseKA','ip','Ib','Ith','kappa','cFactor']) {
       assert.ok(key in res['BUS-11kV'], `Missing ${key} in BUS-11kV`);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// generatorCorrectionKG — IEC 60909-0:2016 §6.6.1 (Eq. 18)
+// ---------------------------------------------------------------------------
+
+describe('generatorCorrectionKG — K_G (IEC 60909-0:2016 §6.6.1 Eq. 18)', () => {
+  // K_G = (Un/UrG) × cmax / (1 + x"d × sin φrG)
+  // 10.5 kV machine at unity turns ratio, x"d = 0.15, pf = 0.8 → sinφ = 0.6
+  //   K_G = 1 × 1.10 / (1 + 0.15×0.6) = 1.10 / 1.09 = 1.00917
+  it('matches the closed-form value for a 10.5 kV / 0.8 pf machine', () => {
+    const kG = generatorCorrectionKG({
+      unKV: 10.5, urgKV: 10.5, xdppPu: 0.15, ratedPF: 0.8, cMax: 1.10
+    });
+    within(kG, 1.00917, 0.0001, 'K_G ');
+  });
+
+  it('scales with the Un/UrG turns ratio', () => {
+    const matched = generatorCorrectionKG({ unKV: 10.5, urgKV: 10.5, xdppPu: 0.15, ratedPF: 0.8, cMax: 1.10 });
+    const mismatched = generatorCorrectionKG({ unKV: 10.0, urgKV: 10.5, xdppPu: 0.15, ratedPF: 0.8, cMax: 1.10 });
+    within(mismatched, matched * (10.0 / 10.5), 1e-9, 'K_G ratio ');
+  });
+
+  it('decreases as subtransient reactance increases', () => {
+    const low = generatorCorrectionKG({ unKV: 10.5, urgKV: 10.5, xdppPu: 0.10, ratedPF: 0.8, cMax: 1.10 });
+    const high = generatorCorrectionKG({ unKV: 10.5, urgKV: 10.5, xdppPu: 0.25, ratedPF: 0.8, cMax: 1.10 });
+    assert.ok(high < low, `expected K_G to fall with x"d, got ${low} then ${high}`);
+  });
+
+  it('returns null when required generator data is missing', () => {
+    assert.strictEqual(generatorCorrectionKG({ unKV: 10.5, urgKV: 10.5, xdppPu: 0.15 }), null);
+    assert.strictEqual(generatorCorrectionKG({ unKV: 10.5, urgKV: 10.5, ratedPF: 0.8 }), null);
+    assert.strictEqual(generatorCorrectionKG({}), null);
+  });
+
+  it('rejects a power factor outside (0, 1]', () => {
+    assert.strictEqual(generatorCorrectionKG({ unKV: 10, urgKV: 10, xdppPu: 0.15, ratedPF: 1.4 }), null);
+    assert.strictEqual(generatorCorrectionKG({ unKV: 10, urgKV: 10, xdppPu: 0.15, ratedPF: 0 }), null);
+  });
+
+  it('reduces to cmax/(1) for a unity-power-factor machine', () => {
+    // sin φ = 0 → K_G = (Un/UrG) × cmax
+    const kG = generatorCorrectionKG({ unKV: 10, urgKV: 10, xdppPu: 0.2, ratedPF: 1.0, cMax: 1.10 });
+    within(kG, 1.10, 1e-9, 'K_G@pf=1 ');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// muFactor — IEC 60909-0:2016 §8.1.5.2
+// ---------------------------------------------------------------------------
+
+describe('muFactor — breaking-current decay μ (IEC 60909-0:2016 §8.1.5.2)', () => {
+  // Tabulated curves at q = I"kG/IrG = 4:
+  //   t_min 0.02 → 0.84 + 0.26 e^(−1.04) = 0.93190
+  //   t_min 0.05 → 0.71 + 0.51 e^(−1.20) = 0.86361
+  //   t_min 0.10 → 0.62 + 0.72 e^(−1.28) = 0.82019
+  //   t_min 0.25 → 0.56 + 0.94 e^(−1.52) = 0.76559
+  it('matches the 0.02 s curve', () => within(muFactor(4, 0.02), 0.93190, 0.0001, 'μ@0.02s '));
+  it('matches the 0.05 s curve', () => within(muFactor(4, 0.05), 0.86361, 0.0001, 'μ@0.05s '));
+  it('matches the 0.10 s curve', () => within(muFactor(4, 0.10), 0.82019, 0.0001, 'μ@0.10s '));
+  it('matches the 0.25 s curve', () => within(muFactor(4, 0.25), 0.76559, 0.0001, 'μ@0.25s '));
+
+  it('μ = 1 when I″kG/IrG ≤ 2 (treated as far-from-generator)', () => {
+    assert.strictEqual(muFactor(2, 0.05), 1);
+    assert.strictEqual(muFactor(1.5, 0.02), 1);
+    assert.strictEqual(muFactor(0, 0.05), 1);
+  });
+
+  it('holds the ≥0.25 s curve for longer delays', () => {
+    within(muFactor(4, 1.0), muFactor(4, 0.25), 1e-12, 'μ@1s ');
+    within(muFactor(4, 5.0), muFactor(4, 0.25), 1e-12, 'μ@5s ');
+  });
+
+  it('clamps delays below the first tabulated curve to 0.02 s', () => {
+    within(muFactor(4, 0.001), muFactor(4, 0.02), 1e-12, 'μ@1ms ');
+  });
+
+  it('linearly interpolates between tabulated curves', () => {
+    // t = 0.075 s sits midway between the 0.05 s and 0.10 s curves.
+    const expected = (muFactor(4, 0.05) + muFactor(4, 0.10)) / 2;
+    within(muFactor(4, 0.075), expected, 1e-12, 'μ@0.075s ');
+  });
+
+  it('decays monotonically as the generator loading ratio rises', () => {
+    const vals = [2.5, 3, 5, 8, 12].map(q => muFactor(q, 0.05));
+    for (let i = 1; i < vals.length; i += 1) {
+      assert.ok(vals[i] < vals[i - 1], `μ should fall as q rises: ${vals}`);
+    }
+  });
+
+  it('decays faster for longer minimum time delays', () => {
+    assert.ok(muFactor(6, 0.25) < muFactor(6, 0.10));
+    assert.ok(muFactor(6, 0.10) < muFactor(6, 0.05));
+    assert.ok(muFactor(6, 0.05) < muFactor(6, 0.02));
+  });
+
+  it('never exceeds 1 or drops to zero', () => {
+    for (const q of [2.1, 4, 10, 50, 500]) {
+      for (const t of [0.02, 0.05, 0.1, 0.25]) {
+        const mu = muFactor(q, t);
+        assert.ok(mu > 0 && mu <= 1, `μ out of range for q=${q}, t=${t}: ${mu}`);
+      }
+    }
+  });
+
+  it('falls back to μ = 1 for non-numeric input', () => {
+    assert.strictEqual(muFactor(NaN, 0.05), 1);
+    assert.strictEqual(muFactor(undefined, 0.05), 1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// breakingCurrent — IEC 60909-0:2016 §8
+// ---------------------------------------------------------------------------
+
+describe('breakingCurrent — Ib (IEC 60909-0:2016 §8)', () => {
+  it('returns Ib = I″k with μ = 1 when no generator data is supplied', () => {
+    const res = breakingCurrent({ ikTotalKA: 20 });
+    assert.strictEqual(res.Ib, 20);
+    assert.strictEqual(res.mu, 1);
+    assert.strictEqual(res.nearToGenerator, false);
+    assert.strictEqual(res.ratio, null);
+  });
+
+  it('applies μ to the whole current when the generator is the only source', () => {
+    // q = 20/5 = 4 → μ = 0.86361 → Ib = 0.86361 × 20 = 17.272 kA
+    const res = breakingCurrent({
+      ikTotalKA: 20, generatorContributionKA: 20, generatorRatedCurrentKA: 5, minTimeDelayS: 0.05
+    });
+    within(res.ratio, 4, 1e-9, 'q ');
+    within(res.mu, 0.86361, 0.0001, 'μ ');
+    within(res.Ib, 17.2722, 0.001, 'Ib ');
+    assert.strictEqual(res.nearToGenerator, true);
+  });
+
+  it('leaves the non-generator infeed undecayed', () => {
+    // 10 kA of the 20 kA total is generator (q = 10/2.5 = 4 → μ = 0.86361).
+    // Ib = 0.86361×10 + 10 = 18.636 kA — only the machine share decays.
+    const res = breakingCurrent({
+      ikTotalKA: 20, generatorContributionKA: 10, generatorRatedCurrentKA: 2.5, minTimeDelayS: 0.05
+    });
+    within(res.Ib, 18.6361, 0.001, 'Ib ');
+    assert.ok(res.Ib > 17.2722, 'partial generator infeed must decay less than a full one');
+  });
+
+  it('never reports a breaking current above the initial symmetrical current', () => {
+    for (const q of [2.5, 4, 10, 40]) {
+      const res = breakingCurrent({
+        ikTotalKA: 20, generatorContributionKA: 20, generatorRatedCurrentKA: 20 / q, minTimeDelayS: 0.25
+      });
+      assert.ok(res.Ib <= 20 + 1e-9, `Ib ${res.Ib} exceeded I″k for q=${q}`);
+      assert.ok(res.Ib > 0, `Ib must stay positive for q=${q}`);
+    }
+  });
+
+  it('caps the generator share at the total current at the bus', () => {
+    // A contribution larger than the total is nonsensical; clamp rather than
+    // letting the undecayed remainder go negative.
+    const res = breakingCurrent({
+      ikTotalKA: 10, generatorContributionKA: 25, generatorRatedCurrentKA: 2.5, minTimeDelayS: 0.05
+    });
+    assert.ok(res.Ib <= 10 + 1e-9, `Ib ${res.Ib} exceeded I″k`);
+    assert.ok(res.Ib > 0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// computeIEC60909Bus — near-to-generator path
+// ---------------------------------------------------------------------------
+
+describe('computeIEC60909Bus — near-to-generator breaking current', () => {
+  const base = {
+    z1: { r: 0.02, x: 0.2 },
+    z2: { r: 0.02, x: 0.2 },
+    z0: { r: 0.02, x: 0.2 },
+    prefaultKV: 10,
+  };
+
+  it('keeps Ib = I″k3 and μ = 1 with no generator data (far-from-generator)', () => {
+    const res = computeIEC60909Bus(base);
+    within(res.Ib, res.threePhaseKA, 0.01, 'Ib ');
+    assert.strictEqual(res.mu, 1);
+    assert.strictEqual(res.nearToGenerator, false);
+    assert.strictEqual(res.generatorRatioIkgIrg, null);
+  });
+
+  it('reduces Ib below I″k3 for a near-to-generator fault', () => {
+    const far = computeIEC60909Bus(base);
+    const near = computeIEC60909Bus({
+      ...base,
+      generatorContributionKA: far.threePhaseKA,
+      generatorRatedCurrentKA: far.threePhaseKA / 4, // q = 4
+      minTimeDelayS: 0.05,
+    });
+    assert.ok(near.Ib < near.threePhaseKA, 'Ib should decay below I″k3');
+    within(near.mu, 0.86361, 0.0001, 'μ ');
+    within(near.generatorRatioIkgIrg, 4, 0.01, 'q ');
+    assert.strictEqual(near.nearToGenerator, true);
+    // I″k3 and ip describe fault inception and must not change.
+    within(near.threePhaseKA, far.threePhaseKA, 1e-9, 'I″k3 ');
+    within(near.ip, far.ip, 1e-9, 'ip ');
+  });
+
+  it('lowers Ith for a near-to-generator fault (n < 1)', () => {
+    const far = computeIEC60909Bus(base);
+    const near = computeIEC60909Bus({
+      ...base,
+      generatorContributionKA: far.threePhaseKA,
+      generatorRatedCurrentKA: far.threePhaseKA / 6,
+      minTimeDelayS: 0.25,
+    });
+    assert.ok(near.Ith < far.Ith, `expected Ith to fall with AC decay: ${far.Ith} → ${near.Ith}`);
+  });
+
+  it('decays more for a longer minimum time delay', () => {
+    const mk = tMin => computeIEC60909Bus({
+      ...base,
+      generatorContributionKA: 15.75,
+      generatorRatedCurrentKA: 15.75 / 5,
+      minTimeDelayS: tMin,
+    }).Ib;
+    assert.ok(mk(0.25) < mk(0.10));
+    assert.ok(mk(0.10) < mk(0.05));
+    assert.ok(mk(0.05) < mk(0.02));
+  });
+});
+
+describe('runIEC60909Batch — near-to-generator pass-through', () => {
+  it('applies per-bus generator data and the batch t_min default', () => {
+    const res = runIEC60909Batch([
+      {
+        id: 'GEN-BUS',
+        z1: { r: 0.02, x: 0.2 }, z2: { r: 0.02, x: 0.2 }, z0: { r: 0.02, x: 0.2 },
+        prefaultKV: 10,
+        generatorContributionKA: 15.75,
+        generatorRatedCurrentKA: 15.75 / 4,
+      },
+      {
+        id: 'UTIL-BUS',
+        z1: { r: 0.02, x: 0.2 }, z2: { r: 0.02, x: 0.2 }, z0: { r: 0.02, x: 0.2 },
+        prefaultKV: 10,
+      },
+    ], { minTimeDelayS: 0.05 });
+
+    within(res['GEN-BUS'].mu, 0.86361, 0.0001, 'μ ');
+    assert.strictEqual(res['GEN-BUS'].nearToGenerator, true);
+    assert.ok(res['GEN-BUS'].Ib < res['GEN-BUS'].threePhaseKA);
+
+    assert.strictEqual(res['UTIL-BUS'].mu, 1);
+    assert.strictEqual(res['UTIL-BUS'].nearToGenerator, false);
+    within(res['UTIL-BUS'].Ib, res['UTIL-BUS'].threePhaseKA, 0.01, 'Ib ');
+  });
+
+  it('lets a per-bus t_min override the batch default', () => {
+    const bus = {
+      id: 'B', z1: { r: 0.02, x: 0.2 }, z2: { r: 0.02, x: 0.2 }, z0: { r: 0.02, x: 0.2 },
+      prefaultKV: 10, generatorContributionKA: 15.75, generatorRatedCurrentKA: 15.75 / 4,
+    };
+    const fast = runIEC60909Batch([{ ...bus, minTimeDelayS: 0.02 }], { minTimeDelayS: 0.25 });
+    within(fast['B'].mu, muFactor(4, 0.02), 0.0005, 'μ override ');
   });
 });

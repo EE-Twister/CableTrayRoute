@@ -11,15 +11,23 @@
  *   I"k1  — initial symmetrical line-to-ground short-circuit current (kA)
  *   I"k2E — initial symmetrical double-line-to-ground short-circuit current (kA)
  *   ip    — peak short-circuit current (kA)  [IEC §4.3.1]
- *   Ib    — symmetrical short-circuit breaking current (kA)  [IEC §4.5, far-from-generator]
+ *   Ib    — symmetrical short-circuit breaking current (kA)  [IEC §8]
  *   Ith   — thermal equivalent short-circuit current (kA)  [IEC §4.8]
  *   kappa — peak factor κ
+ *   mu    — breaking-current decay factor μ  [IEC §8.1.5.2]
  *   cFactor — voltage factor c used in this calculation
  *
+ * Impedance corrections:
+ *   - K_T for transformers (§6.3.3) and K_G for synchronous generators
+ *     (§6.6.1) are applied per element by shortCircuit.mjs before the
+ *     impedance cascade, since each factor corrects only its own element's
+ *     impedance rather than the summed impedance at the bus.
+ *
  * Assumptions / simplifications:
- *   - Far-from-generator short circuit (μ = 1.0, so Ib = I"k3)
- *   - No impedance correction factor K_G for synchronous generators
- *   - Transformer K_T correction applied when xT data is available
+ *   - Near-to-generator decay is applied to the synchronous-machine share of
+ *     I"k only; the remaining infeed is carried through undecayed. Callers that
+ *     cannot apportion the generator contribution get μ = 1 (far-from-
+ *     generator), which is the conservative result for breaker breaking duty.
  *   - Ith uses the simplified m+n method (IEC 60909-0:2016 §4.8.1)
  */
 
@@ -158,6 +166,154 @@ export function transformerCorrectionKT(xTPu, cMax = 1.10) {
 }
 
 // ---------------------------------------------------------------------------
+// IEC 60909-0:2016 — Generator impedance correction factor K_G (§6.6.1, Eq. 18)
+// ---------------------------------------------------------------------------
+
+/**
+ * Calculates the IEC 60909-0:2016 synchronous generator impedance correction
+ * factor K_G for a generator connected directly to the faulted network (no
+ * unit transformer).
+ *
+ *   K_G = (U_n / U_rG) × c_max / (1 + x"_d × sin φ_rG)
+ *
+ * The corrected generator impedance is Z_GK = K_G × Z_G, applied to the
+ * positive-, negative- and zero-sequence generator impedance alike.
+ *
+ * @param {object} params
+ * @param {number} params.unKV    - Nominal system voltage U_n at the generator terminals (kV)
+ * @param {number} params.urgKV   - Generator rated voltage U_rG (kV)
+ * @param {number} params.xdppPu  - Subtransient reactance x"_d, per unit on the generator rating
+ * @param {number} params.ratedPF - Generator rated power factor cos φ_rG (0 < pf ≤ 1)
+ * @param {number} params.cMax    - c_max voltage factor for the generator voltage level
+ * @returns {number|null} K_G, or null when the required generator data is absent
+ */
+export function generatorCorrectionKG({ unKV, urgKV, xdppPu, ratedPF, cMax = 1.10 } = {}) {
+  const un = Number(unKV);
+  const urg = Number(urgKV);
+  const xdpp = Number(xdppPu);
+  const pf = Number(ratedPF);
+  if (!Number.isFinite(un) || un <= 0) return null;
+  if (!Number.isFinite(urg) || urg <= 0) return null;
+  if (!Number.isFinite(xdpp) || xdpp <= 0) return null;
+  // cos φ_rG must be a genuine power factor for sin φ_rG to be meaningful.
+  if (!Number.isFinite(pf) || pf <= 0 || pf > 1) return null;
+  const sinPhi = Math.sqrt(Math.max(1 - pf * pf, 0));
+  return (un / urg) * (cMax / (1 + xdpp * sinPhi));
+}
+
+// ---------------------------------------------------------------------------
+// IEC 60909-0:2016 — Breaking current decay factor μ (§8.1.5.2)
+// ---------------------------------------------------------------------------
+
+// μ curves are tabulated against the minimum time delay t_min. Each entry is
+// [t_min (s), a, b, k] for μ = a + b × e^(−k × q), where q = I"kG / I_rG.
+const MU_CURVES = [
+  [0.02, 0.84, 0.26, 0.26],
+  [0.05, 0.71, 0.51, 0.30],
+  [0.10, 0.62, 0.72, 0.32],
+  [0.25, 0.56, 0.94, 0.38]
+];
+
+function muFromCurve([, a, b, k], q) {
+  return a + b * Math.exp(-k * q);
+}
+
+/**
+ * Calculates the IEC 60909-0:2016 decay factor μ for the symmetrical
+ * short-circuit breaking current of a near-to-generator fault.
+ *
+ * μ accounts for the decay of the AC component between fault inception and
+ * contact separation. It is tabulated for minimum time delays of 0.02, 0.05,
+ * 0.10 and ≥0.25 s; IEC permits linear interpolation between those curves.
+ *
+ * μ = 1 when I"kG / I_rG ≤ 2 — the fault is then treated as far-from-generator
+ * and the AC component is taken as non-decaying (§8.1.5.2).
+ *
+ * @param {number} q      - Ratio I"kG / I_rG (generator contribution over rated current)
+ * @param {number} tMinS  - Minimum time delay t_min in seconds (default 0.05 s)
+ * @returns {number} μ in the range (0, 1]
+ */
+export function muFactor(q, tMinS = 0.05) {
+  const ratio = Number(q);
+  if (!Number.isFinite(ratio) || ratio <= 2) return 1;
+
+  const t = Number.isFinite(Number(tMinS)) ? Number(tMinS) : 0.05;
+
+  let mu;
+  if (t <= MU_CURVES[0][0]) {
+    mu = muFromCurve(MU_CURVES[0], ratio);
+  } else if (t >= MU_CURVES[MU_CURVES.length - 1][0]) {
+    mu = muFromCurve(MU_CURVES[MU_CURVES.length - 1], ratio);
+  } else {
+    // Linear interpolation between the two bracketing tabulated curves.
+    let upper = 1;
+    while (upper < MU_CURVES.length && MU_CURVES[upper][0] < t) upper += 1;
+    const lowCurve = MU_CURVES[upper - 1];
+    const highCurve = MU_CURVES[upper];
+    const span = highCurve[0] - lowCurve[0];
+    const weight = span > 0 ? (t - lowCurve[0]) / span : 0;
+    const low = muFromCurve(lowCurve, ratio);
+    const high = muFromCurve(highCurve, ratio);
+    mu = low + weight * (high - low);
+  }
+
+  // μ is a decay factor: it can never amplify the initial symmetrical current.
+  return Math.min(Math.max(mu, 0), 1);
+}
+
+/**
+ * Resolves the symmetrical short-circuit breaking current I_b (IEC 60909-0 §8).
+ *
+ * Only the synchronous-machine contribution decays, so μ is applied to that
+ * portion alone and the remainder (network / utility infeed) is carried through
+ * undecayed:
+ *
+ *   I_b = μ × I"kG + (I"k − I"kG)
+ *
+ * When no generator contribution is supplied the fault is treated as
+ * far-from-generator and I_b = I"k, which is the conservative result for
+ * breaker breaking duty.
+ *
+ * @param {object} params
+ * @param {number} params.ikTotalKA               - Initial symmetrical current I"k at the bus (kA)
+ * @param {number|null} params.generatorContributionKA - Synchronous-machine share of I"k (kA)
+ * @param {number|null} params.generatorRatedCurrentKA - Summed generator rated current I_rG (kA)
+ * @param {number} params.minTimeDelayS           - Minimum time delay t_min (s)
+ * @returns {{Ib: number, mu: number, nearToGenerator: boolean, ratio: number|null}}
+ */
+export function breakingCurrent({
+  ikTotalKA,
+  generatorContributionKA = null,
+  generatorRatedCurrentKA = null,
+  minTimeDelayS = 0.05
+} = {}) {
+  const ik = Number(ikTotalKA);
+  const safeIk = Number.isFinite(ik) && ik > 0 ? ik : 0;
+  const iGen = Number(generatorContributionKA);
+  const iRated = Number(generatorRatedCurrentKA);
+
+  const hasGeneratorData = Number.isFinite(iGen) && iGen > 0
+    && Number.isFinite(iRated) && iRated > 0;
+
+  if (!hasGeneratorData) {
+    return { Ib: safeIk, mu: 1, nearToGenerator: false, ratio: null };
+  }
+
+  // The generator share cannot exceed the total current at the bus.
+  const genShare = Math.min(iGen, safeIk);
+  const ratio = genShare / iRated;
+  const mu = muFactor(ratio, minTimeDelayS);
+  const Ib = mu * genShare + (safeIk - genShare);
+
+  return {
+    Ib,
+    mu,
+    nearToGenerator: mu < 1,
+    ratio
+  };
+}
+
+// ---------------------------------------------------------------------------
 // IEC 60909-0:2016 — X/R ratio at fault point
 // ---------------------------------------------------------------------------
 
@@ -208,7 +364,10 @@ export function computeIEC60909Bus(params) {
     lvTolerancePct = 10,
     faultDurationS = 1.0,
     freqHz = 50,
-    xrOverride = null
+    xrOverride = null,
+    generatorContributionKA = null,
+    generatorRatedCurrentKA = null,
+    minTimeDelayS = 0.05
   } = params;
 
   const c = cFactor(prefaultKV, cMode, lvTolerancePct);
@@ -243,20 +402,35 @@ export function computeIEC60909Bus(params) {
   const kappa = kappaIEC(xr);
   const ip = kappa * Math.sqrt(2) * Ik3; // kA
 
-  // --- Breaking current (IEC 60909-0 §4.5 — far-from-generator) ---
-  // For far-from-generator short circuit: μ = 1.0, so Ib = I"k3
-  const Ib = Ik3;
+  // --- Breaking current (IEC 60909-0 §8) ---
+  // μ decays the synchronous-machine share of I"k3 when the fault is
+  // near-to-generator; with no generator data μ = 1 and Ib = I"k3.
+  const breaking = breakingCurrent({
+    ikTotalKA: Ik3,
+    generatorContributionKA,
+    generatorRatedCurrentKA,
+    minTimeDelayS
+  });
+  const Ib = breaking.Ib;
 
   // --- Thermal equivalent current (IEC 60909-0 §4.8.1) ---
   // Ith = I"k3 × √(m + n)
-  // n = 1.0 (far-from-generator, AC component does not decay)
   // m = DC component factor from IEC Fig. 22
+  // n accounts for AC decay. It is 1.0 for a far-from-generator fault; for a
+  // near-to-generator fault the AC component decays, which IEC represents with
+  // n < 1. Using n = 1 there would overstate Ith, so scale it by the same decay
+  // ratio μ that sets Ib (n ≈ (Ib/I"k)²).
   const m = thermalMFactor(kappa, faultDurationS, freqHz);
-  const Ith = Ik3 * Math.sqrt(m + 1);
+  const decayRatio = Ik3 > 0 ? Math.min(Ib / Ik3, 1) : 1;
+  const n = decayRatio * decayRatio;
+  const Ith = Ik3 * Math.sqrt(m + n);
 
   return {
     cFactor: c,
     kappa: Number(kappa.toFixed(4)),
+    mu: Number(breaking.mu.toFixed(4)),
+    nearToGenerator: breaking.nearToGenerator,
+    generatorRatioIkgIrg: breaking.ratio === null ? null : Number(breaking.ratio.toFixed(3)),
     // IEC standard notation
     threePhaseKA: Number(Ik3.toFixed(2)),
     lineToLineKA: Number(Ik2.toFixed(2)),
@@ -290,6 +464,7 @@ export function runIEC60909Batch(busData, opts = {}) {
   const lvTolerancePct = opts.lvTolerancePct ?? 10;
   const faultDurationS = opts.faultDurationS ?? 1.0;
   const freqHz = opts.freqHz ?? 50;
+  const minTimeDelayS = opts.minTimeDelayS ?? 0.05;
 
   const results = {};
   for (const bus of busData) {
@@ -302,7 +477,10 @@ export function runIEC60909Batch(busData, opts = {}) {
       lvTolerancePct,
       faultDurationS,
       freqHz,
-      xrOverride: (typeof bus.xr_ratio === 'number' && bus.xr_ratio > 0) ? bus.xr_ratio : null
+      xrOverride: (typeof bus.xr_ratio === 'number' && bus.xr_ratio > 0) ? bus.xr_ratio : null,
+      generatorContributionKA: bus.generatorContributionKA ?? null,
+      generatorRatedCurrentKA: bus.generatorRatedCurrentKA ?? null,
+      minTimeDelayS: bus.minTimeDelayS ?? minTimeDelayS
     });
     results[bus.id] = {
       method: 'IEC',
