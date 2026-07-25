@@ -990,13 +990,13 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 
 **Detected Reads**
 - `settings.trayHardwareCatalogCustomProducts`
-  - src/catalogBrowser.js:41 getTrayHardwareCatalogCustomProducts()
+  - src/catalogBrowser.js:54 getTrayHardwareCatalogCustomProducts()
 - `traySchedule`
   - src/trayhardwarebom.js:37 getTrays()
 
 **Detected Writes**
 - `settings.trayHardwareCatalogCustomProducts`
-  - src/catalogBrowser.js:50 setTrayHardwareCatalogCustomProducts()
+  - src/catalogBrowser.js:63 setTrayHardwareCatalogCustomProducts()
 
 ### Clash Detection (`clashdetect.html`)
 

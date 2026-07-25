@@ -375,12 +375,103 @@ export function mergeCatalogProducts(baseProducts = [], projectProducts = []) {
   return merged;
 }
 
+/**
+ * Insert or replace a product in a catalog list, matching on the governed
+ * manufacturer/catalog identity. Returns a new array; the input is untouched.
+ */
+export function upsertCatalogProduct(products = [], product) {
+  const normalized = normalizeCatalogProduct(product);
+  const list = (Array.isArray(products) ? products : [])
+    .map(row => normalizeCatalogProduct(row))
+    .filter(Boolean);
+  if (!normalized) return list;
+  const key = catalogIdentity(normalized);
+  const index = list.findIndex(row => catalogIdentity(row) === key);
+  if (index === -1) return [...list, normalized];
+  const next = [...list];
+  next[index] = mergeProduct(next[index], normalized);
+  return next;
+}
+
+/**
+ * Remove a product from a catalog list. `target` may be a product object, a
+ * catalog identity string (`manufacturer::catalogNumber`), or a row id.
+ */
+export function removeCatalogProduct(products = [], target) {
+  const list = (Array.isArray(products) ? products : [])
+    .map(row => normalizeCatalogProduct(row))
+    .filter(Boolean);
+  if (!target) return list;
+  const key = typeof target === 'string'
+    ? cleanText(target).toLowerCase()
+    : catalogIdentity(target);
+  if (!key) return list;
+  return list.filter(row => catalogIdentity(row) !== key && cleanText(row.id).toLowerCase() !== key);
+}
+
+/**
+ * Roll up catalog governance evidence across a product list so the catalog
+ * browser, audits, and reports can show how much of the catalog is usable for
+ * approved-part workflows.
+ */
+export function summarizeCatalogQuality(products = [], options = {}) {
+  const rows = (Array.isArray(products) ? products : [])
+    .map(product => normalizeCatalogProduct(product))
+    .filter(Boolean);
+
+  const byConfidence = {
+    [CATALOG_CONFIDENCE_STATUS.complete]: 0,
+    [CATALOG_CONFIDENCE_STATUS.review]: 0,
+    [CATALOG_CONFIDENCE_STATUS.incomplete]: 0
+  };
+  const byApprovalStatus = { approved: 0, conditional: 0, rejected: 0, unreviewed: 0 };
+  const missingCounts = new Map();
+  const staleCounts = new Map();
+  let approved = 0;
+  let scoreTotal = 0;
+  let staleRows = 0;
+
+  rows.forEach((product) => {
+    const confidence = buildCatalogConfidence(product, options);
+    byConfidence[confidence.status] = (byConfidence[confidence.status] || 0) + 1;
+    const status = product.approval?.status || 'unreviewed';
+    byApprovalStatus[status] = (byApprovalStatus[status] || 0) + 1;
+    if (product.approved) approved += 1;
+    scoreTotal += confidence.score;
+    confidence.missingEvidence.forEach((evidence) => {
+      missingCounts.set(evidence, (missingCounts.get(evidence) || 0) + 1);
+    });
+    if (confidence.staleEvidence.length) staleRows += 1;
+    confidence.staleEvidence.forEach((evidence) => {
+      staleCounts.set(evidence, (staleCounts.get(evidence) || 0) + 1);
+    });
+  });
+
+  const toSortedCounts = map => [...map.entries()]
+    .map(([evidence, count]) => ({ evidence, count }))
+    .sort((a, b) => b.count - a.count || a.evidence.localeCompare(b.evidence));
+
+  return {
+    total: rows.length,
+    approved,
+    averageScore: rows.length ? Math.round(scoreTotal / rows.length) : 0,
+    byConfidence,
+    byApprovalStatus,
+    missingEvidence: toSortedCounts(missingCounts),
+    staleEvidence: toSortedCounts(staleCounts),
+    staleRows
+  };
+}
+
 export function filterCatalogProducts(products = [], filters = {}) {
   return (Array.isArray(products) ? products : [])
     .map(product => normalizeCatalogProduct(product))
     .filter(Boolean)
     .filter((product) => {
       if (filters.approvedOnly && !product.approved) return false;
+      if (filters.approvalStatus && (product.approval?.status || 'unreviewed') !== filters.approvalStatus) return false;
+      if (filters.confidenceStatus
+        && buildCatalogConfidence(product, filters.confidenceOptions || {}).status !== filters.confidenceStatus) return false;
       if (filters.category && product.category !== filters.category) return false;
       if (filters.subcategory && product.subcategory !== filters.subcategory) return false;
       if (filters.manufacturer && !product.manufacturer.toLowerCase().includes(String(filters.manufacturer).toLowerCase())) return false;
