@@ -138,6 +138,24 @@
             </span>
           </fieldset>
 
+          <fieldset>
+            <legend>Breaking Current (Ib)</legend>
+            <label for="min-time-delay">Minimum Time Delay t<sub>min</sub> (s)
+              <select id="min-time-delay" name="minTimeDelayS" aria-describedby="min-delay-hint">
+                <option value="0.02">0.02 s — instantaneous / no intentional delay</option>
+                <option value="0.05" selected>0.05 s — typical MV breaker</option>
+                <option value="0.10">0.10 s — short-time delay</option>
+                <option value="0.25">0.25 s or longer — backup / time-graded</option>
+              </select>
+            </label>
+            <span id="min-delay-hint" class="field-hint">
+              Time from fault inception to contact separation. Sets the decay factor &mu; used for
+              I<sub>b</sub> on a near-to-generator fault (IEC 60909-0:2016 &sect;8.1.5.2). A longer
+              delay allows more AC decay, so I<sub>b</sub> is lower. &mu; = 1 when the fault is
+              far-from-generator (I&Prime;kG / I_rG &le; 2), where I<sub>b</sub> = I&Prime;k.
+            </span>
+          </fieldset>
+
           <div class="form-actions">
             <button type="submit" id="run-btn">Run IEC 60909 Study</button>
           </div>
@@ -162,6 +180,7 @@
                 <th scope="col">I&Prime;k1 (kA)</th>
                 <th scope="col">I&Prime;k2 (kA)</th>
                 <th scope="col">ip (kA)</th>
+                <th scope="col">&mu;</th>
                 <th scope="col">Ib (kA)</th>
                 <th scope="col">Ith (kA)</th>
               </tr>
