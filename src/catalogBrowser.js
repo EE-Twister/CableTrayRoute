@@ -534,12 +534,14 @@ export async function mountCatalogBrowser(container, { onSelect } = {}) {
     return ['', ...[...new Set(allProducts.map(p => p[field]).filter(Boolean))].sort()];
   }
 
-  function makeSelect(labelText, options) {
+  function makeSelect(labelText, options, filterKey) {
     const label = document.createElement('label');
     label.className = 'catalog-filter-label';
     label.textContent = labelText + ' ';
     const sel = document.createElement('select');
     sel.className = 'catalog-filter-select';
+    sel.dataset.catalogFilter = filterKey;
+    sel.setAttribute('aria-label', `Filter catalog by ${labelText.toLowerCase()}`);
     for (const opt of options) {
       const o = document.createElement('option');
       o.value = opt;
@@ -550,12 +552,12 @@ export async function mountCatalogBrowser(container, { onSelect } = {}) {
     return { label, select: sel };
   }
 
-  const catFilter = makeSelect('Category', getDistinctOptions('category'));
-  const mfrFilter = makeSelect('Manufacturer', getDistinctOptions('manufacturer'));
-  const matFilter = makeSelect('Material', getDistinctOptions('material'));
-  const approvalFilter = makeSelect('Approval', ['', 'approved', 'conditional', 'rejected', 'unreviewed']);
-  const confidenceFilter = makeSelect('Confidence', ['', 'complete', 'review', 'incomplete']);
-  const originFilter = makeSelect('Origin', ['', 'base', 'project']);
+  const catFilter = makeSelect('Category', getDistinctOptions('category'), 'category');
+  const mfrFilter = makeSelect('Manufacturer', getDistinctOptions('manufacturer'), 'manufacturer');
+  const matFilter = makeSelect('Material', getDistinctOptions('material'), 'material');
+  const approvalFilter = makeSelect('Approval', ['', 'approved', 'conditional', 'rejected', 'unreviewed'], 'approval');
+  const confidenceFilter = makeSelect('Confidence', ['', 'complete', 'review', 'incomplete'], 'confidence');
+  const originFilter = makeSelect('Origin', ['', 'base', 'project'], 'origin');
 
   const searchLabel = document.createElement('label');
   searchLabel.className = 'catalog-filter-label';
@@ -563,6 +565,7 @@ export async function mountCatalogBrowser(container, { onSelect } = {}) {
   const searchInput = document.createElement('input');
   searchInput.type = 'search';
   searchInput.className = 'catalog-filter-input';
+  searchInput.dataset.catalogFilter = 'search';
   searchInput.placeholder = 'Part number or keyword…';
   searchLabel.appendChild(searchInput);
 
@@ -833,7 +836,9 @@ export async function mountCatalogBrowser(container, { onSelect } = {}) {
     addSubmitBtn.textContent = 'Save Changes';
     addCancelBtn.hidden = false;
     addStatus.textContent = `Editing project catalog row ${product.id}.`;
-    addSection.scrollIntoView?.({ block: 'nearest' });
+    // `behavior: 'instant'` opts out of the site-wide smooth scrolling so the
+    // form does not keep moving under the pointer after the Edit click.
+    addSection.scrollIntoView?.({ block: 'nearest', behavior: 'instant' });
   }
 
   async function removeProjectProduct(product) {

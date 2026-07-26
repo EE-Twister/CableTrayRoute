@@ -94,6 +94,23 @@ merges `data/manufacturer_catalog.json` with the project's own catalog rows
   same column spec, so an exported catalog can be edited externally and
   re-imported without remapping headers.
 
+### Catalog governance audit
+
+`npm run audit:catalog` (`scripts/auditManufacturerCatalog.mjs`) runs the same
+validation and confidence roll-up headlessly, so catalog data can be checked in
+CI or before importing a vendor file:
+
+```
+node scripts/auditManufacturerCatalog.mjs [file] [--check] [--json] \
+  [--min-score=<0-100>] [--min-complete=<0-1>] [--today=YYYY-MM-DD]
+```
+
+It accepts either a `{ products: [...] }` payload or a bare product array,
+prints the confidence roll-up, ranked evidence gaps, and the lowest-confidence
+rows, and with `--check` exits non-zero on schema errors or unmet thresholds.
+The npm script uses `--check` with no thresholds, so it guards schema validity
+without pinning the seed catalog's current evidence coverage.
+
 The shipped seed rows in `data/manufacturer_catalog.json` are placeholders for
 approved-part workflows: they carry approval, source, and verification metadata
 but intentionally no datasheet URLs or EPD figures, so they report a **review**
