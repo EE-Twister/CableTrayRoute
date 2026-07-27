@@ -283,7 +283,19 @@ export function runLightningProtection(config = {}) {
   }
 
   return {
-    inputs: { length: L, width: W, height: H, location: config.location || 'isolated', tolerableFrequency: nc, protectedHeight, downConductorMaterial: material, systemKvLL: config.systemKvLL, grounding: config.grounding },
+    inputs: {
+      thunderstormDays: Number.isFinite(config.thunderstormDays) ? Number(config.thunderstormDays) : undefined,
+      groundFlashDensity: Number.isFinite(config.groundFlashDensity) ? Number(config.groundFlashDensity) : undefined,
+      length: L,
+      width: W,
+      height: H,
+      location: config.location || 'isolated',
+      tolerableFrequency: nc,
+      protectedHeight,
+      downConductorMaterial: material,
+      systemKvLL: config.systemKvLL,
+      grounding: config.grounding,
+    },
     groundFlashDensity: ng,
     locationFactor: cd,
     collectionAreaM2: area,

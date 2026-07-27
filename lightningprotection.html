@@ -17,6 +17,7 @@
   <link rel="dns-prefetch" href="https://fonts.gstatic.com">
   <meta name="color-scheme" content="light dark">
   <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="src/styles/lightningprotection.css?v=visual-workspace-v3" />
   <script type="module" src="dirtyTracker.js"></script>
   <script type="module" src="dist/lightningprotection.js" defer></script>
 </head>
@@ -71,13 +72,24 @@
     <input type="file" id="import-project-input" accept=".ctr.json" class="hidden" title="Select project file">
   </div>
 
-  <div class="container">
-    <main id="main-content" class="main-content">
-      <header class="page-header">
-        <h1>Lightning &amp; Surge Protection</h1>
+  <div class="container lp-container">
+    <main id="main-content" class="main-content lp-main">
+      <header class="page-header lp-hero">
+        <div>
+          <p class="lp-eyebrow">IEC 62305 / IEEE 998 screening study</p>
+          <h1>Lightning &amp; Surge Protection</h1>
+          <p class="lp-hero-copy">Shape the structure, see its lightning exposure, and translate the calculated risk into a practical protection concept.</p>
+        </div>
+        <div class="lp-hero-status" id="lp-study-status" role="status" aria-live="polite">
+          <span class="lp-status-icon" aria-hidden="true">↗</span>
+          <div>
+            <strong>Live design preview</strong>
+            <span>Change an input to see its effect before saving the assessment.</span>
+          </div>
+        </div>
       </header>
 
-      <details class="method-panel">
+      <details class="method-panel lp-method-panel">
         <summary>Method &amp; Assumptions</summary>
         <p>This study performs a screening-level lightning protection assessment per IEC 62305 (structural LPS) and IEEE 998 (substation shielding), and recommends a surge-arrester continuous operating voltage per IEEE C62.22 / IEC 60099-5.</p>
         <p><strong>Risk:</strong></p>
@@ -92,100 +104,238 @@ E  = 1 − Nc/Nd  →  LPL I / II / III / IV</pre>
         <p><strong>References:</strong> IEC 62305-1/-2/-3; IEEE Std 998; IEEE C62.22 / IEC 60099-5.</p>
       </details>
 
-      <form id="lp-form" novalidate>
+      <div class="lp-workspace">
+        <aside class="lp-input-panel" aria-label="Lightning study inputs">
+          <form id="lp-form" novalidate>
+            <div class="lp-panel-header">
+              <div>
+                <p class="lp-eyebrow">Inputs</p>
+                <h2>Define the site</h2>
+              </div>
+              <span class="lp-live-badge"><span aria-hidden="true"></span> Live</span>
+            </div>
 
-        <fieldset>
-          <legend><strong>Lightning Exposure</strong></legend>
-          <div class="field-row">
-            <label for="ng-mode">Flash density input</label>
-            <select id="ng-mode">
-              <option value="td" selected>Thunderstorm days (keraunic level)</option>
-              <option value="direct">Ground flash density (direct)</option>
-            </select>
-          </div>
-          <div class="field-row" id="row-td">
-            <label for="td">Thunderstorm days</label>
-            <input type="number" id="td" min="0" step="any" value="40" aria-describedby="td-hint">
-            <span class="field-unit">days/yr</span>
-            <p id="td-hint" class="field-hint">Annual keraunic level for the site (isokeraunic map). Ng = 0.04·Td^1.25.</p>
-          </div>
-          <div class="field-row" id="row-ng" hidden>
-            <label for="ng">Ground flash density</label>
-            <input type="number" id="ng" min="0" step="any" value="3.0">
-            <span class="field-unit">/km²/yr</span>
-          </div>
-          <div class="field-row">
-            <label for="location">Location factor (Cd)</label>
-            <select id="location">
-              <option value="surroundedTaller">Surrounded by taller objects (0.25)</option>
-              <option value="surroundedEqual">Surrounded by equal/shorter objects (0.5)</option>
-              <option value="isolated" selected>Isolated, no nearby objects (1.0)</option>
-              <option value="hilltop">Isolated on a hilltop (2.0)</option>
-            </select>
-          </div>
-          <div class="field-row">
-            <label for="nc">Tolerable strike frequency (Nc)</label>
-            <input type="number" id="nc" min="0" step="any" value="0.001" aria-describedby="nc-hint">
-            <span class="field-unit">/yr</span>
-            <p id="nc-hint" class="field-hint">Acceptable annual direct-strike frequency used to set the required protection efficiency.</p>
-          </div>
-        </fieldset>
+            <div class="lp-unit-bar">
+              <span>Units</span>
+              <div class="lp-unit-switch" role="group" aria-label="Study unit system">
+                <button type="button" class="is-active" data-lp-unit="metric" aria-pressed="true">Metric</button>
+                <button type="button" data-lp-unit="imperial" aria-pressed="false">Imperial</button>
+              </div>
+              <small id="lp-unit-note">Enter dimensions in metres and direct flash density per km².</small>
+            </div>
 
-        <fieldset>
-          <legend><strong>Structure Geometry</strong></legend>
-          <div class="field-row">
-            <label for="length">Length</label>
-            <input type="number" id="length" min="0.1" step="any" value="60" required>
-            <span class="field-unit">m</span>
-            <label for="width">Width</label>
-            <input type="number" id="width" min="0.1" step="any" value="40" required>
-            <span class="field-unit">m</span>
-            <label for="height">Height</label>
-            <input type="number" id="height" min="0.1" step="any" value="25" required>
-            <span class="field-unit">m</span>
-          </div>
-          <div class="field-row">
-            <label for="protected-height">Protected equipment height</label>
-            <input type="number" id="protected-height" min="0" step="any" value="3" aria-describedby="ph-hint">
-            <span class="field-unit">m</span>
-            <p id="ph-hint" class="field-hint">Height of the equipment to be protected, used for the single-mast protective radius.</p>
-          </div>
-          <div class="field-row">
-            <label for="down-material">Down-conductor material</label>
-            <select id="down-material">
-              <option value="copper" selected>Copper (min 16 mm²)</option>
-              <option value="aluminum">Aluminum (min 25 mm²)</option>
-              <option value="steel">Steel (min 50 mm²)</option>
-            </select>
-          </div>
-        </fieldset>
+            <fieldset class="lp-input-section">
+              <legend><span class="lp-section-number">1</span><strong>Lightning exposure</strong></legend>
+              <p class="lp-section-intro">How often lightning reaches the site and how exposed the structure is.</p>
+              <div class="field-row">
+                <label for="ng-mode">Flash-density source</label>
+                <select id="ng-mode">
+                  <option value="td" selected>Thunderstorm days (keraunic level)</option>
+                  <option value="direct">Ground flash density (direct)</option>
+                </select>
+              </div>
+              <div class="field-row" id="row-td">
+                <label for="td">Thunderstorm days per year</label>
+                <div class="lp-input-with-unit">
+                  <input type="number" id="td" min="0" step="any" value="40" aria-describedby="td-hint">
+                  <span>days/yr</span>
+                </div>
+                <p id="td-hint" class="field-hint">Use the annual keraunic level from an isokeraunic map.</p>
+              </div>
+              <div class="field-row" id="row-ng" hidden>
+                <label for="ng">Ground flash density</label>
+                <div class="lp-input-with-unit">
+                  <input type="number" id="ng" min="0" step="any" value="3.0">
+                  <span id="lp-density-input-unit">/km²/yr</span>
+                </div>
+              </div>
+              <div class="field-row">
+                <label for="location">Surroundings</label>
+                <select id="location">
+                  <option value="surroundedTaller">Taller objects nearby — shielded (0.25)</option>
+                  <option value="surroundedEqual">Similar-height objects nearby (0.5)</option>
+                  <option value="isolated" selected>Isolated structure (1.0)</option>
+                  <option value="hilltop">Isolated on a hilltop — exposed (2.0)</option>
+                </select>
+                <div class="lp-exposure-scale" aria-hidden="true">
+                  <span>Shielded</span><i id="lp-location-marker"></i><span>Exposed</span>
+                </div>
+              </div>
+              <div class="field-row">
+                <label for="nc">Tolerable strike frequency</label>
+                <div class="lp-input-with-unit">
+                  <input type="number" id="nc" min="0" step="any" value="0.001" aria-describedby="nc-hint">
+                  <span>/yr</span>
+                </div>
+                <p id="nc-hint" class="field-hint">Your acceptable annual direct-strike frequency. Lower means a more conservative design.</p>
+              </div>
+            </fieldset>
 
-        <fieldset>
-          <legend><strong>Surge Arrester (optional)</strong></legend>
-          <div class="field-row">
-            <label for="system-kv">System voltage (L-L)</label>
-            <input type="number" id="system-kv" min="0" step="any" value="138" aria-describedby="kv-hint">
-            <span class="field-unit">kV</span>
-            <p id="kv-hint" class="field-hint">Leave blank to skip surge-arrester selection.</p>
-          </div>
-          <div class="field-row">
-            <label for="grounding">System grounding</label>
-            <select id="grounding">
-              <option value="solid" selected>Effectively / solidly grounded</option>
-              <option value="ungrounded">Ungrounded / resonant-grounded</option>
-            </select>
-          </div>
-        </fieldset>
+            <fieldset class="lp-input-section">
+              <legend><span class="lp-section-number">2</span><strong>Structure &amp; protection</strong></legend>
+              <p class="lp-section-intro">The dimensions set the lightning collection zone and conductor layout.</p>
+              <div class="lp-dimension-grid">
+                <div class="field-row">
+                  <label for="length">Length</label>
+                  <div class="lp-input-with-unit">
+                    <input type="number" id="length" min="0.1" step="any" value="60" required>
+                    <span data-lp-length-unit>m</span>
+                  </div>
+                </div>
+                <div class="field-row">
+                  <label for="width">Width</label>
+                  <div class="lp-input-with-unit">
+                    <input type="number" id="width" min="0.1" step="any" value="40" required>
+                    <span data-lp-length-unit>m</span>
+                  </div>
+                </div>
+                <div class="field-row">
+                  <label for="height">Height</label>
+                  <div class="lp-input-with-unit">
+                    <input type="number" id="height" min="0.1" step="any" value="25" required>
+                    <span data-lp-length-unit>m</span>
+                  </div>
+                </div>
+              </div>
+              <div class="field-row">
+                <label for="protected-height">Protected equipment height</label>
+                <div class="lp-input-with-unit">
+                  <input type="number" id="protected-height" min="0" step="any" value="3" aria-describedby="ph-hint">
+                  <span data-lp-length-unit>m</span>
+                </div>
+                <p id="ph-hint" class="field-hint">Height above grade of the equipment that must remain inside the mast’s protected zone.</p>
+              </div>
+              <div class="field-row">
+                <label for="down-material">Down-conductor material</label>
+                <select id="down-material">
+                  <option value="copper" selected>Copper (minimum 16 mm²)</option>
+                  <option value="aluminum">Aluminum (minimum 25 mm²)</option>
+                  <option value="steel">Steel (minimum 50 mm²)</option>
+                </select>
+              </div>
+            </fieldset>
 
-        <div class="form-actions">
-          <button type="submit" id="run-btn" class="btn btn-primary">Run Lightning Assessment</button>
-          <button type="button" id="export-csv-btn" class="btn" hidden>Export Results (CSV)</button>
+            <fieldset class="lp-input-section">
+              <legend><span class="lp-section-number">3</span><strong>Surge arrester</strong><span class="lp-optional">Optional</span></legend>
+              <p class="lp-section-intro">Translate system voltage and grounding into a minimum continuous arrester rating.</p>
+              <div class="field-row">
+                <label for="system-kv">System voltage (line-to-line)</label>
+                <div class="lp-input-with-unit">
+                  <input type="number" id="system-kv" min="0" step="any" value="138" aria-describedby="kv-hint">
+                  <span>kV</span>
+                </div>
+                <p id="kv-hint" class="field-hint">Clear the value to omit surge-arrester selection.</p>
+              </div>
+              <div class="field-row">
+                <label for="grounding">System grounding</label>
+                <select id="grounding">
+                  <option value="solid" selected>Effectively / solidly grounded</option>
+                  <option value="ungrounded">Ungrounded / resonant-grounded</option>
+                </select>
+              </div>
+            </fieldset>
+
+            <div class="form-actions lp-sticky-actions">
+              <button type="submit" id="run-btn" class="btn btn-primary">Save Assessment</button>
+              <button type="button" id="export-csv-btn" class="btn" hidden>Export CSV</button>
+              <p>Preview updates live. Save to add this assessment to the project.</p>
+            </div>
+          </form>
+        </aside>
+
+        <div class="lp-visual-workspace">
+          <section class="lp-visual-panel" aria-labelledby="lp-visual-heading">
+            <div class="lp-visual-header">
+              <div>
+                <p class="lp-eyebrow">Protection concept</p>
+                <h2 id="lp-visual-heading">See what the values mean</h2>
+              </div>
+              <span id="lp-preview-status" class="lp-status-pill lp-status-pill--pending">Checking inputs</span>
+            </div>
+
+            <div class="lp-visual-stage">
+              <svg id="lp-protection-preview" class="lp-protection-preview" viewBox="0 0 760 460" role="img" aria-labelledby="lp-preview-title lp-preview-desc">
+                <title id="lp-preview-title">Lightning protection concept preview</title>
+                <desc id="lp-preview-desc">A live diagram of the structure, collection area, rolling-sphere protection, protected equipment, and down-conductors.</desc>
+              </svg>
+              <div class="lp-diagram-legend" aria-label="Diagram legend">
+                <span><i class="lp-legend-swatch lp-legend-swatch--collection"></i>Collection zone</span>
+                <span><i class="lp-legend-swatch lp-legend-swatch--protected"></i>Protected zone</span>
+                <span><i class="lp-legend-swatch lp-legend-swatch--conductor"></i>Conductor path</span>
+              </div>
+            </div>
+
+            <div class="lp-kpi-grid" aria-label="Live assessment summary">
+              <article class="lp-kpi-card lp-kpi-card--exposure">
+                <div class="lp-kpi-icon" aria-hidden="true">ϟ</div>
+                <div>
+                  <span>Site exposure</span>
+                  <strong id="lp-kpi-ng">—</strong>
+                  <small id="lp-kpi-ng-unit">ground flashes / km² / year</small>
+                </div>
+              </article>
+              <article class="lp-kpi-card lp-kpi-card--area">
+                <div class="lp-kpi-icon" aria-hidden="true">◎</div>
+                <div>
+                  <span>Collection area</span>
+                  <strong id="lp-kpi-area">—</strong>
+                  <small>effective lightning capture area</small>
+                </div>
+              </article>
+              <article class="lp-kpi-card lp-kpi-card--risk">
+                <div class="lp-kpi-icon" aria-hidden="true">△</div>
+                <div>
+                  <span>Expected strikes</span>
+                  <strong id="lp-kpi-strikes">—</strong>
+                  <small id="lp-kpi-return">annual frequency</small>
+                </div>
+              </article>
+              <article class="lp-kpi-card lp-kpi-card--lpl">
+                <div class="lp-kpi-icon" aria-hidden="true">◇</div>
+                <div>
+                  <span>Protection level</span>
+                  <strong id="lp-kpi-lpl">—</strong>
+                  <small id="lp-kpi-lpl-note">recommended class</small>
+                </div>
+              </article>
+            </div>
+          </section>
+
+          <section class="lp-risk-panel" aria-labelledby="lp-risk-heading">
+            <div class="lp-risk-copy">
+              <p class="lp-eyebrow">Risk comparison</p>
+              <h2 id="lp-risk-heading">Expected vs. tolerable frequency</h2>
+              <p id="lp-risk-message">Complete the inputs to compare the site risk with your tolerable threshold.</p>
+            </div>
+            <div class="lp-risk-meter">
+              <div class="lp-risk-scale" aria-hidden="true">
+                <span class="lp-risk-safe"></span>
+                <span class="lp-risk-caution"></span>
+                <span class="lp-risk-danger"></span>
+                <i id="lp-risk-marker"></i>
+              </div>
+              <div class="lp-risk-labels">
+                <span>Below threshold</span>
+                <span>At threshold</span>
+                <span>Above threshold</span>
+              </div>
+              <strong id="lp-risk-ratio">—</strong>
+              <small>expected ÷ tolerable</small>
+            </div>
+          </section>
+
+          <section class="lp-guidance-panel" aria-labelledby="lp-guidance-heading">
+            <div class="lp-guidance-heading">
+              <p class="lp-eyebrow">Design translation</p>
+              <h2 id="lp-guidance-heading">What to carry into the design</h2>
+            </div>
+            <div id="lp-guidance-list" class="lp-guidance-list" aria-live="polite"></div>
+          </section>
+
+          <div id="calc-errors" class="result-fail" hidden aria-live="polite"></div>
+          <div id="results" aria-live="polite"></div>
         </div>
-      </form>
-
-      <div id="calc-errors" class="result-fail" hidden aria-live="polite"></div>
-
-      <div id="results" aria-live="polite"></div>
+      </div>
 
       <section class="card">
         <div id="study-basis-panel"></div>

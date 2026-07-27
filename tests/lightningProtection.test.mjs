@@ -142,6 +142,7 @@ const approx = (a, b, tol, msg) => assert.ok(Math.abs(a - b) <= tol, `${msg} (go
   });
 
   assert.ok(r.groundFlashDensity > 0, 'Ng computed');
+  assert.equal(r.inputs.thunderstormDays, 40, 'source thunderstorm-day input is preserved for visual study restore');
   approx(r.collectionAreaM2, collectionArea(60, 40, 25), 1e-6, 'area matches helper');
   assert.ok(r.expectedStrikesPerYear > 0, 'Nd computed');
   assert.ok(['I', 'II', 'III', 'IV'].includes(r.lpl.level), 'an LPL is recommended');

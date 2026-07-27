@@ -11,10 +11,32 @@ The Lightning & Surge Protection study performs a screening-level lightning risk
 ## Quick Start
 
 1. Navigate to **Studies → Grounding → Lightning & Surge Protection**.
-2. Enter the **thunderstorm-day** keraunic level (or the ground flash density directly) and the **location factor**.
-3. Enter the **structure geometry** and the **protected equipment height**.
-4. Optionally enter the **system voltage and grounding** for surge-arrester selection.
-5. Click **Run Lightning Assessment**, review the recommended LPL and sizing, then **Export Results (CSV)**.
+2. Choose **Metric** or **Imperial** units.
+3. Enter the **thunderstorm-day** keraunic level (or the ground flash density directly) and the **location factor**.
+4. Enter the **structure geometry** and the **protected equipment height**.
+5. Optionally enter the **system voltage and grounding** for surge-arrester selection.
+6. Watch the live protection concept and risk comparison update while you edit.
+7. Click **Save Assessment** to add the current study to the project, review the design translation, then **Export CSV** if needed.
+
+## Visual Workspace
+
+The study page translates the calculation into four coordinated views:
+
+- The **protection concept** shows the structure, equivalent collection zone, rolling-sphere envelope, protected equipment, air terminal, down-conductor path, and grounding ring. Dimension and callout labels update with the form.
+- The **live summary** expresses ground-flash density, collection area, expected strike frequency, and required LPL before the study is saved.
+- The **risk comparison** plots expected direct-strike frequency against the tolerable frequency. A value above `1×` means the screening indicates that a structural lightning-protection system is required.
+- The **design translation** explains how the recommended LPL sets the rolling-sphere radius, how protected-equipment height affects single-mast coverage, how many down-conductors are needed, and how the system voltage becomes an arrester MCOV and standard rating.
+
+The visual is a screening aid, not a scaled installation drawing. Final mast locations, multi-mast shielding, shield wires, bonding, and grounding details still require a project-specific design.
+
+## Unit Systems
+
+Use the **Metric / Imperial** switch above the study inputs:
+
+- **Metric** accepts structure dimensions in metres and direct ground-flash density in flashes/km²/year. Length and area outputs are shown in metres and square metres.
+- **Imperial** accepts structure dimensions in feet and direct ground-flash density in flashes/mi²/year. Length and area outputs are shown in feet and square feet.
+
+Switching units converts the values already entered; it does not change the physical design or calculated risk. The selected unit system is saved with the study and applied to the live diagram, design guidance, saved results, and CSV export. Calculations remain in canonical SI units internally. Conductor minimum areas retain the IEC value in mm² and include an in² equivalent in Imperial mode.
 
 ## Risk Assessment
 
