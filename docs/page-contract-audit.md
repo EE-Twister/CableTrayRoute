@@ -335,7 +335,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 
 **Detected Reads**
 - `cableSchedule`
-  - analysis/shortCircuit.mjs:1039 getCables()
+  - analysis/shortCircuit.mjs:1137 getCables()
   - oneline.js:13944 getCables()
   - oneline.js:15859 getCables()
   - oneline.js:19147 getCables()
@@ -396,7 +396,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
   - oneline.js:3380 getItem(studySettings)
 - `settings.tccSettings`
   - analysis/arcFlash.mjs:330 getItem(tccSettings)
-  - analysis/shortCircuit.mjs:712 getItem(tccSettings)
+  - analysis/shortCircuit.mjs:766 getItem(tccSettings)
 - `studyResults`
   - analysis/harmonics.js:496 getStudies()
   - analysis/motorStart.js:209 getStudies()
@@ -990,13 +990,13 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 
 **Detected Reads**
 - `settings.trayHardwareCatalogCustomProducts`
-  - src/catalogBrowser.js:41 getTrayHardwareCatalogCustomProducts()
+  - src/catalogBrowser.js:54 getTrayHardwareCatalogCustomProducts()
 - `traySchedule`
   - src/trayhardwarebom.js:37 getTrays()
 
 **Detected Writes**
 - `settings.trayHardwareCatalogCustomProducts`
-  - src/catalogBrowser.js:50 setTrayHardwareCatalogCustomProducts()
+  - src/catalogBrowser.js:63 setTrayHardwareCatalogCustomProducts()
 
 ### Clash Detection (`clashdetect.html`)
 
@@ -1711,18 +1711,18 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 
 **Detected Reads**
 - `cableSchedule`
-  - analysis/shortCircuit.mjs:1039 getCables()
+  - analysis/shortCircuit.mjs:1137 getCables()
   - analysis/tcc.js:3834 getCables()
 - `oneLineDiagram`
   - analysis/arcFlash.mjs:397 getOneLine()
-  - analysis/shortCircuit.mjs:1034 getOneLine()
+  - analysis/shortCircuit.mjs:1132 getOneLine()
   - analysis/tcc.js:3062 getOneLine()
   - analysis/tcc.js:7936 getOneLine()
   - analysis/tcc.js:7985 getOneLine()
   - ... 3 more
 - `settings.tccSettings`
   - analysis/arcFlash.mjs:330 getItem(tccSettings)
-  - analysis/shortCircuit.mjs:712 getItem(tccSettings)
+  - analysis/shortCircuit.mjs:766 getItem(tccSettings)
   - analysis/tcc.js:918 getItem(tccSettings)
 - `studyResults`
   - analysis/tcc.js:2981 getStudies()
@@ -2361,13 +2361,13 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 
 **Detected Reads**
 - `cableSchedule`
-  - analysis/shortCircuit.mjs:1039 getCables()
+  - analysis/shortCircuit.mjs:1137 getCables()
   - studies/shortCircuit.js:12 getCables()
 - `oneLineDiagram`
-  - analysis/shortCircuit.mjs:1034 getOneLine()
+  - analysis/shortCircuit.mjs:1132 getOneLine()
   - studies/shortCircuit.js:7 getOneLine()
 - `settings.tccSettings`
-  - analysis/shortCircuit.mjs:712 getItem(tccSettings)
+  - analysis/shortCircuit.mjs:766 getItem(tccSettings)
 - `studyResults`
   - studies/shortCircuit.js:133 getStudies()
   - studies/shortCircuit.js:286 getStudies()
@@ -2405,27 +2405,27 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 
 **Detected Reads**
 - `cableSchedule`
-  - analysis/shortCircuit.mjs:1039 getCables()
+  - analysis/shortCircuit.mjs:1137 getCables()
 - `oneLineDiagram`
-  - analysis/shortCircuit.mjs:1034 getOneLine()
-  - iec60909.js:42 getOneLine()
+  - analysis/shortCircuit.mjs:1132 getOneLine()
+  - iec60909.js:49 getOneLine()
 - `settings.designBasis`
   - src/components/studyBasis.js:37 getDesignBasis()
 - `settings.studyApprovals`
   - src/components/studyApproval.js:213 getStudyApprovals()
 - `settings.tccSettings`
-  - analysis/shortCircuit.mjs:712 getItem(tccSettings)
+  - analysis/shortCircuit.mjs:766 getItem(tccSettings)
 - `studyResults`
-  - iec60909.js:102 getStudies()
+  - iec60909.js:111 getStudies()
 
 **Detected Writes**
 - `settings.studyApprovals`
   - src/components/studyApproval.js:235 setStudyApproval()
   - src/components/studyApproval.js:243 clearStudyApproval()
 - `studyResults`
-  - iec60909.js:104 setStudies()
+  - iec60909.js:113 setStudies()
 - `studyResults.iec60909`
-  - iec60909.js:103 studies.iec60909
+  - iec60909.js:112 studies.iec60909
 
 ### Arc Flash (`arcFlash.html`)
 
@@ -2451,14 +2451,14 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 
 **Detected Reads**
 - `cableSchedule`
-  - analysis/shortCircuit.mjs:1039 getCables()
+  - analysis/shortCircuit.mjs:1137 getCables()
 - `oneLineDiagram`
   - analysis/arcFlash.mjs:397 getOneLine()
-  - analysis/shortCircuit.mjs:1034 getOneLine()
+  - analysis/shortCircuit.mjs:1132 getOneLine()
   - studies/arcFlash.js:7 getOneLine()
 - `settings.tccSettings`
   - analysis/arcFlash.mjs:330 getItem(tccSettings)
-  - analysis/shortCircuit.mjs:712 getItem(tccSettings)
+  - analysis/shortCircuit.mjs:766 getItem(tccSettings)
 - `studyResults`
   - studies/arcFlash.js:27 getStudies()
 

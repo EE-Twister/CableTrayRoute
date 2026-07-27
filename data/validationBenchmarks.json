@@ -204,12 +204,14 @@
       "assumptions": [
         "Equivalent voltage source method (no pre-fault load currents in calculation)",
         "Voltage factor c applied to nominal voltage (1.0–1.1 for max; 0.95 for min)",
-        "Far-from-generator condition unless generator correction factor K_G is applied"
+        "Impedance corrections K_G (§6.6.1) and K_T (§6.3.3) applied per element before the cascade, only when the IEC method is explicitly selected",
+        "Near-to-generator decay μ (§8.1.5.2) applied to the synchronous-machine share of I″k; minimum time delay t_min defaults to 0.05 s"
       ],
       "limitations": [
-        "Near-to-generator μ factor (Ib reduction) not yet implemented",
-        "Transformer correction factor K_T exported but not batch-applied per transformer",
-        "Generator correction factor K_G not implemented"
+        "Radial cascade: generator contribution is not apportioned per source, so meshed networks fed by several machines fall back to μ = 1 (conservative for breaking duty)",
+        "No power-station-unit correction (K_S / K_SO per §6.7) for a generator behind a unit transformer",
+        "Asynchronous (induction) generators are left uncorrected and never trigger μ",
+        "Unbalanced faults use a simplified symmetrical-component method"
       ]
     },
     {

@@ -15,11 +15,18 @@ import {
 } from '../analysis/manufacturerCatalog.mjs';
 import {
   CATALOG_IMPORT_COLUMNS,
+  buildCatalogExportCsv,
+  buildCatalogExportRows,
   buildCatalogTemplateCsv,
   buildCatalogTemplateRows,
   importCatalogRows,
   parseCatalogCsv
 } from '../analysis/catalogImport.mjs';
+import {
+  removeCatalogProduct,
+  summarizeCatalogQuality,
+  upsertCatalogProduct
+} from '../analysis/manufacturerCatalog.mjs';
 import { validateLibraryPayload } from '../src/validation/librarySchema.mjs';
 
 function describe(name, fn) {
@@ -148,6 +155,189 @@ describe('manufacturer catalog merge and filters', () => {
       { id: 'B', manufacturer: 'M', category: 'tray', description: 'B', approved: false }
     ], { approvedOnly: true });
     assert.deepEqual(rows.map(row => row.id), ['A']);
+  });
+});
+
+describe('project catalog editing helpers', () => {
+  const base = {
+    id: 'TRAY-12',
+    manufacturer: 'ACME',
+    catalogNumber: 'TRAY-12',
+    category: 'tray',
+    description: 'Base tray',
+    unit: 'EA',
+    list_price_usd: 100
+  };
+
+  it('upserts by manufacturer/catalog identity instead of appending duplicates', () => {
+    const first = upsertCatalogProduct([], base);
+    assert.equal(first.length, 1);
+    const updated = upsertCatalogProduct(first, {
+      ...base,
+      id: 'TRAY-12-REV-B',
+      description: 'Revised tray',
+      list_price_usd: 118,
+      approved: true,
+      source: 'Approved list rev B',
+      lastVerified: '2026-05-22'
+    });
+    assert.equal(updated.length, 1);
+    assert.equal(updated[0].description, 'Revised tray');
+    assert.equal(updated[0].commercial.listPriceUsd, 118);
+    assert.equal(updated[0].approved, true);
+  });
+
+  it('appends products with a different identity', () => {
+    const list = upsertCatalogProduct([base], { ...base, id: 'TRAY-24', catalogNumber: 'TRAY-24' });
+    assert.deepEqual(list.map(row => row.catalogNumber).sort(), ['TRAY-12', 'TRAY-24']);
+  });
+
+  it('removes products by product object, identity string, or row id', () => {
+    const list = [base, { ...base, id: 'TRAY-24', catalogNumber: 'TRAY-24' }];
+    assert.deepEqual(removeCatalogProduct(list, base).map(row => row.id), ['TRAY-24']);
+    assert.deepEqual(removeCatalogProduct(list, 'acme::tray-24').map(row => row.id), ['TRAY-12']);
+    assert.deepEqual(removeCatalogProduct(list, 'TRAY-24').map(row => row.id), ['TRAY-12']);
+    assert.equal(removeCatalogProduct(list, '').length, 2);
+  });
+});
+
+describe('catalog quality summary and filters', () => {
+  const complete = {
+    id: 'FULL-1',
+    manufacturer: 'ACME',
+    catalogNumber: 'FULL-1',
+    category: 'tray',
+    description: 'Fully governed tray',
+    approved: true,
+    source: 'Owner approved list',
+    lastVerified: '2026-05-22',
+    datasheetUrl: 'https://example.com/full-1.pdf',
+    bimRef: { familyName: 'ACME Tray', typeName: 'FULL-1', classification: 'tray' },
+    standards: ['NEMA VE 1'],
+    co2eKgPerUnit: 3.4,
+    epdSource: 'ACME EPD 2026',
+    epdValidUntil: '2027-12-31'
+  };
+  const partial = {
+    id: 'PART-1',
+    manufacturer: 'ACME',
+    catalogNumber: 'PART-1',
+    category: 'fitting',
+    description: 'Partly governed elbow',
+    approved: true,
+    source: 'Owner approved list',
+    lastVerified: '2026-05-22',
+    standards: ['NEMA VE 1']
+  };
+  const ungoverned = {
+    id: 'GEN-1',
+    manufacturer: 'Generic',
+    catalogNumber: '',
+    category: 'accessory',
+    description: 'Placeholder accessory'
+  };
+
+  it('rolls up confidence, approval, and evidence gaps', () => {
+    const summary = summarizeCatalogQuality([complete, partial, ungoverned], { today: '2026-06-02' });
+    assert.equal(summary.total, 3);
+    assert.equal(summary.approved, 2);
+    assert.equal(summary.byConfidence.complete, 1);
+    assert.equal(summary.byConfidence.review, 1);
+    assert.equal(summary.byConfidence.incomplete, 1);
+    assert.equal(summary.byApprovalStatus.approved, 2);
+    assert.equal(summary.byApprovalStatus.unreviewed, 1);
+    const datasheetGap = summary.missingEvidence.find(item => item.evidence === 'datasheet URL');
+    assert.equal(datasheetGap.count, 2);
+    assert.ok(summary.averageScore > 0 && summary.averageScore <= 100);
+  });
+
+  it('counts stale verification and expired EPD evidence', () => {
+    const summary = summarizeCatalogQuality([
+      { ...complete, lastVerified: '2024-01-01' }
+    ], { today: '2026-06-02', verificationMaxAgeDays: 365 });
+    assert.equal(summary.staleRows, 1);
+    assert.ok(summary.staleEvidence.some(item => item.evidence === 'catalog verification date'));
+  });
+
+  it('filters by approval status and confidence status', () => {
+    const products = [complete, partial, ungoverned];
+    assert.deepEqual(
+      filterCatalogProducts(products, { approvalStatus: 'unreviewed' }).map(row => row.id),
+      ['GEN-1']
+    );
+    assert.deepEqual(
+      filterCatalogProducts(products, {
+        confidenceStatus: CATALOG_CONFIDENCE_STATUS.complete,
+        confidenceOptions: { today: '2026-06-02' }
+      }).map(row => row.id),
+      ['FULL-1']
+    );
+  });
+});
+
+describe('catalog export', () => {
+  const product = {
+    id: 'EXP-1',
+    manufacturer: 'ACME',
+    catalogNumber: 'EXP-1',
+    category: 'tray',
+    subcategory: 'straight',
+    description: 'Exportable tray',
+    material: 'steel',
+    finish: 'pre-galvanized',
+    width_in: 12,
+    depth_in: 4,
+    weight_lb: 24.5,
+    unit: 'EA',
+    list_price_usd: 142,
+    load_class: '20A',
+    nec_listed: true,
+    ul_classified: true,
+    approved: true,
+    approval: { status: 'approved', authority: 'Project EE', approvedBy: 'D. Mitz', approvedAt: '2026-05-22' },
+    source: 'Approved list rev B',
+    lastVerified: '2026-05-22',
+    datasheetUrl: 'https://example.com/exp-1.pdf'
+  };
+
+  it('maps governed fields onto the import template headers', () => {
+    const [row] = buildCatalogExportRows([product]);
+    assert.equal(row['Part Number'], 'EXP-1');
+    assert.equal(row['Catalog No.'], 'EXP-1');
+    assert.equal(row['Width (in)'], 12);
+    assert.equal(row['List Price (USD)'], 142);
+    assert.equal(row['Approved'], 'TRUE');
+    assert.equal(row['Approval Status'], 'approved');
+    assert.equal(row['Last Verified'], '2026-05-22');
+    assert.equal(row['Datasheet URL'], 'https://example.com/exp-1.pdf');
+    Object.keys(row).forEach(header => {
+      assert.ok(CATALOG_IMPORT_COLUMNS.some(col => col.header === header), `unexpected header ${header}`);
+    });
+  });
+
+  it('round-trips exported CSV back through the import parser', () => {
+    const csv = buildCatalogExportCsv([product]);
+    const { products, errors } = parseCatalogCsv(csv);
+    assert.equal(errors.length, 0, `unexpected parse errors: ${JSON.stringify(errors)}`);
+    assert.equal(products.length, 1);
+    assert.equal(products[0].catalogNumber, 'EXP-1');
+    assert.equal(products[0].approved, true);
+    assert.equal(products[0].source, 'Approved list rev B');
+    assert.equal(products[0].lastVerified, '2026-05-22');
+    assert.equal(products[0].dimensions.widthIn, 12);
+    assert.equal(products[0].commercial.listPriceUsd, 142);
+  });
+
+  it('escapes commas and quotes so descriptions survive the round trip', () => {
+    const csv = buildCatalogExportCsv([{
+      ...product,
+      id: 'EXP-2',
+      catalogNumber: 'EXP-2',
+      description: 'Tray, 12" wide, "special" order'
+    }]);
+    const { products, errors } = parseCatalogCsv(csv);
+    assert.equal(errors.length, 0);
+    assert.equal(products[0].description, 'Tray, 12" wide, "special" order');
   });
 });
 

@@ -879,9 +879,109 @@
 
 .catalog-add-form {
   display: flex;
+  flex-direction: column;
+  gap: var(--space-3, 0.75rem);
+}
+
+.catalog-form-group {
+  display: flex;
   flex-wrap: wrap;
   gap: var(--space-3, 0.75rem);
   align-items: flex-end;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: var(--space-3, 0.75rem);
+  margin: 0;
+}
+
+.catalog-form-group legend {
+  padding: 0 var(--space-2, 0.5rem);
+  font-size: var(--font-size-sm, 0.8rem);
+  font-weight: 600;
+  color: var(--color-text-muted, #6c757d);
+}
+
+.catalog-add-actions,
+.catalog-export-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2, 0.5rem);
+  align-items: center;
+}
+
+.catalog-export-actions {
+  margin-top: var(--space-2, 0.5rem);
+}
+
+.catalog-export-label {
+  font-size: var(--font-size-sm, 0.8rem);
+  color: var(--color-text-muted, #6c757d);
+}
+
+.catalog-quality {
+  margin-bottom: var(--space-4, 1rem);
+  padding: var(--space-3, 0.75rem);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-strong, var(--color-surface));
+}
+
+.catalog-quality p {
+  margin: 0 0 var(--space-1, 0.25rem);
+  font-size: var(--font-size-sm, 0.8rem);
+}
+
+.catalog-quality-counts {
+  font-weight: 600;
+}
+
+.catalog-quality-gaps,
+.catalog-quality-stale {
+  color: var(--color-text-muted, #6c757d);
+}
+
+.catalog-confidence {
+  display: inline-block;
+  padding: 0.1rem 0.45rem;
+  border-radius: 99px;
+  font-size: 0.72rem;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+
+.catalog-confidence-complete {
+  background: color-mix(in srgb, var(--color-success, #198754) 15%, transparent);
+  color: var(--color-success, #198754);
+  border-color: color-mix(in srgb, var(--color-success, #198754) 30%, transparent);
+}
+
+.catalog-confidence-review {
+  background: color-mix(in srgb, var(--color-warning, #f59e0b) 18%, transparent);
+  color: var(--color-warning-text, #92400e);
+  border-color: color-mix(in srgb, var(--color-warning, #f59e0b) 35%, transparent);
+}
+
+.catalog-confidence-incomplete {
+  background: color-mix(in srgb, var(--color-error, #dc3545) 15%, transparent);
+  color: var(--color-error, #dc3545);
+  border-color: color-mix(in srgb, var(--color-error, #dc3545) 30%, transparent);
+}
+
+.catalog-confidence-detail {
+  display: block;
+  font-size: 0.7rem;
+  color: var(--color-text-muted, #6c757d);
+}
+
+.catalog-row-actions {
+  display: flex;
+  gap: var(--space-2, 0.5rem);
+  white-space: nowrap;
+}
+
+.catalog-row-actions button {
+  font-size: 0.72rem;
+  padding: 0.1rem 0.5rem;
 }
 
 .catalog-add-status {

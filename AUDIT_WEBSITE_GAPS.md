@@ -101,7 +101,7 @@ comment documenting why suppression is intentional (closed 2026-05-26):
 
 ## 5. Component Library Gaps
 
-Per `docs/component-gap-analysis.md` (2026-05-22 snapshot), `componentLibrary.json` covers 31 component types.
+Per `docs/component-gap-analysis.md` (2026-07-25 regeneration), `componentLibrary.json` covers 30 discovered component types.
 
 ### Missing component type
 
@@ -136,8 +136,42 @@ Resolution:
    - `static_load`: `demand_factor: 1.0` (conservative default).
 
 After these changes the regenerated `docs/component-gap-analysis.md`
-shows zero missing attributes across all 29 discovered component
-types.
+shows zero missing attributes across all discovered component types.
+
+### Relay subtype split (reopened and closed 2026-07-25)
+
+The 2026-05-26 result went stale. Commit `4966c00` gave the generic
+relay the subtype `overcurrent_relay`, which stopped it from collapsing
+onto the same `relay` row as `relay_87`. Because the two subtypes had
+been sharing a row, their props were merged — and that merge was the
+only reason the row looked complete. Once split, `relay_87` reported
+missing `time_dial` and `interrupting_rating_ka`.
+
+Both were false positives, not real holes: a differential (87) element
+is a percentage-slope sensing device, so it has no time dial, and the
+breaker it trips carries the interrupting duty rather than the relay.
+
+Resolution:
+
+1. `scripts/componentCoverageAudit.mjs` gained a `differential`
+   baseline class (`pickup_amps`, `slope1_pct`, `protected_zone_type`)
+   and classifies `relay_87` into it ahead of the generic `protective`
+   test, which would otherwise claim it via the `relay` substring.
+2. `relay_87` is deliberately no longer aliased onto `relay`. The two
+   subtypes are distinct protective functions with distinct schemas;
+   keeping them on separate rows stops one subtype's props from masking
+   a gap in the other.
+3. The report is now split into `buildReportBody()` (date-free) and
+   `buildReport()`, so freshness can be asserted without the
+   `Generated on` line causing a spurious mismatch.
+4. `tests/componentCoverageAudit.test.mjs` guards all of it: the
+   committed report must match a fresh regeneration, no type may report
+   missing attributes, and the two relay subtypes must keep their
+   function-appropriate baselines. This is the drift guard that was
+   missing — the 2026-05-26 result had no test holding it in place.
+
+The current report shows 30 component types with zero missing
+attributes and no absent baseline types.
 
 ---
 
