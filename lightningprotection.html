@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="Lightning & Surge Protection — IEC 62305 / IEEE 998 risk assessment, rolling-sphere protective radius, down-conductor sizing, and surge-arrester MCOV selection for substations and structures." />
+  <meta name="description" content="Lightning & Surge Protection — IEC 62305:2024 / IEEE 998-2026 screening, visual rolling-sphere coverage, down-conductor concepts, and voltage-appropriate surge protection guidance." />
   <title>Lightning &amp; Surge Protection — CableTrayRoute</title>
   <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icons/favicon.svg">
   <meta property="og:type" content="website">
   <meta property="og:title" content="Lightning &amp; Surge Protection — CableTrayRoute">
-  <meta property="og:description" content="IEC 62305 / IEEE 998 lightning risk assessment, rolling-sphere protective radius, down-conductor sizing, and surge-arrester MCOV.">
+  <meta property="og:description" content="IEC 62305:2024 / IEEE 998-2026 lightning screening with visual structure, mast, rolling-sphere, and surge-protection guidance.">
   <meta property="og:image" content="https://cabletrayroute.com/icons/og-preview.png">
   <meta property="og:site_name" content="CableTrayRoute">
   <meta property="og:url" content="lightningprotection.html">
@@ -17,9 +17,9 @@
   <link rel="dns-prefetch" href="https://fonts.gstatic.com">
   <meta name="color-scheme" content="light dark">
   <link rel="stylesheet" href="style.css" />
-  <link rel="stylesheet" href="src/styles/lightningprotection.css?v=visual-workspace-v3" />
+  <link rel="stylesheet" href="src/styles/lightningprotection.css?v=visual-workspace-v7" />
   <script type="module" src="dirtyTracker.js"></script>
-  <script type="module" src="dist/lightningprotection.js" defer></script>
+  <script type="module" src="dist/lightningprotection.js?v=shape-coverage-v2" defer></script>
 </head>
 <body class="lightningprotection-page" data-report-title="Lightning &amp; Surge Protection">
   <a href="#main-content" class="skip-link">Skip to main content</a>
@@ -76,7 +76,7 @@
     <main id="main-content" class="main-content lp-main">
       <header class="page-header lp-hero">
         <div>
-          <p class="lp-eyebrow">IEC 62305 / IEEE 998 screening study</p>
+          <p class="lp-eyebrow">IEC 62305:2024 / IEEE 998-2026 screening study</p>
           <h1>Lightning &amp; Surge Protection</h1>
           <p class="lp-hero-copy">Shape the structure, see its lightning exposure, and translate the calculated risk into a practical protection concept.</p>
         </div>
@@ -91,17 +91,18 @@
 
       <details class="method-panel lp-method-panel">
         <summary>Method &amp; Assumptions</summary>
-        <p>This study performs a screening-level lightning protection assessment per IEC 62305 (structural LPS) and IEEE 998 (substation shielding), and recommends a surge-arrester continuous operating voltage per IEEE C62.22 / IEC 60099-5.</p>
+        <p>This study provides a screening-level lightning protection assessment informed by IEC 62305:2024 and IEEE 998-2026. Medium- and high-voltage arrester screening is limited to systems above 1 kV; lower-voltage systems are routed to an SPD review.</p>
         <p><strong>Risk:</strong></p>
-        <pre>Ng = 0.04 · Td^1.25                  (flashes/km²/yr)
-Ad = L·W + 2·(3H)(L+W) + π·(3H)²     (collection area, m²)
-Nd = Ng · Ad · Cd · 1e-6             (direct strikes/yr)
+        <pre>NSG = 0.04 · Td^1.25                 (legacy estimate, strike points/km²/yr)
+Ad = Af + (3H)P + π·(3H)²             (collection area, m²)
+Nd = NSG · Ad · Cd · 1e-6            (direct strikes/yr)
 E  = 1 − Nc/Nd  →  LPL I / II / III / IV</pre>
-        <p>The required Lightning Protection Level (LPL) comes from the protection-efficiency table: E&gt;0.98 → I, &gt;0.95 → II, &gt;0.90 → III, &gt;0.80 → IV.</p>
+        <p><strong>Footprints:</strong> Af is plan area and P is plan perimeter. Rectangular and circular modes calculate both values from dimensions; custom mode uses entered area and perimeter. The coverage view assumes a centered mast and compares its radius with the farthest protected point.</p>
+        <p>The required Lightning Protection Level (LPL) is the least-restrictive class whose interception capability meets E: IV=0.84, III=0.91, II=0.97, I=0.99. Requirements above 0.99 need additional risk-reduction measures.</p>
         <p><strong>Rolling sphere (electrogeometric model):</strong> each LPL has a sphere radius R (I=20 m, II=30 m, III=45 m, IV=60 m). A single mast of height h protects an object of height hx out to a radius:</p>
         <pre>rp = √(h(2R − h)) − √(hx(2R − hx))</pre>
-        <p><strong>Surge arrester:</strong> minimum MCOV Uc ≥ 1.05·V<sub>LL</sub>/√3 (effectively grounded) or 1.05·V<sub>LL</sub> (ungrounded); rated voltage ≈ MCOV/0.8.</p>
-        <p><strong>References:</strong> IEC 62305-1/-2/-3; IEEE Std 998; IEEE C62.22 / IEC 60099-5.</p>
+        <p><strong>Surge arrester:</strong> for systems above 1 kV only, minimum MCOV Uc ≥ 1.05·V<sub>LL</sub>/√3 (effectively grounded) or 1.05·V<sub>LL</sub> (ungrounded); rated voltage ≈ MCOV/0.8. Final selection must include temporary overvoltage and insulation-coordination checks.</p>
+        <p><strong>References:</strong> IEC 62305-1/-2/-3:2024; IEEE Std 998-2026; IEEE C62.22; IEC 60099-5:2018.</p>
       </details>
 
       <div class="lp-workspace">
@@ -121,7 +122,7 @@ E  = 1 − Nc/Nd  →  LPL I / II / III / IV</pre>
                 <button type="button" class="is-active" data-lp-unit="metric" aria-pressed="true">Metric</button>
                 <button type="button" data-lp-unit="imperial" aria-pressed="false">Imperial</button>
               </div>
-              <small id="lp-unit-note">Enter dimensions in metres and direct flash density per km².</small>
+              <small id="lp-unit-note" aria-live="polite">Enter dimensions in metres and direct strike-point density per km².</small>
             </div>
 
             <fieldset class="lp-input-section">
@@ -130,8 +131,8 @@ E  = 1 − Nc/Nd  →  LPL I / II / III / IV</pre>
               <div class="field-row">
                 <label for="ng-mode">Flash-density source</label>
                 <select id="ng-mode">
-                  <option value="td" selected>Thunderstorm days (keraunic level)</option>
-                  <option value="direct">Ground flash density (direct)</option>
+                  <option value="td" selected>Thunderstorm days (legacy estimate)</option>
+                  <option value="direct">Ground strike-point density (direct)</option>
                 </select>
               </div>
               <div class="field-row" id="row-td">
@@ -140,10 +141,10 @@ E  = 1 − Nc/Nd  →  LPL I / II / III / IV</pre>
                   <input type="number" id="td" min="0" step="any" value="40" aria-describedby="td-hint">
                   <span>days/yr</span>
                 </div>
-                <p id="td-hint" class="field-hint">Use the annual keraunic level from an isokeraunic map.</p>
+                <p id="td-hint" class="field-hint">Legacy screening estimate. Prefer mapped ground strike-point density for IEC 62305:2024 work.</p>
               </div>
               <div class="field-row" id="row-ng" hidden>
-                <label for="ng">Ground flash density</label>
+                <label for="ng">Ground strike-point density</label>
                 <div class="lp-input-with-unit">
                   <input type="number" id="ng" min="0" step="any" value="3.0">
                   <span id="lp-density-input-unit">/km²/yr</span>
@@ -173,8 +174,17 @@ E  = 1 − Nc/Nd  →  LPL I / II / III / IV</pre>
 
             <fieldset class="lp-input-section">
               <legend><span class="lp-section-number">2</span><strong>Structure &amp; protection</strong></legend>
-              <p class="lp-section-intro">The dimensions set the lightning collection zone and conductor layout.</p>
-              <div class="lp-dimension-grid">
+              <p class="lp-section-intro">Choose the plan shape, then compare a centered single mast with the farthest protected point.</p>
+              <div class="field-row">
+                <label for="structure-shape">Footprint shape</label>
+                <select id="structure-shape" aria-describedby="shape-hint">
+                  <option value="rectangle" selected>Rectangular</option>
+                  <option value="circle">Circular / cylindrical</option>
+                  <option value="custom">Custom footprint</option>
+                </select>
+                <p id="shape-hint" class="field-hint">Rectangular and circular checks assume the mast is centered. Custom geometry uses entered area, perimeter, and farthest protected point.</p>
+              </div>
+              <div id="row-rectangle" class="lp-dimension-grid" data-shape-fields="rectangle">
                 <div class="field-row">
                   <label for="length">Length</label>
                   <div class="lp-input-with-unit">
@@ -189,13 +199,52 @@ E  = 1 − Nc/Nd  →  LPL I / II / III / IV</pre>
                     <span data-lp-length-unit>m</span>
                   </div>
                 </div>
+              </div>
+              <div id="row-circle" class="field-row" data-shape-fields="circle" hidden>
+                <label for="diameter">Diameter</label>
+                <div class="lp-input-with-unit">
+                  <input type="number" id="diameter" min="0.1" step="any" value="50">
+                  <span data-lp-length-unit>m</span>
+                </div>
+              </div>
+              <div id="row-custom" class="lp-custom-footprint-grid" data-shape-fields="custom" hidden>
                 <div class="field-row">
-                  <label for="height">Height</label>
+                  <label for="footprint-area">Plan area</label>
                   <div class="lp-input-with-unit">
-                    <input type="number" id="height" min="0.1" step="any" value="25" required>
+                    <input type="number" id="footprint-area" min="0.1" step="any" value="2400">
+                    <span data-lp-area-unit>m²</span>
+                  </div>
+                </div>
+                <div class="field-row">
+                  <label for="footprint-perimeter">Plan perimeter</label>
+                  <div class="lp-input-with-unit">
+                    <input type="number" id="footprint-perimeter" min="0.1" step="any" value="200">
                     <span data-lp-length-unit>m</span>
                   </div>
                 </div>
+                <div class="field-row lp-custom-radius-field">
+                  <label for="farthest-point-radius">Mast to farthest protected point</label>
+                  <div class="lp-input-with-unit">
+                    <input type="number" id="farthest-point-radius" min="0.1" step="any" value="36" aria-describedby="farthest-hint">
+                    <span data-lp-length-unit>m</span>
+                  </div>
+                  <p id="farthest-hint" class="field-hint">Measured horizontally in plan. This controls the custom-footprint coverage check.</p>
+                </div>
+              </div>
+              <div class="field-row">
+                <label for="height">Structure height</label>
+                <div class="lp-input-with-unit">
+                  <input type="number" id="height" min="0.1" step="any" value="25" required>
+                  <span data-lp-length-unit>m</span>
+                </div>
+              </div>
+              <div class="field-row">
+                <label for="air-terminal-height">Mast / air-terminal tip height</label>
+                <div class="lp-input-with-unit">
+                  <input type="number" id="air-terminal-height" min="0.1" step="any" value="30" required aria-describedby="ath-hint">
+                  <span data-lp-length-unit>m</span>
+                </div>
+                <p id="ath-hint" class="field-hint">Actual tip elevation above grade. For a roof-mounted terminal, this must be at least the structure height.</p>
               </div>
               <div class="field-row">
                 <label for="protected-height">Protected equipment height</label>
@@ -217,14 +266,14 @@ E  = 1 − Nc/Nd  →  LPL I / II / III / IV</pre>
 
             <fieldset class="lp-input-section">
               <legend><span class="lp-section-number">3</span><strong>Surge arrester</strong><span class="lp-optional">Optional</span></legend>
-              <p class="lp-section-intro">Translate system voltage and grounding into a minimum continuous arrester rating.</p>
+              <p class="lp-section-intro">Screen medium- and high-voltage arresters above 1 kV. Lower-voltage entries are routed to an SPD review.</p>
               <div class="field-row">
                 <label for="system-kv">System voltage (line-to-line)</label>
                 <div class="lp-input-with-unit">
                   <input type="number" id="system-kv" min="0" step="any" value="138" aria-describedby="kv-hint">
                   <span>kV</span>
                 </div>
-                <p id="kv-hint" class="field-hint">Clear the value to omit surge-arrester selection.</p>
+                <p id="kv-hint" class="field-hint">Clear to omit. Values at or below 1 kV require a low-voltage SPD workflow.</p>
               </div>
               <div class="field-row">
                 <label for="grounding">System grounding</label>
@@ -259,9 +308,9 @@ E  = 1 − Nc/Nd  →  LPL I / II / III / IV</pre>
                 <desc id="lp-preview-desc">A live diagram of the structure, collection area, rolling-sphere protection, protected equipment, and down-conductors.</desc>
               </svg>
               <div class="lp-diagram-legend" aria-label="Diagram legend">
-                <span><i class="lp-legend-swatch lp-legend-swatch--collection"></i>Collection zone</span>
+                <span><i class="lp-legend-swatch lp-legend-swatch--footprint"></i>Structure footprint</span>
                 <span><i class="lp-legend-swatch lp-legend-swatch--protected"></i>Protected zone</span>
-                <span><i class="lp-legend-swatch lp-legend-swatch--conductor"></i>Conductor path</span>
+                <span><i class="lp-legend-swatch lp-legend-swatch--sphere"></i>Rolling-sphere boundary</span>
               </div>
             </div>
 
@@ -271,7 +320,7 @@ E  = 1 − Nc/Nd  →  LPL I / II / III / IV</pre>
                 <div>
                   <span>Site exposure</span>
                   <strong id="lp-kpi-ng">—</strong>
-                  <small id="lp-kpi-ng-unit">ground flashes / km² / year</small>
+                  <small id="lp-kpi-ng-unit">ground strike points / km² / year</small>
                 </div>
               </article>
               <article class="lp-kpi-card lp-kpi-card--area">
@@ -357,32 +406,34 @@ E  = 1 − Nc/Nd  →  LPL I / II / III / IV</pre>
     <div class="modal-content">
       <button id="close-help-btn" class="modal-close" aria-label="Close help">×</button>
       <h2 id="help-modal-title">Lightning &amp; Surge Protection Help</h2>
-      <p>This study estimates lightning strike risk to a structure, recommends a Lightning Protection Level, sizes the rolling-sphere air termination and down-conductors, and selects a surge-arrester rating.</p>
+      <p>This page screens direct-strike frequency, visualizes a structure and single-air-terminal concept, and identifies the applicable surge-protection workflow. It is not a final lightning-protection design.</p>
       <h3>When to use</h3>
       <ul>
-        <li>Utility substation direct-stroke shielding (IEEE 998).</li>
-        <li>Structural lightning protection for control buildings, telecom huts, and BESS enclosures (IEC 62305).</li>
-        <li>Surge-arrester MCOV selection for incoming line protection.</li>
+        <li>Utility substation direct-stroke shielding concepts informed by IEEE 998-2026.</li>
+        <li>Structural lightning-protection screening informed by IEC 62305:2024.</li>
+        <li>Preliminary arrester-voltage screening for systems above 1 kV.</li>
       </ul>
       <h3>Inputs</h3>
       <ul>
-        <li><strong>Thunderstorm days</strong> — the site keraunic level from an isokeraunic map, or enter the ground flash density directly.</li>
+        <li><strong>Lightning density</strong> — prefer a mapped ground strike-point density; thunderstorm days provide only a legacy screening estimate.</li>
         <li><strong>Location factor</strong> — accounts for nearby taller objects that intercept strikes.</li>
-        <li><strong>Structure geometry</strong> — sets the equivalent collection area.</li>
-        <li><strong>System voltage / grounding</strong> — drives the surge-arrester MCOV.</li>
+        <li><strong>Footprint shape</strong> — rectangular and circular modes calculate plan area and perimeter; custom mode accepts area, perimeter, and the farthest protected point.</li>
+        <li><strong>Air-terminal tip height</strong> — is the actual elevation used for the single-mast coverage calculation.</li>
+        <li><strong>System voltage / grounding</strong> — selects either a low-voltage SPD review or a preliminary arrester screen above 1 kV.</li>
       </ul>
       <h3>Interpreting results</h3>
       <ul>
-        <li><strong>Required LPL</strong> — the protection class that brings the residual strike frequency below the tolerable value.</li>
-        <li><strong>Rolling-sphere radius</strong> and <strong>single-mast protective radius</strong> size the air termination.</li>
-        <li><strong>Down-conductors</strong> — count and minimum cross-section per the class spacing.</li>
-        <li><strong>Surge arrester</strong> — minimum MCOV and the nearest standard duty-cycle rating.</li>
+        <li><strong>Required LPL</strong> — the least-restrictive class whose nominal interception capability meets the calculated screening efficiency.</li>
+        <li><strong>Plan coverage</strong> — compares the rolling-sphere coverage radius with the farthest protected point from the assumed centered mast.</li>
+        <li><strong>Elevation coverage</strong> — shows true circular rolling-sphere arcs with equal horizontal and vertical scales.</li>
+        <li><strong>Down-conductors</strong> — preliminary count and minimum cross-section when an LPS is indicated.</li>
+        <li><strong>Surge protection</strong> — low-voltage SPD review at or below 1 kV; preliminary MCOV and duty-cycle rating above 1 kV.</li>
       </ul>
       <h3>Limitations</h3>
       <ul>
-        <li>Screening-level — a simplified single-component risk, not the full IEC 62305-2 R1–R4 assessment.</li>
+        <li>Screening-level — a simplified direct-strike frequency comparison, not the full IEC 62305-2:2024 risk assessment.</li>
         <li>Single-mast protection only; multi-mast and shield-wire layouts need a dedicated study.</li>
-        <li>Verify against a full risk assessment before final design.</li>
+        <li>Verify temporary-overvoltage duty, insulation coordination, grounding, and a complete risk assessment before final design.</li>
       </ul>
     </div>
   </div>

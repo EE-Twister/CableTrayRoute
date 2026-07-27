@@ -5,8 +5,12 @@ import {
   DOWN_CONDUCTOR_MIN_MM2,
   LOCATION_FACTORS,
   STANDARD_ARRESTER_KV,
+  MIN_ARRESTER_SYSTEM_KV,
+  STRUCTURE_SHAPES,
   groundFlashDensity,
   collectionArea,
+  collectionAreaFromFootprint,
+  resolveFootprintGeometry,
   expectedStrikes,
   recommendLPL,
   strikingDistance,
@@ -53,6 +57,28 @@ const approx = (a, b, tol, msg) => assert.ok(Math.abs(a - b) <= tol, `${msg} (go
   approx(collectionArea(50, 30, 20), expected, 1e-6, 'collection area formula');
   approx(collectionArea(50, 30, 20), 22409.7, 1, 'collection area ≈ 22410 m²');
 
+  const rectangle = resolveFootprintGeometry({ structureShape: 'rectangle', length: 50, width: 30 });
+  assert.equal(rectangle.areaM2, 1500, 'rectangular footprint area');
+  assert.equal(rectangle.perimeterM, 160, 'rectangular footprint perimeter');
+  approx(rectangle.requiredCoverageRadiusM, Math.hypot(25, 15), 1e-9, 'rectangle farthest centered point');
+  approx(collectionAreaFromFootprint(rectangle.areaM2, rectangle.perimeterM, 20), expected, 1e-6,
+    'general footprint formula matches rectangular helper');
+
+  const circle = resolveFootprintGeometry({ structureShape: 'circle', diameter: 40 });
+  approx(circle.areaM2, Math.PI * 20 ** 2, 1e-9, 'circular footprint area');
+  approx(circle.perimeterM, Math.PI * 40, 1e-9, 'circular footprint perimeter');
+  assert.equal(circle.requiredCoverageRadiusM, 20, 'circular farthest centered point');
+
+  const custom = resolveFootprintGeometry({
+    structureShape: 'custom',
+    footprintArea: 600,
+    footprintPerimeter: 110,
+    farthestPointRadius: 18,
+  });
+  assert.equal(custom.label, STRUCTURE_SHAPES.custom, 'custom footprint label');
+  assert.equal(custom.areaM2, 600, 'custom area preserved');
+  assert.equal(custom.perimeterM, 110, 'custom perimeter preserved');
+
   // Nd = Ng · Ad · Cd · 1e-6
   approx(expectedStrikes(2.81, 22410, 1), 2.81 * 22410 * 1e-6, 1e-12, 'expected strikes formula');
   // Location factor scales linearly
@@ -67,17 +93,19 @@ const approx = (a, b, tol, msg) => assert.ok(Math.abs(a - b) <= tol, `${msg} (go
   const none = recommendLPL(1e-4, 1e-3);
   assert.equal(none.required, false, 'low strike rate → no LPS required');
 
-  // Efficiency thresholds
-  // E = 1 - Nc/Nd. Choose Nd so E lands in each band.
-  assert.equal(recommendLPL(1.0, 0.005).level, 'I', 'E=0.995 → LPL I');     // E=0.995
-  assert.equal(recommendLPL(1.0, 0.03).level, 'II', 'E=0.97 → LPL II');     // E=0.97
-  assert.equal(recommendLPL(1.0, 0.07).level, 'III', 'E=0.93 → LPL III');   // E=0.93
-  assert.equal(recommendLPL(1.0, 0.15).level, 'IV', 'E=0.85 → LPL IV');     // E=0.85
+  // Select the least-restrictive class whose own interception probability
+  // meets the calculated screening efficiency.
+  assert.equal(recommendLPL(1.0, 0.005).level, 'I', 'E=0.995 → LPL I plus additional measures');
+  assert.equal(recommendLPL(1.0, 0.03).level, 'II', 'E=0.97 → LPL II');
+  assert.equal(recommendLPL(1.0, 0.07).level, 'II', 'E=0.93 → LPL II');
+  assert.equal(recommendLPL(1.0, 0.15).level, 'III', 'E=0.85 → LPL III');
   assert.equal(recommendLPL(1.0, 0.30).level, 'IV', 'E=0.70 → LPL IV sufficient');
 
   const r = recommendLPL(0.05, 1e-3);
   approx(r.efficiency, 1 - 1e-3 / 0.05, 1e-9, 'efficiency = 1 - Nc/Nd');
   assert.ok(r.required);
+  assert.ok(LPL_TABLE[r.level].interception >= r.efficiency || r.level === 'I',
+    'recommended class meets required efficiency or identifies the LPL I ceiling');
 })();
 
 // ---------------------------------------------------------------------------
@@ -121,9 +149,14 @@ const approx = (a, b, tol, msg) => assert.ok(Math.abs(a - b) <= tol, `${msg} (go
   assert.ok(arresterMCOV(138, 'ungrounded') > arresterMCOV(138, 'solid'), 'ungrounded needs higher MCOV');
 
   const rec = recommendArrester(138, 'solid');
+  assert.equal(rec.applicable, true, 'MV arrester workflow applies above 1 kV');
   approx(rec.ratedRequired, rec.mcov / 0.8, 1e-9, 'rated = MCOV/0.8');
   assert.ok(rec.ratedStandard >= rec.ratedRequired, 'standard rating ≥ required');
   assert.ok(STANDARD_ARRESTER_KV.includes(rec.ratedStandard), 'standard rating is from the table');
+
+  const lv = recommendArrester(MIN_ARRESTER_SYSTEM_KV, 'solid');
+  assert.equal(lv.applicable, false, '1 kV and below routes to low-voltage SPD review');
+  assert.equal(lv.ratedStandard, null, 'LV systems do not receive an MV arrester rating');
 })();
 
 // ---------------------------------------------------------------------------
@@ -136,6 +169,7 @@ const approx = (a, b, tol, msg) => assert.ok(Math.abs(a - b) <= tol, `${msg} (go
     location: 'isolated',
     tolerableFrequency: 1e-3,
     protectedHeight: 3,
+    airTerminalHeight: 30,
     downConductorMaterial: 'copper',
     systemKvLL: 138,
     grounding: 'solid',
@@ -148,6 +182,10 @@ const approx = (a, b, tol, msg) => assert.ok(Math.abs(a - b) <= tol, `${msg} (go
   assert.ok(['I', 'II', 'III', 'IV'].includes(r.lpl.level), 'an LPL is recommended');
   assert.equal(r.rollingSphereRadius, LPL_TABLE[r.lpl.level].radius, 'sphere radius matches LPL');
   assert.ok(r.mastProtectiveRadiusM >= 0, 'protective radius present');
+  approx(r.requiredCoverageRadiusM, Math.hypot(30, 20), 1e-9, 'rectangle centered coverage target');
+  assert.equal(r.coverageComplete, r.mastProtectiveRadiusM >= r.requiredCoverageRadiusM,
+    'coverage check compares rolling-sphere radius with farthest footprint point');
+  assert.equal(r.inputs.airTerminalHeight, 30, 'air-terminal height is preserved');
   assert.equal(r.perimeterM, 2 * (60 + 40), 'perimeter = 2(L+W)');
   assert.ok(r.downConductorCount >= 2, 'at least two down-conductors');
   assert.equal(r.downConductorMinAreaMm2, 16, 'copper min 16 mm²');
@@ -162,6 +200,59 @@ const approx = (a, b, tol, msg) => assert.ok(Math.abs(a - b) <= tol, `${msg} (go
   const r = runLightningProtection({ groundFlashDensity: 4.0, length: 10, width: 10, height: 5 });
   approx(r.groundFlashDensity, 4.0, 1e-9, 'direct Ng override honoured');
   assert.equal(r.arrester, null, 'no arrester when system voltage omitted');
+
+  const lowRisk = runLightningProtection({
+    groundFlashDensity: 0.01,
+    length: 10,
+    width: 10,
+    height: 10,
+    airTerminalHeight: 12,
+    location: 'surroundedTaller',
+    tolerableFrequency: 1e-3,
+  });
+  assert.equal(lowRisk.lpl.required, false, 'low-risk case does not require an LPS');
+  assert.equal(lowRisk.rollingSphereRadius, null, 'low-risk case does not invent LPL III geometry');
+  assert.equal(lowRisk.mastProtectiveRadiusM, null, 'low-risk case omits mast coverage geometry');
+  assert.equal(lowRisk.downConductorCount, 0, 'low-risk case omits a down-conductor design');
+
+  const lv = runLightningProtection({
+    groundFlashDensity: 3,
+    length: 60,
+    width: 40,
+    height: 25,
+    airTerminalHeight: 30,
+    systemKvLL: 0.208,
+    grounding: 'solid',
+  });
+  assert.equal(lv.arrester.applicable, false, '208 V system routes to LV SPD review');
+  assert.ok(lv.warnings.some(warning => /low-voltage SPD/i.test(warning)), 'LV SPD scope warning is emitted');
+
+  const circular = runLightningProtection({
+    structureShape: 'circle',
+    diameter: 30,
+    height: 12,
+    airTerminalHeight: 20,
+    protectedHeight: 3,
+    groundFlashDensity: 3,
+  });
+  assert.equal(circular.inputs.structureShape, 'circle', 'circle shape is preserved');
+  approx(circular.footprintAreaM2, Math.PI * 15 ** 2, 1e-9, 'circle area feeds the study');
+  approx(circular.perimeterM, Math.PI * 30, 1e-9, 'circle perimeter feeds down-conductor layout');
+
+  const custom = runLightningProtection({
+    structureShape: 'custom',
+    footprintArea: 600,
+    footprintPerimeter: 110,
+    farthestPointRadius: 18,
+    height: 12,
+    airTerminalHeight: 20,
+    protectedHeight: 3,
+    groundFlashDensity: 3,
+  });
+  assert.equal(custom.inputs.structureShape, 'custom', 'custom shape is preserved');
+  assert.equal(custom.requiredCoverageRadiusM, 18, 'custom farthest point drives plan coverage check');
+  assert.ok(custom.warnings.some(warning => /plan outline is schematic/i.test(warning)),
+    'custom geometry limitation is visible');
 })();
 
 // ---------------------------------------------------------------------------
@@ -172,6 +263,20 @@ const approx = (a, b, tol, msg) => assert.ok(Math.abs(a - b) <= tol, `${msg} (go
     /positive structure/i, 'zero dimension rejected');
   assert.throws(() => runLightningProtection({ length: 10, width: 10, height: 5 }),
     /ground flash density|thunderstorm/i, 'missing Ng/Td rejected');
+  assert.throws(() => runLightningProtection({
+    length: 10, width: 10, height: 5, airTerminalHeight: 4, thunderstormDays: 30,
+  }), /at least the structure height/i, 'air-terminal height below structure is rejected');
+  assert.throws(() => runLightningProtection({
+    structureShape: 'circle', diameter: 0, height: 5, thunderstormDays: 30,
+  }), /positive structure diameter/i, 'zero circular diameter rejected');
+  assert.throws(() => runLightningProtection({
+    structureShape: 'custom',
+    footprintArea: 600,
+    footprintPerimeter: 80,
+    farthestPointRadius: 18,
+    height: 5,
+    thunderstormDays: 30,
+  }), /too large/i, 'impossible custom area and perimeter rejected');
 })();
 
 console.log('lightningProtection.test.mjs — all assertions passed');

@@ -1,18 +1,20 @@
 /**
  * Lightning & Surge Protection Coordination (Gap #86)
  *
- * Screening-level lightning protection per IEC 62305 (structural LPS) and
- * IEEE 998 (substation shielding), plus surge-arrester MCOV selection per
- * IEEE C62.22 / IEC 60099-5.
+ * Screening-level lightning protection informed by IEC 62305:2024
+ * (structural LPS) and IEEE 998-2026 (substation shielding), plus
+ * medium/high-voltage surge-arrester screening per IEEE C62.22 /
+ * IEC 60099-5:2018.
  *
  * Workflow:
- *   1. Ground flash density Ng from keraunic level (thunderstorm days) or direct.
- *   2. Equivalent collection area Ad of the structure (IEC 62305-2 Annex A).
+ *   1. Lightning ground strike-point density from a direct value or a legacy
+ *      keraunic-level screening estimate.
+ *   2. Equivalent collection area Ad of the structure (screening geometry).
  *   3. Expected direct strikes Nd = Ng · Ad · Cd · 1e-6  (per year).
  *   4. Required Lightning Protection Level (LPL) from the protection-efficiency
  *      table (IEC 61024-1 / 62305): E = 1 − Nc/Nd.
  *   5. Rolling-sphere radius for the LPL and single-mast protective radius
- *      (electrogeometric model, IEEE 998 / IEC 62305-3 Annex A).
+ *      (electrogeometric model, IEEE 998 / IEC 62305-3:2024 Annex D).
  *   6. Down-conductor count and minimum cross-section (IEC 62305-3).
  *   7. Surge-arrester continuous operating voltage (MCOV) and rated voltage.
  *
@@ -42,7 +44,7 @@ export const LPL_TABLE = {
 /** Minimum down-conductor cross-section by material (mm²), IEC 62305-3 Table 6. */
 export const DOWN_CONDUCTOR_MIN_MM2 = { copper: 16, aluminum: 25, steel: 50 };
 
-/** Location factor Cd (IEC 62305-2 Table A.1). */
+/** Screening location factor Cd retained from the legacy simplified method. */
 export const LOCATION_FACTORS = {
   surroundedTaller: 0.25,  // object surrounded by taller objects
   surroundedEqual: 0.5,    // surrounded by equal/shorter objects
@@ -56,13 +58,23 @@ export const STANDARD_ARRESTER_KV = [
   108, 120, 144, 168, 180, 192, 228, 240, 258, 276, 294, 312, 396, 420, 444, 468, 540, 576,
 ];
 
+/** IEEE C62.22 / IEC 60099-5 arrester screening is not for low-voltage SPDs. */
+export const MIN_ARRESTER_SYSTEM_KV = 1;
+
+export const STRUCTURE_SHAPES = Object.freeze({
+  rectangle: 'Rectangular',
+  circle: 'Circular / cylindrical',
+  custom: 'Custom footprint',
+});
+
 // ---------------------------------------------------------------------------
 // Ground flash density and collection area
 // ---------------------------------------------------------------------------
 
 /**
- * Ground flash density Ng from keraunic level (thunderstorm-days per year).
- * IEEE 998 / IEC 62305: Ng ≈ 0.04 · Td^1.25  (flashes/km²/yr).
+ * Legacy screening estimate of ground flash density from keraunic level.
+ * Prefer a directly supplied lightning ground strike-point density for
+ * IEC 62305-2:2024 work.
  * @param {number} thunderstormDays - Td (days/yr)
  * @returns {number} Ng (flashes/km²/yr)
  */
@@ -72,8 +84,8 @@ export function groundFlashDensity(thunderstormDays) {
 }
 
 /**
- * Equivalent collection area of an isolated rectangular structure
- * (IEC 62305-2 Annex A): Ad = L·W + 2·(3H)(L+W) + π·(3H)²  (m²).
+ * Equivalent collection area of an isolated rectangular structure for this
+ * screening: Ad = L·W + 2·(3H)(L+W) + π·(3H)²  (m²).
  * @param {number} length - L (m)
  * @param {number} width - W (m)
  * @param {number} height - H (m)
@@ -81,7 +93,90 @@ export function groundFlashDensity(thunderstormDays) {
  */
 export function collectionArea(length, width, height) {
   const L = length, W = width, H = height;
-  return L * W + 2 * (3 * H) * (L + W) + Math.PI * Math.pow(3 * H, 2);
+  return collectionAreaFromFootprint(L * W, 2 * (L + W), H);
+}
+
+/**
+ * Equivalent collection area from a plan footprint and its perimeter.
+ * This is the area of the footprint expanded horizontally by 3H:
+ * Ad = Af + (3H)P + pi(3H)^2.
+ * @param {number} footprintAreaM2 - Plan area Af (m2)
+ * @param {number} perimeterM - Plan perimeter P (m)
+ * @param {number} heightM - Structure height H (m)
+ * @returns {number} Collection area (m2)
+ */
+export function collectionAreaFromFootprint(footprintAreaM2, perimeterM, heightM) {
+  return footprintAreaM2 + 3 * heightM * perimeterM + Math.PI * Math.pow(3 * heightM, 2);
+}
+
+/**
+ * Resolve the plan geometry used by collection-area, down-conductor, and
+ * centered single-mast coverage checks.
+ * @param {Object} config
+ * @returns {{shape:string,label:string,areaM2:number,perimeterM:number,spanXM:number,spanYM:number,requiredCoverageRadiusM:number}}
+ */
+export function resolveFootprintGeometry(config = {}) {
+  const shape = Object.hasOwn(STRUCTURE_SHAPES, config.structureShape)
+    ? config.structureShape
+    : 'rectangle';
+
+  if (shape === 'circle') {
+    const diameter = Number(config.diameter);
+    if (!(diameter > 0)) {
+      throw new Error('Enter a positive structure diameter.');
+    }
+    const radius = diameter / 2;
+    return {
+      shape,
+      label: STRUCTURE_SHAPES[shape],
+      areaM2: Math.PI * radius * radius,
+      perimeterM: Math.PI * diameter,
+      spanXM: diameter,
+      spanYM: diameter,
+      requiredCoverageRadiusM: radius,
+    };
+  }
+
+  if (shape === 'custom') {
+    const areaM2 = Number(config.footprintArea);
+    const perimeterM = Number(config.footprintPerimeter);
+    const requiredCoverageRadiusM = Number(config.farthestPointRadius);
+    if (!(areaM2 > 0) || !(perimeterM > 0)) {
+      throw new Error('Enter a positive custom footprint area and perimeter.');
+    }
+    const maximumAreaForPerimeter = perimeterM * perimeterM / (4 * Math.PI);
+    if (areaM2 > maximumAreaForPerimeter * 1.001) {
+      throw new Error('Custom footprint area is too large for the entered perimeter.');
+    }
+    const equivalentRadius = Math.sqrt(areaM2 / Math.PI);
+    if (!(requiredCoverageRadiusM >= equivalentRadius)) {
+      throw new Error('Farthest protected point is too small for the entered footprint area.');
+    }
+    return {
+      shape,
+      label: STRUCTURE_SHAPES[shape],
+      areaM2,
+      perimeterM,
+      spanXM: requiredCoverageRadiusM * 2,
+      spanYM: requiredCoverageRadiusM * 2,
+      requiredCoverageRadiusM,
+    };
+  }
+
+  const length = Number(config.length);
+  const width = Number(config.width);
+  if (!(length > 0) || !(width > 0)) {
+    throw new Error('Enter positive structure length and width.');
+  }
+  return {
+    shape,
+    label: STRUCTURE_SHAPES[shape],
+    areaM2: length * width,
+    perimeterM: 2 * (length + width),
+    spanXM: length,
+    spanYM: width,
+    requiredCoverageRadiusM: Math.hypot(length / 2, width / 2),
+  };
 }
 
 /**
@@ -101,9 +196,8 @@ export function expectedStrikes(ng, areaM2, cd = 1) {
 // ---------------------------------------------------------------------------
 
 /**
- * Recommend an LPL from the protection-efficiency table (IEC 61024-1 / 62305):
- * required efficiency E = 1 − Nc/Nd, mapped to a class.
- *   E > 0.98 → I, > 0.95 → II, > 0.90 → III, > 0.80 → IV, else none required.
+ * Recommend the least-restrictive LPL whose declared interception probability
+ * meets the required screening efficiency E = 1 − Nc/Nd.
  *
  * @param {number} nd - Expected strikes per year
  * @param {number} [nc=DEFAULT_NC] - Tolerable strike frequency per year
@@ -114,12 +208,12 @@ export function recommendLPL(nd, nc = DEFAULT_NC) {
     return { required: false, efficiency: 0, level: null, note: 'Nd ≤ Nc — a dedicated LPS is not required (verify bonding and SPDs).' };
   }
   const efficiency = 1 - nc / nd;
-  let level, note;
-  if (efficiency > 0.98) { level = 'I'; note = efficiency > 0.99 ? 'LPL I with additional risk-reduction measures may be needed (E > 0.99).' : 'LPL I required.'; }
-  else if (efficiency > 0.95) { level = 'II'; note = 'LPL II required.'; }
-  else if (efficiency > 0.90) { level = 'III'; note = 'LPL III required.'; }
-  else if (efficiency > 0.80) { level = 'IV'; note = 'LPL IV required.'; }
-  else { level = 'IV'; note = 'LPL IV is sufficient (low required efficiency).'; }
+  const level = ['IV', 'III', 'II', 'I']
+    .find(key => LPL_TABLE[key].interception >= efficiency) || 'I';
+  const capability = LPL_TABLE[level].interception;
+  const note = efficiency > capability
+    ? `LPL ${level} alone does not meet the ${Math.round(efficiency * 1000) / 10}% required efficiency; add risk-reduction measures.`
+    : `LPL ${level} meets the screening efficiency requirement.`;
   return { required: true, efficiency, level, note };
 }
 
@@ -138,7 +232,7 @@ export function strikingDistance(currentKa) {
 
 /**
  * Protective radius of a single vertical mast at a protected-object height,
- * by the rolling-sphere method (IEEE 998 / IEC 62305-3 Annex A):
+ * by the rolling-sphere method (IEEE 998 / IEC 62305-3:2024 Annex D):
  *   rp = √(h(2R − h)) − √(hx(2R − hx)),  with h, hx ≤ R.
  * Heights above R are capped at R (no additional protection from a sphere
  * that rolls under the tip).
@@ -199,10 +293,30 @@ export function arresterMCOV(systemKvLL, grounding) {
  * @returns {{mcov:number, ratedRequired:number, ratedStandard:(number|null)}}
  */
 export function recommendArrester(systemKvLL, grounding) {
+  if (!(systemKvLL > 0)) {
+    throw new Error('System voltage must be positive.');
+  }
+  if (systemKvLL <= MIN_ARRESTER_SYSTEM_KV) {
+    return {
+      applicable: false,
+      scope: 'low-voltage',
+      mcov: null,
+      ratedRequired: null,
+      ratedStandard: null,
+      note: 'Use a low-voltage SPD selection workflow; IEEE C62.22 and IEC 60099-5 arrester screening applies above 1 kV.',
+    };
+  }
   const mcov = arresterMCOV(systemKvLL, grounding);
   const ratedRequired = mcov / 0.8;
   const ratedStandard = STANDARD_ARRESTER_KV.find(v => v >= ratedRequired) ?? null;
-  return { mcov, ratedRequired, ratedStandard };
+  return {
+    applicable: true,
+    scope: 'medium-high-voltage',
+    mcov,
+    ratedRequired,
+    ratedStandard,
+    note: 'Preliminary rating only; verify maximum system voltage, temporary overvoltage duty, insulation coordination, and manufacturer data.',
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -213,24 +327,31 @@ export function recommendArrester(systemKvLL, grounding) {
  * Run the lightning & surge protection screening study.
  *
  * @param {Object} config
+ * @param {'rectangle'|'circle'|'custom'} [config.structureShape='rectangle'].
  * @param {number} [config.thunderstormDays] - Keraunic level Td (days/yr).
  * @param {number} [config.groundFlashDensity] - Ng directly (overrides Td).
- * @param {number} config.length - Structure length L (m).
- * @param {number} config.width - Structure width W (m).
+ * @param {number} [config.length] - Rectangular structure length L (m).
+ * @param {number} [config.width] - Rectangular structure width W (m).
+ * @param {number} [config.diameter] - Circular structure diameter (m).
+ * @param {number} [config.footprintArea] - Custom plan area (m2).
+ * @param {number} [config.footprintPerimeter] - Custom plan perimeter (m).
+ * @param {number} [config.farthestPointRadius] - Custom farthest protected plan point from the centered mast (m).
  * @param {number} config.height - Structure height H (m).
  * @param {string} [config.location='isolated'] - Location factor key.
  * @param {number} [config.tolerableFrequency=DEFAULT_NC] - Nc (per year).
  * @param {number} [config.protectedHeight=0] - Equipment height to protect (m).
+ * @param {number} [config.airTerminalHeight=config.height] - Mast or air-terminal tip height above grade (m).
  * @param {string} [config.downConductorMaterial='copper'].
  * @param {number} [config.systemKvLL] - Surge-arrester system voltage (kV), optional.
  * @param {'solid'|'ungrounded'} [config.grounding='solid'].
  * @returns {LightningResult}
  */
 export function runLightningProtection(config = {}) {
-  const L = Number(config.length), W = Number(config.width), H = Number(config.height);
-  if (!(L > 0) || !(W > 0) || !(H > 0)) {
-    throw new Error('Enter positive structure length, width, and height.');
+  const H = Number(config.height);
+  if (!(H > 0)) {
+    throw new Error('Enter a positive structure height.');
   }
+  const footprint = resolveFootprintGeometry(config);
   const ng = Number.isFinite(config.groundFlashDensity) && config.groundFlashDensity > 0
     ? config.groundFlashDensity
     : groundFlashDensity(Number(config.thunderstormDays));
@@ -242,21 +363,34 @@ export function runLightningProtection(config = {}) {
     ? config.tolerableFrequency
     : DEFAULT_NC;
 
-  const area = collectionArea(L, W, H);
+  const area = collectionAreaFromFootprint(footprint.areaM2, footprint.perimeterM, H);
   const nd = expectedStrikes(ng, area, cd);
   const lpl = recommendLPL(nd, nc);
 
-  // Geometry for the recommended (or LPL III default) level.
-  const levelKey = lpl.level || 'III';
-  const level = LPL_TABLE[levelKey];
+  const level = lpl.required ? LPL_TABLE[lpl.level] : null;
   const protectedHeight = Number.isFinite(config.protectedHeight) ? config.protectedHeight : 0;
-  const mastProtectiveRadius = singleMastRadius(H, protectedHeight, level.radius);
-  const minStrikeCurrent = level.iMin;
-  const minStrikeDistance = strikingDistance(minStrikeCurrent);
+  const airTerminalHeight = Number.isFinite(config.airTerminalHeight) ? Number(config.airTerminalHeight) : H;
+  if (!(airTerminalHeight > 0)) {
+    throw new Error('Enter a positive mast or air-terminal tip height.');
+  }
+  if (airTerminalHeight < H) {
+    throw new Error('Mast or air-terminal tip height must be at least the structure height.');
+  }
+  const mastProtectiveRadius = level
+    ? singleMastRadius(airTerminalHeight, protectedHeight, level.radius)
+    : null;
+  const coverageMargin = level
+    ? mastProtectiveRadius - footprint.requiredCoverageRadiusM
+    : null;
+  const coverageComplete = level
+    ? coverageMargin >= 0
+    : null;
+  const minStrikeCurrent = level ? level.iMin : null;
+  const minStrikeDistance = level ? strikingDistance(minStrikeCurrent) : null;
 
   // Down-conductors
-  const perimeter = 2 * (L + W);
-  const downCount = downConductorCount(perimeter, level.downSpacing);
+  const perimeter = footprint.perimeterM;
+  const downCount = level ? downConductorCount(perimeter, level.downSpacing) : 0;
   const material = DOWN_CONDUCTOR_MIN_MM2[config.downConductorMaterial] ? config.downConductorMaterial : 'copper';
   const downMinArea = DOWN_CONDUCTOR_MIN_MM2[material];
 
@@ -273,39 +407,57 @@ export function runLightningProtection(config = {}) {
     warnings.push(`Direct strikes Nd = ${nd.toExponential(2)}/yr exceed the tolerable ${nc.toExponential(2)}/yr — install an LPS class ${lpl.level} (${lpl.note}).`);
   }
   if (lpl.required && mastProtectiveRadius <= 0) {
-    warnings.push('A single mast at the structure height does not protect equipment at the specified height — add taller masts or overhead shield wires.');
+    warnings.push('The entered mast or air-terminal tip height does not protect equipment at the specified height — add taller masts or overhead shield wires.');
+  } else if (lpl.required && !coverageComplete) {
+    warnings.push(`A centered single mast reaches ${mastProtectiveRadius.toFixed(2)} m at the protected height, short of the ${footprint.requiredCoverageRadiusM.toFixed(2)} m farthest footprint point — use a taller or multi-terminal arrangement.`);
   }
   if (lpl.efficiency > 0.99) {
     warnings.push('Required protection efficiency exceeds 0.99 — combine LPL I air termination with surge protective devices and equipotential bonding.');
   }
-  if (arrester && arrester.ratedStandard == null) {
+  if (arrester && !arrester.applicable) {
+    warnings.push(arrester.note);
+  } else if (arrester && arrester.ratedStandard == null) {
     warnings.push('System voltage exceeds the standard arrester table — consult the manufacturer for a custom rating.');
+  }
+  if (footprint.shape === 'custom') {
+    warnings.push('Custom-footprint collection area uses the entered plan area and perimeter; the plan outline is schematic and must be checked against survey geometry.');
   }
 
   return {
     inputs: {
       thunderstormDays: Number.isFinite(config.thunderstormDays) ? Number(config.thunderstormDays) : undefined,
       groundFlashDensity: Number.isFinite(config.groundFlashDensity) ? Number(config.groundFlashDensity) : undefined,
-      length: L,
-      width: W,
+      structureShape: footprint.shape,
+      length: footprint.shape === 'rectangle' ? Number(config.length) : undefined,
+      width: footprint.shape === 'rectangle' ? Number(config.width) : undefined,
+      diameter: footprint.shape === 'circle' ? Number(config.diameter) : undefined,
+      footprintArea: footprint.shape === 'custom' ? footprint.areaM2 : undefined,
+      footprintPerimeter: footprint.shape === 'custom' ? footprint.perimeterM : undefined,
+      farthestPointRadius: footprint.shape === 'custom' ? footprint.requiredCoverageRadiusM : undefined,
       height: H,
       location: config.location || 'isolated',
       tolerableFrequency: nc,
       protectedHeight,
+      airTerminalHeight,
       downConductorMaterial: material,
       systemKvLL: config.systemKvLL,
       grounding: config.grounding,
     },
     groundFlashDensity: ng,
     locationFactor: cd,
+    footprint,
+    footprintAreaM2: footprint.areaM2,
     collectionAreaM2: area,
     expectedStrikesPerYear: nd,
     tolerableFrequency: nc,
     lpl,
-    rollingSphereRadius: level.radius,
+    rollingSphereRadius: level?.radius ?? null,
     minStrikeCurrentKa: minStrikeCurrent,
     minStrikeDistanceM: minStrikeDistance,
     mastProtectiveRadiusM: mastProtectiveRadius,
+    requiredCoverageRadiusM: footprint.requiredCoverageRadiusM,
+    coverageMarginM: coverageMargin,
+    coverageComplete,
     perimeterM: perimeter,
     downConductorCount: downCount,
     downConductorMaterial: material,
