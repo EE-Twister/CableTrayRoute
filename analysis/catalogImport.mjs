@@ -325,6 +325,100 @@ export function buildCatalogTemplateWorkbook(XLSX) {
 }
 
 // ---------------------------------------------------------------------------
+// Export (round-trips back through the import parser)
+// ---------------------------------------------------------------------------
+
+function exportCellValue(product, column) {
+  const direct = {
+    id: product.id,
+    manufacturer: product.manufacturer,
+    catalogNumber: product.catalogNumber,
+    category: product.category,
+    subcategory: product.subcategory,
+    description: product.description,
+    material: product.material,
+    finish: product.finish,
+    width_in: product.dimensions?.widthIn,
+    depth_in: product.dimensions?.depthIn,
+    weight_lb: product.dimensions?.weightLb,
+    unit: product.unit,
+    list_price_usd: product.commercial?.listPriceUsd,
+    load_class: product.ratings?.loadClass,
+    nec_listed: product.ratings?.necListed,
+    ul_classified: product.ratings?.ulClassified,
+    approved: product.approved,
+    approval_status: product.approval?.status,
+    approval_authority: product.approval?.authority,
+    approved_by: product.approval?.approvedBy,
+    approved_at: product.approval?.approvedAt,
+    source: product.source,
+    lastVerified: product.lastVerified,
+    datasheet_url: product.datasheetUrl
+  }[column.key];
+
+  if (direct === undefined || direct === null) return '';
+  if (column.type === 'boolean') return direct ? 'TRUE' : 'FALSE';
+  return direct;
+}
+
+/**
+ * Build export rows (header → value) for the same column spec used by the
+ * import template, so an exported catalog can be edited and re-imported.
+ *
+ * @param {object[]} products catalog products (normalized or raw)
+ * @returns {object[]}
+ */
+export function buildCatalogExportRows(products = []) {
+  return (Array.isArray(products) ? products : [])
+    .map(product => normalizeCatalogProduct(product))
+    .filter(Boolean)
+    .map((product) => {
+      const row = {};
+      for (const col of CATALOG_IMPORT_COLUMNS) {
+        row[col.header] = exportCellValue(product, col);
+      }
+      return row;
+    });
+}
+
+/**
+ * Serialize a catalog to CSV using the import template headers.
+ * @param {object[]} products
+ * @returns {string}
+ */
+export function buildCatalogExportCsv(products = []) {
+  const headers = CATALOG_IMPORT_COLUMNS.map(col => col.header);
+  const rows = buildCatalogExportRows(products);
+  const lines = [headers.map(csvEscape).join(',')];
+  for (const row of rows) {
+    lines.push(headers.map(h => csvEscape(row[h])).join(','));
+  }
+  return lines.join('\r\n') + '\r\n';
+}
+
+/**
+ * Build an XLSX workbook of the catalog (Products sheet + Reference sheet),
+ * matching the import template layout.
+ *
+ * @param {object} XLSX SheetJS module (browser global or imported)
+ * @param {object[]} products
+ * @returns {object} workbook
+ */
+export function buildCatalogExportWorkbook(XLSX, products = []) {
+  if (!XLSX || !XLSX.utils || typeof XLSX.utils.book_new !== 'function') {
+    throw new Error('XLSX module is required to build the catalog workbook.');
+  }
+  const wb = XLSX.utils.book_new();
+  const headers = CATALOG_IMPORT_COLUMNS.map(col => col.header);
+  const rows = buildCatalogExportRows(products);
+  const aoa = [headers, ...rows.map(row => headers.map(h => row[h] ?? ''))];
+  const sheet = XLSX.utils.aoa_to_sheet(aoa);
+  sheet['!cols'] = headers.map(h => ({ wch: Math.max(12, Math.min(h.length + 2, 32)) }));
+  XLSX.utils.book_append_sheet(wb, sheet, 'Products');
+  return wb;
+}
+
+// ---------------------------------------------------------------------------
 // CSV parsing (RFC 4180 — quoted strings, escaped quotes, CRLF tolerant)
 // ---------------------------------------------------------------------------
 

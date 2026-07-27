@@ -63,3 +63,56 @@ score from identity, approval, source/date, datasheet, BIM, standards/listing,
 and EPD/CO2e evidence. Submittal XLSX exports include a **Catalog Traceability**
 sheet with the confidence score, missing evidence list, datasheet URL, BIM
 reference, standards, and EPD metadata for each schedule row.
+
+`summarizeCatalogQuality(products, options)` rolls the same evidence up across a
+whole catalog: totals by confidence status and approval status, the average
+evidence score, the most common missing-evidence gaps, and how many rows carry
+stale verification dates or expired EPDs.
+
+## Manufacturer Catalog Management
+
+The catalog browser mounted on the Tray Hardware BOM page (`src/catalogBrowser.js`)
+merges `data/manufacturer_catalog.json` with the project's own catalog rows
+(`settings.trayHardwareCatalogCustomProducts`) and manages the project rows:
+
+- **Add / edit / remove.** Project rows can be edited in place or removed
+  (remove requires a second confirming click). Base catalog rows are read-only,
+  and the table's **Origin** column shows which is which. Edits and adds are
+  keyed by governed identity (`manufacturer::catalogNumber`) through
+  `upsertCatalogProduct` / `removeCatalogProduct`, so a project row cannot
+  silently duplicate an existing catalog identity.
+- **Evidence fields.** The add/edit form captures the full governed set —
+  approval authority, source, last-verified date, datasheet URL, standards, BIM
+  family, EPD source/validity, and CO2e — so project rows can reach a
+  **complete** catalog confidence status.
+- **Filtering.** Rows can be filtered by category, manufacturer, material,
+  approval status, catalog confidence status, origin, and free text. A summary
+  above the table reports the confidence roll-up for the rows in view.
+- **Import / export.** Imports accept CSV or XLSX using the template columns in
+  `analysis/catalogImport.mjs`. Exports (`buildCatalogExportCsv`,
+  `buildCatalogExportWorkbook`, and a JSON export of the filtered view) use the
+  same column spec, so an exported catalog can be edited externally and
+  re-imported without remapping headers.
+
+### Catalog governance audit
+
+`npm run audit:catalog` (`scripts/auditManufacturerCatalog.mjs`) runs the same
+validation and confidence roll-up headlessly, so catalog data can be checked in
+CI or before importing a vendor file:
+
+```
+node scripts/auditManufacturerCatalog.mjs [file] [--check] [--json] \
+  [--min-score=<0-100>] [--min-complete=<0-1>] [--today=YYYY-MM-DD]
+```
+
+It accepts either a `{ products: [...] }` payload or a bare product array,
+prints the confidence roll-up, ranked evidence gaps, and the lowest-confidence
+rows, and with `--check` exits non-zero on schema errors or unmet thresholds.
+The npm script uses `--check` with no thresholds, so it guards schema validity
+without pinning the seed catalog's current evidence coverage.
+
+The shipped seed rows in `data/manufacturer_catalog.json` are placeholders for
+approved-part workflows: they carry approval, source, and verification metadata
+but intentionally no datasheet URLs or EPD figures, so they report a **review**
+confidence status until a project replaces them with rows backed by real vendor
+documentation.
