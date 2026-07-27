@@ -1269,6 +1269,8 @@ async function initializeApp() {
                         end_z: end[2],
                         width: dia,
                         height: dia,
+                        row: cond.row,
+                        column: cond.column ?? cond.col,
                         current_fill: 0,
                         shape: 'STR',
                         allowed_cable_group: cond.allowed_cable_group || '',
@@ -1299,6 +1301,8 @@ async function initializeApp() {
                     end_z: end[2],
                     width: dia,
                     height: dia,
+                    row: cond.row,
+                    column: cond.column ?? cond.col,
                     current_fill: 0,
                     shape: 'STR',
                     allowed_cable_group: cond.allowed_cable_group || '',
@@ -1678,6 +1682,70 @@ async function initializeApp() {
             return (tray.slotFills[slot] + cableArea) <= tray.maxFill;
         }
 
+        // Treat parallel conduits within the same ductbank segment as sibling
+        // choices. Row/column offsets are ignored so corridor pathfinding and
+        // conduit fill allocation can be handled as separate decisions.
+        _ductbankCorridorKey(tray) {
+            const ductbankId = String(tray.ductbankTag || tray.ductbank_tag || tray.ductbank_id || '').trim();
+            if (!ductbankId || tray.conduit_id == null || tray.conduit_id === '') return '';
+            const start = [Number(tray.start_x), Number(tray.start_y), Number(tray.start_z)];
+            const end = [Number(tray.end_x), Number(tray.end_y), Number(tray.end_z)];
+            if (![...start, ...end].every(Number.isFinite)) return '';
+            const delta = end.map((value, index) => value - start[index]);
+            const length = Math.hypot(...delta);
+            if (length <= 1e-6) return '';
+            const direction = delta.map(value => value / length);
+            const firstDirection = direction.find(value => Math.abs(value) > 1e-6) || 0;
+            if (firstDirection < 0) direction.forEach((value, index) => { direction[index] = -value; });
+            const startStation = start.reduce((sum, value, index) => sum + value * direction[index], 0);
+            const endStation = end.reduce((sum, value, index) => sum + value * direction[index], 0);
+            return [
+                ductbankId.toUpperCase(),
+                ...direction.map(value => value.toFixed(5)),
+                Math.min(startStation, endStation).toFixed(2),
+                Math.max(startStation, endStation).toFixed(2)
+            ].join('|');
+        }
+
+        _selectDuctbankConduits(cableArea, cableGroup) {
+            const corridors = new Map();
+            this.trays.forEach(tray => {
+                const key = this._ductbankCorridorKey(tray);
+                if (!key) return;
+                if (!corridors.has(key)) corridors.set(key, []);
+                corridors.get(key).push(tray);
+            });
+
+            const selected = new Map();
+            corridors.forEach((siblings, key) => {
+                const eligible = siblings.filter(tray => {
+                    if (tray.allowed_cable_group && tray.allowed_cable_group !== cableGroup) return false;
+                    return this._trayHasCapacityForCable(tray, cableArea, cableGroup);
+                });
+                if (!eligible.length) return;
+                eligible.sort((left, right) => {
+                    const leftSlot = this._findSlotForCable(left, cableGroup);
+                    const rightSlot = this._findSlotForCable(right, cableGroup);
+                    const leftProjected = left.maxFill
+                        ? (left.slotFills[leftSlot] + cableArea) / left.maxFill
+                        : Infinity;
+                    const rightProjected = right.maxFill
+                        ? (right.slotFills[rightSlot] + cableArea) / right.maxFill
+                        : Infinity;
+                    if (Math.abs(leftProjected - rightProjected) > 1e-9) return leftProjected - rightProjected;
+                    const leftRow = Number.isFinite(Number(left.row)) ? Number(left.row) : Number.MAX_SAFE_INTEGER;
+                    const rightRow = Number.isFinite(Number(right.row)) ? Number(right.row) : Number.MAX_SAFE_INTEGER;
+                    if (leftRow !== rightRow) return leftRow - rightRow;
+                    const leftColumn = Number.isFinite(Number(left.column ?? left.col)) ? Number(left.column ?? left.col) : Number.MAX_SAFE_INTEGER;
+                    const rightColumn = Number.isFinite(Number(right.column ?? right.col)) ? Number(right.column ?? right.col) : Number.MAX_SAFE_INTEGER;
+                    if (leftColumn !== rightColumn) return leftColumn - rightColumn;
+                    return String(left.tray_id).localeCompare(String(right.tray_id), undefined, { numeric: true });
+                });
+                selected.set(key, eligible[0].tray_id);
+            });
+            return selected;
+        }
+
         updateTrayFill(trayIds, cableArea, cableGroup = '') {
              if (!Array.isArray(trayIds)) return;
              trayIds.forEach(trayId => {
@@ -2014,13 +2082,28 @@ async function initializeApp() {
                 return g;
             };
             const graph = cloneGraph(this.baseGraph);
+            const selectedDuctbankConduits = this._selectDuctbankConduits(cableArea, allowedGroup);
+            const graphNodesForTray = trayId => {
+                const id = String(trayId);
+                return Object.keys(graph.nodes).filter(nodeId =>
+                    nodeId === `${id}_start` ||
+                    nodeId === `${id}_end` ||
+                    nodeId.startsWith(`${id}_start_on_`) ||
+                    nodeId.startsWith(`${id}_end_on_`) ||
+                    nodeId.endsWith(`_on_${id}`)
+                );
+            };
 
             // Remove trays without remaining capacity
             this.trays.forEach(tray => {
-                if (!this._trayHasCapacityForCable(tray, cableArea, allowedGroup) ||
+                const unavailable = !this._trayHasCapacityForCable(tray, cableArea, allowedGroup) ||
                     (tray.allowed_cable_group &&
-                     tray.allowed_cable_group !== allowedGroup)) {
-                    const remove = Object.keys(graph.nodes).filter(n => n.includes(tray.tray_id));
+                     tray.allowed_cable_group !== allowedGroup);
+                const corridorKey = this._ductbankCorridorKey(tray);
+                const selectedTrayId = corridorKey ? selectedDuctbankConduits.get(corridorKey) : '';
+                const unselectedSibling = !!selectedTrayId && selectedTrayId !== tray.tray_id;
+                if (unavailable || unselectedSibling) {
+                    const remove = graphNodesForTray(tray.tray_id);
                     remove.forEach(n => {
                         delete graph.nodes[n];
                         delete graph.edges[n];
@@ -2728,29 +2811,32 @@ async function initializeApp() {
         }, {});
 
         const headers = [
-            { label: 'Tray ID', key: 'tray_id' },
+            { label: 'Raceway ID', key: 'tray_id' },
+            { label: 'Type', key: 'raceway_type' },
             { label: 'Start (x,y,z)', key: 'start_xyz' },
             { label: 'End (x,y,z)', key: 'end_xyz' },
             { label: 'Max Capacity (in²)', key: 'max_capacity' },
             { label: 'Current Fill (in²)', key: 'current_fill' },
             { label: 'Utilization %', key: 'utilization_pct' },
             { label: 'Available Space (in²)', key: 'available_space' },
-            { label: 'Tray Fill', key: 'fill' }
+            { label: 'Review', key: 'review' }
         ];
 
         elements.trayUtilizationContainer.innerHTML = '';
         Object.entries(groups).forEach(([dbId, items]) => {
             const rows = items.map(tray => {
                 const maxCapacity = tray.width * tray.height * (parseFloat(elements.fillLimitIn.value) / 100);
+                const target = getRacewayReviewTarget(tray, tray.tray_id);
                 return {
                     tray_id: tray.tray_id,
+                    raceway_type: target.typeLabel,
                     start_xyz: `(${tray.start_x}, ${tray.start_y}, ${tray.start_z})`,
                     end_xyz: `(${tray.end_x}, ${tray.end_y}, ${tray.end_z})`,
                     max_capacity: maxCapacity.toFixed(0),
                     current_fill: tray.current_fill,
                     utilization_pct: ((tray.current_fill / maxCapacity) * 100).toFixed(1),
                     available_space: (maxCapacity - tray.current_fill).toFixed(2),
-                    fill: `<button class="fill-btn" data-tray="${escapeAttr(tray.tray_id)}">Open</button>`
+                    review: `<button type="button" class="fill-btn raceway-review-btn" data-raceway="${escapeAttr(target.racewayId)}" aria-label="${escapeAttr(`${target.actionLabel} for ${target.racewayId}`)}">${escapeHtml(target.actionLabel)}</button>`
                 };
             });
 
@@ -2760,21 +2846,24 @@ async function initializeApp() {
                 summary.textContent = dbId;
                 details.appendChild(summary);
                 const div = document.createElement('div');
-                renderTable(div, headers, rows, utilizationStyle, { fill: value => value });
+                renderTable(div, headers, rows, utilizationStyle, { review: value => value });
                 details.appendChild(div);
                 elements.trayUtilizationContainer.appendChild(details);
             } else {
                 const div = document.createElement('div');
-                renderTable(div, headers, rows, utilizationStyle, { fill: value => value });
+                renderTable(div, headers, rows, utilizationStyle, { review: value => value });
                 elements.trayUtilizationContainer.appendChild(div);
             }
         });
 
-        elements.trayUtilizationContainer.querySelectorAll('.fill-btn').forEach(btn => {
-            btn.addEventListener('click', () => openTrayFill(btn.dataset.tray));
+        elements.trayUtilizationContainer.querySelectorAll('.raceway-review-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const raceway = state.trayData.find(item => item.tray_id === btn.dataset.raceway);
+                if (raceway) openUtilizationReview(raceway);
+            });
         });
         elements.trayUtilizationContainer.querySelectorAll('tbody tr').forEach(row => {
-            const trayId = row.querySelector('.fill-btn')?.dataset.tray || row.cells?.[0]?.textContent?.trim();
+            const trayId = row.querySelector('.raceway-review-btn')?.dataset.raceway || row.cells?.[0]?.textContent?.trim();
             if (!trayId) return;
             row.dataset.trayId = trayId;
             row.tabIndex = 0;
@@ -4733,6 +4822,7 @@ const renderBatchResults = (results) => {
         }
 
         const options = {
+            routingAlgorithmVersion: 'ductbank-balanced-v1',
             fillLimit: parseFloat(elements.fillLimitIn.value) / 100,
             proximityThreshold: parseFloat(document.getElementById('proximity-threshold').value),
             fieldPenalty: parseFloat(document.getElementById('field-route-penalty').value),

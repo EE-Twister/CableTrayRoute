@@ -9,6 +9,7 @@
 ## 2026-07-21
 
 - Added an assumption-driven Ductbank Bill of Materials with route-length input, grouped conduit quantities, couplings, end fittings, spacers, pull rope, warning tape, concrete, excavation, bedding, backfill, editable allowances, scope exclusions, and a dedicated XLSX export.
+- Balanced automatic cable assignments across eligible parallel conduits within each ductbank corridor using projected utilization, cable class, and remaining capacity; explicit/manual assignments still take precedence and each route remains in one conduit for the full corridor.
 - Corrected the Ductbank Route cable table so outside diameter, insulation thickness, and cable weight accept decimal measurements without triggering the browser's whole-number validation warning.
 - Collapsed the Ductbank Route cable table by default while keeping cable and assignment counts plus Add Cable visible; drawing selections and validation targets automatically reopen the table when row-level editing is needed.
 

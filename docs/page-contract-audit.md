@@ -1331,26 +1331,26 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
   - app.mjs:494 getItem(ctrSession)
   - app.mjs:868 getItem(ctrSession)
 - `settings.latestRouteResults`
-  - app.mjs:1519 getItem(latestRouteResults)
+  - app.mjs:1523 getItem(latestRouteResults)
 - `traySchedule`
   - app.mjs:949 getTrays()
 
 **Detected Writes**
 - `cableSchedule`
-  - app.mjs:4899 setCables()
+  - app.mjs:4989 setCables()
 - `settings.conduitFillData`
-  - app.mjs:2824 setItem(conduitFillData)
-  - app.mjs:2858 setItem(conduitFillData)
+  - app.mjs:2913 setItem(conduitFillData)
+  - app.mjs:2947 setItem(conduitFillData)
 - `settings.ctrSession`
   - app.mjs:503 setItem(ctrSession)
   - app.mjs:857 setItem(ctrSession)
 - `settings.ductbankRouteData`
-  - app.mjs:2842 setItem(ductbankRouteData)
+  - app.mjs:2931 setItem(ductbankRouteData)
 - `settings.latestRouteResults`
   - app.mjs:268 setItem(latestRouteResults)
 - `settings.trayFillData`
-  - app.mjs:2799 setItem(trayFillData)
-  - app.mjs:4497 setItem(trayFillData)
+  - app.mjs:2888 setItem(trayFillData)
+  - app.mjs:4586 setItem(trayFillData)
 
 ### Pull Cards (`pullcards.html`)
 

@@ -194,6 +194,73 @@ class CableRoutingSystem {
         return (tray.slotFills[slot] + cableArea) <= tray.maxFill;
     }
 
+    // Parallel conduits in a ductbank share a routing corridor even when their
+    // modeled centerlines are offset by row/column. Group those siblings by
+    // ductbank, direction, and longitudinal extents so conduit selection can be
+    // balanced independently from corridor pathfinding.
+    _ductbankCorridorKey(tray) {
+        const ductbankId = String(tray.ductbankTag || tray.ductbank_tag || tray.ductbank_id || '').trim();
+        if (!ductbankId || tray.conduit_id == null || tray.conduit_id === '') return '';
+        const start = [Number(tray.start_x), Number(tray.start_y), Number(tray.start_z)];
+        const end = [Number(tray.end_x), Number(tray.end_y), Number(tray.end_z)];
+        if (![...start, ...end].every(Number.isFinite)) return '';
+        const delta = end.map((value, index) => value - start[index]);
+        const length = Math.hypot(...delta);
+        if (length <= 1e-6) return '';
+        const direction = delta.map(value => value / length);
+        const firstDirection = direction.find(value => Math.abs(value) > 1e-6) || 0;
+        if (firstDirection < 0) direction.forEach((value, index) => { direction[index] = -value; });
+        const startStation = start.reduce((sum, value, index) => sum + value * direction[index], 0);
+        const endStation = end.reduce((sum, value, index) => sum + value * direction[index], 0);
+        const stationMin = Math.min(startStation, endStation);
+        const stationMax = Math.max(startStation, endStation);
+        return [
+            ductbankId.toUpperCase(),
+            ...direction.map(value => value.toFixed(5)),
+            stationMin.toFixed(2),
+            stationMax.toFixed(2)
+        ].join('|');
+    }
+
+    _selectDuctbankConduits(cableArea, cableGroup) {
+        const corridors = new Map();
+        this.trays.forEach(tray => {
+            const key = this._ductbankCorridorKey(tray);
+            if (!key) return;
+            if (!corridors.has(key)) corridors.set(key, []);
+            corridors.get(key).push(tray);
+        });
+
+        const selected = new Map();
+        corridors.forEach((siblings, key) => {
+            const eligible = siblings.filter(tray => {
+                if (tray.allowed_cable_group && tray.allowed_cable_group !== cableGroup) return false;
+                return this._trayHasCapacityForCable(tray, cableArea, cableGroup);
+            });
+            if (!eligible.length) return;
+            eligible.sort((left, right) => {
+                const leftSlot = this._findSlotForCable(left, cableGroup);
+                const rightSlot = this._findSlotForCable(right, cableGroup);
+                const leftProjected = left.maxFill
+                    ? (left.slotFills[leftSlot] + cableArea) / left.maxFill
+                    : Infinity;
+                const rightProjected = right.maxFill
+                    ? (right.slotFills[rightSlot] + cableArea) / right.maxFill
+                    : Infinity;
+                if (Math.abs(leftProjected - rightProjected) > 1e-9) return leftProjected - rightProjected;
+                const leftRow = Number.isFinite(Number(left.row)) ? Number(left.row) : Number.MAX_SAFE_INTEGER;
+                const rightRow = Number.isFinite(Number(right.row)) ? Number(right.row) : Number.MAX_SAFE_INTEGER;
+                if (leftRow !== rightRow) return leftRow - rightRow;
+                const leftColumn = Number.isFinite(Number(left.column ?? left.col)) ? Number(left.column ?? left.col) : Number.MAX_SAFE_INTEGER;
+                const rightColumn = Number.isFinite(Number(right.column ?? right.col)) ? Number(right.column ?? right.col) : Number.MAX_SAFE_INTEGER;
+                if (leftColumn !== rightColumn) return leftColumn - rightColumn;
+                return String(left.tray_id).localeCompare(String(right.tray_id), undefined, { numeric: true });
+            });
+            selected.set(key, eligible[0].tray_id);
+        });
+        return selected;
+    }
+
     updateTrayFill(trayIds, cableArea, cableGroup = '') {
          if (!Array.isArray(trayIds)) return;
          trayIds.forEach(trayId => {
@@ -726,6 +793,17 @@ class CableRoutingSystem {
             return g;
         };
         const graph = cloneGraph(this.baseGraph);
+        const selectedDuctbankConduits = this._selectDuctbankConduits(cableArea, allowedGroup);
+        const graphNodesForTray = trayId => {
+            const id = String(trayId);
+            return Object.keys(graph.nodes).filter(nodeId =>
+                nodeId === `${id}_start` ||
+                nodeId === `${id}_end` ||
+                nodeId.startsWith(`${id}_start_on_`) ||
+                nodeId.startsWith(`${id}_end_on_`) ||
+                nodeId.endsWith(`_on_${id}`)
+            );
+        };
 
         // Remove trays without remaining capacity or group mismatch
         this.trays.forEach(tray => {
@@ -744,9 +822,11 @@ class CableRoutingSystem {
                 exclusions.push(record);
                 this.mismatchedRecords.push(record);
             } else {
-                return; // tray is usable
+                const corridorKey = this._ductbankCorridorKey(tray);
+                const selectedTrayId = corridorKey ? selectedDuctbankConduits.get(corridorKey) : '';
+                if (!selectedTrayId || selectedTrayId === tray.tray_id) return; // tray is usable
             }
-            const remove = Object.keys(graph.nodes).filter(n => n.includes(tray.tray_id));
+            const remove = graphNodesForTray(tray.tray_id);
             remove.forEach(n => {
                 delete graph.nodes[n];
                 delete graph.edges[n];

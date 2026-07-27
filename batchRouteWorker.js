@@ -33,7 +33,7 @@ function processFrom(index) {
         const routeMs = performance.now() - routeStart;
 
         if (result.success) {
-            system.updateTrayFill(result.tray_segments, cableArea);
+            system.updateTrayFill(result.tray_segments, cableArea, cable.allowed_cable_group);
             system.recordSharedFieldSegments(result.route_segments);
             allRoutes.push({
                 label: cable.name,
@@ -86,7 +86,7 @@ self.onmessage = function(e) {
             if (c.locked && Array.isArray(c.route_segments) && c.route_segments.length) {
                 const area = Math.PI * (c.diameter / 2) ** 2 * getParallelCount(c.parallel_count);
                 const traySegs = c.route_segments.filter(seg => seg.tray_id).map(seg => seg.tray_id);
-                system.updateTrayFill(traySegs, area);
+                system.updateTrayFill(traySegs, area, c.allowed_cable_group);
                 system.recordSharedFieldSegments(c.route_segments);
                 const total = c.route_segments.reduce((s, seg) => s + (seg.length || 0), 0);
                 const fieldLen = c.route_segments.filter(seg => seg.type === 'field').reduce((s, seg) => s + (seg.length || 0), 0);
