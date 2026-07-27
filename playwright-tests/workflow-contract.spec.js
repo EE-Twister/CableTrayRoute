@@ -203,7 +203,7 @@ test('Underground Ductbank checklist loads the sample before opening its route t
   const monitor = monitorPage(page, server.origin);
   await gotoWorkflowPage(page, server, 'samplegallery.html');
   const existingSample = page.locator('[data-sample-id="project-workflow-core"]');
-  await existingSample.getByRole('button', { name: 'Open guided Project Workflow Core sample project' }).click();
+  await existingSample.getByRole('button', { name: 'Start guided Project Workflow Core sample project' }).click();
   await expect(page.locator('#checklist-panel')).toContainText('Guided Workflow: Project Workflow Core');
   await page.evaluate(() => {
     window.projectStorage.setConduitCache({
@@ -212,7 +212,7 @@ test('Underground Ductbank checklist loads the sample before opening its route t
     });
   });
   const card = page.locator('[data-sample-id="ductbank-network"]');
-  await card.getByRole('button', { name: 'Open guided Underground Ductbank sample project' }).click();
+  await card.getByRole('button', { name: 'Start guided Underground Ductbank sample project' }).click();
   await expect(page.locator('#checklist-panel')).toContainText('Guided Workflow: Underground Ductbank');
   const importedConduitCache = await page.evaluate(() => JSON.parse(localStorage.getItem('CTR_CONDUITS') || '{}'));
   expect(importedConduitCache.ductbanks?.[0]?.tag).toBe('DUCTBANK-DB-01');
@@ -356,6 +356,115 @@ test('Underground Ductbank checklist loads the sample before opening its route t
   await expect(page.locator('#results')).toContainText('In conduit (buried)');
   await expect(page.locator('#results')).toContainText('0.0600 mΩ/m');
   await expect(page.locator('#results')).not.toContainText('NaN');
+});
+
+test('generated sample navigation preserves project identity and accessible table context', async ({ page }) => {
+  await page.setViewportSize({ width: 1265, height: 850 });
+  await gotoWorkflowPage(page, server, 'samplegallery.html');
+  await page.locator('[data-sample-id="project-workflow-core"] .primary-btn').click();
+  await expect(page.locator('#checklist-panel')).toContainText('Guided Workflow: Project Workflow Core');
+  await expect.poll(() => page.evaluate(() => window.projectStorage.getProjectState().name)).toContain('Project Workflow Core');
+  await expect(page.locator('[data-sample-id="project-workflow-core"] .primary-btn')).toHaveText('Open Saved Copy');
+  await expect(page.locator('[data-sample-id="project-workflow-core"]').getByRole('button', { name: /Create a fresh copy/ })).toBeVisible();
+
+  const projectName = await page.evaluate(() => window.projectStorage.getProjectState().name);
+  expect(projectName).toContain('Project Workflow Core');
+  const firstStep = page.locator('#checklist-steps .checklist-step__link').first();
+  const firstStepHref = await firstStep.getAttribute('href');
+  expect(decodeURIComponent(firstStepHref.split('#')[1] || '')).toBe(projectName);
+
+  await firstStep.click();
+  await expect(page).toHaveURL(new RegExp(`equipmentlist\\.html.*#${encodeURIComponent(projectName).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`));
+  await expect(page.locator('#equipment-table tbody tr')).toHaveCount(13);
+  await expect(page.locator('.sample-workflow-guide')).toBeVisible();
+  await expect(page.locator('.workflow-step-nav > .sample-workflow-guide')).toHaveCount(1);
+  await expect(page.locator('.equipment-step-nav')).toBeHidden();
+  await expect(page.locator('#project-sync-status')).toBeVisible();
+
+  const fieldLabels = await page.locator('#equipment-table tbody input, #equipment-table tbody select')
+    .evaluateAll(elements => elements.filter(element => !element.hidden).map(element => element.getAttribute('aria-label')));
+  expect(fieldLabels.length).toBeGreaterThan(0);
+  expect(fieldLabels.every(label => label && /row \d+/i.test(label))).toBe(true);
+  const filterLabels = await page.locator('#equipment-table .filter-btn')
+    .evaluateAll(buttons => buttons.map(button => button.getAttribute('aria-label')));
+  expect(filterLabels.length).toBeGreaterThan(0);
+  expect(filterLabels.every(label => label && label !== 'Filter column')).toBe(true);
+
+  const projectHash = encodeURIComponent(projectName);
+  await page.goto(server.url('optimalRoute.html?e2e=1'), { waitUntil: 'domcontentloaded' });
+  const routingFingerprints = await page.evaluate(() => ({
+    saved: window.dataStore.getItem('latestRouteResults', null)?.inputFingerprint,
+    current: window.dataStore.getProjectInputFingerprint(),
+  }));
+  expect(routingFingerprints.saved).toBe(routingFingerprints.current);
+  await expect(page.locator('#route-readiness-status')).toContainText('14 saved routes ready');
+  await expect(page.locator('#route-viewer-route-list-count')).toHaveText('14');
+
+  await page.goto(server.url(`workflowdashboard.html?e2e=1#${projectHash}`), { waitUntil: 'domcontentloaded' });
+  const routeKpi = page.locator('.dash-kpi-card').filter({ hasText: 'Route results' });
+  await expect(routeKpi.locator('.dash-kpi-value')).toHaveText('14');
+  await expect(routeKpi.locator('.dash-kpi-helper')).toContainText('match');
+
+  await page.evaluate(() => {
+    const cables = window.dataStore.getCables();
+    window.dataStore.setCables(cables.map((cable, index) => index === 0 ? { ...cable, notes: 'Input changed after routing' } : cable));
+  });
+  await page.goto(server.url('optimalRoute.html?e2e=1'), { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('#route-readiness-status')).toContainText('rerun required');
+  await expect(page.locator('#results-section')).toBeHidden();
+  const staleDiagnosticCount = await page.evaluate(async () => {
+    const { buildWorkflowCoreDiagnostics } = await import('/analysis/projectWorkflowCore.mjs');
+    const dataStore = window.dataStore;
+    return buildWorkflowCoreDiagnostics({
+      cables: dataStore.getCables(),
+      trays: dataStore.getTrays(),
+      conduits: dataStore.getConduits(),
+      ductbanks: dataStore.getDuctbanks(),
+      routeResults: dataStore.getItem('latestRouteResults', null),
+      currentInputFingerprint: dataStore.getProjectInputFingerprint(),
+    }).health.routeResults;
+  });
+  expect(staleDiagnosticCount).toBe(0);
+});
+
+test('focused palette and report gates reduce overload and expose blocked actions', async ({ page }) => {
+  test.setTimeout(30000);
+  await gotoWorkflowPage(page, server, 'oneline.html');
+  await page.waitForSelector('#oneline-ready-beacon');
+  await expect(page.locator('#palette')).toBeVisible();
+  await expect(page.locator('[data-palette-filter="common"]')).toHaveAttribute('aria-pressed', 'true');
+  const commonCount = await page.locator('#component-buttons [data-testid="palette-button"]:visible').count();
+  await page.locator('[data-palette-filter="all"]').click();
+  const allCount = await page.locator('#component-buttons [data-testid="palette-button"]:visible').count();
+  expect(commonCount).toBeGreaterThan(0);
+  expect(commonCount).toBeLessThan(allCount);
+
+  await gotoWorkflowPage(page, server, 'projectreport.html');
+  await expect(page.locator('#rpt-deliverable-readiness')).toContainText('Issue readiness: blocked');
+  await expect(page.locator('#rpt-print-btn')).toBeDisabled();
+  await expect(page.locator('#rpt-xlsx-btn')).toBeDisabled();
+  await expect(page.locator('#rpt-snapshot-btn')).toBeDisabled();
+  await expect(page.locator('#rpt-deliverable-readiness').getByRole('link', { name: 'Review blocker' })).toBeVisible();
+
+  await gotoWorkflowPage(page, server, 'index.html');
+  const darkContrast = await page.evaluate(() => {
+    document.body.classList.remove('theme-light');
+    document.body.classList.add('dark-mode');
+    const foreground = getComputedStyle(document.getElementById('home-next-action-detail')).color;
+    const background = getComputedStyle(document.querySelector('.home-next-action')).backgroundColor;
+    const channels = value => (value.match(/[\d.]+/g) || []).slice(0, 3).map(Number);
+    const luminance = value => {
+      const [red, green, blue] = channels(value).map(channel => {
+        const normalized = channel / 255;
+        return normalized <= 0.04045 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4;
+      });
+      return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
+    };
+    const light = Math.max(luminance(foreground), luminance(background));
+    const dark = Math.min(luminance(foreground), luminance(background));
+    return { foreground, background, ratio: (light + 0.05) / (dark + 0.05) };
+  });
+  expect(darkContrast.ratio).toBeGreaterThanOrEqual(4.5);
 });
 
 test('sample project satisfies contract handoffs from equipment through deliverables', async ({ page }) => {

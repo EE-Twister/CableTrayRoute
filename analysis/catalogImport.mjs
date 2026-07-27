@@ -9,6 +9,8 @@
 
 import {
   catalogIdentity,
+  mergeCatalogProducts,
+  normalizeCatalogDate,
   normalizeCatalogProduct,
   validateCatalogProduct
 } from './manufacturerCatalog.mjs';
@@ -103,9 +105,13 @@ function coerceCellValue(column, raw) {
   }
   if (column.type === 'date') {
     const text = String(raw).trim();
-    if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
+    const normalized = normalizeCatalogDate(text);
+    if (normalized) return normalized;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return undefined;
     const parsed = new Date(text);
-    if (Number.isFinite(parsed.getTime())) return parsed.toISOString().slice(0, 10);
+    if (Number.isFinite(parsed.getTime())) {
+      return normalizeCatalogDate(parsed.toISOString().slice(0, 10)) || undefined;
+    }
     return undefined;
   }
   return String(raw).trim();
@@ -541,15 +547,17 @@ export function parseCatalogWorkbook(XLSX, buffer, options = {}) {
 
 /**
  * Resolve an incoming batch against an existing catalog: split products into
- * accepted (new), duplicates (would overwrite an existing identity), and
- * compute an `merged` list that combines existing + new + overrides for
- * duplicates.
+ * accepted (new), duplicates (allowed project-row updates), and blocked rows
+ * (protected base identities or duplicate identities inside the same file).
+ * `overridableIdentities` must explicitly name identities the caller owns.
  *
  * @param {object[]} incomingProducts  normalized products to import
  * @param {object[]} existingProducts  current catalog (base + custom merged)
- * @returns {{ accepted, duplicates, merged }}
+ * @param {object} [options]
+ * @param {Set<string>|string[]} [options.overridableIdentities]
+ * @returns {{ accepted, duplicates, blocked, importable, merged }}
  */
-export function importCatalogRows(incomingProducts = [], existingProducts = []) {
+export function importCatalogRows(incomingProducts = [], existingProducts = [], options = {}) {
   const incoming = (Array.isArray(incomingProducts) ? incomingProducts : [])
     .map(p => normalizeCatalogProduct(p))
     .filter(Boolean);
@@ -558,12 +566,38 @@ export function importCatalogRows(incomingProducts = [], existingProducts = []) 
     .filter(Boolean);
 
   const existingByIdentity = new Map(existing.map(p => [catalogIdentity(p), p]));
+  const overridableIdentities = options.overridableIdentities instanceof Set
+    ? options.overridableIdentities
+    : new Set(Array.isArray(options.overridableIdentities) ? options.overridableIdentities : []);
+  const incomingCounts = incoming.reduce((counts, product) => {
+    const key = catalogIdentity(product);
+    counts.set(key, (counts.get(key) || 0) + 1);
+    return counts;
+  }, new Map());
   const accepted = [];
   const duplicates = [];
+  const blocked = [];
+
   for (const product of incoming) {
     const key = catalogIdentity(product);
-    if (existingByIdentity.has(key)) duplicates.push({ key, product, existing: existingByIdentity.get(key) });
-    else accepted.push(product);
+    if (incomingCounts.get(key) > 1) {
+      blocked.push({
+        key,
+        kind: 'incoming-duplicate',
+        product,
+        existing: null
+      });
+      continue;
+    }
+    if (!existingByIdentity.has(key)) {
+      accepted.push(product);
+      continue;
+    }
+    const duplicate = { key, kind: 'existing', product, existing: existingByIdentity.get(key) };
+    if (overridableIdentities.has(key)) duplicates.push(duplicate);
+    else blocked.push({ ...duplicate, kind: 'protected-base' });
   }
-  return { accepted, duplicates };
+  const importable = [...accepted, ...duplicates.map(entry => entry.product)];
+  const merged = mergeCatalogProducts(existing, importable, { allowProjectOverrides: true });
+  return { accepted, duplicates, blocked, importable, merged };
 }

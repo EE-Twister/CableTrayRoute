@@ -96,6 +96,19 @@ const forged = buildDeliverableReadinessDiagnostics({
 assert.equal(forged.health.routeResults, 0);
 assert.deepEqual(forged.missingRouteResultTags, ['CBL-101', 'CBL-102']);
 
+const staleFingerprint = buildDeliverableReadinessDiagnostics({
+  cables,
+  trays,
+  routeResults: {
+    ...routeResults,
+    inputFingerprint: 'before-input-change',
+  },
+  currentInputFingerprint: 'after-input-change',
+});
+
+assert.equal(staleFingerprint.health.routeResults, 0);
+assert.deepEqual(staleFingerprint.missingRouteResultTags, ['CBL-101', 'CBL-102']);
+
 
 const partial = buildDeliverableReadinessDiagnostics({
   cables,

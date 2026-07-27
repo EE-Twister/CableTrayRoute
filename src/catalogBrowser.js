@@ -510,14 +510,21 @@ export async function mountCatalogBrowser(container, { onSelect } = {}) {
   container.innerHTML = '<p class="catalog-loading">Loading catalog…</p>';
 
   let allProducts;
+  let baseIdentities;
   try {
-    allProducts = await loadCatalog();
+    const baseProducts = await loadBaseCatalog();
+    baseIdentities = new Set(baseProducts.map(catalogIdentity));
+    allProducts = mergeCatalogProducts(baseProducts, getCustomProducts());
   } catch (err) {
     container.innerHTML = `<p class="catalog-error">Failed to load catalog: ${err.message}</p>`;
     return;
   }
 
-  let projectIdentities = new Set(getCustomProducts().map(catalogIdentity));
+  let projectIdentities = new Set(
+    getCustomProducts()
+      .map(catalogIdentity)
+      .filter(identity => !baseIdentities.has(identity))
+  );
   let editingIdentity = '';
   let filteredProducts = [];
 
@@ -668,11 +675,17 @@ export async function mountCatalogBrowser(container, { onSelect } = {}) {
 
   function renderPreview(parseResult) {
     const { products, errors, warnings } = parseResult;
-    const { accepted, duplicates } = importCatalogRows(products, allProducts);
+    const {
+      accepted,
+      duplicates,
+      blocked,
+      importable
+    } = importCatalogRows(products, allProducts, { overridableIdentities: projectIdentities });
 
     const summary = document.createElement('p');
     summary.className = 'catalog-import-summary';
-    summary.textContent = `${accepted.length} new, ${duplicates.length} duplicate(s), ${errors.length} error(s), ${warnings.length} warning(s).`;
+    summary.textContent = `${accepted.length} new, ${duplicates.length} project update(s), `
+      + `${blocked.length} blocked conflict(s), ${errors.length} error(s), ${warnings.length} warning(s).`;
     importPreviewDiv.innerHTML = '';
     importPreviewDiv.appendChild(summary);
 
@@ -689,14 +702,27 @@ export async function mountCatalogBrowser(container, { onSelect } = {}) {
     if (duplicates.length) {
       const dupHeader = document.createElement('p');
       dupHeader.className = 'catalog-import-dups';
-      dupHeader.textContent = `Will overwrite ${duplicates.length} existing product(s) with the same manufacturer/catalog number on save.`;
+      dupHeader.textContent = `Will update ${duplicates.length} existing project product(s) with the same manufacturer/catalog number on save.`;
       importPreviewDiv.appendChild(dupHeader);
+    }
+    if (blocked.length) {
+      const blockedList = document.createElement('ul');
+      blockedList.className = 'catalog-import-errors';
+      blocked.slice(0, 50).forEach((entry) => {
+        const li = document.createElement('li');
+        li.textContent = entry.kind === 'protected-base'
+          ? `${entry.product.manufacturer} ${entry.product.catalogNumber} is a protected base catalog identity.`
+          : `${entry.product.manufacturer} ${entry.product.catalogNumber} appears more than once in the import file.`;
+        blockedList.appendChild(li);
+      });
+      importPreviewDiv.appendChild(blockedList);
     }
 
     pendingImport = {
       accepted,
       duplicates,
-      mergeRows: products
+      blocked,
+      mergeRows: importable
     };
     importConfirmDiv.hidden = !(accepted.length || duplicates.length);
   }
@@ -792,7 +818,7 @@ export async function mountCatalogBrowser(container, { onSelect } = {}) {
     if (!pendingImport) return;
     const incoming = pendingImport.mergeRows;
     const current = getCustomProducts();
-    const merged = mergeCatalogProducts(current, incoming);
+    const merged = mergeCatalogProducts(current, incoming, { allowProjectOverrides: true });
     setCustomProducts(merged);
     await reloadProducts();
     importStatusEl.textContent = `Saved ${pendingImport.accepted.length} new and updated ${pendingImport.duplicates.length} existing product(s).`;
@@ -814,8 +840,14 @@ export async function mountCatalogBrowser(container, { onSelect } = {}) {
   }
 
   async function reloadProducts() {
-    allProducts = await loadCatalog();
-    projectIdentities = new Set(getCustomProducts().map(catalogIdentity));
+    const baseProducts = await loadBaseCatalog();
+    baseIdentities = new Set(baseProducts.map(catalogIdentity));
+    allProducts = mergeCatalogProducts(baseProducts, getCustomProducts());
+    projectIdentities = new Set(
+      getCustomProducts()
+        .map(catalogIdentity)
+        .filter(identity => !baseIdentities.has(identity))
+    );
     repopulateSelect(catFilter.select, getDistinctOptions('category'));
     repopulateSelect(mfrFilter.select, getDistinctOptions('manufacturer'));
     repopulateSelect(matFilter.select, getDistinctOptions('material'));

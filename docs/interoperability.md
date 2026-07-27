@@ -80,7 +80,9 @@ merges `data/manufacturer_catalog.json` with the project's own catalog rows
   and the table's **Origin** column shows which is which. Edits and adds are
   keyed by governed identity (`manufacturer::catalogNumber`) through
   `upsertCatalogProduct` / `removeCatalogProduct`, so a project row cannot
-  silently duplicate an existing catalog identity.
+  silently duplicate an existing catalog identity. Base identities are
+  protected during catalog merges: a project row or import cannot replace a
+  shipped row's approval, provenance, description, or commercial data.
 - **Evidence fields.** The add/edit form captures the full governed set —
   approval authority, source, last-verified date, datasheet URL, standards, BIM
   family, EPD source/validity, and CO2e — so project rows can reach a
@@ -92,7 +94,15 @@ merges `data/manufacturer_catalog.json` with the project's own catalog rows
   `analysis/catalogImport.mjs`. Exports (`buildCatalogExportCsv`,
   `buildCatalogExportWorkbook`, and a JSON export of the filtered view) use the
   same column spec, so an exported catalog can be edited externally and
-  re-imported without remapping headers.
+  re-imported without remapping headers. Imports may update an existing
+  project-owned identity, but conflicts with protected base identities are
+  blocked. Repeated manufacturer/catalog identities within one import file are
+  also blocked instead of being silently collapsed.
+
+Catalog matching is strict on the normalized manufacturer/catalog-number pair.
+A matching catalog number from a different manufacturer does not inherit the
+other manufacturer's approval. Governance dates must be real calendar dates in
+`YYYY-MM-DD` form; impossible values such as `2026-02-31` are rejected.
 
 ### Catalog governance audit
 
@@ -111,8 +121,8 @@ rows, and with `--check` exits non-zero on schema errors or unmet thresholds.
 The npm script uses `--check` with no thresholds, so it guards schema validity
 without pinning the seed catalog's current evidence coverage.
 
-The shipped seed rows in `data/manufacturer_catalog.json` are placeholders for
-approved-part workflows: they carry approval, source, and verification metadata
-but intentionally no datasheet URLs or EPD figures, so they report a **review**
-confidence status until a project replaces them with rows backed by real vendor
-documentation.
+The shipped seed rows in `data/manufacturer_catalog.json` are illustrative,
+unreviewed placeholders. They are deliberately not approved and do not claim
+manufacturer verification. Replace them with project rows backed by actual
+manufacturer catalog numbers, datasheets, and the project's approval authority
+before using the data for procurement, submittals, BIM, or estimates.

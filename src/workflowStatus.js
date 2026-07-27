@@ -10,9 +10,10 @@ import {
   getDesignBasis,
   getLifecyclePackages,
   getReportSnapshots,
+  getProjectInputFingerprint,
   getItem
 } from '../dataStore.mjs';
-import { normalizeRouteResults } from '../analysis/deliverableWorkflow.mjs';
+import { filterRouteResultsForProject } from '../analysis/deliverableWorkflow.mjs';
 import { cableHasRoutingCoordinates } from '../analysis/scheduleWorkflow.mjs';
 import { normalizeDesignBasis } from '../analysis/designBasis.mjs';
 import {
@@ -405,12 +406,23 @@ export function getStepStatus(key, overrides = {}) {
   }
 
   if (canonicalKey === 'fillRouting') {
-    const readiness = getCableReadiness(readData(overrides, 'cables', getCables, []));
-    const trays = meaningfulRecords(readData(overrides, 'trays', getTrays, [])).length;
-    const conduits = meaningfulRecords(readData(overrides, 'conduits', getConduits, [])).length;
-    const ductbanks = meaningfulRecords(readData(overrides, 'ductbanks', getDuctbanks, [])).length;
+    const cableRows = readData(overrides, 'cables', getCables, []);
+    const trayRows = readData(overrides, 'trays', getTrays, []);
+    const conduitRows = readData(overrides, 'conduits', getConduits, []);
+    const ductbankRows = readData(overrides, 'ductbanks', getDuctbanks, []);
+    const readiness = getCableReadiness(cableRows);
+    const trays = meaningfulRecords(trayRows).length;
+    const conduits = meaningfulRecords(conduitRows).length;
+    const ductbanks = meaningfulRecords(ductbankRows).length;
     const raceways = trays + conduits + ductbanks;
-    const routeResults = normalizeRouteResults(readData(overrides, 'latestRouteResults', () => getItem('latestRouteResults', null), null));
+    const storedRouteResults = readData(overrides, 'latestRouteResults', () => getItem('latestRouteResults', null), null);
+    const routeResults = filterRouteResultsForProject(storedRouteResults, {
+      cables: cableRows,
+      trays: trayRows,
+      conduits: conduitRows,
+      ductbanks: ductbankRows,
+      currentInputFingerprint: readData(overrides, 'currentInputFingerprint', getProjectInputFingerprint, '')
+    });
     if (readiness.routingReady > 0 && routeResults.length >= readiness.routingReady) {
       if (readiness.missingCoordinates > 0) {
         return {
@@ -467,7 +479,13 @@ export function getStepStatus(key, overrides = {}) {
     const routeResults = readData(overrides, 'latestRouteResults', () => getItem('latestRouteResults', null), null);
     const packageCount = Array.isArray(packages) ? packages.length : 0;
     const snapshotCount = countReportSnapshots(snapshots);
-    const routeCount = normalizeRouteResults(routeResults).length;
+    const routeCount = filterRouteResultsForProject(routeResults, {
+      cables: readData(overrides, 'cables', getCables, []),
+      trays: readData(overrides, 'trays', getTrays, []),
+      conduits: readData(overrides, 'conduits', getConduits, []),
+      ductbanks: readData(overrides, 'ductbanks', getDuctbanks, []),
+      currentInputFingerprint: readData(overrides, 'currentInputFingerprint', getProjectInputFingerprint, '')
+    }).length;
     const total = packageCount + snapshotCount;
     if (total > 0) return { complete: true, label: pluralize(total, 'deliverable', 'deliverables') };
     if (routeCount > 0) {

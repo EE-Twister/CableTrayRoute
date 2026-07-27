@@ -115,7 +115,8 @@ test.describe('Manufacturer catalog browser', () => {
     const rows = page.locator('.catalog-table tbody tr');
     expect(await rows.count()).toBeGreaterThanOrEqual(20);
 
-    await expect(page.locator('.catalog-quality-counts')).toContainText('approved');
+    await expect(page.locator('.catalog-quality-counts')).toContainText('0 approved');
+    await expect(rows.first()).toContainText('unreviewed');
     await expect(page.locator('.catalog-quality-gaps')).toContainText('Top evidence gaps');
 
     const firstRow = rows.first();

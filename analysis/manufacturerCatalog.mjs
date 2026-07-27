@@ -38,7 +38,22 @@ function cleanText(value) {
 
 function cleanDate(value) {
   const text = cleanText(value);
-  return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : '';
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(text);
+  if (!match) return '';
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  if (parsed.getUTCFullYear() !== year
+    || parsed.getUTCMonth() !== month - 1
+    || parsed.getUTCDate() !== day) {
+    return '';
+  }
+  return text;
+}
+
+export function normalizeCatalogDate(value) {
+  return cleanDate(value);
 }
 
 function cleanUrl(value) {
@@ -46,6 +61,7 @@ function cleanUrl(value) {
 }
 
 function toNumberOrNull(value) {
+  if (cleanText(value) === '') return null;
   const num = Number(value);
   return Number.isFinite(num) ? num : null;
 }
@@ -355,11 +371,11 @@ function mergeProduct(existing, next) {
   return merged || next || existing;
 }
 
-export function mergeCatalogProducts(baseProducts = [], projectProducts = []) {
+export function mergeCatalogProducts(baseProducts = [], projectProducts = [], options = {}) {
   const byIdentity = new Map();
   const merged = [];
 
-  [...baseProducts, ...projectProducts].forEach((raw) => {
+  const append = (raw, allowOverride) => {
     const product = normalizeCatalogProduct(raw);
     if (!product) return;
     const key = catalogIdentity(product);
@@ -369,8 +385,15 @@ export function mergeCatalogProducts(baseProducts = [], projectProducts = []) {
       merged.push(product);
       return;
     }
-    merged[existingIndex] = mergeProduct(merged[existingIndex], product);
-  });
+    if (allowOverride) {
+      merged[existingIndex] = mergeProduct(merged[existingIndex], product);
+    }
+  };
+
+  (Array.isArray(baseProducts) ? baseProducts : []).forEach(product => append(product, false));
+  const allowProjectOverrides = options.allowProjectOverrides === true;
+  (Array.isArray(projectProducts) ? projectProducts : [])
+    .forEach(product => append(product, allowProjectOverrides));
 
   return merged;
 }
@@ -681,23 +704,20 @@ function normalizedCatalogIndexes(catalogProducts = []) {
     : [];
   return {
     catalog,
-    byIdentity: new Map(catalog.map(product => [catalogIdentity(product), product])),
-    byId: new Map(catalog.map(product => [cleanText(product.id).toLowerCase(), product]))
+    byIdentity: new Map(catalog.map(product => [catalogIdentity(product), product]))
   };
 }
 
 export function findCatalogProductForRecord(record = {}, catalogProducts = []) {
   const fields = buildBomCatalogFields(record);
-  const { byIdentity, byId } = normalizedCatalogIndexes(catalogProducts);
+  const { byIdentity } = normalizedCatalogIndexes(catalogProducts);
+  if (hasGenericManufacturer(fields.manufacturer) || !fields.catalogNumber) return null;
   const identity = buildIdentity(fields.manufacturer, fields.catalogNumber, fields.catalogNumber);
-  return byIdentity.get(identity)
-    || byId.get(cleanText(fields.catalogNumber).toLowerCase())
-    || byId.get(cleanText(record.id).toLowerCase())
-    || null;
+  return byIdentity.get(identity) || null;
 }
 
 export function buildCatalogWarnings(records = [], catalogProducts = [], options = {}) {
-  const { catalog, byIdentity: catalogByIdentity, byId: catalogById } = normalizedCatalogIndexes(catalogProducts);
+  const { catalog, byIdentity: catalogByIdentity } = normalizedCatalogIndexes(catalogProducts);
   const shouldCheckUnknownCatalog = catalog.length > 0 || options.checkUnknownCatalog === true;
   const today = cleanDate(options.today) || cleanDate(new Date().toISOString().slice(0, 10));
   const verificationMaxAgeDays = Number.isFinite(Number(options.verificationMaxAgeDays))
@@ -721,7 +741,7 @@ export function buildCatalogWarnings(records = [], catalogProducts = [], options
     }
 
     const key = buildIdentity(fields.manufacturer, fields.catalogNumber, fields.catalogNumber);
-    const product = catalogByIdentity.get(key) || catalogById.get(fields.catalogNumber.toLowerCase()) || null;
+    const product = catalogByIdentity.get(key) || null;
 
     if (shouldCheckUnknownCatalog && !product) {
       warnings.push({

@@ -319,6 +319,7 @@ const dataStateOverlayStorageKey = 'oneLineDataStateOverlay';
 const dataStateOverlayDefaultVersionStorageKey = 'oneLineDataStateOverlayDefaultVersion';
 const operatingStateStorageKey = 'oneLineOperatingState';
 const paletteFilterStorageKey = 'oneLinePaletteFilter';
+const paletteFilterDefaultVersionStorageKey = 'oneLinePaletteFilterDefaultVersion';
 const maxViewAttributeCount = 250;
 const maxViewAttributeLength = 128;
 const defaultPaletteWidth = 250;
@@ -611,6 +612,7 @@ if (!Object.prototype.hasOwnProperty.call(operatingStateLabels, activeOperatingS
 }
 
 const paletteCategoryFilters = Object.freeze({
+  common: 'Common',
   all: 'All',
   sources: 'Sources',
   equipment: 'Equipment',
@@ -619,9 +621,14 @@ const paletteCategoryFilters = Object.freeze({
   cable: 'Cables',
   annotations: 'Annotations'
 });
-let activePaletteCategoryFilter = getOneLineViewSetting(paletteFilterStorageKey, 'all');
+let activePaletteCategoryFilter = getOneLineViewSetting(paletteFilterStorageKey, 'common');
 if (!Object.prototype.hasOwnProperty.call(paletteCategoryFilters, activePaletteCategoryFilter)) {
-  activePaletteCategoryFilter = 'all';
+  activePaletteCategoryFilter = 'common';
+}
+if (getOneLineViewSetting(paletteFilterDefaultVersionStorageKey, '') !== 'focused-palette-v1') {
+  activePaletteCategoryFilter = 'common';
+  setOneLineViewSetting(paletteFilterStorageKey, activePaletteCategoryFilter);
+  setOneLineViewSetting(paletteFilterDefaultVersionStorageKey, 'focused-palette-v1');
 }
 
 function compKey(type, subtype) {
@@ -2848,13 +2855,38 @@ function buildPalette() {
     if (cat === 'load') return 'load';
     return cat || 'equipment';
   };
+  const commonPaletteLabels = new Set([
+    'utility',
+    'utility source',
+    'generator',
+    'bus',
+    'panel',
+    'transformer',
+    'xfmr 2w',
+    'lv cb',
+    'motor load',
+    'cable',
+    'cable segment'
+  ]);
+  const commonPaletteTypes = new Set([
+    'utility_source',
+    'generator',
+    'bus',
+    'panel',
+    'transformer',
+    'circuit_breaker',
+    'motor_load',
+    'cable'
+  ]);
   const paletteButtonMatchesFilter = (btn, term, activeFilter) => {
     const label = (btn.dataset.label || '').toLowerCase();
     const sub = (btn.dataset.subtype || '').toLowerCase();
     const type = (btn.dataset.type || '').toLowerCase();
     const category = btn.dataset.filterCategory || btn.dataset.category || '';
     const matchesText = !term || label.includes(term) || sub.includes(term) || type.includes(term);
-    const matchesCategory = activeFilter === 'all' || category === activeFilter;
+    const matchesCategory = activeFilter === 'all'
+      || (activeFilter === 'common' && btn.dataset.common === '1')
+      || category === activeFilter;
     return matchesText && matchesCategory;
   };
   const createPaletteButton = (cat, subKey, meta, { pinned = false } = {}) => {
@@ -2873,6 +2905,10 @@ function buildPalette() {
     }
     btn.setAttribute('data-testid', 'palette-button');
     btn.dataset.label = meta.label;
+    btn.dataset.common = commonPaletteLabels.has(String(meta.label || '').trim().toLowerCase())
+      || commonPaletteTypes.has(String(meta.type || '').trim().toLowerCase())
+      ? '1'
+      : '0';
     btn.title = `${meta.label} - Drag to canvas or click to add`;
     btn.setAttribute('aria-label', meta.label || meta.subtype || meta.type || subKey);
     if (pinned) btn.classList.add('palette-pinned-button');
@@ -2932,7 +2968,7 @@ function buildPalette() {
     const term = paletteSearch?.value.trim().toLowerCase() || '';
     const activeFilter = Object.prototype.hasOwnProperty.call(paletteCategoryFilters, activePaletteCategoryFilter)
       ? activePaletteCategoryFilter
-      : 'all';
+      : 'common';
     let visibleCount = 0;
     palette.querySelectorAll('button[data-testid="palette-button"]').forEach(btn => {
       const visible = paletteButtonMatchesFilter(btn, term, activeFilter);
@@ -2946,7 +2982,7 @@ function buildPalette() {
     });
     document.querySelectorAll('#component-buttons details').forEach(det => {
       const sectionFilter = det.dataset.filterCategory || det.dataset.category || '';
-      const categoryVisible = activeFilter === 'all' || sectionFilter === activeFilter;
+      const categoryVisible = activeFilter === 'all' || activeFilter === 'common' || sectionFilter === activeFilter;
       const buttons = Array.from(det.querySelectorAll('button[data-testid="palette-button"]'));
       const hasVisibleButton = buttons.some(btn => !btn.hidden);
       const card = det.closest('.palette-card');
@@ -3043,7 +3079,7 @@ function buildPalette() {
     paletteSearch.addEventListener('keydown', e => {
       if (e.key === 'Escape') {
         paletteSearch.value = '';
-        activePaletteCategoryFilter = 'all';
+        activePaletteCategoryFilter = 'common';
         setOneLineViewSetting(paletteFilterStorageKey, activePaletteCategoryFilter);
         applyPaletteFilters();
       }

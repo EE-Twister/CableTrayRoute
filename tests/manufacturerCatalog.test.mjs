@@ -6,6 +6,7 @@ import {
   buildBomCatalogFields,
   buildCatalogWarnings,
   CATALOG_CONFIDENCE_STATUS,
+  catalogIdentity,
   findCatalogProductForRecord,
   filterCatalogProducts,
   mergeCatalogProducts,
@@ -107,42 +108,82 @@ describe('manufacturer catalog normalization', () => {
     assert.ok(result.errors.some(error => error.path === 'lastVerified'));
   });
 
+  it('rejects impossible calendar dates and does not coerce blank numbers to zero', () => {
+    const invalidDate = validateCatalogProduct({
+      id: 'BAD-DATE',
+      manufacturer: 'Example',
+      catalogNumber: 'BAD-DATE',
+      category: 'tray',
+      description: 'Invalid verification date',
+      approved: true,
+      source: 'Approved list',
+      lastVerified: '2026-99-99'
+    });
+    assert.equal(invalidDate.valid, false);
+    assert.ok(invalidDate.errors.some(error => error.path === 'lastVerified'));
+
+    const blankCarbon = normalizeCatalogProduct({
+      id: 'BLANK-CARBON',
+      manufacturer: 'Example',
+      catalogNumber: 'BLANK-CARBON',
+      category: 'tray',
+      description: 'Blank carbon value',
+      co2eKgPerUnit: ''
+    });
+    assert.equal(blankCarbon.co2eKgPerUnit, undefined);
+  });
+
   it('validates the seed manufacturer catalog', () => {
     const catalog = JSON.parse(fs.readFileSync('data/manufacturer_catalog.json', 'utf8'));
     const result = validateCatalog(catalog.products, { requireApprovalAuthority: false });
     assert.equal(result.valid, true);
     assert.equal(result.errors.length, 0);
     assert.ok(result.products.length >= 20);
-    assert.ok(result.products.every(product => product.approved));
+    assert.ok(result.products.every(product => !product.approved));
+    assert.ok(result.products.every(product => product.approval.status === 'unreviewed'));
   });
 });
 
 describe('manufacturer catalog merge and filters', () => {
-  it('merges duplicate manufacturer/catalog numbers with project overrides', () => {
+  const baseProduct = {
+    id: 'base-1',
+    manufacturer: 'ACME',
+    catalogNumber: 'TRAY-12',
+    category: 'tray',
+    description: 'Base tray',
+    unit: 'EA',
+    list_price_usd: 100,
+    approved: true,
+    source: 'Manufacturer datasheet',
+    lastVerified: '2026-05-22'
+  };
+  const projectProduct = {
+    id: 'custom-1',
+    manufacturer: 'ACME',
+    catalog_number: 'TRAY-12',
+    category: 'tray',
+    description: 'Project tray',
+    unit: 'EA',
+    list_price_usd: 125,
+    approved: false
+  };
+
+  it('protects base identities from project catalog overrides by default', () => {
     const merged = mergeCatalogProducts([
-      {
-        id: 'base-1',
-        manufacturer: 'ACME',
-        catalogNumber: 'TRAY-12',
-        category: 'tray',
-        description: 'Base tray',
-        unit: 'EA',
-        list_price_usd: 100
-      }
-    ], [
-      {
-        id: 'custom-1',
-        manufacturer: 'ACME',
-        catalog_number: 'TRAY-12',
-        category: 'tray',
-        description: 'Approved tray',
-        unit: 'EA',
-        list_price_usd: 125,
-        approved: true,
-        source: 'Project approved list',
-        lastVerified: '2026-05-22'
-      }
-    ]);
+      baseProduct
+    ], [projectProduct]);
+    assert.equal(merged.length, 1);
+    assert.equal(merged[0].id, 'base-1');
+    assert.equal(merged[0].commercial.listPriceUsd, 100);
+    assert.equal(merged[0].approved, true);
+  });
+
+  it('allows explicit overrides when merging project-owned rows', () => {
+    const merged = mergeCatalogProducts(
+      [baseProduct],
+      [{ ...projectProduct, approved: true, source: 'Project approved list', lastVerified: '2026-05-22' }],
+      { allowProjectOverrides: true }
+    );
     assert.equal(merged.length, 1);
     assert.equal(merged[0].id, 'custom-1');
     assert.equal(merged[0].commercial.listPriceUsd, 125);
@@ -495,6 +536,13 @@ describe('catalog confidence and traceability', () => {
     assert.equal(report.rows[0].confidence.status, CATALOG_CONFIDENCE_STATUS.complete);
     assert.ok(report.rows[1].warnings.some(warning => warning.code === 'missing-catalog-selection'));
   });
+
+  it('does not match a catalog number belonging to a different manufacturer', () => {
+    const record = { tag: 'T-OTHER', manufacturer: 'OtherCo', catalog_number: 'TRAY-100' };
+    assert.equal(findCatalogProductForRecord(record, [approvedProduct]), null);
+    const warnings = buildCatalogWarnings([record], [approvedProduct]);
+    assert.ok(warnings.some(warning => warning.code === 'unknown-catalog-selection'));
+  });
 });
 
 describe('component library catalog validation', () => {
@@ -586,6 +634,16 @@ describe('catalog import: templates and CSV parsing', () => {
     assert.ok(errors.some(err => err.row === 2 && /lastVerified/i.test(err.message)));
   });
 
+  it('reports impossible imported calendar dates as row errors', () => {
+    const csv = [
+      'Part Number,Manufacturer,Catalog No.,Category,Description,Approved,Source,Last Verified',
+      'X-DATE,ACME,X-DATE,tray,Bad date,TRUE,Approved list,2026-02-31'
+    ].join('\r\n');
+    const { products, errors } = parseCatalogCsv(csv);
+    assert.equal(products.length, 0);
+    assert.ok(errors.some(error => error.row === 2 && error.column === 'Last Verified'));
+  });
+
   it('rejects rows with invalid category enums', () => {
     const csv = [
       'Part Number,Manufacturer,Catalog No.,Category,Description',
@@ -630,10 +688,57 @@ describe('catalog import: templates and CSV parsing', () => {
         lastVerified: '2026-05-22'
       })
     ];
-    const { accepted, duplicates } = importCatalogRows(incoming, existing);
+    const identity = catalogIdentity(existing[0]);
+    const { accepted, duplicates, blocked, importable, merged } = importCatalogRows(
+      incoming,
+      existing,
+      { overridableIdentities: new Set([identity]) }
+    );
     assert.deepEqual(accepted.map(p => p.id), ['NEW']);
     assert.equal(duplicates.length, 1);
     assert.equal(duplicates[0].existing.id, 'OLD');
+    assert.equal(blocked.length, 0);
+    assert.deepEqual(importable.map(product => product.id), ['NEW', 'DUP']);
+    assert.deepEqual(merged.map(product => product.id).sort(), ['DUP', 'NEW']);
+  });
+
+  it('blocks protected base identities and repeated identities within one import', () => {
+    const existing = [{
+      id: 'BASE',
+      manufacturer: 'ACME',
+      catalogNumber: 'TRAY-12',
+      category: 'tray',
+      description: 'Protected base row'
+    }];
+    const incoming = [
+      {
+        id: 'BASE-OVERRIDE',
+        manufacturer: 'ACME',
+        catalogNumber: 'TRAY-12',
+        category: 'tray',
+        description: 'Attempted base override'
+      },
+      {
+        id: 'DUP-A',
+        manufacturer: 'ACME',
+        catalogNumber: 'TRAY-24',
+        category: 'tray',
+        description: 'First duplicate'
+      },
+      {
+        id: 'DUP-B',
+        manufacturer: 'ACME',
+        catalogNumber: 'TRAY-24',
+        category: 'tray',
+        description: 'Second duplicate'
+      }
+    ];
+    const result = importCatalogRows(incoming, existing);
+    assert.equal(result.accepted.length, 0);
+    assert.equal(result.duplicates.length, 0);
+    assert.equal(result.importable.length, 0);
+    assert.equal(result.blocked.filter(entry => entry.kind === 'protected-base').length, 1);
+    assert.equal(result.blocked.filter(entry => entry.kind === 'incoming-duplicate').length, 2);
   });
 
   it('skips fully blank CSV rows', () => {

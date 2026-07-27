@@ -14,7 +14,7 @@ import {
   getStudies, getStudyApprovals, getEquipment, getLoads, getOneLine,
   getReportSnapshots, setReportSnapshot, deleteReportSnapshot,
   getLifecyclePackages,
-  getDesignBasis, getDesignGateApprovals, getItem, getProjectMeta, setProjectMeta,
+  getDesignBasis, getDesignGateApprovals, getItem, getProjectInputFingerprint, getProjectMeta, setProjectMeta,
 } from '../dataStore.mjs';
 import { getProjectState } from '../projectStorage.js';
 import { normalizeProjectMeta } from '../analysis/projectIntegration.mjs';
@@ -698,6 +698,7 @@ function currentReportReadinessDiagnostics() {
     designGateApprovals: projectData.designGateApprovals,
     tccSettings: projectData.tccSettings,
     enforceDesignBasis: true,
+    currentInputFingerprint: activeLifecyclePkg ? '' : getProjectInputFingerprint(),
   });
 }
 
@@ -732,7 +733,8 @@ function currentWorkflowDiagnostics() {
       : getItem('latestRouteResults', null),
     reconcilePending: activeLifecyclePkg
       ? Boolean(snap.oneLineScheduleReconcilePending)
-      : Boolean(getItem('oneLineScheduleReconcilePending', false))
+      : Boolean(getItem('oneLineScheduleReconcilePending', false)),
+    currentInputFingerprint: activeLifecyclePkg ? '' : getProjectInputFingerprint()
   });
 }
 
@@ -775,6 +777,13 @@ function renderReportReadiness() {
   const actionLabel = action.severity === 'warning' || action.severity === 'critical'
     ? `${READINESS_VOCABULARY.missingInputs}: ${action.label}`
     : `${READINESS_VOCABULARY.downstreamHandoff}: ${action.label}`;
+  const blocker = workflow.issueBlockers[0] || workflow.designReview.deliverableBlockers[0];
+  const issueActionsBlocked = !workflow.readyForDeliverables;
+  const blockerLabel = blocker?.label || action.label || 'Complete workflow readiness';
+  const blockerHref = globalThis.projectScopedHref?.(blocker?.href || action.href || 'workflowdashboard.html')
+    || blocker?.href
+    || action.href
+    || 'workflowdashboard.html';
   el.classList.toggle('is-warning', action.severity === 'warning' || action.severity === 'critical');
   el.classList.toggle('is-ready', workflow.readyForDeliverables && diagnostics.ready.projectReport && routeCount > 0);
   el.innerHTML = `
@@ -789,7 +798,29 @@ function renderReportReadiness() {
         <span class="report-readiness-tier ${workflow.readyForDeliverables ? 'is-ready' : 'is-warning'}">Issue readiness: ${workflow.readyForDeliverables ? 'ready' : 'blocked'}</span>
       </div>
     </div>
-    <span class="workflow-next-action__meta">${escAttr(actionLabel)}</span>`;
+    <span class="workflow-next-action__meta">
+      ${escAttr(actionLabel)}
+      ${issueActionsBlocked ? `<a class="btn" href="${escAttr(blockerHref)}">Review blocker</a>` : ''}
+    </span>`;
+  const gatedButtonIds = [
+    'rpt-print-btn',
+    'rpt-xlsx-btn',
+    'rpt-html-btn',
+    'rpt-json-btn',
+    'rpt-snapshot-btn',
+    'rpt-mobile-print-btn'
+  ];
+  gatedButtonIds.forEach(id => {
+    const button = document.getElementById(id);
+    if (!button) return;
+    button.disabled = issueActionsBlocked;
+    button.setAttribute('aria-disabled', issueActionsBlocked ? 'true' : 'false');
+    if (issueActionsBlocked) {
+      button.title = `Blocked: ${blockerLabel}`;
+    } else {
+      button.removeAttribute('title');
+    }
+  });
 }
 
 function generatePreview() {

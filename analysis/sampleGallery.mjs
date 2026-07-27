@@ -8,6 +8,23 @@ import { normalizeRouteResultState } from './routeResults.mjs';
 
 export const SCHEMA_VERSION = 1;
 
+export function getSampleProjectCopies(title, existingNames = []) {
+  const base = `${String(title || 'Untitled').trim() || 'Untitled'} — Sample`;
+  const sampleBase = repairMojibake(base);
+  const escapedBase = sampleBase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const matcher = new RegExp(`^${escapedBase}(?: \\((\\d+)\\))?$`, 'i');
+  return (existingNames || [])
+    .map(name => String(name).trim())
+    .filter(name => matcher.test(name))
+    .sort((left, right) => {
+      const leftMatch = left.match(matcher);
+      const rightMatch = right.match(matcher);
+      const leftNumber = Number(leftMatch?.[1] || 1);
+      const rightNumber = Number(rightMatch?.[1] || 1);
+      return rightNumber - leftNumber;
+    });
+}
+
 export function getSampleProjectCopyName(title, existingNames = []) {
   const base = `${String(title || 'Untitled').trim() || 'Untitled'} — Sample`;
   const used = new Set((existingNames || []).map(name => String(name).trim().toLocaleLowerCase()));

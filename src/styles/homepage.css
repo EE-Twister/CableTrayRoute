@@ -203,7 +203,7 @@
 
 .home-next-action__label {
     display: block;
-    color: #1e40af;
+    color: var(--color-primary);
     font-size: 0.68rem;
     font-weight: 800;
     letter-spacing: 0.05em;
@@ -226,7 +226,7 @@
 
 #home-next-action-detail,
 #home-next-action-metrics {
-    color: #334155;
+    color: var(--color-text-muted);
     font-size: 0.78rem;
     line-height: 1.35;
 }
@@ -238,7 +238,7 @@
 
 .home-next-action a {
     margin-top: 0.2rem;
-    color: #1e40af;
+    color: var(--color-primary);
     font-size: 0.82rem;
     font-weight: 800;
     text-decoration: none;
@@ -246,7 +246,7 @@
 
 #workflow-progress-text,
 #workflow-next-step {
-    color: #334155;
+    color: var(--color-text-muted);
 }
 
 .home-next-action a:hover {

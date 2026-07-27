@@ -375,7 +375,7 @@ class TableManager {
       const btn=document.createElement('button');
       btn.className='filter-btn';
       btn.innerHTML=FILTER_ICON_SVG;
-      btn.setAttribute('aria-label','Filter column');
+      btn.setAttribute('aria-label',`Filter ${col.label || col.key || 'column'}`);
       btn.addEventListener('click',e=>{e.stopPropagation();this.showFilterPopup(btn,idx);});
       th.appendChild(btn);
       const resizer=document.createElement('span');
@@ -1196,6 +1196,9 @@ class TableManager {
 
   addRow(data = {}) {
     const tr = this.tbody.insertRow();
+    const rowNumber = this.tbody.rows.length;
+    const rowIdentity = String(data.tag || data.name || data.id || data.ref || '').trim();
+    const rowLabel = rowIdentity ? `${rowIdentity}, row ${rowNumber}` : `row ${rowNumber}`;
     tr.tabIndex = 0;
     tr.classList.add('table-row-focusable');
     tr.addEventListener('keydown', e => {
@@ -1213,6 +1216,7 @@ class TableManager {
       const chk = document.createElement('input');
       chk.type = 'checkbox';
       chk.className = 'row-select';
+      chk.setAttribute('aria-label', `Select ${rowLabel}`);
       chk.addEventListener('change', () => {
         if (!chk.checked && this.selectAll) this.selectAll.checked = false;
         this.updateSelectAllState();
@@ -1295,6 +1299,7 @@ class TableManager {
         }
       }
       el.name = col.key;
+      el.setAttribute('aria-label', `${col.label || col.key || 'Field'}, ${rowLabel}`);
       if (col.readOnly && 'readOnly' in el) {
         el.readOnly = true;
         el.setAttribute('aria-readonly', 'true');

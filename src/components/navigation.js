@@ -406,6 +406,13 @@ function updateProjectSyncStatus(detail = {}) {
   } else {
     status.removeAttribute('title');
   }
+  const trigger = document.querySelector('.project-actions-trigger');
+  if (trigger) {
+    const projectName = document.getElementById('project-display')?.textContent?.replace(/^Project:\s*/i, '').trim() || 'Untitled';
+    const accessibleStatus = detail.detail || status.textContent;
+    trigger.setAttribute('aria-label', `Project actions for ${projectName}. ${accessibleStatus}`);
+    trigger.title = `${projectName} — ${accessibleStatus}`;
+  }
 }
 
 function hasNavigationDomApi() {

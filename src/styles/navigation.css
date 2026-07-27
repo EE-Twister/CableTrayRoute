@@ -846,15 +846,14 @@
     }
 
     .project-actions-trigger {
-        min-width: 2.75rem;
+        min-width: 4.75rem;
         min-height: 2.75rem;
-        max-width: 2.75rem;
+        max-width: 7.5rem;
         justify-content: center;
-        padding: 0;
+        padding: 0.25rem 0.4rem;
     }
 
     .project-actions-trigger::after,
-    .project-sync-status,
     .project-display-chip {
         display: none;
     }
@@ -976,6 +975,10 @@
     color: #1e40af;
 }
 
+.step-nav[hidden] {
+    display: none !important;
+}
+
 /* --- Workflow Step Navigator --- */
 .workflow-step-nav {
     display: flex;
@@ -1083,6 +1086,15 @@ body.dark-mode .workflow-step-nav-link {
     border-radius: 0.55rem;
     background: #eff6ff;
     color: #172554;
+}
+
+.sample-workflow-guide--integrated {
+    flex: 1 0 100%;
+    margin: 0;
+    border-right: 0;
+    border-bottom: 0;
+    border-radius: 0;
+    background: color-mix(in srgb, var(--color-surface-strong) 88%, var(--color-primary));
 }
 
 .sample-workflow-guide__identity {

@@ -13,6 +13,7 @@ import { fileURLToPath } from 'url';
 import {
   SCHEMA_VERSION,
   SAMPLE_REGISTRY,
+  getSampleProjectCopies,
   getSampleProjectCopyName,
   getSamplesByTag,
   getSampleById,
@@ -31,6 +32,22 @@ describe('getSampleProjectCopyName()', () => {
     assert.equal(
       getSampleProjectCopyName('Project Workflow Core', ['project workflow core — sample', 'Project Workflow Core — Sample (2)']),
       'Project Workflow Core — Sample (3)'
+    );
+  });
+
+  it('finds existing sample copies in newest-first order', () => {
+    assert.deepStrictEqual(
+      getSampleProjectCopies('Project Workflow Core', [
+        'Other Project',
+        'Project Workflow Core — Sample',
+        'Project Workflow Core — Sample (3)',
+        'project workflow core — sample (2)',
+      ]),
+      [
+        'Project Workflow Core — Sample (3)',
+        'project workflow core — sample (2)',
+        'Project Workflow Core — Sample',
+      ]
     );
   });
 });

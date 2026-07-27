@@ -618,7 +618,8 @@ export function buildWorkflowCoreDiagnostics(project = {}) {
     studies: project.studies || {},
     routeResults: project.routeResults || project.latestRouteResults || [],
     reportSnapshots: project.reportSnapshots || {},
-    lifecyclePackages: project.deliverables || []
+    lifecyclePackages: project.deliverables || [],
+    currentInputFingerprint: project.currentInputFingerprint || ''
   });
   const reconcilePending = Boolean(project.reconcilePending);
   const blockers = [];

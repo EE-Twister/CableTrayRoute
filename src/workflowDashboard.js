@@ -8,6 +8,7 @@ import {
 import { openModal } from './components/modal.js';
 import {
   getEquipment, getLoads, getCables, getTrays, getConduits, getDuctbanks, getStudies,
+  getProjectInputFingerprint,
   getStudyApprovals, getOneLine, getDesignBasis, setDesignBasis,
   getDesignGateApprovals, setDesignGateApprovals,
   setOneLine, setCables, setTrays, setConduits, setDuctbanks, setItem,
@@ -786,6 +787,7 @@ function currentDashboardProject() {
     designBasis: getDesignBasis(),
     designGateApprovals: getDesignGateApprovals(),
     tccSettings: getItem('tccSettings', null),
+    currentInputFingerprint: getProjectInputFingerprint(),
     reconcilePending: Boolean(getItem('oneLineScheduleReconcilePending', false))
   };
 }

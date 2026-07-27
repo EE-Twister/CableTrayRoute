@@ -1,6 +1,7 @@
 {
   "_version": "2.0",
-  "_description": "Governed manufacturer product catalog for cable trays, fittings, conduit, and accessories. Used by the Tray Hardware BOM wizard, estimates, BIM export, and submittal package generator.",
+  "_description": "Illustrative, unreviewed manufacturer-style catalog placeholders for exercising tray, fitting, conduit, and accessory workflows. Replace with manufacturer-verified project data before procurement, submittal, BIM, or estimating use.",
+  "_notice": "These seed rows are not manufacturer-verified and are not approved parts.",
   "_schema": {
     "version": 2,
     "products": [
@@ -71,17 +72,17 @@
         "classification": "tray"
       },
       "datasheetUrl": null,
-      "approved": true,
-      "approved_part": true,
+      "approved": false,
+      "approved_part": false,
       "approval": {
-        "status": "approved",
-        "authority": "CableTrayRoute seed catalog",
-        "approvedBy": "Default catalog",
-        "approvedAt": "2026-05-22",
-        "notes": "Seed governed catalog row for approved-part workflows."
+        "status": "unreviewed",
+        "authority": "",
+        "approvedBy": "",
+        "approvedAt": "",
+        "notes": "Illustrative seed placeholder; replace with manufacturer-backed project data before use."
       },
-      "source": "CableTrayRoute seed manufacturer catalog",
-      "lastVerified": "2026-05-22"
+      "source": "CableTrayRoute illustrative seed data; not manufacturer verified",
+      "lastVerified": ""
     },
     {
       "id": "BL-VCT-18-4",
@@ -128,17 +129,17 @@
         "classification": "tray"
       },
       "datasheetUrl": null,
-      "approved": true,
-      "approved_part": true,
+      "approved": false,
+      "approved_part": false,
       "approval": {
-        "status": "approved",
-        "authority": "CableTrayRoute seed catalog",
-        "approvedBy": "Default catalog",
-        "approvedAt": "2026-05-22",
-        "notes": "Seed governed catalog row for approved-part workflows."
+        "status": "unreviewed",
+        "authority": "",
+        "approvedBy": "",
+        "approvedAt": "",
+        "notes": "Illustrative seed placeholder; replace with manufacturer-backed project data before use."
       },
-      "source": "CableTrayRoute seed manufacturer catalog",
-      "lastVerified": "2026-05-22"
+      "source": "CableTrayRoute illustrative seed data; not manufacturer verified",
+      "lastVerified": ""
     },
     {
       "id": "BL-VCT-24-4",
@@ -185,17 +186,17 @@
         "classification": "tray"
       },
       "datasheetUrl": null,
-      "approved": true,
-      "approved_part": true,
+      "approved": false,
+      "approved_part": false,
       "approval": {
-        "status": "approved",
-        "authority": "CableTrayRoute seed catalog",
-        "approvedBy": "Default catalog",
-        "approvedAt": "2026-05-22",
-        "notes": "Seed governed catalog row for approved-part workflows."
+        "status": "unreviewed",
+        "authority": "",
+        "approvedBy": "",
+        "approvedAt": "",
+        "notes": "Illustrative seed placeholder; replace with manufacturer-backed project data before use."
       },
-      "source": "CableTrayRoute seed manufacturer catalog",
-      "lastVerified": "2026-05-22"
+      "source": "CableTrayRoute illustrative seed data; not manufacturer verified",
+      "lastVerified": ""
     },
     {
       "id": "BL-VCT-36-6",
@@ -242,17 +243,17 @@
         "classification": "tray"
       },
       "datasheetUrl": null,
-      "approved": true,
-      "approved_part": true,
+      "approved": false,
+      "approved_part": false,
       "approval": {
-        "status": "approved",
-        "authority": "CableTrayRoute seed catalog",
-        "approvedBy": "Default catalog",
-        "approvedAt": "2026-05-22",
-        "notes": "Seed governed catalog row for approved-part workflows."
+        "status": "unreviewed",
+        "authority": "",
+        "approvedBy": "",
+        "approvedAt": "",
+        "notes": "Illustrative seed placeholder; replace with manufacturer-backed project data before use."
       },
-      "source": "CableTrayRoute seed manufacturer catalog",
-      "lastVerified": "2026-05-22"
+      "source": "CableTrayRoute illustrative seed data; not manufacturer verified",
+      "lastVerified": ""
     },
     {
       "id": "BL-HE-12-4-90",
@@ -299,17 +300,17 @@
         "classification": "fitting"
       },
       "datasheetUrl": null,
-      "approved": true,
-      "approved_part": true,
+      "approved": false,
+      "approved_part": false,
       "approval": {
-        "status": "approved",
-        "authority": "CableTrayRoute seed catalog",
-        "approvedBy": "Default catalog",
-        "approvedAt": "2026-05-22",
-        "notes": "Seed governed catalog row for approved-part workflows."
+        "status": "unreviewed",
+        "authority": "",
+        "approvedBy": "",
+        "approvedAt": "",
+        "notes": "Illustrative seed placeholder; replace with manufacturer-backed project data before use."
       },
-      "source": "CableTrayRoute seed manufacturer catalog",
-      "lastVerified": "2026-05-22"
+      "source": "CableTrayRoute illustrative seed data; not manufacturer verified",
+      "lastVerified": ""
     },
     {
       "id": "BL-HE-24-4-90",
@@ -356,17 +357,17 @@
         "classification": "fitting"
       },
       "datasheetUrl": null,
-      "approved": true,
-      "approved_part": true,
+      "approved": false,
+      "approved_part": false,
       "approval": {
-        "status": "approved",
-        "authority": "CableTrayRoute seed catalog",
-        "approvedBy": "Default catalog",
-        "approvedAt": "2026-05-22",
-        "notes": "Seed governed catalog row for approved-part workflows."
+        "status": "unreviewed",
+        "authority": "",
+        "approvedBy": "",
+        "approvedAt": "",
+        "notes": "Illustrative seed placeholder; replace with manufacturer-backed project data before use."
       },
-      "source": "CableTrayRoute seed manufacturer catalog",
-      "lastVerified": "2026-05-22"
+      "source": "CableTrayRoute illustrative seed data; not manufacturer verified",
+      "lastVerified": ""
     },
     {
       "id": "BL-HT-12-4",
@@ -412,17 +413,17 @@
         "classification": "fitting"
       },
       "datasheetUrl": null,
-      "approved": true,
-      "approved_part": true,
+      "approved": false,
+      "approved_part": false,
       "approval": {
-        "status": "approved",
-        "authority": "CableTrayRoute seed catalog",
-        "approvedBy": "Default catalog",
-        "approvedAt": "2026-05-22",
-        "notes": "Seed governed catalog row for approved-part workflows."
+        "status": "unreviewed",
+        "authority": "",
+        "approvedBy": "",
+        "approvedAt": "",
+        "notes": "Illustrative seed placeholder; replace with manufacturer-backed project data before use."
       },
-      "source": "CableTrayRoute seed manufacturer catalog",
-      "lastVerified": "2026-05-22"
+      "source": "CableTrayRoute illustrative seed data; not manufacturer verified",
+      "lastVerified": ""
     },
     {
       "id": "BL-HT-24-4",
@@ -468,17 +469,17 @@
         "classification": "fitting"
       },
       "datasheetUrl": null,
-      "approved": true,
-      "approved_part": true,
+      "approved": false,
+      "approved_part": false,
       "approval": {
-        "status": "approved",
-        "authority": "CableTrayRoute seed catalog",
-        "approvedBy": "Default catalog",
-        "approvedAt": "2026-05-22",
-        "notes": "Seed governed catalog row for approved-part workflows."
+        "status": "unreviewed",
+        "authority": "",
+        "approvedBy": "",
+        "approvedAt": "",
+        "notes": "Illustrative seed placeholder; replace with manufacturer-backed project data before use."
       },
-      "source": "CableTrayRoute seed manufacturer catalog",
-      "lastVerified": "2026-05-22"
+      "source": "CableTrayRoute illustrative seed data; not manufacturer verified",
+      "lastVerified": ""
     },
     {
       "id": "BL-VE-12-4-90",
@@ -525,17 +526,17 @@
         "classification": "fitting"
       },
       "datasheetUrl": null,
-      "approved": true,
-      "approved_part": true,
+      "approved": false,
+      "approved_part": false,
       "approval": {
-        "status": "approved",
-        "authority": "CableTrayRoute seed catalog",
-        "approvedBy": "Default catalog",
-        "approvedAt": "2026-05-22",
-        "notes": "Seed governed catalog row for approved-part workflows."
+        "status": "unreviewed",
+        "authority": "",
+        "approvedBy": "",
+        "approvedAt": "",
+        "notes": "Illustrative seed placeholder; replace with manufacturer-backed project data before use."
       },
-      "source": "CableTrayRoute seed manufacturer catalog",
-      "lastVerified": "2026-05-22"
+      "source": "CableTrayRoute illustrative seed data; not manufacturer verified",
+      "lastVerified": ""
     },
     {
       "id": "BL-COVER-12-12",
@@ -578,17 +579,17 @@
         "classification": "accessory"
       },
       "datasheetUrl": null,
-      "approved": true,
-      "approved_part": true,
+      "approved": false,
+      "approved_part": false,
       "approval": {
-        "status": "approved",
-        "authority": "CableTrayRoute seed catalog",
-        "approvedBy": "Default catalog",
-        "approvedAt": "2026-05-22",
-        "notes": "Seed governed catalog row for approved-part workflows."
+        "status": "unreviewed",
+        "authority": "",
+        "approvedBy": "",
+        "approvedAt": "",
+        "notes": "Illustrative seed placeholder; replace with manufacturer-backed project data before use."
       },
-      "source": "CableTrayRoute seed manufacturer catalog",
-      "lastVerified": "2026-05-22"
+      "source": "CableTrayRoute illustrative seed data; not manufacturer verified",
+      "lastVerified": ""
     },
     {
       "id": "BL-COVER-24-12",
@@ -631,17 +632,17 @@
         "classification": "accessory"
       },
       "datasheetUrl": null,
-      "approved": true,
-      "approved_part": true,
+      "approved": false,
+      "approved_part": false,
       "approval": {
-        "status": "approved",
-        "authority": "CableTrayRoute seed catalog",
-        "approvedBy": "Default catalog",
-        "approvedAt": "2026-05-22",
-        "notes": "Seed governed catalog row for approved-part workflows."
+        "status": "unreviewed",
+        "authority": "",
+        "approvedBy": "",
+        "approvedAt": "",
+        "notes": "Illustrative seed placeholder; replace with manufacturer-backed project data before use."
       },
-      "source": "CableTrayRoute seed manufacturer catalog",
-      "lastVerified": "2026-05-22"
+      "source": "CableTrayRoute illustrative seed data; not manufacturer verified",
+      "lastVerified": ""
     },
     {
       "id": "BL-HANGER-12",
@@ -684,17 +685,17 @@
         "classification": "accessory"
       },
       "datasheetUrl": null,
-      "approved": true,
-      "approved_part": true,
+      "approved": false,
+      "approved_part": false,
       "approval": {
-        "status": "approved",
-        "authority": "CableTrayRoute seed catalog",
-        "approvedBy": "Default catalog",
-        "approvedAt": "2026-05-22",
-        "notes": "Seed governed catalog row for approved-part workflows."
+        "status": "unreviewed",
+        "authority": "",
+        "approvedBy": "",
+        "approvedAt": "",
+        "notes": "Illustrative seed placeholder; replace with manufacturer-backed project data before use."
       },
-      "source": "CableTrayRoute seed manufacturer catalog",
-      "lastVerified": "2026-05-22"
+      "source": "CableTrayRoute illustrative seed data; not manufacturer verified",
+      "lastVerified": ""
     },
     {
       "id": "BL-HANGER-24",
@@ -737,17 +738,17 @@
         "classification": "accessory"
       },
       "datasheetUrl": null,
-      "approved": true,
-      "approved_part": true,
+      "approved": false,
+      "approved_part": false,
       "approval": {
-        "status": "approved",
-        "authority": "CableTrayRoute seed catalog",
-        "approvedBy": "Default catalog",
-        "approvedAt": "2026-05-22",
-        "notes": "Seed governed catalog row for approved-part workflows."
+        "status": "unreviewed",
+        "authority": "",
+        "approvedBy": "",
+        "approvedAt": "",
+        "notes": "Illustrative seed placeholder; replace with manufacturer-backed project data before use."
       },
-      "source": "CableTrayRoute seed manufacturer catalog",
-      "lastVerified": "2026-05-22"
+      "source": "CableTrayRoute illustrative seed data; not manufacturer verified",
+      "lastVerified": ""
     },
     {
       "id": "LG-CF54-12-4",
@@ -794,17 +795,17 @@
         "classification": "tray"
       },
       "datasheetUrl": null,
-      "approved": true,
-      "approved_part": true,
+      "approved": false,
+      "approved_part": false,
       "approval": {
-        "status": "approved",
-        "authority": "CableTrayRoute seed catalog",
-        "approvedBy": "Default catalog",
-        "approvedAt": "2026-05-22",
-        "notes": "Seed governed catalog row for approved-part workflows."
+        "status": "unreviewed",
+        "authority": "",
+        "approvedBy": "",
+        "approvedAt": "",
+        "notes": "Illustrative seed placeholder; replace with manufacturer-backed project data before use."
       },
-      "source": "CableTrayRoute seed manufacturer catalog",
-      "lastVerified": "2026-05-22"
+      "source": "CableTrayRoute illustrative seed data; not manufacturer verified",
+      "lastVerified": ""
     },
     {
       "id": "LG-CF54-24-4",
@@ -851,17 +852,17 @@
         "classification": "tray"
       },
       "datasheetUrl": null,
-      "approved": true,
-      "approved_part": true,
+      "approved": false,
+      "approved_part": false,
       "approval": {
-        "status": "approved",
-        "authority": "CableTrayRoute seed catalog",
-        "approvedBy": "Default catalog",
-        "approvedAt": "2026-05-22",
-        "notes": "Seed governed catalog row for approved-part workflows."
+        "status": "unreviewed",
+        "authority": "",
+        "approvedBy": "",
+        "approvedAt": "",
+        "notes": "Illustrative seed placeholder; replace with manufacturer-backed project data before use."
       },
-      "source": "CableTrayRoute seed manufacturer catalog",
-      "lastVerified": "2026-05-22"
+      "source": "CableTrayRoute illustrative seed data; not manufacturer verified",
+      "lastVerified": ""
     },
     {
       "id": "LG-CFHE-12-90",
@@ -907,17 +908,17 @@
         "classification": "fitting"
       },
       "datasheetUrl": null,
-      "approved": true,
-      "approved_part": true,
+      "approved": false,
+      "approved_part": false,
       "approval": {
-        "status": "approved",
-        "authority": "CableTrayRoute seed catalog",
-        "approvedBy": "Default catalog",
-        "approvedAt": "2026-05-22",
-        "notes": "Seed governed catalog row for approved-part workflows."
+        "status": "unreviewed",
+        "authority": "",
+        "approvedBy": "",
+        "approvedAt": "",
+        "notes": "Illustrative seed placeholder; replace with manufacturer-backed project data before use."
       },
-      "source": "CableTrayRoute seed manufacturer catalog",
-      "lastVerified": "2026-05-22"
+      "source": "CableTrayRoute illustrative seed data; not manufacturer verified",
+      "lastVerified": ""
     },
     {
       "id": "RMC-3-4-10",
@@ -961,17 +962,17 @@
         "classification": "conduit"
       },
       "datasheetUrl": null,
-      "approved": true,
-      "approved_part": true,
+      "approved": false,
+      "approved_part": false,
       "approval": {
-        "status": "approved",
-        "authority": "CableTrayRoute seed catalog",
-        "approvedBy": "Default catalog",
-        "approvedAt": "2026-05-22",
-        "notes": "Seed governed catalog row for approved-part workflows."
+        "status": "unreviewed",
+        "authority": "",
+        "approvedBy": "",
+        "approvedAt": "",
+        "notes": "Illustrative seed placeholder; replace with manufacturer-backed project data before use."
       },
-      "source": "CableTrayRoute seed manufacturer catalog",
-      "lastVerified": "2026-05-22"
+      "source": "CableTrayRoute illustrative seed data; not manufacturer verified",
+      "lastVerified": ""
     },
     {
       "id": "RMC-1-10",
@@ -1015,17 +1016,17 @@
         "classification": "conduit"
       },
       "datasheetUrl": null,
-      "approved": true,
-      "approved_part": true,
+      "approved": false,
+      "approved_part": false,
       "approval": {
-        "status": "approved",
-        "authority": "CableTrayRoute seed catalog",
-        "approvedBy": "Default catalog",
-        "approvedAt": "2026-05-22",
-        "notes": "Seed governed catalog row for approved-part workflows."
+        "status": "unreviewed",
+        "authority": "",
+        "approvedBy": "",
+        "approvedAt": "",
+        "notes": "Illustrative seed placeholder; replace with manufacturer-backed project data before use."
       },
-      "source": "CableTrayRoute seed manufacturer catalog",
-      "lastVerified": "2026-05-22"
+      "source": "CableTrayRoute illustrative seed data; not manufacturer verified",
+      "lastVerified": ""
     },
     {
       "id": "EMT-3-4-10",
@@ -1069,17 +1070,17 @@
         "classification": "conduit"
       },
       "datasheetUrl": null,
-      "approved": true,
-      "approved_part": true,
+      "approved": false,
+      "approved_part": false,
       "approval": {
-        "status": "approved",
-        "authority": "CableTrayRoute seed catalog",
-        "approvedBy": "Default catalog",
-        "approvedAt": "2026-05-22",
-        "notes": "Seed governed catalog row for approved-part workflows."
+        "status": "unreviewed",
+        "authority": "",
+        "approvedBy": "",
+        "approvedAt": "",
+        "notes": "Illustrative seed placeholder; replace with manufacturer-backed project data before use."
       },
-      "source": "CableTrayRoute seed manufacturer catalog",
-      "lastVerified": "2026-05-22"
+      "source": "CableTrayRoute illustrative seed data; not manufacturer verified",
+      "lastVerified": ""
     },
     {
       "id": "EMT-1-10",
@@ -1123,17 +1124,17 @@
         "classification": "conduit"
       },
       "datasheetUrl": null,
-      "approved": true,
-      "approved_part": true,
+      "approved": false,
+      "approved_part": false,
       "approval": {
-        "status": "approved",
-        "authority": "CableTrayRoute seed catalog",
-        "approvedBy": "Default catalog",
-        "approvedAt": "2026-05-22",
-        "notes": "Seed governed catalog row for approved-part workflows."
+        "status": "unreviewed",
+        "authority": "",
+        "approvedBy": "",
+        "approvedAt": "",
+        "notes": "Illustrative seed placeholder; replace with manufacturer-backed project data before use."
       },
-      "source": "CableTrayRoute seed manufacturer catalog",
-      "lastVerified": "2026-05-22"
+      "source": "CableTrayRoute illustrative seed data; not manufacturer verified",
+      "lastVerified": ""
     }
   ]
 }

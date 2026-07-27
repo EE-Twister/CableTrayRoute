@@ -1046,6 +1046,18 @@ async function loadProjectFromHash(){
   }
 }
 
+function projectScopedHref(rawHref){
+  const href=String(rawHref||'').trim();
+  if(!href||href.startsWith('#')||/^[a-z][a-z0-9+.-]*:/i.test(href)||href.startsWith('//')) return href;
+  if(href.includes('#')) return href;
+  let activeName=currentProjectFromHash();
+  if(!activeName&&typeof window!=='undefined'){
+    const globalName=typeof window.currentProjectId==='string'?window.currentProjectId.trim():'';
+    if(globalName&&globalName!=='default'&&!isPageAnchorHash(globalName)) activeName=globalName;
+  }
+  return activeName?`${href}#${encodeURIComponent(activeName)}`:href;
+}
+
 function applyProjectHash(){
   let activeName='';
   if(typeof window!=='undefined'){
@@ -1059,13 +1071,10 @@ function applyProjectHash(){
     window.currentProjectId=activeName||'default';
   }
   if(typeof document==='undefined'||typeof location==='undefined') return;
-  const projectHash=currentProjectFromHash();
-  const navHash=projectHash?`#${encodeURIComponent(projectHash)}`:(activeName?`#${encodeURIComponent(activeName)}`:'');
-  if(!navHash) return;
-  document.querySelectorAll('a[href$=".html"]').forEach(a=>{
+  document.querySelectorAll('a[href]').forEach(a=>{
     const href=a.getAttribute('href');
-    if(!href||href.includes('#')) return;
-    a.setAttribute('href',href+navHash);
+    if(!href||!/\.html(?:[?#]|$)/i.test(href)) return;
+    a.setAttribute('href',projectScopedHref(href));
   });
 }
 
@@ -1196,6 +1205,7 @@ function collectHomepageSummary(){
     designBasis:safeReadHomeData(getDesignBasis,{}),
     designGateApprovals:safeReadHomeData(getDesignGateApprovals,{}),
     studyApprovals:safeReadHomeData(getStudyApprovals,{}),
+    currentInputFingerprint:safeReadHomeData(getProjectInputFingerprint,''),
     reconcilePending
   });
   const workflowStatusByKey=new Map(workflowDiagnostics.workflowSteps.map(status=>[status.key,status]));
@@ -2225,13 +2235,13 @@ function initWorkflowStepNav(){
   mobileSelect.setAttribute('aria-label','Go to workflow step');
   WORKFLOW_STEPS.forEach((workflowStep,workflowIndex)=>{
     const option=document.createElement('option');
-    option.value=workflowStep.href;
+    option.value=projectScopedHref(workflowStep.href);
     option.textContent=`${workflowIndex+1}. ${stripWorkflowNumber(workflowStep.label)}`;
     option.selected=workflowIndex===idx;
     mobileSelect.appendChild(option);
   });
   const dashboardOption=document.createElement('option');
-  dashboardOption.value='workflowdashboard.html';
+  dashboardOption.value=projectScopedHref('workflowdashboard.html');
   dashboardOption.textContent='Project Dashboard';
   mobileSelect.appendChild(dashboardOption);
   mobileSelect.addEventListener('change',()=>{
@@ -2240,7 +2250,7 @@ function initWorkflowStepNav(){
 
   function makeLink(target,text){
     const a=document.createElement('a');
-    a.href=target.href;
+    a.href=projectScopedHref(target.href);
     a.className='workflow-step-nav-link';
     a.textContent=text;
     return a;
@@ -2249,7 +2259,7 @@ function initWorkflowStepNav(){
   if(prev) links.appendChild(makeLink(prev,`\u2190 ${prev.short}`));
 
   const dashboard=document.createElement('a');
-  dashboard.href='workflowdashboard.html';
+  dashboard.href=projectScopedHref('workflowdashboard.html');
   dashboard.className='workflow-step-nav-link';
   dashboard.textContent='Dashboard';
   links.appendChild(dashboard);
@@ -2272,6 +2282,10 @@ function initWorkflowStepNav(){
   }else{
     main.prepend(nav);
   }
+  main.querySelectorAll('nav.step-nav[aria-label="Workflow navigation"]').forEach(legacyNav=>{
+    legacyNav.hidden=true;
+    legacyNav.setAttribute('aria-hidden','true');
+  });
 }
 
 globalThis.document?.addEventListener('DOMContentLoaded',initWorkflowStepNav);
@@ -2313,7 +2327,7 @@ function initActiveSampleWorkflowGuide(){
     const link=document.createElement('a');
     link.className='sample-workflow-guide__link';
     if(secondary) link.classList.add('sample-workflow-guide__link--secondary');
-    link.href=step.page;
+    link.href=projectScopedHref(step.page);
     link.textContent=repairMojibake(label);
     actions.appendChild(link);
   };
@@ -2322,7 +2336,7 @@ function initActiveSampleWorkflowGuide(){
   const checklist=document.createElement('a');
   checklist.className='sample-workflow-guide__link';
   checklist.classList.add('sample-workflow-guide__link--secondary');
-  checklist.href=`samplegallery.html#${encodeURIComponent(workflow.title)}`;
+  checklist.href=projectScopedHref(`samplegallery.html?sample=${encodeURIComponent(workflow.id)}`);
   checklist.textContent='Checklist';
   actions.appendChild(checklist);
   const close=document.createElement('button');
@@ -2341,8 +2355,13 @@ function initActiveSampleWorkflowGuide(){
   const main=document.getElementById('main-content')||document.querySelector('main');
   if(!main) return;
   const workflowNav=main.querySelector(':scope > .workflow-step-nav');
-  if(workflowNav) workflowNav.insertAdjacentElement('afterend',guide);
-  else main.prepend(guide);
+  if(workflowNav){
+    guide.classList.add('sample-workflow-guide--integrated');
+    workflowNav.querySelector('.workflow-step-nav-links')?.setAttribute('hidden','');
+    workflowNav.appendChild(guide);
+  }else{
+    main.prepend(guide);
+  }
 }
 
 globalThis.document?.addEventListener('DOMContentLoaded',initActiveSampleWorkflowGuide);
@@ -2926,6 +2945,7 @@ globalThis.persistConduits=persistConduits;
 globalThis.loadConduits=loadConduits;
 globalThis.applyUnitLabels=applyUnitLabels;
 globalThis.applyProjectHash=applyProjectHash;
+globalThis.projectScopedHref=projectScopedHref;
 globalThis.showSelfCheckModal=showSelfCheckModal;
 
 // ----- Real-time collaboration -----

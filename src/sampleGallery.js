@@ -1,9 +1,18 @@
 import './workflowStatus.js';
 import '../site.js';
 import { repairMojibake } from './textEncoding.js';
-import { getProjectInputFingerprint, getStudies, importProject, saveProject, setItem, setStudies } from '../dataStore.mjs';
+import { getItem, getProjectInputFingerprint, getStudies, importProject, loadProject, saveProject, setItem, setStudies } from '../dataStore.mjs';
 import { getProjectState, listSavedProjects, readAppSetting, setConduitCache, setProjectState, writeAppSetting } from '../projectStorage.js';
-import { SAMPLE_REGISTRY, getSampleProjectCopyName, getSamplesByTag, validateSampleProject, migrateSampleProject, sampleProjectToImportPayload } from '../analysis/sampleGallery.mjs';
+import {
+  SAMPLE_REGISTRY,
+  getSampleById,
+  getSampleProjectCopies,
+  getSampleProjectCopyName,
+  getSamplesByTag,
+  validateSampleProject,
+  migrateSampleProject,
+  sampleProjectToImportPayload
+} from '../analysis/sampleGallery.mjs';
 
 const PROGRESS_KEY_PREFIX = 'ctr_sample_progress_';
 
@@ -163,12 +172,22 @@ function buildCard(sample) {
 
   const actions = document.createElement('div');
   actions.className = 'sample-card__actions';
+  const existingCopies = getSampleProjectCopies(sample.title, listSavedProjects());
 
   const openBtn = document.createElement('button');
   openBtn.className = 'primary-btn';
-  openBtn.textContent = 'Open Guided Sample';
-  openBtn.setAttribute('aria-label', `Open guided ${sample.title} sample project`);
+  openBtn.textContent = existingCopies.length ? 'Open Saved Copy' : 'Start Guided Sample';
+  openBtn.setAttribute('aria-label', existingCopies.length
+    ? `Open saved ${sample.title} sample project`
+    : `Start guided ${sample.title} sample project`);
   openBtn.addEventListener('click', () => openSample(sample));
+
+  const copyBtn = document.createElement('button');
+  copyBtn.className = 'btn';
+  copyBtn.textContent = 'Create Fresh Copy';
+  copyBtn.setAttribute('aria-label', `Create a fresh copy of the ${sample.title} sample project`);
+  copyBtn.hidden = existingCopies.length === 0;
+  copyBtn.addEventListener('click', () => openSample(sample, { forceNew: true }));
 
   const dlLink = document.createElement('a');
   dlLink.className = 'btn';
@@ -178,6 +197,7 @@ function buildCard(sample) {
   dlLink.setAttribute('aria-label', `Download ${sample.title} project JSON`);
 
   actions.appendChild(openBtn);
+  actions.appendChild(copyBtn);
   actions.appendChild(dlLink);
 
   body.appendChild(header);
@@ -215,7 +235,36 @@ function renderGrid() {
 
 // ── Open sample ───────────────────────────────────────────────────────────────
 
-async function openSample(sample) {
+function activateSampleWorkflow(sample, projectId) {
+  window.currentProjectId = projectId;
+  setItem('activeSampleWorkflow', {
+    id: sample.id,
+    title: sample.title,
+    checklist: sample.guidedChecklist.map(step => ({ ...step })),
+    startedAt: new Date().toISOString(),
+  });
+  history.replaceState(null, '', `${location.pathname}${location.search}#${encodeURIComponent(projectId)}`);
+}
+
+async function openSample(sample, { forceNew = false } = {}) {
+  const existingCopies = getSampleProjectCopies(sample.title, listSavedProjects());
+  if (!forceNew && existingCopies.length > 0) {
+    const projectId = existingCopies[0];
+    if (!loadProject(projectId)) {
+      showToast(`Could not open saved project "${projectId}".`, 'error');
+      return;
+    }
+    setProjectState({ ...getProjectState(), name: projectId });
+    activateSampleWorkflow(sample, projectId);
+    await globalThis.updateProjectDisplay?.({ name: projectId });
+    activeSampleId = sample.id;
+    showChecklist(sample);
+    globalThis.applyProjectHash?.();
+    renderGrid();
+    showToast(`Reopened "${projectId}". Choose Create Fresh Copy when you want a separate project.`, 'success');
+    return;
+  }
+
   let projectData;
   try {
     const resp = await fetch(sample.projectFile);
@@ -243,6 +292,13 @@ async function openSample(sample) {
     setConduitCache({ ductbanks: payload.ductbanks, conduits: payload.conduits });
     const projectId = getSampleProjectCopyName(sample.title, listSavedProjects());
     setProjectState({ ...getProjectState(), name: projectId });
+    const routeState = getItem('latestRouteResults', null);
+    if (Array.isArray(routeState?.batchResults) && routeState.batchResults.length > 0) {
+      setItem('latestRouteResults', {
+        ...routeState,
+        inputFingerprint: getProjectInputFingerprint(),
+      });
+    }
     const studies = getStudies();
     if (studies.shortCircuit?._meta) {
       studies.shortCircuit = {
@@ -254,15 +310,7 @@ async function openSample(sample) {
       };
       setStudies(studies);
     }
-    window.currentProjectId = projectId;
-    setItem('activeSampleWorkflow', {
-      id: sample.id,
-      title: sample.title,
-      checklist: sample.guidedChecklist.map(step => ({ ...step })),
-      startedAt: new Date().toISOString(),
-    });
-    history.replaceState(null, '', `${location.pathname}${location.search}#${encodeURIComponent(projectId)}`);
-    globalThis.applyProjectHash?.();
+    activateSampleWorkflow(sample, projectId);
     saveProject(projectId);
     await globalThis.updateProjectDisplay?.({ name: projectId });
   } catch {
@@ -272,6 +320,7 @@ async function openSample(sample) {
 
   activeSampleId = sample.id;
   showChecklist(sample);
+  globalThis.applyProjectHash?.();
   renderGrid();
   showToast(`Loaded "${sample.title}" — follow the checklist to explore.`, 'success');
 }
@@ -310,7 +359,7 @@ function showChecklist(sample) {
 
     const link = document.createElement('a');
     link.className = 'checklist-step__link';
-    link.href = step.page;
+    link.href = globalThis.projectScopedHref?.(step.page) || step.page;
     const pageLabel = step.page.split(/[?#]/)[0].replace('.html', '');
     link.textContent = `Go to ${pageLabel} →`;
     link.textContent = repairMojibake(link.textContent);
@@ -352,3 +401,5 @@ function refresh() {
 // ── Init ──────────────────────────────────────────────────────────────────────
 
 refresh();
+const requestedSample = getSampleById(new URLSearchParams(location.search).get('sample'));
+if (requestedSample) showChecklist(requestedSample);

@@ -38,6 +38,7 @@ import {
     getCableAssignedRacewayIds
 } from './analysis/scheduleWorkflow.mjs';
 import { normalizeRouteResultState } from './analysis/routeResults.mjs';
+import { filterRouteResultsForProject } from './analysis/deliverableWorkflow.mjs';
 import { buildCablePullPlan } from './analysis/cablePullPlan.mjs';
 import { buildPullGroupSuggestions } from './analysis/cablePullGroups.mjs';
 import { summarizeRouteScreening } from './analysis/routeScreeningSummary.mjs';
@@ -105,7 +106,7 @@ function whenPresent(selector, cb, timeoutMs = 5000) {
   };
   poll();
 }
-import { getItem, setItem, setSessionItem, removeItem, getTrays, getCables, getDuctbanks, getConduits, exportProject, importProject, setCables } from './dataStore.mjs';
+import { getItem, setItem, setSessionItem, removeItem, getProjectInputFingerprint, getTrays, getCables, getDuctbanks, getConduits, exportProject, importProject, setCables } from './dataStore.mjs';
 import { buildSegmentRows, buildSummaryRows, buildBOM, buildTrayHardwareBOM } from './resultsExport.mjs';
 import './site.js';
 import { clearConduitCache, getProjectState, setProjectState } from './projectStorage.js';
@@ -257,6 +258,7 @@ async function initializeApp() {
                 source: 'optimalRoute',
                 updatedAt: new Date().toISOString(),
                 ...meta,
+                inputFingerprint: getProjectInputFingerprint(),
                 ...(hasValidMap ? { trayCableMap: compactTrayCableMap } : {})
             }, { cables: state.cableList.map(compactCableReference) });
             const storedState = compactRouteResultStateForStorage(nextState);
@@ -1524,6 +1526,29 @@ async function initializeApp() {
         const normalizedState = normalizeRouteResultState(saved, { cables: state.cableList });
         const rows = normalizedState.batchResults;
         if (!rows.length) return false;
+        const currentRows = filterRouteResultsForProject(rows, {
+            cables: getCables(),
+            trays: getTrays(),
+            conduits: getConduits(),
+            ductbanks: getDuctbanks()
+        });
+        const fingerprintChanged = Boolean(saved?.inputFingerprint)
+            && saved.inputFingerprint !== getProjectInputFingerprint();
+        const structurallyStale = currentRows.length !== rows.length;
+        if (fingerprintChanged || structurallyStale) {
+            state.latestRouteData = [];
+            if (elements.resultsSection) elements.resultsSection.style.display = 'none';
+            elements.routeViewerRouteList?.replaceChildren();
+            if (elements.routeViewerRouteListCount) elements.routeViewerRouteListCount.textContent = '0';
+            if (elements.routeSelectionStatus) {
+                elements.routeSelectionStatus.textContent = 'Saved route results are stale for the current project inputs. Run routing again to replace them.';
+            }
+            if (elements.routeReadinessStatus) {
+                elements.routeReadinessStatus.textContent = 'Routing inputs changed — rerun required';
+                elements.routeReadinessStatus.className = 'route-readiness-status is-warning';
+            }
+            return false;
+        }
 
         state.latestRouteData = applyPullChecksToResults(structuredClone(rows));
         state.trayCableMap = structuredClone(normalizedState.trayCableMap);

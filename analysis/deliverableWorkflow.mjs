@@ -134,7 +134,17 @@ function routeResultRacewayIds(result) {
   return ids.map(normalizedKey).filter(Boolean).filter(id => id !== 'field route');
 }
 
-export function filterRouteResultsForProject(routeResults = [], { cables = [], trays = [], conduits = [], ductbanks = [] } = {}) {
+export function filterRouteResultsForProject(routeResults = [], {
+  cables = [],
+  trays = [],
+  conduits = [],
+  ductbanks = [],
+  currentInputFingerprint = '',
+} = {}) {
+  const savedFingerprint = routeResults && typeof routeResults === 'object' && !Array.isArray(routeResults)
+    ? String(routeResults.inputFingerprint || '').trim()
+    : '';
+  if (savedFingerprint && currentInputFingerprint && savedFingerprint !== currentInputFingerprint) return [];
   const cableTags = knownCableTags(cables);
   const nestedConduits = meaningfulRecords(ductbanks).flatMap(ductbank => meaningfulRecords(ductbank.conduits));
   const racewayIds = new Set([
@@ -159,8 +169,24 @@ export function routeResultsFromCableRows(cables = []) {
     .filter(routeResultSucceeded);
 }
 
-function mergedRouteResults(routeResults = [], { cables = [], trays = [], conduits = [], ductbanks = [] } = {}) {
-  const explicit = filterRouteResultsForProject(routeResults, { cables, trays, conduits, ductbanks });
+function mergedRouteResults(routeResults = [], {
+  cables = [],
+  trays = [],
+  conduits = [],
+  ductbanks = [],
+  currentInputFingerprint = '',
+} = {}) {
+  const savedFingerprint = routeResults && typeof routeResults === 'object' && !Array.isArray(routeResults)
+    ? String(routeResults.inputFingerprint || '').trim()
+    : '';
+  if (savedFingerprint && currentInputFingerprint && savedFingerprint !== currentInputFingerprint) return [];
+  const explicit = filterRouteResultsForProject(routeResults, {
+    cables,
+    trays,
+    conduits,
+    ductbanks,
+    currentInputFingerprint,
+  });
   const explicitTags = new Set(explicit.map(routeResultTag).map(normalizedKey).filter(Boolean));
   const fromCables = routeResultsFromCableRows(cables).filter(result => {
     const key = normalizedKey(routeResultTag(result));
@@ -230,6 +256,7 @@ export function buildDeliverableReadinessDiagnostics({
   oneLine = {},
   tccSettings = null,
   enforceDesignBasis = false,
+  currentInputFingerprint = '',
 } = {}) {
   const cableRows = meaningfulRecords(cables);
   const trayRows = meaningfulRecords(trays);
@@ -241,6 +268,7 @@ export function buildDeliverableReadinessDiagnostics({
     trays: trayRows,
     conduits: conduitRows,
     ductbanks: ductbankRows,
+    currentInputFingerprint,
   });
   const routedRouteResults = allRouteResults.filter(routeResultSucceeded);
   const routedTags = uniqueRoutedCableTags(routedRouteResults);
