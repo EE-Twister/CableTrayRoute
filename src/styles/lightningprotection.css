@@ -578,6 +578,27 @@
   stroke-dasharray: 8 6;
 }
 
+.lp-svg-envelope-fill {
+  stroke: none;
+}
+
+.lp-svg-envelope-fill--pass {
+  fill: rgba(19, 134, 91, 0.13);
+}
+
+.lp-svg-envelope-fill--short {
+  fill: rgba(204, 123, 0, 0.13);
+}
+
+.lp-svg-envelope {
+  fill: none;
+  stroke: var(--lp-cyan);
+  stroke-width: 3.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 1px 1px rgba(9, 95, 125, 0.24));
+}
+
 .lp-svg-structure-front {
   fill: #dce5ef;
   stroke: var(--lp-navy);

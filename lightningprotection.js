@@ -518,29 +518,29 @@ document.addEventListener('DOMContentLoaded', () => {
     const protectedY = elevationY(r.inputs.protectedHeight);
     const tipY = elevationY(r.inputs.airTerminalHeight);
 
-    let sphereSvg = '';
+    let envelopeFillSvg = '';
+    let envelopeArcSvg = '';
+    let coverageDimensionSvg = '';
     if (hasLpsGeometry) {
-      const protectionPoints = [];
+      const leftArcPoints = [];
+      const rightArcPoints = [];
       const samples = 28;
       for (let index = 0; index <= samples; index += 1) {
         const z = effectiveTipHeight * index / samples;
         const boundary = sphereCenterOffset - Math.sqrt(Math.max(0, 2 * sphereRadius * z - z * z));
-        protectionPoints.push([elevationX(-boundary), elevationY(z)]);
+        leftArcPoints.push([elevationX(-boundary), elevationY(z)]);
+        rightArcPoints.push([elevationX(boundary), elevationY(z)]);
       }
-      for (let index = samples; index >= 0; index -= 1) {
-        const z = effectiveTipHeight * index / samples;
-        const boundary = sphereCenterOffset - Math.sqrt(Math.max(0, 2 * sphereRadius * z - z * z));
-        protectionPoints.push([elevationX(boundary), elevationY(z)]);
-      }
-      const protectionPath = protectionPoints
+      const toPath = points => points
         .map(([x, y], index) => `${index === 0 ? 'M' : 'L'} ${x.toFixed(2)} ${y.toFixed(2)}`)
         .join(' ');
-      sphereSvg = `
-        <path d="${protectionPath} Z" class="lp-svg-protection ${r.coverageComplete ? 'lp-svg-protection--pass' : 'lp-svg-protection--short'}"></path>
-        <g clip-path="url(#lp-elevation-clip)">
-          <circle cx="${elevationX(-sphereCenterOffset)}" cy="${elevationY(sphereRadius)}" r="${sphereRadius * elevationScale}" class="lp-svg-sphere"></circle>
-          <circle cx="${elevationX(sphereCenterOffset)}" cy="${elevationY(sphereRadius)}" r="${sphereRadius * elevationScale}" class="lp-svg-sphere"></circle>
-        </g>
+      const protectionPath = toPath([...leftArcPoints, ...rightArcPoints.slice().reverse()]);
+      envelopeFillSvg = `
+        <path d="${protectionPath} Z" class="lp-svg-envelope-fill ${r.coverageComplete ? 'lp-svg-envelope-fill--pass' : 'lp-svg-envelope-fill--short'}"></path>`;
+      envelopeArcSvg = `
+        <path d="${toPath(leftArcPoints)}" class="lp-svg-envelope"></path>
+        <path d="${toPath(rightArcPoints)}" class="lp-svg-envelope"></path>`;
+      coverageDimensionSvg = `
         <line x1="${elevationCenterX}" y1="${protectedY}" x2="${elevationX(r.mastProtectiveRadiusM)}" y2="${protectedY}" class="lp-svg-radius-line"></line>
         <circle cx="${elevationX(r.mastProtectiveRadiusM)}" cy="${protectedY}" r="4" class="lp-svg-coverage-point"></circle>
         <text x="${(elevationCenterX + elevationX(r.mastProtectiveRadiusM)) / 2}" y="${protectedY - 8}" class="lp-svg-dimension-text">rp ${f(lengthForDisplay(r.mastProtectiveRadiusM), 1)} ${unit}</text>`;
@@ -566,9 +566,9 @@ document.addEventListener('DOMContentLoaded', () => {
       <rect x="10" y="42" width="362" height="366" rx="16" class="lp-svg-panel"></rect>
       <rect x="388" y="42" width="362" height="366" rx="16" class="lp-svg-panel"></rect>
       <text x="28" y="70" class="lp-svg-panel-title">PLAN · ${escapeHtml(shapeLabel.toUpperCase())}</text>
-      <text x="406" y="70" class="lp-svg-panel-title">ELEVATION · TRUE ROLLING-SPHERE ARC</text>
+      <text x="406" y="70" class="lp-svg-panel-title">ELEVATION · ROLLING-SPHERE ENVELOPE</text>
       <text x="28" y="91" class="lp-svg-sub-label">Centered mast assumption · footprint and coverage radius are to scale</text>
-      <text x="406" y="91" class="lp-svg-sub-label">Equal horizontal / vertical scale · R = ${hasLpsGeometry ? `${f(lengthForDisplay(sphereRadius), 0)} ${unit}` : 'not generated'}</text>
+      <text x="406" y="91" class="lp-svg-sub-label">Radius-R boundary arcs · equal horizontal / vertical scale · R = ${hasLpsGeometry ? `${f(lengthForDisplay(sphereRadius), 0)} ${unit}` : 'not generated'}</text>
 
       <rect x="18" y="102" width="346" height="294" fill="url(#lp-grid)" opacity="0.55"></rect>
       ${footprintSvg}
@@ -579,16 +579,18 @@ document.addEventListener('DOMContentLoaded', () => {
       <text x="28" y="386" class="lp-svg-label">Farthest point ${f(lengthForDisplay(requiredRadius), 1)} ${unit} · footprint ${f(areaForDisplay(r.footprintAreaM2), 0)} ${areaLabel}</text>
 
       <rect x="396" y="102" width="346" height="294" fill="url(#lp-grid)" opacity="0.55"></rect>
-      ${sphereSvg}
+      ${envelopeFillSvg}
       <line x1="406" y1="${elevationGroundY}" x2="734" y2="${elevationGroundY}" class="lp-svg-axis"></line>
       <rect x="${elevationCenterX - structureWidthPx / 2}" y="${elevationY(r.inputs.height)}" width="${structureWidthPx}" height="${structureHeightPx}" rx="${shape === 'circle' ? 18 : 4}" class="lp-svg-structure-front lp-svg-elevation-structure"></rect>
       <line x1="${elevationCenterX}" y1="${elevationGroundY}" x2="${elevationCenterX}" y2="${tipY}" class="lp-svg-mast"></line>
       <circle cx="${elevationCenterX}" cy="${tipY}" r="6" class="lp-svg-mast-tip"></circle>
+      ${envelopeArcSvg}
+      ${coverageDimensionSvg}
       <line x1="412" y1="${protectedY}" x2="732" y2="${protectedY}" class="lp-svg-protected-plane"></line>
       <text x="412" y="${protectedY - 7}" class="lp-svg-sub-label">protected plane ${f(lengthForDisplay(r.inputs.protectedHeight), 1)} ${unit}</text>
       <text x="406" y="386" class="lp-svg-label">${escapeHtml(coverageText)}</text>
       <text x="28" y="431" class="lp-svg-sub-label">${shape === 'custom' ? 'Custom outline is schematic; area, perimeter, and farthest-point values drive the calculation.' : `Collection area ${f(areaForDisplay(r.collectionAreaM2), 0)} ${areaLabel} is reported separately; this view prioritizes coverage.`}</text>
-      <text x="406" y="431" class="lp-svg-sub-label">${r.lpl.required ? effectiveTipHeight < r.inputs.airTerminalHeight ? 'The sphere contact height is capped at R; added mast height does not enlarge this model.' : 'The cyan circles are radius-R spheres tangent to grade and the mast tip.' : 'Expected direct strikes are below the entered tolerable frequency.'}</text>`;
+      <text x="406" y="431" class="lp-svg-sub-label">${r.lpl.required ? effectiveTipHeight < r.inputs.airTerminalHeight ? 'Envelope contact height is capped at R; mast height above R does not expand this model.' : 'Cyan arcs trace the radius-R envelope; full sphere positions are omitted for clarity.' : 'Expected direct strikes are below the entered tolerable frequency.'}</text>`;
   }
 
   function drawProtectionPreviewPerspective(r) {

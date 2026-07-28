@@ -25,7 +25,7 @@ This study is not a final IEC risk assessment, a scaled shielding drawing, or a 
 
 The page keeps the inputs and engineering meaning together:
 
-- The **protection concept** provides separate plan and elevation views. The plan compares the footprint with the coverage circle at the protected-plane height; the larger 3H collection result remains in the summary so it does not shrink the protection geometry into an unreadable inset. The elevation uses equal horizontal and vertical scales so the displayed rolling-sphere boundaries are circular arcs rather than a decorative parabola.
+- The **protection concept** provides separate plan and elevation views. The plan compares the footprint with the coverage circle at the protected-plane height; the larger 3H collection result remains in the summary so it does not shrink the protection geometry into an unreadable inset. The elevation uses equal horizontal and vertical scales and emphasizes the two true radius-R envelope arcs from the air-terminal tip to the reference plane. Full sphere positions are intentionally omitted so the protection boundary remains legible.
 - The **live summary** reports ground strike-point density, collection area, expected strike frequency, and the selected LPL.
 - The **risk comparison** shows the ratio of expected direct strikes `Nd` to the entered tolerable frequency `Nc`. A ratio above `1×` indicates that the screening calls for additional direct-strike risk reduction.
 - The **design translation** explains the LPL geometry, whether the tip clears the protected equipment, the preliminary down-conductor layout, and the applicable surge-protection workflow.

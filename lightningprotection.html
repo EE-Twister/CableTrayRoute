@@ -17,9 +17,9 @@
   <link rel="dns-prefetch" href="https://fonts.gstatic.com">
   <meta name="color-scheme" content="light dark">
   <link rel="stylesheet" href="style.css" />
-  <link rel="stylesheet" href="src/styles/lightningprotection.css?v=visual-workspace-v7" />
+  <link rel="stylesheet" href="src/styles/lightningprotection.css?v=rolling-envelope-v1" />
   <script type="module" src="dirtyTracker.js"></script>
-  <script type="module" src="dist/lightningprotection.js?v=shape-coverage-v2" defer></script>
+  <script type="module" src="dist/lightningprotection.js" defer></script>
 </head>
 <body class="lightningprotection-page" data-report-title="Lightning &amp; Surge Protection">
   <a href="#main-content" class="skip-link">Skip to main content</a>
@@ -310,7 +310,7 @@ E  = 1 − Nc/Nd  →  LPL I / II / III / IV</pre>
               <div class="lp-diagram-legend" aria-label="Diagram legend">
                 <span><i class="lp-legend-swatch lp-legend-swatch--footprint"></i>Structure footprint</span>
                 <span><i class="lp-legend-swatch lp-legend-swatch--protected"></i>Protected zone</span>
-                <span><i class="lp-legend-swatch lp-legend-swatch--sphere"></i>Rolling-sphere boundary</span>
+                <span><i class="lp-legend-swatch lp-legend-swatch--sphere"></i>Rolling-sphere envelope</span>
               </div>
             </div>
 
@@ -425,7 +425,7 @@ E  = 1 − Nc/Nd  →  LPL I / II / III / IV</pre>
       <ul>
         <li><strong>Required LPL</strong> — the least-restrictive class whose nominal interception capability meets the calculated screening efficiency.</li>
         <li><strong>Plan coverage</strong> — compares the rolling-sphere coverage radius with the farthest protected point from the assumed centered mast.</li>
-        <li><strong>Elevation coverage</strong> — shows true circular rolling-sphere arcs with equal horizontal and vertical scales.</li>
+        <li><strong>Elevation coverage</strong> — shows the two true radius-R envelope arcs from the air-terminal tip to the reference plane, using equal horizontal and vertical scales. Full sphere positions are omitted for clarity.</li>
         <li><strong>Down-conductors</strong> — preliminary count and minimum cross-section when an LPS is indicated.</li>
         <li><strong>Surge protection</strong> — low-voltage SPD review at or below 1 kV; preliminary MCOV and duty-cycle rating above 1 kV.</li>
       </ul>
