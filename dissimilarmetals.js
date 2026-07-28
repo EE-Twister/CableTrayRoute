@@ -11,30 +11,37 @@ import {
 } from './src/workers/dissimilarMetalsClient.js';
 
 const MM_PER_YEAR_TO_MPY = 39.3701;
+const MODEL_VERSION = 2;
+const POTENTIAL_COMPATIBILITY_LIMIT_V = 0.25;
+const GALVANIC_POTENTIAL_BASIS = {
+  label: 'NASA-STD-6012A Table 1 compatible-couple EMF groups',
+  environment: 'Seawater compatibility screening',
+  detail: 'Representative group values are for compatibility ranking, not reference-electrode measurements or universal corrosion potentials.'
+};
 
 const METAL_SERIES = {
   magnesium: { label: 'Magnesium alloy', potentialV: -1.6, family: 'active' },
-  zinc: { label: 'Zinc / galvanized steel (hot-dip)', potentialV: -1.03, family: 'active' },
-  zincElectroplate: { label: 'Zinc electroplate (clear/yellow chromate)', potentialV: -0.98, family: 'active' },
-  aluminum: { label: 'Aluminum alloy', potentialV: -0.8, family: 'active' },
-  aluminumMetallized: { label: 'Aluminum metallized coating', potentialV: -0.78, family: 'active' },
-  carbonSteel: { label: 'Carbon steel', potentialV: -0.6, family: 'active' },
-  castIron: { label: 'Cast iron', potentialV: -0.61, family: 'active' },
-  cadmium: { label: 'Cadmium-plated steel', potentialV: -0.75, family: 'active' },
-  lead: { label: 'Lead', potentialV: -0.5, family: 'intermediate' },
-  tin: { label: 'Tin / tin-plated copper', potentialV: -0.49, family: 'intermediate' },
-  stainless410Active: { label: 'Stainless steel 410/430 (active)', potentialV: -0.56, family: 'active' },
-  stainlessActive: { label: 'Stainless steel (active)', potentialV: -0.5, family: 'intermediate' },
-  copper: { label: 'Copper', potentialV: -0.34, family: 'noble' },
-  brass: { label: 'Brass', potentialV: -0.36, family: 'noble' },
-  bronze: { label: 'Bronze / silicon bronze', potentialV: -0.33, family: 'noble' },
-  copperNickel: { label: 'Copper-nickel alloy', potentialV: -0.3, family: 'noble' },
-  nickelPlatedCopper: { label: 'Nickel-plated copper lug/barrel', potentialV: -0.22, family: 'noble' },
-  stainless304Passive: { label: 'Stainless steel 304 (passive)', potentialV: -0.1, family: 'noble' },
-  stainless316Passive: { label: 'Stainless steel 316 (passive)', potentialV: -0.05, family: 'noble' },
-  stainlessDuplexPassive: { label: 'Stainless steel duplex (passive)', potentialV: -0.04, family: 'noble' },
-  nickel200: { label: 'Nickel alloy (Ni 200)', potentialV: -0.18, family: 'noble' },
-  titanium: { label: 'Titanium', potentialV: -0.03, family: 'noble' }
+  zinc: { label: 'Zinc / galvanized steel (hot-dip)', potentialV: -1.05, family: 'active' },
+  zincElectroplate: { label: 'Zinc electroplate (clear/yellow chromate)', potentialV: -1.1, family: 'active' },
+  aluminum: { label: 'Aluminum alloy', potentialV: -0.75, family: 'active' },
+  aluminumMetallized: { label: 'Aluminum metallized coating', potentialV: -0.75, family: 'active' },
+  carbonSteel: { label: 'Carbon steel', potentialV: -0.7, family: 'active' },
+  castIron: { label: 'Cast iron', potentialV: -0.7, family: 'active' },
+  cadmium: { label: 'Cadmium-plated steel', potentialV: -0.8, family: 'active' },
+  lead: { label: 'Lead', potentialV: -0.55, family: 'intermediate' },
+  tin: { label: 'Tin / tin-plated copper', potentialV: -0.5, family: 'intermediate' },
+  stainless410Active: { label: 'Stainless steel 410/430 (active)', potentialV: -0.45, family: 'active' },
+  stainlessActive: { label: 'Stainless steel (active)', potentialV: -0.35, family: 'intermediate' },
+  copper: { label: 'Copper', potentialV: -0.2, family: 'noble' },
+  brass: { label: 'Brass', potentialV: -0.25, family: 'noble' },
+  bronze: { label: 'Bronze / silicon bronze', potentialV: -0.25, family: 'noble' },
+  copperNickel: { label: 'Copper-nickel alloy', potentialV: -0.2, family: 'noble' },
+  nickelPlatedCopper: { label: 'Nickel-plated copper lug/barrel', potentialV: -0.15, family: 'noble' },
+  stainless304Passive: { label: 'Stainless steel 304 (passive)', potentialV: -0.2, family: 'noble' },
+  stainless316Passive: { label: 'Stainless steel 316 (passive)', potentialV: -0.2, family: 'noble' },
+  stainlessDuplexPassive: { label: 'Stainless steel duplex (passive)', potentialV: -0.2, family: 'noble' },
+  nickel200: { label: 'Nickel alloy (Ni 200)', potentialV: -0.15, family: 'noble' },
+  titanium: { label: 'Titanium', potentialV: -0.15, family: 'noble' }
 };
 
 const ENVIRONMENT_FACTORS = {
@@ -175,6 +182,7 @@ export function estimateDissimilarMetalsRisk(input) {
   const environment = ENVIRONMENT_FACTORS[normalizedInput.environment];
   const exposureDuty = getExposureDutyProfile(normalizedInput.exposureDuty);
 
+  const samePotentialGroup = Math.abs(primary.potentialV - secondary.potentialV) < 0.0005;
   const anodicMetal = primary.potentialV <= secondary.potentialV ? primary : secondary;
   const cathodicMetal = anodicMetal === primary ? secondary : primary;
 
@@ -195,26 +203,34 @@ export function estimateDissimilarMetalsRisk(input) {
     * 0.7;
 
   const corrosionRateMmYear = round(rawRate, 3);
-  const corrosionRateMpy = round(corrosionRateMmYear * MM_PER_YEAR_TO_MPY, 2);
-  const severity = severityFromRate(corrosionRateMmYear);
-  const estimatedLifeYears = corrosionRateMmYear > 0
-    ? round(normalizedInput.corrosionAllowanceMm / corrosionRateMmYear, 1)
+  const corrosionRateMpyExact = rawRate * MM_PER_YEAR_TO_MPY;
+  const corrosionRateMpy = round(corrosionRateMpyExact, 2);
+  const severity = severityFromRate(rawRate);
+  const estimatedLifeYears = rawRate > 0
+    ? round(normalizedInput.corrosionAllowanceMm / rawRate, 1)
     : Infinity;
+  const potentialCompatibility = buildPotentialCompatibility(drivingPotentialV);
 
   const result = {
+    modelVersion: MODEL_VERSION,
     input: normalizedInput,
     timestamp: new Date().toISOString(),
-    primaryRole: anodicMetal === primary ? 'Anodic' : 'Cathodic',
-    secondaryRole: anodicMetal === secondary ? 'Anodic' : 'Cathodic',
-    anodicMetal: anodicMetal.label,
-    cathodicMetal: cathodicMetal.label,
+    samePotentialGroup,
+    primaryRole: samePotentialGroup ? 'Same potential group' : anodicMetal === primary ? 'Anodic' : 'Cathodic',
+    secondaryRole: samePotentialGroup ? 'Same potential group' : anodicMetal === secondary ? 'Anodic' : 'Cathodic',
+    anodicMetal: samePotentialGroup ? 'No distinct anodic member' : anodicMetal.label,
+    cathodicMetal: samePotentialGroup ? 'No distinct cathodic member' : cathodicMetal.label,
     drivingPotentialV: round(drivingPotentialV, 3),
     areaRatio: round(areaRatio, 2),
     environmentLabel: environment.label,
     exposureDutyLabel: exposureDuty.label,
     exposureDutyFactor: exposureDuty.wetnessFactor,
     exposureDutyDetail: exposureDuty.detail,
+    potentialBasis: GALVANIC_POTENTIAL_BASIS,
+    potentialCompatibility,
+    corrosionRateMmYearExact: rawRate,
     corrosionRateMmYear,
+    corrosionRateMpyExact,
     corrosionRateMpy,
     severity,
     estimatedLifeYears,
@@ -224,7 +240,9 @@ export function estimateDissimilarMetalsRisk(input) {
       severity,
       environment: environment.label,
       exposureDuty,
-      areaRatio
+      areaRatio,
+      samePotentialGroup,
+      potentialCompatibility
     })
   };
 
@@ -234,26 +252,30 @@ export function estimateDissimilarMetalsRisk(input) {
 
 export function buildCorrosionTimelineState(result, years) {
   const elapsedYears = Math.max(0, finiteNumber(years, 0));
-  const corrosionRateMmYear = Math.max(0, finiteNumber(result?.corrosionRateMmYear, 0));
+  const corrosionRateMmYear = Math.max(
+    0,
+    finiteNumber(result?.corrosionRateMmYearExact, finiteNumber(result?.corrosionRateMmYear, 0))
+  );
   const fallbackAllowanceMm = Number.isFinite(result?.estimatedLifeYears) && corrosionRateMmYear > 0
     ? result.estimatedLifeYears * corrosionRateMmYear
     : 0;
   const corrosionAllowanceMm = Math.max(0, finiteNumber(result?.input?.corrosionAllowanceMm, fallbackAllowanceMm));
-  const materialLossMm = round(corrosionRateMmYear * elapsedYears, 3);
+  const materialLossMmExact = corrosionRateMmYear * elapsedYears;
+  const materialLossMm = round(materialLossMmExact, 3);
   const allowanceConsumedPct = corrosionAllowanceMm > 0
-    ? round((materialLossMm / corrosionAllowanceMm) * 100, 1)
+    ? round((materialLossMmExact / corrosionAllowanceMm) * 100, 1)
     : 0;
   const visualConsumedPct = Math.min(100, Math.max(0, allowanceConsumedPct));
-  const remainingAllowanceMm = Math.max(0, round(corrosionAllowanceMm - materialLossMm, 3));
-  const overAllowanceMm = Math.max(0, round(materialLossMm - corrosionAllowanceMm, 3));
+  const remainingAllowanceMm = Math.max(0, round(corrosionAllowanceMm - materialLossMmExact, 3));
+  const overAllowanceMm = Math.max(0, round(materialLossMmExact - corrosionAllowanceMm, 3));
   const initialThicknessMm = finiteNumber(result?.input?.initialThicknessMm, NaN);
   const minimumThicknessMm = finiteNumber(result?.input?.minimumThicknessMm, NaN);
   const hasThicknessProjection = Number.isFinite(initialThicknessMm) && initialThicknessMm > 0;
   const remainingThicknessMm = hasThicknessProjection
-    ? Math.max(0, round(initialThicknessMm - materialLossMm, 3))
+    ? Math.max(0, round(initialThicknessMm - materialLossMmExact, 3))
     : null;
   const thicknessConsumedPct = hasThicknessProjection
-    ? round((materialLossMm / initialThicknessMm) * 100, 1)
+    ? round((materialLossMmExact / initialThicknessMm) * 100, 1)
     : null;
   const visualRemainingThicknessPct = hasThicknessProjection
     ? Math.min(100, Math.max(0, round((remainingThicknessMm / initialThicknessMm) * 100, 1)))
@@ -381,7 +403,7 @@ export function buildMitigationComparisonRows(result) {
     ...result.input,
     isolationQuality: 'none'
   });
-  const baselineRate = Math.max(0, baseline.corrosionRateMmYear);
+  const baselineRate = Math.max(0, baseline.corrosionRateMmYearExact);
   const baselineLife = baseline.estimatedLifeYears;
 
   return ISOLATION_OPTIONS.map(option => {
@@ -389,8 +411,9 @@ export function buildMitigationComparisonRows(result) {
       ...result.input,
       isolationQuality: option.key
     });
+    const comparisonRate = comparison.corrosionRateMmYearExact;
     const rateReductionPct = baselineRate > 0
-      ? round(((baselineRate - comparison.corrosionRateMmYear) / baselineRate) * 100, 0)
+      ? round(((baselineRate - comparisonRate) / baselineRate) * 100, 0)
       : 0;
     const lifeGainYears = Number.isFinite(comparison.estimatedLifeYears) && Number.isFinite(baselineLife)
       ? round(comparison.estimatedLifeYears - baselineLife, 1)
@@ -401,6 +424,7 @@ export function buildMitigationComparisonRows(result) {
       label: option.label,
       detail: option.detail,
       isCurrent: option.key === result.input.isolationQuality,
+      corrosionRateMmYearExact: comparisonRate,
       corrosionRateMmYear: comparison.corrosionRateMmYear,
       estimatedLifeYears: comparison.estimatedLifeYears,
       severity: comparison.severity,
@@ -440,6 +464,14 @@ export function buildAssumptionRows(result) {
   const isolation = getIsolationOption(input.isolationQuality);
   const temperatureC = finiteNumber(input.temperatureC, 20);
   const rows = [
+    {
+      label: 'Potential basis',
+      value: `${result.potentialBasis?.label || GALVANIC_POTENTIAL_BASIS.label}; ${result.potentialBasis?.environment || GALVANIC_POTENTIAL_BASIS.environment}`
+    },
+    {
+      label: 'Compatibility criterion',
+      value: `${result.potentialCompatibility?.label || buildPotentialCompatibility(result.drivingPotentialV).label}; current density is not calculated`
+    },
     {
       label: 'Environment model',
       value: environment
@@ -496,9 +528,10 @@ export function buildResultSummary(result) {
     `Cathodic member: ${result.cathodicMetal}`,
     `Driving potential: ${result.drivingPotentialV.toFixed(3)} V`,
     `Cathode/anode area ratio: ${result.areaRatio.toFixed(2)}:1`,
-    `Estimated corrosion rate: ${result.corrosionRateMmYear.toFixed(3)} mm/year (${result.corrosionRateMpy.toFixed(2)} mpy)`,
+    `Heuristic screening rate: ${formatRateMmYear(result)} (${formatRateMpy(result)})`,
     `Severity: ${result.severity}`,
-    `Estimated life from allowance: ${formatLifeYears(result.estimatedLifeYears)}`
+    `Screening interval from allowance: ${formatLifeYears(result.estimatedLifeYears)}`,
+    `Potential compatibility: ${result.potentialCompatibility?.label || buildPotentialCompatibility(result.drivingPotentialV).label}`
   ];
 
   if (warning) {
@@ -525,7 +558,7 @@ export function buildResultSummary(result) {
 export function buildResultExportPayload(result) {
   return {
     exportType: 'dissimilar-metals-corrosion-study',
-    exportVersion: 1,
+    exportVersion: 2,
     exportedAt: new Date().toISOString(),
     summaryText: buildResultSummary(result),
     result
@@ -549,19 +582,22 @@ export function buildCompatibilityWarning(result) {
   } else if (result.drivingPotentialV >= 0.25) {
     drivers.push('moderate galvanic potential separation');
   }
-  if (result.areaRatio > 2) {
+  if (result.potentialCompatibility?.exceedsLimit) {
+    drivers.push(`exceeds ${POTENTIAL_COMPATIBILITY_LIMIT_V.toFixed(2)} V compatibility screen`);
+  }
+  if (!result.samePotentialGroup && result.areaRatio > 2) {
     drivers.push(`${result.areaRatio.toFixed(2)}:1 cathode-to-anode area ratio`);
   }
   if (exposureDuty.wetnessFactor > 1) {
     drivers.push(`${exposureDuty.label.toLowerCase()} electrolyte duty`);
   }
   if (result.input?.isolationQuality !== 'engineered') {
-    drivers.push(`${isolation?.label.toLowerCase() || 'limited'} isolation`);
+    drivers.push(isolation?.label.toLowerCase() || 'limited isolation');
   }
 
   const level = result.severity === 'Severe' || result.severity === 'High'
     ? 'high'
-    : result.severity === 'Moderate'
+    : result.severity === 'Moderate' || result.potentialCompatibility?.exceedsLimit
       ? 'review'
       : 'info';
   const title = level === 'high'
@@ -572,23 +608,39 @@ export function buildCompatibilityWarning(result) {
   const driverText = drivers.length
     ? ` Main drivers: ${drivers.join('; ')}.`
     : '';
+  const relationshipText = result.samePotentialGroup
+    ? 'The selected materials occupy the same representative potential group, so this screen does not assign a distinct anodic member.'
+    : `${result.anodicMetal} is anodic against ${result.cathodicMetal}, so ${result.anodicMetal} is expected to lose material first in this pair.`;
 
   return {
     level,
     title,
-    message: `${result.anodicMetal} is anodic against ${result.cathodicMetal}, so ${result.anodicMetal} is expected to lose material first in this pair. The modeled condition is ${result.severity.toLowerCase()} risk in ${environmentLabel} with ${exposureDuty.label.toLowerCase()} duty.${driverText}`,
+    message: `${relationshipText} The modeled condition is ${result.severity.toLowerCase()} risk in ${environmentLabel} with ${exposureDuty.label.toLowerCase()} duty.${driverText}`,
     drivers
   };
 }
 
-function buildRecommendation({ anodicMetal, cathodicMetal, severity, environment, exposureDuty, areaRatio }) {
+function buildRecommendation({
+  anodicMetal,
+  cathodicMetal,
+  severity,
+  environment,
+  exposureDuty,
+  areaRatio,
+  samePotentialGroup,
+  potentialCompatibility
+}) {
   const recommendations = [];
-  recommendations.push(`Protect ${anodicMetal.label} at the interface with ${cathodicMetal.label}; it is the anodic member in this pair.`);
-  if (severity === 'Severe' || severity === 'High') {
+  if (samePotentialGroup) {
+    recommendations.push('The materials share a representative potential group; verify the specific alloy, surface condition, and electrolyte before assigning anodic and cathodic roles.');
+  } else {
+    recommendations.push(`Protect ${anodicMetal.label} at the interface with ${cathodicMetal.label}; it is the anodic member in this pair.`);
+  }
+  if (severity === 'Severe' || severity === 'High' || potentialCompatibility?.exceedsLimit) {
     recommendations.push('Use dielectric isolation kits or non-conductive bushings at every hardware interface.');
     recommendations.push('Apply a robust barrier coating system and maintain coating continuity after installation.');
   }
-  if (areaRatio > 2) {
+  if (!samePotentialGroup && areaRatio > 2) {
     recommendations.push('Reduce cathode-to-anode area ratio (use larger anodic contact area or smaller noble fasteners) to slow galvanic attack.');
   }
   if (environment.includes('Marine') || environment.includes('coastal') || environment.includes('seawater')) {
@@ -598,7 +650,24 @@ function buildRecommendation({ anodicMetal, cathodicMetal, severity, environment
     recommendations.push('Reduce sustained wetting at the interface where practical by improving drainage, sealing, covers, or drip shielding.');
   }
   recommendations.push('Treat this output as planning guidance; verify final material compatibility with project corrosion engineering standards.');
+  recommendations.push('For a quantitative penetration rate, use measured or qualified galvanic current-density or weight-loss data for the actual assembly and electrolyte.');
   return recommendations;
+}
+
+function buildPotentialCompatibility(drivingPotentialV) {
+  const potential = Math.max(0, finiteNumber(drivingPotentialV, 0));
+  const exceedsLimit = potential > POTENTIAL_COMPATIBILITY_LIMIT_V;
+  return {
+    limitV: POTENTIAL_COMPATIBILITY_LIMIT_V,
+    exceedsLimit,
+    key: exceedsLimit ? 'exceeds' : 'within',
+    label: exceedsLimit
+      ? `Exceeds ${POTENTIAL_COMPATIBILITY_LIMIT_V.toFixed(2)} V screening limit`
+      : `Within ${POTENTIAL_COMPATIBILITY_LIMIT_V.toFixed(2)} V screening limit`,
+    detail: exceedsLimit
+      ? 'Treat the couple as incompatible unless qualified galvanic current density is 1 µA/cm² or less without pitting.'
+      : 'Potential separation is within the NASA-STD-6012A screening limit; assembly-level verification may still be required.'
+  };
 }
 
 function severityFromRate(rateMmYear) {
@@ -741,8 +810,16 @@ if (typeof document !== 'undefined') {
       errorsEl.textContent = '';
     });
 
-    if (saved) {
-      renderResults(saved, resultsEl);
+    if (saved?.input) {
+      const refreshedSavedResult = refreshSavedResult(saved);
+      if (refreshedSavedResult) {
+        applyInputValues(refreshedSavedResult.input);
+        updateAreaRoleGuidance();
+        const studies = getStudies();
+        studies.dissimilarMetals = refreshedSavedResult;
+        setStudies(studies);
+        renderResults(refreshedSavedResult, resultsEl);
+      }
     }
 
     form.addEventListener('submit', (event) => {
@@ -808,6 +885,11 @@ function applyAssemblyPreset(presetId) {
     return;
   }
 
+  applyInputValues(preset.values);
+  updateAreaRoleGuidance();
+}
+
+function applyInputValues(values = {}) {
   const setValue = (id, value) => {
     const element = document.getElementById(id);
     if (element) {
@@ -815,18 +897,27 @@ function applyAssemblyPreset(presetId) {
     }
   };
 
-  setValue('primary-metal', preset.values.primaryMetal);
-  setValue('secondary-metal', preset.values.secondaryMetal);
-  setValue('environment-type', preset.values.environment);
-  setValue('exposure-duty', preset.values.exposureDuty);
-  setValue('isolation-quality', preset.values.isolationQuality);
-  setValue('anode-area', preset.values.anodeArea);
-  setValue('cathode-area', preset.values.cathodeArea);
-  setValue('corrosion-allowance', preset.values.corrosionAllowanceMm);
-  setValue('initial-thickness', preset.values.initialThicknessMm ?? '');
-  setValue('minimum-thickness', preset.values.minimumThicknessMm ?? '');
-  setValue('temperature-c', preset.values.temperatureC);
-  updateAreaRoleGuidance();
+  setValue('primary-metal', values.primaryMetal);
+  setValue('secondary-metal', values.secondaryMetal);
+  setValue('environment-type', values.environment);
+  setValue('exposure-duty', values.exposureDuty || DEFAULT_EXPOSURE_DUTY);
+  setValue('isolation-quality', values.isolationQuality);
+  setValue('anode-area', values.anodeArea);
+  setValue('cathode-area', values.cathodeArea);
+  setValue('corrosion-allowance', values.corrosionAllowanceMm);
+  setValue('initial-thickness', values.initialThicknessMm ?? '');
+  setValue('minimum-thickness', values.minimumThicknessMm ?? '');
+  setValue('temperature-c', values.temperatureC);
+}
+
+function refreshSavedResult(saved) {
+  try {
+    const refreshed = estimateDissimilarMetalsRisk(saved.input);
+    refreshed.timestamp = saved.timestamp || refreshed.timestamp;
+    return refreshed;
+  } catch {
+    return null;
+  }
 }
 
 function updateAssemblyPresetHint(presetId) {
@@ -896,25 +987,32 @@ function updateAreaRoleGuidance() {
 
   const anodicMetal = primary.potentialV <= secondary.potentialV ? primary : secondary;
   const cathodicMetal = anodicMetal === primary ? secondary : primary;
+  const samePotentialGroup = Math.abs(primary.potentialV - secondary.potentialV) < 0.0005;
   const anodeLabel = document.getElementById('anode-area-label');
   const cathodeLabel = document.getElementById('cathode-area-label');
   const areaHint = document.getElementById('area-role-hint');
 
   if (anodeLabel) {
-    anodeLabel.textContent = 'Anodic area (cm²)';
+    anodeLabel.textContent = samePotentialGroup
+      ? 'First material exposed area (cm²)'
+      : 'Anodic area (cm²)';
   }
   if (cathodeLabel) {
-    cathodeLabel.textContent = 'Cathodic area (cm²)';
+    cathodeLabel.textContent = samePotentialGroup
+      ? 'Second material exposed area (cm²)'
+      : 'Cathodic area (cm²)';
   }
   if (areaHint) {
-    areaHint.textContent = `${anodicMetal.label} corrodes first. ${cathodicMetal.label} is cathodic.`;
+    areaHint.textContent = samePotentialGroup
+      ? 'The selected materials share a representative potential group; specific alloy testing may be needed to assign roles.'
+      : `${anodicMetal.label} corrodes first. ${cathodicMetal.label} is cathodic.`;
   }
 }
 
 function renderResults(result, container) {
   const estimatedLife = Number.isFinite(result.estimatedLifeYears)
-    ? `${result.estimatedLifeYears.toFixed(1)} years`
-    : 'No measurable galvanic consumption (model lower bound).';
+    ? formatLifeYears(result.estimatedLifeYears)
+    : 'No modeled galvanic consumption.';
   const environmentLabel = result.environmentLabel
     || ENVIRONMENT_FACTORS[result.input?.environment]?.label
     || 'Not specified';
@@ -924,10 +1022,7 @@ function renderResults(result, container) {
   const resultActionsHtml = renderResultActions(result);
   const compatibilityWarningHtml = renderCompatibilityWarning(result);
   const overviewHtml = renderResultOverview(result, {
-    estimatedLife,
-    environmentLabel,
-    exposureDutyLabel,
-    exposureDutyFactor
+    estimatedLife
   });
   const assessmentDetailsHtml = renderAssessmentDetails(result, {
     estimatedLife,
@@ -967,7 +1062,8 @@ function renderResults(result, container) {
         ${assessmentDetailsHtml}
         <details class="corrosion-assumptions">
           <summary>Engineering note</summary>
-          <p class="field-hint">Rates are planning-level galvanic estimates synthesized from galvanic potential separation, relative wetted area ratio, and electrolyte severity. Validate with your project corrosion engineer and owner standards.</p>
+          <p class="field-hint">The screening rate and interval are heuristic planning outputs, not measured corrosion rates or qualified replacement intervals. Confirm quantitative penetration using galvanic current-density or weight-loss data for the actual assembly and electrolyte.</p>
+          <p class="field-hint">Potential groups follow NASA-STD-6012A Table 1 and are intended for seawater compatibility screening. Review MIL-STD-889D and ASTM G71/G82 when qualifying a final design.</p>
         </details>
         ${assumptionsHtml}
       </section>
@@ -978,12 +1074,9 @@ function renderResults(result, container) {
   initCorrosionTimeline(container, result);
 }
 
-function renderResultOverview(result, {
-  estimatedLife,
-  environmentLabel,
-  exposureDutyLabel,
-  exposureDutyFactor
-}) {
+function renderResultOverview(result, { estimatedLife }) {
+  const potentialCompatibility = result.potentialCompatibility
+    || buildPotentialCompatibility(result.drivingPotentialV);
   return `
     <div class="corrosion-result-summary-grid" aria-label="Assessment summary">
       <article class="corrosion-kpi-card corrosion-kpi-card--${getSeverityClass(result.severity)}">
@@ -992,19 +1085,19 @@ function renderResultOverview(result, {
         <small>${escapeHtml(getSeverityDescription(result.severity))}</small>
       </article>
       <article class="corrosion-kpi-card">
-        <span>Estimated rate</span>
-        <strong>${result.corrosionRateMmYear.toFixed(3)} mm/year</strong>
-        <small>${result.corrosionRateMpy.toFixed(2)} mpy</small>
+        <span>Heuristic screening rate</span>
+        <strong>${escapeHtml(formatRateMmYear(result))}</strong>
+        <small>${escapeHtml(formatRateMpy(result))}</small>
       </article>
       <article class="corrosion-kpi-card">
-        <span>Life from allowance</span>
+        <span>Screening interval</span>
         <strong>${escapeHtml(estimatedLife)}</strong>
         <small>${escapeHtml(formatMm(result.input?.corrosionAllowanceMm))} allowance</small>
       </article>
       <article class="corrosion-kpi-card">
-        <span>Exposure basis</span>
-        <strong>${escapeHtml(environmentLabel)}</strong>
-        <small>${escapeHtml(exposureDutyLabel)} (${exposureDutyFactor.toFixed(2)}x)</small>
+        <span>0.25 V compatibility screen</span>
+        <strong>${escapeHtml(potentialCompatibility.exceedsLimit ? 'Exceeds limit' : 'Within limit')}</strong>
+        <small>${result.drivingPotentialV.toFixed(3)} V representative separation</small>
       </article>
     </div>
   `;
@@ -1025,12 +1118,13 @@ function renderAssessmentDetails(result, {
           <tr><th>Primary component role</th><td>${escapeHtml(result.primaryRole)}</td></tr>
           <tr><th>Connected hardware role</th><td>${escapeHtml(result.secondaryRole)}</td></tr>
           <tr><th>Driving potential</th><td>${result.drivingPotentialV.toFixed(3)} V</td></tr>
+          <tr><th>0.25 V compatibility screen</th><td>${escapeHtml(result.potentialCompatibility?.label || buildPotentialCompatibility(result.drivingPotentialV).label)}</td></tr>
           <tr><th>Cathode/Anode area ratio</th><td>${result.areaRatio.toFixed(2)} : 1</td></tr>
           <tr><th>Exposure environment</th><td>${escapeHtml(environmentLabel)}</td></tr>
           <tr><th>Electrolyte duty cycle</th><td>${escapeHtml(exposureDutyLabel)} (${exposureDutyFactor.toFixed(2)}x)</td></tr>
-          <tr><th>Estimated corrosion rate</th><td>${result.corrosionRateMmYear.toFixed(3)} mm/year (${result.corrosionRateMpy.toFixed(2)} mpy)</td></tr>
+          <tr><th>Heuristic screening rate</th><td>${escapeHtml(formatRateMmYear(result))} (${escapeHtml(formatRateMpy(result))})</td></tr>
           <tr><th>Severity</th><td><strong>${escapeHtml(result.severity)}</strong></td></tr>
-          <tr><th>Estimated life from allowance</th><td>${escapeHtml(estimatedLife)}</td></tr>
+          <tr><th>Screening interval from allowance</th><td>${escapeHtml(estimatedLife)}</td></tr>
         </tbody>
       </table>
     </div>
@@ -1109,6 +1203,9 @@ function summarizeMitigationAction(text) {
   }
   if (action.includes('planning guidance') || action.includes('corrosion engineering')) {
     return 'Verify with project standards';
+  }
+  if (action.includes('quantitative penetration rate') || action.includes('current-density')) {
+    return 'Qualify the quantitative rate';
   }
   if (action.includes('anodic member') || action.includes('interface')) {
     return 'Protect anodic interface';
@@ -1219,7 +1316,9 @@ function renderCompatibilityWarning(result) {
         <p class="corrosion-timeline-kicker">Material compatibility</p>
         <h3>${escapeHtml(warning.title)}</h3>
       </div>
-      <p class="corrosion-compatibility-summary">${escapeHtml(result.anodicMetal)} corrodes first.</p>
+      <p class="corrosion-compatibility-summary">${escapeHtml(result.samePotentialGroup
+        ? 'No distinct anodic member is assigned by the representative potential groups.'
+        : `${result.anodicMetal} corrodes first.`)}</p>
       ${driversHtml}
       <details class="corrosion-warning-detail">
         <summary>Details</summary>
@@ -1251,7 +1350,7 @@ function renderMitigationComparison(result) {
           ${currentBadge}
           <small>${escapeHtml(row.detail)}</small>
         </th>
-        <td>${row.corrosionRateMmYear.toFixed(3)} mm/year</td>
+        <td>${escapeHtml(formatRateMmYear(row))}</td>
         <td>${escapeHtml(lifeText)}</td>
         <td>${row.rateReductionPct}% lower rate<br><small>${escapeHtml(gainText)} vs no isolation</small></td>
         <td><strong>${escapeHtml(row.severity)}</strong></td>
@@ -1273,8 +1372,8 @@ function renderMitigationComparison(result) {
           <thead>
             <tr>
               <th scope="col">Strategy</th>
-              <th scope="col">Rate</th>
-              <th scope="col">Life from allowance</th>
+              <th scope="col">Screening rate</th>
+              <th scope="col">Screening interval</th>
               <th scope="col">Change vs no isolation</th>
               <th scope="col">Severity</th>
             </tr>
@@ -1354,7 +1453,7 @@ function renderCorrosionTimeline(result) {
             <span>0 years</span>
             <span>${escapeHtml(maxYearsText)}</span>
           </div>
-          <p class="field-hint">Based on current rate and ${escapeHtml(allowanceText)} allowance.</p>
+          <p class="field-hint">Heuristic projection based on the screening rate and ${escapeHtml(allowanceText)} allowance.</p>
 
           <div class="corrosion-metrics-grid" aria-live="polite">
             <div class="corrosion-metric">
@@ -1444,7 +1543,7 @@ function renderInspectionMilestones(result) {
           <p class="corrosion-timeline-kicker">Action milestones</p>
           <h3 id="corrosion-milestones-heading">Inspection Plan</h3>
         </div>
-        <p class="field-hint">Based on current rate and allowance.</p>
+        <p class="field-hint">Planning milestones derived from the heuristic screening rate and allowance.</p>
       </div>
       <div class="corrosion-milestone-grid">${milestoneHtml}</div>
     </section>
@@ -1592,9 +1691,35 @@ function formatYears(value) {
   return `${years.toFixed(precision)} years`;
 }
 
+function getExactRateMmYear(result) {
+  return Math.max(
+    0,
+    finiteNumber(result?.corrosionRateMmYearExact, finiteNumber(result?.corrosionRateMmYear, 0))
+  );
+}
+
+function formatRateMmYear(result) {
+  const rate = getExactRateMmYear(result);
+  if (rate > 0 && rate < 0.001) {
+    return '< 0.001 mm/year';
+  }
+  return `${rate.toFixed(3)} mm/year`;
+}
+
+function formatRateMpy(result) {
+  const rateMpy = Math.max(
+    0,
+    finiteNumber(result?.corrosionRateMpyExact, getExactRateMmYear(result) * MM_PER_YEAR_TO_MPY)
+  );
+  if (rateMpy > 0 && rateMpy < 0.01) {
+    return '< 0.01 mpy';
+  }
+  return `${rateMpy.toFixed(2)} mpy`;
+}
+
 function formatLifeYears(value) {
   if (!Number.isFinite(value)) {
-    return 'No measurable galvanic consumption';
+    return 'No modeled galvanic consumption';
   }
   return formatYears(value);
 }

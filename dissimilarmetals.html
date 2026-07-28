@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="Estimate galvanic corrosion risk for dissimilar metals (e.g., aluminum tray and stainless hardware) across different environments." />
+  <meta name="description" content="Screen galvanic compatibility and relative corrosion risk for dissimilar metals such as aluminum tray and stainless hardware." />
   <title>Dissimilar Metals Corrosion Reference — CableTrayRoute</title>
   <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icons/favicon.svg">
   <meta property="og:type" content="website">
   <meta property="og:title" content="Dissimilar Metals Corrosion Reference — CableTrayRoute">
-  <meta property="og:description" content="Planning-level galvanic corrosion rate estimates for dissimilar material pairs by environment.">
+  <meta property="og:description" content="Planning-level galvanic compatibility and relative-risk screening for dissimilar material pairs.">
   <meta property="og:image" content="https://cabletrayroute.com/icons/og-preview.png">
   <meta property="og:site_name" content="CableTrayRoute">
   <meta property="og:url" content="dissimilarmetals.html">
@@ -64,7 +64,7 @@
       <header class="page-header corrosion-page-header">
         <div class="corrosion-header-copy">
           <h1>Dissimilar Metals Corrosion Reference</h1>
-          <p>Quick galvanic risk screen for mixed-metal interfaces.</p>
+          <p>Galvanic compatibility and relative-risk screen for mixed-metal interfaces.</p>
         </div>
         <ol class="corrosion-workflow-steps" aria-label="Assessment workflow">
           <li><span>1</span>Define pair</li>
@@ -184,9 +184,12 @@
         <aside class="corrosion-reference-rail" aria-label="Reference information">
           <details class="method-panel corrosion-reference-card">
             <summary>Method and Engineering Context</summary>
-            <p>Planning-level estimate for electrically connected metals exposed to an electrolyte.</p>
+            <p>Planning-level compatibility screen for electrically connected metals exposed to an electrolyte.</p>
             <pre>Driving potential = E(cathodic metal) - E(anodic metal)
-Rate is proportional to driving potential, environment severity, exposure duty, area ratio, temperature, and isolation quality</pre>
+Compatibility screen = compare driving potential with 0.25 V
+Heuristic rate = relative planning model for comparing exposure and mitigation choices</pre>
+            <p class="field-hint">Potential groups follow NASA-STD-6012A Table 1. The heuristic rate is not a measured corrosion rate or a qualified replacement interval.</p>
+            <p class="field-hint"><a href="docs/dissimilar-metals.md">Engineering basis</a> · <a href="https://standards.nasa.gov/sites/default/files/standards/NASA/A/2022-01-11-NASA-STD-6012A-Approved.pdf" target="_blank" rel="noopener noreferrer">NASA-STD-6012A</a> · <a href="https://quicksearch.dla.mil/qsDocDetails.aspx?ident_number=36032" target="_blank" rel="noopener noreferrer">MIL-STD-889D record</a></p>
           </details>
 
           <section class="corrosion-reference-card" aria-labelledby="reference-heading">
@@ -196,10 +199,10 @@ Rate is proportional to driving potential, environment severity, exposure duty, 
             </div>
             <ol class="corrosion-severity-scale" aria-label="Corrosion severity guide">
               <li><span>&lt; 0.01</span><strong>Negligible</strong></li>
-              <li><span>0.01-0.05</span><strong>Low</strong></li>
-              <li><span>0.05-0.20</span><strong>Moderate</strong></li>
-              <li><span>0.20-0.50</span><strong>High</strong></li>
-              <li><span>&gt; 0.50</span><strong>Severe</strong></li>
+              <li><span>0.01 ≤ r &lt; 0.05</span><strong>Low</strong></li>
+              <li><span>0.05 ≤ r &lt; 0.20</span><strong>Moderate</strong></li>
+              <li><span>0.20 ≤ r &lt; 0.50</span><strong>High</strong></li>
+              <li><span>≥ 0.50</span><strong>Severe</strong></li>
             </ol>
           </section>
         </aside>
@@ -214,8 +217,8 @@ Rate is proportional to driving potential, environment severity, exposure duty, 
     <div class="modal-content">
       <button id="close-help-btn" class="close-btn" aria-label="Close Help">&times;</button>
       <h2 id="help-title">Dissimilar Metals Tool Help</h2>
-      <p>Use this page to estimate galvanic corrosion trends when two metals are electrically connected in wet or corrosive environments.
-      Results provide directional engineering guidance for early design and specification review.</p>
+      <p>Use this page to screen galvanic compatibility when two metals are electrically connected in wet or corrosive environments.
+      Results provide directional engineering guidance for early design and specification review. The displayed rate and interval are heuristic comparisons, not measured corrosion predictions.</p>
     </div>
   </div>
 

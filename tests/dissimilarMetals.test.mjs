@@ -39,8 +39,13 @@ describe('estimateDissimilarMetalsRisk', () => {
       temperatureC: 30
     });
 
+    assert.strictEqual(result.modelVersion, 2);
     assert.strictEqual(result.anodicMetal, 'Aluminum alloy');
     assert.strictEqual(result.cathodicMetal, 'Stainless steel 304 (passive)');
+    assert.strictEqual(result.drivingPotentialV, 0.55);
+    assert.strictEqual(result.potentialCompatibility.exceedsLimit, true);
+    assert.strictEqual(result.corrosionRateMmYear, 0.301);
+    assert.ok(Math.abs(result.corrosionRateMmYearExact - 0.3009939702076045) < 1e-12);
     assert.ok(result.corrosionRateMmYear > 0);
     assert.ok(['Moderate', 'High', 'Severe'].includes(result.severity));
     assert.strictEqual(result.input.exposureDuty, 'intermittentlyWet');
@@ -78,6 +83,47 @@ describe('estimateDissimilarMetalsRisk', () => {
     const immersed = estimateDissimilarMetalsRisk({ ...common, exposureDuty: 'continuouslyWet' });
     assert.ok(immersed.corrosionRateMmYear > dry.corrosionRateMmYear);
     assert.strictEqual(immersed.exposureDutyFactor, 1.65);
+  });
+
+  it('retains raw precision for life when the displayed rate rounds below 0.001 mm/year', () => {
+    const result = estimateDissimilarMetalsRisk({
+      primaryMetal: 'lead',
+      secondaryMetal: 'stainless410Active',
+      environment: 'indoorDry',
+      exposureDuty: 'normallyDry',
+      isolationQuality: 'engineered',
+      anodeArea: 100,
+      cathodeArea: 100,
+      corrosionAllowanceMm: 1.5,
+      temperatureC: 20
+    });
+
+    assert.ok(result.corrosionRateMmYearExact > 0);
+    assert.strictEqual(result.corrosionRateMmYear, 0);
+    assert.strictEqual(result.estimatedLifeYears, 4216.6);
+    const halfLife = buildCorrosionTimelineState(result, result.estimatedLifeYears / 2);
+    assert.strictEqual(halfLife.allowanceConsumedPct, 50);
+  });
+
+  it('does not assign anodic and cathodic roles within the same representative potential group', () => {
+    const result = estimateDissimilarMetalsRisk({
+      primaryMetal: 'copper',
+      secondaryMetal: 'stainless304Passive',
+      environment: 'indoorHumid',
+      exposureDuty: 'intermittentlyWet',
+      isolationQuality: 'none',
+      anodeArea: 100,
+      cathodeArea: 100,
+      corrosionAllowanceMm: 1.5,
+      temperatureC: 20
+    });
+
+    assert.strictEqual(result.samePotentialGroup, true);
+    assert.strictEqual(result.primaryRole, 'Same potential group');
+    assert.strictEqual(result.secondaryRole, 'Same potential group');
+    assert.strictEqual(result.anodicMetal, 'No distinct anodic member');
+    assert.ok(!result.compatibilityWarning.drivers.some(driver => driver.includes('area ratio')));
+    assert.ok(!result.recommendation.some(item => item.includes('Reduce cathode-to-anode area ratio')));
   });
 
   it('throws on unsupported metal key', () => {
@@ -196,7 +242,8 @@ describe('estimateDissimilarMetalsRisk', () => {
 
     assert.ok(summary.includes('Dissimilar Metals Corrosion Reference'));
     assert.ok(summary.includes('Anodic member: Aluminum alloy'));
-    assert.ok(summary.includes('Estimated corrosion rate:'));
+    assert.ok(summary.includes('Heuristic screening rate:'));
+    assert.ok(summary.includes('Potential compatibility:'));
     assert.ok(summary.includes('Model assumptions:'));
     assert.ok(summary.includes('Thickness projection'));
   });
@@ -218,6 +265,7 @@ describe('estimateDissimilarMetalsRisk', () => {
     assert.ok(rows.some(row => row.label === 'Environment model'));
     assert.ok(rows.some(row => row.label === 'Electrolyte duty'));
     assert.strictEqual(payload.exportType, 'dissimilar-metals-corrosion-study');
+    assert.strictEqual(payload.exportVersion, 2);
     assert.strictEqual(payload.result, result);
     assert.ok(payload.summaryText.includes('Recommended mitigations'));
   });
