@@ -15,11 +15,21 @@ import {
   recommendLPL,
   strikingDistance,
   singleMastRadius,
+  roofTerminalRadius,
+  generateTerminalArray,
+  evaluateTerminalArrayCoverage,
   downConductorCount,
+  generateDownConductorLayout,
+  LIGHTNING_CONDUCTOR_MIN_BEND_RADIUS_M,
+  NFPA_UL_MAX_TERMINAL_SPACING_M,
+  NFPA_UL_MAX_TERMINAL_EDGE_DISTANCE_M,
+  NFPA_UL_MAX_CONDUCTOR_SUPPORT_SPACING_M,
+  generateNfpaUlTerminalArray,
   arresterMCOV,
   recommendArrester,
   runLightningProtection,
 } from '../analysis/lightningProtection.mjs';
+import { buildLightningProtectionReportModel } from '../src/lightningProtectionPdf.js';
 
 const approx = (a, b, tol, msg) => assert.ok(Math.abs(a - b) <= tol, `${msg} (got ${a}, expected ${b} ±${tol})`);
 
@@ -126,6 +136,105 @@ const approx = (a, b, tol, msg) => assert.ok(Math.abs(a - b) <= tol, `${msg} (go
   assert.equal(singleMastRadius(20, 20, 45), 0, 'object at mast height → zero radius');
   // Larger sphere (lower LPL) gives larger protective radius for the same mast
   assert.ok(singleMastRadius(30, 3, 60) > singleMastRadius(30, 3, 20), 'bigger sphere → bigger radius');
+
+  const roofRadius = roofTerminalRadius(15, 10, 20);
+  approx(roofRadius, Math.sqrt(5 * 35), 1e-9, 'roof terminal uses protrusion above the reference plane');
+  assert.equal(roofTerminalRadius(10, 10, 20), 0, 'terminal at the reference plane provides no roof coverage');
+  assert.equal(roofTerminalRadius(35, 10, 20), 20, 'terminal protrusion is capped at R');
+
+  const footprint = resolveFootprintGeometry({
+    structureShape: 'rectangle',
+    length: 40,
+    width: 20,
+  });
+  const array = generateTerminalArray(footprint, {
+    terminalRows: 2,
+    terminalColumns: 3,
+    terminalEdgeSetback: 2,
+  });
+  assert.equal(array.terminals.length, 6, 'rows × columns creates the terminal count');
+  assert.deepEqual(array.terminals[0], { xM: -18, yM: -8, row: 0, column: 0 },
+    'rectangular array starts at the setback-adjusted corner');
+  const arrayCoverage = evaluateTerminalArrayCoverage(footprint, array.terminals, roofRadius);
+  approx(arrayCoverage.maxRequiredRadiusM, Math.hypot(9, 8), 1e-9,
+    'exact grid evaluation finds the worst Voronoi-cell point');
+  assert.equal(arrayCoverage.coverageComplete, true, 'six-terminal array covers the example roof');
+
+  const sparseArray = generateTerminalArray(footprint, {
+    terminalRows: 2,
+    terminalColumns: 2,
+    terminalEdgeSetback: 2,
+  });
+  assert.equal(
+    evaluateTerminalArrayCoverage(footprint, sparseArray.terminals, roofRadius).coverageComplete,
+    false,
+    'sparse array exposes a center gap',
+  );
+})();
+
+// ---------------------------------------------------------------------------
+// NFPA 780 / UL 96A design workflow
+// ---------------------------------------------------------------------------
+(function testNfpaUlDesignWorkflow() {
+  const footprint = resolveFootprintGeometry({
+    structureShape: 'rectangle',
+    length: 60,
+    width: 40,
+  });
+  const generated = generateNfpaUlTerminalArray(footprint);
+  assert.ok(generated.edgeSetbackM <= NFPA_UL_MAX_TERMINAL_EDGE_DISTANCE_M,
+    'automatic layout keeps terminals within 2 ft of the roof edge');
+  const xCoordinates = [...new Set(generated.terminals.map(item => item.xM))].sort((a, b) => a - b);
+  const maxXSpacing = Math.max(...xCoordinates.slice(1).map((value, index) => value - xCoordinates[index]));
+  assert.ok(maxXSpacing <= NFPA_UL_MAX_TERMINAL_SPACING_M + 1e-9,
+    'automatic layout limits terminal spacing to 20 ft');
+
+  const result = runLightningProtection({
+    designStandard: 'nfpa-ul',
+    autoTerminalLayout: true,
+    groundFlashDensity: 4,
+    structureShape: 'rectangle',
+    length: 60,
+    width: 40,
+    height: 25,
+    airTerminalHeight: 30,
+    protectedHeight: 3,
+    protectionMethod: 'roof-array',
+    bomAssumptions: {
+      conductorWastePercent: 10,
+      roofSupportSpacingM: 0.9,
+      downConductorSupportSpacingM: 0.9,
+      downConductorRouteAllowanceM: 2,
+      includePerimeterRing: true,
+    },
+  });
+  assert.equal(result.designCompliance.designReady, true,
+    'all calculable NFPA/UL checks pass for the automatic rectangular layout');
+  assert.equal(result.designCompliance.status, 'design-ready-with-assumptions');
+  assert.equal(result.designCompliance.componentClass, 'Class II',
+    'structures above 75 ft use the Class II component basis');
+  assert.ok(result.designCompliance.assumptions.length >= 5,
+    'field-dependent requirements are recorded as project assumptions');
+  assert.ok(result.designCompliance.exclusions.some(item => /final UL field inspection/i.test(item)),
+    'final inspection is explicitly excluded');
+  assert.equal(result.bom.procurementReady, true,
+    'BOM planning status requires the calculable standards checks to pass');
+  assert.match(result.bom.designBasis, /NFPA 780 \/ UL 96A/);
+
+  const supportFailure = runLightningProtection({
+    ...result.inputs,
+    groundFlashDensity: 4,
+    designStandard: 'nfpa-ul',
+    autoTerminalLayout: true,
+    bomAssumptions: {
+      ...result.inputs.bomAssumptions,
+      roofSupportSpacingM: NFPA_UL_MAX_CONDUCTOR_SUPPORT_SPACING_M + 0.1,
+    },
+  });
+  assert.equal(supportFailure.designCompliance.designReady, false,
+    'support spacing over 3 ft prevents design-ready status');
+  assert.equal(supportFailure.bom.procurementReady, false,
+    'a failed standards check prevents BOM procurement readiness');
 })();
 
 // ---------------------------------------------------------------------------
@@ -135,6 +244,47 @@ const approx = (a, b, tol, msg) => assert.ok(Math.abs(a - b) <= tol, `${msg} (go
   assert.equal(downConductorCount(160, 10), 16, 'perimeter 160 / spacing 10 = 16');
   assert.equal(downConductorCount(15, 10), 2, 'minimum two down-conductors');
   assert.equal(downConductorCount(0, 10), 2, 'degenerate → minimum two');
+  assert.equal(
+    downConductorCount(200.00000000000003, 10),
+    20,
+    'unit-conversion noise does not add an extra down-conductor',
+  );
+
+  const rectangle = resolveFootprintGeometry({
+    structureShape: 'rectangle',
+    length: 60,
+    width: 40,
+  });
+  const rectangleLayout = generateDownConductorLayout(rectangle, 10);
+  assert.equal(rectangleLayout.count, 20, '60 m by 40 m rectangle uses twenty 10 m perimeter segments');
+  assert.equal(rectangleLayout.cornerCount, 4, 'rectangular layout starts with all four corners');
+  assert.equal(rectangleLayout.intermediateCount, 16, 'additional routes are distributed along the walls');
+  approx(rectangleLayout.achievedMaxSpacingM, 10, 1e-9, 'wall spacing respects the selected class spacing');
+  assert.equal(rectangleLayout.points.filter(point => point.isCorner).length, 4,
+    'four generated coordinates are identified as corners');
+  const imperialRoundTrip = resolveFootprintGeometry({
+    structureShape: 'rectangle',
+    length: 196.85 / 3.280839895,
+    width: 131.234 / 3.280839895,
+  });
+  assert.equal(
+    generateDownConductorLayout(imperialRoundTrip, 10).count,
+    20,
+    'three-decimal imperial display values retain the nominal 60 m by 40 m layout count',
+  );
+
+  const smallSquare = resolveFootprintGeometry({
+    structureShape: 'rectangle',
+    length: 11,
+    width: 11,
+  });
+  assert.equal(
+    generateDownConductorLayout(smallSquare, 10).count,
+    8,
+    'corner-first layout adds intermediate routes when each wall exceeds the spacing',
+  );
+  approx(LIGHTNING_CONDUCTOR_MIN_BEND_RADIUS_M, 0.2032, 1e-12,
+    'installation coordination exposes the 8 inch bend-radius reference');
 })();
 
 // ---------------------------------------------------------------------------
@@ -191,6 +341,46 @@ const approx = (a, b, tol, msg) => assert.ok(Math.abs(a - b) <= tol, `${msg} (go
   assert.equal(r.downConductorMinAreaMm2, 16, 'copper min 16 mm²');
   assert.ok(r.arrester && r.arrester.ratedStandard > 0, 'arrester recommended');
   assert.ok(Array.isArray(r.warnings));
+
+  const roofArray = runLightningProtection({
+    groundFlashDensity: 4,
+    length: 40,
+    width: 20,
+    height: 10,
+    airTerminalHeight: 15,
+    protectedHeight: 3,
+    protectionMethod: 'roof-array',
+    terminalRows: 2,
+    terminalColumns: 3,
+    terminalEdgeSetback: 2,
+  });
+  assert.equal(roofArray.protectionMethod, 'roof-array', 'roof-array method is preserved');
+  assert.equal(roofArray.referencePlaneHeightM, 10, 'roof is the minimum array reference plane');
+  assert.equal(roofArray.terminalArray.terminals.length, 6, 'array coordinates are returned');
+  approx(
+    roofArray.terminalProtectiveRadiusM,
+    roofTerminalRadius(15, 10, roofArray.rollingSphereRadius),
+    1e-9,
+    'array coverage uses terminal protrusion above the roof plane',
+  );
+  assert.equal(roofArray.coverageComplete, true, 'combined array coverage reaches the complete roof');
+  assert.equal(roofArray.bom.ready, true, 'roof array generates a construction takeoff');
+  assert.equal(roofArray.bom.procurementReady, true, 'passing coverage marks the takeoff ready for planning');
+  approx(roofArray.bom.summary.gridConductorM, 132, 1e-9, 'grid conductor follows every row/column segment plus allowance');
+  approx(roofArray.bom.summary.perimeterConductorM, 132, 1e-9, 'perimeter ring follows the roof perimeter plus allowance');
+  assert.equal(
+    roofArray.bom.rows.find(item => item.item === 'Point air terminal').quantity,
+    6,
+    'BOM includes one point terminal per array coordinate',
+  );
+  assert.equal(roofArray.bom.summary.downConductorCount, roofArray.downConductorCount,
+    'BOM reports independent down paths separately from terminal quantity');
+  assert.ok(roofArray.bom.installationNotes.some(note => /not assigned one-for-one/i.test(note)),
+    'BOM explains that terminals and downconductors are not paired');
+  assert.ok(roofArray.bom.installationNotes.some(note => /8 in/i.test(note)),
+    'BOM carries the bend-radius installation reference');
+  assert.ok(roofArray.warnings.some(warning => /regular 3 × 2 terminal grid/i.test(warning)),
+    'array coordination limitation is visible');
 })();
 
 // ---------------------------------------------------------------------------
@@ -214,6 +404,7 @@ const approx = (a, b, tol, msg) => assert.ok(Math.abs(a - b) <= tol, `${msg} (go
   assert.equal(lowRisk.rollingSphereRadius, null, 'low-risk case does not invent LPL III geometry');
   assert.equal(lowRisk.mastProtectiveRadiusM, null, 'low-risk case omits mast coverage geometry');
   assert.equal(lowRisk.downConductorCount, 0, 'low-risk case omits a down-conductor design');
+  assert.equal(lowRisk.bom.ready, false, 'low-risk screening does not generate an arbitrary LPS BOM');
 
   const lv = runLightningProtection({
     groundFlashDensity: 3,
@@ -256,6 +447,42 @@ const approx = (a, b, tol, msg) => assert.ok(Math.abs(a - b) <= tol, `${msg} (go
 })();
 
 // ---------------------------------------------------------------------------
+// PDF report model
+// ---------------------------------------------------------------------------
+(function testPdfReportModel() {
+  const result = runLightningProtection({
+    groundFlashDensity: 3,
+    structureShape: 'rectangle',
+    length: 40,
+    width: 24,
+    height: 10,
+    airTerminalHeight: 11,
+    protectedHeight: 10,
+    protectionMethod: 'roof-array',
+    terminalRows: 2,
+    terminalColumns: 4,
+    terminalEdgeSetback: 1,
+    systemKvLL: 13.8,
+    grounding: 'solid',
+  });
+  const metric = buildLightningProtectionReportModel(result, 'metric', new Date('2026-07-28T12:00:00Z'));
+  const imperial = buildLightningProtectionReportModel(result, 'imperial', new Date('2026-07-28T12:00:00Z'));
+
+  assert.equal(metric.summary[1].value, '8 point terminals', 'PDF summarizes the complete roof array');
+  assert.ok(metric.dimensions.some(item => item.value === '40.00 m'), 'metric report retains metre dimensions');
+  assert.ok(imperial.dimensions.some(item => item.value === '131.23 ft'), 'imperial report converts metre dimensions to feet');
+  assert.ok(metric.protection.some(item => /Rolling-sphere radius/.test(item.label)), 'PDF includes rolling-sphere design values');
+  assert.ok(metric.surge.some(item => item.label === 'Minimum MCOV'), 'PDF includes surge-arrester screening');
+  assert.ok(metric.bom?.rows.some(item => item.item === 'Point air terminal'), 'PDF model includes the live BOM');
+  assert.ok(imperial.bom?.rows.some(item => /ft$/.test(item.quantity)), 'PDF BOM converts conductor lengths to feet');
+  assert.ok(imperial.warnings.some(item => /\d+(?:\.\d+)? ft/.test(item)),
+    'imperial PDF design-check statements convert embedded metre values to feet');
+  assert.ok(!imperial.warnings.some(item => /\d+(?:\.\d+)? m\b/.test(item)),
+    'imperial PDF design-check statements do not leak metre values');
+  assert.ok(metric.limitations.some(item => /not a complete IEC 62305-2/i.test(item)), 'PDF states the screening limitation');
+})();
+
+// ---------------------------------------------------------------------------
 // Validation
 // ---------------------------------------------------------------------------
 (function testValidation() {
@@ -277,6 +504,18 @@ const approx = (a, b, tol, msg) => assert.ok(Math.abs(a - b) <= tol, `${msg} (go
     height: 5,
     thunderstormDays: 30,
   }), /too large/i, 'impossible custom area and perimeter rejected');
+  assert.throws(() => runLightningProtection({
+    structureShape: 'custom',
+    footprintArea: 600,
+    footprintPerimeter: 110,
+    farthestPointRadius: 18,
+    height: 10,
+    airTerminalHeight: 15,
+    groundFlashDensity: 3,
+    protectionMethod: 'roof-array',
+    terminalRows: 2,
+    terminalColumns: 3,
+  }), /rectangular or circular footprint/i, 'custom roof arrays require known boundaries');
 })();
 
 console.log('lightningProtection.test.mjs — all assertions passed');

@@ -6,6 +6,7 @@ import { getStudies, setStudies } from './dataStore.mjs';
 import { initStudyApprovalPanel } from './src/components/studyApproval.js';
 import { initStudyBasisPanel } from './src/components/studyBasis.js';
 import { escapeHtml } from './src/htmlUtils.mjs';
+import { downloadLightningProtectionPdf } from './src/lightningProtectionPdf.js';
 
 document.addEventListener('DOMContentLoaded', () => {
   initSettings();
@@ -15,25 +16,26 @@ document.addEventListener('DOMContentLoaded', () => {
   initNavToggle();
 
   initStudyBasisPanel('lightningProtection', {
-    standard: 'IEC 62305-1/-2/-3:2024; IEEE Std 998-2026; IEEE C62.22; IEC 60099-5:2018',
-    clause: 'Screening-level LPL selection, rolling-sphere geometry, and >1 kV surge-arrester MCOV',
+    standard: 'NFPA 780; UL 96A; IEC 62305-1/-2/-3:2024; IEEE Std 998-2026; IEEE C62.22; IEC 60099-5:2018',
+    clause: 'NFPA/UL design checks, screening-level LPL selection, rolling-sphere geometry, and >1 kV surge-arrester MCOV',
     formulas: [
       'NSG = 0.04 · Td^1.25  — legacy keraunic screening estimate (strike points/km²/yr)',
       'Ad = Af + (3H)P + π·(3H)²  — footprint area Af expanded by 3H',
       'Nd = NSG · Ad · Cd · 1e-6  — expected direct strikes/yr',
       'Efficiency E = 1 − Nc/Nd → LPL I/II/III/IV',
       'rp = √(h(2R−h)) − √(hx(2R−hx))  — single-mast protective radius',
+      'rp = √(p(2R−p))  — roof-terminal radius for protrusion p above the protected plane',
       'Uc ≥ 1.05·VLL/√3 (solid) or 1.05·VLL (ungrounded)  — arrester MCOV',
     ],
     assumptions: [
       'Rectangular, circular, or entered custom footprint area and perimeter',
       'LPL selection uses each class declared interception capability',
-      'Centered single-mast coverage at the entered protected-plane height',
+      'Single centered mast or regular coordinate-based roof terminal array',
       'Plan and elevation coverage views use equal-axis rolling-sphere geometry',
     ],
     limitations: [
       'Screening-level proxy, not the full IEC 62305-2:2024 risk and damage-frequency assessment',
-      'Single-mast protection only (no multi-mast or shield-wire optimisation)',
+      'Roof arrays use a regular grid; final coordinates, roof obstructions, and shield wires require project-specific engineering',
       'IEEE C62.22 / IEC 60099-5 arrester screening applies only above 1 kV',
       'Verify against a full IEC 62305-2 risk study before final design',
     ],
@@ -45,8 +47,14 @@ document.addEventListener('DOMContentLoaded', () => {
   const resultsDiv = document.getElementById('results');
   const errorsDiv  = document.getElementById('calc-errors');
   const exportBtn  = document.getElementById('export-csv-btn');
+  const exportBomBtn = document.getElementById('export-bom-btn');
+  const exportPdfBtn = document.getElementById('export-pdf-btn');
+  const exportStatus = document.getElementById('lp-export-status');
   const ngModeSel  = document.getElementById('ng-mode');
   const shapeSel   = document.getElementById('structure-shape');
+  const methodSel  = document.getElementById('protection-method');
+  const designStandardSel = document.getElementById('design-standard');
+  const autoLayoutInput = document.getElementById('nfpa-auto-layout');
   const previewSvg = document.getElementById('lp-protection-preview');
   const previewStatus = document.getElementById('lp-preview-status');
   const studyStatus = document.getElementById('lp-study-status');
@@ -55,6 +63,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const SQUARE_METERS_TO_SQUARE_FEET = 10.763910417;
   const SQUARE_KILOMETERS_PER_SQUARE_MILE = 2.58998811;
   let unitSystem = 'metric';
+  let liveAssessment = null;
 
   unitButtons.forEach(button => {
     button.addEventListener('click', () => {
@@ -78,9 +87,51 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('[data-shape-fields]').forEach(group => {
       group.hidden = group.dataset.shapeFields !== shape;
     });
+    const roofArrayOption = methodSel.querySelector('option[value="roof-array"]');
+    roofArrayOption.disabled = shape === 'custom';
+    if (shape === 'custom' && methodSel.value === 'roof-array') {
+      methodSel.value = 'single';
+    }
+    if (designStandardSel.value === 'nfpa-ul' && shape !== 'rectangle') {
+      autoLayoutInput.checked = false;
+    }
+    syncProtectionMethod({ update: false });
     if (options.update !== false) updateLiveAssessment();
   }
   shapeSel.addEventListener('change', syncStructureShape);
+
+  function syncDesignStandard(options = {}) {
+    const isNfpaUl = designStandardSel.value === 'nfpa-ul';
+    autoLayoutInput.closest('.lp-check-row').hidden = !isNfpaUl;
+    if (isNfpaUl && shapeSel.value === 'custom') {
+      shapeSel.value = 'rectangle';
+      syncStructureShape({ update: false });
+    }
+    if (isNfpaUl) methodSel.value = 'roof-array';
+    syncProtectionMethod({ update: false });
+    if (options.update !== false) updateLiveAssessment();
+  }
+  designStandardSel.addEventListener('change', syncDesignStandard);
+  autoLayoutInput.addEventListener('change', () => syncProtectionMethod());
+
+  function syncProtectionMethod(options = {}) {
+    const isArray = methodSel.value === 'roof-array';
+    const automatic = isArray && designStandardSel.value === 'nfpa-ul' && autoLayoutInput.checked;
+    document.getElementById('row-terminal-array').hidden = !isArray;
+    ['terminal-rows', 'terminal-columns', 'terminal-edge-setback'].forEach(id => {
+      document.getElementById(id).disabled = automatic;
+    });
+    const rows = Math.max(1, Number.parseInt(document.getElementById('terminal-rows').value, 10) || 1);
+    const columns = Math.max(1, Number.parseInt(document.getElementById('terminal-columns').value, 10) || 1);
+    document.getElementById('terminal-count-preview').textContent = `${rows * columns} terminal${rows * columns === 1 ? '' : 's'}`;
+    if (options.update !== false) updateLiveAssessment();
+  }
+  methodSel.addEventListener('change', syncProtectionMethod);
+  ['terminal-rows', 'terminal-columns'].forEach(id => {
+    document.getElementById(id).addEventListener('input', () => {
+      syncProtectionMethod({ update: false });
+    });
+  });
 
   const saved = getStudies().lightningProtection;
   if (saved && saved.inputs) {
@@ -91,6 +142,7 @@ document.addEventListener('DOMContentLoaded', () => {
   } else {
     setUnitSystem('metric', { convertValues: false, update: false });
     syncStructureShape({ update: false });
+    syncDesignStandard({ update: false });
     syncNgMode();
   }
 
@@ -137,11 +189,57 @@ document.addEventListener('DOMContentLoaded', () => {
     if (s) download('lightning-protection.csv', resultToCsv(s), 'text/csv');
   });
 
+  exportBomBtn.addEventListener('click', () => {
+    if (liveAssessment?.bom?.ready) {
+      download('lightning-protection-bom.csv', bomToCsv(liveAssessment), 'text/csv');
+    }
+  });
+
+  exportPdfBtn.addEventListener('click', async () => {
+    const originalLabel = exportPdfBtn.textContent;
+    exportPdfBtn.disabled = true;
+    exportPdfBtn.textContent = 'Building PDF...';
+    exportStatus.textContent = 'Rendering the current plan/elevation graphic and engineering values...';
+    try {
+      const result = runLightningProtection(readConfig());
+      result.inputs._formState = { ngMode: ngModeSel.value, unitSystem };
+      updateLiveVisual(result);
+      await new Promise(resolve => window.requestAnimationFrame(resolve));
+      const report = await downloadLightningProtectionPdf({
+        result,
+        svgElement: previewSvg,
+        unitSystem,
+      });
+      exportStatus.textContent = `Downloaded ${report.filename} (${report.pageCount} pages).`;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unable to create the PDF report.';
+      errorsDiv.hidden = false;
+      errorsDiv.textContent = message;
+      exportStatus.textContent = 'PDF export failed. Review the input message and try again.';
+      showModal('PDF Export Error', `<p>${escapeHtml(message)}</p>`, 'error');
+    } finally {
+      exportPdfBtn.disabled = false;
+      exportPdfBtn.textContent = originalLabel;
+    }
+  });
+
   function restoreForm(inputs) {
     if (!inputs) return;
     const set = (id, v) => { const el = document.getElementById(id); if (el && v != null) el.value = v; };
     unitSystem = 'metric';
     set('structure-shape', inputs.structureShape || 'rectangle');
+    set('design-standard', inputs.designStandard || 'iec-screening');
+    set('protection-method', inputs.protectionMethod || 'single');
+    autoLayoutInput.checked = inputs.autoTerminalLayout !== false;
+    set('terminal-rows', inputs.terminalRows ?? 2);
+    set('terminal-columns', inputs.terminalColumns ?? 4);
+    set('terminal-edge-setback', inputs.terminalEdgeSetback ?? 1);
+    set('bom-waste-percent', inputs.bomAssumptions?.conductorWastePercent ?? 10);
+    set('bom-roof-support-spacing', inputs.bomAssumptions?.roofSupportSpacingM ?? 0.9);
+    set('bom-down-support-spacing', inputs.bomAssumptions?.downConductorSupportSpacingM ?? 0.9);
+    set('bom-down-route-allowance', inputs.bomAssumptions?.downConductorRouteAllowanceM ?? 2);
+    const perimeterRing = document.getElementById('bom-include-perimeter-ring');
+    perimeterRing.checked = inputs.bomAssumptions?.includePerimeterRing !== false;
     set('length', inputs.length); set('width', inputs.width);
     set('diameter', inputs.diameter);
     set('footprint-area', inputs.footprintArea);
@@ -160,6 +258,8 @@ document.addEventListener('DOMContentLoaded', () => {
     else set('td', inputs.thunderstormDays);
     setUnitSystem(inputs._formState?.unitSystem || 'metric', { convertValues: true, update: false });
     syncStructureShape({ update: false });
+    syncDesignStandard({ update: false });
+    syncProtectionMethod({ update: false });
     syncNgMode();
   }
 
@@ -179,8 +279,12 @@ document.addEventListener('DOMContentLoaded', () => {
         'height',
         'footprint-perimeter',
         'farthest-point-radius',
+        'terminal-edge-setback',
         'air-terminal-height',
         'protected-height',
+        'bom-roof-support-spacing',
+        'bom-down-support-spacing',
+        'bom-down-route-allowance',
       ].forEach(id => {
         const input = document.getElementById(id);
         const current = parseFloat(input.value);
@@ -258,6 +362,18 @@ document.addEventListener('DOMContentLoaded', () => {
     return unitSystem === 'imperial' ? value * METERS_TO_FEET : value;
   }
 
+  function measurementTextForDisplay(value) {
+    const text = String(value ?? '');
+    if (unitSystem !== 'imperial') return text;
+    return text
+      .replace(/203 mm\s*\(8 in\)/gi, '8 in')
+      .replace(/(-?\d+(?:\.\d+)?)\s*m\b/g, (_, raw) => {
+        const feet = Number(raw) * METERS_TO_FEET;
+        const decimals = Math.abs(feet) >= 100 ? 1 : 2;
+        return `${feet.toFixed(decimals)} ft`;
+      });
+  }
+
   function areaForDisplay(value) {
     return unitSystem === 'imperial' ? value * SQUARE_METERS_TO_SQUARE_FEET : value;
   }
@@ -286,14 +402,29 @@ document.addEventListener('DOMContentLoaded', () => {
   function readConfig() {
     const num = id => parseFloat(document.getElementById(id).value);
     const config = {
+      designStandard: designStandardSel.value,
+      autoTerminalLayout: autoLayoutInput.checked,
       structureShape: shapeSel.value,
       height: lengthFromDisplay(num('height')),
       location: document.getElementById('location').value,
       tolerableFrequency: num('nc'),
       airTerminalHeight: lengthFromDisplay(num('air-terminal-height')),
       protectedHeight: lengthFromDisplay(num('protected-height')),
+      protectionMethod: methodSel.value,
       downConductorMaterial: document.getElementById('down-material').value,
     };
+    if (methodSel.value === 'roof-array') {
+      config.terminalRows = num('terminal-rows');
+      config.terminalColumns = num('terminal-columns');
+      config.terminalEdgeSetback = lengthFromDisplay(num('terminal-edge-setback'));
+      config.bomAssumptions = {
+        conductorWastePercent: num('bom-waste-percent'),
+        roofSupportSpacingM: lengthFromDisplay(num('bom-roof-support-spacing')),
+        downConductorSupportSpacingM: lengthFromDisplay(num('bom-down-support-spacing')),
+        downConductorRouteAllowanceM: lengthFromDisplay(num('bom-down-route-allowance')),
+        includePerimeterRing: document.getElementById('bom-include-perimeter-ring').checked,
+      };
+    }
     if (shapeSel.value === 'circle') {
       config.diameter = lengthFromDisplay(num('diameter'));
     } else if (shapeSel.value === 'custom') {
@@ -318,9 +449,12 @@ document.addEventListener('DOMContentLoaded', () => {
   function updateLiveAssessment() {
     try {
       const result = runLightningProtection(readConfig());
+      liveAssessment = result;
       updateLiveVisual(result);
       setStudyStatus('editing');
     } catch (err) {
+      liveAssessment = null;
+      exportBomBtn.disabled = true;
       renderPreviewPlaceholder(err instanceof Error ? err.message : 'Complete the inputs to see the protection concept.');
     }
   }
@@ -363,6 +497,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function updateLiveVisual(r) {
     if (!previewSvg) return;
+    liveAssessment = r;
     const f = (x, d = 1) => (Number.isFinite(x) ? x.toFixed(d) : '—');
     const compact = x => Number.isFinite(x)
       ? new Intl.NumberFormat(undefined, { maximumFractionDigits: 1, notation: x >= 100000 ? 'compact' : 'standard' }).format(x)
@@ -389,7 +524,153 @@ document.addEventListener('DOMContentLoaded', () => {
     updateLocationMarker(r.inputs.location);
     updateRiskMeter(ratio, r);
     updateGuidance(r);
+    updateCompliancePanel(r);
+    updateBomPanel(r);
+    if (r.inputs.autoTerminalLayout && r.terminalArray) {
+      document.getElementById('terminal-rows').value = r.terminalArray.rows;
+      document.getElementById('terminal-columns').value = r.terminalArray.columns;
+      document.getElementById('terminal-edge-setback').value = formatInputNumber(
+        lengthForDisplay(r.terminalArray.edgeSetbackM),
+      );
+      document.getElementById('terminal-count-preview').textContent = `${r.terminalArray.terminals.length} terminals · auto`;
+    }
     drawProtectionPreview(r);
+  }
+
+  function updateCompliancePanel(r) {
+    const status = document.getElementById('lp-compliance-status');
+    const intro = document.getElementById('lp-compliance-intro');
+    const content = document.getElementById('lp-compliance-content');
+    const compliance = r.designCompliance;
+    if (!status || !intro || !content || !compliance) return;
+    if (compliance.status === 'screening-only') {
+      status.className = 'lp-status-pill lp-status-pill--pending';
+      status.textContent = 'Screening only';
+      intro.textContent = 'IEC/IEEE mode does not claim NFPA 780 or UL 96A design conformance.';
+      content.innerHTML = `
+        <div class="lp-compliance-callout">
+          <strong>Change the Design workflow to NFPA 780 + UL 96A design checks.</strong>
+          <p>The final inspection and certification remain outside the study.</p>
+        </div>`;
+      return;
+    }
+    const pass = compliance.designReady;
+    status.className = `lp-status-pill lp-status-pill--${pass ? 'safe' : 'danger'}`;
+    status.textContent = compliance.label;
+    intro.textContent = pass
+      ? `All calculable checks pass for ${compliance.componentClass} components. Assumptions still require project confirmation.`
+      : 'Resolve the failed checks below before treating the package as ready for detailed design.';
+    const criteria = compliance.criteria.map(item => `
+      <li class="${item.pass ? 'is-pass' : 'is-fail'}">
+        <span aria-hidden="true">${item.pass ? '✓' : '!'}</span>
+        <div><strong>${escapeHtml(item.label)}</strong><small>${escapeHtml(measurementTextForDisplay(item.detail))}</small></div>
+      </li>`).join('');
+    content.innerHTML = `
+      <div class="lp-compliance-callout ${pass ? 'is-ready' : 'is-action'}">
+        <strong>${pass ? 'Design criteria satisfied — inspection excluded' : 'Design changes required'}</strong>
+        <p>${pass
+          ? 'This status applies to the checked geometry and entered assumptions. It is not a UL Master Label or field certification.'
+          : 'The BOM and report remain preliminary until every calculable item passes.'}</p>
+      </div>
+      <ul class="lp-compliance-checks">${criteria}</ul>
+      <details class="lp-bom-notes" open>
+        <summary>Required project assumptions (${compliance.assumptions.length})</summary>
+        <ul>${compliance.assumptions.map(item => `<li>${escapeHtml(measurementTextForDisplay(item))}</li>`).join('')}</ul>
+      </details>
+      <details class="lp-bom-notes">
+        <summary>Excluded from this study (${compliance.exclusions.length})</summary>
+        <ul>${compliance.exclusions.map(item => `<li>${escapeHtml(measurementTextForDisplay(item))}</li>`).join('')}</ul>
+      </details>`;
+  }
+
+  function updateBomPanel(r) {
+    const panel = document.getElementById('lp-bom-panel');
+    const content = document.getElementById('lp-bom-content');
+    const status = document.getElementById('lp-bom-status');
+    const intro = document.getElementById('lp-bom-intro');
+    const bom = r.bom;
+    if (!panel || !content || !status || !intro) return;
+
+    exportBomBtn.disabled = !bom?.ready;
+    if (!bom?.ready) {
+      status.className = 'lp-status-pill lp-status-pill--pending';
+      status.textContent = r.lpl.required ? 'Select roof array' : 'LPS not indicated';
+      intro.textContent = bom?.warnings?.[0]
+        || 'Choose a roof air-terminal array to generate a quantity-driven preliminary BOM.';
+      content.innerHTML = '';
+      return;
+    }
+
+    const unit = lengthUnit();
+    const quantity = row => row.unit === 'm'
+      ? `${lengthForDisplay(row.quantity).toFixed(1)} ${unit}`
+      : `${Math.ceil(row.quantity)} ${row.unit}`;
+    const pass = bom.procurementReady;
+    const standardsWorkflow = r.designCompliance?.standard?.startsWith('NFPA');
+    status.className = `lp-status-pill lp-status-pill--${pass ? 'safe' : 'danger'}`;
+    status.textContent = pass
+      ? standardsWorkflow ? 'Design checks pass' : 'Coverage passes'
+      : standardsWorkflow && !r.designCompliance.designReady ? 'Design action required' : 'Coverage incomplete';
+    intro.textContent = pass
+      ? standardsWorkflow
+        ? 'Calculated NFPA/UL design checks pass subject to the required assumptions; final product selection and field inspection are excluded.'
+        : 'Live preliminary quantities for the entered terminal grid, roof network, down paths, and grounding interfaces.'
+      : standardsWorkflow && !r.designCompliance.designReady
+        ? 'Resolve the failed standards checks before using these quantities for procurement planning.'
+        : 'This BOM follows the current geometry, but coverage must pass before quantities are considered for procurement planning.';
+
+    const summary = bom.summary;
+    const warningHtml = bom.warnings.length
+      ? `<div class="lp-bom-notes lp-bom-notes--warning"><strong>Design checks</strong><ul>${bom.warnings.map(item => `<li>${escapeHtml(measurementTextForDisplay(item))}</li>`).join('')}</ul></div>`
+      : '';
+    const installationNotes = Array.isArray(bom.installationNotes) ? bom.installationNotes : [];
+    const downPathCount = summary.downConductorCount ?? r.downConductorCount;
+    content.innerHTML = `
+      <div class="lp-bom-basis">
+        <strong>Design basis</strong>
+        <span>${escapeHtml(bom.designBasis || 'Interconnected roof air-termination network with distributed down paths.')}</span>
+      </div>
+      <div class="lp-bom-topology" aria-label="Lightning protection system topology">
+        <div><span>1</span><strong>${summary.terminalCount} air terminals</strong><small>strike interception</small></div>
+        <i aria-hidden="true">→</i>
+        <div><span>2</span><strong>Common roof grid</strong><small>all terminals bonded</small></div>
+        <i aria-hidden="true">→</i>
+        <div><span>3</span><strong>${downPathCount} down paths</strong><small>corners, then perimeter</small></div>
+        <i aria-hidden="true">→</i>
+        <div><span>4</span><strong>Earth network</strong><small>ring / electrodes by study</small></div>
+      </div>
+      ${installationNotes.length ? `
+        <div class="lp-bom-installation-notes">
+          ${installationNotes.map((item, index) => `
+            <div>
+              <span aria-hidden="true">${index === 2 ? 'R' : index + 1}</span>
+              <p>${escapeHtml(measurementTextForDisplay(item))}</p>
+            </div>`).join('')}
+        </div>` : ''}
+      <div class="lp-bom-summary">
+        <div><span>Point terminals</span><strong>${summary.terminalCount}</strong></div>
+        <div><span>Roof conductor</span><strong>${lengthForDisplay(summary.gridConductorM + summary.perimeterConductorM).toFixed(1)} ${unit}</strong></div>
+        <div><span>Down paths</span><strong>${downPathCount} · ${lengthForDisplay(summary.downConductorM).toFixed(1)} ${unit}</strong></div>
+        <div><span>Total conductor</span><strong>${lengthForDisplay(summary.totalConductorM).toFixed(1)} ${unit}</strong></div>
+      </div>
+      <div class="lp-bom-table-wrap">
+        <table class="lp-bom-table">
+          <thead><tr><th>Category</th><th>Material / item</th><th>Specification</th><th>Quantity</th><th>Quantity basis</th></tr></thead>
+          <tbody>${bom.rows.map(row => `
+            <tr>
+              <td>${escapeHtml(row.category)}</td>
+              <td><strong>${escapeHtml(row.item)}</strong></td>
+              <td>${escapeHtml(row.specification)}</td>
+              <td class="lp-bom-quantity">${escapeHtml(quantity(row))}</td>
+              <td>${escapeHtml(row.basis)}</td>
+            </tr>`).join('')}</tbody>
+        </table>
+      </div>
+      ${warningHtml}
+      <details class="lp-bom-notes">
+        <summary>Scope exclusions (${bom.exclusions.length})</summary>
+        <ul>${bom.exclusions.map(item => `<li>${escapeHtml(measurementTextForDisplay(item))}</li>`).join('')}</ul>
+      </details>`;
   }
 
   function updateLocationMarker(location) {
@@ -419,6 +700,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const unit = lengthUnit();
     const levelText = r.lpl.required ? `LPL ${r.lpl.level}` : 'LPL not required';
     const coverageWarning = r.lpl.required && !r.coverageComplete;
+    const isArray = r.protectionMethod === 'roof-array' && r.terminalArray;
+    const terminalCount = isArray ? r.terminalArray.terminals.length : 1;
+    const downLayout = r.downConductorLayout;
+    const conductorBasis = r.designCompliance?.standard?.startsWith('NFPA')
+      ? `Use UL 96 Listed ${r.designCompliance.componentClass} ${r.downConductorMaterial} main lightning conductor and compatible listed fittings.`
+      : `Minimum conductor area is ${formatConductorArea(r.downConductorMinAreaMm2)}.`;
+    const downPlacement = downLayout
+      ? `${downLayout.cornerCount ? `${downLayout.cornerCount} corner routes plus ${downLayout.intermediateCount} intermediate routes` : `${downLayout.count} uniformly distributed routes`}; achieved maximum spacing ${f(lengthForDisplay(downLayout.achievedMaxSpacingM), 1)} ${unit}.`
+      : `Distribute routes around the ${f(lengthForDisplay(r.perimeterM), 0)} ${unit} perimeter.`;
+    const bendRadius = lengthForDisplay(r.lightningConductorMinBendRadiusM || 0.2032);
     let arrester = '<strong>Surge protection not evaluated</strong><p>Add a system voltage when an incoming-line protection review is needed.</p>';
     if (r.arrester && !r.arrester.applicable) {
       arrester = '<strong>Low-voltage SPD review</strong><p>This voltage is at or below 1 kV. Select and coordinate an SPD using the low-voltage workflow; no medium-voltage arrester rating is reported.</p>';
@@ -433,11 +724,11 @@ document.addEventListener('DOMContentLoaded', () => {
       </article>
       <article class="lp-guidance-item ${coverageWarning ? 'lp-guidance-item--warning' : 'lp-guidance-item--safe'}">
         <span aria-hidden="true">2</span>
-        <div><strong>${!r.lpl.required ? 'Coverage geometry not generated' : coverageWarning ? 'Centered mast does not reach the full footprint' : `${f(lengthForDisplay(r.mastProtectiveRadiusM), 1)} ${unit} coverage reaches the footprint`}</strong><p>${!r.lpl.required ? 'Enter a more conservative tolerable frequency if an optional reference LPS is desired.' : !(r.mastProtectiveRadiusM > 0) ? 'The protected equipment is at or above the entered air-terminal tip height. Add taller masts or shield wires.' : `At ${f(lengthForDisplay(r.inputs.protectedHeight), 1)} ${unit} elevation, the rolling-sphere coverage radius is ${f(lengthForDisplay(r.mastProtectiveRadiusM), 1)} ${unit}; the farthest protected point is ${f(lengthForDisplay(r.requiredCoverageRadiusM), 1)} ${unit} from the assumed centered mast.`}</p></div>
+        <div><strong>${!r.lpl.required ? 'Coverage geometry not generated' : isArray ? coverageWarning ? `${terminalCount}-terminal array leaves exposed roof points` : `${terminalCount}-terminal array covers the reference plane` : coverageWarning ? 'Centered mast does not reach the full footprint' : `${f(lengthForDisplay(r.mastProtectiveRadiusM), 1)} ${unit} coverage reaches the footprint`}</strong><p>${!r.lpl.required ? 'Enter a more conservative tolerable frequency if an optional reference LPS is desired.' : !(r.mastProtectiveRadiusM > 0) ? 'The protected surface is at or above the entered air-terminal tip height. Increase terminal height.' : isArray ? `At the ${f(lengthForDisplay(r.referencePlaneHeightM), 1)} ${unit} reference plane, each terminal reaches ${f(lengthForDisplay(r.terminalProtectiveRadiusM), 1)} ${unit}; the worst point is ${f(lengthForDisplay(r.requiredCoverageRadiusM), 1)} ${unit} from its nearest terminal, leaving ${r.coverageComplete ? '+' : '−'}${f(lengthForDisplay(Math.abs(r.coverageMarginM)), 1)} ${unit} margin.` : `At ${f(lengthForDisplay(r.inputs.protectedHeight), 1)} ${unit} elevation, the rolling-sphere coverage radius is ${f(lengthForDisplay(r.mastProtectiveRadiusM), 1)} ${unit}; the farthest protected point is ${f(lengthForDisplay(r.requiredCoverageRadiusM), 1)} ${unit} from the assumed centered mast.`}</p></div>
       </article>
       <article class="lp-guidance-item">
         <span aria-hidden="true">3</span>
-        <div><strong>${r.lpl.required ? `${r.downConductorCount} down-conductors` : 'No down-conductor layout generated'}</strong><p>${r.lpl.required ? `Distribute ${escapeHtml(r.downConductorMaterial)} conductors around the ${f(lengthForDisplay(r.perimeterM), 0)} ${unit} perimeter; minimum area is ${formatConductorArea(r.downConductorMinAreaMm2)}.` : 'Bonding and surge protection still require project-specific review.'}</p></div>
+        <div><strong>${r.lpl.required ? `${r.downConductorCount} independent downconductors` : 'No down-conductor layout generated'}</strong><p>${r.lpl.required ? `The air terminals share one roof grid; there is not one downconductor per terminal. ${downPlacement} ${conductorBasis} Keep routes short and direct; the UL-style bend reference is ${f(bendRadius, unit === 'ft' ? 2 : 3)} ${unit} (8 in) minimum radius with no turn sharper than 90°.` : 'Bonding and surge protection still require project-specific review.'}</p></div>
       </article>
       <article class="lp-guidance-item">
         <span aria-hidden="true">4</span>
@@ -446,6 +737,10 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function drawProtectionPreview(r) {
+    if (r.protectionMethod === 'roof-array' && r.terminalArray) {
+      drawRoofArrayPreview(r);
+      return;
+    }
     const f = (x, d = 1) => (Number.isFinite(x) ? x.toFixed(d) : '—');
     const unit = lengthUnit();
     const areaLabel = areaUnit();
@@ -593,6 +888,209 @@ document.addEventListener('DOMContentLoaded', () => {
       <text x="406" y="431" class="lp-svg-sub-label">${r.lpl.required ? effectiveTipHeight < r.inputs.airTerminalHeight ? 'Envelope contact height is capped at R; mast height above R does not expand this model.' : 'Cyan arcs trace the radius-R envelope; full sphere positions are omitted for clarity.' : 'Expected direct strikes are below the entered tolerable frequency.'}</text>`;
   }
 
+  function drawRoofArrayPreview(r) {
+    const f = (x, d = 1) => (Number.isFinite(x) ? x.toFixed(d) : '—');
+    const unit = lengthUnit();
+    const areaLabel = areaUnit();
+    const array = r.terminalArray;
+    const terminals = array.terminals;
+    const hasLpsGeometry = r.lpl.required
+      && Number.isFinite(r.rollingSphereRadius)
+      && Number.isFinite(r.terminalProtectiveRadiusM);
+    const footprintSpanX = r.footprint.spanXM;
+    const footprintSpanY = r.footprint.spanYM;
+    const planCenterX = 196;
+    const planCenterY = 244;
+    const planScale = Math.min(
+      142 / Math.max(footprintSpanX / 2, 0.1),
+      116 / Math.max(footprintSpanY / 2, 0.1),
+      6,
+    );
+    const footprintHalfX = footprintSpanX * planScale / 2;
+    const footprintHalfY = footprintSpanY * planScale / 2;
+    const planX = value => planCenterX + value * planScale;
+    const planY = value => planCenterY - value * planScale;
+    const coverageRadiusPx = hasLpsGeometry ? r.terminalProtectiveRadiusM * planScale : 0;
+    const isCircle = r.footprint.shape === 'circle';
+    const footprintShape = isCircle
+      ? `<circle cx="${planCenterX}" cy="${planCenterY}" r="${footprintHalfX}" class="lp-svg-footprint"></circle>`
+      : `<rect x="${planCenterX - footprintHalfX}" y="${planCenterY - footprintHalfY}" width="${footprintHalfX * 2}" height="${footprintHalfY * 2}" rx="5" class="lp-svg-footprint"></rect>`;
+    const footprintOutline = isCircle
+      ? `<circle cx="${planCenterX}" cy="${planCenterY}" r="${footprintHalfX}" class="lp-svg-footprint-outline"></circle>`
+      : `<rect x="${planCenterX - footprintHalfX}" y="${planCenterY - footprintHalfY}" width="${footprintHalfX * 2}" height="${footprintHalfY * 2}" rx="5" class="lp-svg-footprint-outline"></rect>`;
+    const footprintClip = isCircle
+      ? `<circle cx="${planCenterX}" cy="${planCenterY}" r="${footprintHalfX}"></circle>`
+      : `<rect x="${planCenterX - footprintHalfX}" y="${planCenterY - footprintHalfY}" width="${footprintHalfX * 2}" height="${footprintHalfY * 2}" rx="5"></rect>`;
+    const coverageClass = r.coverageComplete
+      ? 'lp-svg-array-coverage lp-svg-array-coverage--pass'
+      : 'lp-svg-array-coverage lp-svg-array-coverage--short';
+    const planCoverage = hasLpsGeometry ? terminals.map(terminal => `
+      <circle cx="${planX(terminal.xM)}" cy="${planY(terminal.yM)}" r="${coverageRadiusPx}" class="${coverageClass}"></circle>`).join('') : '';
+    const terminalMarkers = terminals.map((terminal, index) => `
+      <g>
+        <circle cx="${planX(terminal.xM)}" cy="${planY(terminal.yM)}" r="5" class="lp-svg-array-terminal"></circle>
+        ${terminals.length <= 16 ? `<text x="${planX(terminal.xM) + 7}" y="${planY(terminal.yM) - 7}" class="lp-svg-terminal-number">${index + 1}</text>` : ''}
+      </g>`).join('');
+    const terminalMap = new Map(
+      terminals.map(terminal => [`${terminal.row}:${terminal.column}`, terminal]),
+    );
+    const roofGridSegments = [];
+    terminals.forEach(terminal => {
+      const right = terminalMap.get(`${terminal.row}:${terminal.column + 1}`);
+      const below = terminalMap.get(`${terminal.row + 1}:${terminal.column}`);
+      if (right) roofGridSegments.push([terminal, right]);
+      if (below) roofGridSegments.push([terminal, below]);
+    });
+    const roofGridSvg = roofGridSegments.map(segment => `
+      <line x1="${planX(segment[0].xM)}" y1="${planY(segment[0].yM)}" x2="${planX(segment[1].xM)}" y2="${planY(segment[1].yM)}" class="lp-svg-roof-grid"></line>`).join('');
+    const includePerimeterRing = r.bom?.assumptions?.includePerimeterRing !== false;
+    const roofRingSvg = includePerimeterRing
+      ? isCircle
+        ? `<circle cx="${planCenterX}" cy="${planCenterY}" r="${footprintHalfX}" class="lp-svg-roof-ring"></circle>`
+        : `<rect x="${planCenterX - footprintHalfX}" y="${planCenterY - footprintHalfY}" width="${footprintHalfX * 2}" height="${footprintHalfY * 2}" rx="5" class="lp-svg-roof-ring"></rect>`
+      : '';
+    const ringConnectorSvg = includePerimeterRing ? terminals.flatMap(terminal => {
+      const connectors = [];
+      if (isCircle) {
+        const magnitude = Math.hypot(terminal.xM, terminal.yM);
+        if (magnitude > 1e-9 && (
+          terminal.row === 0
+          || terminal.row === array.rows - 1
+          || terminal.column === 0
+          || terminal.column === array.columns - 1
+        )) {
+          const radius = footprintSpanX / 2;
+          connectors.push({
+            xM: terminal.xM * radius / magnitude,
+            yM: terminal.yM * radius / magnitude,
+          });
+        }
+      } else {
+        if (terminal.row === 0) connectors.push({ xM: terminal.xM, yM: footprintSpanY / 2 });
+        if (terminal.row === array.rows - 1) connectors.push({ xM: terminal.xM, yM: -footprintSpanY / 2 });
+        if (terminal.column === 0) connectors.push({ xM: -footprintSpanX / 2, yM: terminal.yM });
+        if (terminal.column === array.columns - 1) connectors.push({ xM: footprintSpanX / 2, yM: terminal.yM });
+      }
+      return connectors.map(connector => `
+        <line x1="${planX(terminal.xM)}" y1="${planY(terminal.yM)}" x2="${planX(connector.xM)}" y2="${planY(connector.yM)}" class="lp-svg-grid-connector"></line>`);
+    }).join('') : '';
+    const downPoints = r.downConductorLayout?.points || [];
+    const downConductorMarkers = downPoints.map(point => point.isCorner
+      ? `<rect x="${planX(point.xM) - 4.5}" y="${planY(point.yM) - 4.5}" width="9" height="9" transform="rotate(45 ${planX(point.xM)} ${planY(point.yM)})" class="lp-svg-down-point lp-svg-down-point--corner"></rect>`
+      : `<circle cx="${planX(point.xM)}" cy="${planY(point.yM)}" r="4" class="lp-svg-down-point"></circle>`).join('');
+
+    const critical = array.coverage?.criticalPoint || { xM: 0, yM: 0 };
+    const nearest = array.coverage?.nearestTerminal || terminals[0];
+    const criticalSvg = hasLpsGeometry && nearest ? `
+      <line x1="${planX(nearest.xM)}" y1="${planY(nearest.yM)}" x2="${planX(critical.xM)}" y2="${planY(critical.yM)}" class="lp-svg-target-line"></line>
+      <circle cx="${planX(critical.xM)}" cy="${planY(critical.yM)}" r="5" class="${r.coverageComplete ? 'lp-svg-coverage-point' : 'lp-svg-target-point'}"></circle>` : '';
+
+    const sphereRadius = hasLpsGeometry ? r.rollingSphereRadius : 1;
+    const referenceHeight = r.referencePlaneHeightM;
+    const effectiveRise = hasLpsGeometry
+      ? Math.min(Math.max(r.inputs.airTerminalHeight - referenceHeight, 0), sphereRadius)
+      : 0;
+    const representativeRow = Math.floor((array.rows - 1) / 2);
+    const sectionTerminals = terminals.filter(terminal => terminal.row === representativeRow);
+    const elevationCenterX = 572;
+    const elevationGroundY = 362;
+    const outerTerminalX = sectionTerminals.reduce(
+      (maximum, terminal) => Math.max(maximum, Math.abs(terminal.xM)),
+      0,
+    );
+    const elevationMaxX = Math.max(
+      footprintSpanX / 2,
+      outerTerminalX + (hasLpsGeometry ? r.terminalProtectiveRadiusM : 0),
+      1,
+    );
+    const elevationMaxZ = Math.max(r.inputs.airTerminalHeight, referenceHeight, r.inputs.height, 1);
+    const elevationScale = Math.min(145 / (elevationMaxX * 1.06), 242 / (elevationMaxZ * 1.06), 6);
+    const elevationX = value => elevationCenterX + value * elevationScale;
+    const elevationY = value => elevationGroundY - value * elevationScale;
+    const structureWidthPx = footprintSpanX * elevationScale;
+    const structureHeightPx = r.inputs.height * elevationScale;
+    const roofY = elevationY(r.inputs.height);
+    const tipY = elevationY(r.inputs.airTerminalHeight);
+    const referenceY = elevationY(referenceHeight);
+
+    let elevationArcs = '';
+    if (hasLpsGeometry && effectiveRise > 0) {
+      const samples = 28;
+      const toPath = points => points
+        .map(([x, y], index) => `${index === 0 ? 'M' : 'L'} ${x.toFixed(2)} ${y.toFixed(2)}`)
+        .join(' ');
+      elevationArcs = sectionTerminals.map(terminal => {
+        const left = [];
+        const right = [];
+        for (let index = 0; index <= samples; index += 1) {
+          const localZ = effectiveRise * index / samples;
+          const boundary = r.terminalProtectiveRadiusM
+            - Math.sqrt(Math.max(0, 2 * sphereRadius * localZ - localZ * localZ));
+          left.push([elevationX(terminal.xM - boundary), elevationY(referenceHeight + localZ)]);
+          right.push([elevationX(terminal.xM + boundary), elevationY(referenceHeight + localZ)]);
+        }
+        return `
+          <path d="${toPath(left)}" class="lp-svg-envelope"></path>
+          <path d="${toPath(right)}" class="lp-svg-envelope"></path>`;
+      }).join('');
+    }
+    const elevationTerminals = sectionTerminals.map(terminal => `
+      <line x1="${elevationX(terminal.xM)}" y1="${roofY}" x2="${elevationX(terminal.xM)}" y2="${tipY}" class="lp-svg-mast"></line>
+      <circle cx="${elevationX(terminal.xM)}" cy="${tipY}" r="5" class="lp-svg-mast-tip"></circle>`).join('');
+    const downLeadInset = Math.min(10, Math.max(4, structureWidthPx * 0.025));
+    const downLeadSvg = r.lpl.required ? `
+      <path d="M ${elevationCenterX - structureWidthPx / 2 + 16} ${roofY} Q ${elevationCenterX - structureWidthPx / 2 + downLeadInset} ${roofY} ${elevationCenterX - structureWidthPx / 2 + downLeadInset} ${roofY + 12} L ${elevationCenterX - structureWidthPx / 2 + downLeadInset} ${elevationGroundY}" class="lp-svg-down-lead"></path>
+      <path d="M ${elevationCenterX + structureWidthPx / 2 - 16} ${roofY} Q ${elevationCenterX + structureWidthPx / 2 - downLeadInset} ${roofY} ${elevationCenterX + structureWidthPx / 2 - downLeadInset} ${roofY + 12} L ${elevationCenterX + structureWidthPx / 2 - downLeadInset} ${elevationGroundY}" class="lp-svg-down-lead"></path>` : '';
+
+    const coverageText = !r.lpl.required
+      ? 'No LPL geometry'
+      : r.coverageComplete
+        ? `Complete roof coverage · margin +${f(lengthForDisplay(r.coverageMarginM), 1)} ${unit}`
+        : `Exposed roof point · shortfall ${f(lengthForDisplay(Math.abs(r.coverageMarginM)), 1)} ${unit}`;
+    const description = `${terminals.length} roof air terminals in a regular ${array.columns} by ${array.rows} grid on a ${r.footprint.label.toLowerCase()} footprint. ${r.lpl.required ? `Each terminal has ${f(lengthForDisplay(r.terminalProtectiveRadiusM), 1)} ${unit} radius-R coverage at the ${f(lengthForDisplay(referenceHeight), 1)} ${unit} reference plane.` : 'No LPL geometry is generated because expected strikes are below the tolerable frequency.'}`;
+
+    previewSvg.innerHTML = `
+      <title id="lp-preview-title">Multi-terminal roof protection coverage</title>
+      <desc id="lp-preview-desc">${escapeHtml(description)}</desc>
+      <defs>
+        <pattern id="lp-grid" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M20 0H0V20" fill="none" class="lp-svg-grid"></path></pattern>
+        <clipPath id="lp-array-footprint-clip">${footprintClip}</clipPath>
+        <clipPath id="lp-array-elevation-clip"><rect x="396" y="102" width="346" height="294" rx="12"></rect></clipPath>
+      </defs>
+      <rect x="10" y="42" width="362" height="366" rx="16" class="lp-svg-panel"></rect>
+      <rect x="388" y="42" width="362" height="366" rx="16" class="lp-svg-panel"></rect>
+      <text x="28" y="70" class="lp-svg-panel-title">PLAN · ${array.columns} × ${array.rows} ARRAY · ${r.downConductorCount} DOWN PATHS</text>
+      <text x="406" y="70" class="lp-svg-panel-title">ELEVATION · ARRAY ENVELOPE</text>
+      <text x="28" y="91" class="lp-svg-sub-label">${terminals.length} terminals · common tip ${f(lengthForDisplay(r.inputs.airTerminalHeight), 1)} ${unit} · setback ${f(lengthForDisplay(array.edgeSetbackM), 1)} ${unit}</text>
+      <text x="406" y="91" class="lp-svg-sub-label">Representative row · equal scales · R = ${hasLpsGeometry ? `${f(lengthForDisplay(sphereRadius), 0)} ${unit}` : 'not generated'}</text>
+
+      <rect x="18" y="102" width="346" height="294" fill="url(#lp-grid)" opacity="0.55"></rect>
+      ${footprintShape}
+      <g clip-path="url(#lp-array-footprint-clip)">${planCoverage}</g>
+      ${roofGridSvg}
+      ${ringConnectorSvg}
+      ${roofRingSvg}
+      ${footprintOutline}
+      ${downConductorMarkers}
+      ${terminalMarkers}
+      ${criticalSvg}
+      <text x="28" y="386" class="lp-svg-label">${hasLpsGeometry ? `Worst point ${f(lengthForDisplay(r.requiredCoverageRadiusM), 1)} ${unit} to nearest terminal · rp ${f(lengthForDisplay(r.terminalProtectiveRadiusM), 1)} ${unit}` : 'Coverage geometry not generated'}</text>
+
+      <rect x="396" y="102" width="346" height="294" fill="url(#lp-grid)" opacity="0.55"></rect>
+      <g clip-path="url(#lp-array-elevation-clip)">
+        <rect x="${elevationCenterX - structureWidthPx / 2}" y="${roofY}" width="${structureWidthPx}" height="${structureHeightPx}" rx="${isCircle ? 18 : 4}" class="lp-svg-structure-front lp-svg-elevation-structure"></rect>
+        <line x1="406" y1="${elevationGroundY}" x2="734" y2="${elevationGroundY}" class="lp-svg-axis"></line>
+        ${downLeadSvg}
+        ${elevationTerminals}
+        ${elevationArcs}
+      </g>
+      <line x1="412" y1="${referenceY}" x2="732" y2="${referenceY}" class="lp-svg-protected-plane"></line>
+      <text x="416" y="${referenceY + 17}" class="lp-svg-sub-label">roof / equipment plane ${f(lengthForDisplay(referenceHeight), 1)} ${unit}</text>
+      <text x="406" y="386" class="lp-svg-label">${escapeHtml(coverageText)}</text>
+      <text x="28" y="431" class="lp-svg-sub-label">Blue = roof grid · diamonds = corners · dots = intermediate down paths.</text>
+      <text x="406" y="431" class="lp-svg-sub-label">Radius-R arcs · rounded down leads shown at visible walls.</text>`;
+  }
+
   function drawProtectionPreviewPerspective(r) {
     const f = (x, d = 1) => (Number.isFinite(x) ? x.toFixed(d) : '—');
     const unit = lengthUnit();
@@ -708,6 +1206,8 @@ document.addEventListener('DOMContentLoaded', () => {
   function renderResults(r) {
     const f = (x, d = 2) => (Number.isFinite(x) ? x.toFixed(d) : '—');
     const unit = lengthUnit();
+    const isArray = r.protectionMethod === 'roof-array' && r.terminalArray;
+    const terminalCount = isArray ? r.terminalArray.terminals.length : 1;
     const arresterHtml = r.arrester && !r.arrester.applicable ? `
       <div class="result-group">
         <h3>Surge-protection voltage path</h3>
@@ -726,7 +1226,7 @@ document.addEventListener('DOMContentLoaded', () => {
       </div>` : '';
 
     const warningHtml = r.warnings.length
-      ? `<ul class="lp-warning-list">${r.warnings.map(w => `<li>${escapeHtml(w)}</li>`).join('')}</ul>`
+      ? `<ul class="lp-warning-list">${r.warnings.map(w => `<li>${escapeHtml(measurementTextForDisplay(w))}</li>`).join('')}</ul>`
       : '<p class="field-hint">No study warnings.</p>';
 
     resultsDiv.innerHTML = `
@@ -739,9 +1239,9 @@ document.addEventListener('DOMContentLoaded', () => {
         <div class="result-group">
           <div class="lp-result-grid">
             <div class="lp-result-card"><span>Footprint</span><strong>${escapeHtml(r.footprint?.label || 'Rectangular')}</strong><small>${f(areaForDisplay(r.footprintAreaM2 ?? (r.inputs.length * r.inputs.width)), 0)} ${areaUnit()} plan area · ${f(lengthForDisplay(r.perimeterM), 1)} ${unit} perimeter</small></div>
-            <div class="lp-result-card"><span>Air termination</span><strong>${r.lpl.required ? `LPL ${r.lpl.level}` : 'Not required'}</strong><small>${r.lpl.required ? `${f(lengthForDisplay(r.rollingSphereRadius), 0)} ${unit} rolling sphere · ${f(lengthForDisplay(r.mastProtectiveRadiusM), 1)} ${unit} coverage radius` : 'No LPL geometry generated'}</small></div>
-            <div class="lp-result-card"><span>Plan coverage</span><strong>${!r.lpl.required ? 'Not generated' : r.coverageComplete == null ? 'Update required' : r.coverageComplete ? 'Reaches footprint' : 'Short of footprint'}</strong><small>${r.lpl.required && Number.isFinite(r.requiredCoverageRadiusM) ? `${f(lengthForDisplay(r.requiredCoverageRadiusM), 1)} ${unit} to farthest point · ${r.coverageComplete ? '+' : '−'}${f(lengthForDisplay(Math.abs(r.coverageMarginM)), 1)} ${unit} margin` : 'Save the updated study to run the footprint check'}</small></div>
-            <div class="lp-result-card"><span>Down path</span><strong>${r.lpl.required ? `${r.downConductorCount} conductors` : 'Not generated'}</strong><small>${r.lpl.required ? `${escapeHtml(r.downConductorMaterial)} · minimum ${formatConductorArea(r.downConductorMinAreaMm2)} · ${f(lengthForDisplay(r.perimeterM), 0)} ${unit} perimeter` : 'Bonding still requires project review'}</small></div>
+            <div class="lp-result-card"><span>Air termination</span><strong>${r.lpl.required ? isArray ? `${terminalCount} terminals · LPL ${r.lpl.level}` : `LPL ${r.lpl.level}` : 'Not required'}</strong><small>${r.lpl.required ? `${f(lengthForDisplay(r.rollingSphereRadius), 0)} ${unit} rolling sphere · ${f(lengthForDisplay(r.terminalProtectiveRadiusM ?? r.mastProtectiveRadiusM), 1)} ${unit} ${isArray ? 'per-terminal' : 'single-mast'} radius` : 'No LPL geometry generated'}</small></div>
+            <div class="lp-result-card"><span>${isArray ? 'Roof-array coverage' : 'Plan coverage'}</span><strong>${!r.lpl.required ? 'Not generated' : r.coverageComplete == null ? 'Update required' : r.coverageComplete ? isArray ? 'Complete reference plane' : 'Reaches footprint' : isArray ? 'Exposed points remain' : 'Short of footprint'}</strong><small>${r.lpl.required && Number.isFinite(r.requiredCoverageRadiusM) ? `${f(lengthForDisplay(r.requiredCoverageRadiusM), 1)} ${unit} ${isArray ? 'worst nearest-terminal distance' : 'to farthest point'} · ${r.coverageComplete ? '+' : '−'}${f(lengthForDisplay(Math.abs(r.coverageMarginM)), 1)} ${unit} margin` : 'Save the updated study to run the footprint check'}</small></div>
+            <div class="lp-result-card"><span>Down path</span><strong>${r.lpl.required ? `${r.downConductorCount} conductors` : 'Not generated'}</strong><small>${r.lpl.required ? r.designCompliance?.standard?.startsWith('NFPA') ? `UL 96 Listed ${escapeHtml(r.designCompliance.componentClass)} ${escapeHtml(r.downConductorMaterial)} component basis · ${f(lengthForDisplay(r.perimeterM), 0)} ${unit} perimeter` : `${escapeHtml(r.downConductorMaterial)} · minimum ${formatConductorArea(r.downConductorMinAreaMm2)} · ${f(lengthForDisplay(r.perimeterM), 0)} ${unit} perimeter` : 'Bonding still requires project review'}</small></div>
             <div class="lp-result-card"><span>Stroke model</span><strong>${r.lpl.required ? `≥ ${f(r.minStrikeCurrentKa, 0)} kA` : 'Not applicable'}</strong><small>${r.lpl.required ? `${f(lengthForDisplay(r.minStrikeDistanceM), 1)} ${unit} minimum striking distance` : 'Screening is below the tolerable frequency'}</small></div>
           </div>
         </div>
@@ -756,6 +1256,49 @@ document.addEventListener('DOMContentLoaded', () => {
   // -------------------------------------------------------------------------
   // CSV export
   // -------------------------------------------------------------------------
+  function bomToCsv(r) {
+    const bom = r.bom;
+    if (!bom?.ready) return '';
+    const imperial = unitSystem === 'imperial';
+    const csvLengthUnit = imperial ? 'ft' : 'm';
+    const csvCell = value => {
+      const text = String(value ?? '');
+      return /[",\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
+    };
+    const lines = [
+      ['# Lightning Protection Preliminary BOM'],
+      ['Display unit system', imperial ? 'imperial' : 'metric'],
+      ['Design standard', r.designCompliance?.standard || 'IEC screening'],
+      ['Design-check status', r.designCompliance?.label || 'screening only'],
+      ['Coverage / planning status', bom.procurementReady ? 'design checks pass subject to assumptions' : 'incomplete - do not procure'],
+      ['Conductor allowance', `${bom.assumptions.conductorWastePercent}%`],
+      ['Roof support spacing', lengthForDisplay(bom.assumptions.roofSupportSpacingM).toFixed(2), csvLengthUnit],
+      ['Down-lead clip spacing', lengthForDisplay(bom.assumptions.downConductorSupportSpacingM).toFixed(2), csvLengthUnit],
+      ['Extra route per down lead', lengthForDisplay(bom.assumptions.downConductorRouteAllowanceM).toFixed(2), csvLengthUnit],
+      ['Roof perimeter ring included', bom.assumptions.includePerimeterRing ? 'yes' : 'no'],
+      [],
+      ['Category', 'Material / item', 'Specification', 'Quantity', 'Unit', 'Quantity basis'],
+      ...bom.rows.map(row => [
+        row.category,
+        row.item,
+        row.specification,
+        row.unit === 'm' ? lengthForDisplay(row.quantity).toFixed(2) : Math.ceil(row.quantity),
+        row.unit === 'm' ? csvLengthUnit : row.unit,
+        row.basis,
+      ]),
+      [],
+      ['Warnings'],
+      ...bom.warnings.map(item => [measurementTextForDisplay(item)]),
+      [],
+      ['Required assumptions'],
+      ...(r.designCompliance?.assumptions || []).map(item => [measurementTextForDisplay(item)]),
+      [],
+      ['Scope exclusions'],
+      ...bom.exclusions.map(item => [measurementTextForDisplay(item)]),
+    ];
+    return lines.map(row => row.map(csvCell).join(',')).join('\r\n');
+  }
+
   function resultToCsv(r) {
     const imperial = unitSystem === 'imperial';
     const csvLengthUnit = imperial ? 'ft' : 'm';
@@ -764,6 +1307,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const lines = [];
     lines.push('# Lightning & Surge Protection Assessment');
     lines.push(`Display unit system,${imperial ? 'imperial' : 'metric'}`);
+    lines.push(`Design standard,${r.designCompliance?.standard || 'IEC screening'}`);
+    lines.push(`Design-check status,${r.designCompliance?.label || 'screening only'}`);
     lines.push(`Footprint shape,${r.footprint?.label || 'Rectangular'}`);
     lines.push(`Footprint area (${csvAreaUnit}),${areaForDisplay(r.footprintAreaM2 ?? (r.inputs.length * r.inputs.width)).toFixed(1)}`);
     lines.push(`Footprint perimeter (${csvLengthUnit}),${lengthForDisplay(r.perimeterM).toFixed(2)}`);
@@ -774,19 +1319,30 @@ document.addEventListener('DOMContentLoaded', () => {
     lines.push(`Tolerable frequency Nc (per yr),${r.tolerableFrequency.toExponential(3)}`);
     lines.push(`Required LPL,${r.lpl.level || 'none'}`);
     lines.push(`Protection efficiency,${(r.lpl.efficiency * 100).toFixed(2)}%`);
+    lines.push(`Air-terminal arrangement,${r.protectionMethod === 'roof-array' ? 'roof array' : 'single centered mast'}`);
     lines.push(`Air-terminal tip height (${csvLengthUnit}),${lengthForDisplay(r.inputs.airTerminalHeight).toFixed(2)}`);
     if (r.lpl.required) {
       lines.push(`Rolling sphere radius (${csvLengthUnit}),${lengthForDisplay(r.rollingSphereRadius).toFixed(2)}`);
-      lines.push(`Single-mast protective radius (${csvLengthUnit}),${lengthForDisplay(r.mastProtectiveRadiusM).toFixed(2)}`);
-      lines.push(`Farthest protected point (${csvLengthUnit}),${lengthForDisplay(r.requiredCoverageRadiusM).toFixed(2)}`);
+      if (r.protectionMethod === 'roof-array' && r.terminalArray) {
+        lines.push(`Roof-array rows,${r.terminalArray.rows}`);
+        lines.push(`Roof-array columns,${r.terminalArray.columns}`);
+        lines.push(`Roof-array terminal count,${r.terminalArray.terminals.length}`);
+        lines.push(`Terminal edge setback (${csvLengthUnit}),${lengthForDisplay(r.terminalArray.edgeSetbackM).toFixed(2)}`);
+        lines.push(`Reference plane elevation (${csvLengthUnit}),${lengthForDisplay(r.referencePlaneHeightM).toFixed(2)}`);
+        lines.push(`Per-terminal protective radius (${csvLengthUnit}),${lengthForDisplay(r.terminalProtectiveRadiusM).toFixed(2)}`);
+        lines.push(`Worst nearest-terminal distance (${csvLengthUnit}),${lengthForDisplay(r.requiredCoverageRadiusM).toFixed(2)}`);
+      } else {
+        lines.push(`Single-mast protective radius (${csvLengthUnit}),${lengthForDisplay(r.mastProtectiveRadiusM).toFixed(2)}`);
+        lines.push(`Farthest protected point (${csvLengthUnit}),${lengthForDisplay(r.requiredCoverageRadiusM).toFixed(2)}`);
+      }
       lines.push(`Coverage margin (${csvLengthUnit}),${lengthForDisplay(r.coverageMarginM).toFixed(2)}`);
-      lines.push(`Centered single-mast footprint coverage,${r.coverageComplete ? 'reaches footprint' : 'short of footprint'}`);
+      lines.push(`${r.protectionMethod === 'roof-array' ? 'Roof-array reference-plane coverage' : 'Centered single-mast footprint coverage'},${r.coverageComplete ? 'reaches footprint' : 'short of footprint'}`);
       lines.push(`Down-conductors,${r.downConductorCount}`);
       lines.push(`Down-conductor min area (mm2),${r.downConductorMinAreaMm2}`);
     } else {
       lines.push('Structural LPS,not indicated by screening');
       lines.push(`Rolling sphere radius (${csvLengthUnit}),n/a`);
-      lines.push(`Single-mast protective radius (${csvLengthUnit}),n/a`);
+      lines.push(`${r.protectionMethod === 'roof-array' ? 'Per-terminal protective radius' : 'Single-mast protective radius'} (${csvLengthUnit}),n/a`);
       lines.push('Down-conductors,n/a');
     }
     if (r.arrester) {

@@ -17,9 +17,9 @@
   <link rel="dns-prefetch" href="https://fonts.gstatic.com">
   <meta name="color-scheme" content="light dark">
   <link rel="stylesheet" href="style.css" />
-  <link rel="stylesheet" href="src/styles/lightningprotection.css?v=rolling-envelope-v1" />
+  <link rel="stylesheet" href="src/styles/lightningprotection.css?v=nfpa-ul-v1" />
   <script type="module" src="dirtyTracker.js"></script>
-  <script type="module" src="dist/lightningprotection.js" defer></script>
+  <script type="module" src="dist/lightningprotection.js?v=nfpa-ul-v3" defer></script>
 </head>
 <body class="lightningprotection-page" data-report-title="Lightning &amp; Surge Protection">
   <a href="#main-content" class="skip-link">Skip to main content</a>
@@ -97,10 +97,11 @@
 Ad = Af + (3H)P + π·(3H)²             (collection area, m²)
 Nd = NSG · Ad · Cd · 1e-6            (direct strikes/yr)
 E  = 1 − Nc/Nd  →  LPL I / II / III / IV</pre>
-        <p><strong>Footprints:</strong> Af is plan area and P is plan perimeter. Rectangular and circular modes calculate both values from dimensions; custom mode uses entered area and perimeter. The coverage view assumes a centered mast and compares its radius with the farthest protected point.</p>
+        <p><strong>Footprints:</strong> Af is plan area and P is plan perimeter. Rectangular and circular modes calculate both values from dimensions; custom mode uses entered area and perimeter. Coverage can use one centered mast or a regular coordinate-based roof array.</p>
         <p>The required Lightning Protection Level (LPL) is the least-restrictive class whose interception capability meets E: IV=0.84, III=0.91, II=0.97, I=0.99. Requirements above 0.99 need additional risk-reduction measures.</p>
         <p><strong>Rolling sphere (electrogeometric model):</strong> each LPL has a sphere radius R (I=20 m, II=30 m, III=45 m, IV=60 m). A single mast of height h protects an object of height hx out to a radius:</p>
         <pre>rp = √(h(2R − h)) − √(hx(2R − hx))</pre>
+        <p>For a roof terminal projecting p above the roof/equipment reference plane, the plane radius is <strong>rp = √(p(2R − p))</strong>. Array mode checks the union of those radii over the complete rectangular or circular reference plane and reports the worst nearest-terminal distance.</p>
         <p><strong>Surge arrester:</strong> for systems above 1 kV only, minimum MCOV Uc ≥ 1.05·V<sub>LL</sub>/√3 (effectively grounded) or 1.05·V<sub>LL</sub> (ungrounded); rated voltage ≈ MCOV/0.8. Final selection must include temporary overvoltage and insulation-coordination checks.</p>
         <p><strong>References:</strong> IEC 62305-1/-2/-3:2024; IEEE Std 998-2026; IEEE C62.22; IEC 60099-5:2018.</p>
       </details>
@@ -174,7 +175,15 @@ E  = 1 − Nc/Nd  →  LPL I / II / III / IV</pre>
 
             <fieldset class="lp-input-section">
               <legend><span class="lp-section-number">2</span><strong>Structure &amp; protection</strong></legend>
-              <p class="lp-section-intro">Choose the plan shape, then compare a centered single mast with the farthest protected point.</p>
+              <p class="lp-section-intro">Choose the plan shape and either screen one centered mast or lay out a coordinated roof air-terminal array.</p>
+              <div class="field-row">
+                <label for="design-standard">Design workflow</label>
+                <select id="design-standard" aria-describedby="design-standard-hint">
+                  <option value="nfpa-ul" selected>NFPA 780 + UL 96A design checks</option>
+                  <option value="iec-screening">IEC 62305 / IEEE 998 screening</option>
+                </select>
+                <p id="design-standard-hint" class="field-hint">NFPA/UL mode enforces the calculable layout rules and records the field-dependent requirements as assumptions or exclusions. Final UL inspection is always separate.</p>
+              </div>
               <div class="field-row">
                 <label for="structure-shape">Footprint shape</label>
                 <select id="structure-shape" aria-describedby="shape-hint">
@@ -182,7 +191,81 @@ E  = 1 − Nc/Nd  →  LPL I / II / III / IV</pre>
                   <option value="circle">Circular / cylindrical</option>
                   <option value="custom">Custom footprint</option>
                 </select>
-                <p id="shape-hint" class="field-hint">Rectangular and circular checks assume the mast is centered. Custom geometry uses entered area, perimeter, and farthest protected point.</p>
+                <p id="shape-hint" class="field-hint">Rectangular and circular footprints support both protection methods. A custom footprint remains a single-mast schematic until surveyed boundary coordinates are available.</p>
+              </div>
+              <div class="field-row">
+                <label for="protection-method">Air-terminal arrangement</label>
+                <select id="protection-method" aria-describedby="protection-method-hint">
+                  <option value="single">Single centered mast</option>
+                  <option value="roof-array" selected>Roof air-terminal array</option>
+                </select>
+                <p id="protection-method-hint" class="field-hint">The array method evaluates the complete roof or taller equipment plane against the combined rolling-sphere coverage of every terminal.</p>
+              </div>
+              <div id="row-terminal-array" class="lp-array-config" hidden>
+                <div class="lp-array-config__heading">
+                  <strong>Regular roof grid</strong>
+                  <span id="terminal-count-preview">8 terminals</span>
+                </div>
+                <label class="lp-check-row" for="nfpa-auto-layout">
+                  <input type="checkbox" id="nfpa-auto-layout" checked>
+                  <span><strong>Automatically generate the NFPA/UL roof grid</strong><small>Uses a conservative 20 ft maximum grid spacing and places terminals within 2 ft of rectangular roof edges.</small></span>
+                </label>
+                <div class="lp-array-config__grid">
+                  <div class="field-row">
+                    <label for="terminal-columns">Columns along length</label>
+                    <input type="number" id="terminal-columns" min="1" max="50" step="1" value="4">
+                  </div>
+                  <div class="field-row">
+                    <label for="terminal-rows">Rows across width</label>
+                    <input type="number" id="terminal-rows" min="1" max="50" step="1" value="2">
+                  </div>
+                  <div class="field-row">
+                    <label for="terminal-edge-setback">Edge setback</label>
+                    <div class="lp-input-with-unit">
+                      <input type="number" id="terminal-edge-setback" min="0" step="any" value="0.6">
+                      <span data-lp-length-unit>m</span>
+                    </div>
+                  </div>
+                </div>
+                <p class="field-hint">Terminals share one tip elevation. The plan marks the worst roof point and reports its distance to the nearest terminal.</p>
+                <details class="lp-bom-assumptions">
+                  <summary>BOM takeoff assumptions</summary>
+                  <div class="lp-array-config__grid lp-bom-assumptions__grid">
+                    <div class="field-row">
+                      <label for="bom-waste-percent">Conductor allowance</label>
+                      <div class="lp-input-with-unit">
+                        <input type="number" id="bom-waste-percent" min="0" max="100" step="1" value="10">
+                        <span>%</span>
+                      </div>
+                    </div>
+                    <div class="field-row">
+                      <label for="bom-roof-support-spacing">Roof support spacing</label>
+                      <div class="lp-input-with-unit">
+                        <input type="number" id="bom-roof-support-spacing" min="0.1" step="any" value="0.9">
+                        <span data-lp-length-unit>m</span>
+                      </div>
+                    </div>
+                    <div class="field-row">
+                      <label for="bom-down-support-spacing">Down-lead clip spacing</label>
+                      <div class="lp-input-with-unit">
+                        <input type="number" id="bom-down-support-spacing" min="0.1" step="any" value="0.9">
+                        <span data-lp-length-unit>m</span>
+                      </div>
+                    </div>
+                    <div class="field-row">
+                      <label for="bom-down-route-allowance">Extra route per down lead</label>
+                      <div class="lp-input-with-unit">
+                        <input type="number" id="bom-down-route-allowance" min="0" step="any" value="2">
+                        <span data-lp-length-unit>m</span>
+                      </div>
+                    </div>
+                  </div>
+                  <label class="lp-check-row" for="bom-include-perimeter-ring">
+                    <input type="checkbox" id="bom-include-perimeter-ring" checked>
+                    <span><strong>Include a roof perimeter ring</strong><small>Connects the roof network to distributed down-conductor routes.</small></span>
+                  </label>
+                  <p class="field-hint">These are quantity assumptions, not prescribed construction spacings. Final listed components and attachment details require the project lightning-protection design.</p>
+                </details>
               </div>
               <div id="row-rectangle" class="lp-dimension-grid" data-shape-fields="rectangle">
                 <div class="field-row">
@@ -244,7 +327,7 @@ E  = 1 − Nc/Nd  →  LPL I / II / III / IV</pre>
                   <input type="number" id="air-terminal-height" min="0.1" step="any" value="30" required aria-describedby="ath-hint">
                   <span data-lp-length-unit>m</span>
                 </div>
-                <p id="ath-hint" class="field-hint">Actual tip elevation above grade. For a roof-mounted terminal, this must be at least the structure height.</p>
+                <p id="ath-hint" class="field-hint">Actual tip elevation above grade. In array mode, terminal projection is measured above the roof or taller protected surface.</p>
               </div>
               <div class="field-row">
                 <label for="protected-height">Protected equipment height</label>
@@ -252,14 +335,14 @@ E  = 1 − Nc/Nd  →  LPL I / II / III / IV</pre>
                   <input type="number" id="protected-height" min="0" step="any" value="3" aria-describedby="ph-hint">
                   <span data-lp-length-unit>m</span>
                 </div>
-                <p id="ph-hint" class="field-hint">Height above grade of the equipment that must remain inside the mast’s protected zone.</p>
+                <p id="ph-hint" class="field-hint">Height above grade of protected equipment. Array mode evaluates at the higher of this value or the structure roof.</p>
               </div>
               <div class="field-row">
                 <label for="down-material">Down-conductor material</label>
                 <select id="down-material">
-                  <option value="copper" selected>Copper (minimum 16 mm²)</option>
-                  <option value="aluminum">Aluminum (minimum 25 mm²)</option>
-                  <option value="steel">Steel (minimum 50 mm²)</option>
+                  <option value="copper" selected>Copper</option>
+                  <option value="aluminum">Aluminum</option>
+                  <option value="steel">Steel</option>
                 </select>
               </div>
             </fieldset>
@@ -287,7 +370,9 @@ E  = 1 − Nc/Nd  →  LPL I / II / III / IV</pre>
             <div class="form-actions lp-sticky-actions">
               <button type="submit" id="run-btn" class="btn btn-primary">Save Assessment</button>
               <button type="button" id="export-csv-btn" class="btn" hidden>Export CSV</button>
-              <p>Preview updates live. Save to add this assessment to the project.</p>
+              <button type="button" id="export-bom-btn" class="btn" disabled>Export BOM CSV</button>
+              <button type="button" id="export-pdf-btn" class="btn lp-export-pdf-btn">Export PDF Report</button>
+              <p id="lp-export-status" role="status" aria-live="polite">Preview updates live. Export PDF uses the current visible inputs and protection graphic.</p>
             </div>
           </form>
         </aside>
@@ -311,6 +396,8 @@ E  = 1 − Nc/Nd  →  LPL I / II / III / IV</pre>
                 <span><i class="lp-legend-swatch lp-legend-swatch--footprint"></i>Structure footprint</span>
                 <span><i class="lp-legend-swatch lp-legend-swatch--protected"></i>Protected zone</span>
                 <span><i class="lp-legend-swatch lp-legend-swatch--sphere"></i>Rolling-sphere envelope</span>
+                <span><i class="lp-legend-swatch lp-legend-swatch--grid"></i>Roof grid</span>
+                <span><i class="lp-legend-swatch lp-legend-swatch--down"></i>Down paths</span>
               </div>
             </div>
 
@@ -381,6 +468,30 @@ E  = 1 − Nc/Nd  →  LPL I / II / III / IV</pre>
             <div id="lp-guidance-list" class="lp-guidance-list" aria-live="polite"></div>
           </section>
 
+          <section id="lp-compliance-panel" class="lp-compliance-panel" aria-labelledby="lp-compliance-heading">
+            <div class="lp-bom-header">
+              <div>
+                <p class="lp-eyebrow">Standards readiness</p>
+                <h2 id="lp-compliance-heading">NFPA 780 / UL 96A design checks</h2>
+                <p id="lp-compliance-intro">Select the NFPA/UL workflow to evaluate the calculable design requirements.</p>
+              </div>
+              <span id="lp-compliance-status" class="lp-status-pill lp-status-pill--pending">Screening only</span>
+            </div>
+            <div id="lp-compliance-content" aria-live="polite"></div>
+          </section>
+
+          <section id="lp-bom-panel" class="lp-bom-panel" aria-labelledby="lp-bom-heading">
+            <div class="lp-bom-header">
+              <div>
+                <p class="lp-eyebrow">Construction takeoff</p>
+                <h2 id="lp-bom-heading">Grid protection bill of materials</h2>
+                <p id="lp-bom-intro">Choose a roof air-terminal array to generate a quantity-driven preliminary BOM.</p>
+              </div>
+              <span id="lp-bom-status" class="lp-status-pill lp-status-pill--pending">Waiting for array</span>
+            </div>
+            <div id="lp-bom-content" aria-live="polite"></div>
+          </section>
+
           <div id="calc-errors" class="result-fail" hidden aria-live="polite"></div>
           <div id="results" aria-live="polite"></div>
         </div>
@@ -406,11 +517,12 @@ E  = 1 − Nc/Nd  →  LPL I / II / III / IV</pre>
     <div class="modal-content">
       <button id="close-help-btn" class="modal-close" aria-label="Close help">×</button>
       <h2 id="help-modal-title">Lightning &amp; Surge Protection Help</h2>
-      <p>This page screens direct-strike frequency, visualizes a structure and single-air-terminal concept, and identifies the applicable surge-protection workflow. It is not a final lightning-protection design.</p>
+      <p>This page screens direct-strike frequency, visualizes a single centered mast or regular roof air-terminal array, and provides an NFPA 780 / UL 96A design-check workflow for rectangular control buildings. Passing checks means the calculated design criteria are satisfied subject to listed assumptions; final field inspection and certification remain separate.</p>
       <h3>When to use</h3>
       <ul>
         <li>Utility substation direct-stroke shielding concepts informed by IEEE 998-2026.</li>
         <li>Structural lightning-protection screening informed by IEC 62305:2024.</li>
+        <li>NFPA 780 / UL 96A rectangular-roof layout checks with assumptions and exclusions recorded in the report.</li>
         <li>Preliminary arrester-voltage screening for systems above 1 kV.</li>
       </ul>
       <h3>Inputs</h3>
@@ -418,21 +530,23 @@ E  = 1 − Nc/Nd  →  LPL I / II / III / IV</pre>
         <li><strong>Lightning density</strong> — prefer a mapped ground strike-point density; thunderstorm days provide only a legacy screening estimate.</li>
         <li><strong>Location factor</strong> — accounts for nearby taller objects that intercept strikes.</li>
         <li><strong>Footprint shape</strong> — rectangular and circular modes calculate plan area and perimeter; custom mode accepts area, perimeter, and the farthest protected point.</li>
-        <li><strong>Air-terminal tip height</strong> — is the actual elevation used for the single-mast coverage calculation.</li>
+        <li><strong>Air-terminal arrangement</strong> — selects one centered mast or a regular roof array with entered columns, rows, and edge setback.</li>
+        <li><strong>Air-terminal tip height</strong> — is the actual elevation above grade. Array projection is measured above the higher of the roof or protected-equipment plane.</li>
         <li><strong>System voltage / grounding</strong> — selects either a low-voltage SPD review or a preliminary arrester screen above 1 kV.</li>
       </ul>
       <h3>Interpreting results</h3>
       <ul>
         <li><strong>Required LPL</strong> — the least-restrictive class whose nominal interception capability meets the calculated screening efficiency.</li>
-        <li><strong>Plan coverage</strong> — compares the rolling-sphere coverage radius with the farthest protected point from the assumed centered mast.</li>
-        <li><strong>Elevation coverage</strong> — shows the two true radius-R envelope arcs from the air-terminal tip to the reference plane, using equal horizontal and vertical scales. Full sphere positions are omitted for clarity.</li>
-        <li><strong>Down-conductors</strong> — preliminary count and minimum cross-section when an LPS is indicated.</li>
+        <li><strong>Plan coverage</strong> — checks one centered radius or the combined roof-array coverage and marks the controlling point.</li>
+        <li><strong>Elevation coverage</strong> — shows true radius-R envelope arcs from terminal tips to the reference plane, using equal horizontal and vertical scales. Array mode shows one representative terminal row.</li>
+        <li><strong>Downconductors</strong> — independent discharge paths, placed at rectangular corners first and then distributed around the perimeter. They are not assigned one-for-one to air terminals.</li>
+        <li><strong>Conductor bends</strong> — keep routes short and direct. The page shows an 8 in (203 mm) minimum-radius installation reference with no turn sharper than 90°; verify the adopted standard and listed system.</li>
         <li><strong>Surge protection</strong> — low-voltage SPD review at or below 1 kV; preliminary MCOV and duty-cycle rating above 1 kV.</li>
       </ul>
       <h3>Limitations</h3>
       <ul>
         <li>Screening-level — a simplified direct-strike frequency comparison, not the full IEC 62305-2:2024 risk assessment.</li>
-        <li>Single-mast protection only; multi-mast and shield-wire layouts need a dedicated study.</li>
+        <li>Roof arrays use a regular equal-height grid on one horizontal plane. Irregular terminals, mesh conductors, shield wires, parapets, slopes, and side surfaces need a dedicated three-dimensional study.</li>
         <li>Verify temporary-overvoltage duty, insulation coordination, grounding, and a complete risk assessment before final design.</li>
       </ul>
     </div>
