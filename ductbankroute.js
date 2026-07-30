@@ -46,10 +46,11 @@ function forceShowResumeIfE2E() {
 
 window.E2E = E2E;
 
-import { getItem, setItem, removeItem, getCables, getConduits, getDuctbanks } from './dataStore.mjs';
+import { getItem, setItem, removeItem, getCables, getConduits, getDuctbanks, setDuctbanks } from './dataStore.mjs';
 import { openModal, showAlertModal } from './src/components/modal.js';
 import { buildProjectDuctbankRoute, parseDuctbankRouteData } from './src/ductbankProjectAdapter.mjs';
 import { buildDuctbankBOM, DEFAULT_DUCTBANK_BOM_ASSUMPTIONS, DEFAULT_DUCTBANK_BOM_OPTIONAL_MATERIALS } from './analysis/ductbankBom.mjs';
+import { analyzeDuctbankRouteProfile } from './analysis/ductbankRouteProfile.mjs';
 
 function projectDuctbankId(ductbank={}){
  return String(ductbank.ductbank_id||ductbank.id||ductbank.tag||'').trim();
@@ -801,6 +802,254 @@ function applyDuctbankDefaults({ onlyBlank = true, silent = false, persist = tru
  if(!silent) showToast('Restored practical ductbank defaults');
 }
 
+const DUCTBANK_ROUTE_STRUCTURE_TYPES=['Manhole','Handhole','Pull box','Building entry','Crossing'];
+
+function routeProfileNumberInput(value, label, step='0.1', min=null){
+ const input=document.createElement('input');
+ input.type='number';
+ input.step=step;
+ input.value=value ?? '';
+ input.setAttribute('aria-label',label);
+ if(min!==null) input.min=String(min);
+ return input;
+}
+
+function bindRouteProfileControl(control){
+ control.addEventListener('input',()=>{ markUnsaved(); updateRouteProfile({persist:true}); });
+ control.addEventListener('change',()=>{ markUnsaved(); updateRouteProfile({persist:true}); });
+}
+
+function addRoutePointRow(point={}, {persist=true}={}){
+ const body=document.querySelector('#routeProfileTable tbody');
+ if(!body) return;
+ const row=document.createElement('tr');
+ const values=[
+  ['id',point.id ?? `P${body.children.length + 1}`,'text'],
+  ['stationFt',point.stationFt ?? point.station_ft ?? point.station ?? '', 'number'],
+  ['eastingFt',point.eastingFt ?? point.easting_ft ?? point.x ?? '', 'number'],
+  ['northingFt',point.northingFt ?? point.northing_ft ?? point.y ?? '', 'number'],
+  ['gradeElevationFt',point.gradeElevationFt ?? point.grade_elevation_ft ?? point.grade ?? point.z ?? '', 'number'],
+  ['coverIn',point.coverIn ?? point.cover_in ?? point.cover ?? document.getElementById('ductbankDepth')?.value ?? 36, 'number']
+ ];
+ values.forEach(([key,value,type])=>{
+  const cell=document.createElement('td');
+  const input=type==='number'
+   ? routeProfileNumberInput(value,`${key} for route point`,key==='coverIn'?'1':'0.1',key==='coverIn'?0:null)
+   : document.createElement('input');
+  if(type==='text'){
+   input.type='text';
+   input.value=value;
+   input.setAttribute('aria-label','Route point ID');
+  }
+  input.dataset.routePointField=key;
+  bindRouteProfileControl(input);
+  cell.appendChild(input);
+  row.appendChild(cell);
+ });
+ const action=document.createElement('td');
+ action.appendChild(createButton('Remove','removeBtn','Remove route point',()=>{
+  row.remove();
+  updateRouteProfile({persist:true});
+ }));
+ row.appendChild(action);
+ body.appendChild(row);
+ if(persist) updateRouteProfile({persist:true});
+}
+
+function addRouteStructureRow(structure={}, {persist=true}={}){
+ const body=document.querySelector('#routeStructureTable tbody');
+ if(!body) return;
+ const row=document.createElement('tr');
+ const idCell=document.createElement('td');
+ const id=document.createElement('input');
+ id.type='text';
+ id.value=structure.id ?? `S${body.children.length + 1}`;
+ id.dataset.routeStructureField='id';
+ id.setAttribute('aria-label','Route structure ID');
+ bindRouteProfileControl(id);
+ idCell.appendChild(id);
+ row.appendChild(idCell);
+ const typeCell=document.createElement('td');
+ const type=document.createElement('select');
+ type.dataset.routeStructureField='type';
+ type.setAttribute('aria-label','Route structure type');
+ DUCTBANK_ROUTE_STRUCTURE_TYPES.forEach(value=>{
+  const option=document.createElement('option');
+  option.value=value;
+  option.textContent=value;
+  option.selected=value===(structure.type || 'Pull box');
+  type.appendChild(option);
+ });
+ bindRouteProfileControl(type);
+ typeCell.appendChild(type);
+ row.appendChild(typeCell);
+ const stationCell=document.createElement('td');
+ const station=routeProfileNumberInput(structure.stationFt ?? structure.station_ft ?? structure.station ?? '','Route structure station','0.1',0);
+ station.dataset.routeStructureField='stationFt';
+ bindRouteProfileControl(station);
+ stationCell.appendChild(station);
+ row.appendChild(stationCell);
+ const noteCell=document.createElement('td');
+ const note=document.createElement('input');
+ note.type='text';
+ note.value=structure.note ?? structure.notes ?? '';
+ note.dataset.routeStructureField='note';
+ note.setAttribute('aria-label','Route structure note or crossing description');
+ bindRouteProfileControl(note);
+ noteCell.appendChild(note);
+ row.appendChild(noteCell);
+ const action=document.createElement('td');
+ action.appendChild(createButton('Remove','removeBtn','Remove route structure',()=>{
+  row.remove();
+  updateRouteProfile({persist:true});
+ }));
+ row.appendChild(action);
+ body.appendChild(row);
+ if(persist) updateRouteProfile({persist:true});
+}
+
+function getRouteProfilePoints(){
+ return Array.from(document.querySelectorAll('#routeProfileTable tbody tr')).map(row=>{
+  const value=field=>row.querySelector(`[data-route-point-field="${field}"]`)?.value ?? '';
+  return {
+   id:value('id'),
+   stationFt:value('stationFt'),
+   eastingFt:value('eastingFt'),
+   northingFt:value('northingFt'),
+   gradeElevationFt:value('gradeElevationFt'),
+   coverIn:value('coverIn')
+  };
+ });
+}
+
+function getRouteStructures(){
+ return Array.from(document.querySelectorAll('#routeStructureTable tbody tr')).map(row=>{
+  const value=field=>row.querySelector(`[data-route-structure-field="${field}"]`)?.value ?? '';
+  return {id:value('id'),type:value('type'),stationFt:value('stationFt'),note:value('note')};
+ });
+}
+
+function currentRouteProfile(){
+ return analyzeDuctbankRouteProfile({points:getRouteProfilePoints(),structures:getRouteStructures()});
+}
+
+function renderRouteProfile(profile=currentRouteProfile()){
+ const summary=profile.summary;
+ const length=document.getElementById('routeProfileDevelopedLength');
+ const cover=document.getElementById('routeProfileCoverRange');
+ const bends=document.getElementById('routeProfileBendCount');
+ const structures=document.getElementById('routeProfileStructureCount');
+ if(length) length.textContent=`${summary.developedLengthFt.toLocaleString()} ft`;
+ if(cover) cover.textContent=profile.points.length ? `${summary.minimumCoverIn}–${summary.maximumCoverIn} in` : '—';
+ if(bends) bends.textContent=`${summary.horizontalBends} H / ${summary.verticalBends} V`;
+ if(structures) structures.textContent=String(summary.structureCount);
+ const status=document.getElementById('routeProfileStatus');
+ if(status){
+  status.classList.toggle('is-ready',profile.ready);
+  status.classList.toggle('is-warning',profile.warnings.length > 0);
+  status.innerHTML=profile.ready
+   ? `<strong>Route profile active</strong><span>${profile.points.length} stations · ${profile.segments.length} segments · BOM uses ${escapeHtml(summary.developedLengthFt)} ft developed length${profile.warnings.length ? ` · ${profile.warnings.length} review note${profile.warnings.length===1?'':'s'}` : ''}</span>`
+   : `<strong>Single-length mode</strong><span>${escapeHtml(profile.warnings.join(' '))}</span>`;
+ }
+ const limitations=document.getElementById('routeProfileLimitations');
+ if(limitations) limitations.innerHTML=[...profile.warnings,...profile.limitations].map(note=>`<li>${escapeHtml(note)}</li>`).join('');
+ if(profile.ready){
+  const routeLength=document.getElementById('ductbankLength');
+  if(routeLength) routeLength.value=String(summary.developedLengthFt);
+ }
+ return profile;
+}
+
+function updateRouteProfile({persist=false}={}){
+ const profile=renderRouteProfile();
+ renderDuctbankBom();
+ if(persist) saveDuctbankSession();
+ return profile;
+}
+
+function applyRouteProfileData(routeProfile={}){
+ const points=Array.isArray(routeProfile.points) ? routeProfile.points : [];
+ const structures=Array.isArray(routeProfile.structures) ? routeProfile.structures : [];
+ const pointBody=document.querySelector('#routeProfileTable tbody');
+ const structureBody=document.querySelector('#routeStructureTable tbody');
+ if(pointBody) pointBody.innerHTML='';
+ if(structureBody) structureBody.innerHTML='';
+ points.forEach(point=>addRoutePointRow(point,{persist:false}));
+ structures.forEach(structure=>addRouteStructureRow(structure,{persist:false}));
+ renderRouteProfile();
+}
+
+function loadRouteProfileSample(){
+ applyRouteProfileData({
+  points:[
+   {id:'P1',stationFt:0,eastingFt:0,northingFt:0,gradeElevationFt:100,coverIn:36},
+   {id:'P2',stationFt:100,eastingFt:100,northingFt:0,gradeElevationFt:99,coverIn:42},
+   {id:'P3',stationFt:180,eastingFt:150,northingFt:62.45,gradeElevationFt:98.5,coverIn:48}
+  ],
+  structures:[
+   {id:'MH-01',type:'Manhole',stationFt:100,note:'Intermediate pulling point'},
+   {id:'XING-01',type:'Crossing',stationFt:145,note:'Existing water line; verify survey and clearance'}
+  ]
+ });
+ updateRouteProfile({persist:true});
+ showToast('Loaded sample plan/profile route');
+}
+
+function saveRouteProfileToProject(){
+ const tag=document.getElementById('ductbankTag')?.value.trim();
+ if(!tag){
+  showAlertModal('Ductbank Tag Required','Enter or select a ductbank tag before saving route geometry to the project.');
+  return;
+ }
+ const profile=currentRouteProfile();
+ if(!profile.ready){
+  showAlertModal('Route Profile Incomplete','Add at least two valid stations before saving route geometry to the project.');
+  return;
+ }
+ const ductbanks=getDuctbanks();
+ const index=ductbanks.findIndex(ductbank=>projectDuctbankId(ductbank)===tag);
+ if(index<0){
+  showAlertModal('Project Ductbank Not Found',`Add ${tag} to the Raceway Schedule before saving its route profile.`);
+  return;
+ }
+ const next=ductbanks.map((ductbank,rowIndex)=>rowIndex===index ? {
+  ...ductbank,
+  length_ft:profile.summary.developedLengthFt,
+  route_profile:{
+   version:1,
+   points:profile.points,
+   structures:profile.structures
+  }
+ } : ductbank);
+ setDuctbanks(next);
+ saveDuctbankSession();
+ showToast(`Saved ${tag} plan/profile geometry to the project`);
+}
+
+function exportRouteProfile(){
+ const profile=currentRouteProfile();
+ if(!profile.points.length){
+  showAlertModal('No Route Profile','Add route stations before exporting.');
+  return;
+ }
+ const rows=[
+  ...profile.points.map(point=>({
+   record_type:'station',id:point.id,type:'',station_ft:point.stationFt,easting_ft:point.eastingFt,
+   northing_ft:point.northingFt,grade_elevation_ft:point.gradeElevationFt,cover_in:point.coverIn,note:''
+  })),
+  ...profile.structures.map(structure=>({
+   record_type:'structure',id:structure.id,type:structure.type,station_ft:structure.stationFt,easting_ft:'',
+   northing_ft:'',grade_elevation_ft:'',cover_in:'',note:structure.note
+  }))
+ ];
+ exportCSV('ductbank_route_profile.csv',['record_type','id','type','station_ft','easting_ft','northing_ft','grade_elevation_ft','cover_in','note'],rows,{
+  version:CTR_VERSION,
+  developed_length_ft:profile.summary.developedLengthFt,
+  limitation:'Planning geometry only; verify against survey and IFC drawings.'
+ });
+ showToast('Exported ductbank route profile CSV');
+}
+
 function saveDuctbankSession(){
  const session={
   ductbankTag:document.getElementById('ductbankTag').value,
@@ -834,6 +1083,11 @@ function saveDuctbankSession(){
   bomGroundWireCount:String(ductbankBomOptionState.groundWireCount),
   bomIncludeRedDye:ductbankBomOptionState.includeRedDye,
   bomIncludeShoring:ductbankBomOptionState.includeShoring,
+  routeProfile:{
+   version:1,
+   points:getRouteProfilePoints(),
+   structures:getRouteStructures()
+  },
   conduits:getAllConduits(),
   cables:getAllCables(),
   conductorRating:document.getElementById('conductorRating').value,
@@ -881,6 +1135,9 @@ function loadDuctbankSession(){
     includeRedDye:s.bomIncludeRedDye===undefined ? DUCTBANK_BOM_OPTION_DEFAULTS.includeRedDye : Boolean(s.bomIncludeRedDye),
     includeShoring:s.bomIncludeShoring===undefined ? DUCTBANK_BOM_OPTION_DEFAULTS.includeShoring : Boolean(s.bomIncludeShoring)
   };
+  if(s.routeProfile && typeof s.routeProfile==='object'){
+    applyRouteProfileData(s.routeProfile);
+  }
   if(Array.isArray(s.conduits)){
     document.querySelector('#conduitTable tbody').innerHTML='';
     s.conduits.forEach(addConduitRow);
@@ -981,6 +1238,7 @@ function applyDuctbankRouteData(routeData){
     const element=document.getElementById(elementId);
     if(element && ductbank[projectKey]!==undefined) element.value=ductbank[projectKey];
   });
+  applyRouteProfileData(ductbank.route_profile || ductbank.routeProfile || {});
 
   const conduitRows=Array.isArray(conduits) ? conduits : (Array.isArray(ductbank.conduits) ? ductbank.conduits : []);
   const cbody=document.querySelector('#conduitTable tbody');
@@ -4360,6 +4618,7 @@ function ductbankBomInput(){
   depthIn:parseFloat(document.getElementById('ductbankDepth').value)||0,
   concreteEncasement:document.getElementById('concreteEncasement').checked,
   conduits:getAllConduits(),
+  routeProfile:currentRouteProfile(),
   layout:{
    topPad:parseFloat(document.getElementById('topPad').value)||0,
    bottomPad:parseFloat(document.getElementById('bottomPad').value)||0,
@@ -4455,7 +4714,16 @@ function renderDuctbankBom(){
   </tr>`).join('');
  const empty=document.getElementById('ductbank-bom-empty');
  const tableWrap=document.getElementById('ductbankBomTable')?.closest('.ductbank-table-wrap');
- if(empty) empty.hidden=bom.ready;
+ if(empty){
+  const emptyMessage=empty.querySelector('span');
+  if(emptyMessage){
+   const hasRouteLength=summary.routeLengthFt > 0;
+   emptyMessage.textContent=hasRouteLength
+    ? 'Add at least one conduit to calculate the ductbank BOM.'
+    : 'Enter a route length and add conduits to calculate the ductbank BOM.';
+  }
+  empty.hidden=bom.ready;
+ }
  if(tableWrap) tableWrap.hidden=!bom.ready;
  const notes=document.getElementById('ductbank-bom-notes');
  if(notes){
@@ -4466,7 +4734,7 @@ function renderDuctbankBom(){
  return bom;
 }
 
-function appendDuctbankBomSheets(workbook, bom=currentDuctbankBOM()){
+function appendDuctbankBomSheets(workbook, bom=currentDuctbankBOM(), routeProfile=currentRouteProfile()){
  const rows=bom.rows.map(row=>({
   Category:row.category,
   Item:row.item,
@@ -4481,6 +4749,7 @@ function appendDuctbankBomSheets(workbook, bom=currentDuctbankBOM()){
  const assumptionRows=[
   ['Ductbank',bom.tag || 'Not provided'],
   ['Route length (ft)',bom.summary.routeLengthFt],
+  ['Route length basis',bom.routeProfileApplied ? 'Station/profile developed length' : 'Single route-length input'],
   ['Conduit waste (%)',bom.assumptions.conduitWastePct],
   ['Concrete waste (%)',bom.assumptions.concreteWastePct],
   ['Spacer spacing (ft)',bom.assumptions.spacerSpacingFt],
@@ -4500,6 +4769,30 @@ function appendDuctbankBomSheets(workbook, bom=currentDuctbankBOM()){
  const assumptionsSheet=XLSX.utils.aoa_to_sheet([['Takeoff assumption','Value'],...assumptionRows]);
  assumptionsSheet['!cols']=[{wch:58},{wch:22}];
  XLSX.utils.book_append_sheet(workbook,assumptionsSheet,'BOM Assumptions');
+ if(routeProfile.points.length){
+  const stationRows=routeProfile.points.map(point=>({
+   ID:point.id,
+   'Station (ft)':point.stationFt,
+   'Easting (ft)':point.eastingFt,
+   'Northing (ft)':point.northingFt,
+   'Grade elevation (ft)':point.gradeElevationFt,
+   'Cover (in)':point.coverIn
+  }));
+  const stationSheet=XLSX.utils.json_to_sheet(stationRows);
+  stationSheet['!cols']=[{wch:14},{wch:14},{wch:14},{wch:14},{wch:22},{wch:14}];
+  XLSX.utils.book_append_sheet(workbook,stationSheet,'Route Profile');
+ }
+ if(routeProfile.structures.length){
+  const structureRows=routeProfile.structures.map(structure=>({
+   ID:structure.id,
+   Type:structure.type,
+   'Station (ft)':structure.stationFt,
+   Note:structure.note
+  }));
+  const structureSheet=XLSX.utils.json_to_sheet(structureRows);
+  structureSheet['!cols']=[{wch:16},{wch:18},{wch:14},{wch:54}];
+  XLSX.utils.book_append_sheet(workbook,structureSheet,'Route Structures');
+ }
 }
 
 function exportDuctbankBom(){
@@ -4825,6 +5118,8 @@ function deleteSavedData(){
 removeItem('ductbankSession');
  document.querySelector('#conduitTable tbody').innerHTML='';
  document.querySelector('#cableTable tbody').innerHTML='';
+ document.querySelector('#routeProfileTable tbody').innerHTML='';
+ document.querySelector('#routeStructureTable tbody').innerHTML='';
  ['ductbankTag','ductbankDepth','earthTemp','airTemp','soilResistivity','moistureContent','hSpacing','vSpacing','topPad','bottomPad','leftPad','rightPad','perRow','conductorRating','gridRes','ductThermRes'].forEach(id=>{
   const el=document.getElementById(id);
   if(el) el.value='';
@@ -4840,6 +5135,7 @@ removeItem('ductbankSession');
  applyDuctbankDefaults({onlyBlank:false,silent:true,persist:false});
  drawGrid();
  updateAmpacityReport();
+ renderRouteProfile();
  saveDuctbankSession();
  scheduleDuctbankExperienceUpdate();
 }
@@ -4885,6 +5181,11 @@ async function toggleHeatMap(){
 
 document.getElementById('exportConduitsBtn').addEventListener('click',exportConduits);
 document.getElementById('exportCablesBtn').addEventListener('click',exportCables);
+document.getElementById('addRoutePointBtn').addEventListener('click',()=>addRoutePointRow());
+document.getElementById('addRouteStructureBtn').addEventListener('click',()=>addRouteStructureRow());
+document.getElementById('loadRouteProfileSampleBtn').addEventListener('click',loadRouteProfileSample);
+document.getElementById('saveDuctbankRouteBtn').addEventListener('click',saveRouteProfileToProject);
+document.getElementById('exportRouteProfileBtn').addEventListener('click',exportRouteProfile);
 document.getElementById('exportBomBtn').addEventListener('click',exportDuctbankBom);
 document.getElementById('exportDuctbankBomBtn').addEventListener('click',exportDuctbankBom);
 document.getElementById('refreshDuctbankBomBtn').addEventListener('click',()=>{
@@ -5014,12 +5315,12 @@ if(ductbankBomTable){
 document.getElementById('conduitTable').addEventListener('input',markUnsaved);
 document.getElementById('cableTable').addEventListener('input',markUnsaved);
 document.getElementById('heatSourceTable').addEventListener('input',markUnsaved);
-['addConduit','sampleConduits','addCable','sampleCables','loadDuctbankExample','restoreDuctbankDefaults','autoAssignCablesBtn','addHeatSource','deleteDataBtn','resetBtn'].forEach(id=>{const el=document.getElementById(id);if(el)el.addEventListener('click',markUnsaved);});
+['addConduit','sampleConduits','addCable','sampleCables','loadDuctbankExample','restoreDuctbankDefaults','autoAssignCablesBtn','addHeatSource','addRoutePointBtn','addRouteStructureBtn','loadRouteProfileSampleBtn','deleteDataBtn','resetBtn'].forEach(id=>{const el=document.getElementById(id);if(el)el.addEventListener('click',markUnsaved);});
 const impC=document.getElementById('importConduits'); if(impC) impC.addEventListener('change',markUnsaved);
 const impCb=document.getElementById('importCables'); if(impCb) impCb.addEventListener('change',markUnsaved);
 document.getElementById('conduitTable').addEventListener('click',e=>{if(e.target.tagName==='BUTTON') markUnsaved();});
 document.getElementById('cableTable').addEventListener('click',e=>{if(e.target.tagName==='BUTTON') markUnsaved();});
-['exportConduitsBtn','exportCablesBtn','exportImgBtn','exportBtn','exportBomBtn','exportDuctbankBomBtn','exportThermalBtn','exportCanvasDataBtn','downloadCalcReportBtn'].forEach(id=>{const el=document.getElementById(id);if(el)el.addEventListener('click',markSaved);});
+['exportConduitsBtn','exportCablesBtn','exportRouteProfileBtn','saveDuctbankRouteBtn','exportImgBtn','exportBtn','exportBomBtn','exportDuctbankBomBtn','exportThermalBtn','exportCanvasDataBtn','downloadCalcReportBtn'].forEach(id=>{const el=document.getElementById(id);if(el)el.addEventListener('click',markSaved);});
 const conduitSearch=document.getElementById('conduit-search');
 if(conduitSearch){
  conduitSearch.addEventListener('input',()=>{
@@ -5085,6 +5386,7 @@ loadConductorProperties().then(()=>{
   const requestedDuctbankId=new URLSearchParams(location.search).get('ductbank')||'';
   const storedSession=getItem('ductbankSession');
   loadDuctbankSession();
+  renderRouteProfile();
   const sessionDuctbankId=document.getElementById('ductbankTag')?.value||'';
   const selectedDuctbankId=requestedDuctbankId||sessionDuctbankId||projectDuctbankId(projectDuctbanks[0]);
   initProjectDuctbankSelector({

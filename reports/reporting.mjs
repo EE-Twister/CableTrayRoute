@@ -146,11 +146,22 @@ export function buildHarmonicsRows(result = {}) {
 
 /** Build rows for motor starting study */
 export function buildMotorStartRows(result = {}) {
-  const rows = [];
-  Object.entries(result).forEach(([id, r]) => {
-    rows.push({ id, inrushKA: r.inrushKA, voltageSagPct: r.voltageSagPct, accelTime: r.accelTime });
-  });
-  return rows;
+  if (Array.isArray(result?.results)) {
+    return result.results.map(entry => ({
+      id: entry.label || entry.id,
+      inrushKA: entry.inrushKA,
+      voltageSagPct: entry.voltageSagPct,
+      accelTime: entry.accelTime,
+      starterType: entry.starterType,
+      status: entry.status
+    }));
+  }
+  return Object.entries(result).map(([id, entry]) => ({
+    id,
+    inrushKA: entry.inrushKA,
+    voltageSagPct: entry.voltageSagPct,
+    accelTime: entry.accelTime
+  }));
 }
 
 /**

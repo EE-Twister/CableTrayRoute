@@ -1,7 +1,10 @@
 import { runFrequencyScan } from './analysis/frequencyScan.mjs';
-import { getStudies, setStudies } from './dataStore.mjs';
+import { getCables, getOneLine, getStudies, setStudies } from './dataStore.mjs';
 import { initStudyApprovalPanel } from './src/components/studyApproval.js';
 import { escapeHtml } from './src/htmlUtils.mjs';
+import { showAlertModal } from './src/components/modal.js';
+import { buildFrequencyScanProjectInputs } from './analysis/frequencyScanProjectInputs.mjs';
+import { createStudyRunMetadata, isStudyResultStale } from './analysis/studyResultReadiness.mjs';
 
 document.addEventListener('DOMContentLoaded', () => {
   initSettings();
@@ -15,17 +18,38 @@ document.addEventListener('DOMContentLoaded', () => {
   const form = document.getElementById('freq-scan-form');
   const resultsDiv = document.getElementById('results');
   const errorsDiv = document.getElementById('calc-errors');
+  const sourceDiv = document.getElementById('frequency-input-source');
+  let importedSourceFingerprint = null;
 
   // Dynamic row buttons
   document.getElementById('add-cap-bank-btn').addEventListener('click', () => addCapBankRow());
   document.getElementById('add-filter-btn').addEventListener('click', () => addFilterRow());
   document.getElementById('add-cable-btn').addEventListener('click', () => addCableRow());
+  document.getElementById('import-frequency-project-btn').addEventListener('click', () => {
+    const imported = buildFrequencyScanProjectInputs(getOneLine(), getStudies(), getCables());
+    if (!imported.ready) {
+      sourceDiv.className = 'result-fail';
+      sourceDiv.textContent = imported.warnings.join(' ');
+      showAlertModal('Project Data Incomplete', imported.warnings.join(' '), { variant: 'danger' });
+      return;
+    }
+    restoreForm(imported.inputs);
+    importedSourceFingerprint = imported.sourceFingerprint;
+    sourceDiv.className = imported.warnings.length ? 'result-warn' : 'result-ok';
+    sourceDiv.textContent = `Imported project source data, ${imported.inputs.capacitorBanks.length} capacitor bank(s), ${imported.inputs.filters.length} filter(s), and ${imported.inputs.cables.length} cable(s). ${imported.warnings.join(' ')}`;
+  });
 
   // Restore saved result
   const saved = getStudies().frequencyScan;
   if (saved) {
     restoreForm(saved.inputs);
     renderResults(saved);
+    const currentFingerprint = buildFrequencyScanProjectInputs(getOneLine(), getStudies(), getCables()).sourceFingerprint;
+    const stale = isStudyResultStale(saved, currentFingerprint);
+    sourceDiv.className = stale ? 'result-warn' : 'field-hint';
+    sourceDiv.textContent = stale
+      ? 'Saved scan is stale because its project source data changed. Import and rerun.'
+      : (saved.runMetadata?.source === 'project-data' ? 'Saved inputs were imported from project data.' : 'Saved manual inputs restored.');
   } else {
     // Default one cap bank row
     addCapBankRow(600, 'Cap Bank 1');
@@ -40,12 +64,18 @@ document.addEventListener('DOMContentLoaded', () => {
       const msg = err instanceof Error ? err.message : 'Unable to run frequency scan.';
       errorsDiv.hidden = false;
       errorsDiv.textContent = msg;
-      showModal('Input Error', `<p>${escapeHtml(msg)}</p>`, 'error');
+      showAlertModal('Input Error', msg, { variant: 'danger' });
       return;
     }
     errorsDiv.hidden = true;
     errorsDiv.textContent = '';
 
+    result.runMetadata = createStudyRunMetadata(
+      'frequencyScan',
+      { ready: true, sourceFingerprint: importedSourceFingerprint, counts: { points: result.points?.length || 0 } },
+      { valid: (result.points?.length || 0) > 0, convergedCount: result.points?.length || 0, totalCount: result.points?.length || 0 },
+      { source: importedSourceFingerprint ? 'project-data' : 'manual', persisted: true }
+    );
     const studies = getStudies();
     studies.frequencyScan = result;
     setStudies(studies);

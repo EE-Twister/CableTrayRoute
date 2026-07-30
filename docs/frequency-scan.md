@@ -5,6 +5,8 @@
 
 This guide documents the engineering basis used by the Harmonic Frequency Scan study.
 
+Use **Import Project Source, Banks & Cables** to seed bus voltage from the One-Line, source strength and X/R from the saved Short Circuit result, capacitor/filter data from One-Line components, and cable R/X/length from the Cable Schedule. Missing source strength blocks the import; missing banks or cable impedance is reported as a warning rather than silently filled with demonstration values. Project-derived saved scans are marked stale after a source-data change.
+
 ## Purpose
 
 A frequency scan sweeps the Thevenin driving-point impedance Z(h) from the 1st to the 50th harmonic order. Peaks in the impedance magnitude indicate **parallel resonance** (voltage amplification risk); troughs indicate **series resonance** (current amplification risk).

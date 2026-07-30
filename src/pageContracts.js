@@ -68,6 +68,11 @@ const latestRouteResults = projectInput('settings.latestRouteResults', 'setting'
 const approvals = projectInput('settings.studyApprovals', 'setting', false, 'Engineer review records for study outputs.');
 const reportSnapshots = projectInput('settings.reportSnapshots', 'setting', false, 'Saved report package snapshots used by deliverable pages.');
 const lifecyclePackages = projectInput('settings.lifecyclePackages', 'setting', false, 'Release package records and lifecycle package history.');
+const deliverableArtifacts = projectInput('settings.deliverableArtifacts', 'setting', false, 'Source-fingerprinted deliverable records with revision, status, and transmittal metadata.');
+const fieldExecutionRecords = projectInput('settings.fieldExecutionRecords', 'setting', false, 'Shared cable and raceway installation, punch, and as-built records.');
+const procurementRegister = projectInput('settings.procurementRegister', 'setting', false, 'Saved procurement line items, vendor controls, milestones, and receiving status.');
+const costEstimateArtifact = projectInput('settings.costEstimateArtifact', 'setting', false, 'Latest persisted estimate summary, basis, and line-item rows.');
+const pullPlanArtifact = projectInput('settings.pullPlanArtifact', 'setting', false, 'Saved pull engineering assumptions, direction comparison, limits, jam screening, and input warnings.');
 const scenarios = projectInput('settings.scenarios', 'setting', false, 'Scenario registry and active scenario selection.');
 const oneLineReconcilePending = projectInput('settings.oneLineScheduleReconcilePending', 'setting', false, 'Flag indicating one-line schedule reconciliation is available.');
 const equipmentFilterPresets = projectInput('settings.equipmentFilterPresets', 'setting', false, 'Saved equipment list filter presets.');
@@ -91,7 +96,7 @@ const studyApprovalOutput = output('settings.studyApprovals', 'setting', 'Engine
 const coreProjectInputs = [equipment, loads, oneLine, panels, cables, trays, conduits, ductbanks, studies, designBasis];
 const racewayInputs = [cables, trays, conduits, ductbanks, designBasis];
 const powerModelInputs = [equipment, loads, oneLine, cables, studies, tccSettings, designBasis];
-const deliverableInputs = [equipment, loads, oneLine, panels, cables, trays, conduits, ductbanks, studies, latestRouteResults, designBasis, designGates, approvals];
+const deliverableInputs = [equipment, loads, oneLine, panels, cables, trays, conduits, ductbanks, studies, latestRouteResults, pullPlanArtifact, procurementRegister, costEstimateArtifact, fieldExecutionRecords, deliverableArtifacts, designBasis, designGates, approvals];
 
 const ready = (readyWhen, blockers) => ({ readyWhen, blockers });
 const exportOnly = (purpose, consumers = []) => output('export-only', 'export', purpose, consumers);
@@ -129,9 +134,18 @@ export const PAGE_CONTRACTS_BY_HREF = {
   }),
   'scenarios.html': contract({
     standaloneInputs: ['Scenario names, imported project snapshots, and comparison selections.'],
-    projectInputs: [...coreProjectInputs, scenarios],
+    projectInputs: [
+      ...coreProjectInputs.map(input => input.audit ? input : ({
+        ...input,
+        audit: {
+          expectRead: false,
+          reason: 'Read through the scenario snapshot accessor rather than a direct active-project getter.',
+        },
+      })),
+      scenarios,
+    ],
     outputs: [
-      exportOnly('Scenario comparison tables and exports.')
+      exportOnly('Cross-domain scenario change register, engineering-study delta table, and comparison CSV.')
     ],
     readiness: ready('Ready when at least two named scenarios can be compared or a baseline scenario can be cloned.', ['Only one scenario exists or selected scenario data is empty.']),
     downstream: ['workflowdashboard.html', 'projectreport.html'],
@@ -283,6 +297,7 @@ export const PAGE_CONTRACTS_BY_HREF = {
     standaloneInputs: ['Ductbank route length and segment geometry, conduit assignments, cable selections, thermal report options, and material takeoff allowances.'],
     projectInputs: [cables, conduits, ductbanks, ductbankPanZoom, ductbankSession, ductbankRouteData, designBasis],
     outputs: [
+      output('ductbankSchedule', 'schedule', 'Ductbank rows updated with station/profile geometry, structures, variable cover, and route takeoff metadata.', ['optimalRoute.html', 'projectreport.html']),
       output('settings.ductbankPanZoom', 'setting', 'Ductbank canvas pan and zoom state.', ['ductbankroute.html']),
       output('settings.ductbankSession', 'setting', 'Ductbank page session state.', ['ductbankroute.html']),
       output('settings.ductbankRouteData', 'setting', 'Selected ductbank route handoff data.', ['ductbankroute.html']),
@@ -467,8 +482,10 @@ export const PAGE_CONTRACTS_BY_HREF = {
   'pullcards.html': contract({
     workflowStep: 'deliverables',
     standaloneInputs: ['Imported route workbook, manual route rows, QR options, and pull grouping controls.'],
-    projectInputs: [cables, trays, conduits, ductbanks, studies, latestRouteResults, reportSnapshots, lifecyclePackages, designBasis],
+    projectInputs: [cables, trays, conduits, ductbanks, studies, latestRouteResults, pullPlanArtifact, reportSnapshots, lifecyclePackages, designBasis],
     outputs: [
+      output('settings.pullPlanArtifact', 'setting', 'Saved per-pull physical inputs, limits, direction comparison, jam screening, results, and coverage warnings.', ['projectreport.html', 'submittal.html', 'fieldview.html']),
+      output('settings.deliverableArtifacts', 'setting', 'Source-fingerprinted current pull-plan record.', ['projectreport.html', 'submittal.html']),
       exportOnly('Pull cards, QR payloads, pull tables, and route visual exports.', ['projectreport.html'])
     ],
     readiness: ready('Ready when route results or imported route rows can be grouped into pulls.', ['No successful route results or no import rows with route signatures.']),
@@ -477,8 +494,10 @@ export const PAGE_CONTRACTS_BY_HREF = {
   'procurementschedule.html': contract({
     workflowStep: 'deliverables',
     standaloneInputs: ['Cable cut imports, reel sizes, tolerance settings, and procurement options.'],
-    projectInputs: [cables, latestRouteResults, designBasis],
+    projectInputs: [cables, latestRouteResults, procurementRegister, designBasis],
     outputs: [
+      output('settings.procurementRegister', 'setting', 'Saved commercial cable specification lines with vendor, quote, schedule, PO, delivery, and receiving controls.', ['costestimate.html', 'projectreport.html', 'submittal.html']),
+      output('settings.deliverableArtifacts', 'setting', 'Source-fingerprinted current procurement schedule record.', ['projectreport.html', 'submittal.html']),
       exportOnly('Procurement schedule, reel assignment, and material summary exports.', ['costestimate.html', 'projectreport.html'])
     ],
     readiness: ready('Ready when routed or imported cable lengths can be aggregated by cable specification.', ['No cable cuts, missing cable type/size, or invalid reel settings.']),
@@ -486,10 +505,13 @@ export const PAGE_CONTRACTS_BY_HREF = {
   }),
   'costestimate.html': contract({
     workflowStep: 'deliverables',
-    standaloneInputs: ['Manual quantities, labor rates, custom price book imports, and estimate assumptions.'],
-    projectInputs: [cables, trays, conduits, ductbanks, studies, routeResultsStudy, latestRouteResults, projectInput('settings.customPricing', 'setting', false, 'Saved custom pricing book used to override default estimator unit prices.'), designBasis],
+    standaloneInputs: ['Manual quantities, labor rates, regional wage basis, escalation indexes, custom price book imports, and estimate assumptions.'],
+    projectInputs: [cables, trays, conduits, ductbanks, studies, routeResultsStudy, latestRouteResults, costEstimateArtifact, projectInput('settings.customPricing', 'setting', false, 'Saved custom pricing book used to override default estimator unit prices.'), projectInput('settings.costEstimateBasis', 'setting', false, 'Saved regional labor and material/labor escalation basis.'), designBasis],
     outputs: [
       output('settings.customPricing', 'setting', 'Custom pricing book and estimator overrides.', ['costestimate.html']),
+      output('settings.costEstimateBasis', 'setting', 'Regional wage and index escalation basis with source metadata.', ['costestimate.html', 'projectreport.html']),
+      output('settings.costEstimateArtifact', 'setting', 'Latest estimate summary, cost basis, and line-item rows persisted for report and submittal packages.', ['projectreport.html', 'submittal.html']),
+      output('settings.deliverableArtifacts', 'setting', 'Source-fingerprinted cost estimate artifact record.', ['projectreport.html', 'submittal.html']),
       exportOnly('Cost estimate tables and bid-support exports.', ['projectreport.html'])
     ],
     readiness: ready('Ready when quantities and pricing assumptions are available.', ['No quantities, missing unit pricing, or invalid labor assumptions.']),
@@ -500,6 +522,8 @@ export const PAGE_CONTRACTS_BY_HREF = {
     standaloneInputs: ['Package metadata, selected sections, attached exports, and reviewer fields.'],
     projectInputs: deliverableInputs,
     outputs: [
+      output('settings.projectMeta', 'setting', 'Canonical project identity and revision metadata synchronized from the submittal cover.', ['projectreport.html']),
+      output('settings.deliverableArtifacts', 'setting', 'Saved submittal manifest with included sections, source fingerprint, revision, status, and transmittal.', ['projectreport.html', 'submittal.html']),
       exportOnly('Submittal package documents and spreadsheets.', ['projectreport.html'])
     ],
     readiness: ready('Ready when required package sections have source data and review gates are closed.', ['Missing source sections, open design gates, or no package metadata.']),
@@ -512,6 +536,7 @@ export const PAGE_CONTRACTS_BY_HREF = {
     outputs: [
       output('settings.projectMeta', 'setting', 'Shared project and report metadata edited from the report builder.', ['battery.html', 'generatorsizing.html', 'projectreport.html']),
       output('settings.reportSnapshots', 'setting', 'Saved report package snapshots.', ['workflowdashboard.html', 'projectreport.html']),
+      output('settings.deliverableArtifacts', 'setting', 'Deliverable register content included in report packages.', ['submittal.html', 'projectreport.html']),
       output('studyResults.duty', 'study-result', 'Equipment-duty validation results evaluated while report readiness is refreshed.', ['equipmentevaluation.html']),
       exportOnly('Project report previews, PDF/print output, and report spreadsheets.')
     ],
@@ -614,7 +639,15 @@ export const PAGE_CONTRACTS_BY_HREF = {
   'frequencyscan.html': contract({
     workflowStep: 'studies',
     standaloneInputs: ['System impedance, capacitor size, harmonic orders, and scan range settings.'],
-    projectInputs: [projectInput('studyResults.capacitorBank', 'study-result', false, 'Capacitor bank sizing used as scan context.'), projectInput('studyResults.shortCircuit', 'study-result', false, 'System fault strength used for impedance estimates.'), designBasis, approvals],
+    projectInputs: [
+      oneLine,
+      cables,
+      projectInput('studyResults.capacitorBank', 'study-result', false, 'Capacitor bank sizing used as scan context.'),
+      projectInput('studyResults.shortCircuit', 'study-result', false, 'System fault strength used for impedance estimates.'),
+      projectInput('studyResults.iec60909', 'study-result', false, 'IEC short-circuit result used as a source-strength fallback.'),
+      designBasis,
+      approvals
+    ],
     outputs: [
       output('studyResults.frequencyScan', 'study-result', 'Saved frequency scan points and resonance warnings.', ['harmonics.html', 'projectreport.html']),
       studyApprovalOutput,
@@ -649,10 +682,10 @@ export const PAGE_CONTRACTS_BY_HREF = {
   }),
   'sustainability.html': contract({
     workflowStep: 'studies',
-    standaloneInputs: ['Material quantities, conductor types, route lengths, and carbon factor assumptions.'],
+    standaloneInputs: ['Material quantities, conductor types, route lengths, EPA eGRID subregion or documented custom grid factor, and carbon factor assumptions.'],
     projectInputs: [cables, trays, conduits, iec60287Study, designBasis, approvals],
     outputs: [
-      output('studyResults.sustainabilityFootprint', 'study-result', 'Saved material and carbon footprint summary.', ['projectreport.html']),
+      output('studyResults.sustainabilityFootprint', 'study-result', 'Saved material and carbon footprint summary with factor provenance and EPD coverage.', ['projectreport.html']),
       studyApprovalOutput,
       exportOnly('Sustainability footprint exports.', ['projectreport.html'])
     ],
@@ -744,7 +777,7 @@ export const PAGE_CONTRACTS_BY_HREF = {
   'optimalpowerflow.html': contract({
     workflowStep: 'studies',
     standaloneInputs: ['Generator fleet (Pmin/Pmax and quadratic cost curves), system demand, and transmission loss allowance.'],
-    projectInputs: [designBasis, approvals],
+    projectInputs: [oneLine, designBasis, approvals],
     outputs: [
       output('studyResults.optimalPowerFlow', 'study-result', 'Saved economic dispatch schedule, system lambda, and cost summary.', ['projectreport.html']),
       studyApprovalOutput,
@@ -994,14 +1027,15 @@ export const PAGE_CONTRACTS_BY_HREF = {
   }),
   'reliability.html': contract({
     workflowStep: 'studies',
-    standaloneInputs: ['Component MTBF/MTTR data, topology assumptions, and contingency screening options.'],
-    projectInputs: [oneLine, equipment, designBasis],
+    standaloneInputs: ['Component MTBF/MTTR data, source references, source dates, topology assumptions, and critical-load weighting.'],
+    projectInputs: [oneLine, loads, projectInput('settings.reliabilityInputs', 'setting', false, 'Persistent component overrides and governed source basis.'), designBasis],
     outputs: [
-      output('studyResults.reliability', 'study-result', 'Saved reliability availability and outage result.', ['contingency.html', 'projectreport.html']),
+      output('settings.reliabilityInputs', 'setting', 'Persistent MTBF/MTTR overrides, source references, source dates, and analyst notes.', ['reliability.html']),
+      output('studyResults.reliability', 'study-result', 'Saved component availability, service-point outage, EENS, and N-1/N-2 minimal cut-set result.', ['contingency.html', 'scenarios.html', 'projectreport.html']),
       exportOnly('Reliability reports.', ['projectreport.html'])
     ],
-    readiness: ready('Ready when eligible components have MTBF/MTTR data or direct reliability inputs.', ['No eligible components or missing reliability parameters.']),
-    downstream: ['contingency.html', 'projectreport.html']
+    readiness: ready('Ready when every eligible component has valid MTBF/MTTR values and a traceable source with source date.', ['No connected model, missing reliability parameters, or incomplete source evidence.']),
+    downstream: ['contingency.html', 'scenarios.html', 'projectreport.html']
   }),
   'emf.html': contract({
     workflowStep: 'studies',
@@ -1018,6 +1052,7 @@ export const PAGE_CONTRACTS_BY_HREF = {
     standaloneInputs: ['Generator inertia, mechanical power, clearing time, transfer reactance, and fault profile inputs.'],
     projectInputs: [oneLine, equipment, projectInput('studyResults.loadFlow', 'study-result', false, 'Prefault operating point context.'), projectInput('studyResults.shortCircuit', 'study-result', false, 'Fault context for clearing checks.'), designBasis],
     outputs: [
+      output('studyResults.transientStability', 'study-result', 'Saved OMIB simulation, equal-area screen, and numerical critical-clearing-time result.', ['projectreport.html']),
       exportOnly('Transient stability plots and reports.', ['projectreport.html'])
     ],
     readiness: ready('Ready when generator, transfer, and fault clearing inputs are valid.', ['Missing machine data, invalid clearing time, or incomplete transfer reactance values.']),
@@ -1039,10 +1074,12 @@ export const PAGE_CONTRACTS_BY_HREF = {
     standaloneInputs: ['Manual cable length/load rows, circuit classification, voltage, and conductor settings.'],
     projectInputs: [cables, loads, projectInput('studyResults.loadFlow', 'study-result', false, 'Operating current or voltage context when available.'), designBasis],
     outputs: [
+      output('cableSchedule', 'schedule', 'Selected conductor-size recommendations applied through the governed cable schedule.', ['cableschedule.html', 'scenarios.html', 'projectreport.html']),
+      output('studyResults.voltageDropStudy', 'study-result', 'Saved individual and feeder-plus-branch voltage-drop result with source traceability and sizing recommendations.', ['scenarios.html', 'projectreport.html']),
       exportOnly('Voltage drop reports and CSV exports.', ['projectreport.html'])
     ],
-    readiness: ready('Ready when cable length and load/current data are available.', ['Missing cable length, missing load/current, or invalid conductor data.']),
-    downstream: ['projectreport.html']
+    readiness: ready('Ready when every cable has valid length and conductor data plus current/voltage from the cable row, converged Load Flow, or Load List.', ['Missing cable length, unresolved current/voltage, invalid conductor data, or incomplete feeder-plus-branch path.']),
+    downstream: ['cableschedule.html', 'scenarios.html', 'projectreport.html']
   })
 };
 

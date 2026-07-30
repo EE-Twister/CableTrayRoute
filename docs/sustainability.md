@@ -10,7 +10,8 @@
 
 Calculate the embodied CO₂e (Scope 3, A1–A3 cradle-to-gate) from project materials and
 the operating CO₂e (Scope 2) from capitalised conductor losses, producing a sustainability
-footprint suitable for LEED, BREEAM, and client sustainability appendices.
+footprint for screening and option comparison. The saved result identifies source quality so
+screening-library factors are not confused with product-specific EPD data.
 
 ---
 
@@ -63,15 +64,44 @@ Operating CO₂e [kg] = P_loss [kW] × 8 760 [h/yr] × gridFactor [kg CO₂e/kWh
 
 ## Grid Emission Factors
 
-| Region | Factor (kg CO₂e/kWh) | Source |
-|--------|---------------------|--------|
-| United States | 0.386 | EPA eGRID 2022 |
-| European Union | 0.233 | IEA 2023 |
-| United Kingdom | 0.207 | DESNZ 2023 |
-| Canada | 0.130 | NRCAN 2022 |
-| Australia (NEM) | 0.510 | DCCEEW 2023 |
-| China | 0.581 | IEA 2023 |
-| Custom | User-defined | — |
+The United States national and 27 eGRID subregion choices use **EPA eGRID2023
+Revision 2 total-output CO₂e rates**. EPA publishes the values in lb CO₂e/MWh;
+the analysis module converts them to kg CO₂e/kWh using `0.00045359237`.
+
+- Data year: 2023
+- Revision 2 release: June 12, 2025
+- Method: total-output CO₂e emission rate
+- Source: [EPA eGRID Summary Data](https://www.epa.gov/egrid/summary-data)
+
+The U.S. national factor is 770.884 lb CO₂e/MWh, or 0.349667 kg CO₂e/kWh.
+Subregion choices preserve the acronym, geography, original published value,
+unit, release, and source URL in the saved study result.
+
+Legacy EU, UK, Canada, Australia, and China factors remain available for older
+project files but are labeled **legacy screening factors**. Verify them against
+the current authority before formal reporting.
+
+For a custom factor, record the publisher, source date, applicable geography,
+and source URL or document reference. An undocumented custom factor remains
+calculable but is flagged in the result.
+
+---
+
+## Data Coverage Classification
+
+Every run includes a `factorCoverage` record:
+
+| Metric | Meaning |
+|--------|---------|
+| Included / skipped lines | BOM completeness |
+| Product-specific EPD lines | Items using `co2eKgPerUnit` with an `epdSource` reference |
+| Undocumented override lines | Items using `co2eKgPerUnit` without an `epdSource` reference |
+| Screening-library lines | Items using built-in generic factors |
+| EPD carbon coverage | Percent of calculated embodied CO₂e supported by item overrides |
+| Classification | `product-specific`, `mixed`, `screening-library`, or `no-data` |
+
+The on-screen result and CSV export include this coverage plus the selected grid
+factor provenance.
 
 ---
 

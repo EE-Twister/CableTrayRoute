@@ -1,287 +1,287 @@
-/**
- * scenarioComparison.js — Dedicated scenario comparison page logic (Gap #17).
- *
- * Renders a side-by-side comparison of two user-selected scenarios covering:
- *   1. Cable schedule diff (Added / Removed / Changed)
- *   2. Tray fill status with fill gauges
- *   3. Electrical study results presence
- */
-
-import { buildCableComparison } from './scenarios.js';
-import { createFillGauge } from './components/fillGauge.js';
 import {
+  getScenarioSnapshot,
   listScenarios,
-  compareStudies,
-  getTraysForScenario,
 } from '../dataStore.mjs';
+import {
+  compareProjectScenarios,
+} from '../analysis/scenarioComparison.mjs';
+import { downloadCSV } from '../reports/reporting.mjs';
 import { mountPersistentNavigation } from './components/navigation.js';
-import { trayFillPercent } from '../analysis/designRuleChecker.mjs';
 import '../site.js';
 
-// Studies tracked for comparison (mirrors workflowDashboard.js STUDY_DEFINITIONS)
-const STUDY_DEFINITIONS = [
-  { key: 'arcFlash',     label: 'Arc Flash',        href: 'arcFlash.html' },
-  { key: 'shortCircuit', label: 'Short Circuit',     href: 'shortCircuit.html' },
-  { key: 'loadFlow',     label: 'Load Flow',         href: 'loadFlow.html' },
-  { key: 'harmonics',      label: 'Harmonics',         href: 'harmonics.html' },
-  { key: 'voltageFlicker', label: 'Voltage Flicker',  href: 'voltageflicker.html' },
-  { key: 'bessHazard',    label: 'BESS Hazard Screening', href: 'bessHazard.html' },
-  { key: 'motorStart',     label: 'Motor Starting',   href: 'motorStart.html' },
-  { key: 'reliability',  label: 'Reliability / N-1', href: 'reliability.html' },
-  { key: 'contingency',  label: 'N-1 Contingency',   href: 'contingency.html' },
-  { key: 'insulationCoordination', label: 'Insulation Coordination', href: 'insulationcoordination.html' },
-];
+const STUDY_PAGE_LINKS = {
+  arcFlash: 'arcFlash.html',
+  batterySizing: 'battery.html',
+  bessHazard: 'bessHazard.html',
+  busDuctSizing: 'busdust.html',
+  cableThermalEnvironment: 'cablethermalenv.html',
+  capacitorBank: 'capacitorbank.html',
+  cathodicProtection: 'cathodicprotection.html',
+  contingency: 'contingency.html',
+  dcShortCircuit: 'dcshortcircuit.html',
+  derInterconnect: 'derinterconnect.html',
+  differentialProtection: 'differentialprotection.html',
+  dissimilarMetals: 'dissimilarmetals.html',
+  frequencyScan: 'frequencyscan.html',
+  generatorSizing: 'generatorsizing.html',
+  groundGrid: 'groundgrid.html',
+  harmonics: 'harmonics.html',
+  hazAreaClassification: 'hazareaclassification.html',
+  heatTraceSizing: 'heattracesizing.html',
+  iec60287: 'iec60287.html',
+  iec60909: 'iec60909.html',
+  ibr: 'ibr.html',
+  insulationCoordination: 'insulationcoordination.html',
+  lighting: 'lighting.html',
+  lightningProtection: 'lightningprotection.html',
+  loadFlow: 'loadFlow.html',
+  motorStart: 'motorStart.html',
+  optimalPowerFlow: 'optimalpowerflow.html',
+  probabilisticLoadFlow: 'probabilisticloadflow.html',
+  quasiDynamic: 'quasidynamic.html',
+  reliability: 'reliability.html',
+  sagTension: 'sagtension.html',
+  shortCircuit: 'shortCircuit.html',
+  substationLayout: 'substationlayout.html',
+  transientStability: 'transientstability.html',
+  voltageDropStudy: 'voltagedropstudy.html',
+  voltageFlicker: 'voltageflicker.html',
+  voltageStability: 'voltagestability.html',
+  windLoad: 'windload.html',
+};
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
+let lastComparison = null;
 
-function hasStudyResults(studyValue) {
-  if (!studyValue) return false;
-  if (Array.isArray(studyValue)) return studyValue.length > 0;
-  if (typeof studyValue === 'object') return Object.keys(studyValue).length > 0;
-  return Boolean(studyValue);
-}
-
-function esc(str) {
-  return String(str ?? '')
+function esc(value) {
+  return String(value ?? '')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
 }
 
-// ---------------------------------------------------------------------------
-// Populate both scenario <select> dropdowns
-// ---------------------------------------------------------------------------
+function formatValue(value) {
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) return '—';
+    if (Math.abs(value) >= 1000) return value.toLocaleString(undefined, { maximumFractionDigits: 1 });
+    return Number(value.toFixed(4)).toString();
+  }
+  if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+  return String(value ?? '—');
+}
 
 function populateSelects() {
   const selectA = document.getElementById('sc-select-a');
   const selectB = document.getElementById('sc-select-b');
   if (!selectA || !selectB) return;
-
   const scenarios = listScenarios();
-  [selectA, selectB].forEach(sel => {
-    sel.innerHTML = '';
-    scenarios.forEach(name => {
-      const opt = document.createElement('option');
-      opt.value = name;
-      opt.textContent = name;
-      sel.appendChild(opt);
-    });
-  });
-
-  // Default: A = first, B = second (if available)
+  for (const select of [selectA, selectB]) {
+    select.innerHTML = scenarios
+      .map(name => `<option value="${esc(name)}">${esc(name)}</option>`)
+      .join('');
+  }
   if (scenarios.length >= 2) {
     selectA.value = scenarios[0];
     selectB.value = scenarios[1];
   }
 }
 
-// ---------------------------------------------------------------------------
-// Summary badge row
-// ---------------------------------------------------------------------------
-
-function renderSummaryBadges(added, removed, changed) {
+function renderSummaryBadges(result) {
   const container = document.getElementById('sc-summary-badges');
   if (!container) return;
-  container.innerHTML = '';
-
-  const badges = [
-    { count: added,   label: 'added',     cls: 'sc-badge--added' },
-    { count: removed, label: 'removed',   cls: 'sc-badge--removed' },
-    { count: changed, label: 'changed',   cls: 'sc-badge--changed' },
-  ];
-
-  if (added === 0 && removed === 0 && changed === 0) {
-    const span = document.createElement('span');
-    span.className = 'sc-badge sc-badge--unchanged';
-    span.textContent = 'No cable differences';
-    container.appendChild(span);
+  const totals = result.totals;
+  if (!totals.totalChanges) {
+    container.innerHTML = '<span class="sc-badge sc-badge--unchanged">No project differences</span>';
     return;
   }
-
-  badges.forEach(({ count, label, cls }) => {
-    const span = document.createElement('span');
-    span.className = `sc-badge ${cls}`;
-    span.textContent = `${count} ${label}`;
-    container.appendChild(span);
-  });
+  container.innerHTML = [
+    `<span class="sc-badge sc-badge--added">${totals.added} records added</span>`,
+    `<span class="sc-badge sc-badge--removed">${totals.removed} records removed</span>`,
+    `<span class="sc-badge sc-badge--changed">${totals.changed} records changed</span>`,
+    `<span class="sc-badge sc-badge--changed">${totals.changedStudies} study results changed</span>`,
+  ].join('');
 }
 
-// ---------------------------------------------------------------------------
-// Cable schedule diff table
-// ---------------------------------------------------------------------------
-
-function renderCableDiff(a, b) {
-  const container = document.getElementById('sc-cable-diff-content');
+function renderDomainSummary(result) {
+  const container = document.getElementById('sc-domain-summary-content');
   if (!container) return;
+  const rows = result.domains.map(domain => `
+    <tr${domain.counts.totalChanges ? ' class="cmp-changed"' : ''}>
+      <td>${esc(domain.label)}</td>
+      <td class="num">${domain.counts.before}</td>
+      <td class="num">${domain.counts.after}</td>
+      <td class="num">${domain.counts.added}</td>
+      <td class="num">${domain.counts.removed}</td>
+      <td class="num">${domain.counts.changed}</td>
+    </tr>`).join('');
 
-  const { added, removed, changed, rows } = buildCableComparison(a, b);
-  renderSummaryBadges(added, removed, changed);
-
-  if (rows.length === 0) {
-    container.innerHTML = `<p class="sc-empty-note">No cable schedule differences between <strong>${esc(a)}</strong> and <strong>${esc(b)}</strong>.</p>`;
-    return;
-  }
-
-  container.innerHTML =
-    `<div class="sc-diff-scroll">` +
-      `<table class="sc-diff-table" aria-label="Cable schedule comparison: ${esc(a)} vs ${esc(b)}">` +
-        `<thead><tr>` +
-          `<th scope="col">Status</th>` +
-          `<th scope="col">Tag</th>` +
-          `<th scope="col">From → To</th>` +
-          `<th scope="col">Cable Type</th>` +
-          `<th scope="col">Conductor Size</th>` +
-        `</tr></thead>` +
-        `<tbody>${rows.join('')}</tbody>` +
-      `</table>` +
-    `</div>`;
+  container.innerHTML = `
+    <div class="sc-diff-scroll">
+      <table class="sc-diff-table" aria-label="Project domain comparison">
+        <thead><tr>
+          <th scope="col">Project Domain</th>
+          <th scope="col" class="num">${esc(result.beforeScenario)}</th>
+          <th scope="col" class="num">${esc(result.afterScenario)}</th>
+          <th scope="col" class="num">Added</th>
+          <th scope="col" class="num">Removed</th>
+          <th scope="col" class="num">Changed</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
 }
 
-// ---------------------------------------------------------------------------
-// Tray fill comparison (side-by-side fill gauges)
-// ---------------------------------------------------------------------------
+function renderDomainChanges(result) {
+  const container = document.getElementById('sc-domain-diff-content');
+  if (!container) return;
+  const rows = result.domains.flatMap(domain => (
+    domain.changes.map(change => `
+      <tr class="cmp-${change.status}">
+        <td>${esc(change.status.toUpperCase())}</td>
+        <td>${esc(domain.label)}</td>
+        <td>${esc(change.label)}</td>
+        <td>${change.fields.length ? esc(change.fields.join(', ')) : '—'}</td>
+      </tr>`)
+  ));
 
-let _gaugeSerial = 0;
-
-function renderTrayColumn(scenarioName, columnEl) {
-  columnEl.innerHTML = `<p class="sc-col-heading">${esc(scenarioName)}</p>`;
-
-  const trays = getTraysForScenario(scenarioName);
-  if (!trays || trays.length === 0) {
-    const note = document.createElement('p');
-    note.className = 'sc-empty-note';
-    note.textContent = 'No trays defined.';
-    columnEl.appendChild(note);
-    return;
-  }
-
-  const list = document.createElement('div');
-  list.className = 'sc-gauge-list';
-  columnEl.appendChild(list);
-
-  trays.forEach(tray => {
-    const pct = trayFillPercent(tray);
-    const trayId = tray.tray_id ?? tray.id ?? 'Tray';
-    const gaugeId = `sc-gauge-${++_gaugeSerial}`;
-
-    const card = document.createElement('div');
-    card.className = 'sc-gauge-card' + (pct !== null && pct > 80 ? ' sc-gauge-card--warn' : '');
-
-    const gaugeWrap = document.createElement('div');
-    gaugeWrap.id = gaugeId;
-    card.appendChild(gaugeWrap);
-
-    const trayLabel = document.createElement('p');
-    trayLabel.className = 'sc-gauge-tray-label';
-    trayLabel.textContent = String(trayId);
-    card.appendChild(trayLabel);
-
-    list.appendChild(card);
-
-    // createFillGauge requires the element to be in the DOM
-    const gauge = createFillGauge(gaugeId, { width: 140, strokeWidth: 14, label: 'Fill %' });
-    if (pct !== null) gauge.update(pct);
-  });
+  container.innerHTML = rows.length
+    ? `<div class="sc-diff-scroll">
+        <table class="sc-diff-table" aria-label="Changed project records">
+          <thead><tr>
+            <th scope="col">Status</th>
+            <th scope="col">Domain</th>
+            <th scope="col">Record</th>
+            <th scope="col">Changed Fields</th>
+          </tr></thead>
+          <tbody>${rows.join('')}</tbody>
+        </table>
+      </div>`
+    : '<p class="sc-empty-note">No schedule, model, or arrangement records differ.</p>';
 }
 
-function renderTrayComparison(a, b) {
-  const colA = document.getElementById('sc-tray-col-a');
-  const colB = document.getElementById('sc-tray-col-b');
-  if (!colA || !colB) return;
-
-  renderTrayColumn(a, colA);
-  renderTrayColumn(b, colB);
+function studyState(study, side) {
+  const summary = study[side];
+  const approval = study[`${side}Approval`];
+  if (!summary.present) return 'Not run';
+  const validity = summary.valid === true
+    ? 'valid'
+    : (summary.valid === false ? 'invalid / incomplete' : 'legacy / unverified');
+  const approvalText = approval?.status
+    || approval?.decision
+    || (approval?.approved === true ? 'approved' : 'not approved');
+  return `${validity}; ${approvalText}`;
 }
 
-// ---------------------------------------------------------------------------
-// Study results comparison (side-by-side status rows)
-// ---------------------------------------------------------------------------
-
-function studyIcon(complete) {
-  const span = document.createElement('span');
-  span.className = complete ? 'dash-icon dash-icon--complete' : 'dash-icon dash-icon--incomplete';
-  span.setAttribute('aria-hidden', 'true');
-  span.textContent = complete ? '✓' : '✗';
-  return span;
+function metricText(summary) {
+  if (!summary?.metrics?.length) return '—';
+  return summary.metrics
+    .slice(0, 4)
+    .map(metric => `${metric.key}: ${formatValue(metric.value)}`)
+    .join(' · ');
 }
 
-function renderStudyColumn(scenarioName, studies, columnEl) {
-  columnEl.innerHTML = `<p class="sc-col-heading">${esc(scenarioName)}</p>`;
+function renderStudies(result) {
+  const container = document.getElementById('sc-study-diff-content');
+  if (!container) return;
+  const rows = result.studies.map(study => {
+    const href = STUDY_PAGE_LINKS[study.key];
+    const name = href
+      ? `<a href="${href}">${esc(study.label)}</a>`
+      : esc(study.label);
+    return `
+      <tr class="${study.status === 'unchanged' ? '' : `cmp-${study.status}`}">
+        <td>${name}</td>
+        <td>${esc(study.status)}</td>
+        <td>${esc(studyState(study, 'before'))}</td>
+        <td>${esc(metricText(study.before))}</td>
+        <td>${esc(studyState(study, 'after'))}</td>
+        <td>${esc(metricText(study.after))}</td>
+      </tr>`;
+  }).join('');
 
-  const list = document.createElement('ul');
-  list.className = 'sc-study-list';
-  list.setAttribute('role', 'list');
-
-  STUDY_DEFINITIONS.forEach(({ key, label, href }) => {
-    const hasResults = hasStudyResults(studies[key]);
-
-    const li = document.createElement('li');
-    li.className = 'sc-study-row' + (hasResults ? ' sc-study-row--run' : '');
-
-    const icon = studyIcon(hasResults);
-
-    const link = document.createElement('a');
-    link.href = href;
-    link.className = 'sc-study-name';
-    link.textContent = label;
-
-    const status = document.createElement('span');
-    status.className = 'sc-study-status';
-    status.textContent = hasResults ? 'Results saved' : 'Not run';
-
-    li.appendChild(icon);
-    li.appendChild(link);
-    li.appendChild(status);
-    list.appendChild(li);
-  });
-
-  columnEl.appendChild(list);
+  container.innerHTML = rows
+    ? `<div class="sc-diff-scroll">
+        <table class="sc-diff-table" aria-label="Electrical study result comparison">
+          <thead><tr>
+            <th scope="col">Study</th>
+            <th scope="col">Result Delta</th>
+            <th scope="col">${esc(result.beforeScenario)} State</th>
+            <th scope="col">${esc(result.beforeScenario)} Metrics</th>
+            <th scope="col">${esc(result.afterScenario)} State</th>
+            <th scope="col">${esc(result.afterScenario)} Metrics</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`
+    : '<p class="sc-empty-note">Neither scenario contains saved study results.</p>';
 }
-
-function renderStudyComparison(a, b) {
-  const colA = document.getElementById('sc-study-col-a');
-  const colB = document.getElementById('sc-study-col-b');
-  if (!colA || !colB) return;
-
-  const studyData = compareStudies(a, b);
-  renderStudyColumn(a, studyData[a] ?? {}, colA);
-  renderStudyColumn(b, studyData[b] ?? {}, colB);
-}
-
-// ---------------------------------------------------------------------------
-// Main comparison runner
-// ---------------------------------------------------------------------------
 
 function runComparison() {
-  const a = document.getElementById('sc-select-a')?.value;
-  const b = document.getElementById('sc-select-b')?.value;
-  if (!a || !b) return;
-
-  // Reset gauge serial so IDs don't collide on repeated comparisons
-  _gaugeSerial = 0;
-
-  renderCableDiff(a, b);
-  renderTrayComparison(a, b);
-  renderStudyComparison(a, b);
-
-  const resultsEl = document.getElementById('sc-results');
-  if (resultsEl) resultsEl.hidden = false;
+  const scenarioA = document.getElementById('sc-select-a')?.value;
+  const scenarioB = document.getElementById('sc-select-b')?.value;
+  const status = document.getElementById('sc-status');
+  if (!scenarioA || !scenarioB) return;
+  if (scenarioA === scenarioB) {
+    if (status) status.textContent = 'Choose two different scenarios.';
+    return;
+  }
+  lastComparison = compareProjectScenarios(
+    getScenarioSnapshot(scenarioA),
+    getScenarioSnapshot(scenarioB),
+  );
+  renderSummaryBadges(lastComparison);
+  renderDomainSummary(lastComparison);
+  renderDomainChanges(lastComparison);
+  renderStudies(lastComparison);
+  const results = document.getElementById('sc-results');
+  if (results) results.hidden = false;
+  const exportBtn = document.getElementById('sc-export-btn');
+  if (exportBtn) exportBtn.disabled = false;
+  if (status) {
+    status.textContent = `${lastComparison.totals.totalChanges} material difference(s) found across project records and studies.`;
+  }
 }
 
-// ---------------------------------------------------------------------------
-// Initialise
-// ---------------------------------------------------------------------------
+function exportComparison() {
+  if (!lastComparison) return;
+  const rows = [];
+  lastComparison.domains.forEach(domain => {
+    domain.changes.forEach(change => {
+      rows.push([
+        'project-record',
+        domain.label,
+        change.status,
+        change.label,
+        change.fields.join('; '),
+        lastComparison.beforeScenario,
+        lastComparison.afterScenario,
+      ]);
+    });
+  });
+  lastComparison.studies
+    .filter(study => study.status !== 'unchanged')
+    .forEach(study => {
+      rows.push([
+        'study-result',
+        study.label,
+        study.status,
+        '',
+        `${studyState(study, 'before')} -> ${studyState(study, 'after')}`,
+        lastComparison.beforeScenario,
+        lastComparison.afterScenario,
+      ]);
+    });
+  downloadCSV(
+    ['Type', 'Domain / Study', 'Status', 'Record', 'Details', 'Scenario A', 'Scenario B'],
+    rows,
+    `scenario-comparison-${lastComparison.beforeScenario}-vs-${lastComparison.afterScenario}.csv`,
+  );
+}
 
 window.addEventListener('DOMContentLoaded', () => {
   mountPersistentNavigation();
   populateSelects();
-
-  const compareBtn = document.getElementById('sc-compare-btn');
-  compareBtn?.addEventListener('click', runComparison);
-
-  // If there are at least two scenarios already, run the default comparison
+  document.getElementById('sc-compare-btn')?.addEventListener('click', runComparison);
+  document.getElementById('sc-export-btn')?.addEventListener('click', exportComparison);
   if (listScenarios().length >= 2) runComparison();
 });

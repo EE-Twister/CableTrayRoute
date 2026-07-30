@@ -1,5 +1,12 @@
 import { runContingency } from '../analysis/contingency.mjs';
-import { getStudies, setStudies } from '../dataStore.mjs';
+import { buildLoadFlowModel } from '../analysis/loadFlowModel.js';
+import {
+  createStudyRunMetadata,
+  evaluateConvergenceCoverage,
+  isStudyResultStale,
+  validatePowerFlowStudyModel
+} from '../analysis/studyResultReadiness.mjs';
+import { getOneLine, getStudies, setStudies } from '../dataStore.mjs';
 
 /**
  * Run N-1 contingency analysis and store results.
@@ -10,8 +17,35 @@ import { getStudies, setStudies } from '../dataStore.mjs';
  * @param {number} [opts.baseMVA=100]
  * @returns {object} contingency results
  */
-export function runContingencyStudy(opts = {}) {
-  const results = runContingency(null, opts);
+export function runContingencyStudy(opts = {}, inputModel = null, inputReadiness = null) {
+  const model = inputModel || buildLoadFlowModel(getOneLine());
+  const readiness = inputReadiness || validatePowerFlowStudyModel(model);
+  if (!readiness.ready) {
+    return {
+      persisted: false,
+      valid: false,
+      errors: readiness.errors,
+      baseCase: { converged: false },
+      contingencies: [],
+      summary: { totalBranches: 0, criticalContingencies: 0, totalViolations: 0, transientlyUnstable: 0 },
+      runMetadata: createStudyRunMetadata(
+        'contingency',
+        readiness,
+        evaluateConvergenceCoverage(0, 1, { minimumRatio: 1 })
+      )
+    };
+  }
+
+  const results = runContingency(model, opts);
+  const baseCoverage = evaluateConvergenceCoverage(results.baseCase?.converged ? 1 : 0, 1, { minimumRatio: 1 });
+  const valid = baseCoverage.valid && results.contingencies.length > 0;
+  results.runMetadata = createStudyRunMetadata('contingency', readiness, baseCoverage, {
+    source: 'One-Line Diagram',
+    contingencyCount: results.contingencies.length,
+    valid
+  });
+  results.persisted = valid;
+  if (!valid) return results;
   const studies = getStudies();
   studies.contingency = results;
   setStudies(studies);
@@ -24,6 +58,36 @@ if (typeof document !== 'undefined') {
   const summaryEl = document.getElementById('contingency-summary');
   const tableBody = document.getElementById('contingency-tbody');
   const statusEl = document.getElementById('contingency-status');
+  const readinessEl = document.getElementById('contingency-readiness');
+  const exportBtn = document.getElementById('export-contingency-btn');
+  let lastValidResult = null;
+
+  const renderReadiness = (readiness, options = {}) => {
+    const errors = readiness?.errors || [];
+    const warnings = readiness?.warnings || [];
+    const counts = readiness?.counts || {};
+    const stale = options.stale === true;
+    const cls = readiness?.ready && !stale ? 'result-ok' : 'result-warn';
+    let html = `<div class="result-card ${cls}"><strong>${stale ? 'Saved result is stale' : readiness?.ready ? 'Base network ready' : 'Base network review required'}</strong>`;
+    if (Number.isFinite(counts.buses)) html += `<p>${counts.buses} buses and ${counts.branches} removable branches detected.</p>`;
+    if (stale) html += '<p>The One-Line model changed after this result was run. Re-run before exporting or relying on it.</p>';
+    if (errors.length) html += `<ul>${errors.map(error => `<li>${escapeHtml(error)}</li>`).join('')}</ul>`;
+    if (warnings.length) html += `<ul>${warnings.map(warning => `<li>${escapeHtml(warning)}</li>`).join('')}</ul>`;
+    readinessEl.innerHTML = `${html}</div>`;
+  };
+
+  const escapeHtml = value => String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+
+  const initialModel = buildLoadFlowModel(getOneLine());
+  const initialReadiness = validatePowerFlowStudyModel(initialModel);
+  const saved = getStudies().contingency;
+  const stale = isStudyResultStale(saved, initialReadiness.sourceFingerprint);
+  lastValidResult = saved?.persisted && !stale ? saved : null;
+  exportBtn.disabled = !lastValidResult;
+  renderReadiness(initialReadiness, { stale });
 
   if (form) {
     form.addEventListener('submit', ev => {
@@ -42,6 +106,9 @@ if (typeof document !== 'undefined') {
 
       let results;
       try {
+        const model = buildLoadFlowModel(getOneLine());
+        const readiness = validatePowerFlowStudyModel(model);
+        renderReadiness(readiness);
         results = runContingencyStudy({
           baseMVA,
           voltageMinPu: voltageMin,
@@ -50,13 +117,29 @@ if (typeof document !== 'undefined') {
           checkTransientStability,
           generatorInertiaH,
           faultClearingTime_s,
-        });
+        }, model, readiness);
       } catch (err) {
         if (statusEl) statusEl.textContent = `Error: ${err.message}`;
         return;
       }
 
-      if (statusEl) statusEl.textContent = '';
+      if (!results.persisted) {
+        if (statusEl) {
+          const detail = results.errors?.join(' ')
+            || (!results.baseCase?.converged
+              ? 'The base load flow did not converge.'
+              : 'No removable branch contingencies were found.');
+          statusEl.textContent = `${detail} No result was saved or enabled for export.`;
+        }
+        if (summaryEl) summaryEl.innerHTML = '<div class="result-card result-fail"><strong>No valid contingency result.</strong></div>';
+        exportBtn.disabled = true;
+        lastValidResult = null;
+        return;
+      }
+
+      lastValidResult = results;
+      exportBtn.disabled = false;
+      if (statusEl) statusEl.textContent = 'Valid result saved to this project.';
 
       const { summary, contingencies } = results;
       if (summaryEl) {
@@ -127,6 +210,22 @@ if (typeof document !== 'undefined') {
           }
         }
       }
+    });
+
+    exportBtn.addEventListener('click', () => {
+      if (!lastValidResult) return;
+      const rows = ['branch,type,converged,critical,violations'];
+      lastValidResult.contingencies.forEach(item => {
+        const violations = item.violations.map(entry => `${entry.type}: ${entry.element} ${entry.value}`).join('; ');
+        const values = [item.branchName, item.branchType, item.converged, item.critical, violations]
+          .map(value => `"${String(value ?? '').replace(/"/g, '""')}"`);
+        rows.push(values.join(','));
+      });
+      const anchor = document.createElement('a');
+      anchor.href = URL.createObjectURL(new Blob([rows.join('\n')], { type: 'text/csv' }));
+      anchor.download = 'contingency-results.csv';
+      anchor.click();
+      setTimeout(() => URL.revokeObjectURL(anchor.href), 0);
     });
   }
 }

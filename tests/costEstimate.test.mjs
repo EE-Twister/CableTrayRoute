@@ -8,6 +8,10 @@ import {
   estimateConduitCosts,
   summarizeCosts,
   DEFAULT_PRICES,
+  DEFAULT_ESTIMATE_BASIS,
+  calculateEscalationFactor,
+  buildEstimateBasis,
+  applyEstimateBasis,
   parsePricingCSV,
   exportPricingCSV,
 } from '../analysis/costEstimate.mjs';
@@ -47,6 +51,53 @@ describe('DEFAULT_PRICES', () => {
   it('has labor rates', () => {
     assert.ok(DEFAULT_PRICES.labor.cableInstall > 0);
     assert.ok(DEFAULT_PRICES.labor.trayInstall > 0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+describe('source-aware estimate basis', () => {
+  it('calculates escalation as current index divided by base index', () => {
+    assert.strictEqual(calculateEscalationFactor(100, 125), 1.25);
+  });
+
+  it('keeps invalid index pairs neutral', () => {
+    assert.strictEqual(calculateEscalationFactor(0, 125), 1);
+    assert.strictEqual(calculateEscalationFactor(100, Number.NaN), 1);
+  });
+
+  it('combines regional wage and labor escalation factors', () => {
+    const basis = buildEstimateBasis({
+      nationalElectricianHourlyWage: 30,
+      localElectricianHourlyWage: 36,
+      laborBaseIndex: 100,
+      laborCurrentIndex: 110,
+    });
+    assert.ok(Math.abs(basis.regionalLaborFactor - 1.2) < 1e-9);
+    assert.ok(Math.abs(basis.laborEscalationFactor - 1.1) < 1e-9);
+    assert.ok(Math.abs(basis.combinedLaborFactor - 1.32) < 1e-9);
+  });
+
+  it('applies material and labor factors independently', () => {
+    const basis = buildEstimateBasis({
+      materialBaseIndex: 100,
+      materialCurrentIndex: 120,
+      nationalElectricianHourlyWage: 30,
+      localElectricianHourlyWage: 33,
+      laborBaseIndex: 100,
+      laborCurrentIndex: 105,
+    });
+    const adjusted = applyEstimateBasis(DEFAULT_PRICES, basis);
+    assert.ok(Math.abs(adjusted.cable['4 AWG'] - DEFAULT_PRICES.cable['4 AWG'] * 1.2) < 1e-9);
+    assert.ok(Math.abs(adjusted.fitting - DEFAULT_PRICES.fitting * 1.2) < 1e-9);
+    assert.ok(Math.abs(adjusted.labor.cableInstall - DEFAULT_PRICES.labor.cableInstall * 1.155) < 1e-9);
+    assert.strictEqual(adjusted.laborProductivity.cablePullFtPerHr, DEFAULT_PRICES.laborProductivity.cablePullFtPerHr);
+  });
+
+  it('carries public-source defaults without claiming a selected series', () => {
+    const basis = buildEstimateBasis();
+    assert.strictEqual(basis.nationalElectricianHourlyWage, DEFAULT_ESTIMATE_BASIS.nationalElectricianHourlyWage);
+    assert.strictEqual(basis.materialIndexDocumented, false);
+    assert.strictEqual(basis.laborIndexDocumented, false);
   });
 });
 

@@ -7,6 +7,67 @@ crews can install each pull as a coordinated work package. Each pull card includ
 the cable bundle, route steps, combined cable weight, estimated pull tension, and
 sidewall pressure.
 
+## Cable Data Coverage
+
+Pull Cards maps Cable Schedule's canonical `cable_od` field before imported
+outside-diameter aliases. Cable weight accepts `weight_lb_ft`, `weight`,
+`weight_lbs_ft`, `weightLbsPerFt`, and `cable_weight_lb_ft`.
+
+Missing values are not silently replaced with zero:
+
+- A missing cable weight suppresses the tension result and creates a coverage
+  warning.
+- A missing cable outside diameter suppresses bundle-area and supported jam
+  checks.
+- Missing pulling-tension or sidewall-pressure limits leave the calculated
+  demand visible but mark the corresponding check as **not evaluated**.
+- A route cable without a matching Cable Schedule record is identified in the
+  pull's warning list.
+
+The Pull Summary reports how many pull groups still require input.
+
+## Per-Pull Engineering Inputs
+
+Open a pull and use **Pull Engineering Inputs** to edit the following values for
+that pull:
+
+| Input | Use |
+|---|---|
+| Friction coefficient | Straight-run and capstan friction calculation |
+| Allowable tension | Pull-level pass/fail screening limit |
+| Allowable sidewall pressure | Bend sidewall-pressure screening limit |
+| Default bend radius and angle | Applied to bend-type route segments |
+| Conduit inside diameter | Three-cable jam-ratio screening |
+| Incoming tension | Tension entering the first route segment |
+| Pull direction | Auto, route start-to-end, or route end-to-start |
+
+Auto direction calculates both forward and reverse segment order and selects the
+lower maximum screening tension. The detail view and XLSX export retain both
+direction results, the selected direction, engineering assumptions, limits,
+statuses, jam result, and input warnings.
+
+Jam-ratio screening is intentionally limited to three physical cables whose
+outside diameters are within 10% of one another. Ratios from 2.8 through 3.2 are
+flagged for detailed engineering review. Other bundle configurations are marked
+not applicable rather than given a misleading result.
+
+## Saved Pull-Plan Artifact
+
+**Save Pull Plan to Project** and **Apply & Save Pull Plan** write a versioned
+`pullPlanArtifact` through the shared data-store/project-storage APIs. Each pull
+uses a stable ID derived from its cable tags and route, so assumptions survive
+pull-table re-sorting and renumbering. The artifact includes:
+
+- Per-pull cable tags and route steps
+- Engineering assumptions and direction comparison
+- Tension, sidewall-pressure, and jam results
+- Pass/fail/not-evaluated statuses
+- Input-coverage warnings
+
+Because it is project-backed, the artifact participates in the project's normal
+scenario, undo/redo, import, and export behavior. Pull Cards does not write
+directly to browser `localStorage`.
+
 ## Mobile Field View
 
 Pull card field links open `fieldview.html` with the selected cable in a
@@ -54,6 +115,6 @@ comes from an external routing run.
 
 ## Tension Trace
 
-Existing pull-tension totals are unchanged. The page also computes a segment-level
-trace so each route segment can show incoming tension, outgoing tension, and
-sidewall pressure where bend data is available.
+The page computes a segment-level trace so each route segment can show incoming
+tension, outgoing tension, and sidewall pressure where bend data is available.
+The trace reflects the selected direction and current per-pull assumptions.

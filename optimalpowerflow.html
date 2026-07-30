@@ -113,9 +113,11 @@ IC_i(P) = b_i + 2·c_i·P            [$/MWh]</pre>
           <div class="form-actions">
             <button type="button" id="add-unit-btn" class="btn btn-small">+ Add Unit</button>
             <button type="button" id="load-default-btn" class="btn btn-small">Load Demonstration Fleet</button>
+            <button type="button" id="import-project-fleet-btn" class="btn btn-small">Import Project Generators &amp; Load</button>
             <label for="fleet-file" class="btn btn-small">Import CSV<input type="file" id="fleet-file" accept=".csv,.txt" class="hidden"></label>
             <button type="button" id="export-fleet-btn" class="btn btn-small">Export Fleet CSV</button>
           </div>
+          <div id="opf-input-source" class="field-hint" aria-live="polite">Inputs are currently from the demonstration fleet.</div>
         </fieldset>
 
         <fieldset>

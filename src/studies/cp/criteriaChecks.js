@@ -11,6 +11,22 @@ function toDecisionLabel(status) {
 
 export function evaluateCriteriaChecks(input, standardsProfile) {
   const selectedCriteriaSet = getSelectedProtectionCriteriaSet(standardsProfile);
+  if (input.criteriaEvidenceEnabled === false) {
+    return {
+      selectedCriteriaSet: selectedCriteriaSet
+        ? {
+          id: selectedCriteriaSet.id,
+          label: selectedCriteriaSet.label,
+          reference: selectedCriteriaSet.reference
+        }
+        : null,
+      measurementCorrections: null,
+      dataUsed: {},
+      criteriaResults: [],
+      overallStatus: 'not-run'
+    };
+  }
+
   if (!selectedCriteriaSet) {
     return {
       selectedCriteriaSet: null,

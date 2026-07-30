@@ -12,8 +12,9 @@
  *     co2eKgPerUnit overrides take precedence when present.
  *   Operating losses: P_loss [kW] × 8 760 h/yr × gridFactor [kg CO₂e/kWh]
  *     × projectLifeYears, summed across all conductors whose losses are known.
- *   Grid emission factors: national average generation-mix values (2023–2024
- *     data, market-based) from IEA and EPA eGRID sources.
+ *   Grid emission factors: EPA eGRID2023 Revision 2 total-output CO₂e rates
+ *     for the United States and its eGRID subregions. International screening
+ *     factors are retained for legacy projects and are clearly identified.
  *
  * Final designs must be verified against manufacturer-specific EPDs and the
  * project-specific grid emission factor before use in formal sustainability
@@ -25,19 +26,111 @@
 // ---------------------------------------------------------------------------
 
 /**
- * National / regional average grid emission factors.
- * Source: IEA Emissions Factors 2023, EPA eGRID 2022 US national average.
+ * EPA eGRID2023 Revision 2 total-output CO₂e rates are published in lb/MWh.
+ * Values below are converted with 1 lb = 0.45359237 kg and 1 MWh = 1,000 kWh.
  *
- * @type {Record<string, {label: string, kgPerKwh: number, source: string}>}
+ * @type {Record<string, Object>}
  */
+const EGRID_SUMMARY_URL = 'https://www.epa.gov/egrid/summary-data';
+
+function egridFactor(label, originalValue, geography) {
+  return Object.freeze({
+    label,
+    kgPerKwh: Number((originalValue * 0.00045359237).toFixed(6)),
+    source: 'EPA eGRID2023 Revision 2',
+    sourceYear: 2023,
+    release: 'Revision 2 — June 12, 2025',
+    url: EGRID_SUMMARY_URL,
+    geography,
+    methodology: 'Total output CO₂e emission rate',
+    originalValue,
+    originalUnit: 'lb CO₂e/MWh',
+    quality: 'published',
+  });
+}
+
 export const GRID_EMISSION_FACTORS = {
-  us:      { label: 'United States (national avg)',    kgPerKwh: 0.386, source: 'EPA eGRID 2022' },
-  eu:      { label: 'European Union (avg)',            kgPerKwh: 0.233, source: 'IEA 2023' },
-  uk:      { label: 'United Kingdom',                  kgPerKwh: 0.207, source: 'DESNZ 2023' },
-  ca:      { label: 'Canada (national avg)',           kgPerKwh: 0.130, source: 'NRCAN 2022' },
-  au:      { label: 'Australia (NEM avg)',             kgPerKwh: 0.510, source: 'DCCEEW 2023' },
-  cn:      { label: 'China (national avg)',            kgPerKwh: 0.581, source: 'IEA 2023' },
-  custom:  { label: 'Custom / project-specific',      kgPerKwh: 0.400, source: 'User-defined' },
+  us:   egridFactor('United States — national average', 770.884, 'United States'),
+  AKGD: egridFactor('AKGD — ASCC Alaska Grid', 905.109, 'EPA eGRID subregion AKGD'),
+  AKMS: egridFactor('AKMS — ASCC Miscellaneous', 522.400, 'EPA eGRID subregion AKMS'),
+  AZNM: egridFactor('AZNM — WECC Southwest', 706.189, 'EPA eGRID subregion AZNM'),
+  CAMX: egridFactor('CAMX — WECC California', 429.983, 'EPA eGRID subregion CAMX'),
+  ERCT: egridFactor('ERCT — ERCOT All', 736.629, 'EPA eGRID subregion ERCT'),
+  FRCC: egridFactor('FRCC — Florida', 784.785, 'EPA eGRID subregion FRCC'),
+  HIMS: egridFactor('HIMS — HICC Miscellaneous', 1133.294, 'EPA eGRID subregion HIMS'),
+  HIOA: egridFactor('HIOA — HICC Oahu', 1498.947, 'EPA eGRID subregion HIOA'),
+  MROE: egridFactor('MROE — MRO East', 1404.963, 'EPA eGRID subregion MROE'),
+  MROW: egridFactor('MROW — MRO West', 926.552, 'EPA eGRID subregion MROW'),
+  NEWE: egridFactor('NEWE — NPCC New England', 543.178, 'EPA eGRID subregion NEWE'),
+  NWPP: egridFactor('NWPP — WECC Northwest', 635.267, 'EPA eGRID subregion NWPP'),
+  NYCW: egridFactor('NYCW — NYC / Westchester', 865.744, 'EPA eGRID subregion NYCW'),
+  NYLI: egridFactor('NYLI — Long Island', 1189.333, 'EPA eGRID subregion NYLI'),
+  NYUP: egridFactor('NYUP — Upstate New York', 242.776, 'EPA eGRID subregion NYUP'),
+  PRMS: egridFactor('PRMS — Puerto Rico Miscellaneous', 1548.530, 'EPA eGRID subregion PRMS'),
+  RFCE: egridFactor('RFCE — RFC East', 599.170, 'EPA eGRID subregion RFCE'),
+  RFCM: egridFactor('RFCM — RFC Michigan', 975.978, 'EPA eGRID subregion RFCM'),
+  RFCW: egridFactor('RFCW — RFC West', 916.054, 'EPA eGRID subregion RFCW'),
+  RMPA: egridFactor('RMPA — WECC Rockies', 1042.539, 'EPA eGRID subregion RMPA'),
+  SPNO: egridFactor('SPNO — SPP North', 867.740, 'EPA eGRID subregion SPNO'),
+  SPSO: egridFactor('SPSO — SPP South', 875.567, 'EPA eGRID subregion SPSO'),
+  SRMV: egridFactor('SRMV — SERC Mississippi Valley', 741.741, 'EPA eGRID subregion SRMV'),
+  SRMW: egridFactor('SRMW — SERC Midwest', 1248.582, 'EPA eGRID subregion SRMW'),
+  SRSO: egridFactor('SRSO — SERC South', 846.007, 'EPA eGRID subregion SRSO'),
+  SRTV: egridFactor('SRTV — SERC Tennessee Valley', 903.306, 'EPA eGRID subregion SRTV'),
+  SRVC: egridFactor('SRVC — SERC Virginia / Carolina', 596.326, 'EPA eGRID subregion SRVC'),
+  eu: {
+    label: 'European Union — legacy screening factor',
+    kgPerKwh: 0.233,
+    source: 'IEA 2023 legacy project factor',
+    sourceYear: 2023,
+    geography: 'European Union',
+    methodology: 'Legacy screening value — verify before formal reporting',
+    quality: 'legacy-screening',
+  },
+  uk: {
+    label: 'United Kingdom — legacy screening factor',
+    kgPerKwh: 0.207,
+    source: 'DESNZ 2023 legacy project factor',
+    sourceYear: 2023,
+    geography: 'United Kingdom',
+    methodology: 'Legacy screening value — verify before formal reporting',
+    quality: 'legacy-screening',
+  },
+  ca: {
+    label: 'Canada — legacy screening factor',
+    kgPerKwh: 0.130,
+    source: 'NRCAN 2022 legacy project factor',
+    sourceYear: 2022,
+    geography: 'Canada',
+    methodology: 'Legacy screening value — verify before formal reporting',
+    quality: 'legacy-screening',
+  },
+  au: {
+    label: 'Australia NEM — legacy screening factor',
+    kgPerKwh: 0.510,
+    source: 'DCCEEW 2023 legacy project factor',
+    sourceYear: 2023,
+    geography: 'Australia NEM',
+    methodology: 'Legacy screening value — verify before formal reporting',
+    quality: 'legacy-screening',
+  },
+  cn: {
+    label: 'China — legacy screening factor',
+    kgPerKwh: 0.581,
+    source: 'IEA 2023 legacy project factor',
+    sourceYear: 2023,
+    geography: 'China',
+    methodology: 'Legacy screening value — verify before formal reporting',
+    quality: 'legacy-screening',
+  },
+  custom: {
+    label: 'Custom / project-specific',
+    kgPerKwh: 0.400,
+    source: 'User-defined',
+    geography: 'User-defined',
+    methodology: 'User-supplied factor',
+    quality: 'user-supplied',
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -321,6 +414,7 @@ export function embodiedCO2e(bom = []) {
         co2eKgPerUnit: factor,
         subtotalKg: qty * factor,
         source: 'override',
+        sourceQuality: item.epdSource ? 'documented-epd' : 'undocumented-override',
         factorNote: item.epdSource ? `EPD: ${item.epdSource}` : 'EPD override',
       });
       continue;
@@ -344,6 +438,7 @@ export function embodiedCO2e(bom = []) {
         co2eKgPerUnit: factor,
         subtotalKg: qty * factor,
         source: 'library',
+        sourceQuality: 'screening-library',
         factorNote: `${item.material || 'Cu'} ${f.mm2Used} mm² × ${conductors}c — CABLE_CO2E`,
       });
       continue;
@@ -362,6 +457,7 @@ export function embodiedCO2e(bom = []) {
         co2eKgPerUnit: f.kgPerM,
         subtotalKg: qty * f.kgPerM,
         source: 'library',
+        sourceQuality: 'screening-library',
         factorNote: `${f.widthUsed}" ${item.material || 'steel'} tray — TRAY_CO2E`,
       });
       continue;
@@ -380,6 +476,7 @@ export function embodiedCO2e(bom = []) {
         co2eKgPerUnit: f.kgPerM,
         subtotalKg: qty * f.kgPerM,
         source: 'library',
+        sourceQuality: 'screening-library',
         factorNote: `${f.sizeUsed}" ${item.material || 'emt'} conduit — CONDUIT_CO2E`,
       });
       continue;
@@ -399,6 +496,7 @@ export function embodiedCO2e(bom = []) {
         co2eKgPerUnit: cat.kgPerUnit,
         subtotalKg: qty * cat.kgPerUnit,
         source: 'library',
+        sourceQuality: 'screening-library',
         factorNote: `${cat.label} — EQUIPMENT_CO2E`,
       });
       continue;
@@ -436,6 +534,86 @@ export function operatingCO2e(lossesKw, gridFactorKgPerKwh, projectLifeYears) {
   return { annualKwh, lifetimeKwh, lifetimeKgCO2e };
 }
 
+/**
+ * Resolve the grid factor and preserve the source basis used for the result.
+ *
+ * @param {Object} options
+ * @returns {{ gridRegion: string, kgPerKwh: number, provenance: Object }}
+ */
+export function resolveGridFactor(options = {}) {
+  const requestedRegion = options.gridRegion || 'us';
+  const gridRegion = GRID_EMISSION_FACTORS[requestedRegion] ? requestedRegion : 'us';
+  const definition = GRID_EMISSION_FACTORS[gridRegion];
+  const hasOverride = options.gridFactorKgPerKwh != null
+    && Number.isFinite(Number(options.gridFactorKgPerKwh));
+  const kgPerKwh = hasOverride ? Math.max(0, Number(options.gridFactorKgPerKwh)) : definition.kgPerKwh;
+
+  const provenance = hasOverride
+    ? {
+        label: options.gridFactorLabel || definition.label || 'Custom / project-specific',
+        source: options.gridFactorSource || 'User-defined factor',
+        sourceDate: options.gridFactorSourceDate || '',
+        url: options.gridFactorSourceUrl || '',
+        geography: options.gridFactorGeography || definition.geography || 'User-defined',
+        methodology: options.gridFactorMethodology || 'User-supplied factor',
+        quality: options.gridFactorSource ? 'documented-user-supplied' : 'undocumented-user-supplied',
+        release: '',
+        sourceYear: null,
+        originalValue: null,
+        originalUnit: '',
+      }
+    : { ...definition };
+
+  return { gridRegion, kgPerKwh, provenance };
+}
+
+/**
+ * Summarize source coverage so screening factors are not mistaken for
+ * manufacturer-specific EPD data.
+ *
+ * @param {BomItem[]} bom
+ * @param {{lines: CO2eLine[], totalKg: number, skippedItems: any[]}} embodied
+ * @returns {Object}
+ */
+export function summarizeFactorCoverage(bom = [], embodied = {}) {
+  const lines = Array.isArray(embodied.lines) ? embodied.lines : [];
+  const skippedItems = Array.isArray(embodied.skippedItems) ? embodied.skippedItems : [];
+  const totalKg = Math.max(0, Number(embodied.totalKg) || 0);
+  const overrideLines = lines.filter(line => line.source === 'override');
+  const epdLines = overrideLines.filter(line => line.sourceQuality === 'documented-epd');
+  const undocumentedOverrideLines = overrideLines.filter(line => line.sourceQuality !== 'documented-epd');
+  const libraryLines = lines.filter(line => line.source === 'library');
+  const epdKg = epdLines.reduce((sum, line) => sum + (Number(line.subtotalKg) || 0), 0);
+  const undocumentedOverrideKg = undocumentedOverrideLines.reduce((sum, line) => sum + (Number(line.subtotalKg) || 0), 0);
+  const libraryKg = libraryLines.reduce((sum, line) => sum + (Number(line.subtotalKg) || 0), 0);
+  const totalInputLines = Array.isArray(bom) ? bom.length : 0;
+  const percent = (value, total) => total > 0 ? Number(((value / total) * 100).toFixed(1)) : 0;
+
+  let quality = 'no-data';
+  if (lines.length > 0 && epdLines.length === lines.length) quality = 'product-specific';
+  else if (epdLines.length > 0 || undocumentedOverrideLines.length > 0) quality = 'mixed';
+  else if (libraryLines.length > 0) quality = 'screening-library';
+
+  return {
+    totalInputLines,
+    includedLines: lines.length,
+    skippedLines: skippedItems.length,
+    includedLinePercent: percent(lines.length, totalInputLines),
+    epdLines: epdLines.length,
+    undocumentedOverrideLines: undocumentedOverrideLines.length,
+    libraryLines: libraryLines.length,
+    epdLinePercent: percent(epdLines.length, lines.length),
+    libraryLinePercent: percent(libraryLines.length, lines.length),
+    epdKg,
+    undocumentedOverrideKg,
+    libraryKg,
+    epdCarbonPercent: percent(epdKg, totalKg),
+    undocumentedOverrideCarbonPercent: percent(undocumentedOverrideKg, totalKg),
+    libraryCarbonPercent: percent(libraryKg, totalKg),
+    quality,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Unified report builder
 // ---------------------------------------------------------------------------
@@ -467,14 +645,13 @@ export function operatingCO2e(lossesKw, gridFactorKgPerKwh, projectLifeYears) {
  * }}
  */
 export function buildSustainabilityReport(bom = [], options = {}) {
-  const gridRegion = options.gridRegion || 'us';
-  const gridDef    = GRID_EMISSION_FACTORS[gridRegion] || GRID_EMISSION_FACTORS.us;
-  const gridFactor = (options.gridFactorKgPerKwh != null && isFinite(options.gridFactorKgPerKwh))
-    ? Number(options.gridFactorKgPerKwh)
-    : gridDef.kgPerKwh;
+  const resolvedGrid = resolveGridFactor(options);
+  const gridRegion = resolvedGrid.gridRegion;
+  const gridFactor = resolvedGrid.kgPerKwh;
   const projectLifeYears = Math.max(1, Number(options.projectLifeYears) || 25);
 
   const embodied = embodiedCO2e(bom);
+  const factorCoverage = summarizeFactorCoverage(bom, embodied);
 
   let operating = null;
   if (options.lossesKw != null && Number(options.lossesKw) > 0) {
@@ -505,6 +682,8 @@ export function buildSustainabilityReport(bom = [], options = {}) {
     totalTonnes,
     gridRegion,
     gridFactorKgPerKwh: gridFactor,
+    gridFactorProvenance: resolvedGrid.provenance,
+    factorCoverage,
     projectLifeYears,
     alternativeComparison,
   };

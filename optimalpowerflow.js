@@ -4,10 +4,13 @@ import {
   fleetToCsv,
   DEFAULT_FLEET,
 } from './analysis/optimalPowerFlow.mjs';
-import { getStudies, setStudies } from './dataStore.mjs';
+import { getOneLine, getStudies, setStudies } from './dataStore.mjs';
 import { initStudyApprovalPanel } from './src/components/studyApproval.js';
 import { initStudyBasisPanel } from './src/components/studyBasis.js';
 import { escapeHtml } from './src/htmlUtils.mjs';
+import { showAlertModal } from './src/components/modal.js';
+import { buildOpfProjectInputs } from './analysis/advancedStudyProjectInputs.mjs';
+import { createStudyRunMetadata, isStudyResultStale } from './analysis/studyResultReadiness.mjs';
 
 document.addEventListener('DOMContentLoaded', () => {
   initSettings();
@@ -51,6 +54,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const resultsDiv   = document.getElementById('results');
   const errorsDiv    = document.getElementById('calc-errors');
   const exportBtn    = document.getElementById('export-csv-btn');
+  const sourceDiv    = document.getElementById('opf-input-source');
+  let importedSourceFingerprint = null;
 
   // -------------------------------------------------------------------------
   // Fleet table editing
@@ -88,8 +93,8 @@ document.addEventListener('DOMContentLoaded', () => {
         pmin: Number.isFinite(pmin) ? pmin : 0,
         pmax,
         a: num('.u-a') || 0,
-        b: num('.u-b') || 0,
-        c: num('.u-c') || 0,
+        b: num('.u-b'),
+        c: num('.u-c'),
       });
     });
     return units;
@@ -109,6 +114,26 @@ document.addEventListener('DOMContentLoaded', () => {
     setFleet(DEFAULT_FLEET);
     demandInput.value = 850;
     lossInput.value = 0;
+    importedSourceFingerprint = null;
+    sourceDiv.className = 'field-hint';
+    sourceDiv.textContent = 'Demonstration values loaded. Replace them with project-specific cost curves before using the result for decisions.';
+  });
+
+  document.getElementById('import-project-fleet-btn').addEventListener('click', () => {
+    const imported = buildOpfProjectInputs(getOneLine());
+    if (imported.units.length === 0) {
+      const message = 'No generator components were found on the project One-Line.';
+      sourceDiv.className = 'result-fail';
+      sourceDiv.textContent = message;
+      showAlertModal('Project Data Incomplete', message, { variant: 'danger' });
+      return;
+    }
+    setFleet(imported.units);
+    demandInput.value = imported.demandMW > 0 ? imported.demandMW : '';
+    importedSourceFingerprint = imported.sourceFingerprint;
+    sourceDiv.className = imported.ready ? 'result-ok' : 'result-warn';
+    sourceDiv.textContent = `Imported ${imported.units.length} generator(s) and ${imported.demandMW.toFixed(3)} MW of connected load.${imported.warnings.length ? ` ${imported.warnings.join(' ')}` : ''}`;
+    exportBtn.hidden = true;
   });
 
   importInput.addEventListener('change', () => {
@@ -121,7 +146,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (units.length === 0) throw new Error('No valid generator rows found in the file.');
         setFleet(units);
       } catch (err) {
-        showModal('Import Error', `<p>${escapeHtml(err.message)}</p>`, 'error');
+        showAlertModal('Import Error', err.message, { variant: 'danger' });
       }
       importInput.value = '';
     };
@@ -141,7 +166,15 @@ document.addEventListener('DOMContentLoaded', () => {
     demandInput.value = saved.inputs.demandMW;
     lossInput.value = saved.inputs.lossPercent ?? 0;
     renderResults(saved);
-    exportBtn.hidden = false;
+    const currentFingerprint = buildOpfProjectInputs(getOneLine()).sourceFingerprint;
+    const stale = saved.runMetadata?.sourceFingerprint
+      ? isStudyResultStale(saved, currentFingerprint)
+      : false;
+    exportBtn.hidden = saved.runMetadata?.valid !== true || stale;
+    sourceDiv.className = stale ? 'result-warn' : 'field-hint';
+    sourceDiv.textContent = stale
+      ? 'Saved dispatch is stale because project generation or load data changed. Import and rerun before export.'
+      : (saved.runMetadata?.source === 'project-one-line' ? 'Saved inputs were imported from project generators and connected load.' : 'Saved manual inputs restored.');
   } else {
     setFleet(DEFAULT_FLEET);
     demandInput.value = 850;
@@ -168,7 +201,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const msg = err instanceof Error ? err.message : 'Unable to run economic dispatch.';
       errorsDiv.hidden = false;
       errorsDiv.textContent = msg;
-      showModal('Input Error', `<p>${escapeHtml(msg)}</p>`, 'error');
+      showAlertModal('Input Error', msg, { variant: 'danger' });
       runBtn.disabled = false;
       runBtn.textContent = 'Run Economic Dispatch';
       return;
@@ -177,12 +210,23 @@ document.addEventListener('DOMContentLoaded', () => {
     errorsDiv.hidden = true;
     errorsDiv.textContent = '';
 
-    const studies = getStudies();
-    studies.optimalPowerFlow = result;
-    setStudies(studies);
+    result.runMetadata = createStudyRunMetadata(
+      'optimalPowerFlow',
+      { ready: result.feasible === true, sourceFingerprint: importedSourceFingerprint, counts: { units: units.length } },
+      { valid: result.feasible === true, convergedCount: result.feasible ? 1 : 0, totalCount: 1 },
+      { source: importedSourceFingerprint ? 'project-one-line' : 'manual', persisted: result.feasible === true }
+    );
+    if (result.feasible) {
+      const studies = getStudies();
+      studies.optimalPowerFlow = result;
+      setStudies(studies);
+    } else {
+      errorsDiv.hidden = false;
+      errorsDiv.textContent = 'Dispatch is infeasible. The screening result is shown, but it was not saved or enabled for export.';
+    }
 
     renderResults(result);
-    exportBtn.hidden = false;
+    exportBtn.hidden = !result.feasible;
     runBtn.disabled = false;
     runBtn.textContent = 'Run Economic Dispatch';
   });

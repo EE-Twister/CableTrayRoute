@@ -256,7 +256,12 @@ export function renderLoadFlowResultsHtml(res) {
   if (!converged) {
     const mismatch = formatNumber(res?.maxMismatch, 4, '—');
     const mismatchKw = formatNumber(res?.maxMismatchKW, 1, '—');
-    html += `<p class="study-warning">Load flow did not converge. Max mismatch ${mismatch} pu (${mismatchKw} kW).</p>`;
+    const blocked = res?.blocked === true;
+    html += `<div class="result-card result-fail"><h3>${blocked ? 'Study not run' : 'No valid load flow result'}</h3>`;
+    html += blocked
+      ? '<p>Complete the required network inputs before running the solver.</p>'
+      : `<p>The solver did not converge. Max mismatch ${mismatch} pu (${mismatchKw} kW).</p>`;
+    html += '<p>No result was saved or exported.</p></div>';
   }
   if (warnings.length) {
     html += '<ul class="study-warning-list">';
@@ -265,6 +270,8 @@ export function renderLoadFlowResultsHtml(res) {
   }
 
   html += buildNonConvergenceInsights(res, busLabelMap);
+
+  if (!converged) return html;
 
   html += buildSummaryList(res?.summary);
   html += buildBranchConnectionsSection(res?.summary, busLabelMap);

@@ -21,14 +21,15 @@ function it(name, fn) {
 
 // ---------------------------------------------------------------------------
 describe('runReliability — empty input', () => {
-  it('returns systemAvailability 1 for empty component list', () => {
+  it('does not report perfect availability for an empty component list', () => {
     const result = runReliability([]);
-    assert.strictEqual(result.systemAvailability, 1);
+    assert.strictEqual(result.systemAvailability, null);
+    assert.strictEqual(result.ready, false);
   });
 
-  it('returns expectedOutage 0 for empty input', () => {
+  it('does not report zero outage for empty input', () => {
     const result = runReliability([]);
-    assert.strictEqual(result.expectedOutage, 0);
+    assert.strictEqual(result.expectedOutage, null);
   });
 
   it('returns all required fields', () => {
@@ -101,6 +102,8 @@ describe('runReliability — components without MTBF skip gracefully', () => {
     const result = runReliability(comps);
     assert.ok(!('T1' in result.componentStats));
     assert.ok('B1' in result.componentStats);
+    assert.strictEqual(result.ready, false);
+    assert.deepStrictEqual(result.missingData[0].missing, ['MTBF', 'MTTR']);
   });
 });
 

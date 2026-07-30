@@ -569,7 +569,9 @@ export function buildHarmonicsSection(studies = {}, approvals = {}) {
   const approval = approvals.harmonics || null;
   if (!data) return { key: 'harmonics', title: 'Harmonics Analysis', empty: true };
 
-  const entries = typeof data === 'object' && !Array.isArray(data)
+  const entries = Array.isArray(data?.results)
+    ? data.results
+    : typeof data === 'object' && !Array.isArray(data)
     ? Object.entries(data)
         .filter(([k]) => !k.startsWith('_'))
         .map(([id, v]) => (typeof v === 'object' ? { id, ...v } : { id }))
@@ -604,11 +606,11 @@ export function buildMotorStartSection(studies = {}, approvals = {}) {
     : (Array.isArray(data) ? data : []);
 
   const rows = entries.map(e => ({
-    id:           e.id || '—',
+    id:           e.label || e.id || '—',
     inrushKA:     e.inrushKA     ?? e.inrush_kA    ?? '—',
     voltageSagPct: e.voltageSagPct ?? e.voltage_sag_pct ?? '—',
     accelTime:    e.accelTime    ?? e.accel_time   ?? '—',
-    method:       e.method       ?? e.startMethod  ?? '—',
+    method:       e.starterType  ?? e.method       ?? e.startMethod  ?? '—',
   }));
 
   return { key: 'motorStart', title: 'Motor Starting Study', rows, approval };
@@ -629,16 +631,309 @@ export function buildVoltageDropSection(studies = {}, approvals = {}) {
         .map(([id, v]) => (typeof v === 'object' ? { id, ...v } : { id }));
 
   const rows = results.map(r => ({
-    id:         r.id       || r.cableId   || '—',
+    id:         r.tag      || r.id        || r.cableId || '—',
     from:       r.from     || r.source    || '—',
     to:         r.to       || r.load      || '—',
+    inputSource: r.inputSource?.current || r.input_source || '—',
+    path:       Array.isArray(r.pathTags) ? r.pathTags.join(' → ') : '—',
     dropPct:    r.dropPct  ?? r.drop_pct  ?? '—',
     dropV:      r.dropV    ?? r.drop_v    ?? '—',
     limitPct:   r.limitPct ?? r.limit_pct ?? r.limit ?? '—',
     status:     r.evaluated === false ? 'not evaluated' : (r.status ?? (parseFloat(r.dropPct) > parseFloat(r.limitPct) ? 'fail' : 'pass')),
+    combinedDropPct: r.pathEvaluated === false ? '—' : (r.combinedDropPct ?? '—'),
+    combinedLimitPct: r.combinedLimitPct ?? '—',
+    combinedStatus: r.pathEvaluated === false ? 'not evaluated' : (r.combinedStatus || '—'),
+    recommendation: r.recommendation?.conductorSize || '—',
   }));
 
-  return { key: 'voltageDrop', title: 'Voltage Drop Study', rows, approval };
+  return {
+    key: 'voltageDrop',
+    title: 'Voltage Drop Study',
+    rows,
+    approval,
+    readiness: advancedStudyStatus(data),
+    summary: {
+      'Evaluated cables': `${data.summary?.evaluated ?? rows.length} / ${data.summary?.total ?? rows.length}`,
+      'Individual failures': data.summary?.fail ?? '—',
+      'Combined path failures': data.summary?.combinedFail ?? '—',
+      'Maximum individual drop (%)': data.summary?.maxDropPct ?? '—',
+      'Maximum combined drop (%)': data.summary?.maxCombinedDropPct ?? '—',
+      'Sizing recommendations': data.summary?.recommendations ?? '—',
+    },
+    warnings: Array.isArray(data.warnings) ? data.warnings : [],
+  };
+}
+
+/**
+ * Build a load-weighted reliability and minimal-cut-set section.
+ */
+export function buildReliabilitySection(studies = {}, approvals = {}) {
+  const data = studies.reliability || null;
+  if (!data) return { key: 'reliability', title: 'Reliability Analysis', empty: true };
+  const rows = (data.servicePoints || []).map(point => ({
+    id: point.label || point.id || '—',
+    kw: point.kw ?? '—',
+    critical: point.critical === true ? 'yes' : 'no',
+    availabilityPct: Number.isFinite(Number(point.availability))
+      ? Number(point.availability) * 100
+      : '—',
+    outageHours: point.expectedOutageHours ?? '—',
+    interruptionsPerYear: point.interruptionFrequencyPerYear ?? '—',
+    eensKwh: point.eensKwh ?? '—',
+  }));
+  const cutSets = [...(data.n1Impacts || []), ...(data.n2Impacts || [])].map(impact => ({
+    order: `N-${impact.failed?.length || 0}`,
+    failed: (impact.failed || []).join(' + ') || '—',
+    impacted: (impact.impactedServicePoints || [])
+      .map(point => point.label || point.id)
+      .join('; ') || (impact.impacted || []).join('; ') || '—',
+    impactedKw: impact.impactedKw ?? '—',
+    criticalKw: impact.criticalKw ?? '—',
+    probability: impact.probability ?? '—',
+  }));
+  return {
+    key: 'reliability',
+    title: 'Reliability Analysis',
+    headers: [
+      { key: 'id', label: 'Service Point' },
+      { key: 'kw', label: 'Load (kW)' },
+      { key: 'critical', label: 'Critical' },
+      { key: 'availabilityPct', label: 'Availability (%)' },
+      { key: 'outageHours', label: 'Outage (hr/yr)' },
+      { key: 'interruptionsPerYear', label: 'Interruptions/yr' },
+      { key: 'eensKwh', label: 'EENS (kWh/yr)' },
+    ],
+    rows,
+    cutSets,
+    summary: {
+      'System availability (%)': data.systemAvailability != null && Number.isFinite(Number(data.systemAvailability))
+        ? Number(data.systemAvailability) * 100
+        : '—',
+      'Load-weighted service availability (%)': data.serviceAvailability != null && Number.isFinite(Number(data.serviceAvailability))
+        ? Number(data.serviceAvailability) * 100
+        : '—',
+      'Served load (kW)': data.totalServedKw ?? '—',
+      'EENS (kWh/yr)': data.eensKwh ?? '—',
+      'Critical-load EENS (kWh/yr)': data.criticalLoadEensKwh ?? '—',
+      'Load-weighted outage (hr/yr)': data.serviceInterruptionHours ?? '—',
+      'Reliability source coverage (%)': data.sourceCoveragePct ?? '—',
+    },
+    warnings: Array.isArray(data.warnings) ? data.warnings : [],
+    readiness: advancedStudyStatus(data),
+    approval: approvals.reliability || null,
+  };
+}
+
+function advancedStudyStatus(data) {
+  const metadata = data?.runMetadata || {};
+  return {
+    valid: metadata.valid === true,
+    validityLabel: metadata.valid === true ? 'Valid saved result' : 'Legacy / unverified result',
+    source: metadata.source || 'not recorded',
+    runAt: metadata.runAt || data?.generatedAt || data?.updatedAt || null,
+    convergence: metadata.convergence?.message || null,
+  };
+}
+
+function advancedSection({ key, title, data, approvals, headers, rows, summary = {}, warnings = [] }) {
+  if (!data) return { key, title, empty: true };
+  return {
+    key,
+    title,
+    headers,
+    rows,
+    summary,
+    warnings: Array.isArray(warnings) ? warnings : [],
+    readiness: advancedStudyStatus(data),
+    approval: approvals[key] || null,
+  };
+}
+
+export function buildAdvancedStudySections(studies = {}, approvals = {}) {
+  const qd = studies.quasiDynamic;
+  const probabilistic = studies.probabilisticLoadFlow;
+  const contingency = studies.contingency;
+  const voltage = studies.voltageStability;
+  const frequency = studies.frequencyScan;
+  const transient = studies.transientStability;
+  const opf = studies.optimalPowerFlow;
+
+  return {
+    quasiDynamic: advancedSection({
+      key: 'quasiDynamic',
+      title: 'Quasi-Dynamic Load Flow',
+      data: qd,
+      approvals,
+      headers: [
+        { key: 'bus', label: 'Bus' }, { key: 'minVm', label: 'Min V (pu)' },
+        { key: 'maxVm', label: 'Max V (pu)' }, { key: 'risk', label: 'Envelope Status' },
+      ],
+      rows: (qd?.busEnvelope || []).map(row => ({
+        bus: row.label || row.id || 'â€”',
+        minVm: row.minVm,
+        maxVm: row.maxVm,
+        risk: [row.minRisk, row.maxRisk].includes('fail') ? 'fail'
+          : ([row.minRisk, row.maxRisk].includes('warn') ? 'warning' : 'pass'),
+      })),
+      summary: qd ? {
+        'Converged timesteps': `${qd.convergedCount ?? 0} / ${qd.timestepCount ?? 0}`,
+        'Voltage violations': (qd.overVoltageCount || 0) + (qd.underVoltageCount || 0),
+        'Energy loss (kWh)': qd.totalEnergyLossKwh,
+        'Load factor': qd.loadFactor,
+      } : {},
+      warnings: qd?.warnings,
+    }),
+    probabilisticLoadFlow: advancedSection({
+      key: 'probabilisticLoadFlow',
+      title: 'Probabilistic Load Flow',
+      data: probabilistic,
+      approvals,
+      headers: [
+        { key: 'bus', label: 'Bus' }, { key: 'mean', label: 'Mean V (pu)' },
+        { key: 'p05', label: 'P5 V (pu)' }, { key: 'min', label: 'Minimum V (pu)' },
+        { key: 'pUnder', label: 'P(V < 0.95)' }, { key: 'pOver', label: 'P(V > 1.05)' },
+      ],
+      rows: (probabilistic?.busStats || []).map(row => ({
+        bus: row.label || row.id || 'â€”',
+        mean: row.mean,
+        p05: row.p05,
+        min: row.min,
+        pUnder: row.pUnder,
+        pOver: row.pOver,
+      })),
+      summary: probabilistic ? {
+        'Converged scenarios': `${probabilistic.convergedCount ?? 0} / ${probabilistic.sampleCount ?? 0}`,
+        'Probability of voltage violation': probabilistic.probabilityOfViolation,
+        'Mean loss (kW)': probabilistic.lossStats?.mean,
+        'P95 loss (kW)': probabilistic.lossStats?.p95,
+      } : {},
+      warnings: probabilistic?.warnings,
+    }),
+    contingency: advancedSection({
+      key: 'contingency',
+      title: 'N-1 Contingency',
+      data: contingency,
+      approvals,
+      headers: [
+        { key: 'branch', label: 'Outaged Branch' }, { key: 'type', label: 'Type' },
+        { key: 'converged', label: 'Converged' }, { key: 'violations', label: 'Violations' },
+        { key: 'status', label: 'Status' }, { key: 'transient', label: 'Transient Screen' },
+      ],
+      rows: (contingency?.contingencies || []).map(row => ({
+        branch: row.branchName || row.branchId || 'â€”',
+        type: row.branchType || 'â€”',
+        converged: row.converged ? 'Yes' : 'No',
+        violations: (row.violations || []).length,
+        status: row.critical ? 'critical' : 'pass',
+        transient: row.transientStability?.checked
+          ? (row.transientStability.stable ? 'stable' : 'unstable') : 'not checked',
+      })),
+      summary: contingency?.summary || {},
+      warnings: contingency?.warnings,
+    }),
+    voltageStability: advancedSection({
+      key: 'voltageStability',
+      title: 'Voltage Stability',
+      data: voltage,
+      approvals,
+      headers: [
+        { key: 'targetBus', label: 'Target Bus' }, { key: 'operatingLoadMw', label: 'Operating Load (MW)' },
+        { key: 'maxLoadMw', label: 'Max Converged Load (MW)' }, { key: 'marginMw', label: 'Margin (MW)' },
+        { key: 'marginPct', label: 'Margin (%)' }, { key: 'reactiveMargin', label: 'Reactive Margin (MVAR)' },
+      ],
+      rows: voltage ? [{
+        targetBus: voltage.summary?.targetBusId || 'â€”',
+        operatingLoadMw: voltage.summary?.operatingLoadMW,
+        maxLoadMw: voltage.summary?.maxLoadMW,
+        marginMw: voltage.summary?.loadabilityMarginMW,
+        marginPct: voltage.summary?.loadabilityMarginPct,
+        reactiveMargin: voltage.summary?.reactiveMarginMvar,
+      }] : [],
+      summary: voltage ? {
+        'P-V converged points': voltage.summary?.pvPointCount,
+        'Q-V converged points': voltage.summary?.qvPointCount,
+        'Solver boundary encountered': voltage.summary?.solverLimitEncountered ? 'Yes' : 'No',
+      } : {},
+      warnings: voltage?.warnings,
+    }),
+    frequencyScan: advancedSection({
+      key: 'frequencyScan',
+      title: 'Frequency Scan',
+      data: frequency,
+      approvals,
+      headers: [
+        { key: 'order', label: 'Harmonic Order' }, { key: 'frequencyHz', label: 'Frequency (Hz)' },
+        { key: 'impedance', label: 'Impedance (ohm)' }, { key: 'type', label: 'Type' },
+        { key: 'risk', label: 'Risk' },
+      ],
+      rows: (frequency?.resonances || []).map(row => ({
+        order: row.h,
+        frequencyHz: row.freqHz,
+        impedance: row.zMagOhm,
+        type: row.type,
+        risk: row.risk,
+      })),
+      summary: frequency ? {
+        'Scan points': frequency.points?.length || 0,
+        'Detected resonances': frequency.resonances?.length || 0,
+        'System voltage (kV)': frequency.inputs?.systemKv,
+        'Short-circuit MVA': frequency.inputs?.scMva,
+      } : {},
+      warnings: frequency?.warnings,
+    }),
+    transientStability: advancedSection({
+      key: 'transientStability',
+      title: 'Transient Stability',
+      data: transient,
+      approvals,
+      headers: [
+        { key: 'status', label: 'Stability' }, { key: 'clearingTime', label: 'Clearing Time (s)' },
+        { key: 'maxAngle', label: 'Max Rotor Angle (deg)' }, { key: 'cct', label: 'Numerical CCT (s)' },
+        { key: 'cctCycles', label: 'CCT (cycles)' },
+      ],
+      rows: transient ? [{
+        status: transient.simulation?.stable ? 'stable' : 'unstable',
+        clearingTime: transient.inputs?.t_clear,
+        maxAngle: transient.simulation?.deltaMax_deg,
+        cct: transient.cct?.cct_s,
+        cctCycles: transient.cct?.cct_cycles,
+      }] : [],
+      summary: transient ? {
+        'Inertia H (s)': transient.inputs?.H,
+        'Mechanical power (pu)': transient.inputs?.Pm,
+        'Pre-fault Pmax (pu)': transient.inputs?.Pmax_pre,
+        'Post-fault Pmax (pu)': transient.inputs?.Pmax_post,
+      } : {},
+      warnings: transient?.warnings,
+    }),
+    optimalPowerFlow: advancedSection({
+      key: 'optimalPowerFlow',
+      title: 'Optimal Power Flow',
+      data: opf,
+      approvals,
+      headers: [
+        { key: 'unit', label: 'Unit' }, { key: 'output', label: 'Output (MW)' },
+        { key: 'loading', label: 'Loading (%)' }, { key: 'incrementalCost', label: 'Incremental Cost ($/MWh)' },
+        { key: 'cost', label: 'Cost ($/h)' }, { key: 'limit', label: 'Limit Status' },
+      ],
+      rows: (opf?.dispatch || []).map(row => ({
+        unit: row.name || row.id || 'â€”',
+        output: row.output,
+        loading: row.loadingPct,
+        incrementalCost: row.incrementalCost,
+        cost: row.cost,
+        limit: row.atLimit || 'marginal',
+      })),
+      summary: opf ? {
+        'Demand (MW)': opf.demandMW,
+        'Required generation (MW)': opf.requiredGenMW,
+        'Total cost ($/h)': opf.totalCostPerHr,
+        'System lambda ($/MWh)': opf.systemLambda,
+        'Feasible': opf.feasible ? 'Yes' : 'No',
+      } : {},
+      warnings: opf?.warnings,
+    }),
+  };
 }
 
 /**
@@ -1038,14 +1333,68 @@ export function renderPackageHTML(pkg, baseReport = {}) {
   <h2>Voltage Drop Study</h2>
   ${approvalBadgeHTML(s.approval)}
   ${s.empty ? emptySection('Voltage Drop') : `
+  <p class="report-readiness-note ${s.readiness?.valid ? 'report-readiness-note--ready' : 'report-readiness-note--warning'}">
+    ${esc(s.readiness?.validityLabel || 'Validity not recorded')}
+    &nbsp;·&nbsp; Source: ${esc(s.readiness?.source || 'not recorded')}
+  </p>
+  <dl class="report-summary-list">${Object.entries(s.summary || {}).map(([label, value]) =>
+    `<div><dt>${esc(label)}</dt><dd>${typeof value === 'number' ? fmt(value) : esc(value)}</dd></div>`
+  ).join('')}</dl>
   <div class="report-scroll"><table class="report-table">
-    <thead><tr><th>Cable / Circuit</th><th>From</th><th>To</th><th>Drop (%)</th><th>Drop (V)</th><th>Recommendation (%)</th><th>Status</th></tr></thead>
+    <thead><tr><th>Cable / Circuit</th><th>From</th><th>To</th><th>Current Source</th><th>Path</th><th>Drop (%)</th><th>Limit (%)</th><th>Status</th><th>Combined Drop (%)</th><th>Combined Limit (%)</th><th>Combined Status</th><th>Recommended Size</th></tr></thead>
     <tbody>${(s.rows || []).map(r => `<tr>
       <td>${esc(r.id)}</td><td>${esc(r.from)}</td><td>${esc(r.to)}</td>
-      <td>${fmt(r.dropPct)}</td><td>${fmt(r.dropV)}</td><td>${fmt(r.limitPct)}</td>
-      <td>${statusBadge(r.status)}</td>
+      <td>${esc(r.inputSource)}</td><td>${esc(r.path)}</td>
+      <td>${fmt(r.dropPct)}</td><td>${fmt(r.limitPct)}</td><td>${statusBadge(r.status)}</td>
+      <td>${fmt(r.combinedDropPct)}</td><td>${fmt(r.combinedLimitPct)}</td>
+      <td>${statusBadge(r.combinedStatus)}</td><td>${esc(r.recommendation)}</td>
     </tr>`).join('')}</tbody>
-  </table></div>`}
+  </table></div>
+  ${(s.warnings || []).length ? `<div class="report-alert report-alert--warning"><strong>Study warnings:</strong><ul>${s.warnings.map(warning => `<li>${esc(warning)}</li>`).join('')}</ul></div>` : ''}`}
+</section>`;
+  }
+
+  const advancedStudyKeys = [
+    'quasiDynamic', 'probabilisticLoadFlow', 'contingency', 'voltageStability',
+    'frequencyScan', 'transientStability', 'optimalPowerFlow', 'reliability',
+  ];
+  for (const key of advancedStudyKeys) {
+    const s = sections[key];
+    if (!s) continue;
+    const readinessClass = s.readiness?.valid ? 'report-readiness-note--ready' : 'report-readiness-note--warning';
+    const summaryEntries = Object.entries(s.summary || {}).filter(([, value]) => value != null && value !== '');
+    html += `
+<section class="report-section" id="rpt-${esc(key)}">
+  <h2>${esc(s.title || key)}</h2>
+  ${approvalBadgeHTML(s.approval)}
+  ${s.empty ? emptySection(s.title || key) : `
+  <p class="report-readiness-note ${readinessClass}">
+    ${esc(s.readiness?.validityLabel || 'Validity not recorded')}
+    &nbsp;Â·&nbsp; Source: ${esc(s.readiness?.source || 'not recorded')}
+    ${s.readiness?.runAt ? ` &nbsp;Â·&nbsp; Run: ${esc(s.readiness.runAt)}` : ''}
+  </p>
+  ${s.readiness?.convergence ? `<p class="report-note">${esc(s.readiness.convergence)}</p>` : ''}
+  ${summaryEntries.length ? `<dl class="report-summary-list">${summaryEntries.map(([label, value]) =>
+    `<div><dt>${esc(label)}</dt><dd>${typeof value === 'number' ? fmt(value) : esc(value)}</dd></div>`
+  ).join('')}</dl>` : ''}
+  ${(s.rows || []).length ? `
+  <div class="report-scroll"><table class="report-table">
+    <thead><tr>${(s.headers || []).map(header => `<th>${esc(header.label)}</th>`).join('')}</tr></thead>
+    <tbody>${s.rows.map(row => `<tr>${(s.headers || []).map(header => {
+      const value = row[header.key];
+      return `<td>${typeof value === 'number' ? fmt(value) : esc(value ?? 'â€”')}</td>`;
+    }).join('')}</tr>`).join('')}</tbody>
+  </table></div>` : '<p class="report-empty">No detailed rows were produced.</p>'}
+  ${(s.cutSets || []).length ? `
+  <h3>Minimal Cut-Set Screening</h3>
+  <div class="report-scroll"><table class="report-table">
+    <thead><tr><th>Order</th><th>Failed Components</th><th>Affected Service Points</th><th>Interrupted kW</th><th>Critical kW</th><th>Probability</th></tr></thead>
+    <tbody>${s.cutSets.map(row => `<tr>
+      <td>${esc(row.order)}</td><td>${esc(row.failed)}</td><td>${esc(row.impacted)}</td>
+      <td>${fmt(row.impactedKw)}</td><td>${fmt(row.criticalKw)}</td><td>${fmt(row.probability)}</td>
+    </tr>`).join('')}</tbody>
+  </table></div>` : ''}
+  ${(s.warnings || []).length ? `<div class="report-alert report-alert--warning"><strong>Study warnings:</strong><ul>${s.warnings.map(warning => `<li>${esc(warning)}</li>`).join('')}</ul></div>` : ''}`}
 </section>`;
   }
 
@@ -1077,11 +1426,34 @@ export function renderPackageHTML(pkg, baseReport = {}) {
     'cover', 'toc', 'revisions', 'assumptions',
     'cables', 'fill', 'clashes', 'spools', 'drc',
     'arcFlash', 'shortCircuit', 'loadFlow', 'harmonics', 'motorStart', 'voltageDrop', 'heatTrace',
+    ...advancedStudyKeys,
   ]);
   for (const key of orderedKeys) {
     const section = sections[key];
     if (!section || dedicatedKeys.has(key)) continue;
-    html += unavailableSection(key, section.title || key);
+    if (section.unavailable) {
+      html += unavailableSection(key, section.title || key);
+      continue;
+    }
+    const rows = Array.isArray(section.rows) ? section.rows : [];
+    const headers = Array.isArray(section.headers) && section.headers.length
+      ? section.headers
+      : (rows.length ? Object.keys(rows[0]).map(field => ({ key: field, label: field })) : []);
+    html += `
+<section class="report-section" id="rpt-${esc(key)}">
+  <h2>${esc(section.title || key)}</h2>
+  ${section.summary ? `<dl class="report-summary-list">${Object.entries(section.summary).map(([label, value]) =>
+    `<div><dt>${esc(label)}</dt><dd>${typeof value === 'number' ? fmt(value) : esc(value)}</dd></div>`
+  ).join('')}</dl>` : ''}
+  ${rows.length && headers.length ? `
+  <div class="report-scroll"><table class="report-table">
+    <thead><tr>${headers.map(header => `<th>${esc(header.label || header.key)}</th>`).join('')}</tr></thead>
+    <tbody>${rows.map(row => `<tr>${headers.map(header => {
+      const value = row[header.key];
+      return `<td>${typeof value === 'number' ? fmt(value) : esc(value ?? '—')}</td>`;
+    }).join('')}</tr>`).join('')}</tbody>
+  </table></div>` : '<p class="report-empty">No detailed rows were produced.</p>'}
+</section>`;
   }
 
   return html;

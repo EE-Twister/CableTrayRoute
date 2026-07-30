@@ -10,6 +10,9 @@ import {
   cableQRPayload,
   trayQRPayload,
   enrichPullCardsWithQR,
+  normalizePullCable,
+  evaluateJamRisk,
+  createPullPlanArtifact,
 } from '../analysis/pullCards.mjs';
 import { parsePullRouteRows } from '../analysis/pullCardRouteImport.mjs';
 import { buildPullRouteVisualModel } from '../analysis/pullCardVisualModel.mjs';
@@ -366,6 +369,165 @@ describe('buildPullTable', () => {
     const { pulls } = buildPullTable(fieldResults, fieldCables);
     assert.strictEqual(pulls.length, 1, 'Cables with same field+tray route should group');
     assert.strictEqual(pulls[0].cable_count, 2);
+  });
+});
+
+describe('construction pull engineering', () => {
+  it('maps canonical cable_od and supported weight aliases', () => {
+    const canonical = normalizePullCable({
+      cable_od: '1.25',
+      diameter: '9.99',
+      weight_lb_ft: '2.4',
+      weight: '8.8',
+    });
+    assert.strictEqual(canonical.diameter, 1.25);
+    assert.strictEqual(canonical.diameter_source, 'cable_od');
+    assert.strictEqual(canonical.weight, 2.4);
+    assert.strictEqual(canonical.weight_source, 'weight_lb_ft');
+
+    const imported = normalizePullCable({ weightLbsPerFt: 1.1, OD: 0.75 });
+    assert.strictEqual(imported.weight, 1.1);
+    assert.strictEqual(imported.diameter, 0.75);
+  });
+
+  it('warns and suppresses engineering values when cable coverage is missing', () => {
+    const results = [{
+      cable: 'MISSING-DATA',
+      status: 'Routed',
+      total_length: 40,
+      breakdown: [{ tray_id: 'T1', length: 40, start: [0, 0, 0], end: [40, 0, 0] }],
+      route_segments: [{ type: 'straight', length: 40 }],
+    }];
+    const { pulls } = buildPullTable(results, [{ name: 'MISSING-DATA', cable_type: 'Power' }]);
+    assert.strictEqual(pulls[0].total_weight_lb_ft, null);
+    assert.strictEqual(pulls[0].estimated_tension_lbs, null);
+    assert.strictEqual(pulls[0].max_diameter_in, null);
+    assert.strictEqual(pulls[0].tension_status, 'inputs-required');
+    assert.match(pulls[0].coverage_warnings.join(' '), /weight is missing/i);
+    assert.match(pulls[0].coverage_warnings.join(' '), /outside diameter is missing/i);
+  });
+
+  it('compares directions and selects the lower screening demand in auto mode', () => {
+    const results = [{
+      cable: 'DIR-1',
+      status: 'Routed',
+      total_length: 110,
+      breakdown: [
+        { tray_id: 'T1', length: 100, start: [0, 0, 0], end: [100, 0, 0] },
+        { conduit_id: 'C1', length: 10, start: [100, 0, 0], end: [100, 10, 0] },
+      ],
+      route_segments: [
+        { type: 'straight', length: 100 },
+        { type: 'bend', length: 10, angle: Math.PI / 2, radius: 3 },
+      ],
+    }];
+    const cables = [{
+      name: 'DIR-1',
+      cable_type: 'Power',
+      cable_od: 1,
+      weight_lb_ft: 2,
+      max_tension: 5000,
+      max_sidewall_pressure: 1000,
+    }];
+    const { pulls } = buildPullTable(results, cables, {
+      assumptions: {
+        pullDirection: 'auto',
+        coeffFriction: 0.35,
+        bendRadiusFt: 3,
+        bendAngleDeg: 90,
+      },
+    });
+    assert.strictEqual(pulls[0].pull_direction, 'reverse');
+    assert.ok(
+      pulls[0].direction_comparison.reverse.max_tension_lbs
+        < pulls[0].direction_comparison.forward.max_tension_lbs
+    );
+    assert.deepStrictEqual(pulls[0].route_steps[0].start, [100, 10, 0]);
+  });
+
+  it('supports per-pull limits, direction, incoming tension, and bend assumptions', () => {
+    const { pulls: basePulls } = buildPullTable(routeResults.slice(0, 1), cableList);
+    const pullId = basePulls[0].pull_plan_id;
+    const assumptions = {
+      coeffFriction: 0.2,
+      allowableTensionLbf: 5000,
+      allowableSidewallPressureLbfFt: 1500,
+      bendRadiusFt: 4,
+      bendAngleDeg: 45,
+      conduitInnerDiameterIn: 3,
+      incomingTensionLbf: 75,
+      pullDirection: 'forward',
+    };
+    const { pulls } = buildPullTable(routeResults.slice(0, 1), cableList, {
+      assumptionsByPull: { [pullId]: assumptions },
+    });
+    assert.deepStrictEqual(pulls[0].assumptions, assumptions);
+    assert.strictEqual(pulls[0].pull_direction, 'forward');
+    assert.strictEqual(pulls[0].allowable_tension_lbs, 5000);
+    assert.ok(pulls[0].estimated_tension_lbs >= 75);
+  });
+
+  it('infers coordinate turns for bend sidewall-pressure screening', () => {
+    const results = [{
+      cable: 'TURN-1',
+      status: 'Routed',
+      total_length: 100,
+      breakdown: [
+        { tray_id: 'T1', length: 50, start: [0, 0, 0], end: [50, 0, 0] },
+        { tray_id: 'T2', length: 50, start: [50, 0, 0], end: [50, 50, 0] },
+      ],
+      route_segments: [
+        { type: 'tray', tray_id: 'T1', length: 50, start: [0, 0, 0], end: [50, 0, 0] },
+        { type: 'tray', tray_id: 'T2', length: 50, start: [50, 0, 0], end: [50, 50, 0] },
+      ],
+    }];
+    const cables = [{
+      name: 'TURN-1',
+      cable_od: 1,
+      weight_lb_ft: 1,
+      max_tension: 5000,
+      max_sidewall_pressure: 1000,
+    }];
+    const { pulls } = buildPullTable(results, cables, {
+      assumptions: { bendRadiusFt: 2, bendAngleDeg: 90, pullDirection: 'forward' },
+    });
+    assert.ok(pulls[0].max_sidewall_pressure > 0);
+    assert.ok(pulls[0].tension_trace.some(trace => trace.inferredBend));
+    const visual = buildPullRouteVisualModel(pulls[0]);
+    assert.ok(visual.segments[1].sidewallPressure > 0);
+  });
+
+  it('screens the supported three-cable jam-ratio condition', () => {
+    const caution = evaluateJamRisk([
+      { diameter: 1, parallel_count: 1 },
+      { diameter: 1, parallel_count: 1 },
+      { diameter: 1, parallel_count: 1 },
+    ], 3);
+    assert.strictEqual(caution.status, 'caution');
+    assert.strictEqual(caution.ratio, 3);
+
+    const unsupported = evaluateJamRisk([{ diameter: 1 }, { diameter: 1 }], 3);
+    assert.strictEqual(unsupported.status, 'not-applicable');
+  });
+
+  it('creates a stable project pull-plan artifact with assumptions and results', () => {
+    const { pulls } = buildPullTable(routeResults.slice(0, 1), cableList, {
+      assumptions: {
+        allowableTensionLbf: 5000,
+        allowableSidewallPressureLbfFt: 1500,
+      },
+    });
+    const artifact = createPullPlanArtifact(pulls, {
+      generatedAt: '2026-07-30T12:00:00.000Z',
+      source: 'test',
+    });
+    assert.strictEqual(artifact.schemaVersion, 1);
+    assert.strictEqual(artifact.artifactType, 'cable-pull-plan');
+    assert.strictEqual(artifact.generatedAt, '2026-07-30T12:00:00.000Z');
+    const saved = artifact.pulls[pulls[0].pull_plan_id];
+    assert.deepStrictEqual(saved.cableTags, ['C1']);
+    assert.strictEqual(saved.results.allowableTensionLbf, 5000);
+    assert.strictEqual(saved.assumptions.allowableSidewallPressureLbfFt, 1500);
   });
 });
 

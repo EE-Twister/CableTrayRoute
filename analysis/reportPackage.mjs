@@ -24,9 +24,18 @@ export const SECTION_REGISTRY = [
   { key: 'assumptions', label: 'Assumptions / Basis', group: 'Meta' },
   // ── Construction ──────────────────────────────────────────────────────────
   { key: 'cables',      label: 'Cable Schedule',      group: 'Construction' },
+  { key: 'equipment',   label: 'Equipment Schedule',  group: 'Construction' },
+  { key: 'loads',       label: 'Load Schedule',       group: 'Construction' },
+  { key: 'raceways',    label: 'Raceway Schedule',    group: 'Construction' },
+  { key: 'routing',     label: 'Routing Summary',     group: 'Construction' },
   { key: 'fill',        label: 'Raceway Fill',         group: 'Construction' },
   { key: 'clashes',     label: 'Clash Detection',      group: 'Construction' },
   { key: 'spools',      label: 'Spool Sheets',         group: 'Construction' },
+  { key: 'pullPlans',   label: 'Pull Plans',           group: 'Construction' },
+  { key: 'procurement', label: 'Procurement Register', group: 'Construction' },
+  { key: 'costEstimate', label: 'Cost Estimate',        group: 'Construction' },
+  { key: 'fieldExecution', label: 'Field Execution Register', group: 'Construction' },
+  { key: 'deliverables', label: 'Deliverable Register', group: 'Construction' },
   { key: 'drc',         label: 'Design Rule Check',   group: 'Construction' },
   // ── Studies ───────────────────────────────────────────────────────────────
   { key: 'arcFlash',      label: 'Arc Flash',           group: 'Studies', studyKey: 'arcFlash' },
@@ -35,6 +44,14 @@ export const SECTION_REGISTRY = [
   { key: 'harmonics',     label: 'Harmonics',           group: 'Studies', studyKey: 'harmonics' },
   { key: 'motorStart',    label: 'Motor Starting',      group: 'Studies', studyKey: 'motorStart' },
   { key: 'voltageDrop',   label: 'Voltage Drop Study',  group: 'Studies', studyKey: 'voltageDropStudy' },
+  { key: 'reliability',   label: 'Reliability Analysis', group: 'Studies', studyKey: 'reliability' },
+  { key: 'quasiDynamic',  label: 'Quasi-Dynamic Load Flow', group: 'Advanced Studies', studyKey: 'quasiDynamic' },
+  { key: 'probabilisticLoadFlow', label: 'Probabilistic Load Flow', group: 'Advanced Studies', studyKey: 'probabilisticLoadFlow' },
+  { key: 'contingency',    label: 'N-1 Contingency', group: 'Advanced Studies', studyKey: 'contingency' },
+  { key: 'voltageStability', label: 'Voltage Stability', group: 'Advanced Studies', studyKey: 'voltageStability' },
+  { key: 'frequencyScan',  label: 'Frequency Scan', group: 'Advanced Studies', studyKey: 'frequencyScan' },
+  { key: 'transientStability', label: 'Transient Stability', group: 'Advanced Studies', studyKey: 'transientStability' },
+  { key: 'optimalPowerFlow', label: 'Optimal Power Flow', group: 'Advanced Studies', studyKey: 'optimalPowerFlow' },
   { key: 'heatTrace',       label: 'Heat Trace',            group: 'Studies', studyKey: 'heatTraceSizing' },
   { key: 'sustainability',  label: 'Sustainability Footprint', group: 'Studies', studyKey: 'sustainabilityFootprint' },
   { key: 'tccSettings',     label: 'TCC Settings Manifest', group: 'Studies', studyKey: 'tcc' },
@@ -60,13 +77,22 @@ export function getSectionDef(key) {
 export const PRESET_CONFIGS = {
   electrical: {
     label: 'Electrical Studies',
-    description: 'Protection coordination, arc flash, load flow, harmonics, and motor starting results.',
-    sections: ['cover', 'toc', 'revisions', 'arcFlash', 'shortCircuit', 'loadFlow', 'harmonics', 'motorStart', 'tccSettings'],
+    description: 'Protection coordination, arc flash, load flow, voltage drop, reliability, harmonics, and motor starting results.',
+    sections: [
+      'cover', 'toc', 'revisions', 'arcFlash', 'shortCircuit', 'loadFlow', 'harmonics', 'motorStart',
+      'voltageDrop', 'reliability',
+      'quasiDynamic', 'probabilisticLoadFlow', 'contingency', 'voltageStability',
+      'frequencyScan', 'transientStability', 'optimalPowerFlow', 'tccSettings',
+    ],
   },
   construction: {
     label: 'Construction Cable Package',
-    description: 'Cable schedule, raceway fill, clashes, spool sheets, and design rule check.',
-    sections: ['cover', 'toc', 'revisions', 'assumptions', 'cables', 'fill', 'clashes', 'spools', 'drc'],
+    description: 'Equipment, load, cable, raceway, routing, pull, procurement, field, and design-check records.',
+    sections: [
+      'cover', 'toc', 'revisions', 'assumptions', 'equipment', 'loads', 'cables',
+      'raceways', 'routing', 'fill', 'clashes', 'spools', 'pullPlans',
+      'procurement', 'costEstimate', 'fieldExecution', 'deliverables', 'drc',
+    ],
   },
   heatTrace: {
     label: 'Heat Trace Package',
@@ -119,7 +145,22 @@ export const PRESET_CONFIGS = {
  * @param {{ studies: object, cables: any[], trays: any[], drcResults: any[] }} projectData
  * @returns {Set<string>}
  */
-export function getAvailableSections({ studies = {}, cables = [], trays = [], drcResults = [] } = {}) {
+export function getAvailableSections({
+  studies = {},
+  cables = [],
+  trays = [],
+  conduits = [],
+  ductbanks = [],
+  equipment = [],
+  loads = [],
+  routeResults = [],
+  pullPlans = [],
+  procurement = [],
+  costEstimate = null,
+  fieldExecution = [],
+  deliverables = [],
+  drcResults = [],
+} = {}) {
   const available = new Set();
 
   // Meta always available
@@ -130,6 +171,15 @@ export function getAvailableSections({ studies = {}, cables = [], trays = [], dr
 
   // Construction
   if (cables.length > 0) available.add('cables');
+  if (equipment.length > 0) available.add('equipment');
+  if (loads.length > 0) available.add('loads');
+  if (trays.length > 0 || conduits.length > 0 || ductbanks.length > 0) available.add('raceways');
+  if ((Array.isArray(routeResults) && routeResults.length > 0) || (!Array.isArray(routeResults) && routeResults && Object.keys(routeResults).length > 0)) available.add('routing');
+  if ((Array.isArray(pullPlans) && pullPlans.length > 0) || (!Array.isArray(pullPlans) && pullPlans && Object.keys(pullPlans).length > 0)) available.add('pullPlans');
+  if (Array.isArray(procurement) && procurement.length > 0) available.add('procurement');
+  if (costEstimate && typeof costEstimate === 'object' && Object.keys(costEstimate).length > 0) available.add('costEstimate');
+  if (Array.isArray(fieldExecution) && fieldExecution.length > 0) available.add('fieldExecution');
+  if (Array.isArray(deliverables) && deliverables.length > 0) available.add('deliverables');
   if (trays.length > 0)  { available.add('fill'); available.add('clashes'); available.add('spools'); }
   if (drcResults.length > 0) available.add('drc');
 

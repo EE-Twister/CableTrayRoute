@@ -71,6 +71,7 @@
 
       <header class="page-header">
         <h1>Reliability &amp; N-1 Contingency Analysis</h1>
+        <p class="page-subtitle">Evaluate load service continuity with traceable MTBF/MTTR inputs, minimal N-1/N-2 cut sets, and load-weighted outage metrics.</p>
       </header>
 
       <details class="method-panel">
@@ -81,18 +82,31 @@
         <p>Expected outage hours per year per component:</p>
         <pre>downtime = (8760 / MTBF) × MTTR</pre>
         <p>System unavailability is computed using minimal cut sets up to N-2 failure
-        combinations. Components are loaded from the active One-Line Diagram. Set MTBF
-        and MTTR values on each component in the One-Line editor to enable analysis.</p>
-        <p>Connector elements (cables, feeders, links) are excluded from the component
-        count — they contribute to path unavailability rather than as standalone components.</p>
+        combinations. Load List records are matched to One-Line service points to calculate
+        expected energy not served (EENS), load-weighted service interruption hours, and
+        interruption frequency. Components are loaded from the active One-Line Diagram.</p>
+        <p>Connector elements (cables, feeders, links) define topology but are excluded from
+        the reliability component count and are not assigned standalone failure probabilities.</p>
         <p>References: IEEE Std 493-2007, IEEE Std 1366-2012, IEC 60300-3-2.</p>
       </details>
 
       <!-- Component MTBF/MTTR override table -->
       <fieldset>
         <legend><strong>Component Override Values</strong></legend>
-        <p class="field-hint">Leave blank to use values stored on the One-Line component.
-        Overrides here are applied only for this analysis session.</p>
+        <p class="field-hint">Leave MTBF/MTTR blank to use values stored on the One-Line component.
+        Overrides and their source evidence are saved as governed project inputs.</p>
+        <div class="form-grid">
+          <label for="reliability-source">Default input source
+            <input id="reliability-source" type="text" placeholder="Owner data, vendor report, or approved reliability basis">
+          </label>
+          <label for="reliability-source-date">Source date
+            <input id="reliability-source-date" type="date">
+          </label>
+          <label for="reliability-notes">Basis notes
+            <input id="reliability-notes" type="text" placeholder="Operating environment, exclusions, or data-quality notes">
+          </label>
+        </div>
+        <button id="apply-source-btn" type="button" class="btn btn-secondary">Apply Basis to Blank Rows</button>
         <div id="component-override-area">
           <p class="field-hint">Click <strong>Load from One-Line</strong> to populate component list.</p>
         </div>
@@ -100,7 +114,10 @@
 
       <div id="controls" class="controls-row">
         <button id="run-btn" type="button">Load from One-Line &amp; Analyse</button>
+        <button id="reliability-export-btn" type="button" disabled>Export Valid Result</button>
       </div>
+
+      <div id="reliability-readiness" class="study-readiness" aria-live="polite"></div>
 
       <!-- Results -->
       <div id="results" role="region" aria-live="polite" aria-label="Reliability analysis results"></div>
@@ -129,10 +146,14 @@
       <p>This tool computes system reliability metrics from your One-Line Diagram component data.</p>
       <p><strong>Requirements:</strong> Components in the One-Line Diagram must have MTBF and MTTR
       values set (in hours). Edit component properties in the One-Line editor.</p>
-      <p><strong>Override values:</strong> After loading, you can adjust MTBF/MTTR for any component
-      and re-run the analysis without modifying the stored diagram data.</p>
+      <p><strong>Override values:</strong> After loading, adjust MTBF/MTTR and record the supporting
+      source and date. These governed inputs persist with the project but do not modify the One-Line component.</p>
       <p><strong>N-1 analysis:</strong> Shows which single component failure causes the greatest
       system unavailability impact.</p>
+      <p><strong>N-2 analysis:</strong> Identifies minimal two-component cut sets where neither
+      component alone interrupts the affected service point.</p>
+      <p><strong>Load-weighted metrics:</strong> Matching Load List records provide service kW,
+      critical-load classification, EENS, interruption frequency, and average interruption duration.</p>
     </div>
   </div>
 

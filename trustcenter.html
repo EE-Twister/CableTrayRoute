@@ -65,15 +65,22 @@
 
       <header class="page-header">
         <h1>Trust Center</h1>
-        <p>Verify calculation arithmetic against published industry examples or independently derived known-answer checks. Screening-only studies are identified as such and are not presented as standards-compliance benchmarks.</p>
+        <p>Run live calculation checks and review the broader validation catalog in one place. Screening-only studies are identified as such and are not presented as standards-compliance benchmarks.</p>
       </header>
 
       <details class="method-panel">
         <summary>About These Benchmarks</summary>
         <p>Each benchmark specifies fixed inputs and an expected output derived independently from the code under test. A passing result confirms the tested arithmetic only; it does not by itself establish compliance or validate every input and boundary condition.</p>
         <p>Tolerances account for IEEE 754 floating-point rounding. Results outside tolerance indicate a potential regression in the calculation engine and should be investigated before relying on study outputs for design decisions.</p>
-        <p>Checks currently cover: <strong>EMF Analysis</strong> (Biot-Savart law and exposure-limit comparisons), <strong>Battery / UPS Sizing</strong> (preliminary screening arithmetic), and <strong>Voltage Drop</strong> (NEC informational-note recommendation comparisons).</p>
+        <p>Live checks cover EMF, Battery / UPS Sizing, Voltage Drop, Load Flow, Reliability, and Motor Starting. The reference catalog below covers additional published examples maintained on the <a href="validation.html">Validation &amp; Standards</a> page.</p>
       </details>
+
+      <section class="field-group" aria-labelledby="coverage-heading">
+        <h2 id="coverage-heading">Validation Coverage</h2>
+        <div id="coverage-summary" class="kpi-row" aria-live="polite">
+          <p class="field-hint">Loading coverage…</p>
+        </div>
+      </section>
 
       <!-- Summary card -->
       <section class="field-group" id="summary-section" aria-label="Benchmark summary" hidden>
@@ -108,6 +115,12 @@
       <!-- Per-benchmark detail panel (populated on row expand) -->
       <section id="detail-section" aria-label="Benchmark detail" hidden>
         <div id="detail-panel"></div>
+      </section>
+
+      <section class="field-group" aria-labelledby="reference-catalog-heading">
+        <h2 id="reference-catalog-heading">Published Reference Fixtures</h2>
+        <p>These cases document published or independently referenced inputs and expected outputs. They are fixtures for validation work; unlike the live suite above, this table does not imply every case is executable from this page.</p>
+        <div id="reference-catalog" aria-live="polite"><p class="field-hint">Loading reference fixtures…</p></div>
       </section>
 
     </main>

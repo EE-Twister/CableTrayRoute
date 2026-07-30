@@ -71,25 +71,24 @@
 
       <header class="page-header">
         <h1>Voltage Drop Recommendation Study</h1>
+        <p class="page-subtitle">Resolve operating current from saved Load Flow or the Load List, evaluate individual and feeder-plus-branch paths, and review conductor recommendations.</p>
       </header>
 
       <details class="method-panel">
         <summary>Method &amp; Standards</summary>
-        <p>Voltage drop is calculated as a screening check using conductor DC resistance with
-        temperature correction per conductor material. This page does not model full AC impedance
-        or power-factor reactance effects:</p>
-        <pre>VD% = (√3 × I × R × L) / V × 100   [3-phase]
-VD% = (2 × I × R × L) / V × 100   [single-phase]</pre>
-        <p>where <em>I</em> = load current (A), <em>R</em> = conductor resistance per unit length
-        (Ω/m at operating temperature), <em>L</em> = one-way length (m), and <em>V</em> = nominal
-        line voltage (V).</p>
+        <p>Voltage drop is calculated using the project AC resistance/reactance model and load
+        power factor. Cable Schedule current and voltage take precedence; missing values can be
+        resolved from a converged Load Flow result or the Load List.</p>
+        <pre>VD₃φ = √3 × I × (R cosφ + X sinφ) × L
+VD₁φ = 2 × I × (R cosφ + X sinφ) × L</pre>
         <p><strong>NEC recommendations (informational notes):</strong></p>
         <ul>
           <li>NEC 215.2(A)(3): Feeder circuits — ≤ 3 % recommended</li>
           <li>NEC 210.19(A)(1): Branch circuits — ≤ 3 % recommended</li>
           <li>Combined feeder + branch — ≤ 5 % recommended</li>
         </ul>
-        <p>Cables without length, load current, voltage, or conductor-size data are marked
+        <p>Feeder and branch results are also accumulated along connected cable paths for the
+        combined 5% recommendation. Cables without length, load current, voltage, or conductor-size data are marked
         <strong>Not Evaluated</strong> but remain listed in the table. Circuit type (feeder/branch) is determined from
         the <em>Circuit Type</em> or <em>Service Type</em> field in the cable schedule.</p>
       </details>
@@ -97,7 +96,10 @@ VD% = (2 × I × R × L) / V × 100   [single-phase]</pre>
       <div id="controls" class="controls-row">
         <button id="run-btn" type="button">Run Study</button>
         <button id="export-btn" type="button" disabled>Export CSV</button>
+        <button id="apply-recommendations-btn" type="button" disabled>Apply Selected Recommendations</button>
       </div>
+
+      <div id="voltage-drop-readiness" class="study-readiness" aria-live="polite"></div>
 
       <!-- Summary cards -->
       <div id="summary" hidden role="region" aria-live="polite" aria-label="Study summary"></div>
@@ -117,7 +119,8 @@ VD% = (2 × I × R × L) / V × 100   [single-phase]</pre>
       <button id="close-help-btn" class="close-btn" aria-label="Close Help">&times;</button>
       <h2 id="help-title">Voltage Drop Study Help</h2>
       <p>Click <em>Run Study</em> to analyze all cables in the current project against NEC
-      voltage-drop informational-note recommendations. Cables are retrieved from the Cable Schedule.</p>
+      voltage-drop informational-note recommendations. Cable values are supplemented by a valid
+      saved Load Flow result or matching Load List records when needed.</p>
       <p><strong>Status indicators:</strong></p>
       <ul>
         <li><strong>PASS</strong> — drop is below 80 % of the NEC recommended threshold</li>
@@ -126,10 +129,11 @@ VD% = (2 × I × R × L) / V × 100   [single-phase]</pre>
         <li><strong>NOT EVALUATED</strong> — length, current, voltage, or conductor size is missing</li>
       </ul>
       <p>Rows without sufficient data show a dash and are counted separately from recommendation results.</p>
-      <p>Use <em>Export CSV</em> to download the full table for inclusion in project
-      documentation or submittals.</p>
-      <p><strong>Improving recommendation status:</strong> Increase conductor size, reduce run length,
-      or add intermediate distribution panels to reduce voltage drop on failing circuits.</p>
+      <p>Only a complete, current result is saved and exportable. If project inputs change, rerun
+      the study before using the saved result in a report.</p>
+      <p><strong>Conductor recommendations:</strong> Failing rows may offer the next modeled size
+      that meets the available path allowance. Select recommendations and apply them to the Cable
+      Schedule; the study reruns immediately to verify the change.</p>
     </div>
   </div>
 

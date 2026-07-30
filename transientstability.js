@@ -4,6 +4,10 @@ import {
   equalAreaCriterion,
   initialRotorAngle,
 } from './analysis/transientStability.mjs';
+import { getOneLine, getStudies, setStudies } from './dataStore.mjs';
+import { buildTransientStabilityProjectInputs } from './analysis/transientStabilityProjectInputs.mjs';
+import { createStudyRunMetadata, isStudyResultStale } from './analysis/studyResultReadiness.mjs';
+import { showAlertModal } from './src/components/modal.js';
 
 document.addEventListener('DOMContentLoaded', () => {
   initSettings();
@@ -15,9 +19,56 @@ document.addEventListener('DOMContentLoaded', () => {
   const calcBtn   = document.getElementById('calc-btn');
   const cctBtn    = document.getElementById('cct-btn');
   const resultsDiv = document.getElementById('results');
+  const sourceDiv = document.getElementById('transient-input-source');
+  let importedSourceFingerprint = null;
 
   calcBtn.addEventListener('click', () => runSimulation(false));
   cctBtn.addEventListener('click',  () => runSimulation(true));
+  document.getElementById('import-transient-project-btn').addEventListener('click', importProjectInputs);
+
+  const saved = getStudies().transientStability;
+  if (saved?.inputs && saved?.simulation) {
+    restoreInputs(saved.inputs);
+    renderResults(saved.inputs, saved.simulation, saved.equalArea, saved.cct, saved.delta0);
+    renderPlot(saved.simulation, saved.inputs);
+    const currentFingerprint = buildTransientStabilityProjectInputs(getOneLine(), getStudies()).sourceFingerprint;
+    const stale = isStudyResultStale(saved, currentFingerprint);
+    sourceDiv.className = stale ? 'result-warn' : 'field-hint';
+    sourceDiv.textContent = stale
+      ? 'Saved simulation is stale because its project source data changed. Import and rerun.'
+      : (saved.runMetadata?.source === 'project-one-line' ? 'Saved generator and clearing inputs came from project data.' : 'Saved manual inputs restored.');
+  }
+
+  function restoreInputs(inputs) {
+    const values = {
+      inertia: inputs.H,
+      frequency: inputs.f,
+      'mech-power': inputs.Pm,
+      'pmax-pre': inputs.Pmax_pre,
+      'pmax-fault': inputs.Pmax_fault,
+      'pmax-post': inputs.Pmax_post,
+      't-clear': inputs.t_clear,
+      't-end': inputs.t_end,
+    };
+    Object.entries(values).forEach(([id, value]) => {
+      const input = document.getElementById(id);
+      if (input && Number.isFinite(Number(value))) input.value = value;
+    });
+  }
+
+  function importProjectInputs() {
+    const imported = buildTransientStabilityProjectInputs(getOneLine(), getStudies());
+    if (!imported.inputs) {
+      sourceDiv.className = 'result-fail';
+      sourceDiv.textContent = imported.warnings.join(' ');
+      showAlertModal('Project Data Incomplete', imported.warnings.join(' '), { variant: 'danger' });
+      return;
+    }
+    restoreInputs(imported.inputs);
+    importedSourceFingerprint = imported.sourceFingerprint;
+    sourceDiv.className = 'result-warn';
+    sourceDiv.textContent = `Imported available data for ${imported.inputs.generatorLabel}. ${imported.warnings.join(' ')}`;
+  }
 
   function getInputs() {
     return {
@@ -95,6 +146,23 @@ document.addEventListener('DOMContentLoaded', () => {
         cctResult = { cct_s: NaN, cct_cycles: NaN, converged: false };
       }
     }
+
+    const result = {
+      inputs: inp,
+      simulation: simResult,
+      equalArea: eac,
+      cct: cctResult,
+      delta0,
+      runMetadata: createStudyRunMetadata(
+        'transientStability',
+        { ready: true, sourceFingerprint: importedSourceFingerprint, counts: { machines: 1 } },
+        { valid: true, convergedCount: 1, totalCount: 1 },
+        { source: importedSourceFingerprint ? 'project-one-line' : 'manual', persisted: true }
+      ),
+    };
+    const studies = getStudies();
+    studies.transientStability = result;
+    setStudies(studies);
 
     renderResults(inp, simResult, eac, cctResult, delta0);
     renderPlot(simResult, inp);

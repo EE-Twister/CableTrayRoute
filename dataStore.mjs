@@ -67,6 +67,33 @@ export function compareStudies(a, b) {
   return { [a]: first, [b]: second };
 }
 
+/**
+ * Read the core project state for a named scenario without changing the
+ * active scenario. Scenario Comparison uses this read-only snapshot so every
+ * compared domain comes from the same scenario revision.
+ *
+ * @param {string} scenarioName
+ * @returns {Object}
+ */
+export function getScenarioSnapshot(scenarioName) {
+  const scenario = scenarioName || getCurrentScenarioNameState();
+  return {
+    scenario,
+    equipment: read(KEYS.equipment, [], scenario),
+    loads: read(KEYS.loads, [], scenario),
+    panels: read(KEYS.panels, [], scenario),
+    cables: read(KEYS.cables, [], scenario),
+    trays: read(KEYS.trays, [], scenario),
+    conduits: read(KEYS.conduits, [], scenario),
+    ductbanks: read(KEYS.ductbanks, [], scenario),
+    oneLine: read(KEYS.oneLine, { activeSheet: 0, sheets: [] }, scenario),
+    studies: read(KEYS.studies, {}, scenario),
+    studyProvenance: read(EXTRA_KEYS.studyProvenance, {}, scenario),
+    studyApprovals: read(EXTRA_KEYS.studyApprovals, {}, scenario),
+    designBasis: read(EXTRA_KEYS.designBasis, {}, scenario),
+  };
+}
+
 const KEYS = {
   // Preferred property names
   trays: 'traySchedule',
@@ -105,8 +132,12 @@ const EXTRA_KEYS = {
   drcAcceptedFindings: 'drcAcceptedFindings',
   studyApprovals: 'studyApprovals',
   studyProvenance: 'studyProvenance',
+  cathodicProtectionDraft: 'cathodicProtectionDraft',
   reportSnapshots: 'reportSnapshots',
   lifecyclePackages: 'lifecyclePackages',
+  deliverableArtifacts: 'deliverableArtifacts',
+  fieldExecutionRecords: 'fieldExecutionRecords',
+  procurementRegister: 'procurementRegister',
   projectMeta: 'projectMeta',
   designBasis: 'designBasis',
   designGateApprovals: 'designGateApprovals',
@@ -354,6 +385,39 @@ export const deleteLifecyclePackage = id => {
   const list = getLifecyclePackages().filter(p => p.id !== id);
   write(EXTRA_KEYS.lifecyclePackages, list);
 };
+
+// Structured deliverable records connect page exports back to the project.
+// Each artifact carries its own source fingerprint, revision, status, and
+// included-section manifest so downstream packages can identify stale inputs.
+export const getDeliverableArtifacts = () => read(EXTRA_KEYS.deliverableArtifacts, []);
+export const setDeliverableArtifacts = artifacts => write(
+  EXTRA_KEYS.deliverableArtifacts,
+  Array.isArray(artifacts) ? artifacts : []
+);
+export const upsertDeliverableArtifact = artifact => {
+  if (!artifact || typeof artifact !== 'object' || !artifact.id) return;
+  const artifacts = getDeliverableArtifacts();
+  const index = artifacts.findIndex(item => item?.id === artifact.id);
+  if (index >= 0) artifacts[index] = artifact;
+  else artifacts.unshift(artifact);
+  setDeliverableArtifacts(artifacts);
+};
+
+// Field execution records are keyed by stable record type and source tag.
+// The presentation can evolve independently from this shared project data.
+export const getFieldExecutionRecords = () => read(EXTRA_KEYS.fieldExecutionRecords, []);
+export const setFieldExecutionRecords = records => write(
+  EXTRA_KEYS.fieldExecutionRecords,
+  Array.isArray(records) ? records : []
+);
+
+// Procurement schedule workflow state. The procurement page owns the record
+// shape while storage keeps it scenario-aware and included in project exports.
+export const getProcurementRegister = () => read(EXTRA_KEYS.procurementRegister, []);
+export const setProcurementRegister = records => write(
+  EXTRA_KEYS.procurementRegister,
+  Array.isArray(records) ? records : []
+);
 
 // Canonical project identity and site context. Keep this separate from the
 // display-only project name so every calculator and deliverable can bind to
@@ -690,6 +754,8 @@ export const setStudies = results => {
 };
 
 export const getStudyProvenance = () => read(EXTRA_KEYS.studyProvenance, {});
+export const getCathodicProtectionDraft = () => read(EXTRA_KEYS.cathodicProtectionDraft, null);
+export const setCathodicProtectionDraft = draft => write(EXTRA_KEYS.cathodicProtectionDraft, draft);
 export const getProjectInputSnapshot = () => ({
   projectMeta: getProjectMeta(),
   designBasis: getDesignBasis(),
@@ -863,6 +929,16 @@ export function saveProject(projectId, scenario = getCurrentScenarioNameState())
       cableChangeLog: getCableChangeLog(),
       designBasis: getDesignBasis(),
       designGateApprovals: getDesignGateApprovals(),
+      workflowArtifacts: {
+        deliverableArtifacts: getDeliverableArtifacts(),
+        fieldExecutionRecords: getFieldExecutionRecords(),
+        procurementRegister: getProcurementRegister(),
+        reportSnapshots: getReportSnapshots(),
+        lifecyclePackages: getLifecyclePackages(),
+        pullPlanArtifact: getItem('pullPlanArtifact', null),
+        costEstimateArtifact: getItem('costEstimateArtifact', null),
+        latestRouteResults: getItem('latestRouteResults', null),
+      },
       mccLineups: getMccLineups(),
       raceways: {
         trays: getTrays(),
@@ -900,6 +976,7 @@ export function loadProject(projectId, scenario = getCurrentScenarioNameState())
     const cableChangeLog = payload.cableChangeLog;
     const designBasis = payload.designBasis;
     const designGateApprovals = payload.designGateApprovals;
+    const workflowArtifacts = payload.workflowArtifacts || {};
     const mccLineups = payload.mccLineups;
     const raceways = payload.raceways || {};
     const oneLine = payload.oneLine || {};
@@ -913,6 +990,18 @@ export function loadProject(projectId, scenario = getCurrentScenarioNameState())
     if (Array.isArray(cableChangeLog)) setCableChangeLog(cableChangeLog); else setCableChangeLog([]);
     if (designBasis && typeof designBasis === 'object' && !Array.isArray(designBasis)) setDesignBasis(designBasis); else setDesignBasis(null);
     if (designGateApprovals && typeof designGateApprovals === 'object' && !Array.isArray(designGateApprovals)) setDesignGateApprovals(designGateApprovals); else setDesignGateApprovals({});
+    setDeliverableArtifacts(workflowArtifacts.deliverableArtifacts);
+    setFieldExecutionRecords(workflowArtifacts.fieldExecutionRecords);
+    setProcurementRegister(workflowArtifacts.procurementRegister);
+    if (workflowArtifacts.reportSnapshots && typeof workflowArtifacts.reportSnapshots === 'object') {
+      write(EXTRA_KEYS.reportSnapshots, workflowArtifacts.reportSnapshots);
+    }
+    if (Array.isArray(workflowArtifacts.lifecyclePackages)) {
+      write(EXTRA_KEYS.lifecyclePackages, workflowArtifacts.lifecyclePackages);
+    }
+    if (workflowArtifacts.pullPlanArtifact !== undefined) setItem('pullPlanArtifact', workflowArtifacts.pullPlanArtifact);
+    if (workflowArtifacts.costEstimateArtifact !== undefined) setItem('costEstimateArtifact', workflowArtifacts.costEstimateArtifact);
+    if (workflowArtifacts.latestRouteResults !== undefined) setItem('latestRouteResults', workflowArtifacts.latestRouteResults);
     if (Array.isArray(mccLineups)) setMccLineups(mccLineups); else setMccLineups([]);
     setTrays(Array.isArray(raceways.trays) ? raceways.trays : []);
     setConduits(Array.isArray(raceways.conduits) ? raceways.conduits : []);
@@ -946,7 +1035,7 @@ export function loadProject(projectId, scenario = getCurrentScenarioNameState())
 export function applyRemoteSnapshot(snapshot, projectId) {
   if (!snapshot || typeof snapshot !== 'object') return;
   try {
-    const { equipment, panels, loads, cables, cableTypicals, cableTemplates, cableTagSettings, cableChangeLog, designBasis, designGateApprovals, mccLineups, raceways = {}, oneLine } = snapshot;
+    const { equipment, panels, loads, cables, cableTypicals, cableTemplates, cableTagSettings, cableChangeLog, designBasis, designGateApprovals, workflowArtifacts = {}, mccLineups, raceways = {}, oneLine } = snapshot;
     if (Array.isArray(equipment)) setEquipment(equipment);
     if (Array.isArray(panels)) setPanels(panels);
     if (Array.isArray(loads)) setLoads(loads);
@@ -957,6 +1046,20 @@ export function applyRemoteSnapshot(snapshot, projectId) {
     if (Array.isArray(cableChangeLog)) setCableChangeLog(cableChangeLog);
     if (designBasis && typeof designBasis === 'object' && !Array.isArray(designBasis)) setDesignBasis(designBasis);
     if (designGateApprovals && typeof designGateApprovals === 'object' && !Array.isArray(designGateApprovals)) setDesignGateApprovals(designGateApprovals);
+    if (workflowArtifacts && typeof workflowArtifacts === 'object') {
+      setDeliverableArtifacts(workflowArtifacts.deliverableArtifacts);
+      setFieldExecutionRecords(workflowArtifacts.fieldExecutionRecords);
+      setProcurementRegister(workflowArtifacts.procurementRegister);
+      if (workflowArtifacts.reportSnapshots && typeof workflowArtifacts.reportSnapshots === 'object') {
+        write(EXTRA_KEYS.reportSnapshots, workflowArtifacts.reportSnapshots);
+      }
+      if (Array.isArray(workflowArtifacts.lifecyclePackages)) {
+        write(EXTRA_KEYS.lifecyclePackages, workflowArtifacts.lifecyclePackages);
+      }
+      if (workflowArtifacts.pullPlanArtifact !== undefined) setItem('pullPlanArtifact', workflowArtifacts.pullPlanArtifact);
+      if (workflowArtifacts.costEstimateArtifact !== undefined) setItem('costEstimateArtifact', workflowArtifacts.costEstimateArtifact);
+      if (workflowArtifacts.latestRouteResults !== undefined) setItem('latestRouteResults', workflowArtifacts.latestRouteResults);
+    }
     if (Array.isArray(mccLineups)) setMccLineups(mccLineups); else setMccLineups([]);
     setTrays(Array.isArray(raceways.trays) ? raceways.trays : []);
     setConduits(Array.isArray(raceways.conduits) ? raceways.conduits : []);
@@ -1268,6 +1371,7 @@ if (typeof window !== 'undefined') {
     switchScenario,
     cloneScenario,
     compareStudies,
+    getScenarioSnapshot,
     on,
     off,
     keys,
@@ -1280,6 +1384,13 @@ if (typeof window !== 'undefined') {
     exportToCad,
     getReportSnapshots,
     setReportSnapshot,
-    deleteReportSnapshot
+    deleteReportSnapshot,
+    getDeliverableArtifacts,
+    setDeliverableArtifacts,
+    upsertDeliverableArtifact,
+    getFieldExecutionRecords,
+    setFieldExecutionRecords,
+    getProcurementRegister,
+    setProcurementRegister
   };
 }

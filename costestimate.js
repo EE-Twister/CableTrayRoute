@@ -4,13 +4,29 @@ import {
   estimateConduitCosts,
   summarizeCosts,
   DEFAULT_PRICES,
+  DEFAULT_ESTIMATE_BASIS,
+  COST_SOURCE_URLS,
+  buildEstimateBasis,
+  applyEstimateBasis,
   parsePricingCSV,
   exportPricingCSV,
 } from './analysis/costEstimate.mjs';
-import { getCables, getTrays, getConduits, getStudies, migrateLegacyItem, setItem, removeItem } from './dataStore.mjs';
+import {
+  getCables,
+  getConduits,
+  getProjectInputFingerprint,
+  getStudies,
+  getTrays,
+  migrateLegacyItem,
+  removeItem,
+  setItem,
+  upsertDeliverableArtifact,
+} from './dataStore.mjs';
 import { showAlertModal } from './src/components/modal.js';
+import { normalizeDeliverableArtifact } from './analysis/deliverableArtifacts.mjs';
 
 const CUSTOM_PRICING_KEY = 'customPricing';
+const COST_ESTIMATE_BASIS_KEY = 'costEstimateBasis';
 
 document.addEventListener('DOMContentLoaded', () => {
   initSettings();
@@ -22,6 +38,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // ── Custom pricing state ─────────────────────────────────────────────────
   let customPrices = null;          // null = use DEFAULT_PRICES
   let customPricingMeta = { source: '', date: '', rowCount: 0 };
+  let lastEstimateBasis = buildEstimateBasis();
 
   // Restore persisted custom pricing from project settings.
   try {
@@ -32,7 +49,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   } catch { /* ignore corrupt project settings */ }
 
+  try {
+    const savedBasis = migrateLegacyItem('ctr-cost-estimate-basis', COST_ESTIMATE_BASIS_KEY, null);
+    if (savedBasis && typeof savedBasis === 'object') restoreEstimateBasis(savedBasis);
+  } catch { /* ignore corrupt project settings */ }
+
   renderPricingBasis();
+  updateEscalationPreview();
 
   // ── Button wiring ────────────────────────────────────────────────────────
   document.getElementById('estimate-btn').addEventListener('click', runEstimate);
@@ -46,12 +69,32 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.getElementById('export-pricing-btn').addEventListener('click', handlePricingExport);
 
+  [
+    'estimate-class',
+    'pricing-base-date',
+    'estimate-date',
+    'labor-region',
+    'national-electrician-wage',
+    'local-electrician-wage',
+    'material-base-index',
+    'material-current-index',
+    'material-series-id',
+    'material-series-name',
+    'labor-base-index',
+    'labor-current-index',
+    'labor-series-id',
+    'labor-series-name',
+  ].forEach(id => {
+    document.getElementById(id)?.addEventListener('input', updateEscalationPreview);
+    document.getElementById(id)?.addEventListener('change', updateEscalationPreview);
+  });
+
   document.getElementById('reset-pricing-btn').addEventListener('click', () => {
     customPrices = null;
     customPricingMeta = { source: '', date: '', rowCount: 0 };
     removeItem(CUSTOM_PRICING_KEY);
     renderPricingBasis();
-    showAlertModal('Pricing Reset', 'Unit prices have been reset to default RS Means 2024 mid-range values.');
+    showAlertModal('Pricing Reset', 'Unit prices have been reset to the built-in 2024 conceptual allowances.');
   });
 
   let lastLineItems = [];
@@ -67,7 +110,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const cnt  = customPricingMeta.rowCount != null ? ` — ${customPricingMeta.rowCount} entries` : '';
       el.textContent = `Custom pricing active: ${src}${dt}${cnt}`;
     } else {
-      el.textContent = 'Using default RS Means 2024 mid-range pricing.';
+      el.textContent = 'Using built-in 2024 conceptual pricing allowances.';
     }
   }
 
@@ -107,7 +150,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function handlePricingExport() {
     // Merge current custom prices (or defaults) with any manual UI overrides
-    const merged = buildMergedPrices();
+    const merged = buildMergedPrices(false);
     const csv = exportPricingCSV(merged, customPricingMeta);
     const blob = new Blob([csv], { type: 'text/csv' });
     const url  = URL.createObjectURL(blob);
@@ -123,7 +166,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // ── Price building ───────────────────────────────────────────────────────
 
   /** Build the merged prices object used for the estimate. */
-  function buildMergedPrices() {
+  function buildMergedPrices(applyBasis = true) {
     // Start from custom prices (if loaded) or defaults
     const base = customPrices
       ? {
@@ -143,18 +186,96 @@ document.addEventListener('DOMContentLoaded', () => {
           laborProductivity: { ...DEFAULT_PRICES.laborProductivity },
         };
 
-    // Manual UI labor-rate fields always take precedence
+    const estimateBasis = buildEstimateBasis(readEstimateBasis());
+    const adjusted = applyBasis ? applyEstimateBasis(base, estimateBasis) : base;
+    if (applyBasis) {
+      lastEstimateBasis = estimateBasis;
+      try {
+        setItem(COST_ESTIMATE_BASIS_KEY, estimateBasis);
+      } catch { /* project storage quota is handled centrally */ }
+    }
+
+    // Manual UI labor-rate fields always take precedence as final rates.
     const manualCableLabor   = numVal('labor-cable-rate',   null);
     const manualTrayLabor    = numVal('labor-tray-rate',    null);
     const manualConduitLabor = numVal('labor-conduit-rate', null);
     const manualFitting      = numVal('fitting-price',      null);
 
-    if (manualCableLabor   !== null) base.labor.cableInstall    = manualCableLabor;
-    if (manualTrayLabor    !== null) base.labor.trayInstall     = manualTrayLabor;
-    if (manualConduitLabor !== null) base.labor.conduitInstall  = manualConduitLabor;
-    if (manualFitting      !== null) base.fitting               = manualFitting;
+    if (manualCableLabor   !== null) adjusted.labor.cableInstall    = manualCableLabor;
+    if (manualTrayLabor    !== null) adjusted.labor.trayInstall     = manualTrayLabor;
+    if (manualConduitLabor !== null) adjusted.labor.conduitInstall  = manualConduitLabor;
+    if (manualFitting      !== null) adjusted.fitting               = manualFitting;
 
-    return base;
+    return adjusted;
+  }
+
+  function textVal(id, fallback = '') {
+    const el = document.getElementById(id);
+    return el ? el.value.trim() : fallback;
+  }
+
+  function readEstimateBasis() {
+    return {
+      estimateClass: textVal('estimate-class', DEFAULT_ESTIMATE_BASIS.estimateClass),
+      baseDate: textVal('pricing-base-date', DEFAULT_ESTIMATE_BASIS.baseDate),
+      estimateDate: textVal('estimate-date'),
+      laborRegion: textVal('labor-region', DEFAULT_ESTIMATE_BASIS.laborRegion),
+      nationalElectricianHourlyWage: numVal('national-electrician-wage', DEFAULT_ESTIMATE_BASIS.nationalElectricianHourlyWage),
+      localElectricianHourlyWage: numVal('local-electrician-wage', DEFAULT_ESTIMATE_BASIS.localElectricianHourlyWage),
+      wageDataDate: 'May 2024',
+      wageSource: DEFAULT_ESTIMATE_BASIS.wageSource,
+      wageSourceUrl: COST_SOURCE_URLS.oewsElectricians,
+      materialBaseIndex: numVal('material-base-index', 100),
+      materialCurrentIndex: numVal('material-current-index', 100),
+      materialSeriesId: textVal('material-series-id'),
+      materialSeriesName: textVal('material-series-name', DEFAULT_ESTIMATE_BASIS.materialSeriesName),
+      materialSourceUrl: COST_SOURCE_URLS.ppiData,
+      laborBaseIndex: numVal('labor-base-index', 100),
+      laborCurrentIndex: numVal('labor-current-index', 100),
+      laborSeriesId: textVal('labor-series-id'),
+      laborSeriesName: textVal('labor-series-name', DEFAULT_ESTIMATE_BASIS.laborSeriesName),
+      laborSourceUrl: COST_SOURCE_URLS.eciEscalation,
+    };
+  }
+
+  function restoreEstimateBasis(basis) {
+    const values = {
+      'estimate-class': basis.estimateClass,
+      'pricing-base-date': basis.baseDate,
+      'estimate-date': basis.estimateDate,
+      'labor-region': basis.laborRegion,
+      'national-electrician-wage': basis.nationalElectricianHourlyWage,
+      'local-electrician-wage': basis.localElectricianHourlyWage,
+      'material-base-index': basis.materialBaseIndex,
+      'material-current-index': basis.materialCurrentIndex,
+      'material-series-id': basis.materialSeriesId,
+      'material-series-name': basis.materialSeriesName,
+      'labor-base-index': basis.laborBaseIndex,
+      'labor-current-index': basis.laborCurrentIndex,
+      'labor-series-id': basis.laborSeriesId,
+      'labor-series-name': basis.laborSeriesName,
+    };
+    Object.entries(values).forEach(([id, value]) => {
+      const el = document.getElementById(id);
+      if (el && value != null) el.value = value;
+    });
+  }
+
+  function updateEscalationPreview() {
+    const basis = buildEstimateBasis(readEstimateBasis());
+    lastEstimateBasis = basis;
+    const el = document.getElementById('escalation-preview');
+    if (el) {
+      el.innerHTML = `<strong>Applied factors:</strong> materials ×${basis.materialFactor.toFixed(3)};
+        regional labor ×${basis.regionalLaborFactor.toFixed(3)};
+        labor escalation ×${basis.laborEscalationFactor.toFixed(3)};
+        combined labor ×${basis.combinedLaborFactor.toFixed(3)}.
+        ${basis.materialIndexDocumented ? '' : ' Add a PPI series ID to complete material provenance.'}
+        ${basis.laborIndexDocumented ? '' : ' Add an ECI series ID to complete labor provenance.'}`;
+    }
+    try {
+      setItem(COST_ESTIMATE_BASIS_KEY, basis);
+    } catch { /* project storage quota is handled centrally */ }
   }
 
   function numVal(id, fallback) {
@@ -192,7 +313,35 @@ document.addEventListener('DOMContentLoaded', () => {
     const contingencyAmt = summary.grandTotal * contingencyPct;
     const totalWithContingency = summary.grandTotal + contingencyAmt;
 
-    renderResults(summary, lastLineItems, contingencyPct, contingencyAmt, totalWithContingency);
+    const generatedAt = new Date().toISOString();
+    const savedEstimate = {
+      generatedAt,
+      basis: lastEstimateBasis,
+      summary: {
+        material: summary.grandMaterial,
+        labor: summary.grandLabor,
+        subtotal: summary.grandTotal,
+        contingencyPct: contingencyPct * 100,
+        contingency: contingencyAmt,
+        total: totalWithContingency,
+      },
+      rows: lastLineItems,
+    };
+    setItem('costEstimateArtifact', savedEstimate);
+    upsertDeliverableArtifact(normalizeDeliverableArtifact({
+      id: 'cost-estimate-current',
+      type: 'cost-estimate',
+      title: 'Current Cost Estimate',
+      revision: lastEstimateBasis.estimateDate || lastEstimateBasis.baseDate || '0',
+      status: 'draft',
+      generatedAt,
+      sourceFingerprint: getProjectInputFingerprint(),
+      sourcePage: 'costestimate.html',
+      includedSections: ['costEstimate'],
+      summary: savedEstimate.summary,
+    }));
+
+    renderResults(summary, lastLineItems, contingencyPct, contingencyAmt, totalWithContingency, lastEstimateBasis);
   }
 
   function getContingencyPct() {
@@ -215,10 +364,10 @@ document.addEventListener('DOMContentLoaded', () => {
       const dt = customPricingMeta.date ? ` (${customPricingMeta.date})` : '';
       return `Prices from custom pricing book: "${esc(customPricingMeta.source)}"${esc(dt)}.`;
     }
-    return 'Prices based on mid-range 2024 USD contractor pricing (RS Means basis). Adjust overrides for your region.';
+    return 'Prices based on built-in 2024 USD conceptual allowances. Replace them with a licensed cost source or supplier quote for issued estimates.';
   }
 
-  function renderResults(summary, lineItems, contingencyPct, contingencyAmt, totalWithContingency) {
+  function renderResults(summary, lineItems, contingencyPct, contingencyAmt, totalWithContingency, basis) {
     const catRows = Object.entries(summary.categories).map(([cat, s]) => `
       <tr>
         <td><strong>${esc(cat)}</strong></td>
@@ -244,6 +393,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.getElementById('results').innerHTML = `
       <h2>Cost Summary</h2>
+      <section class="field-group" aria-label="Estimate basis summary" style="margin-bottom:1.5rem">
+        <h3>Estimate Basis</h3>
+        <table class="result-table" aria-label="Estimate escalation basis">
+          <tbody>
+            <tr><td>Classification</td><td><strong>${esc(basis.estimateClass)}</strong></td></tr>
+            <tr><td>Pricing period</td><td>${esc(basis.baseDate || 'not recorded')} → ${esc(basis.estimateDate || 'estimate date not recorded')}</td></tr>
+            <tr><td>Material escalation</td><td>×${basis.materialFactor.toFixed(3)} from ${esc(basis.materialSeriesId || 'undocumented PPI series')} (${basis.materialBaseIndex} → ${basis.materialCurrentIndex}) — <a href="${COST_SOURCE_URLS.ppiData}" target="_blank" rel="noopener">BLS PPI data</a></td></tr>
+            <tr><td>Regional labor</td><td>×${basis.regionalLaborFactor.toFixed(3)} for ${esc(basis.laborRegion)} (${basis.localElectricianHourlyWage.toFixed(2)} ÷ ${basis.nationalElectricianHourlyWage.toFixed(2)}) — <a href="${COST_SOURCE_URLS.oewsElectricians}" target="_blank" rel="noopener">BLS OEWS basis</a></td></tr>
+            <tr><td>Labor escalation</td><td>×${basis.laborEscalationFactor.toFixed(3)} from ${esc(basis.laborSeriesId || 'undocumented ECI series')} (${basis.laborBaseIndex} → ${basis.laborCurrentIndex}) — <a href="${COST_SOURCE_URLS.eciEscalation}" target="_blank" rel="noopener">BLS escalation guidance</a></td></tr>
+            <tr><td>Combined labor adjustment</td><td><strong>×${basis.combinedLaborFactor.toFixed(3)}</strong></td></tr>
+          </tbody>
+        </table>
+        ${!basis.materialIndexDocumented || !basis.laborIndexDocumented
+          ? '<p class="field-hint"><strong>Source gap:</strong> add the selected BLS series IDs before treating this as a traceable escalated estimate.</p>'
+          : ''}
+      </section>
       <table class="result-table" aria-label="Cost summary by category">
         <thead>
           <tr>
@@ -298,8 +463,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
       <p class="field-hint" style="margin-top:1rem">
         ${pricingSourceNote()}
-        Labor rates reflect union-scale journeyperson electrician wages. Contingency covers design
-        changes, site conditions, and minor scope additions.
+        Regional and labor-index factors scale contractor labor rates; employee wage data is used only as a geographic index.
+        Contingency covers design changes, site conditions, and minor scope additions.
       </p>`;
   }
 
@@ -330,11 +495,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const srcNote = customPrices && customPricingMeta.source
       ? `Custom pricing: ${customPricingMeta.source}${customPricingMeta.date ? ' (' + customPricingMeta.date + ')' : ''}`
-      : 'RS Means 2024 mid-range pricing';
+      : 'Built-in 2024 conceptual pricing allowances';
 
     const summaryData = [
       ['CableTrayRoute — Cost Estimate'],
       [`Pricing basis: ${srcNote}`],
+      [`Estimate class: ${lastEstimateBasis.estimateClass}`],
+      [`Pricing period: ${lastEstimateBasis.baseDate || 'not recorded'} to ${lastEstimateBasis.estimateDate || 'not recorded'}`],
+      [`Material factor: ${lastEstimateBasis.materialFactor.toFixed(6)}`],
+      [`Combined labor factor: ${lastEstimateBasis.combinedLaborFactor.toFixed(6)}`],
       [],
       ['Category', 'Material ($)', 'Labor ($)', 'Total ($)'],
       ...Object.entries(summary.categories).map(([cat, s]) => [cat, s.materialCost.toFixed(0), s.laborCost.toFixed(0), s.totalCost.toFixed(0)]),
@@ -344,6 +513,27 @@ document.addEventListener('DOMContentLoaded', () => {
       ['Grand Total', '', '', totalWithContingency.toFixed(0)],
     ];
     addSheet('Summary', summaryData);
+
+    addSheet('Estimate Basis', [
+      ['Field', 'Value', 'Source / note'],
+      ['Estimate classification', lastEstimateBasis.estimateClass, ''],
+      ['Currency', lastEstimateBasis.currency, ''],
+      ['Pricing base date', lastEstimateBasis.baseDate, ''],
+      ['Estimate date', lastEstimateBasis.estimateDate, ''],
+      ['Material series ID', lastEstimateBasis.materialSeriesId, lastEstimateBasis.materialSeriesName],
+      ['Material base index', lastEstimateBasis.materialBaseIndex, ''],
+      ['Material current index', lastEstimateBasis.materialCurrentIndex, ''],
+      ['Material escalation factor', lastEstimateBasis.materialFactor, lastEstimateBasis.materialSourceUrl],
+      ['Labor region', lastEstimateBasis.laborRegion, ''],
+      ['National electrician wage ($/hr)', lastEstimateBasis.nationalElectricianHourlyWage, lastEstimateBasis.wageSource],
+      ['Local electrician wage ($/hr)', lastEstimateBasis.localElectricianHourlyWage, 'Comparable local OEWS value supplied by estimator'],
+      ['Regional labor factor', lastEstimateBasis.regionalLaborFactor, lastEstimateBasis.wageSourceUrl],
+      ['Labor series ID', lastEstimateBasis.laborSeriesId, lastEstimateBasis.laborSeriesName],
+      ['Labor base index', lastEstimateBasis.laborBaseIndex, ''],
+      ['Labor current index', lastEstimateBasis.laborCurrentIndex, ''],
+      ['Labor escalation factor', lastEstimateBasis.laborEscalationFactor, lastEstimateBasis.laborSourceUrl],
+      ['Combined labor factor', lastEstimateBasis.combinedLaborFactor, 'Regional factor × labor escalation factor'],
+    ]);
 
     const detailData = [
       ['Category', 'ID', 'Description', 'Manufacturer', 'Catalog No.', 'Approval', 'Quantity', 'Unit', 'Unit Price ($)', 'Material ($)', 'Labor ($)', 'Total ($)'],

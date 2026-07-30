@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Project Cost Estimator uses unit prices to calculate material and labor costs for cables, trays, conduit, and fittings. By default it uses mid-range RS Means 2024 USD values, which are suitable for conceptual and budgetary estimates.
+The Project Cost Estimator uses unit prices to calculate material and labor costs for cables, trays, conduit, and fittings. Its built-in 2024 USD values are conceptual allowances, not a licensed cost-book extract. Import supplier, internal, or licensed cost data for issued estimates.
 
 For detailed estimates — such as those submitted to a client or used for contractor bid comparison — you can import a **custom pricing book** from a CSV file. Typical sources include:
 
@@ -26,6 +26,44 @@ Imported pricing is saved in your browser and persists between sessions so you d
 
 ---
 
+## Regional and Date Escalation
+
+The **Estimate Basis & Escalation** section applies three independent factors:
+
+```
+material factor = current PPI index / base PPI index
+regional labor factor = local electrician wage / national electrician wage
+labor escalation factor = current ECI index / base ECI index
+combined labor factor = regional labor factor × labor escalation factor
+```
+
+Material prices (cable, tray, conduit, and fittings) receive the material
+factor. Contractor labor rates receive the combined labor factor. Productivity
+rates are not changed.
+
+### Public source basis
+
+- The national reference wage is `$62,350 / 2,080 = $29.98/hr`, based on the
+  BLS May 2024 median annual wage for Electricians (SOC 47-2111):
+  [BLS Electricians](https://www.bls.gov/ooh/construction-and-extraction/electricians.htm)
+- Enter a comparable state or metropolitan OEWS electrician wage for the
+  project location. The wage is used only as a geographic index; it does not
+  replace the loaded contractor bill rate.
+- Select a project-appropriate material series from the
+  [BLS PPI database](https://www.bls.gov/ppi/databases/) and record its series
+  ID, base-period value, and estimate-period value.
+- Select a project-appropriate **non-seasonally adjusted** labor series and
+  follow the [BLS ECI escalation guidance](https://www.bls.gov/eci/factsheets/how-to-use-eci-for-escalation.htm).
+
+The application does not fetch live index values. Values, series IDs, and
+periods are saved together, making the estimate reproducible offline. A blank
+series ID is shown as a provenance gap.
+
+Manual labor-rate inputs are final-rate overrides and are applied after regional
+and escalation factors. The manual fitting price is also a final override.
+
+---
+
 ## Exporting the Current Pricing Book
 
 Click **Export Current Pricing** to download a `pricing-book.csv` file containing all active unit prices (custom or default). You can open this file in Excel, update values, and re-import it.
@@ -41,7 +79,7 @@ This is the recommended workflow for first-time setup:
 
 ## Resetting to Default Prices
 
-Click **Reset to Default (RS Means)** to clear all custom pricing and return to the built-in RS Means 2024 values. The stored pricing book is removed from browser storage.
+Click **Reset to Built-in Defaults** to clear all custom pricing and return to the built-in 2024 conceptual allowances. The stored pricing book is removed from project storage.
 
 ---
 
@@ -144,9 +182,17 @@ productivity,conduitInstallFtPerHr,22,ft/hr,IBEW Local 2026,2026-04-11
 
 ## Persistence
 
-Custom pricing is stored in browser `localStorage` under the key `ctr-custom-prices`. It persists until you:
+Each successful estimate is saved as `settings.costEstimateArtifact`. The
+record includes the source-stamped estimate basis, category summary,
+contingency, grand total, and line-item rows. A source-fingerprinted entry is
+also added to the deliverable register so Project Report and Submittal packages
+can include the current estimate without relying on a downloaded workbook.
 
-- Click **Reset to Default (RS Means)**, or
+Custom pricing is stored through project storage under `settings.customPricing`.
+The regional/escalation basis is stored under `settings.costEstimateBasis`.
+Legacy browser keys are migrated through the central storage API. Pricing persists until you:
+
+- Click **Reset to Built-in Defaults**, or
 - Clear your browser's site data.
 
 Each browser profile and device maintains its own pricing book. For team use, export the CSV and share it so all team members import the same rates.
@@ -155,7 +201,12 @@ Each browser profile and device maintains its own pricing book. For team use, ex
 
 ## XLSX Export
 
-When exporting the estimate to XLSX, the **Summary** sheet includes a "Pricing basis" row identifying whether default or custom pricing was used, along with the source name and date. The **Line Items** sheet also carries manufacturer, catalog number, and approval status fields when schedule rows include governed catalog metadata. This provides an audit trail in the delivered estimate document.
+When exporting the estimate to XLSX, the **Summary** sheet includes the pricing
+basis and applied material/labor factors. A dedicated **Estimate Basis** sheet
+records dates, region, wages, index values, series IDs, calculated factors, and
+public source URLs. The **Line Items** sheet also carries manufacturer, catalog
+number, and approval status fields when schedule rows include governed catalog
+metadata.
 
 
 ---

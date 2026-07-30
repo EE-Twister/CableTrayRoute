@@ -80,7 +80,9 @@
 
       <details class="method-panel">
         <summary>Method &amp; Assumptions</summary>
-        <p>Cables are grouped by conductor specification (type + size + material).
+        <p>Cables are grouped by a canonical product specification: cable type,
+        conductor count, size and material, voltage/insulation ratings, jacket,
+        grounding conductor, and manufacturer/catalog identity.
         A <strong>field-trim tolerance</strong> (default 3%) is added to each cable's
         routed length per IEEE 1185 §6.4 to account for connector strain relief and
         termination offcuts.</p>
@@ -129,6 +131,12 @@
         to generate the procurement schedule.
       </p>
 
+      <section id="coverageSection" hidden aria-labelledby="coverageTitle">
+        <h2 id="coverageTitle">Data Coverage</h2>
+        <p id="coverageStatus" role="status"></p>
+        <ul id="coverageWarnings"></ul>
+      </section>
+
       <!-- Summary -->
       <section id="summarySection" hidden aria-label="Procurement summary">
         <h2>Summary</h2>
@@ -149,7 +157,11 @@
               <th scope="col">Spec</th>
               <th scope="col">Type</th>
               <th scope="col">Size</th>
+              <th scope="col">Material</th>
               <th scope="col">Conductors</th>
+              <th scope="col">Rating</th>
+              <th scope="col">Insulation</th>
+              <th scope="col">Manufacturer / Model</th>
               <th scope="col">Cut Count</th>
               <th scope="col">Total Req. (ft)</th>
               <th scope="col">Reel Size</th>
@@ -162,6 +174,41 @@
           </thead>
           <tbody></tbody>
         </table>
+      </section>
+
+      <section id="registerSection" hidden aria-labelledby="registerTitle">
+        <h2 id="registerTitle">Procurement Register</h2>
+        <p class="field-hint">
+          Commercial fields are saved with the current project and retained when
+          the routing schedule is regenerated. The CSV export includes these fields.
+        </p>
+        <p id="inactiveRegisterMsg" class="field-hint" hidden></p>
+        <div class="table-scroll">
+          <table id="registerTable" class="result-table" aria-label="Cable procurement tracking register">
+            <caption class="visually-hidden">Vendor, quotation, purchase order, and delivery tracking</caption>
+            <thead>
+              <tr>
+                <th scope="col">Specification</th>
+                <th scope="col">Planned (ft)</th>
+                <th scope="col">Vendor</th>
+                <th scope="col">Quote #</th>
+                <th scope="col">Quote Date</th>
+                <th scope="col">Need By</th>
+                <th scope="col">Lead Time (weeks)</th>
+                <th scope="col">PO #</th>
+                <th scope="col">PO Date</th>
+                <th scope="col">Status</th>
+                <th scope="col">Promised Delivery</th>
+                <th scope="col">Actual Delivery</th>
+                <th scope="col">Ordered (ft)</th>
+                <th scope="col">Received (ft)</th>
+                <th scope="col">Received Date</th>
+                <th scope="col">Notes</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
       </section>
 
       <nav class="step-nav" aria-label="Workflow navigation">
@@ -179,14 +226,17 @@
       <p>This tool generates an <strong>ordered-length cable procurement schedule</strong>
       from your routing results.</p>
       <p><strong>How it works:</strong> Cables are grouped by conductor specification
-      (type + size + material). A configurable field-trim tolerance is applied to each
+      using construction, rating, material, and catalog fields from Cable Schedule.
+      Missing fields appear as coverage warnings rather than being silently assumed.
+      A configurable field-trim tolerance is applied to each
       cable's routed length. The resulting cut lengths are bin-packed into standard
       reel sizes to minimise waste.</p>
       <p><strong>Line items:</strong> Each row represents one cable specification.
       Click <em>Show</em> in the Cuts column to see the individual cable-level
       assignments with pull references.</p>
       <p><strong>Export:</strong> Use <em>Export CSV</em> to download the schedule for
-      use in purchasing systems or spreadsheets.</p>
+      use in purchasing systems or spreadsheets. Vendor, quotation, purchase-order,
+      and receiving fields in the Procurement Register are saved with the project.</p>
       <p><strong>Prerequisites:</strong> Route results must be present in the current
       session. Run the <a href="optimalRoute.html">Optimal Route</a> tool first.</p>
     </div>

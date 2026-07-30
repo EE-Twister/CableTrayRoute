@@ -1,4 +1,8 @@
-import { buildPullTable, cableQRPayload } from './analysis/pullCards.mjs';
+import {
+  buildPullTable,
+  cableQRPayload,
+  createPullPlanArtifact,
+} from './analysis/pullCards.mjs';
 import { parsePullRouteRows } from './analysis/pullCardRouteImport.mjs';
 import { buildPullRouteVisualModel } from './analysis/pullCardVisualModel.mjs';
 import { buildDeliverableReadinessDiagnostics, filterRouteResultsForProject, normalizeRouteResults } from './analysis/deliverableWorkflow.mjs';
@@ -10,12 +14,18 @@ import {
   getStudies,
   getReportSnapshots,
   getLifecyclePackages,
+  getProjectInputFingerprint,
   getItem,
+  setItem,
+  upsertDeliverableArtifact,
   keys,
 } from './dataStore.mjs';
+import { normalizeDeliverableArtifact } from './analysis/deliverableArtifacts.mjs';
 import { renderIsometricSvg } from './src/utils/isometricSvg.js';
+import { showAlertModal } from './src/components/modal.js';
 
 document.addEventListener('DOMContentLoaded', () => {
+  const PULL_PLAN_KEY = 'pullPlanArtifact';
   initSettings();
   initDarkMode();
   initCompactMode();
@@ -40,10 +50,15 @@ document.addEventListener('DOMContentLoaded', () => {
   const backToTableBtn = document.getElementById('backToTableBtn');
   const exportPullTableBtn = document.getElementById('exportPullTableBtn');
   const exportPullCardsBtn = document.getElementById('exportPullCardsBtn');
+  const savePullPlanBtn = document.getElementById('savePullPlanBtn');
+  const pullPlanSaveStatus = document.getElementById('pullPlanSaveStatus');
   const pullHandoff = document.getElementById('pull-deliverable-handoff');
 
   let currentPulls = null;
   let selectedPullNumber = null;
+  let currentRouteResults = [];
+  let currentCableList = [];
+  let currentRouteSource = 'Pull Cards';
 
   // ---- Import from XLSX ----
 
@@ -66,7 +81,7 @@ document.addEventListener('DOMContentLoaded', () => {
           return;
         }
         const cableList = getCables();
-        generatePullCards(routeResults, cableList);
+        generatePullCards(routeResults, cableList, null, file.name);
       } catch (err) {
         showAlertModal(`Failed to parse file: ${err.message}`);
       }
@@ -80,7 +95,7 @@ document.addEventListener('DOMContentLoaded', () => {
   loadFromProjectBtn.addEventListener('click', () => {
     const candidate = bestRouteResultCandidate();
     if (candidate) {
-      generatePullCards(candidate.routeResults, getCables());
+      generatePullCards(candidate.routeResults, getCables(), null, candidate.label);
       renderPullDeliverableHandoff(candidate);
       return;
     }
@@ -103,8 +118,31 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // ---- Generate pull cards from results ----
 
-  function generatePullCards(routeResults, cableList) {
-    const { pulls, summary } = buildPullTable(routeResults, cableList, { baseURL: fieldViewBaseURL() });
+  function readSavedPullArtifact() {
+    const saved = getItem(PULL_PLAN_KEY, null);
+    return saved && saved.schemaVersion === 1 && saved.pulls && typeof saved.pulls === 'object'
+      ? saved
+      : null;
+  }
+
+  function savedAssumptionsByPull() {
+    const saved = readSavedPullArtifact();
+    if (!saved) return {};
+    return Object.fromEntries(Object.entries(saved.pulls).map(([id, pull]) => [
+      id,
+      pull?.assumptions || {},
+    ]));
+  }
+
+  function generatePullCards(routeResults, cableList, assumptionOverrides = null, source = currentRouteSource) {
+    currentRouteResults = Array.isArray(routeResults) ? routeResults : [];
+    currentCableList = Array.isArray(cableList) ? cableList : [];
+    currentRouteSource = source || 'Pull Cards';
+    const assumptionsByPull = assumptionOverrides || savedAssumptionsByPull();
+    const { pulls, summary } = buildPullTable(currentRouteResults, currentCableList, {
+      baseURL: fieldViewBaseURL(),
+      assumptionsByPull,
+    });
     currentPulls = pulls;
     selectedPullNumber = pulls[0]?.pull_number ?? null;
 
@@ -129,6 +167,10 @@ document.addEventListener('DOMContentLoaded', () => {
       <div class="summary-stat">
         <span class="stat-value">${summary.cables_per_pull_avg}</span>
         <span class="stat-label">Avg Cables/Pull</span>
+      </div>
+      <div class="summary-stat">
+        <span class="stat-value">${summary.pulls_requiring_input}</span>
+        <span class="stat-label">Pulls Requiring Input</span>
       </div>`;
 
     summarySection.hidden = false;
@@ -148,8 +190,10 @@ document.addEventListener('DOMContentLoaded', () => {
         <td>${esc(p.from)}</td>
         <td>${esc(p.to)}</td>
         <td>${p.total_length_ft}</td>
-        <td>${p.total_weight_lb_ft}</td>
-        <td>${p.estimated_tension_lbs}</td>
+        <td>${formatEngineeringValue(p.total_weight_lb_ft)}</td>
+        <td>${formatEngineeringValue(p.estimated_tension_lbs)}</td>
+        <td>${esc(p.direction_label)}</td>
+        <td><span class="status-badge ${engineeringStatusClass(p)}">${esc(engineeringStatusLabel(p))}</span></td>
         <td>${p.segment_count}</td>
         <td><button class="btn view-pull-btn" data-pull="${p.pull_number}">View</button></td>
       </tr>`;
@@ -159,6 +203,7 @@ document.addEventListener('DOMContentLoaded', () => {
     pullCardDetail.hidden = true;
     renderSelectedPullVisual();
     renderPullDeliverableHandoff();
+    renderPullPlanSaveStatus();
 
     // Wire up view buttons
     pullTableBody.querySelectorAll('tr[data-pull]').forEach(row => {
@@ -181,6 +226,54 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     });
   }
+
+  function saveCurrentPullPlan() {
+    if (!currentPulls?.length) {
+      showAlertModal('No pull data to save. Generate pull cards first.');
+      return null;
+    }
+    const artifact = createPullPlanArtifact(currentPulls, { source: currentRouteSource });
+    setItem(PULL_PLAN_KEY, artifact);
+    upsertDeliverableArtifact(normalizeDeliverableArtifact({
+      id: 'pull-plan-current',
+      type: 'pull-plan',
+      title: 'Current Cable Pull Plan',
+      revision: 'current',
+      status: 'draft',
+      generatedAt: artifact.generatedAt,
+      sourceFingerprint: getProjectInputFingerprint(),
+      sourcePage: 'pullcards.html',
+      includedSections: ['pullPlans'],
+      summary: {
+        pulls: Object.keys(artifact.pulls || {}).length,
+        warnings: currentPulls.reduce((count, pull) => count + (pull.coverage_warnings?.length || 0), 0),
+        failedLimits: currentPulls.filter(pull => pull.tension_status === 'fail' || pull.sidewall_status === 'fail').length,
+      },
+    }));
+    renderPullPlanSaveStatus(artifact);
+    return artifact;
+  }
+
+  function renderPullPlanSaveStatus(artifact = readSavedPullArtifact()) {
+    if (!pullPlanSaveStatus) return;
+    if (!artifact) {
+      pullPlanSaveStatus.textContent = 'No project pull plan has been saved.';
+      return;
+    }
+    const count = Object.keys(artifact.pulls || {}).length;
+    const timestamp = new Date(artifact.generatedAt);
+    const savedWhen = Number.isNaN(timestamp.getTime())
+      ? 'time unavailable'
+      : timestamp.toLocaleString();
+    pullPlanSaveStatus.textContent = `Saved ${count} pull plan${count === 1 ? '' : 's'} to this project (${savedWhen}).`;
+  }
+
+  savePullPlanBtn?.addEventListener('click', () => {
+    const artifact = saveCurrentPullPlan();
+    if (artifact) {
+      showAlertModal('Pull plan saved to the current project.');
+    }
+  });
 
   function addRouteCandidate(candidates, seen, key, label, payload, projectData) {
     const routeResults = filterRouteResultsForProject(normalizeRouteResults(payload), projectData);
@@ -348,8 +441,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const model = buildPullRouteVisualModel(pull);
     pullVisualSection.hidden = false;
-    pullIsoSummary.textContent = `Pull #${pull.pull_number}: ${pull.cable_count} cable${pull.cable_count === 1 ? '' : 's'}, ${pull.total_length_ft} ft, ${pull.estimated_tension_lbs} lb estimated tension`;
-    pullIsoStatus.innerHTML = `<span class="status-badge ${model.hasCoordinates ? 'status-ok' : 'status-warning'}">${model.hasCoordinates ? 'Exact coordinates' : 'Coordinate data missing'}</span>`;
+    pullIsoSummary.textContent = `Pull #${pull.pull_number}: ${pull.cable_count} cable${pull.cable_count === 1 ? '' : 's'}, ${pull.total_length_ft} ft, ${formatEngineeringValue(pull.estimated_tension_lbs)} lb estimated tension, ${pull.direction_label}`;
+    pullIsoStatus.innerHTML = `
+      <span class="status-badge ${model.hasCoordinates ? 'status-ok' : 'status-warning'}">${model.hasCoordinates ? 'Exact coordinates' : 'Coordinate data missing'}</span>
+      <span class="status-badge ${engineeringStatusClass(pull)}">${esc(engineeringStatusLabel(pull))}</span>`;
     pullIsoCanvas.innerHTML = renderPullVisualCanvas(model, 'pull-iso-svg-title', 'pull-iso-svg-desc');
     pullIsoInspector.innerHTML = renderPullInspector(model, pull);
   }
@@ -376,11 +471,14 @@ document.addEventListener('DOMContentLoaded', () => {
       <strong>${formatNumber(trace.tensionOut)} lb</strong>
       <small>${formatNumber(trace.sidewallPressure)} lb/ft sidewall</small>
     </li>`).join('');
-    const warnings = model.warnings.map(warning => `<li>${esc(warning)}</li>`).join('');
+    const warnings = [...new Set([
+      ...(model.warnings || []),
+      ...(pull.coverage_warnings || []),
+    ])].map(warning => `<li>${esc(warning)}</li>`).join('');
     return `
       <div class="iso-facts">
         <span><strong>${summary.exactSegments || 0}/${summary.segmentCount || 0}</strong> coordinate segments</span>
-        <span><strong>${formatNumber(summary.maxSidewallPressure)}</strong> lb/ft max sidewall</span>
+        <span><strong>${formatEngineeringValue(pull.max_sidewall_pressure)}</strong> lb/ft max sidewall</span>
       </div>
       ${warnings ? `<ul class="iso-warning-list">${warnings}</ul>` : ''}
       <h3>Tension Profile</h3>
@@ -410,8 +508,8 @@ document.addEventListener('DOMContentLoaded', () => {
       <td>${esc(c.cable_type)}</td>
       <td>${c.conductors}</td>
       <td>${esc(c.conductor_size)}</td>
-      <td>${c.diameter}</td>
-      <td>${c.weight || '—'}</td>
+      <td>${formatEngineeringValue(c.diameter)}</td>
+      <td>${formatEngineeringValue(c.weight)}</td>
       <td>${esc(c.allowed_cable_group || '—')}</td>
       <td><a href="${escAttr(fieldViewUrl)}">Open</a></td>
     </tr>`;
@@ -425,6 +523,15 @@ document.addEventListener('DOMContentLoaded', () => {
       <td>${esc(formatPoint(s.start))}</td>
       <td>${esc(formatPoint(s.end))}</td>
     </tr>`).join('');
+    const coverageWarnings = (pull.coverage_warnings || [])
+      .map(warning => `<li>${esc(warning)}</li>`)
+      .join('');
+    const assumptions = pull.assumptions || {};
+    const forward = pull.direction_comparison?.forward;
+    const reverse = pull.direction_comparison?.reverse;
+    const jamRatio = pull.jam_check?.ratio === null || pull.jam_check?.ratio === undefined
+      ? 'Not calculated'
+      : pull.jam_check.ratio;
 
     pullCardContent.innerHTML = `
       <div class="pull-card-visual iso-detail-panel">
@@ -435,6 +542,61 @@ document.addEventListener('DOMContentLoaded', () => {
         ${visualHtml}
         <aside class="iso-inspector">${renderPullInspector(visualModel, pull)}</aside>
       </div>
+      <section class="pull-engineering-panel" aria-labelledby="pull-engineering-title-${pull.pull_number}">
+        <div class="pull-engineering-header">
+          <div>
+            <h3 id="pull-engineering-title-${pull.pull_number}">Pull Engineering Inputs</h3>
+            <p class="field-hint">These assumptions apply to this pull only. Apply saves a project pull-plan artifact through project storage.</p>
+          </div>
+          <span class="status-badge ${engineeringStatusClass(pull)}">${esc(engineeringStatusLabel(pull))}</span>
+        </div>
+        <form class="pull-assumption-form" data-pull-plan-id="${escAttr(pull.pull_plan_id)}">
+          <label>Friction coefficient
+            <input name="coeffFriction" type="number" min="0.01" max="2" step="0.01" required value="${engineeringInputValue(assumptions.coeffFriction)}">
+          </label>
+          <label>Allowable tension (lbf)
+            <input name="allowableTensionLbf" type="number" min="0" step="1" value="${engineeringInputValue(assumptions.allowableTensionLbf ?? pull.allowable_tension_lbs)}">
+          </label>
+          <label>Allowable sidewall pressure (lbf/ft)
+            <input name="allowableSidewallPressureLbfFt" type="number" min="0" step="1" value="${engineeringInputValue(assumptions.allowableSidewallPressureLbfFt ?? pull.allowable_sidewall_pressure)}">
+          </label>
+          <label>Default bend radius (ft)
+            <input name="bendRadiusFt" type="number" min="0.01" step="0.01" required value="${engineeringInputValue(assumptions.bendRadiusFt)}">
+          </label>
+          <label>Default bend angle (degrees)
+            <input name="bendAngleDeg" type="number" min="1" max="360" step="1" required value="${engineeringInputValue(assumptions.bendAngleDeg)}">
+          </label>
+          <label>Conduit inside diameter (in)
+            <input name="conduitInnerDiameterIn" type="number" min="0" step="0.01" value="${engineeringInputValue(assumptions.conduitInnerDiameterIn)}">
+          </label>
+          <label>Incoming tension (lbf)
+            <input name="incomingTensionLbf" type="number" min="0" step="1" required value="${engineeringInputValue(assumptions.incomingTensionLbf)}">
+          </label>
+          <label>Pull direction
+            <select name="pullDirection">
+              <option value="auto"${assumptions.pullDirection === 'auto' ? ' selected' : ''}>Auto — lower screening demand</option>
+              <option value="forward"${assumptions.pullDirection === 'forward' ? ' selected' : ''}>Forward — route start to end</option>
+              <option value="reverse"${assumptions.pullDirection === 'reverse' ? ' selected' : ''}>Reverse — route end to start</option>
+            </select>
+          </label>
+          <button type="submit" class="btn primary-btn">Apply &amp; Save Pull Plan</button>
+        </form>
+        <div class="pull-engineering-results">
+          <table class="result-table" aria-label="Pull direction comparison">
+            <thead><tr><th scope="col">Direction</th><th scope="col">Max Tension (lbf)</th><th scope="col">Max SWP (lbf/ft)</th></tr></thead>
+            <tbody>
+              <tr><th scope="row">Forward</th><td>${formatEngineeringValue(forward?.max_tension_lbs)}</td><td>${formatEngineeringValue(forward?.max_sidewall_pressure)}</td></tr>
+              <tr><th scope="row">Reverse</th><td>${formatEngineeringValue(reverse?.max_tension_lbs)}</td><td>${formatEngineeringValue(reverse?.max_sidewall_pressure)}</td></tr>
+            </tbody>
+          </table>
+          <div class="pull-jam-result">
+            <strong>Jam screening: ${esc(pull.jam_check?.status || 'not-applicable')}</strong>
+            <span>Ratio: ${esc(jamRatio)}</span>
+            <p>${esc(pull.jam_check?.message || 'No jam screening result.')}</p>
+          </div>
+        </div>
+        ${coverageWarnings ? `<div class="pull-coverage-warning" role="status"><strong>Inputs requiring review</strong><ul>${coverageWarnings}</ul></div>` : '<p class="pull-coverage-complete">Engineering input coverage is complete.</p>'}
+      </section>
       <div class="pull-card-grid">
         <div class="pull-card-info">
           <table class="result-table" aria-label="Pull card summary">
@@ -444,14 +606,15 @@ document.addEventListener('DOMContentLoaded', () => {
               <tr><th scope="row">Cable Count</th><td>${pull.cable_count}</td></tr>
               <tr><th scope="row">From</th><td>${esc(pull.from)}</td></tr>
               <tr><th scope="row">To</th><td>${esc(pull.to)}</td></tr>
+              <tr><th scope="row">Pull Direction</th><td>${esc(pull.direction_label)}</td></tr>
               <tr><th scope="row">Total Length</th><td>${pull.total_length_ft} ft</td></tr>
-              <tr><th scope="row">Combined Weight</th><td>${pull.total_weight_lb_ft} lbs/ft</td></tr>
-              <tr><th scope="row">Max Cable OD</th><td>${pull.max_diameter_in} in</td></tr>
-              <tr><th scope="row">Total Cross-Section</th><td>${pull.total_cross_section_area_sqin} sq in</td></tr>
+              <tr><th scope="row">Combined Weight</th><td>${formatEngineeringValue(pull.total_weight_lb_ft)} lbs/ft</td></tr>
+              <tr><th scope="row">Max Cable OD</th><td>${formatEngineeringValue(pull.max_diameter_in)} in</td></tr>
+              <tr><th scope="row">Total Cross-Section</th><td>${formatEngineeringValue(pull.total_cross_section_area_sqin)} sq in</td></tr>
               <tr><th scope="row">Segment Count</th><td>${pull.segment_count}</td></tr>
-              <tr><th scope="row">Estimated Tension</th><td>${pull.estimated_tension_lbs} lbs</td></tr>
-              <tr><th scope="row">Max Tension</th><td>${pull.max_tension_lbs} lbs</td></tr>
-              <tr><th scope="row">Max Sidewall Pressure</th><td>${pull.max_sidewall_pressure} lbs/ft</td></tr>
+              <tr><th scope="row">Estimated Tension</th><td>${formatEngineeringValue(pull.estimated_tension_lbs)} lbs</td></tr>
+              <tr><th scope="row">Max Tension</th><td>${formatEngineeringValue(pull.max_tension_lbs)} / ${formatEngineeringValue(pull.allowable_tension_lbs)} lbs (${esc(pull.tension_status)})</td></tr>
+              <tr><th scope="row">Max Sidewall Pressure</th><td>${formatEngineeringValue(pull.max_sidewall_pressure)} / ${formatEngineeringValue(pull.allowable_sidewall_pressure)} lbs/ft (${esc(pull.sidewall_status)})</td></tr>
             </tbody>
           </table>
         </div>
@@ -493,6 +656,30 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
       </div>`;
 
+    pullCardContent.querySelector('.pull-assumption-form')?.addEventListener('submit', event => {
+      event.preventDefault();
+      const formData = new FormData(event.currentTarget);
+      const pullId = event.currentTarget.dataset.pullPlanId;
+      const assumptionMap = Object.fromEntries((currentPulls || []).map(item => [
+        item.pull_plan_id,
+        { ...item.assumptions },
+      ]));
+      assumptionMap[pullId] = {
+        coeffFriction: formData.get('coeffFriction'),
+        allowableTensionLbf: formData.get('allowableTensionLbf'),
+        allowableSidewallPressureLbfFt: formData.get('allowableSidewallPressureLbfFt'),
+        bendRadiusFt: formData.get('bendRadiusFt'),
+        bendAngleDeg: formData.get('bendAngleDeg'),
+        conduitInnerDiameterIn: formData.get('conduitInnerDiameterIn'),
+        incomingTensionLbf: formData.get('incomingTensionLbf'),
+        pullDirection: formData.get('pullDirection'),
+      };
+      generatePullCards(currentRouteResults, currentCableList, assumptionMap, currentRouteSource);
+      saveCurrentPullPlan();
+      const updated = currentPulls.find(item => item.pull_plan_id === pullId);
+      if (updated) showPullCard(updated.pull_number);
+    });
+
     pullTableSection.hidden = true;
     pullVisualSection.hidden = true;
     pullCardDetail.hidden = false;
@@ -528,9 +715,19 @@ document.addEventListener('DOMContentLoaded', () => {
       'Max OD (in)': p.max_diameter_in,
       'Cross Section (sq in)': p.total_cross_section_area_sqin,
       'Segments': p.segment_count,
+      'Pull Direction': p.direction_label,
+      'Forward Max Tension (lbs)': p.direction_comparison?.forward?.max_tension_lbs ?? '',
+      'Reverse Max Tension (lbs)': p.direction_comparison?.reverse?.max_tension_lbs ?? '',
       'Est. Tension (lbs)': p.estimated_tension_lbs,
       'Max Tension (lbs)': p.max_tension_lbs,
+      'Allowable Tension (lbs)': p.allowable_tension_lbs ?? '',
+      'Tension Status': p.tension_status,
       'Max Sidewall (lbs/ft)': p.max_sidewall_pressure,
+      'Allowable Sidewall (lbs/ft)': p.allowable_sidewall_pressure ?? '',
+      'Sidewall Status': p.sidewall_status,
+      'Jam Status': p.jam_check?.status || '',
+      'Jam Ratio': p.jam_check?.ratio ?? '',
+      'Input Warnings': (p.coverage_warnings || []).join('; '),
     }));
 
     const wb = XLSX.utils.book_new();
@@ -562,6 +759,9 @@ document.addEventListener('DOMContentLoaded', () => {
       'Total Length (ft)': p.total_length_ft,
       'Weight (lbs/ft)': p.total_weight_lb_ft,
       'Est. Tension (lbs)': p.estimated_tension_lbs,
+      'Pull Direction': p.direction_label,
+      'Engineering Status': engineeringStatusLabel(p),
+      'Input Warnings': (p.coverage_warnings || []).join('; '),
     }));
     const wsSummary = XLSX.utils.json_to_sheet(summaryRows);
     XLSX.utils.book_append_sheet(wb, wsSummary, 'Pull Summary');
@@ -604,6 +804,30 @@ document.addEventListener('DOMContentLoaded', () => {
     const wsRoute = XLSX.utils.json_to_sheet(routeRows);
     XLSX.utils.book_append_sheet(wb, wsRoute, 'Route Detail');
 
+    const engineeringRows = currentPulls.map(p => ({
+      'Pull #': p.pull_number,
+      'Pull Plan ID': p.pull_plan_id,
+      'Friction Coefficient': p.assumptions.coeffFriction,
+      'Allowable Tension (lbf)': p.allowable_tension_lbs ?? '',
+      'Allowable Sidewall Pressure (lbf/ft)': p.allowable_sidewall_pressure ?? '',
+      'Default Bend Radius (ft)': p.assumptions.bendRadiusFt,
+      'Default Bend Angle (deg)': p.assumptions.bendAngleDeg,
+      'Conduit Inside Diameter (in)': p.assumptions.conduitInnerDiameterIn ?? '',
+      'Incoming Tension (lbf)': p.assumptions.incomingTensionLbf,
+      'Direction Mode': p.assumptions.pullDirection,
+      'Selected Direction': p.pull_direction,
+      'Forward Max Tension (lbf)': p.direction_comparison?.forward?.max_tension_lbs ?? '',
+      'Reverse Max Tension (lbf)': p.direction_comparison?.reverse?.max_tension_lbs ?? '',
+      'Maximum Sidewall Pressure (lbf/ft)': p.max_sidewall_pressure ?? '',
+      'Tension Status': p.tension_status,
+      'Sidewall Status': p.sidewall_status,
+      'Jam Status': p.jam_check?.status || '',
+      'Jam Ratio': p.jam_check?.ratio ?? '',
+      'Warnings': (p.coverage_warnings || []).join('; '),
+    }));
+    const wsEngineering = XLSX.utils.json_to_sheet(engineeringRows);
+    XLSX.utils.book_append_sheet(wb, wsEngineering, 'Engineering Inputs');
+
     XLSX.writeFile(wb, 'pull_cards.xlsx');
   });
 
@@ -635,6 +859,30 @@ document.addEventListener('DOMContentLoaded', () => {
     return String(Math.round(number * 10) / 10);
   }
 
+  function formatEngineeringValue(value) {
+    if (value === null || value === undefined || value === '') return '—';
+    const number = Number(value);
+    if (!Number.isFinite(number)) return '—';
+    return String(Math.round(number * 100) / 100);
+  }
+
+  function engineeringInputValue(value) {
+    if (value === null || value === undefined || value === '') return '';
+    const number = Number(value);
+    return Number.isFinite(number) ? escAttr(number) : '';
+  }
+
+  function engineeringStatusLabel(pull) {
+    if (pull?.tension_status === 'fail' || pull?.sidewall_status === 'fail') return 'Limit exceeded';
+    if (!pull?.input_coverage_complete) return 'Input required';
+    return 'Engineering inputs complete';
+  }
+
+  function engineeringStatusClass(pull) {
+    if (pull?.tension_status === 'fail' || pull?.sidewall_status === 'fail') return 'status-error';
+    return pull?.input_coverage_complete ? 'status-ok' : 'status-warning';
+  }
+
   function formatPoint(point) {
     if (!Array.isArray(point) || point.length < 3) return 'Missing';
     const values = point.map(value => Number(value));
@@ -643,4 +891,5 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   renderPullDeliverableHandoff();
+  renderPullPlanSaveStatus();
 });

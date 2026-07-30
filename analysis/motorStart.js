@@ -1,315 +1,241 @@
-const d3 = globalThis.d3;
 import { getOneLine, getStudies, setStudies } from '../dataStore.mjs';
+import { downloadCSV } from '../reports/reporting.mjs';
+import {
+  calculateMotorStartCase,
+  getStarterProfile,
+  isMotorComponent,
+  normalizeMotorStartInput,
+  runMotorStart,
+  validateMotorStartInput
+} from './motorStartCalc.mjs';
 
-function parseNum(val) {
-  if (typeof val === 'number') return val;
-  const m = String(val || '').match(/([0-9.]+)/);
-  return m ? Number(m[1]) : 0;
+export {
+  calculateMotorStartCase,
+  getStarterProfile,
+  isMotorComponent,
+  normalizeMotorStartInput,
+  runMotorStart,
+  validateMotorStartInput
+};
+
+const STARTER_OPTIONS = [
+  ['dol', 'Direct-on-line'],
+  ['vfd', 'Variable-frequency drive'],
+  ['soft_starter', 'Soft starter'],
+  ['wye_delta', 'Wye-delta'],
+  ['autotransformer', 'Autotransformer']
+];
+
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
-// Parse load torque curve formatted as "speedPct:torquePct" pairs
-function parseTorqueCurve(spec) {
-  if (!spec) return () => 0;
-  const pts = [];
-  if (Array.isArray(spec)) {
-    spec.forEach(p => {
-      if (typeof p !== 'string') return;
-      const [s, t] = p.split(':');
-      if (s === undefined || t === undefined) return;
-      pts.push({ s: Number(s), t: Number(t) });
-    });
-  } else if (typeof spec === 'string') {
-    spec.split(/[\,\s]+/).forEach(p => {
-      if (!p) return;
-      const [s, t] = p.split(':');
-      pts.push({ s: Number(s), t: Number(t) });
-    });
-  }
-  pts.sort((a, b) => a.s - b.s);
-  return (speedFrac) => {
-    const sp = speedFrac * 100;
-    let p1 = pts[0] || { s: 0, t: 0 };
-    let p2 = pts[pts.length - 1] || { s: 100, t: 100 };
-    for (let i = 0; i < pts.length - 1; i++) {
-      if (sp >= pts[i].s && sp <= pts[i + 1].s) {
-        p1 = pts[i];
-        p2 = pts[i + 1];
-        break;
-      }
-    }
-    const ratio = (sp - p1.s) / ((p2.s - p1.s) || 1);
-    const torquePct = p1.t + (p2.t - p1.t) * ratio;
-    return torquePct / 100;
-  };
+function getComponents() {
+  const { sheets = [] } = getOneLine();
+  const components = Array.isArray(sheets[0]?.components)
+    ? sheets.flatMap(sheet => sheet.components || [])
+    : sheets;
+  return (Array.isArray(components) ? components : []).filter(isMotorComponent);
 }
 
-/**
- * Return starting profile parameters for a motor component.
- * Supported starter_type values:
- *   'dol'             – Direct-on-line (default): full locked-rotor current
- *   'vfd'             – Variable-frequency drive: current capped at vfd_current_limit_pu × Ifl
- *   'soft_starter'    – Reduced-voltage ramp from initial_voltage_pu to 1.0 over ramp_time_s
- *   'wye_delta'       – Wye-phase inrush = Ilr/3 for first wye_delta_switch_time_s seconds
- *   'autotransformer' – Inrush reduced by autotransformer_tap²
- *
- * @param {Object} c - Component object from the one-line diagram
- * @returns {{ type: string, vfdCurrentLimitPu: number, initialVoltagePu: number,
- *             rampTimeSec: number, wyeDeltaSwitchTimeSec: number, autotransformerTap: number }}
- */
-export function getStarterProfile(c) {
-  const type = (
-    c.starter_type
-    ?? c.props?.starter_type
-    ?? 'dol'
-  ).toString().toLowerCase().replace(/[-\s]/g, '_');
-  return {
-    type,
-    vfdCurrentLimitPu: Number(c.vfd_current_limit_pu ?? c.props?.vfd_current_limit_pu ?? c.current_limit_pu ?? c.props?.current_limit_pu) || 1.1,
-    initialVoltagePu:  Number(c.initial_voltage_pu   ?? c.props?.initial_voltage_pu)   || 0.3,
-    rampTimeSec:       Number(c.ramp_time_s           ?? c.props?.ramp_time_s)           || 10,
-    wyeDeltaSwitchTimeSec: Number(c.wye_delta_switch_time_s ?? c.props?.wye_delta_switch_time_s) || 5,
-    autotransformerTap: Number(c.autotransformer_tap  ?? c.props?.autotransformer_tap)   || 0.65,
-  };
+function valueOrBlank(value) {
+  return Number.isFinite(value) && value !== 0 ? value : '';
 }
 
-/**
- * Estimate voltage sag during motor starting using a simple Thevenin model.
- * Motors may define inrushMultiple, thevenin_r, thevenin_x, inertia, load_torque,
- * and starter_type ('dol'|'vfd'|'soft_starter'|'wye_delta'|'autotransformer').
- * @returns {Object<string,{inrushKA:number,voltageSagPct:number,accelTime:number,starterType:string}>}
- */
-export function runMotorStart() {
-  const { sheets } = getOneLine();
-  const comps = (Array.isArray(sheets[0]?.components)
-    ? sheets.flatMap(s => s.components)
-    : sheets).filter(c => c && c.type !== 'annotation' && c.type !== 'dimension');
-  const results = {};
-  comps.forEach(c => {
-    const subtype = typeof c.subtype === 'string' ? c.subtype.toLowerCase() : '';
-    const type = typeof c.type === 'string' ? c.type.toLowerCase() : '';
-    const isMotor = subtype === 'motor_load'
-      || type === 'motor_load'
-      || subtype === 'motor'
-      || type === 'motor'
-      || type === 'motor_controller'
-      || type === 'motor_starter'
-      || subtype === 'vfd'
-      || subtype === 'soft_starter'
-      || subtype.includes('starter')
-      || !!c.motor;
-    if (!isMotor) return;
-    const hp = parseNum(c.rating || c.hp || c.props?.rated_hp || c.props?.hp);
-    const voltageKv = Number(c.props?.rated_voltage_kv ?? c.props?.baseKV);
-    const volts = c.voltage ?? c.volts ?? c.props?.voltage ?? c.props?.volts;
-    const V = Number(volts) || (voltageKv ? voltageKv * 1000 : 480);
-    const pfRaw = Number(
-      c.pf ?? c.power_factor
-      ?? c.props?.full_load_pf ?? c.props?.pf ?? c.props?.power_factor
-    );
-    const pf = pfRaw > 1 ? pfRaw / 100 : (pfRaw || 0.9);
-    const effRaw = Number(
-      c.efficiency ?? c.eff
-      ?? c.props?.full_load_efficiency_pct ?? c.props?.efficiency ?? c.props?.eff
-    );
-    const eff = effRaw > 1 ? effRaw / 100 : (effRaw || 0.9);
-    const multiple = Number(
-      c.inrushMultiple
-      ?? c.lr_current_pu
-      ?? c.props?.inrushMultiple
-      ?? c.props?.lr_current_pu
-    ) || 6;
-    const Ifl = hp * 746 / (Math.sqrt(3) * V * pf * eff || 1);
-    const Ilr = Ifl * multiple;
-    const theveninR = Number(
-      c.thevenin_r
-      ?? c.props?.thevenin_r
-      ?? c.theveninR
-      ?? c.props?.theveninR
-    ) || 0;
-    const theveninX = Number(
-      c.thevenin_x
-      ?? c.props?.thevenin_x
-      ?? c.theveninX
-      ?? c.props?.theveninX
-    ) || 0;
-    const Zth = Math.hypot(theveninR, theveninX);
-    const inertia = Number(c.inertia ?? c.props?.inertia) || 0;
-    const speed = Number(c.speed ?? c.props?.synchronous_speed_rpm ?? c.props?.speed) || 1800;
-    const baseTorque = hp ? (hp * 746) / (2 * Math.PI * speed / 60) : 0;
-    const loadCurve = parseTorqueCurve(
-      c.load_torque_curve
-      ?? c.load_torque
-      ?? c.props?.load_torque_curve
-      ?? c.props?.load_torque
-    );
-    const profile = getStarterProfile(c);
+function buildMotorRows(components) {
+  return components.map(component => {
+    const input = normalizeMotorStartInput(component);
+    const pf = input.powerFactor > 0 ? input.powerFactor : 0.9;
+    const efficiency = input.efficiency > 0 ? input.efficiency : 0.9;
+    const multiple = input.inrushMultiple > 0 ? input.inrushMultiple : 6;
+    const setting = input.type === 'vfd'
+      ? input.vfdCurrentLimitPu
+      : input.type === 'soft_starter'
+        ? input.initialVoltagePu
+        : input.type === 'autotransformer'
+          ? input.autotransformerTap
+          : 1;
+    const time = input.type === 'wye_delta' ? input.wyeDeltaSwitchTimeSec : input.rampTimeSec;
+    const options = STARTER_OPTIONS.map(([value, label]) => (
+      `<option value="${value}"${input.type === value ? ' selected' : ''}>${label}</option>`
+    )).join('');
+    return `<tr data-id="${escapeHtml(component.id)}">
+      <td><input class="motor-selected" type="checkbox" checked aria-label="Include ${escapeHtml(input.label)}"></td>
+      <td><strong>${escapeHtml(input.label)}</strong><br><small>${escapeHtml(component.id)}</small></td>
+      <td><input class="motor-hp" type="number" min="0.1" step="0.1" value="${escapeHtml(valueOrBlank(input.hp))}" aria-label="Horsepower for ${escapeHtml(input.label)}"></td>
+      <td><input class="motor-volts" type="number" min="1" step="1" value="${escapeHtml(valueOrBlank(input.volts))}" aria-label="Voltage for ${escapeHtml(input.label)}"></td>
+      <td><input class="motor-pf" type="number" min="0.01" max="1" step="0.01" value="${escapeHtml(pf)}" aria-label="Power factor for ${escapeHtml(input.label)}"></td>
+      <td><input class="motor-eff" type="number" min="0.01" max="1" step="0.01" value="${escapeHtml(efficiency)}" aria-label="Efficiency for ${escapeHtml(input.label)}"></td>
+      <td><input class="motor-inrush" type="number" min="0.1" step="0.1" value="${escapeHtml(multiple)}" aria-label="Locked rotor current multiple for ${escapeHtml(input.label)}"></td>
+      <td><input class="motor-r" type="number" min="0" step="0.001" value="${escapeHtml(valueOrBlank(input.theveninR))}" aria-label="Thevenin resistance for ${escapeHtml(input.label)}"></td>
+      <td><input class="motor-x" type="number" min="0" step="0.001" value="${escapeHtml(valueOrBlank(input.theveninX))}" aria-label="Thevenin reactance for ${escapeHtml(input.label)}"></td>
+      <td><input class="motor-inertia" type="number" min="0" step="0.01" value="${escapeHtml(valueOrBlank(input.inertia))}" aria-label="Combined inertia for ${escapeHtml(input.label)}"></td>
+      <td><select class="motor-starter" aria-label="Starting method for ${escapeHtml(input.label)}">${options}</select></td>
+      <td><input class="motor-setting" type="number" min="0.01" step="0.01" value="${escapeHtml(setting)}" aria-label="Starter setting for ${escapeHtml(input.label)}"></td>
+      <td><input class="motor-time" type="number" min="0.1" step="0.1" value="${escapeHtml(time)}" aria-label="Starter time for ${escapeHtml(input.label)}"></td>
+    </tr>`;
+  }).join('');
+}
 
-    // VFD: drive limits current; voltage sag is negligible; accel follows ramp time
-    if (profile.type === 'vfd') {
-      const limitedI = Ifl * profile.vfdCurrentLimitPu;
-      const Vdrop = limitedI * Zth;
-      results[c.id] = {
-        inrushKA: Number((limitedI / 1000).toFixed(2)),
-        voltageSagPct: Number(((Vdrop / V) * 100).toFixed(2)),
-        accelTime: Number(profile.rampTimeSec.toFixed(2)),
-        starterType: 'vfd',
-      };
-      return;
-    }
+function readNumber(row, selector) {
+  return Number(row.querySelector(selector)?.value);
+}
 
-    let w = 0; // mechanical speed rad/s
-    const wSync = 2 * Math.PI * speed / 60;
-    const dt = 0.01;
-    let time = 0;
-    let maxDrop = 0;
-    while (w < wSync && time < 60) {
-      const slip = Math.max(1 - w / wSync, 0.001);
-
-      // Effective locked-rotor current depends on starter type
-      let effectiveIlr;
-      if (profile.type === 'soft_starter') {
-        const rampFrac = Math.min(time / profile.rampTimeSec, 1.0);
-        const vRamp = profile.initialVoltagePu + (1.0 - profile.initialVoltagePu) * rampFrac;
-        effectiveIlr = Ilr * vRamp * vRamp; // current scales as V²
-      } else if (profile.type === 'wye_delta') {
-        effectiveIlr = time < profile.wyeDeltaSwitchTimeSec ? Ilr / 3 : Ilr;
-      } else if (profile.type === 'autotransformer') {
-        const tap = profile.autotransformerTap;
-        effectiveIlr = Ilr * tap * tap;
-      } else {
-        effectiveIlr = Ilr; // 'dol' or unrecognised
-      }
-
-      let I = effectiveIlr * slip;
-      let Vdrop = I * Zth;
-      let Vterm = V - Vdrop;
-      I = effectiveIlr * slip * (Vterm / V);
-      Vdrop = I * Zth;
-      Vterm = V - Vdrop;
-      const Tm = baseTorque * (Vterm / V) * (Vterm / V) * slip;
-      const Tl = baseTorque * loadCurve(w / wSync);
-      const accel = inertia ? (Tm - Tl) / inertia : 0;
-      w += accel * dt;
-      time += dt;
-      if (Vdrop > maxDrop) maxDrop = Vdrop;
-      if (slip < 0.01) break;
-    }
-    const sagPct = (maxDrop / V) * 100;
-    results[c.id] = {
-      inrushKA: Number((Ilr / 1000).toFixed(2)),
-      voltageSagPct: Number(sagPct.toFixed(2)),
-      accelTime: Number(time.toFixed(2)),
-      starterType: profile.type,
-    };
+function readMotorInput(row, source) {
+  const starterType = row.querySelector('.motor-starter').value;
+  const setting = readNumber(row, '.motor-setting');
+  const time = readNumber(row, '.motor-time');
+  return normalizeMotorStartInput(source, {
+    hp: readNumber(row, '.motor-hp'),
+    voltage: readNumber(row, '.motor-volts'),
+    pf: readNumber(row, '.motor-pf'),
+    efficiency: readNumber(row, '.motor-eff'),
+    inrushMultiple: readNumber(row, '.motor-inrush'),
+    thevenin_r: readNumber(row, '.motor-r'),
+    thevenin_x: readNumber(row, '.motor-x'),
+    inertia: readNumber(row, '.motor-inertia'),
+    starter_type: starterType,
+    vfd_current_limit_pu: setting,
+    initial_voltage_pu: setting,
+    autotransformer_tap: setting,
+    ramp_time_s: time,
+    wye_delta_switch_time_s: time
   });
-  return results;
 }
 
-function ensureMotorStartResults() {
-  const studies = getStudies();
-  const res = runMotorStart();
-  studies.motorStart = res;
-  setStudies(studies);
-  return res;
-}
-
-function appendWrappedText(selection, text, { x, y, maxWidth, fill = '#444', lineHeight = 18 }) {
-  const textEl = selection.append('text')
-    .attr('x', x)
-    .attr('y', y)
-    .attr('text-anchor', 'middle')
-    .attr('fill', fill);
-  const words = text.split(/\s+/).filter(Boolean);
-  if (!words.length) return { element: textEl, lineCount: 0 };
-  let line = [];
-  let lineNumber = 0;
-  let tspan = textEl.append('tspan').attr('x', x).attr('dy', 0);
-  words.forEach(word => {
-    line.push(word);
-    tspan.text(line.join(' '));
-    if (tspan.node().getComputedTextLength() > maxWidth && line.length > 1) {
-      line.pop();
-      tspan.text(line.join(' '));
-      line = [word];
-      lineNumber += 1;
-      tspan = textEl.append('tspan')
-        .attr('x', x)
-        .attr('dy', `${lineHeight}px`)
-        .text(word);
-    }
-  });
-  return { element: textEl, lineCount: lineNumber + 1 };
-}
-
-function renderMotorStartChart(svgEl, data) {
-  const width = Number(svgEl.getAttribute('width')) || 800;
-  const height = Number(svgEl.getAttribute('height')) || 400;
-  const margin = { top: 20, right: 20, bottom: 60, left: 70 };
-  const svg = d3.select(svgEl);
+function renderChart(svgElement, results, maxSag) {
+  const d3 = globalThis.d3;
+  if (!d3 || !svgElement) return;
+  const svg = d3.select(svgElement);
   svg.selectAll('*').remove();
+  if (!results.length) return;
 
-  if (!data.length) {
-    const messages = [
-      { text: 'No motors with starting data found in the active project.', fill: '#666' },
-      { text: 'Add a motor starting curve by editing a motor on the One-Line and entering the inrush multiple, Thevenin impedance, inertia, and load torque curve points on the Motor Start tab.' }
-    ];
-    const maxWidth = Math.max(120, width - margin.left - margin.right);
-    let currentY = height / 2 - ((messages.length - 1) * 24);
-    messages.forEach(msg => {
-      const { lineCount } = appendWrappedText(svg, msg.text, {
-        x: width / 2,
-        y: currentY,
-        maxWidth,
-        fill: msg.fill || '#444'
-      });
-      currentY += lineCount * 18 + 8;
-    });
-    return;
-  }
-
-  const x = d3.scaleBand().domain(data.map(d => d.id)).range([margin.left, width - margin.right]).padding(0.15);
-  const yMax = d3.max(data, d => d.sag) || 1;
-  const y = d3.scaleLinear().domain([0, yMax]).nice().range([height - margin.bottom, margin.top]);
+  const width = Number(svgElement.getAttribute('width')) || 800;
+  const height = Number(svgElement.getAttribute('height')) || 360;
+  const margin = { top: 25, right: 25, bottom: 75, left: 65 };
+  const x = d3.scaleBand()
+    .domain(results.map(result => result.label))
+    .range([margin.left, width - margin.right])
+    .padding(0.2);
+  const yMaximum = Math.max(maxSag, d3.max(results, result => result.voltageSagPct) || 0) * 1.15;
+  const y = d3.scaleLinear().domain([0, yMaximum || 1]).nice().range([height - margin.bottom, margin.top]);
 
   svg.append('g')
     .attr('transform', `translate(0,${height - margin.bottom})`)
     .call(d3.axisBottom(x))
     .selectAll('text')
-    .attr('transform', 'rotate(-35)')
+    .attr('transform', 'rotate(-30)')
     .style('text-anchor', 'end');
-
-  svg.append('g')
-    .attr('transform', `translate(${margin.left},0)`)
-    .call(d3.axisLeft(y).tickFormat(d => `${d}%`));
-
+  svg.append('g').attr('transform', `translate(${margin.left},0)`).call(d3.axisLeft(y).tickFormat(value => `${value}%`));
+  svg.append('line')
+    .attr('x1', margin.left)
+    .attr('x2', width - margin.right)
+    .attr('y1', y(maxSag))
+    .attr('y2', y(maxSag))
+    .attr('stroke', '#b42318')
+    .attr('stroke-dasharray', '6 4');
   svg.append('text')
-    .attr('x', margin.left + (width - margin.left - margin.right) / 2)
-    .attr('y', height - 10)
-    .attr('text-anchor', 'middle')
-    .attr('fill', '#333')
-    .text('Motor ID');
-
-  svg.append('text')
-    .attr('transform', 'rotate(-90)')
-    .attr('x', -(margin.top + (height - margin.top - margin.bottom) / 2))
-    .attr('y', 20)
-    .attr('text-anchor', 'middle')
-    .attr('fill', '#333')
-    .text('Voltage Sag (%)');
-
-  svg.append('g').selectAll('rect').data(data).enter().append('rect')
-    .attr('x', d => x(d.id))
-    .attr('y', d => y(d.sag))
+    .attr('x', width - margin.right)
+    .attr('y', y(maxSag) - 6)
+    .attr('text-anchor', 'end')
+    .attr('fill', '#b42318')
+    .text(`Limit ${maxSag}%`);
+  svg.selectAll('rect')
+    .data(results)
+    .enter()
+    .append('rect')
+    .attr('x', result => x(result.label))
+    .attr('y', result => y(result.voltageSagPct))
     .attr('width', x.bandwidth())
-    .attr('height', d => y(0) - y(d.sag))
-    .attr('fill', 'steelblue');
+    .attr('height', result => y(0) - y(result.voltageSagPct))
+    .attr('fill', result => result.checks.voltageSag ? '#198754' : '#b42318');
 }
 
 if (typeof document !== 'undefined') {
-  const chartEl = document.getElementById('motorstart-chart');
-  if (chartEl) {
-    const results = ensureMotorStartResults();
-    const data = Object.entries(results).map(([id, r]) => ({ id, sag: r.voltageSagPct }));
-    renderMotorStartChart(chartEl, data);
-  }
+  document.addEventListener('DOMContentLoaded', () => {
+    const loadBtn = document.getElementById('load-motors-btn');
+    const runBtn = document.getElementById('run-motors-btn');
+    const exportBtn = document.getElementById('export-motors-btn');
+    const inputs = document.getElementById('motor-inputs');
+    const readiness = document.getElementById('motorstart-readiness');
+    const resultsElement = document.getElementById('motorstart-results');
+    const chart = document.getElementById('motorstart-chart');
+    let sourceById = new Map();
+    let lastStudy = null;
+
+    loadBtn?.addEventListener('click', () => {
+      const motors = getComponents();
+      sourceById = new Map(motors.map(motor => [motor.id, motor]));
+      lastStudy = null;
+      exportBtn.disabled = true;
+      if (!motors.length) {
+        inputs.innerHTML = '<p class="result-fail">No motors were found. Add a motor to the One-Line Diagram first.</p>';
+        readiness.innerHTML = '<div class="result-card result-warn"><strong>No study inputs available.</strong></div>';
+        runBtn.disabled = true;
+        return;
+      }
+      inputs.innerHTML = `<div class="table-scroll"><table class="data-table motor-start-input-table">
+        <thead><tr><th>Use</th><th>Motor</th><th>HP</th><th>V</th><th>PF</th><th>Eff.</th><th>LRC × FLA</th><th>Rth (Ω)</th><th>Xth (Ω)</th><th>Inertia</th><th>Method</th><th>Setting (pu)</th><th>Time (s)</th></tr></thead>
+        <tbody>${buildMotorRows(motors)}</tbody>
+      </table></div>
+      <p class="field-hint">Defaults of 0.90 power factor, 0.90 efficiency, and 6× locked-rotor current are screening assumptions. Enter project-specific values where available. Starter setting means current limit for VFD, initial voltage for soft starter, or tap for autotransformer.</p>`;
+      readiness.innerHTML = `<div class="result-card result-warn"><strong>${motors.length} motor${motors.length === 1 ? '' : 's'} loaded.</strong><p>Complete Thevenin impedance and combined inertia, then run the selected motors.</p></div>`;
+      runBtn.disabled = false;
+    });
+
+    runBtn?.addEventListener('click', () => {
+      const rows = [...inputs.querySelectorAll('tbody tr')].filter(row => row.querySelector('.motor-selected')?.checked);
+      if (!rows.length) {
+        readiness.innerHTML = '<div class="result-card result-warn"><strong>Select at least one motor.</strong></div>';
+        return;
+      }
+      const criteria = {
+        maxVoltageSagPct: Number(document.getElementById('max-sag-pct').value) || 15,
+        maxAccelerationTimeSec: Number(document.getElementById('max-accel-sec').value) || 10
+      };
+      const cases = rows.map(row => readMotorInput(row, sourceById.get(row.dataset.id)));
+      const invalid = cases.map(input => ({ input, validation: validateMotorStartInput(input) })).filter(item => !item.validation.ready);
+      if (invalid.length) {
+        readiness.innerHTML = `<div class="result-card result-warn"><h3>Input review required</h3><ul>${invalid.map(item => `<li><strong>${escapeHtml(item.input.label)}</strong>: add ${escapeHtml(item.validation.errors.join(', '))}</li>`).join('')}</ul><p><strong>No result was saved.</strong></p></div>`;
+        resultsElement.innerHTML = '<p class="field-hint">Complete the required inputs to run this study.</p>';
+        exportBtn.disabled = true;
+        renderChart(chart, [], criteria.maxVoltageSagPct);
+        return;
+      }
+
+      const results = cases.map(input => calculateMotorStartCase(input, criteria));
+      lastStudy = { runAt: new Date().toISOString(), method: 'Thevenin screening', criteria, results };
+      const studies = getStudies();
+      studies.motorStart = lastStudy;
+      setStudies(studies);
+      const passes = results.filter(result => result.status === 'pass').length;
+      readiness.innerHTML = `<div class="result-card ${passes === results.length ? 'result-ok' : 'result-warn'}"><strong>${passes} of ${results.length} motors meet both screening criteria.</strong><p>Result saved to this project.</p></div>`;
+      resultsElement.innerHTML = `<div class="table-scroll"><table class="data-table">
+        <thead><tr><th>Motor</th><th>Method</th><th>FLA (A)</th><th>Start (kA)</th><th>Sag</th><th>Acceleration</th><th>Status</th></tr></thead>
+        <tbody>${results.map(result => `<tr class="${result.status === 'pass' ? 'result-ok' : 'result-warn'}"><td>${escapeHtml(result.label)}</td><td>${escapeHtml(result.starterType.replace(/_/g, ' '))}</td><td>${result.fullLoadAmps.toFixed(1)}</td><td>${result.inrushKA.toFixed(3)}</td><td>${result.voltageSagPct.toFixed(2)}% ${result.checks.voltageSag ? '✓' : 'Review'}</td><td>${result.accelTime.toFixed(2)} s ${result.checks.accelerationTime ? '✓' : 'Review'}</td><td><strong>${result.status === 'pass' ? 'Pass' : 'Review'}</strong></td></tr>`).join('')}</tbody>
+      </table></div>`;
+      renderChart(chart, results, criteria.maxVoltageSagPct);
+      exportBtn.disabled = false;
+    });
+
+    exportBtn?.addEventListener('click', () => {
+      if (!lastStudy) return;
+      const headers = ['motor', 'starter', 'fullLoadAmps', 'startingKA', 'voltageSagPct', 'accelerationTimeSec', 'status'];
+      const rows = lastStudy.results.map(result => ({
+        motor: result.label,
+        starter: result.starterType,
+        fullLoadAmps: result.fullLoadAmps,
+        startingKA: result.inrushKA,
+        voltageSagPct: result.voltageSagPct,
+        accelerationTimeSec: result.accelTime,
+        status: result.status
+      }));
+      downloadCSV(headers, rows, 'motor-start-results.csv');
+    });
+  });
 }

@@ -116,6 +116,19 @@
   vertical-align: middle;
 }
 
+.sc-diff-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+#sc-study-diff-content .sc-diff-table td:nth-child(4),
+#sc-study-diff-content .sc-diff-table td:nth-child(6) {
+  min-width: 18rem;
+  max-width: 30rem;
+  white-space: normal;
+  line-height: 1.35;
+}
+
 .sc-diff-table tbody tr:last-child td {
   border-bottom: none;
 }

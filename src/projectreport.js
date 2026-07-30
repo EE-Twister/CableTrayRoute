@@ -14,10 +14,12 @@ import {
   getStudies, getStudyApprovals, getEquipment, getLoads, getOneLine,
   getReportSnapshots, setReportSnapshot, deleteReportSnapshot,
   getLifecyclePackages,
+  getDeliverableArtifacts, getFieldExecutionRecords, getProcurementRegister, upsertDeliverableArtifact,
   getDesignBasis, getDesignGateApprovals, getItem, getProjectInputFingerprint, getProjectMeta, setProjectMeta,
 } from '../dataStore.mjs';
 import { getProjectState } from '../projectStorage.js';
 import { normalizeProjectMeta } from '../analysis/projectIntegration.mjs';
+import { buildArtifactRegisterRows, normalizeDeliverableArtifact } from '../analysis/deliverableArtifacts.mjs';
 import { renderProjectInputPanel } from './components/projectInputBinding.js';
 import { buildDesignBasisReview } from '../analysis/designBasis.mjs';
 import { buildDeliverableReadinessDiagnostics } from '../analysis/deliverableWorkflow.mjs';
@@ -33,6 +35,8 @@ import {
   buildHarmonicsSection,
   buildMotorStartSection,
   buildVoltageDropSection,
+  buildReliabilitySection,
+  buildAdvancedStudySections,
   buildDRCSection,
 } from '../analysis/projectReport.mjs';
 import {
@@ -43,6 +47,7 @@ import {
   buildRevisionTable,
   snapshotPackage,
   getAvailableSections,
+  sectionToAOA,
 } from '../analysis/reportPackage.mjs';
 
 // ---------------------------------------------------------------------------
@@ -307,6 +312,12 @@ function loadProjectData() {
     designBasis: getDesignBasis(),
     designGateApprovals: getDesignGateApprovals(),
     tccSettings: getItem('tccSettings', null),
+    routeResults: getItem('latestRouteResults', null),
+    pullPlans: getItem('pullPlanArtifact', null),
+    procurement: getProcurementRegister(),
+    costEstimate: getItem('costEstimateArtifact', null),
+    fieldExecution: getFieldExecutionRecords(),
+    deliverables: getDeliverableArtifacts(),
     drcResults: Array.isArray(drcRun?.findings) ? drcRun.findings : [],
   };
 }
@@ -326,6 +337,164 @@ function buildPackageConfig() {
   };
 }
 
+function firstValue(record, fields) {
+  for (const field of fields) {
+    const value = record?.[field];
+    if (value !== undefined && value !== null && value !== '') return value;
+  }
+  return '';
+}
+
+function sectionRows(value) {
+  if (Array.isArray(value)) return value;
+  if (!value || typeof value !== 'object') return [];
+  if (value.pulls && typeof value.pulls === 'object' && !Array.isArray(value.pulls)) {
+    return Object.values(value.pulls).map(pull => ({
+      pullPlanId: pull.pullPlanId,
+      pullNumber: pull.pullNumber,
+      cables: Array.isArray(pull.cableTags) ? pull.cableTags.join(', ') : '',
+      from: pull.route?.from,
+      to: pull.route?.to,
+      lengthFt: pull.route?.lengthFt,
+      direction: pull.results?.direction,
+      maxTensionLbf: pull.results?.maximumTensionLbf,
+      allowableTensionLbf: pull.results?.allowableTensionLbf,
+      tensionStatus: pull.results?.tensionStatus,
+      maxSidewallPressureLbfFt: pull.results?.maximumSidewallPressureLbfFt,
+      sidewallStatus: pull.results?.sidewallStatus,
+      jamStatus: pull.results?.jamCheck?.status,
+      warnings: Array.isArray(pull.coverageWarnings) ? pull.coverageWarnings.join('; ') : '',
+    }));
+  }
+  for (const key of ['rows', 'items', 'routes', 'results', 'cards', 'groups', 'lineItems']) {
+    if (Array.isArray(value[key])) return value[key];
+  }
+  return [];
+}
+
+function constructionSectionData(projectData) {
+  const racewayRows = [
+    ...projectData.trays.map(row => ({
+      kind: 'Tray',
+      id: firstValue(row, ['tray_id', 'id', 'tag']),
+      type: firstValue(row, ['type', 'tray_type']),
+      size: [firstValue(row, ['width']), firstValue(row, ['depth'])].filter(Boolean).join(' × '),
+      material: firstValue(row, ['material']),
+      from: firstValue(row, ['from', 'start']),
+      to: firstValue(row, ['to', 'end']),
+      lengthFt: firstValue(row, ['length', 'length_ft']),
+    })),
+    ...projectData.conduits.map(row => ({
+      kind: 'Conduit',
+      id: firstValue(row, ['conduit_id', 'id', 'tag']),
+      type: firstValue(row, ['type', 'material']),
+      size: firstValue(row, ['trade_size', 'tradeSize', 'size']),
+      material: firstValue(row, ['material']),
+      from: firstValue(row, ['from', 'start']),
+      to: firstValue(row, ['to', 'end']),
+      lengthFt: firstValue(row, ['length', 'length_ft']),
+    })),
+    ...projectData.ductbanks.map(row => ({
+      kind: 'Ductbank',
+      id: firstValue(row, ['ductbank_id', 'id', 'tag']),
+      type: firstValue(row, ['type', 'configuration']),
+      size: firstValue(row, ['size', 'dimensions']),
+      material: firstValue(row, ['material']),
+      from: firstValue(row, ['from', 'start']),
+      to: firstValue(row, ['to', 'end']),
+      lengthFt: firstValue(row, ['length', 'length_ft']),
+    })),
+  ];
+  const pullRows = sectionRows(projectData.pullPlans);
+  const routeRows = sectionRows(projectData.routeResults);
+  return {
+    equipment: {
+      key: 'equipment',
+      title: 'Equipment Schedule',
+      rows: projectData.equipment.map(row => ({
+        tag: firstValue(row, ['tag', 'equipment_tag', 'id']),
+        type: firstValue(row, ['type', 'subtype', 'category']),
+        description: firstValue(row, ['description', 'label', 'name']),
+        voltage: firstValue(row, ['voltage', 'voltage_v', 'voltage_kv']),
+        rating: firstValue(row, ['rating', 'rating_kw', 'rating_kva']),
+        location: firstValue(row, ['location', 'area']),
+      })),
+    },
+    loads: {
+      key: 'loads',
+      title: 'Load Schedule',
+      rows: projectData.loads.map(row => ({
+        tag: firstValue(row, ['tag', 'load_tag', 'id']),
+        description: firstValue(row, ['description', 'name', 'label']),
+        source: firstValue(row, ['source', 'source_tag', 'panel']),
+        kW: firstValue(row, ['kw', 'load_kw', 'connected_kw']),
+        kVA: firstValue(row, ['kva', 'load_kva']),
+        demand: firstValue(row, ['demand_factor', 'demandFactor']),
+      })),
+    },
+    raceways: {
+      key: 'raceways',
+      title: 'Raceway Schedule',
+      rows: racewayRows,
+    },
+    routing: {
+      key: 'routing',
+      title: 'Routing Summary',
+      rows: routeRows,
+      summary: { 'Saved route records': routeRows.length },
+    },
+    pullPlans: {
+      key: 'pullPlans',
+      title: 'Pull Plans',
+      rows: pullRows,
+      summary: { 'Saved pull records': pullRows.length },
+    },
+    procurement: {
+      key: 'procurement',
+      title: 'Procurement Register',
+      rows: projectData.procurement,
+      summary: { 'Procurement records': projectData.procurement.length },
+    },
+    costEstimate: {
+      key: 'costEstimate',
+      title: 'Cost Estimate',
+      rows: sectionRows(projectData.costEstimate),
+      summary: projectData.costEstimate?.summary || {},
+    },
+    fieldExecution: {
+      key: 'fieldExecution',
+      title: 'Field Execution Register',
+      rows: projectData.fieldExecution,
+      summary: { 'Field records': projectData.fieldExecution.length },
+    },
+    deliverables: {
+      key: 'deliverables',
+      title: 'Deliverable Register',
+      rows: buildArtifactRegisterRows(projectData.deliverables),
+      summary: { 'Tracked deliverables': projectData.deliverables.length },
+    },
+  };
+}
+
+function availableSectionInputs(projectData) {
+  return {
+    studies: projectData.studies,
+    cables: projectData.cables,
+    trays: projectData.trays,
+    conduits: projectData.conduits,
+    ductbanks: projectData.ductbanks,
+    equipment: projectData.equipment,
+    loads: projectData.loads,
+    routeResults: projectData.routeResults,
+    pullPlans: projectData.pullPlans,
+    procurement: projectData.procurement,
+    costEstimate: projectData.costEstimate,
+    fieldExecution: projectData.fieldExecution,
+    deliverables: projectData.deliverables,
+    drcResults: projectData.drcResults,
+  };
+}
+
 function assemblePackage(config, projectData) {
   const { studies, approvals, trays, cables, drcResults } = projectData;
 
@@ -337,7 +506,10 @@ function assemblePackage(config, projectData) {
     harmonics:    buildHarmonicsSection(studies, approvals),
     motorStart:   buildMotorStartSection(studies, approvals),
     voltageDrop:  buildVoltageDropSection(studies, approvals),
+    reliability:  buildReliabilitySection(studies, approvals),
     drc:          buildDRCSection(Array.isArray(drcResults) ? drcResults : []),
+    ...constructionSectionData(projectData),
+    ...buildAdvancedStudySections(studies, approvals),
   };
 
   return buildReportPackage(config, sectionData);
@@ -425,7 +597,15 @@ function exportXLSX(pkg, baseReport) {
     { key: 'loadFlow',     headers: ['id', 'voltagePu', 'voltageKv', 'angleDeg', 'loadKW', 'loadKVAR'],               sheetName: 'LoadFlow-Buses', rowKey: 'busRows' },
     { key: 'harmonics',    headers: ['id', 'ithd', 'vthd', 'limit', 'warning', 'calculationStatus'],                   sheetName: 'Harmonics' },
     { key: 'motorStart',   headers: ['id', 'inrushKA', 'voltageSagPct', 'accelTime', 'method'],                        sheetName: 'MotorStart' },
-    { key: 'voltageDrop',  headers: ['id', 'from', 'to', 'dropPct', 'dropV', 'limitPct', 'status'],                   sheetName: 'VoltageDrop' },
+    { key: 'voltageDrop',  headers: ['id', 'from', 'to', 'inputSource', 'path', 'dropPct', 'limitPct', 'status', 'combinedDropPct', 'combinedLimitPct', 'combinedStatus', 'recommendation'], sheetName: 'VoltageDrop' },
+    { key: 'reliability',  headers: ['id', 'kw', 'critical', 'availabilityPct', 'outageHours', 'interruptionsPerYear', 'eensKwh'], sheetName: 'Reliability' },
+    { key: 'quasiDynamic', headers: ['bus', 'minVm', 'maxVm', 'risk'], sheetName: 'QuasiDynamic' },
+    { key: 'probabilisticLoadFlow', headers: ['bus', 'mean', 'p05', 'min', 'pUnder', 'pOver'], sheetName: 'ProbLoadFlow' },
+    { key: 'contingency', headers: ['branch', 'type', 'converged', 'violations', 'status', 'transient'], sheetName: 'Contingency' },
+    { key: 'voltageStability', headers: ['targetBus', 'operatingLoadMw', 'maxLoadMw', 'marginMw', 'marginPct', 'reactiveMargin'], sheetName: 'VoltageStability' },
+    { key: 'frequencyScan', headers: ['order', 'frequencyHz', 'impedance', 'type', 'risk'], sheetName: 'FrequencyScan' },
+    { key: 'transientStability', headers: ['status', 'clearingTime', 'maxAngle', 'cct', 'cctCycles'], sheetName: 'TransientStability' },
+    { key: 'optimalPowerFlow', headers: ['unit', 'output', 'loading', 'incrementalCost', 'cost', 'limit'], sheetName: 'OptimalPowerFlow' },
   ];
 
   for (const { key, headers, sheetName, rowKey } of studySections) {
@@ -437,12 +617,39 @@ function exportXLSX(pkg, baseReport) {
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), sheetName);
   }
 
+  if (sections.reliability?.cutSets?.length) {
+    const headers = ['order', 'failed', 'impacted', 'impactedKw', 'criticalKw', 'probability'];
+    const aoa = [
+      headers,
+      ...sections.reliability.cutSets.map(row => headers.map(header => row[header] ?? '')),
+    ];
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), 'Reliability-CutSets');
+  }
+
   // Heat trace branches
   if (sections.heatTrace && baseReport.heatTrace) {
     const branchRows = baseReport.heatTrace.branchSchedule?.rows || [];
     const headers = ['name', 'status', 'heatTraceCableTypeLabel', 'effectiveTraceLengthFt', 'maxCircuitLengthFt', 'selectedWPerFt', 'requiredWatts', 'voltageV', 'loadAmps'];
     const aoa = [headers, ...branchRows.map(r => headers.map(h => r[h] ?? ''))];
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), 'HeatTrace');
+  }
+
+  const handledKeys = new Set([
+    'cover', 'revisions', 'assumptions', 'cables', 'fill', 'drc', 'heatTrace',
+    ...studySections.map(item => item.key),
+  ]);
+  for (const [key, section] of Object.entries(sections)) {
+    if (handledKeys.has(key) || section?.unavailable) continue;
+    const aoa = sectionToAOA(section);
+    if (!aoa) continue;
+    const baseName = String(section.title || key).replace(/[\\/?*[\]:]/g, '').slice(0, 31) || 'Section';
+    let sheetName = baseName;
+    let suffix = 2;
+    while (wb.SheetNames.includes(sheetName)) {
+      const marker = `-${suffix++}`;
+      sheetName = `${baseName.slice(0, 31 - marker.length)}${marker}`;
+    }
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), sheetName);
   }
 
   if (wb.SheetNames.length === 0) {
@@ -672,6 +879,12 @@ function loadProjectDataWithPackage() {
     designBasis: snap.designBasis || getDesignBasis(),
     designGateApprovals: snap.designGateApprovals || getDesignGateApprovals(),
     tccSettings: snap.tccSettings || getItem('tccSettings', null),
+    routeResults: snap.latestRouteResults || snap.routeResults || null,
+    pullPlans: snap.pullPlanArtifact || null,
+    procurement: Array.isArray(snap.procurementRegister) ? snap.procurementRegister : [],
+    costEstimate: snap.costEstimateArtifact || null,
+    fieldExecution: Array.isArray(snap.fieldExecutionRecords) ? snap.fieldExecutionRecords : [],
+    deliverables: Array.isArray(snap.deliverableArtifacts) ? snap.deliverableArtifacts : [],
     drcResults: [],
   };
 }
@@ -841,12 +1054,7 @@ function generatePreview() {
     }
 
     const selectedSectionCount = config.sections.length;
-    const availableSections = getAvailableSections({
-      studies: projectData.studies,
-      cables: projectData.cables,
-      trays: projectData.trays,
-      drcResults: projectData.drcResults,
-    });
+    const availableSections = getAvailableSections(availableSectionInputs(projectData));
     const contentSectionCount = config.sections.filter(key => availableSections.has(key)).length;
     setStatus(`Preview built — ${selectedSectionCount} section(s) selected; ${contentSectionCount} currently have project content.`, 'success');
     const generateButton = document.getElementById('rpt-generate-btn');
@@ -911,19 +1119,14 @@ document.addEventListener('DOMContentLoaded', () => {
     updateLifecycleBanner();
     // Rebuild section availability for the chosen source
     const pd = loadProjectDataWithPackage();
-    const avail = getAvailableSections({ studies: pd.studies, cables: pd.cables, trays: pd.trays, drcResults: pd.drcResults });
+    const avail = getAvailableSections(availableSectionInputs(pd));
     buildSectionChecks(avail);
     renderReportReadiness();
   });
 
   // Build section checkboxes based on available data
   const projectData = loadProjectData();
-  const available   = getAvailableSections({
-    studies:    projectData.studies,
-    cables:     projectData.cables,
-    trays:      projectData.trays,
-    drcResults: projectData.drcResults,
-  });
+  const available = getAvailableSections(availableSectionInputs(projectData));
   buildSectionChecks(available);
   renderReportReadiness();
 
@@ -998,6 +1201,21 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!lastPkg) return;
     const snap = snapshotPackage(lastPkg);
     setReportSnapshot(snap.id, snap);
+    upsertDeliverableArtifact(normalizeDeliverableArtifact({
+      id: snap.id,
+      type: 'project-report',
+      title: `${snap.config?.coverSheet?.projectName || 'Project'} Report`,
+      revision: snap.config?.coverSheet?.revisionNumber || '0',
+      status: 'draft',
+      generatedAt: snap.generatedAt,
+      generatedBy: snap.config?.coverSheet?.engineer || '',
+      sourceFingerprint: getProjectInputFingerprint(),
+      sourcePage: 'projectreport.html',
+      includedSections: snap.config?.sections || [],
+      summary: {
+        sections: Object.keys(snap.sections || {}).length,
+      },
+    }));
     renderSnapshotList();
     renderReportReadiness();
     // Open the snapshots panel

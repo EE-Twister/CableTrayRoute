@@ -146,17 +146,17 @@ describe('runReliability - expectedOutage', () => {
     assert.ok(Math.abs(result.expectedOutage - (expectedA + expectedB)) < 1e-9);
   });
 
-  it('returns 0 expectedOutage when no eligible components have mtbf/mttr', () => {
+  it('returns an unavailable outage result when no eligible components have mtbf/mttr', () => {
     const components = [
       { id: 'ann', type: 'annotation', mtbf: 1000, mttr: 1 }
     ];
     const result = runReliability(components);
-    assert.strictEqual(result.expectedOutage, 0);
+    assert.strictEqual(result.expectedOutage, null);
   });
 
-  it('returns 0 expectedOutage for empty component list', () => {
+  it('returns an unavailable outage result for empty component list', () => {
     const result = runReliability([]);
-    assert.strictEqual(result.expectedOutage, 0);
+    assert.strictEqual(result.expectedOutage, null);
   });
 });
 

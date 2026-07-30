@@ -77,18 +77,44 @@
 
       <header class="page-header">
         <h1>Motor Starting</h1>
-        <p>Simulate voltage sag from large motor inrush.</p>
+        <p>Screen motor inrush, voltage sag, and acceleration time against project criteria.</p>
       </header>
       <section class="card">
-        <svg id="motorstart-chart" width="800" height="600" xmlns="http://www.w3.org/2000/svg"></svg>
+        <h2>1. Study Criteria</h2>
+        <div class="controls-row">
+          <label for="max-sag-pct">Maximum voltage sag (%)
+            <input id="max-sag-pct" type="number" min="0.1" step="0.1" value="15">
+          </label>
+          <label for="max-accel-sec">Maximum acceleration time (s)
+            <input id="max-accel-sec" type="number" min="0.1" step="0.1" value="10">
+          </label>
+        </div>
+        <div class="controls-row">
+          <button id="load-motors-btn" type="button">Load Motors from One-Line</button>
+          <button id="run-motors-btn" type="button" disabled>Run Selected Motors</button>
+          <button id="export-motors-btn" type="button" disabled>Export Results</button>
+        </div>
+        <div id="motorstart-readiness" class="study-readiness" aria-live="polite"></div>
+      </section>
+      <section class="card" aria-labelledby="motor-inputs-heading">
+        <h2 id="motor-inputs-heading">2. Motor Inputs</h2>
+        <p class="field-hint">Select motors and complete all highlighted study inputs. Values loaded from the One-Line remain editable for this study run.</p>
+        <div id="motor-inputs"><p class="field-hint">Load motors from the active One-Line Diagram to begin.</p></div>
+      </section>
+      <section class="card" aria-labelledby="motor-results-heading">
+        <h2 id="motor-results-heading">3. Results</h2>
+        <div id="motorstart-results" aria-live="polite"><p class="field-hint">No study has been run.</p></div>
+        <div class="chart-scroll">
+          <svg id="motorstart-chart" width="800" height="360" role="img" aria-label="Motor starting voltage sag chart"></svg>
+        </div>
       </section>
       <section class="card" aria-labelledby="starter-types-heading">
         <h2 id="starter-types-heading">Supported Starter Types</h2>
-        <p>Set <code>starter_type</code> on each motor component in the <a href="oneline.html">One-Line Diagram</a> to model different starting methods.</p>
+        <p>Choose a starting method for each motor above. The study applies these screening models:</p>
         <table class="data-table" aria-label="Starter type reference">
           <thead>
             <tr>
-              <th scope="col">starter_type</th>
+              <th scope="col">Starting Method</th>
               <th scope="col">Inrush Model</th>
               <th scope="col">Key Parameters</th>
             </tr>

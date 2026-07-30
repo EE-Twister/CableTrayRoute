@@ -2,6 +2,16 @@ import assert from 'node:assert/strict';
 import { evaluateCriteriaChecks } from '../../src/studies/cp/criteriaChecks.js';
 import { CP_STANDARDS_PROFILE } from '../../src/studies/cp/standardsProfile.js';
 
+(function testCriteriaRemainUnevaluatedWithoutExplicitEvidence() {
+  const result = evaluateCriteriaChecks({
+    criteriaEvidenceEnabled: false
+  }, CP_STANDARDS_PROFILE);
+
+  assert.equal(result.overallStatus, 'not-run');
+  assert.deepEqual(result.criteriaResults, []);
+  assert.equal(result.measurementCorrections, null);
+})();
+
 (function testCriteriaPassesWithCorrectedData() {
   const result = evaluateCriteriaChecks({
     measuredInstantOffPotentialMv: -930,

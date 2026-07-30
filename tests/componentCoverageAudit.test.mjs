@@ -36,7 +36,7 @@ const rowsByType = new Map(coverage.attributeRows.map((row) => [row.type, row]))
 // every regeneration. Strip it so the comparison is about content drift, not
 // the day the script last ran.
 function reportBodyOf(markdown) {
-  const lines = markdown.split('\n');
+  const lines = markdown.replace(/\r\n?/g, '\n').split('\n');
   const start = lines.findIndex((line) => line.startsWith('## Missing Common Component Types'));
   assert.notStrictEqual(start, -1, 'report is missing its first section heading');
   return lines.slice(start).join('\n').trimEnd();

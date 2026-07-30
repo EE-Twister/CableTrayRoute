@@ -12,11 +12,13 @@ The Optimal Power Flow (OPF) / Economic Dispatch study schedules a fleet of disp
 ## Quick Start
 
 1. Navigate to **Studies → Power System → Optimal Power Flow / Economic Dispatch**.
-2. Enter your generators in the fleet table, or click **Load Demonstration Fleet** for the textbook 3-unit example.
+2. Enter your generators in the fleet table, click **Import Project Generators & Load**, or click **Load Demonstration Fleet** for the textbook 3-unit example.
 3. Enter the **system demand** (MW) and an optional **transmission loss** percentage.
 4. Click **Run Economic Dispatch**.
 5. Review the system lambda, per-unit dispatch, total cost, and savings versus naive dispatch.
 6. Click **Export Results (CSV)** to download the dispatch schedule.
+
+Project import reads connected generator capacity and One-Line load. It does not invent missing fuel-cost coefficients: units without `b` and `c` remain visibly incomplete until project-specific cost curves are entered. A dispatch is saved and exportable only when the capacity balance is feasible. Project-derived results become stale when the One-Line generation or load source changes.
 
 ## Cost Model
 

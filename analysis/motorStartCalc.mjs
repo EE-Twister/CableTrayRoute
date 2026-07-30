@@ -77,6 +77,111 @@ export function getStarterProfile(c) {
   };
 }
 
+export function isMotorComponent(component) {
+  const subtype = `${component?.subtype || ''}`.toLowerCase();
+  const type = `${component?.type || ''}`.toLowerCase();
+  return subtype === 'motor_load'
+    || type === 'motor_load'
+    || subtype === 'motor'
+    || type === 'motor'
+    || type === 'motor_controller'
+    || type === 'motor_starter'
+    || subtype === 'vfd'
+    || subtype === 'soft_starter'
+    || subtype.includes('starter')
+    || Boolean(component?.motor);
+}
+
+export function normalizeMotorStartInput(component = {}, overrides = {}) {
+  const merged = { ...component, ...overrides, props: { ...(component.props || {}), ...(overrides.props || {}) } };
+  const props = merged.props;
+  const voltageKv = Number(props.rated_voltage_kv ?? props.baseKV);
+  const pfRaw = Number(merged.pf ?? merged.power_factor ?? props.full_load_pf ?? props.pf ?? props.power_factor);
+  const effRaw = Number(merged.efficiency ?? merged.eff ?? props.full_load_efficiency_pct ?? props.efficiency ?? props.eff);
+  return {
+    id: merged.id,
+    label: merged.tag || merged.name || merged.label || merged.id || 'Motor',
+    hp: parseNum(merged.rating || merged.hp || props.rated_hp || props.hp),
+    volts: Number(merged.voltage ?? merged.volts ?? props.voltage ?? props.volts) || (voltageKv ? voltageKv * 1000 : 0),
+    powerFactor: pfRaw > 1 ? pfRaw / 100 : pfRaw,
+    efficiency: effRaw > 1 ? effRaw / 100 : effRaw,
+    inrushMultiple: Number(merged.inrushMultiple ?? merged.lr_current_pu ?? props.inrushMultiple ?? props.lr_current_pu),
+    theveninR: Number(merged.thevenin_r ?? props.thevenin_r ?? merged.theveninR ?? props.theveninR),
+    theveninX: Number(merged.thevenin_x ?? props.thevenin_x ?? merged.theveninX ?? props.theveninX),
+    inertia: Number(merged.inertia ?? props.inertia),
+    speedRpm: Number(merged.speed ?? props.synchronous_speed_rpm ?? props.speed) || 1800,
+    ...getStarterProfile(merged)
+  };
+}
+
+export function validateMotorStartInput(input = {}) {
+  const errors = [];
+  if (!(input.hp > 0)) errors.push('rated horsepower');
+  if (!(input.volts > 0)) errors.push('rated voltage');
+  if (!(input.powerFactor > 0 && input.powerFactor <= 1)) errors.push('power factor');
+  if (!(input.efficiency > 0 && input.efficiency <= 1)) errors.push('efficiency');
+  if (!(input.inrushMultiple > 0)) errors.push('locked-rotor current multiple');
+  if (!(Math.hypot(input.theveninR, input.theveninX) > 0)) errors.push('Thevenin R or X');
+  if (input.type !== 'vfd' && !(input.inertia > 0)) errors.push('combined inertia');
+  return {
+    ready: errors.length === 0,
+    errors
+  };
+}
+
+export function calculateMotorStartCase(input = {}, criteria = {}) {
+  const validation = validateMotorStartInput(input);
+  if (!validation.ready) return { ...input, ...validation };
+
+  const fullLoadAmps = input.hp * 746
+    / (Math.sqrt(3) * input.volts * input.powerFactor * input.efficiency);
+  const lockedRotorAmps = fullLoadAmps * input.inrushMultiple;
+  let startingAmps = lockedRotorAmps;
+  let accelerationTime;
+
+  if (input.type === 'vfd') {
+    startingAmps = fullLoadAmps * input.vfdCurrentLimitPu;
+    accelerationTime = input.rampTimeSec;
+  } else if (input.type === 'soft_starter') {
+    startingAmps = lockedRotorAmps * input.initialVoltagePu;
+    accelerationTime = input.rampTimeSec;
+  } else if (input.type === 'wye_delta') {
+    startingAmps = lockedRotorAmps / 3;
+    accelerationTime = input.wyeDeltaSwitchTimeSec;
+  } else if (input.type === 'autotransformer') {
+    startingAmps = lockedRotorAmps * input.autotransformerTap * input.autotransformerTap;
+  }
+
+  if (!Number.isFinite(accelerationTime)) {
+    const synchronousSpeed = 2 * Math.PI * input.speedRpm / 60;
+    const ratedTorque = (input.hp * 746) / synchronousSpeed;
+    const torqueFactor = input.type === 'autotransformer'
+      ? input.autotransformerTap * input.autotransformerTap
+      : 1;
+    accelerationTime = Math.min(60, input.inertia * synchronousSpeed / Math.max(ratedTorque * torqueFactor, 0.001));
+  }
+
+  const voltageSagPct = startingAmps * Math.hypot(input.theveninR, input.theveninX) / input.volts * 100;
+  const maxVoltageSagPct = Number(criteria.maxVoltageSagPct) || 15;
+  const maxAccelerationTimeSec = Number(criteria.maxAccelerationTimeSec) || 10;
+  const passes = voltageSagPct <= maxVoltageSagPct && accelerationTime <= maxAccelerationTimeSec;
+  return {
+    ...input,
+    ready: true,
+    errors: [],
+    fullLoadAmps: Number(fullLoadAmps.toFixed(1)),
+    inrushKA: Number((startingAmps / 1000).toFixed(3)),
+    voltageSagPct: Number(voltageSagPct.toFixed(2)),
+    accelTime: Number(accelerationTime.toFixed(2)),
+    starterType: input.type,
+    status: passes ? 'pass' : 'review',
+    checks: {
+      voltageSag: voltageSagPct <= maxVoltageSagPct,
+      accelerationTime: accelerationTime <= maxAccelerationTimeSec
+    }
+  };
+}
+
 /**
  * Estimate voltage sag during motor starting using a simple Thevenin model.
  * @returns {Object<string,{inrushKA:number,voltageSagPct:number,accelTime:number,starterType:string}>}

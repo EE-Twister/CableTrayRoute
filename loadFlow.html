@@ -83,9 +83,11 @@
           <label for="baseMVA">Base MVA <input type="number" id="baseMVA" name="baseMVA" value="100" min="0.1" step="any" aria-describedby="basemva-hint"></label>
           <span id="basemva-hint" class="field-hint">System base power in MVA (typically 100).</span>
           <label><input type="checkbox" name="balanced" checked> Balanced</label>
-          <button type="submit">Run Study</button>
+          <button id="run-loadflow-btn" type="submit">Run Study</button>
+          <button id="export-loadflow-btn" type="button" disabled>Export Valid Result</button>
         </form>
-        <pre id="loadflow-output"></pre>
+        <div id="loadflow-readiness" class="study-readiness" aria-live="polite"></div>
+        <div id="loadflow-output" class="study-results" aria-live="polite"></div>
       </section>
       <section class="card" aria-labelledby="study-review-panel-heading">
         <div id="study-review-panel"></div>

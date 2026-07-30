@@ -66,13 +66,13 @@
 
       <header class="page-header">
         <h1>Sustainability Footprint</h1>
-        <p>Calculate embodied CO₂e (Scope 3, A1–A3 cradle-to-gate) from project BOM and operating CO₂e (Scope 2) from lifetime conductor losses. Suitable for LEED, BREEAM, and client sustainability appendices.</p>
+        <p>Calculate screening-level embodied CO₂e (Scope 3, A1–A3 cradle-to-gate) from project BOM and operating CO₂e (Scope 2) from lifetime conductor losses, with explicit source and coverage records.</p>
       </header>
 
       <details class="method-panel">
         <summary>Method &amp; Standards</summary>
         <p><strong>Embodied CO₂e (Scope 3):</strong> Each BOM line item's quantity is multiplied by a unit embodied factor (kg CO₂e per metre or per unit). Factors are sourced from published EPD averages per IEC/EN 15804 (A1–A3, cradle-to-gate). Item-level <code>co2eKgPerUnit</code> overrides take precedence when EPD data is available for a specific product.</p>
-        <p><strong>Operating CO₂e (Scope 2):</strong> Annual conductor losses (kW) × 8 760 h/yr × grid emission factor (kg CO₂e/kWh) × project life (years). Grid factors are national average generation-mix values from IEA and EPA eGRID.</p>
+        <p><strong>Operating CO₂e (Scope 2):</strong> Annual conductor losses (kW) × 8 760 h/yr × grid emission factor (kg CO₂e/kWh) × project life (years). U.S. factors use EPA eGRID2023 Revision 2 total-output CO₂e rates; source metadata is saved with each result.</p>
         <p><strong>Scope boundaries:</strong> This tool covers Scope 2 (purchased electricity losses) and Scope 3 Category 1 (purchased goods and materials — embodied carbon). Scope 1 (on-site diesel for generators) and transport emissions are excluded from the default calculation.</p>
         <p class="hint"><strong>Disclaimer:</strong> Factors are representative industry averages for screening-level design. Final sustainability reports and LEED/BREEAM submittals must be verified against manufacturer-specific EPDs and the project-specific grid emission factor.</p>
       </details>
@@ -86,13 +86,7 @@
         <div class="field-row-inline">
           <label for="grid-region">Grid emission region
             <select id="grid-region" aria-label="Grid emission region">
-              <option value="us" selected>United States (national avg) — 0.386 kg/kWh</option>
-              <option value="eu">European Union (avg) — 0.233 kg/kWh</option>
-              <option value="uk">United Kingdom — 0.207 kg/kWh</option>
-              <option value="ca">Canada (national avg) — 0.130 kg/kWh</option>
-              <option value="au">Australia (NEM avg) — 0.510 kg/kWh</option>
-              <option value="cn">China (national avg) — 0.581 kg/kWh</option>
-              <option value="custom">Custom / project-specific</option>
+              <option value="us" selected>United States — national average</option>
             </select>
           </label>
           <label for="custom-grid-factor" id="custom-grid-label">Custom grid factor (kg CO₂e/kWh)
@@ -103,6 +97,24 @@
             <input type="number" id="project-life" value="25" min="1" max="100" step="1"
                    aria-label="Project design life in years">
           </label>
+        </div>
+        <div id="custom-grid-source-fields" class="field-group" hidden>
+          <h3>Custom Factor Source</h3>
+          <div class="field-row-inline">
+            <label for="custom-grid-source">Source / publisher
+              <input type="text" id="custom-grid-source" placeholder="Utility disclosure, PPA, or authority">
+            </label>
+            <label for="custom-grid-source-date">Source date
+              <input type="date" id="custom-grid-source-date">
+            </label>
+            <label for="custom-grid-geography">Applicable geography
+              <input type="text" id="custom-grid-geography" placeholder="Utility territory or project site">
+            </label>
+          </div>
+          <label for="custom-grid-source-url">Source URL or document reference
+            <input type="url" id="custom-grid-source-url" placeholder="https://…">
+          </label>
+          <p class="hint">A custom value without a source remains usable for screening, but the result is flagged as undocumented.</p>
         </div>
 
         <h2>Operating Losses</h2>
@@ -165,7 +177,7 @@
       <button id="close-help-btn" class="close-btn" aria-label="Close Help">&times;</button>
       <h2 id="help-title">Sustainability Footprint Help</h2>
       <p>Select a grid region and project life, then click <strong>Calculate Footprint</strong>. The tool reads your project's cable schedule, raceway schedule, and equipment list to assemble a BOM and roll up embodied CO₂e.</p>
-      <p><strong>Grid region:</strong> Sets the national average grid emission factor (kg CO₂e per kWh). Use "Custom" to enter a project-specific factor (e.g. from a PPA or renewable certificate).</p>
+      <p><strong>Grid region:</strong> U.S. choices use EPA eGRID2023 Revision 2 subregion total-output CO₂e rates. Use "Custom" for a utility, PPA, or authority factor and record its source.</p>
       <p><strong>Operating losses:</strong> Select "From IEC 60287 study results" to pull the total conductor losses calculated in the Cable Ampacity study, or enter a manual value. Losses are capitalised over the project life using the selected grid factor.</p>
       <p><strong>Skipped items:</strong> BOM entries whose size, material, or category cannot be matched to the library appear in the Skipped Items panel. Add a <code>co2eKgPerUnit</code> field to the item or use a supported size/material to include it.</p>
       <p><strong>Alternative comparison:</strong> Enable the comparison toggle and paste a BOM JSON array for the alternative design. The tool shows the embodied delta (positive = alternative is heavier, negative = lighter).</p>

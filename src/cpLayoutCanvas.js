@@ -198,6 +198,7 @@ export function initCpLayoutCanvas({
   const measurementStateList = panel.querySelector('#cp-measurement-state-list');
   const hotspotInspector = panel.querySelector('#cp-hotspot-inspector');
   const propertiesPanelContent = panel.querySelector('#cp-element-properties-content');
+  const zoomStatus = panel.querySelector('#cp-layout-zoom-status');
 
   const layerToggles = {
     [LAYERS.structure]: panel.querySelector('#cp-layer-structure'),
@@ -630,9 +631,16 @@ export function initCpLayoutCanvas({
     const selected = state.selectedElement;
     const selectedItem = getElementBySelection(selected);
     if (!selected || !selectedItem) {
+      const segmentCount = state.geometry.structureSegments.length;
+      const anodeCount = state.geometry.anodes.length;
+      const testPointCount = state.geometry.testPoints.length;
       propertiesPanelContent.innerHTML = `
-        <p class="field-hint">No element selected.</p>
-        <p class="field-hint">Double click an anode, test point, structure segment, or the reference electrode to edit properties.</p>
+        <div class="cp-properties-overview">
+          <strong>${segmentCount} segments</strong>
+          <span>${anodeCount} anodes</span>
+          <span>${testPointCount} test points</span>
+        </div>
+        <p class="field-hint">Select a route segment or hotspot to inspect it. Double click an anode, test point, segment, or the reference electrode to edit coordinates and labels.</p>
       `;
       return;
     }
@@ -664,6 +672,14 @@ export function initCpLayoutCanvas({
       </form>
       <p class="field-hint">Changes are applied immediately and persisted with the layout.</p>
     `;
+  }
+
+  function updateZoomStatus() {
+    if (!zoomStatus) return;
+    const scale = roundTo(state.viewport.scale, 2);
+    zoomStatus.textContent = state.viewport.scale <= 1.01
+      ? `Fit entire route · ${scale.toFixed(2)}×`
+      : `Readable route window · ${scale.toFixed(2)}×`;
   }
 
   function render() {
@@ -813,6 +829,7 @@ export function initCpLayoutCanvas({
     renderMeasurementStateList();
     renderHotspotInspector(selectedSegmentAssessment);
     renderPropertiesPanel();
+    updateZoomStatus();
   }
 
   function onPointerDown(event) {
@@ -821,6 +838,7 @@ export function initCpLayoutCanvas({
       const hotspotIndex = Number.parseInt(hotspot.dataset.hotspotIndex || '-1', 10);
       if (Number.isInteger(hotspotIndex) && hotspotIndex >= 0) {
         state.selectedHotspotIndex = hotspotIndex;
+        state.selectedElement = { kind: 'segment', index: hotspotIndex };
         announce(`Hotspot selected: Segment ${hotspotIndex + 1}.`);
         render();
       }
@@ -831,6 +849,7 @@ export function initCpLayoutCanvas({
       const segmentIndex = Number.parseInt(segment.dataset.segmentIndex || '-1', 10);
       if (Number.isInteger(segmentIndex) && segmentIndex >= 0) {
         state.selectedHotspotIndex = segmentIndex;
+        state.selectedElement = { kind: 'segment', index: segmentIndex };
         announce(`Segment selected: Segment ${segmentIndex + 1}.`);
         render();
       }
@@ -851,6 +870,11 @@ export function initCpLayoutCanvas({
     dragState.mode = target.dataset.dragKind;
     dragState.pointerId = event.pointerId;
     dragState.itemIndex = Number.parseInt(target.dataset.index || '-1', 10);
+    if (dragState.mode === 'reference') {
+      state.selectedElement = { kind: 'reference', index: 0 };
+    } else if (Number.isInteger(dragState.itemIndex) && dragState.itemIndex >= 0) {
+      state.selectedElement = { kind: dragState.mode, index: dragState.itemIndex };
+    }
     const world = worldFromClient(event.clientX, event.clientY);
     dragState.startX = world.x;
     dragState.startY = world.y;
@@ -941,6 +965,7 @@ export function initCpLayoutCanvas({
     dragState.pointerId = null;
     dragState.itemIndex = -1;
     canvas.releasePointerCapture(event.pointerId);
+    render();
   }
 
   function selectElementFromTarget(target) {
@@ -1023,6 +1048,17 @@ export function initCpLayoutCanvas({
     state.viewport.y = clamp(state.viewport.y, minY, 0);
   }
 
+  function setReadableViewport() {
+    const bounds = getViewBounds(state.geometry);
+    const scale = clamp(bounds.width / 2000, 1, 2.2);
+    state.viewport = {
+      scale,
+      x: bounds.width * (1 - scale) / 2,
+      y: bounds.height * (1 - scale) / 2
+    };
+    clampViewportToBounds();
+  }
+
   function setLayerVisibility(layer, visible) {
     if (layer === 'heatmap') {
       state.heatmapEnabled = visible;
@@ -1034,11 +1070,10 @@ export function initCpLayoutCanvas({
   }
 
   function resetLayout() {
-    state.viewport = { scale: 1, x: 0, y: 0 };
     buildGeometryFromInputs();
-    clampViewportToBounds();
+    setReadableViewport();
     render();
-    announce('Layout reset to current form values.');
+    announce('Layout reset to current form values with a readable route window.');
     notifyLayoutChanged();
   }
 
@@ -1101,6 +1136,9 @@ export function initCpLayoutCanvas({
 
   buildGeometryFromInputs();
   applyPersistedLayout(initialLayout);
+  if (!initialLayout?.viewport) {
+    setReadableViewport();
+  }
   clampViewportToBounds();
   setViewMode(state.viewMode);
   render();

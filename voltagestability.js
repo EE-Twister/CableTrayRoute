@@ -1,7 +1,10 @@
 import { runVoltageStabilityStudy } from './analysis/voltageStability.mjs';
-import { getStudies, setStudies } from './dataStore.mjs';
+import { getOneLine, getStudies, setStudies } from './dataStore.mjs';
 import { initStudyApprovalPanel } from './src/components/studyApproval.js';
 import { escapeHtml } from './src/htmlUtils.mjs';
+import { showAlertModal } from './src/components/modal.js';
+import { buildVoltageStabilityProjectInputs } from './analysis/advancedStudyProjectInputs.mjs';
+import { createStudyRunMetadata, isStudyResultStale } from './analysis/studyResultReadiness.mjs';
 
 document.addEventListener('DOMContentLoaded', () => {
   initSettings();
@@ -16,17 +19,43 @@ document.addEventListener('DOMContentLoaded', () => {
   const resultsDiv = document.getElementById('results');
   const errorsDiv = document.getElementById('calc-errors');
   const exportBtn = document.getElementById('export-csv-btn');
+  const sourceDiv = document.getElementById('vs-input-source');
+  let importedSourceFingerprint = null;
   let busCounter = 0;
   let branchCounter = 0;
 
   document.getElementById('add-bus-btn').addEventListener('click', () => addBusRow());
   document.getElementById('add-branch-btn').addEventListener('click', () => addBranchRow());
+  document.getElementById('import-oneline-btn').addEventListener('click', () => {
+    const imported = buildVoltageStabilityProjectInputs(getOneLine(), {
+      baseMVA: parseFloat(document.getElementById('base-mva').value) || 100,
+    });
+    if (!imported.ready) {
+      const message = 'The project One-Line needs at least two buses, a branch, and a slack bus before it can seed this study.';
+      sourceDiv.className = 'result-fail';
+      sourceDiv.textContent = message;
+      showAlertModal('Project Data Incomplete', message, { variant: 'danger' });
+      return;
+    }
+    restoreForm(imported.inputs);
+    importedSourceFingerprint = imported.sourceFingerprint;
+    sourceDiv.className = imported.warnings.length ? 'result-warn' : 'result-ok';
+    sourceDiv.textContent = `Imported ${imported.counts.buses} buses and ${imported.counts.branches} branches from the project One-Line.${imported.warnings.length ? ` Review: ${imported.warnings.join(' ')}` : ''}`;
+    exportBtn.hidden = true;
+  });
 
   const saved = getStudies().voltageStability;
   if (saved && saved.inputs) {
     restoreForm(saved.inputs);
     renderResults(saved);
-    exportBtn.hidden = false;
+    const stale = saved.runMetadata?.sourceFingerprint
+      ? isStudyResultStale(saved, buildVoltageStabilityProjectInputs(getOneLine()).sourceFingerprint)
+      : false;
+    exportBtn.hidden = saved.runMetadata?.valid !== true || stale;
+    sourceDiv.className = stale ? 'result-warn' : 'field-hint';
+    sourceDiv.textContent = stale
+      ? 'Saved result is stale because the project One-Line has changed. Import and rerun before export.'
+      : (saved.runMetadata?.source === 'project-one-line' ? 'Saved inputs were imported from the project One-Line.' : 'Saved manual inputs restored.');
   } else {
     addDefaultSystem();
   }
@@ -41,18 +70,31 @@ document.addEventListener('DOMContentLoaded', () => {
       const msg = err instanceof Error ? err.message : 'Unable to run voltage stability study.';
       errorsDiv.hidden = false;
       errorsDiv.textContent = msg;
-      showModal('Input Error', `<p>${escapeHtml(msg)}</p>`, 'error');
+      showAlertModal('Input Error', msg, { variant: 'danger' });
       return;
     }
     errorsDiv.hidden = true;
     errorsDiv.textContent = '';
 
-    const studies = getStudies();
-    studies.voltageStability = result;
-    setStudies(studies);
+    const valid = result.pvCurve?.points?.some(point => point.converged && Math.abs(point.lambda - 1) < 1e-6)
+      && result.qvCurve?.points?.some(point => point.converged && Math.abs(point.qInjMvar) <= (inputs.qStepMvar / 2));
+    result.runMetadata = createStudyRunMetadata(
+      'voltageStability',
+      { ready: valid, sourceFingerprint: importedSourceFingerprint, counts: { buses: inputs.buses.length } },
+      { valid, convergedCount: valid ? 2 : 0, totalCount: 2 },
+      { source: importedSourceFingerprint ? 'project-one-line' : 'manual', persisted: valid }
+    );
+    if (valid) {
+      const studies = getStudies();
+      studies.voltageStability = result;
+      setStudies(studies);
+    } else {
+      errorsDiv.hidden = false;
+      errorsDiv.textContent = 'The base P-V or Q-V operating point did not converge. This result was not saved or enabled for export.';
+    }
 
     renderResults(result);
-    exportBtn.hidden = false;
+    exportBtn.hidden = !valid;
   });
 
   exportBtn.addEventListener('click', () => {

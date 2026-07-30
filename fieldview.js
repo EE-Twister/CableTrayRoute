@@ -1,18 +1,29 @@
 /**
  * Mobile Field View — Gap #21: Mobile-Optimized Field Access
  *
- * Read-only, mobile-first page for field technicians scanning QR codes on
- * pull cards or tray hardware tags during cable installation.
+ * Shared field execution page for technicians scanning QR codes on pull cards
+ * or tray hardware tags during cable installation.
  *
  * URL patterns:
  *   fieldview.html#cable=CABLETAG   — show cable detail card
  *   fieldview.html#tray=TRAYID      — show tray detail card
  *
- * Data is read from localStorage (project loaded in this browser session).
- * If no project data is present the page prompts the user to load one.
+ * Schedule data and execution records use the centralized project data store.
  */
 
-import { getCables, getTrays } from './dataStore.mjs';
+import {
+  getCables,
+  getFieldExecutionRecords,
+  getTrays,
+  setFieldExecutionRecords,
+} from './dataStore.mjs';
+import {
+  FIELD_EXECUTION_STATUSES,
+  findFieldExecutionRecord,
+  normalizeFieldExecutionRecord,
+  summarizeFieldExecution,
+  upsertFieldExecutionRecord,
+} from './analysis/fieldExecution.mjs';
 
 const PREVIEW_CABLE = {
   tag: 'C-1042',
@@ -63,6 +74,66 @@ function fieldRow(label, value) {
       <span class="fv-label">${esc(label)}</span>
       <span class="fv-value">${esc(value)}</span>
     </div>`;
+}
+
+function statusLabel(status) {
+  return String(status || 'not-started')
+    .split('-')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+}
+
+function renderExecutionPanel(recordType, sourceId, options = {}) {
+  if (options.preview) return '';
+  const record = findFieldExecutionRecord(getFieldExecutionRecords(), recordType, sourceId)
+    || normalizeFieldExecutionRecord({ recordType, sourceId });
+  const statusOptions = FIELD_EXECUTION_STATUSES
+    .map(status => `<option value="${status}"${record.status === status ? ' selected' : ''}>${esc(statusLabel(status))}</option>`)
+    .join('');
+  return `
+    <section class="fv-execution" aria-label="Field execution record">
+      <div class="fv-execution-heading">
+        <div>
+          <span class="fv-label">Shared project record</span>
+          <h2>Installation status</h2>
+        </div>
+        <span class="fv-status-badge fv-status-${esc(record.status)}">${esc(statusLabel(record.status))}</span>
+      </div>
+      <div class="fv-execution-grid">
+        <label>Status
+          <select data-field-execution="status">${statusOptions}</select>
+        </label>
+        <label>Quantity complete
+          <input data-field-execution="quantityComplete" type="number" min="0" step="0.1" value="${esc(record.quantityComplete)}">
+        </label>
+        <label>Crew
+          <input data-field-execution="crew" type="text" value="${esc(record.crew)}" autocomplete="off">
+        </label>
+        <label>Updated by
+          <input data-field-execution="updatedBy" type="text" value="${esc(record.updatedBy)}" autocomplete="off">
+        </label>
+      </div>
+      <label class="fv-execution-wide">Field notes
+        <textarea data-field-execution="notes" rows="2">${esc(record.notes)}</textarea>
+      </label>
+      <label class="fv-execution-check">
+        <input data-field-execution="punchOpen" type="checkbox"${record.punchOpen ? ' checked' : ''}>
+        Open punch item
+      </label>
+      <label class="fv-execution-wide">Punch description
+        <textarea data-field-execution="punchDescription" rows="2">${esc(record.punchDescription)}</textarea>
+      </label>
+      <label class="fv-execution-wide">As-built deviation
+        <textarea data-field-execution="asBuiltDeviation" rows="2">${esc(record.asBuiltDeviation)}</textarea>
+      </label>
+      <label class="fv-execution-wide">Evidence references
+        <input data-field-execution="evidenceReferences" type="text" value="${esc(record.evidenceReferences.join(', '))}" placeholder="Photo ID, test report, attachment reference">
+      </label>
+      <div class="fv-actions">
+        <button type="button" class="fv-btn fv-btn-primary" data-save-field-record data-record-type="${esc(recordType)}" data-source-id="${esc(sourceId)}">Save field record</button>
+        <span class="fv-save-status" role="status" aria-live="polite"></span>
+      </div>
+    </section>`;
 }
 
 function renderCableCard(cable, trays, options = {}) {
@@ -129,6 +200,7 @@ function renderCableCard(cable, trays, options = {}) {
       <div class="fv-actions">
         ${actions}
       </div>
+      ${renderExecutionPanel('cable', cableTag, options)}
     </article>`;
 }
 
@@ -161,6 +233,7 @@ function renderTrayCard(tray) {
           Print
         </button>
       </div>
+      ${renderExecutionPanel('tray', trayTag)}
     </article>`;
 }
 
@@ -201,8 +274,16 @@ function renderDesktopPreview() {
 }
 
 function renderNoHash() {
+  const summary = summarizeFieldExecution(getFieldExecutionRecords());
   return `
     ${renderDesktopPreview()}
+    <div class="fv-desktop-only">
+      <div class="fv-message fv-message-info" role="status">
+        <h2>Field execution summary</h2>
+        <p>${summary.total} tracked record(s), ${summary.complete} accepted, ${summary.blocked} blocked, and ${summary.punchOpen} with an open punch item.</p>
+        <p>Open a cable or tray QR link to update its shared installation record.</p>
+      </div>
+    </div>
     <div class="fv-mobile-only">
       <div class="fv-message fv-message-info" role="status">
         <div class="fv-message-icon" aria-hidden="true">&#8505;</div>
@@ -217,7 +298,44 @@ function renderNoHash() {
 // Main entry
 // ---------------------------------------------------------------------------
 
-document.addEventListener('DOMContentLoaded', () => {
+function readExecutionForm(container) {
+  const value = name => container.querySelector(`[data-field-execution="${name}"]`)?.value ?? '';
+  return {
+    status: value('status'),
+    quantityComplete: value('quantityComplete'),
+    crew: value('crew'),
+    updatedBy: value('updatedBy'),
+    notes: value('notes'),
+    punchOpen: Boolean(container.querySelector('[data-field-execution="punchOpen"]')?.checked),
+    punchDescription: value('punchDescription'),
+    asBuiltDeviation: value('asBuiltDeviation'),
+    evidenceReferences: value('evidenceReferences').split(',').map(item => item.trim()).filter(Boolean),
+  };
+}
+
+function bindExecutionActions(container) {
+  const button = container.querySelector('[data-save-field-record]');
+  if (!button) return;
+  button.addEventListener('click', () => {
+    const panel = button.closest('.fv-execution');
+    const record = {
+      recordType: button.dataset.recordType,
+      sourceId: button.dataset.sourceId,
+      ...readExecutionForm(panel),
+      updatedAt: new Date().toISOString(),
+    };
+    setFieldExecutionRecords(upsertFieldExecutionRecord(getFieldExecutionRecords(), record));
+    const saveStatus = panel.querySelector('.fv-save-status');
+    if (saveStatus) saveStatus.textContent = `Saved ${statusLabel(record.status)} at ${new Date().toLocaleTimeString()}.`;
+    const badge = panel.querySelector('.fv-status-badge');
+    if (badge) {
+      badge.className = `fv-status-badge fv-status-${record.status}`;
+      badge.textContent = statusLabel(record.status);
+    }
+  });
+}
+
+function renderCurrentTarget() {
   const container = document.getElementById('fv-content');
   if (!container) return;
 
@@ -242,6 +360,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     const trays = getTrays();
     container.innerHTML = renderCableCard(cable, trays);
+    bindExecutionActions(container);
     // Update page title to cable tag for easy identification
     document.title = `${cableTag} — CableTrayRoute Field View`;
     return;
@@ -259,8 +378,11 @@ document.addEventListener('DOMContentLoaded', () => {
     return;
   }
   container.innerHTML = renderTrayCard(tray);
+  bindExecutionActions(container);
   document.title = `${trayId} — CableTrayRoute Field View`;
-});
+}
+
+document.addEventListener('DOMContentLoaded', renderCurrentTarget);
 
 // Re-render if the user navigates to a different hash without reloading
 window.addEventListener('hashchange', () => {
@@ -282,6 +404,7 @@ window.addEventListener('hashchange', () => {
     container.innerHTML = cable
       ? renderCableCard(cable, getTrays())
       : renderNotFound('cable', cableTag);
+    if (cable) bindExecutionActions(container);
     if (cable) document.title = `${cableTag} — CableTrayRoute Field View`;
     return;
   }
@@ -292,5 +415,6 @@ window.addEventListener('hashchange', () => {
   container.innerHTML = tray
     ? renderTrayCard(tray)
     : renderNotFound('tray', trayId);
+  if (tray) bindExecutionActions(container);
   if (tray) document.title = `${trayId} — CableTrayRoute Field View`;
 });

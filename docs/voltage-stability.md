@@ -2,6 +2,8 @@
 
 Provides preliminary P-V and Q-V sensitivity sweeps using sequential Newton-Raphson power flows. Solver nonconvergence is reported as a numerical boundary only; it is not treated as a physical voltage-collapse nose. The Q-V sweep records voltage response to reactive injection but does not claim a reactive margin.
 
+Use **Import Project One-Line** to populate buses, loads, generation, and modeled branch impedances. Ideal ties and missing impedance are identified in the import banner. A result is saved and exportable only when the base P-V and Q-V operating points converge; project-derived results become stale when the One-Line changes.
+
 > **Screening limitation:** Final voltage-stability margins require continuation
 > power flow or another independently validated method, complete generator
 > reactive limits and controls, transformer taps, shunts, contingency dispatch,

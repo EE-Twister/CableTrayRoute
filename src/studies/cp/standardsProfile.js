@@ -1,12 +1,12 @@
 export const CP_STANDARDS_PROFILE = {
   profileId: 'cp-design-basis-2026',
-  organization: 'CableTrayRoute default profile',
+  organization: 'CableTrayRoute preliminary profile — project adoption required',
   selectedProtectionCriteriaSetId: 'buried-steel-default',
   targetReferences: [
-    { code: 'AMPP SP21424', edition: 'Adopted organizational edition' },
-    { code: 'NACE SP0169', edition: 'Latest organization-approved edition' },
-    { code: 'ISO 15589-1', edition: 'Latest organization-approved edition' },
-    { code: 'DNV-RP-B401', edition: 'Latest organization-approved edition' }
+    { code: 'AMPP SP21424', edition: 'Edition not configured — project selection required' },
+    { code: 'NACE SP0169', edition: 'Edition not configured — project selection required' },
+    { code: 'ISO 15589-1', edition: 'Edition not configured — project selection required' },
+    { code: 'DNV-RP-B401', edition: 'Edition not configured — project selection required' }
   ],
   protectionCriteriaSets: {
     'buried-steel-default': {
@@ -41,15 +41,15 @@ export const CP_STANDARDS_PROFILE = {
     },
     anodeMassSizing: {
       key: 'anodeMassSizing',
-      label: 'Anode mass sizing equation verification',
+      label: 'CP source sizing verification',
       required: true,
-      description: 'Required mass is calculated from approved anode capacity/utilization inputs.'
+      description: 'Galvanic mass or ICCP rectifier current and voltage requirements are calculated from the selected source basis.'
     },
     targetLifeVerification: {
       key: 'targetLifeVerification',
-      label: 'Target life verification',
+      label: 'Source capacity margin verification',
       required: true,
-      description: 'Installed mass life check confirms whether the selected target life is met.'
+      description: 'Installed galvanic mass life or ICCP rectifier capacity confirms that the preliminary source basis is adequate.'
     },
     commissioningChecksDefined: {
       key: 'commissioningChecksDefined',
@@ -120,10 +120,15 @@ export function evaluateComplianceChecks(result) {
   const checks = {
     ...buildInitialComplianceStatus(),
     currentDensitySelection: Number.isFinite(result.designCurrentDensityMaM2) && result.designCurrentDensityMaM2 > 0 ? 'pass' : 'fail',
-    anodeMassSizing: Number.isFinite(result.minimumAnodeMassKg) && result.minimumAnodeMassKg > 0 ? 'pass' : 'fail',
-    targetLifeVerification: Number.isFinite(result.safetyMarginYears)
-      ? (result.safetyMarginYears >= 0 ? 'pass' : 'fail')
-      : 'fail',
+    anodeMassSizing: result.anodeTypeSystem === 'iccp'
+      ? (Number.isFinite(result.iccpSizing?.requiredRectifierCurrentA)
+        && Number.isFinite(result.iccpSizing?.requiredRectifierVoltageV) ? 'pass' : 'fail')
+      : (Number.isFinite(result.minimumAnodeMassKg) && result.minimumAnodeMassKg > 0 ? 'pass' : 'fail'),
+    targetLifeVerification: result.anodeTypeSystem === 'iccp'
+      ? (result.iccpSizing?.overallStatus === 'pass' ? 'pass' : 'fail')
+      : (Number.isFinite(result.safetyMarginYears)
+        ? (result.safetyMarginYears >= 0 ? 'pass' : 'fail')
+        : 'fail'),
     commissioningChecksDefined: criteriaStatus === 'pass' && hasVerificationDate ? 'pass' : 'fail',
     monitoringPlanDefined: hasMitigationActions ? 'pass' : 'fail',
     interferenceAssessment: unresolvedHighRisk ? 'fail' : 'pass'

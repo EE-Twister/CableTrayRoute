@@ -1,4 +1,4 @@
-import { runAllBenchmarks, summarize } from './analysis/benchmarkRunner.mjs';
+import { BENCHMARKS, runAllBenchmarks, summarize } from './analysis/benchmarkRunner.mjs';
 import { escapeHtml } from './src/htmlUtils.mjs';
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -16,8 +16,32 @@ document.addEventListener('DOMContentLoaded', () => {
   const tbody       = document.getElementById('results-tbody');
   const detailEl    = document.getElementById('detail-section');
   const detailPanel = document.getElementById('detail-panel');
+  const coverageEl  = document.getElementById('coverage-summary');
+  const catalogEl   = document.getElementById('reference-catalog');
 
   runBtn.addEventListener('click', runBenchmarks);
+  loadReferenceCatalog();
+
+  async function loadReferenceCatalog() {
+    const liveFamilies = new Set(BENCHMARKS.map(benchmark => benchmark.studyType));
+    try {
+      const response = await fetch('data/validationBenchmarks.json');
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+      const fixtures = Array.isArray(data.benchmarks) ? data.benchmarks : [];
+      coverageEl.innerHTML = `
+        <div class="kpi-card"><span class="kpi-value">${BENCHMARKS.length}</span><span class="kpi-label">Live Executable Checks</span></div>
+        <div class="kpi-card"><span class="kpi-value">${liveFamilies.size}</span><span class="kpi-label">Live Study Families</span></div>
+        <div class="kpi-card"><span class="kpi-value">${fixtures.length}</span><span class="kpi-label">Reference Fixtures</span></div>`;
+      catalogEl.innerHTML = fixtures.length
+        ? `<div class="table-scroll"><table class="results-table"><thead><tr><th>ID</th><th>Reference Case</th><th>Standard</th><th>Study</th><th>Evidence Type</th></tr></thead><tbody>${fixtures.map(fixture => `
+          <tr><td><code>${escapeHtml(fixture.id)}</code></td><td>${escapeHtml(fixture.title)}</td><td>${escapeHtml(fixture.standard)}</td><td><a href="${escapeHtml(fixture.studyPage)}">Open study</a></td><td><span class="fill-badge">Reference fixture</span></td></tr>`).join('')}</tbody></table></div>`
+        : '<p>No reference fixtures are currently listed.</p>';
+    } catch (error) {
+      coverageEl.innerHTML = `<p class="result-fail">Coverage catalog could not be loaded: ${escapeHtml(error.message)}</p>`;
+      catalogEl.innerHTML = '<p class="result-fail">Reference fixtures are unavailable.</p>';
+    }
+  }
 
   function runBenchmarks() {
     runBtn.disabled = true;
@@ -44,13 +68,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function renderSummary(results) {
     const { total, passed, failed, allPass } = summarize(results);
+    const studyFamilies = new Set(results.map(result => result.studyType)).size;
     const cls = allPass ? 'fill-ok' : 'fill-over';
     const icon = allPass ? '✓' : '✗';
 
     summaryCard.innerHTML = `
       <p style="font-size:1.1rem; margin-bottom:0.75rem">
         <span class="fill-badge ${cls}" style="font-size:1rem; padding:.4rem .9rem">
-          ${icon} ${passed} / ${total} benchmarks passing
+          ${icon} ${passed} / ${total} live benchmarks passing across ${studyFamilies} study families
         </span>
       </p>
       ${failed > 0 ? `<p class="hint" role="alert" style="color:var(--color-error,#c0392b)">
@@ -144,6 +169,8 @@ document.addEventListener('DOMContentLoaded', () => {
         <h2>${escapeHtml(r.id)}: ${escapeHtml(r.label)}</h2>
         <p style="font-size:.85rem; color:var(--color-text-muted,#666)">
           <strong>Standard:</strong> ${escapeHtml(r.standardRef)}
+          ${r.sourceUrl ? ` &nbsp;Â·&nbsp; <a href="${escapeHtml(r.sourceUrl)}" target="_blank" rel="noopener noreferrer">Official source</a>` : ''}
+          ${r.fixtureId ? ` &nbsp;Â·&nbsp; Fixture: <code>${escapeHtml(r.fixtureId)}</code>` : ''}
         </p>
         <p>${escapeHtml(r.description)}</p>
 

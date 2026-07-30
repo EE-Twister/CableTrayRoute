@@ -1,25 +1,20 @@
 import assert from 'node:assert';
 
-import { runLoadFlow } from '../../analysis/loadFlow.js';
 import { renderLoadFlowResultsHtml } from '../../analysis/loadFlowResultsRenderer.js';
 
 describe('Load flow results renderer', () => {
   it('renders bus labels when available', () => {
-    const model = {
+    const result = {
+      converged: true,
       buses: [
-        { id: 'source', type: 'slack', baseKV: 13.8, label: 'Source Bus' },
-        { id: 'load', type: 'PQ', baseKV: 13.8, name: 'Load Feeder', load: { kw: 50, kvar: 5 } },
-        { id: 'aux', type: 'PQ', baseKV: 13.8, ref: 'AuxRef', load: { kw: 10, kvar: 1 } },
-        { id: 'plain', type: 'PQ', baseKV: 13.8, load: { kw: 5, kvar: 1 } }
+        { id: 'source', type: 'slack', baseKV: 13.8, label: 'Source Bus', Vm: 1, Va: 0 },
+        { id: 'load', type: 'PQ', baseKV: 13.8, name: 'Load Feeder', Vm: 0.998, Va: -0.1 },
+        { id: 'aux', type: 'PQ', baseKV: 13.8, ref: 'AuxRef', Vm: 0.997, Va: -0.2 },
+        { id: 'plain', type: 'PQ', baseKV: 13.8, Vm: 0.996, Va: -0.3 }
       ],
-      branches: [
-        { id: 'line1', from: 'source', to: 'load', impedance: { r: 0.02, x: 0.04 } },
-        { id: 'line2', from: 'load', to: 'aux', impedance: { r: 0.01, x: 0.03 } },
-        { id: 'line3', from: 'aux', to: 'plain', impedance: { r: 0.01, x: 0.02 } }
-      ]
+      lines: []
     };
 
-    const result = runLoadFlow(model, { baseMVA: 10, balanced: true });
     const html = renderLoadFlowResultsHtml(result);
 
     assert(html.includes('Source Bus'), 'Slack bus label should be rendered');

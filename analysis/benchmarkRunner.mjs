@@ -74,6 +74,8 @@ export function runBenchmark(bm) {
     label: bm.label,
     studyType: bm.studyType,
     standardRef: bm.standardRef,
+    sourceUrl: bm.sourceUrl || null,
+    fixtureId: bm.fixtureId || null,
     description: bm.description,
     pass: error === null && checks.every(c => c.pass),
     error,

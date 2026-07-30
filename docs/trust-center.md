@@ -1,6 +1,6 @@
 # Trust Center
 
-The Trust Center verifies that CableTrayRoute calculation engines produce results consistent with published industry benchmarks derived from IEEE, IEC, NEC, and NFPA standards.
+The Trust Center separates live executable known-answer checks from the broader catalog of published reference fixtures maintained by Validation & Standards.
 
 ## Purpose
 
@@ -23,6 +23,8 @@ Results are shown in a table. Click any row or its **Details** button to expand 
 
 ## Benchmark Coverage
 
+The live suite currently contains 15 checks across 11 study families. The Published Reference Fixtures table remains the complete catalog of documented cases. Two of those fixtures now have explicitly linked live regressions (`IEC60909-001` and `IEC60287-001`); a fixture without a linked executable check remains evidence and a reproducible input set, not a passing live check.
+
 | ID | Study Type | Governing Standard | What It Verifies |
 |----|-----------|-------------------|-----------------|
 | EMF-001 | EMF Analysis | Biot-Savart law; IEC 62110:2009 | Magnetic flux density from a 100 A conductor at 1 m: B = µ₀I/(2πd) = 20.000 µT |
@@ -32,6 +34,16 @@ Results are shown in a table. Click any row or its **Details** button to expand 
 | BAT-002 | Battery / UPS Sizing | Application screening heuristic (not within IEEE 485 scope) | Li-ion preliminary energy capacity at 25 °C, 10 % margin: 15.44 kWh |
 | VDROP-001 | Voltage Drop | NEC 2023 Art. 210.19(A)(1) Informational Note | #12 AWG Cu / 10 A / 30 ft -> below 3 % recommendation, status = pass |
 | VDROP-002 | Voltage Drop | NEC 2023 Art. 210.19(A)(1) Informational Note | #14 AWG Cu / 20 A / 150 ft -> above 3 % recommendation, status = warn or fail |
+| LFLOW-001 | Load Flow | Newton-Raphson power-flow equations | Two-bus 13.8 kV radial case converges at the recorded receiving-bus voltage |
+| REL-001 | Reliability | IEEE Std 493 availability arithmetic | Complete input coverage and radial breaker N-1 detection |
+| MSTART-001 | Motor Starting | Thevenin equivalent screening model | 100 hp direct-on-line starting current and voltage sag |
+| IEC60909-001 | IEC Short Circuit | IEC 60909-0:2016 | Version-pinned sequence-impedance current, voltage factor, peak factor, and peak current |
+| IEC60287-001 | Cable Ampacity | IEC 60287-1-1:2023 | Direct-buried 95 mmÂ² Cu XLPE steady-state rating and conductor-temperature reverse check |
+| FSCAN-001 | Frequency Scan | Parallel resonance screening equation | Source/capacitor resonance near h = 9 |
+| TRANSIENT-001 | Transient Stability | Swing equation / equal-area criterion | Analytical and numerical critical clearing time |
+| OPF-001 | Optimal Power Flow | Equal-incremental-cost dispatch | Three-unit dispatch balance, lambda, and total production cost |
+
+Benchmarks with a public standards catalog page expose an **Official source** link in the detail panel. `IEC60909-001` is deliberately labeled as a 2016-version regression because IEC now publishes a 2026 edition; the application does not claim that the 2016 implementation validates the newer edition.
 
 ## NFPA 70 (NEC) 2023 Scope Matrix
 
@@ -56,7 +68,7 @@ The Trust Center is implemented as three layers:
 
 | File | Role |
 |------|------|
-| `analysis/benchmarkLibrary.mjs` | Benchmark definitions: inputs, expected outputs, tolerances, standard references |
+| `analysis/benchmarkLibrary.mjs` | Benchmark definitions: inputs, expected outputs, tolerances, standard references, fixture links, and official source URLs |
 | `analysis/benchmarkRunner.mjs` | Execution engine: calls `bm.run()`, evaluates checks, returns structured results |
 | `trustcenter.js` | UI layer: renders summary card, results table, expandable detail panels |
 

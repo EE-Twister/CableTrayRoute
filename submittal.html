@@ -131,6 +131,36 @@
         </div>
       </fieldset>
 
+      <fieldset id="package-control-fieldset">
+        <legend><strong>Package Control</strong></legend>
+        <div class="form-row">
+          <label for="sub-package-id">Package ID</label>
+          <input type="text" id="sub-package-id" placeholder="Generated from project and revision" autocomplete="off">
+        </div>
+        <div class="form-row">
+          <label for="sub-package-status">Status</label>
+          <select id="sub-package-status">
+            <option value="draft">Draft</option>
+            <option value="issued">Issued</option>
+            <option value="superseded">Superseded</option>
+            <option value="void">Void</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label for="sub-transmittal">Transmittal Number</label>
+          <input type="text" id="sub-transmittal" autocomplete="off">
+        </div>
+        <div class="form-row">
+          <label for="sub-generated-by">Prepared By</label>
+          <input type="text" id="sub-generated-by" autocomplete="off">
+        </div>
+        <div class="form-row">
+          <label for="sub-package-notes">Package Notes</label>
+          <textarea id="sub-package-notes" rows="2"></textarea>
+        </div>
+        <p class="field-hint">Saving creates a structured project artifact with revision, status, included sections, source fingerprint, and transmittal metadata.</p>
+      </fieldset>
+
       <!-- Section toggles -->
       <fieldset>
         <legend><strong>Sections to Include</strong></legend>
@@ -138,6 +168,8 @@
         <label><input type="checkbox" id="sec-cables" checked> Cable Schedule</label>
         <label><input type="checkbox" id="sec-raceways" checked> Raceway Schedule</label>
         <label><input type="checkbox" id="sec-tray-fill" checked> Tray Fill Summary</label>
+        <label><input type="checkbox" id="sec-artifact-register" checked> Deliverable Register</label>
+        <label><input type="checkbox" id="sec-field-execution" checked> Field Execution Register</label>
         <label><input type="checkbox" id="sec-compliance" checked> Code Compliance Statement</label>
         <label><input type="checkbox" id="sec-signature" checked> Signature Block</label>
       </fieldset>
@@ -145,8 +177,10 @@
       <!-- Actions -->
       <div id="controls" class="controls-row">
         <button id="preview-btn" type="button">Preview Submittal</button>
+        <button id="save-package-record-btn" type="button">Save Package Record</button>
         <button id="print-btn" type="button">Print / Save as PDF</button>
         <button id="export-xlsx-btn" type="button">Export XLSX</button>
+        <span id="sub-package-save-status" role="status" aria-live="polite"></span>
       </div>
 
       <!-- Preview area -->

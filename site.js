@@ -2393,8 +2393,10 @@ function initStudyFreshnessBanner(){
     banner.textContent=`Result is current with the linked project inputs${when?` (run ${when})`:''}.`;
   }
   const main=document.querySelector('main');
-  const header=main?.querySelector('.page-header,h1');
-  if(header?.parentElement) header.parentElement.insertAdjacentElement('afterend',banner);
+  const pageHeader=main?.querySelector(':scope > .page-header');
+  const heading=main?.querySelector('h1');
+  const anchor=pageHeader||(heading?.closest('header')||heading);
+  if(anchor) anchor.insertAdjacentElement('afterend',banner);
   else main?.prepend(banner);
 }
 

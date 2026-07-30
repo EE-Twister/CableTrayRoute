@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="Compare two design scenarios side-by-side — cable schedule differences, tray fill status, and electrical study results." />
+  <meta name="description" content="Compare project schedules, one-line topology, and engineering study results across two design scenarios." />
   <title>Scenario Comparison — CableTrayRoute</title>
   <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icons/favicon.svg">
   <!-- Open Graph / Social sharing -->
   <meta property="og:type" content="website">
   <meta property="og:title" content="Scenario Comparison — CableTrayRoute">
-  <meta property="og:description" content="Compare two design scenarios side-by-side: cable differences, tray fill, and study results.">
+  <meta property="og:description" content="Compare project schedules, one-line topology, and engineering study results across two design scenarios.">
   <meta property="og:image" content="https://cabletrayroute.com/icons/og-preview.png">
   <meta property="og:site_name" content="CableTrayRoute">
   <meta property="og:url" content="scenarios.html">
@@ -91,7 +91,7 @@
 
       <header class="page-header">
         <h1>Scenario Comparison</h1>
-        <p class="page-subtitle">Select two scenarios and compare their cable schedules, tray fill status, and electrical study results side-by-side.</p>
+        <p class="page-subtitle">Compare project records, one-line topology, study values, validity, and approval state before selecting a design basis.</p>
       </header>
 
       <!-- Scenario selector -->
@@ -111,39 +111,33 @@
             </select>
           </label>
           <button id="sc-compare-btn" class="sc-compare-btn" type="button">Compare</button>
+          <button id="sc-export-btn" type="button" disabled>Export Comparison CSV</button>
         </div>
+        <p id="sc-status" class="field-hint" role="status" aria-live="polite"></p>
         <div id="sc-summary-badges" class="sc-summary-badges" aria-live="polite"></div>
       </section>
 
       <!-- Results (hidden until first comparison is run) -->
       <div id="sc-results" hidden>
 
-        <!-- Cable Schedule Diff -->
-        <section class="card" aria-label="Cable schedule differences" aria-live="polite">
-          <h2>Cable Schedule Differences</h2>
-          <div id="sc-cable-diff-content">
+        <section class="card" aria-label="Project domain summary" aria-live="polite">
+          <h2>Project Domain Summary</h2>
+          <p class="text-muted">Inventory and change counts for schedules, raceways, and one-line components.</p>
+          <div id="sc-domain-summary-content">
             <p class="text-muted">Loading…</p>
           </div>
         </section>
 
-        <!-- Tray Fill Comparison -->
-        <section class="card" aria-label="Tray fill comparison" aria-live="polite">
-          <h2>Tray Fill Status</h2>
-          <p class="text-muted" style="margin-bottom:0.75rem">Fill gauges for all trays in each scenario. Trays over 80% fill are highlighted.</p>
-          <div class="sc-side-by-side">
-            <div id="sc-tray-col-a" class="sc-scenario-col"></div>
-            <div id="sc-tray-col-b" class="sc-scenario-col"></div>
-          </div>
+        <section class="card" aria-label="Changed project records" aria-live="polite">
+          <h2>Changed Project Records</h2>
+          <p class="text-muted">Added, removed, and modified records with the fields responsible for each delta.</p>
+          <div id="sc-domain-diff-content"></div>
         </section>
 
-        <!-- Study Results Comparison -->
         <section class="card" aria-label="Electrical study results comparison" aria-live="polite">
-          <h2>Electrical Studies</h2>
-          <p class="text-muted" style="margin-bottom:0.75rem">Studies with saved results are shown as complete for each scenario.</p>
-          <div class="sc-side-by-side">
-            <div id="sc-study-col-a" class="sc-scenario-col"></div>
-            <div id="sc-study-col-b" class="sc-scenario-col"></div>
-          </div>
+          <h2>Engineering Study Results</h2>
+          <p class="text-muted">Compares saved values, result validity, and approval state. Run dates alone do not create a material difference.</p>
+          <div id="sc-study-diff-content"></div>
         </section>
 
       </div><!-- /#sc-results -->

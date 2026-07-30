@@ -85,3 +85,44 @@ test('non-encased ductbank omits concrete quantity and separates conduit types',
   assert.equal(bom.rows.some(row=>row.item==='Concrete encasement'),false);
   assert.equal(conduitOutsideDiameterIn('RMC','3'),3.5);
 });
+
+test('route-aware BOM uses developed length and includes structure and bend planning quantities',()=>{
+  const routeProfile={
+    ready:true,
+    summary:{
+      developedLengthFt:120,
+      averageCoverIn:48,
+      horizontalBends:1,
+      verticalBends:2,
+      structureCounts:{Manhole:1,Crossing:2}
+    }
+  };
+  const bom=buildDuctbankBOM({
+    lengthFt:100,
+    depthIn:36,
+    concreteEncasement:true,
+    conduits,
+    routeProfile
+  });
+
+  assert.equal(bom.routeProfileApplied,true);
+  assert.equal(bom.summary.routeLengthFt,120);
+  assert.equal(bom.summary.conduitLengthFt,504);
+  assert.equal(bom.rows.find(row=>row.item==='Manhole').quantity,1);
+  assert.equal(bom.rows.find(row=>row.item==='Crossing marker').quantity,2);
+  assert.equal(bom.rows.find(row=>row.item==='Horizontal sweep / bend allowance').quantity,4);
+  assert.equal(bom.rows.find(row=>row.item==='Vertical sweep / bend allowance').quantity,8);
+  assert.match(bom.exclusions.join(' '),/planning counts only/i);
+});
+
+test('incomplete route profile falls back to the single route inputs with a warning',()=>{
+  const bom=buildDuctbankBOM({
+    lengthFt:75,
+    depthIn:36,
+    conduits,
+    routeProfile:{ready:false,points:[{stationFt:0}],warnings:['Add another station.']}
+  });
+  assert.equal(bom.routeProfileApplied,false);
+  assert.equal(bom.summary.routeLengthFt,75);
+  assert.match(bom.warnings.join(' '),/profile is incomplete/i);
+});

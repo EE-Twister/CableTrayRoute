@@ -20,15 +20,23 @@ function pointFromArray(point) {
 }
 
 function traceForIndex(pull, index) {
-  return (pull.tension_trace || []).find(trace => trace.index === index) || null;
+  const matches = (pull.tension_trace || []).filter(trace => (
+    (trace.routeStepIndex ?? trace.index) === index
+  ));
+  if (!matches.length) return null;
+  const final = matches.at(-1);
+  return {
+    ...final,
+    sidewallPressure: Math.max(...matches.map(trace => finite(trace.sidewallPressure))),
+  };
 }
 
 function statusForTension(trace, pull) {
   if (!trace) return 'ok';
-  const maxTension = finite(pull.max_tension_lbs, 0);
-  const maxSidewall = finite(pull.max_sidewall_pressure, 0);
-  if (maxTension && trace.tensionOut >= maxTension * 0.9) return 'warn';
-  if (maxSidewall && trace.sidewallPressure >= maxSidewall * 0.9) return 'warn';
+  const allowableTension = finite(pull.allowable_tension_lbs, 0);
+  const allowableSidewall = finite(pull.allowable_sidewall_pressure, 0);
+  if (allowableTension && trace.tensionOut >= allowableTension * 0.9) return 'warn';
+  if (allowableSidewall && trace.sidewallPressure >= allowableSidewall * 0.9) return 'warn';
   return 'ok';
 }
 

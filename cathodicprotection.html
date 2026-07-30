@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="Cathodic protection preliminary sizing for buried metallic structures. Estimate required current, anode mass, and design life." />
+  <meta name="description" content="Cathodic protection preliminary sizing for buried metallic structures. Estimate current demand and size a galvanic or impressed-current CP source." />
   <title>Cathodic Protection Sizing — CableTrayRoute</title>
   <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icons/favicon.svg">
@@ -64,41 +64,41 @@
     <main id="main-content" class="main-content">
       <header class="page-header">
         <h1>Cathodic Protection (CP) Sizing</h1>
+        <p>Estimate current demand and size a preliminary galvanic or impressed-current CP source for a buried metallic asset.</p>
       </header>
 
-      <details class="method-panel" open>
-        <summary>Method, Formulas, and Standards Mapping</summary>
-        <p>This page provides preliminary impressed-current or galvanic CP sizing for buried assets.
-        Inputs and formulas are aligned with common practice from <strong>NACE SP0169 / AMPP SP21424</strong>,
-        <strong>ISO 15589-1</strong>, and <strong>DNV-RP-B401</strong> style current-demand and anode-consumption methods.</p>
-        <pre>I_req = A_exposed × i_d
-W_req = (I_req × t_design_hours) / (Q_anode × U × F_design)
-Life_years = (W_installed × Q_anode × U × F_design) / (I_req × 8760)</pre>
-        <table class="data-table" aria-label="Standards reference mapping">
-          <thead><tr><th>Tool Input / Formula</th><th>Reference Guidance</th></tr></thead>
-          <tbody>
-            <tr><td>Asset type, coating condition, environment severity</td><td>NACE/AMPP CP design workflow and ISO 15589-1 design basis definition.</td></tr>
-            <tr><td>Design current density i<sub>d</sub> selection</td><td>Table-based current-density selection per environment and coating quality guidance (NACE/AMPP, DNV-RP-B401).</td></tr>
-            <tr><td>I<sub>req</sub> = A<sub>exposed</sub> × i<sub>d</sub></td><td>Standard CP current-demand relation for exposed steel area.</td></tr>
-            <tr><td>Anode capacity Q and utilization U</td><td>Anode consumption calculations per galvanic anode design standards (DNV-RP-B401 / ISO 15589-1).</td></tr>
-            <tr><td>Design factor F<sub>design</sub> and availability factor</td><td>Engineering margin and uptime allowance consistent with CP design reliability practice.</td></tr>
-            <tr><td>Life prediction from installed mass</td><td>Service-life check from available ampere-hour capacity divided by demand current.</td></tr>
-          </tbody>
-        </table>
-      </details>
+      <section class="cp-quick-start" aria-labelledby="cp-tool-heading">
+        <div>
+          <p class="cp-eyebrow">Sizing inputs</p>
+          <h2 id="cp-tool-heading">Build the preliminary CP design</h2>
+          <p class="cp-quick-start__intro">Complete the three core steps, then calculate. Core sizing fields are required unless marked optional.</p>
+        </div>
+        <ol class="cp-quick-start__steps">
+          <li><span>1</span><strong>Describe the asset</strong><small>Set the environment and exposed area.</small></li>
+          <li><span>2</span><strong>Define demand</strong><small>Confirm coating and current-density assumptions.</small></li>
+          <li><span>3</span><strong>Configure the CP source</strong><small>Size a galvanic system or an ICCP rectifier and groundbed.</small></li>
+        </ol>
+        <p class="cp-quick-start__note">Defaults are preliminary assumptions, not validated project data. Field-measurement evidence remains unevaluated until explicitly enabled.</p>
+      </section>
 
+      <details class="cp-supporting-workspace">
+        <summary>
+          <span>Advanced workspace and engineering reference</span>
+          <small>Layout canvas, design history, formulas, and design checks</small>
+        </summary>
+        <div class="cp-supporting-workspace__content">
       <section class="card cp-collapsible-card" aria-labelledby="calculation-basis-heading">
-        <details open>
+        <details>
           <summary>
             <h2 id="calculation-basis-heading">Calculation Basis</h2>
           </summary>
-          <p class="field-hint">This standards mapping is rendered directly from <code>CP_STANDARD_BASIS</code> so equation inputs can be audited.</p>
+          <p class="field-hint">Review formulas, affected outputs, assumptions, and standards references in one traceable design-basis view.</p>
           <div id="calculation-basis-content"></div>
         </details>
       </section>
 
       <section class="card cp-collapsible-card" aria-labelledby="cp-compliance-status-heading">
-        <details open>
+        <details>
           <summary>
             <h2 id="cp-compliance-status-heading">Compliance Status</h2>
           </summary>
@@ -112,13 +112,17 @@ Life_years = (W_installed × Q_anode × U × F_design) / (I_req × 8760)</pre>
           <summary>
             <h2 id="cp-decision-timeline-heading">Design Decision Timeline</h2>
           </summary>
-          <p class="field-hint">Replay each project decision from inputs through compliance and jump directly to the linked section, chart, or canvas.</p>
+          <p class="field-hint">Review the current design path and saved input-to-outcome changes, then jump directly to the linked section, chart, or canvas.</p>
           <div id="cp-decision-timeline-content"></div>
         </details>
       </section>
 
-      <section id="cp-layout-canvas-panel" class="card cp-layout-panel" aria-labelledby="cp-layout-heading">
-        <h2 id="cp-layout-heading">CP Layout Canvas</h2>
+      <section id="cp-layout-canvas-panel" class="card cp-layout-panel cp-collapsible-card" aria-labelledby="cp-layout-heading">
+        <details>
+        <summary>
+          <h2 id="cp-layout-heading">CP Layout Canvas</h2>
+        </summary>
+        <div class="cp-layout-panel__content">
         <p class="field-hint">Drag anodes, test points, or the reference electrode to adjust spacing/offset assumptions and visualize structure coverage.</p>
         <div class="cp-mode-switch" role="radiogroup" aria-label="CP layout mode">
           <span class="cp-mode-switch__label">View mode</span>
@@ -143,6 +147,10 @@ Life_years = (W_installed × Q_anode × U × F_design) / (I_req × 8760)</pre>
           <button type="button" class="btn" data-cp-layout-action="zoom-out">Zoom −</button>
           <button type="button" class="btn" data-cp-layout-action="fit">Fit View</button>
           <button type="button" class="btn" data-cp-layout-action="reset">Reset Layout</button>
+        </div>
+        <div class="cp-layout-view-status" aria-live="polite">
+          <span id="cp-layout-zoom-status">Readable route view</span>
+          <span>Single-click a hotspot to inspect risk. Double-click an element to edit its properties.</span>
         </div>
         <div class="cp-layout-workspace">
           <div id="cp-layout-canvas" class="cp-layout-canvas" aria-live="polite"></div>
@@ -184,11 +192,15 @@ Life_years = (W_installed × Q_anode × U × F_design) / (I_req × 8760)</pre>
           <p class="field-hint">Click a hotspot on the layout canvas to inspect assumptions and contributing factors.</p>
         </section>
         <p id="cp-layout-status" class="field-hint" aria-live="polite">Layout initialized from form values.</p>
+        </div>
+        </details>
       </section>
+        </div>
+      </details>
 
-      <form id="cp-form" novalidate>
-        <fieldset>
-          <legend><strong>Asset &amp; Environment Inputs</strong></legend>
+      <form id="cp-form" class="cp-sizing-form" aria-labelledby="cp-tool-heading" novalidate>
+        <fieldset class="cp-form-section cp-form-section--asset">
+          <legend><span class="cp-step-number">1</span><strong>Asset &amp; Environment</strong></legend>
           <div class="field-row">
             <label for="asset-type">Asset type</label>
             <select id="asset-type" required>
@@ -226,8 +238,8 @@ Life_years = (W_installed × Q_anode × U × F_design) / (I_req × 8760)</pre>
           <p class="field-hint" id="pipe-material-hint">Preset-based current density factor for carbon steel is applied.</p>
         </fieldset>
 
-        <fieldset>
-          <legend><strong>Exposure &amp; Current Demand</strong></legend>
+        <fieldset class="cp-form-section cp-form-section--demand">
+          <legend><span class="cp-step-number">2</span><strong>Exposure &amp; Current Demand</strong></legend>
           <div class="field-row">
             <label for="coating-model-type">Coating demand model</label>
             <select id="coating-model-type">
@@ -238,7 +250,8 @@ Life_years = (W_installed × Q_anode × U × F_design) / (I_req × 8760)</pre>
           </div>
           <div class="field-row" id="coating-fixed-row">
             <label for="coating-breakdown">Fixed coating breakdown factor (0–1)</label>
-            <input type="number" id="coating-breakdown" min="0" max="1" step="0.01" value="0.20" required>
+            <input type="number" id="coating-breakdown" min="0" max="1" step="0.01" value="0.20" required aria-describedby="coating-breakdown-hint">
+            <p class="field-hint" id="coating-breakdown-hint">Preliminary 0.20 starting value. Replace it with the project coating specification, survey, or condition assessment.</p>
           </div>
           <div class="field-row" data-coating-curve-row hidden>
             <label for="coating-initial-breakdown">Initial coating breakdown factor (0–1)</label>
@@ -265,11 +278,11 @@ Life_years = (W_installed × Q_anode × U × F_design) / (I_req × 8760)</pre>
           </div>
           <div class="field-row" id="pipe-od-row" hidden>
             <label for="pipe-od">Pipe O.D. (<span class="unit-label-ft">in</span><span class="unit-label-m" hidden>mm</span>)</label>
-            <input type="number" id="pipe-od" min="0.01" step="0.01" value="12">
+            <input type="number" id="pipe-od" min="0.01" step="any" value="12">
           </div>
           <div class="field-row" id="pipe-length-row" hidden>
             <label for="pipe-length">Pipe length (<span class="unit-label-ft">ft</span><span class="unit-label-m" hidden>m</span>)</label>
-            <input type="number" id="pipe-length" min="0.1" step="0.1" value="1000">
+            <input type="number" id="pipe-length" min="0.1" step="any" value="1000">
           </div>
           <div class="field-row" id="calculated-surface-area-row" hidden>
             <label for="calculated-surface-area">Calculated total metallic surface area (<span class="unit-label-ft">ft²</span><span class="unit-label-m" hidden>m²</span>)</label>
@@ -299,7 +312,7 @@ Life_years = (W_installed × Q_anode × U × F_design) / (I_req × 8760)</pre>
           </figure>
           <div class="field-row">
             <label for="surface-area">Total metallic surface area (<span class="unit-label-ft">ft²</span><span class="unit-label-m" hidden>m²</span>)</label>
-            <input type="number" id="surface-area" min="0.1" step="0.1" value="500" required>
+            <input type="number" id="surface-area" min="0.1" step="any" value="500" required>
           </div>
           <div class="field-row">
             <label for="density-method">Current density selection method</label>
@@ -314,12 +327,18 @@ Life_years = (W_installed × Q_anode × U × F_design) / (I_req × 8760)</pre>
           </div>
           <div class="field-row">
             <label for="table-density">Table-based design current density i<sub>d</sub> (mA/m²)</label>
-            <input type="number" id="table-density" value="10" readonly>
+            <input type="number" id="table-density" value="10" readonly aria-describedby="table-density-hint">
+            <p class="field-hint" id="table-density-hint">Derived from the selected asset, environment, soil, pH, and material factors.</p>
+          </div>
+          <div class="field-row">
+            <label for="modeled-reference-potential">Modeled reference potential (mV vs CSE)</label>
+            <input type="number" id="modeled-reference-potential" step="1" value="-900" required aria-describedby="modeled-reference-potential-hint">
+            <p class="field-hint" id="modeled-reference-potential-hint">Design-model assumption used for route profiles. This is not field-measurement evidence.</p>
           </div>
         </fieldset>
 
-        <fieldset>
-          <legend><strong>Anode &amp; Design Factors</strong></legend>
+        <fieldset class="cp-form-section cp-form-section--anode">
+          <legend><span class="cp-step-number">3</span><strong>CP Source &amp; Design Factors</strong></legend>
           <div class="field-row">
             <label for="anode-system-type">Anode type / system</label>
             <select id="anode-system-type" required>
@@ -328,56 +347,91 @@ Life_years = (W_installed × Q_anode × U × F_design) / (I_req × 8760)</pre>
             </select>
           </div>
           <div class="field-row">
-            <label for="number-of-anodes">Number of anodes</label>
+            <label for="number-of-anodes" id="number-of-anodes-label">Number of galvanic anodes</label>
             <input type="number" id="number-of-anodes" min="1" step="1" value="10" required>
           </div>
           <div class="field-row">
-            <label for="anode-spacing">Anode spacing (<span class="unit-label-ft">ft</span><span class="unit-label-m" hidden>m</span>)</label>
-            <input type="number" id="anode-spacing" min="0.1" step="0.1" value="100" required>
+            <label for="anode-spacing"><span id="anode-spacing-label">Galvanic anode spacing</span> (<span class="unit-label-ft">ft</span><span class="unit-label-m" hidden>m</span>)</label>
+            <input type="number" id="anode-spacing" min="0.1" step="any" value="100" required>
           </div>
           <div class="field-row">
-            <label for="anode-distance-to-structure">Anode distance to structure (<span class="unit-label-ft">ft</span><span class="unit-label-m" hidden>m</span>)</label>
-            <input type="number" id="anode-distance-to-structure" min="0.1" step="0.1" value="10" required>
+            <label for="anode-distance-to-structure"><span id="anode-distance-label">Galvanic anode distance to structure</span> (<span class="unit-label-ft">ft</span><span class="unit-label-m" hidden>m</span>)</label>
+            <input type="number" id="anode-distance-to-structure" min="0.1" step="any" value="10" required>
           </div>
           <div class="field-row">
-            <label for="anode-burial-depth">Anode burial depth (<span class="unit-label-ft">ft</span><span class="unit-label-m" hidden>m</span>)</label>
-            <input type="number" id="anode-burial-depth" min="0.1" step="0.1" value="6" required>
+            <label for="anode-burial-depth"><span id="anode-depth-label">Galvanic anode burial depth</span> (<span class="unit-label-ft">ft</span><span class="unit-label-m" hidden>m</span>)</label>
+            <input type="number" id="anode-burial-depth" min="0.1" step="any" value="6" required>
           </div>
           <div class="field-row">
             <label for="zone-resistivity-values">Zone resistivity values (Ω·m, comma separated)</label>
             <input type="text" id="zone-resistivity-values" value="" placeholder="e.g., 40, 65, 90">
           </div>
-          <div class="field-row">
+          <div class="field-row cp-system-dependent cp-system-dependent--galvanic">
             <label for="anode-capacity">Anode capacity Q<sub>anode</sub> (Ah/kg)</label>
-            <input type="number" id="anode-capacity" min="1" step="1" value="780" required>
+            <input type="number" id="anode-capacity" min="1" step="1" value="780" required aria-describedby="anode-capacity-hint">
+            <p class="field-hint" id="anode-capacity-hint">Preliminary 780 Ah/kg value. Verify the selected alloy and manufacturer or project design data.</p>
           </div>
-          <div class="field-row">
+          <div class="field-row cp-system-dependent cp-system-dependent--galvanic">
             <label for="anode-utilization">Anode utilization factor U (0–1)</label>
-            <input type="number" id="anode-utilization" min="0.01" max="1" step="0.01" value="0.85" required>
+            <input type="number" id="anode-utilization" min="0.01" max="1" step="0.01" value="0.85" required aria-describedby="anode-utilization-hint">
+            <p class="field-hint" id="anode-utilization-hint">Preliminary 0.85 value. Confirm the allowable utilization for the selected anode system and adopted design basis.</p>
           </div>
-          <div class="field-row">
+          <div class="field-row cp-system-dependent cp-system-dependent--galvanic">
             <label for="design-factor">Design factor F<sub>design</sub> (&gt;0)</label>
-            <input type="number" id="design-factor" min="0.01" step="0.01" value="1.10" required>
+            <input type="number" id="design-factor" min="0.01" step="0.01" value="1.10" required aria-describedby="design-factor-hint">
+            <p class="field-hint" id="design-factor-hint">Preliminary 1.10 reliability allowance. Replace it with the project-approved contingency basis.</p>
           </div>
           <div class="field-row">
             <label for="availability-factor">Availability factor (0–1)</label>
-            <input type="number" id="availability-factor" min="0.01" max="1" step="0.01" value="0.95" required>
+            <input type="number" id="availability-factor" min="0.01" max="1" step="0.01" value="0.95" required aria-describedby="availability-factor-hint">
+            <p class="field-hint" id="availability-factor-hint">Preliminary 0.95 uptime allowance. Confirm expected system availability and maintenance strategy.</p>
           </div>
           <div class="field-row">
             <label for="design-life-years">Target design life (years)</label>
             <input type="number" id="design-life-years" min="0.1" step="0.1" value="20" required>
           </div>
-          <div class="field-row">
+          <div class="field-row cp-system-dependent cp-system-dependent--galvanic">
             <label for="installed-mass">Installed anode mass (<span class="unit-label-ft">lb</span><span class="unit-label-m" hidden>kg</span>)</label>
-            <input type="number" id="installed-mass" min="0.1" step="0.1" value="500" required>
+            <input type="number" id="installed-mass" min="0.1" step="any" value="500" required>
+          </div>
+          <div class="field-row cp-system-dependent cp-system-dependent--iccp" hidden>
+            <label for="iccp-rated-current">Rectifier rated DC output current (A)</label>
+            <input type="number" id="iccp-rated-current" min="0.01" step="0.01" value="10">
+          </div>
+          <div class="field-row cp-system-dependent cp-system-dependent--iccp" hidden>
+            <label for="iccp-rated-voltage">Rectifier rated DC output voltage (V)</label>
+            <input type="number" id="iccp-rated-voltage" min="0.1" step="0.1" value="50">
+          </div>
+          <div class="field-row cp-system-dependent cp-system-dependent--iccp" hidden>
+            <label for="iccp-groundbed-resistance">Groundbed circuit resistance (Ω)</label>
+            <input type="number" id="iccp-groundbed-resistance" min="0.01" step="0.01" value="1.5">
+          </div>
+          <div class="field-row cp-system-dependent cp-system-dependent--iccp" hidden>
+            <label for="iccp-voltage-allowance">Cable and polarization voltage allowance (V)</label>
+            <input type="number" id="iccp-voltage-allowance" min="0" step="0.1" value="5">
+          </div>
+          <div class="field-row cp-system-dependent cp-system-dependent--iccp" hidden>
+            <label for="iccp-reserve-factor">ICCP design reserve factor (&gt;1)</label>
+            <input type="number" id="iccp-reserve-factor" min="1" step="0.05" value="1.25" aria-describedby="iccp-reserve-factor-hint">
+            <p class="field-hint" id="iccp-reserve-factor-hint">Applied to required structure current before checking rectifier current and voltage headroom.</p>
           </div>
         </fieldset>
 
-        <fieldset>
-          <legend><strong>Protection Criteria Evidence Inputs</strong></legend>
+        <details class="cp-form-advanced">
+          <summary>
+            <span>Optional: protection criteria evidence</span>
+            <small>Not evaluated until field evidence is explicitly enabled.</small>
+          </summary>
+        <div class="cp-evidence-enable">
+          <input type="checkbox" id="criteria-evidence-enabled" aria-controls="cp-criteria-evidence-fields" aria-describedby="criteria-evidence-status">
+          <label for="criteria-evidence-enabled">Use field-measurement evidence in this preliminary evaluation</label>
+          <p id="criteria-evidence-status" class="field-hint" role="status">Field evidence is not included. Protection criteria will be reported as not evaluated.</p>
+        </div>
+        <fieldset id="cp-criteria-evidence-fields" disabled>
+          <legend><strong>Protection Criteria Evidence</strong></legend>
           <div class="field-row">
             <label for="test-method">Test method</label>
-            <select id="test-method" required>
+            <select id="test-method">
               <option value="instant-off" selected>Instant-off interrupter</option>
               <option value="on-potential">On-potential with IR correction</option>
               <option value="coupon">Coupon depolarization</option>
@@ -385,7 +439,7 @@ Life_years = (W_installed × Q_anode × U × F_design) / (I_req × 8760)</pre>
           </div>
           <div class="field-row">
             <label for="measurement-context">Measurement context</label>
-            <select id="measurement-context" required>
+            <select id="measurement-context">
               <option value="native-soil" selected>Native soil (typical route)</option>
               <option value="casing">Cased crossing / shielding concern</option>
               <option value="foreign-interference">Foreign structure / interference zone</option>
@@ -395,7 +449,7 @@ Life_years = (W_installed × Q_anode × U × F_design) / (I_req × 8760)</pre>
           </div>
           <div class="field-row">
             <label for="reference-electrode-location">Reference electrode location</label>
-            <select id="reference-electrode-location" required>
+            <select id="reference-electrode-location">
               <option value="local" selected>Local over structure (close-coupled)</option>
               <option value="remote">Remote / gradient-influenced</option>
               <option value="coupon-lead">Coupon lead reference</option>
@@ -404,7 +458,7 @@ Life_years = (W_installed × Q_anode × U × F_design) / (I_req × 8760)</pre>
           </div>
           <div class="field-row">
             <label for="ir-drop-compensation-method">IR-drop compensation method</label>
-            <select id="ir-drop-compensation-method" required>
+            <select id="ir-drop-compensation-method">
               <option value="instant-off" selected>Instant-off interruption</option>
               <option value="coupon">Coupon depolarization</option>
               <option value="calculated">Calculated from current/resistance</option>
@@ -422,27 +476,78 @@ Life_years = (W_installed × Q_anode × U × F_design) / (I_req × 8760)</pre>
           </div>
           <div class="field-row">
             <label for="measured-off-potential">Measured structure potential (mV vs CSE)</label>
-            <input type="number" id="measured-off-potential" step="1" value="-900" required>
+            <input type="number" id="measured-off-potential" step="1" value="" placeholder="Enter measured value">
           </div>
           <div class="field-row">
-            <label for="simulated-polarization-shift">Measured/simulated polarization shift (mV)</label>
-            <input type="number" id="simulated-polarization-shift" min="0" step="1" value="120" required>
+            <label for="simulated-polarization-shift">Measured polarization shift (mV)</label>
+            <input type="number" id="simulated-polarization-shift" min="0" step="1" value="" placeholder="Enter measured shift">
           </div>
           <div class="field-row">
             <label for="test-point-count">Total test points reviewed</label>
-            <input type="number" id="test-point-count" min="1" step="1" value="8" required>
+            <input type="number" id="test-point-count" min="1" step="1" value="" placeholder="Enter count">
           </div>
           <div class="field-row">
             <label for="test-point-pass-count">Test points meeting criteria</label>
-            <input type="number" id="test-point-pass-count" min="0" step="1" value="8" required>
+            <input type="number" id="test-point-pass-count" min="0" step="1" value="" placeholder="Enter count">
           </div>
         </fieldset>
+        </details>
 
+        <details class="cp-form-advanced">
+          <summary>
+            <span>Optional: interference assessment</span>
+            <small>Document nearby structures, stray-current sources, and mitigation.</small>
+          </summary>
         <fieldset>
           <legend><strong>Interference Assessment</strong></legend>
           <div class="field-row">
+            <label for="interference-geometry">Foreign-structure relationship</label>
+            <select id="interference-geometry">
+              <option value="none" selected>No identified interaction</option>
+              <option value="crossing">Single crossing</option>
+              <option value="parallel">Parallel exposure</option>
+              <option value="shared-corridor">Shared corridor</option>
+            </select>
+          </div>
+          <div class="field-row">
+            <label for="interference-source-type">Dominant interference source</label>
+            <select id="interference-source-type">
+              <option value="none" selected>No identified source</option>
+              <option value="foreign-iccp">Foreign ICCP system</option>
+              <option value="dc-traction">DC traction / rail return</option>
+              <option value="hvdc">HVDC grounding influence</option>
+              <option value="industrial-dc">Industrial DC / welding source</option>
+              <option value="unknown">Source not yet characterized</option>
+            </select>
+          </div>
+          <div class="field-row" id="foreign-structure-separation-row" hidden>
+            <label for="foreign-structure-separation">Minimum structure separation (<span class="unit-label-ft">ft</span><span class="unit-label-m" hidden>m</span>)</label>
+            <input type="number" id="foreign-structure-separation" min="0" step="any" value="25">
+          </div>
+          <div class="field-row" id="parallel-exposure-length-row" hidden>
+            <label for="parallel-exposure-length">Parallel exposure length (<span class="unit-label-ft">ft</span><span class="unit-label-m" hidden>m</span>)</label>
+            <input type="number" id="parallel-exposure-length" min="0" step="any" value="0">
+          </div>
+          <div class="field-row" id="crossing-angle-row" hidden>
+            <label for="crossing-angle">Crossing angle (degrees)</label>
+            <input type="number" id="crossing-angle" min="0" max="90" step="1" value="90">
+          </div>
+          <div class="field-row" id="measured-potential-gradient-row" hidden>
+            <label for="measured-potential-gradient">Measured/assumed potential gradient (mV/m)</label>
+            <input type="number" id="measured-potential-gradient" min="0" step="0.1" value="0">
+          </div>
+          <div class="field-row" id="bonding-strategy-row" hidden>
+            <label for="bonding-strategy">Design-stage bonding strategy</label>
+            <select id="bonding-strategy">
+              <option value="none" selected>None selected</option>
+              <option value="monitoring-only">Monitoring / test leads only</option>
+              <option value="test-bond">Test bond provision</option>
+              <option value="controlled-drainage">Controlled drainage / resistance bond</option>
+            </select>
+          </div>
+          <div class="field-row">
             <label for="nearby-foreign-structures">Nearby foreign structures</label>
-            <select id="nearby-foreign-structures" required>
+            <select id="nearby-foreign-structures">
               <option value="none" selected>None identified</option>
               <option value="isolated">Isolated crossings / adjacent assets</option>
               <option value="multiple">Multiple nearby structures</option>
@@ -451,7 +556,7 @@ Life_years = (W_installed × Q_anode × U × F_design) / (I_req × 8760)</pre>
           </div>
           <div class="field-row">
             <label for="dc-traction-system">DC traction systems</label>
-            <select id="dc-traction-system" required>
+            <select id="dc-traction-system">
               <option value="none" selected>No known DC traction</option>
               <option value="regional">Regional traction network</option>
               <option value="nearby">Nearby traction substation/line</option>
@@ -460,7 +565,7 @@ Life_years = (W_installed × Q_anode × U × F_design) / (I_req × 8760)</pre>
           </div>
           <div class="field-row">
             <label for="known-interference-sources">Known interference sources</label>
-            <select id="known-interference-sources" required>
+            <select id="known-interference-sources">
               <option value="none" selected>No known stray-current issues</option>
               <option value="possible">Possible historical interference</option>
               <option value="confirmed">Confirmed interference sources</option>
@@ -469,7 +574,7 @@ Life_years = (W_installed × Q_anode × U × F_design) / (I_req × 8760)</pre>
           </div>
           <div class="field-row">
             <label for="mitigation-profile">Mitigation profile</label>
-            <select id="mitigation-profile" required>
+            <select id="mitigation-profile">
               <option value="baseline" selected>Baseline</option>
               <option value="enhanced">Enhanced</option>
               <option value="critical">Critical</option>
@@ -484,11 +589,20 @@ Life_years = (W_installed × Q_anode × U × F_design) / (I_req × 8760)</pre>
             <input type="date" id="verification-test-date">
           </div>
         </fieldset>
+        </details>
 
-        <button type="submit" class="primary-btn">Run Analysis</button>
+        <div class="cp-form-submit">
+          <div class="cp-form-submit__copy">
+            <p>Ready? Review the three core steps above, then calculate the preliminary design.</p>
+            <label for="design-change-note">Iteration note <span class="field-hint">(optional)</span></label>
+            <input type="text" id="design-change-note" maxlength="240" placeholder="Why this design iteration changed">
+            <p id="cp-calculation-status" class="cp-calculation-status field-hint" role="status" aria-live="polite" hidden></p>
+          </div>
+          <button type="submit" class="primary-btn">Calculate CP Requirements</button>
+        </div>
       </form>
 
-      <div id="cp-errors" class="alert-error" hidden role="alert"></div>
+      <div id="cp-errors" class="alert-error" hidden role="alert" tabindex="-1"></div>
       <div id="results" role="region" aria-live="polite" aria-label="Cathodic protection sizing results"></div>
 
       <section class="card" aria-labelledby="study-review-panel-heading"><div id="study-review-panel"></div></section>

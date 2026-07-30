@@ -239,6 +239,49 @@
  </div>
 </section>
 
+<section id="ductbankRouteProfileSection" class="ductbank-section-card card" aria-labelledby="ductbank-route-profile-heading">
+ <div class="ductbank-section-header">
+  <div>
+   <p class="page-visual-kicker">Plan / Profile</p>
+   <h2 id="ductbank-route-profile-heading">Station-Based Route Alignment</h2>
+   <p class="field-hint">Define horizontal coordinates, finished grade, cover, and route structures. Developed profile length replaces the single route-length value in the BOM when at least two valid stations are present.</p>
+  </div>
+  <div class="ductbank-section-actions schedule-primary-actions" data-no-print>
+   <button type="button" id="addRoutePointBtn" class="btn primary-btn compact-action-btn">Add Station</button>
+   <button type="button" id="addRouteStructureBtn" class="btn secondary-btn compact-action-btn">Add Structure</button>
+   <button type="button" id="loadRouteProfileSampleBtn" class="btn secondary-btn compact-action-btn">Load Sample</button>
+   <button type="button" id="saveDuctbankRouteBtn" class="btn secondary-btn compact-action-btn">Save to Project</button>
+   <button type="button" id="exportRouteProfileBtn" class="btn secondary-btn compact-action-btn">Export Route CSV</button>
+  </div>
+ </div>
+ <div class="ductbank-bom-summary" aria-label="Ductbank route profile summary">
+  <div class="ductbank-bom-metric"><span>Developed length</span><strong id="routeProfileDevelopedLength">0 ft</strong></div>
+  <div class="ductbank-bom-metric"><span>Cover range</span><strong id="routeProfileCoverRange">—</strong></div>
+  <div class="ductbank-bom-metric"><span>Direction changes</span><strong id="routeProfileBendCount">0</strong></div>
+  <div class="ductbank-bom-metric"><span>Structures</span><strong id="routeProfileStructureCount">0</strong></div>
+ </div>
+ <div id="routeProfileStatus" class="ductbank-bom-status" role="status" aria-live="polite"></div>
+ <div class="ductbank-table-wrap table-scroll-x" tabindex="0" aria-label="Ductbank route profile stations">
+  <table id="routeProfileTable" class="db-table">
+   <caption class="visually-hidden">Ductbank route plan and profile stations</caption>
+   <thead><tr><th>ID</th><th>Station (ft)</th><th>Easting (ft)</th><th>Northing (ft)</th><th>Grade Elev. (ft)</th><th>Cover (in)</th><th>Action</th></tr></thead>
+   <tbody></tbody>
+  </table>
+ </div>
+ <h3>Route Structures and Crossings</h3>
+ <div class="ductbank-table-wrap table-scroll-x" tabindex="0" aria-label="Ductbank route structures">
+  <table id="routeStructureTable" class="db-table">
+   <caption class="visually-hidden">Ductbank route structures and crossings</caption>
+   <thead><tr><th>ID</th><th>Type</th><th>Station (ft)</th><th>Note / Crossing</th><th>Action</th></tr></thead>
+   <tbody></tbody>
+  </table>
+ </div>
+ <details class="ductbank-subdetails">
+  <summary><strong>Route model limitations</strong><span>Planning geometry only</span></summary>
+  <ul id="routeProfileLimitations"></ul>
+ </details>
+</section>
+
 <section class="ductbank-section-card card" aria-labelledby="ductbank-conduit-heading">
  <div class="ductbank-section-header">
   <div>
@@ -663,7 +706,8 @@
   <p>Click <em>Add Conduit</em> or <em>Add Cable</em> to enter the key fields in a guided dialog, or use <em>Import&nbsp;CSV</em> to load your own files. <em>Complete Example</em> fills the page with a ready-to-review ductbank.</p>
   <p>Use <em>Validate</em> before exporting. Actionable warnings identify missing data, duplicate IDs, fill concerns, and thermal alerts; selecting a warning jumps to the row that needs attention.</p>
   <p>After entering data, press <strong>Calculate Fill</strong> to draw the ductbank. Conduits are colored by fill percentage and display individual cable circles. Select a cable in the drawing to view quick properties and jump to its table row.</p>
-  <p>The <strong>Ductbank Bill of Materials</strong> uses the route length and current cross-section to estimate conduit, fittings, spacers, pull rope, concrete, excavation, and backfill. Cable remains on the cable schedule. Optional selectors can add #4/0 grounding conductors, red warning dye application area, and a trench shoring allowance.</p>
+  <p>The <strong>Station-Based Route Alignment</strong> records plan coordinates, finished-grade elevation, variable cover, manholes, handholes, pull boxes, building entries, and crossings. A valid profile drives developed route length and average cover in the BOM. Save it to the selected Raceway Schedule ductbank or export a planning CSV; survey, bend radii, utility clearances, and structure design remain project-specific.</p>
+  <p>The <strong>Ductbank Bill of Materials</strong> uses the station/profile developed length when available, otherwise the single route length, plus the current cross-section to estimate conduit, fittings, spacers, pull rope, concrete, excavation, and backfill. Cable remains on the cable schedule. Optional selectors can add #4/0 grounding conductors, red warning dye application area, and a trench shoring allowance.</p>
   <p>The <strong>Download Ductbank Data</strong> button exports all conduits, cables and fill results to an XLSX file.</p>
   <p><strong>Export Ductbank Conduits</strong> and <strong>Export Ductbank Cables</strong> create CSV files compatible with the import buttons.</p>
   <h3>Reporting and Export</h3>

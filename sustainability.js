@@ -20,6 +20,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const gridRegionEl   = document.getElementById('grid-region');
   const customFactorEl = document.getElementById('custom-grid-factor');
   const customLabelEl  = document.getElementById('custom-grid-label');
+  const customSourceFieldsEl = document.getElementById('custom-grid-source-fields');
+  const customSourceEl = document.getElementById('custom-grid-source');
+  const customSourceDateEl = document.getElementById('custom-grid-source-date');
+  const customSourceUrlEl = document.getElementById('custom-grid-source-url');
+  const customGeographyEl = document.getElementById('custom-grid-geography');
   const projectLifeEl  = document.getElementById('project-life');
   const lossesSourceEl = document.getElementById('losses-source');
   const lossesKwEl     = document.getElementById('losses-kw');
@@ -32,13 +37,40 @@ document.addEventListener('DOMContentLoaded', () => {
   let lastResult = null;
   let lastBom    = [];
 
+  populateGridRegions();
+
   // ── Conditional field visibility ───────────────────────────────────────────
 
-  gridRegionEl.addEventListener('change', () => {
+  function updateCustomGridVisibility() {
     const isCustom = gridRegionEl.value === 'custom';
     customLabelEl.style.display = isCustom ? '' : 'none';
-  });
-  customLabelEl.style.display = 'none';
+    customSourceFieldsEl.hidden = !isCustom;
+  }
+
+  gridRegionEl.addEventListener('change', updateCustomGridVisibility);
+  updateCustomGridVisibility();
+
+  function populateGridRegions() {
+    const selected = gridRegionEl.value || 'us';
+    gridRegionEl.innerHTML = '';
+    const publishedGroup = document.createElement('optgroup');
+    publishedGroup.label = 'EPA eGRID2023 Revision 2';
+    const legacyGroup = document.createElement('optgroup');
+    legacyGroup.label = 'Legacy international screening factors';
+
+    Object.entries(GRID_EMISSION_FACTORS).forEach(([key, definition]) => {
+      const option = document.createElement('option');
+      option.value = key;
+      option.textContent = key === 'custom'
+        ? definition.label
+        : `${definition.label} — ${definition.kgPerKwh.toFixed(3)} kg/kWh`;
+      if (key === 'us' || /^[A-Z]{4}$/.test(key)) publishedGroup.appendChild(option);
+      else legacyGroup.appendChild(option);
+    });
+
+    gridRegionEl.append(publishedGroup, legacyGroup);
+    gridRegionEl.value = GRID_EMISSION_FACTORS[selected] ? selected : 'us';
+  }
 
   lossesSourceEl.addEventListener('change', () => {
     const src = lossesSourceEl.value;
@@ -110,6 +142,10 @@ document.addEventListener('DOMContentLoaded', () => {
     return {
       gridRegion:          gridRegionEl.value,
       customGridFactor:    parseFloat(customFactorEl.value) || null,
+      customGridSource:    customSourceEl.value.trim(),
+      customGridSourceDate: customSourceDateEl.value,
+      customGridSourceUrl: customSourceUrlEl.value.trim(),
+      customGridGeography: customGeographyEl.value.trim(),
       projectLifeYears:    parseInt(projectLifeEl.value, 10) || 25,
       lossesSource,
       lossesKw,
@@ -122,11 +158,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const set = (id, val) => { const el = document.getElementById(id); if (el && val != null) el.value = val; };
     set('grid-region',       inp.gridRegion);
     set('custom-grid-factor', inp.customGridFactor);
+    set('custom-grid-source', inp.customGridSource);
+    set('custom-grid-source-date', inp.customGridSourceDate);
+    set('custom-grid-source-url', inp.customGridSourceUrl);
+    set('custom-grid-geography', inp.customGridGeography);
     set('project-life',      inp.projectLifeYears);
     set('losses-source',     inp.lossesSource);
     set('losses-kw',         inp.lossesKw);
 
-    customLabelEl.style.display = inp.gridRegion === 'custom' ? '' : 'none';
+    updateCustomGridVisibility();
     lossesKwEl.disabled = inp.lossesSource !== 'manual';
 
     if (inp.altBom) {
@@ -143,6 +183,11 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     if (inputs.gridRegion === 'custom' && inputs.customGridFactor != null) {
       opts.gridFactorKgPerKwh = inputs.customGridFactor;
+      opts.gridFactorLabel = 'Custom / project-specific';
+      opts.gridFactorSource = inputs.customGridSource;
+      opts.gridFactorSourceDate = inputs.customGridSourceDate;
+      opts.gridFactorSourceUrl = inputs.customGridSourceUrl;
+      opts.gridFactorGeography = inputs.customGridGeography;
     }
     if (inputs.lossesKw > 0) {
       opts.lossesKw = inputs.lossesKw;
@@ -276,6 +321,10 @@ document.addEventListener('DOMContentLoaded', () => {
     el.hidden = false;
 
     const gridDef = GRID_EMISSION_FACTORS[result.gridRegion] || {};
+    const provenance = result.gridFactorProvenance || gridDef;
+    const coverage = result.factorCoverage || {};
+    const sourceUrl = /^https?:\/\//i.test(String(provenance.url || '')) ? provenance.url : '';
+    const sourceLabel = provenance.source || 'Source not documented';
     const fmtT    = kg => (kg / 1000).toFixed(3);
     const fmtKg   = kg => kg.toFixed(1);
     const safeProjectLifeYears = Number.isFinite(Number(result.projectLifeYears)) ? Number(result.projectLifeYears) : 25;
@@ -287,7 +336,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <table class="results-table" aria-label="Operating losses summary">
             <tbody>
               <tr><td>Annual conductor losses</td><td><strong>${result.operating.annualKwh.toFixed(0).toLocaleString()} kWh/yr</strong></td></tr>
-              <tr><td>Grid emission factor</td><td>${safeGridFactorKgPerKwh} kg CO₂e/kWh (${escapeHtml(gridDef.label || result.gridRegion)})</td></tr>
+              <tr><td>Grid emission factor</td><td>${safeGridFactorKgPerKwh} kg CO₂e/kWh (${escapeHtml(provenance.label || result.gridRegion)})</td></tr>
               <tr><td>Project life</td><td>${safeProjectLifeYears} years</td></tr>
               <tr><td>Lifetime energy consumption</td><td>${(result.operating.lifetimeKwh / 1000).toFixed(1)} MWh</td></tr>
               <tr><td>Operating CO₂e (Scope 2)</td><td><strong>${fmtKg(result.operating.lifetimeKgCO2e)} kg (${fmtT(result.operating.lifetimeKgCO2e)} t)</strong></td></tr>
@@ -379,6 +428,25 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
       </div>
 
+      <section class="field-group" aria-label="Data coverage and source basis" style="margin-bottom:1.5rem">
+        <h3>Data Coverage &amp; Source Basis</h3>
+        <table class="results-table" aria-label="Sustainability data coverage">
+          <tbody>
+            <tr><td>Grid source</td><td><strong>${escapeHtml(sourceLabel)}</strong>${sourceUrl ? ` — <a href="${escapeHtml(sourceUrl)}" target="_blank" rel="noopener">source record</a>` : ''}</td></tr>
+            <tr><td>Grid method</td><td>${escapeHtml(provenance.methodology || 'Not documented')}${provenance.release ? `; ${escapeHtml(provenance.release)}` : ''}</td></tr>
+            <tr><td>Applicable geography</td><td>${escapeHtml(provenance.geography || 'Not documented')}</td></tr>
+            <tr><td>BOM inclusion</td><td>${coverage.includedLines || 0} of ${coverage.totalInputLines || bom.length} lines (${coverage.includedLinePercent || 0}%)</td></tr>
+            <tr><td>Product-specific EPD overrides</td><td>${coverage.epdLines || 0} lines; ${coverage.epdCarbonPercent || 0}% of embodied CO₂e</td></tr>
+            <tr><td>Undocumented factor overrides</td><td>${coverage.undocumentedOverrideLines || 0} lines; ${coverage.undocumentedOverrideCarbonPercent || 0}% of embodied CO₂e</td></tr>
+            <tr><td>Screening library factors</td><td>${coverage.libraryLines || 0} lines; ${coverage.libraryCarbonPercent || 0}% of embodied CO₂e</td></tr>
+            <tr><td>Coverage classification</td><td><strong>${escapeHtml(String(coverage.quality || 'no-data').replace(/-/g, ' '))}</strong></td></tr>
+          </tbody>
+        </table>
+        ${provenance.quality === 'undocumented-user-supplied'
+          ? '<p class="hint"><strong>Source gap:</strong> the custom grid factor has no publisher or document reference.</p>'
+          : ''}
+      </section>
+
       <!-- Category breakdown -->
       <section class="field-group" aria-label="Embodied CO₂e by category" style="margin-bottom:1.5rem">
         <h3>Embodied CO₂e by Category (Scope 3, A1–A3)</h3>
@@ -412,7 +480,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
       <p class="hint" style="font-size:.8em">
         <strong>Disclaimer:</strong> Embodied factors are representative industry EPD averages (IEC/EN 15804, A1–A3 cradle-to-gate).
-        Grid emission factors are national averages. This report is suitable for screening-level design only.
+        Built-in embodied factors are screening values; the coverage table distinguishes them from product-specific EPD overrides.
+        This report is suitable for screening-level design only.
         Verify against manufacturer-specific EPDs and project grid factor before LEED, BREEAM, or formal sustainability submission.
       </p>`;
   }
@@ -464,6 +533,17 @@ document.addEventListener('DOMContentLoaded', () => {
     rows.push(['Total CO₂e (t)', lastResult.totalTonnes.toFixed(6)]);
     rows.push(['Grid region', lastResult.gridRegion]);
     rows.push(['Grid factor (kg/kWh)', lastResult.gridFactorKgPerKwh]);
+    rows.push(['Grid factor source', lastResult.gridFactorProvenance?.source || '']);
+    rows.push(['Grid factor source date', lastResult.gridFactorProvenance?.sourceDate || lastResult.gridFactorProvenance?.release || '']);
+    rows.push(['Grid factor source URL', lastResult.gridFactorProvenance?.url || '']);
+    rows.push(['Grid factor geography', lastResult.gridFactorProvenance?.geography || '']);
+    rows.push(['BOM lines included (%)', lastResult.factorCoverage?.includedLinePercent ?? '']);
+    rows.push(['Product-specific EPD lines', lastResult.factorCoverage?.epdLines ?? '']);
+    rows.push(['Product-specific EPD carbon coverage (%)', lastResult.factorCoverage?.epdCarbonPercent ?? '']);
+    rows.push(['Undocumented override lines', lastResult.factorCoverage?.undocumentedOverrideLines ?? '']);
+    rows.push(['Undocumented override carbon coverage (%)', lastResult.factorCoverage?.undocumentedOverrideCarbonPercent ?? '']);
+    rows.push(['Screening library lines', lastResult.factorCoverage?.libraryLines ?? '']);
+    rows.push(['Skipped BOM lines', lastResult.factorCoverage?.skippedLines ?? '']);
     rows.push(['Project life (years)', lastResult.projectLifeYears]);
 
     const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\r\n');

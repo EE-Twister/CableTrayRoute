@@ -20,6 +20,8 @@ import {
   conduitCO2eFactor,
   embodiedCO2e,
   operatingCO2e,
+  resolveGridFactor,
+  summarizeFactorCoverage,
   buildSustainabilityReport,
 } from '../analysis/sustainabilityFootprint.mjs';
 
@@ -59,6 +61,21 @@ describe('GRID_EMISSION_FACTORS constant', () => {
   it('US factor is in a plausible range (0.30–0.50 kg/kWh)', () => {
     assert.ok(GRID_EMISSION_FACTORS.us.kgPerKwh >= 0.30);
     assert.ok(GRID_EMISSION_FACTORS.us.kgPerKwh <= 0.50);
+  });
+
+  it('includes the complete EPA eGRID2023 subregion set with provenance', () => {
+    const subregions = Object.keys(GRID_EMISSION_FACTORS).filter(key => /^[A-Z]{4}$/.test(key));
+    assert.strictEqual(subregions.length, 27);
+    assert.strictEqual(GRID_EMISSION_FACTORS.CAMX.sourceYear, 2023);
+    assert.strictEqual(GRID_EMISSION_FACTORS.CAMX.originalUnit, 'lb CO₂e/MWh');
+    assert.ok(GRID_EMISSION_FACTORS.CAMX.url.includes('epa.gov/egrid'));
+    assert.ok(approx(GRID_EMISSION_FACTORS.CAMX.kgPerKwh, 0.195037, 0.000001));
+  });
+
+  it('falls back to the published U.S. factor for an unknown key', () => {
+    const resolved = resolveGridFactor({ gridRegion: 'UNKNOWN' });
+    assert.strictEqual(resolved.gridRegion, 'us');
+    assert.strictEqual(resolved.provenance.source, 'EPA eGRID2023 Revision 2');
   });
 });
 
@@ -372,6 +389,9 @@ describe('buildSustainabilityReport()', () => {
     assert.strictEqual(r.gridRegion, 'us');
     assert.ok(r.gridFactorKgPerKwh > 0);
     assert.strictEqual(r.projectLifeYears, 25);
+    assert.strictEqual(r.gridFactorProvenance.source, 'EPA eGRID2023 Revision 2');
+    assert.strictEqual(r.factorCoverage.libraryLines, 4);
+    assert.strictEqual(r.factorCoverage.quality, 'screening-library');
   });
 
   it('operating is null when lossesKw is omitted', () => {
@@ -395,6 +415,43 @@ describe('buildSustainabilityReport()', () => {
   it('uses au grid region factor when specified', () => {
     const r = buildSustainabilityReport(fixtureBom, { gridRegion: 'au', lossesKw: 5 });
     assert.ok(approx(r.gridFactorKgPerKwh, GRID_EMISSION_FACTORS.au.kgPerKwh, 0.0001));
+  });
+
+  it('uses a documented custom factor and preserves its source record', () => {
+    const r = buildSustainabilityReport(fixtureBom, {
+      gridRegion: 'custom',
+      gridFactorKgPerKwh: 0.123,
+      gridFactorSource: 'Example Utility disclosure',
+      gridFactorSourceDate: '2026-01-15',
+      gridFactorSourceUrl: 'https://example.com/disclosure',
+      gridFactorGeography: 'Example service territory',
+    });
+    assert.strictEqual(r.gridFactorProvenance.quality, 'documented-user-supplied');
+    assert.strictEqual(r.gridFactorProvenance.sourceDate, '2026-01-15');
+    assert.strictEqual(r.gridFactorProvenance.geography, 'Example service territory');
+  });
+
+  it('reports product-specific EPD and library coverage separately', () => {
+    const bom = [
+      { type: 'cable', quantity: 10, size: 25, material: 'Cu', conductors: 1, co2eKgPerUnit: 2, epdSource: 'EPD-123' },
+      { type: 'tray', quantity: 10, widthIn: 12, material: 'steel' },
+      { type: 'unknown', quantity: 1 },
+    ];
+    const embodied = embodiedCO2e(bom);
+    const coverage = summarizeFactorCoverage(bom, embodied);
+    assert.strictEqual(coverage.epdLines, 1);
+    assert.strictEqual(coverage.libraryLines, 1);
+    assert.strictEqual(coverage.skippedLines, 1);
+    assert.strictEqual(coverage.quality, 'mixed');
+    assert.ok(coverage.epdCarbonPercent > 0);
+  });
+
+  it('does not count an undocumented override as product-specific EPD coverage', () => {
+    const bom = [{ type: 'equipment', quantity: 1, co2eKgPerUnit: 25 }];
+    const coverage = summarizeFactorCoverage(bom, embodiedCO2e(bom));
+    assert.strictEqual(coverage.epdLines, 0);
+    assert.strictEqual(coverage.undocumentedOverrideLines, 1);
+    assert.strictEqual(coverage.undocumentedOverrideCarbonPercent, 100);
   });
 
   it('returns alternativeComparison when alternative BOM is provided', () => {

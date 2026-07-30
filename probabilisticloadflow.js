@@ -8,7 +8,14 @@ import {
   VOLTAGE_HIGH_PU,
   VOLTAGE_LOW_PU,
 } from './analysis/probabilisticLoadFlow.mjs';
-import { getStudies, setStudies } from './dataStore.mjs';
+import { buildLoadFlowModel } from './analysis/loadFlowModel.js';
+import {
+  createStudyRunMetadata,
+  evaluateConvergenceCoverage,
+  isStudyResultStale,
+  validatePowerFlowStudyModel
+} from './analysis/studyResultReadiness.mjs';
+import { getOneLine, getStudies, setStudies } from './dataStore.mjs';
 import { initStudyApprovalPanel } from './src/components/studyApproval.js';
 import { initStudyBasisPanel } from './src/components/studyBasis.js';
 import { escapeHtml } from './src/htmlUtils.mjs';
@@ -48,6 +55,26 @@ document.addEventListener('DOMContentLoaded', () => {
   const resultsDiv  = document.getElementById('results');
   const errorsDiv   = document.getElementById('calc-errors');
   const exportBtn   = document.getElementById('export-csv-btn');
+  const readinessDiv = document.getElementById('study-readiness');
+
+  const getModelReadiness = () => {
+    const model = buildLoadFlowModel(getOneLine());
+    return { model, readiness: validatePowerFlowStudyModel(model) };
+  };
+
+  const renderReadiness = (readiness, options = {}) => {
+    const errors = readiness?.errors || [];
+    const warnings = readiness?.warnings || [];
+    const counts = readiness?.counts || {};
+    const stale = options.stale === true;
+    const cls = readiness?.ready && !stale ? 'result-ok' : 'result-warn';
+    let html = `<div class="result-card ${cls}"><strong>${stale ? 'Saved result is stale' : readiness?.ready ? 'Base network ready' : 'Base network review required'}</strong>`;
+    if (Number.isFinite(counts.buses)) html += `<p>${counts.buses} buses and ${counts.branches} branches detected.</p>`;
+    if (stale) html += '<p>The One-Line model changed after this result was run. Re-run before exporting or relying on it.</p>';
+    if (errors.length) html += `<ul>${errors.map(error => `<li>${escapeHtml(error)}</li>`).join('')}</ul>`;
+    if (warnings.length) html += `<ul>${warnings.map(warning => `<li>${escapeHtml(warning)}</li>`).join('')}</ul>`;
+    readinessDiv.innerHTML = `${html}</div>`;
+  };
 
   // Show/hide distribution parameter fields based on the selected type.
   function wireDistType(prefix) {
@@ -86,10 +113,16 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Restore a saved run, or leave defaults from the HTML.
+  const initialState = getModelReadiness();
   const saved = getStudies().probabilisticLoadFlow;
   if (saved && saved.inputs) {
     renderResults(saved);
     exportBtn.hidden = false;
+    const stale = isStudyResultStale(saved, initialState.readiness.sourceFingerprint);
+    exportBtn.disabled = stale || saved.runMetadata?.valid !== true;
+    renderReadiness(initialState.readiness, { stale });
+  } else {
+    renderReadiness(initialState.readiness);
   }
 
   form.addEventListener('submit', e => {
@@ -107,12 +140,35 @@ document.addEventListener('DOMContentLoaded', () => {
       if (samples > MAX_SAMPLES) throw new Error(`Scenario count is capped at ${MAX_SAMPLES}.`);
       if (!Number.isFinite(seed)) throw new Error('Enter an integer random seed.');
       const config = { samples, seed, loadDist: readDist('load'), genDist: readDist('gen') };
-      result = runMonteCarloLoadFlow(null, config, { baseMVA, balanced: true });
+      const { model, readiness } = getModelReadiness();
+      renderReadiness(readiness);
+      if (!readiness.ready) throw new Error(readiness.errors.join(' '));
+      result = runMonteCarloLoadFlow(model, config, { baseMVA, balanced: true });
+      const coverage = evaluateConvergenceCoverage(result.convergedCount, result.sampleCount, {
+        minimumRatio: 0.95,
+        minimumConverged: Math.min(30, result.sampleCount)
+      });
+      result.runMetadata = createStudyRunMetadata('probabilisticLoadFlow', readiness, coverage, {
+        source: 'One-Line Diagram',
+        randomSeed: seed
+      });
+      if (!coverage.valid) {
+        result.persisted = false;
+        errorsDiv.hidden = false;
+        errorsDiv.textContent = `${coverage.message} No result was saved or enabled for export.`;
+        resultsDiv.innerHTML = `<div class="result-card result-fail"><h2>No valid probabilistic result</h2><p>${escapeHtml(coverage.message)}</p><p>Correct the base network or narrow the sampled operating range.</p></div>`;
+        exportBtn.hidden = false;
+        exportBtn.disabled = true;
+        runBtn.disabled = false;
+        runBtn.textContent = 'Run Monte Carlo';
+        return;
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Unable to run the Monte Carlo study.';
       errorsDiv.hidden = false;
       errorsDiv.textContent = msg;
-      showModal('Input Error', `<p>${escapeHtml(msg)}</p>`, 'error');
+      exportBtn.hidden = false;
+      exportBtn.disabled = true;
       runBtn.disabled = false;
       runBtn.textContent = 'Run Monte Carlo';
       return;
@@ -122,11 +178,13 @@ document.addEventListener('DOMContentLoaded', () => {
     errorsDiv.textContent = '';
 
     const studies = getStudies();
+    result.persisted = true;
     studies.probabilisticLoadFlow = result;
     setStudies(studies);
 
     renderResults(result);
     exportBtn.hidden = false;
+    exportBtn.disabled = false;
     runBtn.disabled = false;
     runBtn.textContent = 'Run Monte Carlo';
   });

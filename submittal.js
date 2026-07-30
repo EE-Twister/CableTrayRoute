@@ -1,6 +1,20 @@
-import { getCables, getTrays, getConduits, getEquipment, getDuctbanks } from './dataStore.mjs';
+import {
+  getCables,
+  getDeliverableArtifacts,
+  getDuctbanks,
+  getEquipment,
+  getFieldExecutionRecords,
+  getProjectInputFingerprint,
+  getProjectMeta,
+  getTrays,
+  getConduits,
+  setProjectMeta,
+  upsertDeliverableArtifact,
+} from './dataStore.mjs';
 import { showAlertModal } from './src/components/modal.js';
 import { buildBomCatalogFields, buildCatalogTraceabilityReport, buildCatalogWarnings } from './analysis/manufacturerCatalog.mjs';
+import { buildArtifactRegisterRows, normalizeDeliverableArtifact } from './analysis/deliverableArtifacts.mjs';
+import { summarizeFieldExecution } from './analysis/fieldExecution.mjs';
 
 document.addEventListener('DOMContentLoaded', () => {
   initSettings();
@@ -14,6 +28,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (dateInput && !dateInput.value) {
     dateInput.value = new Date().toISOString().slice(0, 10);
   }
+  hydrateProjectInfo();
 
   document.getElementById('preview-btn').addEventListener('click', generatePreview);
   document.getElementById('print-btn').addEventListener('click', () => {
@@ -21,7 +36,38 @@ document.addEventListener('DOMContentLoaded', () => {
     setTimeout(() => window.print(), 300);
   });
   document.getElementById('export-xlsx-btn').addEventListener('click', exportXlsx);
+  document.getElementById('save-package-record-btn')?.addEventListener('click', savePackageRecord);
+  ['sub-project-name', 'sub-project-number', 'sub-client', 'sub-engineer', 'sub-revision']
+    .forEach(id => document.getElementById(id)?.addEventListener('change', persistProjectInfo));
 });
+
+function hydrateProjectInfo() {
+  const meta = getProjectMeta();
+  const assignments = {
+    'sub-project-name': meta.projectName || meta.name,
+    'sub-project-number': meta.projectNumber || meta.number,
+    'sub-client': meta.client || meta.owner,
+    'sub-engineer': meta.engineer || meta.engineerOfRecord,
+    'sub-revision': meta.revision,
+  };
+  for (const [id, value] of Object.entries(assignments)) {
+    const input = document.getElementById(id);
+    if (input && value !== undefined && value !== null && value !== '') input.value = String(value);
+  }
+}
+
+function persistProjectInfo() {
+  const current = getProjectMeta();
+  const info = getProjectInfo();
+  setProjectMeta({
+    ...current,
+    projectName: info.projectName === '(Untitled Project)' ? '' : info.projectName,
+    projectNumber: info.projectNumber === 'â€”' ? '' : info.projectNumber,
+    client: info.client === 'â€”' ? '' : info.client,
+    engineer: info.engineer === 'â€”' ? '' : info.engineer,
+    revision: info.revision,
+  });
+}
 
 function getProjectInfo() {
   return {
@@ -106,6 +152,14 @@ function generatePreview() {
     html += buildTrayFillSection(trays, cables);
   }
 
+  if (sectionEnabled('sec-artifact-register')) {
+    html += buildDeliverableRegisterSection(getDeliverableArtifacts());
+  }
+
+  if (sectionEnabled('sec-field-execution')) {
+    html += buildFieldExecutionSection(getFieldExecutionRecords());
+  }
+
   // Code Compliance Statement
   if (sectionEnabled('sec-compliance')) {
     html += buildComplianceSection(info);
@@ -117,6 +171,83 @@ function generatePreview() {
   }
 
   document.getElementById('submittal-preview').innerHTML = html;
+}
+
+function savePackageRecord() {
+  generatePreview();
+  persistProjectInfo();
+  const info = getProjectInfo();
+  const idInput = document.getElementById('sub-package-id');
+  const generatedId = `SUB-${info.projectNumber}-${info.revision}`
+    .replace(/[^a-zA-Z0-9_-]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  const id = idInput?.value.trim() || generatedId || `SUB-${Date.now()}`;
+  if (idInput) idInput.value = id;
+  const includedSections = [...document.querySelectorAll('fieldset input[type="checkbox"][id^="sec-"]:checked')]
+    .map(input => input.id.replace(/^sec-/, ''));
+  const existingArtifacts = getDeliverableArtifacts();
+  const artifact = normalizeDeliverableArtifact({
+    id,
+    type: 'submittal',
+    title: `${info.projectName} Submittal`,
+    revision: info.revision,
+    status: document.getElementById('sub-package-status')?.value || 'draft',
+    transmittalNumber: document.getElementById('sub-transmittal')?.value || '',
+    generatedBy: document.getElementById('sub-generated-by')?.value || info.engineer,
+    generatedAt: new Date().toISOString(),
+    sourceFingerprint: getProjectInputFingerprint(),
+    sourcePage: 'submittal.html',
+    includedSections,
+    sourceArtifacts: existingArtifacts.filter(item => item.type !== 'submittal').map(item => item.id),
+    notes: document.getElementById('sub-package-notes')?.value || '',
+    summary: {
+      equipment: getEquipment().length,
+      cables: getCables().length,
+      raceways: getTrays().length + getConduits().length + getDuctbanks().length,
+      fieldRecords: getFieldExecutionRecords().length,
+    },
+  });
+  upsertDeliverableArtifact(artifact);
+  const status = document.getElementById('sub-package-save-status');
+  if (status) status.textContent = `Saved ${artifact.id} revision ${artifact.revision} as ${artifact.status}.`;
+}
+
+function buildDeliverableRegisterSection(artifacts) {
+  const rows = buildArtifactRegisterRows(artifacts);
+  if (!rows.length) {
+    return `<section class="submittal-section" aria-label="Deliverable register">
+      <h2>Deliverable Register</h2>
+      <p class="field-hint">No saved deliverable artifacts exist yet.</p>
+    </section>`;
+  }
+  return `<section class="submittal-section" aria-label="Deliverable register">
+    <h2>Deliverable Register</h2>
+    <table class="result-table submittal-table">
+      <thead><tr><th>ID</th><th>Type</th><th>Title</th><th>Rev</th><th>Status</th><th>Transmittal</th><th>Generated</th><th>By</th></tr></thead>
+      <tbody>${rows.map(row => `<tr>
+        <td>${esc(row.id)}</td><td>${esc(row.type)}</td><td>${esc(row.title)}</td>
+        <td>${esc(row.revision)}</td><td>${esc(row.status)}</td><td>${esc(row.transmittal)}</td>
+        <td>${esc(row.generatedAt)}</td><td>${esc(row.generatedBy)}</td>
+      </tr>`).join('')}</tbody>
+    </table>
+  </section>`;
+}
+
+function buildFieldExecutionSection(records) {
+  const summary = summarizeFieldExecution(records);
+  const rows = Array.isArray(records) ? records : [];
+  return `<section class="submittal-section" aria-label="Field execution register">
+    <h2>Field Execution Register</h2>
+    <p>${summary.total} tracked record(s); ${summary.complete} accepted; ${summary.blocked} blocked; ${summary.punchOpen} open punch item(s).</p>
+    ${rows.length ? `<table class="result-table submittal-table">
+      <thead><tr><th>Type</th><th>Record</th><th>Status</th><th>Quantity</th><th>Crew</th><th>Updated</th><th>Punch</th><th>Notes</th></tr></thead>
+      <tbody>${rows.map(row => `<tr>
+        <td>${esc(row.recordType)}</td><td>${esc(row.sourceId)}</td><td>${esc(row.status)}</td>
+        <td>${esc(row.quantityComplete)}</td><td>${esc(row.crew)}</td><td>${esc(row.updatedAt)}</td>
+        <td>${row.punchOpen ? esc(row.punchDescription || 'Open') : '—'}</td><td>${esc(row.notes)}</td>
+      </tr>`).join('')}</tbody>
+    </table>` : '<p class="field-hint">No field execution records exist yet.</p>'}
+  </section>`;
 }
 
 function buildCoverPage(info) {
@@ -618,6 +749,30 @@ function exportXlsx() {
         row.epdSource,
         row.epdValidUntil
       ])
+    ]);
+  }
+
+  const artifacts = buildArtifactRegisterRows(getDeliverableArtifacts());
+  if (artifacts.length && sectionEnabled('sec-artifact-register')) {
+    addSheet('Deliverable Register', [
+      ['ID', 'Type', 'Title', 'Revision', 'Status', 'Transmittal', 'Generated At', 'Generated By', 'Source Fingerprint'],
+      ...artifacts.map(row => [
+        row.id, row.type, row.title, row.revision, row.status, row.transmittal,
+        row.generatedAt, row.generatedBy, row.sourceFingerprint,
+      ]),
+    ]);
+  }
+
+  const fieldRecords = getFieldExecutionRecords();
+  if (fieldRecords.length && sectionEnabled('sec-field-execution')) {
+    addSheet('Field Execution', [
+      ['Type', 'Record', 'Status', 'Quantity Complete', 'Crew', 'Updated At', 'Updated By', 'Open Punch', 'Punch Description', 'As-Built Deviation', 'Notes', 'Evidence References'],
+      ...fieldRecords.map(row => [
+        row.recordType, row.sourceId, row.status, row.quantityComplete, row.crew,
+        row.updatedAt, row.updatedBy, row.punchOpen ? 'Yes' : 'No',
+        row.punchDescription, row.asBuiltDeviation, row.notes,
+        Array.isArray(row.evidenceReferences) ? row.evidenceReferences.join('; ') : '',
+      ]),
     ]);
   }
 

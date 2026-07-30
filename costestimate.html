@@ -87,17 +87,79 @@
         <p>Material costs are estimated from unit prices ($/ft for cable, tray, conduit)
         multiplied by quantities from the project schedules. Cable lengths come from routing
         results if available, otherwise from the cable schedule.</p>
-        <p>Labor costs use standard productivity rates (RS Means Electrical Cost Data basis):</p>
+        <p>Labor costs use built-in conceptual productivity allowances:</p>
         <ul>
           <li>Cable pull: 150 ft/hr → $75/hr = $0.50/ft installed</li>
           <li>Tray installation: 30 ft/hr → $90/hr = $3.00/ft installed</li>
           <li>Conduit installation: 25 ft/hr → $85/hr = $3.40/ft installed</li>
         </ul>
-        <p>Default unit prices reflect mid-range contractor pricing (2024 USD). Adjust prices
-        in the <strong>Price Overrides</strong> section for your specific project conditions.</p>
+        <p>Default unit prices are built-in 2024 USD conceptual allowances, not a licensed cost-book extract.
+        Import a current supplier, internal, or licensed cost source for issued estimates.</p>
         <p>This estimate does not include: engineering fees, permits, switchgear, transformers,
         or conduit fittings beyond a default unit cost per fitting.</p>
       </details>
+
+      <section class="field-group" aria-labelledby="estimate-basis-title">
+        <h2 id="estimate-basis-title">Estimate Basis &amp; Escalation</h2>
+        <p class="field-hint">Normalize a pricing book to the project region and estimate date. Index values are stored with the estimate so a later reviewer can reproduce the adjustment without a live data connection.</p>
+
+        <div class="form-row">
+          <label for="estimate-class">Estimate classification</label>
+          <select id="estimate-class">
+            <option value="Conceptual / screening" selected>Conceptual / screening</option>
+            <option value="Budgetary">Budgetary</option>
+            <option value="Definitive">Definitive</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label for="pricing-base-date">Pricing base date</label>
+          <input type="month" id="pricing-base-date" value="2024-01">
+          <label for="estimate-date">Estimate date</label>
+          <input type="month" id="estimate-date">
+        </div>
+
+        <h3>Regional Labor Basis</h3>
+        <div class="form-row">
+          <label for="labor-region">Project labor region</label>
+          <input type="text" id="labor-region" value="United States — national" placeholder="State, metro area, or labor market">
+        </div>
+        <div class="form-row">
+          <label for="national-electrician-wage">National electrician wage ($/hr)</label>
+          <input type="number" id="national-electrician-wage" min="0.01" step="0.01" value="29.98">
+          <label for="local-electrician-wage">Local electrician wage ($/hr)</label>
+          <input type="number" id="local-electrician-wage" min="0.01" step="0.01" value="29.98">
+        </div>
+        <p class="field-hint">Regional factor = local wage ÷ national wage. The national reference is the BLS OEWS May 2024 median annual electrician wage ($62,350 ÷ 2,080 hr). Enter the comparable local OEWS value; this factor scales the loaded contractor labor rates, not the wage itself.</p>
+
+        <h3>Material Escalation</h3>
+        <div class="form-row">
+          <label for="material-base-index">Base PPI index</label>
+          <input type="number" id="material-base-index" min="0.001" step="0.001" value="100">
+          <label for="material-current-index">Current PPI index</label>
+          <input type="number" id="material-current-index" min="0.001" step="0.001" value="100">
+        </div>
+        <div class="form-row">
+          <label for="material-series-id">BLS PPI series ID</label>
+          <input type="text" id="material-series-id" placeholder="Project-selected series">
+          <label for="material-series-name">Series description</label>
+          <input type="text" id="material-series-name" value="BLS PPI — user-selected electrical material series">
+        </div>
+
+        <h3>Labor Escalation</h3>
+        <div class="form-row">
+          <label for="labor-base-index">Base ECI index</label>
+          <input type="number" id="labor-base-index" min="0.001" step="0.001" value="100">
+          <label for="labor-current-index">Current ECI index</label>
+          <input type="number" id="labor-current-index" min="0.001" step="0.001" value="100">
+        </div>
+        <div class="form-row">
+          <label for="labor-series-id">BLS ECI series ID</label>
+          <input type="text" id="labor-series-id" placeholder="Project-selected non-seasonally adjusted series">
+          <label for="labor-series-name">Series description</label>
+          <input type="text" id="labor-series-name" value="BLS ECI — user-selected non-seasonally adjusted construction series">
+        </div>
+        <div id="escalation-preview" class="field-hint" aria-live="polite"></div>
+      </section>
 
       <!-- Price override inputs -->
       <details id="price-overrides">
@@ -128,7 +190,7 @@
           <button type="button" id="import-pricing-btn">Import Pricing CSV</button>
           <input type="file" id="pricing-csv-input" accept=".csv" class="hidden" title="Select a pricing CSV file">
           <button type="button" id="export-pricing-btn">Export Current Pricing</button>
-          <button type="button" id="reset-pricing-btn">Reset to Default (RS Means)</button>
+          <button type="button" id="reset-pricing-btn">Reset to Built-in Defaults</button>
         </div>
         <div id="pricing-basis" class="field-hint" aria-live="polite" style="margin-top:0.25rem"></div>
       </details>
@@ -163,6 +225,8 @@
         <li>Enter tray lengths in the <a href="racewayschedule.html">Raceway Schedule</a>.</li>
         <li>Override unit prices in the Price Overrides section to match your region.</li>
       </ul>
+      <p><strong>Regional labor:</strong> Enter a comparable local BLS OEWS electrician wage. The tool scales the loaded contractor labor rate by local ÷ national wage; it does not substitute the employee wage for a contractor bill rate.</p>
+      <p><strong>Escalation:</strong> Enter base and current values from the same BLS PPI material series and the same non-seasonally adjusted BLS ECI labor series. A value pair of 100/100 leaves that cost component unchanged.</p>
       <p><strong>Contingency:</strong> A percentage added to the grand total to cover unknowns. 15% is typical for early estimates.</p>
     </div>
   </div>

@@ -3,14 +3,119 @@
  * Calculates material and labor costs from cable schedule, raceway schedule,
  * and routing results using configurable unit pricing.
  *
- * References: RS Means Electrical Cost Data (typical ranges), NEC Article 300.
+ * Built-in values are conceptual allowances. Imported price books and the
+ * source-aware regional/escalation basis provide the auditable pricing path.
  */
 
 import { buildBomCatalogFields } from './manufacturerCatalog.mjs';
 
+export const COST_SOURCE_URLS = Object.freeze({
+  oewsElectricians: 'https://www.bls.gov/ooh/construction-and-extraction/electricians.htm',
+  eciEscalation: 'https://www.bls.gov/eci/factsheets/how-to-use-eci-for-escalation.htm',
+  ppiData: 'https://www.bls.gov/ppi/databases/',
+});
+
+export const DEFAULT_ESTIMATE_BASIS = Object.freeze({
+  estimateClass: 'Conceptual / screening',
+  currency: 'USD',
+  baseDate: '2024-01',
+  estimateDate: '',
+  laborRegion: 'United States — national',
+  nationalElectricianHourlyWage: 29.98,
+  localElectricianHourlyWage: 29.98,
+  wageDataDate: 'May 2024',
+  wageSource: 'BLS OEWS — Electricians (SOC 47-2111)',
+  wageSourceUrl: COST_SOURCE_URLS.oewsElectricians,
+  materialBaseIndex: 100,
+  materialCurrentIndex: 100,
+  materialSeriesId: '',
+  materialSeriesName: 'BLS PPI — user-selected electrical material series',
+  materialSourceUrl: COST_SOURCE_URLS.ppiData,
+  laborBaseIndex: 100,
+  laborCurrentIndex: 100,
+  laborSeriesId: '',
+  laborSeriesName: 'BLS ECI — user-selected non-seasonally adjusted construction series',
+  laborSourceUrl: COST_SOURCE_URLS.eciEscalation,
+});
+
 /**
- * Default unit prices (USD).
- * Prices are mid-range estimates; override via the priceOverrides parameter.
+ * Return current index / base index. Invalid or non-positive inputs are
+ * deliberately neutral so an incomplete basis cannot silently distort cost.
+ */
+export function calculateEscalationFactor(baseIndex, currentIndex) {
+  const base = Number(baseIndex);
+  const current = Number(currentIndex);
+  if (!Number.isFinite(base) || !Number.isFinite(current) || base <= 0 || current <= 0) return 1;
+  return current / base;
+}
+
+/**
+ * Build the source-aware estimate basis used to localize and escalate prices.
+ */
+export function buildEstimateBasis(input = {}) {
+  const basis = { ...DEFAULT_ESTIMATE_BASIS, ...input };
+  const materialFactor = calculateEscalationFactor(basis.materialBaseIndex, basis.materialCurrentIndex);
+  const laborEscalationFactor = calculateEscalationFactor(basis.laborBaseIndex, basis.laborCurrentIndex);
+  const nationalWage = Number(basis.nationalElectricianHourlyWage);
+  const localWage = Number(basis.localElectricianHourlyWage);
+  const regionalLaborFactor = Number.isFinite(nationalWage)
+    && Number.isFinite(localWage)
+    && nationalWage > 0
+    && localWage > 0
+    ? localWage / nationalWage
+    : 1;
+  const combinedLaborFactor = regionalLaborFactor * laborEscalationFactor;
+
+  return {
+    ...basis,
+    materialBaseIndex: Number(basis.materialBaseIndex) || 0,
+    materialCurrentIndex: Number(basis.materialCurrentIndex) || 0,
+    laborBaseIndex: Number(basis.laborBaseIndex) || 0,
+    laborCurrentIndex: Number(basis.laborCurrentIndex) || 0,
+    nationalElectricianHourlyWage: Number(basis.nationalElectricianHourlyWage) || 0,
+    localElectricianHourlyWage: Number(basis.localElectricianHourlyWage) || 0,
+    materialFactor,
+    regionalLaborFactor,
+    laborEscalationFactor,
+    combinedLaborFactor,
+    materialIndexDocumented: Boolean(basis.materialSeriesId && basis.materialSeriesName),
+    laborIndexDocumented: Boolean(basis.laborSeriesId && basis.laborSeriesName),
+    regionalWageDocumented: Boolean(basis.laborRegion && localWage > 0 && nationalWage > 0),
+  };
+}
+
+function scalePriceMap(map, factor) {
+  return Object.fromEntries(Object.entries(map || {}).map(([key, value]) => [
+    key,
+    Number.isFinite(Number(value)) ? Number(value) * factor : value,
+  ]));
+}
+
+/**
+ * Apply material escalation separately from regional and time-based labor
+ * adjustments. Manual final-rate overrides should be applied after this step.
+ */
+export function applyEstimateBasis(prices = DEFAULT_PRICES, basisInput = {}) {
+  const basis = basisInput && basisInput.materialFactor != null
+    ? basisInput
+    : buildEstimateBasis(basisInput);
+
+  return {
+    cable: scalePriceMap(prices.cable || DEFAULT_PRICES.cable, basis.materialFactor),
+    tray: scalePriceMap(prices.tray || DEFAULT_PRICES.tray, basis.materialFactor),
+    conduit: scalePriceMap(prices.conduit || DEFAULT_PRICES.conduit, basis.materialFactor),
+    fitting: Number(prices.fitting ?? DEFAULT_PRICES.fitting) * basis.materialFactor,
+    labor: scalePriceMap(prices.labor || DEFAULT_PRICES.labor, basis.combinedLaborFactor),
+    laborProductivity: {
+      ...DEFAULT_PRICES.laborProductivity,
+      ...(prices.laborProductivity || {}),
+    },
+  };
+}
+
+/**
+ * Default conceptual unit-price allowances (2024 USD).
+ * Replace with current supplier, internal, or licensed cost data for issue.
  */
 export const DEFAULT_PRICES = {
   // Cables: $/ft by conductor size (AWG / kcmil) — copper THWN-2

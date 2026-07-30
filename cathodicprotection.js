@@ -1,5 +1,11 @@
 import { bootstrapPage } from './src/lifecycle/pageBootstrap.js';
-import { getStudies, getStudyApprovals, setStudies } from './dataStore.mjs';
+import {
+  getCathodicProtectionDraft,
+  getStudies,
+  getStudyApprovals,
+  setCathodicProtectionDraft,
+  setStudies
+} from './dataStore.mjs';
 import { initStudyApprovalPanel } from './src/components/studyApproval.js';
 import {
   CP_STANDARDS_PROFILE,
@@ -32,6 +38,118 @@ const FT_TO_M = 0.3048;
 const SQM_TO_SQFT = 10.76391041671;
 const COMMISSIONING_CHECKLIST_ITEMS = [];
 const MAX_NUMBER_OF_ANODES = 10000;
+const CP_DRAFT_SCHEMA_VERSION = 2;
+const CP_PROFILE_POTENTIAL_THRESHOLD_MV = -850;
+const CP_PROFILE_CURRENT_DEMAND_LIMIT_A = 1;
+const CP_PROFILE_DISTRIBUTION_MIN = 0.75;
+const CP_CALCULATION_INPUT_KEYS = Object.freeze([
+  'assetType',
+  'pipeMaterial',
+  'soilResistivityOhmM',
+  'soilPh',
+  'moistureCategory',
+  'coatingModelType',
+  'coatingBreakdownFactor',
+  'coatingInitialBreakdownFactor',
+  'coatingEndOfLifeBreakdownFactor',
+  'coatingDegradationExponent',
+  'segmentConditionFactors',
+  'surfaceAreaM2',
+  'currentDensityMethod',
+  'surfaceAreaMode',
+  'manualCurrentDensityMaM2',
+  'modeledReferencePotentialMv',
+  'anodeCapacityAhPerKg',
+  'anodeUtilization',
+  'designFactor',
+  'availabilityFactor',
+  'targetLifeYears',
+  'installedMassKg',
+  'anodeTypeSystem',
+  'iccpRatedCurrentA',
+  'iccpRatedVoltageV',
+  'iccpGroundbedResistanceOhm',
+  'iccpVoltageAllowanceV',
+  'iccpReserveFactor',
+  'numberOfAnodes',
+  'anodeSpacingM',
+  'anodeDistanceToStructureM',
+  'anodeBurialDepthM',
+  'zoneResistivityOhmM',
+  'criteriaEvidenceEnabled',
+  'testMethod',
+  'measurementContext',
+  'referenceElectrodeLocation',
+  'irDropCompensationMethod',
+  'measuredIrDropMv',
+  'couponDepolarizationMv',
+  'measuredInstantOffPotentialMv',
+  'simulatedPolarizationShiftMv',
+  'testPointCount',
+  'passingTestPointCount',
+  'nearbyForeignStructures',
+  'dcTractionSystem',
+  'knownInterferenceSources',
+  'interferenceGeometry',
+  'interferenceSourceType',
+  'foreignStructureSeparationM',
+  'parallelExposureLengthM',
+  'crossingAngleDeg',
+  'measuredPotentialGradientMvPerM',
+  'bondingStrategy',
+  'mitigationProfile',
+  'mitigationActions',
+  'verificationTestDate'
+]);
+const CP_CONVERTIBLE_FIELDS = Object.freeze([
+  { id: 'surface-area', imperialToMetric: SQFT_TO_SQM },
+  { id: 'pipe-od', imperialToMetric: IN_TO_M / MM_TO_M },
+  { id: 'pipe-length', imperialToMetric: FT_TO_M },
+  { id: 'anode-spacing', imperialToMetric: FT_TO_M },
+  { id: 'anode-distance-to-structure', imperialToMetric: FT_TO_M },
+  { id: 'anode-burial-depth', imperialToMetric: FT_TO_M },
+  { id: 'installed-mass', imperialToMetric: LB_TO_KG },
+  { id: 'foreign-structure-separation', imperialToMetric: FT_TO_M },
+  { id: 'parallel-exposure-length', imperialToMetric: FT_TO_M }
+]);
+const VALIDATION_FIELD_IDS = Object.freeze({
+  soilResistivityOhmM: 'soil-resistivity',
+  soilPh: 'soil-ph',
+  surfaceAreaM2: 'surface-area',
+  coatingBreakdownFactor: 'coating-breakdown',
+  coatingInitialBreakdownFactor: 'coating-initial-breakdown',
+  coatingEndOfLifeBreakdownFactor: 'coating-eol-breakdown',
+  coatingDegradationExponent: 'coating-degradation-exponent',
+  segmentConditionFactors: 'segment-condition-factors',
+  manualCurrentDensityMaM2: 'manual-density',
+  modeledReferencePotentialMv: 'modeled-reference-potential',
+  anodeCapacityAhPerKg: 'anode-capacity',
+  anodeUtilization: 'anode-utilization',
+  designFactor: 'design-factor',
+  availabilityFactor: 'availability-factor',
+  targetLifeYears: 'design-life-years',
+  installedMassKg: 'installed-mass',
+  iccpRatedCurrentA: 'iccp-rated-current',
+  iccpRatedVoltageV: 'iccp-rated-voltage',
+  iccpGroundbedResistanceOhm: 'iccp-groundbed-resistance',
+  iccpVoltageAllowanceV: 'iccp-voltage-allowance',
+  iccpReserveFactor: 'iccp-reserve-factor',
+  numberOfAnodes: 'number-of-anodes',
+  anodeSpacingM: 'anode-spacing',
+  anodeDistanceToStructureM: 'anode-distance-to-structure',
+  anodeBurialDepthM: 'anode-burial-depth',
+  zoneResistivityOhmM: 'zone-resistivity-values',
+  measuredInstantOffPotentialMv: 'measured-off-potential',
+  simulatedPolarizationShiftMv: 'simulated-polarization-shift',
+  testPointCount: 'test-point-count',
+  passingTestPointCount: 'test-point-pass-count',
+  foreignStructureSeparationM: 'foreign-structure-separation',
+  parallelExposureLengthM: 'parallel-exposure-length',
+  measuredPotentialGradientMvPerM: 'measured-potential-gradient',
+  crossingAngleDeg: 'crossing-angle',
+  measuredIrDropMv: 'measured-ir-drop',
+  couponDepolarizationMv: 'coupon-depolarization'
+});
 
 const TABLE_CURRENT_DENSITY_MA_M2 = {
   pipe: { low: 5, moderate: 10, high: 20 },
@@ -54,7 +172,7 @@ let cpComparisonState = {
   hoveredSegmentIndex: null,
   zoomScale: 1
 };
-const TIMELINE_STEP_SEQUENCE = ['inputs', 'geometry', 'distribution', 'criteriaChecks', 'compliance'];
+const TIMELINE_STEP_SEQUENCE = ['inputs', 'geometry', 'interference', 'distribution', 'outcomes'];
 const DEFAULT_TIMELINE_STATE = Object.freeze({
   collapsed: false,
   activeStep: 'inputs'
@@ -65,43 +183,59 @@ const TIMELINE_STEP_DEFINITIONS = [
     title: 'Inputs',
     navTargetId: 'cp-form',
     navLabel: 'Jump to CP inputs form',
-    whyThisMatters: 'NACE/AMPP design workflows require a defensible input basis (asset condition, environment severity, and assumptions) before sizing outputs are considered valid.',
-    checkpoints: ['currentDensitySelection']
+    whyThisMatters: 'The asset condition, environment, and coating assumptions establish the current-demand basis.'
   },
   {
     key: 'geometry',
     title: 'Geometry',
     navTargetId: 'cp-layout-canvas-panel',
     navLabel: 'Jump to CP layout canvas',
-    whyThisMatters: 'AMPP guidance ties anode spacing and reference electrode placement to field verifiability; geometry governs where under-protected zones can appear.',
-    checkpoints: ['testPointCoverage']
+    whyThisMatters: 'Anode count, spacing, burial depth, and structure offset determine how the design distributes current.'
+  },
+  {
+    key: 'interference',
+    title: 'Interference',
+    navTargetId: 'cp-interference-results',
+    navFallbackId: 'results',
+    navLabel: 'Jump to interference assessment',
+    whyThisMatters: 'Nearby structures, DC sources, separation, and parallel exposure can change the required mitigation strategy.'
   },
   {
     key: 'distribution',
     title: 'Distribution',
-    navTargetId: 'cp-profile-chart-root',
+    navTargetId: 'cp-profile-results',
     navFallbackId: 'results',
     navLabel: 'Jump to distribution profile chart',
-    whyThisMatters: 'Distribution attenuation and segment effectiveness demonstrate whether current reaches all zones, a key AMPP/NACE risk-screening expectation.',
-    checkpoints: ['anodeMassSizing', 'targetLifeVerification']
+    whyThisMatters: 'Segment effectiveness and attenuation show whether the design delivers current consistently along the protected asset.'
   },
   {
-    key: 'criteriaChecks',
-    title: 'Criteria Checks',
-    navTargetId: 'cp-criteria-results',
+    key: 'outcomes',
+    title: 'Outcomes',
+    navTargetId: 'cp-result-kpis',
     navFallbackId: 'results',
-    navLabel: 'Jump to criteria evidence table',
-    whyThisMatters: 'NACE/AMPP acceptance criteria (instant-off, polarization shift, test-point coverage) need traceable pass/fail evidence before declaring readiness.',
-    checkpoints: ['instantOffPotential', 'polarizationShift', 'testPointCoverage']
-  },
-  {
-    key: 'compliance',
-    title: 'Compliance',
-    navTargetId: 'cp-compliance-status-heading',
-    navLabel: 'Jump to compliance status panel',
-    whyThisMatters: 'Compliance status consolidates required checks and commissioning evidence so reviewers can confirm readiness against AMPP/NACE governance gates.',
-    checkpoints: ['commissioningChecksDefined', 'monitoringPlanDefined', 'interferenceAssessment']
+    navLabel: 'Jump to sizing outcomes',
+    whyThisMatters: 'Required current, minimum anode mass, predicted life, and safety margin are the primary design decisions produced by the study.'
   }
+];
+const DESIGN_HISTORY_FIELDS = [
+  { key: 'assetType', label: 'Asset type' },
+  { key: 'soilResistivityOhmM', label: 'Soil resistivity', unit: 'Ω·m' },
+  { key: 'coatingBreakdownFactor', label: 'Coating factor' },
+  { key: 'numberOfAnodes', label: 'Anode count' },
+  { key: 'anodeSpacingM', label: 'Anode spacing', unit: 'm' },
+  { key: 'anodeDistanceToStructureM', label: 'Structure offset', unit: 'm' },
+  { key: 'installedMassKg', label: 'Installed mass', unit: 'kg' },
+  { key: 'iccpRatedCurrentA', label: 'Rectifier current rating', unit: 'A' },
+  { key: 'iccpRatedVoltageV', label: 'Rectifier voltage rating', unit: 'V' },
+  { key: 'iccpGroundbedResistanceOhm', label: 'Groundbed resistance', unit: 'Ω' },
+  { key: 'iccpReserveFactor', label: 'ICCP reserve factor' },
+  { key: 'targetLifeYears', label: 'Target life', unit: 'years' },
+  { key: 'interferenceGeometry', label: 'Interference geometry' },
+  { key: 'interferenceSourceType', label: 'Interference source' },
+  { key: 'foreignStructureSeparationM', label: 'Structure separation', unit: 'm' },
+  { key: 'parallelExposureLengthM', label: 'Parallel exposure', unit: 'm' },
+  { key: 'measuredPotentialGradientMvPerM', label: 'Potential gradient', unit: 'mV/m' },
+  { key: 'bondingStrategy', label: 'Bonding strategy' }
 ];
 
 function buildLayoutAssessmentPayload(study) {
@@ -114,7 +248,7 @@ function buildLayoutAssessmentPayload(study) {
     interferenceAssessment: study.interferenceAssessment || null,
     safetyMarginYears: study.safetyMarginYears,
     safetyMarginPercent: study.safetyMarginPercent,
-    measuredInstantOffPotentialMv: study.measuredInstantOffPotentialMv,
+    measuredInstantOffPotentialMv: study.modeledReferencePotentialMv,
     targetLifeYears: study.targetLifeYears
   };
 }
@@ -143,6 +277,7 @@ export const CP_STANDARD_BASIS = {
     standards: CP_STANDARDS_PROFILE.targetReferences.map((reference) => `${reference.code} (${reference.edition})`),
     selectedProtectionCriteriaSetId: CP_STANDARDS_PROFILE.selectedProtectionCriteriaSetId,
     requiredChecks: getRequiredComplianceChecks(),
+    outputs: ['Standards references', 'Required design checks', 'Report design basis'],
     deliverables: Object.values(CP_STANDARDS_PROFILE.deliverables)
       .filter((deliverable) => deliverable.required)
       .map((deliverable) => deliverable.key)
@@ -152,21 +287,28 @@ export const CP_STANDARD_BASIS = {
     label: 'Current density selection ranges',
     standards: ['AMPP SP21424', 'NACE SP0169'],
     requiredChecks: ['currentDensitySelection'],
-    summary: 'Table-range style current demand selection by structure condition and environment severity.'
+    summary: 'Table-range style current demand selection by structure condition and environment severity.',
+    equation: 'i_design = i_base × F_resistivity × F_pH × F_material',
+    outputs: ['Design current density', 'Area-based required current']
   },
   polarizationCriteria: {
     id: 'polarization-criteria',
     label: 'Polarization / protection criteria assumptions',
     standards: ['NACE SP0169', 'ISO 15589-1'],
     requiredChecks: ['commissioningChecksDefined', 'monitoringPlanDefined'],
-    summary: 'Protection assumptions align with conventional on/off potential and polarization criteria used for buried steel CP design.'
+    summary: 'Protection assumptions align with conventional on/off potential and polarization criteria used for buried steel CP design.',
+    equation: 'I_required = (A_surface × f_coating × i_design × F_distribution) / F_availability',
+    outputs: ['Required CP current', 'Profile potential assumptions']
   },
   anodeCapacityUtilization: {
     id: 'anode-capacity-utilization',
     label: 'Anode capacity and utilization values',
     standards: ['DNV-RP-B401', 'ISO 15589-1'],
     requiredChecks: ['anodeMassSizing', 'targetLifeVerification'],
-    summary: 'Galvanic anode ampere-hour capacity and utilization factors follow published anode design guidance.'
+    summary: 'Galvanic anode ampere-hour capacity and utilization factors follow published anode design guidance.',
+    equation: 'W_required = (I_required × t) / (Q_anode × U × F_design)',
+    secondaryEquation: 'Life = (W_installed × Q_anode × U × F_design) / (I_required × 8760)',
+    outputs: ['Minimum anode mass', 'Predicted design life', 'Safety margin']
   },
   engineeringJudgmentAssumptions: {
     id: 'engineering-judgment',
@@ -174,6 +316,7 @@ export const CP_STANDARD_BASIS = {
     standards: ['Project-specific engineering judgment'],
     requiredChecks: ['commissioningChecksDefined', 'monitoringPlanDefined'],
     summary: 'Coating breakdown factor, design factor, and optional temperature correction require project-specific engineering validation.',
+    outputs: ['Coating uncertainty band', 'Sensitivity scenarios', 'Design advisories'],
     assumptions: [
       'Coating demand model is selected by fixed factor, degradation curve, or segment-based condition factors.',
       'Design factor is selected as a reliability margin for uncertainty and lifecycle variability.',
@@ -185,7 +328,9 @@ export const CP_STANDARD_BASIS = {
     label: 'Interference risk assessment and mitigation profile',
     standards: ['AMPP SP21424', 'NACE SP0169'],
     requiredChecks: ['interferenceAssessment'],
-    summary: 'Scored risk screening for foreign structures, DC traction systems, and known stray-current sources with profile-specific mitigations.'
+    summary: 'Scored risk screening for foreign structures, DC sources, route geometry, measured gradients, and profile-specific mitigations.',
+    equation: 'Risk score = categorical drivers + geometry + exposure + gradient − mitigation credits',
+    outputs: ['Interference risk level', 'Risk drivers', 'Required mitigation profile']
   }
 };
 
@@ -199,6 +344,22 @@ export function calculateRequiredAnodeMass(requiredCurrentA, designHours, anodeC
 
 export function calculatePredictedDesignLife(installedMassKg, anodeCapacityAhPerKg, utilizationFactor, designFactor, requiredCurrentA) {
   return (installedMassKg * anodeCapacityAhPerKg * utilizationFactor * designFactor) / (requiredCurrentA * 8760);
+}
+
+export function calculateIccpSourceSizing(requiredCurrentA, reserveFactor, groundbedResistanceOhm, voltageAllowanceV, ratedCurrentA, ratedVoltageV) {
+  const requiredRectifierCurrentA = requiredCurrentA * reserveFactor;
+  const requiredRectifierVoltageV = (requiredRectifierCurrentA * groundbedResistanceOhm) + voltageAllowanceV;
+  const currentHeadroomA = ratedCurrentA - requiredRectifierCurrentA;
+  const voltageHeadroomV = ratedVoltageV - requiredRectifierVoltageV;
+  return {
+    requiredRectifierCurrentA: roundTo(requiredRectifierCurrentA, 4),
+    requiredRectifierVoltageV: roundTo(requiredRectifierVoltageV, 2),
+    currentHeadroomA: roundTo(currentHeadroomA, 4),
+    voltageHeadroomV: roundTo(voltageHeadroomV, 2),
+    currentCapacityStatus: currentHeadroomA >= 0 ? 'pass' : 'fail',
+    voltageCapacityStatus: voltageHeadroomV >= 0 ? 'pass' : 'fail',
+    overallStatus: currentHeadroomA >= 0 && voltageHeadroomV >= 0 ? 'pass' : 'fail'
+  };
 }
 
 function buildDistributionInput(input) {
@@ -226,23 +387,36 @@ function composeCpAnalysisResult({
   const areaBasedRequiredCurrentA = calculateRequiredCurrent(exposedAreaM2, designCurrentDensityAperM2);
   const distributionAdjustedCurrentA = areaBasedRequiredCurrentA * distributionModel.globalAttenuationFactor;
   const adjustedRequiredCurrentA = distributionAdjustedCurrentA / input.availabilityFactor;
+  const isIccp = input.anodeTypeSystem === 'iccp';
   const designHours = input.targetLifeYears * 8760;
-
-  const minimumAnodeMassKg = calculateRequiredAnodeMass(
-    adjustedRequiredCurrentA,
-    designHours,
-    input.anodeCapacityAhPerKg,
-    input.anodeUtilization,
-    input.designFactor
-  );
-
-  const predictedLifeYears = calculatePredictedDesignLife(
-    input.installedMassKg,
-    input.anodeCapacityAhPerKg,
-    input.anodeUtilization,
-    input.designFactor,
-    adjustedRequiredCurrentA
-  );
+  const minimumAnodeMassKg = isIccp
+    ? null
+    : calculateRequiredAnodeMass(
+      adjustedRequiredCurrentA,
+      designHours,
+      input.anodeCapacityAhPerKg,
+      input.anodeUtilization,
+      input.designFactor
+    );
+  const predictedLifeYears = isIccp
+    ? null
+    : calculatePredictedDesignLife(
+      input.installedMassKg,
+      input.anodeCapacityAhPerKg,
+      input.anodeUtilization,
+      input.designFactor,
+      adjustedRequiredCurrentA
+    );
+  const iccpSizing = isIccp
+    ? calculateIccpSourceSizing(
+      adjustedRequiredCurrentA,
+      input.iccpReserveFactor,
+      input.iccpGroundbedResistanceOhm,
+      input.iccpVoltageAllowanceV,
+      input.iccpRatedCurrentA,
+      input.iccpRatedVoltageV
+    )
+    : null;
   const measurementMetadataWarnings = Array.isArray(criteriaCheckEvidence?.measurementCorrections?.warnings)
     ? criteriaCheckEvidence.measurementCorrections.warnings
     : [];
@@ -250,7 +424,7 @@ function composeCpAnalysisResult({
     input,
     adjustedRequiredCurrentA,
     distributionModel,
-    measuredInstantOffPotentialMv: input.measuredInstantOffPotentialMv,
+    modeledReferencePotentialMv: input.modeledReferencePotentialMv,
     baseCoatingFactor: coatingModel.effectiveFactor
   });
 
@@ -258,12 +432,19 @@ function composeCpAnalysisResult({
     ...input,
     timestamp: new Date().toISOString(),
     standardsBasis: CP_STANDARD_BASIS,
-    outputBasis: {
-      requiredCurrentA: 'Uses exposed-area current demand relation adjusted with per-segment distribution attenuation/effectiveness factors.',
-      minimumAnodeMassKg: 'Uses anode mass sizing equation with anode capacity/utilization values from anode-capacity standards basis.',
-      predictedLifeYears: 'Uses installed mass life relation with anode capacity/utilization basis and protection criteria assumptions.',
-      safetyMargin: 'Compares predicted life versus target design life using the same protection and anode basis assumptions.'
-    },
+    outputBasis: isIccp
+      ? {
+        requiredCurrentA: 'Uses exposed-area current demand adjusted for distribution and source availability.',
+        requiredRectifierCurrentA: 'Applies the ICCP reserve factor to the required structure current.',
+        requiredRectifierVoltageV: 'Adds the cable and polarization allowance to the calculated groundbed circuit voltage.',
+        sourceHeadroom: 'Compares the entered rectifier current and voltage ratings with the preliminary source requirements.'
+      }
+      : {
+        requiredCurrentA: 'Uses exposed-area current demand relation adjusted with per-segment distribution attenuation/effectiveness factors.',
+        minimumAnodeMassKg: 'Uses anode mass sizing equation with anode capacity/utilization values from anode-capacity standards basis.',
+        predictedLifeYears: 'Uses installed mass life relation with anode capacity/utilization basis and protection criteria assumptions.',
+        safetyMargin: 'Compares predicted life versus target design life using the same protection and anode basis assumptions.'
+      },
     designCurrentDensityMaM2: roundTo(designCurrentDensityMaM2, 3),
     coatingModel,
     coatingBreakdownFactor: roundTo(coatingModel.effectiveFactor, 4),
@@ -272,11 +453,12 @@ function composeCpAnalysisResult({
     distributionAdjustedCurrentA: roundTo(distributionAdjustedCurrentA, 4),
     distributionModel,
     requiredCurrentA: roundTo(adjustedRequiredCurrentA, 4),
-    minimumAnodeMassKg: roundTo(minimumAnodeMassKg, 3),
-    minimumAnodeMassLb: roundTo(minimumAnodeMassKg / LB_TO_KG, 3),
-    predictedLifeYears: roundTo(predictedLifeYears, 2),
-    safetyMarginYears: roundTo(predictedLifeYears - input.targetLifeYears, 2),
-    safetyMarginPercent: roundTo(((predictedLifeYears - input.targetLifeYears) / input.targetLifeYears) * 100, 1),
+    minimumAnodeMassKg: isIccp ? null : roundTo(minimumAnodeMassKg, 3),
+    minimumAnodeMassLb: isIccp ? null : roundTo(minimumAnodeMassKg / LB_TO_KG, 3),
+    predictedLifeYears: isIccp ? null : roundTo(predictedLifeYears, 2),
+    safetyMarginYears: isIccp ? null : roundTo(predictedLifeYears - input.targetLifeYears, 2),
+    safetyMarginPercent: isIccp ? null : roundTo(((predictedLifeYears - input.targetLifeYears) / input.targetLifeYears) * 100, 1),
+    iccpSizing,
     criteriaCheckEvidence,
     measurementMetadataWarnings,
     interferenceAssessment,
@@ -293,22 +475,23 @@ function composeCpAnalysisResult({
 }
 
 export function runCathodicProtectionAnalysis(input) {
-  const validationErrors = validateInputs(input);
+  const analysisInput = withAnalysisInputDefaults(input);
+  const validationErrors = validateInputs(analysisInput);
   if (validationErrors.length) {
     throw new Error(validationErrors.join(' '));
   }
 
-  const designCurrentDensityMaM2 = input.currentDensityMethod === 'manual'
-    ? input.manualCurrentDensityMaM2
-    : lookupCurrentDensity(input.assetType, input.moistureCategory, input.soilResistivityOhmM, input.soilPh, input.pipeMaterial);
+  const designCurrentDensityMaM2 = analysisInput.currentDensityMethod === 'manual'
+    ? analysisInput.manualCurrentDensityMaM2
+    : lookupCurrentDensity(analysisInput.assetType, analysisInput.moistureCategory, analysisInput.soilResistivityOhmM, analysisInput.soilPh, analysisInput.pipeMaterial);
 
-  const distributionModel = computeDistributionBySegment(buildDistributionInput(input));
-  const coatingModel = resolveCoatingModel(input, { segmentCount: distributionModel.segments.length });
-  const criteriaCheckEvidence = evaluateCriteriaChecks(input, CP_STANDARDS_PROFILE);
-  const interferenceAssessment = evaluateInterferenceAssessment(input);
+  const distributionModel = computeDistributionBySegment(buildDistributionInput(analysisInput));
+  const coatingModel = resolveCoatingModel(analysisInput, { segmentCount: distributionModel.segments.length });
+  const criteriaCheckEvidence = evaluateCriteriaChecks(analysisInput, CP_STANDARDS_PROFILE);
+  const interferenceAssessment = evaluateInterferenceAssessment(analysisInput);
 
   return composeCpAnalysisResult({
-    input,
+    input: analysisInput,
     designCurrentDensityMaM2,
     distributionModel,
     coatingModel,
@@ -318,24 +501,25 @@ export function runCathodicProtectionAnalysis(input) {
 }
 
 async function runCathodicProtectionAnalysisOffMain(input) {
-  const validationErrors = validateInputs(input);
+  const analysisInput = withAnalysisInputDefaults(input);
+  const validationErrors = validateInputs(analysisInput);
   if (validationErrors.length) {
     throw new Error(validationErrors.join(' '));
   }
 
-  const designCurrentDensityMaM2 = input.currentDensityMethod === 'manual'
-    ? input.manualCurrentDensityMaM2
-    : lookupCurrentDensity(input.assetType, input.moistureCategory, input.soilResistivityOhmM, input.soilPh, input.pipeMaterial);
+  const designCurrentDensityMaM2 = analysisInput.currentDensityMethod === 'manual'
+    ? analysisInput.manualCurrentDensityMaM2
+    : lookupCurrentDensity(analysisInput.assetType, analysisInput.moistureCategory, analysisInput.soilResistivityOhmM, analysisInput.soilPh, analysisInput.pipeMaterial);
 
-  const distributionModel = await computeDistributionBySegmentOffMain(buildDistributionInput(input));
-  const coatingModel = await resolveCoatingModelOffMain(input, { segmentCount: distributionModel.segments.length });
+  const distributionModel = await computeDistributionBySegmentOffMain(buildDistributionInput(analysisInput));
+  const coatingModel = await resolveCoatingModelOffMain(analysisInput, { segmentCount: distributionModel.segments.length });
   const [criteriaCheckEvidence, interferenceAssessment] = await Promise.all([
-    evaluateCriteriaChecksOffMain(input, CP_STANDARDS_PROFILE),
-    evaluateInterferenceAssessmentOffMain(input),
+    evaluateCriteriaChecksOffMain(analysisInput, CP_STANDARDS_PROFILE),
+    evaluateInterferenceAssessmentOffMain(analysisInput),
   ]);
 
   return composeCpAnalysisResult({
-    input,
+    input: analysisInput,
     designCurrentDensityMaM2,
     distributionModel,
     coatingModel,
@@ -344,7 +528,7 @@ async function runCathodicProtectionAnalysisOffMain(input) {
   });
 }
 
-function buildCpProfileData({ input, adjustedRequiredCurrentA, distributionModel, measuredInstantOffPotentialMv, baseCoatingFactor }) {
+function buildCpProfileData({ input, adjustedRequiredCurrentA, distributionModel, modeledReferencePotentialMv, baseCoatingFactor }) {
   const segments = Array.isArray(distributionModel?.segments) && distributionModel.segments.length
     ? distributionModel.segments
     : [{ segment: 1, attenuationFactor: 1, zoneResistivityOhmM: input.soilResistivityOhmM }];
@@ -369,7 +553,7 @@ function buildCpProfileData({ input, adjustedRequiredCurrentA, distributionModel
     const potential = segments.map((segment, index) => {
       const attenuationFactor = segment.attenuationFactor ?? 1;
       const distanceM = roundTo((index + 1) * stepDistanceM, 3);
-      const potentialMv = measuredInstantOffPotentialMv - ((1 - attenuationFactor) * 220 * multiplier) - ((baseCoatingFactor || 0.2) * 40 * (multiplier - 1));
+      const potentialMv = modeledReferencePotentialMv - ((1 - attenuationFactor) * 220 * multiplier) - ((baseCoatingFactor || 0.2) * 40 * (multiplier - 1));
       return {
         segmentIndex: index,
         distanceM,
@@ -384,7 +568,7 @@ function buildCpProfileData({ input, adjustedRequiredCurrentA, distributionModel
         segmentIndex: index,
         distanceM: roundTo((index + 1) * stepDistanceM, 3),
         value: roundTo(demandA, 4),
-        passMetricValue: roundTo(demandA / adjustedRequiredCurrentA, 4)
+        passMetricValue: roundTo(demandA, 4)
       };
     });
     return { potential, currentDemand };
@@ -394,7 +578,7 @@ function buildCpProfileData({ input, adjustedRequiredCurrentA, distributionModel
     generatedAt: new Date().toISOString(),
     thresholdBands: {
       potentialMv: { passWhenLessThanOrEqual: -850 },
-      currentDemandRatio: { passWhenLessThanOrEqual: 1 },
+      currentDemandA: { passWhenLessThanOrEqual: roundTo(adjustedRequiredCurrentA, 4) },
       attenuation: { passWhenGreaterThanOrEqual: 0.75 }
     },
     attenuation,
@@ -407,6 +591,7 @@ function buildCpProfileData({ input, adjustedRequiredCurrentA, distributionModel
 }
 
 function buildSensitivitySummary({ input, adjustedRequiredCurrentA, minimumAnodeMassKg, predictedLifeYears, coatingModel, distributionModel }) {
+  const isIccp = input.anodeTypeSystem === 'iccp';
   const uncertainty = coatingModel?.uncertaintyBand || { lowFactor: input.coatingBreakdownFactor, baseFactor: input.coatingBreakdownFactor, highFactor: input.coatingBreakdownFactor };
   const baseFactor = uncertainty.baseFactor || input.coatingBreakdownFactor;
   const scenarios = [
@@ -424,23 +609,39 @@ function buildSensitivitySummary({ input, adjustedRequiredCurrentA, minimumAnode
   return scenarios.map((scenario) => {
     const currentMultiplier = baseFactor > 0 ? scenario.factor / baseFactor : 1;
     const scenarioCurrentA = adjustedRequiredCurrentA * currentMultiplier;
+    const scenarioIccpSizing = isIccp
+      ? calculateIccpSourceSizing(
+        scenarioCurrentA,
+        input.iccpReserveFactor,
+        input.iccpGroundbedResistanceOhm,
+        input.iccpVoltageAllowanceV,
+        input.iccpRatedCurrentA,
+        input.iccpRatedVoltageV
+      )
+      : null;
     const scenarioRequiredMassKg = minimumAnodeMassKg * currentMultiplier;
     const scenarioPredictedLifeYears = predictedLifeYears / currentMultiplier;
     const scenarioSafetyMarginYears = scenarioPredictedLifeYears - input.targetLifeYears;
     const scenarioWorstCaseSegmentDemandA = segmentDemands.worstCaseSegmentDemandA * currentMultiplier;
-    const approvalStatus = scenarioSafetyMarginYears >= 0 ? 'Approved' : 'Review required';
+    const approvalStatus = isIccp
+      ? (scenarioIccpSizing.overallStatus === 'pass' ? 'Capacity available' : 'Review required')
+      : (scenarioSafetyMarginYears >= 0 ? 'Approved' : 'Review required');
     return {
       ...scenario,
       approvalStatus,
       coatingFactor: roundTo(scenario.factor, 4),
       requiredCurrentA: roundTo(scenarioCurrentA, 4),
-      minimumAnodeMassKg: roundTo(scenarioRequiredMassKg, 3),
-      minimumAnodeMassLb: roundTo(scenarioRequiredMassKg / LB_TO_KG, 3),
-      predictedLifeYears: roundTo(scenarioPredictedLifeYears, 2),
+      minimumAnodeMassKg: isIccp ? null : roundTo(scenarioRequiredMassKg, 3),
+      minimumAnodeMassLb: isIccp ? null : roundTo(scenarioRequiredMassKg / LB_TO_KG, 3),
+      predictedLifeYears: isIccp ? null : roundTo(scenarioPredictedLifeYears, 2),
+      requiredRectifierCurrentA: scenarioIccpSizing?.requiredRectifierCurrentA ?? null,
+      requiredRectifierVoltageV: scenarioIccpSizing?.requiredRectifierVoltageV ?? null,
+      currentHeadroomA: scenarioIccpSizing?.currentHeadroomA ?? null,
+      voltageHeadroomV: scenarioIccpSizing?.voltageHeadroomV ?? null,
       worstCaseSegmentDemandA: roundTo(scenarioWorstCaseSegmentDemandA, 4),
       worstCaseSegmentLabel: segmentDemands.worstCaseSegmentLabel,
-      safetyMarginYears: roundTo(scenarioSafetyMarginYears, 2),
-      safetyMarginPercent: roundTo((scenarioSafetyMarginYears / input.targetLifeYears) * 100, 1)
+      safetyMarginYears: isIccp ? null : roundTo(scenarioSafetyMarginYears, 2),
+      safetyMarginPercent: isIccp ? null : roundTo((scenarioSafetyMarginYears / input.targetLifeYears) * 100, 1)
     };
   });
 }
@@ -475,17 +676,28 @@ function computeWorstCaseSegmentDemand({ distributionModel, coatingModel, adjust
   };
 }
 
+function withAnalysisInputDefaults(input) {
+  const candidate = input && typeof input === 'object' ? input : {};
+  return {
+    ...candidate,
+    modeledReferencePotentialMv: Number.isFinite(candidate.modeledReferencePotentialMv)
+      ? candidate.modeledReferencePotentialMv
+      : candidate.measuredInstantOffPotentialMv,
+    iccpRatedCurrentA: Number.isFinite(candidate.iccpRatedCurrentA) ? candidate.iccpRatedCurrentA : 10,
+    iccpRatedVoltageV: Number.isFinite(candidate.iccpRatedVoltageV) ? candidate.iccpRatedVoltageV : 50,
+    iccpGroundbedResistanceOhm: Number.isFinite(candidate.iccpGroundbedResistanceOhm) ? candidate.iccpGroundbedResistanceOhm : 1.5,
+    iccpVoltageAllowanceV: Number.isFinite(candidate.iccpVoltageAllowanceV) ? candidate.iccpVoltageAllowanceV : 5,
+    iccpReserveFactor: Number.isFinite(candidate.iccpReserveFactor) ? candidate.iccpReserveFactor : 1.25
+  };
+}
+
 function validateInputs(input) {
   const errors = [];
   const positiveChecks = [
     ['soilResistivityOhmM', input.soilResistivityOhmM],
     ['surfaceAreaM2', input.surfaceAreaM2],
-    ['anodeCapacityAhPerKg', input.anodeCapacityAhPerKg],
     ['targetLifeYears', input.targetLifeYears],
-    ['installedMassKg', input.installedMassKg],
-    ['designFactor', input.designFactor],
-    ['availabilityFactor', input.availabilityFactor],
-    ['anodeUtilization', input.anodeUtilization]
+    ['availabilityFactor', input.availabilityFactor]
   ];
 
   positiveChecks.forEach(([name, value]) => {
@@ -550,6 +762,38 @@ function validateInputs(input) {
     errors.push('anodeTypeSystem must be galvanic or iccp.');
   }
 
+  if (input.anodeTypeSystem === 'galvanic') {
+    [
+      ['anodeCapacityAhPerKg', input.anodeCapacityAhPerKg],
+      ['installedMassKg', input.installedMassKg],
+      ['designFactor', input.designFactor],
+      ['anodeUtilization', input.anodeUtilization]
+    ].forEach(([name, value]) => {
+      if (!Number.isFinite(value) || value <= 0) {
+        errors.push(`${name} must be greater than zero for galvanic systems.`);
+      }
+    });
+  }
+
+  if (input.anodeTypeSystem === 'iccp') {
+    [
+      ['iccpRatedCurrentA', input.iccpRatedCurrentA],
+      ['iccpRatedVoltageV', input.iccpRatedVoltageV],
+      ['iccpGroundbedResistanceOhm', input.iccpGroundbedResistanceOhm],
+      ['iccpReserveFactor', input.iccpReserveFactor]
+    ].forEach(([name, value]) => {
+      if (!Number.isFinite(value) || value <= 0) {
+        errors.push(`${name} must be greater than zero for ICCP systems.`);
+      }
+    });
+    if (!Number.isFinite(input.iccpVoltageAllowanceV) || input.iccpVoltageAllowanceV < 0) {
+      errors.push('iccpVoltageAllowanceV must be zero or greater for ICCP systems.');
+    }
+    if (Number.isFinite(input.iccpReserveFactor) && input.iccpReserveFactor < 1) {
+      errors.push('iccpReserveFactor must be at least 1.');
+    }
+  }
+
   if (!Number.isInteger(input.numberOfAnodes) || input.numberOfAnodes <= 0 || input.numberOfAnodes > MAX_NUMBER_OF_ANODES) {
     errors.push(`numberOfAnodes must be a positive integer up to ${MAX_NUMBER_OF_ANODES}.`);
   }
@@ -568,20 +812,26 @@ function validateInputs(input) {
     errors.push('zoneResistivityOhmM input must be a comma-separated list of positive numbers.');
   }
 
-  if (!Number.isFinite(input.measuredInstantOffPotentialMv)) {
-    errors.push('measuredInstantOffPotentialMv must be a finite number.');
+  if (!Number.isFinite(input.modeledReferencePotentialMv)) {
+    errors.push('modeledReferencePotentialMv must be a finite number.');
   }
 
-  if (!Number.isFinite(input.simulatedPolarizationShiftMv) || input.simulatedPolarizationShiftMv < 0) {
-    errors.push('simulatedPolarizationShiftMv must be zero or greater.');
-  }
+  if (input.criteriaEvidenceEnabled !== false) {
+    if (!Number.isFinite(input.measuredInstantOffPotentialMv)) {
+      errors.push('measuredInstantOffPotentialMv must be a finite number.');
+    }
 
-  if (!Number.isInteger(input.testPointCount) || input.testPointCount <= 0) {
-    errors.push('testPointCount must be a positive integer.');
-  }
+    if (!Number.isFinite(input.simulatedPolarizationShiftMv) || input.simulatedPolarizationShiftMv < 0) {
+      errors.push('simulatedPolarizationShiftMv must be zero or greater.');
+    }
 
-  if (!Number.isInteger(input.passingTestPointCount) || input.passingTestPointCount < 0 || input.passingTestPointCount > input.testPointCount) {
-    errors.push('passingTestPointCount must be an integer between 0 and testPointCount.');
+    if (!Number.isInteger(input.testPointCount) || input.testPointCount <= 0) {
+      errors.push('testPointCount must be a positive integer.');
+    }
+
+    if (!Number.isInteger(input.passingTestPointCount) || input.passingTestPointCount < 0 || input.passingTestPointCount > input.testPointCount) {
+      errors.push('passingTestPointCount must be an integer between 0 and testPointCount.');
+    }
   }
 
   if (!['none', 'isolated', 'multiple', 'sharedCorridor'].includes(input.nearbyForeignStructures)) {
@@ -596,40 +846,64 @@ function validateInputs(input) {
     errors.push('knownInterferenceSources must be a supported risk value.');
   }
 
+  if (input.interferenceGeometry !== undefined && !['none', 'crossing', 'parallel', 'shared-corridor'].includes(input.interferenceGeometry)) {
+    errors.push('interferenceGeometry must be none, crossing, parallel, or shared-corridor.');
+  }
+
+  if (input.interferenceSourceType !== undefined && !['none', 'foreign-iccp', 'dc-traction', 'hvdc', 'industrial-dc', 'unknown'].includes(input.interferenceSourceType)) {
+    errors.push('interferenceSourceType must be a supported source option.');
+  }
+
+  ['foreignStructureSeparationM', 'parallelExposureLengthM', 'measuredPotentialGradientMvPerM'].forEach((fieldName) => {
+    if (input[fieldName] !== undefined && (!Number.isFinite(input[fieldName]) || input[fieldName] < 0)) {
+      errors.push(`${fieldName} must be zero or greater when provided.`);
+    }
+  });
+
+  if (input.crossingAngleDeg !== undefined && (!Number.isFinite(input.crossingAngleDeg) || input.crossingAngleDeg < 0 || input.crossingAngleDeg > 90)) {
+    errors.push('crossingAngleDeg must be between 0 and 90.');
+  }
+
+  if (input.bondingStrategy !== undefined && !['none', 'monitoring-only', 'test-bond', 'controlled-drainage'].includes(input.bondingStrategy)) {
+    errors.push('bondingStrategy must be a supported design-stage strategy.');
+  }
+
   if (!['baseline', 'enhanced', 'critical'].includes(input.mitigationProfile)) {
     errors.push('mitigationProfile must be baseline, enhanced, or critical.');
   }
 
-  if (!['instant-off', 'on-potential', 'coupon'].includes(input.testMethod)) {
-    errors.push('testMethod must be instant-off, on-potential, or coupon.');
-  }
+  if (input.criteriaEvidenceEnabled !== false) {
+    if (!['instant-off', 'on-potential', 'coupon'].includes(input.testMethod)) {
+      errors.push('testMethod must be instant-off, on-potential, or coupon.');
+    }
 
-  if (!['native-soil', 'casing', 'foreign-interference', 'test-station', 'unknown'].includes(input.measurementContext)) {
-    errors.push('measurementContext must be a supported option.');
-  }
+    if (!['native-soil', 'casing', 'foreign-interference', 'test-station', 'unknown'].includes(input.measurementContext)) {
+      errors.push('measurementContext must be a supported option.');
+    }
 
-  if (!['local', 'remote', 'coupon-lead', 'unknown'].includes(input.referenceElectrodeLocation)) {
-    errors.push('referenceElectrodeLocation must be a supported option.');
-  }
+    if (!['local', 'remote', 'coupon-lead', 'unknown'].includes(input.referenceElectrodeLocation)) {
+      errors.push('referenceElectrodeLocation must be a supported option.');
+    }
 
-  if (!['instant-off', 'coupon', 'calculated', 'none', 'unknown'].includes(input.irDropCompensationMethod)) {
-    errors.push('irDropCompensationMethod must be a supported option.');
-  }
+    if (!['instant-off', 'coupon', 'calculated', 'none', 'unknown'].includes(input.irDropCompensationMethod)) {
+      errors.push('irDropCompensationMethod must be a supported option.');
+    }
 
-  if (Number.isFinite(input.measuredIrDropMv) && input.measuredIrDropMv < 0) {
-    errors.push('measuredIrDropMv cannot be negative.');
-  }
+    if (Number.isFinite(input.measuredIrDropMv) && input.measuredIrDropMv < 0) {
+      errors.push('measuredIrDropMv cannot be negative.');
+    }
 
-  if (Number.isFinite(input.couponDepolarizationMv) && input.couponDepolarizationMv < 0) {
-    errors.push('couponDepolarizationMv cannot be negative.');
-  }
+    if (Number.isFinite(input.couponDepolarizationMv) && input.couponDepolarizationMv < 0) {
+      errors.push('couponDepolarizationMv cannot be negative.');
+    }
 
-  if (input.testMethod === 'on-potential' && (!Number.isFinite(input.measuredIrDropMv) || input.measuredIrDropMv <= 0)) {
-    errors.push('on-potential testMethod requires measuredIrDropMv greater than 0 mV.');
-  }
+    if (input.testMethod === 'on-potential' && (!Number.isFinite(input.measuredIrDropMv) || input.measuredIrDropMv <= 0)) {
+      errors.push('on-potential testMethod requires measuredIrDropMv greater than 0 mV.');
+    }
 
-  if (input.testMethod === 'coupon' && (!Number.isFinite(input.couponDepolarizationMv) || input.couponDepolarizationMv <= 0)) {
-    errors.push('coupon testMethod requires couponDepolarizationMv greater than 0 mV.');
+    if (input.testMethod === 'coupon' && (!Number.isFinite(input.couponDepolarizationMv) || input.couponDepolarizationMv <= 0)) {
+      errors.push('coupon testMethod requires couponDepolarizationMv greater than 0 mV.');
+    }
   }
 
   return errors;
@@ -695,10 +969,14 @@ function normalizeAnalysisInput(candidate) {
   if (!candidate || typeof candidate !== 'object') {
     return null;
   }
-  const normalized = {
+  const normalized = withAnalysisInputDefaults({
     ...candidate,
+    criteriaEvidenceEnabled: candidate.criteriaEvidenceEnabled === true,
+    modeledReferencePotentialMv: Number.isFinite(candidate.modeledReferencePotentialMv)
+      ? candidate.modeledReferencePotentialMv
+      : (Number.isFinite(candidate.measuredInstantOffPotentialMv) ? candidate.measuredInstantOffPotentialMv : -900),
     zoneResistivityOhmM: parseZoneResistivityValues(candidate.zoneResistivityOhmM)
-  };
+  });
   const validationErrors = validateInputs(normalized);
   return validationErrors.length ? null : normalized;
 }
@@ -712,19 +990,220 @@ function normalizeTimelineState(state) {
   };
 }
 
-function applySavedCpInputs(study) {
+function normalizeUnitSystem(value) {
+  return value === 'metric' ? 'metric' : 'imperial';
+}
+
+function updateCpUnitLabels(unitSystem) {
+  const isMetric = normalizeUnitSystem(unitSystem) === 'metric';
+  document.querySelectorAll('.unit-label-ft').forEach((label) => {
+    label.hidden = isMetric;
+  });
+  document.querySelectorAll('.unit-label-m').forEach((label) => {
+    label.hidden = !isMetric;
+  });
+}
+
+function convertCpDisplayUnits(fromUnitSystem, toUnitSystem) {
+  const from = normalizeUnitSystem(fromUnitSystem);
+  const to = normalizeUnitSystem(toUnitSystem);
+  if (from === to) {
+    updateCpUnitLabels(to);
+    return;
+  }
+
+  CP_CONVERTIBLE_FIELDS.forEach(({ id, imperialToMetric }) => {
+    const field = document.getElementById(id);
+    if (!field) {
+      return;
+    }
+    const value = Number.parseFloat(field.value);
+    if (!Number.isFinite(value)) {
+      return;
+    }
+    const converted = to === 'metric'
+      ? value * imperialToMetric
+      : value / imperialToMetric;
+    field.value = String(roundTo(converted, 6));
+  });
+  updateCpUnitLabels(to);
+}
+
+function captureCpFormValues(form) {
+  if (!form) {
+    return {};
+  }
+  return [...form.elements].reduce((values, field) => {
+    if (!field.id || field.id === 'design-change-note' || field.type === 'file' || field.type === 'submit' || field.type === 'button') {
+      return values;
+    }
+    if (field.type === 'checkbox' || field.type === 'radio') {
+      values[field.id] = Boolean(field.checked);
+    } else {
+      values[field.id] = field.value;
+    }
+    return values;
+  }, {});
+}
+
+function applyCpFormValues(form, draft, displayUnitSystem) {
+  if (!form || !draft || typeof draft !== 'object' || !draft.values || typeof draft.values !== 'object') {
+    return false;
+  }
+  Object.entries(draft.values).forEach(([id, value]) => {
+    const field = document.getElementById(id);
+    if (!field || field.form !== form || field.type === 'file') {
+      return;
+    }
+    if (field.type === 'checkbox' || field.type === 'radio') {
+      field.checked = Boolean(value);
+    } else {
+      field.value = String(value ?? '');
+    }
+  });
+  const draftUnits = normalizeUnitSystem(draft.unitSystem);
+  const displayUnits = normalizeUnitSystem(displayUnitSystem);
+  if (draftUnits !== displayUnits) {
+    convertCpDisplayUnits(draftUnits, displayUnits);
+  } else {
+    updateCpUnitLabels(displayUnits);
+  }
+  return true;
+}
+
+function normalizeFingerprintValue(value) {
+  if (Array.isArray(value)) {
+    return value.map(normalizeFingerprintValue);
+  }
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return roundTo(value, 6);
+  }
+  if (value && typeof value === 'object') {
+    return Object.keys(value)
+      .sort()
+      .reduce((normalized, key) => {
+        normalized[key] = normalizeFingerprintValue(value[key]);
+        return normalized;
+      }, {});
+  }
+  return value ?? null;
+}
+
+function buildCalculationInputFingerprint(input) {
+  if (!input || typeof input !== 'object') {
+    return null;
+  }
+  const normalized = CP_CALCULATION_INPUT_KEYS.reduce((values, key) => {
+    values[key] = normalizeFingerprintValue(input[key]);
+    return values;
+  }, {});
+  return JSON.stringify(normalized);
+}
+
+function summarizeModeledProfile(profileData = {}) {
+  const baseScenario = profileData?.scenarios?.base || {};
+  const currentDemandLimitA = Number(profileData?.thresholdBands?.currentDemandA?.passWhenLessThanOrEqual)
+    || CP_PROFILE_CURRENT_DEMAND_LIMIT_A;
+  const checks = [
+    {
+      key: 'potential',
+      label: 'potential',
+      rows: Array.isArray(baseScenario.potential) ? baseScenario.potential : [],
+      passes: (row) => Number(row?.passMetricValue ?? row?.value) <= CP_PROFILE_POTENTIAL_THRESHOLD_MV
+    },
+    {
+      key: 'currentDemand',
+      label: 'current demand',
+      rows: Array.isArray(baseScenario.currentDemand) ? baseScenario.currentDemand : [],
+      passes: (row) => Number(row?.passMetricValue ?? row?.value) <= currentDemandLimitA
+    },
+    {
+      key: 'attenuation',
+      label: 'distribution',
+      rows: Array.isArray(profileData?.attenuation) ? profileData.attenuation : [],
+      passes: (row) => Number(row?.passMetricValue ?? row?.value) >= CP_PROFILE_DISTRIBUTION_MIN
+    }
+  ].map((metric) => {
+    const failed = metric.rows.filter((row) => !metric.passes(row)).length;
+    return {
+      key: metric.key,
+      label: metric.label,
+      total: metric.rows.length,
+      failed
+    };
+  });
+  return {
+    checks,
+    total: checks.reduce((sum, metric) => sum + metric.total, 0),
+    failed: checks.reduce((sum, metric) => sum + metric.failed, 0)
+  };
+}
+
+function applySavedCpInputs(study, displayUnitSystem = 'imperial') {
   if (!study || typeof study !== 'object') {
     return;
   }
 
+  const displayUnits = normalizeUnitSystem(displayUnitSystem);
+  const savedUnits = normalizeUnitSystem(study.units);
+  const displayDistance = (value) => {
+    if (!Number.isFinite(value)) {
+      return undefined;
+    }
+    return displayUnits === 'metric' ? value : (value / FT_TO_M);
+  };
+  const displayArea = (value) => {
+    if (!Number.isFinite(value)) {
+      return undefined;
+    }
+    return displayUnits === 'metric' ? value : (value * SQM_TO_SQFT);
+  };
+  const displayMass = (value) => {
+    if (!Number.isFinite(value)) {
+      return undefined;
+    }
+    return displayUnits === 'metric' ? value : (value / LB_TO_KG);
+  };
+  const displaySavedLength = (value) => {
+    if (!Number.isFinite(value)) {
+      return undefined;
+    }
+    const meters = savedUnits === 'metric' ? value : value * FT_TO_M;
+    return displayUnits === 'metric' ? meters : meters / FT_TO_M;
+  };
+  const displaySavedDiameter = (value) => {
+    if (!Number.isFinite(value)) {
+      return undefined;
+    }
+    const meters = savedUnits === 'metric' ? value * MM_TO_M : value * IN_TO_M;
+    return displayUnits === 'metric' ? meters / MM_TO_M : meters / IN_TO_M;
+  };
   const valueMap = {
+    'surface-area': displayArea(study.surfaceAreaM2),
+    'modeled-reference-potential': study.modeledReferencePotentialMv,
+    'pipe-od': displaySavedDiameter(study.pipeOdInput),
+    'pipe-length': displaySavedLength(study.pipeLengthInput),
     'number-of-anodes': study.numberOfAnodes,
-    'anode-spacing': study.units === 'metric' ? study.anodeSpacingM : (study.anodeSpacingM / FT_TO_M),
-    'anode-distance-to-structure': study.units === 'metric' ? study.anodeDistanceToStructureM : (study.anodeDistanceToStructureM / FT_TO_M),
-    'anode-burial-depth': study.units === 'metric' ? study.anodeBurialDepthM : (study.anodeBurialDepthM / FT_TO_M),
+    'anode-spacing': displayDistance(study.anodeSpacingM),
+    'anode-distance-to-structure': displayDistance(study.anodeDistanceToStructureM),
+    'anode-burial-depth': displayDistance(study.anodeBurialDepthM),
+    'installed-mass': displayMass(study.installedMassKg),
+    'criteria-evidence-enabled': study.criteriaEvidenceEnabled === true,
+    'iccp-rated-current': study.iccpRatedCurrentA,
+    'iccp-rated-voltage': study.iccpRatedVoltageV,
+    'iccp-groundbed-resistance': study.iccpGroundbedResistanceOhm,
+    'iccp-voltage-allowance': study.iccpVoltageAllowanceV,
+    'iccp-reserve-factor': study.iccpReserveFactor,
     'test-point-count': study.testPointCount,
     'test-point-pass-count': study.passingTestPointCount,
-    'reference-electrode-location': study.referenceElectrodeLocation
+    'reference-electrode-location': study.referenceElectrodeLocation,
+    'interference-geometry': study.interferenceGeometry,
+    'interference-source-type': study.interferenceSourceType,
+    'foreign-structure-separation': displayDistance(study.foreignStructureSeparationM),
+    'parallel-exposure-length': displayDistance(study.parallelExposureLengthM),
+    'crossing-angle': study.crossingAngleDeg,
+    'measured-potential-gradient': study.measuredPotentialGradientMvPerM,
+    'bonding-strategy': study.bondingStrategy
   };
 
   Object.entries(valueMap).forEach(([id, value]) => {
@@ -733,6 +1212,10 @@ function applySavedCpInputs(study) {
     }
     const field = document.getElementById(id);
     if (!field) {
+      return;
+    }
+    if (field.type === 'checkbox') {
+      field.checked = value === true;
       return;
     }
     if (field.tagName === 'SELECT') {
@@ -747,6 +1230,61 @@ function applySavedCpInputs(study) {
   });
 }
 
+function formatDesignHistoryValue(value, unit = '') {
+  if (value === null || value === undefined || value === '') {
+    return 'Not set';
+  }
+  const formatted = typeof value === 'number' && Number.isFinite(value)
+    ? String(roundTo(value, 3))
+    : String(value);
+  return unit ? `${formatted} ${unit}` : formatted;
+}
+
+function designHistoryValuesEqual(a, b) {
+  if (typeof a === 'number' && typeof b === 'number') {
+    return Math.abs(a - b) < 0.0001;
+  }
+  return String(a ?? '') === String(b ?? '');
+}
+
+function buildDesignHistoryEntry(result, previousStudy = null) {
+  const changes = DESIGN_HISTORY_FIELDS.flatMap((field) => {
+    const nextValue = result?.[field.key];
+    const previousValue = previousStudy?.[field.key];
+    if (previousStudy && designHistoryValuesEqual(previousValue, nextValue)) {
+      return [];
+    }
+    return [{
+      key: field.key,
+      label: field.label,
+      from: previousStudy ? formatDesignHistoryValue(previousValue, field.unit) : 'Initial',
+      to: formatDesignHistoryValue(nextValue, field.unit)
+    }];
+  });
+  return {
+    id: result.timestamp,
+    timestamp: result.timestamp,
+    note: String(result.designChangeNote || '').trim() || (previousStudy ? 'Design inputs recalculated.' : 'Initial design basis established.'),
+    changes,
+    outcomes: {
+      sourceType: result.anodeTypeSystem,
+      requiredCurrentA: result.requiredCurrentA,
+      minimumAnodeMassKg: result.minimumAnodeMassKg,
+      predictedLifeYears: result.predictedLifeYears,
+      safetyMarginYears: result.safetyMarginYears,
+      requiredRectifierCurrentA: result.iccpSizing?.requiredRectifierCurrentA ?? null,
+      requiredRectifierVoltageV: result.iccpSizing?.requiredRectifierVoltageV ?? null,
+      sourceHeadroomA: result.iccpSizing?.currentHeadroomA ?? null,
+      interferenceRisk: result.interferenceAssessment?.riskLevel || 'low'
+    }
+  };
+}
+
+function appendDesignHistory(result, previousStudy = null) {
+  const previousHistory = Array.isArray(previousStudy?.designHistory) ? previousStudy.designHistory : [];
+  return [...previousHistory, buildDesignHistoryEntry(result, previousStudy)].slice(-20);
+}
+
 function buildTimelineStepSnapshot(stepKey, result) {
   if (!result || typeof result !== 'object') {
     return `<svg viewBox="0 0 120 64" role="img" aria-label="No study yet snapshot"><rect x="6" y="10" width="108" height="44" rx="8" fill="color-mix(in srgb, var(--panel-bg, #f8fafc) 85%, #dbeafe 15%)"></rect><text x="60" y="38" text-anchor="middle" font-size="11" fill="currentColor">Run analysis</text></svg>`;
@@ -758,19 +1296,18 @@ function buildTimelineStepSnapshot(stepKey, result) {
   if (stepKey === 'geometry') {
     return `<svg viewBox="0 0 120 64" role="img" aria-label="Geometry snapshot"><line x1="16" y1="34" x2="104" y2="34" stroke="#334155" stroke-width="5" stroke-linecap="round"></line><circle cx="28" cy="22" r="5" fill="#2563eb"></circle><circle cx="56" cy="22" r="5" fill="#2563eb"></circle><circle cx="84" cy="22" r="5" fill="#2563eb"></circle><rect x="94" y="30" width="12" height="12" rx="2" fill="#16a34a"></rect></svg>`;
   }
+  if (stepKey === 'interference') {
+    const score = Number.isFinite(result.interferenceAssessment?.score) ? result.interferenceAssessment.score : 0;
+    const barWidth = Math.max(4, Math.min(96, Math.round((score / 25) * 96)));
+    return `<svg viewBox="0 0 120 64" role="img" aria-label="Interference risk snapshot"><rect x="12" y="18" width="96" height="20" rx="6" fill="none" stroke="#475569" stroke-width="1.5"></rect><rect x="12" y="18" width="${barWidth}" height="20" rx="6" fill="#d55e00"></rect><text x="60" y="56" text-anchor="middle" font-size="10" fill="currentColor">risk ${score}</text></svg>`;
+  }
   if (stepKey === 'distribution') {
     const attenuation = Number.isFinite(result.distributionModel?.globalAttenuationFactor) ? result.distributionModel.globalAttenuationFactor : 1;
-    const barWidth = Math.max(10, Math.min(96, Math.round(attenuation * 96)));
+    const barWidth = Math.max(10, Math.min(96, Math.round(attenuation * 72)));
     return `<svg viewBox="0 0 120 64" role="img" aria-label="Distribution snapshot"><rect x="12" y="18" width="96" height="28" rx="6" fill="none" stroke="#475569" stroke-width="1.5"></rect><rect x="12" y="18" width="${barWidth}" height="28" rx="6" fill="#f59e0b"></rect><text x="60" y="56" text-anchor="middle" font-size="10" fill="currentColor">attn ${roundTo(attenuation, 2)}</text></svg>`;
   }
-  if (stepKey === 'criteriaChecks') {
-    const totalChecks = Array.isArray(result.criteriaCheckEvidence?.criteriaResults) ? result.criteriaCheckEvidence.criteriaResults.length : 0;
-    const passCount = countCriteriaPasses(result);
-    return `<svg viewBox="0 0 120 64" role="img" aria-label="Criteria snapshot"><circle cx="32" cy="32" r="16" fill="#16a34a"></circle><text x="32" y="36" text-anchor="middle" font-size="12" fill="#fff">${passCount}</text><circle cx="78" cy="32" r="16" fill="#ef4444"></circle><text x="78" y="36" text-anchor="middle" font-size="12" fill="#fff">${Math.max(totalChecks - passCount, 0)}</text><text x="108" y="56" text-anchor="end" font-size="10" fill="currentColor">P/F</text></svg>`;
-  }
-  const complianceState = result.compliance?.complianceState || 'provisional';
-  const badgeColor = complianceState === 'compliant' ? '#16a34a' : (complianceState === 'not-compliant' ? '#ef4444' : '#f59e0b');
-  return `<svg viewBox="0 0 120 64" role="img" aria-label="Compliance snapshot"><rect x="20" y="12" width="80" height="40" rx="8" fill="${badgeColor}"></rect><text x="60" y="37" text-anchor="middle" font-size="11" fill="#fff">${escapeHtml(complianceState)}</text></svg>`;
+  const outcomeLabel = result.anodeTypeSystem === 'iccp' ? 'current · voltage · headroom' : 'current · mass · life';
+  return `<svg viewBox="0 0 120 64" role="img" aria-label="Sizing outcomes snapshot"><rect x="10" y="12" width="28" height="40" rx="5" fill="#2563eb"></rect><rect x="46" y="22" width="28" height="30" rx="5" fill="#0ea5e9"></rect><rect x="82" y="7" width="28" height="45" rx="5" fill="#16a34a"></rect><text x="60" y="63" text-anchor="middle" font-size="9" fill="currentColor">${outcomeLabel}</text></svg>`;
 }
 
 function summarizeTimelineStep(stepKey, result) {
@@ -778,59 +1315,98 @@ function summarizeTimelineStep(stepKey, result) {
     return 'No CP run saved yet. Run a study to capture a replayable design decision at this step.';
   }
   if (stepKey === 'inputs') {
-    return `Inputs established asset ${result.assetType}, soil ${result.soilResistivityOhmM} Ω·m, and design density ${result.designCurrentDensityMaM2} mA/m².`;
+    return `Inputs establish a ${result.assetType} in ${result.moistureCategory} conditions with ${result.soilResistivityOhmM} Ω·m soil and ${result.designCurrentDensityMaM2} mA/m² design density.`;
   }
   if (stepKey === 'geometry') {
-    return `Geometry set ${result.numberOfAnodes} anodes at ${roundTo(result.anodeSpacingM, 2)} m spacing with ${roundTo(result.anodeDistanceToStructureM, 2)} m offset.`;
+    return `Geometry uses ${result.numberOfAnodes} anodes at ${roundTo(result.anodeSpacingM, 2)} m spacing with ${roundTo(result.anodeDistanceToStructureM, 2)} m structure offset.`;
+  }
+  if (stepKey === 'interference') {
+    return result.interferenceAssessment?.riskSummary || 'No design-stage interference assessment has been calculated.';
   }
   if (stepKey === 'distribution') {
-    return `Distribution reduced area demand ${result.areaBasedRequiredCurrentA} A to effective ${result.distributionAdjustedCurrentA} A using attenuation ${result.distributionModel?.globalAttenuationFactor ?? 'n/a'}.`;
+    return `Area demand ${result.areaBasedRequiredCurrentA} A becomes ${result.distributionAdjustedCurrentA} A after the ${result.distributionModel?.globalAttenuationFactor ?? 'n/a'} distribution factor.`;
   }
-  if (stepKey === 'criteriaChecks') {
-    const criteriaStatus = result.criteriaCheckEvidence?.overallStatus || 'not-run';
-    return `Criteria evaluation is ${criteriaStatus}; ${countCriteriaPasses(result)} criteria currently pass with correction context ${result.measurementContext || 'unknown'}.`;
+  if (result.anodeTypeSystem === 'iccp') {
+    return `The design requires ${result.requiredCurrentA} A of structure current and a preliminary rectifier output of ${result.iccpSizing?.requiredRectifierCurrentA ?? 'n/a'} A at ${result.iccpSizing?.requiredRectifierVoltageV ?? 'n/a'} V.`;
   }
-  const label = result.compliance?.complianceState || 'provisional';
-  const failedCheckKeys = Array.isArray(result.compliance?.failedCheckKeys) ? result.compliance.failedCheckKeys : [];
-  return `Compliance gate resolved as ${label}; unresolved checks: ${failedCheckKeys.join(', ') || 'none'}.`;
+  return `The design requires ${result.requiredCurrentA} A and ${result.minimumAnodeMassKg} kg of anode mass, with ${result.predictedLifeYears} years predicted life and ${result.safetyMarginYears} years of margin.`;
 }
 
-function resolveTimelineCheckpoints(stepDefinition, result) {
-  const requiredChecks = result?.compliance?.requiredChecks || {};
-  return stepDefinition.checkpoints.map((checkKey) => {
-    const status = requiredChecks[checkKey] || 'not-run';
-    return `${checkKey}: ${status}`;
-  });
+function resolveTimelineCheckpoints(stepKey, result) {
+  if (!result) return ['Run the sizing analysis to populate this checkpoint.'];
+  if (stepKey === 'inputs') {
+    return [`Density: ${result.currentDensityMethod}`, `Coating: ${result.coatingModel?.label || result.coatingModelType}`];
+  }
+  if (stepKey === 'geometry') {
+    return [`${result.numberOfAnodes} anodes`, `${roundTo(result.anodeSpacingM, 2)} m spacing`, `${roundTo(result.anodeBurialDepthM, 2)} m burial`];
+  }
+  if (stepKey === 'interference') {
+    return [`Risk: ${result.interferenceAssessment?.riskLevel || 'low'}`, `Score: ${result.interferenceAssessment?.score ?? 0}`, `Bonding: ${result.bondingStrategy || 'none'}`];
+  }
+  if (stepKey === 'distribution') {
+    return [`Effectiveness: ${result.distributionModel?.averageEffectivenessFactor ?? 'n/a'}`, `Attenuation: ${result.distributionModel?.globalAttenuationFactor ?? 'n/a'}`];
+  }
+  if (result.anodeTypeSystem === 'iccp') {
+    return [`Current: ${result.requiredCurrentA} A`, `Rectifier: ${result.iccpSizing?.requiredRectifierCurrentA ?? 'n/a'} A`, `Voltage: ${result.iccpSizing?.requiredRectifierVoltageV ?? 'n/a'} V`];
+  }
+  return [`Current: ${result.requiredCurrentA} A`, `Mass: ${result.minimumAnodeMassKg} kg`, `Life: ${result.predictedLifeYears} years`];
 }
 
 function renderTimelinePanel(root, result, timelineState) {
   if (!root) return;
   const state = normalizeTimelineState(timelineState);
+  const activeDefinition = TIMELINE_STEP_DEFINITIONS.find((step) => step.key === state.activeStep) || TIMELINE_STEP_DEFINITIONS[0];
+  const checkpoints = resolveTimelineCheckpoints(activeDefinition.key, result);
   const timelineItems = TIMELINE_STEP_DEFINITIONS.map((step) => {
-    const isActive = step.key === state.activeStep;
-    const checkpoints = resolveTimelineCheckpoints(step, result);
+    const isActive = step.key === activeDefinition.key;
     return `
       <li class="cp-timeline-step ${isActive ? 'is-active' : ''}">
         <button type="button" class="cp-timeline-step__header" data-cp-timeline-step="${step.key}" aria-pressed="${isActive ? 'true' : 'false'}">
+          <span class="cp-timeline-step__index">${TIMELINE_STEP_SEQUENCE.indexOf(step.key) + 1}</span>
           <span class="cp-timeline-step__title">${step.title}</span>
-          <span class="cp-timeline-step__index">${TIMELINE_STEP_SEQUENCE.indexOf(step.key) + 1}/5</span>
         </button>
-        <div class="cp-timeline-step__content">
-          <div class="cp-timeline-step__snapshot">${buildTimelineStepSnapshot(step.key, result)}</div>
-          <p>${escapeHtml(summarizeTimelineStep(step.key, result))}</p>
-          <p class="cp-timeline-step__why"><strong>Why this matters (NACE/AMPP):</strong> ${escapeHtml(step.whyThisMatters)}</p>
-          <p class="cp-timeline-step__checkpoints"><strong>Checkpoint status:</strong> ${escapeHtml(checkpoints.join(' | '))}</p>
-          <button type="button" class="btn" data-cp-nav-target="${step.navTargetId}" data-cp-nav-fallback="${step.navFallbackId || ''}">${step.navLabel}</button>
-        </div>
       </li>
     `;
   }).join('');
+  const history = Array.isArray(result?.designHistory) ? [...result.designHistory].reverse() : [];
+  const historyMarkup = history.length
+    ? history.slice(0, 8).map((entry) => `
+      <li class="cp-design-history__entry">
+        <div>
+          <strong>${escapeHtml(entry.note || 'Design recalculated.')}</strong>
+          <time datetime="${escapeHtml(entry.timestamp || '')}">${entry.timestamp ? escapeHtml(new Date(entry.timestamp).toLocaleString()) : 'Unknown time'}</time>
+        </div>
+        <div class="cp-design-history__changes">
+          ${(Array.isArray(entry.changes) && entry.changes.length
+            ? entry.changes.map((change) => `<span><strong>${escapeHtml(change.label)}:</strong> ${escapeHtml(change.from)} → ${escapeHtml(change.to)}</span>`).join('')
+            : '<span>No input changes; analysis rerun.</span>')}
+        </div>
+        <p>Calculated effect: Required current ${escapeHtml(String(entry.outcomes?.requiredCurrentA ?? 'n/a'))} A · ${entry.outcomes?.sourceType === 'iccp'
+          ? `Rectifier ${escapeHtml(String(entry.outcomes?.requiredRectifierCurrentA ?? 'n/a'))} A at ${escapeHtml(String(entry.outcomes?.requiredRectifierVoltageV ?? 'n/a'))} V`
+          : `Minimum mass ${escapeHtml(String(entry.outcomes?.minimumAnodeMassKg ?? 'n/a'))} kg · Predicted life ${escapeHtml(String(entry.outcomes?.predictedLifeYears ?? 'n/a'))} years`} · ${escapeHtml(String(entry.outcomes?.interferenceRisk || 'low'))} interference risk</p>
+      </li>
+    `).join('')
+    : '<li class="cp-design-history__empty">Run the analysis to start the saved design history.</li>';
 
   root.innerHTML = `
     <details id="cp-timeline-details" class="cp-timeline-panel"${state.collapsed ? '' : ' open'}>
-      <summary>Design Decision Timeline (Inputs → Geometry → Distribution → Criteria Checks → Compliance)</summary>
-      <p class="field-hint">This timeline is saved with the project so reviewers can replay how compliance decisions evolved.</p>
+      <summary>Design Decision Timeline</summary>
+      <p class="field-hint">Follow the current design path, then review the saved input changes and calculated effects for each iteration.</p>
       <ol class="cp-timeline-list">${timelineItems}</ol>
+      <article class="cp-timeline-active-detail">
+        <div class="cp-timeline-step__snapshot">${buildTimelineStepSnapshot(activeDefinition.key, result)}</div>
+        <div>
+          <h4>${escapeHtml(activeDefinition.title)}</h4>
+          <p>${escapeHtml(summarizeTimelineStep(activeDefinition.key, result))}</p>
+          <p class="cp-timeline-step__why">${escapeHtml(activeDefinition.whyThisMatters)}</p>
+          <div class="cp-timeline-checkpoints">${checkpoints.map((checkpoint) => `<span>${escapeHtml(checkpoint)}</span>`).join('')}</div>
+          <button type="button" class="btn" data-cp-nav-target="${activeDefinition.navTargetId}" data-cp-nav-fallback="${activeDefinition.navFallbackId || ''}">${activeDefinition.navLabel}</button>
+        </div>
+      </article>
+      <section class="cp-design-history" aria-labelledby="cp-design-history-heading">
+        <h4 id="cp-design-history-heading">Saved design iterations</h4>
+        <ol>${historyMarkup}</ol>
+      </section>
     </details>
   `;
 }
@@ -934,6 +1510,11 @@ bootstrapPage({
   const form = document.getElementById('cp-form');
   const resultsDiv = document.getElementById('results');
   const errorsDiv = document.getElementById('cp-errors');
+  const supportingWorkspace = document.querySelector('.cp-supporting-workspace');
+  const studyReviewSection = document.getElementById('study-review-panel')?.closest('section');
+  if (supportingWorkspace && studyReviewSection) {
+    studyReviewSection.before(supportingWorkspace);
+  }
   const densityMethodEl = document.getElementById('density-method');
   const manualRow = document.getElementById('manual-density-row');
   const tableDensityEl = document.getElementById('table-density');
@@ -955,12 +1536,25 @@ bootstrapPage({
   const coatingCurveRows = document.querySelectorAll('[data-coating-curve-row]');
   const coatingSegmentRow = document.getElementById('coating-segment-row');
   const timelinePanelEl = document.getElementById('cp-decision-timeline-content');
+  const unitSelectEl = document.getElementById('unit-select');
+  const currentUnitSystem = normalizeUnitSystem(unitSelectEl?.value);
 
   const saved = normalizeSavedStudy(getStudies().cathodicProtection);
+  const savedDraft = getCathodicProtectionDraft();
   const savedApproval = getStudyApprovals().cathodicProtection || null;
   let cpLayoutState = saved?.cpLayout || null;
   let cpTimelineState = normalizeTimelineState(saved?.timelineState);
-  applySavedCpInputs(saved);
+  let lastCalculatedFingerprint = saved?.inputFingerprint || buildCalculationInputFingerprint(saved);
+  let calculationInProgress = false;
+  let draftSaveTimer = null;
+  applySavedCpInputs(saved, currentUnitSystem);
+  const restoredDraft = applyCpFormValues(form, savedDraft, currentUnitSystem);
+  if (!saved && !restoredDraft && currentUnitSystem === 'metric') {
+    convertCpDisplayUnits('imperial', 'metric');
+  } else if (!restoredDraft) {
+    updateCpUnitLabels(currentUnitSystem);
+  }
+  let displayedUnitSystem = currentUnitSystem;
   renderCalculationBasis(basisPanel, CP_STANDARD_BASIS);
   renderComplianceStatusPanel(compliancePanelEl, saved?.compliance?.requiredChecks, saved?.compliance?.lastEvaluatedAt, saved?.compliance);
   renderTimelinePanel(timelinePanelEl, saved, cpTimelineState);
@@ -1017,6 +1611,16 @@ bootstrapPage({
     if (!input) return;
     const tableDensity = lookupCurrentDensity(input.assetType, input.moistureCategory, input.soilResistivityOhmM, input.soilPh, input.pipeMaterial);
     tableDensityEl.value = roundTo(tableDensity, 3);
+    const baseDensity = TABLE_CURRENT_DENSITY_MA_M2[input.assetType]?.[input.moistureCategory] ?? 10;
+    const resistivityFactor = input.soilResistivityOhmM < 50 ? 1.2 : (input.soilResistivityOhmM > 200 ? 0.85 : 1);
+    const phFactor = input.soilPh < 5.5 || input.soilPh > 9 ? 1.15 : 1;
+    const materialFactor = input.assetType === 'pipe'
+      ? (PIPE_MATERIAL_FACTORS[input.pipeMaterial]?.factor ?? 1)
+      : 1;
+    const hint = document.getElementById('table-density-hint');
+    if (hint) {
+      hint.textContent = `Derived basis: ${baseDensity} × resistivity ${resistivityFactor.toFixed(2)} × pH ${phFactor.toFixed(2)} × material ${materialFactor.toFixed(2)} = ${roundTo(tableDensity, 3)} mA/m².`;
+    }
   }
 
   function refreshCoatingModelInputs() {
@@ -1088,12 +1692,277 @@ bootstrapPage({
     calculatedSurfaceAreaEl.value = roundTo(displayArea, 3);
   }
 
+  function refreshCpSourceFields() {
+    const isIccp = document.getElementById('anode-system-type')?.value === 'iccp';
+    document.querySelectorAll('.cp-system-dependent--galvanic').forEach((row) => {
+      row.hidden = isIccp;
+      row.querySelectorAll('input, select, textarea').forEach((field) => {
+        field.disabled = isIccp;
+        field.required = !isIccp;
+      });
+    });
+    document.querySelectorAll('.cp-system-dependent--iccp').forEach((row) => {
+      row.hidden = !isIccp;
+      row.querySelectorAll('input, select, textarea').forEach((field) => {
+        field.disabled = !isIccp;
+        field.required = isIccp;
+      });
+    });
+    const numberLabel = document.getElementById('number-of-anodes-label');
+    if (numberLabel) {
+      numberLabel.textContent = isIccp ? 'Number of groundbed elements' : 'Number of galvanic anodes';
+    }
+    const sourceGeometryLabels = {
+      'anode-spacing-label': isIccp ? 'Groundbed element spacing' : 'Galvanic anode spacing',
+      'anode-distance-label': isIccp ? 'Groundbed distance to structure' : 'Galvanic anode distance to structure',
+      'anode-depth-label': isIccp ? 'Groundbed element burial depth' : 'Galvanic anode burial depth'
+    };
+    Object.entries(sourceGeometryLabels).forEach(([id, label]) => {
+      const element = document.getElementById(id);
+      if (element) {
+        element.textContent = label;
+      }
+    });
+  }
+
+  function refreshCriteriaEvidenceFields() {
+    const enabled = document.getElementById('criteria-evidence-enabled')?.checked === true;
+    const fieldset = document.getElementById('cp-criteria-evidence-fields');
+    const status = document.getElementById('criteria-evidence-status');
+    if (fieldset) {
+      fieldset.disabled = !enabled;
+    }
+    ['test-method', 'measurement-context', 'reference-electrode-location', 'ir-drop-compensation-method',
+      'measured-off-potential', 'simulated-polarization-shift', 'test-point-count', 'test-point-pass-count']
+      .forEach((id) => {
+        const field = document.getElementById(id);
+        if (field) {
+          field.required = enabled;
+        }
+      });
+    if (status) {
+      status.textContent = enabled
+        ? 'Field evidence is enabled. Enter actual project measurements before calculating.'
+        : 'Field evidence is not included. Protection criteria will be reported as not evaluated.';
+    }
+  }
+
+  function refreshInterferenceFields() {
+    const geometry = document.getElementById('interference-geometry')?.value || 'none';
+    const sourceType = document.getElementById('interference-source-type')?.value || 'none';
+    const assessmentActive = geometry !== 'none' || sourceType !== 'none';
+    const visibility = {
+      'foreign-structure-separation-row': geometry !== 'none',
+      'parallel-exposure-length-row': geometry === 'parallel' || geometry === 'shared-corridor',
+      'crossing-angle-row': geometry === 'crossing',
+      'measured-potential-gradient-row': assessmentActive,
+      'bonding-strategy-row': assessmentActive
+    };
+    Object.entries(visibility).forEach(([rowId, visible]) => {
+      const row = document.getElementById(rowId);
+      if (!row) return;
+      row.hidden = !visible;
+      row.querySelectorAll('input, select, textarea').forEach((field) => {
+        field.disabled = !visible;
+      });
+    });
+  }
+
+  function appendDescription(field, descriptionId) {
+    if (!field || !descriptionId) {
+      return;
+    }
+    const ids = new Set((field.getAttribute('aria-describedby') || '').split(/\s+/).filter(Boolean));
+    ids.add(descriptionId);
+    field.setAttribute('aria-describedby', [...ids].join(' '));
+  }
+
+  function removeDescription(field, descriptionId) {
+    if (!field || !descriptionId) {
+      return;
+    }
+    const ids = (field.getAttribute('aria-describedby') || '')
+      .split(/\s+/)
+      .filter((id) => id && id !== descriptionId);
+    if (ids.length) {
+      field.setAttribute('aria-describedby', ids.join(' '));
+    } else {
+      field.removeAttribute('aria-describedby');
+    }
+  }
+
+  function enhanceFormGuidance() {
+    form.querySelectorAll('.field-row + .field-hint').forEach((hint, index) => {
+      const field = hint.previousElementSibling?.querySelector('input, select, textarea');
+      if (!field) {
+        return;
+      }
+      if (!hint.id) {
+        hint.id = `cp-field-hint-${index + 1}`;
+      }
+      appendDescription(field, hint.id);
+    });
+  }
+
+  function clearValidationState() {
+    form.querySelectorAll('[aria-invalid="true"]').forEach((field) => {
+      field.removeAttribute('aria-invalid');
+      removeDescription(field, errorsDiv.id);
+    });
+    errorsDiv.hidden = true;
+    errorsDiv.textContent = '';
+  }
+
+  function fieldForValidationMessage(message) {
+    const key = Object.keys(VALIDATION_FIELD_IDS).find((candidate) => message.includes(candidate));
+    return key ? document.getElementById(VALIDATION_FIELD_IDS[key]) : null;
+  }
+
+  function showInputValidationError(message, field = null) {
+    errorsDiv.hidden = false;
+    errorsDiv.innerHTML = `<strong>Input validation error:</strong> ${escapeHtml(message)}`;
+    if (!field) {
+      errorsDiv.focus?.();
+      return;
+    }
+    const details = field.closest('details');
+    if (details) {
+      details.open = true;
+    }
+    field.setAttribute('aria-invalid', 'true');
+    appendDescription(field, errorsDiv.id);
+    field.focus({ preventScroll: true });
+    field.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
+  const submitButton = form.querySelector('button[type="submit"]');
+  const calculationStatus = document.getElementById('cp-calculation-status');
+  let resultsAreStale = false;
+  let pendingDraftDirty = false;
+
+  function setCalculationBusy(isBusy, completionMessage = '') {
+    calculationInProgress = isBusy;
+    submitButton.disabled = isBusy;
+    form.toggleAttribute('aria-busy', isBusy);
+    resultsDiv.toggleAttribute('aria-busy', isBusy);
+    if (isBusy) {
+      submitButton.textContent = 'Calculating…';
+      calculationStatus.hidden = false;
+      calculationStatus.textContent = 'Calculating cathodic protection requirements…';
+      return;
+    }
+    submitButton.textContent = resultsAreStale ? 'Recalculate Updated Inputs' : 'Calculate CP Requirements';
+    calculationStatus.hidden = !completionMessage;
+    calculationStatus.textContent = completionMessage;
+  }
+
+  function setResultsStaleState(stale) {
+    resultsAreStale = Boolean(stale && resultsDiv.querySelector('.results-panel'));
+    const panel = resultsDiv.querySelector('.results-panel');
+    const staleAlert = resultsDiv.querySelector('#cp-stale-results-alert');
+    panel?.classList.toggle('is-stale', resultsAreStale);
+    if (staleAlert) {
+      staleAlert.hidden = !resultsAreStale;
+    }
+    resultsDiv.setAttribute(
+      'aria-label',
+      resultsAreStale
+        ? 'Cathodic protection sizing results — out of date'
+        : 'Cathodic protection sizing results'
+    );
+    if (!calculationInProgress) {
+      submitButton.textContent = resultsAreStale ? 'Recalculate Updated Inputs' : 'Calculate CP Requirements';
+    }
+  }
+
+  function currentInputFingerprint() {
+    return buildCalculationInputFingerprint(readFormInputs());
+  }
+
+  function flushDraft() {
+    if (draftSaveTimer) {
+      clearTimeout(draftSaveTimer);
+      draftSaveTimer = null;
+    }
+    setCathodicProtectionDraft({
+      schemaVersion: CP_DRAFT_SCHEMA_VERSION,
+      unitSystem: displayedUnitSystem,
+      values: captureCpFormValues(form),
+      dirty: pendingDraftDirty,
+      updatedAt: new Date().toISOString()
+    });
+  }
+
+  function scheduleDraftSave(dirty, immediate = false) {
+    pendingDraftDirty = Boolean(dirty);
+    if (immediate) {
+      flushDraft();
+      return;
+    }
+    if (draftSaveTimer) {
+      clearTimeout(draftSaveTimer);
+    }
+    draftSaveTimer = setTimeout(flushDraft, 250);
+  }
+
+  function updateDraftAndStaleState({ immediate = false } = {}) {
+    const fingerprint = currentInputFingerprint();
+    const stale = Boolean(lastCalculatedFingerprint && fingerprint !== lastCalculatedFingerprint);
+    setResultsStaleState(stale);
+    scheduleDraftSave(stale || !lastCalculatedFingerprint, immediate);
+  }
+
+  function refreshFormPresentation() {
+    refreshCoatingModelInputs();
+    refreshCpSourceFields();
+    refreshCriteriaEvidenceFields();
+    refreshInterferenceFields();
+    updatePipeVisibility();
+    refreshPipeMaterialHint();
+    refreshSurfaceAreaMode();
+    toggleDensityMode();
+    refreshTableDensity();
+    cpLayoutCanvasController?.syncFromInputs();
+  }
+
+  function restoreLastCalculatedInputs() {
+    const study = normalizeSavedStudy(getStudies().cathodicProtection);
+    if (!study) {
+      return;
+    }
+    const restored = applyCpFormValues(form, {
+      values: study.formValues,
+      unitSystem: study.formUnitSystem || study.units
+    }, displayedUnitSystem);
+    if (!restored) {
+      applySavedCpInputs(study, displayedUnitSystem);
+    }
+    refreshFormPresentation();
+    lastCalculatedFingerprint = study.inputFingerprint || buildCalculationInputFingerprint(study);
+    setResultsStaleState(false);
+    scheduleDraftSave(false, true);
+  }
+
   toggleDensityMode();
   refreshCoatingModelInputs();
+  refreshCpSourceFields();
+  refreshCriteriaEvidenceFields();
+  refreshInterferenceFields();
   updatePipeVisibility();
   refreshPipeMaterialHint();
   refreshSurfaceAreaMode();
   refreshTableDensity();
+  enhanceFormGuidance();
+  setResultsStaleState(Boolean(lastCalculatedFingerprint && currentInputFingerprint() !== lastCalculatedFingerprint));
+
+  unitSelectEl?.addEventListener('change', () => {
+    const nextUnitSystem = normalizeUnitSystem(unitSelectEl.value);
+    convertCpDisplayUnits(displayedUnitSystem, nextUnitSystem);
+    displayedUnitSystem = nextUnitSystem;
+    refreshSurfaceAreaMode();
+    cpLayoutCanvasController?.syncFromInputs();
+    updateDraftAndStaleState();
+  });
 
   ['asset-type', 'soil-resistivity', 'soil-ph', 'moisture-category', 'density-method', 'pipe-material', 'surface-area-mode', 'pipe-od', 'pipe-length', 'unit-select', 'coating-model-type'].forEach(id => {
     document.getElementById(id).addEventListener('input', () => {
@@ -1121,7 +1990,52 @@ bootstrapPage({
     field.addEventListener('change', () => cpLayoutCanvasController?.syncFromInputs());
   });
 
+  ['anode-system-type', 'criteria-evidence-enabled', 'interference-geometry', 'interference-source-type'].forEach((id) => {
+    const field = document.getElementById(id);
+    field?.addEventListener('change', () => {
+      refreshCpSourceFields();
+      refreshCriteriaEvidenceFields();
+      refreshInterferenceFields();
+      cpLayoutCanvasController?.syncFromInputs();
+    });
+  });
+
+  form.addEventListener('input', (event) => {
+    const field = event.target.closest('input, select, textarea');
+    if (!field || field.getAttribute('aria-invalid') !== 'true') {
+      return;
+    }
+    field.removeAttribute('aria-invalid');
+    removeDescription(field, errorsDiv.id);
+    errorsDiv.hidden = true;
+    errorsDiv.textContent = '';
+  });
+
+  form.addEventListener('input', () => updateDraftAndStaleState());
+  form.addEventListener('change', () => updateDraftAndStaleState());
+  window.addEventListener('pagehide', flushDraft);
+
   resultsDiv?.addEventListener('click', (event) => {
+    const resultLink = event.target.closest('.cp-results-nav a[href^="#"], a[data-cp-result-link][href^="#"]');
+    if (resultLink) {
+      const target = document.querySelector(resultLink.getAttribute('href'));
+      if (target) {
+        event.preventDefault();
+        if (target instanceof HTMLDetailsElement) {
+          target.open = true;
+        }
+        const focusTarget = target instanceof HTMLDetailsElement
+          ? target.querySelector(':scope > summary')
+          : (target.querySelector('h2, h3, summary') || target);
+        if (focusTarget && !focusTarget.matches('a, button, input, select, textarea, summary, [tabindex]')) {
+          focusTarget.setAttribute('tabindex', '-1');
+        }
+        window.history.replaceState(null, '', resultLink.getAttribute('href'));
+        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        focusTarget?.focus({ preventScroll: true });
+      }
+      return;
+    }
     const trigger = event.target.closest('[data-cp-setup-target]');
     if (trigger) {
       focusMeasurementVisualization(trigger.dataset.cpSetupTarget);
@@ -1129,9 +2043,65 @@ bootstrapPage({
     }
     const actionButton = event.target.closest('[data-cp-action]');
     if (actionButton) {
+      if (actionButton.dataset.cpAction === 'enter-criteria-evidence') {
+        const evidenceToggle = document.getElementById('criteria-evidence-enabled');
+        const details = evidenceToggle?.closest('details');
+        if (details) {
+          details.open = true;
+        }
+        if (evidenceToggle) {
+          evidenceToggle.checked = true;
+          refreshCriteriaEvidenceFields();
+          document.getElementById('measured-off-potential')?.focus();
+          updateDraftAndStaleState();
+        }
+        return;
+      }
+      if (actionButton.dataset.cpAction === 'revert-calculated') {
+        restoreLastCalculatedInputs();
+        return;
+      }
       const studies = getStudies();
       const activeStudy = normalizeSavedStudy(studies.cathodicProtection);
       if (!activeStudy) {
+        return;
+      }
+      if (actionButton.dataset.cpAction === 'download-report-data') {
+        const reportData = activeStudy.reportExport || buildReportExportData(
+          activeStudy,
+          getStudyApprovals().cathodicProtection || null
+        );
+        const blob = new Blob([JSON.stringify(reportData, null, 2)], { type: 'application/json' });
+        const downloadUrl = URL.createObjectURL(blob);
+        const downloadLink = document.createElement('a');
+        downloadLink.href = downloadUrl;
+        downloadLink.download = `cathodic-protection-report-data-${new Date().toISOString().slice(0, 10)}.json`;
+        document.body.appendChild(downloadLink);
+        downloadLink.click();
+        downloadLink.remove();
+        URL.revokeObjectURL(downloadUrl);
+        return;
+      }
+      if (actionButton.dataset.cpAction === 'save-baseline') {
+        const baselineStudy = sanitizeComparisonStudy({
+          ...activeStudy,
+          comparisonBaseline: null
+        });
+        if (!baselineStudy) {
+          return;
+        }
+        studies.cathodicProtection = {
+          ...activeStudy,
+          comparisonBaseline: baselineStudy,
+          timelineState: cpTimelineState
+        };
+        cpComparisonState.baselineStudy = baselineStudy;
+        setStudies(studies);
+        renderResults(studies.cathodicProtection, resultsDiv);
+        const comparePanel = resultsDiv.querySelector('#cp-compare-panel');
+        if (comparePanel) {
+          comparePanel.hidden = false;
+        }
         return;
       }
       if (actionButton.dataset.cpAction === 'show-compare') {
@@ -1293,19 +2263,36 @@ bootstrapPage({
     });
   }, true);
 
-  form.addEventListener('submit', (event) => {
+  form.addEventListener('submit', async (event) => {
     event.preventDefault();
+    if (calculationInProgress) {
+      return;
+    }
+    clearValidationState();
+    if (!form.checkValidity()) {
+      const firstInvalidField = [...form.elements].find((field) => field.willValidate && !field.validity.valid);
+      const message = firstInvalidField?.validationMessage || 'Review the highlighted field and try again.';
+      showInputValidationError(message, firstInvalidField);
+      return;
+    }
     const input = readFormInputs();
     if (!input) return;
-    runSubmitCalculation(input).catch(error => {
+    setCalculationBusy(true);
+    let completionMessage = 'Calculation complete. Results are current for the displayed inputs.';
+    try {
+      await runSubmitCalculation(input);
+    } catch (error) {
       const message = error instanceof Error ? error.message : 'Invalid cathodic protection inputs.';
-      errorsDiv.hidden = false;
-      errorsDiv.innerHTML = `<strong>Input validation error:</strong> ${escapeHtml(message)}`;
-      showModal('Input Error', `<p>${escapeHtml(message)}</p>`, 'error');
-    });
+      showInputValidationError(message, fieldForValidationMessage(message));
+      completionMessage = 'Calculation failed. Review the highlighted input and try again.';
+    } finally {
+      setCalculationBusy(false, completionMessage);
+    }
   });
 
   async function runSubmitCalculation(input) {
+    const inputFingerprint = buildCalculationInputFingerprint(input);
+    const formValues = captureCpFormValues(form);
     const result = await runCathodicProtectionAnalysisOffMain(input);
     errorsDiv.hidden = true;
     errorsDiv.textContent = '';
@@ -1318,11 +2305,23 @@ bootstrapPage({
       reportExport: buildReportExportData(result, approval),
       cpLayout: cpLayoutCanvasController?.getState() || cpLayoutState,
       timelineState: cpTimelineState,
+      inputFingerprint,
+      formValues,
+      formUnitSystem: displayedUnitSystem,
+      designHistory: appendDesignHistory(result, previousStudy),
+      comparisonBaseline: previousStudy?.comparisonBaseline || cpComparisonState.baselineStudy || null,
       compliance: complianceRecord.compliance,
       complianceHistory: complianceRecord.complianceHistory
     };
     setStudies(studies);
+    const changeNote = document.getElementById('design-change-note');
+    if (changeNote) {
+      changeNote.value = '';
+    }
     renderResults(studies.cathodicProtection, resultsDiv);
+    lastCalculatedFingerprint = inputFingerprint;
+    setResultsStaleState(false);
+    scheduleDraftSave(false, true);
     cpLayoutCanvasController?.setAssessmentData(buildLayoutAssessmentPayload(studies.cathodicProtection));
     renderComplianceStatusPanel(
       compliancePanelEl,
@@ -1338,6 +2337,7 @@ bootstrapPage({
 function readFormInputs() {
   const getValue = id => document.getElementById(id).value;
   const getNumber = id => Number.parseFloat(getValue(id));
+  const isVisible = id => !document.getElementById(id)?.hidden;
   const isMetric = document.getElementById('unit-select')?.value === 'metric';
   const assetType = getValue('asset-type');
   const surfaceAreaMode = getValue('surface-area-mode');
@@ -1350,6 +2350,8 @@ function readFormInputs() {
   const anodeSpacingInput = getNumber('anode-spacing');
   const anodeDistanceInput = getNumber('anode-distance-to-structure');
   const anodeBurialDepthInput = getNumber('anode-burial-depth');
+  const foreignStructureSeparationInput = getNumber('foreign-structure-separation');
+  const parallelExposureLengthInput = getNumber('parallel-exposure-length');
   const zoneResistivityRaw = getValue('zone-resistivity-values');
   const segmentConditionFactorsRaw = getValue('segment-condition-factors');
   const parsedZoneResistivityValues = parseZoneResistivityValues(zoneResistivityRaw);
@@ -1360,6 +2362,7 @@ function readFormInputs() {
     .map((token) => token.trim())
     .filter((token) => token.length > 0);
   const zoneResistivityInputValid = zoneResistivityTokens.length === parsedZoneResistivityValues.length;
+  const criteriaEvidenceEnabled = document.getElementById('criteria-evidence-enabled')?.checked === true;
 
   return {
     assetType,
@@ -1380,6 +2383,7 @@ function readFormInputs() {
     pipeOdInput: getNumber('pipe-od'),
     pipeLengthInput: getNumber('pipe-length'),
     manualCurrentDensityMaM2: getNumber('manual-density'),
+    modeledReferencePotentialMv: getNumber('modeled-reference-potential'),
     anodeCapacityAhPerKg: getNumber('anode-capacity'),
     anodeUtilization: getNumber('anode-utilization'),
     designFactor: getNumber('design-factor'),
@@ -1387,12 +2391,18 @@ function readFormInputs() {
     targetLifeYears: getNumber('design-life-years'),
     installedMassKg: isMetric ? installedMassInput : installedMassInput * LB_TO_KG,
     anodeTypeSystem: getValue('anode-system-type'),
+    iccpRatedCurrentA: getNumber('iccp-rated-current'),
+    iccpRatedVoltageV: getNumber('iccp-rated-voltage'),
+    iccpGroundbedResistanceOhm: getNumber('iccp-groundbed-resistance'),
+    iccpVoltageAllowanceV: getNumber('iccp-voltage-allowance'),
+    iccpReserveFactor: getNumber('iccp-reserve-factor'),
     numberOfAnodes: Math.round(getNumber('number-of-anodes')),
     anodeSpacingM: isMetric ? anodeSpacingInput : anodeSpacingInput * FT_TO_M,
     anodeDistanceToStructureM: isMetric ? anodeDistanceInput : anodeDistanceInput * FT_TO_M,
     anodeBurialDepthM: isMetric ? anodeBurialDepthInput : anodeBurialDepthInput * FT_TO_M,
     zoneResistivityOhmM: parsedZoneResistivityValues,
     zoneResistivityInputValid,
+    criteriaEvidenceEnabled,
     testMethod: getValue('test-method'),
     measurementContext: getValue('measurement-context'),
     referenceElectrodeLocation: getValue('reference-electrode-location'),
@@ -1406,27 +2416,55 @@ function readFormInputs() {
     nearbyForeignStructures: getValue('nearby-foreign-structures'),
     dcTractionSystem: getValue('dc-traction-system'),
     knownInterferenceSources: getValue('known-interference-sources'),
+    interferenceGeometry: getValue('interference-geometry'),
+    interferenceSourceType: getValue('interference-source-type'),
+    foreignStructureSeparationM: isVisible('foreign-structure-separation-row')
+      ? (isMetric ? foreignStructureSeparationInput : foreignStructureSeparationInput * FT_TO_M)
+      : undefined,
+    parallelExposureLengthM: isVisible('parallel-exposure-length-row')
+      ? (isMetric ? parallelExposureLengthInput : parallelExposureLengthInput * FT_TO_M)
+      : undefined,
+    crossingAngleDeg: isVisible('crossing-angle-row') ? getNumber('crossing-angle') : undefined,
+    measuredPotentialGradientMvPerM: isVisible('measured-potential-gradient-row') ? getNumber('measured-potential-gradient') : undefined,
+    bondingStrategy: isVisible('bonding-strategy-row') ? getValue('bonding-strategy') : undefined,
     mitigationProfile: getValue('mitigation-profile'),
     mitigationActions,
     mitigationActionsText: getValue('mitigation-actions'),
     verificationTestDate: getValue('verification-test-date'),
+    designChangeNote: getValue('design-change-note').trim(),
     units: isMetric ? 'metric' : 'imperial'
   };
 }
 
 function renderResults(result, root) {
+  const isIccp = result.anodeTypeSystem === 'iccp';
+  const useMetricUnits = normalizeUnitSystem(result.units) === 'metric';
+  const massUnit = useMetricUnits ? 'kg' : 'lb';
+  const distanceUnit = useMetricUnits ? 'm' : 'ft';
+  const areaUnit = useMetricUnits ? 'm²' : 'ft²';
+  const displayMass = (kilograms) => useMetricUnits ? kilograms : kilograms / LB_TO_KG;
+  const displayDistance = (meters) => useMetricUnits ? meters : meters / FT_TO_M;
+  const displayArea = (squareMeters) => useMetricUnits ? squareMeters : squareMeters * SQM_TO_SQFT;
   const profileData = result.profileData || buildCpProfileData({
     input: result,
     adjustedRequiredCurrentA: result.requiredCurrentA,
     distributionModel: result.distributionModel,
-    measuredInstantOffPotentialMv: result.measuredInstantOffPotentialMv,
+    modeledReferencePotentialMv: result.modeledReferencePotentialMv,
     baseCoatingFactor: result.coatingBreakdownFactor
   });
-  const lifeBadgeClass = result.safetyMarginYears >= 0 ? 'result-badge--pass' : 'result-badge--fail';
-  const lifeBadgeIcon = result.safetyMarginYears >= 0 ? '✓' : '✗';
+  const sourcePasses = isIccp ? result.iccpSizing?.overallStatus === 'pass' : result.safetyMarginYears >= 0;
+  const lifeBadgeClass = sourcePasses ? 'result-badge--pass' : 'result-badge--fail';
+  const lifeBadgeIcon = sourcePasses ? '✓' : '✕';
   const outputBasis = result.outputBasis || {};
   const sensitivityRows = Array.isArray(result.sensitivity) ? result.sensitivity : [];
-  const advisories = buildDesignAdvisories(result, sensitivityRows);
+  const modeledProfileSummary = summarizeModeledProfile(profileData);
+  const modeledProfileChecks = modeledProfileSummary.checks
+    .map((check) => `${check.label}: ${check.failed}/${check.total} outside threshold`)
+    .join(' · ');
+  const modeledProfileNeedsReview = modeledProfileSummary.failed > 0;
+  const modeledProfileStatus = modeledProfileNeedsReview ? 'Review required' : 'Within modeled thresholds';
+  const modeledProfileBadgeClass = modeledProfileNeedsReview ? 'result-badge--fail' : 'result-badge--pass';
+  const advisories = buildDesignAdvisories(result, sensitivityRows, modeledProfileSummary);
   const criteriaEvidence = result.criteriaCheckEvidence || {};
   const criteriaSet = criteriaEvidence.selectedCriteriaSet;
   const criteriaRows = Array.isArray(criteriaEvidence.criteriaResults) ? criteriaEvidence.criteriaResults : [];
@@ -1434,13 +2472,30 @@ function renderResults(result, root) {
   const measurementWarnings = Array.isArray(result.measurementMetadataWarnings) ? result.measurementMetadataWarnings : [];
   const interference = result.interferenceAssessment || {};
   const riskFactorRows = Array.isArray(interference.riskFactorScores) ? interference.riskFactorScores : [];
+  const activeRiskFactorRows = riskFactorRows.filter((factor) => Number(factor.score) > 0);
+  const buildRiskFactorTable = (rows, label) => `
+    <div class="table-wrap">
+      <table class="data-table" aria-label="${escapeHtml(label)}">
+        <thead><tr><th>Factor</th><th>Input</th><th>Score</th></tr></thead>
+        <tbody>
+          ${rows.map((factor) => `
+            <tr>
+              <td>${escapeHtml(factor.label)}</td>
+              <td>${escapeHtml(factor.value)}</td>
+              <td>${escapeHtml(String(factor.score))}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
   const riskBadgeClass = interference.riskLevel === 'high'
     ? 'result-badge--fail'
     : (interference.riskLevel === 'medium' ? 'result-badge--not-run' : 'result-badge--pass');
   const unresolvedHighRisk = interference.unresolvedHighRisk === true;
   const criteriaStatusLabel = criteriaEvidence.overallStatus === 'pass'
     ? 'Pass'
-    : (criteriaEvidence.overallStatus === 'fail' ? 'Fail' : 'Not run');
+    : (criteriaEvidence.overallStatus === 'fail' ? 'Fail' : 'Not evaluated');
   const criteriaStatusClass = criteriaEvidence.overallStatus === 'pass'
     ? 'result-badge--pass'
     : (criteriaEvidence.overallStatus === 'fail' ? 'result-badge--fail' : '');
@@ -1462,7 +2517,7 @@ function renderResults(result, root) {
   const complianceBadgeText = complianceState === 'compliant'
     ? 'Compliance status: Compliant'
     : (complianceState === 'provisional'
-      ? 'Compliance status: Provisional (commissioning evidence pending)'
+      ? 'Compliance status: Provisional (verification evidence pending)'
       : 'Compliance status: Not compliant');
   const comparisonBaseline = normalizeSavedStudy(result.comparisonBaseline || cpComparisonState.baselineStudy);
   cpComparisonState.baselineStudy = comparisonBaseline || null;
@@ -1470,49 +2525,119 @@ function renderResults(result, root) {
   const comparisonMarkup = hasComparisonBaseline
     ? buildComparisonPanelMarkup(result, comparisonBaseline)
     : `
-      <div class="result-group">
+      <div class="result-group cp-compare-group">
         <h3>Compare configurations</h3>
-        <p class="field-hint">Import an older saved CP study to compare Configuration A (active) versus Configuration B (baseline).</p>
-        <button type="button" class="btn" data-cp-action="show-compare">Compare configurations</button>
+        <p class="field-hint">Lock the current result as Configuration B, change the design inputs, and run again to see design deltas. An older saved study can also be imported.</p>
+        <div class="cp-compare-actions">
+          <button type="button" class="btn" data-cp-action="save-baseline">Save current as baseline</button>
+          <button type="button" class="btn" data-cp-action="import-compare">Import older saved CP study</button>
+        </div>
+        <input type="file" id="cp-compare-import-input" class="hidden" accept=".ctr.json,.json,application/json" title="Import comparison baseline">
       </div>
     `;
 
   root.innerHTML = `
     <section class="results-panel" aria-labelledby="cp-results-heading">
-      <h2 id="cp-results-heading">Cathodic Protection Sizing Results</h2>
-      <div class="result-badge ${complianceBadgeClass}">${complianceBadgeText}</div>
+      <header class="cp-results-header">
+        <div>
+          <p class="cp-eyebrow">Design outcomes</p>
+          <h2 id="cp-results-heading">Cathodic Protection Sizing Results</h2>
+          <p>Review the primary sizing decisions first, then open the supporting calculations and design checks as needed.</p>
+        </div>
+        <div class="cp-results-header__actions">
+          <div class="result-badge ${complianceBadgeClass}">${complianceBadgeText}</div>
+          <button type="button" class="btn" data-cp-action="download-report-data">Download report data (JSON)</button>
+        </div>
+      </header>
+      <div id="cp-stale-results-alert" class="cp-stale-results-alert" role="status" hidden>
+        <div>
+          <strong>Results out of date</strong>
+          <span>Inputs have changed since this analysis was run. Recalculate before relying on the values below.</span>
+        </div>
+        <button type="button" class="btn" data-cp-action="revert-calculated">Revert to last calculated inputs</button>
+      </div>
+      <nav class="cp-results-nav" aria-label="Cathodic protection result sections">
+        <a href="#cp-result-kpis">Sizing outcomes</a>
+        <a href="#cp-interference-results">Interference</a>
+        <a href="#cp-sensitivity-results">Sensitivity</a>
+        <a href="#cp-profile-results">Profiles</a>
+        <a href="#cp-design-input-summary">Calculation details</a>
+      </nav>
+
+      <div id="cp-result-kpis" class="cp-result-kpi-grid">
+        <article class="cp-result-kpi">
+          <span>Required CP current</span>
+          <strong>${result.requiredCurrentA} A</strong>
+          <small>Area demand ${result.areaBasedRequiredCurrentA} A · distribution-adjusted ${result.distributionAdjustedCurrentA} A</small>
+          <details>
+            <summary>Formula and basis</summary>
+            <p>I<sub>area</sub> = A<sub>exposed</sub> × i<sub>d</sub> = ${result.exposedAreaM2} × ${(result.designCurrentDensityMaM2 / 1000).toFixed(4)} = ${result.areaBasedRequiredCurrentA} A</p>
+            <p>I<sub>required</sub> = I<sub>area</sub> × ${result.distributionModel?.globalAttenuationFactor ?? 1} / ${result.availabilityFactor} = ${result.requiredCurrentA} A</p>
+            <p>${escapeHtml(outputBasis.requiredCurrentA || 'See Calculation Basis for the standards mapping.')}</p>
+          </details>
+        </article>
+        ${isIccp ? `
+        <article class="cp-result-kpi">
+          <span>Required rectifier output</span>
+          <strong>${result.iccpSizing?.requiredRectifierCurrentA ?? 'n/a'} A</strong>
+          <small>${result.iccpSizing?.requiredRectifierVoltageV ?? 'n/a'} V preliminary DC voltage requirement</small>
+          <details>
+            <summary>Formula and basis</summary>
+            <p>Rated current basis = required CP current × ${result.iccpReserveFactor} reserve factor.</p>
+            <p>${escapeHtml(outputBasis.requiredRectifierVoltageV || 'See Calculation Basis for the standards mapping.')}</p>
+          </details>
+        </article>
+        <article class="cp-result-kpi">
+          <span>Rectifier capacity headroom</span>
+          <strong>${result.iccpSizing?.currentHeadroomA ?? 'n/a'} A</strong>
+          <div class="result-badge ${lifeBadgeClass}">${lifeBadgeIcon} ${result.iccpSizing?.voltageHeadroomV ?? 'n/a'} V voltage headroom</div>
+          <details>
+            <summary>Capacity check</summary>
+            <p>Entered rating: ${result.iccpRatedCurrentA} A at ${result.iccpRatedVoltageV} V DC.</p>
+            <p>${escapeHtml(outputBasis.sourceHeadroom || '')}</p>
+          </details>
+        </article>` : `
+        <article class="cp-result-kpi">
+          <span>Minimum anode mass</span>
+          <strong>${formatFiniteValue(displayMass(result.minimumAnodeMassKg), 3)} ${massUnit}</strong>
+          <small>Required for the ${result.targetLifeYears}-year target</small>
+          <details>
+            <summary>Formula and basis</summary>
+            <p>W<sub>required</sub> = (I<sub>required</sub> × design hours) / (capacity × utilization × design factor)</p>
+            <p>${escapeHtml(outputBasis.minimumAnodeMassKg || 'See Calculation Basis for the standards mapping.')}</p>
+          </details>
+        </article>
+        <article class="cp-result-kpi">
+          <span>Predicted design life</span>
+          <strong>${result.predictedLifeYears} years</strong>
+          <div class="result-badge ${lifeBadgeClass}">${lifeBadgeIcon} ${result.safetyMarginYears} years (${result.safetyMarginPercent}%) margin</div>
+          <details>
+            <summary>Formula and basis</summary>
+            <p>Installed mass life is compared with the ${result.targetLifeYears}-year target.</p>
+            <p>${escapeHtml(outputBasis.predictedLifeYears || 'See Calculation Basis for the standards mapping.')}</p>
+            <p>${escapeHtml(outputBasis.safetyMargin || '')}</p>
+          </details>
+        </article>`}
+      </div>
+
+      <section class="cp-modeled-coverage ${modeledProfileNeedsReview ? 'cp-modeled-coverage--review' : 'cp-modeled-coverage--pass'}" aria-labelledby="cp-modeled-coverage-heading">
+        <div>
+          <p class="cp-eyebrow">Modeled route coverage</p>
+          <h3 id="cp-modeled-coverage-heading">Base profile threshold check</h3>
+          <p><strong>${modeledProfileSummary.failed} of ${modeledProfileSummary.total}</strong> modeled points are outside the profile thresholds. ${escapeHtml(modeledProfileChecks)}</p>
+          <p class="field-hint">This route-model check is separate from the entered field-measurement criteria evidence shown below.</p>
+        </div>
+        <div>
+          <span class="result-badge ${modeledProfileBadgeClass}">${modeledProfileStatus}</span>
+          <a class="btn" data-cp-result-link href="#cp-profile-results">Review distribution profiles</a>
+        </div>
+      </section>
+
       ${comparisonMarkup}
 
-      <div class="result-group">
-        <div class="result-row">
-          <span class="result-label">Required CP current</span>
-          <span class="result-value">${result.requiredCurrentA} A</span>
-        </div>
-        <p class="field-hint result-formula">I<sub>area</sub> = A<sub>exposed</sub> × i<sub>d</sub> = ${result.exposedAreaM2} × ${(result.designCurrentDensityMaM2 / 1000).toFixed(4)} = ${result.areaBasedRequiredCurrentA} A</p>
-        <p class="field-hint result-formula">I<sub>distribution</sub> = I<sub>area</sub> × attenuation factor (${result.distributionModel?.globalAttenuationFactor ?? 1}) = ${result.distributionAdjustedCurrentA} A</p>
-        <p class="field-hint result-formula">I<sub>required</sub> = I<sub>distribution</sub> / availability (${result.availabilityFactor}) = ${result.requiredCurrentA} A</p>
-        <p class="field-hint result-basis">Basis: ${escapeHtml(outputBasis.requiredCurrentA || 'See Calculation Basis section for standards mapping.')}</p>
-      </div>
-
-      <div class="result-group">
-        <div class="result-row">
-          <span class="result-label">Minimum anode mass</span>
-          <span class="result-value">${result.minimumAnodeMassKg} kg (${result.minimumAnodeMassLb} lb)</span>
-        </div>
-        <p class="field-hint result-basis">Basis: ${escapeHtml(outputBasis.minimumAnodeMassKg || 'See Calculation Basis section for standards mapping.')}</p>
-      </div>
-
-      <div class="result-group">
-        <div class="result-row">
-          <span class="result-label">Predicted design life from installed mass</span>
-          <span class="result-value">${result.predictedLifeYears} years</span>
-        </div>
-        <div class="result-badge ${lifeBadgeClass}">${lifeBadgeIcon} Safety margin: ${result.safetyMarginYears} years (${result.safetyMarginPercent}%) vs target ${result.targetLifeYears} years</div>
-        <p class="field-hint result-basis">Basis: ${escapeHtml(outputBasis.predictedLifeYears || 'See Calculation Basis section for standards mapping.')}</p>
-        <p class="field-hint result-basis">Safety margin basis: ${escapeHtml(outputBasis.safetyMargin || 'See Calculation Basis section for standards mapping.')}</p>
-      </div>
-
-      <div class="table-wrap">
+      <details id="cp-design-input-summary" class="cp-result-disclosure">
+        <summary>Design inputs and calculated factors</summary>
+        <div class="table-wrap">
         <table class="data-table" aria-label="Cathodic protection summary table">
           <thead><tr><th>Parameter</th><th>Value</th></tr></thead>
           <tbody>
@@ -1525,18 +2650,26 @@ function renderResults(result, root) {
             <tr><td>Coating demand model</td><td>${escapeHtml(result.coatingModel?.label || 'Fixed factor')}</td></tr>
             <tr><td>Effective coating factor</td><td>${result.coatingBreakdownFactor}</td></tr>
             <tr><td>Coating uncertainty band</td><td>${roundTo(result.coatingModel?.uncertaintyBand?.lowFactor ?? result.coatingBreakdownFactor, 4)} to ${roundTo(result.coatingModel?.uncertaintyBand?.highFactor ?? result.coatingBreakdownFactor, 4)}</td></tr>
-            <tr><td>Exposed area</td><td>${result.exposedAreaM2} m²</td></tr>
-            <tr><td>Anode capacity</td><td>${result.anodeCapacityAhPerKg} Ah/kg</td></tr>
+            <tr><td>Exposed area</td><td>${formatFiniteValue(displayArea(result.exposedAreaM2), 3)} ${areaUnit}</td></tr>
+            <tr><td>Modeled reference potential</td><td>${result.modeledReferencePotentialMv} mV vs CSE</td></tr>
             <tr><td>Anode system type</td><td>${escapeHtml(result.anodeTypeSystem)}</td></tr>
-            <tr><td>Number of anodes</td><td>${result.numberOfAnodes}</td></tr>
-            <tr><td>Anode spacing</td><td>${roundTo(result.anodeSpacingM, 3)} m</td></tr>
-            <tr><td>Anode distance to structure</td><td>${roundTo(result.anodeDistanceToStructureM, 3)} m</td></tr>
-            <tr><td>Anode burial depth</td><td>${roundTo(result.anodeBurialDepthM, 3)} m</td></tr>
+            <tr><td>${isIccp ? 'Number of groundbed elements' : 'Number of anodes'}</td><td>${result.numberOfAnodes}</td></tr>
+            <tr><td>Anode spacing</td><td>${formatFiniteValue(displayDistance(result.anodeSpacingM), 3)} ${distanceUnit}</td></tr>
+            <tr><td>Anode distance to structure</td><td>${formatFiniteValue(displayDistance(result.anodeDistanceToStructureM), 3)} ${distanceUnit}</td></tr>
+            <tr><td>Anode burial depth</td><td>${formatFiniteValue(displayDistance(result.anodeBurialDepthM), 3)} ${distanceUnit}</td></tr>
             <tr><td>Distribution effectiveness (average)</td><td>${result.distributionModel?.averageEffectivenessFactor ?? 'n/a'}</td></tr>
             <tr><td>Distribution attenuation factor</td><td>${result.distributionModel?.globalAttenuationFactor ?? 'n/a'}</td></tr>
+            ${isIccp ? `
+            <tr><td>Rectifier rating</td><td>${result.iccpRatedCurrentA} A at ${result.iccpRatedVoltageV} V DC</td></tr>
+            <tr><td>Groundbed circuit resistance</td><td>${result.iccpGroundbedResistanceOhm} Ω</td></tr>
+            <tr><td>Voltage allowance</td><td>${result.iccpVoltageAllowanceV} V</td></tr>
+            <tr><td>ICCP reserve factor</td><td>${result.iccpReserveFactor}</td></tr>` : `
+            <tr><td>Anode capacity</td><td>${result.anodeCapacityAhPerKg} Ah/kg</td></tr>
             <tr><td>Anode utilization factor U</td><td>${result.anodeUtilization}</td></tr>
-            <tr><td>Design factor F<sub>design</sub></td><td>${result.designFactor}</td></tr>
+            <tr><td>Design factor F<sub>design</sub></td><td>${result.designFactor}</td></tr>`}
             <tr><td>Availability factor</td><td>${result.availabilityFactor}</td></tr>
+            <tr><td>Field evidence</td><td>${result.criteriaEvidenceEnabled ? 'Included' : 'Not evaluated'}</td></tr>
+            ${result.criteriaEvidenceEnabled ? `
             <tr><td>Test method</td><td>${escapeHtml(result.testMethod || 'instant-off')}</td></tr>
             <tr><td>Measurement context</td><td>${escapeHtml(result.measurementContext || 'unknown')}</td></tr>
             <tr><td>Reference electrode location</td><td>${escapeHtml(result.referenceElectrodeLocation || 'unknown')}</td></tr>
@@ -1544,16 +2677,28 @@ function renderResults(result, root) {
             <tr><td>Measured IR-drop</td><td>${Number.isFinite(result.measuredIrDropMv) ? `${result.measuredIrDropMv} mV` : 'Not provided'}</td></tr>
             <tr><td>Coupon depolarization</td><td>${Number.isFinite(result.couponDepolarizationMv) ? `${result.couponDepolarizationMv} mV` : 'Not provided'}</td></tr>
             <tr><td>Measured structure potential</td><td>${result.measuredInstantOffPotentialMv} mV</td></tr>
-            <tr><td>Measured/simulated polarization shift</td><td>${result.simulatedPolarizationShiftMv} mV</td></tr>
-            <tr><td>Test points passing</td><td>${result.passingTestPointCount} / ${result.testPointCount}</td></tr>
+            <tr><td>Measured polarization shift</td><td>${result.simulatedPolarizationShiftMv} mV</td></tr>
+            <tr><td>Test points passing</td><td>${result.passingTestPointCount} / ${result.testPointCount}</td></tr>` : ''}
+            <tr><td>Foreign-structure relationship</td><td>${escapeHtml(result.interferenceGeometry || 'none')}</td></tr>
+            <tr><td>Dominant interference source</td><td>${escapeHtml(result.interferenceSourceType || 'none')}</td></tr>
+            <tr><td>Minimum structure separation</td><td>${Number.isFinite(result.foreignStructureSeparationM) ? `${formatFiniteValue(displayDistance(result.foreignStructureSeparationM), 3)} ${distanceUnit}` : 'Not applicable'}</td></tr>
+            <tr><td>Parallel exposure length</td><td>${Number.isFinite(result.parallelExposureLengthM) ? `${formatFiniteValue(displayDistance(result.parallelExposureLengthM), 3)} ${distanceUnit}` : 'Not applicable'}</td></tr>
+            <tr><td>Potential gradient</td><td>${Number.isFinite(result.measuredPotentialGradientMvPerM) ? `${result.measuredPotentialGradientMvPerM} mV/m` : 'Not provided'}</td></tr>
+            <tr><td>Bonding strategy</td><td>${escapeHtml(result.bondingStrategy || 'none')}</td></tr>
             <tr><td>Interference mitigation actions</td><td>${escapeHtml(result.mitigationActionsText || 'Not provided')}</td></tr>
             <tr><td>Verification test date</td><td>${escapeHtml(result.verificationTestDate || 'Not scheduled')}</td></tr>
           </tbody>
         </table>
       </div>
+      </details>
 
       <div id="cp-criteria-results" class="result-group" aria-label="Protection criteria check evidence">
         <h3>Protection Criteria Check Evidence</h3>
+        ${criteriaEvidence.overallStatus === 'not-run' ? `
+        <div class="result-badge result-badge--not-run">Not evaluated</div>
+        <p>No field-measurement evidence was included in this preliminary analysis. The modeled route profile above is a design assumption and is not acceptance evidence.</p>
+        <button type="button" class="btn" data-cp-action="enter-criteria-evidence">Enter field evidence</button>
+        ` : `
         <p class="field-hint">Criteria selected: ${escapeHtml(criteriaSet?.label || 'Not configured')} (${escapeHtml(criteriaSet?.reference || 'No reference')})</p>
         <p class="field-hint">Measurement basis: method ${escapeHtml(measurementCorrections.metadata?.testMethod || result.testMethod || 'instant-off')}, context ${escapeHtml(measurementCorrections.metadata?.measurementContext || result.measurementContext || 'unknown')}, reference ${escapeHtml(measurementCorrections.metadata?.referenceElectrodeLocation || result.referenceElectrodeLocation || 'unknown')}.</p>
         <p class="field-hint">Correction summary: ${escapeHtml(measurementCorrections.correctionSummary || 'No correction summary provided.')}</p>
@@ -1580,30 +2725,32 @@ function renderResults(result, root) {
             </tbody>
           </table>
         </div>
+        `}
       </div>
 
-      <div class="result-group" aria-label="Interference assessment results">
+      <div id="cp-interference-results" class="result-group cp-interference-result" aria-label="Interference assessment results">
         <h3>Interference Assessment</h3>
         <div class="result-badge ${riskBadgeClass}">
           ${escapeHtml(String(interference.riskLevel || 'low').toUpperCase())} risk (score: ${Number.isFinite(interference.score) ? interference.score : 0})
         </div>
+        <p class="cp-interference-summary">${escapeHtml(interference.riskSummary || 'No scored design-stage interference drivers were identified.')}</p>
         <p class="field-hint">Mitigation profile: ${escapeHtml(interference.profile?.label || 'Baseline mitigation profile')}</p>
         <p class="field-hint">Verification test date: ${escapeHtml(interference.verificationTestDate || 'Not scheduled')}</p>
         ${unresolvedHighRisk ? '<p class="field-hint"><strong>High-risk case remains unresolved and blocks compliant status until missing mitigations and verification are completed.</strong></p>' : ''}
-        <div class="table-wrap">
-          <table class="data-table" aria-label="Interference risk factors">
-            <thead><tr><th>Factor</th><th>Input</th><th>Score</th></tr></thead>
-            <tbody>
-              ${riskFactorRows.map((factor) => `
-                <tr>
-                  <td>${escapeHtml(factor.label)}</td>
-                  <td>${escapeHtml(factor.value)}</td>
-                  <td>${escapeHtml(String(factor.score))}</td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-        </div>
+        ${activeRiskFactorRows.length
+          ? `<section class="cp-interference-drivers" aria-labelledby="cp-active-interference-drivers">
+              <h4 id="cp-active-interference-drivers">Active risk drivers (${activeRiskFactorRows.length})</h4>
+              ${buildRiskFactorTable(activeRiskFactorRows, 'Active interference risk drivers')}
+            </section>`
+          : '<p class="field-hint">Active risk drivers: none.</p>'}
+        ${riskFactorRows.length
+          ? `<details class="cp-result-disclosure">
+              <summary>Show complete factor breakdown (${riskFactorRows.length})</summary>
+              <div class="cp-result-disclosure__content">
+                ${buildRiskFactorTable(riskFactorRows, 'Complete interference risk factor breakdown')}
+              </div>
+            </details>`
+          : ''}
         <p class="field-hint">Required mitigations: ${escapeHtml((interference.requiredMitigations || []).join(', ') || 'None')}</p>
         <p class="field-hint">Implemented mitigations: ${escapeHtml((interference.mitigationActions || []).join(', ') || 'None')}</p>
         ${(interference.missingMitigations || []).length
@@ -1619,8 +2766,10 @@ function renderResults(result, root) {
       </div>
 
       ${sensitivityRows.length ? `
-      <div class="table-wrap">
-        <table class="data-table" aria-label="Cathodic protection sensitivity table">
+      <details id="cp-sensitivity-results" class="cp-result-disclosure">
+        <summary>Sensitivity scenarios</summary>
+        <div class="table-wrap">
+          <table class="data-table" aria-label="Cathodic protection sensitivity table">
           <thead>
             <tr>
               <th>Scenario</th>
@@ -1628,9 +2777,12 @@ function renderResults(result, root) {
               <th>Coating factor</th>
               <th>Required current (A)</th>
               <th>Worst-case segment demand (A)</th>
+              ${isIccp ? `
+              <th>Required rectifier output</th>
+              <th>Source headroom</th>` : `
               <th>Minimum anode mass</th>
               <th>Predicted life (years)</th>
-              <th>Safety margin</th>
+              <th>Safety margin</th>`}
             </tr>
           </thead>
           <tbody>
@@ -1641,17 +2793,23 @@ function renderResults(result, root) {
                 <td>${formatFiniteValue(scenario.coatingFactor, 4)}</td>
                 <td>${formatFiniteValue(scenario.requiredCurrentA, 6)}</td>
                 <td>${formatFiniteValue(scenario.worstCaseSegmentDemandA, 6)} (${escapeHtml(scenario.worstCaseSegmentLabel || 'Segment 1')})</td>
-                <td>${formatFiniteValue(scenario.minimumAnodeMassKg, 3)} kg (${formatFiniteValue(scenario.minimumAnodeMassLb, 3)} lb)</td>
+                ${isIccp ? `
+                <td>${formatFiniteValue(scenario.requiredRectifierCurrentA, 4)} A at ${formatFiniteValue(scenario.requiredRectifierVoltageV, 2)} V</td>
+                <td>${formatFiniteValue(scenario.currentHeadroomA, 4)} A / ${formatFiniteValue(scenario.voltageHeadroomV, 2)} V</td>` : `
+                <td>${formatFiniteValue(useMetricUnits ? scenario.minimumAnodeMassKg : scenario.minimumAnodeMassLb, 3)} ${massUnit}</td>
                 <td>${formatFiniteValue(scenario.predictedLifeYears, 2)}</td>
-                <td>${formatFiniteValue(scenario.safetyMarginYears, 2)} years (${formatFiniteValue(scenario.safetyMarginPercent, 2)}%)</td>
+                <td>${formatFiniteValue(scenario.safetyMarginYears, 2)} years (${formatFiniteValue(scenario.safetyMarginPercent, 2)}%)</td>`}
               </tr>`).join('')}
           </tbody>
-        </table>
-      </div>` : ''}
+          </table>
+        </div>
+      </details>` : ''}
 
       ${Array.isArray(result.distributionModel?.segments) && result.distributionModel.segments.length ? `
-      <div class="table-wrap">
-        <table class="data-table" aria-label="Current distribution by segment">
+      <details class="cp-result-disclosure">
+        <summary>Current distribution by segment</summary>
+        <div class="table-wrap">
+          <table class="data-table" aria-label="Current distribution by segment">
           <thead>
             <tr>
               <th>Segment</th>
@@ -1669,13 +2827,17 @@ function renderResults(result, root) {
                 <td>${escapeHtml(segment.attenuationFactor)}</td>
               </tr>`).join('')}
           </tbody>
-        </table>
-      </div>` : ''}
+          </table>
+        </div>
+      </details>` : ''}
 
-      <div class="result-group" aria-label="CP profile chart overlays">
-        <p class="field-hint">Profile overlays include base, conservative, and optimized scenarios with threshold-band pass/fail markers.</p>
-        <div id="cp-profile-chart-root"></div>
-      </div>
+      <details id="cp-profile-results" class="cp-result-disclosure" aria-label="CP profile chart overlays">
+        <summary>Distribution profiles</summary>
+        <div class="cp-result-disclosure__content">
+          <p class="field-hint">Profile overlays include base, conservative, and optimized scenarios with threshold-band pass/fail markers.</p>
+          <div id="cp-profile-chart-root"></div>
+        </div>
+      </details>
 
       ${advisories.length ? `
       <div class="result-group" aria-label="Design improvement advisories">
@@ -1686,7 +2848,7 @@ function renderResults(result, root) {
       </div>` : ''}
 
       <p class="field-hint result-timestamp">Analysis run: ${new Date(result.timestamp).toLocaleString()}</p>
-      <p class="field-hint">Report export package includes JSON and PDF payload sections for design basis and verification plan.</p>
+      <p class="field-hint">Use “Download report data (JSON)” above to save the traceable design-basis package.</p>
     </section>`;
 
   const profileRoot = root.querySelector('#cp-profile-chart-root');
@@ -1694,6 +2856,7 @@ function renderResults(result, root) {
     cpProfilesController = initCpProfiles({
       root: profileRoot,
       profileData,
+      unitSystem: normalizeUnitSystem(result.units),
       onSegmentHover: (segmentIndex) => {
         cpLayoutCanvasController?.setExternalHoverSegment(segmentIndex);
       }
@@ -1760,14 +2923,19 @@ function sanitizeComparisonStudy(study) {
   if (!normalized) {
     return null;
   }
-  if (!Number.isFinite(Number(normalized.requiredCurrentA)) || !Number.isFinite(Number(normalized.predictedLifeYears))) {
+  const validSourceOutcome = normalized.anodeTypeSystem === 'iccp'
+    ? Number.isFinite(Number(normalized.iccpSizing?.requiredRectifierCurrentA))
+    : Number.isFinite(Number(normalized.predictedLifeYears));
+  if (!Number.isFinite(Number(normalized.requiredCurrentA)) || !validSourceOutcome) {
     return null;
   }
   const fallbackGeometry = resolveLayoutGeometry({ ...normalized, cpLayout: null });
   return {
     ...normalized,
     requiredCurrentA: coerceFiniteNumber(normalized.requiredCurrentA, 0, { min: 0, max: 1e6 }),
-    predictedLifeYears: coerceFiniteNumber(normalized.predictedLifeYears, 0, { min: 0, max: 1e4 }),
+    predictedLifeYears: normalized.anodeTypeSystem === 'iccp'
+      ? null
+      : coerceFiniteNumber(normalized.predictedLifeYears, 0, { min: 0, max: 1e4 }),
     interferenceAssessment: {
       ...(normalized.interferenceAssessment && typeof normalized.interferenceAssessment === 'object' ? normalized.interferenceAssessment : {}),
       score: coerceFiniteNumber(normalized.interferenceAssessment?.score, 0, { min: 0, max: 100 })
@@ -1802,7 +2970,10 @@ function buildComparisonPanelMarkup(activeStudy, baselineStudy) {
   const activeCriteriaPasses = countCriteriaPasses(activeStudy);
   const baselineCriteriaPasses = countCriteriaPasses(baselineStudy);
   const requiredCurrentDelta = activeStudy.requiredCurrentA - baselineStudy.requiredCurrentA;
-  const lifeDelta = activeStudy.predictedLifeYears - baselineStudy.predictedLifeYears;
+  const compareIccpCapacity = activeStudy.anodeTypeSystem === 'iccp' && baselineStudy.anodeTypeSystem === 'iccp';
+  const sourceCapacityDelta = compareIccpCapacity
+    ? activeStudy.iccpSizing.currentHeadroomA - baselineStudy.iccpSizing.currentHeadroomA
+    : activeStudy.predictedLifeYears - baselineStudy.predictedLifeYears;
   const riskDelta = (activeStudy.interferenceAssessment?.score || 0) - (baselineStudy.interferenceAssessment?.score || 0);
   const criteriaPassDelta = activeCriteriaPasses - baselineCriteriaPasses;
   const baselineTime = baselineStudy.timestamp ? new Date(baselineStudy.timestamp).toLocaleString() : 'Unknown';
@@ -1810,9 +2981,10 @@ function buildComparisonPanelMarkup(activeStudy, baselineStudy) {
   return `
     <div class="result-group cp-compare-group">
       <h3>Compare configurations</h3>
-      <p class="field-hint">Configuration A = active design result. Configuration B = imported baseline saved on ${escapeHtml(baselineTime)}.</p>
+      <p class="field-hint">Configuration A is the active result. Configuration B is the locked baseline saved on ${escapeHtml(baselineTime)}.</p>
       <div class="cp-compare-actions">
         <button type="button" class="btn" data-cp-action="show-compare">Compare configurations</button>
+        <button type="button" class="btn" data-cp-action="save-baseline">Replace baseline with current</button>
         <button type="button" class="btn" data-cp-action="import-compare">Import older saved CP study</button>
         <button type="button" class="btn" data-cp-action="promote-baseline">Promote B to active design</button>
       </div>
@@ -1825,9 +2997,11 @@ function buildComparisonPanelMarkup(activeStudy, baselineStudy) {
             <small>A: ${escapeHtml(String(activeStudy.requiredCurrentA))} A · B: ${escapeHtml(String(baselineStudy.requiredCurrentA))} A</small>
           </article>
           <article class="cp-delta-card">
-            <h4>Predicted life Δ</h4>
-            <p>${formatDelta(lifeDelta, 'years')}</p>
-            <small>A: ${escapeHtml(String(activeStudy.predictedLifeYears))} y · B: ${escapeHtml(String(baselineStudy.predictedLifeYears))} y</small>
+            <h4>${compareIccpCapacity ? 'Current headroom Δ' : 'Predicted life Δ'}</h4>
+            <p>${formatDelta(sourceCapacityDelta, compareIccpCapacity ? 'A' : 'years')}</p>
+            <small>${compareIccpCapacity
+              ? `A: ${escapeHtml(String(activeStudy.iccpSizing.currentHeadroomA))} A · B: ${escapeHtml(String(baselineStudy.iccpSizing.currentHeadroomA))} A`
+              : `A: ${escapeHtml(String(activeStudy.predictedLifeYears))} y · B: ${escapeHtml(String(baselineStudy.predictedLifeYears))} y`}</small>
           </article>
           <article class="cp-delta-card">
             <h4>Risk score Δ</h4>
@@ -1958,24 +3132,44 @@ function parseComparisonStudyFromImport(rawText) {
   if (parsed?.cathodicProtection) {
     return sanitizeComparisonStudy(parsed.cathodicProtection);
   }
-  if (parsed?.requiredCurrentA && parsed?.predictedLifeYears) {
+  if (parsed?.requiredCurrentA && (parsed?.predictedLifeYears || parsed?.iccpSizing?.requiredRectifierCurrentA)) {
     return sanitizeComparisonStudy(parsed);
   }
   return null;
 }
 
-function buildDesignAdvisories(result, sensitivityRows) {
+function buildDesignAdvisories(result, sensitivityRows, modeledProfileSummary = null) {
   const notes = [];
   const conservativeScenario = sensitivityRows.find((scenario) => scenario.key === 'high-coating');
 
-  if (result.safetyMarginYears < 0) {
-    notes.push('Installed anode mass is below target-life demand; increase installed mass or reduce coating breakdown assumptions.');
-  } else if (result.safetyMarginPercent < 15) {
-    notes.push('Life margin is modest; consider adding design contingency to improve resilience against coating degradation uncertainty.');
+  if (modeledProfileSummary?.failed > 0) {
+    const failureSummary = modeledProfileSummary.checks
+      .filter((check) => check.failed > 0)
+      .map((check) => `${check.failed}/${check.total} ${check.label}`)
+      .join(', ');
+    notes.push(`Base modeled route thresholds need review (${failureSummary}). Open Distribution profiles to locate the affected segments before accepting the design.`);
   }
 
-  if (conservativeScenario && conservativeScenario.safetyMarginYears < 0) {
-    notes.push('The high coating uncertainty band fails target life; add contingency mass or plan earlier replacement intervals.');
+  if (result.anodeTypeSystem === 'iccp') {
+    if (result.iccpSizing?.currentCapacityStatus === 'fail') {
+      notes.push('The entered rectifier current rating is below the preliminary reserved-current requirement; increase the rating or reduce demand.');
+    }
+    if (result.iccpSizing?.voltageCapacityStatus === 'fail') {
+      notes.push('The entered rectifier voltage rating is below the groundbed circuit requirement; review groundbed resistance, cable losses, and source voltage.');
+    }
+    if (conservativeScenario?.approvalStatus === 'Review required') {
+      notes.push('The high coating uncertainty band exceeds the entered rectifier capacity; add source headroom or reduce uncertainty through field condition data.');
+    }
+  } else {
+    if (result.safetyMarginYears < 0) {
+      notes.push('Installed anode mass is below target-life demand; increase installed mass or reduce coating breakdown assumptions.');
+    } else if (result.safetyMarginPercent < 15) {
+      notes.push('Life margin is modest; consider adding design contingency to improve resilience against coating degradation uncertainty.');
+    }
+
+    if (conservativeScenario && conservativeScenario.safetyMarginYears < 0) {
+      notes.push('The high coating uncertainty band fails target life; add contingency mass or plan earlier replacement intervals.');
+    }
   }
 
   if (result.soilResistivityOhmM < 50 || result.soilPh < 5.5 || result.soilPh > 9) {
@@ -2010,6 +3204,8 @@ function escapeHtml(text) {
 function renderCalculationBasis(root, basis) {
   if (!root || !basis) return;
 
+  const standardsNeedConfiguration = CP_STANDARDS_PROFILE.targetReferences
+    .some((reference) => String(reference.edition).includes('not configured'));
   const sections = [
     basis.standardsProfile,
     basis.currentDensitySelection,
@@ -2020,24 +3216,39 @@ function renderCalculationBasis(root, basis) {
   ].filter(Boolean);
 
   root.innerHTML = `
-    <ul class="basis-list">
+    ${standardsNeedConfiguration ? `
+      <div class="cp-standards-warning" role="note">
+        <strong>Standards editions are not configured.</strong>
+        <span>Select and document the exact project-adopted editions before issuing the calculation package.</span>
+      </div>
+    ` : ''}
+    <div class="cp-basis-grid">
       ${sections.map((section) => `
-        <li id="${escapeHtml(section.id)}">
-          <strong>${escapeHtml(section.label)}:</strong>
-          <span>${escapeHtml(section.summary)}</span>
-          <div class="field-hint">Standards: ${escapeHtml(section.standards.join(', '))}</div>
+        <article id="${escapeHtml(section.id)}" class="cp-basis-card">
+          <h3>${escapeHtml(section.label)}</h3>
+          <p>${escapeHtml(section.summary)}</p>
+          ${section.equation
+            ? `<code>${escapeHtml(section.equation)}</code>`
+            : ''}
+          ${section.secondaryEquation
+            ? `<code>${escapeHtml(section.secondaryEquation)}</code>`
+            : ''}
+          ${Array.isArray(section.outputs) && section.outputs.length
+            ? `<div class="cp-basis-outputs"><strong>Affects:</strong> ${section.outputs.map((output) => `<span>${escapeHtml(output)}</span>`).join('')}</div>`
+            : ''}
+          <div class="field-hint"><strong>References:</strong> ${escapeHtml(section.standards.join(', '))}</div>
           ${Array.isArray(section.requiredChecks) && section.requiredChecks.length
-            ? `<div class="field-hint">Required checks: ${escapeHtml(section.requiredChecks.join(', '))}</div>`
+            ? `<div class="field-hint"><strong>Checks:</strong> ${escapeHtml(section.requiredChecks.join(', '))}</div>`
             : ''}
           ${Array.isArray(section.deliverables) && section.deliverables.length
-            ? `<div class="field-hint">Required deliverables: ${escapeHtml(section.deliverables.join(', '))}</div>`
+            ? `<div class="field-hint"><strong>Deliverables:</strong> ${escapeHtml(section.deliverables.join(', '))}</div>`
             : ''}
           ${Array.isArray(section.assumptions) && section.assumptions.length
-            ? `<ul>${section.assumptions.map((assumption) => `<li>${escapeHtml(assumption)}</li>`).join('')}</ul>`
+            ? `<details><summary>Assumptions</summary><ul>${section.assumptions.map((assumption) => `<li>${escapeHtml(assumption)}</li>`).join('')}</ul></details>`
             : ''}
-        </li>
+        </article>
       `).join('')}
-    </ul>
+    </div>
   `;
 }
 
@@ -2148,7 +3359,7 @@ function buildReportExportData(result, approval = null) {
     input: result,
     adjustedRequiredCurrentA: result.requiredCurrentA,
     distributionModel: result.distributionModel,
-    measuredInstantOffPotentialMv: result.measuredInstantOffPotentialMv,
+    modeledReferencePotentialMv: result.modeledReferencePotentialMv,
     baseCoatingFactor: result.coatingBreakdownFactor
   });
   return {
@@ -2172,7 +3383,8 @@ function buildReportExportData(result, approval = null) {
             requiredCurrentA: result.requiredCurrentA,
             minimumAnodeMassKg: result.minimumAnodeMassKg,
             predictedLifeYears: result.predictedLifeYears,
-            safetyMarginYears: result.safetyMarginYears
+            safetyMarginYears: result.safetyMarginYears,
+            iccpSizing: result.iccpSizing || null
           }
         }
       },

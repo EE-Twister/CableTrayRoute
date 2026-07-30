@@ -6,7 +6,14 @@
  * field-trim tolerance, and bin-packs them into standard reel lengths.
  */
 import assert from 'assert';
-import { calculateProcurement, exportProcurementCSV, STANDARD_REEL_SIZES } from '../analysis/cableProcurement.mjs';
+import {
+  buildProcurementSpecKey,
+  calculateProcurement,
+  exportProcurementCSV,
+  reconcileProcurementRegister,
+  resolveProcurementSpec,
+  STANDARD_REEL_SIZES
+} from '../analysis/cableProcurement.mjs';
 
 function describe(name, fn) {
   console.log(name);
@@ -27,12 +34,24 @@ function it(name, fn) {
 // Fixtures
 // ---------------------------------------------------------------------------
 
+const productFields = {
+  conductor_material: 'Copper',
+  cable_rating: 600,
+  insulation_type: 'XLPE',
+  insulation_rating: 90,
+  shielding_jacket: 'PVC',
+  ground_size: '#12 AWG',
+  ground_material: 'Copper',
+  manufacturer: 'Example Cable Co.',
+  model: 'XC-600'
+};
+
 const cableList = [
-  { name: 'C1', cable_type: 'Power',   conductors: 3, conductor_size: '#12 AWG', diameter: 0.75, weight: 0.5 },
-  { name: 'C2', cable_type: 'Power',   conductors: 3, conductor_size: '#12 AWG', diameter: 0.75, weight: 0.5 },
-  { name: 'C3', cable_type: 'Power',   conductors: 3, conductor_size: '#8 AWG',  diameter: 1.0,  weight: 0.8 },
-  { name: 'C4', cable_type: 'Control', conductors: 7, conductor_size: '#18 AWG', diameter: 0.45, weight: 0.2 },
-  { name: 'C5', cable_type: 'Control', conductors: 7, conductor_size: '#18 AWG', diameter: 0.45, weight: 0.2 },
+  { name: 'C1', cable_type: 'Power',   conductors: 3, conductor_size: '#12 AWG', diameter: 0.75, weight: 0.5, ...productFields },
+  { name: 'C2', cable_type: 'Power',   conductors: 3, conductor_size: '#12 AWG', diameter: 0.75, weight: 0.5, ...productFields },
+  { name: 'C3', cable_type: 'Power',   conductors: 3, conductor_size: '#8 AWG',  diameter: 1.0,  weight: 0.8, ...productFields },
+  { name: 'C4', cable_type: 'Control', conductors: 7, conductor_size: '#18 AWG', diameter: 0.45, weight: 0.2, ...productFields },
+  { name: 'C5', cable_type: 'Control', conductors: 7, conductor_size: '#18 AWG', diameter: 0.45, weight: 0.2, ...productFields },
 ];
 
 // Route results: breakdown must be non-empty for groupCablesIntoPulls to process them
@@ -120,23 +139,84 @@ describe('calculateProcurement — spec grouping', () => {
     assert.ok(types.includes('Control'), 'should have Control line item');
   });
 
-  it('spec_key format is cable_type::conductor_size', () => {
+  it('uses a deterministic versioned canonical spec key', () => {
     const results = [makeResult('C1', 100)];
     const report = calculateProcurement(results, cableList);
-    assert.strictEqual(report.lineItems[0].spec_key, 'Power::#12 AWG');
+    assert.ok(report.lineItems[0].spec_key.startsWith('v2::'));
+    assert.ok(report.lineItems[0].spec_key.includes('material=copper'));
+    assert.strictEqual(report.lineItems[0].spec_key, buildProcurementSpecKey(report.lineItems[0]));
+    assert.strictEqual(report.lineItems[0].legacy_spec_key, 'Power::#12 AWG');
   });
 
-  it('derives material as copper by default', () => {
+  it('uses authoritative conductor material from Cable Schedule', () => {
     const results = [makeResult('C1', 100)];
     const report = calculateProcurement(results, cableList);
-    assert.strictEqual(report.lineItems[0].material, 'copper');
+    assert.strictEqual(report.lineItems[0].material, 'Copper');
   });
 
-  it('derives material as aluminum when conductor_size contains AL', () => {
-    const alCable = [{ name: 'A1', cable_type: 'Power', conductors: 3, conductor_size: '#4/0 AWG AL', diameter: 1.2, weight: 0.6 }];
+  it('supports legacy material suffixes but warns that the source is incomplete', () => {
+    const alCable = [{
+      name: 'A1',
+      cable_type: 'Power',
+      conductors: 3,
+      conductor_size: '#4/0 AWG AL',
+      cable_rating: 600,
+      insulation_type: 'XLPE',
+      insulation_rating: 90
+    }];
     const results = [makeResult('A1', 100)];
     const report = calculateProcurement(results, alCable);
-    assert.strictEqual(report.lineItems[0].material, 'aluminum');
+    assert.strictEqual(report.lineItems[0].material, 'Aluminum');
+    assert.ok(report.warnings.some(warning => warning.code === 'material-from-size-fallback'));
+  });
+
+  it('does not infer copper when conductor material is absent', () => {
+    const incomplete = [{
+      name: 'M1',
+      cable_type: 'Power',
+      conductors: 3,
+      conductor_size: '#2 AWG',
+      cable_rating: 600,
+      insulation_type: 'XLPE',
+      insulation_rating: 90
+    }];
+    const report = calculateProcurement([makeResult('M1', 100)], incomplete);
+    assert.strictEqual(report.lineItems[0].material, 'Unspecified');
+    assert.ok(report.warnings.some(warning => warning.code === 'missing-conductor-material'));
+    assert.strictEqual(report.coverage.procurement_ready, false);
+  });
+
+  it('separates otherwise identical cables with different materials', () => {
+    const alternatives = [
+      { ...cableList[0], name: 'CU1', conductor_material: 'Copper' },
+      { ...cableList[0], name: 'AL1', conductor_material: 'Aluminum' },
+    ];
+    const report = calculateProcurement([
+      makeResult('CU1', 100),
+      makeResult('AL1', 100),
+    ], alternatives);
+    assert.strictEqual(report.lineItems.length, 2);
+  });
+
+  it('separates otherwise identical cables with different catalog models', () => {
+    const alternatives = [
+      { ...cableList[0], name: 'P1', model: 'MODEL-A' },
+      { ...cableList[0], name: 'P2', model: 'MODEL-B' },
+    ];
+    const report = calculateProcurement([
+      makeResult('P1', 100),
+      makeResult('P2', 100),
+    ], alternatives);
+    assert.strictEqual(report.lineItems.length, 2);
+  });
+
+  it('normalizes common material aliases in canonical keys', () => {
+    const copper = resolveProcurementSpec({ ...cableList[0], conductor_material: 'Cu' });
+    assert.strictEqual(copper.material, 'Copper');
+    assert.strictEqual(
+      buildProcurementSpecKey(copper),
+      buildProcurementSpecKey(resolveProcurementSpec(cableList[0]))
+    );
   });
 });
 
@@ -174,12 +254,33 @@ describe('calculateProcurement — tolerance and lengths', () => {
     assert.ok(Math.abs(li.total_required_ft - sumCuts) < 0.01, `${li.total_required_ft} should equal sum ${sumCuts}`);
   });
 
+  it('uses each cable route length when cables share the same pull path', () => {
+    const report = calculateProcurement([
+      makeResult('C1', 100, [seg1]),
+      makeResult('C2', 150, [seg1]),
+    ], cableList);
+    assert.deepStrictEqual(
+      report.lineItems[0].cuts.map(cut => cut.length_ft).sort((a, b) => a - b),
+      [103, 154.5]
+    );
+  });
+
   it('each cut includes pull_number and cable_tag', () => {
     const results = [makeResult('C1', 200)];
     const report = calculateProcurement(results, cableList);
     const cut = report.lineItems[0].cuts[0];
     assert.strictEqual(typeof cut.pull_number, 'number');
     assert.strictEqual(cut.cable_tag, 'C1');
+  });
+
+  it('creates one physical cut for every parallel cable run', () => {
+    const parallelCable = [{ ...cableList[0], name: 'P1', parallel_count: 3 }];
+    const report = calculateProcurement([makeResult('P1', 200)], parallelCable);
+    assert.strictEqual(report.lineItems[0].cut_count, 3);
+    assert.deepStrictEqual(
+      report.lineItems[0].cuts.map(cut => cut.parallel_run),
+      [1, 2, 3]
+    );
   });
 });
 
@@ -190,6 +291,20 @@ describe('calculateProcurement — reel assignment', () => {
     const report = calculateProcurement(results, cableList);
     const li = report.lineItems[0];
     assert.strictEqual(li.total_ordered_ft, li.num_reels * li.selected_reel_size.feet);
+  });
+
+  it('sums actual reel capacities when a line item uses mixed reel sizes', () => {
+    const report = calculateProcurement([
+      makeResult('C1', 400, [seg1]),
+      makeResult('C2', 200, [seg1]),
+    ], cableList, { tolerancePct: 0 });
+    const lineItem = report.lineItems[0];
+    assert.deepStrictEqual(
+      lineItem.reel_assignments.map(reel => reel.size.feet),
+      [500, 250]
+    );
+    assert.strictEqual(lineItem.total_ordered_ft, 750);
+    assert.strictEqual(lineItem.waste_ft, 150);
   });
 
   it('waste_ft is never negative', () => {
@@ -291,6 +406,72 @@ describe('calculateProcurement — summary', () => {
 });
 
 // ---------------------------------------------------------------------------
+describe('reconcileProcurementRegister', () => {
+  it('creates commercial tracking records from generated line items', () => {
+    const report = calculateProcurement([makeResult('C1', 100)], cableList);
+    const register = reconcileProcurementRegister(report.lineItems, [], {
+      now: '2026-07-30T12:00:00.000Z'
+    });
+    assert.strictEqual(register.length, 1);
+    assert.strictEqual(register[0].status, 'Planning');
+    assert.strictEqual(register[0].planned_order_ft, report.lineItems[0].total_ordered_ft);
+    assert.strictEqual(register[0].ordered_quantity_ft, report.lineItems[0].total_ordered_ft);
+    assert.strictEqual(register[0].schedule_state, 'active');
+  });
+
+  it('preserves vendor, quote, need-by, purchase-order, and receiving fields', () => {
+    const report = calculateProcurement([makeResult('C1', 100)], cableList);
+    const prior = [{
+      spec_key: report.lineItems[0].spec_key,
+      vendor: 'Cable Vendor',
+      quote_number: 'Q-100',
+      quote_date: '2026-07-01',
+      need_by_date: '2026-09-01',
+      lead_time_weeks: 8,
+      po_number: 'PO-42',
+      po_date: '2026-07-15',
+      status: 'Ordered',
+      promised_delivery_date: '2026-08-28',
+      actual_delivery_date: '',
+      ordered_quantity_ft: 500,
+      received_quantity_ft: 250,
+      received_date: '',
+      notes: 'First reel received',
+      created_at: '2026-07-01T12:00:00.000Z',
+      updated_at: '2026-07-15T12:00:00.000Z',
+    }];
+    const [record] = reconcileProcurementRegister(report.lineItems, prior, {
+      now: '2026-07-30T12:00:00.000Z'
+    });
+    assert.strictEqual(record.vendor, 'Cable Vendor');
+    assert.strictEqual(record.quote_number, 'Q-100');
+    assert.strictEqual(record.need_by_date, '2026-09-01');
+    assert.strictEqual(record.lead_time_weeks, 8);
+    assert.strictEqual(record.po_number, 'PO-42');
+    assert.strictEqual(record.status, 'Ordered');
+    assert.strictEqual(record.received_quantity_ft, 250);
+    assert.strictEqual(record.notes, 'First reel received');
+    assert.strictEqual(record.updated_at, '2026-07-15T12:00:00.000Z');
+  });
+
+  it('migrates one legacy type/size key and retains unmatched history', () => {
+    const report = calculateProcurement([makeResult('C1', 100)], cableList);
+    const prior = [
+      { spec_key: 'Power::#12 AWG', vendor: 'Legacy Vendor', status: 'Quoted' },
+      { spec_key: 'Control::#14 AWG', vendor: 'Old Vendor', status: 'Cancelled' },
+    ];
+    const register = reconcileProcurementRegister(report.lineItems, prior, {
+      now: '2026-07-30T12:00:00.000Z'
+    });
+    assert.strictEqual(register[0].spec_key, report.lineItems[0].spec_key);
+    assert.strictEqual(register[0].vendor, 'Legacy Vendor');
+    assert.strictEqual(register[0].ordered_quantity_ft, report.lineItems[0].total_ordered_ft);
+    assert.strictEqual(register[0].schedule_state, 'active');
+    assert.strictEqual(register[1].schedule_state, 'inactive');
+  });
+});
+
+// ---------------------------------------------------------------------------
 describe('exportProcurementCSV', () => {
   const sampleResults = [
     makeResult('C1', 100),
@@ -313,6 +494,9 @@ describe('exportProcurementCSV', () => {
     assert.ok(firstLine.includes('Reel Size'), 'header should include Reel Size');
     assert.ok(firstLine.includes('Num Reels'), 'header should include Num Reels');
     assert.ok(firstLine.includes('Waste'), 'header should include Waste');
+    assert.ok(firstLine.includes('Vendor'), 'header should include Vendor');
+    assert.ok(firstLine.includes('PO Number'), 'header should include PO Number');
+    assert.ok(firstLine.includes('Received Quantity'), 'header should include receiving fields');
   });
 
   it('has one data row per line item', () => {
@@ -393,6 +577,21 @@ describe('exportProcurementCSV', () => {
     report.lineItems[0].cable_type = 'Power\rAlt';
     const csv = exportProcurementCSV(report);
     assert.ok(csv.includes('"Power\rAlt"'));
+  });
+
+  it('exports persisted commercial tracking fields with the active line item', () => {
+    const report = calculateProcurement([makeResult('C1', 100)], cableList);
+    const register = reconcileProcurementRegister(report.lineItems, []);
+    register[0].vendor = 'Procurement Partners';
+    register[0].quote_number = 'Q-200';
+    register[0].po_number = 'PO-200';
+    register[0].status = 'Ordered';
+    register[0].received_quantity_ft = 100;
+    const csv = exportProcurementCSV(report, register);
+    assert.ok(csv.includes('Procurement Partners'));
+    assert.ok(csv.includes('Q-200'));
+    assert.ok(csv.includes('PO-200'));
+    assert.ok(csv.includes('Ordered'));
   });
 });
 

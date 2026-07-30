@@ -60,15 +60,15 @@ describe('SECTION_REGISTRY', () => {
     assert.strictEqual(unique.size, keys.length);
   });
 
-  it('groups are a subset of Meta, Construction, Studies', () => {
-    const allowed = new Set(['Meta', 'Construction', 'Studies']);
+  it('groups are a subset of Meta, Construction, Studies, Advanced Studies', () => {
+    const allowed = new Set(['Meta', 'Construction', 'Studies', 'Advanced Studies']);
     for (const def of SECTION_REGISTRY) {
       assert.ok(allowed.has(def.group), `unexpected group "${def.group}" for key "${def.key}"`);
     }
   });
 
   it('study sections have studyKey field', () => {
-    const studies = SECTION_REGISTRY.filter(s => s.group === 'Studies');
+    const studies = SECTION_REGISTRY.filter(s => s.group === 'Studies' || s.group === 'Advanced Studies');
     assert.ok(studies.length > 0, 'no Study sections found');
     for (const def of studies) {
       assert.ok(typeof def.studyKey === 'string', `missing studyKey for "${def.key}"`);
@@ -171,6 +171,22 @@ describe('getAvailableSections', () => {
     assert.ok(avail.has('fill'));
     assert.ok(avail.has('clashes'));
     assert.ok(avail.has('spools'));
+    assert.ok(avail.has('raceways'));
+  });
+
+  it('includes persisted workflow registers when records are present', () => {
+    const avail = getAvailableSections({
+      procurement: [{ id: 'P-1' }],
+      fieldExecution: [{ sourceId: 'C-1' }],
+      deliverables: [{ id: 'SUB-1' }],
+      pullPlans: { rows: [{ id: 'PULL-1' }] },
+      costEstimate: { rows: [{ item: 'Cable' }] },
+    });
+    assert.ok(avail.has('procurement'));
+    assert.ok(avail.has('fieldExecution'));
+    assert.ok(avail.has('deliverables'));
+    assert.ok(avail.has('pullPlans'));
+    assert.ok(avail.has('costEstimate'));
   });
 
   it('includes study sections when study data is present', () => {

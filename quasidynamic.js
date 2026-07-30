@@ -6,7 +6,14 @@ import {
   VOLTAGE_HIGH_PU,
   VOLTAGE_LOW_PU,
 } from './analysis/quasiDynamic.mjs';
-import { getStudies, setStudies } from './dataStore.mjs';
+import { buildLoadFlowModel } from './analysis/loadFlowModel.js';
+import {
+  createStudyRunMetadata,
+  evaluateConvergenceCoverage,
+  isStudyResultStale,
+  validatePowerFlowStudyModel
+} from './analysis/studyResultReadiness.mjs';
+import { getOneLine, getStudies, setStudies } from './dataStore.mjs';
 import { initStudyApprovalPanel } from './src/components/studyApproval.js';
 import { initStudyBasisPanel } from './src/components/studyBasis.js';
 import { escapeHtml } from './src/htmlUtils.mjs';
@@ -50,6 +57,26 @@ document.addEventListener('DOMContentLoaded', () => {
   const presetSel  = document.getElementById('profile-preset');
   const fileInput  = document.getElementById('profile-file');
   const textArea   = document.getElementById('profile-text');
+  const readinessDiv = document.getElementById('study-readiness');
+
+  const getModelReadiness = () => {
+    const model = buildLoadFlowModel(getOneLine());
+    return { model, readiness: validatePowerFlowStudyModel(model) };
+  };
+
+  const renderReadiness = (readiness, options = {}) => {
+    const errors = readiness?.errors || [];
+    const warnings = readiness?.warnings || [];
+    const counts = readiness?.counts || {};
+    const stale = options.stale === true;
+    const cls = readiness?.ready && !stale ? 'result-ok' : 'result-warn';
+    let html = `<div class="result-card ${cls}"><strong>${stale ? 'Saved result is stale' : readiness?.ready ? 'Base network ready' : 'Base network review required'}</strong>`;
+    if (Number.isFinite(counts.buses)) html += `<p>${counts.buses} buses and ${counts.branches} branches detected.</p>`;
+    if (stale) html += '<p>The One-Line model changed after this result was run. Re-run before exporting or relying on it.</p>';
+    if (errors.length) html += `<ul>${errors.map(error => `<li>${escapeHtml(error)}</li>`).join('')}</ul>`;
+    if (warnings.length) html += `<ul>${warnings.map(warning => `<li>${escapeHtml(warning)}</li>`).join('')}</ul>`;
+    readinessDiv.innerHTML = `${html}</div>`;
+  };
 
   // Preset selector
   presetSel.addEventListener('change', () => {
@@ -74,14 +101,19 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // Restore saved result
+  const initialState = getModelReadiness();
   const saved = getStudies().quasiDynamic;
   if (saved && saved.inputs) {
     restoreForm(saved.inputs);
     renderResults(saved);
     exportBtn.hidden = false;
+    const stale = isStudyResultStale(saved, initialState.readiness.sourceFingerprint);
+    exportBtn.disabled = stale || saved.runMetadata?.valid !== true;
+    renderReadiness(initialState.readiness, { stale });
   } else {
     // Default: 24-hour commercial profile
     textArea.value = profileToText(builtinDailyProfile());
+    renderReadiness(initialState.readiness);
   }
 
   // Form submit
@@ -94,13 +126,37 @@ document.addEventListener('DOMContentLoaded', () => {
     let result;
     try {
       const inputs = readInputs();
-      result = runQuasiDynamic(null, inputs.profiles, { baseMVA: inputs.baseMVA, balanced: inputs.balanced });
+      const { model, readiness } = getModelReadiness();
+      renderReadiness(readiness);
+      if (!readiness.ready) throw new Error(readiness.errors.join(' '));
+      result = runQuasiDynamic(model, inputs.profiles, { baseMVA: inputs.baseMVA, balanced: inputs.balanced });
       result.inputs._formState = inputs;
+      const coverage = evaluateConvergenceCoverage(result.convergedCount, result.timestepCount, {
+        minimumRatio: 1,
+        minimumConverged: inputs.profiles.length
+      });
+      result.runMetadata = createStudyRunMetadata('quasiDynamic', readiness, coverage, {
+        source: 'One-Line Diagram',
+        profileRows: inputs.profiles.length
+      });
+      if (!coverage.valid) {
+        result.persisted = false;
+        renderReadiness(readiness);
+        errorsDiv.hidden = false;
+        errorsDiv.textContent = `${coverage.message} No result was saved or enabled for export.`;
+        resultsDiv.innerHTML = `<div class="result-card result-fail"><h2>No valid quasi-dynamic result</h2><p>${escapeHtml(coverage.message)}</p><p>Correct the base network or profile and run the study again.</p></div>`;
+        exportBtn.hidden = false;
+        exportBtn.disabled = true;
+        runBtn.disabled = false;
+        runBtn.textContent = 'Run Quasi-Dynamic Study';
+        return;
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Unable to run quasi-dynamic study.';
       errorsDiv.hidden = false;
       errorsDiv.textContent = msg;
-      showModal('Input Error', `<p>${escapeHtml(msg)}</p>`, 'error');
+      exportBtn.hidden = false;
+      exportBtn.disabled = true;
       runBtn.disabled = false;
       runBtn.textContent = 'Run Quasi-Dynamic Study';
       return;
@@ -110,11 +166,13 @@ document.addEventListener('DOMContentLoaded', () => {
     errorsDiv.textContent = '';
 
     const studies = getStudies();
+    result.persisted = true;
     studies.quasiDynamic = result;
     setStudies(studies);
 
     renderResults(result);
     exportBtn.hidden = false;
+    exportBtn.disabled = false;
     runBtn.disabled = false;
     runBtn.textContent = 'Run Quasi-Dynamic Study';
   });

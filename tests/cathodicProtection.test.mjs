@@ -3,6 +3,7 @@ import {
   calculateRequiredCurrent,
   calculateRequiredAnodeMass,
   calculatePredictedDesignLife,
+  calculateIccpSourceSizing,
   runCathodicProtectionAnalysis
 } from '../cathodicprotection.js';
 
@@ -66,10 +67,65 @@ function baseInput(overrides = {}) {
   assert.ok(result.predictedLifeYears > 0);
 })();
 
+(function testIccpUsesRectifierCapacityInsteadOfGalvanicMass() {
+  const result = runCathodicProtectionAnalysis(baseInput({
+    anodeTypeSystem: 'iccp',
+    criteriaEvidenceEnabled: false,
+    modeledReferencePotentialMv: -910,
+    anodeCapacityAhPerKg: undefined,
+    anodeUtilization: undefined,
+    designFactor: undefined,
+    installedMassKg: undefined,
+    iccpRatedCurrentA: 10,
+    iccpRatedVoltageV: 50,
+    iccpGroundbedResistanceOhm: 1.5,
+    iccpVoltageAllowanceV: 5,
+    iccpReserveFactor: 1.25
+  }));
+
+  assert.equal(result.minimumAnodeMassKg, null);
+  assert.equal(result.predictedLifeYears, null);
+  assert.equal(result.criteriaCheckEvidence.overallStatus, 'not-run');
+  assert.equal(result.iccpSizing.requiredRectifierCurrentA, 0.3311);
+  assert.equal(result.iccpSizing.requiredRectifierVoltageV, 5.5);
+  assert.equal(result.iccpSizing.overallStatus, 'pass');
+  assert.equal(result.profileData.thresholdBands.currentDemandA.passWhenLessThanOrEqual, result.requiredCurrentA);
+  assert.equal(result.modeledReferencePotentialMv, -910);
+  const firstAttenuation = result.distributionModel.segments[0].attenuationFactor;
+  assert.equal(
+    result.profileData.scenarios.base.potential[0].value,
+    Number((-910 - ((1 - firstAttenuation) * 220)).toFixed(1))
+  );
+})();
+
 (function testFormulaHelpers() {
   assert.equal(calculateRequiredCurrent(100, 0.01), 1);
   assert.equal(calculateRequiredAnodeMass(1, 8760, 780, 0.85, 1.1).toFixed(6), '12.011518');
   assert.equal(calculatePredictedDesignLife(100, 780, 0.85, 1.1, 1).toFixed(6), '8.325342');
+  assert.deepEqual(
+    calculateIccpSourceSizing(2, 1.25, 1.5, 5, 4, 10),
+    {
+      requiredRectifierCurrentA: 2.5,
+      requiredRectifierVoltageV: 8.75,
+      currentHeadroomA: 1.5,
+      voltageHeadroomV: 1.25,
+      currentCapacityStatus: 'pass',
+      voltageCapacityStatus: 'pass',
+      overallStatus: 'pass'
+    }
+  );
+  assert.deepEqual(
+    calculateIccpSourceSizing(10, 1.25, 2, 5, 10, 25),
+    {
+      requiredRectifierCurrentA: 12.5,
+      requiredRectifierVoltageV: 30,
+      currentHeadroomA: -2.5,
+      voltageHeadroomV: -5,
+      currentCapacityStatus: 'fail',
+      voltageCapacityStatus: 'fail',
+      overallStatus: 'fail'
+    }
+  );
 })();
 
 (function testEdgeCaseVeryLowHighResistivity() {

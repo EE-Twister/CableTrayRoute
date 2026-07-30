@@ -73,8 +73,13 @@
         <em>same ordered sequence of raceway segments</em>. Cables in the same pull
         can be pulled simultaneously by field crews.</p>
         <p><strong>Pull tension</strong> is estimated using the capstan equation for
-        bends and a constant friction coefficient (μ = 0.35) for straight runs.
-        Combined cable weight per foot is used for multi-cable pulls.</p>
+        bends and an editable per-pull friction coefficient. Combined cable weight
+        per foot is used for multi-cable pulls. Forward and reverse directions are
+        compared when route segments support direction-aware calculation.</p>
+        <p>Manufacturer pulling-tension and sidewall-pressure limits must be entered
+        before a pass/fail result is shown. A three-cable conduit pull can also be
+        screened for the common 2.8–3.2 jam-ratio band. These are planning checks,
+        not a substitute for manufacturer installation data.</p>
         <p>References: NEC Article 300.31, IEEE Std 1185, AEIC CG5.</p>
         <p>See also:
           <a href="optimalRoute.html">Optimal Route</a>,
@@ -123,9 +128,11 @@
         <p class="field-hint">Cables grouped by type and shared route. Multi-cable
         pulls indicate cables that can be pulled together.</p>
         <div class="btn-row">
+          <button type="button" id="savePullPlanBtn">Save Pull Plan to Project</button>
           <button type="button" id="exportPullTableBtn">Export Pull Table (XLSX)</button>
           <button type="button" id="exportPullCardsBtn">Export Pull Cards (XLSX)</button>
         </div>
+        <p id="pullPlanSaveStatus" class="field-hint" role="status" aria-live="polite"></p>
         <div class="option-row">
           <label>
             <input type="checkbox" id="includeQRToggle" aria-label="Include QR codes on pull cards">
@@ -145,6 +152,8 @@
               <th scope="col">Length (ft)</th>
               <th scope="col">Weight (lbs/ft)</th>
               <th scope="col">Est. Tension (lbs)</th>
+              <th scope="col">Direction</th>
+              <th scope="col">Engineering Status</th>
               <th scope="col">Segments</th>
               <th scope="col">Detail</th>
             </tr>

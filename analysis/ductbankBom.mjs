@@ -63,6 +63,7 @@ export function buildDuctbankBOM({
   depthIn = 0,
   concreteEncasement = false,
   conduits = [],
+  routeProfile = null,
   layout = {},
   assumptions = {},
   optionalMaterials = {}
@@ -79,7 +80,10 @@ export function buildDuctbankBOM({
   optional.groundWireCount=Math.min(2,Math.max(1,Math.round(positiveNumber(optional.groundWireCount,1))));
   optional.redWarningDye=Boolean(optional.redWarningDye);
   optional.excavationShoring=Boolean(optional.excavationShoring);
-  const routeLengthFt = positiveNumber(lengthFt);
+  const profileReady = routeProfile?.ready === true && positiveNumber(routeProfile?.summary?.developedLengthFt) > 0;
+  const routeLengthFt = profileReady
+    ? positiveNumber(routeProfile.summary.developedLengthFt)
+    : positiveNumber(lengthFt);
   const conduitRows = Array.isArray(conduits) ? conduits : [];
   const warnings = [];
   const rows = [];
@@ -87,6 +91,11 @@ export function buildDuctbankBOM({
 
   if(!routeLengthFt) warnings.push('Enter a ductbank route length greater than 0 ft to calculate quantities.');
   if(!conduitRows.length) warnings.push('Add at least one conduit to build the ductbank BOM.');
+  if(profileReady && Array.isArray(routeProfile.warnings)){
+    routeProfile.warnings.forEach(warning=>warnings.push(`Route profile: ${warning}`));
+  }else if(Array.isArray(routeProfile?.points) && routeProfile.points.length){
+    warnings.push('The station-based route profile is incomplete; the BOM is using the single route-length and cover inputs.');
+  }
 
   const conduitGroups = groupBy(conduitRows, conduit=>`${conduit.conduit_type || 'Conduit'}|${conduit.trade_size || ''}`);
   conduitGroups.forEach((group, key)=>{
@@ -139,6 +148,47 @@ export function buildDuctbankBOM({
     });
   }
 
+  if(profileReady){
+    const structureLabels = {
+      Manhole: 'Manhole',
+      Handhole: 'Handhole',
+      'Pull box': 'Pull box',
+      'Building entry': 'Building entry',
+      Crossing: 'Crossing marker'
+    };
+    Object.entries(routeProfile.summary.structureCounts || {}).forEach(([type, count])=>{
+      if(!count) return;
+      rows.push({
+        category: 'Structures',
+        item: structureLabels[type] || type,
+        specification: 'Route profile location; project-specific assembly',
+        quantity: count,
+        unit: 'EA',
+        basis: 'Counted station-based route structures'
+      });
+    });
+    if(routeProfile.summary.horizontalBends){
+      rows.push({
+        category: 'Route fittings',
+        item: 'Horizontal sweep / bend allowance',
+        specification: 'Radius and fitting type require detailed design',
+        quantity: routeProfile.summary.horizontalBends * conduitRows.length,
+        unit: 'EA',
+        basis: `${routeProfile.summary.horizontalBends} plan direction change(s) × ${conduitRows.length} conduit run(s)`
+      });
+    }
+    if(routeProfile.summary.verticalBends){
+      rows.push({
+        category: 'Route fittings',
+        item: 'Vertical sweep / bend allowance',
+        specification: 'Radius and fitting type require detailed design',
+        quantity: routeProfile.summary.verticalBends * conduitRows.length,
+        unit: 'EA',
+        basis: `${routeProfile.summary.verticalBends} profile grade change(s) × ${conduitRows.length} conduit run(s)`
+      });
+    }
+  }
+
   const ods = conduitRows.map(conduit=>({
     conduit,
     od: conduitOutsideDiameterIn(conduit.conduit_type, conduit.trade_size),
@@ -158,7 +208,10 @@ export function buildDuctbankBOM({
   const envelopeWidthIn = positioned.length ? Math.max(...positioned.map(entry=>entry.x + entry.od)) + rightPad : 0;
   const envelopeHeightIn = positioned.length ? Math.max(...positioned.map(entry=>entry.y + entry.od)) + topPad : 0;
   const trenchWidthIn = envelopeWidthIn + 2 * resolved.workingClearanceIn;
-  const trenchDepthIn = positiveNumber(depthIn) + envelopeHeightIn + resolved.beddingDepthIn;
+  const routeDepthIn = profileReady
+    ? positiveNumber(routeProfile.summary.averageCoverIn, positiveNumber(depthIn))
+    : positiveNumber(depthIn);
+  const trenchDepthIn = routeDepthIn + envelopeHeightIn + resolved.beddingDepthIn;
   const excavationCubicYards = routeLengthFt && trenchWidthIn && trenchDepthIn
     ? (trenchWidthIn / 12) * (trenchDepthIn / 12) * routeLengthFt / 27
     : 0;
@@ -247,7 +300,9 @@ export function buildDuctbankBOM({
     optionalRows,
     warnings,
     exclusions: [
-      'Manholes, pull boxes, sweeps, and route-specific fittings require plan/profile geometry.',
+      profileReady
+        ? 'Route structures and bend allowances are planning counts only; dimensions, radii, penetrations, drainage, grounding, and accessories require detailed design.'
+        : 'Manholes, pull boxes, sweeps, and route-specific fittings require station-based plan/profile geometry.',
       'Cable is excluded from this BOM and remains governed by the cable schedule.',
       'Reinforcing steel, dewatering, rock excavation, labor, tax, and pricing are not included.',
       'Optional shoring is a planning-area allowance, not a protective-system design or OSHA compliance determination.',
@@ -261,6 +316,7 @@ export function buildDuctbankBOM({
       excavationCubicYards: round(excavationCubicYards),
       spacerSets: conduitRows.length && routeLengthFt ? Math.ceil(routeLengthFt / Math.max(resolved.spacerSpacingFt, 0.1)) + 1 : 0,
       optionalLineItems: optionalRows.filter(row=>row.included).length
-    }
+    },
+    routeProfileApplied: profileReady
   };
 }
