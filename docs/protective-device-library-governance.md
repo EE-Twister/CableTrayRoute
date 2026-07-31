@@ -8,6 +8,37 @@ The TCC selector's **Filters** group can isolate calculation-ready,
 source-verified, standards-reference, or screening-only library records before
 curves are selected.
 
+## Authoritative data contract
+
+[`data/protectiveDevices.schema.json`](../data/protectiveDevices.schema.json) is
+the machine-readable contract for both the production array and staged research
+batches. It declares field names, units, nullability, enumerations, curve and
+rating structures, source-document metadata, field-level provenance, review
+metadata, and conditional calculation-ready requirements.
+
+Internet research must start from
+[`protective-device-research-template.json`](protective-device-research-template.json)
+and produce `purpose: "protective_device_research_candidates"` records. Research
+agents may only set `researchStatus: "candidate"` and
+`libraryStatus: "screening"`; they must leave reviewer identity and review date
+null. Validate a research batch before review with:
+
+```text
+npm run validate:protective-devices -- --research <candidate-file.json>
+```
+
+Before a reviewed record is proposed as calculation-ready, run the stricter
+promotion contract after setting `researchStatus: "reviewed"`, recording the
+human reviewer, and setting `libraryStatus: "calculation_ready"`:
+
+```text
+npm run validate:protective-devices -- --promotion <reviewed-file.json>
+```
+
+The checked-in production library is also validated automatically at the start
+of `npm run build`. Legacy screening records remain readable, but they are not
+templates for new research.
+
 | Status | Intended use |
 | --- | --- |
 | Calculation-ready | Exact configuration, voltage-specific ratings, curve evidence, and independent review are present. Suitable for calculation workflows within the recorded applicability. |
@@ -28,6 +59,27 @@ A device may declare `libraryStatus: "calculation_ready"` only when it includes:
 
 The runtime rechecks this gate. A record that claims calculation-ready status
 but misses any required field is displayed as **Screening only** instead.
+
+The runtime gate above is a compatibility minimum. The schema and promotion
+validator additionally require the documented production applicability fields,
+field-level source mapping, verification statuses, last-verified date, curve
+spot checks, and independent review metadata. Passing the compatibility gate
+alone is not authorization to issue engineering work.
+
+## Source and field provenance
+
+Every new researched record must use `sourceDocuments` for complete source
+citations and `fieldSources` to map JSON Pointer field paths to source IDs.
+`fieldStatus` must mark each governed field as `verified`, `derived`,
+`not_found`, `not_applicable`, or `conflicting`. Technical values marked
+verified or derived require a manufacturer, standards-body, regulator, or NRTL
+source. A source supporting US market prevalence is also required; distributor
+or industry sources may support prevalence but cannot be the sole authority for
+ratings, settings, or curves.
+
+Unknown values must remain null, empty arrays, or empty objects and must be
+listed in `missingForProduction`. Research agents must not infer interrupting
+ratings, withstand ratings, curve bands, settings, or reviewer approval.
 
 ## Recording reviewed custom curves
 

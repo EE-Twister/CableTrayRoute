@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "build": "node scripts/buildFastJsonPatch.cjs && rollup -c rollup.config.cjs && node scripts/copyAssets.cjs && node scripts/rewriteHtmlForManifest.cjs && node scripts/generateValidationManifest.cjs && node scripts/auditHtmlAssetReferences.mjs --fix",
+    "build": "node scripts/validateProtectiveDevices.mjs && node scripts/buildFastJsonPatch.cjs && rollup -c rollup.config.cjs && node scripts/copyAssets.cjs && node scripts/rewriteHtmlForManifest.cjs && node scripts/generateValidationManifest.cjs && node scripts/auditHtmlAssetReferences.mjs --fix",
     "sample:engineering-report": "npm run build && node scripts/captureEngineeringReportVisuals.mjs && python scripts/generateEngineeringSamplePackage.py",
     "sample:engineering-report:setup": "python -m pip install -r scripts/engineering-report-requirements.txt",
     "build:cloudflare": "node scripts/generateSupabaseConfig.mjs && npm run build",
@@ -26,6 +26,7 @@
     "e2e:heat-trace-dashboard": "playwright test --config playwright.config.cjs playwright-tests/heatTrace.acceptance.spec.js --grep \"AT-HT-0[1-5]\"",
     "e2e:heat-trace-export": "playwright test --config playwright.config.cjs playwright-tests/heatTrace.acceptance.spec.js --grep \"AT-HT-06\"",
     "audit:catalog": "node scripts/auditManufacturerCatalog.mjs --check",
+    "validate:protective-devices": "node scripts/validateProtectiveDevices.mjs",
     "audit:components": "node scripts/componentCoverageAudit.mjs",
     "audit:symbol-continuity": "node scripts/auditOneLineSymbolContinuity.mjs",
     "audit:page-contracts": "node scripts/auditPageContracts.mjs",
@@ -37,6 +38,7 @@
     "@playwright/test": "^1.41.1",
     "@rollup/plugin-json": "^6.1.0",
     "@rollup/plugin-terser": "^1.0.0",
+    "ajv": "^6.15.0",
     "eslint": "^10.4.0",
     "rollup": "^3.30.0"
   },

@@ -1,0 +1,360 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://cabletrayroute.local/schemas/protectiveDevices.schema.json",
+  "title": "CableTrayRoute Protective Device Library and Research Candidates",
+  "description": "Authoritative field contract for the production protective-device library and candidate records produced by research agents. Research agents must use the research-batch form and may only declare screening candidates.",
+  "oneOf": [
+    { "$ref": "#/definitions/library" },
+    { "$ref": "#/definitions/researchBatch" }
+  ],
+  "definitions": {
+    "nullableString": {
+      "type": ["string", "null"]
+    },
+    "nullablePositiveNumber": {
+      "type": ["number", "null"],
+      "exclusiveMinimum": 0
+    },
+    "curvePoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["current", "time"],
+      "properties": {
+        "current": { "type": "number", "exclusiveMinimum": 0, "description": "RMS current in amperes." },
+        "time": { "type": "number", "exclusiveMinimum": 0, "description": "Operating or clearing time in seconds." }
+      }
+    },
+    "curveSpotCheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["current", "expectedTime", "actualTime", "relativeError", "sourceId"],
+      "properties": {
+        "profileId": { "$ref": "#/definitions/nullableString" },
+        "current": { "type": "number", "exclusiveMinimum": 0 },
+        "expectedTime": { "type": "number", "exclusiveMinimum": 0 },
+        "actualTime": { "type": "number", "exclusiveMinimum": 0 },
+        "relativeError": { "type": "number", "minimum": 0 },
+        "sourceId": { "type": "string", "minLength": 1 }
+      }
+    },
+    "curveEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["document", "extractionMethod"],
+      "properties": {
+        "document": { "type": "string", "minLength": 1 },
+        "revision": { "$ref": "#/definitions/nullableString" },
+        "date": { "$ref": "#/definitions/nullableString" },
+        "curveId": { "$ref": "#/definitions/nullableString" },
+        "curveNumber": { "$ref": "#/definitions/nullableString" },
+        "page": { "$ref": "#/definitions/nullableString" },
+        "representation": {
+          "type": ["string", "null"],
+          "enum": ["minimum_melt", "total_clearing", "average", "nominal", "tolerance_band", "equation", "differential_characteristic", null]
+        },
+        "currentUnit": { "type": ["string", "null"], "enum": ["A", "kA", "multiple_of_pickup", "per_unit", null] },
+        "timeUnit": { "type": ["string", "null"], "enum": ["s", "cycles", null] },
+        "frequencyHz": { "type": ["number", "null"], "exclusiveMinimum": 0 },
+        "referenceAmbientC": { "type": ["number", "null"] },
+        "scalingBasis": { "$ref": "#/definitions/nullableString" },
+        "extractionMethod": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Prefer: manufacturer spreadsheet, manufacturer data file, published equation, digitized official PDF, manual transcription, or not extracted. Include controlled-reduction details when applicable."
+        },
+        "extractionDate": { "$ref": "#/definitions/nullableString" },
+        "sourceId": { "$ref": "#/definitions/nullableString" },
+        "reviewer": { "$ref": "#/definitions/nullableString" }
+      },
+      "anyOf": [
+        { "required": ["revision"] },
+        { "required": ["date"] }
+      ],
+      "allOf": [
+        {
+          "anyOf": [
+            { "required": ["curveId"] },
+            { "required": ["curveNumber"] },
+            { "required": ["page"] }
+          ]
+        }
+      ]
+    },
+    "interruptingRating": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["currentKA", "currentType", "ratingType"],
+      "properties": {
+        "voltageVac": { "type": "number", "exclusiveMinimum": 0 },
+        "voltageVdc": { "type": "number", "exclusiveMinimum": 0 },
+        "currentKA": { "type": "number", "exclusiveMinimum": 0 },
+        "currentType": { "type": "string", "enum": ["AC", "DC"] },
+        "ratingType": { "type": "string", "minLength": 1, "description": "Examples: AIR, AIC, Icu, Ics, RMS symmetrical." },
+        "standard": { "$ref": "#/definitions/nullableString" },
+        "frequencyHz": { "type": ["number", "null"], "exclusiveMinimum": 0 },
+        "poles": { "type": ["integer", "null"], "minimum": 1 },
+        "basis": { "$ref": "#/definitions/nullableString" },
+        "sourceId": { "$ref": "#/definitions/nullableString" }
+      },
+      "oneOf": [
+        { "required": ["voltageVac"] },
+        { "required": ["voltageVdc"] }
+      ]
+    },
+    "shortTimeWithstand": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["currentKA", "durationSeconds", "sourceId"],
+      "properties": {
+        "currentKA": { "type": "number", "exclusiveMinimum": 0 },
+        "durationSeconds": { "type": "number", "exclusiveMinimum": 0 },
+        "voltageVac": { "type": ["number", "null"], "exclusiveMinimum": 0 },
+        "basis": { "$ref": "#/definitions/nullableString" },
+        "sourceId": { "type": "string", "minLength": 1 }
+      }
+    },
+    "settingRange": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["unit", "basis"],
+      "properties": {
+        "min": { "type": ["number", "null"] },
+        "max": { "type": ["number", "null"] },
+        "step": { "type": ["number", "null"], "exclusiveMinimum": 0 },
+        "values": { "type": ["array", "null"], "items": { "type": ["number", "string", "boolean"] } },
+        "unit": { "type": "string", "minLength": 1 },
+        "basis": { "type": "string", "minLength": 1 },
+        "sourceId": { "$ref": "#/definitions/nullableString" }
+      }
+    },
+    "curveProfile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "curve"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$" },
+        "name": { "type": "string", "minLength": 1 },
+        "role": { "type": "string", "enum": ["melting", "clearing", "lower", "upper", "nominal", "operate", "reset", "differential"] },
+        "curve": { "type": "array", "minItems": 2, "items": { "$ref": "#/definitions/curvePoint" } },
+        "curveEvidence": { "$ref": "#/definitions/curveEvidence" },
+        "settings": { "type": "object", "additionalProperties": true }
+      }
+    },
+    "researchedCurveProfile": {
+      "allOf": [
+        { "$ref": "#/definitions/curveProfile" },
+        { "required": ["role", "curveEvidence"] }
+      ]
+    },
+    "sourceDocument": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "sourceType", "purposes", "publisher", "title", "url", "accessedOn"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]*$" },
+        "sourceType": {
+          "type": "string",
+          "enum": ["manufacturer", "standards_body", "regulator", "nrtl", "utility", "distributor", "industry_publication"]
+        },
+        "purposes": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "enum": ["technical_data", "curve_data", "standards", "lifecycle", "market_prevalence"] }
+        },
+        "publisher": { "type": "string", "minLength": 1 },
+        "title": { "type": "string", "minLength": 1 },
+        "url": { "type": "string", "pattern": "^https?://" },
+        "documentNumber": { "$ref": "#/definitions/nullableString" },
+        "revision": { "$ref": "#/definitions/nullableString" },
+        "date": { "$ref": "#/definitions/nullableString" },
+        "accessedOn": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+        "page": { "$ref": "#/definitions/nullableString" },
+        "notes": { "$ref": "#/definitions/nullableString" }
+      }
+    },
+    "review": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reviewer", "reviewedOn", "notes"],
+      "properties": {
+        "reviewer": { "$ref": "#/definitions/nullableString" },
+        "reviewedOn": { "$ref": "#/definitions/nullableString" },
+        "notes": { "$ref": "#/definitions/nullableString" }
+      }
+    },
+    "deviceRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "vendor", "name", "settings", "settingOptions", "curve"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$", "description": "Stable normalized identifier. New research records must use lowercase snake_case and must not encode temporary research status." },
+        "type": { "type": "string", "enum": ["breaker", "fuse", "relay", "relay_87", "recloser", "contactor", "switch"] },
+        "subtype": { "$ref": "#/definitions/nullableString" },
+        "voltageClass": { "type": ["string", "null"], "enum": ["LV", "MV", "HV", null] },
+        "vendor": { "type": "string", "minLength": 1 },
+        "manufacturer": { "$ref": "#/definitions/nullableString" },
+        "series": { "$ref": "#/definitions/nullableString" },
+        "name": { "type": "string", "minLength": 1 },
+        "catalogNumber": { "$ref": "#/definitions/nullableString" },
+        "tripUnitModel": { "$ref": "#/definitions/nullableString" },
+        "lifecycleStatus": { "type": ["string", "null"], "enum": ["current", "legacy", "discontinued", "unknown", null] },
+        "region": { "type": ["array", "null"], "items": { "type": "string", "enum": ["US", "Canada", "Mexico", "global"] }, "uniqueItems": true },
+        "standards": { "type": ["array", "null"], "items": { "type": "string" }, "uniqueItems": true },
+        "frequencyHz": { "type": ["array", "null"], "items": { "type": "number", "exclusiveMinimum": 0 }, "uniqueItems": true },
+        "poles": { "type": ["array", "null"], "items": { "type": "integer", "minimum": 1 }, "uniqueItems": true },
+        "ratedVoltageVac": { "$ref": "#/definitions/nullablePositiveNumber" },
+        "ratedVoltageVdc": { "$ref": "#/definitions/nullablePositiveNumber" },
+        "maximumVoltageVac": { "$ref": "#/definitions/nullablePositiveNumber" },
+        "continuousCurrentA": { "$ref": "#/definitions/nullablePositiveNumber" },
+        "frameA": { "$ref": "#/definitions/nullablePositiveNumber" },
+        "sensorA": { "$ref": "#/definitions/nullablePositiveNumber" },
+        "tripRatingA": { "$ref": "#/definitions/nullablePositiveNumber" },
+        "interruptRating": { "type": ["number", "null"], "description": "Deprecated screening-only maximum in kA. New records must use interruptingRatings." },
+        "interruptingRatings": { "type": ["array", "null"], "items": { "$ref": "#/definitions/interruptingRating" } },
+        "makingCapacityKApeak": { "$ref": "#/definitions/nullablePositiveNumber" },
+        "withstandRatingKA": { "$ref": "#/definitions/nullablePositiveNumber" },
+        "withstandCycles": { "$ref": "#/definitions/nullablePositiveNumber" },
+        "shortTimeWithstand": { "type": ["array", "null"], "items": { "$ref": "#/definitions/shortTimeWithstand" } },
+        "installationRequirement": { "$ref": "#/definitions/nullableString" },
+        "settings": { "type": ["object", "null"], "additionalProperties": true },
+        "settingOptions": { "type": ["object", "null"], "additionalProperties": true },
+        "protectionSettings": { "type": ["object", "null"], "additionalProperties": { "$ref": "#/definitions/settingRange" } },
+        "curve": { "type": ["array", "null"], "items": { "$ref": "#/definitions/curvePoint" } },
+        "curveProfiles": { "type": ["array", "null"], "items": { "$ref": "#/definitions/curveProfile" } },
+        "curveEvidence": { "oneOf": [{ "$ref": "#/definitions/curveEvidence" }, { "type": "null" }] },
+        "curveValidation": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "properties": {
+            "spotChecks": { "type": "array", "items": { "$ref": "#/definitions/curveSpotCheck" } },
+            "notes": { "$ref": "#/definitions/nullableString" }
+          }
+        },
+        "curveReduction": { "type": ["object", "null"], "additionalProperties": true },
+        "tolerance": { "type": ["object", "null"], "additionalProperties": { "type": "number" } },
+        "letThrough": { "type": ["object", "null"], "additionalProperties": true },
+        "openingTime": { "type": ["object", "null"], "additionalProperties": true, "description": "Relay/contact output, mechanism, and arcing time components in seconds or cycles with a stated basis." },
+        "formula": { "type": ["object", "null"], "additionalProperties": true },
+        "iec60255": { "type": ["boolean", "null"] },
+        "curveFamily": { "$ref": "#/definitions/nullableString" },
+        "groundFault": { "type": ["boolean", "null"] },
+        "sensorType": { "$ref": "#/definitions/nullableString" },
+        "nec230_95": { "type": ["boolean", "null"] },
+        "zoneType": { "type": ["string", "null"], "enum": ["87B", "87T", "87G", null] },
+        "harmonicRestraint": { "type": ["boolean", "null"] },
+        "sourceUrls": { "type": ["array", "null"], "items": { "type": "string", "pattern": "^https?://" } },
+        "sourceDocuments": { "type": ["array", "null"], "items": { "$ref": "#/definitions/sourceDocument" } },
+        "fieldSources": { "type": ["object", "null"], "additionalProperties": { "type": "array", "minItems": 1, "items": { "type": "string" }, "uniqueItems": true } },
+        "fieldStatus": { "type": ["object", "null"], "additionalProperties": { "type": "string", "enum": ["verified", "derived", "not_found", "not_applicable", "conflicting"] } },
+        "lastVerified": { "$ref": "#/definitions/nullableString" },
+        "missingForProduction": { "type": ["array", "null"], "items": { "type": "string" }, "uniqueItems": true },
+        "researchStatus": { "type": ["string", "null"], "enum": ["candidate", "reviewed", null] },
+        "libraryStatus": { "type": ["string", "null"], "enum": ["screening", "source_verified", "standards_reference", "calculation_ready", null] },
+        "review": { "oneOf": [{ "$ref": "#/definitions/review" }, { "type": "null" }] },
+        "approved": { "type": ["boolean", "null"] },
+        "evidenceStatus": { "$ref": "#/definitions/nullableString" },
+        "projectCatalog": { "type": ["boolean", "null"] },
+        "catalogSource": { "$ref": "#/definitions/nullableString" },
+        "catalogLastVerified": { "$ref": "#/definitions/nullableString" },
+        "datasheetUrl": { "$ref": "#/definitions/nullableString" }
+      },
+      "allOf": [
+        {
+          "if": {
+            "anyOf": [
+              { "properties": { "type": { "const": "relay" } }, "required": ["type"] },
+              { "properties": { "type": { "const": "relay_87" } }, "required": ["type"] },
+              { "properties": { "subtype": { "const": "relay_87" } }, "required": ["subtype"] }
+            ]
+          },
+          "then": { "properties": { "interruptRating": { "type": "null" } } }
+        },
+        {
+          "if": { "properties": { "researchStatus": { "const": "candidate" } }, "required": ["researchStatus"] },
+          "then": {
+            "required": [
+              "subtype", "series", "catalogNumber", "tripUnitModel", "lifecycleStatus", "region", "standards", "frequencyHz", "poles",
+              "ratedVoltageVac", "ratedVoltageVdc", "continuousCurrentA", "frameA", "sensorA", "tripRatingA", "interruptingRatings",
+              "makingCapacityKApeak", "shortTimeWithstand", "protectionSettings", "curveProfiles", "curveEvidence", "curveValidation", "openingTime",
+              "sourceDocuments", "fieldSources", "fieldStatus", "missingForProduction", "lastVerified", "libraryStatus", "review"
+            ],
+            "properties": {
+              "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_]*$" },
+              "libraryStatus": { "const": "screening" },
+              "curveProfiles": { "type": ["array", "null"], "items": { "$ref": "#/definitions/researchedCurveProfile" } },
+              "review": {
+                "type": "object",
+                "required": ["reviewer", "reviewedOn", "notes"],
+                "properties": {
+                  "reviewer": { "type": "null" },
+                  "reviewedOn": { "type": "null" }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "libraryStatus": { "const": "calculation_ready" } }, "required": ["libraryStatus"] },
+          "then": {
+            "required": [
+              "series", "lifecycleStatus", "region", "standards", "frequencyHz", "poles", "curveEvidence", "curveValidation",
+              "sourceDocuments", "fieldSources", "fieldStatus", "lastVerified", "review"
+            ],
+            "properties": {
+              "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_]*$" },
+              "curveEvidence": { "$ref": "#/definitions/curveEvidence" },
+              "curveProfiles": { "type": ["array", "null"], "items": { "$ref": "#/definitions/researchedCurveProfile" } },
+              "sourceDocuments": { "type": "array", "minItems": 1, "items": { "$ref": "#/definitions/sourceDocument" } },
+              "fieldSources": { "type": "object", "minProperties": 1 },
+              "fieldStatus": { "type": "object", "minProperties": 1 },
+              "review": {
+                "type": "object",
+                "required": ["reviewer", "reviewedOn"],
+                "properties": {
+                  "reviewer": { "type": "string", "minLength": 1 },
+                  "reviewedOn": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" }
+                }
+              }
+            },
+            "anyOf": [
+              { "required": ["catalogNumber"], "properties": { "catalogNumber": { "type": "string", "minLength": 1 } } },
+              { "required": ["tripUnitModel"], "properties": { "tripUnitModel": { "type": "string", "minLength": 1 } } }
+            ]
+          }
+        },
+        {
+          "if": {
+            "allOf": [
+              { "properties": { "libraryStatus": { "const": "calculation_ready" } }, "required": ["libraryStatus"] },
+              { "properties": { "type": { "enum": ["breaker", "fuse", "recloser", "contactor", "switch"] } }, "required": ["type"] }
+            ]
+          },
+          "then": {
+            "required": ["interruptingRatings"],
+            "properties": { "interruptingRatings": { "type": "array", "minItems": 1, "items": { "$ref": "#/definitions/interruptingRating" } } }
+          }
+        }
+      ]
+    },
+    "library": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/deviceRecord" }
+    },
+    "researchBatch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "purpose", "researchedOn", "scope", "records"],
+      "properties": {
+        "schemaVersion": { "const": 1 },
+        "purpose": { "const": "protective_device_research_candidates" },
+        "researchedOn": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+        "scope": { "type": "string", "minLength": 1 },
+        "records": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/deviceRecord" }
+        }
+      }
+    }
+  }
+}

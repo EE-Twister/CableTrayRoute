@@ -381,13 +381,15 @@ export function validateCatalogProduct(product, options = {}) {
     const type = cleanText(normalized.protective_device_type ?? normalized.device_type ?? normalized.type).toLowerCase();
     const curve = cleanText(normalized.protective_device_curve ?? normalized.curve);
     const ratings = cleanText(normalized.protective_device_interrupting_ratings ?? normalized.interruptingRatings);
+    const isDifferentialRelay = type === 'relay_87';
+    const isNonInterruptingDevice = type === 'relay' || isDifferentialRelay;
     if (!PROTECTIVE_DEVICE_TYPES.has(type)) {
       errors.push({ path: 'protective_device_type', message: 'protective_device rows require Protective Device Type (breaker, fuse, relay, relay_87, recloser, contactor, or switch).' });
     }
-    if (curve.split(/[;\n]+/).filter(Boolean).length < 2) {
+    if (!isDifferentialRelay && curve.split(/[;\n]+/).filter(Boolean).length < 2) {
       errors.push({ path: 'protective_device_curve', message: 'protective_device rows require at least two Curve Points as current:time pairs.' });
     }
-    if (type !== 'relay' && !ratings.split(/[;\n]+/).some(pair => {
+    if (!isNonInterruptingDevice && !ratings.split(/[;\n]+/).some(pair => {
       const [voltage, current] = pair.split(/[:@]/, 2).map(Number);
       return voltage > 0 && current > 0;
     })) {

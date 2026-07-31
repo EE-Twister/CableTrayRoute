@@ -29,6 +29,7 @@ const STATUS_DETAILS = Object.freeze({
 });
 
 const PROTECTIVE_TYPES = new Set(['breaker', 'fuse', 'relay', 'relay_87', 'recloser', 'contactor', 'switch']);
+const NON_INTERRUPTING_TYPES = new Set(['relay', 'relay_87']);
 
 function cleanText(value) {
   return String(value ?? '').trim();
@@ -157,6 +158,26 @@ function hasCurveData(device) {
   return false;
 }
 
+function isDifferentialRelay(device) {
+  return device?.type === 'relay_87' || device?.subtype === 'relay_87';
+}
+
+function hasDifferentialCharacteristic(device) {
+  if (!isDifferentialRelay(device)) return false;
+  const settings = device?.settings;
+  return Boolean(
+    settings
+    && Number(settings.slope1) > 0
+    && Number(settings.slope2) > 0
+    && Number(settings.minPickupPu) > 0
+    && Number(settings.breakpointPu) > 0
+  );
+}
+
+function hasProtectionCharacteristic(device) {
+  return isDifferentialRelay(device) ? hasDifferentialCharacteristic(device) : hasCurveData(device);
+}
+
 function hasTraceableCurveEvidence(device, { requireReviewer = true } = {}) {
   const evidence = device?.curveEvidence;
   return Boolean(
@@ -171,7 +192,7 @@ function hasTraceableCurveEvidence(device, { requireReviewer = true } = {}) {
 }
 
 function hasRequiredRatings(device) {
-  if (device?.type === 'relay') return true;
+  if (NON_INTERRUPTING_TYPES.has(device?.type) || device?.subtype === 'relay_87') return true;
   return Array.isArray(device?.interruptingRatings) && device.interruptingRatings.some(rating => {
     const voltage = Number(rating?.voltageVac ?? rating?.voltage ?? rating?.ratedVoltageVac);
     const current = Number(rating?.currentKA ?? rating?.valueKA ?? rating?.value);
@@ -187,8 +208,8 @@ function calculationReadyRequirements(device, { requireReviewer = true } = {}) {
   if (!hasRequiredRatings(device)) {
     missing.push('voltage-specific interrupting ratings');
   }
-  if (!hasCurveData(device)) {
-    missing.push('curve data');
+  if (!hasProtectionCharacteristic(device)) {
+    missing.push(isDifferentialRelay(device) ? 'differential protection characteristic' : 'curve data');
   }
   if (!hasTraceableCurveEvidence(device, { requireReviewer })) {
     missing.push(requireReviewer ? 'traceable curve evidence and reviewer' : 'traceable curve evidence');

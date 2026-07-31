@@ -97,6 +97,13 @@ The following data-model issues should be corrected before adding a large catalo
 
 ## Required production fields
 
+The tables below explain the engineering intent. The enforceable field names,
+types, units, conditional rules, and agent-output wrapper are defined in
+[`data/protectiveDevices.schema.json`](../data/protectiveDevices.schema.json).
+Use [`protective-device-research-template.json`](protective-device-research-template.json)
+for staged extraction; do not infer the target shape from legacy screening
+records in `data/protectiveDevices.json`.
+
 ### Identity and applicability
 
 | Field | Requirement |
@@ -135,6 +142,13 @@ Every production curve should carry:
   `digitized official PDF`), extraction date, and reviewer;
 - upper and lower points when the source publishes a band; and
 - formula coefficients and standard family when a curve is equation-based.
+
+New candidate records also carry `sourceDocuments`, `fieldSources`, and
+`fieldStatus`. At least three `curveValidation.spotChecks` are required before
+promotion for TCC or equation-based records. Differential records use their
+dedicated restraint characteristic and are exempt from ordinary TCC spot
+checks, but still require source-backed characteristic settings and independent
+review.
 
 ## Recommended implementation order
 
