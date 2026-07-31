@@ -392,10 +392,18 @@
         <div class="modal-actions">
           <button id="cable-library-add-btn" class="btn primary-btn" type="button" title="Add a new cable typical">Add Typical</button>
           <button id="cable-library-starter-btn" class="btn" type="button" title="Load common starter cable types">Load Starter Types</button>
+          <button id="cable-library-project-catalog-btn" class="btn" type="button" title="Load governed cable products from the shared project catalog">Load Project Catalog Types</button>
           <button id="cable-library-export-btn" class="btn" type="button" title="Export cable typicals to Excel">Export</button>
           <button id="cable-library-import-btn" class="btn" type="button" title="Import cable typicals from Excel">Import</button>
           <input id="cable-library-import-input" type="file" accept=".xlsx,application/json" hidden aria-hidden="true">
         </div>
+        <label class="cable-library-filter-label" for="cable-library-evidence-filter">Evidence
+          <select id="cable-library-evidence-filter">
+            <option value="">All cable typicals</option>
+            <option value="source_verified">Source verified</option>
+            <option value="screening">Screening / project standard</option>
+          </select>
+        </label>
         <p id="cable-library-empty" class="muted">No cable typicals saved yet.</p>
         <ul id="cable-library-list" class="library-list" role="list"></ul>
       </div>

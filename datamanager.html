@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Review, filter, export, and batch-edit core One-Line component data in a tabular project view." />
+  <title>One-Line Data Manager — CableTrayRoute</title>
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/favicon.svg">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="One-Line Data Manager — CableTrayRoute">
+  <meta property="og:description" content="Review and batch-edit core One-Line component data in a tabular project view.">
+  <meta property="og:image" content="https://cabletrayroute.com/icons/og-preview.png">
+  <meta property="og:site_name" content="CableTrayRoute">
+  <meta property="og:url" content="datamanager.html">
+  <link rel="canonical" href="https://cabletrayroute.com/datamanager.html">
+  <meta name="color-scheme" content="light dark">
+  <link rel="stylesheet" href="style.css" />
+  <script src="dist/vendor/xlsx.full.min.js" defer></script>
+  <script src="cdnFallback.js" defer></script>
+  <script>
+    window.addEventListener('load', function () {
+      if (typeof initCdnFallback === 'function') {
+        initCdnFallback([{ global: 'XLSX', label: 'Data Manager spreadsheet import/export (XLSX)' }]);
+      }
+    });
+  </script>
+  <script type="module" src="dirtyTracker.js"></script>
+  <script type="module" src="dist/datamanager.js" defer></script>
+</head>
+<body class="dashboard-page data-manager-page" data-report-title="One-Line Data Manager">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <nav class="top-nav" aria-label="Primary">
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false" title="Toggle navigation">
+      <img src="icons/toolbar/grid.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+    <div id="nav-links" class="nav-links" role="list"></div>
+    <button id="settings-btn" class="settings-btn" aria-label="Settings" aria-expanded="false" title="Settings">
+      <img src="icons/toolbar/validate.svg" alt="" aria-hidden="true" class="control-icon" loading="lazy" decoding="async">
+    </button>
+  </nav>
+
+  <div id="settings-menu" class="settings-menu">
+    <label for="theme-select">Theme
+      <select id="theme-select">
+        <option value="system">System</option>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+        <option value="high-contrast">High Contrast</option>
+      </select>
+    </label>
+    <label><input type="checkbox" id="compact-toggle" aria-label="Enable compact table mode"> Compact Mode</label>
+    <label for="unit-select">Units
+      <select id="unit-select">
+        <option value="imperial">Imperial</option>
+        <option value="metric">Metric</option>
+      </select>
+    </label>
+    <button id="help-btn" class="btn" aria-expanded="false" title="Show help">Site Help</button>
+    <button id="new-project-btn" title="Start a new project">New Project</button>
+    <button id="save-project-btn" title="Save current project">Save Project</button>
+    <button id="load-project-btn" title="Load an existing project">Load Project</button>
+    <button id="export-project-btn" title="Export project data">Export Project</button>
+    <button id="import-project-btn" title="Import project data">Import Project</button>
+    <input type="file" id="import-project-input" accept=".ctr.json" class="hidden" title="Select project file">
+  </div>
+
+  <div class="container">
+    <main id="main-content" class="main-content">
+      <nav aria-label="Breadcrumb">
+        <ol class="breadcrumb-trail">
+          <li><a href="index.html">Home</a></li>
+          <li>Workflow</li>
+          <li aria-current="page">One-Line Data Manager</li>
+        </ol>
+      </nav>
+
+      <header class="page-header">
+        <h1>One-Line Data Manager</h1>
+        <p class="page-subtitle">Review, filter, export, and batch-edit common One-Line component data without leaving the project model.</p>
+      </header>
+
+      <section class="card" aria-label="Data Manager controls">
+        <div class="dm-controls">
+          <label for="dm-search">Find component
+            <input id="dm-search" type="search" placeholder="ID, tag, label, type, or layer">
+          </label>
+          <label for="dm-sheet-filter">Sheet
+            <select id="dm-sheet-filter"><option value="">All sheets</option></select>
+          </label>
+          <label for="dm-type-filter">Type
+            <select id="dm-type-filter"><option value="">All types</option></select>
+          </label>
+          <button id="dm-refresh" type="button" class="btn">Refresh</button>
+          <button id="dm-export-csv" type="button" class="btn">Export Displayed CSV</button>
+          <button id="dm-export-xlsx" type="button" class="btn">Export Displayed XLSX</button>
+          <button id="dm-import-btn" type="button" class="btn">Preview Spreadsheet Updates</button>
+          <input id="dm-import-input" type="file" accept=".csv,.xlsx,.xls,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" class="hidden" aria-label="Select component update CSV or XLSX file">
+        </div>
+        <p id="dm-row-count" class="field-hint" aria-live="polite"></p>
+        <p id="dm-status" class="field-hint" role="status" aria-live="polite">Changes are saved to the active project scenario and create a One-Line revision.</p>
+      </section>
+
+      <section class="card" aria-label="Batch component update">
+        <h2>Batch Update Selected Components</h2>
+        <p class="text-muted">Only the selected controlled field is changed. Empty layer removes the layer assignment; numerical values must be greater than zero.</p>
+        <div class="dm-batch-controls">
+          <label for="dm-batch-field">Field
+            <select id="dm-batch-field">
+              <option value="voltageKv">Rated voltage (kV)</option>
+              <option value="currentA">Rated current (A)</option>
+              <option value="layer">Layer</option>
+              <option value="locked">Position locked</option>
+            </select>
+          </label>
+          <label id="dm-batch-text-wrap" for="dm-batch-value">Value
+            <input id="dm-batch-value" type="number" min="0.001" step="any">
+          </label>
+          <label id="dm-batch-boolean-wrap" for="dm-batch-boolean-value" hidden>Value
+            <select id="dm-batch-boolean-value">
+              <option value="true">Locked</option>
+              <option value="false">Unlocked</option>
+            </select>
+          </label>
+          <button id="dm-apply-batch" type="button" class="btn primary-btn" disabled>Apply to Selected</button>
+        </div>
+      </section>
+
+      <section id="dm-import-review" class="card" aria-label="Spreadsheet update review" hidden>
+        <h2>Spreadsheet Update Review</h2>
+        <p class="text-muted">CSV or XLSX rows match the active One-Line by <strong>Component ID</strong>. Only Label, Tag, Rated Voltage (kV), Rated Current (A), Layer, and Position Locked are considered. Nothing is changed until you apply this preview.</p>
+        <p id="dm-import-summary" class="field-hint" aria-live="polite"></p>
+        <div class="dm-table-scroll">
+          <table class="dm-table dm-import-table">
+            <thead><tr><th scope="col">Component ID</th><th scope="col">Field</th><th scope="col">Current</th><th scope="col">Imported</th></tr></thead>
+            <tbody id="dm-import-changes"></tbody>
+          </table>
+        </div>
+        <div id="dm-import-warnings" class="dm-import-warnings"></div>
+        <button id="dm-apply-import" type="button" class="btn primary-btn" disabled>Apply Reviewed Spreadsheet Updates</button>
+      </section>
+
+      <section class="card" aria-label="One-Line component data table">
+        <h2>Component Data</h2>
+        <p class="text-muted">Edit labels, tags, ratings, layers, and position locks directly. Use the checkbox in the header to select displayed rows.</p>
+        <div class="dm-table-scroll">
+          <table class="dm-table">
+            <thead>
+              <tr>
+                <th scope="col"><input id="dm-select-visible" type="checkbox" aria-label="Select displayed components"></th>
+                <th scope="col">Sheet</th>
+                <th scope="col">Component ID</th>
+                <th scope="col">Label</th>
+                <th scope="col">Tag</th>
+                <th scope="col">Type</th>
+                <th scope="col">Rated kV</th>
+                <th scope="col">Rated A</th>
+                <th scope="col">Layer</th>
+                <th scope="col">Position locked</th>
+              </tr>
+            </thead>
+            <tbody id="dm-table-body"></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+</body>
+</html>

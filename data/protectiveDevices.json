@@ -226,6 +226,344 @@
     }
   },
   {
+    "id": "sc_smu20_65e_standard_14kv",
+    "type": "fuse",
+    "voltageClass": "MV",
+    "vendor": "S&C Electric Company",
+    "series": "SMU-20",
+    "name": "S&C SMU-20 65E Standard Speed (14.4 kV)",
+    "catalogNumber": "612065",
+    "ratedVoltageVac": 14400,
+    "maximumVoltageVac": 17000,
+    "continuousCurrentA": 65,
+    "interruptRating": 14,
+    "withstandRatingKA": null,
+    "withstandCycles": null,
+    "installationRequirement": "Use with a 14.4 kV S&C SMD-20 mounting; the interrupting rating is assembly-dependent.",
+    "interruptingRatings": [
+      {
+        "voltageVac": 14400,
+        "currentKA": 14,
+        "currentType": "AC",
+        "ratingType": "RMS symmetrical",
+        "basis": "SMD-20 power fuse with SMU-20 fuse unit at 60 Hz"
+      }
+    ],
+    "settings": {
+      "ampRating": 65
+    },
+    "settingOptions": {
+      "ampRating": [65]
+    },
+    "curve": [
+      { "current": 140.18, "time": 602.359 },
+      { "current": 140.602, "time": 514.838 },
+      { "current": 141.024, "time": 360.269 },
+      { "current": 141.589, "time": 171.545 },
+      { "current": 143.155, "time": 121.492 },
+      { "current": 148.106, "time": 50.2418 },
+      { "current": 150.194, "time": 38.2386 },
+      { "current": 153.229, "time": 29.4545 },
+      { "current": 155.389, "time": 23.1003 },
+      { "current": 164.503, "time": 13.9411 },
+      { "current": 169.005, "time": 11.4483 },
+      { "current": 179.995, "time": 7.6971 },
+      { "current": 189.982, "time": 5.79991 },
+      { "current": 210.173, "time": 3.89168 },
+      { "current": 263.995, "time": 2.0935 },
+      { "current": 367.209, "time": 0.976129 },
+      { "current": 574.173, "time": 0.388228 },
+      { "current": 920.513, "time": 0.1671 },
+      { "current": 1601.87, "time": 0.073596 },
+      { "current": 2635.76, "time": 0.04039 },
+      { "current": 3804.46, "time": 0.029594 },
+      { "current": 4909.5, "time": 0.025396 },
+      { "current": 9575.16, "time": 0.019601 },
+      { "current": 17817.3, "time": 0.016504 }
+    ],
+    "curveProfiles": [
+      {
+        "id": "minimum_melting",
+        "name": "Minimum melting",
+        "role": "melting",
+        "curve": [
+          { "current": 129.65572, "time": 601.757 },
+          { "current": 129.785, "time": 569.554 },
+          { "current": 130.30515, "time": 216.34 },
+          { "current": 130.69703, "time": 170.69 },
+          { "current": 131.22021, "time": 141.012 },
+          { "current": 134.27344, "time": 76.3898 },
+          { "current": 138.22456, "time": 40.7659 },
+          { "current": 141.5818, "time": 29.1614 },
+          { "current": 144.73199, "time": 22.3281 },
+          { "current": 150.187, "time": 15.4382 },
+          { "current": 162.04642, "time": 8.93382 },
+          { "current": 179.62648, "time": 5.23749 },
+          { "current": 192.45853, "time": 4.01823 },
+          { "current": 233.89681, "time": 2.21852 },
+          { "current": 272.29398, "time": 1.48563 },
+          { "current": 404.59287, "time": 0.609473 },
+          { "current": 3164.9057, "time": 0.01 }
+        ],
+        "curveEvidence": {
+          "document": "S&C TCC No. 153-2",
+          "date": "2015-07-14",
+          "curveNumber": "153-2",
+          "extractionMethod": "manufacturer spreadsheet"
+        }
+      },
+      {
+        "id": "total_clearing_14_4kv",
+        "name": "Total clearing (14.4 kV)",
+        "role": "clearing",
+        "curve": [
+          { "current": 140.18, "time": 602.359 },
+          { "current": 140.602, "time": 514.838 },
+          { "current": 141.024, "time": 360.269 },
+          { "current": 141.589, "time": 171.545 },
+          { "current": 143.155, "time": 121.492 },
+          { "current": 148.106, "time": 50.2418 },
+          { "current": 150.194, "time": 38.2386 },
+          { "current": 153.229, "time": 29.4545 },
+          { "current": 155.389, "time": 23.1003 },
+          { "current": 164.503, "time": 13.9411 },
+          { "current": 169.005, "time": 11.4483 },
+          { "current": 179.995, "time": 7.6971 },
+          { "current": 189.982, "time": 5.79991 },
+          { "current": 210.173, "time": 3.89168 },
+          { "current": 263.995, "time": 2.0935 },
+          { "current": 367.209, "time": 0.976129 },
+          { "current": 574.173, "time": 0.388228 },
+          { "current": 920.513, "time": 0.1671 },
+          { "current": 1601.87, "time": 0.073596 },
+          { "current": 2635.76, "time": 0.04039 },
+          { "current": 3804.46, "time": 0.029594 },
+          { "current": 4909.5, "time": 0.025396 },
+          { "current": 9575.16, "time": 0.019601 },
+          { "current": 17817.3, "time": 0.016504 }
+        ],
+        "curveEvidence": {
+          "document": "S&C TCC No. 153-2-2",
+          "date": "1988-08-29",
+          "curveNumber": "153-2-2",
+          "extractionMethod": "manufacturer spreadsheet"
+        }
+      }
+    ],
+    "curveEvidence": {
+      "document": "S&C TCC Nos. 153-2 and 153-2-2",
+      "revision": "2015-07-14 minimum melting; 1988-08-29 total clearing",
+      "curveNumber": "153-2 / 153-2-2",
+      "extractionMethod": "manufacturer spreadsheets; exact source points reduced after application-normalization check"
+    },
+    "curveReduction": {
+      "method": "Adaptive selection of official points after application curve normalization",
+      "minimumMelting": { "sourcePoints": 86, "normalizedPoints": 78, "retainedPoints": 17, "maxLogInterpolationError": 0.0202 },
+      "totalClearing": { "sourcePoints": 88, "normalizedPoints": 56, "retainedPoints": 24, "maxLogInterpolationError": 0.0229 }
+    },
+    "sourceUrls": [
+      "https://www.sandc.com/en/contact-us/time-current-characteristic-curves/",
+      "https://www.sandc.com/globalassets/sac-electric/documents/public---documents/sales-manual-library---external-view/tcc-number-153-2.xlsx",
+      "https://www.sandc.com/globalassets/sac-electric/documents/public---documents/sales-manual-library---external-view/tcc-number-153-2-2.xlsx",
+      "https://www.sandc.com/globalassets/sac-electric/documents/public---documents/sales-manual-library---external-view/specification-bulletin-242-31.pdf"
+    ],
+    "libraryStatus": "source_verified"
+  },
+  {
+    "id": "sc_smu20_25e_standard_14kv",
+    "type": "fuse",
+    "voltageClass": "MV",
+    "vendor": "S&C Electric Company",
+    "series": "SMU-20",
+    "name": "S&C SMU-20 25E Standard Speed (14.4 kV)",
+    "catalogNumber": "612025",
+    "ratedVoltageVac": 14400,
+    "maximumVoltageVac": 17000,
+    "continuousCurrentA": 25,
+    "interruptRating": 14,
+    "withstandRatingKA": null,
+    "withstandCycles": null,
+    "installationRequirement": "Use with a 14.4 kV S&C SMD-20 mounting; the interrupting rating is assembly-dependent.",
+    "interruptingRatings": [
+      {
+        "voltageVac": 14400,
+        "currentKA": 14,
+        "currentType": "AC",
+        "ratingType": "RMS symmetrical",
+        "basis": "SMD-20 power fuse with SMU-20 fuse unit at 60 Hz"
+      }
+    ],
+    "settings": { "ampRating": 25 },
+    "settingOptions": { "ampRating": [25] },
+    "curve": [
+      { "current": 53.6206, "time": 601.155 }, { "current": 53.7817, "time": 259.265 },
+      { "current": 53.9433, "time": 68.7068 }, { "current": 53.9973, "time": 33.6108 },
+      { "current": 54.0513, "time": 33.6108 }, { "current": 54.2137, "time": 25.4533 },
+      { "current": 54.8134, "time": 20.6114 }, { "current": 55.9766, "time": 15.9721 },
+      { "current": 57.7968, "time": 12.7285 }, { "current": 60.2158, "time": 10.1233 },
+      { "current": 66.6153, "time": 6.70493 }, { "current": 70.3114, "time": 5.60043 },
+      { "current": 83.5073, "time": 3.30303 }, { "current": 94.5316, "time": 2.39849 },
+      { "current": 131.49, "time": 1.1698 }, { "current": 194.597, "time": 0.559808 },
+      { "current": 588.708, "time": 0.085165 }, { "current": 910.443, "time": 0.047209 },
+      { "current": 1290.68, "time": 0.03411 }, { "current": 1759.75, "time": 0.028207 },
+      { "current": 3294.23, "time": 0.023002 }, { "current": 6386.41, "time": 0.019503 },
+      { "current": 17835.1, "time": 0.016504 }
+    ],
+    "curveProfiles": [
+      {
+        "id": "minimum_melting",
+        "name": "Minimum melting",
+        "role": "melting",
+        "curve": [
+          { "current": 49.4486, "time": 39.7197 }, { "current": 49.6468, "time": 39.7197 },
+          { "current": 49.9956, "time": 26.4921 }, { "current": 51.4152, "time": 18.0626 },
+          { "current": 54.1595, "time": 11.6446 }, { "current": 55.4196, "time": 10.2046 },
+          { "current": 60.3363, "time": 7.06281 }, { "current": 64.5819, "time": 5.53916 },
+          { "current": 73.4007, "time": 3.76912 }, { "current": 84.8541, "time": 2.5724 },
+          { "current": 106.264, "time": 1.51867 }, { "current": 137.13, "time": 0.887666 },
+          { "current": 1326.01, "time": 0.01 }
+        ],
+        "curveEvidence": {
+          "document": "S&C TCC No. 153-2", "date": "2015-07-14", "curveNumber": "153-2", "extractionMethod": "manufacturer spreadsheet"
+        }
+      },
+      {
+        "id": "total_clearing_14_4kv",
+        "name": "Total clearing (14.4 kV)",
+        "role": "clearing",
+        "curve": [
+          { "current": 53.6206, "time": 601.155 }, { "current": 53.7817, "time": 259.265 },
+          { "current": 53.9433, "time": 68.7068 }, { "current": 53.9973, "time": 33.6108 },
+          { "current": 54.0513, "time": 33.6108 }, { "current": 54.2137, "time": 25.4533 },
+          { "current": 54.8134, "time": 20.6114 }, { "current": 55.9766, "time": 15.9721 },
+          { "current": 57.7968, "time": 12.7285 }, { "current": 60.2158, "time": 10.1233 },
+          { "current": 66.6153, "time": 6.70493 }, { "current": 70.3114, "time": 5.60043 },
+          { "current": 83.5073, "time": 3.30303 }, { "current": 94.5316, "time": 2.39849 },
+          { "current": 131.49, "time": 1.1698 }, { "current": 194.597, "time": 0.559808 },
+          { "current": 588.708, "time": 0.085165 }, { "current": 910.443, "time": 0.047209 },
+          { "current": 1290.68, "time": 0.03411 }, { "current": 1759.75, "time": 0.028207 },
+          { "current": 3294.23, "time": 0.023002 }, { "current": 6386.41, "time": 0.019503 },
+          { "current": 17835.1, "time": 0.016504 }
+        ],
+        "curveEvidence": {
+          "document": "S&C TCC No. 153-2-2", "date": "1988-08-29", "curveNumber": "153-2-2", "extractionMethod": "manufacturer spreadsheet"
+        }
+      }
+    ],
+    "curveEvidence": {
+      "document": "S&C TCC Nos. 153-2 and 153-2-2", "revision": "2015-07-14 minimum melting; 1988-08-29 total clearing", "curveNumber": "153-2 / 153-2-2", "extractionMethod": "manufacturer spreadsheets; exact source points reduced after duplicate-current consolidation and monotonic normalization"
+    },
+    "curveReduction": {
+      "method": "Adaptive selection of official points after duplicate-current consolidation and monotonic normalization",
+      "minimumMelting": { "sourcePoints": 86, "normalizedPoints": 59, "retainedPoints": 13, "maxLogInterpolationError": 0.0201 },
+      "totalClearing": { "sourcePoints": 88, "normalizedPoints": 54, "retainedPoints": 23, "maxLogInterpolationError": 0.0249 }
+    },
+    "sourceUrls": [
+      "https://www.sandc.com/en/contact-us/time-current-characteristic-curves/",
+      "https://www.sandc.com/globalassets/sac-electric/documents/public---documents/sales-manual-library---external-view/tcc-number-153-2.xlsx",
+      "https://www.sandc.com/globalassets/sac-electric/documents/public---documents/sales-manual-library---external-view/tcc-number-153-2-2.xlsx",
+      "https://www.sandc.com/globalassets/sac-electric/documents/public---documents/sales-manual-library---external-view/specification-bulletin-665-31.pdf"
+    ],
+    "libraryStatus": "source_verified"
+  },
+  {
+    "id": "sc_smu20_100e_standard_14kv",
+    "type": "fuse",
+    "voltageClass": "MV",
+    "vendor": "S&C Electric Company",
+    "series": "SMU-20",
+    "name": "S&C SMU-20 100E Standard Speed (14.4 kV)",
+    "catalogNumber": "612100",
+    "ratedVoltageVac": 14400,
+    "maximumVoltageVac": 17000,
+    "continuousCurrentA": 100,
+    "interruptRating": 14,
+    "withstandRatingKA": null,
+    "withstandCycles": null,
+    "installationRequirement": "Use with a 14.4 kV S&C SMD-20 mounting; the interrupting rating is assembly-dependent.",
+    "interruptingRatings": [
+      {
+        "voltageVac": 14400,
+        "currentKA": 14,
+        "currentType": "AC",
+        "ratingType": "RMS symmetrical",
+        "basis": "SMD-20 power fuse with SMU-20 fuse unit at 60 Hz"
+      }
+    ],
+    "settings": { "ampRating": 100 },
+    "settingOptions": { "ampRating": [100] },
+    "curve": [
+      { "current": 212.285, "time": 601.155 }, { "current": 213.136, "time": 442.24 },
+      { "current": 215.709, "time": 297.332 }, { "current": 218.313, "time": 210.998 },
+      { "current": 223.84, "time": 145.162 }, { "current": 227.223, "time": 104.569 },
+      { "current": 233.675, "time": 69.1895 }, { "current": 239.83, "time": 51.2568 },
+      { "current": 272.307, "time": 14.5101 }, { "current": 289.725, "time": 9.5529 },
+      { "current": 300.045, "time": 7.85259 }, { "current": 346.863, "time": 3.91902 },
+      { "current": 381.05, "time": 2.88015 }, { "current": 491.731, "time": 1.44316 },
+      { "current": 768.108, "time": 0.53464 }, { "current": 1196.23, "time": 0.228741 },
+      { "current": 1857.39, "time": 0.109026 }, { "current": 3155.58, "time": 0.051707 },
+      { "current": 4550.21, "time": 0.034904 }, { "current": 6111.5, "time": 0.027788 },
+      { "current": 10518.8, "time": 0.020097 }, { "current": 18177.2, "time": 0.016405 }
+    ],
+    "curveProfiles": [
+      {
+        "id": "minimum_melting",
+        "name": "Minimum melting",
+        "role": "melting",
+        "curve": [
+          { "current": 195.182, "time": 601.155 }, { "current": 195.964, "time": 553.827 },
+          { "current": 196.749, "time": 446.684 }, { "current": 198.926, "time": 299.122 },
+          { "current": 201.327, "time": 209.108 }, { "current": 207.458, "time": 122.101 },
+          { "current": 217.442, "time": 64.4473 }, { "current": 238.634, "time": 24.1635 },
+          { "current": 260.846, "time": 11.5518 }, { "current": 277.253, "time": 7.86045 },
+          { "current": 305.8, "time": 4.82998 }, { "current": 335.268, "time": 3.37313 },
+          { "current": 441.833, "time": 1.52781 }, { "current": 569.598, "time": 0.828482 },
+          { "current": 756.673, "time": 0.440801 }, { "current": 1183.14, "time": 0.172706 },
+          { "current": 4929.18, "time": 0.01 }
+        ],
+        "curveEvidence": {
+          "document": "S&C TCC No. 153-2", "date": "2015-07-14", "curveNumber": "153-2", "extractionMethod": "manufacturer spreadsheet"
+        }
+      },
+      {
+        "id": "total_clearing_14_4kv",
+        "name": "Total clearing (14.4 kV)",
+        "role": "clearing",
+        "curve": [
+          { "current": 212.285, "time": 601.155 }, { "current": 213.136, "time": 442.24 },
+          { "current": 215.709, "time": 297.332 }, { "current": 218.313, "time": 210.998 },
+          { "current": 223.84, "time": 145.162 }, { "current": 227.223, "time": 104.569 },
+          { "current": 233.675, "time": 69.1895 }, { "current": 239.83, "time": 51.2568 },
+          { "current": 272.307, "time": 14.5101 }, { "current": 289.725, "time": 9.5529 },
+          { "current": 300.045, "time": 7.85259 }, { "current": 346.863, "time": 3.91902 },
+          { "current": 381.05, "time": 2.88015 }, { "current": 491.731, "time": 1.44316 },
+          { "current": 768.108, "time": 0.53464 }, { "current": 1196.23, "time": 0.228741 },
+          { "current": 1857.39, "time": 0.109026 }, { "current": 3155.58, "time": 0.051707 },
+          { "current": 4550.21, "time": 0.034904 }, { "current": 6111.5, "time": 0.027788 },
+          { "current": 10518.8, "time": 0.020097 }, { "current": 18177.2, "time": 0.016405 }
+        ],
+        "curveEvidence": {
+          "document": "S&C TCC No. 153-2-2", "date": "1988-08-29", "curveNumber": "153-2-2", "extractionMethod": "manufacturer spreadsheet"
+        }
+      }
+    ],
+    "curveEvidence": {
+      "document": "S&C TCC Nos. 153-2 and 153-2-2", "revision": "2015-07-14 minimum melting; 1988-08-29 total clearing", "curveNumber": "153-2 / 153-2-2", "extractionMethod": "manufacturer spreadsheets; exact source points reduced after duplicate-current consolidation and monotonic normalization"
+    },
+    "curveReduction": {
+      "method": "Adaptive selection of official points after duplicate-current consolidation and monotonic normalization",
+      "minimumMelting": { "sourcePoints": 86, "normalizedPoints": 82, "retainedPoints": 17, "maxLogInterpolationError": 0.0245 },
+      "totalClearing": { "sourcePoints": 88, "normalizedPoints": 58, "retainedPoints": 22, "maxLogInterpolationError": 0.0238 }
+    },
+    "sourceUrls": [
+      "https://www.sandc.com/en/contact-us/time-current-characteristic-curves/",
+      "https://www.sandc.com/globalassets/sac-electric/documents/public---documents/sales-manual-library---external-view/tcc-number-153-2.xlsx",
+      "https://www.sandc.com/globalassets/sac-electric/documents/public---documents/sales-manual-library---external-view/tcc-number-153-2-2.xlsx",
+      "https://www.sandc.com/globalassets/sac-electric/documents/public---documents/sales-manual-library---external-view/specification-bulletin-665-31.pdf"
+    ],
+    "libraryStatus": "source_verified"
+  },
+  {
     "id": "ge_multilin_750",
     "type": "relay",
     "vendor": "GE",

@@ -414,6 +414,37 @@ function addPQ(target, addition) {
   return out;
 }
 
+function phaseAssignmentForComponent(comp) {
+  const props = comp?.props && typeof comp.props === 'object' ? comp.props : {};
+  const value = comp?.phase
+    ?? comp?.phase_assignment
+    ?? comp?.phaseAssignment
+    ?? props.phase
+    ?? props.phase_assignment
+    ?? props.phaseAssignment;
+  if (Array.isArray(value)) return value;
+  return typeof value === 'string' ? value : '';
+}
+
+function attachPhaseAssignment(pq, comp) {
+  const phase = phaseAssignmentForComponent(comp);
+  if (!phase || (Array.isArray(phase) && !phase.length)) return pq;
+  return { ...pq, phase };
+}
+
+function addPhaseAwarePQ(target, addition) {
+  if (!addition) return target;
+  if (!target) return addition;
+  const phaseAware = Boolean(
+    addition.phase
+    || addition.phase_assignment
+    || addition.phaseAssignment
+    || (addition.phases && typeof addition.phases === 'object')
+  );
+  if (Array.isArray(target)) return [...target, addition];
+  return phaseAware ? [target, addition] : addPQ(target, addition);
+}
+
 const MAX_PQ_TRAVERSAL_NODES = 20000;
 
 function extractPQ(source) {
@@ -471,6 +502,26 @@ function extractPQ(source) {
   }
 
   return total;
+}
+
+function extractExplicitPhasePQ(sources) {
+  const phases = {};
+  let hasPhaseData = false;
+  sources.forEach(source => {
+    if (!source || typeof source !== 'object' || Array.isArray(source)) return;
+    const phaseSource = source.phases && typeof source.phases === 'object'
+      ? source.phases
+      : source;
+    ['A', 'B', 'C'].forEach(phase => {
+      const value = phaseSource[phase] ?? phaseSource[phase.toLowerCase()];
+      if (value === null || value === undefined) return;
+      const pq = extractPQ(value);
+      if (!pq) return;
+      phases[phase] = addPQ(phases[phase], pq);
+      hasPhaseData = true;
+    });
+  });
+  return hasPhaseData ? { phases } : null;
 }
 
 function isLoadDevice(comp) {
@@ -597,6 +648,8 @@ function extractLoadPQ(comp) {
     seenValues.add(signature);
     sources.push(src);
   });
+  const explicitPhasePQ = extractExplicitPhasePQ(sources);
+  if (explicitPhasePQ) return explicitPhasePQ;
   let total = null;
   sources.forEach(src => {
     const pq = extractPQ(src);
@@ -996,9 +1049,9 @@ export function buildLoadFlowModel(oneLine = {}) {
     const bus = busMap.get(busId);
     if (!bus) return;
     const load = extractLoadPQ(comp);
-    if (load) bus.load = addPQ(bus.load, load);
+    if (load) bus.load = addPhaseAwarePQ(bus.load, attachPhaseAssignment(load, comp));
     const gen = extractGenerationPQ(comp);
-    if (gen) bus.generation = addPQ(bus.generation, gen);
+    if (gen) bus.generation = addPhaseAwarePQ(bus.generation, attachPhaseAssignment(gen, comp));
   });
 
   const branches = [];
@@ -1136,7 +1189,14 @@ export function buildLoadFlowModel(oneLine = {}) {
         }
       }
       const explicitTie = zeroImpedance;
-      const tap = cloneData(comp.tap);
+      const tap = cloneData(
+        comp.tap
+        ?? comp.tap_ratio
+        ?? comp.tapRatio
+        ?? comp.props?.tap
+        ?? comp.props?.tap_ratio
+        ?? comp.props?.tapRatio
+      );
       const shunt = cloneData(comp.shunt);
       const rating = comp.rating ?? comp.ampacity ?? comp.currentRating;
       const phases = comp.phases ? cloneData(comp.phases) : undefined;

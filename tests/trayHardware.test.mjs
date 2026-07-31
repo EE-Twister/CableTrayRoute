@@ -385,6 +385,29 @@ describe('buildTrayHardwareBOM — custom options', () => {
   });
 });
 
+describe('buildTrayHardwareBOM — approved routing catalog handoff', () => {
+  it('keeps an assigned tray catalog identity separate from unmatched sections', () => {
+    const assigned = {
+      ...makeTray('T-CATALOG', 0, 0, 0, 12, 0, 0, 24, 4),
+      catalog_product: 'Acme TR-24-4 — 24 in × 4 in',
+      catalog_identity: 'acme::tr-24-4',
+      manufacturer: 'Acme',
+      catalog_number: 'TR-24-4',
+      approved_part: true,
+      catalog_source: 'Approved list',
+      catalog_last_verified: '2026-07-31'
+    };
+    const unmatched = makeTray('T-GENERIC', 24, 0, 0, 36, 0, 0, 24, 4);
+    const result = buildTrayHardwareBOM([assigned, unmatched]);
+    assert.equal(result.sections[0].catalog_number, 'TR-24-4');
+    assert.equal(result.sections[0].approved_part, true);
+    const catalogSummary = result.summary.find(row => row.catalog_number === 'TR-24-4');
+    assert.ok(catalogSummary);
+    assert.equal(catalogSummary.qty, 1);
+    assert.equal(result.summary.filter(row => row.category === 'Straight Section').length, 2);
+  });
+});
+
 console.log('enrichTrayBOMWithQR');
 try {
   const bom = buildTrayHardwareBOM([

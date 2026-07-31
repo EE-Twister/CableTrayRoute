@@ -7,6 +7,7 @@ import {
   buildHeatTraceBOM,
   buildControllerSchedule,
   filterHeatTraceProducts,
+  mergeHeatTraceProductCatalogs,
 } from './analysis/heatTraceSizing.mjs';
 import heatTraceProductCatalog from './data/heatTraceProducts.json';
 import {
@@ -23,7 +24,7 @@ import {
   buildHeatTraceBOM as buildHeatTraceBOMOffMain,
   buildControllerSchedule as buildControllerScheduleOffMain,
 } from './src/workers/heatTraceClient.js';
-import { getStudies, getStudyApprovals, setStudies } from './dataStore.mjs';
+import { getStudies, getStudyApprovals, getTrayHardwareCatalogCustomProducts, setStudies } from './dataStore.mjs';
 import { getProjectState } from './projectStorage.js';
 import { initStudyApprovalPanel } from './src/components/studyApproval.js';
 import { initStudyBasisPanel } from './src/components/studyBasis.js';
@@ -2253,7 +2254,10 @@ document.addEventListener('DOMContentLoaded', () => {
    * silently propagate into deliverables.
    */
   function getSelectionCatalog() {
-    const catalog = Array.isArray(heatTraceProductCatalog) ? heatTraceProductCatalog : [];
+    const catalog = mergeHeatTraceProductCatalogs(
+      Array.isArray(heatTraceProductCatalog) ? heatTraceProductCatalog : [],
+      getTrayHardwareCatalogCustomProducts()
+    );
     return filterHeatTraceProducts(catalog, { approvedOnly: getApprovedOnly() });
   }
 

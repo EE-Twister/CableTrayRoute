@@ -451,6 +451,69 @@ export function filterHeatTraceProducts(catalog, { approvedOnly = false } = {}) 
   return catalog.filter(isHeatTraceProductApproved);
 }
 
+function parsePositiveNumberList(value) {
+  const values = Array.isArray(value) ? value : String(value ?? '').split(/[;,\s]+/);
+  return [...new Set(values.map(item => Number(item)).filter(item => Number.isFinite(item) && item > 0))];
+}
+
+function parseVoltageLengthMap(value) {
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    return Object.fromEntries(Object.entries(value)
+      .map(([voltage, length]) => [String(Number(voltage)), Number(length)])
+      .filter(([voltage, length]) => Number(voltage) > 0 && Number.isFinite(length) && length > 0));
+  }
+  return Object.fromEntries(String(value ?? '').split(/[;,]+/)
+    .map(pair => pair.split(':').map(item => item.trim()))
+    .map(([voltage, length]) => [String(Number(voltage)), Number(length)])
+    .filter(([voltage, length]) => Number(voltage) > 0 && Number.isFinite(length) && length > 0));
+}
+
+/**
+ * Adapt a governed shared-catalog row into the heat-trace selection shape.
+ * The row retains its approval, source, verification, and datasheet metadata
+ * so a selected construction package does not lose its provenance.
+ */
+export function normalizeHeatTraceCatalogProduct(product) {
+  if (!product || typeof product !== 'object' || String(product.category || '').toLowerCase() !== 'heat_trace') return null;
+  const voltages = parsePositiveNumberList(product.heat_trace_voltages ?? product.voltages);
+  const nominalWPerFt = Number(product.heat_trace_nominal_w_per_ft ?? product.nominalWPerFt);
+  const maxCircuitLengthFt = parseVoltageLengthMap(product.heat_trace_max_circuit_lengths ?? product.maxCircuitLengthFt);
+  const type = String(product.heat_trace_type ?? product.type ?? '').trim();
+  if (!voltages.length || !Number.isFinite(nominalWPerFt) || nominalWPerFt <= 0 || !type) return null;
+  return {
+    ...product,
+    id: String(product.id || product.catalogNumber || ''),
+    catalogNumber: String(product.catalogNumber || product.catalog_number || product.id || ''),
+    family: String(product.heat_trace_family || product.family || product.catalogNumber || product.id || ''),
+    type,
+    voltages,
+    wattDensities: Object.fromEntries(voltages.map(voltage => [String(voltage), nominalWPerFt])),
+    nominalWPerFt,
+    maxCircuitLengthFt,
+    maxExposureTempC: Number(product.heat_trace_max_exposure_temp_c ?? product.maxExposureTempC) || Infinity,
+    startupCurrentMultiplier: Number(product.heat_trace_startup_current_multiplier ?? product.startupCurrentMultiplier) || 1,
+    hazardousAreaRating: String(product.heat_trace_hazardous_area_rating ?? product.hazardousAreaRating ?? '').trim() || null,
+  };
+}
+
+/**
+ * Combine the bundled heat-trace catalog with project-specific shared-catalog
+ * rows. A custom row with the same manufacturer/catalog number wins so a
+ * reviewed project part can replace a generic starter construction.
+ */
+export function mergeHeatTraceProductCatalogs(baseCatalog = [], sharedCatalog = []) {
+  const rows = [
+    ...(Array.isArray(baseCatalog) ? baseCatalog : []),
+    ...(Array.isArray(sharedCatalog) ? sharedCatalog.map(normalizeHeatTraceCatalogProduct).filter(Boolean) : []),
+  ];
+  const byIdentity = new Map();
+  rows.forEach(product => {
+    const identity = `${String(product.manufacturer || '').trim().toLowerCase()}::${String(product.catalogNumber || product.id || '').trim().toLowerCase()}`;
+    if (identity && identity !== '::') byIdentity.set(identity, product);
+  });
+  return [...byIdentity.values()];
+}
+
 export function selectHeatTraceProduct(circuit, catalog) {
   if (!circuit || typeof circuit !== 'object') throw new Error('circuit must be an object');
   if (!Array.isArray(catalog)) throw new Error('catalog must be an array');

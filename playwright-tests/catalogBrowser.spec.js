@@ -113,9 +113,10 @@ test.describe('Manufacturer catalog browser', () => {
 
   test('renders seed catalog rows with governance evidence', async ({ page }) => {
     const rows = page.locator('.catalog-table tbody tr');
-    expect(await rows.count()).toBeGreaterThanOrEqual(20);
+    await expect(rows).toHaveCount(24);
 
     await expect(page.locator('.catalog-quality-counts')).toContainText('0 approved');
+    await expect(page.locator('.catalog-quality-counts')).toContainText('4 source verified');
     await expect(rows.first()).toContainText('unreviewed');
     await expect(page.locator('.catalog-quality-gaps')).toContainText('Top evidence gaps');
 
@@ -197,6 +198,16 @@ test.describe('Manufacturer catalog browser', () => {
 
     await page.selectOption('[data-catalog-filter="confidence"]', 'incomplete');
     await expect(page.locator('.catalog-empty')).toBeVisible();
+  });
+
+  test('filters manufacturer-source-verified starter records without treating them as approved', async ({ page }) => {
+    await page.selectOption('[data-catalog-filter="evidence"]', 'source_verified');
+    await expect(page.locator('.catalog-table tbody tr')).toHaveCount(4);
+    const tray = rowFor(page, 'KRB4ASB-12-120');
+    await expect(tray).toContainText('Source verified');
+    await expect(tray).toContainText('unreviewed');
+    await expect(tray).toContainText('Eaton B-Line');
+    await expect(rowFor(page, 'ACC-04-45HB12')).toBeVisible();
   });
 
   test('exports the current view as CSV using the import template columns', async ({ page }) => {

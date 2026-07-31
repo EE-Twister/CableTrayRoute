@@ -6,6 +6,7 @@ import {
   buildBomCatalogFields,
   buildCatalogWarnings,
   CATALOG_CONFIDENCE_STATUS,
+  CATALOG_EVIDENCE_STATUS,
   catalogIdentity,
   findCatalogProductForRecord,
   filterCatalogProducts,
@@ -141,6 +142,37 @@ describe('manufacturer catalog normalization', () => {
     assert.ok(result.products.length >= 20);
     assert.ok(result.products.every(product => !product.approved));
     assert.ok(result.products.every(product => product.approval.status === 'unreviewed'));
+    const sourceVerified = result.products.filter(product => product.evidenceStatus === CATALOG_EVIDENCE_STATUS.sourceVerified);
+    assert.deepEqual(sourceVerified.map(product => product.id).sort(), [
+      'ACC-04-45HB12',
+      'KR4A-END-12',
+      'KRA-SDO-12',
+      'KRB4ASB-12-120'
+    ]);
+    sourceVerified.forEach(product => {
+      assert.ok(product.source);
+      assert.equal(product.lastVerified, '2026-07-30');
+      assert.match(product.datasheetUrl, /^https:\/\/www\.eaton\.com\//);
+    });
+  });
+
+  it('requires traceable source evidence before accepting source-verified status', () => {
+    const incomplete = validateCatalogProduct({
+      id: 'SOURCE-1', manufacturer: 'Example', catalogNumber: 'SOURCE-1', category: 'tray',
+      description: 'Source-verified candidate', unit: 'EA', evidenceStatus: CATALOG_EVIDENCE_STATUS.sourceVerified
+    });
+    assert.equal(incomplete.valid, false);
+    assert.ok(incomplete.errors.some(error => error.path === 'source'));
+    assert.ok(incomplete.errors.some(error => error.path === 'lastVerified'));
+    assert.ok(incomplete.errors.some(error => error.path === 'datasheetUrl'));
+
+    const verified = validateCatalogProduct({
+      id: 'SOURCE-1', manufacturer: 'Example', catalogNumber: 'SOURCE-1', category: 'tray',
+      description: 'Source-verified candidate', unit: 'EA', evidenceStatus: CATALOG_EVIDENCE_STATUS.sourceVerified,
+      source: 'Example manufacturer product page', lastVerified: '2026-07-30', datasheetUrl: 'https://example.com/source-1'
+    });
+    assert.equal(verified.valid, true);
+    assert.equal(verified.product.approved, false);
   });
 });
 
@@ -196,6 +228,18 @@ describe('manufacturer catalog merge and filters', () => {
       { id: 'B', manufacturer: 'M', category: 'tray', description: 'B', approved: false }
     ], { approvedOnly: true });
     assert.deepEqual(rows.map(row => row.id), ['A']);
+  });
+
+  it('filters source-verified catalog products independently of approval', () => {
+    const rows = filterCatalogProducts([
+      {
+        id: 'VERIFIED', manufacturer: 'M', catalogNumber: 'VERIFIED', category: 'tray', description: 'Verified',
+        evidenceStatus: 'source_verified', source: 'Manufacturer page', lastVerified: '2026-07-30', datasheetUrl: 'https://example.com/verified'
+      },
+      { id: 'SCREENING', manufacturer: 'M', catalogNumber: 'SCREENING', category: 'tray', description: 'Screening' }
+    ], { evidenceStatus: CATALOG_EVIDENCE_STATUS.sourceVerified });
+    assert.deepEqual(rows.map(row => row.id), ['VERIFIED']);
+    assert.equal(rows[0].approved, false);
   });
 });
 
@@ -287,6 +331,7 @@ describe('catalog quality summary and filters', () => {
     assert.equal(summary.byConfidence.incomplete, 1);
     assert.equal(summary.byApprovalStatus.approved, 2);
     assert.equal(summary.byApprovalStatus.unreviewed, 1);
+    assert.equal(summary.byEvidenceStatus.screening, 3);
     const datasheetGap = summary.missingEvidence.find(item => item.evidence === 'datasheet URL');
     assert.equal(datasheetGap.count, 2);
     assert.ok(summary.averageScore > 0 && summary.averageScore <= 100);
@@ -642,6 +687,72 @@ describe('catalog import: templates and CSV parsing', () => {
     const { products, errors } = parseCatalogCsv(csv);
     assert.equal(products.length, 0);
     assert.ok(errors.some(error => error.row === 2 && error.column === 'Last Verified'));
+  });
+
+  it('round-trips heat-trace electrical attributes through the shared catalog import', () => {
+    const csv = [
+      'Part Number,Manufacturer,Catalog No.,Category,Description,Unit,Heat Trace Type,Heat Trace Voltages (V),Heat Trace Nominal W/ft,Heat Trace Max Circuit Lengths (ft),Heat Trace Max Exposure (C)',
+      'HT-5,ACME,HT-5-240,heat_trace,5 W/ft heat trace,FT,selfRegulating,120;240,5,120:300;240:500,65'
+    ].join('\r\n');
+    const { products, errors } = parseCatalogCsv(csv);
+    assert.equal(errors.length, 0, JSON.stringify(errors));
+    assert.equal(products.length, 1);
+    assert.equal(products[0].category, 'heat_trace');
+    assert.equal(products[0].heat_trace_voltages, '120;240');
+    assert.equal(products[0].heat_trace_nominal_w_per_ft, 5);
+  });
+
+  it('rejects incomplete heat-trace product rows before they reach selection', () => {
+    const csv = [
+      'Part Number,Manufacturer,Catalog No.,Category,Description,Unit,Heat Trace Type,Heat Trace Voltages (V)',
+      'HT-BAD,ACME,HT-BAD,heat_trace,Incomplete heat trace,FT,selfRegulating,240'
+    ].join('\r\n');
+    const { products, errors } = parseCatalogCsv(csv);
+    assert.equal(products.length, 0);
+    assert.ok(errors.some(error => /Nominal W\/ft/.test(error.message)));
+    assert.ok(errors.some(error => /Max Circuit Lengths/.test(error.message)));
+  });
+
+  it('round-trips cable construction attributes through the shared catalog import', () => {
+    const csv = [
+      'Part Number,Manufacturer,Catalog No.,Category,Description,Unit,Cable Type,Cable Conductors,Cable Conductor Size,Cable Conductor Material,Cable Insulation Type,Cable Voltage Rating (V)',
+      'CU-12,ACME,CU-THHN-12,cable,12 AWG building wire,FT,Power,1,#12 AWG,Copper,THHN/THWN-2,600'
+    ].join('\r\n');
+    const { products, errors } = parseCatalogCsv(csv);
+    assert.equal(errors.length, 0, JSON.stringify(errors));
+    assert.equal(products.length, 1);
+    assert.equal(products[0].cable_conductor_size, '#12 AWG');
+    assert.equal(products[0].cable_voltage_rating, 600);
+  });
+
+  it('rejects incomplete cable product rows before they reach the Cable Library', () => {
+    const csv = [
+      'Part Number,Manufacturer,Catalog No.,Category,Description,Unit,Cable Conductors,Cable Conductor Size',
+      'CU-BAD,ACME,CU-BAD,cable,Incomplete cable,FT,1,#12 AWG'
+    ].join('\r\n');
+    const { products, errors } = parseCatalogCsv(csv);
+    assert.equal(products.length, 0);
+    assert.ok(errors.some(error => /Conductor Material/.test(error.message)));
+    assert.ok(errors.some(error => /Insulation Type/.test(error.message)));
+    assert.ok(errors.some(error => /Voltage Rating/.test(error.message)));
+  });
+
+  it('round-trips protective-device curves and rejects incomplete governed device rows', () => {
+    const source = [{
+      id: 'PD-100', manufacturer: 'Acme Power', catalogNumber: 'ACME-100-3P',
+      category: 'protective_device', subcategory: 'breaker', description: '100 A breaker', unit: 'EA',
+      protective_device_type: 'breaker', protective_device_interrupting_ratings: '480:35;600:25',
+      protective_device_curve: '100:100;500:1;1000:0.1', protective_device_pickup: 100
+    }];
+    const parsed = parseCatalogCsv(buildCatalogExportCsv(source));
+    assert.equal(parsed.errors.length, 0);
+    assert.equal(parsed.products[0].protective_device_curve, source[0].protective_device_curve);
+    const invalid = validateCatalogProduct({ ...source[0], protective_device_curve: '100:100' });
+    assert.equal(invalid.valid, false);
+    assert.ok(invalid.errors.some(error => error.path === 'protective_device_curve'));
+    const unverifiedReady = validateCatalogProduct({ ...source[0], protective_device_library_status: 'calculation_ready' });
+    assert.equal(unverifiedReady.valid, false);
+    assert.ok(unverifiedReady.errors.some(error => error.path === 'protective_device_library_status'));
   });
 
   it('rejects rows with invalid category enums', () => {

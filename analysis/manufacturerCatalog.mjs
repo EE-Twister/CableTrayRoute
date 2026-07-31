@@ -21,6 +21,15 @@ export const CATALOG_CONFIDENCE_STATUS = Object.freeze({
   incomplete: 'incomplete'
 });
 
+export const CATALOG_EVIDENCE_STATUS = Object.freeze({
+  sourceVerified: 'source_verified',
+  screening: 'screening'
+});
+
+const CATALOG_EVIDENCE_STATUS_VALUES = new Set(Object.values(CATALOG_EVIDENCE_STATUS));
+const HEAT_TRACE_TYPES = new Set(['selfRegulating', 'constantWattage', 'mineralInsulated']);
+const PROTECTIVE_DEVICE_TYPES = new Set(['breaker', 'fuse', 'relay', 'relay_87', 'recloser', 'contactor', 'switch']);
+
 const GENERIC_MANUFACTURERS = new Set([
   '',
   'generic',
@@ -114,6 +123,33 @@ function normalizeStatus(product, approved) {
   return approved ? 'approved' : 'unreviewed';
 }
 
+function hasPositiveHeatTraceVoltages(value) {
+  const values = Array.isArray(value) ? value : String(value ?? '').split(/[;,\s]+/);
+  return values.some(item => Number.isFinite(Number(item)) && Number(item) > 0);
+}
+
+function hasHeatTraceCircuitLengths(value) {
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    return Object.values(value).some(item => Number.isFinite(Number(item)) && Number(item) > 0);
+  }
+  return String(value ?? '').split(/[;,]+/).some((pair) => {
+    const [, length] = pair.split(':');
+    return Number.isFinite(Number(length)) && Number(length) > 0;
+  });
+}
+
+function normalizeEvidenceStatus(product) {
+  const raw = cleanText(
+    product.evidenceStatus
+      ?? product.evidence_status
+      ?? product.catalogEvidenceStatus
+      ?? ''
+  ).toLowerCase();
+  return CATALOG_EVIDENCE_STATUS_VALUES.has(raw)
+    ? raw
+    : CATALOG_EVIDENCE_STATUS.screening;
+}
+
 function inferStandards(product) {
   const standards = normalizeArray(product.standards);
   if (product.nec_listed === true || product.necListed === true) standards.push('NEC listed');
@@ -159,6 +195,7 @@ export function normalizeCatalogProduct(product, options = {}) {
       ?? approval.status
   );
   const approvalStatus = normalizeStatus(product, approved);
+  const evidenceStatus = normalizeEvidenceStatus(product);
   const listPriceUsd = toNumberOrNull(
     product.listPriceUsd
       ?? product.list_price_usd
@@ -238,7 +275,7 @@ export function normalizeCatalogProduct(product, options = {}) {
     material: cleanText(product.material),
     finish: cleanText(product.finish),
     unit: commercial.unit,
-    list_price_usd: commercial.listPriceUsd ?? 0,
+    list_price_usd: commercial.listPriceUsd,
     standards: inferStandards(product),
     ratings,
     dimensions,
@@ -251,6 +288,8 @@ export function normalizeCatalogProduct(product, options = {}) {
     co2eKgPerUnit: epd.co2eKgPerUnit,
     approved: approvalStatus === 'approved',
     approved_part: approvalStatus === 'approved',
+    evidenceStatus,
+    evidence_status: evidenceStatus,
     approval: {
       status: approvalStatus,
       authority: cleanText(approval.authority ?? product.approvalAuthority ?? product.approval_authority),
@@ -296,6 +335,89 @@ export function validateCatalogProduct(product, options = {}) {
     }
     if (!normalized.approval.authority && options.requireApprovalAuthority !== false) {
       warnings.push({ path: 'approval.authority', message: 'Approved catalog rows should name the approving authority.' });
+    }
+  }
+
+  if (normalized.category === 'heat_trace') {
+    const type = cleanText(normalized.heat_trace_type ?? normalized.type);
+    const voltages = normalized.heat_trace_voltages ?? normalized.voltages;
+    const nominalWPerFt = Number(normalized.heat_trace_nominal_w_per_ft ?? normalized.nominalWPerFt);
+    const maxCircuitLengths = normalized.heat_trace_max_circuit_lengths ?? normalized.maxCircuitLengthFt;
+    if (!HEAT_TRACE_TYPES.has(type)) {
+      errors.push({ path: 'heat_trace_type', message: 'heat_trace rows require Heat Trace Type (selfRegulating, constantWattage, or mineralInsulated).' });
+    }
+    if (!hasPositiveHeatTraceVoltages(voltages)) {
+      errors.push({ path: 'heat_trace_voltages', message: 'heat_trace rows require one or more positive Heat Trace Voltages.' });
+    }
+    if (!Number.isFinite(nominalWPerFt) || nominalWPerFt <= 0) {
+      errors.push({ path: 'heat_trace_nominal_w_per_ft', message: 'heat_trace rows require a positive Heat Trace Nominal W/ft.' });
+    }
+    if (!hasHeatTraceCircuitLengths(maxCircuitLengths)) {
+      errors.push({ path: 'heat_trace_max_circuit_lengths', message: 'heat_trace rows require Heat Trace Max Circuit Lengths as voltage:length pairs.' });
+    }
+  }
+
+  if (normalized.category === 'cable') {
+    const conductorCount = Number(normalized.cable_conductors ?? normalized.conductors);
+    const voltageRating = Number(normalized.cable_voltage_rating ?? normalized.cable_rating);
+    if (!cleanText(normalized.cable_conductor_size ?? normalized.conductor_size)) {
+      errors.push({ path: 'cable_conductor_size', message: 'cable rows require Cable Conductor Size.' });
+    }
+    if (!cleanText(normalized.cable_conductor_material ?? normalized.conductor_material)) {
+      errors.push({ path: 'cable_conductor_material', message: 'cable rows require Cable Conductor Material.' });
+    }
+    if (!cleanText(normalized.cable_insulation_type ?? normalized.insulation_type)) {
+      errors.push({ path: 'cable_insulation_type', message: 'cable rows require Cable Insulation Type.' });
+    }
+    if (!Number.isFinite(conductorCount) || conductorCount <= 0) {
+      errors.push({ path: 'cable_conductors', message: 'cable rows require a positive Cable Conductors count.' });
+    }
+    if (!Number.isFinite(voltageRating) || voltageRating <= 0) {
+      errors.push({ path: 'cable_voltage_rating', message: 'cable rows require a positive Cable Voltage Rating.' });
+    }
+  }
+
+  if (normalized.category === 'protective_device') {
+    const type = cleanText(normalized.protective_device_type ?? normalized.device_type ?? normalized.type).toLowerCase();
+    const curve = cleanText(normalized.protective_device_curve ?? normalized.curve);
+    const ratings = cleanText(normalized.protective_device_interrupting_ratings ?? normalized.interruptingRatings);
+    if (!PROTECTIVE_DEVICE_TYPES.has(type)) {
+      errors.push({ path: 'protective_device_type', message: 'protective_device rows require Protective Device Type (breaker, fuse, relay, relay_87, recloser, contactor, or switch).' });
+    }
+    if (curve.split(/[;\n]+/).filter(Boolean).length < 2) {
+      errors.push({ path: 'protective_device_curve', message: 'protective_device rows require at least two Curve Points as current:time pairs.' });
+    }
+    if (type !== 'relay' && !ratings.split(/[;\n]+/).some(pair => {
+      const [voltage, current] = pair.split(/[:@]/, 2).map(Number);
+      return voltage > 0 && current > 0;
+    })) {
+      errors.push({ path: 'protective_device_interrupting_ratings', message: 'Non-relay protective_device rows require Interrupting Ratings as voltage:kA pairs.' });
+    }
+    if (normalized.evidenceStatus === CATALOG_EVIDENCE_STATUS.sourceVerified) {
+      ['protective_device_curve_document', 'protective_device_curve_revision', 'protective_device_curve_id', 'protective_device_curve_extraction_method'].forEach((field) => {
+        if (!cleanText(normalized[field])) {
+          errors.push({ path: field, message: `Source-verified protective_device rows require ${field.replaceAll('_', ' ')}.` });
+        }
+      });
+    }
+    if (cleanText(normalized.protective_device_library_status).toLowerCase() === 'calculation_ready'
+      && normalized.evidenceStatus !== CATALOG_EVIDENCE_STATUS.sourceVerified) {
+      errors.push({ path: 'protective_device_library_status', message: 'Calculation-ready protective_device rows must be source-verified catalog rows.' });
+    }
+  }
+
+  if (normalized.evidenceStatus === CATALOG_EVIDENCE_STATUS.sourceVerified) {
+    if (hasGenericManufacturer(normalized.manufacturer) || !normalized.catalogNumber) {
+      errors.push({ path: 'evidenceStatus', message: 'Source-verified catalog rows require a manufacturer and catalog number.' });
+    }
+    if (!normalized.source) {
+      errors.push({ path: 'source', message: 'Source-verified catalog rows require a manufacturer source.' });
+    }
+    if (!normalized.lastVerified) {
+      errors.push({ path: 'lastVerified', message: 'Source-verified catalog rows require lastVerified as YYYY-MM-DD.' });
+    }
+    if (!normalized.datasheetUrl) {
+      errors.push({ path: 'datasheetUrl', message: 'Source-verified catalog rows require a manufacturer product or datasheet URL.' });
     }
   }
 
@@ -448,6 +570,10 @@ export function summarizeCatalogQuality(products = [], options = {}) {
     [CATALOG_CONFIDENCE_STATUS.incomplete]: 0
   };
   const byApprovalStatus = { approved: 0, conditional: 0, rejected: 0, unreviewed: 0 };
+  const byEvidenceStatus = {
+    [CATALOG_EVIDENCE_STATUS.sourceVerified]: 0,
+    [CATALOG_EVIDENCE_STATUS.screening]: 0
+  };
   const missingCounts = new Map();
   const staleCounts = new Map();
   let approved = 0;
@@ -459,6 +585,8 @@ export function summarizeCatalogQuality(products = [], options = {}) {
     byConfidence[confidence.status] = (byConfidence[confidence.status] || 0) + 1;
     const status = product.approval?.status || 'unreviewed';
     byApprovalStatus[status] = (byApprovalStatus[status] || 0) + 1;
+    const evidenceStatus = product.evidenceStatus || CATALOG_EVIDENCE_STATUS.screening;
+    byEvidenceStatus[evidenceStatus] = (byEvidenceStatus[evidenceStatus] || 0) + 1;
     if (product.approved) approved += 1;
     scoreTotal += confidence.score;
     confidence.missingEvidence.forEach((evidence) => {
@@ -480,6 +608,7 @@ export function summarizeCatalogQuality(products = [], options = {}) {
     averageScore: rows.length ? Math.round(scoreTotal / rows.length) : 0,
     byConfidence,
     byApprovalStatus,
+    byEvidenceStatus,
     missingEvidence: toSortedCounts(missingCounts),
     staleEvidence: toSortedCounts(staleCounts),
     staleRows
@@ -493,6 +622,7 @@ export function filterCatalogProducts(products = [], filters = {}) {
     .filter((product) => {
       if (filters.approvedOnly && !product.approved) return false;
       if (filters.approvalStatus && (product.approval?.status || 'unreviewed') !== filters.approvalStatus) return false;
+      if (filters.evidenceStatus && product.evidenceStatus !== filters.evidenceStatus) return false;
       if (filters.confidenceStatus
         && buildCatalogConfidence(product, filters.confidenceOptions || {}).status !== filters.confidenceStatus) return false;
       if (filters.category && product.category !== filters.category) return false;
@@ -542,6 +672,7 @@ export function buildBomCatalogFields(record = {}) {
     model: cleanText(record.model ?? product.model),
     approvedPart: product.approved === true,
     approvalStatus: product.approval?.status || cleanText(record.approvalStatus ?? record.approval_status) || 'unreviewed',
+    evidenceStatus: product.evidenceStatus || cleanText(record.evidenceStatus ?? record.evidence_status) || CATALOG_EVIDENCE_STATUS.screening,
     source: product.source || cleanText(record.catalog_source),
     lastVerified: product.lastVerified || cleanText(record.catalog_last_verified),
     datasheetUrl: product.datasheetUrl || cleanText(record.datasheet_url ?? record.url),
@@ -592,6 +723,7 @@ function catalogEvidenceFields(record = {}) {
     catalogNumber: product.catalogNumber || cleanText(record.catalogNumber ?? record.catalog_number ?? record.partNumber ?? record.part_number ?? record.model),
     approvedPart: product.approved === true || toBoolean(record.approved_part ?? record.approved),
     approvalStatus: product.approval?.status || cleanText(record.approvalStatus ?? record.approval_status ?? approval.status) || 'unreviewed',
+    evidenceStatus: product.evidenceStatus || cleanText(record.evidenceStatus ?? record.evidence_status) || CATALOG_EVIDENCE_STATUS.screening,
     source: product.source || cleanText(record.catalog_source ?? record.source),
     lastVerified: product.lastVerified || cleanDate(record.catalog_last_verified ?? record.lastVerified ?? record.last_verified),
     datasheetUrl: product.datasheetUrl || cleanUrl(record.datasheet_url ?? record.datasheetUrl ?? record.url),
@@ -669,6 +801,7 @@ export function buildCatalogConfidence(record = {}, options = {}) {
       catalogNumber: fields.catalogNumber,
       approvalStatus: fields.approvalStatus,
       approvedPart: fields.approvedPart,
+      evidenceStatus: fields.evidenceStatus,
       source: fields.source,
       lastVerified: fields.lastVerified,
       datasheetUrl: fields.datasheetUrl,

@@ -29,6 +29,13 @@ test.describe('Load Flow', () => {
     await expect(page.locator('#loadflow-form button[type="submit"]')).toBeVisible();
   });
 
+  test('explains balanced and A/B/C phase study modes', async ({ page }) => {
+    const balanced = page.locator('input[name="balanced"]');
+    await expect(balanced).toBeChecked();
+    await expect(page.locator('#loadflow-form')).toContainText('Balanced three-phase');
+    await expect(page.locator('#loadflow-form')).toContainText('Phase Assignment');
+  });
+
   test('runs study and populates output', async ({ page }) => {
     await page.fill('input[name="baseMVA"]', '100');
     await page.locator('#loadflow-form button[type="submit"]').click();
@@ -36,11 +43,10 @@ test.describe('Load Flow', () => {
     await expect(output).not.toBeEmpty();
   });
 
-  test('output contains JSON result keys', async ({ page }) => {
+  test('renders a readable study state', async ({ page }) => {
     await page.locator('#loadflow-form button[type="submit"]').click();
     const text = await page.locator('#loadflow-output').textContent();
-    // Output should be JSON-parseable
-    expect(() => JSON.parse(text)).not.toThrow();
+    expect(text).toMatch(/Study not run|Load Flow Results/i);
   });
 });
 

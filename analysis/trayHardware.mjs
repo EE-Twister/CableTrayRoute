@@ -11,6 +11,7 @@
 
 import { calcMaxSpan, NEMA_LOAD_CLASSES } from './supportSpan.mjs';
 import { generateQRDataURL, trayQRPayload } from './pullCards.mjs';
+import { catalogAssignmentForRoute } from './routingCatalog.mjs';
 
 /** Distance threshold (ft) for treating two endpoints as coincident. */
 const COINCIDENCE_TOL = 0.5;
@@ -366,6 +367,7 @@ export function buildTrayHardwareBOM(trays, options = {}) {
       straight_sections: straightQty,
       section_length_ft: standardSectionLength,
       cover_sections: coverQty,
+      ...catalogAssignmentForRoute(tray),
     });
   });
 
@@ -408,9 +410,24 @@ function buildHardwareSummary(fittings, supports, sections, trays) {
   const sectionCounts = new Map();
   sections.forEach(s => {
     const material = s.material || 'Steel';
-    const key = `straight|${material}|${s.width}`;
+    const key = `straight|${material}|${s.width}|${s.catalog_identity || s.catalog_number || ''}`;
     if (!sectionCounts.has(key)) {
-      sectionCounts.set(key, { material, width: s.width, qty: 0, coverQty: 0, sectionLen: s.section_length_ft });
+      sectionCounts.set(key, {
+        material,
+        width: s.width,
+        qty: 0,
+        coverQty: 0,
+        sectionLen: s.section_length_ft,
+        catalog_product: s.catalog_product || '',
+        catalog_identity: s.catalog_identity || '',
+        manufacturer: s.manufacturer || '',
+        catalog_number: s.catalog_number || '',
+        approved_part: s.approved_part === true,
+        catalog_source: s.catalog_source || '',
+        catalog_last_verified: s.catalog_last_verified || '',
+        catalog_datasheet_url: s.catalog_datasheet_url || '',
+        catalog_approval_status: s.catalog_approval_status || ''
+      });
     }
     const entry = sectionCounts.get(key);
     entry.qty += s.straight_sections;
@@ -424,6 +441,15 @@ function buildHardwareSummary(fittings, supports, sections, trays) {
       width_in: v.width,
       qty: v.qty,
       unit: 'ea',
+      catalog_product: v.catalog_product,
+      catalog_identity: v.catalog_identity,
+      manufacturer: v.manufacturer,
+      catalog_number: v.catalog_number,
+      approved_part: v.approved_part,
+      catalog_source: v.catalog_source,
+      catalog_last_verified: v.catalog_last_verified,
+      catalog_datasheet_url: v.catalog_datasheet_url,
+      catalog_approval_status: v.catalog_approval_status
     });
     if (v.coverQty > 0) {
       items.push({

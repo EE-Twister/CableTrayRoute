@@ -62,6 +62,18 @@ At runtime each placed component also carries these standard properties on its s
 
 Add new objects to the JSON array and provide matching icons to extend the palette without modifying JavaScript code.
 
+## Palette Favorites and Recent Symbols
+
+The One-Line palette opens with the full component library available. Placing a symbol by click or drag/drop records it in **Favorites & Recent** (up to eight recent symbols), so commonly used equipment stays at the top of the palette. Right-click a palette item and choose **Add to Favorites** to keep it there permanently (up to twelve favorites); choose **Remove from Favorites** to unpin it. **Clear Recent** removes only recent history, never explicit favorites. These preferences are stored with the user's application settings, not in the shared project diagram.
+
+For quick drafting, right-click a blank canvas area to add a Utility Source, Bus, Breaker, Transformer, or Panel at the snapped pointer location. **Repeat Last** in the Edit toolbar, **Repeat Last Symbol** in that canvas menu, or `Alt+R` places the most recently used palette symbol at the guided viewport location. These actions use the same library, grid snapping, undo, and recent-symbol tracking as ordinary palette placement.
+
+Double-click a placed symbol label to edit it directly on the drawing. Press `Enter` or click away to save; press `Escape` to cancel. Label edits use normal project persistence and undo/redo. Text-box annotations use the same direct editor for their displayed text. Locked components, locked layers, and Live operator mode protect labels from editing.
+
+Select a non-bus connection to reveal its blue waypoint handle. Drag the handle along its permitted axis to clean up a bend; grid snapping applies when the grid is enabled. Right-click a connection and choose **Place Waypoint Here** to create a controlled bend at the cursor, or **Reset Auto Route** to return it to automatic routing. Waypoint edits are saved and undoable; bus taps continue to use their automatic geometry.
+
+Component context menus now distinguish **Lock Position** from **Lock Properties**. Position locking retains compatibility with existing locked drawings and prevents moving, nudging, deleting, or label repositioning. Property locking keeps the device available for review but makes its Properties editor read-only and blocks direct rename and property-paste actions. A locked layer protects both modes.
+
 ## Governed Manufacturer Catalog Fields
 
 Product-bearing components also receive a shared catalog metadata baseline in the one-line editor:
@@ -82,6 +94,16 @@ Library validation rejects approved parts that do not include `catalog_source` a
 
 Catalog confidence is calculated from the same metadata. Complete records include manufacturer/catalog identity, approved status, source/date, datasheet URL, BIM reference, standards/listing metadata, and EPD/CO2e evidence. Submittal exports include a traceability worksheet that lists each row's confidence status and missing evidence.
 
+## Protective Device Inventory
+
+The **Library Manager** also shows the bundled protective-device / TCC inventory.
+Use its evidence-status filter and search field to find calculation-ready,
+source-verified, standards-reference, or screening-only records before opening
+the TCC study. The inventory is read-only: changes to custom component or
+manufacturer defaults cannot silently alter an approved protective curve.
+See [Protective Device Library Governance](protective-device-library-governance.md)
+for the promotion requirements and review limitations.
+
 ## Default Motor Control and Disconnect Symbols
 
 The shipped one-line palette includes dedicated motor-control entries for VFD, soft starter, FVNR starter, FVR starter, and combination starter. These components carry starter type, current limit/ramp, SCCR, voltage, phase, enclosure, and commissioning fields so they can be reviewed separately from the driven motor.
@@ -94,7 +116,7 @@ The one-line property editor augments placed components with a **Studies** tab s
 
 | Study | Prompted fields |
 |-------|-----------------|
-| Load Flow / Short Circuit | Rated voltage, source strength, impedance, transformer kVA/%Z/X/R, cable length and R/X per length |
+| Load Flow / Short Circuit | Rated voltage, source strength, impedance, transformer kVA/%Z/X/R, transformer LTC enabled/range/step/setpoint, cable length and R/X per length |
 | Arc Flash | Clearing time, enclosure/open-air basis, electrode gap, working distance, enclosure height/width/depth, electrode configuration |
 | TCC | Protective curve assignment, transformer inrush multiple/duration, motor locked-rotor/start/stall data, cable conductor size/material/temperature rating |
 | Motor Start | HP, FLA, PF, efficiency, locked-rotor multiple, Thevenin R/X, inertia, load torque curve, starter limits and ramp settings |
@@ -134,7 +156,7 @@ On page load, the Library Manager automatically fetches your cloud library (if y
 
 ### Import Formats and Template Workbook
 
-Library Manager imports `.json`, `.csv`, `.xlsx`, and `.xls` files.
+Library Manager imports `.json`, `.csv`, `.xlsx`, and `.xls` files. The page includes the bundled spreadsheet runtime, so its **Download Template** and Excel import flows work without relying on an external CDN.
 
 - Use **Import mode → Replace library** to overwrite the current editor state.
 - Use **Import mode → Merge into existing** to merge categories/icons and upsert components by `subtype`.
@@ -151,6 +173,14 @@ Click **Share Library** to generate a 30-day read-only share link. Send the URL 
 
 Share tokens can be revoked at any time via `DELETE /api/v1/library/shares/:shareId`. See [api-reference.md](api-reference.md) for the full REST API.
 
+### Approved Team Releases
+
+Personal cloud libraries and link sharing are useful for individual standards. For a controlled organization baseline, use **Load Team Library**. It loads the latest approved component-library release for the signed-in deployment, including its publisher and release note.
+
+An `admin` can use **Publish Team Release** to publish the library currently in the editor. Publication validates the same component contract used for local and personal-cloud saves, records an immutable versioned release, and adds an audit-log entry. Engineers, reviewers, and read-only users can load the latest team release but cannot change it. Publishing uses the current release version to prevent a stale browser session from silently replacing a newer approved release.
+
+Team releases are deployment-scoped. Configure an initial administrator as described in [enterprise-auth.md](enterprise-auth.md) before using this workflow. A team release is a deliberate approved baseline; it does not automatically overwrite components already placed in existing projects.
+
 ### Fallback Behaviour
 
 If you are not logged in, or the server is unreachable, the Library Manager falls back to browser `localStorage` and the static `componentLibrary.json` file — no data is lost.
@@ -160,4 +190,5 @@ If you are not logged in, or the server is unreachable, the Library Manager fall
 - Non-technical users can add/edit/delete library entries using structured tables only.
 - Workbook import validates payloads and blocks save until issues are fixed.
 - Cloud sync + conflict handling produce deterministic, user-readable outcomes.
+- Admin-approved team releases provide a versioned, deployment-wide baseline without granting write access to ordinary users.
 - Advanced JSON mode remains available and backward-compatible.

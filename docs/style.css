@@ -25,6 +25,7 @@
 @import "./src/styles/dashboard.css";
 @import "./src/styles/workflow-core.css";
 @import "./src/styles/scenarioComparison.css";
+@import "./src/styles/dataManager.css";
 @import "./src/styles/groundgrid.css";
 
 .lighting-layout-panel {

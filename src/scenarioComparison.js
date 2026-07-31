@@ -216,6 +216,40 @@ function renderStudies(result) {
     : '<p class="sc-empty-note">Neither scenario contains saved study results.</p>';
 }
 
+function renderImpact(result) {
+  const container = document.getElementById('sc-impact-content');
+  if (!container) return;
+  const rows = result.impact.map(impact => {
+    const href = STUDY_PAGE_LINKS[impact.key];
+    const name = href
+      ? `<a href="${href}">${esc(impact.label)}</a>`
+      : esc(impact.label);
+    const action = impact.action === 'rerun' ? 'Rerun recommended' : 'Consider running';
+    return `
+      <tr class="sc-impact--${esc(impact.priority)}">
+        <td>${name}</td>
+        <td><span class="sc-impact-priority">${esc(impact.priority.toUpperCase())}</span></td>
+        <td>${esc(action)}</td>
+        <td>${esc(impact.targetState)}</td>
+        <td>${esc(impact.domains.join(', '))}</td>
+      </tr>`;
+  }).join('');
+  container.innerHTML = rows
+    ? `<div class="sc-diff-scroll">
+        <table class="sc-diff-table" aria-label="Study-impact rerun checklist">
+          <thead><tr>
+            <th scope="col">Study</th>
+            <th scope="col">Priority</th>
+            <th scope="col">Suggested action</th>
+            <th scope="col">Comparison-scenario state</th>
+            <th scope="col">Changed model domains</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`
+    : '<p class="sc-empty-note">No model changes mapped to study rerun recommendations.</p>';
+}
+
 function runComparison() {
   const scenarioA = document.getElementById('sc-select-a')?.value;
   const scenarioB = document.getElementById('sc-select-b')?.value;
@@ -233,6 +267,7 @@ function runComparison() {
   renderDomainSummary(lastComparison);
   renderDomainChanges(lastComparison);
   renderStudies(lastComparison);
+  renderImpact(lastComparison);
   const results = document.getElementById('sc-results');
   if (results) results.hidden = false;
   const exportBtn = document.getElementById('sc-export-btn');
@@ -271,6 +306,17 @@ function exportComparison() {
         lastComparison.afterScenario,
       ]);
     });
+  lastComparison.impact.forEach(impact => {
+    rows.push([
+      'study-impact',
+      impact.label,
+      impact.action,
+      impact.priority,
+      `${impact.targetState}; changed domains: ${impact.domains.join('; ')}`,
+      lastComparison.beforeScenario,
+      lastComparison.afterScenario,
+    ]);
+  });
   downloadCSV(
     ['Type', 'Domain / Study', 'Status', 'Record', 'Details', 'Scenario A', 'Scenario B'],
     rows,

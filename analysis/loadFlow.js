@@ -955,12 +955,62 @@ function resolvePhaseRecord(record, phase) {
   return null;
 }
 
+function phaseSetFromValue(value) {
+  const candidates = Array.isArray(value)
+    ? value
+    : typeof value === 'string'
+      ? value.split(/[\s,;/]+/)
+      : [];
+  return [...new Set(candidates
+    .map(candidate => String(candidate || '').trim().toUpperCase())
+    .filter(candidate => ['A', 'B', 'C'].includes(candidate)))];
+}
+
+function explicitAssignedPhases(record) {
+  if (!record || typeof record !== 'object') return [];
+  const fromDedicatedField = phaseSetFromValue(
+    record.phase ?? record.phaseAssignment ?? record.phase_assignment,
+  );
+  if (fromDedicatedField.length) return fromDedicatedField;
+  return phaseSetFromValue(record.phases);
+}
+
+function hasExplicitPhaseRecords(record) {
+  return ['A', 'B', 'C'].some(phase => resolvePhaseRecord(record, phase) !== null);
+}
+
+function dividedPQ(total, divisor) {
+  return {
+    kw: total.kw / divisor,
+    kvar: total.kvar / divisor,
+  };
+}
+
 function extractPhasePQ(record, phase, balanced) {
   if (!record) return { kw: 0, kvar: 0 };
+  if (Array.isArray(record)) {
+    return record.reduce((total, item) => {
+      const value = extractPhasePQ(item, phase, balanced);
+      return { kw: total.kw + value.kw, kvar: total.kvar + value.kvar };
+    }, { kw: 0, kvar: 0 });
+  }
   if (balanced) return sumPQ(record);
   const phaseRecord = resolvePhaseRecord(record, phase);
   if (phaseRecord) return sumPQ(phaseRecord);
-  return sumPQ(record);
+  // A record with an A/B/C payload is an explicitly unbalanced load. A
+  // missing phase is zero; falling back to the aggregate would duplicate it.
+  if (hasExplicitPhaseRecords(record)) return { kw: 0, kvar: 0 };
+  const total = sumPQ(record);
+  const assigned = explicitAssignedPhases(record);
+  if (assigned.length) {
+    return assigned.includes(phase)
+      ? dividedPQ(total, assigned.length)
+      : { kw: 0, kvar: 0 };
+  }
+  // Ordinary project load records express three-phase totals. In an
+  // unbalanced solve, retain that total by distributing it evenly unless the
+  // model supplies a per-phase record or an explicit phase assignment.
+  return dividedPQ(total, 3);
 }
 
 /**

@@ -11,11 +11,25 @@ import { emitAsync } from "../utils/safeEvents.mjs";
 import * as dataStore from "../dataStore.mjs";
 import { openModal, showAlertModal } from "./components/modal.js";
 import { start as startTour } from "../tour.js";
+import { parseRevit } from "./importers/revit.mjs";
+import { loadProjectManufacturerCatalog } from "../analysis/projectCatalog.mjs";
+import {
+  assignCatalogProductToRoute,
+  compatibleRouteCatalogProducts,
+  routeCatalogOptionLabel
+} from "../analysis/routingCatalog.mjs";
 import {
   applyRecordImport,
   previewRecordImport,
   summarizeRacewayWorkflow
 } from "../analysis/scheduleWorkflow.mjs";
+import {
+  createBimIssue,
+  createBimSnapshot,
+  exportBimIssueExchange,
+  importBimIssueExchange,
+  reconcileBimSnapshot
+} from "../analysis/bimReconciliation.mjs";
 
 const RACEWAY_TOUR_STEPS = [
   { selector: '#add-tray-btn',          message: 'Add a Cable Tray — enter width, depth, start/end 3D coordinates, and tray type (ladder, solid bottom, wire mesh).' },
@@ -35,6 +49,295 @@ import {
 } from "../racewaySampleData.mjs";
 
 const RACEWAY_READINESS_COPY = getContractReadinessCopy('racewayschedule.html');
+const BIM_COORDINATION_SNAPSHOT_KEY = 'bimCoordinationSnapshot';
+const BIM_COORDINATION_ISSUES_KEY = 'bimCoordinationIssues';
+
+function downloadBimJson(payload, filename) {
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+function downloadBimCsv(rows, filename) {
+  const escape = value => `"${String(value ?? '').replaceAll('"', '""')}"`;
+  const headers = ['status', 'type', 'schedule_or_bim_id', 'ifc_guid', 'length_delta'];
+  const content = [headers, ...rows.map(row => [
+    row.status,
+    row.kind,
+    row.id || row.bim?.id || '',
+    row.sourceGuid || '',
+    row.lengthDelta ?? ''
+  ])].map(values => values.map(escape).join(',')).join('\n');
+  const blob = new Blob([content], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+function createModalField(labelText, input) {
+  const label = document.createElement('label');
+  label.className = 'modal-form-field';
+  label.textContent = labelText;
+  label.appendChild(input);
+  return label;
+}
+
+function displayLength(value) {
+  return Number.isFinite(value) ? value.toFixed(2) : '—';
+}
+
+function openBimCoordinationModal() {
+  let snapshot = dataStore.getItem(BIM_COORDINATION_SNAPSHOT_KEY, null);
+  let issues = dataStore.getItem(BIM_COORDINATION_ISSUES_KEY, []);
+  issues = Array.isArray(issues) ? issues : [];
+
+  openModal({
+    title: 'BIM Coordination',
+    description: 'Import an IFC or Revit JSON model as a read-only review snapshot. Raceway, equipment, and support objects remain separate from the live schedule.',
+    primaryText: 'Close',
+    secondaryText: null,
+    defaultWidth: 'wide',
+    render(body) {
+      const form = document.createElement('div');
+      form.className = 'modal-form';
+      const modelInput = document.createElement('input');
+      modelInput.type = 'file';
+      modelInput.accept = '.ifc,.json';
+      modelInput.id = 'bim-coordination-model-input';
+      form.appendChild(createModalField('Read-only IFC / Revit model', modelInput));
+
+      const status = document.createElement('p');
+      status.id = 'bim-coordination-status';
+      status.className = 'panel-info-compact';
+      form.appendChild(status);
+
+      const differenceTable = document.createElement('table');
+      differenceTable.id = 'bim-coordination-differences';
+      differenceTable.className = 'data-table';
+      differenceTable.innerHTML = '<thead><tr><th>Status</th><th>Type</th><th>Schedule / BIM ID</th><th>IFC GUID</th><th>Length Δ</th></tr></thead>';
+      const differenceBody = document.createElement('tbody');
+      differenceTable.appendChild(differenceBody);
+      form.appendChild(differenceTable);
+
+      const quantityTable = document.createElement('table');
+      quantityTable.id = 'bim-coordination-quantities';
+      quantityTable.className = 'data-table';
+      quantityTable.innerHTML = '<thead><tr><th>Type</th><th>System</th><th>Level / Area</th><th>Schedule</th><th>BIM</th><th>Length Δ</th></tr></thead>';
+      const quantityBody = document.createElement('tbody');
+      quantityTable.appendChild(quantityBody);
+      form.appendChild(quantityTable);
+
+      const issueHeading = document.createElement('h3');
+      issueHeading.textContent = 'Coordination issues';
+      form.appendChild(issueHeading);
+      const issueTarget = document.createElement('select');
+      issueTarget.id = 'bim-issue-target';
+      const issueTitle = document.createElement('input');
+      issueTitle.id = 'bim-issue-title';
+      issueTitle.placeholder = 'Issue title';
+      const issueAssignee = document.createElement('input');
+      issueAssignee.id = 'bim-issue-assignee';
+      issueAssignee.placeholder = 'Assignee';
+      const issueComment = document.createElement('textarea');
+      issueComment.id = 'bim-issue-comment';
+      issueComment.placeholder = 'Comment';
+      const screenshot = document.createElement('input');
+      screenshot.id = 'bim-issue-screenshot';
+      screenshot.placeholder = 'Screenshot URL or evidence reference (optional)';
+      const createIssueBtn = document.createElement('button');
+      createIssueBtn.type = 'button';
+      createIssueBtn.id = 'bim-create-issue-btn';
+      createIssueBtn.className = 'btn';
+      createIssueBtn.textContent = 'Create issue';
+      const exportIssuesBtn = document.createElement('button');
+      exportIssuesBtn.type = 'button';
+      exportIssuesBtn.id = 'bim-export-issues-btn';
+      exportIssuesBtn.className = 'btn secondary-btn';
+      exportIssuesBtn.textContent = 'Export issue exchange';
+      const importIssuesInput = document.createElement('input');
+      importIssuesInput.type = 'file';
+      importIssuesInput.accept = '.json';
+      importIssuesInput.id = 'bim-import-issues-input';
+      const exportChangesBtn = document.createElement('button');
+      exportChangesBtn.type = 'button';
+      exportChangesBtn.id = 'bim-export-changes-btn';
+      exportChangesBtn.className = 'btn secondary-btn';
+      exportChangesBtn.textContent = 'Export differences CSV';
+      form.append(
+        createModalField('Affected route', issueTarget),
+        createModalField('Title', issueTitle),
+        createModalField('Assignee', issueAssignee),
+        createModalField('Comment', issueComment),
+        createModalField('Screenshot / evidence', screenshot),
+        createIssueBtn,
+        exportIssuesBtn,
+        createModalField('Import issue exchange', importIssuesInput),
+        exportChangesBtn
+      );
+      const issueList = document.createElement('div');
+      issueList.id = 'bim-coordination-issues';
+      form.appendChild(issueList);
+      body.appendChild(form);
+
+      let reconciliation = null;
+      const persistIssues = () => dataStore.setItem(BIM_COORDINATION_ISSUES_KEY, issues);
+      const appendEmptyRow = (tbody, columns, message) => {
+        const row = document.createElement('tr');
+        const cell = document.createElement('td');
+        cell.colSpan = columns;
+        cell.textContent = message;
+        row.appendChild(cell);
+        tbody.appendChild(row);
+      };
+      const refresh = () => {
+        differenceBody.replaceChildren();
+        quantityBody.replaceChildren();
+        issueTarget.replaceChildren();
+        reconciliation = snapshot
+          ? reconcileBimSnapshot({ trays: dataStore.getTrays(), conduits: dataStore.getConduits() }, snapshot)
+          : null;
+        if (!reconciliation) {
+          status.textContent = 'No coordination model has been imported for this project.';
+          appendEmptyRow(differenceBody, 5, 'Import an IFC or Revit JSON file to compare it with the schedule.');
+          appendEmptyRow(quantityBody, 6, 'No quantity comparison is available.');
+        } else {
+          const summary = reconciliation.summary;
+          const elementCount = snapshot.elements.length;
+          status.textContent = `${elementCount} BIM element${elementCount === 1 ? '' : 's'} from ${snapshot.sourceName || 'model'}: ${summary.matched} matched, ${summary.geometry_changed} geometry changes, ${summary.schedule_only} schedule-only, ${summary.bim_only} BIM-only.`;
+          reconciliation.differences.forEach(difference => {
+            const row = document.createElement('tr');
+            [
+              difference.status.replace('_', ' '),
+              difference.kind,
+              difference.id || difference.bim?.id || 'Unidentified',
+              difference.sourceGuid || '—',
+              displayLength(difference.lengthDelta)
+            ].forEach(value => {
+              const cell = document.createElement('td');
+              cell.textContent = value;
+              row.appendChild(cell);
+            });
+            differenceBody.appendChild(row);
+            if (difference.status !== 'matched') {
+              const option = document.createElement('option');
+              option.value = difference.sourceGuid || `${difference.kind}:${difference.id}`;
+              option.textContent = `${difference.kind}: ${difference.id || 'Unidentified'} (${difference.status.replace('_', ' ')})`;
+              issueTarget.appendChild(option);
+            }
+          });
+          if (!differenceBody.children.length) appendEmptyRow(differenceBody, 5, 'No BIM elements are available to compare.');
+          reconciliation.quantities.forEach(quantity => {
+            const row = document.createElement('tr');
+            [quantity.kind, quantity.system, `${quantity.level} / ${quantity.area}`, `${quantity.projectCount}`, `${quantity.bimCount}`, displayLength(quantity.lengthDelta)].forEach(value => {
+              const cell = document.createElement('td');
+              cell.textContent = value;
+              row.appendChild(cell);
+            });
+            quantityBody.appendChild(row);
+          });
+          if (!quantityBody.children.length) appendEmptyRow(quantityBody, 6, 'No quantity comparison is available.');
+        }
+        if (!issueTarget.options.length) {
+          const option = document.createElement('option');
+          option.value = '';
+          option.textContent = 'General coordination issue';
+          issueTarget.appendChild(option);
+        }
+        issueList.replaceChildren();
+        if (!issues.length) {
+          const empty = document.createElement('p');
+          empty.textContent = 'No saved BIM coordination issues.';
+          issueList.appendChild(empty);
+        } else {
+          const list = document.createElement('ul');
+          issues.forEach(issue => {
+            const item = document.createElement('li');
+            const state = document.createElement('select');
+            ['open', 'in_review', 'closed'].forEach(value => {
+              const option = document.createElement('option');
+              option.value = value;
+              option.textContent = value.replace('_', ' ');
+              option.selected = value === issue.status;
+              state.appendChild(option);
+            });
+            state.addEventListener('change', () => {
+              issue.status = state.value;
+              issue.updatedAt = new Date().toISOString();
+              persistIssues();
+            });
+            const text = document.createElement('span');
+            text.textContent = ` ${issue.id}: ${issue.title}${issue.assignee ? ` — ${issue.assignee}` : ''}`;
+            item.append(state, text);
+            list.appendChild(item);
+          });
+          issueList.appendChild(list);
+        }
+      };
+      modelInput.addEventListener('change', async () => {
+        const file = modelInput.files?.[0];
+        if (!file) return;
+        try {
+          snapshot = createBimSnapshot(parseRevit(await file.text()), { sourceName: file.name });
+          dataStore.setItem(BIM_COORDINATION_SNAPSHOT_KEY, snapshot);
+          refresh();
+        } catch (error) {
+          status.textContent = `Could not read the BIM model: ${error.message || error}`;
+        }
+      });
+      createIssueBtn.addEventListener('click', () => {
+        issues.unshift(createBimIssue({
+          title: issueTitle.value,
+          assignee: issueAssignee.value,
+          comment: issueComment.value,
+          elementIds: issueTarget.value ? [issueTarget.value] : [],
+          screenshot: screenshot.value
+        }));
+        persistIssues();
+        issueTitle.value = '';
+        issueAssignee.value = '';
+        issueComment.value = '';
+        screenshot.value = '';
+        refresh();
+      });
+      exportIssuesBtn.addEventListener('click', () => {
+        downloadBimJson(exportBimIssueExchange(issues, { sourceName: snapshot?.sourceName || '' }), 'bim-coordination-issues.json');
+      });
+      importIssuesInput.addEventListener('change', async () => {
+        const file = importIssuesInput.files?.[0];
+        if (!file) return;
+        try {
+          const imported = importBimIssueExchange(await file.text());
+          const byId = new Map(issues.map(issue => [issue.id, issue]));
+          imported.forEach(issue => byId.set(issue.id, issue));
+          issues = Array.from(byId.values());
+          persistIssues();
+          refresh();
+        } catch (error) {
+          status.textContent = `Could not import the issue exchange: ${error.message || error}`;
+        } finally {
+          importIssuesInput.value = '';
+        }
+      });
+      exportChangesBtn.addEventListener('click', () => {
+        if (!reconciliation) return;
+        downloadBimCsv(reconciliation.differences, 'bim-reconciliation-differences.csv');
+      });
+      refresh();
+      return modelInput;
+    }
+  });
+}
 
 // ---- Inline E2E helpers (no external import) ----
 const E2E = new URLSearchParams(location.search).has('e2e');
@@ -238,8 +541,8 @@ const RACEWAY_VIEW_PRESET_KEY = dataStore.STORAGE_KEYS.racewayScheduleViewPreset
 const RACEWAY_VIEW_PRESETS = {
   basic: {
     ductbanks: ['toggle','tag','from','to','concrete_encasement'],
-    trays: ['tray_id','inside_width','tray_depth','tray_type','cover_condition','material','allowed_cable_group'],
-    conduits: ['conduit_id','type','material','trade_size','allowed_cable_group']
+    trays: ['tray_id','inside_width','tray_depth','tray_type','cover_condition','material','catalog_product','allowed_cable_group'],
+    conduits: ['conduit_id','type','material','trade_size','catalog_product','allowed_cable_group']
   },
   geometry: {
     ductbanks: ['toggle','tag','from','to','start_x','start_y','start_z','end_x','end_y','end_z'],
@@ -253,8 +556,8 @@ const RACEWAY_VIEW_PRESETS = {
   },
   bim: {
     ductbanks: ['toggle','tag','from','to','concrete_encasement','start_x','start_y','start_z','end_x','end_y','end_z'],
-    trays: ['tray_id','start_x','start_y','start_z','end_x','end_y','end_z','inside_width','tray_depth','tray_type','cover_condition','material'],
-    conduits: ['conduit_id','type','material','trade_size','start_x','start_y','start_z','end_x','end_y','end_z']
+    trays: ['tray_id','start_x','start_y','start_z','end_x','end_y','end_z','inside_width','tray_depth','tray_type','cover_condition','material','catalog_product','manufacturer','catalog_number'],
+    conduits: ['conduit_id','type','material','trade_size','start_x','start_y','start_z','end_x','end_y','end_z','catalog_product','manufacturer','catalog_number']
   },
   full: null
 };
@@ -464,6 +767,74 @@ document.addEventListener('DOMContentLoaded', async () => {
     TableUtils.showRacewayModal(racewaySelect,selectBtn);
   });
   const tables={};
+  let routeCatalogProducts = [];
+  const routeCatalogByLabel = new Map();
+
+  function routeDataForRow(tr) {
+    return Object.fromEntries(Array.from(tr?.querySelectorAll?.('[name]') || []).map(field => [field.name, field.value]));
+  }
+
+  function routeCatalogLabels(routeKind, route) {
+    return compatibleRouteCatalogProducts(routeCatalogProducts, route, routeKind).map((product) => {
+      const label = routeCatalogOptionLabel(product);
+      routeCatalogByLabel.set(`${routeKind}:${label}`, product);
+      return label;
+    });
+  }
+
+  function writeRouteCatalogAssignment(tr, route) {
+    Object.entries(route).forEach(([key, value]) => {
+      const field = tr?.querySelector?.(`[name="${key}"]`);
+      if (field && value !== undefined && value !== null) field.value = String(value);
+    });
+  }
+
+  function applyRouteCatalogSelection(routeKind, field, tr) {
+    const selected = routeCatalogByLabel.get(`${routeKind}:${field.value}`);
+    if (!selected) return;
+    const result = assignCatalogProductToRoute(routeDataForRow(tr), selected, routeKind);
+    if (!result.valid) {
+      showAlertModal('Catalog Product Not Compatible', result.error);
+      field.value = '';
+      return;
+    }
+    writeRouteCatalogAssignment(tr, result.route);
+    handleChange();
+  }
+
+  function routeCatalogColumns(routeKind) {
+    return [
+      {
+        key: 'catalog_product',
+        label: 'Approved Catalog Product',
+        type: 'text',
+        placeholder: 'Choose an approved compatible product',
+        datalist: (tr) => routeCatalogLabels(routeKind, routeDataForRow(tr)),
+        onChange: (field, tr) => applyRouteCatalogSelection(routeKind, field, tr)
+      },
+      { key: 'catalog_identity', label: 'Catalog Identity', type: 'text', readOnly: true },
+      { key: 'manufacturer', label: 'Manufacturer', type: 'text', readOnly: true },
+      { key: 'catalog_number', label: 'Catalog Number', type: 'text', readOnly: true },
+      { key: 'approved_part', label: 'Approved Part', type: 'text', readOnly: true },
+      { key: 'catalog_source', label: 'Catalog Source', type: 'text', readOnly: true },
+      { key: 'catalog_last_verified', label: 'Catalog Last Verified', type: 'text', readOnly: true },
+      { key: 'catalog_datasheet_url', label: 'Catalog Datasheet URL', type: 'text', readOnly: true },
+      { key: 'catalog_approval_status', label: 'Catalog Approval Status', type: 'text', readOnly: true }
+    ];
+  }
+
+  async function loadRouteCatalogChoices() {
+    try {
+      routeCatalogProducts = await loadProjectManufacturerCatalog();
+      [tables.trays, tables.conduits].forEach((table) => {
+        if (!table?.getData || !table?.setData) return;
+        table.setData(table.getData());
+      });
+    } catch (error) {
+      console.warn('Approved routing catalog choices could not be loaded.', error);
+    }
+  }
+
   function assertTablesReady(){
     for(const [name,t] of Object.entries(tables)){
       if(!t || typeof t.setData !== 'function'){
@@ -628,6 +999,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     {key:'material',label:'Material',type:'select',options:TRAY_MATERIAL_OPTIONS,default:TRAY_MATERIAL_OPTIONS[0],tooltip:'Raceway material used by procurement, BIM export, and tray hardware BOM outputs.'},
     {key:'num_slots',label:'Slots',type:'number',tooltip:'Number of longitudinal compartments (divider strips). Fill capacity is divided equally among slots. Default: 1 (single undivided tray).'},
     {key:'slot_groups',label:'Slot Groups (JSON)',type:'text',tooltip:'Optional JSON mapping slot index (0-based) to cable group name. Example: {"0":"power","1":"instrument"}. Leave blank for an undivided tray.'},
+    ...routeCatalogColumns('tray'),
     {key:'allowed_cable_group',label:'Allowed Group',type:'text'}
   ];
   const trayTable=TableUtils.createTable({
@@ -697,6 +1069,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     {key:'end_y',label:'End Y',type:'number',validate:['required','numeric']},
     {key:'end_z',label:'End Z',type:'number',validate:['required','numeric']},
     {key:'capacity',label:'Capacity',type:'number',validate:['numeric']},
+    ...routeCatalogColumns('conduit'),
     {key:'allowed_cable_group',label:'Allowed Group',type:'text'}
   ];
   const conduitTable=TableUtils.createTable({
@@ -738,6 +1111,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   conduitTable.getDataCount=function(){return this.getData().length;};
   tables.conduits=conduitTable;
   racewayTablesRef = tables;
+  loadRouteCatalogChoices();
   wireRacewayImportPreview(trayTable, trayColumns, {
     label: 'Tray Schedule',
     identityFields: ['tray_id', 'trayId', 'id', 'tag', 'ref'],
@@ -1861,6 +2235,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
   document.getElementById('import-cad-btn')?.addEventListener('click', () => document.getElementById('import-cad-input')?.click());
   document.getElementById('export-cad-btn')?.addEventListener('click', () => dataStore.exportToCad('json'));
+  document.getElementById('bim-coordination-btn')?.addEventListener('click', openBimCoordinationModal);
   ['load-ductbank-btn','delete-ductbank-btn','load-tray-btn','delete-tray-btn','load-conduit-btn','delete-conduit-btn','clear-ductbank-filters-btn','clear-tray-filters-btn','clear-conduit-filters-btn'].forEach(id => {
     document.getElementById(id)?.addEventListener('click', () => requestAnimationFrame(updateRacewayExperience));
   });

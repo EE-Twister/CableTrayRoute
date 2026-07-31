@@ -17,6 +17,8 @@ try {
 const entries = {
   index: 'src/index.js',
   workflowdashboard: 'src/workflowDashboard.js',
+  datamanager: 'src/oneLineDataManager.js',
+  switchingprocedures: 'src/switchingProcedures.js',
   cableschedule: 'src/cableschedule.js',
   panelschedule: 'src/panelSchedule.js',
   racewayschedule: 'src/racewayschedule.js',
@@ -95,6 +97,7 @@ const entries = {
   insulationcoordination: 'src/insulationcoordination.js',
   lighting: 'src/lighting.js',
   trustcenter: 'src/trustcenter.js',
+  cybercompliance: 'src/cybercompliance.js',
 };
 
 function buildEntryConfig([name, input]) {

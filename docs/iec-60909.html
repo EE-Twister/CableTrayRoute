@@ -101,7 +101,7 @@
     <p>The RMS value of the symmetrical AC component at the time of contact separation in the circuit breaker. Used to verify the <strong>rated symmetrical short-circuit breaking current Ics</strong> of a circuit breaker.</p>
     <p>For <strong>far-from-generator</strong> short circuits (the most common case in distribution systems without local generators contributing to the fault):</p>
     <pre><code>Ib = I"k3     (μ = 1.0, no decay of AC component)</code></pre>
-    <p>For near-to-generator faults, μ &lt; 1.0 and Ib &lt; I"k3. Near-to-generator correction is not yet implemented (see Limitations).</p>
+    <p>For a direct synchronous-machine terminal infeed, the study applies μ to that machine's share of I"k3. In meshed systems where individual machine shares cannot be apportioned, it conservatively uses μ = 1.0 (see Limitations).</p>
 
     <h3>Ith — Thermal equivalent short-circuit current</h3>
     <p>The RMS value of an equivalent constant current producing the same thermal effect (I²t) as the actual short-circuit current over the fault duration Tk. Used to check thermal withstand ratings of cables, busbars, and transformers.</p>
@@ -176,8 +176,8 @@
     <table>
       <thead><tr><th>Assumption</th><th>Detail</th></tr></thead>
       <tbody>
-        <tr><td>Far-from-generator</td><td>Ib = I"k3 (μ = 1.0). For systems with large synchronous generators contributing to the fault, Ib may be lower. Generator impedance correction factor K_G is not applied.</td></tr>
-        <tr><td>Transformer K_T not yet applied</td><td>The standard impedance correction K_T = 0.95 × c_max / (1 + 0.6 × xT) for network transformers (IEC 60909-0 §3.3.3) is defined in <code>analysis/iec60909.mjs</code> as <code>transformerCorrectionKT()</code> but not yet applied in the batch runner.</td></tr>
+        <tr><td>Generator contribution apportionment</td><td>For a direct synchronous-machine terminal infeed, K_G and μ are applied to the machine contribution. Meshed systems with multiple machine infeeds are not apportioned per source and conservatively use μ = 1.0.</td></tr>
+        <tr><td>IEC impedance corrections</td><td>K_T is applied to qualifying transformer impedance and K_G to qualifying directly connected synchronous generators before the IEC impedance cascade. Power-station-unit K_S / K_SO corrections are not modeled.</td></tr>
         <tr><td>Balanced three-phase system</td><td>No provision for unbalanced pre-fault conditions.</td></tr>
         <tr><td>Frequency</td><td>m factor computation assumes constant AC frequency (50 or 60 Hz).</td></tr>
         <tr><td>Motor contributions</td><td>Asynchronous motor back-EMF contributions are not modeled separately; include them as equivalent impedance sources if needed.</td></tr>
@@ -194,6 +194,8 @@
         <tr><td><code>kappaIEC(xr)</code></td><td>Peak factor κ = 1.02 + 0.98 × e^(−3/XR) per §4.3.1.1</td></tr>
         <tr><td><code>thermalMFactor(kappa, faultDurationS, freqHz)</code></td><td>DC heating factor m for Ith calculation per §4.8.1</td></tr>
         <tr><td><code>transformerCorrectionKT(xTPu, cMax)</code></td><td>Transformer impedance correction K_T per §3.3.3</td></tr>
+        <tr><td><code>generatorCorrectionKG(params)</code></td><td>Direct synchronous-generator impedance correction K_G per §6.6.1</td></tr>
+        <tr><td><code>muFactor(q, tMinS)</code></td><td>Near-to-generator breaking-current decay factor μ per §8.1.5.2</td></tr>
         <tr><td><code>computeIEC60909Bus(params)</code></td><td>Single-bus IEC 60909 calculation — returns I"k3, I"k2, I"k1, I"k2E, ip, Ib, Ith, κ, c</td></tr>
         <tr><td><code>runIEC60909Batch(busData, opts)</code></td><td>Batch IEC 60909 study; called by <code>runShortCircuit()</code> when method=IEC</td></tr>
       </tbody>

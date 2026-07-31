@@ -21,6 +21,10 @@ inventory, but production TCC entries also need exact curve data, curve revision
 settings applicability, and independent review. Inventing a few representative
 points would make arc-flash clearing times and coordination results unsafe.
 
+The application now exposes this distinction directly in the TCC device picker.
+See [Protective Device Library Governance](protective-device-library-governance.md)
+for the calculation-ready promotion gate and the meaning of each status.
+
 ## Candidate list
 
 | Category | Source-backed candidates | Evidence level |
@@ -45,10 +49,28 @@ support production clearing-time calculations.
 
 ## Current-library findings
 
-`data/protectiveDevices.json` currently contains 23 records: 6 breakers, 3 fuses,
+`data/protectiveDevices.json` currently contains 26 records: 6 breakers, 6 fuses,
 and 14 relay records. Two physical-device entries are explicitly labeled
 `Sample Study`, and most manufacturer breaker/fuse curves contain only three to
 five points with no source document, revision, voltage basis, or curve identifier.
+
+### First controlled import family: S&C SMU-20 standard-speed 14.4-kV fuses
+
+The `sc_smu20_25e_standard_14kv`, `sc_smu20_65e_standard_14kv`, and
+`sc_smu20_100e_standard_14kv` records are physical-device imports with published
+source points and profile-level provenance. They represent the 25E, 65E, and 100E
+standard-speed 14.4-kV SMU-20 fuse units (catalogs `612025`, `612065`, and
+`612100`). Each record uses its own official points from [S&C TCC No. 153-2](https://www.sandc.com/globalassets/sac-electric/documents/public---documents/sales-manual-library---external-view/tcc-number-153-2.xlsx)
+for minimum melting and [TCC No. 153-2-2](https://www.sandc.com/globalassets/sac-electric/documents/public---documents/sales-manual-library---external-view/tcc-number-153-2-2.xlsx)
+for 14.4-kV total clearing. The exact catalog configurations are confirmed in
+[S&C Specification Bulletin 665-31](https://www.sandc.com/globalassets/sac-electric/documents/public---documents/sales-manual-library---external-view/specification-bulletin-665-31.pdf).
+
+The stored points are a controlled reduction of the manufacturer spreadsheets,
+tested against official spot values with at most 2.5% log-log interpolation
+error after the application’s normalization. The record is intentionally marked
+**Source verified — peer review pending**, not calculation-ready: an independent
+reviewer must still confirm the extraction and the installation-specific SMD-20
+interrupting-duty applicability before it can be used for issued work.
 
 The following data-model issues should be corrected before adding a large catalog:
 

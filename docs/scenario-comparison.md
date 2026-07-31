@@ -20,9 +20,19 @@ Study rows are discovered from the scenario snapshots, so a newly added study do
 - Engineering approval state
 - Important summary metrics available in the result
 
+## Study-impact review
+
+When a compared model domain changes, **Study-Impact Review** produces a deterministic checklist of study families that may need attention. For example, topology, equipment, or cable changes can affect load flow, fault, arc-flash, coordination, reliability, and voltage-drop results.
+
+- **Rerun recommended** means a saved result for that study exists in the comparison scenario and a changed domain maps to the study family.
+- **Consider running** means the changed domain maps to that study family, but no saved result exists in the comparison scenario.
+- Priority and the exact changed model domains are shown for every row.
+
+This is a review aid only. It does not calculate a replacement result, prove study freshness, or approve an engineering deliverable. Confirm the study inputs and required approvals before relying on a result.
+
 ## Export
 
-**Export Comparison CSV** produces one portable register containing domain summaries, record changes, and study-result changes. It does not modify either scenario.
+**Export Comparison CSV** produces one portable register containing domain summaries, record changes, study-result changes, and study-impact review rows. It does not modify either scenario.
 
 ## Limitations
 

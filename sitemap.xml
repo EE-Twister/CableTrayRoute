@@ -76,6 +76,7 @@
   <url><loc>https://cabletrayroute.com/cableFaultBracing.html</loc><priority>0.5</priority></url>
   <url><loc>https://cabletrayroute.com/capacitorbank.html</loc><priority>0.5</priority></url>
   <url><loc>https://cabletrayroute.com/dcshortcircuit.html</loc><priority>0.5</priority></url>
+  <url><loc>https://cabletrayroute.com/datamanager.html</loc><priority>0.6</priority></url>
   <url><loc>https://cabletrayroute.com/demandschedule.html</loc><priority>0.6</priority></url>
   <url><loc>https://cabletrayroute.com/derinterconnect.html</loc><priority>0.5</priority></url>
   <url><loc>https://cabletrayroute.com/differentialprotection.html</loc><priority>0.5</priority></url>
@@ -85,6 +86,7 @@
   <url><loc>https://cabletrayroute.com/frequencyscan.html</loc><priority>0.5</priority></url>
   <url><loc>https://cabletrayroute.com/generatorsizing.html</loc><priority>0.5</priority></url>
   <url><loc>https://cabletrayroute.com/hazareaclassification.html</loc><priority>0.5</priority></url>
+  <url><loc>https://cabletrayroute.com/cybercompliance.html</loc><priority>0.5</priority></url>
   <url><loc>https://cabletrayroute.com/heattracesizing.html</loc><priority>0.6</priority></url>
   <url><loc>https://cabletrayroute.com/ibr.html</loc><priority>0.5</priority></url>
   <url><loc>https://cabletrayroute.com/iec60287.html</loc><priority>0.5</priority></url>
@@ -95,6 +97,7 @@
   <url><loc>https://cabletrayroute.com/scenarios.html</loc><priority>0.6</priority></url>
   <url><loc>https://cabletrayroute.com/seismicwindcombined.html</loc><priority>0.5</priority></url>
   <url><loc>https://cabletrayroute.com/structuralcombinations.html</loc><priority>0.5</priority></url>
+  <url><loc>https://cabletrayroute.com/switchingprocedures.html</loc><priority>0.6</priority></url>
   <url><loc>https://cabletrayroute.com/sustainability.html</loc><priority>0.5</priority></url>
   <url><loc>https://cabletrayroute.com/voltageflicker.html</loc><priority>0.5</priority></url>
   <url><loc>https://cabletrayroute.com/voltagestability.html</loc><priority>0.5</priority></url>

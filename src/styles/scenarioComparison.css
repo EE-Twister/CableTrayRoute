@@ -138,6 +138,19 @@
 .sc-diff-table tr.cmp-removed { background: #fff5f5; }
 .sc-diff-table tr.cmp-changed { background: #fffbeb; }
 
+.sc-diff-table tr.sc-impact--high { background: #fff7ed; }
+.sc-diff-table tr.sc-impact--medium { background: #fffbeb; }
+
+.sc-impact-priority {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.sc-impact--high .sc-impact-priority { color: #c2410c; }
+.sc-impact--medium .sc-impact-priority { color: #92400e; }
+
 .sc-diff-table tr.cmp-added   td:first-child { color: #15803d; font-weight: 700; }
 .sc-diff-table tr.cmp-removed td:first-child { color: #b91c1c; font-weight: 700; }
 .sc-diff-table tr.cmp-changed td:first-child { color: #92400e; font-weight: 700; }
@@ -273,6 +286,10 @@ body.dark-mode .sc-diff-table td {
 body.dark-mode .sc-diff-table tr.cmp-added   { background: #052e16; }
 body.dark-mode .sc-diff-table tr.cmp-removed { background: #450a0a; }
 body.dark-mode .sc-diff-table tr.cmp-changed { background: #422006; }
+body.dark-mode .sc-diff-table tr.sc-impact--high { background: #431407; }
+body.dark-mode .sc-diff-table tr.sc-impact--medium { background: #422006; }
+body.dark-mode .sc-impact--high .sc-impact-priority { color: #fdba74; }
+body.dark-mode .sc-impact--medium .sc-impact-priority { color: #fcd34d; }
 
 body.dark-mode .sc-badge--added   { background: #052e16; color: #86efac; border-color: #166534; }
 body.dark-mode .sc-badge--removed { background: #450a0a; color: #fca5a5; border-color: #991b1b; }

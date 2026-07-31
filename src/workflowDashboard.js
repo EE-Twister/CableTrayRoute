@@ -13,6 +13,7 @@ import {
   getDesignGateApprovals, setDesignGateApprovals,
   setOneLine, setCables, setTrays, setConduits, setDuctbanks, setItem,
   getLifecyclePackages, getReportSnapshots, getItem, addLifecyclePackage, deleteLifecyclePackage,
+  getFieldObservationQueue, getFieldObservations,
 } from '../dataStore.mjs';
 import { trayFillPercent } from '../analysis/designRuleChecker.mjs';
 import { buildLifecyclePackage, summarizePackage } from '../analysis/lifecyclePackage.mjs';
@@ -21,6 +22,7 @@ import { evaluateEquipment, summariseEvaluation } from '../analysis/equipmentEva
 import { buildGuidedWorkflowRunner, buildWorkflowCoreDiagnostics } from '../analysis/projectWorkflowCore.mjs';
 import { buildMinimalDesignAutomation } from '../analysis/workflowAutomation.mjs';
 import { buildDesignBasisReview, normalizeDesignBasis, summarizeDesignBasis } from '../analysis/designBasis.mjs';
+import { summarizeFieldObservations } from '../analysis/fieldObservations.mjs';
 import protectiveDevices from '../data/protectiveDevices.mjs';
 import '../site.js';
 import './projectManager.js';
@@ -50,6 +52,7 @@ const STUDY_DEFINITIONS = [
   { key: 'substationLayout', label: 'Substation Layout', href: 'substationlayout.html' },
   { key: 'lighting',               label: 'Egress Lighting',         href: 'lighting.html' },
   { key: 'trustCenter',            label: 'Trust Center',            href: 'trustcenter.html' },
+  { key: 'cyberCompliance',        label: 'Cyber Compliance',        href: 'cybercompliance.html' },
 ];
 const DASHBOARD_FOCUS_KEY = 'workflowDashboardFocus';
 
@@ -159,6 +162,10 @@ function getEquipmentFailCount() {
   } catch (_) {
     return 0;
   }
+}
+
+function getFieldObservationSummary() {
+  return summarizeFieldObservations(getFieldObservations(), getFieldObservationQueue());
 }
 
 function currentDesignBasisSummary() {
@@ -531,6 +538,15 @@ function renderKpiStrip(container) {
       href: 'equipmentevaluation.html',
       warn: getEquipmentFailCount() > 0,
     },
+    {
+      label: 'Open field observations',
+      value: getFieldObservationSummary().open,
+      helper: getFieldObservationSummary().open > 0
+        ? `${getFieldObservationSummary().asBuiltConflicts} as-built conflict(s); ${getFieldObservationSummary().queued} record(s) pending project save.`
+        : 'No open field observations or punch items.',
+      href: 'fieldview.html',
+      warn: getFieldObservationSummary().open > 0,
+    },
   ];
   const kpis = focus === 'routing' ? routingKpis : fullKpis;
 
@@ -781,6 +797,8 @@ function currentDashboardProject() {
     studies: getStudies(),
     studyApprovals: getStudyApprovals(),
     reportSnapshots: getReportSnapshots(),
+    fieldObservations: getFieldObservations(),
+    fieldObservationQueue: getFieldObservationQueue(),
     deliverables: getLifecyclePackages(),
     routeResults: latestRouteResults,
     latestRouteResults,
@@ -1410,6 +1428,8 @@ function initReleasePackageForm() {
       designBasis: getDesignBasis(),
       designGateApprovals: getDesignGateApprovals(),
       tccSettings: getItem('tccSettings', null),
+      fieldObservations: getFieldObservations(),
+      fieldObservationQueue: getFieldObservationQueue(),
       oneLine:   getOneLine(),
     };
 

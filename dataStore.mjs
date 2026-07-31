@@ -129,6 +129,8 @@ const EXTRA_KEYS = {
   racewayScheduleViewPreset: 'racewayScheduleViewPreset',
   equipmentFilterPresets: 'equipmentFilterPresets',
   trayHardwareCatalogCustomProducts: 'trayHardwareCatalogCustomProducts',
+  bimCoordinationSnapshot: 'bimCoordinationSnapshot',
+  bimCoordinationIssues: 'bimCoordinationIssues',
   drcAcceptedFindings: 'drcAcceptedFindings',
   studyApprovals: 'studyApprovals',
   studyProvenance: 'studyProvenance',
@@ -137,6 +139,8 @@ const EXTRA_KEYS = {
   lifecyclePackages: 'lifecyclePackages',
   deliverableArtifacts: 'deliverableArtifacts',
   fieldExecutionRecords: 'fieldExecutionRecords',
+  fieldObservations: 'fieldObservations',
+  fieldObservationQueue: 'fieldObservationQueue',
   procurementRegister: 'procurementRegister',
   projectMeta: 'projectMeta',
   designBasis: 'designBasis',
@@ -145,6 +149,7 @@ const EXTRA_KEYS = {
   groundGridSoilMeasurements: 'groundGridSoilMeasurements',
   groundGridRiskPoints: 'groundGridRiskPoints',
   mccLineups: 'mccLineups',
+  switchingProcedures: 'switchingProcedures',
 };
 
 const LEGACY_STUDIES_SETTING_KEY = 'studies';
@@ -284,6 +289,9 @@ export const setCableChangeLog = entries => write(EXTRA_KEYS.cableChangeLog, ent
 export const getEquipmentFilterPresets = () => read(EXTRA_KEYS.equipmentFilterPresets, []);
 export const setEquipmentFilterPresets = presets => write(EXTRA_KEYS.equipmentFilterPresets, presets);
 
+export const getSwitchingProcedures = () => read(EXTRA_KEYS.switchingProcedures, []);
+export const setSwitchingProcedures = procedures => write(EXTRA_KEYS.switchingProcedures, Array.isArray(procedures) ? procedures : []);
+
 export const getTrayHardwareCatalogCustomProducts = () => read(EXTRA_KEYS.trayHardwareCatalogCustomProducts, []);
 export const setTrayHardwareCatalogCustomProducts = products => write(EXTRA_KEYS.trayHardwareCatalogCustomProducts, products);
 
@@ -409,6 +417,19 @@ export const getFieldExecutionRecords = () => read(EXTRA_KEYS.fieldExecutionReco
 export const setFieldExecutionRecords = records => write(
   EXTRA_KEYS.fieldExecutionRecords,
   Array.isArray(records) ? records : []
+);
+
+// Offline-first field observations and their pending project-save queue.
+// Attachments are metadata/data-URI records owned by the active project.
+export const getFieldObservations = () => read(EXTRA_KEYS.fieldObservations, []);
+export const setFieldObservations = observations => write(
+  EXTRA_KEYS.fieldObservations,
+  Array.isArray(observations) ? observations : []
+);
+export const getFieldObservationQueue = () => read(EXTRA_KEYS.fieldObservationQueue, []);
+export const setFieldObservationQueue = queue => write(
+  EXTRA_KEYS.fieldObservationQueue,
+  Array.isArray(queue) ? queue : []
 );
 
 // Procurement schedule workflow state. The procurement page owns the record
@@ -575,6 +596,15 @@ function ensureEquipmentFields(eq) {
     z: '',
     manufacturer: '',
     model: '',
+    cyberAssetClass: '',
+    cyberCriticality: '',
+    firmwareVersion: '',
+    protocols: [],
+    cyberZone: '',
+    remoteAccess: {},
+    passwordPolicy: false,
+    patchCurrent: false,
+    cipEvidence: '',
     phases: '',
     notes: '',
     ...eq
@@ -918,6 +948,7 @@ export const keys = (scenario = getCurrentScenarioNameState()) => {
 export function saveProject(projectId, scenario = getCurrentScenarioNameState()) {
   if (!projectId) return;
   try {
+    const pendingFieldObservationQueue = getFieldObservationQueue();
     const payload = {
       equipment: getEquipment(),
       panels: getPanels(),
@@ -932,12 +963,15 @@ export function saveProject(projectId, scenario = getCurrentScenarioNameState())
       workflowArtifacts: {
         deliverableArtifacts: getDeliverableArtifacts(),
         fieldExecutionRecords: getFieldExecutionRecords(),
+        fieldObservations: getFieldObservations(),
+        fieldObservationQueue: [],
         procurementRegister: getProcurementRegister(),
         reportSnapshots: getReportSnapshots(),
         lifecyclePackages: getLifecyclePackages(),
         pullPlanArtifact: getItem('pullPlanArtifact', null),
         costEstimateArtifact: getItem('costEstimateArtifact', null),
         latestRouteResults: getItem('latestRouteResults', null),
+        switchingProcedures: getSwitchingProcedures(),
       },
       mccLineups: getMccLineups(),
       raceways: {
@@ -948,6 +982,7 @@ export function saveProject(projectId, scenario = getCurrentScenarioNameState())
       oneLine: getOneLine(scenario)
     };
     writeSavedProject(projectId, payload);
+    if (pendingFieldObservationQueue.length) setFieldObservationQueue([]);
     // Notify collaboration layer so remote clients receive the update
     if (typeof document !== 'undefined') {
       try {
@@ -992,6 +1027,8 @@ export function loadProject(projectId, scenario = getCurrentScenarioNameState())
     if (designGateApprovals && typeof designGateApprovals === 'object' && !Array.isArray(designGateApprovals)) setDesignGateApprovals(designGateApprovals); else setDesignGateApprovals({});
     setDeliverableArtifacts(workflowArtifacts.deliverableArtifacts);
     setFieldExecutionRecords(workflowArtifacts.fieldExecutionRecords);
+    setFieldObservations(workflowArtifacts.fieldObservations);
+    setFieldObservationQueue(workflowArtifacts.fieldObservationQueue);
     setProcurementRegister(workflowArtifacts.procurementRegister);
     if (workflowArtifacts.reportSnapshots && typeof workflowArtifacts.reportSnapshots === 'object') {
       write(EXTRA_KEYS.reportSnapshots, workflowArtifacts.reportSnapshots);
@@ -1002,6 +1039,7 @@ export function loadProject(projectId, scenario = getCurrentScenarioNameState())
     if (workflowArtifacts.pullPlanArtifact !== undefined) setItem('pullPlanArtifact', workflowArtifacts.pullPlanArtifact);
     if (workflowArtifacts.costEstimateArtifact !== undefined) setItem('costEstimateArtifact', workflowArtifacts.costEstimateArtifact);
     if (workflowArtifacts.latestRouteResults !== undefined) setItem('latestRouteResults', workflowArtifacts.latestRouteResults);
+    setSwitchingProcedures(workflowArtifacts.switchingProcedures);
     if (Array.isArray(mccLineups)) setMccLineups(mccLineups); else setMccLineups([]);
     setTrays(Array.isArray(raceways.trays) ? raceways.trays : []);
     setConduits(Array.isArray(raceways.conduits) ? raceways.conduits : []);
@@ -1049,6 +1087,8 @@ export function applyRemoteSnapshot(snapshot, projectId) {
     if (workflowArtifacts && typeof workflowArtifacts === 'object') {
       setDeliverableArtifacts(workflowArtifacts.deliverableArtifacts);
       setFieldExecutionRecords(workflowArtifacts.fieldExecutionRecords);
+      setFieldObservations(workflowArtifacts.fieldObservations);
+      setFieldObservationQueue(workflowArtifacts.fieldObservationQueue);
       setProcurementRegister(workflowArtifacts.procurementRegister);
       if (workflowArtifacts.reportSnapshots && typeof workflowArtifacts.reportSnapshots === 'object') {
         write(EXTRA_KEYS.reportSnapshots, workflowArtifacts.reportSnapshots);
@@ -1059,6 +1099,7 @@ export function applyRemoteSnapshot(snapshot, projectId) {
       if (workflowArtifacts.pullPlanArtifact !== undefined) setItem('pullPlanArtifact', workflowArtifacts.pullPlanArtifact);
       if (workflowArtifacts.costEstimateArtifact !== undefined) setItem('costEstimateArtifact', workflowArtifacts.costEstimateArtifact);
       if (workflowArtifacts.latestRouteResults !== undefined) setItem('latestRouteResults', workflowArtifacts.latestRouteResults);
+      setSwitchingProcedures(workflowArtifacts.switchingProcedures);
     }
     if (Array.isArray(mccLineups)) setMccLineups(mccLineups); else setMccLineups([]);
     setTrays(Array.isArray(raceways.trays) ? raceways.trays : []);

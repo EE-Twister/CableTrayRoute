@@ -30,7 +30,7 @@ A **2026-04-26 website/product competitiveness refresh** compared CableTrayRoute
 
 A **2026-05-04 refresh** benchmarked against ETAP 2024/2025, EasyPower 2025, SKM PowerTools, DIgSILENT PowerFactory 2024, Siemens PSS SINCAL, PLS-CADD, AGI32/Visual/ElumTools, Eplan Platform, AutoCAD Plant 3D / SmartPlant Electrical, Aeries CARS / Trimble MEP, NFPA 855 BESS hazard tools (DNV / ESRG), and vendor relay platforms (SEL AcSELerator, GE EnerVista, ABB PCM600). It identified **17 new gaps (#83–#99)** across four themes: operations & live data, compliance & risk, construction & MEP, and enterprise & reporting. **Gap #96 (Bus Duct Sizing) implemented 2026-05-05. Gap #85 (Embodied Carbon) implemented 2026-05-05. Gap #97 (Vendor Relay-Settings Export) implemented 2026-05-05. Gap #88 (Quasi-Dynamic Load Flow) implemented 2026-05-06. Gap #91 (NFPA 855 BESS Hazard) implemented 2026-05-06. Gap #94 (Hazardous Area Classification) implemented 2026-05-06. Gap #92 (Demand & Diversity Estimator) implemented 2026-05-04. Gap #93 (Conduit Bend Schedule) implemented 2026-05-04. Gap #99 (Audit Log + SSO + Enterprise Auth) implemented 2026-05-06.** Open from this pass (reconciled 2026-06-21): #83, #84, #86, #89, #90, #98 — #87 (Insulation Coordination) and #95 (Photometric/Egress Lighting) are now implemented (see their per-gap sections).
 
-> **Reconciliation note (2026-06-21).** A codebase sweep found several gap sections were stale relative to shipped code. Now-implemented (evidence in each gap's Status line): **#74** advanced grounding, **#75** unified cable thermal environment, **#81** sample gallery, **#87** insulation coordination, **#95** photometric/egress lighting. Verified **still-open** gaps across all passes: **#72** manufacturer data portal (commercial data), **#76** BIM round-trip / issue markup (IFC export only today), **#77** field data collection / commissioning, **#83** SCADA / telemetry live view (infrastructure), **#84** cybersecurity compliance audit. That is **5 open of 100** (plus the long-deferred native BIM/CAD plugin and live manufacturer pricing feed, both commercial-partnership dependent). **#65** Optimal Power Flow / Economic Dispatch, **#98** Probabilistic / Monte Carlo Load Flow, **#90** Conductor Sag/Tension, **#86** Lightning & Surge Protection, and **#89** Substation Physical Layout Generator were implemented 2026-06-21. The pure-engineering, buildable-now subset is **#77, #84**.
+> **Reconciliation note (updated 2026-07-31).** A codebase sweep found several gap sections stale relative to shipped code. The buildable items from the earlier open list are now shipped: **#72** governed manufacturer catalog workflow, **#76** core browser-native BIM reconciliation and issue workflow, **#77** field data collection / commissioning, **#84** cyber compliance evidence screening, plus the earlier delivered #74, #75, #81, #87, and #95. The remaining open product gap is **#83** real-time SCADA / telemetry, which requires a live external data source and operational integration. Native BIM/CAD plugins and live manufacturer pricing feeds remain commercial-partnership dependent.
 
 ---
 
@@ -135,42 +135,39 @@ The following features were identified by benchmarking the one-line diagram edit
 
 For day-to-day drafting speed (especially for power users coming from ETAP/EasyPower/SKM), the one-line editor already covers many baseline items (right-click edit/rename/duplicate/rotate/lock, select connected, select by type, grouping, zoom-to-fit, grid snap, layers, minimap). The following **simple** additions are still common in competitor tools and would likely provide immediate productivity gains:
 
-1. **Right-click align/distribute commands** (not only toolbar buttons)
+1. ~~**Right-click align/distribute commands** (not only toolbar buttons)~~ — ✅ Available for multi-selection and verified 2026-07-31.
    - Why it matters: users keep their cursor on the canvas and avoid toolbar travel.
    - Typical actions: Align Left/Right/Top/Bottom, Distribute Horizontal/Vertical.
 
-2. **Bring to Front / Send to Back (z-order) in context menu**
+2. ~~**Bring to Front / Send to Back (z-order) in context menu**~~ — ✅ Available from the component context menu and verified 2026-07-31.
    - Why it matters: annotation bubbles, zone blocks, and crossing symbols are faster to manage when stacking order is one click away.
 
-3. **Connection waypoint handles + “Add elbow here” command**
-   - Why it matters: manual cleanup of dense drawings is faster than opening full connection edit dialogs.
+3. ~~**Connection waypoint handles + “Add elbow here” command**~~ — ✅ **Implemented 2026-07-31.** Selecting a non-bus connection exposes a snapped, axis-constrained bend handle. Right-click commands place a waypoint at the cursor or reset automatic routing; each change is saved and undoable.
 
-4. **Repeat last command (hotkey) and configurable keyboard shortcuts**
+4. ~~**Repeat last command (hotkey) and configurable keyboard shortcuts**~~ — ✅ **Implemented 2026-07-31.** The **Shortcuts** control configures repeat-last, rotate, flip, fit, fit-selection, Auto Arrange, and Auto Space keys with conflict protection and saved per-browser preferences. **Repeat Last** now repeats the most recent palette placement, rotate/flip, Auto Arrange, or Auto Space command.
    - Why it matters: repetitive layout work (duplicate, rotate, align) is significantly faster with remembered commands.
 
-5. **Quick-add via right-click on canvas**
+5. ~~**Quick-add via right-click on canvas**~~ — ✅ **Implemented 2026-07-31.** Blank-canvas menus add a Utility Source, Bus, Breaker, Transformer, or Panel directly at the snapped pointer location, without leaving the drawing surface.
    - Why it matters: “Add breaker here / Add transformer here / Add text note here” mirrors CAD-like workflows and reduces palette switching.
 
-6. **Nudge with grid-aware step sizes**
+6. ~~**Nudge with grid-aware step sizes**~~ — ✅ Arrow keys nudge by the active grid step; `Shift` uses a 4× step.
    - Why it matters: arrow keys with Shift/Ctrl step multipliers are heavily used for precise final placement.
 
-7. **Lock position vs lock properties (separate lock modes)**
-   - Why it matters: reviewers often want to freeze geometry but still permit metadata edits.
+7. ~~**Lock position vs lock properties (separate lock modes)**~~ — ✅ **Implemented 2026-07-31.** The component menu now distinguishes Position and Properties locks. Legacy `locked` drawings retain position-lock behavior; property locks make the Properties editor read-only and block direct rename/property-paste, while a locked layer protects both modes.
 
-8. **Recent symbols / favorites strip**
-   - Why it matters: cuts repeated search/scroll in larger symbol libraries.
+8. ~~**Recent symbols / favorites strip**~~ — ✅ **Implemented 2026-07-31.** The palette keeps up to 12 explicit favorites and 8 recently placed symbols across sessions. Right-click a palette symbol to add/remove it from Favorites; the strip tracks both click placement and drag/drop placement, and **Clear Recent** never removes favorites.
 
-9. **Inline label editing on double-click (for all symbol types)**
+9. ~~**Inline label editing on double-click (for all symbol types)**~~ — ✅ **Implemented 2026-07-31.** Double-clicking an equipment label opens a direct on-canvas editor; `Enter` or blur saves, `Escape` cancels, and the edit is undoable. Text-box annotations use the same workflow, while locked components/layers and Live operator mode remain protected.
    - Why it matters: avoids modal friction during annotation-heavy sessions.
 
-10. **Persistent snapping aids (guides + distance readout)**
+10. ~~**Persistent snapping aids (guides + distance readout)**~~ — ✅ **Implemented 2026-07-31.** Dragging equipment now snaps to nearby component edges or centers within tolerance, draws blue alignment guides, and shows a live ΔX/ΔY movement readout. The **Guides** Grid control persists the preference between sessions.
     - Why it matters: users can align against nearby objects without toggling full grid modes.
 
 ### Suggested priority (highest everyday impact)
 
-- **P1:** Context-menu align/distribute, z-order actions, nudge step controls.
-- **P2:** Quick-add canvas menu, inline label editing coverage, repeat-last command.
-- **P3:** Favorites/recent symbols, advanced waypoint elbow editing, guide/readout polish.
+- **P1:** Complete.
+- **P2:** Complete.
+- **P3:** Complete. Favorites/recent symbols, single-bend waypoint editing, and snapping-guide/readout polish are implemented.
 
 ## One-Line Diagram & TCC Deep Dive (2026-04-06 Pass)
 
@@ -1096,7 +1093,7 @@ All originally high- and medium-priority feasible items have been implemented:
 
 ### New Low-Priority / Deferred (2026-03-24)
 
-9. **Cloud-Based Component Library** — Shared organization-wide product library synchronized via the existing collaboration backend. Aligns with Bentley's Components Center model.
+9. ~~**Cloud-Based Component Library**~~ — ✅ **Implemented 2026-07-31** — `library.html` now supports personal cloud sync and share links plus an approved team-release workflow. Admins publish immutable, validated organization releases; every signed-in user can load the latest approved baseline. `server.mjs` exposes `/api/v1/team-library`; tests: `tests/teamLibrary.test.mjs`.
 10. ~~**Electrical Digital Twin / Navisworks Export**~~ — ✅ **Implemented 2026-04-11** — `src/exporters/gltf2.mjs` `exportToGLTF2()` exports cable tray solid mesh geometry and cable route polylines as a glTF 2.0 binary (`.glb`) for Navisworks / BIM 360 import. Docs: `docs/gltf-export.md`. Tests: `tests/gltfExport.test.mjs`.
 11. **Revit Plugin / BIM Sync** — Requires Revit SDK (Windows-native C#/.NET). IFC export is the recommended interim step.
 12. **AutoCAD / AVEVA Plugin** — Requires commercial CAD SDK licensing.
@@ -1257,7 +1254,7 @@ The strongest market pattern is that competing tools sell more than formulas. Th
 - Add warnings when reports use generic/unapproved parts.
 - Tests: catalog import validation, duplicate catalog-number merge behavior, approved/unapproved filtering, and report warning output.
 
-**Status:** Partial, advanced 2026-05-22. `analysis/manufacturerCatalog.mjs` now provides governed catalog normalization, approval evidence validation, manufacturer/catalog-number duplicate merging, approved-only filtering, BOM/submittal metadata extraction, and warnings for missing, unknown, or unapproved catalog selections. `data/manufacturer_catalog.json` is schema v2 with approval/source/last-verified metadata on seed rows. Tray Hardware BOM catalog browsing now supports approval filtering and project custom catalog governance fields. Cost line items, submittal schedules/XLSX exports, and Revit/BIM JSON exports now carry manufacturer, catalog number, approval, source, verification, datasheet, and BIM reference fields. Remaining work: CSV/XLSX catalog import templates across trays, conduits, fittings, heat-trace components, protective devices, and cable types; approved-catalog filtering in routing, heat trace, and TCC selectors.
+**Status:** ✅ **Implemented 2026-07-31.** `analysis/manufacturerCatalog.mjs` now provides governed catalog normalization, approval evidence validation, manufacturer/catalog-number duplicate merging, approved-only filtering, BOM/submittal metadata extraction, and warnings for missing, unknown, or unapproved catalog selections. `data/manufacturer_catalog.json` is schema v2 with approval/source/last-verified metadata on seed rows. Tray Hardware BOM catalog browsing now supports approval filtering and project custom catalog governance fields. Cost line items, submittal schedules/XLSX exports, and Revit/BIM JSON exports carry manufacturer, catalog number, approval, source, verification, datasheet, and BIM reference fields. The shared CSV/XLSX catalog template and Library Manager support `heat_trace`, `cable`, and `protective_device` products with validated selection fields. Heat Trace Sizing merges valid project catalog entries into selection, Cable Schedule loads complete governed catalog cable rows as reusable types, TCC exposes governed project catalog device curves under **Project Catalog Devices** while retaining the curve-evidence readiness gate, and Raceway Schedule assigns approved compatible tray/conduit products to routed segments. Tray Hardware BOM keeps approved straight-section identities discrete and carries their catalog evidence into the procurement table and XLSX export.
 
 ---
 
@@ -1332,7 +1329,7 @@ The strongest market pattern is that competing tools sell more than formulas. Th
 - Export resolved changes as CSV/BCF-like JSON, leaving Revit/AutoCAD native plugins as a later integration.
 - Tests: IFC object extraction fixtures, GUID mapping, quantity diff generation, and issue export/import round-trip.
 
-**Status:** IFC export partially implemented; round-trip and issue markup not implemented.
+**Status:** 🟡 **Core raceway workflow implemented** (2026-07-31). `src/importers/revit.mjs` retains available BIM GUIDs plus Revit JSON electrical equipment and support objects; `analysis/bimReconciliation.mjs` creates a separate read-only IFC/Revit snapshot, maps tray/conduit schedule records by GUID or route ID, reports geometry/schedule/BIM-only differences, summarizes quantity deltas, and round-trips issue records. `racewayschedule.html` exposes this through **CAD / BIM → BIM Coordination** without overwriting live schedules, with CSV difference export and JSON issue exchange import/export. Native BIM viewer rendering and rich BCF 2.x package interoperability remain deferred.
 
 ---
 
@@ -1349,7 +1346,7 @@ The strongest market pattern is that competing tools sell more than formulas. Th
 - Add report appendix for field verification and unresolved punch items.
 - Tests: offline observation queue, attachment metadata persistence, project merge behavior, and report appendix generation.
 
-**Status:** Mobile field viewing implemented; field data collection not implemented.
+**Status:** ✅ **Implemented 2026-07-31.** `analysis/fieldObservations.mjs` provides normalized, validated field observation records, attachment metadata, a deduplicated offline/project-save queue, summaries, and report rows. `fieldview.html` / `fieldview.js` now captures target-specific installation, punch, as-built, test, safety, and damage observations from cable or tray QR links; it accepts an optional local photo attachment (2 MB cap) and queues the record for the next project save. `dataStore.mjs` persists observations and queue state through local project save/load and remote snapshots. `workflowdashboard.html` surfaces open observations and as-built conflicts, while `projectreport.html` includes a **Field Observations and Punch Items** appendix with attachment and save state. Tests: `tests/fieldObservations.test.mjs`.
 
 ---
 
@@ -1451,9 +1448,9 @@ The strongest market pattern is that competing tools sell more than formulas. Th
 | **P2** | 80 | ~~**Equipment Evaluation / Compliance Inventory**~~ | Join ratings with short-circuit/arc-flash/TCC results | Medium | ✅ Implemented 2026-05-03 |
 | **P2** | 74 | **Advanced Grounding Fidelity** | Soil data fitting and risk-point table | High | Implemented 2026-05-03 |
 | **P3** | 75 | ~~**Cable Thermal Environment Modeling**~~ | Unified environment model over existing calculators | High | ✅ Implemented |
-| **P3** | 72 | **Manufacturer Data Portal / Product Catalogs** | Approved catalog schema and imports | Medium | Partial |
-| **P3** | 77 | **Field Data Collection / Commissioning** | Field observations and offline queue | Medium | Not implemented |
-| **P4** | 76 | **BIM Round-Trip / Issue Markup** | IFC import, quantity reconciliation, BCF-like issues | High | Not implemented |
+| **P3** | 72 | **Manufacturer Data Portal / Product Catalogs** | Approved catalog schema and imports | Medium | ✅ Implemented 2026-07-31 |
+| **P3** | 77 | **Field Data Collection / Commissioning** | Field observations and offline queue | Medium | ✅ Implemented 2026-07-31 |
+| **P4** | 76 | **BIM Round-Trip / Issue Markup** | IFC import, quantity reconciliation, BCF-like issues | High | Partial — core raceway workflow implemented 2026-07-31 |
 
 ---
 
@@ -1483,7 +1480,7 @@ CableTrayRoute's calculation breadth is now strong, but several **operations**, 
 - Add a read-only "Operator" project role that locks editing actions while live mode is on.
 - Tests: adapter polling cadence, value write-through, role enforcement, and trend ring-buffer behaviour.
 
-**Status:** Not implemented.
+**Status:** 🟡 **Browser-native live mode implemented 2026-07-31.** `analysis/liveTagAdapter.mjs` provides read-only HTTP JSON and WebSocket adapters, polling/connection control with bounded reconnect, component/tag mapping, bounded trend history, rolling 24-hour per-metric views, CSV export, timestamp freshness checks, and configurable low/high limit evaluation. The One-Line **Live** control renders current values in datablocks, visibly marks stale source readings, surfaces active read-only threshold alarms, exposes per-metric in-session trends, exports their timestamped samples, and can lock diagram editing in operator mode. Plant protocols (OPC UA, Modbus-TCP, MQTT) require a site gateway that exposes a read-only HTTP or WebSocket endpoint; durable historian retention and server-side operator authorization remain integration work.
 
 ---
 
@@ -1499,7 +1496,7 @@ CableTrayRoute's calculation breadth is now strong, but several **operations**, 
 - Add a "Cyber Compliance" study page with a per-asset evidence table and a generated compliance letter appendix for the report builder.
 - Tests: rule coverage on a fixture model, missing-evidence flags, and report-letter rendering.
 
-**Status:** Not implemented.
+**Status:** ✅ **Implemented 2026-07-31.** `analysis/cyberCompliance.mjs` normalizes and derives project cyber assets, screens CIP-002 asset identification, CIP-005 electronic security perimeter, CIP-007 remote-access/system-security evidence, and IEC 62443-3-3 SR 1/3/5 coverage. `cybercompliance.html` provides a project-backed evidence inventory, seed-from-project action, assessment matrix, saved study result, CSV export, and report-package evidence-matrix appendix. This is a design-stage evidence screen, not a formal compliance certification.
 
 ---
 
@@ -1610,7 +1607,7 @@ CableTrayRoute's calculation breadth is now strong, but several **operations**, 
 - Add an HMA appendix (executive summary, propagation timing, vent sizing, separation map) into the report builder.
 - Tests: separation distance lookup, propagation timing on a fixture rack, and vent-area calculation.
 
-**Status:** Not implemented.
+**Status:** ✅ **Implemented 2026-07-31 (roadmap reconciliation).** `analysis/bessHazard.mjs`, `bessHazard.html`, and `bessHazard.js` provide advisory separation screening, propagation sensitivity, preliminary deflagration vent screening, site exposure entries, and a project-backed HMA result. The Report Package builder includes the BESS hazard appendix. The controls deliberately require project-specific UL 9540A data, qualified-engineer review, and AHJ approval rather than presenting generic outputs as a code-compliance determination. Tests: `tests/bessHazard.test.mjs`.
 
 ---
 
@@ -1755,8 +1752,8 @@ CableTrayRoute's calculation breadth is now strong, but several **operations**, 
 | **P2** | 91 | ~~**NFPA 855 BESS Hazard Modeling**~~ | Separation/HMA appendix tied to existing IBR data | Medium | ✅ Implemented 2026-05-06 |
 | **P2** | 94 | ~~**Hazardous Area Classification (NEC 500–505)**~~ | hazArea polygons + certification check on library items | Medium | ✅ Implemented 2026-05-06 |
 | **P2** | 97 | ~~**Vendor Relay-Settings File Export**~~ | SEL/GE/ABB/Siemens adapters from existing TCC settings | Medium | ✅ Implemented 2026-05-05 |
-| **P3** | 83 | **Real-Time SCADA / Telemetry Live View** | Generic tag adapter + Live mode on one-line | High | Not implemented |
-| **P3** | 84 | **Cybersecurity Compliance Audit (NERC CIP / IEC 62443)** | Cyber-asset metadata + compliance matrix study | High | Not implemented |
+| **P3** | 83 | **Real-Time SCADA / Telemetry Live View** | Generic tag adapter + Live mode on one-line | High | Partial — browser-native read-only HTTP polling and WebSocket streaming implemented 2026-07-31 |
+| **P3** | 84 | **Cybersecurity Compliance Audit (NERC CIP / IEC 62443)** | Cyber-asset metadata + compliance matrix study | High | ✅ Implemented 2026-07-31 |
 | **P3** | 86 | ~~**Lightning & Surge Protection (IEEE 998 / IEC 62305)**~~ | Rolling-sphere + IEC 62305 risk index + arrester selection | High | ✅ Implemented 2026-06-21 |
 | **P3** | 87 | ~~**Insulation Coordination (IEC 60071)**~~ | Standard-table lookup + statistical risk-of-failure | Medium | ✅ Implemented |
 | **P3** | 89 | ~~**Substation Physical Layout Generator**~~ | Footprint library + auto-layout from one-line topology | High | ✅ Implemented 2026-06-21 |
@@ -1936,15 +1933,14 @@ Full IEC 60909-0:2016 equivalent voltage source method implemented in `analysis/
 - `ip` — Peak current: κ × √2 × I"k3
 - `Ib` — Breaking current (far-from-generator: Ib = I"k3)
 - `Ith` — Thermal equivalent current: I"k3 × √(m+1), with m computed via IEC §4.8.1 analytical formula
-- `transformerCorrectionKT(xTPu, cMax)` — K_T formula exported but not yet applied in the batch runner
+- `transformerCorrectionKT(xTPu, cMax)` — K_T transformer impedance correction applied in the IEC cascade
 - Standalone study page `iec60909.html` with c-factor mode selector, fault duration input, PDF/CSV export
 - Full unit test suite: `tests/iec60909/iec60909.test.cjs` (25 tests, all passing)
 - User documentation: `docs/iec-60909.md`
 
 **Deferred (follow-on work):**
-- K_T impedance correction automatically applied per-transformer (currently exported but not batch-applied)
-- K_G generator correction factor (synchronous machine impedance correction per §3.6)
-- Near-to-generator μ factor for Ib reduction when generators contribute to the fault
+- Power-station-unit K_S / K_SO corrections for generators behind unit transformers
+- Per-source contribution apportionment for meshed multi-generator buses when applying near-to-generator μ
 - Integration into one-line diagram overlays (I"k3/ip overlay labels)
 
 ### Priority 1 — Low Effort, High Impact — All Done ✅

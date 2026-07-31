@@ -26,6 +26,7 @@ export const STUDY_LABELS = {
   cathodicProtection: 'Cathodic Protection',
   contingency: 'N-1 Contingency',
   dcShortCircuit: 'DC Short Circuit',
+  demandSchedule: 'Demand Schedule',
   derInterconnect: 'DER Interconnection',
   differentialProtection: 'Differential Protection',
   dissimilarMetals: 'Dissimilar Metals',
@@ -59,6 +60,51 @@ export const STUDY_LABELS = {
   voltageStability: 'Voltage Stability',
   windLoad: 'Wind Load',
 };
+
+const STUDY_IMPACT_RULES = {
+  equipment: {
+    priority: 'high',
+    studies: ['loadFlow', 'shortCircuit', 'arcFlash', 'tcc', 'duty', 'reliability'],
+  },
+  loads: {
+    priority: 'high',
+    studies: ['loadFlow', 'voltageDropStudy', 'arcFlash', 'demandSchedule', 'generatorSizing', 'motorStart', 'reliability'],
+  },
+  panels: {
+    priority: 'medium',
+    studies: ['loadFlow', 'shortCircuit', 'arcFlash', 'voltageDropStudy', 'demandSchedule'],
+  },
+  cables: {
+    priority: 'high',
+    studies: ['loadFlow', 'shortCircuit', 'arcFlash', 'voltageDropStudy', 'cableThermalEnvironment', 'iec60287', 'tcc'],
+  },
+  trays: {
+    priority: 'medium',
+    studies: ['cableThermalEnvironment', 'iec60287', 'voltageDropStudy'],
+  },
+  conduits: {
+    priority: 'medium',
+    studies: ['cableThermalEnvironment', 'iec60287', 'voltageDropStudy'],
+  },
+  ductbanks: {
+    priority: 'medium',
+    studies: ['cableThermalEnvironment', 'iec60287', 'voltageDropStudy'],
+  },
+  oneLineSheets: {
+    priority: 'high',
+    studies: ['loadFlow', 'shortCircuit', 'arcFlash', 'tcc', 'reliability', 'contingency'],
+  },
+  oneLine: {
+    priority: 'high',
+    studies: ['loadFlow', 'shortCircuit', 'arcFlash', 'tcc', 'reliability', 'contingency', 'harmonics'],
+  },
+  oneLineConnections: {
+    priority: 'high',
+    studies: ['loadFlow', 'shortCircuit', 'arcFlash', 'tcc', 'reliability', 'contingency', 'harmonics'],
+  },
+};
+
+const IMPACT_PRIORITY_RANK = { high: 0, medium: 1, low: 2 };
 
 function stableSerialize(value) {
   if (Array.isArray(value)) return `[${value.map(stableSerialize).join(',')}]`;
@@ -256,6 +302,55 @@ export function compareStudyCollections(before = {}, after = {}, provenanceBefor
   });
 }
 
+/**
+ * Build a deterministic, read-only study rerun checklist from a comparison.
+ * The checklist identifies potentially affected study families; it does not
+ * recalculate results, establish result freshness, or grant approval.
+ */
+export function buildScenarioStudyImpact(comparison = {}) {
+  const impacts = new Map();
+  const targetStudies = new Map(
+    (Array.isArray(comparison.studies) ? comparison.studies : [])
+      .map(study => [study.key, study.after]),
+  );
+
+  for (const domain of Array.isArray(comparison.domains) ? comparison.domains : []) {
+    if (!domain?.counts?.totalChanges) continue;
+    const rule = STUDY_IMPACT_RULES[domain.key];
+    if (!rule) continue;
+    for (const studyKey of rule.studies) {
+      const existing = impacts.get(studyKey) || {
+        key: studyKey,
+        label: STUDY_LABELS[studyKey] || studyKey,
+        priority: rule.priority,
+        domains: [],
+        changedRecords: 0,
+      };
+      if (IMPACT_PRIORITY_RANK[rule.priority] < IMPACT_PRIORITY_RANK[existing.priority]) {
+        existing.priority = rule.priority;
+      }
+      existing.domains.push(domain.label);
+      existing.changedRecords += domain.counts.totalChanges;
+      impacts.set(studyKey, existing);
+    }
+  }
+
+  return [...impacts.values()]
+    .map(impact => {
+      const target = targetStudies.get(impact.key);
+      return {
+        ...impact,
+        domains: [...new Set(impact.domains)],
+        action: target?.present ? 'rerun' : 'consider',
+        targetState: target?.present ? 'Saved result present' : 'Not saved in comparison scenario',
+      };
+    })
+    .sort((first, second) => (
+      IMPACT_PRIORITY_RANK[first.priority] - IMPACT_PRIORITY_RANK[second.priority]
+      || first.label.localeCompare(second.label)
+    ));
+}
+
 export function compareProjectScenarios(before = {}, after = {}) {
   const domains = DOMAIN_DEFINITIONS.map(definition => ({
     key: definition.key,
@@ -324,6 +419,7 @@ export function compareProjectScenarios(before = {}, after = {}) {
     afterScenario: after?.scenario || 'Scenario B',
     domains,
     studies,
+    impact: buildScenarioStudyImpact({ domains, studies }),
     totals: {
       ...totals,
       changedStudies,

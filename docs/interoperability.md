@@ -126,3 +126,17 @@ unreviewed placeholders. They are deliberately not approved and do not claim
 manufacturer verification. Replace them with project rows backed by actual
 manufacturer catalog numbers, datasheets, and the project's approval authority
 before using the data for procurement, submittals, BIM, or estimates.
+
+### Manufacturer-source verified starter records
+
+Catalog governance distinguishes **source verified** from **project approved**.
+`source_verified` means a non-generic manufacturer/catalog identity, a dated
+manufacturer source, and a product or datasheet URL have been captured. It does
+not authorize procurement or substitute for the project's approval authority.
+Rows that do not meet that evidence gate remain `screening` rows.
+
+The shipped catalog includes four source-verified Eaton B-Line/KwikRail starter
+records: `KRB4ASB-12-120`, `ACC-04-45HB12`, `KRA-SDO-12`, and `KR4A-END-12`.
+They are unapproved by design. Use the catalog browser's **Evidence** filter to
+isolate them, then apply the project approval process before they are used in a
+submittal, procurement, or final BIM/estimate workflow.

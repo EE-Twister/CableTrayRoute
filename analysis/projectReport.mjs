@@ -757,6 +757,7 @@ export function buildAdvancedStudySections(studies = {}, approvals = {}) {
   const frequency = studies.frequencyScan;
   const transient = studies.transientStability;
   const opf = studies.optimalPowerFlow;
+  const cyber = studies.cyberCompliance;
 
   return {
     quasiDynamic: advancedSection({
@@ -932,6 +933,20 @@ export function buildAdvancedStudySections(studies = {}, approvals = {}) {
         'Feasible': opf.feasible ? 'Yes' : 'No',
       } : {},
       warnings: opf?.warnings,
+    }),
+    cyberCompliance: advancedSection({
+      key: 'cyberCompliance',
+      title: 'Cyber Compliance Evidence Matrix',
+      data: cyber,
+      approvals,
+      headers: [
+        { key: 'asset', label: 'Asset' }, { key: 'standard', label: 'Standard' },
+        { key: 'control', label: 'Control' }, { key: 'status', label: 'Status' }, { key: 'detail', label: 'Evidence / Action' },
+      ],
+      rows: (cyber?.assessments || []).flatMap(assessment => (assessment.checks || []).map(item => ({
+        asset: assessment.asset?.id || '—', standard: item.standard, control: item.title, status: item.status, detail: item.detail,
+      }))),
+      summary: cyber?.summary || {},
     }),
   };
 }

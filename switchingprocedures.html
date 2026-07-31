@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Read-only planning checklist for proposed electrical switching procedures.">
+  <title>Switching Procedure Planner — CableTrayRoute</title>
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+  <script type="module" src="dist/switchingprocedures.js" defer></script>
+  <style>
+    .procedure-page { max-width: 1180px; margin: 0 auto; padding: 1.25rem; }
+    .procedure-toolbar, .step-controls { display: flex; gap: .75rem; flex-wrap: wrap; align-items: end; margin: 1rem 0; }
+    .procedure-toolbar label, .step-controls label { display: grid; gap: .25rem; min-width: 180px; }
+    .procedure-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: .75rem; }
+    .procedure-form label { display: grid; gap: .25rem; }
+    .procedure-form .wide { grid-column: 1 / -1; }
+    .procedure-validation { border-left: 4px solid #b45309; padding: .7rem .9rem; background: #fffbeb; margin: 1rem 0 .5rem; }
+    .procedure-validation.ready { border-left-color: #15803d; background: #f0fdf4; }
+    .procedure-validation.blocked { border-left-color: #b91c1c; background: #fef2f2; }
+    #procedure-issues .error { color: #b91c1c; } #procedure-issues .warning { color: #92400e; }
+    .procedure-table-wrap { overflow-x: auto; }
+    .procedure-table { width: 100%; border-collapse: collapse; }
+    .procedure-table th, .procedure-table td { border: 1px solid var(--color-border, #d1d5db); padding: .55rem; vertical-align: top; text-align: left; }
+    .procedure-table th { background: var(--surface-2, #f3f4f6); }
+    .safety-notice { border: 1px solid #b91c1c; background: #fef2f2; padding: 1rem; border-radius: 6px; }
+    @media (max-width: 680px) { .procedure-page { padding: .75rem; } }
+  </style>
+</head>
+<body data-report-title="Switching Procedure Planner">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <nav class="top-nav" aria-label="Primary"><button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false"><img src="icons/toolbar/grid.svg" alt="" class="control-icon"></button><div id="nav-links" class="nav-links" role="list"></div></nav>
+  <main id="main-content" class="procedure-page">
+    <nav aria-label="Breadcrumb"><ol class="breadcrumb-trail"><li><a href="index.html">Home</a></li><li>Workflow</li><li aria-current="page">Switching Procedures</li></ol></nav>
+    <header class="page-header"><h1>Switching Procedure Planner</h1><p>Document proposed switching steps and review hold points from the project One-Line.</p></header>
+    <section class="safety-notice" aria-label="Safety limitation"><strong>Planning record only.</strong> This page does not operate equipment, prove isolation, or replace the site’s authorized switching program, lockout/tagout process, qualified-person verification, or work permit.</section>
+    <section class="card" aria-label="Procedure editor">
+      <div class="procedure-toolbar"><label>Procedure <select id="procedure-select" aria-label="Select procedure"></select></label><button id="new-procedure" type="button" class="btn primary-btn">New Procedure</button><button id="export-procedure" type="button" class="btn">Export CSV</button></div>
+      <p id="procedure-empty">Create a procedure to begin planning. Add devices to the One-Line first to select them here.</p>
+      <div id="procedure-editor" hidden>
+        <div class="procedure-form"><label>Title<input id="procedure-title" data-procedure-field="title" type="text" required></label><label>Status<select id="procedure-status" data-procedure-field="status"><option value="draft">Draft</option><option value="reviewed">Reviewed</option></select></label><label>Prepared by<input id="procedure-prepared-by" data-procedure-field="preparedBy" type="text"></label><label>Reviewed by<input id="procedure-reviewed-by" data-procedure-field="reviewedBy" type="text"></label><label class="wide">Planning notes<textarea id="procedure-notes" data-procedure-field="notes" rows="3"></textarea></label></div>
+        <p id="procedure-validation" aria-live="polite"></p><ul id="procedure-issues" aria-live="polite"></ul>
+        <h2>Procedure Steps</h2><div class="procedure-table-wrap"><table class="procedure-table"><thead><tr><th>#</th><th>Type</th><th>Device</th><th>Action</th><th>Instruction</th><th>Record</th><th></th></tr></thead><tbody id="procedure-steps-body"></tbody></table></div>
+        <div class="step-controls"><label>Step type<select id="step-type"><option value="operate">Operate device</option><option value="verify">Verify absence of voltage</option><option value="ground">Apply protective grounds</option><option value="remove_ground">Remove protective grounds</option><option value="hold">Independent hold point</option></select></label><label>One-Line device<select id="step-device"></select></label><label>Operation<select id="step-action"><option value="open">Open</option><option value="close">Close</option></select></label><label>Instruction override<input id="step-instruction" type="text" placeholder="Optional procedure-specific instruction"></label><button id="add-step" type="button" class="btn">Add Step</button></div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

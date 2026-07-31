@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import * as XLSX from 'xlsx';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.join(__dirname, '..');
@@ -68,6 +69,25 @@ async function installLibraryApiMock(page, { initialState, latestState = null, c
 }
 
 test.describe('Component Library structured workflows', () => {
+  test('shows governed protective-device inventory with readiness filters', async ({ page }) => {
+    await page.goto(pageUrl);
+
+    await expect(page.locator('#protective-library-summary')).toContainText('26 bundled devices');
+    await expect(page.locator('#protective-library-body tr')).toHaveCount(26);
+
+    await page.locator('#protective-library-status-filter').selectOption('source_verified');
+    await expect(page.locator('#protective-library-body tr')).toHaveCount(3);
+    await page.locator('#protective-library-search').fill('612065');
+    await expect(page.locator('#protective-library-body tr')).toHaveCount(1);
+    await expect(page.locator('#protective-library-body')).toContainText('S&C SMU-20 65E Standard Speed');
+    await expect(page.locator('#protective-library-body')).toContainText('612065');
+    await expect(page.locator('.protective-library-status')).toContainText('Source verified');
+
+    await page.locator('#protective-library-search').fill('not-a-device');
+    await expect(page.locator('#protective-library-body tr')).toHaveCount(0);
+    await expect(page.locator('#protective-library-empty')).toBeVisible();
+  });
+
   test('structured edit/save/load cloud roundtrip', async ({ page }) => {
     await withAuth(page);
 
@@ -111,6 +131,7 @@ test.describe('Component Library structured workflows', () => {
 
   test('import handling validates supported/unsupported workbook formats', async ({ page }) => {
     await page.goto(pageUrl);
+    await expect.poll(() => page.evaluate(() => typeof window.XLSX)).toBe('object');
 
     const csvPayload = [
       'subtype,label,category,icon,ports,schema',
@@ -124,6 +145,17 @@ test.describe('Component Library structured workflows', () => {
     });
 
     await expect(page.locator('[data-kind="component-subtype"]').last()).toHaveValue('GEN');
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet([
+      { subtype: 'UPS', label: 'Backup UPS', category: 'equipment', icon: 'icons/components/UPS.svg', ports: 2, schema: '{"kva":{"label":"kVA","type":"number"}}' },
+    ]), 'Components');
+    await page.setInputFiles('#library-upload', {
+      name: 'library.xlsx',
+      mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      buffer: XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' }),
+    });
+    await expect(page.locator('[data-kind="component-subtype"]').last()).toHaveValue('UPS');
 
     await page.setInputFiles('#library-upload', {
       name: 'bad.xlsx',
@@ -183,5 +215,60 @@ test.describe('Component Library structured workflows', () => {
     const mergedPayload = await page.evaluate(() => window.__libraryApiMock?.mergedPayload || null);
     expect(mergedPayload.components.some((entry) => entry.subtype === 'UPS')).toBeTruthy();
     expect(mergedPayload.components.some((entry) => entry.subtype === 'GEN')).toBeTruthy();
+  });
+
+  test('admin publishes and reloads an approved team library release', async ({ page }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem('authCsrfToken', 'team-test-csrf');
+      localStorage.setItem('authExpiresAt', String(Date.now() + 60_000));
+      localStorage.setItem('authUser', 'library-admin');
+      localStorage.setItem('ctr-user-role', 'admin');
+      const originalFetch = window.fetch.bind(window);
+      window.__teamLibraryApiMock = { release: null, publications: [] };
+      window.fetch = async (input, init = {}) => {
+        const url = typeof input === 'string' ? input : input?.url || '';
+        if (String(url).endsWith('/api/v1/team-library')) {
+          const method = String(init?.method || 'GET').toUpperCase();
+          if (method === 'GET') {
+            if (!window.__teamLibraryApiMock.release) {
+              return new Response(JSON.stringify({ error: 'not found' }), { status: 404 });
+            }
+            return new Response(JSON.stringify(window.__teamLibraryApiMock.release), { status: 200 });
+          }
+          if (method === 'PUT') {
+            const request = JSON.parse(init?.body || '{}');
+            const release = {
+              version: '1712345678901-a1b2c3d4',
+              data: request.data,
+              publishedAt: '2026-07-31T18:30:00.000Z',
+              publishedBy: 'library-admin',
+              releaseNotes: request.releaseNotes,
+              unchanged: false,
+            };
+            window.__teamLibraryApiMock.release = release;
+            window.__teamLibraryApiMock.publications.push(request);
+            return new Response(JSON.stringify(release), { status: 200 });
+          }
+        }
+        return originalFetch(input, init);
+      };
+    });
+
+    await page.goto(pageUrl);
+    await expect(page.getByRole('button', { name: 'Publish Team Release' })).toBeVisible();
+    await page.getByRole('button', { name: 'Publish Team Release' }).click();
+    await page.locator('#team-release-notes').fill('Approved standard symbols');
+    await page.getByRole('button', { name: 'Publish Release' }).click();
+    await expect(page.getByText('Team Release Published')).toBeVisible();
+    await page.getByRole('button', { name: 'Close', exact: true }).click();
+
+    const publication = await page.evaluate(() => window.__teamLibraryApiMock.publications[0]);
+    expect(publication.releaseNotes).toBe('Approved standard symbols');
+    expect(publication.data).toHaveProperty('components');
+
+    await page.getByRole('button', { name: 'Load Team Library' }).click();
+    await expect(page.getByText('Team Library Loaded')).toBeVisible();
+    await page.getByRole('button', { name: 'Close', exact: true }).click();
+    await expect(page.locator('#team-library-status')).toContainText('Loaded team release 1712345678901-a1b2c3d4');
   });
 });

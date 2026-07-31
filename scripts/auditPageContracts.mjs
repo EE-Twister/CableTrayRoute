@@ -79,6 +79,8 @@ const dataStoreCalls = {
   setGroundGridRiskPoints: ['write', 'settings.groundGridRiskPoints'],
   getMccLineups: ['read', 'mccLineups'],
   setMccLineups: ['write', 'mccLineups'],
+  getSwitchingProcedures: ['read', 'settings.switchingProcedures'],
+  setSwitchingProcedures: ['write', 'settings.switchingProcedures'],
   getDuctbanks: ['read', 'ductbankSchedule'],
   setDuctbanks: ['write', 'ductbankSchedule'],
   getConduits: ['read', 'conduitSchedule'],

@@ -12,6 +12,8 @@ The Raceway Schedule manages ductbanks, cable trays, and standalone conduits.
 - Use **Add Ductbank**, **Add Tray**, or **Add Conduit** to enter the common fields in a guided form.
 - Ductbank conduits are created inside ductbank rows. Standalone conduits remain in the Conduit Schedule.
 - Tray and conduit rows include **Material** so procurement, BIM export, and downstream BOM outputs can distinguish steel, aluminum, PVC, stainless steel, and fiberglass raceways.
+- Each tray or standalone conduit can receive an **Approved Catalog Product** from the project manufacturer catalog. Tray choices are constrained to approved products with matching width/depth. The assignment stores manufacturer, catalog number, approval, source, verification date, and datasheet provenance on the routed segment.
+- Tray Hardware BOM preserves the assigned straight-section catalog identity, rather than merging it into a generic tray line item. Fittings, covers, and supports remain separate until compatible approved products are selected for those component categories.
 - Use **Batch Edit** from a table's **More** menu to apply one field value to the visible filtered rows or every row. Ductbanks can batch edit either ductbank rows or the nested conduit rows.
 - The top summary shows total raceways, ductbanks, trays, conduits, validation issues, assigned raceways, missing IDs, missing geometry, and unused raceways.
 - The next-action strip points to the highest-value repair or continuation step, such as fixing IDs, completing geometry, returning to Cable Schedule for assignments, or continuing into fill checks.
@@ -19,6 +21,12 @@ The Raceway Schedule manages ductbanks, cable trays, and standalone conduits.
 ## Views and filters
 
 Use the **View** menu to switch between Basic Entry, Geometry, Fill / Grouping, BIM Export, and Full Detail. The choice is saved with the project settings.
+
+## BIM coordination review
+
+The **CAD / BIM → BIM Coordination** action imports an IFC or Revit JSON file as a **read-only project snapshot**; it does not overwrite the tray or conduit schedule. The review matches route IDs and, when present, IFC/Revit global IDs (GUIDs), then separates matched, geometry-changed, schedule-only, and BIM-only records. It also compares counts and centerline lengths by type, system, voltage, level, and area when those fields are available.
+
+Create coordination issues against a differing route with a title, assignee, comment, and optional screenshot/evidence reference. Issue records are stored with the project and can be exported/imported as a CableTrayRoute BCF-like JSON exchange; the difference register can also be exported as CSV. Review the comparison before using the existing **Import CAD** command, which intentionally replaces live schedule data.
 
 Quick filters help isolate rows that need attention:
 

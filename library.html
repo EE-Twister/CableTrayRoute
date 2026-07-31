@@ -9,6 +9,15 @@
   <link rel="dns-prefetch" href="https://fonts.gstatic.com">
   <meta name="color-scheme" content="light dark">
   <link rel="stylesheet" href="style.css">
+  <script src="dist/vendor/xlsx.full.min.js" defer></script>
+  <script src="cdnFallback.js" defer></script>
+  <script>
+    window.addEventListener('load', function () {
+      if (typeof initCdnFallback === 'function') {
+        initCdnFallback([{ global: 'XLSX', label: 'Library spreadsheet import/export (XLSX)' }]);
+      }
+    });
+  </script>
   <!-- Open Graph / Social sharing -->
   <meta property="og:type" content="website">
   <meta property="og:title" content="Component Library — CableTrayRoute">
@@ -80,10 +89,64 @@
       font-weight: 600;
       margin-bottom: 4px;
     }
+    .protective-library-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: end;
+      margin: 10px 0;
+    }
+    .protective-library-controls label {
+      display: grid;
+      gap: 4px;
+      font-size: 0.9rem;
+      font-weight: 600;
+    }
+    .protective-library-controls input,
+    .protective-library-controls select {
+      min-width: 190px;
+      padding: 6px 8px;
+    }
+    .protective-library-summary {
+      margin: 10px 0;
+      color: #4b5563;
+      font-size: 0.92rem;
+    }
+    .protective-library-table-wrap { overflow-x: auto; }
+    .protective-library-table { width: 100%; border-collapse: collapse; }
+    .protective-library-table th,
+    .protective-library-table td {
+      border: 1px solid #d0d7de;
+      padding: 7px;
+      text-align: left;
+      vertical-align: top;
+    }
+    .protective-library-table th { background: #f6f8fa; }
+    .protective-library-status {
+      display: inline-block;
+      border-radius: 12px;
+      padding: 2px 8px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .protective-library-status-calculation_ready { background: #d4edda; color: #155724; }
+    .protective-library-status-source_verified { background: #fff3cd; color: #856404; }
+    .protective-library-status-standards_reference { background: #dbeafe; color: #1e40af; }
+    .protective-library-status-screening { background: #f8d7da; color: #721c24; }
+    .protective-library-empty { color: #6b7280; font-style: italic; }
     @media (prefers-color-scheme: dark) {
       .library-editor { background: #1f2328; border-color: #3d444d; }
       .editor-grid th,
       .editor-grid td { border-color: #3d444d; }
+      .protective-library-summary { color: #b9c0c9; }
+      .protective-library-table th,
+      .protective-library-table td { border-color: #3d444d; }
+      .protective-library-table th { background: #2a3038; }
+      .protective-library-status-calculation_ready { background: #1a3a24; color: #6fe08d; }
+      .protective-library-status-source_verified { background: #3a3000; color: #ffc947; }
+      .protective-library-status-standards_reference { background: #172554; color: #93c5fd; }
+      .protective-library-status-screening { background: #3a1020; color: #f07080; }
     }
   </style>
 </head>
@@ -172,13 +235,44 @@
       <button id="cloud-load-btn" title="Reload library from cloud">Load from Cloud</button>
       <button id="cloud-share-btn" title="Generate a shareable link for this library">Share Library</button>
       <button id="cloud-import-btn" title="Load a library shared by someone else">Load Shared Library</button>
+      <button id="team-load-btn" title="Load the approved organization library">Load Team Library</button>
+      <button id="team-publish-btn" type="button" title="Publish an approved organization library release" hidden>Publish Team Release</button>
     </div>
+    <p id="team-library-status" class="protective-library-summary" aria-live="polite"></p>
   </section>
   <section>
     <h2>Manufacturer Library</h2>
+    <p>Legacy defaults for component properties. Use the governed project catalog in the schedules and BOM workflows for approved product selections, source evidence, and commercial data.</p>
     <textarea id="manufacturer-text" rows="20" cols="80"></textarea><br>
     <button id="manufacturer-save">Save</button>
     <button id="manufacturer-download">Download</button>
+  </section>
+  <section aria-labelledby="protective-library-heading">
+    <h2 id="protective-library-heading">Protective Device Library</h2>
+    <p>Browse the bundled TCC device inventory before assigning curves. Readiness is evidence-based: records marked source verified still require independent review before issued calculations or settings.</p>
+    <p><a href="tcc.html">Open Time-Current Curves</a> to plot and assign devices.</p>
+    <div class="protective-library-controls">
+      <label for="protective-library-status-filter">Evidence status
+        <select id="protective-library-status-filter">
+          <option value="all">All statuses</option>
+          <option value="calculation_ready">Calculation-ready</option>
+          <option value="source_verified">Source verified - peer review pending</option>
+          <option value="standards_reference">Standards reference</option>
+          <option value="screening">Screening only</option>
+        </select>
+      </label>
+      <label for="protective-library-search">Search device, manufacturer, or catalog number
+        <input id="protective-library-search" type="search" placeholder="e.g., SMU-20 or 612065">
+      </label>
+    </div>
+    <p id="protective-library-summary" class="protective-library-summary" aria-live="polite"></p>
+    <div class="protective-library-table-wrap">
+      <table class="protective-library-table" aria-label="Protective device library inventory">
+        <thead><tr><th>Device</th><th>Manufacturer</th><th>Type</th><th>Catalog / Trip Unit</th><th>Evidence Status</th></tr></thead>
+        <tbody id="protective-library-body"></tbody>
+      </table>
+    </div>
+    <p id="protective-library-empty" class="protective-library-empty" hidden>No protective devices match the current filters.</p>
   </section>
   <script type="module">
     import './src/components/navigation.js';
@@ -186,6 +280,8 @@
     import openModal, { showAlertModal } from './src/components/modal.js';
     import { getAuthContextState } from './projectStorage.js';
     import { validateLibraryPayload } from './src/validation/librarySchema.mjs';
+    import protectiveDevices from './data/protectiveDevices.mjs';
+    import { assessProtectiveDeviceLibraryEntry, summarizeProtectiveDeviceLibrary } from './analysis/protectiveDeviceLibrary.mjs';
 
     // -------------------------------------------------------------------------
     // Sync status badge
@@ -409,6 +505,38 @@
       return res.json();
     }
 
+    async function teamLibraryGet() {
+      const auth = authState();
+      if (!auth) return null;
+      const res = await fetch('/api/v1/team-library');
+      if (res.status === 404) return { notFound: true };
+      if (!res.ok) return null;
+      return res.json();
+    }
+
+    async function teamLibraryPublish(data, baseVersion, releaseNotes) {
+      const auth = authState();
+      if (!auth) return null;
+      const res = await fetch('/api/v1/team-library', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Csrf-Token': auth.csrfToken,
+        },
+        body: JSON.stringify({ data, baseVersion, releaseNotes }),
+      });
+      if (res.status === 409) {
+        const details = await res.json().catch(() => ({}));
+        return { conflict: true, currentVersion: details.currentVersion || null };
+      }
+      if (res.status === 400) {
+        const details = await res.json().catch(() => ({}));
+        return { error: details.error || 'Team library validation failed', validationErrors: details.details || [] };
+      }
+      if (!res.ok) return null;
+      return res.json();
+    }
+
     const structuredState = {
       components: [],
       categories: [],
@@ -524,8 +652,7 @@
     function componentHint(component, field) {
       if (field === 'subtype' && !component.subtype) return 'Required.';
       if (field === 'label' && !component.label) return 'Required.';
-      if (field === 'category' && !component.category) return 'Required.';
-      if (field === 'ports' && !Number.isFinite(component.ports)) return 'Must be a number.';
+      if (field === 'ports' && Object.hasOwn(component, 'ports') && !Number.isFinite(component.ports)) return 'Must be a number.';
       if (field === 'schema' && (typeof component.schema !== 'object' || component.schema === null || Array.isArray(component.schema))) {
         return 'Must be a JSON object.';
       }
@@ -616,7 +743,6 @@
           : {};
         if (!Object.hasOwn(normalized, 'subtype') || normalized.subtype == null) normalized.subtype = '';
         if (!Object.hasOwn(normalized, 'label') || normalized.label == null) normalized.label = '';
-        if (!Object.hasOwn(normalized, 'category') || normalized.category == null) normalized.category = '';
         if (!Object.hasOwn(normalized, 'icon') || normalized.icon == null) normalized.icon = '';
         if (!Object.hasOwn(normalized, 'schema')
           || typeof normalized.schema !== 'object'
@@ -658,6 +784,7 @@
     // Page load
     // -------------------------------------------------------------------------
     let _cloudVersion = null;
+    let _teamLibraryVersion = null;
 
     async function load() {
       const manufArea = document.getElementById('manufacturer-text');
@@ -991,9 +1118,13 @@
             Object.entries(row).map(([key, value]) => [clampCellValue(key), clampCellValue(value)]),
           ));
         });
+        const payload = mapWorkbookRowsToLibrary(sheets);
+        if (!payload.components.length && !payload.categories.length && !Object.keys(payload.icons).length) {
+          throw new Error('Workbook does not contain supported Components, Categories, or Icons data.');
+        }
         return {
           version: '',
-          payload: mapWorkbookRowsToLibrary(sheets),
+          payload,
         };
       }
       throw new Error('Unsupported file type. Use .xlsx, .xls, .csv, or .json.');
@@ -1212,6 +1343,105 @@
       }
     }
 
+    function setTeamLibraryStatus(message) {
+      document.getElementById('team-library-status').textContent = message || '';
+    }
+
+    function configureTeamLibraryControls() {
+      const canPublish = authState()?.role === 'admin';
+      document.getElementById('team-publish-btn').hidden = !canPublish;
+      setTeamLibraryStatus(canPublish
+        ? 'Admins can publish an immutable, approved team release. All signed-in users can load the latest release.'
+        : 'Load the latest approved organization library. Only administrators can publish releases.');
+    }
+
+    async function requestTeamReleaseNotes() {
+      let input = null;
+      return openModal({
+        title: 'Publish Team Library Release',
+        description: 'Publishing creates an immutable organization-wide release. Include a concise approval or change note for the audit trail.',
+        primaryText: 'Publish Release',
+        secondaryText: 'Cancel',
+        initialFocusSelector: '#team-release-notes',
+        render(body) {
+          const label = document.createElement('label');
+          label.htmlFor = 'team-release-notes';
+          label.textContent = 'Release notes (optional, 500 characters maximum)';
+          input = document.createElement('textarea');
+          input.id = 'team-release-notes';
+          input.maxLength = 500;
+          input.rows = 5;
+          input.style.width = '100%';
+          label.appendChild(input);
+          body.appendChild(label);
+        },
+        onSubmit() {
+          return { releaseNotes: input?.value.trim() || '' };
+        },
+      });
+    }
+
+    async function handleTeamLoad() {
+      if (!authState()) {
+        await showAlertModal('Not logged in', 'Please log in to load your organization library.');
+        return;
+      }
+      setStatus('pending', '⟳ Loading team release…');
+      try {
+        const release = await teamLibraryGet();
+        if (!release || release.notFound) {
+          setStatus('local', 'Local');
+          await showAlertModal('No Team Library', 'No approved organization library has been published yet.');
+          return;
+        }
+        populateFromData(release.data);
+        _teamLibraryVersion = release.version;
+        setStatus('local', 'Team release loaded');
+        const publishedOn = new Date(release.publishedAt).toLocaleString();
+        setTeamLibraryStatus(`Loaded team release ${release.version} published by ${release.publishedBy} on ${publishedOn}.`);
+        await showAlertModal('Team Library Loaded', 'The approved team library is now in the editor. Save it to your personal cloud library if you need a private copy.');
+      } catch {
+        setStatus('offline', '⚠ Team library unavailable');
+        await showAlertModal('Load Failed', 'Could not load the team library. Check your connection and try again.');
+      }
+    }
+
+    async function handleTeamPublish() {
+      if (authState()?.role !== 'admin') {
+        await showAlertModal('Administrator Required', 'Only administrators can publish an organization library release.');
+        return;
+      }
+      try {
+        syncStructuredFromTextareas();
+        const payload = getStructuredPayload();
+        if (!await validateLibraryForPersistence(payload)) return;
+        const releaseRequest = await requestTeamReleaseNotes();
+        if (!releaseRequest) return;
+        const current = await teamLibraryGet();
+        const published = await teamLibraryPublish(payload, current?.version || _teamLibraryVersion || undefined, releaseRequest.releaseNotes);
+        if (published?.conflict) {
+          await showAlertModal('Team Release Changed', `Another release was published first${published.currentVersion ? ` (${published.currentVersion})` : ''}. Load it, review your edits, and publish again.`);
+          return;
+        }
+        if (published?.validationErrors?.length) {
+          await showAlertModal('Team Release Validation Failed', renderValidationErrors(published.validationErrors));
+          return;
+        }
+        if (!published) {
+          await showAlertModal('Publish Failed', 'Could not publish the team library release. Check your connection and try again.');
+          return;
+        }
+        _teamLibraryVersion = published.version;
+        setTeamLibraryStatus(`Team release ${published.version} ${published.unchanged ? 'was reviewed without changes' : 'published'}${published.releaseNotes ? `: ${published.releaseNotes}` : '.'}`);
+        await showAlertModal(
+          published.unchanged ? 'Team Release Unchanged' : 'Team Release Published',
+          published.unchanged ? 'The approved library already matches these contents.' : 'The new approved library release is available to every signed-in user.',
+        );
+      } catch {
+        await showAlertModal('Invalid JSON', 'Please check your JSON syntax and try again.');
+      }
+    }
+
     // -------------------------------------------------------------------------
     // Auto-load shared library if ?share=<token> is in the URL
     // -------------------------------------------------------------------------
@@ -1264,6 +1494,63 @@
     }
 
     // -------------------------------------------------------------------------
+    // Governed protective-device inventory (read-only bundled TCC library)
+    // -------------------------------------------------------------------------
+    function appendInventoryCell(row, value, className = '') {
+      const cell = document.createElement('td');
+      if (className) cell.className = className;
+      cell.textContent = value || '—';
+      row.appendChild(cell);
+      return cell;
+    }
+
+    function protectiveDeviceSearchText(entry) {
+      return [entry.name, entry.vendor, entry.series, entry.catalogNumber, entry.tripUnitModel, entry.type]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+    }
+
+    function renderProtectiveDeviceInventory() {
+      const statusFilter = document.getElementById('protective-library-status-filter').value;
+      const search = document.getElementById('protective-library-search').value.trim().toLowerCase();
+      const body = document.getElementById('protective-library-body');
+      const empty = document.getElementById('protective-library-empty');
+      const summary = document.getElementById('protective-library-summary');
+      const counts = summarizeProtectiveDeviceLibrary(protectiveDevices);
+      const rows = protectiveDevices
+        .map(entry => ({ entry, assessment: assessProtectiveDeviceLibraryEntry(entry) }))
+        .filter(({ entry, assessment }) => (
+          (statusFilter === 'all' || assessment.status === statusFilter)
+          && (!search || protectiveDeviceSearchText(entry).includes(search))
+        ))
+        .sort((left, right) => (
+          String(left.entry.vendor || '').localeCompare(String(right.entry.vendor || ''))
+          || String(left.entry.name || '').localeCompare(String(right.entry.name || ''))
+        ));
+
+      body.replaceChildren();
+      rows.forEach(({ entry, assessment }) => {
+        const row = document.createElement('tr');
+        appendInventoryCell(row, entry.name);
+        appendInventoryCell(row, entry.vendor);
+        appendInventoryCell(row, entry.type);
+        appendInventoryCell(row, entry.catalogNumber || entry.tripUnitModel);
+        const statusCell = document.createElement('td');
+        const badge = document.createElement('span');
+        badge.className = `protective-library-status protective-library-status-${assessment.status}`;
+        badge.textContent = assessment.label;
+        statusCell.appendChild(badge);
+        row.appendChild(statusCell);
+        body.appendChild(row);
+      });
+
+      const totalLabel = `${counts.total} bundled device${counts.total === 1 ? '' : 's'}`;
+      summary.textContent = `${totalLabel}: ${counts.calculation_ready} calculation-ready, ${counts.source_verified} source-verified pending peer review, ${counts.standards_reference} standards-reference, and ${counts.screening} screening-only.`;
+      empty.hidden = rows.length > 0;
+    }
+
+    // -------------------------------------------------------------------------
     // Wire up events
     // -------------------------------------------------------------------------
     document.getElementById('component-save').addEventListener('click', saveComponents);
@@ -1272,19 +1559,21 @@
     document.getElementById('library-upload').addEventListener('change', handleUpload);
     document.getElementById('manufacturer-save').addEventListener('click', () => save('manufacturer-text', 'manufacturerDefaults'));
     document.getElementById('manufacturer-download').addEventListener('click', () => download('manufacturer-text', 'manufacturerLibrary.json'));
+    document.getElementById('protective-library-status-filter').addEventListener('change', renderProtectiveDeviceInventory);
+    document.getElementById('protective-library-search').addEventListener('input', renderProtectiveDeviceInventory);
     document.getElementById('cloud-save-btn').addEventListener('click', handleCloudSave);
     document.getElementById('cloud-load-btn').addEventListener('click', handleCloudLoad);
     document.getElementById('cloud-share-btn').addEventListener('click', handleCloudShare);
     document.getElementById('cloud-import-btn').addEventListener('click', handleCloudImport);
+    document.getElementById('team-load-btn').addEventListener('click', handleTeamLoad);
+    document.getElementById('team-publish-btn').addEventListener('click', handleTeamPublish);
     document.getElementById('component-text').addEventListener('input', syncStructuredFromTextareas);
     document.getElementById('icon-text').addEventListener('input', syncStructuredFromTextareas);
     document.getElementById('add-component-row').addEventListener('click', () => {
       structuredState.components.push({
         subtype: '',
         label: '',
-        category: '',
         icon: '',
-        ports: NaN,
         schema: {},
       });
       renderStructuredEditors();
@@ -1311,11 +1600,23 @@
       }
       if (kind === 'component-subtype') structuredState.components[index].subtype = target.value.trim();
       if (kind === 'component-label') structuredState.components[index].label = target.value.trim();
-      if (kind === 'component-category') structuredState.components[index].category = target.value.trim();
+      if (kind === 'component-category') {
+        const category = target.value.trim();
+        if (category) {
+          structuredState.components[index].category = category;
+        } else {
+          delete structuredState.components[index].category;
+        }
+      }
       if (kind === 'component-icon') structuredState.components[index].icon = target.value.trim();
       if (kind === 'component-ports') {
         const value = target.value.trim();
-        structuredState.components[index].ports = value === '' ? NaN : Number(value);
+        if (value === '') {
+          delete structuredState.components[index].ports;
+        } else {
+          const parsed = Number(value);
+          structuredState.components[index].ports = Number.isFinite(parsed) ? parsed : value;
+        }
       }
       if (kind === 'component-schema') {
         const parsed = parseJsonSafe(target.value, null);
@@ -1363,6 +1664,8 @@
     if (!sharedLoaded) {
       await load();
     }
+    configureTeamLibraryControls();
+    renderProtectiveDeviceInventory();
   </script>
   </main>
 </body>

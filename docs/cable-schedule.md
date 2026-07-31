@@ -15,6 +15,8 @@ The Cable Schedule page is optimized for fast entry first, with deeper routing a
 
 - Use **Cable Library** to manage reusable cable constructions.
 - Use **Load Starter Types** in the Cable Library to seed common saved cable types such as 600V Power, Control Cable, Instrument Pair, Ethernet, and Fiber.
+- The library distinguishes **source verified** constructions from **screening / project standard** typicals. Source verification requires a manufacturer, model or catalog reference, manufacturer source, verification date, product/datasheet URL, conductor construction, insulation type, and voltage rating; it does not grant project approval.
+- Use **Load Project Catalog Types** to add complete `cable` rows from the shared manufacturer catalog as reusable typicals. The imported type retains its source-verification metadata; it is still not project-approved unless the catalog row has separate approval evidence.
 - When adding a cable, select a typical to prefill construction fields, then enter the project-specific tag, terminations, raceway, and length.
 - Use **Apply Typical** to update selected existing rows.
 

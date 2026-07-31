@@ -173,6 +173,23 @@ test.describe('cableschedule buttons', () => {
     await page.click('#cable-editor-cancel');
   });
 
+  test('cable library separates source-verified constructions from screening typicals', async ({ page }) => {
+    await openToolbarMenu(page, 'Templates');
+    await page.click('#cable-library-btn');
+    await expect(page.locator('#cable-library-modal[aria-hidden="false"]')).toBeVisible();
+    await page.click('#cable-library-starter-btn');
+    const notice = page.locator('.component-modal').filter({ has: page.getByRole('heading', { name: 'Starter Types Loaded' }) });
+    await expect(notice).toBeVisible();
+    await notice.getByRole('button', { name: 'Close', exact: true }).click();
+
+    await expect(page.locator('#cable-library-description')).toContainText('1 source verified');
+    await page.selectOption('#cable-library-evidence-filter', 'source_verified');
+    await expect(page.locator('#cable-library-list li')).toHaveCount(1);
+    await expect(page.locator('#cable-library-list')).toContainText('Southwire SIMpull THHN/THWN-2 Copper 12 AWG');
+    await expect(page.locator('#cable-library-list')).toContainText('Source verified');
+    await expect(page.locator('#cable-library-list')).toContainText('project approval pending');
+  });
+
   test('batch edit applies common values to selected cables', async ({ page }) => {
     await addCable(page, { tag: 'B1', raceway: 'R1' });
     await addCable(page, { tag: 'B2', raceway: 'R2' });

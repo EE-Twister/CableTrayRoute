@@ -75,6 +75,7 @@ const costEstimateArtifact = projectInput('settings.costEstimateArtifact', 'sett
 const pullPlanArtifact = projectInput('settings.pullPlanArtifact', 'setting', false, 'Saved pull engineering assumptions, direction comparison, limits, jam screening, and input warnings.');
 const scenarios = projectInput('settings.scenarios', 'setting', false, 'Scenario registry and active scenario selection.');
 const oneLineReconcilePending = projectInput('settings.oneLineScheduleReconcilePending', 'setting', false, 'Flag indicating one-line schedule reconciliation is available.');
+const switchingProcedures = projectInput('settings.switchingProcedures', 'setting', false, 'Read-only proposed switching procedure records and planning hold points.');
 const equipmentFilterPresets = projectInput('settings.equipmentFilterPresets', 'setting', false, 'Saved equipment list filter presets.');
 const mccLineupActiveId = projectInput('settings.mccLineupActiveId', 'setting', false, 'Active MCC lineup selection.');
 const cableTagSettings = projectInput('settings.cableTagSettings', 'setting', false, 'Cable tag generation settings.');
@@ -84,6 +85,10 @@ const ductbankSession = projectInput('settings.ductbankSession', 'setting', fals
 const ductbankRouteData = projectInput('settings.ductbankRouteData', 'setting', false, 'Selected ductbank route handoff data.');
 const trayFillData = projectInput('settings.trayFillData', 'setting', false, 'Selected tray fill handoff data.');
 const conduitFillData = projectInput('settings.conduitFillData', 'setting', false, 'Selected conduit fill handoff data.');
+const bimCoordinationSnapshot = projectInput('settings.bimCoordinationSnapshot', 'setting', false, 'Read-only IFC or Revit import snapshot used to compare BIM raceways with the schedule.');
+const bimCoordinationIssues = projectInput('settings.bimCoordinationIssues', 'setting', false, 'BCF-like BIM coordination issue records, including element IDs, status, assignee, comments, and evidence references.');
+const cyberComplianceAssets = projectInput('settings.cyberComplianceAssets', 'setting', false, 'Cyber asset inventory with zones, protocols, remote-access controls, firmware, and evidence metadata.');
+const liveTelemetryConfig = projectInput('settings.liveTelemetryConfig', 'setting', false, 'Read-only telemetry endpoint, polling interval, operator mode, and component/tag mappings.');
 const routeSession = projectInput('settings.ctrSession', 'setting', false, 'Optimal Route working session values.');
 const routeResultsStudy = projectInput('studyResults.routeResults', 'study-result', false, 'Route result rows stored in study results by legacy workflows.');
 const iec60287Study = projectInput('studyResults.iec60287', 'study-result', false, 'IEC 60287 result used as cable thermal context.');
@@ -212,7 +217,8 @@ export const PAGE_CONTRACTS_BY_HREF = {
       projectInput('settings.diagramDatablockConfig', 'setting', false, 'One-line datablock display configuration.'),
       projectInput('settings.studyProvenance', 'setting', false, 'Study scenario, revision, approval, and run metadata used to qualify one-line overlays.'),
       projectInput('settings.activeSampleWorkflow', 'setting', false, 'Active sample context used to fit and guide the sample diagram.'),
-      projectInput('settings.gistToken', 'setting', false, 'Gist import/export token setting.')
+      projectInput('settings.gistToken', 'setting', false, 'Gist import/export token setting.'),
+      liveTelemetryConfig
     ],
     outputs: [
       output('oneLineDiagram', 'model', 'One-line sheets, components, connections, layers, protection zones, and linked schedule refs.', ['loadFlow.html', 'shortCircuit.html', 'arcFlash.html', 'tcc.html', 'designrulechecker.html']),
@@ -224,6 +230,7 @@ export const PAGE_CONTRACTS_BY_HREF = {
       output('conduitSchedule', 'schedule', 'Conduit records created from one-line route actions.', ['racewayschedule.html']),
       output('studyResults', 'study-result', 'Embedded one-line study result container.', ['projectreport.html']),
       output('studyResults.loadFlow', 'study-result', 'Embedded load-flow result generated from one-line.', ['loadFlow.html', 'projectreport.html']),
+      output('studyResults.transformerTapOptimization', 'study-result', 'Constrained transformer tap what-if review with expected controlled-bus voltage impact and explicit approval state.', ['oneline.html', 'projectreport.html']),
       output('studyResults.shortCircuit', 'study-result', 'Embedded short-circuit result generated from one-line.', ['shortCircuit.html', 'projectreport.html']),
       output('studyResults.arcFlash', 'study-result', 'Embedded arc-flash result generated from one-line.', ['arcFlash.html', 'projectreport.html']),
       output('studyResults.harmonics', 'study-result', 'Embedded harmonics result generated from one-line.', ['harmonics.html', 'projectreport.html']),
@@ -241,15 +248,40 @@ export const PAGE_CONTRACTS_BY_HREF = {
       output('settings.gistToken', 'setting', 'Gist import/export token setting.', ['oneline.html']),
       output('settings.onelineTemplates', 'setting', 'Reusable one-line component templates saved with project settings.', ['oneline.html']),
       output('settings.activeSampleWorkflow', 'setting', 'Sample workflow layout version saved after the diagram is arranged and fit.', ['oneline.html']),
-      output('settings.oneLineScheduleReconcilePending', 'setting', 'Flag indicating that schedule reconciliation is available.', ['workflowdashboard.html'])
+      output('settings.oneLineScheduleReconcilePending', 'setting', 'Flag indicating that schedule reconciliation is available.', ['workflowdashboard.html']),
+      output('settings.liveTelemetryConfig', 'setting', 'Read-only live telemetry endpoint and component/tag mapping configuration.', ['oneline.html'])
     ],
     readiness: ready('At least one one-line component exists and schedule reconciliation state is explicit.', ['Diagram is empty or schedule reconciliation issues remain unresolved.']),
     downstream: ['cableschedule.html', 'loadFlow.html', 'shortCircuit.html', 'arcFlash.html', 'tcc.html']
   }),
+  'datamanager.html': contract({
+    workflowStep: 'oneLineDiagram',
+    standaloneInputs: ['Component search text, sheet/type filters, selected table rows, and controlled field values.'],
+    projectInputs: [oneLine],
+    outputs: [
+      output('oneLineDiagram', 'model', 'Controlled component label, tag, rating, layer, and position-lock updates saved through One-Line revision history.', ['oneline.html', 'loadFlow.html', 'shortCircuit.html', 'arcFlash.html', 'tcc.html']),
+      exportOnly('Filtered One-Line component data-manager CSV/XLSX and previewed controlled CSV/XLSX updates.')
+    ],
+    readiness: ready('Ready when the project has at least one One-Line component available for review.', ['The One-Line diagram is empty.']),
+    downstream: ['oneline.html', 'loadFlow.html', 'shortCircuit.html', 'arcFlash.html', 'tcc.html'],
+    notes: ['This is a controlled tabular editor for common component data. It does not create topology, edit connections, or approve calculations.']
+  }),
+  'switchingprocedures.html': contract({
+    workflowStep: 'oneLineDiagram',
+    standaloneInputs: ['Proposed step types, preparation notes, reviewer identity, and authorized site procedure context.'],
+    projectInputs: [oneLine, switchingProcedures],
+    outputs: [
+      output('settings.switchingProcedures', 'setting', 'Read-only proposed switching procedures, planning checks, and step-completion records.', ['switchingprocedures.html']),
+      exportOnly('Switching procedure CSV planning records.')
+    ],
+    readiness: ready('Ready when a proposed procedure has a title, documented steps, required safety order checks, and a named reviewer when marked reviewed.', ['No one-line switching devices, missing procedure title or steps, unsafe step order, or reviewed status without a reviewer.']),
+    downstream: ['projectreport.html'],
+    notes: ['Planning support only; this page does not operate equipment or replace site-authorized switching, lockout/tagout, or qualified-person verification.']
+  }),
   'cableschedule.html': contract({
     workflowStep: 'cableSchedule',
     standaloneInputs: ['Manual cable rows, template selection, imports, inline edits, and report options.'],
-    projectInputs: [equipment, loads, panels, oneLine, trays, conduits, ductbanks, cableTagSettings, cableChangeLog, designBasis],
+    projectInputs: [equipment, loads, panels, oneLine, trays, conduits, ductbanks, cableTagSettings, cableChangeLog, designBasis, projectInput('settings.trayHardwareCatalogCustomProducts', 'setting', false, 'Project-owned governed cable constructions imported from the shared manufacturer catalog.')],
     outputs: [
       output('cableSchedule', 'schedule', 'Cable rows with tags, endpoints, conductor details, length, and raceway assignments.', ['racewayschedule.html', 'cabletrayfill.html', 'conduitfill.html', 'optimalRoute.html', 'voltagedropstudy.html']),
       output('settings.cableTemplates', 'setting', 'User-maintained cable templates.', ['cableschedule.html']),
@@ -278,6 +310,9 @@ export const PAGE_CONTRACTS_BY_HREF = {
     projectInputs: [
       cables,
       designBasis,
+      bimCoordinationSnapshot,
+      bimCoordinationIssues,
+      projectInput('settings.trayHardwareCatalogCustomProducts', 'setting', false, 'Project-owned approved tray and conduit products available for routed segment assignment.'),
       projectInput('settings.activeSampleWorkflow', 'setting', false, 'Active sample context used to repair legacy underground ductbank parent rows.')
     ],
     outputs: [
@@ -287,7 +322,9 @@ export const PAGE_CONTRACTS_BY_HREF = {
       output('cableSchedule', 'schedule', 'Raceway assignment edits written back to cable rows.', ['cableschedule.html']),
       output('settings.trayFillData', 'setting', 'Selected tray fill handoff data.', ['cabletrayfill.html']),
       output('settings.conduitFillData', 'setting', 'Selected conduit fill handoff data.', ['conduitfill.html']),
-      output('settings.ductbankSession', 'setting', 'Ductbank schedule handoff state.', ['ductbankroute.html'])
+      output('settings.ductbankSession', 'setting', 'Ductbank schedule handoff state.', ['ductbankroute.html']),
+      output('settings.bimCoordinationSnapshot', 'setting', 'Read-only IFC/Revit coordination snapshot retained separately from the live schedules.', ['racewayschedule.html']),
+      output('settings.bimCoordinationIssues', 'setting', 'BCF-like issue records for model coordination review and exchange.', ['racewayschedule.html'])
     ],
     readiness: ready('At least one tray, conduit, or ductbank record exists.', ['No routeable raceway records have been added.']),
     downstream: ['cabletrayfill.html', 'conduitfill.html', 'ductbankroute.html', 'optimalRoute.html']
@@ -603,7 +640,7 @@ export const PAGE_CONTRACTS_BY_HREF = {
   'tcc.html': contract({
     workflowStep: 'studies',
     standaloneInputs: ['Protective device library selections, relay settings, annotations, chart ranges, and selected references.'],
-    projectInputs: [oneLine, equipment, cables, projectInput('studyResults.shortCircuit', 'study-result', false, 'Fault current values used for coordination context.'), projectInput('studyResults.arcFlash', 'study-result', false, 'Arc flash results used for equipment overlays.'), tccSettings],
+    projectInputs: [oneLine, equipment, cables, projectInput('settings.trayHardwareCatalogCustomProducts', 'setting', false, 'Project-owned governed protective-device curves imported from the shared manufacturer catalog.'), projectInput('studyResults.shortCircuit', 'study-result', false, 'Fault current values used for coordination context.'), projectInput('studyResults.arcFlash', 'study-result', false, 'Arc flash results used for equipment overlays.'), tccSettings],
     outputs: [
       output('settings.tccSettings', 'setting', 'Protective device selections, settings, annotations, chart options, and assignments.', ['shortCircuit.html', 'arcFlash.html', 'projectreport.html']),
       output('oneLineDiagram', 'model', 'One-line protection zone and context updates from TCC review flows.', ['oneline.html']),
@@ -945,6 +982,17 @@ export const PAGE_CONTRACTS_BY_HREF = {
     readiness: ready('Ready when release source, material, and ventilation inputs are valid.', ['Missing release source, material properties, or ventilation assumptions.']),
     downstream: ['projectreport.html']
   }),
+  'cybercompliance.html': contract({
+    workflowStep: 'studies',
+    standaloneInputs: ['Cyber asset inventory, security zones, protocol inventory, remote-access controls, firmware, patch, and evidence records.'],
+    projectInputs: [equipment, panels, oneLine, cyberComplianceAssets, approvals],
+    outputs: [
+      output('settings.cyberComplianceAssets', 'setting', 'Project cyber asset evidence inventory.', ['cybercompliance.html', 'projectreport.html']),
+      output('studyResults.cyberCompliance', 'study-result', 'NERC CIP and IEC 62443 screening matrix with evidence gaps.', ['workflowdashboard.html', 'projectreport.html'])
+    ],
+    readiness: ready('Ready when at least one cyber asset has an ID, asset class, zone, and evidence context.', ['No cyber assets, unidentified assets, or missing zone/evidence records.']),
+    downstream: ['workflowdashboard.html', 'projectreport.html']
+  }),
   'insulationcoordination.html': contract({
     workflowStep: 'studies',
     standaloneInputs: ['BIL/SIL levels, arrester ratings, altitude, voltage class, and surge assumptions.'],
@@ -1015,7 +1063,13 @@ export const PAGE_CONTRACTS_BY_HREF = {
   'heattracesizing.html': contract({
     workflowStep: 'studies',
     standaloneInputs: ['Pipe geometry, ambient/maintain temperatures, insulation, circuit data, and branch schedule inputs.'],
-    projectInputs: [loads, equipment, designBasis, approvals],
+    projectInputs: [
+      loads,
+      equipment,
+      designBasis,
+      approvals,
+      projectInput('settings.trayHardwareCatalogCustomProducts', 'setting', false, 'Project-owned governed heat-trace rows from the shared manufacturer catalog.')
+    ],
     outputs: [
       output('studyResults.heatTraceSizing', 'study-result', 'Saved heat trace sizing active result.', ['projectreport.html']),
       output('studyResults.heatTraceSizingCircuits', 'study-result', 'Saved heat trace circuit case schedule.', ['projectreport.html']),

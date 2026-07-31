@@ -35,6 +35,7 @@ export const SECTION_REGISTRY = [
   { key: 'procurement', label: 'Procurement Register', group: 'Construction' },
   { key: 'costEstimate', label: 'Cost Estimate',        group: 'Construction' },
   { key: 'fieldExecution', label: 'Field Execution Register', group: 'Construction' },
+  { key: 'fieldObservations', label: 'Field Observations and Punch Items', group: 'Construction' },
   { key: 'deliverables', label: 'Deliverable Register', group: 'Construction' },
   { key: 'drc',         label: 'Design Rule Check',   group: 'Construction' },
   // ── Studies ───────────────────────────────────────────────────────────────
@@ -58,6 +59,7 @@ export const SECTION_REGISTRY = [
   { key: 'hazAreaClass',    label: 'Hazardous Area Classification', group: 'Studies', studyKey: 'hazAreaClassification' },
   { key: 'insulationCoord', label: 'Insulation Coordination (BIL/SIL)', group: 'Studies', studyKey: 'insulationCoordination' },
   { key: 'lighting',        label: 'Egress Lighting (NFPA 101)',       group: 'Studies', studyKey: 'lighting' },
+  { key: 'cyberCompliance', label: 'Cyber Compliance Evidence Matrix', group: 'Studies', studyKey: 'cyberCompliance' },
 ];
 
 /** Lookup a section definition by key. */
@@ -91,7 +93,7 @@ export const PRESET_CONFIGS = {
     sections: [
       'cover', 'toc', 'revisions', 'assumptions', 'equipment', 'loads', 'cables',
       'raceways', 'routing', 'fill', 'clashes', 'spools', 'pullPlans',
-      'procurement', 'costEstimate', 'fieldExecution', 'deliverables', 'drc',
+      'procurement', 'costEstimate', 'fieldExecution', 'fieldObservations', 'deliverables', 'drc',
     ],
   },
   heatTrace: {
@@ -158,6 +160,7 @@ export function getAvailableSections({
   procurement = [],
   costEstimate = null,
   fieldExecution = [],
+  fieldObservations = [],
   deliverables = [],
   drcResults = [],
 } = {}) {
@@ -179,6 +182,7 @@ export function getAvailableSections({
   if (Array.isArray(procurement) && procurement.length > 0) available.add('procurement');
   if (costEstimate && typeof costEstimate === 'object' && Object.keys(costEstimate).length > 0) available.add('costEstimate');
   if (Array.isArray(fieldExecution) && fieldExecution.length > 0) available.add('fieldExecution');
+  if (Array.isArray(fieldObservations) && fieldObservations.length > 0) available.add('fieldObservations');
   if (Array.isArray(deliverables) && deliverables.length > 0) available.add('deliverables');
   if (trays.length > 0)  { available.add('fill'); available.add('clashes'); available.add('spools'); }
   if (drcResults.length > 0) available.add('drc');

@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Cybersecurity compliance evidence matrix for electrical automation assets.">
+  <title>Cyber Compliance — CableTrayRoute</title>
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+  <script type="module" src="dist/cybercompliance.js" defer></script>
+</head>
+<body data-report-title="Cyber Compliance">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <nav class="top-nav" aria-label="Primary"><button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-controls="nav-links" aria-expanded="false"><img src="icons/toolbar/grid.svg" alt="" class="control-icon"></button><div id="nav-links" class="nav-links" role="list"></div><button id="settings-btn" class="settings-btn" aria-label="Settings"><img src="icons/toolbar/validate.svg" alt="" class="control-icon"></button></nav>
+  <div id="settings-menu" class="settings-menu"><label for="theme-select">Theme<select id="theme-select"><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option><option value="high-contrast">High Contrast</option></select></label><label><input type="checkbox" id="compact-toggle"> Compact Mode</label><button id="help-btn" class="btn">Site Help</button></div>
+  <main id="main-content" class="container main-content">
+    <header class="page-header"><h1>Cyber Compliance</h1><p>Design-stage evidence screening for NERC CIP and IEC 62443 cyber-physical controls.</p></header>
+    <details class="method-panel"><summary>Scope and limitations</summary><p>This study identifies missing asset evidence for CIP-002, CIP-005, CIP-007, and IEC 62443-3-3 SR 1/3/5. It is not a compliance certification; asset owners must determine formal applicability and accept evidence.</p></details>
+    <section class="field-group"><h2>Cyber assets and evidence</h2><p class="hint">Seed candidate assets from the equipment, panel, and one-line records, then complete zone, protocol, remote-access, firmware, and evidence fields.</p><div class="action-row"><button id="seed-cyber-assets-btn" class="btn" type="button">Seed from project</button><button id="add-cyber-asset-btn" class="btn" type="button">Add asset</button><button id="run-cyber-study-btn" class="btn primary-btn" type="button">Run assessment</button><button id="export-cyber-csv-btn" class="btn secondary-btn" type="button">Export CSV</button></div>
+      <div class="table-scroll"><table id="cyber-assets"><thead><tr><th>ID</th><th>Asset Class</th><th>Criticality</th><th>Zone</th><th>Firmware</th><th>Protocols</th><th>Remote</th><th>MFA</th><th>Log</th><th>Approved Path</th><th>Password Policy</th><th>Patch Current</th><th>CIP Evidence</th><th></th></tr></thead><tbody></tbody></table></div>
+    </section>
+    <section class="field-group"><h2>Compliance evidence matrix</h2><p id="cyber-summary" aria-live="polite">Run the assessment to generate an evidence matrix.</p><div class="table-scroll"><table id="cyber-results"><thead><tr><th>Asset</th><th>Standard</th><th>Control</th><th>Status</th><th>Evidence / action</th></tr></thead><tbody></tbody></table></div></section>
+  </main>
+</body>
+</html>

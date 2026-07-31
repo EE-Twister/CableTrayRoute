@@ -376,8 +376,37 @@ body.modal-open {
 }
 
 .library-item-detail {
-    font-size: 0.875rem;
-    color: var(--muted-text, #6b7280);
+  font-size: 0.875rem;
+  color: var(--muted-text, #6b7280);
+}
+
+.cable-library-filter-label {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  margin-top: var(--spacing-base);
+  font-size: 0.85rem;
+}
+
+.cable-library-evidence {
+  display: inline-block;
+  align-self: flex-start;
+  padding: 0.1rem 0.45rem;
+  border: 1px solid transparent;
+  border-radius: 99px;
+  font-size: 0.72rem;
+}
+
+.cable-library-evidence-source_verified {
+  background: color-mix(in srgb, var(--color-info, #0d6efd) 15%, transparent);
+  color: var(--color-info-dark, #0756b3);
+  border-color: color-mix(in srgb, var(--color-info, #0d6efd) 35%, transparent);
+}
+
+.cable-library-evidence-screening {
+  background: color-mix(in srgb, var(--color-warning, #f59e0b) 12%, transparent);
+  color: var(--color-warning-text, #92400e);
+  border-color: color-mix(in srgb, var(--color-warning, #f59e0b) 25%, transparent);
 }
 
 .library-item-actions {

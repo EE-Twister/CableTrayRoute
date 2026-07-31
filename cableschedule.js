@@ -25,6 +25,13 @@ import {
   writeAoaWorkbook
 } from './src/cable-schedule/io.js';
 import { renderCablePrintReport as renderCablePrintReportTo } from './src/cable-schedule/printReport.js';
+import {
+  CABLE_LIBRARY_EVIDENCE_STATUS,
+  assessCableTypical,
+  normalizeCableCatalogProduct,
+  normalizeCableTypical,
+  summarizeCableLibrary
+} from './analysis/cableLibrary.mjs';
 const { sizeToArea } = ampacity;
 const CABLE_READINESS_COPY = getContractReadinessCopy('cableschedule.html');
 
@@ -207,6 +214,10 @@ async function initCableSchedule() {
     {key:'allowed_cable_group',label:'Allowed Group',type:'text',group:'Routing Details',tooltip:'Permitted cable grouping identifier'},
     {key:'manufacturer',label:'Manufacturer',type:'text',group:'Manufacturer Details',tooltip:'Manufacturer or vendor for this cable'},
     {key:'model',label:'Model #',type:'text',group:'Manufacturer Details',tooltip:'Manufacturer model number or catalog reference'},
+    {key:'catalog_evidence_status',label:'Library Evidence',type:'select',options:['screening','source_verified'],group:'Manufacturer Details',tooltip:'Source verified requires a manufacturer, model/catalog reference, dated source, URL, and complete construction fields. It is not project approval.'},
+    {key:'catalog_source',label:'Catalog Source',type:'text',group:'Manufacturer Details',tooltip:'Manufacturer product page, datasheet, or catalog reference used to verify this cable construction'},
+    {key:'catalog_last_verified',label:'Catalog Verified',type:'text',group:'Manufacturer Details',tooltip:'Date the manufacturer source was checked (YYYY-MM-DD)'},
+    {key:'datasheet_url',label:'Datasheet URL',type:'text',group:'Manufacturer Details',tooltip:'Manufacturer product page or datasheet URL for the cable construction'},
     {key:'ambient_temp',label:'Ambient Temp (°C)',type:'number',group:'Manufacturer Details',tooltip:'Ambient temperature for sizing'},
     {key:'insulation_thickness',label:'Insul Thick (in)',type:'number',group:'Manufacturer Details',tooltip:'Insulation thickness in inches'},
     {key:'cable_od',label:'Cable O.D. (in)',type:'number',group:'Manufacturer Details',tooltip:'Outside diameter of the cable in inches'},
@@ -352,6 +363,25 @@ async function initCableSchedule() {
     end_x: 'Used only when routing to explicit end coordinates.'
   };
   const STARTER_CABLE_TYPES = [
+    {
+      label: 'Southwire SIMpull THHN/THWN-2 Copper 12 AWG',
+      manufacturer: 'Southwire',
+      model: 'SPEC10000',
+      catalog_evidence_status: 'source_verified',
+      catalog_source: 'Southwire SIMpull THHN/THWN-2 Copper manufacturer product page',
+      catalog_last_verified: '2026-07-31',
+      datasheet_url: 'https://www.southwire.com/wire-cable/building-wire/simpull-sup-sup-thhn-thwn-2-copper/p/SPEC10000',
+      cable_type: 'Power',
+      conductors: 1,
+      conductor_size: '#12 AWG',
+      conductor_material: 'Copper',
+      install_method: 'Conduit',
+      insulation_type: 'THHN',
+      insulation_rating: '90',
+      terminal_temp_rating: '60',
+      cable_rating: 600,
+      shielding_jacket: ''
+    },
     {
       label: '600V Power',
       cable_type: 'Power',
@@ -621,7 +651,7 @@ async function initCableSchedule() {
     const copies = cloneTemplates(templates);
     let changed = false;
     copies.forEach((tpl, idx) => {
-      const sanitized = filterTemplateFields(tpl);
+      const sanitized = normalizeCableTypical(filterTemplateFields(tpl));
       const tplKeys = Object.keys(tpl || {});
       const sanitizedKeys = Object.keys(sanitized || {});
       if (tplKeys.length !== sanitizedKeys.length || sanitizedKeys.some(key => sanitized[key] !== tpl[key])) {
@@ -1424,12 +1454,15 @@ async function initCableSchedule() {
       this.headerLookup = headerLookup instanceof Map && headerLookup.size ? headerLookup : templateHeaderLookup;
       this.modal = document.getElementById('cable-library-modal');
       this.button = document.getElementById('cable-library-btn');
+      this.description = this.modal ? this.modal.querySelector('#cable-library-description') : null;
       this.closeBtn = this.modal ? this.modal.querySelector('#close-cable-library-btn') : null;
       this.addBtn = this.modal ? this.modal.querySelector('#cable-library-add-btn') : null;
       this.starterBtn = this.modal ? this.modal.querySelector('#cable-library-starter-btn') : null;
+      this.projectCatalogBtn = this.modal ? this.modal.querySelector('#cable-library-project-catalog-btn') : null;
       this.exportBtn = this.modal ? this.modal.querySelector('#cable-library-export-btn') : null;
       this.importBtn = this.modal ? this.modal.querySelector('#cable-library-import-btn') : null;
       this.importInput = this.modal ? this.modal.querySelector('#cable-library-import-input') : null;
+      this.evidenceFilter = this.modal ? this.modal.querySelector('#cable-library-evidence-filter') : null;
       this.listView = this.modal ? this.modal.querySelector('#cable-library-list-view') : null;
       this.list = this.modal ? this.modal.querySelector('#cable-library-list') : null;
       this.emptyState = this.modal ? this.modal.querySelector('#cable-library-empty') : null;
@@ -1460,6 +1493,7 @@ async function initCableSchedule() {
       if (this.closeBtn) this.closeBtn.addEventListener('click', () => this.close());
       if (this.addBtn) this.addBtn.addEventListener('click', () => this.startAdd());
       if (this.starterBtn) this.starterBtn.addEventListener('click', () => this.loadStarterTemplates());
+      if (this.projectCatalogBtn) this.projectCatalogBtn.addEventListener('click', () => this.loadProjectCatalogTypes());
       if (this.exportBtn) this.exportBtn.addEventListener('click', () => this.exportTemplates());
       if (this.importBtn && this.importInput) {
         this.importBtn.addEventListener('click', () => {
@@ -1470,6 +1504,7 @@ async function initCableSchedule() {
         });
       }
       if (this.cancelBtn) this.cancelBtn.addEventListener('click', () => this.showList());
+      if (this.evidenceFilter) this.evidenceFilter.addEventListener('change', () => this.renderList());
       if (this.form) {
         this.form.addEventListener('submit', e => {
           e.preventDefault();
@@ -1505,7 +1540,7 @@ async function initCableSchedule() {
       );
       const additions = STARTER_CABLE_TYPES
         .filter(tpl => !existingLabels.has((tpl.label || '').trim().toLowerCase()))
-        .map(tpl => ({ ...filterTemplateFields(tpl, { keepLabel: true }), template_id: generateTemplateId() }));
+        .map(tpl => ({ ...normalizeCableTypical(filterTemplateFields(tpl, { keepLabel: true })), template_id: generateTemplateId() }));
       if (!additions.length) {
         showAlertModal('Starter Types Loaded', 'The starter cable types are already in the library.');
         return;
@@ -1516,6 +1551,39 @@ async function initCableSchedule() {
       this.showList();
       this.renderList();
       showAlertModal('Starter Types Loaded', `${additions.length} starter cable type${additions.length === 1 ? '' : 's'} added to the library.`);
+    }
+
+    loadProjectCatalogTypes() {
+      const sharedProducts = dataStore.getTrayHardwareCatalogCustomProducts();
+      const candidates = (Array.isArray(sharedProducts) ? sharedProducts : [])
+        .map(normalizeCableCatalogProduct)
+        .filter(Boolean);
+      if (!candidates.length) {
+        showAlertModal('Project Catalog', 'No complete cable products were found in this project catalog. Add or import rows with category "cable" and construction fields first.');
+        return;
+      }
+      const existingKeys = new Set((this.templates || []).map((template) => [
+        String(template?.manufacturer || '').trim().toLowerCase(),
+        String(template?.model || '').trim().toLowerCase(),
+        String(template?.conductor_size || '').trim().toLowerCase(),
+      ].join('::')));
+      const additions = candidates
+        .filter((template) => {
+          const key = [template.manufacturer, template.model, template.conductor_size]
+            .map(value => String(value || '').trim().toLowerCase()).join('::');
+          if (existingKeys.has(key)) return false;
+          existingKeys.add(key);
+          return true;
+        })
+        .map(template => ({ ...template, template_id: generateTemplateId() }));
+      if (!additions.length) {
+        showAlertModal('Project Catalog', 'All project catalog cable products are already in the Cable Library.');
+        return;
+      }
+      const { templates } = ensureTemplateIds([...(this.templates || []), ...additions]);
+      dataStore.setCableTemplates(templates);
+      this.showList();
+      showAlertModal('Project Catalog', `${additions.length} governed cable type${additions.length === 1 ? '' : 's'} added to the Cable Library.`);
     }
 
     exportTemplates() {
@@ -1783,14 +1851,36 @@ async function initCableSchedule() {
     renderList() {
       if (!this.list) return;
       this.list.innerHTML = '';
+      const summary = summarizeCableLibrary(this.templates);
+      if (this.description) {
+        this.description.textContent = summary.total
+          ? `Reuse saved cable typicals across your schedule. ${summary.source_verified} source verified; ${summary.screening} screening or project standard.`
+          : 'Reuse saved cable typicals across your schedule.';
+      }
+      const filteredTemplates = (this.templates || []).filter((template) => {
+        const filter = this.evidenceFilter?.value || '';
+        return !filter || assessCableTypical(template).status === filter;
+      });
       if (!this.templates.length) {
         if (this.emptyState) this.emptyState.hidden = false;
         this.list.setAttribute('aria-hidden', 'true');
         return;
       }
+      if (!filteredTemplates.length) {
+        if (this.emptyState) {
+          this.emptyState.hidden = false;
+          this.emptyState.textContent = 'No cable typicals match the selected evidence status.';
+        }
+        this.list.setAttribute('aria-hidden', 'true');
+        return;
+      }
       this.list.removeAttribute('aria-hidden');
-      if (this.emptyState) this.emptyState.hidden = true;
-      this.templates.forEach((tpl, idx) => {
+      if (this.emptyState) {
+        this.emptyState.hidden = true;
+        this.emptyState.textContent = 'No cable typicals saved yet.';
+      }
+      filteredTemplates.forEach((tpl) => {
+        const idx = this.templates.indexOf(tpl);
         const li = document.createElement('li');
         li.className = 'library-item';
         li.setAttribute('role', 'listitem');
@@ -1800,6 +1890,13 @@ async function initCableSchedule() {
         name.className = 'library-item-name';
         name.textContent = tpl.label || tpl.tag || `Cable ${idx + 1}`;
         info.appendChild(name);
+        const assessment = assessCableTypical(tpl);
+        const evidence = document.createElement('span');
+        evidence.className = `cable-library-evidence cable-library-evidence-${assessment.status}`;
+        evidence.textContent = assessment.status === CABLE_LIBRARY_EVIDENCE_STATUS.sourceVerified
+          ? 'Source verified — project approval pending'
+          : 'Screening / project standard';
+        info.appendChild(evidence);
         const detail = document.createElement('span');
         detail.className = 'library-item-detail';
         const from = tpl.from_tag ? `From ${tpl.from_tag}` : '';
@@ -1970,7 +2067,12 @@ async function initCableSchedule() {
       if (this.labelInput) {
         this.labelInput.removeAttribute('aria-invalid');
       }
-      const sanitized = filterTemplateFields(values, { keepLabel: true });
+      const assessment = assessCableTypical(values);
+      if (assessment.requestedStatus === CABLE_LIBRARY_EVIDENCE_STATUS.sourceVerified && !assessment.sourceVerified) {
+        showAlertModal('Source Verification Incomplete', `Source-verified cable typicals require: ${assessment.missing.join(', ')}.`);
+        return;
+      }
+      const sanitized = normalizeCableTypical(filterTemplateFields(values, { keepLabel: true }));
       const next = { ...sanitized };
       if (this.mode === 'edit' && this.editIndex >= 0) {
         const existingId = this.templates[this.editIndex]?.template_id;

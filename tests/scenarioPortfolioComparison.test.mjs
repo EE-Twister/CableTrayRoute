@@ -3,6 +3,7 @@ import {
   compareEntityCollections,
   compareProjectScenarios,
   compareStudyCollections,
+  buildScenarioStudyImpact,
 } from '../analysis/scenarioComparison.mjs';
 
 const base = {
@@ -82,6 +83,31 @@ const future = {
   assert.strictEqual(result.totals.changedStudies, 2);
   assert.strictEqual(result.studies.find(study => study.key === 'voltageDropStudy').status, 'added');
   assert.strictEqual(result.studies.find(study => study.key === 'loadFlow').beforeApproval.status, 'approved');
+  assert.strictEqual(result.impact.find(impact => impact.key === 'loadFlow').action, 'rerun');
+  assert.strictEqual(result.impact.find(impact => impact.key === 'iec60287').action, 'consider');
+  assert.strictEqual(result.impact.find(impact => impact.key === 'loadFlow').priority, 'high');
+}
+
+{
+  const impact = buildScenarioStudyImpact({
+    domains: [{
+      key: 'trays',
+      label: 'Cable Trays',
+      counts: { totalChanges: 1 },
+    }, {
+      key: 'oneLineConnections',
+      label: 'One-Line Connections',
+      counts: { totalChanges: 2 },
+    }],
+    studies: [{
+      key: 'loadFlow',
+      after: { present: true },
+    }],
+  });
+  assert.strictEqual(impact.find(item => item.key === 'loadFlow').action, 'rerun');
+  assert.strictEqual(impact.find(item => item.key === 'loadFlow').changedRecords, 2);
+  assert.strictEqual(impact.find(item => item.key === 'iec60287').priority, 'medium');
+  assert.deepStrictEqual(impact.find(item => item.key === 'loadFlow').domains, ['One-Line Connections']);
 }
 
 {

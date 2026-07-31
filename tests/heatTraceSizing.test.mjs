@@ -16,6 +16,8 @@ import {
   buildControllerSchedule,
   filterHeatTraceProducts,
   isHeatTraceProductApproved,
+  mergeHeatTraceProductCatalogs,
+  normalizeHeatTraceCatalogProduct,
 } from '../analysis/heatTraceSizing.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -432,6 +434,45 @@ describe('filterHeatTraceProducts', () => {
   it('handles non-array catalogs by returning []', () => {
     assert.deepEqual(filterHeatTraceProducts(null, { approvedOnly: true }), []);
     assert.deepEqual(filterHeatTraceProducts(undefined), []);
+  });
+});
+
+describe('shared catalog heat-trace adapter', () => {
+  const sharedProduct = {
+    id: 'HT-5-240',
+    manufacturer: 'ACME Heat',
+    catalogNumber: 'HT-5-240',
+    category: 'heat_trace',
+    description: '5 W/ft self-regulating cable',
+    heat_trace_type: 'selfRegulating',
+    heat_trace_voltages: '120;240',
+    heat_trace_nominal_w_per_ft: 5,
+    heat_trace_max_circuit_lengths: '120:300;240:500',
+    heat_trace_max_exposure_temp_c: 65,
+    heat_trace_startup_current_multiplier: 1.7,
+    approval: { status: 'approved' },
+  };
+
+  it('adapts a governed shared-catalog row to the heat-trace selection shape', () => {
+    const product = normalizeHeatTraceCatalogProduct(sharedProduct);
+    assert.ok(product);
+    assert.deepEqual(product.voltages, [120, 240]);
+    assert.equal(product.nominalWPerFt, 5);
+    assert.equal(product.maxCircuitLengthFt['240'], 500);
+    assert.equal(product.approval.status, 'approved');
+  });
+
+  it('does not adapt unrelated or electrically incomplete catalog rows', () => {
+    assert.equal(normalizeHeatTraceCatalogProduct({ category: 'tray' }), null);
+    assert.equal(normalizeHeatTraceCatalogProduct({ category: 'heat_trace', heat_trace_type: 'selfRegulating' }), null);
+  });
+
+  it('lets a project catalog row replace a bundled product with the same manufacturer/catalog identity', () => {
+    const base = [{ manufacturer: 'ACME Heat', catalogNumber: 'HT-5-240', id: 'base', nominalWPerFt: 3 }];
+    const merged = mergeHeatTraceProductCatalogs(base, [sharedProduct]);
+    assert.equal(merged.length, 1);
+    assert.equal(merged[0].nominalWPerFt, 5);
+    assert.equal(merged[0].id, 'HT-5-240');
   });
 });
 

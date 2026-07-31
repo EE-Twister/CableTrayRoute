@@ -358,6 +358,94 @@ class CloudLibraryStore {
   }
 }
 
+/**
+ * Stores approved, organization-wide component-library releases separately
+ * from each user's personal cloud library.  A release is immutable once
+ * published; publishing the next release always creates a new record so a
+ * deployment retains an auditable library history.
+ */
+class TeamLibraryStore {
+  constructor(dataDir) {
+    this.releaseDir = path.join(dataDir, 'team-library-releases');
+  }
+
+  async init() {
+    await fs.mkdir(this.releaseDir, { recursive: true });
+  }
+
+  #releasePath(version) {
+    return path.join(this.releaseDir, `${version}.json`);
+  }
+
+  #isValidVersion(version) {
+    return typeof version === 'string' && /^[A-Za-z0-9-]{6,80}$/.test(version);
+  }
+
+  async #readReleases({ includeData = true } = {}) {
+    let files = [];
+    try {
+      files = await fs.readdir(this.releaseDir);
+    } catch (err) {
+      if (err.code === 'ENOENT') return [];
+      throw err;
+    }
+    const releases = [];
+    for (const filename of files.filter(file => file.endsWith('.json')).sort()) {
+      try {
+        const record = JSON.parse(await fs.readFile(path.join(this.releaseDir, filename), 'utf-8'));
+        if (!record || typeof record !== 'object' || !this.#isValidVersion(record.version)) continue;
+        if (includeData) {
+          releases.push(record);
+        } else {
+          const { data, ...metadata } = record;
+          releases.push(metadata);
+        }
+      } catch {
+        // A malformed historical file must not make the team library unusable.
+      }
+    }
+    return releases.sort((a, b) => String(b.publishedAt).localeCompare(String(a.publishedAt)));
+  }
+
+  async loadLatest() {
+    const releases = await this.#readReleases();
+    if (!releases.length) throw new Error('not-found');
+    return releases[0];
+  }
+
+  async listReleases() {
+    return this.#readReleases({ includeData: false });
+  }
+
+  async publish({ username, data, baseVersion, releaseNotes = '' }) {
+    let current = null;
+    try {
+      current = await this.loadLatest();
+    } catch (err) {
+      if (err.message !== 'not-found') throw err;
+    }
+    if (baseVersion && current && baseVersion !== current.version) {
+      const conflict = new Error('version-conflict');
+      conflict.code = 'VERSION_CONFLICT';
+      conflict.currentVersion = current.version;
+      throw conflict;
+    }
+    if (current && JSON.stringify(current.data) === JSON.stringify(data)) {
+      return { ...current, unchanged: true };
+    }
+    const version = `${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
+    const record = {
+      version,
+      data,
+      publishedAt: new Date().toISOString(),
+      publishedBy: username,
+      releaseNotes: String(releaseNotes || '').trim(),
+    };
+    await fs.writeFile(this.#releasePath(version), `${JSON.stringify(record, null, 2)}\n`);
+    return { ...record, unchanged: false };
+  }
+}
+
 class LibraryShareStore {
   constructor(filePath) {
     this.filePath = filePath;
@@ -911,6 +999,8 @@ export async function createApp(options = {}) {
   const snapshotStore = new SnapshotStore(snapshotsFile, tokenTtlMs);
   await snapshotStore.init();
   const cloudLibraryStore = new CloudLibraryStore(dataDir);
+  const teamLibraryStore = new TeamLibraryStore(dataDir);
+  await teamLibraryStore.init();
   const libraryShareStore = new LibraryShareStore(librarySharesFile);
   await libraryShareStore.init();
   const resetTokenStore = new ResetTokenStore();
@@ -2048,6 +2138,69 @@ When answering queries:
         return;
       }
       res.json({ revoked: true });
+    })
+  );
+
+  // Team Library endpoints. The library is readable by every authenticated
+  // deployment user, while publishing is restricted to admins and captured in
+  // the audit log. Releases are immutable records rather than overwrites.
+  app.get(
+    '/api/v1/team-library',
+    asyncHandler(async (req, res) => {
+      try {
+        const release = await teamLibraryStore.loadLatest();
+        res.json(release);
+      } catch {
+        res.status(404).json({ error: 'No approved team library has been published yet' });
+      }
+    })
+  );
+
+  app.get(
+    '/api/v1/team-library/releases',
+    asyncHandler(async (req, res) => {
+      const releases = await teamLibraryStore.listReleases();
+      res.json({ releases });
+    })
+  );
+
+  app.put(
+    '/api/v1/team-library',
+    csrfProtection,
+    requireRole('admin'),
+    asyncHandler(async (req, res) => {
+      const { data, baseVersion, releaseNotes } = req.body || {};
+      if (typeof releaseNotes === 'string' && releaseNotes.length > 500) {
+        res.status(400).json({ error: 'Release notes must be 500 characters or fewer' });
+        return;
+      }
+      const validation = validateLibraryPayload(data);
+      if (!validation.valid) {
+        res.status(400).json({ error: 'Library payload validation failed', details: validation.errors });
+        return;
+      }
+      try {
+        const release = await teamLibraryStore.publish({
+          username: req.username,
+          data,
+          baseVersion,
+          releaseNotes,
+        });
+        appendAuditEntry(auditLogFile, {
+          actor: req.username,
+          action: release.unchanged ? 'TEAM_LIBRARY_REVIEW' : 'TEAM_LIBRARY_PUBLISH',
+          entityType: 'team_library_release',
+          entityId: release.version,
+          metadata: { releaseNotes: release.releaseNotes, unchanged: release.unchanged },
+        }).catch(() => {});
+        res.json(release);
+      } catch (err) {
+        if (err.code === 'VERSION_CONFLICT') {
+          res.status(409).json({ error: 'Version conflict', currentVersion: err.currentVersion });
+          return;
+        }
+        throw err;
+      }
     })
   );
 

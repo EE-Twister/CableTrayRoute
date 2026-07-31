@@ -8,7 +8,7 @@ This document defines handoff-level inputs, outputs, readiness rules, and downst
 
 Standard readiness vocabulary: Ready, Missing inputs, Downstream handoff.
 
-Coverage: 77 contracts for 77 navigation routes.
+Coverage: 80 contracts for 80 navigation routes.
 
 ## Workflow
 
@@ -258,6 +258,7 @@ Coverage: 77 contracts for 77 navigation routes.
 - `settings.studyProvenance` (setting, optional): Study scenario, revision, approval, and run metadata used to qualify one-line overlays.
 - `settings.activeSampleWorkflow` (setting, optional): Active sample context used to fit and guide the sample diagram.
 - `settings.gistToken` (setting, optional): Gist import/export token setting.
+- `settings.liveTelemetryConfig` (setting, optional): Read-only telemetry endpoint, polling interval, operator mode, and component/tag mappings.
 
 **Outputs**
 - `oneLineDiagram` (model): One-line sheets, components, connections, layers, protection zones, and linked schedule refs. Consumers: `loadFlow.html`, `shortCircuit.html`, `arcFlash.html`, `tcc.html`, `designrulechecker.html`.
@@ -269,6 +270,7 @@ Coverage: 77 contracts for 77 navigation routes.
 - `conduitSchedule` (schedule): Conduit records created from one-line route actions. Consumers: `racewayschedule.html`.
 - `studyResults` (study-result): Embedded one-line study result container. Consumers: `projectreport.html`.
 - `studyResults.loadFlow` (study-result): Embedded load-flow result generated from one-line. Consumers: `loadFlow.html`, `projectreport.html`.
+- `studyResults.transformerTapOptimization` (study-result): Constrained transformer tap what-if review with expected controlled-bus voltage impact and explicit approval state. Consumers: `oneline.html`, `projectreport.html`.
 - `studyResults.shortCircuit` (study-result): Embedded short-circuit result generated from one-line. Consumers: `shortCircuit.html`, `projectreport.html`.
 - `studyResults.arcFlash` (study-result): Embedded arc-flash result generated from one-line. Consumers: `arcFlash.html`, `projectreport.html`.
 - `studyResults.harmonics` (study-result): Embedded harmonics result generated from one-line. Consumers: `harmonics.html`, `projectreport.html`.
@@ -287,6 +289,7 @@ Coverage: 77 contracts for 77 navigation routes.
 - `settings.onelineTemplates` (setting): Reusable one-line component templates saved with project settings. Consumers: `oneline.html`.
 - `settings.activeSampleWorkflow` (setting): Sample workflow layout version saved after the diagram is arranged and fit. Consumers: `oneline.html`.
 - `settings.oneLineScheduleReconcilePending` (setting): Flag indicating that schedule reconciliation is available. Consumers: `workflowdashboard.html`.
+- `settings.liveTelemetryConfig` (setting): Read-only live telemetry endpoint and component/tag mapping configuration. Consumers: `oneline.html`.
 
 **Readiness**
 - Ready when: At least one one-line component exists and schedule reconciliation state is explicit.
@@ -301,6 +304,63 @@ Coverage: 77 contracts for 77 navigation routes.
 
 **Notes**
 - None.
+
+#### One-Line Data Manager (`datamanager.html`)
+
+- Section: Workflow
+- Group: Planning
+- Workflow step: oneLineDiagram
+
+**Standalone Inputs**
+- Component search text, sheet/type filters, selected table rows, and controlled field values.
+
+**Project Inputs**
+- `oneLineDiagram` (model, required): One-line components, connections, sheets, layers, and linked schedule references.
+
+**Outputs**
+- `oneLineDiagram` (model): Controlled component label, tag, rating, layer, and position-lock updates saved through One-Line revision history. Consumers: `oneline.html`, `loadFlow.html`, `shortCircuit.html`, `arcFlash.html`, `tcc.html`.
+- `export-only` (export): Filtered One-Line component data-manager CSV/XLSX and previewed controlled CSV/XLSX updates.
+
+**Readiness**
+- Ready when: Ready when the project has at least one One-Line component available for review.
+- Blockers: The One-Line diagram is empty.
+
+**Downstream Pages**
+- `oneline.html`
+- `loadFlow.html`
+- `shortCircuit.html`
+- `arcFlash.html`
+- `tcc.html`
+
+**Notes**
+- This is a controlled tabular editor for common component data. It does not create topology, edit connections, or approve calculations.
+
+#### Switching Procedures (`switchingprocedures.html`)
+
+- Section: Workflow
+- Group: Planning
+- Workflow step: oneLineDiagram
+
+**Standalone Inputs**
+- Proposed step types, preparation notes, reviewer identity, and authorized site procedure context.
+
+**Project Inputs**
+- `oneLineDiagram` (model, required): One-line components, connections, sheets, layers, and linked schedule references.
+- `settings.switchingProcedures` (setting, optional): Read-only proposed switching procedure records and planning hold points.
+
+**Outputs**
+- `settings.switchingProcedures` (setting): Read-only proposed switching procedures, planning checks, and step-completion records. Consumers: `switchingprocedures.html`.
+- `export-only` (export): Switching procedure CSV planning records.
+
+**Readiness**
+- Ready when: Ready when a proposed procedure has a title, documented steps, required safety order checks, and a named reviewer when marked reviewed.
+- Blockers: No one-line switching devices, missing procedure title or steps, unsafe step order, or reviewed status without a reviewer.
+
+**Downstream Pages**
+- `projectreport.html`
+
+**Notes**
+- Planning support only; this page does not operate equipment or replace site-authorized switching, lockout/tagout, or qualified-person verification.
 
 ### Cable
 
@@ -324,6 +384,7 @@ Coverage: 77 contracts for 77 navigation routes.
 - `settings.cableTagSettings` (setting, optional): Cable tag generation settings.
 - `settings.cableChangeLog` (setting, optional): Cable schedule change log entries.
 - `settings.designBasis` (setting, optional): Project code basis, sizing defaults, routing defaults, and study prerequisites.
+- `settings.trayHardwareCatalogCustomProducts` (setting, optional): Project-owned governed cable constructions imported from the shared manufacturer catalog.
 
 **Outputs**
 - `cableSchedule` (schedule): Cable rows with tags, endpoints, conductor details, length, and raceway assignments. Consumers: `racewayschedule.html`, `cabletrayfill.html`, `conduitfill.html`, `optimalRoute.html`, `voltagedropstudy.html`.
@@ -418,6 +479,9 @@ Coverage: 77 contracts for 77 navigation routes.
 **Project Inputs**
 - `cableSchedule` (schedule, required): Cable tags, endpoints, conductor details, lengths, and raceway assignments.
 - `settings.designBasis` (setting, optional): Project code basis, sizing defaults, routing defaults, and study prerequisites.
+- `settings.bimCoordinationSnapshot` (setting, optional): Read-only IFC or Revit import snapshot used to compare BIM raceways with the schedule.
+- `settings.bimCoordinationIssues` (setting, optional): BCF-like BIM coordination issue records, including element IDs, status, assignee, comments, and evidence references.
+- `settings.trayHardwareCatalogCustomProducts` (setting, optional): Project-owned approved tray and conduit products available for routed segment assignment.
 - `settings.activeSampleWorkflow` (setting, optional): Active sample context used to repair legacy underground ductbank parent rows.
 
 **Outputs**
@@ -428,6 +492,8 @@ Coverage: 77 contracts for 77 navigation routes.
 - `settings.trayFillData` (setting): Selected tray fill handoff data. Consumers: `cabletrayfill.html`.
 - `settings.conduitFillData` (setting): Selected conduit fill handoff data. Consumers: `conduitfill.html`.
 - `settings.ductbankSession` (setting): Ductbank schedule handoff state. Consumers: `ductbankroute.html`.
+- `settings.bimCoordinationSnapshot` (setting): Read-only IFC/Revit coordination snapshot retained separately from the live schedules. Consumers: `racewayschedule.html`.
+- `settings.bimCoordinationIssues` (setting): BCF-like issue records for model coordination review and exchange. Consumers: `racewayschedule.html`.
 
 **Readiness**
 - Ready when: At least one tray, conduit, or ductbank record exists.
@@ -1347,6 +1413,7 @@ Coverage: 77 contracts for 77 navigation routes.
 - `equipment` (schedule, required): Equipment tags, ratings, locations, and physical metadata.
 - `settings.designBasis` (setting, optional): Project code basis, sizing defaults, routing defaults, and study prerequisites.
 - `settings.studyApprovals` (setting, optional): Engineer review records for study outputs.
+- `settings.trayHardwareCatalogCustomProducts` (setting, optional): Project-owned governed heat-trace rows from the shared manufacturer catalog.
 
 **Outputs**
 - `studyResults.heatTraceSizing` (study-result): Saved heat trace sizing active result. Consumers: `projectreport.html`.
@@ -1534,6 +1601,7 @@ Coverage: 77 contracts for 77 navigation routes.
 - `oneLineDiagram` (model, required): One-line components, connections, sheets, layers, and linked schedule references.
 - `equipment` (schedule, required): Equipment tags, ratings, locations, and physical metadata.
 - `cableSchedule` (schedule, required): Cable tags, endpoints, conductor details, lengths, and raceway assignments.
+- `settings.trayHardwareCatalogCustomProducts` (setting, optional): Project-owned governed protective-device curves imported from the shared manufacturer catalog.
 - `studyResults.shortCircuit` (study-result, optional): Fault current values used for coordination context.
 - `studyResults.arcFlash` (study-result, optional): Arc flash results used for equipment overlays.
 - `settings.tccSettings` (setting, optional): Protective device selections, relay settings, chart options, and coordination context.
@@ -1838,6 +1906,37 @@ Coverage: 77 contracts for 77 navigation routes.
 - Blockers: Missing voltage class, BIL/SIL level, or arrester rating.
 
 **Downstream Pages**
+- `projectreport.html`
+
+**Notes**
+- None.
+
+#### Cyber Compliance (`cybercompliance.html`)
+
+- Section: Studies
+- Group: Protection
+- Workflow step: studies
+
+**Standalone Inputs**
+- Cyber asset inventory, security zones, protocol inventory, remote-access controls, firmware, patch, and evidence records.
+
+**Project Inputs**
+- `equipment` (schedule, required): Equipment tags, ratings, locations, and physical metadata.
+- `panelSchedule` (schedule, optional): Panel and circuit records used for load, cable, and one-line handoffs.
+- `oneLineDiagram` (model, required): One-line components, connections, sheets, layers, and linked schedule references.
+- `settings.cyberComplianceAssets` (setting, optional): Cyber asset inventory with zones, protocols, remote-access controls, firmware, and evidence metadata.
+- `settings.studyApprovals` (setting, optional): Engineer review records for study outputs.
+
+**Outputs**
+- `settings.cyberComplianceAssets` (setting): Project cyber asset evidence inventory. Consumers: `cybercompliance.html`, `projectreport.html`.
+- `studyResults.cyberCompliance` (study-result): NERC CIP and IEC 62443 screening matrix with evidence gaps. Consumers: `workflowdashboard.html`, `projectreport.html`.
+
+**Readiness**
+- Ready when: Ready when at least one cyber asset has an ID, asset class, zone, and evidence context.
+- Blockers: No cyber assets, unidentified assets, or missing zone/evidence records.
+
+**Downstream Pages**
+- `workflowdashboard.html`
 - `projectreport.html`
 
 **Notes**

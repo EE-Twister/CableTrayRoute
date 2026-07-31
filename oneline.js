@@ -14,6 +14,7 @@ import { getOneLine, setOneLine, getEquipment, setEquipment, getPanels, setPanel
 import { previewScheduleReconcile, applyScheduleReconcilePreview } from './analysis/scheduleReconcile.mjs';
 import { runLoadFlow } from './analysis/loadFlow.js';
 import { renderLoadFlowResultsHtml } from './analysis/loadFlowResultsRenderer.js';
+import { applyTapRatioToOneLine, evaluateTransformerTapOptimization } from './analysis/transformerTapOptimization.mjs';
 import { runShortCircuit } from './analysis/shortCircuit.mjs';
 import { runArcFlash } from './analysis/arcFlash.mjs';
 import { runHarmonics } from './analysis/harmonics.js';
@@ -37,6 +38,7 @@ import { runDiagramValidationPasses } from './src/one-line/validation.js';
 import { exportPDF } from './exporters/pdf.js';
 import { exportDXF, exportDWG } from './exporters/dxf.js';
 import { ensureFieldAssistiveText, openModal, showAlertModal } from './src/components/modal.js';
+import { applyLiveReadings, createLivePollingController, evaluateLiveAlarms, exportLiveTrendCsv, formatLiveReading, formatLiveAlarmRule, getLiveTrendMetrics, getLiveTrendSeries, isLiveReadingStale, normalizeLiveTagConfig, summarizeLiveTrend } from './analysis/liveTagAdapter.mjs';
 import { resolveOneLineProbe } from './src/crossProbe.js';
 import {
   READINESS_VOCABULARY,
@@ -57,7 +59,7 @@ import {
   syncTransformerDefaults
 } from './utils/transformerProperties.js';
 import './site.js';
-import { getProjectState, readAppSetting, writeAppSetting } from './projectStorage.js';
+import { getAuthRole, getProjectState, readAppSetting, writeAppSetting } from './projectStorage.js';
 
 const ONE_LINE_READINESS_COPY = getContractReadinessCopy('oneline.html');
 
@@ -320,6 +322,10 @@ const dataStateOverlayDefaultVersionStorageKey = 'oneLineDataStateOverlayDefault
 const operatingStateStorageKey = 'oneLineOperatingState';
 const paletteFilterStorageKey = 'oneLinePaletteFilter';
 const paletteFilterDefaultVersionStorageKey = 'oneLinePaletteFilterDefaultVersion';
+const paletteRecentStorageKey = 'oneLinePaletteRecent';
+const paletteFavoritesStorageKey = 'oneLinePaletteFavorites';
+const PALETTE_RECENT_LIMIT = 8;
+const PALETTE_FAVORITES_LIMIT = 12;
 const maxViewAttributeCount = 250;
 const maxViewAttributeLength = 128;
 const defaultPaletteWidth = 250;
@@ -346,6 +352,97 @@ function getOneLineViewSetting(key, fallback = null) {
 
 function setOneLineViewSetting(key, value) {
   writeAppSetting(`${oneLineViewSettingPrefix}${key}`, JSON.stringify(value));
+}
+
+function normalizeShortcut(value) {
+  if (typeof value !== 'string') return '';
+  const parts = value.split('+').map(part => part.trim()).filter(Boolean);
+  const key = parts.pop();
+  if (!key || key.length !== 1 || !/^[a-z0-9]$/i.test(key)) return '';
+  const modifiers = new Set(parts.map(part => part.toLowerCase()));
+  if ([...modifiers].some(part => part !== 'alt' && part !== 'shift')) return '';
+  return `${modifiers.has('alt') ? 'Alt+' : ''}${modifiers.has('shift') ? 'Shift+' : ''}${key.toUpperCase()}`;
+}
+
+function getShortcutBindings() {
+  const stored = getOneLineViewSetting(ONE_LINE_SHORTCUTS_SETTING_KEY, {});
+  const values = stored && typeof stored === 'object' ? stored : {};
+  const seen = new Set();
+  return ONE_LINE_SHORTCUT_DEFINITIONS.reduce((bindings, definition) => {
+    const candidate = normalizeShortcut(values[definition.id]) || definition.defaultShortcut;
+    const shortcut = seen.has(candidate) ? definition.defaultShortcut : candidate;
+    seen.add(shortcut);
+    bindings[definition.id] = shortcut;
+    return bindings;
+  }, {});
+}
+
+function setShortcutBindings(bindings) {
+  setOneLineViewSetting(ONE_LINE_SHORTCUTS_SETTING_KEY, bindings);
+  updateShortcutControlLabels();
+}
+
+function updateShortcutControlLabels() {
+  const bindings = getShortcutBindings();
+  const repeatButton = document.getElementById('repeat-last-symbol-btn');
+  if (repeatButton) repeatButton.title = `Repeat last command (${bindings['repeat-last']})`;
+}
+
+function shortcutFromEvent(event) {
+  if (event.ctrlKey || event.metaKey || event.isComposing) return '';
+  const key = typeof event.key === 'string' ? event.key : '';
+  if (key.length !== 1 || !/^[a-z0-9]$/i.test(key)) return '';
+  return `${event.altKey ? 'Alt+' : ''}${event.shiftKey ? 'Shift+' : ''}${key.toUpperCase()}`;
+}
+
+function commandForShortcut(event) {
+  const shortcut = shortcutFromEvent(event);
+  if (!shortcut) return null;
+  return ONE_LINE_SHORTCUT_DEFINITIONS.find(definition => getShortcutBindings()[definition.id] === shortcut) || null;
+}
+
+function rememberRepeatableCommand(command) {
+  if (!command?.id) return;
+  lastRepeatableCommand = { ...command };
+}
+
+function getPaletteSubtypeList(key, limit) {
+  const value = getOneLineViewSetting(key, []);
+  if (!Array.isArray(value)) return [];
+  return [...new Set(value.filter(subtype => typeof subtype === 'string' && subtype.trim()))].slice(0, limit);
+}
+
+function getPaletteFavorites() {
+  return getPaletteSubtypeList(paletteFavoritesStorageKey, PALETTE_FAVORITES_LIMIT);
+}
+
+function getPaletteRecent() {
+  return getPaletteSubtypeList(paletteRecentStorageKey, PALETTE_RECENT_LIMIT);
+}
+
+function recordPaletteUsage(subtype) {
+  if (!subtype || !componentMeta[subtype]) return;
+  const next = [subtype, ...getPaletteRecent().filter(item => item !== subtype)].slice(0, PALETTE_RECENT_LIMIT);
+  setOneLineViewSetting(paletteRecentStorageKey, next);
+  rememberRepeatableCommand({ id: 'palette-symbol', subtype });
+}
+
+function togglePaletteFavorite(subtype) {
+  if (!subtype || !componentMeta[subtype]) return false;
+  const current = getPaletteFavorites();
+  const existingIndex = current.indexOf(subtype);
+  if (existingIndex !== -1) {
+    current.splice(existingIndex, 1);
+    setOneLineViewSetting(paletteFavoritesStorageKey, current);
+    return false;
+  }
+  const next = [subtype, ...current].slice(0, PALETTE_FAVORITES_LIMIT);
+  setOneLineViewSetting(paletteFavoritesStorageKey, next);
+  return true;
+}
+
+function clearPaletteRecent() {
+  setOneLineViewSetting(paletteRecentStorageKey, []);
 }
 
 let paletteContextTarget = null;
@@ -621,14 +718,14 @@ const paletteCategoryFilters = Object.freeze({
   cable: 'Cables',
   annotations: 'Annotations'
 });
-let activePaletteCategoryFilter = getOneLineViewSetting(paletteFilterStorageKey, 'common');
+let activePaletteCategoryFilter = getOneLineViewSetting(paletteFilterStorageKey, 'all');
 if (!Object.prototype.hasOwnProperty.call(paletteCategoryFilters, activePaletteCategoryFilter)) {
-  activePaletteCategoryFilter = 'common';
+  activePaletteCategoryFilter = 'all';
 }
-if (getOneLineViewSetting(paletteFilterDefaultVersionStorageKey, '') !== 'focused-palette-v1') {
-  activePaletteCategoryFilter = 'common';
+if (getOneLineViewSetting(paletteFilterDefaultVersionStorageKey, '') !== 'favorites-recent-palette-v1') {
+  activePaletteCategoryFilter = 'all';
   setOneLineViewSetting(paletteFilterStorageKey, activePaletteCategoryFilter);
-  setOneLineViewSetting(paletteFilterDefaultVersionStorageKey, 'focused-palette-v1');
+  setOneLineViewSetting(paletteFilterDefaultVersionStorageKey, 'favorites-recent-palette-v1');
 }
 
 function compKey(type, subtype) {
@@ -1811,6 +1908,23 @@ const baselineComponentFieldSpecs = [
   { name: 'datasheet_url', label: 'Datasheet URL', type: 'text', required: false, defaultValue: '' },
   { name: 'bim_ref', label: 'BIM Reference', type: 'text', required: false, defaultValue: '' },
   { name: 'phases', label: 'Phases', type: 'number', required: true, defaultValue: 3 },
+  {
+    name: 'phase_assignment',
+    label: 'Phase Assignment',
+    type: 'select',
+    required: false,
+    defaultValue: '',
+    options: [
+      { value: '', label: 'Balanced / not assigned' },
+      { value: 'A', label: 'A' },
+      { value: 'B', label: 'B' },
+      { value: 'C', label: 'C' },
+      { value: 'A,B', label: 'A + B' },
+      { value: 'A,C', label: 'A + C' },
+      { value: 'B,C', label: 'B + C' }
+    ],
+    help: 'For an unbalanced load-flow study, total load is distributed across the selected phases. Leave unassigned to distribute evenly across A/B/C.'
+  },
   { name: 'commissioning_state', label: 'Commissioning State', type: 'text', required: true, defaultValue: 'existing' },
   { name: 'service_status', label: 'Service Status', type: 'text', required: true, defaultValue: 'in_service' },
   { name: 'notes', label: 'Notes', type: 'textarea', required: false, rows: 3, defaultValue: '' }
@@ -2927,9 +3041,12 @@ function buildPalette() {
     labelSpan.className = 'palette-label';
     labelSpan.textContent = meta.label || meta.subtype || meta.type || subKey;
     btn.appendChild(labelSpan);
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', event => {
+      if (event.button !== 0) return;
       const comp = addComponent({ type: meta.type, subtype: subKey, placeAtViewportCenter: true });
       if (comp) {
+        recordPaletteUsage(subKey);
+        buildPalette();
         selection = [comp];
         selected = comp;
         selectedConnection = null;
@@ -2947,18 +3064,14 @@ function buildPalette() {
     btn.dataset.custom = meta.isCustom ? '1' : '0';
     btn.addEventListener('contextmenu', e => {
       e.preventDefault();
-      openPaletteContextMenu(meta, btn, e.clientX, e.clientY);
+      e.stopPropagation();
+      openPaletteContextMenu(meta, btn, e.clientX, e.clientY, subKey);
     });
     btn.addEventListener('keydown', e => {
       if (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) {
         e.preventDefault();
         const rect = btn.getBoundingClientRect();
-        openPaletteContextMenu(
-          meta,
-          btn,
-          rect.left + rect.width / 2,
-          rect.top + rect.height / 2
-        );
+        openPaletteContextMenu(meta, btn, rect.left + rect.width / 2, rect.top + rect.height / 2, subKey);
       }
     });
     return btn;
@@ -3019,6 +3132,7 @@ function buildPalette() {
   });
   const renderedLabels = new Set();
   const renderedComponentIdentities = new Set();
+  const paletteEntries = new Map();
   const paletteIdentity = (subKey, meta) => {
     const type = String(meta.type || '').trim().toLowerCase();
     const subtype = String(meta.subtype || subKey || '').trim().toLowerCase();
@@ -3039,6 +3153,7 @@ function buildPalette() {
       if (normalizedLabel && renderedLabels.has(normalizedLabel)) return;
       if (identity) renderedComponentIdentities.add(identity);
       if (normalizedLabel) renderedLabels.add(normalizedLabel);
+      paletteEntries.set(subKey, { cat, meta });
       const btn = createPaletteButton(cat, subKey, meta);
       container.appendChild(btn);
       // Keep one canonical palette control per component. Repeating hard-coded
@@ -3046,6 +3161,18 @@ function buildPalette() {
       // appear to be separate duplicate definitions.
     });
   });
+  if (pinnedContainer) {
+    const favorites = getPaletteFavorites().filter(subtype => paletteEntries.has(subtype));
+    const favoriteSet = new Set(favorites);
+    const recent = getPaletteRecent().filter(subtype => paletteEntries.has(subtype) && !favoriteSet.has(subtype));
+    [...favorites, ...recent].forEach(subtype => {
+      const entry = paletteEntries.get(subtype);
+      const btn = createPaletteButton(entry.cat, subtype, entry.meta, { pinned: true });
+      btn.dataset.palettePinnedKind = favoriteSet.has(subtype) ? 'favorite' : 'recent';
+      btn.title = `${entry.meta.label} — ${favoriteSet.has(subtype) ? 'Favorite' : 'Recent'}; drag to canvas or click to add`;
+      pinnedContainer.appendChild(btn);
+    });
+  }
   document.querySelectorAll('#component-buttons details').forEach(det => {
     const key = `palette-${det.id}-open`;
     const container = det.querySelector('.section-buttons');
@@ -3107,6 +3234,14 @@ function buildPalette() {
     });
     clearFilterBtn.dataset.paletteClearBound = '1';
   }
+  const clearRecentBtn = document.getElementById('palette-clear-recent-btn');
+  if (clearRecentBtn && !clearRecentBtn.dataset.paletteRecentBound) {
+    clearRecentBtn.addEventListener('click', () => {
+      clearPaletteRecent();
+      buildPalette();
+    });
+    clearRecentBtn.dataset.paletteRecentBound = '1';
+  }
   applyPaletteFilters();
 }
 
@@ -3116,10 +3251,16 @@ function closePaletteContextMenu() {
   paletteContextTarget = null;
 }
 
-function openPaletteContextMenu(meta, triggerEl, clientX, clientY) {
+function openPaletteContextMenu(meta, triggerEl, clientX, clientY, subtype = null) {
   if (!paletteContextMenu || !meta) return;
   closePaletteContextMenu();
-  paletteContextTarget = { meta, trigger: triggerEl };
+  paletteContextTarget = { meta, subtype: subtype || meta.subtype || triggerEl?.dataset?.subtype || '', trigger: triggerEl };
+  const favoriteItem = paletteContextMenu.querySelector('[data-action="toggle-favorite"]');
+  if (favoriteItem) {
+    favoriteItem.textContent = getPaletteFavorites().includes(paletteContextTarget.subtype)
+      ? 'Remove from Favorites'
+      : 'Add to Favorites';
+  }
   paletteContextMenu.style.display = 'block';
   paletteContextMenu.style.left = '0px';
   paletteContextMenu.style.top = '0px';
@@ -3177,8 +3318,21 @@ let dragging = false;
 let draggingConnection = null;
 let dragConnections = null;
 let draggingLabel = null;
+let activeInlineLabelEditor = null;
 let clipboard = [];
 let propertyClipboard = null;
+let lastRepeatableCommand = null;
+
+const ONE_LINE_SHORTCUT_DEFINITIONS = [
+  { id: 'repeat-last', label: 'Repeat last command', defaultShortcut: 'Alt+R' },
+  { id: 'rotate', label: 'Rotate selection', defaultShortcut: 'R' },
+  { id: 'flip', label: 'Flip selection', defaultShortcut: 'Shift+R' },
+  { id: 'fit', label: 'Fit diagram', defaultShortcut: 'F' },
+  { id: 'fit-selection', label: 'Fit selection', defaultShortcut: 'Shift+F' },
+  { id: 'auto-arrange', label: 'Auto arrange', defaultShortcut: 'Alt+A' },
+  { id: 'auto-space', label: 'Auto-space equipment', defaultShortcut: 'Alt+S' }
+];
+const ONE_LINE_SHORTCUTS_SETTING_KEY = 'keyboardShortcuts';
 
 function createDiagramEntityId(prefix = 'n') {
   const safePrefix = String(prefix || 'n').replace(/[^a-zA-Z0-9_-]/g, '') || 'n';
@@ -3347,6 +3501,7 @@ function applyPropertyClipboardToComponent(target, clipboardData) {
   return changed;
 }
 let contextTarget = null;
+let contextCanvasPoint = null;
 let connectMode = false;
 let connectSource = null;
 let tempConnection = null;
@@ -3419,6 +3574,8 @@ let legendDrag = null;
 let legendUserMoved = false;
 let gridSize = Number(getOneLineViewSetting('gridSize', 20));
 let gridEnabled = getOneLineViewSetting('gridEnabled', true);
+let alignmentGuidesEnabled = getOneLineViewSetting('alignmentGuidesEnabled', true);
+let dragSnapGuides = null;
 let snapIndicatorTimeout = null;
 let history = [];
 let historyIndex = -1;
@@ -3449,6 +3606,358 @@ let minimapVisible = false;        // Gap #39
 let diagramDatablockConfig = {};
 // Gap #49 – Arc Flash Label Overlays on one-line diagram
 let arcFlashLabelMode = false;
+const LIVE_TELEMETRY_CONFIG_KEY = 'liveTelemetryConfig';
+let liveTelemetryConfig = normalizeLiveTagConfig(getItem(LIVE_TELEMETRY_CONFIG_KEY, {}));
+let liveTelemetryValues = {};
+let liveTelemetryError = '';
+let refreshLiveTrendModal = null;
+let liveTelemetryFreshnessTimer = null;
+
+function clearLiveTelemetryFreshnessTimer() {
+  if (liveTelemetryFreshnessTimer) clearTimeout(liveTelemetryFreshnessTimer);
+  liveTelemetryFreshnessTimer = null;
+}
+
+function scheduleLiveTelemetryFreshnessRender() {
+  clearLiveTelemetryFreshnessTimer();
+  if (!liveTelemetryController.running) return;
+  const thresholdMs = liveTelemetryConfig.staleAfterSeconds * 1000;
+  const now = Date.now();
+  const nextStaleAt = Object.values(liveTelemetryValues)
+    .map(reading => Date.parse(reading?.timestamp))
+    .filter(Number.isFinite)
+    .map(timestamp => timestamp + thresholdMs)
+    .filter(timestamp => timestamp > now)
+    .sort((left, right) => left - right)[0];
+  if (!Number.isFinite(nextStaleAt)) return;
+  const delay = Math.max(250, Math.min(60000, nextStaleAt - now + 25));
+  liveTelemetryFreshnessTimer = setTimeout(() => {
+    liveTelemetryFreshnessTimer = null;
+    render();
+    scheduleLiveTelemetryFreshnessRender();
+  }, delay);
+}
+
+const liveTelemetryController = createLivePollingController({
+  onReadings(payload, config) {
+    liveTelemetryValues = applyLiveReadings(liveTelemetryValues, payload, config);
+    liveTelemetryError = '';
+    refreshLiveTrendModal?.();
+    render();
+    scheduleLiveTelemetryFreshnessRender();
+  },
+  onError(error) {
+    liveTelemetryError = error?.message || 'Telemetry poll failed.';
+    render();
+  },
+  onStatus(status) {
+    if (status?.state === 'stopped') clearLiveTelemetryFreshnessTimer();
+    else scheduleLiveTelemetryFreshnessRender();
+    render();
+  }
+});
+
+function liveReadingLines(comp) {
+  if (!liveTelemetryController.running || !comp?.id) return [];
+  const reading = liveTelemetryValues[comp.id];
+  const formatted = formatLiveReading(reading?.values);
+  const stale = isLiveReadingStale(reading, { staleAfterSeconds: liveTelemetryConfig.staleAfterSeconds });
+  const alarms = evaluateLiveAlarms(liveTelemetryValues, liveTelemetryConfig).filter(alarm => alarm.componentId === comp.id);
+  const alarmLines = alarms.map(alarm => `Live alarm: ${alarm.metric} ${alarm.direction} (${alarm.value} ${alarm.direction === 'high' ? '>' : '<'} ${alarm.threshold})`);
+  if (!formatted && !alarmLines.length) return [];
+  return [...(formatted ? [`${stale ? 'Live stale' : 'Live'}: ${formatted}`] : ['Live alarm']), ...alarmLines];
+}
+
+function getLiveAlarms() {
+  return evaluateLiveAlarms(liveTelemetryValues, liveTelemetryConfig);
+}
+
+function updateLiveTelemetryControl() {
+  const button = document.getElementById('live-telemetry-btn');
+  if (!button) return;
+  const alarms = liveTelemetryController.running ? getLiveAlarms() : [];
+  button.dataset.alarmCount = String(alarms.length);
+  button.title = alarms.length ? `${alarms.length} active live alarm${alarms.length === 1 ? '' : 's'}` : 'Configure read-only live telemetry';
+}
+
+function formatLiveTrendNumber(value) {
+  if (!Number.isFinite(Number(value))) return '—';
+  return Number(value).toLocaleString(undefined, { maximumFractionDigits: 3 });
+}
+
+function createLiveTrendChart(doc, componentId, metric) {
+  const panel = doc.createElement('section');
+  panel.className = 'live-trend-panel';
+  panel.setAttribute('aria-live', 'polite');
+  const reading = liveTelemetryValues[componentId];
+  const series = getLiveTrendSeries(reading, metric);
+  const summary = summarizeLiveTrend(series);
+  if (!summary) {
+    const empty = doc.createElement('p');
+    empty.className = 'live-trend-empty';
+    empty.textContent = 'No numeric readings have been received for this metric in the last 24 hours.';
+    panel.appendChild(empty);
+    return panel;
+  }
+  const heading = doc.createElement('p');
+  heading.className = 'live-trend-caption';
+  heading.textContent = `${metric} · ${summary.count} reading${summary.count === 1 ? '' : 's'} in the last 24 hours`;
+  const svg = doc.createElementNS(svgNS, 'svg');
+  svg.classList.add('live-trend-chart');
+  svg.setAttribute('viewBox', '0 0 640 220');
+  svg.setAttribute('role', 'img');
+  svg.setAttribute('aria-label', `24-hour ${metric} trend for ${componentId}. Minimum ${formatLiveTrendNumber(summary.minimum)}, average ${formatLiveTrendNumber(summary.average)}, maximum ${formatLiveTrendNumber(summary.maximum)}.`);
+  const chartTitle = doc.createElementNS(svgNS, 'title');
+  chartTitle.textContent = `24-hour ${metric} trend`;
+  const padding = { left: 62, right: 18, top: 18, bottom: 36 };
+  const width = 640 - padding.left - padding.right;
+  const height = 220 - padding.top - padding.bottom;
+  const values = series.map(point => point.value);
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min || Math.max(Math.abs(max) * 0.1, 1);
+  const end = Date.now();
+  const start = end - 24 * 60 * 60 * 1000;
+  const points = series.map(point => {
+    const x = padding.left + Math.min(1, Math.max(0, (point.timestamp - start) / (end - start))) * width;
+    const y = padding.top + (1 - (point.value - min) / range) * height;
+    return `${x.toFixed(2)},${y.toFixed(2)}`;
+  });
+  const grid = doc.createElementNS(svgNS, 'line');
+  grid.setAttribute('x1', padding.left);
+  grid.setAttribute('x2', 640 - padding.right);
+  grid.setAttribute('y1', padding.top + height);
+  grid.setAttribute('y2', padding.top + height);
+  grid.classList.add('live-trend-axis');
+  const line = doc.createElementNS(svgNS, 'polyline');
+  line.setAttribute('points', points.join(' '));
+  line.setAttribute('fill', 'none');
+  line.classList.add('live-trend-line');
+  const high = doc.createElementNS(svgNS, 'text');
+  high.setAttribute('x', 4);
+  high.setAttribute('y', padding.top + 4);
+  high.textContent = formatLiveTrendNumber(max);
+  high.classList.add('live-trend-label');
+  const low = doc.createElementNS(svgNS, 'text');
+  low.setAttribute('x', 4);
+  low.setAttribute('y', padding.top + height);
+  low.textContent = formatLiveTrendNumber(min);
+  low.classList.add('live-trend-label');
+  const startLabel = doc.createElementNS(svgNS, 'text');
+  startLabel.setAttribute('x', padding.left);
+  startLabel.setAttribute('y', 214);
+  startLabel.textContent = '24 h ago';
+  startLabel.classList.add('live-trend-label');
+  const endLabel = doc.createElementNS(svgNS, 'text');
+  endLabel.setAttribute('x', 640 - padding.right);
+  endLabel.setAttribute('y', 214);
+  endLabel.setAttribute('text-anchor', 'end');
+  endLabel.textContent = 'Now';
+  endLabel.classList.add('live-trend-label');
+  svg.append(chartTitle, grid, line, high, low, startLabel, endLabel);
+  const summaryList = doc.createElement('dl');
+  summaryList.className = 'live-trend-summary';
+  [['Latest', summary.latest], ['Minimum', summary.minimum], ['Average', summary.average], ['Maximum', summary.maximum]].forEach(([label, value]) => {
+    const term = doc.createElement('dt');
+    term.textContent = label;
+    const definition = doc.createElement('dd');
+    definition.textContent = formatLiveTrendNumber(value);
+    summaryList.append(term, definition);
+  });
+  panel.append(heading, svg, summaryList);
+  return panel;
+}
+
+function downloadLiveTrendCsv(componentId, metric) {
+  const series = getLiveTrendSeries(liveTelemetryValues[componentId], metric);
+  if (!series.length) return false;
+  const safePart = value => String(value || 'telemetry').replace(/[^a-z0-9._-]+/gi, '-').replace(/^-+|-+$/g, '') || 'telemetry';
+  const blob = new Blob([exportLiveTrendCsv(series, metric)], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `${safePart(componentId)}-${safePart(metric)}-24h-live-trend.csv`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 0);
+  return true;
+}
+
+function openLiveTrendModal(initialComponentId = '') {
+  const mappedComponents = liveTelemetryConfig.mappings.map(mapping => ({
+    id: mapping.componentId,
+    label: getComponentLabelText(components.find(component => component.id === mapping.componentId) || { id: mapping.componentId })
+  }));
+  let refresh = null;
+  const modal = openModal({
+    title: '24-hour Live Trend',
+    description: 'In-session, read-only telemetry history. This view does not replace a site historian.',
+    primaryText: 'Close',
+    secondaryText: null,
+    onSubmit: () => true,
+    render(body) {
+      const controls = document.createElement('div');
+      controls.className = 'live-trend-controls';
+      const componentLabel = document.createElement('label');
+      componentLabel.textContent = 'Tagged component';
+      const componentSelect = document.createElement('select');
+      componentSelect.name = 'trend-component';
+      mappedComponents.forEach(component => {
+        const option = document.createElement('option');
+        option.value = component.id;
+        option.textContent = component.label || component.id;
+        componentSelect.appendChild(option);
+      });
+      componentSelect.value = mappedComponents.some(component => component.id === initialComponentId) ? initialComponentId : mappedComponents[0]?.id || '';
+      componentSelect.disabled = !mappedComponents.length;
+      componentLabel.appendChild(componentSelect);
+      const metricLabel = document.createElement('label');
+      metricLabel.textContent = 'Metric';
+      const metricSelect = document.createElement('select');
+      metricSelect.name = 'trend-metric';
+      metricLabel.appendChild(metricSelect);
+      const chartHost = document.createElement('div');
+      chartHost.className = 'live-trend-host';
+      const exportButton = document.createElement('button');
+      exportButton.type = 'button';
+      exportButton.className = 'btn';
+      exportButton.textContent = 'Export 24-hour CSV';
+      const populateMetrics = () => {
+        const currentMetric = metricSelect.value;
+        const metrics = getLiveTrendMetrics(liveTelemetryValues[componentSelect.value]);
+        metricSelect.replaceChildren();
+        metrics.forEach(metric => {
+          const option = document.createElement('option');
+          option.value = metric;
+          option.textContent = metric;
+          metricSelect.appendChild(option);
+        });
+        metricSelect.disabled = !metrics.length;
+        metricSelect.value = metrics.includes(currentMetric) ? currentMetric : (metrics.includes('kw') ? 'kw' : metrics[0] || '');
+      };
+      refresh = () => {
+        populateMetrics();
+        chartHost.replaceChildren(createLiveTrendChart(document, componentSelect.value, metricSelect.value));
+        exportButton.disabled = !getLiveTrendSeries(liveTelemetryValues[componentSelect.value], metricSelect.value).length;
+      };
+      componentSelect.addEventListener('change', refresh);
+      metricSelect.addEventListener('change', refresh);
+      exportButton.addEventListener('click', () => downloadLiveTrendCsv(componentSelect.value, metricSelect.value));
+      controls.append(componentLabel, metricLabel);
+      body.append(controls, chartHost, exportButton);
+      refresh();
+      return componentSelect;
+    }
+  });
+  refreshLiveTrendModal = refresh;
+  modal.finally(() => {
+    if (refreshLiveTrendModal === refresh) refreshLiveTrendModal = null;
+  });
+}
+
+function openLiveAlarmModal() {
+  const alarms = getLiveAlarms();
+  openModal({
+    title: 'Active Live Alarms',
+    description: 'Read-only threshold alerts evaluated from the latest mapped telemetry values. They do not alter the design model, studies, or site controls.',
+    primaryText: 'Close',
+    secondaryText: null,
+    render(body) {
+      if (!liveTelemetryController.running) {
+        const message = document.createElement('p');
+        message.textContent = 'Start live mode to evaluate alarm limits.';
+        body.appendChild(message);
+        return message;
+      }
+      if (!alarms.length) {
+        const message = document.createElement('p');
+        message.textContent = 'No configured alarm limits are active.';
+        body.appendChild(message);
+        return message;
+      }
+      const list = document.createElement('ul');
+      list.className = 'live-alarm-list';
+      alarms.forEach(alarm => {
+        const item = document.createElement('li');
+        item.textContent = alarm.message;
+        list.appendChild(item);
+      });
+      body.appendChild(list);
+      return list;
+    }
+  });
+}
+
+function applyLiveOperatorLock() {
+  const lock = liveTelemetryController.running && liveTelemetryConfig.operatorMode;
+  const ids = ['connect-btn', 'add-shape-btn', 'undo-btn', 'redo-btn', 'align-left-btn', 'align-right-btn', 'align-top-btn', 'align-bottom-btn', 'distribute-h-btn', 'distribute-v-btn', 'auto-space-equipment-btn', 'add-sheet-btn', 'rename-sheet-btn', 'delete-sheet-btn', 'auto-build-oneline-btn', 'auto-arrange-btn', 'reconcile-schedules-btn'];
+  ids.forEach(id => {
+    const element = document.getElementById(id);
+    if (element) element.disabled = lock;
+  });
+  document.body.dataset.liveOperatorMode = lock ? '1' : '0';
+}
+
+function openLiveTelemetryModal() {
+  openModal({
+    title: 'Live Telemetry',
+    description: 'Read-only HTTP polling or WebSocket streaming. Messages must provide { readings: [{ tag, values: { kw, kvar, kv, amps, status } }] }. Browser CORS and WebSocket origin rules apply; stale values and configured threshold alarms are marked in the one-line, and WebSocket recovery uses bounded backoff when enabled.',
+    primaryText: liveTelemetryController.running ? 'Stop live mode' : 'Start live mode',
+    secondaryText: 'Cancel',
+    render(body) {
+      const form = document.createElement('form');
+      form.className = 'modal-form';
+      form.innerHTML = `<label>Transport<select name="transport"><option value="http" ${liveTelemetryConfig.transport === 'websocket' ? '' : 'selected'}>HTTP polling</option><option value="websocket" ${liveTelemetryConfig.transport === 'websocket' ? 'selected' : ''}>WebSocket stream</option></select></label><label>Endpoint URL<input name="endpoint" type="url" value="${escapeHtml(liveTelemetryConfig.endpoint)}" placeholder="https://gateway.example/api/tags or wss://gateway.example/tags"></label><label>Poll interval (seconds)<input name="interval" type="number" min="5" max="3600" value="${liveTelemetryConfig.intervalSeconds}"></label><label>Stale after (seconds)<input name="staleAfter" type="number" min="5" max="86400" value="${liveTelemetryConfig.staleAfterSeconds}"></label><label>Mappings (component ID = tag, one per line)<textarea name="mappings" rows="5">${escapeHtml(liveTelemetryConfig.mappings.map(item => `${item.componentId}=${item.tag}`).join('\n'))}</textarea></label><label>Alarm limits (component.metric = low..high, one per line)<textarea name="alarms" rows="3" placeholder="BUS-1.kv=12.5..14.5&#10;MTR-1.amps=..800">${escapeHtml(liveTelemetryConfig.alarms.map(formatLiveAlarmRule).join('\n'))}</textarea></label><label><input name="reconnect" type="checkbox" ${liveTelemetryConfig.reconnect ? 'checked' : ''}> Reconnect WebSocket after disconnect (bounded backoff)</label><label><input name="operator" type="checkbox" ${liveTelemetryConfig.operatorMode ? 'checked' : ''}> Operator mode: lock editing commands while live</label>`;
+      const trendButton = document.createElement('button');
+      trendButton.type = 'button';
+      trendButton.className = 'btn';
+      trendButton.textContent = 'View 24-hour trend';
+      trendButton.addEventListener('click', () => openLiveTrendModal());
+      const alarmButton = document.createElement('button');
+      alarmButton.type = 'button';
+      alarmButton.className = 'btn';
+      const alarmCount = getLiveAlarms().length;
+      alarmButton.textContent = `View active alarms (${alarmCount})`;
+      alarmButton.addEventListener('click', () => openLiveAlarmModal());
+      form.append(trendButton, alarmButton);
+      body.appendChild(form);
+      return form.querySelector('[name="endpoint"]');
+    },
+    onSubmit(controller) {
+      if (liveTelemetryController.running) {
+        liveTelemetryController.stop();
+        applyLiveOperatorLock();
+        render();
+        controller.close();
+        return false;
+      }
+      const form = controller.body.querySelector('form');
+      const mappingLines = form.elements.mappings.value.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+      const alarmLines = form.elements.alarms.value.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+      liveTelemetryConfig = normalizeLiveTagConfig({
+        endpoint: form.elements.endpoint.value,
+        transport: form.elements.transport.value,
+        intervalSeconds: form.elements.interval.value,
+        staleAfterSeconds: form.elements.staleAfter.value,
+        alarms: alarmLines,
+        reconnect: form.elements.reconnect.checked,
+        operatorMode: form.elements.operator.checked || getAuthRole() === 'read-only',
+        mappings: mappingLines.map(line => { const [componentId, ...tag] = line.split('='); return { componentId, tag: tag.join('=') || componentId }; })
+      });
+      if (!liveTelemetryConfig.endpoint) {
+        showAlertModal('Live Telemetry', 'Enter a read-only telemetry endpoint before starting live mode.');
+        return false;
+      }
+      setItem(LIVE_TELEMETRY_CONFIG_KEY, liveTelemetryConfig);
+      liveTelemetryController.start(liveTelemetryConfig);
+      applyLiveOperatorLock();
+      render();
+      scheduleLiveTelemetryFreshnessRender();
+      return true;
+    }
+  });
+}
 
 // Gap #51 – Named Layer Management
 let layers = [];             // layer definitions for the active sheet: [{id,name,visible,locked}]
@@ -3492,6 +4001,7 @@ if (studiesPanel && hasStoredStudiesWidth) {
   studiesPanel.style.setProperty('--studies-width', `${studiesWidth}px`);
 }
 const runLFBtn = document.getElementById('run-loadflow-btn');
+const runTapOptimizationBtn = document.getElementById('run-tap-optimization-btn');
 const runSCBtn = document.getElementById('run-shortcircuit-btn');
 const runAFBtn = document.getElementById('run-arcflash-btn');
 const printAFLabelsBtn = document.getElementById('print-arcflash-labels-btn');
@@ -3501,7 +4011,9 @@ const runMSBtn = document.getElementById('run-motorstart-btn');
 const runRelBtn = document.getElementById('run-reliability-btn');
 const studyResultsEl = document.getElementById('study-results');
 const loadFlowResultsEl = document.getElementById('loadflow-results');
+const transformerTapReviewEl = document.getElementById('transformer-tap-review');
 const overlayToggle = document.getElementById('toggle-overlays');
+document.getElementById('live-telemetry-btn')?.addEventListener('click', openLiveTelemetryModal);
 const studySettingsBtn = document.getElementById('study-settings-btn');
 const studySettingsForm = document.getElementById('study-settings-menu');
 const studyResultsCopyBtn = document.getElementById('study-results-copy-btn');
@@ -3509,6 +4021,7 @@ const studyLoadFlowBase = document.getElementById('study-loadflow-basemva');
 const studyLoadFlowIterations = document.getElementById('study-loadflow-iterations');
 const studyLoadFlowBalanced = document.getElementById('study-loadflow-balanced');
 const studyShortCircuitMethod = document.getElementById('study-shortcircuit-method');
+let transformerTapReview = getStudies()?.transformerTapOptimization || null;
 
 function persistStudySettings() {
   setItem(STUDY_SETTINGS_KEY, studySettings);
@@ -4930,6 +5443,7 @@ function refineOneLineCommandSurface() {
     gridMenu.panel.appendChild(gridSizeLabel);
   }
   appendIfPresent(gridMenu.panel, normalizeMenuLabel(document.getElementById('orthogonal-routing-toggle')?.closest('label')));
+  appendIfPresent(gridMenu.panel, normalizeMenuLabel(document.getElementById('alignment-guides-toggle')?.closest('label')));
 
   const zoomMenu = createCommandMenu('Zoom', { wide: true });
   zoomMenu.details.classList.add('drawing-mode-zoom-menu');
@@ -5271,6 +5785,256 @@ function renderLoadFlowResults(res) {
 }
 
 export { renderLoadFlowResults };
+
+function formatTapReviewNumber(value, digits = 3) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return '—';
+  return numeric.toFixed(digits).replace(/\.0+$/, '').replace(/(\.\d*?)0+$/, '$1');
+}
+
+function formatTapReviewPu(value) {
+  return Number.isFinite(Number(value)) ? `${formatTapReviewNumber(value, 4)} pu` : '—';
+}
+
+function formatTapReviewPercent(value) {
+  return Number.isFinite(Number(value)) ? `${formatTapReviewNumber(value, 3)}%` : '—';
+}
+
+function appendTapReviewCell(row, text, className = '') {
+  const cell = document.createElement('td');
+  if (className) cell.className = className;
+  cell.textContent = text;
+  row.appendChild(cell);
+  return cell;
+}
+
+function renderTransformerTapReview(review = transformerTapReview) {
+  if (!transformerTapReviewEl) return;
+  transformerTapReviewEl.innerHTML = '';
+  if (!review) {
+    transformerTapReviewEl.classList.add('hidden');
+    return;
+  }
+  transformerTapReviewEl.classList.remove('hidden');
+
+  const heading = document.createElement('h3');
+  heading.textContent = 'Transformer tap review';
+  const intro = document.createElement('p');
+  intro.textContent = 'What-if load-flow cases are evaluated only at the configured LTC steps and range. No transformer setting changes until you approve a recommendation.';
+  transformerTapReviewEl.append(heading, intro);
+
+  const generated = document.createElement('p');
+  generated.className = 'tap-review-meta';
+  const voltageLimitLabel = review.voltageLimits?.source === 'workflow_override'
+    ? 'workflow voltage limits'
+    : 'default limits when transformer limits are unset';
+  generated.textContent = `Evaluated ${review.transformers?.length || 0} transformer${review.transformers?.length === 1 ? '' : 's'} · ${review.balanced ? 'balanced' : 'A/B/C'} load flow · ${voltageLimitLabel} ${formatTapReviewPu(review.voltageLimits?.minPu)} to ${formatTapReviewPu(review.voltageLimits?.maxPu)}`;
+  transformerTapReviewEl.appendChild(generated);
+
+  if (!Array.isArray(review.transformers) || !review.transformers.length) {
+    const empty = document.createElement('p');
+    empty.className = 'tap-review-empty';
+    empty.textContent = 'No transformer components were found in the active One-Line.';
+    transformerTapReviewEl.appendChild(empty);
+    return;
+  }
+
+  review.transformers.forEach(record => {
+    const card = document.createElement('article');
+    card.className = `tap-review-card${record.eligible ? '' : ' tap-review-card-warning'}`;
+    card.dataset.transformerId = record.transformerId || '';
+    const title = document.createElement('h4');
+    title.textContent = record.label || record.transformerId || 'Transformer';
+    card.appendChild(title);
+
+    if (!record.eligible) {
+      const reason = document.createElement('p');
+      reason.className = 'tap-review-warning';
+      reason.textContent = `${record.reasonText || 'Tap constraints are incomplete.'} Add or verify LTC enabled state, range, and step in transformer properties.`;
+      card.appendChild(reason);
+      transformerTapReviewEl.appendChild(card);
+      return;
+    }
+
+    const details = document.createElement('p');
+    const rangeText = Number.isFinite(record.minTapVolts) && Number.isFinite(record.maxTapVolts)
+      ? `${formatTapReviewNumber(record.minTapVolts, 1)}–${formatTapReviewNumber(record.maxTapVolts, 1)} V`
+      : `${formatTapReviewPercent((record.minRatio - 1) * 100)} to ${formatTapReviewPercent((record.maxRatio - 1) * 100)}`;
+    details.className = 'tap-review-meta';
+    details.textContent = `Permitted range ${rangeText} · step ${formatTapReviewPercent(record.stepPercent)} · setpoint ${formatTapReviewPu(record.setpointPu)} · voltage limits ${formatTapReviewPu(record.minVoltagePu)} to ${formatTapReviewPu(record.maxVoltagePu)} · controlled bus ${record.controlledBusId || 'secondary bus'}`;
+    card.appendChild(details);
+
+    const recommendation = document.createElement('p');
+    recommendation.className = record.recommendedTapRatio !== null ? 'tap-review-recommendation' : 'tap-review-warning';
+    recommendation.textContent = record.recommendedTapRatio !== null
+      ? record.recommendedTapRatio === record.currentTapRatio
+        ? `Recommendation: keep the current ${formatTapReviewPercent((record.currentTapRatio - 1) * 100)} tap. ${record.recommendationReason || ''}`
+        : `Recommendation: ${formatTapReviewPercent((record.recommendedTapRatio - 1) * 100)} tap (${formatTapReviewPu(record.recommendedTapRatio)} ratio). ${record.recommendationReason || ''}`
+      : record.recommendationReason || 'No feasible permitted tap step was found.';
+    card.appendChild(recommendation);
+
+    const table = document.createElement('table');
+    table.className = 'tap-review-table';
+    const head = document.createElement('thead');
+    const headRow = document.createElement('tr');
+    ['Tap', 'Controlled bus', 'Δ vs current', 'System range', 'Result', 'Action'].forEach(label => appendTapReviewCell(headRow, label, 'tap-review-heading'));
+    head.appendChild(headRow);
+    table.appendChild(head);
+    const body = document.createElement('tbody');
+    (record.cases || []).forEach(candidate => {
+      const row = document.createElement('tr');
+      if (candidate.isCurrent) row.classList.add('is-current');
+      if (candidate.tapRatio === record.recommendedTapRatio) row.classList.add('is-recommended');
+      appendTapReviewCell(row, `${formatTapReviewPercent(candidate.tapPercent)} (${formatTapReviewPu(candidate.tapRatio)})`);
+      appendTapReviewCell(row, `${formatTapReviewPu(candidate.targetVoltagePu)}${candidate.targetVoltagePu !== null ? ` · ${formatTapReviewPercent(candidate.deltaVoltagePct)}` : ''}`);
+      appendTapReviewCell(row, candidate.isCurrent ? 'Current' : formatTapReviewPu(candidate.deltaVoltagePu));
+      appendTapReviewCell(row, `${formatTapReviewPu(candidate.systemMinPu)}–${formatTapReviewPu(candidate.systemMaxPu)}`);
+      const resultCell = appendTapReviewCell(row, candidate.isCurrent
+        ? 'Current case'
+        : candidate.feasible
+          ? 'Permitted · feasible'
+          : candidate.converged
+            ? `Rejected · ${candidate.violations} limit violation${candidate.violations === 1 ? '' : 's'}`
+            : 'Rejected · no convergence');
+      if (candidate.feasible) resultCell.classList.add('tap-review-pass');
+      else if (!candidate.isCurrent) resultCell.classList.add('tap-review-fail');
+      const actionCell = document.createElement('td');
+      if (candidate.tapRatio === record.recommendedTapRatio && candidate.feasible && !candidate.isCurrent) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'btn btn-sm primary-btn';
+        button.textContent = record.appliedTapRatio === candidate.tapRatio ? 'Applied' : 'Approve & Apply';
+        button.disabled = record.appliedTapRatio === candidate.tapRatio;
+        button.dataset.testid = 'tap-approve-apply';
+        button.dataset.tapApply = '1';
+        button.dataset.transformerId = record.transformerId;
+        button.dataset.tapRatio = String(candidate.tapRatio);
+        actionCell.appendChild(button);
+      } else if (candidate.isCurrent) {
+        actionCell.textContent = 'No change';
+      } else {
+        actionCell.textContent = 'Review only';
+      }
+      row.appendChild(actionCell);
+      body.appendChild(row);
+    });
+    table.appendChild(body);
+    card.appendChild(table);
+    transformerTapReviewEl.appendChild(card);
+  });
+}
+
+function refreshLocalOneLineAfterStudyApply() {
+  const currentOneLineData = getOneLine();
+  sheets = (Array.isArray(currentOneLineData.sheets) ? currentOneLineData.sheets : []).map((sheet, index) => ({
+    ...sheet,
+    name: sheet.name || `Sheet ${index + 1}`,
+    components: (Array.isArray(sheet.components) ? sheet.components : []).map(normalizeComponent),
+    connections: Array.isArray(sheet.connections) ? sheet.connections : []
+  }));
+  if (!sheets.length) sheets = [{ name: 'Sheet 1', components: [], connections: [] }];
+  activeSheet = Math.min(Math.max(Number(currentOneLineData.activeSheet) || 0, 0), sheets.length - 1);
+  components = sheets[activeSheet].components;
+  connections = sheets[activeSheet].connections;
+  renderSheetTabs();
+  render();
+}
+
+async function applyTransformerTapRecommendation(transformerId, tapRatio) {
+  const review = transformerTapReview;
+  const record = review?.transformers?.find(item => item.transformerId === transformerId);
+  const candidate = record?.cases?.find(item => Math.abs(Number(item.tapRatio) - Number(tapRatio)) <= 1e-8);
+  if (!record || !candidate || !candidate.feasible || record.recommendedTapRatio === null || Math.abs(record.recommendedTapRatio - candidate.tapRatio) > 1e-8) {
+    showToast('Tap recommendation is no longer available. Run the review again.');
+    return;
+  }
+  const oneLineData = getOneLine();
+  if (review.sourceOneLineRevision !== getOneLineSheetsRevision(oneLineData)) {
+    showAlertModal('Tap Review Stale', 'The One-Line changed after this review. Rerun Transformer Tap Review before approving a setting.');
+    return;
+  }
+  const approved = await confirmDialog(
+    'Approve transformer tap change',
+    `Apply ${formatTapReviewPercent(candidate.tapPercent)} (${formatTapReviewPu(candidate.tapRatio)}) to ${record.label}? This changes the One-Line transformer setting and creates a revision-history entry.`,
+    { primaryText: 'Approve & Apply' }
+  );
+  if (!approved) return;
+  const currentOneLineData = assertOneLineSheetsUnchanged(review.sourceOneLineRevision, 'Transformer tap review');
+  const updatedOneLine = applyTapRatioToOneLine(currentOneLineData, transformerId, candidate.tapRatio);
+  if (!updatedOneLine) {
+    showAlertModal('Tap Apply Error', 'The transformer could not be found in the current One-Line.');
+    return;
+  }
+  setOneLine(updatedOneLine);
+  const savedStudies = getStudies();
+  const savedReview = savedStudies.transformerTapOptimization || review;
+  const savedRecord = savedReview.transformers?.find(item => item.transformerId === transformerId);
+  if (savedRecord) {
+    savedRecord.appliedTapRatio = candidate.tapRatio;
+    savedRecord.appliedAt = new Date().toISOString();
+    savedRecord.appliedOneLineRevision = getOneLineSheetsRevision(getOneLine());
+  }
+  savedReview.status = 'applied';
+  savedStudies.transformerTapOptimization = savedReview;
+  recordOneLineStudyProvenance(savedStudies, 'transformerTapOptimization');
+  setStudies(savedStudies);
+  transformerTapReview = savedReview;
+  refreshLocalOneLineAfterStudyApply();
+  renderTransformerTapReview(savedReview);
+  showToast(`Transformer tap applied for ${record.label}; One-Line revision recorded.`);
+}
+
+async function runTransformerTapOptimizationFromButton() {
+  if (!runTapOptimizationBtn) return;
+  const oneLineData = getOneLine();
+  const oneLineRevision = getOneLineSheetsRevision(oneLineData);
+  runTapOptimizationBtn.disabled = true;
+  runTapOptimizationBtn.textContent = 'Reviewing…';
+  try {
+    const result = await evaluateTransformerTapOptimization(oneLineData, {
+      baseMVA: studySettings.loadFlow.baseMVA,
+      balanced: studySettings.loadFlow.balanced,
+      maxIterations: studySettings.loadFlow.maxIterations,
+      runStudy: (snapshot, options) => runLoadFlowOffMain(snapshot, options)
+    });
+    assertOneLineSheetsUnchanged(oneLineRevision, 'Transformer tap review');
+    const studies = getStudies();
+    result.sourceOneLineRevision = oneLineRevision;
+    result.scenario = getCurrentScenario() || 'default';
+    result.status = 'review';
+    studies.transformerTapOptimization = result;
+    recordOneLineStudyProvenance(studies, 'transformerTapOptimization');
+    setStudies(studies);
+    transformerTapReview = result;
+    renderStudyResults();
+    renderTransformerTapReview(result);
+  } finally {
+    runTapOptimizationBtn.disabled = false;
+    runTapOptimizationBtn.textContent = 'Review Transformer Taps';
+  }
+}
+
+if (runTapOptimizationBtn) {
+  runTapOptimizationBtn.addEventListener('click', () => {
+    runTransformerTapOptimizationFromButton().catch(error => {
+      console.error('[oneline] transformer tap review failed', error);
+      showAlertModal('Transformer Tap Review Error', error?.message || String(error));
+    });
+  });
+}
+
+if (transformerTapReviewEl) {
+  transformerTapReviewEl.addEventListener('click', event => {
+    const button = event.target.closest('[data-tap-apply="1"]');
+    if (!button) return;
+    applyTransformerTapRecommendation(button.dataset.transformerId, Number(button.dataset.tapRatio)).catch(error => {
+      console.error('[oneline] transformer tap apply failed', error);
+      showAlertModal('Tap Apply Error', error?.message || String(error));
+    });
+  });
+  if (transformerTapReview) renderTransformerTapReview(transformerTapReview);
+}
+
 if (runSCBtn) runSCBtn.addEventListener('click', () => {
   runShortCircuitFromButton().catch(err => {
     console.error('[oneline] short circuit failed', err);
@@ -6215,7 +6979,13 @@ function renderRightRailProperties() {
   approveBtn.type = 'button';
   approveBtn.className = 'btn';
   approveBtn.textContent = 'Approve Assumption';
+  approveBtn.disabled = isComponentPropertiesLocked(selectedComp);
+  approveBtn.title = approveBtn.disabled ? 'Unlock component properties to approve assumptions' : '';
   approveBtn.addEventListener('click', () => {
+    if (isComponentPropertiesLocked(selectedComp)) {
+      showToast('Unlock component properties before approving assumptions');
+      return;
+    }
     selectedComp.reviewStatus = 'reviewed';
     selectedComp.assumptionsReviewedAt = new Date().toISOString();
     render();
@@ -6888,7 +7658,245 @@ function attachLabelInteractions(el, comp) {
   el.addEventListener('dblclick', e => {
     e.stopPropagation();
     cancelPendingClickSelection();
-    selectComponent(comp);
+    startInlineLabelEdit(comp);
+  });
+}
+
+const ALIGNMENT_SNAP_THRESHOLD = 10;
+
+function alignmentAnchors(bounds, axis) {
+  if (axis === 'x') {
+    return [
+      { value: bounds.left, label: 'left' },
+      { value: (bounds.left + bounds.right) / 2, label: 'center' },
+      { value: bounds.right, label: 'right' }
+    ];
+  }
+  return [
+    { value: bounds.top, label: 'top' },
+    { value: (bounds.top + bounds.bottom) / 2, label: 'middle' },
+    { value: bounds.bottom, label: 'bottom' }
+  ];
+}
+
+function isComponentOnHiddenLayer(comp) {
+  if (!comp?.layer) return false;
+  return layers.some(layer => layer.id === comp.layer && layer.visible === false);
+}
+
+function findAlignmentSnap(movingBounds, candidateBounds, axis) {
+  let best = null;
+  alignmentAnchors(movingBounds, axis).forEach(movingAnchor => {
+    alignmentAnchors(candidateBounds, axis).forEach(candidateAnchor => {
+      const delta = candidateAnchor.value - movingAnchor.value;
+      if (Math.abs(delta) > ALIGNMENT_SNAP_THRESHOLD) return;
+      if (!best || Math.abs(delta) < Math.abs(best.delta)) {
+        best = {
+          delta,
+          value: candidateAnchor.value,
+          movingAnchor: movingAnchor.label,
+          candidateAnchor: candidateAnchor.label
+        };
+      }
+    });
+  });
+  return best;
+}
+
+function buildDragSnapGuides(projectedComponent, movingIds, startPosition) {
+  if (!alignmentGuidesEnabled || !projectedComponent) return null;
+  const movingBounds = componentBounds(projectedComponent);
+  const candidates = components.filter(comp => !movingIds.has(comp.id) && !isComponentOnHiddenLayer(comp));
+  let vertical = null;
+  let horizontal = null;
+  candidates.forEach(candidate => {
+    const candidateBounds = componentBounds(candidate);
+    const xMatch = findAlignmentSnap(movingBounds, candidateBounds, 'x');
+    const yMatch = findAlignmentSnap(movingBounds, candidateBounds, 'y');
+    if (xMatch && (!vertical || Math.abs(xMatch.delta) < Math.abs(vertical.delta))) {
+      vertical = {
+        ...xMatch,
+        min: Math.min(movingBounds.top, candidateBounds.top) - 18,
+        max: Math.max(movingBounds.bottom, candidateBounds.bottom) + 18
+      };
+    }
+    if (yMatch && (!horizontal || Math.abs(yMatch.delta) < Math.abs(horizontal.delta))) {
+      horizontal = {
+        ...yMatch,
+        min: Math.min(movingBounds.left, candidateBounds.left) - 18,
+        max: Math.max(movingBounds.right, candidateBounds.right) + 18
+      };
+    }
+  });
+  const dx = projectedComponent.x - startPosition.x + (vertical?.delta || 0);
+  const dy = projectedComponent.y - startPosition.y + (horizontal?.delta || 0);
+  return {
+    vertical,
+    horizontal,
+    readout: { x: projectedComponent.x + (vertical?.delta || 0), y: projectedComponent.y + (horizontal?.delta || 0), dx, dy }
+  };
+}
+
+function renderDragSnapGuides(svg) {
+  if (!dragSnapGuides || isEngineeringPrintMode()) return;
+  const guides = document.createElementNS(svgNS, 'g');
+  guides.classList.add('alignment-snap-guides');
+  guides.style.pointerEvents = 'none';
+  if (dragSnapGuides.vertical) {
+    const line = document.createElementNS(svgNS, 'line');
+    line.classList.add('alignment-snap-guide', 'alignment-snap-guide-vertical');
+    line.setAttribute('x1', dragSnapGuides.vertical.value);
+    line.setAttribute('x2', dragSnapGuides.vertical.value);
+    line.setAttribute('y1', dragSnapGuides.vertical.min);
+    line.setAttribute('y2', dragSnapGuides.vertical.max);
+    guides.appendChild(line);
+  }
+  if (dragSnapGuides.horizontal) {
+    const line = document.createElementNS(svgNS, 'line');
+    line.classList.add('alignment-snap-guide', 'alignment-snap-guide-horizontal');
+    line.setAttribute('x1', dragSnapGuides.horizontal.min);
+    line.setAttribute('x2', dragSnapGuides.horizontal.max);
+    line.setAttribute('y1', dragSnapGuides.horizontal.value);
+    line.setAttribute('y2', dragSnapGuides.horizontal.value);
+    guides.appendChild(line);
+  }
+  const readout = dragSnapGuides.readout;
+  if (readout) {
+    const label = document.createElementNS(svgNS, 'text');
+    label.classList.add('alignment-snap-readout');
+    label.setAttribute('x', readout.x + 12);
+    label.setAttribute('y', readout.y - 12);
+    label.textContent = `ΔX ${Math.round(readout.dx)}  ΔY ${Math.round(readout.dy)}`;
+    guides.appendChild(label);
+  }
+  svg.appendChild(guides);
+}
+
+function isInlineLabelEditLocked(comp) {
+  return !comp || isComponentPositionLocked(comp) || isComponentPropertiesLocked(comp);
+}
+
+function canEditConnectionWaypoint(component, connection) {
+  if (!component || !connection || isBusComponent(component)) return false;
+  const target = components.find(candidate => candidate.id === connection.target);
+  return !!target
+    && !isBusComponent(target)
+    && !(liveTelemetryController.running && liveTelemetryConfig.operatorMode);
+}
+
+function placeConnectionWaypoint(component, index, point = null) {
+  const source = components.find(candidate => candidate.id === component?.id) || component;
+  const connection = source?.connections?.[index];
+  if (!canEditConnectionWaypoint(source, connection)) {
+    showToast('Waypoints are unavailable for bus taps or Live operator mode');
+    return false;
+  }
+  const target = components.find(candidate => candidate.id === connection.target);
+  const start = portPosition(source, connection.sourcePort);
+  const end = portPosition(target, connection.targetPort);
+  if (!start || !end) return false;
+  const horizontalFirst = Math.abs(end.x - start.x) >= Math.abs(end.y - start.y);
+  connection.dir = horizontalFirst ? 'h' : 'v';
+  let mid = horizontalFirst
+    ? (Number.isFinite(point?.x) ? point.x : (start.x + end.x) / 2)
+    : (Number.isFinite(point?.y) ? point.y : (start.y + end.y) / 2);
+  if (gridEnabled) mid = Math.round(mid / gridSize) * gridSize;
+  connection.mid = Number(mid.toFixed(2));
+  pushHistory();
+  render();
+  save();
+  showToast('Connection waypoint placed');
+  return true;
+}
+
+function resetConnectionWaypoint(component, index) {
+  const source = components.find(candidate => candidate.id === component?.id) || component;
+  const connection = source?.connections?.[index];
+  if (!canEditConnectionWaypoint(source, connection)) {
+    showToast('Waypoints are unavailable for bus taps or Live operator mode');
+    return false;
+  }
+  delete connection.dir;
+  delete connection.mid;
+  pushHistory();
+  render();
+  save();
+  showToast('Connection route reset');
+  return true;
+}
+
+function closeInlineLabelEditor({ commit = false } = {}) {
+  const editor = activeInlineLabelEditor;
+  if (!editor) return;
+  activeInlineLabelEditor = null;
+  editor.element.remove();
+  if (!commit) return;
+
+  const nextValue = editor.input.value.trim();
+  if (!nextValue) {
+    showToast(`${editor.fieldLabel} cannot be blank`);
+    return;
+  }
+  if (nextValue === editor.originalValue) return;
+  const component = components.find(candidate => candidate.id === editor.comp.id) || editor.comp;
+  component[editor.key] = nextValue;
+  if (editor.key === 'label' && component.type === 'annotation' && !component.text) {
+    component.text = nextValue;
+  }
+  pushHistory();
+  save(false);
+  render();
+}
+
+function startInlineLabelEdit(comp, { key = 'label', fallbackKey = '', fieldLabel = 'Label' } = {}) {
+  if (!comp || isInlineLabelEditLocked(comp)) {
+    if (comp) showToast('Unlock the component position, properties, or layer before editing its label');
+    return;
+  }
+  closeInlineLabelEditor({ commit: true });
+  const svg = document.getElementById('diagram');
+  if (!svg) return;
+  const originalValue = String(comp[key] ?? comp[fallbackKey] ?? '').trim();
+  const bounds = componentBounds(comp);
+  const position = key === 'label' ? getLabelPosition(comp) : {
+    x: (bounds.left + bounds.right) / 2,
+    y: (bounds.top + bounds.bottom) / 2
+  };
+  const width = Math.max(132, Math.min(340, estimateTextWidth(originalValue || fieldLabel, 13) + 52));
+  const height = 28;
+  const editor = document.createElementNS(svgNS, 'foreignObject');
+  editor.classList.add('inline-label-editor');
+  editor.setAttribute('x', position.x - width / 2);
+  editor.setAttribute('y', position.y - height / 2);
+  editor.setAttribute('width', width);
+  editor.setAttribute('height', height);
+  editor.dataset.componentId = comp.id;
+  const input = document.createElementNS('http://www.w3.org/1999/xhtml', 'input');
+  input.className = 'inline-label-editor-input';
+  input.type = 'text';
+  input.value = originalValue;
+  input.setAttribute('aria-label', `${fieldLabel} for ${getComponentLabelText(comp) || comp.id}`);
+  input.addEventListener('mousedown', event => event.stopPropagation());
+  input.addEventListener('dblclick', event => event.stopPropagation());
+  input.addEventListener('keydown', event => {
+    event.stopPropagation();
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      closeInlineLabelEditor({ commit: true });
+    } else if (event.key === 'Escape') {
+      event.preventDefault();
+      closeInlineLabelEditor();
+    }
+  });
+  input.addEventListener('blur', () => closeInlineLabelEditor({ commit: true }));
+  editor.appendChild(input);
+  svg.appendChild(editor);
+  activeInlineLabelEditor = { element: editor, input, comp, key, originalValue, fieldLabel };
+  window.requestAnimationFrame(() => {
+    if (activeInlineLabelEditor?.element === editor) {
+      input.focus();
+      input.select();
+    }
   });
 }
 
@@ -7142,7 +8150,7 @@ function getEngineeringLabelLines(comp) {
 }
 
 function getComponentAttributeLines(comp) {
-  if (datablockFormatMode === 'engineering') return getEngineeringLabelLines(comp);
+  if (datablockFormatMode === 'engineering') return [...liveReadingLines(comp), ...getEngineeringLabelLines(comp)].slice(0, datablockDensityMode === 'expanded' ? 6 : 4);
   if (!viewAttributes.size) return [];
   const keys = Array.from(viewAttributes);
   keys.sort((a, b) => {
@@ -7166,7 +8174,7 @@ function getComponentAttributeLines(comp) {
     const labelText = baseLabel || formatAttributeLabel(option.key);
     lines.push(`${labelText}: ${valueText}`.trim());
   });
-  return lines;
+  return [...lines, ...liveReadingLines(comp)];
 }
 
 function rectsOverlap(a, b, pad = 0) {
@@ -10008,14 +11016,38 @@ function selectByType(subtype) {
   showToast(`Selected ${matched.length} component${matched.length !== 1 ? 's' : ''} of type "${subtype}"`);
 }
 
-// Gap #41 – Lock / unlock a component
+function isComponentPositionLocked(comp) {
+  if (!comp) return false;
+  const layer = comp.layer ? layers.find(entry => entry.id === comp.layer) : null;
+  return !!(comp.locked || comp.positionLocked || layer?.locked);
+}
+
+function isComponentPropertiesLocked(comp) {
+  if (!comp) return false;
+  const layer = comp.layer ? layers.find(entry => entry.id === comp.layer) : null;
+  return !!(comp.propertiesLocked || layer?.locked || (liveTelemetryController.running && liveTelemetryConfig.operatorMode));
+}
+
+// Gap #41 – Lock / unlock a component position. The legacy `locked` flag remains
+// authoritative so previously saved diagrams retain their existing behavior.
 function toggleLock(comp) {
   if (!comp) return;
-  comp.locked = !comp.locked;
+  const next = !isComponentPositionLocked(comp);
+  comp.locked = next;
+  comp.positionLocked = next;
   pushHistory();
   render();
   save();
-  showToast(comp.locked ? `"${comp.label || comp.id}" locked` : `"${comp.label || comp.id}" unlocked`);
+  showToast(next ? `"${comp.label || comp.id}" position locked` : `"${comp.label || comp.id}" position unlocked`);
+}
+
+function togglePropertiesLock(comp) {
+  if (!comp) return;
+  comp.propertiesLocked = !comp.propertiesLocked;
+  pushHistory();
+  render();
+  save();
+  showToast(comp.propertiesLocked ? `"${comp.label || comp.id}" properties locked` : `"${comp.label || comp.id}" properties unlocked`);
 }
 
 // Gap #36 – Compute energized component set via topology traversal
@@ -10449,6 +11481,7 @@ function renderBgPanel() {
 // ─── End Gap #51 ────────────────────────────────────────────────────────────
 
 function render() {
+  updateLiveTelemetryControl();
   applyTransformerVoltages();
   propagateSourceVoltagesToBuses(components);
   applyDrawingModeClass();
@@ -10457,7 +11490,7 @@ function render() {
     ? computeEnergizedSet(components, connections)
     : new Set();
   const svg = document.getElementById('diagram');
-  svg.querySelectorAll('g.component, .connection, .conn-label, .port, .bus-handle, .annotation-handle, .issue-badge, .component-label, .component-attribute, .component-datablock, .operating-state-badge, .data-state-badge, .connection-junction, .selection-marquee, .transformer-port-label').forEach(el => el.remove());
+  svg.querySelectorAll('g.component, .connection, .conn-label, .connection-waypoint-handle, .port, .bus-handle, .annotation-handle, .issue-badge, .component-label, .component-attribute, .component-datablock, .operating-state-badge, .data-state-badge, .connection-junction, .selection-marquee, .transformer-port-label, .alignment-snap-guides').forEach(el => el.remove());
 
   // Gap #52: re-insert background image underlay (positioned later by applyDiagramZoom)
   const existingBgUnderlay = svg.querySelector('#bg-underlay');
@@ -10895,7 +11928,7 @@ function render() {
       poly.style.pointerEvents = 'stroke';
       poly.style.cursor = 'move';
       poly.classList.add('connection', connectionRole);
-      if (selectedConnection?.component === c && selectedConnection.index === idx) poly.classList.add('selected-connection');
+      if (selectedConnection?.component?.id === c.id && selectedConnection.index === idx) poly.classList.add('selected-connection');
       if (!componentMatchesDiagramFilter(c) || !componentMatchesDiagramFilter(target)) poly.classList.add('diagram-filter-dimmed');
       poly.dataset.comp = c.id;
       poly.dataset.index = idx;
@@ -10908,7 +11941,7 @@ function render() {
         selection = [];
         selectedConnection = { component: c, index: idx };
         setRightRailTab('properties');
-        renderRightRail();
+        render();
       });
       poly.addEventListener('dblclick', async e => {
         e.stopPropagation();
@@ -10920,15 +11953,49 @@ function render() {
       });
       poly.addEventListener('mousedown', e => {
         e.stopPropagation();
+        if (!canEditConnectionWaypoint(c, conn) || (conn.dir !== 'h' && conn.dir !== 'v')) return;
         const coords = toDiagramCoords(e);
         draggingConnection = {
           component: c,
           index: idx,
           start: { x: coords.x, y: coords.y },
-          mid: conn.mid ?? (conn.dir === 'h' ? pts[1].x : pts[1].y)
+          mid: conn.mid ?? (conn.dir === 'h' ? pts[1].x : pts[1].y),
+          moved: false
         };
       });
       svg.appendChild(poly);
+      if (!engineeringPrint
+        && selectedConnection?.component?.id === c.id
+        && selectedConnection.index === idx
+        && canEditConnectionWaypoint(c, conn)
+        && (conn.dir === 'h' || conn.dir === 'v')) {
+        const waypoint = document.createElementNS(svgNS, 'circle');
+        const mid = Number.isFinite(conn.mid)
+          ? conn.mid
+          : conn.dir === 'h'
+            ? (pts[0].x + pts[pts.length - 1].x) / 2
+            : (pts[0].y + pts[pts.length - 1].y) / 2;
+        waypoint.setAttribute('cx', conn.dir === 'h' ? mid : (pts[1].x + pts[2].x) / 2);
+        waypoint.setAttribute('cy', conn.dir === 'h' ? (pts[1].y + pts[2].y) / 2 : mid);
+        waypoint.setAttribute('r', 6);
+        waypoint.classList.add('connection-waypoint-handle');
+        waypoint.dataset.comp = c.id;
+        waypoint.dataset.index = String(idx);
+        waypoint.dataset.axis = conn.dir === 'h' ? 'x' : 'y';
+        waypoint.setAttribute('aria-label', `Drag ${conn.dir === 'h' ? 'horizontal' : 'vertical'} connection waypoint`);
+        waypoint.addEventListener('mousedown', e => {
+          e.stopPropagation();
+          const coords = toDiagramCoords(e);
+          draggingConnection = {
+            component: c,
+            index: idx,
+            start: { x: coords.x, y: coords.y },
+            mid,
+            moved: false
+          };
+        });
+        svg.appendChild(waypoint);
+      }
       const startPoint = pts[0];
       const endPoint = pts[pts.length - 1];
       const sourceNeedsJunction = isBusComponent(c)
@@ -10999,7 +12066,7 @@ function render() {
         selection = [];
         selectedConnection = { component: c, index: idx };
         setRightRailTab('properties');
-        renderRightRail();
+        render();
       });
       label.addEventListener('dblclick', async e => {
         e.stopPropagation();
@@ -11035,7 +12102,6 @@ function render() {
     g.addEventListener('dblclick', e => {
       e.stopPropagation();
       cancelPendingClickSelection();
-      // Gap #48 – Off-page connector: navigate on double-click
       if (c.type === 'sheet_link') { navigateToLinkedSheet(c); return; }
       selectComponent(c);
     });
@@ -11171,7 +12237,7 @@ function render() {
         txt.addEventListener('dblclick', e => {
           e.stopPropagation();
           cancelPendingClickSelection();
-          selectComponent(c);
+          startInlineLabelEdit(c, { key: 'text', fallbackKey: 'label', fieldLabel: 'Text' });
         });
         g.appendChild(txt);
       } else {
@@ -11271,7 +12337,6 @@ function render() {
       img.addEventListener('dblclick', e => {
         e.stopPropagation();
         cancelPendingClickSelection();
-        // Gap #48 – Off-page connector: navigate on double-click
         if (c.type === 'sheet_link') { navigateToLinkedSheet(c); return; }
         selectComponent(c);
       });
@@ -11327,7 +12392,7 @@ function render() {
       g.appendChild(rect);
     }
     // Gap #41 – Locked component indicator
-    if (!engineeringPrint && c.locked) {
+    if (!engineeringPrint && (isComponentPositionLocked(c) || c.propertiesLocked)) {
       const lockEl = document.createElementNS(svgNS, 'text');
       lockEl.setAttribute('x', c.x + w - 2);
       lockEl.setAttribute('y', c.y + 12);
@@ -11553,6 +12618,8 @@ function render() {
 
   // Gap #49 – Arc Flash label badge overlays
   if (!engineeringPrint && arcFlashLabelMode) renderArcFlashLabelOverlays(svg);
+
+  renderDragSnapGuides(svg);
 
   if (lengthsChanged) {
     render();
@@ -12710,6 +13777,191 @@ function addComponent(cfg) {
   if (!skipHistory) pushHistory();
   if (gridEnabled) flashSnapIndicator(x, y);
   return comp;
+}
+
+function addPaletteSymbol(subtype, { point = null } = {}) {
+  const metaKey = componentMeta[subtype]
+    ? subtype
+    : Object.entries(componentMeta).find(([, entry]) => entry?.subtype === subtype)?.[0];
+  const meta = metaKey ? componentMeta[metaKey] : null;
+  if (!meta) {
+    showToast('That library symbol is no longer available');
+    return null;
+  }
+  const hasPoint = Number.isFinite(point?.x) && Number.isFinite(point?.y);
+  const comp = addComponent({
+    type: meta.type,
+    subtype: metaKey,
+    ...(hasPoint ? { x: point.x, y: point.y } : { placeAtViewportCenter: true })
+  });
+  if (!comp) return null;
+  recordPaletteUsage(metaKey);
+  buildPalette();
+  selection = [comp];
+  selected = comp;
+  selectedConnection = null;
+  setRightRailTab('properties');
+  render();
+  save();
+  return comp;
+}
+
+function repeatLastPaletteSymbol({ point = null } = {}) {
+  const subtype = getPaletteRecent()[0];
+  if (!subtype) {
+    showToast('Add a palette symbol first, then repeat it');
+    return null;
+  }
+  const comp = addPaletteSymbol(subtype, { point });
+  if (comp) showToast(`${comp.label || resolveComponentMeta(subtype)?.label || 'Symbol'} repeated`);
+  return comp;
+}
+
+function rotateSelectedComponents({ flip = false, remember = true } = {}) {
+  const selectedIds = (selection.length ? selection : selected ? [selected] : [])
+    .map(comp => comp?.id)
+    .filter(Boolean);
+  const targets = selectedIds
+    .map(id => components.find(comp => comp.id === id))
+    .filter(comp => comp && !isComponentPositionLocked(comp));
+  if (!targets.length) {
+    showToast('Select an unlocked component first');
+    return false;
+  }
+  selection = targets;
+  selected = targets[0];
+  targets.forEach(comp => {
+    if (flip) {
+      comp.flipped = !comp.flipped;
+    } else {
+      comp.rotation = ((comp.rotation || 0) + 90) % 360;
+      comp.rotationManual = true;
+    }
+  });
+  pushHistory();
+  render();
+  save();
+  if (remember) rememberRepeatableCommand({ id: flip ? 'flip' : 'rotate' });
+  return true;
+}
+
+function runRepeatableCommand(command, { repeat = false } = {}) {
+  if (!command?.id) return false;
+  let result = false;
+  if (command.id === 'palette-symbol') {
+    const subtype = command.subtype || getPaletteRecent()[0];
+    if (subtype) result = Boolean(addPaletteSymbol(subtype, { point: command.point || null }));
+  } else if (command.id === 'rotate') {
+    result = rotateSelectedComponents({ remember: false });
+  } else if (command.id === 'flip') {
+    result = rotateSelectedComponents({ flip: true, remember: false });
+  } else if (command.id === 'auto-arrange') {
+    result = arrangeSourceToLoad();
+  } else if (command.id === 'auto-space') {
+    result = autoSpaceEquipment();
+  }
+  if (result && !repeat) rememberRepeatableCommand(command);
+  return result;
+}
+
+function repeatLastCommand({ point = null } = {}) {
+  const command = lastRepeatableCommand || { id: 'palette-symbol', subtype: getPaletteRecent()[0], point };
+  if (!command?.id || (command.id === 'palette-symbol' && !command.subtype)) {
+    showToast('Run a repeatable command or add a palette symbol first');
+    return false;
+  }
+  return runRepeatableCommand({ ...command, ...(point ? { point } : {}) }, { repeat: true });
+}
+
+function executeShortcutCommand(commandId) {
+  if (commandId === 'repeat-last') return repeatLastCommand();
+  if (commandId === 'rotate') return rotateSelectedComponents();
+  if (commandId === 'flip') return rotateSelectedComponents({ flip: true });
+  if (commandId === 'fit') {
+    zoomToFit();
+    return true;
+  }
+  if (commandId === 'fit-selection') {
+    zoomToSelection();
+    return true;
+  }
+  if (commandId === 'auto-arrange') {
+    return runRepeatableCommand({ id: 'auto-arrange' });
+  }
+  if (commandId === 'auto-space') {
+    return runRepeatableCommand({ id: 'auto-space' });
+  }
+  return false;
+}
+
+function openKeyboardShortcutsModal() {
+  let draftBindings = { ...getShortcutBindings() };
+  const modalPromise = openModal({
+    title: 'One-Line Keyboard Shortcuts',
+    description: 'Choose a letter with optional Alt or Shift. Ctrl and Command combinations remain reserved for browser and editing commands.',
+    primaryText: 'Save Shortcuts',
+    secondaryText: 'Cancel',
+    variant: 'wide',
+    onSubmit() {
+      setShortcutBindings(draftBindings);
+      showToast('One-Line shortcuts saved');
+      return true;
+    },
+    render(body) {
+      body.classList.add('shortcut-settings-body');
+      const list = document.createElement('div');
+      list.className = 'shortcut-settings-list';
+      const help = document.createElement('p');
+      help.className = 'shortcut-settings-help';
+      help.textContent = 'Select Change, then press the new shortcut.';
+      const resetAll = document.createElement('button');
+      resetAll.type = 'button';
+      resetAll.className = 'btn secondary-btn';
+      resetAll.textContent = 'Restore Defaults';
+      const renderRows = () => {
+        list.innerHTML = '';
+        ONE_LINE_SHORTCUT_DEFINITIONS.forEach(definition => {
+          const row = document.createElement('div');
+          row.className = 'shortcut-settings-row';
+          const label = document.createElement('span');
+          label.textContent = definition.label;
+          const binding = document.createElement('kbd');
+          binding.textContent = draftBindings[definition.id];
+          const change = document.createElement('button');
+          change.type = 'button';
+          change.className = 'btn secondary-btn';
+          change.textContent = 'Change';
+          change.addEventListener('click', () => {
+            change.textContent = 'Press shortcut…';
+            change.focus();
+          });
+          change.addEventListener('keydown', event => {
+            const shortcut = shortcutFromEvent(event);
+            if (!shortcut) return;
+            event.preventDefault();
+            event.stopPropagation();
+            const conflict = ONE_LINE_SHORTCUT_DEFINITIONS.find(item => item.id !== definition.id && draftBindings[item.id] === shortcut);
+            if (conflict) {
+              showToast(`${shortcut} is already assigned to ${conflict.label}`);
+              return;
+            }
+            draftBindings = { ...draftBindings, [definition.id]: shortcut };
+            renderRows();
+          });
+          row.append(label, binding, change);
+          list.appendChild(row);
+        });
+      };
+      resetAll.addEventListener('click', () => {
+        draftBindings = Object.fromEntries(ONE_LINE_SHORTCUT_DEFINITIONS.map(definition => [definition.id, definition.defaultShortcut]));
+        renderRows();
+      });
+      renderRows();
+      body.append(help, list, resetAll);
+      return list;
+    }
+  });
+  return modalPromise;
 }
 
 function buildVirtualNodeEntries(allComponents, sheetConnections) {
@@ -13989,6 +15241,10 @@ function selectComponent(compOrId) {
     let lastSourceVoltageDriver = null;
 
     const applyChanges = () => {
+      if (isComponentPropertiesLocked(targetComp)) {
+        showToast('Unlock component properties before applying changes');
+        return;
+      }
       if (hasApplied) return;
       hasApplied = true;
       const fd = new FormData(form);
@@ -15701,6 +16957,18 @@ function selectComponent(compOrId) {
 
     form.appendChild(actions);
 
+    if (isComponentPropertiesLocked(targetComp)) {
+      const lockedNotice = document.createElement('p');
+      lockedNotice.className = 'prop-property-lock-notice';
+      lockedNotice.textContent = 'Properties are locked. Unlock them from the component context menu to edit this device.';
+      form.prepend(lockedNotice);
+      form.querySelectorAll('input, select, textarea').forEach(control => {
+        control.disabled = true;
+      });
+      applyBtn.disabled = true;
+      applyBtn.title = 'Unlock component properties to apply changes';
+    }
+
     form.addEventListener('submit', e => {
       e.preventDefault();
       applyChanges();
@@ -16611,6 +17879,8 @@ async function init() {
       const x = Number.isFinite(coords?.x) ? coords.x : fallbackX;
       const y = Number.isFinite(coords?.y) ? coords.y : fallbackY;
       const comp = addComponent({ type: info.type, subtype: info.subtype, x, y, skipHistory: true });
+      recordPaletteUsage(info.subtype);
+      buildPalette();
       if (!snapToNearestBus(comp)) {
         autoAttachComponent(comp);
       }
@@ -16900,7 +18170,7 @@ async function init() {
   document.getElementById('distribute-h-btn').addEventListener('click', () => distributeSelection('h'));
   document.getElementById('distribute-v-btn').addEventListener('click', () => distributeSelection('v'));
   const autoSpaceEquipmentBtn = document.getElementById('auto-space-equipment-btn');
-  if (autoSpaceEquipmentBtn) autoSpaceEquipmentBtn.addEventListener('click', () => autoSpaceEquipment());
+  if (autoSpaceEquipmentBtn) autoSpaceEquipmentBtn.addEventListener('click', () => runRepeatableCommand({ id: 'auto-space' }));
   const exportBtn = document.getElementById('export-btn');
   const exportMenu = document.getElementById('export-menu');
   if (exportBtn && exportMenu) {
@@ -16991,7 +18261,7 @@ async function init() {
   const autoBuildBtn = document.getElementById('auto-build-oneline-btn');
   if (autoBuildBtn) autoBuildBtn.addEventListener('click', openAutoBuildModal);
   const autoArrangeBtn = document.getElementById('auto-arrange-btn');
-  if (autoArrangeBtn) autoArrangeBtn.addEventListener('click', () => arrangeSourceToLoad());
+  if (autoArrangeBtn) autoArrangeBtn.addEventListener('click', () => runRepeatableCommand({ id: 'auto-arrange' }));
   const reconcileBtn = document.getElementById('reconcile-schedules-btn');
   if (reconcileBtn) reconcileBtn.addEventListener('click', openScheduleReconcileModal);
   const primaryReconcileBtn = document.getElementById('reconcile-schedules-primary-btn');
@@ -17060,7 +18330,7 @@ async function init() {
       const step = e.shiftKey ? (gridSize || 20) * 4 : (gridSize || 20);
       let moved = false;
       nudgeTargets.forEach(c => {
-        if (c.locked) return;
+        if (isComponentPositionLocked(c)) return;
         if (e.key === 'ArrowUp') c.y -= step;
         else if (e.key === 'ArrowDown') c.y += step;
         else if (e.key === 'ArrowLeft') c.x -= step;
@@ -17080,15 +18350,25 @@ async function init() {
 
   const gridToggle = document.getElementById('grid-toggle');
   const gridSizeInput = document.getElementById('grid-size');
+  const alignmentGuidesToggle = document.getElementById('alignment-guides-toggle');
   const gridPattern = document.getElementById('grid');
   const gridPath = gridPattern.querySelector('path');
   if (gridToggle) gridToggle.checked = gridEnabled;
+  if (alignmentGuidesToggle) alignmentGuidesToggle.checked = alignmentGuidesEnabled;
   if (gridSizeInput) gridSizeInput.value = gridSize;
   gridPattern.setAttribute('width', gridSize);
   gridPattern.setAttribute('height', gridSize);
   gridPath.setAttribute('d', `M${gridSize} 0 L0 0 0 ${gridSize}`);
   document.getElementById('grid-bg').style.display = gridEnabled ? 'block' : 'none';
   gridToggle?.addEventListener('change', toggleGrid);
+  alignmentGuidesToggle?.addEventListener('change', event => {
+    alignmentGuidesEnabled = event.target.checked;
+    setOneLineViewSetting('alignmentGuidesEnabled', alignmentGuidesEnabled);
+    if (!alignmentGuidesEnabled && dragSnapGuides) {
+      dragSnapGuides = null;
+      render();
+    }
+  });
   gridSizeInput?.addEventListener('change', e => {
     gridSize = Number(e.target.value) || 20;
     gridPattern.setAttribute('width', gridSize);
@@ -17320,6 +18600,7 @@ async function init() {
       cancelPendingClickSelection();
       marqueeSelectionMade = false;
       pointerDownComponentId = null;
+      dragSnapGuides = null;
       if (e.button === 1) {
         if (canvasScroll) {
           e.preventDefault();
@@ -17413,7 +18694,7 @@ async function init() {
       }
       selected = comp;
       // Gap #41 – Locked components cannot be dragged
-      dragOffset = selection.filter(c => !c.locked).map(c => ({
+      dragOffset = selection.filter(c => !isComponentPositionLocked(c)).map(c => ({
         comp: c,
         dx: pointerX - c.x,
         dy: pointerY - c.y,
@@ -17462,12 +18743,19 @@ async function init() {
         const { component, index, start, mid } = draggingConnection;
         const conn = component.connections[index];
         if (conn) {
+          let nextMid;
           if (conn.dir === 'h') {
-            conn.mid = mid + (pointerX - start.x);
+            nextMid = mid + (pointerX - start.x);
           } else {
-            conn.mid = mid + (pointerY - start.y);
+            nextMid = mid + (pointerY - start.y);
           }
-          render();
+          if (gridEnabled) nextMid = Math.round(nextMid / gridSize) * gridSize;
+          nextMid = Number(nextMid.toFixed(2));
+          if (conn.mid !== nextMid) {
+            conn.mid = nextMid;
+            draggingConnection.moved = true;
+            render();
+          }
         }
         return;
       }
@@ -17541,21 +18829,38 @@ async function init() {
     if (marquee && marquee.active) return;
     if (resizingBus || draggingConnection) return;
     if (!dragOffset || !dragOffset.length) return;
-    let snapPos = null;
-    let moved = false;
-    dragOffset.forEach(off => {
+    const projectedPositions = dragOffset.map(off => {
       const rawX = pointerX - off.dx;
       const rawY = pointerY - off.dy;
-      let x = rawX;
-      let y = rawY;
+      return {
+        off,
+        rawX,
+        rawY,
+        x: gridEnabled ? Math.round(rawX / gridSize) * gridSize : rawX,
+        y: gridEnabled ? Math.round(rawY / gridSize) * gridSize : rawY
+      };
+    });
+    const primaryProjection = projectedPositions[0];
+    const projectedPrimary = primaryProjection
+      ? { ...primaryProjection.off.comp, x: primaryProjection.x, y: primaryProjection.y }
+      : null;
+    const nextSnapGuides = primaryProjection
+      ? buildDragSnapGuides(projectedPrimary, new Set(dragOffset.map(off => off.comp.id)), {
+        x: primaryProjection.off.startX,
+        y: primaryProjection.off.startY
+      })
+      : null;
+    const snapDeltaX = nextSnapGuides?.vertical?.delta || 0;
+    const snapDeltaY = nextSnapGuides?.horizontal?.delta || 0;
+    let snapPos = null;
+    let moved = false;
+    projectedPositions.forEach(({ off, rawX, rawY, x: projectedX, y: projectedY }) => {
+      const x = projectedX + snapDeltaX;
+      const y = projectedY + snapDeltaY;
       if (gridEnabled) {
-        const snappedX = Math.round(x / gridSize) * gridSize;
-        const snappedY = Math.round(y / gridSize) * gridSize;
-        if (snappedX !== x || snappedY !== y) {
-          snapPos = { x: snappedX, y: snappedY };
+        if (projectedX !== rawX || projectedY !== rawY) {
+          snapPos = { x, y };
         }
-        x = snappedX;
-        y = snappedY;
       }
       const deltaX = Math.abs(rawX - off.startX);
       const deltaY = Math.abs(rawY - off.startY);
@@ -17569,6 +18874,7 @@ async function init() {
       }
     });
     if (moved) {
+      dragSnapGuides = nextSnapGuides;
       if (dragConnections && dragConnections.length) {
         dragConnections.forEach(entry => {
           const { conn, dir, source, target, offset } = entry;
@@ -17622,10 +18928,13 @@ async function init() {
         return;
       }
       if (draggingConnection) {
+        const moved = draggingConnection.moved;
         draggingConnection = null;
-        pushHistory();
-        render();
-        save();
+        if (moved) {
+          pushHistory();
+          render();
+          save();
+        }
         lastPointerUp = { id: null, time: 0 };
         return;
       }
@@ -17663,6 +18972,7 @@ async function init() {
           save();
           movedDuringDrag = true;
         }
+        dragSnapGuides = null;
         dragOffset = null;
         dragConnections = null;
         dragging = false;
@@ -17772,6 +19082,7 @@ async function init() {
   svg.addEventListener('contextmenu', e => {
     e.preventDefault();
     closePaletteContextMenu();
+    contextCanvasPoint = toDiagramCoords(e);
     const connEl = e.target.closest('.connection');
     if (connEl) {
       const comp = components.find(c => c.id === connEl.dataset.comp);
@@ -17794,6 +19105,10 @@ async function init() {
       const canPaste = isComponentContext && canPastePropertyClipboard(propertyClipboard, contextTarget);
       pastePropsItem.style.display = canPaste ? 'block' : 'none';
     }
+    const positionLockItem = menu.querySelector('[data-action="toggle-lock"]');
+    if (positionLockItem) positionLockItem.textContent = isComponentContext && isComponentPositionLocked(contextTarget) ? 'Unlock Position' : 'Lock Position';
+    const propertiesLockItem = menu.querySelector('[data-action="toggle-properties-lock"]');
+    if (propertiesLockItem) propertiesLockItem.textContent = isComponentContext && contextTarget?.propertiesLocked ? 'Unlock Properties' : 'Lock Properties';
     // Gap #40 – Show Group only when 2+ non-group components selected
     const groupItem = menu.querySelector('[data-action="group-selection"]');
     const ungroupItem = menu.querySelector('[data-action="ungroup"]');
@@ -17834,7 +19149,11 @@ async function init() {
     if (contextTarget && contextTarget.connection) {
       const { component, index } = contextTarget;
       const conn = component.connections[index];
-      if (action === 'edit') {
+      if (action === 'place-waypoint') {
+        placeConnectionWaypoint(component, index, contextCanvasPoint);
+      } else if (action === 'reset-waypoint') {
+        resetConnectionWaypoint(component, index);
+      } else if (action === 'edit') {
         const target = components.find(t => t.id === conn.target);
         const cableComp = isConductorSegmentComponent(component) ? component : isConductorSegmentComponent(target) ? target : null;
         if (cableComp) {
@@ -17858,11 +19177,21 @@ async function init() {
       menu.style.display = 'none';
       return;
     }
-    if (action === 'edit' && contextTarget) {
+    if (action.startsWith('quick-add-')) {
+      const subtype = action.slice('quick-add-'.length);
+      const comp = addPaletteSymbol(subtype, { point: contextCanvasPoint });
+      if (comp) showToast(`${comp.label || resolveComponentMeta(subtype)?.label || 'Symbol'} added`);
+    } else if (action === 'repeat-last-symbol') {
+      repeatLastCommand({ point: contextCanvasPoint });
+    } else if (action === 'edit' && contextTarget) {
       selectComponent(contextTarget.id);
     } else if (action === 'rename' && contextTarget) {
       const targets = getContextTargets(contextTarget);
       if (!targets.length) return;
+      if (targets.some(comp => isComponentPropertiesLocked(comp))) {
+        showToast('Unlock component properties before renaming');
+        return;
+      }
       const current = contextTarget.label || '';
       const next = await promptDialog('Rename Component', 'Component label', current);
       if (next !== null) {
@@ -17894,6 +19223,8 @@ async function init() {
         showToast('Copy properties from a device first');
       } else if (!targets.length) {
         showToast('Select a device to paste properties');
+      } else if (targets.some(target => isComponentPropertiesLocked(target))) {
+        showToast('Unlock component properties before pasting');
       } else if (targets.some(target => !canPastePropertyClipboard(propertyClipboard, target))) {
         showToast('Properties can only be pasted to devices of the same type');
       } else {
@@ -17945,7 +19276,7 @@ async function init() {
       const targets = getContextTargets(contextTarget);
       if (!targets.length) return;
       // Gap #41 – block deletion of locked components
-      const locked = targets.filter(c => c.locked);
+      const locked = targets.filter(c => isComponentPositionLocked(c));
       if (locked.length) { showToast(`Cannot delete: ${locked.map(c => c.label || c.id).join(', ')} is locked`); return; }
       const ids = new Set(targets.map(c => c.id));
       components = components.filter(c => !ids.has(c.id));
@@ -18033,6 +19364,9 @@ async function init() {
     } else if (action === 'toggle-lock' && contextTarget) {
       const targets = getContextTargets(contextTarget);
       targets.forEach(c => toggleLock(c));
+    } else if (action === 'toggle-properties-lock' && contextTarget) {
+      const targets = getContextTargets(contextTarget);
+      targets.forEach(c => togglePropertiesLock(c));
     // Gap #43 – Select Connected
     } else if (action === 'select-connected' && contextTarget) {
       selectConnected(contextTarget.id);
@@ -18090,7 +19424,10 @@ async function init() {
       menu.style.display = 'none';
     }
     if (paletteContextMenu && paletteContextMenu.style.display === 'block' && !paletteContextMenu.contains(e.target)) {
-      closePaletteContextMenu();
+      const trigger = paletteContextTarget?.trigger;
+      if (!(trigger instanceof Element) || !trigger.contains(e.target)) {
+        closePaletteContextMenu();
+      }
     }
   });
   document.addEventListener('keydown', e => {
@@ -18118,7 +19455,7 @@ async function init() {
     }
     if (selection.length) {
       // Gap #41 – block deletion of locked components
-      const locked = selection.filter(c => c.locked);
+      const locked = selection.filter(c => isComponentPositionLocked(c));
       if (locked.length) { showToast(`Cannot delete: ${locked.map(c => c.label || c.id).join(', ')} is locked`); return; }
       const ids = new Set(selection.map(c => c.id));
       components = components.filter(c => !ids.has(c.id));
@@ -18182,22 +19519,9 @@ async function init() {
         render();
         save();
       }
-    } else if (!mod && key === 'r') {
+    } else if (!mod && commandForShortcut(e)) {
       e.preventDefault();
-      const targets = selection.length ? selection : selected ? [selected] : [];
-      if (targets.length) {
-        if (e.shiftKey) {
-          targets.forEach(c => { c.flipped = !c.flipped; });
-        } else {
-          targets.forEach(c => {
-            c.rotation = ((c.rotation || 0) + 90) % 360;
-            c.rotationManual = true;
-          });
-        }
-        pushHistory();
-        render();
-        save();
-      }
+      executeShortcutCommand(commandForShortcut(e).id);
     } else if (mod && key === 'a') {
       e.preventDefault();
       selection = [...components];
@@ -18216,12 +19540,6 @@ async function init() {
       e.preventDefault();
       const lockTargets = selection.length ? selection : selected ? [selected] : [];
       lockTargets.forEach(c => toggleLock(c));
-    } else if (!mod && key === 'f' && !e.shiftKey) {
-      e.preventDefault();
-      zoomToFit();
-    } else if (!mod && key === 'f' && e.shiftKey) {
-      e.preventDefault();
-      zoomToSelection();
     } else if (!mod && e.key === 'Escape') {
       // Cancel connect mode or deselect
       const anyModalOpen = document.querySelector('.prop-modal.show');
@@ -18238,6 +19556,12 @@ async function init() {
     }
   });
 
+  document.getElementById('repeat-last-symbol-btn')?.addEventListener('click', () => {
+    repeatLastCommand();
+  });
+  document.getElementById('shortcuts-btn')?.addEventListener('click', openKeyboardShortcutsModal);
+  updateShortcutControlLabels();
+
   if (paletteContextMenu) {
     paletteContextMenu.addEventListener('click', e => {
       const item = e.target.closest('li[data-action]');
@@ -18246,6 +19570,10 @@ async function init() {
       e.stopPropagation();
       if (item.dataset.action === 'edit' && paletteContextTarget?.meta) {
         navigateToCustomComponentEditor(paletteContextTarget.meta);
+      } else if (item.dataset.action === 'toggle-favorite' && paletteContextTarget?.meta) {
+        const isFavorite = togglePaletteFavorite(paletteContextTarget.subtype);
+        buildPalette();
+        showToast(isFavorite ? 'Added to Favorites' : 'Removed from Favorites');
       }
       closePaletteContextMenu();
     });

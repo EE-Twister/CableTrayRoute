@@ -94,6 +94,7 @@ export async function loadCatalog() {
  * @param {number}   [filters.depthIn]      - exact tray depth in inches
  * @param {string}   [filters.material]     - 'steel' | 'aluminum' | 'fiberglass' etc.
  * @param {string}   [filters.approvalStatus]   - 'approved' | 'conditional' | 'rejected' | 'unreviewed'
+ * @param {string}   [filters.evidenceStatus]   - 'source_verified' | 'screening'
  * @param {string}   [filters.confidenceStatus] - 'complete' | 'review' | 'incomplete'
  * @param {string}   [filters.search]       - free-text search across description, id, series
  * @returns {Promise<object[]>}
@@ -131,6 +132,11 @@ const CONFIDENCE_LABELS = {
   complete: 'Complete',
   review: 'Review',
   incomplete: 'Incomplete'
+};
+
+const EVIDENCE_STATUS_LABELS = {
+  source_verified: 'Source verified',
+  screening: 'Screening'
 };
 
 function confidenceLabel(confidence) {
@@ -200,7 +206,7 @@ export function renderCatalogTable(container, products, {
     { key: 'material', label: 'Material' },
     { key: 'unit', label: 'Unit' },
     { key: 'commercial.listPriceUsd', label: 'List Price' },
-    { key: 'approval.status', label: 'Approval' },
+    { key: 'approval.status', label: 'Approval / Evidence' },
     { key: 'confidence', label: 'Catalog Confidence' },
     { key: 'origin', label: 'Origin' },
   ];
@@ -241,6 +247,20 @@ export function renderCatalogTable(container, products, {
           detail.textContent = `Missing ${confidence.missingEvidence.length}`;
           td.appendChild(detail);
         }
+        tr.appendChild(td);
+        continue;
+      }
+      if (col.key === 'approval.status') {
+        const approval = document.createElement('span');
+        approval.textContent = product.approval?.status || 'unreviewed';
+        td.appendChild(approval);
+        const badge = document.createElement('span');
+        badge.className = `catalog-evidence-status catalog-evidence-status-${product.evidenceStatus || 'screening'}`;
+        badge.textContent = EVIDENCE_STATUS_LABELS[product.evidenceStatus] || 'Screening';
+        badge.title = product.evidenceStatus === 'source_verified'
+          ? 'Manufacturer source, verification date, and product/datasheet URL are present. Project approval is still separate.'
+          : 'Illustrative or project-entered screening record; verify a manufacturer source before procurement.';
+        td.appendChild(badge);
         tr.appendChild(td);
         continue;
       }
@@ -326,6 +346,7 @@ export function renderCatalogQuality(container, products, options = {}) {
   counts.textContent = summary.total === 0
     ? 'No catalog rows in view.'
     : `${summary.total} row(s) · ${summary.approved} approved · `
+      + `${summary.byEvidenceStatus.source_verified || 0} source verified Â· `
       + `${summary.byConfidence.complete} complete, ${summary.byConfidence.review} review, `
       + `${summary.byConfidence.incomplete} incomplete · average evidence score ${summary.averageScore}%`;
   container.appendChild(counts);
@@ -362,6 +383,9 @@ const ADD_FORM_FIELDS = `
         <option value="fitting">fitting</option>
         <option value="conduit">conduit</option>
         <option value="accessory">accessory</option>
+        <option value="heat_trace">heat_trace</option>
+        <option value="cable">cable</option>
+        <option value="protective_device">protective_device</option>
       </select>
     </label>
     <label class="catalog-filter-label">Subcategory <input class="catalog-filter-input" name="subcategory" placeholder="straight, elbow, cover…"></label>
@@ -385,7 +409,76 @@ const ADD_FORM_FIELDS = `
     <label class="catalog-filter-label">List Price (USD) <input class="catalog-filter-input" name="list_price_usd" type="number" min="0" step="0.01" value="0"></label>
   </fieldset>
   <fieldset class="catalog-form-group">
+    <legend>Heat trace selection (heat_trace only)</legend>
+    <label class="catalog-filter-label">Type
+      <select class="catalog-filter-select" name="heat_trace_type">
+        <option value="">â€”</option>
+        <option value="selfRegulating">Self-regulating</option>
+        <option value="constantWattage">Constant wattage</option>
+        <option value="mineralInsulated">Mineral insulated</option>
+      </select>
+    </label>
+    <label class="catalog-filter-label">Voltages (V) <input class="catalog-filter-input" name="heat_trace_voltages" placeholder="120;240"></label>
+    <label class="catalog-filter-label">Nominal W/ft <input class="catalog-filter-input" name="heat_trace_nominal_w_per_ft" type="number" min="0" step="0.1"></label>
+    <label class="catalog-filter-label">Max lengths (ft) <input class="catalog-filter-input" name="heat_trace_max_circuit_lengths" placeholder="120:300;240:500"></label>
+    <label class="catalog-filter-label">Max exposure (C) <input class="catalog-filter-input" name="heat_trace_max_exposure_temp_c" type="number" min="0" step="1"></label>
+    <label class="catalog-filter-label">Hazardous area rating <input class="catalog-filter-input" name="heat_trace_hazardous_area_rating" placeholder="Class I Div 2 / Zone 1"></label>
+    <label class="catalog-filter-label">Startup multiplier <input class="catalog-filter-input" name="heat_trace_startup_current_multiplier" type="number" min="0" step="0.1"></label>
+    <label class="catalog-filter-label">Family <input class="catalog-filter-input" name="heat_trace_family" placeholder="Product family"></label>
+  </fieldset>
+  <fieldset class="catalog-form-group">
+    <legend>Cable construction (cable only)</legend>
+    <label class="catalog-filter-label">Cable type <input class="catalog-filter-input" name="cable_type" placeholder="Power"></label>
+    <label class="catalog-filter-label">Conductors <input class="catalog-filter-input" name="cable_conductors" type="number" min="1" step="1"></label>
+    <label class="catalog-filter-label">Conductor size <input class="catalog-filter-input" name="cable_conductor_size" placeholder="#12 AWG"></label>
+    <label class="catalog-filter-label">Conductor material <input class="catalog-filter-input" name="cable_conductor_material" placeholder="Copper"></label>
+    <label class="catalog-filter-label">Insulation type <input class="catalog-filter-input" name="cable_insulation_type" placeholder="THHN/THWN-2"></label>
+    <label class="catalog-filter-label">Voltage rating (V) <input class="catalog-filter-input" name="cable_voltage_rating" type="number" min="1" step="1"></label>
+    <label class="catalog-filter-label">Terminal temperature rating <input class="catalog-filter-input" name="cable_terminal_temp_rating" placeholder="75"></label>
+    <label class="catalog-filter-label">Shielding / jacket <input class="catalog-filter-input" name="cable_shielding_jacket" placeholder="Nylon jacket"></label>
+  </fieldset>
+  <fieldset class="catalog-form-group">
+    <legend>Protective-device curve (protective_device only)</legend>
+    <label class="catalog-filter-label">Device type
+      <select class="catalog-filter-select" name="protective_device_type">
+        <option value="">â€”</option>
+        <option value="breaker">Breaker</option>
+        <option value="fuse">Fuse</option>
+        <option value="relay">Relay</option>
+        <option value="relay_87">Differential relay</option>
+        <option value="recloser">Recloser</option>
+        <option value="contactor">Contactor</option>
+        <option value="switch">Switch</option>
+      </select>
+    </label>
+    <label class="catalog-filter-label">Voltage class <input class="catalog-filter-input" name="protective_device_voltage_class" placeholder="LV / MV"></label>
+    <label class="catalog-filter-label">Trip-unit model <input class="catalog-filter-input" name="protective_device_trip_unit_model" placeholder="Electronic trip unit"></label>
+    <label class="catalog-filter-label">Interrupting ratings <input class="catalog-filter-input" name="protective_device_interrupting_ratings" placeholder="480:65;600:50"></label>
+    <label class="catalog-filter-label">Curve points <input class="catalog-filter-input" name="protective_device_curve" placeholder="100:100;500:1;1000:0.1"></label>
+    <label class="catalog-filter-label">Pickup (A) <input class="catalog-filter-input" name="protective_device_pickup" type="number" min="0" step="1"></label>
+    <label class="catalog-filter-label">Time (s) <input class="catalog-filter-input" name="protective_device_time" type="number" min="0" step="0.01"></label>
+    <label class="catalog-filter-label">Instantaneous (A) <input class="catalog-filter-input" name="protective_device_instantaneous" type="number" min="0" step="1"></label>
+    <label class="catalog-filter-label">Curve document <input class="catalog-filter-input" name="protective_device_curve_document" placeholder="Manufacturer curve sheet"></label>
+    <label class="catalog-filter-label">Curve revision <input class="catalog-filter-input" name="protective_device_curve_revision" placeholder="Rev. 3"></label>
+    <label class="catalog-filter-label">Curve ID / page <input class="catalog-filter-input" name="protective_device_curve_id" placeholder="Figure 7 / page 12"></label>
+    <label class="catalog-filter-label">Extraction method <input class="catalog-filter-input" name="protective_device_curve_extraction_method" placeholder="manufacturer CSV"></label>
+    <label class="catalog-filter-label">Independent reviewer <input class="catalog-filter-input" name="protective_device_curve_reviewer" placeholder="Engineer name / date"></label>
+    <label class="catalog-filter-label">Declared library status
+      <select class="catalog-filter-select" name="protective_device_library_status">
+        <option value="screening">Screening</option>
+        <option value="source_verified">Source verified</option>
+        <option value="calculation_ready">Calculation-ready</option>
+      </select>
+    </label>
+  </fieldset>
+  <fieldset class="catalog-form-group">
     <legend>Governed evidence</legend>
+    <label class="catalog-filter-label">Evidence Status
+      <select class="catalog-filter-select" name="evidenceStatus">
+        <option value="screening">Screening</option>
+        <option value="source_verified">Source verified</option>
+      </select>
+    </label>
     <label class="catalog-filter-label">Approved <input name="approved" type="checkbox"></label>
     <label class="catalog-filter-label">Approval Authority <input class="catalog-filter-input" name="approvalAuthority" placeholder="Project EE"></label>
     <label class="catalog-filter-label">Source <input class="catalog-filter-input" name="source" placeholder="approved list, quote, or datasheet"></label>
@@ -438,6 +531,36 @@ function productFromForm(formData) {
     load_class: formValue(formData, 'load_class') || null,
     unit: formValue(formData, 'unit') || 'EA',
     list_price_usd: formNumber(formData, 'list_price_usd') ?? 0,
+    heat_trace_type: formValue(formData, 'heat_trace_type'),
+    heat_trace_voltages: formValue(formData, 'heat_trace_voltages'),
+    heat_trace_nominal_w_per_ft: formNumber(formData, 'heat_trace_nominal_w_per_ft'),
+    heat_trace_max_circuit_lengths: formValue(formData, 'heat_trace_max_circuit_lengths'),
+    heat_trace_max_exposure_temp_c: formNumber(formData, 'heat_trace_max_exposure_temp_c'),
+    heat_trace_hazardous_area_rating: formValue(formData, 'heat_trace_hazardous_area_rating'),
+    heat_trace_startup_current_multiplier: formNumber(formData, 'heat_trace_startup_current_multiplier'),
+    heat_trace_family: formValue(formData, 'heat_trace_family'),
+    cable_type: formValue(formData, 'cable_type'),
+    cable_conductors: formNumber(formData, 'cable_conductors'),
+    cable_conductor_size: formValue(formData, 'cable_conductor_size'),
+    cable_conductor_material: formValue(formData, 'cable_conductor_material'),
+    cable_insulation_type: formValue(formData, 'cable_insulation_type'),
+    cable_voltage_rating: formNumber(formData, 'cable_voltage_rating'),
+    cable_terminal_temp_rating: formValue(formData, 'cable_terminal_temp_rating'),
+    cable_shielding_jacket: formValue(formData, 'cable_shielding_jacket'),
+    protective_device_type: formValue(formData, 'protective_device_type'),
+    protective_device_voltage_class: formValue(formData, 'protective_device_voltage_class'),
+    protective_device_trip_unit_model: formValue(formData, 'protective_device_trip_unit_model'),
+    protective_device_interrupting_ratings: formValue(formData, 'protective_device_interrupting_ratings'),
+    protective_device_curve: formValue(formData, 'protective_device_curve'),
+    protective_device_pickup: formNumber(formData, 'protective_device_pickup'),
+    protective_device_time: formNumber(formData, 'protective_device_time'),
+    protective_device_instantaneous: formNumber(formData, 'protective_device_instantaneous'),
+    protective_device_curve_document: formValue(formData, 'protective_device_curve_document'),
+    protective_device_curve_revision: formValue(formData, 'protective_device_curve_revision'),
+    protective_device_curve_id: formValue(formData, 'protective_device_curve_id'),
+    protective_device_curve_extraction_method: formValue(formData, 'protective_device_curve_extraction_method'),
+    protective_device_curve_reviewer: formValue(formData, 'protective_device_curve_reviewer'),
+    protective_device_library_status: formValue(formData, 'protective_device_library_status') || 'screening',
     standards,
     nec_listed: standards.some(item => /nec/i.test(item)),
     ul_classified: standards.some(item => /\bul\b/i.test(item)),
@@ -453,6 +576,7 @@ function productFromForm(formData) {
       co2eKgPerUnit: formNumber(formData, 'co2eKgPerUnit')
     },
     approved: formData.get('approved') === 'on',
+    evidenceStatus: formValue(formData, 'evidenceStatus') || 'screening',
     approval: {
       status: formData.get('approved') === 'on' ? 'approved' : 'unreviewed',
       authority: formValue(formData, 'approvalAuthority')
@@ -483,7 +607,38 @@ function fillFormFromProduct(form, product) {
   setValue('load_class', product.ratings?.loadClass);
   setValue('unit', product.unit || 'EA');
   setValue('list_price_usd', product.commercial?.listPriceUsd ?? 0);
+  setValue('heat_trace_type', product.heat_trace_type);
+  setValue('heat_trace_voltages', product.heat_trace_voltages);
+  setValue('heat_trace_nominal_w_per_ft', product.heat_trace_nominal_w_per_ft);
+  setValue('heat_trace_max_circuit_lengths', product.heat_trace_max_circuit_lengths);
+  setValue('heat_trace_max_exposure_temp_c', product.heat_trace_max_exposure_temp_c);
+  setValue('heat_trace_hazardous_area_rating', product.heat_trace_hazardous_area_rating);
+  setValue('heat_trace_startup_current_multiplier', product.heat_trace_startup_current_multiplier);
+  setValue('heat_trace_family', product.heat_trace_family);
+  setValue('cable_type', product.cable_type);
+  setValue('cable_conductors', product.cable_conductors);
+  setValue('cable_conductor_size', product.cable_conductor_size);
+  setValue('cable_conductor_material', product.cable_conductor_material);
+  setValue('cable_insulation_type', product.cable_insulation_type);
+  setValue('cable_voltage_rating', product.cable_voltage_rating);
+  setValue('cable_terminal_temp_rating', product.cable_terminal_temp_rating);
+  setValue('cable_shielding_jacket', product.cable_shielding_jacket);
+  setValue('protective_device_type', product.protective_device_type);
+  setValue('protective_device_voltage_class', product.protective_device_voltage_class);
+  setValue('protective_device_trip_unit_model', product.protective_device_trip_unit_model);
+  setValue('protective_device_interrupting_ratings', product.protective_device_interrupting_ratings);
+  setValue('protective_device_curve', product.protective_device_curve);
+  setValue('protective_device_pickup', product.protective_device_pickup);
+  setValue('protective_device_time', product.protective_device_time);
+  setValue('protective_device_instantaneous', product.protective_device_instantaneous);
+  setValue('protective_device_curve_document', product.protective_device_curve_document);
+  setValue('protective_device_curve_revision', product.protective_device_curve_revision);
+  setValue('protective_device_curve_id', product.protective_device_curve_id);
+  setValue('protective_device_curve_extraction_method', product.protective_device_curve_extraction_method);
+  setValue('protective_device_curve_reviewer', product.protective_device_curve_reviewer);
+  setValue('protective_device_library_status', product.protective_device_library_status || 'screening');
   setValue('approved', product.approved);
+  setValue('evidenceStatus', product.evidenceStatus || 'screening');
   setValue('approvalAuthority', product.approval?.authority);
   setValue('source', product.source);
   setValue('lastVerified', product.lastVerified);
@@ -563,6 +718,7 @@ export async function mountCatalogBrowser(container, { onSelect } = {}) {
   const mfrFilter = makeSelect('Manufacturer', getDistinctOptions('manufacturer'), 'manufacturer');
   const matFilter = makeSelect('Material', getDistinctOptions('material'), 'material');
   const approvalFilter = makeSelect('Approval', ['', 'approved', 'conditional', 'rejected', 'unreviewed'], 'approval');
+  const evidenceFilter = makeSelect('Evidence', ['', 'source_verified', 'screening'], 'evidence');
   const confidenceFilter = makeSelect('Confidence', ['', 'complete', 'review', 'incomplete'], 'confidence');
   const originFilter = makeSelect('Origin', ['', 'base', 'project'], 'origin');
 
@@ -580,6 +736,7 @@ export async function mountCatalogBrowser(container, { onSelect } = {}) {
   filterBar.appendChild(mfrFilter.label);
   filterBar.appendChild(matFilter.label);
   filterBar.appendChild(approvalFilter.label);
+  filterBar.appendChild(evidenceFilter.label);
   filterBar.appendChild(confidenceFilter.label);
   filterBar.appendChild(originFilter.label);
   filterBar.appendChild(searchLabel);
@@ -888,6 +1045,7 @@ export async function mountCatalogBrowser(container, { onSelect } = {}) {
       manufacturer: mfrFilter.select.value || undefined,
       material: matFilter.select.value || undefined,
       approvalStatus: approvalFilter.select.value || undefined,
+      evidenceStatus: evidenceFilter.select.value || undefined,
       confidenceStatus: confidenceFilter.select.value || undefined,
       search: searchInput.value.trim() || undefined,
     });
@@ -910,6 +1068,7 @@ export async function mountCatalogBrowser(container, { onSelect } = {}) {
   mfrFilter.select.addEventListener('change', refresh);
   matFilter.select.addEventListener('change', refresh);
   approvalFilter.select.addEventListener('change', refresh);
+  evidenceFilter.select.addEventListener('change', refresh);
   confidenceFilter.select.addEventListener('change', refresh);
   originFilter.select.addEventListener('change', refresh);
   searchInput.addEventListener('input', refresh);

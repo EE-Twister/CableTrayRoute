@@ -118,4 +118,51 @@ describe('loadFlowModel voltage inheritance', () => {
     assert(sourceBus.load, 'The bus should have an aggregated load');
     assert.strictEqual(sourceBus.load.kw, 125, 'The bus should accumulate the remote load kW');
   });
+
+  it('retains component phase assignments and explicit phase payloads', () => {
+    const fixture = {
+      sheets: [{
+        components: [
+          { id: 'bus', type: 'bus', subtype: 'bus_Bus', voltage: '13.8' },
+          { id: 'phase-b-load', type: 'load', kw: 24, kvar: 12, props: { phase_assignment: 'B' }, connections: [{ target: 'bus' }] },
+          {
+            id: 'phase-record-load',
+            type: 'load',
+            load: { phases: { A: { kw: 60, kvar: 20 }, C: { kw: 30, kvar: 10 } } },
+            connections: [{ target: 'bus' }]
+          }
+        ],
+        connections: []
+      }]
+    };
+
+    const model = buildLoadFlowModel(fixture);
+    const bus = model.buses.find(entry => entry.id === 'bus');
+    assert(bus && Array.isArray(bus.load), 'Phase-aware loads should retain individual contributions');
+    assert.deepStrictEqual(bus.load, [
+      { kw: 24, kvar: 12, phase: 'B' },
+      { phases: { A: { kw: 60, kvar: 20 }, C: { kw: 30, kvar: 10 } } }
+    ]);
+  });
+
+  it('maps a transformer tap ratio stored in One-Line properties into its branch model', () => {
+    const fixture = {
+      sheets: [{
+        components: [
+          { id: 'primary', type: 'bus', subtype: 'bus_Bus', voltage: '13.8' },
+          { id: 'secondary', type: 'bus', subtype: 'bus_Bus', voltage: '0.48' },
+          {
+            id: 'xfmr',
+            type: 'transformer',
+            props: { tap_ratio: 1.025 },
+            connections: [{ target: 'primary', sourcePort: 0 }, { target: 'secondary', sourcePort: 1 }]
+          }
+        ],
+        connections: []
+      }]
+    };
+    const branch = buildLoadFlowModel(fixture).branches.find(entry => entry.id === 'xfmr');
+    assert(branch, 'Transformer branch should be generated');
+    assert.strictEqual(branch.tap, 1.025);
+  });
 });

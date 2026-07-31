@@ -36,7 +36,13 @@ export function validateLoadFlowModel(model) {
     errors.push(`Bus ${bus.displayLabel || bus.label || bus.id} is isolated.`);
   });
 
-  const hasLoad = buses.some(bus => Number(bus?.load?.kw ?? bus?.Pd ?? 0) > 0);
+  const hasPositiveLoad = value => {
+    if (Array.isArray(value)) return value.some(hasPositiveLoad);
+    if (!value || typeof value !== 'object') return false;
+    if (Number(value.kw ?? value.kW ?? value.P ?? 0) > 0) return true;
+    return hasPositiveLoad(value.phases);
+  };
+  const hasLoad = buses.some(bus => hasPositiveLoad(bus?.load) || Number(bus?.Pd ?? 0) > 0);
   if (!hasLoad) warnings.push('No positive load was found; the study may only verify the unloaded network.');
 
   return {

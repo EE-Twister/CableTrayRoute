@@ -128,6 +128,8 @@ export function summarizePackage(projectData = {}) {
  *   designBasis?: object|null,
  *   designGateApprovals?: object,
  *   tccSettings?: object|null,
+ *   fieldObservations?: any[],
+ *   fieldObservationQueue?: string[],
  *   oneLine?: object,
  * }} projectData
  * @returns {LifecyclePackage}
@@ -143,6 +145,8 @@ export function buildLifecyclePackage(config = {}, projectData = {}) {
   const designBasis = deepClone(projectData.designBasis || null);
   const designGateApprovals = deepClone(projectData.designGateApprovals || {});
   const tccSettings = deepClone(projectData.tccSettings || null);
+  const fieldObservations = deepClone(Array.isArray(projectData.fieldObservations) ? projectData.fieldObservations : []);
+  const fieldObservationQueue = deepClone(Array.isArray(projectData.fieldObservationQueue) ? projectData.fieldObservationQueue : []);
   const oneLine   = deepClone(projectData.oneLine || {});
   const components = oneLineComponents(oneLine);
 
@@ -169,6 +173,8 @@ export function buildLifecyclePackage(config = {}, projectData = {}) {
       designBasis,
       designGateApprovals,
       tccSettings,
+      fieldObservations,
+      fieldObservationQueue,
       oneLine,
       oneLineComponentCount: components.length
     },

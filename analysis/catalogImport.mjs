@@ -16,7 +16,10 @@ import {
 } from './manufacturerCatalog.mjs';
 
 const APPROVAL_OPTIONS = ['approved', 'conditional', 'rejected', 'unreviewed'];
-const CATEGORY_OPTIONS = ['tray', 'fitting', 'conduit', 'accessory'];
+const EVIDENCE_STATUS_OPTIONS = ['source_verified', 'screening'];
+const CATEGORY_OPTIONS = ['tray', 'fitting', 'conduit', 'accessory', 'heat_trace', 'cable', 'protective_device'];
+const HEAT_TRACE_TYPE_OPTIONS = ['selfRegulating', 'constantWattage', 'mineralInsulated'];
+const PROTECTIVE_DEVICE_TYPE_OPTIONS = ['breaker', 'fuse', 'relay', 'relay_87', 'recloser', 'contactor', 'switch'];
 const UNIT_OPTIONS = ['EA', 'FT', 'LF', 'BOX', 'CTN'];
 
 /**
@@ -59,6 +62,11 @@ export const CATALOG_IMPORT_COLUMNS = [
   { key: 'ul_classified', header: 'UL Classified', type: 'boolean', required: false },
   { key: 'approved', header: 'Approved', type: 'boolean', required: false,
     notes: 'TRUE/FALSE. Approved rows require Source and Last Verified.' },
+  { key: 'evidenceStatus', header: 'Evidence Status', type: 'enum', required: false,
+    aliases: ['evidence_status'],
+    enumValues: EVIDENCE_STATUS_OPTIONS,
+    default: 'screening',
+    notes: 'source_verified requires Source, Last Verified, and Datasheet URL; it is not project approval.' },
   { key: 'approval_status', header: 'Approval Status', type: 'enum', required: false,
     enumValues: APPROVAL_OPTIONS,
     notes: `One of: ${APPROVAL_OPTIONS.join(', ')}.` },
@@ -72,7 +80,48 @@ export const CATALOG_IMPORT_COLUMNS = [
   { key: 'lastVerified', header: 'Last Verified', type: 'date', required: false,
     aliases: ['last_verified'],
     notes: 'Required for Approved rows. YYYY-MM-DD.' },
-  { key: 'datasheet_url', header: 'Datasheet URL', type: 'text', required: false }
+  { key: 'datasheet_url', header: 'Datasheet URL', type: 'text', required: false },
+  { key: 'heat_trace_type', header: 'Heat Trace Type', type: 'enum', required: false,
+    enumValues: HEAT_TRACE_TYPE_OPTIONS,
+    notes: `For heat_trace rows: one of ${HEAT_TRACE_TYPE_OPTIONS.join(', ')}.` },
+  { key: 'heat_trace_voltages', header: 'Heat Trace Voltages (V)', type: 'text', required: false,
+    notes: 'For heat_trace rows: semicolon-separated voltages, e.g. 120;240.' },
+  { key: 'heat_trace_nominal_w_per_ft', header: 'Heat Trace Nominal W/ft', type: 'number', required: false },
+  { key: 'heat_trace_max_circuit_lengths', header: 'Heat Trace Max Circuit Lengths (ft)', type: 'text', required: false,
+    notes: 'For heat_trace rows: voltage:length pairs, e.g. 120:300;240:500.' },
+  { key: 'heat_trace_max_exposure_temp_c', header: 'Heat Trace Max Exposure (C)', type: 'number', required: false },
+  { key: 'heat_trace_hazardous_area_rating', header: 'Heat Trace Hazardous Area Rating', type: 'text', required: false },
+  { key: 'heat_trace_startup_current_multiplier', header: 'Heat Trace Startup Current Multiplier', type: 'number', required: false },
+  { key: 'heat_trace_family', header: 'Heat Trace Family', type: 'text', required: false },
+  { key: 'cable_type', header: 'Cable Type', type: 'text', required: false,
+    notes: 'For cable rows: e.g. Power, Control, Instrument, Fiber.' },
+  { key: 'cable_conductors', header: 'Cable Conductors', type: 'number', required: false },
+  { key: 'cable_conductor_size', header: 'Cable Conductor Size', type: 'text', required: false },
+  { key: 'cable_conductor_material', header: 'Cable Conductor Material', type: 'text', required: false },
+  { key: 'cable_insulation_type', header: 'Cable Insulation Type', type: 'text', required: false },
+  { key: 'cable_voltage_rating', header: 'Cable Voltage Rating (V)', type: 'number', required: false },
+  { key: 'cable_terminal_temp_rating', header: 'Cable Terminal Temp Rating', type: 'text', required: false },
+  { key: 'cable_shielding_jacket', header: 'Cable Shielding / Jacket', type: 'text', required: false }
+  , { key: 'protective_device_type', header: 'Protective Device Type', type: 'enum', required: false,
+    enumValues: PROTECTIVE_DEVICE_TYPE_OPTIONS,
+    notes: `For protective_device rows: one of ${PROTECTIVE_DEVICE_TYPE_OPTIONS.join(', ')}.` }
+  , { key: 'protective_device_voltage_class', header: 'Protective Device Voltage Class', type: 'text', required: false }
+  , { key: 'protective_device_trip_unit_model', header: 'Protective Device Trip Unit Model', type: 'text', required: false }
+  , { key: 'protective_device_interrupting_ratings', header: 'Protective Device Interrupting Ratings', type: 'text', required: false,
+    notes: 'For non-relay protective_device rows: voltage:kA pairs, e.g. 480:65;600:50.' }
+  , { key: 'protective_device_curve', header: 'Protective Device Curve Points', type: 'text', required: false,
+    notes: 'For protective_device rows: at least two current:time pairs, e.g. 100:100;500:1;1000:0.1.' }
+  , { key: 'protective_device_pickup', header: 'Protective Device Pickup (A)', type: 'number', required: false }
+  , { key: 'protective_device_time', header: 'Protective Device Time (s)', type: 'number', required: false }
+  , { key: 'protective_device_instantaneous', header: 'Protective Device Instantaneous (A)', type: 'number', required: false }
+  , { key: 'protective_device_curve_document', header: 'Protective Device Curve Document', type: 'text', required: false }
+  , { key: 'protective_device_curve_revision', header: 'Protective Device Curve Revision', type: 'text', required: false }
+  , { key: 'protective_device_curve_id', header: 'Protective Device Curve ID', type: 'text', required: false }
+  , { key: 'protective_device_curve_extraction_method', header: 'Protective Device Curve Extraction Method', type: 'text', required: false }
+  , { key: 'protective_device_curve_reviewer', header: 'Protective Device Curve Reviewer', type: 'text', required: false }
+  , { key: 'protective_device_library_status', header: 'Protective Device Library Status', type: 'enum', required: false,
+    enumValues: ['screening', 'source_verified', 'calculation_ready'],
+    notes: 'Declared TCC readiness; the app verifies required curve/rating evidence before using it.' }
 ];
 
 const HEADER_INDEX = (() => {
@@ -199,6 +248,7 @@ const TEMPLATE_EXAMPLES = [
     nec_listed: true,
     ul_classified: true,
     approved: true,
+    evidenceStatus: 'source_verified',
     approval_status: 'approved',
     approval_authority: 'Project EE',
     approved_by: 'D. Mitz',
@@ -257,6 +307,64 @@ const TEMPLATE_EXAMPLES = [
     approval_status: 'approved',
     source: 'Approved manufacturer list rev B',
     lastVerified: '2026-05-22'
+  },
+  {
+    id: 'HT-EXAMPLE-5',
+    manufacturer: 'Example Manufacturer',
+    catalogNumber: 'HT-5-240',
+    category: 'heat_trace',
+    subcategory: 'cable',
+    description: '5 W/ft self-regulating heat-trace cable, 120/240 V',
+    unit: 'FT',
+    approved: false,
+    approval_status: 'unreviewed',
+    heat_trace_type: 'selfRegulating',
+    heat_trace_voltages: '120;240',
+    heat_trace_nominal_w_per_ft: 5,
+    heat_trace_max_circuit_lengths: '120:300;240:500',
+    heat_trace_max_exposure_temp_c: 65,
+    heat_trace_startup_current_multiplier: 1.7,
+    heat_trace_family: 'HT Example'
+  },
+  {
+    id: 'CABLE-EXAMPLE-12',
+    manufacturer: 'Example Manufacturer',
+    catalogNumber: 'CU-THHN-12',
+    category: 'cable',
+    subcategory: 'building-wire',
+    description: 'Copper 12 AWG THHN/THWN-2 building wire, 600 V',
+    unit: 'FT',
+    approved: false,
+    approval_status: 'unreviewed',
+    cable_type: 'Power',
+    cable_conductors: 1,
+    cable_conductor_size: '#12 AWG',
+    cable_conductor_material: 'Copper',
+    cable_insulation_type: 'THHN/THWN-2',
+    cable_voltage_rating: 600,
+    cable_terminal_temp_rating: '75',
+    cable_shielding_jacket: 'Nylon jacket'
+  },
+  {
+    id: 'PD-EXAMPLE-100',
+    manufacturer: 'Example Manufacturer',
+    catalogNumber: 'PD-100-3P',
+    category: 'protective_device',
+    subcategory: 'breaker',
+    description: '100 A 3-pole molded-case circuit breaker',
+    unit: 'EA',
+    approved: false,
+    approval_status: 'unreviewed',
+    evidenceStatus: 'screening',
+    protective_device_type: 'breaker',
+    protective_device_voltage_class: 'LV',
+    protective_device_trip_unit_model: 'Example electronic trip',
+    protective_device_interrupting_ratings: '480:35;600:25',
+    protective_device_curve: '100:100;500:1;1000:0.1',
+    protective_device_pickup: 100,
+    protective_device_time: 0.3,
+    protective_device_instantaneous: 500,
+    protective_device_library_status: 'screening'
   }
 ];
 
@@ -359,7 +467,37 @@ function exportCellValue(product, column) {
     approved_at: product.approval?.approvedAt,
     source: product.source,
     lastVerified: product.lastVerified,
-    datasheet_url: product.datasheetUrl
+    datasheet_url: product.datasheetUrl,
+    heat_trace_type: product.heat_trace_type,
+    heat_trace_voltages: product.heat_trace_voltages,
+    heat_trace_nominal_w_per_ft: product.heat_trace_nominal_w_per_ft,
+    heat_trace_max_circuit_lengths: product.heat_trace_max_circuit_lengths,
+    heat_trace_max_exposure_temp_c: product.heat_trace_max_exposure_temp_c,
+    heat_trace_hazardous_area_rating: product.heat_trace_hazardous_area_rating,
+    heat_trace_startup_current_multiplier: product.heat_trace_startup_current_multiplier,
+    heat_trace_family: product.heat_trace_family,
+    cable_type: product.cable_type,
+    cable_conductors: product.cable_conductors,
+    cable_conductor_size: product.cable_conductor_size,
+    cable_conductor_material: product.cable_conductor_material,
+    cable_insulation_type: product.cable_insulation_type,
+    cable_voltage_rating: product.cable_voltage_rating,
+    cable_terminal_temp_rating: product.cable_terminal_temp_rating,
+    cable_shielding_jacket: product.cable_shielding_jacket,
+    protective_device_type: product.protective_device_type,
+    protective_device_voltage_class: product.protective_device_voltage_class,
+    protective_device_trip_unit_model: product.protective_device_trip_unit_model,
+    protective_device_interrupting_ratings: product.protective_device_interrupting_ratings,
+    protective_device_curve: product.protective_device_curve,
+    protective_device_pickup: product.protective_device_pickup,
+    protective_device_time: product.protective_device_time,
+    protective_device_instantaneous: product.protective_device_instantaneous,
+    protective_device_curve_document: product.protective_device_curve_document,
+    protective_device_curve_revision: product.protective_device_curve_revision,
+    protective_device_curve_id: product.protective_device_curve_id,
+    protective_device_curve_extraction_method: product.protective_device_curve_extraction_method,
+    protective_device_curve_reviewer: product.protective_device_curve_reviewer,
+    protective_device_library_status: product.protective_device_library_status
   }[column.key];
 
   if (direct === undefined || direct === null) return '';

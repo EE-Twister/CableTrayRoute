@@ -90,8 +90,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const summarySection = document.createElement('section');
     summarySection.innerHTML = '<h2>Hardware Summary (Procurement View)</h2>';
     summarySection.appendChild(buildTable(
-      ['Category', 'Item Description', 'Material', 'Width (in)', 'Qty', 'Unit'],
-      bom.summary.map(r => [r.category, r.item, r.material || 'Steel', r.width_in || '—', r.qty, r.unit])
+      ['Category', 'Item Description', 'Manufacturer', 'Catalog No.', 'Approved', 'Material', 'Width (in)', 'Qty', 'Unit'],
+      bom.summary.map(r => [r.category, r.item, r.manufacturer || '—', r.catalog_number || '—', r.approved_part === true ? 'Yes' : '—', r.material || 'Steel', r.width_in || '—', r.qty, r.unit])
     ));
     container.appendChild(summarySection);
 
@@ -138,10 +138,13 @@ document.addEventListener('DOMContentLoaded', () => {
       const secSection = document.createElement('section');
       secSection.innerHTML = '<h2>Straight Sections &amp; Covers Detail</h2>';
       secSection.appendChild(buildTable(
-        ['Tray ID', 'Type', 'Material', 'Width (in)', 'Length (ft)', 'Sections', 'Cover Sections', 'Field View URL'],
+        ['Tray ID', 'Type', 'Manufacturer', 'Catalog No.', 'Approved', 'Material', 'Width (in)', 'Length (ft)', 'Sections', 'Cover Sections', 'Field View URL'],
         bom.sections.map(s => [
           s.tray_id,
           s.tray_type || '—',
+          s.manufacturer || '—',
+          s.catalog_number || '—',
+          s.approved_part === true ? 'Yes' : '—',
           s.material || 'Steel',
           s.width,
           s.length_ft,
@@ -196,8 +199,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const wb = XLSX.utils.book_new();
 
     // Summary sheet
-    const summaryData = [['Category', 'Item Description', 'Material', 'Width (in)', 'Qty', 'Unit'],
-      ...bom.summary.map(r => [r.category, r.item, r.material || 'Steel', r.width_in || '', r.qty, r.unit])];
+    const summaryData = [['Category', 'Item Description', 'Manufacturer', 'Catalog No.', 'Approved', 'Catalog Source', 'Last Verified', 'Datasheet URL', 'Material', 'Width (in)', 'Qty', 'Unit'],
+      ...bom.summary.map(r => [r.category, r.item, r.manufacturer || '', r.catalog_number || '', r.approved_part === true ? 'Yes' : '', r.catalog_source || '', r.catalog_last_verified || '', r.catalog_datasheet_url || '', r.material || 'Steel', r.width_in || '', r.qty, r.unit])];
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summaryData), 'Summary');
 
     // Fittings sheet
@@ -222,8 +225,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Sections sheet
     if (bom.sections.length > 0) {
-      const secData = [['Tray ID', 'Type', 'Material', 'Width (in)', 'Length (ft)', 'Straight Sections', 'Cover Sections', 'Field View URL'],
-        ...bom.sections.map(s => [s.tray_id, s.tray_type, s.material || 'Steel', s.width, s.length_ft, s.straight_sections, s.cover_sections, s.field_view_url || ''])];
+      const secData = [['Tray ID', 'Type', 'Manufacturer', 'Catalog No.', 'Approved', 'Catalog Source', 'Last Verified', 'Datasheet URL', 'Material', 'Width (in)', 'Length (ft)', 'Straight Sections', 'Cover Sections', 'Field View URL'],
+        ...bom.sections.map(s => [s.tray_id, s.tray_type, s.manufacturer || '', s.catalog_number || '', s.approved_part === true ? 'Yes' : '', s.catalog_source || '', s.catalog_last_verified || '', s.catalog_datasheet_url || '', s.material || 'Steel', s.width, s.length_ft, s.straight_sections, s.cover_sections, s.field_view_url || ''])];
       XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(secData), 'Sections');
     }
 

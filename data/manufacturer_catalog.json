@@ -1,7 +1,7 @@
 {
   "_version": "2.0",
-  "_description": "Illustrative, unreviewed manufacturer-style catalog placeholders for exercising tray, fitting, conduit, and accessory workflows. Replace with manufacturer-verified project data before procurement, submittal, BIM, or estimating use.",
-  "_notice": "These seed rows are not manufacturer-verified and are not approved parts.",
+  "_description": "Illustrative screening rows plus a small source-verified Eaton B-Line/KwikRail starter family for exercising tray, fitting, conduit, and accessory workflows. Project approval remains required before procurement, submittal, BIM, or estimating use.",
+  "_notice": "Source-verified rows are manufacturer-traceable but are not approved parts; all other seed rows are illustrative screening placeholders.",
   "_schema": {
     "version": 2,
     "products": [
@@ -1135,6 +1135,146 @@
       },
       "source": "CableTrayRoute illustrative seed data; not manufacturer verified",
       "lastVerified": ""
+    },
+    {
+      "id": "KRB4ASB-12-120",
+      "manufacturer": "Eaton B-Line",
+      "series": "KwikRail",
+      "category": "tray",
+      "subcategory": "straight",
+      "description": "KwikRail solid-bottom straight section, NEMA Class B, aluminum, 4 in high x 12 in wide x 10 ft long",
+      "material": "aluminum",
+      "finish": "aluminum",
+      "unit": "EA",
+      "standards": [
+        "UL Classified",
+        "CSA"
+      ],
+      "ratings": {
+        "loadClass": "NEMA Class B",
+        "ulClassified": true
+      },
+      "dimensions": {
+        "widthIn": 12,
+        "depthIn": 120,
+        "weightLb": 18.053
+      },
+      "productHeightIn": 3.858,
+      "datasheetUrl": "https://www.eaton.com/us/en-us/skuPage.KRB4ASB-12-120.html",
+      "approved": false,
+      "approval": {
+        "status": "unreviewed",
+        "authority": "",
+        "approvedBy": "",
+        "approvedAt": "",
+        "notes": "Manufacturer source verified; project approval is still required."
+      },
+      "evidenceStatus": "source_verified",
+      "source": "Eaton manufacturer product page for KRB4ASB-12-120",
+      "lastVerified": "2026-07-30"
+    },
+    {
+      "id": "ACC-04-45HB12",
+      "manufacturer": "Eaton B-Line",
+      "series": "Cable Channel",
+      "category": "fitting",
+      "subcategory": "elbow",
+      "description": "Ventilated horizontal bend cable channel, aluminum, 45 degree, 12 in radius, 4 in wide",
+      "material": "aluminum",
+      "finish": "6063-T4",
+      "unit": "EA",
+      "standards": [
+        "CSA",
+        "UL Classified",
+        "CE"
+      ],
+      "ratings": {
+        "ulClassified": true
+      },
+      "dimensions": {
+        "widthIn": 4,
+        "depthIn": 15.021,
+        "angleDeg": 45,
+        "weightLb": 1.3
+      },
+      "productHeightIn": 1.75,
+      "radiusIn": 12,
+      "datasheetUrl": "https://www.eaton.com/us/en-us/skuPage.ACC-04-45HB12.html",
+      "approved": false,
+      "approval": {
+        "status": "unreviewed",
+        "authority": "",
+        "approvedBy": "",
+        "approvedAt": "",
+        "notes": "Manufacturer source verified; project approval is still required."
+      },
+      "evidenceStatus": "source_verified",
+      "source": "Eaton manufacturer product page for ACC-04-45HB12",
+      "lastVerified": "2026-07-30"
+    },
+    {
+      "id": "KRA-SDO-12",
+      "manufacturer": "Eaton B-Line",
+      "series": "KwikRail",
+      "category": "accessory",
+      "subcategory": "cable drop-out",
+      "description": "KwikRail aluminum side-rail drop-out accessory for 12 in wide tray",
+      "material": "aluminum",
+      "finish": "aluminum",
+      "unit": "EA",
+      "standards": [
+        "Certification not applicable per manufacturer product page"
+      ],
+      "dimensions": {
+        "widthIn": 9.459,
+        "depthIn": 12,
+        "weightLb": 0.927
+      },
+      "productHeightIn": 1,
+      "datasheetUrl": "https://www.eaton.com/us/en-us/skuPage.KRA-SDO-12.html",
+      "approved": false,
+      "approval": {
+        "status": "unreviewed",
+        "authority": "",
+        "approvedBy": "",
+        "approvedAt": "",
+        "notes": "Manufacturer source verified; project approval is still required."
+      },
+      "evidenceStatus": "source_verified",
+      "source": "Eaton manufacturer product page for KRA-SDO-12",
+      "lastVerified": "2026-07-30"
+    },
+    {
+      "id": "KR4A-END-12",
+      "manufacturer": "Eaton B-Line",
+      "series": "KwikRail",
+      "category": "accessory",
+      "subcategory": "blind end",
+      "description": "KwikRail aluminum blind end for 12 in wide KRA4A and KRB4A tray",
+      "material": "aluminum",
+      "finish": "aluminum",
+      "unit": "EA",
+      "standards": [
+        "Certification not applicable per manufacturer product page"
+      ],
+      "dimensions": {
+        "widthIn": 14.194,
+        "depthIn": 12,
+        "weightLb": 1.391
+      },
+      "productHeightIn": 4,
+      "datasheetUrl": "https://www.eaton.com/us/en-us/skuPage.KR4A-END-12.html",
+      "approved": false,
+      "approval": {
+        "status": "unreviewed",
+        "authority": "",
+        "approvedBy": "",
+        "approvedAt": "",
+        "notes": "Manufacturer source verified; project approval is still required."
+      },
+      "evidenceStatus": "source_verified",
+      "source": "Eaton manufacturer product page for KR4A-END-12",
+      "lastVerified": "2026-07-30"
     }
   ]
 }

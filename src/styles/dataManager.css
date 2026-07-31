@@ -1,0 +1,97 @@
+/* One-Line Data Manager — tabular model review and controlled batch editing */
+.dm-controls,
+.dm-batch-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 0.8rem;
+}
+
+.dm-controls label,
+.dm-batch-controls label {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 10rem;
+  color: var(--color-text, #1f2937);
+  font-size: 0.8rem;
+  font-weight: 650;
+}
+
+.dm-controls input,
+.dm-controls select,
+.dm-batch-controls input,
+.dm-batch-controls select {
+  min-height: 2.2rem;
+  border: 1px solid var(--color-border, #d1d5db);
+  border-radius: var(--radius, 6px);
+  background: var(--color-surface, #fff);
+  color: var(--color-text, #1f2937);
+  padding: 0.35rem 0.5rem;
+}
+
+.dm-controls #dm-search { min-width: min(20rem, 76vw); }
+
+.dm-table-scroll {
+  overflow: auto;
+  border: 1px solid var(--color-border, #d1d5db);
+  border-radius: var(--radius, 6px);
+}
+
+.dm-table {
+  width: 100%;
+  min-width: 72rem;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+}
+
+.dm-table th,
+.dm-table td {
+  border-bottom: 1px solid var(--color-border, #e5e7eb);
+  padding: 0.45rem 0.55rem;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.dm-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--color-surface-alt, #f8fafc);
+  white-space: nowrap;
+}
+
+.dm-table tr:last-child td { border-bottom: 0; }
+.dm-table input:not([type="checkbox"]) { width: 100%; min-width: 6rem; }
+.dm-table input[type="checkbox"] { inline-size: 1rem; block-size: 1rem; }
+.dm-table .dm-id { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space: nowrap; }
+.dm-subtype { display: block; color: var(--color-text-muted, #64748b); font-size: 0.7rem; }
+.dm-empty { padding: 1.25rem !important; color: var(--color-text-muted, #64748b); font-style: italic; text-align: center !important; }
+
+.dm-import-warnings {
+  margin: 0.9rem 0;
+  color: var(--color-text-muted, #64748b);
+  font-size: 0.8rem;
+}
+
+.dm-import-warnings h3 { margin: 0 0 0.35rem; color: var(--color-warning, #a16207); font-size: 0.85rem; }
+.dm-import-warnings ul { margin: 0; padding-left: 1.25rem; }
+
+body.dark-mode .dm-controls input,
+body.dark-mode .dm-controls select,
+body.dark-mode .dm-batch-controls input,
+body.dark-mode .dm-batch-controls select,
+body.dark-mode .dm-table input:not([type="checkbox"]) {
+  background: var(--color-surface-alt, #1e293b);
+  border-color: var(--color-border, #475569);
+  color: var(--color-text, #e2e8f0);
+}
+
+body.dark-mode .dm-table th { background: var(--color-surface-alt, #1e293b); }
+
+@media (max-width: 640px) {
+  .dm-controls,
+  .dm-batch-controls { align-items: stretch; }
+  .dm-controls label,
+  .dm-batch-controls label { min-width: 100%; }
+  .dm-controls #dm-search { min-width: 100%; }
+}

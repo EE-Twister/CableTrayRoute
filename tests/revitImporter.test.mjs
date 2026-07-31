@@ -33,6 +33,11 @@ describe('parseRevit - JSON object input', () => {
     assert.strictEqual(result.trays[0].material, 'Aluminum');
   });
 
+  it('retains a source BIM GUID for coordination reconciliation', () => {
+    const result = parseRevit({ trays: [{ id: 'T-GUID', GlobalId: 'IFC-GUID-01' }] });
+    assert.strictEqual(result.trays[0].bim_guid, 'IFC-GUID-01');
+  });
+
   it('falls back to Trays field name', () => {
     const result = parseRevit({ Trays: [{ id: 'T2' }] });
     assert.strictEqual(result.trays.length, 1);
@@ -268,6 +273,21 @@ describe('parseRevit - conduit normalization', () => {
   it('reads capacity from fill fallback', () => {
     const result = parseRevit({ conduits: [{ fill: 0.4 }] });
     assert.strictEqual(result.conduits[0].capacity, 0.4);
+  });
+});
+
+describe('parseRevit - non-raceway coordination objects', () => {
+  it('normalizes equipment and support metadata from a Revit JSON export', () => {
+    const result = parseRevit({
+      ElectricalEquipment: [{ id: 'MCC-1', GlobalId: 'EQ-GUID-1', Family: 'MCC', Manufacturer: 'Contoso', Model: 'M-400', location: { x: 10, y: 20, z: 0 } }],
+      Hangers: [{ id: 'HGR-1', GlobalId: 'SUP-GUID-1', Type: 'Trapeze', HostId: 'TR-1', X: 12, Y: 2, Z: 8 }]
+    });
+    assert.strictEqual(result.equipment[0].bim_guid, 'EQ-GUID-1');
+    assert.strictEqual(result.equipment[0].family, 'MCC');
+    assert.strictEqual(result.equipment[0].x, 10);
+    assert.strictEqual(result.supports[0].supportType, 'Trapeze');
+    assert.strictEqual(result.supports[0].hostId, 'TR-1');
+    assert.strictEqual(result.supports[0].z, 8);
   });
 });
 

@@ -337,6 +337,44 @@ curl http://localhost:3000/api/v1/library/shared/abc123...
 
 ---
 
+## Approved Team Library Endpoints
+
+An approved team library is a deployment-wide, immutable release stream. All authenticated users can read the latest release; only users with the `admin` role can publish. Releases retain the publisher, time, and optional change note for auditing.
+
+### GET /api/v1/team-library
+
+Returns the latest approved team-library release. Returns `404` if no release has been published.
+
+```json
+{
+  "version": "1712345678901-a1b2c3d4",
+  "data": { "categories": ["bus"], "components": [], "icons": {} },
+  "publishedAt": "2026-07-31T18:30:00.000Z",
+  "publishedBy": "standards_admin",
+  "releaseNotes": "Approved breaker and MCC catalog updates"
+}
+```
+
+### GET /api/v1/team-library/releases
+
+Lists release metadata, newest first. The list intentionally omits the component payload; load the latest endpoint when the actual library data is required.
+
+### PUT /api/v1/team-library
+
+Requires: `admin` role and CSRF token. Publishes the supplied valid library payload as a new immutable release. Include `baseVersion` to protect against replacing a release published after the editor was loaded. `releaseNotes` is optional and limited to 500 characters.
+
+```json
+{
+  "data": { "categories": ["bus"], "components": [], "icons": {} },
+  "baseVersion": "1712345000000-1234abcd",
+  "releaseNotes": "Standards committee approval 2026-07"
+}
+```
+
+Returns `409` with `currentVersion` when the supplied `baseVersion` is stale. Repeating an unchanged release returns the existing release with `unchanged: true` rather than creating duplicate history.
+
+---
+
 ## TCC Device Library — IEC 60255-151 Relay Types
 
 The protective device library (`data/protectiveDevices.json`) includes four IEC 60255-151 formula-based relay types. These relay curves are computed mathematically from the formula **t = TMS × k / [(I/Is)^α − 1]** rather than using sampled point arrays, so they accept `tms` and `pickup` as their primary settings.

@@ -8,7 +8,7 @@
  * data store (start_x, start_y, ...).
  *
  * @param {string|object} input - IFC STEP text or Revit JSON.
- * @returns {{trays:Array, conduits:Array}}
+ * @returns {{trays:Array, conduits:Array, equipment:Array, supports:Array}}
  */
 export function parseRevit(input) {
   if (typeof input === "string") {
@@ -31,9 +31,11 @@ export function parseRevit(input) {
  * @param {any} obj
  */
 function parseRevitJSON(obj) {
-  if (!obj || typeof obj !== "object") return { trays: [], conduits: [] };
+  if (!obj || typeof obj !== "object") return { trays: [], conduits: [], equipment: [], supports: [] };
   const trays = [];
   const conduits = [];
+  const equipment = [];
+  const supports = [];
 
   const traySrc =
     obj.trays || obj.Trays || obj.cableTrays || obj.CableTrays || [];
@@ -51,7 +53,17 @@ function parseRevitJSON(obj) {
     conduits.push(normalizeConduit(c));
   }
 
-  return { trays, conduits };
+  const equipmentSrc = obj.equipment || obj.Equipment || obj.electricalEquipment || obj.ElectricalEquipment || [];
+  for (const item of equipmentSrc) {
+    equipment.push(normalizeEquipment(item));
+  }
+
+  const supportSrc = obj.supports || obj.Supports || obj.hangers || obj.Hangers || obj.brackets || obj.Brackets || [];
+  for (const item of supportSrc) {
+    supports.push(normalizeSupport(item));
+  }
+
+  return { trays, conduits, equipment, supports };
 }
 
 function num(val) {
@@ -62,6 +74,7 @@ function num(val) {
 function normalizeTray(t = {}) {
   return {
     id: t.id || t.tag || t.tray_id || t.TrayID || t.name || t.Tag || "",
+    bim_guid: t.bim_guid || t.bimGuid || t.globalId || t.GlobalId || t.guid || t.Guid || t._ctr?.bim_guid || "",
     start_x: num(t.start_x ?? t.sx ?? t.x1 ?? t.StartX ?? t.start?.x),
     start_y: num(t.start_y ?? t.sy ?? t.y1 ?? t.StartY ?? t.start?.y),
     start_z: num(t.start_z ?? t.sz ?? t.z1 ?? t.StartZ ?? t.start?.z),
@@ -77,6 +90,7 @@ function normalizeTray(t = {}) {
 function normalizeConduit(c = {}) {
   return {
     conduit_id: c.conduit_id || c.id || c.tag || c.ConduitID || "",
+    bim_guid: c.bim_guid || c.bimGuid || c.globalId || c.GlobalId || c.guid || c.Guid || c._ctr?.bim_guid || "",
     type: c.type || c.conduit_type || c.Type || "",
     trade_size: c.trade_size || c.tradeSize || c.size || c.TradeSize || "",
     start_x: num(c.start_x ?? c.sx ?? c.x1 ?? c.start?.x),
@@ -87,6 +101,41 @@ function normalizeConduit(c = {}) {
     end_z: num(c.end_z ?? c.ez ?? c.z2 ?? c.end?.z),
     material: c.material || c.Material || c._ctr?.material || "",
     capacity: num(c.capacity ?? c.fill),
+  };
+}
+
+function normalizeEquipment(item = {}) {
+  return {
+    id: item.id || item.tag || item.equipment_id || item.EquipmentID || item.name || item.Name || "",
+    bim_guid: item.bim_guid || item.bimGuid || item.globalId || item.GlobalId || item.guid || item.Guid || item._ctr?.bim_guid || "",
+    category: item.category || item.Category || item.classification || item.Classification || "",
+    family: item.family || item.Family || "",
+    type: item.type || item.Type || item.equipment_type || item.EquipmentType || "",
+    manufacturer: item.manufacturer || item.Manufacturer || "",
+    model: item.model || item.Model || "",
+    system: item.system || item.system_name || item.System || "",
+    voltage: item.voltage || item.Voltage || "",
+    level: item.level || item.Level || "",
+    area: item.area || item.Area || "",
+    x: num(item.x ?? item.X ?? item.location?.x ?? item.Location?.x),
+    y: num(item.y ?? item.Y ?? item.location?.y ?? item.Location?.y),
+    z: num(item.z ?? item.Z ?? item.location?.z ?? item.Location?.z),
+  };
+}
+
+function normalizeSupport(item = {}) {
+  return {
+    id: item.id || item.tag || item.support_id || item.SupportID || item.name || item.Name || "",
+    bim_guid: item.bim_guid || item.bimGuid || item.globalId || item.GlobalId || item.guid || item.Guid || item._ctr?.bim_guid || "",
+    supportType: item.supportType || item.support_type || item.type || item.Type || item.family || item.Family || "",
+    hostId: item.hostId || item.host_id || item.HostId || item.host || item.Host || "",
+    material: item.material || item.Material || "",
+    system: item.system || item.system_name || item.System || "",
+    level: item.level || item.Level || "",
+    area: item.area || item.Area || "",
+    x: num(item.x ?? item.X ?? item.location?.x ?? item.Location?.x),
+    y: num(item.y ?? item.Y ?? item.location?.y ?? item.Location?.y),
+    z: num(item.z ?? item.Z ?? item.location?.z ?? item.Location?.z),
   };
 }
 
@@ -109,6 +158,8 @@ function normalizeConduit(c = {}) {
 function parseIFC(text) {
   const trays = [];
   const conduits = [];
+  const equipment = [];
+  const supports = [];
 
   // --- Pass 1: inline simplified format (existing behaviour) ---
   const segRegex =
@@ -133,7 +184,7 @@ function parseIFC(text) {
   }
 
   // If inline format found something, return it
-  if (trays.length > 0 || conduits.length > 0) return { trays, conduits };
+  if (trays.length > 0 || conduits.length > 0) return { trays, conduits, equipment, supports };
 
   // --- Pass 2: referenced-entity IFC4 format ---
   // Build a map from entity id → parsed content for CartesianPoint and Polyline
@@ -165,6 +216,7 @@ function parseIFC(text) {
     const body = segEMatch[1];
     // Extract the name (3rd positional argument, single-quoted)
     const nameMatch = body.match(/'([^']*)'/g);
+    const segGuid = nameMatch && nameMatch[0] ? nameMatch[0].replace(/'/g, '') : '';
     const segName = nameMatch && nameMatch[1] ? nameMatch[1].replace(/'/g, '') : `SEG-${j}`;
     // Determine type: .CABLETRAY. or .CONDUIT.
     const isTray = /\.CABLETRAY\./i.test(body);
@@ -185,6 +237,7 @@ function parseIFC(text) {
       const pt2 = cartesianPoints.get(ptIds[1]) || [0, 0, 0];
       const seg = {
         id: segName || `SEG-${j}`,
+        bim_guid: segGuid,
         start_x: pt1[0],
         start_y: pt1[1],
         start_z: pt1[2],
@@ -198,6 +251,6 @@ function parseIFC(text) {
     j++;
   }
 
-  return { trays, conduits };
+  return { trays, conduits, equipment, supports };
 }
 

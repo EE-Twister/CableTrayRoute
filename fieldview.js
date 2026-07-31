@@ -14,8 +14,12 @@
 import {
   getCables,
   getFieldExecutionRecords,
+  getFieldObservationQueue,
+  getFieldObservations,
   getTrays,
   setFieldExecutionRecords,
+  setFieldObservationQueue,
+  setFieldObservations,
 } from './dataStore.mjs';
 import {
   FIELD_EXECUTION_STATUSES,
@@ -24,6 +28,16 @@ import {
   summarizeFieldExecution,
   upsertFieldExecutionRecord,
 } from './analysis/fieldExecution.mjs';
+import {
+  FIELD_OBSERVATION_STATUSES,
+  FIELD_OBSERVATION_TYPES,
+  enqueueFieldObservation,
+  normalizeFieldObservation,
+  summarizeFieldObservations,
+  upsertFieldObservation,
+} from './analysis/fieldObservations.mjs';
+
+const MAX_FIELD_ATTACHMENT_BYTES = 2 * 1024 * 1024;
 
 const PREVIEW_CABLE = {
   tag: 'C-1042',
@@ -136,6 +150,70 @@ function renderExecutionPanel(recordType, sourceId, options = {}) {
     </section>`;
 }
 
+function formatObservationType(type) {
+  return String(type || 'installation').replace(/-/g, ' ').replace(/\b\w/g, char => char.toUpperCase());
+}
+
+function renderObservationPanel(sourceType, sourceId, options = {}) {
+  if (options.preview) return '';
+  const observations = getFieldObservations()
+    .map(item => normalizeFieldObservation(item))
+    .filter(item => item.sourceType === sourceType && item.sourceId === sourceId);
+  const summary = summarizeFieldObservations(getFieldObservations(), getFieldObservationQueue());
+  const typeOptions = FIELD_OBSERVATION_TYPES
+    .map(type => `<option value="${type}">${esc(formatObservationType(type))}</option>`)
+    .join('');
+  const statusOptions = FIELD_OBSERVATION_STATUSES
+    .map(status => `<option value="${status}">${esc(formatObservationType(status))}</option>`)
+    .join('');
+  const recent = observations.slice(0, 3).map(item => `
+    <li class="fv-observation-item">
+      <strong>${esc(formatObservationType(item.type))}: ${esc(item.summary)}</strong>
+      <span>${esc(formatObservationType(item.status))}${item.attachments.length ? ` · ${item.attachments.length} attachment(s)` : ''}</span>
+    </li>`).join('');
+  return `
+    <section class="fv-execution fv-observation" aria-label="Field observations">
+      <div class="fv-execution-heading">
+        <div>
+          <span class="fv-label">Offline-first project record</span>
+          <h2>Field observation / punch item</h2>
+        </div>
+        <span class="fv-status-badge">${summary.open} open</span>
+      </div>
+      ${recent ? `<ul class="fv-observation-list">${recent}</ul>` : '<p class="fv-observation-empty">No observations logged for this target.</p>'}
+      <div class="fv-execution-grid">
+        <label>Type
+          <select data-field-observation="type">${typeOptions}</select>
+        </label>
+        <label>Status
+          <select data-field-observation="status">${statusOptions}</select>
+        </label>
+        <label>Observed by
+          <input data-field-observation="observedBy" type="text" autocomplete="off">
+        </label>
+        <label>Study package ID
+          <input data-field-observation="studyPackageId" type="text" autocomplete="off" placeholder="Optional release package">
+        </label>
+      </div>
+      <label class="fv-execution-wide">Summary
+        <input data-field-observation="summary" type="text" required placeholder="What needs review or verification?">
+      </label>
+      <label class="fv-execution-wide">Comment
+        <textarea data-field-observation="comment" rows="2" placeholder="Location, condition, or test result"></textarea>
+      </label>
+      <label class="fv-execution-wide">As-built change
+        <textarea data-field-observation="asBuiltChange" rows="2" placeholder="Describe any installed condition differing from the model"></textarea>
+      </label>
+      <label class="fv-execution-wide">Photo attachment (max 2 MB)
+        <input data-field-observation="attachment" type="file" accept="image/*" capture="environment">
+      </label>
+      <div class="fv-actions">
+        <button type="button" class="fv-btn fv-btn-primary" data-save-field-observation data-source-type="${esc(sourceType)}" data-source-id="${esc(sourceId)}">Save observation</button>
+        <span class="fv-save-status" role="status" aria-live="polite"></span>
+      </div>
+    </section>`;
+}
+
 function renderCableCard(cable, trays, options = {}) {
   const trayList = Array.isArray(cable.tray_ids) && cable.tray_ids.length
     ? cable.tray_ids.join(' → ')
@@ -201,6 +279,7 @@ function renderCableCard(cable, trays, options = {}) {
         ${actions}
       </div>
       ${renderExecutionPanel('cable', cableTag, options)}
+      ${renderObservationPanel('cable', cableTag, options)}
     </article>`;
 }
 
@@ -234,6 +313,7 @@ function renderTrayCard(tray) {
         </button>
       </div>
       ${renderExecutionPanel('tray', trayTag)}
+      ${renderObservationPanel('tray', trayTag)}
     </article>`;
 }
 
@@ -335,6 +415,64 @@ function bindExecutionActions(container) {
   });
 }
 
+function readFieldAttachment(input) {
+  const file = input?.files?.[0];
+  if (!file) return Promise.resolve([]);
+  if (file.size > MAX_FIELD_ATTACHMENT_BYTES) {
+    return Promise.reject(new Error('Photo is larger than 2 MB. Choose a smaller image before saving.'));
+  }
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.addEventListener('load', () => resolve([{
+      name: file.name,
+      mediaType: file.type || 'image/*',
+      sizeBytes: file.size,
+      dataUrl: String(reader.result || ''),
+      capturedAt: new Date().toISOString(),
+    }]));
+    reader.addEventListener('error', () => reject(new Error('The selected photo could not be read on this device.')));
+    reader.readAsDataURL(file);
+  });
+}
+
+function bindObservationActions(container) {
+  const button = container.querySelector('[data-save-field-observation]');
+  if (!button) return;
+  button.addEventListener('click', async () => {
+    const panel = button.closest('.fv-observation');
+    const value = name => panel.querySelector(`[data-field-observation="${name}"]`)?.value ?? '';
+    const saveStatus = panel.querySelector('.fv-save-status');
+    button.disabled = true;
+    try {
+      const attachments = await readFieldAttachment(panel.querySelector('[data-field-observation="attachment"]'));
+      const result = upsertFieldObservation(getFieldObservations(), {
+        type: value('type'),
+        status: value('status'),
+        sourceType: button.dataset.sourceType,
+        sourceId: button.dataset.sourceId,
+        observedBy: value('observedBy'),
+        studyPackageId: value('studyPackageId'),
+        summary: value('summary'),
+        comment: value('comment'),
+        asBuiltChange: value('asBuiltChange'),
+        attachments,
+      });
+      if (result.errors.length) {
+        if (saveStatus) saveStatus.textContent = result.errors[0];
+        return;
+      }
+      setFieldObservations(result.observations);
+      setFieldObservationQueue(enqueueFieldObservation(getFieldObservationQueue(), result.observation.id));
+      if (saveStatus) saveStatus.textContent = 'Saved locally and queued for the next project save.';
+      window.setTimeout(renderCurrentTarget, 500);
+    } catch (error) {
+      if (saveStatus) saveStatus.textContent = error.message || 'Unable to save the field observation.';
+    } finally {
+      button.disabled = false;
+    }
+  });
+}
+
 function renderCurrentTarget() {
   const container = document.getElementById('fv-content');
   if (!container) return;
@@ -361,6 +499,7 @@ function renderCurrentTarget() {
     const trays = getTrays();
     container.innerHTML = renderCableCard(cable, trays);
     bindExecutionActions(container);
+    bindObservationActions(container);
     // Update page title to cable tag for easy identification
     document.title = `${cableTag} — CableTrayRoute Field View`;
     return;
@@ -379,6 +518,7 @@ function renderCurrentTarget() {
   }
   container.innerHTML = renderTrayCard(tray);
   bindExecutionActions(container);
+  bindObservationActions(container);
   document.title = `${trayId} — CableTrayRoute Field View`;
 }
 
@@ -405,6 +545,7 @@ window.addEventListener('hashchange', () => {
       ? renderCableCard(cable, getTrays())
       : renderNotFound('cable', cableTag);
     if (cable) bindExecutionActions(container);
+    if (cable) bindObservationActions(container);
     if (cable) document.title = `${cableTag} — CableTrayRoute Field View`;
     return;
   }
@@ -416,5 +557,6 @@ window.addEventListener('hashchange', () => {
     ? renderTrayCard(tray)
     : renderNotFound('tray', trayId);
   if (tray) bindExecutionActions(container);
+  if (tray) bindObservationActions(container);
   if (tray) document.title = `${trayId} — CableTrayRoute Field View`;
 });

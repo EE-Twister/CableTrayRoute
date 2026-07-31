@@ -14,7 +14,7 @@ import {
   getStudies, getStudyApprovals, getEquipment, getLoads, getOneLine,
   getReportSnapshots, setReportSnapshot, deleteReportSnapshot,
   getLifecyclePackages,
-  getDeliverableArtifacts, getFieldExecutionRecords, getProcurementRegister, upsertDeliverableArtifact,
+  getDeliverableArtifacts, getFieldExecutionRecords, getFieldObservationQueue, getFieldObservations, getProcurementRegister, upsertDeliverableArtifact,
   getDesignBasis, getDesignGateApprovals, getItem, getProjectInputFingerprint, getProjectMeta, setProjectMeta,
 } from '../dataStore.mjs';
 import { getProjectState } from '../projectStorage.js';
@@ -49,6 +49,7 @@ import {
   getAvailableSections,
   sectionToAOA,
 } from '../analysis/reportPackage.mjs';
+import { buildFieldObservationReportRows, summarizeFieldObservations } from '../analysis/fieldObservations.mjs';
 
 // ---------------------------------------------------------------------------
 // DOM references (resolved after DOMContentLoaded)
@@ -317,6 +318,8 @@ function loadProjectData() {
     procurement: getProcurementRegister(),
     costEstimate: getItem('costEstimateArtifact', null),
     fieldExecution: getFieldExecutionRecords(),
+    fieldObservations: getFieldObservations(),
+    fieldObservationQueue: getFieldObservationQueue(),
     deliverables: getDeliverableArtifacts(),
     drcResults: Array.isArray(drcRun?.findings) ? drcRun.findings : [],
   };
@@ -467,6 +470,12 @@ function constructionSectionData(projectData) {
       rows: projectData.fieldExecution,
       summary: { 'Field records': projectData.fieldExecution.length },
     },
+    fieldObservations: {
+      key: 'fieldObservations',
+      title: 'Field Observations and Punch Items',
+      rows: buildFieldObservationReportRows(projectData.fieldObservations, projectData.fieldObservationQueue),
+      summary: summarizeFieldObservations(projectData.fieldObservations, projectData.fieldObservationQueue),
+    },
     deliverables: {
       key: 'deliverables',
       title: 'Deliverable Register',
@@ -490,6 +499,8 @@ function availableSectionInputs(projectData) {
     procurement: projectData.procurement,
     costEstimate: projectData.costEstimate,
     fieldExecution: projectData.fieldExecution,
+    fieldObservations: projectData.fieldObservations,
+    fieldObservationQueue: projectData.fieldObservationQueue,
     deliverables: projectData.deliverables,
     drcResults: projectData.drcResults,
   };
@@ -884,6 +895,8 @@ function loadProjectDataWithPackage() {
     procurement: Array.isArray(snap.procurementRegister) ? snap.procurementRegister : [],
     costEstimate: snap.costEstimateArtifact || null,
     fieldExecution: Array.isArray(snap.fieldExecutionRecords) ? snap.fieldExecutionRecords : [],
+    fieldObservations: Array.isArray(snap.fieldObservations) ? snap.fieldObservations : [],
+    fieldObservationQueue: Array.isArray(snap.fieldObservationQueue) ? snap.fieldObservationQueue : [],
     deliverables: Array.isArray(snap.deliverableArtifacts) ? snap.deliverableArtifacts : [],
     drcResults: [],
   };

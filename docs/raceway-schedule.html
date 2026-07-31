@@ -24,6 +24,9 @@
 
     <h2>Views and filters</h2>
     <p>Use the <strong>View</strong> menu to switch between Basic Entry, Geometry, Fill / Grouping, BIM Export, and Full Detail. The choice is saved with the project settings.</p>
+    <h2>BIM coordination review</h2>
+    <p>The <strong>CAD / BIM → BIM Coordination</strong> action imports an IFC or Revit JSON file as a <strong>read-only project snapshot</strong>; it does not overwrite the tray or conduit schedule. It matches route IDs and available IFC/Revit global IDs, identifies geometry, schedule-only, and BIM-only differences, and compares quantities by available system, voltage, level, and area fields.</p>
+    <p>Create issues with an assignee, comments, and optional screenshot/evidence reference, then exchange them as BCF-like JSON or export the difference register as CSV. Review this snapshot before using <strong>Import CAD</strong>, which replaces live schedule data.</p>
     <p>Quick filters isolate missing geometry, duplicate IDs, unused raceways, assigned raceways, ductbank conduits, and standalone conduits.</p>
 
     <h2>Validation</h2>

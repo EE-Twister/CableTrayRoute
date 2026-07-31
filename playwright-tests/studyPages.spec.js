@@ -160,6 +160,64 @@ test.describe('Time-Current Curves', () => {
     await expect(page.locator('#device-select')).toBeAttached();
   });
 
+  test('library evidence status is visible in the device picker', async ({ page }) => {
+    await page.click('#device-modal-btn');
+    await expect(page.locator('.device-library-readiness')).toContainText('0 calculation-ready');
+    await expect(page.locator('.device-model-badge')).toContainText('Screening');
+    await expect(page.locator('.device-detail-meta')).toContainText('Library Status');
+    await page.getByRole('button', { name: 'Fuse (6)' }).click();
+    await page.getByRole('button', { name: 'S&C Electric Company (3)' }).click();
+    await expect(page.locator('.device-model-badge')).toHaveCount(3);
+    await expect(page.locator('.device-model-badge').first()).toContainText('Review');
+    await expect(page.locator('.device-detail-meta')).toContainText('Source verified — peer review pending');
+    await expect(page.locator('.device-detail-meta')).toContainText('612100');
+    const sourceVerifiedFilter = page.getByRole('button', { name: 'Source Verified (3)' });
+    await expect(sourceVerifiedFilter).toBeEnabled();
+    await sourceVerifiedFilter.click();
+    await expect(page.locator('.device-model-label')).toHaveCount(3);
+    await expect(page.locator('.device-model-label', { hasText: '65E Standard Speed' })).toBeVisible();
+    await expect(page.locator('.device-model-badge').first()).toContainText('Review');
+  });
+
+  test('custom curve builder captures promotion evidence', async ({ page }) => {
+    const toolsMenu = page.locator('details.tcc-action-menu').filter({ has: page.locator('#custom-curve-btn') });
+    await toolsMenu.locator('summary').click();
+    await page.click('#custom-curve-btn');
+    await expect(page.getByText('Source Evidence and Review')).toBeVisible();
+    await expect(page.getByLabel('Exact catalog / trip-unit identifier')).toBeVisible();
+    await expect(page.getByLabel('Source document')).toBeVisible();
+    await expect(page.getByLabel('Promote as calculation-ready after independent source review')).toBeVisible();
+  });
+
+  test('reviewed custom curve is promoted only with complete evidence', async ({ page }) => {
+    const toolsMenu = page.locator('details.tcc-action-menu').filter({ has: page.locator('#custom-curve-btn') });
+    await toolsMenu.locator('summary').click();
+    await page.click('#custom-curve-btn');
+    await page.getByLabel('Curve name').fill('Reviewed test breaker');
+    await page.getByLabel('Device type').selectOption('breaker');
+    await page.getByLabel('Exact catalog / trip-unit identifier').fill('TEST-100-3P');
+    await page.getByLabel('Source document').fill('Manufacturer TCC TEST-1');
+    await page.getByLabel('Revision or date').fill('Rev 1');
+    await page.getByLabel('Curve number or page').fill('C-1');
+    await page.getByLabel('Extraction method').fill('manufacturer spreadsheet');
+    await page.getByLabel('Reviewer').fill('Test reviewer');
+    await page.getByLabel('Voltage (VAC)').fill('480');
+    await page.getByLabel('Interrupting rating (kA)').fill('35');
+    await page.getByPlaceholder('Current (A)').fill('100');
+    await page.getByPlaceholder('Time (s)').fill('10');
+    await page.getByRole('button', { name: 'Add point', exact: true }).click();
+    await page.getByPlaceholder('Current (A)').fill('1000');
+    await page.getByPlaceholder('Time (s)').fill('0.1');
+    await page.getByRole('button', { name: 'Add point', exact: true }).click();
+    await page.getByLabel('Promote as calculation-ready after independent source review').check();
+    await page.getByRole('button', { name: 'Add Curve', exact: true }).click();
+    await expect(page.locator('#selected-device-summary').getByText('Reviewed test breaker')).toBeVisible();
+    await page.click('#device-modal-btn');
+    await page.locator('.device-filter-btn', { hasText: 'Custom Curves (1)' }).click();
+    await expect(page.locator('.device-model-badge')).toContainText('Ready');
+    await expect(page.locator('.device-detail-meta')).toContainText('Calculation-ready');
+  });
+
   test('Add Annotation button is present', async ({ page }) => {
     await expect(page.locator('#add-annotation-btn')).toBeVisible();
   });
