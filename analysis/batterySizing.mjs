@@ -274,6 +274,334 @@ export function upsKvaRequired(peakKw, upsPowerFactor = 0.9) {
   };
 }
 
+function round(value, digits = 4) {
+  const scale = 10 ** digits;
+  return Math.round(value * scale) / scale;
+}
+
+/**
+ * Validate and normalize a manufacturer discharge-current table.
+ *
+ * Each row represents the current delivered by a reference-capacity cell or
+ * string for a stated duration at one documented end voltage and temperature.
+ * The caller supplies the reference capacity separately; no manufacturer data
+ * or hidden generic curve is embedded in this module.
+ *
+ * @param {{durationMinutes:number, ampsPerReferenceCapacity?:number, ampsPer100Ah?:number}[]} rows
+ * @returns {{durationMinutes:number, ampsPerReferenceCapacity:number}[]}
+ */
+export function normalizeManufacturerDischargeTable(rows) {
+  if (!Array.isArray(rows) || rows.length < 2) {
+    throw new Error('manufacturerDischargeTable must contain at least two duration/current rows.');
+  }
+
+  const normalized = rows.map((row, index) => {
+    const durationMinutes = Number(row?.durationMinutes);
+    const ampsPerReferenceCapacity = Number(
+      row?.ampsPerReferenceCapacity ?? row?.ampsPer100Ah
+    );
+    if (!Number.isFinite(durationMinutes) || durationMinutes <= 0) {
+      throw new Error(`Manufacturer discharge row [${index}]: durationMinutes must be greater than zero.`);
+    }
+    if (!Number.isFinite(ampsPerReferenceCapacity) || ampsPerReferenceCapacity <= 0) {
+      throw new Error(`Manufacturer discharge row [${index}]: current must be greater than zero.`);
+    }
+    return { durationMinutes, ampsPerReferenceCapacity };
+  }).sort((a, b) => a.durationMinutes - b.durationMinutes);
+
+  for (let index = 1; index < normalized.length; index += 1) {
+    if (normalized[index].durationMinutes === normalized[index - 1].durationMinutes) {
+      throw new Error(`Manufacturer discharge table has duplicate duration ${normalized[index].durationMinutes} minutes.`);
+    }
+    if (normalized[index].ampsPerReferenceCapacity > normalized[index - 1].ampsPerReferenceCapacity) {
+      throw new Error('Manufacturer discharge current must not increase as duration increases.');
+    }
+  }
+  return normalized;
+}
+
+/**
+ * Interpolate discharge current on log-log axes between manufacturer points.
+ * Extrapolation is deliberately rejected because it would invent performance
+ * outside the supplied product data.
+ */
+export function interpolateManufacturerDischargeCurrent(rows, durationMinutes) {
+  const table = normalizeManufacturerDischargeTable(rows);
+  const duration = Number(durationMinutes);
+  if (!Number.isFinite(duration) || duration <= 0) {
+    throw new Error('durationMinutes must be greater than zero.');
+  }
+  const first = table[0];
+  const last = table[table.length - 1];
+  if (duration < first.durationMinutes || duration > last.durationMinutes) {
+    throw new Error(
+      `Manufacturer discharge table does not cover ${round(duration, 3)} minutes ` +
+      `(available range ${first.durationMinutes}-${last.durationMinutes} minutes).`
+    );
+  }
+  const exact = table.find(row => row.durationMinutes === duration);
+  if (exact) return exact.ampsPerReferenceCapacity;
+
+  const upperIndex = table.findIndex(row => row.durationMinutes > duration);
+  const lower = table[upperIndex - 1];
+  const upper = table[upperIndex];
+  const fraction = (
+    Math.log(duration) - Math.log(lower.durationMinutes)
+  ) / (
+    Math.log(upper.durationMinutes) - Math.log(lower.durationMinutes)
+  );
+  const current = Math.exp(
+    Math.log(lower.ampsPerReferenceCapacity) +
+    fraction * (Math.log(upper.ampsPerReferenceCapacity) - Math.log(lower.ampsPerReferenceCapacity))
+  );
+  return round(current, 6);
+}
+
+/**
+ * Size a stationary battery from a sequential dc duty cycle and a documented
+ * manufacturer discharge table.
+ *
+ * For every duty-cycle section endpoint, load changes are superimposed against
+ * the manufacturer's current capability at the remaining duration. The
+ * controlling section establishes the minimum reference capacity. Explicit
+ * temperature, end-of-life, and design-margin factors are then applied.
+ *
+ * This is a transparent manufacturer-data calculation aid. It does not claim
+ * IEEE compliance, because load classification, random-load placement, cell
+ * qualification, and project acceptance remain project-specific.
+ */
+export function sizeManufacturerDutyCycle({
+  dutyCyclePeriods,
+  manufacturerDischargeTable,
+  referenceCapacityAh,
+  temperatureCapacityFactor,
+  endOfLifeCapacityPct,
+  designMarginPct = 0,
+  candidateCellCapacityAh,
+  dcBusVoltageV,
+}) {
+  if (!Array.isArray(dutyCyclePeriods) || dutyCyclePeriods.length === 0) {
+    throw new Error('dutyCyclePeriods must be a non-empty array of {currentA, durationMinutes} rows.');
+  }
+  const periods = dutyCyclePeriods.map((period, index) => {
+    const currentA = Number(period?.currentA);
+    const durationMinutes = Number(period?.durationMinutes);
+    if (!Number.isFinite(currentA) || currentA < 0) {
+      throw new Error(`Duty-cycle period [${index}]: currentA must be zero or greater.`);
+    }
+    if (!Number.isFinite(durationMinutes) || durationMinutes <= 0) {
+      throw new Error(`Duty-cycle period [${index}]: durationMinutes must be greater than zero.`);
+    }
+    return { currentA, durationMinutes };
+  });
+  if (!periods.some(period => period.currentA > 0)) {
+    throw new Error('dutyCyclePeriods must include at least one positive current.');
+  }
+
+  const table = normalizeManufacturerDischargeTable(manufacturerDischargeTable);
+  const referenceAh = Number(referenceCapacityAh);
+  const temperatureFactorValue = Number(temperatureCapacityFactor);
+  const endOfLifePct = Number(endOfLifeCapacityPct);
+  const marginPct = Number(designMarginPct);
+  const candidateAh = Number(candidateCellCapacityAh);
+  const busVoltage = Number(dcBusVoltageV);
+  if (!Number.isFinite(referenceAh) || referenceAh <= 0) {
+    throw new Error('referenceCapacityAh must be greater than zero.');
+  }
+  if (!Number.isFinite(temperatureFactorValue) || temperatureFactorValue <= 0 || temperatureFactorValue > 1) {
+    throw new Error('temperatureCapacityFactor must be in (0, 1].');
+  }
+  if (!Number.isFinite(endOfLifePct) || endOfLifePct <= 0 || endOfLifePct > 100) {
+    throw new Error('endOfLifeCapacityPct must be in (0, 100].');
+  }
+  if (!Number.isFinite(marginPct) || marginPct < 0) {
+    throw new Error('designMarginPct must be zero or greater.');
+  }
+  if (!Number.isFinite(candidateAh) || candidateAh <= 0) {
+    throw new Error('candidateCellCapacityAh must be greater than zero.');
+  }
+  if (!Number.isFinite(busVoltage) || busVoltage <= 0) {
+    throw new Error('dcBusVoltageV must be greater than zero.');
+  }
+
+  const starts = [];
+  let elapsed = 0;
+  periods.forEach(period => {
+    starts.push(elapsed);
+    elapsed += period.durationMinutes;
+  });
+  const correctionMultiplier = (
+    (1 / temperatureFactorValue) *
+    (100 / endOfLifePct) *
+    (1 + marginPct / 100)
+  );
+
+  const sections = periods.map((period, sectionIndex) => {
+    const endMinutes = starts[sectionIndex] + period.durationMinutes;
+    let referenceUnits = 0;
+    const contributions = [];
+    for (let loadIndex = 0; loadIndex <= sectionIndex; loadIndex += 1) {
+      const previousCurrent = loadIndex === 0 ? 0 : periods[loadIndex - 1].currentA;
+      const deltaCurrentA = periods[loadIndex].currentA - previousCurrent;
+      const remainingDurationMinutes = endMinutes - starts[loadIndex];
+      const ratedCurrentA = interpolateManufacturerDischargeCurrent(table, remainingDurationMinutes);
+      const referenceUnitContribution = deltaCurrentA / ratedCurrentA;
+      referenceUnits += referenceUnitContribution;
+      contributions.push({
+        loadStep: loadIndex + 1,
+        deltaCurrentA: round(deltaCurrentA, 4),
+        remainingDurationMinutes: round(remainingDurationMinutes, 4),
+        ratedCurrentA: round(ratedCurrentA, 4),
+        referenceUnitContribution: round(referenceUnitContribution, 6),
+      });
+    }
+    const rawRequiredCapacityAh = Math.max(0, referenceUnits * referenceAh);
+    return {
+      section: sectionIndex + 1,
+      endMinutes: round(endMinutes, 4),
+      loadCurrentA: period.currentA,
+      rawRequiredCapacityAh: round(rawRequiredCapacityAh, 4),
+      correctedRequiredCapacityAh: round(rawRequiredCapacityAh * correctionMultiplier, 4),
+      contributions,
+    };
+  });
+
+  const controllingSection = sections.reduce((current, section) => (
+    section.correctedRequiredCapacityAh > current.correctedRequiredCapacityAh ? section : current
+  ));
+  const requiredCapacityAh = controllingSection.correctedRequiredCapacityAh;
+  const requiredParallelStrings = Math.max(1, Math.ceil(requiredCapacityAh / candidateAh));
+  const installedCapacityAh = requiredParallelStrings * candidateAh;
+
+  return {
+    periods,
+    manufacturerDischargeTable: table,
+    referenceCapacityAh: referenceAh,
+    temperatureCapacityFactor: temperatureFactorValue,
+    endOfLifeCapacityPct: endOfLifePct,
+    agingFactor: round(100 / endOfLifePct, 6),
+    designMarginPct: marginPct,
+    correctionMultiplier: round(correctionMultiplier, 6),
+    sections,
+    controllingSection: controllingSection.section,
+    requiredCapacityAh: round(requiredCapacityAh, 2),
+    candidateCellCapacityAh: candidateAh,
+    requiredParallelStrings,
+    installedCapacityAh: round(installedCapacityAh, 2),
+    dcBusVoltageV: busVoltage,
+    minimumNominalEnergyKwh: round(requiredCapacityAh * busVoltage / 1000, 2),
+    installedNominalEnergyKwh: round(installedCapacityAh * busVoltage / 1000, 2),
+  };
+}
+
+/** Run the manufacturer-data duty-cycle branch used by the page orchestrator. */
+export function runManufacturerDutyCycleAnalysis(inputs) {
+  const {
+    systemLabel = '',
+    averageLoadKw,
+    peakLoadKw,
+    runtimeHours,
+    chemistry,
+    ambientTempC = 25,
+    designMarginPct = 0,
+    upsPowerFactor = 0.9,
+    rackLayoutInputs,
+    dutyCyclePeriods,
+    manufacturerDischargeTable,
+    referenceCapacityAh,
+    temperatureCapacityFactor,
+    endOfLifeCapacityPct,
+    endVoltageVPerCell,
+    dischargeTableSource,
+  } = inputs;
+  if (!averageLoadKw || averageLoadKw <= 0) throw new Error('averageLoadKw must be greater than zero.');
+  if (!peakLoadKw || peakLoadKw <= 0) throw new Error('peakLoadKw must be greater than zero.');
+  if (!runtimeHours || runtimeHours <= 0) throw new Error('runtimeHours must be greater than zero.');
+  const chem = CHEMISTRY[chemistry];
+  if (!chem) throw new Error(`Unknown chemistry "${chemistry}".`);
+  if (!String(dischargeTableSource || '').trim()) {
+    throw new Error('dischargeTableSource is required for manufacturer-data sizing.');
+  }
+  const endVoltage = Number(endVoltageVPerCell);
+  if (!Number.isFinite(endVoltage) || endVoltage <= 0) {
+    throw new Error('endVoltageVPerCell must be greater than zero.');
+  }
+
+  const dcBusVoltageV = Number(rackLayoutInputs?.dcBusVoltageV);
+  const candidateCellCapacityAh = Number(rackLayoutInputs?.cellCapacityAh);
+  const duty = sizeManufacturerDutyCycle({
+    dutyCyclePeriods,
+    manufacturerDischargeTable,
+    referenceCapacityAh,
+    temperatureCapacityFactor,
+    endOfLifeCapacityPct,
+    designMarginPct,
+    candidateCellCapacityAh,
+    dcBusVoltageV,
+  });
+  const ups = upsKvaRequired(peakLoadKw, upsPowerFactor);
+  const kwhNet = round(duty.periods.reduce((total, period) => (
+    total + period.currentA * dcBusVoltageV / 1000 * period.durationMinutes / 60
+  ), 0), 4);
+  const standardBasis = chemistry.startsWith('lead-acid')
+    ? 'IEEE 485-2020 duty-cycle framework'
+    : chemistry === 'nickel-cadmium'
+      ? 'IEEE 1115-2014 duty-cycle framework'
+      : 'Manufacturer-specific discharge-performance method';
+  const warnings = [
+    'Manufacturer-data calculation: verify the entered discharge table uses the selected cell, end voltage, temperature basis, and reference capacity.',
+    'This result supports cell-selection review but does not certify IEEE compliance or replace manufacturer sizing software and project acceptance checks.',
+  ];
+  if (chemistry === 'lithium-ion') {
+    warnings.push('IEEE 485 and IEEE 1115 do not apply to lithium-ion; the result is manufacturer-specific.');
+  }
+  if (duty.requiredParallelStrings > 1) {
+    warnings.push(`${duty.requiredParallelStrings} parallel strings are required for the entered ${candidateCellCapacityAh} Ah candidate cell.`);
+  }
+
+  return {
+    systemLabel,
+    chemistry,
+    chemistryLabel: chem.label,
+    averageLoadKw,
+    peakLoadKw,
+    runtimeHours,
+    ambientTempC,
+    designMarginPct,
+    upsPowerFactor,
+    sizingMethod: 'manufacturer-duty-cycle',
+    usingDutyCycle: true,
+    kwhNet,
+    kwhFinal: duty.minimumNominalEnergyKwh,
+    selectedBankKwh: duty.installedNominalEnergyKwh,
+    nextLargerKwh: null,
+    bankOptions: [],
+    exceedsStandard: false,
+    runtimeCurvePoints: [],
+    kvaRequired: ups.kvaRequired,
+    standardKva: ups.standardKva,
+    dutyCycleSizing: duty,
+    endVoltageVPerCell: endVoltage,
+    dischargeTableSource: String(dischargeTableSource).trim(),
+    standardBasis,
+    dod: chem.dod,
+    eta: chem.eta,
+    agingFactor: duty.agingFactor,
+    rackLayoutInputs: rackLayoutInputs && typeof rackLayoutInputs === 'object'
+      ? { ...rackLayoutInputs }
+      : undefined,
+    calculationStatus: 'manufacturer-data-based',
+    standardCompliance: null,
+    requiredInputs: [
+      'Confirm momentary, noncontinuous, continuous, and random load placement in the project duty cycle.',
+      'Confirm the selected cell model, end voltage, temperature correction, end-of-life criterion, and discharge table revision.',
+      'Complete manufacturer, protection, ventilation, seismic, short-circuit, and installation reviews before issue.',
+    ],
+    warnings,
+    timestamp: new Date().toISOString(),
+  };
+}
+
 /**
  * Run a preliminary battery / UPS energy screening analysis.
  *
@@ -308,6 +636,7 @@ export function runBatterySizingAnalysis(inputs) {
     upsPowerFactor = 0.9,
     rackLayoutInputs,
     loadProfilePeriods,
+    sizingMethod = 'energy-screen',
   } = inputs;
 
   // --- Input validation ---
@@ -319,6 +648,12 @@ export function runBatterySizingAnalysis(inputs) {
       `Unknown chemistry "${chemistry}". ` +
       `Valid values: ${Object.keys(CHEMISTRY).join(', ')}.`
     );
+  }
+  if (sizingMethod === 'manufacturer-duty-cycle') {
+    return runManufacturerDutyCycleAnalysis(inputs);
+  }
+  if (sizingMethod !== 'energy-screen') {
+    throw new Error(`Unknown sizingMethod "${sizingMethod}".`);
   }
 
   const warnings = [];

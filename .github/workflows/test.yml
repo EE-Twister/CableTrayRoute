@@ -18,7 +18,7 @@ jobs:
         run: npm install --no-save eslint prettier
       - name: Lint
         run: |
-          npx eslint . --max-warnings=0
+          npm run lint
           npx prettier --check '**/*.js'
       - name: Build test assets
         run: npm run build

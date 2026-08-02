@@ -13,6 +13,54 @@ async function openToolbarMenu(page, name) {
   await page.locator('summary.command-menu-trigger', { hasText: new RegExp(`^${name}`) }).first().click();
 }
 
+test('protection zones create, edit, assign, hide, and delete through the extracted domain', async ({ page }) => {
+  await page.addInitScript(() => {
+    if (sessionStorage.getItem('protectionZoneE2eStarted') === 'true') return;
+    localStorage.clear();
+    sessionStorage.clear();
+    sessionStorage.setItem('protectionZoneE2eStarted', 'true');
+    localStorage.setItem('onelineTourDone', 'true');
+  });
+  await page.goto(pageUrl('oneline.html?e2e=1'));
+  await page.waitForSelector('[data-oneline-ready="1"]');
+
+  await openToolbarMenu(page, 'Insert');
+  await page.locator('#protection-zones-panel-toggle').click();
+  await expect(page.locator('#protection-zones-panel')).toBeVisible();
+  await expect(page.locator('#protection-zone-list')).toContainText('No zones');
+
+  await page.locator('#add-protection-zone-btn').click();
+  const zone = page.locator('#protection-zone-list [data-zone-id]');
+  await expect(zone).toHaveCount(1);
+  await expect(zone.locator('.layer-row-name')).toHaveText('Zone 1');
+
+  await page.locator('#undo-btn').click();
+  await expect(page.locator('#protection-zone-list')).toContainText('No zones');
+  await page.locator('#redo-btn').click();
+  await expect(zone.locator('.layer-row-name')).toHaveText('Zone 1');
+
+  await zone.locator('.layer-row-name').dblclick();
+  await zone.locator('.layer-rename-input').fill('Main Feeder Zone');
+  await zone.locator('.layer-rename-input').press('Enter');
+  await expect(zone.locator('.layer-row-name')).toHaveText('Main Feeder Zone');
+
+  await page.reload();
+  await page.waitForSelector('[data-oneline-ready="1"]');
+  await openToolbarMenu(page, 'Insert');
+  await page.locator('#protection-zones-panel-toggle').click();
+  await expect(zone.locator('.layer-row-name')).toHaveText('Main Feeder Zone');
+
+  await zone.getByRole('button', { name: 'Assign components' }).click();
+  await expect(page.locator('#zone-assign-mode-banner')).toBeVisible();
+  await page.locator('#zone-assign-done-btn').click();
+  await expect(page.locator('#zone-assign-mode-banner')).toBeHidden();
+
+  await zone.getByRole('button', { name: 'Hide zone' }).click();
+  await expect(zone.getByRole('button', { name: 'Show zone' })).toBeVisible();
+  await zone.getByRole('button', { name: 'Delete zone' }).click();
+  await expect(page.locator('#protection-zone-list')).toContainText('No zones');
+});
+
 test('mobile layout keeps the canvas reachable and starts with the inspector collapsed', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.addInitScript(() => {

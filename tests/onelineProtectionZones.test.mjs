@@ -7,103 +7,20 @@
 
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-
-// ---------------------------------------------------------------------------
-// Pure helper functions mirroring oneline.js logic (for testability)
-// ---------------------------------------------------------------------------
-
-const ZONE_COLORS = ['#e74c3c', '#1abc9c', '#3498db', '#2ecc71', '#f39c12', '#9b59b6', '#16a085', '#e67e22'];
+import {
+  PROTECTION_ZONE_COLORS as ZONE_COLORS,
+  computeProtectionZoneBounds as computeZoneBounds,
+  createProtectionZone,
+  deleteProtectionZone,
+  getProtectionZones,
+  renameProtectionZone,
+  setProtectionZoneColor as setZoneColor,
+  setProtectionZoneVisibility as setZoneVisibility,
+  toggleProtectionZoneComponent as toggleComponentInZone,
+} from '../src/one-line/protectionZones.mjs';
 
 function makeSheet() {
   return { name: 'Sheet 1', components: [], connections: [], layers: [] };
-}
-
-function getProtectionZones(sheet) {
-  if (!sheet.protectionZones) sheet.protectionZones = [];
-  return sheet.protectionZones;
-}
-
-function createProtectionZone(sheet, name) {
-  const zones = getProtectionZones(sheet);
-  const color = ZONE_COLORS[zones.length % ZONE_COLORS.length];
-  const zone = {
-    id: 'zone_' + (zones.length + 1), // deterministic id for tests
-    name: name || `Zone ${zones.length + 1}`,
-    color,
-    componentIds: [],
-    visible: true
-  };
-  zones.push(zone);
-  return zone;
-}
-
-function deleteProtectionZone(sheet, zoneId) {
-  const zones = getProtectionZones(sheet);
-  const idx = zones.findIndex(z => z.id === zoneId);
-  if (idx === -1) return false;
-  zones.splice(idx, 1);
-  return true;
-}
-
-function renameProtectionZone(sheet, zoneId, newName) {
-  const zone = getProtectionZones(sheet).find(z => z.id === zoneId);
-  if (!zone || !newName.trim()) return false;
-  zone.name = newName.trim();
-  return true;
-}
-
-function setZoneVisibility(sheet, zoneId, visible) {
-  const zone = getProtectionZones(sheet).find(z => z.id === zoneId);
-  if (!zone) return false;
-  zone.visible = visible;
-  return true;
-}
-
-function setZoneColor(sheet, zoneId, color) {
-  const zone = getProtectionZones(sheet).find(z => z.id === zoneId);
-  if (!zone) return false;
-  zone.color = color;
-  return true;
-}
-
-function toggleComponentInZone(sheet, zoneId, compId) {
-  const zone = getProtectionZones(sheet).find(z => z.id === zoneId);
-  if (!zone) return false;
-  const idx = zone.componentIds.indexOf(compId);
-  if (idx === -1) zone.componentIds.push(compId);
-  else zone.componentIds.splice(idx, 1);
-  return true;
-}
-
-/**
- * Compute axis-aligned bounding box for a zone given a component list.
- * Returns null if no valid components are found.
- * Mirrors the rendering logic in renderProtectionZones().
- */
-function computeZoneBounds(zone, components, pad = 12) {
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-  const compWidth = 50, compHeight = 50; // default dimensions (matches oneline.js)
-  zone.componentIds.forEach(id => {
-    const comp = components.find(c => c.id === id);
-    if (!comp) return;
-    const w = comp.width || compWidth;
-    const h = comp.height || compHeight;
-    const left = comp.x;
-    const top = comp.y;
-    const right = comp.x + w;
-    const bottom = comp.y + h;
-    minX = Math.min(minX, left);
-    minY = Math.min(minY, top);
-    maxX = Math.max(maxX, right);
-    maxY = Math.max(maxY, bottom);
-  });
-  if (!Number.isFinite(minX)) return null;
-  return {
-    x: minX - pad,
-    y: minY - pad,
-    width: maxX - minX + pad * 2,
-    height: maxY - minY + pad * 2
-  };
 }
 
 // ---------------------------------------------------------------------------

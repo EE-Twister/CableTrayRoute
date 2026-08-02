@@ -575,7 +575,11 @@ function compareRoute(route, pageContract, reads, writes) {
   const declaredKeys = uniqueSorted([...inputKeys, ...outputKeys]);
   const readKeys = [...reads.keys()];
   const writeKeys = [...writes.keys()];
-  const unreadInputs = pageContract.projectInputs.filter(item => !keyCoveredBy(item.key, readKeys) && !keyCoveredBy(item.key, writeKeys));
+  const inputsWithoutEvidence = pageContract.projectInputs.filter(item => (
+    !keyCoveredBy(item.key, readKeys) && !keyCoveredBy(item.key, writeKeys)
+  ));
+  const indirectInputs = inputsWithoutEvidence.filter(item => item.audit?.expectRead === false);
+  const unreadInputs = inputsWithoutEvidence.filter(item => item.audit?.expectRead !== false);
   const declaredOutputsNotWritten = outputKeys.filter(key => !keyCoveredBy(key, writeKeys));
   const undocumentedReads = readKeys.filter(key => !keyCoveredBy(key, declaredKeys));
   const undocumentedWrites = writeKeys.filter(key => !keyCoveredBy(key, outputKeys));
@@ -585,6 +589,10 @@ function compareRoute(route, pageContract, reads, writes) {
     declaredInputWarnings: unreadInputs.map(item => ({
       key: item.key,
       reason: item.audit?.reason || 'No static read/write evidence was detected for this declared input.'
+    })),
+    declaredIndirectInputs: indirectInputs.map(item => ({
+      key: item.key,
+      reason: item.audit?.reason || 'This input is intentionally supplied as indirect workflow context.'
     })),
     declaredOutputsNotWritten,
     undocumentedReads,
@@ -624,6 +632,7 @@ export async function buildPageContractAudit() {
       : {
         declaredInputsNotRead: [],
         declaredInputWarnings: [],
+        declaredIndirectInputs: [],
         declaredOutputsNotWritten: [],
         undocumentedReads: [],
           undocumentedWrites: [],
@@ -653,6 +662,7 @@ export async function buildPageContractAudit() {
     routesWithUndocumentedReads: routes.filter(route => route.undocumentedReads.length > 0).length,
     routesWithUndocumentedWrites: routes.filter(route => route.undocumentedWrites.length > 0).length,
     routesWithDeclaredInputsNotRead: routes.filter(route => route.declaredInputsNotRead.length > 0).length,
+    routesWithDeclaredIndirectInputs: routes.filter(route => route.declaredIndirectInputs.length > 0).length,
     routesWithDeclaredOutputsNotWritten: routes.filter(route => route.declaredOutputsNotWritten.length > 0).length,
     directStorageHits: routes.reduce((sum, route) => sum + route.directStorage.length, 0),
     unclassifiedDirectStorageHits: routes.reduce((sum, route) => (
@@ -714,6 +724,7 @@ function routeHasAuditFindings(route) {
   return route.undocumentedReads.length
     || route.undocumentedWrites.length
     || route.declaredInputsNotRead.length
+    || route.declaredIndirectInputs.length
     || route.declaredOutputsNotWritten.length
     || route.directStorage.length
     || route.sourceFiles.length === 0;
@@ -727,7 +738,7 @@ export function renderPageContractAuditMarkdown(audit) {
     '',
     'This report compares the Workflow and Studies page contracts against statically detected storage access in page source files.',
     '',
-    'The audit is intentionally conservative: `--check` fails on actionable drift and reports declared-but-unread inputs as warnings for review.',
+    'The audit is intentionally conservative: `--check` fails on actionable drift, reports unexplained declared-but-unread inputs as warnings, and separately records inputs whose contracts explicitly declare indirect workflow consumption.',
     '',
     '## Summary',
     '',
@@ -739,6 +750,7 @@ export function renderPageContractAuditMarkdown(audit) {
     `- Routes with undocumented reads: ${audit.summary.routesWithUndocumentedReads}`,
     `- Routes with undocumented writes: ${audit.summary.routesWithUndocumentedWrites}`,
     `- Routes with declared inputs not statically read: ${audit.summary.routesWithDeclaredInputsNotRead}`,
+    `- Routes with explicitly indirect project inputs: ${audit.summary.routesWithDeclaredIndirectInputs}`,
     `- Routes with declared outputs not statically written: ${audit.summary.routesWithDeclaredOutputsNotWritten}`,
     `- Direct browser storage hits: ${audit.summary.directStorageHits}`,
     `- Unclassified direct browser storage hits: ${audit.summary.unclassifiedDirectStorageHits}`,
@@ -769,6 +781,9 @@ export function renderPageContractAuditMarkdown(audit) {
     lines.push('');
     lines.push('**Declared Inputs Not Statically Read**');
     lines.push(formatInputWarnings(route.declaredInputWarnings || []));
+    lines.push('');
+    lines.push('**Declared Indirect Workflow Inputs**');
+    lines.push(formatInputWarnings(route.declaredIndirectInputs || []));
     lines.push('');
     lines.push('**Declared Outputs Not Statically Written**');
     lines.push(formatKeyList(route.declaredOutputsNotWritten));

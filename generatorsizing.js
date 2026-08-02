@@ -34,6 +34,7 @@ document.addEventListener('DOMContentLoaded', () => {
     return buildGeneratorProjectInputs({
       loads: getLoads(),
       equipment: getEquipment(),
+      studies: getStudies(),
       projectMeta: getProjectMeta(),
     });
   }

@@ -42,3 +42,24 @@ test('Optimal Route dependencies load under the production CSP', async ({ page }
   expect(requestedScripts.some(url => url.endsWith('/dist/vendor/papaparse.min.js'))).toBe(true);
   expect(requestedScripts.filter(url => new URL(url).origin !== origin)).toEqual([]);
 });
+
+test('decomposed One-Line and TCC modules load from the served source tree', async ({ page }) => {
+  const requestedScripts = [];
+  const pageErrors = [];
+  page.on('request', request => {
+    if (request.resourceType() === 'script') requestedScripts.push(new URL(request.url()).pathname);
+  });
+  page.on('pageerror', error => pageErrors.push(error.message));
+
+  await page.goto(`${origin}/oneline.html?e2e=1`, { waitUntil: 'networkidle' });
+  await page.waitForSelector('[data-oneline-ready="1"]');
+  expect(requestedScripts).toContain('/src/one-line/protectionZones.mjs');
+  expect(requestedScripts).toContain('/src/one-line/protectionZonePanel.mjs');
+
+  requestedScripts.length = 0;
+  await page.goto(`${origin}/tcc.html`, { waitUntil: 'networkidle' });
+  await expect(page.locator('#plot-btn')).toBeVisible();
+  expect(requestedScripts).toContain('/analysis/tcc/viewModel.mjs');
+  expect(requestedScripts).toContain('/analysis/tcc/customCurveModel.mjs');
+  expect(pageErrors).toEqual([]);
+});

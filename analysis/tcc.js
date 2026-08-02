@@ -41,6 +41,43 @@ import {
   normalizeCatalogProtectiveDevice,
   summarizeProtectiveDeviceLibrary
 } from './protectiveDeviceLibrary.mjs';
+import {
+  mergeProtectiveDeviceReview,
+  openProtectiveDeviceReview
+} from './protectiveDeviceReview.mjs';
+import {
+  CUSTOM_CURVE_SETTING_CONFIG,
+  CUSTOM_CURVE_SETTING_OPTIONS,
+  TCC_CALLOUT_SCOPES,
+  TCC_RANGE_PRESETS,
+  TCC_VIEW_OPTIONS,
+  computeLegendLayout as computeLegendLayoutModel,
+  formatViewValue as formatViewValueModel,
+  getActiveViewConfigs as getActiveViewConfigsModel,
+  getTccRangePreset,
+  normalizeCalloutScope,
+  normalizeRangePreset,
+  normalizeViewOptionList,
+  summarizeActiveViewLabels as summarizeActiveViewLabelsModel
+} from './tcc/viewModel.mjs';
+import {
+  CUSTOM_CURVE_CATEGORY,
+  CUSTOM_CURVE_VENDOR_FALLBACK,
+  buildCustomCurveBaseDevice,
+  createCustomCurveId,
+  normalizeCustomCurveRole,
+  normalizeCustomCurveSequences,
+  sanitizeAxisSpec,
+  sanitizeBoundsSpec,
+  sanitizeCustomCurve,
+  sanitizeCustomCurveEvidence,
+  sanitizeCustomCurveProfiles,
+  sanitizeCustomCurveSettings,
+  sanitizeCustomCurveText,
+  sanitizeCustomInterruptingRatings,
+  sanitizeToleranceSpec,
+  sortCustomCurveList
+} from './tcc/customCurveModel.mjs';
 
 const PROTECTIVE_TYPES = new Set(['breaker', 'fuse', 'relay', 'relay_87', 'recloser', 'contactor', 'switch']);
 const MOTOR_TYPES = new Set(['motor_load', 'motor', 'motor_starter', 'motor_controller']);
@@ -87,8 +124,6 @@ const K_CONSTANTS = {
   copper: { 60: 103, 75: 118, 90: 143 },
   aluminum: { 60: 75, 75: 87, 90: 99 }
 };
-const CUSTOM_CURVE_VENDOR_FALLBACK = 'Custom Curves';
-const CUSTOM_CURVE_CATEGORY = 'custom curve';
 const CUSTOM_CURVE_DEFAULT_AXES = { currentMin: 10, currentMax: 10000, timeMin: 0.01, timeMax: 100 };
 const CUSTOM_CURVE_DEFAULT_BOUNDS = { left: 0, right: 0, top: 0, bottom: 0 };
 
@@ -385,80 +420,6 @@ let lastCoordState = null;
 let updatingActiveComponentFromSelect = false;
 
 
-const TCC_VIEW_OPTIONS = [
-  { id: 'none', label: 'No Additional View', field: null, description: 'Hide device settings in the legend.' },
-  { id: 'callouts', label: 'Chart Callouts', field: null, shortLabel: 'Callouts', description: 'Show draggable labels on the chart with the device tag and selected settings.' },
-  { id: 'pickup', label: 'Pickup', field: 'pickup', unit: 'A', shortLabel: 'Pickup', description: 'Display the long-time pickup current.' },
-  { id: 'time', label: 'Delay', field: 'time', unit: 's', shortLabel: 'Delay', description: 'Display the long-time delay setting.' },
-  { id: 'shortTimePickup', label: 'Short-Time Pickup', field: 'shortTimePickup', unit: 'A', shortLabel: 'ST Pickup', description: 'Display the short-time pickup current.' },
-  { id: 'shortTimeDelay', label: 'Short-Time Delay', field: 'shortTimeDelay', unit: 's', shortLabel: 'ST Delay', description: 'Display the short-time delay setting.' },
-  { id: 'instantaneousPickup', label: 'Instantaneous Pickup (INST)', field: 'instantaneousPickup', unit: 'A', shortLabel: 'INST', description: 'Display the instantaneous pickup current.' },
-  { id: 'instantaneousDelay', label: 'Instantaneous Delay', field: 'instantaneousDelay', unit: 's', shortLabel: 'INST Delay', description: 'Display the instantaneous delay setting.' },
-  { id: 'instantaneousMax', label: 'Instantaneous Max', field: 'instantaneousMax', unit: 'A', shortLabel: 'INST Max', description: 'Display the instantaneous ceiling current.' },
-  { id: 'curveProfile', label: 'Curve Profile', field: 'curveProfileLabel', shortLabel: 'Curve', description: 'Display the selected curve profile.' },
-  { id: 'arcFlashOverlay', label: 'Arc Flash Limit Curve', field: null, description: 'Overlay a constant incident energy limit curve from arc flash study results.' },
-  { id: 'groundFault', label: 'Ground Fault Plane', field: null, description: 'Plot ground fault relay curves as a separate plane with dashed purple curves (NEC 230.95 / OSHA 29 CFR 1910.304).' }
-];
-
-const viewOptionMap = new Map(TCC_VIEW_OPTIONS.map(option => [option.id, option]));
-
-const TCC_RANGE_PRESETS = [
-  { id: 'full', label: 'Full Range' },
-  { id: 'coordination', label: 'Coordination Region' },
-  { id: 'motorStart', label: 'Motor Starting' },
-  { id: 'transformerInrush', label: 'Transformer Inrush' },
-  { id: 'faultCurrent', label: 'Fault Current Region' }
-];
-
-const rangePresetMap = new Map(TCC_RANGE_PRESETS.map(option => [option.id, option]));
-
-const TCC_CALLOUT_SCOPES = [
-  { id: 'context', label: 'Context Devices' },
-  { id: 'selected', label: 'Selected Device' },
-  { id: 'all', label: 'All Plotted Devices' }
-];
-
-const calloutScopeMap = new Map(TCC_CALLOUT_SCOPES.map(option => [option.id, option]));
-
-const CUSTOM_CURVE_SETTING_OPTIONS = TCC_VIEW_OPTIONS
-  .filter(option => option.field)
-  .map(option => ({
-    field: option.field,
-    label: option.label,
-    unit: option.unit || '',
-    numeric: !!option.unit
-  }));
-
-const CUSTOM_CURVE_SETTING_CONFIG = new Map(
-  CUSTOM_CURVE_SETTING_OPTIONS.map(option => [option.field, option])
-);
-
-function normalizeViewOption(id) {
-  if (typeof id !== 'string') return 'none';
-  const trimmed = id.trim();
-  return viewOptionMap.has(trimmed) ? trimmed : 'none';
-}
-
-function normalizeViewOptionList(input) {
-  if (!input) return [];
-  const list = Array.isArray(input) ? input : [input];
-  const seen = new Set();
-  const normalized = [];
-  list.forEach(value => {
-    const normalizedValue = normalizeViewOption(value);
-    if (normalizedValue === 'none') return;
-    if (seen.has(normalizedValue)) return;
-    seen.add(normalizedValue);
-    normalized.push(normalizedValue);
-  });
-  return normalized;
-}
-
-function normalizeRangePreset(value) {
-  const preset = typeof value === 'string' ? value.trim() : '';
-  return rangePresetMap.has(preset) ? preset : 'full';
-}
-
 function setActiveRangePreset(value, { persist = true } = {}) {
   activeRangePreset = normalizeRangePreset(value);
   if (rangePresetSelect) {
@@ -470,11 +431,6 @@ function setActiveRangePreset(value, { persist = true } = {}) {
     saved.calloutScope = activeCalloutScope;
     setItem('tccSettings', saved);
   }
-}
-
-function normalizeCalloutScope(value) {
-  const scope = typeof value === 'string' ? value.trim() : '';
-  return calloutScopeMap.has(scope) ? scope : 'context';
 }
 
 function updateCalloutScopeControl() {
@@ -499,9 +455,7 @@ function setActiveCalloutScope(value, { persist = true } = {}) {
 }
 
 function getActiveViewConfigs() {
-  return activeViewOptions
-    .map(id => viewOptionMap.get(id))
-    .filter(option => option && option.field);
+  return getActiveViewConfigsModel(activeViewOptions);
 }
 
 function areCalloutsEnabled() {
@@ -516,28 +470,12 @@ function shouldRenderCalloutForEntry(entry) {
   return role === 'upstream' || role === 'selected' || role === 'downstream';
 }
 
-function formatViewValue(option, value) {
-  if (!option) return null;
-  if (value === undefined || value === null) return null;
-  if (typeof value === 'number') {
-    const formatted = formatSettingValue(value);
-    if (!formatted && formatted !== '0') return null;
-    return option.unit ? `${formatted} ${option.unit}`.trim() : formatted;
-  }
-  if (typeof value === 'string') {
-    const trimmed = value.trim();
-    if (!trimmed) return null;
-    return option.unit ? `${trimmed} ${option.unit}`.trim() : trimmed;
-  }
-  return null;
-}
-
 function formatViewSummaries(entry) {
   if (!entry || !entry.scaled || !entry.scaled.settings) return [];
   return getActiveViewConfigs()
     .map(option => {
       const raw = entry.scaled.settings[option.field];
-      const formatted = formatViewValue(option, raw);
+      const formatted = formatViewValueModel(option, raw, formatSettingValue);
       if (!formatted) return null;
       const prefix = option.shortLabel || option.label;
       return `${prefix}: ${formatted}`;
@@ -582,68 +520,11 @@ function formatCalloutDeviceLabel(entry) {
 }
 
 function summarizeActiveViewLabels() {
-  const options = TCC_VIEW_OPTIONS
-    .filter(option => option.id !== 'none' && activeViewOptions.includes(option.id));
-  if (!options.length) return null;
-  if (options.length === 1) {
-    return options[0].shortLabel || options[0].label;
-  }
-  const labels = options.map(option => option.shortLabel || option.label);
-  if (labels.length <= 2) {
-    return labels.join(', ');
-  }
-  return `${labels[0]}, ${labels[1]}, +${labels.length - 2}`;
-}
-
-function estimateLegendItemMetrics(label, viewSummaries) {
-  const baseLabel = typeof label === 'string' && label.trim() ? label.trim() : 'Device';
-  const summaries = Array.isArray(viewSummaries) ? viewSummaries : [];
-  const textWidth = Math.ceil(baseLabel.length * 7);
-  const iconWidth = 24; // icon plus spacing before text
-  const badgeWidths = summaries.map(summary => {
-    const trimmed = summary ? String(summary) : '';
-    const estimatedText = Math.ceil(trimmed.length * 6.5);
-    return Math.max(32, estimatedText + 16);
-  });
-  const badgeSpacing = badgeWidths.length > 1 ? (badgeWidths.length - 1) * 8 : 0;
-  const badgesWidth = badgeWidths.reduce((sum, value) => sum + value, 0) + badgeSpacing;
-  const width = iconWidth + textWidth + (badgeWidths.length ? 8 + badgesWidth : 0);
-  const height = 20 + (badgeWidths.length ? 26 : 0);
-  return { width, height };
+  return summarizeActiveViewLabelsModel(activeViewOptions);
 }
 
 function computeLegendLayout(entries, availableWidth) {
-  const layouts = [];
-  if (!Array.isArray(entries) || !entries.length) {
-    return { layouts, height: 0 };
-  }
-  const safeWidth = Number.isFinite(availableWidth) && availableWidth > 0 ? availableWidth : 400;
-  let cursorX = 0;
-  let cursorY = 0;
-  let rowHeight = 0;
-  const columnSpacing = 16;
-  const rowSpacing = 12;
-
-  entries.forEach(entry => {
-    const baseLabel = entry.selection?.name || entry.name || entry.selection?.baseDevice?.name || '';
-    const relationship = entry.relationship?.role && entry.relationship.role !== 'additional'
-      ? `${entry.relationship.label}: `
-      : '';
-    const legendLabel = `${relationship}${baseLabel || entry.name || entry.selection?.baseDevice?.name || 'Device'}`;
-    const viewSummaries = formatViewSummaries(entry);
-    const metrics = estimateLegendItemMetrics(legendLabel, viewSummaries);
-    if (cursorX > 0 && cursorX + metrics.width > safeWidth) {
-      cursorX = 0;
-      cursorY += rowHeight + rowSpacing;
-      rowHeight = 0;
-    }
-    layouts.push({ entry, x: cursorX, y: cursorY, width: metrics.width, height: metrics.height, legendLabel, viewSummaries });
-    cursorX += metrics.width + columnSpacing;
-    rowHeight = Math.max(rowHeight, metrics.height);
-  });
-
-  const totalHeight = layouts.length ? cursorY + rowHeight : 0;
-  return { layouts, height: totalHeight };
+  return computeLegendLayoutModel(entries, availableWidth, formatViewSummaries);
 }
 
 function updateViewButtonLabel() {
@@ -950,6 +831,9 @@ function loadSavedSettings() {
   if (typeof stored.printIncludePreview !== 'boolean') stored.printIncludePreview = false;
   if (!Array.isArray(stored.customCurves)) stored.customCurves = [];
   stored.customCurves = stored.customCurves.map(sanitizeCustomCurve).filter(Boolean);
+  if (!stored.protectiveDeviceReviews || typeof stored.protectiveDeviceReviews !== 'object' || Array.isArray(stored.protectiveDeviceReviews)) {
+    stored.protectiveDeviceReviews = {};
+  }
   if (!Number.isFinite(stored.customCurveCounter)) {
     stored.customCurveCounter = stored.customCurves.reduce((max, curve) => {
       const seq = Number(curve.sequence);
@@ -1072,319 +956,6 @@ function createContextMenu() {
   });
 
   return { show, hide, element: menu };
-}
-
-function createCustomCurveId(counter = null) {
-  if (Number.isFinite(counter) && counter >= 0) {
-    return `custom-curve-${counter}`;
-  }
-  return `custom-curve-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
-}
-
-function sanitizeAxisSpec(raw = {}) {
-  if (!raw || typeof raw !== 'object') return {};
-  const axis = {};
-  const currentMin = Number(raw.currentMin ?? raw.minCurrent ?? raw.xMin ?? raw.minCurrentAmp);
-  const currentMax = Number(raw.currentMax ?? raw.maxCurrent ?? raw.xMax ?? raw.maxCurrentAmp);
-  const timeMin = Number(raw.timeMin ?? raw.minTime ?? raw.yMin ?? raw.minTimeSec);
-  const timeMax = Number(raw.timeMax ?? raw.maxTime ?? raw.yMax ?? raw.maxTimeSec);
-  if (Number.isFinite(currentMin) && currentMin > 0) axis.currentMin = currentMin;
-  if (Number.isFinite(currentMax) && currentMax > 0) axis.currentMax = currentMax;
-  if (Number.isFinite(timeMin) && timeMin > 0) axis.timeMin = timeMin;
-  if (Number.isFinite(timeMax) && timeMax > 0) axis.timeMax = timeMax;
-  if (axis.currentMin !== undefined && axis.currentMax !== undefined && axis.currentMax <= axis.currentMin) {
-    const swap = axis.currentMin;
-    axis.currentMin = Math.min(axis.currentMin, axis.currentMax / 1.5 || axis.currentMin);
-    axis.currentMax = Math.max(swap, axis.currentMax);
-  }
-  if (axis.timeMin !== undefined && axis.timeMax !== undefined && axis.timeMax <= axis.timeMin) {
-    const swap = axis.timeMin;
-    axis.timeMin = Math.min(axis.timeMin, axis.timeMax / 1.5 || axis.timeMin);
-    axis.timeMax = Math.max(swap, axis.timeMax);
-  }
-  return axis;
-}
-
-function sanitizeBoundsSpec(raw = {}) {
-  if (!raw || typeof raw !== 'object') return {};
-  const bounds = {};
-  const left = Number(raw.left ?? raw.leftOffset ?? raw.xPadding ?? raw.paddingLeft);
-  const right = Number(raw.right ?? raw.rightOffset ?? raw.paddingRight);
-  const top = Number(raw.top ?? raw.topOffset ?? raw.paddingTop);
-  const bottom = Number(raw.bottom ?? raw.bottomOffset ?? raw.paddingBottom);
-  if (Number.isFinite(left) && left >= 0) bounds.left = left;
-  if (Number.isFinite(right) && right >= 0) bounds.right = right;
-  if (Number.isFinite(top) && top >= 0) bounds.top = top;
-  if (Number.isFinite(bottom) && bottom >= 0) bounds.bottom = bottom;
-  return bounds;
-}
-
-function sanitizeToleranceSpec(raw = {}) {
-  if (!raw || typeof raw !== 'object') return undefined;
-  const lower = Number(raw.timeLower ?? raw.lower ?? raw.timeLowerBound);
-  const upper = Number(raw.timeUpper ?? raw.upper ?? raw.timeUpperBound);
-  const tolerance = {};
-  if (Number.isFinite(lower) && lower > 0) tolerance.timeLower = lower;
-  if (Number.isFinite(upper) && upper > 0) tolerance.timeUpper = upper;
-  return Object.keys(tolerance).length ? tolerance : undefined;
-}
-
-function sanitizeCustomCurveSettings(raw = {}) {
-  if (!raw || typeof raw !== 'object') return {};
-  const sanitized = {};
-  Object.entries(raw).forEach(([field, value]) => {
-    if (!CUSTOM_CURVE_SETTING_CONFIG.has(field)) return;
-    const config = CUSTOM_CURVE_SETTING_CONFIG.get(field);
-    if (config.numeric) {
-      const numberValue = Number(value);
-      if (Number.isFinite(numberValue) && numberValue >= 0) {
-        sanitized[field] = numberValue;
-      }
-    } else if (value !== undefined && value !== null) {
-      const strValue = String(value).trim();
-      if (strValue) {
-        sanitized[field] = strValue;
-      }
-    }
-  });
-  return sanitized;
-}
-
-function sanitizeCustomCurveText(value, maxLength = 240) {
-  if (value === undefined || value === null) return '';
-  return String(value).trim().slice(0, maxLength);
-}
-
-function sanitizeCustomInterruptingRatings(raw = []) {
-  if (!Array.isArray(raw)) return [];
-  return raw
-    .map(rating => {
-      if (!rating || typeof rating !== 'object') return null;
-      const voltageVac = Number(rating.voltageVac ?? rating.voltage ?? rating.ratedVoltageVac);
-      const currentKA = Number(rating.currentKA ?? rating.valueKA ?? rating.value);
-      if (!Number.isFinite(voltageVac) || voltageVac <= 0 || !Number.isFinite(currentKA) || currentKA <= 0) {
-        return null;
-      }
-      return {
-        voltageVac,
-        currentKA,
-        currentType: sanitizeCustomCurveText(rating.currentType || 'AC', 12) || 'AC',
-        ratingType: sanitizeCustomCurveText(rating.ratingType || 'AIR', 24) || 'AIR'
-      };
-    })
-    .filter(Boolean);
-}
-
-function sanitizeCustomCurveEvidence(raw = {}) {
-  if (!raw || typeof raw !== 'object') return {};
-  const evidence = {
-    document: sanitizeCustomCurveText(raw.document, 300),
-    revision: sanitizeCustomCurveText(raw.revision, 100),
-    date: sanitizeCustomCurveText(raw.date, 40),
-    curveNumber: sanitizeCustomCurveText(raw.curveNumber ?? raw.curveId, 100),
-    page: sanitizeCustomCurveText(raw.page, 40),
-    extractionMethod: sanitizeCustomCurveText(raw.extractionMethod, 100),
-    reviewer: sanitizeCustomCurveText(raw.reviewer, 160)
-  };
-  return Object.fromEntries(Object.entries(evidence).filter(([, value]) => value));
-}
-
-const CUSTOM_CURVE_ALLOWED_ROLES = new Set(['melting', 'clearing', 'symmetrical_rms_peak']);
-
-function normalizeCustomCurveRole(value) {
-  if (typeof value !== 'string') return null;
-  const trimmed = value.trim().toLowerCase();
-  return CUSTOM_CURVE_ALLOWED_ROLES.has(trimmed) ? trimmed : null;
-}
-
-function sanitizeCustomCurveProfiles(rawProfiles = []) {
-  if (!Array.isArray(rawProfiles)) return [];
-  const seenIds = new Set();
-  let counter = 0;
-  const MAX_SUFFIX_COUNTER = Number.MAX_SAFE_INTEGER;
-  const ensureName = (name, index) => {
-    if (typeof name === 'string' && name.trim()) return name.trim();
-    return `Curve ${index + 1}`;
-  };
-  const parseTrailingCounter = id => {
-    if (typeof id !== 'string') return null;
-    const match = /([0-9]+)$/.exec(id);
-    if (!match) return null;
-    const suffix = match[1];
-    if (suffix.length > 15) return null;
-    const parsed = Number(suffix);
-    if (!Number.isSafeInteger(parsed) || parsed < 0) return null;
-    return Math.min(parsed, MAX_SUFFIX_COUNTER);
-  };
-  const syncCounter = id => {
-    const suffixCounter = parseTrailingCounter(id);
-    if (suffixCounter !== null) {
-      counter = Math.max(counter, suffixCounter);
-    }
-  };
-  const reserveId = candidate => {
-    let base = '';
-    if (typeof candidate === 'string' && candidate.trim()) {
-      base = candidate.trim();
-    } else if (Number.isFinite(candidate)) {
-      base = `curve-${Math.abs(Math.trunc(candidate))}`;
-    }
-    if (!base) {
-      counter += 1;
-      base = `curve-${counter}`;
-    }
-    let id = base;
-    syncCounter(id);
-    while (seenIds.has(id)) {
-      counter += 1;
-      id = `${base}-${counter}`;
-    }
-    seenIds.add(id);
-    syncCounter(id);
-    return id;
-  };
-  return rawProfiles
-    .map((profile, index) => {
-      if (!profile || typeof profile !== 'object') return null;
-      const id = reserveId(profile.id ?? profile.key ?? profile.name ?? profile.label ?? '');
-      const name = ensureName(profile.name ?? profile.label, index);
-      const pointsSource = Array.isArray(profile.curve)
-        ? profile.curve
-        : Array.isArray(profile.points)
-          ? profile.points
-          : [];
-      const curve = sanitizeCurve(pointsSource);
-      if (!curve.length) return null;
-      const settings = sanitizeCustomCurveSettings(profile.settings ?? {});
-      const tolerance = sanitizeToleranceSpec(profile.tolerance ?? {});
-      const role = normalizeCustomCurveRole(profile.role ?? profile.kind);
-      return {
-        id,
-        name,
-        curve,
-        settings,
-        tolerance,
-        role: role || undefined
-      };
-    })
-    .filter(Boolean);
-}
-
-function sanitizeCustomCurve(raw) {
-  if (!raw || typeof raw !== 'object') return null;
-  const curvePoints = Array.isArray(raw.curve)
-    ? raw.curve
-    : Array.isArray(raw.points)
-      ? raw.points
-      : [];
-  let sanitizedPoints = sanitizeCurve(curvePoints);
-  const profileSource = Array.isArray(raw.curveProfiles)
-    ? raw.curveProfiles
-    : Array.isArray(raw.curves)
-      ? raw.curves
-      : [];
-  let curveProfiles = sanitizeCustomCurveProfiles(profileSource);
-  if (!curveProfiles.length && sanitizedPoints.length) {
-    curveProfiles = [
-      {
-        id: 'curve-1',
-        name: 'Curve 1',
-        curve: sanitizedPoints.map(point => ({ ...point })),
-        settings: {}
-      }
-    ];
-  }
-  if (!sanitizedPoints.length && curveProfiles.length) {
-    sanitizedPoints = curveProfiles[0].curve.map(point => ({ ...point }));
-  }
-  if (!sanitizedPoints.length) return null;
-  const name = typeof raw.name === 'string' && raw.name.trim() ? raw.name.trim() : 'Custom Curve';
-  const id = typeof raw.id === 'string' && raw.id.trim() ? raw.id.trim() : createCustomCurveId();
-  const manufacturer = typeof raw.manufacturer === 'string' && raw.manufacturer.trim()
-    ? raw.manufacturer.trim()
-    : (typeof raw.vendor === 'string' && raw.vendor.trim() ? raw.vendor.trim() : '');
-  const deviceType = typeof raw.deviceType === 'string' && raw.deviceType.trim()
-    ? raw.deviceType.trim()
-    : CUSTOM_CURVE_CATEGORY;
-  const description = typeof raw.description === 'string' ? raw.description.trim() : '';
-  const sequenceSource = raw.sequence ?? raw.order ?? raw.index ?? raw.position;
-  const sequence = Number(sequenceSource);
-  const tolerance = sanitizeToleranceSpec(raw.tolerance);
-  const axes = sanitizeAxisSpec(raw.axes ?? raw.axis ?? {});
-  const bounds = sanitizeBoundsSpec(raw.bounds ?? raw.padding ?? {});
-  const settings = sanitizeCustomCurveSettings(raw.settings ?? raw.adjustableSettings ?? raw.deviceSettings ?? {});
-  const catalogNumber = sanitizeCustomCurveText(raw.catalogNumber ?? raw.catalog ?? raw.model, 160);
-  const interruptingRatings = sanitizeCustomInterruptingRatings(raw.interruptingRatings);
-  const curveEvidence = sanitizeCustomCurveEvidence(raw.curveEvidence ?? raw.evidence ?? {});
-  const libraryStatus = raw.libraryStatus === 'calculation_ready' ? 'calculation_ready' : undefined;
-  return {
-    id,
-    name,
-    manufacturer,
-    deviceType,
-    description,
-    curve: sanitizedPoints,
-    curveProfiles,
-    axes,
-    bounds,
-    settings,
-    catalogNumber,
-    interruptingRatings,
-    curveEvidence,
-    libraryStatus,
-    sequence: Number.isFinite(sequence) ? sequence : null,
-    tolerance
-  };
-}
-
-function buildCustomCurveBaseDevice(curve, id = `custom:${curve?.id || ''}`) {
-  const vendor = curve?.manufacturer || CUSTOM_CURVE_VENDOR_FALLBACK;
-  const profiles = Array.isArray(curve?.curveProfiles)
-    ? curve.curveProfiles.filter(profile => Array.isArray(profile?.curve) && profile.curve.length)
-    : [];
-  const baseCurve = Array.isArray(curve?.curve) && curve.curve.length
-    ? curve.curve
-    : profiles.length
-      ? profiles[0].curve || []
-      : [];
-  return {
-    id,
-    name: curve?.name || 'Custom Curve',
-    type: curve?.deviceType || CUSTOM_CURVE_CATEGORY,
-    curve: baseCurve,
-    curveProfiles: profiles.length ? profiles : undefined,
-    settings: { ...(curve?.settings || {}) },
-    vendor,
-    manufacturer: vendor,
-    tolerance: curve?.tolerance,
-    catalogNumber: curve?.catalogNumber || '',
-    interruptingRatings: sanitizeCustomInterruptingRatings(curve?.interruptingRatings),
-    curveEvidence: sanitizeCustomCurveEvidence(curve?.curveEvidence),
-    libraryStatus: curve?.libraryStatus
-  };
-}
-
-function sortCustomCurveList(list = []) {
-  if (!Array.isArray(list)) return [];
-  return list
-    .slice()
-    .sort((a, b) => {
-      const seqA = Number(a?.sequence) || 0;
-      const seqB = Number(b?.sequence) || 0;
-      if (seqA !== seqB) return seqA - seqB;
-      const nameA = typeof a?.name === 'string' ? a.name : '';
-      const nameB = typeof b?.name === 'string' ? b.name : '';
-      return nameA.localeCompare(nameB, undefined, { sensitivity: 'base' });
-    });
-}
-
-function normalizeCustomCurveSequences(list = []) {
-  if (!Array.isArray(list)) return [];
-  let seq = 0;
-  return sortCustomCurveList(list).map(curve => ({
-    ...curve,
-    sequence: ++seq
-  }));
 }
 
 let saved = loadSavedSettings();
@@ -2738,7 +2309,7 @@ function handleExportReview() {
   const coordinationMarkup = coordPanel && !coordPanel.classList.contains('hidden')
     ? serializeReviewNode(coordPanel)
     : '';
-  const rangeLabel = rangePresetMap.get(activeRangePreset)?.label || 'Full Range';
+  const rangeLabel = getTccRangePreset(activeRangePreset)?.label || 'Full Range';
   const html = buildReviewExportMarkup({
     chartMarkup,
     previewMarkup,
@@ -3070,11 +2641,15 @@ function refreshProjectCatalogDevices() {
     .map(normalizeCatalogProtectiveDevice)
     .filter(Boolean);
   const identities = new Set(baseLibraryDevices.map(device => device.id));
-  libraryDevices = [...baseLibraryDevices];
+  const applySavedReview = device => {
+    const review = saved.protectiveDeviceReviews?.[device.id];
+    return review ? mergeProtectiveDeviceReview(device, review) : device;
+  };
+  libraryDevices = baseLibraryDevices.map(applySavedReview);
   projectDevices.forEach((device) => {
     if (!identities.has(device.id)) {
       identities.add(device.id);
-      libraryDevices.push(device);
+      libraryDevices.push(applySavedReview(device));
     }
   });
   return projectDevices.length;
@@ -4579,7 +4154,8 @@ function renderDeviceDetails(entry, container, doc, options = {}) {
   const {
     allowAssignment = false,
     onAssign = null,
-    assignmentBusy = false
+    assignmentBusy = false,
+    onReview = null
   } = options;
   if (!entry) {
     const empty = docRef.createElement('p');
@@ -4669,6 +4245,34 @@ function renderDeviceDetails(entry, container, doc, options = {}) {
       : 'device-detail-notice';
     notice.textContent = libraryAssessment.summary;
     container.appendChild(notice);
+  }
+
+  if (entry.kind === 'library' && typeof onReview === 'function') {
+    const reviewSection = docRef.createElement('section');
+    reviewSection.className = 'protective-device-review-launch';
+    const reviewHeading = docRef.createElement('h4');
+    reviewHeading.textContent = 'Engineering Review';
+    const reviewHint = docRef.createElement('p');
+    reviewHint.className = 'protective-device-review-launch-hint';
+    reviewHint.textContent = 'Compare the manufacturer source curve with the stored library curve and record spot checks without editing code.';
+    const reviewButton = docRef.createElement('button');
+    reviewButton.type = 'button';
+    reviewButton.className = 'btn primary-btn';
+    reviewButton.textContent = 'Open Curve Review';
+    reviewButton.addEventListener('click', async () => {
+      reviewButton.disabled = true;
+      reviewButton.textContent = 'Opening review…';
+      try {
+        await onReview(entry);
+      } catch (error) {
+        console.error('Failed to open protective-device review', error);
+        reviewButton.disabled = false;
+        reviewButton.textContent = 'Open Curve Review';
+        showAlertModal('Review Error', 'The protective-device review workspace could not be opened.');
+      }
+    });
+    reviewSection.append(reviewHeading, reviewHint, reviewButton);
+    container.appendChild(reviewSection);
   }
 
   const properties = describeEntryAttributes(entry);
@@ -5093,13 +4697,48 @@ async function openDeviceSelectionModal() {
   const firstButtonRef = { current: null };
 
   const docRef = { current: null };
+  let readinessEl = null;
+
+  const updateReadinessSummary = () => {
+    if (!readinessEl) return;
+    const summary = summarizeProtectiveDeviceLibrary(libraryDevices);
+    readinessEl.textContent = `Library readiness: ${summary.calculation_ready} calculation-ready, ${summary.source_verified} source-verified pending peer review, ${summary.standards_reference} standards-reference, and ${summary.screening} screening-only entries.`;
+  };
+
+  async function handleEntryReview(entry) {
+    const device = entry?.baseDevice;
+    if (!device?.id) return null;
+    return openProtectiveDeviceReview(device, {
+      review: saved.protectiveDeviceReviews?.[device.id] || null,
+      onSave: review => {
+        saved.protectiveDeviceReviews[device.id] = review;
+        setItem('tccSettings', saved);
+        const merged = mergeProtectiveDeviceReview(device, review);
+        deviceEntries
+          .filter(item => item.baseDeviceId === device.id)
+          .forEach(item => {
+            item.baseDevice = merged;
+            item.libraryAssessment = assessProtectiveDeviceLibraryEntry(merged);
+          });
+        const libraryDevice = libraryDevices.find(item => item.id === device.id);
+        if (libraryDevice) Object.assign(libraryDevice, merged);
+        updateReadinessSummary();
+        return true;
+      }
+    }).then(result => {
+      const refreshed = deviceMap.get(entry.uid) || entry;
+      activeEntry = refreshed;
+      renderDeviceDetails(refreshed, detailContainer, docRef.current, { onReview: handleEntryReview });
+      return result;
+    });
+  }
 
   function updateActiveEntry(entry) {
     activeEntry = entry;
     modelElements.forEach(({ item }, uid) => {
       item.classList.toggle('active', !!entry && uid === entry.uid);
     });
-    renderDeviceDetails(entry, detailContainer, docRef.current);
+    renderDeviceDetails(entry, detailContainer, docRef.current, { onReview: handleEntryReview });
   }
 
   function updateModelSelectionIndicators() {
@@ -5369,10 +5008,10 @@ async function openDeviceSelectionModal() {
       docRef.current = doc;
       container.classList.add('device-selection-modal');
       const librarySummary = summarizeProtectiveDeviceLibrary(libraryDevices);
-      const readiness = doc.createElement('p');
-      readiness.className = 'device-library-readiness';
-      readiness.textContent = `Library readiness: ${librarySummary.calculation_ready} calculation-ready, ${librarySummary.source_verified} source-verified pending peer review, ${librarySummary.standards_reference} standards-reference, and ${librarySummary.screening} screening-only entries.`;
-      container.appendChild(readiness);
+      readinessEl = doc.createElement('p');
+      readinessEl.className = 'device-library-readiness';
+      readinessEl.textContent = `Library readiness: ${librarySummary.calculation_ready} calculation-ready, ${librarySummary.source_verified} source-verified pending peer review, ${librarySummary.standards_reference} standards-reference, and ${librarySummary.screening} screening-only entries.`;
+      container.appendChild(readinessEl);
       const layout = doc.createElement('div');
       layout.className = 'device-selection-layout';
 

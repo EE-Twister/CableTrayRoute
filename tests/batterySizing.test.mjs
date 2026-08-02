@@ -18,6 +18,10 @@ import {
   standardBankSize,
   runtimeCurve,
   upsKvaRequired,
+  normalizeManufacturerDischargeTable,
+  interpolateManufacturerDischargeCurrent,
+  sizeManufacturerDutyCycle,
+  runManufacturerDutyCycleAnalysis,
   runBatterySizingAnalysis,
 } from '../analysis/batterySizing.mjs';
 
@@ -319,6 +323,150 @@ describe('upsKvaRequired()', () => {
       () => upsKvaRequired(100, 1.1),
       /upsPowerFactor must be in/
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Manufacturer-data duty-cycle sizing
+// ---------------------------------------------------------------------------
+
+describe('manufacturer discharge table', () => {
+  const table = [
+    { durationMinutes: 10, ampsPerReferenceCapacity: 300 },
+    { durationMinutes: 60, ampsPerReferenceCapacity: 100 },
+    { durationMinutes: 120, ampsPerReferenceCapacity: 50 },
+  ];
+
+  it('normalizes rows in ascending duration order', () => {
+    const normalized = normalizeManufacturerDischargeTable([...table].reverse());
+    assert.deepStrictEqual(normalized.map(row => row.durationMinutes), [10, 60, 120]);
+  });
+
+  it('returns exact manufacturer values without interpolation drift', () => {
+    assert.strictEqual(interpolateManufacturerDischargeCurrent(table, 60), 100);
+  });
+
+  it('uses bounded log-log interpolation between published points', () => {
+    const current = interpolateManufacturerDischargeCurrent(table, 30);
+    assert.ok(current < 300 && current > 100, `expected interpolated current between 100 A and 300 A, got ${current}`);
+  });
+
+  it('rejects extrapolation outside the supplied manufacturer range', () => {
+    assert.throws(
+      () => interpolateManufacturerDischargeCurrent(table, 5),
+      /does not cover 5 minutes/
+    );
+  });
+
+  it('rejects a discharge table whose current increases with duration', () => {
+    assert.throws(
+      () => normalizeManufacturerDischargeTable([
+        { durationMinutes: 10, ampsPerReferenceCapacity: 100 },
+        { durationMinutes: 60, ampsPerReferenceCapacity: 120 },
+      ]),
+      /must not increase/
+    );
+  });
+});
+
+describe('sizeManufacturerDutyCycle()', () => {
+  const inputs = {
+    dutyCyclePeriods: [
+      { currentA: 100, durationMinutes: 60 },
+      { currentA: 20, durationMinutes: 60 },
+    ],
+    manufacturerDischargeTable: [
+      { durationMinutes: 10, ampsPerReferenceCapacity: 300 },
+      { durationMinutes: 60, ampsPerReferenceCapacity: 100 },
+      { durationMinutes: 120, ampsPerReferenceCapacity: 50 },
+    ],
+    referenceCapacityAh: 100,
+    temperatureCapacityFactor: 0.8,
+    endOfLifeCapacityPct: 80,
+    designMarginPct: 10,
+    candidateCellCapacityAh: 100,
+    dcBusVoltageV: 125,
+  };
+
+  it('evaluates every section and identifies the controlling section', () => {
+    const result = sizeManufacturerDutyCycle(inputs);
+    assert.strictEqual(result.sections.length, 2);
+    assert.strictEqual(result.controllingSection, 2);
+    approx(result.sections[0].rawRequiredCapacityAh, 100, 0.001);
+    approx(result.sections[1].rawRequiredCapacityAh, 120, 0.001);
+  });
+
+  it('applies explicit temperature, end-of-life, and margin factors', () => {
+    const result = sizeManufacturerDutyCycle(inputs);
+    approx(result.correctionMultiplier, 1.71875, 0.0001);
+    approx(result.requiredCapacityAh, 206.25, 0.0001);
+  });
+
+  it('selects enough parallel candidate strings and reports installed energy', () => {
+    const result = sizeManufacturerDutyCycle(inputs);
+    assert.strictEqual(result.requiredParallelStrings, 3);
+    assert.strictEqual(result.installedCapacityAh, 300);
+    assert.strictEqual(result.installedNominalEnergyKwh, 37.5);
+  });
+
+  it('retains contribution provenance for an auditable section calculation', () => {
+    const result = sizeManufacturerDutyCycle(inputs);
+    const controlling = result.sections[1];
+    assert.strictEqual(controlling.contributions.length, 2);
+    assert.strictEqual(controlling.contributions[0].deltaCurrentA, 100);
+    assert.strictEqual(controlling.contributions[1].deltaCurrentA, -80);
+  });
+});
+
+describe('runManufacturerDutyCycleAnalysis()', () => {
+  const inputs = {
+    systemLabel: '125 VDC control battery',
+    averageLoadKw: 10,
+    peakLoadKw: 20,
+    runtimeHours: 2,
+    chemistry: 'lead-acid-flooded',
+    ambientTempC: 10,
+    designMarginPct: 10,
+    upsPowerFactor: 0.9,
+    dutyCyclePeriods: [
+      { currentA: 100, durationMinutes: 60 },
+      { currentA: 20, durationMinutes: 60 },
+    ],
+    manufacturerDischargeTable: [
+      { durationMinutes: 10, ampsPerReferenceCapacity: 300 },
+      { durationMinutes: 60, ampsPerReferenceCapacity: 100 },
+      { durationMinutes: 120, ampsPerReferenceCapacity: 50 },
+    ],
+    referenceCapacityAh: 100,
+    temperatureCapacityFactor: 0.8,
+    endOfLifeCapacityPct: 80,
+    endVoltageVPerCell: 1.75,
+    dischargeTableSource: 'Example manufacturer manual, Rev A, Table 4',
+    rackLayoutInputs: {
+      dcBusVoltageV: 125,
+      cellCapacityAh: 100,
+    },
+  };
+
+  it('returns a manufacturer-data result rather than screening-only status', () => {
+    const result = runManufacturerDutyCycleAnalysis(inputs);
+    assert.strictEqual(result.calculationStatus, 'manufacturer-data-based');
+    assert.strictEqual(result.sizingMethod, 'manufacturer-duty-cycle');
+    assert.match(result.standardBasis, /IEEE 485-2020/);
+    assert.strictEqual(result.dischargeTableSource, inputs.dischargeTableSource);
+  });
+
+  it('requires source provenance for the discharge table', () => {
+    assert.throws(
+      () => runManufacturerDutyCycleAnalysis({ ...inputs, dischargeTableSource: '' }),
+      /dischargeTableSource is required/
+    );
+  });
+
+  it('is selected by the public analysis orchestrator', () => {
+    const result = runBatterySizingAnalysis({ ...inputs, sizingMethod: 'manufacturer-duty-cycle' });
+    assert.strictEqual(result.calculationStatus, 'manufacturer-data-based');
+    assert.strictEqual(result.dutyCycleSizing.controllingSection, 2);
   });
 });
 

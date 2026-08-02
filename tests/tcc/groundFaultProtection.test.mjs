@@ -22,7 +22,9 @@ function it(name, fn) {
 }
 
 const devices = JSON.parse(readFileSync(new URL('../../data/protectiveDevices.json', import.meta.url), 'utf8'));
-const gfpDevices = devices.filter(d => d.groundFault === true);
+// Screening research candidates may carry groundFault metadata, but they are
+// not part of the governed calculation GFP set until independently reviewed.
+const gfpDevices = devices.filter(d => d.groundFault === true && d.libraryStatus !== 'screening');
 const gfpById = Object.fromEntries(gfpDevices.map(d => [d.id, d]));
 
 // ─── 1. Device Library Validation ─────────────────────────────────────────────

@@ -16,6 +16,10 @@ function makeStorage() {
 
 globalThis.localStorage = makeStorage();
 globalThis.sessionStorage = makeStorage();
+// Raw storage assertions in this file intentionally inspect the injected test
+// doubles to verify that projectStorage removes redundant persisted copies.
+const localStorageTestDouble = globalThis.localStorage;
+const sessionStorageTestDouble = globalThis.sessionStorage;
 globalThis.document = { baseURI: 'http://localhost/index.html' };
 globalThis.location = { href: 'http://localhost/index.html' };
 globalThis.window = {};
@@ -44,8 +48,8 @@ function check(name, fn) {
 
 console.log('listAppSettingKeys / readAppSetting fallback');
 
-globalThis.localStorage.setItem('base:routeCache', JSON.stringify({ batchResults: [{ cable: 'C1' }] }));
-sessionStorage.setItem('future:routeCache', JSON.stringify({ batchResults: [{ cable: 'C2' }] }));
+localStorageTestDouble.setItem('base:routeCache', JSON.stringify({ batchResults: [{ cable: 'C1' }] }));
+sessionStorageTestDouble.setItem('future:routeCache', JSON.stringify({ batchResults: [{ cable: 'C2' }] }));
 
 check('lists keys from both session and local storage', () => {
   const keys = listAppSettingKeys();
@@ -65,8 +69,8 @@ check('lists session keys before local keys', () => {
 });
 
 check('dedupes keys present in more than one storage', () => {
-  globalThis.localStorage.setItem('dup:key', 'a');
-  sessionStorage.setItem('dup:key', 'b');
+  localStorageTestDouble.setItem('dup:key', 'a');
+  sessionStorageTestDouble.setItem('dup:key', 'b');
   const keys = listAppSettingKeys('dup:');
   assert.equal(keys.filter(k => k === 'dup:key').length, 1);
 });
@@ -78,7 +82,7 @@ check('readAppSetting falls back to sessionStorage', () => {
 
 check('readAppSetting prefers localStorage over sessionStorage', () => {
   writeAppSetting('pref:key', 'local-value');
-  sessionStorage.setItem('pref:key', 'session-value');
+  sessionStorageTestDouble.setItem('pref:key', 'session-value');
   assert.equal(readAppSetting('pref:key'), 'local-value');
 });
 
@@ -87,28 +91,28 @@ check('readAppSetting returns null for missing keys', () => {
 });
 
 check('session-backed scenario values avoid duplicate local-storage copies', () => {
-  localStorage.setItem('base:latestRouteResults', JSON.stringify({ stale: true }));
-  localStorage.setItem('latestRouteResults', JSON.stringify({ stale: true }));
+  localStorageTestDouble.setItem('base:latestRouteResults', JSON.stringify({ stale: true }));
+  localStorageTestDouble.setItem('latestRouteResults', JSON.stringify({ stale: true }));
   const routeState = { batchResults: [{ cable: 'C-200', status: 'Routed' }] };
 
   writeScenarioSessionValue('latestRouteResults', routeState, 'base');
 
-  assert.equal(localStorage.getItem('base:latestRouteResults'), null);
-  assert.equal(localStorage.getItem('latestRouteResults'), null);
+  assert.equal(localStorageTestDouble.getItem('base:latestRouteResults'), null);
+  assert.equal(localStorageTestDouble.getItem('latestRouteResults'), null);
   assert.deepEqual(readScenarioValue('latestRouteResults', null, 'base'), routeState);
   assert.deepEqual(getProjectState().settings.latestRouteResults, routeState);
-  assert.ok(sessionStorage.getItem('base:latestRouteResults'));
-  assert.ok(sessionStorage.getItem('latestRouteResults'));
+  assert.ok(sessionStorageTestDouble.getItem('base:latestRouteResults'));
+  assert.ok(sessionStorageTestDouble.getItem('latestRouteResults'));
 
   setProjectKey('smallSetting', JSON.stringify({ saved: true }));
-  const persistedProject = JSON.parse(localStorage.getItem('CTR_PROJECT_V1'));
+  const persistedProject = JSON.parse(localStorageTestDouble.getItem('CTR_PROJECT_V1'));
   assert.equal(persistedProject.settings.latestRouteResults, undefined);
   assert.deepEqual(persistedProject.settings.smallSetting, { saved: true });
 
   const compactRouteState = { batchResults: [{ cable: 'C-1', status: 'Routed' }] };
   writeScenarioValue('latestRouteResults', compactRouteState, 'base');
-  assert.equal(sessionStorage.getItem('base:latestRouteResults'), null);
-  assert.equal(sessionStorage.getItem('latestRouteResults'), null);
+  assert.equal(sessionStorageTestDouble.getItem('base:latestRouteResults'), null);
+  assert.equal(sessionStorageTestDouble.getItem('latestRouteResults'), null);
   assert.deepEqual(readScenarioValue('latestRouteResults', null, 'base'), compactRouteState);
 });
 

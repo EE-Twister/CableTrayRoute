@@ -734,7 +734,7 @@ export const PAGE_CONTRACTS_BY_HREF = {
     standaloneInputs: ['Duty cycle, chemistry, runtime, UPS power, temperature, margin, and rack layout inputs.'],
     projectInputs: [loads, projectInput('studyResults.motorStart', 'study-result', false, 'Motor starting results used to seed peak UPS load.'), projectMeta, designBasis, approvals],
     outputs: [
-      output('studyResults.batterySizing', 'study-result', 'Saved battery/UPS sizing, runtime, and rack layout result.', ['bessHazard.html', 'projectreport.html']),
+      output('studyResults.batterySizing', 'study-result', 'Saved battery/UPS energy screen or manufacturer-data duty-cycle sizing result, including source provenance, controlling-section math, runtime, and rack layout.', ['bessHazard.html', 'projectreport.html']),
       studyApprovalOutput,
       exportOnly('Battery sizing and rack layout exports.', ['projectreport.html'])
     ],
@@ -782,11 +782,11 @@ export const PAGE_CONTRACTS_BY_HREF = {
     standaloneInputs: ['Motor horsepower, voltage, starter type, inertia/load torque, and Thevenin source inputs.'],
     projectInputs: [oneLine, equipment, loads, projectInput('studyResults.loadFlow', 'study-result', false, 'Prefault voltage context.'), designBasis],
     outputs: [
-      output('studyResults.motorStart', 'study-result', 'Saved motor starting current, torque, and voltage sag result.', ['generatorsizing.html', 'projectreport.html']),
+      output('studyResults.motorStart', 'study-result', 'Saved motor starting current, controlling starting kVA/kW, torque, and voltage sag result.', ['battery.html', 'generatorsizing.html', 'projectreport.html']),
       exportOnly('Motor starting charts and reports.', ['projectreport.html'])
     ],
     readiness: ready('Ready when a motor and source impedance context are valid.', ['No motor data, missing source impedance, or invalid starter parameters.']),
-    downstream: ['generatorsizing.html', 'projectreport.html']
+    downstream: ['battery.html', 'generatorsizing.html', 'projectreport.html']
   }),
   'loadFlow.html': contract({
     workflowStep: 'studies',

@@ -38,8 +38,8 @@ jobs:
           npm run check:dist-review -- FETCH_HEAD
 
       - name: ESLint
-        # Treat any warning as a failure so warnings don't accumulate.
-        run: npx eslint . --max-warnings=0 --ignore-pattern dist/ --ignore-pattern node_modules/
+        # Includes the architecture-boundary ratchet after ESLint.
+        run: npm run lint
 
   # ─────────────────────────────────────────────
   # 2. Unit tests

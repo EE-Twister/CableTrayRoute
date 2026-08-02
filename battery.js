@@ -44,11 +44,24 @@ document.addEventListener('DOMContentLoaded', () => {
   const resultsDiv = document.getElementById('results');
   const chemistrySelect = document.getElementById('chemistry');
   const cellVoltageInput = document.getElementById('rack-cell-voltage-v');
+  const sizingMethodSelect = document.getElementById('sizing-method');
+  const manufacturerInputs = document.getElementById('manufacturer-duty-cycle-inputs');
   const projectOverrides = new Set();
   let projectInputModel = null;
   let cellVoltageEdited = false;
 
   initStudyApprovalPanel('batterySizing');
+
+  function syncSizingMethodVisibility() {
+    const enabled = sizingMethodSelect?.value === 'manufacturer-duty-cycle';
+    if (manufacturerInputs) {
+      manufacturerInputs.hidden = !enabled;
+      manufacturerInputs.open = enabled;
+    }
+  }
+
+  sizingMethodSelect?.addEventListener('change', syncSizingMethodVisibility);
+  syncSizingMethodVisibility();
 
   if (cellVoltageInput && chemistrySelect) {
     cellVoltageInput.addEventListener('input', () => {
@@ -100,6 +113,11 @@ document.addEventListener('DOMContentLoaded', () => {
   // --- Restore previous results from project store ---
   const saved = getStudies().batterySizing;
   if (saved) {
+    if (sizingMethodSelect && saved.sizingMethod) {
+      sizingMethodSelect.value = saved.sizingMethod;
+      syncSizingMethodVisibility();
+    }
+    restoreManufacturerDutyCycleInputs(saved);
     (saved.projectLink?.overrides || []).forEach(field => projectOverrides.add(field));
     const savedFieldIds = {
       systemLabel: 'system-label', averageLoadKw: 'avg-load-kw', peakLoadKw: 'peak-load-kw',
@@ -164,6 +182,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const upsPowerFactor  = getFloat('ups-pf');
     const systemLabel     = get('system-label').value.trim();
     const rackLayoutInputs = readRackLayoutInputs(get, getFloat);
+    const sizingMethod = sizingMethodSelect?.value || 'energy-screen';
 
     if (!averageLoadKw || averageLoadKw <= 0) {
       showModal('Input Error', '<p>Average load P<sub>avg</sub> (kW) must be greater than zero.</p>', 'error');
@@ -186,6 +205,32 @@ document.addEventListener('DOMContentLoaded', () => {
       return null;
     }
 
+    let manufacturerInputs = {};
+    if (sizingMethod === 'manufacturer-duty-cycle') {
+      try {
+        manufacturerInputs = {
+          dutyCyclePeriods: parseDelimitedRows(
+            get('duty-cycle-periods').value,
+            ['durationMinutes', 'currentA'],
+            'Duty cycle'
+          ),
+          manufacturerDischargeTable: parseDelimitedRows(
+            get('manufacturer-discharge-table').value,
+            ['durationMinutes', 'ampsPerReferenceCapacity'],
+            'Manufacturer discharge table'
+          ),
+          dischargeTableSource: get('discharge-table-source').value.trim(),
+          referenceCapacityAh: getFloat('reference-capacity-ah'),
+          endVoltageVPerCell: getFloat('end-voltage-v-per-cell'),
+          temperatureCapacityFactor: getFloat('temperature-capacity-factor'),
+          endOfLifeCapacityPct: getFloat('end-of-life-capacity-pct'),
+        };
+      } catch (error) {
+        showModal('Duty-Cycle Input Error', `<p>${escHtml(error.message)}</p>`, 'error');
+        return null;
+      }
+    }
+
     return {
       systemLabel,
       averageLoadKw,
@@ -195,8 +240,44 @@ document.addEventListener('DOMContentLoaded', () => {
       ambientTempC,
       designMarginPct,
       upsPowerFactor,
+      sizingMethod,
       rackLayoutInputs,
+      ...manufacturerInputs,
     };
+  }
+
+  function parseDelimitedRows(value, fields, label) {
+    const lines = String(value || '')
+      .split(/\r?\n/)
+      .map(line => line.trim())
+      .filter(line => line && !line.startsWith('#'));
+    if (lines.length && /[a-z]/i.test(lines[0])) lines.shift();
+    if (!lines.length) throw new Error(`${label} must contain at least one numeric row.`);
+    return lines.map((line, index) => {
+      const values = line.split(/[\s,;\t]+/).filter(Boolean).map(Number);
+      if (values.length !== fields.length || values.some(item => !Number.isFinite(item))) {
+        throw new Error(`${label} row ${index + 1} must contain ${fields.length} numeric values.`);
+      }
+      return Object.fromEntries(fields.map((field, fieldIndex) => [field, values[fieldIndex]]));
+    });
+  }
+
+  function restoreManufacturerDutyCycleInputs(savedResult) {
+    const duty = savedResult?.dutyCycleSizing;
+    if (!duty) return;
+    const setValue = (id, value) => {
+      const element = document.getElementById(id);
+      if (element && value != null) element.value = value;
+    };
+    setValue('duty-cycle-periods', (duty.periods || [])
+      .map(period => `${period.durationMinutes},${period.currentA}`).join('\n'));
+    setValue('manufacturer-discharge-table', (duty.manufacturerDischargeTable || [])
+      .map(row => `${row.durationMinutes},${row.ampsPerReferenceCapacity}`).join('\n'));
+    setValue('discharge-table-source', savedResult.dischargeTableSource);
+    setValue('reference-capacity-ah', duty.referenceCapacityAh);
+    setValue('end-voltage-v-per-cell', savedResult.endVoltageVPerCell);
+    setValue('temperature-capacity-factor', duty.temperatureCapacityFactor);
+    setValue('end-of-life-capacity-pct', duty.endOfLifeCapacityPct);
   }
 
   function readRackLayoutInputs(get, getFloat) {
@@ -236,6 +317,11 @@ document.addEventListener('DOMContentLoaded', () => {
           `<li class="drc-finding drc-warn"><span class="drc-msg">${escHtml(String(w))}</span></li>`
         ).join('')}</ul>`
       : '';
+
+    if (r.sizingMethod === 'manufacturer-duty-cycle' && r.dutyCycleSizing) {
+      renderManufacturerDutyCycleResults(r, rackLayoutModel, rackLayoutError, warningsHtml);
+      return;
+    }
 
     // Runtime curve table rows
     const runtimePoints = Array.isArray(r.runtimeCurvePoints) ? r.runtimeCurvePoints : [];
@@ -388,6 +474,126 @@ document.addEventListener('DOMContentLoaded', () => {
 
         ${warningsHtml}
 
+        <p class="field-hint result-timestamp">Analysis run: ${new Date(r.timestamp).toLocaleString()}</p>
+      </section>`;
+  }
+
+  function renderManufacturerDutyCycleResults(r, rackLayoutModel, rackLayoutError, warningsHtml) {
+    const duty = r.dutyCycleSizing;
+    const sectionRows = (duty.sections || []).map(section => {
+      const controlling = section.section === duty.controllingSection;
+      return `<tr${controlling ? ' style="font-weight:700"' : ''}>
+        <td>${section.section}${controlling ? ' (controlling)' : ''}</td>
+        <td>${Number(section.endMinutes).toFixed(1)} min</td>
+        <td>${Number(section.loadCurrentA).toFixed(1)} A</td>
+        <td>${Number(section.rawRequiredCapacityAh).toFixed(1)} Ah</td>
+        <td>${Number(section.correctedRequiredCapacityAh).toFixed(1)} Ah</td>
+      </tr>`;
+    }).join('');
+    const controlling = (duty.sections || []).find(section => section.section === duty.controllingSection);
+    const contributionRows = (controlling?.contributions || []).map(item => `
+      <tr>
+        <td>${item.loadStep}</td>
+        <td>${Number(item.deltaCurrentA).toFixed(1)} A</td>
+        <td>${Number(item.remainingDurationMinutes).toFixed(1)} min</td>
+        <td>${Number(item.ratedCurrentA).toFixed(1)} A</td>
+        <td>${Number(item.referenceUnitContribution).toFixed(4)}</td>
+      </tr>`).join('');
+
+    resultsDiv.innerHTML = `
+      <section class="results-panel" aria-labelledby="results-heading">
+        <h2 id="results-heading">Manufacturer-Data Duty-Cycle Results</h2>
+        <div class="result-badge result-badge--pass" role="status">
+          <strong>Manufacturer discharge data applied.</strong>
+          Every duty-cycle section was evaluated without extrapolating beyond the entered table.
+        </div>
+        <div class="alert-warn" role="note">
+          <strong>Selection review aid.</strong> This result does not certify IEEE compliance or
+          replace manufacturer sizing software, product qualification, or project acceptance checks.
+        </div>
+        ${r.systemLabel ? `<p class="field-hint">System: <strong>${escHtml(r.systemLabel)}</strong></p>` : ''}
+        <p class="field-hint">
+          Basis: <strong>${escHtml(r.standardBasis)}</strong><br>
+          Source: <strong>${escHtml(r.dischargeTableSource)}</strong><br>
+          End voltage: ${Number(r.endVoltageVPerCell).toFixed(2)} V/cell
+          &nbsp;|&nbsp; Reference capacity: ${Number(duty.referenceCapacityAh).toFixed(1)} Ah
+        </p>
+
+        <div class="result-group">
+          <h3>Duty-Cycle Section Sizing</h3>
+          <table class="results-table" aria-label="Battery capacity required by duty-cycle section">
+            <thead>
+              <tr>
+                <th scope="col">Section</th>
+                <th scope="col">End time</th>
+                <th scope="col">Load</th>
+                <th scope="col">Raw capacity</th>
+                <th scope="col">Corrected capacity</th>
+              </tr>
+            </thead>
+            <tbody>${sectionRows}</tbody>
+          </table>
+          <p class="field-hint">
+            Correction multiplier = 1 / ${Number(duty.temperatureCapacityFactor).toFixed(3)} temperature factor
+            &times; 100 / ${Number(duty.endOfLifeCapacityPct).toFixed(1)}% end-of-life capacity
+            &times; ${(1 + Number(duty.designMarginPct) / 100).toFixed(3)} design margin
+            = <strong>${Number(duty.correctionMultiplier).toFixed(4)}&times;</strong>.
+          </p>
+        </div>
+
+        <details class="result-group">
+          <summary><strong>Controlling section contribution math</strong></summary>
+          <table class="results-table" aria-label="Controlling duty-cycle section contributions">
+            <thead>
+              <tr>
+                <th scope="col">Load step</th>
+                <th scope="col">Current change</th>
+                <th scope="col">Remaining duration</th>
+                <th scope="col">Manufacturer current</th>
+                <th scope="col">Reference units</th>
+              </tr>
+            </thead>
+            <tbody>${contributionRows}</tbody>
+          </table>
+        </details>
+
+        <div class="result-group">
+          <h3>Cell / String Selection</h3>
+          <div class="result-row">
+            <span class="result-label">Minimum corrected capacity</span>
+            <span class="result-value"><strong>${Number(duty.requiredCapacityAh).toFixed(1)} Ah</strong></span>
+          </div>
+          <div class="result-row">
+            <span class="result-label">Candidate cell/string capacity</span>
+            <span class="result-value">${Number(duty.candidateCellCapacityAh).toFixed(1)} Ah</span>
+          </div>
+          <div class="result-row">
+            <span class="result-label">Required parallel strings</span>
+            <span class="result-value"><strong>${duty.requiredParallelStrings}</strong></span>
+          </div>
+          <div class="result-row">
+            <span class="result-label">Installed nominal capacity</span>
+            <span class="result-value">${Number(duty.installedCapacityAh).toFixed(1)} Ah / ${Number(duty.installedNominalEnergyKwh).toFixed(1)} kWh</span>
+          </div>
+        </div>
+
+        <div class="result-group">
+          <h3>UPS Sizing</h3>
+          <div class="result-row">
+            <span class="result-label">Required UPS kVA</span>
+            <span class="result-value">${Number(r.kvaRequired).toFixed(1)} kVA</span>
+          </div>
+          <div class="result-row">
+            <span class="result-label">Screening standard UPS size</span>
+            <span class="result-value"><strong>${r.standardKva} kVA</strong></span>
+          </div>
+        </div>
+
+        ${rackLayoutModel
+          ? renderRackLayoutSection(rackLayoutModel)
+          : `<div class="alert-warn" role="note"><strong>Rack layout unavailable.</strong> ${escHtml(rackLayoutError)}</div>`}
+
+        ${warningsHtml}
         <p class="field-hint result-timestamp">Analysis run: ${new Date(r.timestamp).toLocaleString()}</p>
       </section>`;
   }

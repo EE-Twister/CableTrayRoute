@@ -49,10 +49,18 @@ support production clearing-time calculations.
 
 ## Current-library findings
 
-`data/protectiveDevices.json` currently contains 26 records: 6 breakers, 6 fuses,
-and 14 relay records. Two physical-device entries are explicitly labeled
-`Sample Study`, and most manufacturer breaker/fuse curves contain only three to
-five points with no source document, revision, voltage basis, or curve identifier.
+`data/protectiveDevices.json` now contains 5,218 records: 746 breakers, 4,418
+fuses, 31 reclosers, 16 relays, and 7 switches. The original governed library
+contributed 26 records; 5,192 records were promoted from the 2026-07-31 U.S.
+research batch as `libraryStatus: "screening"` and
+`researchStatus: "candidate"`. Those candidates are not source-verified or
+calculation-ready and must complete the field-level review workflow before
+supporting issued engineering work.
+
+The original 26-record subset still includes two physical-device entries
+explicitly labeled `Sample Study`. The catalog expansion should therefore be
+treated as a screening inventory, not as an approval of every manufacturer
+record or curve.
 
 ### First controlled import family: S&C SMU-20 standard-speed 14.4-kV fuses
 

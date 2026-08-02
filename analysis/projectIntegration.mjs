@@ -182,9 +182,18 @@ export function buildBatteryProjectInputs({ loads = [], studies = {}, designBasi
   };
 }
 
-export function buildGeneratorProjectInputs({ loads = [], equipment = [], projectMeta = {} } = {}) {
+export function buildGeneratorProjectInputs({ loads = [], equipment = [], studies = {}, projectMeta = {} } = {}) {
   const linkedLoads = projectLoadRows(loads);
-  const motor = largestProjectMotor(equipment, loads);
+  const motorStart = studies && typeof studies === 'object' ? studies.motorStart || {} : {};
+  const studiedMotor = motorStart.controllingMotor?.hp > 0 ? {
+    id: text(motorStart.controllingMotor.id, 'motor-start'),
+    label: text(motorStart.controllingMotor.label, 'Motor Start controlling motor'),
+    hp: finite(motorStart.controllingMotor.hp, 0),
+    powerFactor: unitFactor(motorStart.controllingMotor.powerFactor, 0.85),
+    efficiency: unitFactor(motorStart.controllingMotor.efficiency, 0.92),
+    fromMotorStart: true,
+  } : null;
+  const motor = studiedMotor || largestProjectMotor(equipment, loads);
   const meta = normalizeProjectMeta(projectMeta);
   return {
     inputs: {
@@ -201,9 +210,9 @@ export function buildGeneratorProjectInputs({ loads = [], equipment = [], projec
       loads: { sourcePath: 'loads', sourceLabel: `Load List (${linkedLoads.length} loads)` },
       altitudeFt: { sourcePath: 'projectMeta.altitudeFt', sourceLabel: 'Project metadata' },
       ambientC: { sourcePath: 'projectMeta.ambientTempC', sourceLabel: 'Project metadata' },
-      motorHp: { sourcePath: motor ? `equipment.${motor.id}` : 'equipment', sourceLabel: motor ? `Equipment · ${motor.label}` : 'Equipment' },
-      motorPf: { sourcePath: motor ? `equipment.${motor.id}.powerFactor` : 'equipment', sourceLabel: 'Equipment' },
-      motorEff: { sourcePath: motor ? `equipment.${motor.id}.efficiency` : 'equipment', sourceLabel: 'Equipment' }
+      motorHp: { sourcePath: motor?.fromMotorStart ? 'studyResults.motorStart.controllingMotor.hp' : motor ? `equipment.${motor.id}` : 'equipment', sourceLabel: motor?.fromMotorStart ? `Motor Start · ${motor.label}` : motor ? `Equipment · ${motor.label}` : 'Equipment' },
+      motorPf: { sourcePath: motor?.fromMotorStart ? 'studyResults.motorStart.controllingMotor.powerFactor' : motor ? `equipment.${motor.id}.powerFactor` : 'equipment', sourceLabel: motor?.fromMotorStart ? 'Motor Start' : 'Equipment' },
+      motorEff: { sourcePath: motor?.fromMotorStart ? 'studyResults.motorStart.controllingMotor.efficiency' : motor ? `equipment.${motor.id}.efficiency` : 'equipment', sourceLabel: motor?.fromMotorStart ? 'Motor Start' : 'Equipment' }
     },
     missing: linkedLoads.length ? [] : ['Add at least one load with a usable power value.']
   };

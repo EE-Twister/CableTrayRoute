@@ -88,11 +88,14 @@
 
       <details class="method-panel">
         <summary>Method &amp; Assumptions</summary>
-        <p class="alert warning"><strong>Screening limitation:</strong> this page applies generic
-        energy factors. It is not an IEEE 485 or IEEE 1115 cell-sizing implementation and cannot
-        establish compliance or a final product selection. Final sizing requires the complete dc
-        duty cycle, end voltage, and manufacturer discharge-performance data. IEEE 485-2020 applies
-        only to lead-acid batteries.</p>
+        <p>This page provides two calculation paths. <strong>Generic energy screen</strong> applies
+        planning-level chemistry factors. <strong>Manufacturer-data duty cycle</strong> evaluates
+        every sequential duty-cycle section against an entered product discharge table, rejects
+        extrapolation, and retains the controlling-section contribution math.</p>
+        <p class="alert warning"><strong>Selection boundary:</strong> neither path certifies IEEE
+        compliance or replaces manufacturer sizing software, product qualification, and project
+        acceptance checks. IEEE 485-2020 applies only to lead-acid batteries; IEEE 1115 applies to
+        nickel-cadmium batteries.</p>
 
         <p><strong>Step 1 — Net energy:</strong></p>
         <pre>kWh_net = P_avg_kW &times; t_hours  &nbsp;[uniform load]
@@ -112,6 +115,12 @@ kWh_temp = kWh_design / K_temp</pre>
 
         <p><strong>Step 5 — User-entered design margin:</strong></p>
         <pre>kWh_final = kWh_aged &times; (1 + margin%)</pre>
+
+        <p><strong>Manufacturer-data duty cycle:</strong></p>
+        <pre>reference_units(section) = &Sigma;(&Delta;I_i / I_manufacturer(remaining_duration_i))
+Ah_required = reference_units &times; Ah_reference &divide; K_temp &times; K_aging &times; K_margin</pre>
+        <p>Manufacturer current is interpolated on log-log axes only between entered points.
+        Durations outside the supplied table are rejected.</p>
 
         <p><strong>UPS kVA:</strong></p>
         <pre>kVA_required = P_peak_kW / PF_UPS</pre>
@@ -139,6 +148,85 @@ kWh_temp = kWh_design / K_temp</pre>
               Used in the results summary only.
             </p>
           </div>
+        </fieldset>
+
+        <fieldset>
+          <legend><strong>Sizing Method</strong></legend>
+          <div class="field-row">
+            <label for="sizing-method">Battery sizing basis</label>
+            <select id="sizing-method" aria-describedby="sizing-method-hint">
+              <option value="energy-screen">Generic energy screen</option>
+              <option value="manufacturer-duty-cycle">Manufacturer-data duty cycle</option>
+            </select>
+            <p id="sizing-method-hint" class="field-hint">
+              Use the energy screen for early planning. Use manufacturer-data duty-cycle sizing
+              when a documented discharge table, end voltage, and complete sequential DC load
+              profile are available.
+            </p>
+          </div>
+
+          <details id="manufacturer-duty-cycle-inputs" hidden>
+            <summary><strong>Manufacturer duty-cycle inputs</strong></summary>
+            <p class="alert warning">
+              No product curve is assumed. Enter data from the selected manufacturer's document
+              at the stated end voltage and temperature. The calculation rejects extrapolation
+              beyond the entered duration range.
+            </p>
+
+            <div class="field-row">
+              <label for="duty-cycle-periods">Sequential DC duty cycle</label>
+              <textarea id="duty-cycle-periods" rows="6"
+                        placeholder="duration_minutes,current_amps&#10;1,250&#10;59,80&#10;60,25"
+                        aria-describedby="duty-cycle-periods-hint"></textarea>
+              <p id="duty-cycle-periods-hint" class="field-hint">
+                One sequential period per line: <code>duration_minutes,current_amps</code>.
+                Include momentary, noncontinuous, and continuous loads in their actual order.
+              </p>
+            </div>
+
+            <div class="field-row">
+              <label for="manufacturer-discharge-table">Manufacturer discharge table</label>
+              <textarea id="manufacturer-discharge-table" rows="8"
+                        placeholder="duration_minutes,amps_for_reference_capacity&#10;1,520&#10;5,360&#10;15,230&#10;60,100&#10;120,55"
+                        aria-describedby="manufacturer-discharge-table-hint"></textarea>
+              <p id="manufacturer-discharge-table-hint" class="field-hint">
+                Enter at least two duration/current points for one reference-capacity cell or
+                string. Current must stay level or decrease as duration increases.
+              </p>
+            </div>
+
+            <div class="field-row">
+              <label for="discharge-table-source">Manufacturer source / revision</label>
+              <input type="text" id="discharge-table-source"
+                     placeholder="Manufacturer, model, document, revision, table/page"
+                     aria-describedby="discharge-table-source-hint">
+              <p id="discharge-table-source-hint" class="field-hint">
+                Required provenance for the entered discharge-performance values.
+              </p>
+            </div>
+
+            <div class="battery-layout-grid">
+              <div class="field-row">
+                <label for="reference-capacity-ah">Reference capacity (Ah)</label>
+                <input type="number" id="reference-capacity-ah" min="0.1" step="0.1" value="100">
+              </div>
+              <div class="field-row">
+                <label for="end-voltage-v-per-cell">End voltage (V/cell)</label>
+                <input type="number" id="end-voltage-v-per-cell" min="0.1" step="0.01"
+                       placeholder="From manufacturer table">
+              </div>
+              <div class="field-row">
+                <label for="temperature-capacity-factor">Temperature capacity factor</label>
+                <input type="number" id="temperature-capacity-factor" min="0.01" max="1" step="0.01" value="1">
+                <p class="field-hint">Available-capacity fraction from manufacturer data; 1.00 is neutral.</p>
+              </div>
+              <div class="field-row">
+                <label for="end-of-life-capacity-pct">End-of-life capacity (%)</label>
+                <input type="number" id="end-of-life-capacity-pct" min="1" max="100" step="1" value="80">
+                <p class="field-hint">Required capacity is multiplied by 100 / this value.</p>
+              </div>
+            </div>
+          </details>
         </fieldset>
 
         <!-- Load Parameters -->

@@ -1352,7 +1352,7 @@ Coverage: 80 contracts for 80 navigation routes.
 - `settings.studyApprovals` (setting, optional): Engineer review records for study outputs.
 
 **Outputs**
-- `studyResults.batterySizing` (study-result): Saved battery/UPS sizing, runtime, and rack layout result. Consumers: `bessHazard.html`, `projectreport.html`.
+- `studyResults.batterySizing` (study-result): Saved battery/UPS energy screen or manufacturer-data duty-cycle sizing result, including source provenance, controlling-section math, runtime, and rack layout. Consumers: `bessHazard.html`, `projectreport.html`.
 - `settings.studyApprovals` (setting): Engineer approval records written by the shared study approval panel. Consumers: `projectreport.html`.
 - `export-only` (export): Battery sizing and rack layout exports. Consumers: `projectreport.html`.
 
@@ -2161,7 +2161,7 @@ Coverage: 80 contracts for 80 navigation routes.
 - `settings.designBasis` (setting, optional): Project code basis, sizing defaults, routing defaults, and study prerequisites.
 
 **Outputs**
-- `studyResults.motorStart` (study-result): Saved motor starting current, torque, and voltage sag result. Consumers: `generatorsizing.html`, `projectreport.html`.
+- `studyResults.motorStart` (study-result): Saved motor starting current, controlling starting kVA/kW, torque, and voltage sag result. Consumers: `battery.html`, `generatorsizing.html`, `projectreport.html`.
 - `export-only` (export): Motor starting charts and reports. Consumers: `projectreport.html`.
 
 **Readiness**
@@ -2169,6 +2169,7 @@ Coverage: 80 contracts for 80 navigation routes.
 - Blockers: No motor data, missing source impedance, or invalid starter parameters.
 
 **Downstream Pages**
+- `battery.html`
 - `generatorsizing.html`
 - `projectreport.html`
 

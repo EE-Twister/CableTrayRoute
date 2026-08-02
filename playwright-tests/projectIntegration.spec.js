@@ -53,6 +53,38 @@ async function seedProject(page, firstPage = 'battery.html') {
 }
 
 test.describe('shared project data integration', () => {
+  test('Motor Start merges project schedules and publishes downstream starting demand', async ({ page }) => {
+    await seedProject(page, 'motorStart.html');
+    await expect(page.getByRole('region', { name: 'Project data sources' })).toContainText('One-Line (0 motors)');
+    await expect(page.getByRole('region', { name: 'Project data sources' })).toContainText('Equipment List');
+    await expect(page.getByRole('region', { name: 'Project data sources' })).toContainText('Load List (1 motors)');
+    await expect(page.locator('#motor-inputs tbody tr')).toHaveCount(1);
+    await expect(page.locator('#motor-inputs tbody tr')).toContainText('PMP-101');
+    await expect(page.locator('#motor-inputs tbody tr')).toContainText('Equipment List');
+    await expect(page.locator('#motor-inputs tbody tr')).toContainText('Load List');
+    await expect(page.locator('.motor-hp')).toHaveValue('22.9');
+    await expect(page.locator('.motor-volts')).toHaveValue('480');
+
+    await page.locator('.motor-r').fill('0.01');
+    await page.locator('.motor-x').fill('0.03');
+    await page.locator('.motor-inertia').fill('1');
+    await page.locator('#run-motors-btn').click();
+
+    const summary = await page.evaluate(() => window.dataStore.getStudies().motorStart);
+    expect(summary.startingKva).toBeGreaterThan(0);
+    expect(summary.startingKw).toBeGreaterThan(0);
+    expect(summary.controllingMotor.label).toContain('PMP-101');
+    expect(summary.projectLink.overrides).toContain('pmp-101.motor-r');
+
+    await page.goto(pageUrl('battery.html'));
+    await expect(page.locator('#peak-load-kw')).toHaveValue(String(summary.peakLoadKw));
+    await expect(page.getByRole('region', { name: 'Project data sources' })).toContainText('Motor Start');
+
+    await page.goto(pageUrl('generatorsizing.html'));
+    await expect(page.locator('#motor-hp')).toHaveValue('22.9');
+    await expect(page.getByRole('region', { name: 'Project data sources' })).toContainText('Motor Start');
+  });
+
   test('Battery and Generator Sizing reuse project inputs without duplicate entry', async ({ page }) => {
     await seedProject(page);
     await expect(page.getByRole('region', { name: 'Project data sources' })).toContainText('Load List (2 loads)');

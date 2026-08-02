@@ -2,14 +2,18 @@
 
 ## Overview
 
-The Battery / UPS Sizing study provides a preliminary energy, budget, and space
-screen for a stationary battery bank and UPS unit.
+The Battery / UPS Sizing study provides two calculation paths:
 
-> **Screening only:** The calculation is not an IEEE 485 or IEEE 1115 cell-sizing
-> implementation and does not establish compliance or a final product selection.
-> Final sizing requires the complete dc duty cycle, minimum end voltage, and the
-> selected manufacturer's discharge-performance data. IEEE 485-2020 applies to
-> lead-acid batteries only; it does not apply to lithium-ion batteries.
+- **Generic energy screen** for early energy, budget, and space planning.
+- **Manufacturer-data duty-cycle sizing** for section-by-section stationary
+  battery sizing when the selected product's discharge table, end voltage,
+  temperature factor, and complete sequential DC duty cycle are available.
+
+> **Selection boundary:** The manufacturer-data path is a transparent cell-selection
+> review aid, not an IEEE compliance certification. Manufacturer sizing software,
+> product qualification, load classification, random-load placement, and project
+> acceptance checks remain required. IEEE 485-2020 applies to lead-acid batteries;
+> IEEE 1115 applies to nickel-cadmium batteries. Neither applies to lithium-ion.
 
 Correct battery sizing is required for:
 - Emergency lighting and life-safety systems (NEC Article 700)
@@ -29,11 +33,64 @@ Run this study when:
 - Evaluating runtime extension for an existing UPS
 - Sizing a standalone DC battery system (telecom, substation control)
 - Screening a requested NEC 700/701 runtime before a code and manufacturer review
+- Reviewing a lead-acid or nickel-cadmium cell selection against a documented
+  manufacturer discharge table and sequential DC duty cycle
 
 **Upstream inputs:**
 - Average and peak load demand — use the [Load List](../loadlist.html) or
   [Load Flow](../loadFlow.html) study P results
 - Cold-environment ambient temperature — from facility data or ASHRAE design conditions
+
+---
+
+## Manufacturer-Data Duty-Cycle Method
+
+Use this mode only when the manufacturer discharge-performance table is available
+for the selected cell family, reference capacity, end voltage, and temperature
+basis. The application deliberately contains no generic product curve and rejects
+durations outside the entered table.
+
+Enter the duty cycle as sequential constant-current periods:
+
+```text
+duration_minutes,current_amps
+1,250
+59,80
+60,25
+```
+
+For each section endpoint, the calculation expresses the load as current changes
+and superimposes those changes against the manufacturer current available for the
+remaining duration:
+
+```text
+reference_units(section) = Σ [ΔI_i / I_manufacturer(remaining_duration_i)]
+Ah_raw(section) = reference_units(section) × Ah_reference
+Ah_corrected = Ah_raw / K_temperature × (100 / end_of_life_pct) × (1 + margin_pct/100)
+```
+
+Manufacturer discharge current is interpolated on log-log axes between entered
+points. It is never extrapolated. Every result retains the per-load-step current
+change, remaining duration, interpolated manufacturer current, and reference-unit
+contribution. The section with the greatest corrected amp-hour requirement controls.
+
+The candidate cell capacity from **Rack Layout & Connections** determines the
+number of parallel strings:
+
+```text
+parallel_strings = ceil(Ah_required / candidate_cell_Ah)
+installed_Ah = parallel_strings × candidate_cell_Ah
+```
+
+Required provenance inputs are:
+
+- Manufacturer, cell model/family, document identifier, revision, and table/page
+- Reference cell capacity represented by the entered current values
+- End voltage in volts per cell
+- Manufacturer temperature capacity factor for the design temperature
+- Project end-of-life capacity criterion and design margin
+- Complete ordered duty cycle, including momentary, noncontinuous, continuous,
+  and deliberately placed random loads
 
 ---
 
@@ -145,6 +202,14 @@ applicable battery standard govern the final margin.
 | Ambient temp (°C) | Battery room / enclosure temperature | −40 to +40 °C |
 | Design margin (%) | User-entered screening allowance | 10–25% |
 | UPS power factor | UPS output PF (typically 0.9 for modern units) | 0.8–1.0 |
+| Sizing method | Generic energy screen or manufacturer-data duty cycle | Select by project phase |
+| DC duty-cycle periods | Sequential duration (minutes) and current (A) rows | Complete project duty cycle |
+| Manufacturer discharge table | Duration and current for one documented reference-capacity cell/string | Selected product data |
+| Discharge table source | Manufacturer, model/family, document, revision, table/page | Required in duty-cycle mode |
+| Reference capacity | Capacity represented by the discharge-current table | Manufacturer-specific |
+| End voltage | Minimum voltage basis for the discharge table | Manufacturer/project-specific |
+| Temperature capacity factor | Available-capacity fraction at design temperature | Manufacturer-specific, 0-1 |
+| End-of-life capacity | Project replacement capacity threshold | Commonly 80%, verify criteria |
 | DC bus voltage (V) | Nominal battery string / UPS DC bus voltage for rack layout | 125, 240, 480, 600 VDC |
 | Nominal cell voltage (V) | Cell voltage used to compute cells in series | 2.0 lead-acid, 3.2 Li-ion, 1.2 NiCd |
 | Cell capacity (Ah) | Per-cell amp-hour rating at the selected discharge rate | Manufacturer-specific |
@@ -156,6 +221,15 @@ applicable battery standard govern the final margin.
 ---
 
 ## Results Interpretation
+
+**Duty-cycle section table** — shows raw and corrected amp-hour capacity at
+every section endpoint. The controlling section is highlighted. Expand the
+contribution table to audit each current change, remaining duration, interpolated
+manufacturer current, and reference-unit contribution.
+
+**Cell / string selection** — compares the minimum corrected amp-hour requirement
+with the candidate cell capacity and reports the required parallel-string count,
+installed amp-hour capacity, and nominal installed energy.
 
 **Energy chain** — shows each step of the calculation so you can see which
 factor dominates the final requirement. A large gap between kWh_net and
@@ -245,6 +319,10 @@ All functions are exported from `analysis/batterySizing.mjs` with no DOM depende
 | `standardBankSize(kwhRequired)` | Select nearest standard bank kWh |
 | `runtimeCurve(kwhSelected, loadKw, chemistry)` | Runtime at 25/50/75/100/125% load |
 | `upsKvaRequired(peakKw, upsPF)` | UPS kVA requirement and standard size |
+| `normalizeManufacturerDischargeTable(rows)` | Validate and order entered product discharge data |
+| `interpolateManufacturerDischargeCurrent(rows, duration)` | Bounded log-log interpolation without extrapolation |
+| `sizeManufacturerDutyCycle(inputs)` | Evaluate every duty-cycle section and select parallel strings |
+| `runManufacturerDutyCycleAnalysis(inputs)` | Build the manufacturer-data result with provenance and warnings |
 | `runBatterySizingAnalysis(inputs)` | Master orchestrator — call this from the UI |
 
 Rack layout functions are exported from `analysis/batteryRackLayout.mjs`:

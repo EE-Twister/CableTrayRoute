@@ -365,6 +365,27 @@ test.describe('Battery / UPS Sizing', () => {
     await expect(page.locator('#battery-rack-elevation-svg')).toBeVisible();
     await expect(page.locator('.battery-rack-summary-grid')).toContainText('Battery racks');
   });
+
+  test('sizes a documented manufacturer duty cycle without curve extrapolation', async ({ page }) => {
+    await page.selectOption('#sizing-method', 'manufacturer-duty-cycle');
+    await expect(page.locator('#manufacturer-duty-cycle-inputs')).toBeVisible();
+    await page.fill('#duty-cycle-periods', '60,100\n60,20');
+    await page.fill('#manufacturer-discharge-table', '10,300\n60,100\n120,50');
+    await page.fill('#discharge-table-source', 'Example manufacturer manual, Rev A, Table 4');
+    await page.fill('#end-voltage-v-per-cell', '1.75');
+    await page.fill('#temperature-capacity-factor', '0.8');
+    await page.fill('#end-of-life-capacity-pct', '80');
+    await page.fill('#design-margin-pct', '10');
+    await page.fill('#rack-dc-bus-voltage-v', '125');
+    await page.fill('#rack-cell-capacity-ah', '100');
+    await page.locator('#battery-form').evaluate(form => form.requestSubmit());
+
+    await expect(page.getByRole('heading', { name: 'Manufacturer-Data Duty-Cycle Results' })).toBeVisible();
+    await expect(page.locator('.result-row').filter({ hasText: 'Minimum corrected capacity' })).toContainText('206.3 Ah');
+    await expect(page.locator('.result-row').filter({ hasText: 'Required parallel strings' })).toContainText('3');
+    await expect(page.getByText('Example manufacturer manual, Rev A, Table 4')).toBeVisible();
+    await expect(page.getByRole('note')).toContainText('does not certify IEEE compliance');
+  });
 });
 
 // -------------------------------------------------------------------------

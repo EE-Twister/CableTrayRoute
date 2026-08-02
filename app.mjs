@@ -33,9 +33,7 @@ import { fetchDataFile } from './src/fetchUtils.mjs';
 import { showAlertModal } from './src/components/modal.js';
 import { createDirtyTracker } from './dirtyTracker.js';
 import {
-    buildRoutingReadinessDiagnostics,
-    cableHasRoutingCoordinates,
-    getCableAssignedRacewayIds
+    buildRoutingReadinessDiagnostics
 } from './analysis/scheduleWorkflow.mjs';
 import { normalizeRouteResultState } from './analysis/routeResults.mjs';
 import { filterRouteResultsForProject } from './analysis/deliverableWorkflow.mjs';
@@ -50,38 +48,7 @@ import {
     compactTrayCableMapForStorage
 } from './analysis/routeStorageCompaction.mjs';
 
-/**
- * Escape a string for safe insertion into HTML content or attributes.
- * Use instead of raw template literals in innerHTML assignments.
- */
-function escapeHtml(str) {
-    if (str === null || str === undefined) return '';
-    return String(str)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
-}
-/** Alias for escapeHtml — use in attribute value contexts for readability. */
-const escapeAttr = escapeHtml;
-const getParallelCount = (value) => Math.max(1, Number.parseInt(value, 10) || 1);
-
-/**
- * Return true only for URLs that are safe to use as href values.
- * Allows relative URLs and only http/https absolute URLs.
- * Blocks javascript:, data:, vbscript:, and other dangerous schemes.
- */
-function isSafeUrl(url) {
-    if (typeof url !== 'string' || url.trim() === '') return false;
-    if (/^[#/?.]/.test(url.trim())) return true;
-    try {
-        const parsed = new URL(url);
-        return parsed.protocol === 'http:' || parsed.protocol === 'https:';
-    } catch {
-        return false;
-    }
-}
+const getParallelCount = value => Math.max(1, Number.parseInt(value, 10) || 1);
 
 function emitSticky(name, flagKey) {
   if (!window.__e2eFlags) window.__e2eFlags = {};
@@ -115,6 +82,21 @@ import { exportRoutesDXF } from './bimExport.mjs';
 import { exportToGLTF2 } from './src/exporters/gltf2.mjs';
 import { buildRouteDecisionScore, buildRouteMetrics, buildRouteSceneModel } from './src/routing/routeSceneModel.mjs?v=4';
 import { buildDuctbankRouteHandoff } from './src/ductbankProjectAdapter.mjs';
+import { escapeAttr, escapeHtml, isSafeUrl } from './src/htmlSafety.mjs';
+import {
+    buildRouteExplanationPoints,
+    buildRouteIssueAdvice,
+    formatRouteDistance as formatRouteDistanceModel,
+    getRejectedReasonCounts,
+    isRoutedResult,
+    summarizeRouteReview
+} from './src/routing/routeReviewModel.mjs';
+import {
+    buildRouteExplanationMarkup,
+    buildRouteScreeningReviewMarkup,
+    renderRouteSummaryPanel as renderRouteSummaryPanelView
+} from './src/routing/routeReviewView.mjs';
+import { createRoutingState } from './src/routing/routingState.mjs';
 
 // Filename: app.mjs
 // (This is an improved version that adds route segment consolidation)
@@ -210,40 +192,7 @@ async function initializeApp() {
     const markUnsaved = () => { dirty.markDirty(); };
 
     // --- STATE MANAGEMENT ---
-    let state = {
-        manualTrays: [],
-        cableList: [],
-        trayData: [],
-        latestRouteData: [],
-        selectedRouteIndex: null,
-        sharedFieldRoutes: [],
-        trayCableMap: {},
-        fieldSegmentCableMap: new Map(),
-        updatedUtilData: [],
-        utilizationOverloadFilter: false,
-        finalTrays: [],
-        highlightTraceIndex: null,
-        ductbankData: null,
-        ductbankTraceIndices: [],
-        ductbankVisible: true,
-        fieldConnectionsVisible: true,
-        plotView: 'isometric',
-        labelsVisible: true,
-        conduitData: [],
-        ductbanksWithoutConduits: [],
-        includeDuctbankOutlines: false,
-        geometryWarnings: { ductbanks: [], conduits: [] },
-        heatmapEnabled: false,
-        pullChecksEnabled: false,
-        pullSetupsVisible: true,
-        pullGroupAnalysis: null,
-        pullGroupDecisions: {},
-        expandedPullGroupIds: new Set(),
-        routeViewer: null,
-        routeViewerLoad: null,
-        routeViewerFailed: false,
-        largeFacilityTestMode: false,
-    };
+    let state = createRoutingState();
 
     const storeLatestRouteResults = (batchResults, meta = {}) => {
         const hasValidMap = meta.trayCableMap
@@ -3456,157 +3405,36 @@ const openUtilizationReview = row => {
     const downloadTraySample=()=>downloadSampleTemplate(trayTemplateHeaders,'tray_list_template.xlsx');
 const downloadCableSample=()=>downloadSampleTemplate(cableTemplateHeaders,'cable_options_template.xlsx');
 
-const isRoutedResult = (result) => {
-    return !!result && String(result.status || '').toLowerCase().includes('routed');
-};
+const formatRouteDistance = value => formatRouteDistanceModel(value, globalThis.units?.formatDistance);
 
-const formatRouteDistance = (value) => {
-    const num = Number(value);
-    if (!Number.isFinite(num)) return 'N/A';
-    const fmt = globalThis.units?.formatDistance || (v => `${v.toFixed(2)} ft`);
-    return fmt(num);
-};
+const routeIssueAdvice = result => buildRouteIssueAdvice(result, {
+    cables: state.cableList,
+    readiness: getRoutingReadiness()
+});
 
-const getRejectedReasonCounts = (results = []) => {
-    const counts = {};
-    results.forEach(result => {
-        (result.exclusions || []).forEach(exclusion => {
-            if (!exclusion.reason) return;
-            counts[exclusion.reason] = (counts[exclusion.reason] || 0) + 1;
-        });
-        (result.mismatched_records || []).forEach(record => {
-            const reason = record.reason || 'mismatched raceway';
-            counts[reason] = (counts[reason] || 0) + 1;
-        });
-    });
-    return counts;
-};
+const buildRouteExplanation = result => buildRouteExplanationMarkup(
+    buildRouteExplanationPoints(result, {
+        cables: state.cableList,
+        readiness: getRoutingReadiness(),
+        formatDistance: formatRouteDistance
+    }),
+    escapeHtml
+);
 
-const routeIssueAdvice = (result) => {
-    if (isRoutedResult(result)) return [];
-    const reasons = new Set([
-        ...(result.exclusions || []).map(ex => ex.reason).filter(Boolean),
-        ...(result.mismatched_records || []).map(record => record.reason).filter(Boolean)
-    ]);
-    const advice = [];
-    const matchingCable = state.cableList.find(cable => {
-        const tag = cable.name || cable.tag || cable.id || cable.ref;
-        return String(tag || '') === String(result.cable || '');
-    });
-    if (matchingCable && !cableHasRoutingCoordinates(matchingCable)) {
-        advice.push('Add start/end XYZ coordinates for this cable, then rerun routing.');
-    }
-    if (matchingCable) {
-        const readiness = getRoutingReadiness();
-        const assignedRefs = new Set(getCableAssignedRacewayIds(matchingCable));
-        const invalidRefs = readiness.diagnostics.invalidAssignedRefs
-            .filter(item => item.cable === (matchingCable.name || matchingCable.tag || matchingCable.id || matchingCable.ref || '(untagged cable)') && assignedRefs.has(item.raceway))
-            .map(item => item.raceway);
-        if (invalidRefs.length) {
-            advice.push(`Confirm raceway assignment(s) ${invalidRefs.join(', ')} exist in the Raceway Schedule.`);
-        }
-    }
-    if ([...reasons].some(reason => /fill|capacity/i.test(reason))) {
-        advice.push('Review tray fill or lower the cable group density before rerouting.');
-    }
-    if ([...reasons].some(reason => /group|segregation|mismatch/i.test(reason))) {
-        advice.push('Check allowed cable group values in the cable and raceway schedules.');
-    }
-    if (result.total_length === 'N/A' || reasons.size === 0) {
-        advice.push('Check that start/end coordinates are near the tray network or increase the proximity threshold.');
-    }
-    return advice;
-};
-
-const buildRouteExplanation = (result) => {
-    if (!result) return '';
-    const points = [];
-    if (isRoutedResult(result)) {
-        const trayCount = Number(result.tray_segments_count) || 0;
-        const fieldLength = Number(result.field_length) || 0;
-        points.push(`${escapeHtml(result.mode || 'Automatic')} route selected using ${trayCount} tray/conduit segment${trayCount === 1 ? '' : 's'}.`);
-        if (fieldLength > 0) {
-            points.push(`${escapeHtml(formatRouteDistance(fieldLength))} of field routing was used for endpoint jumps or network gaps.`);
-        } else {
-            points.push('No field routing was needed for this cable.');
-        }
-        const screeningCount = summarizeRouteScreening(result).total;
-        if (screeningCount) {
-            points.push(`${screeningCount} candidate segment${screeningCount === 1 ? '' : 's'} were not used; review the grouped reasons below.`);
-        } else {
-            points.push('Every reported candidate raceway remained eligible for this route.');
-        }
-    } else {
-        points.push('No valid route was found for this cable.');
-        routeIssueAdvice(result).forEach(item => points.push(item));
-    }
-    return `<ul class="route-explanation-list">${points.map(point => `<li>${point}</li>`).join('')}</ul>`;
-};
-
-const buildRouteScreeningReview = (result, summary = summarizeRouteScreening(result)) => {
-    if (!summary.total) {
-        return '<section class="route-screening-review route-screening-review--clear"><strong>No candidates were screened out.</strong><p>Every raceway segment considered by the routing search remained eligible.</p></section>';
-    }
-    const groupCards = summary.groups.map(group => `
-        <article class="route-screening-reason" data-route-screening-reason="${escapeAttr(group.code)}">
-            <strong>${group.count}</strong>
-            <span>${escapeHtml(group.label)}</span>
-            <p>${escapeHtml(group.description)}</p>
-        </article>
-    `).join('');
-    const candidateRows = summary.candidates.map(candidate => {
-        const details = candidate.message
-            ? candidate.message.replace(/^Rejected\s+[^:]+:\s*/i, '')
-            : summary.groups.find(group => group.code === candidate.reason)?.label || candidate.reason;
-        const link = candidate.filter && isSafeUrl(candidate.filter)
-            ? `<a href="${escapeAttr(candidate.filter)}">Open raceway</a>`
-            : '';
-        return `<li><strong>${escapeHtml(candidate.id)}</strong><span>${escapeHtml(details)}</span>${link}</li>`;
-    }).join('');
-    return `
-        <section class="route-screening-review" tabindex="-1">
-            <div class="route-screening-review-heading">
-                <div><span>Routing search review</span><h4>Why ${summary.total} candidate${summary.total === 1 ? '' : 's'} were not used</h4></div>
-                <span class="route-screening-advisory">Selected route remains valid</span>
-            </div>
-            <p class="route-screening-explanation">The router evaluates nearby raceway segments before choosing a continuous path. These are alternatives removed by the configured rules—not ${summary.total} defects in the selected route.</p>
-            <div class="route-screening-reason-grid">${groupCards}</div>
-            <details class="route-screening-records">
-                <summary>Show ${summary.total} candidate raceway record${summary.total === 1 ? '' : 's'}</summary>
-                <ul>${candidateRows}</ul>
-            </details>
-        </section>
-    `;
-};
+const buildRouteScreeningReview = (result, summary = summarizeRouteScreening(result)) => (
+    buildRouteScreeningReviewMarkup(summary, { escapeHtml, escapeAttr, isSafeUrl })
+);
 
 const renderRouteSummaryPanel = (results = []) => {
-    if (!elements.routeSummaryPanel) return;
-    if (!results || results.length === 0) {
-        elements.routeSummaryPanel.innerHTML = '';
-        return;
-    }
-    const routed = results.filter(isRoutedResult);
-    const failed = results.length - routed.length;
-    const totalLength = routed.reduce((sum, row) => sum + (Number(row.total_length) || 0), 0);
-    const fieldLength = routed.reduce((sum, row) => sum + (Number(row.field_length) || 0), 0);
-    const overFillCount = (state.updatedUtilData || []).filter(row => isRacewayOverloaded(row)).length;
-    const primary = routed[0] || {};
-    const primaryLength = Number(primary.total_length) || 0;
-    const primaryField = Number(primary.field_length) || 0;
-    const primaryContained = primaryLength > 0 ? Math.max(0, 100 - (primaryField / primaryLength) * 100) : 0;
-    elements.routeSummaryPanel.innerHTML = `
-        <div class="route-review-kpis" aria-label="Recommended route summary">
-            <div class="route-review-kpi route-review-kpi--recommended"><i aria-hidden="true">✓</i><span><strong>Recommended</strong><small>${routed.length} routed${failed ? ` · ${failed} need review` : ''}</small></span></div>
-            <div class="route-review-kpi"><i aria-hidden="true">↔</i><span><strong id="selected-route-kpi-length">${escapeHtml(formatRouteDistance(primaryLength))}</strong><small>selected route</small></span></div>
-            <div class="route-review-kpi"><i aria-hidden="true">▦</i><span><strong id="selected-route-kpi-contained">${primaryContained.toFixed(0)}% contained</strong><small>${escapeHtml(formatRouteDistance(totalLength - fieldLength))} in raceway</small></span></div>
-            ${overFillCount
-                ? `<button type="button" id="route-overload-kpi" class="route-review-kpi route-review-kpi--warning" aria-controls="updated-utilization-details"><i aria-hidden="true">!</i><span><strong>${overFillCount} overloads</strong><small>View affected raceways</small></span></button>`
-                : '<div class="route-review-kpi route-review-kpi--safe"><i aria-hidden="true">◆</i><span><strong>0 overloads</strong><small>within review threshold</small></span></div>'}
-        </div>
-    `;
-    elements.routeSummaryPanel.querySelector('#route-overload-kpi')?.addEventListener('click', focusOverloadedRaceways);
+    const summary = results.length
+        ? summarizeRouteReview(results, state.updatedUtilData || [], isRacewayOverloaded)
+        : null;
+    renderRouteSummaryPanelView(elements.routeSummaryPanel, summary, {
+        formatDistance: formatRouteDistance,
+        escapeHtml,
+        onOverload: focusOverloadedRaceways
+    });
 };
-
 const renderPullGroupAnalysis = analysis => {
     const groups = [...analysis.suggestions, ...analysis.reviewGroups];
     const activeGroupIds = new Set(groups.map(group => group.id));

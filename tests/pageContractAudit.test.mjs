@@ -65,6 +65,7 @@ assert.deepStrictEqual(audit.summary.extraContracts, []);
 assert.deepStrictEqual(audit.summary.routesWithoutSources, []);
 assert.equal(audit.summary.actionableFailures, 0);
 assert.ok(audit.summary.warningCount >= 0);
+assert.ok(audit.summary.routesWithDeclaredIndirectInputs >= 0);
 assert.equal(audit.summary.unclassifiedDirectStorageHits, 0);
 
 for (const href of scopedHrefs) {
@@ -104,6 +105,12 @@ for (const route of audit.routes) {
     assertStorageKey(item.key);
     assert.equal(typeof item.reason, 'string', `${route.href} declared input warning reason must be a string`);
     assert.ok(item.reason.trim(), `${route.href} declared input warning reason must not be empty`);
+  });
+  assert.ok(Array.isArray(route.declaredIndirectInputs), `${route.href} declaredIndirectInputs must be an array`);
+  route.declaredIndirectInputs.forEach(item => {
+    assertStorageKey(item.key);
+    assert.equal(typeof item.reason, 'string', `${route.href} indirect input reason must be a string`);
+    assert.ok(item.reason.trim(), `${route.href} indirect input reason must not be empty`);
   });
   route.declaredOutputsNotWritten.forEach(assertStorageKey);
   route.undocumentedReads.forEach(assertStorageKey);

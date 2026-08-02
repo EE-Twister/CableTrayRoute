@@ -27,6 +27,17 @@ null. Validate a research batch before review with:
 npm run validate:protective-devices -- --research <candidate-file.json>
 ```
 
+After the batch passes research validation, merge it into the production library
+as screening-only inventory with:
+
+```text
+npm run promote:protective-devices -- --input <candidate-file.json> --apply
+```
+
+This merge preserves `libraryStatus: "screening"` and
+`researchStatus: "candidate"`; it does not bypass the human review gate or
+make records calculation-ready.
+
 Before a reviewed record is proposed as calculation-ready, run the stricter
 promotion contract after setting `researchStatus: "reviewed"`, recording the
 human reviewer, and setting `libraryStatus: "calculation_ready"`:
@@ -90,6 +101,28 @@ method, reviewer, and—where applicable—the AC voltage and interrupting ratin
 Selecting **Promote as calculation-ready** is rejected until the same promotion
 gate passes. This preserves incomplete entries as screening curves while still
 letting a project team capture source context and complete its review later.
+
+## Graphical engineering review workflow
+
+Engineering reviewers do not need to edit JSON or use a command line to compare
+curves in the application. In **TCC Analysis**, select **Select Devices**, filter
+to **Screening Only**, select the device, and choose **Open Curve Review**.
+The review workspace provides:
+
+- a log-log overlay of the stored library curve and manufacturer source points;
+- editable source and stored-point tables, including a paste helper for
+  current/time pairs;
+- live spot-check results calculated from the stored curve;
+- direct access to the cited source document;
+- fields for revision, curve/page reference, extraction method, reviewer, date,
+  and review notes; and
+- a live promotion gate that keeps **Mark calculation-ready** blocked until the
+  production requirements pass.
+
+Review progress is saved with the current project through the application's
+project storage. The reviewer can save an incomplete review and return to it;
+the production library remains unchanged until the reviewed record is
+deliberately published through the governed library-promotion workflow.
 
 `data/protectiveDevices.json` is intentionally conservative today: its physical
 breaker, fuse, and manufacturer relay records are screening entries until their

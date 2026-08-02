@@ -4,7 +4,7 @@
 
 This report compares the Workflow and Studies page contracts against statically detected storage access in page source files.
 
-The audit is intentionally conservative: `--check` fails on actionable drift and reports declared-but-unread inputs as warnings for review.
+The audit is intentionally conservative: `--check` fails on actionable drift, reports unexplained declared-but-unread inputs as warnings, and separately records inputs whose contracts explicitly declare indirect workflow consumption.
 
 ## Summary
 
@@ -15,13 +15,14 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 - Routes without source files: 0
 - Routes with undocumented reads: 0
 - Routes with undocumented writes: 0
-- Routes with declared inputs not statically read: 67
+- Routes with declared inputs not statically read: 47
+- Routes with explicitly indirect project inputs: 56
 - Routes with declared outputs not statically written: 0
 - Direct browser storage hits: 2
 - Unclassified direct browser storage hits: 0
 - Direct browser storage classifications: session-handoff=2
 - Actionable failures: 0
-- Warnings: 153
+- Warnings: 87
 
 ## Findings
 
@@ -39,6 +40,9 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 
 **Declared Inputs Not Statically Read**
 - `panelSchedule` - No static read/write evidence was detected for this declared input.
+
+**Declared Indirect Workflow Inputs**
+- None
 
 **Declared Outputs Not Statically Written**
 - None
@@ -195,6 +199,9 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 - None
 
 **Declared Inputs Not Statically Read**
+- None
+
+**Declared Indirect Workflow Inputs**
 - `equipment` - Read through the scenario snapshot accessor rather than a direct active-project getter.
 - `loadList` - Read through the scenario snapshot accessor rather than a direct active-project getter.
 - `oneLineDiagram` - Read through the scenario snapshot accessor rather than a direct active-project getter.
@@ -236,6 +243,9 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 - None
 
 **Declared Inputs Not Statically Read**
+- None
+
+**Declared Indirect Workflow Inputs**
 - `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
@@ -279,6 +289,8 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 
 **Declared Inputs Not Statically Read**
 - `panelSchedule` - No static read/write evidence was detected for this declared input.
+
+**Declared Indirect Workflow Inputs**
 - `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
@@ -319,7 +331,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 
 - Section: Workflow
 - Group: Planning
-- Source files: `ampacity.mjs`, `analysis/arcFlash.mjs`, `analysis/ctMetadata.mjs`, `analysis/harmonics.js`, `analysis/ibrModeling.mjs`, `analysis/iec60909.mjs`, `analysis/iecRelayCurves.mjs`, `analysis/ieee1584.mjs`, `analysis/liveTagAdapter.mjs`, `analysis/loadFlow.js`, `analysis/loadFlowModel.js`, `analysis/loadFlowResultsRenderer.js`, `analysis/motorStart.js`, `analysis/motorStartCalc.mjs`, `analysis/ptVtMetadata.mjs`, `analysis/reliability.js`, `analysis/scheduleReconcile.mjs`, `analysis/shortCircuit.mjs`, `analysis/tccUtils.js`, `analysis/transformerTapOptimization.mjs`, `codes/iecTables.js`, `codes/necTables.js`, `componentLibrary.json`, `conductorProperties.mjs`, `conductorPropertiesData.mjs`, `data/conductor_properties.js`, `data/protectiveDevices.mjs`, `exporters/dxf.js`, `exporters/pdf.js`, `exporters/simpleDxf.js`, `oneline.js`, `reports/arcFlashReport.mjs`, `reports/exportAll.mjs`, `reports/labels.mjs`, `reports/reporting.mjs`, `sizing.js`, `src/crossProbe.js`, `src/lifecycle/pageBootstrap.js`, `src/necTable9.mjs`, `src/one-line/componentElectricalSchema.mjs`, `src/one-line/protectiveDeviceCompatibility.mjs`, `src/one-line/validation.js`, `src/voltageDrop.js`, `src/workers/createWorkerClient.js`, `src/workers/onelineClient.js`, `utils/cableImpedance.js`, `utils/cablePhases.js`, `utils/componentLabels.js`, `utils/transformerImpedance.js`, `utils/transformerProperties.js`, `utils/voltage.js`, `validation/rules.js`
+- Source files: `ampacity.mjs`, `analysis/arcFlash.mjs`, `analysis/ctMetadata.mjs`, `analysis/harmonics.js`, `analysis/ibrModeling.mjs`, `analysis/iec60909.mjs`, `analysis/iecRelayCurves.mjs`, `analysis/ieee1584.mjs`, `analysis/liveTagAdapter.mjs`, `analysis/loadFlow.js`, `analysis/loadFlowModel.js`, `analysis/loadFlowResultsRenderer.js`, `analysis/motorStart.js`, `analysis/motorStartCalc.mjs`, `analysis/motorStartProjectInputs.mjs`, `analysis/ptVtMetadata.mjs`, `analysis/reliability.js`, `analysis/scheduleReconcile.mjs`, `analysis/shortCircuit.mjs`, `analysis/tccUtils.js`, `analysis/transformerTapOptimization.mjs`, `codes/iecTables.js`, `codes/necTables.js`, `componentLibrary.json`, `conductorProperties.mjs`, `conductorPropertiesData.mjs`, `data/conductor_properties.js`, `data/protectiveDevices.mjs`, `exporters/dxf.js`, `exporters/pdf.js`, `exporters/simpleDxf.js`, `oneline.js`, `reports/arcFlashReport.mjs`, `reports/exportAll.mjs`, `reports/labels.mjs`, `reports/reporting.mjs`, `sizing.js`, `src/components/projectInputBinding.js`, `src/crossProbe.js`, `src/lifecycle/pageBootstrap.js`, `src/necTable9.mjs`, `src/one-line/componentElectricalSchema.mjs`, `src/one-line/protectionZonePanel.mjs`, `src/one-line/protectionZones.mjs`, `src/one-line/protectiveDeviceCompatibility.mjs`, `src/one-line/validation.js`, `src/voltageDrop.js`, `src/workers/createWorkerClient.js`, `src/workers/onelineClient.js`, `utils/cableImpedance.js`, `utils/cablePhases.js`, `utils/componentLabels.js`, `utils/transformerImpedance.js`, `utils/transformerProperties.js`, `utils/voltage.js`, `validation/rules.js`
 
 **Undocumented Reads**
 - None
@@ -330,179 +342,186 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 **Declared Inputs Not Statically Read**
 - None
 
+**Declared Indirect Workflow Inputs**
+- None
+
 **Declared Outputs Not Statically Written**
 - None
 
 **Direct Browser Storage**
-- oneline.js:2939 sessionStorage.setItem(<dynamic>) - session-handoff: Temporary custom component editor prefill; not durable project state.
+- oneline.js:2950 sessionStorage.setItem(<dynamic>) - session-handoff: Temporary custom component editor prefill; not durable project state.
 
 **Detected Reads**
 - `cableSchedule`
   - analysis/shortCircuit.mjs:1137 getCables()
-  - oneline.js:15232 getCables()
-  - oneline.js:17163 getCables()
-  - oneline.js:20511 getCables()
-  - oneline.js:4789 getCables()
+  - oneline.js:15143 getCables()
+  - oneline.js:17074 getCables()
+  - oneline.js:20424 getCables()
+  - oneline.js:4801 getCables()
   - ... 3 more
 - `equipment`
-  - oneline.js:10165 getEquipment()
-  - oneline.js:15208 getEquipment()
-  - oneline.js:20508 getEquipment()
-  - oneline.js:4790 getEquipment()
-  - reports/exportAll.mjs:293 getEquipment()
+  - analysis/motorStart.js:53 getEquipment()
+  - oneline.js:10191 getEquipment()
+  - oneline.js:15119 getEquipment()
+  - oneline.js:20421 getEquipment()
+  - oneline.js:4802 getEquipment()
+  - ... 1 more
 - `loadList`
-  - oneline.js:10166 getLoads()
-  - oneline.js:15216 getLoads()
-  - oneline.js:20510 getLoads()
-  - oneline.js:4787 getLoads()
+  - analysis/motorStart.js:54 getLoads()
+  - oneline.js:10192 getLoads()
+  - oneline.js:15127 getLoads()
+  - oneline.js:20423 getLoads()
+  - oneline.js:4799 getLoads()
 - `oneLineDiagram`
   - analysis/arcFlash.mjs:397 getOneLine()
   - analysis/harmonics.js:191 getOneLine()
   - analysis/harmonics.js:265 getOneLine()
   - analysis/loadFlow.js:1031 getOneLine()
-  - analysis/motorStart.js:39 getOneLine()
+  - analysis/motorStart.js:52 getOneLine()
   - ... 19 more
 - `panelSchedule`
-  - oneline.js:15224 getPanels()
-  - oneline.js:20509 getPanels()
-  - oneline.js:4788 getPanels()
+  - oneline.js:15135 getPanels()
+  - oneline.js:20422 getPanels()
+  - oneline.js:4800 getPanels()
   - reports/exportAll.mjs:294 getPanels()
 - `settings.activeSampleWorkflow`
-  - oneline.js:19791 getItem(activeSampleWorkflow)
+  - oneline.js:19704 getItem(activeSampleWorkflow)
 - `settings.diagramDatablockConfig`
-  - oneline.js:19779 getItem(diagramDatablockConfig)
+  - oneline.js:19692 getItem(diagramDatablockConfig)
 - `settings.diagramScale`
-  - oneline.js:3526 getItem(diagramScale)
+  - oneline.js:3537 getItem(diagramScale)
 - `settings.diagramTitleBlock`
-  - oneline.js:19726 getItem(diagramTitleBlock)
+  - oneline.js:19639 getItem(diagramTitleBlock)
 - `settings.gistToken`
-  - oneline.js:20751 getItem(gistToken)
+  - oneline.js:20664 getItem(gistToken)
 - `settings.labelCounters`
-  - oneline.js:17969 getItem(labelCounters)
-  - oneline.js:6253 getItem(labelCounters)
+  - oneline.js:17881 getItem(labelCounters)
+  - oneline.js:6265 getItem(labelCounters)
 - `settings.labelPrefixes`
-  - oneline.js:6252 getItem(labelPrefixes)
+  - oneline.js:6264 getItem(labelPrefixes)
 - `settings.liveTelemetryConfig`
-  - oneline.js:3610 getItem(liveTelemetryConfig)
+  - oneline.js:3621 getItem(liveTelemetryConfig)
 - `settings.manufacturerDefaults`
-  - oneline.js:2835 getItem(manufacturerDefaults)
+  - oneline.js:2846 getItem(manufacturerDefaults)
 - `settings.oneLineScheduleReconcilePending`
-  - oneline.js:3968 getItem(oneLineScheduleReconcilePending)
+  - oneline.js:3980 getItem(oneLineScheduleReconcilePending)
 - `settings.onelineTemplates`
-  - oneline.js:7330 migrateLegacyItem(..., onelineTemplates)
+  - oneline.js:7356 migrateLegacyItem(..., onelineTemplates)
 - `settings.studyProvenance`
-  - oneline.js:12043 getStudyProvenance()
-  - oneline.js:13035 getStudyProvenance()
-  - oneline.js:13175 getStudyProvenance()
-  - oneline.js:5186 getStudyProvenance()
-  - oneline.js:5204 getStudyProvenance()
+  - oneline.js:12069 getStudyProvenance()
+  - oneline.js:12942 getStudyProvenance()
+  - oneline.js:13082 getStudyProvenance()
+  - oneline.js:5198 getStudyProvenance()
+  - oneline.js:5216 getStudyProvenance()
   - ... 1 more
 - `settings.studySettings`
-  - oneline.js:3571 getItem(studySettings)
+  - oneline.js:3582 getItem(studySettings)
 - `settings.tccSettings`
   - analysis/arcFlash.mjs:330 getItem(tccSettings)
   - analysis/shortCircuit.mjs:766 getItem(tccSettings)
 - `studyResults`
   - analysis/harmonics.js:496 getStudies()
-  - analysis/motorStart.js:213 getStudies()
-  - oneline.js:20064 getStudies()
-  - oneline.js:20727 getStudies()
-  - oneline.js:3986 getStudies()
-  - ... 15 more
+  - analysis/motorStart.js:264 getStudies()
+  - analysis/motorStart.js:55 getStudies()
+  - oneline.js:19977 getStudies()
+  - oneline.js:20640 getStudies()
+  - ... 16 more
 - `studyResults.arcFlash`
-  - oneline.js:6092 getStudies().arcFlash
+  - oneline.js:6104 getStudies().arcFlash
   - reports/exportAll.mjs:297 getStudies().arcFlash
 - `studyResults.duty`
   - validation/rules.js:666 studies.duty
   - validation/rules.js:666 studies?.duty
+- `studyResults.loadFlow`
+  - analysis/motorStartProjectInputs.mjs:176 studies.loadFlow
 - `studyResults.reliability`
   - validation/rules.js:671 studies?.reliability
   - validation/rules.js:672 studies.reliability
   - validation/rules.js:674 studies?.reliability
 - `studyResults.transformerTapOptimization`
-  - oneline.js:4024 getStudies().transformerTapOptimization
+  - oneline.js:4036 getStudies().transformerTapOptimization
 
 **Detected Writes**
 - `cableSchedule`
-  - oneline.js:20527 setCables()
-  - oneline.js:4808 setCables()
-  - oneline.js:4916 setCables()
+  - oneline.js:20440 setCables()
+  - oneline.js:4820 setCables()
+  - oneline.js:4928 setCables()
 - `conduitSchedule`
-  - oneline.js:10074 addRaceway()
-  - oneline.js:10661 addRaceway()
+  - oneline.js:10100 addRaceway()
+  - oneline.js:10687 addRaceway()
 - `equipment`
-  - oneline.js:20524 setEquipment()
-  - oneline.js:4810 setEquipment()
+  - oneline.js:20437 setEquipment()
+  - oneline.js:4822 setEquipment()
 - `loadList`
-  - oneline.js:20526 setLoads()
-  - oneline.js:4804 setLoads()
+  - oneline.js:20439 setLoads()
+  - oneline.js:4816 setLoads()
 - `oneLineDiagram`
-  - oneline.js:13416 setOneLine()
-  - oneline.js:13609 setOneLine()
-  - oneline.js:5770 setOneLine()
-  - oneline.js:5968 setOneLine()
-  - oneline.js:6058 setOneLine()
+  - oneline.js:13324 setOneLine()
+  - oneline.js:13520 setOneLine()
+  - oneline.js:5782 setOneLine()
+  - oneline.js:5980 setOneLine()
+  - oneline.js:6070 setOneLine()
   - ... 1 more
 - `panelSchedule`
-  - oneline.js:20525 setPanels()
-  - oneline.js:4806 setPanels()
+  - oneline.js:20438 setPanels()
+  - oneline.js:4818 setPanels()
 - `settings.activeSampleWorkflow`
-  - oneline.js:19798 setItem(activeSampleWorkflow)
+  - oneline.js:19711 setItem(activeSampleWorkflow)
 - `settings.diagramDatablockConfig`
-  - oneline.js:13345 setItem(diagramDatablockConfig)
+  - oneline.js:13252 setItem(diagramDatablockConfig)
 - `settings.diagramScale`
-  - oneline.js:13610 setItem(diagramScale)
-  - oneline.js:20862 setItem(diagramScale)
+  - oneline.js:13521 setItem(diagramScale)
+  - oneline.js:20775 setItem(diagramScale)
 - `settings.diagramTitleBlock`
-  - oneline.js:19761 setItem(diagramTitleBlock)
+  - oneline.js:19674 setItem(diagramTitleBlock)
 - `settings.gistToken`
-  - oneline.js:20755 setItem(gistToken)
+  - oneline.js:20668 setItem(gistToken)
 - `settings.labelCounters`
-  - oneline.js:6262 setItem(labelCounters)
+  - oneline.js:6274 setItem(labelCounters)
 - `settings.labelPrefixes`
-  - oneline.js:6448 setItem(labelPrefixes)
+  - oneline.js:6460 setItem(labelPrefixes)
 - `settings.liveTelemetryConfig`
-  - oneline.js:3952 setItem(liveTelemetryConfig)
+  - oneline.js:3963 setItem(liveTelemetryConfig)
 - `settings.manufacturerDefaults`
-  - oneline.js:6517 setItem(manufacturerDefaults)
+  - oneline.js:6529 setItem(manufacturerDefaults)
 - `settings.oneLineScheduleReconcilePending`
-  - oneline.js:20343 setItem(oneLineScheduleReconcilePending)
+  - oneline.js:20256 setItem(oneLineScheduleReconcilePending)
 - `settings.onelineTemplates`
-  - oneline.js:7330 migrateLegacyItem(..., onelineTemplates)
-  - oneline.js:7338 setItem(onelineTemplates)
+  - oneline.js:7356 migrateLegacyItem(..., onelineTemplates)
+  - oneline.js:7364 setItem(onelineTemplates)
 - `settings.scenarios`
-  - oneline.js:20858 switchScenario()
+  - oneline.js:20771 switchScenario()
 - `settings.studySettings`
-  - oneline.js:4027 setItem(studySettings)
+  - oneline.js:4039 setItem(studySettings)
 - `studyResults`
   - analysis/harmonics.js:499 setStudies()
-  - analysis/motorStart.js:215 setStudies()
-  - oneline.js:5774 setStudies()
-  - oneline.js:5980 setStudies()
-  - oneline.js:6007 setStudies()
+  - analysis/motorStart.js:266 setStudies()
+  - oneline.js:5786 setStudies()
+  - oneline.js:5992 setStudies()
+  - oneline.js:6019 setStudies()
   - ... 5 more
 - `studyResults.arcFlash`
-  - oneline.js:6082 studies.arcFlash
+  - oneline.js:6094 studies.arcFlash
 - `studyResults.duty`
   - validation/rules.js:666 studies.duty
 - `studyResults.harmonics`
   - analysis/harmonics.js:498 studies.harmonics
-  - oneline.js:6102 studies.harmonics
+  - oneline.js:6114 studies.harmonics
 - `studyResults.loadFlow`
-  - oneline.js:5772 studies.loadFlow
+  - oneline.js:5784 studies.loadFlow
 - `studyResults.motorStart`
-  - analysis/motorStart.js:214 studies.motorStart
-  - oneline.js:6110 studies.motorStart
+  - analysis/motorStart.js:265 studies.motorStart
+  - oneline.js:6122 studies.motorStart
 - `studyResults.reliability`
-  - oneline.js:6130 studies.reliability
+  - oneline.js:6142 studies.reliability
 - `studyResults.shortCircuit`
-  - oneline.js:6060 studies.shortCircuit
-  - oneline.js:6081 studies.shortCircuit
+  - oneline.js:6072 studies.shortCircuit
+  - oneline.js:6093 studies.shortCircuit
 - `studyResults.transformerTapOptimization`
-  - oneline.js:6005 studies.transformerTapOptimization
+  - oneline.js:6017 studies.transformerTapOptimization
 - `traySchedule`
-  - oneline.js:10074 addRaceway()
-  - oneline.js:10661 addRaceway()
+  - oneline.js:10100 addRaceway()
+  - oneline.js:10687 addRaceway()
 
 ### Demand Schedule (`demandschedule.html`)
 
@@ -519,6 +538,8 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 **Declared Inputs Not Statically Read**
 - `equipment` - No static read/write evidence was detected for this declared input.
 - `panelSchedule` - No static read/write evidence was detected for this declared input.
+
+**Declared Indirect Workflow Inputs**
 - `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
@@ -547,6 +568,9 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 - None
 
 **Declared Inputs Not Statically Read**
+- None
+
+**Declared Indirect Workflow Inputs**
 - `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
@@ -621,6 +645,9 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 - None
 
 **Declared Inputs Not Statically Read**
+- None
+
+**Declared Indirect Workflow Inputs**
 - `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
@@ -684,6 +711,9 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 - None
 
 **Declared Inputs Not Statically Read**
+- None
+
+**Declared Indirect Workflow Inputs**
 - `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
@@ -764,6 +794,9 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 - None
 
 **Declared Inputs Not Statically Read**
+- None
+
+**Declared Indirect Workflow Inputs**
 - `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
@@ -815,6 +848,8 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 **Declared Inputs Not Statically Read**
 - `cableSchedule` - No static read/write evidence was detected for this declared input.
 - `traySchedule` - No static read/write evidence was detected for this declared input.
+
+**Declared Indirect Workflow Inputs**
 - `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
@@ -846,6 +881,8 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 **Declared Inputs Not Statically Read**
 - `cableSchedule` - No static read/write evidence was detected for this declared input.
 - `conduitSchedule` - No static read/write evidence was detected for this declared input.
+
+**Declared Indirect Workflow Inputs**
 - `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
@@ -877,6 +914,8 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 **Declared Inputs Not Statically Read**
 - `conduitSchedule` - No static read/write evidence was detected for this declared input.
 - `cableSchedule` - No static read/write evidence was detected for this declared input.
+
+**Declared Indirect Workflow Inputs**
 - `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
@@ -918,6 +957,9 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 - None
 
 **Declared Inputs Not Statically Read**
+- None
+
+**Declared Indirect Workflow Inputs**
 - `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
@@ -949,6 +991,8 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 
 **Declared Inputs Not Statically Read**
 - `equipment` - No static read/write evidence was detected for this declared input.
+
+**Declared Indirect Workflow Inputs**
 - `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
@@ -980,6 +1024,8 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 
 **Declared Inputs Not Statically Read**
 - `studyResults.shortCircuit` - No static read/write evidence was detected for this declared input.
+
+**Declared Indirect Workflow Inputs**
 - `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
@@ -1009,6 +1055,8 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 
 **Declared Inputs Not Statically Read**
 - `cableSchedule` - No static read/write evidence was detected for this declared input.
+
+**Declared Indirect Workflow Inputs**
 - `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
@@ -1043,6 +1091,8 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 - `equipment` - No static read/write evidence was detected for this declared input.
 - `conduitSchedule` - No static read/write evidence was detected for this declared input.
 - `ductbankSchedule` - No static read/write evidence was detected for this declared input.
+
+**Declared Indirect Workflow Inputs**
 - `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
@@ -1074,6 +1124,8 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 - `equipment` - No static read/write evidence was detected for this declared input.
 - `ductbankSchedule` - No static read/write evidence was detected for this declared input.
 - `studyResults` - No static read/write evidence was detected for this declared input.
+
+**Declared Indirect Workflow Inputs**
 - `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
@@ -1120,6 +1172,8 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 - `equipment` - No static read/write evidence was detected for this declared input.
 - `conduitSchedule` - No static read/write evidence was detected for this declared input.
 - `ductbankSchedule` - No static read/write evidence was detected for this declared input.
+
+**Declared Indirect Workflow Inputs**
 - `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
@@ -1176,6 +1230,9 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 - None
 
 **Declared Inputs Not Statically Read**
+- None
+
+**Declared Indirect Workflow Inputs**
 - `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
@@ -1221,6 +1278,9 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 - None
 
 **Declared Inputs Not Statically Read**
+- None
+
+**Declared Indirect Workflow Inputs**
 - `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
@@ -1254,6 +1314,8 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 - `equipment` - No static read/write evidence was detected for this declared input.
 - `traySchedule` - No static read/write evidence was detected for this declared input.
 - `studyResults.windLoad` - No static read/write evidence was detected for this declared input.
+
+**Declared Indirect Workflow Inputs**
 - `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
@@ -1282,6 +1344,8 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 
 **Declared Inputs Not Statically Read**
 - `equipment` - No static read/write evidence was detected for this declared input.
+
+**Declared Indirect Workflow Inputs**
 - `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
@@ -1314,6 +1378,8 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 **Declared Inputs Not Statically Read**
 - `equipment` - No static read/write evidence was detected for this declared input.
 - `traySchedule` - No static read/write evidence was detected for this declared input.
+
+**Declared Indirect Workflow Inputs**
 - `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
@@ -1332,7 +1398,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 
 - Section: Workflow
 - Group: Optimization
-- Source files: `ampacity.mjs`, `analysis/cablePullGroups.mjs`, `analysis/cablePullPlan.mjs`, `analysis/deliverableWorkflow.mjs`, `analysis/designBasis.mjs`, `analysis/largeFacilityRoutingSample.mjs`, `analysis/pullCards.mjs`, `analysis/racewayReviewTarget.mjs`, `analysis/reportPackage.mjs`, `analysis/routeResults.mjs`, `analysis/routeScreeningSummary.mjs`, `analysis/routeStorageCompaction.mjs`, `analysis/scheduleWorkflow.mjs`, `analysis/spoolSheetVisualModel.mjs`, `analysis/spoolSheets.mjs`, `app.mjs`, `bimExport.mjs`, `conductorProperties.mjs`, `conductorPropertiesData.mjs`, `data/conductor_properties.js`, `e2e-helpers.js`, `exporters/simpleDxf.js`, `optimalRoute.js`, `resultsExport.mjs`, `src/ductbankProjectAdapter.mjs`, `src/exporters/gltf2.mjs`, `src/fetchUtils.mjs`, `src/necTable9.mjs`, `src/optimalRoute.js`, `src/pullCalc.js`, `src/voltageDrop.js`, `tableUtils.mjs`, `tour.js`, `utils/safeEvents.mjs`
+- Source files: `ampacity.mjs`, `analysis/cablePullGroups.mjs`, `analysis/cablePullPlan.mjs`, `analysis/deliverableWorkflow.mjs`, `analysis/designBasis.mjs`, `analysis/largeFacilityRoutingSample.mjs`, `analysis/pullCards.mjs`, `analysis/racewayReviewTarget.mjs`, `analysis/reportPackage.mjs`, `analysis/routeResults.mjs`, `analysis/routeScreeningSummary.mjs`, `analysis/routeStorageCompaction.mjs`, `analysis/scheduleWorkflow.mjs`, `analysis/spoolSheetVisualModel.mjs`, `analysis/spoolSheets.mjs`, `app.mjs`, `bimExport.mjs`, `conductorProperties.mjs`, `conductorPropertiesData.mjs`, `data/conductor_properties.js`, `e2e-helpers.js`, `exporters/simpleDxf.js`, `optimalRoute.js`, `resultsExport.mjs`, `src/ductbankProjectAdapter.mjs`, `src/exporters/gltf2.mjs`, `src/fetchUtils.mjs`, `src/htmlSafety.mjs`, `src/necTable9.mjs`, `src/optimalRoute.js`, `src/pullCalc.js`, `src/routing/routeReviewModel.mjs`, `src/routing/routeReviewView.mjs`, `src/routing/routingState.mjs`, `src/voltageDrop.js`, `tableUtils.mjs`, `tour.js`, `utils/safeEvents.mjs`
 
 **Undocumented Reads**
 - None
@@ -1341,6 +1407,9 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 - None
 
 **Declared Inputs Not Statically Read**
+- None
+
+**Declared Indirect Workflow Inputs**
 - `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
@@ -1351,39 +1420,39 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 
 **Detected Reads**
 - `cableSchedule`
-  - app.mjs:1530 getCables()
-  - app.mjs:952 getCables()
+  - app.mjs:1479 getCables()
+  - app.mjs:901 getCables()
 - `conduitSchedule`
-  - app.mjs:1017 getConduits()
-  - app.mjs:1532 getConduits()
+  - app.mjs:1481 getConduits()
+  - app.mjs:966 getConduits()
 - `ductbankSchedule`
-  - app.mjs:1016 getDuctbanks()
-  - app.mjs:1533 getDuctbanks()
+  - app.mjs:1482 getDuctbanks()
+  - app.mjs:965 getDuctbanks()
 - `settings.ctrSession`
-  - app.mjs:496 getItem(ctrSession)
-  - app.mjs:870 getItem(ctrSession)
+  - app.mjs:445 getItem(ctrSession)
+  - app.mjs:819 getItem(ctrSession)
 - `settings.latestRouteResults`
-  - app.mjs:1525 getItem(latestRouteResults)
+  - app.mjs:1474 getItem(latestRouteResults)
 - `traySchedule`
-  - app.mjs:1531 getTrays()
-  - app.mjs:951 getTrays()
+  - app.mjs:1480 getTrays()
+  - app.mjs:900 getTrays()
 
 **Detected Writes**
 - `cableSchedule`
-  - app.mjs:5014 setCables()
+  - app.mjs:4842 setCables()
 - `settings.conduitFillData`
-  - app.mjs:2938 setItem(conduitFillData)
-  - app.mjs:2972 setItem(conduitFillData)
+  - app.mjs:2887 setItem(conduitFillData)
+  - app.mjs:2921 setItem(conduitFillData)
 - `settings.ctrSession`
-  - app.mjs:505 setItem(ctrSession)
-  - app.mjs:859 setItem(ctrSession)
+  - app.mjs:454 setItem(ctrSession)
+  - app.mjs:808 setItem(ctrSession)
 - `settings.ductbankRouteData`
-  - app.mjs:2956 setItem(ductbankRouteData)
+  - app.mjs:2905 setItem(ductbankRouteData)
 - `settings.latestRouteResults`
-  - app.mjs:270 setItem(latestRouteResults)
+  - app.mjs:219 setItem(latestRouteResults)
 - `settings.trayFillData`
-  - app.mjs:2913 setItem(trayFillData)
-  - app.mjs:4611 setItem(trayFillData)
+  - app.mjs:2862 setItem(trayFillData)
+  - app.mjs:4439 setItem(trayFillData)
 
 ### Pull Cards (`pullcards.html`)
 
@@ -1398,6 +1467,9 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 - None
 
 **Declared Inputs Not Statically Read**
+- None
+
+**Declared Indirect Workflow Inputs**
 - `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
@@ -1452,6 +1524,9 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 - None
 
 **Declared Inputs Not Statically Read**
+- None
+
+**Declared Indirect Workflow Inputs**
 - `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
@@ -1490,6 +1565,8 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 **Declared Inputs Not Statically Read**
 - `ductbankSchedule` - No static read/write evidence was detected for this declared input.
 - `settings.latestRouteResults` - No static read/write evidence was detected for this declared input.
+
+**Declared Indirect Workflow Inputs**
 - `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
@@ -1549,9 +1626,11 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 - `settings.pullPlanArtifact` - No static read/write evidence was detected for this declared input.
 - `settings.procurementRegister` - No static read/write evidence was detected for this declared input.
 - `settings.costEstimateArtifact` - No static read/write evidence was detected for this declared input.
-- `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 - `settings.designGateApprovals` - No static read/write evidence was detected for this declared input.
 - `settings.studyApprovals` - No static read/write evidence was detected for this declared input.
+
+**Declared Indirect Workflow Inputs**
+- `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
 - None
@@ -1611,6 +1690,9 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 
 **Declared Inputs Not Statically Read**
 - `panelSchedule` - No static read/write evidence was detected for this declared input.
+
+**Declared Indirect Workflow Inputs**
+- None
 
 **Declared Outputs Not Statically Written**
 - None
@@ -1752,6 +1834,8 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 **Declared Inputs Not Statically Read**
 - `cableSchedule` - No static read/write evidence was detected for this declared input.
 - `traySchedule` - No static read/write evidence was detected for this declared input.
+
+**Declared Indirect Workflow Inputs**
 - `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
@@ -1781,6 +1865,8 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 **Declared Inputs Not Statically Read**
 - `cableSchedule` - No static read/write evidence was detected for this declared input.
 - `loadList` - No static read/write evidence was detected for this declared input.
+
+**Declared Indirect Workflow Inputs**
 - `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
@@ -1799,7 +1885,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 
 - Section: Studies
 - Group: Protection
-- Source files: `analysis/arcFlash.mjs`, `analysis/chartExportUtils.mjs`, `analysis/ctMetadata.mjs`, `analysis/ibrModeling.mjs`, `analysis/iec60909.mjs`, `analysis/iecRelayCurves.mjs`, `analysis/ieee1584.mjs`, `analysis/protectiveDeviceLibrary.mjs`, `analysis/ptVtMetadata.mjs`, `analysis/shortCircuit.mjs`, `analysis/tcc.js`, `analysis/tccAutoCoord.mjs`, `analysis/tccContext.mjs`, `analysis/tccUtils.js`, `componentLibrary.json`, `conductorPropertiesData.mjs`, `data/conductor_properties.js`, `data/protectiveDevices.mjs`, `reports/coordinationReport.mjs`, `reports/relaySettingsExport.mjs`, `reports/reporting.mjs`, `src/crossProbe.js`, `src/necTable9.mjs`, `utils/cableImpedance.js`, `utils/transformerImpedance.js`, `utils/voltage.js`
+- Source files: `analysis/arcFlash.mjs`, `analysis/chartExportUtils.mjs`, `analysis/ctMetadata.mjs`, `analysis/ibrModeling.mjs`, `analysis/iec60909.mjs`, `analysis/iecRelayCurves.mjs`, `analysis/ieee1584.mjs`, `analysis/protectiveDeviceLibrary.mjs`, `analysis/protectiveDeviceReview.mjs`, `analysis/protectiveDeviceValidation.mjs`, `analysis/ptVtMetadata.mjs`, `analysis/shortCircuit.mjs`, `analysis/tcc.js`, `analysis/tcc/customCurveModel.mjs`, `analysis/tcc/viewModel.mjs`, `analysis/tccAutoCoord.mjs`, `analysis/tccContext.mjs`, `analysis/tccUtils.js`, `componentLibrary.json`, `conductorPropertiesData.mjs`, `data/conductor_properties.js`, `data/protectiveDevices.mjs`, `reports/coordinationReport.mjs`, `reports/relaySettingsExport.mjs`, `reports/reporting.mjs`, `src/crossProbe.js`, `src/necTable9.mjs`, `utils/cableImpedance.js`, `utils/transformerImpedance.js`, `utils/voltage.js`
 
 **Undocumented Reads**
 - None
@@ -1810,6 +1896,9 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 **Declared Inputs Not Statically Read**
 - `equipment` - No static read/write evidence was detected for this declared input.
 
+**Declared Indirect Workflow Inputs**
+- None
+
 **Declared Outputs Not Statically Written**
 - None
 
@@ -1819,51 +1908,51 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 **Detected Reads**
 - `cableSchedule`
   - analysis/shortCircuit.mjs:1137 getCables()
-  - analysis/tcc.js:3929 getCables()
+  - analysis/tcc.js:3504 getCables()
 - `oneLineDiagram`
   - analysis/arcFlash.mjs:397 getOneLine()
   - analysis/shortCircuit.mjs:1132 getOneLine()
-  - analysis/tcc.js:3160 getOneLine()
-  - analysis/tcc.js:8198 getOneLine()
-  - analysis/tcc.js:8247 getOneLine()
+  - analysis/tcc.js:2735 getOneLine()
+  - analysis/tcc.js:7837 getOneLine()
+  - analysis/tcc.js:7886 getOneLine()
   - ... 3 more
 - `settings.tccSettings`
   - analysis/arcFlash.mjs:330 getItem(tccSettings)
   - analysis/shortCircuit.mjs:766 getItem(tccSettings)
-  - analysis/tcc.js:925 getItem(tccSettings)
+  - analysis/tcc.js:806 getItem(tccSettings)
 - `settings.trayHardwareCatalogCustomProducts`
-  - analysis/tcc.js:3069 getTrayHardwareCatalogCustomProducts()
+  - analysis/tcc.js:2640 getTrayHardwareCatalogCustomProducts()
 - `studyResults`
-  - analysis/tcc.js:3062 getStudies()
-  - analysis/tcc.js:8833 getStudies()
-  - analysis/tcc.js:9649 getStudies()
-  - analysis/tcc.js:9657 getStudies()
-  - analysis/tcc.js:9954 getStudies()
+  - analysis/tcc.js:2633 getStudies()
+  - analysis/tcc.js:8472 getStudies()
+  - analysis/tcc.js:9288 getStudies()
+  - analysis/tcc.js:9296 getStudies()
+  - analysis/tcc.js:9593 getStudies()
 - `studyResults.arcFlash`
-  - analysis/tcc.js:8842 studies?.arcFlash
-  - analysis/tcc.js:9878 studies.arcFlash
-  - analysis/tcc.js:9878 studies?.arcFlash
+  - analysis/tcc.js:8481 studies?.arcFlash
+  - analysis/tcc.js:9517 studies.arcFlash
+  - analysis/tcc.js:9517 studies?.arcFlash
 - `studyResults.shortCircuit`
-  - analysis/tcc.js:8835 studies.shortCircuit
-  - analysis/tcc.js:9657 getStudies().shortCircuit
-  - analysis/tcc.js:9954 getStudies().shortCircuit
+  - analysis/tcc.js:8474 studies.shortCircuit
+  - analysis/tcc.js:9296 getStudies().shortCircuit
+  - analysis/tcc.js:9593 getStudies().shortCircuit
 
 **Detected Writes**
 - `oneLineDiagram`
-  - analysis/tcc.js:8218 setOneLine()
-  - analysis/tcc.js:8278 setOneLine()
+  - analysis/tcc.js:7857 setOneLine()
+  - analysis/tcc.js:7917 setOneLine()
 - `settings.tccSettings`
-  - analysis/tcc.js:1927 setItem(tccSettings)
-  - analysis/tcc.js:2557 setItem(tccSettings)
-  - analysis/tcc.js:3034 setItem(tccSettings)
-  - analysis/tcc.js:3156 setItem(tccSettings)
-  - analysis/tcc.js:3579 setItem(tccSettings)
-  - ... 6 more
+  - analysis/tcc.js:1498 setItem(tccSettings)
+  - analysis/tcc.js:2128 setItem(tccSettings)
+  - analysis/tcc.js:2605 setItem(tccSettings)
+  - analysis/tcc.js:2731 setItem(tccSettings)
+  - analysis/tcc.js:3154 setItem(tccSettings)
+  - ... 7 more
 - `studyResults`
-  - analysis/tcc.js:3064 setStudies()
-  - analysis/tcc.js:9652 setStudies()
+  - analysis/tcc.js:2635 setStudies()
+  - analysis/tcc.js:9291 setStudies()
 - `studyResults.shortCircuit`
-  - analysis/tcc.js:3063 studies.shortCircuit
+  - analysis/tcc.js:2634 studies.shortCircuit
 
 ### Harmonics (`harmonics.html`)
 
@@ -1879,6 +1968,8 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 
 **Declared Inputs Not Statically Read**
 - `equipment` - No static read/write evidence was detected for this declared input.
+
+**Declared Indirect Workflow Inputs**
 - `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
@@ -1914,6 +2005,8 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 
 **Declared Inputs Not Statically Read**
 - `loadList` - No static read/write evidence was detected for this declared input.
+
+**Declared Indirect Workflow Inputs**
 - `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
@@ -1953,6 +2046,9 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 - None
 
 **Declared Inputs Not Statically Read**
+- None
+
+**Declared Indirect Workflow Inputs**
 - `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
@@ -2004,6 +2100,9 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 - None
 
 **Declared Inputs Not Statically Read**
+- None
+
+**Declared Indirect Workflow Inputs**
 - `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
@@ -2057,6 +2156,9 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 - None
 
 **Declared Inputs Not Statically Read**
+- None
+
+**Declared Indirect Workflow Inputs**
 - `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
@@ -2105,6 +2207,9 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 - None
 
 **Declared Inputs Not Statically Read**
+- None
+
+**Declared Indirect Workflow Inputs**
 - `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
@@ -2119,23 +2224,24 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 - `loadList`
   - generatorsizing.js:35 getLoads()
 - `settings.projectMeta`
-  - generatorsizing.js:37 getProjectMeta()
+  - generatorsizing.js:38 getProjectMeta()
 - `settings.studyApprovals`
   - src/components/studyApproval.js:213 getStudyApprovals()
 - `studyResults`
-  - generatorsizing.js:133 getStudies()
-  - generatorsizing.js:80 getStudies()
+  - generatorsizing.js:134 getStudies()
+  - generatorsizing.js:37 getStudies()
+  - generatorsizing.js:81 getStudies()
 - `studyResults.generatorSizing`
-  - generatorsizing.js:80 getStudies().generatorSizing
+  - generatorsizing.js:81 getStudies().generatorSizing
 
 **Detected Writes**
 - `settings.studyApprovals`
   - src/components/studyApproval.js:235 setStudyApproval()
   - src/components/studyApproval.js:243 clearStudyApproval()
 - `studyResults`
-  - generatorsizing.js:135 setStudies()
+  - generatorsizing.js:136 setStudies()
 - `studyResults.generatorSizing`
-  - generatorsizing.js:134 studies.generatorSizing
+  - generatorsizing.js:135 studies.generatorSizing
 
 ### IBR Modeling (PV/BESS) (`ibr.html`)
 
@@ -2152,6 +2258,8 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 **Declared Inputs Not Statically Read**
 - `equipment` - No static read/write evidence was detected for this declared input.
 - `oneLineDiagram` - No static read/write evidence was detected for this declared input.
+
+**Declared Indirect Workflow Inputs**
 - `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
@@ -2220,6 +2328,8 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 **Declared Inputs Not Statically Read**
 - `equipment` - No static read/write evidence was detected for this declared input.
 - `oneLineDiagram` - No static read/write evidence was detected for this declared input.
+
+**Declared Indirect Workflow Inputs**
 - `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
@@ -2255,7 +2365,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 
 - Section: Studies
 - Group: Motor
-- Source files: `analysis/motorStart.js`, `analysis/motorStartCalc.mjs`, `reports/reporting.mjs`
+- Source files: `analysis/motorStart.js`, `analysis/motorStartCalc.mjs`, `analysis/motorStartProjectInputs.mjs`, `reports/reporting.mjs`, `src/components/projectInputBinding.js`
 
 **Undocumented Reads**
 - None
@@ -2264,8 +2374,9 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 - None
 
 **Declared Inputs Not Statically Read**
-- `equipment` - No static read/write evidence was detected for this declared input.
-- `loadList` - No static read/write evidence was detected for this declared input.
+- None
+
+**Declared Indirect Workflow Inputs**
 - `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
@@ -2275,17 +2386,24 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 - None
 
 **Detected Reads**
+- `equipment`
+  - analysis/motorStart.js:53 getEquipment()
+- `loadList`
+  - analysis/motorStart.js:54 getLoads()
 - `oneLineDiagram`
-  - analysis/motorStart.js:39 getOneLine()
+  - analysis/motorStart.js:52 getOneLine()
   - analysis/motorStartCalc.mjs:190 getOneLine()
 - `studyResults`
-  - analysis/motorStart.js:213 getStudies()
+  - analysis/motorStart.js:264 getStudies()
+  - analysis/motorStart.js:55 getStudies()
+- `studyResults.loadFlow`
+  - analysis/motorStartProjectInputs.mjs:176 studies.loadFlow
 
 **Detected Writes**
 - `studyResults`
-  - analysis/motorStart.js:215 setStudies()
+  - analysis/motorStart.js:266 setStudies()
 - `studyResults.motorStart`
-  - analysis/motorStart.js:214 studies.motorStart
+  - analysis/motorStart.js:265 studies.motorStart
 
 ### Load Flow (`loadFlow.html`)
 
@@ -2303,6 +2421,8 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 - `equipment` - No static read/write evidence was detected for this declared input.
 - `loadList` - No static read/write evidence was detected for this declared input.
 - `cableSchedule` - No static read/write evidence was detected for this declared input.
+
+**Declared Indirect Workflow Inputs**
 - `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
@@ -2338,6 +2458,9 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 
 **Declared Inputs Not Statically Read**
 - `loadList` - No static read/write evidence was detected for this declared input.
+
+**Declared Indirect Workflow Inputs**
+- None
 
 **Declared Outputs Not Statically Written**
 - None
@@ -2386,6 +2509,9 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 **Declared Inputs Not Statically Read**
 - `loadList` - No static read/write evidence was detected for this declared input.
 
+**Declared Indirect Workflow Inputs**
+- None
+
 **Declared Outputs Not Statically Written**
 - None
 
@@ -2432,6 +2558,8 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 
 **Declared Inputs Not Statically Read**
 - `loadList` - No static read/write evidence was detected for this declared input.
+
+**Declared Indirect Workflow Inputs**
 - `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
@@ -2477,6 +2605,8 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 
 **Declared Inputs Not Statically Read**
 - `equipment` - No static read/write evidence was detected for this declared input.
+
+**Declared Indirect Workflow Inputs**
 - `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
@@ -2523,6 +2653,9 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 **Declared Inputs Not Statically Read**
 - `equipment` - No static read/write evidence was detected for this declared input.
 
+**Declared Indirect Workflow Inputs**
+- None
+
 **Declared Outputs Not Statically Written**
 - None
 
@@ -2567,6 +2700,8 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 
 **Declared Inputs Not Statically Read**
 - `equipment` - No static read/write evidence was detected for this declared input.
+
+**Declared Indirect Workflow Inputs**
 - `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
@@ -2609,6 +2744,8 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 **Declared Inputs Not Statically Read**
 - `equipment` - No static read/write evidence was detected for this declared input.
 - `cableSchedule` - No static read/write evidence was detected for this declared input.
+
+**Declared Indirect Workflow Inputs**
 - `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
@@ -2650,6 +2787,8 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 **Declared Inputs Not Statically Read**
 - `oneLineDiagram` - No static read/write evidence was detected for this declared input.
 - `equipment` - No static read/write evidence was detected for this declared input.
+
+**Declared Indirect Workflow Inputs**
 - `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
@@ -2694,6 +2833,9 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 - `equipment` - No static read/write evidence was detected for this declared input.
 - `settings.tccSettings` - No static read/write evidence was detected for this declared input.
 
+**Declared Indirect Workflow Inputs**
+- None
+
 **Declared Outputs Not Statically Written**
 - None
 
@@ -2731,6 +2873,9 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 - None
 
 **Declared Inputs Not Statically Read**
+- None
+
+**Declared Indirect Workflow Inputs**
 - `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
@@ -2778,6 +2923,8 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 
 **Declared Inputs Not Statically Read**
 - `equipment` - No static read/write evidence was detected for this declared input.
+
+**Declared Indirect Workflow Inputs**
 - `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
@@ -2818,6 +2965,9 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 
 **Declared Inputs Not Statically Read**
 - `oneLineDiagram` - No static read/write evidence was detected for this declared input.
+
+**Declared Indirect Workflow Inputs**
+- None
 
 **Declared Outputs Not Statically Written**
 - None
@@ -2872,6 +3022,8 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 **Declared Inputs Not Statically Read**
 - `equipment` - No static read/write evidence was detected for this declared input.
 - `loadList` - No static read/write evidence was detected for this declared input.
+
+**Declared Indirect Workflow Inputs**
 - `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
@@ -2916,6 +3068,9 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 - `equipment` - No static read/write evidence was detected for this declared input.
 - `studyResults.shortCircuit` - No static read/write evidence was detected for this declared input.
 
+**Declared Indirect Workflow Inputs**
+- None
+
 **Declared Outputs Not Statically Written**
 - None
 
@@ -2943,6 +3098,8 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 
 **Declared Inputs Not Statically Read**
 - `equipment` - No static read/write evidence was detected for this declared input.
+
+**Declared Indirect Workflow Inputs**
 - `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
@@ -3006,6 +3163,8 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 
 **Declared Inputs Not Statically Read**
 - `equipment` - No static read/write evidence was detected for this declared input.
+
+**Declared Indirect Workflow Inputs**
 - `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
@@ -3045,6 +3204,8 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 **Declared Inputs Not Statically Read**
 - `loadList` - No static read/write evidence was detected for this declared input.
 - `cableSchedule` - No static read/write evidence was detected for this declared input.
+
+**Declared Indirect Workflow Inputs**
 - `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
@@ -3074,6 +3235,9 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 **Declared Inputs Not Statically Read**
 - `loadList` - No static read/write evidence was detected for this declared input.
 - `equipment` - No static read/write evidence was detected for this declared input.
+
+**Declared Indirect Workflow Inputs**
+- None
 
 **Declared Outputs Not Statically Written**
 - None
@@ -3132,6 +3296,9 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 - None
 
 **Declared Inputs Not Statically Read**
+- None
+
+**Declared Indirect Workflow Inputs**
 - `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
@@ -3179,6 +3346,8 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 - `traySchedule` - No static read/write evidence was detected for this declared input.
 - `conduitSchedule` - No static read/write evidence was detected for this declared input.
 - `studyResults.loadFlow` - No static read/write evidence was detected for this declared input.
+
+**Declared Indirect Workflow Inputs**
 - `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
@@ -3207,6 +3376,8 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 
 **Declared Inputs Not Statically Read**
 - `equipment` - No static read/write evidence was detected for this declared input.
+
+**Declared Indirect Workflow Inputs**
 - `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
@@ -3251,6 +3422,8 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 **Declared Inputs Not Statically Read**
 - `equipment` - No static read/write evidence was detected for this declared input.
 - `cableSchedule` - No static read/write evidence was detected for this declared input.
+
+**Declared Indirect Workflow Inputs**
 - `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
@@ -3291,6 +3464,9 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 - None
 
 **Declared Inputs Not Statically Read**
+- None
+
+**Declared Indirect Workflow Inputs**
 - `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
 
 **Declared Outputs Not Statically Written**
@@ -3333,6 +3509,9 @@ The audit is intentionally conservative: `--check` fails on actionable drift and
 
 **Declared Inputs Not Statically Read**
 - `settings.studyApprovals` - No static read/write evidence was detected for this declared input.
+
+**Declared Indirect Workflow Inputs**
+- None
 
 **Declared Outputs Not Statically Written**
 - None

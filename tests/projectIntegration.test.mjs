@@ -68,6 +68,19 @@ assert.equal(generator.inputs.motorHp, 200);
 assert.equal(generator.inputs.motorPf, 0.86);
 assert.equal(generator.inputs.motorEff, 0.94);
 
+const generatorFromMotorStart = buildGeneratorProjectInputs({
+  loads,
+  equipment: [{ id: 'M-200', description: 'Fire pump', horsepower: 200, powerFactor: 0.86, efficiency: 0.94 }],
+  studies: {
+    motorStart: {
+      controllingMotor: { id: 'M-300', label: 'Cooling Water Pump', hp: 300, powerFactor: 0.82, efficiency: 0.95 },
+    },
+  },
+});
+assert.equal(generatorFromMotorStart.inputs.motorHp, 300);
+assert.equal(generatorFromMotorStart.inputs.motorPf, 0.82);
+assert.equal(generatorFromMotorStart.bindings.motorHp.sourcePath, 'studyResults.motorStart.controllingMotor.hp');
+
 const inferredMotor = buildGeneratorProjectInputs({
   loads: [{ tag: 'PMP-101', description: 'Cooling water pump motor', loadType: 'Motor', kw: 18.6, powerFactor: 85, efficiency: 92 }],
 });
