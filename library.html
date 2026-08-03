@@ -122,6 +122,18 @@
       vertical-align: top;
     }
     .protective-library-table th { background: #f6f8fa; }
+    .protective-library-device-button {
+      appearance: none;
+      border: 0;
+      padding: 0;
+      background: transparent;
+      color: var(--primary-color, #0b57d0);
+      font: inherit;
+      font-weight: 600;
+      text-align: left;
+      text-decoration: underline;
+      cursor: pointer;
+    }
     .protective-library-status {
       display: inline-block;
       border-radius: 12px;
@@ -280,8 +292,11 @@
     import openModal, { showAlertModal } from './src/components/modal.js';
     import { getAuthContextState } from './projectStorage.js';
     import { validateLibraryPayload } from './src/validation/librarySchema.mjs';
-    import protectiveDevices from './data/protectiveDevices.mjs';
     import { assessProtectiveDeviceLibraryEntry, summarizeProtectiveDeviceLibrary } from './analysis/protectiveDeviceLibrary.mjs';
+    import { createProtectiveDeviceCatalogLoader } from './src/protectiveDevices/catalogLoader.mjs';
+
+    const protectiveDeviceCatalog = createProtectiveDeviceCatalogLoader();
+    let protectiveDevices = [];
 
     // -------------------------------------------------------------------------
     // Sync status badge
@@ -1511,6 +1526,46 @@
         .toLowerCase();
     }
 
+    async function openProtectiveDeviceInventoryDetails(metadata) {
+      const entry = await protectiveDeviceCatalog.loadDevice(metadata.id);
+      if (!entry) {
+        await showAlertModal('Device Unavailable', 'The selected protective-device record could not be loaded.');
+        return;
+      }
+      const assessment = assessProtectiveDeviceLibraryEntry(entry);
+      const curveCount = Array.isArray(entry.curve)
+        ? entry.curve.length
+        : Object.values(entry.curveProfiles || {}).reduce((count, profile) => (
+          count + (Array.isArray(profile?.curve) ? profile.curve.length : 0)
+        ), 0);
+      await openModal({
+        title: entry.name || entry.id,
+        description: 'Full curve and rating data loaded on demand from the protective-device catalog.',
+        primaryText: 'Close',
+        secondaryText: null,
+        render(body) {
+          const details = document.createElement('dl');
+          [
+            ['Manufacturer', entry.vendor || entry.manufacturer],
+            ['Catalog / trip unit', entry.catalogNumber || entry.tripUnitModel],
+            ['Type', entry.type],
+            ['Voltage class', entry.voltageClass],
+            ['Evidence status', assessment.label],
+            ['Curve points', String(curveCount)],
+            ['Interrupt rating', Number.isFinite(entry.interruptRating) ? `${entry.interruptRating} kA` : ''],
+          ].forEach(([term, value]) => {
+            if (!value) return;
+            const dt = document.createElement('dt');
+            const dd = document.createElement('dd');
+            dt.textContent = term;
+            dd.textContent = value;
+            details.append(dt, dd);
+          });
+          body.appendChild(details);
+        },
+      });
+    }
+
     function renderProtectiveDeviceInventory() {
       const statusFilter = document.getElementById('protective-library-status-filter').value;
       const search = document.getElementById('protective-library-search').value.trim().toLowerCase();
@@ -1532,7 +1587,14 @@
       body.replaceChildren();
       rows.forEach(({ entry, assessment }) => {
         const row = document.createElement('tr');
-        appendInventoryCell(row, entry.name);
+        const nameCell = document.createElement('td');
+        const detailButton = document.createElement('button');
+        detailButton.type = 'button';
+        detailButton.className = 'protective-library-device-button';
+        detailButton.textContent = entry.name || entry.id;
+        detailButton.addEventListener('click', () => openProtectiveDeviceInventoryDetails(entry));
+        nameCell.appendChild(detailButton);
+        row.appendChild(nameCell);
         appendInventoryCell(row, entry.vendor);
         appendInventoryCell(row, entry.type);
         appendInventoryCell(row, entry.catalogNumber || entry.tripUnitModel);
@@ -1664,6 +1726,7 @@
     if (!sharedLoaded) {
       await load();
     }
+    protectiveDevices = await protectiveDeviceCatalog.loadIndex();
     configureTeamLibraryControls();
     renderProtectiveDeviceInventory();
   </script>

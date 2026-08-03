@@ -3,7 +3,7 @@ import { spawnSync } from 'node:child_process';
 const generatedPaths = [
   'dist/',
   'docs/asset-manifest.json',
-  'data/protectiveDevices.mjs'
+  'data/protectiveDeviceCalculations.mjs'
 ];
 
 function runGit(args) {

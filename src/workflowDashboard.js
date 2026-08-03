@@ -23,9 +23,19 @@ import { buildGuidedWorkflowRunner, buildWorkflowCoreDiagnostics } from '../anal
 import { buildMinimalDesignAutomation } from '../analysis/workflowAutomation.mjs';
 import { buildDesignBasisReview, normalizeDesignBasis, summarizeDesignBasis } from '../analysis/designBasis.mjs';
 import { summarizeFieldObservations } from '../analysis/fieldObservations.mjs';
-import protectiveDevices from '../data/protectiveDevices.mjs';
+import { createProtectiveDeviceCatalogLoader } from './protectiveDevices/catalogLoader.mjs';
 import '../site.js';
 import './projectManager.js';
+
+const protectiveDeviceCatalog = createProtectiveDeviceCatalogLoader();
+let protectiveDevices = [];
+
+async function ensureProtectiveDeviceIndex() {
+  if (!protectiveDevices.length) {
+    protectiveDevices = await protectiveDeviceCatalog.loadIndex();
+  }
+  return protectiveDevices;
+}
 
 // Studies tracked in the dashboard with display labels and their storage keys
 const STUDY_DEFINITIONS = [
@@ -981,6 +991,14 @@ function renderDesignBasisReviewPanel() {
   const gates = review.gates;
   const openCount = review.openGateCount;
   const blockingCount = review.blockingGateCount;
+  const qualityDetails = el.closest('details[data-dashboard-full-only]');
+  if (qualityDetails && blockingCount > 0) {
+    qualityDetails.hidden = false;
+    if (!qualityDetails.dataset.blockingGateRevealed) {
+      qualityDetails.open = true;
+      qualityDetails.dataset.blockingGateRevealed = 'true';
+    }
+  }
   const statusText = blockingCount
     ? `${blockingCount} blocking gate(s), ${openCount} open total`
     : (openCount ? `${openCount} open review gate(s)` : 'All gates reviewed or not currently triggered');
@@ -1036,6 +1054,8 @@ function renderDesignBasisReviewPanel() {
       </section>
     </div>
   `;
+  const summaryStatus = qualityDetails?.querySelector('summary small');
+  if (summaryStatus) summaryStatus.textContent = statusText;
   el.querySelectorAll('[data-review-gate]').forEach(button => {
     button.addEventListener('click', () => openReviewGateDrawer(button.getAttribute('data-review-gate')));
   });
@@ -1195,7 +1215,7 @@ function renderWorkflowCoreDiagnostics() {
       <div class="workflow-next-action__actions">
         <a class="btn primary-btn" href="${esc(action.href)}">Open Step</a>
         ${focus === 'full' ? '<button id="dashboard-design-basis-btn" type="button" class="btn">Design Basis</button>' : '<a class="btn" href="cabletrayfill.html">Tray Fill</a>'}
-        ${focus === 'full' && automationHasChanges ? '<button id="dashboard-auto-build-btn" type="button" class="btn" title="Create missing one-line, cable, starter raceway, and initial route-result records from current equipment and loads.">Auto-Build Workflow</button>' : ''}
+        ${automationHasChanges ? '<button id="dashboard-auto-build-btn" type="button" class="btn" title="Create missing one-line, cable, starter raceway, and initial route-result records from current equipment and loads.">Auto-Build Workflow</button>' : ''}
       </div>
     `;
     nextEl.querySelector('#dashboard-design-basis-btn')?.addEventListener('click', openDesignBasisWizard);
@@ -1452,10 +1472,12 @@ function initReleasePackageForm() {
   });
 }
 
-window.addEventListener('DOMContentLoaded', () => {
+window.addEventListener('DOMContentLoaded', async () => {
+  if (getDashboardFocus() === 'full') await ensureProtectiveDeviceIndex();
   const focusSelect = document.getElementById('dashboard-focus-select');
-  focusSelect?.addEventListener('change', () => {
+  focusSelect?.addEventListener('change', async () => {
     setItem(DASHBOARD_FOCUS_KEY, focusSelect.value === 'full' ? 'full' : 'routing');
+    if (focusSelect.value === 'full') await ensureProtectiveDeviceIndex();
     refreshDashboard();
   });
   refreshDashboard();

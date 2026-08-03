@@ -1,0 +1,112 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://cabletrayroute.app/schemas/project.schema.json",
+  "title": "CableTrayRoute Project Document",
+  "description": "Version 1 schema for canonical browser storage records and .ctr.json interchange files.",
+  "oneOf": [
+    { "$ref": "#/definitions/storageProject" },
+    { "$ref": "#/definitions/interchangeProject" }
+  ],
+  "definitions": {
+    "recordArray": {
+      "type": "array",
+      "items": { "type": "object" }
+    },
+    "schemaVersion": {
+      "type": "integer",
+      "const": 1
+    },
+    "storageSettings": {
+      "type": "object",
+      "required": ["session", "collapsedGroups", "units", "theme"],
+      "properties": {
+        "session": { "type": "object" },
+        "collapsedGroups": { "type": "object" },
+        "units": { "enum": ["imperial", "metric"] },
+        "theme": { "enum": ["system", "light", "dark", "high-contrast"] }
+      },
+      "additionalProperties": true
+    },
+    "storageProject": {
+      "type": "object",
+      "required": [
+        "schemaVersion",
+        "name",
+        "ductbanks",
+        "conduits",
+        "trays",
+        "cables",
+        "cableTypicals",
+        "settings"
+      ],
+      "properties": {
+        "schemaVersion": { "$ref": "#/definitions/schemaVersion" },
+        "name": { "type": "string" },
+        "ductbanks": { "$ref": "#/definitions/recordArray" },
+        "conduits": { "$ref": "#/definitions/recordArray" },
+        "trays": { "$ref": "#/definitions/recordArray" },
+        "cables": { "$ref": "#/definitions/recordArray" },
+        "cableTypicals": { "$ref": "#/definitions/recordArray" },
+        "settings": { "$ref": "#/definitions/storageSettings" }
+      },
+      "additionalProperties": false
+    },
+    "interchangeMeta": {
+      "type": "object",
+      "properties": {
+        "version": { "type": "integer" },
+        "scenario": { "type": "string" },
+        "scenarios": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "oneLine": {
+      "oneOf": [
+        { "$ref": "#/definitions/recordArray" },
+        {
+          "type": "object",
+          "required": ["sheets"],
+          "properties": {
+            "activeSheet": { "type": "integer", "minimum": 0 },
+            "sheets": { "$ref": "#/definitions/recordArray" }
+          },
+          "additionalProperties": true
+        }
+      ]
+    },
+    "interchangeProject": {
+      "type": "object",
+      "required": [
+        "schemaVersion",
+        "ductbanks",
+        "conduits",
+        "trays",
+        "cables",
+        "cableTypicals",
+        "panels",
+        "equipment",
+        "loads",
+        "settings"
+      ],
+      "properties": {
+        "schemaVersion": { "$ref": "#/definitions/schemaVersion" },
+        "meta": { "$ref": "#/definitions/interchangeMeta" },
+        "ductbanks": { "$ref": "#/definitions/recordArray" },
+        "conduits": { "$ref": "#/definitions/recordArray" },
+        "trays": { "$ref": "#/definitions/recordArray" },
+        "cables": { "$ref": "#/definitions/recordArray" },
+        "cableTypicals": { "$ref": "#/definitions/recordArray" },
+        "panels": { "$ref": "#/definitions/recordArray" },
+        "equipment": { "$ref": "#/definitions/recordArray" },
+        "loads": { "$ref": "#/definitions/recordArray" },
+        "settings": { "type": "object" },
+        "oneLine": { "$ref": "#/definitions/oneLine" },
+        "mccLineups": { "$ref": "#/definitions/recordArray" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

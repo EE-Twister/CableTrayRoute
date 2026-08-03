@@ -18,7 +18,16 @@ describe('architecture boundaries', () => {
   });
 
   it('requires explicit production-module seams for every large entrypoint', () => {
-    assert.deepEqual(Object.keys(REQUIRED_BOUNDARIES).sort(), ['analysis/tcc.js', 'app.mjs', 'oneline.js']);
+    assert.deepEqual(Object.keys(REQUIRED_BOUNDARIES).sort(), [
+      'analysis/tcc.js',
+      'app.mjs',
+      'cableschedule.js',
+      'cathodicprotection.js',
+      'ductbankroute.js',
+      'oneline.js',
+      'site.js',
+      'src/panelSchedule.js'
+    ]);
     Object.values(REQUIRED_BOUNDARIES).forEach(imports => assert.ok(imports.length >= 2));
   });
 

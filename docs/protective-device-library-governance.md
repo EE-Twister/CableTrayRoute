@@ -8,6 +8,12 @@ The TCC selector's **Filters** group can isolate calculation-ready,
 source-verified, standards-reference, or screening-only library records before
 curves are selected.
 
+The Library Manager initially loads the compact governed inventory rather than
+every curve and source record. Selecting a device name loads that device's full
+record from its catalog shard and opens the detailed rating and curve summary.
+This keeps the complete inventory searchable without placing the full catalog
+on the startup path.
+
 ## Authoritative data contract
 
 [`data/protectiveDevices.schema.json`](../data/protectiveDevices.schema.json) is

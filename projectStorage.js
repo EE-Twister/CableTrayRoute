@@ -1,4 +1,9 @@
 import { repairMojibakeDeep } from './src/textEncoding.js';
+import {
+  PROJECT_SCHEMA_VERSION,
+  assertValidStoredProject,
+  readProjectSchemaVersion
+} from './src/projectSchema.js';
 
 const PROJECT_KEY = 'CTR_PROJECT_V1';
 const SCENARIOS_KEY = 'ctr_scenarios_v1';
@@ -28,6 +33,7 @@ const FAST_JSON_PATCH_URL = (() => {
 
 function defaultProject() {
   return {
+    schemaVersion: PROJECT_SCHEMA_VERSION,
     name: '',
     ductbanks: [],
     conduits: [],
@@ -235,6 +241,7 @@ function migrateOneLineDiagram(data) {
 }
 
 function migrateSettingsPayload(settings = {}) {
+  if (!settings || typeof settings !== 'object' || Array.isArray(settings)) return settings;
   const next = { ...settings };
   const oneLine = next.oneLineDiagram;
   if (oneLine && typeof oneLine === 'object') {
@@ -242,29 +249,57 @@ function migrateSettingsPayload(settings = {}) {
   }
   return next;
 }
-function migrateProject(old = {}) {
-  const source = repairMojibakeDeep(old);
-  const settings = source.settings || {
-    session: source.session || source.ctrSession || {},
-    collapsedGroups: source.collapsedGroups || {}
-  };
-  if (!settings.units) settings.units = 'imperial';
-  const sessionDarkMode = settings.session && typeof settings.session === 'object'
-    ? settings.session.darkMode
-    : undefined;
-  settings.theme = normalizeThemePreference(settings.theme)
-    || normalizeThemePreference(source.themePreference)
-    || (typeof sessionDarkMode === 'boolean' ? (sessionDarkMode ? 'dark' : 'light') : 'system');
+
+function migrateProjectV0ToV1(source) {
+  let settings = source.settings;
+  if (settings === undefined || settings === null) {
+    settings = {
+      session: source.session || source.ctrSession || {},
+      collapsedGroups: source.collapsedGroups || {}
+    };
+  } else if (typeof settings === 'object' && !Array.isArray(settings)) {
+    settings = { ...settings };
+  }
+  if (settings && typeof settings === 'object' && !Array.isArray(settings)) {
+    if (!settings.session) settings.session = {};
+    if (!settings.collapsedGroups) settings.collapsedGroups = {};
+    if (!settings.units) settings.units = 'imperial';
+    const sessionDarkMode = settings.session && typeof settings.session === 'object'
+      ? settings.session.darkMode
+      : undefined;
+    settings.theme = normalizeThemePreference(settings.theme)
+      || normalizeThemePreference(source.themePreference)
+      || (typeof sessionDarkMode === 'boolean' ? (sessionDarkMode ? 'dark' : 'light') : 'system');
+  }
   const migratedSettings = migrateSettingsPayload(settings);
   return {
-    name: source.name || '',
-    ductbanks: source.ductbanks || source.ductbankSchedule || [],
-    conduits: source.conduits || source.conduitSchedule || [],
-    trays: source.trays || source.traySchedule || [],
-    cables: source.cables || source.cableSchedule || [],
-    cableTypicals: source.cableTypicals || [],
+    schemaVersion: 1,
+    name: source.name ?? '',
+    ductbanks: source.ductbanks ?? source.ductbankSchedule ?? [],
+    conduits: source.conduits ?? source.conduitSchedule ?? [],
+    trays: source.trays ?? source.traySchedule ?? [],
+    cables: source.cables ?? source.cableSchedule ?? [],
+    cableTypicals: source.cableTypicals ?? [],
     settings: migratedSettings
   };
+}
+
+const PROJECT_MIGRATIONS = new Map([
+  [0, migrateProjectV0ToV1]
+]);
+
+function migrateProject(old = {}) {
+  let projectDocument = repairMojibakeDeep(old);
+  let version = readProjectSchemaVersion(projectDocument);
+  while (version < PROJECT_SCHEMA_VERSION) {
+    const migrate = PROJECT_MIGRATIONS.get(version);
+    if (!migrate) throw new Error(`No stored project migration exists for schema version ${version}.`);
+    projectDocument = migrate(projectDocument);
+    const nextVersion = readProjectSchemaVersion(projectDocument);
+    if (nextVersion <= version) throw new Error(`Stored project migration ${version} did not advance the schema version.`);
+    version = nextVersion;
+  }
+  return assertValidStoredProject(projectDocument);
 }
 
 let project = defaultProject();
@@ -273,10 +308,12 @@ let applyPatch;
 let jsonPatchPromise;
 const undoStack = [];
 const redoStack = [];
+let projectMutationBatch = null;
 let trackedSettingsKeys = new Set();
 const listeners = new Set();
 const memoryStorage = new Map();
 let storageWriteBlocked = false;
+let projectSchemaLoadError = null;
 let quotaWarningShown = false;
 const sessionOnlyProjectKeys = new Set();
 const MAX_SCENARIO_ENTRY_SIZE = 2.5 * 1024 * 1024;
@@ -1345,7 +1382,7 @@ function persistProject({ notify = true, changeSet = null, mutationType = 'persi
   let syncStats = { writes: 0, skips: 0 };
   if (storage && !storageWriteBlocked) {
     syncStats = syncDerivedStorage(storage, changeSet) || syncStats;
-    if (!storageWriteBlocked) {
+    if (!storageWriteBlocked && !projectSchemaLoadError) {
       try {
         const persistedProject = sessionOnlyProjectKeys.size ? cloneProject() : project;
         sessionOnlyProjectKeys.forEach(key => {
@@ -1394,9 +1431,17 @@ function loadExistingProject() {
   if (raw) {
     try {
       project = migrateProject(JSON.parse(raw));
+      projectSchemaLoadError = null;
       setTrackedSettings(Object.keys(project.settings || {}));
       return;
     } catch (e) {
+      if (e?.code === 'PROJECT_SCHEMA_INVALID' || e?.code === 'PROJECT_SCHEMA_UNSUPPORTED') {
+        projectSchemaLoadError = e;
+        project = defaultProject();
+        setTrackedSettings(Object.keys(project.settings || {}));
+        console.error('Stored project was refused and left unchanged', e);
+        return;
+      }
       console.warn('Failed to parse stored project', e);
     }
   }
@@ -1465,10 +1510,14 @@ export async function initializeProjectStorage() {
         if (!event.newValue) return;
         try {
           project = migrateProject(JSON.parse(event.newValue));
+          projectSchemaLoadError = null;
           setTrackedSettings(Object.keys(project.settings || {}));
           if (storage) syncDerivedStorage(storage);
           notifyChange();
         } catch (e) {
+          if (e?.code === 'PROJECT_SCHEMA_INVALID' || e?.code === 'PROJECT_SCHEMA_UNSUPPORTED') {
+            projectSchemaLoadError = e;
+          }
           console.warn('project sync failed', e);
         }
         return;
@@ -1506,6 +1555,10 @@ export function getProjectState() {
   return cloneProject();
 }
 
+export function getProjectSchemaLoadError() {
+  return projectSchemaLoadError;
+}
+
 export function setProjectState(next) {
   const oldProject = cloneProject();
   project = migrateProject(next || {});
@@ -1523,13 +1576,46 @@ export function setProjectState(next) {
   persistProject({ changeSet, mutationType: 'setProjectState' });
 }
 
+export function beginProjectMutationBatch() {
+  if (projectMutationBatch) {
+    projectMutationBatch.depth += 1;
+    return;
+  }
+  projectMutationBatch = {
+    depth: 1,
+    oldProject: cloneProject(),
+    changes: new Set(),
+  };
+}
+
+export function endProjectMutationBatch() {
+  if (!projectMutationBatch) return;
+  projectMutationBatch.depth -= 1;
+  if (projectMutationBatch.depth > 0) return;
+  const batch = projectMutationBatch;
+  projectMutationBatch = null;
+  if (!batch.changes.size) return;
+  pushUndo(batch.oldProject, { coalesceKey: 'projectMutationBatch', allowCoalesce: false });
+  persistProject({ changeSet: createChangeSet([...batch.changes]), mutationType: 'projectMutationBatch' });
+}
+
+function captureBatchedChanges(changeSet) {
+  if (!projectMutationBatch) return false;
+  changeSet.forEach(change => projectMutationBatch.changes.add(change));
+  return true;
+}
+
 export function setProjectKey(key, value, options = {}) {
   if (!key) return;
   if (key === PROJECT_KEY) {
     if (!options.skipLocalStorage) {
       const storage = getStorage();
       if (storage && !storageWriteBlocked) {
-        try { storage.setItem(key, value); }
+        try {
+          const validated = migrateProject(JSON.parse(value));
+          storage.setItem(key, JSON.stringify(validated));
+          projectSchemaLoadError = null;
+        }
         catch (e) { handleStorageWriteError('project save failed', e); }
       }
     }
@@ -1596,6 +1682,7 @@ export function setProjectKey(key, value, options = {}) {
               : key === 'ctrSession'
                 ? createChangeSet(['settings:session'])
                 : createChangeSet(['settings:other']);
+  if (captureBatchedChanges(changeSet)) return;
   pushUndo(oldProject, { coalesceKey: `setProjectKey:${key}`, allowCoalesce: true });
   if (options.sessionOnly) {
     notifyChange();
@@ -1622,6 +1709,7 @@ export function removeProjectKey(key, options = {}) {
         try { storage.removeItem(key); } catch {}
       }
     }
+    projectSchemaLoadError = null;
     return;
   }
   const oldProject = cloneProject();
@@ -1657,6 +1745,7 @@ export function removeProjectKey(key, options = {}) {
               : key === 'ctrSession'
                 ? createChangeSet(['settings:session'])
                 : createChangeSet(['settings:other']);
+  if (captureBatchedChanges(changeSet)) return;
   pushUndo(oldProject, { coalesceKey: `removeProjectKey:${key}`, allowCoalesce: true });
   if (!options.skipLocalStorage) {
     const storage = getStorage();
@@ -1728,11 +1817,15 @@ loadScenarioState();
 
 const api = {
   PROJECT_KEY,
+  PROJECT_SCHEMA_VERSION,
   defaultProject,
   migrateProject,
   initializeProjectStorage,
   getProjectState,
+  getProjectSchemaLoadError,
   setProjectState,
+  beginProjectMutationBatch,
+  endProjectMutationBatch,
   setProjectKey,
   removeProjectKey,
   undoProjectChange,
@@ -1776,4 +1869,4 @@ if (typeof globalThis !== 'undefined') {
   globalThis.projectStorage = api;
 }
 
-export { PROJECT_KEY, defaultProject, migrateProject };
+export { PROJECT_KEY, PROJECT_SCHEMA_VERSION, defaultProject, migrateProject };

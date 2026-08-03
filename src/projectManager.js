@@ -510,8 +510,7 @@ async function serverLoadProject(name) {
   if (isSupabaseAuthContext(auth)) {
     const data = await supabaseLoadProject(auth, name);
     if (!data) return false;
-    importProject(data);
-    return true;
+    return importProject(data);
   }
   const res = await fetch(`/projects/${encodeURIComponent(name)}`, {
     headers: {
@@ -524,8 +523,7 @@ async function serverLoadProject(name) {
   }
   if (!res.ok) return false;
   const { data } = await res.json();
-  importProject(data);
-  return true;
+  return importProject(data);
 }
 
 async function saveProject(options = {}) {

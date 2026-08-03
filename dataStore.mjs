@@ -18,9 +18,22 @@
 // directly. Import it with a named import so it works consistently in
 // both the browser and Node test environments.
 import { parseRevit } from './src/importers/revit.mjs';
+import { startPerformanceMeasurement } from './src/performance/performanceMetrics.js';
 import { buildOneLineProjectView, hashProjectInputs, normalizeOneLineReferences, normalizeProjectEntities } from './analysis/projectIntegration.mjs';
 import {
+  PROJECT_SCHEMA_VERSION,
+  formatProjectSchemaErrors,
+  upgradeProjectImport
+} from './src/projectSchema.js';
+import {
+  PROJECT_KEY,
+  beginProjectMutationBatch,
+  endProjectMutationBatch,
+  getProjectSchemaLoadError,
+  getProjectState,
   getScenarioListState,
+  removeProjectKey,
+  setProjectState,
   setScenarioListState,
   registerScenario,
   getCurrentScenarioNameState,
@@ -157,8 +170,13 @@ const LEGACY_STUDIES_SETTING_KEY = 'studies';
 export const STORAGE_KEYS = { ...KEYS, ...EXTRA_KEYS };
 
 const listeners = {};
+let deferredEvents = null;
 
 function emit(event, detail) {
+  if (deferredEvents) {
+    deferredEvents.set(event, detail);
+    return;
+  }
   (listeners[event] || []).forEach(fn => {
     try { fn(detail); } catch (e) { console.error(e); }
   });
@@ -1127,47 +1145,12 @@ export function applyRemoteSnapshot(snapshot, projectId) {
   }
 }
 
-// Simple schema validator replacing Ajv. Checks for required fields,
-// disallows extras, and verifies basic types.
-function validateProjectSchema(obj) {
-  const required = ['ductbanks', 'conduits', 'trays', 'cables', 'cableTypicals', 'panels', 'equipment', 'loads', 'settings'];
-  const optional = ['oneLine', 'mccLineups'];
-  const missing = [];
-  const extra = [];
-
-  if (!obj || typeof obj !== 'object') {
-    missing.push(...required);
-    return { valid: false, missing, extra };
-  }
-
-  for (const key of required) {
-    if (!(key in obj)) missing.push(key);
-  }
-  for (const key of Object.keys(obj)) {
-    if (!required.includes(key) && !optional.includes(key)) extra.push(key);
-  }
-
-  const typesValid = Array.isArray(obj.ductbanks) &&
-    Array.isArray(obj.conduits) &&
-    Array.isArray(obj.trays) &&
-    Array.isArray(obj.cables) &&
-    Array.isArray(obj.cableTypicals) &&
-    Array.isArray(obj.panels) &&
-    Array.isArray(obj.equipment) &&
-    Array.isArray(obj.loads) &&
-    obj.settings && typeof obj.settings === 'object' && !Array.isArray(obj.settings) &&
-    (obj.oneLine === undefined || Array.isArray(obj.oneLine) || Array.isArray(obj.oneLine?.sheets)) &&
-    (obj.mccLineups === undefined || Array.isArray(obj.mccLineups));
-
-  const valid = missing.length === 0 && extra.length === 0 && typesValid;
-  return { valid, missing, extra };
-}
-
 /**
  * Export current project data.
  */
 export function exportProject() {
   const project = {
+    schemaVersion: PROJECT_SCHEMA_VERSION,
     ductbanks: getDuctbanks(),
     conduits: getConduits(),
     trays: getTrays(),
@@ -1192,6 +1175,22 @@ export function exportProject() {
   }
   const meta = { version: 1, scenario: getCurrentScenarioNameState(), scenarios: listScenarios() };
   return { meta, ...project };
+}
+
+function beginEventBatch() {
+  if (!deferredEvents) deferredEvents = new Map();
+}
+
+function flushEventBatch() {
+  const pending = deferredEvents;
+  deferredEvents = null;
+  pending?.forEach((detail, event) => emit(event, detail));
+}
+
+let lastProjectImportError = '';
+
+export function getLastProjectImportError() {
+  return lastProjectImportError;
 }
 
 /**
@@ -1275,80 +1274,91 @@ export function exportToCad(fileType = 'json') {
  * @returns {boolean} success
  */
 export function importProject(obj) {
-  const { meta, ...rest } = obj || {};
+  const finishMeasurement = startPerformanceMeasurement('ctr.project-import', {
+    schemaVersion: Number(obj?.schemaVersion) || null,
+  });
+  let upgraded;
+  try {
+    upgraded = upgradeProjectImport(obj);
+  } catch (error) {
+    if (Array.isArray(error?.errors)) {
+      lastProjectImportError = `Project import is invalid: ${formatProjectSchemaErrors(error.errors)}`;
+    } else {
+      lastProjectImportError = error instanceof Error ? error.message : 'Project import is invalid.';
+    }
+    finishMeasurement({ success: false });
+    return false;
+  }
+
+  const { meta } = upgraded;
+  const data = { ...upgraded };
+  delete data.meta;
+  delete data.schemaVersion;
   const importScenario = meta && isValidScenarioName(meta.scenario) ? meta.scenario : null;
   if (meta && Array.isArray(meta.scenarios)) {
     setScenarioListState(meta.scenarios);
   }
-  let data = rest;
-  const { valid, missing, extra } = validateProjectSchema(data);
-  if (!valid) {
-    const parts = [];
-    if (missing.length) parts.push(`Missing fields: ${missing.join(', ')}`);
-    if (extra.length) parts.push(`Extra fields: ${extra.join(', ')}`);
-    const msg = parts.join('\n') || 'Invalid project data.';
-    const proceed = (typeof window !== 'undefined' && typeof window.confirm === 'function')
-      ? window.confirm(`${msg}\nRepair & continue?`)
-      : false;
-    if (!proceed) return false;
-    data = {
-      ductbanks: Array.isArray(obj.ductbanks) ? obj.ductbanks : [],
-      conduits: Array.isArray(obj.conduits) ? obj.conduits : [],
-      trays: Array.isArray(obj.trays) ? obj.trays : [],
-      cables: Array.isArray(obj.cables) ? obj.cables : [],
-      cableTypicals: Array.isArray(obj.cableTypicals) ? obj.cableTypicals : [],
-      panels: Array.isArray(obj.panels) ? obj.panels : [],
-      equipment: Array.isArray(obj.equipment) ? obj.equipment : [],
-      loads: Array.isArray(obj.loads) ? obj.loads : [],
-      oneLine: Array.isArray(obj.oneLine) ? obj.oneLine : [],
-      mccLineups: Array.isArray(obj.mccLineups) ? obj.mccLineups : [],
-      settings: (obj.settings && typeof obj.settings === 'object') ? obj.settings : {}
-    };
-  }
+  lastProjectImportError = '';
 
   if (importScenario) {
     switchScenario(importScenario);
   }
 
-  setDuctbanks(data.ductbanks);
-  setConduits(data.conduits);
-  clearConduitCache();
-  setTrays(data.trays);
-  setCables(data.cables);
-  setCableTypicals(Array.isArray(data.cableTypicals) ? data.cableTypicals : []);
-  setPanels(Array.isArray(data.panels) ? data.panels : []);
-  setEquipment(Array.isArray(data.equipment) ? data.equipment : []);
-  setLoads(Array.isArray(data.loads) ? data.loads : []);
-  setMccLineups(Array.isArray(data.mccLineups) ? data.mccLineups : []);
-  if (Array.isArray(data.oneLine)) {
-    setOneLine({ activeSheet: 0, sheets: data.oneLine });
-  } else if (data.oneLine && Array.isArray(data.oneLine.sheets)) {
-    setOneLine({ activeSheet: data.oneLine.activeSheet || 0, sheets: data.oneLine.sheets });
-  } else {
-    setOneLine({ activeSheet: 0, sheets: [] });
-  }
-  const importedStudies = data.settings?.studyResults ?? data.settings?.[LEGACY_STUDIES_SETTING_KEY] ?? {};
-  if (importedStudies && typeof importedStudies === 'object' && !Array.isArray(importedStudies)) {
-    setStudies(importedStudies);
-  } else {
-    setStudies({});
-  }
-  removeItem(LEGACY_STUDIES_SETTING_KEY);
-  removeItem(REVISION_KEY);
-
-  const reserved = new Set([...Object.values(KEYS), EXTRA_KEYS.mccLineups, REVISION_KEY, 'CTR_PROJECT_V1', LEGACY_STUDIES_SETTING_KEY]);
-  for (const key of keys()) {
-    if (!reserved.has(key) && !(data.settings && key in data.settings)) {
-      removeItem(key);
+  beginEventBatch();
+  beginProjectMutationBatch();
+  try {
+    setDuctbanks(data.ductbanks);
+    setConduits(data.conduits);
+    clearConduitCache();
+    setTrays(data.trays);
+    setCables(data.cables);
+    setCableTypicals(Array.isArray(data.cableTypicals) ? data.cableTypicals : []);
+    setPanels(Array.isArray(data.panels) ? data.panels : []);
+    setEquipment(Array.isArray(data.equipment) ? data.equipment : []);
+    setLoads(Array.isArray(data.loads) ? data.loads : []);
+    setMccLineups(Array.isArray(data.mccLineups) ? data.mccLineups : []);
+    if (Array.isArray(data.oneLine)) {
+      setOneLine({ activeSheet: 0, sheets: data.oneLine });
+    } else if (data.oneLine && Array.isArray(data.oneLine.sheets)) {
+      setOneLine({ activeSheet: data.oneLine.activeSheet || 0, sheets: data.oneLine.sheets });
+    } else {
+      setOneLine({ activeSheet: 0, sheets: [] });
     }
-  }
-  if (data.settings) {
-    for (const [k, v] of Object.entries(data.settings)) {
-      if (!reserved.has(k)) {
-        setItem(k, v);
+    const importedStudies = data.settings?.studyResults ?? data.settings?.[LEGACY_STUDIES_SETTING_KEY] ?? {};
+    if (importedStudies && typeof importedStudies === 'object' && !Array.isArray(importedStudies)) {
+      setStudies(importedStudies);
+    } else {
+      setStudies({});
+    }
+    removeItem(LEGACY_STUDIES_SETTING_KEY);
+    removeItem(REVISION_KEY);
+
+    const reserved = new Set([...Object.values(KEYS), EXTRA_KEYS.mccLineups, REVISION_KEY, 'CTR_PROJECT_V1', LEGACY_STUDIES_SETTING_KEY]);
+    for (const key of keys()) {
+      if (!reserved.has(key) && !(data.settings && key in data.settings)) {
+        removeItem(key);
       }
     }
+    if (data.settings) {
+      for (const [k, v] of Object.entries(data.settings)) {
+        if (!reserved.has(k)) {
+          setItem(k, v);
+        }
+      }
+    }
+  } finally {
+    endProjectMutationBatch();
+    flushEventBatch();
   }
+  if (getProjectSchemaLoadError()) {
+    removeProjectKey(PROJECT_KEY);
+    setProjectState(getProjectState());
+  }
+  finishMeasurement({
+    success: true,
+    cableCount: data.cables.length,
+    trayCount: data.trays.length,
+  });
   return true;
 }
 
@@ -1418,6 +1428,7 @@ if (typeof window !== 'undefined') {
     keys,
     exportProject,
     importProject,
+    getLastProjectImportError,
     saveProject,
     loadProject,
     applyRemoteSnapshot,

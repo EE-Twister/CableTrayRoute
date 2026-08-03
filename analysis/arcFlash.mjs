@@ -1,7 +1,8 @@
-import { runShortCircuit } from './shortCircuit.mjs';
+import { defaultProtectiveDeviceCatalog, runShortCircuit } from './shortCircuit.mjs';
 import { scaleCurve } from './tccUtils.js';
 import { getOneLine, getItem } from '../dataStore.mjs';
 import { showAlertModal } from '../src/components/modal.js';
+import { createProtectiveDeviceCatalogLoader } from '../src/protectiveDevices/catalogLoader.mjs';
 import {
   arcingCurrents,
   incidentEnergy,
@@ -9,7 +10,10 @@ import {
   ELECTRODE_CONFIGS,
 } from './ieee1584.mjs';
 
-let deviceCache = null;
+const deviceCache = new Map();
+const protectiveDeviceCatalog = typeof window !== 'undefined'
+  ? createProtectiveDeviceCatalogLoader()
+  : null;
 
 const PROTECTIVE_TYPES = new Set(['breaker', 'fuse', 'relay', 'recloser', 'contactor', 'switch']);
 function isProtectiveComponent(component) {
@@ -269,11 +273,18 @@ function formatProtectiveDeviceName(protectiveComp, device) {
   return 'Not Specified';
 }
 
-async function loadDevices() {
-  if (deviceCache) return deviceCache;
+async function loadDevices(ids = [], providedDevices = []) {
+  providedDevices.forEach(device => {
+    if (device?.id) deviceCache.set(device.id, device);
+  });
+  const uniqueIds = [...new Set(ids.filter(Boolean))];
+  const missingIds = uniqueIds.filter(id => !deviceCache.has(id));
+  if (!missingIds.length) return uniqueIds.map(id => deviceCache.get(id)).filter(Boolean);
   try {
-    const mod = await import('../data/protectiveDevices.mjs');
-    deviceCache = mod.default || mod;
+    const loaded = protectiveDeviceCatalog
+      ? await protectiveDeviceCatalog.loadDevices(missingIds)
+      : defaultProtectiveDeviceCatalog.filter(device => missingIds.includes(device.id));
+    loaded.forEach(device => deviceCache.set(device.id, device));
   } catch (err) {
     console.error('Protective device library failed to load', err);
     if (typeof window !== 'undefined') {
@@ -295,7 +306,7 @@ async function loadDevices() {
     loadErr.cause = err;
     throw loadErr;
   }
-  return deviceCache;
+  return uniqueIds.map(id => deviceCache.get(id)).filter(Boolean);
 }
 
 function interpolateTime(curve = [], currentA) {
@@ -383,7 +394,6 @@ function clearingTime(comp, evalKA, devices, protectiveComp, scResults, protecti
  * where energy is in cal/cm^2 and boundary in millimeters.
  */
 export async function runArcFlash(options = {}) {
-  const devices = await loadDevices();
   const studyDate = new Date().toISOString().split('T')[0];
   let scOptions = {};
   if (options && typeof options === 'object') {
@@ -393,11 +403,18 @@ export async function runArcFlash(options = {}) {
       scOptions = options;
     }
   }
-  const sc = runShortCircuit(scOptions);
   const { sheets } = getOneLine();
   const comps = (Array.isArray(sheets[0]?.components)
     ? sheets.flatMap(s => s.components)
     : sheets).filter(c => c && c.type !== 'annotation' && c.type !== 'dimension');
+  const deviceIds = comps
+    .filter(component => isProtectiveComponent(component) && component.tccId)
+    .map(component => component.tccId);
+  const providedDevices = Array.isArray(options?.deviceCatalog)
+    ? options.deviceCatalog
+    : (Array.isArray(scOptions?.deviceCatalog) ? scOptions.deviceCatalog : []);
+  const devices = await loadDevices(deviceIds, providedDevices);
+  const sc = runShortCircuit({ ...scOptions, deviceCatalog: devices });
   const protection = createProtectiveResolver(comps);
   const results = {};
   comps.forEach(comp => {

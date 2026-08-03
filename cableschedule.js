@@ -25,6 +25,7 @@ import {
   writeAoaWorkbook
 } from './src/cable-schedule/io.js';
 import { renderCablePrintReport as renderCablePrintReportTo } from './src/cable-schedule/printReport.js';
+import { collectPanelOptions, collectRacewayOptions } from './src/cable-schedule/optionModel.js';
 import {
   CABLE_LIBRARY_EVIDENCE_STATUS,
   assessCableTypical,
@@ -81,26 +82,21 @@ async function initCableSchedule() {
   const installMethods = ['Conduit','Tray','Direct Buried'];
 
   function getRacewayOptions(){
-    const ids = new Set();
-    try{ dataStore.getTrays().forEach(t=>{ if(t.tray_id) ids.add(t.tray_id); }); }catch(e){ console.warn('getRacewayOptions: failed to read trays', e); }
-    try{ dataStore.getConduits().forEach(c=>{
-      const id=c.tray_id||(c.ductbank_id&&c.conduit_id?`${c.ductbank_id}-${c.conduit_id}`:c.conduit_id);
-      if(id) ids.add(id);
-    }); }catch(e){ console.warn('getRacewayOptions: failed to read conduits', e); }
-    try{ dataStore.getDuctbanks().forEach(db=>{
-      const dbId=db.ductbank_id||db.id||db.tag;
-      (db.conduits||[]).forEach(c=>{
-        const id=c.tray_id||(dbId&&c.conduit_id?`${dbId}-${c.conduit_id}`:c.conduit_id);
-        if(id) ids.add(id);
+    try{
+      return collectRacewayOptions({
+        trays:dataStore.getTrays(),
+        conduits:dataStore.getConduits(),
+        ductbanks:dataStore.getDuctbanks()
       });
-    }); }catch(e){ console.warn('getRacewayOptions: failed to read ductbanks', e); }
-    return Array.from(ids);
+    }catch(e){
+      console.warn('getRacewayOptions: failed to read raceways', e);
+      return [];
+    }
   }
 
   function getPanelOptions(){
-    const ids=new Set();
-    try{ dataStore.getPanels().forEach(p=>{ if(p.panel_id) ids.add(p.panel_id); }); }catch(e){ console.warn('getPanelOptions: failed to read panels', e); }
-    return Array.from(ids);
+    try{ return collectPanelOptions(dataStore.getPanels()); }
+    catch(e){ console.warn('getPanelOptions: failed to read panels', e); return []; }
   }
 
   function getEquipmentOptions(){

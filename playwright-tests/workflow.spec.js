@@ -223,6 +223,11 @@ test.describe("CableTrayRoute workflow", () => {
     await expect(page.locator("#dashboard-guided-workflow")).toContainText("Missing Information Prompts");
     await expect(page.locator("#dashboard-compliance-matrix")).toContainText("Protective-device settings confirmed");
     await expect(page.locator("#dashboard-review-gates")).toContainText("Confirm protective-device settings");
+    const qualityDetails = page.locator('details[aria-label="Project quality details"]');
+    await expect(qualityDetails).toBeVisible();
+    await expect(qualityDetails).toHaveJSProperty('open', true);
+    await expect(qualityDetails.locator('summary')).toContainText('blocking gate');
+    await expect(page.locator('[data-review-gate="protective-device-settings"]')).toBeVisible();
     await page.click('[data-review-gate="protective-device-settings"]');
     await expect(page.locator(".component-modal")).toContainText("Review Gate: Confirm protective-device settings");
     await page.selectOption("#review-gate-status", "flagged");
@@ -241,8 +246,11 @@ test.describe("CableTrayRoute workflow", () => {
     expect(generatedCable.raceway_id).toBe("TR-E2E-001");
 
     await page.goto(pageUrl("projectreport.html?e2e=1"));
-    await expect(page.locator("#rpt-deliverable-readiness")).toContainText("design basis gate");
-    await page.click("#rpt-json-btn");
-    await expect(page.locator("#report-status")).toContainText("JSON export blocked");
+    await expect(page.locator("#rpt-deliverable-readiness")).toContainText("Confirm protective-device settings");
+    await expect(page.locator("#rpt-deliverable-readiness")).toContainText("Issue readiness: blocked");
+    const jsonExport = page.locator("#rpt-json-btn");
+    await expect(jsonExport).toBeDisabled();
+    await expect(jsonExport).toHaveAttribute("aria-disabled", "true");
+    await expect(jsonExport).toHaveAttribute("title", /Confirm protective-device settings/);
   });
 });

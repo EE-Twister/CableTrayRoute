@@ -231,6 +231,14 @@ export function assessProtectiveDeviceLibraryEntry(device) {
     };
   }
 
+  if (device.catalogAssessmentStatus && STATUS_DETAILS[device.catalogAssessmentStatus]) {
+    return {
+      status: device.catalogAssessmentStatus,
+      ...STATUS_DETAILS[device.catalogAssessmentStatus],
+      missing: []
+    };
+  }
+
   if (device.iec60255 === true) {
     return {
       status: STATUS.STANDARDS_REFERENCE,

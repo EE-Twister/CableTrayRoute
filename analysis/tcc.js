@@ -78,6 +78,12 @@ import {
   sanitizeToleranceSpec,
   sortCustomCurveList
 } from './tcc/customCurveModel.mjs';
+import { resolvePlotDomainsModel } from './tcc/plotDomainModel.mjs';
+import { resolveCatalogSelection } from './tcc/catalogSelectionModel.mjs';
+import { startPerformanceMeasurement } from '../src/performance/performanceMetrics.js';
+import { createProtectiveDeviceCatalogLoader } from '../src/protectiveDevices/catalogLoader.mjs';
+import { createTccCatalogHydrator } from '../src/protectiveDevices/tccCatalogHydrator.mjs';
+import { loadReferencedProtectiveDevices } from '../src/protectiveDevices/calculationCatalog.mjs';
 
 const PROTECTIVE_TYPES = new Set(['breaker', 'fuse', 'relay', 'relay_87', 'recloser', 'contactor', 'switch']);
 const MOTOR_TYPES = new Set(['motor_load', 'motor', 'motor_starter', 'motor_controller']);
@@ -568,6 +574,7 @@ const ANNOTATION_DRAG_STATE = Symbol('tccAnnotationDragState');
 
 let baseLibraryDevices = [];
 let libraryDevices = [];
+const protectiveDeviceCatalog = createProtectiveDeviceCatalogLoader();
 let deviceEntries = [];
 let deviceMap = new Map();
 let deviceGroups = [];
@@ -983,6 +990,18 @@ saved.customCurveCounter = saved.customCurves.reduce((max, curve) => {
 
 annotations = (saved.annotations || []).map(sanitizeAnnotation).filter(Boolean);
 saved.annotations = annotations.map(exportAnnotation);
+
+const hydrateProtectiveDevices = createTccCatalogHydrator({
+  catalog: protectiveDeviceCatalog,
+  getBaseDevices: () => baseLibraryDevices,
+  getLibraryDevices: () => libraryDevices,
+  setBaseDevices: devices => { baseLibraryDevices = devices; },
+  setLibraryDevices: devices => { libraryDevices = devices; },
+  getDeviceEntries: () => deviceEntries,
+  getReviews: () => saved.protectiveDeviceReviews,
+  mergeReview: mergeProtectiveDeviceReview,
+  assess: assessProtectiveDeviceLibraryEntry,
+});
 
 const BUTTON_READY_TITLES = new WeakMap();
 
@@ -2563,40 +2582,19 @@ function refreshCatalog({
   const previousSelection = preserveSelection && !resetSelection ? new Set(selectedDeviceIds()) : new Set();
   buildComponentData();
   rebuildCatalog();
-  const available = new Set(deviceEntries.map(entry => entry.uid));
-  const defaults = new Set(resetSelection ? [] : (saved.devices || []).filter(id => available.has(id)));
   const contextId = getActiveComponentId();
-  if (preserveSelection) {
-    previousSelection.forEach(id => {
-      if (available.has(id)) defaults.add(id);
-    });
-  }
-  if (includeComponentContext && contextId) {
-    const compEntry = componentDeviceMap.get(contextId);
-    if (compEntry) defaults.add(compEntry.uid);
-    collectNeighborDeviceDefaults(contextId).forEach(id => {
-      if (available.has(id)) defaults.add(id);
-    });
-  }
-  if (includeDeviceParam && deviceParam) {
-    const hasComponentDevice = [...defaults].some(id => {
-      const entry = deviceMap.get(id);
-      return entry?.kind === 'component' && entry.baseDeviceId === deviceParam;
-    });
-    const libraryEntry = deviceEntries.find(
-      entry => entry.kind === 'library' && entry.baseDeviceId === deviceParam
-    );
-    if (libraryEntry && !hasComponentDevice) defaults.add(libraryEntry.uid);
-  }
-  deviceEntries
-    .filter(entry => entry.autoSelect)
-    .forEach(entry => defaults.add(entry.uid));
-  if (!defaults.size && deviceEntries.length) {
-    const first = deviceEntries.find(entry => entry.kind === 'component')
-      || deviceEntries.find(entry => entry.kind === 'library');
-    if (first) defaults.add(first.uid);
-  }
-  const selection = [...defaults].filter(id => available.has(id));
+  const selection = resolveCatalogSelection({
+    entries: deviceEntries,
+    savedDeviceIds: saved.devices || [],
+    previousSelection,
+    preserveSelection,
+    resetSelection,
+    includeComponentContext,
+    contextComponentUid: contextId ? componentDeviceMap.get(contextId)?.uid : '',
+    neighborDeviceIds: contextId ? collectNeighborDeviceDefaults(contextId) : [],
+    includeDeviceParam,
+    deviceParam,
+  });
   applySelectionSet(selection);
   saved.devices = selection;
   persistAnnotations({ skipSetItem: true });
@@ -2627,15 +2625,16 @@ function setActiveComponent(componentId, { preserveSelection = false } = {}) {
   }
   return selection;
 }
-
-function updateShortCircuitStudy() {
-  const sc = runShortCircuit();
+async function updateShortCircuitStudy() {
+  const oneLine = getOneLine();
+  const projectDevices = libraryDevices.filter(device => !device.catalogShard);
+  const deviceCatalog = await loadReferencedProtectiveDevices(oneLine, { catalog: protectiveDeviceCatalog, additionalDevices: projectDevices }).catch(() => projectDevices);
+  const sc = runShortCircuit({ deviceCatalog });
   const studies = getStudies();
   studies.shortCircuit = sc;
   setStudies(studies);
   return sc;
 }
-
 function refreshProjectCatalogDevices() {
   const projectDevices = (getTrayHardwareCatalogCustomProducts() || [])
     .map(normalizeCatalogProtectiveDevice)
@@ -2657,7 +2656,7 @@ function refreshProjectCatalogDevices() {
 
 async function init() {
   try {
-    const list = await fetch('data/protectiveDevices.json').then(r => r.json());
+    const list = await protectiveDeviceCatalog.loadIndex();
     baseLibraryDevices = Array.isArray(list) ? list : [];
   } catch (e) {
     console.error('Failed to load device data', e);
@@ -4706,7 +4705,8 @@ async function openDeviceSelectionModal() {
   };
 
   async function handleEntryReview(entry) {
-    const device = entry?.baseDevice;
+    await hydrateProtectiveDevices([entry?.baseDeviceId]);
+    const device = libraryDevices.find(item => item.id === entry?.baseDeviceId);
     if (!device?.id) return null;
     return openProtectiveDeviceReview(device, {
       review: saved.protectiveDeviceReviews?.[device.id] || null,
@@ -5344,8 +5344,8 @@ if (contextBackBtn) {
   });
 }
 
-function applyPlotAndPersistence() {
-  plot();
+async function applyPlotAndPersistence() {
+  await plot();
   persistSettings();
 }
 
@@ -8277,81 +8277,25 @@ function computeEquipmentConstraintChecks(plotted = [], overlays = []) {
     .filter(Boolean);
 }
 
-function pushCurveRangeValues(curve, currents, times) {
-  (Array.isArray(curve) ? curve : []).forEach(point => {
-    if (Number.isFinite(point.current) && point.current > 0) currents.push(point.current);
-    if (Number.isFinite(point.time) && point.time > 0) times.push(point.time);
+function resolvePlotDomains(devicePlots, overlays, faultCurrentA, allCurrents, allTimes) {
+  const preset = normalizeRangePreset(activeRangePreset);
+  return resolvePlotDomainsModel({
+    preset,
+    devicePlots,
+    overlays,
+    faultCurrentA,
+    allCurrents,
+    allTimes,
+    defaultInrushDuration: DEFAULT_INRUSH_DURATION,
   });
 }
 
-function collectRangeValuesForPreset(preset, devicePlots, overlays, faultCurrentA, allCurrents, allTimes) {
-  const currents = [];
-  const times = [];
-  const includeDeviceCurves = entries => {
-    entries.forEach(entry => {
-      pushCurveRangeValues(entry.scaled?.curve, currents, times);
-      pushCurveRangeValues(entry.scaled?.minCurve, currents, times);
-      pushCurveRangeValues(entry.scaled?.maxCurve, currents, times);
-    });
-  };
-  const includeOverlays = entries => {
-    entries.forEach(entry => {
-      if (entry.kind === 'inrush') {
-        if (entry.current > 0) currents.push(entry.current);
-        const duration = entry.normalizedDuration ?? entry.duration ?? DEFAULT_INRUSH_DURATION;
-        if (duration > 0) times.push(duration);
-      } else {
-        pushCurveRangeValues(entry.curve, currents, times);
-      }
-    });
-  };
-
-  if (preset === 'coordination') {
-    includeDeviceCurves(devicePlots);
-    if (faultCurrentA > 0) currents.push(faultCurrentA);
-  } else if (preset === 'motorStart') {
-    includeDeviceCurves(devicePlots);
-    includeOverlays(overlays.filter(entry => entry.kind === 'motorStart' || entry.kind === 'motorThermal'));
-  } else if (preset === 'transformerInrush') {
-    includeDeviceCurves(devicePlots);
-    includeOverlays(overlays.filter(entry => entry.kind === 'inrush' || entry.kind === 'transformerDamage'));
-  } else if (preset === 'faultCurrent' && faultCurrentA > 0) {
-    includeDeviceCurves(devicePlots);
-    currents.push(faultCurrentA / 4, faultCurrentA, faultCurrentA * 4);
-    times.push(0.001, 0.01, 0.1, 1, 10);
-  }
-
-  return {
-    currents: currents.length ? currents : allCurrents,
-    times: times.length ? times : allTimes
-  };
-}
-
-function resolvePlotDomains(devicePlots, overlays, faultCurrentA, allCurrents, allTimes) {
-  const preset = normalizeRangePreset(activeRangePreset);
-  const { currents, times } = collectRangeValuesForPreset(preset, devicePlots, overlays, faultCurrentA, allCurrents, allTimes);
-  const minCurrent = d3.min(currents) || 1;
-  const maxCurrent = d3.max(currents) || minCurrent * 10;
-  const minTime = d3.min(times) || 0.01;
-  const maxTime = d3.max(times) || minTime * 10;
-  let currentDomain = [Math.max(minCurrent / 1.5, 0.01), Math.max(maxCurrent * 1.5, minCurrent * 1.2)];
-  let timeDomain = [Math.max(minTime / 1.5, 0.001), Math.max(maxTime * 1.3, minTime * 2)];
-
-  if (preset === 'faultCurrent' && faultCurrentA > 0) {
-    currentDomain = [Math.max(faultCurrentA / 5, 0.01), Math.max(faultCurrentA * 5, faultCurrentA + 1)];
-    timeDomain = [0.001, Math.max(10, maxTime * 1.2)];
-  } else if (preset === 'motorStart') {
-    timeDomain[0] = Math.min(timeDomain[0], 0.01);
-    timeDomain[1] = Math.max(timeDomain[1], 30);
-  } else if (preset === 'transformerInrush') {
-    timeDomain[0] = Math.min(timeDomain[0], 0.001);
-    timeDomain[1] = Math.max(timeDomain[1], 2);
-  }
-
-  return { currentDomain, timeDomain };
-}
-
-function plot() {
+async function plot() {
+  const finishPlotMeasurement = startPerformanceMeasurement('ctr.tcc-plot', {
+    selectedDeviceCount: selectedDeviceIds().length,
+  });
+  updateCoordinationStatus('Loading selected device curves...', 'pending');
+  await hydrateProtectiveDevices(selectedDeviceIds().map(uid => deviceMap.get(uid)?.baseDeviceId));
   contextMenu.hide();
   clearPinnedChartDetail();
   activeLegendFocusKey = null;
@@ -8405,6 +8349,7 @@ function plot() {
     updateCoordinationStatus('No devices selected. Choose devices to update the plot.', 'warning');
     renderEquipmentMetrics([], []);
     clearPlotRefreshPending();
+    finishPlotMeasurement({ plottedCount: 0 });
     return;
   }
 
@@ -8432,6 +8377,7 @@ function plot() {
     updateCoordinationStatus('No plottable curves are available for the selected devices.', 'warning');
     renderEquipmentMetrics([], []);
     clearPlotRefreshPending();
+    finishPlotMeasurement({ plottedCount: 0 });
     return;
   }
 
@@ -9580,6 +9526,7 @@ function plot() {
   );
   renderCoordOrderList();
   updateCurves();
+  finishPlotMeasurement({ plottedCount: plotted.length });
 }
 
 function autoCoordinate() {

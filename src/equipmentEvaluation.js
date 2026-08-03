@@ -18,8 +18,10 @@ import {
   getStudies,
   getOneLine,
 } from '../dataStore.mjs';
-import protectiveDevices from '../data/protectiveDevices.mjs';
 import { createCrossProbeLink } from './crossProbe.js';
+import { createProtectiveDeviceCatalogLoader } from './protectiveDevices/catalogLoader.mjs';
+
+const protectiveDeviceCatalog = createProtectiveDeviceCatalogLoader();
 
 document.addEventListener('DOMContentLoaded', () => {
   initSettings();
@@ -56,7 +58,7 @@ document.addEventListener('DOMContentLoaded', () => {
     URL.revokeObjectURL(url);
   });
 
-  function runAndRender() {
+  async function runAndRender() {
     runBtn.disabled = true;
     runBtn.textContent = 'Running…';
     try {
@@ -64,6 +66,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const cables     = getCables() || [];
       const studies    = getStudies() || {};
 
+      const protectiveDevices = await protectiveDeviceCatalog.loadIndex();
       lastEvaluations = evaluateEquipment(components, cables, studies, protectiveDevices);
       renderKpis(lastEvaluations);
       renderTable(lastEvaluations);

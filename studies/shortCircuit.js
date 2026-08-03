@@ -2,6 +2,7 @@ import { runShortCircuit } from '../analysis/shortCircuit.mjs';
 import { getOneLine, getCables, getStudies, setStudies, getProjectInputFingerprint } from '../dataStore.mjs';
 import { getProjectState } from '../projectStorage.js';
 import { downloadPDF } from '../reports/reporting.mjs';
+import { loadReferencedProtectiveDevices } from '../src/protectiveDevices/calculationCatalog.mjs';
 
 function projectComponents() {
   const sheets = getOneLine()?.sheets;
@@ -126,10 +127,11 @@ function escapeHtml(value) {
     .replace(/'/g, '&#39;');
 }
 
-export function runShortCircuitStudy(opts = {}) {
+export async function runShortCircuitStudy(opts = {}) {
   const model = buildModel();
   if (!model.buses.length) throw new Error('The active project One-Line has no components to analyze.');
-  const results = runShortCircuit(model, opts);
+  const deviceCatalog = await loadReferencedProtectiveDevices(model);
+  const results = runShortCircuit(model, { ...opts, deviceCatalog });
   const studies = getStudies();
   const previous = summarizeForHistory(studies.shortCircuit);
   const existingHistory = resultHistory(studies.shortCircuit);
@@ -299,10 +301,12 @@ function initializeShortCircuitPage() {
       if (savedMethod && form?.method) form.method.value = savedMethod;
     }
 
-    form?.addEventListener('submit', event => {
+    form?.addEventListener('submit', async event => {
       event.preventDefault();
+      if (status) status.textContent = 'Loading referenced protection data...';
+      if (form) form.setAttribute('aria-busy', 'true');
       try {
-        latestResults = runShortCircuitStudy({ method: form.method.value });
+        latestResults = await runShortCircuitStudy({ method: form.method.value });
         renderResults(latestResults, scope?.value || 'project');
         if (exportButton) exportButton.disabled = !reviewableResults(latestResults);
         if (status) status.textContent = 'Study complete and saved to the active project. Results now match the current project inputs.';
@@ -310,6 +314,8 @@ function initializeShortCircuitPage() {
         if (status) status.textContent = `Study blocked: ${error.message}`;
         const output = document.getElementById('shortcircuit-output');
         if (output) output.textContent = JSON.stringify({ error: error.message }, null, 2);
+      } finally {
+        if (form) form.removeAttribute('aria-busy');
       }
     });
     scope?.addEventListener('change', () => {

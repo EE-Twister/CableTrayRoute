@@ -11,6 +11,7 @@ import "./units.js";
 import {
   exportProject,
   importProject,
+  getLastProjectImportError,
   getOneLine,
   getStudies,
   getStudyProvenance,
@@ -51,6 +52,7 @@ import {
   defaultProject,
   initializeProjectStorage,
   getProjectState,
+  getProjectSchemaLoadError,
   setProjectKey,
   setProjectState,
   onProjectChange,
@@ -67,6 +69,13 @@ import {
 import { openModal, showAlertModal } from "./src/components/modal.js";
 import { createDomWriteBatcher, createElementCache, createHandlerProfiler } from "./src/utils/domLifecycle.js";
 import { initCollaboration, stopCollaboration } from "./src/collabManager.js";
+import {
+  canonicalJSONString,
+  compressString,
+  decodeProjectFromUrl,
+  encodeProjectForUrl,
+  sha256Hex
+} from "./src/projectFileCodec.js";
 
 const FOCUSABLE="a[href],button:not([disabled]),textarea:not([disabled]),input:not([disabled]),select:not([disabled]),[tabindex]:not([tabindex='-1'])";
 const CHECKPOINT_KEY='CTR_CHECKPOINT';
@@ -665,82 +674,6 @@ function recordSave(){
 }
 
 initializeProjectStorage().catch(e=>console.error('fast-json-patch load failed',e));
-
-function canonicalize(obj){
-  if(Array.isArray(obj)) return obj.map(canonicalize);
-  if(obj&&typeof obj==='object'){
-    const out={};
-    Object.keys(obj).sort().forEach(k=>{out[k]=canonicalize(obj[k]);});
-    return out;
-  }
-  return obj;
-}
-
-function canonicalJSONString(obj){
-  return JSON.stringify(canonicalize(obj));
-}
-
-async function sha256Hex(str){
-  const buf=new TextEncoder().encode(str);
-  const subtle=crypto.subtle||crypto.webcrypto?.subtle;
-  const hash=await subtle.digest('SHA-256',buf);
-  return Array.from(new Uint8Array(hash)).map(b=>b.toString(16).padStart(2,'0')).join('');
-}
-
-function bytesToBase64(bytes){
-  let binary='';
-  for(const b of bytes) binary+=String.fromCharCode(b);
-  return btoa(binary);
-}
-
-function base64ToBytes(b64){
-  const bin=atob(b64);
-  const arr=new Uint8Array(bin.length);
-  for(let i=0;i<bin.length;i++) arr[i]=bin.charCodeAt(i);
-  return arr;
-}
-
-async function compressString(str){
-  try{
-    if(typeof CompressionStream==='function'&&typeof Blob==='function'){
-      const stream=new Blob([str],{type:'application/json'}).stream().pipeThrough(new CompressionStream('gzip'));
-      const buffer=await new Response(stream).arrayBuffer();
-      return new Uint8Array(buffer);
-    }
-  }catch{}
-  try{
-    return new TextEncoder().encode(str);
-  }catch{
-    return new Uint8Array();
-  }
-}
-
-async function decompressBytes(bytes){
-  try{
-    if(typeof DecompressionStream==='function'&&typeof Blob==='function'){
-      const stream=new Blob([bytes],{type:'application/octet-stream'}).stream().pipeThrough(new DecompressionStream('gzip'));
-      const buffer=await new Response(stream).arrayBuffer();
-      return new TextDecoder().decode(buffer);
-    }
-  }catch{}
-  try{
-    return new TextDecoder().decode(bytes);
-  }catch{
-    return '';
-  }
-}
-
-async function encodeProjectForUrl(project){
-  const json=canonicalJSONString(project);
-  const bytes=await compressString(json);
-  return encodeURIComponent(bytesToBase64(bytes));
-}
-
-async function decodeProjectFromUrl(encoded){
-  const bytes=base64ToBytes(decodeURIComponent(encoded));
-  const json=await decompressBytes(bytes);
-  return JSON.parse(json);
-}
 
 async function saveCheckpoint(){
   try{
@@ -2742,6 +2675,19 @@ if(typeof window!=='undefined'){
 }
 
 function initProjectIO(){
+  const schemaLoadError=getProjectSchemaLoadError();
+  if(schemaLoadError){
+    const noticeKey=`ctr-project-schema-notice:${schemaLoadError.code}:${schemaLoadError.schemaVersion||'invalid'}`;
+    let noticeSeen=false;
+    try{
+      noticeSeen=sessionStorage.getItem(noticeKey)==='1';
+      if(!noticeSeen) sessionStorage.setItem(noticeKey,'1');
+    }catch{}
+    if(!noticeSeen){
+      const title=schemaLoadError.code==='PROJECT_SCHEMA_UNSUPPORTED'?'Project Update Required':'Stored Project Invalid';
+      showAlertModal(title,`${schemaLoadError.message} The stored data was left unchanged and saves are paused until it is cleared or replaced.`).catch(()=>{});
+    }
+  }
   const operationStatusHost=initOperationStatusHost(document.getElementById('settings-menu'));
   runOperationWithStatus(operationStatusHost,{
     pendingText:'Loading project from URL…',
@@ -2809,7 +2755,7 @@ function initProjectIO(){
                 location.reload();
                 return;
               }
-              reject(new Error('Import canceled or invalid project data.'));
+              reject(new Error(getLastProjectImportError() || 'Import canceled or invalid project data.'));
             }catch(err){
               reject(err);
             }

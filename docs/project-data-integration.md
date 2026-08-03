@@ -17,6 +17,14 @@ Battery Sizing, Generator Sizing, and Report Builder bind directly to this recor
 
 Other study pages automatically reuse common project identity, system label, altitude, ambient, jurisdiction, and AHJ fields when no saved study result exists. A source badge identifies each populated value. Heat Trace uses the minimum design ambient; equipment-rating and thermal pages use the maximum design ambient.
 
+## Project file compatibility
+
+Canonical browser-storage records and exported `.ctr.json` files carry a root-level `schemaVersion`. Version 1 is the current project contract. The machine-readable contract is [Project JSON Schema](../schemas/project.schema.json); it describes both the compact storage record and the richer interchange file.
+
+Unversioned projects are treated as legacy version 0 and upgraded through the ordered migration registry before use. Each migration must advance exactly one supported contract version, and the migrated result is validated before it can replace application state. Files with a newer version are refused with an update prompt instead of being interpreted as an older shape.
+
+Import validation checks required collections, row object types, One-Line sheet structure, scenario metadata, and unexpected root fields. A malformed import is rejected atomically: CableTrayRoute reports the failing JSON path and leaves the current project unchanged. The former repair path that silently replaced invalid collections with empty arrays is intentionally no longer used.
+
 Specialized project-scope selectors are available where a study must target a particular record:
 
 - **Bus Duct Sizing** selects a load or circuit and derives voltage, phases, load current, cable-route length, maximum ambient, and Short Circuit duty.

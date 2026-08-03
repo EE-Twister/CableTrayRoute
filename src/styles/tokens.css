@@ -6,7 +6,7 @@
   --color-border: #e2e8f0;
   --color-overlay: rgba(0, 0, 0, 0.55);
 
-  --font-family-base: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-family-base: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-size-xs: 0.75rem;
   --font-size-sm: 0.875rem;
   --font-size-md: 1rem;
@@ -26,6 +26,15 @@
   --radius-md: 10px;
   --radius-lg: 16px;
   --radius-pill: 999px;
+
+  --control-height: 2.5rem;
+  --control-padding-block: var(--space-2);
+  --control-padding-inline: 0.625rem;
+  --control-radius: var(--radius-sm);
+  --panel-padding: var(--space-5);
+  --panel-border: 1px solid var(--color-border);
+  --motion-fast: 100ms;
+  --motion-standard: 150ms;
 
   --elevation-sm: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.04);
   --elevation-md: 0 4px 16px rgba(0, 0, 0, 0.08), 0 2px 6px rgba(0, 0, 0, 0.04);
@@ -58,6 +67,7 @@
   --error-bg: #f8d7da;
   --error-text: #721c24;
   --focus-ring-color: #0a58ca;
+  --focus-ring: 0 0 0 3px color-mix(in srgb, var(--focus-ring-color) 28%, transparent);
   --theme-control-bg: #ffffff;
   --theme-control-text: #111827;
   --panel-phase-a: #f25c54;

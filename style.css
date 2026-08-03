@@ -1,32 +1,34 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-@import "./src/styles/tokens.css";
-@import "./src/styles/oneline.css?v=mobile-workflow-drawer-v2";
-@import "./src/styles/base.css";
-@import "./src/styles/navigation.css";
-@import "./src/styles/auth.css";
-@import "./src/styles/layout.css";
-@import "./src/styles/forms.css?v=dark-palette-icons";
-@import "./src/styles/modals.css";
-@import "./src/styles/tables.css?v=mobile-row-actions-v2";
-@import "./src/styles/messages.css";
-@import "./src/styles/ductbank.css";
-@import "./src/styles/tray-fill.css";
-@import "./src/styles/homepage.css";
-@import "./src/styles/components.css";
-@import "./src/styles/dissimilar-metals.css";
-@import "./src/styles/isometric.css";
-@import "./src/styles/spoolsheets.css";
-@import "./src/styles/docs.css";
-@import "./src/styles/context-menu.css";
-@import "./src/styles/panel-schedule.css";
-@import "./src/styles/routing.css";
-@import "./src/styles/print.css";
-@import "./src/styles/copilot.css";
-@import "./src/styles/dashboard.css";
-@import "./src/styles/workflow-core.css";
-@import "./src/styles/scenarioComparison.css";
-@import "./src/styles/dataManager.css";
-@import "./src/styles/groundgrid.css";
+@import "./src/styles/tokens.css" layer(tokens);
+@import "./src/styles/base.css" layer(base);
+@import "./src/styles/layout.css" layer(layout);
+@import "./src/styles/navigation.css" layer(components);
+@import "./src/styles/auth.css" layer(components);
+@import "./src/styles/forms.css?v=dark-palette-icons" layer(components);
+@import "./src/styles/modals.css" layer(components);
+@import "./src/styles/tables.css?v=mobile-row-actions-v2" layer(components);
+@import "./src/styles/messages.css" layer(components);
+@import "./src/styles/components.css" layer(components);
+@import "./src/styles/context-menu.css" layer(components);
+@import "./src/styles/copilot.css" layer(components);
+@import "./src/styles/homepage.css" layer(layout);
+@import "./src/styles/dashboard.css" layer(layout);
+@import "./src/styles/workflow-core.css" layer(layout);
+@import "./src/styles/oneline.css?v=mobile-workflow-drawer-v2" layer(pages);
+@import "./src/styles/ductbank.css" layer(pages);
+@import "./src/styles/tray-fill.css" layer(pages);
+@import "./src/styles/dissimilar-metals.css" layer(pages);
+@import "./src/styles/isometric.css" layer(pages);
+@import "./src/styles/spoolsheets.css" layer(pages);
+@import "./src/styles/docs.css" layer(pages);
+@import "./src/styles/panel-schedule.css" layer(pages);
+@import "./src/styles/routing.css" layer(pages);
+@import "./src/styles/scenarioComparison.css" layer(pages);
+@import "./src/styles/dataManager.css" layer(pages);
+@import "./src/styles/groundgrid.css" layer(pages);
+@import "./src/styles/print.css" layer(overrides);
+@layer tokens, base, layout, components, pages, utilities, overrides;
+
+@layer pages {
 
 .lighting-layout-panel {
   margin: 1.25rem 0;
@@ -5235,4 +5237,5 @@ body.theme-high-contrast .battery-string-jumper line {
 
 .chart-scroll {
   overflow-x: auto;
+}
 }

@@ -1,3 +1,5 @@
+import { recordStartupMeasurement } from '../performance/performanceMetrics.js';
+
 /**
  * Shared page initialisation helper.
  *
@@ -148,6 +150,9 @@ export function bootstrapPage(opts = {}) {
       if (readyEvent && typeof window !== 'undefined') {
         window.dispatchEvent(new Event(readyEvent));
       }
+      recordStartupMeasurement({
+        page: typeof location !== 'undefined' ? location.pathname.split('/').pop() : '',
+      });
     }
 
     if (beacon && beacon.id) {

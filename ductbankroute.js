@@ -51,6 +51,18 @@ import { openModal, showAlertModal } from './src/components/modal.js';
 import { buildProjectDuctbankRoute, parseDuctbankRouteData } from './src/ductbankProjectAdapter.mjs';
 import { buildDuctbankBOM, DEFAULT_DUCTBANK_BOM_ASSUMPTIONS, DEFAULT_DUCTBANK_BOM_OPTIONAL_MATERIALS } from './analysis/ductbankBom.mjs';
 import { analyzeDuctbankRouteProfile } from './analysis/ductbankRouteProfile.mjs';
+import {
+  CONDUIT_SPECS,
+  INSULATION_TEMP_LIMIT,
+  cableCurrentCarryingConductors,
+  conduitEquivalentDiameterMeters,
+  fahrenheitToCelsius as fToC,
+  finiteNumber,
+  insulationTypesForRating,
+  neherMcGrathTemperature as neherMcGrathTemp,
+  parseTradeSize as parseSize,
+  resolveCableTemperatureRating
+} from './src/ductbank-route/thermalPrimitives.js';
 
 function projectDuctbankId(ductbank={}){
  return String(ductbank.ductbank_id||ductbank.id||ductbank.tag||'').trim();
@@ -230,11 +242,6 @@ SAMPLE_CABLES.forEach(c=>{
  if(c.est_load===undefined) c.est_load=250;
 });
 
-const CONDUIT_SPECS={
- "EMT":{"1/2":0.304,"3/4":0.533,"1":0.864,"1-1/4":1.496,"1-1/2":2.036,"2":3.356,"2-1/2":5.858,"3":8.846,"3-1/2":11.545,"4":14.753},
- "RMC":{"1/2":0.314,"3/4":0.549,"1":0.887,"1-1/4":1.526,"1-1/2":2.071,"2":3.408,"2-1/2":4.866,"3":7.499,"3-1/2":10.01,"4":12.882,"5":20.212,"6":29.158},
- "PVC Sch 40":{"1/2":0.285,"3/4":0.508,"1":0.832,"1-1/4":1.453,"1-1/2":1.986,"2":3.291,"2-1/2":4.695,"3":7.268,"3-1/2":9.737,"4":12.554,"5":19.761,"6":28.567}
-};
 const RDUCT_TABLE={
   PVC:{"1/2":0.12,"3/4":0.115,"1":0.11,"1-1/4":0.105,"1-1/2":0.10,"2":0.095,"2-1/2":0.09,"3":0.085,"3-1/2":0.082,"4":0.08,"5":0.078,"6":0.075},
   steel:{"1/2":0.09,"3/4":0.085,"1":0.08,"1-1/4":0.075,"1-1/2":0.07,"2":0.065,"2-1/2":0.06,"3":0.058,"3-1/2":0.056,"4":0.055,"5":0.053,"6":0.05},
@@ -242,63 +249,17 @@ const RDUCT_TABLE={
 };
 
 
-const INSULATION_TEMP_LIMIT={
-  THHN:90,
-  XLPE:90,
-  PVC:75,
-  XHHW:90,
-  'XHHW-2':90,
-  'THWN-2':90,
-  THW:75,
-  'THWN':75,
-  TW:60,
-  UF:60
-};
-
-function fToC(f){
-  return (f-32)/1.8;
-}
-
-function finiteNumber(value, fallback = 0){
-  const num=parseFloat(value);
-  return Number.isFinite(num)?num:fallback;
-}
-
 function getConductorRating(){
   const val=parseFloat(document.getElementById('conductorRating')?.value);
   return isNaN(val)?90:val;
 }
 
 function cableTemperatureRating(cable){
-  const direct=parseFloat(cable?.insulation_rating);
-  if(Number.isFinite(direct) && direct > 0) return direct;
-  const type=String(cable?.insulation_type || '').trim().toUpperCase();
-  return INSULATION_TEMP_LIMIT[type] || getConductorRating();
-}
-
-function cableCurrentCarryingConductors(cable){
-  return Math.max(1, finiteNumber(cable?.conductors, 1));
-}
-
-function conduitEquivalentDiameterMeters(conduit){
-  const area=CONDUIT_SPECS[conduit?.conduit_type]?.[conduit?.trade_size];
-  if(!Number.isFinite(area) || area <= 0) return 0;
-  return 2 * Math.sqrt(area / Math.PI) * 0.0254;
-}
-
-function insulationTypesForRating(rating){
-  const types=Object.keys(INSULATION_TEMP_LIMIT).filter(t=>INSULATION_TEMP_LIMIT[t]==rating);
-  return types.length?types:Object.keys(INSULATION_TEMP_LIMIT);
+  return resolveCableTemperatureRating(cable, getConductorRating());
 }
 
 // Conductor temperature rise per Neher‑McGrath thermal model
 // See docs/AMPACITY_METHOD.md#equation for context
-function neherMcGrathTemp(power, Rth, ambient, k, r){
-  const r0 = 0.05; // reference radius in meters
-  const radial = Math.log(Math.max(r, r0)/r0)/(2*Math.PI*k);
-  return ambient + power*(Rth + radial);
-}
-
 function runNeherMcGrathTests(){
   const t = neherMcGrathTemp(10, 0.5, 20, 1, 0.5);
   console.assert(Math.abs(t-28.7)<0.5, 'neherMcGrathTemp basic test');
@@ -306,12 +267,6 @@ function runNeherMcGrathTests(){
 
 const CTR_VERSION='1.0.0';
 runNeherMcGrathTests();
-
-function parseSize(sz){
- if(sz.includes('-')){const[w,f]=sz.split('-');const[n,d]=f.split('/');return parseFloat(w)+parseFloat(n)/parseFloat(d);} 
- if(sz.includes('/')){const[n,d]=sz.split('/');return parseFloat(n)/parseFloat(d);} 
- return parseFloat(sz);
-}
 
 function conduitSizeOptions(type){
  const sel=document.createElement('select');

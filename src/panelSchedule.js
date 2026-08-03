@@ -3,121 +3,38 @@ import "../site.js";
 import * as dataStore from "../dataStore.mjs";
 import { exportPanelSchedule } from "../exportPanelSchedule.js";
 import { ensureFieldAssistiveText, showAlertModal, openModal } from "./components/modal.js";
+import {
+  DEFAULT_PANEL_CIRCUIT_COUNT,
+  MAX_PANEL_CIRCUITS,
+  duplicatePanelDefinition as duplicatePanelModel,
+  findPanelByIdentifier,
+  formatPanelSelectorLabel,
+  generatePanelId,
+  getPanelDisplayName,
+  getPanelIdentifierCandidates
+} from "./panel-schedule/panelModel.js";
+import {
+  DC_PHASE_LABELS,
+  SINGLE_PHASE_LABELS,
+  THREE_PHASE_LABELS,
+  clampBreakerPolesForSystem,
+  computeBreakerSpan,
+  getAllowedBranchPoleCounts,
+  getDcPolarityForCircuit,
+  getMaxBranchPoleCount,
+  getPanelBranchDeviceType,
+  getPanelCircuitCount as resolvePanelCircuitCount,
+  getPanelPhaseSequence,
+  getPanelPoleLimit,
+  getPanelSystem,
+  parsePositiveInt,
+  resolveDcSequence
+} from "./panel-schedule/phaseModel.js";
 
 const projectId = typeof window !== "undefined" ? window.currentProjectId : undefined;
 
-const DEFAULT_PANEL_CIRCUIT_COUNT = 42;
-const MAX_PANEL_CIRCUITS = 512;
-
-function getPanelIdentifierCandidates(panel) {
-  if (!panel) return [];
-  return [panel.id, panel.ref, panel.panel_id, panel.tag]
-    .map(value => (value == null ? null : String(value)))
-    .filter(Boolean);
-}
-
-function panelMatchesIdentifier(panel, identifier) {
-  if (!panel || identifier == null) return false;
-  const normalized = String(identifier).toLowerCase();
-  if (!normalized) return false;
-  return getPanelIdentifierCandidates(panel)
-    .some(value => value.toLowerCase() === normalized);
-}
-
-function findPanelByIdentifier(panels, identifier) {
-  if (!Array.isArray(panels) || !identifier) return null;
-  return panels.find(panel => panelMatchesIdentifier(panel, identifier)) || null;
-}
-
-function generatePanelId(panels) {
-  const used = new Set();
-  if (Array.isArray(panels)) {
-    panels.forEach(panel => {
-      getPanelIdentifierCandidates(panel).forEach(value => used.add(value));
-    });
-  }
-  let max = 0;
-  used.forEach(value => {
-    const match = /^P(\d+)$/i.exec(value || "");
-    if (match) {
-      const parsed = Number.parseInt(match[1], 10);
-      if (Number.isFinite(parsed)) {
-        max = Math.max(max, parsed);
-      }
-    }
-  });
-  let candidateNumber = Math.max(1, max + 1);
-  while (used.has(`P${candidateNumber}`)) {
-    candidateNumber++;
-  }
-  return `P${candidateNumber}`;
-}
-
-function getPanelDisplayName(panel, index = 0) {
-  if (!panel) return `Panel ${index + 1}`;
-  const candidates = [panel.ref, panel.panel_id, panel.tag, panel.id];
-  for (const candidate of candidates) {
-    if (candidate != null && String(candidate).trim()) {
-      return String(candidate);
-    }
-  }
-  return `Panel ${index + 1}`;
-}
-
-function formatPanelSelectorLabel(panel, index = 0) {
-  const base = getPanelDisplayName(panel, index);
-  const meta = [];
-  const voltage = panel?.voltage;
-  if (voltage) {
-    const trimmed = String(voltage).trim();
-    if (trimmed) {
-      meta.push(/v$/i.test(trimmed) ? trimmed : `${trimmed} V`);
-    }
-  }
-  const fed = panel?.fedFrom || panel?.fed_from;
-  if (fed) {
-    meta.push(`Fed from ${fed}`);
-  }
-  return meta.length ? `${base} (${meta.join(" • ")})` : base;
-}
-
-function clonePanelState(panel) {
-  if (!panel) return null;
-  try {
-    return structuredClone(panel);
-  } catch (err) {
-    console.warn('[panelSchedule] structuredClone failed, using shallow copy:', err.message);
-    return { ...panel };
-  }
-}
-
 function duplicatePanelDefinition(panel, panels) {
-  if (!panel) return null;
-  const clone = clonePanelState(panel) || {};
-  const circuitCount = getPanelCircuitCount(panel);
-  clone.id = generatePanelId(panels);
-  const sourceLabel = getPanelDisplayName(panel);
-  const copyLabel = sourceLabel ? `${sourceLabel} Copy` : clone.id;
-  clone.ref = copyLabel;
-  clone.panel_id = copyLabel;
-  clone.tag = copyLabel;
-  clone.breakers = Array.from({ length: circuitCount }, () => null);
-  clone.breakerLayout = Array.isArray(panel.breakerLayout)
-    ? panel.breakerLayout.map(entry => (entry ? { ...entry } : null))
-    : [];
-  if (panel.breakerDetails && typeof panel.breakerDetails === "object") {
-    clone.breakerDetails = Object.fromEntries(
-      Object.entries(panel.breakerDetails).map(([key, detail]) => {
-        if (detail && typeof detail === "object") {
-          return [key, { ...detail }];
-        }
-        return [key, detail];
-      })
-    );
-  } else {
-    clone.breakerDetails = {};
-  }
-  return clone;
+  return duplicatePanelModel(panel, panels, getPanelCircuitCount(panel));
 }
 
 function clearLoadsForPanel(panel) {
@@ -220,114 +137,8 @@ function getOrCreatePanel(panelId = "P1") {
   return { panel, panels };
 }
 
-const DC_PHASE_LABELS = ["+", "−"];
-const SINGLE_PHASE_LABELS = ["A", "B"];
-const THREE_PHASE_LABELS = ["A", "B", "C"];
-const FALLBACK_DC_SEQUENCE = ["+", "−"];
-
-function resolveDcSequence(sequence) {
-  if (Array.isArray(sequence) && sequence.length >= 2) {
-    return sequence;
-  }
-  return FALLBACK_DC_SEQUENCE;
-}
-
-function getDcPolarityForCircuit(circuit, sequence = DC_PHASE_LABELS) {
-  const slot = Number.parseInt(circuit, 10);
-  if (!Number.isFinite(slot) || slot < 1) return "";
-  const normalized = resolveDcSequence(sequence);
-  const positive = normalized[0] ?? FALLBACK_DC_SEQUENCE[0];
-  const negative = normalized[1] ?? FALLBACK_DC_SEQUENCE[1];
-  const rowIndex = Math.floor((slot - 1) / 2);
-  const label = rowIndex % 2 === 0 ? positive : negative;
-  return label == null ? "" : String(label);
-}
-
-function getMaxBranchPoleCount(system) {
-  return system === "dc" ? 2 : 3;
-}
-
-function getAllowedBranchPoleCounts(system, maxPoles = null) {
-  const systemMax = getMaxBranchPoleCount(system);
-  const limit = Number.isFinite(maxPoles) && maxPoles > 0
-    ? Math.min(systemMax, maxPoles)
-    : systemMax;
-  return Array.from({ length: Math.max(1, limit) }, (_, idx) => idx + 1);
-}
-
-function clampBreakerPolesForSystem(system, poles, maxPoles = null) {
-  if (!Number.isFinite(poles) || poles < 1) return 1;
-  const systemMax = getMaxBranchPoleCount(system);
-  const limit = Number.isFinite(maxPoles) && maxPoles > 0
-    ? Math.min(systemMax, maxPoles)
-    : systemMax;
-  return Math.min(poles, Math.max(1, limit));
-}
-
-function parsePositiveInt(value) {
-  if (value == null) return null;
-  const parsed = Number.parseInt(value, 10);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
-}
-
 function getPanelCircuitCount(panel) {
-  const explicit = parsePositiveInt(panel?.circuitCount);
-  if (explicit) return Math.min(explicit, MAX_PANEL_CIRCUITS);
-  if (Array.isArray(panel?.breakers) && panel.breakers.length > 0) return Math.min(panel.breakers.length, MAX_PANEL_CIRCUITS);
-  return DEFAULT_PANEL_CIRCUIT_COUNT;
-}
-
-function getPanelSystem(panel) {
-  const raw = (panel?.powerType || panel?.systemType || panel?.type || "").toString().toLowerCase();
-  return raw === "dc" ? "dc" : "ac";
-}
-
-function getPanelBranchDeviceType(panel) {
-  return panel?.branchDeviceType === "fuse" ? "fuse" : "breaker";
-}
-
-function getPanelPoleLimit(panel) {
-  const system = getPanelSystem(panel);
-  const systemMax = getMaxBranchPoleCount(system);
-  const explicit = parsePositiveInt(panel?.poles);
-  if (explicit) return Math.min(systemMax, explicit);
-  return systemMax;
-}
-
-function getPanelPhaseSequence(panel) {
-  const system = getPanelSystem(panel);
-  const poleLimit = getPanelPoleLimit(panel) || 1;
-  if (system === "dc") {
-    const sequence = resolveDcSequence(DC_PHASE_LABELS);
-    return sequence.slice(0, Math.max(1, Math.min(sequence.length, poleLimit)));
-  }
-  const phases = parseInt(panel?.phases, 10);
-  let sequence;
-  if (Number.isFinite(phases)) {
-    if (phases <= 1) sequence = SINGLE_PHASE_LABELS;
-    else if (phases === 2) sequence = SINGLE_PHASE_LABELS;
-    else if (phases >= 3) sequence = THREE_PHASE_LABELS;
-  }
-  const normalized = Array.isArray(sequence) && sequence.length ? sequence : THREE_PHASE_LABELS;
-  return normalized.slice(0, Math.max(1, Math.min(normalized.length, poleLimit)));
-}
-
-function computeBreakerSpan(startCircuit, poleCount, circuitCount) {
-  const start = Number.parseInt(startCircuit, 10);
-  const poles = Number.parseInt(poleCount, 10);
-  if (!Number.isFinite(start) || start < 1) return [];
-  if (!Number.isFinite(poles) || poles <= 0) return [];
-  const limit = Number.isFinite(circuitCount) && circuitCount > 0 ? circuitCount : null;
-  const step = poles > 1 ? 2 : 1;
-  const span = [];
-  for (let position = 0; position < poles; position++) {
-    const circuit = start + position * step;
-    if (limit && circuit > limit) {
-      return [];
-    }
-    span.push(circuit);
-  }
-  return span;
+  return resolvePanelCircuitCount(panel, DEFAULT_PANEL_CIRCUIT_COUNT, MAX_PANEL_CIRCUITS);
 }
 
 const BREAKER_RATING_VALUES = [15, 20, 25, 30, 35, 40, 45, 50, 60, 70, 80, 90, 100, 110, 125, 150, 175, 200, 225, 250];

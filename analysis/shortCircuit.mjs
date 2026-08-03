@@ -2,7 +2,6 @@ import { getOneLine, getItem, getCables } from '../dataStore.mjs';
 import { scaleCurve } from './tccUtils.js';
 import { resolveCtForComponent } from './ctMetadata.mjs';
 import { resolvePtVtForComponent } from './ptVtMetadata.mjs';
-import protectiveDevices from '../data/protectiveDevices.mjs';
 import { calculateTransformerImpedance } from '../utils/transformerImpedance.js';
 import { computeImpedanceFromPerKm } from '../utils/cableImpedance.js';
 import { table9Impedance } from '../src/necTable9.mjs';
@@ -176,8 +175,17 @@ function pickValue(comp, key) {
   return undefined;
 }
 
-const protectiveDeviceLibrary = Array.isArray(protectiveDevices) ? protectiveDevices : [];
-const protectiveDeviceMap = new Map(protectiveDeviceLibrary.map(device => [device.id, device]));
+const isNodeRuntime = typeof process !== 'undefined' && Boolean(process.versions?.node);
+let nodeProtectiveDeviceCatalog = [];
+if (isNodeRuntime) {
+  const calculationCatalogPath = '../data/' + 'protectiveDeviceCalculations.mjs';
+  const calculationCatalogModule = await import(calculationCatalogPath);
+  nodeProtectiveDeviceCatalog = Array.isArray(calculationCatalogModule.default)
+    ? calculationCatalogModule.default
+    : [];
+}
+
+export const defaultProtectiveDeviceCatalog = nodeProtectiveDeviceCatalog;
 const DEFAULT_TCC_SETTINGS = { devices: [], settings: {}, componentOverrides: {} };
 const DEFAULT_LET_THROUGH_WINDOW = 0.008;
 
@@ -791,7 +799,7 @@ function resolveTccOverrides(component, saved = {}, baseDevice) {
   return { ...deviceOverride, ...componentOverride, ...inlineOverride };
 }
 
-function getScaledDeviceForComponent(component, saved, cache) {
+function getScaledDeviceForComponent(component, saved, cache, protectiveDeviceMap) {
   if (!component?.id || !component.tccId) return null;
   if (cache.has(component.id)) return cache.get(component.id);
   const base = protectiveDeviceMap.get(component.tccId);
@@ -854,11 +862,11 @@ function computeLetThroughLimitKA(baseDevice, scaledDevice, faultKA) {
   return null;
 }
 
-function limitFaultByProtection(entry, comp, comps, compMap, protectiveCache, scaledCache, tccSettings) {
+function limitFaultByProtection(entry, comp, comps, compMap, protectiveCache, scaledCache, tccSettings, protectiveDeviceMap) {
   if (!comp?.id || !entry || !Number.isFinite(entry.threePhaseKA) || entry.threePhaseKA <= 0) return;
   const protectiveComp = findNearestProtectiveComponent(comp, comps, compMap, protectiveCache);
   if (!protectiveComp) return;
-  const resolved = getScaledDeviceForComponent(protectiveComp, tccSettings, scaledCache);
+  const resolved = getScaledDeviceForComponent(protectiveComp, tccSettings, scaledCache, protectiveDeviceMap);
   if (!resolved?.base || !resolved?.scaled) return;
   const limitKA = computeLetThroughLimitKA(resolved.base, resolved.scaled, entry.threePhaseKA);
   if (!Number.isFinite(limitKA) || limitKA <= 0 || limitKA >= entry.threePhaseKA - 1e-6) return;
@@ -1154,6 +1162,10 @@ export function runShortCircuit(modelOrOpts = {}, maybeOpts = {}) {
   const protectiveLookupCache = new Map();
   const scaledDeviceCache = new Map();
   const tccSettings = loadTccSettings();
+  const protectiveDeviceLibrary = Array.isArray(opts.deviceCatalog)
+    ? opts.deviceCatalog
+    : defaultProtectiveDeviceCatalog;
+  const protectiveDeviceMap = new Map(protectiveDeviceLibrary.map(device => [device.id, device]));
   const results = {};
 
   const missingImpedanceComponents = new Set();
@@ -1321,7 +1333,16 @@ export function runShortCircuit(modelOrOpts = {}, maybeOpts = {}) {
       entry.requiredInputs = [...new Set([...(entry.requiredInputs || []), ...path.requiredInputs])];
     }
 
-    limitFaultByProtection(entry, comp, comps, compMap, protectiveLookupCache, scaledDeviceCache, tccSettings);
+    limitFaultByProtection(
+      entry,
+      comp,
+      comps,
+      compMap,
+      protectiveLookupCache,
+      scaledDeviceCache,
+      tccSettings,
+      protectiveDeviceMap
+    );
     const ct = resolveCtForComponent(comp, comps, compMap);
     if (ct) entry.ct = ct;
     const ptVt = resolvePtVtForComponent(comp, comps, compMap);

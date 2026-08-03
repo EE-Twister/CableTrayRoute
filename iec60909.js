@@ -3,6 +3,7 @@ import { initStudyBasisPanel } from './src/components/studyBasis.js';
 import { runShortCircuit } from './analysis/shortCircuit.mjs';
 import { getOneLine, getStudies, setStudies } from './dataStore.mjs';
 import { downloadPDF } from './reports/reporting.mjs';
+import { loadReferencedProtectiveDevices } from './src/protectiveDevices/calculationCatalog.mjs';
 
 document.addEventListener('DOMContentLoaded', () => {
   initStudyBasisPanel('iec60909', {
@@ -52,7 +53,7 @@ function buildModel() {
     : sheets;
   let buses = comps.filter(c => c.subtype === 'Bus');
   if (buses.length === 0) buses = comps;
-  return { buses };
+  return { buses, components: comps };
 }
 
 function renderResults(res) {
@@ -93,7 +94,7 @@ function renderResults(res) {
   resultsSection.hidden = false;
 }
 
-form.addEventListener('submit', ev => {
+form.addEventListener('submit', async ev => {
   ev.preventDefault();
   runBtn.disabled = true;
   try {
@@ -106,7 +107,8 @@ form.addEventListener('submit', ev => {
       minTimeDelayS: Number(form.minTimeDelayS.value),
     };
     const model = buildModel();
-    const res = runShortCircuit(model, opts);
+    const deviceCatalog = await loadReferencedProtectiveDevices(model);
+    const res = runShortCircuit(model, { ...opts, deviceCatalog });
     lastResults = res;
     const studies = getStudies();
     studies.iec60909 = res;

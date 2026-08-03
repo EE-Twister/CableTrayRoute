@@ -32,7 +32,7 @@ html {
     font-weight: 500;
     font-size: 0.875rem;
     letter-spacing: 0.01em;
-    transition: background 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
+    transition: background var(--motion-standard) ease, box-shadow var(--motion-standard) ease, transform var(--motion-fast) ease;
 }
 .btn:hover {
     background: var(--button-hover-bg);
@@ -271,7 +271,7 @@ body.dark-mode .settings-menu {
     background: var(--theme-control-bg);
     color: var(--theme-control-text);
     border: 1px solid var(--color-border);
-    border-radius: 8px;
+    border-radius: var(--radius-md);
     min-height: 2.4rem;
     margin: 0;
     font-size: 0.9rem;

@@ -137,8 +137,12 @@ test.describe('Motor Starting', () => {
 // -------------------------------------------------------------------------
 // Time-Current Curves (TCC)
 // -------------------------------------------------------------------------
+const tccRequests = new WeakMap();
 test.describe('Time-Current Curves', () => {
   test.beforeEach(async ({ page }) => {
+    const requests = [];
+    tccRequests.set(page, requests);
+    page.on('request', request => requests.push(request.url()));
     await page.goto(pageUrl('tcc.html?e2e=1&e2e_reset=1'));
     await page.waitForLoadState('networkidle');
   });
@@ -160,13 +164,27 @@ test.describe('Time-Current Curves', () => {
     await expect(page.locator('#device-select')).toBeAttached();
   });
 
+  test('catalog startup loads metadata and hydrates a curve shard only when plotting', async ({ page }) => {
+    const startupResources = tccRequests.get(page) || [];
+    expect(startupResources.some(name => name.endsWith('/data/protectiveDeviceIndex.json'))).toBe(true);
+    expect(startupResources.some(name => name.endsWith('/data/protectiveDevices.json'))).toBe(false);
+    expect(startupResources.some(name => name.includes('/data/protectiveDeviceCatalog/'))).toBe(false);
+
+    await page.click('#plot-btn');
+    await expect.poll(async () => (
+      (tccRequests.get(page) || []).some(name => name.includes('/data/protectiveDeviceCatalog/'))
+    )).toBe(true);
+    await expect(page.locator('.tcc-device-layer path[tabindex="0"]')).toHaveCount(1);
+    expect((tccRequests.get(page) || []).some(name => name.endsWith('/data/protectiveDevices.json'))).toBe(false);
+  });
+
   test('library evidence status is visible in the device picker', async ({ page }) => {
     await page.click('#device-modal-btn');
     await expect(page.locator('.device-library-readiness')).toContainText('0 calculation-ready');
-    await expect(page.locator('.device-model-badge')).toContainText('Screening');
+    await expect(page.locator('.device-model-badge').first()).toContainText('Screening');
     await expect(page.locator('.device-detail-meta')).toContainText('Library Status');
-    await page.getByRole('button', { name: 'Fuse (6)' }).click();
-    await page.getByRole('button', { name: 'S&C Electric Company (3)' }).click();
+    await page.getByRole('button', { name: /^Fuse \(\d+\)$/ }).click();
+    await page.getByRole('button', { name: /^S&C Electric Company \(\d+\)$/ }).click();
     await expect(page.locator('.device-model-badge')).toHaveCount(3);
     await expect(page.locator('.device-model-badge').first()).toContainText('Review');
     await expect(page.locator('.device-detail-meta')).toContainText('Source verified — peer review pending');

@@ -31,6 +31,7 @@ export function createRoutingState() {
     routeViewer: null,
     routeViewerLoad: null,
     routeViewerFailed: false,
+    sampleDataMode: false,
     largeFacilityTestMode: false
   };
 }

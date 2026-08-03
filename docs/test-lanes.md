@@ -15,6 +15,8 @@ This lane is intended for pull requests and rapid iteration. It validates:
 - Core computational/unit regression paths (routing, analysis, validation, collaboration/security)
 - Selected Playwright smoke/integration scenarios for high-risk user journeys:
   - workflow creation and dirty-state prompts
+  - design-basis review gates, Auto-Build reachability, and blocked report exports
+  - Cable Schedule sample hydration
   - one-line editing behavior
   - next-feature smoke page boot and core controls
 
@@ -43,6 +45,12 @@ Current command mappings:
 - `npm run test:full` -> discovered Node full regression lane via `scripts/runNodeTests.mjs`
 - `npm run e2e:critical` -> curated Playwright smoke lane for high-risk browser journeys
 - `npm run e2e:full` -> full Playwright browser lane
+- `npm run perf:browser` -> deterministic workflow plus Short Circuit, IEC 60909, Arc Flash, and Library startup/request budgets
+- `npm run check:bundle-budgets` -> built Workflow Dashboard, Equipment Evaluation, Short Circuit, and IEC 60909 bundle-size limits
+
+On managed Windows environments, a locally installed Playwright Firefox may fail before page creation when the OS blocks its tab subprocess (`Failed to launch tab subprocess`). That is a browser-runtime failure rather than an application assertion. Use the `msedge` project for local diagnosis and retain the Ubuntu Firefox CI result as the cross-browser merge gate.
+
+The Browser Performance Contracts CI job runs independently after the build, fails on missing or over-budget measurements, and always uploads `performance-report.json`. See `docs/performance-contracts.md` for workloads, thresholds, and local commands.
 
 
 ## CI workflow mapping

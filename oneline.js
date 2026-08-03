@@ -1,5 +1,7 @@
 import { bootstrapPage } from './src/lifecycle/pageBootstrap.js';
-
+import { createOneLineRenderPerformance } from './src/one-line/renderPerformance.js';
+import { createProtectiveDeviceCatalogLoader } from './src/protectiveDevices/catalogLoader.mjs';
+import { loadReferencedProtectiveDevices } from './src/protectiveDevices/calculationCatalog.mjs';
 function escapeHtml(value) {
   if (value === null || value === undefined) return '';
   return String(value)
@@ -1740,7 +1742,10 @@ let subtypeCategory = {};
 let componentTypes = {};
 let manufacturerDefaults = {};
 let protectiveDevices = [];
-
+const protectiveDeviceCatalog = createProtectiveDeviceCatalogLoader({
+  indexUrl: asset('data/protectiveDeviceIndex.json'), shardBaseUrl: asset('data/protectiveDeviceCatalog'),
+  legacyUrl: asset('data/protectiveDevices.json'),
+});
 let paletteWidth = clampPaletteWidth(getOneLineViewSetting(paletteWidthStorageKey, defaultPaletteWidth));
 const storedStudiesWidth = getOneLineViewSetting(studiesWidthStorageKey, null);
 let studiesWidth = defaultStudiesWidth;
@@ -2845,16 +2850,6 @@ async function loadManufacturerLibrary() {
   }
   const stored = getItem('manufacturerDefaults', {});
   manufacturerDefaults = { ...manufacturerDefaults, ...stored };
-}
-
-async function loadProtectiveDevices() {
-  try {
-    const res = await fetch(asset('data/protectiveDevices.json'));
-    protectiveDevices = await res.json();
-  } catch (err) {
-    console.error('Failed to load protective devices', err);
-    protectiveDevices = [];
-  }
 }
 
 function rebuildComponentMaps() {
@@ -4795,12 +4790,9 @@ function scheduleKeyForComponent(comp) {
   return 'equipment';
 }
 
-function scheduleCollectionForKey(key) {
-  if (key === 'load') return getLoads();
-  if (key === 'panel') return getPanels();
-  if (key === 'cable') return getCables();
-  return getEquipment();
-}
+const renderPerformance = createOneLineRenderPerformance({ getEquipment, getPanels, getLoads, getCables });
+
+function scheduleCollectionForKey(key) { return renderPerformance.getCollection(key); }
 
 function hasResolvedScheduleLink(comp) {
   if (!comp) return false;
@@ -6034,7 +6026,6 @@ if (runTapOptimizationBtn) {
     });
   });
 }
-
 if (transformerTapReviewEl) {
   transformerTapReviewEl.addEventListener('click', event => {
     const button = event.target.closest('[data-tap-apply="1"]');
@@ -6046,18 +6037,17 @@ if (transformerTapReviewEl) {
   });
   if (transformerTapReview) renderTransformerTapReview(transformerTapReview);
 }
-
 if (runSCBtn) runSCBtn.addEventListener('click', () => {
   runShortCircuitFromButton().catch(err => {
     console.error('[oneline] short circuit failed', err);
     showAlertModal('Short Circuit Error', err?.message || String(err));
   });
 });
-
 async function runShortCircuitFromButton() {
   const oneLineData = getOneLine();
   const oneLineRevision = getOneLineSheetsRevision(oneLineData);
-  const res = await runShortCircuitOffMain(oneLineData, { method: studySettings.shortCircuit.method });
+  const deviceCatalog = await loadReferencedProtectiveDevices(oneLineData, { catalog: protectiveDeviceCatalog });
+  const res = await runShortCircuitOffMain(oneLineData, { method: studySettings.shortCircuit.method, deviceCatalog });
   const currentOneLineData = assertOneLineSheetsUnchanged(oneLineRevision, 'Short circuit');
   const { sheets } = oneLineData;
   const diagram = sheets.flatMap(s => s.components);
@@ -6076,9 +6066,11 @@ async function runShortCircuitFromButton() {
   render();
 }
 if (runAFBtn) runAFBtn.addEventListener('click', async () => {
-  const shortCircuitOpts = { method: studySettings.shortCircuit.method };
+  const oneLineData = getOneLine();
+  const deviceCatalog = await loadReferencedProtectiveDevices(oneLineData, { catalog: protectiveDeviceCatalog });
+  const shortCircuitOpts = { method: studySettings.shortCircuit.method, deviceCatalog };
   const sc = runShortCircuit(shortCircuitOpts);
-  const af = await runArcFlash({ shortCircuit: { ...shortCircuitOpts } });
+  const af = await runArcFlash({ shortCircuit: { ...shortCircuitOpts }, deviceCatalog });
   const { sheets } = getOneLine();
   const diagram = sheets.flatMap(s => s.components);
   diagram.forEach(c => {
@@ -11507,6 +11499,10 @@ function renderBgPanel() {
 // ─── End Gap #51 ────────────────────────────────────────────────────────────
 
 function render() {
+  renderPerformance.begin({
+    componentCount: components.length,
+    connectionCount: connections.length,
+  });
   updateLiveTelemetryControl();
   applyTransformerVoltages();
   propagateSourceVoltagesToBuses(components);
@@ -12648,10 +12644,12 @@ function render() {
   renderDragSnapGuides(svg);
 
   if (lengthsChanged) {
+    renderPerformance.finish({ repeatedForCalculatedLengths: true });
     render();
     return;
   }
   renderRightRail();
+  renderPerformance.finish();
 }
 
 export function toggleGrid() {
@@ -14062,7 +14060,7 @@ function autoSpaceEquipment({ silent = false } = {}) {
   return true;
 }
 
-function selectComponent(compOrId) {
+async function selectComponent(compOrId) {
   closeCommandMenus();
   const nodeComponents = buildVirtualNodeEntries(components, connections);
   const baseComponents = [...components];
@@ -14081,6 +14079,7 @@ function selectComponent(compOrId) {
     }
   }
   if (!activeComponent) activeComponent = deviceComponents[0];
+  protectiveDevices = await protectiveDeviceCatalog.loadIndex();
 
   if (activeComponent?.isVirtualNode) {
     selected = null;
@@ -20815,12 +20814,11 @@ if (typeof window !== 'undefined') {
 }
 
 async function __oneline_init() {
-  buildPalette();
-
   // Load libraries
-  try { await loadComponentLibrary(); } catch (e) { console.error('loadComponentLibrary failed:', e); }
-  try { await loadManufacturerLibrary(); } catch (e) { console.error('loadManufacturerLibrary failed:', e); }
-  try { await loadProtectiveDevices(); } catch (e) { console.error('loadProtectiveDevices failed:', e); }
+  await Promise.all([
+    loadComponentLibrary().catch(e => console.error('loadComponentLibrary failed:', e)),
+    loadManufacturerLibrary().catch(e => console.error('loadManufacturerLibrary failed:', e)),
+  ]);
 
   await init();
 

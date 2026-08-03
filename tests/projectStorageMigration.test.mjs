@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { migrateProject } from '../projectStorage.js';
+import { PROJECT_SCHEMA_VERSION, migrateProject } from '../projectStorage.js';
 
 const legacyProject = {
   settings: {
@@ -22,6 +22,7 @@ const legacyProject = {
 };
 
 const migrated = migrateProject(legacyProject);
+assert.equal(migrated.schemaVersion, PROJECT_SCHEMA_VERSION);
 const components = migrated.settings.oneLineDiagram.sheets[0].components;
 const getComponent = (subtype) => components.find((component) => component.subtype === subtype);
 
