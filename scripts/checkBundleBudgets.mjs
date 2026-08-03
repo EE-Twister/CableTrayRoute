@@ -8,6 +8,14 @@ export const BUNDLE_BUDGETS = Object.freeze({
   'workflowdashboard.js': 1_000_000,
   'shortCircuit.js': 650_000,
   'iec60909.js': 650_000,
+  'arcFlash.js': 650_000,
+  'tcc.js': 1_000_000,
+  'library.js': 200_000,
+  'harmonics.js': 200_000,
+  'loadFlow.js': 325_000,
+  'motorStart.js': 225_000,
+  'contingency.js': 325_000,
+  'transientstability.js': 650_000,
   'equipmentevaluation.js': 1_000_000,
 });
 

@@ -247,6 +247,14 @@ function migrateSettingsPayload(settings = {}) {
   if (oneLine && typeof oneLine === 'object') {
     next.oneLineDiagram = migrateOneLineDiagram(oneLine);
   }
+  const studyResults = next.studyResults;
+  if (studyResults && typeof studyResults === 'object' && !Array.isArray(studyResults)) {
+    next.studyResults = { ...studyResults };
+    if (next.studyResults.frequencyScan === undefined && next.studyResults.freqScan !== undefined) {
+      next.studyResults.frequencyScan = next.studyResults.freqScan;
+    }
+    delete next.studyResults.freqScan;
+  }
   return next;
 }
 
@@ -298,6 +306,12 @@ function migrateProject(old = {}) {
     const nextVersion = readProjectSchemaVersion(projectDocument);
     if (nextVersion <= version) throw new Error(`Stored project migration ${version} did not advance the schema version.`);
     version = nextVersion;
+  }
+  if (projectDocument.settings && typeof projectDocument.settings === 'object' && !Array.isArray(projectDocument.settings)) {
+    projectDocument = {
+      ...projectDocument,
+      settings: migrateSettingsPayload(projectDocument.settings),
+    };
   }
   return assertValidStoredProject(projectDocument);
 }

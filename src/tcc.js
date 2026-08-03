@@ -1,4 +1,4 @@
 import '../site.js';
 import './projectManager.js';
-import '../iec60909.js';
+import '../analysis/tcc.js';
 import './workflowStatus.js';

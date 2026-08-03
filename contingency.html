@@ -43,8 +43,7 @@
     .contingency-ts-stable   { color: var(--color-success, #198754); }
     .contingency-ts-na       { color: var(--color-text-muted, #6c757d); }
   </style>
-  <script type="module" src="dataStore.mjs" defer></script>
-  <script type="module" src="studies/contingency.js" defer></script>
+  <script type="module" src="dist/contingency.js" defer></script>
 </head>
 <body data-report-title="N-1 Contingency Analysis">
   <a href="#main-content" class="skip-link">Skip to main content</a>
@@ -197,10 +196,5 @@
       <a href="help.html">Help</a>
     </nav>
   </footer>
-  <script type="module" src="dist/projectManager.js"></script>
-  <script type="module">
-    import { initStudyApprovalPanel } from './src/components/studyApproval.js';
-    document.addEventListener('DOMContentLoaded', () => initStudyApprovalPanel('contingency'));
-  </script>
 </body>
 </html>

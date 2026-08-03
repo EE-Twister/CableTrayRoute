@@ -32,9 +32,11 @@ describe('page navigation', () => {
     });
   });
 
-  it('library.html imports navigation.js', () => {
+  it('Library Manager loads the production entry that owns navigation', () => {
     const html = fs.readFileSync(path.join(root, 'library.html'), 'utf8');
-    assert.ok(html.includes('navigation.js'), 'library.html missing navigation.js import');
+    const entry = fs.readFileSync(path.join(root, 'src', 'library.js'), 'utf8');
+    assert.ok(html.includes('dist/library.js'), 'library.html missing bundled Library entry');
+    assert.ok(entry.includes("import './components/navigation.js'"), 'Library entry missing navigation import');
   });
 
   it('account.js imports navigation.js', () => {

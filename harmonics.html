@@ -31,8 +31,6 @@
     ]
   }
   </script>
-  <script type="module" src="dataStore.mjs" defer></script>
-  <script type="module" src="analysis/harmonics.js" defer></script>
 </head>
 <body data-report-title="Harmonic Analysis">
   <a href="#main-content" class="skip-link">Skip to main content</a>
@@ -234,10 +232,13 @@
       <a href="help.html">Help</a>
     </nav>
   </footer>
-  <script type="module" src="dist/projectManager.js"></script>
   <script type="module">
-    import { getOneLine, getStudies, setStudies } from './dataStore.mjs';
-    import { runHarmonicsUnbalanced } from './analysis/harmonics.js';
+    import {
+      getOneLine,
+      getStudies,
+      runHarmonicsUnbalanced,
+      setStudies,
+    } from './dist/harmonics.js';
 
     const toggle = document.getElementById('unbalanced-mode-toggle');
     const inputsDiv = document.getElementById('unbalanced-inputs');
@@ -374,8 +375,7 @@
   </script>
   <script type="module">
   const d3 = window.d3;
-    import { getStudies, setStudies } from './dataStore.mjs';
-    import { frequencyScan } from './analysis/harmonics.js';
+    import { frequencyScan, getStudies, setStudies } from './dist/harmonics.js';
 
     const banksBody  = document.getElementById('fs-banks-tbody');
     const addBtn     = document.getElementById('fs-add-bank-btn');
@@ -550,7 +550,8 @@
 
     function saveResults(params, results) {
       const studies = getStudies() || {};
-      studies.freqScan = { params, results, timestamp: Date.now() };
+      studies.frequencyScan = { params, results, timestamp: Date.now() };
+      delete studies.freqScan;
       setStudies(studies);
     }
 
@@ -593,14 +594,11 @@
     });
 
     // Restore persisted results if available
-    const saved = getStudies()?.freqScan;
+    const savedStudies = getStudies();
+    const saved = savedStudies?.frequencyScan || savedStudies?.freqScan;
     if (saved?.results?.sweep?.length) {
       renderFreqChart(saved.results.sweep, saved.results.resonances || [], clampHMax(saved.params?.hMax));
     }
-  </script>
-  <script type="module">
-    import { initStudyApprovalPanel } from './src/components/studyApproval.js';
-    document.addEventListener('DOMContentLoaded', () => initStudyApprovalPanel('harmonics'));
   </script>
 </body>
 </html>

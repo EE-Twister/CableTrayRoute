@@ -1,3 +1,5 @@
+import browserData from './data/conductor_properties.js';
+
 let data;
 
 if (typeof process !== 'undefined' && process.versions?.node) {
@@ -9,7 +11,7 @@ if (typeof process !== 'undefined' && process.versions?.node) {
   const dataPath = join(__dirname, 'data', 'conductor_properties.json');
   data = JSON.parse(readFileSync(dataPath, 'utf8'));
 } else {
-  data = (await import('./data/conductor_properties.js')).default;
+  data = browserData;
 }
 
 export default data;

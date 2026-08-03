@@ -16,7 +16,8 @@ export function collectDiagramComponents(modelOrComponents = []) {
 
 export function collectReferencedProtectiveDeviceIds(modelOrComponents = []) {
   return [...new Set(collectDiagramComponents(modelOrComponents)
-    .map(component => String(component?.tccId || '').trim())
+    .flatMap(component => [component?.tccId, component?.props?.device])
+    .map(value => String(value || '').trim())
     .filter(Boolean))];
 }
 

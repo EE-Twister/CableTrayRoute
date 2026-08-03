@@ -1,8 +1,14 @@
 export const ROUTE_STARTUP_CONTRACTS = Object.freeze({
-  'shortCircuit.html': Object.freeze({ maxReadyMs: 1500, maxCatalogRequests: 0, maxShardRequests: 0 }),
-  'iec60909.html': Object.freeze({ maxReadyMs: 1500, maxCatalogRequests: 0, maxShardRequests: 0 }),
-  'arcFlash.html': Object.freeze({ maxReadyMs: 1500, maxCatalogRequests: 0, maxShardRequests: 0 }),
-  'library.html': Object.freeze({ maxReadyMs: 2500, maxCatalogRequests: 1, maxShardRequests: 0 }),
+  'shortCircuit.html': Object.freeze({ maxReadyMs: 1500, maxScriptRequests: 2, maxCatalogRequests: 0, maxShardRequests: 0 }),
+  'iec60909.html': Object.freeze({ maxReadyMs: 1500, maxScriptRequests: 2, maxCatalogRequests: 0, maxShardRequests: 0 }),
+  'arcFlash.html': Object.freeze({ maxReadyMs: 1500, maxScriptRequests: 2, maxCatalogRequests: 0, maxShardRequests: 0 }),
+  'tcc.html': Object.freeze({ maxReadyMs: 2000, maxScriptRequests: 4, maxCatalogRequests: 1, maxShardRequests: 0 }),
+  'library.html': Object.freeze({ maxReadyMs: 2500, maxScriptRequests: 2, maxCatalogRequests: 1, maxShardRequests: 0 }),
+  'harmonics.html': Object.freeze({ maxReadyMs: 1500, maxScriptRequests: 2, maxCatalogRequests: 0, maxShardRequests: 0 }),
+  'loadFlow.html': Object.freeze({ maxReadyMs: 1500, maxScriptRequests: 1, maxCatalogRequests: 0, maxShardRequests: 0 }),
+  'motorStart.html': Object.freeze({ maxReadyMs: 1500, maxScriptRequests: 2, maxCatalogRequests: 0, maxShardRequests: 0 }),
+  'contingency.html': Object.freeze({ maxReadyMs: 1500, maxScriptRequests: 1, maxCatalogRequests: 0, maxShardRequests: 0 }),
+  'transientstability.html': Object.freeze({ maxReadyMs: 1500, maxScriptRequests: 3, maxCatalogRequests: 0, maxShardRequests: 0 }),
 });
 
 const MONOLITH_PATTERNS = Object.freeze([
@@ -32,6 +38,7 @@ export function evaluateRouteStartupProfile(profile, contracts = ROUTE_STARTUP_C
   ));
   const shardRequests = requestPaths.filter(path => path.includes('/data/protectiveDeviceCatalog/'));
   const monolithRequests = requestPaths.filter(path => MONOLITH_PATTERNS.some(pattern => path.includes(pattern)));
+  const scriptRequests = requestPaths.filter(path => /\.(?:m?js)$/i.test(path));
   const failures = [];
 
   if (!Number.isFinite(Number(profile.readyMs)) || Number(profile.readyMs) > contract.maxReadyMs) {
@@ -46,12 +53,16 @@ export function evaluateRouteStartupProfile(profile, contracts = ROUTE_STARTUP_C
   if (monolithRequests.length) {
     failures.push(`forbidden monolithic catalog requested: ${monolithRequests.join(', ')}`);
   }
+  if (Number.isFinite(contract.maxScriptRequests) && scriptRequests.length > contract.maxScriptRequests) {
+    failures.push(`${scriptRequests.length} script startup requests exceed ${contract.maxScriptRequests}`);
+  }
 
   return {
     route: profile.route,
     readyMs: Number(profile.readyMs),
     catalogRequestCount: catalogRequests.length,
     shardRequestCount: shardRequests.length,
+    scriptRequestCount: scriptRequests.length,
     passed: failures.length === 0,
     failures,
   };

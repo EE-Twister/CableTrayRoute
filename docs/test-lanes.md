@@ -45,8 +45,9 @@ Current command mappings:
 - `npm run test:full` -> discovered Node full regression lane via `scripts/runNodeTests.mjs`
 - `npm run e2e:critical` -> curated Playwright smoke lane for high-risk browser journeys
 - `npm run e2e:full` -> full Playwright browser lane
-- `npm run perf:browser` -> deterministic workflow plus Short Circuit, IEC 60909, Arc Flash, and Library startup/request budgets
-- `npm run check:bundle-budgets` -> built Workflow Dashboard, Equipment Evaluation, Short Circuit, and IEC 60909 bundle-size limits
+- `npm run perf:browser` -> deterministic workflow plus Short Circuit, IEC 60909, Arc Flash, TCC, Harmonics, Load Flow, Motor Start, Contingency, Transient Stability, and Library startup/request budgets
+- `npm run check:bundle-budgets` -> built Workflow Dashboard, Equipment Evaluation, Short Circuit, IEC 60909, Arc Flash, TCC, Harmonics, Load Flow, Motor Start, Contingency, Transient Stability, and Library Manager bundle-size limits
+- `node tests/protectiveDeviceCatalog.test.mjs` -> packed locator schema, sub-1 MB budget, shard hydration/cache, and legacy fallback
 
 On managed Windows environments, a locally installed Playwright Firefox may fail before page creation when the OS blocks its tab subprocess (`Failed to launch tab subprocess`). That is a browser-runtime failure rather than an application assertion. Use the `msedge` project for local diagnosis and retain the Ubuntu Firefox CI result as the cross-browser merge gate.
 

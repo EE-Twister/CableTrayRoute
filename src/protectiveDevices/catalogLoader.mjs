@@ -12,6 +12,22 @@ async function fetchJson(fetchFn, url, label) {
   return response.json();
 }
 
+export function decodeProtectiveDeviceIndex(value) {
+  if (Array.isArray(value)) return value;
+  if (value?.schemaVersion !== 2 || !Array.isArray(value.fields) || !Array.isArray(value.records)) {
+    throw new Error('Protective-device index has an unsupported format.');
+  }
+  const fields = value.fields.map(field => String(field));
+  return value.records.map(record => {
+    if (!Array.isArray(record)) throw new Error('Protective-device index record is not an array.');
+    const decoded = {};
+    fields.forEach((field, index) => {
+      if (record[index] !== null && record[index] !== undefined) decoded[field] = record[index];
+    });
+    return decoded;
+  });
+}
+
 export function createProtectiveDeviceCatalogLoader({
   indexUrl = 'data/protectiveDeviceIndex.json',
   shardBaseUrl = 'data/protectiveDeviceCatalog',
@@ -30,10 +46,10 @@ export function createProtectiveDeviceCatalogLoader({
       const finishMeasurement = startPerformanceMeasurement('ctr.protective-device-index-load');
       indexPromise = fetchJson(fetchFn, indexUrl, 'Protective-device index')
         .then(value => {
-          if (!Array.isArray(value)) throw new Error('Protective-device index is not an array.');
-          indexById = new Map(value.map(device => [device.id, device]));
-          finishMeasurement({ deviceCount: value.length });
-          return value;
+          const decoded = decodeProtectiveDeviceIndex(value);
+          indexById = new Map(decoded.map(device => [device.id, device]));
+          finishMeasurement({ deviceCount: decoded.length });
+          return decoded;
         })
         .catch(async error => {
           console.warn('Failed to load protective-device index; using the legacy catalog.', error);

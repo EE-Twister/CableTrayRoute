@@ -16,7 +16,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 - Routes with undocumented reads: 0
 - Routes with undocumented writes: 0
 - Routes with declared inputs not statically read: 47
-- Routes with explicitly indirect project inputs: 56
+- Routes with explicitly indirect project inputs: 54
 - Routes with declared outputs not statically written: 0
 - Direct browser storage hits: 2
 - Unclassified direct browser storage hits: 0
@@ -30,7 +30,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 - Section: Workflow
 - Group: Planning
-- Source files: `ampacity.mjs`, `analysis/autoSize.mjs`, `analysis/cableThermalEnvironment.mjs`, `analysis/conduitFill.mjs`, `analysis/deliverableWorkflow.mjs`, `analysis/designBasis.mjs`, `analysis/designCoach.mjs`, `analysis/designRuleChecker.mjs`, `analysis/equipmentEvaluation.mjs`, `analysis/equipmentWorkflow.mjs`, `analysis/fieldObservations.mjs`, `analysis/iec60287.mjs`, `analysis/lifecyclePackage.mjs`, `analysis/loadWorkflow.mjs`, `analysis/projectWorkflowCore.mjs`, `analysis/pullCards.mjs`, `analysis/reportPackage.mjs`, `analysis/routeResults.mjs`, `analysis/scheduleWorkflow.mjs`, `analysis/spoolSheetVisualModel.mjs`, `analysis/spoolSheets.mjs`, `analysis/voltageDropStudy.mjs`, `analysis/workflowAutomation.mjs`, `conductorProperties.mjs`, `conductorPropertiesData.mjs`, `data/conductor_properties.js`, `src/necTable9.mjs`, `src/performance/performanceMetrics.js`, `src/protectiveDevices/catalogLoader.mjs`, `src/pullCalc.js`, `src/voltageDrop.js`, `src/workflowDashboard.js`, `utils/componentLabels.js`, `validation/rules.js`
+- Source files: `ampacity.mjs`, `analysis/autoSize.mjs`, `analysis/cableThermalEnvironment.mjs`, `analysis/conduitFill.mjs`, `analysis/deliverableWorkflow.mjs`, `analysis/designBasis.mjs`, `analysis/designCoach.mjs`, `analysis/designRuleChecker.mjs`, `analysis/equipmentEvaluation.mjs`, `analysis/equipmentWorkflow.mjs`, `analysis/fieldObservations.mjs`, `analysis/iec60287.mjs`, `analysis/lifecyclePackage.mjs`, `analysis/loadWorkflow.mjs`, `analysis/projectWorkflowCore.mjs`, `analysis/pullCards.mjs`, `analysis/reportPackage.mjs`, `analysis/routeResults.mjs`, `analysis/scheduleWorkflow.mjs`, `analysis/spoolSheetVisualModel.mjs`, `analysis/spoolSheets.mjs`, `analysis/voltageDropStudy.mjs`, `analysis/workflowAutomation.mjs`, `conductorProperties.mjs`, `conductorPropertiesData.mjs`, `data/conductor_properties.js`, `src/necTable9.mjs`, `src/performance/performanceMetrics.js`, `src/protectiveDevices/calculationCatalog.mjs`, `src/protectiveDevices/catalogLoader.mjs`, `src/pullCalc.js`, `src/voltageDrop.js`, `src/workflowDashboard.js`, `utils/componentLabels.js`, `validation/rules.js`
 
 **Undocumented Reads**
 - None
@@ -84,9 +84,9 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
   - src/workflowDashboard.js:1453 getOneLine()
   - src/workflowDashboard.js:169 getOneLine()
   - src/workflowDashboard.js:190 getOneLine()
+  - src/workflowDashboard.js:35 getOneLine()
   - src/workflowDashboard.js:677 getOneLine()
-  - src/workflowDashboard.js:802 getOneLine()
-  - ... 1 more
+  - ... 2 more
 - `settings.activeSampleWorkflow`
   - src/workflowDashboard.js:1201 getItem(activeSampleWorkflow)
   - src/workflowDashboard.js:873 getItem(activeSampleWorkflow)
@@ -1878,7 +1878,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 - Section: Studies
 - Group: Protection
-- Source files: `analysis/arcFlash.mjs`, `analysis/chartExportUtils.mjs`, `analysis/ctMetadata.mjs`, `analysis/ibrModeling.mjs`, `analysis/iec60909.mjs`, `analysis/iecRelayCurves.mjs`, `analysis/ieee1584.mjs`, `analysis/protectiveDeviceLibrary.mjs`, `analysis/protectiveDeviceReview.mjs`, `analysis/protectiveDeviceValidation.mjs`, `analysis/ptVtMetadata.mjs`, `analysis/shortCircuit.mjs`, `analysis/tcc.js`, `analysis/tcc/catalogSelectionModel.mjs`, `analysis/tcc/customCurveModel.mjs`, `analysis/tcc/plotDomainModel.mjs`, `analysis/tcc/viewModel.mjs`, `analysis/tccAutoCoord.mjs`, `analysis/tccContext.mjs`, `analysis/tccUtils.js`, `componentLibrary.json`, `conductorPropertiesData.mjs`, `data/conductor_properties.js`, `reports/coordinationReport.mjs`, `reports/relaySettingsExport.mjs`, `reports/reporting.mjs`, `src/crossProbe.js`, `src/necTable9.mjs`, `src/performance/performanceMetrics.js`, `src/protectiveDevices/calculationCatalog.mjs`, `src/protectiveDevices/catalogLoader.mjs`, `src/protectiveDevices/tccCatalogHydrator.mjs`, `utils/cableImpedance.js`, `utils/transformerImpedance.js`, `utils/voltage.js`
+- Source files: `analysis/arcFlash.mjs`, `analysis/chartExportUtils.mjs`, `analysis/ctMetadata.mjs`, `analysis/ibrModeling.mjs`, `analysis/iec60909.mjs`, `analysis/iecRelayCurves.mjs`, `analysis/ieee1584.mjs`, `analysis/protectiveDeviceLibrary.mjs`, `analysis/protectiveDeviceReview.mjs`, `analysis/protectiveDeviceValidation.mjs`, `analysis/ptVtMetadata.mjs`, `analysis/shortCircuit.mjs`, `analysis/tcc.js`, `analysis/tcc/catalogSelectionModel.mjs`, `analysis/tcc/customCurveModel.mjs`, `analysis/tcc/plotDomainModel.mjs`, `analysis/tcc/viewModel.mjs`, `analysis/tccAutoCoord.mjs`, `analysis/tccContext.mjs`, `analysis/tccUtils.js`, `componentLibrary.json`, `conductorPropertiesData.mjs`, `data/conductor_properties.js`, `reports/coordinationReport.mjs`, `reports/relaySettingsExport.mjs`, `reports/reporting.mjs`, `src/crossProbe.js`, `src/necTable9.mjs`, `src/performance/performanceMetrics.js`, `src/protectiveDevices/calculationCatalog.mjs`, `src/protectiveDevices/catalogLoader.mjs`, `src/protectiveDevices/tccCatalogHydrator.mjs`, `src/tcc.js`, `utils/cableImpedance.js`, `utils/transformerImpedance.js`, `utils/voltage.js`
 
 **Undocumented Reads**
 - None
@@ -1951,7 +1951,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 - Section: Studies
 - Group: Power Quality
-- Source files: `analysis/ctMetadata.mjs`, `analysis/harmonics.js`
+- Source files: `analysis/ctMetadata.mjs`, `analysis/harmonics.js`, `src/components/studyApproval.js`, `src/harmonics.js`
 
 **Undocumented Reads**
 - None
@@ -1975,10 +1975,15 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 - `oneLineDiagram`
   - analysis/harmonics.js:191 getOneLine()
   - analysis/harmonics.js:265 getOneLine()
+- `settings.studyApprovals`
+  - src/components/studyApproval.js:213 getStudyApprovals()
 - `studyResults`
   - analysis/harmonics.js:496 getStudies()
 
 **Detected Writes**
+- `settings.studyApprovals`
+  - src/components/studyApproval.js:235 setStudyApproval()
+  - src/components/studyApproval.js:243 clearStudyApproval()
 - `studyResults`
   - analysis/harmonics.js:499 setStudies()
 - `studyResults.harmonics`
@@ -2358,7 +2363,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 - Section: Studies
 - Group: Motor
-- Source files: `analysis/motorStart.js`, `analysis/motorStartCalc.mjs`, `analysis/motorStartProjectInputs.mjs`, `reports/reporting.mjs`, `src/components/projectInputBinding.js`
+- Source files: `analysis/motorStart.js`, `analysis/motorStartCalc.mjs`, `analysis/motorStartProjectInputs.mjs`, `reports/reporting.mjs`, `src/components/projectInputBinding.js`, `src/components/studyApproval.js`, `src/motorStart.js`
 
 **Undocumented Reads**
 - None
@@ -2386,6 +2391,8 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 - `oneLineDiagram`
   - analysis/motorStart.js:52 getOneLine()
   - analysis/motorStartCalc.mjs:190 getOneLine()
+- `settings.studyApprovals`
+  - src/components/studyApproval.js:213 getStudyApprovals()
 - `studyResults`
   - analysis/motorStart.js:264 getStudies()
   - analysis/motorStart.js:55 getStudies()
@@ -2393,6 +2400,9 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
   - analysis/motorStartProjectInputs.mjs:176 studies.loadFlow
 
 **Detected Writes**
+- `settings.studyApprovals`
+  - src/components/studyApproval.js:235 setStudyApproval()
+  - src/components/studyApproval.js:243 clearStudyApproval()
 - `studyResults`
   - analysis/motorStart.js:266 setStudies()
 - `studyResults.motorStart`
@@ -2402,7 +2412,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 - Section: Studies
 - Group: Power System
-- Source files: `analysis/ibrModeling.mjs`, `analysis/loadFlow.js`, `analysis/loadFlowModel.js`, `analysis/loadFlowResultsRenderer.js`, `componentLibrary.json`, `reports/reporting.mjs`, `studies/loadFlow.js`, `utils/transformerImpedance.js`, `utils/voltage.js`
+- Source files: `analysis/ibrModeling.mjs`, `analysis/loadFlow.js`, `analysis/loadFlowModel.js`, `analysis/loadFlowResultsRenderer.js`, `componentLibrary.json`, `reports/reporting.mjs`, `src/components/studyApproval.js`, `src/loadFlow.js`, `studies/loadFlow.js`, `utils/transformerImpedance.js`, `utils/voltage.js`
 
 **Undocumented Reads**
 - None
@@ -2428,10 +2438,15 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 - `oneLineDiagram`
   - analysis/loadFlow.js:1031 getOneLine()
   - studies/loadFlow.js:8 getOneLine()
+- `settings.studyApprovals`
+  - src/components/studyApproval.js:213 getStudyApprovals()
 - `studyResults`
   - studies/loadFlow.js:91 getStudies()
 
 **Detected Writes**
+- `settings.studyApprovals`
+  - src/components/studyApproval.js:235 setStudyApproval()
+  - src/components/studyApproval.js:243 clearStudyApproval()
 - `studyResults`
   - studies/loadFlow.js:93 setStudies()
 - `studyResults.loadFlow`
@@ -2588,7 +2603,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 - Section: Studies
 - Group: Protection
-- Source files: `analysis/ctMetadata.mjs`, `analysis/ibrModeling.mjs`, `analysis/iec60909.mjs`, `analysis/iecRelayCurves.mjs`, `analysis/ptVtMetadata.mjs`, `analysis/shortCircuit.mjs`, `analysis/tccUtils.js`, `reports/reporting.mjs`, `src/necTable9.mjs`, `src/performance/performanceMetrics.js`, `src/protectiveDevices/calculationCatalog.mjs`, `src/protectiveDevices/catalogLoader.mjs`, `src/shortCircuit.js`, `studies/shortCircuit.js`, `utils/cableImpedance.js`, `utils/transformerImpedance.js`, `utils/voltage.js`
+- Source files: `analysis/ctMetadata.mjs`, `analysis/designBasis.mjs`, `analysis/ibrModeling.mjs`, `analysis/iec60909.mjs`, `analysis/iecRelayCurves.mjs`, `analysis/ptVtMetadata.mjs`, `analysis/shortCircuit.mjs`, `analysis/tccUtils.js`, `reports/reporting.mjs`, `src/components/studyApproval.js`, `src/components/studyBasis.js`, `src/necTable9.mjs`, `src/performance/performanceMetrics.js`, `src/protectiveDevices/calculationCatalog.mjs`, `src/protectiveDevices/catalogLoader.mjs`, `src/shortCircuit.js`, `studies/shortCircuit.js`, `utils/cableImpedance.js`, `utils/transformerImpedance.js`, `utils/voltage.js`
 
 **Undocumented Reads**
 - None
@@ -2600,7 +2615,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 - `equipment` - No static read/write evidence was detected for this declared input.
 
 **Declared Indirect Workflow Inputs**
-- `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
+- None
 
 **Declared Outputs Not Statically Written**
 - None
@@ -2615,6 +2630,10 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 - `oneLineDiagram`
   - analysis/shortCircuit.mjs:1140 getOneLine()
   - studies/shortCircuit.js:8 getOneLine()
+- `settings.designBasis`
+  - src/components/studyBasis.js:37 getDesignBasis()
+- `settings.studyApprovals`
+  - src/components/studyApproval.js:213 getStudyApprovals()
 - `settings.tccSettings`
   - analysis/shortCircuit.mjs:774 getItem(tccSettings)
 - `studyResults`
@@ -2626,6 +2645,9 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
   - studies/shortCircuit.js:288 getStudies().shortCircuit
 
 **Detected Writes**
+- `settings.studyApprovals`
+  - src/components/studyApproval.js:235 setStudyApproval()
+  - src/components/studyApproval.js:243 clearStudyApproval()
 - `studyResults`
   - studies/shortCircuit.js:147 setStudies()
 - `studyResults.shortCircuit`
@@ -2683,7 +2705,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 - Section: Studies
 - Group: Protection
-- Source files: `analysis/arcFlash.mjs`, `analysis/ctMetadata.mjs`, `analysis/ibrModeling.mjs`, `analysis/iec60909.mjs`, `analysis/iecRelayCurves.mjs`, `analysis/ieee1584.mjs`, `analysis/ptVtMetadata.mjs`, `analysis/shortCircuit.mjs`, `analysis/tccUtils.js`, `reports/arcFlashReport.mjs`, `reports/labels.mjs`, `reports/reporting.mjs`, `src/necTable9.mjs`, `src/performance/performanceMetrics.js`, `src/protectiveDevices/catalogLoader.mjs`, `studies/arcFlash.js`, `utils/cableImpedance.js`, `utils/transformerImpedance.js`, `utils/voltage.js`
+- Source files: `analysis/arcFlash.mjs`, `analysis/ctMetadata.mjs`, `analysis/designBasis.mjs`, `analysis/ibrModeling.mjs`, `analysis/iec60909.mjs`, `analysis/iecRelayCurves.mjs`, `analysis/ieee1584.mjs`, `analysis/ptVtMetadata.mjs`, `analysis/shortCircuit.mjs`, `analysis/tccUtils.js`, `reports/arcFlashReport.mjs`, `reports/labels.mjs`, `reports/reporting.mjs`, `src/arcFlash.js`, `src/components/studyApproval.js`, `src/components/studyBasis.js`, `src/necTable9.mjs`, `src/performance/performanceMetrics.js`, `src/protectiveDevices/catalogLoader.mjs`, `studies/arcFlash.js`, `utils/cableImpedance.js`, `utils/transformerImpedance.js`, `utils/voltage.js`
 
 **Undocumented Reads**
 - None
@@ -2695,7 +2717,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 - `equipment` - No static read/write evidence was detected for this declared input.
 
 **Declared Indirect Workflow Inputs**
-- `settings.designBasis` - Broad workflow context; many pages declare design basis as a readiness/handoff input even when the page does not directly read it.
+- None
 
 **Declared Outputs Not Statically Written**
 - None
@@ -2710,6 +2732,10 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
   - analysis/arcFlash.mjs:406 getOneLine()
   - analysis/shortCircuit.mjs:1140 getOneLine()
   - studies/arcFlash.js:7 getOneLine()
+- `settings.designBasis`
+  - src/components/studyBasis.js:37 getDesignBasis()
+- `settings.studyApprovals`
+  - src/components/studyApproval.js:213 getStudyApprovals()
 - `settings.tccSettings`
   - analysis/arcFlash.mjs:341 getItem(tccSettings)
   - analysis/shortCircuit.mjs:774 getItem(tccSettings)
@@ -2717,6 +2743,9 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
   - studies/arcFlash.js:27 getStudies()
 
 **Detected Writes**
+- `settings.studyApprovals`
+  - src/components/studyApproval.js:235 setStudyApproval()
+  - src/components/studyApproval.js:243 clearStudyApproval()
 - `studyResults`
   - studies/arcFlash.js:29 setStudies()
 - `studyResults.arcFlash`
@@ -2814,7 +2843,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 - Section: Studies
 - Group: Protection
-- Source files: `analysis/equipmentEvaluation.mjs`, `src/crossProbe.js`, `src/equipmentEvaluation.js`, `src/performance/performanceMetrics.js`, `src/protectiveDevices/catalogLoader.mjs`
+- Source files: `analysis/equipmentEvaluation.mjs`, `src/crossProbe.js`, `src/equipmentEvaluation.js`, `src/performance/performanceMetrics.js`, `src/protectiveDevices/calculationCatalog.mjs`, `src/protectiveDevices/catalogLoader.mjs`
 
 **Undocumented Reads**
 - None
@@ -2837,14 +2866,14 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 **Detected Reads**
 - `cableSchedule`
-  - src/equipmentEvaluation.js:66 getCables()
+  - src/equipmentEvaluation.js:67 getCables()
 - `oneLineDiagram`
   - src/crossProbe.js:139 getOneLine()
   - src/crossProbe.js:152 getOneLine()
   - src/crossProbe.js:201 getOneLine()
-  - src/equipmentEvaluation.js:65 getOneLine()
+  - src/equipmentEvaluation.js:66 getOneLine()
 - `studyResults`
-  - src/equipmentEvaluation.js:67 getStudies()
+  - src/equipmentEvaluation.js:68 getStudies()
 - `studyResults.arcFlash`
   - analysis/equipmentEvaluation.mjs:236 studies?.arcFlash
 - `studyResults.shortCircuit`
@@ -3404,7 +3433,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 - Section: Studies
 - Group: Power System
-- Source files: `analysis/contingency.mjs`, `analysis/ibrModeling.mjs`, `analysis/loadFlow.js`, `analysis/loadFlowModel.js`, `analysis/studyResultReadiness.mjs`, `analysis/transientStability.mjs`, `componentLibrary.json`, `studies/contingency.js`, `utils/transformerImpedance.js`, `utils/voltage.js`
+- Source files: `analysis/contingency.mjs`, `analysis/ibrModeling.mjs`, `analysis/loadFlow.js`, `analysis/loadFlowModel.js`, `analysis/studyResultReadiness.mjs`, `analysis/transientStability.mjs`, `componentLibrary.json`, `src/components/studyApproval.js`, `src/contingency.js`, `studies/contingency.js`, `utils/transformerImpedance.js`, `utils/voltage.js`
 
 **Undocumented Reads**
 - None
@@ -3432,6 +3461,8 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
   - studies/contingency.js:109 getOneLine()
   - studies/contingency.js:21 getOneLine()
   - studies/contingency.js:84 getOneLine()
+- `settings.studyApprovals`
+  - src/components/studyApproval.js:213 getStudyApprovals()
 - `studyResults`
   - studies/contingency.js:49 getStudies()
   - studies/contingency.js:86 getStudies()
@@ -3439,6 +3470,9 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
   - studies/contingency.js:86 getStudies().contingency
 
 **Detected Writes**
+- `settings.studyApprovals`
+  - src/components/studyApproval.js:235 setStudyApproval()
+  - src/components/studyApproval.js:243 clearStudyApproval()
 - `studyResults`
   - studies/contingency.js:51 setStudies()
 - `studyResults.contingency`

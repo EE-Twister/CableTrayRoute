@@ -31,8 +31,7 @@
     ]
   }
   </script>
-  <script type="module" src="dataStore.mjs" defer></script>
-  <script type="module" src="analysis/motorStart.js" defer></script>
+  <script type="module" src="dist/motorStart.js" defer></script>
 </head>
 <body data-report-title="Motor Starting Study">
   <a href="#main-content" class="skip-link">Skip to main content</a>
@@ -165,10 +164,5 @@
       <a href="help.html">Help</a>
     </nav>
   </footer>
-  <script type="module" src="dist/projectManager.js"></script>
-  <script type="module">
-    import { initStudyApprovalPanel } from './src/components/studyApproval.js';
-    document.addEventListener('DOMContentLoaded', () => initStudyApprovalPanel('motorStart'));
-  </script>
 </body>
 </html>

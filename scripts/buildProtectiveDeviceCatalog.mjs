@@ -10,35 +10,21 @@ const indexPath = path.join(root, 'data', 'protectiveDeviceIndex.json');
 const calculationModulePath = path.join(root, 'data', 'protectiveDeviceCalculations.mjs');
 const shardDirectory = path.join(root, 'data', 'protectiveDeviceCatalog');
 const SHARD_COUNT = 64;
+const LOCATOR_BUDGET_BYTES = 1_000_000;
 
-const INDEX_FIELDS = [
+const LOCATOR_FIELDS = [
   'id',
   'type',
   'subtype',
   'voltageClass',
   'vendor',
-  'manufacturer',
   'series',
   'name',
   'catalogNumber',
   'tripUnitModel',
-  'interruptRating',
-  'withstandRatingKA',
-  'withstandCycles',
-  'sccr',
-  'settings',
-  'settingOptions',
   'groundFault',
-  'iec60255',
-  'sensorType',
-  'nec230_95',
-  'curveFamily',
-  'libraryStatus',
-  'researchStatus',
-  'lifecycleStatus',
-  'region',
-  'frequencyHz',
-  'standards',
+  'catalogAssessmentStatus',
+  'catalogShard',
 ];
 
 const CALCULATION_FIELDS = [
@@ -62,8 +48,6 @@ const CALCULATION_FIELDS = [
   'groundFault',
 ];
 
-const CURVE_EVIDENCE_FIELDS = ['document', 'revision', 'date', 'curveNumber', 'page', 'reviewer'];
-
 function shardForId(id) {
   let hash = 0x811c9dc5;
   for (const char of String(id || '')) {
@@ -77,22 +61,13 @@ function shardName(index) {
   return index.toString(16).padStart(2, '0');
 }
 
-function compactRecord(record) {
-  const compact = {};
-  INDEX_FIELDS.forEach(field => {
-    if (record[field] !== undefined) compact[field] = record[field];
-  });
-  if (record.curveEvidence && typeof record.curveEvidence === 'object') {
-    compact.curveEvidence = {};
-    CURVE_EVIDENCE_FIELDS.forEach(field => {
-      if (record.curveEvidence[field] !== undefined) {
-        compact.curveEvidence[field] = record.curveEvidence[field];
-      }
-    });
-  }
-  compact.catalogAssessmentStatus = assessProtectiveDeviceLibraryEntry(record).status;
-  compact.catalogShard = shardName(shardForId(record.id));
-  return compact;
+function locatorRecord(record) {
+  const derived = {
+    ...record,
+    catalogAssessmentStatus: assessProtectiveDeviceLibraryEntry(record).status,
+    catalogShard: shardName(shardForId(record.id)),
+  };
+  return LOCATOR_FIELDS.map(field => derived[field] ?? null);
 }
 
 function calculationRecord(record) {
@@ -118,7 +93,11 @@ devices.forEach(device => {
   shards[shardForId(device.id)].push(device);
 });
 
-const index = devices.map(compactRecord);
+const index = {
+  schemaVersion: 2,
+  fields: LOCATOR_FIELDS,
+  records: devices.map(locatorRecord),
+};
 fs.writeFileSync(indexPath, `${JSON.stringify(index)}\n`);
 const calculationDevices = devices.map(calculationRecord);
 fs.writeFileSync(calculationModulePath, `export default ${JSON.stringify(calculationDevices)};\n`);
@@ -133,9 +112,12 @@ shards.forEach((records, shardIndex) => {
 const sourceBytes = fs.statSync(sourcePath).size;
 const indexBytes = fs.statSync(indexPath).size;
 const calculationBytes = fs.statSync(calculationModulePath).size;
+if (indexBytes > LOCATOR_BUDGET_BYTES) {
+  throw new Error(`Protective-device locator is ${indexBytes} bytes; budget is ${LOCATOR_BUDGET_BYTES} bytes.`);
+}
 console.log(
   `Built protective-device catalog: ${devices.length} records, ${SHARD_COUNT} shards, `
-  + `${(indexBytes / 1024 / 1024).toFixed(2)} MB index `
+  + `${(indexBytes / 1024 / 1024).toFixed(2)} MB locator `
   + `and ${(calculationBytes / 1024 / 1024).toFixed(2)} MB calculation module `
   + `(${(((indexBytes + calculationBytes) / sourceBytes) * 100).toFixed(1)}% combined).`
 );

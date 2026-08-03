@@ -1,5 +1,9 @@
 # UI Refinement Log
 
+## 2026-08-03
+
+- Consolidated Load Flow, Motor Start, Contingency, and Transient Stability into production route entries so project controls, calculations, persistence, and Engineer Review initialize once per page instead of through browser-visible source-module waterfalls. Replaced Transient Stability's public Plotly CDN request with the build-managed local asset, and added bundle-size and browser-startup contracts to preserve the resulting headroom.
+
 ## 2026-07-22
 
 - Condensed Ductbank optional materials into persistent BOM table rows with an Include checkbox column and inline ground-wire run and allowance inputs; unchecked options remain visible for discovery but are omitted from exports and included-line totals.

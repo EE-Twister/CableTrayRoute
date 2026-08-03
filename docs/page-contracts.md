@@ -1640,9 +1640,11 @@ Coverage: 80 contracts for 80 navigation routes.
 - `cableSchedule` (schedule, required): Cable tags, endpoints, conductor details, lengths, and raceway assignments.
 - `settings.tccSettings` (setting, optional): Protective device selections, relay settings, chart options, and coordination context.
 - `settings.designBasis` (setting, optional): Project code basis, sizing defaults, routing defaults, and study prerequisites.
+- `settings.studyApprovals` (setting, optional): Engineer review records for study outputs.
 
 **Outputs**
 - `studyResults.shortCircuit` (study-result): Saved short-circuit duty result by bus or device. Consumers: `arcFlash.html`, `tcc.html`, `equipmentevaluation.html`, `projectreport.html`.
+- `settings.studyApprovals` (setting): Engineer approval records written by the shared study approval panel. Consumers: `projectreport.html`.
 - `export-only` (export): Short-circuit reports and duty tables. Consumers: `projectreport.html`.
 
 **Readiness**
@@ -1707,9 +1709,11 @@ Coverage: 80 contracts for 80 navigation routes.
 - `studyResults.shortCircuit` (study-result, required): Fault current results required for arc flash calculations.
 - `settings.tccSettings` (setting, optional): Protective device selections, relay settings, chart options, and coordination context.
 - `settings.designBasis` (setting, optional): Project code basis, sizing defaults, routing defaults, and study prerequisites.
+- `settings.studyApprovals` (setting, optional): Engineer review records for study outputs.
 
 **Outputs**
 - `studyResults.arcFlash` (study-result): Saved incident energy, boundary, PPE, and label data. Consumers: `tcc.html`, `designcoach.html`, `projectreport.html`.
+- `settings.studyApprovals` (setting): Engineer approval records written by the shared study approval panel. Consumers: `projectreport.html`.
 - `export-only` (export): Arc flash CSV/PDF reports and SVG label files. Consumers: `projectreport.html`.
 
 **Readiness**
@@ -1957,10 +1961,14 @@ Coverage: 80 contracts for 80 navigation routes.
 - `oneLineDiagram` (model, required): One-line components, connections, sheets, layers, and linked schedule references.
 - `equipment` (schedule, required): Equipment tags, ratings, locations, and physical metadata.
 - `studyResults.loadFlow` (study-result, optional): Operating bus values used for harmonic context.
+- `studyResults.frequencyScan` (study-result, optional): Previously saved resonance sweep restored by the embedded frequency-scan panel.
 - `settings.designBasis` (setting, optional): Project code basis, sizing defaults, routing defaults, and study prerequisites.
+- `settings.studyApprovals` (setting, optional): Engineer review records for study outputs.
 
 **Outputs**
 - `studyResults.harmonics` (study-result): Saved harmonic distortion results and source contributions. Consumers: `designcoach.html`, `projectreport.html`.
+- `studyResults.frequencyScan` (study-result): Saved embedded frequency-scan points and resonance warnings. Consumers: `frequencyscan.html`, `projectreport.html`.
+- `settings.studyApprovals` (setting): Engineer approval records written by the shared study approval panel. Consumers: `projectreport.html`.
 - `export-only` (export): Harmonic chart and report exports. Consumers: `projectreport.html`.
 
 **Readiness**
@@ -2159,9 +2167,11 @@ Coverage: 80 contracts for 80 navigation routes.
 - `loadList` (schedule, required): Load tags, source relationships, demand values, and operating metadata.
 - `studyResults.loadFlow` (study-result, optional): Prefault voltage context.
 - `settings.designBasis` (setting, optional): Project code basis, sizing defaults, routing defaults, and study prerequisites.
+- `settings.studyApprovals` (setting, optional): Engineer review records for study outputs.
 
 **Outputs**
 - `studyResults.motorStart` (study-result): Saved motor starting current, controlling starting kVA/kW, torque, and voltage sag result. Consumers: `battery.html`, `generatorsizing.html`, `projectreport.html`.
+- `settings.studyApprovals` (setting): Engineer approval records written by the shared study approval panel. Consumers: `projectreport.html`.
 - `export-only` (export): Motor starting charts and reports. Consumers: `projectreport.html`.
 
 **Readiness**
@@ -2193,9 +2203,11 @@ Coverage: 80 contracts for 80 navigation routes.
 - `loadList` (schedule, required): Load tags, source relationships, demand values, and operating metadata.
 - `cableSchedule` (schedule, required): Cable tags, endpoints, conductor details, lengths, and raceway assignments.
 - `settings.designBasis` (setting, optional): Project code basis, sizing defaults, routing defaults, and study prerequisites.
+- `settings.studyApprovals` (setting, optional): Engineer review records for study outputs.
 
 **Outputs**
 - `studyResults.loadFlow` (study-result): Saved bus voltage, branch loading, and power flow result. Consumers: `quasidynamic.html`, `voltagestability.html`, `capacitorbank.html`, `projectreport.html`.
+- `settings.studyApprovals` (setting): Engineer approval records written by the shared study approval panel. Consumers: `projectreport.html`.
 - `export-only` (export): Load flow reports and charts. Consumers: `projectreport.html`.
 
 **Readiness**
@@ -2439,9 +2451,11 @@ Coverage: 80 contracts for 80 navigation routes.
 - `studyResults.loadFlow` (study-result, optional): Base flow result for contingency checks.
 - `studyResults.reliability` (study-result, optional): Reliability context for outage prioritization.
 - `settings.designBasis` (setting, optional): Project code basis, sizing defaults, routing defaults, and study prerequisites.
+- `settings.studyApprovals` (setting, optional): Engineer review records for study outputs.
 
 **Outputs**
 - `studyResults.contingency` (study-result): Saved N-1 contingency screening result. Consumers: `projectreport.html`.
+- `settings.studyApprovals` (setting): Engineer approval records written by the shared study approval panel. Consumers: `projectreport.html`.
 - `export-only` (export): Contingency summary exports. Consumers: `projectreport.html`.
 
 **Readiness**

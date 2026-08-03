@@ -24,16 +24,16 @@ import { buildMinimalDesignAutomation } from '../analysis/workflowAutomation.mjs
 import { buildDesignBasisReview, normalizeDesignBasis, summarizeDesignBasis } from '../analysis/designBasis.mjs';
 import { summarizeFieldObservations } from '../analysis/fieldObservations.mjs';
 import { createProtectiveDeviceCatalogLoader } from './protectiveDevices/catalogLoader.mjs';
+import { loadReferencedProtectiveDevices } from './protectiveDevices/calculationCatalog.mjs';
 import '../site.js';
 import './projectManager.js';
 
 const protectiveDeviceCatalog = createProtectiveDeviceCatalogLoader();
 let protectiveDevices = [];
 
-async function ensureProtectiveDeviceIndex() {
-  if (!protectiveDevices.length) {
-    protectiveDevices = await protectiveDeviceCatalog.loadIndex();
-  }
+async function ensureReferencedProtectiveDevices() {
+  const components = (getOneLine()?.sheets ?? []).flatMap(sheet => sheet.components ?? []);
+  protectiveDevices = await loadReferencedProtectiveDevices(components, { catalog: protectiveDeviceCatalog });
   return protectiveDevices;
 }
 
@@ -1473,11 +1473,11 @@ function initReleasePackageForm() {
 }
 
 window.addEventListener('DOMContentLoaded', async () => {
-  if (getDashboardFocus() === 'full') await ensureProtectiveDeviceIndex();
+  if (getDashboardFocus() === 'full') await ensureReferencedProtectiveDevices();
   const focusSelect = document.getElementById('dashboard-focus-select');
   focusSelect?.addEventListener('change', async () => {
     setItem(DASHBOARD_FOCUS_KEY, focusSelect.value === 'full' ? 'full' : 'routing');
-    if (focusSelect.value === 'full') await ensureProtectiveDeviceIndex();
+    if (focusSelect.value === 'full') await ensureReferencedProtectiveDevices();
     refreshDashboard();
   });
   refreshDashboard();

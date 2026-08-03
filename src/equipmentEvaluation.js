@@ -20,6 +20,7 @@ import {
 } from '../dataStore.mjs';
 import { createCrossProbeLink } from './crossProbe.js';
 import { createProtectiveDeviceCatalogLoader } from './protectiveDevices/catalogLoader.mjs';
+import { loadReferencedProtectiveDevices } from './protectiveDevices/calculationCatalog.mjs';
 
 const protectiveDeviceCatalog = createProtectiveDeviceCatalogLoader();
 
@@ -66,7 +67,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const cables     = getCables() || [];
       const studies    = getStudies() || {};
 
-      const protectiveDevices = await protectiveDeviceCatalog.loadIndex();
+      const protectiveDevices = await loadReferencedProtectiveDevices(components, { catalog: protectiveDeviceCatalog });
       lastEvaluations = evaluateEquipment(components, cables, studies, protectiveDevices);
       renderKpis(lastEvaluations);
       renderTable(lastEvaluations);

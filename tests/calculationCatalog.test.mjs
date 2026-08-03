@@ -11,11 +11,12 @@ describe('referenced protective-device calculation catalog', () => {
     { id: 'main', type: 'breaker', tccId: 'breaker-a' },
     { id: 'feeder', type: 'fuse', tccId: 'fuse-b' },
     { id: 'duplicate', type: 'breaker', tccId: 'breaker-a' },
+    { id: 'evaluated', type: 'breaker', props: { device: 'breaker-c' } },
     { id: 'load', type: 'load' },
   ];
 
   it('collects unique device IDs from arrays and One-Line sheets', () => {
-    assert.deepEqual(collectReferencedProtectiveDeviceIds(components), ['breaker-a', 'fuse-b']);
+    assert.deepEqual(collectReferencedProtectiveDeviceIds(components), ['breaker-a', 'fuse-b', 'breaker-c']);
     assert.deepEqual(collectReferencedProtectiveDeviceIds({
       sheets: [{ components: components.slice(0, 2) }],
     }), ['breaker-a', 'fuse-b']);
@@ -35,8 +36,8 @@ describe('referenced protective-device calculation catalog', () => {
       additionalDevices: [{ id: 'breaker-a', name: 'Project breaker' }],
     });
 
-    assert.deepEqual(requested, ['fuse-b']);
-    assert.deepEqual(devices.map(device => device.id), ['breaker-a', 'fuse-b']);
+    assert.deepEqual(requested, ['fuse-b', 'breaker-c']);
+    assert.deepEqual(devices.map(device => device.id), ['breaker-a', 'fuse-b', 'breaker-c']);
     assert.equal(devices[0].name, 'Project breaker');
   });
 

@@ -653,9 +653,11 @@ export const PAGE_CONTRACTS_BY_HREF = {
   'harmonics.html': contract({
     workflowStep: 'studies',
     standaloneInputs: ['Harmonic source data, impedance assumptions, bus selections, and chart settings.'],
-    projectInputs: [oneLine, equipment, projectInput('studyResults.loadFlow', 'study-result', false, 'Operating bus values used for harmonic context.'), designBasis],
+    projectInputs: [oneLine, equipment, projectInput('studyResults.loadFlow', 'study-result', false, 'Operating bus values used for harmonic context.'), projectInput('studyResults.frequencyScan', 'study-result', false, 'Previously saved resonance sweep restored by the embedded frequency-scan panel.'), designBasis, approvals],
     outputs: [
       output('studyResults.harmonics', 'study-result', 'Saved harmonic distortion results and source contributions.', ['designcoach.html', 'projectreport.html']),
+      output('studyResults.frequencyScan', 'study-result', 'Saved embedded frequency-scan points and resonance warnings.', ['frequencyscan.html', 'projectreport.html']),
+      studyApprovalOutput,
       exportOnly('Harmonic chart and report exports.', ['projectreport.html'])
     ],
     readiness: ready('Ready when harmonic sources and bus context exist or direct source inputs are valid.', ['No harmonic sources or missing bus/impedance data.']),
@@ -780,9 +782,10 @@ export const PAGE_CONTRACTS_BY_HREF = {
   'motorStart.html': contract({
     workflowStep: 'studies',
     standaloneInputs: ['Motor horsepower, voltage, starter type, inertia/load torque, and Thevenin source inputs.'],
-    projectInputs: [oneLine, equipment, loads, projectInput('studyResults.loadFlow', 'study-result', false, 'Prefault voltage context.'), designBasis],
+    projectInputs: [oneLine, equipment, loads, projectInput('studyResults.loadFlow', 'study-result', false, 'Prefault voltage context.'), designBasis, approvals],
     outputs: [
       output('studyResults.motorStart', 'study-result', 'Saved motor starting current, controlling starting kVA/kW, torque, and voltage sag result.', ['battery.html', 'generatorsizing.html', 'projectreport.html']),
+      studyApprovalOutput,
       exportOnly('Motor starting charts and reports.', ['projectreport.html'])
     ],
     readiness: ready('Ready when a motor and source impedance context are valid.', ['No motor data, missing source impedance, or invalid starter parameters.']),
@@ -791,9 +794,10 @@ export const PAGE_CONTRACTS_BY_HREF = {
   'loadFlow.html': contract({
     workflowStep: 'studies',
     standaloneInputs: ['Manual buses, branches, loads, sources, and solver settings.'],
-    projectInputs: [oneLine, equipment, loads, cables, designBasis],
+    projectInputs: [oneLine, equipment, loads, cables, designBasis, approvals],
     outputs: [
       output('studyResults.loadFlow', 'study-result', 'Saved bus voltage, branch loading, and power flow result.', ['quasidynamic.html', 'voltagestability.html', 'capacitorbank.html', 'projectreport.html']),
+      studyApprovalOutput,
       exportOnly('Load flow reports and charts.', ['projectreport.html'])
     ],
     readiness: ready('Ready when the model has a source, connected buses, and load data.', ['No source, disconnected network, or invalid load/bus data.']),
@@ -886,9 +890,10 @@ export const PAGE_CONTRACTS_BY_HREF = {
   'shortCircuit.html': contract({
     workflowStep: 'studies',
     standaloneInputs: ['Manual source impedance, fault location, equipment ratings, and device settings.'],
-    projectInputs: [oneLine, equipment, cables, tccSettings, designBasis],
+    projectInputs: [oneLine, equipment, cables, tccSettings, designBasis, approvals],
     outputs: [
       output('studyResults.shortCircuit', 'study-result', 'Saved short-circuit duty result by bus or device.', ['arcFlash.html', 'tcc.html', 'equipmentevaluation.html', 'projectreport.html']),
+      studyApprovalOutput,
       exportOnly('Short-circuit reports and duty tables.', ['projectreport.html'])
     ],
     readiness: ready(
@@ -916,9 +921,10 @@ export const PAGE_CONTRACTS_BY_HREF = {
   'arcFlash.html': contract({
     workflowStep: 'studies',
     standaloneInputs: ['Manual equipment data, working distance, clearing time, enclosure, and label options.'],
-    projectInputs: [oneLine, equipment, cables, projectInput('studyResults.shortCircuit', 'study-result', true, 'Fault current results required for arc flash calculations.'), tccSettings, designBasis],
+    projectInputs: [oneLine, equipment, cables, projectInput('studyResults.shortCircuit', 'study-result', true, 'Fault current results required for arc flash calculations.'), tccSettings, designBasis, approvals],
     outputs: [
       output('studyResults.arcFlash', 'study-result', 'Saved incident energy, boundary, PPE, and label data.', ['tcc.html', 'designcoach.html', 'projectreport.html']),
+      studyApprovalOutput,
       exportOnly('Arc flash CSV/PDF reports and SVG label files.', ['projectreport.html'])
     ],
     readiness: ready('Ready when fault current and clearing time are available for target equipment.', ['Missing short-circuit result, clearing time, working distance, or equipment voltage.']),
@@ -1115,9 +1121,10 @@ export const PAGE_CONTRACTS_BY_HREF = {
   'contingency.html': contract({
     workflowStep: 'studies',
     standaloneInputs: ['Manual contingency cases, outage selections, and pass/fail criteria.'],
-    projectInputs: [oneLine, equipment, cables, projectInput('studyResults.loadFlow', 'study-result', false, 'Base flow result for contingency checks.'), projectInput('studyResults.reliability', 'study-result', false, 'Reliability context for outage prioritization.'), designBasis],
+    projectInputs: [oneLine, equipment, cables, projectInput('studyResults.loadFlow', 'study-result', false, 'Base flow result for contingency checks.'), projectInput('studyResults.reliability', 'study-result', false, 'Reliability context for outage prioritization.'), designBasis, approvals],
     outputs: [
       output('studyResults.contingency', 'study-result', 'Saved N-1 contingency screening result.', ['projectreport.html']),
+      studyApprovalOutput,
       exportOnly('Contingency summary exports.', ['projectreport.html'])
     ],
     readiness: ready('Ready when a connected model and at least one contingency case are available.', ['No connected model, no outage candidates, or missing base operating point.']),

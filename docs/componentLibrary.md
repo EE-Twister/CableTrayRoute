@@ -41,6 +41,10 @@ Library Manager (`library.html`) includes a structured editor so non-technical u
 
 Advanced users can still use **Advanced JSON Editor (Power Users)**. Both editors stay synchronized.
 
+### Production delivery
+
+Library Manager loads its application dependencies through `dist/library.js` and keeps the large XLSX runtime as a separately cached vendor asset. This reduced a measured cold-start module graph from 18 script requests to 2 without removing spreadsheet import/export or changing the page-local editing workflow. The build caps the application entry at 200 KB, while the browser performance contract rejects any startup increase beyond the two intentional scripts. See [Production module delivery architecture](study-module-delivery-architecture.md) for the dependency boundary and maintenance rules.
+
 ## Component Instance Properties
 
 At runtime each placed component also carries these standard properties on its saved JSON object:
@@ -99,7 +103,10 @@ Catalog confidence is calculated from the same metadata. Complete records includ
 The **Library Manager** also shows the bundled protective-device / TCC inventory.
 Use its evidence-status filter and search field to find calculation-ready,
 source-verified, standards-reference, or screening-only records before opening
-the TCC study. The inventory is read-only: changes to custom component or
+the TCC study. To keep startup and filtering responsive as the catalog grows,
+the table renders at most the first 200 matches and prompts users to refine the
+filters when more results exist; search and evidence counts still cover the full
+packed locator. The inventory is read-only: changes to custom component or
 manufacturer defaults cannot silently alter an approved protective curve.
 See [Protective Device Library Governance](protective-device-library-governance.md)
 for the promotion requirements and review limitations.

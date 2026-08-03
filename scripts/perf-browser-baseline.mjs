@@ -357,7 +357,7 @@ async function main() {
   routeStartupEvaluations.forEach(evaluation => {
     const status = evaluation.passed ? 'PASS' : 'FAIL';
     const details = evaluation.passed
-      ? `${evaluation.readyMs.toFixed(1)}ms, ${evaluation.catalogRequestCount} catalog startup request(s)`
+      ? `${evaluation.readyMs.toFixed(1)}ms, ${evaluation.scriptRequestCount} script and ${evaluation.catalogRequestCount} catalog startup request(s)`
       : evaluation.failures.join('; ');
     console.log(`[perf] ${status} startup:${evaluation.route}: ${details}`);
   });

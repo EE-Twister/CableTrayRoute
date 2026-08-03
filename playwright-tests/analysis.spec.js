@@ -10,18 +10,29 @@ import { fileURLToPath } from 'url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.join(__dirname, '..');
 const pageUrl = file => 'file://' + path.join(root, file);
+const startupScriptsByPage = new WeakMap();
 
 // ---------------------------------------------------------------------------
 // Load Flow
 // ---------------------------------------------------------------------------
 test.describe('Load Flow', () => {
   test.beforeEach(async ({ page }) => {
+    const startupScripts = [];
+    startupScriptsByPage.set(page, startupScripts);
+    page.on('request', request => {
+      if (request.resourceType() === 'script') startupScripts.push(new URL(request.url()).pathname);
+    });
     await page.goto(pageUrl('loadFlow.html?e2e=1&e2e_reset=1'));
     await page.waitForLoadState('networkidle');
   });
 
   test('page loads with correct heading', async ({ page }) => {
     await expect(page.locator('h1')).toContainText('Load Flow');
+    const startupScripts = startupScriptsByPage.get(page) || [];
+    expect(startupScripts).toHaveLength(1);
+    expect(startupScripts.some(pathname => /\/dist\/loadFlow(?:\.[0-9a-f]{8,})?\.js$/.test(pathname))).toBe(true);
+    expect(startupScripts.some(pathname => pathname.endsWith('/dataStore.mjs'))).toBe(false);
+    expect(startupScripts.some(pathname => pathname.endsWith('/studies/loadFlow.js'))).toBe(false);
   });
 
   test('has form with Run Study button', async ({ page }) => {

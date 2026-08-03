@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { PROJECT_SCHEMA_VERSION, migrateProject } from '../projectStorage.js';
+import { PROJECT_SCHEMA_VERSION, defaultProject, migrateProject } from '../projectStorage.js';
 
 const legacyProject = {
   settings: {
@@ -48,5 +48,18 @@ const ups = getComponent('ups');
 assert.equal(ups.props.runtime_battery_min, 20);
 assert.equal(ups.props.battery_runtime_min, 20);
 assert.equal(ups.props.mode_battery_enabled, undefined);
+
+const currentProjectWithLegacyFrequencyScan = defaultProject();
+currentProjectWithLegacyFrequencyScan.settings.studyResults = {
+  harmonics: { sourceCount: 2 },
+  freqScan: { params: { hMax: 25 }, results: { sweep: [{ h: 1, zPu: 1 }] } }
+};
+const migratedFrequencyScan = migrateProject(currentProjectWithLegacyFrequencyScan);
+assert.deepEqual(
+  migratedFrequencyScan.settings.studyResults.frequencyScan,
+  currentProjectWithLegacyFrequencyScan.settings.studyResults.freqScan
+);
+assert.equal(migratedFrequencyScan.settings.studyResults.freqScan, undefined);
+assert.deepEqual(migratedFrequencyScan.settings.studyResults.harmonics, { sourceCount: 2 });
 
 console.log('✓ projectStorage migrateProject preserves missing Phase 1 study fields');

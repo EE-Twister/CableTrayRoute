@@ -10,7 +10,6 @@
   <meta name="color-scheme" content="light dark">
   <link rel="stylesheet" href="style.css">
   <script src="dist/vendor/xlsx.full.min.js" defer></script>
-  <script src="cdnFallback.js" defer></script>
   <script>
     window.addEventListener('load', function () {
       if (typeof initCdnFallback === 'function') {
@@ -287,15 +286,20 @@
     <p id="protective-library-empty" class="protective-library-empty" hidden>No protective devices match the current filters.</p>
   </section>
   <script type="module">
-    import './src/components/navigation.js';
-    import { getItem, setItem } from './dataStore.mjs';
-    import openModal, { showAlertModal } from './src/components/modal.js';
-    import { getAuthContextState } from './projectStorage.js';
-    import { validateLibraryPayload } from './src/validation/librarySchema.mjs';
-    import { assessProtectiveDeviceLibraryEntry, summarizeProtectiveDeviceLibrary } from './analysis/protectiveDeviceLibrary.mjs';
-    import { createProtectiveDeviceCatalogLoader } from './src/protectiveDevices/catalogLoader.mjs';
+    import {
+      assessProtectiveDeviceLibraryEntry,
+      createProtectiveDeviceCatalogLoader,
+      getAuthContextState,
+      getItem,
+      openModal,
+      setItem,
+      showAlertModal,
+      summarizeProtectiveDeviceLibrary,
+      validateLibraryPayload,
+    } from './dist/library.js';
 
     const protectiveDeviceCatalog = createProtectiveDeviceCatalogLoader();
+    const PROTECTIVE_DEVICE_RENDER_LIMIT = 200;
     let protectiveDevices = [];
 
     // -------------------------------------------------------------------------
@@ -1573,7 +1577,7 @@
       const empty = document.getElementById('protective-library-empty');
       const summary = document.getElementById('protective-library-summary');
       const counts = summarizeProtectiveDeviceLibrary(protectiveDevices);
-      const rows = protectiveDevices
+      const matchingRows = protectiveDevices
         .map(entry => ({ entry, assessment: assessProtectiveDeviceLibraryEntry(entry) }))
         .filter(({ entry, assessment }) => (
           (statusFilter === 'all' || assessment.status === statusFilter)
@@ -1583,8 +1587,15 @@
           String(left.entry.vendor || '').localeCompare(String(right.entry.vendor || ''))
           || String(left.entry.name || '').localeCompare(String(right.entry.name || ''))
         ));
+      const rows = matchingRows.slice(0, PROTECTIVE_DEVICE_RENDER_LIMIT);
 
-      body.replaceChildren();
+      const totalLabel = `${counts.total} bundled device${counts.total === 1 ? '' : 's'}`;
+      const visibleLabel = matchingRows.length > PROTECTIVE_DEVICE_RENDER_LIMIT
+        ? ` Showing the first ${PROTECTIVE_DEVICE_RENDER_LIMIT} of ${matchingRows.length} matches; refine the filters to see a specific device.`
+        : ` Showing ${matchingRows.length} matching device${matchingRows.length === 1 ? '' : 's'}.`;
+      summary.textContent = `${totalLabel}: ${counts.calculation_ready} calculation-ready, ${counts.source_verified} source-verified pending peer review, ${counts.standards_reference} standards-reference, and ${counts.screening} screening-only.${visibleLabel}`;
+
+      const fragment = document.createDocumentFragment();
       rows.forEach(({ entry, assessment }) => {
         const row = document.createElement('tr');
         const nameCell = document.createElement('td');
@@ -1604,12 +1615,10 @@
         badge.textContent = assessment.label;
         statusCell.appendChild(badge);
         row.appendChild(statusCell);
-        body.appendChild(row);
+        fragment.appendChild(row);
       });
-
-      const totalLabel = `${counts.total} bundled device${counts.total === 1 ? '' : 's'}`;
-      summary.textContent = `${totalLabel}: ${counts.calculation_ready} calculation-ready, ${counts.source_verified} source-verified pending peer review, ${counts.standards_reference} standards-reference, and ${counts.screening} screening-only.`;
-      empty.hidden = rows.length > 0;
+      body.replaceChildren(fragment);
+      empty.hidden = matchingRows.length > 0;
     }
 
     // -------------------------------------------------------------------------
@@ -1721,13 +1730,16 @@
       }
     });
 
+    // Configure authorization-dependent actions before network/catalog work so
+    // the controls do not wait behind the protective-device inventory.
+    configureTeamLibraryControls();
+
     // Initial load: check URL for share token, otherwise normal load
     const sharedLoaded = await maybeLoadShareFromUrl();
     if (!sharedLoaded) {
       await load();
     }
     protectiveDevices = await protectiveDeviceCatalog.loadIndex();
-    configureTeamLibraryControls();
     renderProtectiveDeviceInventory();
   </script>
   </main>

@@ -16,6 +16,7 @@ import { fileURLToPath } from 'url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root      = path.join(__dirname, '..');
 const pageUrl   = file => 'file://' + path.join(root, file);
+const startupScriptsByPage = new WeakMap();
 
 async function startStaticServer() {
   const server = http.createServer(async (req, res) => {
@@ -59,12 +60,23 @@ async function startStaticServer() {
 // -------------------------------------------------------------------------
 test.describe('Harmonic Analysis', () => {
   test.beforeEach(async ({ page }) => {
+    const startupScripts = [];
+    startupScriptsByPage.set(page, startupScripts);
+    page.on('request', request => {
+      if (request.resourceType() === 'script') startupScripts.push(new URL(request.url()).pathname);
+    });
     await page.goto(pageUrl('harmonics.html?e2e=1&e2e_reset=1'));
     await page.waitForLoadState('networkidle');
   });
 
   test('page loads with correct heading', async ({ page }) => {
     await expect(page.locator('h1')).toContainText('Harmonic');
+    const startupScripts = startupScriptsByPage.get(page) || [];
+    expect(startupScripts).toHaveLength(2);
+    expect(startupScripts.some(pathname => pathname.endsWith('/dist/vendor/d3.min.js'))).toBe(true);
+    expect(startupScripts.some(pathname => /\/dist\/harmonics(?:\.[0-9a-f]{8,})?\.js$/.test(pathname))).toBe(true);
+    expect(startupScripts.some(pathname => pathname.endsWith('/dataStore.mjs'))).toBe(false);
+    expect(startupScripts.some(pathname => pathname.endsWith('/analysis/harmonics.js'))).toBe(false);
   });
 
   test('SVG chart element is present in DOM', async ({ page }) => {
@@ -94,6 +106,17 @@ test.describe('Harmonic Analysis', () => {
   test('settings button is present', async ({ page }) => {
     await expect(page.locator('#settings-btn')).toBeVisible();
   });
+
+  test('frequency scan persists the canonical report handoff', async ({ page }) => {
+    await page.getByRole('button', { name: 'Run Frequency Scan' }).click();
+    await expect(page.getByRole('table', { name: 'Frequency scan resonance results' })).toBeVisible();
+    const studies = await page.evaluate(async () => {
+      const harmonics = await import('./dist/harmonics.js');
+      return harmonics.getStudies();
+    });
+    expect(studies.frequencyScan?.results?.sweep?.length).toBeGreaterThan(0);
+    expect(studies.freqScan).toBeUndefined();
+  });
 });
 
 // -------------------------------------------------------------------------
@@ -101,12 +124,23 @@ test.describe('Harmonic Analysis', () => {
 // -------------------------------------------------------------------------
 test.describe('Motor Starting', () => {
   test.beforeEach(async ({ page }) => {
+    const startupScripts = [];
+    startupScriptsByPage.set(page, startupScripts);
+    page.on('request', request => {
+      if (request.resourceType() === 'script') startupScripts.push(new URL(request.url()).pathname);
+    });
     await page.goto(pageUrl('motorStart.html?e2e=1&e2e_reset=1'));
     await page.waitForLoadState('networkidle');
   });
 
   test('page loads with correct heading', async ({ page }) => {
     await expect(page.locator('h1')).toContainText('Motor Starting');
+    const startupScripts = startupScriptsByPage.get(page) || [];
+    expect(startupScripts).toHaveLength(2);
+    expect(startupScripts.some(pathname => pathname.endsWith('/dist/vendor/d3.min.js'))).toBe(true);
+    expect(startupScripts.some(pathname => /\/dist\/motorStart(?:\.[0-9a-f]{8,})?\.js$/.test(pathname))).toBe(true);
+    expect(startupScripts.some(pathname => pathname.endsWith('/dataStore.mjs'))).toBe(false);
+    expect(startupScripts.some(pathname => pathname.endsWith('/analysis/motorStart.js'))).toBe(false);
   });
 
   test('SVG chart element is present in DOM', async ({ page }) => {

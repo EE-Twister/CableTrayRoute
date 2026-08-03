@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
-import { createProtectiveDeviceCatalogLoader } from '../src/protectiveDevices/catalogLoader.mjs';
+import {
+  createProtectiveDeviceCatalogLoader,
+  decodeProtectiveDeviceIndex,
+} from '../src/protectiveDevices/catalogLoader.mjs';
 import { createTccCatalogHydrator } from '../src/protectiveDevices/tccCatalogHydrator.mjs';
 import { resolveCatalogSelection } from '../analysis/tcc/catalogSelectionModel.mjs';
 import calculationDevices from '../data/protectiveDeviceCalculations.mjs';
@@ -11,15 +14,20 @@ function response(value, ok = true, status = 200) {
 }
 
 const source = JSON.parse(fs.readFileSync(new URL('../data/protectiveDevices.json', import.meta.url), 'utf8'));
-const index = JSON.parse(fs.readFileSync(new URL('../data/protectiveDeviceIndex.json', import.meta.url), 'utf8'));
-assert.equal(index.length, source.length, 'compact index must cover every protective device');
+const packedIndex = JSON.parse(fs.readFileSync(new URL('../data/protectiveDeviceIndex.json', import.meta.url), 'utf8'));
+const index = decodeProtectiveDeviceIndex(packedIndex);
+assert.equal(packedIndex.schemaVersion, 2, 'locator index must use the versioned packed format');
+assert.deepEqual(packedIndex.fields, [
+  'id', 'type', 'subtype', 'voltageClass', 'vendor', 'series', 'name',
+  'catalogNumber', 'tripUnitModel', 'groundFault', 'catalogAssessmentStatus', 'catalogShard'
+]);
+assert.equal(index.length, source.length, 'compact locator must cover every protective device');
 assert.deepEqual(index.map(device => device.id), source.map(device => device.id), 'index order and IDs must match the canonical catalog');
 assert.ok(index.every(device => device.catalogShard && device.catalogAssessmentStatus), 'each index record must identify its shard and readiness');
-assert.ok(index.every(device => !('curve' in device) && !('sourceDocuments' in device)), 'heavy curve and evidence collections must stay out of the index');
+assert.ok(index.every(device => !('curve' in device) && !('settings' in device) && !('sourceDocuments' in device)), 'calculation and governance fields must stay out of the locator');
 assert.ok(
-  fs.statSync(new URL('../data/protectiveDeviceIndex.json', import.meta.url)).size
-    < fs.statSync(new URL('../data/protectiveDevices.json', import.meta.url)).size * 0.15,
-  'compact index must remain below 15% of the canonical catalog size'
+  fs.statSync(new URL('../data/protectiveDeviceIndex.json', import.meta.url)).size < 1_000_000,
+  'packed locator must remain below the 1 MB startup budget'
 );
 assert.deepEqual(calculationDevices.map(device => device.id), source.map(device => device.id), 'calculation catalog must cover every canonical device');
 assert.ok(calculationDevices.every(device => !('sourceDocuments' in device) && !('fieldSources' in device)), 'calculation catalog must omit governance payloads');
@@ -54,6 +62,16 @@ assert.deepEqual(loader.getStats(), {
   hydratedDeviceCount: 1,
   legacyFallbackUsed: false,
 });
+
+const packedLoader = createProtectiveDeviceCatalogLoader({
+  indexUrl: '/packed-index.json',
+  fetchFn: async () => response({
+    schemaVersion: 2,
+    fields: ['id', 'name', 'catalogShard'],
+    records: [['packed-a', 'Packed device', '0b']],
+  }),
+});
+assert.deepEqual(await packedLoader.loadIndex(), [{ id: 'packed-a', name: 'Packed device', catalogShard: '0b' }]);
 
 let baseDevices = [{ id: 'a', catalogShard: '0a', name: 'Metadata' }];
 let libraryDevices = [...baseDevices];

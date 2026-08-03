@@ -43,7 +43,7 @@ test('Optimal Route dependencies load under the production CSP', async ({ page }
   expect(requestedScripts.filter(url => new URL(url).origin !== origin)).toEqual([]);
 });
 
-test('decomposed One-Line and TCC modules load from the served source tree', async ({ page }) => {
+test('One-Line modules remain decomposed while TCC loads its production entry', async ({ page }) => {
   const requestedScripts = [];
   const pageErrors = [];
   page.on('request', request => {
@@ -59,7 +59,9 @@ test('decomposed One-Line and TCC modules load from the served source tree', asy
   requestedScripts.length = 0;
   await page.goto(`${origin}/tcc.html`, { waitUntil: 'networkidle' });
   await expect(page.locator('#plot-btn')).toBeVisible();
-  expect(requestedScripts).toContain('/analysis/tcc/viewModel.mjs');
-  expect(requestedScripts).toContain('/analysis/tcc/customCurveModel.mjs');
+  expect(requestedScripts.some(pathname => /^\/dist\/tcc(?:\.[0-9a-f]{8,})?\.js$/.test(pathname))).toBe(true);
+  expect(requestedScripts).not.toContain('/analysis/tcc.js');
+  expect(requestedScripts).not.toContain('/analysis/tcc/viewModel.mjs');
+  expect(requestedScripts).not.toContain('/analysis/tcc/customCurveModel.mjs');
   expect(pageErrors).toEqual([]);
 });

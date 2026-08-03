@@ -17,6 +17,7 @@ import { fileURLToPath } from 'url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.join(__dirname, '..');
 const pageUrl = file => 'file://' + path.join(root, file);
+const startupScriptsByPage = new WeakMap();
 
 async function startStaticServer() {
   const server = http.createServer(async (req, res) => {
@@ -131,12 +132,24 @@ test.describe('Wind Load Analysis', () => {
 // -------------------------------------------------------------------------
 test.describe('Transient Stability Analysis', () => {
   test.beforeEach(async ({ page }) => {
+    const startupScripts = [];
+    startupScriptsByPage.set(page, startupScripts);
+    page.on('request', request => {
+      if (request.resourceType() === 'script') startupScripts.push(new URL(request.url()).pathname);
+    });
     await page.goto(pageUrl('transientstability.html?e2e=1&e2e_reset=1'));
     await page.waitForLoadState('networkidle');
   });
 
   test('page loads with correct heading', async ({ page }) => {
     await expect(page.locator('h1')).toContainText('Transient Stability');
+    const startupScripts = startupScriptsByPage.get(page) || [];
+    expect(startupScripts).toHaveLength(3);
+    expect(startupScripts.some(pathname => pathname.endsWith('/dist/vendor/plotly.min.js'))).toBe(true);
+    expect(startupScripts.some(pathname => /\/dist\/transientstability(?:\.[0-9a-f]{8,})?\.js$/.test(pathname))).toBe(true);
+    expect(startupScripts.some(pathname => pathname.endsWith('/dist/vendor/fast-json-patch.mjs'))).toBe(true);
+    expect(startupScripts.some(pathname => pathname.endsWith('/dirtyTracker.js'))).toBe(false);
+    expect(startupScripts.some(pathname => pathname.endsWith('/dist/projectManager.js'))).toBe(false);
   });
 
   test('has required input fields', async ({ page }) => {
@@ -185,12 +198,22 @@ test.describe('Transient Stability Analysis', () => {
 // -------------------------------------------------------------------------
 test.describe('N-1 Contingency Analysis', () => {
   test.beforeEach(async ({ page }) => {
+    const startupScripts = [];
+    startupScriptsByPage.set(page, startupScripts);
+    page.on('request', request => {
+      if (request.resourceType() === 'script') startupScripts.push(new URL(request.url()).pathname);
+    });
     await page.goto(pageUrl('contingency.html?e2e=1&e2e_reset=1'));
     await page.waitForLoadState('networkidle');
   });
 
   test('page loads with correct heading', async ({ page }) => {
     await expect(page.locator('h1')).toContainText(/Contingency|N-1/i);
+    const startupScripts = startupScriptsByPage.get(page) || [];
+    expect(startupScripts).toHaveLength(1);
+    expect(startupScripts.some(pathname => /\/dist\/contingency(?:\.[0-9a-f]{8,})?\.js$/.test(pathname))).toBe(true);
+    expect(startupScripts.some(pathname => pathname.endsWith('/dataStore.mjs'))).toBe(false);
+    expect(startupScripts.some(pathname => pathname.endsWith('/studies/contingency.js'))).toBe(false);
   });
 
   test('contingency form is present', async ({ page }) => {

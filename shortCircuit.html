@@ -30,7 +30,6 @@
     ]
   }
   </script>
-  <script type="module" src="dataStore.mjs" defer></script>
   <script type="module" src="dist/shortCircuit.js" defer></script>
 </head>
 <body data-page-visual="analysis" data-report-title="Short Circuit Study">
@@ -147,20 +146,5 @@
       <a href="help.html">Help</a>
     </nav>
   </footer>
-  <script type="module" src="dist/projectManager.js"></script>
-  <script type="module">
-    import { initStudyApprovalPanel } from './src/components/studyApproval.js';
-    import { initStudyBasisPanel } from './src/components/studyBasis.js';
-    document.addEventListener('DOMContentLoaded', () => {
-      initStudyBasisPanel('shortCircuit', {
-        standard: 'ANSI C37 / IEC 60909',
-        clause: 'Fault-current calculation at modeled buses',
-        assumptions: ['Uses the active project One-Line model', 'Results are saved to the active project', 'Export occurs only when explicitly requested'],
-        limitations: ['Missing source or impedance data produces assumed inputs that require review'],
-        benchmarkId: 'short-circuit-project-model'
-      });
-      initStudyApprovalPanel('shortCircuit');
-    });
-  </script>
 </body>
 </html>
