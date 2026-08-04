@@ -198,10 +198,25 @@ jobs:
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
 
+      - name: Download previous base-branch performance report
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BASE_BRANCH: ${{ github.base_ref || github.event.repository.default_branch }}
+        run: |
+          run_id=$(gh run list --workflow ci.yml --branch "$BASE_BRANCH" --status success --limit 1 --json databaseId --jq '.[0].databaseId')
+          if [ -n "$run_id" ]; then
+            gh run download "$run_id" --name browser-performance-report --dir output/playwright/performance-baseline
+          fi
+
       - name: Enforce browser performance budgets
         run: npm run perf:browser
         env:
           CI: true
+
+      - name: Publish performance summary
+        if: always()
+        run: npm run perf:summary -- --baseline output/playwright/performance-baseline/performance-report.json
 
       - name: Upload performance measurements
         if: always()

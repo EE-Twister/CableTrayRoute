@@ -179,6 +179,7 @@ if (typeof document !== 'undefined') {
     const readiness = document.getElementById('motorstart-readiness');
     const resultsElement = document.getElementById('motorstart-results');
     const chart = document.getElementById('motorstart-chart');
+    if (!loadBtn || !runBtn || !exportBtn || !inputs || !readiness || !resultsElement || !chart) return;
     const projectOverrides = new Set();
     let projectInputModel = getProjectInputModel();
     let sourceById = new Map();

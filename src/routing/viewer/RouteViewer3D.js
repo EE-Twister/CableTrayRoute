@@ -248,6 +248,8 @@ export class RouteViewer3D {
     this.contextDensity = 'medium';
     this.racewayFilter = 'compatible';
     this.selectedCableGroup = '';
+    this.staticSceneSignature = '';
+    this.staticSceneReuseCount = 0;
     this.layerVisibility = {
       tray: true,
       conduit: true,
@@ -380,7 +382,8 @@ export class RouteViewer3D {
   }
 
   setData({ raceways = [], ductbanks = [], routes = [], selectedRouteIndex } = {}) {
-    this.model = buildRouteSceneModel({ raceways, ductbanks, routes });
+    const nextModel = buildRouteSceneModel({ raceways, ductbanks, routes });
+    this.model = nextModel;
     this.selectedRouteIndex = Number.isInteger(selectedRouteIndex)
       ? selectedRouteIndex
       : this.model.routes.length === 1
@@ -390,13 +393,51 @@ export class RouteViewer3D {
       this.selectedRouteIndex = null;
     }
     this.selectedCableGroup = normalizedCableGroup(this.model.routes[this.selectedRouteIndex]?.allowedGroup);
-    this.rebuildScene();
+    const nextSceneSignature = this.sceneSignature(nextModel);
+    if (nextSceneSignature === this.staticSceneSignature) {
+      this.staticSceneReuseCount += 1;
+      this.selectable = [];
+      this.staticGroup.traverse(child => { if (child.userData?.selectable) this.selectable.push(child); });
+      this.clearRouteOverlay();
+    } else {
+      this.rebuildScene(nextSceneSignature);
+    }
     this.fitAll();
     if (this.selectedRouteIndex != null) this.selectRoute(this.selectedRouteIndex, { focus: true, emit: false });
     this.updateDebugState();
   }
 
-  rebuildScene() {
+  sceneSignature(model = this.model) {
+    return JSON.stringify([
+      this.contextDensity,
+      this.heatmapEnabled,
+      this.selectedRouteIndex,
+      model.raceways.map(raceway => [
+        raceway.id,
+        raceway.kind,
+        raceway.parentId,
+        raceway.path,
+        raceway.widthIn,
+        raceway.heightIn,
+        raceway.diameterIn,
+        raceway.allowedGroup,
+        raceway.utilizationPct
+      ]),
+      model.routes.map(route => {
+        const first = route.segments[0];
+        const last = route.segments.at(-1);
+        return [
+          route.startTag,
+          route.endTag,
+          first?.start,
+          last?.end,
+          route.segments.map(segment => segment.containmentType === 'field' ? '' : segment.racewayId)
+        ];
+      })
+    ]);
+  }
+
+  rebuildScene(signature = this.sceneSignature()) {
     disposeObject(this.staticGroup);
     disposeObject(this.contextGroup);
     this.clearRouteOverlay();
@@ -412,6 +453,7 @@ export class RouteViewer3D {
     this.addEquipmentContext();
     this.drawMinimap();
     this.updateElevationScale();
+    this.staticSceneSignature = signature;
     this.requestRender();
   }
 
@@ -1751,6 +1793,7 @@ export class RouteViewer3D {
       racewayKinds,
       inferredGeometryCount: this.model.raceways.filter(raceway => raceway.geometrySource === 'inferred-arrangement').length,
       routeCount: this.model.routes.length,
+      staticSceneReuseCount: this.staticSceneReuseCount,
       selectedRouteIndex: this.selectedRouteIndex,
       selectedRacewayId: this.selectedRacewayId,
       currentView: this.currentView || 'isometric',

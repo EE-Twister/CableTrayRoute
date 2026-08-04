@@ -24,6 +24,7 @@
     "visual:regression:update": "playwright test --config playwright.visual.config.cjs --update-snapshots",
     "perf:browser": "node scripts/perf-browser-baseline.mjs",
     "perf:browser:report": "node scripts/perf-browser-baseline.mjs --no-enforce",
+    "perf:summary": "node scripts/writePerformanceSummary.mjs",
     "e2e:next-features-integration": "playwright test --config playwright.config.cjs playwright-tests/nextFeatures.integration.spec.js",
     "e2e:next-features-cost": "playwright test --config playwright.config.cjs playwright-tests/nextFeatures.integration.spec.js --grep \"AT-CE-0[1-4]\"",
     "e2e:next-features-emf": "playwright test --config playwright.config.cjs playwright-tests/nextFeatures.integration.spec.js --grep \"AT-EMF-0[1-4]\"",

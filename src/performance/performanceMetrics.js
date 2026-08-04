@@ -1,5 +1,6 @@
 const STORE_KEY = '__CTR_PERFORMANCE__';
 const EVENT_NAME = 'ctr:performance-measure';
+const MAX_RETAINED_MEASUREMENTS = 200;
 
 function clockNow() {
   if (typeof performance !== 'undefined' && typeof performance.now === 'function') {
@@ -24,7 +25,12 @@ export function recordPerformanceMeasurement(name, durationMs, detail = {}) {
     detail: { ...detail },
   };
   const store = getStore();
-  if (store) store.measurements.push(measurement);
+  if (store) {
+    store.measurements.push(measurement);
+    if (store.measurements.length > MAX_RETAINED_MEASUREMENTS) {
+      store.measurements.splice(0, store.measurements.length - MAX_RETAINED_MEASUREMENTS);
+    }
+  }
   if (typeof window !== 'undefined' && typeof CustomEvent === 'function') {
     window.dispatchEvent(new CustomEvent(EVENT_NAME, { detail: measurement }));
   }

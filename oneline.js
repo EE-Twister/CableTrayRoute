@@ -1,5 +1,6 @@
 import { bootstrapPage } from './src/lifecycle/pageBootstrap.js';
-import { createOneLineRenderPerformance } from './src/one-line/renderPerformance.js';
+import { scheduleNoncriticalWork } from './src/one-line/deferredStartup.js';
+import { createBoxSpatialIndex, createOneLineRenderPerformance, prepareAtomicRenderLayer, snapComponentsToGrid } from './src/one-line/renderPerformance.js';
 import { createProtectiveDeviceCatalogLoader } from './src/protectiveDevices/catalogLoader.mjs';
 import { loadReferencedProtectiveDevices } from './src/protectiveDevices/calculationCatalog.mjs';
 function escapeHtml(value) {
@@ -12,7 +13,7 @@ function escapeHtml(value) {
     .replace(/'/g, '&#39;');
 }
 
-import { getOneLine, setOneLine, getEquipment, setEquipment, getPanels, setPanels, getLoads, setLoads, getCables, setCables, addRaceway, getItem, setItem, migrateLegacyItem, getStudies, setStudies, on, getCurrentScenario, switchScenario, STORAGE_KEYS, loadProject, saveProject } from './dataStore.mjs';
+import { getOneLine, setOneLine, getEquipment, setEquipment, getPanels, setPanels, getLoads, setLoads, getCables, getOneLineScheduleCollections, setCables, addRaceway, getItem, setItem, migrateLegacyItem, getStudies, setStudies, on, getCurrentScenario, switchScenario, STORAGE_KEYS, loadProject, saveProject } from './dataStore.mjs';
 import { previewScheduleReconcile, applyScheduleReconcilePreview } from './analysis/scheduleReconcile.mjs';
 import { runLoadFlow } from './analysis/loadFlow.js';
 import { renderLoadFlowResultsHtml } from './analysis/loadFlowResultsRenderer.js';
@@ -2712,7 +2713,7 @@ function ensureCapacitorReactorPropertyMetadata() {
 
 
 // === REPLACE THE ENTIRE FUNCTION ===
-async function loadComponentLibrary() {
+async function loadComponentLibrary({ renderPalette = true } = {}) {
   componentMeta = {};
   propSchemas = {};
   subtypeCategory = {};
@@ -2831,7 +2832,7 @@ async function loadComponentLibrary() {
   ensureBaselineComponentMetadata();
   ensureStudyInputMetadata();
 
-  buildPalette();
+  if (renderPalette) buildPalette();
   refreshAttributeOptions();
 }
 // === END REPLACEMENT ===
@@ -4790,7 +4791,7 @@ function scheduleKeyForComponent(comp) {
   return 'equipment';
 }
 
-const renderPerformance = createOneLineRenderPerformance({ getEquipment, getPanels, getLoads, getCables });
+const renderPerformance = createOneLineRenderPerformance({ getEquipment, getPanels, getLoads, getCables, getCollections: getOneLineScheduleCollections });
 
 function scheduleCollectionForKey(key) { return renderPerformance.getCollection(key); }
 
@@ -11512,8 +11513,7 @@ function render() {
     ? computeEnergizedSet(components, connections)
     : new Set();
   const svg = document.getElementById('diagram');
-  svg.querySelectorAll('g.component, .connection, .conn-label, .connection-waypoint-handle, .port, .bus-handle, .annotation-handle, .issue-badge, .component-label, .component-attribute, .component-datablock, .operating-state-badge, .data-state-badge, .connection-junction, .selection-marquee, .transformer-port-label, .alignment-snap-guides').forEach(el => el.remove());
-
+  const { surface: renderSurface, commit: commitRenderSurface, componentById, routeCandidates } = prepareAtomicRenderLayer(svg, svgNS, components, componentBounds);
   // Gap #52: re-insert background image underlay (positioned later by applyDiagramZoom)
   const existingBgUnderlay = svg.querySelector('#bg-underlay');
   if (existingBgUnderlay) existingBgUnderlay.remove();
@@ -11632,7 +11632,7 @@ function render() {
       let midX = initialMid;
       for (let attempts = 0; attempts < MAX_ROUTE_ADJUST_STEPS; attempts++) {
         let moved = false;
-        components.forEach(comp => {
+        routeCandidates(Math.min(start.x, end.x, midX), Math.min(start.y, end.y), Math.max(start.x, end.x, midX), Math.max(start.y, end.y)).forEach(comp => {
           if (comp === src || comp === tgt) return;
           const rect = { x: comp.x, y: comp.y, w: comp.width || compWidth, h: comp.height || compHeight };
           if (
@@ -11676,7 +11676,7 @@ function render() {
       let midY = initialMid;
       for (let attempts = 0; attempts < MAX_ROUTE_ADJUST_STEPS; attempts++) {
         let moved = false;
-        components.forEach(comp => {
+        routeCandidates(Math.min(start.x, end.x), Math.min(start.y, end.y, midY), Math.max(start.x, end.x), Math.max(start.y, end.y, midY)).forEach(comp => {
           if (comp === src || comp === tgt) return;
           const rect = { x: comp.x, y: comp.y, w: comp.width || compWidth, h: comp.height || compHeight };
           if (
@@ -11724,7 +11724,7 @@ function render() {
         const x2 = Math.max(p1.x, p2.x);
         const y1 = Math.min(p1.y, p2.y);
         const y2 = Math.max(p1.y, p2.y);
-        for (const comp of components) {
+        for (const comp of routeCandidates(x1, y1, x2, y2)) {
           if (comp === src || comp === tgt) continue;
           const rect = { x: comp.x, y: comp.y, w: comp.width || compWidth, h: comp.height || compHeight };
           if (horizontal) {
@@ -11876,6 +11876,7 @@ function render() {
     .filter(comp => !isHiddenByLayer(comp))
     .map(componentVisualBounds)
     .filter(Boolean);
+  const labelCollisionIndex = createBoxSpatialIndex(labelCollisionBoxes);
   const boxesOverlap = (a, b, padding = 14) => !(
     a.right + padding < b.left
     || a.left - padding > b.right
@@ -11896,13 +11897,14 @@ function render() {
     for (const offset of offsets) {
       const candidate = { ...position, y: position.y + offset };
       const box = connectionLabelBox(candidate, text);
-      if (!labelCollisionBoxes.some(existing => boxesOverlap(box, existing))) {
-        labelCollisionBoxes.push(box);
+      if (!labelCollisionIndex.hasOverlap(box, existing => boxesOverlap(box, existing), 14)) {
+        labelCollisionBoxes.push(box); labelCollisionIndex.add(box);
         return candidate;
       }
     }
     const fallback = { ...position, y: position.y - 144 };
-    labelCollisionBoxes.push(connectionLabelBox(fallback, text));
+    const fallbackBox = connectionLabelBox(fallback, text);
+    labelCollisionBoxes.push(fallbackBox); labelCollisionIndex.add(fallbackBox);
     return fallback;
   };
   const inboundConnectionCount = new Map();
@@ -11922,7 +11924,7 @@ function render() {
   // draw connections
   components.forEach(c => {
     (c.connections || []).forEach((conn, idx) => {
-      const target = components.find(t => t.id === conn.target);
+      const target = componentById.get(conn.target);
       if (!target) return;
       // Gap #51: skip connection if either endpoint is on a hidden layer
       if (isHiddenByLayer(c) || isHiddenByLayer(target)) return;
@@ -11985,7 +11987,7 @@ function render() {
           moved: false
         };
       });
-      svg.appendChild(poly);
+      renderSurface.appendChild(poly);
       if (!engineeringPrint
         && selectedConnection?.component?.id === c.id
         && selectedConnection.index === idx
@@ -12016,7 +12018,7 @@ function render() {
             moved: false
           };
         });
-        svg.appendChild(waypoint);
+        renderSurface.appendChild(waypoint);
       }
       const startPoint = pts[0];
       const endPoint = pts[pts.length - 1];
@@ -12098,7 +12100,7 @@ function render() {
           await editCableComponent(cableComp);
         }
       });
-      svg.appendChild(label);
+      renderSurface.appendChild(label);
     });
   });
 
@@ -12366,7 +12368,7 @@ function render() {
       appendConnectedTerminalBridges(g, c, meta);
       if (dataStateInfo) {
         if (useCompactDataState) {
-          renderDataStateBadge(svg, c, dataStateInfo, dataStateOverlayMode, includePoint);
+          renderDataStateBadge(renderSurface, c, dataStateInfo, dataStateOverlayMode, includePoint);
         } else {
           const outline = document.createElementNS(svgNS, 'rect');
           outline.setAttribute('x', c.x - 1.5);
@@ -12461,8 +12463,8 @@ function render() {
       glabel.textContent = c.label || 'Group';
       g.appendChild(glabel);
     }
-    svg.appendChild(g);
-    if (!engineeringPrint) renderOperatingStateBadge(svg, c, operatingStatus, includePoint);
+    renderSurface.appendChild(g);
+    if (!engineeringPrint) renderOperatingStateBadge(renderSurface, c, operatingStatus, includePoint);
     if (!engineeringPrint && c.type === 'annotation' && selection.includes(c)) {
       const handle = document.createElementNS(svgNS, 'rect');
       handle.setAttribute('x', c.x + w - 5);
@@ -12474,7 +12476,7 @@ function render() {
       handle.setAttribute('stroke-width', '1');
       handle.classList.add('annotation-handle');
       handle.dataset.id = c.id;
-      svg.appendChild(handle);
+      renderSurface.appendChild(handle);
     }
     if (c.type !== 'annotation') {
       const labelPos = getLabelPosition(c);
@@ -12488,7 +12490,7 @@ function render() {
       labelEl.setAttribute('dominant-baseline', getLabelBaseline(c));
       labelEl.textContent = labelText;
       attachLabelInteractions(labelEl, c);
-      svg.appendChild(labelEl);
+      renderSurface.appendChild(labelEl);
       const labelBounds = componentLabelBounds(c);
       if (labelBounds) {
         includePoint(labelBounds.left, labelBounds.top);
@@ -12496,7 +12498,7 @@ function render() {
       }
       const attrLines = getComponentAttributeLines(c);
       if (attrLines.length) {
-        renderComponentDatablock(svg, c, attrLines, includePoint, datablockLayout);
+        renderComponentDatablock(renderSurface, c, attrLines, includePoint, datablockLayout);
       }
       if (c.type === 'transformer') {
         const ports = c.ports || resolveComponentMeta(c)?.ports || [];
@@ -12535,7 +12537,7 @@ function render() {
           textEl.setAttribute('text-anchor', anchor);
           textEl.setAttribute('dominant-baseline', baseline);
           textEl.textContent = labelText;
-          svg.appendChild(textEl);
+          renderSurface.appendChild(textEl);
         });
       }
     }
@@ -12548,7 +12550,7 @@ function render() {
       handleRight.classList.add('bus-handle');
       handleRight.dataset.id = c.id;
       handleRight.dataset.side = 'right';
-      svg.appendChild(handleRight);
+      renderSurface.appendChild(handleRight);
       const handleLeft = document.createElementNS(svgNS, 'rect');
       handleLeft.setAttribute('x', c.x - 5);
       handleLeft.setAttribute('y', c.y + (c.height / 2) - 5);
@@ -12557,7 +12559,7 @@ function render() {
       handleLeft.classList.add('bus-handle');
       handleLeft.dataset.id = c.id;
       handleLeft.dataset.side = 'left';
-      svg.appendChild(handleLeft);
+      renderSurface.appendChild(handleLeft);
     }
       if (!engineeringPrint && connectMode) {
         (c.ports || meta.ports || []).forEach((p, idx) => {
@@ -12575,7 +12577,7 @@ function render() {
           }
           circ.dataset.id = c.id;
           circ.dataset.port = idx;
-          svg.appendChild(circ);
+          renderSurface.appendChild(circ);
         });
       }
   });
@@ -12590,9 +12592,10 @@ function render() {
     dot.setAttribute('stroke-width', 1.2);
     dot.classList.add('connection-junction');
     dot.style.pointerEvents = 'none';
-    svg.appendChild(dot);
+    renderSurface.appendChild(dot);
   });
 
+  commitRenderSurface();
   if (!engineeringPrint) applyValidationIssueMarkers(svg);
 
   if (!engineeringPrint && marquee && marquee.active) {
@@ -12611,7 +12614,7 @@ function render() {
     if (marquee.x2 < marquee.x1) rect.setAttribute('stroke-dasharray', '6 4');
     rect.classList.add('selection-marquee');
     rect.style.pointerEvents = 'none';
-    svg.appendChild(rect);
+    renderSurface.appendChild(rect);
   }
 
   updateDiagramViewport(boundsState);
@@ -12657,7 +12660,7 @@ export function toggleGrid() {
   gridEnabled = toggle?.checked;
   setOneLineViewSetting('gridEnabled', gridEnabled);
   document.getElementById('grid-bg').style.display = gridEnabled ? 'block' : 'none';
-  render();
+  if (gridEnabled && snapComponentsToGrid(components, gridSize)) render();
 }
 
 // ----------------------------------------------------------------
@@ -12714,7 +12717,7 @@ function renderProtectionZones(svg) {
     rect.setAttribute('stroke-width', '1.5');
     rect.classList.add('protection-zone-overlay');
     const firstConn = svg.querySelector('polyline');
-    if (firstConn) svg.insertBefore(rect, firstConn);
+    if (firstConn) firstConn.parentNode.insertBefore(rect, firstConn);
     else svg.appendChild(rect);
 
     // Zone name label above the rectangle
@@ -12807,7 +12810,7 @@ function renderHazAreaOverlay(svg) {
     rect.setAttribute('stroke-dasharray', '5,3');
     rect.classList.add('haz-area-overlay');
     const firstConn = svg.querySelector('polyline');
-    if (firstConn) svg.insertBefore(rect, firstConn);
+    if (firstConn) firstConn.parentNode.insertBefore(rect, firstConn);
     else svg.appendChild(rect);
 
     // Designation label
@@ -17922,10 +17925,7 @@ async function init() {
   const exportReportsBtn = document.getElementById('export-reports-btn');
   if (exportReportsBtn) exportReportsBtn.addEventListener('click', () => exportAllReports());
 
-  buildPalette();
-  loadTemplates();
-  renderTemplates();
-  setupLibraryTools();
+  scheduleNoncriticalWork(() => { buildPalette(); loadTemplates(); renderTemplates(); setupLibraryTools(); });
   const customComponentStorageSuffix = `:${customComponentStorageKey}`;
   window.addEventListener('storage', e => {
     if (!e.key) return;
@@ -20816,7 +20816,7 @@ if (typeof window !== 'undefined') {
 async function __oneline_init() {
   // Load libraries
   await Promise.all([
-    loadComponentLibrary().catch(e => console.error('loadComponentLibrary failed:', e)),
+    loadComponentLibrary({ renderPalette: false }).catch(e => console.error('loadComponentLibrary failed:', e)),
     loadManufacturerLibrary().catch(e => console.error('loadManufacturerLibrary failed:', e)),
   ]);
 

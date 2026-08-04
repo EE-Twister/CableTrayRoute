@@ -41,6 +41,17 @@ setOneLine({
 const oneLine = getOneLine();
 assert.equal(oneLine.sheets[0].components[0].entityId, 'pmp-101');
 assert.equal(oneLine.sheets[0].connections[0].circuitId, 'cbl-mcc-pmp-101');
+const originalComponentLabel = oneLine.sheets[0].components[0].label;
+oneLine.sheets[0].components[0].label = 'caller-only mutation';
+assert.equal(getOneLine().sheets[0].components[0].label, originalComponentLabel,
+  'cached normalized One-Line snapshots must remain isolated from caller mutations');
+const secondDataStore = await import(`../dataStore.mjs?one-line-cache=${Date.now()}`);
+secondDataStore.setOneLine({
+  activeSheet: 0,
+  sheets: [{ name: 'Shared cache update', components: [], connections: [], layers: [] }],
+}, undefined, { captureRevision: false });
+assert.equal(getOneLine().sheets[0].name, 'Shared cache update',
+  'normalized One-Line cache invalidation must be shared across module instances');
 
 const studyInputHash = getProjectInputFingerprint();
 setStudies({ integrationTest: { value: 1 } });

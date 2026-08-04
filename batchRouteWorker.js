@@ -51,6 +51,8 @@ function processFrom(index) {
         self.postMessage({ type: 'progress', completed: i + 1, total: cables.length, cableName: cable.name, routeMs, success: result.success });
     }
 
+    const cableMapForArea = new Map(cables.map(cable => [cable.name, cable.diameter]));
+    const sharedRoutes = system.findCommonFieldRoutes(allRoutes, 6, cableMapForArea);
     const wallTime = performance.now() - state.startTime - (state.pausedDuration || 0);
     const finalUtilization = system.getTrayUtilization();
     const finalTrays = Array.from(system.trays.values()).map(t => ({ ...t }));
@@ -58,6 +60,7 @@ function processFrom(index) {
         type: 'done',
         results,
         allRoutes,
+        sharedRoutes,
         utilization: finalUtilization,
         finalTrays,
         wallTime

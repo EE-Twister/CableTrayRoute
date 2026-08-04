@@ -306,6 +306,19 @@ describe("_racewayRoute", () => {
     assert.strictEqual(result.exclusions.length, 0);
   });
 
+  it("deduplicates shared field geometry before later route searches", () => {
+    const system = new CableRoutingSystem({});
+    const segment = { type: "field", start: [0, 0, 0], end: [10, 0, 0] };
+    system.recordSharedFieldSegments([
+      segment,
+      { type: "field", start: [10, 0, 0], end: [0, 0, 0] },
+      { type: "tray", start: [0, 0, 0], end: [10, 0, 0] },
+    ]);
+
+    assert.strictEqual(system.sharedFieldSegments.length, 1);
+    assert(system._isSharedSegment({ start: [5, 0, 0], end: [15, 0, 0] }));
+  });
+
   it("warns when ductbank has no conduits", () => {
     const appCode = fs.readFileSync(
       path.join(__dirname, "..", "app.mjs"),

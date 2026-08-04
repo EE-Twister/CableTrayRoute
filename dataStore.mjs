@@ -65,12 +65,14 @@ export function switchScenario(name) {
   if (!name) return;
   registerScenario(name);
   setCurrentScenarioNameState(name);
+  projectInputFingerprintCache = null;
   emit('scenario', getCurrentScenarioNameState());
 }
 
 export function cloneScenario(newName, from = getCurrentScenarioNameState()) {
   if (!newName) return;
   cloneScenarioStorage(from, newName);
+  oneLineProjectViewCache.delete(newName);
   registerScenario(newName);
 }
 
@@ -166,6 +168,32 @@ const EXTRA_KEYS = {
 };
 
 const LEGACY_STUDIES_SETTING_KEY = 'studies';
+const PROJECT_INPUT_KEYS = new Set([
+  KEYS.equipment,
+  KEYS.loads,
+  KEYS.panels,
+  KEYS.cables,
+  KEYS.trays,
+  KEYS.conduits,
+  KEYS.ductbanks,
+  KEYS.oneLine,
+  EXTRA_KEYS.projectMeta,
+  EXTRA_KEYS.designBasis,
+]);
+const ONE_LINE_VIEW_INPUT_KEYS = new Set([
+  KEYS.equipment,
+  KEYS.loads,
+  KEYS.panels,
+  KEYS.cables,
+  KEYS.oneLine,
+]);
+let projectInputFingerprintCache = null;
+let projectInputFingerprintScenario = '';
+const ONE_LINE_VIEW_CACHE_SYMBOL = Symbol.for('cabletrayroute.oneLineProjectViewCache');
+const oneLineProjectViewCache = globalThis[ONE_LINE_VIEW_CACHE_SYMBOL] instanceof Map
+  ? globalThis[ONE_LINE_VIEW_CACHE_SYMBOL]
+  : new Map();
+globalThis[ONE_LINE_VIEW_CACHE_SYMBOL] = oneLineProjectViewCache;
 
 export const STORAGE_KEYS = { ...KEYS, ...EXTRA_KEYS };
 
@@ -224,6 +252,8 @@ if (typeof window !== 'undefined' && typeof window.addEventListener === 'functio
     if (!crossWindowKeys.has(key)) return;
     try {
       const val = e.newValue ? JSON.parse(e.newValue) : undefined;
+      if (PROJECT_INPUT_KEYS.has(key)) projectInputFingerprintCache = null;
+      if (ONE_LINE_VIEW_INPUT_KEYS.has(key)) oneLineProjectViewCache.delete(getCurrentScenarioNameState());
       emit(key, val);
     } catch (err) {
       console.warn('storage event: failed to parse value for key', e.key, err);
@@ -235,12 +265,17 @@ function read(key, fallback, scenario = getCurrentScenarioNameState()) {
   return readScenarioValue(key, fallback, scenario);
 }
 
-function write(key, value, scenario = getCurrentScenarioNameState()) {
+function write(key, value, scenario = getCurrentScenarioNameState(), options = {}) {
   try {
-    writeScenarioValue(key, value, scenario);
+    const changed = writeScenarioValue(key, value, scenario, options);
+    if (!changed) return false;
+    if (PROJECT_INPUT_KEYS.has(key)) projectInputFingerprintCache = null;
+    if (ONE_LINE_VIEW_INPUT_KEYS.has(key)) oneLineProjectViewCache.delete(scenario);
     emit(key, value);
+    return true;
   } catch (e) {
     console.error('Failed to store', key, e);
+    return false;
   }
 }
 
@@ -269,11 +304,11 @@ export const getCables = () => {
 /**
  * @param {Cable[]} cables
  */
-export const setCables = cables => write(KEYS.cables, normalizeProjectEntities({
+export const setCables = (cables, options = {}) => write(KEYS.cables, normalizeProjectEntities({
   equipment: getEquipment(),
   loads: getLoads(),
   cables,
-}).cables);
+}).cables, getCurrentScenarioNameState(), options);
 
 /**
  * Read the cable schedule for a specific named scenario without switching the
@@ -541,6 +576,31 @@ export const addRaceway = raceway => {
  */
 export const getPanels = () => read(KEYS.panels, []);
 
+/**
+ * Read and normalize the four schedules consumed together by One-Line.
+ * This avoids re-reading equipment and loads through dependent getters for
+ * every render while preserving the individual getter APIs elsewhere.
+ */
+export function getOneLineScheduleCollections() {
+  const rawEquipment = read(KEYS.equipment, []);
+  const rawLoads = read(KEYS.loads, []);
+  const rawCables = read(KEYS.cables, []);
+  const equipment = normalizeProjectEntities({
+    equipment: rawEquipment.map(ensureEquipmentFields),
+  }).equipment;
+  const loads = normalizeProjectEntities({
+    equipment,
+    loads: rawLoads.map(ensureLoadFields),
+  }).loads;
+  const cables = normalizeProjectEntities({ equipment, loads, cables: rawCables }).cables;
+  return new Map([
+    ['equipment', equipment],
+    ['panel', read(KEYS.panels, [])],
+    ['load', loads],
+    ['cable', cables],
+  ]);
+}
+
 const DEFAULT_PANEL_CIRCUIT_COUNT = 42;
 const MAX_PANEL_CIRCUITS = 512;
 
@@ -688,17 +748,38 @@ export const removeEquipment = index => {
  * @returns {OneLineSheet[]}
  */
 export const getOneLine = (scenario = getCurrentScenarioNameState()) => {
+  const cloneView = value => {
+    if (typeof structuredClone === 'function') return structuredClone(value);
+    return JSON.parse(JSON.stringify(value));
+  };
+  if (oneLineProjectViewCache.has(scenario)) {
+    return cloneView(oneLineProjectViewCache.get(scenario));
+  }
+  const cacheView = value => {
+    oneLineProjectViewCache.set(scenario, cloneView(value));
+    return value;
+  };
   const normalizeActiveSheet = value => (Number.isInteger(value) && value >= 0 ? value : 0);
   const data = read(KEYS.oneLine, {}, scenario);
+  const projectReferences = () => {
+    const schedules = getOneLineScheduleCollections();
+    return {
+      equipment: schedules.get('equipment'),
+      loads: schedules.get('load'),
+      cables: schedules.get('cable'),
+    };
+  };
   if (Array.isArray(data)) {
+    const references = projectReferences();
     // legacy array of components
     const normalized = normalizeOneLineReferences(
       { activeSheet: 0, sheets: [{ name: 'Sheet 1', components: data, connections: [], layers: [] }] },
-      { equipment: getEquipment(), loads: getLoads(), cables: getCables() }
+      references
     );
-    return buildOneLineProjectView(normalized, { equipment: getEquipment(), loads: getLoads(), cables: getCables() });
+    return cacheView(buildOneLineProjectView(normalized, references));
   }
   if (data && Array.isArray(data.sheets)) {
+    const references = projectReferences();
     const normalized = normalizeOneLineReferences({
       activeSheet: normalizeActiveSheet(data.activeSheet),
       sheets: data.sheets.map(s => ({
@@ -711,10 +792,10 @@ export const getOneLine = (scenario = getCurrentScenarioNameState()) => {
         // Gap #50: preserve protection zone definitions per sheet
         ...(Array.isArray(s.protectionZones) ? { protectionZones: s.protectionZones } : {})
       }))
-    }, { equipment: getEquipment(), loads: getLoads(), cables: getCables() });
-    return buildOneLineProjectView(normalized, { equipment: getEquipment(), loads: getLoads(), cables: getCables() });
+    }, references);
+    return cacheView(buildOneLineProjectView(normalized, references));
   }
-  return { activeSheet: 0, sheets: [] };
+  return cacheView({ activeSheet: 0, sheets: [] });
 };
 /**
  * Persist one-line sheets
@@ -762,10 +843,12 @@ export const restoreRevision = (index, scenario = getCurrentScenarioNameState())
   return rev ? rev.sheets : null;
 };
 
-export const setOneLine = (data, scenario = getCurrentScenarioNameState()) => {
+export const setOneLine = (data, scenario = getCurrentScenarioNameState(), options = {}) => {
   const normalizeActiveSheet = value => (Number.isInteger(value) && value >= 0 ? value : 0);
-  const prev = getOneLine(scenario);
-  if (Array.isArray(prev.sheets) && prev.sheets.length) addRevision(prev.sheets, scenario);
+  if (options.captureRevision !== false) {
+    const prev = getOneLine(scenario);
+    if (Array.isArray(prev.sheets) && prev.sheets.length) addRevision(prev.sheets, scenario);
+  }
   const payload = {
     activeSheet: normalizeActiveSheet(data.activeSheet),
     sheets: Array.isArray(data.sheets) ? data.sheets : []
@@ -816,7 +899,17 @@ export const getProjectInputSnapshot = () => ({
   panels: getPanels(),
   oneLine: getOneLine(),
 });
-export const getProjectInputFingerprint = () => hashProjectInputs(getProjectInputSnapshot());
+export const getProjectInputFingerprint = () => {
+  const scenario = getCurrentScenarioNameState();
+  if (projectInputFingerprintScenario !== scenario) {
+    projectInputFingerprintCache = null;
+    projectInputFingerprintScenario = scenario;
+  }
+  if (projectInputFingerprintCache === null) {
+    projectInputFingerprintCache = hashProjectInputs(getProjectInputSnapshot());
+  }
+  return projectInputFingerprintCache;
+};
 
 /**
  * @returns {GenericRecord[]}
@@ -930,6 +1023,7 @@ export const setSessionItem = (key, value, scenario = getCurrentScenarioNameStat
 };
 export const removeItem = (key, scenario = getCurrentScenarioNameState()) => {
   try {
+    if (PROJECT_INPUT_KEYS.has(key)) projectInputFingerprintCache = null;
     removeScenarioValue(key, scenario);
     emit(key, null);
   } catch (e) {
@@ -1033,39 +1127,46 @@ export function loadProject(projectId, scenario = getCurrentScenarioNameState())
     const mccLineups = payload.mccLineups;
     const raceways = payload.raceways || {};
     const oneLine = payload.oneLine || {};
-    if (Array.isArray(equipment)) setEquipment(equipment); else setEquipment([]);
-    if (Array.isArray(panels)) setPanels(panels); else setPanels([]);
-    if (Array.isArray(loads)) setLoads(loads);
-    if (Array.isArray(cables)) setCables(cables); else setCables([]);
-    if (Array.isArray(cableTypicals)) setCableTypicals(cableTypicals); else setCableTypicals([]);
-    if (Array.isArray(cableTemplates)) setCableTemplates(cableTemplates); else setCableTemplates([]);
-    if (cableTagSettings && typeof cableTagSettings === 'object' && !Array.isArray(cableTagSettings)) setCableTagSettings(cableTagSettings); else setCableTagSettings({});
-    if (Array.isArray(cableChangeLog)) setCableChangeLog(cableChangeLog); else setCableChangeLog([]);
-    if (designBasis && typeof designBasis === 'object' && !Array.isArray(designBasis)) setDesignBasis(designBasis); else setDesignBasis(null);
-    if (designGateApprovals && typeof designGateApprovals === 'object' && !Array.isArray(designGateApprovals)) setDesignGateApprovals(designGateApprovals); else setDesignGateApprovals({});
-    setDeliverableArtifacts(workflowArtifacts.deliverableArtifacts);
-    setFieldExecutionRecords(workflowArtifacts.fieldExecutionRecords);
-    setFieldObservations(workflowArtifacts.fieldObservations);
-    setFieldObservationQueue(workflowArtifacts.fieldObservationQueue);
-    setProcurementRegister(workflowArtifacts.procurementRegister);
-    if (workflowArtifacts.reportSnapshots && typeof workflowArtifacts.reportSnapshots === 'object') {
-      write(EXTRA_KEYS.reportSnapshots, workflowArtifacts.reportSnapshots);
-    }
-    if (Array.isArray(workflowArtifacts.lifecyclePackages)) {
-      write(EXTRA_KEYS.lifecyclePackages, workflowArtifacts.lifecyclePackages);
-    }
-    if (workflowArtifacts.pullPlanArtifact !== undefined) setItem('pullPlanArtifact', workflowArtifacts.pullPlanArtifact);
-    if (workflowArtifacts.costEstimateArtifact !== undefined) setItem('costEstimateArtifact', workflowArtifacts.costEstimateArtifact);
-    if (workflowArtifacts.latestRouteResults !== undefined) setItem('latestRouteResults', workflowArtifacts.latestRouteResults);
-    setSwitchingProcedures(workflowArtifacts.switchingProcedures);
-    if (Array.isArray(mccLineups)) setMccLineups(mccLineups); else setMccLineups([]);
-    setTrays(Array.isArray(raceways.trays) ? raceways.trays : []);
-    setConduits(Array.isArray(raceways.conduits) ? raceways.conduits : []);
-    setDuctbanks(Array.isArray(raceways.ductbanks) ? raceways.ductbanks : []);
-    if (Array.isArray(oneLine)) {
-      setOneLine({ activeSheet: 0, sheets: oneLine }, scenario);
-    } else {
-      setOneLine(oneLine || { activeSheet: 0, sheets: [] }, scenario);
+    beginEventBatch();
+    beginProjectMutationBatch();
+    try {
+      if (Array.isArray(equipment)) setEquipment(equipment); else setEquipment([]);
+      if (Array.isArray(panels)) setPanels(panels); else setPanels([]);
+      if (Array.isArray(loads)) setLoads(loads);
+      if (Array.isArray(cables)) setCables(cables); else setCables([]);
+      if (Array.isArray(cableTypicals)) setCableTypicals(cableTypicals); else setCableTypicals([]);
+      if (Array.isArray(cableTemplates)) setCableTemplates(cableTemplates); else setCableTemplates([]);
+      if (cableTagSettings && typeof cableTagSettings === 'object' && !Array.isArray(cableTagSettings)) setCableTagSettings(cableTagSettings); else setCableTagSettings({});
+      if (Array.isArray(cableChangeLog)) setCableChangeLog(cableChangeLog); else setCableChangeLog([]);
+      if (designBasis && typeof designBasis === 'object' && !Array.isArray(designBasis)) setDesignBasis(designBasis); else setDesignBasis(null);
+      if (designGateApprovals && typeof designGateApprovals === 'object' && !Array.isArray(designGateApprovals)) setDesignGateApprovals(designGateApprovals); else setDesignGateApprovals({});
+      setDeliverableArtifacts(workflowArtifacts.deliverableArtifacts);
+      setFieldExecutionRecords(workflowArtifacts.fieldExecutionRecords);
+      setFieldObservations(workflowArtifacts.fieldObservations);
+      setFieldObservationQueue(workflowArtifacts.fieldObservationQueue);
+      setProcurementRegister(workflowArtifacts.procurementRegister);
+      if (workflowArtifacts.reportSnapshots && typeof workflowArtifacts.reportSnapshots === 'object') {
+        write(EXTRA_KEYS.reportSnapshots, workflowArtifacts.reportSnapshots);
+      }
+      if (Array.isArray(workflowArtifacts.lifecyclePackages)) {
+        write(EXTRA_KEYS.lifecyclePackages, workflowArtifacts.lifecyclePackages);
+      }
+      if (workflowArtifacts.pullPlanArtifact !== undefined) setItem('pullPlanArtifact', workflowArtifacts.pullPlanArtifact);
+      if (workflowArtifacts.costEstimateArtifact !== undefined) setItem('costEstimateArtifact', workflowArtifacts.costEstimateArtifact);
+      if (workflowArtifacts.latestRouteResults !== undefined) setItem('latestRouteResults', workflowArtifacts.latestRouteResults);
+      setSwitchingProcedures(workflowArtifacts.switchingProcedures);
+      if (Array.isArray(mccLineups)) setMccLineups(mccLineups); else setMccLineups([]);
+      setTrays(Array.isArray(raceways.trays) ? raceways.trays : []);
+      setConduits(Array.isArray(raceways.conduits) ? raceways.conduits : []);
+      setDuctbanks(Array.isArray(raceways.ductbanks) ? raceways.ductbanks : []);
+      if (Array.isArray(oneLine)) {
+        setOneLine({ activeSheet: 0, sheets: oneLine }, scenario, { captureRevision: false });
+      } else {
+        setOneLine(oneLine || { activeSheet: 0, sheets: [] }, scenario, { captureRevision: false });
+      }
+    } finally {
+      endProjectMutationBatch();
+      flushEventBatch();
     }
     if (migrated) saveProject(projectId, scenario);
     return !!rawPayload;
@@ -1090,8 +1191,12 @@ export function loadProject(projectId, scenario = getCurrentScenarioNameState())
  */
 export function applyRemoteSnapshot(snapshot, projectId) {
   if (!snapshot || typeof snapshot !== 'object') return;
+  let batchStarted = false;
   try {
     const { equipment, panels, loads, cables, cableTypicals, cableTemplates, cableTagSettings, cableChangeLog, designBasis, designGateApprovals, workflowArtifacts = {}, mccLineups, raceways = {}, oneLine } = snapshot;
+    beginEventBatch();
+    beginProjectMutationBatch();
+    batchStarted = true;
     if (Array.isArray(equipment)) setEquipment(equipment);
     if (Array.isArray(panels)) setPanels(panels);
     if (Array.isArray(loads)) setLoads(loads);
@@ -1126,11 +1231,14 @@ export function applyRemoteSnapshot(snapshot, projectId) {
     const scenario = getCurrentScenarioNameState();
     if (oneLine !== undefined) {
       if (Array.isArray(oneLine)) {
-        setOneLine({ activeSheet: 0, sheets: oneLine }, scenario);
+        setOneLine({ activeSheet: 0, sheets: oneLine }, scenario, { captureRevision: false });
       } else {
-        setOneLine(oneLine || { activeSheet: 0, sheets: [] }, scenario);
+        setOneLine(oneLine || { activeSheet: 0, sheets: [] }, scenario, { captureRevision: false });
       }
     }
+    endProjectMutationBatch();
+    flushEventBatch();
+    batchStarted = false;
     // Persist to storage so subsequent loadProject() calls see the updated data
     const pid = projectId || (typeof window !== 'undefined' && window.currentProjectId) || null;
     if (pid) writeSavedProject(pid, snapshot);
@@ -1141,6 +1249,10 @@ export function applyRemoteSnapshot(snapshot, projectId) {
       } catch { /* non-critical */ }
     }
   } catch (e) {
+    if (batchStarted) {
+      endProjectMutationBatch();
+      flushEventBatch();
+    }
     console.warn('[collab] Failed to apply remote snapshot', e);
   }
 }
@@ -1318,11 +1430,11 @@ export function importProject(obj) {
     setLoads(Array.isArray(data.loads) ? data.loads : []);
     setMccLineups(Array.isArray(data.mccLineups) ? data.mccLineups : []);
     if (Array.isArray(data.oneLine)) {
-      setOneLine({ activeSheet: 0, sheets: data.oneLine });
+      setOneLine({ activeSheet: 0, sheets: data.oneLine }, getCurrentScenarioNameState(), { captureRevision: false });
     } else if (data.oneLine && Array.isArray(data.oneLine.sheets)) {
-      setOneLine({ activeSheet: data.oneLine.activeSheet || 0, sheets: data.oneLine.sheets });
+      setOneLine({ activeSheet: data.oneLine.activeSheet || 0, sheets: data.oneLine.sheets }, getCurrentScenarioNameState(), { captureRevision: false });
     } else {
-      setOneLine({ activeSheet: 0, sheets: [] });
+      setOneLine({ activeSheet: 0, sheets: [] }, getCurrentScenarioNameState(), { captureRevision: false });
     }
     const importedStudies = data.settings?.studyResults ?? data.settings?.[LEGACY_STUDIES_SETTING_KEY] ?? {};
     if (importedStudies && typeof importedStudies === 'object' && !Array.isArray(importedStudies)) {

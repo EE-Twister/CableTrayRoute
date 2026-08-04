@@ -124,6 +124,7 @@ class CableRoutingSystem {
         // Optionally include ductbank outline segments lacking conduit IDs
         this.includeDuctbankOutlines = options.includeDuctbankOutlines || false;
         this.sharedFieldSegments = [];
+        this.sharedFieldSegmentKeys = new Set();
         this.trays = new Map();
         this.mismatchedRecords = [];
     }
@@ -579,15 +580,43 @@ class CableRoutingSystem {
         });
 
         this.baseGraph = graph;
+        this._indexBaseGraphTrayNodes();
         if (this.mismatchedRecords.length) {
             const formatted = this._formatMismatchedRecords();
             console.warn('Mismatched raceway segments:', formatted);
         }
     }
 
+    _indexBaseGraphTrayNodes() {
+        const nodeIds = Object.keys(this.baseGraph?.nodes || {});
+        this.baseGraphTrayNodes = new Map();
+        this.trays.forEach((tray, trayId) => {
+            const id = String(trayId);
+            this.baseGraphTrayNodes.set(trayId, nodeIds.filter(nodeId =>
+                nodeId === `${id}_start` ||
+                nodeId === `${id}_end` ||
+                nodeId.startsWith(`${id}_start_on_`) ||
+                nodeId.startsWith(`${id}_end_on_`) ||
+                nodeId.endsWith(`_on_${id}`)
+            ));
+        });
+    }
+
     recordSharedFieldSegments(segments) {
         segments.forEach(s => {
             if (s.type === 'field') {
+                const orientation = this._segmentOrientation(s);
+                const start = Math.min(s.start[orientation.axis], s.end[orientation.axis]);
+                const end = Math.max(s.start[orientation.axis], s.end[orientation.axis]);
+                const key = [
+                    orientation.axis,
+                    s.start[orientation.const1],
+                    s.start[orientation.const2],
+                    start,
+                    end
+                ].map(value => Number(value).toFixed(6)).join('|');
+                if (this.sharedFieldSegmentKeys.has(key)) return;
+                this.sharedFieldSegmentKeys.add(key);
                 this.sharedFieldSegments.push({ start: s.start.slice(), end: s.end.slice() });
             }
         });
@@ -794,16 +823,8 @@ class CableRoutingSystem {
         };
         const graph = cloneGraph(this.baseGraph);
         const selectedDuctbankConduits = this._selectDuctbankConduits(cableArea, allowedGroup);
-        const graphNodesForTray = trayId => {
-            const id = String(trayId);
-            return Object.keys(graph.nodes).filter(nodeId =>
-                nodeId === `${id}_start` ||
-                nodeId === `${id}_end` ||
-                nodeId.startsWith(`${id}_start_on_`) ||
-                nodeId.startsWith(`${id}_end_on_`) ||
-                nodeId.endsWith(`_on_${id}`)
-            );
-        };
+        if (!this.baseGraphTrayNodes) this._indexBaseGraphTrayNodes();
+        const graphNodesToRemove = new Set();
 
         // Remove trays without remaining capacity or group mismatch
         this.trays.forEach(tray => {
@@ -826,12 +847,14 @@ class CableRoutingSystem {
                 const selectedTrayId = corridorKey ? selectedDuctbankConduits.get(corridorKey) : '';
                 if (!selectedTrayId || selectedTrayId === tray.tray_id) return; // tray is usable
             }
-            const remove = graphNodesForTray(tray.tray_id);
-            remove.forEach(n => {
-                delete graph.nodes[n];
-                delete graph.edges[n];
-                Object.keys(graph.edges).forEach(k => { if (graph.edges[k]) delete graph.edges[k][n]; });
-            });
+            (this.baseGraphTrayNodes.get(tray.tray_id) || []).forEach(nodeId => graphNodesToRemove.add(nodeId));
+        });
+        graphNodesToRemove.forEach(nodeId => {
+            delete graph.nodes[nodeId];
+            delete graph.edges[nodeId];
+        });
+        Object.values(graph.edges).forEach(edgeMap => {
+            graphNodesToRemove.forEach(nodeId => { delete edgeMap[nodeId]; });
         });
 
         if (this.mismatchedRecords.length) {

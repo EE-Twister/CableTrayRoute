@@ -325,7 +325,19 @@ const redoStack = [];
 let projectMutationBatch = null;
 let trackedSettingsKeys = new Set();
 const listeners = new Set();
-const memoryStorage = new Map();
+const RAW_STORAGE_CACHE_SYMBOL = Symbol.for('cabletrayroute.rawStorageCache');
+const MISSING_STORAGE_CACHE_SYMBOL = Symbol.for('cabletrayroute.missingStorageCache');
+const STORAGE_SCAN_STATE_SYMBOL = Symbol.for('cabletrayroute.storageScanState');
+const memoryStorage = globalThis[RAW_STORAGE_CACHE_SYMBOL] instanceof Map
+  ? globalThis[RAW_STORAGE_CACHE_SYMBOL]
+  : new Map();
+const missingStorageKeys = globalThis[MISSING_STORAGE_CACHE_SYMBOL] instanceof Set
+  ? globalThis[MISSING_STORAGE_CACHE_SYMBOL]
+  : new Set();
+const storageScanState = globalThis[STORAGE_SCAN_STATE_SYMBOL] || { primed: false, complete: false, localLength: -1, sessionLength: -1 };
+globalThis[RAW_STORAGE_CACHE_SYMBOL] = memoryStorage;
+globalThis[MISSING_STORAGE_CACHE_SYMBOL] = missingStorageKeys;
+globalThis[STORAGE_SCAN_STATE_SYMBOL] = storageScanState;
 let storageWriteBlocked = false;
 let projectSchemaLoadError = null;
 let quotaWarningShown = false;
@@ -348,9 +360,71 @@ const DERIVED_SYNC_KEYS = {
 };
 const NON_EXPORTABLE_SETTING_KEYS = new Set(['gistToken']);
 const UNDO_COALESCE_WINDOW_MS = 200;
+const MAX_UNDO_HISTORY_ENTRIES = 50;
+const MAX_UNDO_HISTORY_BYTES = 8 * 1024 * 1024;
 const derivedStorageCache = new Map();
 const mutationCounters = new Map();
 let undoCoalesceState = null;
+let undoHistoryBytes = 0;
+let redoHistoryBytes = 0;
+
+function estimatePatchBytes(patch) {
+  try {
+    return JSON.stringify(patch).length * 2;
+  } catch {
+    return MAX_UNDO_HISTORY_BYTES + 1;
+  }
+}
+
+function trimHistory(stack, byteState) {
+  let bytes = byteState;
+  while (stack.length > MAX_UNDO_HISTORY_ENTRIES || (stack.length > 1 && bytes > MAX_UNDO_HISTORY_BYTES)) {
+    const removed = stack.shift();
+    bytes -= removed?.__ctrBytes || 0;
+  }
+  return Math.max(0, bytes);
+}
+
+function wrapHistoryPatch(patch) {
+  return { patch, __ctrBytes: estimatePatchBytes(patch) };
+}
+
+function clearRedoHistory() {
+  redoStack.length = 0;
+  redoHistoryBytes = 0;
+}
+
+function pushUndoPatch(patch) {
+  const entry = wrapHistoryPatch(patch);
+  undoStack.push(entry);
+  undoHistoryBytes += entry.__ctrBytes;
+  undoHistoryBytes = trimHistory(undoStack, undoHistoryBytes);
+}
+
+function replaceLatestUndoPatch(patch) {
+  const previous = undoStack.pop();
+  undoHistoryBytes -= previous?.__ctrBytes || 0;
+  pushUndoPatch(patch);
+}
+
+function pushRedoPatch(patch) {
+  const entry = wrapHistoryPatch(patch);
+  redoStack.push(entry);
+  redoHistoryBytes += entry.__ctrBytes;
+  redoHistoryBytes = trimHistory(redoStack, redoHistoryBytes);
+}
+
+function popUndoPatch() {
+  const entry = undoStack.pop();
+  undoHistoryBytes = Math.max(0, undoHistoryBytes - (entry?.__ctrBytes || 0));
+  return entry?.patch;
+}
+
+function popRedoPatch() {
+  const entry = redoStack.pop();
+  redoHistoryBytes = Math.max(0, redoHistoryBytes - (entry?.__ctrBytes || 0));
+  return entry?.patch;
+}
 
 function getNowMs() {
   if (typeof performance !== 'undefined' && typeof performance.now === 'function') {
@@ -392,53 +466,120 @@ function hasChange(changeSet, change) {
 }
 
 function readRawStorage(key) {
+  if (memoryStorage.has(key)) return memoryStorage.get(key);
+  if (storageScanState.primed && storageCacheLengthsChanged()) primeRawStorageCache(true);
+  if (memoryStorage.has(key)) return memoryStorage.get(key);
+  if (missingStorageKeys.has(key)) return null;
+  if (storageScanState.primed && storageScanState.complete) return null;
   const storage = getStorage();
   if (storage) {
     const value = safeGet(storage, key);
-    if (value !== null && value !== undefined) return value;
+    if (value !== null && value !== undefined) {
+      memoryStorage.set(key, value);
+      missingStorageKeys.delete(key);
+      return value;
+    }
   }
   const session = getSessionStorage();
   if (session) {
     const value = safeGet(session, key);
-    if (value !== null && value !== undefined) return value;
+    if (value !== null && value !== undefined) {
+      memoryStorage.set(key, value);
+      missingStorageKeys.delete(key);
+      return value;
+    }
   }
-  return memoryStorage.has(key) ? memoryStorage.get(key) : null;
+  missingStorageKeys.add(key);
+  return null;
+}
+
+function storageLength(storage) {
+  try { return storage?.length ?? 0; } catch { return 0; }
+}
+
+function updateStorageScanLengths() {
+  storageScanState.localLength = storageLength(getStorage());
+  storageScanState.sessionLength = storageLength(getSessionStorage());
+}
+
+function storageCacheLengthsChanged() {
+  return storageScanState.localLength !== storageLength(getStorage())
+    || storageScanState.sessionLength !== storageLength(getSessionStorage());
+}
+
+function primeRawStorageCache(force = false) {
+  if (storageScanState.primed && !force) return;
+  const collect = storage => {
+    if (!storage) return true;
+    if (typeof storage.key !== 'function' || !Number.isFinite(Number(storage.length))) return false;
+    try {
+      for (let index = 0; index < storage.length; index += 1) {
+        const key = storage.key(index);
+        if (!key || memoryStorage.has(key)) continue;
+        const value = safeGet(storage, key);
+        if (value !== null && value !== undefined) memoryStorage.set(key, value);
+      }
+      return true;
+    } catch (error) {
+      console.warn('project storage cache warmup failed', error);
+      return false;
+    }
+  };
+  const localComplete = collect(getStorage());
+  const sessionComplete = collect(getSessionStorage());
+  storageScanState.primed = true;
+  storageScanState.complete = localComplete && sessionComplete;
+  updateStorageScanLengths();
 }
 
 function writeSessionStorage(key, value) {
   if (value === null || value === undefined) {
     memoryStorage.delete(key);
+    missingStorageKeys.add(key);
   } else {
     memoryStorage.set(key, value);
+    missingStorageKeys.delete(key);
   }
   const storage = getStorage();
   if (storage) {
     try { storage.removeItem(key); } catch {}
   }
   const session = getSessionStorage();
-  if (!session) return;
+  if (!session) {
+    updateStorageScanLengths();
+    return;
+  }
   try {
     if (value === null || value === undefined) session.removeItem(key);
     else session.setItem(key, value);
   } catch (error) {
     console.warn('session storage write failed', key, error);
   }
+  updateStorageScanLengths();
 }
 
 function writeRawStorage(key, value, options = {}) {
   const skipLocalStorage = Boolean(options && options.skipLocalStorage);
   if (value === null || value === undefined) {
     memoryStorage.delete(key);
+    missingStorageKeys.add(key);
   } else {
     memoryStorage.set(key, value);
+    missingStorageKeys.delete(key);
   }
   const session = getSessionStorage();
   if (session) {
     try { session.removeItem(key); } catch {}
   }
   const storage = getStorage();
-  if (!storage || storageWriteBlocked) return;
-  if (skipLocalStorage && value !== null && value !== undefined) return;
+  if (!storage || storageWriteBlocked) {
+    updateStorageScanLengths();
+    return;
+  }
+  if (skipLocalStorage && value !== null && value !== undefined) {
+    updateStorageScanLengths();
+    return;
+  }
   try {
     if (value === null || value === undefined) {
       storage.removeItem(key);
@@ -448,6 +589,7 @@ function writeRawStorage(key, value, options = {}) {
   } catch (e) {
     handleStorageWriteError('project storage write failed', key, e);
   }
+  updateStorageScanLengths();
 }
 
 function listPrefixedKeys(prefix) {
@@ -589,29 +731,32 @@ export function readScenarioValue(key, fallback, scenario = currentScenarioName)
   return safeParse(raw, fallback);
 }
 
-export function writeScenarioValue(key, value, scenario = currentScenarioName) {
+export function writeScenarioValue(key, value, scenario = currentScenarioName, options = {}) {
   const target = sanitizeScenarioName(scenario) || currentScenarioName;
   try {
     const serialized = JSON.stringify(value);
     const storageKey = scenarioStorageKey(target, key);
+    if (readScenarioRaw(target, key) === serialized) return false;
     if (serialized.length > MAX_SCENARIO_ENTRY_SIZE) {
       writeScenarioRaw(target, key, serialized, { skipLocalStorage: true });
       if (target === currentScenarioName) {
-        setProjectKey(key, serialized, { skipLocalStorage: true });
+        setProjectKey(key, serialized, { skipLocalStorage: true, captureUndo: options.captureUndo });
       }
       if (!scenarioSizeWarnings.has(storageKey)) {
         scenarioSizeWarnings.add(storageKey);
         const limitMb = (MAX_SCENARIO_ENTRY_SIZE / (1024 * 1024)).toFixed(1);
         console.warn(`Scenario entry "${storageKey}" exceeds ${limitMb}MB. Data will persist for this tab only; use Save Project to keep a copy.`);
       }
-      return;
+      return true;
     }
     writeScenarioRaw(target, key, serialized);
     if (target === currentScenarioName) {
-      setProjectKey(key, serialized);
+      setProjectKey(key, serialized, { captureUndo: options.captureUndo });
     }
+    return true;
   } catch (e) {
     console.error('scenario write failed', key, e);
+    return false;
   }
 }
 
@@ -1141,17 +1286,7 @@ export function getAuthRole() {
 }
 
 export function readAppSetting(key) {
-  const value = readRawStorage(key);
-  if (value !== null && value !== undefined) return value;
-  // Some cross-page payloads (e.g. per-scenario routeCache entries) are written
-  // to sessionStorage by the routing flow. Fall back to it so callers do not
-  // have to reach into storage globals directly.
-  const session = getSessionStorage();
-  if (session) {
-    const sessionValue = safeGet(session, key);
-    if (sessionValue !== null && sessionValue !== undefined) return sessionValue;
-  }
-  return value;
+  return readRawStorage(key);
 }
 
 export function writeAppSetting(key, value) {
@@ -1225,6 +1360,7 @@ function handleStorageWriteError(prefix, keyOrError, maybeError) {
         if (storage) storage.removeItem(key);
       } catch { /* already in quota-recovery branch; removeItem failure means storage is fully unavailable */ }
       memoryStorage.delete(key);
+      missingStorageKeys.add(key);
       storageWriteBlocked = false;
       quotaWarningShown = false;
       console.warn('One-line revision history cleared to free storage.');
@@ -1415,19 +1551,19 @@ function persistProject({ notify = true, changeSet = null, mutationType = 'persi
   });
 }
 
-function loadLegacyProject(storage) {
+function loadLegacyProject() {
   return {
-    cables: safeParse(safeGet(storage, 'cableSchedule'), []),
-    trays: safeParse(safeGet(storage, 'traySchedule'), []),
-    conduits: safeParse(safeGet(storage, 'conduitSchedule'), []),
-    ductbanks: safeParse(safeGet(storage, 'ductbankSchedule'), []),
-    cableTypicals: safeParse(safeGet(storage, 'cableTypicals'), []),
+    cables: safeParse(readRawStorage('cableSchedule'), []),
+    trays: safeParse(readRawStorage('traySchedule'), []),
+    conduits: safeParse(readRawStorage('conduitSchedule'), []),
+    ductbanks: safeParse(readRawStorage('ductbankSchedule'), []),
+    cableTypicals: safeParse(readRawStorage('cableTypicals'), []),
     settings: {
-      session: safeParse(safeGet(storage, 'ctrSession'), {}),
-      collapsedGroups: safeParse(safeGet(storage, 'collapsedGroups'), {}),
-      conduitFillData: safeParse(safeGet(storage, 'conduitFillData'), null),
-      trayFillData: safeParse(safeGet(storage, 'trayFillData'), null),
-      ductbankSession: safeParse(safeGet(storage, 'ductbankSession'), {})
+      session: safeParse(readRawStorage('ctrSession'), {}),
+      collapsedGroups: safeParse(readRawStorage('collapsedGroups'), {}),
+      conduitFillData: safeParse(readRawStorage('conduitFillData'), null),
+      trayFillData: safeParse(readRawStorage('trayFillData'), null),
+      ductbankSession: safeParse(readRawStorage('ductbankSession'), {})
     }
   };
 }
@@ -1439,9 +1575,7 @@ function loadExistingProject() {
     setTrackedSettings(Object.keys(project.settings || {}));
     return;
   }
-  let raw;
-  try { raw = storage.getItem(PROJECT_KEY); }
-  catch { raw = null; }
+  const raw = readRawStorage(PROJECT_KEY);
   if (raw) {
     try {
       project = migrateProject(JSON.parse(raw));
@@ -1459,7 +1593,7 @@ function loadExistingProject() {
       console.warn('Failed to parse stored project', e);
     }
   }
-  const legacy = loadLegacyProject(storage);
+  const legacy = loadLegacyProject();
   project = migrateProject(legacy);
   setTrackedSettings(Object.keys(project.settings || {}));
   persistProject({ notify: false });
@@ -1479,18 +1613,18 @@ function pushUndo(oldProject, { coalesceKey = '', allowCoalesce = false } = {}) 
       if (canCoalesce) {
         const mergedPatch = compare(project, undoCoalesceState.baseProject);
         if (Array.isArray(mergedPatch) && mergedPatch.length) {
-          undoStack[undoStack.length - 1] = mergedPatch;
+          replaceLatestUndoPatch(mergedPatch);
           undoCoalesceState.timestamp = now;
         }
       } else {
-        undoStack.push(patch);
+        pushUndoPatch(patch);
         undoCoalesceState = {
           key: coalesceKey,
           timestamp: now,
           baseProject: oldProject
         };
       }
-      redoStack.length = 0;
+      clearRedoHistory();
       return;
     }
     if (!allowCoalesce) undoCoalesceState = null;
@@ -1517,9 +1651,18 @@ export async function initializeProjectStorage() {
     window.addEventListener('beforeunload', () => {
       undoStack.length = 0;
       redoStack.length = 0;
+      undoHistoryBytes = 0;
+      redoHistoryBytes = 0;
     });
     window.addEventListener('storage', event => {
       if (!event.key) return;
+      if (event.newValue === null || event.newValue === undefined) {
+        memoryStorage.delete(event.key);
+        missingStorageKeys.add(event.key);
+      } else {
+        memoryStorage.set(event.key, event.newValue);
+        missingStorageKeys.delete(event.key);
+      }
       if (event.key === PROJECT_KEY) {
         if (!event.newValue) return;
         try {
@@ -1648,7 +1791,10 @@ export function setProjectKey(key, value, options = {}) {
     }
     return;
   }
-  const oldProject = cloneProject();
+  const shouldCaptureUndo = !projectMutationBatch
+    && !options.sessionOnly
+    && options.captureUndo !== false;
+  const oldProject = shouldCaptureUndo ? cloneProject() : null;
   if (options.sessionOnly) sessionOnlyProjectKeys.add(key);
   else {
     sessionOnlyProjectKeys.delete(key);
@@ -1697,7 +1843,9 @@ export function setProjectKey(key, value, options = {}) {
                 ? createChangeSet(['settings:session'])
                 : createChangeSet(['settings:other']);
   if (captureBatchedChanges(changeSet)) return;
-  pushUndo(oldProject, { coalesceKey: `setProjectKey:${key}`, allowCoalesce: true });
+  if (shouldCaptureUndo) {
+    pushUndo(oldProject, { coalesceKey: `setProjectKey:${key}`, allowCoalesce: true });
+  }
   if (options.sessionOnly) {
     notifyChange();
     return;
@@ -1773,15 +1921,15 @@ export function removeProjectKey(key, options = {}) {
 export function undoProjectChange() {
   if (!undoStack.length || !applyPatch) return;
   undoCoalesceState = null;
-  const patch = undoStack.pop();
+  const patch = popUndoPatch();
   const current = cloneProject();
   try {
     const result = applyPatch(current, patch, true).newDocument;
     if (compare) {
-      try { redoStack.push(compare(result, project)); }
-      catch { redoStack.push([]); }
+      try { pushRedoPatch(compare(result, project)); }
+      catch { pushRedoPatch([]); }
     } else {
-      redoStack.push([]);
+      pushRedoPatch([]);
     }
     project = migrateProject(result);
     persistProject({ mutationType: 'undoProjectChange' });
@@ -1793,15 +1941,15 @@ export function undoProjectChange() {
 export function redoProjectChange() {
   if (!redoStack.length || !applyPatch) return;
   undoCoalesceState = null;
-  const patch = redoStack.pop();
+  const patch = popRedoPatch();
   const current = cloneProject();
   try {
     const result = applyPatch(current, patch, true).newDocument;
     if (compare) {
-      try { undoStack.push(compare(result, project)); }
-      catch { undoStack.push([]); }
+      try { pushUndoPatch(compare(result, project)); }
+      catch { pushUndoPatch([]); }
     } else {
-      undoStack.push([]);
+      pushUndoPatch([]);
     }
     project = migrateProject(result);
     persistProject({ mutationType: 'redoProjectChange' });
@@ -1818,6 +1966,19 @@ export function canRedo() {
   return redoStack.length > 0;
 }
 
+export function getProjectStorageDiagnostics() {
+  return {
+    undoEntries: undoStack.length,
+    redoEntries: redoStack.length,
+    undoBytes: undoHistoryBytes,
+    redoBytes: redoHistoryBytes,
+    maxUndoEntries: MAX_UNDO_HISTORY_ENTRIES,
+    maxUndoBytes: MAX_UNDO_HISTORY_BYTES,
+    cachedStorageEntries: memoryStorage.size,
+    cachedMissingStorageEntries: missingStorageKeys.size,
+  };
+}
+
 export function onProjectChange(handler) {
   if (typeof handler !== 'function') return () => {};
   listeners.add(handler);
@@ -1826,6 +1987,7 @@ export function onProjectChange(handler) {
   };
 }
 
+primeRawStorageCache();
 loadExistingProject();
 loadScenarioState();
 
@@ -1846,6 +2008,7 @@ const api = {
   redoProjectChange,
   canUndo,
   canRedo,
+  getProjectStorageDiagnostics,
   onProjectChange,
   getScenarioListState,
   setScenarioListState,

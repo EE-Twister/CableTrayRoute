@@ -50,6 +50,7 @@ import {
 import { recordStartupMeasurement, startPerformanceMeasurement } from './src/performance/performanceMetrics.js';
 import { appendHtmlChunks } from './src/components/incrementalDom.js';
 import { bindRouteDetailActions, buildRouteDetailMarkup } from './src/routing/routeDetailView.mjs';
+import { createRouteBreakdown } from './src/routing/routeBreakdown.mjs';
 
 const getParallelCount = value => Math.max(1, Number.parseInt(value, 10) || 1);
 
@@ -1445,22 +1446,25 @@ async function initializeApp() {
     const buildFieldSegmentCableMap = (results) => {
         const nameMap = new Map(state.cableList.map(c => [c.name, c]));
         const map = new Map();
+        const breakdownByRow = new Map(results.map(row => [row, createRouteBreakdown(row, formatPoint, getSegmentType)]));
         results.forEach(row => {
             const cableObj = nameMap.get(row.cable);
-            if (!cableObj || !Array.isArray(row.breakdown)) return;
-            row.breakdown.forEach(b => {
+            if (!cableObj) return;
+            breakdownByRow.get(row).forEach(b => {
                 if (b.type === 'field') {
                     const key = [b.from, b.to].sort().join('|');
                     b.segment_key = key;
+                    if (b.sourceSegment) b.sourceSegment.segment_key = key;
                     if (!map.has(key)) map.set(key, []);
                     map.get(key).push(cableObj);
                 }
             });
         });
         results.forEach(row => {
-            (row.breakdown || []).forEach(b => {
+            breakdownByRow.get(row).forEach(b => {
                 if (b.type === 'field') {
                     b.raceway = getRacewayRecommendation(map.get(b.segment_key) || []);
+                    if (b.sourceSegment) b.sourceSegment.raceway = b.raceway;
                 }
             });
         });
@@ -3684,7 +3688,7 @@ const renderBatchResults = async (results) => {
             const segsLabel = isSuccess ? `${res.segments_count || 0}` : '0';
             const screeningSummary = summarizeRouteScreening(res);
             const screeningCell = screeningSummary.total
-                ? `<button type="button" class="route-screening-toggle" data-index="${idx}" aria-expanded="false" aria-controls="route-screening-details-${idx}"><strong>${screeningSummary.total}</strong><span>candidate${screeningSummary.total === 1 ? '' : 's'} not used</span><small>View reasons</small></button>`
+                ? `<button type="button" class="route-screening-toggle" data-index="${idx}" aria-expanded="false"><strong>${screeningSummary.total}</strong><span>candidate${screeningSummary.total === 1 ? '' : 's'} not used</span><small>View reasons</small></button>`
                 : '<span class="route-screening-none"><strong>0</strong><span>All candidates eligible</span></span>';
             rowMarkup.push(`<tr class="route-list-row ${rowClass}" data-route-index="${idx}" tabindex="0">
                 <td>${escapeHtml(res.cable)}</td>
@@ -3695,9 +3699,6 @@ const renderBatchResults = async (results) => {
                 <td>${escapeHtml(segsLabel)}</td>
                 <td>${screeningCell}</td>
                 <td><span class="route-row-actions"><button class="view-map-btn" data-index="${idx}">Highlight</button><button class="route-detail-toggle" data-index="${idx}" aria-expanded="false">Details</button>${lockBtn}</span></td>
-            </tr>
-            <tr id="route-screening-details-${idx}" class="route-detail-row" data-route-detail-index="${idx}" hidden>
-                <td colspan="8" data-route-detail-content="${idx}"></td>
             </tr>`);
         });
         elements.routeBreakdownContainer.innerHTML = `
@@ -3740,21 +3741,25 @@ const renderBatchResults = async (results) => {
         if (results.some(r => (r.exclusions && r.exclusions.length > 0) || (r.mismatched_records && r.mismatched_records.length > 0))) {
             emitAsync('exclusions-found');
         }
-        elements.routeBreakdownContainer.querySelectorAll('.view-map-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const idx = parseInt(btn.dataset.index, 10);
-                highlightCableRoute(idx);
-            });
-        });
         const setRouteDetailVisibility = (idx, visible, focusScreening = false) => {
-            const row = elements.routeBreakdownContainer.querySelector(`.route-detail-row[data-route-detail-index="${idx}"]`);
+            let row = elements.routeBreakdownContainer.querySelector(`.route-detail-row[data-route-detail-index="${idx}"]`);
+            if (!row && visible) {
+                const resultRow = elements.routeBreakdownContainer.querySelector(`tr[data-route-index="${idx}"]`);
+                if (!resultRow) return;
+                row = document.createElement('tr');
+                Object.assign(row, { id: `route-screening-details-${idx}`, className: 'route-detail-row' });
+                row.dataset.routeDetailIndex = String(idx);
+                row.innerHTML = `<td colspan="8" data-route-detail-content="${idx}"></td>`;
+                resultRow.after(row);
+                elements.routeBreakdownContainer.querySelectorAll(`.route-screening-toggle[data-index="${idx}"], .route-detail-toggle[data-index="${idx}"]`)
+                    .forEach(button => button.setAttribute('aria-controls', row.id));
+            }
             if (!row) return;
             const detailCell = row.querySelector('[data-route-detail-content]');
             if (visible && detailCell && detailCell.dataset.rendered !== '1') {
                 const result = results[idx];
                 if (result) {
-                    detailCell.innerHTML = buildRouteDetailMarkup(result, summarizeRouteScreening(result), {
+                    detailCell.innerHTML = buildRouteDetailMarkup({ ...result, breakdown: createRouteBreakdown(result, formatPoint, getSegmentType) }, summarizeRouteScreening(result), {
                         explanation: buildRouteExplanation,
                         screening: buildRouteScreeningReview,
                     });
@@ -3783,52 +3788,53 @@ const renderBatchResults = async (results) => {
                 requestAnimationFrame(() => row.querySelector('.route-screening-review')?.focus({ preventScroll: true }));
             }
         };
-        elements.routeBreakdownContainer.querySelectorAll('.route-screening-toggle').forEach(btn => {
-            btn.addEventListener('click', event => {
-                event.stopPropagation();
-                const idx = parseInt(btn.dataset.index, 10);
-                const row = elements.routeBreakdownContainer.querySelector(`.route-detail-row[data-route-detail-index="${idx}"]`);
-                if (!row) return;
-                setRouteDetailVisibility(idx, row.hidden, true);
-            });
-        });
-        elements.routeBreakdownContainer.querySelectorAll('.route-detail-toggle').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const idx = parseInt(btn.dataset.index, 10);
-                const row = elements.routeBreakdownContainer.querySelector(`.route-detail-row[data-route-detail-index="${idx}"]`);
-                if (!row) return;
-                setRouteDetailVisibility(idx, row.hidden);
-            });
-        });
-        elements.routeBreakdownContainer.querySelectorAll('tr[data-route-index]').forEach(row => {
-            row.addEventListener('click', event => {
-                if (event.target.closest('button, a, input, select')) return;
-                const idx = parseInt(row.dataset.routeIndex, 10);
-                if (Number.isFinite(idx)) highlightCableRoute(idx);
-            });
-            row.addEventListener('keydown', event => {
-                if (event.key !== 'Enter' && event.key !== ' ') return;
-                event.preventDefault();
-                const idx = parseInt(row.dataset.routeIndex, 10);
-                if (Number.isFinite(idx)) highlightCableRoute(idx);
-            });
-        });
-        elements.routeBreakdownContainer.querySelectorAll('.lock-route-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const idx = parseInt(btn.dataset.idx, 10);
-                state.cableList[idx].locked = true;
-                saveSession();
-                if (state.latestRouteData && state.latestRouteData[idx]) {
-                    state.latestRouteData[idx].mode = 'Locked';
+        elements.routeBreakdownContainer.__ctrSetRouteDetailVisibility = setRouteDetailVisibility;
+        if (elements.routeBreakdownContainer.dataset.routeEventsBound !== '1') {
+            elements.routeBreakdownContainer.dataset.routeEventsBound = '1';
+            elements.routeBreakdownContainer.addEventListener('click', event => {
+                const button = event.target.closest('button');
+                const row = event.target.closest('tr[data-route-index]');
+                if (button?.classList.contains('view-map-btn')) {
+                    event.stopPropagation();
+                    highlightCableRoute(Number.parseInt(button.dataset.index, 10));
+                    return;
                 }
-                updateCableListDisplay();
-                renderBatchResults(state.latestRouteData);
-                setRouteReviewMode(false);
-                elements.calculateBtn?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                if (button?.classList.contains('route-screening-toggle') || button?.classList.contains('route-detail-toggle')) {
+                    event.stopPropagation();
+                    const idx = Number.parseInt(button.dataset.index, 10);
+                    const detailRow = elements.routeBreakdownContainer.querySelector(`.route-detail-row[data-route-detail-index="${idx}"]`);
+                    elements.routeBreakdownContainer.__ctrSetRouteDetailVisibility?.(idx, !detailRow || detailRow.hidden, button.classList.contains('route-screening-toggle'));
+                    return;
+                }
+                if (button?.classList.contains('lock-route-btn')) {
+                    event.stopPropagation();
+                    const idx = Number.parseInt(button.dataset.idx, 10);
+                    if (!Number.isFinite(idx) || !state.cableList[idx]) return;
+                    state.cableList[idx].locked = true;
+                    saveSession();
+                    if (state.latestRouteData && state.latestRouteData[idx]) {
+                        state.latestRouteData[idx].mode = 'Locked';
+                    }
+                    updateCableListDisplay();
+                    renderBatchResults(state.latestRouteData);
+                    setRouteReviewMode(false);
+                    elements.calculateBtn?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    return;
+                }
+                if (row && !event.target.closest('a, input, select')) {
+                    const idx = Number.parseInt(row.dataset.routeIndex, 10);
+                    if (Number.isFinite(idx)) highlightCableRoute(idx);
+                }
             });
-        });
+            elements.routeBreakdownContainer.addEventListener('keydown', event => {
+                if (event.key !== 'Enter' && event.key !== ' ') return;
+                const row = event.target.closest('tr[data-route-index]');
+                if (!row || event.target.closest('button, a, input, select')) return;
+                event.preventDefault();
+                const idx = Number.parseInt(row.dataset.routeIndex, 10);
+                if (Number.isFinite(idx)) highlightCableRoute(idx);
+            });
+        }
         renderPullChecks(results);
         if (results.length) setRouteReviewMode(true);
         return true;
@@ -4268,8 +4274,8 @@ const renderBatchResults = async (results) => {
 
         const trayMap = new Map();
         state.latestRouteData.forEach(row => {
-            if (Array.isArray(row.breakdown)) {
-                row.breakdown.forEach(b => {
+            {
+                createRouteBreakdown(row, formatPoint, getSegmentType).forEach(b => {
                     if (b.tray_id && b.tray_id !== 'Field Route' && b.tray_id !== 'N/A') {
                         if (!trayMap.has(b.tray_id)) trayMap.set(b.tray_id, new Set());
                         trayMap.get(b.tray_id).add(row.cable);
@@ -4324,7 +4330,7 @@ const renderBatchResults = async (results) => {
         // Build per-tray cable weight map from route results for support span calculation
         const trayWeights = {};
         state.latestRouteData.forEach(res => {
-            (res.breakdown || []).forEach(seg => {
+            createRouteBreakdown(res, formatPoint, getSegmentType).forEach(seg => {
                 if (!seg.tray_id) return;
                 const cable = state.cableList.find(c => (c.tag || c.cable_tag) === res.cable);
                 const w = cable
@@ -4770,7 +4776,7 @@ const renderBatchResults = async (results) => {
                 } else if (msg.type === 'done') {
                     routingWorker.terminate();
                     routingWorker = null;
-                    const rawResults = msg.results;
+                    let rawResults = msg.results;
                     allRoutesForPlotting = msg.allRoutes || [];
                     batchResults = rawResults.map((result, index) => {
                         const cable = state.cableList[index];
@@ -4800,36 +4806,22 @@ const renderBatchResults = async (results) => {
                             voltage_drop_pct: result.success ? vd.toFixed(2) : 'N/A',
                             ...(pullCheck ? { pull_check: pullCheck } : {}),
                             exclusions: result.exclusions || [],
-                            breakdown: result.success ? result.route_segments.map((seg, i) => {
-                                let tray_id = seg.type === 'field' ? 'Field Route' : (seg.tray_id || 'N/A');
-                                let type = getSegmentType(seg);
-                                let raceway = '';
-                                let conduit_id = seg.conduit_id || '';
-                                return {
-                                    segment: i + 1,
-                                    tray_id,
-                                    type,
-                                    from: formatPoint(seg.start),
-                                    to: formatPoint(seg.end),
-                                    length: seg.length.toFixed(2),
-                                    raceway,
-                                    conduit_id,
-                                    ductbankTag: seg.ductbankTag
-                                };
-                            }) : []
                         };
                     });
+                    rawResults = null;
+                    msg.results = null;
 
                     buildFieldSegmentCableMap(batchResults);
-                    if (!state.sampleDataMode) setCables(state.cableList);
+                    if (!state.sampleDataMode) setCables(state.cableList, { captureUndo: false });
                     state.latestRouteData = batchResults;
                     await renderBatchResults(batchResults);
+                    await new Promise(resolve => requestAnimationFrame(resolve));
                     const nameMap = new Map(state.cableList.map(c => [c.name, c]));
                     state.trayCableMap = {};
                     batchResults.forEach(row => {
                         const cableObj = nameMap.get(row.cable);
-                        if (!cableObj || !Array.isArray(row.breakdown)) return;
-                        row.breakdown.forEach(b => {
+                        if (!cableObj) return;
+                        createRouteBreakdown(row, formatPoint, getSegmentType).forEach(b => {
                             if (b.tray_id && b.tray_id !== 'Field Route' && b.tray_id !== 'N/A') {
                                 if (!state.trayCableMap[b.tray_id]) state.trayCableMap[b.tray_id] = [];
                                 const entry = b.conduit_id ? { ...cableObj, conduit_id: b.conduit_id } : cableObj;
@@ -4842,8 +4834,7 @@ const renderBatchResults = async (results) => {
                     });
                     const cableMapForArea = new Map(state.cableList.map(c => [c.name, c.diameter]));
                     const cableMapForObj = new Map(state.cableList.map(c => [c.name, c]));
-                    const tempSystem = new CableRoutingSystem({});
-                    const commonRaw = tempSystem.findCommonFieldRoutes(allRoutesForPlotting, 6, cableMapForArea);
+                    const commonRaw = msg.sharedRoutes || [];
                     const common = commonRaw.map(r => {
                         const areas = r.cables.map(n => {
                             const d = cableMapForArea.get(n);
@@ -4927,6 +4918,7 @@ const renderBatchResults = async (results) => {
                     if (routeStorageMode === 'session') {
                         showToast('Routing complete. This large result is saved for this tab; use Save Project to retain it after closing the tab.');
                     }
+                    await new Promise(resolve => requestAnimationFrame(resolve));
                     visualize(state.finalTrays, viewerRoutes(), "Batch Route Visualization");
 
                     elements.progressLabel.textContent = `Complete (${(msg.wallTime/1000).toFixed(2)}s)`;
@@ -4948,6 +4940,8 @@ const renderBatchResults = async (results) => {
                             wallTime: msg.wallTime
                         });
                     }
+                    msg.allRoutes = null;
+                    allRoutesForPlotting = [];
                     finishRoutingMeasurement({
                         success: true,
                         workerMs: Number(msg.wallTime) || 0,
@@ -5069,8 +5063,8 @@ const renderBatchResults = async (results) => {
         state.trayCableMap = {};
         state.latestRouteData.forEach(row => {
             const cableObj = nameMap.get(row.cable);
-            if (!cableObj || !Array.isArray(row.breakdown)) return;
-            row.breakdown.forEach(b => {
+            if (!cableObj) return;
+            createRouteBreakdown(row, formatPoint, getSegmentType).forEach(b => {
                 if (b.tray_id && b.tray_id !== 'Field Route' && b.tray_id !== 'N/A') {
                     if (!state.trayCableMap[b.tray_id]) state.trayCableMap[b.tray_id] = [];
                     const entry = b.conduit_id ? { ...cableObj, conduit_id: b.conduit_id } : cableObj;
@@ -5327,9 +5321,9 @@ const renderBatchResults = async (results) => {
         renderRacewayClassLegend(summary);
     };
 
-    const syncRacewayCompatibilityFilter = cable => {
+    const syncRacewayCompatibilityFilter = (cable, sceneModel = null) => {
         const cableGroup = String(cable?.allowed_cable_group || '').trim().toUpperCase();
-        const scene = currentRouteSceneModel();
+        const scene = sceneModel || currentRouteSceneModel();
         const groups = [...new Set(scene.raceways.map(raceway => raceway.allowedGroup).filter(Boolean))].sort();
         if (elements.racewayCompatibilityFilter) {
             const previousValue = elements.racewayCompatibilityFilter.value || 'compatible';
@@ -5368,11 +5362,12 @@ const renderBatchResults = async (results) => {
     const renderRouteViewerList = (routes = state.latestRouteData || []) => {
         if (!elements.routeViewerRouteList) return;
         elements.routeViewerRouteList.replaceChildren();
+        const cableMap = new Map(state.cableList.map(cable => [cable.name, cable]));
         if (elements.routeViewerRouteListCount) {
             elements.routeViewerRouteListCount.textContent = routes.length.toLocaleString();
         }
         routes.forEach((route, index) => {
-            const cable = state.cableList.find(item => item.name === route.cable) || {};
+            const cable = cableMap.get(route.cable) || {};
             const button = document.createElement('button');
             button.type = 'button';
             button.className = 'route-viewer-route-button';
@@ -5391,15 +5386,16 @@ const renderBatchResults = async (results) => {
         });
     };
 
-    const routeReviewMetrics = route => buildRouteMetrics(route, currentRouteSceneModel().raceways);
+    const routeReviewMetrics = (route, sceneModel = null) => buildRouteMetrics(route, (sceneModel || currentRouteSceneModel()).raceways);
 
-    const updateRouteInspector = index => {
+    const updateRouteInspector = (index, providedSceneModel = null) => {
         const route = state.latestRouteData[index];
         if (!route || !elements.routeInspectorTitle) return;
         const cable = state.cableList.find(item => item.name === route.cable) || {};
-        syncRacewayCompatibilityFilter(cable);
-        const metrics = routeReviewMetrics(route);
-        const decisionScore = buildRouteDecisionScore(route, currentRouteSceneModel().raceways);
+        const sceneModel = providedSceneModel || currentRouteSceneModel();
+        syncRacewayCompatibilityFilter(cable, sceneModel);
+        const metrics = routeReviewMetrics(route, sceneModel);
+        const decisionScore = buildRouteDecisionScore(route, sceneModel.raceways);
         const selectedLengthKpi = document.getElementById('selected-route-kpi-length');
         const selectedContainedKpi = document.getElementById('selected-route-kpi-contained');
         if (selectedLengthKpi) selectedLengthKpi.textContent = formatRouteDistance(metrics.total);
@@ -5484,7 +5480,7 @@ const renderBatchResults = async (results) => {
             });
         }
         if (elements.routeInspectorTimeline) {
-            const sequenceScene = currentRouteSceneModel();
+            const sequenceScene = sceneModel;
             const sequence = [{ label: cable.start_tag || 'Start', kind: 'endpoint' }];
             (route.route_segments || []).forEach(segment => {
                 const containment = String(segment.containmentType || segment.containment || '').toLowerCase();
@@ -5620,7 +5616,7 @@ const renderBatchResults = async (results) => {
                 routes,
                 selectedRouteIndex: state.selectedRouteIndex
             });
-            if (state.selectedRouteIndex != null) updateRouteInspector(state.selectedRouteIndex);
+            if (state.selectedRouteIndex != null) updateRouteInspector(state.selectedRouteIndex, viewer.model);
             if (elements.routeSelectionStatus) {
                 elements.routeSelectionStatus.textContent = routes.length
                     ? 'Select a cable, tray, conduit, or ductbank to inspect the route in 3D.'
@@ -6463,7 +6459,7 @@ Plotly.newPlot(document.getElementById('plot'), data, layout, ${safeJson(plotCon
         elements.openFillBtn.addEventListener('click', () => {
             const selectedRoute = state.latestRouteData[state.selectedRouteIndex]
                 || (state.latestRouteData.length === 1 ? state.latestRouteData[0] : null);
-            const routedTrayId = (selectedRoute?.breakdown || [])
+            const routedTrayId = createRouteBreakdown(selectedRoute, formatPoint, getSegmentType)
                 .map(segment => segment.raceway_id || segment.tray_id || segment.raceway)
                 .find(id => state.trayData.some(tray => tray.tray_id === id));
             if (routedTrayId) {

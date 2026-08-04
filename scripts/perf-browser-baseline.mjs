@@ -5,7 +5,9 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { chromium } from '@playwright/test';
 import {
   PERFORMANCE_BUDGETS,
+  PERFORMANCE_PROFILE_BUDGETS,
   evaluatePerformanceReport,
+  evaluatePerformanceProfiles,
 } from '../src/performance/performanceContracts.js';
 import {
   ROUTE_STARTUP_CONTRACTS,
@@ -16,18 +18,16 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const OUTPUT_DIR = path.join(ROOT, 'output', 'playwright', 'performance');
 const args = new Set(process.argv.slice(2));
 const reportOnly = args.has('--no-enforce');
+const sampleRetainedHeap = args.has('--heap-sampling');
 const configuredChannel = process.env.CTR_PLAYWRIGHT_CHANNEL?.trim();
 const channel = configuredChannel || (process.platform === 'win32' ? 'msedge' : '');
+const ONE_LINE_COMPONENT_COUNT = 1000;
 
 function pageUrl(relativePath) {
   const url = pathToFileURL(path.join(ROOT, relativePath));
   url.searchParams.set('e2e', '1');
   url.searchParams.set('perf', '1');
   return url.href;
-}
-
-function latestMeasurement(measurements, name) {
-  return [...measurements].reverse().find(measurement => measurement.name === name);
 }
 
 async function installProfiler(page) {
@@ -83,8 +83,50 @@ async function installProfiler(page) {
   });
 }
 
-async function profileSnapshot(page) {
-  return page.evaluate(() => {
+async function collectGarbage(page) {
+  const session = await page.context().newCDPSession(page);
+  try {
+    await session.send('HeapProfiler.collectGarbage');
+  } finally {
+    await session.detach();
+  }
+}
+
+async function startHeapSampling(page) {
+  const session = await page.context().newCDPSession(page);
+  await session.send('HeapProfiler.enable');
+  await session.send('HeapProfiler.startSampling', { samplingInterval: 32768 });
+  return session;
+}
+
+async function stopHeapSampling(session) {
+  if (!session) return [];
+  try {
+    await session.send('HeapProfiler.collectGarbage');
+    const { profile } = await session.send('HeapProfiler.stopSampling');
+    const allocations = [];
+    const visit = node => {
+      const size = Number(node.selfSize) || 0;
+      if (size > 0) {
+        allocations.push({
+          bytes: size,
+          functionName: node.callFrame?.functionName || '(anonymous)',
+          url: node.callFrame?.url || '',
+          line: (Number(node.callFrame?.lineNumber) || 0) + 1,
+        });
+      }
+      (node.children || []).forEach(visit);
+    };
+    visit(profile.head);
+    return allocations.sort((left, right) => right.bytes - left.bytes).slice(0, 20);
+  } finally {
+    await session.detach();
+  }
+}
+
+async function profileSnapshot(page, { garbageCollection = 'none' } = {}) {
+  if (garbageCollection === 'before') await collectGarbage(page);
+  const snapshot = await page.evaluate(() => {
     const navigation = performance.getEntriesByType('navigation')[0];
     const slowResources = performance.getEntriesByType('resource')
       .map(entry => ({
@@ -98,6 +140,7 @@ async function profileSnapshot(page) {
       .slice(0, 12);
     return {
       now: performance.now(),
+      heapUsedBytes: Number(performance.memory?.usedJSHeapSize) || 0,
       elementCount: document.querySelectorAll('*').length,
       longTaskCount: window.__CTR_PROFILE__?.longTasks.length || 0,
       navigation: navigation ? {
@@ -111,8 +154,14 @@ async function profileSnapshot(page) {
         total: window.__CTR_PROFILE__?.storageReads.total || 0,
         byKey: { ...(window.__CTR_PROFILE__?.storageReads.byKey || {}) },
       },
+      storageDiagnostics: window.projectStorage?.getProjectStorageDiagnostics?.() || {},
     };
   });
+  if (garbageCollection === 'after') {
+    await collectGarbage(page);
+    snapshot.heapUsedBytes = await page.evaluate(() => Number(performance.memory?.usedJSHeapSize) || 0);
+  }
+  return snapshot;
 }
 
 function profileDelta(name, start, end, allLongTasks) {
@@ -129,6 +178,9 @@ function profileDelta(name, start, end, allLongTasks) {
   return {
     name,
     durationMs: end.now - start.now,
+    heapGrowthBytes: Math.max(0, (end.heapUsedBytes || 0) - (start.heapUsedBytes || 0)),
+    heapStartBytes: start.heapUsedBytes || 0,
+    heapEndBytes: end.heapUsedBytes || 0,
     elementDelta: end.elementCount - (start.elementCount || 0),
     longTasks,
     longTaskTotalMs: longTasks.reduce((sum, task) => sum + task.durationMs, 0),
@@ -138,6 +190,12 @@ function profileDelta(name, start, end, allLongTasks) {
     storageReads: {
       total: end.storageReads.total - start.storageReads.total,
       byKey: Object.fromEntries(Object.entries(byKey).sort((a, b) => b[1] - a[1])),
+    },
+    storageDiagnostics: {
+      undoEntries: end.storageDiagnostics.undoEntries || 0,
+      undoBytes: end.storageDiagnostics.undoBytes || 0,
+      undoEntryDelta: (end.storageDiagnostics.undoEntries || 0) - (start.storageDiagnostics?.undoEntries || 0),
+      undoByteDelta: (end.storageDiagnostics.undoBytes || 0) - (start.storageDiagnostics?.undoBytes || 0),
     },
   };
 }
@@ -150,13 +208,18 @@ async function readMeasurements(page) {
   return page.evaluate(() => window.__CTR_PERFORMANCE__?.measurements || []);
 }
 
+async function waitForRenderedFrame(page) {
+  await page.evaluate(() => new Promise(resolve => {
+    requestAnimationFrame(() => requestAnimationFrame(resolve));
+  }));
+}
+
 async function measureRoutingAndImport(browser, project) {
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
   await installProfiler(page);
   await page.goto(pageUrl('optimalRoute.html'));
   await page.locator('#optimal-ready-beacon[data-optimal-ready="1"]').waitFor({ timeout: 30000 });
 
-  const startup = latestMeasurement(await readMeasurements(page), 'ctr.startup');
   const startupEnd = await profileSnapshot(page);
   const importStart = startupEnd;
   const imported = await page.evaluate(async projectData => {
@@ -166,33 +229,92 @@ async function measureRoutingAndImport(browser, project) {
   if (!imported) {
     throw new Error(`Project performance fixture failed to import: ${await page.evaluate(() => window.dataStore.getLastProjectImportError())}`);
   }
-  const projectImport = latestMeasurement(await readMeasurements(page), 'ctr.project-import');
   const importEnd = await profileSnapshot(page);
+  const repeatedLoadsStart = await profileSnapshot(page, { garbageCollection: 'before' });
+  await page.evaluate(async projectData => {
+    const dataStore = await import('./dataStore.mjs');
+    for (let index = 0; index < 6; index += 1) {
+      const next = structuredClone(projectData);
+      next.settings = { ...(next.settings || {}) };
+      next.settings.projectMeta = {
+        ...(next.settings.projectMeta || {}),
+        revision: `PERF-${index % 2}`,
+      };
+      if (!dataStore.importProject(next)) throw new Error(dataStore.getLastProjectImportError());
+    }
+  }, project);
+  const repeatedLoadsEnd = await profileSnapshot(page, { garbageCollection: 'after' });
 
   await page.click('#load-large-facility-btn');
   await page.waitForFunction(() => document.querySelectorAll('#cable-list-container tbody tr').length >= 200, null, { timeout: 30000 });
-  const routingStart = await profileSnapshot(page);
+  let routingCount = (await readMeasurements(page)).filter(measurement => measurement.name === 'ctr.routing-recalculation').length;
   await page.click('#calculate-route-btn');
   await page.waitForFunction(
-    () => window.__CTR_PERFORMANCE__?.measurements?.some(measurement => measurement.name === 'ctr.routing-recalculation'),
-    null,
+    expected => (window.__CTR_PERFORMANCE__?.measurements || [])
+      .filter(measurement => measurement.name === 'ctr.routing-recalculation').length > expected,
+    routingCount,
     { timeout: 120000 },
   );
-  const routing = latestMeasurement(await readMeasurements(page), 'ctr.routing-recalculation');
-  const routingEnd = await profileSnapshot(page);
+  await page.waitForFunction(
+    () => Number(window.__routeViewerDebug?.routeCount) >= 200,
+    null,
+    { timeout: 30000 },
+  );
+  await waitForRenderedFrame(page);
+  routingCount += 1;
+  const routingStart = await profileSnapshot(page, { garbageCollection: 'before' });
+  const heapSamplingSession = sampleRetainedHeap ? await startHeapSampling(page) : null;
+  await page.evaluate(() => document.querySelector('#calculate-route-btn')?.click());
+  await page.waitForFunction(
+    expected => (window.__CTR_PERFORMANCE__?.measurements || [])
+      .filter(measurement => measurement.name === 'ctr.routing-recalculation').length > expected,
+    routingCount,
+    { timeout: 120000 },
+  );
+  await waitForRenderedFrame(page);
+  const routingEnd = await profileSnapshot(page, { garbageCollection: 'after' });
+  const retainedAllocationHotspots = await stopHeapSampling(heapSamplingSession);
+  routingCount += 1;
+  const repeatRoutingStart = routingEnd;
+  await page.evaluate(() => document.querySelector('#calculate-route-btn')?.click());
+  await page.waitForFunction(
+    expected => (window.__CTR_PERFORMANCE__?.measurements || [])
+      .filter(measurement => measurement.name === 'ctr.routing-recalculation').length > expected,
+    routingCount,
+    { timeout: 120000 },
+  );
+  await waitForRenderedFrame(page);
+  const repeatRoutingEnd = await profileSnapshot(page, { garbageCollection: 'after' });
+  const staticSceneReuseCount = await page.evaluate(() => Number(window.__routeViewerDebug?.staticSceneReuseCount) || 0);
+  if (staticSceneReuseCount < 2) throw new Error(`Repeated routing rebuilt static 3D geometry; expected 2 reuses, observed ${staticSceneReuseCount}.`);
   const longTasks = await readLongTasks(page);
   const profiles = [
     profileDelta('startup:optimal-route', {
       now: 0,
       longTaskCount: 0,
+      heapUsedBytes: 0,
       dom: {},
       storageReads: { total: 0, byKey: {} },
     }, startupEnd, longTasks),
     profileDelta('project-import', importStart, importEnd, longTasks),
-    profileDelta('routing-recalculation', routingStart, routingEnd, longTasks),
+    profileDelta('repeated-project-loads', repeatedLoadsStart, repeatedLoadsEnd, longTasks),
+    {
+      ...profileDelta('routing-recalculation', routingStart, routingEnd, longTasks),
+      staticSceneReuseCount,
+      ...(retainedAllocationHotspots.length ? { retainedAllocationHotspots } : {}),
+    },
+    profileDelta('routing-recalculation-steady-state', repeatRoutingStart, repeatRoutingEnd, longTasks),
   ];
+  const allMeasurements = await readMeasurements(page);
   await page.close();
-  return { measurements: [startup, projectImport, routing].filter(Boolean), profiles };
+  return {
+    measurements: allMeasurements.filter(measurement => [
+      'ctr.startup',
+      'ctr.project-import',
+      'ctr.routing-recalculation',
+    ].includes(measurement.name)),
+    profiles,
+  };
 }
 
 async function measureOneLine(browser) {
@@ -200,13 +322,12 @@ async function measureOneLine(browser) {
   await installProfiler(page);
   await page.goto(pageUrl('oneline.html'));
   await page.locator('#oneline-ready-beacon[data-oneline-ready="1"]').waitFor({ timeout: 30000 });
-  const startup = latestMeasurement(await readMeasurements(page), 'ctr.startup');
   const priorCount = (await readMeasurements(page)).filter(measurement => measurement.name === 'ctr.oneline-render').length;
   const startupEnd = await profileSnapshot(page);
   const renderStart = startupEnd;
 
-  await page.evaluate(() => {
-    const componentCount = 160;
+  await page.evaluate(async componentCount => {
+    const dataStore = await import(`./dataStore.mjs?perf-oneline=${Date.now()}`);
     const components = Array.from({ length: componentCount }, (_, index) => ({
       id: `perf-${index}`,
       type: index === 0 ? 'utility_source' : 'load',
@@ -223,12 +344,16 @@ async function measureOneLine(browser) {
       source: `perf-${index}`,
       target: `perf-${index + 1}`,
     }));
-    window.dataStore.setOneLine({
+    dataStore.setOneLine({
       activeSheet: 0,
       sheets: [{ name: 'Performance Fixture', components, connections }],
     });
+    const storedCount = dataStore.getOneLine().sheets?.[0]?.components?.length || 0;
+    if (storedCount !== componentCount) {
+      throw new Error(`One-Line performance fixture stored ${storedCount} of ${componentCount} components.`);
+    }
     document.dispatchEvent(new CustomEvent('ctr:remote-applied'));
-  });
+  }, ONE_LINE_COMPONENT_COUNT);
 
   await page.waitForFunction(
     expected => (window.__CTR_PERFORMANCE__?.measurements || [])
@@ -236,20 +361,49 @@ async function measureOneLine(browser) {
     priorCount,
     { timeout: 30000 },
   );
-  const oneLine = latestMeasurement(await readMeasurements(page), 'ctr.oneline-render');
+  try {
+    await page.waitForFunction(
+      expected => document.querySelectorAll('#diagram g.component').length === expected,
+      ONE_LINE_COMPONENT_COUNT,
+      { timeout: 30000 },
+    );
+  } catch (error) {
+    const diagnostics = await page.evaluate(() => ({
+      componentElements: document.querySelectorAll('#diagram g.component').length,
+      renderLayerCount: document.querySelectorAll('#diagram > .oneline-render-layer').length,
+      recentMeasurements: (window.__CTR_PERFORMANCE__?.measurements || []).filter(item => item.name === 'ctr.oneline-render').slice(-4),
+      storedComponents: window.dataStore.getOneLine().sheets?.[0]?.components?.length || 0,
+    }));
+    throw new Error(`One-Line large fixture did not render: ${JSON.stringify(diagnostics)}`, { cause: error });
+  }
   const renderEnd = await profileSnapshot(page);
+  const interactionStart = await profileSnapshot(page, { garbageCollection: 'before' });
+  for (let index = 0; index < 6; index += 1) {
+    await page.evaluate(() => document.querySelector('#grid-toggle')?.click());
+  }
+  await waitForRenderedFrame(page);
+  const interactionEnd = await profileSnapshot(page, { garbageCollection: 'after' });
   const longTasks = await readLongTasks(page);
   const profiles = [
     profileDelta('startup:oneline', {
       now: 0,
       longTaskCount: 0,
+      heapUsedBytes: 0,
       dom: {},
       storageReads: { total: 0, byKey: {} },
     }, startupEnd, longTasks),
     profileDelta('oneline-render', renderStart, renderEnd, longTasks),
+    profileDelta('one-line-interactions', interactionStart, interactionEnd, longTasks),
   ];
+  const allMeasurements = await readMeasurements(page);
   await page.close();
-  return { measurements: [startup, oneLine].filter(Boolean), profiles };
+  return {
+    measurements: allMeasurements.filter(measurement => [
+      'ctr.startup',
+      'ctr.oneline-render',
+    ].includes(measurement.name)),
+    profiles,
+  };
 }
 
 async function measureTcc(browser) {
@@ -274,22 +428,34 @@ async function measureTcc(browser) {
   }), deviceIds);
   await page.reload();
   await page.waitForLoadState('networkidle');
-  const start = await profileSnapshot(page);
-  const priorCount = (await readMeasurements(page)).filter(measurement => measurement.name === 'ctr.tcc-plot').length;
+  const warmupCount = (await readMeasurements(page)).filter(measurement => measurement.name === 'ctr.tcc-plot').length;
   await page.click('#plot-btn');
   await page.waitForFunction(
     expected => (window.__CTR_PERFORMANCE__?.measurements || [])
       .filter(measurement => measurement.name === 'ctr.tcc-plot').length > expected,
-    priorCount,
+    warmupCount,
     { timeout: 30000 },
   );
-  const end = await profileSnapshot(page);
+  const start = await profileSnapshot(page, { garbageCollection: 'before' });
+  const priorCount = (await readMeasurements(page)).filter(measurement => measurement.name === 'ctr.tcc-plot').length;
+  for (let index = 0; index < 5; index += 1) {
+    await page.click('#plot-btn');
+    await page.waitForFunction(
+      expected => (window.__CTR_PERFORMANCE__?.measurements || [])
+        .filter(measurement => measurement.name === 'ctr.tcc-plot').length > expected,
+      priorCount + index,
+      { timeout: 30000 },
+    );
+  }
+  const end = await profileSnapshot(page, { garbageCollection: 'after' });
   const measurements = await readMeasurements(page);
   const longTasks = await readLongTasks(page);
-  const profile = profileDelta('tcc-plot', start, end, longTasks);
-  const measurement = latestMeasurement(measurements, 'ctr.tcc-plot');
+  const profile = profileDelta('study-runs', start, end, longTasks);
   await page.close();
-  return { measurements: [measurement].filter(Boolean), profiles: [profile] };
+  return {
+    measurements: measurements.filter(measurement => measurement.name === 'ctr.tcc-plot'),
+    profiles: [profile],
+  };
 }
 
 async function measureRouteStartups(browser) {
@@ -313,7 +479,7 @@ async function main() {
   delete project.title;
   const launchOptions = {
     headless: true,
-    args: ['--allow-file-access-from-files'],
+    args: ['--allow-file-access-from-files', '--enable-precise-memory-info'],
     ...(channel ? { channel } : {}),
   };
   const browser = await chromium.launch(launchOptions);
@@ -332,18 +498,22 @@ async function main() {
   }
 
   const evaluations = evaluatePerformanceReport(measurements);
+  const profileEvaluations = evaluatePerformanceProfiles(profiles);
   const routeStartupEvaluations = evaluateRouteStartupProfiles(routeStartups);
   const report = {
     generatedAt: new Date().toISOString(),
     browser: channel || 'chromium',
     budgets: PERFORMANCE_BUDGETS,
+    profileBudgets: PERFORMANCE_PROFILE_BUDGETS,
     measurements,
     profiles,
     evaluations,
+    profileEvaluations,
     routeStartupBudgets: ROUTE_STARTUP_CONTRACTS,
     routeStartups,
     routeStartupEvaluations,
     passed: evaluations.every(evaluation => evaluation.passed)
+      && profileEvaluations.every(evaluation => evaluation.passed)
       && routeStartupEvaluations.every(evaluation => evaluation.passed),
   };
   await fs.mkdir(OUTPUT_DIR, { recursive: true });
@@ -353,6 +523,13 @@ async function main() {
   evaluations.forEach(evaluation => {
     const status = evaluation.passed ? 'PASS' : 'FAIL';
     console.log(`[perf] ${status} ${evaluation.name}: ${evaluation.durationMs.toFixed(1)}ms / ${evaluation.maxMs}ms`);
+  });
+  profileEvaluations.forEach(evaluation => {
+    const status = evaluation.passed ? 'PASS' : 'FAIL';
+    const details = evaluation.passed
+      ? `${evaluation.durationMs.toFixed(1)}ms, ${(evaluation.heapGrowthBytes / (1024 * 1024)).toFixed(1)}MB heap growth, ${evaluation.longestTaskMs.toFixed(1)}ms longest task`
+      : evaluation.failures.join('; ');
+    console.log(`[perf] ${status} profile:${evaluation.name}: ${details}`);
   });
   routeStartupEvaluations.forEach(evaluation => {
     const status = evaluation.passed ? 'PASS' : 'FAIL';
