@@ -2,27 +2,36 @@ const d3 = globalThis.d3;
 import { getOneLine, getStudies, setStudies } from '../dataStore.mjs';
 import { resolveCtForComponent } from './ctMetadata.mjs';
 
+const loadNetworkHarmonics = () => import('../src/harmonicNetwork.lazy.js');
+
 // Convert spectrum description to a map of harmonic order to percent
 export function parseSpectrum(spec) {
-  const map = {};
-  if (!spec) return map;
+  const parsed = {};
+  if (!spec) return parsed;
   if (Array.isArray(spec)) {
-    spec.forEach((v, i) => {
-      const val = Number(v);
-      if (!isNaN(val) && val) map[i + 1] = val;
+    spec.forEach((value, index) => {
+      const percent = Number(value);
+      const order = index + 1;
+      if (order > 1 && Number.isFinite(percent) && percent !== 0) parsed[order] = percent;
     });
-    return map;
+    return parsed;
   }
-  if (typeof spec === 'string') {
-    spec.split(/[\,\s]+/).forEach(p => {
-      if (!p) return;
-      const parts = p.split(':');
-      const order = Number(parts[0]);
-      const val = Number(parts[1] || parts[0]);
-      if (!isNaN(order) && !isNaN(val) && order > 1) map[order] = val;
+  if (typeof spec === 'object') {
+    Object.entries(spec).forEach(([orderValue, percentValue]) => {
+      const order = Number(orderValue);
+      const percent = Number(percentValue);
+      if (order > 1 && Number.isFinite(percent) && percent !== 0) parsed[order] = percent;
     });
+    return parsed;
   }
-  return map;
+  String(spec).split(/[,\s]+/).forEach(token => {
+    if (!token) return;
+    const [orderValue, percentValue] = token.split(':');
+    const order = Number(orderValue);
+    const percent = Number(percentValue ?? orderValue);
+    if (order > 1 && Number.isFinite(percent) && percent !== 0) parsed[order] = percent;
+  });
+  return parsed;
 }
 
 // IEEE 519-2022 Table 1 — voltage total harmonic distortion (THD) limits (%)
@@ -492,12 +501,113 @@ export function frequencyScan({
   return { sweep, resonances };
 }
 
-function ensureHarmonicResults() {
+async function ensureHarmonicResults() {
   const studies = getStudies();
   const res = runHarmonics();
+  const { runNetworkHarmonics } = await loadNetworkHarmonics();
+  const network = runNetworkHarmonics();
   studies.harmonics = res;
+  studies.harmonicNetwork = network;
   setStudies(studies);
-  return res;
+  return { sourceResults: res, network, runNetworkHarmonics };
+}
+
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, character => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  }[character]));
+}
+
+function formatNetworkMetric(value, digits = 2, suffix = '') {
+  return Number.isFinite(value) ? `${Number(value).toFixed(digits)}${suffix}` : 'Not evaluated';
+}
+
+function renderNetworkHarmonicResults(network, runNetworkHarmonics) {
+  const summary = document.getElementById('harmonic-network-summary');
+  const filter = document.getElementById('harmonic-bus-filter');
+  const status = document.getElementById('harmonic-bus-status');
+  const tbody = document.getElementById('harmonic-bus-results');
+  const demandInput = document.getElementById('harmonic-max-demand');
+  const rerunButton = document.getElementById('harmonic-network-rerun');
+  if (!summary || !filter || !status || !tbody || !demandInput || !rerunButton) return;
+  rerunButton.onclick = () => {
+    const maximumDemandCurrentA = Number(demandInput.value);
+    const next = runNetworkHarmonics({
+      maximumDemandCurrentA: maximumDemandCurrentA > 0 ? maximumDemandCurrentA : undefined
+    });
+    const studies = getStudies();
+    studies.harmonicNetwork = next;
+    setStudies(studies);
+    renderNetworkHarmonicResults(next, runNetworkHarmonics);
+  };
+  if (!network || network.calculationStatus === 'unsupported') {
+    const reason = network?.requiredInputs?.[0] || 'Network harmonic results are unavailable.';
+    summary.className = 'result-card result-warn';
+    summary.innerHTML = `<strong>Network model requires review.</strong><p>${escapeHtml(reason)}</p>`;
+    tbody.innerHTML = '<tr><td colspan="8">No network bus results are available.</td></tr>';
+    status.textContent = '';
+    return;
+  }
+
+  const pcc = network.pcc || {};
+  if (!demandInput.value && Number.isFinite(pcc.maximumDemandCurrentA)) {
+    demandInput.value = pcc.maximumDemandCurrentA;
+  }
+  const tddText = pcc.currentTddEvaluated
+    ? formatNetworkMetric(pcc.currentTddPct, 2, '%')
+    : 'Maximum demand current required';
+  summary.className = pcc.voltageThdPct > pcc.voltageLimitPct
+    ? 'result-card result-warn'
+    : 'result-card result-ok';
+  summary.innerHTML = `<strong>PCC: ${escapeHtml(pcc.busId || 'Not selected')}</strong>
+    <p>${network.topology.busCount} buses, ${network.topology.branchCount} branches, and ${network.topology.sourceCount} harmonic sources.</p>
+    <p>Voltage THD: <strong>${formatNetworkMetric(pcc.voltageThdPct, 2, '%')}</strong>
+    / ${formatNetworkMetric(pcc.voltageLimitPct, 2, '%')} screening limit &middot;
+    Current THD: <strong>${formatNetworkMetric(pcc.currentThdPct, 2, '%')}</strong> &middot;
+    Current TDD: <strong>${escapeHtml(tddText)}</strong></p>`;
+
+  const branchByBus = new Map(Object.values(network.branches || {})
+    .map(branch => [branch.toBusId, branch]));
+  const buses = Object.values(network.buses || {})
+    .sort((a, b) => (b.voltageThdPct || 0) - (a.voltageThdPct || 0));
+  const renderRows = () => {
+    const query = filter.value.trim().toLowerCase();
+    const matches = buses.filter(bus => !query
+      || String(bus.id).toLowerCase().includes(query)
+      || String(bus.label || '').toLowerCase().includes(query));
+    const visible = matches.slice(0, 100);
+    status.textContent = `Showing ${visible.length} of ${matches.length} matching buses (${buses.length} total).`;
+    if (!visible.length) {
+      tbody.innerHTML = '<tr><td colspan="8">No buses match the current search.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = visible.map(bus => {
+      const branch = branchByBus.get(bus.id);
+      const spectrumRows = Object.entries(bus.harmonics || {}).map(([order, harmonic]) => {
+        const branchCurrent = branch?.harmonics?.[order]?.currentA;
+        return `<tr><td>${escapeHtml(order)}</td><td>${formatNetworkMetric(harmonic.voltageV, 3, ' V')}</td><td>${formatNetworkMetric(harmonic.voltagePct, 3, '%')}</td><td>${formatNetworkMetric(harmonic.currentA, 3, ' A')}</td><td>${formatNetworkMetric(branchCurrent, 3, ' A')}</td></tr>`;
+      }).join('');
+      const spectrum = spectrumRows
+        ? `<details><summary>View</summary><table class="data-table"><thead><tr><th>Order</th><th>Bus V</th><th>Bus V%</th><th>Bus I</th><th>Feeder I</th></tr></thead><tbody>${spectrumRows}</tbody></table></details>`
+        : 'No injected orders';
+      return `<tr>
+        <td><strong>${escapeHtml(bus.label || bus.id)}</strong><br><small>${escapeHtml(bus.id)}</small></td>
+        <td>${formatNetworkMetric(bus.voltageThdPct, 2, '%')}</td>
+        <td>${formatNetworkMetric(bus.voltageLimitPct, 2, '%')}</td>
+        <td>${formatNetworkMetric(bus.harmonicCurrentRmsA, 2, ' A')}</td>
+        <td>${formatNetworkMetric(bus.currentThdPct, 2, '%')}</td>
+        <td>${bus.dominantOrder ? escapeHtml(bus.dominantOrder) : 'None'}</td>
+        <td>${escapeHtml((bus.localSourceIds || []).join(', ') || 'None')}</td>
+        <td>${spectrum}</td>
+      </tr>`;
+    }).join('');
+  };
+  filter.oninput = renderRows;
+  renderRows();
 }
 
 function renderChart(svgEl, data) {
@@ -569,10 +679,12 @@ function renderChart(svgEl, data) {
 if (typeof document !== 'undefined') {
   const chartEl = document.getElementById('harmonics-chart');
   if (chartEl) {
-    const results = ensureHarmonicResults();
-    const data = Object.entries(results)
-      .filter(([, result]) => Number.isFinite(result.vthd))
-      .map(([id, result]) => ({ id, thd: result.vthd, limit: result.limit }));
-    renderChart(chartEl, data);
+    ensureHarmonicResults().then(({ sourceResults, network, runNetworkHarmonics }) => {
+      const data = Object.entries(sourceResults)
+        .filter(([, result]) => Number.isFinite(result.vthd))
+        .map(([id, result]) => ({ id, thd: result.vthd, limit: result.limit }));
+      renderChart(chartEl, data);
+      renderNetworkHarmonicResults(network, runNetworkHarmonics);
+    }).catch(error => console.error('[harmonics] network initialization failed', error));
   }
 }

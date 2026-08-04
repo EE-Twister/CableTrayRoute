@@ -274,6 +274,7 @@ Coverage: 80 contracts for 80 navigation routes.
 - `studyResults.shortCircuit` (study-result): Embedded short-circuit result generated from one-line. Consumers: `shortCircuit.html`, `projectreport.html`.
 - `studyResults.arcFlash` (study-result): Embedded arc-flash result generated from one-line. Consumers: `arcFlash.html`, `projectreport.html`.
 - `studyResults.harmonics` (study-result): Embedded harmonics result generated from one-line. Consumers: `harmonics.html`, `projectreport.html`.
+- `studyResults.harmonicNetwork` (study-result): Embedded per-bus, per-branch, and PCC harmonic network screen generated from one-line. Consumers: `harmonics.html`, `projectreport.html`.
 - `studyResults.motorStart` (study-result): Embedded motor-start result generated from one-line. Consumers: `motorStart.html`, `projectreport.html`.
 - `studyResults.reliability` (study-result): Embedded reliability result generated from one-line. Consumers: `reliability.html`, `projectreport.html`.
 - `studyResults.duty` (study-result): Embedded equipment-duty result generated from one-line validation. Consumers: `equipmentevaluation.html`, `projectreport.html`.
@@ -1967,6 +1968,7 @@ Coverage: 80 contracts for 80 navigation routes.
 
 **Outputs**
 - `studyResults.harmonics` (study-result): Saved harmonic distortion results and source contributions. Consumers: `designcoach.html`, `projectreport.html`.
+- `studyResults.harmonicNetwork` (study-result): Saved per-source, per-bus, per-branch, and PCC radial network screening results. Consumers: `oneline.html`, `projectreport.html`.
 - `studyResults.frequencyScan` (study-result): Saved embedded frequency-scan points and resonance warnings. Consumers: `frequencyscan.html`, `projectreport.html`.
 - `settings.studyApprovals` (setting): Engineer approval records written by the shared study approval panel. Consumers: `projectreport.html`.
 - `export-only` (export): Harmonic chart and report exports. Consumers: `projectreport.html`.

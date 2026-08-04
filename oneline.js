@@ -12,7 +12,6 @@ function escapeHtml(value) {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
 }
-
 import { getOneLine, setOneLine, getEquipment, setEquipment, getPanels, setPanels, getLoads, setLoads, getCables, getOneLineScheduleCollections, setCables, addRaceway, getItem, setItem, migrateLegacyItem, getStudies, setStudies, on, getCurrentScenario, switchScenario, STORAGE_KEYS, loadProject, saveProject } from './dataStore.mjs';
 import { previewScheduleReconcile, applyScheduleReconcilePreview } from './analysis/scheduleReconcile.mjs';
 import { runLoadFlow } from './analysis/loadFlow.js';
@@ -21,6 +20,7 @@ import { applyTapRatioToOneLine, evaluateTransformerTapOptimization } from './an
 import { runShortCircuit } from './analysis/shortCircuit.mjs';
 import { runArcFlash } from './analysis/arcFlash.mjs';
 import { runHarmonics } from './analysis/harmonics.js';
+import { runNetworkHarmonics } from './analysis/harmonicNetwork.mjs';
 import { runMotorStart } from './analysis/motorStart.js';
 import { runReliability } from './analysis/reliability.js';
 // Worker-routed entry points for user-initiated study buttons (load flow,
@@ -3339,6 +3339,7 @@ const ONE_LINE_SHORTCUT_DEFINITIONS = [
   { id: 'auto-arrange', label: 'Auto arrange', defaultShortcut: 'Alt+A' },
   { id: 'auto-space', label: 'Auto-space equipment', defaultShortcut: 'Alt+S' }
 ];
+
 const ONE_LINE_SHORTCUTS_SETTING_KEY = 'keyboardShortcuts';
 
 function createDiagramEntityId(prefix = 'n') {
@@ -6102,9 +6103,9 @@ if (afLabelModeToggle) afLabelModeToggle.addEventListener('change', () => {
   render();
 });
 if (runHBtn) runHBtn.addEventListener('click', () => {
-  const res = runHarmonics();
+  const res = runHarmonics(); const network = runNetworkHarmonics();
   const studies = getStudies();
-  studies.harmonics = res;
+  Object.assign(studies, { harmonics: res, harmonicNetwork: network });
   setStudies(studies);
   renderStudyResults();
   window.open('harmonics.html', '_blank');
@@ -6123,7 +6124,6 @@ if (runRelBtn) runRelBtn.addEventListener('click', () => {
     showAlertModal('Reliability Error', err?.message || String(err));
   });
 });
-
 async function runReliabilityFromButton() {
   const oneLineData = getOneLine();
   const oneLineRevision = getOneLineSheetsRevision(oneLineData);

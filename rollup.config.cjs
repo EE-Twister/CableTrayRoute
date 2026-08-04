@@ -50,6 +50,7 @@ const entries = {
   tcc: 'src/tcc.js',
   library: 'src/library.js',
   harmonics: 'src/harmonics.js',
+  'harmonicNetwork.lazy': 'src/harmonicNetwork.lazy.js',
   loadFlow: 'src/loadFlow.js',
   motorStart: 'src/motorStart.js',
   contingency: 'src/contingency.js',
@@ -96,9 +97,18 @@ const entries = {
   cybercompliance: 'src/cybercompliance.js',
 };
 
+function isHarmonicNetworkLazyId(id) {
+  return id === '../src/harmonicNetwork.lazy.js'
+    || id.replace(/\\/g, '/').endsWith('/src/harmonicNetwork.lazy.js');
+}
+
 function buildEntryConfig([name, input]) {
+  const isHarmonicsEntry = name === 'harmonics';
   return {
     input,
+    external: isHarmonicsEntry
+      ? isHarmonicNetworkLazyId
+      : undefined,
     // Keep writes serial so synced Windows workspaces do not intermittently lock dist files.
     maxParallelFileOps: 1,
     output: {
@@ -106,6 +116,9 @@ function buildEntryConfig([name, input]) {
       format: 'es',
       sourcemap: false,
       inlineDynamicImports: true,
+      paths: isHarmonicsEntry
+        ? id => isHarmonicNetworkLazyId(id) ? './harmonicNetwork.lazy.js' : id
+        : undefined,
     },
     plugins: [nodeResolve({ browser: true }), json(), terser()]
   };

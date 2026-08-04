@@ -241,6 +241,171 @@ function toMW(value) {
   return Number.isFinite(num) ? num / 1000 : 0;
 }
 
+const RADIAL_SWEEP_MIN_BUSES = 250;
+
+function hasNonZeroShunt(shunt) {
+  if (!shunt || typeof shunt !== 'object') return false;
+  return Math.abs(Number(shunt.g) || 0) > MIN_COMPLEX_MAG
+    || Math.abs(Number(shunt.b) || 0) > MIN_COMPLEX_MAG;
+}
+
+function buildRadialSweepModel(buses, baseMVA) {
+  if (buses.length < RADIAL_SWEEP_MIN_BUSES) return null;
+  const slack = buses
+    .map((bus, index) => String(bus.type || '').toLowerCase() === 'slack' ? index : -1)
+    .filter(index => index >= 0);
+  if (slack.length !== 1) return null;
+  if (buses.some(bus => {
+    const type = String(bus.type || '').toUpperCase();
+    return !['SLACK', 'PQ'].includes(type)
+      || bus.ibrProfile?.voltVarEnabled
+      || hasNonZeroShunt(bus.shunt);
+  })) return null;
+
+  const baseKV = buses[slack[0]].baseKV;
+  if (buses.some(bus => Math.abs(bus.baseKV - baseKV) > Math.max(1e-9, baseKV * 1e-9))) return null;
+
+  const indexById = new Map(buses.map((bus, index) => [bus.id, index]));
+  const edges = new Map();
+  for (let from = 0; from < buses.length; from++) {
+    const bus = buses[from];
+    for (const conn of bus.connections || []) {
+      const to = indexById.get(conn?.target);
+      if (to === undefined || to === from) continue;
+      const tapMagnitude = Number(conn.tap?.ratio ?? conn.tap ?? 1);
+      const tapAngle = Number(conn.tap?.angle ?? 0);
+      if (!Number.isFinite(tapMagnitude)
+        || Math.abs(tapMagnitude - 1) > 1e-12
+        || Math.abs(tapAngle) > 1e-12
+        || hasNonZeroShunt(conn.shunt?.from)
+        || hasNonZeroShunt(conn.shunt?.to)) return null;
+      const impedance = toPerUnitZ(conn.impedance || { r: 0, x: 0 }, bus.baseKV, baseMVA);
+      if (impedance.re * impedance.re + impedance.im * impedance.im < MIN_COMPLEX_MAG) return null;
+      const low = Math.min(from, to);
+      const high = Math.max(from, to);
+      const key = `${low}:${high}`;
+      const existing = edges.get(key);
+      if (existing) {
+        const componentId = conn.componentId || conn.id || null;
+        const sameComponent = existing.componentId || componentId
+          ? existing.componentId === componentId
+          : true;
+        const sameImpedance = Math.abs(existing.impedance.re - impedance.re) < 1e-12
+          && Math.abs(existing.impedance.im - impedance.im) < 1e-12;
+        if (!sameComponent || !sameImpedance) return null;
+        continue;
+      }
+      edges.set(key, {
+        from,
+        to,
+        impedance,
+        componentId: conn.componentId || conn.id || null
+      });
+    }
+  }
+  if (edges.size !== buses.length - 1) return null;
+
+  const adjacency = Array.from({ length: buses.length }, () => []);
+  edges.forEach(edge => {
+    adjacency[edge.from].push({ index: edge.to, impedance: edge.impedance });
+    adjacency[edge.to].push({ index: edge.from, impedance: edge.impedance });
+  });
+  const parent = new Array(buses.length).fill(-1);
+  const parentImpedance = new Array(buses.length).fill(null);
+  const order = [slack[0]];
+  parent[slack[0]] = slack[0];
+  for (let cursor = 0; cursor < order.length; cursor++) {
+    const current = order[cursor];
+    for (const neighbor of adjacency[current]) {
+      if (parent[neighbor.index] !== -1) continue;
+      parent[neighbor.index] = current;
+      parentImpedance[neighbor.index] = neighbor.impedance;
+      order.push(neighbor.index);
+    }
+  }
+  if (order.length !== buses.length) return null;
+  return { slack: slack[0], parent, parentImpedance, order };
+}
+
+function solveRadialPQVoltages(buses, baseMVA, Vm, Va, maxIterations, model) {
+  const voltages = buses.map((_, index) => toComplex(
+    Vm[index] * Math.cos(Va[index]),
+    Vm[index] * Math.sin(Va[index])
+  ));
+  const loadPower = buses.map(bus => toComplex(
+    (toMW(bus.Pd) - toMW(bus.Pg)) / baseMVA,
+    (toMW(bus.Qd) - toMW(bus.Qg)) / baseMVA
+  ));
+  const voltageTolerance = 1e-10;
+  let converged = false;
+  let iterations = 0;
+
+  for (let iteration = 0; iteration < maxIterations; iteration++) {
+    const accumulatedCurrents = loadPower.map((power, index) => {
+      const voltage = voltages[index];
+      const safeVoltage = voltage.re * voltage.re + voltage.im * voltage.im > MIN_COMPLEX_MAG
+        ? voltage
+        : toComplex(1, 0);
+      return conj(div(power, safeVoltage));
+    });
+    for (let cursor = model.order.length - 1; cursor > 0; cursor--) {
+      const index = model.order[cursor];
+      const parent = model.parent[index];
+      accumulatedCurrents[parent] = add(accumulatedCurrents[parent], accumulatedCurrents[index]);
+    }
+
+    const nextVoltages = new Array(buses.length);
+    nextVoltages[model.slack] = voltages[model.slack];
+    let maxVoltageChange = 0;
+    for (let cursor = 1; cursor < model.order.length; cursor++) {
+      const index = model.order[cursor];
+      const parent = model.parent[index];
+      nextVoltages[index] = sub(
+        nextVoltages[parent],
+        mul(model.parentImpedance[index], accumulatedCurrents[index])
+      );
+      const change = sub(nextVoltages[index], voltages[index]);
+      maxVoltageChange = Math.max(maxVoltageChange, Math.hypot(change.re, change.im));
+    }
+    for (let index = 0; index < voltages.length; index++) voltages[index] = nextVoltages[index];
+    iterations = iteration + 1;
+    if (maxVoltageChange < voltageTolerance) {
+      converged = true;
+      break;
+    }
+  }
+
+  voltages.forEach((voltage, index) => {
+    Vm[index] = Math.hypot(voltage.re, voltage.im);
+    Va[index] = Math.atan2(voltage.im, voltage.re);
+  });
+  return { converged, iterations };
+}
+
+function calcRadialPQ(model, Vm, Va) {
+  const P = new Array(Vm.length).fill(0);
+  const Q = new Array(Vm.length).fill(0);
+  const voltages = Vm.map((magnitude, index) => toComplex(
+    magnitude * Math.cos(Va[index]),
+    magnitude * Math.sin(Va[index])
+  ));
+  for (let cursor = 1; cursor < model.order.length; cursor++) {
+    const child = model.order[cursor];
+    const parent = model.parent[child];
+    const current = div(
+      sub(voltages[parent], voltages[child]),
+      model.parentImpedance[child]
+    );
+    const parentPower = mul(voltages[parent], conj(current));
+    const childPower = mul(voltages[child], conj(toComplex(-current.re, -current.im)));
+    P[parent] += parentPower.re;
+    Q[parent] += parentPower.im;
+    P[child] += childPower.re;
+    Q[child] += childPower.im;
+  }
+  return { P, Q };
+}
+
 function solvePhase(buses, baseMVA, options = {}) {
   const requestedIter = Number.isFinite(options.maxIterations)
     ? Math.floor(options.maxIterations)
@@ -275,14 +440,33 @@ function solvePhase(buses, baseMVA, options = {}) {
   const PV = working.map((b, i) => b.type === 'PV' ? i : -1).filter(i => i >= 0);
   const PQ = working.map((b, i) => b.type === 'PQ' ? i : -1).filter(i => i >= 0);
   const nonSlack = working.map((b, i) => b.type !== 'slack' ? i : -1).filter(i => i >= 0);
-  const { matrix: Y, warnings: branchWarnings = [] } = buildYBus(working, baseMVA);
+  const radialModel = options.radialOptimization === false
+    ? null
+    : buildRadialSweepModel(working, baseMVA);
+  const admittance = radialModel ? null : buildYBus(working, baseMVA);
+  const Y = admittance?.matrix || null;
+  const branchWarnings = admittance?.warnings || [];
   const maxIter = Math.max(1, requestedIter && requestedIter > 0 ? requestedIter : 20);
   const tol = 1e-6;
   let iterations = 0;
   let maxMis = 0;
   let converged = false;
+  let solver = 'newton-raphson';
 
-  for (let iter = 0; iter < maxIter; iter++) {
+  const radialResult = radialModel
+    ? solveRadialPQVoltages(working, baseMVA, Vm, Va, maxIter, radialModel)
+    : null;
+  if (radialResult) {
+    solver = 'radial-backward-forward-sweep';
+    iterations = radialResult.iterations;
+    const { P: Pcalc, Q: Qcalc } = calcRadialPQ(radialModel, Vm, Va);
+    const mismatch = [
+      ...nonSlack.map(index => Math.abs(Pspec[index] - Pcalc[index])),
+      ...PQ.map(index => Math.abs(Qspec[index] - Qcalc[index]))
+    ];
+    maxMis = mismatch.length ? Math.max(...mismatch) : 0;
+    converged = radialResult.converged && maxMis < tol;
+  } else for (let iter = 0; iter < maxIter; iter++) {
     const { P: Pcalc, Q: Qcalc } = calcPQ(working, Y, Vm, Va);
     const dP = nonSlack.map(i => Pspec[i] - Pcalc[i]);
     const dQ = PQ.map(i => Qspec[i] - Qcalc[i]);
@@ -388,7 +572,9 @@ function solvePhase(buses, baseMVA, options = {}) {
     warnings.push(`Solution did not converge after ${maxIter} iterations. Last mismatch ${maxMis.toFixed(4)} pu (${mismatchKW.toFixed(1)} kW).`);
   }
 
-  const { P: PcalcFinal, Q: QcalcFinal } = calcPQ(working, Y, Vm, Va);
+  const { P: PcalcFinal, Q: QcalcFinal } = radialModel
+    ? calcRadialPQ(radialModel, Vm, Va)
+    : calcPQ(working, Y, Vm, Va);
   const baseKW = baseMVA * 1000;
   const actualGeneration = working.map((bus, i) => {
     const netP = Number.isFinite(PcalcFinal[i]) ? PcalcFinal[i] * baseKW : 0;
@@ -631,6 +817,7 @@ function solvePhase(buses, baseMVA, options = {}) {
     });
   });
   summary.branchConnections = branchConnections;
+  summary.solver = solver;
 
   const mismatchPu = Number.isFinite(maxMis) ? maxMis : 0;
 
@@ -640,6 +827,7 @@ function solvePhase(buses, baseMVA, options = {}) {
     maxMismatch: mismatchPu,
     maxMismatchKW: mismatchPu * baseMVA * 1000,
     warnings,
+    solver,
     buses: busRes,
     lines: flows,
     losses,
@@ -1030,7 +1218,12 @@ export function runLoadFlow(modelOrOpts = {}, maybeOpts = {}) {
   if (!model) {
     model = buildLoadFlowModel(getOneLine());
   }
-  const { baseMVA = 100, balanced = true, maxIterations = 20 } = opts;
+  const {
+    baseMVA = 100,
+    balanced = true,
+    maxIterations = 20,
+    radialOptimization = true
+  } = opts;
   let busComps;
   if (model && model.buses) {
     const usable = model.buses.filter(isUsableComponent);
@@ -1123,7 +1316,10 @@ export function runLoadFlow(modelOrOpts = {}, maybeOpts = {}) {
         }))
       };
     });
-    phaseResults[phase] = solvePhase(buses, baseMVA, { maxIterations });
+    phaseResults[phase] = solvePhase(buses, baseMVA, {
+      maxIterations,
+      radialOptimization: balanced && radialOptimization
+    });
   });
 
   if (balanced) return phaseResults['balanced'];

@@ -59,22 +59,33 @@ async function startStaticServer() {
 // Harmonic Analysis
 // -------------------------------------------------------------------------
 test.describe('Harmonic Analysis', () => {
+  let staticSite;
+
+  test.beforeAll(async () => {
+    staticSite = await startStaticServer();
+  });
+
+  test.afterAll(async () => {
+    await staticSite?.close();
+  });
+
   test.beforeEach(async ({ page }) => {
     const startupScripts = [];
     startupScriptsByPage.set(page, startupScripts);
     page.on('request', request => {
       if (request.resourceType() === 'script') startupScripts.push(new URL(request.url()).pathname);
     });
-    await page.goto(pageUrl('harmonics.html?e2e=1&e2e_reset=1'));
+    await page.goto(staticSite.url('harmonics.html?e2e=1&e2e_reset=1'));
     await page.waitForLoadState('networkidle');
   });
 
   test('page loads with correct heading', async ({ page }) => {
     await expect(page.locator('h1')).toContainText('Harmonic');
     const startupScripts = startupScriptsByPage.get(page) || [];
-    expect(startupScripts).toHaveLength(2);
+    expect(startupScripts).toHaveLength(3);
     expect(startupScripts.some(pathname => pathname.endsWith('/dist/vendor/d3.min.js'))).toBe(true);
     expect(startupScripts.some(pathname => /\/dist\/harmonics(?:\.[0-9a-f]{8,})?\.js$/.test(pathname))).toBe(true);
+    expect(startupScripts.some(pathname => pathname.endsWith('/dist/harmonicNetwork.lazy.js'))).toBe(true);
     expect(startupScripts.some(pathname => pathname.endsWith('/dataStore.mjs'))).toBe(false);
     expect(startupScripts.some(pathname => pathname.endsWith('/analysis/harmonics.js'))).toBe(false);
   });
@@ -123,13 +134,23 @@ test.describe('Harmonic Analysis', () => {
 // Motor Starting
 // -------------------------------------------------------------------------
 test.describe('Motor Starting', () => {
+  let staticSite;
+
+  test.beforeAll(async () => {
+    staticSite = await startStaticServer();
+  });
+
+  test.afterAll(async () => {
+    await staticSite?.close();
+  });
+
   test.beforeEach(async ({ page }) => {
     const startupScripts = [];
     startupScriptsByPage.set(page, startupScripts);
     page.on('request', request => {
       if (request.resourceType() === 'script') startupScripts.push(new URL(request.url()).pathname);
     });
-    await page.goto(pageUrl('motorStart.html?e2e=1&e2e_reset=1'));
+    await page.goto(staticSite.url('motorStart.html?e2e=1&e2e_reset=1'));
     await page.waitForLoadState('networkidle');
   });
 
@@ -173,11 +194,21 @@ test.describe('Motor Starting', () => {
 // -------------------------------------------------------------------------
 const tccRequests = new WeakMap();
 test.describe('Time-Current Curves', () => {
+  let staticSite;
+
+  test.beforeAll(async () => {
+    staticSite = await startStaticServer();
+  });
+
+  test.afterAll(async () => {
+    await staticSite?.close();
+  });
+
   test.beforeEach(async ({ page }) => {
     const requests = [];
     tccRequests.set(page, requests);
     page.on('request', request => requests.push(request.url()));
-    await page.goto(pageUrl('tcc.html?e2e=1&e2e_reset=1'));
+    await page.goto(staticSite.url('tcc.html?e2e=1&e2e_reset=1'));
     await page.waitForLoadState('networkidle');
   });
 

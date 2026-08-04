@@ -2,6 +2,14 @@
 
 The Load Flow study uses the active one-line diagram to build buses, branches, loads, and generation.
 
+## Solver selection for large systems
+
+The study automatically uses a backward/forward-sweep solver when a balanced network has at least 250 buses and is a supported radial tree: one slack bus, PQ buses, a common voltage base, non-zero series impedances, and no taps, shunts, PV buses, or active IBR Volt-VAR controls. This path scales linearly with the radial branches and is intended for large utility-fed distribution systems.
+
+Newton-Raphson remains the default for smaller cases and is always retained for meshed networks, PV buses, multiple voltage bases, transformer taps, shunts, ideal ties, and active IBR controls. Results expose the selected method as `solver`; reports and downstream consumers otherwise receive the same bus, branch-flow, loss, source, warning, and convergence fields.
+
+The enforced large-project contract converts and solves one common utility bus, 1,000 downstream buses, and 2,000 attached devices in less than 2 seconds. A numerical regression runs the same supported network through both solvers and compares every bus voltage magnitude and angle plus real and reactive losses.
+
 ## Balanced three-phase study
 
 **Balanced three-phase** is selected by default. The solver uses the total kW and kvar on each connected bus as a single three-phase load.

@@ -75,9 +75,41 @@
 
       <header class="page-header">
         <h1>Harmonic Analysis</h1>
-        <p>Estimate source-level THD and identify harmonic conditions requiring a PCC study.</p>
+        <p>Investigate source, bus, branch, and point-of-common-coupling harmonic distortion.</p>
       </header>
-      <div class="alert warning"><strong>Screening only—not IEEE 519 compliance.</strong> IEEE 519 evaluation requires aggregated voltage and current distortion at the point of common coupling, including current TDD based on maximum demand load current. This page evaluates individual modeled sources.</div>
+      <div class="alert warning"><strong>Network screening only—not final IEEE 519 compliance.</strong> Bus and PCC results use the modeled radial impedances and source spectra. Current TDD is shown only when maximum demand load current is provided; field measurements and frequency-dependent equipment data remain required for final evaluation.</div>
+
+      <section class="card" id="harmonic-network-section" aria-labelledby="harmonic-network-heading">
+        <h2 id="harmonic-network-heading">Network and PCC Results</h2>
+        <div id="harmonic-network-summary" class="result-card" role="status">Run the One-Line harmonic study to populate network results.</div>
+        <div style="display:flex;flex-wrap:wrap;gap:0.75rem;align-items:end;margin:1rem 0;">
+          <label for="harmonic-max-demand">PCC maximum demand current (A)
+            <input id="harmonic-max-demand" type="number" min="0" step="1" placeholder="Required for TDD">
+          </label>
+          <button id="harmonic-network-rerun" class="btn btn-primary" type="button">Recalculate Network</button>
+          <label for="harmonic-bus-filter">Find a bus
+            <input id="harmonic-bus-filter" type="search" placeholder="Bus ID or label" autocomplete="off">
+          </label>
+          <span id="harmonic-bus-status" class="field-hint"></span>
+        </div>
+        <div class="table-scroll">
+          <table class="data-table" aria-label="Per-bus harmonic network results">
+            <thead>
+              <tr>
+                <th scope="col">Bus</th>
+                <th scope="col">VTHD</th>
+                <th scope="col">Limit</th>
+                <th scope="col">Harmonic current</th>
+                <th scope="col">ITHD</th>
+                <th scope="col">Dominant order</th>
+                <th scope="col">Local sources</th>
+                <th scope="col">Spectrum</th>
+              </tr>
+            </thead>
+            <tbody id="harmonic-bus-results"></tbody>
+          </table>
+        </div>
+      </section>
       <section class="card">
         <svg id="harmonics-chart" width="800" height="600" xmlns="http://www.w3.org/2000/svg"></svg>
       </section>

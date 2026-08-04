@@ -10,6 +10,15 @@ The application enforces elapsed-time budgets for five engineering workflows:
 | `ctr.tcc-plot` | Plot eight selected protective devices | 300 ms |
 | `ctr.routing-recalculation` | Route the deterministic 200-cable large-facility sample and render the results | 1,000 ms |
 
+The study engines also enforce a Node-level large-network contract that is independent of browser painting:
+
+| Metric | Workload | Budget |
+| --- | --- | ---: |
+| `large-radial-load-flow` | Convert and solve one common utility, 1,000 downstream buses, and 2,000 attached devices | 2,000 ms |
+| `large-radial-harmonics` | Calculate source, bus, branch, and PCC spectra for the same 1,001-bus/2,000-device radial system | 1,000 ms and < 2 MiB serialized result |
+
+`tests/loadflow/largeRadialPerformance.test.mjs` enforces both the elapsed-time budget and numerical equivalence to the Newton-Raphson solver. Large balanced radial networks with one slack bus, PQ buses, one voltage base, non-zero series impedances, and no taps or shunts use a backward/forward-sweep solver. Meshed networks, PV buses, IBR Volt-VAR controls, transformers with taps or multiple voltage bases, shunts, and smaller cases retain Newton-Raphson. The radial path does not allocate the dense admittance or Jacobian matrices. The reference Node run on August 4, 2026 reduced the exact 1,001-bus/2,000-device workload from about 12,002 ms to 34 ms; an independent full-study fixture measured 46 ms.
+
 Elapsed time alone can hide degrading interaction latency or retained memory. The same run therefore enforces repeated-operation profiles:
 
 | Profile | Workload | Total | Longest task | Heap growth | DOM growth | Storage reads |

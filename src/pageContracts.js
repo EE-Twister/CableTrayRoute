@@ -234,6 +234,7 @@ export const PAGE_CONTRACTS_BY_HREF = {
       output('studyResults.shortCircuit', 'study-result', 'Embedded short-circuit result generated from one-line.', ['shortCircuit.html', 'projectreport.html']),
       output('studyResults.arcFlash', 'study-result', 'Embedded arc-flash result generated from one-line.', ['arcFlash.html', 'projectreport.html']),
       output('studyResults.harmonics', 'study-result', 'Embedded harmonics result generated from one-line.', ['harmonics.html', 'projectreport.html']),
+      output('studyResults.harmonicNetwork', 'study-result', 'Embedded per-bus, per-branch, and PCC harmonic network screen generated from one-line.', ['harmonics.html', 'projectreport.html']),
       output('studyResults.motorStart', 'study-result', 'Embedded motor-start result generated from one-line.', ['motorStart.html', 'projectreport.html']),
       output('studyResults.reliability', 'study-result', 'Embedded reliability result generated from one-line.', ['reliability.html', 'projectreport.html']),
       output('studyResults.duty', 'study-result', 'Embedded equipment-duty result generated from one-line validation.', ['equipmentevaluation.html', 'projectreport.html']),
@@ -656,6 +657,7 @@ export const PAGE_CONTRACTS_BY_HREF = {
     projectInputs: [oneLine, equipment, projectInput('studyResults.loadFlow', 'study-result', false, 'Operating bus values used for harmonic context.'), projectInput('studyResults.frequencyScan', 'study-result', false, 'Previously saved resonance sweep restored by the embedded frequency-scan panel.'), designBasis, approvals],
     outputs: [
       output('studyResults.harmonics', 'study-result', 'Saved harmonic distortion results and source contributions.', ['designcoach.html', 'projectreport.html']),
+      output('studyResults.harmonicNetwork', 'study-result', 'Saved per-source, per-bus, per-branch, and PCC radial network screening results.', ['oneline.html', 'projectreport.html']),
       output('studyResults.frequencyScan', 'study-result', 'Saved embedded frequency-scan points and resonance warnings.', ['frequencyscan.html', 'projectreport.html']),
       studyApprovalOutput,
       exportOnly('Harmonic chart and report exports.', ['projectreport.html'])
