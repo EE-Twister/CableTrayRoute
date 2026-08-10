@@ -20,6 +20,7 @@ The Load List page is designed for fast load entry first, with deeper engineerin
 - **Demand** places demand factor and calculated demand kW/kVA immediately after source and tag so its defining values are visible without horizontal hunting.
 - **Procurement** focuses on manufacturer, model, quantity, type, and notes.
 - **Full Detail** shows all available columns.
+- **MCC Unit Type** and **Starter Type** remain visible in every view preset so MCC classifications are not hidden by a previously saved view.
 - On narrow screens, the active view is rendered as editable row cards rather than a desktop-width grid. Secondary workflow shortcuts collapse so the first load record stays close to the top of the page.
 
 ## Batch Editing

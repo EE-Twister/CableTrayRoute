@@ -164,7 +164,7 @@ if (typeof window !== 'undefined') {
     const viewPresets = {
       basic: ['select', 'source', 'tag', 'description', 'quantity', 'voltage', 'loadType', 'mccUnitType', 'starterType', 'duty', 'kw', 'hp', 'powerFactor', 'phases', 'circuit', 'kva', 'current', 'actions'],
       electrical: ['select', 'source', 'tag', 'description', 'quantity', 'voltage', 'mccUnitType', 'starterType', 'kw', 'hp', 'powerFactor', 'phases', 'kva', 'current', 'circuit', 'actions'],
-      demand: ['select', 'source', 'tag', 'demandFactor', 'demandKva', 'demandKw', 'kw', 'hp', 'loadFactor', 'description', 'loadType', 'duty', 'actions'],
+      demand: ['select', 'source', 'tag', 'demandFactor', 'demandKva', 'demandKw', 'kw', 'hp', 'loadFactor', 'description', 'loadType', 'mccUnitType', 'starterType', 'duty', 'actions'],
       procurement: ['select', 'source', 'tag', 'description', 'manufacturer', 'model', 'quantity', 'voltage', 'hp', 'loadType', 'mccUnitType', 'starterType', 'notes', 'actions'],
       full: ['select', 'source', 'tag', 'description', 'manufacturer', 'model', 'quantity', 'voltage', 'loadType', 'mccUnitType', 'starterType', 'duty', 'kw', 'hp', 'powerFactor', 'loadFactor', 'efficiency', 'demandFactor', 'phases', 'circuit', 'notes', 'kva', 'current', 'demandKva', 'demandKw', 'actions']
     };
