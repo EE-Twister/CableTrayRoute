@@ -496,7 +496,18 @@ export function normalizeBucket(bucket = {}, unitHeightIn = DEFAULT_MCC_UNIT_HEI
     motorSpaceHeaterRequired,
     motorSpaceHeaterVa: text(bucket.motorSpaceHeaterVa ?? bucket.motorSpaceHeaterVA ?? bucket.spaceHeaterVa ?? bucket.spaceHeaterVA),
     cableTag: text(bucket.cableTag),
-    notes: text(bucket.notes)
+    notes: text(bucket.notes),
+    loadListManaged: booleanValue(bucket.loadListManaged, false),
+    sourceLoadId: text(bucket.sourceLoadId),
+    sourceLoadTag: text(bucket.sourceLoadTag),
+    sourceCircuit: text(bucket.sourceCircuit),
+    sourceLoadType: text(bucket.sourceLoadType),
+    sourceKw: text(bucket.sourceKw),
+    sourceVoltage: text(bucket.sourceVoltage),
+    sourceQuantity: text(bucket.sourceQuantity),
+    loadListSourceValues: bucket.loadListSourceValues && typeof bucket.loadListSourceValues === 'object'
+      ? { ...bucket.loadListSourceValues }
+      : {}
   };
 }
 
@@ -506,6 +517,7 @@ export function normalizeSection(section = {}, unitHeightIn = DEFAULT_MCC_UNIT_H
     name: text(section.name, `Section ${index + 1}`),
     widthIn: positiveNumber(section.widthIn, DEFAULT_MCC_SECTION_WIDTH_IN, 6),
     verticalWirewayWidthIn: nonNegativeNumber(section.verticalWirewayWidthIn, DEFAULT_MCC_VERTICAL_WIREWAY_WIDTH_IN),
+    loadListManaged: booleanValue(section.loadListManaged, false),
     buckets: Array.isArray(section.buckets)
       ? section.buckets.map((bucket, bucketIndex) => normalizeBucket(bucket, unitHeightIn, bucketIndex))
       : []

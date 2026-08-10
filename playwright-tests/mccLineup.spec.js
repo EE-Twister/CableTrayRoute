@@ -50,8 +50,8 @@ async function changeField(page, field, value) {
   await input.evaluate(node => node.dispatchEvent(new Event("change", { bubbles: true })));
 }
 
-async function installCleanProject(page) {
-  await page.addInitScript(() => {
+async function installCleanProject(page, { loads = [] } = {}) {
+  await page.addInitScript(({ initialLoads }) => {
     if (sessionStorage.getItem("__mccLineupSmokeInitialized")) return;
     sessionStorage.setItem("__mccLineupSmokeInitialized", "1");
     localStorage.clear();
@@ -74,7 +74,8 @@ async function installCleanProject(page) {
         }
       }
     }));
-  });
+    if (initialLoads.length) localStorage.setItem("base:loadList", JSON.stringify(initialLoads));
+  }, { initialLoads: loads });
 }
 
 test.describe("MCC Lineups", () => {
@@ -319,5 +320,86 @@ test.describe("MCC Lineups", () => {
     await expect(page.locator("#equipment-mcc-preview-title")).toContainText("MCC-ONEOFF");
     await expect(page.locator("#equipment-mcc-elevation-preview svg")).toBeVisible();
     await expect(page.locator("#equipment-mcc-oneline-preview svg")).toBeVisible();
+  });
+
+  test("previews, builds, and safely refreshes Load List-managed buckets", async ({ page }) => {
+    await installCleanProject(page, {
+      loads: [
+        {
+          id: "load-p201",
+          source: "MCC-AUTO",
+          tag: "P-201",
+          description: "Cooling Water Pump",
+          loadType: "Motor",
+          kw: "18.6",
+          voltage: "480",
+          powerFactor: "0.85",
+          phases: "3"
+        },
+        {
+          id: "load-fan202",
+          source: "MCC-AUTO",
+          tag: "FAN-202",
+          description: "Exhaust Fan VFD",
+          loadType: "VFD",
+          kw: "22",
+          voltage: "480",
+          powerFactor: "0.9",
+          phases: "3"
+        },
+        { id: "load-other", source: "SWBD-1", tag: "OTHER", loadType: "Motor", kw: "10" }
+      ]
+    });
+    await page.goto(pageUrl("mcclineup.html?e2e=1"));
+
+    await changeField(page, "tag", "MCC-AUTO");
+    await changeField(page, "equipmentTag", "MCC-AUTO");
+    await page.click("#build-mcc-from-loads");
+
+    const preview = page.getByRole("dialog", { name: "Build MCC from Load List" });
+    await expect(preview).toBeVisible();
+    await expect(preview).toContainText("2 Load List records use MCC-AUTO");
+    await expect(preview).toContainText("2 new buckets");
+    await expect(preview).toContainText("Cooling Water Pump");
+    await expect(preview).toContainText("horsepower, starter size, and protective-device ratings remain unassigned");
+    await preview.getByRole("button", { name: "Build / Refresh", exact: true }).click();
+
+    await expect(page.locator("#mcc-sync-status")).toContainText("Built 2 Load List buckets for MCC-AUTO");
+    await expect(page.locator('[data-section-field="name"]').last()).toHaveValue("Load List 1");
+    await expect(page.locator('[data-bucket-field="equipmentTag"][value="P-201"]')).toHaveCount(1);
+    await expect(page.locator('[data-bucket-field="equipmentTag"][value="FAN-202"]')).toHaveCount(1);
+
+    const managedBucketIds = await page.evaluate(() => {
+      const lineup = JSON.parse(localStorage.getItem("base:mccLineups") || "[]")[0];
+      return Object.fromEntries(lineup.sections
+        .flatMap(section => section.buckets)
+        .filter(bucket => bucket.sourceLoadId)
+        .map(bucket => [bucket.sourceLoadId, bucket.id]));
+    });
+    const motorRow = page.locator(`[data-bucket-id="${managedBucketIds["load-p201"]}"]`);
+    await motorRow.locator('[data-bucket-field="starterType"]').selectOption("soft-starter");
+
+    await page.evaluate(() => {
+      const loads = JSON.parse(localStorage.getItem("base:loadList") || "[]");
+      localStorage.setItem("base:loadList", JSON.stringify(loads
+        .filter(load => load.id !== "load-fan202")
+        .map(load => load.id === "load-p201"
+          ? { ...load, description: "Cooling Water Pump Revised", hp: "25", starterType: "fvnr" }
+          : load)));
+    });
+    await page.reload();
+    await page.click("#build-mcc-from-loads");
+    await expect(preview).toContainText("1 source updates");
+    await expect(preview).toContainText("1 stale linked buckets removed");
+    await preview.getByRole("button", { name: "Build / Refresh", exact: true }).click();
+
+    const refreshed = await page.evaluate(() => {
+      const lineup = JSON.parse(localStorage.getItem("base:mccLineups") || "[]")[0];
+      return lineup.sections.flatMap(section => section.buckets).filter(bucket => bucket.sourceLoadId);
+    });
+    expect(refreshed).toHaveLength(1);
+    expect(refreshed[0].equipmentDescription).toBe("Cooling Water Pump Revised");
+    expect(refreshed[0].hp).toBe("25");
+    expect(refreshed[0].starterType).toBe("soft-starter");
   });
 });

@@ -25,7 +25,18 @@ The MCC Lineups tool (`mcclineup.html`) builds motor control center lineup layou
 - SVG sheet export for the current lineup.
 - PDF report export with the current lineup summary, elevation view, simple one-line, and bucket schedule.
 - Optional Equipment List sync for MCC summary fields such as width, depth, height, voltage, arrangement, and lineup tag.
+- Previewed Load List reconciliation that builds and refreshes preliminary MCC buckets from loads whose Source / Panel matches the active lineup Equipment Tag or Tag.
 - Direct placement on Equipment Arrangements as a one-off MCC lineup without creating an Equipment List row first.
+
+## Build or refresh from the Load List
+
+Use **Build / Refresh from Load List** to preview loads whose **Source / Panel** matches the active lineup's **Equipment Tag**, or its **Tag** when no Equipment Tag is provided. Source matching ignores capitalization and surrounding spaces. Confirming the preview creates one Load List-managed bucket per matching load and packs those buckets into dedicated `Load List` sections. Existing manual buckets and sections are preserved.
+
+Refreshing uses each load's stable project ID to update generated tag, description, type, and any explicit MCC fields supplied by imported data. A manual edit to a generated field is preserved on later refreshes. Generated buckets whose source loads no longer belong to the MCC are listed in the preview and removed only after confirmation.
+
+Motor loads initially become starter buckets, explicit VFD loads become VFD buckets, spare loads become spare buckets, and other loads become feeder buckets. The Load List's kW and calculated current are not converted into motor nameplate horsepower or protective-device ratings. When horsepower, starter selection, breaker rating, or physical bucket size is absent, those values remain unassigned; new buckets use one MCC unit only as a preliminary layout default. Quantity greater than one, voltage mismatches, missing tags, and incomplete motor data are shown as review items in the preview.
+
+Load List-generated layouts are screening and coordination drafts. Confirm equipment quantities, nameplate horsepower, starter and VFD selections, protective-device ratings, and manufacturer bucket dimensions before detailed design, procurement, or construction use.
 
 ## Equipment List sync
 

@@ -1,4 +1,6 @@
 import * as dataStore from '../dataStore.mjs';
+import { openModal } from './components/modal.js';
+import { reconcileMccLineupFromLoads } from './mcc-lineup/loadListSync.mjs';
 import {
   DEFAULT_MCC_VERTICAL_WIREWAY_WIDTH_IN,
   MCC_BUS_MATERIAL_TYPES,
@@ -1320,6 +1322,112 @@ function syncEquipmentList() {
   setStatus(`Synced ${linkedCount} MCC lineup${linkedCount === 1 ? '' : 's'} to the Equipment List.${skipped}`);
 }
 
+function appendPreviewMetric(list, label, value) {
+  const item = document.createElement('li');
+  const strong = document.createElement('strong');
+  strong.textContent = String(value);
+  item.append(strong, ` ${label}`);
+  list.appendChild(item);
+}
+
+function renderLoadListBuildPreview(body, controller, summary) {
+  const intro = document.createElement('p');
+  intro.textContent = summary.matched
+    ? `${summary.matched} Load List record${summary.matched === 1 ? '' : 's'} use ${summary.target} as Source / Panel.`
+    : `No Load List records use ${summary.target} as Source / Panel.`;
+  body.appendChild(intro);
+
+  const metrics = document.createElement('ul');
+  metrics.className = 'mcc-load-sync-metrics';
+  appendPreviewMetric(metrics, 'new buckets', summary.created);
+  appendPreviewMetric(metrics, 'source updates', summary.updated);
+  appendPreviewMetric(metrics, 'unchanged linked buckets', summary.unchanged);
+  appendPreviewMetric(metrics, 'stale linked buckets removed', summary.removed);
+  appendPreviewMetric(metrics, 'manual buckets preserved', summary.manualBucketsPreserved);
+  body.appendChild(metrics);
+
+  if (summary.loads.length) {
+    const tableScroll = document.createElement('div');
+    tableScroll.className = 'table-scroll mcc-load-sync-table-wrap';
+    const table = document.createElement('table');
+    table.className = 'mcc-load-sync-table';
+    const head = document.createElement('thead');
+    const headerRow = document.createElement('tr');
+    ['Load Tag', 'Description', 'Type', 'kW', 'Voltage'].forEach(label => {
+      const cell = document.createElement('th');
+      cell.scope = 'col';
+      cell.textContent = label;
+      headerRow.appendChild(cell);
+    });
+    head.appendChild(headerRow);
+    const tableBody = document.createElement('tbody');
+    summary.loads.forEach(load => {
+      const row = document.createElement('tr');
+      [load.tag, load.description, load.loadType, load.kw, load.voltage].forEach(value => {
+        const cell = document.createElement('td');
+        cell.textContent = value || '—';
+        row.appendChild(cell);
+      });
+      tableBody.appendChild(row);
+    });
+    table.append(head, tableBody);
+    tableScroll.appendChild(table);
+    body.appendChild(tableScroll);
+  }
+
+  if (summary.warnings.length) {
+    const heading = document.createElement('h3');
+    heading.textContent = 'Review items';
+    const warnings = document.createElement('ul');
+    warnings.className = 'mcc-load-sync-warnings';
+    summary.warnings.forEach(message => {
+      const item = document.createElement('li');
+      item.textContent = message;
+      warnings.appendChild(item);
+    });
+    body.append(heading, warnings);
+  }
+
+  const boundary = document.createElement('p');
+  boundary.className = 'field-hint';
+  boundary.textContent = 'Generated buckets are preliminary. Confirm horsepower, starter selection, protective-device rating, and physical bucket size before detailed design or procurement.';
+  body.appendChild(boundary);
+
+  if (!summary.matched && !summary.removed) {
+    controller.setPrimaryText('No Loads Found');
+    controller.setPrimaryDisabled(true);
+  }
+}
+
+async function buildFromLoadList() {
+  const lineup = activeLineup();
+  if (!lineup) return;
+  const preview = reconcileMccLineupFromLoads(lineup, dataStore.getLoads());
+  const confirmed = await openModal({
+    title: 'Build MCC from Load List',
+    description: 'Preview the Load List reconciliation before changing this lineup. Manual buckets are preserved; only Load List-managed buckets are refreshed or removed.',
+    primaryText: 'Build / Refresh',
+    secondaryText: 'Cancel',
+    defaultWidth: 'wide',
+    render: (body, controller) => renderLoadListBuildPreview(body, controller, preview.summary)
+  });
+  if (!confirmed) {
+    if (!preview.summary.matched) setStatus(`No Load List records use ${preview.summary.target} as Source / Panel.`);
+    return;
+  }
+
+  state.lineups[activeIndex()] = preview.lineup;
+  state.selectedBucketId = '';
+  persistLineups();
+  render();
+  const summary = preview.summary;
+  setStatus(
+    `Built ${summary.matched} Load List bucket${summary.matched === 1 ? '' : 's'} for ${summary.target}: `
+    + `${summary.created} added, ${summary.updated} updated, ${summary.removed} removed. `
+    + `${summary.manualBucketsPreserved} manual bucket${summary.manualBucketsPreserved === 1 ? '' : 's'} preserved.`
+  );
+}
+
 function downloadLineupSheet() {
   const lineup = activeLineup();
   if (!lineup) return;
@@ -1875,6 +1983,7 @@ function bindUi() {
   document.getElementById('delete-mcc-lineup')?.addEventListener('click', deleteLineup);
   document.getElementById('apply-mcc-profile')?.addEventListener('click', applySelectedProfile);
   document.getElementById('add-mcc-section')?.addEventListener('click', addSection);
+  document.getElementById('build-mcc-from-loads')?.addEventListener('click', buildFromLoadList);
   document.getElementById('sync-mcc-equipment')?.addEventListener('click', syncEquipmentList);
   document.getElementById('export-mcc-lineup-svg')?.addEventListener('click', downloadLineupSheet);
   document.getElementById('export-mcc-lineup-pdf')?.addEventListener('click', downloadLineupPdfReport);

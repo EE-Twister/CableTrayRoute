@@ -182,6 +182,7 @@ Coverage: 80 contracts for 80 navigation routes.
 
 **Project Inputs**
 - `equipment` (schedule, required): Equipment tags, ratings, locations, and physical metadata.
+- `loadList` (schedule, optional): Optional source-linked loads used to preview, build, and refresh MCC buckets.
 - `settings.mccLineupActiveId` (setting, optional): Active MCC lineup selection.
 
 **Outputs**

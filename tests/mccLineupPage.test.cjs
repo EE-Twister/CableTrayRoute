@@ -20,6 +20,7 @@ describe('MCC lineup page', () => {
   const entryJs = fs.readFileSync(path.join(root, 'src', 'mcclineup.js'), 'utf8');
   const pageJs = fs.readFileSync(path.join(root, 'src', 'mccLineupPage.js'), 'utf8');
   const modelJs = fs.readFileSync(path.join(root, 'src', 'mccLineupModel.mjs'), 'utf8');
+  const loadListSyncJs = fs.readFileSync(path.join(root, 'src', 'mcc-lineup', 'loadListSync.mjs'), 'utf8');
   const dataStoreJs = fs.readFileSync(path.join(root, 'dataStore.mjs'), 'utf8');
   const arrangementHtml = fs.readFileSync(path.join(root, 'equipmentarrangements.html'), 'utf8');
   const arrangementJs = fs.readFileSync(path.join(root, 'equipmentarrangements.js'), 'utf8');
@@ -28,6 +29,7 @@ describe('MCC lineup page', () => {
   const siteJs = fs.readFileSync(path.join(root, 'site.js'), 'utf8');
   const styleCss = fs.readFileSync(path.join(root, 'style.css'), 'utf8');
   const baseCss = fs.readFileSync(path.join(root, 'src', 'styles', 'base.css'), 'utf8');
+  const modalCss = fs.readFileSync(path.join(root, 'src', 'styles', 'modals.css'), 'utf8');
   const distJs = fs.readFileSync(path.join(root, 'dist', 'mcclineup.js'), 'utf8');
   const distArrangementJs = fs.readFileSync(path.join(root, 'dist', 'equipmentarrangements.js'), 'utf8');
   // The bundler inlines dynamic imports (rollup `inlineDynamicImports: true`),
@@ -78,6 +80,7 @@ describe('MCC lineup page', () => {
     assert.ok(html.includes('data-mcc-report-field="projectName"'), 'mcclineup.html missing PDF project name field');
     assert.ok(html.includes('data-mcc-report-field="drawingNumber"'), 'mcclineup.html missing PDF drawing number field');
     assert.ok(html.includes('id="export-mcc-lineup-pdf"'), 'mcclineup.html missing PDF report export control');
+    assert.ok(html.includes('id="build-mcc-from-loads"'), 'mcclineup.html missing Load List build control');
     assert.ok(html.includes('dist/mcclineup.js'), 'mcclineup.html missing bundled script');
   });
 
@@ -163,8 +166,10 @@ describe('MCC lineup page', () => {
       'dataStore.getMccLineups()',
       'dataStore.setMccLineups(state.lineups)',
       'syncMccLineupsToEquipment(dataStore.getEquipment(), state.lineups)',
+      'reconcileMccLineupFromLoads(lineup, dataStore.getLoads())',
       "document.getElementById('add-mcc-lineup')",
       "document.getElementById('add-mcc-section')",
+      "document.getElementById('build-mcc-from-loads')",
       "document.getElementById('export-mcc-lineup-svg')",
       "document.getElementById('export-mcc-lineup-pdf')",
       'downloadLineupPdfReport',
@@ -278,6 +283,15 @@ describe('MCC lineup page', () => {
     assert.ok(styleCss.includes('#mcc-oneline-preview svg'), 'style.css should target the MCC one-line preview SVG');
     assert.ok(styleCss.includes('#equipment-mcc-oneline-preview svg'), 'style.css should target the equipment arrangement MCC one-line preview SVG');
     assert.ok(styleCss.includes('max-width:none'), 'style.css should let one-line previews keep natural SVG width and scroll horizontally');
+    assert.ok(modalCss.includes('.mcc-load-sync-metrics'), 'modals.css should style the Load List reconciliation preview');
+    [
+      'export function loadsForMccLineup',
+      'export function reconcileMccLineupFromLoads',
+      'loadListManaged',
+      'sourceLoadId',
+      'manualBucketsPreserved',
+      'manualOverrides'
+    ].forEach(fragment => assert.ok(loadListSyncJs.includes(fragment), `loadListSync.mjs missing ${fragment}`));
   });
 
   it('adds MCC lineup storage helpers and project persistence', () => {
@@ -311,6 +325,7 @@ describe('MCC lineup page', () => {
     assert.ok(distModelJs.includes('mccLineupId'), 'dist/mcclineup.js missing inlined MCC model bundle');
     assert.ok(distJs.includes('mcc-lineup-select'), 'dist/mcclineup.js missing MCC page wiring');
     assert.ok(distJs.includes('sync-mcc-equipment'), 'dist/mcclineup.js missing equipment sync control');
+    assert.ok(distJs.includes('build-mcc-from-loads'), 'dist/mcclineup.js missing Load List build control');
     assert.ok(distJs.includes('export-mcc-lineup-pdf'), 'dist/mcclineup.js missing PDF report export control');
     assert.ok(distJs.includes('mcc-lineup-report'), 'dist/mcclineup.js missing PDF report export filename');
     assert.ok(distJs.includes('mcc-profile-preset'), 'dist/mcclineup.js missing MCC profile preset wiring');

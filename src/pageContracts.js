@@ -183,7 +183,11 @@ export const PAGE_CONTRACTS_BY_HREF = {
   'mcclineup.html': contract({
     workflowStep: 'equipmentList',
     standaloneInputs: ['Lineup names, bucket entries, starter metadata, and physical lineup dimensions.'],
-    projectInputs: [equipment, mccLineupActiveId],
+    projectInputs: [
+      equipment,
+      projectInput('loadList', 'schedule', false, 'Optional source-linked loads used to preview, build, and refresh MCC buckets.'),
+      mccLineupActiveId
+    ],
     outputs: [
       output('mccLineups', 'schedule', 'Persisted MCC lineup definitions and active lineup selection.', ['equipmentlist.html', 'equipmentarrangements.html', 'projectreport.html']),
       output('equipment', 'schedule', 'Optional synchronized MCC equipment rows.', ['equipmentlist.html', 'oneline.html']),
