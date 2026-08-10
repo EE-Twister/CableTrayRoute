@@ -1042,6 +1042,7 @@ function ensureLoadFields(load) {
     loadType: '',
     duty: '',
     kw: '',
+    hp: '',
     powerFactor: '',
     loadFactor: '',
     efficiency: '',

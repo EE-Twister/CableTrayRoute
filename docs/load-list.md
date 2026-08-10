@@ -8,12 +8,13 @@ The Load List page is designed for fast load entry first, with deeper engineerin
 - Use **Add Load** to open the focused load entry form.
 - Use **Sample** to seed starter loads for motors, lighting, receptacles, HVAC, and UPS examples.
 - Use **Basic Entry** view for the common fields needed to define and review loads.
+- Enter optional motor nameplate horsepower in **HP**. HP is stored separately from kW and is not derived from it.
 - Required readiness fields are Source, kW, Voltage, Power Factor, and Phases.
 
 ## Views
 
 - **Basic Entry** keeps source, tag, description, electrical basics, circuit, and calculated values visible.
-- **Electrical** focuses on voltage, kW, power factor, phases, kVA, and current.
+- **Electrical** focuses on voltage, kW, motor HP, power factor, phases, kVA, and current.
 - **Demand** places demand factor and calculated demand kW/kVA immediately after source and tag so its defining values are visible without horizontal hunting.
 - **Procurement** focuses on manufacturer, model, quantity, type, and notes.
 - **Full Detail** shows all available columns.
@@ -28,7 +29,7 @@ The Load List page is designed for fast load entry first, with deeper engineerin
 - **Import CSV** opens a mapping step when headers are present so non-native column names can be matched to Load List fields.
 - **Import JSON** accepts native load data and can also map non-native object keys.
 - Imports show replace and merge counts before changes are applied. Merge matches by `ref`, `id`, `tag`, or description and does not delete existing rows absent from the import.
-- **Export CSV**, **Export JSON**, and **Copy Table** include calculated kVA, current, demand kVA, and demand kW.
+- **Export CSV**, **Export JSON**, and **Copy Table** preserve HP and include calculated kVA, current, demand kVA, and demand kW.
 
 ## Downstream Workflow
 
@@ -36,4 +37,5 @@ The Load List page is designed for fast load entry first, with deeper engineerin
 - Source / Panel fields suggest Equipment List tags when equipment records are available.
 - Validation groups blockers by missing source, kW, voltage, power factor, and phases.
 - The source summary groups totals by Source / Panel.
+- When a motor load is sourced from an MCC, explicit HP, voltage, phases, and starter method can support a preliminary NEMA starter-size estimate when the MCC lineup is built or refreshed. Supported FVNR starters then receive a conservative generic bucket-height allowance from the estimated NEMA size. Explicit imported bucket dimensions take precedence, and other starter constructions remain unassigned. These are screening estimates, not procurement selections.
 - Use the next-action strip to continue to One-Line once loads are complete, or continue directly to Cable Schedule when the project path does not need a diagram first.

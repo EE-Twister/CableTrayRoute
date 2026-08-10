@@ -34,9 +34,42 @@ Use **Build / Refresh from Load List** to preview loads whose **Source / Panel**
 
 Refreshing uses each load's stable project ID to update generated tag, description, type, and any explicit MCC fields supplied by imported data. A manual edit to a generated field is preserved on later refreshes. Generated buckets whose source loads no longer belong to the MCC are listed in the preview and removed only after confirmation.
 
-Motor loads initially become starter buckets, explicit VFD loads become VFD buckets, spare loads become spare buckets, and other loads become feeder buckets. The Load List's kW and calculated current are not converted into motor nameplate horsepower or protective-device ratings. When horsepower, starter selection, breaker rating, or physical bucket size is absent, those values remain unassigned; new buckets use one MCC unit only as a preliminary layout default. Quantity greater than one, voltage mismatches, missing tags, and incomplete motor data are shown as review items in the preview.
+Motor loads initially become starter buckets, explicit VFD loads become VFD buckets, spare loads become spare buckets, and other loads become feeder buckets. The Load List's kW and calculated current are not converted into motor nameplate horsepower or protective-device ratings. Instead, an explicit Load List HP value is passed through as nameplate horsepower.
 
-Load List-generated layouts are screening and coordination drafts. Confirm equipment quantities, nameplate horsepower, starter and VFD selections, protective-device ratings, and manufacturer bucket dimensions before detailed design, procurement, or construction use.
+For three-phase motor loads with an explicit positive HP value, a supported voltage class, and no explicit starter size, the generator can assign a preliminary NEMA starter size from the same horsepower table shown in the Starter Size tooltip. Supported nominal voltages are 200/208 V, 220/230/240 V, and 440/460/480/575/600 V. Full-voltage non-reversing/reversing, wye-delta, part-winding, and reduced-voltage autotransformer methods use their corresponding table columns. If no starter method is provided, the screening estimate assumes full voltage and records that assumption. Soft starters, two-speed starters, VFDs, other unsupported methods, single-phase loads, unsupported voltages, missing HP, and values beyond the table remain unassigned. An explicit imported starter size always takes precedence.
+
+The starter table basis is the [Eaton NEMA Contactors and Starters catalog](https://www.eaton.com/content/dam/eaton/products/industrialcontrols-drives-automation-sensors/nema-contactors-and-starters-v5-t2-ca08100006e.pdf). It is used only for early screening.
+
+When a starter size is available and the method is FVNR, the generator also applies this conservative cross-manufacturer bucket-height allowance:
+
+| NEMA starter size | Estimated bucket height | MCC units at 6 in./unit |
+| --- | ---: | ---: |
+| 00-2 | 12 in. | 2 |
+| 3 | 24 in. | 4 |
+| 4 | 36 in. | 6 |
+| 5 | 48 in. | 8 |
+| 6 | Full usable section | Depends on lineup |
+| 7-9 | Not automatically assigned | Custom |
+
+The allowance is informed by published construction data from the [Eaton Freedom MCC catalog](https://www.eaton.com/content/dam/eaton/products/low-voltage-power-distribution-controls-systems/motor-contols/mcc-catalog.pdf-vol03-tab03.pdf), [Rockwell Automation CENTERLINE 2100 selection guide](https://literature.rockwellautomation.com/idc/groups/literature/documents/sg/2100-sg003_-en-p.pdf), and [Schneider Electric Model 6 guidance](https://www.se.com/us/en/faqs/FA236769/). It is intentionally conservative for generic layout planning, not a manufacturer-specific selection. FVR, wye-delta, part-winding, autotransformer, soft-starter, VFD, and NEMA 7-9 constructions remain unassigned unless a bucket size is supplied explicitly. Options such as arc-resistant construction, larger protective devices, control power transformers, pilot devices, communications, and special terminations can require more space.
+
+An explicit imported bucket size takes precedence over the estimate. A user can resize a generated bucket in the MCC editor; that manual value is retained on later Load List refreshes and its automatic-estimate provenance is cleared. Loads without an explicit or supported estimated bucket size use one MCC unit for preliminary layout. Quantity greater than one, voltage mismatches, missing tags, preliminary starter or bucket estimates, and incomplete or unsupported motor data are shown as review items in the preview.
+
+Feeder and breaker buckets can also use an explicit breaker amp-frame rating. Enter the breaker as `100AT/250AF`, or provide a separate `breakerFrameA` value in imported data. A lone value such as `100` is treated as trip amps and does not trigger frame-based sizing. The conservative planning allowances are:
+
+| Breaker amp frame | Estimated bucket height | MCC units at 6 in./unit |
+| --- | ---: | ---: |
+| Up to 125 AF | 12 in. | 2 |
+| 126-250 AF | 18 in. | 3 |
+| 251-400 AF | 30 in. | 5 |
+| 401-600 AF | 42 in. | 7 |
+| 601-800 AF | 66 in. | 11 |
+| 801-2500 AF | Full usable section | Depends on lineup |
+| Above 2500 AF | Not automatically assigned | Custom |
+
+This feeder-breaker allowance is informed by the [Eaton low-voltage MCC design guide](https://www.eaton.com/content/dam/eaton/products/design-guides---consultant-audience/eaton-low-voltage-mcc-design-guide-dg043001en.pdf), [Rockwell Automation CENTERLINE 2100 selection guide](https://literature.rockwellautomation.com/idc/groups/literature/documents/sg/2100-sg003_-en-p.pdf), and [Schneider Electric Model 6 feeder catalog](https://productinfo.se.com/nadigest/5c51d645347bdf0001f1f280/Master/17717_MAIN%20%28bookmap%29_0000055870.xml/%24/topicref). It is a generic screening allowance. Breaker family, interrupting rating, fixed versus withdrawable construction, arc-resistant construction, line/load lug orientation, conductor quantity and size, metering, controls, and accessories can change the required space.
+
+Load List-generated layouts are screening and coordination drafts. Confirm equipment quantities, motor nameplate current and horsepower, duty, starter method, starter and VFD selections, protective-device ratings, manufacturer horsepower ratings, construction options, and physical bucket dimensions before detailed design, procurement, or construction use.
 
 ## Equipment List sync
 

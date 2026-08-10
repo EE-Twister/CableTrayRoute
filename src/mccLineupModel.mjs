@@ -1,3 +1,5 @@
+import { parseBreakerAmpFrame } from './mcc-lineup/breakerBucketSizing.mjs';
+
 export const MCC_LINEUPS_KEY = 'mccLineups';
 
 export const DEFAULT_MCC_UNIT_HEIGHT_IN = 6;
@@ -58,6 +60,7 @@ export const MCC_STARTER_TYPES = [
   'fvr',
   'soft-starter',
   'wye-delta',
+  'part-winding',
   'two-speed',
   'reduced-voltage-autotransformer',
   'other'
@@ -486,13 +489,19 @@ export function normalizeBucket(bucket = {}, unitHeightIn = DEFAULT_MCC_UNIT_HEI
     status,
     sizeUnits: round(normalizedUnits, 2),
     heightIn: round(normalizedHeight, 2),
+    bucketSizeEstimated: booleanValue(bucket.bucketSizeEstimated, false),
+    bucketSizeBasis: text(bucket.bucketSizeBasis),
+    bucketSizeEstimateKind: text(bucket.bucketSizeEstimateKind),
     equipmentTag,
     equipmentDescription: text(bucket.equipmentDescription, bucket.description || ''),
     loadTag: text(bucket.loadTag, equipmentTag),
     hp: text(bucket.hp),
     breakerA: text(bucket.breakerA),
+    breakerFrameA: text(bucket.breakerFrameA),
     starterType: MCC_STARTER_TYPES.includes(starterType) ? starterType : '',
     starterSize: text(bucket.starterSize),
+    starterSizeEstimated: booleanValue(bucket.starterSizeEstimated, false),
+    starterSizeBasis: text(bucket.starterSizeBasis),
     motorSpaceHeaterRequired,
     motorSpaceHeaterVa: text(bucket.motorSpaceHeaterVa ?? bucket.motorSpaceHeaterVA ?? bucket.spaceHeaterVa ?? bucket.spaceHeaterVA),
     cableTag: text(bucket.cableTag),
@@ -503,7 +512,9 @@ export function normalizeBucket(bucket = {}, unitHeightIn = DEFAULT_MCC_UNIT_HEI
     sourceCircuit: text(bucket.sourceCircuit),
     sourceLoadType: text(bucket.sourceLoadType),
     sourceKw: text(bucket.sourceKw),
+    sourceHp: text(bucket.sourceHp),
     sourceVoltage: text(bucket.sourceVoltage),
+    sourcePhases: text(bucket.sourcePhases),
     sourceQuantity: text(bucket.sourceQuantity),
     loadListSourceValues: bucket.loadListSourceValues && typeof bucket.loadListSourceValues === 'object'
       ? { ...bucket.loadListSourceValues }
@@ -674,6 +685,25 @@ export function validateMccLineup(lineup) {
           message: `${section.name} ${bucketName} is set as a main breaker but has no breaker rating.`
         });
       }
+      if (['breaker', 'feeder', 'spare'].includes(bucket.type) && bucket.breakerA) {
+        const parsedFrame = parseBreakerAmpFrame({ breakerA: bucket.breakerA, breakerFrameA: bucket.breakerFrameA });
+        if (!parsedFrame.frameA) {
+          messages.push({
+            severity: 'warning',
+            sectionId: section.id,
+            bucketId: bucket.id,
+            message: `${section.name} ${bucketName} has a breaker rating but no valid explicit amp-frame rating; bucket size cannot be estimated from trip amps alone.`
+          });
+        }
+      }
+      if (bucket.bucketSizeEstimateKind === 'breaker-frame') {
+        messages.push({
+          severity: 'warning',
+          sectionId: section.id,
+          bucketId: bucket.id,
+          message: `${section.name} ${bucketName} uses a generic amp-frame bucket-size estimate; confirm breaker and MCC manufacturer construction.`
+        });
+      }
       if (bucket.motorSpaceHeaterRequired && !bucket.motorSpaceHeaterVa) {
         messages.push({
           severity: 'warning',
@@ -779,6 +809,7 @@ export function mccStarterTypeLabel(bucket = {}) {
     fvr: 'FVR',
     'soft-starter': 'Soft Starter',
     'wye-delta': 'Wye-Delta',
+    'part-winding': 'Part Winding',
     'two-speed': 'Two-Speed',
     'reduced-voltage-autotransformer': 'RV Auto',
     other: 'Other'
@@ -795,10 +826,12 @@ export function mccStarterTypeSizeLabel(bucket = {}) {
 
 export function mccBreakerAtAfLabel(bucket = {}) {
   const raw = text(bucket.breakerA);
-  if (!raw) return '';
+  const explicitFrame = text(bucket.breakerFrameA);
+  if (!raw) return explicitFrame ? `${explicitFrame}AF` : '';
   if (/\b(?:AT|AF)\b/i.test(raw)) return raw;
   const ratings = raw.match(/\d+(?:\.\d+)?/g) || [];
   if (ratings.length >= 2) return `${ratings[0]}AT/${ratings[1]}AF`;
+  if (ratings.length === 1 && explicitFrame) return `${ratings[0]}AT/${explicitFrame}AF`;
   if (ratings.length === 1) return `${ratings[0]}AT`;
   return raw;
 }

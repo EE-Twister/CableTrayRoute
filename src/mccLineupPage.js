@@ -1,6 +1,8 @@
 import * as dataStore from '../dataStore.mjs';
 import { openModal } from './components/modal.js';
 import { reconcileMccLineupFromLoads } from './mcc-lineup/loadListSync.mjs';
+import { NEMA_STARTER_HP_TABLE_ROWS } from './mcc-lineup/nemaStarterSizing.mjs';
+import { approximateFeederBreakerBucketSize } from './mcc-lineup/breakerBucketSizing.mjs';
 import {
   DEFAULT_MCC_VERTICAL_WIREWAY_WIDTH_IN,
   MCC_BUS_MATERIAL_TYPES,
@@ -287,20 +289,7 @@ function iconMarkup(src, label) {
 }
 
 function starterSizeChartContent() {
-  const rows = [
-    ['00', '1 1/2', '1 1/2', '2', '--', '--', '--', '--', '--', '--', '--', '--', '--'],
-    ['0', '3', '3', '5', '--', '--', '--', '--', '--', '--', '--', '--', '--'],
-    ['1', '7 1/2', '7 1/2', '10', '7 1/2', '7 1/2', '10', '10', '10', '15', '10', '10', '15'],
-    ['2', '10', '15', '25', '10', '15', '25', '20', '25', '40', '20', '25', '40'],
-    ['3', '25', '30', '50', '25', '30', '50', '40', '50', '75', '40', '50', '75'],
-    ['4', '40', '50', '100', '40', '50', '100', '75', '75', '150', '60', '75', '150'],
-    ['5', '75', '100', '200', '75', '100', '200', '150', '150', '350', '150', '150', '300'],
-    ['6', '150', '200', '400', '150', '200', '400', '--', '300', '600', '300', '350', '700'],
-    ['7', '--', '300', '600', '--', '300', '600', '--', '450', '900', '500', '500', '1000'],
-    ['8', '--', '450', '900', '--', '450', '900', '--', '700', '1400', '750', '800', '1500'],
-    ['9', '--', '800', '1600', '--', '800', '1600', '--', '1300', '2600', '1500', '1500', '3000']
-  ];
-  const body = rows.map(row => (
+  const body = NEMA_STARTER_HP_TABLE_ROWS.map(row => (
     `<tr>${row.map(cell => `<td>${escapeXml(cell)}</td>`).join('')}</tr>`
   )).join('');
   return `
@@ -532,7 +521,7 @@ function renderSections(lineup) {
               <th>Units</th>
               <th>Height (in)</th>
               <th>HP</th>
-              <th>Breaker</th>
+              <th title="Enter trip/frame as 100AT/250AF. Bucket estimation requires an explicit amp-frame rating.">Breaker AT / AF</th>
               <th>Starter Type</th>
               <th><span class="mcc-table-header-with-help">Starter Size ${starterSizeChartTooltip()}</span></th>
               <th>Motor Htr</th>
@@ -553,7 +542,7 @@ function renderSections(lineup) {
                 <td><input type="number" step="0.25" min="0.25" data-bucket-field="sizeUnits" value="${escapeXml(formatNumber(bucket.sizeUnits))}"></td>
                 <td><input type="number" step="0.5" min="1" data-bucket-field="heightIn" value="${escapeXml(formatNumber(bucket.heightIn))}"></td>
                 <td><input type="text" data-bucket-field="hp" value="${escapeXml(bucket.hp)}"></td>
-                <td><input type="text" data-bucket-field="breakerA" value="${escapeXml(bucket.breakerA)}"></td>
+                <td><input type="text" data-bucket-field="breakerA" value="${escapeXml(bucket.breakerA)}" placeholder="100AT/250AF" title="Enter trip/frame as 100AT/250AF. A lone number is treated as trip amps only."></td>
                 <td><select data-bucket-field="starterType"${bucket.type === 'starter' ? '' : ' disabled'}>${starterTypeOptionList(bucket.starterType)}</select></td>
                 <td><input type="text" data-bucket-field="starterSize" value="${escapeXml(bucket.starterSize)}"></td>
                 <td class="mcc-bucket-check-cell"><input type="checkbox" data-bucket-field="motorSpaceHeaterRequired"${bucket.motorSpaceHeaterRequired ? ' checked' : ''} aria-label="Motor space heater feed required"></td>
@@ -810,6 +799,8 @@ function updateBucketField(input) {
   const context = bucketForRow(input.closest('tr'));
   if (!context) return;
   const key = input.dataset.bucketField;
+  const hadManualPhysicalOverride = String(context.bucket.bucketSizeBasis || '').startsWith('Manual MCC bucket sizing override');
+  const wasBreakerEstimate = context.bucket.bucketSizeEstimateKind === 'breaker-frame';
   if (key === 'sizeUnits') {
     const units = Number.parseFloat(input.value);
     context.bucket.sizeUnits = units;
@@ -841,6 +832,42 @@ function updateBucketField(input) {
     }
   } else {
     context.bucket[key] = input.value;
+  }
+  if (context.bucket.loadListManaged && ['type', 'hp', 'starterType', 'starterSize'].includes(key)) {
+    context.bucket.starterSizeEstimated = false;
+    context.bucket.starterSizeBasis = 'Manual MCC starter selection override; verify against the selected starter method and manufacturer ratings.';
+  }
+  if (['sizeUnits', 'heightIn'].includes(key)) {
+    context.bucket.bucketSizeEstimated = false;
+    context.bucket.bucketSizeBasis = 'Manual MCC bucket sizing override; verify against the selected MCC manufacturer, starter construction, and options.';
+    context.bucket.bucketSizeEstimateKind = '';
+  } else if (context.bucket.loadListManaged && ['type', 'hp', 'starterType', 'starterSize'].includes(key)) {
+    context.bucket.bucketSizeEstimated = false;
+    context.bucket.bucketSizeBasis = 'Manual MCC bucket sizing override; verify against the selected MCC manufacturer, starter construction, and options.';
+    context.bucket.bucketSizeEstimateKind = '';
+  }
+  if (['type', 'breakerA'].includes(key) && !hadManualPhysicalOverride) {
+    const breakerEstimate = ['breaker', 'feeder', 'spare'].includes(context.bucket.type)
+      ? approximateFeederBreakerBucketSize({
+        breakerA: context.bucket.breakerA,
+        breakerFrameA: context.bucket.breakerFrameA,
+        unitHeightIn: context.lineup.unitHeightIn,
+        usableBucketHeightIn: context.lineup.usableBucketHeightIn
+      })
+      : { sizeUnits: null };
+    if (breakerEstimate.sizeUnits) {
+      context.bucket.sizeUnits = breakerEstimate.sizeUnits;
+      context.bucket.heightIn = breakerEstimate.heightIn;
+      context.bucket.bucketSizeEstimated = true;
+      context.bucket.bucketSizeBasis = breakerEstimate.basis;
+      context.bucket.bucketSizeEstimateKind = 'breaker-frame';
+    } else if (wasBreakerEstimate) {
+      context.bucket.sizeUnits = 1;
+      context.bucket.heightIn = bucketHeightFromUnits(1, context.lineup.unitHeightIn);
+      context.bucket.bucketSizeEstimated = false;
+      context.bucket.bucketSizeBasis = '';
+      context.bucket.bucketSizeEstimateKind = '';
+    }
   }
   state.lineups[activeIndex()] = normalizeMccLineup(context.lineup, activeIndex());
   persistLineups();
@@ -1390,7 +1417,7 @@ function renderLoadListBuildPreview(body, controller, summary) {
 
   const boundary = document.createElement('p');
   boundary.className = 'field-hint';
-  boundary.textContent = 'Generated buckets are preliminary. Confirm horsepower, starter selection, protective-device rating, and physical bucket size before detailed design or procurement.';
+  boundary.textContent = 'Generated buckets are preliminary. Where supported, starter size is estimated from explicit nameplate HP using the displayed three-phase NEMA table, FVNR bucket height uses a conservative cross-manufacturer planning allowance, and feeder-breaker bucket height uses an explicit amp-frame rating. Confirm motor nameplate current, breaker trip and frame, interrupting rating, starter method, duty, manufacturer ratings, lug and cable space, construction options, and physical bucket size before detailed design or procurement.';
   body.appendChild(boundary);
 
   if (!summary.matched && !summary.removed) {

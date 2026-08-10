@@ -6,6 +6,11 @@ import {
   createMccUniqueId,
   normalizeMccLineup
 } from '../mccLineupModel.mjs';
+import {
+  approximateMccBucketSizeFromNema,
+  approximateNemaStarterSize
+} from './nemaStarterSizing.mjs';
+import { approximateFeederBreakerBucketSize } from './breakerBucketSizing.mjs';
 
 const LOAD_MANAGED_BUCKET_FIELDS = [
   'label',
@@ -14,10 +19,18 @@ const LOAD_MANAGED_BUCKET_FIELDS = [
   'loadTag',
   'type',
   'status',
+  'sizeUnits',
+  'heightIn',
+  'bucketSizeEstimated',
+  'bucketSizeBasis',
+  'bucketSizeEstimateKind',
   'hp',
   'breakerA',
+  'breakerFrameA',
   'starterType',
   'starterSize',
+  'starterSizeEstimated',
+  'starterSizeBasis',
   'cableTag',
   'notes'
 ];
@@ -50,11 +63,45 @@ function loadBucketType(load) {
   return 'feeder';
 }
 
-function bucketSourceValues(load) {
+function bucketSourceValues(load, lineup) {
   const equipmentTag = explicitValue(load, ['tag', 'ref', 'id']);
   const type = loadBucketType(load);
   const status = type === 'spare' ? 'spare' : 'active';
   const requestedStarterType = token(explicitValue(load, ['starterType', 'starter_type'])).replace(/[\s_]+/g, '-');
+  const starterType = MCC_STARTER_TYPES.includes(requestedStarterType) ? requestedStarterType : '';
+  const hp = explicitValue(load, ['hp', 'horsepower', 'motorHp', 'motorHP']);
+  const explicitStarterSize = explicitValue(load, ['starterSize', 'starter_size']);
+  const starterSizing = type === 'starter' && !explicitStarterSize
+    ? approximateNemaStarterSize({ hp, voltage: load.voltage, phases: load.phases, starterType: requestedStarterType || starterType })
+    : { size: null, reason: explicitStarterSize ? 'explicit-size' : 'not-starter' };
+  const starterSize = explicitStarterSize || starterSizing.label || '';
+  const breakerA = explicitValue(load, ['breakerA', 'breaker', 'ocpdRating', 'ocpd_rating', 'breakerTripA', 'breaker_trip_a']);
+  const breakerFrameA = explicitValue(load, ['breakerFrameA', 'breakerFrame', 'breaker_frame_a', 'breaker_frame', 'frameA', 'frame_a']);
+  const requestedUnits = Number.parseFloat(load.mccBucketUnits ?? load.bucketUnits ?? load.sizeUnits);
+  const hasExplicitBucketSize = Number.isFinite(requestedUnits) && requestedUnits > 0;
+  let bucketSizing = { sizeUnits: null, heightIn: null, reason: hasExplicitBucketSize ? 'explicit-size' : 'unsupported-type' };
+  let bucketSizeEstimateKind = '';
+  if (type === 'starter' && !hasExplicitBucketSize) {
+    bucketSizing = approximateMccBucketSizeFromNema({
+      starterSize,
+      starterType: requestedStarterType || starterType,
+      unitHeightIn: lineup.unitHeightIn,
+      usableBucketHeightIn: lineup.usableBucketHeightIn
+    });
+    if (bucketSizing.sizeUnits) bucketSizeEstimateKind = 'starter';
+  } else if (['breaker', 'feeder', 'spare'].includes(type) && !hasExplicitBucketSize) {
+    bucketSizing = approximateFeederBreakerBucketSize({
+      breakerA,
+      breakerFrameA,
+      unitHeightIn: lineup.unitHeightIn,
+      usableBucketHeightIn: lineup.usableBucketHeightIn
+    });
+    if (bucketSizing.sizeUnits) bucketSizeEstimateKind = 'breaker-frame';
+  }
+  const sizeUnits = hasExplicitBucketSize ? requestedUnits : (bucketSizing.sizeUnits || 1);
+  const heightIn = hasExplicitBucketSize
+    ? bucketHeightFromUnits(sizeUnits, lineup.unitHeightIn)
+    : (bucketSizing.heightIn || bucketHeightFromUnits(sizeUnits, lineup.unitHeightIn));
   return {
     label: equipmentTag || 'LOAD',
     equipmentTag,
@@ -62,10 +109,18 @@ function bucketSourceValues(load) {
     loadTag: equipmentTag,
     type,
     status,
-    hp: explicitValue(load, ['hp', 'horsepower', 'motorHp', 'motorHP']),
-    breakerA: explicitValue(load, ['breakerA', 'ocpdRating', 'ocpd_rating']),
-    starterType: MCC_STARTER_TYPES.includes(requestedStarterType) ? requestedStarterType : '',
-    starterSize: explicitValue(load, ['starterSize', 'starter_size']),
+    sizeUnits,
+    heightIn,
+    bucketSizeEstimated: Boolean(bucketSizing.sizeUnits),
+    bucketSizeBasis: bucketSizing.sizeUnits ? bucketSizing.basis : '',
+    bucketSizeEstimateKind,
+    hp,
+    breakerA,
+    breakerFrameA,
+    starterType,
+    starterSize,
+    starterSizeEstimated: Boolean(starterSizing.size),
+    starterSizeBasis: starterSizing.size ? starterSizing.basis : '',
     cableTag: explicitValue(load, ['cableTag', 'cable_tag']),
     notes: text(load.notes)
   };
@@ -79,20 +134,18 @@ function sourceMetadata(load) {
     sourceCircuit: text(load.circuit),
     sourceLoadType: text(load.loadType || load.type),
     sourceKw: text(load.kw),
+    sourceHp: explicitValue(load, ['hp', 'horsepower', 'motorHp', 'motorHP']),
     sourceVoltage: text(load.voltage),
+    sourcePhases: text(load.phases),
     sourceQuantity: text(load.quantity)
   };
 }
 
 function newManagedBucket(load, lineup) {
-  const sourceValues = bucketSourceValues(load);
-  const requestedUnits = Number.parseFloat(load.mccBucketUnits ?? load.bucketUnits ?? load.sizeUnits);
-  const sizeUnits = Number.isFinite(requestedUnits) && requestedUnits > 0 ? requestedUnits : 1;
+  const sourceValues = bucketSourceValues(load, lineup);
   return {
     id: createMccUniqueId('mcc-bkt'),
     mainDevice: '',
-    sizeUnits,
-    heightIn: bucketHeightFromUnits(sizeUnits, lineup.unitHeightIn),
     motorSpaceHeaterRequired: false,
     motorSpaceHeaterVa: '',
     ...sourceValues,
@@ -101,24 +154,83 @@ function newManagedBucket(load, lineup) {
   };
 }
 
-function refreshManagedBucket(bucket, load) {
-  const incoming = bucketSourceValues(load);
+function refreshManagedBucket(bucket, load, lineup) {
+  const incoming = bucketSourceValues(load, lineup);
   const previous = bucket.loadListSourceValues && typeof bucket.loadListSourceValues === 'object'
     ? bucket.loadListSourceValues
     : {};
   const next = { ...bucket };
   let sourceChanged = false;
   let manualOverrides = 0;
+  const starterDriverFields = ['type', 'hp', 'starterType', 'starterSize'];
+  const breakerDriverFields = ['breakerA', 'breakerFrameA'];
+  const starterDependentFields = ['starterSize', 'starterSizeEstimated', 'starterSizeBasis'];
+  const bucketDependentFields = ['sizeUnits', 'heightIn', 'bucketSizeEstimated', 'bucketSizeBasis', 'bucketSizeEstimateKind'];
+  const isManualOverride = field => (
+    Object.prototype.hasOwnProperty.call(previous, field)
+    && !valuesEqual(bucket[field], previous[field])
+    && !valuesEqual(bucket[field], incoming[field])
+  );
+  const starterSizingOverridden = starterDriverFields.some(isManualOverride);
+  const breakerSizingOverridden = breakerDriverFields.some(isManualOverride);
+  const physicalSizingOverridden = ['sizeUnits', 'heightIn'].some(field => {
+    if (isManualOverride(field)) return true;
+    if (Object.prototype.hasOwnProperty.call(previous, field)) return false;
+    const previousVersionDefault = field === 'sizeUnits'
+      ? valuesEqual(bucket[field], 1)
+      : valuesEqual(bucket[field], bucketHeightFromUnits(1, lineup.unitHeightIn));
+    return !previousVersionDefault && !valuesEqual(bucket[field], incoming[field]);
+  });
+  const bucketSizingOverridden = starterSizingOverridden || breakerSizingOverridden || physicalSizingOverridden;
 
   LOAD_MANAGED_BUCKET_FIELDS.forEach(field => {
     const hadPrevious = Object.prototype.hasOwnProperty.call(previous, field);
     if (!valuesEqual(previous[field], incoming[field])) sourceChanged = true;
-    if (!hadPrevious || valuesEqual(bucket[field], previous[field])) {
+    if (starterSizingOverridden && starterDependentFields.includes(field)) return;
+    if (bucketSizingOverridden && bucketDependentFields.includes(field)) return;
+    const physicalField = field === 'sizeUnits' || field === 'heightIn';
+    const previousVersionDefault = physicalField && !hadPrevious && (
+      (field === 'sizeUnits' && valuesEqual(bucket[field], 1))
+      || (field === 'heightIn' && valuesEqual(bucket[field], bucketHeightFromUnits(1, lineup.unitHeightIn)))
+    );
+    if ((!hadPrevious && (!physicalField || previousVersionDefault)) || valuesEqual(bucket[field], previous[field])) {
       next[field] = incoming[field];
     } else if (!valuesEqual(bucket[field], incoming[field])) {
       manualOverrides += 1;
     }
   });
+
+  if (starterSizingOverridden) manualOverrides += 1;
+  if (breakerSizingOverridden) manualOverrides += 1;
+  if (physicalSizingOverridden) manualOverrides += 1;
+
+  if (starterSizingOverridden) {
+    next.starterSizeEstimated = false;
+    next.starterSizeBasis = 'Manual MCC starter selection override; verify against the selected starter method and manufacturer ratings.';
+  }
+  if (breakerSizingOverridden && !physicalSizingOverridden && ['breaker', 'feeder', 'spare'].includes(next.type)) {
+    const manualBreakerEstimate = approximateFeederBreakerBucketSize({
+      breakerA: next.breakerA,
+      breakerFrameA: next.breakerFrameA,
+      unitHeightIn: lineup.unitHeightIn,
+      usableBucketHeightIn: lineup.usableBucketHeightIn
+    });
+    if (manualBreakerEstimate.sizeUnits) {
+      next.sizeUnits = manualBreakerEstimate.sizeUnits;
+      next.heightIn = manualBreakerEstimate.heightIn;
+      next.bucketSizeEstimated = true;
+      next.bucketSizeBasis = manualBreakerEstimate.basis;
+      next.bucketSizeEstimateKind = 'breaker-frame';
+    } else {
+      next.bucketSizeEstimated = false;
+      next.bucketSizeBasis = 'Manual MCC breaker selection could not be assigned a generic frame-based bucket size; verify manufacturer construction.';
+      next.bucketSizeEstimateKind = '';
+    }
+  } else if (bucketSizingOverridden) {
+    next.bucketSizeEstimated = false;
+    next.bucketSizeBasis = 'Manual MCC bucket sizing override; verify against the selected MCC manufacturer, starter construction, and options.';
+    next.bucketSizeEstimateKind = '';
+  }
 
   Object.assign(next, sourceMetadata(load));
   next.loadListSourceValues = incoming;
@@ -160,9 +272,21 @@ function loadWarnings(loads, lineup, createdCount) {
     loadBucketType(load) === 'starter'
     && !explicitValue(load, ['hp', 'horsepower', 'motorHp', 'motorHP'])
   )).length;
-  const missingBucketSize = loads.filter(load => {
+  const sourceValues = loads.map(load => bucketSourceValues(load, lineup));
+  const preliminaryStarterSizes = sourceValues.filter(values => values.starterSizeEstimated).length;
+  const preliminaryStarterBucketSizes = sourceValues.filter(values => values.bucketSizeEstimateKind === 'starter').length;
+  const preliminaryBreakerBucketSizes = sourceValues.filter(values => values.bucketSizeEstimateKind === 'breaker-frame').length;
+  const unsupportedStarterSizes = loads.filter(load => {
+    if (loadBucketType(load) !== 'starter') return false;
+    if (!explicitValue(load, ['hp', 'horsepower', 'motorHp', 'motorHP'])) return false;
+    if (explicitValue(load, ['starterSize', 'starter_size'])) return false;
+    return !bucketSourceValues(load, lineup).starterSizeEstimated;
+  }).length;
+  const missingBucketSize = sourceValues.filter((values, index) => {
+    const load = loads[index];
     const units = Number.parseFloat(load.mccBucketUnits ?? load.bucketUnits ?? load.sizeUnits);
-    return !Number.isFinite(units) || units <= 0;
+    const hasExplicitBucketSize = Number.isFinite(units) && units > 0;
+    return !hasExplicitBucketSize && !values.bucketSizeEstimated;
   }).length;
 
   if (!loads.length) warnings.push(`No Load List records use ${mccLoadListTarget(lineup)} as their Source / Panel.`);
@@ -170,6 +294,10 @@ function loadWarnings(loads, lineup, createdCount) {
   if (quantityRows) warnings.push(`${quantityRows} load row${quantityRows === 1 ? ' has' : 's have'} quantity above 1; each row creates one bucket pending equipment-level confirmation.`);
   if (voltageMismatches) warnings.push(`${voltageMismatches} load${voltageMismatches === 1 ? '' : 's'} do not match the lineup voltage.`);
   if (motorsMissingHp) warnings.push(`${motorsMissingHp} motor load${motorsMissingHp === 1 ? '' : 's'} lack explicit horsepower; horsepower, starter size, and protective-device ratings remain unassigned.`);
+  if (preliminaryStarterSizes) warnings.push(`${preliminaryStarterSizes} starter size${preliminaryStarterSizes === 1 ? ' uses' : 's use'} a preliminary NEMA horsepower-table estimate; confirm motor nameplate current, starter method, duty, and manufacturer ratings.`);
+  if (preliminaryStarterBucketSizes) warnings.push(`${preliminaryStarterBucketSizes} MCC bucket height${preliminaryStarterBucketSizes === 1 ? ' uses' : 's use'} a conservative generic FVNR planning estimate; confirm the selected MCC manufacturer, starter construction, and options.`);
+  if (preliminaryBreakerBucketSizes) warnings.push(`${preliminaryBreakerBucketSizes} feeder-breaker bucket height${preliminaryBreakerBucketSizes === 1 ? ' uses' : 's use'} a conservative amp-frame planning estimate; confirm the selected breaker frame, MCC manufacturer, lug and cable space, interrupting rating, and options.`);
+  if (unsupportedStarterSizes) warnings.push(`${unsupportedStarterSizes} motor load${unsupportedStarterSizes === 1 ? '' : 's'} could not be assigned a preliminary NEMA starter size because the phase, voltage, horsepower, or starter method is outside the supported table scope.`);
   if (createdCount && missingBucketSize) warnings.push(`${missingBucketSize} load${missingBucketSize === 1 ? '' : 's'} lack an explicit MCC bucket size; new buckets use one MCC unit for preliminary layout.`);
   return warnings;
 }
@@ -236,6 +364,7 @@ export function reconcileMccLineupFromLoads(lineup = {}, loads = []) {
       description: text(load.description),
       loadType: text(load.loadType),
       kw: text(load.kw),
+      hp: explicitValue(load, ['hp', 'horsepower', 'motorHp', 'motorHP']),
       voltage: text(load.voltage)
     }))
   };
@@ -249,7 +378,7 @@ export function reconcileMccLineupFromLoads(lineup = {}, loads = []) {
       summary.created += 1;
       return newManagedBucket(load, normalized);
     }
-    const refreshed = refreshManagedBucket(existing, load);
+    const refreshed = refreshManagedBucket(existing, load, normalized);
     summary.manualOverrides += refreshed.manualOverrides;
     if (refreshed.sourceChanged) summary.updated += 1;
     else summary.unchanged += 1;

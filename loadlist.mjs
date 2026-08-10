@@ -150,18 +150,18 @@ if (typeof window !== 'undefined') {
       Spare: { loadType: 'Spare', duty: 'Stand-by', demandFactor: '0' }
     };
     const starterLoads = [
-      { source: 'SWBD-1', tag: 'MTR-101', description: 'Process pump motor', quantity: '1', voltage: '480', kw: '18.6', circuit: 'MCC-1-01', ...loadTypeDefaults.Motor },
+      { source: 'SWBD-1', tag: 'MTR-101', description: 'Process pump motor', quantity: '1', voltage: '480', kw: '18.6', hp: '25', circuit: 'MCC-1-01', ...loadTypeDefaults.Motor },
       { source: 'PNL-L1', tag: 'LTG-101', description: 'Office lighting zone', quantity: '1', voltage: '120', kw: '3.2', circuit: 'L1-03', ...loadTypeDefaults.Lighting },
       { source: 'PNL-L1', tag: 'REC-101', description: 'General receptacles', quantity: '12', voltage: '120', kw: '0.18', circuit: 'L1-05', ...loadTypeDefaults.Receptacle },
       { source: 'MCC-1', tag: 'AHU-101', description: 'Air handling unit', quantity: '1', voltage: '480', kw: '22', circuit: 'MCC-1-05', ...loadTypeDefaults.HVAC },
       { source: 'SWBD-1', tag: 'UPS-101', description: 'Controls UPS input', quantity: '1', voltage: '480', kw: '12', circuit: 'SWBD-1-12', ...loadTypeDefaults.UPS }
     ];
     const viewPresets = {
-      basic: ['select', 'source', 'tag', 'description', 'quantity', 'voltage', 'loadType', 'duty', 'kw', 'powerFactor', 'phases', 'circuit', 'kva', 'current', 'actions'],
-      electrical: ['select', 'source', 'tag', 'description', 'quantity', 'voltage', 'kw', 'powerFactor', 'phases', 'kva', 'current', 'circuit', 'actions'],
-      demand: ['select', 'source', 'tag', 'demandFactor', 'demandKva', 'demandKw', 'kw', 'loadFactor', 'description', 'loadType', 'duty', 'actions'],
-      procurement: ['select', 'source', 'tag', 'description', 'manufacturer', 'model', 'quantity', 'voltage', 'loadType', 'notes', 'actions'],
-      full: ['select', 'source', 'tag', 'description', 'manufacturer', 'model', 'quantity', 'voltage', 'loadType', 'duty', 'kw', 'powerFactor', 'loadFactor', 'efficiency', 'demandFactor', 'phases', 'circuit', 'notes', 'kva', 'current', 'demandKva', 'demandKw', 'actions']
+      basic: ['select', 'source', 'tag', 'description', 'quantity', 'voltage', 'loadType', 'duty', 'kw', 'hp', 'powerFactor', 'phases', 'circuit', 'kva', 'current', 'actions'],
+      electrical: ['select', 'source', 'tag', 'description', 'quantity', 'voltage', 'kw', 'hp', 'powerFactor', 'phases', 'kva', 'current', 'circuit', 'actions'],
+      demand: ['select', 'source', 'tag', 'demandFactor', 'demandKva', 'demandKw', 'kw', 'hp', 'loadFactor', 'description', 'loadType', 'duty', 'actions'],
+      procurement: ['select', 'source', 'tag', 'description', 'manufacturer', 'model', 'quantity', 'voltage', 'hp', 'loadType', 'notes', 'actions'],
+      full: ['select', 'source', 'tag', 'description', 'manufacturer', 'model', 'quantity', 'voltage', 'loadType', 'duty', 'kw', 'hp', 'powerFactor', 'loadFactor', 'efficiency', 'demandFactor', 'phases', 'circuit', 'notes', 'kva', 'current', 'demandKva', 'demandKw', 'actions']
     };
     const loadFields = [
       { key: 'source', label: 'Source / Panel', aliases: ['source', 'panel', 'source panel', 'source/panel', 'feed from'] },
@@ -174,6 +174,7 @@ if (typeof window !== 'undefined') {
       { key: 'loadType', label: 'Load Type', aliases: ['load type', 'type', 'category', 'load category'] },
       { key: 'duty', label: 'Duty', aliases: ['duty', 'duty cycle', 'service'] },
       { key: 'kw', label: 'kW', aliases: ['kw', 'power', 'load kw', 'kilowatt', 'kilowatts'] },
+      { key: 'hp', label: 'HP', aliases: ['hp', 'horsepower', 'motor hp', 'nameplate hp', 'rated hp'] },
       { key: 'powerFactor', label: 'Power Factor', aliases: ['power factor', 'pf', 'p.f.', 'powerfactor'] },
       { key: 'loadFactor', label: 'Load Factor (%)', aliases: ['load factor', 'load factor %', 'lf'] },
       { key: 'efficiency', label: 'Efficiency (%)', aliases: ['efficiency', 'efficiency %', 'eff'] },
@@ -193,6 +194,7 @@ if (typeof window !== 'undefined') {
       loadType: '',
       duty: '',
       kw: '',
+      hp: '',
       powerFactor: '',
       loadFactor: '',
       efficiency: '',
@@ -221,6 +223,7 @@ if (typeof window !== 'undefined') {
         'voltage',
         'loadType',
         'kw',
+        'hp',
         'powerFactor',
         'phases',
         'circuit',
@@ -294,7 +297,8 @@ if (typeof window !== 'undefined') {
   function saveRow(tr) {
     const idx = getStoreIndex(tr);
     const load = gatherRow(tr);
-    const numericFields = ['quantity','voltage','kw','powerFactor','loadFactor','efficiency','demandFactor','phases'];
+    const numericFields = ['quantity','voltage','kw','hp','powerFactor','loadFactor','efficiency','demandFactor','phases'];
+    const nonNegativeFields = ['hp'];
     const rangeFields = [
       { name: 'powerFactor', min: 0, max: 1 },
       { name: 'loadFactor', min: 0, max: 100 },
@@ -314,6 +318,15 @@ if (typeof window !== 'undefined') {
           input.classList.remove('input-error');
           input.removeAttribute('title');
         }
+      }
+    });
+    nonNegativeFields.forEach(name => {
+      const input = tr.querySelector(`input[name="${name}"]`);
+      const value = Number(input?.value);
+      if (input && input.value.trim() !== '' && value < 0) {
+        input.classList.add('input-error');
+        input.title = `${name} must be zero or greater.`;
+        valid = false;
       }
     });
     rangeFields.forEach(({ name, min, max }) => {
@@ -643,6 +656,7 @@ if (typeof window !== 'undefined') {
         <option value="Stand-by"${load.duty === 'Stand-by' ? ' selected' : ''}>Stand-by</option>
       </select></td>
       <td data-column="kw"><input name="kw" type="number" step="any" min="0" maxlength="15" value="${escapeAttr(load.kw || '')}" placeholder="15"></td>
+      <td data-column="hp"><input name="hp" type="number" step="any" min="0" maxlength="15" value="${escapeAttr(load.hp || '')}" placeholder="25" aria-label="Motor horsepower"></td>
       <td data-column="powerFactor"><input name="powerFactor" type="number" step="any" min="0" max="1" maxlength="15" value="${escapeAttr(load.powerFactor || '')}" placeholder="0.90"></td>
       <td data-column="loadFactor"><input name="loadFactor" type="number" step="any" min="0" max="100" maxlength="15" value="${escapeAttr(load.loadFactor || '')}" placeholder="100"></td>
       <td data-column="efficiency"><input name="efficiency" type="number" step="any" min="0" max="100" maxlength="15" value="${escapeAttr(load.efficiency || '')}" placeholder="95"></td>
@@ -804,6 +818,7 @@ if (typeof window !== 'undefined') {
       <td data-column="loadType"></td>
       <td data-column="duty"></td>
       <td data-column="kw">${totals.kW.toFixed(2)}</td>
+      <td data-column="hp"></td>
       <td data-column="powerFactor"></td>
       <td data-column="loadFactor"></td>
       <td data-column="efficiency"></td>
@@ -870,6 +885,7 @@ if (typeof window !== 'undefined') {
       load.manufacturer,
       load.model,
       load.loadType,
+      load.hp,
       load.circuit,
       load.notes
     ].join(' ').toLowerCase();
@@ -893,7 +909,7 @@ if (typeof window !== 'undefined') {
         .filter(entry => matchesLoadFilter(entry.load, filterQuery));
 
       if (hasStoredLoads && !filtered.length) {
-        tbody.innerHTML = `<tr><td colspan="23" class="empty-state">No matching loads for the current search.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="24" class="empty-state">No matching loads for the current search.</td></tr>`;
       } else {
         filtered.forEach((entry, idx) => tbody.appendChild(createRow(entry.load, idx, entry.storeIndex)));
       }
@@ -933,6 +949,7 @@ if (typeof window !== 'undefined') {
       'loadType',
       'duty',
       'kw',
+      'hp',
       'powerFactor',
       'loadFactor',
       'efficiency',
@@ -948,7 +965,7 @@ if (typeof window !== 'undefined') {
       'demandKw'
     ].join(delimiter);
     const lines = loads.map(l => {
-      const base = { source: '', manufacturer: '', model: '', notes: '', panelId: '', breaker: '', duty: '', ...l };
+      const base = { source: '', manufacturer: '', model: '', notes: '', panelId: '', breaker: '', duty: '', hp: '', ...l };
       const full = { ...base, ...calculateDerived(base) };
       const vals = [
         full.source,
@@ -961,6 +978,7 @@ if (typeof window !== 'undefined') {
         full.loadType,
         full.duty,
         full.kw,
+        full.hp,
         full.powerFactor,
         full.loadFactor,
         full.efficiency,
@@ -1028,7 +1046,7 @@ if (typeof window !== 'undefined') {
 
   function looksLikeHeaderRow(headers) {
     const inferred = inferImportMapping(headers);
-    return Object.keys(inferred).length >= 2 || headers.some(header => /description|source|panel|kw|power|voltage|load/i.test(header));
+    return Object.keys(inferred).length >= 2 || headers.some(header => /description|source|panel|kw|power|hp|horsepower|voltage|load/i.test(header));
   }
 
   function mapRowsToLoads(rows, headers, mapping) {
@@ -1169,7 +1187,7 @@ if (typeof window !== 'undefined') {
       return set;
     }, new Set()));
     const inferred = inferImportMapping(keys);
-    const hasNativeKeys = ['description', 'kw', 'voltage'].some(key => keys.includes(key));
+    const hasNativeKeys = ['description', 'kw', 'hp', 'voltage'].some(key => keys.includes(key));
     if (!hasNativeKeys && keys.length) {
       const rows = data.map(row => keys.map(key => row?.[key] ?? ''));
       return importMappedRows(keys, rows);
@@ -1186,6 +1204,7 @@ if (typeof window !== 'undefined') {
         loadType: '',
         duty: '',
         kw: '',
+        hp: '',
         powerFactor: '',
         loadFactor: '',
         efficiency: '',
@@ -1443,6 +1462,10 @@ if (typeof window !== 'undefined') {
           <input name="kw" type="number" min="0" step="any" value="${escapeAttr(load.kw || '')}" placeholder="15">
         </label>
         <label class="modal-form-field">
+          <span>Motor HP (Nameplate)</span>
+          <input name="hp" type="number" min="0" step="any" value="${escapeAttr(load.hp || '')}" placeholder="25">
+        </label>
+        <label class="modal-form-field">
           <span>Power Factor</span>
           <input name="powerFactor" type="number" min="0" max="1" step="any" value="${escapeAttr(load.powerFactor || '')}" placeholder="0.90">
         </label>
@@ -1468,7 +1491,7 @@ if (typeof window !== 'undefined') {
           <input name="circuit" type="text" value="${escapeAttr(load.circuit || '')}" placeholder="L1-01">
         </label>
       </div>
-      <p class="field-hint">Use Full Detail view for manufacturer, model, notes, and advanced factors. Load type defaults prefill blank electrical fields.</p>
+      <p class="field-hint">Motor HP is optional and supports preliminary MCC starter sizing; it does not replace kW. Use Full Detail view for manufacturer, model, notes, and advanced factors.</p>
     `;
     body.appendChild(form);
     controller.registerForm(form);

@@ -209,7 +209,7 @@ Coverage: 80 contracts for 80 navigation routes.
 - Workflow step: loadList
 
 **Standalone Inputs**
-- Manual load rows, imports, equipment source selections, and demand metadata.
+- Manual load rows, imports, equipment source selections, optional motor nameplate HP, and demand metadata.
 
 **Project Inputs**
 - `equipment` (schedule, required): Equipment tags, ratings, locations, and physical metadata.
@@ -218,7 +218,7 @@ Coverage: 80 contracts for 80 navigation routes.
 - `settings.designBasis` (setting, optional): Project code basis, sizing defaults, routing defaults, and study prerequisites.
 
 **Outputs**
-- `loadList` (schedule): Load schedule with source, demand, power factor, duty, and equipment links. Consumers: `oneline.html`, `demandschedule.html`, `loadFlow.html`, `generatorsizing.html`.
+- `loadList` (schedule): Load schedule with source, demand, power factor, duty, optional motor nameplate HP, and equipment links. Consumers: `oneline.html`, `demandschedule.html`, `loadFlow.html`, `generatorsizing.html`, `mcclineup.html`.
 - `settings.loadListViewPreset` (setting): Load list view and grouping preferences. Consumers: `loadlist.html`.
 
 **Readiness**

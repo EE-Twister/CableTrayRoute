@@ -299,13 +299,13 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 **Detected Reads**
 - `equipment`
-  - loadlist.mjs:580 getEquipment()
+  - loadlist.mjs:593 getEquipment()
 - `loadList`
-  - loadlist.mjs:1107 getLoads()
-  - loadlist.mjs:1144 getLoads()
-  - loadlist.mjs:1564 getLoads()
-  - loadlist.mjs:1577 getLoads()
-  - loadlist.mjs:1589 getLoads()
+  - loadlist.mjs:1125 getLoads()
+  - loadlist.mjs:1162 getLoads()
+  - loadlist.mjs:1587 getLoads()
+  - loadlist.mjs:1600 getLoads()
+  - loadlist.mjs:1612 getLoads()
   - ... 18 more
 - `oneLineDiagram`
   - src/crossProbe.js:139 getOneLine()
@@ -316,14 +316,14 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 **Detected Writes**
 - `loadList`
-  - loadlist.mjs:1146 setLoads()
-  - loadlist.mjs:1503 addLoad()
-  - loadlist.mjs:1569 setLoads()
-  - loadlist.mjs:1580 setLoads()
+  - loadlist.mjs:1164 setLoads()
+  - loadlist.mjs:1526 addLoad()
   - loadlist.mjs:1592 setLoads()
+  - loadlist.mjs:1603 setLoads()
+  - loadlist.mjs:1615 setLoads()
   - ... 11 more
 - `settings.loadListViewPreset`
-  - loadlist.mjs:1692 setItem(settings.loadListViewPreset)
+  - loadlist.mjs:1715 setItem(settings.loadListViewPreset)
 
 ### One-Line (`oneline.html`)
 

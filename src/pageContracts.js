@@ -198,10 +198,10 @@ export const PAGE_CONTRACTS_BY_HREF = {
   }),
   'loadlist.html': contract({
     workflowStep: 'loadList',
-    standaloneInputs: ['Manual load rows, imports, equipment source selections, and demand metadata.'],
+    standaloneInputs: ['Manual load rows, imports, equipment source selections, optional motor nameplate HP, and demand metadata.'],
     projectInputs: [equipment, panels, oneLine, designBasis],
     outputs: [
-      output('loadList', 'schedule', 'Load schedule with source, demand, power factor, duty, and equipment links.', ['oneline.html', 'demandschedule.html', 'loadFlow.html', 'generatorsizing.html']),
+      output('loadList', 'schedule', 'Load schedule with source, demand, power factor, duty, optional motor nameplate HP, and equipment links.', ['oneline.html', 'demandschedule.html', 'loadFlow.html', 'generatorsizing.html', 'mcclineup.html']),
       output('settings.loadListViewPreset', 'setting', 'Load list view and grouping preferences.', ['loadlist.html'])
     ],
     readiness: ready('At least one meaningful load row exists.', ['No load records exist or source relationships are not assigned for workflow handoff.']),

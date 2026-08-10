@@ -332,20 +332,23 @@ test.describe("MCC Lineups", () => {
           description: "Cooling Water Pump",
           loadType: "Motor",
           kw: "18.6",
+          hp: "25",
           voltage: "480",
           powerFactor: "0.85",
-          phases: "3"
+          phases: "3",
+          starterType: "fvnr"
         },
         {
           id: "load-fan202",
           source: "MCC-AUTO",
           tag: "FAN-202",
-          description: "Exhaust Fan VFD",
-          loadType: "VFD",
+          description: "Exhaust Fan Feeder",
+          loadType: "Breaker",
           kw: "22",
           voltage: "480",
           powerFactor: "0.9",
-          phases: "3"
+          phases: "3",
+          breakerA: "100AT/250AF"
         },
         { id: "load-other", source: "SWBD-1", tag: "OTHER", loadType: "Motor", kw: "10" }
       ]
@@ -361,14 +364,15 @@ test.describe("MCC Lineups", () => {
     await expect(preview).toContainText("2 Load List records use MCC-AUTO");
     await expect(preview).toContainText("2 new buckets");
     await expect(preview).toContainText("Cooling Water Pump");
-    await expect(preview).toContainText("horsepower, starter size, and protective-device ratings remain unassigned");
+    await expect(preview).toContainText("preliminary NEMA horsepower-table estimate");
+    await expect(preview).toContainText("conservative generic FVNR planning estimate");
+    await expect(preview).toContainText("conservative amp-frame planning estimate");
     await preview.getByRole("button", { name: "Build / Refresh", exact: true }).click();
 
     await expect(page.locator("#mcc-sync-status")).toContainText("Built 2 Load List buckets for MCC-AUTO");
     await expect(page.locator('[data-section-field="name"]').last()).toHaveValue("Load List 1");
     await expect(page.locator('[data-bucket-field="equipmentTag"][value="P-201"]')).toHaveCount(1);
     await expect(page.locator('[data-bucket-field="equipmentTag"][value="FAN-202"]')).toHaveCount(1);
-
     const managedBucketIds = await page.evaluate(() => {
       const lineup = JSON.parse(localStorage.getItem("base:mccLineups") || "[]")[0];
       return Object.fromEntries(lineup.sections
@@ -377,7 +381,27 @@ test.describe("MCC Lineups", () => {
         .map(bucket => [bucket.sourceLoadId, bucket.id]));
     });
     const motorRow = page.locator(`[data-bucket-id="${managedBucketIds["load-p201"]}"]`);
+    const feederRow = page.locator(`[data-bucket-id="${managedBucketIds["load-fan202"]}"]`);
+    await expect(motorRow.locator('[data-bucket-field="starterSize"]')).toHaveValue("NEMA 2");
+    await expect(motorRow.locator('[data-bucket-field="sizeUnits"]')).toHaveValue("2");
+    const automaticSizingProvenance = await page.evaluate(loadId => {
+      const lineup = JSON.parse(localStorage.getItem("base:mccLineups") || "[]")[0];
+      return lineup.sections.flatMap(section => section.buckets).find(bucket => bucket.sourceLoadId === loadId);
+    }, "load-p201");
+    expect(automaticSizingProvenance.starterSizeEstimated).toBe(true);
+    expect(automaticSizingProvenance.bucketSizeEstimated).toBe(true);
+    await expect(feederRow.locator('[data-bucket-field="breakerA"]')).toHaveValue("100AT/250AF");
+    await expect(feederRow.locator('[data-bucket-field="sizeUnits"]')).toHaveValue("3");
+    await feederRow.locator('[data-bucket-field="breakerA"]').fill("300AT/400AF");
+    await feederRow.locator('[data-bucket-field="breakerA"]').press("Tab");
+    await expect(feederRow.locator('[data-bucket-field="sizeUnits"]')).toHaveValue("5");
     await motorRow.locator('[data-bucket-field="starterType"]').selectOption("soft-starter");
+    const manualSizingProvenance = await page.evaluate(loadId => {
+      const lineup = JSON.parse(localStorage.getItem("base:mccLineups") || "[]")[0];
+      return lineup.sections.flatMap(section => section.buckets).find(bucket => bucket.sourceLoadId === loadId);
+    }, "load-p201");
+    expect(manualSizingProvenance.starterSizeEstimated).toBe(false);
+    expect(manualSizingProvenance.bucketSizeEstimated).toBe(false);
 
     await page.evaluate(() => {
       const loads = JSON.parse(localStorage.getItem("base:loadList") || "[]");

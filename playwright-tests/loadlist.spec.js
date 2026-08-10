@@ -40,12 +40,14 @@ test.describe('loadlist experience', () => {
     await dialog.getByLabel('Source / Panel').fill('MCC-2');
     await dialog.getByLabel('Load Type').selectOption('Motor');
     await dialog.getByLabel('kW').fill('10');
+    await dialog.getByLabel('Motor HP (Nameplate)').fill('15');
     await dialog.getByLabel('Power Factor').fill('0.88');
     await dialog.getByRole('button', { name: 'Add Load' }).click();
 
     await expect(dialog).toHaveCount(0);
     await expect(page.locator('#load-table tbody tr')).toHaveCount(1);
     await expect(page.locator('#load-table tbody tr:first-child input[name="description"]')).toHaveValue('Booster pump');
+    await expect(page.locator('#load-table tbody tr:first-child input[name="hp"]')).toHaveValue('15');
     await expect(page.locator('#load-validation-summary')).toContainText('All loads have');
   });
 
@@ -98,8 +100,8 @@ test.describe('loadlist experience', () => {
   test('CSV import mapping accepts non-native headers', async ({ page }) => {
     const csvPath = path.join(os.tmpdir(), `loadlist-import-${Date.now()}.csv`);
     fs.writeFileSync(csvPath, [
-      'Panel,Equipment Tag,Load Name,Power,Volts,PF,Phase',
-      'PNL-1,LD-1,Imported exhaust fan,7.5,480,0.86,3'
+      'Panel,Equipment Tag,Load Name,Power,Horsepower,Volts,PF,Phase',
+      'PNL-1,LD-1,Imported exhaust fan,7.5,10,480,0.86,3'
     ].join('\n'));
 
     await openToolbarMenu(page, 'Import / Export');
@@ -120,5 +122,6 @@ test.describe('loadlist experience', () => {
     await expect(page.locator('#load-table tbody tr')).toHaveCount(1);
     await expect(page.locator('#load-table tbody tr:first-child input[name="description"]')).toHaveValue('Imported exhaust fan');
     await expect(page.locator('#load-table tbody tr:first-child input[name="kw"]')).toHaveValue('7.5');
+    await expect(page.locator('#load-table tbody tr:first-child input[name="hp"]')).toHaveValue('10');
   });
 });

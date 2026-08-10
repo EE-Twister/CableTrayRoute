@@ -276,6 +276,31 @@ const wirewayWidthError = normalizeMccLineup({
 });
 assert.ok(validateMccLineup(wirewayWidthError).some(message => message.message.includes('vertical wireway width')));
 
+const ambiguousBreakerFrame = normalizeMccLineup({
+  tag: 'MCC-BREAKER-FRAME',
+  sections: [{
+    name: 'Feeder Section',
+    buckets: [{ type: 'breaker', equipmentTag: 'FDR-1', breakerA: '100', sizeUnits: 1 }]
+  }]
+});
+assert.ok(validateMccLineup(ambiguousBreakerFrame).some(message => message.message.includes('cannot be estimated from trip amps alone')));
+
+const estimatedBreakerFrame = normalizeMccLineup({
+  tag: 'MCC-BREAKER-ESTIMATE',
+  sections: [{
+    name: 'Feeder Section',
+    buckets: [{
+      type: 'breaker',
+      equipmentTag: 'FDR-2',
+      breakerA: '100AT/250AF',
+      sizeUnits: 3,
+      bucketSizeEstimated: true,
+      bucketSizeEstimateKind: 'breaker-frame'
+    }]
+  }]
+});
+assert.ok(validateMccLineup(estimatedBreakerFrame).some(message => message.message.includes('generic amp-frame bucket-size estimate')));
+
 const standalone = normalizeMccLineup({
   id: 'mcc-standalone',
   tag: 'MCC-STANDALONE',
