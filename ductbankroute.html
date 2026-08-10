@@ -715,7 +715,7 @@
   <h3>NEC Fill Rules</h3>
   <p>NEC Chapter&nbsp;9 Table&nbsp;1 limits conduit fill to 53% with one cable, 31% with two cables and 40% with three or more cables. Table&nbsp;4 provides areas for each conduit type and size.</p>
   <h3>Ampacity Calculation</h3>
-  <p>Ampacity is estimated using the full Neher-McGrath equation:</p>
+  <p>Ampacity is estimated using a simplified Neher-McGrath-style steady-state screening relation. It is not a complete Neher-McGrath, IEEE 835, IEC 60287, or NEC compliance calculation:</p>
   <pre>I = sqrt( (T<sub>c</sub> - (T<sub>a</sub> + &Delta;T<sub>d</sub>)) /
              (R<sub>dc</sub> &times; (1 + Y<sub>c</sub>) &times; R<sub>ca</sub> &times; N<sub>c</sub>) )</pre>
   <p>Here T<sub>c</sub> is the cable-specific allowable conductor temperature in &deg;C and N<sub>c</sub> is the current-carrying conductor count. T<sub>a</sub> comes from the entered earth and air temperatures&mdash;those values are input in &deg;F and converted to &deg;C for the calculation. &Delta;T<sub>d</sub> is the dielectric-loss rise and Y<sub>c</sub> accounts for AC skin effect.</p>
@@ -724,7 +724,7 @@
   <h3>Thermal Analysis</h3>
   <p>The <em>Thermal Analysis</em> button overlays a heat map on the drawing. Each conduit center is marked with a yellow dot labeled with the estimated earth temperature in Fahrenheit and the hottest point is highlighted in red.</p>
   <p>Inputs are validated before running the analysis. Ductbank depth is limited to 0–120&nbsp;in, spacing between 1–24&nbsp;in and cable estimated load up to 2000&nbsp;A. Values outside these ranges will be clamped.</p>
-  <p>Conduit fill limits come from NEC Chapter&nbsp;9, while ampacity calculations follow the Neher‑McGrath approach from NEC&nbsp;310‑15(C) and IEEE&nbsp;Std&nbsp;835. For a breakdown of the equation and variable meanings see <a href="docs/AMPACITY_METHOD.html#equation" target="_blank" rel="noopener noreferrer">Ampacity Method</a>. Soil resistivity guidance is summarized in <a href="docs/AMPACITY_METHOD.html#soil-resistivity-ranges" target="_blank" rel="noopener noreferrer">Soil Resistivity Ranges</a>. Additional references are listed in <a href="docs/standards.html" target="_blank" rel="noopener noreferrer">documentation</a>.</p>
+  <p>Conduit fill limits come from NEC Chapter&nbsp;9. The page-level ampacity value is a preliminary screening estimate informed by Neher‑McGrath concepts; final design requires an accepted project-specific method and inputs. For the equation, variable meanings, and separate benchmark solver evidence see <a href="docs/AMPACITY_METHOD.html#equation" target="_blank" rel="noopener noreferrer">Ampacity Method</a>. Soil resistivity guidance is summarized in <a href="docs/AMPACITY_METHOD.html#soil-resistivity-ranges" target="_blank" rel="noopener noreferrer">Soil Resistivity Ranges</a>. Additional references are listed in <a href="docs/standards.html" target="_blank" rel="noopener noreferrer">documentation</a>.</p>
 </div>
 </div>
 

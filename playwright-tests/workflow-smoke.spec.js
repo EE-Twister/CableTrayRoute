@@ -480,7 +480,7 @@ test('sample gallery lists the full project workflow sample', async ({ page }) =
   await expect(page.locator('[data-sample-id="commercial-office-fitout"]')).toHaveClass(/sample-card--selected/);
 });
 
-test('one-line loads styled assets and opens reconcile preview', async ({ page }) => {
+test('one-line saves shared records automatically and opens the data-link review', async ({ page }) => {
   const diagram = {
     activeSheet: 0,
     sheets: [{
@@ -511,9 +511,77 @@ test('one-line loads styled assets and opens reconcile preview', async ({ page }
     if (menu) menu.open = true;
     el.click();
   });
-  const dialog = page.getByRole('dialog', { name: 'Reconcile Schedules' });
+  const dialog = page.getByRole('dialog', { name: 'Review Shared Project Data' });
   await expect(dialog).toContainText('Equipment');
   await expect(dialog).toContainText('Loads');
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('base:equipment') || '[]').map(item => item.tag))).toContain('MCC-1');
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('base:loadList') || '[]').map(item => item.tag))).toContain('MTR-1');
+});
+
+test('core data entry requires a named project outside the test workspace', async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.clear();
+    sessionStorage.clear();
+  });
+  await page.goto(server.url('equipmentlist.html'), { waitUntil: 'domcontentloaded' });
+  await page.waitForFunction(() => Boolean(window.dataStore));
+  await page.evaluate(() => window.dataStore.setEquipment([{ tag: 'ONE-OFF-1' }]));
+  await expect(page.getByRole('dialog', { name: 'Create New Project' })).toBeVisible();
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('base:equipment') || '[]'))).toEqual([]);
+});
+
+test('equipment tag changes propagate and deletions surface shared-link diagnostics', async ({ page }) => {
+  await page.addInitScript(() => {
+    if (localStorage.getItem('lifecycleTestSeeded') === 'true') return;
+    localStorage.clear();
+    sessionStorage.clear();
+    localStorage.setItem('lifecycleTestSeeded', 'true');
+    localStorage.setItem('base:equipment', JSON.stringify([{ id: 'eq-stable', tag: 'MCC-101', description: 'Main MCC' }]));
+    localStorage.setItem('base:loadList', JSON.stringify([{ id: 'load-stable', tag: 'PMP-101', source: 'MCC-101', equipmentId: 'eq-stable', kw: 25 }]));
+    localStorage.setItem('base:cableSchedule', JSON.stringify([{ id: 'cable-stable', tag: 'CBL-101', from_tag: 'MCC-101', to_tag: 'PMP-101', sourceEquipmentId: 'eq-stable' }]));
+    localStorage.setItem('base:oneLineDiagram', JSON.stringify({
+      activeSheet: 0,
+      sheets: [{ name: 'Lifecycle', components: [{ id: 'visual-mcc', entityId: 'eq-stable', label: 'MCC-101' }], connections: [], layers: [] }]
+    }));
+  });
+  await page.goto(server.url('equipmentlist.html?e2e=1'), { waitUntil: 'domcontentloaded' });
+  const tagInput = page.locator('#equipment-table input[name="tag"]').first();
+  await expect(tagInput).toHaveValue('MCC-101');
+  await tagInput.fill('MCC-201');
+  await tagInput.press('Tab');
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('base:loadList') || '[]')[0]?.source)).toBe('MCC-201');
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('base:cableSchedule') || '[]')[0]?.from_tag)).toBe('MCC-201');
+
+  await page.locator('#equipment-table tbody input[type="checkbox"]').first().check();
+  await page.locator('#delete-selected-btn').click();
+  const deletionDialog = page.getByRole('dialog', { name: 'Review Equipment Deletion' });
+  await expect(deletionDialog).toContainText('3 dependent references');
+  await expect(deletionDialog).toContainText('PMP-101');
+  await expect(deletionDialog).toContainText('CBL-101');
+  await expect(page.locator('#equipment-table tbody tr')).toHaveCount(1);
+  await deletionDialog.getByRole('button', { name: 'Cancel' }).click();
+  await expect(deletionDialog).toBeHidden();
+  await expect(page.locator('#equipment-table tbody tr')).toHaveCount(1);
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('base:equipment') || '[]').length)).toBe(1);
+  await page.locator('#delete-selected-btn').click();
+  await deletionDialog.getByRole('button', { name: 'Delete and Flag Links' }).click();
+  await expect(page.locator('#equipment-table tbody tr')).toHaveCount(0);
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('base:equipment') || '[]'))).toEqual([]);
+  await expect.poll(() => page.evaluate(() => (
+    JSON.parse(localStorage.getItem('base:oneLineDiagram') || '{}').sheets?.[0]?.components?.[0]?.referenceStatus
+  ))).toBe('orphaned');
+  await expect.poll(() => page.evaluate(() => window.dataStore.getProjectReferenceDiagnostics().length)).toBeGreaterThan(0);
+  await page.goto(server.url('workflowdashboard.html?e2e=1'), { waitUntil: 'domcontentloaded' });
+  await expect.poll(() => page.evaluate(() => window.dataStore.getProjectReferenceDiagnostics().length)).toBeGreaterThan(0);
+  await expect(page.locator('#dashboard-health')).toContainText('Data Links');
+  await expect(page.locator('#dashboard-health')).toContainText('need review');
+  const dataLinks = page.locator('#dashboard-data-links');
+  await expect(dataLinks).toContainText('PMP-101');
+  await expect(dataLinks).toContainText('CBL-101');
+  await expect(dataLinks).toContainText('visual-mcc');
+  await expect(dataLinks.getByRole('link', { name: 'Review Load List' })).toHaveAttribute('href', 'loadlist.html');
+  await expect(dataLinks.getByRole('link', { name: 'Review Cable Schedule' })).toHaveAttribute('href', 'cableschedule.html');
+  await expect(dataLinks.getByRole('link', { name: 'Review One-Line' })).toHaveAttribute('href', /oneline\.html\?probe=/);
 });
 
 for (const file of workflowPages) {

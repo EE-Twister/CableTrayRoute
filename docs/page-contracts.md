@@ -38,7 +38,7 @@ Coverage: 80 contracts for 80 navigation routes.
 - `settings.reportSnapshots` (setting, optional): Saved report package snapshots used by deliverable pages.
 - `settings.lifecyclePackages` (setting, optional): Release package records and lifecycle package history.
 - `settings.tccSettings` (setting, optional): Protective device selections, relay settings, chart options, and coordination context.
-- `settings.oneLineScheduleReconcilePending` (setting, optional): Flag indicating one-line schedule reconciliation is available.
+- `settings.oneLineScheduleReconcilePending` (setting, optional): Legacy compatibility flag; automatic shared-data synchronization keeps this false.
 - `settings.activeSampleWorkflow` (setting, optional): Active sample context used to suppress redundant sample-loading guidance.
 - `settings.workflowDashboardFocus` (setting, optional): Routing or full-engineering dashboard focus selected for this project.
 
@@ -53,12 +53,12 @@ Coverage: 80 contracts for 80 navigation routes.
 - `ductbankSchedule` (schedule): Automation-seeded ductbank schedule rows. Consumers: `ductbankroute.html`, `optimalRoute.html`.
 - `settings.lifecyclePackages` (setting): Lifecycle package records created from dashboard package actions. Consumers: `projectreport.html`.
 - `studyResults.duty` (study-result): Equipment-duty validation results evaluated while central workflow readiness is refreshed. Consumers: `equipmentevaluation.html`, `projectreport.html`.
-- `settings.oneLineScheduleReconcilePending` (setting): Workflow automation reconcile state for one-line and schedule handoff. Consumers: `oneline.html`.
+- `settings.oneLineScheduleReconcilePending` (setting): Legacy reconcile flag cleared by automatic shared-data synchronization. Consumers: `oneline.html`.
 - `settings.workflowDashboardFocus` (setting): Routing or full-engineering dashboard focus selected by the user. Consumers: `workflowdashboard.html`.
 
 **Readiness**
 - Ready when: Dashboard is ready when it can summarize every workflow step and identify the next incomplete handoff.
-- Blockers: Missing schedule data, unresolved review gates, pending studies, or no deliverables.
+- Blockers: Missing schedule data, unresolved shared-record links, review gates, pending studies, or no deliverables.
 
 **Downstream Pages**
 - `equipmentlist.html`
@@ -70,6 +70,8 @@ Coverage: 80 contracts for 80 navigation routes.
 
 **Notes**
 - This page aggregates workflow state instead of belonging to a single workflow step.
+- The Data Links metric is derived from stable equipment, panel, load, cable, and One-Line references; it does not create a second persisted copy of link state.
+- Data Link Review lists each orphaned reference and routes the user to the canonical Load List, Cable Schedule, or One-Line remediation surface.
 
 #### Scenario Comparison (`scenarios.html`)
 
@@ -237,7 +239,7 @@ Coverage: 80 contracts for 80 navigation routes.
 - Workflow step: oneLineDiagram
 
 **Standalone Inputs**
-- Manual diagram drawing, palette components, imported sample diagrams, and reconcile choices.
+- Manual diagram drawing, palette components, and imported sample diagrams within the active project.
 
 **Project Inputs**
 - `equipment` (schedule, required): Equipment tags, ratings, locations, and physical metadata.
@@ -262,10 +264,10 @@ Coverage: 80 contracts for 80 navigation routes.
 
 **Outputs**
 - `oneLineDiagram` (model): One-line sheets, components, connections, layers, protection zones, and linked schedule refs. Consumers: `loadFlow.html`, `shortCircuit.html`, `arcFlash.html`, `tcc.html`, `designrulechecker.html`.
-- `cableSchedule` (schedule): Explicit reconcile-created or reconcile-updated cable rows. Consumers: `cableschedule.html`, `optimalRoute.html`.
-- `loadList` (schedule): Explicit reconcile-created or reconcile-updated load rows. Consumers: `loadlist.html`.
-- `panelSchedule` (schedule): Explicit reconcile-created or reconcile-updated panel rows. Consumers: `panelschedule.html`.
-- `equipment` (schedule): Explicit reconcile-created or reconcile-updated equipment rows. Consumers: `equipmentlist.html`.
+- `cableSchedule` (schedule): Canonical cable rows automatically created or updated from linked diagram circuits. Consumers: `cableschedule.html`, `optimalRoute.html`.
+- `loadList` (schedule): Canonical load rows automatically created or updated from linked diagram components. Consumers: `loadlist.html`.
+- `panelSchedule` (schedule): Canonical panel rows automatically created or updated from linked diagram components. Consumers: `panelschedule.html`.
+- `equipment` (schedule): Canonical equipment rows automatically created or updated from linked diagram components. Consumers: `equipmentlist.html`.
 - `traySchedule` (schedule): Raceway records created from one-line route actions. Consumers: `racewayschedule.html`.
 - `conduitSchedule` (schedule): Conduit records created from one-line route actions. Consumers: `racewayschedule.html`.
 - `studyResults` (study-result): Embedded one-line study result container. Consumers: `projectreport.html`.
@@ -289,12 +291,12 @@ Coverage: 80 contracts for 80 navigation routes.
 - `settings.gistToken` (setting): Gist import/export token setting. Consumers: `oneline.html`.
 - `settings.onelineTemplates` (setting): Reusable one-line component templates saved with project settings. Consumers: `oneline.html`.
 - `settings.activeSampleWorkflow` (setting): Sample workflow layout version saved after the diagram is arranged and fit. Consumers: `oneline.html`.
-- `settings.oneLineScheduleReconcilePending` (setting): Flag indicating that schedule reconciliation is available. Consumers: `workflowdashboard.html`.
+- `settings.oneLineScheduleReconcilePending` (setting): Legacy reconcile flag retained as false for compatibility. Consumers: `workflowdashboard.html`.
 - `settings.liveTelemetryConfig` (setting): Read-only live telemetry endpoint and component/tag mapping configuration. Consumers: `oneline.html`.
 
 **Readiness**
-- Ready when: At least one one-line component exists and schedule reconciliation state is explicit.
-- Blockers: Diagram is empty or schedule reconciliation issues remain unresolved.
+- Ready when: At least one one-line component exists and its shared project-record links are current.
+- Blockers: Diagram is empty or shared-record identities remain unresolved.
 
 **Downstream Pages**
 - `cableschedule.html`
@@ -1150,7 +1152,7 @@ Coverage: 80 contracts for 80 navigation routes.
 - `settings.lifecyclePackages` (setting, optional): Release package records and lifecycle package history.
 - `settings.tccSettings` (setting, optional): Protective device selections, relay settings, chart options, and coordination context.
 - `settings.projectMeta` (setting, optional): Canonical project identity, client, site, engineer, revision, and environmental context.
-- `settings.oneLineScheduleReconcilePending` (setting, optional): Flag indicating one-line schedule reconciliation is available.
+- `settings.oneLineScheduleReconcilePending` (setting, optional): Legacy compatibility flag; automatic shared-data synchronization keeps this false.
 
 **Outputs**
 - `settings.projectMeta` (setting): Shared project and report metadata edited from the report builder. Consumers: `battery.html`, `generatorsizing.html`, `projectreport.html`.

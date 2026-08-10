@@ -13,7 +13,7 @@
     "server": "npm run build && node server.mjs",
     "server:fast": "node server.mjs",
     "lint": "eslint . --max-warnings=0 --ignore-pattern \"dist/**\" --ignore-pattern \"node_modules/**\" && npm run lint:architecture && npm run lint:css",
-    "lint:architecture": "node scripts/checkArchitectureBoundaries.mjs",
+    "lint:architecture": "node scripts/checkArchitectureBoundaries.mjs && node scripts/checkModuleCycles.mjs",
     "lint:css": "node scripts/checkCssArchitecture.mjs",
     "test:critical": "node tests/ampacity.test.mjs && node tests/racewayRoute.test.cjs && node tests/analysis.test.cjs && node tests/serverSecurity.test.mjs && node tests/collaborationServer.test.mjs && node tests/projectDisplayScheduler.test.mjs && node tests/revitImporter.test.mjs && node tests/validation.test.mjs && node tests/validationManifest.test.mjs && node tests/studyBasis.test.mjs",
     "test:full": "node scripts/runNodeTests.mjs",
@@ -41,6 +41,7 @@
     "audit:page-contracts": "node scripts/auditPageContracts.mjs",
     "check:html-assets": "node scripts/auditHtmlAssetReferences.mjs",
     "check:bundle-budgets": "node scripts/checkBundleBudgets.mjs",
+    "check:cycles": "node scripts/checkModuleCycles.mjs",
     "check:dist-review": "node scripts/checkDistReviewNoise.mjs"
   },
   "devDependencies": {

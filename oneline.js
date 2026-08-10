@@ -12,8 +12,8 @@ function escapeHtml(value) {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
 }
-import { getOneLine, setOneLine, getEquipment, setEquipment, getPanels, setPanels, getLoads, setLoads, getCables, getOneLineScheduleCollections, setCables, addRaceway, getItem, setItem, migrateLegacyItem, getStudies, setStudies, on, getCurrentScenario, switchScenario, STORAGE_KEYS, loadProject, saveProject } from './dataStore.mjs';
-import { previewScheduleReconcile, applyScheduleReconcilePreview } from './analysis/scheduleReconcile.mjs';
+import { getOneLine, setOneLine, getEquipment, setEquipment, getPanels, setPanels, getLoads, setLoads, getCables, getOneLineScheduleCollections, setCables, setProjectEntityCollections, addRaceway, getItem, setItem, migrateLegacyItem, getStudies, setStudies, on, getCurrentScenario, switchScenario, STORAGE_KEYS, loadProject, saveProject } from './dataStore.mjs';
+import { previewScheduleReconcile, applyScheduleReconcilePreview, synchronizeCanonicalSchedules } from './analysis/scheduleReconcile.mjs';
 import { runLoadFlow } from './analysis/loadFlow.js';
 import { renderLoadFlowResultsHtml } from './analysis/loadFlowResultsRenderer.js';
 import { applyTapRatioToOneLine, evaluateTransformerTapOptimization } from './analysis/transformerTapOptimization.mjs';
@@ -64,6 +64,94 @@ import {
   toggleProtectionZoneComponent,
 } from './src/one-line/protectionZones.mjs';
 import { renderProtectionZonePanel } from './src/one-line/protectionZonePanel.mjs';
+import {
+  createComponentGroup,
+  getComponentBounds,
+  getConnectedComponentIds,
+  getEnergizedComponentIds,
+  getGroupMembers
+} from './src/one-line/diagramModel.mjs';
+import {
+  findPairedConnector,
+  getSheetLinkBadgeText,
+  normalizeSheetLinkValue,
+  resolveLinkedSheetIndex,
+  validateSheetLinks
+} from './src/one-line/sheetLinks.mjs';
+import {
+  BUILT_IN_HARMONIC_PROFILES,
+  MANUAL_HARMONIC_PROFILE_ID,
+  createCustomHarmonicProfile,
+  defaultHarmonicProfileId,
+  estimateVoltageHarmonicPoints,
+  findHarmonicProfileById as findHarmonicProfileByIdInLibrary,
+  findHarmonicProfileBySpectrum as findHarmonicProfileBySpectrumInLibrary,
+  formatHarmonicMetric,
+  harmonicThdPercent,
+  mergeHarmonicProfiles,
+  normalizeHarmonicProfile,
+  parseHarmonicSpectrumPoints
+} from './src/one-line/harmonicProfiles.mjs';
+import {
+  getEngineeringLabelLines as buildEngineeringLabelLines,
+  resolveComponentAttribute as resolveOneLineComponentAttribute
+} from './src/one-line/componentAttributes.mjs';
+import {
+  chooseDatablockPlacement,
+  chooseEngineeringDatablockPlacement as chooseEngineeringDatablockPlacementForModel,
+  createDatablockLayout as createDatablockLayoutForModel,
+  truncateDatablockLine
+} from './src/one-line/datablockLayout.mjs';
+import {
+  getNestedComponentValue,
+  inferSchemaFromProps
+} from './src/one-line/componentPropertyModel.mjs';
+import {
+  applyIndustrySymbolGeometry as applyIndustrySymbolGeometryForModel,
+  categoryForType,
+  coerceNumber,
+  defaultRotationForType,
+  getDefaultPorts,
+  getIndustrySymbolProfile as getIndustrySymbolProfileForModel,
+  industrySymbolGeometry,
+  normalizePortsForCategory as normalizePortsForCategoryForModel,
+  normalizeRotation,
+  remapPortsForVerticalOneLineFlow as remapPortsForVerticalOneLineFlowForModel,
+  shouldUseVerticalOneLinePorts,
+  visualSizeForRotation
+} from './src/one-line/componentGeometry.mjs';
+import { CABLE_PROPERTY_METADATA, createBuiltInComponents } from './src/one-line/builtInComponentCatalog.mjs';
+import {
+  createStudyInputFieldSpecs,
+  resolveStudyInputFieldSpecs as resolveStudyInputFieldSpecsForModel
+} from './src/one-line/studyInputModel.mjs';
+import {
+  connectionLabelPosition,
+  routeConnection as buildConnectionRoute
+} from './src/one-line/connectionRouting.mjs';
+import { createDiagramHistoryController } from './src/one-line/historyController.mjs';
+import { createPaletteController } from './src/one-line/paletteController.mjs';
+import {
+  applyPropertyFieldFromForm,
+  formatPropertyFieldLabel,
+  formatPropertyNumber,
+  normalizePropertySchema,
+  parsePropertyNumber,
+  readPropertyValue
+} from './src/one-line/propertyEditorModel.mjs';
+import {
+  createPropertyEditorController,
+  getPropertyEditorDeviceLabel
+} from './src/one-line/propertyEditorController.mjs';
+import { renderConnections } from './src/one-line/connectionRenderController.mjs';
+import { createLiveTelemetryViewController } from './src/one-line/liveTelemetryViewController.mjs';
+import { createStudyPanelController } from './src/one-line/studyPanelController.mjs';
+import { createSheetPersistenceController } from './src/one-line/sheetPersistenceController.mjs';
+import { createDiagramFileController } from './src/one-line/diagramFileController.mjs';
+import { renderComponentNodes } from './src/one-line/componentNodeRenderController.mjs';
+import { createPropertyDetailRenderer } from './src/one-line/propertyDetailView.mjs';
+import { createStudyExecutionController } from './src/one-line/studyExecutionController.mjs';
+import { createEventStateAdapter, initializeOneLineEvents } from './src/one-line/eventBindingController.mjs';
 import {
   resolveTransformerKva,
   resolveTransformerPercentZ,
@@ -781,16 +869,6 @@ function resolveComponentMeta(comp) {
   return componentMeta[resolveComponentMetaKey(comp)] || componentMeta[comp?.subtype] || {};
 }
 
-function normalizeRotation(angle) {
-  if (!Number.isFinite(angle)) return 0;
-  const normalized = angle % 360;
-  return normalized < 0 ? normalized + 360 : normalized;
-}
-
-function defaultRotationForType(type, category) {
-  return 0;
-}
-
 function defaultRotationForMeta(meta, type = null) {
   return normalizeRotation(meta?.defaultRotation ?? defaultRotationForType(type || meta?.type, meta?.category));
 }
@@ -798,50 +876,6 @@ function defaultRotationForMeta(meta, type = null) {
 function defaultRotationForComponent(comp) {
   const meta = componentMeta[comp?.subtype] || {};
   return normalizeRotation(meta.defaultRotation ?? defaultRotationForType(comp?.type || meta.type, meta.category || resolveComponentCategory(comp)));
-}
-
-function visualSizeForRotation(width, height, rotation) {
-  const normalized = normalizeRotation(rotation);
-  if (normalized === 90 || normalized === 270) {
-    return { width: height, height: width };
-  }
-  return { width, height };
-}
-
-function categoryForType(t) {
-  switch (t) {
-    case 'bus':
-      return 'bus';
-    case 'motor':
-    case 'motor_load':
-    case 'static_load':
-      return 'load';
-    case 'cable':
-      return 'cable';
-    case 'breaker':
-    case 'fuse':
-    case 'recloser':
-    case 'relay':
-    case 'contactor':
-    case 'switch':
-      return 'protection';
-    case 'utility_source':
-    case 'generator':
-    case 'pv_inverter':
-    case 'pv_array':
-    case 'bess_inverter':
-    case 'battery':
-      return 'sources';
-    case 'sheet_link':
-      return 'links';
-    case 'annotation':
-      return 'annotations';
-    case 'panel':
-    case 'mcc':
-      return 'equipment';
-    default:
-      return 'equipment';
-  }
 }
 
 const PALETTE_CATEGORIES = new Set([
@@ -865,110 +899,6 @@ function isProtectionComponent(comp) {
   return false;
 }
 
-function readNestedValue(holder, path = []) {
-  if (!holder || typeof holder !== 'object') return undefined;
-  let current = holder;
-  for (const key of path) {
-    if (
-      !current
-      || typeof current !== 'object'
-      || isUnsafeNestedPathSegment(key)
-      || !Object.prototype.hasOwnProperty.call(current, key)
-    ) {
-      return undefined;
-    }
-    current = current[key];
-  }
-  return current;
-}
-
-function isUnsafeNestedPathSegment(segment) {
-  return segment === '__proto__' || segment === 'prototype' || segment === 'constructor';
-}
-
-function writeNestedValue(holder, path = [], value) {
-  if (!holder || typeof holder !== 'object' || !path.length) return;
-  if (path.some(isUnsafeNestedPathSegment)) return;
-  let current = holder;
-  for (let i = 0; i < path.length - 1; i += 1) {
-    const key = path[i];
-    const next = current[key];
-    if (!Object.prototype.hasOwnProperty.call(current, key) || !next || typeof next !== 'object') {
-      current[key] = {};
-    }
-    current = current[key];
-  }
-  current[path[path.length - 1]] = value;
-}
-
-function getNestedComponentValue(comp, path = []) {
-  const direct = readNestedValue(comp, path);
-  if (direct !== undefined) return direct;
-  if (comp && comp.props && typeof comp.props === 'object') {
-    return readNestedValue(comp.props, path);
-  }
-  return undefined;
-}
-
-function setNestedComponentValue(comp, path = [], rawValue, type) {
-  if (!comp || !path.length) return;
-  let finalValue;
-  if (type === 'checkbox') {
-    finalValue = !!rawValue;
-  } else if (type === 'number') {
-    if (rawValue === '' || rawValue === null || rawValue === undefined) {
-      finalValue = '';
-    } else if (typeof rawValue === 'number' && Number.isFinite(rawValue)) {
-      finalValue = rawValue;
-    } else {
-      const parsed = parseFloat(rawValue);
-      finalValue = Number.isFinite(parsed) ? parsed : '';
-    }
-  } else {
-    finalValue = rawValue ?? '';
-  }
-  writeNestedValue(comp, path, finalValue);
-  if (comp.props && typeof comp.props === 'object') {
-    writeNestedValue(comp.props, path, finalValue);
-  }
-}
-
-function inferSchemaFromProps(props, path = []) {
-  const schema = [];
-  const reservedTopLevelFieldNames = new Set([
-    'id', 'type', 'subtype', 'x', 'y', 'width', 'height', 'rotation', 'rotationManual', 'flipped', 'label',
-    'ports', 'connections', 'meta', 'svg', 'icon', 'scheduleLinks', 'props'
-  ]);
-  Object.entries(props || {}).forEach(([key, value]) => {
-    if (!path.length && reservedTopLevelFieldNames.has(key)) return;
-    if (isUnsafeNestedPathSegment(key)) return;
-    const currentPath = [...path, key];
-    if (value && typeof value === 'object' && !Array.isArray(value)) {
-      schema.push(...inferSchemaFromProps(value, currentPath));
-      return;
-    }
-    const fieldName = currentPath.join('_');
-    const labelParts = currentPath.map(part => part.replace(/_/g, ' '));
-    const type = typeof value === 'number'
-      ? 'number'
-      : typeof value === 'boolean'
-        ? 'checkbox'
-        : 'text';
-    const field = {
-      name: fieldName,
-      label: labelParts.join(' '),
-      type,
-      default: value
-    };
-    if (path.length) {
-      field.getValue = comp => getNestedComponentValue(comp, currentPath);
-      field.setValue = (comp, raw) => setNestedComponentValue(comp, currentPath, raw, type);
-    }
-    schema.push(field);
-  });
-  return schema;
-}
-
 function isBusComponent(c) {
   return resolveComponentMeta(c)?.type === 'bus' || c.type === 'bus' || c.subtype === 'Bus';
 }
@@ -988,310 +918,28 @@ function isSourceComponent(comp) {
 }
 
 function defaultPorts(type, subtype) {
-  if (type === 'transformer' && subtype === 'three_winding') {
-    return [
-      { x: compWidth / 2, y: 0 },
-      { x: compWidth * 0.3, y: compHeight },
-      { x: compWidth * 0.7, y: compHeight }
-    ];
-  }
-  return [
-    { x: compWidth / 2, y: 0 },
-    { x: compWidth / 2, y: compHeight }
-  ];
+  return getDefaultPorts(type, subtype, compWidth, compHeight);
 }
 
 function getIndustrySymbolProfile(comp, meta = resolveComponentMeta(comp)) {
-  const type = String(meta?.type || comp?.type || '').toLowerCase();
-  const subtype = String(meta?.subtype || comp?.subtype || '').toLowerCase();
-  const label = String(meta?.label || comp?.label || '').toLowerCase();
-  const signature = `${type} ${subtype} ${label}`;
-  if (type === 'utility_source' || signature.includes('utility')) return 'utility';
-  if (type === 'bus') return 'bus';
-  if (type === 'busway') return 'busway';
-  if (type === 'generator') return 'generator';
-  if (type === 'transformer') return subtype === 'three_winding' ? 'transformer3' : 'transformer';
-  if (subtype === 'ats' || subtype === 'double_throw') return 'transferSwitch';
-  if (type === 'ups' || signature.includes('ups')) return 'ups';
-  if (type === 'panel' || signature.includes('panel')) return 'panel';
-  if (['vfd', 'soft_starter', 'motor_starter', 'combination_starter'].includes(type) || signature.includes('vfd') || signature.includes('starter')) return 'controller';
-  if (['switchboard', 'switchgear', 'mcc', 'equipment'].includes(type)) return 'equipment';
-  if (['breaker', 'fuse', 'switch', 'disconnect', 'relay', 'recloser', 'contactor', 'meter', 'current_transformer', 'voltage_transformer'].includes(type)) return 'inlineDevice';
-  if (signature.includes('breaker') || signature.includes('fuse') || signature.includes('disconnect') || signature.includes('switch') || signature.includes('relay') || signature.includes('meter')) return 'inlineDevice';
-  if (['motor', 'motor_load'].includes(type) || subtype.includes('motor')) return 'motor';
-  if (type === 'static_load' || subtype.includes('static_load')) return 'load';
-  if (type === 'shunt_capacitor_bank' || subtype.includes('capacitor') || subtype.includes('cap')) return 'capacitor';
-  if (type === 'reactor') return 'reactor';
-  return '';
-}
-
-function industrySymbolGeometry(profile) {
-  if (profile === 'utility') {
-    return {
-      width: 64,
-      height: 64,
-      ports: [{ x: 32, y: 64 }]
-    };
-  }
-  if (profile === 'ups') {
-    return {
-      width: 72,
-      height: 82,
-      ports: [
-        { x: 36, y: 0 },
-        { x: 36, y: 82 }
-      ]
-    };
-  }
-  if (profile === 'panel') {
-    return {
-      width: 64,
-      height: 76,
-      ports: [{ x: 32, y: 0 }]
-    };
-  }
-  if (profile === 'equipment') {
-    return {
-      width: 70,
-      height: 82,
-      ports: [
-        { x: 35, y: 0 },
-        { x: 35, y: 82 }
-      ]
-    };
-  }
-  if (profile === 'controller') {
-    return {
-      width: 64,
-      height: 78,
-      ports: [
-        { x: 32, y: 0 },
-        { x: 32, y: 78 }
-      ]
-    };
-  }
-  if (profile === 'inlineDevice') {
-    return {
-      width: 56,
-      height: 72,
-      ports: [
-        { x: 28, y: 0 },
-        { x: 28, y: 72 }
-      ]
-    };
-  }
-  if (profile === 'transformer') {
-    return {
-      width: 76,
-      height: 84,
-      ports: [
-        { x: 38, y: 0 },
-        { x: 38, y: 84 }
-      ]
-    };
-  }
-  if (profile === 'transformer3') {
-    return {
-      width: 86,
-      height: 92,
-      ports: [
-        { x: 43, y: 0 },
-        { x: 26, y: 92 },
-        { x: 60, y: 92 }
-      ]
-    };
-  }
-  if (profile === 'generator') {
-    return {
-      width: 68,
-      height: 68,
-      ports: [{ x: 34, y: 68 }]
-    };
-  }
-  if (profile === 'motor' || profile === 'load' || profile === 'capacitor' || profile === 'reactor') {
-    return {
-      width: 64,
-      height: 64,
-      ports: [{ x: 32, y: 0 }]
-    };
-  }
-  if (profile === 'busway') {
-    return {
-      width: 160,
-      height: 22,
-      ports: [
-        { x: 0, y: 11 },
-        { x: 160, y: 11 }
-      ]
-    };
-  }
-  if (profile === 'bus') {
-    return {
-      width: 260,
-      height: 20,
-      ports: [
-        { x: 0, y: 10 },
-        { x: 260, y: 10 }
-      ]
-    };
-  }
-  return null;
-}
-
-function isLegacyDefaultComponentSize(comp) {
-  const hasWidth = Number.isFinite(Number(comp?.width));
-  const hasHeight = Number.isFinite(Number(comp?.height));
-  if (!hasWidth && !hasHeight) return true;
-  const width = hasWidth ? Number(comp.width) : compWidth;
-  const height = hasHeight ? Number(comp.height) : compHeight;
-  return Math.abs(width - compWidth) <= 0.5 && Math.abs(height - compHeight) <= 0.5;
+  return getIndustrySymbolProfileForModel(comp, meta);
 }
 
 function applyIndustrySymbolGeometry(comp, meta = resolveComponentMeta(comp), { preserveCenter = true, force = false } = {}) {
-  const profile = getIndustrySymbolProfile(comp, meta);
-  const geometry = industrySymbolGeometry(profile);
-  if (!geometry) return false;
-  if (profile === 'bus') {
-    const width = Number(comp.width);
-    const height = Number(comp.height);
-    comp.width = Number.isFinite(width) && width > 0 ? width : geometry.width;
-    comp.height = Number.isFinite(height) && height > 0 ? height : geometry.height;
-    const spacing = 20;
-    const ports = [];
-    for (let px = 0; px <= comp.width; px += spacing) {
-      ports.push({ x: px, y: 0 });
-      ports.push({ x: px, y: comp.height });
-    }
-    if (ports.at(-1)?.x !== comp.width) {
-      ports.push({ x: comp.width, y: 0 });
-      ports.push({ x: comp.width, y: comp.height });
-    }
-    comp.ports = ports;
-    return true;
-  }
-  const oldWidth = Number(comp.width) || compWidth;
-  const oldHeight = Number(comp.height) || compHeight;
-  const shouldResize = force || isLegacyDefaultComponentSize(comp);
-  if (shouldResize) {
-    const centerX = Number(comp.x) + oldWidth / 2;
-    const centerY = Number(comp.y) + oldHeight / 2;
-    comp.width = geometry.width;
-    comp.height = geometry.height;
-    if (preserveCenter) {
-      comp.x = centerX - geometry.width / 2;
-      comp.y = centerY - geometry.height / 2;
-    }
-  }
-  const fittedPorts = (() => {
-    // Legacy motor, VFD, transformer, and panel components can center their native
-    // symbols inside a differently sized component box. Match their ports to the same
-    // preserveAspectRatio="meet" fit used by the SVG image so every feeder
-    // lands on the corresponding visible terminal lead.
-    // Keep the established geometry for other profiles to avoid changing their
-    // existing connection routing and label placement.
-    const requiresRenderedPortFit = ['motor', 'controller', 'transformer', 'transformer3', 'panel'].includes(profile);
-    if (shouldResize || !requiresRenderedPortFit) return geometry.ports;
-    const renderedWidth = Number(comp.width) || oldWidth;
-    const renderedHeight = Number(comp.height) || oldHeight;
-    const scale = Math.min(renderedWidth / geometry.width, renderedHeight / geometry.height);
-    const offsetX = (renderedWidth - (geometry.width * scale)) / 2;
-    const offsetY = (renderedHeight - (geometry.height * scale)) / 2;
-    return geometry.ports.map(port => ({
-      x: offsetX + (port.x * scale),
-      y: offsetY + (port.y * scale)
-    }));
-  })();
-  const portsNeedSync = !Array.isArray(comp.ports)
-    || comp.ports.length !== fittedPorts.length
-    || comp.ports.some((port, idx) => {
-      const expected = fittedPorts[idx];
-      return Math.abs(Number(port?.x) - expected.x) > 0.5
-        || Math.abs(Number(port?.y) - expected.y) > 0.5;
-    });
-  if (force || shouldResize || portsNeedSync) {
-    comp.ports = fittedPorts.map(port => ({ ...port }));
-  }
-  return true;
-}
-
-function coerceNumber(value, fallback) {
-  const num = Number(value);
-  return Number.isFinite(num) ? num : fallback;
-}
-
-function shouldUseVerticalOneLinePorts(category, type) {
-  const resolvedCategory = String(category || '').toLowerCase();
-  const resolvedType = String(type || '').toLowerCase();
-  if (resolvedCategory === 'bus' || resolvedCategory === 'load' || resolvedCategory === 'cable' || resolvedCategory === 'busway' || resolvedCategory === 'annotations' || resolvedCategory === 'links') return false;
-  if (resolvedType === 'bus' || resolvedType === 'cable' || resolvedType === 'busway' || resolvedType === 'annotation' || resolvedType === 'dimension' || resolvedType === 'sheet_link') return false;
-  return true;
-}
-
-function remapPortsForVerticalOneLineFlow(ports, category, type, width = compWidth, height = compHeight) {
-  const normalized = (Array.isArray(ports) ? ports : [])
-    .filter(port => port && typeof port === 'object')
-    .map(port => ({
-      x: coerceNumber(port.x, width / 2),
-      y: coerceNumber(port.y, height / 2)
-    }));
-  if (!normalized.length) {
-    return String(category || '').toLowerCase() === 'sources'
-      ? [{ x: width / 2, y: height }]
-      : [{ x: width / 2, y: 0 }];
-  }
-  if (!shouldUseVerticalOneLinePorts(category, type)) return normalized;
-  if (normalized.length === 1) {
-    return [{
-      x: width / 2,
-      y: String(category || '').toLowerCase() === 'sources' ? height : 0
-    }];
-  }
-  const xs = normalized.map(port => port.x);
-  const ys = normalized.map(port => port.y);
-  const horizontalSpan = Math.max(...xs) - Math.min(...xs);
-  const verticalSpan = Math.max(...ys) - Math.min(...ys);
-  if (verticalSpan >= horizontalSpan) return normalized;
-  if (normalized.length === 2) {
-    return [
-      { x: width / 2, y: 0 },
-      { x: width / 2, y: height }
-    ];
-  }
-  return normalized.map((_, idx) => {
-    if (idx === 0) return { x: width / 2, y: 0 };
-    const slots = normalized.length - 1;
-    return {
-      x: width * (idx / (slots + 1)),
-      y: height
-    };
+  return applyIndustrySymbolGeometryForModel(comp, meta, {
+    preserveCenter,
+    force,
+    defaultWidth: compWidth,
+    defaultHeight: compHeight
   });
 }
 
+function remapPortsForVerticalOneLineFlow(ports, category, type, width = compWidth, height = compHeight) {
+  return remapPortsForVerticalOneLineFlowForModel(ports, category, type, width, height);
+}
+
 function normalizePortsForCategory(category, ports, type, subtype, width = compWidth, height = compHeight) {
-  const hasDefinedPorts = Array.isArray(ports) && ports.length > 0;
-  const base = hasDefinedPorts ? ports : defaultPorts(type, subtype);
-  if (category === 'load') {
-    const defaultX = width / 2;
-    const defaultY = 0;
-    if (!hasDefinedPorts || !base.length) {
-      return [{ x: defaultX, y: defaultY }];
-    }
-    if (base.length === 1) {
-      return [{
-        x: coerceNumber(base[0]?.x, defaultX),
-        y: coerceNumber(base[0]?.y, defaultY)
-      }];
-    }
-    return base.map(port => ({
-      x: coerceNumber(port?.x, defaultX),
-      y: coerceNumber(port?.y, defaultY)
-    }));
-  }
-  const normalized = base.map(port => ({
-    x: coerceNumber(port?.x, width / 2),
-    y: coerceNumber(port?.y, height / 2)
-  }));
-  return remapPortsForVerticalOneLineFlow(normalized, category, type, width, height);
+  return normalizePortsForCategoryForModel(category, ports, type, subtype, width, height);
 }
 
 const defaultBusProps = {
@@ -1423,320 +1071,16 @@ function ensureShapeDefaults(comp) {
   });
 }
 
-const builtinComponents = [
-  {
-    subtype: 'Bus',
-    label: 'Bus',
-    icon: typeIcons.bus || placeholderIcon,
-    category: 'bus',
-    type: 'bus',
-    ports: [
-      { x: 0, y: 20 },
-      { x: 80, y: 20 }
-    ],
-    props: { ...defaultBusProps }
-  },
-  {
-    subtype: 'Panel',
-    label: 'Panel',
-    icon: asset(`icons/components/MLO.svg?v=${oneLineSymbolAssetVersion}`),
-    category: 'equipment',
-    type: 'panel',
-    width: 64,
-    height: 76,
-    ports: [{ x: 32, y: 0 }]
-  },
-  {
-    subtype: 'Equipment',
-    label: 'Equipment',
-    icon: typeIcons.equipment || placeholderIcon,
-    category: 'equipment',
-    type: 'equipment',
-    ports: [
-      { x: 0, y: 20 },
-      { x: 80, y: 20 }
-    ]
-  },
-  {
-    subtype: 'motor_load',
-    label: 'Motor Load',
-    icon: asset(`icons/components/Motor.svg?v=${oneLineSymbolAssetVersion}`),
-    category: 'load',
-    type: 'motor_load',
-    defaultRotation: 0,
-    ports: [
-      { x: 32, y: 0 }
-    ],
-    props: {
-      hp: 150,
-      volts: 480,
-      pf: 0.88,
-      service_factor: 1.15,
-      efficiency: 95,
-      lr_current_pu: 6.0,
-      starting: 'DOL',
-      vfd: false,
-      load: {
-        kw: 117.789,
-        kvar: 63.576
-      }
-    }
-  },
-  {
-    subtype: 'motor',
-    label: 'Motor',
-    icon: asset(`icons/components/Motor.svg?v=${oneLineSymbolAssetVersion}`),
-    iconIEC: asset('icons/components/iec/IEC_Motor.svg'),
-    category: 'load',
-    type: 'motor',
-    defaultRotation: 0,
-    ports: [
-      { x: 32, y: 0 }
-    ],
-    props: {
-      tag: '',
-      description: '',
-      manufacturer: '',
-      model: '',
-      rated_hp: 100,
-      rated_kw: 74.6,
-      rated_voltage_kv: 0.48,
-      phases: 3,
-      synchronous_speed_rpm: 1800,
-      design_class: 'B',
-      code_letter: 'G',
-      locked_rotor_kva_per_hp: 5.6,
-      full_load_efficiency_pct: 95.0,
-      full_load_pf: 0.90,
-      service_factor: 1.15,
-      starter_type: 'dol',
-      vfd_current_limit_pu: 1.1,
-      initial_voltage_pu: 0.3,
-      ramp_time_s: 10,
-      wye_delta_switch_time_s: 5,
-      autotransformer_tap: 0.65,
-      lr_current_pu: 6.0,
-      thevenin_r: 0.02,
-      thevenin_x: 0.08,
-      inertia: 0.5,
-      load_torque_curve: '0:0 100:100',
-      commissioning_state: 'in_service',
-      service_status: 'normal',
-      notes: ''
-    }
-  },
-  {
-    subtype: 'static_load',
-    label: 'Non-Motor Load',
-    icon: asset('icons/components/Load.svg'),
-    category: 'load',
-    type: 'static_load',
-    defaultRotation: 0,
-    ports: [
-      { x: 32, y: 0 }
-    ],
-    props: {
-      watts: 300000,
-      kva: 300,
-      pf: 1,
-      volts: 480,
-      baseKV: 0.48,
-      kV: 0.48,
-      voltage: 480,
-      prefault_voltage: 0.48,
-      load: {
-        kw: 300.0,
-        kvar: 0
-      }
-    }
-  },
-  {
-    subtype: 'CapacitorBank',
-    label: 'Capacitor Bank',
-    icon: asset(`icons/components/CapacitorBank.svg?v=${oneLineSymbolAssetVersion}`),
-    category: 'load',
-    type: 'shunt_capacitor_bank',
-    defaultRotation: 0,
-    width: 64,
-    height: 64,
-    ports: [
-      { x: 32, y: 0 }
-    ],
-    props: {
-      rated_kv: 0.48,
-      rated_kvar: 150,
-      volts: 480,
-      kvar: 150,
-      baseKV: 0.48,
-      kV: 0.48,
-      prefault_voltage: 0.48,
-      shunt: {
-        kvar: 150
-      }
-    }
-  },
-  {
-    subtype: 'Cable',
-    label: 'Cable',
-    icon: typeIcons.cable || placeholderIcon,
-    category: 'cable',
-    type: 'cable',
-    ports: [
-      { x: 0, y: 20 },
-      { x: 80, y: 20 }
-    ],
-    props: {
-      cable: {
-        tag: '',
-        cable_type: '',
-        conductors: '',
-        phases: '',
-        conductor_size: '',
-        conductor_material: '',
-        insulation_type: '',
-        ambient_temp: '',
-        operating_temp: '',
-        install_method: '',
-        thermal_rating_ampacity: '',
-        shield_armor: '',
-        resistance_per_km: '',
-        reactance_per_km: '',
-        zero_sequence_impedance: '',
-        mutual_coupling: '',
-        impedance_per_length: '',
-        capacitance_per_km: '',
-        short_circuit_rating: '',
-        grouping_factor: '',
-        resistance_temp_correction_coeff: '',
-        core_configuration: '',
-        ground_return_path_resistance: '',
-        color: '#000000',
-        length: '',
-        manual_length: false
-      }
-    }
-  },
-  {
-    subtype: 'custom_shape',
-    label: 'Shape',
-    icon: typeIcons.annotations || placeholderIcon,
-    category: 'annotations',
-    type: 'annotation',
-    width: 160,
-    height: 100,
-    props: { ...defaultShapeProps },
-    hidden: true
-  }
-];
+const builtinComponents = createBuiltInComponents({
+  asset,
+  typeIcons,
+  placeholderIcon,
+  symbolAssetVersion: oneLineSymbolAssetVersion,
+  defaultBusProps,
+  defaultShapeProps
+});
 
-const cablePropertyMetadata = {
-  cable_rating: {
-    label: 'Cable Rating (V)',
-    type: 'number',
-    help: 'Maximum operating voltage. Used for duty and validation checks.'
-  },
-  conductor_size: {
-    label: 'Conductor Size (AWG or mm²)',
-    help: 'Determines resistance and ampacity. Base electrical characteristic.'
-  },
-  conductor_material: {
-    label: 'Conductor Material (Cu/Al)',
-    help: 'Affects resistance and derating. Impacts loss and weight.'
-  },
-  resistance_per_km: {
-    label: 'Resistance (Ω/km)',
-    type: 'number',
-    help: 'Used in voltage drop and loss calculations. Derived or vendor data.'
-  },
-  reactance_per_km: {
-    label: 'Reactance (Ω/km)',
-    type: 'number',
-    help: 'Used in power flow and fault calculations. Important for impedance matching.'
-  },
-  zero_sequence_impedance: {
-    label: 'Zero Sequence Impedance',
-    help: 'Ground fault studies. Required for unbalanced analysis.'
-  },
-  mutual_coupling: {
-    label: 'Mutual Coupling',
-    help: 'Modeling magnetic coupling between circuits. Important for parallel runs.'
-  },
-  length: {
-    label: 'Length',
-    type: 'number',
-    help: 'Scales impedance and drop. Must be accurate for realistic models.'
-  },
-  operating_temp: {
-    label: 'Operating Temperature (°C)',
-    type: 'number',
-    help: 'Used for resistance correction. Impacts ampacity.'
-  },
-  ambient_temp: {
-    label: 'Ambient Temperature (°C)',
-    type: 'number',
-    help: 'Used for derating. Impacts heat dissipation.'
-  },
-  thermal_rating_ampacity: {
-    label: 'Thermal Rating/Ampacity (A)',
-    type: 'number',
-    help: 'Defines max current capacity. Used in protection sizing.'
-  },
-  shield_armor: {
-    label: 'Shield/Armor Data',
-    help: 'Defines ground path and shielding. Used for EMI and fault analysis.'
-  },
-  impedance_per_length: {
-    label: 'Impedance per Length',
-    help: 'Z = R + jX. Defines voltage drop and fault contribution.'
-  },
-  capacitance_per_km: {
-    label: 'Capacitance (µF/km)',
-    type: 'number',
-    help: 'Used for reactive compensation. Relevant for long lines.'
-  },
-  insulation_type: {
-    label: 'Insulation Type',
-    help: 'Determines max voltage and dielectric loss. Used for derating.'
-  },
-  install_method: {
-    label: 'Installation Type (in conduit, tray, buried)',
-    help: 'Determines derating factors. Used for thermal calculations.'
-  },
-  short_circuit_rating: {
-    label: 'Short Circuit Rating (kA)',
-    type: 'number',
-    help: 'Fault withstand capability. Compare against max fault.'
-  },
-  grouping_factor: {
-    label: 'Grouping Factor',
-    type: 'number',
-    help: 'Used for ampacity derating. Multiple cables reduce rating.'
-  },
-  resistance_temp_correction_coeff: {
-    label: 'Resistance Temp Correction Coeff',
-    type: 'number',
-    help: 'Adjust R vs temperature. Used in IEC modeling.'
-  },
-  core_configuration: {
-    label: 'Core Configuration (1C,3C)',
-    help: 'Determines magnetic coupling. Impacts reactance.'
-  },
-  ground_return_path_resistance: {
-    label: 'Ground Return Path Resistance',
-    type: 'number',
-    help: 'Used for unbalanced faults. Important for system grounding.'
-  },
-  impedance_r: {
-    label: 'Impedance R (Ω)',
-    type: 'number',
-    help: 'Positive-sequence resistance. Impacts voltage drop and fault currents.'
-  },
-  impedance_x: {
-    label: 'Impedance X (Ω)',
-    type: 'number',
-    help: 'Positive-sequence reactance. Impacts voltage drop and fault currents.'
-  }
-};
+const cablePropertyMetadata = CABLE_PROPERTY_METADATA;
 
 let propSchemas = {};
 let subtypeCategory = {};
@@ -2228,109 +1572,8 @@ function ensurePtVtMetadata() {
   });
 }
 
-const commonStudyFieldSpecs = [
-  { name: 'mtbf', label: 'MTBF (hr)', type: 'number', required: false, defaultValue: '' },
-  { name: 'mttr', label: 'MTTR (hr)', type: 'number', required: false, defaultValue: '' }
-];
-
-const arcFlashStudyFieldSpecs = [
-  { name: 'clearing_time', label: 'Clearing Time (s)', type: 'number', required: false, defaultValue: '' },
-  {
-    name: 'enclosure',
-    label: 'Arc Flash Enclosure',
-    type: 'select',
-    required: false,
-    defaultValue: 'box',
-    options: [
-      { value: 'box', label: 'Box / enclosed' },
-      { value: 'open', label: 'Open air' },
-      { value: 'NEMA 1', label: 'NEMA 1' },
-      { value: 'NEMA 3R', label: 'NEMA 3R' },
-      { value: 'NEMA 4', label: 'NEMA 4' },
-      { value: 'NEMA 4X', label: 'NEMA 4X' }
-    ]
-  },
-  { name: 'gap', label: 'Electrode Gap (mm)', type: 'number', required: false, defaultValue: '' },
-  { name: 'working_distance', label: 'Working Distance (mm)', type: 'number', required: false, defaultValue: '' },
-  { name: 'enclosure_height', label: 'Enclosure Height (mm)', type: 'number', required: false, defaultValue: '' },
-  { name: 'enclosure_width', label: 'Enclosure Width (mm)', type: 'number', required: false, defaultValue: '' },
-  { name: 'enclosure_depth', label: 'Enclosure Depth (mm)', type: 'number', required: false, defaultValue: '' },
-  {
-    name: 'electrode_config',
-    label: 'Electrode Configuration',
-    type: 'select',
-    required: false,
-    defaultValue: 'VCB',
-    options: ['VCB', 'VCBB', 'HCB', 'VOA', 'HOA']
-  }
-];
-
-const transformerTccStudyFieldSpecs = [
-  { name: 'inrush_multiple', label: 'Transformer Inrush Multiple (x FLA)', type: 'number', required: false, defaultValue: 12 },
-  { name: 'inrush_duration', label: 'Transformer Inrush Duration (s)', type: 'number', required: false, defaultValue: 0.1 }
-];
-
 const harmonicProfileStorageKey = 'harmonicProfileLibrary';
-const manualHarmonicProfileId = 'custom';
-const builtInHarmonicProfiles = [
-  {
-    id: 'six_pulse_vfd',
-    label: '6-pulse VFD / rectifier',
-    spectrum: '5:35 7:25 11:12 13:8',
-    description: 'Typical untreated six-pulse input current profile.'
-  },
-  {
-    id: 'six_pulse_line_reactor',
-    label: '6-pulse VFD with line reactor',
-    spectrum: '5:20 7:14 11:9 13:7',
-    description: 'Reduced characteristic harmonics for a six-pulse drive with input impedance.'
-  },
-  {
-    id: 'twelve_pulse_drive',
-    label: '12-pulse drive / rectifier',
-    spectrum: '11:12 13:10 23:5 25:4',
-    description: 'Dominant harmonics shifted to the 11th, 13th, 23rd, and 25th orders.'
-  },
-  {
-    id: 'eighteen_pulse_drive',
-    label: '18-pulse drive / rectifier',
-    spectrum: '17:8 19:7 35:3 37:3',
-    description: 'Dominant harmonics shifted higher for eighteen-pulse front ends.'
-  },
-  {
-    id: 'active_front_end',
-    label: 'Active front-end drive',
-    spectrum: '5:4 7:3 11:2 13:1',
-    description: 'Low-distortion active front-end or active filter corrected profile.'
-  },
-  {
-    id: 'ups_inverter',
-    label: 'UPS / inverter',
-    spectrum: '5:3 7:2 11:1',
-    description: 'Low-distortion inverter source profile.'
-  },
-  {
-    id: manualHarmonicProfileId,
-    label: 'Custom / manual spectrum',
-    spectrum: '',
-    description: 'Use the entered harmonic spectrum for this component.'
-  }
-];
-
-function normalizeHarmonicProfile(profile) {
-  if (!profile || typeof profile !== 'object') return null;
-  const label = String(profile.label || profile.name || '').trim();
-  const spectrum = String(profile.spectrum || '').trim();
-  const id = String(profile.id || label.toLowerCase().replace(/[^a-z0-9]+/g, '_')).replace(/^_+|_+$/g, '');
-  if (!id || !label) return null;
-  return {
-    id,
-    label,
-    spectrum,
-    description: String(profile.description || '').trim(),
-    custom: !!profile.custom
-  };
-}
+const manualHarmonicProfileId = MANUAL_HARMONIC_PROFILE_ID;
 
 function getCustomHarmonicProfiles() {
   const stored = getItem(harmonicProfileStorageKey, []);
@@ -2341,14 +1584,7 @@ function getCustomHarmonicProfiles() {
 }
 
 function getHarmonicProfileLibrary() {
-  const builtIns = builtInHarmonicProfiles.map(profile => ({ ...profile, custom: false }));
-  const customProfiles = getCustomHarmonicProfiles();
-  const reservedIds = new Set(builtIns.map(profile => profile.id));
-  return [
-    ...builtIns.filter(profile => profile.id !== manualHarmonicProfileId),
-    ...customProfiles.filter(profile => !reservedIds.has(profile.id)),
-    builtIns.find(profile => profile.id === manualHarmonicProfileId)
-  ].filter(Boolean);
+  return mergeHarmonicProfiles(getCustomHarmonicProfiles(), BUILT_IN_HARMONIC_PROFILES);
 }
 
 function getHarmonicProfileOptions() {
@@ -2359,203 +1595,20 @@ function getHarmonicProfileOptions() {
 }
 
 function findHarmonicProfileById(id) {
-  const normalizedId = String(id || '').trim();
-  return getHarmonicProfileLibrary().find(profile => profile.id === normalizedId) || null;
+  return findHarmonicProfileByIdInLibrary(getHarmonicProfileLibrary(), id);
 }
 
 function findHarmonicProfileBySpectrum(spectrum) {
-  const normalizedSpectrum = String(spectrum || '').trim();
-  if (!normalizedSpectrum) return null;
-  return getHarmonicProfileLibrary()
-    .filter(profile => profile.id !== manualHarmonicProfileId)
-    .find(profile => profile.spectrum === normalizedSpectrum) || null;
-}
-
-function defaultHarmonicProfileId(meta) {
-  const type = `${meta?.type || ''}`.trim().toLowerCase();
-  const subtype = `${meta?.subtype || ''}`.trim().toLowerCase();
-  if (subtype === 'vfd' || subtype.includes('vfd') || type === 'rectifier' || subtype.includes('rectifier')) {
-    return 'six_pulse_vfd';
-  }
-  if (subtype === 'soft_starter' || subtype.includes('soft_starter')) {
-    return manualHarmonicProfileId;
-  }
-  if (type === 'ups' || subtype.includes('ups')) return 'ups_inverter';
-  if (type.includes('inverter') || subtype.includes('inverter')) return 'ups_inverter';
-  return manualHarmonicProfileId;
+  return findHarmonicProfileBySpectrumInLibrary(getHarmonicProfileLibrary(), spectrum);
 }
 
 function saveCustomHarmonicProfile(label, spectrum) {
-  const normalizedLabel = String(label || '').trim();
-  const normalizedSpectrum = String(spectrum || '').trim();
-  if (!normalizedLabel || !normalizedSpectrum) return null;
-  const baseId = normalizedLabel.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'custom_profile';
-  const profile = {
-    id: `custom_${baseId}`,
-    label: normalizedLabel,
-    spectrum: normalizedSpectrum,
-    description: 'Custom harmonic profile.',
-    custom: true
-  };
+  const profile = createCustomHarmonicProfile(label, spectrum);
+  if (!profile) return null;
   const existing = getCustomHarmonicProfiles().filter(item => item.id !== profile.id);
   existing.push(profile);
   setItem(harmonicProfileStorageKey, existing);
   return profile;
-}
-
-function parseHarmonicSpectrumPoints(spec) {
-  const map = new Map();
-  if (!spec) return [];
-  if (Array.isArray(spec)) {
-    spec.forEach((value, index) => {
-      const pct = Number(value);
-      const order = index + 1;
-      if (Number.isFinite(pct) && pct > 0 && order > 1) map.set(order, pct);
-    });
-  } else if (typeof spec === 'string') {
-    spec.split(/[,\s]+/).forEach(part => {
-      if (!part) return;
-      const [orderPart, pctPart] = part.split(':');
-      const order = Number(orderPart);
-      const pct = Number(pctPart ?? orderPart);
-      if (Number.isFinite(order) && Number.isFinite(pct) && order > 1 && pct >= 0) {
-        map.set(order, pct);
-      }
-    });
-  }
-  return [...map.entries()]
-    .map(([order, pct]) => ({ order, pct }))
-    .sort((a, b) => a.order - b.order);
-}
-
-function harmonicThdPercent(points) {
-  if (!Array.isArray(points) || !points.length) return 0;
-  const sumSquares = points.reduce((sum, point) => {
-    const pct = Number(point?.pct);
-    return Number.isFinite(pct) ? sum + pct * pct : sum;
-  }, 0);
-  return Math.sqrt(sumSquares);
-}
-
-function formatHarmonicMetric(value, decimals = 1) {
-  if (!Number.isFinite(value)) return '';
-  const factor = 10 ** decimals;
-  const rounded = Math.round(value * factor) / factor;
-  let text = rounded.toFixed(decimals);
-  text = text.replace(/\.0+$/, '');
-  text = text.replace(/(\.[0-9]*[1-9])0+$/, '$1');
-  return text;
-}
-
-function estimateVoltageHarmonicPoints(currentPoints, { voltage, loadKw, scMVA } = {}) {
-  if (
-    !Array.isArray(currentPoints)
-    || !currentPoints.length
-    || !Number.isFinite(voltage)
-    || voltage <= 0
-    || !Number.isFinite(loadKw)
-    || loadKw <= 0
-    || !Number.isFinite(scMVA)
-    || scMVA <= 0
-  ) {
-    return [];
-  }
-  const baseCurrent = loadKw * 1000 / (Math.sqrt(3) * voltage);
-  const kv = voltage / 1000;
-  const yBase = scMVA / (kv * kv);
-  if (!Number.isFinite(baseCurrent) || baseCurrent <= 0 || !Number.isFinite(yBase) || yBase <= 0) return [];
-  return currentPoints.map(point => {
-    const harmonicCurrent = baseCurrent * (point.pct / 100);
-    const harmonicVoltage = harmonicCurrent / yBase;
-    const pct = harmonicVoltage / voltage * 100;
-    return {
-      order: point.order,
-      pct: Number.isFinite(pct) && pct > 0 ? pct : 0
-    };
-  });
-}
-
-const harmonicStudyFieldSpecs = [
-  { name: 'harmonicSource', label: 'Harmonic Source', type: 'checkbox', required: false, defaultValue: (comp, meta) => isDefaultHarmonicSourceMeta(meta || comp) },
-  { name: 'harmonicProfileId', label: 'Harmonic Profile', type: 'select', required: false, defaultValue: (comp, meta) => defaultHarmonicProfileId(meta || comp), options: () => getHarmonicProfileOptions() },
-  { name: 'harmonics', label: 'Harmonic Spectrum (order:pct)', type: 'text', required: false, defaultValue: (comp, meta) => defaultHarmonicSpectrum(meta || comp), placeholder: '5:35 7:25 11:12 13:8' },
-  { name: 'scMVA', label: 'Short-Circuit Strength at Bus (MVA)', type: 'number', required: false, defaultValue: '' },
-  { name: 'harmonicsA', label: 'Phase A Harmonics (order:pct)', type: 'text', required: false, defaultValue: '' },
-  { name: 'harmonicsB', label: 'Phase B Harmonics (order:pct)', type: 'text', required: false, defaultValue: '' },
-  { name: 'harmonicsC', label: 'Phase C Harmonics (order:pct)', type: 'text', required: false, defaultValue: '' }
-];
-
-const motorStudyFieldSpecs = [
-  { name: 'full_load_amps', label: 'Full-Load Amps (A)', type: 'number', required: false, defaultValue: comp => comp.rated_current_a || comp.rated_current || '' },
-  { name: 'pf', label: 'Power Factor', type: 'number', required: false, defaultValue: 0.88 },
-  { name: 'efficiency', label: 'Efficiency (%)', type: 'number', required: false, defaultValue: 95 },
-  { name: 'lr_current_pu', label: 'Locked-Rotor Current (x FLA)', type: 'number', required: false, defaultValue: 6 },
-  { name: 'inrushMultiple', label: 'Inrush Multiple (x FLA)', type: 'number', required: false, defaultValue: 6 },
-  { name: 'thevenin_r', label: 'Thevenin R (ohm)', type: 'number', required: false, defaultValue: '' },
-  { name: 'thevenin_x', label: 'Thevenin X (ohm)', type: 'number', required: false, defaultValue: '' },
-  { name: 'inertia', label: 'Inertia (kg*m^2)', type: 'number', required: false, defaultValue: '' },
-  { name: 'load_torque_curve', label: 'Load Torque Curve (speed%:torque%)', type: 'textarea', required: false, rows: 3, defaultValue: '0:0 100:100' },
-  { name: 'start_time_s', label: 'Start Time (s)', type: 'number', required: false, defaultValue: '' },
-  { name: 'stall_time', label: 'Stall Time (s)', type: 'number', required: false, defaultValue: '' },
-  { name: 'synchronous_speed_rpm', label: 'Synchronous Speed (rpm)', type: 'number', required: false, defaultValue: '' },
-  { name: 'current_limit_pu', label: 'Current Limit (x FLA)', type: 'number', required: false, defaultValue: '' },
-  { name: 'vfd_current_limit_pu', label: 'VFD Current Limit (x FLA)', type: 'number', required: false, defaultValue: '' },
-  { name: 'initial_voltage_pu', label: 'Initial Voltage (pu)', type: 'number', required: false, defaultValue: '' },
-  { name: 'ramp_time_s', label: 'Ramp Time (s)', type: 'number', required: false, defaultValue: '' }
-];
-
-function isMotorStudyComponentMeta(meta) {
-  if (!meta || typeof meta !== 'object') return false;
-  const type = `${meta.type || ''}`.trim().toLowerCase();
-  const subtype = `${meta.subtype || ''}`.trim().toLowerCase();
-  return type === 'motor_load'
-    || type === 'motor'
-    || type === 'motor_controller'
-    || type === 'motor_starter'
-    || subtype === 'motor_load'
-    || subtype === 'motor'
-    || subtype.includes('starter')
-    || subtype === 'vfd'
-    || subtype === 'soft_starter';
-}
-
-function isTransformerStudyComponentMeta(meta) {
-  if (!meta || typeof meta !== 'object') return false;
-  const type = `${meta.type || ''}`.trim().toLowerCase();
-  const subtype = `${meta.subtype || ''}`.trim().toLowerCase();
-  return type === 'transformer' || subtype.includes('transformer') || subtype.includes('xfmr');
-}
-
-function isArcFlashStudyComponentMeta(meta) {
-  if (!isDiagramAssetComponentMeta(meta)) return false;
-  const type = `${meta.type || ''}`.trim().toLowerCase();
-  const subtype = `${meta.subtype || ''}`.trim().toLowerCase();
-  return type !== 'cable' && type !== 'busway' && subtype !== 'cable' && subtype !== 'busway';
-}
-
-function isHarmonicStudyComponentMeta(meta) {
-  if (!meta || typeof meta !== 'object') return false;
-  const type = `${meta.type || ''}`.trim().toLowerCase();
-  const subtype = `${meta.subtype || ''}`.trim().toLowerCase();
-  return ['pv_inverter', 'bess_inverter', 'rectifier', 'ups', 'static_load'].includes(type)
-    || type === 'motor_controller'
-    || subtype === 'vfd'
-    || subtype === 'soft_starter'
-    || subtype.includes('inverter')
-    || subtype.includes('rectifier')
-    || subtype.includes('ups');
-}
-
-function isDefaultHarmonicSourceMeta(meta) {
-  if (!meta || typeof meta !== 'object') return false;
-  const type = `${meta.type || ''}`.trim().toLowerCase();
-  const subtype = `${meta.subtype || ''}`.trim().toLowerCase();
-  return ['pv_inverter', 'bess_inverter', 'rectifier', 'ups'].includes(type)
-    || subtype === 'vfd'
-    || subtype.includes('vfd')
-    || subtype.includes('inverter')
-    || subtype.includes('rectifier')
-    || subtype.includes('ups');
 }
 
 function defaultHarmonicSpectrum(meta) {
@@ -2563,14 +1616,14 @@ function defaultHarmonicSpectrum(meta) {
   return profile?.spectrum || '';
 }
 
+const studyInputFieldSpecs = createStudyInputFieldSpecs({
+  getHarmonicProfileOptions,
+  getDefaultHarmonicProfileId: defaultHarmonicProfileId,
+  getDefaultHarmonicSpectrum: defaultHarmonicSpectrum
+});
+
 function resolveStudyInputFieldSpecs(meta) {
-  if (!isDiagramAssetComponentMeta(meta)) return [];
-  const specs = [...commonStudyFieldSpecs];
-  if (isArcFlashStudyComponentMeta(meta)) specs.push(...arcFlashStudyFieldSpecs);
-  if (isTransformerStudyComponentMeta(meta)) specs.push(...transformerTccStudyFieldSpecs);
-  if (isHarmonicStudyComponentMeta(meta)) specs.push(...harmonicStudyFieldSpecs);
-  if (isMotorStudyComponentMeta(meta)) specs.push(...motorStudyFieldSpecs);
-  return specs;
+  return resolveStudyInputFieldSpecsForModel(meta, studyInputFieldSpecs, { isDiagramAssetComponentMeta });
 }
 
 function ensureStudyInputFieldsOnComponent(comp, meta) {
@@ -2951,307 +2004,53 @@ function navigateToCustomComponentEditor(meta) {
   window.location.href = url.toString();
 }
 
-function buildPalette() {
-  closePaletteContextMenu();
-  const palette = document.getElementById('component-buttons');
-  const btnTemplate = document.getElementById('palette-button-template');
-  const pinnedContainer = document.getElementById('palette-pinned-buttons');
-  const noResults = document.getElementById('palette-no-results');
-  if (pinnedContainer) pinnedContainer.innerHTML = '';
-  const sectionContainers = {
-    sources: document.getElementById('sources-buttons'),
-    equipment: document.getElementById('equipment-buttons'),
-    protection: document.getElementById('protection-buttons'),
-    load: document.getElementById('load-buttons'),
-    bus: document.getElementById('bus-buttons'),
-    cable: document.getElementById('cable-buttons'),
-    links: document.getElementById('links-buttons'),
-    annotations: document.getElementById('annotations-buttons')
-  };
-  Object.values(sectionContainers).forEach(c => {
-    if (c) c.innerHTML = '';
-  });
-  const normalizePaletteFilterCategory = cat => {
-    if (cat === 'bus' || cat === 'busway' || cat === 'panel') return 'equipment';
-    if (cat === 'load') return 'load';
-    return cat || 'equipment';
-  };
-  const commonPaletteLabels = new Set([
-    'utility',
-    'utility source',
-    'generator',
-    'bus',
-    'panel',
-    'transformer',
-    'xfmr 2w',
-    'lv cb',
-    'motor load',
-    'cable',
-    'cable segment'
-  ]);
-  const commonPaletteTypes = new Set([
-    'utility_source',
-    'generator',
-    'bus',
-    'panel',
-    'transformer',
-    'circuit_breaker',
-    'motor_load',
-    'cable'
-  ]);
-  const paletteButtonMatchesFilter = (btn, term, activeFilter) => {
-    const label = (btn.dataset.label || '').toLowerCase();
-    const sub = (btn.dataset.subtype || '').toLowerCase();
-    const type = (btn.dataset.type || '').toLowerCase();
-    const category = btn.dataset.filterCategory || btn.dataset.category || '';
-    const matchesText = !term || label.includes(term) || sub.includes(term) || type.includes(term);
-    const matchesCategory = activeFilter === 'all'
-      || (activeFilter === 'common' && btn.dataset.common === '1')
-      || category === activeFilter;
-    return matchesText && matchesCategory;
-  };
-  const createPaletteButton = (cat, subKey, meta, { pinned = false } = {}) => {
-    const btn = btnTemplate ? btnTemplate.content.firstElementChild.cloneNode(true) : document.createElement('button');
-    btn.draggable = true;
-    btn.setAttribute('draggable', 'true');
-    btn.dataset.type = meta.type;
-    btn.dataset.category = cat;
-    btn.dataset.filterCategory = normalizePaletteFilterCategory(cat);
-    if (meta.subtype) {
-      btn.dataset.subtype = meta.subtype;
-      btn.setAttribute('data-subtype', meta.subtype);
-    } else {
-      btn.dataset.subtype = '';
-      btn.setAttribute('data-subtype', '');
-    }
-    btn.setAttribute('data-testid', 'palette-button');
-    btn.dataset.label = meta.label;
-    btn.dataset.common = commonPaletteLabels.has(String(meta.label || '').trim().toLowerCase())
-      || commonPaletteTypes.has(String(meta.type || '').trim().toLowerCase())
-      ? '1'
-      : '0';
-    btn.title = `${meta.label} - Drag to canvas or click to add`;
-    btn.setAttribute('aria-label', meta.label || meta.subtype || meta.type || subKey);
-    if (pinned) btn.classList.add('palette-pinned-button');
-    const rotation = defaultRotationForMeta(meta, meta?.type);
-    const iconWrapper = document.createElement('span');
-    iconWrapper.className = 'palette-icon';
-    iconWrapper.dataset.rotation = String(rotation);
-    const iconImg = document.createElement('img');
-    iconImg.src = symbolStandard === 'IEC' && meta.iconIEC ? meta.iconIEC : meta.icon;
-    iconImg.alt = '';
-    iconImg.setAttribute('aria-hidden', 'true');
-    iconWrapper.appendChild(iconImg);
-    btn.innerHTML = '';
-    btn.appendChild(iconWrapper);
-    const labelSpan = document.createElement('span');
-    labelSpan.className = 'palette-label';
-    labelSpan.textContent = meta.label || meta.subtype || meta.type || subKey;
-    btn.appendChild(labelSpan);
-    btn.addEventListener('click', event => {
-      if (event.button !== 0) return;
-      const comp = addComponent({ type: meta.type, subtype: subKey, placeAtViewportCenter: true });
-      if (comp) {
-        recordPaletteUsage(subKey);
-        buildPalette();
-        selection = [comp];
-        selected = comp;
-        selectedConnection = null;
-        setRightRailTab('properties');
-        showToast(`${comp.label || meta.label || 'Component'} added`);
-      }
-      render();
-      if (comp) zoomToComponents([comp], { maxZoom: 1.35, pad: 90 });
-      save();
-    });
-    btn.addEventListener('dragstart', e => {
-      e.dataTransfer.setData('text/plain', JSON.stringify({ type: meta.type, subtype: subKey }));
-      setDragPreview(e, meta, rotation);
-    });
-    btn.dataset.custom = meta.isCustom ? '1' : '0';
-    btn.addEventListener('contextmenu', e => {
-      e.preventDefault();
-      e.stopPropagation();
-      openPaletteContextMenu(meta, btn, e.clientX, e.clientY, subKey);
-    });
-    btn.addEventListener('keydown', e => {
-      if (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) {
-        e.preventDefault();
-        const rect = btn.getBoundingClientRect();
-        openPaletteContextMenu(meta, btn, rect.left + rect.width / 2, rect.top + rect.height / 2, subKey);
-      }
-    });
-    return btn;
-  };
-  const applyPaletteFilters = () => {
-    const paletteSearch = document.getElementById('palette-search');
-    const term = paletteSearch?.value.trim().toLowerCase() || '';
-    const activeFilter = Object.prototype.hasOwnProperty.call(paletteCategoryFilters, activePaletteCategoryFilter)
-      ? activePaletteCategoryFilter
-      : 'common';
-    let visibleCount = 0;
-    palette.querySelectorAll('button[data-testid="palette-button"]').forEach(btn => {
-      const visible = paletteButtonMatchesFilter(btn, term, activeFilter);
-      btn.hidden = !visible;
-      if (visible) visibleCount += 1;
-    });
-    document.querySelectorAll('#component-buttons .palette-filter').forEach(button => {
-      const active = button.dataset.paletteFilter === activeFilter;
-      button.classList.toggle('active', active);
-      button.setAttribute('aria-pressed', active ? 'true' : 'false');
-    });
-    document.querySelectorAll('#component-buttons details').forEach(det => {
-      const sectionFilter = det.dataset.filterCategory || det.dataset.category || '';
-      const categoryVisible = activeFilter === 'all' || activeFilter === 'common' || sectionFilter === activeFilter;
-      const buttons = Array.from(det.querySelectorAll('button[data-testid="palette-button"]'));
-      const hasVisibleButton = buttons.some(btn => !btn.hidden);
-      const card = det.closest('.palette-card');
-      if (card) card.hidden = buttons.length === 0 || !categoryVisible || (!hasVisibleButton && term);
-      if (term && hasVisibleButton) det.open = true;
-    });
-    const pinned = document.getElementById('palette-pinned');
-    if (pinned) {
-      const hasPinned = Array.from(pinned.querySelectorAll('button[data-testid="palette-button"]')).some(btn => !btn.hidden);
-      pinned.hidden = !hasPinned;
-    }
-    if (noResults) noResults.hidden = visibleCount > 0;
-  };
-  Object.entries(sectionContainers).forEach(([cat, container]) => {
-    const summary = container?.parentElement?.querySelector('summary');
-    if (!summary) return;
-    const details = summary.closest('details');
-    if (details) {
-      details.dataset.category = cat;
-      details.dataset.filterCategory = normalizePaletteFilterCategory(cat);
-    }
-    Array.from(summary.childNodes).forEach(node => {
-      if (node.nodeType === Node.TEXT_NODE) {
-        summary.removeChild(node);
-      }
-    });
-    let label = summary.querySelector('.summary-label');
-    if (!label) {
-      label = document.createElement('span');
-      label.className = 'summary-label';
-      summary.appendChild(label);
-    }
-    label.textContent = cat.charAt(0).toUpperCase() + cat.slice(1);
-  });
-  const renderedLabels = new Set();
-  const renderedComponentIdentities = new Set();
-  const paletteEntries = new Map();
-  const paletteIdentity = (subKey, meta) => {
-    const type = String(meta.type || '').trim().toLowerCase();
-    const subtype = String(meta.subtype || subKey || '').trim().toLowerCase();
-    const label = String(meta.label || '').trim().toLowerCase();
-    if (type === 'utility_source' || subtype === 'utility_source' || subtype === 'utility' || label === 'utility_source') {
-      return 'sources:utility';
-    }
-    return `${normalizePaletteFilterCategory(meta.category)}:${type}:${subtype}`;
-  };
-  Object.entries(componentTypes).forEach(([cat, subs]) => {
-    const container = sectionContainers[cat] || (cat === 'busway' ? sectionContainers.equipment : null) || palette;
-    subs.forEach(subKey => {
-      const meta = componentMeta[subKey];
-      if (!meta || meta.hidden) return;
-      const normalizedLabel = String(meta.label || meta.subtype || meta.type || subKey).trim().toLowerCase();
-      const identity = paletteIdentity(subKey, meta);
-      if (identity && renderedComponentIdentities.has(identity)) return;
-      if (normalizedLabel && renderedLabels.has(normalizedLabel)) return;
-      if (identity) renderedComponentIdentities.add(identity);
-      if (normalizedLabel) renderedLabels.add(normalizedLabel);
-      paletteEntries.set(subKey, { cat, meta });
-      const btn = createPaletteButton(cat, subKey, meta);
-      container.appendChild(btn);
-      // Keep one canonical palette control per component. Repeating hard-coded
-      // "frequent" controls made types such as Panel, Utility, Cable, and MCC
-      // appear to be separate duplicate definitions.
-    });
-  });
-  if (pinnedContainer) {
-    const favorites = getPaletteFavorites().filter(subtype => paletteEntries.has(subtype));
-    const favoriteSet = new Set(favorites);
-    const recent = getPaletteRecent().filter(subtype => paletteEntries.has(subtype) && !favoriteSet.has(subtype));
-    [...favorites, ...recent].forEach(subtype => {
-      const entry = paletteEntries.get(subtype);
-      const btn = createPaletteButton(entry.cat, subtype, entry.meta, { pinned: true });
-      btn.dataset.palettePinnedKind = favoriteSet.has(subtype) ? 'favorite' : 'recent';
-      btn.title = `${entry.meta.label} — ${favoriteSet.has(subtype) ? 'Favorite' : 'Recent'}; drag to canvas or click to add`;
-      pinnedContainer.appendChild(btn);
+let paletteController = null;
+
+function getPaletteController() {
+  if (!paletteController) {
+    paletteController = createPaletteController({
+      documentRef: document,
+      categoryFilters: paletteCategoryFilters,
+      getActiveFilter: () => activePaletteCategoryFilter,
+      setActiveFilter: filter => {
+        activePaletteCategoryFilter = filter;
+        setOneLineViewSetting(paletteFilterStorageKey, filter);
+      },
+      getComponentTypes: () => componentTypes,
+      getComponentMeta: () => componentMeta,
+      getSymbolStandard: () => symbolStandard,
+      getDefaultRotation: defaultRotationForMeta,
+      getViewSetting: getOneLineViewSetting,
+      setViewSetting: setOneLineViewSetting,
+      getFavorites: getPaletteFavorites,
+      getRecent: getPaletteRecent,
+      clearRecent: clearPaletteRecent,
+      onActivate: ({ meta, subtype, rerender }) => {
+        const comp = addComponent({ type: meta.type, subtype, placeAtViewportCenter: true });
+        if (comp) {
+          recordPaletteUsage(subtype);
+          rerender();
+          selection = [comp];
+          selected = comp;
+          selectedConnection = null;
+          setRightRailTab('properties');
+          showToast(`${comp.label || meta.label || 'Component'} added`);
+        }
+        render();
+        if (comp) zoomToComponents([comp], { maxZoom: 1.35, pad: 90 });
+        save();
+      },
+      onDragStart: setDragPreview,
+      onContextMenu: openPaletteContextMenu,
+      onCloseContextMenu: closePaletteContextMenu
     });
   }
-  document.querySelectorAll('#component-buttons details').forEach(det => {
-    const key = `palette-${det.id}-open`;
-    const container = det.querySelector('.section-buttons');
-    const hasButtons = container && container.children.length > 0;
-    const card = det.closest('.palette-card');
-    if (card) card.hidden = !hasButtons;
-    if (!hasButtons && container) {
-      const placeholder = document.createElement('div');
-      placeholder.className = 'no-components';
-      placeholder.textContent = 'No components available';
-      container.appendChild(placeholder);
-    }
-    const stored = getOneLineViewSetting(key, null);
-    if (stored !== null) {
-      det.open = stored === true || stored === 'true';
-    } else if (!hasButtons) {
-      det.open = true;
-    }
-    if (!det.dataset.paletteToggleBound) {
-      det.addEventListener('toggle', () => {
-        setOneLineViewSetting(key, det.open);
-      });
-      det.dataset.paletteToggleBound = '1';
-    }
-  });
-  const paletteSearch = document.getElementById('palette-search');
-  if (paletteSearch && !paletteSearch.dataset.paletteSearchBound) {
-    paletteSearch.addEventListener('input', () => {
-      applyPaletteFilters();
-    });
-    paletteSearch.addEventListener('keydown', e => {
-      if (e.key === 'Escape') {
-        paletteSearch.value = '';
-        activePaletteCategoryFilter = 'common';
-        setOneLineViewSetting(paletteFilterStorageKey, activePaletteCategoryFilter);
-        applyPaletteFilters();
-      }
-    });
-    paletteSearch.dataset.paletteSearchBound = '1';
-  }
-  document.querySelectorAll('#component-buttons .palette-filter').forEach(button => {
-    if (button.dataset.paletteFilterBound) return;
-    button.addEventListener('click', () => {
-      const filter = button.dataset.paletteFilter || 'all';
-      activePaletteCategoryFilter = Object.prototype.hasOwnProperty.call(paletteCategoryFilters, filter) ? filter : 'all';
-      setOneLineViewSetting(paletteFilterStorageKey, activePaletteCategoryFilter);
-      applyPaletteFilters();
-    });
-    button.dataset.paletteFilterBound = '1';
-  });
-  const clearFilterBtn = document.getElementById('palette-clear-filter-btn');
-  if (clearFilterBtn && !clearFilterBtn.dataset.paletteClearBound) {
-    clearFilterBtn.addEventListener('click', () => {
-      const paletteSearchInput = document.getElementById('palette-search');
-      if (paletteSearchInput) paletteSearchInput.value = '';
-      activePaletteCategoryFilter = 'all';
-      setOneLineViewSetting(paletteFilterStorageKey, activePaletteCategoryFilter);
-      applyPaletteFilters();
-    });
-    clearFilterBtn.dataset.paletteClearBound = '1';
-  }
-  const clearRecentBtn = document.getElementById('palette-clear-recent-btn');
-  if (clearRecentBtn && !clearRecentBtn.dataset.paletteRecentBound) {
-    clearRecentBtn.addEventListener('click', () => {
-      clearPaletteRecent();
-      buildPalette();
-    });
-    clearRecentBtn.dataset.paletteRecentBound = '1';
-  }
-  applyPaletteFilters();
+  return paletteController;
 }
 
+function buildPalette() {
+  getPaletteController().render();
+}
 function closePaletteContextMenu() {
   if (!paletteContextMenu) return;
   paletteContextMenu.style.display = 'none';
@@ -3585,8 +2384,6 @@ let gridEnabled = getOneLineViewSetting('gridEnabled', true);
 let alignmentGuidesEnabled = getOneLineViewSetting('alignmentGuidesEnabled', true);
 let dragSnapGuides = null;
 let snapIndicatorTimeout = null;
-let history = [];
-let historyIndex = -1;
 let checkpointCounter = 0;
 let historyEvents = [];
 let checkpoints = [];
@@ -3618,7 +2415,7 @@ const LIVE_TELEMETRY_CONFIG_KEY = 'liveTelemetryConfig';
 let liveTelemetryConfig = normalizeLiveTagConfig(getItem(LIVE_TELEMETRY_CONFIG_KEY, {}));
 let liveTelemetryValues = {};
 let liveTelemetryError = '';
-let refreshLiveTrendModal = null;
+let liveTelemetryViewController = null;
 let liveTelemetryFreshnessTimer = null;
 
 function clearLiveTelemetryFreshnessTimer() {
@@ -3650,7 +2447,7 @@ const liveTelemetryController = createLivePollingController({
   onReadings(payload, config) {
     liveTelemetryValues = applyLiveReadings(liveTelemetryValues, payload, config);
     liveTelemetryError = '';
-    refreshLiveTrendModal?.();
+    liveTelemetryViewController?.refreshTrend();
     render();
     scheduleLiveTelemetryFreshnessRender();
   },
@@ -3680,223 +2477,41 @@ function getLiveAlarms() {
   return evaluateLiveAlarms(liveTelemetryValues, liveTelemetryConfig);
 }
 
-function updateLiveTelemetryControl() {
-  const button = document.getElementById('live-telemetry-btn');
-  if (!button) return;
-  const alarms = liveTelemetryController.running ? getLiveAlarms() : [];
-  button.dataset.alarmCount = String(alarms.length);
-  button.title = alarms.length ? `${alarms.length} active live alarm${alarms.length === 1 ? '' : 's'}` : 'Configure read-only live telemetry';
-}
-
-function formatLiveTrendNumber(value) {
-  if (!Number.isFinite(Number(value))) return '—';
-  return Number(value).toLocaleString(undefined, { maximumFractionDigits: 3 });
-}
-
-function createLiveTrendChart(doc, componentId, metric) {
-  const panel = doc.createElement('section');
-  panel.className = 'live-trend-panel';
-  panel.setAttribute('aria-live', 'polite');
-  const reading = liveTelemetryValues[componentId];
-  const series = getLiveTrendSeries(reading, metric);
-  const summary = summarizeLiveTrend(series);
-  if (!summary) {
-    const empty = doc.createElement('p');
-    empty.className = 'live-trend-empty';
-    empty.textContent = 'No numeric readings have been received for this metric in the last 24 hours.';
-    panel.appendChild(empty);
-    return panel;
+function getLiveTelemetryViewController() {
+  if (!liveTelemetryViewController) {
+    liveTelemetryViewController = createLiveTelemetryViewController({
+      documentRef: document,
+      svgNS,
+      openModal,
+      getRunning: () => liveTelemetryController.running,
+      getConfig: () => liveTelemetryConfig,
+      getValues: () => liveTelemetryValues,
+      getAlarms: () => getLiveAlarms(),
+      getComponents: () => components,
+      getComponentLabel: getComponentLabelText,
+      getTrendSeries: getLiveTrendSeries,
+      getTrendMetrics: getLiveTrendMetrics,
+      summarizeTrend: summarizeLiveTrend,
+      exportTrendCsv: exportLiveTrendCsv,
+      BlobCtor: Blob,
+      URLRef: URL,
+      setTimeoutFn: setTimeout
+    });
   }
-  const heading = doc.createElement('p');
-  heading.className = 'live-trend-caption';
-  heading.textContent = `${metric} · ${summary.count} reading${summary.count === 1 ? '' : 's'} in the last 24 hours`;
-  const svg = doc.createElementNS(svgNS, 'svg');
-  svg.classList.add('live-trend-chart');
-  svg.setAttribute('viewBox', '0 0 640 220');
-  svg.setAttribute('role', 'img');
-  svg.setAttribute('aria-label', `24-hour ${metric} trend for ${componentId}. Minimum ${formatLiveTrendNumber(summary.minimum)}, average ${formatLiveTrendNumber(summary.average)}, maximum ${formatLiveTrendNumber(summary.maximum)}.`);
-  const chartTitle = doc.createElementNS(svgNS, 'title');
-  chartTitle.textContent = `24-hour ${metric} trend`;
-  const padding = { left: 62, right: 18, top: 18, bottom: 36 };
-  const width = 640 - padding.left - padding.right;
-  const height = 220 - padding.top - padding.bottom;
-  const values = series.map(point => point.value);
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const range = max - min || Math.max(Math.abs(max) * 0.1, 1);
-  const end = Date.now();
-  const start = end - 24 * 60 * 60 * 1000;
-  const points = series.map(point => {
-    const x = padding.left + Math.min(1, Math.max(0, (point.timestamp - start) / (end - start))) * width;
-    const y = padding.top + (1 - (point.value - min) / range) * height;
-    return `${x.toFixed(2)},${y.toFixed(2)}`;
-  });
-  const grid = doc.createElementNS(svgNS, 'line');
-  grid.setAttribute('x1', padding.left);
-  grid.setAttribute('x2', 640 - padding.right);
-  grid.setAttribute('y1', padding.top + height);
-  grid.setAttribute('y2', padding.top + height);
-  grid.classList.add('live-trend-axis');
-  const line = doc.createElementNS(svgNS, 'polyline');
-  line.setAttribute('points', points.join(' '));
-  line.setAttribute('fill', 'none');
-  line.classList.add('live-trend-line');
-  const high = doc.createElementNS(svgNS, 'text');
-  high.setAttribute('x', 4);
-  high.setAttribute('y', padding.top + 4);
-  high.textContent = formatLiveTrendNumber(max);
-  high.classList.add('live-trend-label');
-  const low = doc.createElementNS(svgNS, 'text');
-  low.setAttribute('x', 4);
-  low.setAttribute('y', padding.top + height);
-  low.textContent = formatLiveTrendNumber(min);
-  low.classList.add('live-trend-label');
-  const startLabel = doc.createElementNS(svgNS, 'text');
-  startLabel.setAttribute('x', padding.left);
-  startLabel.setAttribute('y', 214);
-  startLabel.textContent = '24 h ago';
-  startLabel.classList.add('live-trend-label');
-  const endLabel = doc.createElementNS(svgNS, 'text');
-  endLabel.setAttribute('x', 640 - padding.right);
-  endLabel.setAttribute('y', 214);
-  endLabel.setAttribute('text-anchor', 'end');
-  endLabel.textContent = 'Now';
-  endLabel.classList.add('live-trend-label');
-  svg.append(chartTitle, grid, line, high, low, startLabel, endLabel);
-  const summaryList = doc.createElement('dl');
-  summaryList.className = 'live-trend-summary';
-  [['Latest', summary.latest], ['Minimum', summary.minimum], ['Average', summary.average], ['Maximum', summary.maximum]].forEach(([label, value]) => {
-    const term = doc.createElement('dt');
-    term.textContent = label;
-    const definition = doc.createElement('dd');
-    definition.textContent = formatLiveTrendNumber(value);
-    summaryList.append(term, definition);
-  });
-  panel.append(heading, svg, summaryList);
-  return panel;
+  return liveTelemetryViewController;
 }
 
-function downloadLiveTrendCsv(componentId, metric) {
-  const series = getLiveTrendSeries(liveTelemetryValues[componentId], metric);
-  if (!series.length) return false;
-  const safePart = value => String(value || 'telemetry').replace(/[^a-z0-9._-]+/gi, '-').replace(/^-+|-+$/g, '') || 'telemetry';
-  const blob = new Blob([exportLiveTrendCsv(series, metric)], { type: 'text/csv;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = `${safePart(componentId)}-${safePart(metric)}-24h-live-trend.csv`;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 0);
-  return true;
+function updateLiveTelemetryControl() {
+  getLiveTelemetryViewController().updateControl();
 }
 
 function openLiveTrendModal(initialComponentId = '') {
-  const mappedComponents = liveTelemetryConfig.mappings.map(mapping => ({
-    id: mapping.componentId,
-    label: getComponentLabelText(components.find(component => component.id === mapping.componentId) || { id: mapping.componentId })
-  }));
-  let refresh = null;
-  const modal = openModal({
-    title: '24-hour Live Trend',
-    description: 'In-session, read-only telemetry history. This view does not replace a site historian.',
-    primaryText: 'Close',
-    secondaryText: null,
-    onSubmit: () => true,
-    render(body) {
-      const controls = document.createElement('div');
-      controls.className = 'live-trend-controls';
-      const componentLabel = document.createElement('label');
-      componentLabel.textContent = 'Tagged component';
-      const componentSelect = document.createElement('select');
-      componentSelect.name = 'trend-component';
-      mappedComponents.forEach(component => {
-        const option = document.createElement('option');
-        option.value = component.id;
-        option.textContent = component.label || component.id;
-        componentSelect.appendChild(option);
-      });
-      componentSelect.value = mappedComponents.some(component => component.id === initialComponentId) ? initialComponentId : mappedComponents[0]?.id || '';
-      componentSelect.disabled = !mappedComponents.length;
-      componentLabel.appendChild(componentSelect);
-      const metricLabel = document.createElement('label');
-      metricLabel.textContent = 'Metric';
-      const metricSelect = document.createElement('select');
-      metricSelect.name = 'trend-metric';
-      metricLabel.appendChild(metricSelect);
-      const chartHost = document.createElement('div');
-      chartHost.className = 'live-trend-host';
-      const exportButton = document.createElement('button');
-      exportButton.type = 'button';
-      exportButton.className = 'btn';
-      exportButton.textContent = 'Export 24-hour CSV';
-      const populateMetrics = () => {
-        const currentMetric = metricSelect.value;
-        const metrics = getLiveTrendMetrics(liveTelemetryValues[componentSelect.value]);
-        metricSelect.replaceChildren();
-        metrics.forEach(metric => {
-          const option = document.createElement('option');
-          option.value = metric;
-          option.textContent = metric;
-          metricSelect.appendChild(option);
-        });
-        metricSelect.disabled = !metrics.length;
-        metricSelect.value = metrics.includes(currentMetric) ? currentMetric : (metrics.includes('kw') ? 'kw' : metrics[0] || '');
-      };
-      refresh = () => {
-        populateMetrics();
-        chartHost.replaceChildren(createLiveTrendChart(document, componentSelect.value, metricSelect.value));
-        exportButton.disabled = !getLiveTrendSeries(liveTelemetryValues[componentSelect.value], metricSelect.value).length;
-      };
-      componentSelect.addEventListener('change', refresh);
-      metricSelect.addEventListener('change', refresh);
-      exportButton.addEventListener('click', () => downloadLiveTrendCsv(componentSelect.value, metricSelect.value));
-      controls.append(componentLabel, metricLabel);
-      body.append(controls, chartHost, exportButton);
-      refresh();
-      return componentSelect;
-    }
-  });
-  refreshLiveTrendModal = refresh;
-  modal.finally(() => {
-    if (refreshLiveTrendModal === refresh) refreshLiveTrendModal = null;
-  });
+  getLiveTelemetryViewController().openTrendModal(initialComponentId);
 }
 
 function openLiveAlarmModal() {
-  const alarms = getLiveAlarms();
-  openModal({
-    title: 'Active Live Alarms',
-    description: 'Read-only threshold alerts evaluated from the latest mapped telemetry values. They do not alter the design model, studies, or site controls.',
-    primaryText: 'Close',
-    secondaryText: null,
-    render(body) {
-      if (!liveTelemetryController.running) {
-        const message = document.createElement('p');
-        message.textContent = 'Start live mode to evaluate alarm limits.';
-        body.appendChild(message);
-        return message;
-      }
-      if (!alarms.length) {
-        const message = document.createElement('p');
-        message.textContent = 'No configured alarm limits are active.';
-        body.appendChild(message);
-        return message;
-      }
-      const list = document.createElement('ul');
-      list.className = 'live-alarm-list';
-      alarms.forEach(alarm => {
-        const item = document.createElement('li');
-        item.textContent = alarm.message;
-        list.appendChild(item);
-      });
-      body.appendChild(list);
-      return list;
-    }
-  });
+  getLiveTelemetryViewController().openAlarmModal();
 }
-
 function applyLiveOperatorLock() {
   const lock = liveTelemetryController.running && liveTelemetryConfig.operatorMode;
   const ids = ['connect-btn', 'add-shape-btn', 'undo-btn', 'redo-btn', 'align-left-btn', 'align-right-btn', 'align-top-btn', 'align-bottom-btn', 'distribute-h-btn', 'distribute-v-btn', 'auto-space-equipment-btn', 'add-sheet-btn', 'rename-sheet-btn', 'delete-sheet-btn', 'auto-build-oneline-btn', 'auto-arrange-btn', 'reconcile-schedules-btn'];
@@ -3969,12 +2584,34 @@ function openLiveTelemetryModal() {
 
 // Gap #51 – Named Layer Management
 let layers = [];             // layer definitions for the active sheet: [{id,name,visible,locked}]
-let layersHistory = [];      // parallel snapshot array to history[], each entry is deep copy of layers
-let layersHistoryIndex = -1; // mirrors historyIndex
-let protectionZonesHistory = []; // parallel snapshots for active-sheet protection zones
 let activeLayerId = null;    // layer id assigned to newly placed components (null = unassigned)
+const historyController = createDiagramHistoryController({
+  captureSnapshot: () => ({
+    components,
+    layers,
+    protectionZones: getProtectionZones()
+  }),
+  applySnapshot: snapshot => {
+    components = snapshot.components;
+    layers = snapshot.layers;
+    sheets[activeSheet].protectionZones = snapshot.protectionZones;
+    selected = null;
+    selection = [];
+    selectedConnection = null;
+  },
+  onPush: ({ reason }) => {
+    pruneCheckpoints();
+    recordHistoryEvent('change', reason);
+  },
+  onRestore: ({ action, reason, metadata }) => {
+    renderLayerPanel();
+    renderProtectionZonesPanel();
+    render();
+    save();
+    recordHistoryEvent(action, reason, metadata);
+  }
+});
 const SCHEDULE_RECONCILE_PENDING_KEY = 'oneLineScheduleReconcilePending';
-let scheduleReconcilePending = Boolean(getItem(SCHEDULE_RECONCILE_PENDING_KEY, false));
 let lintPanel = null;
 let lintList = null;
 let clickSelectTimer = null;
@@ -4032,156 +2669,64 @@ const studyLoadFlowBalanced = document.getElementById('study-loadflow-balanced')
 const studyShortCircuitMethod = document.getElementById('study-shortcircuit-method');
 let transformerTapReview = getStudies()?.transformerTapOptimization || null;
 
-function persistStudySettings() {
-  setItem(STUDY_SETTINGS_KEY, studySettings);
-}
+const studyPanelController = createStudyPanelController({
+  documentRef: document,
+  navigatorRef: typeof navigator === 'undefined' ? null : navigator,
+  elements: {
+    settingsButton: studySettingsBtn,
+    settingsForm: studySettingsForm,
+    copyButton: studyResultsCopyBtn,
+    loadFlowBase: studyLoadFlowBase,
+    loadFlowIterations: studyLoadFlowIterations,
+    loadFlowBalanced: studyLoadFlowBalanced,
+    shortCircuitMethod: studyShortCircuitMethod,
+    results: studyResultsEl,
+    loadFlowResults: loadFlowResultsEl,
+    overlayToggle
+  },
+  getSettings: () => studySettings,
+  updateSettings: update => {
+    studySettings = normalizeStudySettings(update(studySettings));
+    setItem(STUDY_SETTINGS_KEY, studySettings);
+  },
+  defaultSettings: defaultStudySettings,
+  getStudyResults: getStudies,
+  onOverlayChange: (checked, { initial }) => {
+    showOverlays = checked;
+    if (!initial) render();
+  },
+  showToast
+});
 
 function applyStudySettingsToForm() {
-  if (studyLoadFlowBase) studyLoadFlowBase.value = String(studySettings.loadFlow.baseMVA);
-  if (studyLoadFlowIterations) studyLoadFlowIterations.value = String(studySettings.loadFlow.maxIterations);
-  if (studyLoadFlowBalanced) studyLoadFlowBalanced.checked = !!studySettings.loadFlow.balanced;
-  if (studyShortCircuitMethod) studyShortCircuitMethod.value = studySettings.shortCircuit.method;
-}
-
-if (overlayToggle) {
-  showOverlays = overlayToggle.checked;
-  overlayToggle.addEventListener('change', () => {
-    showOverlays = overlayToggle.checked;
-    render();
-  });
-}
-
-applyStudySettingsToForm();
-
-if (studySettingsBtn && studySettingsForm) {
-  studySettingsBtn.addEventListener('click', () => {
-    const isHidden = studySettingsForm.classList.toggle('hidden');
-    studySettingsBtn.setAttribute('aria-expanded', String(!isHidden));
-    studySettingsForm.setAttribute('aria-hidden', String(isHidden));
-    if (!isHidden) applyStudySettingsToForm();
-  });
-}
-if (studySettingsForm) {
-  studySettingsForm.addEventListener('submit', e => e.preventDefault());
-  if (!studySettingsForm.hasAttribute('aria-hidden')) {
-    studySettingsForm.setAttribute('aria-hidden', 'true');
-  }
-}
-if (studyResultsCopyBtn) {
-  studyResultsCopyBtn.addEventListener('click', () => {
-    copyStudyResultsToClipboard();
-  });
-  updateStudyResultsCopyState();
-}
-if (studyLoadFlowBase) {
-  studyLoadFlowBase.addEventListener('change', () => {
-    const value = Number(studyLoadFlowBase.value);
-    const normalized = Number.isFinite(value) && value > 0 ? value : defaultStudySettings.loadFlow.baseMVA;
-    studySettings.loadFlow.baseMVA = normalized;
-    studyLoadFlowBase.value = String(normalized);
-    persistStudySettings();
-  });
-}
-if (studyLoadFlowIterations) {
-  studyLoadFlowIterations.addEventListener('change', () => {
-    const value = Number(studyLoadFlowIterations.value);
-    const normalized = Number.isFinite(value) && value > 0
-      ? Math.min(Math.floor(value), 999)
-      : defaultStudySettings.loadFlow.maxIterations;
-    studySettings.loadFlow.maxIterations = normalized;
-    studyLoadFlowIterations.value = String(normalized);
-    persistStudySettings();
-  });
-}
-if (studyLoadFlowBalanced) {
-  studyLoadFlowBalanced.addEventListener('change', () => {
-    studySettings.loadFlow.balanced = studyLoadFlowBalanced.checked;
-    persistStudySettings();
-  });
-}
-if (studyShortCircuitMethod) {
-  studyShortCircuitMethod.addEventListener('change', () => {
-    const method = (studyShortCircuitMethod.value || '').toUpperCase() === 'ANSI' ? 'ANSI' : 'IEC';
-    studySettings.shortCircuit.method = method;
-    studyShortCircuitMethod.value = method;
-    persistStudySettings();
-  });
+  studyPanelController.applySettingsToForm();
 }
 
 function hasRenderedStudyResults() {
-  if (!studyResultsEl) return false;
-  const text = (studyResultsEl.textContent || '').trim();
-  if (!text || text === 'No results') return false;
-  return true;
+  return studyPanelController.hasResults();
 }
 
 function hasRenderedLoadFlowResults() {
-  if (!loadFlowResultsEl) return false;
-  const text = (loadFlowResultsEl.innerText || loadFlowResultsEl.textContent || '').trim();
-  return text.length > 0;
+  return studyPanelController.hasLoadFlowResults();
 }
 
 function updateStudyResultsCopyState() {
-  if (!studyResultsCopyBtn) return;
-  const hasCopyable = hasRenderedStudyResults() || hasRenderedLoadFlowResults();
-  studyResultsCopyBtn.disabled = !hasCopyable;
+  studyPanelController.updateCopyState();
 }
 
 function renderStudyResults() {
-  if (!studyResultsEl) return;
-  const res = getStudies();
-  studyResultsEl.textContent = Object.keys(res).length ? JSON.stringify(res, null, 2) : 'No results';
-  updateStudyResultsCopyState();
+  studyPanelController.renderResults();
 }
 
 function gatherStudyResultsText() {
-  const sections = [];
-  if (hasRenderedStudyResults()) {
-    const jsonText = (studyResultsEl.textContent || '').trim();
-    if (jsonText) sections.push(jsonText);
-  }
-  if (hasRenderedLoadFlowResults()) {
-    const loadFlowText = (loadFlowResultsEl.innerText || loadFlowResultsEl.textContent || '').trim();
-    if (loadFlowText) sections.push(loadFlowText);
-  }
-  return sections.join('\n\n').trim();
+  return studyPanelController.gatherResultsText();
 }
 
 async function copyStudyResultsToClipboard() {
-  const payload = gatherStudyResultsText();
-  if (!payload) {
-    showToast('No study results to copy');
-    return;
-  }
-  let copied = false;
-  if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
-    try {
-      await navigator.clipboard.writeText(payload);
-      copied = true;
-    } catch (err) {
-      console.error('Clipboard write failed', err);
-    }
-  }
-  if (!copied) {
-    try {
-      const textarea = document.createElement('textarea');
-      textarea.value = payload;
-      textarea.setAttribute('readonly', '');
-      textarea.style.position = 'fixed';
-      textarea.style.opacity = '0';
-      document.body.appendChild(textarea);
-      textarea.select();
-      textarea.setSelectionRange(0, textarea.value.length);
-      copied = document.execCommand('copy');
-      textarea.remove();
-    } catch (err) {
-      console.error('Fallback copy failed', err);
-      copied = false;
-    }
-  }
-  showToast(copied ? 'Study results copied to clipboard' : 'Unable to copy study results');
+  await studyPanelController.copyResults();
 }
 
+studyPanelController.bind();
 function highlightSPF(ids = []) {
   const svg = document.getElementById('diagram');
   if (!svg) return;
@@ -5408,7 +3953,7 @@ function refineOneLineCommandSurface() {
   const buildMenu = createCommandMenu('Build');
   appendIfPresent(buildMenu.panel, normalizeCommandButton(document.getElementById('sample-diagram-btn'), 'Load Sample'));
   appendIfPresent(buildMenu.panel, normalizeCommandButton(document.getElementById('auto-arrange-btn'), 'Auto Arrange'));
-  appendIfPresent(buildMenu.panel, normalizeCommandButton(document.getElementById('reconcile-schedules-btn'), 'Reconcile Schedules'));
+  appendIfPresent(buildMenu.panel, normalizeCommandButton(document.getElementById('reconcile-schedules-btn'), 'Review Shared Data'));
 
   const insertMenu = createCommandMenu('Insert');
   appendIfPresent(insertMenu.panel, normalizeCommandButton(document.getElementById('add-shape-btn'), 'Add Shape'));
@@ -5673,117 +4218,52 @@ function recordOneLineStudyProvenance(studies, studyKey) {
   studies[oneLineStudyMetaKey] = meta;
 }
 
-if (runLFBtn) runLFBtn.addEventListener('click', () => {
-  runLoadFlowFromButton().catch(err => {
-    console.error('[oneline] load flow failed', err);
-    showAlertModal('Load Flow Error', err?.message || String(err));
-  });
+const studyExecutionController = createStudyExecutionController({
+  buttons: {
+    loadFlow: runLFBtn,
+    shortCircuit: runSCBtn,
+    arcFlash: runAFBtn,
+    printArcFlashLabels: printAFLabelsBtn,
+    harmonics: runHBtn,
+    motorStart: runMSBtn,
+    reliability: runRelBtn
+  },
+  getOneLine,
+  setOneLine,
+  getStudies,
+  setStudies,
+  getStudySettings: () => studySettings,
+  getActiveSheet: () => activeSheet,
+  getProtectiveDeviceCatalog: () => protectiveDeviceCatalog,
+  loadReferencedProtectiveDevices,
+  runLoadFlow: runLoadFlowOffMain,
+  runShortCircuitOffMain,
+  runShortCircuit,
+  runArcFlash,
+  runHarmonics,
+  runNetworkHarmonics,
+  runMotorStart,
+  runReliability: runReliabilityOffMain,
+  assertSheetsUnchanged: assertOneLineSheetsUnchanged,
+  getSheetsRevision: getOneLineSheetsRevision,
+  recordProvenance: recordOneLineStudyProvenance,
+  updateCableOperatingVoltages,
+  markScheduleReconcilePending,
+  renderStudyResults,
+  renderLoadFlowResults,
+  render,
+  generateArcFlashReport,
+  openLabelPrintWindow,
+  highlightSPF,
+  showAlertModal,
+  windowRef: window
 });
 
-async function runLoadFlowFromButton() {
-  const oneLineData = getOneLine();
-  const oneLineRevision = getOneLineSheetsRevision(oneLineData);
-  const res = await runLoadFlowOffMain(oneLineData, {
-    baseMVA: studySettings.loadFlow.baseMVA,
-    balanced: studySettings.loadFlow.balanced,
-    maxIterations: studySettings.loadFlow.maxIterations
-  });
-  const currentOneLineData = assertOneLineSheetsUnchanged(oneLineRevision, 'Load flow');
-  const { sheets } = oneLineData;
-  const diagram = sheets.flatMap(s => s.components);
-  diagram.forEach(comp => {
-    (comp.connections || []).forEach(conn => {
-      delete conn.loading_kW;
-      delete conn.loading_amps;
-      delete conn.voltage_drop_pct;
-      delete conn.voltage_from_kv;
-      delete conn.voltage_to_kv;
-      delete conn.voltage_from_v;
-      delete conn.voltage_to_v;
-    });
-  });
-  const buses = Array.isArray(res?.buses)
-    ? res.buses
-    : Array.isArray(res)
-      ? res
-      : [];
-  buses.forEach(r => {
-    const comp = diagram.find(c => c.id === r.id);
-    if (!comp) return;
-    if (!Number.isFinite(r.Vm)) return;
-    const kv = Number.isFinite(r.voltageKV)
-      ? r.voltageKV
-      : Number.isFinite(r.baseKV)
-        ? r.baseKV * r.Vm
-        : null;
-    if (r.phase) {
-      if (typeof comp.voltage_mag !== 'object') comp.voltage_mag = {};
-      if (typeof comp.voltage_angle !== 'object') comp.voltage_angle = {};
-      comp.voltage_mag[r.phase] = Number(r.Vm.toFixed(4));
-      comp.voltage_angle[r.phase] = Number(r.Va.toFixed(4));
-    } else {
-      comp.voltage_mag = Number(r.Vm.toFixed(4));
-      comp.voltage_angle = Number(r.Va.toFixed(4));
-    }
-    if (kv !== null && Number.isFinite(kv)) {
-      const kvRounded = Number(kv.toFixed(4));
-      const voltsRounded = Number((kv * 1000).toFixed(1));
-      comp.voltage_kv = kvRounded;
-      comp.voltage_v = voltsRounded;
-    }
-  });
-  // store line loading results on connections
-  (res.lines || []).forEach(l => {
-    const src = diagram.find(c => c.id === l.from);
-    const conn = src?.connections?.find(c => c.target === l.to);
-    if (!conn) return;
-    const ampsRaw = typeof l.amps === 'number'
-      ? l.amps
-      : typeof l.currentKA === 'number'
-        ? l.currentKA * 1000
-        : null;
-    const formatKw = value => Number(value.toFixed(2));
-    const formatAmp = value => Number(value.toFixed(1));
-    const formatPct = value => Number(value.toFixed(2));
-    const formatKV = value => Number(value.toFixed(3));
-    const formatVolts = value => Number(value.toFixed(1));
-    if (l.phase) {
-      if (typeof conn.loading_kW !== 'object') conn.loading_kW = {};
-      conn.loading_kW[l.phase] = formatKw(l.P);
-      if (ampsRaw !== null) {
-        if (typeof conn.loading_amps !== 'object') conn.loading_amps = {};
-        conn.loading_amps[l.phase] = formatAmp(ampsRaw);
-      }
-      if (typeof l.dropPct === 'number') {
-        if (typeof conn.voltage_drop_pct !== 'object') conn.voltage_drop_pct = {};
-        conn.voltage_drop_pct[l.phase] = formatPct(l.dropPct);
-      }
-    } else {
-      conn.loading_kW = formatKw(l.P);
-      if (ampsRaw !== null) {
-        conn.loading_amps = formatAmp(ampsRaw);
-      }
-      if (typeof l.dropPct === 'number') {
-        conn.voltage_drop_pct = formatPct(l.dropPct);
-      }
-    }
-    if (typeof l.fromKV === 'number') conn.voltage_from_kv = formatKV(l.fromKV);
-    if (typeof l.toKV === 'number') conn.voltage_to_kv = formatKV(l.toKV);
-    if (typeof l.fromKV === 'number') conn.voltage_from_v = formatVolts(l.fromKV * 1000);
-    if (typeof l.toKV === 'number') conn.voltage_to_v = formatVolts(l.toKV * 1000);
-  });
-  updateCableOperatingVoltages(diagram);
-  setOneLine({ activeSheet: currentOneLineData.activeSheet, sheets });
-  const studies = getStudies();
-  studies.loadFlow = res;
-  recordOneLineStudyProvenance(studies, 'loadFlow');
-  setStudies(studies);
-  markScheduleReconcilePending();
-  renderStudyResults();
-  renderLoadFlowResults(res);
-  render();
-}
+studyExecutionController.bind();
 
+async function runLoadFlowFromButton() {
+  return studyExecutionController.runLoadFlowStudy();
+}
 function renderLoadFlowResults(res) {
   if (!loadFlowResultsEl) return;
   loadFlowResultsEl.innerHTML = renderLoadFlowResultsHtml(res);
@@ -6039,105 +4519,18 @@ if (transformerTapReviewEl) {
   });
   if (transformerTapReview) renderTransformerTapReview(transformerTapReview);
 }
-if (runSCBtn) runSCBtn.addEventListener('click', () => {
-  runShortCircuitFromButton().catch(err => {
-    console.error('[oneline] short circuit failed', err);
-    showAlertModal('Short Circuit Error', err?.message || String(err));
-  });
-});
 async function runShortCircuitFromButton() {
-  const oneLineData = getOneLine();
-  const oneLineRevision = getOneLineSheetsRevision(oneLineData);
-  const deviceCatalog = await loadReferencedProtectiveDevices(oneLineData, { catalog: protectiveDeviceCatalog });
-  const res = await runShortCircuitOffMain(oneLineData, { method: studySettings.shortCircuit.method, deviceCatalog });
-  const currentOneLineData = assertOneLineSheetsUnchanged(oneLineRevision, 'Short circuit');
-  const { sheets } = oneLineData;
-  const diagram = sheets.flatMap(s => s.components);
-  diagram.forEach(c => {
-    c.shortCircuit = res[c.id];
-    (c.connections || []).forEach(conn => {
-      conn.faultKA = res[conn.target]?.threePhaseKA;
-    });
-  });
-  setOneLine({ activeSheet: currentOneLineData.activeSheet, sheets });
-  const studies = getStudies();
-  studies.shortCircuit = res;
-  recordOneLineStudyProvenance(studies, 'shortCircuit');
-  setStudies(studies);
-  renderStudyResults();
-  render();
+  return studyExecutionController.runShortCircuitStudy();
 }
-if (runAFBtn) runAFBtn.addEventListener('click', async () => {
-  const oneLineData = getOneLine();
-  const deviceCatalog = await loadReferencedProtectiveDevices(oneLineData, { catalog: protectiveDeviceCatalog });
-  const shortCircuitOpts = { method: studySettings.shortCircuit.method, deviceCatalog };
-  const sc = runShortCircuit(shortCircuitOpts);
-  const af = await runArcFlash({ shortCircuit: { ...shortCircuitOpts }, deviceCatalog });
-  const { sheets } = getOneLine();
-  const diagram = sheets.flatMap(s => s.components);
-  diagram.forEach(c => {
-    c.shortCircuit = sc[c.id];
-    c.arcFlash = af[c.id];
-    (c.connections || []).forEach(conn => {
-      conn.faultKA = sc[conn.target]?.threePhaseKA;
-    });
-  });
-  setOneLine({ activeSheet, sheets });
-  const studies = getStudies();
-  studies.shortCircuit = sc;
-  studies.arcFlash = af;
-  recordOneLineStudyProvenance(studies, 'shortCircuit');
-  recordOneLineStudyProvenance(studies, 'arcFlash');
-  setStudies(studies);
-  generateArcFlashReport(af);
-  if (printAFLabelsBtn) printAFLabelsBtn.disabled = false;
-  renderStudyResults();
-  render();
-});
-if (printAFLabelsBtn) printAFLabelsBtn.addEventListener('click', () => {
-  const af = getStudies()?.arcFlash || {};
-  openLabelPrintWindow(af);
-});
+
 if (afLabelModeToggle) afLabelModeToggle.addEventListener('change', () => {
   arcFlashLabelMode = afLabelModeToggle.checked;
   render();
 });
-if (runHBtn) runHBtn.addEventListener('click', () => {
-  const res = runHarmonics(); const network = runNetworkHarmonics();
-  const studies = getStudies();
-  Object.assign(studies, { harmonics: res, harmonicNetwork: network });
-  setStudies(studies);
-  renderStudyResults();
-  window.open('harmonics.html', '_blank');
-});
-if (runMSBtn) runMSBtn.addEventListener('click', () => {
-  const res = runMotorStart();
-  const studies = getStudies();
-  studies.motorStart = res;
-  setStudies(studies);
-  renderStudyResults();
-  window.open('motorStart.html', '_blank');
-});
-if (runRelBtn) runRelBtn.addEventListener('click', () => {
-  runReliabilityFromButton().catch(err => {
-    console.error('[oneline] reliability failed', err);
-    showAlertModal('Reliability Error', err?.message || String(err));
-  });
-});
-async function runReliabilityFromButton() {
-  const oneLineData = getOneLine();
-  const oneLineRevision = getOneLineSheetsRevision(oneLineData);
-  const { sheets } = oneLineData;
-  const diagram = sheets.flatMap(s => s.components);
-  const res = await runReliabilityOffMain(diagram);
-  assertOneLineSheetsUnchanged(oneLineRevision, 'Reliability');
-  const studies = getStudies();
-  studies.reliability = res;
-  setStudies(studies);
-  highlightSPF(res.n1Failures);
-  renderStudyResults();
-}
 
+async function runReliabilityFromButton() {
+  return studyExecutionController.runReliabilityStudy();
+}
 // Guided tour steps
 const tourSteps = [
   { element: '#component-buttons', text: 'Add components from the palette.' },
@@ -6567,7 +4960,7 @@ function recordHistoryEvent(type, description, extra = {}) {
     type,
     description,
     timestamp: Date.now(),
-    historyIndex,
+    historyIndex: historyController.index,
     ...extra
   };
   historyEvents.push(event);
@@ -6578,7 +4971,12 @@ function recordHistoryEvent(type, description, extra = {}) {
 }
 
 function pruneCheckpoints() {
-  checkpoints = checkpoints.filter(point => point && Number.isInteger(point.historyIndex) && point.historyIndex >= 0 && point.historyIndex < history.length);
+  checkpoints = checkpoints.filter(point => (
+    point
+    && Number.isInteger(point.historyIndex)
+    && point.historyIndex >= 0
+    && point.historyIndex < historyController.length
+  ));
 }
 
 function renderHistorySidebar() {
@@ -7203,7 +5601,7 @@ async function confirmDialog(title, description = '', { primaryText = 'Confirm' 
 }
 
 async function addCheckpoint() {
-  if (historyIndex < 0 || historyIndex >= history.length) {
+  if (historyController.index < 0 || historyController.index >= historyController.length) {
     showToast('No history state available for checkpoint');
     return;
   }
@@ -7217,7 +5615,7 @@ async function addCheckpoint() {
   const checkpoint = {
     id: `cp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     name,
-    historyIndex,
+    historyIndex: historyController.index,
     createdAt: Date.now()
   };
   checkpoints.push(checkpoint);
@@ -7235,24 +5633,17 @@ async function jumpToCheckpoint(checkpointId) {
     secondaryText: 'Cancel'
   });
   if (!confirmed) return;
-  if (checkpoint.historyIndex < 0 || checkpoint.historyIndex >= history.length) {
+  if (checkpoint.historyIndex < 0 || checkpoint.historyIndex >= historyController.length) {
     showToast('Checkpoint no longer available');
     checkpoints = checkpoints.filter(point => point.id !== checkpointId);
     renderHistorySidebar();
     return;
   }
-  historyIndex = checkpoint.historyIndex;
-  components = JSON.parse(JSON.stringify(history[historyIndex]));
-  if (protectionZonesHistory[historyIndex] !== undefined) {
-    sheets[activeSheet].protectionZones = JSON.parse(JSON.stringify(protectionZonesHistory[historyIndex]));
-  }
-  selected = null;
-  selection = [];
-  selectedConnection = null;
-  renderProtectionZonesPanel();
-  render();
-  save();
-  recordHistoryEvent('restore', `Restored checkpoint "${checkpoint.name}"`, { checkpointId: checkpoint.id });
+  historyController.restore(checkpoint.historyIndex, {
+    action: 'restore',
+    reason: `Restored checkpoint "${checkpoint.name}"`,
+    metadata: { checkpointId: checkpoint.id }
+  });
 }
 
 function bindHistorySidebarControls() {
@@ -7285,63 +5676,15 @@ function bindHistorySidebarControls() {
 }
 
 function pushHistory(reason = 'Diagram updated') {
-  history = history.slice(0, historyIndex + 1);
-  history.push(JSON.parse(JSON.stringify(components)));
-  // Gap #51: snapshot layers alongside components
-  layersHistory = layersHistory.slice(0, historyIndex + 1);
-  layersHistory.push(JSON.parse(JSON.stringify(layers)));
-  protectionZonesHistory = protectionZonesHistory.slice(0, historyIndex + 1);
-  protectionZonesHistory.push(JSON.parse(JSON.stringify(getProtectionZones())));
-  historyIndex = history.length - 1;
-  layersHistoryIndex = historyIndex;
-  pruneCheckpoints();
-  recordHistoryEvent('change', reason);
+  historyController.push(reason);
 }
 
 function undo() {
-  if (historyIndex > 0) {
-    historyIndex--;
-    components = JSON.parse(JSON.stringify(history[historyIndex]));
-    // Gap #51: restore layers alongside components
-    layersHistoryIndex = historyIndex;
-    if (layersHistory[layersHistoryIndex] !== undefined) {
-      layers = JSON.parse(JSON.stringify(layersHistory[layersHistoryIndex]));
-    }
-    if (protectionZonesHistory[historyIndex] !== undefined) {
-      sheets[activeSheet].protectionZones = JSON.parse(JSON.stringify(protectionZonesHistory[historyIndex]));
-    }
-    selected = null;
-    selection = [];
-    selectedConnection = null;
-    renderLayerPanel();
-    renderProtectionZonesPanel();
-    render();
-    save();
-    recordHistoryEvent('undo', 'Undo applied');
-  }
+  historyController.undo('Undo applied');
 }
 
 function redo() {
-  if (historyIndex < history.length - 1) {
-    historyIndex++;
-    components = JSON.parse(JSON.stringify(history[historyIndex]));
-    // Gap #51: restore layers alongside components
-    layersHistoryIndex = historyIndex;
-    if (layersHistory[layersHistoryIndex] !== undefined) {
-      layers = JSON.parse(JSON.stringify(layersHistory[layersHistoryIndex]));
-    }
-    if (protectionZonesHistory[historyIndex] !== undefined) {
-      sheets[activeSheet].protectionZones = JSON.parse(JSON.stringify(protectionZonesHistory[historyIndex]));
-    }
-    selected = null;
-    selection = [];
-    selectedConnection = null;
-    renderLayerPanel();
-    renderProtectionZonesPanel();
-    render();
-    save();
-    recordHistoryEvent('redo', 'Redo applied');
-  }
+  historyController.redo('Redo applied');
 }
 
 function loadTemplates() {
@@ -8037,135 +6380,18 @@ function formatAttributeValue(key, value) {
   return null;
 }
 
-function getNestedValue(source, segments = []) {
-  let current = source;
-  for (const segment of segments) {
-    if (!current || typeof current !== 'object' || !(segment in current)) return undefined;
-    current = current[segment];
-  }
-  return current;
-}
-
 function resolveComponentAttribute(comp, key) {
-  if (!comp || !key) return undefined;
-  if (!key.includes('.')) {
-    let value = comp[key];
-    if (value === undefined && comp.props && typeof comp.props === 'object') {
-      value = comp.props[key];
-    }
-    return value;
-  }
-  const segments = key.split('.');
-  const resolver = studyAttributeResolvers[segments[0]];
-  if (resolver) {
-    const base = resolver(comp);
-    if (base && typeof base === 'object') {
-      const studyValue = getNestedValue(base, segments.slice(1));
-      if (studyValue !== undefined) return studyValue;
-    }
-  }
-  let value = getNestedValue(comp, segments);
-  if (value !== undefined) return value;
-  if (comp.props && typeof comp.props === 'object') {
-    value = getNestedValue(comp.props, segments);
-    if (value !== undefined) return value;
-  }
-  return undefined;
-}
-
-function coalesceComponentAttribute(comp, keys = []) {
-  for (const key of keys) {
-    const value = resolveComponentAttribute(comp, key);
-    if (value !== undefined && value !== null && value !== '') return value;
-  }
-  return undefined;
-}
-
-function formatEngineeringNumber(value, maxDigits = 3) {
-  const num = Number(value);
-  if (!Number.isFinite(num)) return String(value ?? '').trim();
-  if (Math.abs(num) >= 100) return num.toFixed(num % 1 === 0 ? 0 : 1);
-  if (Math.abs(num) >= 10) return num.toFixed(num % 1 === 0 ? 0 : 2).replace(/\.?0+$/, '');
-  return num.toPrecision(maxDigits).replace(/\.?0+$/, '');
-}
-
-function formatEngineeringVoltage(value, sourceKey = '') {
-  const num = Number(value);
-  if (!Number.isFinite(num)) return String(value ?? '').trim();
-  const key = String(sourceKey || '').toLowerCase();
-  if (key.includes('kv') || key === 'basekv' || (num > 0 && num <= 35 && !Number.isInteger(num))) {
-    return `${formatEngineeringNumber(num)} kV`;
-  }
-  if (Math.abs(num) >= 1000) return `${formatEngineeringNumber(num / 1000)} kV`;
-  return `${formatEngineeringNumber(num)} V`;
-}
-
-function formatEngineeringValueWithUnit(value, unit, precision = 3) {
-  if (value === undefined || value === null || value === '') return '';
-  return `${formatEngineeringNumber(value, precision)} ${unit}`.trim();
+  return resolveOneLineComponentAttribute(comp, key, { studyAttributeResolvers });
 }
 
 function getEngineeringLabelLines(comp) {
-  if (!comp) return [];
-  const type = String(comp.type || '').toLowerCase();
-  const subtype = String(comp.subtype || '').toLowerCase();
-  const category = getCategory(comp);
-  const lines = [];
-  const seen = new Set();
-  const add = text => {
-    const normalized = String(text || '').trim();
-    if (!normalized || seen.has(normalized)) return;
-    seen.add(normalized);
-    lines.push(normalized);
-  };
-  const voltageKeys = ['voltage', 'volts', 'rated_voltage_kv', 'rated_kv', 'baseKV', 'kV'];
-  for (const key of voltageKeys) {
-    const value = coalesceComponentAttribute(comp, [key]);
-    if (value !== undefined && value !== null && value !== '') {
-      add(formatEngineeringVoltage(value, key));
-      break;
-    }
-  }
-  if (isBusComponent(comp)) {
-    add(formatEngineeringValueWithUnit(coalesceComponentAttribute(comp, ['bus_rating_a', 'rating_a', 'max_continuous_current_a']), 'A'));
-    const vm = coalesceComponentAttribute(comp, ['Vm', 'voltage_mag']);
-    const va = coalesceComponentAttribute(comp, ['Va', 'phase_angle']);
-    if (vm !== undefined || va !== undefined) {
-      const vmText = vm !== undefined ? `${formatEngineeringNumber(vm, 4)} pu` : '';
-      const vaText = va !== undefined ? `${formatEngineeringNumber(va)} deg` : '';
-      add([vmText, vaText].filter(Boolean).join(' / '));
-    }
-  } else if (type === 'transformer') {
-    add(formatEngineeringValueWithUnit(coalesceComponentAttribute(comp, ['kva', 'rated_kva', 'kva_hv', 'mva']), 'kVA'));
-    add(formatEngineeringValueWithUnit(coalesceComponentAttribute(comp, ['percent_z', 'impedance_z_percent', 'z_hv_lv_percent']), '%Z'));
-    const tap = coalesceComponentAttribute(comp, ['tap_percent', 'tap', 'tap_position']);
-    if (tap !== undefined) add(`Tap ${formatEngineeringNumber(tap)}${String(tap).includes('%') ? '' : '%'}`);
-  } else if (type === 'utility_source') {
-    add(formatEngineeringValueWithUnit(coalesceComponentAttribute(comp, ['thevenin_mva', 'short_circuit_capacity']), 'MVA'));
-    add(formatEngineeringValueWithUnit(coalesceComponentAttribute(comp, ['xr_ratio']), 'X/R'));
-  } else if (type === 'generator') {
-    add(formatEngineeringValueWithUnit(coalesceComponentAttribute(comp, ['kw', 'rated_kw', 'max_kw']), 'kW'));
-    add(formatEngineeringValueWithUnit(coalesceComponentAttribute(comp, ['kva', 'rated_kva']), 'kVA'));
-  } else if (type === 'motor' || subtype.includes('motor')) {
-    add(formatEngineeringValueWithUnit(coalesceComponentAttribute(comp, ['hp', 'rated_hp']), 'HP'));
-    add(formatEngineeringValueWithUnit(coalesceComponentAttribute(comp, ['kw', 'load.kw']), 'kW'));
-  } else if (type === 'static_load') {
-    add(formatEngineeringValueWithUnit(coalesceComponentAttribute(comp, ['kw', 'load.kw', 'watts']), 'kW'));
-    add(formatEngineeringValueWithUnit(coalesceComponentAttribute(comp, ['kvar', 'load.kvar']), 'kVAR'));
-  } else if (type === 'shunt_capacitor_bank' || type === 'reactor') {
-    add(formatEngineeringValueWithUnit(coalesceComponentAttribute(comp, ['rated_kvar', 'kvar', 'shunt.kvar', 'kvar_absorb']), 'kVAR'));
-  } else if (type === 'ups') {
-    add(formatEngineeringValueWithUnit(coalesceComponentAttribute(comp, ['rated_kva', 'kva']), 'kVA'));
-    add(formatEngineeringValueWithUnit(coalesceComponentAttribute(comp, ['battery_runtime_min', 'runtime_min']), 'min'));
-  } else if (category === 'equipment' || type === 'panel' || type === 'switchboard' || type === 'switchgear' || type === 'mcc') {
-    add(formatEngineeringValueWithUnit(coalesceComponentAttribute(comp, ['bus_rating_a', 'rating_a']), 'A'));
-    add(formatEngineeringValueWithUnit(coalesceComponentAttribute(comp, ['interrupting_ka', 'main_interrupting_ka', 'withstand_1s_ka']), 'kA'));
-  } else if (isProtectionComponent(comp)) {
-    add(formatEngineeringValueWithUnit(coalesceComponentAttribute(comp, ['rating_a', 'frame_a', 'pickup_amps']), 'A'));
-    add(formatEngineeringValueWithUnit(coalesceComponentAttribute(comp, ['interrupt_rating_ka', 'interrupting_rating_ka', 'short_circuit_rating_ka']), 'kA'));
-  }
-  add(formatEngineeringValueWithUnit(coalesceComponentAttribute(comp, ['shortCircuit.threePhaseKA']), 'kA fault'));
-  return lines.slice(0, datablockDensityMode === 'expanded' ? 6 : 4);
+  return buildEngineeringLabelLines(comp, {
+    studyAttributeResolvers,
+    getCategory,
+    isBusComponent,
+    isProtectionComponent,
+    maxLines: datablockDensityMode === 'expanded' ? 6 : 4
+  });
 }
 
 function getComponentAttributeLines(comp) {
@@ -8196,116 +6422,18 @@ function getComponentAttributeLines(comp) {
   return [...lines, ...liveReadingLines(comp)];
 }
 
-function rectsOverlap(a, b, pad = 0) {
-  if (!a || !b) return false;
-  return !(
-    a.x + a.width + pad < b.x ||
-    b.x + b.width + pad < a.x ||
-    a.y + a.height + pad < b.y ||
-    b.y + b.height + pad < a.y
-  );
-}
-
-function expandRect(rect, pad = 0) {
-  return {
-    x: rect.x - pad,
-    y: rect.y - pad,
-    width: rect.width + pad * 2,
-    height: rect.height + pad * 2
-  };
-}
-
-function rectFromComponentBounds(bounds) {
-  return {
-    x: bounds.left,
-    y: bounds.top,
-    width: Math.max(1, bounds.right - bounds.left),
-    height: Math.max(1, bounds.bottom - bounds.top)
-  };
-}
-
 function createDatablockLayout(items = components) {
-  const occupied = [];
-  const content = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
-  items.forEach(comp => {
-    if (!comp || comp.type === 'dimension') return;
-    const bounds = componentBounds(comp);
-    const rect = rectFromComponentBounds(bounds);
-    occupied.push(expandRect(rect, 12));
-    content.minX = Math.min(content.minX, bounds.left);
-    content.minY = Math.min(content.minY, bounds.top);
-    content.maxX = Math.max(content.maxX, bounds.right);
-    content.maxY = Math.max(content.maxY, bounds.bottom);
+  return createDatablockLayoutForModel(items, {
+    getComponentBounds: componentBounds,
+    fallbackBounds: STATIC_VIEWPORT_BOUNDS
   });
-  if (!Number.isFinite(content.minX)) {
-    content.minX = STATIC_VIEWPORT_BOUNDS.minX;
-    content.minY = STATIC_VIEWPORT_BOUNDS.minY;
-    content.maxX = STATIC_VIEWPORT_BOUNDS.minX + STATIC_VIEWPORT_BOUNDS.width;
-    content.maxY = STATIC_VIEWPORT_BOUNDS.minY + STATIC_VIEWPORT_BOUNDS.height;
-  }
-  return {
-    content,
-    occupied,
-    reserve(rect) {
-      occupied.push(expandRect(rect, 10));
-    }
-  };
-}
-
-function chooseDatablockPlacement(bounds, width, height, layout) {
-  const centerX = (bounds.left + bounds.right) / 2;
-  const centerY = (bounds.top + bounds.bottom) / 2;
-  const margin = 14;
-  const rightCrowded = bounds.right + width > layout.content.maxX + 140;
-  const leftCrowded = bounds.left - width < layout.content.minX - 140;
-  let sideOrder = ['right', 'left', 'bottom', 'top'];
-  if (rightCrowded && !leftCrowded) sideOrder = ['left', 'bottom', 'top', 'right'];
-  if (leftCrowded && !rightCrowded) sideOrder = ['right', 'bottom', 'top', 'left'];
-  const offsets = [0, 28, -28, 58, -58, 92, -92, 126, -126];
-  const makeCandidate = (side, offset) => {
-    if (side === 'right') return { side, x: bounds.right + margin, y: bounds.top + offset };
-    if (side === 'left') return { side, x: bounds.left - width - margin, y: bounds.top + offset };
-    if (side === 'bottom') return { side, x: centerX - width / 2 + offset, y: bounds.bottom + margin };
-    return { side, x: centerX - width / 2 + offset, y: bounds.top - height - margin };
-  };
-  for (const side of sideOrder) {
-    for (const offset of offsets) {
-      const candidate = makeCandidate(side, offset);
-      const rect = { x: candidate.x, y: candidate.y, width, height };
-      if (!layout.occupied.some(existing => rectsOverlap(rect, existing, 4))) return candidate;
-    }
-  }
-  return makeCandidate(sideOrder[0], offsets[offsets.length - 1]);
 }
 
 function chooseEngineeringDatablockPlacement(comp, bounds, width, height, layout) {
-  const centerX = (bounds.left + bounds.right) / 2;
-  const centerY = (bounds.top + bounds.bottom) / 2;
-  const margin = isBusComponent(comp) ? 18 : 10;
-  const preferred = isBusComponent(comp) || resolveComponentCategory(comp) === 'sources'
-    ? ['right', 'bottom', 'left', 'top']
-    : ['bottom', 'right', 'left', 'top'];
-  const offsets = [0, 22, -22, 44, -44, 72, -72, 100, -100];
-  const makeCandidate = (side, offset) => {
-    if (side === 'right') return { side, x: bounds.right + margin, y: centerY - height / 2 + offset };
-    if (side === 'left') return { side, x: bounds.left - width - margin, y: centerY - height / 2 + offset };
-    if (side === 'bottom') return { side, x: centerX - width / 2 + offset, y: bounds.bottom + margin };
-    return { side, x: centerX - width / 2 + offset, y: bounds.top - height - margin };
-  };
-  for (const side of preferred) {
-    for (const offset of offsets) {
-      const candidate = makeCandidate(side, offset);
-      const rect = { x: candidate.x, y: candidate.y, width, height };
-      if (!layout.occupied.some(existing => rectsOverlap(rect, existing, 4))) return candidate;
-    }
-  }
-  return makeCandidate(preferred[0], offsets[offsets.length - 1]);
-}
-
-function truncateDatablockLine(line, limit = 38) {
-  const text = String(line || '').trim();
-  if (text.length <= limit) return text;
-  return `${text.slice(0, Math.max(0, limit - 3)).trimEnd()}...`;
+  return chooseEngineeringDatablockPlacementForModel(comp, bounds, width, height, layout, {
+    isBusComponent,
+    resolveComponentCategory
+  });
 }
 
 function renderComponentDatablock(svg, comp, lines, includePoint, layout = createDatablockLayout()) {
@@ -9492,15 +7620,15 @@ function scheduleImplicitHistoryUpdate() {
     pendingImplicitHistoryUpdate = true;
     return;
   }
-  if (historyIndex < 0 || historyIndex >= history.length) return;
+  if (historyController.index < 0 || historyController.index >= historyController.length) return;
   pendingImplicitHistoryUpdate = true;
   implicitHistoryUpdateScheduled = true;
   Promise.resolve().then(() => {
     implicitHistoryUpdateScheduled = false;
     if (!pendingImplicitHistoryUpdate) return;
     pendingImplicitHistoryUpdate = false;
-    if (historyIndex < 0 || historyIndex >= history.length) return;
-    history[historyIndex] = JSON.parse(JSON.stringify(components));
+    if (historyController.index < 0 || historyController.index >= historyController.length) return;
+    historyController.replaceCurrent();
   });
 }
 
@@ -10857,41 +8985,7 @@ function normalizeComponent(c) {
 }
 
 function componentBounds(comp) {
-  const w = comp.width || compWidth;
-  const h = comp.height || compHeight;
-  const angle = (comp.rotation || 0) * Math.PI / 180;
-  if (!angle) {
-    return {
-      left: comp.x,
-      top: comp.y,
-      right: comp.x + w,
-      bottom: comp.y + h
-    };
-  }
-  const cx = comp.x + w / 2;
-  const cy = comp.y + h / 2;
-  const rotatePoint = (px, py) => {
-    const dx = px - cx;
-    const dy = py - cy;
-    return {
-      x: cx + dx * Math.cos(angle) - dy * Math.sin(angle),
-      y: cy + dx * Math.sin(angle) + dy * Math.cos(angle)
-    };
-  };
-  const points = [
-    rotatePoint(comp.x, comp.y),
-    rotatePoint(comp.x + w, comp.y),
-    rotatePoint(comp.x, comp.y + h),
-    rotatePoint(comp.x + w, comp.y + h)
-  ];
-  const xs = points.map(p => p.x);
-  const ys = points.map(p => p.y);
-  return {
-    left: Math.min(...xs),
-    top: Math.min(...ys),
-    right: Math.max(...xs),
-    bottom: Math.max(...ys)
-  };
+  return getComponentBounds(comp, { defaultWidth: compWidth, defaultHeight: compHeight });
 }
 
 function alignComponentBoundsToTopLeft(comp, x, y) {
@@ -10986,34 +9080,8 @@ function finalizeMarqueeSelection() {
 // Gap #43 – Select Connected (topology flood-fill from selected component)
 function selectConnected(startId) {
   if (!startId) return;
-  const byId = new Map(components.map(c => [c.id, c]));
-  const visited = new Set();
-  const queue = [startId];
-  while (queue.length) {
-    const id = queue.shift();
-    if (visited.has(id)) continue;
-    visited.add(id);
-    const comp = byId.get(id);
-    if (!comp) continue;
-    // outbound connections on this component
-    (comp.connections || []).forEach(conn => {
-      if (conn.target && !visited.has(conn.target)) queue.push(conn.target);
-    });
-    // inbound connections from other components
-    components.forEach(c => {
-      (c.connections || []).forEach(conn => {
-        if (conn.target === id && !visited.has(c.id)) queue.push(c.id);
-      });
-    });
-    // sheet-level connections
-    if (Array.isArray(connections)) {
-      connections.forEach(conn => {
-        if (conn.from === id && !visited.has(conn.to)) queue.push(conn.to);
-        if (conn.to === id && !visited.has(conn.from)) queue.push(conn.from);
-      });
-    }
-  }
-  const reached = components.filter(c => visited.has(c.id));
+  const connectedIds = getConnectedComponentIds(startId, components, connections);
+  const reached = components.filter(component => connectedIds.has(component.id));
   if (!reached.length) return;
   selection = reached;
   selected = reached[0];
@@ -11073,124 +9141,23 @@ function togglePropertiesLock(comp) {
 // Starts from source nodes; traverses through non-open breakers/switches.
 // Returns a Set<string> of energized component IDs.
 function computeEnergizedSet(comps, conns) {
-  const allComponents = Array.isArray(comps) ? comps.filter(c => c?.id) : [];
-  const byId = new Map(allComponents.map(c => [c.id, c]));
-  const energized = new Set();
-  const endpointAdjacency = new Map();
-  const endpointKey = (id, port) => `${id}\u0000${Math.max(0, Number(port) || 0)}`;
-  const connectEndpoints = (a, b) => {
-    if (!endpointAdjacency.has(a)) endpointAdjacency.set(a, new Set());
-    if (!endpointAdjacency.has(b)) endpointAdjacency.set(b, new Set());
-    endpointAdjacency.get(a).add(b);
-    endpointAdjacency.get(b).add(a);
-  };
-  const portCount = comp => {
-    const ports = Array.isArray(comp?.ports) && comp.ports.length
-      ? comp.ports
-      : resolveComponentMeta(comp)?.ports;
-    return Math.max(1, Array.isArray(ports) ? ports.length : 1);
-  };
-  const sourceAvailable = comp => {
-    if (!comp || isComponentOpenForOperatingState(comp)) return false;
-    const values = [
-      comp.available,
-      comp.props?.available,
-      comp.enabled,
-      comp.props?.enabled
-    ];
-    if (values.some(value => value === false || value === 0 || value === 'false')) return false;
-    const status = String(
-      comp.service_status
-      || comp.props?.service_status
-      || comp.commissioning_state
-      || comp.props?.commissioning_state
-      || ''
-    ).trim().toLowerCase();
-    return !['off', 'offline', 'out_of_service', 'decommissioned', 'disabled', 'unavailable'].includes(status);
-  };
-
-  allComponents.forEach(comp => {
-    const count = portCount(comp);
-    if (isComponentOpenForOperatingState(comp)) return;
-    const subtype = String(comp.subtype || '').toLowerCase();
-    if ((subtype === 'ats' || subtype.endsWith('_ats')) && count >= 3) {
-      const selectedSource = String(comp.selected_source || comp.props?.selected_source || comp.source_priority || comp.props?.source_priority || 'normal').toLowerCase();
-      const selectedPort = selectedSource === 'emergency' || selectedSource === 'alternate' ? 1 : 0;
-      const availableKey = selectedPort === 1 ? 'emergency_source_available' : 'normal_source_available';
-      const selectedAvailable = comp[availableKey] ?? comp.props?.[availableKey] ?? true;
-      if (selectedAvailable !== false) connectEndpoints(endpointKey(comp.id, selectedPort), endpointKey(comp.id, 2));
-      return;
-    }
-    for (let a = 0; a < count; a += 1) {
-      for (let b = a + 1; b < count; b += 1) connectEndpoints(endpointKey(comp.id, a), endpointKey(comp.id, b));
-    }
+  return getEnergizedComponentIds(comps, conns, {
+    isComponentOpen: isComponentOpenForOperatingState,
+    isSourceComponent,
+    resolveComponentPorts: comp => resolveComponentMeta(comp)?.ports
   });
-
-  allComponents.forEach(source => {
-    (source.connections || []).forEach(connection => {
-      if (!connection?.target || !byId.has(connection.target)) return;
-      connectEndpoints(
-        endpointKey(source.id, connection.sourcePort ?? connection.fromPort ?? 0),
-        endpointKey(connection.target, connection.targetPort ?? connection.toPort ?? 0)
-      );
-    });
-  });
-  (Array.isArray(conns) ? conns : []).forEach(connection => {
-    const from = connection?.from || connection?.source;
-    const to = connection?.to || connection?.target;
-    if (!byId.has(from) || !byId.has(to)) return;
-    connectEndpoints(
-      endpointKey(from, connection.sourcePort ?? connection.fromPort ?? 0),
-      endpointKey(to, connection.targetPort ?? connection.toPort ?? 0)
-    );
-  });
-
-  const queue = [];
-  allComponents.forEach(comp => {
-    if (!(isSourceComponent(comp) || comp.type === 'sources' || comp.subtype === 'bus_Utility' || comp.subtype === 'bus_Generator')) return;
-    if (!sourceAvailable(comp)) return;
-    for (let port = 0; port < portCount(comp); port += 1) queue.push(endpointKey(comp.id, port));
-  });
-  const visited = new Set();
-  while (queue.length) {
-    const endpoint = queue.shift();
-    if (visited.has(endpoint)) continue;
-    visited.add(endpoint);
-    const separator = endpoint.indexOf('\u0000');
-    const id = separator >= 0 ? endpoint.slice(0, separator) : endpoint;
-    if (byId.has(id)) energized.add(id);
-    (endpointAdjacency.get(endpoint) || []).forEach(next => {
-      if (!visited.has(next)) queue.push(next);
-    });
-  }
-  return energized;
 }
 
 // Gap #40 – Group selected components into a group object
 function groupSelection() {
   const targets = selection.filter(c => c.type !== 'group');
   if (targets.length < 2) { showToast('Select at least 2 components to group'); return; }
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-  targets.forEach(c => {
-    const b = componentBounds(c);
-    minX = Math.min(minX, b.left); minY = Math.min(minY, b.top);
-    maxX = Math.max(maxX, b.right); maxY = Math.max(maxY, b.bottom);
-  });
-  const memberIds = targets.map(c => c.id);
-  const group = {
+  const group = createComponentGroup(targets, {
     id: 'grp' + Date.now(),
-    type: 'group',
-    subtype: 'group',
-    x: minX - 8,
-    y: minY - 8,
-    width: maxX - minX + 16,
-    height: maxY - minY + 16,
-    label: 'Group',
-    rotation: 0,
-    memberIds,
-    connections: [],
-    props: {}
-  };
+    defaultWidth: compWidth,
+    defaultHeight: compHeight
+  });
+  const memberIds = group.memberIds;
   components.push(group);
   selection = [group];
   selected = group;
@@ -11204,9 +9171,8 @@ function groupSelection() {
 function ungroupComponent(groupId) {
   const idx = components.findIndex(c => c.id === groupId && c.type === 'group');
   if (idx === -1) return;
-  const group = components[idx];
+  const members = getGroupMembers(components, groupId);
   components.splice(idx, 1);
-  const members = components.filter(c => (group.memberIds || []).includes(c.id));
   selection = members;
   selected = members[0] || null;
   pushHistory();
@@ -11552,315 +9518,18 @@ function render() {
   }
   const datablockLayout = createDatablockLayout(components);
 
-  /**
-   * Gap #47 – Orthogonal Connection Routing.
-   * Computes a rectilinear path between two points using a single elbow.
-   * Chooses horizontal-first or vertical-first based on which dimension
-   * is larger, so the elbow is placed at the midpoint of the dominant axis.
-   */
-  function computeOrthogonalPath(start, end) {
-    const dx = end.x - start.x;
-    const dy = end.y - start.y;
-    if (Math.abs(dx) < 0.5) return [start, end];   // already vertical
-    if (Math.abs(dy) < 0.5) return [start, end];   // already horizontal
-    if (Math.abs(dx) >= Math.abs(dy)) {
-      // Horizontal-first: go half-way across, then down/up
-      const elbowX = start.x + dx * 0.5;
-      return [
-        start,
-        { x: elbowX, y: start.y },
-        { x: elbowX, y: end.y },
-        end
-      ];
-    } else {
-      // Vertical-first: go half-way up/down, then across
-      const elbowY = start.y + dy * 0.5;
-      return [
-        start,
-        { x: start.x, y: elbowY },
-        { x: end.x,   y: elbowY },
-        end
-      ];
-    }
-  }
-
-  function routeBusTapPath(src, tgt, start, end) {
-    const sourceIsBus = isBusComponent(src);
-    const targetIsBus = isBusComponent(tgt);
-    if (sourceIsBus === targetIsBus) return null;
-    const bus = sourceIsBus ? src : tgt;
-    const otherPoint = sourceIsBus ? end : start;
-    const busWidth = Number(bus.width) || compWidth;
-    const busHeight = Number(bus.height) || compHeight;
-    const busLeft = Number(bus.x) || 0;
-    const busRight = busLeft + busWidth;
-    const busTop = Number(bus.y) || 0;
-    const busMidY = busTop + busHeight / 2;
-    const tapX = Math.min(Math.max(otherPoint.x, busLeft), busRight);
-    const tapY = busMidY;
-    const busPoint = { x: tapX, y: tapY };
-    const aligned = Math.abs(otherPoint.x - busPoint.x) < 0.5;
-    if (sourceIsBus) {
-      return aligned
-        ? [busPoint, end]
-        : [busPoint, { x: end.x, y: busPoint.y }, end];
-    }
-    return aligned
-      ? [start, busPoint]
-      : [start, { x: start.x, y: busPoint.y }, busPoint];
-  }
-
-  function routeConnection(src, tgt, conn) {
-    const start = portPosition(src, conn?.sourcePort);
-    const end = portPosition(tgt, conn?.targetPort);
-    const sDir = portDirection(src, conn?.sourcePort);
-    const tDir = portDirection(tgt, conn?.targetPort);
-    let path;
-    let busTapPath = false;
-    if (conn && conn.dir && !isBusComponent(src) && !isBusComponent(tgt)) {
-      const mid = conn.mid ?? (conn.dir === 'h' ? (start.x + end.x) / 2 : (start.y + end.y) / 2);
-      if (conn.dir === 'h') {
-        path = [start, { x: mid, y: start.y }, { x: mid, y: end.y }, end];
-      } else {
-        path = [start, { x: start.x, y: mid }, { x: end.x, y: mid }, end];
-      }
-      conn.mid = mid;
-    }
-
-    function horizontalFirst() {
-      const initialMid = (start.x + end.x) / 2;
-      let midX = initialMid;
-      for (let attempts = 0; attempts < MAX_ROUTE_ADJUST_STEPS; attempts++) {
-        let moved = false;
-        routeCandidates(Math.min(start.x, end.x, midX), Math.min(start.y, end.y), Math.max(start.x, end.x, midX), Math.max(start.y, end.y)).forEach(comp => {
-          if (comp === src || comp === tgt) return;
-          const rect = { x: comp.x, y: comp.y, w: comp.width || compWidth, h: comp.height || compHeight };
-          if (
-            rect.x <= midX && midX <= rect.x + rect.w &&
-            Math.min(start.y, end.y) <= rect.y + rect.h &&
-            Math.max(start.y, end.y) >= rect.y
-          ) {
-            midX = midX < rect.x + rect.w / 2 ? rect.x - 10 : rect.x + rect.w + 10;
-            moved = true;
-          }
-          if (
-            start.y >= rect.y && start.y <= rect.y + rect.h &&
-            Math.min(start.x, midX) <= rect.x + rect.w &&
-            Math.max(start.x, midX) >= rect.x
-          ) {
-            midX = midX < rect.x ? rect.x - 10 : rect.x + rect.w + 10;
-            moved = true;
-          }
-          if (
-            end.y >= rect.y && end.y <= rect.y + rect.h &&
-            Math.min(end.x, midX) <= rect.x + rect.w &&
-            Math.max(end.x, midX) >= rect.x
-          ) {
-            midX = midX < rect.x ? rect.x - 10 : rect.x + rect.w + 10;
-            moved = true;
-          }
-        });
-        if (moved === false) break;
-      }
-      if (Number.isFinite(midX) === false) midX = initialMid;
-      if (diagramViewport && Number.isFinite(diagramViewport.minX) && Number.isFinite(diagramViewport.width)) {
-        const min = diagramViewport.minX;
-        const max = diagramViewport.minX + diagramViewport.width;
-        midX = Math.min(Math.max(midX, min), max);
-      }
-      return [start, { x: midX, y: start.y }, { x: midX, y: end.y }, end];
-    }
-
-    function verticalFirst() {
-      const initialMid = (start.y + end.y) / 2;
-      let midY = initialMid;
-      for (let attempts = 0; attempts < MAX_ROUTE_ADJUST_STEPS; attempts++) {
-        let moved = false;
-        routeCandidates(Math.min(start.x, end.x), Math.min(start.y, end.y, midY), Math.max(start.x, end.x), Math.max(start.y, end.y, midY)).forEach(comp => {
-          if (comp === src || comp === tgt) return;
-          const rect = { x: comp.x, y: comp.y, w: comp.width || compWidth, h: comp.height || compHeight };
-          if (
-            rect.y <= midY && midY <= rect.y + rect.h &&
-            Math.min(start.x, end.x) <= rect.x + rect.w &&
-            Math.max(start.x, end.x) >= rect.x
-          ) {
-            midY = midY < rect.y + rect.h / 2 ? rect.y - 10 : rect.y + rect.h + 10;
-            moved = true;
-          }
-          if (
-            start.x >= rect.x && start.x <= rect.x + rect.w &&
-            Math.min(start.y, midY) <= rect.y + rect.h &&
-            Math.max(start.y, midY) >= rect.y
-          ) {
-            midY = midY < rect.y ? rect.y - 10 : rect.y + rect.h + 10;
-            moved = true;
-          }
-          if (
-            end.x >= rect.x && end.x <= rect.x + rect.w &&
-            Math.min(end.y, midY) <= rect.y + rect.h &&
-            Math.max(end.y, midY) >= rect.y
-          ) {
-            midY = midY < rect.y ? rect.y - 10 : rect.y + rect.h + 10;
-            moved = true;
-          }
-        });
-        if (moved === false) break;
-      }
-      if (Number.isFinite(midY) === false) midY = initialMid;
-      if (diagramViewport && Number.isFinite(diagramViewport.minY) && Number.isFinite(diagramViewport.height)) {
-        const min = diagramViewport.minY;
-        const max = diagramViewport.minY + diagramViewport.height;
-        midY = Math.min(Math.max(midY, min), max);
-      }
-      return [start, { x: start.x, y: midY }, { x: end.x, y: midY }, end];
-    }
-
-    function intersects(path) {
-      for (let i = 0; i < path.length - 1; i++) {
-        const p1 = path[i];
-        const p2 = path[i + 1];
-        const horizontal = p1.y === p2.y;
-        const x1 = Math.min(p1.x, p2.x);
-        const x2 = Math.max(p1.x, p2.x);
-        const y1 = Math.min(p1.y, p2.y);
-        const y2 = Math.max(p1.y, p2.y);
-        for (const comp of routeCandidates(x1, y1, x2, y2)) {
-          if (comp === src || comp === tgt) continue;
-          const rect = { x: comp.x, y: comp.y, w: comp.width || compWidth, h: comp.height || compHeight };
-          if (horizontal) {
-            if (
-              p1.y >= rect.y && p1.y <= rect.y + rect.h &&
-              x2 >= rect.x && x1 <= rect.x + rect.w
-            ) return true;
-          } else {
-            if (
-              p1.x >= rect.x && p1.x <= rect.x + rect.w &&
-              y2 >= rect.y && y1 <= rect.y + rect.h
-            ) return true;
-          }
-        }
-      }
-      return false;
-    }
-
-    if (!path) {
-      const busPath = routeBusTapPath(src, tgt, start, end);
-      if (busPath) {
-        path = busPath;
-        busTapPath = true;
-        if (conn) { delete conn.dir; delete conn.mid; }
-      } else if (orthogonalRouting) {
-        // Gap #47 – use simple single-elbow orthogonal path; suppress mid-handle
-        path = computeOrthogonalPath(start, end);
-        if (conn) { delete conn.dir; delete conn.mid; }
-      } else {
-        const h = horizontalFirst();
-        const v = verticalFirst();
-        // Prefer horizontal routing only when targeting left/right ports so
-        // that connections into top/bottom ports end with a vertical segment.
-        const preferH = tDir === 'left' || tDir === 'right';
-        if (preferH) {
-          if (!intersects(h)) path = h;
-          else if (!intersects(v)) path = v;
-          else path = h.length <= v.length ? h : v;
-        } else {
-          if (!intersects(v)) path = v;
-          else if (!intersects(h)) path = h;
-          else path = h.length <= v.length ? h : v;
-        }
-        if (conn) {
-          conn.dir = path === h ? 'h' : 'v';
-          conn.mid = conn.dir === 'h' ? path[1].x : path[1].y;
-        }
-      }
-    }
-    if (!busTapPath) {
-      const pen = path[path.length - 2];
-      if (tDir === 'top' || tDir === 'bottom') {
-        if (pen.x !== end.x) path.splice(path.length - 1, 0, { x: end.x, y: pen.y });
-      } else if (tDir === 'left' || tDir === 'right') {
-        if (pen.y !== end.y) path.splice(path.length - 1, 0, { x: pen.x, y: end.y });
-      }
-    }
-    const approx = (a, b) => Math.abs(a - b) < 0.01;
-    const samePoint = (a, b) => approx(a.x, b.x) && approx(a.y, b.y);
-    const offsetPoint = (pt, dir) => {
-      const len = 18;
-      if (dir === 'left') return { x: pt.x - len, y: pt.y };
-      if (dir === 'right') return { x: pt.x + len, y: pt.y };
-      if (dir === 'top') return { x: pt.x, y: pt.y - len };
-      if (dir === 'bottom') return { x: pt.x, y: pt.y + len };
-      return pt;
-    };
-    if (isConductorSegmentComponent(src) && sDir && path.length > 1) {
-      const stub = offsetPoint(path[0], sDir);
-      if (!samePoint(path[0], stub) && (!path[1] || !samePoint(path[1], stub))) {
-        path.splice(1, 0, stub);
-      }
-    }
-    if (isConductorSegmentComponent(tgt) && tDir && path.length > 1) {
-      const stub = offsetPoint(path[path.length - 1], tDir);
-      const insertAt = path.length - 1;
-      if (!samePoint(path[insertAt], stub) && (!path[insertAt - 1] || !samePoint(path[insertAt - 1], stub))) {
-        path.splice(insertAt, 0, stub);
-      }
-    }
-    return path;
-  }
-
-  function midpoint(points) {
-    if (!Array.isArray(points) || points.length === 0) {
-      return { x: 0, y: 0 };
-    }
-    const segs = [];
-    let len = 0;
-    for (let i = 0; i < points.length - 1; i++) {
-      const p1 = points[i];
-      const p2 = points[i + 1];
-      const l = Math.hypot(p2.x - p1.x, p2.y - p1.y);
-      if (!Number.isFinite(l) || l <= 0) continue;
-      segs.push({ p1, p2, l });
-      len += l;
-    }
-    if (!segs.length) {
-      return points[0] || { x: 0, y: 0 };
-    }
-    let half = len / 2;
-    for (const s of segs) {
-      if (half <= s.l) {
-        const ratio = half / s.l;
-        return {
-          x: s.p1.x + (s.p2.x - s.p1.x) * ratio,
-          y: s.p1.y + (s.p2.y - s.p1.y) * ratio
-        };
-      }
-      half -= s.l;
-    }
-    const last = segs[segs.length - 1];
-    return last ? last.p2 : points[0];
-  }
-
-  function connectionLabelPosition(points) {
-    if (!Array.isArray(points) || points.length < 2) {
-      return { ...midpoint(points), textAnchor: 'middle' };
-    }
-    const segments = [];
-    for (let i = 0; i < points.length - 1; i++) {
-      const p1 = points[i];
-      const p2 = points[i + 1];
-      const length = Math.hypot(p2.x - p1.x, p2.y - p1.y);
-      if (Number.isFinite(length) && length > 0) segments.push({ p1, p2, length });
-    }
-    const segment = segments.sort((a, b) => b.length - a.length)[0];
-    if (!segment) return { ...midpoint(points), textAnchor: 'middle' };
-    const horizontal = Math.abs(segment.p2.x - segment.p1.x) >= Math.abs(segment.p2.y - segment.p1.y);
-    const x = (segment.p1.x + segment.p2.x) / 2;
-    const y = (segment.p1.y + segment.p2.y) / 2;
-    return horizontal
-      ? { x, y: y - 11, textAnchor: 'middle' }
-      : { x: x + 11, y, textAnchor: 'start' };
-  }
-
+  const routeConnection = (source, target, connection) => buildConnectionRoute(source, target, connection, {
+    portPosition,
+    portDirection,
+    isBusComponent,
+    isConductorSegmentComponent,
+    routeCandidates,
+    diagramViewport,
+    orthogonalRouting,
+    defaultWidth: compWidth,
+    defaultHeight: compHeight,
+    maxAdjustSteps: MAX_ROUTE_ADJUST_STEPS
+  });
   // dimension tool removed
 
   // Gap #51: build a Set of hidden-layer component ids for O(1) lookup
@@ -11907,681 +9576,122 @@ function render() {
     labelCollisionBoxes.push(fallbackBox); labelCollisionIndex.add(fallbackBox);
     return fallback;
   };
-  const inboundConnectionCount = new Map();
-  components.forEach(source => {
-    (source.connections || []).forEach(conn => {
-      if (!conn?.target) return;
-      inboundConnectionCount.set(conn.target, (inboundConnectionCount.get(conn.target) || 0) + 1);
-    });
-  });
-  const junctionPoints = new Map();
-  const rememberJunctionPoint = (point, color = '#111827') => {
-    if (!point || !Number.isFinite(point.x) || !Number.isFinite(point.y)) return;
-    const key = `${Math.round(point.x * 10) / 10}:${Math.round(point.y * 10) / 10}`;
-    if (!junctionPoints.has(key)) junctionPoints.set(key, { x: point.x, y: point.y, color });
-  };
-
-  // draw connections
-  components.forEach(c => {
-    (c.connections || []).forEach((conn, idx) => {
-      const target = componentById.get(conn.target);
-      if (!target) return;
-      // Gap #51: skip connection if either endpoint is on a hidden layer
-      if (isHiddenByLayer(c) || isHiddenByLayer(target)) return;
-      const pts = routeConnection(c, target, conn);
-      pts.forEach(pt => includePoint(pt.x, pt.y));
-      const lenPx = pts.reduce((sum, p, i) => (i ? sum + Math.hypot(p.x - pts[i - 1].x, p.y - pts[i - 1].y) : 0), 0);
-      if (Math.abs((conn.length || 0) - lenPx) > 0.5) lengthsChanged = true;
-      conn.length = lenPx;
-      const poly = document.createElementNS(svgNS, 'polyline');
-      poly.setAttribute('points', pts.map(p => `${p.x},${p.y}`).join(' '));
-      const cableInfo = getCableForConnection(c, target, conn);
-      const vRange = getVoltageRange(conn.voltage || cableInfo?.voltage || c.voltage || target.voltage);
-      if (vRange) usedVoltageRanges.add(vRange);
-      const connPhaseList = parseCablePhases(conn?.phases);
-      const rawPhases = connPhaseList.length ? connPhaseList : parseCablePhases(cableInfo);
-      const phaseKey = rawPhases.join('');
-      const phaseColor = phaseColors[phaseKey];
-      const stroke = !engineeringPrint && showOverlays
-        ? (phaseColor || vRange?.color || cableColors[cableInfo?.cable_type] || cableInfo?.color || '#000')
-        : '#111827';
-      const connectionRole = classifyConnectionRole(c, target);
-      poly.setAttribute('stroke', stroke);
-      poly.setAttribute('fill', 'none');
-      poly.setAttribute('stroke-width', '3');
-      poly.style.pointerEvents = 'stroke';
-      poly.style.cursor = 'move';
-      poly.classList.add('connection', connectionRole);
-      if (selectedConnection?.component?.id === c.id && selectedConnection.index === idx) poly.classList.add('selected-connection');
-      if (!componentMatchesDiagramFilter(c) || !componentMatchesDiagramFilter(target)) poly.classList.add('diagram-filter-dimmed');
-      poly.dataset.comp = c.id;
-      poly.dataset.index = idx;
-      const vdLimit = parseFloat(target.maxVoltageDrop) || 3;
-      if (cableInfo?.sizing_warning) poly.classList.add('sizing-violation');
-      if (parseFloat(cableInfo?.voltage_drop_pct) > vdLimit) poly.classList.add('voltage-exceed');
-      poly.addEventListener('click', e => {
-        e.stopPropagation();
-        selected = null;
-        selection = [];
-        selectedConnection = { component: c, index: idx };
-        setRightRailTab('properties');
-        render();
-      });
-      poly.addEventListener('dblclick', async e => {
-        e.stopPropagation();
-        cancelPendingClickSelection();
-        const cableComp = isConductorSegmentComponent(c) ? c : isConductorSegmentComponent(target) ? target : null;
-        if (cableComp) {
-          await editCableComponent(cableComp);
-        }
-      });
-      poly.addEventListener('mousedown', e => {
-        e.stopPropagation();
-        if (!canEditConnectionWaypoint(c, conn) || (conn.dir !== 'h' && conn.dir !== 'v')) return;
-        const coords = toDiagramCoords(e);
-        draggingConnection = {
-          component: c,
-          index: idx,
-          start: { x: coords.x, y: coords.y },
-          mid: conn.mid ?? (conn.dir === 'h' ? pts[1].x : pts[1].y),
-          moved: false
-        };
-      });
-      renderSurface.appendChild(poly);
-      if (!engineeringPrint
-        && selectedConnection?.component?.id === c.id
-        && selectedConnection.index === idx
-        && canEditConnectionWaypoint(c, conn)
-        && (conn.dir === 'h' || conn.dir === 'v')) {
-        const waypoint = document.createElementNS(svgNS, 'circle');
-        const mid = Number.isFinite(conn.mid)
-          ? conn.mid
-          : conn.dir === 'h'
-            ? (pts[0].x + pts[pts.length - 1].x) / 2
-            : (pts[0].y + pts[pts.length - 1].y) / 2;
-        waypoint.setAttribute('cx', conn.dir === 'h' ? mid : (pts[1].x + pts[2].x) / 2);
-        waypoint.setAttribute('cy', conn.dir === 'h' ? (pts[1].y + pts[2].y) / 2 : mid);
-        waypoint.setAttribute('r', 6);
-        waypoint.classList.add('connection-waypoint-handle');
-        waypoint.dataset.comp = c.id;
-        waypoint.dataset.index = String(idx);
-        waypoint.dataset.axis = conn.dir === 'h' ? 'x' : 'y';
-        waypoint.setAttribute('aria-label', `Drag ${conn.dir === 'h' ? 'horizontal' : 'vertical'} connection waypoint`);
-        waypoint.addEventListener('mousedown', e => {
-          e.stopPropagation();
-          const coords = toDiagramCoords(e);
-          draggingConnection = {
-            component: c,
-            index: idx,
-            start: { x: coords.x, y: coords.y },
-            mid,
-            moved: false
-          };
-        });
-        renderSurface.appendChild(waypoint);
-      }
-      const startPoint = pts[0];
-      const endPoint = pts[pts.length - 1];
-      const sourceNeedsJunction = isBusComponent(c)
-        ? !engineeringPrint
-        : (c.connections || []).length > 1;
-      const targetNeedsJunction = isBusComponent(target)
-        ? !engineeringPrint
-        : (inboundConnectionCount.get(target.id) || 0) > 1;
-      if (sourceNeedsJunction) {
-        rememberJunctionPoint(startPoint, stroke);
-      }
-      if (targetNeedsJunction) {
-        rememberJunctionPoint(endPoint, stroke);
-      }
-
-      const label = document.createElementNS(svgNS, 'text');
-      const labelPosition = connectionLabelPosition(pts);
-      const transformerOutputRole = c.type === 'transformer'
-        ? getTransformerPortRole(c, conn.sourcePort)
-        : null;
-      if (transformerOutputRole === 'secondary' || transformerOutputRole === 'tertiary') {
-        labelPosition.x -= 75;
-        labelPosition.textAnchor = 'end';
-      }
-      label.setAttribute('dominant-baseline', 'middle');
-      label.setAttribute('fill', stroke);
-      let lblText = cableInfo?.tag || cableInfo?.cable_type || '';
-      if (!engineeringPrint && showOverlays) {
-        const overlays = [];
-        if (dataStateOverlayMode === 'faultDuty' && conn.faultKA != null) {
-          const faultText = formatOverlayMetric(conn.faultKA, 'kA', 2);
-          if (faultText) overlays.push(faultText);
-        } else if (dataStateOverlayMode === 'loadFlow') {
-          const loadKw = formatOverlayMetric(conn.loading_kW, 'kW', 2);
-          if (loadKw) overlays.push(loadKw);
-          const loadAmps = formatOverlayMetric(conn.loading_amps, 'A', 1);
-          if (loadAmps) overlays.push(loadAmps);
-        }
-        const provenanceKey = dataStateOverlayMode === 'faultDuty'
-          ? 'shortCircuit'
-          : dataStateOverlayMode === 'loadFlow'
-            ? 'loadFlow'
-            : null;
-        if (overlays.length && provenanceKey) {
-          const provenance = getStudyProvenance(provenanceKey);
-          if (provenance.status === 'stale') overlays.push('[stale]');
-          if (provenance.status === 'unknown') overlays.push('[freshness unknown]');
-        }
-        if (overlays.length) {
-          lblText += ` ${overlays.join(' / ')}`;
-        }
-      }
-      label.textContent = lblText;
-      const resolvedLabelPosition = resolveConnectionLabelPosition(labelPosition, lblText);
-      label.setAttribute('x', resolvedLabelPosition.x);
-      label.setAttribute('y', resolvedLabelPosition.y);
-      label.setAttribute('text-anchor', resolvedLabelPosition.textAnchor);
-      label.classList.add('conn-label');
-      if (conn.cable?.provisional || conn.reviewStatus === 'assumed') label.classList.add('conn-label-assumed');
-      if (!componentMatchesDiagramFilter(c) || !componentMatchesDiagramFilter(target)) label.classList.add('diagram-filter-dimmed');
-      if (cableInfo?.sizing_warning) label.classList.add('sizing-violation');
-      if (parseFloat(cableInfo?.voltage_drop_pct) > vdLimit) label.classList.add('voltage-exceed');
-      label.style.pointerEvents = 'auto';
-      label.style.cursor = 'pointer';
-      label.addEventListener('click', e => {
-        e.stopPropagation();
-        selected = null;
-        selection = [];
-        selectedConnection = { component: c, index: idx };
-        setRightRailTab('properties');
-        render();
-      });
-      label.addEventListener('dblclick', async e => {
-        e.stopPropagation();
-        cancelPendingClickSelection();
-        const cableComp = isConductorSegmentComponent(c) ? c : isConductorSegmentComponent(target) ? target : null;
-        if (cableComp) {
-          await editCableComponent(cableComp);
-        }
-      });
-      renderSurface.appendChild(label);
-    });
-  });
-
-  // draw nodes
-  components.filter(c => c.type !== 'dimension').forEach(c => {
-    includeComponentBounds(c);
-    // Gap #51: skip rendering components on hidden layers
-    if (isHiddenByLayer(c)) return;
-    const g = document.createElementNS(svgNS, 'g');
-    g.dataset.id = c.id;
-    g.classList.add('component');
-    if (!componentMatchesDiagramFilter(c)) g.classList.add('diagram-filter-dimmed');
-    const dataStateInfo = engineeringPrint ? null : getComponentColorInfo(c);
-    const operatingStatus = getComponentOperatingStatus(c);
-    if (operatingStatus === 'open') g.classList.add('operating-open');
-    // Gap #51: suppress pointer events for components on locked layers
-    if (isLockedByLayer(c)) {
-      g.setAttribute('pointer-events', 'none');
-      g.style.opacity = '0.5';
-    } else {
-      g.setAttribute('pointer-events', 'bounding-box');
-    }
-    g.addEventListener('dblclick', e => {
-      e.stopPropagation();
+  const connectionRenderResult = renderConnections({
+    documentRef: document,
+    svgNS,
+    components,
+    componentById,
+    renderSurface,
+    routeConnection,
+    isHiddenByLayer,
+    includePoint,
+    getCableForConnection,
+    getVoltageRange,
+    usedVoltageRanges,
+    parseCablePhases,
+    phaseColors,
+    cableColors,
+    engineeringPrint,
+    showOverlays,
+    classifyConnectionRole,
+    selectedConnection,
+    componentMatchesDiagramFilter,
+    isConductorSegmentComponent,
+    canEditConnectionWaypoint,
+    toDiagramCoords,
+    onSelectConnection: (component, index) => {
+      selected = null;
+      selection = [];
+      selectedConnection = { component, index };
+      setRightRailTab('properties');
+      render();
+    },
+    onEditCableComponent: async cableComponent => {
       cancelPendingClickSelection();
-      if (c.type === 'sheet_link') { navigateToLinkedSheet(c); return; }
-      selectComponent(c);
-    });
-    const tooltipParts = [];
-    if (c.label) tooltipParts.push(`Label: ${c.label}`);
-    if (c.voltage) tooltipParts.push(`Voltage: ${c.voltage}`);
-    if (c.rating) tooltipParts.push(`Rating: ${c.rating}`);
-    if (dataStateInfo) tooltipParts.push(`${dataStateOverlayLabels[dataStateOverlayMode]}: ${dataStateInfo.label}`);
-    if (operatingStatus === 'open') tooltipParts.push(`Operating state: Open in ${operatingStateLabels[activeOperatingState]}`);
-    // Gap #48 – Off-page connector tooltip
-    if (c.type === 'sheet_link') {
-      const badge = getSheetLinkBadgeText(c, sheets);
-      if (badge) tooltipParts.push(`Navigate: ${badge} (double-click)`);
-      const lid = normalizeSheetLinkValue(c.props?.link_id);
-      if (lid) tooltipParts.push(`Link ID: ${lid}`);
-    }
-    if (tooltipParts.length) g.setAttribute('data-tooltip', tooltipParts.join('\n'));
-    g.addEventListener('mouseenter', showTooltip);
-    g.addEventListener('mousemove', moveTooltip);
-    g.addEventListener('mouseleave', hideTooltip);
-    const w = c.width || compWidth;
-    const h = c.height || compHeight;
-    if (findHighlightId === c.id) {
-      const highlight = document.createElementNS(svgNS, 'rect');
-      highlight.setAttribute('x', c.x - 6);
-      highlight.setAttribute('y', c.y - 6);
-      highlight.setAttribute('width', w + 12);
-      highlight.setAttribute('height', h + 12);
-      highlight.setAttribute('class', 'find-highlight');
-      g.appendChild(highlight);
-    }
-    const cx = c.x + w / 2;
-    const cy = c.y + h / 2;
-    const voltageMagnitudes = getFiniteVoltageMagnitudes(c.voltage_mag);
-    if (!engineeringPrint && showOverlays && dataStateOverlayMode === 'loadFlow' && voltageMagnitudes.length) {
-      let dev = 0;
-      for (const mag of voltageMagnitudes) {
-        const magDev = Math.abs(mag - 1) * 100;
-        if (magDev > dev) dev = magDev;
-      }
-      let color = '#4caf50';
-      if (dev > 10) color = '#f44336';
-      else if (dev > 5) color = '#ffeb3b';
-      const overlay = document.createElementNS(svgNS, 'rect');
-      overlay.setAttribute('x', c.x);
-      overlay.setAttribute('y', c.y);
-      overlay.setAttribute('width', w);
-      overlay.setAttribute('height', h);
-      overlay.setAttribute('fill', color);
-      overlay.setAttribute('opacity', 0.3);
-      g.appendChild(overlay);
-    }
-    const voltageMagnitudeEntries = getVoltageMagnitudeEntries(c.voltage_mag);
-    const showLoadFlowValues = dataStateOverlayMode === 'loadFlow' && voltageMagnitudeEntries.length;
-    const showFaultDutyValues = dataStateOverlayMode === 'faultDuty' && c.shortCircuit?.threePhaseKA !== undefined;
-    if (!engineeringPrint && showOverlays && (showLoadFlowValues || showFaultDutyValues)) {
-      const txt = document.createElementNS(svgNS, 'text');
-      txt.setAttribute('x', cx);
-      txt.setAttribute('y', cy - (h / 2) - 4);
-      txt.setAttribute('text-anchor', 'middle');
-      txt.setAttribute('class', 'overlay-label');
-      const parts = [];
-      if (showLoadFlowValues) {
-        if (typeof c.voltage_mag === 'object') {
-          parts.push(voltageMagnitudeEntries
-            .map(([ph, v]) => `${ph}:${v.toFixed(3)} pu`)
-            .join(' '));
-        } else {
-          parts.push(`${voltageMagnitudeEntries[0][1].toFixed(3)} pu`);
-        }
-      }
-      if (showFaultDutyValues) {
-        parts.push(`${Number(c.shortCircuit.threePhaseKA).toFixed(2)} kA`);
-      }
-      txt.textContent = parts.join(' / ');
-      g.appendChild(txt);
-    }
-    const useCompactDataState = dataStateOverlayMode === 'validation' || dataStateOverlayMode === 'review';
-    if (dataStateInfo && !useCompactDataState) {
-      const dataFill = document.createElementNS(svgNS, 'rect');
-      dataFill.setAttribute('x', c.x);
-      dataFill.setAttribute('y', c.y);
-      dataFill.setAttribute('width', w);
-      dataFill.setAttribute('height', h);
-      dataFill.setAttribute('fill', dataStateInfo.color);
-      dataFill.setAttribute('opacity', '0.14');
-      dataFill.classList.add('data-state-fill', `data-state-${dataStateInfo.key}`);
-      const title = document.createElementNS(svgNS, 'title');
-      title.textContent = dataStateInfo.label;
-      dataFill.appendChild(title);
-      g.appendChild(dataFill);
-    }
-    const transforms = [];
-    if (c.flipped) transforms.push(`translate(${cx}, ${cy}) scale(-1,1) translate(${-cx}, ${-cy})`);
-    if (c.rotation) transforms.push(`rotate(${c.rotation}, ${cx}, ${cy})`);
-    if (transforms.length) g.setAttribute('transform', transforms.join(' '));
-    const vRange = !engineeringPrint && showOverlays && c.voltage_mag === undefined ? getVoltageRange(c.voltage) : null;
-    if (vRange) {
-      usedVoltageRanges.add(vRange);
-      const bg = document.createElementNS(svgNS, 'rect');
-      bg.setAttribute('x', c.x);
-      bg.setAttribute('y', c.y);
-      bg.setAttribute('width', w);
-      bg.setAttribute('height', h);
-      bg.setAttribute('fill', vRange.color);
-      bg.setAttribute('opacity', 0.3);
-      if (c.subtype === 'motor' || c.subtype === 'motor_load' || c.subtype === 'static_load') {
-        const rotation = normalizeRotation(Number(c.rotation) || 0);
-        const desired = 90;
-        const offset = desired - rotation;
-        if (offset % 360 !== 0) {
-          bg.setAttribute('transform', `rotate(${offset}, ${cx}, ${cy})`);
-        }
-      }
-      g.appendChild(bg);
-    }
-    const meta = resolveComponentMeta(c);
-    if (c.type === 'annotation') {
-      if (c.subtype === 'annotation_text_box') {
-        const rect = document.createElementNS(svgNS, 'rect');
-        rect.setAttribute('x', c.x);
-        rect.setAttribute('y', c.y);
-        rect.setAttribute('width', w);
-        rect.setAttribute('height', h);
-        rect.setAttribute('fill', '#fff');
-        rect.setAttribute('stroke', '#333');
-        g.appendChild(rect);
-        const txt = document.createElementNS(svgNS, 'text');
-        txt.setAttribute('x', c.x + w / 2);
-        txt.setAttribute('y', c.y + h / 2 + 5);
-        txt.setAttribute('text-anchor', 'middle');
-        txt.textContent = c.text || c.label || '';
-        txt.addEventListener('dblclick', e => {
-          e.stopPropagation();
-          cancelPendingClickSelection();
-          startInlineLabelEdit(c, { key: 'text', fallbackKey: 'label', fieldLabel: 'Text' });
-        });
-        g.appendChild(txt);
-      } else {
-        if (c.subtype === 'annotation_custom_shape') ensureShapeDefaults(c);
-        const shapeType = normalizeLowerChoice(
-          c.shapeType,
-          'rectangle',
-          ['rectangle', 'rounded', 'circle'],
-          { rounded_rectangle: 'rounded' }
-        );
-        const strokeStyle = normalizeLowerChoice(c.strokeStyle, 'solid', ['solid', 'dashed', 'dotted']);
-        const strokeColor = c.strokeColor || '#333';
-        const fillColor = c.fillColor && c.fillColor !== 'none' && c.fillColor !== 'transparent'
-          ? c.fillColor
-          : 'none';
-        const fillOpacity = Number.isFinite(Number(c.fillOpacity))
-          ? Math.max(0, Math.min(1, Number(c.fillOpacity)))
-          : 1;
-        const strokeWidth = Number(c.strokeWidth) || 1;
-        const dash = shapeDashPatterns[strokeStyle] || '';
-        let shape;
-        if (shapeType === 'circle') {
-          const ellipse = document.createElementNS(svgNS, 'ellipse');
-          ellipse.setAttribute('cx', c.x + w / 2);
-          ellipse.setAttribute('cy', c.y + h / 2);
-          ellipse.setAttribute('rx', w / 2);
-          ellipse.setAttribute('ry', h / 2);
-          shape = ellipse;
-        } else {
-          const rect = document.createElementNS(svgNS, 'rect');
-          rect.setAttribute('x', c.x);
-          rect.setAttribute('y', c.y);
-          rect.setAttribute('width', w);
-          rect.setAttribute('height', h);
-          if (shapeType === 'rounded' && Number.isFinite(Number(c.cornerRadius))) {
-            const radius = Math.max(0, Math.min(Number(c.cornerRadius), Math.min(w, h) / 2));
-            rect.setAttribute('rx', radius);
-            rect.setAttribute('ry', radius);
-          }
-          shape = rect;
-        }
-        shape.setAttribute('fill', fillColor);
-        shape.setAttribute('fill-opacity', fillColor === 'none' ? 0 : fillOpacity);
-        shape.setAttribute('stroke', strokeColor);
-        shape.setAttribute('stroke-width', strokeWidth);
-        if (dash) shape.setAttribute('stroke-dasharray', dash);
-        if (strokeStyle === 'dotted') {
-          shape.setAttribute('stroke-linecap', 'round');
-        }
-        g.appendChild(shape);
-      }
-    } else {
-      if (isConductorSegmentComponent(c)) {
-        const wLocal = c.width || compWidth;
-        const hLocal = c.height || compHeight;
-        const centerLocal = { x: wLocal / 2, y: hLocal / 2 };
-        const ports = c.ports || meta.ports || [];
-        ports.forEach(port => {
-          if (!port) return;
-          let px = port.x;
-          let py = port.y;
-          if (c.flipped) px = wLocal - px;
-          const dx = centerLocal.x - px;
-          const dy = centerLocal.y - py;
-          const dist = Math.hypot(dx, dy);
-          if (!dist) return;
-          const leadLength = Math.min(20, dist - 2);
-          if (leadLength <= 0) return;
-          const innerX = px + (dx * (leadLength / dist));
-          const innerY = py + (dy * (leadLength / dist));
-          const lead = document.createElementNS(svgNS, 'line');
-          lead.setAttribute('x1', c.x + px);
-          lead.setAttribute('y1', c.y + py);
-          lead.setAttribute('x2', c.x + innerX);
-          lead.setAttribute('y2', c.y + innerY);
-          lead.classList.add('cable-lead');
-          g.appendChild(lead);
-        });
-      }
-      // Gap #37 – IEC 60617 / ANSI-IEEE symbol standard toggle
-      const iconHref = (symbolStandard === 'IEC' && meta.iconIEC)
-        ? asset(meta.iconIEC)
-        : (meta.icon || placeholderIcon);
-      const img = document.createElementNS(svgNS, 'image');
-      img.setAttribute('x', c.x);
-      img.setAttribute('y', c.y);
-      img.setAttribute('width', w);
-      img.setAttribute('height', h);
-      img.setAttributeNS('http://www.w3.org/1999/xlink', 'href', iconHref);
-      if (isBusComponent(c)) img.setAttribute('preserveAspectRatio', 'none');
-      if (iconHref !== placeholderIcon) {
-        img.addEventListener('error', () => {
-          console.warn(`Missing icon for subtype ${c.subtype}`);
-          img.setAttributeNS('http://www.w3.org/1999/xlink', 'href', placeholderIcon);
-        }, { once: true });
-      }
-      img.addEventListener('dblclick', e => {
-        e.stopPropagation();
-        cancelPendingClickSelection();
-        if (c.type === 'sheet_link') { navigateToLinkedSheet(c); return; }
-        selectComponent(c);
-      });
-      g.appendChild(img);
-      appendConnectedTerminalBridges(g, c, meta);
-      if (dataStateInfo) {
-        if (useCompactDataState) {
-          renderDataStateBadge(renderSurface, c, dataStateInfo, dataStateOverlayMode, includePoint);
-        } else {
-          const outline = document.createElementNS(svgNS, 'rect');
-          outline.setAttribute('x', c.x - 1.5);
-          outline.setAttribute('y', c.y - 1.5);
-          outline.setAttribute('width', w + 3);
-          outline.setAttribute('height', h + 3);
-          outline.setAttribute('fill', 'none');
-          outline.setAttribute('stroke', dataStateInfo.color);
-          outline.setAttribute('stroke-width', 1.5);
-          outline.setAttribute('opacity', 0.82);
-          outline.classList.add('data-state-outline', `data-state-${dataStateInfo.key}`);
-          outline.style.pointerEvents = 'none';
-          g.appendChild(outline);
-        }
-      }
-      // Gap #48 – Off-page connector sheet badge
-      if (c.type === 'sheet_link') {
-        const badgeText = getSheetLinkBadgeText(c, sheets);
-        if (badgeText) {
-          const badge = document.createElementNS(svgNS, 'text');
-          badge.setAttribute('x', cx);
-          badge.setAttribute('y', c.y + h + 12);
-          badge.setAttribute('text-anchor', 'middle');
-          badge.setAttribute('font-size', '9');
-          badge.setAttribute('font-family', 'Helvetica, Arial, sans-serif');
-          badge.setAttribute('fill', '#0055aa');
-          badge.setAttribute('class', 'sheet-link-badge');
-          badge.style.pointerEvents = 'none';
-          badge.textContent = badgeText;
-          g.appendChild(badge);
-        }
-        g.style.cursor = 'pointer';
-      }
-    }
-    if (!engineeringPrint && selection.includes(c)) {
-      const rect = document.createElementNS(svgNS, 'rect');
-      rect.setAttribute('x', c.x - 2);
-      rect.setAttribute('y', c.y - 2);
-      rect.setAttribute('width', w + 4);
-      rect.setAttribute('height', h + 4);
-      rect.setAttribute('fill', 'none');
-      rect.setAttribute('stroke', '#00f');
-      rect.setAttribute('stroke-dasharray', '4 2');
-      rect.style.pointerEvents = 'none';
-      g.appendChild(rect);
-    }
-    // Gap #41 – Locked component indicator
-    if (!engineeringPrint && (isComponentPositionLocked(c) || c.propertiesLocked)) {
-      const lockEl = document.createElementNS(svgNS, 'text');
-      lockEl.setAttribute('x', c.x + w - 2);
-      lockEl.setAttribute('y', c.y + 12);
-      lockEl.setAttribute('text-anchor', 'end');
-      lockEl.setAttribute('font-size', '12');
-      lockEl.classList.add('locked-indicator');
-      lockEl.textContent = '\uD83D\uDD12'; // 🔒
-      lockEl.style.pointerEvents = 'none';
-      lockEl.style.userSelect = 'none';
-      g.appendChild(lockEl);
-    }
-    // Gap #40 – Group outline for group components
-    if (!engineeringPrint) getComponentReviewBadges(c).slice(0, 3).forEach((badgeInfo, badgeIdx) => {
-      const badge = document.createElementNS(svgNS, 'g');
-      badge.setAttribute('class', `review-badge review-badge-${badgeInfo.className}`);
-      const bx = c.x + w - 8 - badgeIdx * 18;
-      const by = c.y + 8;
-      const circ = document.createElementNS(svgNS, 'circle');
-      circ.setAttribute('cx', bx);
-      circ.setAttribute('cy', by);
-      circ.setAttribute('r', 7);
-      const txt = document.createElementNS(svgNS, 'text');
-      txt.setAttribute('x', bx);
-      txt.setAttribute('y', by + 3);
-      txt.setAttribute('text-anchor', 'middle');
-      txt.textContent = badgeInfo.text;
-      const title = document.createElementNS(svgNS, 'title');
-      title.textContent = badgeInfo.label;
-      badge.append(title, circ, txt);
-      g.appendChild(badge);
-    });
-    if (c.type === 'group') {
-      const outline = document.createElementNS(svgNS, 'rect');
-      outline.setAttribute('x', c.x);
-      outline.setAttribute('y', c.y);
-      outline.setAttribute('width', c.width || w);
-      outline.setAttribute('height', c.height || h);
-      outline.classList.add('group-outline');
-      g.appendChild(outline);
-      const glabel = document.createElementNS(svgNS, 'text');
-      glabel.setAttribute('x', c.x + 4);
-      glabel.setAttribute('y', c.y - 3);
-      glabel.classList.add('group-label');
-      glabel.textContent = c.label || 'Group';
-      g.appendChild(glabel);
-    }
-    renderSurface.appendChild(g);
-    if (!engineeringPrint) renderOperatingStateBadge(renderSurface, c, operatingStatus, includePoint);
-    if (!engineeringPrint && c.type === 'annotation' && selection.includes(c)) {
-      const handle = document.createElementNS(svgNS, 'rect');
-      handle.setAttribute('x', c.x + w - 5);
-      handle.setAttribute('y', c.y + h - 5);
-      handle.setAttribute('width', 10);
-      handle.setAttribute('height', 10);
-      handle.setAttribute('fill', '#fff');
-      handle.setAttribute('stroke', '#00f');
-      handle.setAttribute('stroke-width', '1');
-      handle.classList.add('annotation-handle');
-      handle.dataset.id = c.id;
-      renderSurface.appendChild(handle);
-    }
-    if (c.type !== 'annotation') {
-      const labelPos = getLabelPosition(c);
-      const labelText = getComponentLabelText(c, meta);
-      const labelEl = document.createElementNS(svgNS, 'text');
-      labelEl.classList.add('component-label');
-      labelEl.dataset.id = c.id;
-      labelEl.setAttribute('x', labelPos.x);
-      labelEl.setAttribute('y', labelPos.y);
-      labelEl.setAttribute('text-anchor', getLabelAlignment(c));
-      labelEl.setAttribute('dominant-baseline', getLabelBaseline(c));
-      labelEl.textContent = labelText;
-      attachLabelInteractions(labelEl, c);
-      renderSurface.appendChild(labelEl);
-      const labelBounds = componentLabelBounds(c);
-      if (labelBounds) {
-        includePoint(labelBounds.left, labelBounds.top);
-        includePoint(labelBounds.right, labelBounds.bottom);
-      }
-      const attrLines = getComponentAttributeLines(c);
-      if (attrLines.length) {
-        renderComponentDatablock(renderSurface, c, attrLines, includePoint, datablockLayout);
-      }
-      if (c.type === 'transformer') {
-        const ports = c.ports || resolveComponentMeta(c)?.ports || [];
-        ports.forEach((_, portIdx) => {
-          const labelText = buildTransformerPortLabel(c, portIdx);
-          if (!labelText) return;
-          const pos = portPosition(c, portIdx);
-          if (!pos) return;
-          const dir = portDirection(c, portIdx) || 'top';
-          let x = pos.x;
-          let y = pos.y;
-          let anchor = 'middle';
-          let baseline = 'middle';
-          if (dir === 'left') {
-            x -= 6;
-            anchor = 'end';
-          } else if (dir === 'right') {
-            x += 6;
-            anchor = 'start';
-          } else if (dir === 'bottom') {
-            x -= 10;
-            y += 10;
-            anchor = 'end';
-            baseline = 'hanging';
-          } else {
-            x -= 10;
-            y -= 6;
-            anchor = 'end';
-            baseline = 'baseline';
-          }
-          const textEl = document.createElementNS(svgNS, 'text');
-          textEl.classList.add('transformer-port-label');
-          textEl.dataset.componentId = c.id;
-          textEl.setAttribute('x', x);
-          textEl.setAttribute('y', y);
-          textEl.setAttribute('text-anchor', anchor);
-          textEl.setAttribute('dominant-baseline', baseline);
-          textEl.textContent = labelText;
-          renderSurface.appendChild(textEl);
-        });
-      }
-    }
-    if (!engineeringPrint && isBusComponent(c) && selection.includes(c)) {
-      const handleRight = document.createElementNS(svgNS, 'rect');
-      handleRight.setAttribute('x', c.x + c.width - 5);
-      handleRight.setAttribute('y', c.y + (c.height / 2) - 5);
-      handleRight.setAttribute('width', 10);
-      handleRight.setAttribute('height', 10);
-      handleRight.classList.add('bus-handle');
-      handleRight.dataset.id = c.id;
-      handleRight.dataset.side = 'right';
-      renderSurface.appendChild(handleRight);
-      const handleLeft = document.createElementNS(svgNS, 'rect');
-      handleLeft.setAttribute('x', c.x - 5);
-      handleLeft.setAttribute('y', c.y + (c.height / 2) - 5);
-      handleLeft.setAttribute('width', 10);
-      handleLeft.setAttribute('height', 10);
-      handleLeft.classList.add('bus-handle');
-      handleLeft.dataset.id = c.id;
-      handleLeft.dataset.side = 'left';
-      renderSurface.appendChild(handleLeft);
-    }
-      if (!engineeringPrint && connectMode) {
-        (c.ports || meta.ports || []).forEach((p, idx) => {
-          const pos = portPosition(c, idx);
-          const circ = document.createElementNS(svgNS, 'circle');
-          circ.setAttribute('cx', pos.x);
-          circ.setAttribute('cy', pos.y);
-          circ.setAttribute('r', 8);
-          circ.classList.add('port');
-          if (connectSource?.component === c && normalizePortIndex(connectSource.port) === idx) {
-            circ.classList.add('port-active');
-          }
-          if (portInUse(c, idx)) {
-            circ.classList.add('port-used');
-          }
-          circ.dataset.id = c.id;
-          circ.dataset.port = idx;
-          renderSurface.appendChild(circ);
-        });
-      }
+      await editCableComponent(cableComponent);
+    },
+    onStartWaypointDrag: dragState => {
+      draggingConnection = dragState;
+    },
+    isBusComponent,
+    connectionLabelPosition,
+    getTransformerPortRole,
+    dataStateOverlayMode,
+    formatOverlayMetric,
+    getStudyProvenance,
+    resolveConnectionLabelPosition
   });
-
+  const junctionPoints = connectionRenderResult.junctions;
+  if (connectionRenderResult.lengthsChanged) lengthsChanged = true;
+  // draw nodes
+  renderComponentNodes({
+    documentRef: document,
+    activeOperatingState,
+    appendConnectedTerminalBridges,
+    asset,
+    attachLabelInteractions,
+    buildTransformerPortLabel,
+    cancelPendingClickSelection,
+    compHeight,
+    compWidth,
+    componentLabelBounds,
+    componentMatchesDiagramFilter,
+    components,
+    connectMode,
+    connectSource,
+    datablockLayout,
+    dataStateOverlayLabels,
+    dataStateOverlayMode,
+    engineeringPrint,
+    ensureShapeDefaults,
+    findHighlightId,
+    getComponentAttributeLines,
+    getComponentColorInfo,
+    getComponentLabelText,
+    getComponentOperatingStatus,
+    getComponentReviewBadges,
+    getFiniteVoltageMagnitudes,
+    getLabelAlignment,
+    getLabelBaseline,
+    getLabelPosition,
+    getSheetLinkBadgeText,
+    getVoltageMagnitudeEntries,
+    getVoltageRange,
+    hideTooltip,
+    includeComponentBounds,
+    includePoint,
+    isBusComponent,
+    isComponentPositionLocked,
+    isConductorSegmentComponent,
+    isHiddenByLayer,
+    isLockedByLayer,
+    moveTooltip,
+    navigateToLinkedSheet,
+    normalizeLowerChoice,
+    normalizePortIndex,
+    normalizeRotation,
+    normalizeSheetLinkValue,
+    operatingStateLabels,
+    placeholderIcon,
+    portDirection,
+    portInUse,
+    portPosition,
+    renderComponentDatablock,
+    renderDataStateBadge,
+    renderOperatingStateBadge,
+    renderSurface,
+    resolveComponentMeta,
+    selectComponent,
+    selection,
+    shapeDashPatterns,
+    sheets,
+    showOverlays,
+    showTooltip,
+    startInlineLabelEdit,
+    svgNS,
+    symbolStandard,
+    usedVoltageRanges
+  });
   junctionPoints.forEach(point => {
     const dot = document.createElementNS(svgNS, 'circle');
     dot.setAttribute('cx', point.x);
@@ -13275,139 +10385,80 @@ function flashSnapIndicator(x, y) {
   }, 200);
 }
 
-function renderSheetTabs() {
-  const tabs = document.getElementById('sheet-tabs');
-  if (!tabs) return;
-  tabs.innerHTML = '';
-  sheets.forEach((s, i) => {
-    const tab = document.createElement('button');
-    tab.textContent = s.name || `Sheet ${i + 1}`;
-    tab.className = 'sheet-tab' + (i === activeSheet ? ' active' : '');
-    tab.setAttribute('role', 'tab');
-    tab.setAttribute('aria-selected', String(i === activeSheet));
-    tab.tabIndex = i === activeSheet ? 0 : -1;
-    tab.addEventListener('click', () => loadSheet(i));
-    tabs.appendChild(tab);
-  });
+let sheetPersistenceController = null;
+
+function getSheetPersistenceController() {
+  if (!sheetPersistenceController) {
+    sheetPersistenceController = createSheetPersistenceController({
+      documentRef: document,
+      getState: () => ({ sheets, activeSheet, components, connections, layers }),
+      onActivateSheet: (index, sheet, { resetHistory = true } = {}) => {
+        activeSheet = index;
+        components = sheet.components;
+        components.forEach(normalizeComponentElectricalProperties);
+        connections = sheet.connections;
+        layers = Array.isArray(sheet.layers) ? sheet.layers : [];
+        activeLayerId = null;
+        if (resetHistory) {
+          historyController.reset();
+          checkpoints = [];
+          historyEvents = [];
+          recordHistoryEvent('sheet', `Switched to sheet ${index + 1}`);
+          selection = [];
+          selected = null;
+          selectedConnection = null;
+        }
+      },
+      onPersistedSheets: state => {
+        sheets = state.sheets;
+        activeSheet = state.activeSheet;
+        components = state.components;
+        connections = state.connections;
+      },
+      onAfterSheetLoad: () => {
+        refreshAttributeOptions();
+        renderLayerPanel();
+        renderBgPanel();
+        activeZoneId = null;
+        renderProtectionZonesPanel();
+        needsInitialViewportCenter = true;
+        pendingInitialCenter = null;
+        render();
+      },
+      onAfterSheetDelete: () => {
+        refreshAttributeOptions();
+        renderLayerPanel();
+        render();
+      },
+      persistOneLine: setOneLine,
+      persistDiagramScale: scale => setItem('diagramScale', scale),
+      getDiagramScale: () => diagramScale,
+      normalizeDiagramScale,
+      synchronizeProjectData: synchronizeProjectDataFromDiagram,
+      validateDiagram,
+      getProtectionZones,
+      promptDialog,
+      confirmDialog,
+      showToast
+    });
+  }
+  return sheetPersistenceController;
 }
 
-function loadSheet(idx, { skipCurrentSave = false } = {}) {
-  if (idx < 0 || idx >= sheets.length) return;
-  if (!skipCurrentSave) save(false);
-  activeSheet = idx;
-  components = sheets[activeSheet].components;
-  components.forEach(normalizeComponentElectricalProperties);
-  connections = sheets[activeSheet].connections;
-  // Gap #51: load layers for this sheet
-  layers = Array.isArray(sheets[activeSheet].layers) ? sheets[activeSheet].layers : [];
-  activeLayerId = null;
-  history = [JSON.parse(JSON.stringify(components))];
-  layersHistory = [JSON.parse(JSON.stringify(layers))];
-  protectionZonesHistory = [JSON.parse(JSON.stringify(getProtectionZones()))];
-  historyIndex = 0;
-  layersHistoryIndex = 0;
-  checkpoints = [];
-  historyEvents = [];
-  recordHistoryEvent('sheet', `Switched to sheet ${idx + 1}`);
-  selection = [];
-  selected = null;
-  selectedConnection = null;
-  refreshAttributeOptions();
-  renderSheetTabs();
-  renderLayerPanel();
-  renderBgPanel();
-  // Gap #50: reset zone assignment mode and refresh panel on sheet switch
-  activeZoneId = null;
-  renderProtectionZonesPanel();
-  needsInitialViewportCenter = true;
-  pendingInitialCenter = null;
-  render();
-  setOneLine({ activeSheet, sheets });
+function renderSheetTabs() {
+  getSheetPersistenceController().renderTabs();
+}
+
+function loadSheet(index, options) {
+  getSheetPersistenceController().load(index, options);
 }
 
 async function addSheet(name) {
-  const sheetName = name || await promptDialog('Add Sheet', 'Sheet name', `Sheet ${sheets.length + 1}`);
-  if (!sheetName) return;
-  sheets.push({ name: sheetName, components: [], connections: [], layers: [] });
-  loadSheet(sheets.length - 1);
-  save();
+  await getSheetPersistenceController().add(name);
 }
-
 // ============================================================
 // Gap #48 – Cross-Sheet Off-Page Connector helpers (pure, testable)
 // ============================================================
-
-/**
- * Resolve the sheet index for a sheet_link component from its linked_sheet prop.
- * Returns -1 if the name is blank or no sheet with that name exists.
- */
-function normalizeSheetLinkValue(value) {
-  if (value === null || value === undefined) return '';
-  return String(value).trim();
-}
-
-function resolveLinkedSheetIndex(comp, sheetsArr) {
-  const name = normalizeSheetLinkValue(comp.props?.linked_sheet ?? comp.linked_sheet);
-  if (!name) return -1;
-  return sheetsArr.findIndex(s => s.name === name);
-}
-
-/**
- * Search all sheets for the partner sheet_link component (opposite subtype,
- * same link_id). Returns { sheetIndex, component } or null.
- */
-function findPairedConnector(linkId, subtype, sheetsArr) {
-  if (!linkId) return null;
-  const partnerSubtype = subtype === 'link_source' ? 'link_target' : 'link_source';
-  for (let i = 0; i < sheetsArr.length; i++) {
-    const found = (sheetsArr[i].components || []).find(
-      c => c.type === 'sheet_link' &&
-           c.subtype === partnerSubtype &&
-           (c.props?.link_id ?? c.link_id ?? '') === linkId
-    );
-    if (found) return { sheetIndex: i, component: found };
-  }
-  return null;
-}
-
-/**
- * Validate all sheet_link components across all sheets.
- * Returns an array of { component: id, sheetIndex, message } objects.
- */
-function validateSheetLinks(sheetsArr) {
-  const issues = [];
-  sheetsArr.forEach((sheet, idx) => {
-    (sheet.components || []).forEach(c => {
-      if (c.type !== 'sheet_link') return;
-      const linkId = normalizeSheetLinkValue(c.props?.link_id ?? c.link_id);
-      const linkedSheet = normalizeSheetLinkValue(c.props?.linked_sheet ?? c.linked_sheet);
-      if (!linkId) {
-        issues.push({ component: c.id, sheetIndex: idx, message: 'Sheet link has no link_id' });
-      }
-      if (!linkedSheet) {
-        issues.push({ component: c.id, sheetIndex: idx, message: 'Sheet link has no target sheet set' });
-      }
-      if (linkId) {
-        const partner = findPairedConnector(linkId, c.subtype, sheetsArr);
-        if (!partner) {
-          issues.push({ component: c.id, sheetIndex: idx, message: `No matching paired connector for link_id "${linkId}"` });
-        }
-      }
-    });
-  });
-  return issues;
-}
-
-/**
- * Returns the directional badge string for a sheet_link component,
- * e.g. '→ Sheet 2' (source) or '← Sheet 1' (target). Empty string if unconfigured.
- */
-function getSheetLinkBadgeText(comp, sheetsArr) {
-  const name = normalizeSheetLinkValue(comp.props?.linked_sheet ?? comp.linked_sheet);
-  if (!name) return '';
-  const arrow = comp.subtype === 'link_source' ? '→' : '←';
-  return `${arrow} ${name}`;
-}
 
 /**
  * Navigate to the sheet paired with a sheet_link component and highlight the
@@ -13450,85 +10501,16 @@ function navigateToLinkedSheet(comp) {
 }
 
 async function renameSheet(id, newName) {
-  const idx = id ?? activeSheet;
-  if (idx < 0 || idx >= sheets.length) return;
-  const sheetName = newName || await promptDialog('Rename Sheet', 'Sheet name', sheets[idx].name);
-  if (!sheetName) return;
-  sheets[idx].name = sheetName;
-  renderSheetTabs();
-  save();
+  await getSheetPersistenceController().rename(id, newName);
 }
 
 async function deleteSheet(id) {
-  if (sheets.length <= 1) return;
-  const idx = id ?? activeSheet;
-  if (idx < 0 || idx >= sheets.length) return;
-  const ok = await confirmDialog('Delete Sheet', `Delete "${sheets[idx].name}"? This cannot be undone.`, { primaryText: 'Delete' });
-  if (!ok) return;
-  sheets.splice(idx, 1);
-  activeSheet = Math.max(0, idx - 1);
-  components = sheets[activeSheet].components;
-  connections = sheets[activeSheet].connections;
-  // Gap #51: reload layers for the new active sheet
-  layers = Array.isArray(sheets[activeSheet].layers) ? sheets[activeSheet].layers : [];
-  activeLayerId = null;
-  refreshAttributeOptions();
-  renderSheetTabs();
-  renderLayerPanel();
-  render();
-  save();
+  await getSheetPersistenceController().remove(id);
 }
 
 function save(notify = true) {
-  const buildConnections = comps =>
-    comps.flatMap(c =>
-      (c.connections || []).map(conn => ({
-        ...conn,
-        from: c.id,
-        to: conn.target
-      }))
-    );
-  const sheetData = sheets.map((s, i) => {
-    const comps = (i === activeSheet ? components : s.components).map(c => ({
-      ...c,
-      rotation: c.rotation || 0,
-      flipped: !!c.flipped
-    }));
-    return {
-      name: s.name,
-      components: comps,
-      connections: buildConnections(comps),
-      // Gap #51: persist layers for each sheet
-      layers: i === activeSheet ? JSON.parse(JSON.stringify(layers)) : (Array.isArray(s.layers) ? s.layers : []),
-      protectionZones: i === activeSheet
-        ? JSON.parse(JSON.stringify(getProtectionZones()))
-        : (Array.isArray(s.protectionZones) ? JSON.parse(JSON.stringify(s.protectionZones)) : []),
-      // Gap #52: persist background image underlay per sheet
-      ...(s.backgroundImage ? { backgroundImage: s.backgroundImage } : {})
-    };
-  });
-  sheets = sheetData;
-  if (sheets.length) {
-    const clampedIndex = Math.min(Math.max(activeSheet, 0), sheets.length - 1);
-    activeSheet = clampedIndex;
-    components = sheets[clampedIndex].components;
-    connections = sheets[clampedIndex].connections;
-  } else {
-    activeSheet = 0;
-    components = [];
-    connections = [];
-  }
-  setOneLine({ activeSheet, sheets: sheetData });
-  setItem('diagramScale', normalizeDiagramScale(diagramScale));
-  const issues = validateDiagram({ notify: false, revealPanel: false });
-  if (issues.length === 0) {
-    markScheduleReconcilePending();
-    if (notify) showToast('One-line saved. Use Reconcile Schedules to update linked schedules.');
-  } else if (notify) {
-    showToast('Fix validation issues before reconciling schedules');
-  }
+  return getSheetPersistenceController().save(notify);
 }
-
 function updateBusPorts(bus) {
   const spacing = 20;
   const ports = [];
@@ -14093,2972 +11075,124 @@ async function selectComponent(compOrId) {
   }
   selectedConnection = null;
 
-  const sortedComponents = [...deviceComponents].sort((a, b) =>
-    getComponentListLabel(a).localeCompare(getComponentListLabel(b), undefined, { sensitivity: 'base' })
-  );
-
-  const categoryEntries = new Map();
-  sortedComponents.forEach(device => {
-    const category = getCategory(device) || 'equipment';
-    if (!categoryEntries.has(category)) categoryEntries.set(category, []);
-    categoryEntries.get(category).push(device);
-  });
-  const categoryOrder = Array.from(categoryEntries.keys()).sort((a, b) =>
-    formatAttributeLabel(String(a)).localeCompare(formatAttributeLabel(String(b)), undefined, { sensitivity: 'base' })
-  );
-  let activeCategory = null;
-  if (activeComponent) {
-    const componentCategory = getCategory(activeComponent) || null;
-    if (componentCategory && categoryEntries.has(componentCategory)) activeCategory = componentCategory;
-  }
-  if (!activeCategory) activeCategory = categoryOrder[0] || null;
-  if (activeCategory && (!activeComponent || !categoryEntries.get(activeCategory).some(item => item.id === activeComponent.id))) {
-    const fallbackDevice = categoryEntries.get(activeCategory)?.[0] || null;
-    if (fallbackDevice) {
-      activeComponent = fallbackDevice;
-    }
-  }
-  if (activeComponent?.isVirtualNode) {
-    selected = null;
-    selection = [];
-  } else {
-    selected = activeComponent;
-    selection = [activeComponent];
-  }
-  selectedConnection = null;
-
+  const getComponentListLabel = getPropertyEditorDeviceLabel;
   const modal = ensurePropModal();
-  if (modal._outsideHandler) modal.removeEventListener('click', modal._outsideHandler);
-  if (modal._keyHandler) document.removeEventListener('keydown', modal._keyHandler);
-  modal.innerHTML = '';
-
-  const panel = document.createElement('div');
-  panel.className = 'prop-modal-panel';
-  modal.appendChild(panel);
-
-  const layout = document.createElement('div');
-  layout.className = 'prop-modal-layout';
-  panel.appendChild(layout);
-
-  const componentColumn = document.createElement('div');
-  componentColumn.className = 'prop-modal-column prop-modal-components';
-  const categoryHeading = document.createElement('h3');
-  categoryHeading.className = 'prop-modal-heading';
-  categoryHeading.textContent = 'Categories';
-  const categoryListEl = document.createElement('div');
-  categoryListEl.className = 'prop-category-list';
-  const componentHeading = document.createElement('h3');
-  componentHeading.className = 'prop-modal-heading';
-  componentHeading.textContent = 'Device Tags';
-  const componentListEl = document.createElement('div');
-  componentListEl.className = 'prop-component-list';
-  componentColumn.append(categoryHeading, categoryListEl, componentHeading, componentListEl);
-  layout.appendChild(componentColumn);
-
-  const propertyColumn = document.createElement('div');
-  propertyColumn.className = 'prop-modal-column prop-modal-properties';
-  const propertyHeading = document.createElement('h3');
-  propertyHeading.className = 'prop-modal-heading';
-  propertyColumn.appendChild(propertyHeading);
-  const propertyContainer = document.createElement('div');
-  propertyContainer.className = 'prop-property-container';
-  propertyColumn.appendChild(propertyContainer);
-  layout.appendChild(propertyColumn);
-
-  const categoryButtonMap = new Map();
-  const buttonMap = new Map();
-  let activeId = activeComponent?.id || null;
-  const applyPendingChanges = () => {
-    if (typeof modal._applyChanges === 'function') {
-      modal._applyChanges();
-    }
-  };
-
-  function renderCategoryButtons() {
-    categoryListEl.innerHTML = '';
-    categoryButtonMap.clear();
-    categoryOrder.forEach(categoryKey => {
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.className = 'prop-category-option';
-      button.textContent = getCategoryLabel(categoryKey);
-      button.dataset.category = categoryKey;
-      button.setAttribute('aria-pressed', 'false');
-      button.addEventListener('click', () => {
-        if (activeCategory === categoryKey) return;
-        activeCategory = categoryKey;
-        const nextDevice = categoryEntries.get(activeCategory)?.[0] || null;
-        renderDeviceButtons();
-        updateCategoryStates();
-        if (nextDevice) {
-          setActiveComponent(nextDevice);
-        } else {
-          applyPendingChanges();
-          selected = null;
-          selection = [];
-          selectedConnection = null;
-          renderPropertiesFor(null);
-          updateButtonStates();
-        }
-      });
-      categoryButtonMap.set(categoryKey, button);
-      categoryListEl.appendChild(button);
-    });
-  }
-
-  function getComponentListLabel(comp) {
-    if (!comp) return 'Device';
-    const tag = typeof comp.label === 'string' ? comp.label.trim() : '';
-    if (tag) return tag;
-    if (comp.subtype) return comp.subtype;
-    if (comp.type) return comp.type;
-    return comp.id || 'Device';
-  }
-
-  function getCategoryLabel(key) {
-    if (!key) return 'Other';
-    return formatAttributeLabel(String(key));
-  }
-
-  function renderDeviceButtons() {
-    componentListEl.innerHTML = '';
-    buttonMap.clear();
-    const devices = activeCategory ? categoryEntries.get(activeCategory) || [] : [];
-    const headingLabel = activeCategory ? `Device Tags – ${getCategoryLabel(activeCategory)}` : 'Device Tags';
-    componentHeading.textContent = headingLabel;
-    devices.forEach(device => {
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.className = 'prop-component-option';
-      button.dataset.componentId = device.id;
-      button.textContent = getComponentListLabel(device);
-      button.setAttribute('aria-pressed', 'false');
-      button.addEventListener('click', () => {
-        if (activeId === device.id) return;
-        applyPendingChanges();
-        activeComponent = device;
-        activeId = device.id;
-        if (device?.isVirtualNode) {
-          selected = null;
-          selection = [];
-        } else {
-          selected = device;
-          selection = [device];
-        }
-        selectedConnection = null;
-        updateButtonStates();
-        renderPropertiesFor(device);
-      });
-      buttonMap.set(device.id, button);
-      componentListEl.appendChild(button);
-    });
-    if (!devices.length) {
-      const empty = document.createElement('p');
-      empty.className = 'prop-component-empty view-modal-empty';
-      empty.textContent = 'No devices in this category.';
-      componentListEl.appendChild(empty);
-    }
-  }
-
-  function updateButtonStates() {
-    buttonMap.forEach((button, id) => {
-      const selectedState = id === activeId;
-      button.classList.toggle('is-active', selectedState);
-      button.setAttribute('aria-pressed', String(selectedState));
-      button.tabIndex = selectedState ? 0 : -1;
-    });
-  }
-
-  function updateCategoryStates() {
-    categoryButtonMap.forEach((button, key) => {
-      const selectedState = key === activeCategory;
-      button.classList.toggle('is-active', selectedState);
-      button.setAttribute('aria-pressed', String(selectedState));
-      button.tabIndex = selectedState ? 0 : -1;
-    });
-  }
-
-  function closeModal(opts) {
-    let shouldApply = false;
-    if (opts && typeof opts === 'object' && Object.prototype.hasOwnProperty.call(opts, 'applyChanges')) {
-      shouldApply = !!opts.applyChanges;
-    }
-    if (shouldApply && typeof modal._applyChanges === 'function') {
-      modal._applyChanges();
-    }
-    modal.classList.remove('show');
-    modal.removeEventListener('click', outsideHandler);
-    if (modal._pointerDownHandler) {
-      modal.removeEventListener('pointerdown', modal._pointerDownHandler);
-    }
-    document.removeEventListener('keydown', keyHandler);
-    delete modal._outsideHandler;
-    delete modal._keyHandler;
-    delete modal._applyChanges;
-    delete modal._pointerDownHandler;
-    delete modal._pointerDownOnOverlay;
-    selected = null;
-    selection = [];
-    selectedConnection = null;
-  }
-
-  const outsideHandler = e => {
-    if (e.target === modal && modal._pointerDownOnOverlay) {
-      closeModal({ applyChanges: true });
-    }
-    modal._pointerDownOnOverlay = false;
-  };
-  const keyHandler = e => {
-    if (e.key === 'Escape') {
-      e.preventDefault();
-      closeModal();
-    }
-  };
-  const pointerDownHandler = e => {
-    modal._pointerDownOnOverlay = e.target === modal;
-  };
-
-  function renderPropertiesFor(targetComp) {
-    propertyContainer.innerHTML = '';
-    propertyContainer.classList.remove('prop-property-container-form');
-    modal._applyChanges = null;
-    if (!targetComp) {
-      propertyHeading.textContent = 'Properties';
-      const empty = document.createElement('p');
-      empty.className = 'prop-property-empty view-modal-empty';
-      empty.textContent = 'Select a device to view its properties.';
-      propertyContainer.appendChild(empty);
-      return;
-    }
-
-    if (targetComp.isVirtualNode) {
-      renderNodeProperties(targetComp);
-      return;
-    }
-
-    if (isConductorSegmentComponent(targetComp) && (!targetComp.cable || typeof targetComp.cable !== 'object')) {
-      targetComp.cable = {};
-    }
-
-    propertyHeading.textContent = `${getComponentListLabel(targetComp)} Properties`;
-
-    const normalizedTargetType = `${targetComp.type || ''}`.toLowerCase();
-    const normalizedTargetSubtype = `${targetComp.subtype || ''}`.toLowerCase();
-    const isMotorComponent = normalizedTargetSubtype === 'motor_load' || normalizedTargetSubtype === 'motor' || normalizedTargetType === 'motor_load' || normalizedTargetType === 'motor';
-    const isMotorStudyComponent = isMotorComponent
-      || normalizedTargetType === 'motor_controller'
-      || normalizedTargetType === 'motor_starter'
-      || normalizedTargetSubtype.includes('starter')
-      || normalizedTargetSubtype === 'vfd'
-      || normalizedTargetSubtype === 'soft_starter';
-    const isStaticLoadComponent = targetComp.subtype === 'static_load';
-    const isTransformerComponent = targetComp.type === 'transformer';
-    const isSourceCategoryComponent = isSourceComponent(targetComp);
-    const motorInputMap = new Map();
-    const staticInputMap = isStaticLoadComponent ? new Map() : null;
-    const transformerInputMap = isTransformerComponent ? new Map() : null;
-    const transformerCustomBadges = isTransformerComponent ? new Map() : null;
-    const sourceInputMap = isSourceCategoryComponent ? new Map() : null;
-    const sourceCustomBadges = isSourceCategoryComponent ? new Map() : null;
-    const motorCalculatedFields = new Set([
-      'load_kw',
-      'load_kvar',
-      'impedance_r',
-      'impedance_x'
-    ]);
-    const staticCalculatedFields = isStaticLoadComponent
-      ? new Set(['load_kw', 'load_kvar', 'baseKV', 'kV', 'kv', 'prefault_voltage'])
-      : null;
-    const staticManualFields = isStaticLoadComponent
-      ? new Set(['watts', 'kva', 'pf', 'power_factor', 'volts', 'voltage'])
-      : null;
-    const transformerCalculatedFields = new Set(['impedance_r', 'impedance_x']);
-    const transformerAutoFieldNames = new Set(['baseKV', 'kV', 'kv', 'prefault_voltage']);
-    const sourceCalculatedFields = new Set(['thevenin_mva']);
-    const sourceAutoFieldNames = new Set(['baseKV', 'kV', 'kv', 'prefault_voltage']);
-
-    const parseNumericValue = raw => {
-      if (raw === null || raw === undefined) return null;
-      if (typeof raw === 'number') return Number.isFinite(raw) ? raw : null;
-      const text = String(raw).trim();
-      if (!text) return null;
-      const match = text.match(/[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?/);
-      if (!match) return null;
-      const num = Number.parseFloat(match[0]);
-      return Number.isFinite(num) ? num : null;
-    };
-
-    const readComponentValue = name => {
-      if (!name) return null;
-      if (targetComp && Object.prototype.hasOwnProperty.call(targetComp, name)) {
-        const direct = targetComp[name];
-        if (direct !== undefined && direct !== null && direct !== '') return direct;
-      }
-      if (targetComp?.props && Object.prototype.hasOwnProperty.call(targetComp.props, name)) {
-        const propVal = targetComp.props[name];
-        if (propVal !== undefined && propVal !== null && propVal !== '') return propVal;
-      }
-      return null;
-    };
-
-    const formatNumber = (val, decimals = 3) => {
-      if (!Number.isFinite(val)) return '';
-      const factor = 10 ** decimals;
-      const rounded = Math.round(val * factor) / factor;
-      let text = rounded.toFixed(decimals);
-      text = text.replace(/\.0+$/, '');
-      text = text.replace(/(\.[0-9]*[1-9])0+$/, '$1');
-      return text;
-    };
-
-    let rawSchema = propSchemas[targetComp.subtype] || [];
-    if (!rawSchema.length) {
-      const metaProps = resolveComponentMeta(targetComp)?.props || {};
-      rawSchema = inferSchemaFromProps({ ...metaProps, ...(targetComp.props || {}) });
-    }
-
-    const motorHorsepowerIndicators = new Set(['hp', 'horsepower']);
-    const rawSchemaFieldNames = new Set(
-      rawSchema
-        .map(field => field && field.name)
-        .filter(name => typeof name === 'string' && name)
-    );
-    const hasMotorHorsepowerIndicator = [...motorHorsepowerIndicators].some(name =>
-      rawSchemaFieldNames.has(name)
-    );
-    const shouldApplyMotorDerivations =
-      isMotorStudyComponent
-      || hasMotorHorsepowerIndicator;
-
-    const generalLabelOverrides = {
-      hp: 'Horsepower',
-      pf: 'Power Factor',
-      service_factor: 'Service Factor',
-      full_load_amps: 'Full-Load Amps (A)',
-      rated_current: 'Rated Current (A)',
-      rated_current_a: 'Rated Current (A)',
-      lr_current_pu: 'Locked-Rotor Current (x FLA)',
-      current_limit_pu: 'Current Limit (x FLA)',
-      vfd_current_limit_pu: 'VFD Current Limit (x FLA)',
-      initial_voltage_pu: 'Initial Voltage (pu)',
-      ramp_time_s: 'Ramp Time (s)',
-      start_time_s: 'Start Time (s)',
-      stall_time: 'Stall Time (s)',
-      synchronous_speed_rpm: 'Synchronous Speed (rpm)',
-      inrushMultiple: 'Inrush Multiple (× FLA)',
-      thevenin_r: 'Thevenin R (Ω)',
-      thevenin_x: 'Thevenin X (Ω)',
-      inertia: 'Inertia (kg·m²)',
-      load_torque_curve: 'Load Torque Curve (speed%:torque%)',
-      mtbf: 'MTBF (hr)',
-      mttr: 'MTTR (hr)',
-      clearing_time: 'Clearing Time (s)',
-      gap: 'Electrode Gap (mm)',
-      working_distance: 'Working Distance (mm)',
-      enclosure_height: 'Enclosure Height (mm)',
-      enclosure_width: 'Enclosure Width (mm)',
-      enclosure_depth: 'Enclosure Depth (mm)',
-      inrush_multiple: 'Transformer Inrush Multiple (x FLA)',
-      inrush_duration: 'Transformer Inrush Duration (s)',
-      harmonicSource: 'Harmonic Source',
-      harmonicProfileId: {
-        label: 'Harmonic Profile',
-        type: 'select',
-        options: () => getHarmonicProfileOptions(),
-        help: 'Select a library profile or save the current spectrum as a custom profile.'
-      },
-      harmonic_profile_id: {
-        label: 'Harmonic Profile',
-        type: 'select',
-        options: () => getHarmonicProfileOptions(),
-        help: 'Select a library profile or save the current spectrum as a custom profile.'
-      },
-      harmonics: {
-        label: 'Harmonic Spectrum (order:pct)',
-        placeholder: '5:35 7:25 11:12 13:8',
-        help: 'Populated by the harmonic profile library; custom spectra use order:pct pairs separated by spaces or commas.'
-      },
-      harmonicsA: 'Phase A Harmonics (order:pct)',
-      harmonicsB: 'Phase B Harmonics (order:pct)',
-      harmonicsC: 'Phase C Harmonics (order:pct)',
-      scMVA: 'Short-Circuit Strength at Bus (MVA)',
-      electrode_config: {
-        label: 'Electrode Configuration',
-        type: 'select',
-        options: ['VCB', 'VCBB', 'HCB', 'VOA', 'HOA']
-      },
-      primary_connection: 'Primary Connection',
-      secondary_connection: 'Secondary Connection',
-      tertiary_connection: 'Tertiary Connection',
-      source_voltage_base: {
-        label: 'Source Voltage (kV)',
-        help: 'Defines system base voltage. Reference point of system.'
-      },
-      short_circuit_capacity: {
-        label: 'Short Circuit Capacity (MVA or kA)',
-        help: 'Defines source strength. Used for fault calc.'
-      },
-      source_impedance: {
-        label: 'Source Impedance (R + jX)',
-        help: 'Sets Thevenin equivalent. Core short circuit input.',
-        placeholder: '0.01 + j0.08'
-      },
-      sequence_impedances: {
-        label: 'Sequence Impedances (Z1,Z2,Z0)',
-        help: 'For asymmetrical faults. Required for detailed calc.',
-        placeholder: 'Z1=, Z2=, Z0='
-      },
-      frequency_hz: {
-        label: 'Frequency (Hz)',
-        help: 'System operating frequency. Usually 50 or 60 Hz.'
-      },
-      grounding: {
-        label: 'Grounding Type (solid, resistive)',
-        help: 'Defines earth fault characteristics. Important for grounding model.'
-      },
-      voltage_regulation_percent: {
-        label: 'Voltage Regulation (%)',
-        help: 'Defines source voltage control range. Used for load flow.'
-      },
-      phase_angle: {
-        label: 'Phase Angle',
-        help: 'Reference for system phase. Used for synchronization.'
-      },
-      max_mw_delivery: {
-        label: 'Max MW Delivery',
-        help: 'For power flow limit modeling. Defines source constraint.'
-      },
-      losses_r_percent: {
-        label: 'Losses (R%)',
-        help: 'For performance modeling. Used for efficiency calc.'
-      },
-      stability_response: {
-        label: 'Stability Response',
-        help: 'Used in dynamic studies. Defines voltage recovery.'
-      },
-      transformer_impedance: {
-        label: 'Transformer Impedance (if substation integrated)',
-        help: 'Defines interface strength. For network modeling.'
-      },
-      operating_mode: {
-        label: 'Operating Mode (infinite bus, finite grid)',
-        help: 'Determines model behavior. Impacts fault current.'
-      },
-      short_circuit_duration_cycles: {
-        label: 'Short Circuit Duration (cycles)',
-        help: 'For thermal withstand calc. Time-dependent modeling.'
-      },
-      ratio_primary: 'CT Ratio Primary (A)',
-      ratio_secondary: 'CT Ratio Secondary (A)',
-      accuracy_class: 'CT Accuracy Class',
-      burden_va: 'CT Burden (VA)',
-      knee_point_v: 'CT Knee-Point Voltage (V)',
-      polarity: {
-        label: 'CT Polarity',
-        type: 'select',
-        options: ['H1-X1', 'H1-X2']
-      },
-      location_context: {
-        label: 'CT Context',
-        type: 'select',
-        options: ['protection', 'metering']
-      },
-      protected_device_id: 'Protected Device ID',
-      meter_id: 'Linked Meter ID',
-      relay_id: 'Linked Relay ID'
-      ,
-      primary_voltage: 'PT/VT Primary Voltage (V)',
-      secondary_voltage: 'PT/VT Secondary Voltage (V)',
-      connection_type: {
-        label: 'PT/VT Connection Type',
-        type: 'select',
-        options: ['wye-grounded', 'wye-ungrounded', 'delta', 'open-delta']
-      },
-      fuse_protection: {
-        label: 'PT/VT Fuse Protection',
-        type: 'select',
-        options: ['yes', 'no']
-      },
-      consumer_ids: 'Linked Consumer IDs'
-    };
-
-    let schema = rawSchema
-      .map(f => {
-        if (f.name === 'voltage_class') {
-          return { ...f, type: 'select', options: voltageClasses };
-        }
-        if (f.name === 'thermal_rating') {
-          return { ...f, type: 'select', options: thermalRatings };
-        }
-        if (f.name === 'manufacturer') {
-          return { ...f, type: 'select', options: manufacturerOptions };
-        }
-        if (f.name === 'model') {
-          const manu = targetComp.manufacturer || manufacturerOptions[0];
-          return { ...f, type: 'select', options: getManufacturerModels(manu) };
-        }
-        if (
-          targetComp.type === 'transformer'
-          && ['primary_connection', 'secondary_connection', 'tertiary_connection'].includes(f.name)
-        ) {
-          return { ...f, type: 'select', options: transformerConnectionOptions };
-        }
-        if (isMotorStudyComponent && f.name === 'load_torque_curve') {
-          return {
-            ...f,
-            type: 'textarea',
-            rows: 3,
-            placeholder: '0:0 50:40 100:100',
-            help: 'Enter speed%:torque% pairs separated by spaces or commas.'
-          };
-        }
-        return f;
-      });
-
-    schema = schema.map(f => {
-      const next = { ...f };
-      if (next.name.startsWith('cable_')) {
-        const key = next.name.replace(/^cable_/, '');
-        const meta = cablePropertyMetadata[key];
-        if (meta) {
-          if (meta.label) next.label = meta.label;
-          if (meta.type) next.type = meta.type;
-          if (meta.help) next.help = meta.help;
-        }
-      } else if (generalLabelOverrides[next.name]) {
-        const override = generalLabelOverrides[next.name];
-        if (typeof override === 'string') {
-          next.label = override;
-        } else if (override && typeof override === 'object') {
-          if (override.label) next.label = override.label;
-          if (override.type) next.type = override.type;
-          if (override.options) next.options = override.options;
-          if (override.placeholder) next.placeholder = override.placeholder;
-          if (override.help) next.help = override.help;
-        }
-      }
-      return next;
-    });
-
-    if (isConductorSegmentComponent(targetComp)) {
-      schema = schema.filter(f => !['cable_cable_rating', 'cable_impedance_r', 'cable_impedance_x'].includes(f.name));
-    }
-
-    if (isMotorStudyComponent) {
-      schema = schema.filter(
-        f => !['conductor_type', 'cable_assembly', 'breaker_frame', 'conductor_assembly'].includes(f.name)
-      );
-    }
-
-    let baseFields;
-    if (isConductorSegmentComponent(targetComp)) {
-      baseFields = [
-        { name: 'label', label: 'Label', type: 'text' },
-        { name: 'ref', label: 'Ref ID', type: 'text' },
-        {
-          name: 'cable_rating',
-          label: 'Cable Rating (V)',
-          type: 'number',
-          getValue: comp => comp.cable?.cable_rating ?? '',
-          setValue: (comp, rawValue) => {
-            if (!comp.cable || typeof comp.cable !== 'object') comp.cable = {};
-            const trimmed = typeof rawValue === 'string' ? rawValue.trim() : rawValue;
-            if (trimmed === '' || trimmed === null || trimmed === undefined) {
-              delete comp.cable.cable_rating;
-              return;
-            }
-            const num = Number(trimmed);
-            comp.cable.cable_rating = Number.isFinite(num) ? num : trimmed;
-          }
-        },
-        {
-          name: 'cable_impedance_r',
-          label: 'Impedance R (Ω)',
-          type: 'number',
-          getValue: comp => getImpedancePart(comp.cable, 'r'),
-          setValue: (comp, value) => {
-            if (!comp.cable || typeof comp.cable !== 'object') comp.cable = {};
-            setImpedancePart(comp.cable, 'r', value, { keepEmpty: false });
-          }
-        },
-        {
-          name: 'cable_impedance_x',
-          label: 'Impedance X (Ω)',
-          type: 'number',
-          getValue: comp => getImpedancePart(comp.cable, 'x'),
-          setValue: (comp, value) => {
-            if (!comp.cable || typeof comp.cable !== 'object') comp.cable = {};
-            setImpedancePart(comp.cable, 'x', value, { keepEmpty: false });
-          }
-        }
-      ];
-    } else if (targetComp.type === 'annotation') {
-      const isShapeAnnotation = targetComp.subtype === 'annotation_custom_shape';
-      baseFields = [
-        { name: 'label', label: 'Label', type: 'text' },
-        {
-          name: 'width',
-          label: 'Width (px)',
-          type: 'number',
-          help: isShapeAnnotation ? 'For circles width controls the diameter.' : undefined
-        },
-        {
-          name: 'height',
-          label: 'Height (px)',
-          type: 'number',
-          help: isShapeAnnotation ? 'Circles keep height equal to width.' : undefined
-        }
-      ];
-      if (isShapeAnnotation) {
-        baseFields.push(
-          {
-            name: 'shapeType',
-            label: 'Shape Type',
-            type: 'select',
-            options: [
-              { value: 'rectangle', label: 'Rectangle' },
-              { value: 'rounded', label: 'Rounded Rectangle' },
-              { value: 'circle', label: 'Circle' }
-            ]
-          },
-          {
-            name: 'strokeStyle',
-            label: 'Line Style',
-            type: 'select',
-            options: [
-              { value: 'solid', label: 'Solid' },
-              { value: 'dashed', label: 'Dashed' },
-              { value: 'dotted', label: 'Dotted' }
-            ]
-          },
-          {
-            name: 'strokeWidth',
-            label: 'Line Weight',
-            type: 'number'
-          },
-          {
-            name: 'strokeColor',
-            label: 'Line Color',
-            type: 'color'
-          },
-          {
-            name: 'fillColor',
-            label: 'Fill Color',
-            type: 'color',
-            getValue: comp => {
-              const raw = comp.fillColor || comp.props?.fillColor || defaultShapeProps.fillColor;
-              return raw && raw !== 'none' ? raw : defaultShapeProps.fillColor;
-            }
-          },
-          {
-            name: 'fillOpacity',
-            label: 'Fill Opacity',
-            type: 'number',
-            help: '0 = transparent, 1 = opaque.',
-            min: 0,
-            max: 1,
-            step: 0.05,
-            getValue: comp => {
-              const value = comp.fillOpacity ?? comp.props?.fillOpacity ?? defaultShapeProps.fillOpacity;
-              const numeric = Number(value);
-              if (Number.isFinite(numeric)) return numeric;
-              const fallback = Number(defaultShapeProps.fillOpacity);
-              return Number.isFinite(fallback) ? fallback : 1;
-            }
-          },
-          {
-            name: 'cornerRadius',
-            label: 'Corner Radius',
-            type: 'number',
-            help: 'Applied to rounded rectangles.'
-          }
-        );
-      }
-    } else {
-      baseFields = [
-        { name: 'label', label: 'Label', type: 'text' },
-        { name: 'ref', label: 'Ref ID', type: 'text' },
-        {
-          name: 'enclosure',
-          label: 'Enclosure',
-          type: 'select',
-          options: [
-            { value: 'box', label: 'Box / enclosed' },
-            { value: 'open', label: 'Open air' },
-            { value: 'NEMA 1', label: 'NEMA 1' },
-            { value: 'NEMA 3R', label: 'NEMA 3R' },
-            { value: 'NEMA 4', label: 'NEMA 4' },
-            { value: 'NEMA 4X', label: 'NEMA 4X' }
-          ]
-        },
-        { name: 'gap', label: 'Electrode Gap (mm)', type: 'number' },
-        { name: 'working_distance', label: 'Working Distance (mm)', type: 'number' },
-        { name: 'clearing_time', label: 'Clearing Time (s)', type: 'number' }
-      ];
-
-      if (isMotorStudyComponent) {
-        baseFields = baseFields.filter(
-          f => !['conductor_type', 'cable_assembly', 'breaker_frame', 'conductor_assembly'].includes(f.name)
-        );
-      }
-
-      if (hasImpedance(targetComp)) {
-        baseFields = baseFields.concat([
-          {
-            name: 'impedance_r',
-            label: 'Impedance R (Ω)',
-            type: 'number',
-            getValue: comp => getImpedancePart(comp, 'r'),
-            setValue: (comp, value) => setImpedancePart(comp, 'r', value, { keepEmpty: true })
-          },
-          {
-            name: 'impedance_x',
-            label: 'Impedance X (Ω)',
-            type: 'number',
-            getValue: comp => getImpedancePart(comp, 'x'),
-            setValue: (comp, value) => setImpedancePart(comp, 'x', value, { keepEmpty: true })
-          }
-        ]);
-      }
-    }
-
-    let manufacturerInput = null;
-    let modelInput = null;
-    let tccInput = null;
-    let harmonicProfileInput = null;
-    let harmonicSpectrumInput = null;
-
-    const form = document.createElement('form');
-    form.id = 'prop-form';
-    form.className = 'prop-detail-form';
-    let hasApplied = false;
-
-    const formatPropertyFieldLabel = (label, fieldName = '') => {
-      const raw = String(label || formatAttributeLabel(fieldName) || fieldName || '')
-        .replace(/[_-]+/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim();
-      if (!raw) return '';
-      const acronymMap = new Map([
-        ['a', 'A'],
-        ['ac', 'AC'],
-        ['dc', 'DC'],
-        ['fla', 'FLA'],
-        ['hp', 'HP'],
-        ['id', 'ID'],
-        ['ka', 'kA'],
-        ['kv', 'kV'],
-        ['kva', 'kVA'],
-        ['kvar', 'kVAR'],
-        ['kw', 'kW'],
-        ['mva', 'MVA'],
-        ['mw', 'MW'],
-        ['pf', 'PF'],
-        ['pt', 'PT'],
-        ['pu', 'pu'],
-        ['tcc', 'TCC'],
-        ['ups', 'UPS'],
-        ['v', 'V'],
-        ['vt', 'VT'],
-        ['xr', 'X/R']
-      ]);
-      const formatToken = token => token.replace(/[A-Za-z0-9/]+/g, match => {
-        const mapped = acronymMap.get(match.toLowerCase());
-        if (mapped) return mapped;
-        if (match.length <= 1 && match === match.toUpperCase()) return match;
-        return match.charAt(0).toUpperCase() + match.slice(1).toLowerCase();
-      });
-      return raw.split(' ').map(formatToken).join(' ')
-        .replace(/\bVoltage Volts\b/g, 'Voltage (V)')
-        .replace(/\bDC V\b/g, 'DC Voltage')
-        .replace(/\bPct\b/g, '(%)')
-        .replace(/\bRuntime Min\b/g, 'Runtime (min)')
-        .replace(/\bDuration S\b/g, 'Duration (s)')
-        .replace(/\bTime S\b/g, 'Time (s)');
-    };
-
-    const buildField = (f, container) => {
-      const lbl = document.createElement('label');
-      const labelHeader = document.createElement('span');
-      labelHeader.className = 'prop-field-label';
-      const labelName = document.createElement('span');
-      labelName.className = 'prop-field-name';
-      labelName.textContent = formatPropertyFieldLabel(f.label, f.name);
-      labelHeader.appendChild(labelName);
-      const requiredBadge = document.createElement('span');
-      requiredBadge.className = `prop-field-badge ${f.required ? 'prop-field-badge-required' : 'prop-field-badge-optional'}`;
-      requiredBadge.textContent = f.required ? 'Required' : 'Optional';
-      labelHeader.appendChild(requiredBadge);
-      let input;
-      const defVal = manufacturerDefaults[targetComp.subtype]?.[f.name] || '';
-      let curVal;
-      if (typeof f.getValue === 'function') {
-        curVal = f.getValue(targetComp);
-      } else if (targetComp[f.name] !== undefined && targetComp[f.name] !== '') {
-        curVal = targetComp[f.name];
-      } else if (
-        targetComp.props
-        && typeof targetComp.props === 'object'
-        && Object.prototype.hasOwnProperty.call(targetComp.props, f.name)
-        && targetComp.props[f.name] !== ''
-      ) {
-        curVal = targetComp.props[f.name];
+  const propertyEditor = createPropertyEditorController({
+    documentRef: document,
+    modal,
+    devices: deviceComponents,
+    initialComponent: activeComponent,
+    getCategory,
+    getCategoryLabel: key => key ? formatAttributeLabel(String(key)) : 'Other',
+    onSelectionChange: target => {
+      activeComponent = target;
+      if (target?.isVirtualNode || !target) {
+        selected = null;
+        selection = [];
       } else {
-        curVal = defVal;
+        selected = target;
+        selection = [target];
       }
-      if (f.type === 'select') {
-        input = document.createElement('select');
-        const selectOptions = typeof f.options === 'function' ? f.options(targetComp, f) : f.options;
-        (selectOptions || []).forEach(opt => {
-          const optionValue = typeof opt === 'object' ? opt.value ?? opt.label ?? '' : opt;
-          const optionLabel = typeof opt === 'object' ? opt.label ?? opt.value ?? '' : opt;
-          const o = document.createElement('option');
-          o.value = optionValue;
-          o.textContent = optionLabel;
-          if ((curVal ?? '') == optionValue) o.selected = true;
-          input.appendChild(o);
-        });
-      } else if (f.type === 'textarea') {
-        input = document.createElement('textarea');
-        input.value = curVal ?? '';
-        if (f.rows) input.rows = f.rows;
-        input.spellcheck = false;
-      } else if (f.type === 'checkbox') {
-        input = document.createElement('input');
-        input.type = 'checkbox';
-        input.checked = !!curVal;
-      } else {
-        input = document.createElement('input');
-        input.type = f.type || 'text';
-        if (f.type === 'number') {
-          input.step = f.step !== undefined ? String(f.step) : 'any';
-          if (f.min !== undefined) input.min = String(f.min);
-          if (f.max !== undefined) input.max = String(f.max);
-        }
-        input.value = curVal ?? '';
-      }
-      input.name = f.name;
-      if (f.required) input.required = true;
-      if (f.placeholder) input.placeholder = f.placeholder;
-      if (f.name === 'manufacturer') manufacturerInput = input;
-      if (f.name === 'model') modelInput = input;
-      if (f.name === 'tccId') tccInput = input;
-      if (f.name === 'harmonicProfileId' || f.name === 'harmonic_profile_id') harmonicProfileInput = input;
-      if (f.name === 'harmonics' || f.name === 'harmonic_spectrum') harmonicSpectrumInput = input;
-      if (shouldApplyMotorDerivations) {
-        motorInputMap.set(f.name, input);
-      }
-      if (isStaticLoadComponent && staticInputMap) {
-        staticInputMap.set(f.name, input);
-      }
-      if (isTransformerComponent && transformerInputMap) {
-        transformerInputMap.set(f.name, input);
-      }
-      if (isSourceCategoryComponent && sourceInputMap) {
-        sourceInputMap.set(f.name, input);
-      }
-      const isMotorCalculatedField = shouldApplyMotorDerivations && motorCalculatedFields.has(f.name);
-      const isStaticCalculatedField = isStaticLoadComponent && staticCalculatedFields?.has(f.name);
-      const isTransformerCalculatedField = isTransformerComponent && transformerCalculatedFields.has(f.name);
-      const isSourceCalculatedField = isSourceCategoryComponent && sourceCalculatedFields.has(f.name);
-      const isStaticManualField = isStaticLoadComponent && staticManualFields?.has(f.name);
-      if (isStaticManualField) {
-        const badge = document.createElement('span');
-        badge.className = 'prop-field-badge prop-field-badge-manual';
-        badge.textContent = 'Input';
-        labelHeader.appendChild(badge);
-      }
-      if (isMotorCalculatedField || isStaticCalculatedField || isTransformerCalculatedField || isSourceCalculatedField) {
-        lbl.classList.add('prop-field-calculated');
-        input.classList.add('prop-input-calculated');
-        input.readOnly = true;
-        input.setAttribute('aria-readonly', 'true');
-        const badge = document.createElement('span');
-        badge.className = 'prop-field-badge prop-field-badge-calculated';
-        badge.textContent = 'Calculated';
-        labelHeader.appendChild(badge);
-      }
-      if (isTransformerComponent && transformerAutoFieldNames.has(f.name) && transformerCustomBadges) {
-        const customBadge = document.createElement('span');
-        customBadge.className = 'prop-field-badge prop-field-badge-custom';
-        customBadge.textContent = 'Custom';
-        customBadge.hidden = true;
-        labelHeader.appendChild(customBadge);
-        transformerCustomBadges.set(f.name, { badge: customBadge, input });
-      }
-      if (isSourceCategoryComponent && sourceAutoFieldNames.has(f.name) && sourceCustomBadges) {
-        const customBadge = document.createElement('span');
-        customBadge.className = 'prop-field-badge prop-field-badge-custom';
-        customBadge.textContent = 'Custom';
-        customBadge.hidden = true;
-        labelHeader.appendChild(customBadge);
-        sourceCustomBadges.set(f.name, { badge: customBadge, input });
-      }
-      if (f.help) {
-        const helpBtn = document.createElement('button');
-        helpBtn.type = 'button';
-        helpBtn.className = 'prop-help-btn';
-        helpBtn.title = f.help;
-        helpBtn.setAttribute('aria-label', f.help);
-        helpBtn.textContent = '?';
-        labelHeader.appendChild(helpBtn);
-      }
-      lbl.appendChild(labelHeader);
-      lbl.appendChild(input);
-      container.appendChild(lbl);
-    };
-
-    const applyFieldFromForm = (target, field, formData) => {
-      const reservedTopLevelFieldNames = new Set([
-        'id', 'type', 'subtype', 'x', 'y', 'width', 'height', 'rotation', 'rotationManual', 'flipped', 'label',
-        'ports', 'connections', 'meta', 'svg', 'icon', 'scheduleLinks', 'props'
-      ]);
-      if (reservedTopLevelFieldNames.has(field.name) && typeof field.setValue !== 'function') return;
-      const hasPropKey = !!(
-        target
-        && target.props
-        && typeof target.props === 'object'
-        && Object.prototype.hasOwnProperty.call(target.props, field.name)
-      );
-      if (field.type === 'checkbox') {
-        const checked = formData.get(field.name) === 'on';
-        if (typeof field.setValue === 'function') field.setValue(target, checked);
-        else target[field.name] = checked;
-        if (hasPropKey) target.props[field.name] = checked;
-        return;
-      }
-      const raw = formData.get(field.name);
-      const value = raw === null ? '' : raw;
-      if (typeof field.setValue === 'function') {
-        field.setValue(target, value);
-        if (hasPropKey) {
-          target.props[field.name] = field.type === 'number' && value ? parseFloat(value) : value || '';
-        }
-        return;
-      }
-      if (field.type === 'number') {
-        const numVal = value ? parseFloat(value) : '';
-        target[field.name] = numVal;
-        if (hasPropKey) target.props[field.name] = numVal;
-      } else {
-        const textVal = value || '';
-        target[field.name] = textVal;
-        if (hasPropKey) target.props[field.name] = textVal;
-      }
-    };
-
-    let fields = [...baseFields, ...schema];
-    const seenFieldNames = new Set();
-    fields = fields.filter(field => {
-      if (!field || !field.name) return true;
-      if (seenFieldNames.has(field.name)) return false;
-      seenFieldNames.add(field.name);
-      return true;
-    });
-    if (isMotorStudyComponent) {
-      fields = fields.filter(
-        f => !['conductor_type', 'cable_assembly', 'breaker_frame', 'conductor_assembly'].includes(f.name)
-      );
+      selectedConnection = null;
     }
-
-    const compatibleTccDevices = compatibleProtectiveDevices(protectiveDevices, targetComp);
-    const shouldShowTccField = targetComp.type !== 'cable' && componentProtectionKind(targetComp) !== null;
-
-    if (shouldShowTccField) {
-      const tccOptions = [
-        { value: '', label: '--Select Device--' },
-        ...compatibleTccDevices.map(dev => ({ value: dev.id, label: dev.name }))
-      ];
-      fields.push({
-        name: 'tccId',
-        label: 'TCC Device',
-        type: 'select',
-        options: tccOptions,
-        getValue: comp => comp.tccId || '',
-        setValue: (comp, value) => {
-          comp.tccId = value || '';
-        },
-        help: compatibleTccDevices.length
-          ? 'Only device families compatible with this component type and voltage class are shown.'
-          : 'No compatible protective-device records are available for this component type and voltage class.'
-      });
-    }
-
-    const makeScheduleLinkOptions = records => {
-      const seen = new Set();
-      const options = [{ value: '', label: '--None--' }];
-      (Array.isArray(records) ? records : []).forEach(record => {
-        const value = String(record?.ref || record?.id || record?.tag || record?.cable_id || record?.cableId || '').trim();
-        if (!value || seen.has(value)) return;
-        seen.add(value);
-        const description = record?.description || record?.name || record?.loadType || '';
-        options.push({
-          value,
-          label: description ? `${value} - ${description}` : value
-        });
-      });
-      return options;
-    };
-
-    const setScheduleLink = (comp, key, directKey, value) => {
-      if (!comp.scheduleLinks || typeof comp.scheduleLinks !== 'object') comp.scheduleLinks = {};
-      const nextValue = String(value || '').trim();
-      if (nextValue) {
-        comp.scheduleLinks[key] = nextValue;
-        comp[directKey] = nextValue;
-      } else {
-        delete comp.scheduleLinks[key];
-        delete comp[directKey];
-      }
-      if (!Object.keys(comp.scheduleLinks).length) delete comp.scheduleLinks;
-    };
-
-    const scheduleLinkFieldDefs = [
-      {
-        name: 'equipmentRef',
-        label: 'Equipment Record',
-        type: 'select',
-        options: makeScheduleLinkOptions(getEquipment()),
-        getValue: comp => comp.scheduleLinks?.equipment || comp.equipmentRef || '',
-        setValue: (comp, value) => setScheduleLink(comp, 'equipment', 'equipmentRef', value)
-      },
-      {
-        name: 'loadRef',
-        label: 'Load Record',
-        type: 'select',
-        options: makeScheduleLinkOptions(getLoads()),
-        getValue: comp => comp.scheduleLinks?.load || comp.loadRef || '',
-        setValue: (comp, value) => setScheduleLink(comp, 'load', 'loadRef', value)
-      },
-      {
-        name: 'panelRef',
-        label: 'Panel Record',
-        type: 'select',
-        options: makeScheduleLinkOptions(getPanels()),
-        getValue: comp => comp.scheduleLinks?.panel || comp.panelRef || '',
-        setValue: (comp, value) => setScheduleLink(comp, 'panel', 'panelRef', value)
-      },
-      {
-        name: 'cableRef',
-        label: 'Cable Record',
-        type: 'select',
-        options: makeScheduleLinkOptions(getCables()),
-        getValue: comp => comp.scheduleLinks?.cable || comp.cableRef || '',
-        setValue: (comp, value) => setScheduleLink(comp, 'cable', 'cableRef', value)
-      }
-    ];
-    fields.push(...scheduleLinkFieldDefs);
-    const scheduleLinkFieldNames = new Set(scheduleLinkFieldDefs.map(field => field.name));
-
-    const hasTccField = fields.some(f => f.name === 'tccId');
-    let lastSourceVoltageDriver = null;
-
-    const applyChanges = () => {
-      if (isComponentPropertiesLocked(targetComp)) {
-        showToast('Unlock component properties before applying changes');
-        return;
-      }
-      if (hasApplied) return;
-      hasApplied = true;
-      const fd = new FormData(form);
-      fields.forEach(f => {
-        applyFieldFromForm(targetComp, f, fd);
-      });
-      normalizeComponentElectricalProperties(targetComp);
-      ensureShapeDefaults(targetComp);
-      if (hasTccField) {
-        targetComp.tccId = fd.get('tccId') || '';
-      }
-      if (isSourceCategoryComponent) {
-        syncSourceVoltageFields(targetComp, lastSourceVoltageDriver);
-      }
-      pushHistory();
-      render();
-      zoomToComponentNeighborhood(targetComp, { pad: 110, maxZoom: 1.2 });
-      save();
-      markScheduleReconcilePending();
-    };
-    modal._applyChanges = applyChanges;
-
-    const baseFieldNames = new Set(baseFields.map(f => f.name));
-    const manufacturerFields = [];
-    const noteFields = [];
-    const electricalFields = [];
-    const motorStartFields = [];
-    const physicalFields = [];
-    const studyFields = [];
-    const scheduleLinkFields = [];
-    const generalFields = [];
-    const motorStartFieldNames = [
-      'inrushMultiple', 'lr_current_pu', 'thevenin_r', 'thevenin_x', 'inertia', 'load_torque_curve',
-      'starter_type', 'vfd_current_limit_pu', 'initial_voltage_pu', 'ramp_time_s',
-      'wye_delta_switch_time_s', 'autotransformer_tap', 'synchronous_speed_rpm',
-      'full_load_amps', 'locked_rotor_current', 'locked_rotor_multiple', 'current_limit_pu',
-      'start_time_s', 'stall_time', 'pf', 'power_factor', 'efficiency', 'full_load_efficiency_pct'
-    ];
-    fields.forEach(f => {
-      if (scheduleLinkFieldNames.has(f.name)) {
-        scheduleLinkFields.push(f);
-      } else if (isMotorStudyComponent && motorStartFieldNames.includes(f.name)) {
-        motorStartFields.push(f);
-      } else if (impedanceFieldNameSet.has(f.name)) {
-        electricalFields.push(f);
-      } else if (studyInputFieldNameSet.has(f.name)) {
-        studyFields.push(f);
-      } else if (isPhysicalPropertyField(f)) {
-        physicalFields.push(f);
-      } else if (['manufacturer', 'model'].includes(f.name)) manufacturerFields.push(f);
-      else if (['notes', 'failure_modes'].includes(f.name)) noteFields.push(f);
-      else if (baseFieldNames.has(f.name) || f.name === 'tccId') generalFields.push(f);
-      else electricalFields.push(f);
-    });
-
-    const moveMotorCalculatedToEnd = fieldArr => {
-      if (!shouldApplyMotorDerivations || !Array.isArray(fieldArr) || !fieldArr.length) return fieldArr;
-      const nonCalculated = [];
-      const calculated = [];
-      fieldArr.forEach(field => {
-        if (motorCalculatedFields.has(field.name)) calculated.push(field);
-        else nonCalculated.push(field);
-      });
-      fieldArr.length = 0;
-      fieldArr.push(...nonCalculated, ...calculated);
-      return fieldArr;
-    };
-
-    [generalFields, electricalFields, physicalFields, studyFields, motorStartFields].forEach(moveMotorCalculatedToEnd);
-
-    const createFieldset = (legendText, fieldArr) => {
-      const fs = document.createElement('fieldset');
-      if (legendText) {
-        const legend = document.createElement('legend');
-        legend.textContent = legendText;
-        fs.appendChild(legend);
-      }
-      fieldArr.forEach(field => buildField(field, fs));
-      return fs;
-    };
-
-    const tabList = document.createElement('div');
-    tabList.className = 'prop-tabs';
-    tabList.setAttribute('role', 'tablist');
-    form.appendChild(tabList);
-
-    const tabPanels = document.createElement('div');
-    tabPanels.className = 'prop-tab-panels';
-    form.appendChild(tabPanels);
-
-    const tabs = [];
-    const tabMap = new Map();
-
-    const activateTab = id => {
-      tabs.forEach(tab => {
-        const isSelected = tab.id === id;
-        tab.button.setAttribute('aria-selected', isSelected ? 'true' : 'false');
-        tab.button.tabIndex = isSelected ? 0 : -1;
-        tab.panel.hidden = !isSelected;
-      });
-    };
-
-    const focusTabAt = index => {
-      if (!tabs.length) return;
-      const normalized = ((index % tabs.length) + tabs.length) % tabs.length;
-      const tab = tabs[normalized];
-      activateTab(tab.id);
-      tab.button.focus();
-    };
-
-    const createTabSection = (id, label, legendText, fieldArr, options = {}) => {
-      const hasFields = Array.isArray(fieldArr) && fieldArr.length > 0;
-      if (!options.force && !hasFields) return null;
-      const tabButton = document.createElement('button');
-      tabButton.type = 'button';
-      tabButton.className = 'prop-tab';
-      tabButton.id = `prop-tab-${id}`;
-      tabButton.textContent = label;
-      tabButton.setAttribute('role', 'tab');
-      tabButton.setAttribute('aria-selected', 'false');
-      tabButton.setAttribute('aria-controls', `prop-tab-panel-${id}`);
-      tabButton.tabIndex = -1;
-      tabList.appendChild(tabButton);
-
-      const panel = document.createElement('div');
-      panel.className = 'prop-tab-panel';
-      panel.id = `prop-tab-panel-${id}`;
-      panel.setAttribute('role', 'tabpanel');
-      panel.setAttribute('aria-labelledby', tabButton.id);
-      panel.hidden = true;
-      if (hasFields) panel.appendChild(createFieldset(legendText, fieldArr));
-      tabPanels.appendChild(panel);
-
-      const tabRecord = { id, button: tabButton, panel };
-      tabs.push(tabRecord);
-      tabMap.set(id, tabRecord);
-
-      tabButton.addEventListener('click', () => {
-        activateTab(id);
-      });
-      tabButton.addEventListener('keydown', e => {
-        if (e.key === 'ArrowRight') {
-          e.preventDefault();
-          focusTabAt(tabs.findIndex(t => t.id === id) + 1);
-        } else if (e.key === 'ArrowLeft') {
-          e.preventDefault();
-          focusTabAt(tabs.findIndex(t => t.id === id) - 1);
-        }
-      });
-
-      return tabRecord;
-    };
-
-    createTabSection('general', 'General', 'General', generalFields);
-    createTabSection('links', 'Links', 'Schedule Links', scheduleLinkFields);
-    createTabSection('electrical', 'Electrical', 'Electrical', electricalFields);
-    createTabSection('studies', 'Studies', 'Study Inputs', studyFields);
-    createTabSection('physical', 'Physical', 'Physical', physicalFields);
-    createTabSection('motor', 'Motor Start', 'Motor Start', motorStartFields);
-    createTabSection('manufacturer', 'Manufacturer', 'Manufacturer', manufacturerFields);
-    createTabSection('notes', 'Notes', 'Notes', noteFields);
-
-    if (shouldApplyMotorDerivations) {
-      const driverFieldNames = [
-        'hp',
-        'horsepower',
-        'pf',
-        'power_factor',
-        'efficiency',
-        'eff',
-        'voltage',
-        'volts',
-        'volts_primary',
-        'volts_secondary',
-        'baseKV',
-        'kV',
-        'kv',
-        'phases',
-        'phase_count',
-        'phaseCount',
-        'inrushMultiple',
-        'lr_current_pu',
-        'locked_rotor_multiple',
-        'lockedRotorMultiple'
-      ];
-
-      const parseNumericValue = raw => {
-        if (raw === null || raw === undefined) return null;
-        if (typeof raw === 'number') return Number.isFinite(raw) ? raw : null;
-        const text = String(raw).trim();
-        if (!text) return null;
-        const num = Number.parseFloat(text);
-        return Number.isFinite(num) ? num : null;
-      };
-
-      const parsePercentValue = raw => {
-        const num = parseNumericValue(raw);
-        if (num === null) return null;
-        let ratio = num;
-        if (Math.abs(ratio) > 1.5) ratio /= 100;
-        if (!Number.isFinite(ratio) || ratio <= 0) return null;
-        return ratio;
-      };
-
-      const readComponentValue = name => {
-        if (targetComp && Object.prototype.hasOwnProperty.call(targetComp, name)) {
-          const direct = targetComp[name];
-          if (direct !== undefined && direct !== null && direct !== '') return direct;
-        }
-        if (targetComp?.props && Object.prototype.hasOwnProperty.call(targetComp.props, name)) {
-          const propVal = targetComp.props[name];
-          if (propVal !== undefined && propVal !== null && propVal !== '') return propVal;
-        }
-        return null;
-      };
-
-      const getNumeric = (names, { percent = false } = {}) => {
-        for (const name of names) {
-          const input = motorInputMap.get(name);
-          if (!input) continue;
-          const value = percent ? parsePercentValue(input.value) : parseNumericValue(input.value);
-          if (value !== null) return value;
-        }
-        for (const name of names) {
-          const fromComp = readComponentValue(name);
-          if (fromComp === null) continue;
-          const value = percent ? parsePercentValue(fromComp) : parseNumericValue(fromComp);
-          if (value !== null) return value;
-        }
-        return null;
-      };
-
-      const clamp = (val, min, max) => {
-        if (!Number.isFinite(val)) return val;
-        if (val < min) return min;
-        if (val > max) return max;
-        return val;
-      };
-
-      const updateMotorDerivedFields = () => {
-        const hpVal = getNumeric(['hp', 'horsepower']);
-        let effVal = getNumeric(['efficiency', 'eff'], { percent: true });
-        let pfVal = getNumeric(['pf', 'power_factor'], { percent: true });
-        let voltageVal = getNumeric(['voltage', 'volts', 'volts_primary', 'volts_secondary']);
-        if (voltageVal === null) {
-          const baseKv = getNumeric(['baseKV', 'kV', 'kv']);
-          if (Number.isFinite(baseKv) && baseKv > 0) voltageVal = baseKv * 1000;
-        }
-        let phasesVal = getNumeric(['phases', 'phase_count', 'phaseCount']);
-        const loadKwInput = motorInputMap.get('load_kw');
-        const loadKvarInput = motorInputMap.get('load_kvar');
-        const impRInput = motorInputMap.get('impedance_r');
-        const impXInput = motorInputMap.get('impedance_x');
-        effVal = effVal !== null ? clamp(effVal, 0.01, 0.9999) : null;
-        pfVal = pfVal !== null ? clamp(pfVal, 0.01, 0.9999) : null;
-        phasesVal = Number.isFinite(phasesVal) && phasesVal > 0 ? phasesVal : 3;
-
-        let inputKw = null;
-        if (Number.isFinite(hpVal) && hpVal > 0 && Number.isFinite(effVal) && effVal > 0) {
-          const outputKw = hpVal * 0.746;
-          inputKw = outputKw / effVal;
-          if (loadKwInput) loadKwInput.value = formatNumber(inputKw, 3);
-        }
-
-        if (Number.isFinite(inputKw) && pfVal !== null && loadKvarInput) {
-          const kva = inputKw / pfVal;
-          const kvar = Math.sqrt(Math.max(kva * kva - inputKw * inputKw, 0));
-          loadKvarInput.value = formatNumber(kvar, 3);
-        }
-
-        const voltageValid = Number.isFinite(voltageVal) && voltageVal > 0 ? voltageVal : null;
-        let lineCurrent = null;
-        if (Number.isFinite(inputKw) && pfVal !== null && voltageValid !== null) {
-          const isSinglePhase = phasesVal <= 1.5;
-          const denom = isSinglePhase ? voltageValid * pfVal : Math.sqrt(3) * voltageValid * pfVal;
-          if (denom > 0) {
-            lineCurrent = (inputKw * 1000) / denom;
-          }
-          if (lineCurrent && lineCurrent > 0 && impRInput && impXInput) {
-            const phaseVoltage = isSinglePhase ? voltageValid : voltageValid / Math.sqrt(3);
-            const impedanceMag = phaseVoltage / lineCurrent;
-            if (Number.isFinite(impedanceMag) && impedanceMag > 0) {
-              const sinPhi = Math.sqrt(Math.max(1 - pfVal * pfVal, 0));
-              const resistance = impedanceMag * pfVal;
-              const reactance = impedanceMag * sinPhi;
-              impRInput.value = formatNumber(resistance, 4);
-              impXInput.value = formatNumber(reactance, 4);
-            }
-          }
-        }
-      };
-
-      const attachUpdate = input => {
-        if (!input) return;
-        input.addEventListener('input', updateMotorDerivedFields);
-        input.addEventListener('change', updateMotorDerivedFields);
-      };
-
-      driverFieldNames.forEach(name => {
-        const input = motorInputMap.get(name);
-        if (input) attachUpdate(input);
-      });
-
-      updateMotorDerivedFields();
-    }
-
-    if (isStaticLoadComponent && staticInputMap) {
-      const pfFieldNames = ['pf', 'power_factor'];
-      const wattsFieldNames = ['watts'];
-      const kvaFieldNames = ['kva'];
-      const voltageFieldNames = ['volts', 'voltage'];
-      const baseFieldNames = ['baseKV', 'kV', 'kv', 'prefault_voltage'];
-
-      const parsePfValue = raw => {
-        const numeric = parseNumericValue(raw);
-        if (numeric === null) return null;
-        let pf = numeric;
-        if (Math.abs(pf) > 1.5) pf /= 100;
-        if (!Number.isFinite(pf) || pf === 0) return null;
-        const sign = pf >= 0 ? 1 : -1;
-        pf = Math.abs(pf);
-        if (pf < 0.01) pf = 0.01;
-        if (pf > 1) pf = 1;
-        return sign * pf;
-      };
-
-      const getInputValue = (names, parser) => {
-        for (const name of names) {
-          const input = staticInputMap.get(name);
-          if (!input) continue;
-          const parsed = parser(input.value);
-          if (parsed !== null) return parsed;
-        }
-        return null;
-      };
-
-      const updateStaticPowerFields = (source, { commitFormatting = false, allowFallback = false } = {}) => {
-        const wattsInput = staticInputMap.get('watts');
-        const kvaInput = staticInputMap.get('kva');
-        const loadKwInput = staticInputMap.get('load_kw');
-        const loadKvarInput = staticInputMap.get('load_kvar');
-        const pfInput = staticInputMap.get('pf') || staticInputMap.get('power_factor');
-
-        const setFieldValue = (input, value, decimals, { skip = false, preserveOnInvalid = false } = {}) => {
-          if (!input || skip) return;
-          if (Number.isFinite(value)) {
-            input.value = formatNumber(value, decimals);
-          } else if (!preserveOnInvalid || commitFormatting) {
-            input.value = '';
-          }
-        };
-
-        let pfVal = getInputValue(pfFieldNames, parsePfValue);
-        if (pfVal === null && allowFallback) {
-          for (const name of pfFieldNames) {
-            const fallback = parsePfValue(readComponentValue(name));
-            if (fallback !== null) {
-              pfVal = fallback;
-              break;
-            }
-          }
-        }
-
-        let wattsVal = getInputValue(wattsFieldNames, parseNumericValue);
-        if (wattsVal === null && allowFallback) {
-          const fallbackWatts = parseNumericValue(readComponentValue('watts'));
-          if (fallbackWatts !== null) {
-            wattsVal = fallbackWatts;
-          } else {
-            const loadKwFallback = parseNumericValue(getNestedComponentValue(targetComp, ['load', 'kw']));
-            if (loadKwFallback !== null) wattsVal = loadKwFallback * 1000;
-          }
-        }
-
-        let kvaVal = getInputValue(kvaFieldNames, parseNumericValue);
-        if (kvaVal === null && allowFallback) {
-          const fallbackKva = parseNumericValue(readComponentValue('kva'));
-          if (fallbackKva !== null) kvaVal = fallbackKva;
-        }
-
-        const pfMagnitude = Number.isFinite(pfVal) ? Math.min(Math.max(Math.abs(pfVal), 0.01), 1) : null;
-        const kvarSign = Number.isFinite(pfVal) && pfVal < 0 ? -1 : 1;
-
-        let kwVal = Number.isFinite(wattsVal) ? wattsVal / 1000 : null;
-        if (!Number.isFinite(kwVal) && Number.isFinite(kvaVal) && pfMagnitude !== null) {
-          kwVal = kvaVal * pfMagnitude;
-        }
-
-        const sourceIsWattsOrPf = source === 'watts' || pfFieldNames.includes(source);
-        if (sourceIsWattsOrPf && Number.isFinite(kwVal) && pfMagnitude !== null && pfMagnitude > 0) {
-          kvaVal = kwVal / pfMagnitude;
-        } else if (!Number.isFinite(kvaVal) && Number.isFinite(kwVal) && pfMagnitude !== null && pfMagnitude > 0) {
-          kvaVal = kwVal / pfMagnitude;
-        }
-
-        if (!Number.isFinite(wattsVal) && Number.isFinite(kwVal)) {
-          wattsVal = kwVal * 1000;
-        }
-
-        let kvarVal = null;
-        if (Number.isFinite(kvaVal) && Number.isFinite(kwVal)) {
-          const diff = Math.max(kvaVal * kvaVal - kwVal * kwVal, 0);
-          kvarVal = Math.sqrt(diff) * (Number.isFinite(pfVal) ? kvarSign : 1);
-        }
-
-        const existingKvarVal = allowFallback
-          ? parseNumericValue(getNestedComponentValue(targetComp, ['load', 'kvar']))
-          : null;
-
-        const skipManual = !commitFormatting;
-
-        setFieldValue(wattsInput, wattsVal, 3, {
-          skip: source === 'watts' && skipManual,
-          preserveOnInvalid: true
-        });
-        setFieldValue(kvaInput, kvaVal, 3, {
-          skip: source === 'kva' && skipManual,
-          preserveOnInvalid: true
-        });
-
-        if (pfInput) {
-          const pfNames = pfFieldNames.filter(name => staticInputMap.has(name));
-          const pfSkip = pfNames.includes(source) && skipManual;
-          if (Number.isFinite(pfVal)) {
-            if (!pfSkip) pfInput.value = formatNumber(pfVal, 3);
-          } else if (!pfSkip && commitFormatting) {
-            pfInput.value = '';
-          }
-        }
-
-        if (loadKwInput) {
-          if (Number.isFinite(kwVal)) loadKwInput.value = formatNumber(kwVal, 3);
-          else loadKwInput.value = '';
-        }
-        if (loadKvarInput) {
-          if (Number.isFinite(kvarVal)) loadKvarInput.value = formatNumber(kvarVal, 3);
-          else if (Number.isFinite(existingKvarVal)) loadKvarInput.value = formatNumber(existingKvarVal, 3);
-          else loadKvarInput.value = '';
-        }
-      };
-
-      const parseVoltageValue = raw => {
-        const normalized = normalizeVoltageToVolts(raw);
-        if (!Number.isFinite(normalized) || normalized <= 0) return null;
-        return normalized;
-      };
-
-      const updateStaticVoltageFields = (source, { commitFormatting = false, allowFallback = false } = {}) => {
-        const voltsInput = staticInputMap.get('volts');
-        const voltageInput = staticInputMap.get('voltage');
-        const baseInputs = baseFieldNames
-          .map(name => ({ name, input: staticInputMap.get(name) }))
-          .filter(entry => entry.input);
-
-        const getVoltageFromInput = input => {
-          if (!input) return null;
-          return parseVoltageValue(input.value);
-        };
-
-        let voltsVal = null;
-        if (source === 'volts') voltsVal = getVoltageFromInput(voltsInput);
-        if (voltsVal === null && source === 'voltage') voltsVal = getVoltageFromInput(voltageInput);
-        if (voltsVal === null) {
-          voltsVal = getVoltageFromInput(voltsInput) ?? getVoltageFromInput(voltageInput);
-        }
-        if (voltsVal === null) {
-          for (const entry of baseInputs) {
-            const parsed = parseVoltageValue(entry.input.value);
-            if (parsed !== null) {
-              voltsVal = parsed;
-              break;
-            }
-          }
-        }
-        if (voltsVal === null && allowFallback) {
-          const fallbackSources = [...voltageFieldNames, ...baseFieldNames];
-          for (const name of fallbackSources) {
-            const parsed = parseVoltageValue(readComponentValue(name));
-            if (parsed !== null) {
-              voltsVal = parsed;
-              break;
-            }
-          }
-          if (voltsVal === null) {
-            const nested = parseVoltageValue(getNestedComponentValue(targetComp, ['voltage']));
-            if (nested !== null) voltsVal = nested;
-          }
-        }
-
-        const kvVal = Number.isFinite(voltsVal) ? voltsVal / 1000 : null;
-
-        const skipManual = !commitFormatting;
-
-        if (voltsInput) {
-          const skip = source === 'volts' && skipManual;
-          if (Number.isFinite(voltsVal)) {
-            if (!skip) voltsInput.value = formatNumber(voltsVal, 3);
-          } else if (!skip && commitFormatting) {
-            voltsInput.value = '';
-          }
-        }
-
-        if (voltageInput) {
-          const skip = source === 'voltage' && skipManual;
-          if (Number.isFinite(voltsVal)) {
-            if (!skip) voltageInput.value = formatNumber(voltsVal, 3);
-          } else if (!skip && commitFormatting) {
-            voltageInput.value = '';
-          }
-        }
-
-        baseInputs.forEach(({ input }) => {
-          if (!input) return;
-          if (Number.isFinite(kvVal)) {
-            input.value = formatNumber(kvVal, 6);
-          } else if (commitFormatting || !input.value) {
-            input.value = '';
-          }
-        });
-      };
-
-      const attachPowerListener = name => {
-        const input = staticInputMap.get(name);
-        if (!input) return;
-        input.addEventListener('input', () => updateStaticPowerFields(name, { allowFallback: false }));
-        input.addEventListener('change', () => updateStaticPowerFields(name, { commitFormatting: true, allowFallback: false }));
-      };
-
-      const attachVoltageListener = name => {
-        const input = staticInputMap.get(name);
-        if (!input) return;
-        input.addEventListener('input', () => updateStaticVoltageFields(name, { allowFallback: false }));
-        input.addEventListener('change', () => updateStaticVoltageFields(name, { commitFormatting: true, allowFallback: false }));
-      };
-
-      [...wattsFieldNames, ...kvaFieldNames, ...pfFieldNames].forEach(attachPowerListener);
-      voltageFieldNames.forEach(attachVoltageListener);
-
-      updateStaticPowerFields(null, { commitFormatting: true, allowFallback: true });
-      updateStaticVoltageFields(null, { commitFormatting: true, allowFallback: true });
-    }
-
-    if (isSourceCategoryComponent && sourceInputMap) {
-      const baseFieldNames = ['baseKV', 'kV', 'kv', 'prefault_voltage'];
-      const sourceVoltageDriverNames = [
-        'source_voltage_base',
-        'voltage',
-        'volts',
-        'voltage_primary',
-        'voltage_secondary',
-        'nominalVoltage',
-        'nominal_voltage'
-      ];
-      const orderedSourceVoltageDrivers = preferredDriver => (
-        preferredDriver && sourceVoltageDriverNames.includes(preferredDriver)
-          ? [preferredDriver, ...sourceVoltageDriverNames.filter(name => name !== preferredDriver)]
-          : sourceVoltageDriverNames
-      );
-
-      const setCustomIndicator = (name, active) => {
-        if (!sourceCustomBadges) return;
-        const entry = sourceCustomBadges.get(name);
-        if (!entry) return;
-        const { badge, input } = entry;
-        if (badge) badge.hidden = !active;
-        if (input) {
-          if (active) input.classList.add('prop-input-custom');
-          else input.classList.remove('prop-input-custom');
-        }
-      };
-
-      const parseKvValue = raw => {
-        if (raw === null || raw === undefined) return null;
-        const directKv = toBaseKV(raw);
-        if (Number.isFinite(directKv) && directKv > 0.2) return directKv;
-        const numeric = parseNumericValue(raw);
-        if (!Number.isFinite(numeric) || numeric <= 0) return null;
-        if (numeric > 1000) return numeric / 1000;
-        return numeric;
-      };
-
-      const getKvFromInputs = names => {
-        for (const name of names) {
-          const input = sourceInputMap.get(name);
-          if (!input) continue;
-          const kv = parseKvValue(input.value);
-          if (kv !== null) return kv;
-        }
-        return null;
-      };
-
-      const getKvFromComponent = names => {
-        for (const name of names) {
-          const kv = parseKvValue(readComponentValue(name));
-          if (kv !== null) return kv;
-        }
-        return null;
-      };
-
-      const getKvFromOverrideInputs = names => {
-        for (const name of names) {
-          const entry = sourceCustomBadges?.get(name);
-          const input = entry?.input ?? sourceInputMap.get(name);
-          if (!input) continue;
-          if (input.dataset.userOverride !== '1') continue;
-          const kv = parseKvValue(input.value);
-          if (kv !== null) return kv;
-        }
-        return null;
-      };
-
-      const resolveAutoBaseKV = ({ includeOverrides = false, preferredDriver = null } = {}) => {
-        if (includeOverrides) {
-          const fromOverrides = getKvFromOverrideInputs(baseFieldNames);
-          if (Number.isFinite(fromOverrides) && fromOverrides > 0) return fromOverrides;
-        }
-        const driverInputs = orderedSourceVoltageDrivers(preferredDriver);
-        const fromInputs = getKvFromInputs(driverInputs);
-        if (Number.isFinite(fromInputs) && fromInputs > 0) return fromInputs;
-        const fromComponentDrivers = getKvFromComponent(driverInputs);
-        if (Number.isFinite(fromComponentDrivers) && fromComponentDrivers > 0) return fromComponentDrivers;
-        if (includeOverrides) {
-          const fromBaseInputs = getKvFromInputs(baseFieldNames);
-          if (Number.isFinite(fromBaseInputs) && fromBaseInputs > 0) return fromBaseInputs;
-        }
-        const fromBase = getKvFromComponent(baseFieldNames);
-        if (Number.isFinite(fromBase) && fromBase > 0) return fromBase;
-        return null;
-      };
-
-      const syncSourceVoltageInputs = preferredDriver => {
-        const autoKv = resolveAutoBaseKV({ preferredDriver });
-        if (!Number.isFinite(autoKv) || autoKv <= 0) return;
-        const formattedKv = formatNumber(autoKv, 6);
-        const formattedVolts = formatNumber(autoKv * 1000, 3);
-        [
-          { name: 'source_voltage_base', value: formattedKv },
-          { name: 'voltage', value: formattedVolts },
-          { name: 'volts', value: formattedVolts }
-        ].forEach(({ name, value }) => {
-          if (name === preferredDriver) return;
-          const input = sourceInputMap.get(name);
-          if (input) input.value = value;
-        });
-      };
-
-      const parseShortCircuitCapacity = raw => {
-        if (raw === null || raw === undefined) return null;
-        if (typeof raw === 'number') {
-          return Number.isFinite(raw) && raw > 0 ? { value: raw, unit: 'mva' } : null;
-        }
-        const text = String(raw).trim();
-        if (!text) return null;
-        const match = text.match(/[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?/);
-        if (!match) return null;
-        const numeric = Number.parseFloat(match[0].replace(/,/g, ''));
-        if (!Number.isFinite(numeric) || numeric <= 0) return null;
-        const lowered = text.toLowerCase();
-        if (lowered.includes('ka')) return { value: numeric, unit: 'ka' };
-        if (lowered.includes('mva')) return { value: numeric, unit: 'mva' };
-        return { value: numeric, unit: 'mva' };
-      };
-
-      const getShortCircuitCapacity = () => {
-        const input = sourceInputMap.get('short_circuit_capacity');
-        const fromInput = parseShortCircuitCapacity(input?.value ?? null);
-        if (fromInput) return fromInput;
-        return parseShortCircuitCapacity(readComponentValue('short_circuit_capacity'));
-      };
-
-      const updateSourceBaseFields = (options = {}) => {
-        const autoKv = resolveAutoBaseKV(options);
-        const tolerance = 1e-6;
-        baseFieldNames.forEach(name => {
-          const entry = sourceCustomBadges?.get(name);
-          const input = entry?.input ?? sourceInputMap.get(name);
-          if (!input) return;
-          if (!Number.isFinite(autoKv) || autoKv <= 0) {
-            delete input.dataset.autoValue;
-            if (!input.value.trim()) delete input.dataset.userOverride;
-            const active = input.dataset.userOverride === '1';
-            setCustomIndicator(name, active);
-            return;
-          }
-          const formatted = formatNumber(autoKv, 6);
-          input.dataset.autoValue = formatted;
-          const currentVal = parseNumericValue(input.value);
-          const hasValue = typeof input.value === 'string' && input.value.trim() !== '';
-          let isOverride = input.dataset.userOverride === '1';
-          if (!hasValue) {
-            isOverride = false;
-          } else if (Number.isFinite(currentVal) && Math.abs(currentVal - autoKv) <= tolerance) {
-            isOverride = false;
-          } else if (!isOverride) {
-            isOverride = true;
-          }
-          if (!isOverride) {
-            input.value = formatted;
-            delete input.dataset.userOverride;
-          } else {
-            input.dataset.userOverride = '1';
-          }
-          setCustomIndicator(name, isOverride);
-        });
-      };
-
-      const updateSourceDerivedFields = () => {
-        const theveninInput = sourceInputMap.get('thevenin_mva');
-        if (!theveninInput) return;
-        let theveninMva = null;
-        const sc = getShortCircuitCapacity();
-        if (sc) {
-          if (sc.unit === 'ka') {
-            const baseKv = resolveAutoBaseKV({ includeOverrides: true, preferredDriver: lastSourceVoltageDriver });
-            if (Number.isFinite(baseKv) && baseKv > 0) {
-              theveninMva = Math.sqrt(3) * baseKv * sc.value;
-            }
-          } else {
-            theveninMva = sc.value;
-          }
-        }
-        if (theveninMva === null) {
-          const existing = parseNumericValue(readComponentValue('thevenin_mva'));
-          if (Number.isFinite(existing)) theveninMva = existing;
-          else {
-            const fallback = parseNumericValue(readComponentValue('mva'));
-            if (Number.isFinite(fallback)) theveninMva = fallback;
-          }
-        }
-        theveninInput.value = Number.isFinite(theveninMva) ? formatNumber(theveninMva, 6) : '';
-      };
-
-      const attachBaseDriverListener = name => {
-        const input = sourceInputMap.get(name);
-        if (!input) return;
-        const handler = () => {
-          lastSourceVoltageDriver = name;
-          syncSourceVoltageInputs(name);
-          updateSourceBaseFields({ preferredDriver: name });
-          updateSourceDerivedFields();
-        };
-        input.addEventListener('input', handler);
-        input.addEventListener('change', handler);
-      };
-
-      ['source_voltage_base', 'voltage', 'volts', 'voltage_primary', 'voltage_secondary', 'nominalVoltage', 'nominal_voltage'].forEach(
-        attachBaseDriverListener
-      );
-
-      const attachDerivedListener = name => {
-        const input = sourceInputMap.get(name);
-        if (!input) return;
-        const handler = () => {
-          updateSourceDerivedFields();
-        };
-        input.addEventListener('input', handler);
-        input.addEventListener('change', handler);
-      };
-
-      ['short_circuit_capacity'].forEach(attachDerivedListener);
-
-      baseFieldNames.forEach(name => {
-        const entry = sourceCustomBadges?.get(name);
-        const input = entry?.input ?? sourceInputMap.get(name);
-        if (!input) return;
-        input.addEventListener('input', () => {
-          if (!input.value.trim()) {
-            delete input.dataset.userOverride;
-            setCustomIndicator(name, false);
-            updateSourceBaseFields();
-            updateSourceDerivedFields();
-            return;
-          }
-          input.dataset.userOverride = '1';
-          setCustomIndicator(name, true);
-          updateSourceDerivedFields();
-        });
-        input.addEventListener('change', () => {
-          if (!input.value.trim()) {
-            delete input.dataset.userOverride;
-            setCustomIndicator(name, false);
-            updateSourceBaseFields();
-            updateSourceDerivedFields();
-            return;
-          }
-          const autoVal = parseNumericValue(input.dataset.autoValue);
-          const currentVal = parseNumericValue(input.value);
-          if (Number.isFinite(autoVal) && Number.isFinite(currentVal) && Math.abs(currentVal - autoVal) <= 1e-6) {
-            delete input.dataset.userOverride;
-            setCustomIndicator(name, false);
-            updateSourceBaseFields();
-          } else {
-            input.dataset.userOverride = '1';
-            setCustomIndicator(name, true);
-          }
-          updateSourceDerivedFields();
-        });
-      });
-
-      updateSourceBaseFields();
-      updateSourceDerivedFields();
-    }
-
-    if (isTransformerComponent && transformerInputMap) {
-      const impedanceDriverFields = [
-        'kva',
-        'kva_lv',
-        'kva_secondary',
-        'kva_primary',
-        'kva_hv',
-        'kva_tv',
-        'kva_tertiary',
-        'percent_z',
-        'z_percent',
-        'percent_primary',
-        'percent_secondary',
-        'percent_tertiary',
-        'z_hv_lv_percent',
-        'z_hv_tv_percent',
-        'z_lv_tv_percent',
-        'xr_ratio',
-        'xr'
-      ];
-      const voltageFieldPriority = [
-        'volts_secondary',
-        'volts_lv',
-        'volts_tv',
-        'volts_tertiary',
-        'volts_primary',
-        'volts_hv',
-        'voltage_secondary',
-        'voltage_primary',
-        'voltage'
-      ];
-      const baseFieldNames = ['baseKV', 'kV', 'kv', 'prefault_voltage'];
-
-      const setCustomIndicator = (name, active) => {
-        if (!transformerCustomBadges) return;
-        const entry = transformerCustomBadges.get(name);
-        if (!entry) return;
-        const { badge, input } = entry;
-        if (active) {
-          badge.hidden = false;
-          input.classList.add('prop-input-custom');
-        } else {
-          badge.hidden = true;
-          input.classList.remove('prop-input-custom');
-        }
-      };
-
-      const parseVoltageToKV = raw => {
-        const volts = normalizeVoltageToVolts(raw);
-        if (!Number.isFinite(volts) || volts <= 0) return null;
-        return volts / 1000;
-      };
-
-      const getNumericFromInputs = (names, { voltage = false } = {}) => {
-        for (const name of names) {
-          const input = transformerInputMap.get(name);
-          if (!input) continue;
-          const raw = input.value;
-          const value = voltage ? parseVoltageToKV(raw) : parseNumericValue(raw);
-          if (value !== null) return value;
-        }
-        return null;
-      };
-
-      const resolveAutoBaseKV = () => {
-        const fromInputs = getNumericFromInputs(voltageFieldPriority, { voltage: true });
-        if (Number.isFinite(fromInputs) && fromInputs > 0) return fromInputs;
-        const derived = deriveTransformerBaseKV(targetComp);
-        if (Number.isFinite(derived) && derived > 0) return derived;
-        const fallback = computeTransformerBaseKV(targetComp);
-        if (Number.isFinite(fallback) && fallback > 0) return fallback;
-        return null;
-      };
-
-      const updateTransformerDerivedFields = () => {
-        const kvaVal = getNumericFromInputs(impedanceDriverFields) ?? resolveTransformerKva(targetComp);
-        const percentVal = getNumericFromInputs([
-          'percent_z',
-          'z_percent',
-          'percent_primary',
-          'percent_secondary',
-          'percent_tertiary',
-          'z_hv_lv_percent',
-          'z_hv_tv_percent',
-          'z_lv_tv_percent'
-        ]) ?? resolveTransformerPercentZ(targetComp);
-        let baseKv = getNumericFromInputs(voltageFieldPriority, { voltage: true });
-        if (baseKv === null) {
-          const fromBaseInputs = getNumericFromInputs(baseFieldNames);
-          if (Number.isFinite(fromBaseInputs) && fromBaseInputs > 0) baseKv = fromBaseInputs;
-        }
-        if (baseKv === null) baseKv = computeTransformerBaseKV(targetComp);
-        const xrVal = getNumericFromInputs(['xr_ratio', 'xr']) ?? resolveTransformerXrRatio(targetComp);
-        const impRInput = transformerInputMap.get('impedance_r');
-        const impXInput = transformerInputMap.get('impedance_x');
-        if (
-          Number.isFinite(kvaVal)
-          && Number.isFinite(percentVal)
-          && Number.isFinite(baseKv)
-          && kvaVal !== 0
-          && percentVal !== 0
-          && baseKv !== 0
-        ) {
-          const impedance = calculateTransformerImpedance({ kva: kvaVal, percentZ: percentVal, voltageKV: baseKv, xrRatio: xrVal });
-          if (impedance && Number.isFinite(impedance.r) && Number.isFinite(impedance.x)) {
-            if (impRInput) impRInput.value = formatNumber(impedance.r, 6);
-            if (impXInput) impXInput.value = formatNumber(impedance.x, 6);
-            return;
-          }
-        }
-        if (impRInput) impRInput.value = '';
-        if (impXInput) impXInput.value = '';
-      };
-
-      const updateTransformerBaseFields = () => {
-        const autoKv = resolveAutoBaseKV();
-        const tolerance = 1e-6;
-        baseFieldNames.forEach(name => {
-          const input = transformerInputMap.get(name);
-          if (!input) return;
-          if (!Number.isFinite(autoKv) || autoKv <= 0) {
-            delete input.dataset.autoValue;
-            const isCustom = input.dataset.userOverride === '1';
-            setCustomIndicator(name, isCustom);
-            return;
-          }
-          const formatted = formatNumber(autoKv, 6);
-          input.dataset.autoValue = formatted;
-          const currentVal = parseNumericValue(input.value);
-          const hasValue = typeof input.value === 'string' && input.value.trim() !== '';
-          let isOverride = input.dataset.userOverride === '1';
-          if (!hasValue) {
-            isOverride = false;
-          } else if (Number.isFinite(currentVal) && Math.abs(currentVal - autoKv) <= tolerance) {
-            isOverride = false;
-          } else if (!isOverride) {
-            isOverride = true;
-          }
-          if (!isOverride) {
-            input.value = formatted;
-            delete input.dataset.userOverride;
-          } else {
-            input.dataset.userOverride = '1';
-          }
-          setCustomIndicator(name, isOverride);
-        });
-      };
-
-      const attachDerivedListener = name => {
-        const input = transformerInputMap.get(name);
-        if (!input) return;
-        const handler = () => {
-          updateTransformerDerivedFields();
-          if (voltageFieldPriority.includes(name)) updateTransformerBaseFields();
-        };
-        input.addEventListener('input', handler);
-        input.addEventListener('change', handler);
-      };
-
-      impedanceDriverFields.concat(voltageFieldPriority).forEach(attachDerivedListener);
-
-      baseFieldNames.forEach(name => {
-        const input = transformerInputMap.get(name);
-        if (!input) return;
-        input.addEventListener('input', () => {
-          if (!input.value.trim()) {
-            delete input.dataset.userOverride;
-            setCustomIndicator(name, false);
-            updateTransformerBaseFields();
-            updateTransformerDerivedFields();
-            return;
-          }
-          input.dataset.userOverride = '1';
-          setCustomIndicator(name, true);
-          updateTransformerDerivedFields();
-        });
-        input.addEventListener('change', () => {
-          if (!input.value.trim()) {
-            delete input.dataset.userOverride;
-            setCustomIndicator(name, false);
-            updateTransformerBaseFields();
-            updateTransformerDerivedFields();
-            return;
-          }
-          const autoVal = parseNumericValue(input.dataset.autoValue);
-          const currentVal = parseNumericValue(input.value);
-          if (Number.isFinite(autoVal) && Number.isFinite(currentVal) && Math.abs(currentVal - autoVal) <= 1e-6) {
-            delete input.dataset.userOverride;
-            setCustomIndicator(name, false);
-            updateTransformerBaseFields();
-          } else {
-            input.dataset.userOverride = '1';
-            setCustomIndicator(name, true);
-          }
-          updateTransformerDerivedFields();
-        });
-      });
-
-      updateTransformerDerivedFields();
-      updateTransformerBaseFields();
-    }
-
-    const getTabPanel = id => tabMap.get(id)?.panel || tabs[0]?.panel || null;
-
-    if (harmonicProfileInput && harmonicSpectrumInput) {
-      const studiesPanel = getTabPanel('studies');
-      const studiesFieldset = studiesPanel?.querySelector('fieldset');
-      const helper = document.createElement('div');
-      helper.className = 'harmonic-profile-helper';
-
-      const selectedInfo = document.createElement('div');
-      selectedInfo.className = 'harmonic-profile-selected';
-      const selectedTitle = document.createElement('strong');
-      selectedTitle.textContent = 'Profile spectrum';
-      const selectedText = document.createElement('span');
-      selectedInfo.appendChild(selectedTitle);
-      selectedInfo.appendChild(selectedText);
-
-      const chartActionRow = document.createElement('div');
-      chartActionRow.className = 'harmonic-profile-action-row';
-      const viewChartsButton = document.createElement('button');
-      viewChartsButton.type = 'button';
-      viewChartsButton.className = 'btn harmonic-profile-chart-btn';
-      viewChartsButton.textContent = 'View Profile Charts';
-      chartActionRow.appendChild(viewChartsButton);
-
-      const saveRow = document.createElement('div');
-      saveRow.className = 'harmonic-profile-save-row';
-      const customName = document.createElement('input');
-      customName.type = 'text';
-      customName.placeholder = 'Custom profile name';
-      customName.autocomplete = 'off';
-      const saveProfileButton = document.createElement('button');
-      saveProfileButton.type = 'button';
-      saveProfileButton.className = 'btn harmonic-profile-save-btn';
-      saveProfileButton.textContent = 'Save Current Spectrum';
-      saveRow.appendChild(customName);
-      saveRow.appendChild(saveProfileButton);
-
-      helper.appendChild(selectedInfo);
-      helper.appendChild(chartActionRow);
-      helper.appendChild(saveRow);
-      if (studiesFieldset) studiesFieldset.appendChild(helper);
-
-      const getNamedFormElement = name => {
-        const element = form.elements.namedItem(name);
-        if (!element) return null;
-        if (typeof Element !== 'undefined' && element instanceof Element) return element;
-        return element[0] || null;
-      };
-
-      const readFormOrComponentValue = name => {
-        const element = getNamedFormElement(name);
-        if (element) {
-          if (element.type === 'checkbox') return element.checked;
-          if (element.value !== undefined && element.value !== '') return element.value;
-        }
-        return readComponentValue(name);
-      };
-
-      const getPreviewNumeric = names => {
-        for (const name of names) {
-          const parsed = parseNumericValue(readFormOrComponentValue(name));
-          if (parsed !== null) return parsed;
-        }
-        return null;
-      };
-
-      const getPreviewVoltage = () => {
-        const voltageNames = [
-          'voltage',
-          'volts',
-          'rated_voltage',
-          'rated_voltage_v',
-          'nominal_voltage',
-          'nominalVoltage',
-          'baseKV',
-          'kV',
-          'kv',
-          'prefault_voltage'
-        ];
-        for (const name of voltageNames) {
-          const volts = normalizeVoltageToVolts(readFormOrComponentValue(name));
-          if (Number.isFinite(volts) && volts > 0) return volts;
-        }
-        const fallback = normalizeVoltageToVolts(targetComp);
-        return Number.isFinite(fallback) && fallback > 0 ? fallback : null;
-      };
-
-      const getPreviewLoadKw = () => {
-        const loadValue = readComponentValue('load');
-        if (loadValue && typeof loadValue === 'object') {
-          const nestedKw = parseNumericValue(loadValue.kw ?? loadValue.kW ?? loadValue.P);
-          if (nestedKw !== null) return nestedKw;
-        }
-        const kw = getPreviewNumeric(['load_kw', 'kw', 'kW', 'rated_kw', 'output_kw']);
-        if (kw !== null) return kw;
-        const hp = getPreviewNumeric(['hp', 'horsepower']);
-        return hp !== null ? hp * 0.746 : null;
-      };
-
-      const makeSvgElement = (tagName, attrs = {}) => {
-        const el = document.createElementNS('http://www.w3.org/2000/svg', tagName);
-        Object.entries(attrs).forEach(([key, value]) => {
-          el.setAttribute(key, String(value));
-        });
-        return el;
-      };
-
-      const createChartPanel = (chartGrid, title, unitLabel, emptyText, className) => {
-        const panel = document.createElement('div');
-        panel.className = 'harmonic-profile-chart-panel';
-        const header = document.createElement('div');
-        header.className = 'harmonic-profile-chart-header';
-        const heading = document.createElement('strong');
-        heading.textContent = title;
-        const summary = document.createElement('span');
-        header.appendChild(heading);
-        header.appendChild(summary);
-        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-        svg.setAttribute('viewBox', '0 0 320 170');
-        svg.setAttribute('role', 'img');
-        svg.setAttribute('aria-label', `${title} chart`);
-        svg.classList.add('harmonic-profile-chart', className);
-        const empty = document.createElement('p');
-        empty.className = 'harmonic-profile-chart-empty';
-        empty.textContent = emptyText;
-        panel.appendChild(header);
-        panel.appendChild(svg);
-        panel.appendChild(empty);
-        chartGrid.appendChild(panel);
-        return { svg, summary, empty, emptyText, unitLabel };
-      };
-
-      let chartModalState = null;
-
-      const ensureHarmonicChartModal = () => {
-        if (chartModalState) return chartModalState;
-        const chartModalEl = document.createElement('div');
-        chartModalEl.className = 'harmonic-profile-chart-modal';
-        chartModalEl.hidden = true;
-        chartModalEl.setAttribute('role', 'dialog');
-        chartModalEl.setAttribute('aria-modal', 'true');
-        chartModalEl.setAttribute('aria-labelledby', 'harmonic-profile-chart-title');
-
-        const panel = document.createElement('div');
-        panel.className = 'harmonic-profile-chart-modal-panel';
-
-        const header = document.createElement('div');
-        header.className = 'harmonic-profile-chart-modal-header';
-        const title = document.createElement('h3');
-        title.id = 'harmonic-profile-chart-title';
-        title.textContent = 'Harmonic Profile Charts';
-        const closeButton = document.createElement('button');
-        closeButton.type = 'button';
-        closeButton.className = 'harmonic-profile-chart-close';
-        closeButton.setAttribute('aria-label', 'Close harmonic profile charts');
-        closeButton.textContent = 'x';
-        header.appendChild(title);
-        header.appendChild(closeButton);
-
-        const profileSummary = document.createElement('p');
-        profileSummary.className = 'harmonic-profile-chart-summary';
-
-        const chartGrid = document.createElement('div');
-        chartGrid.className = 'harmonic-profile-chart-grid';
-        const currentChart = createChartPanel(
-          chartGrid,
-          'Current Harmonics',
-          '% I1',
-          'No harmonic orders are defined for this profile.',
-          'harmonic-profile-current-chart'
-        );
-        const voltageChart = createChartPanel(
-          chartGrid,
-          'Voltage Harmonics',
-          '% V1 est.',
-          'Voltage estimate needs load, voltage, and short-circuit MVA.',
-          'harmonic-profile-voltage-chart'
-        );
-
-        const basisText = document.createElement('p');
-        basisText.className = 'harmonic-profile-basis';
-
-        const actions = document.createElement('div');
-        actions.className = 'harmonic-profile-chart-modal-actions';
-        const doneButton = document.createElement('button');
-        doneButton.type = 'button';
-        doneButton.className = 'btn';
-        doneButton.textContent = 'Done';
-        actions.appendChild(doneButton);
-
-        panel.appendChild(header);
-        panel.appendChild(profileSummary);
-        panel.appendChild(chartGrid);
-        panel.appendChild(basisText);
-        panel.appendChild(actions);
-        chartModalEl.appendChild(panel);
-        document.body.appendChild(chartModalEl);
-
-        const closeChartModal = () => {
-          const lastFocused = chartModalState?.lastFocused;
-          chartModalEl.hidden = true;
-          chartModalEl.classList.remove('show');
-          chartModalEl.remove();
-          document.removeEventListener('keydown', keyHandler);
-          chartModalState = null;
-          lastFocused?.focus?.();
-        };
-        closeButton.addEventListener('click', closeChartModal);
-        doneButton.addEventListener('click', closeChartModal);
-        chartModalEl.addEventListener('click', e => {
-          if (e.target === chartModalEl) closeChartModal();
-        });
-        const keyHandler = e => {
-          if (chartModalEl.hidden || e.key !== 'Escape') return;
-          e.preventDefault();
-          closeChartModal();
-        };
-        document.addEventListener('keydown', keyHandler);
-
-        chartModalState = {
-          modal: chartModalEl,
-          closeButton,
-          profileSummary,
-          currentChart,
-          voltageChart,
-          basisText,
-          lastFocused: null
-        };
-        return chartModalState;
-      };
-
-      const renderBarChart = (chart, points, { summaryLabel, emptyText } = {}) => {
-        const svg = chart.svg;
-        svg.textContent = '';
-        const validPoints = (Array.isArray(points) ? points : [])
-          .filter(point => Number.isFinite(point.order) && Number.isFinite(point.pct) && point.order > 1 && point.pct >= 0);
-        if (!validPoints.length) {
-          chart.empty.hidden = false;
-          chart.empty.textContent = emptyText || chart.emptyText;
-          chart.summary.textContent = '';
-          return;
-        }
-
-        chart.empty.hidden = true;
-        chart.empty.textContent = emptyText || chart.emptyText;
-        const width = 320;
-        const height = 170;
-        const margin = { top: 18, right: 16, bottom: 34, left: 42 };
-        const plotWidth = width - margin.left - margin.right;
-        const plotHeight = height - margin.top - margin.bottom;
-        const maxPct = Math.max(1, ...validPoints.map(point => point.pct)) * 1.18;
-        const barGap = 8;
-        const barWidth = Math.max(12, (plotWidth - barGap * (validPoints.length - 1)) / validPoints.length);
-
-        const yAxis = makeSvgElement('line', {
-          x1: margin.left,
-          y1: margin.top,
-          x2: margin.left,
-          y2: margin.top + plotHeight,
-          class: 'harmonic-profile-chart-axis'
-        });
-        const xAxis = makeSvgElement('line', {
-          x1: margin.left,
-          y1: margin.top + plotHeight,
-          x2: margin.left + plotWidth,
-          y2: margin.top + plotHeight,
-          class: 'harmonic-profile-chart-axis'
-        });
-        svg.appendChild(yAxis);
-        svg.appendChild(xAxis);
-
-        [0.5, 1].forEach(ratio => {
-          const y = margin.top + plotHeight - ratio * plotHeight;
-          svg.appendChild(makeSvgElement('line', {
-            x1: margin.left,
-            y1: y,
-            x2: margin.left + plotWidth,
-            y2: y,
-            class: 'harmonic-profile-chart-gridline'
-          }));
-          const tick = makeSvgElement('text', {
-            x: margin.left - 8,
-            y: y + 4,
-            'text-anchor': 'end',
-            class: 'harmonic-profile-chart-text'
-          });
-          tick.textContent = formatHarmonicMetric(maxPct * ratio, 1);
-          svg.appendChild(tick);
-        });
-
-        validPoints.forEach((point, index) => {
-          const x = margin.left + index * (barWidth + barGap);
-          const barHeight = maxPct ? (point.pct / maxPct) * plotHeight : 0;
-          const y = margin.top + plotHeight - barHeight;
-          const rect = makeSvgElement('rect', {
-            x,
-            y,
-            width: barWidth,
-            height: Math.max(1, barHeight),
-            rx: 2,
-            class: 'harmonic-profile-chart-bar'
-          });
-          const title = makeSvgElement('title');
-          title.textContent = `${point.order}th harmonic: ${formatHarmonicMetric(point.pct, 2)} ${chart.unitLabel}`;
-          rect.appendChild(title);
-          svg.appendChild(rect);
-
-          const orderLabel = makeSvgElement('text', {
-            x: x + barWidth / 2,
-            y: margin.top + plotHeight + 18,
-            'text-anchor': 'middle',
-            class: 'harmonic-profile-chart-text'
-          });
-          orderLabel.textContent = String(point.order);
-          svg.appendChild(orderLabel);
-
-          const valueLabel = makeSvgElement('text', {
-            x: x + barWidth / 2,
-            y: Math.max(margin.top + 10, y - 5),
-            'text-anchor': 'middle',
-            class: 'harmonic-profile-chart-value'
-          });
-          valueLabel.textContent = formatHarmonicMetric(point.pct, point.pct < 1 ? 2 : 1);
-          svg.appendChild(valueLabel);
-        });
-
-        const xLabel = makeSvgElement('text', {
-          x: margin.left + plotWidth / 2,
-          y: height - 4,
-          'text-anchor': 'middle',
-          class: 'harmonic-profile-chart-text'
-        });
-        xLabel.textContent = 'Harmonic order';
-        svg.appendChild(xLabel);
-
-        const yLabel = makeSvgElement('text', {
-          x: 12,
-          y: margin.top + plotHeight / 2,
-          transform: `rotate(-90 12 ${margin.top + plotHeight / 2})`,
-          'text-anchor': 'middle',
-          class: 'harmonic-profile-chart-text'
-        });
-        yLabel.textContent = chart.unitLabel;
-        svg.appendChild(yLabel);
-
-        const thd = harmonicThdPercent(validPoints);
-        chart.summary.textContent = `${summaryLabel}: ${formatHarmonicMetric(thd, thd < 1 ? 2 : 1)}%`;
-      };
-
-      const renderHarmonicPreview = () => {
-        const state = chartModalState;
-        if (!state || state.modal.hidden) return;
-        const activeProfile = findHarmonicProfileById(harmonicProfileInput.value);
-        const spectrumText = String(harmonicSpectrumInput.value || '').trim();
-        state.profileSummary.textContent = activeProfile && activeProfile.id !== manualHarmonicProfileId
-          ? `${activeProfile.label}: ${spectrumText || activeProfile.spectrum || 'No spectrum defined'}`
-          : `Manual spectrum: ${spectrumText || 'No spectrum defined'}`;
-        const currentPoints = parseHarmonicSpectrumPoints(harmonicSpectrumInput.value);
-        renderBarChart(state.currentChart, currentPoints, { summaryLabel: 'ITHD' });
-
-        const voltage = getPreviewVoltage();
-        const loadKw = getPreviewLoadKw();
-        const scMVA = getPreviewNumeric(['scMVA', 'short_circuit_mva', 'thevenin_mva']);
-        const voltagePoints = estimateVoltageHarmonicPoints(currentPoints, { voltage, loadKw, scMVA });
-        const missing = [];
-        if (!Number.isFinite(voltage) || voltage <= 0) missing.push('voltage');
-        if (!Number.isFinite(loadKw) || loadKw <= 0) missing.push('load kW or HP');
-        if (!Number.isFinite(scMVA) || scMVA <= 0) missing.push('short-circuit MVA');
-        const voltageEmptyText = missing.length
-          ? `Voltage estimate needs ${missing.join(', ')}.`
-          : 'No voltage harmonic estimate is available for this profile.';
-        renderBarChart(state.voltageChart, voltagePoints, {
-          summaryLabel: 'VTHD est.',
-          emptyText: voltageEmptyText
-        });
-        state.basisText.textContent = voltagePoints.length
-          ? `Voltage estimate uses ${formatHarmonicMetric(loadKw, 1)} kW, ${formatHarmonicMetric(voltage, 0)} V, and ${formatHarmonicMetric(scMVA, 1)} MVA short-circuit strength.`
-          : voltageEmptyText;
-      };
-
-      viewChartsButton.addEventListener('click', () => {
-        const state = ensureHarmonicChartModal();
-        state.lastFocused = document.activeElement;
-        state.modal.hidden = false;
-        state.modal.classList.add('show');
-        renderHarmonicPreview();
-        state.closeButton.focus();
-      });
-
-      const refreshProfileOptions = selectedId => {
-        const nextValue = selectedId || harmonicProfileInput.value || manualHarmonicProfileId;
-        harmonicProfileInput.innerHTML = '';
-        getHarmonicProfileOptions().forEach(opt => {
-          const option = document.createElement('option');
-          option.value = opt.value;
-          option.textContent = opt.label;
-          harmonicProfileInput.appendChild(option);
-        });
-        harmonicProfileInput.value = findHarmonicProfileById(nextValue) ? nextValue : manualHarmonicProfileId;
-      };
-
-      const updateSelectedInfo = profile => {
-        const activeProfile = profile || findHarmonicProfileById(harmonicProfileInput.value);
-        if (!activeProfile || activeProfile.id === manualHarmonicProfileId) {
-          selectedText.textContent = 'Manual spectrum';
-          renderHarmonicPreview();
-          return;
-        }
-        selectedText.textContent = activeProfile.spectrum
-          ? `${activeProfile.label}: ${activeProfile.spectrum}`
-          : activeProfile.label;
-        renderHarmonicPreview();
-      };
-
-      const syncProfileFromSpectrum = () => {
-        const match = findHarmonicProfileBySpectrum(harmonicSpectrumInput.value);
-        harmonicProfileInput.value = match ? match.id : manualHarmonicProfileId;
-        updateSelectedInfo(match);
-      };
-
-      const applySelectedProfile = ({ force = false } = {}) => {
-        const profile = findHarmonicProfileById(harmonicProfileInput.value);
-        if (!profile) {
-          harmonicProfileInput.value = manualHarmonicProfileId;
-          updateSelectedInfo(null);
-          return;
-        }
-        if (profile.id !== manualHarmonicProfileId && profile.spectrum && (force || !harmonicSpectrumInput.value.trim())) {
-          harmonicSpectrumInput.value = profile.spectrum;
-        }
-        updateSelectedInfo(profile);
-      };
-
-      const initialSpectrum = String(harmonicSpectrumInput.value || '').trim();
-      const matchingProfile = findHarmonicProfileBySpectrum(initialSpectrum);
-      refreshProfileOptions(harmonicProfileInput.value || matchingProfile?.id || defaultHarmonicProfileId(targetComp));
-      if (!initialSpectrum) applySelectedProfile({ force: false });
-      else if (matchingProfile && !harmonicProfileInput.value) harmonicProfileInput.value = matchingProfile.id;
-      updateSelectedInfo(findHarmonicProfileById(harmonicProfileInput.value));
-
-      harmonicProfileInput.addEventListener('change', () => applySelectedProfile({ force: true }));
-      harmonicSpectrumInput.addEventListener('input', syncProfileFromSpectrum);
-      const previewDriverNames = new Set([
-        'voltage',
-        'volts',
-        'rated_voltage',
-        'rated_voltage_v',
-        'nominal_voltage',
-        'nominalVoltage',
-        'baseKV',
-        'kV',
-        'kv',
-        'prefault_voltage',
-        'load_kw',
-        'kw',
-        'kW',
-        'rated_kw',
-        'output_kw',
-        'hp',
-        'horsepower',
-        'scMVA',
-        'short_circuit_mva',
-        'thevenin_mva'
-      ]);
-      Array.from(form.elements).forEach(element => {
-        if (!element?.name || !previewDriverNames.has(element.name)) return;
-        element.addEventListener('input', renderHarmonicPreview);
-        element.addEventListener('change', renderHarmonicPreview);
-      });
-      saveProfileButton.addEventListener('click', () => {
-        const profile = saveCustomHarmonicProfile(customName.value, harmonicSpectrumInput.value);
-        if (!profile) {
-          showToast('Enter a custom profile name and harmonic spectrum');
-          return;
-        }
-        refreshProfileOptions(profile.id);
-        harmonicProfileInput.value = profile.id;
-        customName.value = '';
-        updateSelectedInfo(profile);
-        showToast('Harmonic profile saved');
-      });
-    }
-
-    const connectionCount = Array.isArray(targetComp.connections) ? targetComp.connections.length : 0;
-    if (connectionCount > 0) {
-      const connectionsTab = createTabSection('connections', 'Connections', null, [], { force: true });
-      if (connectionsTab) {
-        const header = document.createElement('h3');
-        header.textContent = 'Connections';
-        connectionsTab.panel.appendChild(header);
-        const list = document.createElement('ul');
-        list.className = 'prop-connection-list';
-        (targetComp.connections || []).forEach((conn, idx) => {
-          const li = document.createElement('li');
-          const target = components.find(t => t.id === conn.target);
-          const span = document.createElement('span');
-          const cableInfo = getCableForConnection(targetComp, target, conn);
-          const cableLabel = cableInfo?.tag || cableInfo?.cable_type;
-          span.textContent = `to ${target?.label || target?.subtype || conn.target}${cableLabel ? ` (${cableLabel})` : ''}`;
-          li.appendChild(span);
-          const edit = document.createElement('button');
-          edit.type = 'button';
-          edit.textContent = 'Edit';
-          edit.classList.add('btn');
-          edit.addEventListener('click', async e => {
-            e.stopPropagation();
-            const cableComp = isConductorSegmentComponent(targetComp) ? targetComp : isConductorSegmentComponent(target) ? target : null;
-            if (cableComp) {
-              await editCableComponent(cableComp);
-              renderPropertiesFor(targetComp);
-            } else {
-              showToast('No conductor segment on this connection');
-            }
-          });
-          li.appendChild(edit);
-          const del = document.createElement('button');
-          del.type = 'button';
-          del.textContent = 'Delete';
-          del.classList.add('btn');
-          del.addEventListener('click', e => {
-            e.stopPropagation();
-            targetComp.connections.splice(idx, 1);
-            pushHistory();
-            render();
-            save();
-            renderPropertiesFor(targetComp);
-          });
-          li.appendChild(del);
-          li.addEventListener('click', () => {
-            selectedConnection = { component: targetComp, index: idx };
-          });
-          list.appendChild(li);
-        });
-        connectionsTab.panel.appendChild(list);
-      }
-    }
-
-    if (tabs.length) {
-      activateTab(tabs[0].id);
-    } else {
-      tabList.remove();
-      tabPanels.remove();
-    }
-
-    if (manufacturerInput && modelInput) {
-      const updateModels = () => {
-        const models = getManufacturerModels(manufacturerInput.value);
-        modelInput.innerHTML = '';
-        models.forEach(m => {
-          const o = document.createElement('option');
-          o.value = m;
-          o.textContent = m;
-          if (targetComp.model === m) o.selected = true;
-          modelInput.appendChild(o);
-        });
-      };
-      manufacturerInput.addEventListener('change', updateModels);
-      if (!manufacturerInput.value) manufacturerInput.value = manufacturerOptions[0];
-      updateModels();
-    }
-
-    if (tccInput) {
-      const generalPanel = getTabPanel('general');
-      if (generalPanel) {
-        const tccActions = document.createElement('div');
-        tccActions.className = 'prop-tab-actions';
-        const tccBtn = document.createElement('button');
-        tccBtn.type = 'button';
-        tccBtn.classList.add('btn');
-        const updateTccActionLabel = () => {
-          const hasAssignedDevice = !!tccInput.value;
-          tccBtn.textContent = hasAssignedDevice ? 'View TCC Curve' : 'Assign/View TCC';
-          tccBtn.title = hasAssignedDevice
-            ? 'Open the TCC page with this device and adjacent protective devices selected.'
-            : 'Open the TCC page after assigning a protective device.';
-        };
-        updateTccActionLabel();
-        tccInput.addEventListener('change', updateTccActionLabel);
-        tccBtn.addEventListener('click', () => {
-          if (!targetComp.id) return;
-          applyChanges();
-          const navParams = new URLSearchParams();
-          navParams.set('component', targetComp.id);
-          const assignedDevice = targetComp.tccId || tccInput.value;
-          if (assignedDevice) navParams.set('device', assignedDevice);
-          navParams.set('tccContext', 'adjacent');
-          window.location.href = `tcc.html?${navParams.toString()}`;
-        });
-        tccActions.appendChild(tccBtn);
-        generalPanel.appendChild(tccActions);
-      }
-    }
-
-    if (isConductorSegmentComponent(targetComp)) {
-      const generalPanel = getTabPanel('general');
-      if (generalPanel) {
-        const cable = targetComp.cable || {};
-        const cableInfo = document.createElement('div');
-        cableInfo.className = 'cable-info';
-        cableInfo.innerHTML = `
-          <p><strong>Tag:</strong> ${escapeHtml(cable.tag)}</p>
-          <p><strong>Type:</strong> ${escapeHtml(cable.cable_type)}</p>
-          <p><strong>Cable Rating (V):</strong> ${escapeHtml(cable.cable_rating ?? '')}</p>
-          <p><strong>Operating Voltage (V):</strong> ${escapeHtml(formatOperatingVoltage(cable.operating_voltage) || '')}</p>
-          <p><strong>Conductors:</strong> ${escapeHtml(cable.conductors)}</p>
-          <p><strong>Phases:</strong> ${escapeHtml(Array.isArray(cable.phases) ? cable.phases.join(',') : cable.phases || '')}</p>
-          <p><strong>Conductor Size (AWG or mm²):</strong> ${escapeHtml(cable.conductor_size)}</p>
-          <p><strong>Conductor Material (Cu/Al):</strong> ${escapeHtml(cable.conductor_material)}</p>
-          <p><strong>Resistance (Ω/km):</strong> ${escapeHtml(cable.resistance_per_km ?? '')}</p>
-          <p><strong>Reactance (Ω/km):</strong> ${escapeHtml(cable.reactance_per_km ?? '')}</p>
-          <p><strong>Zero Sequence Impedance:</strong> ${escapeHtml(cable.zero_sequence_impedance)}</p>
-          <p><strong>Mutual Coupling:</strong> ${escapeHtml(cable.mutual_coupling)}</p>
-          <p><strong>Length:</strong> ${escapeHtml(cable.length ?? '')}</p>
-          <p><strong>Operating Temperature (°C):</strong> ${escapeHtml(cable.operating_temp ?? '')}</p>
-          <p><strong>Ambient Temperature (°C):</strong> ${escapeHtml(cable.ambient_temp ?? '')}</p>
-          <p><strong>Thermal Rating/Ampacity (A):</strong> ${escapeHtml(cable.thermal_rating_ampacity ?? '')}</p>
-          <p><strong>Shield/Armor Data:</strong> ${escapeHtml(cable.shield_armor)}</p>
-          <p><strong>Impedance per Length:</strong> ${escapeHtml(cable.impedance_per_length)}</p>
-          <p><strong>Capacitance (µF/km):</strong> ${escapeHtml(cable.capacitance_per_km ?? '')}</p>
-          <p><strong>Insulation Type:</strong> ${escapeHtml(cable.insulation_type)}</p>
-          <p><strong>Installation Type (in conduit, tray, buried):</strong> ${escapeHtml(cable.install_method)}</p>
-          <p><strong>Short Circuit Rating (kA):</strong> ${escapeHtml(cable.short_circuit_rating ?? '')}</p>
-          <p><strong>Grouping Factor:</strong> ${escapeHtml(cable.grouping_factor ?? '')}</p>
-          <p><strong>Resistance Temp Correction Coeff:</strong> ${escapeHtml(cable.resistance_temp_correction_coeff ?? '')}</p>
-          <p><strong>Core Configuration (1C,3C):</strong> ${escapeHtml(cable.core_configuration)}</p>
-          <p><strong>Ground Return Path Resistance:</strong> ${escapeHtml(cable.ground_return_path_resistance ?? '')}</p>
-          <p><strong>Impedance R (Ω):</strong> ${escapeHtml(getImpedancePart(cable, 'r') || '')}</p>
-          <p><strong>Impedance X (Ω):</strong> ${escapeHtml(getImpedancePart(cable, 'x') || '')}</p>
-        `;
-        generalPanel.appendChild(cableInfo);
-
-        const cableActions = document.createElement('div');
-        cableActions.className = 'prop-tab-actions';
-        const editCableBtn = document.createElement('button');
-        editCableBtn.type = 'button';
-        editCableBtn.textContent = 'Edit Segment Details';
-        editCableBtn.classList.add('btn');
-        editCableBtn.addEventListener('click', async () => {
-          await editCableComponent(targetComp);
-          renderPropertiesFor(targetComp);
-        });
-        cableActions.appendChild(editCableBtn);
-        generalPanel.appendChild(cableActions);
-      }
-    }
-
-    const actions = document.createElement('div');
-    actions.className = 'prop-form-actions';
-
-    const applyBtn = document.createElement('button');
-    applyBtn.type = 'submit';
-    applyBtn.textContent = 'Apply';
-    applyBtn.classList.add('btn');
-    actions.appendChild(applyBtn);
-
-    const templateBtn = document.createElement('button');
-    templateBtn.type = 'button';
-    templateBtn.textContent = 'Save as Template';
-    templateBtn.classList.add('btn');
-    templateBtn.addEventListener('click', async () => {
-      const name = await promptDialog('Save Template', 'Template name', targetComp.label || targetComp.subtype);
-      if (!name) return;
-      const fd = new FormData(form);
-      const data = {
-        subtype: targetComp.subtype,
-        type: getCategory(targetComp),
-        rotation: targetComp.rotation || 0,
-        flipped: !!targetComp.flipped
-      };
-      fields.forEach(f => {
-        applyFieldFromForm(data, f, fd);
-      });
-      if (hasTccField) {
-        data.tccId = fd.get('tccId') || '';
-      }
-      templates.push({ name, component: data });
-      saveTemplates();
-      renderTemplates();
-      showToast('Template saved');
-    });
-    actions.appendChild(templateBtn);
-
-    const cancelBtn = document.createElement('button');
-    cancelBtn.type = 'button';
-    cancelBtn.textContent = 'Cancel';
-    cancelBtn.classList.add('btn');
-    cancelBtn.addEventListener('click', closeModal);
-    actions.appendChild(cancelBtn);
-
-    const deleteBtn = document.createElement('button');
-    deleteBtn.type = 'button';
-    deleteBtn.textContent = 'Delete Component';
-    deleteBtn.classList.add('btn');
-    deleteBtn.addEventListener('click', () => {
-      components = components.filter(c => c !== targetComp);
-      components.forEach(c => {
-        c.connections = (c.connections || []).filter(conn => conn.target !== targetComp.id);
-      });
-      closeModal();
-      pushHistory();
-      render();
-      save();
-    });
-    actions.appendChild(deleteBtn);
-
-    form.appendChild(actions);
-
-    if (isComponentPropertiesLocked(targetComp)) {
-      const lockedNotice = document.createElement('p');
-      lockedNotice.className = 'prop-property-lock-notice';
-      lockedNotice.textContent = 'Properties are locked. Unlock them from the component context menu to edit this device.';
-      form.prepend(lockedNotice);
-      form.querySelectorAll('input, select, textarea').forEach(control => {
-        control.disabled = true;
-      });
-      applyBtn.disabled = true;
-      applyBtn.title = 'Unlock component properties to apply changes';
-    }
-
-    form.addEventListener('submit', e => {
-      e.preventDefault();
-      applyChanges();
-      closeModal();
-    });
-
-    propertyContainer.classList.add('prop-property-container-form');
-    propertyContainer.appendChild(form);
-    propertyContainer.scrollTop = 0;
-
-    function renderNodeProperties(node) {
-      const displayName = node.label || node.id || 'Node';
-      propertyHeading.textContent = `${displayName} Node`;
-      const inboundCount = Array.isArray(node.inbound) ? node.inbound.length : 0;
-      const outboundCount = Array.isArray(node.outbound) ? node.outbound.length : 0;
-      const summary = document.createElement('p');
-      summary.className = 'prop-node-summary';
-      const formatCount = (count, noun) => `${count} ${noun}${count === 1 ? '' : 's'}`;
-      summary.textContent = `This node has ${formatCount(inboundCount, 'inbound connection')} and ${formatCount(outboundCount, 'outbound connection')}.`;
-      propertyContainer.appendChild(summary);
-
-      const formatEndpoint = (component, fallback) => {
-        if (component) return getComponentListLabel(component);
-        if (fallback) return fallback;
-        return 'Unknown';
-      };
-
-      const describeCable = conn => {
-        if (!conn) return '';
-        if (conn.cable && conn.cable.tag) return ` (${conn.cable.tag})`;
-        if (conn.cable?.cable_type) return ` (${conn.cable.cable_type})`;
-        if (conn.cable_tag) return ` (${conn.cable_tag})`;
-        if (conn.cable_type) return ` (${conn.cable_type})`;
-        return '';
-      };
-
-      const addConnectionList = (title, entries, direction) => {
-        const header = document.createElement('h4');
-        header.textContent = title;
-        propertyContainer.appendChild(header);
-        if (!entries.length) {
-          const empty = document.createElement('p');
-          empty.className = 'view-modal-empty prop-node-empty';
-          empty.textContent = direction === 'inbound'
-            ? 'No inbound connections.'
-            : 'No outbound connections.';
-          propertyContainer.appendChild(empty);
-          return;
-        }
-        const list = document.createElement('ul');
-        list.className = 'prop-node-connection-list';
-        entries.forEach(entry => {
-          const li = document.createElement('li');
-          const text = document.createElement('span');
-          if (direction === 'inbound') {
-            const sourceLabel = formatEndpoint(entry.sourceComponent, entry.sourceId);
-            text.textContent = `From ${sourceLabel}${describeCable(entry.connection)}`;
-          } else {
-            const targetLabel = formatEndpoint(entry.targetComponent, entry.targetId);
-            text.textContent = `To ${targetLabel}${describeCable(entry.connection)}`;
-          }
-          li.appendChild(text);
-          const related = direction === 'inbound' ? entry.sourceComponent : entry.targetComponent;
-          if (related) {
-            const viewBtn = document.createElement('button');
-            viewBtn.type = 'button';
-            viewBtn.textContent = 'View';
-            viewBtn.classList.add('btn');
-            viewBtn.addEventListener('click', e => {
-              e.stopPropagation();
-              setActiveComponent(related);
-            });
-            li.appendChild(viewBtn);
-          }
-          list.appendChild(li);
-        });
-        propertyContainer.appendChild(list);
-      };
-
-      addConnectionList('Inbound Connections', Array.isArray(node.inbound) ? node.inbound : [], 'inbound');
-      addConnectionList('Outbound Connections', Array.isArray(node.outbound) ? node.outbound : [], 'outbound');
-
-      const actions = document.createElement('div');
-      actions.className = 'prop-form-actions';
-      const deleteBtn = document.createElement('button');
-      deleteBtn.type = 'button';
-      deleteBtn.textContent = 'Delete Node';
-      deleteBtn.classList.add('btn');
-      deleteBtn.addEventListener('click', e => {
-        e.stopPropagation();
-        const nodeId = node.id;
-        if (!nodeId) return;
-        let updated = false;
-        components.forEach(comp => {
-          if (!Array.isArray(comp.connections)) return;
-          const filtered = comp.connections.filter(conn => conn && conn.target !== nodeId);
-          if (filtered.length !== comp.connections.length) {
-            comp.connections = filtered;
-            updated = true;
-          }
-        });
-        const sheet = sheets[activeSheet];
-        if (sheet && Array.isArray(sheet.connections)) {
-          const filtered = sheet.connections.filter(conn => conn && conn.from !== nodeId && conn.to !== nodeId);
-          if (filtered.length !== sheet.connections.length) {
-            sheet.connections.splice(0, sheet.connections.length, ...filtered);
-            connections = sheet.connections;
-            updated = true;
-          }
-        }
-        if (updated) {
-          pushHistory();
-          render();
-          save();
-          showToast('Node deleted');
-          closeModal();
-          selectComponent();
-        } else {
-          showToast('No connections referenced this node');
-        }
-      });
-      actions.appendChild(deleteBtn);
-      const closeBtn = document.createElement('button');
-      closeBtn.type = 'button';
-      closeBtn.textContent = 'Close';
-      closeBtn.classList.add('btn');
-      closeBtn.addEventListener('click', () => {
-        closeModal();
-      });
-      actions.appendChild(closeBtn);
-      propertyContainer.appendChild(actions);
-      propertyContainer.scrollTop = 0;
-    }
-  }
-
-  function setActiveComponent(target) {
-    if (!target) return;
-    applyPendingChanges();
-    const targetCategory = getCategory(target) || activeCategory;
-    if (targetCategory && targetCategory !== activeCategory) {
-      activeCategory = targetCategory;
-      renderDeviceButtons();
-      updateCategoryStates();
-    } else if (!buttonMap.has(target.id)) {
-      renderDeviceButtons();
-    }
-    activeComponent = target;
-    activeId = target.id;
-    if (target?.isVirtualNode) {
-      selected = null;
-      selection = [];
-    } else {
-      selected = target;
-      selection = [target];
-    }
-    selectedConnection = null;
-    updateButtonStates();
-    renderPropertiesFor(target);
-  }
-
-  renderCategoryButtons();
-  renderDeviceButtons();
-  updateCategoryStates();
-  updateButtonStates();
-  renderPropertiesFor(activeComponent);
-
-  const initialButton = buttonMap.get(activeId);
-  if (initialButton) initialButton.focus();
-
-  modal.classList.add('show');
-  modal.addEventListener('click', outsideHandler);
-  modal.addEventListener('pointerdown', pointerDownHandler);
-  modal._pointerDownHandler = pointerDownHandler;
-  modal._pointerDownOnOverlay = false;
-  document.addEventListener('keydown', keyHandler);
-  modal._outsideHandler = outsideHandler;
-  modal._keyHandler = keyHandler;
+  });
+  const { propertyContainer, propertyHeading } = propertyEditor;
+  const closeModal = options => propertyEditor.close(options);
+  const setActiveComponent = target => propertyEditor.setActiveComponent(target);
+  const renderPropertiesFor = createPropertyDetailRenderer({
+    documentRef: document,
+    Element,
+    FormData,
+    URLSearchParams,
+    window,
+    activeSheet,
+    applyPropertyFieldFromForm,
+    cablePropertyMetadata,
+    calculateTransformerImpedance,
+    closeModal,
+    compatibleProtectiveDevices,
+    componentProtectionKind,
+    components,
+    computeTransformerBaseKV,
+    connections,
+    defaultHarmonicProfileId,
+    defaultShapeProps,
+    deriveTransformerBaseKV,
+    editCableComponent,
+    ensureShapeDefaults,
+    escapeHtml,
+    estimateVoltageHarmonicPoints,
+    findHarmonicProfileById,
+    findHarmonicProfileBySpectrum,
+    formatAttributeLabel,
+    formatHarmonicMetric,
+    formatOperatingVoltage,
+    formatPropertyFieldLabel,
+    formatPropertyNumber,
+    getCableForConnection,
+    getCables,
+    getCategory,
+    getComponentListLabel,
+    getEquipment,
+    getHarmonicProfileOptions,
+    getImpedancePart,
+    getLoads,
+    getManufacturerModels,
+    getNestedComponentValue,
+    getPanels,
+    harmonicThdPercent,
+    hasImpedance,
+    impedanceFieldNameSet,
+    inferSchemaFromProps,
+    isComponentPropertiesLocked,
+    isConductorSegmentComponent,
+    isPhysicalPropertyField,
+    isSourceComponent,
+    manualHarmonicProfileId,
+    manufacturerDefaults,
+    manufacturerOptions,
+    markScheduleReconcilePending,
+    modal,
+    normalizeComponentElectricalProperties,
+    normalizePropertySchema,
+    normalizeVoltageToVolts,
+    parseHarmonicSpectrumPoints,
+    parsePropertyNumber,
+    promptDialog,
+    propertyContainer,
+    propertyHeading,
+    propSchemas,
+    protectiveDevices,
+    pushHistory,
+    readPropertyValue,
+    render,
+    renderTemplates,
+    resolveComponentMeta,
+    resolveTransformerKva,
+    resolveTransformerPercentZ,
+    resolveTransformerXrRatio,
+    save,
+    saveCustomHarmonicProfile,
+    saveTemplates,
+    selectComponent,
+    setActiveComponent,
+    setImpedancePart,
+    sheets,
+    showToast,
+    studyInputFieldNameSet,
+    syncSourceVoltageFields,
+    templates,
+    thermalRatings,
+    toBaseKV,
+    transformerConnectionOptions,
+    voltageClasses,
+    zoomToComponentNeighborhood,
+    setComponents: nextComponents => { components = nextComponents; },
+    setConnections: nextConnections => { connections = nextConnections; },
+    setSelectedConnection: connection => { selectedConnection = connection; }
+  });
+  propertyEditor.setPropertyRenderer(renderPropertiesFor);
+  propertyEditor.start();
 }
 
 async function chooseCable(source, target, existingConn = null) {
@@ -17761,1956 +11895,271 @@ async function editCableComponent(comp) {
   markScheduleReconcilePending();
 }
 
+const oneLineEventState = createEventStateAdapter({
+  activeLayerId: { get: () => activeLayerId, set: value => { activeLayerId = value; } },
+  activeSheet: { get: () => activeSheet, set: value => { activeSheet = value; } },
+  activeZoneId: { get: () => activeZoneId, set: value => { activeZoneId = value; } },
+  alignmentGuidesEnabled: { get: () => alignmentGuidesEnabled, set: value => { alignmentGuidesEnabled = value; } },
+  checkpoints: { get: () => checkpoints, set: value => { checkpoints = value; } },
+  clickSelectTimer: { get: () => clickSelectTimer, set: value => { clickSelectTimer = value; } },
+  clipboard: { get: () => clipboard, set: value => { clipboard = value; } },
+  componentMeta: { get: () => componentMeta, set: value => { componentMeta = value; } },
+  components: { get: () => components, set: value => { components = value; } },
+  connectMode: { get: () => connectMode, set: value => { connectMode = value; } },
+  connectSource: { get: () => connectSource, set: value => { connectSource = value; } },
+  connections: { get: () => connections, set: value => { connections = value; } },
+  contextCanvasPoint: { get: () => contextCanvasPoint, set: value => { contextCanvasPoint = value; } },
+  contextTarget: { get: () => contextTarget, set: value => { contextTarget = value; } },
+  cursorPos: { get: () => cursorPos, set: value => { cursorPos = value; } },
+  cursorPosValid: { get: () => cursorPosValid, set: value => { cursorPosValid = value; } },
+  diagramDatablockConfig: { get: () => diagramDatablockConfig, set: value => { diagramDatablockConfig = value; } },
+  diagramFilterMode: { get: () => diagramFilterMode, set: value => { diagramFilterMode = value; } },
+  diagramViewport: { get: () => diagramViewport, set: value => { diagramViewport = value; } },
+  diagramZoom: { get: () => diagramZoom, set: value => { diagramZoom = value; } },
+  dragConnections: { get: () => dragConnections, set: value => { dragConnections = value; } },
+  dragOffset: { get: () => dragOffset, set: value => { dragOffset = value; } },
+  dragSnapGuides: { get: () => dragSnapGuides, set: value => { dragSnapGuides = value; } },
+  dragging: { get: () => dragging, set: value => { dragging = value; } },
+  draggingConnection: { get: () => draggingConnection, set: value => { draggingConnection = value; } },
+  draggingLabel: { get: () => draggingLabel, set: value => { draggingLabel = value; } },
+  gridEnabled: { get: () => gridEnabled, set: value => { gridEnabled = value; } },
+  gridSize: { get: () => gridSize, set: value => { gridSize = value; } },
+  historyEvents: { get: () => historyEvents, set: value => { historyEvents = value; } },
+  hoverPort: { get: () => hoverPort, set: value => { hoverPort = value; } },
+  labelCounters: { get: () => labelCounters, set: value => { labelCounters = value; } },
+  lastComponentClick: { get: () => lastComponentClick, set: value => { lastComponentClick = value; } },
+  lastPointerUp: { get: () => lastPointerUp, set: value => { lastPointerUp = value; } },
+  layers: { get: () => layers, set: value => { layers = value; } },
+  legendDrag: { get: () => legendDrag, set: value => { legendDrag = value; } },
+  legendUserMoved: { get: () => legendUserMoved, set: value => { legendUserMoved = value; } },
+  lintList: { get: () => lintList, set: value => { lintList = value; } },
+  lintPanel: { get: () => lintPanel, set: value => { lintPanel = value; } },
+  marquee: { get: () => marquee, set: value => { marquee = value; } },
+  marqueeSelectionMade: { get: () => marqueeSelectionMade, set: value => { marqueeSelectionMade = value; } },
+  middlePanState: { get: () => middlePanState, set: value => { middlePanState = value; } },
+  minimapVisible: { get: () => minimapVisible, set: value => { minimapVisible = value; } },
+  orthogonalRouting: { get: () => orthogonalRouting, set: value => { orthogonalRouting = value; } },
+  paletteContextTarget: { get: () => paletteContextTarget, set: value => { paletteContextTarget = value; } },
+  paletteWidth: { get: () => paletteWidth, set: value => { paletteWidth = value; } },
+  pointerDownComponentId: { get: () => pointerDownComponentId, set: value => { pointerDownComponentId = value; } },
+  propSchemas: { get: () => propSchemas, set: value => { propSchemas = value; } },
+  propertyClipboard: { get: () => propertyClipboard, set: value => { propertyClipboard = value; } },
+  resizingAnnotation: { get: () => resizingAnnotation, set: value => { resizingAnnotation = value; } },
+  resizingBus: { get: () => resizingBus, set: value => { resizingBus = value; } },
+  resizingPalette: { get: () => resizingPalette, set: value => { resizingPalette = value; } },
+  resizingStudiesPanel: { get: () => resizingStudiesPanel, set: value => { resizingStudiesPanel = value; } },
+  selected: { get: () => selected, set: value => { selected = value; } },
+  selectedConnection: { get: () => selectedConnection, set: value => { selectedConnection = value; } },
+  selection: { get: () => selection, set: value => { selection = value; } },
+  sheets: { get: () => sheets, set: value => { sheets = value; } },
+  showEnergizedState: { get: () => showEnergizedState, set: value => { showEnergizedState = value; } },
+  showHazAreaOverlay: { get: () => showHazAreaOverlay, set: value => { showHazAreaOverlay = value; } },
+  showProtectionZones: { get: () => showProtectionZones, set: value => { showProtectionZones = value; } },
+  showTitleBlock: { get: () => showTitleBlock, set: value => { showTitleBlock = value; } },
+  studiesResizeStartWidth: { get: () => studiesResizeStartWidth, set: value => { studiesResizeStartWidth = value; } },
+  studiesResizeStartX: { get: () => studiesResizeStartX, set: value => { studiesResizeStartX = value; } },
+  studiesWidth: { get: () => studiesWidth, set: value => { studiesWidth = value; } },
+  symbolStandard: { get: () => symbolStandard, set: value => { symbolStandard = value; } },
+  tempConnection: { get: () => tempConnection, set: value => { tempConnection = value; } },
+  titleBlockFields: { get: () => titleBlockFields, set: value => { titleBlockFields = value; } },
+  typeIcons: { get: () => typeIcons }
+});
+
 async function init() {
-  lintPanel = document.getElementById('lint-panel');
-  lintList = document.getElementById('lint-list');
-  const lintCloseBtn = document.getElementById('lint-close-btn');
-  if (lintCloseBtn) lintCloseBtn.addEventListener('click', () => lintPanel.classList.add('hidden'));
-
-  let svg = document.getElementById('diagram');
-  if (!svg) {
-    svg = document.querySelector('svg');
-    if (svg) svg.id = 'diagram';
-  }
-  if (svg) {
-    svg.addEventListener('dragover', e => e.preventDefault());
-    svg.addEventListener('drop', e => {
-      e.preventDefault();
-      const dataText = e.dataTransfer.getData('text/plain');
-      if (!dataText) return;
-      let info;
-      try {
-        info = JSON.parse(dataText);
-      } catch {
-        showToast('Cannot drop component');
-        return;
-      }
-      const coords = toDiagramCoords(e);
-      const { left, top } = svg.getBoundingClientRect();
-      const fallbackX = e.clientX - left;
-      const fallbackY = e.clientY - top;
-      const x = Number.isFinite(coords?.x) ? coords.x : fallbackX;
-      const y = Number.isFinite(coords?.y) ? coords.y : fallbackY;
-      const comp = addComponent({ type: info.type, subtype: info.subtype, x, y, skipHistory: true });
-      recordPaletteUsage(info.subtype);
-      buildPalette();
-      if (!snapToNearestBus(comp)) {
-        autoAttachComponent(comp);
-      }
-      pushHistory();
-      render();
-      save();
-      const elem = svg.querySelector(`g.component[data-id="${comp.id}"]`);
-      if (elem) {
-        elem.classList.add('flash');
-        setTimeout(() => elem.classList.remove('flash'), 500);
-      }
-    });
-  }
-
-  const { sheets: storedSheets, activeSheet: storedActive = 0 } = getOneLine();
-  sheets = storedSheets.map((s, i) => ({
-    name: s.name || `Sheet ${i + 1}`,
-    components: (s.components || []).map(normalizeComponent),
-    connections: Array.isArray(s.connections) ? s.connections : [],
-    layers: Array.isArray(s.layers) ? s.layers : [],
-    protectionZones: Array.isArray(s.protectionZones) ? s.protectionZones : [],
-    // Gap #52: preserve background image underlay per sheet
-    ...(s.backgroundImage ? { backgroundImage: s.backgroundImage } : {})
-  }));
-  if (!sheets.length) sheets = [{ name: 'Sheet 1', components: [], connections: [] }];
-
-  sheets.forEach(s => {
-    s.components.forEach(c => {
-      if (c.type === 'dimension') return;
-      const resolvedMetaKey = resolveComponentMetaKey(c);
-      if (resolvedMetaKey && resolvedMetaKey !== c.subtype && componentMeta[resolvedMetaKey]) {
-        c.subtype = resolvedMetaKey;
-      }
-      if (!componentMeta[c.subtype]) {
-        const icon = typeIcons[c.type] || asset('icons/equipment.svg');
-        const category = categoryForType(c.type);
-        componentMeta[c.subtype] = {
-          icon,
-          label: c.subtype,
-          category,
-          type: c.type,
-          ports: normalizePortsForCategory(category, c.ports, c.type, c.subtype, c.width || compWidth, c.height || compHeight)
-        };
-      }
-      if (!propSchemas[c.subtype]) {
-        const skip = new Set(['id', 'type', 'subtype', 'x', 'y', 'rotation', 'rotationManual', 'flipped', 'connections', 'label', 'ref', 'props']);
-        const raw = {};
-        Object.entries(c).forEach(([k, v]) => {
-          if (skip.has(k)) return;
-          if (v && typeof v === 'object') return;
-          raw[k] = v;
-        });
-        propSchemas[c.subtype] = inferSchemaFromProps(raw);
-      }
-      const currentMeta = resolveComponentMeta(c);
-      ensureBaselineFieldsOnComponent(c, currentMeta);
-      ensureGeneratorStudyFieldsOnComponent(c, currentMeta);
-      ensureMccFieldsOnComponent(c, currentMeta);
-      ensurePtVtFieldsOnComponent(c, currentMeta);
-      ensureStudyInputFieldsOnComponent(c, currentMeta);
-      normalizeComponentElectricalProperties(c);
-    });
-  });
-  rebuildComponentMaps();
-  Object.keys(componentMeta).forEach(sub => {
-    if (!propSchemas[sub]) propSchemas[sub] = inferSchemaFromProps(componentMeta[sub].props || {});
-  });
-  ensureBaselineComponentMetadata();
-  ensureGeneratorStudyMetadata();
-  ensureMccMetadata();
-  ensurePtVtMetadata();
-  ensureStudyInputMetadata();
-  sheets.forEach(s => {
-    s.components.forEach(c => {
-      (c.connections || []).forEach(conn => {
-        const target = s.components.find(t => t.id === conn.target);
-        if (target && (conn.sourcePort === undefined || conn.targetPort === undefined)) {
-          const [sp, tp] = nearestPorts(c, target);
-          conn.sourcePort = sp;
-          conn.targetPort = tp;
-        }
-      });
-    });
-  });
-
-  // initialize counters from existing labels
-  labelCounters = getItem('labelCounters', labelCounters);
-  sheets.forEach(s => {
-    s.components.forEach(c => {
-      const m = (c.label || '').match(/(\d+)$/);
-      if (m) {
-        const num = Number(m[1]);
-        if (!labelCounters[c.subtype] || labelCounters[c.subtype] < num) {
-          labelCounters[c.subtype] = num;
-        }
-      }
-    });
-  });
-  const normalizedStoredActive = Number.isInteger(storedActive) ? storedActive : 0;
-  activeSheet = Math.min(Math.max(normalizedStoredActive, 0), sheets.length - 1);
-  components = sheets[activeSheet].components;
-  connections = sheets[activeSheet].connections;
-  // Gap #51: load layers for the initial active sheet
-  layers = Array.isArray(sheets[activeSheet]?.layers) ? sheets[activeSheet].layers : [];
-  activeLayerId = null;
-  history = [JSON.parse(JSON.stringify(components))];
-  layersHistory = [JSON.parse(JSON.stringify(layers))];
-  protectionZonesHistory = [JSON.parse(JSON.stringify(getProtectionZones()))];
-  historyIndex = 0;
-  layersHistoryIndex = 0;
-  checkpoints = [];
-  historyEvents = [];
-  recordHistoryEvent('init', 'History initialized');
-  refreshAttributeOptions();
-  renderSheetTabs();
-  applyDrawingModeClass();
-  render();
-  renderLayerPanel();
-  renderBgPanel();
-  const initIssues = validateDiagram({ notify: false, revealPanel: false });
-  if (!initIssues.length) updateScheduleReconcileButtonState();
-
-  const prefixBtn = document.getElementById('prefix-settings-btn');
-  if (prefixBtn) prefixBtn.addEventListener('click', editPrefixes);
-
-  const defaultsBtn = document.getElementById('update-defaults-btn');
-  if (defaultsBtn) defaultsBtn.addEventListener('click', editManufacturerDefaults);
-
-  const exportReportsBtn = document.getElementById('export-reports-btn');
-  if (exportReportsBtn) exportReportsBtn.addEventListener('click', () => exportAllReports());
-
-  scheduleNoncriticalWork(() => { buildPalette(); loadTemplates(); renderTemplates(); setupLibraryTools(); });
-  const customComponentStorageSuffix = `:${customComponentStorageKey}`;
-  window.addEventListener('storage', e => {
-    if (!e.key) return;
-    if (e.key === customComponentStorageKey || e.key.endsWith(customComponentStorageSuffix)) {
-      loadComponentLibrary()
-        .then(() => render())
-        .catch(err => console.error('Custom component reload failed', err));
-    }
-  });
-  const connectBtn = document.getElementById('connect-btn');
-  if (connectBtn) {
-    connectBtn.addEventListener('click', () => {
-      connectMode = !connectMode;
-      resetConnectInteraction({ keepMode: connectMode });
-      connectBtn.classList.toggle('active', connectMode);
-      render();
-    });
-  }
-  const addShapeBtn = document.getElementById('add-shape-btn');
-  if (addShapeBtn) {
-    addShapeBtn.addEventListener('click', () => {
-      openShapeModal();
-    });
-  }
-  // dimension tool removed
-  document.getElementById('undo-btn').addEventListener('click', undo);
-  document.getElementById('redo-btn').addEventListener('click', redo);
-  bindHistorySidebarControls();
-  renderHistorySidebar();
-
-  // Gap #51: wire up the layers panel
-  const layersToggleBtn = document.getElementById('layers-panel-toggle');
-  const layersPanel = document.getElementById('layers-panel');
-  const layersCloseBtn = document.getElementById('layers-close-btn');
-  const addLayerBtn = document.getElementById('add-layer-btn');
-  if (layersToggleBtn && layersPanel) {
-    const layersPanelOpen = getOneLineViewSetting('layersPanelOpen', false);
-    if (!layersPanelOpen) layersPanel.classList.add('hidden');
-    layersToggleBtn.setAttribute('aria-expanded', String(!layersPanel.classList.contains('hidden')));
-    layersToggleBtn.addEventListener('click', () => {
-      const nowHidden = layersPanel.classList.toggle('hidden');
-      layersToggleBtn.setAttribute('aria-expanded', String(!nowHidden));
-      setOneLineViewSetting('layersPanelOpen', !nowHidden);
-    });
-  }
-  if (layersCloseBtn && layersPanel) {
-    layersCloseBtn.addEventListener('click', () => {
-      layersPanel.classList.add('hidden');
-      if (layersToggleBtn) layersToggleBtn.setAttribute('aria-expanded', 'false');
-      setOneLineViewSetting('layersPanelOpen', false);
-    });
-  }
-  if (addLayerBtn) {
-    addLayerBtn.addEventListener('click', async () => {
-      const name = await promptDialog('Add Layer', 'Layer name', `Layer ${layers.length + 1}`);
-      if (name) createLayer(name);
-    });
-  }
-
-  // Gap #50: wire up protection zones panel
-  const pzToggleBtn = document.getElementById('protection-zones-panel-toggle');
-  const pzPanel = document.getElementById('protection-zones-panel');
-  const pzCloseBtn = document.getElementById('protection-zones-close-btn');
-  const addZoneBtn = document.getElementById('add-protection-zone-btn');
-  const pzOverlayToggle = document.getElementById('toggle-protection-zones');
-  const pzAssignDoneBtn = document.getElementById('zone-assign-done-btn');
-
-  if (pzToggleBtn && pzPanel) {
-    pzPanel.classList.add('hidden');
-    pzToggleBtn.setAttribute('aria-expanded', 'false');
-    pzToggleBtn.addEventListener('click', () => {
-      const nowHidden = pzPanel.classList.toggle('hidden');
-      pzToggleBtn.setAttribute('aria-expanded', String(!nowHidden));
-      if (!nowHidden) renderProtectionZonesPanel();
-    });
-  }
-  if (pzCloseBtn && pzPanel) {
-    pzCloseBtn.addEventListener('click', () => {
-      pzPanel.classList.add('hidden');
-      if (pzToggleBtn) pzToggleBtn.setAttribute('aria-expanded', 'false');
-      exitZoneAssignMode();
-    });
-  }
-  if (addZoneBtn) {
-    addZoneBtn.addEventListener('click', () => createProtectionZone(''));
-  }
-  if (pzOverlayToggle) {
-    pzOverlayToggle.addEventListener('change', () => {
-      showProtectionZones = pzOverlayToggle.checked;
-      render();
-    });
-  }
-  const hazAreaToggle = document.getElementById('toggle-haz-area');
-  if (hazAreaToggle) {
-    showHazAreaOverlay = Boolean(getOneLineViewSetting('showHazAreaOverlay', false));
-    hazAreaToggle.checked = showHazAreaOverlay;
-    hazAreaToggle.addEventListener('change', () => {
-      showHazAreaOverlay = hazAreaToggle.checked;
-      setOneLineViewSetting('showHazAreaOverlay', showHazAreaOverlay);
-      render();
-    });
-  }
-  if (pzAssignDoneBtn) {
-    pzAssignDoneBtn.addEventListener('click', () => exitZoneAssignMode());
-  }
-
-  // Gap #52: wire up background image controls
-  const bgImageBtn = document.getElementById('bg-image-btn');
-  const bgImageInput = document.getElementById('bg-image-input');
-  const bgImagePanel = document.getElementById('bg-image-panel');
-  const bgImageCloseBtn = document.getElementById('bg-image-close-btn');
-  const bgOpacitySlider = document.getElementById('bg-opacity-slider');
-  const bgToggleBtn = document.getElementById('bg-toggle-btn');
-  const bgClearBtn = document.getElementById('bg-clear-btn');
-  if (bgImageBtn && bgImageInput) {
-    bgImageBtn.addEventListener('click', () => bgImageInput.click());
-    bgImageInput.addEventListener('change', e => {
-      const file = e.target.files[0];
-      if (file) uploadBackground(file);
-      e.target.value = '';
-    });
-  }
-  if (bgImageCloseBtn && bgImagePanel) {
-    bgImageCloseBtn.addEventListener('click', () => bgImagePanel.classList.add('hidden'));
-  }
-  if (bgOpacitySlider) {
-    bgOpacitySlider.addEventListener('input', e => {
-      const bg = sheets[activeSheet]?.backgroundImage;
-      if (!bg) return;
-      bg.opacity = Number(e.target.value) / 100;
-      const underlayEl = document.getElementById('bg-underlay');
-      if (underlayEl) underlayEl.setAttribute('opacity', String(bg.opacity));
-      save();
-    });
-  }
-  if (bgToggleBtn) {
-    bgToggleBtn.addEventListener('click', () => {
-      const bg = sheets[activeSheet]?.backgroundImage;
-      if (!bg) return;
-      bg.visible = bg.visible === false;
-      save();
-      render();
-      renderBgPanel();
-    });
-  }
-  if (bgClearBtn) {
-    bgClearBtn.addEventListener('click', clearBackground);
-  }
-
-  document.getElementById('align-left-btn').addEventListener('click', () => alignSelection('left'));
-  document.getElementById('align-right-btn').addEventListener('click', () => alignSelection('right'));
-  document.getElementById('align-top-btn').addEventListener('click', () => alignSelection('top'));
-  document.getElementById('align-bottom-btn').addEventListener('click', () => alignSelection('bottom'));
-  document.getElementById('distribute-h-btn').addEventListener('click', () => distributeSelection('h'));
-  document.getElementById('distribute-v-btn').addEventListener('click', () => distributeSelection('v'));
-  const autoSpaceEquipmentBtn = document.getElementById('auto-space-equipment-btn');
-  if (autoSpaceEquipmentBtn) autoSpaceEquipmentBtn.addEventListener('click', () => runRepeatableCommand({ id: 'auto-space' }));
-  const exportBtn = document.getElementById('export-btn');
-  const exportMenu = document.getElementById('export-menu');
-  if (exportBtn && exportMenu) {
-    exportBtn.addEventListener('click', () => {
-      const expanded = exportBtn.getAttribute('aria-expanded') === 'true';
-      exportBtn.setAttribute('aria-expanded', String(!expanded));
-      exportMenu.classList.toggle('show');
-    });
-    exportMenu.addEventListener('click', e => {
-      const format = e.target?.dataset?.format;
-      if (!format) return;
-      exportMenu.classList.remove('show');
-      exportBtn.setAttribute('aria-expanded', 'false');
-      if (format === 'pdf') {
-        exportPDF({
-          svgEl: document.getElementById('diagram'),
-          sheets,
-          loadSheet,
-          serializeDiagram,
-          activeSheet
-        });
-      } else if (format === 'dxf') {
-        exportDXF(sheets[activeSheet]?.components || []);
-      } else if (format === 'dwg') {
-        exportDWG(sheets[activeSheet]?.components || []);
-      }
-    });
-  }
-  const viewMenuBtn = document.getElementById('view-menu-btn');
-  if (viewMenuBtn) {
-    viewMenuBtn.setAttribute('aria-expanded', 'false');
-    viewMenuBtn.addEventListener('click', event => {
-      event.preventDefault();
-      if (viewMenuBtn.disabled) return;
-      openViewModal();
-    });
-    updateViewButtonLabel();
-  }
-  const drawingModeSelect = document.getElementById('drawing-mode-select');
-  if (drawingModeSelect) {
-    syncDrawingModeControl();
-    drawingModeSelect.addEventListener('change', event => {
-      setDrawingMode(event.target.value);
-    });
-  }
-  const datablockFormatSelect = document.getElementById('datablock-format-select');
-  if (datablockFormatSelect) {
-    syncDatablockFormatControl();
-    datablockFormatSelect.addEventListener('change', event => {
-      setDatablockFormatMode(event.target.value);
-    });
-  }
-  const datablockDensitySelect = document.getElementById('datablock-density-select');
-  if (datablockDensitySelect) {
-    syncDatablockDensityControl();
-    datablockDensitySelect.addEventListener('change', event => {
-      setDatablockDensityMode(event.target.value);
-    });
-  }
-  const dataStateOverlaySelect = document.getElementById('data-state-overlay-select');
-  if (dataStateOverlaySelect) {
-    syncDataStateOverlayControl();
-    dataStateOverlaySelect.addEventListener('change', event => {
-      setDataStateOverlayMode(event.target.value);
-    });
-  }
-  const operatingStateSelect = document.getElementById('operating-state-select');
-  if (operatingStateSelect) {
-    syncOperatingStateControl();
-    operatingStateSelect.addEventListener('change', event => {
-      setActiveOperatingState(event.target.value);
-    });
-  }
-  const importBtn = document.getElementById('import-btn');
-  if (importBtn) importBtn.addEventListener('click', () => document.getElementById('import-input').click());
-  const importInput = document.getElementById('import-input');
-  if (importInput) importInput.addEventListener('change', handleImport);
-  const diagramExportBtn = document.getElementById('diagram-export-btn');
-  if (diagramExportBtn) diagramExportBtn.addEventListener('click', exportDiagram);
-  const diagramImportBtn = document.getElementById('diagram-import-btn');
-  if (diagramImportBtn) diagramImportBtn.addEventListener('click', () => document.getElementById('diagram-import-input').click());
-  const diagramImportInput = document.getElementById('diagram-import-input');
-  if (diagramImportInput) diagramImportInput.addEventListener('change', handleImport);
-  const shareBtn = document.getElementById('diagram-share-btn');
-  if (shareBtn) shareBtn.addEventListener('click', shareDiagram);
-  const sampleBtn = document.getElementById('sample-diagram-btn');
-  if (sampleBtn) sampleBtn.addEventListener('click', loadSampleDiagram);
-  const autoBuildBtn = document.getElementById('auto-build-oneline-btn');
-  if (autoBuildBtn) autoBuildBtn.addEventListener('click', openAutoBuildModal);
-  const autoArrangeBtn = document.getElementById('auto-arrange-btn');
-  if (autoArrangeBtn) autoArrangeBtn.addEventListener('click', () => runRepeatableCommand({ id: 'auto-arrange' }));
-  const reconcileBtn = document.getElementById('reconcile-schedules-btn');
-  if (reconcileBtn) reconcileBtn.addEventListener('click', openScheduleReconcileModal);
-  const primaryReconcileBtn = document.getElementById('reconcile-schedules-primary-btn');
-  if (primaryReconcileBtn) primaryReconcileBtn.addEventListener('click', openScheduleReconcileModal);
-  updateScheduleReconcileButtonState();
-  const onelineExportBtn = document.getElementById('export-oneline-data-btn');
-  if (onelineExportBtn) onelineExportBtn.addEventListener('click', exportOneLineDiagnostics);
-  document.getElementById('add-sheet-btn').addEventListener('click', () => addSheet());
-  document.getElementById('rename-sheet-btn').addEventListener('click', () => renameSheet());
-  document.getElementById('delete-sheet-btn').addEventListener('click', () => deleteSheet());
-  document.getElementById('validate-btn').addEventListener('click', () => validateDiagram({ revealPanel: true }));
-
-  updateZoomDisplay();
-  applyDiagramZoom();
-  window.addEventListener('resize', () => applyDiagramZoom());
-  const zoomInBtn = document.getElementById('zoom-in-btn');
-  const zoomOutBtn = document.getElementById('zoom-out-btn');
-  const zoomResetBtn = document.getElementById('zoom-reset-btn');
-  zoomInBtn?.addEventListener('click', () => {
-    const focus = getViewportCenter();
-    adjustZoom(1.2, focus ? { focusPoint: focus } : {});
-  });
-  zoomOutBtn?.addEventListener('click', () => {
-    const focus = getViewportCenter();
-    adjustZoom(1 / 1.2, focus ? { focusPoint: focus } : {});
-  });
-  zoomResetBtn?.addEventListener('click', () => {
-    const focus = getViewportCenter();
-    setDiagramZoom(DEFAULT_DIAGRAM_ZOOM, focus ? { focusPoint: focus } : {});
-  });
-  const zoomFitBtn = document.getElementById('zoom-fit-btn');
-  zoomFitBtn?.addEventListener('click', () => zoomToFit());
-
-  const panUpBtn = document.getElementById('pan-up-btn');
-  const panDownBtn = document.getElementById('pan-down-btn');
-  const panLeftBtn = document.getElementById('pan-left-btn');
-  const panRightBtn = document.getElementById('pan-right-btn');
-  const bindPan = (btn, direction) => {
-    if (!btn) return;
-    btn.addEventListener('click', () => {
-      if (!canvasScroll) return;
-      panDiagram(direction, canvasScroll);
-    });
-  };
-  bindPan(panUpBtn, 'up');
-  bindPan(panDownBtn, 'down');
-  bindPan(panLeftBtn, 'left');
-  bindPan(panRightBtn, 'right');
-
-  document.addEventListener('keydown', e => {
-    if (!canvasScroll) return;
-    if (e.defaultPrevented) return;
-    if (e.altKey || e.ctrlKey || e.metaKey) return;
-    const target = e.target instanceof HTMLElement ? e.target : null;
-    if (target) {
-      const tag = target.tagName;
-      if (target.isContentEditable) return;
-      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
-      if (tag === 'BUTTON' || tag === 'A' || tag === 'OPTION') return;
-    }
-    const isArrow = e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight';
-    if (!isArrow) return;
-    e.preventDefault();
-    const nudgeTargets = selection.length ? selection : selected ? [selected] : [];
-    if (nudgeTargets.length) {
-      const step = e.shiftKey ? (gridSize || 20) * 4 : (gridSize || 20);
-      let moved = false;
-      nudgeTargets.forEach(c => {
-        if (isComponentPositionLocked(c)) return;
-        if (e.key === 'ArrowUp') c.y -= step;
-        else if (e.key === 'ArrowDown') c.y += step;
-        else if (e.key === 'ArrowLeft') c.x -= step;
-        else if (e.key === 'ArrowRight') c.x += step;
-        moved = true;
-      });
-      if (moved) {
-        pushHistory();
-        render();
-        save();
-      }
-    } else {
-      const dir = e.key === 'ArrowUp' ? 'up' : e.key === 'ArrowDown' ? 'down' : e.key === 'ArrowLeft' ? 'left' : 'right';
-      panDiagram(dir, canvasScroll);
-    }
-  });
-
-  const gridToggle = document.getElementById('grid-toggle');
-  const gridSizeInput = document.getElementById('grid-size');
-  const alignmentGuidesToggle = document.getElementById('alignment-guides-toggle');
-  const gridPattern = document.getElementById('grid');
-  const gridPath = gridPattern.querySelector('path');
-  if (gridToggle) gridToggle.checked = gridEnabled;
-  if (alignmentGuidesToggle) alignmentGuidesToggle.checked = alignmentGuidesEnabled;
-  if (gridSizeInput) gridSizeInput.value = gridSize;
-  gridPattern.setAttribute('width', gridSize);
-  gridPattern.setAttribute('height', gridSize);
-  gridPath.setAttribute('d', `M${gridSize} 0 L0 0 0 ${gridSize}`);
-  document.getElementById('grid-bg').style.display = gridEnabled ? 'block' : 'none';
-  gridToggle?.addEventListener('change', toggleGrid);
-  alignmentGuidesToggle?.addEventListener('change', event => {
-    alignmentGuidesEnabled = event.target.checked;
-    setOneLineViewSetting('alignmentGuidesEnabled', alignmentGuidesEnabled);
-    if (!alignmentGuidesEnabled && dragSnapGuides) {
-      dragSnapGuides = null;
-      render();
-    }
-  });
-  gridSizeInput?.addEventListener('change', e => {
-    gridSize = Number(e.target.value) || 20;
-    gridPattern.setAttribute('width', gridSize);
-    gridPattern.setAttribute('height', gridSize);
-    gridPath.setAttribute('d', `M${gridSize} 0 L0 0 0 ${gridSize}`);
-    setOneLineViewSetting('gridSize', gridSize);
-    render();
-  });
-
-  const findForm = document.getElementById('find-device-form');
-  const findInput = document.getElementById('find-device-input');
-  const diagramFilterSelect = document.getElementById('diagram-filter-select');
-  if (diagramFilterSelect) {
-    diagramFilterSelect.value = diagramFilterMode;
-    diagramFilterSelect.addEventListener('change', event => {
-      diagramFilterMode = event.target.value || 'all';
-      setOneLineViewSetting('oneLineDiagramFilterMode', diagramFilterMode);
-      render();
-    });
-  }
-  if (findForm && findInput) {
-    findForm.addEventListener('submit', e => {
-      e.preventDefault();
-      const query = findInput.value.trim();
-      if (!query) {
-        showToast('Enter a device tag to find');
-        findInput.focus();
-        return;
-      }
-      const match = findComponentByTag(query);
-      if (!match) {
-        showToast(`No device found matching "${query}"`);
-        return;
-      }
-      selection = [match];
-      selected = match;
-      selectedConnection = null;
-      highlightFoundComponent(match.id);
-      focusComponentElement(match);
-      showToast(`Selected ${match.label || match.subtype || match.id}`);
-    });
-  }
-
-  const workspaceEl = document.querySelector('.workspace');
-  const splitter = document.querySelector('.splitter');
-  const paletteToggle = document.getElementById('palette-toggle');
-
-  if (workspaceEl) {
-    workspaceEl.style.setProperty('--palette-width', `${paletteWidth}px`);
-  }
-  if (splitter) {
-    splitter.style.left = `${paletteWidth}px`;
-  }
-
-  splitter?.addEventListener('mousedown', e => {
-    resizingPalette = true;
-    e.preventDefault();
-  });
-
-  document.addEventListener('mousemove', e => {
-    let handled = false;
-    if (resizingPalette && workspaceEl) {
-      const rect = workspaceEl.getBoundingClientRect();
-      const nextWidth = clampPaletteWidth(e.clientX - rect.left, paletteWidth);
-      if (nextWidth !== paletteWidth) {
-        paletteWidth = nextWidth;
-        workspaceEl.style.setProperty('--palette-width', `${paletteWidth}px`);
-        workspaceEl.style.gridTemplateColumns = `${paletteWidth}px 1fr`;
-        if (splitter) splitter.style.left = `${paletteWidth}px`;
-      }
-      handled = true;
-    }
-    if (resizingStudiesPanel && studiesPanel) {
-      const delta = studiesResizeStartX - e.clientX;
-      const nextWidth = clampStudiesWidth(studiesResizeStartWidth + delta, studiesWidth);
-      if (nextWidth !== studiesWidth) {
-        studiesWidth = nextWidth;
-        studiesPanel.style.setProperty('--studies-width', `${studiesWidth}px`);
-      }
-      handled = true;
-    }
-    if (handled) {
-      e.preventDefault();
-    }
-  });
-
-  document.addEventListener('mouseup', () => {
-    const wasResizingPalette = resizingPalette;
-    const wasResizingStudies = resizingStudiesPanel;
-    resizingPalette = false;
-    resizingStudiesPanel = false;
-    if (wasResizingPalette) {
-      if (workspaceEl) {
-        workspaceEl.style.setProperty('--palette-width', `${paletteWidth}px`);
-      }
-      setOneLineViewSetting(paletteWidthStorageKey, Math.round(paletteWidth));
-    }
-    if (wasResizingStudies && studiesPanel) {
-      studiesPanel.classList.remove('is-resizing');
-      studiesPanel.style.setProperty('--studies-width', `${studiesWidth}px`);
-      if (Number.isFinite(studiesWidth)) {
-        setOneLineViewSetting(studiesWidthStorageKey, Math.round(studiesWidth));
-      }
-    } else if (studiesPanel) {
-      studiesPanel.classList.remove('is-resizing');
-    }
-    let needsRender = false;
-    let needsSave = false;
-    if (draggingLabel) {
-      const moved = draggingLabel.moved;
-      draggingLabel = null;
-      if (moved) {
-        pushHistory();
-        needsRender = true;
-        needsSave = true;
-      }
-    }
-    if (resizingAnnotation) {
-      const data = resizingAnnotation;
-      resizingAnnotation = null;
-      const comp = data.comp;
-      if (comp) {
-        const widthChanged = Math.abs((comp.width || 0) - data.startWidth) > 0.01;
-        const heightChanged = Math.abs((comp.height || 0) - data.startHeight) > 0.01;
-        if (widthChanged || heightChanged) {
-          pushHistory();
-          needsSave = true;
-        }
-        needsRender = true;
-      }
-    }
-    if (marquee && marquee.active) {
-      const changed = finalizeMarqueeSelection();
-      marqueeSelectionMade = changed;
-      needsRender = true;
-    }
-    if (needsRender) {
-      render();
-    }
-    if (needsSave) {
-      save();
-    }
-  });
-
-  paletteToggle?.addEventListener('click', () => {
-    if (!workspaceEl) return;
-    const show = !workspaceEl.classList.contains('show-palette');
-    const narrow = window.matchMedia?.('(max-width: 600px)')?.matches === true;
-    workspaceEl.classList.toggle('show-palette', show);
-    document.body.classList.toggle('palette-drawer-open', show && narrow);
-    paletteToggle.setAttribute('aria-expanded', show);
-    if (show) {
-      workspaceEl.style.setProperty('--palette-width', `${paletteWidth}px`);
-      workspaceEl.style.gridTemplateColumns = narrow ? '1fr' : `${paletteWidth}px 1fr`;
-      if (splitter) splitter.style.left = `${paletteWidth}px`;
-    } else {
-      workspaceEl.style.gridTemplateColumns = '1fr';
-    }
-  });
-
-  const editorEl = document.querySelector('.oneline-editor');
-  const canvasScroll = document.querySelector('.oneline-canvas-scroll') || editorEl;
-  const paletteRoot = document.getElementById('palette');
-  const paletteScroll = paletteRoot?.querySelector('.palette-scroll');
-  if (paletteScroll instanceof HTMLElement) {
-    attachLocalWheelScroll(paletteScroll);
-  } else {
-    attachLocalWheelScroll(paletteRoot);
-  }
-  attachLocalWheelScroll(canvasScroll);
-  // Gap #39 – Update minimap viewport on scroll
-  if (canvasScroll) {
-    canvasScroll.addEventListener('scroll', () => renderMinimap(), { passive: true });
-  }
-  const legendEl = document.getElementById('voltage-legend');
-  if (canvasScroll) {
-    canvasScroll.addEventListener('wheel', e => {
-      if (!e.ctrlKey) return;
-      const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
-      const focus = toDiagramCoords(e);
-      e.preventDefault();
-      adjustZoom(factor, { focusPoint: focus });
-    }, { passive: false });
-  }
-  legendEl?.addEventListener('mousedown', e => {
-    if (e.button !== 0) return;
-    legendDrag = {
-      dx: e.offsetX,
-      dy: e.offsetY,
-      startX: e.clientX,
-      startY: e.clientY,
-      moved: false
-    };
-    e.preventDefault();
-  });
-  document.addEventListener('mousemove', e => {
-    if (!middlePanState) return;
-    updateMiddlePan(e);
-    e.preventDefault();
-  });
-  document.addEventListener('mousemove', e => {
-    if (!legendDrag || !legendEl || !canvasScroll) return;
-    const rect = canvasScroll.getBoundingClientRect();
-    const parent = legendEl.offsetParent instanceof HTMLElement ? legendEl.offsetParent : canvasScroll;
-    const boundsWidth = parent instanceof HTMLElement ? parent.clientWidth : rect.width;
-    const boundsHeight = parent instanceof HTMLElement ? parent.clientHeight : rect.height;
-    const rawLeft = e.clientX - rect.left - legendDrag.dx;
-    const rawTop = e.clientY - rect.top - legendDrag.dy;
-    const clampedLeft = Math.max(0, Math.min(boundsWidth - legendEl.offsetWidth, rawLeft));
-    const clampedTop = Math.max(0, Math.min(boundsHeight - legendEl.offsetHeight, rawTop));
-    legendEl.style.left = `${clampedLeft}px`;
-    legendEl.style.top = `${clampedTop}px`;
-    if (!legendDrag.moved) {
-      const deltaX = Math.abs(e.clientX - legendDrag.startX);
-      const deltaY = Math.abs(e.clientY - legendDrag.startY);
-      if (deltaX > 2 || deltaY > 2) legendDrag.moved = true;
-    }
-  });
-  document.addEventListener('mouseup', () => {
-    if (legendDrag?.moved) legendUserMoved = true;
-    legendDrag = null;
-    stopMiddlePan();
-  });
-
-  // Reuse the diagram element fetched earlier in this function.
-  // Avoid redeclaring the `svg` constant to prevent "Identifier has already been declared" errors.
-  const menu = document.getElementById('context-menu');
-    svg.addEventListener('mousedown', e => {
-      cancelPendingClickSelection();
-      marqueeSelectionMade = false;
-      pointerDownComponentId = null;
-      dragSnapGuides = null;
-      if (e.button === 1) {
-        if (canvasScroll) {
-          e.preventDefault();
-          startMiddlePan(e, canvasScroll);
-        }
-        return;
-      }
-      const coords = toDiagramCoords(e);
-      const pointerX = coords.x;
-      const pointerY = coords.y;
-      if (connectMode) {
-        const candidate = getConnectionCandidateFromEvent(e, pointerX, pointerY);
-        if (candidate) {
-          e.preventDefault();
-          pointerDownComponentId = null;
-          if (!connectSource) {
-            connectSource = candidate;
-            selected = candidate.component;
-            selection = [candidate.component];
-            selectedConnection = null;
-            if (tempConnection) {
-              tempConnection.remove();
-              tempConnection = null;
-            }
-            render();
-            showToast('Select the next device to complete the connection.');
-          } else {
-            finishConnectionToCandidate(candidate, { provisional: true });
-            resetConnectInteraction({ keepMode: false });
-            render();
-          }
-          updateStatusBar();
-          return;
-        }
-        showToast('Click a device body, label, or visible port to connect.');
-        return;
-      }
-      if (e.target.classList.contains('annotation-handle')) {
-        const comp = components.find(c => c.id === e.target.dataset.id);
-        if (comp) {
-          pointerDownComponentId = comp.id;
-          resizingAnnotation = {
-            comp,
-            startX: pointerX,
-            startY: pointerY,
-            startWidth: comp.width || compWidth,
-            startHeight: comp.height || compHeight,
-            changed: false
-          };
-        }
-        return;
-      }
-      if (e.target.classList.contains('bus-handle')) {
-        const comp = components.find(c => c.id === e.target.dataset.id);
-        if (comp) {
-          pointerDownComponentId = comp.id;
-          resizingBus = {
-            comp,
-            startX: pointerX,
-            startWidth: comp.width,
-            startCompX: comp.x,
-            side: e.target.dataset.side || 'right',
-            anchors: captureBusAnchors(comp)
-          };
-        }
-        return;
-      }
-      const g = e.target.closest('.component');
-      if (!g) {
-        dragOffset = null;
-        marquee = {
-          active: true,
-          x1: pointerX,
-          y1: pointerY,
-          x2: pointerX,
-          y2: pointerY
-        };
-        return;
-      }
-      pointerDownComponentId = g.dataset.id || null;
-      const comp = components.find(c => c.id === g.dataset.id);
-      if (!comp) return;
-      if (e.shiftKey || e.ctrlKey || e.metaKey) {
-        if (selection.includes(comp)) {
-          selection = selection.filter(c => c !== comp);
-        } else {
-          selection.push(comp);
-        }
-      } else if (!selection.includes(comp)) {
-        selection = [comp];
-      }
-      selected = comp;
-      // Gap #41 – Locked components cannot be dragged
-      dragOffset = selection.filter(c => !isComponentPositionLocked(c)).map(c => ({
-        comp: c,
-        dx: pointerX - c.x,
-        dy: pointerY - c.y,
-        startX: c.x,
-        startY: c.y
-      }));
-      dragConnections = computeDragConnections(selection);
-      dragging = false;
-      render();
-    });
-    svg.addEventListener('mousemove', e => {
-      if (middlePanState) return;
-      if (draggingLabel) return;
-      const coords = toDiagramCoords(e);
-      const pointerX = coords.x;
-      const pointerY = coords.y;
-      cursorPos = { x: pointerX, y: pointerY };
-      cursorPosValid = Number.isFinite(pointerX) && Number.isFinite(pointerY);
-      updateStatusBar();
-      if (resizingAnnotation) {
-        const data = resizingAnnotation;
-        const comp = data.comp;
-        if (comp) {
-          let newW = Math.max(40, data.startWidth + (pointerX - data.startX));
-          let newH = Math.max(20, data.startHeight + (pointerY - data.startY));
-          if (gridEnabled) {
-            newW = Math.max(40, Math.round(newW / gridSize) * gridSize);
-            newH = Math.max(20, Math.round(newH / gridSize) * gridSize);
-          }
-          if (comp.width !== newW || comp.height !== newH) {
-            comp.width = newW;
-            comp.height = newH;
-            data.changed = true;
-            render();
-          }
-        }
-        return;
-      }
-      if (marquee && marquee.active) {
-        marquee.x2 = pointerX;
-        marquee.y2 = pointerY;
-        render();
-        return;
-      }
-      if (draggingConnection) {
-        const { component, index, start, mid } = draggingConnection;
-        const conn = component.connections[index];
-        if (conn) {
-          let nextMid;
-          if (conn.dir === 'h') {
-            nextMid = mid + (pointerX - start.x);
-          } else {
-            nextMid = mid + (pointerY - start.y);
-          }
-          if (gridEnabled) nextMid = Math.round(nextMid / gridSize) * gridSize;
-          nextMid = Number(nextMid.toFixed(2));
-          if (conn.mid !== nextMid) {
-            conn.mid = nextMid;
-            draggingConnection.moved = true;
-            render();
-          }
-        }
-        return;
-      }
-      if (resizingBus) {
-        let delta = pointerX - resizingBus.startX;
-        if (resizingBus.side === 'right') {
-          let newW = Math.max(40, resizingBus.startWidth + delta);
-          if (gridEnabled) newW = Math.round(newW / gridSize) * gridSize;
-          resizingBus.comp.width = newW;
-        } else {
-          let newW = Math.max(40, resizingBus.startWidth - delta);
-          let newX = resizingBus.startCompX + delta;
-          if (gridEnabled) {
-            newW = Math.round(newW / gridSize) * gridSize;
-            newX = Math.round(newX / gridSize) * gridSize;
-          }
-          if (newW === 40 && delta > resizingBus.startWidth - 40) {
-            newX = resizingBus.startCompX + (resizingBus.startWidth - 40);
-          }
-          resizingBus.comp.width = newW;
-          resizingBus.comp.x = newX;
-        }
-        updateBusPorts(resizingBus.comp);
-        reassignBusAnchors(resizingBus.comp, resizingBus.anchors);
-        render();
-        return;
-      }
-      if (connectSource) {
-        if (!tempConnection) {
-          tempConnection = createConnectionPreviewLine(connectSource);
-        }
-        if (!tempConnection) return;
-        const nearest = nearestPortToPoint(pointerX, pointerY, connectSource);
-        let end = { x: pointerX, y: pointerY };
-        hoverPort = null;
-        if (nearest) {
-          hoverPort = { component: nearest.component, port: nearest.port };
-          end = nearest.pos;
-        }
-        tempConnection.setAttribute('x2', end.x);
-        tempConnection.setAttribute('y2', end.y);
-      }
-    });
-  svg.addEventListener('mousemove', e => {
-    if (middlePanState) return;
-    const coords = toDiagramCoords(e);
-    const pointerX = coords.x;
-    const pointerY = coords.y;
-    if (draggingLabel) {
-      let x = pointerX - draggingLabel.dx;
-      let y = pointerY - draggingLabel.dy;
-      if (gridEnabled) {
-        x = Math.round(x / gridSize) * gridSize;
-        y = Math.round(y / gridSize) * gridSize;
-      }
-      const comp = draggingLabel.component;
-      const base = defaultLabelAnchor(comp);
-      const newOffset = {
-        x: Number((x - base.x).toFixed(2)),
-        y: Number((y - base.y).toFixed(2))
-      };
-      const current = comp.labelOffset || { x: 0, y: 0 };
-      if (newOffset.x !== current.x || newOffset.y !== current.y) {
-        comp.labelOffset = newOffset;
-        draggingLabel.moved = true;
-        render();
-      }
-      return;
-    }
-    if (resizingAnnotation) return;
-    if (marquee && marquee.active) return;
-    if (resizingBus || draggingConnection) return;
-    if (!dragOffset || !dragOffset.length) return;
-    const projectedPositions = dragOffset.map(off => {
-      const rawX = pointerX - off.dx;
-      const rawY = pointerY - off.dy;
-      return {
-        off,
-        rawX,
-        rawY,
-        x: gridEnabled ? Math.round(rawX / gridSize) * gridSize : rawX,
-        y: gridEnabled ? Math.round(rawY / gridSize) * gridSize : rawY
-      };
-    });
-    const primaryProjection = projectedPositions[0];
-    const projectedPrimary = primaryProjection
-      ? { ...primaryProjection.off.comp, x: primaryProjection.x, y: primaryProjection.y }
-      : null;
-    const nextSnapGuides = primaryProjection
-      ? buildDragSnapGuides(projectedPrimary, new Set(dragOffset.map(off => off.comp.id)), {
-        x: primaryProjection.off.startX,
-        y: primaryProjection.off.startY
-      })
-      : null;
-    const snapDeltaX = nextSnapGuides?.vertical?.delta || 0;
-    const snapDeltaY = nextSnapGuides?.horizontal?.delta || 0;
-    let snapPos = null;
-    let moved = false;
-    projectedPositions.forEach(({ off, rawX, rawY, x: projectedX, y: projectedY }) => {
-      const x = projectedX + snapDeltaX;
-      const y = projectedY + snapDeltaY;
-      if (gridEnabled) {
-        if (projectedX !== rawX || projectedY !== rawY) {
-          snapPos = { x, y };
-        }
-      }
-      const deltaX = Math.abs(rawX - off.startX);
-      const deltaY = Math.abs(rawY - off.startY);
-      const shouldMove = dragging || deltaX >= DRAG_MOVE_THRESHOLD || deltaY >= DRAG_MOVE_THRESHOLD;
-      if (!shouldMove) return;
-      if (!dragging) dragging = true;
-      if (off.comp.x !== x || off.comp.y !== y) {
-        off.comp.x = x;
-        off.comp.y = y;
-        moved = true;
-      }
-    });
-    if (moved) {
-      dragSnapGuides = nextSnapGuides;
-      if (dragConnections && dragConnections.length) {
-        dragConnections.forEach(entry => {
-          const { conn, dir, source, target, offset } = entry;
-          if (!conn || (dir !== 'h' && dir !== 'v')) return;
-          const startPos = portPosition(source, conn.sourcePort);
-          const endPos = target ? portPosition(target, conn.targetPort) : null;
-          if (!startPos || !endPos) return;
-          const base = dir === 'h'
-            ? (startPos.x + endPos.x) / 2
-            : (startPos.y + endPos.y) / 2;
-          const nextMid = Number.isFinite(base)
-            ? base + (Number.isFinite(offset) ? offset : 0)
-            : base;
-          if (Number.isFinite(nextMid)) {
-            conn.mid = Number(nextMid.toFixed(2));
-          }
-        });
-      }
-      render();
-      if (snapPos) flashSnapIndicator(snapPos.x, snapPos.y);
-    }
-  });
-    svg.addEventListener('mouseup', async e => {
-      if (e.button === 1 && middlePanState) {
-        stopMiddlePan();
-        pointerDownComponentId = null;
-        lastPointerUp = { id: null, time: 0 };
-        return;
-      }
-      if (draggingLabel) {
-        const moved = draggingLabel.moved;
-        draggingLabel = null;
-        if (moved) {
-          pushHistory();
-          render();
-          save();
-        }
-        lastPointerUp = { id: null, time: 0 };
-        return;
-      }
-      if (resizingAnnotation) {
-        lastPointerUp = { id: null, time: 0 };
-        return;
-      }
-      if (resizingBus) {
-        resizingBus = null;
-        pushHistory();
-        render();
-        save();
-        lastPointerUp = { id: null, time: 0 };
-        return;
-      }
-      if (draggingConnection) {
-        const moved = draggingConnection.moved;
-        draggingConnection = null;
-        if (moved) {
-          pushHistory();
-          render();
-          save();
-        }
-        lastPointerUp = { id: null, time: 0 };
-        return;
-      }
-      if (marquee && marquee.active) {
-        const changed = finalizeMarqueeSelection();
-        marqueeSelectionMade = changed;
-        render();
-        lastPointerUp = { id: null, time: 0 };
-        return;
-      }
-      if (connectSource && tempConnection) {
-        tempConnection.remove();
-        tempConnection = null;
-        if (hoverPort && hoverPort.component !== connectSource.component) {
-          finishConnectionToCandidate(hoverPort, { provisional: true });
-          resetConnectInteraction({ keepMode: false });
-        } else {
-          hoverPort = null;
-          render();
-          updateStatusBar();
-        }
-        lastPointerUp = { id: null, time: 0 };
-        return;
-      }
-      let movedDuringDrag = false;
-      if (dragOffset && dragOffset.length) {
-        if (dragging) {
-          const moved = dragOffset.map(off => off.comp);
-          const exclude = new Set(moved);
-          moved.forEach(comp => {
-            autoAttachComponent(comp, exclude);
-          });
-          pushHistory();
-          render();
-          save();
-          movedDuringDrag = true;
-        }
-        dragSnapGuides = null;
-        dragOffset = null;
-        dragConnections = null;
-        dragging = false;
-      } else {
-        dragOffset = null;
-        dragConnections = null;
-      }
-      if (movedDuringDrag) {
-        lastPointerUp = { id: null, time: 0 };
-        return;
-      }
-      if (e.button !== 0) {
-        lastPointerUp = { id: null, time: 0 };
-        return;
-      }
-      const targetComponent = e.target instanceof Element ? e.target.closest('.component') : null;
-      const compId = targetComponent?.dataset.id || pointerDownComponentId || null;
-      if (!compId) {
-        lastPointerUp = { id: null, time: 0 };
-        return;
-      }
-      const now = (typeof performance !== 'undefined' && performance.now)
-        ? performance.now()
-        : Date.now();
-      if (lastPointerUp.id === compId && (now - lastPointerUp.time) <= DOUBLE_CLICK_THRESHOLD_MS) {
-        lastPointerUp = { id: null, time: 0 };
-        const comp = components.find(c => c.id === compId);
-        if (comp) {
-          cancelPendingClickSelection();
-          lastComponentClick = { id: null, time: 0 };
-          selectComponent(comp);
-        }
-        return;
-      }
-      lastPointerUp = { id: compId, time: now };
-    });
-  svg.addEventListener('click', e => {
-    // Gap #50 – In zone assignment mode, clicks toggle component membership
-    if (activeZoneId) {
-      const compEl = e.target.closest('.component');
-      const compId = compEl?.dataset.id;
-      if (compId) {
-        toggleComponentInZone(activeZoneId, compId);
-        return;
-      }
-    }
-    if (marqueeSelectionMade) {
-      marqueeSelectionMade = false;
-      pointerDownComponentId = null;
-      return;
-    }
-    if (e.shiftKey || e.ctrlKey || e.metaKey) {
-      cancelPendingClickSelection();
-      lastComponentClick = { id: null, time: 0 };
-      pointerDownComponentId = null;
-      return;
-    }
-    const compEl = e.target.closest('.component');
-    let compId = compEl?.dataset.id || pointerDownComponentId || null;
-    const clickedOutside = !compId;
-    const now = (typeof performance !== 'undefined' && performance.now)
-      ? performance.now()
-      : Date.now();
-    cancelPendingClickSelection();
-    pointerDownComponentId = null;
-    if (compId && lastComponentClick.id === compId && (now - lastComponentClick.time) <= DOUBLE_CLICK_THRESHOLD_MS) {
-      lastComponentClick = { id: null, time: 0 };
-      const comp = components.find(c => c.id === compId);
-      if (comp) {
-        selectComponent(comp);
-      }
-      return;
-    }
-    lastComponentClick = { id: compId, time: now };
-    if (e.detail > 1) return;
-    clickSelectTimer = window.setTimeout(() => {
-      clickSelectTimer = null;
-      if (clickedOutside) {
-        selection = [];
-        selected = null;
-        selectedConnection = null;
-        render();
-        return;
-      }
-      const comp = components.find(c => c.id === compId);
-      if (!comp) return;
-      selection = [comp];
-      selected = comp;
-      selectedConnection = null;
-      render();
-    }, SINGLE_CLICK_DELAY_MS);
-  });
-
-  svg.addEventListener('dblclick', e => {
-    const targetComponent = e.target instanceof Element ? e.target.closest('g.component') : null;
-    const compId = targetComponent?.dataset.id || pointerDownComponentId || null;
-    pointerDownComponentId = null;
-    if (!compId) return;
-    const comp = components.find(c => c.id === compId);
-    if (!comp) return;
-    e.stopPropagation();
-    cancelPendingClickSelection();
-    lastComponentClick = { id: null, time: 0 };
-    selectComponent(comp);
-  });
-
-  svg.addEventListener('contextmenu', e => {
-    e.preventDefault();
-    closePaletteContextMenu();
-    contextCanvasPoint = toDiagramCoords(e);
-    const connEl = e.target.closest('.connection');
-    if (connEl) {
-      const comp = components.find(c => c.id === connEl.dataset.comp);
-      contextTarget = { component: comp, index: parseInt(connEl.dataset.index, 10), connection: true };
-    } else {
-      const g = e.target.closest('.component');
-      contextTarget = g ? components.find(c => c.id === g.dataset.id) : null;
-    }
-    const compItems = menu.querySelectorAll('[data-context="component"]');
-    const connItems = menu.querySelectorAll('[data-context="connection"]');
-    const canvasItems = menu.querySelectorAll('[data-context="canvas"]');
-    const isComponentContext = !!(contextTarget && !contextTarget.connection);
-    compItems.forEach(li => li.style.display = isComponentContext ? 'block' : 'none');
-    connItems.forEach(li => li.style.display = contextTarget && contextTarget.connection ? 'block' : 'none');
-    canvasItems.forEach(li => li.style.display = contextTarget ? 'none' : 'block');
-    const copyPropsItem = menu.querySelector('[data-action="copy-properties"]');
-    if (copyPropsItem) copyPropsItem.style.display = isComponentContext ? 'block' : 'none';
-    const pastePropsItem = menu.querySelector('[data-action="paste-properties"]');
-    if (pastePropsItem) {
-      const canPaste = isComponentContext && canPastePropertyClipboard(propertyClipboard, contextTarget);
-      pastePropsItem.style.display = canPaste ? 'block' : 'none';
-    }
-    const positionLockItem = menu.querySelector('[data-action="toggle-lock"]');
-    if (positionLockItem) positionLockItem.textContent = isComponentContext && isComponentPositionLocked(contextTarget) ? 'Unlock Position' : 'Lock Position';
-    const propertiesLockItem = menu.querySelector('[data-action="toggle-properties-lock"]');
-    if (propertiesLockItem) propertiesLockItem.textContent = isComponentContext && contextTarget?.propertiesLocked ? 'Unlock Properties' : 'Lock Properties';
-    // Gap #40 – Show Group only when 2+ non-group components selected
-    const groupItem = menu.querySelector('[data-action="group-selection"]');
-    const ungroupItem = menu.querySelector('[data-action="ungroup"]');
-    if (groupItem) groupItem.style.display = (isComponentContext && selection.length >= 2 && !selection.every(c => c.type === 'group')) ? 'block' : 'none';
-    if (ungroupItem) ungroupItem.style.display = (isComponentContext && contextTarget?.type === 'group') ? 'block' : 'none';
-    const inMultiSelection = isComponentContext && selection.length >= 2 && selection.includes(contextTarget);
-    menu.querySelectorAll('[data-context="multi"]').forEach(li => {
-      const needsThree = li.dataset.action === 'distribute-h' || li.dataset.action === 'distribute-v';
-      li.style.display = (needsThree ? (selection.length >= 3 && inMultiSelection) : inMultiSelection) ? 'block' : 'none';
-    });
-    const rect = canvasScroll?.getBoundingClientRect();
-    if (rect) {
-      const scrollLeft = canvasScroll?.scrollLeft ?? 0;
-      const scrollTop = canvasScroll?.scrollTop ?? 0;
-      const left = e.clientX - rect.left + scrollLeft;
-      const top = e.clientY - rect.top + scrollTop;
-      menu.style.left = `${left}px`;
-      menu.style.top = `${top}px`;
-    } else {
-      menu.style.left = `${e.pageX}px`;
-      menu.style.top = `${e.pageY}px`;
-    }
-    menu.style.display = 'block';
-  });
-
-  const getContextTargets = target => {
-    if (!target) return [];
-    if (selection.length && selection.includes(target)) {
-      return selection.slice();
-    }
-    return [target];
-  };
-
-  menu.addEventListener('click', async e => {
-    const action = e.target.dataset.action;
-    if (!action) return;
-    e.stopPropagation();
-    if (contextTarget && contextTarget.connection) {
-      const { component, index } = contextTarget;
-      const conn = component.connections[index];
-      if (action === 'place-waypoint') {
-        placeConnectionWaypoint(component, index, contextCanvasPoint);
-      } else if (action === 'reset-waypoint') {
-        resetConnectionWaypoint(component, index);
-      } else if (action === 'edit') {
-        const target = components.find(t => t.id === conn.target);
-        const cableComp = isConductorSegmentComponent(component) ? component : isConductorSegmentComponent(target) ? target : null;
-        if (cableComp) {
-          await editCableComponent(cableComp);
-        } else {
-          const result = target ? await chooseCable(component, target, conn) : null;
-          if (result && applyCableResultToConnection(conn, result)) {
-            pushHistory();
-            render();
-            save();
-            markScheduleReconcilePending();
-          }
-        }
-      } else if (action === 'delete') {
-        component.connections.splice(index, 1);
-        selectedConnection = null;
-        pushHistory();
-        render();
-        save();
-      }
-      menu.style.display = 'none';
-      return;
-    }
-    if (action.startsWith('quick-add-')) {
-      const subtype = action.slice('quick-add-'.length);
-      const comp = addPaletteSymbol(subtype, { point: contextCanvasPoint });
-      if (comp) showToast(`${comp.label || resolveComponentMeta(subtype)?.label || 'Symbol'} added`);
-    } else if (action === 'repeat-last-symbol') {
-      repeatLastCommand({ point: contextCanvasPoint });
-    } else if (action === 'edit' && contextTarget) {
-      selectComponent(contextTarget.id);
-    } else if (action === 'rename' && contextTarget) {
-      const targets = getContextTargets(contextTarget);
-      if (!targets.length) return;
-      if (targets.some(comp => isComponentPropertiesLocked(comp))) {
-        showToast('Unlock component properties before renaming');
-        return;
-      }
-      const current = contextTarget.label || '';
-      const next = await promptDialog('Rename Component', 'Component label', current);
-      if (next !== null) {
-        let changed = false;
-        targets.forEach(comp => {
-          if ((comp.label || '') !== next) {
-            comp.label = next;
-            changed = true;
-          }
-        });
-        if (changed) {
-          pushHistory();
-          render();
-          save();
-        }
-      }
-    } else if (action === 'copy-properties' && contextTarget && !contextTarget.connection) {
-      const clipboardData = createPropertyClipboardFromComponent(contextTarget);
-      if (clipboardData) {
-        propertyClipboard = clipboardData;
-        showToast('Properties copied');
-      } else {
-        propertyClipboard = null;
-        showToast('No properties available to copy');
-      }
-    } else if (action === 'paste-properties' && contextTarget && !contextTarget.connection) {
-      const targets = getContextTargets(contextTarget).filter(comp => comp && !comp.isVirtualNode);
-      if (!propertyClipboard || !propertyClipboard.data) {
-        showToast('Copy properties from a device first');
-      } else if (!targets.length) {
-        showToast('Select a device to paste properties');
-      } else if (targets.some(target => isComponentPropertiesLocked(target))) {
-        showToast('Unlock component properties before pasting');
-      } else if (targets.some(target => !canPastePropertyClipboard(propertyClipboard, target))) {
-        showToast('Properties can only be pasted to devices of the same type');
-      } else {
-        let changed = false;
-        targets.forEach(target => {
-          if (applyPropertyClipboardToComponent(target, propertyClipboard)) changed = true;
-        });
-        if (changed) {
-          pushHistory();
-          render();
-          save();
-          markScheduleReconcilePending();
-          showToast('Properties pasted');
-        } else {
-          showToast('Properties already match');
-        }
-      }
-    } else if (action === 'disconnect' && contextTarget) {
-      const targets = getContextTargets(contextTarget);
-      if (!targets.length) return;
-      const targetIds = new Set(targets.map(t => t.id));
-      let changed = false;
-      targets.forEach(comp => {
-        if (Array.isArray(comp.connections) && comp.connections.length) {
-          comp.connections = [];
-          changed = true;
-        }
-      });
-      components.forEach(comp => {
-        if (!Array.isArray(comp.connections) || !comp.connections.length) return;
-        const filtered = comp.connections.filter(conn => !targetIds.has(conn.target));
-        if (filtered.length !== comp.connections.length) {
-          comp.connections = filtered;
-          changed = true;
-          if (selectedConnection && selectedConnection.component === comp) {
-            selectedConnection = null;
-          }
-        }
-      });
-      if (selectedConnection && targetIds.has(selectedConnection.component?.id)) {
-        selectedConnection = null;
-      }
-      if (changed) {
-        pushHistory();
-        render();
-        save();
-      }
-    } else if (action === 'delete' && contextTarget) {
-      const targets = getContextTargets(contextTarget);
-      if (!targets.length) return;
-      // Gap #41 – block deletion of locked components
-      const locked = targets.filter(c => isComponentPositionLocked(c));
-      if (locked.length) { showToast(`Cannot delete: ${locked.map(c => c.label || c.id).join(', ')} is locked`); return; }
-      const ids = new Set(targets.map(c => c.id));
-      components = components.filter(c => !ids.has(c.id));
-      components.forEach(c => {
-        c.connections = (c.connections || []).filter(conn => !ids.has(conn.target));
-      });
-      selection = selection.filter(c => !ids.has(c.id));
-      selected = selection[0] || null;
-      selectedConnection = null;
-      pushHistory();
-      render();
-      save();
-      const modal = ensurePropModal();
-      if (modal) modal.classList.remove('show');
-    } else if (action === 'duplicate' && contextTarget) {
-      const targets = getContextTargets(contextTarget);
-      if (!targets.length) return;
-      const base = Date.now();
-      const idMap = {};
-      const newComps = targets.map((comp, idx) => {
-        const clone = {
-          ...JSON.parse(JSON.stringify(comp)),
-          id: 'n' + (base + idx),
-          x: comp.x + gridSize,
-          y: comp.y + gridSize,
-          connections: (comp.connections || []).map(conn => ({ ...conn }))
-        };
-        idMap[comp.id] = clone.id;
-        applyNextLabel(clone);
-        return clone;
-      });
-      newComps.forEach(clone => {
-        clone.connections = (clone.connections || [])
-          .filter(conn => idMap[conn.target])
-          .map(conn => ({ ...conn, target: idMap[conn.target] }));
-      });
-      components.push(...newComps);
-      selection = newComps;
-      selected = newComps[0] || null;
-      selectedConnection = null;
-      pushHistory();
-      render();
-      save();
-    } else if (action === 'rotate' && contextTarget) {
-      const targets = getContextTargets(contextTarget);
-      if (!targets.length) return;
-      targets.forEach(comp => {
-        comp.rotation = ((comp.rotation || 0) + 90) % 360;
-        comp.rotationManual = true;
-      });
-      selectedConnection = null;
-      pushHistory();
-      render();
-      save();
-    } else if (action === 'paste') {
-      if (clipboard.length) {
-        const base = Date.now();
-        const idMap = {};
-        const newComps = clipboard.map((c, idx) => {
-          const newId = 'n' + (base + idx);
-          idMap[c.id] = newId;
-          const clone = {
-            ...JSON.parse(JSON.stringify(c)),
-            id: newId,
-            x: c.x + gridSize,
-            y: c.y + gridSize,
-            connections: (c.connections || []).map(conn => ({ ...conn }))
-          };
-          applyNextLabel(clone);
-          return clone;
-        });
-        newComps.forEach(c => {
-          c.connections = (c.connections || [])
-            .filter(conn => idMap[conn.target])
-            .map(conn => ({ ...conn, target: idMap[conn.target] }));
-        });
-        components.push(...newComps);
-        selection = newComps;
-        selected = newComps[0] || null;
-        pushHistory();
-        render();
-        save();
-      }
-    // Gap #41 – Lock / unlock
-    } else if (action === 'toggle-lock' && contextTarget) {
-      const targets = getContextTargets(contextTarget);
-      targets.forEach(c => toggleLock(c));
-    } else if (action === 'toggle-properties-lock' && contextTarget) {
-      const targets = getContextTargets(contextTarget);
-      targets.forEach(c => togglePropertiesLock(c));
-    // Gap #43 – Select Connected
-    } else if (action === 'select-connected' && contextTarget) {
-      selectConnected(contextTarget.id);
-    // Gap #44 – Select by Type
-    } else if (action === 'select-by-type' && contextTarget) {
-      selectByType(contextTarget.subtype || contextTarget.type);
-    // Gap #40 – Group Selection
-    } else if (action === 'group-selection') {
-      groupSelection();
-    // Gap #40 – Ungroup
-    } else if (action === 'ungroup' && contextTarget) {
-      if (contextTarget.type === 'group') ungroupComponent(contextTarget.id);
-    } else if (action === 'bring-to-front' && contextTarget && !contextTarget.connection) {
-      const targets = getContextTargets(contextTarget);
-      targets.forEach(comp => {
-        const idx = components.indexOf(comp);
-        if (idx !== -1 && idx < components.length - 1) {
-          components.splice(idx, 1);
-          components.push(comp);
-        }
-      });
-      pushHistory();
-      render();
-      save();
-    } else if (action === 'send-to-back' && contextTarget && !contextTarget.connection) {
-      const targets = getContextTargets(contextTarget);
-      [...targets].reverse().forEach(comp => {
-        const idx = components.indexOf(comp);
-        if (idx !== -1 && idx > 0) {
-          components.splice(idx, 1);
-          components.unshift(comp);
-        }
-      });
-      pushHistory();
-      render();
-      save();
-    } else if (action === 'align-left') {
-      alignSelection('left');
-    } else if (action === 'align-right') {
-      alignSelection('right');
-    } else if (action === 'align-top') {
-      alignSelection('top');
-    } else if (action === 'align-bottom') {
-      alignSelection('bottom');
-    } else if (action === 'distribute-h') {
-      distributeSelection('h');
-    } else if (action === 'distribute-v') {
-      distributeSelection('v');
-    }
-    menu.style.display = 'none';
-  });
-
-  document.addEventListener('click', e => {
-    if (!menu.contains(e.target)) {
-      menu.style.display = 'none';
-    }
-    if (paletteContextMenu && paletteContextMenu.style.display === 'block' && !paletteContextMenu.contains(e.target)) {
-      const trigger = paletteContextTarget?.trigger;
-      if (!(trigger instanceof Element) || !trigger.contains(e.target)) {
-        closePaletteContextMenu();
-      }
-    }
-  });
-  document.addEventListener('keydown', e => {
-    if (e.key === 'Escape') {
-      menu.style.display = 'none';
-      closePaletteContextMenu();
-    }
-  });
-
-  document.addEventListener('keydown', e => {
-    if (e.key !== 'Delete') return;
-    const target = e.target;
-    if (target instanceof HTMLElement && (target.isContentEditable || ['INPUT', 'TEXTAREA'].includes(target.tagName))) {
-      return;
-    }
-    if (selectedConnection) {
-      const { component, index } = selectedConnection;
-      component.connections.splice(index, 1);
-      selectedConnection = null;
-      pushHistory();
-      render();
-      save();
-      if (selected) selectComponent(selected);
-      return;
-    }
-    if (selection.length) {
-      // Gap #41 – block deletion of locked components
-      const locked = selection.filter(c => isComponentPositionLocked(c));
-      if (locked.length) { showToast(`Cannot delete: ${locked.map(c => c.label || c.id).join(', ')} is locked`); return; }
-      const ids = new Set(selection.map(c => c.id));
-      components = components.filter(c => !ids.has(c.id));
-      components.forEach(c => {
-        c.connections = (c.connections || []).filter(conn => !ids.has(conn.target));
-      });
-      selection = [];
-      selected = null;
-      selectedConnection = null;
-      pushHistory();
-      render();
-      save();
-      const modal = ensurePropModal();
-      if (modal) modal.classList.remove('show');
-    }
-  });
-
-  document.addEventListener('keydown', e => {
-    const mod = e.ctrlKey || e.metaKey;
-    const target = e.target;
-    if (target instanceof HTMLElement && (target.isContentEditable || ['INPUT', 'TEXTAREA'].includes(target.tagName))) {
-      return;
-    }
-    const key = e.key.toLowerCase();
-    if (mod && key === 'z' && !e.shiftKey) {
-      e.preventDefault();
-      undo();
-    } else if (mod && (key === 'y' || (key === 'z' && e.shiftKey))) {
-      e.preventDefault();
-      redo();
-    } else if (mod && key === 'c') {
-      e.preventDefault();
-      clipboard = selection.map(c => JSON.parse(JSON.stringify(c)));
-    } else if (mod && key === 'v') {
-      e.preventDefault();
-      if (clipboard.length) {
-        const base = Date.now();
-        const idMap = {};
-        const newComps = clipboard.map((c, idx) => {
-          const newId = 'n' + (base + idx);
-          idMap[c.id] = newId;
-          const clone = {
-            ...JSON.parse(JSON.stringify(c)),
-            id: newId,
-            x: c.x + gridSize,
-            y: c.y + gridSize,
-            connections: (c.connections || []).map(conn => ({ ...conn }))
-          };
-          applyNextLabel(clone);
-          return clone;
-        });
-        newComps.forEach(c => {
-          c.connections = (c.connections || [])
-            .filter(conn => idMap[conn.target])
-            .map(conn => ({ ...conn, target: idMap[conn.target] }));
-        });
-        components.push(...newComps);
-        selection = newComps;
-        selected = newComps[0] || null;
-        pushHistory();
-        render();
-        save();
-      }
-    } else if (!mod && commandForShortcut(e)) {
-      e.preventDefault();
-      executeShortcutCommand(commandForShortcut(e).id);
-    } else if (mod && key === 'a') {
-      e.preventDefault();
-      selection = [...components];
-      selected = components[0] || null;
-      selectedConnection = null;
-      render();
-      updateStatusBar();
-    } else if (mod && key === 'g' && !e.shiftKey) {
-      e.preventDefault();
-      if (selection.length >= 2) groupSelection();
-    } else if (mod && key === 'g' && e.shiftKey) {
-      e.preventDefault();
-      const grp = selection.find(c => c.type === 'group') || (selected?.type === 'group' ? selected : null);
-      if (grp) ungroupComponent(grp.id);
-    } else if (mod && key === 'l') {
-      e.preventDefault();
-      const lockTargets = selection.length ? selection : selected ? [selected] : [];
-      lockTargets.forEach(c => toggleLock(c));
-    } else if (!mod && e.key === 'Escape') {
-      // Cancel connect mode or deselect
-      const anyModalOpen = document.querySelector('.prop-modal.show');
-      if (!anyModalOpen) {
-        if (connectMode) {
-          resetConnectInteraction({ keepMode: false });
-        }
-        selection = [];
-        selected = null;
-        selectedConnection = null;
-        render();
-        updateStatusBar();
-      }
-    }
-  });
-
-  document.getElementById('repeat-last-symbol-btn')?.addEventListener('click', () => {
-    repeatLastCommand();
-  });
-  document.getElementById('shortcuts-btn')?.addEventListener('click', openKeyboardShortcutsModal);
-  updateShortcutControlLabels();
-
-  if (paletteContextMenu) {
-    paletteContextMenu.addEventListener('click', e => {
-      const item = e.target.closest('li[data-action]');
-      if (!item) return;
-      e.preventDefault();
-      e.stopPropagation();
-      if (item.dataset.action === 'edit' && paletteContextTarget?.meta) {
-        navigateToCustomComponentEditor(paletteContextTarget.meta);
-      } else if (item.dataset.action === 'toggle-favorite' && paletteContextTarget?.meta) {
-        const isFavorite = togglePaletteFavorite(paletteContextTarget.subtype);
-        buildPalette();
-        showToast(isFavorite ? 'Added to Favorites' : 'Removed from Favorites');
-      }
-      closePaletteContextMenu();
-    });
-    paletteContextMenu.addEventListener('contextmenu', e => {
-      e.preventDefault();
-    });
-  }
-  svg.addEventListener('mouseenter', e => {
-    const coords = toDiagramCoords(e);
-    const pointerX = coords.x;
-    const pointerY = coords.y;
-    if (Number.isFinite(pointerX) && Number.isFinite(pointerY)) {
-      cursorPos = { x: pointerX, y: pointerY };
-      cursorPosValid = true;
-    }
-  });
-  svg.addEventListener('mouseleave', () => {
-    cursorPosValid = false;
-    updateStatusBar();
-  });
-  window.addEventListener('resize', closePaletteContextMenu);
-  document.addEventListener('scroll', closePaletteContextMenu, true);
-
-  const tourBtn = document.getElementById('tour-btn');
-  if (tourBtn) tourBtn.addEventListener('click', () => {
-    startTour();
-    writeAppSetting('onelineTourDone', 'true');
-  });
-
-  const params = new URLSearchParams(window.location.search);
-  const probeTarget = resolveInitialCrossProbe(params);
-  const shouldOpenComponentModal = params.has('componentModal');
-  if (probeTarget) {
-    const probeLabel = params.get('probe') || params.get('component') || probeTarget.matchValue || '';
-    focusCrossProbeTarget(probeTarget, { componentModal: shouldOpenComponentModal, label: probeLabel });
-  } else if (params.get('component') || params.get('probe')) {
-    const probeLabel = params.get('probe') || params.get('component') || 'that item';
-    showToast(`No one-line component found for ${probeLabel}.`);
-    if (shouldOpenComponentModal) selectComponent();
-  } else if (shouldOpenComponentModal) {
-    selectComponent();
-  }
-
-  initSettings();
-  initDarkMode();
-  initCompactMode();
-  initNavToggle();
-
-  // ----------------------------------------------------------------
-  // Gap #42 – Zoom to Selection button
-  // ----------------------------------------------------------------
-  document.getElementById('zoom-fit-selection-btn')?.addEventListener('click', () => zoomToSelection());
-
-  // ----------------------------------------------------------------
-  // Gap #36 – Energized/de-energized state toggle
-  // ----------------------------------------------------------------
-  const toggleEnergized = document.getElementById('toggle-energized');
-  if (toggleEnergized) {
-    toggleEnergized.checked = showEnergizedState;
-    toggleEnergized.addEventListener('change', () => {
-      showEnergizedState = toggleEnergized.checked;
-      render();
-    });
-  }
-
-  // ----------------------------------------------------------------
-  // Gap #39 – Minimap toggle
-  // ----------------------------------------------------------------
-  const minimapToggle = document.getElementById('minimap-toggle');
-  if (minimapToggle) {
-    minimapToggle.checked = minimapVisible;
-    minimapToggle.addEventListener('change', () => {
-      minimapVisible = minimapToggle.checked;
-      renderMinimap();
-    });
-    // Minimap click-to-navigate
-    const minimapSvgEl = document.getElementById('minimap-svg');
-    if (minimapSvgEl) {
-      minimapSvgEl.addEventListener('mousedown', e => {
-        if (!minimapVisible) return;
-        const rect = minimapSvgEl.getBoundingClientRect();
-        const mx = e.clientX - rect.left;
-        const my = e.clientY - rect.top;
-        // Convert minimap coords to diagram coords
-        if (!components.length) return;
-        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-        components.forEach(c => {
-          const b = componentBounds(c);
-          minX = Math.min(minX, b.left); minY = Math.min(minY, b.top);
-          maxX = Math.max(maxX, b.right); maxY = Math.max(maxY, b.bottom);
-        });
-        const pad = 20;
-        minX -= pad; minY -= pad; maxX += pad; maxY += pad;
-        const dw = maxX - minX || 1, dh = maxY - minY || 1;
-        const scale = Math.min(180 / dw, 120 / dh);
-        const ox = (180 - dw * scale) / 2;
-        const oy = (120 - dh * scale) / 2;
-        const diagramX = (mx - ox) / scale + minX;
-        const diagramY = (my - oy) / scale + minY;
-        const editor = document.querySelector('.oneline-canvas-scroll');
-        if (editor) {
-          const zoom = diagramZoom || DEFAULT_DIAGRAM_ZOOM;
-          editor.scrollLeft = Math.max(0, (diagramX - diagramViewport.minX) * zoom - editor.clientWidth / 2);
-          editor.scrollTop = Math.max(0, (diagramY - diagramViewport.minY) * zoom - editor.clientHeight / 2);
-          renderMinimap();
-        }
-      });
-    }
-  }
-
-  // ----------------------------------------------------------------
-  // Gap #47 – Orthogonal routing toggle
-  // ----------------------------------------------------------------
-  const orthoToggle = document.getElementById('orthogonal-routing-toggle');
-  if (orthoToggle) {
-    orthoToggle.checked = orthogonalRouting;
-    orthoToggle.addEventListener('change', () => {
-      orthogonalRouting = orthoToggle.checked;
-      setOneLineViewSetting('orthogonalRouting', orthogonalRouting);
-      // Clear cached dir/mid so routeConnection re-computes with the new mode
-      components.forEach(c => (c.connections || []).forEach(conn => {
-        delete conn.dir; delete conn.mid;
-      }));
-      render();
-    });
-    orthogonalRouting = !!getOneLineViewSetting('orthogonalRouting', false);
-    orthoToggle.checked = orthogonalRouting;
-  }
-
-  // ----------------------------------------------------------------
-  // Gap #37 – Symbol standard (IEC 60617 / ANSI-IEEE) toggle
-  // ----------------------------------------------------------------
-  const symStdSelect = document.getElementById('symbol-standard-select');
-  if (symStdSelect) {
-    symbolStandard = getOneLineViewSetting('symbolStandard', 'ANSI') || 'ANSI';
-    symStdSelect.value = symbolStandard;
-    symStdSelect.addEventListener('change', () => {
-      symbolStandard = symStdSelect.value;
-      setOneLineViewSetting('symbolStandard', symbolStandard);
-      buildPalette();
-      render();
-    });
-  }
-
-  // ----------------------------------------------------------------
-  // Gap #38 – Title block
-  // ----------------------------------------------------------------
-  const titleBlockBtn = document.getElementById('title-block-btn');
-  if (titleBlockBtn) {
-    titleBlockFields = getItem('diagramTitleBlock') || {};
-    titleBlockBtn.addEventListener('click', () => {
-      const fields = [
-        ['projectName', 'Project Name'],
-        ['drawingNumber', 'Drawing Number'],
-        ['revision', 'Revision'],
-        ['revDate', 'Date'],
-        ['drawnBy', 'Drawn By'],
-        ['checkedBy', 'Checked By'],
-        ['company', 'Company'],
-        ['peStamp', 'PE Stamp / Seal Note'],
-      ];
-      const form = document.createElement('form');
-      form.className = 'title-block-modal-form';
-      fields.forEach(([key, label]) => {
-        const lbl = document.createElement('label');
-        lbl.textContent = label;
-        const inp = document.createElement('input');
-        inp.type = 'text';
-        inp.value = titleBlockFields[key] || '';
-        inp.dataset.key = key;
-        lbl.appendChild(inp);
-        form.appendChild(lbl);
-      });
-      const modal = openModal({ title: 'Title Block', content: '', buttons: [
-        { text: 'Save', primary: true, id: 'tb-save-btn' },
-        { text: 'Cancel', id: 'tb-cancel-btn' }
-      ]});
-      if (!modal) return;
-      const body = modal.querySelector('.modal-body') || modal.querySelector('.prop-form');
-      if (body) body.appendChild(form);
-      modal.querySelector('#tb-save-btn')?.addEventListener('click', () => {
-        form.querySelectorAll('input[data-key]').forEach(inp => {
-          titleBlockFields[inp.dataset.key] = inp.value.trim();
-        });
-        setItem('diagramTitleBlock', titleBlockFields);
-        renderTitleBlock();
-        modal.classList.remove('show');
-      });
-    });
-  }
-  const titleBlockShowToggle = document.getElementById('title-block-show-toggle');
-  if (titleBlockShowToggle) {
-    titleBlockShowToggle.checked = showTitleBlock;
-    titleBlockShowToggle.addEventListener('change', () => {
-      showTitleBlock = titleBlockShowToggle.checked;
-      renderTitleBlock();
-    });
-  }
-
-  // ----------------------------------------------------------------
-  // Gap #46 – Datablock config: hook into the existing Views button
-  // ----------------------------------------------------------------
-  diagramDatablockConfig = getItem('diagramDatablockConfig') || {};
-
-  // Show/hide context menu items based on selection state
-  const ctxGroupItem = document.getElementById('ctx-group-selection');
-  const ctxUngroupItem = document.getElementById('ctx-ungroup');
-  const ctxMenu = document.getElementById('context-menu');
-  if (ctxMenu) {
-    ctxMenu.addEventListener('contextmenu', e => e.preventDefault());
-    // Update group/ungroup visibility just before menu is shown (handled in contextmenu event)
-  }
-  refineOneLineCommandSurface();
-  setupToolbarMenus();
-  const activeSampleWorkflow = getItem('activeSampleWorkflow');
-  if (activeSampleWorkflow?.id === 'ductbank-network' && components.length) {
-    const layoutVersion = Number(activeSampleWorkflow.layoutVersion || 0);
-    if (layoutVersion < 2 && arrangeDuctbankSampleLayout(components)) {
-      pushHistory();
-      render();
-      save();
-      setItem('activeSampleWorkflow', { ...activeSampleWorkflow, layoutVersion: 2 });
-    }
-    requestAnimationFrame(() => requestAnimationFrame(() => zoomToFit({ pad: 120, maxZoom: 1.1 })));
-  }
+  await initializeOneLineEvents({
+    documentRef: document,
+    DEFAULT_DIAGRAM_ZOOM,
+    DOUBLE_CLICK_THRESHOLD_MS,
+    DRAG_MOVE_THRESHOLD,
+    Element,
+    HTMLElement,
+    SINGLE_CLICK_DELAY_MS,
+    URLSearchParams,
+    addComponent,
+    addPaletteSymbol,
+    addSheet,
+    adjustZoom,
+    alignSelection,
+    applyCableResultToConnection,
+    applyDiagramZoom,
+    applyDrawingModeClass,
+    applyNextLabel,
+    applyPropertyClipboardToComponent,
+    arrangeDuctbankSampleLayout,
+    asset,
+    attachLocalWheelScroll,
+    autoAttachComponent,
+    bindHistorySidebarControls,
+    buildDragSnapGuides,
+    buildPalette,
+    canPastePropertyClipboard,
+    cancelPendingClickSelection,
+    captureBusAnchors,
+    categoryForType,
+    chooseCable,
+    clampPaletteWidth,
+    clampStudiesWidth,
+    clearBackground,
+    closePaletteContextMenu,
+    commandForShortcut,
+    compHeight,
+    compWidth,
+    componentBounds,
+    computeDragConnections,
+    createConnectionPreviewLine,
+    createLayer,
+    createPropertyClipboardFromComponent,
+    createProtectionZone,
+    customComponentStorageKey,
+    defaultLabelAnchor,
+    deleteSheet,
+    distributeSelection,
+    editCableComponent,
+    editManufacturerDefaults,
+    editPrefixes,
+    ensureBaselineComponentMetadata,
+    ensureBaselineFieldsOnComponent,
+    ensureGeneratorStudyFieldsOnComponent,
+    ensureGeneratorStudyMetadata,
+    ensureMccFieldsOnComponent,
+    ensureMccMetadata,
+    ensurePropModal,
+    ensurePtVtFieldsOnComponent,
+    ensurePtVtMetadata,
+    ensureStudyInputFieldsOnComponent,
+    ensureStudyInputMetadata,
+    executeShortcutCommand,
+    exitZoneAssignMode,
+    exportAllReports,
+    exportDWG,
+    exportDXF,
+    exportDiagram,
+    exportOneLineDiagnostics,
+    exportPDF,
+    finalizeMarqueeSelection,
+    findComponentByTag,
+    finishConnectionToCandidate,
+    flashSnapIndicator,
+    focusComponentElement,
+    focusCrossProbeTarget,
+    getConnectionCandidateFromEvent,
+    getItem,
+    getOneLine,
+    getOneLineViewSetting,
+    getViewportCenter,
+    groupSelection,
+    handleImport,
+    highlightFoundComponent,
+    historyController,
+    inferSchemaFromProps,
+    initCompactMode,
+    initDarkMode,
+    initNavToggle,
+    initSettings,
+    isComponentPositionLocked,
+    isComponentPropertiesLocked,
+    isConductorSegmentComponent,
+    loadComponentLibrary,
+    loadSampleDiagram,
+    loadSheet,
+    loadTemplates,
+    markScheduleReconcilePending,
+    navigateToCustomComponentEditor,
+    nearestPortToPoint,
+    nearestPorts,
+    normalizeComponent,
+    normalizeComponentElectricalProperties,
+    normalizePortsForCategory,
+    openAutoBuildModal,
+    openKeyboardShortcutsModal,
+    openModal,
+    openScheduleReconcileModal,
+    openShapeModal,
+    openViewModal,
+    paletteContextMenu,
+    paletteWidthStorageKey,
+    panDiagram,
+    performance,
+    placeConnectionWaypoint,
+    portPosition,
+    promptDialog,
+    pushHistory,
+    reassignBusAnchors,
+    rebuildComponentMaps,
+    recordHistoryEvent,
+    recordPaletteUsage,
+    redo,
+    refineOneLineCommandSurface,
+    refreshAttributeOptions,
+    renameSheet,
+    render,
+    renderBgPanel,
+    renderHistorySidebar,
+    renderLayerPanel,
+    renderMinimap,
+    renderProtectionZonesPanel,
+    renderSheetTabs,
+    renderTemplates,
+    renderTitleBlock,
+    repeatLastCommand,
+    requestAnimationFrame,
+    resetConnectInteraction,
+    resetConnectionWaypoint,
+    resolveComponentMeta,
+    resolveComponentMetaKey,
+    resolveInitialCrossProbe,
+    runRepeatableCommand,
+    save,
+    scheduleNoncriticalWork,
+    selectByType,
+    selectComponent,
+    selectConnected,
+    serializeDiagram,
+    setActiveOperatingState,
+    setDataStateOverlayMode,
+    setDatablockDensityMode,
+    setDatablockFormatMode,
+    setDiagramZoom,
+    setDrawingMode,
+    setItem,
+    setOneLineViewSetting,
+    setTimeout,
+    setupLibraryTools,
+    setupToolbarMenus,
+    shareDiagram,
+    showToast,
+    snapToNearestBus,
+    startMiddlePan,
+    startTour,
+    stopMiddlePan,
+    studiesPanel,
+    studiesWidthStorageKey,
+    syncDataStateOverlayControl,
+    syncDatablockDensityControl,
+    syncDatablockFormatControl,
+    syncDrawingModeControl,
+    syncOperatingStateControl,
+    toDiagramCoords,
+    toggleComponentInZone,
+    toggleGrid,
+    toggleLock,
+    togglePaletteFavorite,
+    togglePropertiesLock,
+    undo,
+    ungroupComponent,
+    updateBusPorts,
+    updateMiddlePan,
+    updateShortcutControlLabels,
+    updateStatusBar,
+    updateViewButtonLabel,
+    updateZoomDisplay,
+    uploadBackground,
+    validateDiagram,
+    window,
+    writeAppSetting,
+    zoomToFit,
+    zoomToSelection
+  }, oneLineEventState);
 }
 
 function getCategory(c) {
@@ -20145,6 +12594,7 @@ function buildScheduleDataFromDiagram() {
       : formatCablePhases(c);
     const connConductors = conn?.conductors || cableInfo?.conductors || conn?.cable?.conductors || '';
     const fields = {
+      entityId: c.entityId || '',
       id: c.ref || c.id,
       ref: c.id,
       tag: componentTag,
@@ -20207,6 +12657,7 @@ function buildScheduleDataFromDiagram() {
     .forEach(cableComp => {
       const spec = buildCableSpecFromComponent(cableComp, all);
       if (!spec) return;
+      spec.circuitId = cableComp.circuitId || spec.circuitId || '';
       if (spec.tag) seenTags.add(spec.tag);
       cableSpecs.push(spec);
     });
@@ -20217,6 +12668,7 @@ function buildScheduleDataFromDiagram() {
       const target = all.find(t => t.id === conn.target);
       const spec = {
         ...conn.cable,
+        circuitId: conn.circuitId || conn.cable?.circuitId || '',
         phases: hasStoredPhases(conn.phases) ? formatCablePhases(conn.phases) : formatCablePhases(conn.cable),
         conductors: conn.conductors || conn.cable.conductors,
         from_tag: getComponentTag(c),
@@ -20238,22 +12690,17 @@ function buildScheduleDataFromDiagram() {
   };
 }
 
-function updateScheduleReconcileButtonState() {
-  const btn = document.getElementById('reconcile-schedules-btn');
-  if (btn) {
-    btn.dataset.pending = scheduleReconcilePending ? 'true' : 'false';
-    btn.title = scheduleReconcilePending
-      ? 'Preview pending schedule updates from this one-line'
-      : 'Preview schedule updates from this one-line';
-  }
-  const primaryBtn = document.getElementById('reconcile-schedules-primary-btn');
-  if (primaryBtn) primaryBtn.hidden = !scheduleReconcilePending;
+function synchronizeProjectDataFromDiagram() {
+  const synchronized = synchronizeCanonicalSchedules({
+    equipment: getEquipment(), panels: getPanels(), loads: getLoads(), cables: getCables()
+  }, buildScheduleDataFromDiagram());
+  if (synchronized.totals.creates || synchronized.totals.updates) setProjectEntityCollections(synchronized.collections);
+  markScheduleReconcilePending(false);
+  return synchronized.totals;
 }
 
-function markScheduleReconcilePending(pending = true) {
-  scheduleReconcilePending = !!pending;
-  setItem(SCHEDULE_RECONCILE_PENDING_KEY, scheduleReconcilePending);
-  updateScheduleReconcileButtonState();
+function markScheduleReconcilePending(pending = false) {
+  setItem(SCHEDULE_RECONCILE_PENDING_KEY, !!pending);
 }
 
 function collectionLabel(name) {
@@ -20425,8 +12872,8 @@ function openScheduleReconcileModal() {
   const hasChanges = preview.totals.creates > 0 || preview.totals.updates > 0;
 
   return openModal({
-    title: 'Reconcile Schedules',
-    description: 'Apply safe additions now. Existing schedule values remain unchanged wherever the one-line disagrees.',
+    title: 'Review Shared Project Data',
+    description: 'One-Line saves update shared project records automatically. Use this review to inspect unresolved identity or legacy-data differences.',
     primaryText: hasChanges ? 'Apply Safe Changes' : 'Close',
     secondaryText: hasChanges ? 'Cancel' : null,
     defaultWidth: 'wide',
@@ -20445,8 +12892,8 @@ function openScheduleReconcileModal() {
     render(container) {
       const summary = document.createElement('p');
       summary.textContent = hasChanges
-        ? 'Safe updates can be applied without overwriting populated schedule fields. Open the affected-record details only when you need field-level context.'
-        : `No automatic schedule changes are available. ${preview.totals.conflictRecords} record(s) still need a decision.`;
+        ? 'Legacy or unlinked records can still receive safe additions. Open the affected-record details for field-level context.'
+        : `Shared project data is current. ${preview.totals.conflictRecords} identity or legacy-data difference(s) still need review.`;
       container.appendChild(summary);
       appendReconcileTable(container, preview);
       appendConflictSummary(container, preview);
@@ -20564,98 +13011,52 @@ function serializeState() {
   };
 }
 
-function exportDiagram() {
-  const data = {
-    sheets: sheets.map(s => ({
-      name: s.name,
-      components: s.components.map(c => ({ ...c })),
-      connections: (s.connections || []).map(conn => ({ ...conn })),
-      // Gap #51: export layers
-      layers: Array.isArray(s.layers) ? s.layers.map(l => ({ ...l })) : []
-    }))
-  };
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'oneline.json';
-  a.click();
-  URL.revokeObjectURL(a.href);
+let diagramFileController = null;
+
+function getDiagramFileController() {
+  if (!diagramFileController) {
+    diagramFileController = createDiagramFileController({
+      documentRef: document,
+      windowRef: typeof window === 'undefined' ? null : window,
+      URLRef: URL,
+      BlobCtor: Blob,
+      setTimeoutFn: setTimeout,
+      getSheets: () => sheets,
+      getScenario: getCurrentScenario,
+      getOneLine,
+      getStudies,
+      diagramVersion: DIAGRAM_VERSION,
+      switchScenario,
+      normalizeDiagramScale,
+      applyDiagramScale: scale => {
+        diagramScale = scale;
+        setItem('diagramScale', diagramScale);
+      },
+      applyTemplates: importedTemplates => {
+        templates = importedTemplates;
+        saveTemplates();
+        renderTemplates();
+      },
+      normalizeComponent,
+      applySheets: importedSheets => {
+        sheets = importedSheets;
+      },
+      loadSheet,
+      renderSheetTabs,
+      save,
+      showToast
+    });
+  }
+  return diagramFileController;
 }
 
-function sanitizeForExport(value, seen = new WeakSet()) {
-  if (value === undefined) return undefined;
-  const type = typeof value;
-  if (type === 'bigint') {
-    const num = Number(value);
-    return Number.isSafeInteger(num) ? num : value.toString();
-  }
-  if (type === 'number') {
-    if (Number.isFinite(value)) return value;
-    if (Number.isNaN(value)) return 'NaN';
-    return value > 0 ? 'Infinity' : '-Infinity';
-  }
-  if (type === 'boolean' || type === 'string') return value;
-  if (type === 'function') return undefined;
-  if (value === null) return null;
-  if (type !== 'object') return value;
-  if (typeof window !== 'undefined' && (value === window || value === window.document)) return undefined;
-  if (value && typeof value.nodeType === 'number' && typeof value.nodeName === 'string') return undefined;
-  if (seen.has(value)) return '[Circular]';
-  seen.add(value);
-  if (value instanceof Date) return value.toISOString();
-  if (value instanceof Set) return Array.from(value, item => sanitizeForExport(item, seen));
-  if (value instanceof Map) {
-    const out = {};
-    value.forEach((v, k) => {
-      const sanitized = sanitizeForExport(v, seen);
-      if (sanitized !== undefined) out[String(k)] = sanitized;
-    });
-    return out;
-  }
-  if (ArrayBuffer.isView(value)) {
-    return Array.from(new Uint8Array(value.buffer, value.byteOffset, value.byteLength));
-  }
-  if (value instanceof ArrayBuffer) {
-    return Array.from(new Uint8Array(value));
-  }
-  if (Array.isArray(value)) return value.map(item => sanitizeForExport(item, seen));
-  const plain = {};
-  Object.keys(value).forEach(key => {
-    const sanitized = sanitizeForExport(value[key], seen);
-    if (sanitized !== undefined) plain[key] = sanitized;
-  });
-  return plain;
+function exportDiagram() {
+  getDiagramFileController().exportDiagram();
 }
 
 function exportOneLineDiagnostics() {
-  try {
-    const scenario = getCurrentScenario() || 'default';
-    const safeScenario = scenario.replace(/[^a-z0-9-_]+/gi, '_') || 'default';
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const payload = {
-      exportedAt: new Date().toISOString(),
-      scenario,
-      oneLine: getOneLine(),
-      studies: getStudies()
-    };
-    const sanitized = sanitizeForExport(payload);
-    const blob = new Blob([JSON.stringify(sanitized, null, 2)], { type: 'application/json' });
-    const a = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    a.href = url;
-    a.download = `oneline-diagnostics-${safeScenario}-${timestamp}.json`;
-    const parent = document.body || document.documentElement;
-    if (parent) parent.appendChild(a);
-    a.click();
-    if (a.parentNode) a.parentNode.removeChild(a);
-    setTimeout(() => URL.revokeObjectURL(url), 0);
-    showToast('One-line diagnostics exported');
-  } catch (err) {
-    console.error('Failed to export one-line diagnostics', err);
-    showToast('Failed to export one-line diagnostics');
-  }
+  getDiagramFileController().exportDiagnostics();
 }
-
 async function shareDiagram() {
   const token = await promptDialog(
     'Share Diagram',
@@ -20706,91 +13107,13 @@ function serializeDiagram() {
 }
 
 
-function migrateDiagram(data) {
-  if (Array.isArray(data)) {
-    data = { version: 0, templates: [], sheets: [{ name: 'Sheet 1', components: data }] };
-  }
-  const version = data.version || 0;
-  let migrated = data;
-  if (version < 1) {
-    migrated = {
-      version: 1,
-      templates: data.templates || [],
-      sheets: data.sheets || []
-    };
-  }
-  if (version < 2) {
-    migrated.scale = data.scale || { unitPerPx: 1, unit: 'in' };
-  }
-  if (version < 3) {
-    // Gap #51: ensure every sheet has a layers array
-    migrated.sheets = (migrated.sheets || []).map(s => ({
-      ...s,
-      layers: Array.isArray(s.layers) ? s.layers : []
-    }));
-  }
-  if (version < 4) {
-    // Gap #48: normalize target_sheet/from_sheet → linked_sheet on sheet_link components
-    migrated.sheets = (migrated.sheets || []).map(s => ({
-      ...s,
-      components: (s.components || []).map(c => {
-        if (c.type !== 'sheet_link') return c;
-        const nc = { ...c, props: { ...(c.props || {}) } };
-        if ('target_sheet' in nc.props && !('linked_sheet' in nc.props)) {
-          nc.props.linked_sheet = nc.props.target_sheet;
-          delete nc.props.target_sheet;
-        }
-        if ('from_sheet' in nc.props && !('linked_sheet' in nc.props)) {
-          nc.props.linked_sheet = nc.props.from_sheet;
-          delete nc.props.from_sheet;
-        }
-        return nc;
-      })
-    }));
-  }
-  migrated.version = DIAGRAM_VERSION;
-  return migrated;
-}
-
-async function handleImport(e) {
-  const file = e.target.files[0];
-  if (!file) return;
-  try {
-    const text = await file.text();
-    const data = JSON.parse(text);
-    await importDiagram(data);
-  } catch (err) {
-    console.error('Failed to import diagram', err);
-  }
-  e.target.value = '';
+async function handleImport(event) {
+  await getDiagramFileController().handleImport(event);
 }
 
 async function importDiagram(data) {
-  if (data.meta && data.meta.scenario) {
-    switchScenario(data.meta.scenario);
-  }
-  data = migrateDiagram(data);
-  diagramScale = normalizeDiagramScale(data.scale);
-  setItem('diagramScale', diagramScale);
-  templates = data.templates || [];
-  saveTemplates();
-  renderTemplates();
-  sheets = (data.sheets || []).map((s, i) => ({
-    name: s.name || `Sheet ${i + 1}`,
-    components: (s.components || []).map(normalizeComponent),
-    connections: Array.isArray(s.connections) ? s.connections : [],
-    // Gap #51: load layers from imported diagram
-    layers: Array.isArray(s.layers) ? s.layers : [],
-    // Gap #52: load background image from imported diagram
-    ...(s.backgroundImage ? { backgroundImage: s.backgroundImage } : {})
-  }));
-  if (sheets.length) {
-    loadSheet(0, { skipCurrentSave: true });
-    renderSheetTabs();
-    save();
-  }
+  await getDiagramFileController().importDiagram(data);
 }
-
 async function loadSampleDiagram() {
   try {
     const res = await fetch(`${asset('examples/sample_oneline.json')}?v=${Date.now()}`);

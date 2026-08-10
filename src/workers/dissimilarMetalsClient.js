@@ -5,40 +5,16 @@
  * from the UI thread. Falls back to running the same pure functions on
  * the calling thread when Worker construction is not available.
  */
-import {
-  estimateDissimilarMetalsRisk as estimateDissimilarMetalsRiskSync,
-  buildCorrosionTimelineState as buildCorrosionTimelineStateSync,
-  buildMitigationComparisonRows as buildMitigationComparisonRowsSync,
-  buildInspectionMilestones as buildInspectionMilestonesSync,
-  buildAssumptionRows as buildAssumptionRowsSync,
-  buildResultSummary as buildResultSummarySync,
-  buildResultExportPayload as buildResultExportPayloadSync,
-} from '../../dissimilarmetals.js';
+import { DISSIMILAR_METALS_WORKER_OPERATIONS } from '../../analysis/dissimilarMetalsModel.mjs';
 import { createWorkerClient } from './createWorkerClient.js';
 
-const OPS = [
-  'estimateDissimilarMetalsRisk',
-  'buildCorrosionTimelineState',
-  'buildMitigationComparisonRows',
-  'buildInspectionMilestones',
-  'buildAssumptionRows',
-  'buildResultSummary',
-  'buildResultExportPayload',
-];
+const OPS = Object.keys(DISSIMILAR_METALS_WORKER_OPERATIONS);
 
 const client = createWorkerClient({
   workerUrl: 'dissimilarMetalsWorker.js',
   workerType: 'module',
   operations: OPS,
-  fallback: {
-    estimateDissimilarMetalsRisk: estimateDissimilarMetalsRiskSync,
-    buildCorrosionTimelineState: buildCorrosionTimelineStateSync,
-    buildMitigationComparisonRows: buildMitigationComparisonRowsSync,
-    buildInspectionMilestones: buildInspectionMilestonesSync,
-    buildAssumptionRows: buildAssumptionRowsSync,
-    buildResultSummary: buildResultSummarySync,
-    buildResultExportPayload: buildResultExportPayloadSync,
-  },
+  fallback: DISSIMILAR_METALS_WORKER_OPERATIONS,
 });
 
 export function estimateDissimilarMetalsRisk(input) {

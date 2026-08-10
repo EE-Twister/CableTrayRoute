@@ -5,6 +5,7 @@ import { sizeConductor } from './sizing.js';
 import ampacity from './ampacity.mjs';
 import { createTable, STORAGE_KEYS } from './tableUtils.mjs';
 import { openModal, showAlertModal } from './src/components/modal.js';
+import { confirmProjectEntityDeletion } from './src/components/projectDeletionReview.js';
 import { start as startTour } from './tour.js';
 import {
   applyCableImport,
@@ -26,6 +27,38 @@ import {
 } from './src/cable-schedule/io.js';
 import { renderCablePrintReport as renderCablePrintReportTo } from './src/cable-schedule/printReport.js';
 import { collectPanelOptions, collectRacewayOptions } from './src/cable-schedule/optionModel.js';
+import {
+  MAX_TEMPLATE_IMPORT_COUNT,
+  MAX_TEMPLATE_IMPORT_FILE_BYTES,
+  cloneTemplates,
+  createTemplateFieldPolicy,
+  ensureTemplateIds as ensureTemplateIdsModel,
+  filterTemplateFields as filterTemplateFieldsModel,
+  generateTemplateId,
+  getTemplateDisplayName,
+  mergeTemplateValues,
+  sanitizeTemplate as sanitizeTemplateModel,
+  sanitizeTemplateFieldValue,
+  truncateImportedTemplateValues
+} from './src/cable-schedule/templateModel.js';
+import {
+  DEFAULT_TAG_SETTINGS,
+  formatCableTag as formatCableTagModel,
+  generateTagSequence as generateTagSequenceModel,
+  nextTagNumberAfter,
+  normalizeTagSettings
+} from './src/cable-schedule/tagModel.js';
+import {
+  BASIC_ENTRY_KEYS,
+  CABLE_TYPES as cableTypes,
+  CONDUCTOR_SIZES as conductorSizes,
+  DEFAULT_PRESET,
+  FIELD_HELP_TEXT,
+  MOBILE_ENTRY_KEYS,
+  STARTER_CABLE_TYPES,
+  createCableScheduleColumns,
+  createCableSchedulePresets
+} from './src/cable-schedule/scheduleConfig.js';
 import {
   CABLE_LIBRARY_EVIDENCE_STATUS,
   assessCableTypical,
@@ -69,17 +102,6 @@ async function initCableSchedule() {
   window.addEventListener('beforeunload', e => {
     if (!saved) { e.preventDefault(); e.returnValue = ''; }
   });
-
-  const INSULATION_TEMP_LIMIT = {
-    THHN:90,XLPE:90,PVC:75,XHHW:90,'XHHW-2':90,'THWN-2':90,THW:75,THWN:75,TW:60,UF:60
-  };
-  const conductorSizes = ['#22 AWG','#20 AWG','#18 AWG','#16 AWG','#14 AWG','#12 AWG','#10 AWG','#8 AWG','#6 AWG','#4 AWG','#3 AWG','#2 AWG','#1 AWG','1/0 AWG','2/0 AWG','3/0 AWG','4/0 AWG','250 kcmil','300 kcmil','350 kcmil','400 kcmil','500 kcmil','600 kcmil','750 kcmil','1000 kcmil'];
-  const cableTypes = ['Power','Control','Signal','Data','Fiber'];
-  const conductorMaterials = ['Copper','Aluminum'];
-  const insulationRatings = ['60','75','90'];
-  const terminalTempRatings = ['','60','75','90'];
-  const shieldingOptions = ['', 'Lead', 'Copper Tape'];
-  const installMethods = ['Conduit','Tray','Direct Buried'];
 
   function getRacewayOptions(){
     try{
@@ -190,268 +212,16 @@ async function initCableSchedule() {
     });
   }
 
-  const columns=[
-    {key:'tag',label:'Tag',type:'text',group:'Identification',tooltip:'Unique identifier for the cable',sticky:'left',placeholder:'CBL-001'},
-    {key:'service_description',label:'Service Description',type:'text',group:'Identification',tooltip:"Description of the cable's purpose"},
-    {key:'from_tag',label:'From Tag',type:'text',datalist:()=>getEquipmentOptions(),group:'Terminations',tooltip:'Starting equipment or location tag',sticky:'left'},
-    {key:'to_tag',label:'To Tag',type:'text',datalist:()=>getEquipmentOptions(),group:'Terminations',tooltip:'Ending equipment or location tag',sticky:'left'},
-    {key:'raceway_ids',label:'Raceway(s)',type:'select',multiple:true,size:5,options:()=>getRacewayOptions(),group:'Terminations',tooltip:'Select raceway IDs from Raceway Schedule'},
-    {key:'panel_id',label:'Panel ID',type:'text',datalist:()=>getPanelOptions(),group:'Terminations',tooltip:'Panel identifier from Panel Schedule'},
-    {key:'circuit_number',label:'Circuit #',type:'number',group:'Terminations',tooltip:'Circuit number from Panel Schedule'},
-    {key:'start_x',label:'Start X',type:'number',group:'Routing Details',tooltip:'X-coordinate of cable start'},
-    {key:'start_y',label:'Start Y',type:'number',group:'Routing Details',tooltip:'Y-coordinate of cable start'},
-    {key:'start_z',label:'Start Z',type:'number',group:'Routing Details',tooltip:'Z-coordinate of cable start'},
-    {key:'end_x',label:'End X',type:'number',group:'Routing Details',tooltip:'X-coordinate of cable end'},
-    {key:'end_y',label:'End Y',type:'number',group:'Routing Details',tooltip:'Y-coordinate of cable end'},
-    {key:'end_z',label:'End Z',type:'number',group:'Routing Details',tooltip:'Z-coordinate of cable end'},
-    {key:'zone',label:'Cable Zone',type:'number',group:'Routing Details',tooltip:'Routing zone or area number'},
-    {key:'manual_path',label:'Manual Path',type:'text',datalist:()=>getRacewayOptions(),group:'Routing Details',tooltip:'Tray IDs separated by > to override route'},
-    {key:'circuit_group',label:'Circuit Group',type:'number',group:'Routing Details',tooltip:'Circuit grouping number'},
-    {key:'allowed_cable_group',label:'Allowed Group',type:'text',group:'Routing Details',tooltip:'Permitted cable grouping identifier'},
-    {key:'manufacturer',label:'Manufacturer',type:'text',group:'Manufacturer Details',tooltip:'Manufacturer or vendor for this cable'},
-    {key:'model',label:'Model #',type:'text',group:'Manufacturer Details',tooltip:'Manufacturer model number or catalog reference'},
-    {key:'catalog_evidence_status',label:'Library Evidence',type:'select',options:['screening','source_verified'],group:'Manufacturer Details',tooltip:'Source verified requires a manufacturer, model/catalog reference, dated source, URL, and complete construction fields. It is not project approval.'},
-    {key:'catalog_source',label:'Catalog Source',type:'text',group:'Manufacturer Details',tooltip:'Manufacturer product page, datasheet, or catalog reference used to verify this cable construction'},
-    {key:'catalog_last_verified',label:'Catalog Verified',type:'text',group:'Manufacturer Details',tooltip:'Date the manufacturer source was checked (YYYY-MM-DD)'},
-    {key:'datasheet_url',label:'Datasheet URL',type:'text',group:'Manufacturer Details',tooltip:'Manufacturer product page or datasheet URL for the cable construction'},
-    {key:'ambient_temp',label:'Ambient Temp (°C)',type:'number',group:'Manufacturer Details',tooltip:'Ambient temperature for sizing'},
-    {key:'insulation_thickness',label:'Insul Thick (in)',type:'number',group:'Manufacturer Details',tooltip:'Insulation thickness in inches'},
-    {key:'cable_od',label:'Cable O.D. (in)',type:'number',group:'Manufacturer Details',tooltip:'Outside diameter of the cable in inches'},
-    {key:'shielding_jacket',label:'Shielding/Jacket',type:'select',options:shieldingOptions,group:'Manufacturer Details',tooltip:'Shielding or outer jacket type'},
-    {key:'cable_rating',label:'Cable Rating (V)',type:'number',group:'Manufacturer Details',tooltip:'Maximum voltage rating'},
-    {key:'cable_type',label:'Cable Type',type:'select',options:cableTypes,group:'Cable Construction',tooltip:'Category such as Power, Control, or Signal'},
-    {key:'conductors',label:'Conductors',type:'number',group:'Cable Construction',tooltip:'Number of conductors within the cable'},
-    {key:'conductor_size',label:'Conductor Size',type:'select',options:conductorSizes,group:'Cable Construction',tooltip:'Size of each conductor'},
-    {key:'conductor_material',label:'Conductor Material',type:'select',options:conductorMaterials,group:'Cable Construction',tooltip:'Material of the conductors'},
-    {key:'ground_size',label:'EGC Size',type:'select',options:conductorSizes,allowEmpty:true,emptyLabel:'Select EGC size',group:'Cable Construction',tooltip:'Equipment grounding conductor size used for NEC 250.122 screening'},
-    {key:'ground_material',label:'EGC Material',type:'select',options:conductorMaterials,allowEmpty:true,emptyLabel:'Select EGC material',group:'Cable Construction',tooltip:'Equipment grounding conductor material. The DRC currently screens selected copper EGC sizes.'},
-    {key:'install_method',label:'Install Method',type:'select',options:installMethods,group:'Cable Construction',tooltip:'Installation method'},
-    {key:'insulation_type',label:'Insulation Type',type:'select',options:Object.keys(INSULATION_TEMP_LIMIT),group:'Cable Construction',tooltip:'Insulation material type'},
-    {key:'insulation_rating',label:'Insul Rating (°C)',type:'select',options:insulationRatings,group:'Cable Construction',tooltip:'Maximum temperature rating of insulation'},
-    {key:'parallel_count',label:'Parallel Runs',type:'number',group:'Cable Construction',min:1,step:1,tooltip:'Number of identical cables run in parallel for this circuit (e.g. 3 × 240 kcmil in parallel). Tray fill and ampacity are multiplied by this count.'},
-    {key:'operating_voltage',label:'Operating Voltage (V)',type:'number',group:'Electrical Entry',tooltip:'Nominal operating voltage'},
-    {key:'est_load',label:'Est Load (A)',type:'number',group:'Electrical Entry',tooltip:'Estimated operating current'},
-    {key:'ocpd_rating',label:'OCPD Rating (A)',type:'number',group:'Electrical Entry',tooltip:'Overcurrent protective device rating used for NEC 240.4/250.122 screening'},
-    {key:'terminal_temp_rating',label:'Terminal Temp (C)',type:'select',options:terminalTempRatings,group:'Electrical Entry',tooltip:'Equipment terminal temperature rating for NEC 110.14(C); blank lets DRC infer 60C through 100A and 75C above 100A'},
-    {key:'duty_cycle',label:'Duty Cycle (%)',type:'number',group:'Electrical Entry',tooltip:'Duty cycle percentage'},
-    {key:'length',label:'Length (ft)',type:'number',group:'Electrical Entry',tooltip:'Length of cable run'},
-    {key:'load_flow_current',label:'Load Flow Current (A)',type:'text',group:'Calculations',tooltip:'Current captured from the latest load flow study'},
-    {key:'calc_ampacity',label:'Calc Ampacity (A)',type:'number',group:'Calculations',tooltip:'Ampacity after code factors'},
-    {key:'impedance',label:'Impedance (Ω)',type:'number',group:'Calculations',tooltip:'Circuit impedance used for voltage drop checks'},
-    {key:'code_reference',label:'Code Ref',type:'text',group:'Calculations',tooltip:'Code table used'},
-    {key:'voltage_drop_pct',label:'Estimated Voltage Drop (%)',type:'number',group:'Calculations',tooltip:'Estimated voltage drop percent'},
-    {key:'sizing_warning',label:'Sizing Warning',type:'text',group:'Calculations',tooltip:'Non-compliance details'},
-    {key:'notes',label:'Notes',type:'text',group:'Notes',tooltip:'Additional comments or notes'},
-    {key:'engineer_note',label:'Engineer Note',type:'text',group:'Notes',tooltip:'Engineering annotation, design decision rationale, or field observation'},
-    {key:'review_status',label:'Review Status',type:'select',options:['','pending','approved','flagged'],group:'Notes',tooltip:'Engineer review/approval status for this cable record'},
-    {key:'last_modified',label:'Last Modified',type:'text',group:'Notes',tooltip:'Local timestamp for the most recent row edit',readOnly:true}
-  ];
+  const columns = createCableScheduleColumns({ getEquipmentOptions, getRacewayOptions, getPanelOptions });
 
-  const TYPICAL_EXCLUDED_GROUPS = new Set(['Identification', 'Terminations', 'Routing Details']);
-  const ADDITIONAL_TEMPLATE_FIELD_EXCLUSIONS = [
-    'install_method',
-    'operating_voltage',
-    'est_load',
-    'terminal_temp_rating',
-    'load_flow_current',
-    'ambient_temp',
-    'duty_cycle',
-    'length',
-    'calc_ampacity',
-    'voltage_drop_pct',
-    'sizing_warning',
-    'review_status',
-    'last_modified'
-  ];
-  const TYPICAL_EXCLUDED_KEYS = new Set(
-    columns
-      .filter(col => TYPICAL_EXCLUDED_GROUPS.has(col.group))
-      .map(col => col.key)
-  );
-  ADDITIONAL_TEMPLATE_FIELD_EXCLUSIONS.forEach(key => TYPICAL_EXCLUDED_KEYS.add(key));
+  const {
+    excludedKeys: TYPICAL_EXCLUDED_KEYS,
+    libraryColumns,
+    headerConfig: templateHeaderConfig,
+    headerLookup: templateHeaderLookup
+  } = createTemplateFieldPolicy(columns);
 
-  const libraryColumns = columns.filter(
-    col => !TYPICAL_EXCLUDED_GROUPS.has(col.group) && !TYPICAL_EXCLUDED_KEYS.has(col.key)
-  );
-
-  const buildTemplateHeaderConfig = cols => {
-    const seen = new Set();
-    const config = [];
-    const add = (key, header) => {
-      if (!header) return;
-      let candidate = header;
-      while (seen.has(candidate)) {
-        candidate = `${header} (${key})`;
-      }
-      seen.add(candidate);
-      config.push({ key, header: candidate });
-    };
-    add('label', 'Typical Name');
-    add('template_id', 'Template ID');
-    cols.forEach(col => add(col.key, col.label || col.key));
-    return config;
-  };
-
-  const buildTemplateHeaderLookup = config => {
-    const lookup = new Map();
-    config.forEach(({ key, header }) => {
-      const normalizedHeader = typeof header === 'string' ? header.trim().toLowerCase() : '';
-      const normalizedKey = typeof key === 'string' ? key.trim().toLowerCase() : '';
-      if (normalizedHeader && !lookup.has(normalizedHeader)) lookup.set(normalizedHeader, key);
-      if (normalizedKey && !lookup.has(normalizedKey)) lookup.set(normalizedKey, key);
-    });
-    return lookup;
-  };
-
-  const templateHeaderConfig = buildTemplateHeaderConfig(libraryColumns);
-  const templateHeaderLookup = buildTemplateHeaderLookup(templateHeaderConfig);
-
-  const groupNames = Array.from(new Set(columns.map(col => col.group || 'General')));
-  const BASIC_ENTRY_KEYS = new Set([
-    'tag',
-    'service_description',
-    'from_tag',
-    'to_tag',
-    'raceway_ids',
-    'panel_id',
-    'circuit_number',
-    'cable_type',
-    'conductors',
-    'conductor_size',
-    'conductor_material',
-    'ground_size',
-    'ground_material',
-    'install_method',
-    'insulation_type',
-    'insulation_rating',
-    'parallel_count',
-    'operating_voltage',
-    'est_load',
-    'ocpd_rating',
-    'terminal_temp_rating',
-    'length',
-    'notes'
-  ]);
-  const PRESETS = {
-    entry: {
-      label: 'Basic Entry',
-      groups: groupNames,
-      keys: ['tag', 'from_tag', 'to_tag', 'raceway_ids', 'cable_type', 'conductors', 'conductor_size', 'ground_size', 'ocpd_rating', 'length']
-    },
-    full: { label: 'Full Detail', groups: groupNames },
-    routing: { label: 'Routing Focus', groups: ['Identification', 'Terminations', 'Routing Details', 'Notes'] },
-    electrical: { label: 'Electrical Focus', groups: ['Identification', 'Cable Construction', 'Electrical Entry', 'Calculations', 'Notes'] },
-    construction: { label: 'Construction Specs', groups: ['Identification', 'Cable Construction', 'Manufacturer Details', 'Notes'] }
-  };
-  const DEFAULT_PRESET = 'entry';
-  const MOBILE_ENTRY_KEYS = ['tag', 'from_tag', 'to_tag', 'conductor_size', 'length'];
-  const FIELD_HELP_TEXT = {
-    tag: 'Use the project cable numbering standard. Auto tag settings can prefill this value.',
-    raceway_ids: 'Required before routing. Options come from the Raceway Schedule.',
-    conductor_size: 'Required for tray fill, ampacity, and voltage drop calculations.',
-    ground_size: 'Used with OCPD Rating by Design Rule Checker for selected NEC 250.122 EGC screening.',
-    ocpd_rating: 'Used with EGC Size and Conductor Size by Design Rule Checker for selected NEC 240.4 and 250.122 screening.',
-    terminal_temp_rating: 'Optional NEC 110.14(C) termination rating. Leave blank to infer 60C through 100A equipment and 75C above 100A.',
-    length: 'Required for voltage drop and route quantity checks.',
-    operating_voltage: 'Used with load current for electrical sizing and review reports.',
-    est_load: 'Estimated operating current for sizing checks.',
-    start_x: 'Used only when routing from explicit start coordinates.',
-    end_x: 'Used only when routing to explicit end coordinates.'
-  };
-  const STARTER_CABLE_TYPES = [
-    {
-      label: 'Southwire SIMpull THHN/THWN-2 Copper 12 AWG',
-      manufacturer: 'Southwire',
-      model: 'SPEC10000',
-      catalog_evidence_status: 'source_verified',
-      catalog_source: 'Southwire SIMpull THHN/THWN-2 Copper manufacturer product page',
-      catalog_last_verified: '2026-07-31',
-      datasheet_url: 'https://www.southwire.com/wire-cable/building-wire/simpull-sup-sup-thhn-thwn-2-copper/p/SPEC10000',
-      cable_type: 'Power',
-      conductors: 1,
-      conductor_size: '#12 AWG',
-      conductor_material: 'Copper',
-      install_method: 'Conduit',
-      insulation_type: 'THHN',
-      insulation_rating: '90',
-      terminal_temp_rating: '60',
-      cable_rating: 600,
-      shielding_jacket: ''
-    },
-    {
-      label: '600V Power',
-      cable_type: 'Power',
-      conductors: 3,
-      conductor_size: '#12 AWG',
-      conductor_material: 'Copper',
-      ground_size: '#12 AWG',
-      ground_material: 'Copper',
-      install_method: 'Tray',
-      insulation_type: 'THHN',
-      insulation_rating: '90',
-      terminal_temp_rating: '60',
-      ocpd_rating: 20,
-      cable_rating: 600,
-      shielding_jacket: ''
-    },
-    {
-      label: 'Control Cable',
-      cable_type: 'Control',
-      conductors: 7,
-      conductor_size: '#14 AWG',
-      conductor_material: 'Copper',
-      install_method: 'Tray',
-      insulation_type: 'PVC',
-      insulation_rating: '75',
-      cable_rating: 600,
-      shielding_jacket: ''
-    },
-    {
-      label: 'Instrument Pair',
-      cable_type: 'Signal',
-      conductors: 2,
-      conductor_size: '#18 AWG',
-      conductor_material: 'Copper',
-      install_method: 'Tray',
-      insulation_type: 'XLPE',
-      insulation_rating: '90',
-      cable_rating: 300,
-      shielding_jacket: 'Copper Tape'
-    },
-    {
-      label: 'Ethernet',
-      cable_type: 'Data',
-      conductors: 8,
-      conductor_size: '#24 AWG',
-      conductor_material: 'Copper',
-      install_method: 'Tray',
-      insulation_type: 'PVC',
-      insulation_rating: '60',
-      cable_rating: 300,
-      shielding_jacket: ''
-    },
-    {
-      label: 'Fiber',
-      cable_type: 'Fiber',
-      conductors: 12,
-      conductor_size: '#22 AWG',
-      conductor_material: 'Copper',
-      install_method: 'Tray',
-      insulation_type: 'PVC',
-      insulation_rating: '60',
-      cable_rating: 300,
-      shielding_jacket: ''
-    }
-  ];
-
-  columns.forEach(col => {
-    if (col.type === 'number') {
-      col.step = 'any';
-      col.maxlength = 15;
-      col.validate = col.validate || 'numeric';
-    }
-  });
-
+  const { groupNames, presets: PRESETS } = createCableSchedulePresets(columns);
   const editorModal = document.getElementById('cable-editor-modal');
   const editorForm = editorModal ? editorModal.querySelector('#cable-editor-form') : null;
   const editorBody = editorModal ? editorModal.querySelector('#cable-editor-body') : null;
@@ -591,122 +361,15 @@ async function initCableSchedule() {
     attachVoltageDropAutomation();
   };
 
-  const cloneTemplates = templates => (Array.isArray(templates) ? templates.map(t => JSON.parse(JSON.stringify(t))) : []);
-  // Bounds for cable-typical imports to keep a hostile/oversized file from
-  // exhausting memory or freezing the UI during parsing/merge.
-  const MAX_TEMPLATE_IMPORT_FILE_BYTES = 5 * 1024 * 1024;
-  const MAX_TEMPLATE_IMPORT_COUNT = 5000;
-  const MAX_TEMPLATE_IMPORT_FIELD_LENGTH = 2048;
-  const truncateImportedTemplateValues = (input = {}) => {
-    const out = {};
-    Object.entries(input || {}).forEach(([key, value]) => {
-      out[key] = typeof value === 'string'
-        ? value.slice(0, MAX_TEMPLATE_IMPORT_FIELD_LENGTH)
-        : value;
-    });
-    return out;
-  };
-  const sanitizeTemplateFieldValue = value => {
-    if (value == null) return '';
-    if (Array.isArray(value)) {
-      return value.map(item => (item == null ? '' : `${item}`)).join(', ');
-    }
-    if (typeof value === 'object') {
-      return JSON.stringify(value);
-    }
-    return value;
-  };
-  const filterTemplateFields = (input = {}, options = {}) => {
-    const { keepLabel = true, keepTypicalId = false } = options;
-    const copy = { ...input };
-    Object.keys(copy).forEach(key => {
-      if (TYPICAL_EXCLUDED_KEYS.has(key)) {
-        delete copy[key];
-      }
-    });
-    if (!keepLabel && Object.prototype.hasOwnProperty.call(copy, 'label')) {
-      delete copy.label;
-    }
-    if (!keepTypicalId && Object.prototype.hasOwnProperty.call(copy, 'typical_id')) {
-      delete copy.typical_id;
-    }
-    Object.keys(copy).forEach(key => {
-      copy[key] = sanitizeTemplateFieldValue(copy[key]);
-    });
-    return copy;
-  };
-  const generateTemplateId = () => {
-    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-      return crypto.randomUUID();
-    }
-    const rand = Math.random().toString(36).slice(2, 10);
-    const stamp = Date.now().toString(36);
-    return `tpl-${stamp}-${rand}`;
-  };
-  const ensureTemplateIds = templates => {
-    const copies = cloneTemplates(templates);
-    let changed = false;
-    copies.forEach((tpl, idx) => {
-      const sanitized = normalizeCableTypical(filterTemplateFields(tpl));
-      const tplKeys = Object.keys(tpl || {});
-      const sanitizedKeys = Object.keys(sanitized || {});
-      if (tplKeys.length !== sanitizedKeys.length || sanitizedKeys.some(key => sanitized[key] !== tpl[key])) {
-        changed = true;
-      }
-      if (!sanitized.template_id) {
-        sanitized.template_id = generateTemplateId();
-        changed = true;
-      }
-      copies[idx] = sanitized;
-    });
-    return { templates: copies, changed };
-  };
-  const sanitizeTemplate = template => filterTemplateFields(template, { keepLabel: false, keepTypicalId: false });
-  const getTemplateDisplayName = (template, idx) => (template?.label || template?.tag || `Typical ${idx + 1}`);
-  const mergeTemplateValues = (templateValues, existingValues = {}, options = {}) => {
-    const preserveKeys = new Set(options.preserveKeys || []);
-    const skipUndefined = options.skipUndefined !== undefined ? options.skipUndefined : true;
-    const overwriteExisting = options.overwriteExisting || false;
-    const merged = { ...existingValues };
-    Object.entries(templateValues || {}).forEach(([key, value]) => {
-      if (key === 'label' || key === 'template_id') return;
-      if (preserveKeys.has(key)) return;
-      if ((value === undefined || value === null) && skipUndefined) return;
-      if (!overwriteExisting) {
-        const existing = merged[key];
-        const isArrayEmpty = Array.isArray(existing) && existing.length === 0;
-        const isStringEmpty = typeof existing === 'string' && existing.trim() === '';
-        const hasExisting = !(existing === undefined || existing === null || isArrayEmpty || isStringEmpty);
-        if (hasExisting) return;
-      }
-      merged[key] = Array.isArray(value) ? value.map(v => (v != null ? `${v}` : v)) : value;
-    });
-    return merged;
-  };
+  const filterTemplateFields = (input = {}, options = {}) => filterTemplateFieldsModel(input, TYPICAL_EXCLUDED_KEYS, options);
+  const ensureTemplateIds = templates => ensureTemplateIdsModel(templates, TYPICAL_EXCLUDED_KEYS);
+  const sanitizeTemplate = template => sanitizeTemplateModel(template, TYPICAL_EXCLUDED_KEYS);
   const { templates: initialTemplates, changed: initialTemplateChange } = ensureTemplateIds(dataStore.getCableTemplates());
   if (initialTemplateChange) {
     dataStore.setCableTemplates(initialTemplates);
   }
   let cachedCableTemplates = initialTemplates;
 
-  const DEFAULT_TAG_SETTINGS = {
-    enabled: true,
-    prefix: 'CBL-',
-    nextNumber: 1,
-    padding: 3
-  };
-
-  const normalizeTagSettings = input => {
-    const source = input && typeof input === 'object' ? input : {};
-    const nextNumber = Math.max(1, parseInt(source.nextNumber, 10) || DEFAULT_TAG_SETTINGS.nextNumber);
-    const padding = Math.min(8, Math.max(1, parseInt(source.padding, 10) || DEFAULT_TAG_SETTINGS.padding));
-    return {
-      enabled: source.enabled !== false,
-      prefix: typeof source.prefix === 'string' ? source.prefix : DEFAULT_TAG_SETTINGS.prefix,
-      nextNumber,
-      padding
-    };
-  };
 
   let tagSettings = normalizeTagSettings(
     typeof dataStore.getCableTagSettings === 'function'
@@ -724,44 +387,14 @@ async function initCableSchedule() {
     updateTagSettingsControls();
   };
 
-  const formatCableTag = (settings = tagSettings, number = settings.nextNumber) => {
-    const safeNumber = Math.max(1, parseInt(number, 10) || 1);
-    return `${settings.prefix || ''}${String(safeNumber).padStart(settings.padding || 1, '0')}`;
-  };
-
-  const parseGeneratedTagNumber = tag => {
-    const text = `${tag || ''}`.trim();
-    const prefix = tagSettings.prefix || '';
-    if (!text.startsWith(prefix)) return null;
-    const suffix = text.slice(prefix.length);
-    if (!/^\d+$/.test(suffix)) return null;
-    return parseInt(suffix, 10);
-  };
+  const formatCableTag = (settings = tagSettings, number = settings.nextNumber) => formatCableTagModel(settings, number);
 
   const getExistingCableTagSet = () => {
-    const tags = new Set();
     const rows = tableInstance && typeof tableInstance.getData === 'function' ? tableInstance.getData() : [];
-    rows.forEach(row => {
-      const value = `${row?.tag || ''}`.trim().toLowerCase();
-      if (value) tags.add(value);
-    });
-    return tags;
+    return new Set(rows.map(row => `${row?.tag || ''}`.trim().toLowerCase()).filter(Boolean));
   };
 
-  const generateTagSequence = count => {
-    if (!tagSettings.enabled) return { tags: Array(count).fill(''), nextNumber: tagSettings.nextNumber };
-    const used = getExistingCableTagSet();
-    const tags = [];
-    let nextNumber = tagSettings.nextNumber;
-    while (tags.length < count) {
-      const tag = formatCableTag(tagSettings, nextNumber);
-      nextNumber += 1;
-      if (used.has(tag.toLowerCase())) continue;
-      used.add(tag.toLowerCase());
-      tags.push(tag);
-    }
-    return { tags, nextNumber };
-  };
+  const generateTagSequence = count => generateTagSequenceModel(tagSettings, count, getExistingCableTagSet());
 
   const generateNextCableTag = () => {
     const { tags } = generateTagSequence(1);
@@ -769,15 +402,8 @@ async function initCableSchedule() {
   };
 
   const advanceTagSettingsPastTags = tags => {
-    if (!tagSettings.enabled || !Array.isArray(tags)) return;
-    let max = tagSettings.nextNumber - 1;
-    tags.forEach(tag => {
-      const number = parseGeneratedTagNumber(tag);
-      if (Number.isFinite(number)) max = Math.max(max, number);
-    });
-    if (max >= tagSettings.nextNumber) {
-      saveTagSettings({ ...tagSettings, nextNumber: max + 1 });
-    }
+    const nextNumber = nextTagNumberAfter(tagSettings, tags);
+    if (nextNumber > tagSettings.nextNumber) saveTagSettings({ ...tagSettings, nextNumber });
   };
 
   const CHANGE_LOG_LIMIT = 50;
@@ -2565,6 +2191,10 @@ async function initCableSchedule() {
     compactActionMenu:true,
     columns,
     onView:(row,tr)=>openEditor(row,tr,table),
+    beforeDelete:({ records, type }) => confirmProjectEntityDeletion({ collection:'cables', records, getImpact:dataStore.getProjectEntityDeletionImpact }).then(confirmed => {
+      if (confirmed && type === 'all') recordCableChange('Deleted all cables', `${records.length} cable${records.length === 1 ? '' : 's'} removed`);
+      return confirmed;
+    }),
     onDuplicateRowData: row => {
       const clone = { ...row };
       const ids = table.getData().map(r => r.tag).filter(Boolean);
@@ -2702,14 +2332,6 @@ async function initCableSchedule() {
         e.stopImmediatePropagation();
         showAlertModal('Required Fields Missing', 'Complete Tag, From/To, Conductor Size, and Length before saving. Power cables also need an EGC Size and OCPD Rating. Raceway assignments can be completed later for routing.');
       }
-    }, { capture: true });
-  }
-
-  const deleteAllBtn = document.getElementById('delete-all-btn');
-  if (deleteAllBtn) {
-    deleteAllBtn.addEventListener('click', () => {
-      const count = table.getData().length;
-      if (count) recordCableChange('Deleted all cables', `${count} cable${count === 1 ? '' : 's'} removed`);
     }, { capture: true });
   }
 

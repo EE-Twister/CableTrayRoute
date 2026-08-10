@@ -2,8 +2,11 @@ const DEFAULT_IDENTITY_FIELDS = ['ref', 'id', 'tag'];
 
 const CANVAS_ONLY_FIELDS = new Set([
   'x', 'y', 'z', 'width', 'height', 'rotation', 'ports', 'position',
-  'selected', 'dragging', 'layerId'
+  'selected', 'dragging', 'layerId', 'projectEntity', 'projectCircuit',
+  'entityId', 'circuitId'
 ]);
+
+const STABLE_IDENTITY_FIELDS = new Set(['id', 'ref', 'cable_id', 'cableId']);
 
 const COLLECTION_IDENTITY_FIELDS = {
   equipment: ['ref', 'id', 'tag'],
@@ -167,4 +170,116 @@ export function applyScheduleReconcilePreview(preview = {}) {
     loads: preview.loads?.result || [],
     cables: preview.cables?.result || []
   };
+}
+
+/**
+ * Merge records edited through a project view back into the canonical
+ * schedule. The incoming page is authoritative for populated shared fields,
+ * while stable record identifiers and canvas-only fields are never replaced.
+ */
+export function synchronizeCanonicalRecords(currentRecords = [], incomingRecords = [], options = {}) {
+  const identityFields = options.identityFields || DEFAULT_IDENTITY_FIELDS;
+  const linkField = options.linkField || '';
+  const fieldFilter = typeof options.fieldFilter === 'function' ? options.fieldFilter : () => true;
+  const result = Array.isArray(currentRecords) ? currentRecords.map(cloneRecord) : [];
+  const creates = [];
+  const updates = [];
+  const unchanged = [];
+
+  const findMatch = incoming => {
+    const linkedIdentity = normalizedIdentity(incoming?.[linkField]);
+    if (linkedIdentity) {
+      const linkedIndex = result.findIndex(record => identityValues(record, identityFields).includes(linkedIdentity));
+      if (linkedIndex >= 0) return linkedIndex;
+    }
+    const incomingIds = new Set(identityValues(incoming, identityFields));
+    if (!incomingIds.size) return -1;
+    return result.findIndex(record => identityValues(record, identityFields).some(id => incomingIds.has(id)));
+  };
+
+  (Array.isArray(incomingRecords) ? incomingRecords : [])
+    .filter(isMeaningfulRecord)
+    .forEach(incoming => {
+      const matchIndex = findMatch(incoming);
+      const incomingClone = cloneRecord(incoming);
+      if (linkField) delete incomingClone[linkField];
+      Object.keys(incomingClone).forEach(field => {
+        if (CANVAS_ONLY_FIELDS.has(field) || !fieldFilter(field, incomingClone[field], incomingClone)) {
+          delete incomingClone[field];
+        }
+      });
+
+      if (matchIndex < 0) {
+        if (!isMeaningfulRecord(incomingClone)) return;
+        result.push(incomingClone);
+        creates.push({ identity: recordIdentity(incomingClone, identityFields), record: incomingClone });
+        return;
+      }
+
+      const existing = result[matchIndex];
+      const changedFields = [];
+      Object.entries(incomingClone).forEach(([field, value]) => {
+        if (isEmptyValue(value)) return;
+        if (STABLE_IDENTITY_FIELDS.has(field) && !isEmptyValue(existing[field])) return;
+        if (sameValue(existing[field], value, field)) return;
+        existing[field] = cloneRecord({ value }).value;
+        changedFields.push(field);
+      });
+      if (changedFields.length) {
+        updates.push({
+          identity: recordIdentity(existing, identityFields),
+          index: matchIndex,
+          fields: changedFields
+        });
+      } else {
+        unchanged.push({ identity: recordIdentity(existing, identityFields), index: matchIndex });
+      }
+    });
+
+  return {
+    creates,
+    updates,
+    unchanged,
+    result,
+    counts: {
+      creates: creates.length,
+      updates: updates.length,
+      unchanged: unchanged.length
+    }
+  };
+}
+
+/**
+ * Synchronize the entity projections produced by One-Line with the canonical
+ * project schedules. Existing rows that are not represented on the diagram
+ * are preserved.
+ */
+export function synchronizeCanonicalSchedules(current = {}, incoming = {}) {
+  const collectionOptions = {
+    equipment: { linkField: 'entityId' },
+    panels: { linkField: 'entityId' },
+    loads: { linkField: 'entityId' },
+    cables: { linkField: 'circuitId' }
+  };
+  const collections = {};
+  const details = {};
+  ['equipment', 'panels', 'loads', 'cables'].forEach(collection => {
+    const detail = synchronizeCanonicalRecords(
+      current[collection] || [],
+      incoming[collection] || [],
+      {
+        identityFields: COLLECTION_IDENTITY_FIELDS[collection] || DEFAULT_IDENTITY_FIELDS,
+        ...collectionOptions[collection]
+      }
+    );
+    details[collection] = detail;
+    collections[collection] = detail.result;
+  });
+  const totals = Object.values(details).reduce((summary, detail) => {
+    summary.creates += detail.counts.creates;
+    summary.updates += detail.counts.updates;
+    summary.unchanged += detail.counts.unchanged;
+    return summary;
+  }, { creates: 0, updates: 0, unchanged: 0 });
+  return { collections, details, totals };
 }

@@ -1,6 +1,7 @@
 import * as dataStore from './dataStore.mjs';
 import { escapeHtml as escapeAttr, escapeHtml } from './src/htmlUtils.mjs';
 import { openModal, showAlertModal } from './src/components/modal.js';
+import { confirmProjectEntityDeletion } from './src/components/projectDeletionReview.js';
 import {
   getEquipmentSourceOptions,
   mergeLoadRows,
@@ -379,7 +380,13 @@ if (typeof window !== 'undefined') {
     return id;
   }
 
-  tbody.addEventListener('click', e => {
+  const confirmLoadDeletion = records => confirmProjectEntityDeletion({
+    collection: 'loads',
+    records,
+    getImpact: dataStore.getProjectEntityDeletionImpact
+  });
+
+  tbody.addEventListener('click', async e => {
     const btn = e.target;
     const tr = btn.closest('tr');
     if (!tr) return;
@@ -393,6 +400,8 @@ if (typeof window !== 'undefined') {
       dataStore.insertLoad(idx + 1, load);
       render();
     } else if (btn.classList.contains('removeBtn')) {
+      const load = dataStore.getLoads()[idx];
+      if (!await confirmLoadDeletion([load])) return;
       dataStore.deleteLoad(idx);
       render();
     }
@@ -723,7 +732,14 @@ if (typeof window !== 'undefined') {
         render();
       }
     },
-    { label: 'Delete Row', action: tr => { if (!tr) return; dataStore.deleteLoad(getStoreIndex(tr)); render(); } }
+    { label: 'Delete Row', action: async tr => {
+      if (!tr) return;
+      const index = getStoreIndex(tr);
+      const load = dataStore.getLoads()[index];
+      if (!await confirmLoadDeletion([load])) return;
+      dataStore.deleteLoad(index);
+      render();
+    } }
   ]);
 
   table.addEventListener('contextmenu', e => {
@@ -1566,12 +1582,13 @@ if (typeof window !== 'undefined') {
   }
 
   // --- events -------------------------------------------------------------
-  deleteBtn.addEventListener('click', () => {
+  deleteBtn.addEventListener('click', async () => {
     const rows = Array.from(tbody.querySelectorAll('tr')).filter(r => r.querySelector('.row-select')?.checked);
     if (!rows.length) return;
-    if (!confirm('Delete selected loads?')) return;
     const indices = rows.map(r => getStoreIndex(r));
-    const loads = dataStore.getLoads().filter((_, idx) => !indices.includes(idx));
+    const currentLoads = dataStore.getLoads();
+    if (!await confirmLoadDeletion(indices.map(index => currentLoads[index]))) return;
+    const loads = currentLoads.filter((_, idx) => !indices.includes(idx));
     dataStore.setLoads(loads);
     render();
   });

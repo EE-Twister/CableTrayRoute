@@ -178,8 +178,14 @@ test.afterAll(async () => {
 
 test('legacy specialist sample hydrates every supporting project surface', async ({ page }) => {
   await gotoWorkflowPage(page, server, 'samplegallery.html');
+  await page.evaluate(() => {
+    history.replaceState = () => {
+      throw new DOMException('History updates are unavailable in this embedded context.', 'SecurityError');
+    };
+  });
   await page.locator('[data-sample-id="industrial-plant"] .primary-btn').click();
   await expect(page.locator('#checklist-panel')).toContainText('Guided Workflow: Industrial Plant');
+  await expect(page.locator('#toast')).not.toContainText('Could not save sample to project storage');
 
   await waitForDataStore(page);
   const imported = await page.evaluate(() => ({

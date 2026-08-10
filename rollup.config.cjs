@@ -18,7 +18,7 @@ const entries = {
   routeViewer3D: 'src/routing/viewer/routeViewerEntry.js',
   loadlist: 'src/loadlist.js',
   equipmentlist: 'src/equipmentlist.js',
-  projectManager: 'src/projectManager.js',
+  projectManager: 'src/projectManagerEntry.js',
   scenarios: 'src/scenarios.js',
   supportspan: 'src/supportspan.js',
   pullcards: 'src/pullcards.js',

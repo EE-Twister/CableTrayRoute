@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import {
   previewReconcileRecords,
   previewScheduleReconcile,
-  applyScheduleReconcilePreview
+  applyScheduleReconcilePreview,
+  synchronizeCanonicalSchedules
 } from '../analysis/scheduleReconcile.mjs';
 
 const current = [
@@ -57,5 +58,31 @@ const normalizedPreview = previewScheduleReconcile(
 assert.equal(normalizedPreview.totals.creates, 0, 'identity matching is case-insensitive');
 assert.equal(normalizedPreview.totals.conflicts, 0, 'case-only identities and canvas coordinates are ignored');
 assert.equal(normalizedPreview.totals.unchanged, 1);
+
+const synchronized = synchronizeCanonicalSchedules({
+  equipment: [
+    { id: 'mcc-01', ref: 'MCC-01', tag: 'MCC-01', description: 'Old description', voltage: '480V' },
+    { id: 'keep-01', tag: 'KEEP-01', description: 'Not on the one-line' }
+  ],
+  panels: [{ id: 'lp-01', tag: 'LP-01', description: 'Lighting panel' }],
+  loads: [],
+  cables: [{ id: 'cbl-01', tag: 'CBL-01', length: 50 }]
+}, {
+  equipment: [{ entityId: 'mcc-01', id: 'visual-mcc', ref: 'visual-mcc', tag: 'MCC-01', description: 'Updated on one-line', voltage: '', x: 300 }],
+  panels: [{ entityId: 'lp-01', id: 'visual-panel', tag: 'LP-01', manufacturer: 'Square D' }],
+  loads: [{ entityId: '', id: 'load-01', tag: 'PMP-01', description: 'New pump', kw: 25 }],
+  cables: [{ circuitId: 'cbl-01', id: 'visual-cable', tag: 'CBL-01', length: 75, y: 100 }]
+});
+assert.equal(synchronized.totals.creates, 1, 'new one-line entities become canonical schedule records');
+assert.equal(synchronized.totals.updates, 3, 'linked shared records are updated from the editing page');
+assert.equal(synchronized.collections.equipment[0].id, 'mcc-01', 'stable canonical IDs are preserved');
+assert.equal(synchronized.collections.equipment[0].ref, 'MCC-01', 'visual IDs do not replace canonical references');
+assert.equal(synchronized.collections.equipment[0].description, 'Updated on one-line');
+assert.equal(synchronized.collections.equipment[0].voltage, '480V', 'blank projections do not erase populated canonical values');
+assert.equal(synchronized.collections.equipment[0].x, undefined, 'canvas-only fields never enter schedules');
+assert.equal(synchronized.collections.equipment[1].id, 'keep-01', 'records absent from the diagram are preserved');
+assert.equal(synchronized.collections.panels[0].manufacturer, 'Square D');
+assert.equal(synchronized.collections.cables[0].length, 75);
+assert.equal(synchronized.collections.cables[0].circuitId, undefined, 'view link fields are not persisted in schedule records');
 
 console.log('✓ schedule reconcile');

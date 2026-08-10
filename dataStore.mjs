@@ -21,6 +21,11 @@ import { parseRevit } from './src/importers/revit.mjs';
 import { startPerformanceMeasurement } from './src/performance/performanceMetrics.js';
 import { buildOneLineProjectView, hashProjectInputs, normalizeOneLineReferences, normalizeProjectEntities } from './analysis/projectIntegration.mjs';
 import {
+  getProjectEntityDeletionImpact as buildProjectEntityDeletionImpact,
+  getProjectReferenceDiagnostics as buildProjectReferenceDiagnostics,
+  propagateProjectEntityLifecycle
+} from './analysis/projectEntityLifecycle.mjs';
+import {
   PROJECT_SCHEMA_VERSION,
   formatProjectSchemaErrors,
   upgradeProjectImport
@@ -180,6 +185,7 @@ const PROJECT_INPUT_KEYS = new Set([
   EXTRA_KEYS.projectMeta,
   EXTRA_KEYS.designBasis,
 ]);
+const NAMED_PROJECT_WRITE_KEYS = new Set([...PROJECT_INPUT_KEYS, KEYS.studies]);
 const ONE_LINE_VIEW_INPUT_KEYS = new Set([
   KEYS.equipment,
   KEYS.loads,
@@ -265,8 +271,25 @@ function read(key, fallback, scenario = getCurrentScenarioNameState()) {
   return readScenarioValue(key, fallback, scenario);
 }
 
+function hasNamedProjectContext() {
+  if (typeof window === 'undefined') return true;
+  if (!window.location?.href || /jsdom/i.test(window.navigator?.userAgent || '')) return true;
+  const params = new URLSearchParams(window.location?.search || '');
+  if (params.has('e2e')) return true;
+  const projectId = typeof window.currentProjectId === 'string'
+    ? window.currentProjectId.trim()
+    : '';
+  return Boolean(projectId && projectId !== 'default');
+}
+
 function write(key, value, scenario = getCurrentScenarioNameState(), options = {}) {
   try {
+    if (NAMED_PROJECT_WRITE_KEYS.has(key) && options.allowUnnamedProject !== true && !hasNamedProjectContext()) {
+      if (typeof document !== 'undefined') {
+        document.dispatchEvent(new CustomEvent('ctr:project-required', { detail: { key } }));
+      }
+      return false;
+    }
     const changed = writeScenarioValue(key, value, scenario, options);
     if (!changed) return false;
     if (PROJECT_INPUT_KEYS.has(key)) projectInputFingerprintCache = null;
@@ -276,6 +299,33 @@ function write(key, value, scenario = getCurrentScenarioNameState(), options = {
   } catch (e) {
     console.error('Failed to store', key, e);
     return false;
+  }
+}
+
+function writeCanonicalCollection(collection, key, previousRecords, nextRecords, scenario, options = {}) {
+  const lifecycle = propagateProjectEntityLifecycle({
+    collection,
+    previousRecords,
+    nextRecords,
+    loads: read(KEYS.loads, [], scenario),
+    cables: read(KEYS.cables, [], scenario),
+    oneLine: read(KEYS.oneLine, { activeSheet: 0, sheets: [] }, scenario)
+  });
+  const ownsEventBatch = !deferredEvents;
+  if (ownsEventBatch) beginEventBatch();
+  beginProjectMutationBatch();
+  try {
+    const changed = write(key, nextRecords, scenario, options);
+    if (!changed) return false;
+    if (key !== KEYS.loads && lifecycle.loads.changed) write(KEYS.loads, lifecycle.loads.value, scenario);
+    if (key !== KEYS.cables && lifecycle.cables.changed) write(KEYS.cables, lifecycle.cables.value, scenario);
+    if (lifecycle.oneLine.changed) {
+      setOneLine(lifecycle.oneLine.value, scenario, { captureRevision: false });
+    }
+    return true;
+  } finally {
+    endProjectMutationBatch();
+    if (ownsEventBatch) flushEventBatch();
   }
 }
 
@@ -304,11 +354,15 @@ export const getCables = () => {
 /**
  * @param {Cable[]} cables
  */
-export const setCables = (cables, options = {}) => write(KEYS.cables, normalizeProjectEntities({
-  equipment: getEquipment(),
-  loads: getLoads(),
-  cables,
-}).cables, getCurrentScenarioNameState(), options);
+export const setCables = (cables, options = {}) => {
+  const scenario = options.scenario || getCurrentScenarioNameState();
+  const normalized = normalizeProjectEntities({
+    equipment: getEquipment(),
+    loads: getLoads(),
+    cables,
+  }).cables;
+  return writeCanonicalCollection('cables', KEYS.cables, read(KEYS.cables, [], scenario), normalized, scenario, options);
+};
 
 /**
  * Read the cable schedule for a specific named scenario without switching the
@@ -583,11 +637,15 @@ export const getPanels = () => read(KEYS.panels, []);
  */
 export function getOneLineScheduleCollections() {
   const rawEquipment = read(KEYS.equipment, []);
+  const rawPanels = read(KEYS.panels, []);
   const rawLoads = read(KEYS.loads, []);
   const rawCables = read(KEYS.cables, []);
   const equipment = normalizeProjectEntities({
     equipment: rawEquipment.map(ensureEquipmentFields),
   }).equipment;
+  const panels = normalizeProjectEntities({
+    panels: rawPanels.map(ensurePanelFields),
+  }).panels;
   const loads = normalizeProjectEntities({
     equipment,
     loads: rawLoads.map(ensureLoadFields),
@@ -595,7 +653,7 @@ export function getOneLineScheduleCollections() {
   const cables = normalizeProjectEntities({ equipment, loads, cables: rawCables }).cables;
   return new Map([
     ['equipment', equipment],
-    ['panel', read(KEYS.panels, [])],
+    ['panel', panels],
     ['load', loads],
     ['cable', cables],
   ]);
@@ -639,7 +697,12 @@ function ensurePanelFields(panel) {
 /**
  * @param {GenericRecord[]} panels
  */
-export const setPanels = panels => write(KEYS.panels, panels.map(ensurePanelFields));
+export const setPanels = (panels, options = {}) => {
+  const scenario = options.scenario || getCurrentScenarioNameState();
+  const source = options.preserveShape ? panels : panels.map(ensurePanelFields);
+  const normalized = normalizeProjectEntities({ panels: source }).panels;
+  return writeCanonicalCollection('panels', KEYS.panels, read(KEYS.panels, [], scenario), normalized, scenario, options);
+};
 
 /**
  * @returns {GenericRecord[]}
@@ -689,10 +752,12 @@ function ensureEquipmentFields(eq) {
   };
 }
 
-export const setEquipment = list => write(
-  KEYS.equipment,
-  normalizeProjectEntities({ equipment: list.map(ensureEquipmentFields) }).equipment
-);
+export const setEquipment = (list, options = {}) => {
+  const scenario = options.scenario || getCurrentScenarioNameState();
+  const source = options.preserveShape ? list : list.map(ensureEquipmentFields);
+  const normalized = normalizeProjectEntities({ equipment: source }).equipment;
+  return writeCanonicalCollection('equipment', KEYS.equipment, read(KEYS.equipment, [], scenario), normalized, scenario, options);
+};
 
 export const addEquipment = item => {
   const list = getEquipment();
@@ -765,6 +830,7 @@ export const getOneLine = (scenario = getCurrentScenarioNameState()) => {
     const schedules = getOneLineScheduleCollections();
     return {
       equipment: schedules.get('equipment'),
+      panels: schedules.get('panel'),
       loads: schedules.get('load'),
       cables: schedules.get('cable'),
     };
@@ -851,7 +917,19 @@ export const setOneLine = (data, scenario = getCurrentScenarioNameState(), optio
   }
   const payload = {
     activeSheet: normalizeActiveSheet(data.activeSheet),
-    sheets: Array.isArray(data.sheets) ? data.sheets : []
+    sheets: Array.isArray(data.sheets) ? data.sheets.map(sheet => ({
+      ...sheet,
+      components: (Array.isArray(sheet.components) ? sheet.components : []).map(component => {
+        const diagramComponent = { ...component };
+        delete diagramComponent.projectEntity;
+        return diagramComponent;
+      }),
+      connections: (Array.isArray(sheet.connections) ? sheet.connections : []).map(connection => {
+        const diagramConnection = { ...connection };
+        delete diagramConnection.projectCircuit;
+        return diagramConnection;
+      })
+    })) : []
   };
   write(KEYS.oneLine, payload, scenario);
 };
@@ -897,6 +975,20 @@ export const getProjectInputSnapshot = () => ({
   conduits: getConduits(),
   ductbanks: getDuctbanks(),
   panels: getPanels(),
+  oneLine: getOneLine(),
+});
+export const getProjectReferenceDiagnostics = () => buildProjectReferenceDiagnostics({
+  equipment: getEquipment(),
+  panels: getPanels(),
+  loads: getLoads(),
+  cables: getCables(),
+  oneLine: getOneLine(),
+});
+export const getProjectEntityDeletionImpact = (collection, records = []) => buildProjectEntityDeletionImpact({
+  collection,
+  records,
+  loads: getLoads(),
+  cables: getCables(),
   oneLine: getOneLine(),
 });
 export const getProjectInputFingerprint = () => {
@@ -968,12 +1060,14 @@ function isEmptyLoad(load) {
   return Object.values(l).every(v => v === '');
 }
 
-export const setLoads = loads => {
+export const setLoads = (loads, options = {}) => {
+  const scenario = options.scenario || getCurrentScenarioNameState();
+  const source = options.preserveShape ? loads : (loads.length ? loads : [{}]).map(ensureLoadFields);
   const list = normalizeProjectEntities({
     equipment: getEquipment(),
-    loads: (loads.length ? loads : [{}]).map(ensureLoadFields),
+    loads: source,
   }).loads;
-  write(KEYS.loads, list);
+  return writeCanonicalCollection('loads', KEYS.loads, read(KEYS.loads, [], scenario), list, scenario, options);
 };
 
 export const addLoad = load => {
@@ -1014,9 +1108,36 @@ export const deleteLoad = index => {
 // Backward compatibility
 export const removeLoad = deleteLoad;
 
+/**
+ * Persist the canonical project entity collections as one undoable mutation.
+ * Pages that edit a projection of shared project data (such as One-Line)
+ * should use this instead of maintaining a page-local copy of the records.
+ *
+ * @param {{equipment?:GenericRecord[], panels?:GenericRecord[], loads?:GenericRecord[], cables?:GenericRecord[]}} collections
+ */
+export function setProjectEntityCollections(collections = {}) {
+  beginEventBatch();
+  beginProjectMutationBatch();
+  try {
+    if (Array.isArray(collections.equipment)) setEquipment(collections.equipment);
+    if (Array.isArray(collections.panels)) setPanels(collections.panels);
+    if (Array.isArray(collections.loads)) setLoads(collections.loads);
+    if (Array.isArray(collections.cables)) setCables(collections.cables);
+  } finally {
+    endProjectMutationBatch();
+    flushEventBatch();
+  }
+}
+
 // generic access for other values so pages never touch localStorage directly
 export const getItem = (key, fallback = null, scenario) => read(key, fallback, scenario);
-export const setItem = (key, value, scenario) => write(key, value, scenario);
+export const setItem = (key, value, scenario) => {
+  if (key === KEYS.equipment && Array.isArray(value)) return setEquipment(value, { scenario, preserveShape: true });
+  if (key === KEYS.panels && Array.isArray(value)) return setPanels(value, { scenario, preserveShape: true });
+  if (key === KEYS.loads && Array.isArray(value)) return setLoads(value, { scenario, preserveShape: true });
+  if (key === KEYS.cables && Array.isArray(value)) return setCables(value, { scenario, preserveShape: true });
+  return write(key, value, scenario);
+};
 export const setSessionItem = (key, value, scenario = getCurrentScenarioNameState()) => {
   writeScenarioSessionValue(key, value, scenario);
   emit(key, value);
@@ -1058,7 +1179,7 @@ export const keys = (scenario = getCurrentScenarioNameState()) => {
 };
 
 export function saveProject(projectId, scenario = getCurrentScenarioNameState()) {
-  if (!projectId) return;
+  if (!projectId) return false;
   try {
     const pendingFieldObservationQueue = getFieldObservationQueue();
     const payload = {
@@ -1101,8 +1222,10 @@ export function saveProject(projectId, scenario = getCurrentScenarioNameState())
         document.dispatchEvent(new CustomEvent('ctr:project-saved', { detail: payload }));
       } catch { /* non-critical */ }
     }
+    return true;
   } catch (e) {
     console.error('Failed to save project', e);
+    return false;
   }
 }
 
@@ -1519,6 +1642,8 @@ if (typeof window !== 'undefined') {
     setStudies,
     getStudyProvenance,
     getProjectInputFingerprint,
+    getProjectEntityDeletionImpact,
+    getProjectReferenceDiagnostics,
     getProjectMeta,
     setProjectMeta,
     getDesignBasis,

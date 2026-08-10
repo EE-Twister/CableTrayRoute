@@ -46,8 +46,8 @@ export const workflowOrder = [
     label: '3. One-Line',
     short: '3. One-Line',
     href: 'oneline.html',
-    hint: 'Model the electrical relationships, then reconcile schedules explicitly.',
-    standaloneHint: 'Diagram editor ready for independent drawing, import, and export.'
+    hint: 'Model electrical relationships; linked project records update automatically when the diagram is saved.',
+    standaloneHint: 'Diagram editor ready for focused work in the active project.'
   },
   {
     key: 'cableSchedule',

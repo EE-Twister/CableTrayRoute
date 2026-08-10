@@ -5,64 +5,14 @@
  */
 
 import assert from 'node:assert/strict';
+import {
+  findPairedConnector,
+  getSheetLinkBadgeText,
+  resolveLinkedSheetIndex,
+  validateSheetLinks
+} from '../src/one-line/sheetLinks.mjs';
 
 // ─── Inline copies of the pure helpers (mirrored from oneline.js) ─────────────
-
-function normalizeSheetLinkValue(value) {
-  if (value === null || value === undefined) return '';
-  return String(value).trim();
-}
-
-function resolveLinkedSheetIndex(comp, sheetsArr) {
-  const name = normalizeSheetLinkValue(comp.props?.linked_sheet ?? comp.linked_sheet);
-  if (!name) return -1;
-  return sheetsArr.findIndex(s => s.name === name);
-}
-
-function findPairedConnector(linkId, subtype, sheetsArr) {
-  if (!linkId) return null;
-  const partnerSubtype = subtype === 'link_source' ? 'link_target' : 'link_source';
-  for (let i = 0; i < sheetsArr.length; i++) {
-    const found = (sheetsArr[i].components || []).find(
-      c => c.type === 'sheet_link' &&
-           c.subtype === partnerSubtype &&
-           (c.props?.link_id ?? c.link_id ?? '') === linkId
-    );
-    if (found) return { sheetIndex: i, component: found };
-  }
-  return null;
-}
-
-function validateSheetLinks(sheetsArr) {
-  const issues = [];
-  sheetsArr.forEach((sheet, idx) => {
-    (sheet.components || []).forEach(c => {
-      if (c.type !== 'sheet_link') return;
-      const linkId = normalizeSheetLinkValue(c.props?.link_id ?? c.link_id);
-      const linkedSheet = normalizeSheetLinkValue(c.props?.linked_sheet ?? c.linked_sheet);
-      if (!linkId) {
-        issues.push({ component: c.id, sheetIndex: idx, message: 'Sheet link has no link_id' });
-      }
-      if (!linkedSheet) {
-        issues.push({ component: c.id, sheetIndex: idx, message: 'Sheet link has no target sheet set' });
-      }
-      if (linkId) {
-        const partner = findPairedConnector(linkId, c.subtype, sheetsArr);
-        if (!partner) {
-          issues.push({ component: c.id, sheetIndex: idx, message: `No matching paired connector for link_id "${linkId}"` });
-        }
-      }
-    });
-  });
-  return issues;
-}
-
-function getSheetLinkBadgeText(comp, sheetsArr) {
-  const name = normalizeSheetLinkValue(comp.props?.linked_sheet ?? comp.linked_sheet);
-  if (!name) return '';
-  const arrow = comp.subtype === 'link_source' ? '→' : '←';
-  return `${arrow} ${name}`;
-}
 
 // Minimal replica of the v4 migration block (from migrateDiagram in oneline.js)
 function migrateV3toV4(data) {

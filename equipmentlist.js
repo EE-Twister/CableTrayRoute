@@ -1,6 +1,7 @@
 import * as dataStore from './dataStore.mjs';
 import './tableUtils.mjs';
 import { openModal, showAlertModal } from './src/components/modal.js';
+import { confirmProjectEntityDeletion } from './src/components/projectDeletionReview.js';
 import {
   applyBulkEquipmentUpdate,
   inferEquipmentMapping,
@@ -69,6 +70,11 @@ if (typeof window !== 'undefined') {
       enableContextMenu: true,
       contextMenuViewLabel: 'View on One-Line',
       onView: row => openOneLineProbe(row, { probeType: 'equipment' }),
+      beforeDelete: ({ records }) => confirmProjectEntityDeletion({
+        collection: 'equipment',
+        records,
+        getImpact: dataStore.getProjectEntityDeletionImpact
+      }),
       showActionColumn: false,
       columns,
       onChange: () => {

@@ -3,6 +3,7 @@ import "../site.js";
 import * as dataStore from "../dataStore.mjs";
 import { exportPanelSchedule } from "../exportPanelSchedule.js";
 import { ensureFieldAssistiveText, showAlertModal, openModal } from "./components/modal.js";
+import { confirmProjectEntityDeletion } from "./components/projectDeletionReview.js";
 import {
   DEFAULT_PANEL_CIRCUIT_COUNT,
   MAX_PANEL_CIRCUITS,
@@ -30,6 +31,35 @@ import {
   parsePositiveInt,
   resolveDcSequence
 } from "./panel-schedule/phaseModel.js";
+import {
+  applyPanelBreakerAssignments,
+  clearBreakerBlock,
+  clearPanelBreakerAssignments,
+  deleteBreakerDetail,
+  ensureBreakerDetail,
+  ensureBreakerDetails,
+  ensurePanelBreakerCapacity,
+  ensurePanelBreakerLayout,
+  formatDeviceLabel,
+  getBlockCircuits,
+  getBreakerBlock,
+  getBreakerDetail,
+  getDeviceType,
+  getLoadBreakerSpan,
+  getLoadPoleCount,
+  initializeLayoutFromLoads,
+  sanitizeDcLoadBreakerPoles,
+  syncBranchDeviceType
+} from "./panel-schedule/breakerLayoutModel.js";
+import {
+  calculatePhaseSummary,
+  getCustomPhaseLoadsForSpan,
+  getDetailPhaseLoad,
+  getPhaseLabel,
+  getPhaseLoadKey,
+  getPhaseLoadsForSpan,
+  getPhasePowerValue
+} from "./panel-schedule/phaseLoadModel.js";
 
 const projectId = typeof window !== "undefined" ? window.currentProjectId : undefined;
 
@@ -143,72 +173,6 @@ function getPanelCircuitCount(panel) {
 
 const BREAKER_RATING_VALUES = [15, 20, 25, 30, 35, 40, 45, 50, 60, 70, 80, 90, 100, 110, 125, 150, 175, 200, 225, 250];
 
-function ensureBreakerDetails(panel) {
-  if (!panel) return {};
-  if (!panel.breakerDetails || typeof panel.breakerDetails !== "object") {
-    panel.breakerDetails = {};
-  }
-  return panel.breakerDetails;
-}
-
-function syncBranchDeviceType(panel) {
-  if (!panel) return { branchType: "breaker", updated: false };
-  const branchType = getPanelBranchDeviceType(panel);
-  const details = ensureBreakerDetails(panel);
-  let updated = false;
-  Object.values(details).forEach(detail => {
-    if (detail && typeof detail === "object" && detail.deviceType !== branchType) {
-      detail.deviceType = branchType;
-      updated = true;
-    }
-  });
-  return { branchType, updated };
-}
-
-function ensureBreakerDetail(panel, startCircuit) {
-  if (!panel || !Number.isFinite(startCircuit)) return null;
-  const details = ensureBreakerDetails(panel);
-  const key = String(startCircuit);
-  const existing = details[key];
-  if (existing && typeof existing === "object") {
-    if (!existing.deviceType || existing.deviceType !== getPanelBranchDeviceType(panel)) {
-      existing.deviceType = getPanelBranchDeviceType(panel);
-    }
-    return existing;
-  }
-  const created = { deviceType: getPanelBranchDeviceType(panel) };
-  details[key] = created;
-  return created;
-}
-
-function getBreakerDetail(panel, startCircuit) {
-  if (!panel || !Number.isFinite(startCircuit)) return null;
-  const details = ensureBreakerDetails(panel);
-  const detail = details[String(startCircuit)];
-  if (detail && !detail.deviceType) {
-    detail.deviceType = getPanelBranchDeviceType(panel);
-  }
-  return detail || null;
-}
-
-function deleteBreakerDetail(panel, startCircuit) {
-  if (!panel || !panel.breakerDetails || !Number.isFinite(startCircuit)) return;
-  delete panel.breakerDetails[String(startCircuit)];
-}
-
-function getDeviceType(detail) {
-  return detail && detail.deviceType === "fuse" ? "fuse" : "breaker";
-}
-
-function formatDeviceLabel(detail, poleCount) {
-  const type = getDeviceType(detail);
-  const base = type === "fuse" ? "Fuse" : "";
-  if (Number.isFinite(poleCount) && poleCount > 1) {
-    return type === "fuse" ? `${poleCount}-Pole Fuse` : `${poleCount}-Pole`;
-  }
-  return base;
-}
-
 function getCableDisplayId(cable) {
   return cable?.tag || cable?.id || cable?.ref || cable?.cable_id || null;
 }
@@ -242,325 +206,6 @@ function formatCableDetails(cable) {
   return sizeLabel || typeLabel || "";
 }
 
-function clearBreakerBlock(layout, startCircuit) {
-  if (!Array.isArray(layout)) return;
-  for (let i = 0; i < layout.length; i++) {
-    const entry = layout[i];
-    if (entry && entry.start === startCircuit) {
-      layout[i] = null;
-    }
-  }
-}
-
-function ensurePanelBreakerLayout(panel, circuitCount) {
-  if (!panel) {
-    return { layout: [], changed: false };
-  }
-  const branchType = getPanelBranchDeviceType(panel);
-  if (!Array.isArray(panel.breakerLayout)) {
-    panel.breakerLayout = [];
-  }
-  const prevLayout = panel.breakerLayout;
-  const count = Number.isFinite(circuitCount) && circuitCount > 0 ? circuitCount : 0;
-  const normalized = new Array(count).fill(null);
-  let changed = false;
-  const details = panel ? ensureBreakerDetails(panel) : {};
-  const system = getPanelSystem(panel);
-  const isDcPanel = system === "dc";
-  const maxPoles = getMaxBranchPoleCount(system);
-  const trimmedSlots = new Set();
-
-  const blocks = new Map();
-  for (let i = 0; i < prevLayout.length; i++) {
-    const entry = prevLayout[i];
-    if (!entry) continue;
-    const start = Number(entry.start);
-    const size = Number(entry.size);
-    const position = Number(entry.position);
-    if (!Number.isFinite(start) || !Number.isFinite(size) || size <= 0) {
-      changed = true;
-      continue;
-    }
-    if (start < 1 || start > count) {
-      changed = true;
-      continue;
-    }
-    if (Number.isFinite(position) && (position < 0 || position >= size)) {
-      changed = true;
-      continue;
-    }
-    const existing = blocks.get(start);
-    let normalizedSize = size;
-    if (isDcPanel && Number.isFinite(maxPoles) && normalizedSize > maxPoles) {
-      if (position === 0) {
-        const spanToTrim = computeBreakerSpan(start, normalizedSize, count);
-        if (spanToTrim.length > maxPoles) {
-          for (let idx = maxPoles; idx < spanToTrim.length; idx++) {
-            trimmedSlots.add(spanToTrim[idx]);
-          }
-        }
-      }
-      normalizedSize = maxPoles;
-      changed = true;
-    }
-    if (!existing || existing.size < normalizedSize) {
-      blocks.set(start, { start, size: normalizedSize });
-    }
-  }
-
-  blocks.forEach(({ start, size }) => {
-    const span = computeBreakerSpan(start, size, count);
-    if (span.length !== size) {
-      changed = true;
-      return;
-    }
-    let conflict = false;
-    span.forEach(slot => {
-      const idx = slot - 1;
-      if (normalized[idx] && normalized[idx].start !== start) {
-        conflict = true;
-      }
-    });
-    if (conflict) {
-      changed = true;
-      return;
-    }
-    span.forEach((slot, position) => {
-      const idx = slot - 1;
-      normalized[idx] = { start, size, position };
-    });
-    if (details) {
-      const detail = details[String(start)];
-      if (detail) {
-        detail.poles = Number.isFinite(size) && size > 0 ? Number(size) : detail.poles;
-        detail.deviceType = branchType;
-      } else {
-        const created = ensureBreakerDetail(panel, start);
-        created.poles = Number.isFinite(size) && size > 0 ? Number(size) : created.poles;
-      }
-    }
-  });
-
-  if (prevLayout.length !== normalized.length) {
-    changed = true;
-  } else {
-    for (let i = 0; i < normalized.length; i++) {
-      const existing = prevLayout[i] || null;
-      const next = normalized[i] || null;
-      if (!existing && !next) continue;
-      if (!existing || !next || existing.start !== next.start || existing.size !== next.size || existing.position !== next.position) {
-        changed = true;
-        break;
-      }
-    }
-  }
-
-  panel.breakerLayout = normalized;
-  if (trimmedSlots.size && Array.isArray(panel.breakers)) {
-    trimmedSlots.forEach(slot => {
-      const index = slot - 1;
-      if (index >= 0 && index < panel.breakers.length) {
-        panel.breakers[index] = null;
-      }
-    });
-  }
-  if (panel) {
-    const validStarts = new Set();
-    normalized.forEach(entry => {
-      if (!entry) return;
-      const start = Number(entry.start);
-      if (!Number.isFinite(start)) return;
-      if (entry.position === 0) {
-        const key = String(start);
-        validStarts.add(key);
-        const detail = details[key];
-        if (detail) {
-          detail.poles = Number(entry.size) && Number(entry.size) > 0 ? Number(entry.size) : detail.poles;
-          detail.deviceType = branchType;
-        } else {
-          const created = ensureBreakerDetail(panel, start);
-          created.poles = Number(entry.size) && Number(entry.size) > 0 ? Number(entry.size) : created.poles;
-        }
-      }
-    });
-    Object.keys(details).forEach(key => {
-      if (!validStarts.has(key)) {
-        delete details[key];
-      }
-    });
-  }
-  return { layout: panel.breakerLayout, changed };
-}
-
-function getBreakerBlock(panel, circuit) {
-  if (!panel || !Array.isArray(panel.breakerLayout)) return null;
-  if (!Number.isFinite(circuit) || circuit < 1) return null;
-  return panel.breakerLayout[circuit - 1] || null;
-}
-
-function getLayoutPoleCount(panel, startCircuit) {
-  const block = getBreakerBlock(panel, startCircuit);
-  if (!block || block.position !== 0) return null;
-  const size = Number(block.size);
-  return Number.isFinite(size) && size > 0 ? size : null;
-}
-
-function getBlockCircuits(panel, block, circuitCount) {
-  if (!block) return [];
-  const size = Number(block.size);
-  const start = Number(block.start);
-  if (!Number.isFinite(size) || !Number.isFinite(start) || size <= 0 || start < 1) return [];
-  const total = Number.isFinite(circuitCount) && circuitCount > 0
-    ? circuitCount
-    : getPanelCircuitCount(panel);
-  return computeBreakerSpan(start, size, total);
-}
-
-function initializeLayoutFromLoads(panel, panelId, loads, circuitCount) {
-  if (!panel) return false;
-  const { layout } = ensurePanelBreakerLayout(panel, circuitCount);
-  if (layout.some(entry => entry)) return false;
-  let changed = false;
-  loads.forEach(load => {
-    if (load.panelId !== panelId) return;
-    const span = getLoadBreakerSpan(load, panel, circuitCount);
-    if (!span.length) return;
-    const start = span[0];
-    const size = span.length;
-    const normalized = computeBreakerSpan(start, size, circuitCount);
-    if (normalized.length !== size) return;
-    normalized.forEach((slot, position) => {
-      if (slot >= 1 && slot <= circuitCount) {
-        layout[slot - 1] = { start, size, position };
-      }
-    });
-    changed = true;
-  });
-  return changed;
-}
-
-function getPhaseLabel(panel, breaker) {
-  const sequence = getPanelPhaseSequence(panel);
-  if (!sequence.length) return "";
-  const index = Number(breaker);
-  if (!Number.isFinite(index) || index < 1) return "";
-  const system = getPanelSystem(panel);
-  if (system === "dc") {
-    return getDcPolarityForCircuit(index, sequence);
-  }
-  if (system === "ac") {
-    if (sequence.length === 3) {
-      const rowIndex = Math.floor((index - 1) / 2);
-      return sequence[rowIndex % sequence.length];
-    }
-    if (sequence.length === 2) {
-      const rowIndex = Math.floor((index - 1) / 2);
-      return sequence[rowIndex % sequence.length];
-    }
-  }
-  return sequence[(index - 1) % sequence.length] || "";
-}
-
-function getLoadPoleCount(load, panel) {
-  const system = getPanelSystem(panel);
-  const candidates = [
-    load?.breakerPoles,
-    load?.poles,
-    load?.poleCount,
-    load?.phaseCount,
-    load?.phases
-  ];
-  let poleCount = 1;
-  for (const candidate of candidates) {
-    const parsed = parsePositiveInt(candidate);
-    if (!parsed) continue;
-    if (system === "dc") {
-      poleCount = Math.min(parsed, 2);
-      break;
-    }
-    if (system === "ac") {
-      poleCount = parsed >= 3 ? 3 : parsed === 2 ? 2 : 1;
-      break;
-    }
-    poleCount = parsed;
-    break;
-  }
-  const poleLimit = getPanelPoleLimit(panel);
-  return Math.min(poleCount, poleLimit);
-}
-
-function getLoadBreakerSpan(load, panel, circuitCount) {
-  let start = parsePositiveInt(load?.breaker);
-  if (!start) return [];
-  const limit = Number.isFinite(circuitCount) && circuitCount > 0
-    ? circuitCount
-    : (panel ? getPanelCircuitCount(panel) : null);
-
-  if (panel) {
-    const blockAtSlot = getBreakerBlock(panel, start);
-    if (blockAtSlot && Number.isFinite(Number(blockAtSlot.start)) && Number(blockAtSlot.start) !== start) {
-      start = Number(blockAtSlot.start);
-    }
-    const startBlock = getBreakerBlock(panel, start);
-    if (startBlock && startBlock.position === 0) {
-      const blockSpan = getBlockCircuits(panel, startBlock, limit ?? getPanelCircuitCount(panel));
-      if (blockSpan.length) {
-        return blockSpan;
-      }
-    }
-    const layoutPoles = getLayoutPoleCount(panel, start);
-    if (Number.isFinite(layoutPoles) && layoutPoles > 0) {
-      return computeBreakerSpan(start, layoutPoles, limit);
-    }
-  }
-
-  const poles = Math.max(1, getLoadPoleCount(load, panel));
-  return computeBreakerSpan(start, poles, limit);
-}
-
-function sanitizeDcLoadBreakerPoles(loads, panel, panelId) {
-  if (!Array.isArray(loads)) return false;
-  if (!panel || getPanelSystem(panel) !== "dc") return false;
-  let mutated = false;
-  loads.forEach(load => {
-    if (!load || load.panelId !== panelId) return;
-    const parsed = parsePositiveInt(load.breakerPoles);
-    if (parsed && parsed > 2) {
-      load.breakerPoles = 2;
-      mutated = true;
-    }
-  });
-  return mutated;
-}
-
-function ensurePanelBreakerCapacity(panel, circuitCount) {
-  if (!panel) return;
-  if (!Array.isArray(panel.breakers)) panel.breakers = [];
-  if (!Number.isFinite(circuitCount) || circuitCount <= 0) return;
-  if (panel.breakers.length >= circuitCount) return;
-  for (let i = panel.breakers.length; i < circuitCount; i++) {
-    panel.breakers[i] = null;
-  }
-}
-
-function clearPanelBreakerAssignments(panel, loadTag) {
-  if (!panel || !Array.isArray(panel.breakers) || !loadTag) return;
-  for (let i = 0; i < panel.breakers.length; i++) {
-    if (panel.breakers[i] === loadTag) {
-      panel.breakers[i] = null;
-    }
-  }
-}
-
-function applyPanelBreakerAssignments(panel, loadTag, span) {
-  if (!panel || !Array.isArray(panel.breakers) || !loadTag) return;
-  span.forEach(slot => {
-    const index = slot - 1;
-    if (index >= 0 && index < panel.breakers.length) {
-      panel.breakers[index] = loadTag;
-    }
-  });
-}
 
 function getLoadDisplayId(load) {
   return load?.ref || load?.id || load?.tag || null;
@@ -578,173 +223,25 @@ function createMetaChip(text) {
   span.textContent = text;
   return span;
 }
-
-function getPhasePowerValue(load, system) {
-  if (!load) return null;
-  const candidates = system === "dc"
-    ? [
-        { value: load.demandKw, scale: 1000 },
-        { value: load.kw, scale: 1000 },
-        { value: load.demandKva, scale: 1000 },
-        { value: load.kva, scale: 1000 },
-        { value: load.watts, scale: 1 }
-      ]
-    : [
-        { value: load.demandKva, scale: 1000 },
-        { value: load.kva, scale: 1000 },
-        { value: load.demandKw, scale: 1000 },
-        { value: load.kw, scale: 1000 },
-        { value: load.va, scale: 1 }
-      ];
-  let zeroFound = false;
-  for (const candidate of candidates) {
-    const parsed = parseFloat(candidate.value);
-    if (!Number.isFinite(parsed)) continue;
-    if (parsed === 0) {
-      zeroFound = true;
-      continue;
-    }
-    return parsed * candidate.scale;
-  }
-  if (zeroFound) return 0;
-  return null;
-}
-
-function getPhaseLoadKey(phaseLabel, block) {
-  const normalizedPhase = phaseLabel != null ? String(phaseLabel).trim() : "";
-  if (normalizedPhase) return normalizedPhase;
-  const position = block && Number.isFinite(Number(block.position)) ? Number(block.position) : null;
-  if (position != null) return `pole-${position + 1}`;
-  return null;
-}
-
-function getDetailPhaseLoad(detail, phaseKey) {
-  if (!detail || detail.loadVaPerPhase == null) return null;
-  const source = detail.loadVaPerPhase;
-  const collection = source && typeof source === "object" && !Array.isArray(source)
-    ? source
-    : { default: source };
-  const keys = phaseKey ? [phaseKey, "default"] : ["default"];
-  for (const key of keys) {
-    if (!(key in collection)) continue;
-    const value = collection[key];
-    const parsed = parseFloat(value);
-    if (Number.isFinite(parsed)) return parsed;
-    if (value === 0 || value === "0") return 0;
-  }
-  return null;
-}
-
-function getCustomPhaseLoadsForSpan(panel, detail, spanCircuits) {
-  const totals = new Map();
-  if (!panel || !detail || detail.loadVaPerPhase == null || !Array.isArray(spanCircuits)) return totals;
-  spanCircuits.forEach(circuit => {
-    const block = getBreakerBlock(panel, circuit);
-    const phaseLabel = getPhaseLabel(panel, circuit);
-    const phaseKey = getPhaseLoadKey(phaseLabel, block);
-    const load = getDetailPhaseLoad(detail, phaseKey);
-    if (load == null) return;
-    const label = phaseLabel || phaseKey || `Circuit ${circuit}`;
-    totals.set(label, (totals.get(label) || 0) + load);
-  });
-  return totals;
-}
-
-function getPhaseLoadsForSpan(panel, detail, spanCircuits, defaultTotalPower) {
-  const totals = new Map();
-  if (!panel || !Array.isArray(spanCircuits) || !spanCircuits.length) return totals;
-  const share = Number.isFinite(defaultTotalPower) ? defaultTotalPower / spanCircuits.length : null;
-  spanCircuits.forEach(circuit => {
-    const block = getBreakerBlock(panel, circuit);
-    const phaseLabel = getPhaseLabel(panel, circuit);
-    if (!phaseLabel) return;
-    const phaseKey = getPhaseLoadKey(phaseLabel, block);
-    const custom = getDetailPhaseLoad(detail, phaseKey);
-    const amount = custom != null ? custom : share;
-    if (amount == null) return;
-    totals.set(phaseLabel, (totals.get(phaseLabel) || 0) + amount);
-  });
-  return totals;
-}
-
 function createPhaseSummary(panel, panelId, loads, circuitCount) {
-  const sequence = getPanelPhaseSequence(panel);
-  if (!sequence.length) return null;
-  const phases = Array.from(new Set(sequence)).filter(Boolean);
-  if (!phases.length) return null;
-  const system = getPanelSystem(panel);
-  const breakerDetails = ensureBreakerDetails(panel);
-  const totals = {};
-  phases.forEach(phase => {
-    totals[phase] = 0;
-  });
-
-  const seenLoads = new Set();
-  const totalBreakers = Number.isFinite(circuitCount) && circuitCount > 0 ? circuitCount : panel.breakers?.length || 0;
-  for (let circuit = 1; circuit <= totalBreakers; circuit++) {
-    const block = getBreakerBlock(panel, circuit);
-    const start = block && Number.isFinite(Number(block.start)) ? Number(block.start) : circuit;
-    const detail = getBreakerDetail(panel, start);
-    if (!detail || detail.loadVaPerPhase == null) continue;
-    const phase = getPhaseLabel(panel, circuit);
-    if (!phase) continue;
-    const phaseKey = getPhaseLoadKey(phase, block);
-    const load = getDetailPhaseLoad(detail, phaseKey);
-    if (load == null) continue;
-    if (!(phase in totals)) totals[phase] = 0;
-    totals[phase] += load;
-  }
-
-  loads.forEach(load => {
-    if (load.panelId !== panelId) return;
-    const id = getLoadDisplayId(load) || `idx-${loads.indexOf(load)}`;
-    if (seenLoads.has(id)) return;
-    seenLoads.add(id);
-    const span = getLoadBreakerSpan(load, panel, totalBreakers);
-    if (!span.length) return;
-    const startCircuit = span[0];
-    const value = getPhasePowerValue(load, system);
-    const detail = getBreakerDetail(panel, startCircuit);
-    if (value == null) return;
-    const share = span.length > 0 ? value / span.length : value;
-    span.forEach(slot => {
-      const phase = getPhaseLabel(panel, slot);
-      if (!phase) return;
-      const block = getBreakerBlock(panel, slot);
-      const phaseKey = getPhaseLoadKey(phase, block);
-      if (detail && getDetailPhaseLoad(detail, phaseKey) != null) return;
-      totals[phase] += share;
-    });
-  });
+  const model = calculatePhaseSummary(panel, panelId, loads, circuitCount);
+  if (!model) return null;
 
   const summary = document.createElement("div");
   summary.className = "panel-phase-summary";
   const title = document.createElement("div");
   title.className = "panel-phase-summary-title";
-  title.textContent = system === "dc" ? "Polarity Load (W)" : "Phase Load (VA)";
+  title.textContent = model.title;
   summary.appendChild(title);
 
   const values = document.createElement("div");
   values.className = "panel-phase-summary-values";
   const formatter = new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 });
-  const unit = system === "dc" ? "W" : "VA";
-  const deviationMap = new Map();
-  const phaseTotals = phases.map(phase => totals[phase] || 0);
-  phases.forEach((phase, index) => {
-    const total = phaseTotals[index] || 0;
-    const comparisons = phaseTotals.map((other, otherIndex) => {
-      if (otherIndex === index) return 0;
-      if (other > 0) return (total - other) / other;
-      return total > 0 ? Infinity : 0;
-    });
-    deviationMap.set(phase, Math.max(0, ...comparisons));
-  });
-  phases.forEach(phase => {
+  model.phases.forEach(phase => {
     const chip = document.createElement("span");
     chip.className = "panel-phase-summary-chip";
-    const total = totals[phase] || 0;
-    chip.textContent = `${phase}: ${formatter.format(total)} ${unit}`;
-    const deviation = deviationMap.get(phase) || 0;
+    chip.textContent = `${phase}: ${formatter.format(model.totals[phase] || 0)} ${model.unit}`;
+    const deviation = model.deviations[phase] || 0;
     if (deviation >= 0.2) {
       chip.classList.add("panel-phase-summary-chip--critical");
       chip.title = "More than 20% above other phases";
@@ -757,7 +254,6 @@ function createPhaseSummary(panel, panelId, loads, circuitCount) {
   summary.appendChild(values);
   return summary;
 }
-
 /**
  * Assign a load to a breaker within a panel.
  * Updates the stored load with panel and breaker information.
@@ -2710,22 +2206,17 @@ window.addEventListener("DOMContentLoaded", () => {
   if (deletePanelBtn) {
     deletePanelBtn.addEventListener("click", async () => {
       if (!panel || !Array.isArray(panels) || panels.length <= 1) return;
-      const label = getPanelDisplayName(panel);
-      const confirmed = await openModal({
-        title: 'Delete Panel',
-        description: `Delete ${label}? Loads assigned to this panel will be cleared.`,
-        primaryText: 'Delete',
-        secondaryText: 'Cancel',
-        variant: 'danger'
+      const confirmed = await confirmProjectEntityDeletion({
+        collection: 'panels',
+        records: [panel],
+        getImpact: dataStore.getProjectEntityDeletionImpact,
+        title: 'Review Panel Deletion'
       });
       if (!confirmed) return;
       const idx = panels.findIndex(entry => entry && panelMatchesIdentifier(entry, activePanelId));
-      const [removed] = idx >= 0 ? panels.splice(idx, 1) : panels.splice(panels.length - 1, 1);
+      if (idx >= 0) panels.splice(idx, 1);
+      else panels.splice(panels.length - 1, 1);
       savePanels();
-      const loadsChanged = clearLoadsForPanel(removed || panel);
-      if (loadsChanged) {
-        dataStore.saveProject(projectId);
-      }
       const nextPanel = panels[idx] || panels[idx - 1] || panels[0];
       const nextId = nextPanel ? (nextPanel.id || nextPanel.ref || nextPanel.panel_id || nextPanel.tag) : null;
       if (nextId) {

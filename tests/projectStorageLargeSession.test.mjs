@@ -65,4 +65,11 @@ const persistedProject = JSON.parse(local.getItem('CTR_PROJECT_V1'));
 assert.equal(persistedProject.settings.latestRouteResults, undefined);
 assert.deepEqual(persistedProject.settings.smallSetting, { saved: true });
 
+storage.writeAppSetting('quotaProbe', 'y'.repeat(3_000));
+const quotaDiagnostics = storage.getProjectStorageDiagnostics();
+assert.equal(quotaDiagnostics.persistentStorageAvailable, false);
+assert.equal(quotaDiagnostics.storageWriteBlocked, true);
+assert.equal(quotaDiagnostics.quotaWarningShown, true);
+assert.equal(storage.readAppSetting('quotaProbe'), 'y'.repeat(3_000));
+
 console.log('large route results remain session-backed under local-storage quota pressure');

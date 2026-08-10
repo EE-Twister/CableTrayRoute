@@ -86,13 +86,19 @@ The original Neher‑McGrath paper provides additional discussion on how soil co
 
 ## IEEE 835 Underground Benchmarks
 
-The automated test suite validates underground calculations using published
+The automated test suite validates the dedicated underground ampacity solver using published
 values from IEEE Std 835. A key benchmark is a **500 kcmil Copper conductor**
 with a 90 °C insulation rating installed 36 inches deep in average soil
 (90 °C·cm/W). IEEE 835 lists an ampacity of roughly **392 A** for this
-configuration. The Neher‑McGrath implementation and the finite‑element solver
+configuration. The dedicated Neher‑McGrath implementation and the finite‑element solver
 are calibrated so that the predicted ampacity and resulting conductor
 temperature are within ±5 % of these values.
+
+The Ductbank Route page also displays a separate simplified steady-state
+screening estimate. That page-level value is an arithmetic screening aid and
+is not covered by the ±5% IEEE 835 benchmark claim. It must remain labeled as
+screening until a page-model fixture with the exact cable construction,
+conductor arrangement, conduit geometry, and benchmark source is reconciled.
 
 ## References
 

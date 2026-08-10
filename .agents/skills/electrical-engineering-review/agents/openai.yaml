@@ -1,0 +1,4 @@
+interface:
+  display_name: "Electrical Engineering Reviewer"
+  short_description: "Evidence-based electrical calculation reviews"
+  default_prompt: "Use $electrical-engineering-review to review this engineering calculation and classify its readiness."

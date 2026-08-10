@@ -1,4 +1,3 @@
-import './components/navigation.js';
 import { saveProject as dsSaveProject, loadProject as dsLoadProject, exportProject, importProject } from '../dataStore.mjs';
 import { PROJECT_TEMPLATES } from './projectTemplates.js';
 import {
@@ -1061,6 +1060,17 @@ function initProjectManagerControls() {
   wireButton('new-project-btn', newProject);
   wireButton('save-project-btn', saveProject);
   wireButton('load-project-btn', loadProject);
+  if (!window.__projectRequiredListenerWired) {
+    window.__projectRequiredListenerWired = true;
+    let projectPromptOpen = false;
+    document.addEventListener('ctr:project-required', () => {
+      if (projectPromptOpen) return;
+      projectPromptOpen = true;
+      newProject()
+        .catch(console.error)
+        .finally(() => { projectPromptOpen = false; });
+    });
+  }
   mountShareControls();
   mountProfileControl();
   mountProjectWorkspace();

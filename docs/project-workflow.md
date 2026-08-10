@@ -13,10 +13,10 @@ A complete data workflow is not automatically issue-ready. The Dashboard and Rep
 
 Home, the Workflow Dashboard, guided workflow strips, DRC, and the Report Package Builder derive their completion and next-action state from the same core workflow diagnostics. A saved route therefore advances routing consistently on each surface, and active DRC counts remain consistent when moving between them.
 
-CableTrayRoute supports two working modes:
+CableTrayRoute supports two project-scoped working modes:
 
-- **Standalone modules:** Open any page directly, enter the schedule or study data you need, and export from that module without building the full project model.
-- **Integrated workflow:** Follow the shared project path so records can be reconciled between modules:
+- **Focused project:** Create a separate project for a one-off calculation or schedule, then use only the page needed for that work. Its inputs remain isolated from every other project.
+- **Integrated project:** Follow the shared project path. Core equipment, panel, load, cable, and raceway records remain the same records regardless of which page edits them:
 
 `Equipment List -> Load List -> One-Line -> Cable Schedule -> Raceway Schedule -> Fill / Routing -> Studies -> Deliverables`
 
@@ -35,7 +35,7 @@ CableTrayRoute supports two working modes:
 
 Core workflow pages keep project guidance in a compact navigation row above the workspace. It identifies the current step, shows a small readiness status, and provides previous, dashboard, and next links without displacing the page's primary tools. Hovering the status exposes the current readiness explanation.
 
-Each page remains usable as an independent calculator, table, diagram, or deliverable builder with its own direct entry, import, and export path. The shared status is driven by `src/workflowStatus.js`, so aliases such as Tray Fill, Conduit Fill, Ductbank, and Optimal Route report the same Fill / Routing readiness while preserving their specialized page tools. Page-specific panels can still show deeper diagnostics, but they should use the same status vocabulary: schedule-ready, routing-ready, route-results-ready, study-saved, and deliverable-ready.
+Each page remains usable as a focused calculator, table, diagram, or deliverable builder with its own direct entry, import, and export path, but all persisted inputs belong to the active project. Create a new project before entering one-off data; do not use a page-local copy inside an unrelated project. The shared status is driven by `src/workflowStatus.js`, so aliases such as Tray Fill, Conduit Fill, Ductbank, and Optimal Route report the same Fill / Routing readiness while preserving their specialized page tools. Page-specific panels can still show deeper diagnostics, but they should use the same status vocabulary: schedule-ready, routing-ready, route-results-ready, study-saved, and deliverable-ready.
 
 The handoff-level inputs, outputs, readiness rules, and downstream consumers for every Workflow and Studies navigation page are generated in [Workflow and Studies Page Contracts](page-contracts.md) from `src/pageContracts.js`. The static contract-to-code comparison is generated in [Page Contract Code Audit](page-contract-audit.md) from `scripts/auditPageContracts.mjs`.
 
@@ -49,13 +49,17 @@ Opening a sample replaces cached conduit and ductbank schedule context with the 
 
 Older Underground Ductbank sample copies are repaired in place: missing parent tags are recovered from the parent id or conduit ids, the known sample endpoints and encasement are restored when absent, and the one-line receives a one-time spaced layout plus an automatic fit-to-view. Transformer tags are offset below winding labels so the two text layers do not overlap.
 
-## Explicit Reconcile Behavior
+## Shared Project Data Authority
 
-The One-Line does not automatically overwrite schedule rows during page load, save, property edits, or study runs. Use **Reconcile Schedules** from the One-Line toolbar when you want to integrate diagram data into schedules.
+Equipment, panel, load, and cable schedules are the canonical engineering records. The One-Line stores diagram layout, connectivity, and stable links to those records. Reading the One-Line hydrates linked components from the canonical schedules, so schedule edits appear without duplicate re-entry. Saving a valid or in-progress One-Line automatically creates missing canonical records and updates populated shared fields edited on the diagram.
 
-The reconcile preview matches records by `ref`, `id`, or `tag` without treating letter case as a different identity. Canvas-only fields such as X/Y position, size, rotation, and ports are excluded. The preview separates safe updates and new records from record-level decisions, with field details collapsed by default. Applying safe changes can create missing records and fill empty fields in matching records. It does not delete schedule rows, and it preserves existing non-empty schedule values when the One-Line proposes a different value. When diagram edits are pending, **Review Schedule Changes** is promoted into the One-Line primary action row.
+Automatic synchronization matches stable entity or circuit IDs first and falls back to `ref`, `id`, or `tag` without treating letter case as a different identity. Canvas-only fields such as X/Y position, size, rotation, and ports never enter schedule records. Rows not represented on the diagram are preserved, and blank diagram projections do not erase populated engineering values.
 
-Schedule pages can still be used first. When a schedule already contains equipment, load, panel, or cable records, the One-Line reconcile action treats those records as authoritative unless fields are blank.
+Stable IDs remain unchanged when equipment, panel, load, or cable display tags are renamed. References in dependent loads, cable endpoints, and One-Line links update in the same project mutation, so a tag change does not require duplicate edits on other pages. Because these records are study inputs, relevant tag changes also make previously saved study provenance stale until the study is rerun.
+
+Deleting a referenced canonical record does not silently cascade-delete dependent engineering records. Before deletion, Equipment List, Load List, Panel Schedule, and Cable Schedule show the affected load, cable-endpoint, and One-Line references and require explicit confirmation. Loads and cables remain available for review, affected One-Line links are detached and marked as orphaned, and the Dashboard **Data Links** metric reports the unresolved references. Its **Data Link Review** lists each affected record with a link to the appropriate remediation page. Resolve each diagnostic by relinking the dependent record or deliberately removing it; deletion is not treated as engineering approval to discard downstream data.
+
+**Review Shared Data** remains available on the One-Line as an audit and legacy-link repair surface; it is not a required data-entry handoff. Engineering validation remains separate from persistence: saving incomplete diagram work keeps the shared project data current but does not make that data calculation-ready or approved.
 
 ## Current Core Workflow UX
 
@@ -68,7 +72,7 @@ Schedule pages can still be used first. When a schedule already contains equipme
 - **Deliverables** use saved route results from Optimal Route to expose pull-card groups, spool-sheet readiness, report-section readiness, design-basis review gate status, saved snapshots, and release-package status on the downstream pages.
 - **Study results** label saved Short Circuit output as current, stale, or unknown against the active project-input fingerprint. Each rerun retains a compact per-bus snapshot so the next run can show previous/current three-phase fault current and deltas.
 - **Ductbank Route** includes a project-ductbank selector plus a next-action strip for conduit setup, cable assignment, fill calculation, thermal review, and calculation-report export.
-- **Sample Gallery** includes visual thumbnail cards for the Project Workflow Core sample plus realistic commercial office, water treatment pump station, and EV charging depot samples. These projects exercise equipment, loads, one-line links, cable schedule rows, raceway geometry, route results, study data, report snapshots, and release packages.
+- **Sample Gallery** includes visual thumbnail cards for the Project Workflow Core sample plus realistic commercial office, water treatment pump station, and EV charging depot samples. These projects exercise equipment, loads, one-line links, cable schedule rows, raceway geometry, route results, study data, report snapshots, and release packages. Sample copies report whether they were written to persistent browser storage; if storage is full or unavailable, the sample remains usable in the current tab and the user is told to export it before closing or reloading.
 - **TCC** can open directly from a one-line protective device, plot the selected device with its nearest upstream and downstream protective devices beside a matching one-line preview, keep additional selected references collapsed into a compact count above the graph, prioritize the graph before controls on narrow screens, show transformer inrush/damage, motor cold/hot starting, motor thermal, and cable damage reference metrics where project data is available below the graph, expose those equipment references on hover/focus/tap in a pinned side-panel detail, confirm estimated equipment assumptions from metric cards or pinned detail, toggle draggable chart callouts for device tags and selected settings with context/selected/all scope options, choose chart range presets for coordination, motor starting, transformer inrush, and fault-current review, export a full review package with the graph, one-line preview, metrics, and coordination results, and show a source-to-load one-line preview with label leaders for dense layouts.
 
 ## Deliverable Handoff Rules

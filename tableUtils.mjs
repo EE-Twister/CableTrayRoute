@@ -155,6 +155,7 @@ class TableManager {
     this.onSave = opts.onSave || null;
     this.onView = opts.onView || null;
     this.onDuplicateRowData = opts.onDuplicateRowData || null;
+    this.beforeDelete = opts.beforeDelete || null;
     this.rowCountEl = opts.rowCountId ? document.getElementById(opts.rowCountId) : null;
     this.selectable = opts.selectable || false;
     this.colOffset = this.selectable ? 1 : 0;
@@ -244,8 +245,8 @@ class TableManager {
       document.getElementById(opts.importBtnId).addEventListener('click', () => document.getElementById(opts.importInputId).click());
       document.getElementById(opts.importInputId).addEventListener('change', e => { this.importXlsx(e.target.files[0]); e.target.value=''; if (this.onChange) this.onChange(); });
     }
-    if (opts.deleteAllBtnId) document.getElementById(opts.deleteAllBtnId).addEventListener('click', () => { this.deleteAll(); if (this.onChange) this.onChange(); });
-    if (opts.deleteSelectedBtnId) document.getElementById(opts.deleteSelectedBtnId).addEventListener('click', () => { this.deleteSelected(); if (this.onChange) this.onChange(); });
+    if (opts.deleteAllBtnId) document.getElementById(opts.deleteAllBtnId).addEventListener('click', () => this.deleteAll());
+    if (opts.deleteSelectedBtnId) document.getElementById(opts.deleteSelectedBtnId).addEventListener('click', () => this.deleteSelected());
   }
 
   buildHeader() {
@@ -1538,10 +1539,7 @@ class TableManager {
         label: 'Delete row',
         onClick: e => {
           e.stopPropagation();
-          tr.remove();
-          this.save();
-          this.updateRowCount();
-          if (this.onChange) this.onChange();
+          this.deleteRow(tr);
         }
       });
       actionTarget.appendChild(delBtn);
@@ -1761,21 +1759,50 @@ class TableManager {
     rows.forEach(row => this.tbody.appendChild(row));
   }
 
+  runDeletionReview(type, rows, action) {
+    const execute = () => {
+      action();
+      this.save();
+      this.updateRowCount();
+      if (this.selectAll) this.selectAll.checked = false;
+      this.updateSelectAllState();
+      if (this.onChange) this.onChange();
+      return true;
+    };
+    if (typeof this.beforeDelete !== 'function') return execute();
+    let review;
+    try {
+      review = this.beforeDelete({
+        type,
+        rows,
+        records: rows.map(row => this.getRowData(row)),
+        table: this
+      });
+    } catch (error) {
+      console.error('delete review failed', error);
+      return false;
+    }
+    if (review && typeof review.then === 'function') {
+      return review.then(confirmed => (confirmed ? execute() : false));
+    }
+    return review ? execute() : false;
+  }
+
   deleteAll() {
-    this.tbody.innerHTML='';
-    if (this.selectAll) this.selectAll.checked = false;
-    this.save();
-    this.updateRowCount();
-    if (this.onChange) this.onChange();
+    const rows = Array.from(this.tbody.rows);
+    if (!rows.length) return false;
+    return this.runDeletionReview('all', rows, () => { this.tbody.innerHTML = ''; });
   }
 
   deleteSelected() {
-    this.getSelectedRows(true).forEach(tr => tr.remove());
-    if (this.selectAll) this.selectAll.checked = false;
-    this.save();
-    this.updateRowCount();
-    this.updateSelectAllState();
-    if (this.onChange) this.onChange();
+    const rows = this.getSelectedRows(true);
+    if (!rows.length) return false;
+    return this.runDeletionReview('selected', rows, () => rows.forEach(tr => tr.remove()));
+  }
+
+  deleteRow(row) {
+    if (!row) return false;
+    return this.runDeletionReview('row', [row], () => row.remove());
   }
 
   initContextMenu() {
@@ -1816,7 +1843,7 @@ class TableManager {
         },
         isDisabled: () => !clipboard
       },
-      { label: 'Delete Row', action: tr => { if (!tr) return; tr.remove(); this.save(); this.updateRowCount(); if (this.onChange) this.onChange(); } }
+      { label: 'Delete Row', action: tr => { if (!tr) return; this.deleteRow(tr); } }
     );
     menu.setItems(items);
 

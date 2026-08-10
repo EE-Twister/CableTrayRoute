@@ -281,7 +281,7 @@ function resolveIdentity(index, ...values) {
   return '';
 }
 
-export function normalizeProjectEntities({ equipment = [], loads = [], cables = [] } = {}) {
+export function normalizeProjectEntities({ equipment = [], panels = [], loads = [], cables = [] } = {}) {
   const equipmentIds = new Set();
   const normalizedEquipment = (Array.isArray(equipment) ? equipment : []).map((record, index) => (
     hasRecordValue(record)
@@ -289,6 +289,13 @@ export function normalizeProjectEntities({ equipment = [], loads = [], cables = 
       : { ...record, id: text(record?.id) }
   ));
   const equipmentIndex = identityIndex(normalizedEquipment);
+
+  const panelIds = new Set();
+  const normalizedPanels = (Array.isArray(panels) ? panels : []).map((record, index) => (
+    hasRecordValue(record)
+      ? { ...record, id: recordId(record, 'panel', index, panelIds) }
+      : { ...record, id: text(record?.id) }
+  ));
 
   const loadIds = new Set();
   const normalizedLoads = (Array.isArray(loads) ? loads : []).map((record, index) => {
@@ -331,12 +338,17 @@ export function normalizeProjectEntities({ equipment = [], loads = [], cables = 
     };
   });
 
-  return { equipment: normalizedEquipment, loads: normalizedLoads, cables: normalizedCables };
+  return {
+    equipment: normalizedEquipment,
+    panels: normalizedPanels,
+    loads: normalizedLoads,
+    cables: normalizedCables
+  };
 }
 
 export function normalizeOneLineReferences(oneLine = {}, project = {}) {
   const normalized = normalizeProjectEntities(project);
-  const entityIndex = identityIndex([...normalized.equipment, ...normalized.loads]);
+  const entityIndex = identityIndex([...normalized.equipment, ...normalized.panels, ...normalized.loads]);
   const circuitIndex = identityIndex(normalized.cables);
   const sheets = Array.isArray(oneLine?.sheets) ? oneLine.sheets : [];
   return {
@@ -347,13 +359,19 @@ export function normalizeOneLineReferences(oneLine = {}, project = {}) {
         const entityId = text(component.entityId) || resolveIdentity(
           entityIndex,
           component.scheduleLinks?.equipment,
+          component.scheduleLinks?.panel,
           component.scheduleLinks?.load,
           component.equipmentRef,
+          component.panelRef,
           component.loadRef,
           component.ref,
           component.tag
         );
-        return entityId ? { ...component, entityId } : component;
+        if (!entityId) return component;
+        const linked = { ...component, entityId };
+        delete linked.orphanedEntityId;
+        if (linked.referenceStatus === 'orphaned') delete linked.referenceStatus;
+        return linked;
       }),
       connections: (Array.isArray(sheet.connections) ? sheet.connections : []).map(connection => {
         const circuitId = text(connection.circuitId) || resolveIdentity(
@@ -363,7 +381,11 @@ export function normalizeOneLineReferences(oneLine = {}, project = {}) {
           connection.cable_tag,
           connection.tag
         );
-        return circuitId ? { ...connection, circuitId } : connection;
+        if (!circuitId) return connection;
+        const linked = { ...connection, circuitId };
+        delete linked.orphanedCircuitId;
+        if (linked.referenceStatus === 'orphaned') delete linked.referenceStatus;
+        return linked;
       }),
     }))
   };
@@ -372,7 +394,7 @@ export function normalizeOneLineReferences(oneLine = {}, project = {}) {
 export function buildOneLineProjectView(oneLine = {}, project = {}) {
   const normalized = normalizeProjectEntities(project);
   const entities = new Map();
-  [...normalized.equipment, ...normalized.loads].forEach(entity => {
+  [...normalized.equipment, ...normalized.panels, ...normalized.loads].forEach(entity => {
     if (!entity?.id) return;
     entities.set(entity.id, { ...(entities.get(entity.id) || {}), ...entity });
   });

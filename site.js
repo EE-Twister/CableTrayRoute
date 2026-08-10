@@ -76,6 +76,16 @@ import {
   encodeProjectForUrl,
   sha256Hex
 } from "./src/projectFileCodec.js";
+import {
+  collectHomepageSummary as buildHomepageSummary,
+  homeCableFrom,
+  homeCableSize,
+  homeCableTag,
+  homeCableTo,
+  pluralHome,
+  stripWorkflowNumber
+} from "./src/homepageSummary.js";
+import { createAutoSaveScheduler as createAutoSaveSchedulerModel } from "./src/autoSaveScheduler.js";
 
 const FOCUSABLE="a[href],button:not([disabled]),textarea:not([disabled]),input:not([disabled]),select:not([disabled]),[tabindex]:not([tabindex='-1'])";
 const CHECKPOINT_KEY='CTR_CHECKPOINT';
@@ -90,6 +100,16 @@ let dirtyTrackerInstance=null;
 let operationToastTimer=null;
 let lastSavedAt=null;
 let lastSavedIndicatorTimer=null;
+
+export function createAutoSaveScheduler(options={}){
+  return createAutoSaveSchedulerModel({
+    writer:writeProjectToHandle,
+    markClean:()=>getDirtyTracker()?.markClean?.(),
+    setFlag:setAutoSaveFlag,
+    intervalMs:AUTO_SAVE_INTERVAL_MS,
+    ...options
+  });
+}
 
 function claimSharedShellFeature(feature){
   const state=globalThis[SHARED_SHELL_INIT_KEY]||(globalThis[SHARED_SHELL_INIT_KEY]={});
@@ -1011,70 +1031,6 @@ function applyProjectHash(){
   });
 }
 
-function hasWorkflowValue(value){
-  if(Array.isArray(value)) return value.some(hasWorkflowValue);
-  if(value&&typeof value==='object') return Object.keys(value).length>0;
-  return value!==null&&value!==undefined&&String(value).trim()!=='';
-}
-
-function meaningfulHomeRecords(records){
-  if(!Array.isArray(records)) return [];
-  return records.filter(record=>{
-    if(!record||typeof record!=='object') return false;
-    return Object.entries(record).some(([key,value])=>!key.startsWith('_')&&hasWorkflowValue(value));
-  });
-}
-
-function safeReadHomeData(getter,fallback){
-  try{return getter();}
-  catch(err){
-    console.warn('Homepage summary read failed',err);
-    return fallback;
-  }
-}
-
-function homeField(record,names){
-  for(const name of names){
-    if(hasWorkflowValue(record?.[name])) return record[name];
-  }
-  return '';
-}
-
-function homeCableTag(cable){
-  return homeField(cable,['tag','id','cable_id','cableId','ref'])||'Untitled';
-}
-
-function homeCableFrom(cable){
-  return homeField(cable,['from','from_tag','fromTag','source','source_tag'])||'--';
-}
-
-function homeCableTo(cable){
-  return homeField(cable,['to','to_tag','toTag','destination','load','load_tag'])||'--';
-}
-
-function homeCableSize(cable){
-  return homeField(cable,['conductor_size','conductorSize','cable_size','wire_size','size'])||'--';
-}
-
-function countHomeStudies(studies){
-  if(!studies||typeof studies!=='object') return 0;
-  return Object.values(studies).filter(hasWorkflowValue).length;
-}
-
-function countHomeReportSnapshots(snapshots){
-  if(Array.isArray(snapshots)) return snapshots.length;
-  if(snapshots&&typeof snapshots==='object') return Object.keys(snapshots).length;
-  return 0;
-}
-
-function pluralHome(count,singular,plural=singular+'s'){
-  return `${count} ${count===1?singular:plural}`;
-}
-
-function stripWorkflowNumber(label){
-  return String(label||'').replace(/^\d+\.\s*/,'');
-}
-
 function setHomeText(id,text){
   const el=document.getElementById(id);
   if(el) el.textContent=text;
@@ -1087,98 +1043,34 @@ function setHomeLink(id,href,text){
   el.textContent=text;
 }
 
-function numericPercent(record,names){
-  for(const name of names){
-    const raw=record?.[name];
-    if(raw===null||raw===undefined||raw==='') continue;
-    const value=Number(String(raw).replace('%',''));
-    if(Number.isFinite(value)) return value;
-  }
-  return null;
-}
-
-function averageHomeFill(records){
-  const values=records
-    .map(record=>numericPercent(record,['fill_pct','fillPercent','percent_fill','percentFill','fill','tray_fill_pct','conduit_fill_pct']))
-    .filter(value=>Number.isFinite(value));
-  if(!values.length) return null;
-  return Math.round(values.reduce((sum,value)=>sum+value,0)/values.length);
-}
-
 function collectHomepageSummary(){
-  const equipment=meaningfulHomeRecords(safeReadHomeData(getEquipment,[]));
-  const loads=meaningfulHomeRecords(safeReadHomeData(getLoads,[]));
-  const oneLine=safeReadHomeData(getOneLine,{activeSheet:0,sheets:[]});
-  const cables=meaningfulHomeRecords(safeReadHomeData(getCables,[]));
-  const trays=meaningfulHomeRecords(safeReadHomeData(getTrays,[]));
-  const conduits=meaningfulHomeRecords(safeReadHomeData(getConduits,[]));
-  const ductbanks=meaningfulHomeRecords(safeReadHomeData(getDuctbanks,[]));
-  const studies=safeReadHomeData(getStudies,{});
-  const lifecyclePackages=safeReadHomeData(getLifecyclePackages,[]);
-  const reportSnapshots=safeReadHomeData(getReportSnapshots,{});
-  const reconcilePending=Boolean(safeReadHomeData(()=>getItem('oneLineScheduleReconcilePending',false),false));
-  const routeResults=safeReadHomeData(()=>getItem('latestRouteResults',null),null);
-  const cableReadiness=getCableReadiness(cables);
-  const oneLineComponents=countOneLineComponents(oneLine);
-  const raceways=trays.length+conduits.length+ductbanks.length;
-  const workflowDiagnostics=buildWorkflowCoreDiagnostics({
-    equipment,
-    loads,
-    oneLine,
-    cables,
-    trays,
-    conduits,
-    ductbanks,
-    studies,
-    routeResults,
-    latestRouteResults:routeResults,
-    lifecyclePackages,
-    deliverables:lifecyclePackages,
-    reportSnapshots,
-    designBasis:safeReadHomeData(getDesignBasis,{}),
-    designGateApprovals:safeReadHomeData(getDesignGateApprovals,{}),
-    studyApprovals:safeReadHomeData(getStudyApprovals,{}),
-    currentInputFingerprint:safeReadHomeData(getProjectInputFingerprint,''),
-    reconcilePending
+  return buildHomepageSummary({
+    readers:{
+      getEquipment,
+      getLoads,
+      getOneLine,
+      getCables,
+      getTrays,
+      getConduits,
+      getDuctbanks,
+      getStudies,
+      getLifecyclePackages,
+      getReportSnapshots,
+      getReconcilePending:()=>getItem('oneLineScheduleReconcilePending',false),
+      getRouteResults:()=>getItem('latestRouteResults',null),
+      getDesignBasis,
+      getDesignGateApprovals,
+      getStudyApprovals,
+      getProjectInputFingerprint
+    },
+    services:{
+      getCableReadiness,
+      countOneLineComponents,
+      buildWorkflowCoreDiagnostics,
+      getStepStatus
+    },
+    workflowSteps:PROJECT_WORKFLOW_STEPS
   });
-  const workflowStatusByKey=new Map(workflowDiagnostics.workflowSteps.map(status=>[status.key,status]));
-  const stepStatuses=PROJECT_WORKFLOW_STEPS.map(step=>({
-    ...step,
-    status:workflowStatusByKey.get(step.key)||getStepStatus(step.key)
-  }));
-  const completeCount=stepStatuses.filter(step=>step.status.complete).length;
-  const nextStep=stepStatuses.find(step=>!step.status.complete)||stepStatuses[stepStatuses.length-1];
-  const packageCount=Array.isArray(lifecyclePackages)?lifecyclePackages.length:0;
-  const reportCount=countHomeReportSnapshots(reportSnapshots);
-  const routeRecords=[...trays,...conduits,...ductbanks];
-
-  return {
-    equipment,
-    loads,
-    oneLine,
-    oneLineComponents,
-    cables,
-    trays,
-    conduits,
-    ductbanks,
-    studies,
-    studyCount:countHomeStudies(studies),
-    lifecyclePackages,
-    reportCount:packageCount+reportCount,
-    reconcilePending,
-    cableReadiness,
-    raceways,
-    routeRecords,
-    averageFill:averageHomeFill(routeRecords),
-    routeWarnings:routeRecords.filter(record=>{
-      const pct=numericPercent(record,['fill_pct','fillPercent','percent_fill','percentFill','fill']);
-      return Number.isFinite(pct)&&pct>40;
-    }).length,
-    workflowDiagnostics,
-    stepStatuses,
-    completeCount,
-    nextStep
-  };
 }
 
 function renderHomeCablePreview(cables){
@@ -2556,48 +2448,6 @@ async function ensureHandlePermission(handle){
   return false;
 }
 
-export function createAutoSaveScheduler({
-  getHandle,
-  writer=writeProjectToHandle,
-  markClean=()=>getDirtyTracker()?.markClean?.(),
-  setFlag=setAutoSaveFlag,
-  warn=()=>{},
-  intervalMs=AUTO_SAVE_INTERVAL_MS,
-  schedule=(fn,delay)=>setInterval(fn,delay),
-  cancel=id=>clearInterval(id)
-}={}){
-  let timerId=null;
-  async function run(){
-    const handle=typeof getHandle==='function'?getHandle():undefined;
-    if(!handle){
-      setFlag?.(false);
-      warn?.();
-      return false;
-    }
-    setFlag?.(true);
-    let saved=false;
-    try{
-      saved=await writer(handle);
-      if(saved) markClean?.();
-    }catch(err){
-      console.error('Autosave execution failed',err);
-    }finally{
-      setFlag?.(false);
-    }
-    return saved;
-  }
-  function start(){
-    if(timerId!==null) return;
-    timerId=schedule(run,intervalMs);
-  }
-  function stop(){
-    if(timerId===null) return;
-    cancel(timerId);
-    timerId=null;
-  }
-  return {start,stop,run};
-}
-
 function ensureAutoSaveScheduler(){
   if(autoSaveSchedulerInstance) return autoSaveSchedulerInstance;
   autoSaveSchedulerInstance=createAutoSaveScheduler({
@@ -2605,7 +2455,8 @@ function ensureAutoSaveScheduler(){
     writer:handle=>writeProjectToHandle(handle),
     markClean:()=>{getDirtyTracker()?.markClean?.(); recordSave();},
     setFlag:setAutoSaveFlag,
-    warn:()=>{updateSaveButtonState(); console.warn('Autosave skipped: choose Save Project to select a file for updates.');}
+    warn:()=>{updateSaveButtonState(); console.warn('Autosave skipped: choose Save Project to select a file for updates.');},
+    intervalMs:AUTO_SAVE_INTERVAL_MS
   });
   if(typeof window!=='undefined'){
     window.__CTR_autoSaveScheduler=autoSaveSchedulerInstance;

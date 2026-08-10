@@ -1374,6 +1374,7 @@ function handleStorageWriteError(prefix, keyOrError, maybeError) {
         window.dispatchEvent(new CustomEvent('ctr:storageQuotaExceeded'));
         // Show a visible banner if no listener handles it within this tick.
         setTimeout(() => {
+          if (typeof document === 'undefined' || typeof document.querySelector !== 'function') return;
           if (document.querySelector('.ctr-quota-banner')) return;
           const banner = document.createElement('div');
           banner.className = 'ctr-quota-banner';
@@ -1967,6 +1968,7 @@ export function canRedo() {
 }
 
 export function getProjectStorageDiagnostics() {
+  const storage = getStorage();
   return {
     undoEntries: undoStack.length,
     redoEntries: redoStack.length,
@@ -1976,6 +1978,10 @@ export function getProjectStorageDiagnostics() {
     maxUndoBytes: MAX_UNDO_HISTORY_BYTES,
     cachedStorageEntries: memoryStorage.size,
     cachedMissingStorageEntries: missingStorageKeys.size,
+    persistentStorageAvailable: Boolean(storage) && !storageWriteBlocked,
+    storageWriteBlocked,
+    quotaWarningShown,
+    savedProjectsError: savedProjectsError?.message || '',
   };
 }
 

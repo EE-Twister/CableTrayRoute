@@ -104,6 +104,8 @@ test.describe('cableschedule buttons', () => {
 
     await openToolbarMenu(page, 'More');
     await page.click('#delete-all-btn');
+    await expect(page.getByRole('dialog', { name: 'Review Cable Deletion' })).toBeVisible();
+    await page.getByRole('button', { name: 'Delete', exact: true }).click();
     await expect(page.locator('#cableScheduleTable tbody tr')).toHaveCount(0);
     await expect.poll(() => page.evaluate(() => window.cableScheduleTable.getData().length)).toBe(0);
   });

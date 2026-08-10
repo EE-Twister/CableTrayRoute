@@ -54,8 +54,6 @@ import { analyzeDuctbankRouteProfile } from './analysis/ductbankRouteProfile.mjs
 import {
   CONDUIT_SPECS,
   INSULATION_TEMP_LIMIT,
-  cableCurrentCarryingConductors,
-  conduitEquivalentDiameterMeters,
   fahrenheitToCelsius as fToC,
   finiteNumber,
   insulationTypesForRating,
@@ -63,6 +61,7 @@ import {
   parseTradeSize as parseSize,
   resolveCableTemperatureRating
 } from './src/ductbank-route/thermalPrimitives.js';
+import { createDuctbankAmpacityModel } from './src/ductbank-route/ampacityModel.js';
 
 function projectDuctbankId(ductbank={}){
  return String(ductbank.ductbank_id||ductbank.id||ductbank.tag||'').trim();
@@ -1310,220 +1309,74 @@ function fillResults(){
 }
 
 let CONDUCTOR_PROPS={};
-const AWG_AREA={"22":642,"20":1020,"18":1624,"16":2583,"14":4107,"12":6530,"10":10380,"8":16510,"6":26240,"4":41740,"3":52620,"2":66360,"1":83690,"1/0":105600,"2/0":133100,"3/0":167800,"4/0":211600,"250":250000,"350":350000,"500":500000,"750":750000,"1000":1000000};
-
-const BASE_RESISTIVITY={cu:0.017241,al:0.028264}; // ohm-mm^2/m @20C
-const TEMP_COEFF={cu:0.00393,al:0.00403};
-const RESISTANCE_TABLE={cu:{},al:{}};
-for(const sz in AWG_AREA){
-  const areaMM2=AWG_AREA[sz]*0.0005067;
-  RESISTANCE_TABLE.cu[sz]=BASE_RESISTIVITY.cu/areaMM2;
-  RESISTANCE_TABLE.al[sz]=BASE_RESISTIVITY.al/areaMM2;
-}
+const ductbankAmpacityModel = createDuctbankAmpacityModel({
+  getConductorProperties: () => CONDUCTOR_PROPS,
+  findConduit: id => getAllConduits().find(conduit => conduit.conduit_id === id) || {},
+  getConductorRating,
+  getCableTemperatureRating: cableTemperatureRating,
+  normalizeConduitId: normalizeDuctbankId,
+  ductResistanceTable: RDUCT_TABLE
+});
 
 function normalizeSizeKey(size){
-  const s=size?size.toString().trim():'';
-  if(CONDUCTOR_PROPS[s]) return s;
-  const alt=s.replace(/^#/, '');
-  if(CONDUCTOR_PROPS[alt]) return alt;
-  return s;
+  return ductbankAmpacityModel.normalizeSizeKey(size);
 }
 
 function dcResistance(size,material,temp=20){
-  const key=normalizeSizeKey(size);
-  const mat=material&&material.toLowerCase().includes('al')?'al':'cu';
-  let base;
-  const props=CONDUCTOR_PROPS[key];
-  if(props){
-    base=(mat==='al'?props.rdc_al:props.rdc_cu);
-  }else{
-    base=RESISTANCE_TABLE[mat][key];
-    if(base===undefined){
-      const areaCM=sizeToArea(size);
-      if(!areaCM)return 0;
-      const areaMM2=areaCM*0.0005067;
-      base=BASE_RESISTIVITY[mat]/areaMM2;
-    }
-  }
-  return base*(1+TEMP_COEFF[mat]*(temp-20));
+  return ductbankAmpacityModel.dcResistance(size,material,temp);
 }
 
 function sizeToArea(size){
- if(!size)return 0;
- let s=size.toString().trim();
- if(CONDUCTOR_PROPS[s]) return CONDUCTOR_PROPS[s].area_cm;
- s=s.replace(/^#/, '');
- if(/kcmil/i.test(s))return parseFloat(s)*1000;
- const m=s.match(/(\d+(?:\/0)?)/);
- if(!m)return 0;
- return AWG_AREA[m[1]]||0;
+ return ductbankAmpacityModel.sizeToArea(size);
 }
 
 function skinEffect(size){
-  // AC skin effect per IEEE Std 835 Table 4.
-  // Interpolate Yc using conductor area in kcmil.
-  const area=sizeToArea(size)/1000; // convert to kcmil
-  if(!area) return 0;
-  const table=[
-    [0,0], [100,0], [250,0.05], [500,0.1],
-    [1000,0.15], [2000,0.2]
-  ];
-  for(let i=1;i<table.length;i++){
-    const a=table[i-1];
-    const b=table[i];
-    if(area<=b[0]){
-      const t=(area-a[0])/(b[0]-a[0]);
-      return a[1]+t*(b[1]-a[1]);
-    }
-  }
-  return table[table.length-1][1];
+  return ductbankAmpacityModel.skinEffect(size);
 }
 
 function dielectricRise(voltage){
-  // Dielectric loss temperature rise from IEEE Std 835 Table 9
-  const v=(parseFloat(voltage)||0)/1000; // kV
-  const table=[
-    [0,0],[2,0],[5,5],[15,10],[25,15],[35,20]
-  ];
-  if(v<=table[0][0]) return table[0][1];
-  for(let i=1;i<table.length;i++){
-    const a=table[i-1];
-    const b=table[i];
-    if(v<=b[0]){
-      const t=(v-a[0])/(b[0]-a[0]);
-      return a[1]+t*(b[1]-a[1]);
-    }
-  }
-  return table[table.length-1][1];
+  return ductbankAmpacityModel.dielectricRise(voltage);
 }
 
 function conductorThermalResistance(cable){
-  const key=normalizeSizeKey(cable.conductor_size);
-  const props=CONDUCTOR_PROPS[key];
-  if(!props){
-    throw new Error('Invalid conductor size: '+cable.conductor_size);
-  }
-  const areaM2=props.area_cm*5.067e-10;
-  const r=Math.sqrt(areaM2/Math.PI); // conductor radius (m)
-  const t=(parseFloat(cable.insulation_thickness)||props.insulation_thickness||0)*0.0254;
-  const r_i=r;
-  const r_o=r+t;
-  const r_inner_equivalent=r*0.001;
-  const kCond=cable.conductor_material&&cable.conductor_material.toLowerCase().includes('al')?237:401;
-  const kIns=parseFloat(cable.insulation_k)||0.3;
-  const Rcond=Math.log(r_i/r_inner_equivalent)/(2*Math.PI*kCond);
-  const Rins=Math.log(r_o/r_i)/(2*Math.PI*kIns);
-  return {Rcond,Rins};
-}
-
-function findConduit(id){
-  if(typeof getAllConduits==='function'){
-    return getAllConduits().find(c=>c.conduit_id===id)||{};
-  }
-  return {};
-}
-
-function getRduct(conduit,params){
-  if(!conduit||!conduit.conduit_type)return params.concreteEncasement?0.1:0.08;
-  const mat=conduit.conduit_type.includes('PVC')?'PVC':'steel';
-  const base=(RDUCT_TABLE[mat]||{})[conduit.trade_size];
-  let val=base!==undefined?base:(mat==='PVC'?0.1:0.08);
-  if(params.concreteEncasement){
-    const extra=RDUCT_TABLE.concrete[conduit.trade_size];
-    val+=(extra!==undefined?extra:0.05);
-  }
-  return val;
+  return ductbankAmpacityModel.conductorThermalResistance(cable);
 }
 
 // Thermal resistance components for Neher‑McGrath
 // see docs/AMPACITY_METHOD.md#equation
 function calcRcaComponents(cable,params,count=1,total=1){
- const cr=conductorThermalResistance(cable);
- let Rcond=cr.Rcond;
- let Rins=cr.Rins;
- const conduit=findConduit(cable.conduit_id);
- let Rduct=getRduct(conduit,params);
- let rho=params.soilResistivity||90;
- rho=Math.min(150,Math.max(40,rho));
- const rho_m=rho/100;
- const burialDepth=(params.ductbankDepth||0)*0.0254;
- const conduitDiameter=conduitEquivalentDiameterMeters(conduit);
- let Rsoil=0;
- if(burialDepth>0&&conduitDiameter>0){
-  Rsoil=(rho_m/(2*Math.PI))*Math.log(4*burialDepth/conduitDiameter);
- }
- return {Rcond,Rins,Rduct,Rsoil,Rca:Rcond+Rins+Rduct+Rsoil};
+ return ductbankAmpacityModel.calcRcaComponents(cable,params,count,total);
 }
 
 function calcRca(cable,params,count=1,total=1){
   // helper for Neher‑McGrath ampacity, see docs/AMPACITY_METHOD.md
-  return calcRcaComponents(cable,params,count,total).Rca;
+  return ductbankAmpacityModel.calcRca(cable,params,count,total);
 }
 
-/* Ampacity via full Neher-McGrath equation
-   See docs/AMPACITY_METHOD.md#equation */
+/* Ampacity via a simplified Neher-McGrath-style screening relation.
+   This is not the benchmark solver; see docs/AMPACITY_METHOD.md#equation. */
 function estimateAmpacity(cable,params,count=1,total=0){
- const rating=cableTemperatureRating(cable);
- const Rdc=dcResistance(cable.conductor_size,cable.conductor_material,rating);
- const Yc=skinEffect(cable.conductor_size);
- const dTd=dielectricRise(cable.voltage_rating);
- const comps=calcRcaComponents(cable,params,count,total);
- const Rca=(+comps.Rcond)+(+comps.Rins)+(+comps.Rduct)+(+comps.Rsoil);
- if(!Number.isFinite(Rca)||Rca<=0) return {ampacity:NaN};
- const amb=Math.max(Number.isFinite(params.earthTemp)?params.earthTemp:20,
-                   isNaN(params.airTemp)?-Infinity:params.airTemp);
- const num=rating-(amb+dTd);
- if(num<=0 || !Number.isFinite(Rdc) || Rdc<=0) return {ampacity:0};
- const conductorFactor=cableCurrentCarryingConductors(cable);
- const ampacity=Math.sqrt(num/(Rdc*(1+Yc)*Rca*conductorFactor));
- return {ampacity};
+ return ductbankAmpacityModel.estimateAmpacity(cable,params,count,total);
 }
 
 function ampacityDetails(cable,params,count=1,total=0){
- const areaCM=sizeToArea(cable.conductor_size);
- if(!areaCM) return {ampacity:0};
- const rating=cableTemperatureRating(cable);
- const Rdc=dcResistance(cable.conductor_size,cable.conductor_material,rating);
- const Yc=skinEffect(cable.conductor_size);
- const dTd=dielectricRise(cable.voltage_rating);
- const comps=calcRcaComponents(cable,params,count,total);
- const Rca=comps.Rca;
- const amb=Math.max(Number.isFinite(params.earthTemp)?params.earthTemp:20,
-                   isNaN(params.airTemp)?-Infinity:params.airTemp);
- const num=rating-(amb+dTd);
- const conductorFactor=cableCurrentCarryingConductors(cable);
- const ampacity=num<=0 || !Number.isFinite(Rdc) || Rdc<=0 || !Number.isFinite(Rca) || Rca<=0
-   ? 0
-   : Math.sqrt(num/(Rdc*(1+Yc)*Rca*conductorFactor));
- return {Rdc,Yc,deltaTd:dTd,Rcond:comps.Rcond,Rins:comps.Rins,Rduct:comps.Rduct,Rsoil:comps.Rsoil,Rca,ampacity,rating,conductorFactor};
+ return ductbankAmpacityModel.ampacityDetails(cable,params,count,total);
 }
 
 function cableHeatLoss(cable,current=finiteNumber(cable?.est_load,0),rating=cableTemperatureRating(cable)){
- const Rdc=dcResistance(cable.conductor_size,cable.conductor_material,rating);
- if(!Number.isFinite(Rdc) || Rdc<=0) return 0;
- return current * current * Rdc * (1 + skinEffect(cable.conductor_size)) * cableCurrentCarryingConductors(cable);
+ return ductbankAmpacityModel.cableHeatLoss(cable,current,rating);
 }
 
 function cableSelfThermalResistance(cable){
- try{
-   const comps=conductorThermalResistance(cable);
-   return comps.Rcond + comps.Rins;
- }catch(e){
-   return 0;
- }
+ return ductbankAmpacityModel.cableSelfThermalResistance(cable);
 }
 
 function cableConductorTemperature(cable,conduitTemp,current=finiteNumber(cable?.est_load,0)){
- const base=Number.isFinite(conduitTemp)?conduitTemp:20;
- return base + cableHeatLoss(cable,current) * cableSelfThermalResistance(cable);
+ return ductbankAmpacityModel.cableConductorTemperature(cable,conduitTemp,current);
 }
 
 function conduitTemperatureLimit(conduitId,cables){
- const ratings=cables
-   .filter(c=>normalizeDuctbankId(c.conduit_id)===normalizeDuctbankId(conduitId))
-   .map(cableTemperatureRating)
-   .filter(r=>Number.isFinite(r) && r>0);
- return ratings.length?Math.min(...ratings):getConductorRating();
+ return ductbankAmpacityModel.conduitTemperatureLimit(conduitId,cables);
 }
 
 // Iterative ampacity search using Neher‑McGrath temps
@@ -1610,7 +1463,7 @@ function updateAmpacityReport(scroll=false){
 document.getElementById('ampacityReport').innerHTML=
    `<div class="ampacity-container"><table class="db-table ampacity-table"><thead><tr>`+
    `<th>Cable</th><th>Rdc</th><th>Yc</th><th>&Delta;Td</th><th>Rcond</th><th>Rins</th><th>Rduct</th>`+
-   `<th>Rsoil</th><th>Rca</th><th>Tc</th><th>Cond.</th><th>Neher (A)</th><th>Finite (A)</th><th>Over</th></tr>`+
+   `<th>Rsoil</th><th>Rca</th><th>Tc</th><th>Cond.</th><th>Screening (A)</th><th>Finite (A)</th><th>Over</th></tr>`+
    `</thead><tbody>${rows}</tbody></table></div>`;
  updateCableRowStyles();
  const det=document.getElementById('ampacityDetails');
@@ -3845,7 +3698,7 @@ function collectDuctbankAmpacityOverEntries(context){
    const finite=parseFloat(window.finiteAmpacity?.[cable.tag] ?? window.finiteAmpacity?.[tag]);
    const conductorTemp=parseFloat(window.cableThermalTemps?.[cable.tag] ?? window.cableThermalTemps?.[tag]);
    const reasons=[];
-   if(Number.isFinite(neher) && load > neher) reasons.push(`Neher ${formatDuctbankAmpacity(neher)}`);
+   if(Number.isFinite(neher) && load > neher) reasons.push(`Screening ${formatDuctbankAmpacity(neher)}`);
    if(Number.isFinite(finite) && load > finite) reasons.push(`Finite ${formatDuctbankAmpacity(finite)}`);
    if(Number.isFinite(conductorTemp) && Number.isFinite(rating) && conductorTemp > rating){
      reasons.push(`Temp ${conductorTemp.toFixed(1)}\u00B0C > ${rating.toFixed(0)}\u00B0C`);
@@ -3918,11 +3771,11 @@ function renderDuctbankAmpacityOverList(context){
    const detail=document.createElement('span');
    detail.className='ductbank-ampacity-over-detail';
    const estimates=[
-     `Neher ${formatDuctbankAmpacity(entry.neher)}`,
+     `Screening ${formatDuctbankAmpacity(entry.neher)}`,
      `Finite ${formatDuctbankAmpacity(entry.finite)}`
    ];
    const conduit=entry.conduitId ? `Conduit ${entry.conduitId}` : 'No conduit';
-   const extraReasons=entry.reasons.filter(reason=>!reason.startsWith('Neher ') && !reason.startsWith('Finite '));
+   const extraReasons=entry.reasons.filter(reason=>!reason.startsWith('Screening ') && !reason.startsWith('Finite '));
    detail.textContent=`${estimates.join(' / ')} - ${conduit}${extraReasons.length ? ` - ${extraReasons.join('; ')}` : ''}`;
    item.append(tag,message,detail);
    item.addEventListener('click',()=>focusDuctbankAmpacityOverEntry(entry));
@@ -4837,7 +4690,7 @@ function buildCalcReport(){
  lines.push('');
  lines.push('Ampacity Results');
  lines.push('----------------');
- lines.push('Cable             Load  Tc  Cond  Neher  Finite  Overload');
+ lines.push('Cable             Load  Tc  Cond  Screen  Finite  Overload');
  lines.push('----------------------------------------------------------');
  cables.forEach(c=>{
   const d=ampacityDetails(c,{...params,earthTemp:fToC(params.earthTemp),airTemp:isNaN(params.airTemp)?NaN:fToC(params.airTemp)},countMap[c.conduit_id],total);
@@ -4849,12 +4702,12 @@ function buildCalcReport(){
   lines.push(`  Rdc=${d.Rdc.toFixed(4)}, Yc=${d.Yc.toFixed(3)}, \u0394Td=${d.deltaTd.toFixed(2)}, Rcond=${d.Rcond.toFixed(3)}, Rins=${d.Rins.toFixed(3)}, Rduct=${d.Rduct.toFixed(3)}, Rsoil=${d.Rsoil.toFixed(3)}, Rca=${d.Rca.toFixed(3)}`);
  });
  lines.push('');
- lines.push('Ampacity calculations use the Neher-McGrath equation with cable-specific temperature ratings and current-carrying conductor count. Formulas for Yc and \u0394Td appear in the AC Resistance Correction documentation. Rdc, Rcond, Rins, Rduct, Rsoil and Rca are defined in Variable Definitions.');
+ lines.push('The page-level ampacity value uses a simplified Neher-McGrath-style steady-state screening relation with cable-specific temperature ratings and current-carrying conductor count. It is not a standards-compliance result. Formulas for Yc and \u0394Td appear in the AC Resistance Correction documentation. Rdc, Rcond, Rins, Rduct, Rsoil and Rca are defined in Variable Definitions.');
  lines.push('');
  lines.push('Variable Legend');
  lines.push('---------------');
  lines.push('load - estimated cable load (A)');
-lines.push('Neher - ampacity via Neher-McGrath (A)');
+lines.push('Screen - simplified steady-state screening ampacity (A)');
 lines.push('Finite - ampacity from finite-element solver (A)');
  lines.push('Tc - cable-specific allowable conductor temperature (\u00B0C)');
  lines.push('Cond - current-carrying conductor count used for heat loss');
@@ -4936,7 +4789,7 @@ const children=[];
  children.push(new docx.Paragraph('Ampacity Results'));
  children.push(new docx.Paragraph('----------------'));
 
-  const rows=[new docx.TableRow({children:['Cable','Load','Tc','Cond.','Rdc','Yc','\u0394Td','Rcond','Rins','Rduct','Rsoil','Rca','Neher','Finite','Overload'].map(t=>
+  const rows=[new docx.TableRow({children:['Cable','Load','Tc','Cond.','Rdc','Yc','\u0394Td','Rcond','Rins','Rduct','Rsoil','Rca','Screening','Finite','Overload'].map(t=>
     new docx.TableCell({children:[new docx.Paragraph(t)]}))})];
 
   cables.forEach(c=>{
@@ -4966,7 +4819,7 @@ const children=[];
   children.push(new docx.Table({rows}));
 
  children.push(new docx.Paragraph(''));
- children.push(new docx.Paragraph('Ampacity calculations use the Neher-McGrath equation with cable-specific temperature ratings and current-carrying conductor count:'));
+ children.push(new docx.Paragraph('The page-level ampacity value uses a simplified Neher-McGrath-style steady-state screening relation with cable-specific temperature ratings and current-carrying conductor count. It is not a standards-compliance result:'));
  children.push(new docx.Paragraph({
    children:[
      new docx.Math({
@@ -4987,7 +4840,7 @@ const children=[];
  children.push(new docx.Paragraph('Variable Legend'));
  children.push(new docx.Paragraph('---------------'));
  children.push(new docx.Paragraph('load - estimated cable load (A)'));
- children.push(new docx.Paragraph('Neher - ampacity via Neher-McGrath (A)'));
+ children.push(new docx.Paragraph('Screening - simplified steady-state screening ampacity (A)'));
  children.push(new docx.Paragraph('Finite - ampacity from finite-element solver (A)'));
  children.push(new docx.Paragraph('Rdc - dc conductor resistance at T_c (\u03A9/m)'));
  children.push(new docx.Paragraph('Yc - ac resistance factor (dimensionless)'));

@@ -1,0 +1,112 @@
+---
+name: electrical-engineering-review
+description: Perform evidence-based electrical-engineering reviews of CableTrayRoute calculation modules, study workflows, engineering data, protective-device records, tests, and reports. Use for formula and unit audits, standards-basis checks, benchmark verification, input-completeness reviews, screening-versus-production-readiness assessments, protective-device promotion prechecks, or reviews of engineering code changes. Default to a read-only review and never represent AI output as licensed-engineer approval.
+---
+
+# Electrical Engineering Review
+
+Review electrical calculations and engineering workflows from input through exported result. Separate verified defects from model limitations, missing evidence, data-quality gaps, and documentation problems.
+
+## Non-negotiable boundaries
+
+- Treat the review as technical assistance, not professional licensure, sealing, certification, commissioning acceptance, or authority-having-jurisdiction approval.
+- Never record a human reviewer identity, review date, sign-off, approval, or `calculation_ready` status. Report when evidence appears ready for qualified human review instead.
+- Do not call a result code-compliant merely because a test passes or a standard is cited.
+- Do not infer inaccessible standard clauses, manufacturer values, curves, ratings, tolerances, or adopted editions.
+- Use primary sources for technical verification. If the governing source is unavailable, mark the check blocked or provisional.
+- Keep research-only protective-device records at `researchStatus: candidate` and `libraryStatus: screening`. Do not modify `data/protectiveDevices.json` during research or review.
+- Default to read-only inspection. Implement changes only when the user explicitly asks to fix or update the application.
+
+## Select the review mode
+
+1. **Calculation review** — inspect equations, units, assumptions, numerical method, bounds, and implementation.
+2. **Study-readiness review** — decide whether inputs, models, provenance, validation, and outputs support screening, benchmark use, or qualified human review.
+3. **Protective-device readiness precheck** — assess exact configuration, ratings, curves, evidence, spot checks, applicability, and missing promotion prerequisites.
+4. **Change review** — review a diff for engineering regressions, altered assumptions, stale tests, or misleading output semantics.
+
+For multi-domain requests, review one calculation chain at a time. State what is out of scope.
+
+## Review workflow
+
+### 1. Establish scope and authority
+
+- Identify the calculation, equipment type, voltage/current regime, jurisdiction, standard edition, installation conditions, and intended use.
+- Distinguish preliminary design, detailed design, coordination/settings, safety labeling, procurement, and issued-for-construction use.
+- State missing scope facts. Continue with bounded assumptions only when they cannot change the safety or readiness conclusion.
+
+### 2. Build the evidence map
+
+- Read `AGENTS.md` and the relevant module documentation under `docs/`.
+- Inspect the browser/controller entrypoint, pure analysis module, project adapter, validation rules, report/export consumers, and focused tests.
+- Read `docs/calculation-accuracy-review.md` when the module or a shared dependency appears there.
+- Read `data/validationBenchmarks.json` and the relevant sample fixture when the calculation claims benchmark validation.
+- For protective devices, read `docs/protective-device-library-governance.md` before assessing readiness.
+
+### 3. Trace the complete calculation chain
+
+Trace and record:
+
+`source data -> normalization/defaults -> units -> model construction -> solver/equations -> limit checks -> saved result -> report/export`
+
+Look for divergent equations, defaults, or units between UI, worker, analysis, validation, and export paths. Confirm stale-result fingerprinting where project inputs feed a saved study.
+
+### 4. Verify engineering behavior
+
+- Perform dimensional analysis and at least one independent hand calculation or separately derived fixture.
+- Check sign conventions, phase basis, line-to-line versus line-to-neutral values, RMS versus peak, one-way versus loop length, percent versus per-unit, temperature bases, and unit conversions.
+- Test nominal, boundary, invalid, missing-data, and out-of-range cases.
+- Check that convergence failure, extrapolation, missing manufacturer data, and unsupported topology do not become authoritative numeric results.
+- Compare implemented scope and edition against the governing source. Clearly distinguish a different valid method from an error.
+- Use the domain checklist in `references/review-checklist.md` for the selected calculation family.
+
+### 5. Evaluate validation quality
+
+- Prefer published worked examples, independently calculated fixtures, manufacturer data, or cross-tool comparisons with recorded configuration.
+- Reject circular validation where the expected value is generated by the same implementation or copied constants.
+- Confirm tolerances have an engineering basis and are tight enough to catch consequential mistakes.
+- Run the narrowest relevant tests. If code changes are requested, also follow the repository-required `npm test`, `npm run build`, and applicable Playwright instructions.
+
+### 6. Classify the outcome
+
+Use exactly one overall class:
+
+- **Blocked** — governing inputs or authoritative evidence are missing, contradictory, or inaccessible.
+- **Screening only** — useful for preliminary comparison, but important model, data, or validation limits prevent issued use.
+- **Benchmark validated** — the implemented scope matches identified benchmarks within justified tolerances; installation-specific approval is still required.
+- **Candidate for qualified human review** — automated checks found no unresolved blocking issue and the evidence package appears complete enough for independent professional review. This is not approval.
+
+### 7. Report findings first
+
+Order findings by consequence:
+
+- **Critical** — credible risk of unsafe or materially wrong engineering output.
+- **High** — unsupported compliance/readiness claim, material model error, or missing safety-critical input.
+- **Medium** — limitation, data gap, or validation weakness likely to affect some real cases.
+- **Low** — traceability, clarity, maintainability, or non-consequential inconsistency.
+
+For every finding include:
+
+- affected file and tight line reference;
+- observed behavior;
+- engineering impact and affected operating range;
+- governing basis or reason the basis is unavailable;
+- recommended correction or additional evidence;
+- whether current tests detect it.
+
+Then provide:
+
+1. overall review class and intended-use boundary;
+2. calculation-basis matrix: topic, implementation, source, status;
+3. verification performed and commands run;
+4. unresolved assumptions and residual risk;
+5. minimum next actions for qualified human review.
+
+If there are no findings, say so directly but retain scope, evidence, validation performed, and residual limitations.
+
+## Repository-specific cautions
+
+- Treat the canonical project document and legacy derived-storage mirrors as separate paths that can drift; verify both only when the reviewed feature consumes both.
+- Verify explicit One-Line-to-schedule reconciliation behavior when a study depends on schedule records.
+- Do not treat a protective-device catalog record as calculation-ready solely because it loads or plots.
+- Check whether reports preserve the same screening language, assumptions, source fingerprint, and stale status shown in the interactive page.
+- Treat code references to a standard as traceability metadata, not proof of full implementation.

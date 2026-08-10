@@ -2,7 +2,7 @@ import './workflowStatus.js';
 import '../site.js';
 import { repairMojibake } from './textEncoding.js';
 import { getItem, getProjectInputFingerprint, getStudies, importProject, loadProject, saveProject, setItem, setStudies } from '../dataStore.mjs';
-import { getProjectState, listSavedProjects, readAppSetting, setConduitCache, setProjectState, writeAppSetting } from '../projectStorage.js';
+import { getProjectState, getProjectStorageDiagnostics, listSavedProjects, readAppSetting, setConduitCache, setProjectState, writeAppSetting } from '../projectStorage.js';
 import {
   SAMPLE_REGISTRY,
   getSampleById,
@@ -243,7 +243,11 @@ function activateSampleWorkflow(sample, projectId) {
     checklist: sample.guidedChecklist.map(step => ({ ...step })),
     startedAt: new Date().toISOString(),
   });
-  history.replaceState(null, '', `${location.pathname}${location.search}#${encodeURIComponent(projectId)}`);
+  try {
+    history.replaceState(null, '', `${location.pathname}${location.search}#${encodeURIComponent(projectId)}`);
+  } catch (error) {
+    console.warn('Could not update the sample project URL.', error);
+  }
 }
 
 async function openSample(sample, { forceNew = false } = {}) {
@@ -266,6 +270,7 @@ async function openSample(sample, { forceNew = false } = {}) {
   }
 
   let projectData;
+  let persistenceWarning = '';
   try {
     const resp = await fetch(sample.projectFile);
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
@@ -311,10 +316,20 @@ async function openSample(sample, { forceNew = false } = {}) {
       setStudies(studies);
     }
     activateSampleWorkflow(sample, projectId);
-    saveProject(projectId);
+    if (!saveProject(projectId)) {
+      throw new Error(`The project copy "${projectId}" could not be created.`);
+    }
+    const storageDiagnostics = getProjectStorageDiagnostics();
+    if (!storageDiagnostics.persistentStorageAvailable) {
+      persistenceWarning = ' Browser storage is full or unavailable, so this copy is available only in this tab. Export the project before closing or reloading.';
+    }
     await globalThis.updateProjectDisplay?.({ name: projectId });
-  } catch {
-    showToast('Could not save sample to project storage (storage full?)', 'error');
+  } catch (error) {
+    console.error(`Could not load the ${sample.title} sample project.`, error);
+    const detail = error instanceof Error && error.message
+      ? ` ${error.message}`
+      : '';
+    showToast(`Could not load "${sample.title}".${detail}`, 'error');
     return;
   }
 
@@ -322,7 +337,7 @@ async function openSample(sample, { forceNew = false } = {}) {
   showChecklist(sample);
   globalThis.applyProjectHash?.();
   renderGrid();
-  showToast(`Loaded "${sample.title}" — follow the checklist to explore.`, 'success');
+  showToast(`Loaded "${sample.title}" — follow the checklist to explore.${persistenceWarning}`, persistenceWarning ? 'error' : 'success');
 }
 
 // ── Checklist ─────────────────────────────────────────────────────────────────

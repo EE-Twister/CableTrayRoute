@@ -32,9 +32,6 @@ import { emitAsync } from './utils/safeEvents.mjs';
 import { fetchDataFile } from './src/fetchUtils.mjs';
 import { showAlertModal } from './src/components/modal.js';
 import { createDirtyTracker } from './dirtyTracker.js';
-import {
-    buildRoutingReadinessDiagnostics
-} from './analysis/scheduleWorkflow.mjs';
 import { normalizeRouteResultState } from './analysis/routeResults.mjs';
 import { filterRouteResultsForProject } from './analysis/deliverableWorkflow.mjs';
 import { buildCablePullPlan } from './analysis/cablePullPlan.mjs';
@@ -102,6 +99,46 @@ import {
 } from './src/routing/routeReviewView.mjs';
 import { createRoutingState } from './src/routing/routingState.mjs';
 import { computeRoutingProjectHash } from './src/routing/projectHash.mjs';
+import {
+    computeNeededTrayWidth,
+    formatRacewayRecommendation,
+    recommendRaceway
+} from './src/routing/racewaySizingModel.mjs';
+import { buildRoutingReadiness } from './src/routing/routingReadinessModel.mjs';
+import { CableRoutingSystem } from './src/routing/cableRoutingSystem.mjs';
+import {
+    buildRoutingRacewayData,
+    expandScheduledRaceways,
+    formatConduitCountText,
+    normalizeCableSchedule,
+    normalizeDuctbankSchedule,
+    normalizeTraySchedule
+} from './src/routing/routingProjectAdapter.mjs';
+import {
+    getSampleCables,
+    getSampleDuctbanks,
+    getSampleRiserConduits,
+    getSampleTrays,
+    ROUTE_PRESETS
+} from './src/routing/routingSamples.mjs';
+import {
+    getRouteVisualizationMetrics as routeMetrics,
+    getTrayUtilizationPercent as utilizationForTray,
+    ROUTE_COLORS,
+    ROUTE_PLOT_CONFIG as plotConfig,
+    ROUTE_VIEW_PRESETS
+} from './src/routing/routeVisualizationModel.mjs';
+import { buildPlotlyRouteScene } from './src/routing/plotlyRouteScene.mjs';
+import {
+    bindPullReviewActions,
+    buildPullReviewMarkup
+} from './src/routing/pullReviewView.mjs';
+import {
+    bindCableTable,
+    bindManualTrayTable,
+    buildCableTableMarkup,
+    buildManualTrayTableMarkup
+} from './src/routing/manualEntryView.mjs';
 
 // Filename: app.mjs
 // (This is an improved version that adds route segment consolidation)
@@ -584,10 +621,7 @@ async function initializeApp() {
         const messageHost = typeof elements !== 'undefined' ? elements.messages : null;
         messageHost?.querySelectorAll('.conduit-geometry-warning').forEach(message => message.remove());
         if (el) {
-            el.textContent = `Conduits added: ${count}`;
-            if (count === 0 && hasSchedule) {
-                el.textContent += ' (No valid conduits found; check geometry or IDs)';
-            }
+            el.textContent = formatConduitCountText(count, hasSchedule);
         }
         if (count === 0 && hasSchedule) {
             console.warn('No valid conduits were loaded. Check geometry fields or conduit IDs.');
@@ -887,393 +921,72 @@ async function initializeApp() {
         }
     };
 
-    const loadSchedulesIntoSession = async () => {
-        const store = globalThis.dataStore || {
-            getTrays,
-            getCables,
-            getDuctbanks,
-            getConduits
-        };
-
-        let trays = store.getTrays();
-        let cables = store.getCables();
-        let ductbanks = [];
-        let conduits = [];
-
-        state.ductbanksWithoutConduits = [];
-
-        const normalizeConduitAlias = value => String(value || '').trim().toUpperCase();
-        const conduitAliases = (conduit = {}, ductbankTag = '') => {
-            const dbTag = normalizeConduitAlias(conduit.ductbankTag || conduit.ductbank_tag || conduit.ductbank || ductbankTag);
-            const ids = [
-                conduit.conduit_id,
-                conduit.id,
-                conduit.tag,
-                conduit.tray_id
-            ].map(normalizeConduitAlias).filter(Boolean);
-            const aliases = new Set();
-            ids.forEach(id => {
-                aliases.add(`${dbTag}:${id}`);
-                if (dbTag && !id.startsWith(`${dbTag}-`)) aliases.add(`${dbTag}:${dbTag}-${id}`);
-                if (dbTag && id.startsWith(`${dbTag}-`)) aliases.add(`${dbTag}:${id.slice(dbTag.length + 1)}`);
-            });
-            return [...aliases];
-        };
-        const addUniqueConduit = (target, conduit, seenAliases) => {
-            const aliases = conduitAliases(conduit);
-            if (aliases.some(alias => seenAliases.has(alias))) return;
-            aliases.forEach(alias => seenAliases.add(alias));
-            target.push(conduit);
-        };
-        const expandScheduledRaceways = (rawDb = [], rawCond = []) => {
-            const flat=[];
-            const rawConduits=Array.isArray(rawCond)?rawCond:[];
-            const rawAliases=new Set();
-            rawConduits.forEach(conduit => conduitAliases(conduit).forEach(alias => rawAliases.add(alias)));
-            const normalizedDuctbanks=(Array.isArray(rawDb)?rawDb:[]).map(db=>{
-                (Array.isArray(db.conduits)?db.conduits:[]).forEach(c=>{
-                    const dbTag = db.tag || db.id || db.ductbank_id;
-                    const nestedConduit = {
-                        ductbankTag:dbTag,
-                        conduit_id:c.conduit_id || c.id || c.tag,
-                        tray_id:c.tray_id || c.tag || (dbTag && c.conduit_id ? `${dbTag}-${c.conduit_id}` : c.conduit_id),
-                        type:c.type || c.conduit_type,
-                        trade_size:c.trade_size,
-                        row:c.row,
-                        column:c.column ?? c.col,
-                        diameter:c.diameter,
-                        start_x:c.start_x,start_y:c.start_y,start_z:c.start_z,
-                        end_x:c.end_x,end_y:c.end_y,end_z:c.end_z,
-                        allowed_cable_group:c.allowed_cable_group
-                    };
-                    if (!conduitAliases(nestedConduit, dbTag).some(alias => rawAliases.has(alias))) {
-                        flat.push(nestedConduit);
-                    }
-                });
-                const {conduits:_,...rest}=db;
-                return rest;
-            });
-            const uniqueConduits = [];
-            const seenAliases = new Set();
-            rawConduits.forEach(conduit => addUniqueConduit(uniqueConduits, conduit, seenAliases));
-            flat.forEach(conduit => addUniqueConduit(uniqueConduits, conduit, seenAliases));
-            return {ductbanks:normalizedDuctbanks,conduits:uniqueConduits};
-        };
-
-        const scheduledDuctbanks = store.getDuctbanks();
-        const scheduledConduits = store.getConduits();
-        const hasScheduledRaceways = (Array.isArray(scheduledDuctbanks) && scheduledDuctbanks.length > 0) ||
-            (Array.isArray(scheduledConduits) && scheduledConduits.length > 0);
-        let loaded;
-        if(hasScheduledRaceways){
-            loaded=expandScheduledRaceways(scheduledDuctbanks, scheduledConduits);
-        }else if(typeof loadConduits==='function'){
-            loaded=loadConduits();
-        }else{
-            loaded=expandScheduledRaceways(scheduledDuctbanks, scheduledConduits);
-        }
-        ductbanks=loaded.ductbanks||[];
-        conduits=loaded.conduits||[];
-        const normalize = s => String(s || '').trim().toUpperCase();
-        const conduitsByDb = {};
-        const standaloneConduits = [];
-        conduits.forEach(c => {
-            const key = normalize(c.ductbankTag);
-            if (key) {
-                (conduitsByDb[key] ||= []).push(c);
-            } else {
-                standaloneConduits.push(c);
-            }
-        });
-        state.conduitsByDb = conduitsByDb;
-        if (trays.length > 0) {
-            state.manualTrays = trays.map(t => ({
-                tray_id: t.tray_id,
-                start_x: parseFloat(t.start_x),
-                start_y: parseFloat(t.start_y),
-                start_z: parseFloat(t.start_z),
-                end_x: parseFloat(t.end_x),
-                end_y: parseFloat(t.end_y),
-                end_z: parseFloat(t.end_z),
-                width: parseFloat(t.inside_width),
-                height: parseFloat(t.tray_depth),
-                num_slots: Math.max(1, parseInt(t.num_slots) || 1),
-                slot_groups: t.slot_groups || null,
-                current_fill: 0,
-                shape: 'STR',
-                allowed_cable_group: t.allowed_cable_group || '',
-                raceway_type: 'tray',
-            }));
-        }
-
-        if (cables.length > 0) {
-            const conductorProps = await ensureConductorProps();
-            const parseThickness = v => {
-                if (v === undefined || v === null || v === '') return undefined;
-                if (typeof v === 'number') return v;
-                const str = String(v).trim().toLowerCase();
-                const num = parseFloat(str);
-                if (Number.isNaN(num)) return undefined;
-                if (str.endsWith('mm')) return num / 25.4;
-                if (str.endsWith('cm')) return num / 2.54;
-                return num;
-            };
-
-            state.cableList = cables.map(c => {
-                const { tag, from_tag, to_tag, start_x, start_y, start_z, end_x, end_y, end_z, raceway_ids,
-                        cable_od, diameter: diameterRaw, OD, od, ...rest } = c;
-                let diameter = parseFloat(diameterRaw ?? cable_od ?? OD ?? od);
-                let weight = parseFloat(rest.weight);
-                const size = (rest.conductor_size || '').trim();
-                const prop = conductorProps[size];
-
-                if (!diameter) {
-                    let bare = 0.25; // default bare conductor diameter in inches
-                    if (prop && prop.area_cm) {
-                        bare = Math.sqrt(prop.area_cm) / 1000;
-                    } else {
-                        console.warn(`Unknown conductor size '${size}' for cable ${tag}; using ${bare} in.`);
-                    }
-
-                    let ins = parseThickness(rest.insulation_thickness);
-                    if (ins === undefined) {
-                        if (prop && prop.insulation_thickness !== undefined) {
-                            ins = prop.insulation_thickness;
-                        } else {
-                            ins = 0.03;
-                            console.warn(`Missing insulation thickness for cable ${tag}; assuming ${ins} in.`);
-                        }
-                    }
-
-                    let shield = parseThickness(rest.shielding_jacket);
-                    if (rest.shielding_jacket && shield === undefined) {
-                        console.warn(`Unrecognized shielding/jacket value '${rest.shielding_jacket}' for cable ${tag}; assuming 0 in.`);
-                    }
-                    shield = shield || 0;
-
-                    diameter = bare + 2 * (ins + shield);
-                }
-
-                if (Number.isNaN(weight)) {
-                    if (prop && prop.area_cm) {
-                        const areaSqIn = prop.area_cm * 7.8539816e-7;
-                        const conductors = parseFloat(rest.conductors) || 1;
-                        const mat = String(rest.conductor_material || 'copper').toLowerCase();
-                        const density = mat.startsWith('al') ? 0.0975 : 0.321; // lb/in^3
-                        weight = areaSqIn * density * 12 * conductors;
-                    } else {
-                        weight = 0;
-                    }
-                }
-
-                const mapped = {
-                    name: tag,
-                    start_tag: from_tag,
-                    end_tag: to_tag,
-                    start: [parseFloat(start_x), parseFloat(start_y), parseFloat(start_z)],
-                    end: [parseFloat(end_x), parseFloat(end_y), parseFloat(end_z)],
-                    manual_path: '',
-                    ...rest,
-                    diameter,
-                    weight,
-                };
-                setRacewayIds(mapped, raceway_ids || []);
-                return mapped;
-            });
-        }
-
-        if (ductbanks.length > 0) {
-            state.ductbankData = {
-                ductbanks: ductbanks.map(db => {
-                    const dbTag = db.tag;
-                    const key = normalize(dbTag);
-                    const dbId = db.id || db.tag || db.ductbank_id;
-                    return {
-                        id: dbId,
-                        tag: dbTag,
-                        width: db.width ?? db.inside_width,
-                        height: db.height ?? db.depth,
-                        conduit_spacing: db.conduit_spacing ?? db.spacing,
-                        outline: [
-                            [parseFloat(db.start_x), parseFloat(db.start_y), parseFloat(db.start_z)],
-                            [parseFloat(db.end_x), parseFloat(db.end_y), parseFloat(db.end_z)]
-                        ],
-                        conduits: (state.conduitsByDb[key] || []).map(c => {
-                            const condId = c.conduit_id || c.id;
-                            const trayId = c.tray_id || `${dbTag}-${condId}`;
-                            return {
-                                id: condId,
-                                tag: trayId,
-                                tray_id: trayId,
-                                conduit_id: condId,
-                                ductbankTag: dbTag,
-                                type: c.type,
-                                conduit_type: c.type,
-                                trade_size: c.trade_size,
-                                diameter: c.diameter,
-                                row: c.row,
-                                column: c.column ?? c.col,
-                                path: [
-                                    [parseFloat(c.start_x), parseFloat(c.start_y), parseFloat(c.start_z)],
-                                    [parseFloat(c.end_x), parseFloat(c.end_y), parseFloat(c.end_z)]
-                                ],
-                                allowed_cable_group: c.allowed_cable_group
-                            };
-                        })
-                    };
-                })
-            };
-
-            state.ductbanksWithoutConduits = state.ductbankData.ductbanks
-                .filter(db => (state.conduitsByDb[normalize(db.tag || db.id)] || []).length === 0)
-                .map(db => db.tag || db.id);
-            if (state.ductbanksWithoutConduits.length > 0) {
-                const fixUrl = 'racewayschedule.html?focus=ductbanks&expandAll=true&showConduitsWizard=true';
-                console.warn(`Ductbanks missing conduits: ${state.ductbanksWithoutConduits.join(', ')}. Go fix it: ${fixUrl}`);
-                const warnEl = typeof document !== 'undefined' && document.getElementById('ductbank-no-conduits-warning');
-                if (warnEl) {
-                    const listEl = warnEl.querySelector('.db-list');
-                    if (listEl) listEl.textContent = state.ductbanksWithoutConduits.join(', ');
-                    const fixLink = warnEl.querySelector('.fix-link');
-                    if (fixLink) fixLink.href = fixUrl;
-                    warnEl.style.display = '';
-                }
-            }
-        }
-
-        state.conduitData = standaloneConduits;
-        rebuildTrayData();
-    };
-
     const rebuildTrayData = () => {
-        state.trayData = state.manualTrays.map(t => ({ ...t }));
-        state.geometryWarnings = { ductbanks: [], conduits: [] };
-
-        if (state.ductbankData && state.ductbankData.ductbanks) {
-            state.ductbankData.ductbanks.forEach(db => {
-                const hasOutline = Array.isArray(db.outline) && db.outline.length >= 2;
-                const dbStart = hasOutline
-                    ? db.outline[0]
-                    : [
-                        parseFloat(db.start_x),
-                        parseFloat(db.start_y),
-                        parseFloat(db.start_z)
-                    ];
-                const dbEnd = hasOutline
-                    ? db.outline[db.outline.length - 1]
-                    : [
-                        parseFloat(db.end_x),
-                        parseFloat(db.end_y),
-                        parseFloat(db.end_z)
-                    ];
-                const coordsValid = dbStart.every(v => !isNaN(v)) && dbEnd.every(v => !isNaN(v));
-                if (!hasOutline && !coordsValid) {
-                    state.geometryWarnings.ductbanks.push(db.id || db.tag || '(unnamed)');
-                    console.warn(`Skipping ductbank ${db.id || db.tag || '(unnamed)'}: missing outline and coordinates.`);
-                    return;
-                }
-
-                if (state.includeDuctbankOutlines && coordsValid) {
-                    state.trayData.push({
-                        tray_id: db.id || db.tag,
-                        start_x: dbStart[0],
-                        start_y: dbStart[1],
-                        start_z: dbStart[2],
-                        end_x: dbEnd[0],
-                        end_y: dbEnd[1],
-                        end_z: dbEnd[2],
-                        width: parseFloat(db.width) || 12,
-                        height: parseFloat(db.height) || 12,
-                        current_fill: 0,
-                        shape: 'STR',
-                        allowed_cable_group: '',
-                        raceway_type: 'ductbank',
-                    });
-                }
-
-                (db.conduits || []).forEach(cond => {
-                    if (!Array.isArray(cond.path) || cond.path.length < 2) {
-                        state.geometryWarnings.conduits.push(cond.conduit_id || cond.id || '(unnamed)');
-                        console.warn(`Skipping conduit ${cond.conduit_id || cond.id || '(unnamed)'}: missing path.`);
-                        return;
-                    }
-                    const start = cond.path[0];
-                    const end = cond.path[cond.path.length - 1];
-                    const area = (CONDUIT_SPECS[cond.type] || {})[cond.trade_size];
-                    const dia = area ? Math.sqrt((4 * area) / Math.PI)
-                                     : parseFloat(cond.diameter) || 0;
-                    const dbTag = cond.ductbankTag || db.tag || db.id || db.ductbank_id;
-                    const condId = cond.conduit_id || cond.id;
-                    const trayId = `${dbTag}-${condId}`;
-                    cond.tray_id = trayId;
-                    state.trayData.push({
-                        tray_id: trayId,
-                        ductbankTag: dbTag,
-                        conduit_id: condId,
-                        start_x: start[0],
-                        start_y: start[1],
-                        start_z: start[2],
-                        end_x: end[0],
-                        end_y: end[1],
-                        end_z: end[2],
-                        width: dia,
-                        height: dia,
-                        row: cond.row,
-                        column: cond.column ?? cond.col,
-                        current_fill: 0,
-                        shape: 'STR',
-                        allowed_cable_group: cond.allowed_cable_group || '',
-                        raceway_type: 'conduit',
-                    });
-                });
-            });
-        }
-
-        if (state.conduitData && state.conduitData.length) {
-            state.conduitData.forEach(cond => {
-                const start = [parseFloat(cond.start_x), parseFloat(cond.start_y), parseFloat(cond.start_z)];
-                const end = [parseFloat(cond.end_x), parseFloat(cond.end_y), parseFloat(cond.end_z)];
-                const area = (CONDUIT_SPECS[cond.type] || {})[cond.trade_size];
-                const dia = area ? Math.sqrt((4 * area) / Math.PI)
-                                 : parseFloat(cond.diameter) || 0;
-                const condId = cond.conduit_id || cond.id;
-                const trayId = cond.tray_id || condId;
-                state.trayData.push({
-                    tray_id: trayId,
-                    ductbankTag: cond.ductbankTag,
-                    conduit_id: condId,
-                    start_x: start[0],
-                    start_y: start[1],
-                    start_z: start[2],
-                    end_x: end[0],
-                    end_y: end[1],
-                    end_z: end[2],
-                    width: dia,
-                    height: dia,
-                    row: cond.row,
-                    column: cond.column ?? cond.col,
-                    current_fill: 0,
-                    shape: 'STR',
-                    allowed_cable_group: cond.allowed_cable_group || '',
-                    raceway_type: 'conduit',
-                });
-            });
-        }
-
-        if ((state.geometryWarnings.ductbanks.length || state.geometryWarnings.conduits.length) && typeof displayGeometryWarnings === 'function') {
+        const model = buildRoutingRacewayData({
+            manualTrays: state.manualTrays,
+            ductbankData: state.ductbankData,
+            conduitData: state.conduitData,
+            includeDuctbankOutlines: state.includeDuctbankOutlines,
+            conduitSpecs: CONDUIT_SPECS,
+            warningLog: message => console.warn(message)
+        });
+        state.trayData = model.trayData;
+        state.geometryWarnings = model.geometryWarnings;
+        if ((model.geometryWarnings.ductbanks.length || model.geometryWarnings.conduits.length) && typeof displayGeometryWarnings === 'function') {
             displayGeometryWarnings();
         }
-        const conduitCount = state.trayData.filter(t => t.raceway_type === 'conduit').length;
-        const hasSchedule = !!(
-            (state.ductbankData && state.ductbankData.ductbanks && state.ductbankData.ductbanks.some(db => (db.conduits || []).length)) ||
-            (state.conduitData && state.conduitData.length)
-        );
         if (typeof displayConduitCount === 'function') {
-            displayConduitCount(conduitCount, hasSchedule);
+            displayConduitCount(model.conduitCount, model.hasSchedule);
         }
         if (typeof updateRoutingReadiness === 'function') {
             updateRoutingReadiness();
         }
+    };
+
+    const loadSchedulesIntoSession = async () => {
+        const store = globalThis.dataStore || { getTrays, getCables, getDuctbanks, getConduits };
+        const trays = store.getTrays();
+        const cables = store.getCables();
+        state.ductbanksWithoutConduits = [];
+
+        const scheduledDuctbanks = store.getDuctbanks();
+        const scheduledConduits = store.getConduits();
+        const hasScheduledRaceways = (Array.isArray(scheduledDuctbanks) && scheduledDuctbanks.length > 0)
+            || (Array.isArray(scheduledConduits) && scheduledConduits.length > 0);
+        const loaded = hasScheduledRaceways
+            ? expandScheduledRaceways(scheduledDuctbanks, scheduledConduits)
+            : typeof loadConduits === 'function'
+                ? loadConduits()
+                : expandScheduledRaceways(scheduledDuctbanks, scheduledConduits);
+        const normalizedRaceways = normalizeDuctbankSchedule(loaded.ductbanks || [], loaded.conduits || []);
+        state.conduitsByDb = normalizedRaceways.conduitsByDuctbank;
+
+        if (trays.length > 0) {
+            state.manualTrays = normalizeTraySchedule(trays);
+        }
+        if (cables.length > 0) {
+            state.cableList = normalizeCableSchedule(cables, await ensureConductorProps(), {
+                warningLog: message => console.warn(message)
+            });
+        }
+        if ((loaded.ductbanks || []).length > 0) {
+            state.ductbankData = normalizedRaceways.ductbankData;
+            state.ductbanksWithoutConduits = normalizedRaceways.ductbanksWithoutConduits;
+            if (state.ductbanksWithoutConduits.length > 0) {
+                const fixUrl = 'racewayschedule.html?focus=ductbanks&expandAll=true&showConduitsWizard=true';
+                console.warn(`Ductbanks missing conduits: ${state.ductbanksWithoutConduits.join(', ')}. Go fix it: ${fixUrl}`);
+                const warning = document.getElementById('ductbank-no-conduits-warning');
+                if (warning) {
+                    const list = warning.querySelector('.db-list');
+                    if (list) list.textContent = state.ductbanksWithoutConduits.join(', ');
+                    const link = warning.querySelector('.fix-link');
+                    if (link) link.href = fixUrl;
+                    warning.style.display = '';
+                }
+            }
+        }
+        state.conduitData = normalizedRaceways.standaloneConduits;
+        rebuildTrayData();
     };
 
     const filterTable = (container, query) => {
@@ -1358,89 +1071,12 @@ async function initializeApp() {
         return valid;
     };
 
-    // --- Tray Sizing Helpers (from cabletrayfill) ---
-    const ALLOWABLE_AREA_BY_WIDTH = { 6:7.0, 9:10.5, 12:14.0, 18:21.0, 24:28.0, 30:32.5, 36:39.0 };
-    const STANDARD_WIDTHS = [6, 9, 12, 18, 24, 30, 36];
-
-    const sizeRank = (sizeStr) => {
-        if (!sizeStr) return -Infinity;
-        const s = sizeStr.trim().toUpperCase();
-        if (s.endsWith('KCMIL')) return 2000 + parseFloat(s);
-        const m = s.match(/(\d+)\/0\s*AWG/);
-        if (m) return 1000 + parseInt(m[1]);
-        const m2 = s.match(/#(\d+)\s*AWG/);
-        if (m2) return -parseInt(m2[1]);
-        return NaN;
-    };
-
-    const splitLargeSmall = (cables) => {
-        const large = [], small = [];
-        const rank1_0 = sizeRank('1/0 AWG');
-        const rank4_0 = sizeRank('4/0 AWG');
-        cables.forEach(c => {
-            const r = sizeRank(c.conductor_size);
-            if (c.isGroup || c.diameter >= 1.55 || (c.conductors === 1 && r >= rank1_0 && r <= rank4_0)) {
-                large.push(c);
-            } else {
-                small.push(c);
-            }
-        });
-        return { large, small };
-    };
-
-    const sumDiameters = arr => arr.reduce((s, c) => s + c.diameter, 0);
-    const sumAreas = arr => arr.reduce((s, c) => s + Math.PI * (c.diameter/2)**2, 0);
-    const getAllowableArea = (width, trayType) => {
-        const base = ALLOWABLE_AREA_BY_WIDTH[width] || 0;
-        return trayType === 'solid' ? base * 0.78 : base;
-    };
-
-    const computeNeededTrayWidth = (cables, trayType='ladder') => {
-        const { large, small } = splitLargeSmall(cables);
-        let widthNeededLarge = 0;
-        if (large.length > 0) {
-            const sumD = sumDiameters(large);
-            widthNeededLarge = trayType === 'solid' ? (sumD / 0.9) : sumD;
-        }
-        const areaNeededSmall = sumAreas(small);
-        for (const W of STANDARD_WIDTHS) {
-            if (W < widthNeededLarge) continue;
-            const allowA = getAllowableArea(W, trayType);
-            if (small.length === 0 || areaNeededSmall <= allowA) {
-                return W;
-            }
-        }
-        return null;
-    };
-
     const getRacewayRecommendation = (cables) => {
-        const count = cables.length;
-        let rec = 'conduit';
-        if (count <= CONTAINMENT_RULES.thresholds.conduit) {
-            rec = 'conduit';
-        } else if (count <= CONTAINMENT_RULES.thresholds.channel) {
-            rec = 'channel';
-        } else {
-            rec = 'tray';
-        }
-        let text = 'Recommended: ';
-        if (rec === 'conduit') {
-            const conduitType = elements.conduitType.value;
-            const spec = CONDUIT_SPECS[conduitType] || {};
-            const totalArea = cables.reduce((s, c) => s + Math.PI * (c.diameter/2)**2, 0);
-            /* NEC Chapter 9 Table 1 fill limits (see docs/standards.md) */
-            const fillPct = count === 1 ? 0.53 : count === 2 ? 0.31 : 0.40;
-            let tradeSize = null;
-            for (const size of Object.keys(spec)) {
-                if (totalArea <= spec[size] * fillPct) { tradeSize = size; break; }
-            }
-            text += tradeSize ? `${tradeSize}" Conduit` : 'Conduit';
-        } else {
-            const width = computeNeededTrayWidth(cables) || null;
-            const label = rec === 'tray' ? 'Tray' : 'Channel';
-            text += width ? `${width}" ${label}` : label;
-        }
-        return text;
+        return formatRacewayRecommendation(recommendRaceway(cables, {
+            thresholds: CONTAINMENT_RULES.thresholds,
+            conduitType: elements.conduitType.value,
+            conduitSpecs: CONDUIT_SPECS
+        }));
     };
 
     const buildFieldSegmentCableMap = (results) => {
@@ -1550,991 +1186,8 @@ async function initializeApp() {
 
     // --- CORE ROUTING LOGIC (JavaScript implementation of your Python backend) ---
 
-    class MinHeap {
-        constructor() {
-            this.heap = [];
-        }
-
-        push(node, priority) {
-            this.heap.push({ node, priority });
-            let i = this.heap.length - 1;
-            while (i > 0) {
-                const p = Math.floor((i - 1) / 2);
-                if (this.heap[p].priority <= this.heap[i].priority) break;
-                [this.heap[i], this.heap[p]] = [this.heap[p], this.heap[i]];
-                i = p;
-            }
-        }
-
-        pop() {
-            if (this.heap.length === 0) return null;
-            const min = this.heap[0];
-            const last = this.heap.pop();
-            if (this.heap.length > 0) {
-                this.heap[0] = last;
-                let i = 0;
-                while (true) {
-                    let l = 2 * i + 1;
-                    let r = 2 * i + 2;
-                    let smallest = i;
-                    if (l < this.heap.length && this.heap[l].priority < this.heap[smallest].priority) smallest = l;
-                    if (r < this.heap.length && this.heap[r].priority < this.heap[smallest].priority) smallest = r;
-                    if (smallest === i) break;
-                    [this.heap[i], this.heap[smallest]] = [this.heap[smallest], this.heap[i]];
-                    i = smallest;
-                }
-            }
-            return min.node;
-        }
-
-        isEmpty() {
-            return this.heap.length === 0;
-        }
-    }
-
-    class CableRoutingSystem {
-        constructor(options) {
-            this.fillLimit = options.fillLimit || 0.4;
-            // Proximity threshold is specified in inches; convert to feet for calculations
-            this.proximityThreshold = (options.proximityThreshold ?? 72.0) / 12.0;
-            this.fieldPenalty = options.fieldPenalty || 3.0;
-            this.sharedPenalty = options.sharedPenalty || 0.5;
-            // Limit how far apart generic field edges can be created to avoid
-            // generating a fully connected graph for large datasets
-            this.maxFieldEdge = options.maxFieldEdge || 1000;
-            // Limit how many field connections each node keeps to further
-            // reduce graph density and memory usage
-            this.maxFieldNeighbors = options.maxFieldNeighbors || 8;
-            // Optionally include ductbank outline segments lacking conduit IDs
-            this.includeDuctbankOutlines = options.includeDuctbankOutlines || false;
-            this.sharedFieldSegments = [];
-            this.trays = new Map();
-        }
-
-        addTraySegment(tray) {
-            const numSlots = Math.max(1, parseInt(tray.num_slots) || 1);
-            const slotArea = (tray.width * tray.height) / numSlots;
-            const maxFill  = slotArea * this.fillLimit;
-
-            // Parse slot_groups: JSON string or plain object → Map<slotIndex, groupName>
-            const slotGroups = new Map();
-            const raw = tray.slot_groups;
-            if (raw) {
-                try {
-                    const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
-                    for (const [k, v] of Object.entries(parsed)) {
-                        const idx = parseInt(k, 10);
-                        if (!isNaN(idx) && idx >= 0 && idx < numSlots)
-                            slotGroups.set(idx, String(v).trim());
-                    }
-                } catch { /* invalid JSON — treat as no slot-group mapping */ }
-            }
-
-            // Seed slotFills from current_fill for backward compatibility.
-            // Single-slot trays map current_fill → slotFills[0] directly.
-            // Multi-slot trays without per-slot data distribute fill evenly.
-            const existingFill = parseFloat(tray.current_fill) || 0;
-            const slotFills = new Array(numSlots).fill(0);
-            if (existingFill > 0) {
-                const fillPerSlot = existingFill / numSlots;
-                for (let i = 0; i < numSlots; i++) slotFills[i] = fillPerSlot;
-            }
-
-            // Preserve ductbank association for later use
-            this.trays.set(tray.tray_id, {
-                ...tray, ductbankTag: tray.ductbankTag,
-                numSlots, maxFill,
-                slotFills,
-                slotGroups,
-            });
-        }
-
-        // Return the slot index a cable should occupy, or -1 if no slot is available.
-        _findSlotForCable(tray, cableGroup) {
-            if (tray.slotGroups.size === 0) {
-                // No group mapping — use the slot with most remaining capacity.
-                let bestSlot = 0;
-                let bestRemaining = tray.maxFill - tray.slotFills[0];
-                for (let i = 1; i < tray.numSlots; i++) {
-                    const rem = tray.maxFill - tray.slotFills[i];
-                    if (rem > bestRemaining) { bestRemaining = rem; bestSlot = i; }
-                }
-                return bestSlot;
-            }
-            // Group mapping — find the slot whose group matches the cable group.
-            const group = (cableGroup || '').trim();
-            for (const [idx, slotGroup] of tray.slotGroups) {
-                if (!slotGroup || !group || slotGroup === group) return idx;
-            }
-            return -1; // no matching slot
-        }
-
-        // Return true when the cable fits in the correct slot for its group.
-        _trayHasCapacityForCable(tray, cableArea, cableGroup) {
-            const slot = this._findSlotForCable(tray, cableGroup);
-            if (slot < 0) return false;
-            return (tray.slotFills[slot] + cableArea) <= tray.maxFill;
-        }
-
-        // Treat parallel conduits within the same ductbank segment as sibling
-        // choices. Row/column offsets are ignored so corridor pathfinding and
-        // conduit fill allocation can be handled as separate decisions.
-        _ductbankCorridorKey(tray) {
-            const ductbankId = String(tray.ductbankTag || tray.ductbank_tag || tray.ductbank_id || '').trim();
-            if (!ductbankId || tray.conduit_id == null || tray.conduit_id === '') return '';
-            const start = [Number(tray.start_x), Number(tray.start_y), Number(tray.start_z)];
-            const end = [Number(tray.end_x), Number(tray.end_y), Number(tray.end_z)];
-            if (![...start, ...end].every(Number.isFinite)) return '';
-            const delta = end.map((value, index) => value - start[index]);
-            const length = Math.hypot(...delta);
-            if (length <= 1e-6) return '';
-            const direction = delta.map(value => value / length);
-            const firstDirection = direction.find(value => Math.abs(value) > 1e-6) || 0;
-            if (firstDirection < 0) direction.forEach((value, index) => { direction[index] = -value; });
-            const startStation = start.reduce((sum, value, index) => sum + value * direction[index], 0);
-            const endStation = end.reduce((sum, value, index) => sum + value * direction[index], 0);
-            return [
-                ductbankId.toUpperCase(),
-                ...direction.map(value => value.toFixed(5)),
-                Math.min(startStation, endStation).toFixed(2),
-                Math.max(startStation, endStation).toFixed(2)
-            ].join('|');
-        }
-
-        _selectDuctbankConduits(cableArea, cableGroup) {
-            const corridors = new Map();
-            this.trays.forEach(tray => {
-                const key = this._ductbankCorridorKey(tray);
-                if (!key) return;
-                if (!corridors.has(key)) corridors.set(key, []);
-                corridors.get(key).push(tray);
-            });
-
-            const selected = new Map();
-            corridors.forEach((siblings, key) => {
-                const eligible = siblings.filter(tray => {
-                    if (tray.allowed_cable_group && tray.allowed_cable_group !== cableGroup) return false;
-                    return this._trayHasCapacityForCable(tray, cableArea, cableGroup);
-                });
-                if (!eligible.length) return;
-                eligible.sort((left, right) => {
-                    const leftSlot = this._findSlotForCable(left, cableGroup);
-                    const rightSlot = this._findSlotForCable(right, cableGroup);
-                    const leftProjected = left.maxFill
-                        ? (left.slotFills[leftSlot] + cableArea) / left.maxFill
-                        : Infinity;
-                    const rightProjected = right.maxFill
-                        ? (right.slotFills[rightSlot] + cableArea) / right.maxFill
-                        : Infinity;
-                    if (Math.abs(leftProjected - rightProjected) > 1e-9) return leftProjected - rightProjected;
-                    const leftRow = Number.isFinite(Number(left.row)) ? Number(left.row) : Number.MAX_SAFE_INTEGER;
-                    const rightRow = Number.isFinite(Number(right.row)) ? Number(right.row) : Number.MAX_SAFE_INTEGER;
-                    if (leftRow !== rightRow) return leftRow - rightRow;
-                    const leftColumn = Number.isFinite(Number(left.column ?? left.col)) ? Number(left.column ?? left.col) : Number.MAX_SAFE_INTEGER;
-                    const rightColumn = Number.isFinite(Number(right.column ?? right.col)) ? Number(right.column ?? right.col) : Number.MAX_SAFE_INTEGER;
-                    if (leftColumn !== rightColumn) return leftColumn - rightColumn;
-                    return String(left.tray_id).localeCompare(String(right.tray_id), undefined, { numeric: true });
-                });
-                selected.set(key, eligible[0].tray_id);
-            });
-            return selected;
-        }
-
-        updateTrayFill(trayIds, cableArea, cableGroup = '') {
-             if (!Array.isArray(trayIds)) return;
-             trayIds.forEach(trayId => {
-                if (!this.trays.has(trayId)) return;
-                const tray = this.trays.get(trayId);
-                const slot = this._findSlotForCable(tray, cableGroup);
-                if (slot >= 0) tray.slotFills[slot] += cableArea;
-             });
-        }
-
-        getTrayUtilization() {
-            const utilization = {};
-            for (const [id, tray] of this.trays.entries()) {
-                const totalFill   = tray.slotFills.reduce((a, b) => a + b, 0);
-                const worstFill   = Math.max(...tray.slotFills);
-                const totalMax    = tray.maxFill * tray.numSlots;
-                const slots = tray.slotFills.map((fill, i) => ({
-                    slot_index: i,
-                    group: tray.slotGroups.get(i) ?? null,
-                    current_fill: fill,
-                    max_fill: tray.maxFill,
-                    utilization_percentage: tray.maxFill ? (fill / tray.maxFill) * 100 : 0,
-                }));
-                utilization[id] = {
-                    current_fill: totalFill,
-                    max_fill: totalMax,
-                    utilization_percentage: totalMax ? (totalFill / totalMax) * 100 : 0,
-                    available_capacity: totalMax - totalFill,
-                    worst_slot_utilization: tray.maxFill ? (worstFill / tray.maxFill) * 100 : 0,
-                    slots,
-                };
-            }
-            return utilization;
-        }
-
-        // Geometric helper: 3D distance
-        distance(p1, p2) {
-            return Math.sqrt(Math.pow(p1[0] - p2[0], 2) + Math.pow(p1[1] - p2[1], 2) + Math.pow(p1[2] - p2[2], 2));
-        }
-
-        // Manhattan distance used for field routing
-        manhattanDistance(p1, p2) {
-            return Math.abs(p1[0] - p2[0]) + Math.abs(p1[1] - p2[1]) + Math.abs(p1[2] - p2[2]);
-        }
-        
-        // Geometric helper: Project point p onto line segment [a, b]
-        projectPointOnSegment(p, a, b) {
-            const ab = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
-            const ap = [p[0] - a[0], p[1] - a[1], p[2] - a[2]];
-            const magAbSq = ab[0]*ab[0] + ab[1]*ab[1] + ab[2]*ab[2];
-            if (magAbSq === 0) return a;
-            
-            const dot = ap[0]*ab[0] + ap[1]*ab[1] + ap[2]*ab[2];
-            const t = Math.max(0, Math.min(1, dot / magAbSq));
-            
-            return [a[0] + t * ab[0], a[1] + t * ab[1], a[2] + t * ab[2]];
-        }
-
-        _consolidateSegments(segments) {
-            if (segments.length === 0) return [];
-
-            const consolidated = [];
-            let current = { ...segments[0] };
-
-            for (let i = 1; i < segments.length; i++) {
-                const next = segments[i];
-                // Consolidate consecutive tray segments belonging to the same tray
-                if (next.type === current.type && next.type === 'tray' && next.tray_id === current.tray_id) {
-                    current.end = next.end; // Extend the end point
-                    current.length += next.length; // Add to the length
-                } else {
-                    consolidated.push(current);
-                    current = { ...next };
-                }
-            }
-            consolidated.push(current); // Add the last segment
-            return consolidated;
-        }
-
-        _segmentOrientation(seg) {
-            if (seg.start[0] !== seg.end[0]) return { axis: 0, const1: 1, const2: 2 };
-            if (seg.start[1] !== seg.end[1]) return { axis: 1, const1: 0, const2: 2 };
-            return { axis: 2, const1: 0, const2: 1 };
-        }
-
-        _segmentsOverlap(segA, segB, tol) {
-            const oA = this._segmentOrientation(segA);
-            const oB = this._segmentOrientation(segB);
-            if (oA.axis !== oB.axis) return null;
-            if (Math.abs(segA.start[oA.const1] - segB.start[oB.const1]) > tol) return null;
-            if (Math.abs(segA.start[oA.const2] - segB.start[oB.const2]) > tol) return null;
-
-            const a1 = Math.min(segA.start[oA.axis], segA.end[oA.axis]);
-            const a2 = Math.max(segA.start[oA.axis], segA.end[oA.axis]);
-            const b1 = Math.min(segB.start[oB.axis], segB.end[oB.axis]);
-            const b2 = Math.max(segB.start[oB.axis], segB.end[oB.axis]);
-
-            const start = Math.max(a1, b1);
-            const end = Math.min(a2, b2);
-            if (end + tol < start) return null;
-
-            const pointStart = segA.start.slice();
-            const pointEnd = segA.start.slice();
-            pointStart[oA.axis] = start;
-            pointEnd[oA.axis] = end;
-            return { start: pointStart, end: pointEnd };
-        }
-
-        findCommonFieldRoutes(routes, tolerance = 1, cableMap = null) {
-            const map = {};
-            const keyFor = (s, e, group) => {
-                const rounded = arr => arr.map(v => v.toFixed(2)).join(',');
-                return `${rounded(s)}|${rounded(e)}|${group || ''}`;
-            };
-            for (let i = 0; i < routes.length; i++) {
-                const a = routes[i];
-                for (let j = i + 1; j < routes.length; j++) {
-                    const b = routes[j];
-                    if (a.allowed_cable_group && b.allowed_cable_group && a.allowed_cable_group !== b.allowed_cable_group) continue;
-                    for (const segA of a.segments) {
-                        if (segA.type !== 'field') continue;
-                        for (const segB of b.segments) {
-                            if (segB.type !== 'field') continue;
-                            const ov = this._segmentsOverlap(segA, segB, tolerance);
-                            if (ov) {
-                                const key = keyFor(ov.start, ov.end, a.allowed_cable_group);
-                                if (!map[key]) {
-                                    map[key] = { start: ov.start, end: ov.end, group: a.allowed_cable_group, cables: new Set() };
-                                }
-                                map[key].cables.add(a.label || a.name);
-                                map[key].cables.add(b.label || b.name);
-                            }
-                        }
-                    }
-                }
-            }
-            let count = 1;
-            return Object.values(map).map(r => {
-                const cables = Array.from(r.cables);
-                let totalArea = 0;
-                if (cableMap) {
-                    cables.forEach(n => {
-                        const d = cableMap.get(n);
-                        if (d) totalArea += Math.PI * (d / 2) ** 2;
-                    });
-                }
-                return {
-                    name: `Route ${count++}`,
-                    start: r.start,
-                    end: r.end,
-                    allowed_cable_group: r.group,
-                    cables,
-                    total_area: totalArea,
-                    cable_count: cables.length
-                };
-            });
-        }
-
-        _isSharedSegment(seg, tol = 0.1) {
-            for (const existing of this.sharedFieldSegments) {
-                if (this._segmentsOverlap(seg, existing, tol)) return true;
-            }
-            return false;
-        }
-
-        _removeTrayBacktracking(segments) {
-            const result = [];
-            let i = 0;
-            while (i < segments.length) {
-                const curr = { ...segments[i] };
-                if (curr.type === 'tray' && i + 1 < segments.length) {
-                    const next = { ...segments[i + 1] };
-                    if (next.type === 'field') {
-                        const oTray = this._segmentOrientation(curr);
-                        const oField = this._segmentOrientation(next);
-                        if (oTray.axis === oField.axis) {
-                            const trayDir = Math.sign(curr.end[oTray.axis] - curr.start[oTray.axis]);
-                            const fieldDir = Math.sign(next.end[oField.axis] - next.start[oField.axis]);
-                            if (trayDir !== 0 && fieldDir !== 0 && trayDir !== fieldDir) {
-                                const overshoot = Math.min(Math.abs(next.end[oField.axis] - next.start[oField.axis]), curr.length);
-                                curr.end[oTray.axis] -= trayDir * overshoot;
-                                curr.length -= overshoot;
-                                next.start[oField.axis] -= trayDir * overshoot;
-                                next.length -= overshoot;
-                                if (curr.length > 0.0001) result.push(curr);
-                                if (next.length > 0.0001) {
-                                    result.push(next);
-                                }
-                                i += 2;
-                                continue;
-                            }
-                        }
-                    }
-                }
-                result.push(curr);
-                i++;
-            }
-            return result;
-        }
-
-        prepareBaseGraph() {
-            const graph = { nodes: {}, edges: {} };
-            const addNode = (id, point, type = 'generic') => {
-                graph.nodes[id] = { point, type };
-                graph.edges[id] = {};
-            };
-            const addEdge = (id1, id2, weight, type, trayId = null) => {
-                if (!graph.edges[id1]) graph.edges[id1] = {};
-                if (!graph.edges[id2]) graph.edges[id2] = {};
-                graph.edges[id1][id2] = { weight, type, trayId };
-                graph.edges[id2][id1] = { weight, type, trayId };
-            };
-
-            const allTrays = Array.from(this.trays.values());
-            const missingDuctbank = allTrays.filter(t => t.raceway_type === 'ductbank' &&
-                (t.conduit_id == null || t.conduit_id === ''));
-            if (missingDuctbank.length) {
-                console.warn(`${missingDuctbank.length} ductbank segment(s) without conduit_id; ` +
-                    (this.includeDuctbankOutlines ? 'treated as generic raceways.' : 'ignored.'));
-            }
-            let trays;
-            if (this.includeDuctbankOutlines) {
-                let placeholder = 0;
-                trays = allTrays.map(t => {
-                    if (t.raceway_type === 'ductbank' && (t.conduit_id == null || t.conduit_id === '')) {
-                        const tray_id = t.tray_id || `ductbank_outline_${placeholder++}`;
-                        return { ...t, tray_id };
-                    }
-                    return t;
-                });
-            } else {
-                trays = allTrays.filter(t => t.raceway_type !== 'ductbank' ||
-                    (t.conduit_id != null && t.conduit_id !== ''));
-            }
-
-            trays.forEach(tray => {
-                const startId = `${tray.tray_id}_start`;
-                const endId = `${tray.tray_id}_end`;
-                addNode(startId, [tray.start_x, tray.start_y, tray.start_z], 'tray_endpoint');
-                addNode(endId, [tray.end_x, tray.end_y, tray.end_z], 'tray_endpoint');
-                const trayLength = this.distance(graph.nodes[startId].point, graph.nodes[endId].point);
-                addEdge(startId, endId, trayLength, 'tray', tray.tray_id);
-            });
-
-            trays.forEach(trayA => {
-                const startA = `${trayA.tray_id}_start`;
-                const endA = `${trayA.tray_id}_end`;
-                const endpoints = [
-                    { id: startA, point: graph.nodes[startA].point },
-                    { id: endA, point: graph.nodes[endA].point }
-                ];
-                trays.forEach(trayB => {
-                    if (trayA.tray_id === trayB.tray_id) return;
-                    const startB = `${trayB.tray_id}_start`;
-                    const endB = `${trayB.tray_id}_end`;
-                    const a = graph.nodes[startB].point;
-                    const b = graph.nodes[endB].point;
-                    endpoints.forEach(ep => {
-                        const proj = this.projectPointOnSegment(ep.point, a, b);
-                        if (this.distance(ep.point, proj) < 0.1) {
-                            const projId = `${ep.id}_on_${trayB.tray_id}`;
-                            addNode(projId, proj, 'projection');
-                            addEdge(ep.id, projId, 0.1, 'tray_connection', trayB.tray_id);
-                            addEdge(projId, startB, this.distance(proj, a), 'tray', trayB.tray_id);
-                            addEdge(projId, endB, this.distance(proj, b), 'tray', trayB.tray_id);
-                        }
-                    });
-                });
-            });
-
-            const nodeIds = Object.keys(graph.nodes);
-            const candidates = {};
-            nodeIds.forEach(id => candidates[id] = []);
-
-            for (let i = 0; i < nodeIds.length; i++) {
-                for (let j = i + 1; j < nodeIds.length; j++) {
-                    const id1 = nodeIds[i];
-                    const id2 = nodeIds[j];
-                    const p1 = graph.nodes[id1].point;
-                    const p2 = graph.nodes[id2].point;
-
-                    const isSameTray = id1.startsWith(id2.split('_')[0]) && id2.startsWith(id1.split('_')[0]);
-                    if (graph.edges[id1][id2] || (id1.includes('_') && isSameTray)) continue;
-
-                    const dist = this.manhattanDistance(p1, p2);
-                    if (dist > this.maxFieldEdge) continue;
-                    candidates[id1].push({ id: id2, dist });
-                    candidates[id2].push({ id: id1, dist });
-                }
-            }
-
-            nodeIds.forEach(id1 => {
-                candidates[id1].sort((a,b) => a.dist - b.dist);
-                candidates[id1].slice(0, this.maxFieldNeighbors).forEach(({id: id2, dist}) => {
-                    if (graph.edges[id1][id2]) return;
-                    let weight, type;
-                    if (dist < 0.1) {
-                        weight = 0.1;
-                        type = 'tray_connection';
-                    } else {
-                        weight = dist * this.fieldPenalty;
-                        type = 'field';
-                    }
-                    addEdge(id1, id2, weight, type);
-                });
-            });
-
-            this.baseGraph = graph;
-        }
-
-        recordSharedFieldSegments(segments) {
-            segments.forEach(s => {
-                if (s.type === 'field') {
-                    this.sharedFieldSegments.push({ start: s.start.slice(), end: s.end.slice() });
-                }
-            });
-        }
-
-        calculateRoute(startPoint, endPoint, cableArea, allowedGroup) {
-            if (!this.baseGraph) this.prepareBaseGraph();
-            const t0 = performance.now();
-            // 1. Start from the precomputed graph
-            const cloneGraph = (base) => {
-                const g = { nodes: {}, edges: {} };
-                for (const [id, n] of Object.entries(base.nodes)) {
-                    g.nodes[id] = { point: n.point.slice(), type: n.type };
-                }
-                for (const [id, edges] of Object.entries(base.edges)) {
-                    g.edges[id] = {};
-                    for (const [k, e] of Object.entries(edges)) {
-                        g.edges[id][k] = { weight: e.weight, type: e.type, trayId: e.trayId };
-                    }
-                }
-                return g;
-            };
-            const graph = cloneGraph(this.baseGraph);
-            const selectedDuctbankConduits = this._selectDuctbankConduits(cableArea, allowedGroup);
-            const graphNodesForTray = trayId => {
-                const id = String(trayId);
-                return Object.keys(graph.nodes).filter(nodeId =>
-                    nodeId === `${id}_start` ||
-                    nodeId === `${id}_end` ||
-                    nodeId.startsWith(`${id}_start_on_`) ||
-                    nodeId.startsWith(`${id}_end_on_`) ||
-                    nodeId.endsWith(`_on_${id}`)
-                );
-            };
-
-            // Remove trays without remaining capacity
-            this.trays.forEach(tray => {
-                const unavailable = !this._trayHasCapacityForCable(tray, cableArea, allowedGroup) ||
-                    (tray.allowed_cable_group &&
-                     tray.allowed_cable_group !== allowedGroup);
-                const corridorKey = this._ductbankCorridorKey(tray);
-                const selectedTrayId = corridorKey ? selectedDuctbankConduits.get(corridorKey) : '';
-                const unselectedSibling = !!selectedTrayId && selectedTrayId !== tray.tray_id;
-                if (unavailable || unselectedSibling) {
-                    const remove = graphNodesForTray(tray.tray_id);
-                    remove.forEach(n => {
-                        delete graph.nodes[n];
-                        delete graph.edges[n];
-                        Object.keys(graph.edges).forEach(k => { if (graph.edges[k]) delete graph.edges[k][n]; });
-                    });
-                }
-            });
-
-            const addNode = (id, point, type = 'generic') => {
-                graph.nodes[id] = { point, type };
-                graph.edges[id] = {};
-            };
-            const addEdge = (id1, id2, weight, type, trayId = null) => {
-                if (!graph.edges[id1]) graph.edges[id1] = {};
-                if (!graph.edges[id2]) graph.edges[id2] = {};
-                graph.edges[id1][id2] = { weight, type, trayId };
-                graph.edges[id2][id1] = { weight, type, trayId };
-            };
-
-            addNode('start', startPoint, 'start');
-            addNode('end', endPoint, 'end');
-
-            const nodeIds = Object.keys(graph.nodes);
-            nodeIds.forEach(id => {
-                if (id === 'start' || id === 'end') return;
-                const p = graph.nodes[id].point;
-                const segS = { start: startPoint, end: p };
-                const segE = { start: endPoint, end: p };
-                const penS = this._isSharedSegment(segS) ? this.fieldPenalty * this.sharedPenalty : this.fieldPenalty;
-                const penE = this._isSharedSegment(segE) ? this.fieldPenalty * this.sharedPenalty : this.fieldPenalty;
-                addEdge('start', id, this.manhattanDistance(startPoint, p) * penS, 'field');
-                addEdge('end', id, this.manhattanDistance(endPoint, p) * penE, 'field');
-            });
-
-            const segSE = { start: startPoint, end: endPoint };
-            const penSE = this._isSharedSegment(segSE) ? this.fieldPenalty * this.sharedPenalty : this.fieldPenalty;
-            addEdge('start', 'end', this.manhattanDistance(startPoint, endPoint) * penSE, 'field');
-            
-            // Add projection nodes for start/end points onto trays
-            this.trays.forEach(tray => {
-                const startId = `${tray.tray_id}_start`;
-                if (!graph.nodes[startId]) return; // Skip if tray was full
-                
-                const a = graph.nodes[startId].point;
-                const b = graph.nodes[`${tray.tray_id}_end`].point;
-                
-                // Project cable's start point
-                const projStart = this.projectPointOnSegment(startPoint, a, b);
-                const distToProjStart = this.manhattanDistance(startPoint, projStart);
-                if (distToProjStart <= this.proximityThreshold) {
-                    const projId = `proj_start_on_${tray.tray_id}`;
-                    addNode(projId, projStart, 'projection');
-                    const penStart = this._isSharedSegment({ start: startPoint, end: projStart }) ? this.fieldPenalty * this.sharedPenalty : this.fieldPenalty;
-                    addEdge('start', projId, distToProjStart * penStart, 'field');
-                    addEdge(projId, startId, this.distance(projStart, a), 'tray', tray.tray_id);
-                    addEdge(projId, `${tray.tray_id}_end`, this.distance(projStart, b), 'tray', tray.tray_id);
-                }
-
-                // Project cable's end point
-                const projEnd = this.projectPointOnSegment(endPoint, a, b);
-                const distToProjEnd = this.manhattanDistance(endPoint, projEnd);
-                if (distToProjEnd <= this.proximityThreshold) {
-                    const projId = `proj_end_on_${tray.tray_id}`;
-                    addNode(projId, projEnd, 'projection');
-                    const penEnd = this._isSharedSegment({ start: endPoint, end: projEnd }) ? this.fieldPenalty * this.sharedPenalty : this.fieldPenalty;
-                    addEdge('end', projId, distToProjEnd * penEnd, 'field');
-                    addEdge(projId, startId, this.distance(projEnd, a), 'tray', tray.tray_id);
-                    addEdge(projId, `${tray.tray_id}_end`, this.distance(projEnd, b), 'tray', tray.tray_id);
-                }
-            });
-            
-            // 2. Dijkstra's Algorithm
-            const distances = {};
-            const prev = {};
-            Object.keys(graph.nodes).forEach(node => distances[node] = Infinity);
-            distances['start'] = 0;
-
-            const pq = new MinHeap();
-            pq.push('start', 0);
-            const visited = new Set();
-
-            while (!pq.isEmpty()) {
-                const u = pq.pop();
-                if (visited.has(u)) continue;
-                visited.add(u);
-                if (u === 'end') break;
-
-                for (const v in graph.edges[u]) {
-                    const edge = graph.edges[u][v];
-                    const alt = distances[u] + edge.weight;
-                    if (alt < distances[v]) {
-                        distances[v] = alt;
-                        prev[v] = { node: u, edge };
-                        pq.push(v, alt);
-                    }
-                }
-            }
-
-            // 3. Reconstruct path and results
-            if (distances['end'] === Infinity) {
-                const elapsedFail = performance.now() - t0;
-                if (window.debug?.enabled) window.debug.log(`Route failed ${startPoint.join(',')} -> ${endPoint.join(',')} (${elapsedFail.toFixed(1)}ms)`);
-                return { success: false, error: "No valid path could be found." };
-            }
-
-            const path = [];
-            let current = 'end';
-            while (current) {
-                path.unshift(current);
-                current = prev[current] ? prev[current].node : null;
-            }
-            
-            let totalLength = 0;
-            let fieldRoutedLength = 0;
-            const routeSegments = [];
-            const traySegments = new Set();
-
-            for (let i = 0; i < path.length - 1; i++) {
-                const u = path[i];
-                const v = path[i+1];
-                const edge = graph.edges[u][v] || graph.edges[v][u];
-                const p1 = graph.nodes[u].point;
-                const p2 = graph.nodes[v].point;
-                const length = edge.type === 'field' ? this.manhattanDistance(p1, p2) : this.distance(p1, p2);
-                totalLength += length;
-                if (edge.type === 'field') {
-                    fieldRoutedLength += length;
-                }
-                let type = edge.type;
-                if (type === 'tray_connection') type = 'tray'; // Treat connections as trays for segment breakdown
-                
-                let tray_id = edge.trayId;
-                if (!tray_id) { // Infer tray_id if not on edge
-                    const node_id = u.includes('_') ? u : v;
-                    tray_id = node_id.split('_')[0]
-                }
-                if (type === 'tray') traySegments.add(tray_id);
-                const conduit_id = this.trays.get(tray_id)?.conduit_id;
-                const ductbankTag = this.trays.get(tray_id)?.ductbankTag;
-
-                if (edge.type === 'field') {
-                    let curr = p1.slice();
-                    if (p2[0] !== curr[0]) {
-                        const next = [p2[0], curr[1], curr[2]];
-                        routeSegments.push({ type, start: curr, end: next, length: Math.abs(p2[0]-curr[0]), tray_id, conduit_id, ductbankTag });
-                        curr = next;
-                    }
-                    if (p2[1] !== curr[1]) {
-                        const next = [curr[0], p2[1], curr[2]];
-                        routeSegments.push({ type, start: curr, end: next, length: Math.abs(p2[1]-curr[1]), tray_id, conduit_id, ductbankTag });
-                        curr = next;
-                    }
-                    if (p2[2] !== curr[2]) {
-                        const next = [curr[0], curr[1], p2[2]];
-                        routeSegments.push({ type, start: curr, end: next, length: Math.abs(p2[2]-curr[2]), tray_id, conduit_id, ductbankTag });
-                        curr = next;
-                    }
-                } else {
-                    routeSegments.push({ type, start: p1, end: p2, length, tray_id, conduit_id, ductbankTag });
-                }
-            }
-
-            const cleaned = this._removeTrayBacktracking(routeSegments);
-            const result = {
-                success: true,
-                total_length: totalLength,
-                field_routed_length: fieldRoutedLength,
-                route_segments: this._consolidateSegments(cleaned),
-                tray_segments: Array.from(traySegments),
-                warnings: [],
-            };
-            const elapsed = performance.now() - t0;
-            if (window.debug?.enabled) {
-                const segSummary = result.route_segments.map(s => `${s.type}${s.tray_id?':' + s.tray_id:''}`).join(' -> ');
-                window.debug.log(`Route ${startPoint.join(',')} -> ${endPoint.join(',')} (${elapsed.toFixed(1)}ms)`, segSummary);
-            }
-            return result;
-        }
-    }
 
     // --- EVENT HANDLERS & UI LOGIC (This part remains the same) ---
-    
-    const getSampleTrays = () => [
-        {"tray_id": "ENTRY-HV", "start_x": 0, "start_y": -12, "start_z": 10, "end_x": 0, "end_y": 0, "end_z": 10, "width": 16, "height": 3.94, "current_fill": 2.40, "allowed_cable_group": "HV", "shape": "STR"},
-        {"tray_id": "ENTRY-LV", "start_x": 40, "start_y": 12, "start_z": 30, "end_x": 40, "end_y": 0, "end_z": 30, "width": 12, "height": 3.15, "current_fill": 1.80, "allowed_cable_group": "LV", "shape": "STR"},
-        {"tray_id": "H1-A", "start_x": 0, "start_y": 0, "start_z": 10, "end_x": 40, "end_y": 0, "end_z": 10, "width": 16, "height": 3.94, "current_fill": 9.30,"allowed_cable_group": "HV", "shape": "STR"},
-        {"tray_id": "H1-B", "start_x": 40, "start_y": 0, "start_z": 10, "end_x": 80, "end_y": 0, "end_z": 10, "width": 16, "height": 3.94, "current_fill": 6.98,"allowed_cable_group": "HV", "shape": "STR"},
-        {"tray_id": "H1-C", "start_x": 80, "start_y": 0, "start_z": 10, "end_x": 120, "end_y": 0, "end_z": 10, "width": 16, "height": 3.94, "current_fill": 12.71,"allowed_cable_group": "HV", "shape": "STR"},
-        {"tray_id": "H2-A", "start_x": 0, "start_y": 0, "start_z": 30, "end_x": 40, "end_y": 0, "end_z": 30, "width": 12, "height": 3.15, "current_fill": 4.96,"allowed_cable_group": "LV", "shape": "STR"},
-        {"tray_id": "H2-B", "start_x": 40, "start_y": 0, "start_z": 30, "end_x": 80, "end_y": 0, "end_z": 30, "width": 12, "height": 3.15, "current_fill": 8.99,"allowed_cable_group": "LV", "shape": "STR"},
-        {"tray_id": "H2-C", "start_x": 80, "start_y": 0, "start_z": 30, "end_x": 120, "end_y": 0, "end_z": 30, "width": 12, "height": 3.15, "current_fill": 3.26,"allowed_cable_group": "LV", "shape": "STR"},
-        {"tray_id": "V1", "start_x": 40, "start_y": 0, "start_z": 10, "end_x": 40, "end_y": 0, "end_z": 30, "width": 8, "height": 2.36, "current_fill": 2.79,"allowed_cable_group": "HV", "shape": "STR"},
-        {"tray_id": "V2", "start_x": 80, "start_y": 0, "start_z": 10, "end_x": 80, "end_y": 0, "end_z": 30, "width": 8, "height": 2.36, "current_fill": 3.41,"allowed_cable_group": "LV", "shape": "STR"},
-        {"tray_id": "C1", "start_x": 60, "start_y": 0, "start_z": 10, "end_x": 60, "end_y": 40, "end_z": 10, "width": 9, "height": 2.95, "current_fill": 5.43,"allowed_cable_group": "HV", "shape": "STR"},
-        {"tray_id": "C2", "start_x": 100, "start_y": 0, "start_z": 30, "end_x": 100, "end_y": 60, "end_z": 30, "width": 9, "height": 2.95, "current_fill": 6.36,"allowed_cable_group": "LV", "shape": "STR"},
-        {"tray_id": "B1", "start_x": 60, "start_y": 40, "start_z": 10, "end_x": 60, "end_y": 80, "end_z": 10, "width": 6, "height": 1.97, "current_fill": 1.86,"allowed_cable_group": "HV", "shape": "STR"},
-        {"tray_id": "B2", "start_x": 100, "start_y": 60, "start_z": 30, "end_x": 100, "end_y": 100, "end_z": 30, "width": 6, "height": 1.97, "current_fill": 1.40,"allowed_cable_group": "LV", "shape": "STR"},
-        {"tray_id": "TRUNK", "start_x": 0, "start_y": 20, "start_z": 50, "end_x": 120, "end_y": 20, "end_z": 50, "width": 24, "height": 5.91, "current_fill": 27.90,"allowed_cable_group": "HV", "shape": "STR"},
-        {"tray_id": "EQ1", "start_x": 20, "start_y": 0, "start_z": 10, "end_x": 20, "end_y": 15, "end_z": 5, "width": 4, "height": 1.57, "current_fill": 1.24,"allowed_cable_group": "HV", "shape": "STR"},
-        {"tray_id": "EQ2", "start_x": 100, "start_y": 60, "start_z": 30, "end_x": 110, "end_y": 90, "end_z": 20, "width": 4, "height": 1.57, "current_fill": 0.93,"allowed_cable_group": "LV", "shape": "STR"},
-        {"tray_id": "CONN1", "start_x": 120, "start_y": 0, "start_z": 10, "end_x": 120, "end_y": 20, "end_z": 25, "width": 8, "height": 2.95, "current_fill": 3.10,"allowed_cable_group": "HV", "shape": "STR"},
-        {"tray_id": "CONN2", "start_x": 120, "start_y": 20, "start_z": 25, "end_x": 120, "end_y": 20, "end_z": 50, "width": 8, "height": 2.95, "current_fill": 2.33,"allowed_cable_group": "HV", "shape": "STR"},
-        {"tray_id": "INST-ENTRY", "start_x": 0, "start_y": -40, "start_z": 20, "end_x": 0, "end_y": -20, "end_z": 20, "width": 6, "height": 2.00, "current_fill": 0.70, "allowed_cable_group": "INSTRUMENT", "shape": "STR"},
-        {"tray_id": "INST-A", "start_x": 0, "start_y": -20, "start_z": 20, "end_x": 60, "end_y": -20, "end_z": 20, "width": 6, "height": 2.00, "current_fill": 1.20, "allowed_cable_group": "INSTRUMENT", "shape": "STR"},
-        {"tray_id": "INST-B", "start_x": 60, "start_y": -20, "start_z": 20, "end_x": 60, "end_y": 70, "end_z": 20, "width": 6, "height": 2.00, "current_fill": 1.50, "allowed_cable_group": "INSTRUMENT", "shape": "STR"},
-        {"tray_id": "INST-C", "start_x": 60, "start_y": 70, "start_z": 20, "end_x": 110, "end_y": 70, "end_z": 20, "width": 6, "height": 2.00, "current_fill": 0.90, "allowed_cable_group": "INSTRUMENT", "shape": "STR"},
-        {"tray_id": "COMM-ENTRY", "start_x": 20, "start_y": 30, "start_z": 45, "end_x": 20, "end_y": 40, "end_z": 45, "width": 8, "height": 2.00, "current_fill": 0.80, "allowed_cable_group": "COMMUNICATION", "shape": "STR"},
-        {"tray_id": "COMM-A", "start_x": 20, "start_y": 40, "start_z": 45, "end_x": 70, "end_y": 40, "end_z": 45, "width": 8, "height": 2.00, "current_fill": 1.10, "allowed_cable_group": "COMMUNICATION", "shape": "STR"},
-        {"tray_id": "COMM-B", "start_x": 70, "start_y": 40, "start_z": 45, "end_x": 70, "end_y": 95, "end_z": 45, "width": 8, "height": 2.00, "current_fill": 1.30, "allowed_cable_group": "COMMUNICATION", "shape": "STR"},
-        {"tray_id": "COMM-C", "start_x": 70, "start_y": 95, "start_z": 45, "end_x": 120, "end_y": 95, "end_z": 45, "width": 8, "height": 2.00, "current_fill": 0.60, "allowed_cable_group": "COMMUNICATION", "shape": "STR"}
-    ];
-
-    const getSampleDuctbanks = () => ({
-        ductbanks: [
-            {
-                id: 'DB-HV-01',
-                tag: 'DB-HV-01',
-                width: 32,
-                height: 24,
-                conduit_spacing: 8,
-                outline: [[-60, -12, -8], [0, -12, -8]],
-                conduits: [
-                    { id: 'HV-C1', conduit_id: 'HV-C1', ductbankTag: 'DB-HV-01', type: 'PVC Sch 40', trade_size: '4', diameter: 4, row: 1, column: 1, path: [[-60, -12, -8], [0, -12, -8]], allowed_cable_group: 'HV' },
-                    { id: 'HV-C2', conduit_id: 'HV-C2', ductbankTag: 'DB-HV-01', type: 'PVC Sch 40', trade_size: '4', diameter: 4, row: 1, column: 2, path: [[-60, -12, -8], [0, -12, -8]], allowed_cable_group: 'HV' },
-                    { id: 'HV-C3', conduit_id: 'HV-C3', ductbankTag: 'DB-HV-01', type: 'PVC Sch 40', trade_size: '4', diameter: 4, row: 2, column: 1, path: [[-60, -12, -8], [0, -12, -8]], allowed_cable_group: 'HV' },
-                    { id: 'HV-C4', conduit_id: 'HV-C4', ductbankTag: 'DB-HV-01', type: 'PVC Sch 40', trade_size: '4', diameter: 4, row: 2, column: 2, path: [[-60, -12, -8], [0, -12, -8]], allowed_cable_group: 'HV' }
-                ]
-            },
-            {
-                id: 'DB-LV-01',
-                tag: 'DB-LV-01',
-                width: 32,
-                height: 24,
-                conduit_spacing: 8,
-                outline: [[-60, 12, -8], [40, 12, -8]],
-                conduits: [
-                    { id: 'LV-C1', conduit_id: 'LV-C1', ductbankTag: 'DB-LV-01', type: 'PVC Sch 40', trade_size: '4', diameter: 4, row: 1, column: 1, path: [[-60, 12, -8], [40, 12, -8]], allowed_cable_group: 'LV' },
-                    { id: 'LV-C2', conduit_id: 'LV-C2', ductbankTag: 'DB-LV-01', type: 'PVC Sch 40', trade_size: '4', diameter: 4, row: 1, column: 2, path: [[-60, 12, -8], [40, 12, -8]], allowed_cable_group: 'LV' },
-                    { id: 'LV-C3', conduit_id: 'LV-C3', ductbankTag: 'DB-LV-01', type: 'PVC Sch 40', trade_size: '4', diameter: 4, row: 2, column: 1, path: [[-60, 12, -8], [40, 12, -8]], allowed_cable_group: 'LV' },
-                    { id: 'LV-C4', conduit_id: 'LV-C4', ductbankTag: 'DB-LV-01', type: 'PVC Sch 40', trade_size: '4', diameter: 4, row: 2, column: 2, path: [[-60, 12, -8], [40, 12, -8]], allowed_cable_group: 'LV' }
-                ]
-            }
-        ]
-    });
-
-    const getSampleRiserConduits = () => [
-        {
-            conduit_id: 'RISER-HV-01',
-            tray_id: 'RISER-HV-01',
-            type: 'RMC',
-            trade_size: '4',
-            diameter: 4,
-            start_x: 0,
-            start_y: -12,
-            start_z: -8,
-            end_x: 0,
-            end_y: -12,
-            end_z: 10,
-            allowed_cable_group: 'HV'
-        },
-        {
-            conduit_id: 'RISER-LV-01',
-            tray_id: 'RISER-LV-01',
-            type: 'RMC',
-            trade_size: '4',
-            diameter: 4,
-            start_x: 40,
-            start_y: 12,
-            start_z: -8,
-            end_x: 40,
-            end_y: 12,
-            end_z: 30,
-            allowed_cable_group: 'LV'
-        }
-    ];
-    
-    const getSampleCables = () => {
-        const templates = [
-            {
-                cable_type: "Power",
-                conductors: 3,
-                conductor_size: '#12 AWG',
-                diameter: 1.26,
-                weight: 1.5,
-                start: [5, 5, 5],
-                end: [110, 95, 45],
-                allowed_cable_group: "HV"
-            },
-            {
-                cable_type: "Control",
-                conductors: 3,
-                conductor_size: '#12 AWG',
-                diameter: 0.47,
-                weight: 0.8,
-                start: [10, 0, 10],
-                end: [100, 80, 25],
-                allowed_cable_group: "LV"
-            },
-            {
-                cable_type: "Signal",
-                conductors: 3,
-                conductor_size: '#12 AWG',
-                diameter: 0.31,
-                weight: 0.5,
-                start: [15, 5, 15],
-                end: [105, 85, 30],
-                allowed_cable_group: "INSTRUMENT"
-            },
-            {
-                cable_type: "Signal",
-                conductors: 12,
-                conductor_size: '#22 AWG',
-                diameter: 0.55,
-                weight: 0.4,
-                start: [20, 10, 8],
-                end: [115, 90, 35],
-                allowed_cable_group: "COMMUNICATION"
-            },
-            {
-                cable_type: "Control",
-                conductors: 3,
-                conductor_size: '#12 AWG',
-                diameter: 0.59,
-                weight: 0.9,
-                start: [25, 15, 12],
-                end: [95, 75, 28],
-                allowed_cable_group: "LV"
-            }
-        ];
-
-        const cables = [];
-        for (let i = 0; i < 30; i++) {
-            const t = templates[i % templates.length];
-            const offset = Math.floor(i / templates.length) * 5;
-            cables.push({
-                name: `Cable ${String(i + 1).padStart(2, '0')}`,
-                cable_type: t.cable_type,
-                conductors: t.conductors,
-                conductor_size: t.conductor_size,
-                diameter: t.diameter,
-                weight: t.weight,
-                start: t.start.map(v => v + offset),
-                end: t.end.map(v => v + offset),
-                start_tag: `ST${i + 1}`,
-                end_tag: `ET${i + 1}`,
-                allowed_cable_group: t.allowed_cable_group,
-                manual_path: '',
-                raceway_ids: []
-            });
-        }
-        Object.assign(cables[0], {
-            start: [-60, -12, -8],
-            end: [120, 0, 10],
-            start_tag: 'SWGR-UG-HV',
-            end_tag: 'MCC-HV-01',
-            allowed_cable_group: 'HV'
-        });
-        Object.assign(cables[1], {
-            start: [-60, 12, -8],
-            end: [100, 100, 30],
-            start_tag: 'SWGR-UG-LV',
-            end_tag: 'MCC-LV-01',
-            allowed_cable_group: 'LV'
-        });
-        Object.assign(cables[2], {
-            start: [0, -40, 20],
-            end: [110, 70, 20],
-            start_tag: 'PLC-IO-01',
-            end_tag: 'JB-INST-07',
-            allowed_cable_group: 'INSTRUMENT'
-        });
-        Object.assign(cables[3], {
-            start: [20, 30, 45],
-            end: [120, 95, 45],
-            start_tag: 'NET-RACK-01',
-            end_tag: 'IDF-02',
-            allowed_cable_group: 'COMMUNICATION'
-        });
-        [10, 20].forEach(index => Object.assign(cables[index], {
-            start: cables[0].start.slice(),
-            end: cables[0].end.slice(),
-            start_tag: 'SWGR-UG-HV',
-            end_tag: 'MCC-HV-01',
-            allowed_cable_group: 'HV'
-        }));
-        [7, 17].forEach(index => Object.assign(cables[index], {
-            start: cables[2].start.slice(),
-            end: cables[2].end.slice(),
-            start_tag: 'PLC-IO-01',
-            end_tag: 'JB-INST-07',
-            allowed_cable_group: 'INSTRUMENT'
-        }));
-        return cables;
-    };
-
-    const ROUTE_PRESETS = {
-        conservative: {
-            label: 'Conservative',
-            fillLimit: 40,
-            proximityThreshold: 72,
-            maxFieldEdge: 1000,
-            fieldPenalty: 4,
-            sharedPenalty: 0.7,
-            description: 'Uses a 40% tray fill limit and higher field-route cost for a conservative first pass.'
-        },
-        'tray-preferred': {
-            label: 'Tray Preferred',
-            fillLimit: 45,
-            proximityThreshold: 72,
-            maxFieldEdge: 1000,
-            fieldPenalty: 6,
-            sharedPenalty: 0.8,
-            description: 'Strongly favors existing trays and conduits before accepting field-routed connections.'
-        },
-        'field-allowed': {
-            label: 'Allow Field Routes',
-            fillLimit: 50,
-            proximityThreshold: 120,
-            maxFieldEdge: 1500,
-            fieldPenalty: 1.8,
-            sharedPenalty: 0.45,
-            description: 'Allows longer endpoint jumps and lower field-route cost when tray coverage is incomplete.'
-        },
-        'high-density': {
-            label: 'High Density Review',
-            fillLimit: 70,
-            proximityThreshold: 96,
-            maxFieldEdge: 1200,
-            fieldPenalty: 3,
-            sharedPenalty: 0.55,
-            description: 'Raises the fill limit for what-if studies and highlights trays that need follow-up review.'
-        },
-        custom: {
-            label: 'Custom',
-            description: 'Uses the current routing values without applying a preset.'
-        }
-    };
 
     let applyingRoutePreset = false;
 
@@ -2577,99 +1230,9 @@ async function initializeApp() {
         }
     };
 
-    const getRoutingCounts = () => {
-        const trays = state.trayData.filter(t => (t.raceway_type || 'tray') === 'tray');
-        const conduits = state.trayData.filter(t => t.raceway_type === 'conduit');
-        const ductbanks = state.ductbankData?.ductbanks || [];
-        const routableSegments = state.trayData.filter(t => t.raceway_type !== 'ductbank');
-        return {
-            trays,
-            conduits,
-            ductbanks,
-            routableSegments,
-            cables: state.cableList || []
-        };
-    };
-
-    const getDuplicateIds = (rows) => {
-        const seen = new Set();
-        const dupes = new Set();
-        rows.forEach(row => {
-            const id = String(row.tray_id || '').trim();
-            if (!id) return;
-            if (seen.has(id)) dupes.add(id);
-            seen.add(id);
-        });
-        return Array.from(dupes);
-    };
-
-    const hasValidRouteGeometry = (row) => {
-        const nums = ['start_x', 'start_y', 'start_z', 'end_x', 'end_y', 'end_z', 'width', 'height']
-            .map(key => parseFloat(row[key]));
-        return nums.every(Number.isFinite) && nums[6] > 0 && nums[7] > 0;
-    };
-
-    const getGroupWarnings = (trays, cables) => {
-        const trayGroups = new Set(trays.map(t => String(t.allowed_cable_group || '').trim()).filter(Boolean));
-        const hasOpenTray = trays.some(t => !String(t.allowed_cable_group || '').trim());
-        if (hasOpenTray || trayGroups.size === 0) return [];
-        const cableGroups = new Set(cables.map(c => String(c.allowed_cable_group || '').trim()).filter(Boolean));
-        return Array.from(cableGroups).filter(group => !trayGroups.has(group));
-    };
-
-    const getFillWarnings = (trays) => {
-        const fillLimit = parseFloat(elements.fillLimitIn.value) / 100;
-        return trays.filter(tray => {
-            const max = (parseFloat(tray.width) || 0) * (parseFloat(tray.height) || 0) * fillLimit;
-            return max > 0 && (parseFloat(tray.current_fill) || 0) > max;
-        });
-    };
-
-    const getRoutingReadiness = () => {
-        const counts = getRoutingCounts();
-        const duplicateIds = getDuplicateIds(counts.routableSegments);
-        const missingGeometry = counts.routableSegments.filter(row => !hasValidRouteGeometry(row));
-        const groupWarnings = getGroupWarnings(counts.routableSegments, counts.cables);
-        const overLimit = getFillWarnings(counts.trays);
-        const geometryWarnings = [
-            ...(state.geometryWarnings?.ductbanks || []),
-            ...(state.geometryWarnings?.conduits || [])
-        ];
-        const diagnostics = buildRoutingReadinessDiagnostics({
-            cables: counts.cables,
-            trays: counts.trays,
-            conduits: counts.conduits,
-            ductbanks: counts.ductbanks
-        });
-        const blocking = [];
-        const warnings = [];
-        if (counts.routableSegments.length === 0) blocking.push('Add or import at least one tray, conduit, or ductbank conduit.');
-        if (counts.cables.length === 0) blocking.push('Add or import at least one cable.');
-        if (counts.cables.length && diagnostics.coordinateReady === 0) blocking.push('Add start/end XYZ coordinates for at least one cable before running routing.');
-        if (missingGeometry.length) blocking.push(`${missingGeometry.length} raceway segment(s) need valid geometry.`);
-        if (duplicateIds.length) blocking.push(`${duplicateIds.length} duplicate raceway ID(s) need unique names.`);
-        if (diagnostics.invalidAssignedRefs.length) blocking.push(`${diagnostics.invalidAssignedRefs.length} cable raceway assignment(s) do not match the Raceway Schedule.`);
-        if (diagnostics.cableSummary.missingSchedule) warnings.push(`${diagnostics.cableSummary.missingSchedule} cable row(s) are not schedule-ready.`);
-        if (diagnostics.cableSummary.missingRaceway) warnings.push(`${diagnostics.cableSummary.missingRaceway} schedule-ready cable row(s) need raceway assignments.`);
-        if (diagnostics.coordinateReady > 0 && diagnostics.coordinateReady < diagnostics.cableSummary.total) {
-            warnings.push(`${diagnostics.cableSummary.total - diagnostics.coordinateReady} cable row(s) are missing start/end coordinates for auto-routing.`);
-        }
-        if (groupWarnings.length) warnings.push(`No matching raceway group for ${groupWarnings.join(', ')}.`);
-        if (overLimit.length) warnings.push(`${overLimit.length} tray(s) already exceed the selected fill limit.`);
-        if (geometryWarnings.length) warnings.push(`${geometryWarnings.length} ductbank/conduit geometry warning(s) were found.`);
-        return {
-            ...counts,
-            diagnostics,
-            duplicateIds,
-            missingGeometry,
-            groupWarnings,
-            overLimit,
-            geometryWarnings,
-            blocking,
-            warnings,
-            ready: blocking.length === 0
-        };
-    };
+    const getRoutingReadiness = () => buildRoutingReadiness(state, {
+        fillLimitPercent: parseFloat(elements.fillLimitIn.value)
+    });
 
     const readinessItem = (value, label, status = '') => `
         <div class="readiness-item ${status}">
@@ -3160,142 +1723,45 @@ const openUtilizationReview = row => {
             updateTableCounts();
             return;
         }
-        let table = '<table id="trayTable" class="sticky-table"><thead><tr>' +
-            '<th data-key="tray_id">Tray ID</th>' +
-            '<th data-key="start_x">Start (X,Y,Z)</th>' +
-            '<th data-key="end_x">End (X,Y,Z)</th>' +
-            '<th data-key="width">Width</th>' +
-            '<th data-key="height">Height</th>' +
-            '<th data-key="current_fill">Current Fill</th>' +
-            '<th data-key="allowed_cable_group">Allowed Group</th>' +
-            '<th data-key="shape">Shape <span class="help-icon" tabindex="0" role="button" aria-label="Help" aria-expanded="false" aria-describedby="shape-help">?<span id="shape-help" class="tooltip">STR: Straight<br>90B: 90\u00B0 Bend<br>45B: 45\u00B0 Bend<br>30B/60B: 30\u00B0/60\u00B0 Bend<br>TEE: Tee<br>X: Cross<br>VI: Vertical Inside<br>VO: Vertical Outside<br>45VI: 45\u00B0 Vertical Inside<br>45VO: 45\u00B0 Vertical Outside<br>RED-C: Center Reducer<br>RED-S: Side Reducer<br>Z: Z-Bend<br>OFFSET: Offset<br>SPIRAL: Spiral</span></span></th>' +
-            '<th></th><th></th></tr></thead><tbody>';
-        state.manualTrays.forEach((t, idx) => {
-            table += `<tr data-idx="${idx}">
-                        <td><input type="text" class="tray-id-input" data-idx="${idx}" value="${escapeAttr(t.tray_id)}" style="width:80px;"></td>
-                        <td>
-                            <input type="number" class="tray-start-input" data-idx="${idx}" data-coord="0" value="${t.start_x}" step="0.1" style="width:70px;">
-                            <input type="number" class="tray-start-input" data-idx="${idx}" data-coord="1" value="${t.start_y}" step="0.1" style="width:70px;">
-                            <input type="number" class="tray-start-input" data-idx="${idx}" data-coord="2" value="${t.start_z}" step="0.1" style="width:70px;">
-                        </td>
-                        <td>
-                            <input type="number" class="tray-end-input" data-idx="${idx}" data-coord="0" value="${t.end_x}" step="0.1" style="width:70px;">
-                            <input type="number" class="tray-end-input" data-idx="${idx}" data-coord="1" value="${t.end_y}" step="0.1" style="width:70px;">
-                            <input type="number" class="tray-end-input" data-idx="${idx}" data-coord="2" value="${t.end_z}" step="0.1" style="width:70px;">
-                        </td>
-                        <td><input type="number" class="tray-width-input" data-idx="${idx}" value="${t.width}" min="0" step="0.1" style="width:60px;"></td>
-                        <td><input type="number" class="tray-height-input" data-idx="${idx}" value="${t.height}" min="0" step="0.1" style="width:60px;"></td>
-                        <td><input type="number" class="tray-fill-input" data-idx="${idx}" value="${t.current_fill}" min="0" step="0.1" style="width:80px;"></td>
-                        <td><input type="text" class="tray-group-input" data-idx="${idx}" value="${escapeAttr(t.allowed_cable_group || '')}" style="width:100px;"></td>
-                        <td>
-                            <select class="tray-shape-select" data-idx="${idx}" style="width:100px;">
-                                ${SHAPE_CODES.map(s => `<option value="${s}" ${t.shape === s ? 'selected' : ''}>${s}</option>`).join('')}
-                            </select>
-                        </td>
-                        <td><button class="icon-button dup-tray" data-idx="${idx}" title="Duplicate" aria-label="Duplicate tray">📋</button></td>
-                        <td><button class="icon-button delete-tray icon-delete" data-idx="${idx}" title="Delete" aria-label="Delete tray">\u274C</button></td>
-                     </tr>`;
+        elements.manualTrayTableContainer.innerHTML = buildManualTrayTableMarkup(state.manualTrays, {
+            shapeCodes: SHAPE_CODES,
+            escapeAttr
         });
-        table += '</tbody></table>';
-        elements.manualTrayTableContainer.innerHTML = table;
         initHelpIcons(elements.manualTrayTableContainer);
         elements.manualTrayTableContainer.classList.add('table-scroll');
-        
-        const updateTrayData = () => { rebuildTrayData(); updateTrayDisplay(); };
-
-        elements.manualTrayTableContainer.querySelectorAll('.tray-id-input').forEach(input => {
-            input.addEventListener('input', e => {
-                const i = parseInt(e.target.dataset.idx, 10);
-                state.manualTrays[i].tray_id = e.target.value;
-                e.target.classList.remove('input-error');
-                updateTrayData();
+        bindManualTrayTable(elements.manualTrayTableContainer, {
+            onFieldChange: ({ index, field, coordinate, value }) => {
+                const tray = state.manualTrays[index];
+                if (!tray) return;
+                if (field === 'start') {
+                    if (coordinate === 0) tray.start_x = value;
+                    if (coordinate === 1) tray.start_y = value;
+                    if (coordinate === 2) tray.start_z = value;
+                } else if (field === 'end') {
+                    if (coordinate === 0) tray.end_x = value;
+                    if (coordinate === 1) tray.end_y = value;
+                    if (coordinate === 2) tray.end_z = value;
+                } else {
+                    tray[field] = value;
+                }
+                rebuildTrayData();
+                updateTrayDisplay();
                 saveSession();
-            });
-        });
-        elements.manualTrayTableContainer.querySelectorAll('.tray-start-input').forEach(input => {
-            input.addEventListener('input', e => {
-                const i = parseInt(e.target.dataset.idx, 10);
-                const c = parseInt(e.target.dataset.coord, 10);
-                const val = parseFloat(e.target.value);
-                if (c === 0) state.manualTrays[i].start_x = val;
-                if (c === 1) state.manualTrays[i].start_y = val;
-                if (c === 2) state.manualTrays[i].start_z = val;
-                updateTrayData();
-                saveSession();
-            });
-        });
-        elements.manualTrayTableContainer.querySelectorAll('.tray-end-input').forEach(input => {
-            input.addEventListener('input', e => {
-                const i = parseInt(e.target.dataset.idx, 10);
-                const c = parseInt(e.target.dataset.coord, 10);
-                const val = parseFloat(e.target.value);
-                if (c === 0) state.manualTrays[i].end_x = val;
-                if (c === 1) state.manualTrays[i].end_y = val;
-                if (c === 2) state.manualTrays[i].end_z = val;
-                updateTrayData();
-                saveSession();
-            });
-        });
-        elements.manualTrayTableContainer.querySelectorAll('.tray-width-input').forEach(input => {
-            input.addEventListener('input', e => {
-                const i = parseInt(e.target.dataset.idx, 10);
-                state.manualTrays[i].width = parseFloat(e.target.value);
-                updateTrayData();
-                saveSession();
-            });
-        });
-        elements.manualTrayTableContainer.querySelectorAll('.tray-height-input').forEach(input => {
-            input.addEventListener('input', e => {
-                const i = parseInt(e.target.dataset.idx, 10);
-                state.manualTrays[i].height = parseFloat(e.target.value);
-                updateTrayData();
-                saveSession();
-            });
-        });
-        elements.manualTrayTableContainer.querySelectorAll('.tray-fill-input').forEach(input => {
-            input.addEventListener('input', e => {
-                const i = parseInt(e.target.dataset.idx, 10);
-                state.manualTrays[i].current_fill = parseFloat(e.target.value);
-                updateTrayData();
-                saveSession();
-            });
-        });
-        elements.manualTrayTableContainer.querySelectorAll('.tray-group-input').forEach(input => {
-            input.addEventListener('input', e => {
-                const i = parseInt(e.target.dataset.idx, 10);
-                state.manualTrays[i].allowed_cable_group = e.target.value;
-                updateTrayData();
-                saveSession();
-            });
-        });
-        elements.manualTrayTableContainer.querySelectorAll('.tray-shape-select').forEach(sel => {
-            sel.addEventListener('change', e => {
-                const i = parseInt(e.target.dataset.idx, 10);
-                state.manualTrays[i].shape = e.target.value;
-                updateTrayData();
-                saveSession();
-            });
-        });
-        elements.manualTrayTableContainer.querySelectorAll('.delete-tray').forEach(btn => {
-            btn.addEventListener('click', e => {
-                const i = parseInt(e.target.dataset.idx, 10);
-                state.manualTrays.splice(i, 1);
+            },
+            onDelete: index => {
+                state.manualTrays.splice(index, 1);
                 rebuildTrayData();
                 renderManualTrayTable();
                 updateTrayDisplay();
                 saveSession();
-            });
-        });
-        elements.manualTrayTableContainer.querySelectorAll('.dup-tray').forEach(btn => {
-            btn.addEventListener('click', e => {
-                const i = parseInt(e.target.dataset.idx, 10);
-                const copy = { ...state.manualTrays[i] };
-                state.manualTrays.push(copy);
+            },
+            onDuplicate: index => {
+                state.manualTrays.push({ ...state.manualTrays[index] });
                 rebuildTrayData();
                 renderManualTrayTable();
                 updateTrayDisplay();
                 saveSession();
-            });
+            }
         });
         updateTableCounts();
         addSortHandlers(elements.manualTrayTableContainer, state.manualTrays, renderManualTrayTable, traySort);
@@ -3304,7 +1770,6 @@ const openUtilizationReview = row => {
             emitSticky('imports-ready-trays','importsReadyTrays');
         }
     };
-
     const exportManualTraysCSV = () => {
         const headers = trayTemplateHeaders.map(h=>Array.isArray(h)?h[0]:h);
         const rows = state.manualTrays;
@@ -3456,60 +1921,7 @@ const renderRouteSummaryPanel = (results = []) => {
         onOverload: focusOverloadedRaceways
     });
 };
-const renderPullGroupAnalysis = analysis => {
-    const groups = [...analysis.suggestions, ...analysis.reviewGroups];
-    const activeGroupIds = new Set(groups.map(group => group.id));
-    state.expandedPullGroupIds = new Set([...state.expandedPullGroupIds].filter(id => activeGroupIds.has(id)));
-    const acceptedCount = analysis.suggestions.filter(group => state.pullGroupDecisions[group.id] === 'together').length;
-    let html = `<section class="pull-group-review" aria-label="Automatic pull set suggestions"><div class="pull-group-review-heading"><div><span>Automatic pull-set suggestions</span><h4>${analysis.summary.suggestedGroups} recommended pull set${analysis.summary.suggestedGroups === 1 ? '' : 's'}</h4><p>Review the compact rows, make the pull decision, or expand a row for cables, assumptions, and equipment details.</p></div><div class="pull-group-review-tools"><div class="pull-group-summary-badges"><span class="is-recommended">${analysis.summary.suggestedCables} eligible cables</span><span>${analysis.summary.separateCables} kept separate</span>${acceptedCount ? `<span class="is-selected">${acceptedCount} selected</span>` : ''}</div>${groups.length ? '<div class="pull-group-display-actions" aria-label="Pull set display controls"><button type="button" data-pull-group-display="expand">Expand all</button><button type="button" data-pull-group-display="collapse">Collapse all</button></div>' : ''}</div></div>`;
-    if (groups.length) {
-        html += `<div class="pull-group-card-grid" aria-label="${groups.length} pull set recommendation${groups.length === 1 ? '' : 's'}">`;
-        groups.forEach(group => {
-            const decision = state.pullGroupDecisions[group.id] || 'suggested';
-            const isReview = group.status === 'review';
-            const plan = group.plan || {};
-            const equipment = group.fieldEquipment || {};
-            const weakest = plan.equipment?.weakestLink;
-            const isExpanded = state.expandedPullGroupIds.has(group.id);
-            const detailId = `pull-group-detail-${group.id}`;
-            const decisionLabel = isReview
-                ? 'Keep separate pending review'
-                : decision === 'together'
-                    ? 'Planned together'
-                    : decision === 'separate'
-                        ? 'Kept separate'
-                        : 'Suggested together';
-            const cardClass = isReview ? 'is-review' : decision === 'together' ? 'is-together' : decision === 'separate' ? 'is-separate' : '';
-            html += `<article class="pull-group-card ${cardClass} ${isExpanded ? 'is-expanded' : ''}" data-pull-group-card="${escapeAttr(group.id)}"><div class="pull-group-card-summary">`;
-            html += `<button type="button" class="pull-group-card-toggle" data-pull-group-id="${escapeAttr(group.id)}" aria-expanded="${isExpanded}" aria-controls="${escapeAttr(detailId)}"><span class="pull-group-card-chevron" aria-hidden="true">›</span><span class="pull-group-card-identity"><span>${escapeHtml(group.label)} · ${escapeHtml(group.className)}</span><strong>${group.cableCount} cables</strong></span></button>`;
-            html += `<div class="pull-group-card-preview"><span><strong>${Number(group.routeLengthFt).toFixed(0)} ft</strong>route</span><span><strong>${plan.sections?.length || '—'}</strong>sections</span><span><strong>${Number.isFinite(plan.maxTension) ? `${Number(plan.maxTension).toFixed(0)} lbf` : 'Review'}</strong>max tension</span></div>`;
-            html += `<span class="pull-group-status">${escapeHtml(decisionLabel)}</span><div class="pull-group-actions">`;
-            if (!isReview) {
-                html += `<button type="button" class="pull-group-decision ${decision === 'together' ? 'is-active' : ''}" data-pull-group-id="${escapeAttr(group.id)}" data-pull-group-decision="together">Plan together</button><button type="button" class="pull-group-decision ${decision === 'separate' ? 'is-active' : ''}" data-pull-group-id="${escapeAttr(group.id)}" data-pull-group-decision="separate">Keep separate</button>`;
-            } else {
-                html += `<button type="button" class="pull-group-decision is-active" data-pull-group-id="${escapeAttr(group.id)}" data-pull-group-decision="separate">Keep separate</button>`;
-            }
-            html += `<button type="button" class="pull-group-review-route" data-pull-group-id="${escapeAttr(group.id)}">Show route</button></div></div>`;
-            html += `<div class="pull-group-card-detail" id="${escapeAttr(detailId)}" ${isExpanded ? '' : 'hidden'}><div class="pull-group-cables">${group.cableNames.map(name => `<span>${escapeHtml(name)}</span>`).join('')}</div>`;
-            html += `<div class="pull-group-metrics"><span><strong>${Number(group.routeLengthFt).toFixed(0)} ft</strong>Shared route</span><span><strong>${Number(group.combinedWeightLbsFt).toFixed(2)} lb/ft</strong>Combined weight</span><span><strong>${Number(group.equivalentDiameterIn).toFixed(2)} in</strong>Equivalent bundle OD</span><span><strong>${plan.sections?.length || '—'}</strong>Pull sections</span><span><strong>${Number.isFinite(plan.maxTension) ? `${Number(plan.maxTension).toFixed(0)} lbf` : 'Review'}</strong>Maximum tension</span><span><strong>${escapeHtml(weakest?.label || 'Inputs')}</strong>Weakest link</span></div>`;
-            html += `<ul class="pull-group-reasons">${group.reasons.map(reason => `<li>${escapeHtml(reason)}</li>`).join('')}</ul>`;
-            if (!isReview) {
-                html += `<p class="pull-group-equipment-note">Group plan: ${equipment.payoffStations || 0} payoff station${equipment.payoffStations === 1 ? '' : 's'} · ${equipment.cableReels || 0} cable reels · ${equipment.tuggers || 0} tugger setup${equipment.tuggers === 1 ? '' : 's'} · ${equipment.handPulls || 0} hand pull${equipment.handPulls === 1 ? '' : 's'} · ${equipment.sheaves || 0} sheaves · ${equipment.rollers || 0} rollers.${group.equipmentSavings.pullOperations ? ` Avoids ${group.equipmentSavings.pullOperations} separate pull operation${group.equipmentSavings.pullOperations === 1 ? '' : 's'}.` : ' No pull-operation reduction; grouping is still physically feasible under the screening limits.'}</p>`;
-            }
-            html += '</div></article>';
-        });
-        html += '</div>';
-    } else {
-        html += '<div class="pull-group-empty"><strong>No complete-route pull sets found.</strong><span>Cables may share portions of a corridor, but no two currently share the same complete route and circuit class.</span></div>';
-    }
-    if (analysis.separate.length) {
-        html += `<details class="pull-group-separate"><summary>Why ${analysis.separate.length} cable${analysis.separate.length === 1 ? '' : 's'} stay separate</summary><div class="pull-group-separate-list">${analysis.separate.map(item => `<div><strong>${escapeHtml(item.cableName)}</strong><span>${escapeHtml(item.className)}</span><p>${escapeHtml(item.reason)}</p></div>`).join('')}</div></details>`;
-    }
-    html += '<p class="pull-group-assumption">Screening model: combined tension is distributed by cable weight and bundle OD is area-equivalent. Confirm pulling-head design, conduit jam ratio, manufacturer limits, and field conditions before construction.</p></section>';
-    return html;
-};
-
-const renderPullChecks = (results) => {
+const renderPullChecks = results => {
     if (!elements.pullChecksContainer || !elements.pullChecksDetails) return;
     if (!state.pullChecksEnabled || !results || results.length === 0) {
         state.pullGroupAnalysis = null;
@@ -3518,131 +1930,46 @@ const renderPullChecks = (results) => {
         elements.pullChecksDetails.open = false;
         return;
     }
-    const checks = results.map(result => result.pull_check).filter(Boolean);
-    const setupCount = checks.filter(check => check.status === 'setups-required').length;
-    const reviewCount = checks.filter(check => ['review-required', 'inputs-required'].includes(check.status)).length;
-    const formatCheck = (actual, allowable, unit) => Number.isFinite(actual) && Number.isFinite(allowable)
-        ? `${Number(actual).toFixed(1)} / ${Number(allowable).toFixed(0)} ${unit}`
-        : 'Inputs required';
-    const statusDetails = (check, sectionCount = 0) => {
-        if (!check) return { label: 'Not calculated', className: 'inputs' };
-        if (check.status === 'pass') return { label: '1 setup · within limits', className: 'pass' };
-        if (check.status === 'setups-required') {
-            const count = Math.max(2, sectionCount || 0);
-            return { label: `${count} setups required`, className: 'setup' };
-        }
-        if (check.status === 'review-required') return { label: 'Review required', className: 'review' };
-        return { label: 'Inputs missing', className: 'inputs' };
-    };
     const pullOptions = getPullCheckOptions();
     state.pullGroupAnalysis = pullOptions.suggestPullGroups
         ? buildPullGroupSuggestions(results, state.cableList, pullOptions)
         : null;
-    let html = `<div class="pull-check-summary"><strong>${checks.length} cable pull plans</strong><span>${setupCount} require multiple setups</span><span>${reviewCount} require input or equipment review</span><span>Auto direction compares both ends · weakest equipment rating governs</span></div>`;
-    if (state.pullGroupAnalysis) html += renderPullGroupAnalysis(state.pullGroupAnalysis);
-    html += '<div class="pull-check-guidance"><span aria-hidden="true">↗</span><div><strong>Setup locations are already calculated.</strong><p>The Pull plan pill describes the result; it is not a button. Choose <strong>Show setup locations</strong> to select that cable and display its reel, tugger or hand-pull receiving point, sheave, and roller locations on the 3D canvas.</p></div></div>';
-    html += '<div class="table-scroll"><table class="sticky-table"><thead><tr><th>Cable</th><th>Pull plan</th><th>3D locations</th><th>Pull direction</th><th>Sections</th><th>Max tension / weakest limit</th><th>Max pressure / limit</th><th>Field equipment</th></tr></thead><tbody>';
-    results.forEach((r, routeIndex) => {
-        const check = r.pull_check;
-        const sections = Array.isArray(check?.sections) ? check.sections : [];
-        const status = statusDetails(check, sections.length);
-        const equipment = check?.equipment || {};
-        const guidance = check?.status === 'inputs-required'
-            ? `Missing: ${(check.missingInputs || []).join(', ')}`
-            : check
-                ? `${equipment.counts?.reels || 0} reel · ${equipment.counts?.tuggers || 0} tugger · ${equipment.counts?.handPulls || 0} hand pull · ${equipment.counts?.sheaves || 0} sheave · ${equipment.counts?.rollers || 0} rollers`
-                : 'Run routing with pull planning enabled';
-        const canShowSetups = check && check.status !== 'inputs-required';
-        const setupLabel = sections.length === 1 ? 'Show setup location' : `Show ${sections.length} setup locations`;
-        const canvasAction = canShowSetups
-            ? `<button type="button" class="pull-check-view-setups" data-pull-route-index="${routeIndex}" aria-label="${escapeAttr(`${setupLabel} for ${r.cable} on the 3D canvas`)}">${escapeHtml(setupLabel)}</button>`
-            : '<span class="pull-check-canvas-unavailable">Complete inputs first</span>';
-        html += `<tr data-pull-route="${escapeAttr(r.cable)}"><td>${escapeHtml(r.cable)}</td><td><span class="pull-check-status pull-check-status--${status.className}">${status.label}</span></td><td>${canvasAction}</td><td>${escapeHtml(check?.directionLabel || '—')}</td><td>${sections.length || '—'}</td><td>${escapeHtml(formatCheck(check?.maxTension, check?.allowableTension, 'lbf'))}</td><td>${escapeHtml(formatCheck(check?.maxSidewallPressure, check?.allowableSidewallPressure, 'lbf/ft'))}</td><td>${escapeHtml(guidance)}</td></tr>`;
-    });
-    html += '</tbody></table></div>';
-
-    const selectedRoute = results[state.selectedRouteIndex] || results.find(result => result.pull_check);
-    const selected = selectedRoute?.pull_check;
-    if (selected && selected.status !== 'inputs-required') {
-        const equipment = selected.equipment || {};
-        const weakest = equipment.weakestLink;
-        const forward = selected.directionComparison?.forward;
-        const reverse = selected.directionComparison?.reverse;
-        const directionReason = selected.directionMode === 'auto' && forward && reverse
-            ? `Compared both directions: From → To ${forward.sections} section(s), ${Number(forward.maxTension).toFixed(0)} lbf; To → From ${reverse.sections} section(s), ${Number(reverse.maxTension).toFixed(0)} lbf.`
-            : 'Direction was fixed by the pull strategy setting.';
-        const handPullCount = equipment.counts?.handPulls || 0;
-        const handPullReason = handPullCount
-            ? ` ${handPullCount} short section${handPullCount === 1 ? '' : 's'} meet both hand-pull limits: ≤ ${Number(selected.assumptions?.maxHandPullLengthFt || 25).toFixed(0)} ft and ≤ ${Number(selected.assumptions?.maxHandPullTensionLbf || 200).toFixed(0)} lbf.`
-            : '';
-        html += `<section class="pull-field-plan" aria-label="Selected cable field pull plan"><div class="pull-field-plan-heading"><div><span>Selected cable field plan</span><h4>${escapeHtml(selectedRoute.cable)} · ${escapeHtml(selected.directionLabel)}</h4><p>${escapeHtml(directionReason + handPullReason)}</p></div><span class="pull-direction-badge">${escapeHtml(selected.direction === 'reverse' ? 'Reverse pull selected' : 'Forward pull selected')}</span></div>`;
-        html += `<div class="pull-equipment-kpis"><span><i class="legend-reel"></i><strong>${equipment.counts?.reels || 0}</strong>Reels</span><span><i class="legend-tugger"></i><strong>${equipment.counts?.tuggers || 0}</strong>Tuggers</span><span><i class="legend-hand-pull"></i><strong>${handPullCount}</strong>Hand pulls</span><span><i class="legend-sheave"></i><strong>${equipment.counts?.sheaves || 0}</strong>Sheaves</span><span><i class="legend-roller"></i><strong>${equipment.counts?.rollers || 0}</strong>Tray rollers</span><span><strong>${escapeHtml(weakest?.label || '—')}</strong>Weakest link · ${escapeHtml(weakest ? `${weakest.value.toFixed(0)} lbf` : '—')}</span></div>`;
-        html += '<div class="table-scroll"><table class="sticky-table pull-section-table"><thead><tr><th>Section</th><th>Reel / payoff</th><th>Receiving method / end</th><th>Length</th><th>Maximum tension</th><th>Sheaves</th><th>Tray rollers</th></tr></thead><tbody>';
-        selected.sections.forEach(section => {
-            const sheaveCount = (equipment.sheaves || []).filter(item => item.distanceFromPullStart >= section.startDistance - 0.01 && item.distanceFromPullStart <= section.endDistance + 0.01).length;
-            const rollerCount = (equipment.rollers || []).filter(item => item.distanceFromPullStart >= section.startDistance - 0.01 && item.distanceFromPullStart <= section.endDistance + 0.01).length;
-            const receivingMethod = section.pullMethod === 'hand'
-                ? `<span class="pull-method-hand">PULL BY HAND</span> @ ${escapeHtml(formatRouteDistance(section.endDistance))}`
-                : `Tugger ${section.index} @ ${escapeHtml(formatRouteDistance(section.endDistance))}`;
-            html += `<tr><td>Pull ${section.index}</td><td>Reel ${section.index} @ ${escapeHtml(formatRouteDistance(section.startDistance))}</td><td>${receivingMethod}</td><td>${escapeHtml(formatRouteDistance(section.length))}</td><td>${escapeHtml(`${Number(section.maxTension).toFixed(1)} lbf`)}</td><td>${sheaveCount}</td><td>${rollerCount}</td></tr>`;
-        });
-        html += '</tbody></table></div>';
-        if ((equipment.sheaves || []).length) {
-            html += '<div class="pull-sheave-strip"><strong>Sheave schedule</strong>';
-            equipment.sheaves.forEach(sheave => {
-                const transition = sheave.transition ? ` · ${sheave.transition}` : '';
-                html += `<span class="${sheave.pass ? '' : 'is-warning'}">S${sheave.index} @ ${escapeHtml(formatRouteDistance(sheave.distanceFromPullStart))} · ${Number(sheave.angleDeg).toFixed(0)}° · radius ≥ ${Number(sheave.recommendedRadiusFt).toFixed(2)} ft · support ${Number(sheave.reactionLbf).toFixed(0)} / ${Number(sheave.capacityLbf).toFixed(0)} lbf${escapeHtml(transition)}</span>`;
-            });
-            html += '</div>';
-        }
-        html += '</section>';
+    if (state.pullGroupAnalysis) {
+        const groups = [...state.pullGroupAnalysis.suggestions, ...state.pullGroupAnalysis.reviewGroups];
+        const activeGroupIds = new Set(groups.map(group => group.id));
+        state.expandedPullGroupIds = new Set(
+            [...state.expandedPullGroupIds].filter(id => activeGroupIds.has(id))
+        );
     }
-    elements.pullChecksContainer.innerHTML = html;
-    const setPullGroupCardExpanded = (card, expanded) => {
-        const toggle = card?.querySelector('.pull-group-card-toggle');
-        const detail = card?.querySelector('.pull-group-card-detail');
-        const groupId = card?.dataset.pullGroupCard;
-        if (!toggle || !detail || !groupId) return;
-        toggle.setAttribute('aria-expanded', String(expanded));
-        detail.hidden = !expanded;
-        card.classList.toggle('is-expanded', expanded);
-        if (expanded) state.expandedPullGroupIds.add(groupId);
-        else state.expandedPullGroupIds.delete(groupId);
-    };
-    elements.pullChecksContainer.querySelectorAll('.pull-group-card-toggle').forEach(button => {
-        button.addEventListener('click', () => {
-            const card = button.closest('.pull-group-card');
-            setPullGroupCardExpanded(card, button.getAttribute('aria-expanded') !== 'true');
-        });
+    const review = buildPullReviewMarkup(results, {
+        groupAnalysis: state.pullGroupAnalysis,
+        decisions: state.pullGroupDecisions,
+        expandedGroupIds: state.expandedPullGroupIds,
+        selectedRouteIndex: state.selectedRouteIndex,
+        formatDistance: formatRouteDistance,
+        escapeHtml,
+        escapeAttr
     });
-    elements.pullChecksContainer.querySelectorAll('[data-pull-group-display]').forEach(button => {
-        button.addEventListener('click', () => {
-            const expanded = button.dataset.pullGroupDisplay === 'expand';
-            elements.pullChecksContainer.querySelectorAll('.pull-group-card').forEach(card => {
-                setPullGroupCardExpanded(card, expanded);
-            });
-        });
-    });
-    elements.pullChecksContainer.querySelectorAll('.pull-group-decision').forEach(button => {
-        button.addEventListener('click', () => {
-            state.pullGroupDecisions[button.dataset.pullGroupId] = button.dataset.pullGroupDecision;
+    elements.pullChecksContainer.innerHTML = review.html;
+    bindPullReviewActions(elements.pullChecksContainer, {
+        onExpandedChange: (groupId, expanded) => {
+            if (expanded) state.expandedPullGroupIds.add(groupId);
+            else state.expandedPullGroupIds.delete(groupId);
+        },
+        onDecision: (groupId, decision) => {
+            state.pullGroupDecisions[groupId] = decision;
             renderPullChecks(results);
             saveSession();
-        });
-    });
-    elements.pullChecksContainer.querySelectorAll('.pull-group-review-route').forEach(button => {
-        button.addEventListener('click', async () => {
+        },
+        onShowGroupRoute: async groupId => {
             const group = [...(state.pullGroupAnalysis?.suggestions || []), ...(state.pullGroupAnalysis?.reviewGroups || [])]
-                .find(candidate => candidate.id === button.dataset.pullGroupId);
+                .find(candidate => candidate.id === groupId);
             const routeIndex = group?.routeIndices?.[0];
             if (!Number.isFinite(routeIndex)) return;
             await highlightCableRoute(routeIndex);
             document.querySelector('.route-visual-shell')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        });
-    });
-    elements.pullChecksContainer.querySelectorAll('.pull-check-view-setups').forEach(button => {
-        button.addEventListener('click', async () => {
-            const routeIndex = Number(button.dataset.pullRouteIndex);
+        },
+        onShowSetups: async routeIndex => {
             if (!Number.isFinite(routeIndex) || !state.latestRouteData[routeIndex]) return;
             state.pullSetupsVisible = true;
             state.labelsVisible = true;
@@ -3654,14 +1981,16 @@ const renderPullChecks = (results) => {
             const route = state.latestRouteData[routeIndex];
             const sectionCount = route.pull_check?.sections?.length || 1;
             if (elements.routeSelectionStatus) {
-                elements.routeSelectionStatus.textContent = `${route.cable} is selected. ${sectionCount} calculated pull setup location${sectionCount === 1 ? ' is' : 's are'} displayed with reel, tugger or hand-pull, sheave, and roller markers.`;
+                elements.routeSelectionStatus.textContent = route.cable + ' is selected. ' + sectionCount +
+                    ' calculated pull setup location' + (sectionCount === 1 ? ' is' : 's are') +
+                    ' displayed with reel, tugger or hand-pull, sheave, and roller markers.';
             }
             saveSession();
             document.querySelector('.route-visual-shell')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        });
+        }
     });
     elements.pullChecksDetails.style.display = '';
-    elements.pullChecksDetails.open = setupCount > 0 || reviewCount > 0;
+    elements.pullChecksDetails.open = review.setupCount > 0 || review.reviewCount > 0;
 };
 
 let routeResultRenderVersion = 0;
@@ -3839,7 +2168,7 @@ const renderBatchResults = async (results) => {
         if (results.length) setRouteReviewMode(true);
         return true;
     };
-    
+
     const updateCableListDisplay = () => {
         if (state.cableList.length === 0) {
             elements.cableListContainer.innerHTML = '';
@@ -3847,206 +2176,37 @@ const renderBatchResults = async (results) => {
             return;
         }
         state.cableList.forEach(syncManualPath);
-        let html = '<h4>Cables to Route:</h4><table id="cables-panel" class="sticky-table"><thead><tr>' +
-            '<th data-key="name">Tag</th>' +
-            '<th data-key="start_tag">Start Tag</th>' +
-            '<th data-key="end_tag">End Tag</th>' +
-            '<th data-key="cable_type">Cable Type</th>' +
-            '<th data-key="conductors">Conductors</th>' +
-            '<th data-key="conductor_size">Conductor Size</th>' +
-            '<th data-key="diameter">Diameter (in)</th>' +
-            '<th data-key="weight">Weight (lbs/ft)</th>' +
-            '<th data-key="allowed_cable_group">Allowed Group</th>' +
-            '<th data-key="start0">Start (X,Y,Z)</th>' +
-            '<th data-key="end0">End (X,Y,Z)</th>' +
-            '<th data-key="manual_path">Manual Path</th>' +
-            '<th data-key="locked">Locked</th><th></th><th></th></tr></thead><tbody>';
-        state.cableList.forEach((c, idx) => {
-            html += `<tr>
-                        <td><input type="text" class="cable-tag-input" data-idx="${idx}" value="${escapeAttr(c.name)}"></td>
-                        <td><input type="text" class="cable-start-tag-input" data-idx="${idx}" value="${escapeAttr(c.start_tag || '')}" style="width:180px;"></td>
-                        <td><input type="text" class="cable-end-tag-input" data-idx="${idx}" value="${escapeAttr(c.end_tag || '')}" style="width:180px;"></td>
-                        <td>
-                            <select class="cable-type-select" data-idx="${idx}">
-                                <option value="Power" ${c.cable_type === 'Power' ? 'selected' : ''}>Power</option>
-                                <option value="Control" ${c.cable_type === 'Control' ? 'selected' : ''}>Control</option>
-                                <option value="Signal" ${c.cable_type === 'Signal' ? 'selected' : ''}>Signal</option>
-                            </select>
-                        </td>
-                        <td><input type="number" class="cable-conductors-input" data-idx="${idx}" value="${c.conductors || 0}" min="1" step="1" style="width:60px;"></td>
-                        <td>
-                            <select class="cable-size-select" data-idx="${idx}">
-                                <option value="#22 AWG" ${c.conductor_size === '#22 AWG' ? 'selected' : ''}>#22 AWG</option>
-                                <option value="#20 AWG" ${c.conductor_size === '#20 AWG' ? 'selected' : ''}>#20 AWG</option>
-                                <option value="#18 AWG" ${c.conductor_size === '#18 AWG' ? 'selected' : ''}>#18 AWG</option>
-                                <option value="#16 AWG" ${c.conductor_size === '#16 AWG' ? 'selected' : ''}>#16 AWG</option>
-                                <option value="#14 AWG" ${c.conductor_size === '#14 AWG' ? 'selected' : ''}>#14 AWG</option>
-                                <option value="#12 AWG" ${c.conductor_size === '#12 AWG' ? 'selected' : ''}>#12 AWG</option>
-                                <option value="#10 AWG" ${c.conductor_size === '#10 AWG' ? 'selected' : ''}>#10 AWG</option>
-                                <option value="#8 AWG" ${c.conductor_size === '#8 AWG' ? 'selected' : ''}>#8 AWG</option>
-                                <option value="#6 AWG" ${c.conductor_size === '#6 AWG' ? 'selected' : ''}>#6 AWG</option>
-                                <option value="#4 AWG" ${c.conductor_size === '#4 AWG' ? 'selected' : ''}>#4 AWG</option>
-                                <option value="#2 AWG" ${c.conductor_size === '#2 AWG' ? 'selected' : ''}>#2 AWG</option>
-                                <option value="#1 AWG" ${c.conductor_size === '#1 AWG' ? 'selected' : ''}>#1 AWG</option>
-                                <option value="1/0 AWG" ${c.conductor_size === '1/0 AWG' ? 'selected' : ''}>1/0 AWG</option>
-                                <option value="2/0 AWG" ${c.conductor_size === '2/0 AWG' ? 'selected' : ''}>2/0 AWG</option>
-                                <option value="3/0 AWG" ${c.conductor_size === '3/0 AWG' ? 'selected' : ''}>3/0 AWG</option>
-                                <option value="4/0 AWG" ${c.conductor_size === '4/0 AWG' ? 'selected' : ''}>4/0 AWG</option>
-                                <option value="250 kcmil" ${c.conductor_size === '250 kcmil' ? 'selected' : ''}>250 kcmil</option>
-                                <option value="350 kcmil" ${c.conductor_size === '350 kcmil' ? 'selected' : ''}>350 kcmil</option>
-                                <option value="500 kcmil" ${c.conductor_size === '500 kcmil' ? 'selected' : ''}>500 kcmil</option>
-                                <option value="750 kcmil" ${c.conductor_size === '750 kcmil' ? 'selected' : ''}>750 kcmil</option>
-                                <option value="1000 kcmil" ${c.conductor_size === '1000 kcmil' ? 'selected' : ''}>1000 kcmil</option>
-                            </select>
-                        </td>
-                        <td><input type="number" class="cable-diameter-input" data-idx="${idx}" value="${c.diameter}" min="0" step="0.01" style="width:60px;"></td>
-                        <td><input type="number" class="cable-weight-input" data-idx="${idx}" value="${c.weight || 0}" min="0" step="0.01" style="width:80px;"></td>
-                        <td><input type="text" class="cable-group-input" data-idx="${idx}" value="${escapeAttr(c.allowed_cable_group || '')}" style="width:120px;"></td>
-                        <td>
-                            <input type="number" class="cable-start-input" data-idx="${idx}" data-coord="0" value="${c.start[0]}" step="0.1" style="width:60px;">
-                            <input type="number" class="cable-start-input" data-idx="${idx}" data-coord="1" value="${c.start[1]}" step="0.1" style="width:60px;">
-                            <input type="number" class="cable-start-input" data-idx="${idx}" data-coord="2" value="${c.start[2]}" step="0.1" style="width:60px;">
-                        </td>
-                        <td>
-                            <input type="number" class="cable-end-input" data-idx="${idx}" data-coord="0" value="${c.end[0]}" step="0.1" style="width:60px;">
-                            <input type="number" class="cable-end-input" data-idx="${idx}" data-coord="1" value="${c.end[1]}" step="0.1" style="width:60px;">
-                            <input type="number" class="cable-end-input" data-idx="${idx}" data-coord="2" value="${c.end[2]}" step="0.1" style="width:60px;">
-                        </td>
-                        <td><input type="text" class="cable-manual-input" data-idx="${idx}" value="${escapeAttr(c.manual_path || '')}" placeholder="Tray1>Tray2 or x,y,z;..." style="width:180px;"></td>
-                        <td><span class="lock-indicator">${c.locked ? '🔒' : ''}</span>${c.locked ? `<button class="unlock-cable" data-idx="${idx}">Unlock</button>` : (c.route_segments && c.route_segments.length ? `<button class="relock-cable" data-idx="${idx}">Relock</button>` : '')}</td>
-                        <td><button class="icon-button dup-cable" data-idx="${idx}" title="Duplicate" aria-label="Duplicate cable">📋</button></td>
-                        <td><button class="icon-button del-cable icon-delete" data-idx="${idx}" title="Delete" aria-label="Delete cable">\u274C</button></td>
-                    </tr>`;
-        });
-        html += '</tbody></table>';
-        elements.cableListContainer.innerHTML = html;
+        elements.cableListContainer.innerHTML = buildCableTableMarkup(state.cableList, { escapeAttr });
         elements.cableListContainer.classList.add('table-scroll');
-        elements.cableListContainer.querySelectorAll('.cable-tag-input').forEach(input => {
-            input.addEventListener('input', e => {
-                const i = parseInt(e.target.dataset.idx, 10);
-                state.cableList[i].name = e.target.value;
+        bindCableTable(elements.cableListContainer, {
+            onFieldChange: ({ index, field, coordinate, value }) => {
+                const cable = state.cableList[index];
+                if (!cable) return;
+                if (field === 'start' || field === 'end') cable[field][coordinate] = value;
+                else cable[field] = value;
                 saveSession();
-            });
-        });
-        elements.cableListContainer.querySelectorAll('.cable-start-tag-input').forEach(input => {
-            input.addEventListener('input', e => {
-                const i = parseInt(e.target.dataset.idx, 10);
-                state.cableList[i].start_tag = e.target.value;
-                saveSession();
-            });
-        });
-        elements.cableListContainer.querySelectorAll('.cable-end-tag-input').forEach(input => {
-            input.addEventListener('input', e => {
-                const i = parseInt(e.target.dataset.idx, 10);
-                state.cableList[i].end_tag = e.target.value;
-                saveSession();
-            });
-        });
-        elements.cableListContainer.querySelectorAll('.cable-diameter-input').forEach(input => {
-            input.addEventListener('input', e => {
-                const i = parseInt(e.target.dataset.idx, 10);
-                state.cableList[i].diameter = parseFloat(e.target.value);
-                saveSession();
-            });
-        });
-        elements.cableListContainer.querySelectorAll('.cable-conductors-input').forEach(input => {
-            input.addEventListener('input', e => {
-                const i = parseInt(e.target.dataset.idx, 10);
-                state.cableList[i].conductors = parseInt(e.target.value);
-                saveSession();
-            });
-        });
-        elements.cableListContainer.querySelectorAll('.cable-size-select').forEach(sel => {
-            sel.addEventListener('change', e => {
-                const i = parseInt(e.target.dataset.idx, 10);
-                state.cableList[i].conductor_size = e.target.value;
-                saveSession();
-            });
-        });
-        elements.cableListContainer.querySelectorAll('.cable-weight-input').forEach(input => {
-            input.addEventListener('input', e => {
-                const i = parseInt(e.target.dataset.idx, 10);
-                state.cableList[i].weight = parseFloat(e.target.value);
-                saveSession();
-            });
-        });
-        elements.cableListContainer.querySelectorAll('.cable-type-select').forEach(sel => {
-            sel.addEventListener('change', e => {
-                const i = parseInt(e.target.dataset.idx, 10);
-                state.cableList[i].cable_type = e.target.value;
-                saveSession();
-            });
-        });
-        elements.cableListContainer.querySelectorAll('.cable-group-input').forEach(input => {
-            input.addEventListener('input', e => {
-                const i = parseInt(e.target.dataset.idx, 10);
-                state.cableList[i].allowed_cable_group = e.target.value;
-                saveSession();
-            });
-        });
-        elements.cableListContainer.querySelectorAll('.cable-start-input').forEach(input => {
-            input.addEventListener('input', e => {
-                const i = parseInt(e.target.dataset.idx, 10);
-                const coord = parseInt(e.target.dataset.coord, 10);
-                state.cableList[i].start[coord] = parseFloat(e.target.value);
-                saveSession();
-            });
-        });
-        elements.cableListContainer.querySelectorAll('.cable-end-input').forEach(input => {
-            input.addEventListener('input', e => {
-                const i = parseInt(e.target.dataset.idx, 10);
-                const coord = parseInt(e.target.dataset.coord, 10);
-                state.cableList[i].end[coord] = parseFloat(e.target.value);
-                saveSession();
-            });
-        });
-        elements.cableListContainer.querySelectorAll('.cable-manual-input').forEach(input => {
-            input.addEventListener('input', e => {
-                const i = parseInt(e.target.dataset.idx, 10);
-                state.cableList[i].manual_path = e.target.value;
-                e.target.classList.remove('input-error');
-                const err = e.target.nextElementSibling;
-                if (err && err.classList.contains('error-message')) err.remove();
-                saveSession();
-            });
-        });
-        elements.cableListContainer.querySelectorAll('.dup-cable').forEach(btn => {
-            btn.addEventListener('click', e => {
-                const i = parseInt(e.target.dataset.idx, 10);
-                const copy = structuredClone(state.cableList[i]);
+            },
+            onDuplicate: index => {
+                const copy = structuredClone(state.cableList[index]);
                 copy.name = nextCableName(copy.name);
-                state.cableList.splice(i + 1, 0, copy);
+                state.cableList.splice(index + 1, 0, copy);
                 updateCableListDisplay();
                 saveSession();
-            });
-        });
-        elements.cableListContainer.querySelectorAll('.del-cable').forEach(btn => {
-            btn.addEventListener('click', e => {
-                const i = parseInt(e.target.dataset.idx, 10);
-                state.cableList.splice(i, 1);
+            },
+            onDelete: index => {
+                state.cableList.splice(index, 1);
                 updateCableListDisplay();
                 saveSession();
-            });
-        });
-        elements.cableListContainer.querySelectorAll('.unlock-cable').forEach(btn => {
-            btn.addEventListener('click', e => {
-                const i = parseInt(e.target.dataset.idx, 10);
-                state.cableList[i].locked = false;
-                if (state.latestRouteData && state.latestRouteData[i]) state.latestRouteData[i].mode = 'Unlocked';
+            },
+            onLockChange: (index, locked) => {
+                state.cableList[index].locked = locked;
+                if (state.latestRouteData?.[index]) {
+                    state.latestRouteData[index].mode = locked ? 'Locked' : 'Unlocked';
+                }
                 saveSession();
                 updateCableListDisplay();
                 renderBatchResults(state.latestRouteData);
-            });
-        });
-        elements.cableListContainer.querySelectorAll('.relock-cable').forEach(btn => {
-            btn.addEventListener('click', e => {
-                const i = parseInt(e.target.dataset.idx, 10);
-                state.cableList[i].locked = true;
-                if (state.latestRouteData && state.latestRouteData[i]) state.latestRouteData[i].mode = 'Locked';
-                saveSession();
-                updateCableListDisplay();
-                renderBatchResults(state.latestRouteData);
-            });
+            }
         });
         updateTableCounts();
         addSortHandlers(elements.cableListContainer, state.cableList, updateCableListDisplay, cableSort);
@@ -4842,24 +3002,18 @@ const renderBatchResults = async (results) => {
                         });
                         const totalArea = areas.reduce((a,b) => a + b, 0);
                         const count = r.cables.length;
-                        let recommendation;
-                        if (count <= CONTAINMENT_RULES.thresholds.conduit) recommendation = 'conduit';
-                        else if (count <= CONTAINMENT_RULES.thresholds.channel) recommendation = 'channel';
-                        else recommendation = 'tray';
-                        let tradeSize = null;
-                        let traySize = null;
-                        if (recommendation === 'conduit') {
-                            const conduitType = elements.conduitType.value;
-                            const spec = CONDUIT_SPECS[conduitType] || {};
-                            const fillPct = count === 1 ? 0.53 : count === 2 ? 0.31 : 0.40;
-                            for (const size of Object.keys(spec)) {
-                                if (totalArea <= spec[size] * fillPct) { tradeSize = size; break; }
-                            }
-                            if (!tradeSize) tradeSize = 'N/A';
-                        } else {
-                            const cableObjs = r.cables.map(n => cableMapForObj.get(n)).filter(Boolean);
-                            traySize = computeNeededTrayWidth(cableObjs) || null;
-                        }
+                        const cableObjs = r.cables.map(name => cableMapForObj.get(name) || {
+                            diameter: cableMapForArea.get(name) || 0
+                        });
+                        const sizing = recommendRaceway(cableObjs, {
+                            thresholds: CONTAINMENT_RULES.thresholds,
+                            conduitType: elements.conduitType.value,
+                            conduitSpecs: CONDUIT_SPECS,
+                            totalAreaOverride: totalArea
+                        });
+                        const recommendation = sizing.recommendation;
+                        const tradeSize = recommendation === 'conduit' ? sizing.tradeSize || 'N/A' : null;
+                        const traySize = sizing.traySize;
                         return { ...r, total_area: totalArea, cable_count: count, recommendation, trade_size: tradeSize, tray_size: traySize };
                     });
                     state.sharedFieldRoutes = common;
@@ -4975,6 +3129,11 @@ const renderBatchResults = async (results) => {
             maxFieldEdge: parseFloat(document.getElementById('max-field-edge').value),
             maxFieldNeighbors: 8,
             includeDuctbankOutlines: state.includeDuctbankOutlines,
+            clock: () => performance.now(),
+            warningLog: message => console.warn(message),
+            debugLog: (...args) => {
+                if (window.debug?.enabled) window.debug.log(...args);
+            }
         });
 
         const trayData = state.finalTrays.map(t => ({ ...t }));
@@ -5108,163 +3267,6 @@ const renderBatchResults = async (results) => {
     };
     
     // --- VISUALIZATION ---
-    const ROUTE_COLORS = {
-        route: '#2563eb',
-        field: '#f59e0b',
-        selected: '#06b6d4',
-        raceway: '#64748b',
-        conduit: '#334155',
-        ductbank: '#9a6b44',
-        start: '#16a34a',
-        end: '#7c3aed'
-    };
-    const ROUTE_VIEW_PRESETS = {
-        isometric: {
-            camera: { up: { x: 0, y: 0, z: 1 }, eye: { x: 1.45, y: 1.45, z: 1.15 } },
-            projection: 'perspective'
-        },
-        plan: {
-            camera: { up: { x: 0, y: 1, z: 0 }, eye: { x: 0, y: 0, z: 2.5 } },
-            projection: 'orthographic'
-        },
-        front: {
-            camera: { up: { x: 0, y: 0, z: 1 }, eye: { x: 0, y: -2.5, z: 0.15 } },
-            projection: 'orthographic'
-        },
-        right: {
-            camera: { up: { x: 0, y: 0, z: 1 }, eye: { x: 2.5, y: 0, z: 0.15 } },
-            projection: 'orthographic'
-        }
-    };
-    const plotConfig = {
-        responsive: true,
-        scrollZoom: true,
-        displaylogo: false,
-        modeBarButtonsToRemove: ['toImage', 'sendDataToCloud', 'lasso3d', 'select2d']
-    };
-    const routeMetrics = route => {
-        const segments = route?.route_segments || route?.segments || [];
-        const segmentLength = segment => {
-            const explicitLength = Number(segment.length);
-            if (Number.isFinite(explicitLength)) return explicitLength;
-            if (!Array.isArray(segment.start) || !Array.isArray(segment.end)) return 0;
-            return Math.hypot(
-                Number(segment.end[0]) - Number(segment.start[0]),
-                Number(segment.end[1]) - Number(segment.start[1]),
-                Number(segment.end[2]) - Number(segment.start[2])
-            );
-        };
-        const total = segments.reduce((sum, segment) => sum + segmentLength(segment), 0);
-        const field = segments
-            .filter(segment => segment.type !== 'tray')
-            .reduce((sum, segment) => sum + segmentLength(segment), 0);
-        return { segments: segments.length, total, field };
-    };
-    const updatePlotSelectionCard = ({ kicker, name, detail } = {}) => {
-        if (!elements.plotSelectionCard) return;
-        elements.plotSelectionCard.hidden = !name;
-        if (!name) return;
-        elements.plotSelectionKicker.textContent = kicker || 'Selected route';
-        elements.plotSelectionName.textContent = name;
-        elements.plotSelectionDetail.textContent = detail || '';
-    };
-    const updatePlotSummary = (trays, routes) => {
-        const fieldCount = routes.reduce((count, route) => (
-            count + (route.segments || []).filter(segment => segment.type !== 'tray').length
-        ), 0);
-        const racewayCount = buildRouteSceneModel({
-            raceways: trays,
-            ductbanks: state.ductbankData?.ductbanks || []
-        }).raceways.length;
-        if (elements.plotRouteCount) elements.plotRouteCount.textContent = routes.length.toLocaleString();
-        if (elements.plotRacewayCount) elements.plotRacewayCount.textContent = racewayCount.toLocaleString();
-        if (elements.plotFieldCount) elements.plotFieldCount.textContent = fieldCount.toLocaleString();
-    };
-    const utilizationForTray = tray => {
-        const totalFill = Array.isArray(tray.slotFills)
-            ? tray.slotFills.reduce((sum, fill) => sum + (Number(fill) || 0), 0)
-            : (Number(tray.current_fill) || 0);
-        const totalMax = (Number(tray.maxFill) || 0) * (Number(tray.numSlots) || 1);
-        return totalMax ? Math.max(0, Math.min(100, (totalFill / totalMax) * 100)) : 0;
-    };
-    const heatColor = pct => {
-        if (pct < 50) return '#14b8a6';
-        if (pct < 80) return '#f59e0b';
-        return '#ef4444';
-    };
-    const currentViewDefinition = () => ROUTE_VIEW_PRESETS[state.plotView] || ROUTE_VIEW_PRESETS.isometric;
-    const graphTheme = () => {
-        const dark = document.body.classList.contains('dark-mode');
-        return {
-            surface: dark ? '#0f172a' : '#f4f7fb',
-            text: dark ? '#e5e7eb' : '#334155',
-            grid: dark ? 'rgba(148, 163, 184, 0.2)' : 'rgba(100, 116, 139, 0.2)',
-            axis: dark ? '#64748b' : '#94a3b8',
-            hover: dark ? '#0f172a' : '#ffffff',
-            floor: dark ? '#1e293b' : '#dbeafe'
-        };
-    };
-    const routePointKey = point => point.map(value => (Number(value) || 0).toFixed(3)).join(',');
-    const routeSegmentKey = segment => {
-        const endpoints = [routePointKey(segment.start), routePointKey(segment.end)].sort();
-        return `${segment.type === 'tray' ? 'tray' : 'field'}|${endpoints.join('|')}`;
-    };
-    const aggregateRouteSegments = routes => {
-        const segmentMap = new Map();
-        routes.forEach((route, routeIndex) => {
-            (route.segments || []).forEach(segment => {
-                if (!Array.isArray(segment.start) || !Array.isArray(segment.end)) return;
-                const key = routeSegmentKey(segment);
-                if (!segmentMap.has(key)) {
-                    segmentMap.set(key, {
-                        type: segment.type === 'tray' ? 'tray' : 'field',
-                        start: segment.start,
-                        end: segment.end,
-                        routeIndices: new Set(),
-                        cableLabels: new Set(),
-                        racewayIds: new Set()
-                    });
-                }
-                const aggregate = segmentMap.get(key);
-                aggregate.routeIndices.add(routeIndex);
-                aggregate.cableLabels.add(route.label || `Route ${routeIndex + 1}`);
-                const racewayId = segment.tray_id || segment.raceway_id || segment.conduit_id;
-                if (racewayId) aggregate.racewayIds.add(racewayId);
-            });
-        });
-        return Array.from(segmentMap.values()).map(segment => ({
-            ...segment,
-            routeIndices: Array.from(segment.routeIndices),
-            cableLabels: Array.from(segment.cableLabels),
-            racewayIds: Array.from(segment.racewayIds)
-        }));
-    };
-    const groupRouteEndpoints = (routes, endpoint) => {
-        const groups = [];
-        const clusterDistance = 7.5;
-        routes.forEach((route, routeIndex) => {
-            const point = endpoint === 'Start' ? route.startPoint : route.endPoint;
-            if (!Array.isArray(point)) return;
-            let group = groups.find(candidate => Math.hypot(
-                candidate.point[0] - point[0],
-                candidate.point[1] - point[1],
-                candidate.point[2] - point[2]
-            ) <= clusterDistance);
-            if (!group) {
-                group = { point: point.slice(), points: [], routeIndices: [], labels: [], tags: [] };
-                groups.push(group);
-            }
-            group.points.push(point);
-            group.routeIndices.push(routeIndex);
-            group.labels.push(route.label || `Route ${routeIndex + 1}`);
-            const tag = endpoint === 'Start' ? route.startTag : route.endTag;
-            if (tag && !group.tags.includes(tag)) group.tags.push(tag);
-            group.point = [0, 1, 2].map(coordinate => (
-                group.points.reduce((sum, candidate) => sum + Number(candidate[coordinate]), 0) / group.points.length
-            ));
-        });
-        return groups;
-    };
 
     const viewerRaceways = () => state.finalTrays.length ? state.finalTrays : state.trayData;
     const viewerRoutes = () => {
@@ -5290,6 +3292,28 @@ const renderBatchResults = async (results) => {
         ductbanks: state.ductbankData?.ductbanks || [],
         routes: viewerRoutes()
     });
+
+    const updatePlotSelectionCard = ({ kicker, name, detail } = {}) => {
+        if (!elements.plotSelectionCard) return;
+        elements.plotSelectionCard.hidden = !name;
+        if (!name) return;
+        elements.plotSelectionKicker.textContent = kicker || 'Selected route';
+        elements.plotSelectionName.textContent = name;
+        elements.plotSelectionDetail.textContent = detail || '';
+    };
+
+    const updatePlotSummary = (trays, routes) => {
+        const fieldCount = routes.reduce((count, route) => (
+            count + (route.segments || []).filter(segment => segment.type !== 'tray').length
+        ), 0);
+        const racewayCount = buildRouteSceneModel({
+            raceways: trays,
+            ductbanks: state.ductbankData?.ductbanks || []
+        }).raceways.length;
+        if (elements.plotRouteCount) elements.plotRouteCount.textContent = routes.length.toLocaleString();
+        if (elements.plotRacewayCount) elements.plotRacewayCount.textContent = racewayCount.toLocaleString();
+        if (elements.plotFieldCount) elements.plotFieldCount.textContent = fieldCount.toLocaleString();
+    };
 
     const renderRacewayClassLegend = summary => {
         if (!elements.racewayClassLegend) return;
@@ -5638,324 +3662,25 @@ const renderBatchResults = async (results) => {
             console.warn('Plotly is not loaded');
             return;
         }
-        const traces = [];
         const theme = graphTheme();
         const view = currentViewDefinition();
-        state.ductbankTraceIndices = [];
         state.selectedRouteIndex = null;
         updatePlotSelectionCard();
         updatePlotSummary(trays, routes);
-
-        const geometryPoints = [];
-        trays.forEach(tray => {
-            geometryPoints.push(
-                [tray.start_x, tray.start_y, tray.start_z],
-                [tray.end_x, tray.end_y, tray.end_z]
-            );
+        const scene = buildPlotlyRouteScene({
+            trays,
+            routes,
+            title,
+            theme,
+            view,
+            heatmapEnabled: state.heatmapEnabled,
+            ductbankVisible: state.ductbankVisible,
+            labelsVisible: state.labelsVisible,
+            fieldConnectionsVisible: state.fieldConnectionsVisible,
+            darkMode: document.body.classList.contains('dark-mode')
         });
-        routes.forEach(route => (route.segments || []).forEach(segment => {
-            if (Array.isArray(segment.start)) geometryPoints.push(segment.start);
-            if (Array.isArray(segment.end)) geometryPoints.push(segment.end);
-        }));
-        let facilityFloorZ = 0;
-        if (geometryPoints.length) {
-            const coordinates = index => geometryPoints.map(point => Number(point[index])).filter(Number.isFinite);
-            const xs = coordinates(0), ys = coordinates(1), zs = coordinates(2);
-            const minX = Math.min(...xs), maxX = Math.max(...xs);
-            const minY = Math.min(...ys), maxY = Math.max(...ys);
-            const minZ = Math.min(...zs);
-            const xPadding = Math.max((maxX - minX) * 0.08, 6);
-            const yPadding = Math.max((maxY - minY) * 0.08, 6);
-            const floorZ = minZ - Math.max((Math.max(...zs) - minZ) * 0.04, 2);
-            facilityFloorZ = floorZ;
-            traces.push({
-                type: 'surface',
-                x: [minX - xPadding, maxX + xPadding],
-                y: [minY - yPadding, maxY + yPadding],
-                z: [[floorZ, floorZ], [floorZ, floorZ]],
-                surfacecolor: [[0, 0], [0, 0]],
-                colorscale: [[0, theme.floor], [1, theme.floor]],
-                opacity: 0.34,
-                showscale: false,
-                hoverinfo: 'skip',
-                name: '__facility_floor__',
-                showlegend: false
-            });
-            const floorGrid = { x: [], y: [], z: [] };
-            const gridDivisions = 8;
-            for (let index = 0; index <= gridDivisions; index += 1) {
-                const x = minX - xPadding + ((maxX - minX + (2 * xPadding)) * index / gridDivisions);
-                const y = minY - yPadding + ((maxY - minY + (2 * yPadding)) * index / gridDivisions);
-                floorGrid.x.push(x, x, null, minX - xPadding, maxX + xPadding, null);
-                floorGrid.y.push(minY - yPadding, maxY + yPadding, null, y, y, null);
-                floorGrid.z.push(floorZ, floorZ, null, floorZ, floorZ, null);
-            }
-            traces.push({
-                ...floorGrid,
-                type: 'scatter3d', mode: 'lines',
-                line: { color: theme.axis, width: 1 }, opacity: 0.24,
-                hoverinfo: 'skip', showlegend: false, name: '__facility_grid__'
-            });
-        }
-
-        const meshForSegment = (start, end, tray) => {
-            const actualWidth = (Number(tray.width) || 6) / 12;
-            const actualHeight = (Number(tray.height) || 4) / 12;
-            const width = Math.max(actualWidth, 1.25);
-            const height = Math.max(actualHeight, 0.65);
-            const [sx, sy, sz] = start;
-            const [ex, ey, ez] = end;
-            let vertices;
-            if (sx !== ex) {
-                const y1 = sy - width / 2, y2 = sy + width / 2;
-                const z1 = sz - height / 2, z2 = sz + height / 2;
-                vertices = [[sx,y1,z1],[sx,y2,z1],[sx,y2,z2],[sx,y1,z2],[ex,y1,z1],[ex,y2,z1],[ex,y2,z2],[ex,y1,z2]];
-            } else if (sy !== ey) {
-                const x1 = sx - width / 2, x2 = sx + width / 2;
-                const z1 = sz - height / 2, z2 = sz + height / 2;
-                vertices = [[x1,sy,z1],[x2,sy,z1],[x2,sy,z2],[x1,sy,z2],[x1,ey,z1],[x2,ey,z1],[x2,ey,z2],[x1,ey,z2]];
-            } else {
-                const x1 = sx - width / 2, x2 = sx + width / 2;
-                const y1 = sy - height / 2, y2 = sy + height / 2;
-                vertices = [[x1,y1,sz],[x2,y1,sz],[x2,y2,sz],[x1,y2,sz],[x1,y1,ez],[x2,y1,ez],[x2,y2,ez],[x1,y2,ez]];
-            }
-            const racewayType = tray.raceway_type || 'tray';
-            const utilization = utilizationForTray(tray);
-            const color = state.heatmapEnabled
-                ? heatColor(utilization)
-                : racewayType === 'ductbank'
-                    ? ROUTE_COLORS.ductbank
-                    : racewayType === 'conduit'
-                        ? ROUTE_COLORS.conduit
-                        : ROUTE_COLORS.raceway;
-            return {
-                type: 'mesh3d',
-                x: vertices.map(vertex => vertex[0]),
-                y: vertices.map(vertex => vertex[1]),
-                z: vertices.map(vertex => vertex[2]),
-                i: [0,0,4,4,3,3,0,0,0,0,1,1],
-                j: [1,2,5,6,2,6,1,5,3,7,2,6],
-                k: [2,3,6,7,6,7,5,4,7,4,6,5],
-                color,
-                opacity: state.heatmapEnabled ? 0.8 : 0.42,
-                flatshading: true,
-                lighting: { ambient: 0.8, diffuse: 0.55, specular: 0.05, roughness: 0.9 },
-                name: tray.tray_id,
-                meta: { kind: 'raceway', trayId: tray.tray_id },
-                customdata: [[racewayType, tray.width, tray.height, utilization]],
-                hovertemplate: `<b>${tray.tray_id}</b><br>${racewayType}<br>${tray.width || '—'} in × ${tray.height || '—'} in<br>Utilization: ${utilization.toFixed(1)}%<extra></extra>`,
-                visible: racewayType === 'ductbank' ? state.ductbankVisible : true,
-                showlegend: false
-            };
-        };
-        const traySegments = tray => {
-            const start = [tray.start_x, tray.start_y, tray.start_z];
-            const end = [tray.end_x, tray.end_y, tray.end_z];
-            const segments = [];
-            let current = start.slice();
-            if (current[0] !== end[0]) { const next = [end[0], current[1], current[2]]; segments.push([current, next]); current = next; }
-            if (current[1] !== end[1]) { const next = [current[0], end[1], current[2]]; segments.push([current, next]); current = next; }
-            if (current[2] !== end[2]) { const next = [current[0], current[1], end[2]]; segments.push([current, next]); current = next; }
-            if (segments.length === 0) segments.push([start, end]);
-            return segments;
-        };
-
-        const labelX = [], labelY = [], labelZ = [], labelText = [];
-        trays.forEach(tray => {
-            const segments = traySegments(tray);
-            segments.map(segment => meshForSegment(segment[0], segment[1], tray)).forEach(trace => {
-                const traceIndex = traces.length;
-                traces.push(trace);
-                if (tray.raceway_type === 'ductbank') state.ductbankTraceIndices.push(traceIndex);
-            });
-            const centerline = { x: [], y: [], z: [] };
-            segments.forEach(segment => {
-                centerline.x.push(segment[0][0], segment[1][0], null);
-                centerline.y.push(segment[0][1], segment[1][1], null);
-                centerline.z.push(segment[0][2], segment[1][2], null);
-            });
-            const racewayType = tray.raceway_type || 'tray';
-            const centerlineIndex = traces.length;
-            traces.push({
-                ...centerline,
-                type: 'scatter3d', mode: 'lines',
-                line: {
-                    color: racewayType === 'ductbank' ? '#795234' : racewayType === 'conduit' ? '#1e293b' : '#475569',
-                    width: racewayType === 'ductbank' ? 7 : 5
-                },
-                opacity: state.heatmapEnabled ? 0.45 : 0.62,
-                name: tray.tray_id,
-                meta: { kind: 'raceway', trayId: tray.tray_id },
-                hovertemplate: `<b>${tray.tray_id}</b><br>${racewayType}<br>Click to inspect<extra></extra>`,
-                visible: racewayType === 'ductbank' ? state.ductbankVisible : true,
-                showlegend: false
-            });
-            if (racewayType === 'ductbank') state.ductbankTraceIndices.push(centerlineIndex);
-            labelX.push((tray.start_x + tray.end_x) / 2);
-            labelY.push((tray.start_y + tray.end_y) / 2);
-            labelZ.push((tray.start_z + tray.end_z) / 2 + 0.75);
-            labelText.push(tray.tray_id);
-        });
-        if (state.labelsVisible && labelX.length) {
-            traces.push({
-                type: 'scatter3d', mode: 'text', x: labelX, y: labelY, z: labelZ,
-                text: labelText, textfont: { size: 10, color: theme.text },
-                showlegend: false, hoverinfo: 'skip', meta: { kind: 'labels' }
-            });
-        }
-
-        const aggregatedSegments = aggregateRouteSegments(routes);
-        aggregatedSegments.filter(segment => segment.type === 'tray').forEach(segment => {
-            const cableCount = segment.routeIndices.length;
-            const corridorWidth = 4 + Math.min(9, Math.log2(cableCount + 1) * 2.4);
-            const corridorColor = cableCount >= 12
-                ? '#1d4ed8'
-                : cableCount >= 5
-                    ? '#2563eb'
-                    : '#3b82f6';
-            const cablePreview = segment.cableLabels.slice(0, 5).join(', ');
-            const moreCables = Math.max(0, cableCount - 5);
-            const racewayText = segment.racewayIds.length ? `<br>Raceway: ${segment.racewayIds.join(', ')}` : '';
-            const hover = `<b>${cableCount} cable${cableCount === 1 ? '' : 's'} in this corridor</b>${racewayText}<br>${cablePreview}${moreCables ? ` +${moreCables} more` : ''}<extra>Click to inspect corridor</extra>`;
-            const linePoints = {
-                x: [segment.start[0], segment.end[0]],
-                y: [segment.start[1], segment.end[1]],
-                z: [segment.start[2], segment.end[2]]
-            };
-            traces.push({
-                ...linePoints, type: 'scatter3d', mode: 'lines',
-                line: { color: document.body.classList.contains('dark-mode') ? '#020617' : '#ffffff', width: corridorWidth + 5 },
-                opacity: 0.9, hoverinfo: 'skip', showlegend: false, name: '__corridor_halo__'
-            });
-            traces.push({
-                ...linePoints, type: 'scatter3d', mode: 'lines',
-                line: { color: corridorColor, width: corridorWidth },
-                opacity: 0.96,
-                name: `${cableCount} cable corridor`,
-                showlegend: false,
-                hovertemplate: hover,
-                meta: {
-                    kind: 'route-corridor',
-                    start: segment.start,
-                    end: segment.end,
-                    routeIndices: segment.routeIndices,
-                    cableLabels: segment.cableLabels,
-                    racewayIds: segment.racewayIds
-                }
-            });
-        });
-        if (state.fieldConnectionsVisible) {
-            aggregatedSegments.filter(segment => segment.type === 'field').forEach(segment => {
-                const cableCount = segment.routeIndices.length;
-                traces.push({
-                    x: [segment.start[0], segment.end[0]],
-                    y: [segment.start[1], segment.end[1]],
-                    z: [segment.start[2], segment.end[2]],
-                    type: 'scatter3d', mode: 'lines',
-                    line: { color: ROUTE_COLORS.field, width: 2 + Math.min(4, Math.sqrt(cableCount)), dash: 'dash' },
-                    opacity: 0.58,
-                    name: `${cableCount} cable field jump`,
-                    showlegend: false,
-                    hovertemplate: `<b>Field jump</b><br>${cableCount} cable${cableCount === 1 ? '' : 's'}<extra>Click to inspect</extra>`,
-                    meta: {
-                        kind: 'route-corridor',
-                        start: segment.start,
-                        end: segment.end,
-                        routeIndices: segment.routeIndices,
-                        cableLabels: segment.cableLabels,
-                        racewayIds: []
-                    }
-                });
-            });
-        }
-
-        const endpointTrace = (groups, color, endpoint) => ({
-            type: 'scatter3d', mode: state.labelsVisible ? 'markers+text' : 'markers',
-            x: groups.map(group => group.point[0]),
-            y: groups.map(group => group.point[1]),
-            z: groups.map(group => group.point[2]),
-            text: groups.map(group => group.tags.join(', ') || `${group.labels.length} ${endpoint.toLowerCase()}`),
-            textposition: 'top center',
-            textfont: { size: 10, color: theme.text },
-            marker: {
-                color,
-                size: groups.map(group => 7 + Math.min(6, Math.log2(group.routeIndices.length + 1) * 2)),
-                symbol: endpoint === 'Start' ? 'circle' : 'diamond',
-                opacity: 0.9,
-                line: { color: theme.hover, width: 2 }
-            },
-            customdata: groups.map(group => [group.routeIndices, group.routeIndices.length, group.labels.join(', ')]),
-            meta: { kind: 'route-endpoint-cluster', endpoint },
-            hovertemplate: `<b>%{text}</b><br>%{customdata[1]} cable${endpoint === 'Start' ? ' start' : ' end'}<br>%{customdata[2]}<extra>Click to inspect</extra>`,
-            showlegend: false
-        });
-        const startGroups = groupRouteEndpoints(routes, 'Start');
-        const endGroups = groupRouteEndpoints(routes, 'End');
-        const endpointStemTrace = (groups, color) => {
-            const stemPoints = { x: [], y: [], z: [] };
-            groups.forEach(group => {
-                stemPoints.x.push(group.point[0], group.point[0], null);
-                stemPoints.y.push(group.point[1], group.point[1], null);
-                stemPoints.z.push(facilityFloorZ, group.point[2], null);
-            });
-            return {
-                ...stemPoints, type: 'scatter3d', mode: 'lines',
-                line: { color, width: 2 }, opacity: 0.28,
-                hoverinfo: 'skip', showlegend: false, name: '__endpoint_stems__'
-            };
-        };
-        if (startGroups.length) {
-            traces.push(endpointStemTrace(startGroups, ROUTE_COLORS.start));
-            traces.push(endpointTrace(startGroups, ROUTE_COLORS.start, 'Start'));
-        }
-        if (endGroups.length) {
-            traces.push(endpointStemTrace(endGroups, ROUTE_COLORS.end));
-            traces.push(endpointTrace(endGroups, ROUTE_COLORS.end, 'End'));
-        }
-
-        if (state.heatmapEnabled) {
-            traces.push({
-                type: 'scatter3d', mode: 'markers', x: [null], y: [null], z: [null],
-                marker: {
-                    size: 0, color: [0], cmin: 0, cmax: 100,
-                    colorscale: [[0, '#14b8a6'], [0.5, '#f59e0b'], [1, '#ef4444']],
-                    colorbar: { title: { text: 'Fill %', side: 'right' }, thickness: 12, len: 0.55, x: 0.99 }
-                },
-                hoverinfo: 'skip', showlegend: false
-            });
-        }
-
-        const axis = titleText => ({
-            title: { text: titleText, font: { size: 11 } },
-            showbackground: false,
-            showgrid: true,
-            gridcolor: theme.grid,
-            zeroline: false,
-            showline: true,
-            linecolor: theme.axis,
-            ticks: '',
-            color: theme.text,
-            showspikes: false
-        });
-        const layout = {
-            title: { text: '' },
-            autosize: true,
-            showlegend: false,
-            paper_bgcolor: 'rgba(0,0,0,0)',
-            plot_bgcolor: 'rgba(0,0,0,0)',
-            font: { family: 'Inter, ui-sans-serif, system-ui, sans-serif', color: theme.text },
-            hoverlabel: { bgcolor: theme.hover, bordercolor: theme.axis, font: { color: theme.text } },
-            margin: { l: 0, r: state.heatmapEnabled ? 54 : 0, t: 0, b: 0 },
-            scene: {
-                aspectmode: 'data',
-                bgcolor: theme.surface,
-                camera: { ...structuredClone(view.camera), projection: { type: view.projection } },
-                xaxis: axis('X'),
-                yaxis: axis('Y'),
-                zaxis: axis('Elevation')
-            },
-            uirevision: `optimal-route-${title}`
-        };
+        const { traces, layout } = scene;
+        state.ductbankTraceIndices = scene.ductbankTraceIndices;
         const render = elements.plot3d.data ? Plotly.react : Plotly.newPlot;
         Promise.resolve(render(elements.plot3d, traces, layout, plotConfig)).then(() => {
             if (!elements.plot3d.dataset.routePlotBound) {

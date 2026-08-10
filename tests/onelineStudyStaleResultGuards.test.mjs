@@ -1,56 +1,12 @@
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { resolveComponentAttribute } from '../src/one-line/componentAttributes.mjs';
+import { createStudyExecutionController } from '../src/one-line/studyExecutionController.mjs';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const repoRoot = path.resolve(__dirname, '..');
-const source = fs.readFileSync(path.join(repoRoot, 'oneline.js'), 'utf8');
-
-function getFunctionBody(name) {
-  const start = source.indexOf(`async function ${name}()`);
-  assert.notEqual(start, -1, `${name} should exist`);
-  const bodyStart = source.indexOf('{', start);
-  let depth = 0;
-  for (let i = bodyStart; i < source.length; i += 1) {
-    if (source[i] === '{') depth += 1;
-    if (source[i] === '}') depth -= 1;
-    if (depth === 0) return source.slice(bodyStart + 1, i);
-  }
-  assert.fail(`Unable to parse ${name}`);
-}
-
-function getFunctionSource(name) {
-  const start = source.indexOf(`function ${name}(`);
-  assert.notEqual(start, -1, `${name} should exist`);
-  const bodyStart = source.indexOf('{', start);
-  let depth = 0;
-  for (let i = bodyStart; i < source.length; i += 1) {
-    if (source[i] === '{') depth += 1;
-    if (source[i] === '}') depth -= 1;
-    if (depth === 0) return source.slice(start, i + 1);
-  }
-  assert.fail(`Unable to parse ${name}`);
-}
-
-function getNestedValue(sourceValue, segments = []) {
-  let current = sourceValue;
-  for (const segment of segments) {
-    if (!current || typeof current !== 'object' || !(segment in current)) return undefined;
-    current = current[segment];
-  }
-  return current;
-}
-
-const resolveComponentAttribute = new Function(
-  'getNestedValue',
-  'studyAttributeResolvers',
-  `return ${getFunctionSource('resolveComponentAttribute')};`
-)(getNestedValue, {
+const studyAttributeResolvers = {
   arcFlash: comp => comp.studyResults?.arcFlash?.[comp.id] || null,
   shortCircuit: comp => comp.studyResults?.shortCircuit?.[comp.id] || null,
   reliability: comp => comp.studyResults?.reliability?.componentStats?.[comp.id] || null,
-});
+};
 
 const importedComponent = {
   id: 'PANEL-1',
@@ -70,17 +26,17 @@ const importedComponent = {
 };
 
 assert.equal(
-  resolveComponentAttribute(importedComponent, 'reliability.availability'),
+  resolveComponentAttribute(importedComponent, 'reliability.availability', { studyAttributeResolvers }),
   0.990099,
   'calculated reliability results should take precedence over imported component reliability fields',
 );
 assert.equal(
-  resolveComponentAttribute(importedComponent, 'shortCircuit.threePhaseKA'),
+  resolveComponentAttribute(importedComponent, 'shortCircuit.threePhaseKA', { studyAttributeResolvers }),
   42.5,
   'calculated short-circuit results should take precedence over imported component shortCircuit fields',
 );
 assert.equal(
-  resolveComponentAttribute(importedComponent, 'arcFlash.incidentEnergy'),
+  resolveComponentAttribute(importedComponent, 'arcFlash.incidentEnergy', { studyAttributeResolvers }),
   18.7,
   'calculated arc-flash results should take precedence over imported component arcFlash fields',
 );
@@ -90,19 +46,75 @@ assert.equal(
   'non-study dotted component fields should still resolve from the component object',
 );
 
-assert.ok(source.includes('function assertOneLineSheetsUnchanged'), 'one-line study stale-result guard should exist');
+function createGuardHarness() {
+  const calls = [];
+  const oneLine = {
+    activeSheet: 0,
+    sheets: [{ components: [{ id: 'source', connections: [{ target: 'load' }] }, { id: 'load' }] }]
+  };
+  const studies = {};
+  const controller = createStudyExecutionController({
+    buttons: {},
+    getOneLine: () => oneLine,
+    setOneLine: () => calls.push('write-one-line'),
+    getStudies: () => studies,
+    setStudies: () => calls.push('write-studies'),
+    getStudySettings: () => ({ loadFlow: {}, shortCircuit: { method: 'IEC' } }),
+    getActiveSheet: () => 0,
+    getProtectiveDeviceCatalog: () => ({}),
+    loadReferencedProtectiveDevices: async () => ({}),
+    runLoadFlow: async () => {
+      calls.push('run-load-flow');
+      return { buses: [], lines: [] };
+    },
+    runShortCircuitOffMain: async () => {
+      calls.push('run-short-circuit');
+      return {};
+    },
+    runShortCircuit: () => ({}),
+    runArcFlash: async () => ({}),
+    runHarmonics: () => ({}),
+    runNetworkHarmonics: () => ({}),
+    runMotorStart: () => ({}),
+    runReliability: async () => {
+      calls.push('run-reliability');
+      return { n1Failures: [] };
+    },
+    assertSheetsUnchanged: () => {
+      calls.push('guard');
+      return oneLine;
+    },
+    getSheetsRevision: () => {
+      calls.push('revision');
+      return 'revision';
+    },
+    recordProvenance: () => {},
+    updateCableOperatingVoltages: () => {},
+    markScheduleReconcilePending: () => {},
+    renderStudyResults: () => {},
+    renderLoadFlowResults: () => {},
+    render: () => {},
+    generateArcFlashReport: () => {},
+    openLabelPrintWindow: () => {},
+    highlightSPF: () => {},
+    showAlertModal: () => {},
+    windowRef: { open() {} }
+  });
+  return { calls, controller };
+}
 
-[
-  ['runLoadFlowFromButton', 'runLoadFlowOffMain', 'setOneLine'],
-  ['runShortCircuitFromButton', 'runShortCircuitOffMain', 'setOneLine'],
-  ['runReliabilityFromButton', 'runReliabilityOffMain', 'setStudies'],
-].forEach(([name, awaitedCall, writeCall]) => {
-  const body = getFunctionBody(name);
-  const revisionIndex = body.indexOf('const oneLineRevision = getOneLineSheetsRevision(oneLineData);');
-  const awaitIndex = body.indexOf(`await ${awaitedCall}`);
-  const guardIndex = body.indexOf('assertOneLineSheetsUnchanged(oneLineRevision');
-  const writeIndex = body.indexOf(writeCall);
-  assert.ok(revisionIndex !== -1 && revisionIndex < awaitIndex, `${name} should capture the one-line revision before awaiting worker results`);
-  assert.ok(guardIndex !== -1 && awaitIndex < guardIndex, `${name} should validate the one-line revision after worker results resolve`);
-  assert.ok(writeIndex !== -1 && guardIndex < writeIndex, `${name} should validate the one-line revision before writing results`);
-});
+for (const [method, runCall, writeCall] of [
+  ['runLoadFlowStudy', 'run-load-flow', 'write-one-line'],
+  ['runShortCircuitStudy', 'run-short-circuit', 'write-one-line'],
+  ['runReliabilityStudy', 'run-reliability', 'write-studies']
+]) {
+  const { calls, controller } = createGuardHarness();
+  await controller[method]();
+  const revisionIndex = calls.indexOf('revision');
+  const runIndex = calls.indexOf(runCall);
+  const guardIndex = calls.indexOf('guard');
+  const writeIndex = calls.indexOf(writeCall);
+  assert.ok(revisionIndex !== -1 && revisionIndex < runIndex, `${method} should capture the one-line revision before awaiting results`);
+  assert.ok(guardIndex !== -1 && runIndex < guardIndex, `${method} should validate the one-line revision after results resolve`);
+  assert.ok(writeIndex !== -1 && guardIndex < writeIndex, `${method} should validate the one-line revision before writing results`);
+}

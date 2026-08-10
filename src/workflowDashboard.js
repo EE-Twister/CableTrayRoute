@@ -9,6 +9,7 @@ import { openModal } from './components/modal.js';
 import {
   getEquipment, getLoads, getCables, getTrays, getConduits, getDuctbanks, getStudies,
   getProjectInputFingerprint,
+  getProjectReferenceDiagnostics,
   getStudyApprovals, getOneLine, getDesignBasis, setDesignBasis,
   getDesignGateApprovals, setDesignGateApprovals,
   setOneLine, setCables, setTrays, setConduits, setDuctbanks, setItem,
@@ -705,7 +706,7 @@ function renderProjectSummary(container) {
       value: oneLineComponents,
       href: 'oneline.html',
       icon: 'icons/oneline.svg',
-      subtitle: 'reconcile schedules explicitly',
+      subtitle: 'linked to shared project records',
       state: oneLineComponents > 0 ? 'linked' : 'neutral',
     },
     {
@@ -816,7 +817,7 @@ function currentDashboardProject() {
     designGateApprovals: getDesignGateApprovals(),
     tccSettings: getItem('tccSettings', null),
     currentInputFingerprint: getProjectInputFingerprint(),
-    reconcilePending: Boolean(getItem('oneLineScheduleReconcilePending', false))
+    reconcilePending: false
   };
 }
 
@@ -1257,6 +1258,9 @@ function renderWorkflowCoreDiagnostics() {
   const healthEl = document.getElementById('dashboard-health');
   if (healthEl) {
     const health = diagnostics.health;
+    const referenceIssues = getProjectReferenceDiagnostics();
+    const healthDetails = healthEl.closest('details');
+    if (healthDetails && referenceIssues.length) healthDetails.open = true;
     const metrics = focus === 'routing' ? [
       ['Cable Rows', health.cableRows],
       ['Schedule Ready', `${health.scheduleReady}/${health.cableRows}`],
@@ -1265,7 +1269,8 @@ function renderWorkflowCoreDiagnostics() {
       ['Route Results', health.routeResults],
       ['Raceways', health.raceways],
       ['Pull Groups', health.pullGroups],
-      ['Spool Sheets', health.spoolSheets]
+      ['Spool Sheets', health.spoolSheets],
+      ['Data Links', referenceIssues.length ? `${referenceIssues.length} need review` : 'Current']
     ] : [
       ['Equipment', health.equipment],
       ['Loads', `${health.completeLoads}/${health.loads} complete`],
@@ -1281,7 +1286,8 @@ function renderWorkflowCoreDiagnostics() {
       ['Release Packages', health.lifecyclePackages],
       ['Deliverables', health.deliverables],
       ['Cable Issue Readiness', `${health.cableDeliverableReady}/${health.cableRows} complete`],
-      ['Design Rule Check', `${health.drcErrors} error(s), ${health.drcWarnings} warning(s)`]
+      ['Design Rule Check', `${health.drcErrors} error(s), ${health.drcWarnings} warning(s)`],
+      ['Data Links', referenceIssues.length ? `${referenceIssues.length} need review` : 'Current']
     ];
     healthEl.innerHTML = `
       <div class="dashboard-health-grid">
@@ -1292,7 +1298,24 @@ function renderWorkflowCoreDiagnostics() {
           </article>
         `).join('')}
       </div>
-      ${health.reconcilePending ? '<p class="dashboard-reconcile-warning">One-Line changes are pending schedule reconcile.</p>' : ''}
+      ${referenceIssues.length ? `
+        <section id="dashboard-data-links" class="dashboard-data-links" aria-labelledby="dashboard-data-links-heading">
+          <h3 id="dashboard-data-links-heading">Data Link Review</h3>
+          <p class="dashboard-reconcile-warning">${esc(referenceIssues.length)} shared project reference${referenceIssues.length === 1 ? '' : 's'} need review after a rename or deletion.</p>
+          <ul class="dashboard-blocker-list">
+            ${referenceIssues.map(issue => `
+              <li class="dashboard-blocker dashboard-blocker--warning">
+                <div>
+                  <strong>${esc(issue.recordId)}</strong>
+                  <span>${esc(issue.message)}</span>
+                </div>
+                <a class="btn" href="${esc(issue.href || 'workflowdashboard.html')}">${esc(issue.actionLabel || 'Review')}</a>
+              </li>
+            `).join('')}
+          </ul>
+          <p class="field-hint">Relink each dependent record or deliberately remove it. This review does not approve deletion of downstream engineering data.</p>
+        </section>
+      ` : ''}
     `;
   }
 }

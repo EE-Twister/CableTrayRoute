@@ -74,7 +74,7 @@ const procurementRegister = projectInput('settings.procurementRegister', 'settin
 const costEstimateArtifact = projectInput('settings.costEstimateArtifact', 'setting', false, 'Latest persisted estimate summary, basis, and line-item rows.');
 const pullPlanArtifact = projectInput('settings.pullPlanArtifact', 'setting', false, 'Saved pull engineering assumptions, direction comparison, limits, jam screening, and input warnings.');
 const scenarios = projectInput('settings.scenarios', 'setting', false, 'Scenario registry and active scenario selection.');
-const oneLineReconcilePending = projectInput('settings.oneLineScheduleReconcilePending', 'setting', false, 'Flag indicating one-line schedule reconciliation is available.');
+const oneLineReconcilePending = projectInput('settings.oneLineScheduleReconcilePending', 'setting', false, 'Legacy compatibility flag; automatic shared-data synchronization keeps this false.');
 const switchingProcedures = projectInput('settings.switchingProcedures', 'setting', false, 'Read-only proposed switching procedure records and planning hold points.');
 const equipmentFilterPresets = projectInput('settings.equipmentFilterPresets', 'setting', false, 'Saved equipment list filter presets.');
 const mccLineupActiveId = projectInput('settings.mccLineupActiveId', 'setting', false, 'Active MCC lineup selection.');
@@ -130,12 +130,12 @@ export const PAGE_CONTRACTS_BY_HREF = {
       output('ductbankSchedule', 'schedule', 'Automation-seeded ductbank schedule rows.', ['ductbankroute.html', 'optimalRoute.html']),
       output('settings.lifecyclePackages', 'setting', 'Lifecycle package records created from dashboard package actions.', ['projectreport.html']),
       output('studyResults.duty', 'study-result', 'Equipment-duty validation results evaluated while central workflow readiness is refreshed.', ['equipmentevaluation.html', 'projectreport.html']),
-      output('settings.oneLineScheduleReconcilePending', 'setting', 'Workflow automation reconcile state for one-line and schedule handoff.', ['oneline.html']),
+      output('settings.oneLineScheduleReconcilePending', 'setting', 'Legacy reconcile flag cleared by automatic shared-data synchronization.', ['oneline.html']),
       output('settings.workflowDashboardFocus', 'setting', 'Routing or full-engineering dashboard focus selected by the user.', ['workflowdashboard.html'])
     ],
-    readiness: ready('Dashboard is ready when it can summarize every workflow step and identify the next incomplete handoff.', ['Missing schedule data, unresolved review gates, pending studies, or no deliverables.']),
+    readiness: ready('Dashboard is ready when it can summarize every workflow step and identify the next incomplete handoff.', ['Missing schedule data, unresolved shared-record links, review gates, pending studies, or no deliverables.']),
     downstream: ['equipmentlist.html', 'loadlist.html', 'oneline.html', 'cableschedule.html', 'racewayschedule.html', 'projectreport.html'],
-    notes: ['This page aggregates workflow state instead of belonging to a single workflow step.']
+    notes: ['This page aggregates workflow state instead of belonging to a single workflow step.', 'The Data Links metric is derived from stable equipment, panel, load, cable, and One-Line references; it does not create a second persisted copy of link state.', 'Data Link Review lists each orphaned reference and routes the user to the canonical Load List, Cable Schedule, or One-Line remediation surface.']
   }),
   'scenarios.html': contract({
     standaloneInputs: ['Scenario names, imported project snapshots, and comparison selections.'],
@@ -205,7 +205,7 @@ export const PAGE_CONTRACTS_BY_HREF = {
   }),
   'oneline.html': contract({
     workflowStep: 'oneLineDiagram',
-    standaloneInputs: ['Manual diagram drawing, palette components, imported sample diagrams, and reconcile choices.'],
+    standaloneInputs: ['Manual diagram drawing, palette components, and imported sample diagrams within the active project.'],
     projectInputs: [
       equipment, loads, panels, cables, trays, conduits, studies, tccSettings,
       projectInput('settings.manufacturerDefaults', 'setting', false, 'Manufacturer default selections for one-line component properties.'),
@@ -222,10 +222,10 @@ export const PAGE_CONTRACTS_BY_HREF = {
     ],
     outputs: [
       output('oneLineDiagram', 'model', 'One-line sheets, components, connections, layers, protection zones, and linked schedule refs.', ['loadFlow.html', 'shortCircuit.html', 'arcFlash.html', 'tcc.html', 'designrulechecker.html']),
-      output('cableSchedule', 'schedule', 'Explicit reconcile-created or reconcile-updated cable rows.', ['cableschedule.html', 'optimalRoute.html']),
-      output('loadList', 'schedule', 'Explicit reconcile-created or reconcile-updated load rows.', ['loadlist.html']),
-      output('panelSchedule', 'schedule', 'Explicit reconcile-created or reconcile-updated panel rows.', ['panelschedule.html']),
-      output('equipment', 'schedule', 'Explicit reconcile-created or reconcile-updated equipment rows.', ['equipmentlist.html']),
+      output('cableSchedule', 'schedule', 'Canonical cable rows automatically created or updated from linked diagram circuits.', ['cableschedule.html', 'optimalRoute.html']),
+      output('loadList', 'schedule', 'Canonical load rows automatically created or updated from linked diagram components.', ['loadlist.html']),
+      output('panelSchedule', 'schedule', 'Canonical panel rows automatically created or updated from linked diagram components.', ['panelschedule.html']),
+      output('equipment', 'schedule', 'Canonical equipment rows automatically created or updated from linked diagram components.', ['equipmentlist.html']),
       output('traySchedule', 'schedule', 'Raceway records created from one-line route actions.', ['racewayschedule.html']),
       output('conduitSchedule', 'schedule', 'Conduit records created from one-line route actions.', ['racewayschedule.html']),
       output('studyResults', 'study-result', 'Embedded one-line study result container.', ['projectreport.html']),
@@ -249,10 +249,10 @@ export const PAGE_CONTRACTS_BY_HREF = {
       output('settings.gistToken', 'setting', 'Gist import/export token setting.', ['oneline.html']),
       output('settings.onelineTemplates', 'setting', 'Reusable one-line component templates saved with project settings.', ['oneline.html']),
       output('settings.activeSampleWorkflow', 'setting', 'Sample workflow layout version saved after the diagram is arranged and fit.', ['oneline.html']),
-      output('settings.oneLineScheduleReconcilePending', 'setting', 'Flag indicating that schedule reconciliation is available.', ['workflowdashboard.html']),
+      output('settings.oneLineScheduleReconcilePending', 'setting', 'Legacy reconcile flag retained as false for compatibility.', ['workflowdashboard.html']),
       output('settings.liveTelemetryConfig', 'setting', 'Read-only live telemetry endpoint and component/tag mapping configuration.', ['oneline.html'])
     ],
-    readiness: ready('At least one one-line component exists and schedule reconciliation state is explicit.', ['Diagram is empty or schedule reconciliation issues remain unresolved.']),
+    readiness: ready('At least one one-line component exists and its shared project-record links are current.', ['Diagram is empty or shared-record identities remain unresolved.']),
     downstream: ['cableschedule.html', 'loadFlow.html', 'shortCircuit.html', 'arcFlash.html', 'tcc.html']
   }),
   'datamanager.html': contract({
