@@ -54,6 +54,17 @@ export const MCC_BUCKET_TYPES = [
   'spare'
 ];
 
+export const MCC_BUCKET_TYPE_CHOICES = [
+  { value: 'main-mlo', label: 'Main-MLO' },
+  { value: 'main-breaker', label: 'Main-Breaker' },
+  { value: 'starter', label: 'Starter' },
+  { value: 'vfd', label: 'VFD' },
+  { value: 'breaker', label: 'Breaker' },
+  { value: 'feeder', label: 'Feeder' },
+  { value: 'space', label: 'Space' },
+  { value: 'spare', label: 'Spare' }
+];
+
 export const MCC_STARTER_TYPES = [
   '',
   'fvnr',
@@ -64,6 +75,18 @@ export const MCC_STARTER_TYPES = [
   'two-speed',
   'reduced-voltage-autotransformer',
   'other'
+];
+
+export const MCC_STARTER_TYPE_CHOICES = [
+  { value: '', label: '-' },
+  { value: 'fvnr', label: 'FVNR' },
+  { value: 'fvr', label: 'FVR' },
+  { value: 'soft-starter', label: 'Soft Starter' },
+  { value: 'wye-delta', label: 'Wye-Delta' },
+  { value: 'part-winding', label: 'Part-Winding' },
+  { value: 'two-speed', label: 'Two-Speed' },
+  { value: 'reduced-voltage-autotransformer', label: 'Reduced Voltage Autotransformer' },
+  { value: 'other', label: 'Other' }
 ];
 
 export const MCC_BUCKET_STATUSES = [

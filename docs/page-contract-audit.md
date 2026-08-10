@@ -277,7 +277,7 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 - Section: Workflow
 - Group: Planning
-- Source files: `analysis/loadWorkflow.mjs`, `loadlist.mjs`, `src/components/projectDeletionReview.js`, `src/crossProbe.js`, `src/htmlUtils.mjs`, `src/loadlist.js`, `src/projectManagerEntry.js`
+- Source files: `analysis/loadWorkflow.mjs`, `loadlist.mjs`, `src/components/projectDeletionReview.js`, `src/crossProbe.js`, `src/htmlUtils.mjs`, `src/loadlist.js`, `src/mcc-lineup/breakerBucketSizing.mjs`, `src/mccLineupModel.mjs`, `src/projectManagerEntry.js`
 
 **Undocumented Reads**
 - None
@@ -299,31 +299,31 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 **Detected Reads**
 - `equipment`
-  - loadlist.mjs:593 getEquipment()
+  - loadlist.mjs:621 getEquipment()
 - `loadList`
-  - loadlist.mjs:1125 getLoads()
-  - loadlist.mjs:1162 getLoads()
-  - loadlist.mjs:1587 getLoads()
-  - loadlist.mjs:1600 getLoads()
-  - loadlist.mjs:1612 getLoads()
+  - loadlist.mjs:1172 getLoads()
+  - loadlist.mjs:1209 getLoads()
+  - loadlist.mjs:1670 getLoads()
+  - loadlist.mjs:1684 getLoads()
+  - loadlist.mjs:1696 getLoads()
   - ... 18 more
 - `oneLineDiagram`
   - src/crossProbe.js:139 getOneLine()
   - src/crossProbe.js:152 getOneLine()
   - src/crossProbe.js:201 getOneLine()
 - `settings.loadListViewPreset`
-  - loadlist.mjs:133 getItem(settings.loadListViewPreset)
+  - loadlist.mjs:134 getItem(settings.loadListViewPreset)
 
 **Detected Writes**
 - `loadList`
-  - loadlist.mjs:1164 setLoads()
-  - loadlist.mjs:1526 addLoad()
-  - loadlist.mjs:1592 setLoads()
-  - loadlist.mjs:1603 setLoads()
-  - loadlist.mjs:1615 setLoads()
+  - loadlist.mjs:1211 setLoads()
+  - loadlist.mjs:1601 addLoad()
+  - loadlist.mjs:1676 setLoads()
+  - loadlist.mjs:1687 setLoads()
+  - loadlist.mjs:1699 setLoads()
   - ... 11 more
 - `settings.loadListViewPreset`
-  - loadlist.mjs:1715 setItem(settings.loadListViewPreset)
+  - loadlist.mjs:1799 setItem(settings.loadListViewPreset)
 
 ### One-Line (`oneline.html`)
 

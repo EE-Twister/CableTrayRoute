@@ -18,6 +18,7 @@ const LOAD_MANAGED_BUCKET_FIELDS = [
   'equipmentDescription',
   'loadTag',
   'type',
+  'mainDevice',
   'status',
   'sizeUnits',
   'heightIn',
@@ -55,6 +56,8 @@ function explicitValue(load, fields) {
 }
 
 function loadBucketType(load) {
+  const requestedType = token(load?.mccUnitType || load?.mccBucketType || load?.bucketType).replace(/[\s_]+/g, '-');
+  if (['main-mlo', 'main-breaker', 'starter', 'vfd', 'breaker', 'feeder', 'space', 'spare'].includes(requestedType)) return requestedType;
   const kind = token(load?.loadType || load?.type);
   if (kind.includes('spare')) return 'spare';
   if (kind.includes('vfd') || kind.includes('variable frequency')) return 'vfd';
@@ -65,8 +68,10 @@ function loadBucketType(load) {
 
 function bucketSourceValues(load, lineup) {
   const equipmentTag = explicitValue(load, ['tag', 'ref', 'id']);
-  const type = loadBucketType(load);
-  const status = type === 'spare' ? 'spare' : 'active';
+  const requestedType = loadBucketType(load);
+  const type = requestedType === 'main-mlo' || requestedType === 'main-breaker' ? 'main' : requestedType;
+  const mainDevice = requestedType === 'main-breaker' ? 'breaker' : (requestedType === 'main-mlo' ? 'mlo' : '');
+  const status = type === 'space' ? 'space' : (type === 'spare' ? 'spare' : 'active');
   const requestedStarterType = token(explicitValue(load, ['starterType', 'starter_type'])).replace(/[\s_]+/g, '-');
   const starterType = MCC_STARTER_TYPES.includes(requestedStarterType) ? requestedStarterType : '';
   const hp = explicitValue(load, ['hp', 'horsepower', 'motorHp', 'motorHP']);
@@ -108,6 +113,7 @@ function bucketSourceValues(load, lineup) {
     equipmentDescription: text(load.description),
     loadTag: equipmentTag,
     type,
+    mainDevice,
     status,
     sizeUnits,
     heightIn,
@@ -133,6 +139,7 @@ function sourceMetadata(load) {
     sourceLoadTag: text(load.tag || load.ref || load.id),
     sourceCircuit: text(load.circuit),
     sourceLoadType: text(load.loadType || load.type),
+    sourceMccUnitType: text(load.mccUnitType || load.mccBucketType || load.bucketType),
     sourceKw: text(load.kw),
     sourceHp: explicitValue(load, ['hp', 'horsepower', 'motorHp', 'motorHP']),
     sourceVoltage: text(load.voltage),
@@ -243,7 +250,7 @@ function voltageNumber(value) {
 }
 
 function loadHasMeaningfulData(load) {
-  return ['tag', 'ref', 'id', 'description', 'kw', 'loadType'].some(field => text(load?.[field]));
+  return ['tag', 'ref', 'id', 'description', 'kw', 'loadType', 'mccUnitType', 'starterType'].some(field => text(load?.[field]));
 }
 
 export function mccLoadListTarget(lineup = {}) {
@@ -363,6 +370,8 @@ export function reconcileMccLineupFromLoads(lineup = {}, loads = []) {
       tag: text(load.tag || load.ref || load.id),
       description: text(load.description),
       loadType: text(load.loadType),
+      mccUnitType: text(load.mccUnitType || load.mccBucketType || load.bucketType),
+      starterType: text(load.starterType || load.starter_type),
       kw: text(load.kw),
       hp: explicitValue(load, ['hp', 'horsepower', 'motorHp', 'motorHP']),
       voltage: text(load.voltage)

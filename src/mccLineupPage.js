@@ -7,7 +7,7 @@ import {
   DEFAULT_MCC_VERTICAL_WIREWAY_WIDTH_IN,
   MCC_BUS_MATERIAL_TYPES,
   MCC_BUS_PLATING_TYPES,
-  MCC_BUCKET_TYPES,
+  MCC_BUCKET_TYPE_CHOICES,
   MCC_COMMUNICATION_PROTOCOL_TYPES,
   MCC_ARRANGEMENT_TYPES,
   MCC_BUS_JOIN_PLATING_TYPES,
@@ -18,7 +18,7 @@ import {
   MCC_INCOMING_LINE_POWER_TYPES,
   MCC_MOTOR_PROTECTION_DEVICE_TYPES,
   MCC_SPACE_HEATER_ACCESSORY_TYPES,
-  MCC_STARTER_TYPES,
+  MCC_STARTER_TYPE_CHOICES,
   bucketHeightFromUnits,
   bucketUnitsFromHeight,
   createDefaultMccLineup,
@@ -256,31 +256,14 @@ function bucketTypeValue(bucket = {}) {
 
 function bucketTypeOptionList(bucket = {}) {
   const selected = bucketTypeValue(bucket);
-  const options = [
-    { value: 'main-mlo', label: 'Main-MLO' },
-    { value: 'main-breaker', label: 'Main-Breaker' },
-    ...MCC_BUCKET_TYPES
-      .filter(value => value !== 'main')
-      .map(value => ({ value, label: titleCaseOption(value) }))
-  ];
-  return options.map(option => (
+  return MCC_BUCKET_TYPE_CHOICES.map(option => (
     `<option value="${escapeXml(option.value)}"${option.value === selected ? ' selected' : ''}>${escapeXml(option.label)}</option>`
   )).join('');
 }
 
 function starterTypeOptionList(selected) {
-  const labels = {
-    '': '-',
-    fvnr: 'FVNR',
-    fvr: 'FVR',
-    'soft-starter': 'Soft Starter',
-    'wye-delta': 'Wye-Delta',
-    'two-speed': 'Two-Speed',
-    'reduced-voltage-autotransformer': 'Reduced Voltage Autotransformer',
-    other: 'Other'
-  };
-  return MCC_STARTER_TYPES.map(value => (
-    `<option value="${escapeXml(value)}"${value === selected ? ' selected' : ''}>${escapeXml(labels[value] || titleCaseOption(value))}</option>`
+  return MCC_STARTER_TYPE_CHOICES.map(option => (
+    `<option value="${escapeXml(option.value)}"${option.value === selected ? ' selected' : ''}>${escapeXml(option.label)}</option>`
   )).join('');
 }
 

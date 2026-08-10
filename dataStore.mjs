@@ -1040,6 +1040,8 @@ function ensureLoadFields(load) {
     quantity: '',
     voltage: '',
     loadType: '',
+    mccUnitType: '',
+    starterType: '',
     duty: '',
     kw: '',
     hp: '',

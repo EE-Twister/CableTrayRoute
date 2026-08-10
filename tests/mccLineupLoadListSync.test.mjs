@@ -86,6 +86,37 @@ assert.equal(vfdBucket.sizeUnits, 2);
 const heaterBucket = firstBuckets.find(bucket => bucket.sourceLoadId === 'load-heater');
 assert.equal(heaterBucket.type, 'feeder');
 
+const explicitUnitTypes = reconcileMccLineupFromLoads(baseLineup, [
+  { ...loads[0], id: 'load-explicit-vfd', tag: 'P-201', mccUnitType: 'vfd' },
+  { ...loads[2], id: 'load-explicit-starter', tag: 'HTR-201', mccUnitType: 'starter', starterType: 'fvr' },
+  { ...loads[0], id: 'load-explicit-feeder', tag: 'P-202', mccUnitType: 'feeder' },
+  { ...loads[0], id: 'load-explicit-main-mlo', tag: 'MAIN-MLO', mccUnitType: 'main-mlo' },
+  { ...loads[0], id: 'load-explicit-main-breaker', tag: 'MAIN-BKR', mccUnitType: 'main-breaker' },
+  { ...loads[0], id: 'load-explicit-space', tag: 'SPACE', mccUnitType: 'space' },
+  { ...loads[0], id: 'load-explicit-spare', tag: 'SPARE', mccUnitType: 'spare' }
+]);
+const explicitBuckets = explicitUnitTypes.lineup.sections.flatMap(section => section.buckets);
+assert.equal(explicitBuckets.find(bucket => bucket.sourceLoadId === 'load-explicit-vfd').type, 'vfd');
+assert.equal(explicitBuckets.find(bucket => bucket.sourceLoadId === 'load-explicit-starter').type, 'starter');
+assert.equal(explicitBuckets.find(bucket => bucket.sourceLoadId === 'load-explicit-starter').starterType, 'fvr');
+assert.equal(explicitBuckets.find(bucket => bucket.sourceLoadId === 'load-explicit-feeder').type, 'feeder');
+assert.deepEqual(
+  {
+    type: explicitBuckets.find(bucket => bucket.sourceLoadId === 'load-explicit-main-mlo').type,
+    mainDevice: explicitBuckets.find(bucket => bucket.sourceLoadId === 'load-explicit-main-mlo').mainDevice
+  },
+  { type: 'main', mainDevice: 'mlo' }
+);
+assert.deepEqual(
+  {
+    type: explicitBuckets.find(bucket => bucket.sourceLoadId === 'load-explicit-main-breaker').type,
+    mainDevice: explicitBuckets.find(bucket => bucket.sourceLoadId === 'load-explicit-main-breaker').mainDevice
+  },
+  { type: 'main', mainDevice: 'breaker' }
+);
+assert.equal(explicitBuckets.find(bucket => bucket.sourceLoadId === 'load-explicit-space').status, 'space');
+assert.equal(explicitBuckets.find(bucket => bucket.sourceLoadId === 'load-explicit-spare').status, 'spare');
+
 motorBucket.starterType = 'soft-starter';
 motorBucket.heightIn = 12;
 motorBucket.sizeUnits = 2;

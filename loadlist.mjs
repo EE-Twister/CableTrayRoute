@@ -13,6 +13,7 @@ import {
   READINESS_VOCABULARY,
   getContractReadinessCopy
 } from './src/workflowStatus.js';
+import { MCC_BUCKET_TYPE_CHOICES, MCC_STARTER_TYPE_CHOICES } from './src/mccLineupModel.mjs';
 
 const LOAD_READINESS_COPY = getContractReadinessCopy('loadlist.html');
 
@@ -149,19 +150,23 @@ if (typeof window !== 'undefined') {
       'EV Charger': { loadType: 'EV Charger', duty: 'Continuous', voltage: '208', powerFactor: '0.98', loadFactor: '100', efficiency: '96', demandFactor: '100', phases: '3' },
       Spare: { loadType: 'Spare', duty: 'Stand-by', demandFactor: '0' }
     };
+    const mccUnitTypes = [
+      { value: '', label: 'Auto' },
+      ...MCC_BUCKET_TYPE_CHOICES
+    ];
     const starterLoads = [
-      { source: 'SWBD-1', tag: 'MTR-101', description: 'Process pump motor', quantity: '1', voltage: '480', kw: '18.6', hp: '25', circuit: 'MCC-1-01', ...loadTypeDefaults.Motor },
+      { source: 'SWBD-1', tag: 'MTR-101', description: 'Process pump motor', quantity: '1', voltage: '480', kw: '18.6', hp: '25', mccUnitType: 'starter', starterType: 'fvnr', circuit: 'MCC-1-01', ...loadTypeDefaults.Motor },
       { source: 'PNL-L1', tag: 'LTG-101', description: 'Office lighting zone', quantity: '1', voltage: '120', kw: '3.2', circuit: 'L1-03', ...loadTypeDefaults.Lighting },
       { source: 'PNL-L1', tag: 'REC-101', description: 'General receptacles', quantity: '12', voltage: '120', kw: '0.18', circuit: 'L1-05', ...loadTypeDefaults.Receptacle },
-      { source: 'MCC-1', tag: 'AHU-101', description: 'Air handling unit', quantity: '1', voltage: '480', kw: '22', circuit: 'MCC-1-05', ...loadTypeDefaults.HVAC },
+      { source: 'MCC-1', tag: 'AHU-101', description: 'Air handling unit', quantity: '1', voltage: '480', kw: '22', mccUnitType: 'vfd', circuit: 'MCC-1-05', ...loadTypeDefaults.HVAC },
       { source: 'SWBD-1', tag: 'UPS-101', description: 'Controls UPS input', quantity: '1', voltage: '480', kw: '12', circuit: 'SWBD-1-12', ...loadTypeDefaults.UPS }
     ];
     const viewPresets = {
-      basic: ['select', 'source', 'tag', 'description', 'quantity', 'voltage', 'loadType', 'duty', 'kw', 'hp', 'powerFactor', 'phases', 'circuit', 'kva', 'current', 'actions'],
-      electrical: ['select', 'source', 'tag', 'description', 'quantity', 'voltage', 'kw', 'hp', 'powerFactor', 'phases', 'kva', 'current', 'circuit', 'actions'],
+      basic: ['select', 'source', 'tag', 'description', 'quantity', 'voltage', 'loadType', 'mccUnitType', 'starterType', 'duty', 'kw', 'hp', 'powerFactor', 'phases', 'circuit', 'kva', 'current', 'actions'],
+      electrical: ['select', 'source', 'tag', 'description', 'quantity', 'voltage', 'mccUnitType', 'starterType', 'kw', 'hp', 'powerFactor', 'phases', 'kva', 'current', 'circuit', 'actions'],
       demand: ['select', 'source', 'tag', 'demandFactor', 'demandKva', 'demandKw', 'kw', 'hp', 'loadFactor', 'description', 'loadType', 'duty', 'actions'],
-      procurement: ['select', 'source', 'tag', 'description', 'manufacturer', 'model', 'quantity', 'voltage', 'hp', 'loadType', 'notes', 'actions'],
-      full: ['select', 'source', 'tag', 'description', 'manufacturer', 'model', 'quantity', 'voltage', 'loadType', 'duty', 'kw', 'hp', 'powerFactor', 'loadFactor', 'efficiency', 'demandFactor', 'phases', 'circuit', 'notes', 'kva', 'current', 'demandKva', 'demandKw', 'actions']
+      procurement: ['select', 'source', 'tag', 'description', 'manufacturer', 'model', 'quantity', 'voltage', 'hp', 'loadType', 'mccUnitType', 'starterType', 'notes', 'actions'],
+      full: ['select', 'source', 'tag', 'description', 'manufacturer', 'model', 'quantity', 'voltage', 'loadType', 'mccUnitType', 'starterType', 'duty', 'kw', 'hp', 'powerFactor', 'loadFactor', 'efficiency', 'demandFactor', 'phases', 'circuit', 'notes', 'kva', 'current', 'demandKva', 'demandKw', 'actions']
     };
     const loadFields = [
       { key: 'source', label: 'Source / Panel', aliases: ['source', 'panel', 'source panel', 'source/panel', 'feed from'] },
@@ -172,6 +177,8 @@ if (typeof window !== 'undefined') {
       { key: 'quantity', label: 'Qty', aliases: ['qty', 'quantity', 'count'] },
       { key: 'voltage', label: 'Voltage', aliases: ['voltage', 'volts', 'v', 'voltage v'] },
       { key: 'loadType', label: 'Load Type', aliases: ['load type', 'type', 'category', 'load category'] },
+      { key: 'mccUnitType', label: 'MCC Unit Type', aliases: ['mcc unit type', 'mcc bucket type', 'bucket type', 'controller type', 'starter vfd feeder type'] },
+      { key: 'starterType', label: 'Starter Type', aliases: ['starter type', 'starter method', 'motor starter type', 'motor controller type'] },
       { key: 'duty', label: 'Duty', aliases: ['duty', 'duty cycle', 'service'] },
       { key: 'kw', label: 'kW', aliases: ['kw', 'power', 'load kw', 'kilowatt', 'kilowatts'] },
       { key: 'hp', label: 'HP', aliases: ['hp', 'horsepower', 'motor hp', 'nameplate hp', 'rated hp'] },
@@ -192,6 +199,8 @@ if (typeof window !== 'undefined') {
       quantity: '',
       voltage: '',
       loadType: '',
+      mccUnitType: '',
+      starterType: '',
       duty: '',
       kw: '',
       hp: '',
@@ -222,6 +231,8 @@ if (typeof window !== 'undefined') {
         'quantity',
         'voltage',
         'loadType',
+        'mccUnitType',
+        'starterType',
         'kw',
         'hp',
         'powerFactor',
@@ -255,6 +266,22 @@ if (typeof window !== 'undefined') {
 
     function normalizeHeader(value) {
       return String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+    }
+
+    function usesStarterType(mccUnitType, loadType) {
+      const unitType = String(mccUnitType || '').trim().toLowerCase();
+      if (unitType) return unitType === 'starter';
+      return String(loadType || '').trim().toLowerCase().includes('motor');
+    }
+
+    function syncRowStarterTypeControl(tr) {
+      const unitType = tr.querySelector('[name="mccUnitType"]')?.value;
+      const loadType = tr.querySelector('[name="loadType"]')?.value;
+      const starterType = tr.querySelector('[name="starterType"]');
+      if (!starterType) return;
+      const enabled = usesStarterType(unitType, loadType);
+      starterType.disabled = !enabled;
+      if (!enabled) starterType.value = '';
     }
 
     function createIcon(path) {
@@ -297,6 +324,7 @@ if (typeof window !== 'undefined') {
   function saveRow(tr) {
     const idx = getStoreIndex(tr);
     const load = gatherRow(tr);
+    if (!usesStarterType(load.mccUnitType, load.loadType)) load.starterType = '';
     const numericFields = ['quantity','voltage','kw','hp','powerFactor','loadFactor','efficiency','demandFactor','phases'];
     const nonNegativeFields = ['hp'];
     const rangeFields = [
@@ -639,6 +667,8 @@ if (typeof window !== 'undefined') {
     if (load.ref) tr.dataset.ref = load.ref;
     if (load.id) tr.dataset.id = load.id;
     tr.classList.add(rowClass);
+    const starterTypeEnabled = usesStarterType(load.mccUnitType, load.loadType);
+    const starterTypeValue = starterTypeEnabled ? String(load.starterType || '') : '';
     tr.innerHTML = `
       <td data-column="select" class="load-sticky-select"><input type="checkbox" class="row-select" aria-label="Select row"></td>
       <td data-column="source" class="load-sticky-source"><input name="source" type="text" list="load-source-list" value="${escapeAttr(load.source || '')}" placeholder="SWBD-101"></td>
@@ -649,6 +679,12 @@ if (typeof window !== 'undefined') {
       <td data-column="quantity"><input name="quantity" type="number" step="any" min="0" maxlength="15" value="${escapeAttr(load.quantity || '')}" placeholder="1"></td>
       <td data-column="voltage"><input name="voltage" type="number" step="any" min="0" maxlength="15" value="${escapeAttr(load.voltage || '')}" placeholder="480"></td>
       <td data-column="loadType"><input name="loadType" type="text" list="load-type-list" value="${escapeAttr(load.loadType || '')}" placeholder="Motor"></td>
+      <td data-column="mccUnitType"><select name="mccUnitType" aria-label="MCC unit type" title="Sets the generated MCC bucket type; leave Auto to infer it from Load Type.">
+        ${mccUnitTypes.map(type => `<option value="${escapeAttr(type.value)}"${load.mccUnitType === type.value ? ' selected' : ''}>${escapeHtml(type.label)}</option>`).join('')}
+      </select></td>
+      <td data-column="starterType"><select name="starterType" aria-label="Starter type" title="Starter method used for MCC generation and preliminary NEMA sizing."${starterTypeEnabled ? '' : ' disabled'}>
+        ${MCC_STARTER_TYPE_CHOICES.map(type => `<option value="${escapeAttr(type.value)}"${starterTypeValue === type.value ? ' selected' : ''}>${escapeHtml(type.label)}</option>`).join('')}
+      </select></td>
       <td data-column="duty"><select name="duty">
         <option value=""></option>
         <option value="Continuous"${load.duty === 'Continuous' ? ' selected' : ''}>Continuous</option>
@@ -656,7 +692,7 @@ if (typeof window !== 'undefined') {
         <option value="Stand-by"${load.duty === 'Stand-by' ? ' selected' : ''}>Stand-by</option>
       </select></td>
       <td data-column="kw"><input name="kw" type="number" step="any" min="0" maxlength="15" value="${escapeAttr(load.kw || '')}" placeholder="15"></td>
-      <td data-column="hp"><input name="hp" type="number" step="any" min="0" maxlength="15" value="${escapeAttr(load.hp || '')}" placeholder="25" aria-label="Motor horsepower"></td>
+      <td data-column="hp"><input name="hp" type="number" step="any" min="0" maxlength="15" value="${escapeAttr(load.hp || '')}" aria-label="Motor horsepower"></td>
       <td data-column="powerFactor"><input name="powerFactor" type="number" step="any" min="0" max="1" maxlength="15" value="${escapeAttr(load.powerFactor || '')}" placeholder="0.90"></td>
       <td data-column="loadFactor"><input name="loadFactor" type="number" step="any" min="0" max="100" maxlength="15" value="${escapeAttr(load.loadFactor || '')}" placeholder="100"></td>
       <td data-column="efficiency"><input name="efficiency" type="number" step="any" min="0" max="100" maxlength="15" value="${escapeAttr(load.efficiency || '')}" placeholder="95"></td>
@@ -675,7 +711,10 @@ if (typeof window !== 'undefined') {
       input.addEventListener('focus', () => { input.dataset.prevValue = input.value; });
       input.addEventListener('blur', () => saveRow(tr));
       if (input.tagName === 'SELECT') {
-        input.addEventListener('change', () => saveRow(tr));
+        input.addEventListener('change', () => {
+          if (input.name === 'mccUnitType') syncRowStarterTypeControl(tr);
+          saveRow(tr);
+        });
       }
       input.addEventListener('keydown', e => handleNav(e, td));
     });
@@ -816,6 +855,8 @@ if (typeof window !== 'undefined') {
       <td data-column="quantity"></td>
       <td data-column="voltage"></td>
       <td data-column="loadType"></td>
+      <td data-column="mccUnitType"></td>
+      <td data-column="starterType"></td>
       <td data-column="duty"></td>
       <td data-column="kw">${totals.kW.toFixed(2)}</td>
       <td data-column="hp"></td>
@@ -885,6 +926,8 @@ if (typeof window !== 'undefined') {
       load.manufacturer,
       load.model,
       load.loadType,
+      load.mccUnitType,
+      load.starterType,
       load.hp,
       load.circuit,
       load.notes
@@ -947,6 +990,8 @@ if (typeof window !== 'undefined') {
       'quantity',
       'voltage',
       'loadType',
+      'mccUnitType',
+      'starterType',
       'duty',
       'kw',
       'hp',
@@ -976,6 +1021,8 @@ if (typeof window !== 'undefined') {
         full.quantity,
         full.voltage,
         full.loadType,
+        full.mccUnitType,
+        full.starterType,
         full.duty,
         full.kw,
         full.hp,
@@ -1161,7 +1208,11 @@ if (typeof window !== 'undefined') {
     const nextLoads = decision.mode === 'merge'
       ? mergeLoadRows(dataStore.getLoads(), incomingLoads)
       : incomingLoads;
-    dataStore.setLoads(nextLoads.map(load => ({ ...load, ...calculateDerived(load) })));
+    dataStore.setLoads(nextLoads.map(load => {
+      const next = { ...load };
+      if (!usesStarterType(next.mccUnitType, next.loadType)) next.starterType = '';
+      return { ...next, ...calculateDerived(next) };
+    }));
     render();
   }
 
@@ -1202,6 +1253,8 @@ if (typeof window !== 'undefined') {
         quantity: '',
         voltage: '',
         loadType: '',
+        mccUnitType: '',
+        starterType: '',
         duty: '',
         kw: '',
         hp: '',
@@ -1450,6 +1503,18 @@ if (typeof window !== 'undefined') {
           </select>
         </label>
         <label class="modal-form-field">
+          <span>MCC Unit Type</span>
+          <select name="mccUnitType">
+            ${mccUnitTypes.map(type => `<option value="${escapeAttr(type.value)}"${load.mccUnitType === type.value ? ' selected' : ''}>${escapeHtml(type.label)}</option>`).join('')}
+          </select>
+        </label>
+        <label class="modal-form-field">
+          <span>Starter Type</span>
+          <select name="starterType">
+            ${MCC_STARTER_TYPE_CHOICES.map(type => `<option value="${escapeAttr(type.value)}"${load.starterType === type.value ? ' selected' : ''}>${escapeHtml(type.label)}</option>`).join('')}
+          </select>
+        </label>
+        <label class="modal-form-field">
           <span>Qty</span>
           <input name="quantity" type="number" min="0" step="any" value="${escapeAttr(load.quantity || '')}" placeholder="1">
         </label>
@@ -1496,13 +1561,23 @@ if (typeof window !== 'undefined') {
     body.appendChild(form);
     controller.registerForm(form);
     const typeSelect = form.querySelector('[name="loadType"]');
+    const unitTypeSelect = form.querySelector('[name="mccUnitType"]');
+    const starterTypeSelect = form.querySelector('[name="starterType"]');
+    const syncFormStarterType = () => {
+      const enabled = usesStarterType(unitTypeSelect.value, typeSelect.value);
+      starterTypeSelect.disabled = !enabled;
+      if (!enabled) starterTypeSelect.value = '';
+    };
     typeSelect.addEventListener('change', () => {
       const next = applyLoadTypeDefaults(collectFormLoad(form), typeSelect.value);
       Object.entries(next).forEach(([key, value]) => {
         const field = form.querySelector(`[name="${key}"]`);
         if (field) field.value = value;
       });
+      syncFormStarterType();
     });
+    unitTypeSelect.addEventListener('change', syncFormStarterType);
+    syncFormStarterType();
     return form.querySelector('[name="description"]');
   }
 
@@ -1553,6 +1628,14 @@ if (typeof window !== 'undefined') {
             <option value=""></option>
             ${Object.keys(loadTypeDefaults).map(type => `<option value="${escapeAttr(type)}">${escapeHtml(type)}</option>`).join('')}
           </select>
+          <label><input data-batch-toggle="mccUnitType" type="checkbox"> MCC Unit Type</label>
+          <select data-batch-field="mccUnitType">
+            ${mccUnitTypes.map(type => `<option value="${escapeAttr(type.value)}">${escapeHtml(type.label)}</option>`).join('')}
+          </select>
+          <label><input data-batch-toggle="starterType" type="checkbox"> Starter Type</label>
+          <select data-batch-field="starterType">
+            ${MCC_STARTER_TYPE_CHOICES.map(type => `<option value="${escapeAttr(type.value)}">${escapeHtml(type.label)}</option>`).join('')}
+          </select>
           <label><input data-batch-toggle="voltage" type="checkbox"> Voltage</label>
           <input data-batch-field="voltage" type="number" min="0" step="any" placeholder="480">
           <label><input data-batch-toggle="phases" type="checkbox"> Phases</label>
@@ -1587,6 +1670,7 @@ if (typeof window !== 'undefined') {
         const loads = dataStore.getLoads().map((load, idx) => {
           if (!indices.includes(idx)) return load;
           const next = { ...load, ...updates };
+          if (!usesStarterType(next.mccUnitType, next.loadType)) next.starterType = '';
           return { ...next, ...calculateDerived(next) };
         });
         dataStore.setLoads(loads);
