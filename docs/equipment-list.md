@@ -23,6 +23,8 @@ CSV, XLSX, and XML imports show a mapping preview before applying data. After ma
 
 Stored project text is checked for common UTF-8 mojibake during migration. Older sample descriptions containing sequences such as `â€”` are repaired when the project is opened.
 
+The Equipment List represents physical equipment, not cable relationship records. Cable **From** and **To** values remain in the Cable Schedule and are linked internally with stable IDs where a corresponding schedule entity exists. Sample imports no longer create synthetic “cable endpoint” equipment rows for free-form termination tags; sample validation reports unlinked terminations as warnings instead. Projects created from older samples show **Remove Generated Endpoint Rows** only when rows match the complete legacy-generated signature. The cleanup is user-confirmed and leaves cable termination data unchanged.
+
 ## Workflow Navigation
 
 Use the workflow navigation to return to the Dashboard or Home, continue to Load List, or jump to One-Line when the equipment basis is ready for diagram work.

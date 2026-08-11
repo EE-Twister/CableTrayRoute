@@ -251,6 +251,36 @@ describe('sampleProjectToImportPayload()', () => {
       route_preference: 'DB-1',
       raceway_ids: ['DB-1'],
     });
+    assert.deepStrictEqual(payload.equipment, [], 'cable endpoints must not be fabricated as equipment');
+  });
+
+  it('keeps a Load List or panel termination valid without adding Equipment List placeholders', () => {
+    const sample = { pagesUsed: ['cableschedule.html'] };
+    const audit = auditSampleDemonstration(sample, {
+      schemaVersion: 1,
+      cables: [
+        { id: 'CBL-1', from: 'PANEL-1', to: 'LOAD-1' },
+        { id: 'CBL-2', from: 'PANEL-1', to: 'LOAD-2' },
+      ],
+      panels: [{ id: 'PANEL-1', name: 'PANEL-1' }],
+      loads: [{ tag: 'LOAD-1' }, { tag: 'LOAD-2' }],
+      raceways: { trays: [], conduits: [], ductbanks: [] },
+    });
+    assert.deepStrictEqual(audit.payload.equipment, []);
+    assert.ok(!audit.warnings.some(warning => warning.startsWith('unlinked cable terminations:')), audit.warnings.join('; '));
+  });
+
+  it('reports unresolved cable terminations instead of masking them with equipment rows', () => {
+    const audit = auditSampleDemonstration({ pagesUsed: ['cableschedule.html'] }, {
+      schemaVersion: 1,
+      cables: [
+        { id: 'CBL-1', from: 'SW-1', to: 'LOAD-1' },
+        { id: 'CBL-2', from: 'SW-1', to: 'LOAD-2' },
+      ],
+      raceways: { trays: [], conduits: [], ductbanks: [] },
+    });
+    assert.deepStrictEqual(audit.payload.equipment, []);
+    assert.ok(audit.warnings.some(warning => warning.includes('unlinked cable terminations: SW-1, LOAD-1, LOAD-2')));
   });
 
   it('renders multiline component descriptions with a readable separator', () => {

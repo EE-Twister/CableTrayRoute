@@ -5,6 +5,7 @@ import {
   mapRowsToEquipment,
   mergeEquipmentRows,
   previewEquipmentImport,
+  removeLegacyCableEndpointEquipment,
   summarizeEquipment,
   validateEquipmentRows
 } from '../analysis/equipmentWorkflow.mjs';
@@ -59,6 +60,27 @@ const merged = mergeEquipmentRows(
 assert.equal(merged.length, 3, 'merge must not delete absent existing equipment');
 assert.equal(merged[0].description, 'Existing MCC');
 assert.equal(merged[0].voltage, '480');
+
+const legacyEndpoint = {
+  tag: 'MTR-101',
+  description: 'MTR-101 cable endpoint',
+  category: 'Cable endpoint',
+  subCategory: 'Referenced equipment',
+  arrangement: 'Sample project',
+  lineup: 'MTR-101',
+  manufacturer: 'Sample basis',
+  model: 'Demonstration record'
+};
+const intentionalEndpointEquipment = {
+  ...legacyEndpoint,
+  tag: 'JB-101',
+  description: 'Field junction box',
+  lineup: 'JB-101',
+  manufacturer: 'Acme'
+};
+const legacyCleanup = removeLegacyCableEndpointEquipment([legacyEndpoint, intentionalEndpointEquipment]);
+assert.deepEqual(legacyCleanup.removed, [legacyEndpoint]);
+assert.deepEqual(legacyCleanup.equipment, [intentionalEndpointEquipment]);
 
 const bulk = applyBulkEquipmentUpdate([{ tag: 'A' }, { tag: 'B' }], [1], 'arrangement', 'Room B');
 assert.equal(bulk[0].arrangement, undefined);

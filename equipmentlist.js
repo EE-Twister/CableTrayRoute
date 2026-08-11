@@ -8,6 +8,7 @@ import {
   mapRowsToEquipment,
   mergeEquipmentRows,
   previewEquipmentImport,
+  removeLegacyCableEndpointEquipment,
   starterEquipment,
   summarizeEquipment
 } from './analysis/equipmentWorkflow.mjs';
@@ -43,7 +44,19 @@ if (typeof window !== 'undefined') {
         { key: 'z', label: 'Z', type: 'number', step: 'any', maxlength: 15, validate: 'numeric' }
       ];
 
-      const hiddenColumns = new Set(['id', 'ref']);
+      const hiddenColumns = new Set([
+        'id',
+        'ref',
+        'entityId',
+        'equipmentId',
+        'circuitId',
+        'sourceEquipmentId',
+        'targetEquipmentId',
+        'from_tag',
+        'fromTag',
+        'to_tag',
+        'toTag'
+      ]);
       const existing = new Set(columns.map(c => c.key).concat(Array.from(hiddenColumns)));
       dataStore.getEquipment().forEach(eq => {
         Object.keys(eq).forEach(k => {
@@ -106,6 +119,7 @@ if (typeof window !== 'undefined') {
     const summaryCards = document.getElementById('equipment-summary-cards');
     const emptyGuide = document.getElementById('equipment-empty-guide');
     const starterBtn = document.getElementById('load-starter-equipment-btn');
+    const removeGeneratedEndpointsBtn = document.getElementById('remove-generated-endpoints-btn');
     const emptyAddBtn = document.getElementById('empty-add-equipment-btn');
     const emptyImportBtn = document.getElementById('empty-import-equipment-btn');
     const emptyStarterBtn = document.getElementById('empty-starter-equipment-btn');
@@ -190,6 +204,13 @@ if (typeof window !== 'undefined') {
       document.querySelectorAll('[data-equipment-populated-only]').forEach(element => {
         element.hidden = summary.total === 0;
       });
+      if (removeGeneratedEndpointsBtn) {
+        const { removed } = removeLegacyCableEndpointEquipment(table.getData());
+        removeGeneratedEndpointsBtn.hidden = removed.length === 0;
+        removeGeneratedEndpointsBtn.textContent = removed.length === 1
+          ? 'Remove Generated Endpoint Row'
+          : `Remove ${removed.length} Generated Endpoint Rows`;
+      }
     };
 
     const updateResultSummary = () => {
@@ -357,6 +378,26 @@ if (typeof window !== 'undefined') {
       table.save();
       if (table.onChange) table.onChange();
     };
+
+    if (removeGeneratedEndpointsBtn) {
+      removeGeneratedEndpointsBtn.addEventListener('click', async () => {
+        const { equipment, removed } = removeLegacyCableEndpointEquipment(table.getData());
+        if (!removed.length) return;
+        const confirmed = await openModal({
+          title: 'Remove Generated Endpoint Rows',
+          description: `${removed.length} legacy row${removed.length === 1 ? '' : 's'} created by older sample imports will be removed from the Equipment List. Cable Schedule From/To values and internal cable relationships will not be changed.`,
+          primaryText: 'Remove Rows',
+          secondaryText: 'Cancel',
+          defaultWidth: 'medium'
+        });
+        if (!confirmed) return;
+        commitEquipmentRows(equipment);
+        await showAlertModal(
+          'Generated Rows Removed',
+          `${removed.length} endpoint placeholder row${removed.length === 1 ? ' was' : 's were'} removed. Cable termination data remains in the Cable Schedule.`
+        );
+      });
+    }
 
     const openEquipmentModal = async () => {
       const result = await openModal({

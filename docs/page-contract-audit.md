@@ -254,24 +254,24 @@ The audit is intentionally conservative: `--check` fails on actionable drift, re
 
 **Detected Reads**
 - `equipment`
-  - equipmentlist.js:48 getEquipment()
-  - equipmentlist.js:63 TableUtils.createTable(equipment)
+  - equipmentlist.js:61 getEquipment()
+  - equipmentlist.js:76 TableUtils.createTable(equipment)
 - `oneLineDiagram`
   - src/crossProbe.js:139 getOneLine()
   - src/crossProbe.js:152 getOneLine()
   - src/crossProbe.js:201 getOneLine()
 - `settings.equipmentColumns`
-  - equipmentlist.js:63 TableUtils.createTable(settings.equipmentColumns)
+  - equipmentlist.js:76 TableUtils.createTable(settings.equipmentColumns)
 - `settings.equipmentFilterPresets`
-  - equipmentlist.js:144 getEquipmentFilterPresets()
+  - equipmentlist.js:158 getEquipmentFilterPresets()
 
 **Detected Writes**
 - `equipment`
-  - equipmentlist.js:63 TableUtils.createTable(equipment)
+  - equipmentlist.js:76 TableUtils.createTable(equipment)
 - `settings.equipmentColumns`
-  - equipmentlist.js:63 TableUtils.createTable(settings.equipmentColumns)
+  - equipmentlist.js:76 TableUtils.createTable(settings.equipmentColumns)
 - `settings.equipmentFilterPresets`
-  - equipmentlist.js:678 setEquipmentFilterPresets()
+  - equipmentlist.js:719 setEquipmentFilterPresets()
 
 ### Load List (`loadlist.html`)
 

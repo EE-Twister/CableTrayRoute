@@ -122,6 +122,36 @@ function normalize(value) {
   return String(value || '').trim().toLowerCase();
 }
 
+/**
+ * Identifies the synthetic Equipment List rows created by older sample imports
+ * solely to make unresolved cable termination tags appear resolved.
+ *
+ * The full marker set is intentionally strict so a user-authored equipment row
+ * is never removed merely because its category mentions an endpoint.
+ */
+export function isLegacyCableEndpointEquipment(row) {
+  if (!row || typeof row !== 'object') return false;
+  const tag = String(row.tag || '').trim();
+  if (!tag) return false;
+  return normalize(row.description) === normalize(`${tag} cable endpoint`)
+    && normalize(row.category) === 'cable endpoint'
+    && normalize(row.subCategory) === 'referenced equipment'
+    && normalize(row.arrangement) === 'sample project'
+    && normalize(row.lineup) === normalize(tag)
+    && normalize(row.manufacturer) === 'sample basis'
+    && normalize(row.model) === 'demonstration record';
+}
+
+export function removeLegacyCableEndpointEquipment(rows = []) {
+  const equipment = [];
+  const removed = [];
+  (Array.isArray(rows) ? rows : []).forEach(row => {
+    if (isLegacyCableEndpointEquipment(row)) removed.push(row);
+    else equipment.push(row);
+  });
+  return { equipment, removed };
+}
+
 function canonicalHeader(header) {
   return normalize(header).replace(/\s+/g, ' ');
 }

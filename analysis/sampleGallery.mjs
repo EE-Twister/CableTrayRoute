@@ -1,4 +1,5 @@
 import { repairMojibake, repairMojibakeDeep } from '../src/textEncoding.js';
+import { removeLegacyCableEndpointEquipment } from './equipmentWorkflow.mjs';
 import { normalizeRouteResultState } from './routeResults.mjs';
 
 /**
@@ -561,9 +562,9 @@ function sampleComponentVoltage(component = {}) {
   return numeric >= 1000 ? `${numeric / 1000} kV` : String(numeric);
 }
 
-function deriveSampleEquipment(oneLine = {}, cables = []) {
+function deriveSampleEquipment(oneLine = {}) {
   const excluded = new Set(['bus', 'utility_source', 'breaker', 'fuse', 'relay', 'annotation']);
-  const equipment = sampleOneLineComponents(oneLine)
+  return sampleOneLineComponents(oneLine)
     .filter(component => component?.id && !excluded.has(normalizeSampleToken(component.type)))
     .map(component => ({
       tag: component.id,
@@ -577,24 +578,6 @@ function deriveSampleEquipment(oneLine = {}, cables = []) {
       model: 'Demonstration record',
       phases: '3',
     }));
-  const knownTags = new Set(equipment.map(row => row.tag));
-  cables.flatMap(cable => [cable.from_tag || cable.from, cable.to_tag || cable.to]).filter(Boolean).forEach(tag => {
-    if (knownTags.has(tag)) return;
-    knownTags.add(tag);
-    equipment.push({
-      tag,
-      description: `${tag} cable endpoint`,
-      voltage: '',
-      category: 'Cable endpoint',
-      subCategory: 'Referenced equipment',
-      arrangement: 'Sample project',
-      lineup: tag,
-      manufacturer: 'Sample basis',
-      model: 'Demonstration record',
-      phases: '3',
-    });
-  });
-  return equipment;
 }
 
 function deriveSampleLoads(oneLine = {}) {
@@ -743,9 +726,10 @@ export function sampleProjectToImportPayload(obj = {}) {
   settings = seedSampleStudies(obj, settings);
   const cables = Array.isArray(obj.cables) ? obj.cables.map(normalizeSampleCable) : [];
   settings = deriveSampleRouteResults(cables, settings);
-  const equipment = Array.isArray(obj.equipment) && obj.equipment.length
+  const sourceEquipment = Array.isArray(obj.equipment) && obj.equipment.length
     ? obj.equipment
-    : deriveSampleEquipment(oneLine, cables);
+    : deriveSampleEquipment(oneLine);
+  const { equipment } = removeLegacyCableEndpointEquipment(sourceEquipment);
   const loads = Array.isArray(obj.loads) && obj.loads.length
     ? obj.loads
     : deriveSampleLoads(oneLine);
@@ -778,18 +762,27 @@ const SAMPLE_PAGE_STUDY_KEYS = {
 
 export function auditSampleDemonstration(sample, obj = {}) {
   const errors = [];
+  const warnings = [];
   const payload = sampleProjectToImportPayload(obj);
   const pages = new Set(sample?.pagesUsed || []);
   const components = sampleOneLineComponents(payload.oneLine);
   const connections = sampleOneLineConnections(payload.oneLine);
   const studies = payload.settings.studyResults || {};
   const racewayCount = payload.trays.length + payload.conduits.length + payload.ductbanks.length;
-  const equipmentTags = new Set([
-    ...payload.equipment.map(row => row.tag || row.id),
-    ...payload.loads.map(row => row.tag || row.id),
-  ].filter(Boolean));
+  const terminationTags = new Set();
+  const addTerminationTags = (row, keys) => {
+    keys.forEach(key => {
+      const value = String(row?.[key] || '').trim().toLowerCase();
+      if (value) terminationTags.add(value);
+    });
+  };
+  payload.equipment.forEach(row => addTerminationTags(row, ['tag', 'id', 'ref']));
+  payload.loads.forEach(row => addTerminationTags(row, ['tag', 'id', 'ref']));
+  payload.panels.forEach(row => addTerminationTags(row, ['tag', 'id', 'ref', 'name']));
+  payload.mccLineups.forEach(row => addTerminationTags(row, ['tag', 'id', 'ref', 'name']));
+  components.forEach(row => addTerminationTags(row, ['id', 'ref', 'equipmentRef', 'loadRef', 'panelRef']));
   const unresolvedEndpoints = payload.cables.flatMap(cable => [cable.from_tag || cable.from, cable.to_tag || cable.to])
-    .filter(tag => tag && !equipmentTags.has(tag));
+    .filter(tag => tag && !terminationTags.has(String(tag).trim().toLowerCase()));
   const racewayIds = new Set([
     ...payload.trays.map(row => row.tray_id || row.id),
     ...payload.conduits.map(row => row.conduit_id || row.id),
@@ -801,7 +794,7 @@ export function auditSampleDemonstration(sample, obj = {}) {
     .filter(id => id && !racewayIds.has(id));
 
   if (payload.cables.length < 2) errors.push('needs at least two cable records');
-  if (unresolvedEndpoints.length) errors.push(`unresolved cable endpoints: ${[...new Set(unresolvedEndpoints)].join(', ')}`);
+  if (unresolvedEndpoints.length) warnings.push(`unlinked cable terminations: ${[...new Set(unresolvedEndpoints)].join(', ')}`);
   if (unresolvedRaceways.length) errors.push(`unresolved raceway references: ${[...new Set(unresolvedRaceways)].join(', ')}`);
   if (pages.has('equipmentlist.html') && payload.equipment.length < 3) errors.push('Equipment List needs at least three records');
   if (pages.has('loadlist.html') && payload.loads.length < 2) errors.push('Load List needs at least two records');
@@ -823,5 +816,5 @@ export function auditSampleDemonstration(sample, obj = {}) {
   if (pages.has('projectreport.html') && !Object.keys(payload.settings.reportSnapshots || {}).length) {
     errors.push('Project Report needs at least one report snapshot');
   }
-  return { adequate: errors.length === 0, errors, payload };
+  return { adequate: errors.length === 0, errors, warnings, payload };
 }

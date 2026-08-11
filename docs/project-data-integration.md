@@ -60,6 +60,8 @@ The data store assigns stable IDs when schedule records do not already have them
 
 Legacy tag, endpoint, and embedded cable fields remain readable during migration. New integrations should use stable IDs as the relationship and treat legacy aliases as compatibility data.
 
+Equipment List rows represent physical assets. Cable termination tags are resolved against equipment, loads, panels, MCC lineups, and linked One-Line components when those records exist, without creating placeholder equipment. Free-form termination tags remain valid Cable Schedule data; unlinked values are reported as warnings and stay editable in the Cable Schedule.
+
 ## Adding another integrated study
 
 1. Add a pure project-input adapter to `analysis/projectIntegration.mjs`.
